@@ -6,7 +6,7 @@ Deliver an immersive window border for the Flutter desktop media player in three
 
 ## Phases
 
-- [ ] **Phase 1: Window Chrome** - Title bar with glass-morphism, window controls, and production quality baseline
+- [x] **Phase 1: Window Chrome** - Title bar with glass-morphism, window controls, and production quality baseline
 - [ ] **Phase 2: Resize & Persistence** - Jank-free resize optimization, minimum size enforcement, geometry persistence, edge case handling
 - [ ] **Phase 3: Playback-Aware Sizing** - Window aspect ratio locks to video during playback, returns to free-resize on stop
 
@@ -29,9 +29,9 @@ Deliver an immersive window border for the Flutter desktop media player in three
   10. All sizes, colors, and durations come from DesignTokens or named constants -- no hardcoded values
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md -- Design tokens + FakePlatformService extraction
-- [ ] 01-02-PLAN.md -- CustomTitleBar widget (glass-morphism + controls + gestures)
-- [ ] 01-03-PLAN.md -- App integration + widget tests
+- [x] 01-01-PLAN.md -- Design tokens + FakePlatformService extraction
+- [x] 01-02-PLAN.md -- CustomTitleBar widget (glass-morphism + controls + gestures)
+- [x] 01-03-PLAN.md -- App integration + widget tests
 
 ### Phase 2: Resize & Persistence
 **Goal**: Window resizes smoothly without GPU jank, enforces minimum size in empty state, persists geometry across sessions, and handles edge cases gracefully. Unit tests cover resize debounce logic and persistence.
@@ -44,7 +44,10 @@ Plans:
   4. Window geometry (size, position, maximized, fullscreen) persists across app restarts via SettingsStore
   5. Unit tests verify WindowManagerService resize debounce timing, isResizing state transitions, and persistence round-trip
   6. Edge cases handled gracefully: DPI changes mid-session, monitor disconnect, rapid fullscreen toggle
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 02-01-PLAN.md -- Update minSize constant and SettingsStore sanitization bounds
+- [ ] 02-02-PLAN.md -- Fix test inaccuracies and add comprehensive test coverage
 
 ### Phase 3: Playback-Aware Sizing
 **Goal**: Window adapts its sizing behavior based on playback state -- freely resizable when empty, locked to video aspect ratio when playing.
@@ -61,6 +64,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Window Chrome | 0/TBD | Not started | - |
-| 2. Resize & Persistence | 0/TBD | Not started | - |
+| 1. Window Chrome | 3/3 | Complete | 2026-05-07 |
+| 2. Resize & Persistence | 0/2 | Planning complete | - |
 | 3. Playback-Aware Sizing | 0/TBD | Not started | - |
