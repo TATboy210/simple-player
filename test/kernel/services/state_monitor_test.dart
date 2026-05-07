@@ -275,5 +275,29 @@ void main() {
       );
       expect(lockCalls, isEmpty);
     });
+
+    test('rapid state changes maintain correct ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 2.35;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+
+      // Playing -> pause -> playing should maintain lock
+      engine.pause();
+      engine.play();
+      await Future(() {});
+
+      // The last call should be matchVideo(2.35) from the second play
+      expect(aspectCalls, isNotEmpty);
+      expect(aspectCalls.last.method, 'setAspectRatio');
+      expect(aspectCalls.last.arguments, closeTo(2.35, 0.01));
+
+      // No unlock calls should have occurred during pause
+      final unlockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
+      );
+      expect(unlockCalls, isEmpty);
+    });
   });
 }
