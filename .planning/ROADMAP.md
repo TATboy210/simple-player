@@ -44,10 +44,11 @@ Plans:
   4. Window geometry (size, position, maximized, fullscreen) persists across app restarts via SettingsStore
   5. Unit tests verify WindowManagerService resize debounce timing, isResizing state transitions, and persistence round-trip
   6. Edge cases handled gracefully: DPI changes mid-session, monitor disconnect, rapid fullscreen toggle
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
 - [ ] 02-01-PLAN.md -- Update minSize constant and SettingsStore sanitization bounds
 - [ ] 02-02-PLAN.md -- Fix test inaccuracies and add comprehensive test coverage
+- [ ] 02-03-PLAN.md -- Fix title bar jitter (Stack + AnimatedOpacity + RepaintBoundary + hover guard)
 
 ### Phase 3: Playback-Aware Sizing
 **Goal**: Window adapts its sizing behavior based on playback state -- freely resizable when empty, locked to video aspect ratio when playing.
@@ -65,5 +66,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Window Chrome | 3/3 | Complete | 2026-05-07 |
-| 2. Resize & Persistence | 0/2 | Planning complete | - |
+| 2. Resize & Persistence | 0/3 | Planning complete | - |
 | 3. Playback-Aware Sizing | 0/TBD | Not started | - |
