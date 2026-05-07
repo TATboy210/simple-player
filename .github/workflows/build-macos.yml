@@ -1,0 +1,53 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: dart analyze --fatal-infos
+
+      - name: Test
+        run: flutter test
+
+      - name: Build macOS
+        run: flutter build macos --release
+
+      - name: Create DMG
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "Simple Player" \
+            --window-pos 200 120 \
+            --window-size 600 300 \
+            --icon "Simple Player.app" 150 150 \
+            --app-drop-link 450 150 \
+            --hide-extension "Simple Player.app" \
+            "SimplePlayer.dmg" \
+            "build/macos/Build/Products/Release/Simple Player.app"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimplePlayer-macOS
+          path: SimplePlayer.dmg
+          retention-days: 30

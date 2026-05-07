@@ -1,0 +1,28 @@
+name: simple_player_flutter
+description: "Simple Player - A dark-themed media player"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  fvp: ^0.36.2
+  path_provider: ^2.1.5
+  file_picker: ^11.0.2
+  window_manager: ^0.5.1
+  shared_preferences: ^2.5.5
+  desktop_drop: ^0.7.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true
