@@ -61,9 +61,9 @@ Plans:
   4. When video stops or user exits playback, window returns to free-resize mode with minimum 16:9 constraint
 **Plans**: 3 plans
 Plans:
-- [ ] 03-01-PLAN.md -- Core playback-aware sizing integration (StateMonitor + AspectRatioService)
-- [ ] 03-02-PLAN.md -- WindowManagerService hardening (multi-monitor + persist + hover)
-- [ ] 03-03-PLAN.md -- UI integration (aspect ratio button) + tests
+- [x] 03-01-PLAN.md -- Core playback-aware sizing integration (StateMonitor + AspectRatioService)
+- [x] 03-02-PLAN.md -- WindowManagerService hardening (persist coalescing + hover recovery)
+- [x] 03-03-PLAN.md -- UI integration (aspect ratio button) + tests
 
 ## Progress
 
@@ -71,4 +71,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Window Chrome | 3/3 | Complete | 2026-05-07 |
 | 2. Resize & Persistence | 3/3 | Complete | 2026-05-07 |
-| 3. Playback-Aware Sizing | 0/3 | Planning complete | - |
+| 3. Playback-Aware Sizing | 3/3 | Complete | 2026-05-07 |
