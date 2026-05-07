@@ -7,7 +7,7 @@ Deliver an immersive window border for the Flutter desktop media player in three
 ## Phases
 
 - [x] **Phase 1: Window Chrome** - Title bar with glass-morphism, window controls, and production quality baseline
-- [ ] **Phase 2: Resize & Persistence** - Jank-free resize optimization, minimum size enforcement, geometry persistence, edge case handling
+- [x] **Phase 2: Resize & Persistence** - Jank-free resize optimization, minimum size enforcement, geometry persistence, edge case handling
 - [ ] **Phase 3: Playback-Aware Sizing** - Window aspect ratio locks to video during playback, returns to free-resize on stop
 
 ## Phase Details
@@ -46,9 +46,9 @@ Plans:
   6. Edge cases handled gracefully: DPI changes mid-session, monitor disconnect, rapid fullscreen toggle
 **Plans**: 3 plans
 Plans:
-- [ ] 02-01-PLAN.md -- Update minSize constant and SettingsStore sanitization bounds
-- [ ] 02-02-PLAN.md -- Fix test inaccuracies and add comprehensive test coverage
-- [ ] 02-03-PLAN.md -- Fix title bar jitter (Stack + AnimatedOpacity + RepaintBoundary + hover guard)
+- [x] 02-01-PLAN.md -- Update minSize constant and SettingsStore sanitization bounds
+- [x] 02-02-PLAN.md -- Fix test inaccuracies and add comprehensive test coverage
+- [x] 02-03-PLAN.md -- Fix title bar jitter (Stack + AnimatedOpacity + RepaintBoundary + hover guard)
 
 ### Phase 3: Playback-Aware Sizing
 **Goal**: Window adapts its sizing behavior based on playback state -- freely resizable when empty, locked to video aspect ratio when playing.
@@ -59,12 +59,16 @@ Plans:
   2. Resizing during playback scales proportionally (maintains video aspect ratio)
   3. Aspect ratio lock uses native AspectRatioService (MethodChannel) for OS-level enforcement
   4. When video stops or user exits playback, window returns to free-resize mode with minimum 16:9 constraint
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 03-01-PLAN.md -- Core playback-aware sizing integration (StateMonitor + AspectRatioService)
+- [ ] 03-02-PLAN.md -- WindowManagerService hardening (multi-monitor + persist + hover)
+- [ ] 03-03-PLAN.md -- UI integration (aspect ratio button) + tests
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Window Chrome | 3/3 | Complete | 2026-05-07 |
-| 2. Resize & Persistence | 0/3 | Planning complete | - |
-| 3. Playback-Aware Sizing | 0/TBD | Not started | - |
+| 2. Resize & Persistence | 3/3 | Complete | 2026-05-07 |
+| 3. Playback-Aware Sizing | 0/3 | Planning complete | - |
