@@ -94,9 +94,7 @@ class CustomTitleBar extends StatelessWidget {
                 ),
               ),
               // Content layer — RepaintBoundary isolates from blur dirty marks.
-              Positioned.fill(
-                child: RepaintBoundary(child: child!),
-              ),
+              Positioned.fill(child: RepaintBoundary(child: child!)),
             ],
           ),
         ),
@@ -175,6 +173,24 @@ class _TitleBarButton extends StatefulWidget {
 
 class _TitleBarButtonState extends State<_TitleBarButton> {
   bool _hovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PlatformService.I.isResizing.addListener(_onResizingChanged);
+  }
+
+  @override
+  void dispose() {
+    PlatformService.I.isResizing.removeListener(_onResizingChanged);
+    super.dispose();
+  }
+
+  void _onResizingChanged() {
+    if (!PlatformService.I.isResizing.value && mounted) {
+      setState(() => _hovered = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

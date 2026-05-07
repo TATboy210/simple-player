@@ -36,8 +36,9 @@ class WindowManagerService implements WindowListener {
 
   // ─── Constants ───
 
-  static const minSize = Size(640, 360); // 360p 16:9
+  static const minSize = Size(1024, 576); // 576p 16:9
   static const _completerTimeoutSeconds = 5;
+
   /// 拖拽结束后等待此时间才重置 isResizing，防止慢速拖拽时 BackdropFilter 闪烁
   static const _resizeDebounceMs = 500;
   static const _persistDebounceMs = 500;
@@ -65,6 +66,9 @@ class WindowManagerService implements WindowListener {
 
   /// 持久化进行中守卫 — 防止并发 _persistWindowState
   Completer<void>? _persistInFlight;
+
+  /// 持久化合并标记 — 持久化进行中又有新请求时设为 true，finally 中重新持久化
+  bool _persistRequested = false;
 
   /// 关闭守卫 — 防止 onWindowClose 双击触发重复关闭
   bool _closing = false;
@@ -204,7 +208,9 @@ class WindowManagerService implements WindowListener {
     // 等待 init 完成（5s 超时兜底，防止永久阻塞）
     if (_initCompleter != null && !_initCompleter!.isCompleted) {
       try {
-        await _initCompleter!.future.timeout(const Duration(seconds: _completerTimeoutSeconds));
+        await _initCompleter!.future.timeout(
+          const Duration(seconds: _completerTimeoutSeconds),
+        );
       } catch (_) {
         // 超时或出错，强制继续清理
       }
@@ -219,7 +225,9 @@ class WindowManagerService implements WindowListener {
     // RC-1: 等待 onWindowClose 中的异步操作完成（5s 超时兜底）
     if (_closeCompleter != null && !_closeCompleter!.isCompleted) {
       try {
-        await _closeCompleter!.future.timeout(const Duration(seconds: _completerTimeoutSeconds));
+        await _closeCompleter!.future.timeout(
+          const Duration(seconds: _completerTimeoutSeconds),
+        );
       } catch (_) {
         // 超时或出错，强制继续
       }
@@ -394,16 +402,19 @@ class WindowManagerService implements WindowListener {
     // RC-1: 同步入口 → 异步工作通过 Completer 暴露给 dispose() 等待
     _closeCompleter = Completer<void>();
     _persistDebounce?.cancel();
-    _persistWindowState().then((_) {
-      return windowManager.destroy();
-    }).then((_) {
-      _closeCompleter!.complete();
-    }).catchError((Object e) {
-      debugPrint('[WindowManager] close sequence failed: $e');
-      if (!_closeCompleter!.isCompleted) {
-        _closeCompleter!.completeError(e);
-      }
-    });
+    _persistWindowState()
+        .then((_) {
+          return windowManager.destroy();
+        })
+        .then((_) {
+          _closeCompleter!.complete();
+        })
+        .catchError((Object e) {
+          debugPrint('[WindowManager] close sequence failed: $e');
+          if (!_closeCompleter!.isCompleted) {
+            _closeCompleter!.completeError(e);
+          }
+        });
   }
 
   // 其他 WindowListener 回调（空实现）
@@ -439,9 +450,13 @@ class WindowManagerService implements WindowListener {
   /// 全屏时不保存全屏尺寸 — 用内存缓存的窗口化几何，避免磁盘读取。
   /// RC-7: _persistInFlight 防止并发写入导致数据竞争。
   Future<void> _persistWindowState() async {
-    // RC-7: 如果已有持久化在进行中，等待其完成而非并发执行
-    if (_persistInFlight != null) return _persistInFlight!.future;
+    // RC-7: 如果已有持久化在进行中，标记待重试而非丢弃
+    if (_persistInFlight != null) {
+      _persistRequested = true;
+      return _persistInFlight!.future;
+    }
     _persistInFlight = Completer<void>();
+    _persistRequested = false;
     try {
       final results = await Future.wait([
         windowManager.getSize(),
@@ -484,6 +499,11 @@ class WindowManagerService implements WindowListener {
       }
     } finally {
       _persistInFlight = null;
+      // PQ-04: 持久化进行中有新请求时，重新持久化最新状态
+      if (_persistRequested) {
+        _persistRequested = false;
+        _persistWindowState();
+      }
     }
   }
 
@@ -493,14 +513,18 @@ class WindowManagerService implements WindowListener {
   ///
   /// 使用 PlatformDispatcher 获取主显示器逻辑尺寸，判断窗口是否至少有
   /// 100px 可见区域。覆盖多显示器→单显示器切换、DPI 变化等场景。
-  Future<void> _clampToVisibleBounds(Size savedSize, Offset savedPosition) async {
+  Future<void> _clampToVisibleBounds(
+    Size savedSize,
+    Offset savedPosition,
+  ) async {
     try {
       final view = ui.PlatformDispatcher.instance.views.first;
       final screenW = view.physicalSize.width / view.devicePixelRatio;
       final screenH = view.physicalSize.height / view.devicePixelRatio;
       const double minVisible = 100; // 至少 100px 可见
 
-      final isOffScreen = savedPosition.dx + savedSize.width < minVisible ||
+      final isOffScreen =
+          savedPosition.dx + savedSize.width < minVisible ||
           savedPosition.dy + savedSize.height < minVisible ||
           savedPosition.dx > screenW - minVisible ||
           savedPosition.dy > screenH - minVisible;
