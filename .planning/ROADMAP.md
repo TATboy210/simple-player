@@ -27,7 +27,11 @@ Deliver an immersive window border for the Flutter desktop media player in three
   8. All ValueNotifiers are disposed and all timers cancelled when widgets unmount -- no leaks
   9. All FFI/native calls (window manager, DPI) are wrapped in try-catch with graceful fallback
   10. All sizes, colors, and durations come from DesignTokens or named constants -- no hardcoded values
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md -- Design tokens + FakePlatformService extraction
+- [ ] 01-02-PLAN.md -- CustomTitleBar widget (glass-morphism + controls + gestures)
+- [ ] 01-03-PLAN.md -- App integration + widget tests
 
 ### Phase 2: Resize & Persistence
 **Goal**: Window resizes smoothly without GPU jank, enforces minimum size in empty state, persists geometry across sessions, and handles edge cases gracefully. Unit tests cover resize debounce logic and persistence.
