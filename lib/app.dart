@@ -8,6 +8,7 @@ import 'kernel/playlist/playlist.dart';
 import 'kernel/services/playback_controller.dart';
 import 'kernel/services/platform_service.dart';
 import 'kernel/ui/theme/app_theme.dart';
+import 'kernel/ui/window/custom_title_bar.dart';
 import 'l10n/app_localizations.dart';
 
 /// 应用壳 — 纯框架：引擎/服务初始化 + 窗口管理 + MaterialApp 骨架
@@ -25,6 +26,7 @@ class _AppState extends State<App> {
   late final Playlist _playlist;
   late final PlaybackController _controller;
   final ValueNotifier<Locale> _locale = ValueNotifier(const Locale('zh'));
+  final ValueNotifier<String> _currentFileName = ValueNotifier('');
   bool _ready = false;
 
   @override
@@ -60,6 +62,7 @@ class _AppState extends State<App> {
 
   @override
   void dispose() {
+    _currentFileName.dispose();
     _locale.dispose();
     _controller.dispose();
     _engine.dispose();
@@ -93,13 +96,20 @@ class _AppState extends State<App> {
             enableResizeEdges: windowMode == WindowMode.fullscreen
                 ? []
                 : null,
-            child: const Scaffold(
+            child: Scaffold(
               backgroundColor: Colors.black,
-              body: Center(
-                child: Text(
-                  'Ready',
-                  style: TextStyle(color: Colors.white54, fontSize: 18),
-                ),
+              body: Column(
+                children: [
+                  CustomTitleBar(fileName: _currentFileName),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'Ready',
+                        style: TextStyle(color: Colors.white54, fontSize: 18),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
