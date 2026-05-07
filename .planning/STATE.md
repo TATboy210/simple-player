@@ -5,9 +5,9 @@ milestone_name: milestone
 status: executing
 stopped_at: null
 last_updated: "2026-05-07T07:00:00.000Z"
-last_activity: 2026-05-07 -- Phase 2 planning complete (3 plans: 02-01, 02-02, 02-03)
+last_activity: 2026-05-07 -- Phase 2 execution complete (02-01, 02-02, 02-03)
 progress:
-  percent: 33
+  percent: 67
 ---
 
 # Project State
@@ -21,30 +21,31 @@ See: .planning/PROJECT.md (updated 2026-05-07)
 
 ## Current Position
 
-Phase: 2 of 3 (Resize & Persistence)
-Plan: 0 of 3 in current phase
-Status: Ready to execute
-Last activity: 2026-05-07 -- Phase 2 planning complete
+Phase: 3 of 3 (Playback-Aware Sizing)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-05-07 -- Phase 2 execution complete
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 3
-- Average duration: ~20 min/plan
-- Total execution time: ~1 hour
+- Total plans completed: 6
+- Average duration: ~15 min/plan
+- Total execution time: ~1.5 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 Window Chrome | 3 | 3 | ~20 min |
+| 2 Resize & Persistence | 3 | 3 | ~10 min |
 
 **Recent Trend:**
 
-- Last 3 plans: 01-01 (tokens+fake), 01-02 (widget), 01-03 (integration+tests)
+- Last 3 plans: 02-01 (minSize+bounds), 02-02 (tests), 02-03 (jitter fix)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -58,10 +59,12 @@ Recent decisions affecting current work:
 
 - Phase 1 widget tests: button tap dispatch tests removed (gesture arena conflict in test env). Button wiring verified by code inspection + rendering tests.
 - HitTestBehavior.opaque added to _TitleBarButton GestureDetector (improvement over reference project)
+- Phase 2: Stack+AnimatedOpacity pattern replaces tree-mutating ValueListenableBuilder for jitter elimination
+- Phase 2: Three-level RepaintBoundary isolation (outer in app.dart, blur-layer, content-layer)
+- Phase 2: Hover effects gated by isResizing.value (synchronous read, zero overhead)
 
 ### Pending Todos
 
-- Phase 2: Resize & Persistence (jank-free resize, geometry persistence)
 - Phase 3: Playback-Aware Sizing (aspect ratio locking)
 
 ### Blockers/Concerns

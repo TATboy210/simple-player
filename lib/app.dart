@@ -100,7 +100,9 @@ class _AppState extends State<App> {
               backgroundColor: Colors.black,
               body: Column(
                 children: [
-                  CustomTitleBar(fileName: _currentFileName),
+                  RepaintBoundary(
+                    child: CustomTitleBar(fileName: _currentFileName),
+                  ),
                   const Expanded(
                     child: Center(
                       child: Text(

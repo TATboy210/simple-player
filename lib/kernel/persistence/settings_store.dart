@@ -128,9 +128,9 @@ class SettingsStore {
         lastFile: prefs.getString(_keyLastFile) ?? '',
         // RC-3: 验证窗口尺寸 — 防止 NaN/损坏数据导致启动失败
         windowWidth: _sanitizeDimension(
-          prefs.getDouble(_keyWindowWidth) ?? 1280, 1280, 640, 8192),
+          prefs.getDouble(_keyWindowWidth) ?? 1280, 1280, 1024, 8192),
         windowHeight: _sanitizeDimension(
-          prefs.getDouble(_keyWindowHeight) ?? 720, 720, 360, 4608),
+          prefs.getDouble(_keyWindowHeight) ?? 720, 720, 576, 4608),
         windowX: prefs.getDouble(_keyWindowX) != null
             ? _sanitizeCoordinate(prefs.getDouble(_keyWindowX)!, 0)
             : null,
@@ -195,8 +195,8 @@ class SettingsStore {
     required bool isMaximized,
   }) =>
       _save('saveWindowGeometry', (p) async {
-        final safeWidth = _sanitizeDimension(width, 1280, 640, 8192);
-        final safeHeight = _sanitizeDimension(height, 720, 360, 4608);
+        final safeWidth = _sanitizeDimension(width, 1280, 1024, 8192);
+        final safeHeight = _sanitizeDimension(height, 720, 576, 4608);
         final safeX = _sanitizeCoordinate(x, 0);
         final safeY = _sanitizeCoordinate(y, 0);
         // RC-4: 顺序写入 — 避免 Future.wait 部分成功导致数据不一致
@@ -276,8 +276,8 @@ class SettingsStore {
         await p.setDouble(_keyVolume, s.volume.clamp(0.0, 1.0));
         await p.setString(_keyLastFile, s.lastFile);
         // RC-3: 验证窗口尺寸
-        await p.setDouble(_keyWindowWidth, _sanitizeDimension(s.windowWidth, 1280, 640, 8192));
-        await p.setDouble(_keyWindowHeight, _sanitizeDimension(s.windowHeight, 720, 360, 4608));
+        await p.setDouble(_keyWindowWidth, _sanitizeDimension(s.windowWidth, 1280, 1024, 8192));
+        await p.setDouble(_keyWindowHeight, _sanitizeDimension(s.windowHeight, 720, 576, 4608));
         await p.setInt(_keyPlayMode, s.playMode.clamp(0, PlayMode.values.length - 1));
         await p.setBool(_keyIsMuted, s.isMuted);
         await p.setDouble(_keySubtitleFontSize, s.subtitleFontSize.clamp(14.0, 28.0));

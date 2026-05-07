@@ -69,18 +69,37 @@ class CustomTitleBar extends StatelessWidget {
       onDoubleTap: () => wm.toggleMaximize(),
       child: ValueListenableBuilder<bool>(
         valueListenable: wm.isResizing,
-        builder: (_, resizing, child) => resizing
-            ? child!
-            : ClipRect(
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(
-                    sigmaX: Tokens.glassBlurThin,
-                    sigmaY: Tokens.glassBlurThin,
+        child: content,
+        builder: (_, resizing, child) => SizedBox(
+          height: Tokens.titleBarHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Blur layer — AnimatedOpacity avoids tree mutation.
+              // opacity: 0 → RenderOpacity.needsCompositing = false → GPU blur skipped.
+              // 80ms fade-in masks stale-bitmap flash on resize end.
+              RepaintBoundary(
+                child: AnimatedOpacity(
+                  opacity: resizing ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: Tokens.durationFast),
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(
+                        sigmaX: Tokens.glassBlurThin,
+                        sigmaY: Tokens.glassBlurThin,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
                   ),
-                  child: child,
                 ),
               ),
-        child: content,
+              // Content layer — RepaintBoundary isolates from blur dirty marks.
+              Positioned.fill(
+                child: RepaintBoundary(child: child!),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -171,8 +190,16 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
       waitDuration: const Duration(milliseconds: 400),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) {
+          if (!PlatformService.I.isResizing.value) {
+            setState(() => _hovered = true);
+          }
+        },
+        onExit: (_) {
+          if (!PlatformService.I.isResizing.value) {
+            setState(() => _hovered = false);
+          }
+        },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onPressed,
