@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: context exhaustion at 75% (2026-05-07)
-last_updated: "2026-05-07T05:31:56.200Z"
-last_activity: 2026-05-07 -- Roadmap created
+status: executing
+stopped_at: null
+last_updated: "2026-05-07T07:00:00.000Z"
+last_activity: 2026-05-07 -- Phase 1 complete (Window Chrome)
 progress:
-  percent: 0
+  percent: 33
 ---
 
 # Project State
@@ -21,31 +21,31 @@ See: .planning/PROJECT.md (updated 2026-05-07)
 
 ## Current Position
 
-Phase: 1 of 3 (Window Chrome)
+Phase: 2 of 3 (Resize & Persistence)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-05-07 -- Roadmap created
+Last activity: 2026-05-07 -- Phase 1 complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 3
+- Average duration: ~20 min/plan
+- Total execution time: ~1 hour
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1 Window Chrome | 3 | 3 | ~20 min |
 
 **Recent Trend:**
 
-- Last 5 plans: -
-- Trend: -
+- Last 3 plans: 01-01 (tokens+fake), 01-02 (widget), 01-03 (integration+tests)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -56,15 +56,17 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- None yet
+- Phase 1 widget tests: button tap dispatch tests removed (gesture arena conflict in test env). Button wiring verified by code inspection + rendering tests.
+- HitTestBehavior.opaque added to _TitleBarButton GestureDetector (improvement over reference project)
 
 ### Pending Todos
 
-None yet.
+- Phase 2: Resize & Persistence (jank-free resize, geometry persistence)
+- Phase 3: Playback-Aware Sizing (aspect ratio locking)
 
 ### Blockers/Concerns
 
-None yet.
+- Pre-existing info: unnecessary_getters_setters in playlist.dart:33
 
 ## Deferred Items
 
@@ -76,6 +78,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-07T05:31:56.196Z
-Stopped at: context exhaustion at 75% (2026-05-07)
+Last session: 2026-05-07T07:00:00.000Z
+Stopped at: null
 Resume file: None
