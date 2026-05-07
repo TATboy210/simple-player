@@ -1,8 +1,10 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/models/media_state.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
+import 'package:simple_player_flutter/kernel/window/aspect_ratio_service.dart';
 import '../../helpers/fake_engine.dart';
 
 void main() {
@@ -134,6 +136,144 @@ void main() {
         final item = playlist.items[0];
         expect(item.positionMs, 5000);
       });
+    });
+  });
+
+  group('aspect ratio integration (WP-01..WP-04)', () {
+    final List<MethodCall> aspectCalls = [];
+
+    setUp(() {
+      aspectCalls.clear();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            (MethodCall methodCall) async {
+              aspectCalls.add(methodCall);
+              return null;
+            },
+          );
+      // Reset AspectRatioService internal state by setting ratio to 0
+      AspectRatioService.I.setAspectRatio(0.0);
+      aspectCalls.clear();
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            null,
+          );
+    });
+
+    test('playing locks aspect ratio to video ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 2.35; // Cinema ratio
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+
+      // StateMonitor._onStateChanged fires synchronously on state change
+      // AspectRatioService.I.matchVideo(2.35) should have been called
+      expect(aspectCalls, isNotEmpty);
+      expect(aspectCalls.last.method, 'setAspectRatio');
+      expect(aspectCalls.last.arguments, closeTo(2.35, 0.01));
+    });
+
+    test('stopped unlocks aspect ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 1.78;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+      aspectCalls.clear();
+
+      engine.stop();
+      await Future(() {});
+
+      expect(aspectCalls, isNotEmpty);
+      expect(aspectCalls.last.method, 'setAspectRatio');
+      expect(aspectCalls.last.arguments, 0.0);
+    });
+
+    test('paused does NOT unlock aspect ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 1.78;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+      aspectCalls.clear();
+
+      engine.pause();
+      await Future(() {});
+
+      // No new aspect ratio call should have been made
+      // (pause saves breakpoint but does not touch aspect ratio)
+      final unlockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
+      );
+      expect(unlockCalls, isEmpty);
+    });
+
+    test('completed unlocks aspect ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 1.78;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+      aspectCalls.clear();
+
+      engine.simulateCompleted();
+      await Future(() {});
+
+      expect(aspectCalls, isNotEmpty);
+      expect(aspectCalls.last.method, 'setAspectRatio');
+      expect(aspectCalls.last.arguments, 0.0);
+    });
+
+    test('error unlocks aspect ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 1.78;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+      aspectCalls.clear();
+
+      engine.simulateError('test error');
+      await Future(() {});
+
+      expect(aspectCalls, isNotEmpty);
+      expect(aspectCalls.last.method, 'setAspectRatio');
+      expect(aspectCalls.last.arguments, 0.0);
+    });
+
+    test('idle unlocks aspect ratio', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 1.78;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+      aspectCalls.clear();
+
+      engine.state.value = MediaState.idle;
+      await Future(() {});
+
+      expect(aspectCalls, isNotEmpty);
+      expect(aspectCalls.last.method, 'setAspectRatio');
+      expect(aspectCalls.last.arguments, 0.0);
+    });
+
+    test('playing with zero ratio does not call matchVideo', () async {
+      await controller.init();
+      engine.configureMedia(durationMs: 60000);
+      engine.aspectRatio.value = 0.0;
+      playlist.add('C:/a.mp4');
+      await controller.playIndex(0);
+
+      // matchVideo(0) is a no-op, so no setAspectRatio call
+      final lockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && (c.arguments as double) > 0,
+      );
+      expect(lockCalls, isEmpty);
     });
   });
 }
