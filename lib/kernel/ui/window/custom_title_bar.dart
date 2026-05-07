@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../services/platform_service.dart';
+import '../../window/aspect_ratio_service.dart';
 import '../theme/tokens.dart';
 
 /// 自定义标题栏 — 毛玻璃 + 拖拽 + 窗口控制
@@ -114,6 +115,18 @@ class TitleBarControls extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Aspect ratio cycle (visible when ratio is locked)
+        ValueListenableBuilder<double>(
+          valueListenable: AspectRatioService.I.ratioNotifier,
+          builder: (_, ratio, _) {
+            if (ratio <= 0) return const SizedBox.shrink();
+            return _TitleBarButton(
+              icon: Icons.aspect_ratio,
+              tooltip: AspectRatioService.I.currentLabel,
+              onPressed: () => AspectRatioService.I.cycleRatio(),
+            );
+          },
+        ),
         // Pin (always on top)
         ValueListenableBuilder<bool>(
           valueListenable: wm.isAlwaysOnTop,

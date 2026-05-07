@@ -23,15 +23,20 @@ class AspectRatioService {
 
   double get current => _current;
 
+  /// UI rebuild notifier — fires on every ratio change
+  final ValueNotifier<double> ratioNotifier = ValueNotifier<double>(0.0);
+
   /// 设置宽高比约束（0 = 无约束）
   Future<void> setAspectRatio(double ratio) async {
     if (_current == ratio) return;
     final previous = _current; // RC-6: 保存用于失败回滚
     _current = ratio;
+    ratioNotifier.value = ratio;
     try {
       await _channel.invokeMethod('setAspectRatio', ratio);
     } on Exception catch (e) {
       _current = previous; // RC-6: 回滚到之前的状态
+      ratioNotifier.value = previous;
       debugPrint('[AspectRatio] setAspectRatio($ratio) failed: $e');
     }
   }
