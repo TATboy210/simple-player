@@ -1,4 +1,4 @@
-# Requirements: Simple Player Flutter — Window Border
+# Requirements: Simple Player Flutter -- Window Border
 
 **Defined:** 2026-05-07
 **Core Value:** Smooth, jank-free window resize that respects video aspect ratio
@@ -14,13 +14,13 @@
 - [ ] **WB-05**: During resize, BackdropFilter is skipped (isResizing notifier) to prevent GPU jank
 - [ ] **WB-06**: Resize debounce (500ms) before restoring glass-morphism after drag ends
 
-### Window Sizing — Empty State
+### Window Sizing -- Empty State
 
-- [ ] **WS-01**: Minimum window size is 1024×576 (16:9) when no video is playing
+- [ ] **WS-01**: Minimum window size is 1024x576 (16:9) when no video is playing
 - [ ] **WS-02**: Window can be freely resized to any aspect ratio in empty state
 - [ ] **WS-03**: Window geometry (size, position, maximized, fullscreen) persists across sessions via SettingsStore
 
-### Window Sizing — Playing State
+### Window Sizing -- Playing State
 
 - [ ] **WP-01**: When video starts playing, window aspect ratio locks to video's aspect ratio
 - [ ] **WP-02**: Resize during playback scales proportionally (maintains video aspect ratio)
@@ -34,6 +34,16 @@
 - [ ] **WC-03**: Maximize button toggles maximize/restore
 - [ ] **WC-04**: Close button closes window safely (persist state, dispose resources)
 - [ ] **WC-05**: All controls reflect current state via ValueNotifier (pinned, maximized)
+
+### Production Quality
+
+- [ ] **PQ-01**: All window border code passes `flutter analyze` with zero warnings
+- [ ] **PQ-02**: Unit tests for WindowManagerService resize debounce, isResizing state, and persistence
+- [ ] **PQ-03**: Unit tests for CustomTitleBar controls state reflection
+- [ ] **PQ-04**: Edge case handling: DPI changes, monitor disconnect, rapid fullscreen toggle
+- [ ] **PQ-05**: Dispose safety — all ValueNotifiers disposed, all timers cancelled, no leaks
+- [ ] **PQ-06**: Error handling — all FFI/native calls wrapped in try-catch with graceful fallback
+- [ ] **PQ-07**: No hardcoded values — all sizes, colors, durations from DesignTokens/constants
 
 ## v2 Requirements
 
@@ -58,26 +68,33 @@
 | WB-02 | Phase 1 | Pending |
 | WB-03 | Phase 1 | Pending |
 | WB-04 | Phase 1 | Pending |
-| WB-05 | Phase 1 | Pending |
-| WB-06 | Phase 1 | Pending |
-| WS-01 | Phase 1 | Pending |
-| WS-02 | Phase 1 | Pending |
-| WS-03 | Phase 1 | Pending |
-| WP-01 | Phase 2 | Pending |
-| WP-02 | Phase 2 | Pending |
-| WP-03 | Phase 2 | Pending |
-| WP-04 | Phase 2 | Pending |
+| WB-05 | Phase 2 | Pending |
+| WB-06 | Phase 2 | Pending |
+| WS-01 | Phase 2 | Pending |
+| WS-02 | Phase 2 | Pending |
+| WS-03 | Phase 2 | Pending |
+| WP-01 | Phase 3 | Pending |
+| WP-02 | Phase 3 | Pending |
+| WP-03 | Phase 3 | Pending |
+| WP-04 | Phase 3 | Pending |
 | WC-01 | Phase 1 | Pending |
 | WC-02 | Phase 1 | Pending |
 | WC-03 | Phase 1 | Pending |
 | WC-04 | Phase 1 | Pending |
 | WC-05 | Phase 1 | Pending |
+| PQ-01 | Phase 1 | Pending |
+| PQ-02 | Phase 2 | Pending |
+| PQ-03 | Phase 1 | Pending |
+| PQ-04 | Phase 2 | Pending |
+| PQ-05 | Phase 1 | Pending |
+| PQ-06 | Phase 1 | Pending |
+| PQ-07 | Phase 1 | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total
-- Mapped to phases: 18
+- v1 requirements: 25 total
+- Mapped to phases: 25
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-07*
-*Last updated: 2026-05-07 after initial definition*
+*Last updated: 2026-05-07 after adding production quality requirements (PQ-01..07)*
