@@ -37,4 +37,21 @@ class Tokens {
   static const radiusSm = 6.0;
   static const radiusMd = 10.0;
   static const radiusBtn = 8.0;
+
+  // ── 标题栏 ──
+  static const titleBarHeight = 36.0;
+  static const titleBarButtonWidth = 46.0;
+
+  // ── 毛玻璃 ──
+  static const glassBlurThin = 12.0;
+  static const glassBlur = 16.0;
+  static const glassBlurThick = 24.0;
+
+  // ── 动画 ──
+  static const durationFast = 80;
+  static const durationNormal = 150;
+  static const durationDebounce = 500;
+
+  // ── 图标 ──
+  static const iconLg = 20.0;
 }
