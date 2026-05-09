@@ -4,190 +4,204 @@
 
 ## Tech Debt
 
-**Static Mutable Singletons:**
-- Issue: Heavy reliance on static mutable state across multiple classes: `SettingsStore._cachedPrefs`, `PlaylistStore._debounce/_pendingJson/_writeInFlight`, `PlatformService._instance`, `MotionUtils._reducedMotion`. These create hidden coupling, make testing harder (requiring `reset()` calls), and risk state leaking between tests.
-- Files: `lib/kernel/persistence/settings_store.dart`, `lib/kernel/persistence/playlist_store.dart`, `lib/kernel/services/platform_service.dart`, `lib/kernel/utils/motion_utils.dart`
-- Impact: Test isolation requires explicit `reset()`/`resetPrewarm()` calls; missing these causes flaky tests. Production code has implicit ordering dependencies (e.g., `SettingsStore.prewarm()` must be called before `load()`).
-- Fix approach: Consider dependency injection via constructor parameters. At minimum, document initialization order requirements and add assert guards.
-
-**Mixin-Based PlaybackController:**
-- Issue: `PlaybackController` uses 3 mixins (`FileOperations`, `PlaybackNavigator`, `StateMonitor`) that share state via abstract getters. This creates implicit coupling — each mixin depends on the host class providing specific fields and methods, but this contract is only enforced at compile time via abstract members.
-- Files: `lib/kernel/services/playback_controller.dart`, `lib/kernel/services/file_operations.dart`, `lib/kernel/services/playback_navigator.dart`, `lib/kernel/services/state_monitor.dart`
-- Impact: Adding new shared state requires modifying the mixin interface. Mixin method signatures must stay in sync. Hard to reason about execution order.
-- Fix approach: Current approach works for 3 mixins but won't scale. If more mixins are needed, consider extracting a shared context object or switching to composition with explicit constructor injection.
-
-**History Migration Runs on Every Load:**
-- Issue: `PlaylistStore._migrateHistory()` checks for `history.json` on every `load()` call. After first successful migration, the file is deleted, so subsequent calls are cheap (file existence check), but the code path is always executed.
-- Files: `lib/kernel/persistence/playlist_store.dart:107`
-- Impact: Minor performance cost (one extra `File.exists()` call per load). More importantly, the migration logic adds complexity to the load path.
-- Fix approach: Consider adding a `migrated` flag to `playlist.json` to skip the check entirely after first migration.
-
-**Playlist.currentIndex Getter/Setter:**
-- Issue: Dart analyzer flags `Playlist.currentIndex` as `unnecessary_getters_setters` — the getter/setter wraps `_currentIndex` with range validation, which is intentional but triggers the lint.
-- Files: `lib/kernel/playlist/playlist.dart:32`
-- Impact: Cosmetic lint warning. The validation logic in the setter is valuable.
-- Fix approach: Suppress the lint with `// ignore: unnecessary_getters_setters` or rename to `currentIndexWithValidation` if the getter truly adds no value.
-
-**FvpEngine Size (555 lines):**
-- Issue: `FvpEngine` is the largest source file. It handles open/play/pause/stop/seek, track management delegation, video effects, subtitle management, and lifecycle.
+**FvpEngine exceeds 400-line target:**
+- Issue: `lib/kernel/engine/fvp_engine.dart` is 555 lines. Largest file in codebase. Contains playback control, media info parsing, track delegation, video effects, subtitle handling, and lifecycle management in one class.
 - Files: `lib/kernel/engine/fvp_engine.dart`
-- Impact: Readability concern. The file is well-organized with clear sections, but adding more features will push it past comfortable size.
-- Fix approach: Already partially mitigated by extracting `FvpCallbackHandler`, `PositionPoller`, and `TrackManager`. Consider extracting video effects and subtitle management into separate helpers if more features are added.
+- Impact: Hard to navigate, test, and modify. The `open()` method alone is 136 lines (lines 137-273) with deeply nested media info parsing.
+- Fix approach: Extract media info parsing into a dedicated `MediaInfoParser` helper. Extract video effect/equalizer/rotation methods into a `VideoEffectMixin` or delegate class. Target: reduce to ~350 lines.
+
+**SettingsStore all-static design:**
+- Issue: `lib/kernel/persistence/settings_store.dart` (314 lines) is entirely static methods with a static `_cachedPrefs` field. No dependency injection, no interface. Each `save*` method repeats the same `_save` boilerplate pattern.
+- Files: `lib/kernel/persistence/settings_store.dart`
+- Impact: Hard to test in isolation (requires `resetPrewarm()` dance). Static state leaks between tests if `reset()` not called. Cannot swap storage backend.
+- Fix approach: Extract `SettingsStore` interface, make implementation injectable. Consider code generation for the 15+ near-identical save methods.
+
+**PlaylistStore all-static design:**
+- Issue: `lib/kernel/persistence/playlist_store.dart` (172 lines) uses static fields (`_debounce`, `_pendingJson`, `_writeInFlight`) for debounced write-back. Same testability problem as SettingsStore.
+- Files: `lib/kernel/persistence/playlist_store.dart`
+- Impact: Static state leaks between tests. `PlaylistStore.reset()` exists but must be manually called in every test teardown.
+- Fix approach: Make injectable with interface. Keep static convenience methods for backward compatibility but delegate to instance.
+
+**13 separate ValueNotifiers in FvpEngine:**
+- Issue: `FvpEngine` exposes 13 individual `ValueNotifier` fields (`textureId`, `state`, `position`, `duration`, `volume`, `isMuted`, `isBuffering`, `subtitleText`, `buffered`, `aspectRatio`, `errorMessage`, `playbackSpeed`, `activeDecoder`). Each requires separate `addListener`/`dispose` calls.
+- Files: `lib/kernel/engine/fvp_engine.dart` (lines 48-88), `lib/kernel/engine/media_engine.dart` (lines 20-57)
+- Impact: Widget code needs multiple `ValueListenableBuilder` wrappers. Easy to forget disposing one. Composing state requires listening to multiple notifiers.
+- Fix approach: Consider grouping related notifiers into state objects (e.g., `PlaybackState`, `AudioState`, `VideoState`). Or adopt a single `ChangeNotifier` with grouped getters.
+
+**Deleted .planning directory in working tree:**
+- Issue: Git status shows 25+ `.planning/` files deleted in working tree but not committed. Previous planning artifacts (phases 1-3, ROADMAP, STATE, etc.) are gone.
+- Files: `.planning/` directory tree
+- Impact: Lost project context. Previous phase plans and research docs unavailable for reference.
+- Fix approach: Either commit the deletions intentionally or restore from git. Document the decision.
+
+**PlaybackController uses mixin chain for orchestration:**
+- Issue: `PlaybackController` (`lib/kernel/services/playback_controller.dart`, 49 lines) mixes in `FileOperations`, `PlaybackNavigator`, and `StateMonitor`. Each mixin declares abstract getters for shared state (`engine`, `playlist`, `currentFileName`, `onNeedRebuild`, `onError`, `savePlaylist`). The mixin chain pattern is non-standard and makes dependency relationships implicit.
+- Files: `lib/kernel/services/playback_controller.dart`, `lib/kernel/services/file_operations.dart`, `lib/kernel/services/playback_navigator.dart`, `lib/kernel/services/state_monitor.dart`
+- Impact: IDE navigation across mixin boundaries is poor. Refactoring shared state requires updating all 4 files. Debugging call stacks through mixin dispatch is harder than direct delegation.
+- Fix approach: Acceptable for now (each mixin is focused). If complexity grows, convert to composition with explicit delegate objects.
 
 ## Known Bugs
 
-**No-op onNeedRebuild Callback:**
-- Symptoms: `App` passes `onNeedRebuild: () {}` (empty callback) to `PlaybackController`. This means `StateMonitor` calls `onNeedRebuild()` after playlist operations, but nothing happens.
-- Files: `lib/app.dart:41`
-- Trigger: Any playlist operation (remove, reorder, clear, play mode toggle) calls `onNeedRebuild()` which is a no-op.
-- Workaround: The UI may not be wired up yet (home screen shows "Ready" placeholder). When UI is connected, this callback must trigger a widget rebuild.
+**Empty onNeedRebuild callback:**
+- Symptoms: `PlaybackController` receives `onNeedRebuild: () {}` (empty no-op) from `app.dart` line 40. Any UI that depends on playlist rebuild notifications will not update.
+- Files: `lib/app.dart:40`, `lib/kernel/services/playback_controller.dart:27`
+- Trigger: Adding/removing/reordering playlist items, toggling play mode.
+- Workaround: Currently no UI exists to observe this (app shows "Ready" placeholder). When UI is added, this must be wired to `setState` or equivalent.
 
-**Unawaited Migration in StateMonitor.init():**
-- Symptoms: `_loadPlaylistForMigration()` is called with `unawaited()` — fire-and-forget. If migration fails, the error is logged but the playlist may be incomplete.
-- Files: `lib/kernel/services/state_monitor.dart:35`
-- Trigger: First app launch with legacy `history.json` present.
-- Workaround: Migration errors are caught and logged. Playlist still loads from `playlist.json` independently.
+**VideoProcessingService not instantiated:**
+- Symptoms: `VideoProcessingService` exists in `lib/kernel/services/video_processing_service.dart` (121 lines) but is never created or used in `app.dart` or `PlaybackController`. Video effects, rotation, aspect ratio, and deinterlace settings cannot be applied from UI.
+- Files: `lib/kernel/services/video_processing_service.dart`, `lib/app.dart`
+- Trigger: Always -- service is dead code in current state.
+- Workaround: None. Must be instantiated in `_AppState.initState()` and wired to `_engine`.
+
+**PlatformService stubs do nothing:**
+- Symptoms: Both `WindowsPlatformService` (`lib/kernel/platform/windows_platform_service.dart`) and `LinuxPlatformService` (`lib/kernel/platform/linux_platform_service.dart`) have empty `initService()` and `dispose()` methods.
+- Files: `lib/kernel/platform/windows_platform_service.dart`, `lib/kernel/platform/linux_platform_service.dart`
+- Trigger: Always -- platform-specific initialization is no-op.
+- Workaround: None needed currently (fvp handles rendering). But window management (fullscreen, always-on-top, size persistence) requires real platform service.
 
 ## Security Considerations
 
-**PathValidator Error Messages Leak Full Paths:**
-- Risk: `PathValidator.validate()` returns error messages containing the full file path (e.g., `'路径不安全: ${trimmed}'`, `'不支持的文件类型: ${trimmed}'`). These messages may be displayed in UI or logged.
-- Files: `lib/kernel/utils/path_validator.dart:71-72`
-- Current mitigation: Error messages are only used internally (`validationError` notifier) and via `debugPrint`/`log.d` (debug-only).
-- Recommendations: Sanitize paths in user-facing error messages — show only filename, not full path. Keep full path only in debug logs.
+**PathValidator URL validation is weak:**
+- Risk: `PathValidator.validate()` allows any URL with `http://`, `https://`, `rtmp://`, `rtsp://` scheme to pass without further validation. Only checks extension whitelist. An attacker could craft a URL with a valid media extension pointing to a malicious server.
+- Files: `lib/kernel/utils/path_validator.dart:67-69`
+- Current mitigation: Extension whitelist enforced for local files. URL scheme whitelist exists.
+- Recommendations: Add hostname allowlist or at minimum log/deny private IP ranges (10.x, 192.168.x, 127.x) for non-development builds. Consider SSRF protection.
 
-**URL Scheme Whitelist Includes http://:**
-- Risk: `PathValidator._urlSchemes` includes `http://`, allowing unencrypted media streams. For a desktop media player playing user-selected content, this is acceptable (user explicitly provides the URL), but worth noting.
-- Files: `lib/kernel/utils/path_validator.dart:35`
-- Current mitigation: URLs are only accepted from user input (file picker, drag-drop), not from untrusted sources.
-- Recommendations: No change needed for local media player. If remote content discovery is added, restrict to `https://` and `rtmps://`.
+**No input sanitization on subtitle delay:**
+- Risk: `FvpEngine.setSubtitleDelay()` passes raw integer to `setProperty()` without bounds checking. Extreme values could cause unexpected behavior in mdk.
+- Files: `lib/kernel/engine/fvp_engine.dart:460-462`
+- Current mitigation: None.
+- Recommendations: Clamp to reasonable range (e.g., -30000ms to 30000ms).
 
-**No Input Sanitization on Playlist JSON:**
-- Risk: `Playlist.fromJson()` and `PlaylistItem.fromJson()` parse JSON from disk without schema validation. Malformed JSON could cause unexpected behavior.
-- Files: `lib/kernel/playlist/playlist.dart:277`, `lib/kernel/models/playlist_item.dart:45`
-- Current mitigation: Individual item parsing is wrapped in try-catch (line 289-295), corrupt items are skipped. Index values are clamped.
-- Recommendations: Current defensive parsing is adequate for a local desktop app. No external JSON sources.
+**No input sanitization on equalizer filter string:**
+- Risk: `FvpEngine.setEqualizer()` passes raw string to `setProperty('af', ...)` without validation. Malformed FFmpeg filter syntax could crash the engine.
+- Files: `lib/kernel/engine/fvp_engine.dart:478-480`
+- Current mitigation: None.
+- Recommendations: Validate filter string format or use structured parameters.
 
 ## Performance Bottlenecks
 
-**PositionPoller 250ms Interval:**
-- Problem: Timer fires every 250ms to poll `_player.position` via FFI. During playback, this is 4 FFI calls/second.
-- Files: `lib/kernel/engine/position_poller.dart:17`
-- Cause: mdk/FFmpeg doesn't provide a push-based position callback; polling is the only option.
-- Improvement path: Already optimized — only updates `ValueNotifier` when value changes (avoids unnecessary widget rebuilds). URL paths additionally poll `buffered()`. Local files skip buffered polling entirely.
+**PositionPoller 250ms timer runs continuously during playback:**
+- Problem: `PositionPoller` (`lib/kernel/engine/position_poller.dart`) polls `_player.position` every 250ms via `Timer.periodic`. Each poll calls into mdk FFI.
+- Files: `lib/kernel/engine/position_poller.dart:41-44`
+- Cause: No event-driven position updates from mdk; polling is the only option.
+- Improvement path: Consider increasing interval to 500ms for non-seek-bar updates. Use mdk's `onPosition` callback if available in future fvp versions.
 
-**VideoProcessingService Persists All Settings on Every Change:**
-- Problem: Each slider change triggers `_persistAll()` which calls 7 individual `SettingsStore.save*()` methods. With 50ms debounce, rapid slider movement causes burst writes.
-- Files: `lib/kernel/services/video_processing_service.dart:86-95`
-- Cause: Each setting is saved individually via `SettingsStore` (sequential SharedPreferences writes).
-- Improvement path: Use `SettingsStore.saveAll()` instead of 7 individual calls. Increase debounce to 200ms for slider interactions. Consider only persisting on slider release (onChangedEnd) rather than every pixel.
+**PlaylistStore serializes entire playlist on every pause:**
+- Problem: `StateMonitor._onStateChanged()` calls `savePlaylist()` on every pause event (line 69). This triggers JSON serialization of the full playlist even if nothing changed.
+- Files: `lib/kernel/services/state_monitor.dart:60-70`
+- Cause: No dirty flag to track whether playlist actually changed.
+- Improvement path: Add a `_dirty` flag. Only serialize and debounce-write when playlist data actually changed.
 
-**SettingsStore Sequential Writes:**
-- Problem: `saveAll()` performs 20+ sequential `await` calls to SharedPreferences. Each write is a platform I/O call.
+**SettingsStore.saveAll() makes 18 sequential SharedPreferences writes:**
+- Problem: `saveAll()` in `lib/kernel/persistence/settings_store.dart:279-313` performs 18 sequential `await` calls to SharedPreferences. Each is a platform channel round-trip.
 - Files: `lib/kernel/persistence/settings_store.dart:279-313`
-- Cause: RC-4 decision to use sequential writes for data consistency (vs `Future.wait` which could partial-fail).
-- Improvement path: Batch all key-value pairs into a single `SharedPreferences.setMap()` if the API supports it. Or accept the ~4ms sequential cost (documented as acceptable in RC-4 comment).
+- Cause: Sequential writes for data consistency (RC-4 comment). But SharedPreferences is a single JSON file internally -- all writes are buffered until commit.
+- Improvement path: Use `SharedPreferences.setString` with a single JSON blob instead of 18 individual keys. Reduces platform calls from 18 to 1.
+
+**VideoProcessingService double-listener pattern:**
+- Problem: `VideoProcessingService` (`lib/kernel/services/video_processing_service.dart`) adds two listeners per ValueNotifier -- one for engine delegation and one for persistence debounce. Each change fires both. The persist listener triggers 7 sequential `SettingsStore.save*()` calls on every slider drag.
+- Files: `lib/kernel/services/video_processing_service.dart:56-83`
+- Cause: Separate listener functions for engine and persistence.
+- Improvement path: Merge into single listener. Batch all persistence writes into one `saveAll()` call.
 
 ## Fragile Areas
 
-**MediaEngine Interface (13 ValueNotifiers):**
-- Files: `lib/kernel/engine/media_engine.dart`
-- Why fragile: Any new engine implementation must correctly manage 13 ValueNotifier lifecycles (create, update, dispose). Missing disposal causes memory leaks. Missing state updates cause UI desync.
-- Safe modification: When adding a new notifier, update: (1) `MediaEngine` interface, (2) `FvpEngine` implementation, (3) `FakeEngine` test double, (4) all tests that check notifier values.
-- Test coverage: `FakeEngine` covers all 13 notifiers. `FvpEngine` tests are limited (FFI-dependent).
+**PlaybackNavigator openGeneration guard:**
+- Files: `lib/kernel/services/playback_navigator.dart:23-27, 53`
+- Why fragile: The `openGeneration` counter prevents stale async callbacks from applying, but the pattern is subtle. If any code path forgets to check `gen != openGeneration`, stale state leaks through. The guard is implicit, not enforced by type system.
+- Safe modification: When adding new async operations in PlaybackNavigator, always capture `openGeneration` before `await` and check after.
+- Test coverage: `test/kernel/services/playback_navigator_test.dart` covers basic cases but not rapid-fire race conditions.
 
-**PlaybackNavigator.openGeneration Guard:**
-- Files: `lib/kernel/services/playback_navigator.dart:24`
-- Why fragile: The generation counter prevents stale async callbacks from applying, but the pattern is easy to get wrong. Missing `if (gen != openGeneration) return;` check after any `await` would cause race conditions.
-- Safe modification: Always add generation checks after every `await` in `playIndex()`. The current code does this correctly (lines 53, 180, 254, 336).
-- Test coverage: Covered by `playback_navigator_test.dart` and `playback_controller_test.dart`.
+**Playlist index tracking during mutations:**
+- Files: `lib/kernel/playlist/playlist.dart:107-119, 124-140`
+- Why fragile: `removeAt()` and `reorder()` manually adjust `_currentIndex` with branching logic. Off-by-one errors are easy to introduce. The `clamp` on line 116 silently snaps to valid range rather than signaling error.
+- Safe modification: Always run `test/kernel/playlist/playlist_test.dart` after changes. Add property-based tests for index tracking.
+- Test coverage: 217 lines of tests exist but do not cover all edge cases (e.g., remove at boundary while in shuffle mode).
 
-**PlaylistStore Static State Coordination:**
-- Files: `lib/kernel/persistence/playlist_store.dart`
-- Why fragile: 3 static fields (`_debounce`, `_pendingJson`, `_writeInFlight`) must be coordinated. The `reset()` method must clear all 3. The `_flush()` method must handle concurrent calls via `_writeInFlight`.
-- Safe modification: Always update `reset()` when adding new static fields. Test isolation depends on calling `reset()` in `setUp()`.
-- Test coverage: `PlaylistStore.reset()` is `@visibleForTesting`. Tests use it correctly.
+**FvpEngine._isOpening reentrancy guard:**
+- Files: `lib/kernel/engine/fvp_engine.dart:95, 139-142, 169, 271`
+- Why fragile: Boolean `_isOpening` flag prevents concurrent `open()` calls. But if `open()` throws before reaching `finally` block (e.g., in `_player.prepare()` timeout handling), `_isOpening` could remain `true` permanently, blocking all future opens.
+- Safe modification: The `finally` block on line 269-272 handles this. Verify with test that timeout + exception paths always clear `_isOpening`.
+- Test coverage: No direct test for `_isOpening` guard behavior.
 
-**AppState initState → _init Race:**
-- Files: `lib/app.dart:32-59`
-- Why fragile: `initState()` calls `_init()` (async) without awaiting. The `_ready` flag gates the UI, but between `initState` and `_init` completing, the widget is in a partial state. If `dispose()` is called before `_init()` completes, `setState(() => _ready = true)` runs on unmounted widget.
-- Safe modification: The `if (mounted)` guard on line 59 prevents the crash, but the pattern is subtle.
-- Test coverage: Not directly tested (App is a StatefulWidget, no widget tests exist).
+**PlaylistStore static debounce timer leaks across tests:**
+- Files: `lib/kernel/persistence/playlist_store.dart:25-27`
+- Why fragile: `_debounce`, `_pendingJson`, `_writeInFlight` are static. Any test that calls `PlaylistStore.save()` without calling `PlaylistStore.reset()` in tearDown leaks a timer that fires after the test completes.
+- Safe modification: Always call `PlaylistStore.reset()` in tearDown. Consider making PlaylistStore instantiable.
+- Test coverage: No dedicated PlaylistStore tests exist.
 
 ## Scaling Limits
 
-**Playlist In-Memory Storage:**
-- Current capacity: Entire playlist stored in `List<PlaylistItem>` in memory.
-- Limit: Practical limit ~10,000 items (memory) and ~1,000 items (JSON serialization/deserialization speed).
-- Scaling path: For very large playlists, switch to database storage (sqflite/drift) with pagination.
+**Playlist grows without bounds:**
+- Current capacity: No limit on playlist size.
+- Limit: Large playlists (10,000+ items) will slow JSON serialization, debounce writes, and UI rebuilds.
+- Scaling path: Add playlist size cap (e.g., 5,000 items). Implement virtual scrolling for playlist UI. Consider database-backed storage for large collections.
 
-**SharedPreferences for Settings:**
-- Current capacity: All settings in a single SharedPreferences instance.
-- Limit: SharedPreferences loads all keys into memory on first access. With 20+ keys, this is fine. At 100+ keys, startup cost grows.
-- Scaling path: Not needed for current key count. If settings grow significantly, consider grouping into JSON blobs.
+**SharedPreferences as primary storage:**
+- Current capacity: All settings in single SharedPreferences JSON file.
+- Limit: SharedPreferences loads entire file into memory. With large `lastFile` paths or many keys, startup cost grows.
+- Scaling path: Migrate to structured storage (sqflite, hive) if settings complexity grows beyond current ~25 keys.
 
 ## Dependencies at Risk
 
-**fvp 0.36.2:**
-- Risk: FFI binding to native MDK/FFmpeg libraries. Version pinned to `^0.36.2`. Breaking changes in MDK API would require updating all `FvpEngine` FFI calls.
-- Impact: Core playback functionality. Any breakage blocks the entire app.
-- Migration plan: No alternative engine currently implemented. `MediaEngine` interface exists specifically to allow swapping backends.
+**11 unused dependencies in pubspec.yaml:**
+- Risk: `pubspec.yaml` declares 16 non-SDK dependencies. Only 5 are actually imported in lib/: `fvp`, `path_provider`, `shared_preferences`, `dynamic_color`, `logger`. The following 11 are unused: `file_picker`, `window_manager`, `desktop_drop`, `easy_localization`, `shadcn_flutter`, `velocity_x`, `smooth_page_indicator`, `glass_kit`, `flutter_zoom_drawer`, `flutter_animate`, `just_audio`.
+- Impact: Increases build time, app size, and dependency surface area. `window_manager: 0.5.1` is pinned to exact version (not range), blocking security updates.
+- Migration plan: Remove unused deps from `pubspec.yaml`. Keep only `fvp`, `path_provider`, `shared_preferences`, `dynamic_color`, `logger`. Re-add when UI is implemented.
 
-**shadcn_flutter 0.0.52:**
-- Risk: Pre-1.0 package with frequent breaking changes. The `0.0.x` versioning suggests rapid iteration.
-- Impact: UI components may break on upgrade.
-- Migration plan: Pin to exact version (`0.0.52` not `^0.0.52`). Evaluate on each upgrade.
+**fvp pinned to ^0.36.2:**
+- Risk: fvp is a pre-1.0 package wrapping native MDK/FFmpeg. Breaking changes possible on minor version bumps.
+- Impact: Engine layer tightly coupled to fvp's mdk.Player API.
+- Migration plan: `MediaEngine` interface abstracts fvp. If fvp breaks, only `fvp_engine.dart` and helpers need updating. Keep interface stable.
 
-**easy_localization 3.0.8:**
-- Risk: Localization package. If abandoned, switching to `flutter_localizations` + `intl` is straightforward.
-- Impact: Low — localization is a thin layer.
-- Migration plan: Already uses `flutter_localizations` delegates. `easy_localization` may be removable if only used for string loading.
+**window_manager pinned to exact version 0.5.1:**
+- Risk: Not using caret range (`^0.5.1`). Blocks automatic patch/minor updates. Package is declared but never imported -- dead dependency.
+- Files: `pubspec.yaml:17`
+- Impact: If re-enabled for window management, will be locked to stale version.
+- Migration plan: Remove from pubspec.yaml. Re-add with `^0.5.1` or latest when needed.
 
 ## Missing Critical Features
 
-**No Widget Tests:**
-- Problem: Zero widget tests exist. All 238 tests are unit tests. UI behavior (player screen, control bar, playlist panel, settings dialog) is completely untested.
-- Blocks: Confident UI refactoring. Visual regressions go undetected.
+**No actual UI:**
+- Problem: `app.dart` renders a black screen with "Ready" text placeholder. No player screen, control bar, progress bar, playlist panel, or any user-facing UI exists in the current codebase.
+- Blocks: All user-facing functionality. The kernel layer is complete but unexercised.
 
-**No Integration Tests:**
-- Problem: No `integration_test/` directory exists. End-to-end flows (open file → play → seek → pause → next track) are untested.
-- Blocks: Confidence in full playback flow correctness.
+**No macOS platform service:**
+- Problem: `main.dart:20-21` only handles Linux and Windows (`Platform.isLinux ? LinuxPlatformService() : WindowsPlatformService()`). macOS falls through to WindowsPlatformService.
+- Blocks: macOS support.
 
-**No Error Recovery UI:**
-- Problem: `App` shows a static "Ready" placeholder. No actual player UI is connected. Error states from `FvpEngine` are stored in `errorMessage` ValueNotifier but no widget displays them.
-- Blocks: Users cannot see error messages or recover from failures.
+**analysis_options.yaml has empty linter rules:**
+- Problem: `analysis_options.yaml:3` includes `package:flutter_lints/flutter.yaml` but the `linter: rules:` section is empty. No custom lint rules enabled.
+- Files: `analysis_options.yaml`
+- Blocks: Enforcement of project-specific conventions (e.g., `avoid_print`, `prefer_const_constructors`).
 
 ## Test Coverage Gaps
 
-**FvpEngine (555 lines, 0 dedicated tests):**
-- What's not tested: `open()`, `play()`, `pause()`, `stop()`, `seekTo()`, `setVolume()`, `setMute()`, `togglePlayPause()`, `setPlaybackRate()`, `setRange()`, `setVideoEffect()`, `rotate()`, `setAspectRatio()`, `setDeinterlace()`, `setExternalSubtitle()`, `setSubtitleDelay()`, `setEqualizer()`, `dispose()`.
+**FvpEngine has no direct tests:**
+- What's not tested: The entire 555-line engine class -- `open()`, `play()`, `pause()`, `stop()`, `seekTo()`, `setVolume()`, `setMute()`, `togglePlayPause()`, `skipForward/Back()`, `setPlaybackRate()`, `setRange()`, `setVideoEffect()`, `rotate()`, `setAspectRatio()`, `setDeinterlace()`, `setExternalSubtitle()`, `setSubtitleDelay()`, `setEqualizer()`, `dispose()`.
 - Files: `lib/kernel/engine/fvp_engine.dart`
-- Risk: Core playback engine has no unit tests. All testing is indirect via `FakeEngine` which doesn't exercise FFI paths.
-- Priority: High — but constrained by FFI dependency. Consider adding more mock-based tests for state machine logic.
+- Risk: Engine is the core of the app. Bugs in state transitions, error handling, or dispose ordering go undetected.
+- Priority: HIGH -- requires FakeEngine or mdk mock to test. Current `test/helpers/fake_engine.dart` (357 lines) exists but tests only use it indirectly through PlaybackController.
 
-**PlaylistStore (172 lines, 0 dedicated tests):**
-- What's not tested: `save()`, `load()`, `clear()`, `dispose()`, `_flush()`, `_migrateHistory()`.
+**PlaylistStore has no tests:**
+- What's not tested: Debounce behavior, atomic write (tmp+rename), load/save round-trip, history migration, clear(), dispose(), concurrent write guard.
 - Files: `lib/kernel/persistence/playlist_store.dart`
-- Risk: Persistence layer is untested. File I/O, atomic rename, debounce, and migration logic all unverified.
-- Priority: High — persistence bugs cause data loss.
+- Risk: Data loss if debounce or atomic write logic is broken.
+- Priority: MEDIUM -- file I/O requires temp directory fixtures.
 
-**App Widget (116 lines, 0 tests):**
-- What's not tested: `initState()`, `_init()`, `dispose()`, `build()`.
-- Files: `lib/app.dart`
-- Risk: App initialization (parallel `Future.wait`, prewarm, locale loading) is untested.
-- Priority: Medium — initialization bugs cause startup failures.
+**App shell has no tests:**
+- What's not tested: `_init()` parallel initialization, locale loading, error recovery, dispose ordering, "Ready" loading state.
+- Files: `lib/app.dart`, `lib/main.dart`
+- Risk: Startup failures go undetected.
+- Priority: LOW -- app shell is thin wrapper.
 
-**MotionUtils (28 lines, 0 tests):**
-- What's not tested: `update()`, `duration()`, `curve()`, `isReducedMotion`.
-- Files: `lib/kernel/utils/motion_utils.dart`
-- Risk: Accessibility feature (reduced motion) is untested.
-- Priority: Low — simple utility with minimal logic.
-
-**MediaState/PlayMode/VideoEffectType Enums:**
-- What's not tested: Enum values and their ordering (used by `SettingsStore` for index-based persistence).
-- Files: `lib/kernel/models/media_state.dart`, `lib/kernel/models/play_mode.dart`, `lib/kernel/models/video_effect_type.dart`
-- Risk: Adding/removing/reordering enum values breaks persisted settings (indices shift).
-- Priority: Medium — already mitigated by clamp guards in `SettingsStore`, but no test verifies enum stability.
+**UI theme layer has no tests:**
+- What's not tested: `lib/kernel/ui/theme/tokens.dart`, `lib/kernel/ui/theme/app_theme.dart`.
+- Files: `lib/kernel/ui/theme/tokens.dart`, `lib/kernel/ui/theme/app_theme.dart`
+- Risk: Theme regressions undetected.
+- Priority: LOW -- compile-time const tokens are inherently safe.
 
 ---
 

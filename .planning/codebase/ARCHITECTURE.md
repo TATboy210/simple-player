@@ -6,279 +6,247 @@
 ## System Overview
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                          lib/app.dart                               │
-│                    MaterialApp + Service Wiring                      │
-├─────────────────────────┬───────────────────────────────────────────┤
-│   lib/kernel/services/  │           lib/kernel/engine/              │
-│  PlaybackController     │           FvpEngine (MediaEngine)         │
-│  (3-mixin orchestrator) │           FvpCallbackHandler              │
-│  ├─ FileOperations      │           PositionPoller                  │
-│  ├─ PlaybackNavigator   │           TrackManager                   │
-│  └─ StateMonitor        │                                          │
-│  VideoProcessingService │                                          │
-│  PlatformService (abs)  │                                          │
-└───────────┬─────────────┴───────────────┬───────────────────────────┘
-            │                             │
-            ▼                             ▼
-┌───────────────────────┐   ┌──────────────────────────────────────────┐
-│  lib/kernel/persistence/ │ │  lib/kernel/playlist/                    │
-│  SettingsStore          │ │  Playlist (state machine)                 │
-│  PlaylistStore          │ │  4 play modes, CQS navigation            │
-│  (shared_preferences)   │ │  JSON serialization                      │
-│  (JSON atomic write)    │ │                                          │
-└─────────────────────────┘ └──────────────────────────────────────────┘
-            │
-            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     lib/kernel/models/                               │
-│  MediaState · MediaInfo · PlaylistItem · PlayMode                    │
-│  VideoEffectType · AspectRatioMode                                   │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                         App Shell                            │
+│                      `lib/app.dart`                          │
+├─────────────────────────────────────────────────────────────┤
+│                    PlaybackController                        │
+│              `lib/kernel/services/playback_controller.dart`  │
+│        (Orchestrator — 3 mixins composed)                    │
+├──────────────┬──────────────────┬────────────────────────────┤
+│ FileOperations│ PlaybackNavigator│      StateMonitor          │
+│ `file_ops`    │ `playback_nav`   │   `state_monitor`          │
+└──────┬───────┴────────┬─────────┴──────────┬─────────────────┘
+       │                │                     │
+       ▼                ▼                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      MediaEngine                             │
+│               `lib/kernel/engine/media_engine.dart`          │
+│              (abstract interface — 13 ValueNotifiers)        │
+├─────────────────────────────────────────────────────────────┤
+│                      FvpEngine                               │
+│               `lib/kernel/engine/fvp_engine.dart`            │
+│        (fvp/MDK implementation — FFmpeg + D3D11)             │
+├──────────────┬──────────────────┬────────────────────────────┤
+│FvpCallback   │  PositionPoller  │     TrackManager           │
+│ Handler      │  (250ms timer)   │  (audio/subtitle tracks)   │
+└──────────────┴──────────────────┴────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Persistence Layer                          │
+│         `lib/kernel/persistence/settings_store.dart`         │
+│         `lib/kernel/persistence/playlist_store.dart`         │
+│            (SharedPreferences + JSON files)                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| App | Material shell, service wiring, locale/theme init | `lib/app.dart` |
-| FvpEngine | MediaEngine implementation wrapping fvp/MDK | `lib/kernel/engine/fvp_engine.dart` |
-| FvpCallbackHandler | mdk callback registration, state mapping, main-thread scheduling | `lib/kernel/engine/fvp_callback_handler.dart` |
-| PositionPoller | 250ms timer polling playback position/buffered | `lib/kernel/engine/position_poller.dart` |
-| TrackManager | Audio/subtitle track selection and switching | `lib/kernel/engine/track_manager.dart` |
-| PlaybackController | Business orchestrator (3-mixin composition) | `lib/kernel/services/playback_controller.dart` |
-| FileOperations | File open (validate -> add to list -> play) | `lib/kernel/services/file_operations.dart` |
-| PlaybackNavigator | Playlist navigation (prev/next/playIndex) | `lib/kernel/services/playback_navigator.dart` |
-| StateMonitor | Auto-advance, breakpoint save, settings restore | `lib/kernel/services/state_monitor.dart` |
-| VideoProcessingService | 7 ValueNotifiers for video effects, delegates to engine | `lib/kernel/services/video_processing_service.dart` |
-| PlatformService | Abstract platform interface (singleton factory) | `lib/kernel/services/platform_service.dart` |
-| WindowsPlatformService | No-op implementation (OS provides native window) | `lib/kernel/platform/windows_platform_service.dart` |
-| LinuxPlatformService | No-op implementation (GTK native window) | `lib/kernel/platform/linux_platform_service.dart` |
-| Playlist | Playlist state machine (4 play modes, CQS navigation) | `lib/kernel/playlist/playlist.dart` |
-| SettingsStore | SharedPreferences persistence (prewarm, sanitize) | `lib/kernel/persistence/settings_store.dart` |
-| PlaylistStore | JSON atomic write with 300ms debounce | `lib/kernel/persistence/playlist_store.dart` |
-| PathValidator | Path security: extension whitelist, traversal detection | `lib/kernel/utils/path_validator.dart` |
-| PathUtils | Cross-platform basename/dirname extraction | `lib/kernel/utils/path_utils.dart` |
-| TimeUtils | Milliseconds to HH:MM:SS formatting | `lib/kernel/utils/time_utils.dart` |
-| MotionUtils | Reduced-motion accessibility adapter | `lib/kernel/utils/motion_utils.dart` |
-| log | Kernel-wide Logger instance (PrettyPrinter) | `lib/kernel/utils/log.dart` |
-| Tokens | Design tokens (colors, fonts, spacing, glass, animation) | `lib/kernel/ui/theme/tokens.dart` |
-| AppTheme | ThemeData bridge from Tokens | `lib/kernel/ui/theme/app_theme.dart` |
+| `App` | App shell: engine/service init + MaterialApp skeleton | `lib/app.dart` |
+| `PlaybackController` | Business orchestration: file ops, navigation, state monitoring | `lib/kernel/services/playback_controller.dart` |
+| `FileOperations` mixin | File open, batch add, path validation | `lib/kernel/services/file_operations.dart` |
+| `PlaybackNavigator` mixin | Index jump, prev/next, concurrency guard (openGeneration) | `lib/kernel/services/playback_navigator.dart` |
+| `StateMonitor` mixin | Auto-advance, breakpoint save, settings restore, playlist management | `lib/kernel/services/state_monitor.dart` |
+| `MediaEngine` | Abstract engine interface (13 ValueNotifiers + playback commands) | `lib/kernel/engine/media_engine.dart` |
+| `FvpEngine` | fvp/MDK engine implementation (FFmpeg + D3D11 rendering) | `lib/kernel/engine/fvp_engine.dart` |
+| `FvpCallbackHandler` | mdk callback registration, state mapping, main-thread dispatch | `lib/kernel/engine/fvp_callback_handler.dart` |
+| `PositionPoller` | 250ms timer polling for playback position | `lib/kernel/engine/position_poller.dart` |
+| `TrackManager` | Audio/subtitle track selection and switching | `lib/kernel/engine/track_manager.dart` |
+| `Playlist` | Ordered playlist model with 4 play modes (CQS navigation) | `lib/kernel/playlist/playlist.dart` |
+| `PlaylistItem` | Immutable data class (path + name + history metadata) | `lib/kernel/models/playlist_item.dart` |
+| `VideoProcessingService` | Reactive video effects (brightness/contrast/saturation/hue/rotation/aspect) | `lib/kernel/services/video_processing_service.dart` |
+| `SettingsStore` | SharedPreferences persistence (window/volume/mute/video settings) | `lib/kernel/persistence/settings_store.dart` |
+| `PlaylistStore` | JSON file persistence (300ms debounce, atomic write) | `lib/kernel/persistence/playlist_store.dart` |
+| `PlatformService` | Abstract platform interface (factory singleton) | `lib/kernel/services/platform_service.dart` |
+| `Tokens` | Compile-time design constants (colors, spacing, fonts, radii) | `lib/kernel/ui/theme/tokens.dart` |
+| `AppTheme` | ThemeData bridge from Tokens | `lib/kernel/ui/theme/app_theme.dart` |
+| `PathValidator` | Security: extension whitelist, path traversal detection | `lib/kernel/utils/path_validator.dart` |
 
 ## Pattern Overview
 
-**Overall:** Layered architecture with Interface Segregation + Mixin Composition
+**Overall:** Layered architecture with mixin composition for the business logic layer.
 
 **Key Characteristics:**
-- **ValueNotifier + ValueListenableBuilder** for reactive state (no Provider/Riverpod/Bloc)
-- **MediaEngine** abstract interface decouples UI from fvp/MDK implementation
-- **PlaybackController** uses Dart mixins (`with FileOperations, PlaybackNavigator, StateMonitor`) to separate concerns while sharing state
-- **Singleton factory** pattern for PlatformService (`PlatformService.init()` in main, `PlatformService.I` everywhere)
-- **CQS (Command-Query Separation)** in Playlist: `peekNext()`/`peekPrevious()` are pure queries, callers update `currentIndex` explicitly
-- **Defensive programming**: `_disposed` guards on every engine method, `clamp()` on all inputs, try-catch with `log.d()` fallbacks
-- **No external state management**: pure Flutter primitives (ValueNotifier, ValueListenableBuilder, setState)
+- **ValueNotifier + ValueListenableBuilder** — no Provider/Riverpod/Bloc. All reactive state flows through `ValueNotifier` on `MediaEngine` and `VideoProcessingService`.
+- **Mixin composition** — `PlaybackController` is assembled from 3 mixins (`FileOperations`, `PlaybackNavigator`, `StateMonitor`), each with a narrow responsibility.
+- **Abstract engine interface** — `MediaEngine` is the contract. `FvpEngine` is the only production implementation. UI never touches fvp/mdk directly.
+- **CQS (Command-Query Separation)** — `Playlist.peekNext()`/`peekPrevious()` are pure queries returning indices. State mutation happens only through explicit `currentIndex` setter.
+- **Defensive programming** — All persistence uses clamp/sanitize. All engine methods check `_disposed`. All file paths go through `PathValidator`.
+- **Debounced persistence** — `PlaylistStore` uses 300ms debounce + atomic write (`.tmp` then rename). `VideoProcessingService` uses 50ms debounce.
 
 ## Layers
 
 **Entry Layer:**
-- Purpose: Bootstrap Flutter app, initialize fvp/MDK, set up platform service
-- Location: `lib/main.dart`
-- Contains: `fvp.registerWith()`, `SettingsStore.prewarm()`, `PlatformService.init()`, `runApp()`
-- Depends on: SettingsStore, PlatformService, App
-- Used by: Flutter runtime
+- Purpose: Bootstrap and app shell
+- Location: `lib/main.dart`, `lib/app.dart`
+- Contains: fvp registration, SharedPreferences prewarm, platform service init, MaterialApp setup
+- Depends on: kernel layer
+- Used by: Flutter framework
 
-**Application Shell:**
-- Purpose: Material shell with theme, locale, engine/playlist/controller wiring
-- Location: `lib/app.dart`
-- Contains: `App` StatefulWidget, creates `FvpEngine`, `Playlist`, `PlaybackController`
-- Depends on: FvpEngine, Playlist, PlaybackController, AppTheme, AppLocalizations
-- Used by: main.dart
+**Service Layer (Business Logic):**
+- Purpose: Orchestrate playback operations
+- Location: `lib/kernel/services/`
+- Contains: `PlaybackController` + 3 mixins (`FileOperations`, `PlaybackNavigator`, `StateMonitor`), `VideoProcessingService`
+- Depends on: Engine layer, Persistence layer, Models, Utils
+- Used by: UI layer (widgets)
 
 **Engine Layer:**
-- Purpose: Abstract media playback interface + fvp/MDK concrete implementation
+- Purpose: Abstract media playback backend
 - Location: `lib/kernel/engine/`
-- Contains: `MediaEngine` (abstract), `FvpEngine` (impl), 3 helpers (FvpCallbackHandler, PositionPoller, TrackManager)
-- Depends on: fvp/mdk, models, utils
-- Used by: PlaybackController, VideoProcessingService, UI widgets
-
-**Service Layer:**
-- Purpose: Business orchestration — file operations, playback navigation, state monitoring
-- Location: `lib/kernel/services/`
-- Contains: PlaybackController (mixin composition), PlatformService (abstract), VideoProcessingService
-- Depends on: Engine, Playlist, Persistence, Utils
-- Used by: App, UI widgets
-
-**Persistence Layer:**
-- Purpose: Settings and playlist persistence
-- Location: `lib/kernel/persistence/`
-- Contains: SettingsStore (shared_preferences), PlaylistStore (JSON file with atomic write)
-- Depends on: shared_preferences, path_provider, models
-- Used by: StateMonitor, SettingsDialog, App
-
-**Playlist Layer:**
-- Purpose: Playlist state machine with play mode navigation
-- Location: `lib/kernel/playlist/`
-- Contains: Playlist class (add/remove/reorder, 4 play modes, JSON serialization)
-- Depends on: models
-- Used by: PlaybackController, PlaylistStore
+- Contains: `MediaEngine` interface, `FvpEngine` implementation, 3 helpers (`FvpCallbackHandler`, `PositionPoller`, `TrackManager`)
+- Depends on: fvp/mdk package, Models, Utils
+- Used by: Service layer
 
 **Model Layer:**
-- Purpose: Pure data classes and enums, no business logic
+- Purpose: Data types and enums
 - Location: `lib/kernel/models/`
-- Contains: MediaState, MediaInfo, PlaylistItem, PlayMode, VideoEffectType, AspectRatioMode
-- Depends on: utils (PathUtils only for PlaylistItem.name)
+- Contains: `MediaState` (9-state enum), `MediaInfo`, `PlaylistItem`, `PlayMode`, `AspectRatioMode`, `VideoEffectType`
+- Depends on: Utils (PathUtils)
 - Used by: All layers
 
-**Platform Layer:**
-- Purpose: Platform-specific service implementations
-- Location: `lib/kernel/platform/`
-- Contains: WindowsPlatformService, LinuxPlatformService (both no-op)
-- Depends on: PlatformService interface
-- Used by: main.dart (init)
+**Persistence Layer:**
+- Purpose: Settings and playlist storage
+- Location: `lib/kernel/persistence/`
+- Contains: `SettingsStore` (SharedPreferences), `PlaylistStore` (JSON files)
+- Depends on: Models, shared_preferences, path_provider
+- Used by: Service layer
 
-**Utils Layer:**
-- Purpose: Shared utilities — logging, path validation, time formatting
-- Location: `lib/kernel/utils/`
-- Contains: log (Logger), PathValidator, PathUtils, TimeUtils, MotionUtils
-- Depends on: logger package
-- Used by: Engine, Services, Playlist, Models
+**Platform Layer:**
+- Purpose: Platform-specific behavior
+- Location: `lib/kernel/platform/`
+- Contains: `PlatformService` interface, `WindowsPlatformService`, `LinuxPlatformService`
+- Depends on: Nothing (no-op implementations)
+- Used by: Entry layer (init), Service layer (lifecycle)
 
 **Theme Layer:**
-- Purpose: Design tokens and ThemeData bridge
+- Purpose: Design tokens and ThemeData
 - Location: `lib/kernel/ui/theme/`
-- Contains: Tokens (compile-time constants), AppTheme (ThemeData builder)
-- Depends on: flutter/material
-- Used by: App, UI widgets
+- Contains: `Tokens` (compile-time constants), `AppTheme` (ThemeData bridge)
+- Depends on: Flutter Material
+- Used by: UI widgets
 
-**L10n Layer:**
-- Purpose: Internationalization (zh/en)
+**Utils Layer:**
+- Purpose: Pure utility functions
+- Location: `lib/kernel/utils/`
+- Contains: `PathValidator`, `PathUtils`, `TimeUtils`, `MotionUtils`, `log`
+- Depends on: logger package
+- Used by: All layers
+
+**Localization Layer:**
+- Purpose: i18n strings
 - Location: `lib/l10n/`
-- Contains: AppLocalizations, AppLocalizationsEn, AppLocalizationsZh
-- Depends on: flutter_localizations
-- Used by: App, UI widgets
+- Contains: ARB files + generated Dart localizations (zh, en)
+- Depends on: Flutter localizations
+- Used by: UI widgets
 
 ## Data Flow
 
-### Primary Request Path: Open and Play File
+### Primary Playback Request Path
 
-1. User triggers file open (keyboard O / FilePicker / drag-drop) -> UI calls `PlaybackController.openAndPlay(path)` (`lib/kernel/services/file_operations.dart:29`)
+1. User action (file picker / drag-drop / keyboard) triggers `FileOperations.openAndPlay(path)` (`lib/kernel/services/file_operations.dart:29`)
 2. `PathValidator.validate(path)` checks extension whitelist + path traversal (`lib/kernel/utils/path_validator.dart:64`)
-3. `Playlist.add(path)` appends item, returns index (`lib/kernel/playlist/playlist.dart:81`)
-4. `PlaybackNavigator.playIndex(idx)` called (`lib/kernel/services/playback_navigator.dart:30`)
-5. Path validated again, `playlist.currentIndex = index` set (`lib/kernel/services/playback_navigator.dart:49`)
-6. `engine.open(path)` -> `FvpEngine.open()` sets media, calls `_player.prepare()`, reads mediaInfo, creates texture (`lib/kernel/engine/fvp_engine.dart:137`)
-7. Resume from saved position if `positionMs > 1000` (`lib/kernel/services/playback_navigator.dart:60`)
-8. Auto-detect external subtitles in same directory (`lib/kernel/services/playback_navigator.dart:107`)
-9. `engine.play()` -> sets mdk.PlaybackState.playing, starts PositionPoller 250ms timer (`lib/kernel/engine/fvp_engine.dart:276`)
-10. `currentFileName` notifier updated, `playlist.updateHistory()` called, `savePlaylist()` persists (`lib/kernel/services/playback_navigator.dart:77-83`)
+3. `Playlist.add(path)` adds to list, returns index (`lib/kernel/playlist/playlist.dart:82`)
+4. `PlaybackNavigator.playIndex(idx)` calls `engine.open(path)` (`lib/kernel/services/playback_navigator.dart:30`)
+5. `FvpEngine.open(path)` sets media, calls `_player.prepare()`, waits for texture (`lib/kernel/engine/fvp_engine.dart:137`)
+6. `FvpCallbackHandler` maps mdk state changes to `MediaEngine.state` ValueNotifier via `SchedulerBinding.addPostFrameCallback` (`lib/kernel/engine/fvp_callback_handler.dart:36`)
+7. `PositionPoller.start()` begins 250ms polling loop (`lib/kernel/engine/position_poller.dart:39`)
+8. `engine.play()` sets mdk playing state (`lib/kernel/engine/fvp_engine.dart:276`)
+9. UI rebuilds via `ValueListenableBuilder` on `MediaEngine.state`, `position`, `duration`, etc.
 
-### Auto-Advance Flow: Track Completes
+### Auto-Advance Flow (StateMonitor)
 
-1. mdk fires `onMediaStatus` with `end` flag -> `FvpCallbackHandler` sets `state = MediaState.completed` (`lib/kernel/engine/fvp_callback_handler.dart:66`)
-2. `StateMonitor._onStateChanged()` detects completed state (`lib/kernel/services/state_monitor.dart:73`)
-3. If `loopSingle` mode: `playIndex(currentIndex)` replays same track (`lib/kernel/services/state_monitor.dart:78`)
-4. Otherwise: `playNext()` -> `Playlist.peekNext()` calculates next index based on play mode (`lib/kernel/playlist/playlist.dart:217`)
-5. `playIndex(nextIndex)` opens next track (same flow as primary request from step 4)
+1. `FvpCallbackHandler` detects `mdk.MediaStatus.end` → sets `state = MediaState.completed` (`lib/kernel/engine/fvp_callback_handler.dart:65`)
+2. `StateMonitor._onStateChanged()` receives notification (`lib/kernel/services/state_monitor.dart:56`)
+3. Checks `Playlist.mode`: `loopSingle` → replay current; otherwise → `playNext()` (`lib/kernel/services/state_monitor.dart:75-88`)
+4. `PlaybackNavigator.playNext()` calls `Playlist.peekNext()` to get index (`lib/kernel/services/playback_navigator.dart:87`)
 
-### State Persistence Flow: Pause/Exit
+### Breakpoint Resume Flow
 
-1. Pause detected in `StateMonitor._onStateChanged()`: saves breakpoint position to playlist item (`lib/kernel/services/state_monitor.dart:60-70`)
-2. On `dispose()`: saves current position, volume, muted state, play mode to SettingsStore (`lib/kernel/services/state_monitor.dart:131-147`)
-3. `PlaylistStore.save(playlist)` serializes to JSON, 300ms debounce, atomic write (.tmp rename) (`lib/kernel/persistence/playlist_store.dart:44-77`)
-4. `SettingsStore.saveVolume/saveIsMuted` write individual keys to SharedPreferences (`lib/kernel/persistence/settings_store.dart:182-216`)
-
-### Video Effect Flow: User Adjusts Brightness
-
-1. UI updates `VideoProcessingService.brightness.value` (`lib/kernel/services/video_processing_service.dart:57`)
-2. Listener calls `engine.setVideoEffect(VideoEffectType.brightness, value)` (`lib/kernel/services/video_processing_service.dart:57`)
-3. `FvpEngine._guardedAction` clamps value, maps to mdk.VideoEffect, calls `_player.setVideoEffect()` (`lib/kernel/engine/fvp_engine.dart:486-496`)
-4. 50ms debounce persists to SettingsStore (`lib/kernel/services/video_processing_service.dart:72-75`)
+1. On pause: `StateMonitor._onStateChanged()` saves position via `Playlist.updatePosition()` + `PlaylistStore.save()` (`lib/kernel/services/state_monitor.dart:60-69`)
+2. On play: `PlaybackNavigator.playIndex()` checks `current.positionMs`, if > 1000ms calls `engine.seekTo(savedMs)` (`lib/kernel/services/playback_navigator.dart:59-62`)
 
 **State Management:**
-- **ValueNotifier** is the sole reactive primitive. Engine exposes 13 ValueNotifiers. Services add their own (e.g., VideoProcessingService has 7). `ValueListenableBuilder` in UI binds to these.
-- **No global state container.** Each service holds its own notifiers. PlaybackController shares state via mixin `get` declarations.
-- **Playlist** is a mutable state machine. Its `items` getter returns `List.unmodifiable` to prevent external mutation.
+- All reactive state uses `ValueNotifier` — no external state management packages
+- `MediaEngine` exposes 13 `ValueNotifier`s: `textureId`, `state`, `position`, `duration`, `volume`, `isMuted`, `isBuffering`, `subtitleText`, `buffered`, `aspectRatio`, `errorMessage`, `playbackSpeed`, `activeDecoder`
+- `VideoProcessingService` exposes 7 `ValueNotifier`s: `brightness`, `contrast`, `saturation`, `hue`, `deinterlaceEnabled`, `rotation`, `aspectRatioMode`
+- `PlaybackController` adds `currentFileName` and `validationError` ValueNotifiers
 
 ## Key Abstractions
 
-**MediaEngine:**
-- Purpose: Abstract media playback interface decoupled from fvp/MDK
-- Examples: `lib/kernel/engine/media_engine.dart` (interface), `lib/kernel/engine/fvp_engine.dart` (impl)
-- Pattern: Interface with 13 ValueNotifiers for state, command methods (play/pause/seek), query methods (getAudioTracks/mediaInfo)
+**MediaEngine (abstract interface):**
+- Purpose: Decouple UI from playback backend (fvp/mdk). Enables testing with fake implementations.
+- Pattern: Abstract class with ValueNotifier getters + command methods
+- File: `lib/kernel/engine/media_engine.dart`
 
-**PlaybackController (Mixin Composition):**
-- Purpose: Business orchestration combining file ops, navigation, and state monitoring
-- Examples: `lib/kernel/services/playback_controller.dart` (composition), `lib/kernel/services/file_operations.dart`, `lib/kernel/services/playback_navigator.dart`, `lib/kernel/services/state_monitor.dart` (mixins)
-- Pattern: Concrete class `with` 3 mixins. Each mixin declares abstract `get` for shared state (engine, playlist, currentFileName). Controller provides concrete fields.
+**PlaybackController (mixin composition):**
+- Purpose: Single entry point for all playback business logic
+- Pattern: Class with 3 mixins sharing state via abstract getters
+- File: `lib/kernel/services/playback_controller.dart`
 
-**PlatformService (Singleton Factory):**
-- Purpose: Platform abstraction for window management
-- Examples: `lib/kernel/services/platform_service.dart` (interface + static singleton), `lib/kernel/platform/windows_platform_service.dart`, `lib/kernel/platform/linux_platform_service.dart`
-- Pattern: `PlatformService.init(impl)` in main(), `PlatformService.I` accessor elsewhere. `@visibleForTesting static reset()` for test isolation.
+**PlatformService (factory singleton):**
+- Purpose: Platform-specific behavior abstraction
+- Pattern: `PlatformService.init(impl)` in main(), `PlatformService.I` everywhere
+- File: `lib/kernel/services/platform_service.dart`
 
-**Playlist (State Machine):**
-- Purpose: Ordered list with 4 play modes and CQS navigation
-- Examples: `lib/kernel/playlist/playlist.dart`
-- Pattern: `peekNext()`/`peekPrevious()` return index without modifying state. Caller sets `currentIndex` explicitly. `List.unmodifiable` for external access.
+**Playlist (state machine with CQS):**
+- Purpose: Ordered list + play mode navigation
+- Pattern: `peekNext()`/`peekPrevious()` are pure queries; caller sets `currentIndex`
+- File: `lib/kernel/playlist/playlist.dart`
 
 ## Entry Points
 
 **App Entry:**
 - Location: `lib/main.dart`
-- Triggers: Flutter runtime `runApp()`
-- Responsibilities: fvp registration, SharedPreferences prewarm, PlatformService init, launch App widget
+- Triggers: Flutter framework
+- Responsibilities: Register fvp, prewarm SharedPreferences, init PlatformService, run App widget
 
 **App Shell:**
 - Location: `lib/app.dart`
-- Triggers: `runApp(App(...))`
-- Responsibilities: Create FvpEngine, Playlist, PlaybackController. Init services in parallel (`Future.wait`). Build MaterialApp with theme/locale.
-
-**File Open:**
-- Location: `lib/kernel/services/file_operations.dart:29` (`openAndPlay`)
-- Triggers: Keyboard O, FilePicker dialog, drag-drop
-- Responsibilities: Validate path, add to playlist, trigger playIndex
+- Triggers: `main()` → `runApp(App(...))`
+- Responsibilities: Create FvpEngine, Playlist, PlaybackController; parallel init; MaterialApp with DynamicColor + locale
 
 ## Architectural Constraints
 
-- **Threading:** Single-threaded Dart event loop. mdk callbacks dispatched to main thread via `SchedulerBinding.instance.addPostFrameCallback`. Position polling via `Timer.periodic(250ms)`.
-- **Global state:** `SettingsStore._cachedPrefs` (prewarmed SharedPreferences), `PlaylistStore` static debounce/write-in-flight state, `PlatformService._instance` singleton, `MotionUtils._reducedMotion` flag, `log` global Logger instance.
-- **Circular imports:** None detected. All imports flow downward: services -> engine -> models <- utils.
-- **Mixin coupling:** PlaybackController mixins share state via abstract `get` declarations. Mixins call each other's methods (e.g., `StateMonitor` calls `playIndex` from `PlaybackNavigator`). This is by design but means mixins cannot be used independently.
-- **No UI in kernel:** `lib/kernel/` contains no Flutter widgets (only theme tokens/ThemeData). UI widgets are expected outside kernel (currently missing from tree — see CONCERNS.md).
+- **Threading:** Single-threaded (Dart event loop). mdk callbacks from native threads are dispatched to main thread via `SchedulerBinding.addPostFrameCallback` in `FvpCallbackHandler`.
+- **Global state:** `SettingsStore._cachedPrefs` (SharedPreferences cache), `PlaylistStore` static state (debounce timer, pending JSON, write-in-flight), `PlatformService._instance` (singleton), `MotionUtils._reducedMotion` (static bool), `log` (global Logger instance).
+- **Circular imports:** None detected. Layer dependency flows: Entry → Service → Engine → Models. Persistence and Utils are leaf dependencies.
+- **Mixin coupling:** The 3 mixins (`FileOperations`, `PlaybackNavigator`, `StateMonitor`) share state via abstract getters declared in each mixin. `PlaybackController` provides the concrete implementations. This creates implicit coupling — all mixins must agree on the shared interface.
 
 ## Anti-Patterns
 
-### Missing UI Layer
+### Static Mutable State in Stores
 
-**What happens:** The `lib/kernel/` directory contains engine, services, models, persistence, playlist, and theme — but no actual Flutter widgets. The CLAUDE.md references widgets like `control_bar.dart`, `progress_bar.dart`, `player_screen.dart` that do not exist in the current codebase.
-**Why it's wrong:** The architecture is incomplete — there is no visible UI consuming the kernel services.
-**Do this instead:** Create `lib/ui/` with screens and widgets that use `ValueListenableBuilder` to bind to engine/service ValueNotifiers. Reference CLAUDE.md for the expected widget structure.
+**What happens:** `SettingsStore` and `PlaylistStore` use static methods with mutable static fields (`_cachedPrefs`, `_debounce`, `_pendingJson`, `_writeInFlight`).
+**Why it's wrong:** Makes testing harder (requires `reset()` calls), prevents multiple instances, creates hidden global dependencies.
+**Do this instead:** Consider constructor-injected store instances. Current code mitigates with `@visibleForTesting static void reset()` in both stores.
 
-### Deprecated Model/Utils Directories
+### Mixin Interface Contract
 
-**What happens:** `lib/models/` and `lib/utils/` exist at the top level alongside `lib/kernel/`. These appear to be deprecated locations being migrated into `lib/kernel/models/` and `lib/kernel/utils/`.
-**Why it's wrong:** Two locations for the same concern creates confusion about canonical source.
-**Do this instead:** Use only `lib/kernel/models/` and `lib/kernel/utils/`. Remove top-level duplicates after confirming no imports remain.
+**What happens:** The 3 mixins in `PlaybackController` declare abstract getters (`engine`, `playlist`, `currentFileName`, etc.) that must match exactly.
+**Why it's wrong:** If one mixin adds a new abstract member, compilation fails at the composing class, not at the mixin. The contract is implicit.
+**Do this instead:** Extract a shared interface (`PlaybackContext` or similar) that all mixins implement, making the contract explicit. Current approach works but relies on convention.
 
 ## Error Handling
 
-**Strategy:** Defensive programming with try-catch + log.d() + graceful fallback. Never crash, never silently swallow.
+**Strategy:** Catch + log + graceful fallback. No exceptions propagate to UI.
 
 **Patterns:**
-- **Guard Clause:** Every FvpEngine method checks `_disposed` before proceeding (`lib/kernel/engine/fvp_engine.dart:124-132`)
-- **_guardedAction:** Generic wrapper for engine methods — try-catch + log + set errorMessage ValueNotifier (`lib/kernel/engine/fvp_engine.dart:124-132`)
-- **Validation at boundary:** PathValidator checks at file open entry points, not deep in engine (`lib/kernel/utils/path_validator.dart:64`)
-- **Sanitize persistence:** SettingsStore clamps all values on load, sanitizes NaN/Infinity for window geometry (`lib/kernel/persistence/settings_store.dart:83-104`)
-- **Atomic write:** PlaylistStore writes .tmp then renames to prevent corruption (`lib/kernel/persistence/playlist_store.dart:51-77`)
-- **Corrupted data tolerance:** Playlist.fromJson skips individual corrupt items, PlaylistStore.load catches all exceptions and returns null (`lib/kernel/playlist/playlist.dart:288-295`, `lib/kernel/persistence/playlist_store.dart:82-100`)
+- Engine methods: `_guardedAction()` wraps try-catch, sets `errorMessage` ValueNotifier, logs via `debugPrint` (`lib/kernel/engine/fvp_engine.dart:124-132`)
+- Persistence: All `SettingsStore._save()` calls catch exceptions, log, and continue (`lib/kernel/persistence/settings_store.dart:173-180`)
+- PlaylistStore: `_flush()` catches write errors, logs, completes future to unblock next write (`lib/kernel/persistence/playlist_store.dart:51-77`)
+- Services: `StateMonitor.init()` catches settings load failure, continues with defaults (`lib/kernel/services/state_monitor.dart:37-43`)
+- UI: App `_init()` catches all exceptions, continues (player works without saved settings) (`lib/app.dart:46-58`)
 
 ## Cross-Cutting Concerns
 
-**Logging:** `log` global instance from `lib/kernel/utils/log.dart` using `logger` package PrettyPrinter. Debug-only (default filter). Used as `log.d()` throughout kernel.
-**Validation:** PathValidator at all file entry points. SettingsStore sanitizes all loaded values. Playlist clamps indices.
-**Authentication:** Not applicable (local desktop app).
-**Localization:** `flutter_localizations` + `AppLocalizations` generated from ARB files. zh/en supported. Default locale 'zh'.
-**Accessibility:** MotionUtils adapts animations when `AccessibilityFeatures.disableAnimations` is true (`lib/kernel/utils/motion_utils.dart`).
+**Logging:** `logger` package via global `log` instance (`lib/kernel/utils/log.dart`). Uses `PrettyPrinter` with no method count, compact desktop output. Only logs in debug mode.
+**Validation:** `PathValidator` for all file paths — extension whitelist, path traversal detection, null byte injection check (`lib/kernel/utils/path_validator.dart`).
+**Persistence:** `SharedPreferences` for settings (key-value), JSON files for playlist (debounced + atomic). Window geometry sanitized against NaN/Infinity/negative values.
+**Localization:** Flutter's built-in l10n with ARB files (`lib/l10n/app_en.arb`, `lib/l10n/app_zh.arb`). Default locale: Chinese (`zh`).
+**Accessibility:** `MotionUtils` adapts animations when system `disableAnimations` is enabled (`lib/kernel/utils/motion_utils.dart`).
 
 ---
 

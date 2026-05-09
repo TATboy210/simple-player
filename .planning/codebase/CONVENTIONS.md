@@ -5,218 +5,235 @@
 ## Naming Patterns
 
 **Files:**
-- `snake_case.dart` for all Dart files (e.g., `playback_controller.dart`, `media_engine.dart`)
-- Directories mirror module structure: `kernel/engine/`, `kernel/services/`, `kernel/models/`
+- `snake_case.dart` for all Dart files (Dart convention)
+- Examples: `playback_controller.dart`, `fvp_engine.dart`, `playlist_item.dart`
+
+**Classes:**
+- `PascalCase` for classes, enums, typedefs
+- Examples: `PlaybackController`, `MediaEngine`, `PlaylistItem`, `PlayMode`, `MediaState`
 
 **Functions/Methods:**
 - `camelCase` for all functions and methods
-- Private members prefixed with `_` (e.g., `_disposed`, `_currentPath`, `_guardedAction`)
-- Mixin methods follow same conventions as class methods
+- Examples: `playIndex()`, `openAndPlay()`, `seekTo()`, `setVolume()`
 
 **Variables:**
-- `camelCase` for variables (e.g., `currentFileName`, `openGeneration`)
-- Private fields prefixed with `_` (e.g., `_items`, `_currentIndex`, `_mode`)
-
-**Types/Classes:**
-- `PascalCase` for classes, enums, mixins (e.g., `PlaybackController`, `MediaEngine`, `PlayMode`)
-- Mixins: descriptive names (e.g., `FileOperations`, `PlaybackNavigator`, `StateMonitor`)
+- `camelCase` for local variables and parameters
+- Private members prefixed with `_`
+- Examples: `_player`, `_disposed`, `_currentPath`, `openGeneration`
 
 **Constants:**
-- `SCREAMING_SNAKE_CASE` for top-level constants (e.g., `_prepareTimeoutSeconds`, `_textureTimeoutSeconds`)
-- Private constants prefixed with `_` (e.g., `_keyVolume`, `_keyLastFile`)
-- SharedPreferences keys follow `_key` prefix pattern: `_keyVolume`, `_keyWindowWidth`
+- `camelCase` for class-level constants (Dart convention, not SCREAMING_SNAKE)
+- Examples: `_prepareTimeoutSeconds`, `_defaultSkipSeconds`, `_urlSchemes`
 
-**Booleans:**
-- Prefer `is`, `has`, `should` prefixes (e.g., `isMuted`, `isBuffering`, `isEmpty`, `isFullscreen`, `hasNext`, `hasPrevious`)
+**Enums:**
+- `PascalCase` enum name, `camelCase` values
+- Examples: `MediaState.idle`, `PlayMode.loopAll`, `VideoEffectType.brightness`
 
 ## Code Style
 
 **Formatting:**
-- `dart format` for all `.dart` files
-- Line length: 80 characters (dart format default)
-- Trailing commas on multi-line argument/parameter lists
+- Dart default formatter (`dart format`)
+- Line length: 80 characters (Dart default)
+- Trailing commas on multi-line argument lists
 
 **Linting:**
-- `analysis_options.yaml` includes `package:flutter_lints/flutter.yaml`
-- No custom lint rules beyond defaults
+- `package:flutter_lints/flutter.yaml` via `analysis_options.yaml`
+- No custom lint rules configured
 
 ## Import Organization
 
 **Order:**
-1. `dart:` imports (e.g., `dart:io`, `dart:async`, `dart:math`)
-2. External `package:` imports (e.g., `package:flutter/foundation.dart`, `package:fvp/mdk.dart`)
-3. Internal `package:` imports (e.g., `package:simple_player_flutter/kernel/...`)
-4. Relative imports for same-module files (e.g., `../models/media_state.dart`)
+1. `dart:*` imports first
+2. External `package:` imports (flutter, fvp, shared_preferences, etc.)
+3. Internal `package:simple_player_flutter/` imports
+4. Relative imports (`../models/`, `../utils/`) for same-package kernel code
 
-**Path Style:**
-- Relative imports used within kernel module: `import '../models/media_state.dart'`
-- Package imports for cross-module: `import 'package:simple_player_flutter/kernel/utils/path_validator.dart'`
-- Log utility imported as: `import 'package:simple_player_flutter/kernel/utils/log.dart'`
+**Pattern observed:**
+```dart
+import 'package:simple_player_flutter/kernel/utils/log.dart'; // package import first
+import 'dart:async';                                          // dart: after (inconsistent)
+import 'package:flutter/foundation.dart';                     // external package
+import '../models/media_state.dart';                          // relative for kernel
+```
+
+**Path aliases:** None used. All imports use relative paths within kernel or package imports.
 
 ## Error Handling
 
-**Patterns:**
-- Guard clause: check `_disposed` before any operation (e.g., `if (_disposed) return;`)
-- `_guardedAction` pattern in `FvpEngine`: wraps try-catch + log + sets `errorMessage.value`
-- Try-catch with `on Exception catch (e)` — never bare `catch (e)`
-- Log errors with `log.d()` (kernel-wide Logger instance)
-- Set `errorMessage.value` for user-visible errors
-- Graceful fallback: `SettingsStore.load()` returns defaults on failure, never crashes
-- Validation errors stored in `validationError` ValueNotifier, not thrown
+**Pattern: Guard Clause + try-catch + debugPrint**
 
-**Specific patterns from `lib/kernel/engine/fvp_engine.dart`:**
+Every public method follows this pattern:
 ```dart
-// Guard clause + try-catch + error message
-void _guardedAction(String name, void Function() action) {
-  if (_disposed) return;
+void someAction() {
+  if (_disposed) return;  // Guard: disposed check
   try {
-    action();
+    // action
   } on Exception catch (e) {
-    log.d('FvpEngine.$name error: $e');
-    errorMessage.value = '$name failed: $e';
+    log.d('ClassName.method error: $e');  // Log with logger package
+    errorMessage.value = '用户友好的错误消息: $e';  // Set error state
   }
 }
 ```
 
-**SettingsStore pattern from `lib/kernel/persistence/settings_store.dart`:**
-```dart
-// Generic save helper with try-catch
-static Future<void> _save(String method, Future<void> Function(SharedPreferences prefs) op) async {
-  try {
-    final prefs = await _getPrefs();
-    await op(prefs);
-  } on Exception catch (e) {
-    log.d('SettingsStore.$method failed: $e');
-  }
-}
-```
+**Key rules:**
+- Always check `_disposed` before any action
+- Use `on Exception catch (e)` — never bare `catch (e)`
+- Use `log.d()` (Logger package) for debug logging — never `print()`
+- Set `errorMessage.value` for user-facing errors (Chinese messages)
+- Use `_guardedAction()` helper in `FvpEngine` for repetitive guard+try-catch
+- `SettingsStore.load()` returns safe defaults on failure — never crashes
+- Deserialization uses defensive clamping (e.g., `modeIndex.clamp(0, PlayMode.values.length - 1)`)
 
-**Validation pattern from `lib/kernel/utils/path_validator.dart`:**
-```dart
-// Returns null for valid, error string for invalid
-static String? validate(String path) {
-  final trimmed = path.trim();
-  if (trimmed.isEmpty) return 'path is empty';
-  if (isPathTraversal(trimmed)) return 'unsafe path: $trimmed';
-  if (!isAllowedMedia(trimmed)) return 'unsupported file type: $trimmed';
-  return null;
-}
-```
+**Error propagation:**
+- `onError` callback for notifying UI layer
+- `validationError` ValueNotifier for path validation failures
+- `errorMessage` ValueNotifier on MediaEngine for playback errors
 
 ## Logging
 
-**Framework:** `logger` package via `lib/kernel/utils/log.dart`
+**Framework:** `logger` package (PrettyPrinter, methodCount: 0, no emojis)
 
-**Global instance:** `final Logger log = Logger(...)` — import as `log.d()`, `log.w()`
+**Implementation:** `lib/kernel/utils/log.dart`
+```dart
+final Logger log = Logger(
+  printer: PrettyPrinter(methodCount: 0, errorMethodCount: 4, ...),
+);
+```
 
-**Patterns:**
-- `log.d()` for debug messages (most common)
-- `log.w()` for warnings
-- Minimal method count, no emojis, compact desktop output
-- Only logs in debug mode (default filter)
+**Usage pattern:**
+```dart
+log.d('[ClassName] descriptive message: $context');
+log.w('Warning message');
+```
 
-**When to log:**
-- Error catch blocks: `log.d('ComponentName.method error: $e')`
-- State transitions: `log.d('[App] init completed in ${sw.elapsedMilliseconds}ms')`
-- Validation failures: `log.d('playIndex: rejected unsafe path: $validationError')`
-- Guard blocks: `log.w('FvpEngine.open() blocked — already opening')`
+**Rules:**
+- Use `log.d()` for debug info, `log.w()` for warnings
+- Prefix messages with `[ClassName]` for source identification
+- Include relevant context (path, error, state)
+- Never use `print()` or `debugPrint()` for logging (use `log.*` instead)
 
 ## Comments
 
 **When to Comment:**
-- Chinese comments are acceptable (existing codebase convention)
-- Doc comments (`///`) on all public classes, mixins, and key methods
-- Inline comments for non-obvious logic (e.g., `// PAR correction`)
-- Section dividers: `// ─── Section Name ───`
+- Chinese comments are acceptable and common throughout the codebase
+- Document complex algorithms (e.g., CQS navigation, index clamping)
+- Explain "why" not "what" for non-obvious decisions
+- Use `///` doc comments for public APIs
+- Use `//` for inline explanations
 
-**Doc Comment Style:**
+**Examples:**
 ```dart
-/// FileOperations mixin — open/batch add files
+/// 播放列表管理 — 状态机
 ///
-/// Responsibilities: openAndPlay, addFiles, validationError
-mixin FileOperations {
-```
+/// 核心职责:
+///   - 维护有序播放项列表
+///   - 跟踪当前播放索引（add/remove/reorder 时自动调整）
 
-**Section Dividers:**
-```dart
-// ─── Playback Control ───
-// ─── Audio/Subtitle (delegated to TrackManager) ───
-// ─── Lifecycle ───
+// CQS 分离: next()/previous() 只返回新索引，不修改内部状态
+// 设计决策: peekNext/peekPrevious 是纯查询，不修改 _currentIndex。
 ```
 
 ## Function Design
 
-**Size:** Keep functions focused. Large operations decomposed into helpers (e.g., `_guardedAction`, `_sanitizeDimension`).
+**Size:** Functions are typically 10-40 lines. Complex functions like `FvpEngine.open()` are ~80 lines but broken into clear sections.
 
 **Parameters:**
-- Use named parameters with `required` for mandatory fields
-- Optional parameters with defaults: `[int seconds = 10]`
-- Defensive clamping: `value.clamp(0.0, 1.0)`
+- Use named parameters with `required` for mandatory params
+- Use default values for optional params: `[int seconds = 10]`
+- Clamp numeric inputs at entry: `value.clamp(0.0, 1.0)`
 
 **Return Values:**
-- CQS separation: query methods return values without side effects (e.g., `peekNext()` returns index without mutating `_currentIndex`)
-- Command methods are void or return Future<void>
-- Validation methods return `String?` (null = valid, string = error message)
+- `void` for commands (CQS pattern)
+- `Future<void>` for async commands
+- Return values for queries: `int peekNext()`, `String? validate()`
+- `bool` for success/failure: `Future<bool> openAndPlay()`
 
 ## Module Design
 
-**State Management:**
-- `ValueNotifier` + `ValueListenableBuilder` pattern (no Provider/Riverpod/Bloc)
-- `MediaEngine` exposes 13 ValueNotifiers as reactive state
+**Exports:**
+- Classes exported directly from their files (no barrel files)
+- No `index.dart` or barrel export files detected
+
+**Mixins:**
+- `FileOperations`, `PlaybackNavigator`, `StateMonitor` are mixins composed into `PlaybackController`
+- Mixins declare abstract getters for shared dependencies: `MediaEngine get engine;`
+- Mixins use `on` clause for type constraints where needed
+
+**Singletons:**
+- `PlatformService.I` — factory singleton with `init()` / `reset()` pattern
+- `SettingsStore` — static class with `_cachedPrefs` for prewarm optimization
+- `log` — top-level final Logger instance
+
+## State Management
+
+**Pattern: ValueNotifier + ValueListenableBuilder**
+
+- No Provider, Riverpod, or Bloc
+- `MediaEngine` exposes 13 `ValueNotifier` fields for reactive state
 - Widgets rebuild via `ValueListenableBuilder` wrappers
+- `ValueNotifier` lifecycle: create in constructor, `dispose()` in `dispose()`
 
-**Mixin Composition:**
-- `PlaybackController` composed of 3 mixins: `FileOperations`, `PlaybackNavigator`, `StateMonitor`
-- Mixins declare abstract getters for shared state: `MediaEngine get engine; Playlist get playlist;`
-- Mixins implement shared methods: `void savePlaylist();`
+**Example:**
+```dart
+final ValueNotifier<MediaState> state = ValueNotifier<MediaState>(MediaState.idle);
 
-**Singleton Pattern:**
-- `PlatformService` uses factory singleton: `PlatformService.init()` in main(), `PlatformService.I` throughout app
-- `@visibleForTesting static void reset()` for test teardown
+@override
+void dispose() {
+  state.dispose();
+  // ... dispose all notifiers
+}
+```
 
-**Data Classes:**
-- Immutable with `copyWith()` pattern (e.g., `PlaylistItem`)
-- `toJson()` / `fromJson()` for serialization
-- Defensive deserialization: clamp values, skip corrupt items, fallback to defaults
+## Immutability
 
-**Abstract Interfaces:**
-- `MediaEngine` defines the engine contract — all playback backends implement this
-- UI layer depends only on the interface, not concrete implementations
+**Models:**
+- `PlaylistItem` uses `copyWith()` for immutable updates
+- `AppSettings` is `const` constructor with all `final` fields
+- `MediaInfo`, `AudioTrackInfo`, `SubtitleTrackInfo`, `VideoCodecInfo` are all `const` with `final` fields
+- `Playlist.items` returns `List.unmodifiable(_items)` to prevent external mutation
+
+**Collections:**
+- Internal lists are mutable (`_items`, `_players`)
+- Public getters return unmodifiable views
+
+## Conventional Commits
+
+**Format:** `type: description`
+
+**Types used:**
+- `feat:` — new features
+- `fix:` — bug fixes
+- `refactor:` — code restructuring
+- `test:` — test additions/changes
+- `docs:` — documentation
+- `chore:` — maintenance
+
+## Dart 3 Features
+
+**Pattern matching:**
+```dart
+final mdkEffect = switch (effect) {
+  VideoEffectType.brightness => mdk.VideoEffect.brightness,
+  VideoEffectType.contrast => mdk.VideoEffect.contrast,
+  VideoEffectType.hue => mdk.VideoEffect.hue,
+  VideoEffectType.saturation => mdk.VideoEffect.saturation,
+};
+```
+
+**Sealed classes:** Not currently used (enums preferred for simple state)
 
 ## Defensive Programming
 
-**Input Clamping:**
-```dart
-final clamped = value.clamp(0.0, 1.0);
-```
-All numeric inputs clamped to valid ranges at entry points.
+**Input validation at boundaries:**
+- `PathValidator.validate()` — path traversal + extension whitelist
+- `PathValidator.isAllowedMedia()` — extension check
+- Numeric clamping: `value.clamp(min, max)` everywhere
+- `fromJson` methods validate types: `if (path is! String) throw FormatException(...)`
+- Window geometry sanitization: `_sanitizeDimension()`, `_sanitizeCoordinate()`
 
-**Index Validation:**
-```dart
-if (index < 0 || index >= playlist.length) return;
-```
-Bounds checks before any list access.
-
-**Serialization Defense:**
-```dart
-final modeIndex = (json['mode'] as num?)?.toInt() ?? 0;
-playlist._mode = (modeIndex >= 0 && modeIndex < PlayMode.values.length)
-    ? PlayMode.values[modeIndex]
-    : PlayMode.normal;
-```
-Clamp indices, skip corrupt items, fallback to defaults.
-
-**Path Traversal Prevention:**
-```dart
-if (isPathTraversal(trimmed)) return 'unsafe path: $trimmed';
-```
-All file paths validated through `PathValidator.validate()` before use.
-
-**Lifecycle Guards:**
-```dart
-if (_disposed) return;
-```
-Check `_disposed` flag before every operation in engine/services.
+**Disposed guards:**
+- Every public method on disposable classes checks `_disposed`
+- Pattern: `if (_disposed) return;`
 
 ---
 
