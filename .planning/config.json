@@ -20,5 +20,11 @@
     "code_review_depth": "standard",
     "ui_review": true,
     "skip_discuss": false
+  },
+  "intel": {
+    "enabled": false
+  },
+  "graphify": {
+    "enabled": false
   }
 }
