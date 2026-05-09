@@ -28,7 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can drag title bar to move window, double-tap to toggle maximize, and resize edges while aspect ratio stays locked (16:9 idle, video ratio when playing)
   4. F11 toggles fullscreen reliably with no ABA state corruption, and fullscreen reentry guard prevents rapid toggling
   5. Window size/position/maximized/fullscreen/pin state persists (500ms debounce) and restores correctly, with bounds clamping to visible screen on multi-monitor setups
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — WindowManagerService + PlatformService extension + title bar tokens
+- [ ] 01-02-PLAN.md — AspectRatioService + CustomTitleBar with Win11-style buttons
+- [ ] 01-03-PLAN.md — App shell wiring + FakePlatformService + comprehensive tests
 
 **UI hint**: yes
 
@@ -62,6 +67,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Window Shell | 0 | Not started | - |
+| 1. Window Shell | 0 | Planning complete | - |
 | 2. Video & Content | 0 | Not started | - |
 | 3. Security Hardening | 0 | Not started | - |
