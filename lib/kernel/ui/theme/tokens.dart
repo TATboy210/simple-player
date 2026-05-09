@@ -38,10 +38,6 @@ class Tokens {
   static const radiusMd = 10.0;
   static const radiusBtn = 8.0;
 
-  // ── 标题栏 ──
-  static const titleBarHeight = 36.0;
-  static const titleBarButtonWidth = 46.0;
-
   // ── 毛玻璃 ──
   static const glassBlurThin = 12.0;
   static const glassBlur = 16.0;
@@ -54,4 +50,12 @@ class Tokens {
 
   // ── 图标 ──
   static const iconLg = 20.0;
+
+  // ── 标题栏 ──
+  static const titleBarHeight = 36.0;
+  static const titleBarButtonWidth = 36.0; // D-04: 36x36px
+  static const titleBarBg = Color(0xE61A1A24); // 90% opacity bgPanel
+  static const titleBarBorder = Color(0x33FFFFFF); // reuse borderHighlight
+  static const titleBarHover = Color(0x1AFFFFFF); // 10% white overlay
+  static const closeHoverBg = Color(0xFFC42B1C); // Win11 close red fallback
 }
