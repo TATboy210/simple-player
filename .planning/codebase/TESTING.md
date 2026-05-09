@@ -1,42 +1,47 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-07
+**Analysis Date:** 2026-05-09
 
 ## Test Framework
 
 **Runner:**
-- `flutter_test` (built-in with Flutter SDK)
-- Config: `pubspec.yaml` dev_dependencies: `flutter_test: sdk: flutter`
+- `flutter_test` (built-in Flutter test runner)
+- Config: `pubspec.yaml` dev_dependencies
 
 **Assertion Library:**
-- Built-in `expect()` from `flutter_test` / `test` package
-- Matchers: `equals`, `isNull`, `isNotNull`, `isTrue`, `isFalse`, `isEmpty`, `isNotEmpty`, `contains`, `closeTo`, `throwsA`, `isA<Type>()`, `greaterThan`, `greaterThanOrEqualTo`, `anyOf`, `same`
+- `flutter_test` built-in matchers (`expect`, `isNotNull`, `isTrue`, `equals`, etc.)
+
+**Mocking Library:**
+- Hand-written fakes (no mockito/mocktail)
+
+**Async Testing:**
+- `fake_async: ^1.0.0` available but not heavily used
+- `Future<void>.value()` for minimal async yield in tests
+- `Future<void>.delayed()` for debounce testing
 
 **Run Commands:**
 ```bash
 flutter test                    # Run all tests
-flutter test --coverage         # Run with coverage report
-flutter test test/kernel/playlist/playlist_test.dart  # Run single file
+flutter test --coverage         # With coverage
+dart test test/kernel/          # Run specific directory
 ```
 
 ## Test File Organization
 
 **Location:**
-- Co-located with source: `lib/kernel/playlist/playlist.dart` -> `test/kernel/playlist/playlist_test.dart`
-- Additional test directories:
-  - `test/helpers/` -- Shared fakes and test utilities
-  - `test/unit/` -- Additional unit tests (platform service, perf)
-  - `test/unit/kernel/engine/` -- Engine extension tests
+- Tests mirror source structure under `test/`
+- Co-located pattern: `test/kernel/services/playback_controller_test.dart` tests `lib/kernel/services/playback_controller.dart`
 
 **Naming:**
-- Source file: `playlist.dart` -> Test file: `playlist_test.dart`
-- Helpers: `fake_engine.dart` (no `_test` suffix)
+- `{module_name}_test.dart` pattern
+- Test files match source file names exactly
 
-**Directory Structure:**
+**Structure:**
 ```
 test/
 ├── helpers/
-│   └── fake_engine.dart              # Hand-written FakeEngine for MediaEngine
+│   ├── fake_engine.dart              # Fake MediaEngine implementation
+│   └── fake_platform_service.dart    # Fake PlatformService implementation
 ├── kernel/
 │   ├── engine/
 │   │   ├── fvp_callback_handler_test.dart
@@ -58,17 +63,14 @@ test/
 │   │   ├── playback_navigator_test.dart
 │   │   ├── state_monitor_test.dart
 │   │   └── video_processing_service_test.dart
-│   ├── utils/
-│   │   └── path_utils_test.dart
-│   └── window/
-│       ├── aspect_ratio_service_test.dart
-│       └── window_manager_service_test.dart
+│   └── utils/
+│       └── path_utils_test.dart
 └── unit/
-    ├── kernel/engine/
-    │   └── media_engine_extension_test.dart
-    ├── perf/
-    │   └── startup_parallel_init_test.dart
-    └── platform_service_test.dart
+    ├── kernel/
+    │   └── engine/
+    │       └── media_engine_extension_test.dart
+    └── perf/
+        └── startup_parallel_init_test.dart
 ```
 
 ## Test Structure
@@ -76,22 +78,40 @@ test/
 **Suite Organization:**
 ```dart
 void main() {
-  group('ClassName', () {
-    late ClassName instance;
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    setUp(() {
-      instance = ClassName();
-    });
+  late FakeEngine engine;
+  late Playlist playlist;
+  late PlaybackController controller;
 
-    tearDown(() {
-      instance.dispose();
-    });
+  setUp(() {
+    engine = FakeEngine();
+    playlist = Playlist();
+    controller = PlaybackController(
+      engine: engine,
+      playlist: playlist,
+      onNeedRebuild: () {},
+    );
+  });
 
-    group('feature area', () {
-      test('describes expected behavior', () {
+  tearDown(() {
+    controller.dispose();
+    engine.dispose();
+  });
+
+  group('ComponentName', () {
+    group('methodOrFeature', () {
+      test('specific behavior description', () async {
         // Arrange
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/test/video.mp4');
+
         // Act
+        await controller.playIndex(0);
+
         // Assert
+        expect(playlist.currentIndex, 0);
+        expect(engine.state.value, MediaState.playing);
       });
     });
   });
@@ -99,129 +119,67 @@ void main() {
 ```
 
 **Patterns:**
-- `setUp()` for creating instances and resetting state
-- `tearDown()` for disposing resources (ValueNotifiers, engines, controllers)
-- Nested `group()` by class name, then by feature/behavior area
-- `TestWidgetsFlutterBinding.ensureInitialized()` at top of `main()` when testing code that uses Flutter bindings (SchedulerBinding, platform channels)
-- Chinese test descriptions are acceptable: `test('rejects non-string path', () { ... })`
+- `TestWidgetsFlutterBinding.ensureInitialized()` at top of main when ValueNotifiers used
+- `setUp()` creates fresh instances per test
+- `tearDown()` disposes all resources (engine, controller, ValueNotifiers)
+- `group()` for component-level and method-level organization
+- Nested `group()` for feature subdivisions
 
-**Test Naming:**
-- Descriptive behavior-focused names in English or Chinese
-- Format: `test('action/behavior when condition', () { ... })`
-- Examples:
-  - `test('rejects empty path and sets validationError', () async { ... })`
-  - `test('maps stopped to MediaState.stopped', () { ... })`
-  - `test('fromJson clamps out-of-range mode', () { ... })`
+## Mocking
 
-## Mocking / Faking
+**Approach:** Hand-written fakes implementing abstract interfaces
 
-**Framework:** Hand-written fakes (no mockito/mocktail)
+**FakeEngine (`test/helpers/fake_engine.dart`):**
+- Implements `MediaEngine` interface
+- Provides controllable behavior: `configureMedia()`, `simulateError()`, `simulateCompleted()`, `simulateBuffering()`
+- Call tracking: `openCallCount`, `playCallCount`, `pauseCallCount`, `stopCallCount`, `seekToCallCount`, `openPaths`
+- State capture: `lastSeekToMs`, `lastExternalSubtitlePath`, `lastVideoEffectType`, `lastVideoEffectValue`, `lastRotateDegree`, `lastAspectRatioValue`, `lastDeinterlaceValue`
+- Error simulation: `failNextOpenWith` (one-shot)
+- Disposal guard: checks `_disposed` before operations
 
-**Primary Fake:** `FakeEngine` at `test/helpers/fake_engine.dart`
-- Implements `MediaEngine` interface completely
-- No FFI imports, no platform plugins -- runs purely in Dart
-- Call tracking: `openCallCount`, `playCallCount`, `pauseCallCount`, `stopCallCount`, `openPaths`
-- Configurable failure: `failNextOpenWith` (one-shot error injection)
-- Pre-configuration: `configureMedia(durationMs:, audioTracks:, subtitleTracks:)`
-- Simulation helpers: `simulateError()`, `simulateCompleted()`, `simulateBuffering()`
-- Trackable state for new methods: `seekToCallCount`, `lastSeekToMs`, `setExternalSubtitleCallCount`, `lastExternalSubtitlePath`, `setVideoEffectCallCount`, `lastVideoEffectType`, `rotateCallCount`, etc.
+**FakePlatformService (`test/helpers/fake_platform_service.dart`):**
+- Minimal implementation: `initService()` and `dispose()` are no-ops
 
-**Secondary Fake:** `FakePlatformService` at `test/unit/platform_service_test.dart`
-- Implements `PlatformService` interface
-- Call counters for all window methods: `minimizeCalls`, `toggleMaximizeCalls`, etc.
+**What to Mock:**
+- `MediaEngine` — always use `FakeEngine` (never the real `FvpEngine` which requires FFI/native)
+- `PlatformService` — use `FakePlatformService`
+- `SharedPreferences` — use `SharedPreferences.setMockInitialValues({})`
 
-**What to Fake:**
-- All external dependencies with FFI/platform channels (mdk.Player, window_manager, SharedPreferences)
-- Abstract interfaces: `MediaEngine`, `PlatformService`
-- I/O operations: file system access for subtitle detection tests uses real temp directories
-
-**What NOT to Fake:**
-- Pure data classes (`Playlist`, `PlaylistItem`, `MediaInfo`, `AppSettings`)
-- Pure utility functions (`PathUtils`, `PathValidator`, `formatMs`)
-- Enum mappings (`FvpCallbackHandler.mapMdkState`)
-
-**SharedPreferences Mocking:**
-```dart
-setUp(() {
-  SharedPreferences.setMockInitialValues({'key': value});
-});
-```
-- Use `SharedPreferences.setMockInitialValues()` for persistence tests
-- Call `SettingsStore.resetPrewarm()` in setUp/tearDown to clear cached instance
-- Call `PlaylistStore.reset()` in tearDown to clear static debounce state
-
-**MethodChannel Mocking:**
-```dart
-setUp(() {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(
-    const MethodChannel('com.simple_player/aspect_ratio'),
-    (MethodCall methodCall) async {
-      calls.add(methodCall);
-      return null;
-    },
-  );
-});
-```
-- Used for testing `AspectRatioService` native calls
-- Verify method name and arguments sent to platform
-
-## Async Testing
-
-**Pattern -- yield to let async complete:**
-```dart
-test('adds file to playlist and starts playback', () async {
-  engine.configureMedia(durationMs: 120000);
-  final result = await controller.openAndPlay('C:/test/video.mp4');
-  await Future(() {});  // Yield to let backgrounded playIndex complete
-  expect(result, true);
-  expect(engine.state.value, MediaState.playing);
-});
-```
-
-**Pattern -- debounce testing with delayed wait:**
-```dart
-test('brightness change persists to SharedPreferences', () async {
-  service.brightness.value = 0.5;
-  await Future<void>.delayed(const Duration(milliseconds: 100));  // Wait for 50ms debounce
-  final prefs = await SharedPreferences.getInstance();
-  expect(prefs.getDouble('videoBrightness'), closeTo(0.5, 0.01));
-});
-```
-
-**Pattern -- widget tester pump for timers:**
-```dart
-testWidgets('isResizing resets after debounce', (WidgetTester tester) async {
-  wm.onWindowResize();
-  wm.onWindowResized();
-  await tester.pump(const Duration(milliseconds: 600));
-  expect(wm.isResizing.value, isFalse);
-});
-```
+**What NOT to Mock:**
+- `Playlist` — use real instance (pure Dart, no platform deps)
+- `PlaylistItem` — use real instance
+- `PathValidator` — use real implementation
+- `SettingsStore` — use real with mocked SharedPreferences
 
 ## Fixtures and Factories
 
 **Test Data:**
-- Inline test data in each test file (no shared fixtures directory)
-- Paths use Windows-style strings: `'C:/test/video.mp4'`, `'C:/a.mp4'`
-- Playlist creation helper in setUp:
 ```dart
-setUp(() {
-  playlist = Playlist();
-  playlist.add('C:/a.mp4');
-  playlist.add('C:/b.mp4');
-  playlist.add('C:/c.mp4');
-});
+// Common test paths
+const testPath = 'C:/test/video.mp4';
+const testPathA = 'C:/a.mp4';
+const testPathB = 'C:/b.mp4';
+const testPathC = 'C:/c.mp4';
+
+// Engine configuration
+engine.configureMedia(durationMs: 60000);
+
+// Playlist setup
+playlist.add('C:/a.mp4');
+playlist.add('C:/b.mp4');
+playlist.add('C:/c.mp4');
 ```
 
-**Auto-advance helper (reused across test files):**
+**Helper Methods:**
 ```dart
+// Register auto-advance listener (bypasses init() which needs SharedPreferences)
 void registerAutoAdvance() {
   engine.state.addListener(() {
     final state = engine.state.value;
     if (state != MediaState.completed) return;
     if (playlist.mode == PlayMode.loopSingle) {
-      controller.playIndex(playlist.currentIndex).catchError((e) {});
+      final idx = playlist.currentIndex;
+      if (idx >= 0) controller.playIndex(idx).catchError((e) {});
     } else {
       controller.playNext().catchError((e) {});
     }
@@ -229,71 +187,138 @@ void registerAutoAdvance() {
 }
 ```
 
-**Temp directory for file I/O tests:**
-```dart
-setUp(() {
-  tempDir = Directory.systemTemp.createTempSync('subtitle_test_');
-});
-tearDown(() {
-  tempDir.deleteSync(recursive: true);
-});
-```
+**Location:**
+- Shared fakes: `test/helpers/`
+- Test-specific helpers defined inline in test files
 
 ## Coverage
 
-**Requirements:** Not explicitly enforced in config, but CLAUDE.md states 80% minimum target.
+**Requirements:** Not formally enforced, but tests exist for all kernel modules
 
 **View Coverage:**
 ```bash
-flutter test --coverage           # Generates coverage/lcov.info
+flutter test --coverage
+# Generates coverage/lcov.info
 ```
 
 ## Test Types
 
 **Unit Tests:**
-- All kernel logic: Playlist, PlaylistItem, PathValidator, PathUtils, SettingsStore, formatMs
-- All services via FakeEngine: PlaybackController, FileOperations, PlaybackNavigator, StateMonitor, VideoProcessingService
-- Engine helpers: FvpCallbackHandler (static mapMdkState), TrackManager (data classes)
-- Model classes: MediaInfo, VideoCodecInfo, AspectRatioMode, AppSettings
-- Window services: WindowManagerService (via WindowListener callbacks), AspectRatioService (via MethodChannel mock)
-- Platform service: PlatformService singleton lifecycle via FakePlatformService
-- Persistence: SettingsStore with SharedPreferences mocks
+- All kernel logic: engine, services, models, persistence, playlist, utils
+- Pure Dart tests with no Flutter widget dependencies
+- Path validation, serialization, state machines, navigation logic
 
 **Widget Tests:**
-- WindowManagerService resize debouncing uses `testWidgets` with `tester.pump()`
-- No dedicated widget tests for UI components in this directory (UI widgets may be tested elsewhere)
+- Not currently present in test suite
+- UI testing would require `FakeEngine` + `FakePlatformService` setup
 
-**Integration/E2E Tests:**
-- Not present in this test directory
-- `external_subtitle_test.dart` is a hybrid: uses real filesystem (temp directory) with FakeEngine
+**Integration Tests:**
+- Not currently present
+- `test/kernel/services/external_subtitle_test.dart` uses real filesystem (`Directory.systemTemp.createTempSync`) as integration-style test
+
+**Performance Tests:**
+- `test/unit/perf/startup_parallel_init_test.dart` verifies `Future.wait` parallelism
 
 ## Common Patterns
 
-**ValueNotifier assertion:**
+**Async Testing:**
 ```dart
-test('mode ValueNotifier notifies listeners on change', () {
-  final values = <WindowMode>[];
-  wm.mode.addListener(() => values.add(wm.mode.value));
-  wm.mode.value = WindowMode.fullscreen;
-  wm.mode.value = WindowMode.windowed;
-  expect(values, [WindowMode.fullscreen, WindowMode.windowed]);
+// Await async operations
+await controller.playIndex(0);
+
+// Yield to let backgrounded async complete
+await Future(() {});
+
+// Debounce testing with delay
+await Future<void>.delayed(const Duration(milliseconds: 100));
+```
+
+**ValueNotifier Testing:**
+```dart
+// Direct value assertion
+expect(engine.state.value, MediaState.playing);
+expect(engine.position.value, 0);
+expect(controller.currentFileName.value, 'video.mp4');
+
+// Value change verification
+engine.position.value = 5000;
+engine.state.value = MediaState.paused;
+```
+
+**Error Testing:**
+```dart
+// Validation error checking
+final result = await controller.openAndPlay('');
+expect(result, false);
+expect(controller.validationError.value, isNotNull);
+expect(controller.validationError.value, contains('empty'));
+
+// Engine error simulation
+engine.failNextOpenWith = 'decode failed';
+await controller.playIndex(0);
+expect(errors, isNotEmpty);
+
+// Error state simulation
+engine.simulateError('test error');
+expect(engine.errorMessage.value, 'test error');
+```
+
+**Call Tracking:**
+```dart
+// Verify method was called
+expect(engine.openCallCount, 1);
+expect(engine.playCallCount, 1);
+expect(engine.seekToCallCount, 1);
+
+// Verify call arguments
+expect(engine.openPaths.last, contains('b.mp4'));
+expect(engine.lastSeekToMs, 30000);
+expect(engine.lastExternalSubtitlePath, contains('video.srt'));
+expect(engine.lastVideoEffectType, VideoEffectType.brightness);
+```
+
+**SharedPreferences Mocking:**
+```dart
+setUp(() {
+  SharedPreferences.setMockInitialValues({});
+  SettingsStore.resetPrewarm();
+});
+
+test('reads value from SharedPreferences', () async {
+  SharedPreferences.setMockInitialValues({'volume': 0.5});
+  final settings = await SettingsStore.load();
+  expect(settings.volume, closeTo(0.5, 0.01));
+});
+
+test('writes value to SharedPreferences', () async {
+  await SettingsStore.saveVolume(0.5);
+  final prefs = await SharedPreferences.getInstance();
+  expect(prefs.getDouble('volume'), closeTo(0.5, 0.01));
 });
 ```
 
-**Error injection:**
+**Boundary Testing:**
 ```dart
-test('restores old index on engine.open failure', () async {
-  playlist.add('C:/a.mp4');
-  playlist.add('C:/b.mp4');
-  await controller.playIndex(0);
-  final oldIndex = playlist.currentIndex;
-  engine.failNextOpenWith = 'open failed';
-  await controller.playIndex(1);
-  expect(playlist.currentIndex, oldIndex);
+test('clamps out-of-range values', () async {
+  SharedPreferences.setMockInitialValues({
+    'videoBrightness': 5.0,  // above max 1.0
+    'videoContrast': -5.0,   // below min -1.0
+    'videoRotation': 45,     // not in {0, 90, 180, 270}
+  });
+  final settings = await SettingsStore.load();
+  expect(settings.videoBrightness, 1.0);
+  expect(settings.videoContrast, -1.0);
+  expect(settings.videoRotation, 0);
+});
+
+test('rejects out-of-range index', () async {
+  await controller.playIndex(-1);
+  await controller.playIndex(99);
+  expect(engine.openCallCount, 0);
 });
 ```
 
-**Serialization round-trip:**
+**Serialization Round-Trip:**
 ```dart
 test('round-trip', () {
   final original = PlaylistItem(path: '/test/video.mp4');
@@ -301,36 +326,66 @@ test('round-trip', () {
   final restored = PlaylistItem.fromJson(json);
   expect(restored, equals(original));
 });
-```
 
-**Defensive boundary testing:**
-```dart
-test('rejects non-string path', () {
-  expect(
-    () => PlaylistItem.fromJson({'path': 123}),
-    throwsA(isA<FormatException>()),
-  );
+test('fromJson handles empty map', () {
+  final restored = Playlist.fromJson({});
+  expect(restored.isEmpty, true);
+  expect(restored.currentIndex, -1);
+  expect(restored.mode, PlayMode.normal);
 });
 ```
 
-**PlatformException rollback testing:**
+**Disposal Testing:**
 ```dart
-test('setAspectRatio rolls back on platform exception', () async {
-  await service.setAspectRatio(1.5);
-  expect(service.current, 1.5);
-  // Override with error handler
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(
-    const MethodChannel('com.simple_player/aspect_ratio'),
-    (MethodCall methodCall) async {
-      throw PlatformException(code: 'ERROR', message: 'test error');
-    },
-  );
-  await service.setAspectRatio(2.0);
-  expect(service.current, 1.5);  // Rolled back
+test('dispose does not throw', () {
+  expect(() => service.dispose(), returnsNormally);
 });
+
+test('operations are no-op when disposed', () {
+  final testEngine = FakeEngine();
+  testEngine.dispose();
+  testEngine.setExternalSubtitle('/path/to/sub.srt');
+  expect(testEngine.setExternalSubtitleCallCount, 0);
+});
+```
+
+**Concurrency Guard Testing:**
+```dart
+test('generation guard: only last request wins', () async {
+  final f1 = controller.playIndex(0);
+  final f2 = controller.playIndex(1);
+  final f3 = controller.playIndex(2);
+  await f1;
+  await f2;
+  await f3;
+  expect(playlist.currentIndex, 2);
+  expect(controller.currentGeneration, 3);
+});
+```
+
+**Filesystem Integration:**
+```dart
+late Directory tempDir;
+
+setUp(() {
+  tempDir = Directory.systemTemp.createTempSync('test_prefix_');
+});
+
+tearDown(() {
+  try {
+    tempDir.deleteSync(recursive: true);
+  } on Exception {
+    // ignore cleanup failures
+  }
+});
+
+File createFile(String name, [String content = '']) {
+  final file = File('${tempDir.path}/$name');
+  file.writeAsStringSync(content);
+  return file;
+}
 ```
 
 ---
 
-*Testing analysis: 2026-05-07*
+*Testing analysis: 2026-05-09*

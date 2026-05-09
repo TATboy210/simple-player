@@ -1,30 +1,120 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-07T19:00:00.000Z",
-  "phase": 3,
-  "phase_name": "playback-aware-sizing",
-  "phase_dir": ".planning/phases/03-playback-aware-sizing",
-  "plan": 3,
-  "task": 0,
-  "total_tasks": 0,
-  "status": "complete",
+  "timestamp": "2026-05-07T21:45:00+08:00",
+  "phase": null,
+  "phase_name": null,
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "03-01: Wire StateMonitor to AspectRatioService", "status": "done", "commit": "41d1a63"},
-    {"id": 2, "name": "03-02: WindowManagerService hardening (persist + hover)", "status": "done", "commit": "765e914"},
-    {"id": 3, "name": "03-03: Aspect ratio cycle button + tests", "status": "done", "commit": "6d3f933"}
+    {
+      "id": 1,
+      "name": "Stack+AnimatedOpacity pattern for CustomTitleBar",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 2,
+      "name": "Hover guard in _TitleBarButtonState (isResizing check)",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 3,
+      "name": "RepaintBoundary wrapper in app.dart",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 4,
+      "name": "Update resize degradation tests (AnimatedOpacity opacity check)",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 5,
+      "name": "Impeller engine configuration in main.cpp",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 6,
+      "name": "WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE in win32_window.cpp",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 7,
+      "name": "_prepareFramelessFirstFrame + ForceRedraw bridge layer verification",
+      "status": "done",
+      "commit": "uncommitted"
+    }
   ],
-  "remaining_tasks": [],
-  "blockers": [],
+  "remaining_tasks": [
+    {
+      "id": 8,
+      "name": "Manual verification: resize drag jitter test",
+      "status": "not_started"
+    },
+    {
+      "id": 9,
+      "name": "Manual verification: 4K Blu-ray content playback",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "Title bar jitter may be a Flutter framework-level issue (flutter/flutter#65460, flutter/flutter#33612) — needs manual verification to confirm fixes work",
+      "type": "technical",
+      "workaround": "All known mitigations applied: Stack+AnimatedOpacity, RepaintBoundary isolation, hover guard, Impeller, WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE"
+    }
+  ],
   "human_actions_pending": [
-    {"action": "Manual verification: play 4K Blu-ray content, verify aspect ratio lock/unlock behavior", "context": "WP-01 through WP-04 success criteria require manual testing with real video content", "blocking": false}
+    {
+      "action": "Manual window resize drag test — verify title bar no longer jitters",
+      "context": "All code changes applied, 327 tests pass. Need human eyes on actual resize behavior.",
+      "blocking": true
+    },
+    {
+      "action": "Verify glass-morphism blur visible when not resizing",
+      "context": "AnimatedOpacity pattern changes rendering — confirm visual parity",
+      "blocking": false
+    }
   ],
   "decisions": [
-    {"decision": "Living room single-display only, no multi-monitor support", "rationale": "User explicitly rejected multi-monitor: target is 4K Blu-ray in living room", "phase": 3},
-    {"decision": "Simplified 03-02 to persist coalescing + hover recovery only", "rationale": "Removed multi-monitor tasks per user request", "phase": 3},
-    {"decision": "ratioNotifier added to AspectRatioService for UI binding", "rationale": "Current getter is plain double, UI needs ValueNotifier for reactive rebuilds", "phase": 3},
-    {"decision": "Widget tap test simplified to tooltip verification", "rationale": "Gesture arena conflict in test env prevents tap from reaching nested button callback", "phase": 3}
+    {
+      "decision": "Use Stack+AnimatedOpacity instead of conditional widget tree mutation",
+      "rationale": "AnimatedOpacity(opacity:0) sets RenderOpacity.needsCompositing=false, bypassing BackdropFilter GPU cost without removing widgets from tree. No tree mutation = no relayout spike.",
+      "phase": null
+    },
+    {
+      "decision": "Three-level RepaintBoundary isolation",
+      "rationale": "Column -> outer RepaintBoundary -> TitleBar -> blur/content RepaintBoundaries. Content completely shielded from resize-triggered repaints.",
+      "phase": null
+    },
+    {
+      "decision": "80ms AnimatedOpacity duration (Tokens.durationFast)",
+      "rationale": "Masks 1-frame stale-bitmap flash when resize ends and blur reappears. Imperceptible to humans.",
+      "phase": null
+    },
+    {
+      "decision": "Keep Impeller enabled via _putenv_s in main.cpp",
+      "rationale": "Confirmed correct approach for standalone/release builds. Sets env vars before engine creation.",
+      "phase": null
+    }
   ],
-  "uncommitted_files": [],
-  "next_action": "Run /gsd-verify-work 3 to verify phase completion, or manually test with 4K Blu-ray content",
-  "context_notes": "All 3 phases complete (9/9 plans). 328 tests passing. dart analyze clean (0 issues on modified files). Pre-existing lint: unnecessary_getters_setters in playlist.dart:33."
+  "uncommitted_files": [
+    "lib/kernel/ui/window/custom_title_bar.dart",
+    "lib/app.dart",
+    "test/widget/window/custom_title_bar_test.dart",
+    "windows/runner/main.cpp",
+    "windows/runner/win32_window.cpp",
+    "windows/runner/win32_window.h",
+    ".planning/HANDOFF.json",
+    ".planning/STATE.md"
+  ],
+  "next_action": "Manual verification: run the app, resize window by dragging edges/corners, verify title bar does not jitter. If jitter persists, it's likely a Flutter framework limitation.",
+  "context_notes": "Applied plan from vivid-weaving-ripple.md. All code changes complete, all 327 tests pass. The key insight: BackdropFilter tree mutation (mount/unmount) was causing relayout spikes during resize. Stack+AnimatedOpacity keeps it always mounted but skips compositing when opacity=0. Three RepaintBoundary instances provide complete isolation. User needs to manually verify the fix works on their display."
 }
