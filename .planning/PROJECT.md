@@ -1,60 +1,99 @@
-# Simple Player Flutter — Window Border
+# Simple Player Flutter
 
 ## What This Is
 
-Immersive, lightweight window border for a Flutter desktop media player. The window adapts its behavior based on playback state: freely resizable with a minimum 16:9 (1024×576) constraint when empty, and locked to the video's aspect ratio during playback. The reference implementation lives at `D:\player_flutter`.
+A Flutter desktop media player for Windows (primary) with Linux/macOS support. Kernel layer (engine, playlist, persistence, services) is complete. Current focus: building the window shell and UI layer on top of existing kernel, referencing proven patterns from D:\player_flutter.
 
 ## Core Value
 
-Smooth, jank-free window resize that respects video aspect ratio — the window should feel like part of the player, not a frame around it.
+Stable, efficient, secure frameless window with video playback — the window must never flicker, crash, or leak memory. Everything else is secondary.
 
 ## Requirements
 
 ### Validated
 
-- ✓ Media playback (fvp/MDK backend) — existing
-- ✓ Playlist management with 4 play modes — existing
-- ✓ Keyboard shortcuts (14-key handler) — existing
+- ✓ FvpEngine with MDK/FFmpeg backend — existing
+- ✓ Playlist management (add, remove, reorder, play modes) — existing
 - ✓ Settings persistence (SharedPreferences) — existing
-- ✓ Frameless window via C++ runner (WM_NCCALCSIZE) — existing
-- ✓ WindowManagerService singleton with fullscreen/windowed/maximized — existing
-- ✓ AspectRatioService via MethodChannel — existing
+- ✓ PlaybackController orchestration (file ops, navigation, state monitoring) — existing
+- ✓ PlatformService abstraction (Windows/Linux) — existing
+- ✓ Keyboard handler (14-key bindings) — existing
+- ✓ ValueNotifier + ValueListenableBuilder state management — existing
+- ✓ Design system (50 tokens, Midnight theme, glass-morphism) — existing
+- ✓ Localization (EN/ZH via ARB) — existing
 
 ### Active
 
-- [ ] Custom title bar with glass-morphism (BackdropFilter) and resize-aware rendering
-- [ ] Empty state: minimum window size 1024×576 (16:9), freely resizable
-- [ ] Playing state: window aspect ratio locks to video, resize scales proportionally
-- [ ] Smooth resize: skip BackdropFilter during drag, debounce before restoring
-- [ ] Drag-to-move via title bar, double-tap to maximize
-- [ ] Window controls: pin, minimize, maximize, close
+- [ ] Frameless window with custom title bar (36px, drag, window controls)
+- [ ] Aspect ratio lock (16:9 idle, video ratio when playing, cycle button)
+- [ ] Windows snap layouts support
+- [ ] Fullscreen toggle (F11, manual setSize/position for frameless)
+- [ ] Window state persistence (size, position, maximized, fullscreen, always-on-top)
+- [ ] VideoSurface rendering (Texture widget from fvp engine)
+- [ ] Controls overlay (play/pause, seek bar, volume, playlist toggle)
+- [ ] Drag-and-drop file support (desktop_drop)
+- [ ] File picker integration (file_picker)
+- [ ] Empty state with open file button
+- [ ] AspectRatioService via MethodChannel to native WM_SIZING
+- [ ] VideoProcessingService wiring (currently dead code)
+- [ ] Security hardening (URL validation, input bounds, SSRF protection)
+- [ ] Performance optimization (dirty flags, batch writes, position poll tuning)
 
 ### Out of Scope
 
-- Custom window shadow/glow effects — unnecessary complexity for v1
-- Multi-monitor edge snapping — not core to border experience
-- Animated window transitions — defer to polish phase
+- Mobile platforms (Android/iOS) — desktop only for v1
+- Streaming/DRM — local file playback only
+- Audio-only player (just_audio) — fvp handles all media
+- Network media streaming — local files only for v1
+- Custom equalizer UI — kernel supports it but UI deferred to v2
 
 ## Context
 
-- **Reference project**: `D:\player_flutter` has a working `CustomTitleBar` (glass-morphism, resize-aware) and `WindowManagerService` (500ms debounce, isResizing notifier, Completer guards)
-- **Current codebase**: Already has `WindowManagerService`, `AspectRatioService`, `PlatformService` abstract interface. `PlayerScreen` was recently stripped to bare video surface.
-- **Key pattern**: `isResizing` ValueNotifier lets UI skip GPU-heavy `BackdropFilter` during drag, preventing jank.
+**Existing codebase state:**
+- Kernel layer complete: FvpEngine (555 lines), Playlist, PlaybackController, SettingsStore, PlaylistStore
+- UI layer empty: app.dart renders "Ready" placeholder
+- 11 unused dependencies in pubspec.yaml (window_manager, glass_kit, shadcn_flutter, etc.)
+- Previous planning phases 1-3 (window chrome, resize, playback-aware sizing) deleted from working tree
+
+**Reference project:** D:\player_flutter — full working implementation with:
+- WindowManagerService (singleton, 500ms debounce, bounds check, fullscreen reentry guard)
+- AspectRatioService (MethodChannel to native WM_SIZING, ratio cycling)
+- CustomTitleBar (36px, drag, auto-hide when playing)
+- PlayerScreen (responsive layout, keyboard handler, controls overlay)
+- C++ runner (frameless first frame prep, forceRedraw channel)
+
+**Key architectural decisions from reference:**
+- Frameless window: `setAsFrameless()` + `setHasShadow(true)` before `show()`
+- Fullscreen: manual `setSize` + `setPosition` (not `setFullScreen` — broken on frameless)
+- Aspect ratio: native MethodChannel to WM_SIZING (not Flutter-level constraint)
+- State: ValueNotifier + ValueListenableBuilder (no Provider/Riverpod/BLoC)
+- Persistence: 500ms debounce on window geometry, SharedPreferences single-instance prewarm
+
+**Known tech debt:**
+- FvpEngine 555 lines — needs decomposition (MediaInfoParser, VideoEffectMixin)
+- SettingsStore all-static — hard to test, no DI
+- PlaylistStore all-static — timer leaks across tests
+- 13 separate ValueNotifiers — consider grouping into state objects
+- PlaybackController mixin chain — acceptable but implicit dependencies
 
 ## Constraints
 
-- **Platform**: Windows primary (C++ runner, WM_NCCALCSIZE)
-- **State**: ValueNotifier + ValueListenableBuilder (no Provider/Riverpod/Bloc)
-- **Design**: Glass-morphism via `BackdropFilter` + `Tokens.bgGlass`
-- **Performance**: Must not regress — resize debounce, persistence debounce
+- **Platform**: Windows 10+ primary (D3D11), Linux/macOS secondary
+- **Flutter**: 3.44.0+ (beta channel), Dart 3.12.0+
+- **Engine**: fvp 0.36.2 (MDK/FFmpeg, pre-1.0 — breaking changes possible)
+- **Window**: window_manager 0.5.1 (pinned exact — consider updating)
+- **Performance**: 250ms position poll, 500ms persist debounce, 500ms resize debounce
+- **Security**: No SSRF protection, weak URL validation, unbounded subtitle delay
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Reuse reference project's CustomTitleBar pattern | Proven glass-morphism + resize optimization | — Pending |
-| Minimum size 1024×576 (vs 640×360 in reference) | Better default for modern displays | — Pending |
-| Aspect ratio lock on playback | Core user experience requirement | — Pending |
+| Frameless window from start | Immersive media player UX, no system chrome | — Pending |
+| AspectRatioService via MethodChannel | Native WM_SIZING is more reliable than Flutter-level constraints | — Pending |
+| Keep fvp over media_kit | Lowest latency on Windows (D3D11 direct rendering) | — Pending |
+| ValueNotifier pattern (no BLoC/Riverpod) | Already established in kernel, lightweight, sufficient for this scope | — Pending |
+| Reference D:\player_flutter patterns | Proven working implementation, avoid reinventing | — Pending |
 
 ## Evolution
 
@@ -74,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-07 after initialization*
+*Last updated: 2026-05-09 after initialization*
