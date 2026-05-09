@@ -1,74 +1,67 @@
-# Roadmap: Simple Player Flutter -- Window Border
+# Roadmap: Simple Player Flutter
 
 ## Overview
 
-Deliver an immersive window border for the Flutter desktop media player in three phases. Phase 1 builds the visual chrome (title bar + controls). Phase 2 adds resize optimization and state persistence for smooth, jank-free interaction. Phase 3 integrates playback-aware aspect ratio locking -- the core value of the project. Each phase delivers a complete, independently verifiable capability.
+Build a stable frameless window shell first (the hard part -- flicker-free, resize-safe, persistence), then wire video playback and content management into it, and finally harden security for all external input paths. Each phase delivers a complete, verifiable capability.
 
 ## Phases
 
-- [x] **Phase 1: Window Chrome** - Title bar with glass-morphism, window controls, and production quality baseline
-- [x] **Phase 2: Resize & Persistence** - Jank-free resize optimization, minimum size enforcement, geometry persistence, edge case handling
-- [ ] **Phase 3: Playback-Aware Sizing** - Window aspect ratio locks to video during playback, returns to free-resize on stop
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
+
+- [ ] **Phase 1: Window Shell** - Frameless window with custom title bar, aspect ratio, fullscreen, state persistence (15 requirements)
+- [ ] **Phase 2: Video & Content** - Video surface rendering, play/pause, file picker, drag-and-drop, playlist wiring (6 requirements)
+- [ ] **Phase 3: Security Hardening** - Input validation for URLs, subtitle delays, equalizer filters (3 requirements)
 
 ## Phase Details
 
-### Phase 1: Window Chrome
-**Goal**: Users see a glass-morphism title bar with app icon, file name, and fully functional window controls (pin, minimize, maximize, close) that reflect live state. All code passes static analysis with zero warnings, no hardcoded values, proper dispose safety, and FFI error handling.
+### Phase 1: Window Shell
+**Goal**: Users see a stable, flicker-free frameless window with custom title bar, can drag/resize/fullscreen, and window state persists across sessions
 **Depends on**: Nothing (first phase)
-**Requirements**: WB-01, WB-02, WB-03, WB-04, WC-01, WC-02, WC-03, WC-04, WC-05, PQ-01, PQ-03, PQ-05, PQ-06, PQ-07
+**Requirements**: WIN-01, WIN-02, WIN-03, WIN-04, WIN-05, WIN-06, WIN-07, WIN-08, WIN-09, WIN-10, WIN-11, WIN-12, WIN-13, WIN-14, WIN-15
 **Success Criteria** (what must be TRUE):
-  1. Title bar renders at 36px height with glass-morphism (BackdropFilter blur) showing app icon and current file name
-  2. All four window controls (pin, minimize, maximize, close) are visible and functional
-  3. Window controls reflect current state via ValueNotifier (pinned indicator, maximized/restore icon toggle)
-  4. User can drag the window by grabbing the title bar
-  5. Double-tap on title bar toggles maximize/restore
-  6. All window border code passes `flutter analyze` with zero warnings
-  7. Unit tests verify CustomTitleBar controls reflect pinned/maximized state changes
-  8. All ValueNotifiers are disposed and all timers cancelled when widgets unmount -- no leaks
-  9. All FFI/native calls (window manager, DPI) are wrapped in try-catch with graceful fallback
-  10. All sizes, colors, and durations come from DesignTokens or named constants -- no hardcoded values
-**Plans**: 3 plans
-Plans:
-- [x] 01-01-PLAN.md -- Design tokens + FakePlatformService extraction
-- [x] 01-02-PLAN.md -- CustomTitleBar widget (glass-morphism + controls + gestures)
-- [x] 01-03-PLAN.md -- App integration + widget tests
+  1. App launches with no system title bar, no white flash -- frameless window appears immediately with correct size from persisted state
+  2. Custom title bar (36px) shows app name, minimize/maximize/close buttons, and always-on-top pin -- buttons do not flicker during window resize
+  3. User can drag title bar to move window, double-tap to toggle maximize, and resize edges while aspect ratio stays locked (16:9 idle, video ratio when playing)
+  4. F11 toggles fullscreen reliably with no ABA state corruption, and fullscreen reentry guard prevents rapid toggling
+  5. Window size/position/maximized/fullscreen/pin state persists (500ms debounce) and restores correctly, with bounds clamping to visible screen on multi-monitor setups
+**Plans**: TBD
 
-### Phase 2: Resize & Persistence
-**Goal**: Window resizes smoothly without GPU jank, enforces minimum size in empty state, persists geometry across sessions, and handles edge cases gracefully. Unit tests cover resize debounce logic and persistence.
+**UI hint**: yes
+
+### Phase 2: Video & Content
+**Goal**: Users can open video files (picker or drag-drop), see them rendered in the window, and control basic playback
 **Depends on**: Phase 1
-**Requirements**: WB-05, WB-06, WS-01, WS-02, WS-03, PQ-02, PQ-04
+**Requirements**: VID-01, VID-02, VID-03, CON-01, CON-02, CON-03
 **Success Criteria** (what must be TRUE):
-  1. Window enforces minimum size of 1024x576 (16:9) when no video is playing
-  2. During resize drag, BackdropFilter is skipped (isResizing notifier) preventing GPU jank
-  3. After resize drag ends, glass-morphism restores after 500ms debounce (not instantly)
-  4. Window geometry (size, position, maximized, fullscreen) persists across app restarts via SettingsStore
-  5. Unit tests verify WindowManagerService resize debounce timing, isResizing state transitions, and persistence round-trip
-  6. Edge cases handled gracefully: DPI changes mid-session, monitor disconnect, rapid fullscreen toggle
-**Plans**: 3 plans
-Plans:
-- [x] 02-01-PLAN.md -- Update minSize constant and SettingsStore sanitization bounds
-- [x] 02-02-PLAN.md -- Fix test inaccuracies and add comprehensive test coverage
-- [x] 02-03-PLAN.md -- Fix title bar jitter (Stack + AnimatedOpacity + RepaintBoundary + hover guard)
+  1. Video renders via Texture widget using fvp engine textureId -- video surface fills the window below the title bar
+  2. User can play/pause video, and an empty state overlay with "Open File" button shows when no video is loaded
+  3. User can open files via file picker (video type filter) or drag-and-drop onto the window
+  4. Opened files are added to playlist via PlaybackController and playback starts automatically
+**Plans**: TBD
 
-### Phase 3: Playback-Aware Sizing
-**Goal**: Window adapts its sizing behavior based on playback state -- freely resizable when empty, locked to video aspect ratio when playing.
+**UI hint**: yes
+
+### Phase 3: Security Hardening
+**Goal**: All external input paths (URLs, subtitles, equalizer) are validated and bounded, preventing crashes or exploits
 **Depends on**: Phase 2
-**Requirements**: WP-01, WP-02, WP-03, WP-04
+**Requirements**: SEC-01, SEC-02, SEC-03
 **Success Criteria** (what must be TRUE):
-  1. When video starts playing, window aspect ratio locks to the video's native aspect ratio
-  2. Resizing during playback scales proportionally (maintains video aspect ratio)
-  3. Aspect ratio lock uses native AspectRatioService (MethodChannel) for OS-level enforcement
-  4. When video stops or user exits playback, window returns to free-resize mode with minimum 16:9 constraint
-**Plans**: 3 plans
-Plans:
-- [x] 03-01-PLAN.md -- Core playback-aware sizing integration (StateMonitor + AspectRatioService)
-- [x] 03-02-PLAN.md -- WindowManagerService hardening (persist coalescing + hover recovery)
-- [x] 03-03-PLAN.md -- UI integration (aspect ratio button) + tests
+  1. URLs are validated against a scheme whitelist (http, https, rtmp, rtsp) before engine access -- invalid schemes are rejected with user feedback
+  2. Subtitle delay is clamped to +/-30000ms -- out-of-range values are silently corrected
+  3. Equalizer filter strings are validated before passing to engine -- malformed strings are rejected without crashing
+**Plans**: TBD
 
 ## Progress
 
+**Execution Order:**
+Phases execute in numeric order: 1 → 2 → 3
+
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Window Chrome | 3/3 | Complete | 2026-05-07 |
-| 2. Resize & Persistence | 3/3 | Complete | 2026-05-07 |
-| 3. Playback-Aware Sizing | 3/3 | Complete | 2026-05-07 |
+| 1. Window Shell | 0 | Not started | - |
+| 2. Video & Content | 0 | Not started | - |
+| 3. Security Hardening | 0 | Not started | - |
