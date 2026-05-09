@@ -16,7 +16,7 @@ Stable, flicker-free frameless window with custom title bar, aspect ratio manage
 ### Title Bar Button Style
 - **D-01:** Close 按钮 hover 跟随系统主题色 — 不硬编码红色，使用 `dynamic_color` 包获取系统 accent color
 - **D-02:** Hover 状态用 StatefulWidget local state — 每个按钮独立管理 `_isHovered`，不使用全局 ValueNotifier，确保 resize 期间无额外 rebuild
-- **D-03:** 图标使用 Windows 11 风格 — CustomPainter 绘制最小化(─)、最大化(□)、关闭(✕)、置顶(📌)
+- **D-03:** 图标使用 Material Icons — minimize, crop_square, close, push_pin（与参考项目 D:\player_flutter 一致，CustomPainter 可后续升级）
 - **D-04:** 按钮尺寸 36×36px — 正方形，和标题栏等高
 - **D-05:** Hover 动画简单颜色过渡 — 背景色 150ms ease，无缩放/旋转动效
 - **D-06:** 显示 Tooltip — 鼠标悬停 300ms 后显示按钮名称（最小化/最大化/关闭/置顶）
