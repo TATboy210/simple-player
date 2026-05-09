@@ -1,100 +1,119 @@
-# Requirements: Simple Player Flutter -- Window Border
+# Requirements: Simple Player Flutter
 
-**Defined:** 2026-05-07
-**Core Value:** Smooth, jank-free window resize that respects video aspect ratio
+**Defined:** 2026-05-09
+**Core Value:** Stable, efficient, secure frameless window with video playback
 
 ## v1 Requirements
 
-### Window Border
+### Window Shell (首要 — 先把窗口做出来)
 
-- [ ] **WB-01**: Custom title bar with glass-morphism (BackdropFilter blur), 36px height
-- [ ] **WB-02**: Title bar shows app icon, current file name, and window controls (pin, minimize, maximize, close)
-- [ ] **WB-03**: Drag-to-move window via title bar gesture
-- [ ] **WB-04**: Double-tap title bar toggles maximize
-- [ ] **WB-05**: During resize, BackdropFilter is skipped (isResizing notifier) to prevent GPU jank
-- [ ] **WB-06**: Resize debounce (500ms) before restoring glass-morphism after drag ends
+- [ ] **WIN-01**: Frameless window with no system title bar (setAsFrameless before show)
+- [ ] **WIN-02**: Custom title bar — 稳定不闪烁 (36px, app name, window controls)
+- [ ] **WIN-03**: Title bar 按钮 resize 稳定性 — isResizing 守卫 + RepaintBoundary + ValueListenableBuilder 精确重建，resize 期间按钮不闪烁不重绘
+- [ ] **WIN-04**: Title bar drag to move window (GestureDetector onPanStart → startDragging)
+- [ ] **WIN-05**: Title bar double-tap to toggle maximize
+- [ ] **WIN-06**: Aspect ratio lock (16:9 idle, video ratio when playing, cycle button)
+- [ ] **WIN-07**: Aspect ratio enforcement via native MethodChannel (WM_SIZING, not Flutter AspectRatio widget)
+- [ ] **WIN-08**: Fullscreen toggle (F11, manual setSize/setPosition for frameless)
+- [ ] **WIN-09**: Fullscreen reentry guard (prevent rapid F11 ABA state corruption)
+- [ ] **WIN-10**: Window state persistence (size, position, maximized, fullscreen, always-on-top)
+- [ ] **WIN-11**: 500ms debounced persistence (merge continuous resize/move events)
+- [ ] **WIN-12**: Window bounds check on restore (clamp to visible screen area)
+- [ ] **WIN-13**: Minimum window size (640×360, 360p 16:9)
+- [ ] **WIN-14**: Always-on-top toggle (pin button in title bar)
+- [ ] **WIN-15**: First frame fix (setAsFrameless + forceRedraw MethodChannel, 零白色闪烁)
 
-### Window Sizing -- Empty State
+### Video Playback
 
-- [ ] **WS-01**: Minimum window size is 1024x576 (16:9) when no video is playing
-- [ ] **WS-02**: Window can be freely resized to any aspect ratio in empty state
-- [ ] **WS-03**: Window geometry (size, position, maximized, fullscreen) persists across sessions via SettingsStore
+- [ ] **VID-01**: VideoSurface rendering (Texture widget from fvp engine textureId)
+- [ ] **VID-02**: Basic play/pause (wire to engine.togglePlayPause)
+- [ ] **VID-03**: Empty state overlay (open file button when idle)
 
-### Window Sizing -- Playing State
+### Content Management
 
-- [ ] **WP-01**: When video starts playing, window aspect ratio locks to video's aspect ratio
-- [ ] **WP-02**: Resize during playback scales proportionally (maintains video aspect ratio)
-- [ ] **WP-03**: Aspect ratio lock uses native AspectRatioService (MethodChannel) for OS-level enforcement
-- [ ] **WP-04**: When video stops/exits, window returns to free-resize mode with minimum 16:9
+- [ ] **CON-01**: File picker integration (FilePicker.pickFiles, type: video)
+- [ ] **CON-02**: Drag-and-drop file support (desktop_drop DropHandler)
+- [ ] **CON-03**: Files added to playlist via PlaybackController.addFiles
 
-### Window Controls
+### Security
 
-- [ ] **WC-01**: Pin button toggles always-on-top
-- [ ] **WC-02**: Minimize button minimizes window
-- [ ] **WC-03**: Maximize button toggles maximize/restore
-- [ ] **WC-04**: Close button closes window safely (persist state, dispose resources)
-- [ ] **WC-05**: All controls reflect current state via ValueNotifier (pinned, maximized)
-
-### Production Quality
-
-- [ ] **PQ-01**: All window border code passes `flutter analyze` with zero warnings
-- [ ] **PQ-02**: Unit tests for WindowManagerService resize debounce, isResizing state, and persistence
-- [ ] **PQ-03**: Unit tests for CustomTitleBar controls state reflection
-- [ ] **PQ-04**: Edge case handling: DPI changes, monitor disconnect, rapid fullscreen toggle
-- [ ] **PQ-05**: Dispose safety — all ValueNotifiers disposed, all timers cancelled, no leaks
-- [ ] **PQ-06**: Error handling — all FFI/native calls wrapped in try-catch with graceful fallback
-- [ ] **PQ-07**: No hardcoded values — all sizes, colors, durations from DesignTokens/constants
+- [ ] **SEC-01**: URL validation with scheme whitelist (http, https, rtmp, rtsp)
+- [ ] **SEC-02**: Subtitle delay bounds check (clamp to ±30000ms)
+- [ ] **SEC-03**: Equalizer filter string validation
 
 ## v2 Requirements
 
-- **WB-07**: Window border glow/shadow effect
-- **WB-08**: Animated transitions between empty and playing states
-- **WS-04**: Multi-monitor edge snapping
+### Playback UI
+
+- **PLY-01**: Controls overlay (seek bar, volume slider, mute toggle)
+- **PLY-02**: Auto-hide controls when playing, show on mouse hover
+- **PLY-03**: OSD overlay (floating pill for play/pause/seek actions)
+- **PLY-04**: Progress bar with seek functionality
+- **PLY-05**: Speed control button
+
+### Content Management
+
+- **CNT-01**: Playlist panel (right side, add/remove/reorder)
+- **CNT-02**: Play modes (sequential, loop, shuffle, single)
+- **CNT-03**: Resume playback from last position
+- **CNT-04**: Recent files history
+
+### Polish
+
+- **POL-01**: Keyboard shortcuts (19 bindings from reference)
+- **POL-02**: Aurora background animation (idle state)
+- **POL-03**: Glass-morphism effects (BackdropFilter)
+- **POL-04**: Responsive layout (wide/narrow breakpoint)
+- **POL-05**: Localization (EN/ZH)
+- **POL-06**: Media info dialog
+- **POL-07**: Settings dialog (equalizer, video processing)
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Custom window shadow/glow | Unnecessary complexity for v1, defer to polish |
-| Multi-monitor edge snapping | Not core to border experience |
-| Animated window transitions | Defer to polish phase |
-| Title bar theme switching | Single midnight theme for v1 |
+| Mobile platforms (Android/iOS) | Desktop only for v1 |
+| Network streaming / DRM | Local file playback only |
+| Audio-only player (just_audio) | fvp handles all media |
+| Custom equalizer UI | Kernel supports it, UI deferred to v2 |
+| Video processing UI | VideoProcessingService exists but UI deferred |
+| AB loop | Kernel supports it, UI deferred |
+| Subtitle overlay positioning | Deferred to v2 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WB-01 | Phase 1 | Pending |
-| WB-02 | Phase 1 | Pending |
-| WB-03 | Phase 1 | Pending |
-| WB-04 | Phase 1 | Pending |
-| WB-05 | Phase 2 | Pending |
-| WB-06 | Phase 2 | Pending |
-| WS-01 | Phase 2 | Pending |
-| WS-02 | Phase 2 | Pending |
-| WS-03 | Phase 2 | Pending |
-| WP-01 | Phase 3 | Pending |
-| WP-02 | Phase 3 | Pending |
-| WP-03 | Phase 3 | Pending |
-| WP-04 | Phase 3 | Pending |
-| WC-01 | Phase 1 | Pending |
-| WC-02 | Phase 1 | Pending |
-| WC-03 | Phase 1 | Pending |
-| WC-04 | Phase 1 | Pending |
-| WC-05 | Phase 1 | Pending |
-| PQ-01 | Phase 1 | Pending |
-| PQ-02 | Phase 2 | Pending |
-| PQ-03 | Phase 1 | Pending |
-| PQ-04 | Phase 2 | Pending |
-| PQ-05 | Phase 1 | Pending |
-| PQ-06 | Phase 1 | Pending |
-| PQ-07 | Phase 1 | Pending |
+| WIN-01 | Phase 1 | Pending |
+| WIN-02 | Phase 1 | Pending |
+| WIN-03 | Phase 1 | Pending |
+| WIN-04 | Phase 1 | Pending |
+| WIN-05 | Phase 1 | Pending |
+| WIN-06 | Phase 1 | Pending |
+| WIN-07 | Phase 1 | Pending |
+| WIN-08 | Phase 1 | Pending |
+| WIN-09 | Phase 1 | Pending |
+| WIN-10 | Phase 1 | Pending |
+| WIN-11 | Phase 1 | Pending |
+| WIN-12 | Phase 1 | Pending |
+| WIN-13 | Phase 1 | Pending |
+| WIN-14 | Phase 1 | Pending |
+| WIN-15 | Phase 1 | Pending |
+| VID-01 | Phase 2 | Pending |
+| VID-02 | Phase 2 | Pending |
+| VID-03 | Phase 2 | Pending |
+| CON-01 | Phase 2 | Pending |
+| CON-02 | Phase 2 | Pending |
+| CON-03 | Phase 2 | Pending |
+| SEC-01 | Phase 2 | Pending |
+| SEC-02 | Phase 2 | Pending |
+| SEC-03 | Phase 2 | Pending |
 
 **Coverage:**
-- v1 requirements: 25 total
-- Mapped to phases: 25
+- v1 requirements: 21 total
+- Mapped to phases: 21
 - Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-05-07*
-*Last updated: 2026-05-07 after adding production quality requirements (PQ-01..07)*
+*Requirements defined: 2026-05-09*
+*Last updated: 2026-05-09 after initial definition*
