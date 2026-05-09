@@ -1,86 +1,69 @@
----
-gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: paused
-stopped_at: "2026-05-07T21:45:00+08:00"
-last_updated: "2026-05-07T21:45:00+08:00"
-last_activity: 2026-05-07 -- Jitter fix v2: Stack+AnimatedOpacity pattern applied
-progress:
-  percent: 100
----
-
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-07)
+See: .planning/PROJECT.md (updated 2026-05-09)
 
-**Core value:** Smooth, jank-free window resize that respects video aspect ratio
-**Current focus:** Title bar jitter fix during window resize
+**Core value:** Stable, efficient, secure frameless window with video playback
+**Current focus:** Phase 1 - Window Shell
 
 ## Current Position
 
-Phase: 3 of 3 (Playback-Aware Sizing) — complete
-Status: Paused — awaiting manual verification of jitter fix
-Last activity: 2026-05-07 -- Jitter fix v2 applied
+Phase: 1 of 3 (Window Shell)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-05-09 -- Roadmap created
 
-Progress: [██████████] 100% (code complete, manual verification pending)
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-
-- Total plans completed: 9
-- Average duration: ~15 min/plan
-- Total execution time: ~2 hours
+- Total plans completed: 0
+- Average duration: -
+- Total execution time: 0 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 Window Chrome | 3 | 3 | ~20 min |
-| 2 Resize & Persistence | 3 | 3 | ~10 min |
-| 3 Playback-Aware Sizing | 3 | 3 | ~15 min |
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: -
+- Trend: -
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-- Living room single-display only, no multi-monitor (user rejected multi-monitor)
-- Stack+AnimatedOpacity pattern replaces conditional widget tree mutation (jitter fix v2)
-- Three-level RepaintBoundary isolation: Column > outer > TitleBar > blur/content
-- AnimatedOpacity(opacity:0) skips GPU compositing without removing widgets from tree
-- 80ms duration masks 1-frame stale-bitmap flash when resize ends
-- Impeller enabled via _putenv_s in main.cpp (confirmed correct for standalone builds)
-- WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE added to win32_window.cpp for resize state tracking
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- [Roadmap]: 3 phases derived from 24 v1 requirements (15 window + 6 video/content + 3 security)
+- [Roadmap]: SEC requirements included in v1 (traceability was missing them)
 
 ### Pending Todos
 
-- Manual verification: resize drag jitter test (blocking)
-- Manual verification: glass-morphism blur visual parity
-- Manual verification: 4K Blu-ray content playback
+None yet.
 
 ### Blockers/Concerns
 
-- Title bar jitter may be Flutter framework-level issue (flutter/flutter#65460)
-- Pre-existing info: unnecessary_getters_setters in playlist.dart:33
+- Previous planning phases 1-3 (window chrome, resize, playback-aware sizing) were deleted from working tree -- patterns exist in D:\player_flutter reference project
+- 11 unused dependencies in pubspec.yaml need cleanup
 
 ## Deferred Items
 
+Items acknowledged and carried forward from previous milestone close:
+
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| Verification | Manual test: resize drag, verify no jitter | Pending | 2026-05-07 |
-| Verification | Manual test: play 4K Blu-ray, verify aspect ratio lock/unlock | Pending | 2026-05-07 |
+| *(none)* | | | |
 
 ## Session Continuity
 
-Last session: 2026-05-07T21:45:00+08:00
-Stopped at: Manual verification pending
-Resume file: .planning/.continue-here.md
-
-## Jitter Fix History
-
-**v1 (2026-05-07 19:30):** ValueListenableBuilder conditionally renders BackdropFilter vs ClipRect+RepaintBoundary. BackdropFilter removed from tree during resize.
-
-**v2 (2026-05-07 21:45):** Stack+AnimatedOpacity pattern. BackdropFilter always mounted; AnimatedOpacity(opacity:0) skips GPU compositing without tree mutation. Three RepaintBoundary instances for isolation. Hover guard suppresses setState during resize. Impeller + WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE added.
+Last session: 2026-05-09
+Stopped at: Roadmap created, ready to plan Phase 1
+Resume file: None
