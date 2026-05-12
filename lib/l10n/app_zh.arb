@@ -50,6 +50,7 @@
   "resetAll": "重置全部",
   "enableDeinterlace": "启用去隔行",
   "softwareDecoderOnly": "仅软件解码器生效",
+  "videoProcessing": "画面",
 
   "shortcutsHelpTitle": "快捷键",
   "close": "关闭",

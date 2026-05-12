@@ -149,6 +149,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get softwareDecoderOnly => 'Software decoder only';
 
   @override
+  String get videoProcessing => 'Video';
+
+  @override
   String get shortcutsHelpTitle => 'Keyboard Shortcuts';
 
   @override

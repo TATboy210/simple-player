@@ -100,6 +100,8 @@
   "@enableDeinterlace": { "description": "Toggle label for deinterlace" },
   "softwareDecoderOnly": "Software decoder only",
   "@softwareDecoderOnly": { "description": "Hint that deinterlace only works with software decoder" },
+  "videoProcessing": "Video",
+  "@videoProcessing": { "description": "Tab label for video processing settings" },
 
   "shortcutsHelpTitle": "Keyboard Shortcuts",
   "@shortcutsHelpTitle": { "description": "Title of keyboard shortcuts help dialog" },

@@ -88,9 +88,9 @@ void main() {
   });
 
   group('WindowManagerService minSize', () {
-    test('minSize is 1024x576 (576p 16:9)', () {
-      expect(WindowManagerService.minSize.width, 1024.0);
-      expect(WindowManagerService.minSize.height, 576.0);
+    test('minSize is 640x360 (360p 16:9)', () {
+      expect(WindowManagerService.minSize.width, 640.0);
+      expect(WindowManagerService.minSize.height, 360.0);
     });
 
     test('minSize aspect ratio is 16:9', () {
