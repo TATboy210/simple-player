@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 设计令牌 — 编译时常量
+/// Design tokens — compile-time constants
 class Tokens {
   Tokens._();
 
@@ -10,13 +10,15 @@ class Tokens {
   static const bgHover = Color(0xFF2A2A3A);
   static const bgGlass = Color(0x801A1A24);
 
-  static const accent = Color(0xFF6C5CE7);
-  static const accentLight = Color(0xFFA29BFE);
-  static const danger = Color(0xFFFF6B6B);
+  static const accent = Color.fromARGB(255, 44, 88, 244);
+  static const accentLight = Color.fromARGB(180, 44, 87, 244);
+  static const accentegg = Color.fromARGB(255, 102, 204, 255);
+  static const danger = Color.fromARGB(255, 250, 55, 55);
 
   static const textPrimary = Color(0xFFE8E8F0);
   static const textSecondary = Color(0xFF9999AA);
   static const textTertiary = Color(0xFF666677);
+  static const textDisabled = Color(0xFF444455);
 
   static const borderHighlight = Color(0x33FFFFFF);
 
@@ -24,9 +26,12 @@ class Tokens {
   static const fontBody = 14.0;
   static const fontCaption = 12.0;
   static const fontOverline = 10.0;
+  static const fontBranding = 18.0;
 
   static const iconSm = 16.0;
-  static const iconMd = 20.0;
+  static const iconMd = 18.0;
+  static const iconLg = 20.0;
+  static const iconXl = 28.0;
 
   static const spXs = 4.0;
   static const spSm = 8.0;
@@ -36,26 +41,52 @@ class Tokens {
 
   static const radiusSm = 6.0;
   static const radiusMd = 10.0;
-  static const radiusBtn = 8.0;
+  static const radiusBtn = 4.0;
+  static const radiusLarge = 12.0;
+  static const radiusPopup = 8.0;
 
-  // ── 毛玻璃 ──
+  // 鈹€鈹€ 姣涚幓鐠?鈹€鈹€
   static const glassBlurThin = 12.0;
   static const glassBlur = 16.0;
   static const glassBlurThick = 24.0;
 
-  // ── 动画 ──
+  // 鈹€鈹€ 鍔ㄧ敾 鈹€鈹€
   static const durationFast = 80;
   static const durationNormal = 150;
+  static const durationFade = 300;
+  static const durationSlide = 300;
   static const durationDebounce = 500;
 
-  // ── 图标 ──
-  static const iconLg = 20.0;
+  // 鈹€鈹€ 鑷姩闅愯棌 鈹€鈹€
+  static const hideDelayFullscreen = 3;
+  static const hideDelayWindowed = 5;
 
-  // ── 标题栏 ──
+  // 鈹€鈹€ 鏍囬鏍?鈹€鈹€
   static const titleBarHeight = 36.0;
-  static const titleBarButtonWidth = 36.0; // D-04: 36x36px
-  static const titleBarBg = Color(0xE61A1A24); // 90% opacity bgPanel
-  static const titleBarBorder = Color(0x33FFFFFF); // reuse borderHighlight
-  static const titleBarHover = Color(0x1AFFFFFF); // 10% white overlay
-  static const closeHoverBg = Color(0xFFC42B1C); // Win11 close red fallback
+  static const titleBarButtonWidth = 36.0;
+  static const titleBarBg = Color(0xE61A1A24);
+  static const titleBarBorder = Color(0x33FFFFFF);
+  static const titleBarHover = Color(0x1AFFFFFF);
+  static const closeHoverBg = Color(0xFFC42B1C);
+
+  // 鈹€鈹€ 鎺у埗鏍?鈹€鈹€
+  static const controlBarHeight = 72.0;
+
+  // 鈹€鈹€ 杩涘害鏉?鈹€鈹€
+  static const progressBarHeight = 32.0;
+  static const progressBarThickness = 3.0;
+  static const progressBarThicknessDrag = 5.0;
+  static const progressThumbRadius = 7.0;
+  static const progressPlayed = Color(0xFF6C5CE7);
+  static const progressBuffer = Color(0x44FFFFFF);
+
+  // 鈹€鈹€ 鎾斁鍒楄〃闈㈡澘 鈹€鈹€
+  static const playlistPanelWidth = 300.0;
+
+  // 鈹€鈹€ 缂╂斁 鈹€鈹€
+  static const hoverScale = 1.02;
+  static const pressScale = 0.98;
+
+  // 鈹€鈹€ 瀛椾綋鐗规€?鈹€鈹€
+  static const tabularFigures = FontFeature.tabularFigures();
 }

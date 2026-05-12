@@ -374,6 +374,12 @@ abstract class AppLocalizations {
   /// **'Software decoder only'**
   String get softwareDecoderOnly;
 
+  /// Tab label for video processing settings
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get videoProcessing;
+
   /// Title of keyboard shortcuts help dialog
   ///
   /// In en, this message translates to:

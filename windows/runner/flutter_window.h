@@ -39,6 +39,8 @@ class FlutterWindow : public Win32Window {
 
   // Current aspect ratio constraint (0 = none, >0 = width/height ratio).
   double aspect_ratio_ = 0.0;
+
+
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

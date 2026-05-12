@@ -149,6 +149,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get softwareDecoderOnly => '仅软件解码器生效';
 
   @override
+  String get videoProcessing => '画面';
+
+  @override
   String get shortcutsHelpTitle => '快捷键';
 
   @override

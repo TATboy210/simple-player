@@ -3,8 +3,7 @@ import 'package:fvp/fvp.dart' as fvp;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'kernel/persistence/settings_store.dart';
-import 'kernel/platform/windows_platform_service.dart';
-import 'kernel/services/platform_service.dart';
+import 'window/bootstrap.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +12,7 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   SettingsStore.prewarm(prefs);
 
-  PlatformService.init(WindowsPlatformService());
+  await WindowBootstrap.init(prefs);
 
   runApp(App(sharedPreferences: prefs));
 }
