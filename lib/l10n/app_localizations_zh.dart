@@ -357,5 +357,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aspectRatioCropFill => '裁剪填充';
 
   @override
+  String get aspectRatioFree => '自由';
+
+  @override
   String get progressBar => '播放进度';
 }

@@ -51,6 +51,7 @@ class KeyboardHandler extends StatelessWidget {
   final VoidCallback? onMediaPlayPause;
   final VoidCallback? onMediaNext;
   final VoidCallback? onMediaPrevious;
+  final VoidCallback? onCycleAspectRatio;
 
   const KeyboardHandler({
     super.key,
@@ -73,6 +74,7 @@ class KeyboardHandler extends StatelessWidget {
     this.onMediaPlayPause,
     this.onMediaNext,
     this.onMediaPrevious,
+    this.onCycleAspectRatio,
   });
 
   @override
@@ -157,6 +159,7 @@ class KeyboardHandler extends StatelessWidget {
     }
 
     if (key == LogicalKeyboardKey.keyA) {
+      onCycleAspectRatio?.call();
       return KeyEventResult.handled;
     }
 
