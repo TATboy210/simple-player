@@ -52,7 +52,8 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
   3. Audio track selection switches tracks
   4. Video processing sliders persist via SettingsStore
   5. Video processing tab shows correct fallback (not "no audio tracks")
-**Plans**: 1 plan
+**Plans**:
+- [ ] 06-01-PLAN.md — Fix l10n fallback text, video processing persistence, hardcoded Chinese close button
 
 ### Phase 4: Production Code Cleanup
 **Goal**: Codebase is production-grade — no dead code, no hardcoded strings, no swallowed keys, proper cleanup
