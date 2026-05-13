@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-last_updated: "2026-05-13T15:20:00.000Z"
-last_activity: 2026-05-13 -- Phase 04 plan complete, ready to execute
+status: executing
+last_updated: "2026-05-13T15:35:00.000Z"
+last_activity: "2026-05-13 -- Phase 04 Plan 01 complete (button highlight fix)"
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 10
-  completed_plans: 3
-  percent: 25
+  completed_plans: 4
+  percent: 40
 ---
 
 # Project State
@@ -20,16 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-13)
 
 **Core value:** Every control must work reliably, every visual state must be consistent, code must be production-grade
-**Current focus:** Phase 1 - Button Highlight Fix
+**Current focus:** Phase 4 - Button Highlight Fix (COMPLETE)
 
 ## Current Position
 
-Phase: 1 of 4 (Button Highlight Fix)
-Plan: 1 of 1 planned
-Status: Ready to execute
-Last activity: 2026-05-13 -- Phase 04 plan complete
+Phase: 4 of 4 (Button Highlight Fix)
+Plan: 1 of 1
+Status: COMPLETE
+Last activity: 2026-05-13 -- Phase 04 Plan 01 complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████░░░░░░] 40%
 
 ## Accumulated Context
 
@@ -65,11 +65,13 @@ Progress: [░░░░░░░░░░] 0%
 
 ### Decisions
 
-- Phase order: Button Highlight → Fullscreen → Settings → Code Cleanup
+- Phase order: Button Highlight -> Fullscreen -> Settings -> Code Cleanup
 - Single plan per phase (focused, verifiable)
 - Remove WindowManagerService in Phase 4 (after all wiring verified)
+- Use OverlayPortal instead of manual OverlayEntry (eliminates timing gaps)
+- Use ValueNotifier<int> generation counter for popup close signal
 
 ## Session Continuity
 
-Last session: 2026-05-13T15:19:23.970Z
-Resume: Phase 1 planning ready
+Last session: 2026-05-13T15:35:00.000Z
+Resume: Phase 4 Plan 01 complete, ready for next phase
