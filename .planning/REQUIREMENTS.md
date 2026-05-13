@@ -8,11 +8,11 @@
 
 ### Button Highlight (HIGH — user-visible bug)
 
-- [ ] **BTN-01**: Volume button icon turns cyan (#66CCFF) when popup is open
-- [ ] **BTN-02**: Speed button text turns cyan with border when popup is open
-- [ ] **BTN-03**: Highlight persists while popup is visible (no premature clearing)
-- [ ] **BTN-04**: Popup auto-closes when control bar auto-hides
-- [ ] **BTN-05**: Close animation consistent — highlight stays during fade-out, clears on remove
+- [x] **BTN-01**: Volume button icon turns cyan (#66CCFF) when popup is open
+- [x] **BTN-02**: Speed button text turns cyan with border when popup is open
+- [x] **BTN-03**: Highlight persists while popup is visible (no premature clearing)
+- [x] **BTN-04**: Popup auto-closes when control bar auto-hides
+- [x] **BTN-05**: Close animation consistent — highlight stays during fade-out, clears on remove
 
 ### Fullscreen (HIGH — core functionality)
 
@@ -67,11 +67,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BTN-01 | Phase 1 | Pending |
-| BTN-02 | Phase 1 | Pending |
-| BTN-03 | Phase 1 | Pending |
-| BTN-04 | Phase 1 | Pending |
-| BTN-05 | Phase 1 | Pending |
+| BTN-01 | Phase 1 | DONE |
+| BTN-02 | Phase 1 | DONE |
+| BTN-03 | Phase 1 | DONE |
+| BTN-04 | Phase 1 | DONE |
+| BTN-05 | Phase 1 | DONE |
 | FS-01 | Phase 2 | Pending |
 | FS-02 | Phase 2 | Pending |
 | FS-03 | Phase 2 | Pending |

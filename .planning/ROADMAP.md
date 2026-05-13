@@ -6,7 +6,7 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
 
 ## Phases
 
-- [ ] **Phase 1: Button Highlight Fix** — Volume/Speed button highlight visible and consistent when popup open (5 requirements)
+- [x] **Phase 1: Button Highlight Fix** — Volume/Speed button highlight visible and consistent when popup open (5 requirements)
 - [ ] **Phase 2: Fullscreen Reliability** — Fullscreen toggle works from all entry points, mode persists, optimistic state (7 requirements)
 - [ ] **Phase 3: Settings Completion** — Settings dialog accessible, all tabs functional, correct fallback text (5 requirements)
 - [ ] **Phase 4: Production Code Cleanup** — Remove dead code, fix keyboard handler, l10n labels, unused imports (5 requirements)
@@ -70,7 +70,7 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Button Highlight | 0 | Ready to plan | - |
+| 1. Button Highlight | 1 | COMPLETE | 2026-05-13 |
 | 2. Fullscreen | 0 | Blocked by Phase 1 | - |
 | 3. Settings | 0 | Blocked by Phase 1 | - |
 | 4. Code Cleanup | 0 | Blocked by Phases 1-3 | - |
