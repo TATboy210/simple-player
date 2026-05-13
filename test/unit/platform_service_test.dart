@@ -1,12 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
 import 'package:simple_player_flutter/kernel/services/platform_service.dart';
 import '../helpers/fake_platform_service.dart';
 
 void main() {
   tearDown(() => PlatformService.reset());
 
-  test('PlatformService.I throws before init', () {
-    expect(() => PlatformService.I, throwsStateError);
+  test('PlatformService.I returns proxy before init (no throw)', () {
+    final instance = PlatformService.I;
+    expect(instance, isA<PlatformService>());
+    // Before init, returns _Proxy that delegates to WindowBridge.I (noop)
+    expect(PlatformService.isInitialized, isFalse);
   });
 
   test('PlatformService.init sets singleton', () {
@@ -15,10 +19,12 @@ void main() {
     expect(PlatformService.I, same(fake));
   });
 
-  test('PlatformService.reset clears singleton', () {
+  test('PlatformService.reset clears singleton, falls back to proxy', () {
     PlatformService.init(FakePlatformService());
     PlatformService.reset();
-    expect(() => PlatformService.I, throwsStateError);
+    expect(PlatformService.isInitialized, isFalse);
+    // After reset, I returns the _Proxy fallback (no throw)
+    expect(PlatformService.I, isA<PlatformService>());
   });
 
   test('mode defaults to windowed', () {
