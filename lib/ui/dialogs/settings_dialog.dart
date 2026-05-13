@@ -68,7 +68,7 @@ class _SettingsDialogState extends State<SettingsDialog>
                     ? VideoProcessingTab(service: widget.videoProcessing!)
                     : Center(
                         child: Text(
-                          l10n.noAudioTracks,
+                          l10n.videoProcessingUnavailable,
                           style: const TextStyle(color: Tokens.textSecondary),
                         ),
                       ),

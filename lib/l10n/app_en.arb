@@ -62,6 +62,8 @@
   "@videoTab": { "description": "Video processing tab label in settings" },
   "noAudioTracks": "No audio tracks available",
   "@noAudioTracks": { "description": "Shown when no audio tracks are found" },
+  "videoProcessingUnavailable": "Video processing unavailable",
+  "@videoProcessingUnavailable": { "description": "Shown when video processing service is not available" },
   "audioTrackN": "Track {index}",
   "@audioTrackN": {
     "description": "Audio track label with index",

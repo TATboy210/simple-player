@@ -272,6 +272,12 @@ abstract class AppLocalizations {
   /// **'No audio tracks available'**
   String get noAudioTracks;
 
+  /// Shown when video processing service is not available
+  ///
+  /// In en, this message translates to:
+  /// **'Video processing unavailable'**
+  String get videoProcessingUnavailable;
+
   /// Audio track label with index
   ///
   /// In en, this message translates to:

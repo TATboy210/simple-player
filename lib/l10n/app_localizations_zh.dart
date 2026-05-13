@@ -96,6 +96,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noAudioTracks => '无可用音轨';
 
   @override
+  String get videoProcessingUnavailable => '画面处理不可用';
+
+  @override
   String audioTrackN(int index) {
     return '音轨 $index';
   }
