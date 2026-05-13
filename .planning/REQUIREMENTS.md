@@ -26,11 +26,11 @@
 
 ### Settings (MEDIUM — functionality gap)
 
-- [ ] **SET-01**: Settings button opens dialog from control bar
-- [ ] **SET-02**: Equalizer presets apply correctly
-- [ ] **SET-03**: Audio track selection works
-- [ ] **SET-04**: Video processing sliders persist
-- [ ] **SET-05**: Fallback text correct for each tab (not l10n.noAudioTracks for video processing)
+- [x] **SET-01**: Settings button opens dialog from control bar
+- [x] **SET-02**: Equalizer presets apply correctly
+- [x] **SET-03**: Audio track selection works
+- [x] **SET-04**: Video processing sliders persist
+- [x] **SET-05**: Fallback text correct for each tab (not l10n.noAudioTracks for video processing)
 
 ### Code Quality (MEDIUM — production readiness)
 
@@ -79,11 +79,11 @@
 | FS-05 | Phase 2 | DONE |
 | FS-06 | Phase 2 | DONE |
 | FS-07 | Phase 2 | DONE |
-| SET-01 | Phase 3 | Pending |
-| SET-02 | Phase 3 | Pending |
-| SET-03 | Phase 3 | Pending |
-| SET-04 | Phase 3 | Pending |
-| SET-05 | Phase 3 | Pending |
+| SET-01 | Phase 3 | DONE |
+| SET-02 | Phase 3 | DONE |
+| SET-03 | Phase 3 | DONE |
+| SET-04 | Phase 3 | DONE |
+| SET-05 | Phase 3 | DONE |
 | CODE-01 | Phase 4 | Pending |
 | CODE-02 | Phase 4 | Pending |
 | CODE-03 | Phase 4 | Pending |
@@ -97,4 +97,4 @@
 
 ---
 *Requirements defined: 2026-05-09*
-*Last updated: 2026-05-14 — Phase 05 fullscreen reliability complete, FS-01 through FS-07 DONE*
+*Last updated: 2026-05-14 — Phase 06 settings completion, SET-01 through SET-05 DONE*
