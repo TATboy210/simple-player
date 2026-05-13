@@ -5,11 +5,18 @@ import '../../kernel/ui/theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_container.dart';
 
-/// 音量控件 — 按钮 + 竖向弹窗滑块
+/// 音量控件 — 按钮 + OverlayPortal 竖向弹窗滑块
 class VolumeSlider extends StatefulWidget {
   final MediaEngine engine;
 
-  const VolumeSlider({super.key, required this.engine});
+  /// 控制栏自动隐藏时触发，关闭弹窗
+  final ValueNotifier<int>? popupCloseNotifier;
+
+  const VolumeSlider({
+    super.key,
+    required this.engine,
+    this.popupCloseNotifier,
+  });
 
   @override
   State<VolumeSlider> createState() => _VolumeSliderState();
@@ -17,11 +24,11 @@ class VolumeSlider extends StatefulWidget {
 
 class _VolumeSliderState extends State<VolumeSlider>
     with SingleTickerProviderStateMixin {
-  bool _popupOpen = false;
+  final _popupController = OverlayPortalController();
+  final _layerLink = LayerLink();
   late final AnimationController _popupAnim;
   late final Animation<double> _popupOpacity;
   late final _VolumeMerged _volumeMerged;
-  OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
@@ -38,14 +45,21 @@ class _VolumeSliderState extends State<VolumeSlider>
       curve: Curves.easeOut,
       reverseCurve: Curves.easeIn,
     );
+    widget.popupCloseNotifier?.addListener(_onCloseRequested);
   }
 
   @override
   void dispose() {
-    _removeOverlay();
+    widget.popupCloseNotifier?.removeListener(_onCloseRequested);
+    _popupAnim.stop();
+    if (_popupController.isShowing) _popupController.hide();
     _popupAnim.dispose();
     _volumeMerged.dispose();
     super.dispose();
+  }
+
+  void _onCloseRequested() {
+    if (_popupController.isShowing) closePopupImmediate();
   }
 
   IconData _icon(bool muted, double volume) {
@@ -55,7 +69,7 @@ class _VolumeSliderState extends State<VolumeSlider>
   }
 
   void _togglePopup() {
-    if (_popupOpen) {
+    if (_popupController.isShowing) {
       _closePopup();
     } else {
       _openPopup();
@@ -64,54 +78,44 @@ class _VolumeSliderState extends State<VolumeSlider>
 
   void _openPopup() {
     _popupAnim.stop();
-    _removeOverlay();
-    setState(() => _popupOpen = true);
+    _popupController.show();
     _popupAnim.forward(from: 0.0);
-
-    final renderBox = context.findRenderObject() as RenderBox;
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final buttonPos = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
-
-    _overlayEntry = OverlayEntry(
-      builder: (_) => _VolumePopup(
-        engine: widget.engine,
-        buttonPosition: buttonPos,
-        buttonSize: renderBox.size,
-        opacity: _popupOpacity,
-        volumeState: _volumeMerged,
-        onClose: _closePopup,
-      ),
-    );
-    Overlay.of(context).insert(_overlayEntry!);
   }
 
   void _closePopup() {
-    if (!_popupOpen) return;
-    setState(() => _popupOpen = false);
-    final entry = _overlayEntry;
     _popupAnim.reverse().then((_) {
-      if (!_popupOpen && entry != null) {
-        entry.remove();
-        if (_overlayEntry == entry) _overlayEntry = null;
+      if (mounted && _popupController.isShowing) {
+        _popupController.hide();
       }
     });
   }
 
-  void _removeOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
+  /// 立即关闭弹窗（无动画），用于控制栏自动隐藏
+  void closePopupImmediate() {
+    _popupAnim.stop();
+    if (_popupController.isShowing) _popupController.hide();
   }
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = _popupOpen ? Tokens.accentegg : Tokens.textPrimary;
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: OverlayPortal(
+        controller: _popupController,
+        overlayChildBuilder: _buildPopup,
+        child: _buildButton(),
+      ),
+    );
+  }
+
+  Widget _buildButton() {
     return ValueListenableBuilder<_VolumeState>(
-      // key 绑定 _popupOpen：setState 触发 rebuild 时强制重建 Element，
-      // 否则 ValueListenableBuilder 只在 _volumeMerged 变化时才调 builder
-      key: ValueKey(_popupOpen),
       valueListenable: _volumeMerged,
       builder: (_, state, _) {
         final l10n = AppLocalizations.of(context);
+        final iconColor = _popupController.isShowing
+            ? Tokens.accentegg
+            : Tokens.textPrimary;
         return IconButton(
           icon: Icon(
             _icon(state.muted, state.volume),
@@ -125,30 +129,61 @@ class _VolumeSliderState extends State<VolumeSlider>
       },
     );
   }
+
+  Widget _buildPopup(BuildContext context) {
+    const popupHeight = 200.0;
+    return Stack(
+      children: [
+        // 全屏点击关闭背景
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _closePopup,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        // 按钮区域穿透 — 点击按钮切换弹窗
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _togglePopup,
+            child: const SizedBox(width: 48, height: 48),
+          ),
+        ),
+        // 弹窗内容 — 定位在按钮上方
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          offset: const Offset(0, -(popupHeight + Tokens.spSm)),
+          child: FadeTransition(
+            opacity: _popupOpacity,
+            child: _VolumePopupContent(
+              engine: widget.engine,
+              volumeState: _volumeMerged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _VolumePopup extends StatefulWidget {
+class _VolumePopupContent extends StatefulWidget {
   final MediaEngine engine;
-  final Offset buttonPosition;
-  final Size buttonSize;
-  final Animation<double> opacity;
   final ValueNotifier<_VolumeState> volumeState;
-  final VoidCallback onClose;
 
-  const _VolumePopup({
+  const _VolumePopupContent({
     required this.engine,
-    required this.buttonPosition,
-    required this.buttonSize,
-    required this.opacity,
     required this.volumeState,
-    required this.onClose,
   });
 
   @override
-  State<_VolumePopup> createState() => _VolumePopupState();
+  State<_VolumePopupContent> createState() => _VolumePopupContentState();
 }
 
-class _VolumePopupState extends State<_VolumePopup> {
+class _VolumePopupContentState extends State<_VolumePopupContent> {
   bool _dragging = false;
   double _dragValue = 0;
 
@@ -157,118 +192,96 @@ class _VolumePopupState extends State<_VolumePopup> {
 
   @override
   Widget build(BuildContext context) {
-    const popupWidth = 48.0;
-    const popupHeight = 200.0;
     const sliderAreaHeight = 150.0;
 
-    final left =
-        widget.buttonPosition.dx + widget.buttonSize.width / 2 - popupWidth / 2;
-    final top = widget.buttonPosition.dy - popupHeight - Tokens.spSm;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: widget.onClose,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        Positioned(
-          left: left,
-          top: top,
-          width: popupWidth,
-          height: popupHeight,
-          child: FadeTransition(
-            opacity: widget.opacity,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {},
-              child: Material(
-                color: Colors.transparent,
-                child: ValueListenableBuilder<_VolumeState>(
-                  valueListenable: widget.volumeState,
-                  builder: (_, state, _) {
-                    final muted = state.muted;
-                    final volume = _effectiveValue;
-                    return GlassContainer(
-                      tier: GlassTier.thick,
-                      respectResizeState: true,
-                      borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: Tokens.spSm),
-                            child: Text(
-                              '${(volume * 100).round()}',
-                              style: const TextStyle(
-                                color: Tokens.textPrimary,
-                                fontSize: Tokens.fontOverline,
-                                fontFeatures: [Tokens.tabularFigures],
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Center(
-                              child: SizedBox(
-                                height: sliderAreaHeight,
-                                child: RotatedBox(
-                                  quarterTurns: -1,
-                                  child: SliderTheme(
-                                    data: const SliderThemeData(
-                                      trackHeight: 3,
-                                      thumbShape: RoundSliderThumbShape(
-                                        enabledThumbRadius: 6,
-                                      ),
-                                      overlayShape: RoundSliderOverlayShape(
-                                        overlayRadius: 14,
-                                      ),
-                                    ),
-                                    child: Slider(
-                                      value: volume,
-                                      onChanged: (v) {
-                                        setState(() {
-                                          _dragging = true;
-                                          _dragValue = v;
-                                        });
-                                        widget.engine.setVolume(v);
-                                      },
-                                      onChangeEnd: (_) {
-                                        setState(() => _dragging = false);
-                                      },
-                                      activeColor: Tokens.accent,
-                                      inactiveColor: Tokens.bgHover,
-                                    ),
-                                  ),
+    return SizedBox(
+      width: 48.0,
+      height: 200.0,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {},
+        child: Material(
+          color: Colors.transparent,
+          child: ValueListenableBuilder<_VolumeState>(
+            valueListenable: widget.volumeState,
+            builder: (_, state, _) {
+              final muted = state.muted;
+              final volume = _effectiveValue;
+              return GlassContainer(
+                tier: GlassTier.thick,
+                respectResizeState: true,
+                borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: Tokens.spSm),
+                      child: Text(
+                        '${(volume * 100).round()}',
+                        style: const TextStyle(
+                          color: Tokens.textPrimary,
+                          fontSize: Tokens.fontOverline,
+                          fontFeatures: [Tokens.tabularFigures],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: SizedBox(
+                          height: sliderAreaHeight,
+                          child: RotatedBox(
+                            quarterTurns: -1,
+                            child: SliderTheme(
+                              data: const SliderThemeData(
+                                trackHeight: 3,
+                                thumbShape: RoundSliderThumbShape(
+                                  enabledThumbRadius: 6,
+                                ),
+                                overlayShape: RoundSliderOverlayShape(
+                                  overlayRadius: 14,
                                 ),
                               ),
+                              child: Slider(
+                                value: volume,
+                                onChanged: (v) {
+                                  setState(() {
+                                    _dragging = true;
+                                    _dragValue = v;
+                                  });
+                                  widget.engine.setVolume(v);
+                                },
+                                onChangeEnd: (_) {
+                                  setState(() => _dragging = false);
+                                },
+                                activeColor: Tokens.accent,
+                                inactiveColor: Tokens.bgHover,
+                              ),
                             ),
                           ),
-                          IconButton(
-                            icon: Icon(
-                              muted ? Icons.volume_off : Icons.volume_up,
-                              size: Tokens.iconSm,
-                              color: muted
-                                  ? Tokens.danger
-                                  : Tokens.textSecondary,
-                            ),
-                            onPressed: () => widget.engine.setMute(!muted),
-                            splashRadius: 14,
-                            tooltip: muted
-                                ? AppLocalizations.of(context).unmute
-                                : AppLocalizations.of(context).mute,
-                          ),
-                          const SizedBox(height: Tokens.spXs),
-                        ],
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        muted ? Icons.volume_off : Icons.volume_up,
+                        size: Tokens.iconSm,
+                        color: muted
+                            ? Tokens.danger
+                            : Tokens.textSecondary,
+                      ),
+                      onPressed: () => widget.engine.setMute(!muted),
+                      splashRadius: 14,
+                      tooltip: muted
+                          ? AppLocalizations.of(context).unmute
+                          : AppLocalizations.of(context).mute,
+                    ),
+                    const SizedBox(height: Tokens.spXs),
+                  ],
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
-      ],
+      ),
     );
   }
 }
