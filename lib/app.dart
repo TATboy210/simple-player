@@ -46,21 +46,25 @@ class _AppState extends State<App> {
       playlist: _playlist,
       onNeedRebuild: () => _playlistGeneration.value++,
     );
-    _videoProcessing = VideoProcessingService(_engine);
     _init();
   }
 
   Future<void> _init() async {
     final sw = Stopwatch()..start();
     try {
-      await Future.wait([
+      final results = await Future.wait([
         _controller.init(),
         SettingsStore.loadLocale().then((code) {
           _locale.value = Locale(code);
+          return code;
         }),
+        SettingsStore.load(),
       ]);
+      final settings = results[2] as AppSettings;
+      _videoProcessing = VideoProcessingService(_engine, initialSettings: settings);
     } on Exception catch (e) {
       debugPrint('[App] init failed (continuing): $e');
+      _videoProcessing = VideoProcessingService(_engine);
     }
     debugPrint('[App] init completed in ${sw.elapsedMilliseconds}ms');
     if (mounted) setState(() => _ready = true);
