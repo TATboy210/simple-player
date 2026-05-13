@@ -63,6 +63,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     with TickerProviderStateMixin {
   late final AnimationController _animController;
   late final Animation<double> _opacity;
+  final _popupCloseNotifier = ValueNotifier<int>(0);
   bool _visible = true;
   bool _hovering = false;
   Timer? _hideTimer;
@@ -178,6 +179,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     // idle 时控制栏永久显示，不允许隐藏
     if (widget.engine.state.value == MediaState.idle) return;
     if (_visible && !_hovering) {
+      _popupCloseNotifier.value++;
       _animController.reverse().then((_) {
         if (mounted) setState(() => _visible = false);
       });
@@ -209,6 +211,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     widget.engine.isMuted.removeListener(_onVolumeChanged);
     _hideTimer?.cancel();
     _clickTimer?.cancel();
+    _popupCloseNotifier.dispose();
     _osdAnim.dispose();
     _animController.dispose();
     super.dispose();
@@ -293,6 +296,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         engine: widget.engine,
                         isFullscreen: widget.isFullscreen,
                         isIdle: isIdle,
+                        popupCloseNotifier: _popupCloseNotifier,
                         onPrevious: widget.onPrevious,
                         onNext: widget.onNext,
                         onTogglePlaylist: widget.onTogglePlaylist,
