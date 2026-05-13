@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import 'dart:ffi' hide Size;
 
 import '../kernel/bridge/window_bridge.dart';
+import '../kernel/persistence/settings_store.dart';
 import 'aspect_ratio_service.dart';
 import 'geometry_store.dart';
 
@@ -272,29 +273,53 @@ class WindowService implements WindowBridge {
     _windowedSize = await windowManager.getSize();
     _windowedPosition = await windowManager.getPosition();
 
-    // Manual borderless fullscreen (setFullScreen doesn't work on frameless)
-    await windowManager.setHasShadow(false);
-    final screen = ui.PlatformDispatcher.instance.views.first;
-    final screenW = screen.physicalSize.width / screen.devicePixelRatio;
-    final screenH = screen.physicalSize.height / screen.devicePixelRatio;
-    await windowManager.setPosition(Offset.zero);
-    await windowManager.setSize(Size(screenW, screenH));
+    // Optimistic update — UI reacts immediately
+    mode.value = WindowMode.fullscreen;
+
+    try {
+      // Manual borderless fullscreen (setFullScreen doesn't work on frameless)
+      await windowManager.setHasShadow(false);
+      final screen = ui.PlatformDispatcher.instance.views.first;
+      final screenW = screen.physicalSize.width / screen.devicePixelRatio;
+      final screenH = screen.physicalSize.height / screen.devicePixelRatio;
+      await windowManager.setPosition(Offset.zero);
+      await windowManager.setSize(Size(screenW, screenH));
+      await SettingsStore.saveIsFullscreen(true);
+    } on Exception catch (e) {
+      // Rollback on failure
+      mode.value = WindowMode.windowed;
+      if (_savedRatio > 0) {
+        await AspectRatioService.I.setAspectRatio(_savedRatio);
+        _savedRatio = 0.0;
+      }
+      debugPrint('[WindowService] enterFullscreen failed: $e');
+    }
   }
 
   Future<void> _exitFullscreenInternal() async {
-    // Restore windowed geometry
-    if (_windowedSize != null) {
-      await windowManager.setSize(_windowedSize!);
-    }
-    if (_windowedPosition != null) {
-      await windowManager.setPosition(_windowedPosition!);
-    }
-    await windowManager.setHasShadow(true);
+    // Optimistic update
+    mode.value = WindowMode.windowed;
 
-    // Restore aspect ratio
-    if (_savedRatio > 0) {
-      await AspectRatioService.I.setAspectRatio(_savedRatio);
-      _savedRatio = 0.0;
+    try {
+      // Restore windowed geometry
+      if (_windowedSize != null) {
+        await windowManager.setSize(_windowedSize!);
+      }
+      if (_windowedPosition != null) {
+        await windowManager.setPosition(_windowedPosition!);
+      }
+      await windowManager.setHasShadow(true);
+
+      // Restore aspect ratio
+      if (_savedRatio > 0) {
+        await AspectRatioService.I.setAspectRatio(_savedRatio);
+        _savedRatio = 0.0;
+      }
+      await SettingsStore.saveIsFullscreen(false);
+    } on Exception catch (e) {
+      // Rollback on failure
+      mode.value = WindowMode.fullscreen;
+      debugPrint('[WindowService] exitFullscreen failed: $e');
     }
   }
 
