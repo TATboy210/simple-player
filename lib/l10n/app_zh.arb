@@ -124,6 +124,7 @@
   "aspectRatioOriginal": "原始",
   "aspectRatioStretch": "拉伸",
   "aspectRatioCropFill": "裁剪填充",
+  "aspectRatioFree": "自由",
 
   "progressBar": "播放进度"
 }

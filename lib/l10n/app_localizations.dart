@@ -758,6 +758,12 @@ abstract class AppLocalizations {
   /// **'Crop Fill'**
   String get aspectRatioCropFill;
 
+  /// Aspect ratio mode: no constraint
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get aspectRatioFree;
+
   /// Semantics label for playback progress bar
   ///
   /// In en, this message translates to:

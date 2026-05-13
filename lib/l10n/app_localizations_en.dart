@@ -357,5 +357,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aspectRatioCropFill => 'Crop Fill';
 
   @override
+  String get aspectRatioFree => 'Free';
+
+  @override
   String get progressBar => 'Playback Progress';
 }

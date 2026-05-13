@@ -10,6 +10,7 @@ import '../../kernel/services/playback_controller.dart';
 import '../../kernel/ui/theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/play_mode_utils.dart';
+import '../../window/aspect_ratio_service.dart';
 import 'controls_overlay.dart';
 import 'custom_title_bar.dart';
 import 'drop_handler.dart';
@@ -114,6 +115,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onMediaPlayPause: () => widget.engine.togglePlayPause(),
           onMediaNext: () => widget.controller.playNext(),
           onMediaPrevious: () => widget.controller.playPrevious(),
+          onCycleAspectRatio: () => AspectRatioService.I.cycleRatio(),
           child: DragToResizeArea(
             enableResizeEdges: isFullscreen ? [] : null,
             child: Scaffold(

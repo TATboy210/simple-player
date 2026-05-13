@@ -122,7 +122,7 @@ class TitleBarControls extends StatelessWidget {
             if (ratio <= 0) return const SizedBox.shrink();
             return _TitleBarButton(
               icon: Icons.aspect_ratio,
-              tooltip: AspectRatioService.I.currentLabel,
+              tooltip: _aspectRatioLabel(ratio, l10n),
               onPressed: () => AspectRatioService.I.cycleRatio(),
             );
           },
@@ -162,6 +162,14 @@ class TitleBarControls extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 宽高比标签本地化 — 标准比例用 l10n key，数值比例用 fallback
+String _aspectRatioLabel(double ratio, AppLocalizations l10n) {
+  if ((ratio - 16.0 / 9.0).abs() < 0.01) return '16:9';
+  if ((ratio - 4.0 / 3.0).abs() < 0.01) return '4:3';
+  if ((ratio - 21.0 / 9.0).abs() < 0.01) return '21:9';
+  return '${ratio.toStringAsFixed(2)}:1';
 }
 
 /// 标题栏按钮 — 46×36，hover 高亮，close hover = danger 红底

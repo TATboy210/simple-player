@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../kernel/models/aspect_ratio_mode.dart';
+
 /// 宽高比约束服务 — 通过 MethodChannel 调用原生 WM_SIZING 处理
 ///
 /// 无视频时锁定 16:9，播放视频时匹配视频比例。
@@ -19,6 +21,9 @@ class AspectRatioService {
 
   double _current = 0.0;
 
+  /// UI 响应式通知器 — 比例变化时通知监听者
+  final ratioNotifier = ValueNotifier<double>(0.0);
+
   double get current => _current;
 
   /// 设置宽高比约束（0 = 无约束）
@@ -26,10 +31,12 @@ class AspectRatioService {
     if (_current == ratio) return;
     final previous = _current; // 保存用于失败回滚
     _current = ratio;
+    ratioNotifier.value = ratio;
     try {
       await _channel.invokeMethod('setAspectRatio', ratio);
     } on Exception catch (e) {
       _current = previous; // 回滚到之前的状态
+      ratioNotifier.value = previous;
       debugPrint('[AspectRatio] setAspectRatio($ratio) failed: $e');
     }
   }
@@ -58,12 +65,12 @@ class AspectRatioService {
     await setAspectRatio(next);
   }
 
-  /// 当前比例的显示标签
+  /// 当前比例的显示标签（中文，UI 层通过 l10n 覆盖）
   String get currentLabel {
     if (_current == 0.0) return '自由';
-    if ((_current - ratio16x9).abs() < 0.01) return '16:9';
-    if ((_current - ratio4x3).abs() < 0.01) return '4:3';
-    if ((_current - 21.0 / 9.0).abs() < 0.01) return '21:9';
+    for (final mode in AspectRatioMode.values) {
+      if ((_current - mode.mdkValue).abs() < 0.01) return mode.label;
+    }
     return '${_current.toStringAsFixed(2)}:1';
   }
 }

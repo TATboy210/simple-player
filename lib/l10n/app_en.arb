@@ -262,6 +262,8 @@
   "@aspectRatioStretch": { "description": "Aspect ratio mode: stretch to fill" },
   "aspectRatioCropFill": "Crop Fill",
   "@aspectRatioCropFill": { "description": "Aspect ratio mode: crop to fill" },
+  "aspectRatioFree": "Free",
+  "@aspectRatioFree": { "description": "Aspect ratio mode: no constraint" },
 
   "progressBar": "Playback Progress",
   "@progressBar": { "description": "Semantics label for playback progress bar" }
