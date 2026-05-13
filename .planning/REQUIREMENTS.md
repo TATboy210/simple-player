@@ -16,13 +16,13 @@
 
 ### Fullscreen (HIGH — core functionality)
 
-- [ ] **FS-01**: F key toggles fullscreen reliably
-- [ ] **FS-02**: Fullscreen button in control bar toggles fullscreen
-- [ ] **FS-03**: Double-click video area toggles fullscreen
-- [ ] **FS-04**: ESC exits fullscreen
-- [ ] **FS-05**: Mode ValueNotifier updates optimistically (not waiting for callback)
-- [ ] **FS-06**: Fullscreen state persists across sessions
-- [ ] **FS-07**: Aspect ratio unlocks in fullscreen, restores on exit
+- [x] **FS-01**: F key toggles fullscreen reliably
+- [x] **FS-02**: Fullscreen button in control bar toggles fullscreen
+- [x] **FS-03**: Double-click video area toggles fullscreen
+- [x] **FS-04**: ESC exits fullscreen
+- [x] **FS-05**: Mode ValueNotifier updates optimistically (not waiting for callback)
+- [x] **FS-06**: Fullscreen state persists across sessions
+- [x] **FS-07**: Aspect ratio unlocks in fullscreen, restores on exit
 
 ### Settings (MEDIUM — functionality gap)
 
@@ -72,13 +72,13 @@
 | BTN-03 | Phase 1 | DONE |
 | BTN-04 | Phase 1 | DONE |
 | BTN-05 | Phase 1 | DONE |
-| FS-01 | Phase 2 | Pending |
-| FS-02 | Phase 2 | Pending |
-| FS-03 | Phase 2 | Pending |
-| FS-04 | Phase 2 | Pending |
-| FS-05 | Phase 2 | Pending |
-| FS-06 | Phase 2 | Pending |
-| FS-07 | Phase 2 | Pending |
+| FS-01 | Phase 2 | DONE |
+| FS-02 | Phase 2 | DONE |
+| FS-03 | Phase 2 | DONE |
+| FS-04 | Phase 2 | DONE |
+| FS-05 | Phase 2 | DONE |
+| FS-06 | Phase 2 | DONE |
+| FS-07 | Phase 2 | DONE |
 | SET-01 | Phase 3 | Pending |
 | SET-02 | Phase 3 | Pending |
 | SET-03 | Phase 3 | Pending |
@@ -97,4 +97,4 @@
 
 ---
 *Requirements defined: 2026-05-09*
-*Last updated: 2026-05-13 — refocused on button highlight, fullscreen, settings, code quality*
+*Last updated: 2026-05-14 — Phase 05 fullscreen reliability complete, FS-01 through FS-07 DONE*
