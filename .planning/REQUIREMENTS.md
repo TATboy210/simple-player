@@ -1,119 +1,100 @@
 # Requirements: Simple Player Flutter
 
 **Defined:** 2026-05-09
-**Core Value:** Stable, efficient, secure frameless window with video playback
+**Updated:** 2026-05-13
+**Core Value:** Stable, efficient, secure frameless window with video playback — every control must work reliably
 
 ## v1 Requirements
 
-### Window Shell (首要 — 先把窗口做出来)
+### Button Highlight (HIGH — user-visible bug)
 
-- [ ] **WIN-01**: Frameless window with no system title bar (setAsFrameless before show)
-- [ ] **WIN-02**: Custom title bar — 稳定不闪烁 (36px, app name, window controls)
-- [ ] **WIN-03**: Title bar 按钮 resize 稳定性 — isResizing 守卫 + RepaintBoundary + ValueListenableBuilder 精确重建，resize 期间按钮不闪烁不重绘
-- [ ] **WIN-04**: Title bar drag to move window (GestureDetector onPanStart → startDragging)
-- [ ] **WIN-05**: Title bar double-tap to toggle maximize
-- [ ] **WIN-06**: Aspect ratio lock (16:9 idle, video ratio when playing, cycle button)
-- [ ] **WIN-07**: Aspect ratio enforcement via native MethodChannel (WM_SIZING, not Flutter AspectRatio widget)
-- [ ] **WIN-08**: Fullscreen toggle (F11, manual setSize/setPosition for frameless)
-- [ ] **WIN-09**: Fullscreen reentry guard (prevent rapid F11 ABA state corruption)
-- [ ] **WIN-10**: Window state persistence (size, position, maximized, fullscreen, always-on-top)
-- [ ] **WIN-11**: 500ms debounced persistence (merge continuous resize/move events)
-- [ ] **WIN-12**: Window bounds check on restore (clamp to visible screen area)
-- [ ] **WIN-13**: Minimum window size (640×360, 360p 16:9)
-- [ ] **WIN-14**: Always-on-top toggle (pin button in title bar)
-- [ ] **WIN-15**: First frame fix (setAsFrameless + forceRedraw MethodChannel, 零白色闪烁)
+- [ ] **BTN-01**: Volume button icon turns cyan (#66CCFF) when popup is open
+- [ ] **BTN-02**: Speed button text turns cyan with border when popup is open
+- [ ] **BTN-03**: Highlight persists while popup is visible (no premature clearing)
+- [ ] **BTN-04**: Popup auto-closes when control bar auto-hides
+- [ ] **BTN-05**: Close animation consistent — highlight stays during fade-out, clears on remove
 
-### Video Playback
+### Fullscreen (HIGH — core functionality)
 
-- [ ] **VID-01**: VideoSurface rendering (Texture widget from fvp engine textureId)
-- [ ] **VID-02**: Basic play/pause (wire to engine.togglePlayPause)
-- [ ] **VID-03**: Empty state overlay (open file button when idle)
+- [ ] **FS-01**: F key toggles fullscreen reliably
+- [ ] **FS-02**: Fullscreen button in control bar toggles fullscreen
+- [ ] **FS-03**: Double-click video area toggles fullscreen
+- [ ] **FS-04**: ESC exits fullscreen
+- [ ] **FS-05**: Mode ValueNotifier updates optimistically (not waiting for callback)
+- [ ] **FS-06**: Fullscreen state persists across sessions
+- [ ] **FS-07**: Aspect ratio unlocks in fullscreen, restores on exit
 
-### Content Management
+### Settings (MEDIUM — functionality gap)
 
-- [ ] **CON-01**: File picker integration (FilePicker.pickFiles, type: video)
-- [ ] **CON-02**: Drag-and-drop file support (desktop_drop DropHandler)
-- [ ] **CON-03**: Files added to playlist via PlaybackController.addFiles
+- [ ] **SET-01**: Settings button opens dialog from control bar
+- [ ] **SET-02**: Equalizer presets apply correctly
+- [ ] **SET-03**: Audio track selection works
+- [ ] **SET-04**: Video processing sliders persist
+- [ ] **SET-05**: Fallback text correct for each tab (not l10n.noAudioTracks for video processing)
 
-### Security
+### Code Quality (MEDIUM — production readiness)
 
-- [ ] **SEC-01**: URL validation with scheme whitelist (http, https, rtmp, rtsp)
-- [ ] **SEC-02**: Subtitle delay bounds check (clamp to ±30000ms)
-- [ ] **SEC-03**: Equalizer filter string validation
+- [ ] **CODE-01**: Remove dead WindowManagerService (515 lines)
+- [ ] **CODE-02**: Fix KeyboardHandler 'A' key (currently swallows key with no action)
+- [ ] **CODE-03**: AspectRatioService labels use l10n (not hardcoded Chinese)
+- [ ] **CODE-04**: No unused imports or dead code
+- [ ] **CODE-05**: All popup overlay entries cleaned up on dispose
 
 ## v2 Requirements
 
-### Playback UI
+### Playback UI Polish
 
-- **PLY-01**: Controls overlay (seek bar, volume slider, mute toggle)
-- **PLY-02**: Auto-hide controls when playing, show on mouse hover
-- **PLY-03**: OSD overlay (floating pill for play/pause/seek actions)
-- **PLY-04**: Progress bar with seek functionality
-- **PLY-05**: Speed control button
+- **PLY-01**: 10-band equalizer (replace 5 presets)
+- **PLY-02**: AB loop button (kernel supports, UI deferred)
+- **PLY-03**: Subtitle overlay positioning
+- **PLY-04**: Media info dialog enhancements
 
-### Content Management
+### Settings
 
-- **CNT-01**: Playlist panel (right side, add/remove/reorder)
-- **CNT-02**: Play modes (sequential, loop, shuffle, single)
-- **CNT-03**: Resume playback from last position
-- **CNT-04**: Recent files history
-
-### Polish
-
-- **POL-01**: Keyboard shortcuts (19 bindings from reference)
-- **POL-02**: Aurora background animation (idle state)
-- **POL-03**: Glass-morphism effects (BackdropFilter)
-- **POL-04**: Responsive layout (wide/narrow breakpoint)
-- **POL-05**: Localization (EN/ZH)
-- **POL-06**: Media info dialog
-- **POL-07**: Settings dialog (equalizer, video processing)
+- **SET-10**: General settings tab (language, theme, startup behavior)
+- **SET-11**: Keyboard shortcut customization
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Mobile platforms (Android/iOS) | Desktop only for v1 |
-| Network streaming / DRM | Local file playback only |
-| Audio-only player (just_audio) | fvp handles all media |
-| Custom equalizer UI | Kernel supports it, UI deferred to v2 |
-| Video processing UI | VideoProcessingService exists but UI deferred |
-| AB loop | Kernel supports it, UI deferred |
-| Subtitle overlay positioning | Deferred to v2 |
+| Mobile platforms | Desktop only |
+| Network streaming / DRM | Local files only |
+| Custom equalizer (10-band) | 5 presets sufficient for v1 |
+| General settings tab | v2 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WIN-01 | Phase 1 | Pending |
-| WIN-02 | Phase 1 | Pending |
-| WIN-03 | Phase 1 | Pending |
-| WIN-04 | Phase 1 | Pending |
-| WIN-05 | Phase 1 | Pending |
-| WIN-06 | Phase 1 | Pending |
-| WIN-07 | Phase 1 | Pending |
-| WIN-08 | Phase 1 | Pending |
-| WIN-09 | Phase 1 | Pending |
-| WIN-10 | Phase 1 | Pending |
-| WIN-11 | Phase 1 | Pending |
-| WIN-12 | Phase 1 | Pending |
-| WIN-13 | Phase 1 | Pending |
-| WIN-14 | Phase 1 | Pending |
-| WIN-15 | Phase 1 | Pending |
-| VID-01 | Phase 2 | Pending |
-| VID-02 | Phase 2 | Pending |
-| VID-03 | Phase 2 | Pending |
-| CON-01 | Phase 2 | Pending |
-| CON-02 | Phase 2 | Pending |
-| CON-03 | Phase 2 | Pending |
-| SEC-01 | Phase 3 | Pending |
-| SEC-02 | Phase 3 | Pending |
-| SEC-03 | Phase 3 | Pending |
+| BTN-01 | Phase 1 | Pending |
+| BTN-02 | Phase 1 | Pending |
+| BTN-03 | Phase 1 | Pending |
+| BTN-04 | Phase 1 | Pending |
+| BTN-05 | Phase 1 | Pending |
+| FS-01 | Phase 2 | Pending |
+| FS-02 | Phase 2 | Pending |
+| FS-03 | Phase 2 | Pending |
+| FS-04 | Phase 2 | Pending |
+| FS-05 | Phase 2 | Pending |
+| FS-06 | Phase 2 | Pending |
+| FS-07 | Phase 2 | Pending |
+| SET-01 | Phase 3 | Pending |
+| SET-02 | Phase 3 | Pending |
+| SET-03 | Phase 3 | Pending |
+| SET-04 | Phase 3 | Pending |
+| SET-05 | Phase 3 | Pending |
+| CODE-01 | Phase 4 | Pending |
+| CODE-02 | Phase 4 | Pending |
+| CODE-03 | Phase 4 | Pending |
+| CODE-04 | Phase 4 | Pending |
+| CODE-05 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 24 total
-- Mapped to phases: 24
+- v1 requirements: 22 total
+- Mapped to phases: 22
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-09*
-*Last updated: 2026-05-09 — traceability updated with 3 phases, SEC requirements added (24 total)*
+*Last updated: 2026-05-13 — refocused on button highlight, fullscreen, settings, code quality*

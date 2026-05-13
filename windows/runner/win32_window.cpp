@@ -16,6 +16,21 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+#ifndef DWMWCP_ROUND
+#define DWMWCP_ROUND 2
+#endif
+
+/// Re-apply rounded corners. Windows 11 DWM resets DWMWA_WINDOW_CORNER_PREFERENCE
+/// during snap/maximize/restore transitions.
+void ApplyRoundedCorners(HWND hwnd) {
+  DWORD corner = DWMWCP_ROUND;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+                        &corner, sizeof(corner));
+}
+
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
 /// Registry key for app theme preference.
@@ -155,15 +170,7 @@ bool Win32Window::Create(const std::wstring& title,
   UpdateTheme(window);
 
   // Restore rounded corners on Windows 11 (stripped by setAsFrameless)
-#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
-#define DWMWA_WINDOW_CORNER_PREFERENCE 33
-#endif
-#ifndef DWMWCP_ROUND
-#define DWMWCP_ROUND 2
-#endif
-  DWORD corner = DWMWCP_ROUND;
-  DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE,
-                        &corner, sizeof(corner));
+  ApplyRoundedCorners(window);
 
   return OnCreate();
 }
@@ -224,6 +231,8 @@ Win32Window::MessageHandler(HWND hwnd,
         MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
                    rect.bottom - rect.top, FALSE);
       }
+      // Re-apply rounded corners after snap/maximize/restore.
+      ApplyRoundedCorners(hwnd);
       return 0;
     }
 

@@ -70,7 +70,11 @@ class Tokens {
   static const closeHoverBg = Color(0xFFC42B1C);
 
   // 鈹€鈹€ 鎺у埗鏍?鈹€鈹€
-  static const controlBarHeight = 72.0;
+  static const controlBarHeight = 84.0;
+  static const controlBarRadius = 16.0;
+  static const controlBarMarginH = 48.0;
+  static const controlBarMarginBottom = 16.0;
+  static const controlBarBorder = Color(0x1AFFFFFF);
 
   // 鈹€鈹€ 杩涘害鏉?鈹€鈹€
   static const progressBarHeight = 32.0;

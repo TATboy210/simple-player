@@ -101,6 +101,15 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_SIZING: {
       if (aspect_ratio_ > 0.0) {
         auto* rect = reinterpret_cast<RECT*>(lparam);
+
+        // Skip ratio constraint when window covers entire monitor (fullscreen)
+        MONITORINFO mi = { sizeof(mi) };
+        GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+        if (rect->left <= mi.rcMonitor.left && rect->top <= mi.rcMonitor.top &&
+            rect->right >= mi.rcMonitor.right && rect->bottom >= mi.rcMonitor.bottom) {
+          break;
+        }
+
         LONG w = rect->right - rect->left;
         LONG h = rect->bottom - rect->top;
         // Frameless window (TitleBarStyle.hidden): non-client area is

@@ -195,6 +195,14 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   }
 
   @override
+  void didUpdateWidget(covariant ControlsOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isFullscreen != widget.isFullscreen) {
+      _scheduleHide();
+    }
+  }
+
+  @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
     widget.engine.volume.removeListener(_onVolumeChanged);
@@ -274,11 +282,11 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             child: RepaintBoundary(
               child: Stack(
                 children: [
-                  // ControlBar 固定在底部 — 跟随淡入淡出
+                  // ControlBar 浮动在底部 — 跟随淡入淡出
                   Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
+                    left: Tokens.controlBarMarginH,
+                    right: Tokens.controlBarMarginH,
+                    bottom: Tokens.controlBarMarginBottom,
                     child: FadeTransition(
                       opacity: _opacity,
                       child: ControlBar(
@@ -302,17 +310,21 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                   ),
                   // 错误消息条：独立于控制栏淡入淡出
                   Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 96,
+                    left: Tokens.controlBarMarginH + 16,
+                    right: Tokens.controlBarMarginH + 16,
+                    bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight + 8,
                     child: ErrorBanner(
                       engine: widget.engine,
                       onOpenFile: widget.onOpenFile,
                       onRetry: widget.onOpenFile,
                     ),
                   ),
-                  // OSD 浮动提示 — 替代 OverlayEntry
-                  Positioned.fill(
+                  // OSD 浮动提示 — 固定在控制栏上方
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: Tokens.controlBarMarginBottom +
+                        Tokens.controlBarHeight + 16,
                     child: IgnorePointer(
                       child: Center(
                         child: FadeTransition(
@@ -340,7 +352,7 @@ class _OsdBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 80),
+      padding: EdgeInsets.zero,
       child: GlassContainer(
         tier: GlassTier.thick,
         respectResizeState: true,

@@ -35,7 +35,7 @@ class WindowManagerService implements WindowListener {
 
   // ─── Constants ───
 
-  static const minSize = Size(640, 360); // 360p 16:9
+  static const minSize = Size(800, 450); // 800x450 16:9
   static const _completerTimeoutSeconds = 5;
   /// 拖拽结束后等待此时间才重置 isResizing，防止慢速拖拽时 BackdropFilter 闪烁
   static const _resizeDebounceMs = 500;
