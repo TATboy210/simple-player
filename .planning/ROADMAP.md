@@ -8,7 +8,7 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
 
 - [x] **Phase 1: Button Highlight Fix** — Volume/Speed button highlight visible and consistent when popup open (5 requirements)
 - [x] **Phase 2: Fullscreen Reliability** — Fullscreen toggle works from all entry points, mode persists, optimistic state (7 requirements)
-- [ ] **Phase 3: Settings Completion** — Settings dialog accessible, all tabs functional, correct fallback text (5 requirements)
+- [x] **Phase 3: Settings Completion** — Settings dialog accessible, all tabs functional, correct fallback text (5 requirements)
 - [ ] **Phase 4: Production Code Cleanup** — Remove dead code, fix keyboard handler, l10n labels, unused imports (5 requirements)
 
 ## Phase Details
@@ -53,7 +53,7 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
   4. Video processing sliders persist via SettingsStore
   5. Video processing tab shows correct fallback (not "no audio tracks")
 **Plans**:
-- [ ] 06-01-PLAN.md — Fix l10n fallback text, video processing persistence, hardcoded Chinese close button
+- [x] 06-01-PLAN.md — Fix l10n fallback text, video processing persistence, hardcoded Chinese close button
 
 ### Phase 4: Production Code Cleanup
 **Goal**: Codebase is production-grade — no dead code, no hardcoded strings, no swallowed keys, proper cleanup
@@ -73,5 +73,5 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
 |-------|----------------|--------|-----------|
 | 1. Button Highlight | 1 | COMPLETE | 2026-05-13 |
 | 2. Fullscreen | 1 | COMPLETE | 2026-05-14 |
-| 3. Settings | 0 | Ready | - |
+| 3. Settings | 1 | COMPLETE | 2026-05-14 |
 | 4. Code Cleanup | 0 | Blocked by Phase 3 | - |
