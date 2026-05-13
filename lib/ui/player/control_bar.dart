@@ -28,6 +28,7 @@ class ControlBar extends StatelessWidget {
   final bool isVideo;
   final bool enableBlur;
   final bool isIdle;
+  final ValueNotifier<int>? popupCloseNotifier;
 
   const ControlBar({
     super.key,
@@ -46,6 +47,7 @@ class ControlBar extends StatelessWidget {
     this.isVideo = false,
     this.enableBlur = true,
     this.isIdle = false,
+    this.popupCloseNotifier,
   });
 
   @override
@@ -109,14 +111,20 @@ class ControlBar extends StatelessWidget {
                             ignoring: isIdle,
                             child: Opacity(
                               opacity: isIdle ? 0.0 : 1.0,
-                              child: VolumeSlider(engine: engine),
+                              child: VolumeSlider(
+                                engine: engine,
+                                popupCloseNotifier: popupCloseNotifier,
+                              ),
                             ),
                           ),
                           IgnorePointer(
                             ignoring: isIdle,
                             child: Opacity(
                               opacity: isIdle ? 0.0 : 1.0,
-                              child: SpeedButton(engine: engine),
+                              child: SpeedButton(
+                                engine: engine,
+                                popupCloseNotifier: popupCloseNotifier,
+                              ),
                             ),
                           ),
                         ],
