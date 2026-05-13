@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../kernel/ui/theme/tokens.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 共享对话框包装器 — 统一视觉风格和关闭按钮
 ///
@@ -49,9 +50,9 @@ class AppDialog extends StatelessWidget {
             ...?actions,
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                '关闭',
-                style: TextStyle(color: Tokens.textSecondary),
+              child: Text(
+                AppLocalizations.of(context).close,
+                style: const TextStyle(color: Tokens.textSecondary),
               ),
             ),
           ],
