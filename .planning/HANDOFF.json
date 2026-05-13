@@ -1,120 +1,35 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-07T21:45:00+08:00",
-  "phase": null,
-  "phase_name": null,
-  "phase_dir": null,
+  "timestamp": "2026-05-14T02:00:00.000Z",
+  "phase": "07",
+  "phase_name": "code-cleanup",
+  "phase_dir": ".planning/phases/07-code-cleanup",
   "plan": null,
   "task": null,
-  "total_tasks": null,
-  "status": "paused",
-  "completed_tasks": [
-    {
-      "id": 1,
-      "name": "Stack+AnimatedOpacity pattern for CustomTitleBar",
-      "status": "done",
-      "commit": "uncommitted"
-    },
-    {
-      "id": 2,
-      "name": "Hover guard in _TitleBarButtonState (isResizing check)",
-      "status": "done",
-      "commit": "uncommitted"
-    },
-    {
-      "id": 3,
-      "name": "RepaintBoundary wrapper in app.dart",
-      "status": "done",
-      "commit": "uncommitted"
-    },
-    {
-      "id": 4,
-      "name": "Update resize degradation tests (AnimatedOpacity opacity check)",
-      "status": "done",
-      "commit": "uncommitted"
-    },
-    {
-      "id": 5,
-      "name": "Impeller engine configuration in main.cpp",
-      "status": "done",
-      "commit": "uncommitted"
-    },
-    {
-      "id": 6,
-      "name": "WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE in win32_window.cpp",
-      "status": "done",
-      "commit": "uncommitted"
-    },
-    {
-      "id": 7,
-      "name": "_prepareFramelessFirstFrame + ForceRedraw bridge layer verification",
-      "status": "done",
-      "commit": "uncommitted"
-    }
+  "status": "context-gathered",
+  "next_action": "gsd-plan-phase 4",
+  "completed_this_session": [
+    "Phase 06 (Settings Completion) executed and verified — all 5 requirements DONE",
+    "Phase 07 discuss-phase: CONTEXT.md and DISCUSSION-LOG.md created and committed",
+    "STATE.md, ROADMAP.md, REQUIREMENTS.md updated for Phase 06 completion"
   ],
-  "remaining_tasks": [
-    {
-      "id": 8,
-      "name": "Manual verification: resize drag jitter test",
-      "status": "not_started"
-    },
-    {
-      "id": 9,
-      "name": "Manual verification: 4K Blu-ray content playback",
-      "status": "not_started"
-    }
+  "remaining_work": [
+    "Phase 07 RESEARCH.md — needs gsd-phase-researcher",
+    "Phase 07 PLAN.md — needs gsd-planner",
+    "Phase 07 plan verification — needs gsd-plan-checker",
+    "Phase 07 execution — CODE-01 through CODE-05"
   ],
-  "blockers": [
-    {
-      "description": "Title bar jitter may be a Flutter framework-level issue (flutter/flutter#65460, flutter/flutter#33612) — needs manual verification to confirm fixes work",
-      "type": "technical",
-      "workaround": "All known mitigations applied: Stack+AnimatedOpacity, RepaintBoundary isolation, hover guard, Impeller, WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE"
-    }
-  ],
-  "human_actions_pending": [
-    {
-      "action": "Manual window resize drag test — verify title bar no longer jitters",
-      "context": "All code changes applied, 327 tests pass. Need human eyes on actual resize behavior.",
-      "blocking": true
-    },
-    {
-      "action": "Verify glass-morphism blur visible when not resizing",
-      "context": "AnimatedOpacity pattern changes rendering — confirm visual parity",
-      "blocking": false
-    }
-  ],
-  "decisions": [
-    {
-      "decision": "Use Stack+AnimatedOpacity instead of conditional widget tree mutation",
-      "rationale": "AnimatedOpacity(opacity:0) sets RenderOpacity.needsCompositing=false, bypassing BackdropFilter GPU cost without removing widgets from tree. No tree mutation = no relayout spike.",
-      "phase": null
-    },
-    {
-      "decision": "Three-level RepaintBoundary isolation",
-      "rationale": "Column -> outer RepaintBoundary -> TitleBar -> blur/content RepaintBoundaries. Content completely shielded from resize-triggered repaints.",
-      "phase": null
-    },
-    {
-      "decision": "80ms AnimatedOpacity duration (Tokens.durationFast)",
-      "rationale": "Masks 1-frame stale-bitmap flash when resize ends and blur reappears. Imperceptible to humans.",
-      "phase": null
-    },
-    {
-      "decision": "Keep Impeller enabled via _putenv_s in main.cpp",
-      "rationale": "Confirmed correct approach for standalone/release builds. Sets env vars before engine creation.",
-      "phase": null
-    }
-  ],
+  "decisions": {
+    "dead_code_scope": "Delete WindowManagerService (514 lines) + WindowsPlatformService (53 lines). Keep PlatformService and kernel/AspectRatioService.",
+    "custom_title_bar_fix": "Proxy pattern: PlatformService internally delegates to WindowBridge.I. Zero changes to CustomTitleBar.",
+    "a_key": "Not discussed — planner discretion. Add onCycleAspectRatio callback prop.",
+    "l10n_labels": "Not discussed — planner discretion. Either l10n key in service or enum mapping in UI.",
+    "overlay_cleanup": "Already satisfied by Phase 01 OverlayPortal migration."
+  },
+  "blockers": [],
+  "human_actions_pending": [],
   "uncommitted_files": [
-    "lib/kernel/ui/window/custom_title_bar.dart",
-    "lib/app.dart",
-    "test/widget/window/custom_title_bar_test.dart",
-    "windows/runner/main.cpp",
-    "windows/runner/win32_window.cpp",
-    "windows/runner/win32_window.h",
-    ".planning/HANDOFF.json",
-    ".planning/STATE.md"
-  ],
-  "next_action": "Manual verification: run the app, resize window by dragging edges/corners, verify title bar does not jitter. If jitter persists, it's likely a Flutter framework limitation.",
-  "context_notes": "Applied plan from vivid-weaving-ripple.md. All code changes complete, all 327 tests pass. The key insight: BackdropFilter tree mutation (mount/unmount) was causing relayout spikes during resize. Stack+AnimatedOpacity keeps it always mounted but skips compositing when opacity=0. Three RepaintBoundary instances provide complete isolation. User needs to manually verify the fix works on their display."
+    "lib/ui/player/volume_slider.dart",
+    "ruvector.db"
+  ]
 }
