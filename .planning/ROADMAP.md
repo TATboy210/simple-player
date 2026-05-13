@@ -9,7 +9,7 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
 - [x] **Phase 1: Button Highlight Fix** — Volume/Speed button highlight visible and consistent when popup open (5 requirements)
 - [x] **Phase 2: Fullscreen Reliability** — Fullscreen toggle works from all entry points, mode persists, optimistic state (7 requirements)
 - [x] **Phase 3: Settings Completion** — Settings dialog accessible, all tabs functional, correct fallback text (5 requirements)
-- [ ] **Phase 4: Production Code Cleanup** — Remove dead code, fix keyboard handler, l10n labels, unused imports (5 requirements)
+- [x] **Phase 4: Production Code Cleanup** — Remove dead code, fix keyboard handler, l10n labels, unused imports (5 requirements)
 
 ## Phase Details
 
@@ -66,8 +66,8 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
   4. `dart analyze` passes with no warnings
   5. All overlay entries cleaned up on dispose
 **Plans**:
-- [ ] 07-01-PLAN.md — Delete dead WindowManagerService + WindowsPlatformService, create PlatformService proxy
-- [ ] 07-02-PLAN.md — Wire 'A' key, localize AspectRatio labels, fix all dart analyze warnings
+- [x] 07-01-PLAN.md — Delete dead WindowManagerService + WindowsPlatformService, create PlatformService proxy
+- [x] 07-02-PLAN.md — Wire 'A' key, localize AspectRatio labels, fix all dart analyze warnings
 
 ## Progress
 
@@ -76,4 +76,4 @@ Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, 
 | 1. Button Highlight | 1 | COMPLETE | 2026-05-13 |
 | 2. Fullscreen | 1 | COMPLETE | 2026-05-14 |
 | 3. Settings | 1 | COMPLETE | 2026-05-14 |
-| 4. Code Cleanup | 0 | In Progress | - |
+| 4. Code Cleanup | 2 | COMPLETE | 2026-05-14 |
