@@ -64,12 +64,11 @@ class _SpeedButtonState extends State<SpeedButton>
   void _open() {
     _anim.stop();
     _removeOverlay();
-    _popupOpen = true;
+    setState(() => _popupOpen = true);
     _anim.forward(from: 0.0);
 
     final box = context.findRenderObject() as RenderBox;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final pos = box.localToGlobal(Offset.zero, ancestor: overlay);
 
     _overlay = OverlayEntry(
@@ -87,9 +86,13 @@ class _SpeedButtonState extends State<SpeedButton>
 
   void _close() {
     if (!_popupOpen) return;
-    _popupOpen = false;
+    setState(() => _popupOpen = false);
+    final entry = _overlay;
     _anim.reverse().then((_) {
-      if (!_popupOpen) _removeOverlay();
+      if (!_popupOpen && entry != null) {
+        entry.remove();
+        if (_overlay == entry) _overlay = null;
+      }
     });
   }
 
@@ -101,26 +104,42 @@ class _SpeedButtonState extends State<SpeedButton>
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<double>(
+      key: ValueKey(_popupOpen),
       valueListenable: widget.engine.playbackSpeed,
       builder: (_, speed, _) {
         final label = speed == speed.roundToDouble()
             ? '${speed.toInt()}x'
             : '${speed}x';
+        final active = speed != 1.0 || _popupOpen;
         return InkWell(
           onTap: _toggle,
           borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+          hoverColor: Tokens.bgHover,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: Tokens.spSm,
               vertical: Tokens.spXs,
             ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color:
-                    speed == 1.0 ? Tokens.textDisabled : Tokens.accent,
-                fontSize: Tokens.fontCaption,
-                fontWeight: FontWeight.w500,
+            child: Container(
+              decoration: active
+                  ? BoxDecoration(
+                      borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+                      border: Border.all(
+                        color: Tokens.accentegg.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    )
+                  : null,
+              padding: active
+                  ? const EdgeInsets.symmetric(horizontal: 4, vertical: 1)
+                  : EdgeInsets.zero,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? Tokens.accentegg : Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -155,11 +174,8 @@ class _SpeedPopup extends StatelessWidget {
     final itemHeight = 36.0;
     final popupHeight = _speeds.length * itemHeight + 16.0;
 
-    final left =
-        buttonPosition.dx + buttonSize.width / 2 - popupWidth / 2;
-    final bottom = MediaQuery.of(context).size.height -
-        buttonPosition.dy +
-        Tokens.spSm;
+    final left = buttonPosition.dx + buttonSize.width / 2 - popupWidth / 2;
+    final top = buttonPosition.dy - popupHeight - Tokens.spSm;
 
     return Stack(
       children: [
@@ -172,79 +188,81 @@ class _SpeedPopup extends StatelessWidget {
         ),
         Positioned(
           left: left,
-          bottom: bottom,
+          top: top,
           width: popupWidth,
           height: popupHeight,
           child: FadeTransition(
             opacity: opacity,
             child: ScaleTransition(
               scale: scale,
-              alignment: Alignment.bottomCenter,
+              alignment: Alignment.topCenter,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {},
-                child: GlassContainer(
-                  tier: GlassTier.thick,
-                  respectResizeState: true,
-                  borderRadius:
-                      BorderRadius.circular(Tokens.radiusLarge),
-                  child: ValueListenableBuilder<double>(
-                    valueListenable: engine.playbackSpeed,
-                    builder: (_, speed, _) {
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(height: Tokens.spXs),
-                          ..._speeds.map(
-                            (s) => Semantics(
-                              button: true,
-                              selected: s == speed,
-                              label: AppLocalizations.of(
-                                context,
-                              ).speedLabel(s),
-                              child: InkWell(
-                                onTap: () {
-                                  engine.setPlaybackRate(s);
-                                  onClose();
-                                },
-                                child: SizedBox(
-                                  height: itemHeight,
-                                  child: Row(
-                                    children: [
-                                      const SizedBox(width: 12),
-                                      if (s == speed)
-                                        const Icon(
-                                          Icons.check,
-                                          size: Tokens.iconSm,
-                                          color: Tokens.accent,
-                                        )
-                                      else
-                                        const SizedBox(width: 16),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        s == s.roundToDouble()
-                                            ? '${s.toInt()}x'
-                                            : '${s}x',
-                                        style: TextStyle(
-                                          color: s == speed
-                                              ? Tokens.accent
-                                              : Tokens.textPrimary,
-                                          fontSize: Tokens.fontCaption,
-                                          fontWeight: s == speed
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
+                child: Material(
+                  color: Colors.transparent,
+                  child: GlassContainer(
+                    tier: GlassTier.thick,
+                    respectResizeState: true,
+                    borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: engine.playbackSpeed,
+                      builder: (_, speed, _) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(height: Tokens.spXs),
+                            ..._speeds.map(
+                              (s) => Semantics(
+                                button: true,
+                                selected: s == speed,
+                                label: AppLocalizations.of(
+                                  context,
+                                ).speedLabel(s),
+                                child: InkWell(
+                                  onTap: () {
+                                    engine.setPlaybackRate(s);
+                                    onClose();
+                                  },
+                                  child: SizedBox(
+                                    height: itemHeight,
+                                    child: Row(
+                                      children: [
+                                        const SizedBox(width: 12),
+                                        if (s == speed)
+                                          const Icon(
+                                            Icons.check,
+                                            size: Tokens.iconSm,
+                                            color: Tokens.accentegg,
+                                          )
+                                        else
+                                          const SizedBox(width: 16),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          s == s.roundToDouble()
+                                              ? '${s.toInt()}x'
+                                              : '${s}x',
+                                          style: TextStyle(
+                                            color: s == speed
+                                                ? Tokens.accentegg
+                                                : Tokens.textPrimary,
+                                            fontSize: Tokens.fontCaption,
+                                            fontWeight: s == speed
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: Tokens.spXs),
-                        ],
-                      );
-                    },
+                            const SizedBox(height: Tokens.spXs),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),

@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import 'dart:ffi' hide Size;
 
 import '../kernel/bridge/window_bridge.dart';
+import 'aspect_ratio_service.dart';
 import 'geometry_store.dart';
 
 const int _wsThickFrame = 0x00040000;
@@ -60,7 +62,7 @@ class WindowService implements WindowBridge {
 
   // 鈹€鈹€鈹€ Constants 鈹€鈹€鈹€
 
-  static const _minSize = Size(640, 360);
+  static const _minSize = Size(800, 450);
   static const _resizeDebounceMs = 500;
 
   /// Unified MethodChannel 鈥?all runtime window operations + C++ events
@@ -76,6 +78,9 @@ class WindowService implements WindowBridge {
   Timer? _persistDebounce;
 
   bool _togglingFullscreen = false;
+  double _savedRatio = 0.0;
+  Size? _windowedSize;
+  Offset? _windowedPosition;
   bool _closing = false;
   Completer<void>? _persistInFlight;
 
@@ -137,7 +142,7 @@ class WindowService implements WindowBridge {
 
           // Restore fullscreen after frameless is confirmed
           if (saved.isFullscreen) {
-            await windowManager.setFullScreen(true);
+            await _enterFullscreenInternal();
           }
 
           // Register window_manager listener for resize/move debounce
@@ -184,17 +189,6 @@ class WindowService implements WindowBridge {
 
   Future<void> _onNativeEvent(MethodCall call) async {
     switch (call.method) {
-      case 'onModeChanged':
-        final modeStr = call.arguments as String;
-        mode.value = modeStr == 'fullscreen'
-            ? WindowMode.fullscreen
-            : WindowMode.windowed;
-        if (modeStr == 'fullscreen') {
-          await _geometry.saveFullscreen(true);
-        } else {
-          await _geometry.saveFullscreen(false);
-        }
-        break;
       case 'onMaximizeChanged':
         isMaximized.value = call.arguments as bool;
         _persistWindowState();
@@ -256,14 +250,51 @@ class WindowService implements WindowBridge {
     _togglingFullscreen = true;
     try {
       if (mode.value == WindowMode.fullscreen) {
-        await windowManager.setFullScreen(false);
+        await _exitFullscreenInternal();
       } else {
-        await windowManager.setFullScreen(true);
+        await _enterFullscreenInternal();
       }
     } on Exception catch (e) {
       debugPrint('[WindowService] toggleFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
+      _resizeEndDebounce?.cancel();
+      isResizing.value = false;
+    }
+  }
+
+  Future<void> _enterFullscreenInternal() async {
+    // Unlock aspect ratio so WM_SIZING won't constrain the resize
+    _savedRatio = AspectRatioService.I.current;
+    if (_savedRatio > 0) await AspectRatioService.I.unlock();
+
+    // Cache windowed geometry for restore
+    _windowedSize = await windowManager.getSize();
+    _windowedPosition = await windowManager.getPosition();
+
+    // Manual borderless fullscreen (setFullScreen doesn't work on frameless)
+    await windowManager.setHasShadow(false);
+    final screen = ui.PlatformDispatcher.instance.views.first;
+    final screenW = screen.physicalSize.width / screen.devicePixelRatio;
+    final screenH = screen.physicalSize.height / screen.devicePixelRatio;
+    await windowManager.setPosition(Offset.zero);
+    await windowManager.setSize(Size(screenW, screenH));
+  }
+
+  Future<void> _exitFullscreenInternal() async {
+    // Restore windowed geometry
+    if (_windowedSize != null) {
+      await windowManager.setSize(_windowedSize!);
+    }
+    if (_windowedPosition != null) {
+      await windowManager.setPosition(_windowedPosition!);
+    }
+    await windowManager.setHasShadow(true);
+
+    // Restore aspect ratio
+    if (_savedRatio > 0) {
+      await AspectRatioService.I.setAspectRatio(_savedRatio);
+      _savedRatio = 0.0;
     }
   }
 
@@ -273,11 +304,13 @@ class WindowService implements WindowBridge {
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
     try {
-        await windowManager.setFullScreen(false);
+      await _exitFullscreenInternal();
     } on Exception catch (e) {
       debugPrint('[WindowService] exitFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
+      _resizeEndDebounce?.cancel();
+      isResizing.value = false;
     }
   }
 
@@ -403,11 +436,13 @@ class _WindowListener extends WindowListener {
   @override
   void onWindowEnterFullScreen() {
     _service.mode.value = WindowMode.fullscreen;
+    _service._geometry.saveFullscreen(true);
   }
 
   @override
   void onWindowLeaveFullScreen() {
     _service.mode.value = WindowMode.windowed;
+    _service._geometry.saveFullscreen(false);
   }
   @override
   void onWindowMinimize() {}

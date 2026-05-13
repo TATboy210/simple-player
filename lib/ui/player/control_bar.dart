@@ -54,13 +54,22 @@ class ControlBar extends StatelessWidget {
     final prevTooltip = l10n.previousTrack;
     final nextTooltip = l10n.nextTrack;
 
-    final content = Container(
-      height: Tokens.controlBarHeight,
-      decoration: const BoxDecoration(
+    final borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
+    final content = Material(
+      color: Colors.transparent,
+      child: Container(
+        height: Tokens.controlBarHeight,
+      decoration: BoxDecoration(
         color: Tokens.bgGlass,
-        border: Border(
-          top: BorderSide(color: Tokens.borderHighlight, width: 1),
-        ),
+        borderRadius: borderRadius,
+        border: Border.all(color: Tokens.controlBarBorder, width: 0.5),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
       child: LayoutBuilder(
@@ -96,7 +105,13 @@ class ControlBar extends StatelessWidget {
                         ),
                         if (showSecondary) ...[
                           const SizedBox(width: Tokens.spXs),
-                          VolumeSlider(engine: engine),
+                          IgnorePointer(
+                            ignoring: isIdle,
+                            child: Opacity(
+                              opacity: isIdle ? 0.0 : 1.0,
+                              child: VolumeSlider(engine: engine),
+                            ),
+                          ),
                           IgnorePointer(
                             ignoring: isIdle,
                             child: Opacity(
@@ -119,38 +134,27 @@ class ControlBar extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (onOpenFile != null)
-                          IconButton(
-                            icon: const Icon(Icons.folder_open, size: Tokens.iconLg),
-                            color: Tokens.textPrimary,
+                          _GlassIconButton(
+                            icon: Icons.folder_open,
                             onPressed: onOpenFile,
-                            splashRadius: 18,
                             tooltip: l10n.openFileTooltip,
                           ),
                         if (onTogglePlaylist != null)
-                          IconButton(
-                            icon: const Icon(Icons.queue_music, size: Tokens.iconLg),
-                            color: Tokens.textPrimary,
+                          _GlassIconButton(
+                            icon: Icons.queue_music,
                             onPressed: onTogglePlaylist,
-                            splashRadius: 18,
                             tooltip: l10n.playlist,
                           ),
                         if (onSettings != null)
-                          IconButton(
-                            icon: const Icon(Icons.settings, size: Tokens.iconLg),
-                            color: Tokens.textPrimary,
+                          _GlassIconButton(
+                            icon: Icons.settings,
                             onPressed: onSettings,
-                            splashRadius: 18,
                             tooltip: l10n.settings,
                           ),
                         if (onToggleFullscreen != null)
-                          IconButton(
-                            icon: Icon(
-                              isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                              size: Tokens.iconLg,
-                            ),
-                            color: Tokens.textPrimary,
+                          _GlassIconButton(
+                            icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
                             onPressed: onToggleFullscreen,
-                            splashRadius: 18,
                             tooltip: isFullscreen ? l10n.exitFullscreen : l10n.fullscreen,
                           ),
                       ],
@@ -162,6 +166,7 @@ class ControlBar extends StatelessWidget {
           );
         },
       ),
+    ),
     );
 
     if (!enableBlur) return RepaintBoundary(child: content);
@@ -170,7 +175,8 @@ class ControlBar extends StatelessWidget {
       valueListenable: WindowBridge.I.isResizing,
       builder: (_, resizing, child) => resizing
           ? child!
-          : ClipRect(
+          : ClipRRect(
+              borderRadius: borderRadius,
               child: BackdropFilter(
                 filter: ui.ImageFilter.blur(
                   sigmaX: Tokens.glassBlur,
@@ -180,6 +186,48 @@ class ControlBar extends StatelessWidget {
               ),
             ),
       child: RepaintBoundary(child: content),
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final double iconSize;
+  final Color? color;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+
+  const _GlassIconButton({
+    required this.icon,
+    this.iconSize = Tokens.iconLg,
+    this.color = Tokens.textPrimary,
+    this.onPressed,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip ?? '',
+      waitDuration: const Duration(milliseconds: 400),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+          child: InkWell(
+            onTap: onPressed,
+            hoverColor: Tokens.bgHover,
+            highlightColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            splashFactory: InkRipple.splashFactory,
+            child: Center(
+              child: Icon(icon, size: iconSize, color: color),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -197,14 +245,11 @@ class _PlayPauseButton extends StatelessWidget {
       valueListenable: engine.state,
       builder: (_, state, _) {
         final playing = state == MediaState.playing;
-        return IconButton(
-          icon: Icon(
-            playing ? Icons.pause : Icons.play_arrow,
-            size: Tokens.iconXl,
-            color: playing ? Tokens.accent : Tokens.textPrimary,
-          ),
+        return _GlassIconButton(
+          icon: playing ? Icons.pause : Icons.play_arrow,
+          iconSize: Tokens.iconXl,
+          color: playing ? Tokens.accent : Tokens.textPrimary,
           onPressed: isIdle ? null : engine.togglePlayPause,
-          splashRadius: 24,
           tooltip: playing ? l10n.pause : l10n.play,
         );
       },
@@ -352,45 +397,35 @@ class _CenterGroup extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.skip_previous, size: Tokens.iconLg),
-            color: Tokens.textPrimary,
+          _GlassIconButton(
+            icon: Icons.skip_previous,
             onPressed: isIdle ? null : onPrevious,
-            splashRadius: 20,
             tooltip: prevTooltip,
           ),
           const SizedBox(width: Tokens.spXs),
-          IconButton(
-            icon: const Icon(Icons.replay_10, size: Tokens.iconLg),
-            color: Tokens.textPrimary,
+          _GlassIconButton(
+            icon: Icons.replay_10,
             onPressed: isIdle ? null : () => engine.skipBack(10),
-            splashRadius: 20,
             tooltip: AppLocalizations.of(context).rewind10,
           ),
           const SizedBox(width: Tokens.spSm),
           _PlayPauseButton(engine: engine, isIdle: isIdle),
           const SizedBox(width: Tokens.spSm),
-          IconButton(
-            icon: const Icon(Icons.forward_10, size: Tokens.iconLg),
-            color: Tokens.textPrimary,
+          _GlassIconButton(
+            icon: Icons.forward_10,
             onPressed: isIdle ? null : () => engine.skipForward(10),
-            splashRadius: 20,
             tooltip: AppLocalizations.of(context).forward10,
           ),
           const SizedBox(width: Tokens.spXs),
-          IconButton(
-            icon: const Icon(Icons.skip_next, size: Tokens.iconLg),
-            color: Tokens.textPrimary,
+          _GlassIconButton(
+            icon: Icons.skip_next,
             onPressed: isIdle ? null : onNext,
-            splashRadius: 20,
             tooltip: nextTooltip,
           ),
           const SizedBox(width: Tokens.spXs),
-          IconButton(
-            icon: const Icon(Icons.stop, size: Tokens.iconLg),
-            color: Tokens.textPrimary,
+          _GlassIconButton(
+            icon: Icons.stop,
             onPressed: isIdle ? null : engine.stop,
-            splashRadius: 18,
             tooltip: AppLocalizations.of(context).stop,
           ),
         ],

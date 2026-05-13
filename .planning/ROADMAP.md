@@ -2,71 +2,75 @@
 
 ## Overview
 
-Build a stable frameless window shell first (the hard part -- flicker-free, resize-safe, persistence), then wire video playback and content management into it, and finally harden security for all external input paths. Each phase delivers a complete, verifiable capability.
+Fix widget-layer bugs (button highlights), complete fullscreen/settings wiring, and clean up code for production quality. Four phases, each delivering a verifiable improvement.
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [ ] **Phase 1: Window Shell** - Frameless window with custom title bar, aspect ratio, fullscreen, state persistence (15 requirements)
-- [ ] **Phase 2: Video & Content** - Video surface rendering, play/pause, file picker, drag-and-drop, playlist wiring (6 requirements)
-- [ ] **Phase 3: Security Hardening** - Input validation for URLs, subtitle delays, equalizer filters (3 requirements)
+- [ ] **Phase 1: Button Highlight Fix** — Volume/Speed button highlight visible and consistent when popup open (5 requirements)
+- [ ] **Phase 2: Fullscreen Reliability** — Fullscreen toggle works from all entry points, mode persists, optimistic state (7 requirements)
+- [ ] **Phase 3: Settings Completion** — Settings dialog accessible, all tabs functional, correct fallback text (5 requirements)
+- [ ] **Phase 4: Production Code Cleanup** — Remove dead code, fix keyboard handler, l10n labels, unused imports (5 requirements)
 
 ## Phase Details
 
-### Phase 1: Window Shell
-**Goal**: Users see a stable, flicker-free frameless window with custom title bar, can drag/resize/fullscreen, and window state persists across sessions
-**Depends on**: Nothing (first phase)
-**Requirements**: WIN-01, WIN-02, WIN-03, WIN-04, WIN-05, WIN-06, WIN-07, WIN-08, WIN-09, WIN-10, WIN-11, WIN-12, WIN-13, WIN-14, WIN-15
-**Success Criteria** (what must be TRUE):
-  1. App launches with no system title bar, no white flash -- frameless window appears immediately with correct size from persisted state
-  2. Custom title bar (36px) shows app name, minimize/maximize/close buttons, and always-on-top pin -- buttons do not flicker during window resize
-  3. User can drag title bar to move window, double-tap to toggle maximize, and resize edges while aspect ratio stays locked (16:9 idle, video ratio when playing)
-  4. F11 toggles fullscreen reliably with no ABA state corruption, and fullscreen reentry guard prevents rapid toggling
-  5. Window size/position/maximized/fullscreen/pin state persists (500ms debounce) and restores correctly, with bounds clamping to visible screen on multi-monitor setups
-**Plans**: 3 plans
+### Phase 1: Button Highlight Fix
+**Goal**: Volume and Speed buttons show clear cyan highlight when their popup is open, and the highlight state is visually consistent throughout the popup lifecycle
+**Depends on**: Nothing
+**Requirements**: BTN-01, BTN-02, BTN-03, BTN-04, BTN-05
+**Success Criteria**:
+  1. Clicking volume button opens popup AND icon turns cyan — both happen simultaneously, user can see the highlight
+  2. Clicking speed button opens popup AND text turns cyan with border — both happen simultaneously
+  3. Highlight stays while popup is visible — no flicker or premature clearing
+  4. When control bar auto-hides, any open popup closes and highlight clears
+  5. During close animation, highlight persists until overlay is fully removed (no 200ms gap)
+**Root cause analysis**:
+  - ValueKey(_popupOpen) mechanism is architecturally correct
+  - Most likely: overlay popup's full-screen GestureDetector intercepts button taps
+  - Secondary: popup overlay escapes ControlsOverlay FadeTransition
+  - Tertiary: 200ms gap between highlight clear and overlay remove during close
+**Plans**: 1 plan (single focused fix)
 
-Plans:
-- [ ] 01-01-PLAN.md — WindowManagerService + PlatformService extension + title bar tokens
-- [ ] 01-02-PLAN.md — AspectRatioService + CustomTitleBar with Win11-style buttons
-- [ ] 01-03-PLAN.md — App shell wiring + FakePlatformService + comprehensive tests
+### Phase 2: Fullscreen Reliability
+**Goal**: Fullscreen toggle works from all 4 entry points (F key, button, double-click, ESC), mode updates immediately, and persists across sessions
+**Depends on**: Phase 1 (clean widget layer)
+**Requirements**: FS-01 through FS-07
+**Success Criteria**:
+  1. F key, fullscreen button, double-click, and ESC all trigger fullscreen correctly
+  2. `mode.value` updates optimistically in `toggleFullscreen()` — UI reflects change before window_manager callback
+  3. Fullscreen state saved to GeometryStore on toggle (not just on callback)
+  4. Aspect ratio unlocks in fullscreen, restores on exit
+  5. Rapid toggle attempts guarded (reentrancy check)
+**Plans**: 1 plan
 
-**UI hint**: yes
-
-### Phase 2: Video & Content
-**Goal**: Users can open video files (picker or drag-drop), see them rendered in the window, and control basic playback
+### Phase 3: Settings Completion
+**Goal**: Settings dialog opens from control bar, all 3 tabs work correctly, fallback text is accurate
 **Depends on**: Phase 1
-**Requirements**: VID-01, VID-02, VID-03, CON-01, CON-02, CON-03
-**Success Criteria** (what must be TRUE):
-  1. Video renders via Texture widget using fvp engine textureId -- video surface fills the window below the title bar
-  2. User can play/pause video, and an empty state overlay with "Open File" button shows when no video is loaded
-  3. User can open files via file picker (video type filter) or drag-and-drop onto the window
-  4. Opened files are added to playlist via PlaybackController and playback starts automatically
-**Plans**: TBD
+**Requirements**: SET-01 through SET-05
+**Success Criteria**:
+  1. Settings button in control bar opens SettingsDialog
+  2. Equalizer presets apply FFmpeg filters correctly
+  3. Audio track selection switches tracks
+  4. Video processing sliders persist via SettingsStore
+  5. Video processing tab shows correct fallback (not "no audio tracks")
+**Plans**: 1 plan
 
-**UI hint**: yes
-
-### Phase 3: Security Hardening
-**Goal**: All external input paths (URLs, subtitles, equalizer) are validated and bounded, preventing crashes or exploits
-**Depends on**: Phase 2
-**Requirements**: SEC-01, SEC-02, SEC-03
-**Success Criteria** (what must be TRUE):
-  1. URLs are validated against a scheme whitelist (http, https, rtmp, rtsp) before engine access -- invalid schemes are rejected with user feedback
-  2. Subtitle delay is clamped to +/-30000ms -- out-of-range values are silently corrected
-  3. Equalizer filter strings are validated before passing to engine -- malformed strings are rejected without crashing
-**Plans**: TBD
+### Phase 4: Production Code Cleanup
+**Goal**: Codebase is production-grade — no dead code, no hardcoded strings, no swallowed keys, proper cleanup
+**Depends on**: Phases 1-3
+**Requirements**: CODE-01 through CODE-05
+**Success Criteria**:
+  1. WindowManagerService (515 lines) removed
+  2. KeyboardHandler 'A' key either wired to AB loop or removed
+  3. AspectRatioService labels use l10n
+  4. `dart analyze` passes with no warnings
+  5. All overlay entries cleaned up on dispose
+**Plans**: 1 plan
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
-
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Window Shell | 0 | Planning complete | - |
-| 2. Video & Content | 0 | Not started | - |
-| 3. Security Hardening | 0 | Not started | - |
+| 1. Button Highlight | 0 | Ready to plan | - |
+| 2. Fullscreen | 0 | Blocked by Phase 1 | - |
+| 3. Settings | 0 | Blocked by Phase 1 | - |
+| 4. Code Cleanup | 0 | Blocked by Phases 1-3 | - |

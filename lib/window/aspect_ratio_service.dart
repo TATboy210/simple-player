@@ -9,7 +9,7 @@ class AspectRatioService {
   AspectRatioService._();
   static final AspectRatioService I = AspectRatioService._();
 
-  static const _channel = MethodChannel('com.simple_player/window');
+  static const _channel = MethodChannel('com.simple_player/aspect_ratio');
 
   /// 16:9（默认空闲比例）
   static const ratio16x9 = 16.0 / 9.0;

@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
+import '../../kernel/models/play_mode.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/ui/theme/tokens.dart';
@@ -192,6 +193,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                 l10n,
                                               ),
                                               isVideo: widget.isVideo,
+                                              playModeActive:
+                                                  widget.playlist.mode !=
+                                                  PlayMode.normal,
                                             );
                                           },
                                         ),
