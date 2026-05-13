@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
 import 'package:simple_player_flutter/kernel/services/platform_service.dart';
 
 /// Fake implementation for testing the interface contract

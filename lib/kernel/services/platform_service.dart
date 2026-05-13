@@ -1,29 +1,19 @@
 import 'package:flutter/foundation.dart';
 
-/// Window mode enumeration
-enum WindowMode { windowed, fullscreen }
+import '../bridge/window_bridge.dart';
 
 /// Abstract platform service interface
 ///
 /// UI code depends on this interface, never on concrete implementations.
-/// Factory singleton pattern: call PlatformService.init() in main(),
-/// access via PlatformService.I throughout the app.
+/// Singleton pattern: access via PlatformService.I throughout the app.
 ///
-/// To add a new platform:
-/// 1. Create lib/kernel/platform/{platform}_platform_service.dart
-/// 2. Implement all methods in this interface
-/// 3. Call PlatformService.init(NewPlatformService()) in main()
-/// 4. No UI code changes needed
+/// When no explicit implementation is injected via PlatformService.init(),
+/// the accessor returns a transparent _Proxy that delegates to WindowBridge.I.
+/// This ensures existing consumers (e.g. CustomTitleBar) continue to work
+/// without changes after WindowManagerService deletion.
 abstract class PlatformService {
-  /// Singleton accessor — throws if not initialized
-  static PlatformService get I {
-    if (_instance == null) {
-      throw StateError(
-        'PlatformService not initialized. Call PlatformService.init() first.',
-      );
-    }
-    return _instance!;
-  }
+  /// Singleton accessor — returns _Proxy if no explicit implementation set
+  static PlatformService get I => _instance ?? _Proxy();
 
   static PlatformService? _instance;
 
@@ -58,4 +48,52 @@ abstract class PlatformService {
 
   Future<void> initService();
   Future<void> dispose();
+}
+
+/// Transparent proxy that delegates all operations to WindowBridge.I
+///
+/// Used as the default when no explicit PlatformService implementation is
+/// injected. WindowBridge.I returns NoopWindowBridge before WindowBootstrap
+/// initializes, so the proxy never throws.
+class _Proxy implements PlatformService {
+  WindowBridge get _bridge => WindowBridge.I;
+
+  @override
+  Future<void> minimize() => _bridge.minimize();
+
+  @override
+  Future<void> toggleMaximize() => _bridge.toggleMaximize();
+
+  @override
+  Future<void> close() => _bridge.close();
+
+  @override
+  Future<void> startDragging() => _bridge.startDragging();
+
+  @override
+  Future<void> toggleFullscreen() => _bridge.toggleFullscreen();
+
+  @override
+  Future<void> exitFullscreen() => _bridge.exitFullscreen();
+
+  @override
+  Future<void> toggleAlwaysOnTop() => _bridge.toggleAlwaysOnTop();
+
+  @override
+  ValueNotifier<WindowMode> get mode => _bridge.mode;
+
+  @override
+  ValueNotifier<bool> get isAlwaysOnTop => _bridge.isAlwaysOnTop;
+
+  @override
+  ValueNotifier<bool> get isMaximized => _bridge.isMaximized;
+
+  @override
+  ValueNotifier<bool> get isResizing => _bridge.isResizing;
+
+  @override
+  Future<void> initService() => Future.value();
+
+  @override
+  Future<void> dispose() => Future.value();
 }
