@@ -26,6 +26,7 @@ class _VolumeSliderState extends State<VolumeSlider>
     with SingleTickerProviderStateMixin {
   final _popupController = OverlayPortalController();
   final _layerLink = LayerLink();
+  final ValueNotifier<bool> _popupShowing = ValueNotifier(false);
   late final AnimationController _popupAnim;
   late final Animation<double> _popupOpacity;
   late final _VolumeMerged _volumeMerged;
@@ -55,6 +56,7 @@ class _VolumeSliderState extends State<VolumeSlider>
     if (_popupController.isShowing) _popupController.hide();
     _popupAnim.dispose();
     _volumeMerged.dispose();
+    _popupShowing.dispose();
     super.dispose();
   }
 
@@ -79,6 +81,7 @@ class _VolumeSliderState extends State<VolumeSlider>
   void _openPopup() {
     _popupAnim.stop();
     _popupController.show();
+    _popupShowing.value = true;
     _popupAnim.forward(from: 0.0);
   }
 
@@ -87,6 +90,7 @@ class _VolumeSliderState extends State<VolumeSlider>
       if (mounted && _popupController.isShowing) {
         _popupController.hide();
       }
+      if (mounted) _popupShowing.value = _popupController.isShowing;
     });
   }
 
@@ -94,6 +98,7 @@ class _VolumeSliderState extends State<VolumeSlider>
   void closePopupImmediate() {
     _popupAnim.stop();
     if (_popupController.isShowing) _popupController.hide();
+    if (mounted) _popupShowing.value = false;
   }
 
   @override
@@ -109,22 +114,25 @@ class _VolumeSliderState extends State<VolumeSlider>
   }
 
   Widget _buildButton() {
-    return ValueListenableBuilder<_VolumeState>(
-      valueListenable: _volumeMerged,
-      builder: (_, state, _) {
-        final l10n = AppLocalizations.of(context);
-        final iconColor = _popupController.isShowing
-            ? Tokens.accentegg
-            : Tokens.textPrimary;
-        return IconButton(
-          icon: Icon(
-            _icon(state.muted, state.volume),
-            color: iconColor,
-            size: Tokens.iconLg,
-          ),
-          onPressed: _togglePopup,
-          splashRadius: 18,
-          tooltip: state.muted ? l10n.unmute : l10n.mute,
+    return ValueListenableBuilder<bool>(
+      valueListenable: _popupShowing,
+      builder: (_, showing, _) {
+        return ValueListenableBuilder<_VolumeState>(
+          valueListenable: _volumeMerged,
+          builder: (_, state, _) {
+            final l10n = AppLocalizations.of(context);
+            final iconColor = showing ? Tokens.accentegg : Tokens.textPrimary;
+            return IconButton(
+              icon: Icon(
+                _icon(state.muted, state.volume),
+                color: iconColor,
+                size: Tokens.iconLg,
+              ),
+              onPressed: _togglePopup,
+              splashRadius: 18,
+              tooltip: state.muted ? l10n.unmute : l10n.mute,
+            );
+          },
         );
       },
     );
@@ -174,10 +182,7 @@ class _VolumePopupContent extends StatefulWidget {
   final MediaEngine engine;
   final ValueNotifier<_VolumeState> volumeState;
 
-  const _VolumePopupContent({
-    required this.engine,
-    required this.volumeState,
-  });
+  const _VolumePopupContent({required this.engine, required this.volumeState});
 
   @override
   State<_VolumePopupContent> createState() => _VolumePopupContentState();
@@ -264,9 +269,7 @@ class _VolumePopupContentState extends State<_VolumePopupContent> {
                       icon: Icon(
                         muted ? Icons.volume_off : Icons.volume_up,
                         size: Tokens.iconSm,
-                        color: muted
-                            ? Tokens.danger
-                            : Tokens.textSecondary,
+                        color: muted ? Tokens.danger : Tokens.textSecondary,
                       ),
                       onPressed: () => widget.engine.setMute(!muted),
                       splashRadius: 14,

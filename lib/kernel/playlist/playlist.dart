@@ -1,3 +1,4 @@
+// ignore_for_file: unnecessary_getters_setters
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';

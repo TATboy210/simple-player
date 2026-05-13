@@ -85,7 +85,11 @@ class _PlaylistPanelState extends State<PlaylistPanel> {
     }
     return ReorderableListView.builder(
       itemCount: items.length,
-      onReorder: widget.onReorder,
+      onReorderItem: (oldIndex, newIndex) {
+        // onReorderItem passes unadjusted newIndex; Playlist.reorder expects adjusted
+        if (oldIndex < newIndex) newIndex -= 1;
+        widget.onReorder(oldIndex, newIndex);
+      },
       itemBuilder: (_, index) {
         final item = items[index];
         final isCurrent = index == widget.playlist.currentIndex;
@@ -264,7 +268,7 @@ class _PlaylistItemTile extends StatelessWidget {
         ),
       ],
     ).then((value) {
-      if (value == null) return;
+      if (value == null || !context.mounted) return;
       switch (value) {
         case 'play':
           onSelect();

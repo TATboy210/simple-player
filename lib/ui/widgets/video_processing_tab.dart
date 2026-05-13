@@ -79,7 +79,7 @@ class _DebouncedSliderState extends State<_DebouncedSlider> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<double>(
       valueListenable: widget.notifier,
-      builder: (_, __, ___) {
+      builder: (_, _, _) {
         final display = _effectiveValue;
         return Row(
           children: [
@@ -192,7 +192,7 @@ class _DeinterlaceToggle extends StatelessWidget {
                 ],
               ),
             ),
-            Switch(value: enabled, onChanged: (v) => notifier.value = v, activeColor: Tokens.accent),
+            Switch(value: enabled, onChanged: (v) => notifier.value = v, activeThumbColor: Tokens.accent),
           ],
         );
       },
