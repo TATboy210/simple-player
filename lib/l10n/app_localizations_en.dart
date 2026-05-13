@@ -96,6 +96,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noAudioTracks => 'No audio tracks available';
 
   @override
+  String get videoProcessingUnavailable => 'Video processing unavailable';
+
+  @override
   String audioTrackN(int index) {
     return 'Track $index';
   }

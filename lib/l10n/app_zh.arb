@@ -32,6 +32,7 @@
   "audioTrack": "音轨",
   "videoTab": "视频",
   "noAudioTracks": "无可用音轨",
+  "videoProcessingUnavailable": "画面处理不可用",
   "audioTrackN": "音轨 {index}",
   "eqOff": "关闭",
   "eqBassBoost": "低音增强",
