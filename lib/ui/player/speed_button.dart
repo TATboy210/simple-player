@@ -9,7 +9,14 @@ import '../shared/glass_container.dart';
 class SpeedButton extends StatefulWidget {
   final MediaEngine engine;
 
-  const SpeedButton({super.key, required this.engine});
+  /// 控制栏自动隐藏时触发，关闭弹窗
+  final ValueNotifier<int>? popupCloseNotifier;
+
+  const SpeedButton({
+    super.key,
+    required this.engine,
+    this.popupCloseNotifier,
+  });
 
   @override
   State<SpeedButton> createState() => _SpeedButtonState();
@@ -17,11 +24,11 @@ class SpeedButton extends StatefulWidget {
 
 class _SpeedButtonState extends State<SpeedButton>
     with SingleTickerProviderStateMixin {
-  bool _popupOpen = false;
+  final _popupController = OverlayPortalController();
+  final _layerLink = LayerLink();
   late final AnimationController _anim;
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
-  OverlayEntry? _overlay;
 
   @override
   void initState() {
@@ -44,17 +51,24 @@ class _SpeedButtonState extends State<SpeedButton>
         reverseCurve: Curves.easeInCubic,
       ),
     );
+    widget.popupCloseNotifier?.addListener(_onCloseRequested);
   }
 
   @override
   void dispose() {
-    _removeOverlay();
+    widget.popupCloseNotifier?.removeListener(_onCloseRequested);
+    _anim.stop();
+    if (_popupController.isShowing) _popupController.hide();
     _anim.dispose();
     super.dispose();
   }
 
+  void _onCloseRequested() {
+    if (_popupController.isShowing) closePopupImmediate();
+  }
+
   void _toggle() {
-    if (_popupOpen) {
+    if (_popupController.isShowing) {
       _close();
     } else {
       _open();
@@ -63,54 +77,44 @@ class _SpeedButtonState extends State<SpeedButton>
 
   void _open() {
     _anim.stop();
-    _removeOverlay();
-    setState(() => _popupOpen = true);
+    _popupController.show();
     _anim.forward(from: 0.0);
-
-    final box = context.findRenderObject() as RenderBox;
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final pos = box.localToGlobal(Offset.zero, ancestor: overlay);
-
-    _overlay = OverlayEntry(
-      builder: (_) => _SpeedPopup(
-        engine: widget.engine,
-        buttonPosition: pos,
-        buttonSize: box.size,
-        opacity: _opacity,
-        scale: _scale,
-        onClose: _close,
-      ),
-    );
-    Overlay.of(context).insert(_overlay!);
   }
 
   void _close() {
-    if (!_popupOpen) return;
-    setState(() => _popupOpen = false);
-    final entry = _overlay;
     _anim.reverse().then((_) {
-      if (!_popupOpen && entry != null) {
-        entry.remove();
-        if (_overlay == entry) _overlay = null;
+      if (mounted && _popupController.isShowing) {
+        _popupController.hide();
       }
     });
   }
 
-  void _removeOverlay() {
-    _overlay?.remove();
-    _overlay = null;
+  /// 立即关闭弹窗（无动画），用于控制栏自动隐藏
+  void closePopupImmediate() {
+    _anim.stop();
+    if (_popupController.isShowing) _popupController.hide();
   }
 
   @override
   Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: OverlayPortal(
+        controller: _popupController,
+        overlayChildBuilder: _buildPopup,
+        child: _buildButton(),
+      ),
+    );
+  }
+
+  Widget _buildButton() {
     return ValueListenableBuilder<double>(
-      key: ValueKey(_popupOpen),
       valueListenable: widget.engine.playbackSpeed,
       builder: (_, speed, _) {
         final label = speed == speed.roundToDouble()
             ? '${speed.toInt()}x'
             : '${speed}x';
-        final active = speed != 1.0 || _popupOpen;
+        final active = speed != 1.0 || _popupController.isShowing;
         return InkWell(
           onTap: _toggle,
           borderRadius: BorderRadius.circular(Tokens.radiusBtn),
@@ -147,24 +151,60 @@ class _SpeedButtonState extends State<SpeedButton>
       },
     );
   }
+
+  Widget _buildPopup(BuildContext context) {
+    final itemHeight = 36.0;
+    final popupHeight = _SpeedPopupContent.speeds.length * itemHeight + 16.0;
+    return Stack(
+      children: [
+        // 全屏点击关闭背景
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _close,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        // 按钮区域穿透 — 点击按钮切换弹窗
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggle,
+            child: const SizedBox(width: 48, height: 48),
+          ),
+        ),
+        // 弹窗内容 — 定位在按钮上方
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          offset: Offset(0, -(popupHeight + Tokens.spSm)),
+          child: FadeTransition(
+            opacity: _opacity,
+            child: ScaleTransition(
+              scale: _scale,
+              alignment: Alignment.topCenter,
+              child: _SpeedPopupContent(
+                engine: widget.engine,
+                onClose: _close,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _SpeedPopup extends StatelessWidget {
+class _SpeedPopupContent extends StatelessWidget {
   final MediaEngine engine;
-  final Offset buttonPosition;
-  final Size buttonSize;
-  final Animation<double> opacity;
-  final Animation<double> scale;
   final VoidCallback onClose;
 
-  static const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
+  static const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
 
-  const _SpeedPopup({
+  const _SpeedPopupContent({
     required this.engine,
-    required this.buttonPosition,
-    required this.buttonSize,
-    required this.opacity,
-    required this.scale,
     required this.onClose,
   });
 
@@ -172,104 +212,81 @@ class _SpeedPopup extends StatelessWidget {
   Widget build(BuildContext context) {
     const popupWidth = 72.0;
     final itemHeight = 36.0;
-    final popupHeight = _speeds.length * itemHeight + 16.0;
+    final popupHeight = speeds.length * itemHeight + 16.0;
 
-    final left = buttonPosition.dx + buttonSize.width / 2 - popupWidth / 2;
-    final top = buttonPosition.dy - popupHeight - Tokens.spSm;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: onClose,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        Positioned(
-          left: left,
-          top: top,
-          width: popupWidth,
-          height: popupHeight,
-          child: FadeTransition(
-            opacity: opacity,
-            child: ScaleTransition(
-              scale: scale,
-              alignment: Alignment.topCenter,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {},
-                child: Material(
-                  color: Colors.transparent,
-                  child: GlassContainer(
-                    tier: GlassTier.thick,
-                    respectResizeState: true,
-                    borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                    child: ValueListenableBuilder<double>(
-                      valueListenable: engine.playbackSpeed,
-                      builder: (_, speed, _) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(height: Tokens.spXs),
-                            ..._speeds.map(
-                              (s) => Semantics(
-                                button: true,
-                                selected: s == speed,
-                                label: AppLocalizations.of(
-                                  context,
-                                ).speedLabel(s),
-                                child: InkWell(
-                                  onTap: () {
-                                    engine.setPlaybackRate(s);
-                                    onClose();
-                                  },
-                                  child: SizedBox(
-                                    height: itemHeight,
-                                    child: Row(
-                                      children: [
-                                        const SizedBox(width: 12),
-                                        if (s == speed)
-                                          const Icon(
-                                            Icons.check,
-                                            size: Tokens.iconSm,
-                                            color: Tokens.accentegg,
-                                          )
-                                        else
-                                          const SizedBox(width: 16),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          s == s.roundToDouble()
-                                              ? '${s.toInt()}x'
-                                              : '${s}x',
-                                          style: TextStyle(
-                                            color: s == speed
-                                                ? Tokens.accentegg
-                                                : Tokens.textPrimary,
-                                            fontSize: Tokens.fontCaption,
-                                            fontWeight: s == speed
-                                                ? FontWeight.w600
-                                                : FontWeight.normal,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+    return SizedBox(
+      width: popupWidth,
+      height: popupHeight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {},
+        child: Material(
+          color: Colors.transparent,
+          child: GlassContainer(
+            tier: GlassTier.thick,
+            respectResizeState: true,
+            borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+            child: ValueListenableBuilder<double>(
+              valueListenable: engine.playbackSpeed,
+              builder: (_, speed, _) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: Tokens.spXs),
+                    ...speeds.map(
+                      (s) => Semantics(
+                        button: true,
+                        selected: s == speed,
+                        label: AppLocalizations.of(
+                          context,
+                        ).speedLabel(s),
+                        child: InkWell(
+                          onTap: () {
+                            engine.setPlaybackRate(s);
+                            onClose();
+                          },
+                          child: SizedBox(
+                            height: itemHeight,
+                            child: Row(
+                              children: [
+                                const SizedBox(width: 12),
+                                if (s == speed)
+                                  const Icon(
+                                    Icons.check,
+                                    size: Tokens.iconSm,
+                                    color: Tokens.accentegg,
+                                  )
+                                else
+                                  const SizedBox(width: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  s == s.roundToDouble()
+                                      ? '${s.toInt()}x'
+                                      : '${s}x',
+                                  style: TextStyle(
+                                    color: s == speed
+                                        ? Tokens.accentegg
+                                        : Tokens.textPrimary,
+                                    fontSize: Tokens.fontCaption,
+                                    fontWeight: s == speed
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                            const SizedBox(height: Tokens.spXs),
-                          ],
-                        );
-                      },
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                    const SizedBox(height: Tokens.spXs),
+                  ],
+                );
+              },
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
