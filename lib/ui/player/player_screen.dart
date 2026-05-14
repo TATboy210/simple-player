@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -70,6 +71,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _togglePlaylist() {
     _playlistVisible.value = !_playlistVisible.value;
     widget.onTogglePlaylist?.call();
+  }
+
+  Future<void> _openSubtitle() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
+    );
+    if (result != null && result.files.single.path != null) {
+      widget.engine.setExternalSubtitle(result.files.single.path!);
+    }
   }
 
   @override
@@ -187,6 +198,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                   wm.toggleFullscreen,
                                               onTogglePlayMode:
                                                   widget.onTogglePlayMode,
+                                              onOpenSubtitle: _openSubtitle,
                                               playModeIcon: playModeIcon(
                                                 widget.playlist.mode,
                                               ),

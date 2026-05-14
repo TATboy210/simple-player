@@ -13,6 +13,7 @@ import 'ui/dialogs/settings_dialog.dart';
 import 'l10n/app_localizations.dart';
 import 'ui/player/player_screen.dart';
 import 'ui/playlist/playlist_panel.dart';
+import 'ui/widgets/osd_overlay.dart';
 import 'ui/shared/empty_state.dart';
 
 /// 应用壳 — 引擎/服务初始化 + 窗口管理 + 完整播放器 UI
@@ -122,7 +123,9 @@ class _AppState extends State<App> {
         onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
         debugShowCheckedModeBanner: false,
         theme: ThemeData.dark(),
-        home: PlayerScreen(
+        home: Stack(
+          children: [
+            PlayerScreen(
           engine: _engine,
           controller: _controller,
           playlist: _playlist,
@@ -169,6 +172,9 @@ class _AppState extends State<App> {
             isDragHovering: _isDragHovering,
             engineState: _engine.state,
           ),
+            ),
+            const OsdOverlay(),
+          ],
         ),
       ),
     );

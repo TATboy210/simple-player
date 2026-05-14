@@ -176,6 +176,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exitFullscreen => 'Exit Fullscreen (F)';
 
   @override
+  String get openSubtitle => 'Open Subtitle';
+
+  @override
   String get play => 'Play';
 
   @override

@@ -176,6 +176,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exitFullscreen => '退出全屏 (F)';
 
   @override
+  String get openSubtitle => '打开字幕';
+
+  @override
   String get play => '播放';
 
   @override

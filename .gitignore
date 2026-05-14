@@ -54,3 +54,9 @@ app.*.map.json
 
 # Production build output
 /production/
+
+# Database
+ruvector.db
+
+# Windows command artifacts
+nul

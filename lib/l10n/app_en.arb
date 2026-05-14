@@ -120,6 +120,8 @@
   "@fullscreen": { "description": "Tooltip for fullscreen button" },
   "exitFullscreen": "Exit Fullscreen (F)",
   "@exitFullscreen": { "description": "Tooltip for exit fullscreen button" },
+  "openSubtitle": "Open Subtitle",
+  "@openSubtitle": { "description": "Tooltip for subtitle import button" },
   "play": "Play",
   "@play": { "description": "Tooltip for play button" },
   "pause": "Pause",
