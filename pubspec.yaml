@@ -1,7 +1,7 @@
 name: simple_player_flutter
 description: "Simple Player - A dark-themed media player"
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.0.1
 
 environment:
   sdk: ^3.11.5

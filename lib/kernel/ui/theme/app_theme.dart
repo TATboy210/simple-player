@@ -17,9 +17,19 @@ class AppTheme {
       ),
       iconTheme: const IconThemeData(color: Tokens.textPrimary),
       textTheme: const TextTheme(
-        titleLarge: TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontTitle, fontWeight: FontWeight.w600),
-        bodyLarge: TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontBody),
-        bodyMedium: TextStyle(color: Tokens.textSecondary, fontSize: Tokens.fontCaption),
+        titleLarge: TextStyle(
+          color: Tokens.textPrimary,
+          fontSize: Tokens.fontTitle,
+          fontWeight: FontWeight.w600,
+        ),
+        bodyLarge: TextStyle(
+          color: Tokens.textPrimary,
+          fontSize: Tokens.fontBody,
+        ),
+        bodyMedium: TextStyle(
+          color: Tokens.textSecondary,
+          fontSize: Tokens.fontCaption,
+        ),
       ),
     );
   }

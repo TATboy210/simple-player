@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/ui/theme/tokens.dart';
-import '../../l10n/app_localizations.dart';
-import '../shared/glass_container.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
 
@@ -25,6 +23,7 @@ class ControlsOverlay extends StatefulWidget {
   final VoidCallback? onOpenFile;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onTogglePlayMode;
+  final VoidCallback? onOpenSubtitle;
   final IconData? playModeIcon;
   final bool playModeActive;
 
@@ -48,6 +47,7 @@ class ControlsOverlay extends StatefulWidget {
     this.onOpenFile,
     this.onToggleFullscreen,
     this.onTogglePlayMode,
+    this.onOpenSubtitle,
     this.playModeIcon,
     this.playModeActive = false,
     this.playModeLabel,
@@ -69,11 +69,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   Timer? _hideTimer;
   Timer? _clickTimer;
 
-  // OSD 状态
-  late final AnimationController _osdAnim;
-  String _osdMessage = '';
-  int _osdGeneration = 0;
-
   /// 节流：避免每次 hover 像素都触发 setState
   DateTime _lastHoverTime = DateTime.fromMillisecondsSinceEpoch(0);
   static const _hoverThrottle = Duration(milliseconds: 100);
@@ -92,14 +87,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       value: 1,
     );
     _opacity = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
-    _osdAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
     // 监听 state 变化，暂停/停止/完成/错误时强制显示（在 listener 中处理，不在 build 中）
     widget.engine.state.addListener(_onEngineStateChanged);
-    widget.engine.volume.addListener(_onVolumeChanged);
-    widget.engine.isMuted.addListener(_onVolumeChanged);
     // idle 时显示控制栏（永久显示，不自动隐藏）
     if (widget.engine.state.value == MediaState.idle) {
       _visible = true;
@@ -207,49 +196,11 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
-    widget.engine.volume.removeListener(_onVolumeChanged);
-    widget.engine.isMuted.removeListener(_onVolumeChanged);
     _hideTimer?.cancel();
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
-    _osdAnim.dispose();
     _animController.dispose();
     super.dispose();
-  }
-
-  // OSD 逻辑 — 监听音量/静音变化，显示浮动提示
-  String get _osdKey =>
-      '${widget.engine.isMuted.value}_${(widget.engine.volume.value * 100).round()}';
-
-  late String _lastOsdKey = _osdKey;
-
-  void _onVolumeChanged() {
-    final key = _osdKey;
-    if (key == _lastOsdKey) return;
-    _lastOsdKey = key;
-    final engine = widget.engine;
-    final l10n = AppLocalizations.of(context);
-    if (engine.isMuted.value) {
-      _showOsd(l10n.mute);
-    } else {
-      _showOsd(l10n.volumePercent('${(engine.volume.value * 100).round()}'));
-    }
-  }
-
-  void _showOsd(String message) {
-    _osdAnim.stop();
-    _osdAnim.reset();
-    final gen = ++_osdGeneration;
-    setState(() => _osdMessage = message);
-    _osdAnim.forward().then((_) {
-      Future.delayed(
-        const Duration(seconds: 1),
-        () {
-          if (!mounted || gen != _osdGeneration) return;
-          _osdAnim.reverse();
-        },
-      );
-    });
   }
 
   @override
@@ -304,6 +255,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         onOpenFile: widget.onOpenFile,
                         onToggleFullscreen: widget.onToggleFullscreen,
                         onTogglePlayMode: widget.onTogglePlayMode,
+                        onOpenSubtitle: widget.onOpenSubtitle,
                         playModeIcon: widget.playModeIcon,
                         playModeActive: widget.playModeActive,
                         playModeLabel: widget.playModeLabel,
@@ -323,50 +275,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                       onRetry: widget.onOpenFile,
                     ),
                   ),
-                  // OSD 浮动提示 — 固定在控制栏上方
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight + 16,
-                    child: IgnorePointer(
-                      child: Center(
-                        child: FadeTransition(
-                          opacity: _osdAnim,
-                          child: _OsdBubble(message: _osdMessage),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// OSD 气泡 — 毛玻璃背景的浮动提示文字
-class _OsdBubble extends StatelessWidget {
-  final String message;
-  const _OsdBubble({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.zero,
-      child: GlassContainer(
-        tier: GlassTier.thick,
-        respectResizeState: true,
-        borderRadius: BorderRadius.circular(Tokens.radiusPopup),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Text(
-          message,
-          style: const TextStyle(
-            color: Tokens.textPrimary,
-            fontSize: Tokens.fontBody,
           ),
         ),
       ),

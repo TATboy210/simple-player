@@ -428,6 +428,12 @@ abstract class AppLocalizations {
   /// **'Exit Fullscreen (F)'**
   String get exitFullscreen;
 
+  /// Tooltip for subtitle import button
+  ///
+  /// In en, this message translates to:
+  /// **'Open Subtitle'**
+  String get openSubtitle;
+
   /// Tooltip for play button
   ///
   /// In en, this message translates to:
