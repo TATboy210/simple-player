@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/ui/theme/tokens.dart';
+import '../widgets/osd_overlay.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
 
@@ -236,6 +237,16 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             child: RepaintBoundary(
               child: Stack(
                 children: [
+                  // OSD 提示 — 控制栏上方居中，与控制栏/logo 同纵轴
+                  Positioned(
+                    bottom:
+                        Tokens.controlBarMarginBottom +
+                        Tokens.controlBarHeight +
+                        12,
+                    left: Tokens.controlBarMarginH,
+                    right: Tokens.controlBarMarginH,
+                    child: const OsdOverlay(),
+                  ),
                   // ControlBar 浮动在底部 — 跟随淡入淡出
                   Positioned(
                     left: Tokens.controlBarMarginH,
@@ -268,7 +279,10 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                   Positioned(
                     left: Tokens.controlBarMarginH + 16,
                     right: Tokens.controlBarMarginH + 16,
-                    bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight + 8,
+                    bottom:
+                        Tokens.controlBarMarginBottom +
+                        Tokens.controlBarHeight +
+                        8,
                     child: ErrorBanner(
                       engine: widget.engine,
                       onOpenFile: widget.onOpenFile,

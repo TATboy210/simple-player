@@ -13,7 +13,6 @@ import 'ui/dialogs/settings_dialog.dart';
 import 'l10n/app_localizations.dart';
 import 'ui/player/player_screen.dart';
 import 'ui/playlist/playlist_panel.dart';
-import 'ui/widgets/osd_overlay.dart';
 import 'ui/shared/empty_state.dart';
 
 /// 应用壳 — 引擎/服务初始化 + 窗口管理 + 完整播放器 UI
@@ -62,7 +61,10 @@ class _AppState extends State<App> {
         SettingsStore.load(),
       ]);
       final settings = results[2] as AppSettings;
-      _videoProcessing = VideoProcessingService(_engine, initialSettings: settings);
+      _videoProcessing = VideoProcessingService(
+        _engine,
+        initialSettings: settings,
+      );
     } on Exception catch (e) {
       debugPrint('[App] init failed (continuing): $e');
       _videoProcessing = VideoProcessingService(_engine);
@@ -86,8 +88,20 @@ class _AppState extends State<App> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: [
-        'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm',
-        'mp3', 'flac', 'wav', 'aac', 'ogg', 'wma', 'm4a',
+        'mp4',
+        'mkv',
+        'avi',
+        'mov',
+        'wmv',
+        'flv',
+        'webm',
+        'mp3',
+        'flac',
+        'wav',
+        'aac',
+        'ogg',
+        'wma',
+        'm4a',
       ],
     );
     if (result != null && result.files.isNotEmpty) {
@@ -126,54 +140,53 @@ class _AppState extends State<App> {
         home: Stack(
           children: [
             PlayerScreen(
-          engine: _engine,
-          controller: _controller,
-          playlist: _playlist,
-          playlistGeneration: _playlistGeneration,
-          isVideo: _engine.textureId.value != null,
-          onOpenFile: _openFile,
-          onPrevious: () => _controller.playPrevious(),
-          onNext: () => _controller.playNext(),
-          onTogglePlayMode: () {
-            final modes = PlayMode.values;
-            final nextIndex = (_playlist.mode.index + 1) % modes.length;
-            _playlist.mode = modes[nextIndex];
-            _playlistGeneration.value++;
-          },
-          onSettings: () => showDialog(
-            context: context,
-            builder: (_) => SettingsDialog(
               engine: _engine,
-              videoProcessing: _videoProcessing,
+              controller: _controller,
+              playlist: _playlist,
+              playlistGeneration: _playlistGeneration,
+              isVideo: _engine.textureId.value != null,
+              onOpenFile: _openFile,
+              onPrevious: () => _controller.playPrevious(),
+              onNext: () => _controller.playNext(),
+              onTogglePlayMode: () {
+                final modes = PlayMode.values;
+                final nextIndex = (_playlist.mode.index + 1) % modes.length;
+                _playlist.mode = modes[nextIndex];
+                _playlistGeneration.value++;
+              },
+              onSettings: () => showDialog(
+                context: context,
+                builder: (_) => SettingsDialog(
+                  engine: _engine,
+                  videoProcessing: _videoProcessing,
+                ),
+              ),
+              onFilesDropped: _onFilesDropped,
+              onDragHoverChanged: (hovering) {
+                setState(() => _isDragHovering = hovering);
+              },
+              playlistPanel: PlaylistPanel(
+                playlist: _playlist,
+                onSelectIndex: (i) => _controller.playIndex(i),
+                onRemoveIndex: (i) {
+                  _playlist.removeAt(i);
+                  _playlistGeneration.value++;
+                },
+                onReorder: (oldIndex, newIndex) {
+                  _playlist.reorder(oldIndex, newIndex);
+                  _playlistGeneration.value++;
+                },
+                onClear: () {
+                  _playlist.clear();
+                  _playlistGeneration.value++;
+                },
+              ),
+              emptyState: EmptyState(
+                onOpenFile: _openFile,
+                isDragHovering: _isDragHovering,
+                engineState: _engine.state,
+              ),
             ),
-          ),
-          onFilesDropped: _onFilesDropped,
-          onDragHoverChanged: (hovering) {
-            setState(() => _isDragHovering = hovering);
-          },
-          playlistPanel: PlaylistPanel(
-            playlist: _playlist,
-            onSelectIndex: (i) => _controller.playIndex(i),
-            onRemoveIndex: (i) {
-              _playlist.removeAt(i);
-              _playlistGeneration.value++;
-            },
-            onReorder: (oldIndex, newIndex) {
-              _playlist.reorder(oldIndex, newIndex);
-              _playlistGeneration.value++;
-            },
-            onClear: () {
-              _playlist.clear();
-              _playlistGeneration.value++;
-            },
-          ),
-          emptyState: EmptyState(
-            onOpenFile: _openFile,
-            isDragHovering: _isDragHovering,
-            engineState: _engine.state,
-          ),
-            ),
-            const OsdOverlay(),
           ],
         ),
       ),
