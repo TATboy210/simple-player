@@ -217,7 +217,10 @@ class _VolumeButtonState extends State<_VolumeButton> {
     if (engine.isMuted.value) {
       engine.setMute(false);
       engine.setVolume(_savedVolume);
-      OsdService.I.show('${(_savedVolume * 100).round()}%');
+      OsdService.I.show(
+        '${(_savedVolume * 100).round()}%',
+        progress: _savedVolume,
+      );
     } else {
       _savedVolume = engine.volume.value;
       engine.setVolume(0);
@@ -270,7 +273,7 @@ class _VolumeSlider extends StatelessWidget {
             final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
             final v = (engine.volume.value + delta).clamp(0.0, 1.0);
             engine.setVolume(v);
-            OsdService.I.show('${(v * 100).round()}%');
+            OsdService.I.show('${(v * 100).round()}%', progress: v);
           }
         },
         child: ValueListenableBuilder<double>(
@@ -285,7 +288,7 @@ class _VolumeSlider extends StatelessWidget {
               value: volume,
               onChanged: (v) {
                 engine.setVolume(v);
-                OsdService.I.show('${(v * 100).round()}%');
+                OsdService.I.show('${(v * 100).round()}%', progress: v);
               },
               activeColor: Tokens.accent,
               inactiveColor: Tokens.bgHover,
