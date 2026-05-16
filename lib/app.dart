@@ -14,6 +14,8 @@ import 'l10n/app_localizations.dart';
 import 'ui/player/player_screen.dart';
 import 'ui/playlist/playlist_panel.dart';
 import 'ui/shared/empty_state.dart';
+import 'ui/shared/play_mode_utils.dart';
+import 'ui/widgets/osd_overlay.dart';
 
 /// 应用壳 — 引擎/服务初始化 + 窗口管理 + 完整播放器 UI
 class App extends StatefulWidget {
@@ -153,6 +155,11 @@ class _AppState extends State<App> {
                 final nextIndex = (_playlist.mode.index + 1) % modes.length;
                 _playlist.mode = modes[nextIndex];
                 _playlistGeneration.value++;
+                const labels = ['顺序播放', '列表循环', '单曲循环', '随机播放'];
+                OsdService.I.show(
+                  labels[_playlist.mode.index],
+                  icon: playModeIcon(_playlist.mode),
+                );
               },
               onSettings: () => showDialog(
                 context: context,

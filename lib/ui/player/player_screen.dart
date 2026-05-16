@@ -292,7 +292,7 @@ class _ShortcutsHelpDialog extends StatelessWidget {
                         style: const TextStyle(
                           color: Tokens.accent,
                           fontSize: Tokens.fontCaption,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: Tokens.weightMedium,
                         ),
                       ),
                     ),

@@ -51,7 +51,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: Tokens.spSm),
-      child: Text(text, style: const TextStyle(color: Tokens.textSecondary, fontSize: Tokens.fontCaption, fontWeight: FontWeight.w600)),
+      child: Text(text, style: const TextStyle(color: Tokens.textSecondary, fontSize: Tokens.fontCaption, fontWeight: Tokens.weightSemiBold)),
     );
   }
 }

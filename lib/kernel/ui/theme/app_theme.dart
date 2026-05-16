@@ -16,19 +16,22 @@ class AppTheme {
         error: Tokens.danger,
       ),
       iconTheme: const IconThemeData(color: Tokens.textPrimary),
+      fontFamily: Tokens.fontFamily,
       textTheme: const TextTheme(
         titleLarge: TextStyle(
           color: Tokens.textPrimary,
           fontSize: Tokens.fontTitle,
-          fontWeight: FontWeight.w600,
+          fontWeight: Tokens.weightSemiBold,
         ),
         bodyLarge: TextStyle(
           color: Tokens.textPrimary,
           fontSize: Tokens.fontBody,
+          fontWeight: Tokens.weightRegular,
         ),
         bodyMedium: TextStyle(
           color: Tokens.textSecondary,
           fontSize: Tokens.fontCaption,
+          fontWeight: Tokens.weightRegular,
         ),
       ),
     );

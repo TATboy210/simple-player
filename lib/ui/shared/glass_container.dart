@@ -211,7 +211,7 @@ class _GlassButtonState extends State<GlassButton> {
                           widget.label!,
                           style: TextStyle(
                             fontSize: Tokens.fontBody,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: Tokens.weightMedium,
                             color: textColor,
                           ),
                         ),

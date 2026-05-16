@@ -22,11 +22,19 @@ class Tokens {
 
   static const borderHighlight = Color(0x33FFFFFF);
 
+  // ── 字体 ──
+  static const fontFamily = 'Noto Sans SC';
   static const fontTitle = 18.0;
   static const fontBody = 14.0;
   static const fontCaption = 12.0;
   static const fontOverline = 10.0;
   static const fontBranding = 18.0;
+
+  static const weightExtraLight = FontWeight.w200;
+  static const weightLight = FontWeight.w300;
+  static const weightRegular = FontWeight.w400;
+  static const weightMedium = FontWeight.w500;
+  static const weightSemiBold = FontWeight.w600;
 
   static const iconSm = 16.0;
   static const iconMd = 18.0;

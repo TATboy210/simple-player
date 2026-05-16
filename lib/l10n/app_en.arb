@@ -253,6 +253,7 @@
   },
 
   "speedLabel": "{speed}x Speed",
+  "speedTooltip": "Playback speed",
   "@speedLabel": {
     "description": "Semantics label for speed option",
     "placeholders": { "speed": { "type": "num" } }

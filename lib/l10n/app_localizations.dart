@@ -746,6 +746,12 @@ abstract class AppLocalizations {
   /// **'{speed}x Speed'**
   String speedLabel(num speed);
 
+  /// No description provided for @speedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed'**
+  String get speedTooltip;
+
   /// Aspect ratio mode: keep original
   ///
   /// In en, this message translates to:

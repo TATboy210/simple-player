@@ -42,7 +42,7 @@ class CustomTitleBar extends StatelessWidget {
                   style: const TextStyle(
                     color: Tokens.textSecondary,
                     fontSize: Tokens.fontCaption,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: Tokens.weightMedium,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -55,7 +55,7 @@ class CustomTitleBar extends StatelessWidget {
               style: TextStyle(
                 color: Tokens.textSecondary,
                 fontSize: Tokens.fontCaption,
-                fontWeight: FontWeight.w500,
+                fontWeight: Tokens.weightMedium,
               ),
             ),
           const Spacer(),

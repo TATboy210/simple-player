@@ -194,7 +194,7 @@ class _EmptyStateState extends State<EmptyState>
           l10n.brandName,
           style: TextStyle(
             fontSize: Tokens.fontBranding,
-            fontWeight: FontWeight.w200,
+            fontWeight: Tokens.weightExtraLight,
             color: Tokens.textPrimary,
             letterSpacing: 4,
           ),

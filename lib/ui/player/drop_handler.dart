@@ -72,15 +72,18 @@ class _DropHandlerState extends State<DropHandler> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.file_download_outlined,
-                          size: 48, color: Tokens.accent),
+                      const Icon(
+                        Icons.file_download_outlined,
+                        size: 48,
+                        color: Tokens.accent,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         '释放以添加文件',
                         style: TextStyle(
                           color: Tokens.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
+                          fontSize: Tokens.fontBody,
+                          fontWeight: Tokens.weightMedium,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -88,7 +91,7 @@ class _DropHandlerState extends State<DropHandler> {
                         '支持常见音视频格式',
                         style: TextStyle(
                           color: Tokens.textSecondary,
-                          fontSize: 13,
+                          fontSize: Tokens.fontCaption,
                         ),
                       ),
                     ],

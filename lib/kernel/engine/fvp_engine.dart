@@ -4,6 +4,7 @@ import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
 
+import '../models/media_error_type.dart';
 import '../models/media_state.dart';
 import '../models/media_info.dart';
 import '../models/video_effect_type.dart';
@@ -79,6 +80,10 @@ class FvpEngine implements MediaEngine {
   @override
   final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
 
+  MediaErrorType _errorType = MediaErrorType.unknown;
+  @override
+  MediaErrorType get errorType => _errorType;
+
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
 
@@ -120,6 +125,7 @@ class FvpEngine implements MediaEngine {
       action();
     } on Exception catch (e) {
       debugPrint('FvpEngine.$name error: $e');
+      _errorType = MediaErrorType.playback;
       errorMessage.value = '$name 失败: $e';
     }
   }
@@ -137,6 +143,7 @@ class FvpEngine implements MediaEngine {
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
       state.value = MediaState.error;
+      _errorType = MediaErrorType.file;
       errorMessage.value = '文件路径为空';
       return;
     }
@@ -147,11 +154,13 @@ class FvpEngine implements MediaEngine {
         final file = File(trimmed);
         if (!await file.exists()) {
           state.value = MediaState.error;
+          _errorType = MediaErrorType.file;
           errorMessage.value = '文件不存在: ${PathUtils.basename(trimmed)}';
           return;
         }
       } on Exception catch (e) {
         state.value = MediaState.error;
+        _errorType = MediaErrorType.file;
         errorMessage.value = '路径无效: $e';
         return;
       }
@@ -172,6 +181,9 @@ class FvpEngine implements MediaEngine {
       if (_disposed) return;
       if (prepareResult < 0) {
         state.value = MediaState.error;
+        _errorType = prepareResult == -99
+            ? MediaErrorType.file
+            : MediaErrorType.codec;
         errorMessage.value = prepareResult == -99
             ? '打开超时: ${PathUtils.basename(trimmed)}'
             : '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)';
@@ -244,6 +256,7 @@ class FvpEngine implements MediaEngine {
       if (_disposed) return;
       if (textureResult < 0) {
         state.value = MediaState.error;
+        _errorType = MediaErrorType.codec;
         errorMessage.value = textureResult == -99
             ? '纹理创建超时: ${PathUtils.basename(trimmed)}'
             : '纹理创建失败: ${PathUtils.basename(trimmed)}';
@@ -251,9 +264,11 @@ class FvpEngine implements MediaEngine {
       }
 
       position.value = 0;
+      _errorType = MediaErrorType.unknown;
       errorMessage.value = null;
     } on Exception catch (e) {
       state.value = MediaState.error;
+      _errorType = MediaErrorType.playback;
       errorMessage.value = '无法打开: ${PathUtils.basename(path)}\n$e';
     } finally {
       isBuffering.value = false;
@@ -270,6 +285,7 @@ class FvpEngine implements MediaEngine {
       _positionPoller.start();
     } on Exception catch (e) {
       state.value = MediaState.error;
+      _errorType = MediaErrorType.playback;
       errorMessage.value = '播放失败: $e';
     }
   }
@@ -302,6 +318,7 @@ class FvpEngine implements MediaEngine {
   @override
   Future<void> seekTo(int milliseconds) async {
     if (_disposed) return;
+    if (state.value == MediaState.idle || duration.value <= 0) return;
     final clamped = milliseconds.clamp(0, duration.value);
     final wasPlaying = _player.state == mdk.PlaybackState.playing;
     _positionPoller.seeking = true;
@@ -312,6 +329,7 @@ class FvpEngine implements MediaEngine {
       position.value = clamped;
     } on Exception catch (e) {
       if (_disposed) return;
+      _errorType = MediaErrorType.playback;
       errorMessage.value = '跳转失败: $e';
       position.value = _player.position;
     } finally {

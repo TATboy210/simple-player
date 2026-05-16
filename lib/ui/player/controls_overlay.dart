@@ -6,6 +6,7 @@ import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/ui/theme/tokens.dart';
 import '../widgets/osd_overlay.dart';
+import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
 
@@ -62,44 +63,23 @@ class ControlsOverlay extends StatefulWidget {
 
 class _ControlsOverlayState extends State<ControlsOverlay>
     with TickerProviderStateMixin {
-  late final AnimationController _animController;
-  late final Animation<double> _opacity;
+  late final AutoHideController _autoHide;
   final _popupCloseNotifier = ValueNotifier<int>(0);
-  bool _visible = true;
-  bool _hovering = false;
-  Timer? _hideTimer;
   Timer? _clickTimer;
-
-  /// 节流：避免每次 hover 像素都触发 setState
-  DateTime _lastHoverTime = DateTime.fromMillisecondsSinceEpoch(0);
-  static const _hoverThrottle = Duration(milliseconds: 100);
-
-  /// 全屏 3s，窗口化 5s
-  Duration get _hideDelay => widget.isFullscreen
-      ? const Duration(seconds: Tokens.hideDelayFullscreen)
-      : const Duration(seconds: Tokens.hideDelayWindowed);
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
+    _autoHide = AutoHideController(
       vsync: this,
-      duration: const Duration(milliseconds: Tokens.durationFade),
-      value: 1,
+      engineState: widget.engine.state,
+      isFullscreen: widget.isFullscreen,
+      popupCloseNotifier: _popupCloseNotifier,
     );
-    _opacity = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
-    // 监听 state 变化，暂停/停止/完成/错误时强制显示（在 listener 中处理，不在 build 中）
     widget.engine.state.addListener(_onEngineStateChanged);
-    // idle 时显示控制栏（永久显示，不自动隐藏）
-    if (widget.engine.state.value == MediaState.idle) {
-      _visible = true;
-      _animController.value = 1;
-    } else {
-      _scheduleHide();
-    }
+    _autoHide.init();
   }
 
-  /// 单击空白区域 → 隐藏控制栏（250ms 延迟等待可能的双击）
   void _handleTap() {
     _clickTimer?.cancel();
     _clickTimer = Timer(
@@ -107,112 +87,38 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       () {
         if (!mounted) return;
         if (widget.engine.state.value == MediaState.idle) return;
-        if (_visible) _hide();
+        _autoHide.hide();
       },
     );
   }
 
-  /// 双击 → 切换全屏
   void _handleDoubleTap() {
     _clickTimer?.cancel();
     widget.onToggleFullscreen?.call();
   }
 
-  void _onEngineStateChanged() {
-    if (!mounted) return;
-    final s = widget.engine.state.value;
-    // idle（未加载媒体）时永久显示控制栏，不自动隐藏
-    if (s == MediaState.idle) {
-      _hideTimer?.cancel();
-      if (!_visible) {
-        _show();
-      }
-      return;
-    }
-    // loading/playing: 显示控制栏并启动自动隐藏
-    if (s == MediaState.loading || s == MediaState.playing) {
-      if (!_visible) {
-        _show();
-        _scheduleHide();
-      }
-      return;
-    }
-    // paused/stopped/completed/error: 强制显示，不自动隐藏
-    final alwaysShow =
-        s == MediaState.paused ||
-        s == MediaState.stopped ||
-        s == MediaState.completed ||
-        s == MediaState.error;
-    if (alwaysShow && !_visible) {
-      _show();
-      _hideTimer?.cancel(); // 取消 hide timer，防止闪烁
-    }
-  }
-
-  /// 取消旧 Timer 再设新的，避免多次鼠标移动导致 Timer 堆积
-  void _scheduleHide() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(_hideDelay, () {
-      if (mounted && !_hovering) _hide();
-    });
-  }
-
-  void _show() {
-    if (!mounted) return;
-    if (!_visible) {
-      setState(() => _visible = true);
-      _animController.forward();
-    }
-  }
-
-  void _hide() {
-    // idle 时控制栏永久显示，不允许隐藏
-    if (widget.engine.state.value == MediaState.idle) return;
-    if (_visible && !_hovering) {
-      _popupCloseNotifier.value++;
-      _animController.reverse().then((_) {
-        if (mounted) setState(() => _visible = false);
-      });
-    }
-  }
-
-  void _onMouseMove() {
-    // idle 时控制栏永久显示，不响应鼠标移动
-    if (widget.engine.state.value == MediaState.idle) return;
-    final now = DateTime.now();
-    if (now.difference(_lastHoverTime) < _hoverThrottle) return;
-    _lastHoverTime = now;
-    _show();
-    _scheduleHide();
-  }
+  void _onEngineStateChanged() => _autoHide.onEngineStateChanged();
 
   @override
   void didUpdateWidget(covariant ControlsOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isFullscreen != widget.isFullscreen) {
-      _scheduleHide();
+      _autoHide.isFullscreen = widget.isFullscreen;
     }
   }
 
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
-    _hideTimer?.cancel();
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
-    _animController.dispose();
+    _autoHide.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isIdle = widget.engine.state.value == MediaState.idle;
-    // 手势统一在此处理：
-    // - 单击空白区域 → 隐藏控制栏
-    // - 双击 → 切换全屏
-    // - ControlBar 按钮有自己的 GestureDetector，优先赢得竞技场，不触发隐藏
-    // - behavior: translucent 确保空白区域点击穿透到 Stack children
-    // 空状态 + idle 时：不创建手势识别器，让 tap 穿透到 EmptyState 按钮
     final gestureActive = !(widget.emptyStatePresent && isIdle);
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -223,21 +129,18 @@ class _ControlsOverlayState extends State<ControlsOverlay>
         child: MouseRegion(
           opaque: false,
           hitTestBehavior: HitTestBehavior.translucent,
-          onHover: (_) => _onMouseMove(),
-          onEnter: (_) {
-            _hovering = true;
-            _show();
-          },
-          onExit: (_) {
-            _hovering = false;
-            if (!isIdle) _scheduleHide();
-          },
-          child: IgnorePointer(
-            ignoring: !_visible,
+          onHover: (_) => _autoHide.onMouseMove(),
+          onEnter: (_) => _autoHide.onMouseEnter(),
+          onExit: (_) => _autoHide.onMouseExit(),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _autoHide.visible,
+            builder: (_, isVisible, child) => IgnorePointer(
+              ignoring: !isVisible,
+              child: child,
+            ),
             child: RepaintBoundary(
               child: Stack(
                 children: [
-                  // OSD 提示 — 控制栏上方居中，与控制栏/logo 同纵轴
                   Positioned(
                     bottom:
                         Tokens.controlBarMarginBottom +
@@ -247,35 +150,36 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                     right: Tokens.controlBarMarginH,
                     child: const OsdOverlay(),
                   ),
-                  // ControlBar 浮动在底部 — 跟随淡入淡出
                   Positioned(
                     left: Tokens.controlBarMarginH,
                     right: Tokens.controlBarMarginH,
                     bottom: Tokens.controlBarMarginBottom,
-                    child: FadeTransition(
-                      opacity: _opacity,
-                      child: ControlBar(
-                        engine: widget.engine,
-                        isFullscreen: widget.isFullscreen,
-                        isIdle: isIdle,
-                        popupCloseNotifier: _popupCloseNotifier,
-                        onPrevious: widget.onPrevious,
-                        onNext: widget.onNext,
-                        onTogglePlaylist: widget.onTogglePlaylist,
-                        onSettings: widget.onSettings,
-                        onOpenFile: widget.onOpenFile,
-                        onToggleFullscreen: widget.onToggleFullscreen,
-                        onTogglePlayMode: widget.onTogglePlayMode,
-                        onOpenSubtitle: widget.onOpenSubtitle,
-                        playModeIcon: widget.playModeIcon,
-                        playModeActive: widget.playModeActive,
-                        playModeLabel: widget.playModeLabel,
-                        isVideo: widget.isVideo,
-                        enableBlur: _visible,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _autoHide.visible,
+                      builder: (_, isVisible, _) => FadeTransition(
+                        opacity: _autoHide.opacity,
+                        child: ControlBar(
+                          engine: widget.engine,
+                          isFullscreen: widget.isFullscreen,
+                          isIdle: isIdle,
+                          popupCloseNotifier: _popupCloseNotifier,
+                          onPrevious: widget.onPrevious,
+                          onNext: widget.onNext,
+                          onTogglePlaylist: widget.onTogglePlaylist,
+                          onSettings: widget.onSettings,
+                          onOpenFile: widget.onOpenFile,
+                          onToggleFullscreen: widget.onToggleFullscreen,
+                          onTogglePlayMode: widget.onTogglePlayMode,
+                          onOpenSubtitle: widget.onOpenSubtitle,
+                          playModeIcon: widget.playModeIcon,
+                          playModeActive: widget.playModeActive,
+                          playModeLabel: widget.playModeLabel,
+                          isVideo: widget.isVideo,
+                          enableBlur: isVisible,
+                        ),
                       ),
                     ),
                   ),
-                  // 错误消息条：独立于控制栏淡入淡出
                   Positioned(
                     left: Tokens.controlBarMarginH + 16,
                     right: Tokens.controlBarMarginH + 16,
