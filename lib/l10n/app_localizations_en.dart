@@ -351,6 +351,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get speedTooltip => 'Playback speed';
+
+  @override
   String get aspectRatioOriginal => 'Original';
 
   @override

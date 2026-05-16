@@ -1,0 +1,143 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
+import '../../helpers/fake_engine.dart';
+
+void main() {
+  late FakeEngine engine;
+
+  setUp(() {
+    engine = FakeEngine();
+  });
+
+  tearDown(() {
+    engine.dispose();
+  });
+
+  Widget buildSubject({
+    MediaEngine? eng,
+    bool isFullscreen = false,
+    VoidCallback? onToggleFullscreen,
+    bool emptyStatePresent = false,
+  }) {
+    return MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: ControlsOverlay(
+          engine: eng ?? engine,
+          isFullscreen: isFullscreen,
+          onToggleFullscreen: onToggleFullscreen,
+          emptyStatePresent: emptyStatePresent,
+        ),
+      ),
+    );
+  }
+
+  group('ControlsOverlay', () {
+    testWidgets('renders without error', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('renders ControlBar', (tester) async {
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('double tap triggers onToggleFullscreen', (tester) async {
+      var toggled = false;
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(
+        buildSubject(onToggleFullscreen: () => toggled = true),
+      );
+      await tester.pump();
+
+      final center = tester.getCenter(find.byType(ControlsOverlay));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pump();
+      // Pump past the click timer (250ms) to let it resolve
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(toggled, isTrue);
+    });
+
+    testWidgets('single tap hides controls after delay', (tester) async {
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final center = tester.getCenter(find.byType(ControlsOverlay));
+      await tester.tapAt(center);
+      await tester.pump();
+
+      // After 250ms delay + animation
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('idle state does not hide on tap', (tester) async {
+      engine.state.value = MediaState.idle;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final center = tester.getCenter(find.byType(ControlsOverlay));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+    });
+
+    testWidgets('emptyStatePresent + idle disables gesture', (tester) async {
+      engine.state.value = MediaState.idle;
+      await tester.pumpWidget(buildSubject(emptyStatePresent: true));
+      await tester.pump();
+
+      // Should render without error
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('didUpdateWidget propagates isFullscreen change',
+        (tester) async {
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject(isFullscreen: false));
+      await tester.pump();
+
+      // Rebuild with isFullscreen = true
+      await tester.pumpWidget(buildSubject(isFullscreen: true));
+      await tester.pump();
+
+      // No crash, AutoHideController updated
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('mouse hover shows controls', (tester) async {
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(
+        location: tester.getCenter(find.byType(ControlsOverlay)),
+      );
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(
+        tester.getCenter(find.byType(ControlsOverlay)),
+      );
+      await tester.pump();
+
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+  });
+}

@@ -5,6 +5,13 @@ import '../../kernel/ui/theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
 
+class _HoverState {
+  const _HoverState(this.hovering, this.x);
+  static const empty = _HoverState(false, 0.0);
+  final bool hovering;
+  final double x;
+}
+
 /// 进度条 — 已播放/已缓冲/未播放三层，拖拽 seek + 时间提示
 class ProgressBar extends StatefulWidget {
   final MediaEngine engine;
@@ -18,10 +25,11 @@ class ProgressBar extends StatefulWidget {
 class _ProgressBarState extends State<ProgressBar> {
   bool _dragging = false;
   double _dragFraction = 0;
-  bool _hovering = false;
-  double _hoverX = 0;
+  final _hoverNotifier = ValueNotifier<_HoverState>(_HoverState.empty);
   DateTime _lastHoverUpdate = DateTime.fromMillisecondsSinceEpoch(0);
   double _barWidth = 0;
+
+  double get _hoverX => _hoverNotifier.value.x;
 
   double get _effectiveFraction {
     final dur = widget.engine.duration.value;
@@ -39,6 +47,12 @@ class _ProgressBarState extends State<ProgressBar> {
   MediaEngine get engine => widget.engine;
 
   @override
+  void dispose() {
+    _hoverNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -46,16 +60,16 @@ class _ProgressBarState extends State<ProgressBar> {
         _barWidth = barWidth;
         return MouseRegion(
           cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovering = true),
-          onExit: (_) => setState(() => _hovering = false),
+          onEnter: (_) => _hoverNotifier.value = _HoverState(true, _hoverX),
+          onExit: (_) => _hoverNotifier.value = _HoverState.empty,
           onHover: (details) {
             final now = DateTime.now();
             if (now.difference(_lastHoverUpdate).inMilliseconds < 16) return;
             _lastHoverUpdate = now;
-            setState(() {
-              _hoverX =
-                  (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
-            });
+            _hoverNotifier.value = _HoverState(
+              true,
+              (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
+            );
           },
           child: Semantics(
             label: AppLocalizations.of(context).progressBar,
@@ -77,11 +91,16 @@ class _ProgressBarState extends State<ProgressBar> {
                 });
               },
               onHorizontalDragEnd: (_) {
+                if (widget.engine.duration.value <= 0) {
+                  setState(() => _dragging = false);
+                  return;
+                }
                 final ms = _dragPositionMs;
                 widget.engine.seekTo(ms);
                 setState(() => _dragging = false);
               },
               onTapDown: (details) {
+                if (widget.engine.duration.value <= 0) return;
                 final fraction =
                     (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
                 final ms =
@@ -95,10 +114,17 @@ class _ProgressBarState extends State<ProgressBar> {
                   children: [
                     _buildBarLayers(),
                     if (_dragging) _buildDragTooltip(),
-                    if (_hovering &&
-                        !_dragging &&
-                        widget.engine.duration.value > 0)
-                      _buildHoverTooltip(),
+                    ValueListenableBuilder<_HoverState>(
+                      valueListenable: _hoverNotifier,
+                      builder: (_, hover, _) {
+                        if (!hover.hovering ||
+                            _dragging ||
+                            widget.engine.duration.value <= 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return _buildHoverTooltip();
+                      },
+                    ),
                   ],
                 ),
               ),

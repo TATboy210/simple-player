@@ -351,6 +351,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get speedTooltip => '倍速';
+
+  @override
   String get aspectRatioOriginal => '原始';
 
   @override

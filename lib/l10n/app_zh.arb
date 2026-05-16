@@ -121,6 +121,7 @@
   "volumePercent": "音量 {percent}%",
 
   "speedLabel": "{speed}x 速度",
+  "speedTooltip": "倍速",
 
   "aspectRatioOriginal": "原始",
   "aspectRatioStretch": "拉伸",

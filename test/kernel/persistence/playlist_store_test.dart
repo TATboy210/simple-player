@@ -1,4 +1,7 @@
 
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/persistence/playlist_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
@@ -6,8 +9,30 @@ import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() {
+  late Directory tempDir;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('playlist_store_test_');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (call) async {
+        if (call.method == 'getApplicationSupportDirectory') {
+          return tempDir.path;
+        }
+        return null;
+      },
+    );
+  });
+
+  tearDown(() async {
     PlaylistStore.reset();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      null,
+    );
+    if (await tempDir.exists()) await tempDir.delete(recursive: true);
   });
 
   group('PlaylistStore', () {
@@ -17,7 +42,7 @@ void main() {
       playlist.add('/video/test2.mkv');
 
       PlaylistStore.save(playlist);
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await PlaylistStore.dispose();
 
       final loaded = await PlaylistStore.load();
       expect(loaded, isNotNull);
@@ -45,7 +70,7 @@ void main() {
       PlaylistStore.save(p1);
       PlaylistStore.save(p2); // should overwrite p1
 
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await PlaylistStore.dispose();
 
       final loaded = await PlaylistStore.load();
       expect(loaded, isNotNull);
@@ -86,7 +111,7 @@ void main() {
       PlaylistStore.reset();
 
       // After reset, debounce is cancelled
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await PlaylistStore.dispose();
     });
 
     test('save preserves currentIndex', () async {
@@ -96,7 +121,7 @@ void main() {
       playlist.currentIndex = 1;
 
       PlaylistStore.save(playlist);
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await PlaylistStore.dispose();
 
       final loaded = await PlaylistStore.load();
       expect(loaded, isNotNull);

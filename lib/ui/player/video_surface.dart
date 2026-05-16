@@ -28,7 +28,8 @@ class VideoSurface extends StatelessWidget {
                     onPointerSignal: (event) {
                       if (event is PointerScrollEvent) {
                         final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
-                        engine.setVolume(engine.volume.value + delta);
+                        final v = (engine.volume.value + delta).clamp(0.0, 1.0);
+                        engine.setVolume(v);
                       }
                     },
                     child: FittedBox(

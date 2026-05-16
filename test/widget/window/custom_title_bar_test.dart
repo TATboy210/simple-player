@@ -56,7 +56,7 @@ void main() {
       fake.isAlwaysOnTop.value = true;
       await tester.pump();
       final icon = tester.widget<Icon>(find.byIcon(Icons.push_pin));
-      expect(icon.color, const Color(0xFF6C5CE7)); // Tokens.accent
+      expect(icon.color, const Color(0xFF2C58F4)); // Tokens.accent
     });
 
     testWidgets('isAlwaysOnTop 为 false 时 pin 图标为 textSecondary 色', (

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:simple_player_flutter/kernel/models/media_error_type.dart';
 import 'package:simple_player_flutter/kernel/models/media_state.dart';
 import 'package:simple_player_flutter/kernel/models/media_info.dart';
 import 'package:simple_player_flutter/kernel/models/video_effect_type.dart';
@@ -48,6 +49,9 @@ class FakeEngine implements MediaEngine {
 
   @override
   final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
+
+  @override
+  MediaErrorType errorType = MediaErrorType.unknown;
 
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);

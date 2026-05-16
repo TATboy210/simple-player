@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/media_error_type.dart';
 import '../models/media_state.dart';
 import '../models/media_info.dart';
 import '../models/video_effect_type.dart';
@@ -49,6 +50,9 @@ abstract class MediaEngine {
 
   /// 错误消息（null = 无错误）
   ValueNotifier<String?> get errorMessage;
+
+  /// 错误类型（UI 层根据类型选择操作按钮）
+  MediaErrorType get errorType;
 
   /// 播放速度（0.25 - 4.0），默认 1.0
   ValueNotifier<double> get playbackSpeed;
