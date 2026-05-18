@@ -54,9 +54,7 @@ class PlayerError {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PlayerError &&
-          code == other.code &&
-          message == other.message;
+      other is PlayerError && code == other.code && message == other.message;
 
   @override
   int get hashCode => code.hashCode ^ message.hashCode;

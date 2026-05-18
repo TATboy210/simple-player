@@ -16,7 +16,8 @@ class PathUtils {
     var lastSep = -1;
     for (var i = path.length - 1; i >= 0; i--) {
       final c = path.codeUnitAt(i);
-      if (c == 0x2F || c == 0x5C) { // '/' or '\'
+      if (c == 0x2F || c == 0x5C) {
+        // '/' or '\'
         lastSep = i;
         break;
       }

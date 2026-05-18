@@ -15,7 +15,13 @@ class SubtitleService {
   SubtitleService(this._engine);
 
   static const _subtitleExtensions = {
-    '.srt', '.ass', '.ssa', '.sub', '.vtt', '.idx', '.sup',
+    '.srt',
+    '.ass',
+    '.ssa',
+    '.sub',
+    '.vtt',
+    '.idx',
+    '.sup',
   };
 
   /// 异步扫描媒体文件目录，匹配同名字幕文件并加载第一个匹配项。

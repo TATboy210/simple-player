@@ -23,8 +23,9 @@ void main() {
   }
 
   group('VideoSurface', () {
-    testWidgets('renders SizedBox.shrink when textureId is null',
-        (tester) async {
+    testWidgets('renders SizedBox.shrink when textureId is null', (
+      tester,
+    ) async {
       engine.textureId.value = null;
       await tester.pumpWidget(buildSubject());
       await tester.pump();
@@ -40,8 +41,9 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
-    testWidgets('uses default 16/9 ratio when ratio is invalid (0)',
-        (tester) async {
+    testWidgets('uses default 16/9 ratio when ratio is invalid (0)', (
+      tester,
+    ) async {
       engine.textureId.value = 1;
       engine.aspectRatio.value = 0;
       await tester.pumpWidget(buildSubject());
@@ -50,8 +52,9 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
-    testWidgets('uses default 16/9 ratio when ratio is negative',
-        (tester) async {
+    testWidgets('uses default 16/9 ratio when ratio is negative', (
+      tester,
+    ) async {
       engine.textureId.value = 1;
       engine.aspectRatio.value = -1;
       await tester.pumpWidget(buildSubject());
@@ -60,8 +63,9 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
-    testWidgets('uses default 16/9 ratio when ratio is infinity',
-        (tester) async {
+    testWidgets('uses default 16/9 ratio when ratio is infinity', (
+      tester,
+    ) async {
       engine.textureId.value = 1;
       engine.aspectRatio.value = double.infinity;
       await tester.pumpWidget(buildSubject());

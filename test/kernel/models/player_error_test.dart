@@ -8,12 +8,18 @@ void main() {
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.pathEmpty));
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.fileNotFound));
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.pathTraversal));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.unsupportedFormat));
+      expect(
+        PlayerErrorCode.values,
+        contains(PlayerErrorCode.unsupportedFormat),
+      );
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.openTimeout));
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.decodeFailed));
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.textureFailed));
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.networkTimeout));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.codecUnsupported));
+      expect(
+        PlayerErrorCode.values,
+        contains(PlayerErrorCode.codecUnsupported),
+      );
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.fileCorruption));
       expect(PlayerErrorCode.values, contains(PlayerErrorCode.unknown));
     });
@@ -43,7 +49,11 @@ void main() {
       const withoutCause = PlayerError(PlayerErrorCode.unknown, 'err');
       expect(withoutCause.cause, isNull);
 
-      final withCause = PlayerError(PlayerErrorCode.decodeFailed, 'err', Exception('bad'));
+      final withCause = PlayerError(
+        PlayerErrorCode.decodeFailed,
+        'err',
+        Exception('bad'),
+      );
       expect(withCause.cause, isA<Exception>());
     });
   });

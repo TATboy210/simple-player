@@ -37,8 +37,9 @@ void main() {
       });
 
       test('rejects path traversal attempt', () async {
-        final result =
-            await controller.openAndPlay('C:/test/../../../etc/passwd.mp4');
+        final result = await controller.openAndPlay(
+          'C:/test/../../../etc/passwd.mp4',
+        );
         expect(result, false);
         expect(controller.validationError.value, contains('不安全'));
       });
@@ -72,8 +73,7 @@ void main() {
 
     group('addFiles', () {
       test('returns 0 for all-invalid paths', () async {
-        final count =
-            await controller.addFiles(['', 'bad.txt', '../hack.mp4']);
+        final count = await controller.addFiles(['', 'bad.txt', '../hack.mp4']);
         expect(count, 0);
         expect(playlist.isEmpty, true);
       });

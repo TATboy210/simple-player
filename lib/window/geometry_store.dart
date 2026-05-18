@@ -75,11 +75,7 @@ class WindowGeometryStore {
     _debounce?.cancel();
     _debounce = Timer(
       const Duration(milliseconds: _debounceMs),
-      () => _saveNow(
-        size: size,
-        position: position,
-        isMaximized: isMaximized,
-      ),
+      () => _saveNow(size: size, position: position, isMaximized: isMaximized),
     );
   }
 
@@ -90,11 +86,7 @@ class WindowGeometryStore {
     required bool isMaximized,
   }) {
     _debounce?.cancel();
-    return _saveNow(
-      size: size,
-      position: position,
-      isMaximized: isMaximized,
-    );
+    return _saveNow(size: size, position: position, isMaximized: isMaximized);
   }
 
   /// 保存全屏状态
@@ -149,7 +141,8 @@ class WindowGeometryStore {
       final screenW = display.physicalSize.width / display.devicePixelRatio;
       final screenH = display.physicalSize.height / display.devicePixelRatio;
 
-      final isOffScreen = geo.x + geo.width < minVisible ||
+      final isOffScreen =
+          geo.x + geo.width < minVisible ||
           geo.y + geo.height < minVisible ||
           geo.x > screenW - minVisible ||
           geo.y > screenH - minVisible;

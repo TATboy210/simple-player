@@ -94,8 +94,9 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
     });
 
-    testWidgets('renders progress bar when message has progress',
-        (tester) async {
+    testWidgets('renders progress bar when message has progress', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(home: Scaffold(body: OsdOverlay())),
       );

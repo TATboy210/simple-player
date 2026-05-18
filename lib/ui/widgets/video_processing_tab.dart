@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -34,7 +34,13 @@ class VideoProcessingTab extends StatelessWidget {
         Center(
           child: TextButton(
             onPressed: service.resetAll,
-            child: Text(l10n.resetAll, style: const TextStyle(color: Tokens.accent, fontSize: Tokens.fontCaption)),
+            child: Text(
+              l10n.resetAll,
+              style: const TextStyle(
+                color: Tokens.accent,
+                fontSize: Tokens.fontCaption,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: Tokens.spSm),
@@ -51,7 +57,14 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: Tokens.spSm),
-      child: Text(text, style: const TextStyle(color: Tokens.textSecondary, fontSize: Tokens.fontCaption, fontWeight: Tokens.weightSemiBold)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Tokens.textSecondary,
+          fontSize: Tokens.fontCaption,
+          fontWeight: Tokens.weightSemiBold,
+        ),
+      ),
     );
   }
 }
@@ -73,7 +86,10 @@ class _DebouncedSliderState extends State<_DebouncedSlider> {
   double get _effectiveValue => _dragging ? _dragValue : widget.notifier.value;
 
   @override
-  void dispose() { _debounce?.cancel(); super.dispose(); }
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,25 +99,50 @@ class _DebouncedSliderState extends State<_DebouncedSlider> {
         final display = _effectiveValue;
         return Row(
           children: [
-            SizedBox(width: 64, child: Text(widget.label, style: const TextStyle(color: Tokens.textSecondary, fontSize: Tokens.fontOverline))),
+            SizedBox(
+              width: 64,
+              child: Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontOverline,
+                ),
+              ),
+            ),
             Expanded(
               child: Slider(
                 value: display,
                 min: -1.0,
                 max: 1.0,
                 onChanged: (v) {
-                  setState(() { _dragging = true; _dragValue = v; });
+                  setState(() {
+                    _dragging = true;
+                    _dragValue = v;
+                  });
                   _debounce?.cancel();
-                  _debounce = Timer(const Duration(milliseconds: 50), () => widget.notifier.value = v);
+                  _debounce = Timer(
+                    const Duration(milliseconds: 50),
+                    () => widget.notifier.value = v,
+                  );
                 },
-                onChangeEnd: (_) { setState(() => _dragging = false); },
+                onChangeEnd: (_) {
+                  setState(() => _dragging = false);
+                },
                 activeColor: Tokens.accent,
                 inactiveColor: Tokens.bgHover,
               ),
             ),
             SizedBox(
               width: 36,
-              child: Text('\${(display * 100).round()}', textAlign: TextAlign.right, style: const TextStyle(color: Tokens.textTertiary, fontSize: Tokens.fontOverline, fontFeatures: [Tokens.tabularFigures])),
+              child: Text(
+                '\${(display * 100).round()}',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: Tokens.textTertiary,
+                  fontSize: Tokens.fontOverline,
+                  fontFeatures: [Tokens.tabularFigures],
+                ),
+              ),
             ),
           ],
         );
@@ -129,8 +170,13 @@ class _RotationPicker extends StatelessWidget {
               onSelected: (_) => notifier.value = deg,
               selectedColor: Tokens.accent,
               backgroundColor: Tokens.bgElevated,
-              labelStyle: TextStyle(color: selected ? Tokens.textPrimary : Tokens.textSecondary, fontSize: Tokens.fontOverline),
-              side: BorderSide(color: selected ? Tokens.accent : Tokens.borderHighlight),
+              labelStyle: TextStyle(
+                color: selected ? Tokens.textPrimary : Tokens.textSecondary,
+                fontSize: Tokens.fontOverline,
+              ),
+              side: BorderSide(
+                color: selected ? Tokens.accent : Tokens.borderHighlight,
+              ),
             );
           }).toList(),
         );
@@ -153,9 +199,21 @@ class _AspectRatioSelector extends StatelessWidget {
           value: current,
           isExpanded: true,
           dropdownColor: Tokens.bgElevated,
-          style: const TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontCaption),
-          items: AspectRatioMode.values.map((mode) => DropdownMenuItem(value: mode, child: Text(_label(mode, l10n)))).toList(),
-          onChanged: (mode) { if (mode != null) notifier.value = mode; },
+          style: const TextStyle(
+            color: Tokens.textPrimary,
+            fontSize: Tokens.fontCaption,
+          ),
+          items: AspectRatioMode.values
+              .map(
+                (mode) => DropdownMenuItem(
+                  value: mode,
+                  child: Text(_label(mode, l10n)),
+                ),
+              )
+              .toList(),
+          onChanged: (mode) {
+            if (mode != null) notifier.value = mode;
+          },
         );
       },
     );
@@ -187,12 +245,28 @@ class _DeinterlaceToggle extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.enableDeinterlace, style: const TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontCaption)),
-                  Text(l10n.softwareDecoderOnly, style: const TextStyle(color: Tokens.textTertiary, fontSize: Tokens.fontOverline)),
+                  Text(
+                    l10n.enableDeinterlace,
+                    style: const TextStyle(
+                      color: Tokens.textPrimary,
+                      fontSize: Tokens.fontCaption,
+                    ),
+                  ),
+                  Text(
+                    l10n.softwareDecoderOnly,
+                    style: const TextStyle(
+                      color: Tokens.textTertiary,
+                      fontSize: Tokens.fontOverline,
+                    ),
+                  ),
                 ],
               ),
             ),
-            Switch(value: enabled, onChanged: (v) => notifier.value = v, activeThumbColor: Tokens.accent),
+            Switch(
+              value: enabled,
+              onChanged: (v) => notifier.value = v,
+              activeThumbColor: Tokens.accent,
+            ),
           ],
         );
       },

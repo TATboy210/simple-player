@@ -21,7 +21,7 @@ import '../models/play_mode.dart';
 class Playlist {
   final List<PlaylistItem> _items = [];
   int _currentIndex = -1;
-  PlayMode _mode = PlayMode.normal;
+  PlayMode _mode = PlayMode.loopAll;
   final _random = Random();
 
   Playlist();
@@ -38,32 +38,12 @@ class Playlist {
   /// 当前播放项，索引无效时返回 null
   PlaylistItem? get current =>
       (_currentIndex >= 0 && _currentIndex < _items.length)
-          ? _items[_currentIndex]
-          : null;
+      ? _items[_currentIndex]
+      : null;
 
-  bool get hasNext {
-    if (_items.isEmpty) return false;
-    switch (_mode) {
-      case PlayMode.normal:
-        return _currentIndex < _items.length - 1;
-      case PlayMode.loopAll:
-      case PlayMode.loopSingle:
-      case PlayMode.shuffle:
-        return true;
-    }
-  }
+  bool get hasNext => _items.isNotEmpty;
 
-  bool get hasPrevious {
-    if (_items.isEmpty) return false;
-    switch (_mode) {
-      case PlayMode.normal:
-        return _currentIndex > 0;
-      case PlayMode.loopAll:
-      case PlayMode.loopSingle:
-      case PlayMode.shuffle:
-        return true;
-    }
-  }
+  bool get hasPrevious => _items.isNotEmpty;
 
   // ─── 修改 ───
 
@@ -191,12 +171,14 @@ class Playlist {
     for (final entry in historyMap.entries) {
       if (!_items.any((item) => item.path == entry.key)) {
         final map = entry.value;
-        _items.add(PlaylistItem(
-          path: entry.key,
-          timestamp: (map['timestamp'] as num?)?.toInt(),
-          positionMs: (map['positionMs'] as num?)?.toInt(),
-          durationMs: (map['durationMs'] as num?)?.toInt(),
-        ));
+        _items.add(
+          PlaylistItem(
+            path: entry.key,
+            timestamp: (map['timestamp'] as num?)?.toInt(),
+            positionMs: (map['positionMs'] as num?)?.toInt(),
+            durationMs: (map['durationMs'] as num?)?.toInt(),
+          ),
+        );
       }
     }
     if (_currentIndex < 0 && _items.isNotEmpty) {
@@ -218,20 +200,12 @@ class Playlist {
     if (_items.isEmpty) return -1;
 
     switch (_mode) {
-      case PlayMode.normal:
-        if (_currentIndex < _items.length - 1) {
-          return _currentIndex + 1;
-        }
-        return -1;
       case PlayMode.loopAll:
         return (_currentIndex + 1) % _items.length;
       case PlayMode.loopSingle:
         return _currentIndex;
       case PlayMode.shuffle:
-        // 单首歌直接返回自身（do-while 会死循环）
         if (_items.length == 1) return _currentIndex;
-        // 随机选一首，排除当前首避免连续重复
-        // do-while 安全：_items.length > 1 时保证能退出
         int next;
         do {
           next = _random.nextInt(_items.length);
@@ -247,11 +221,6 @@ class Playlist {
     if (_items.isEmpty) return -1;
 
     switch (_mode) {
-      case PlayMode.normal:
-        if (_currentIndex > 0) {
-          return _currentIndex - 1;
-        }
-        return -1;
       case PlayMode.loopAll:
         return (_currentIndex - 1 + _items.length) % _items.length;
       case PlayMode.loopSingle:
@@ -269,25 +238,27 @@ class Playlist {
   // ─── 序列化 ───
 
   Map<String, dynamic> toJson() => {
-        'mode': _mode.index,
-        'currentIndex': _currentIndex,
-        'items': _items.map((e) => e.toJson()).toList(),
-      };
+    'mode': _mode.index,
+    'currentIndex': _currentIndex,
+    'items': _items.map((e) => e.toJson()).toList(),
+  };
 
   factory Playlist.fromJson(Map<String, dynamic> json) {
     final playlist = Playlist();
 
-    // 播放模式（防御: 越界回退 normal）
+    // 播放模式（防御: 越界回退 loopAll）
     final modeIndex = (json['mode'] as num?)?.toInt() ?? 0;
     playlist._mode = (modeIndex >= 0 && modeIndex < PlayMode.values.length)
         ? PlayMode.values[modeIndex]
-        : PlayMode.normal;
+        : PlayMode.loopAll;
 
     // 播放项（逐项 try-catch，损坏项跳过）
     final items = json['items'] as List<dynamic>? ?? [];
     for (final item in items) {
       try {
-        playlist._items.add(PlaylistItem.fromJson(item as Map<String, dynamic>));
+        playlist._items.add(
+          PlaylistItem.fromJson(item as Map<String, dynamic>),
+        );
       } on Exception catch (e) {
         debugPrint('Playlist.fromJson: skipping corrupted item: $e');
       }
@@ -298,8 +269,10 @@ class Playlist {
     if (playlist._items.isEmpty) {
       playlist._currentIndex = -1;
     } else {
-      playlist._currentIndex =
-          playlist._currentIndex.clamp(0, playlist._items.length - 1);
+      playlist._currentIndex = playlist._currentIndex.clamp(
+        0,
+        playlist._items.length - 1,
+      );
     }
 
     return playlist;

@@ -13,11 +13,7 @@ class MediaInfoDialog extends StatelessWidget {
   final String path;
   final MediaInfo info;
 
-  const MediaInfoDialog({
-    super.key,
-    required this.path,
-    required this.info,
-  });
+  const MediaInfoDialog({super.key, required this.path, required this.info});
 
   static Future<void> show(
     BuildContext context, {

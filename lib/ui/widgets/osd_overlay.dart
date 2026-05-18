@@ -91,7 +91,7 @@ class _OsdBubble extends StatelessWidget {
   const _OsdBubble({required this.message});
 
   static const _textStyle = TextStyle(
-    color: Color(0xFFFFFFFF),
+    color: Tokens.textPrimary,
     fontSize: Tokens.fontTitle,
     fontWeight: Tokens.weightRegular,
     fontFeatures: [Tokens.tabularFigures],
@@ -106,7 +106,7 @@ class _OsdBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (message.icon != null) ...[
-              Icon(message.icon, size: 22, color: const Color(0xFFFFFFFF)),
+              Icon(message.icon, size: 22, color: Tokens.textPrimary),
               const SizedBox(width: 8),
             ],
             Text(message.text, style: _textStyle),

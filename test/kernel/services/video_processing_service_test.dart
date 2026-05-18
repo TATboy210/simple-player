@@ -165,9 +165,11 @@ void main() {
       service.brightness.value = 0.5;
       service.rotation.value = 90;
 
-      final callsBefore = engine.setVideoEffectCallCount + engine.rotateCallCount;
+      final callsBefore =
+          engine.setVideoEffectCallCount + engine.rotateCallCount;
       service.resetAll();
-      final callsAfter = engine.setVideoEffectCallCount + engine.rotateCallCount;
+      final callsAfter =
+          engine.setVideoEffectCallCount + engine.rotateCallCount;
 
       // resetAll triggers listeners which call engine methods
       expect(callsAfter, greaterThan(callsBefore));

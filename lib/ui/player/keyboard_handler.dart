@@ -8,21 +8,21 @@ import '../../l10n/app_localizations.dart';
 /// 每个条目: (按键显示文本, 功能描述)
 /// 新增快捷键时必须同时更新此列表和 KeyboardHandler._handleKeyEvent。
 List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
-      ('Space', l10n.shortcutPlayPause),
-      ('← / →', l10n.shortcutSeek),
-      ('↑ / ↓', l10n.shortcutVolume),
-      ('F', l10n.shortcutFullscreen),
-      ('ESC', l10n.shortcutExitFullscreen),
-      ('M', l10n.shortcutMute),
-      ('N', l10n.shortcutNext),
-      ('P', l10n.shortcutPrevious),
-      ('O', l10n.shortcutOpenFile),
-      ('S', l10n.shortcutSubtitle),
-      ('] / [', l10n.shortcutSubtitleDelay),
-      ('F1 / ?', l10n.shortcutHelp),
-      ('A', l10n.aspectRatio),
-      ('媒体键', l10n.shortcutMediaKeys),
-    ];
+  ('Space', l10n.shortcutPlayPause),
+  ('← / →', l10n.shortcutSeek),
+  ('↑ / ↓', l10n.shortcutVolume),
+  ('F', l10n.shortcutFullscreen),
+  ('ESC', l10n.shortcutExitFullscreen),
+  ('M', l10n.shortcutMute),
+  ('N', l10n.shortcutNext),
+  ('P', l10n.shortcutPrevious),
+  ('O', l10n.shortcutOpenFile),
+  ('S', l10n.shortcutSubtitle),
+  ('] / [', l10n.shortcutSubtitleDelay),
+  ('F1 / ?', l10n.shortcutHelp),
+  ('A', l10n.aspectRatio),
+  ('媒体键', l10n.shortcutMediaKeys),
+];
 
 /// 键盘快捷键包装器 — 19 个快捷键
 ///

@@ -51,6 +51,5 @@ void main() {
     test('subtitleDelay defaults to 0', () {
       expect(engine.subtitleDelay, 0);
     });
-
   });
 }

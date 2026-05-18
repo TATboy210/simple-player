@@ -140,16 +140,10 @@ abstract class AppLocalizations {
   /// **'Drop video here to play'**
   String get dragHint;
 
-  /// Play mode: play tracks in order
+  /// Play mode: play tracks in order and loop
   ///
   /// In en, this message translates to:
   /// **'Sequential'**
-  String get playModeNormal;
-
-  /// Play mode: loop entire playlist
-  ///
-  /// In en, this message translates to:
-  /// **'Loop All'**
   String get playModeLoopAll;
 
   /// Play mode: loop current track
@@ -458,11 +452,11 @@ abstract class AppLocalizations {
   /// **'Rewind 10s'**
   String get rewind10;
 
-  /// Tooltip for forward 10 seconds button
+  /// Tooltip for forward 30 seconds button
   ///
   /// In en, this message translates to:
-  /// **'Forward 10s'**
-  String get forward10;
+  /// **'Forward 30s'**
+  String get forward30;
 
   /// Tooltip for pin window button
   ///
@@ -739,18 +733,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Volume {percent}%'**
   String volumePercent(String percent);
-
-  /// Semantics label for speed option
-  ///
-  /// In en, this message translates to:
-  /// **'{speed}x Speed'**
-  String speedLabel(num speed);
-
-  /// No description provided for @speedTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Playback speed'**
-  String get speedTooltip;
 
   /// Aspect ratio mode: keep original
   ///

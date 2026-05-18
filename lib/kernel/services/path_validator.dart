@@ -9,10 +9,30 @@ class PathValidator {
   ///
   /// 与 [allowedExtensions] 保持同步，供 FilePicker 和 UI 层引用。
   static const supportedExtensions = [
-    'mp4', 'mkv', 'avi', 'mov', 'flv', 'm4v', 'wmv', 'webm', 'ts',
-    'mpeg', 'mpg', '3gp', 'ogv',
-    'mp3', 'flac', 'wav', 'aac', 'ogg', 'opus', 'm4a', 'wma', 'ape',
-    'alac', 'aiff',
+    'mp4',
+    'mkv',
+    'avi',
+    'mov',
+    'flv',
+    'm4v',
+    'wmv',
+    'webm',
+    'ts',
+    'mpeg',
+    'mpg',
+    '3gp',
+    'ogv',
+    'mp3',
+    'flac',
+    'wav',
+    'aac',
+    'ogg',
+    'opus',
+    'm4a',
+    'wma',
+    'ape',
+    'alac',
+    'aiff',
   ];
 
   /// 允许的媒体文件扩展名白名单（小写，从 supportedExtensions 派生）
@@ -22,8 +42,7 @@ class PathValidator {
   static const _urlSchemes = {'http://', 'https://', 'rtmp://', 'rtsp://'};
 
   /// 检查是否为 URL
-  static bool isUrl(String path) =>
-      _urlSchemes.any((s) => path.startsWith(s));
+  static bool isUrl(String path) => _urlSchemes.any((s) => path.startsWith(s));
 
   /// 检查扩展名是否为允许的媒体类型
   static bool isAllowedMedia(String path) {

@@ -4,9 +4,7 @@ import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
-import 'package:simple_player_flutter/ui/player/speed_button.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
-import 'package:simple_player_flutter/ui/player/play_mode_button.dart';
 import 'package:simple_player_flutter/ui/player/time_range_display.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
 import '../../helpers/fake_engine.dart';
@@ -76,11 +74,11 @@ void main() {
       expect(find.byType(ProgressBar), findsOneWidget);
     });
 
-    testWidgets('renders PlayModeButton', (tester) async {
+    testWidgets('renders play mode button', (tester) async {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
-      expect(find.byType(PlayModeButton), findsOneWidget);
+      expect(find.byIcon(Icons.repeat), findsOneWidget);
     });
 
     testWidgets('renders CenterGroup', (tester) async {
@@ -96,7 +94,6 @@ void main() {
 
       expect(find.byType(VolumeButton), findsOneWidget);
       expect(find.byType(VolumeSlider), findsOneWidget);
-      expect(find.byType(SpeedButton), findsOneWidget);
     });
 
     testWidgets('hides secondary controls at width < 500', (tester) async {
@@ -117,27 +114,29 @@ void main() {
 
       expect(find.byType(VolumeButton), findsNothing);
       expect(find.byType(VolumeSlider), findsNothing);
-      expect(find.byType(SpeedButton), findsNothing);
     });
 
-    testWidgets('shows folder_open button when onOpenFile is provided',
-        (tester) async {
+    testWidgets('shows folder_open button when onOpenFile is provided', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildSubject(onOpenFile: () {}));
       await tester.pump();
 
       expect(find.byIcon(Icons.folder_open), findsOneWidget);
     });
 
-    testWidgets('hides folder_open button when onOpenFile is null',
-        (tester) async {
+    testWidgets('hides folder_open button when onOpenFile is null', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
       expect(find.byIcon(Icons.folder_open), findsNothing);
     });
 
-    testWidgets('shows fullscreen button when onToggleFullscreen is provided',
-        (tester) async {
+    testWidgets('shows fullscreen button when onToggleFullscreen is provided', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildSubject(onToggleFullscreen: () {}));
       await tester.pump();
 
@@ -153,16 +152,18 @@ void main() {
       expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
     });
 
-    testWidgets('shows subtitles button when onOpenSubtitle is provided',
-        (tester) async {
+    testWidgets('shows subtitles button when onOpenSubtitle is provided', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildSubject(onOpenSubtitle: () {}));
       await tester.pump();
 
       expect(find.byIcon(Icons.subtitles), findsOneWidget);
     });
 
-    testWidgets('shows queue_music when onTogglePlaylist is provided',
-        (tester) async {
+    testWidgets('shows queue_music when onTogglePlaylist is provided', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildSubject(onTogglePlaylist: () {}));
       await tester.pump();
 

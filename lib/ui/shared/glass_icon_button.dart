@@ -43,9 +43,7 @@ class GlassIconButton extends StatelessWidget {
             highlightColor: Colors.transparent,
             borderRadius: BorderRadius.circular(Tokens.radiusBtn),
             splashFactory: InkRipple.splashFactory,
-            child: Center(
-              child: content,
-            ),
+            child: Center(child: content),
           ),
         ),
       ),

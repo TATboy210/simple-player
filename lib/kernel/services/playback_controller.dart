@@ -15,8 +15,7 @@ import 'state_monitor.dart';
 ///   - StateMonitor: 自动连播、断点保存、设置恢复、播放列表管理
 ///
 /// 本类持有共享状态和构造函数，savePlaylist 作为跨 mixin 共享方法。
-class PlaybackController
-    with FileOperations, PlaybackNavigator, StateMonitor {
+class PlaybackController with FileOperations, PlaybackNavigator, StateMonitor {
   @override
   final MediaEngine engine;
   @override

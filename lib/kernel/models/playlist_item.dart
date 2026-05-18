@@ -22,11 +22,7 @@ class PlaylistItem {
   }) : name = PathUtils.basename(path);
 
   /// 不可变更新历史元数据
-  PlaylistItem copyWith({
-    int? timestamp,
-    int? positionMs,
-    int? durationMs,
-  }) {
+  PlaylistItem copyWith({int? timestamp, int? positionMs, int? durationMs}) {
     return PlaylistItem(
       path: path,
       timestamp: timestamp ?? this.timestamp,
@@ -36,11 +32,11 @@ class PlaylistItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'path': path,
-        if (timestamp != null) 'timestamp': timestamp,
-        if (positionMs != null) 'positionMs': positionMs,
-        if (durationMs != null) 'durationMs': durationMs,
-      };
+    'path': path,
+    if (timestamp != null) 'timestamp': timestamp,
+    if (positionMs != null) 'positionMs': positionMs,
+    if (durationMs != null) 'durationMs': durationMs,
+  };
 
   factory PlaylistItem.fromJson(Map<String, dynamic> json) {
     final path = json['path'];

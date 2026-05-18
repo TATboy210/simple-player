@@ -110,15 +110,6 @@ void main() {
     });
 
     group('playNext / playPrevious', () {
-      test('playNext returns -1 at end in normal mode (no-op)', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.mode = PlayMode.normal;
-        await controller.playIndex(0);
-        await controller.playNext();
-        expect(playlist.currentIndex, 0);
-      });
-
       test('playPrevious at start in loopAll wraps to end', () async {
         engine.configureMedia(durationMs: 60000);
         playlist.add('C:/a.mp4');

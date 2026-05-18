@@ -34,8 +34,14 @@ void main() {
       });
 
       test('accepts URLs', () {
-        expect(PathValidator.isAllowedMedia('http://example.com/video.mp4'), true);
-        expect(PathValidator.isAllowedMedia('https://example.com/stream'), true);
+        expect(
+          PathValidator.isAllowedMedia('http://example.com/video.mp4'),
+          true,
+        );
+        expect(
+          PathValidator.isAllowedMedia('https://example.com/stream'),
+          true,
+        );
         expect(PathValidator.isAllowedMedia('rtmp://live.example.com'), true);
       });
     });
@@ -46,7 +52,10 @@ void main() {
       });
 
       test('detects path traversal', () {
-        expect(PathValidator.isPathTraversal('/safe/../../../etc/passwd'), true);
+        expect(
+          PathValidator.isPathTraversal('/safe/../../../etc/passwd'),
+          true,
+        );
       });
 
       test('detects UNC path', () {

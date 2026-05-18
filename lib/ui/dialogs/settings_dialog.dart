@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/services/video_processing_service.dart';
@@ -11,11 +11,7 @@ class SettingsDialog extends StatefulWidget {
   final MediaEngine engine;
   final VideoProcessingService? videoProcessing;
 
-  const SettingsDialog({
-    super.key,
-    required this.engine,
-    this.videoProcessing,
-  });
+  const SettingsDialog({super.key, required this.engine, this.videoProcessing});
 
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
@@ -120,13 +116,18 @@ class _EqualizerTabState extends State<_EqualizerTab> {
         final selected = i == _selectedIndex;
         return ListTile(
           leading: Icon(
-            selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+            selected
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
             color: selected ? Tokens.accent : Tokens.textDisabled,
             size: Tokens.iconLg,
           ),
           title: Text(
             _presetLabel(i, l10n),
-            style: const TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontCaption),
+            style: const TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontCaption,
+            ),
           ),
           onTap: () {
             setState(() => _selectedIndex = i);
@@ -148,7 +149,10 @@ class _AudioTrackTab extends StatelessWidget {
     final tracks = engine.getAudioTracks();
     if (tracks.isEmpty) {
       return Center(
-        child: Text(l10n.noAudioTracks, style: const TextStyle(color: Tokens.textSecondary)),
+        child: Text(
+          l10n.noAudioTracks,
+          style: const TextStyle(color: Tokens.textSecondary),
+        ),
       );
     }
     return ListView.builder(
@@ -165,9 +169,21 @@ class _AudioTrackTab extends StatelessWidget {
             color: active ? Tokens.accent : Tokens.textDisabled,
             size: Tokens.iconLg,
           ),
-          title: Text(label, style: const TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontCaption)),
+          title: Text(
+            label,
+            style: const TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontCaption,
+            ),
+          ),
           subtitle: track.language.isNotEmpty
-              ? Text(track.language, style: const TextStyle(color: Tokens.textSecondary, fontSize: Tokens.fontOverline))
+              ? Text(
+                  track.language,
+                  style: const TextStyle(
+                    color: Tokens.textSecondary,
+                    fontSize: Tokens.fontOverline,
+                  ),
+                )
               : null,
           onTap: () {
             engine.switchAudioTrack(i);

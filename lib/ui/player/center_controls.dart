@@ -75,9 +75,9 @@ class CenterGroup extends StatelessWidget {
           PlayPauseButton(engine: engine, isIdle: isIdle),
           const SizedBox(width: Tokens.spSm),
           GlassIconButton(
-            icon: Icons.forward_10,
-            onPressed: isIdle ? null : () => engine.skipForward(10),
-            tooltip: AppLocalizations.of(context).forward10,
+            icon: Icons.forward_30,
+            onPressed: isIdle ? null : () => engine.skipForward(30),
+            tooltip: AppLocalizations.of(context).forward30,
           ),
           const SizedBox(width: Tokens.spXs),
           GlassIconButton(

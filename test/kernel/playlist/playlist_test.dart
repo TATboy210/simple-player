@@ -16,7 +16,10 @@ void main() {
       test('current is null', () => expect(playlist.current, isNull));
       test('currentIndex is -1', () => expect(playlist.currentIndex, -1));
       test('peekNext returns -1', () => expect(playlist.peekNext(), -1));
-      test('peekPrevious returns -1', () => expect(playlist.peekPrevious(), -1));
+      test(
+        'peekPrevious returns -1',
+        () => expect(playlist.peekPrevious(), -1),
+      );
       test('hasNext is false', () => expect(playlist.hasNext, false));
       test('hasPrevious is false', () => expect(playlist.hasPrevious, false));
     });
@@ -103,33 +106,6 @@ void main() {
       });
     });
 
-    group('navigation — normal mode', () {
-      setUp(() {
-        playlist.add('/a.mp4');
-        playlist.add('/b.mp4');
-        playlist.add('/c.mp4');
-        playlist.mode = PlayMode.normal;
-      });
-
-      test('peekNext returns next index', () {
-        expect(playlist.peekNext(), 1);
-      });
-
-      test('peekNext at end returns -1', () {
-        playlist.currentIndex = 2;
-        expect(playlist.peekNext(), -1);
-      });
-
-      test('peekPrevious at start returns -1', () {
-        expect(playlist.peekPrevious(), -1);
-      });
-
-      test('peekPrevious returns previous index', () {
-        playlist.currentIndex = 2;
-        expect(playlist.peekPrevious(), 1);
-      });
-    });
-
     group('navigation — loopAll mode', () {
       setUp(() {
         playlist.add('/a.mp4');
@@ -194,12 +170,12 @@ void main() {
         final restored = Playlist.fromJson({});
         expect(restored.isEmpty, true);
         expect(restored.currentIndex, -1);
-        expect(restored.mode, PlayMode.normal);
+        expect(restored.mode, PlayMode.loopAll);
       });
 
       test('fromJson clamps out-of-range mode', () {
         final restored = Playlist.fromJson({'mode': 99, 'items': []});
-        expect(restored.mode, PlayMode.normal);
+        expect(restored.mode, PlayMode.loopAll);
       });
 
       test('fromJson skips corrupt items', () {

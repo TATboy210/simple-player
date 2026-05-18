@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -16,15 +16,17 @@ import 'geometry_store.dart';
 const int _wsThickFrame = 0x00040000;
 
 final _user32 = DynamicLibrary.open('user32.dll');
-final _getWindowLongPtrW = _user32.lookupFunction<
-    IntPtr Function(IntPtr, Int32),
-    int Function(int, int)>('GetWindowLongPtrW');
-final _setWindowLongPtrW = _user32.lookupFunction<
-    IntPtr Function(IntPtr, Int32, IntPtr),
-    int Function(int, int, int)>('SetWindowLongPtrW');
-final _getForegroundWindow = _user32.lookupFunction<
-    IntPtr Function(),
-    int Function()>('GetForegroundWindow');
+final _getWindowLongPtrW = _user32
+    .lookupFunction<IntPtr Function(IntPtr, Int32), int Function(int, int)>(
+      'GetWindowLongPtrW',
+    );
+final _setWindowLongPtrW = _user32
+    .lookupFunction<
+      IntPtr Function(IntPtr, Int32, IntPtr),
+      int Function(int, int, int)
+    >('SetWindowLongPtrW');
+final _getForegroundWindow = _user32
+    .lookupFunction<IntPtr Function(), int Function()>('GetForegroundWindow');
 
 /// Restore WS_THICKFRAME after setAsFrameless() strips it.
 /// Without this, WM_NCHITTEST resize borders don't work.
@@ -374,7 +376,6 @@ class WindowService implements WindowBridge {
     _schedulePersist();
   }
 
-
   // 鈹€鈹€鈹€ Persistence 鈹€鈹€鈹€
 
   static const _persistDebounceMs = 500;
@@ -469,6 +470,7 @@ class _WindowListener extends WindowListener {
     _service.mode.value = WindowMode.windowed;
     _service._geometry.saveFullscreen(false);
   }
+
   @override
   void onWindowMinimize() {}
   @override
@@ -478,5 +480,3 @@ class _WindowListener extends WindowListener {
   @override
   void onWindowUndocked() {}
 }
-
-

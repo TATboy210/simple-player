@@ -15,9 +15,9 @@ class AutoHideController {
     required ValueNotifier<MediaState> engineState,
     required bool isFullscreen,
     ValueNotifier<int>? popupCloseNotifier,
-  })  : _engineState = engineState,
-        _isFullscreen = isFullscreen,
-        _popupCloseNotifier = popupCloseNotifier {
+  }) : _engineState = engineState,
+       _isFullscreen = isFullscreen,
+       _popupCloseNotifier = popupCloseNotifier {
     _animController = AnimationController(
       vsync: vsync,
       duration: const Duration(milliseconds: Tokens.durationFade),
@@ -123,7 +123,8 @@ class AutoHideController {
       }
       return;
     }
-    final alwaysShow = s == MediaState.paused ||
+    final alwaysShow =
+        s == MediaState.paused ||
         s == MediaState.stopped ||
         s == MediaState.completed ||
         s == MediaState.error;

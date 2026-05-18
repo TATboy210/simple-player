@@ -107,8 +107,9 @@ void main() {
       expect(find.byType(ControlsOverlay), findsOneWidget);
     });
 
-    testWidgets('didUpdateWidget propagates isFullscreen change',
-        (tester) async {
+    testWidgets('didUpdateWidget propagates isFullscreen change', (
+      tester,
+    ) async {
       engine.state.value = MediaState.playing;
       await tester.pumpWidget(buildSubject(isFullscreen: false));
       await tester.pump();
@@ -132,9 +133,7 @@ void main() {
       );
       addTearDown(gesture.removePointer);
 
-      await gesture.moveTo(
-        tester.getCenter(find.byType(ControlsOverlay)),
-      );
+      await gesture.moveTo(tester.getCenter(find.byType(ControlsOverlay)));
       await tester.pump();
 
       expect(find.byType(ControlsOverlay), findsOneWidget);

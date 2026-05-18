@@ -8,8 +8,7 @@
   "dragHintIdle": "拖拽视频至窗口上松开即可播放视频",
   "dragHint": "拖拽视频至窗口松开即可播放",
 
-  "playModeNormal": "顺序播放",
-  "playModeLoopAll": "列表循环",
+  "playModeLoopAll": "顺序播放",
   "playModeLoopSingle": "单曲循环",
   "playModeShuffle": "随机播放",
 
@@ -66,7 +65,7 @@
   "pause": "暂停",
   "stop": "停止",
   "rewind10": "快退 10 秒",
-  "forward10": "快进 10 秒",
+  "forward30": "快进 30 秒",
 
   "pin": "置顶",
   "unpin": "取消置顶",
@@ -119,9 +118,6 @@
   "mute": "静音",
   "volume": "音量",
   "volumePercent": "音量 {percent}%",
-
-  "speedLabel": "{speed}x 速度",
-  "speedTooltip": "倍速",
 
   "aspectRatioOriginal": "原始",
   "aspectRatioStretch": "拉伸",

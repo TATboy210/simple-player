@@ -41,8 +41,7 @@ class _ProgressBarState extends State<ProgressBar> {
   int get _dragPositionMs =>
       (_dragFraction * widget.engine.duration.value).round();
 
-  int get _hoverPositionMs =>
-      (_hoverX * widget.engine.duration.value).round();
+  int get _hoverPositionMs => (_hoverX * widget.engine.duration.value).round();
 
   MediaEngine get engine => widget.engine;
 
@@ -80,14 +79,18 @@ class _ProgressBarState extends State<ProgressBar> {
               onHorizontalDragStart: (details) {
                 setState(() {
                   _dragging = true;
-                  _dragFraction =
-                      (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
+                  _dragFraction = (details.localPosition.dx / barWidth).clamp(
+                    0.0,
+                    1.0,
+                  );
                 });
               },
               onHorizontalDragUpdate: (details) {
                 setState(() {
-                  _dragFraction =
-                      (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
+                  _dragFraction = (details.localPosition.dx / barWidth).clamp(
+                    0.0,
+                    1.0,
+                  );
                 });
               },
               onHorizontalDragEnd: (_) {
@@ -101,10 +104,11 @@ class _ProgressBarState extends State<ProgressBar> {
               },
               onTapDown: (details) {
                 if (widget.engine.duration.value <= 0) return;
-                final fraction =
-                    (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
-                final ms =
-                    (fraction * widget.engine.duration.value).round();
+                final fraction = (details.localPosition.dx / barWidth).clamp(
+                  0.0,
+                  1.0,
+                );
+                final ms = (fraction * widget.engine.duration.value).round();
                 widget.engine.seekTo(ms);
               },
               child: SizedBox(
@@ -164,8 +168,7 @@ class _ProgressBarState extends State<ProgressBar> {
   Widget _buildDragTooltip() {
     return Positioned(
       bottom: 24,
-      left:
-          (_dragFraction * _barWidth).clamp(40, _barWidth - 40).toDouble(),
+      left: (_dragFraction * _barWidth).clamp(40, _barWidth - 40).toDouble(),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: Tokens.spSm,
