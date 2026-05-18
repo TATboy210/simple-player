@@ -7,30 +7,22 @@ import 'package:simple_player_flutter/window/geometry_store.dart';
 void main() {
   group('WindowGeometry', () {
     test('position returns Offset from x,y', () {
-      const geo = WindowGeometry(
-        width: 800, height: 600, x: 100, y: 200,
-      );
+      const geo = WindowGeometry(width: 800, height: 600, x: 100, y: 200);
       expect(geo.position, const Offset(100, 200));
     });
 
     test('size returns Size from width,height', () {
-      const geo = WindowGeometry(
-        width: 800, height: 600, x: 0, y: 0,
-      );
+      const geo = WindowGeometry(width: 800, height: 600, x: 0, y: 0);
       expect(geo.size, const Size(800, 600));
     });
 
     test('isMaximized defaults to false', () {
-      const geo = WindowGeometry(
-        width: 800, height: 600, x: 0, y: 0,
-      );
+      const geo = WindowGeometry(width: 800, height: 600, x: 0, y: 0);
       expect(geo.isMaximized, false);
     });
 
     test('isFullscreen defaults to false', () {
-      const geo = WindowGeometry(
-        width: 800, height: 600, x: 0, y: 0,
-      );
+      const geo = WindowGeometry(width: 800, height: 600, x: 0, y: 0);
       expect(geo.isFullscreen, false);
     });
   });
@@ -233,9 +225,7 @@ void main() {
 
   group('WindowGeometryStore.clampToVisibleBounds', () {
     test('returns original geometry when on-screen', () {
-      const geo = WindowGeometry(
-        width: 800, height: 600, x: 100, y: 100,
-      );
+      const geo = WindowGeometry(width: 800, height: 600, x: 100, y: 100);
       final clamped = WindowGeometryStore.clampToVisibleBounds(geo);
       expect(clamped.x, 100.0);
       expect(clamped.y, 100.0);
@@ -245,9 +235,7 @@ void main() {
 
     test('preserves size when repositioning off-screen window', () {
       // Window far off-screen (negative position)
-      const geo = WindowGeometry(
-        width: 800, height: 600, x: -2000, y: -2000,
-      );
+      const geo = WindowGeometry(width: 800, height: 600, x: -2000, y: -2000);
       final clamped = WindowGeometryStore.clampToVisibleBounds(geo);
       expect(clamped.width, 800.0);
       expect(clamped.height, 600.0);

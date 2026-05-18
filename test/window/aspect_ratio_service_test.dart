@@ -38,20 +38,20 @@ void main() {
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        (MethodCall methodCall) async {
-          calls.add(methodCall);
-          return null;
-        },
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            (MethodCall methodCall) async {
+              calls.add(methodCall);
+              return null;
+            },
+          );
     });
 
     tearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        null,
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            null,
+          );
     });
 
     test('setAspectRatio sends correct method call', () async {
@@ -127,11 +127,11 @@ void main() {
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        (MethodCall methodCall) async {
-          throw PlatformException(code: 'ERROR', message: 'test error');
-        },
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            (MethodCall methodCall) async {
+              throw PlatformException(code: 'ERROR', message: 'test error');
+            },
+          );
 
       await service.setAspectRatio(2.0);
       expect(service.current, 1.5);
@@ -158,12 +158,12 @@ void main() {
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        (MethodCall methodCall) async {
-          calls.add(methodCall);
-          return null;
-        },
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            (MethodCall methodCall) async {
+              calls.add(methodCall);
+              return null;
+            },
+          );
 
       // Reset to known state
       await service.unlock();
@@ -187,9 +187,9 @@ void main() {
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        null,
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            null,
+          );
     });
   });
 
@@ -199,9 +199,9 @@ void main() {
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        (MethodCall methodCall) async => null,
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            (MethodCall methodCall) async => null,
+          );
 
       await service.unlock();
       expect(service.currentLabel, '自由');
@@ -214,9 +214,9 @@ void main() {
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
-        const MethodChannel('com.simple_player/aspect_ratio'),
-        null,
-      );
+            const MethodChannel('com.simple_player/aspect_ratio'),
+            null,
+          );
     });
   });
 }

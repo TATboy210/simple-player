@@ -20,10 +20,7 @@ void main() {
     });
 
     test('deeply nested path', () {
-      expect(
-        PathUtils.basename('/a/b/c/d/e/f/file.txt'),
-        'file.txt',
-      );
+      expect(PathUtils.basename('/a/b/c/d/e/f/file.txt'), 'file.txt');
     });
 
     test('trailing separator returns empty', () {

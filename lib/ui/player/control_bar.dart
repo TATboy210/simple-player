@@ -8,7 +8,6 @@ import '../../kernel/ui/theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_icon_button.dart';
 import 'center_controls.dart';
-import 'play_mode_button.dart';
 import 'progress_bar.dart';
 import 'speed_button.dart';
 import 'time_range_display.dart';
@@ -26,12 +25,10 @@ class ControlBar extends StatelessWidget {
   final VoidCallback? onTogglePlayMode;
   final VoidCallback? onOpenSubtitle;
   final IconData? playModeIcon;
-  final bool playModeActive;
   final String? playModeLabel;
   final bool isVideo;
   final bool enableBlur;
   final bool isIdle;
-  final ValueNotifier<int>? popupCloseNotifier;
 
   const ControlBar({
     super.key,
@@ -46,12 +43,10 @@ class ControlBar extends StatelessWidget {
     this.onTogglePlayMode,
     this.onOpenSubtitle,
     this.playModeIcon,
-    this.playModeActive = false,
     this.playModeLabel,
     this.isVideo = false,
     this.enableBlur = true,
     this.isIdle = false,
-    this.popupCloseNotifier,
   });
 
   @override
@@ -97,29 +92,20 @@ class ControlBar extends StatelessWidget {
                 ),
                 Expanded(
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          PlayModeButton(
-                            icon: playModeIcon ?? Icons.repeat,
-                            label: playModeLabel ?? '顺序',
-                            active: playModeActive,
-                            isIdle: isIdle,
-                            onPressed: onTogglePlayMode,
-                          ),
-                          if (showSecondary) ...[
-                            const SizedBox(width: Tokens.spXs),
-                            VolumeButton(engine: engine),
-                            VolumeSlider(engine: engine),
-                            SpeedButton(
-                              engine: engine,
-                              popupCloseNotifier: popupCloseNotifier,
-                            ),
-                          ],
-                        ],
+                      GlassIconButton(
+                        icon: playModeIcon ?? Icons.repeat,
+                        tooltip: playModeLabel ?? '顺序',
+                        onPressed: onTogglePlayMode,
                       ),
+                      if (showSecondary) ...[
+                        const SizedBox(width: Tokens.spXs),
+                        VolumeButton(engine: engine),
+                        VolumeSlider(engine: engine),
+                        const SizedBox(width: Tokens.spXs),
+                        SpeedButton(engine: engine),
+                      ],
+                      const Spacer(),
                       CenterGroup(
                         engine: engine,
                         isIdle: isIdle,
@@ -128,45 +114,8 @@ class ControlBar extends StatelessWidget {
                         onPrevious: onPrevious,
                         onNext: onNext,
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (onOpenFile != null)
-                            GlassIconButton(
-                              icon: Icons.folder_open,
-                              onPressed: onOpenFile,
-                              tooltip: l10n.openFileTooltip,
-                            ),
-                          if (onOpenSubtitle != null)
-                            GlassIconButton(
-                              icon: Icons.subtitles,
-                              onPressed: onOpenSubtitle,
-                              tooltip: l10n.openSubtitle,
-                            ),
-                          if (onTogglePlaylist != null)
-                            GlassIconButton(
-                              icon: Icons.queue_music,
-                              onPressed: onTogglePlaylist,
-                              tooltip: l10n.playlist,
-                            ),
-                          if (onSettings != null)
-                            GlassIconButton(
-                              icon: Icons.settings,
-                              onPressed: onSettings,
-                              tooltip: l10n.settings,
-                            ),
-                          if (onToggleFullscreen != null)
-                            GlassIconButton(
-                              icon: isFullscreen
-                                  ? Icons.fullscreen_exit
-                                  : Icons.fullscreen,
-                              onPressed: onToggleFullscreen,
-                              tooltip: isFullscreen
-                                  ? l10n.exitFullscreen
-                                  : l10n.fullscreen,
-                            ),
-                        ],
-                      ),
+                      const Spacer(),
+                      _buildRightGroup(context, l10n),
                     ],
                   ),
                 ),
@@ -194,6 +143,44 @@ class ControlBar extends StatelessWidget {
               ),
             ),
       child: RepaintBoundary(child: content),
+    );
+  }
+
+  Widget _buildRightGroup(BuildContext context, AppLocalizations l10n) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onOpenFile != null)
+          GlassIconButton(
+            icon: Icons.folder_open,
+            onPressed: onOpenFile,
+            tooltip: l10n.openFileTooltip,
+          ),
+        if (onOpenSubtitle != null)
+          GlassIconButton(
+            icon: Icons.subtitles,
+            onPressed: onOpenSubtitle,
+            tooltip: l10n.openSubtitle,
+          ),
+        if (onTogglePlaylist != null)
+          GlassIconButton(
+            icon: Icons.queue_music,
+            onPressed: onTogglePlaylist,
+            tooltip: l10n.playlist,
+          ),
+        if (onSettings != null)
+          GlassIconButton(
+            icon: Icons.settings,
+            onPressed: onSettings,
+            tooltip: l10n.settings,
+          ),
+        if (onToggleFullscreen != null)
+          GlassIconButton(
+            icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+            onPressed: onToggleFullscreen,
+            tooltip: isFullscreen ? l10n.exitFullscreen : l10n.fullscreen,
+          ),
+      ],
     );
   }
 }

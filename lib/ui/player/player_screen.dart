@@ -5,7 +5,6 @@ import 'package:window_manager/window_manager.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
-import '../../kernel/models/play_mode.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/ui/theme/tokens.dart';
@@ -134,118 +133,117 @@ class _PlayerScreenState extends State<PlayerScreen> {
               body: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                // 标题栏：全屏时跳过构建（Offstage 仍运行 BackdropFilter）
-                if (!isFullscreen)
-                  CustomTitleBar(
-                    fileName: widget.controller.currentFileName,
-                    onOpenFile: widget.onOpenFile,
-                  ),
+                  // 标题栏：全屏时跳过构建（Offstage 仍运行 BackdropFilter）
+                  if (!isFullscreen)
+                    CustomTitleBar(
+                      fileName: widget.controller.currentFileName,
+                      onOpenFile: widget.onOpenFile,
+                    ),
 
-                // 主内容区
-                Expanded(
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: _playlistVisible,
-                    builder: (context, playlistVisible, _) => LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isWide =
-                            constraints.maxWidth >= PlayerScreen._breakpoint;
-                        final showPanel =
-                            playlistVisible && widget.playlistPanel != null;
+                  // 主内容区
+                  Expanded(
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _playlistVisible,
+                      builder: (context, playlistVisible, _) => LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide =
+                              constraints.maxWidth >= PlayerScreen._breakpoint;
+                          final showPanel =
+                              playlistVisible && widget.playlistPanel != null;
 
-                        return Stack(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropHandler(
-                                    onFilesDropped:
-                                        widget.onFilesDropped ?? (_) {},
-                                    onHoverChanged: widget.onDragHoverChanged,
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        VideoSurface(engine: widget.engine),
-                                        if (widget.emptyState != null)
-                                          ValueListenableBuilder<MediaState>(
-                                            valueListenable:
-                                                widget.engine.state,
-                                            builder: (_, state, child) =>
-                                                state == MediaState.idle
-                                                ? child!
-                                                : const SizedBox.shrink(),
-                                            child: Positioned.fill(
-                                              child: widget.emptyState!,
+                          return Stack(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropHandler(
+                                      onFilesDropped:
+                                          widget.onFilesDropped ?? (_) {},
+                                      onHoverChanged: widget.onDragHoverChanged,
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          VideoSurface(engine: widget.engine),
+                                          if (widget.emptyState != null)
+                                            ValueListenableBuilder<MediaState>(
+                                              valueListenable:
+                                                  widget.engine.state,
+                                              builder: (_, state, child) =>
+                                                  state == MediaState.idle
+                                                  ? child!
+                                                  : const SizedBox.shrink(),
+                                              child: Positioned.fill(
+                                                child: widget.emptyState!,
+                                              ),
                                             ),
+                                          ValueListenableBuilder<int>(
+                                            valueListenable:
+                                                widget.playlistGeneration,
+                                            builder: (context, _, _) {
+                                              final l10n = AppLocalizations.of(
+                                                context,
+                                              );
+                                              return ControlsOverlay(
+                                                engine: widget.engine,
+                                                isFullscreen: isFullscreen,
+                                                emptyStatePresent:
+                                                    widget.emptyState != null,
+                                                onPrevious: widget.onPrevious,
+                                                onNext: widget.onNext,
+                                                onTogglePlaylist:
+                                                    _togglePlaylist,
+                                                onSettings: widget.onSettings,
+                                                onOpenFile: widget.onOpenFile,
+                                                onToggleFullscreen:
+                                                    wm.toggleFullscreen,
+                                                onTogglePlayMode:
+                                                    widget.onTogglePlayMode,
+                                                onOpenSubtitle: _openSubtitle,
+                                                playModeIcon: playModeIcon(
+                                                  widget.playlist.mode,
+                                                ),
+                                                playModeLabel: playModeLabel(
+                                                  widget.playlist.mode,
+                                                  l10n,
+                                                ),
+                                                isVideo: widget.isVideo,
+                                              );
+                                            },
                                           ),
-                                        ValueListenableBuilder<int>(
-                                          valueListenable:
-                                              widget.playlistGeneration,
-                                          builder: (context, _, _) {
-                                            final l10n = AppLocalizations.of(
-                                              context,
-                                            );
-                                            return ControlsOverlay(
-                                              engine: widget.engine,
-                                              isFullscreen: isFullscreen,
-                                              emptyStatePresent:
-                                                  widget.emptyState != null,
-                                              onPrevious: widget.onPrevious,
-                                              onNext: widget.onNext,
-                                              onTogglePlaylist: _togglePlaylist,
-                                              onSettings: widget.onSettings,
-                                              onOpenFile: widget.onOpenFile,
-                                              onToggleFullscreen:
-                                                  wm.toggleFullscreen,
-                                              onTogglePlayMode:
-                                                  widget.onTogglePlayMode,
-                                              onOpenSubtitle: _openSubtitle,
-                                              playModeIcon: playModeIcon(
-                                                widget.playlist.mode,
-                                              ),
-                                              playModeLabel: playModeLabel(
-                                                widget.playlist.mode,
-                                                l10n,
-                                              ),
-                                              isVideo: widget.isVideo,
-                                              playModeActive:
-                                                  widget.playlist.mode !=
-                                                  PlayMode.normal,
-                                            );
-                                          },
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                                if (isWide && showPanel) widget.playlistPanel!,
-                              ],
-                            ),
-
-                            // 窄屏面板 overlay（滑入/滑出动画）
-                            if (!isWide && widget.playlistPanel != null)
-                              AnimatedPositioned(
-                                duration: const Duration(
-                                  milliseconds: Tokens.durationSlide,
-                                ),
-                                curve: Curves.easeOut,
-                                top: 0,
-                                right: showPanel
-                                    ? 0
-                                    : -Tokens.playlistPanelWidth,
-                                bottom: 0,
-                                width: Tokens.playlistPanelWidth,
-                                child: Material(
-                                  elevation: 8,
-                                  child: widget.playlistPanel!,
-                                ),
+                                  if (isWide && showPanel)
+                                    widget.playlistPanel!,
+                                ],
                               ),
-                          ],
-                        );
-                      },
+
+                              // 窄屏面板 overlay（滑入/滑出动画）
+                              if (!isWide && widget.playlistPanel != null)
+                                AnimatedPositioned(
+                                  duration: const Duration(
+                                    milliseconds: Tokens.durationSlide,
+                                  ),
+                                  curve: Curves.easeOut,
+                                  top: 0,
+                                  right: showPanel
+                                      ? 0
+                                      : -Tokens.playlistPanelWidth,
+                                  bottom: 0,
+                                  width: Tokens.playlistPanelWidth,
+                                  child: Material(
+                                    elevation: 8,
+                                    child: widget.playlistPanel!,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
               ),
             ),
           ),

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/ui/theme/tokens.dart';
@@ -16,7 +16,10 @@ class RecentFilesPanel extends StatelessWidget {
 
     if (recent.isEmpty) {
       return const Center(
-        child: Text('No recent files', style: TextStyle(color: Tokens.textSecondary)),
+        child: Text(
+          'No recent files',
+          style: TextStyle(color: Tokens.textSecondary),
+        ),
       );
     }
 
@@ -25,18 +28,30 @@ class RecentFilesPanel extends StatelessWidget {
       itemBuilder: (_, i) {
         final item = recent[i];
         return ListTile(
-          leading: const Icon(Icons.history, color: Tokens.textTertiary, size: Tokens.iconMd),
+          leading: const Icon(
+            Icons.history,
+            color: Tokens.textTertiary,
+            size: Tokens.iconMd,
+          ),
           title: Text(
             item.name,
-            style: const TextStyle(color: Tokens.textPrimary, fontSize: Tokens.fontCaption),
+            style: const TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontCaption,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
             _relativeTime(item.timestamp!),
-            style: const TextStyle(color: Tokens.textTertiary, fontSize: Tokens.fontOverline),
+            style: const TextStyle(
+              color: Tokens.textTertiary,
+              fontSize: Tokens.fontOverline,
+            ),
           ),
-          onTap: onTapItem != null ? () => onTapItem!(items.indexOf(item)) : null,
+          onTap: onTapItem != null
+              ? () => onTapItem!(items.indexOf(item))
+              : null,
         );
       },
     );

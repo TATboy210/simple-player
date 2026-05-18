@@ -19,47 +19,53 @@ void main() {
       expect(sw.elapsedMilliseconds, lessThan(90)); // generous margin for CI
     });
 
-    test('Future.wait with error-catching continues when one future fails', () async {
-      // Arrange: one succeeds, one throws
-      bool errorCaught = false;
+    test(
+      'Future.wait with error-catching continues when one future fails',
+      () async {
+        // Arrange: one succeeds, one throws
+        bool errorCaught = false;
 
-      try {
-        await Future.wait([
-          Future.delayed(const Duration(milliseconds: 20), () => 'ok'),
-          Future.delayed(const Duration(milliseconds: 20), () {
-            throw Exception('init failed');
-          }),
-        ]);
-      } on Exception catch (e) {
-        errorCaught = true;
-        debugPrint('Caught: $e');
-      }
+        try {
+          await Future.wait([
+            Future.delayed(const Duration(milliseconds: 20), () => 'ok'),
+            Future.delayed(const Duration(milliseconds: 20), () {
+              throw Exception('init failed');
+            }),
+          ]);
+        } on Exception catch (e) {
+          errorCaught = true;
+          debugPrint('Caught: $e');
+        }
 
-      // With the try-catch in App._init, the error is caught and app continues
-      expect(errorCaught, isTrue);
-    });
+        // With the try-catch in App._init, the error is caught and app continues
+        expect(errorCaught, isTrue);
+      },
+    );
 
-    test('Future.wait error handling allows app to show on partial failure', () async {
-      // Simulate App._init pattern: try-catch around Future.wait, then set ready
-      bool ready = false;
-      bool initFailed = false;
+    test(
+      'Future.wait error handling allows app to show on partial failure',
+      () async {
+        // Simulate App._init pattern: try-catch around Future.wait, then set ready
+        bool ready = false;
+        bool initFailed = false;
 
-      try {
-        await Future.wait([
-          Future.value('window_ok'),
-          Future<String>(() => throw Exception('controller failed')),
-        ]);
-      } on Exception catch (e) {
-        initFailed = true;
-        debugPrint('[App] init failed (continuing): $e');
-      }
+        try {
+          await Future.wait([
+            Future.value('window_ok'),
+            Future<String>(() => throw Exception('controller failed')),
+          ]);
+        } on Exception catch (e) {
+          initFailed = true;
+          debugPrint('[App] init failed (continuing): $e');
+        }
 
-      // App continues even after partial failure
-      ready = true;
+        // App continues even after partial failure
+        ready = true;
 
-      expect(initFailed, isTrue);
-      expect(ready, isTrue); // app shows despite init failure
-    });
+        expect(initFailed, isTrue);
+        expect(ready, isTrue); // app shows despite init failure
+      },
+    );
   });
 
   group('SettingsStore prewarm', () {
@@ -90,21 +96,23 @@ void main() {
       expect(settings.lastFile, 'test_video.mp4');
     });
 
-    test('load() falls back to SharedPreferences.getInstance() when not prewarmed',
-        () async {
-      // Arrange: set values via mock, do NOT prewarm
-      SharedPreferences.setMockInitialValues({
-        'volume': 0.77,
-        'lastFile': 'fallback.mp4',
-      });
+    test(
+      'load() falls back to SharedPreferences.getInstance() when not prewarmed',
+      () async {
+        // Arrange: set values via mock, do NOT prewarm
+        SharedPreferences.setMockInitialValues({
+          'volume': 0.77,
+          'lastFile': 'fallback.mp4',
+        });
 
-      // Act
-      final settings = await SettingsStore.load();
+        // Act
+        final settings = await SettingsStore.load();
 
-      // Assert: values come from the standard path
-      expect(settings.volume, 0.77);
-      expect(settings.lastFile, 'fallback.mp4');
-    });
+        // Assert: values come from the standard path
+        expect(settings.volume, 0.77);
+        expect(settings.lastFile, 'fallback.mp4');
+      },
+    );
 
     test('saveVolume uses cached instance when prewarmed', () async {
       // Arrange: prewarm with empty prefs
@@ -144,18 +152,21 @@ void main() {
       expect(settings2.volume, 0.88);
     });
 
-    test('prewarm can be called multiple times with different instances', () async {
-      // First prewarm
-      SharedPreferences.setMockInitialValues({'volume': 0.1});
-      final first = await SharedPreferences.getInstance();
-      SettingsStore.prewarm(first);
-      expect((await SettingsStore.load()).volume, 0.1);
+    test(
+      'prewarm can be called multiple times with different instances',
+      () async {
+        // First prewarm
+        SharedPreferences.setMockInitialValues({'volume': 0.1});
+        final first = await SharedPreferences.getInstance();
+        SettingsStore.prewarm(first);
+        expect((await SettingsStore.load()).volume, 0.1);
 
-      // Second prewarm with different values
-      SharedPreferences.setMockInitialValues({'volume': 0.9});
-      final second = await SharedPreferences.getInstance();
-      SettingsStore.prewarm(second);
-      expect((await SettingsStore.load()).volume, 0.9);
-    });
+        // Second prewarm with different values
+        SharedPreferences.setMockInitialValues({'volume': 0.9});
+        final second = await SharedPreferences.getInstance();
+        SettingsStore.prewarm(second);
+        expect((await SettingsStore.load()).volume, 0.9);
+      },
+    );
   });
 }

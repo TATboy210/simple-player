@@ -48,8 +48,7 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rRect =
-        borderRadius ?? BorderRadius.circular(Tokens.radiusLarge);
+    final rRect = borderRadius ?? BorderRadius.circular(Tokens.radiusLarge);
 
     final content = Container(
       width: width,
@@ -58,8 +57,7 @@ class GlassContainer extends StatelessWidget {
       decoration: BoxDecoration(
         color: Tokens.bgGlass,
         borderRadius: rRect,
-        border:
-            border ?? Border.all(color: Tokens.borderHighlight, width: 1),
+        border: border ?? Border.all(color: Tokens.borderHighlight, width: 1),
       ),
       child: child,
     );
@@ -68,10 +66,7 @@ class GlassContainer extends StatelessWidget {
       return ClipRRect(
         borderRadius: rRect,
         child: BackdropFilter(
-          filter: ui.ImageFilter.blur(
-            sigmaX: tier.sigma,
-            sigmaY: tier.sigma,
-          ),
+          filter: ui.ImageFilter.blur(sigmaX: tier.sigma, sigmaY: tier.sigma),
           child: RepaintBoundary(child: content),
         ),
       );
@@ -90,10 +85,7 @@ class GlassContainer extends StatelessWidget {
         return ClipRRect(
           borderRadius: rRect,
           child: BackdropFilter(
-            filter: ui.ImageFilter.blur(
-              sigmaX: tier.sigma,
-              sigmaY: tier.sigma,
-            ),
+            filter: ui.ImageFilter.blur(sigmaX: tier.sigma, sigmaY: tier.sigma),
             child: RepaintBoundary(child: child),
           ),
         );
@@ -154,17 +146,16 @@ class _GlassButtonState extends State<GlassButton> {
 
   @override
   Widget build(BuildContext context) {
-    final textColor =
-        widget.isPrimary ? Tokens.textPrimary : Tokens.textSecondary;
+    final textColor = widget.isPrimary
+        ? Tokens.textPrimary
+        : Tokens.textSecondary;
     final scale = _pressed
         ? Tokens.pressScale
         : (_hovered ? Tokens.hoverScale : 1.0);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: widget.enabled
-          ? (_) => setState(() => _pressed = true)
-          : null,
+      onTapDown: widget.enabled ? (_) => setState(() => _pressed = true) : null,
       onTap: widget.enabled
           ? () {
               setState(() => _pressed = false);
@@ -183,8 +174,9 @@ class _GlassButtonState extends State<GlassButton> {
           message: widget.tooltip ?? widget.label ?? '',
           child: AnimatedContainer(
             duration: Duration(
-              milliseconds:
-                  _pressed ? Tokens.durationFast : Tokens.durationNormal,
+              milliseconds: _pressed
+                  ? Tokens.durationFast
+                  : Tokens.durationNormal,
             ),
             transform: Matrix4.diagonal3Values(scale, scale, 1),
             transformAlignment: Alignment.center,

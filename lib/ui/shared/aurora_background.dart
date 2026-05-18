@@ -90,7 +90,8 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 
   /// 根据 app 前后台 + 引擎状态决定 Ticker 启停
   void _syncTicker() {
-    final engineIdle = widget.engineState?.value == MediaState.idle ||
+    final engineIdle =
+        widget.engineState?.value == MediaState.idle ||
         widget.engineState == null;
     final resizing = WindowBridge.I.isResizing.value;
     final shouldRun = _isRunning && engineIdle && !resizing;
@@ -268,8 +269,7 @@ class _AuroraPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AuroraPainter oldDelegate) {
-    return oldDelegate.time != time ||
-        oldDelegate.blobImage != blobImage;
+    return oldDelegate.time != time || oldDelegate.blobImage != blobImage;
   }
 }
 

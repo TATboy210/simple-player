@@ -61,9 +61,7 @@ class _PlaylistPanelState extends State<PlaylistPanel> {
           ),
           const Divider(height: 1, color: Tokens.bgHover),
           Expanded(
-            child: _selectedTab == 0
-                ? _buildPlaylist()
-                : _buildHistory(),
+            child: _selectedTab == 0 ? _buildPlaylist() : _buildHistory(),
           ),
         ],
       ),
@@ -107,12 +105,16 @@ class _PlaylistPanelState extends State<PlaylistPanel> {
 
   Widget _buildHistory() {
     // 播放历史：显示有播放记录的项目（按最近播放排序）
-    final historyItems = widget.playlist.items
-        .asMap()
-        .entries
-        .where((e) => (e.value.timestamp ?? 0) > 0)
-        .toList()
-      ..sort((a, b) => (b.value.timestamp ?? 0).compareTo(a.value.timestamp ?? 0));
+    final historyItems =
+        widget.playlist.items
+            .asMap()
+            .entries
+            .where((e) => (e.value.timestamp ?? 0) > 0)
+            .toList()
+          ..sort(
+            (a, b) =>
+                (b.value.timestamp ?? 0).compareTo(a.value.timestamp ?? 0),
+          );
 
     if (historyItems.isEmpty) {
       return Center(
@@ -177,42 +179,42 @@ class _PlaylistItemTile extends StatelessWidget {
     Widget tile = Material(
       color: isCurrent ? Tokens.bgHover : Colors.transparent,
       child: ListTile(
-      dense: true,
-      selected: isCurrent,
-      selectedTileColor: Tokens.bgHover,
-      leading: Icon(
-        hasBreakpoint ? Icons.play_circle : Icons.play_arrow,
-        color: isCurrent
-            ? Tokens.accent
-            : (hasBreakpoint ? Tokens.accent : Tokens.textDisabled),
-        size: Tokens.iconMd,
-      ),
-      title: Text(
-        item.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: isCurrent ? Tokens.accent : Tokens.textPrimary,
-          fontSize: Tokens.fontCaption,
+        dense: true,
+        selected: isCurrent,
+        selectedTileColor: Tokens.bgHover,
+        leading: Icon(
+          hasBreakpoint ? Icons.play_circle : Icons.play_arrow,
+          color: isCurrent
+              ? Tokens.accent
+              : (hasBreakpoint ? Tokens.accent : Tokens.textDisabled),
+          size: Tokens.iconMd,
         ),
+        title: Text(
+          item.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: isCurrent ? Tokens.accent : Tokens.textPrimary,
+            fontSize: Tokens.fontCaption,
+          ),
+        ),
+        subtitle: hasBreakpoint
+            ? Text(
+                l10n.breakpointAt(formatMs(item.positionMs!)),
+                style: const TextStyle(
+                  color: Tokens.accent,
+                  fontSize: Tokens.fontOverline,
+                ),
+              )
+            : null,
+        trailing: IconButton(
+          icon: const Icon(Icons.close, size: 14, color: Tokens.textDisabled),
+          onPressed: onRemove,
+          splashRadius: 14,
+          tooltip: l10n.remove,
+        ),
+        onTap: onSelect,
       ),
-      subtitle: hasBreakpoint
-          ? Text(
-              l10n.breakpointAt(formatMs(item.positionMs!)),
-              style: const TextStyle(
-                color: Tokens.accent,
-                fontSize: Tokens.fontOverline,
-              ),
-            )
-          : null,
-      trailing: IconButton(
-        icon: const Icon(Icons.close, size: 14, color: Tokens.textDisabled),
-        onPressed: onRemove,
-        splashRadius: 14,
-        tooltip: l10n.remove,
-      ),
-      onTap: onSelect,
-    ),
     );
 
     // Tooltip（仅有断点时显示）
@@ -254,8 +256,14 @@ class _PlaylistItemTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(Tokens.radiusPopup),
       ),
       items: [
-        PopupMenuItem(value: 'play', child: _MenuItemRow(Icons.play_arrow, l10n.playAction)),
-        PopupMenuItem(value: 'copy', child: _MenuItemRow(Icons.copy, l10n.copyPath)),
+        PopupMenuItem(
+          value: 'play',
+          child: _MenuItemRow(Icons.play_arrow, l10n.playAction),
+        ),
+        PopupMenuItem(
+          value: 'copy',
+          child: _MenuItemRow(Icons.copy, l10n.copyPath),
+        ),
         const PopupMenuDivider(),
         if (onShowProperties != null)
           PopupMenuItem(

@@ -48,31 +48,42 @@ class VideoProcessingService {
     rotation = ValueNotifier<int>(s?.videoRotation ?? 0);
     aspectRatioMode = ValueNotifier<AspectRatioMode>(
       s != null
-          ? AspectRatioMode.values[s.videoAspectRatioIndex.clamp(0, AspectRatioMode.values.length - 1)]
+          ? AspectRatioMode.values[s.videoAspectRatioIndex.clamp(
+              0,
+              AspectRatioMode.values.length - 1,
+            )]
           : AspectRatioMode.keepOriginal,
     );
 
     // 引擎委托
-    brightness.addListener(() =>
-        _engine.setVideoEffect(VideoEffectType.brightness, brightness.value));
-    contrast.addListener(() =>
-        _engine.setVideoEffect(VideoEffectType.contrast, contrast.value));
-    saturation.addListener(() =>
-        _engine.setVideoEffect(VideoEffectType.saturation, saturation.value));
-    hue.addListener(() =>
-        _engine.setVideoEffect(VideoEffectType.hue, hue.value));
-    deinterlaceEnabled.addListener(() =>
-        _engine.setDeinterlace(deinterlaceEnabled.value));
-    rotation.addListener(() =>
-        _engine.rotate(rotation.value));
-    aspectRatioMode.addListener(() =>
-        _engine.setAspectRatio(aspectRatioMode.value.mdkValue));
+    brightness.addListener(
+      () =>
+          _engine.setVideoEffect(VideoEffectType.brightness, brightness.value),
+    );
+    contrast.addListener(
+      () => _engine.setVideoEffect(VideoEffectType.contrast, contrast.value),
+    );
+    saturation.addListener(
+      () =>
+          _engine.setVideoEffect(VideoEffectType.saturation, saturation.value),
+    );
+    hue.addListener(
+      () => _engine.setVideoEffect(VideoEffectType.hue, hue.value),
+    );
+    deinterlaceEnabled.addListener(
+      () => _engine.setDeinterlace(deinterlaceEnabled.value),
+    );
+    rotation.addListener(() => _engine.rotate(rotation.value));
+    aspectRatioMode.addListener(
+      () => _engine.setAspectRatio(aspectRatioMode.value.mdkValue),
+    );
 
     // 持久化监听（50ms 防抖，避免逐像素写磁盘）
     void schedulePersist() {
       _persistDebounce?.cancel();
       _persistDebounce = Timer(const Duration(milliseconds: 50), _persistAll);
     }
+
     brightness.addListener(schedulePersist);
     contrast.addListener(schedulePersist);
     saturation.addListener(schedulePersist);

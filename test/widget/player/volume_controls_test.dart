@@ -18,10 +18,7 @@ void main() {
     engine.dispose();
   });
 
-  Widget buildSubject({
-    MediaEngine? eng,
-    required Widget child,
-  }) {
+  Widget buildSubject({MediaEngine? eng, required Widget child}) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

@@ -504,7 +504,9 @@ class FvpEngine implements MediaEngine {
       // mdk 只接受 0/90/180/270
       final valid = {0, 90, 180, 270};
       if (!valid.contains(degree)) {
-        debugPrint('FvpEngine.rotate invalid degree: $degree, expected 0/90/180/270');
+        debugPrint(
+          'FvpEngine.rotate invalid degree: $degree, expected 0/90/180/270',
+        );
         return;
       }
       _player.rotate(degree);

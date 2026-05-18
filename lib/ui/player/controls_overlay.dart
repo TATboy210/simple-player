@@ -27,7 +27,6 @@ class ControlsOverlay extends StatefulWidget {
   final VoidCallback? onTogglePlayMode;
   final VoidCallback? onOpenSubtitle;
   final IconData? playModeIcon;
-  final bool playModeActive;
 
   /// 播放模式名称（如"顺序播放"、"列表循环"）
   final String? playModeLabel;
@@ -51,7 +50,6 @@ class ControlsOverlay extends StatefulWidget {
     this.onTogglePlayMode,
     this.onOpenSubtitle,
     this.playModeIcon,
-    this.playModeActive = false,
     this.playModeLabel,
     this.isVideo = false,
     this.emptyStatePresent = false,
@@ -134,10 +132,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
           onExit: (_) => _autoHide.onMouseExit(),
           child: ValueListenableBuilder<bool>(
             valueListenable: _autoHide.visible,
-            builder: (_, isVisible, child) => IgnorePointer(
-              ignoring: !isVisible,
-              child: child,
-            ),
+            builder: (_, isVisible, child) =>
+                IgnorePointer(ignoring: !isVisible, child: child),
             child: RepaintBoundary(
               child: Stack(
                 children: [
@@ -162,7 +158,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                           engine: widget.engine,
                           isFullscreen: widget.isFullscreen,
                           isIdle: isIdle,
-                          popupCloseNotifier: _popupCloseNotifier,
                           onPrevious: widget.onPrevious,
                           onNext: widget.onNext,
                           onTogglePlaylist: widget.onTogglePlaylist,
@@ -172,7 +167,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                           onTogglePlayMode: widget.onTogglePlayMode,
                           onOpenSubtitle: widget.onOpenSubtitle,
                           playModeIcon: widget.playModeIcon,
-                          playModeActive: widget.playModeActive,
                           playModeLabel: widget.playModeLabel,
                           isVideo: widget.isVideo,
                           enableBlur: isVisible,

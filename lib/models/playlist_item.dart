@@ -3,7 +3,7 @@ class PlaylistItem {
   final String name;
 
   PlaylistItem({required this.path})
-      : name = path.split('/').last.split('\\').last;
+    : name = path.split('/').last.split('\\').last;
 
   Map<String, dynamic> toJson() => {'path': path};
 

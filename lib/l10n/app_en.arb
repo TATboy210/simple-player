@@ -16,10 +16,8 @@
   "dragHint": "Drop video here to play",
   "@dragHint": { "description": "Hint shown while dragging a file over the window" },
 
-  "playModeNormal": "Sequential",
-  "@playModeNormal": { "description": "Play mode: play tracks in order" },
-  "playModeLoopAll": "Loop All",
-  "@playModeLoopAll": { "description": "Play mode: loop entire playlist" },
+  "playModeLoopAll": "Sequential",
+  "@playModeLoopAll": { "description": "Play mode: play tracks in order and loop" },
   "playModeLoopSingle": "Loop Single",
   "@playModeLoopSingle": { "description": "Play mode: loop current track" },
   "playModeShuffle": "Shuffle",
@@ -130,8 +128,8 @@
   "@stop": { "description": "Tooltip for stop button" },
   "rewind10": "Rewind 10s",
   "@rewind10": { "description": "Tooltip for rewind 10 seconds button" },
-  "forward10": "Forward 10s",
-  "@forward10": { "description": "Tooltip for forward 10 seconds button" },
+  "forward30": "Forward 30s",
+  "@forward30": { "description": "Tooltip for forward 30 seconds button" },
 
   "pin": "Pin on Top",
   "@pin": { "description": "Tooltip for pin window button" },
@@ -250,13 +248,6 @@
   "@volumePercent": {
     "description": "OSD message showing volume percentage",
     "placeholders": { "percent": { "type": "String" } }
-  },
-
-  "speedLabel": "{speed}x Speed",
-  "speedTooltip": "Playback speed",
-  "@speedLabel": {
-    "description": "Semantics label for speed option",
-    "placeholders": { "speed": { "type": "num" } }
   },
 
   "aspectRatioOriginal": "Original",

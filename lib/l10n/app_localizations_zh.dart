@@ -30,10 +30,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dragHint => '拖拽视频至窗口松开即可播放';
 
   @override
-  String get playModeNormal => '顺序播放';
-
-  @override
-  String get playModeLoopAll => '列表循环';
+  String get playModeLoopAll => '顺序播放';
 
   @override
   String get playModeLoopSingle => '单曲循环';
@@ -191,7 +188,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get rewind10 => '快退 10 秒';
 
   @override
-  String get forward10 => '快进 10 秒';
+  String get forward30 => '快进 30 秒';
 
   @override
   String get pin => '置顶';
@@ -344,14 +341,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String volumePercent(String percent) {
     return '音量 $percent%';
   }
-
-  @override
-  String speedLabel(num speed) {
-    return '${speed}x 速度';
-  }
-
-  @override
-  String get speedTooltip => '倍速';
 
   @override
   String get aspectRatioOriginal => '原始';

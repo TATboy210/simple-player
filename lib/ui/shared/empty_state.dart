@@ -34,8 +34,7 @@ class EmptyState extends StatefulWidget {
   State<EmptyState> createState() => _EmptyStateState();
 }
 
-class _EmptyStateState extends State<EmptyState>
-    with TickerProviderStateMixin {
+class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
   late final AnimationController _dragAnim;
   late final CurvedAnimation _dragCurve;
   late final AnimationController _idleAnim;
@@ -237,11 +236,7 @@ class _EmptyStateState extends State<EmptyState>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.play_circle_outline,
-            size: 20,
-            color: Tokens.accent,
-          ),
+          const Icon(Icons.play_circle_outline, size: 20, color: Tokens.accent),
           const SizedBox(width: Tokens.spSm),
           Text(
             AppLocalizations.of(context).dragHint,

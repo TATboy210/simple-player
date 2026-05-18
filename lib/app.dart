@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'kernel/bridge/window_bridge.dart';
 import 'kernel/engine/fvp_engine.dart';
-import 'kernel/models/play_mode.dart';
 import 'kernel/persistence/settings_store.dart';
 import 'kernel/playlist/playlist.dart';
 import 'kernel/services/playback_controller.dart';
@@ -139,62 +138,61 @@ class _AppState extends State<App> {
         onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
         debugShowCheckedModeBanner: false,
         theme: ThemeData.dark(),
-        home: Stack(
-          children: [
-            PlayerScreen(
-              engine: _engine,
-              controller: _controller,
-              playlist: _playlist,
-              playlistGeneration: _playlistGeneration,
-              isVideo: _engine.textureId.value != null,
-              onOpenFile: _openFile,
-              onPrevious: () => _controller.playPrevious(),
-              onNext: () => _controller.playNext(),
-              onTogglePlayMode: () {
-                final modes = PlayMode.values;
-                final nextIndex = (_playlist.mode.index + 1) % modes.length;
-                _playlist.mode = modes[nextIndex];
-                _playlistGeneration.value++;
-                const labels = ['顺序播放', '列表循环', '单曲循环', '随机播放'];
-                OsdService.I.show(
-                  labels[_playlist.mode.index],
-                  icon: playModeIcon(_playlist.mode),
-                );
-              },
-              onSettings: () => showDialog(
-                context: context,
-                builder: (_) => SettingsDialog(
-                  engine: _engine,
-                  videoProcessing: _videoProcessing,
+        home: Builder(
+          builder: (ctx) => Stack(
+            children: [
+              PlayerScreen(
+                engine: _engine,
+                controller: _controller,
+                playlist: _playlist,
+                playlistGeneration: _playlistGeneration,
+                isVideo: _engine.textureId.value != null,
+                onOpenFile: _openFile,
+                onPrevious: () => _controller.playPrevious(),
+                onNext: () => _controller.playNext(),
+                onTogglePlayMode: () {
+                  _controller.togglePlayMode();
+                  final l10n = AppLocalizations.of(ctx);
+                  OsdService.I.show(
+                    playModeLabel(_playlist.mode, l10n),
+                    icon: playModeIcon(_playlist.mode),
+                  );
+                },
+                onSettings: () => showDialog(
+                  context: ctx,
+                  builder: (_) => SettingsDialog(
+                    engine: _engine,
+                    videoProcessing: _videoProcessing,
+                  ),
+                ),
+                onFilesDropped: _onFilesDropped,
+                onDragHoverChanged: (hovering) {
+                  setState(() => _isDragHovering = hovering);
+                },
+                playlistPanel: PlaylistPanel(
+                  playlist: _playlist,
+                  onSelectIndex: (i) => _controller.playIndex(i),
+                  onRemoveIndex: (i) {
+                    _playlist.removeAt(i);
+                    _playlistGeneration.value++;
+                  },
+                  onReorder: (oldIndex, newIndex) {
+                    _playlist.reorder(oldIndex, newIndex);
+                    _playlistGeneration.value++;
+                  },
+                  onClear: () {
+                    _playlist.clear();
+                    _playlistGeneration.value++;
+                  },
+                ),
+                emptyState: EmptyState(
+                  onOpenFile: _openFile,
+                  isDragHovering: _isDragHovering,
+                  engineState: _engine.state,
                 ),
               ),
-              onFilesDropped: _onFilesDropped,
-              onDragHoverChanged: (hovering) {
-                setState(() => _isDragHovering = hovering);
-              },
-              playlistPanel: PlaylistPanel(
-                playlist: _playlist,
-                onSelectIndex: (i) => _controller.playIndex(i),
-                onRemoveIndex: (i) {
-                  _playlist.removeAt(i);
-                  _playlistGeneration.value++;
-                },
-                onReorder: (oldIndex, newIndex) {
-                  _playlist.reorder(oldIndex, newIndex);
-                  _playlistGeneration.value++;
-                },
-                onClear: () {
-                  _playlist.clear();
-                  _playlistGeneration.value++;
-                },
-              ),
-              emptyState: EmptyState(
-                onOpenFile: _openFile,
-                isDragHovering: _isDragHovering,
-                engineState: _engine.state,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

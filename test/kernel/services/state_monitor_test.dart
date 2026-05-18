@@ -92,9 +92,9 @@ void main() {
 
     group('togglePlayMode', () {
       test('persists mode change', () {
-        expect(playlist.mode, PlayMode.normal);
-        controller.togglePlayMode();
         expect(playlist.mode, PlayMode.loopAll);
+        controller.togglePlayMode();
+        expect(playlist.mode, PlayMode.loopSingle);
       });
     });
 

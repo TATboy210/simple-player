@@ -30,10 +30,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dragHint => 'Drop video here to play';
 
   @override
-  String get playModeNormal => 'Sequential';
-
-  @override
-  String get playModeLoopAll => 'Loop All';
+  String get playModeLoopAll => 'Sequential';
 
   @override
   String get playModeLoopSingle => 'Loop Single';
@@ -191,7 +188,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rewind10 => 'Rewind 10s';
 
   @override
-  String get forward10 => 'Forward 10s';
+  String get forward30 => 'Forward 30s';
 
   @override
   String get pin => 'Pin on Top';
@@ -344,14 +341,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String volumePercent(String percent) {
     return 'Volume $percent%';
   }
-
-  @override
-  String speedLabel(num speed) {
-    return '${speed}x Speed';
-  }
-
-  @override
-  String get speedTooltip => 'Playback speed';
 
   @override
   String get aspectRatioOriginal => 'Original';

@@ -153,13 +153,6 @@ void main() {
         expect(playlist.currentIndex, 1);
       });
 
-      test('playNext at end in normal mode does nothing', () async {
-        playlist.currentIndex = 2;
-        playlist.mode = PlayMode.normal;
-        await controller.playNext();
-        expect(playlist.currentIndex, 2);
-      });
-
       test('playNext at end in loopAll wraps around', () async {
         playlist.currentIndex = 2;
         playlist.mode = PlayMode.loopAll;
@@ -172,22 +165,17 @@ void main() {
         await controller.playPrevious();
         expect(playlist.currentIndex, 1);
       });
-
-      test('playPrevious at start in normal mode does nothing', () async {
-        playlist.currentIndex = 0;
-        playlist.mode = PlayMode.normal;
-        await controller.playPrevious();
-        expect(playlist.currentIndex, 0);
-      });
     });
 
     // ─── addFiles ───
 
     group('addFiles', () {
       test('adds multiple valid files', () async {
-        final count = await controller.addFiles(
-          ['C:/a.mp4', 'C:/b.mp4', 'C:/c.mp4'],
-        );
+        final count = await controller.addFiles([
+          'C:/a.mp4',
+          'C:/b.mp4',
+          'C:/c.mp4',
+        ]);
         expect(count, 3);
         expect(playlist.length, 3);
       });
@@ -210,9 +198,7 @@ void main() {
       });
 
       test('filters invalid paths', () async {
-        final count = await controller.addFiles(
-          ['C:/a.mp4', '', 'C:/bad.txt'],
-        );
+        final count = await controller.addFiles(['C:/a.mp4', '', 'C:/bad.txt']);
         expect(count, 1);
         expect(playlist.length, 1);
       });
@@ -276,27 +262,25 @@ void main() {
 
     group('togglePlayMode', () {
       test('cycles through all modes', () {
-        expect(playlist.mode, PlayMode.normal);
-        controller.togglePlayMode();
         expect(playlist.mode, PlayMode.loopAll);
         controller.togglePlayMode();
         expect(playlist.mode, PlayMode.loopSingle);
         controller.togglePlayMode();
         expect(playlist.mode, PlayMode.shuffle);
         controller.togglePlayMode();
-        expect(playlist.mode, PlayMode.normal);
+        expect(playlist.mode, PlayMode.loopAll);
       });
     });
 
     // ─── auto-advance on completed ───
 
     group('auto-advance on completed', () {
-      test('auto-plays next in normal mode', () async {
+      test('auto-plays next in loopAll mode', () async {
         engine.configureMedia(durationMs: 60000);
         playlist.add('C:/a.mp4');
         playlist.add('C:/b.mp4');
         playlist.add('C:/c.mp4');
-        playlist.mode = PlayMode.normal;
+        playlist.mode = PlayMode.loopAll;
         registerAutoAdvance();
         await controller.playIndex(0);
         engine.simulateCompleted();
@@ -315,19 +299,6 @@ void main() {
         engine.simulateCompleted();
         await Future(() {});
         expect(playlist.currentIndex, 0);
-      });
-
-      test('does nothing in normal mode at end of list', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.add('C:/c.mp4');
-        playlist.mode = PlayMode.normal;
-        registerAutoAdvance();
-        playlist.currentIndex = 2;
-        engine.simulateCompleted();
-        // Should not crash
-        expect(playlist.currentIndex, anyOf(2, isNonNegative));
       });
     });
   });

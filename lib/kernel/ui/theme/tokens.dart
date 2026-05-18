@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Design tokens — compile-time constants
+/// 设计令牌 — 编译时常量
 class Tokens {
   Tokens._();
 
@@ -53,23 +53,23 @@ class Tokens {
   static const radiusLarge = 12.0;
   static const radiusPopup = 8.0;
 
-  // 鈹€鈹€ 姣涚幓鐠?鈹€鈹€
+  // ── 毛玻璃 ──
   static const glassBlurThin = 12.0;
   static const glassBlur = 16.0;
   static const glassBlurThick = 24.0;
 
-  // 鈹€鈹€ 鍔ㄧ敾 鈹€鈹€
+  // ── 动画 ──
   static const durationFast = 80;
   static const durationNormal = 150;
   static const durationFade = 300;
   static const durationSlide = 300;
   static const durationDebounce = 500;
 
-  // 鈹€鈹€ 鑷姩闅愯棌 鈹€鈹€
+  // ── 自动隐藏 ──
   static const hideDelayFullscreen = 3;
   static const hideDelayWindowed = 5;
 
-  // 鈹€鈹€ 鏍囬鏍?鈹€鈹€
+  // ── 标题栏 ──
   static const titleBarHeight = 36.0;
   static const titleBarButtonWidth = 36.0;
   static const titleBarBg = Color(0xE61A1A24);
@@ -77,14 +77,14 @@ class Tokens {
   static const titleBarHover = Color(0x1AFFFFFF);
   static const closeHoverBg = Color(0xFFC42B1C);
 
-  // 鈹€鈹€ 鎺у埗鏍?鈹€鈹€
+  // ── 控制栏 ──
   static const controlBarHeight = 84.0;
   static const controlBarRadius = 16.0;
-  static const controlBarMarginH = 48.0;
+  static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;
   static const controlBarBorder = Color(0x1AFFFFFF);
 
-  // 鈹€鈹€ 杩涘害鏉?鈹€鈹€
+  // ── 进度条 ──
   static const progressBarHeight = 32.0;
   static const progressBarThickness = 3.0;
   static const progressBarThicknessDrag = 5.0;
@@ -92,13 +92,13 @@ class Tokens {
   static const progressPlayed = Color(0xFF6C5CE7);
   static const progressBuffer = Color(0x44FFFFFF);
 
-  // 鈹€鈹€ 鎾斁鍒楄〃闈㈡澘 鈹€鈹€
+  // ── 播放列表面板 ──
   static const playlistPanelWidth = 300.0;
 
-  // 鈹€鈹€ 缂╂斁 鈹€鈹€
+  // ── 缩放 ──
   static const hoverScale = 1.02;
   static const pressScale = 0.98;
 
-  // 鈹€鈹€ 瀛椾綋鐗规€?鈹€鈹€
+  // ── 字体特性 ──
   static const tabularFigures = FontFeature.tabularFigures();
 }
