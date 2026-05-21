@@ -5,12 +5,14 @@ import 'package:window_manager/window_manager.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
+import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/ui/theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
-import '../../window/aspect_ratio_service.dart';
+import '../../kernel/window/aspect_ratio_service.dart';
 import 'controls_overlay.dart';
 import 'custom_title_bar.dart';
 import 'drop_handler.dart';
@@ -27,19 +29,23 @@ class PlayerScreen extends StatefulWidget {
   final PlaybackController controller;
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
+  final Map<String, String> customBindings;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onTogglePlaylist;
   final VoidCallback? onSettings;
+  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final VoidCallback? onTogglePlayMode;
   final bool isVideo;
   final void Function(List<String> paths)? onFilesDropped;
   final void Function(bool hovering)? onDragHoverChanged;
-  final Widget? playlistPanel;
   final Widget? emptyState;
 
-  static const _breakpoint = 600.0;
+  final void Function(String folderPath, List<PlaylistItem> scanned)?
+      onFolderScanned;
+  final VoidCallback? onClearHistory;
+  final void Function(String path)? onShowProperties;
 
   const PlayerScreen({
     super.key,
@@ -47,17 +53,21 @@ class PlayerScreen extends StatefulWidget {
     required this.controller,
     required this.playlist,
     required this.playlistGeneration,
+    this.customBindings = const {},
     this.onPrevious,
     this.onNext,
     this.onTogglePlaylist,
     this.onSettings,
+    this.onSettingsSecondary,
     this.onOpenFile,
     this.onTogglePlayMode,
     this.isVideo = false,
     this.onFilesDropped,
     this.onDragHoverChanged,
-    this.playlistPanel,
     this.emptyState,
+    this.onFolderScanned,
+    this.onClearHistory,
+    this.onShowProperties,
   });
 
   @override
@@ -66,10 +76,26 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   final ValueNotifier<bool> _playlistVisible = ValueNotifier(false);
+  bool _playlistMounted = false;
 
   void _togglePlaylist() {
-    _playlistVisible.value = !_playlistVisible.value;
+    final nowVisible = !_playlistVisible.value;
+    _playlistVisible.value = nowVisible;
+    if (nowVisible) _playlistMounted = true;
     widget.onTogglePlaylist?.call();
+  }
+
+  void _closePlaylist() {
+    _playlistVisible.value = false;
+    // 延迟卸载，等待淡出动画完成
+    Future.delayed(
+      const Duration(milliseconds: Tokens.durationSlide),
+      () {
+        if (mounted && !_playlistVisible.value) {
+          setState(() => _playlistMounted = false);
+        }
+      },
+    );
   }
 
   Future<void> _openSubtitle() async {
@@ -98,6 +124,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         final isFullscreen = windowMode == WindowMode.fullscreen;
 
         return KeyboardHandler(
+          customBindings: widget.customBindings,
           onPlayPause: () => widget.engine.togglePlayPause(),
           onSeekBackward: () => _seek(widget.engine, -5000),
           onSeekForward: () => _seek(widget.engine, 5000),
@@ -144,102 +171,96 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   Expanded(
                     child: ValueListenableBuilder<bool>(
                       valueListenable: _playlistVisible,
-                      builder: (context, playlistVisible, _) => LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isWide =
-                              constraints.maxWidth >= PlayerScreen._breakpoint;
-                          final showPanel =
-                              playlistVisible && widget.playlistPanel != null;
-
-                          return Stack(
+                      builder: (context, playlistVisible, _) => Stack(
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: DropHandler(
-                                      onFilesDropped:
-                                          widget.onFilesDropped ?? (_) {},
-                                      onHoverChanged: widget.onDragHoverChanged,
-                                      child: Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          VideoSurface(engine: widget.engine),
-                                          if (widget.emptyState != null)
-                                            ValueListenableBuilder<MediaState>(
-                                              valueListenable:
-                                                  widget.engine.state,
-                                              builder: (_, state, child) =>
-                                                  state == MediaState.idle
-                                                  ? child!
-                                                  : const SizedBox.shrink(),
-                                              child: Positioned.fill(
-                                                child: widget.emptyState!,
-                                              ),
-                                            ),
-                                          ValueListenableBuilder<int>(
-                                            valueListenable:
-                                                widget.playlistGeneration,
-                                            builder: (context, _, _) {
-                                              final l10n = AppLocalizations.of(
-                                                context,
-                                              );
-                                              return ControlsOverlay(
-                                                engine: widget.engine,
-                                                isFullscreen: isFullscreen,
-                                                emptyStatePresent:
-                                                    widget.emptyState != null,
-                                                onPrevious: widget.onPrevious,
-                                                onNext: widget.onNext,
-                                                onTogglePlaylist:
-                                                    _togglePlaylist,
-                                                onSettings: widget.onSettings,
-                                                onOpenFile: widget.onOpenFile,
-                                                onToggleFullscreen:
-                                                    wm.toggleFullscreen,
-                                                onTogglePlayMode:
-                                                    widget.onTogglePlayMode,
-                                                onOpenSubtitle: _openSubtitle,
-                                                playModeIcon: playModeIcon(
-                                                  widget.playlist.mode,
-                                                ),
-                                                playModeLabel: playModeLabel(
-                                                  widget.playlist.mode,
-                                                  l10n,
-                                                ),
-                                                isVideo: widget.isVideo,
-                                              );
-                                            },
+                              Expanded(
+                                child: DropHandler(
+                                  onFilesDropped:
+                                      widget.onFilesDropped ?? (_) {},
+                                  onHoverChanged: widget.onDragHoverChanged,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      VideoSurface(engine: widget.engine),
+                                      if (widget.emptyState != null)
+                                        ValueListenableBuilder<MediaState>(
+                                          valueListenable:
+                                              widget.engine.state,
+                                          builder: (_, state, child) =>
+                                              state == MediaState.idle
+                                              ? child!
+                                              : const SizedBox.shrink(),
+                                          child: Positioned.fill(
+                                            child: widget.emptyState!,
                                           ),
-                                        ],
+                                        ),
+                                      ValueListenableBuilder<int>(
+                                        valueListenable:
+                                            widget.playlistGeneration,
+                                        builder: (context, _, _) {
+                                          final l10n = AppLocalizations.of(
+                                            context,
+                                          );
+                                          return ControlsOverlay(
+                                            engine: widget.engine,
+                                            isFullscreen: isFullscreen,
+                                            emptyStatePresent:
+                                                widget.emptyState != null,
+                                            onPrevious: widget.onPrevious,
+                                            onNext: widget.onNext,
+                                            onTogglePlaylist:
+                                                _togglePlaylist,
+                                            onSettings: widget.onSettings,
+                                            onSettingsSecondary:
+                                                widget.onSettingsSecondary,
+                                            onOpenFile: widget.onOpenFile,
+                                            onToggleFullscreen:
+                                                wm.toggleFullscreen,
+                                            onTogglePlayMode:
+                                                widget.onTogglePlayMode,
+                                            onOpenSubtitle: _openSubtitle,
+                                            playModeIcon: playModeIcon(
+                                              widget.playlist.mode,
+                                            ),
+                                            playModeLabel: playModeLabel(
+                                              widget.playlist.mode,
+                                              l10n,
+                                            ),
+                                            isVideo: widget.isVideo,
+                                          );
+                                        },
                                       ),
-                                    ),
-                                  ),
-                                  if (isWide && showPanel)
-                                    widget.playlistPanel!,
-                                ],
-                              ),
-
-                              // 窄屏面板 overlay（滑入/滑出动画）
-                              if (!isWide && widget.playlistPanel != null)
-                                AnimatedPositioned(
-                                  duration: const Duration(
-                                    milliseconds: Tokens.durationSlide,
-                                  ),
-                                  curve: Curves.easeOut,
-                                  top: 0,
-                                  right: showPanel
-                                      ? 0
-                                      : -Tokens.playlistPanelWidth,
-                                  bottom: 0,
-                                  width: Tokens.playlistPanelWidth,
-                                  child: Material(
-                                    elevation: 8,
-                                    child: widget.playlistPanel!,
+                                    ],
                                   ),
                                 ),
+                              ),
                             ],
-                          );
-                        },
+                          ),
+
+                          // 沉浸式浮窗播放列表
+                          if (_playlistMounted)
+                            IgnorePointer(
+                              ignoring: !playlistVisible,
+                              child: PlaylistPanel(
+                                playlist: widget.playlist,
+                                visible: playlistVisible,
+                                onClose: _closePlaylist,
+                                onSelectIndex: (i) {
+                                  widget.controller.playIndex(i);
+                                  _closePlaylist();
+                                },
+                                onRemoveIndex: (i) {
+                                  widget.playlist.removeAt(i);
+                                  widget.playlistGeneration.value++;
+                                },
+                                onShowProperties: widget.onShowProperties,
+                                onFolderScanned: widget.onFolderScanned,
+                                onClearHistory: widget.onClearHistory,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

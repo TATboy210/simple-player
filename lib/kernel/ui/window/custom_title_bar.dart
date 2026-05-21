@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../services/platform_service.dart';
+import '../../bridge/window_bridge.dart';
 import '../../window/aspect_ratio_service.dart';
 import '../theme/tokens.dart';
 
@@ -19,7 +19,7 @@ class CustomTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wm = PlatformService.I;
+    final wm = WindowBridge.I;
 
     final content = Container(
       height: Tokens.titleBarHeight,
@@ -111,7 +111,7 @@ class TitleBarControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final wm = PlatformService.I;
+    final wm = WindowBridge.I;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -198,17 +198,17 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
   @override
   void initState() {
     super.initState();
-    PlatformService.I.isResizing.addListener(_onResizingChanged);
+    WindowBridge.I.isResizing.addListener(_onResizingChanged);
   }
 
   @override
   void dispose() {
-    PlatformService.I.isResizing.removeListener(_onResizingChanged);
+    WindowBridge.I.isResizing.removeListener(_onResizingChanged);
     super.dispose();
   }
 
   void _onResizingChanged() {
-    if (!PlatformService.I.isResizing.value && mounted) {
+    if (!WindowBridge.I.isResizing.value && mounted) {
       setState(() => _hovered = false);
     }
   }
@@ -228,12 +228,12 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         onEnter: (_) {
-          if (!PlatformService.I.isResizing.value) {
+          if (!WindowBridge.I.isResizing.value) {
             setState(() => _hovered = true);
           }
         },
         onExit: (_) {
-          if (!PlatformService.I.isResizing.value) {
+          if (!WindowBridge.I.isResizing.value) {
             setState(() => _hovered = false);
           }
         },

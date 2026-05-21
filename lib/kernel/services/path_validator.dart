@@ -38,8 +38,16 @@ class PathValidator {
   /// 允许的媒体文件扩展名白名单（小写，从 supportedExtensions 派生）
   static final allowedExtensions = supportedExtensions.toSet();
 
-  /// URL 协议白名单
-  static const _urlSchemes = {'http://', 'https://', 'rtmp://', 'rtsp://'};
+  /// URL 协议白名单 — MDK/FFmpeg 原生支持
+  static const _urlSchemes = {
+    'http://',
+    'https://',
+    'rtmp://',
+    'rtsp://',
+    'srt://',
+    'udp://',
+    'tcp://',
+  };
 
   /// 检查是否为 URL
   static bool isUrl(String path) => _urlSchemes.any((s) => path.startsWith(s));

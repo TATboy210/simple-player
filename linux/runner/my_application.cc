@@ -7,6 +7,41 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+// ─── Aspect Ratio MethodChannel handler ───
+
+static GtkWindow* g_window = nullptr;
+
+static void aspect_ratio_method_cb(FlMethodChannel* channel,
+                                   FlMethodCall* method_call,
+                                   gpointer user_data) {
+  const gchar* method = fl_method_call_get_name(method_call);
+  g_autoptr(FlMethodResponse) response = nullptr;
+
+  if (strcmp(method, "setAspectRatio") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    double ratio = fl_value_get_float(args);
+
+    if (g_window != nullptr) {
+      GdkGeometry hints;
+      hints.min_aspect = ratio > 0 ? ratio : 0.0;
+      hints.max_aspect = ratio > 0 ? ratio : G_MAXDOUBLE;
+      GdkWindowHints hint_mask =
+          ratio > 0 ? static_cast<GdkWindowHints>(GDK_HINT_ASPECT)
+                    : static_cast<GdkWindowHints>(0);
+
+      gtk_window_set_geometry_hints(g_window, nullptr, &hints, hint_mask);
+    }
+
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(
+        fl_value_new_null()));
+  } else {
+    response = FL_METHOD_RESPONSE(
+        fl_method_not_implemented_response_new());
+  }
+
+  fl_method_call_respond(method_call, response, nullptr);
+}
+
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
@@ -74,6 +109,19 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  // Store window reference for aspect ratio handler
+  g_window = window;
+
+  // Register aspect ratio MethodChannel
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(
+          fl_view_get_engine(view)),
+      "com.simple_player/aspect_ratio",
+      FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      channel, aspect_ratio_method_cb, nullptr, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

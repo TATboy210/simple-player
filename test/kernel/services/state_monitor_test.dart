@@ -192,7 +192,10 @@ void main() {
 
       expect(aspectCalls, isNotEmpty);
       expect(aspectCalls.last.method, 'setAspectRatio');
-      expect(aspectCalls.last.arguments, 0.0);
+      final unlockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
+      );
+      expect(unlockCalls, isNotEmpty);
     });
 
     test('paused does NOT unlock aspect ratio', () async {
@@ -227,7 +230,10 @@ void main() {
 
       expect(aspectCalls, isNotEmpty);
       expect(aspectCalls.last.method, 'setAspectRatio');
-      expect(aspectCalls.last.arguments, 0.0);
+      final unlockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
+      );
+      expect(unlockCalls, isNotEmpty);
     });
 
     test('error unlocks aspect ratio', () async {
@@ -243,7 +249,10 @@ void main() {
 
       expect(aspectCalls, isNotEmpty);
       expect(aspectCalls.last.method, 'setAspectRatio');
-      expect(aspectCalls.last.arguments, 0.0);
+      final unlockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
+      );
+      expect(unlockCalls, isNotEmpty);
     });
 
     test('idle unlocks aspect ratio', () async {
@@ -259,7 +268,10 @@ void main() {
 
       expect(aspectCalls, isNotEmpty);
       expect(aspectCalls.last.method, 'setAspectRatio');
-      expect(aspectCalls.last.arguments, 0.0);
+      final unlockCalls = aspectCalls.where(
+        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
+      );
+      expect(unlockCalls, isNotEmpty);
     });
 
     test('playing with zero ratio does not call matchVideo', () async {

@@ -37,6 +37,12 @@ class FvpEngine implements MediaEngine {
   static const _minPlaybackRate = 0.25;
   static const _maxPlaybackRate = 4.0;
 
+  // 网络流常量 — 仅对 URL 生效，本地文件不受影响
+  static const _networkTimeoutMs = 10000;
+  static const _networkProbeSize = 1000000; // 1MB
+  static const _networkAnalyzeDurationUs = 5000000; // 5s
+  static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
+
   // ─── Helpers ───
 
   late final FvpCallbackHandler _callbackHandler;
@@ -118,6 +124,58 @@ class FvpEngine implements MediaEngine {
     textureId.value = _player.textureId.value;
   }
 
+  /// 为 URL 源配置 FFmpeg 网络参数
+  ///
+  /// 仅对 http/https/rtmp/rtsp 等 URL 生效，本地文件不调用。
+  /// 设置超时、探测大小、分析时长和协议特定参数。
+  void _configureNetworkOptions(String url) {
+    // 通用网络超时
+    _player.setProperty('timeout', _networkTimeoutMs.toString());
+
+    // FFmpeg 流探测参数 — 减少首帧延迟
+    _player.setProperty('avformat.probesize', _networkProbeSize.toString());
+    _player.setProperty(
+      'avformat.analyzeduration',
+      _networkAnalyzeDurationUs.toString(),
+    );
+
+    // RTSP 低延迟配置
+    if (url.startsWith('rtsp://')) {
+      _player.setProperty('avformat.probesize', _rtspProbeSize.toString());
+      _player.setProperty('avformat.fflags', '+nobuffer');
+      _player.setProperty('avformat.fpsprobesize', '0');
+      _player.setProperty('avformat.avioflags', 'direct');
+      // RTSP 实时流：min=0, max=MAX, drop=true (低延迟丢帧)
+      _player.setBufferRange(min: 0, max: 0, drop: true);
+    }
+
+    // RTMP 低延迟配置
+    if (url.startsWith('rtmp://')) {
+      _player.setProperty('avformat.fflags', '+nobuffer');
+      _player.setProperty('avformat.fpsprobesize', '0');
+      _player.setBufferRange(min: 0, max: 0, drop: true);
+    }
+
+    // SRT 低延迟配置
+    if (url.startsWith('srt://')) {
+      _player.setProperty('avformat.fflags', '+nobuffer');
+      _player.setProperty('avformat.fpsprobesize', '0');
+      _player.setBufferRange(min: 0, max: 0, drop: true);
+    }
+
+    // UDP/TCP 实时流低延迟
+    if (url.startsWith('udp://') || url.startsWith('tcp://')) {
+      _player.setProperty('avformat.fflags', '+nobuffer');
+      _player.setProperty('avformat.fpsprobesize', '0');
+      _player.setBufferRange(min: 0, max: 0, drop: true);
+    }
+
+    // HTTP/HTTPS 启用解复用缓存（加速 seek）
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      _player.setProperty('demux.buffer.ranges', '1');
+    }
+  }
+
   /// 通用守卫：disposed 检查 + try-catch + debugPrint
   void _guardedAction(String name, void Function() action) {
     if (_disposed) return;
@@ -174,6 +232,11 @@ class FvpEngine implements MediaEngine {
     try {
       _player.media = trimmed;
 
+      // URL 源自动配置网络参数，本地文件跳过
+      if (PathValidator.isUrl(trimmed)) {
+        _configureNetworkOptions(trimmed);
+      }
+
       final prepareResult = await _player.prepare().timeout(
         const Duration(seconds: _prepareTimeoutSeconds),
         onTimeout: () => -99,
@@ -182,7 +245,9 @@ class FvpEngine implements MediaEngine {
       if (prepareResult < 0) {
         state.value = MediaState.error;
         _errorType = prepareResult == -99
-            ? MediaErrorType.file
+            ? (PathValidator.isUrl(trimmed)
+                ? MediaErrorType.network
+                : MediaErrorType.file)
             : MediaErrorType.codec;
         errorMessage.value = prepareResult == -99
             ? '打开超时: ${PathUtils.basename(trimmed)}'
@@ -268,7 +333,9 @@ class FvpEngine implements MediaEngine {
       errorMessage.value = null;
     } on Exception catch (e) {
       state.value = MediaState.error;
-      _errorType = MediaErrorType.playback;
+      _errorType = PathValidator.isUrl(trimmed)
+          ? MediaErrorType.network
+          : MediaErrorType.playback;
       errorMessage.value = '无法打开: ${PathUtils.basename(path)}\n$e';
     } finally {
       isBuffering.value = false;

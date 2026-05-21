@@ -124,13 +124,13 @@ mixin StateMonitor on PlaybackContract {
 
 ## 2. Platform Integration (平台集成)
 
-### 2.1 PlatformService -- 窗口操作代理
+### 2.1 WindowBridge -- 窗口操作接口
 
-**文件:** `lib/kernel/services/platform_service.dart`
+**文件:** `lib/kernel/bridge/window_bridge.dart`
 
-**职责:** 窗口管理操作的抽象接口。UI代码依赖此接口，不依赖具体实现。
+**职责:** 窗口管理操作的抽象接口。UI 代码通过 `WindowBridge.I` 访问窗口状态和操作。
 
-**设计模式:** 带透明代理回退的单例。`PlatformService.I` 返回 `_Proxy` (委托给 `WindowBridge.I`)。通过 `PlatformService.init()` 注入显式实现时保持向后兼容。
+**设计模式:** 带 NoopWindowBridge 回退的注入式单例。通过 `WindowBridge.inject()` 注入平台实现（由 `WindowBootstrap` 调用）。
 
 **关键 API:**
 ```dart
@@ -428,8 +428,10 @@ PlaylistStore
   ├── Playlist (序列化)
   └── path_provider (文件系统)
 
-PlatformService
-  └── WindowBridge (原生窗口操作)
+WindowBridge (原生窗口操作)
+  ├── WindowService (Windows)
+  ├── LinuxWindowService (Linux)
+  └── MacosWindowService (macOS)
 ```
 
 ---
@@ -444,7 +446,7 @@ PlatformService
 | CQS | Playlist | peekNext/Previous 纯查询不修改状态 |
 | 防抖持久化 | PlaylistStore(300ms), VideoProcessing(50ms) | 合并快速状态变更为单次磁盘写入 |
 | 原子文件写入 | PlaylistStore._flush | 先写.tmp再rename |
-| 带代理回退的单例 | PlatformService | _Proxy 委托给 WindowBridge |
+| 带 Noop 回退的注入单例 | WindowBridge | NoopWindowBridge 安全降级 |
 | 响应式ValueNotifier | 全局 | 无外部状态管理包 |
 | 防御性序列化 | Playlist.fromJson, SettingsStore.load | 钳位索引、跳过损坏项、回退默认值 |
 | 输入安全 | PathValidator | 扩展名白名单 + 路径遍历防护 |

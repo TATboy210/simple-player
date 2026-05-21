@@ -333,7 +333,7 @@ Container (width: Tokens.playlistPanelWidth, bgPanel, border left)
 | `normal` | 16 | 控制栏 |
 | `thick` | 24 | 对话框 |
 
-**`respectResizeState`**: 为 true 时监听 `PlatformService.I.isResizing`，窗口调整大小期间跳过 `BackdropFilter`，降级为纯色 `bgGlass`。防止调整大小期间GPU卡顿。
+**`respectResizeState`**: 为 true 时监听 `WindowBridge.I.isResizing`，窗口调整大小期间跳过 `BackdropFilter`，降级为纯色 `bgGlass`。防止调整大小期间GPU卡顿。
 
 ### 13.2 GlassIconButton -- 毛玻璃图标按钮
 

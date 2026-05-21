@@ -125,7 +125,7 @@ lib/
 │  └── StateMonitor     (生命周期/自动续播/持久化)            │
 │  VideoProcessingService (7个ValueNotifier)                │
 │  SubtitleService      (外挂字幕检测)                      │
-│  PlatformService      (窗口操作代理)                      │
+│  (UI 直接使用 WindowBridge.I — 无需代理层)                │
 │  PathValidator        (路径安全验证)                      │
 └───────────────────────┬─────────────────────────────────┘
                         │
@@ -228,8 +228,7 @@ main()
 ```
 test/
 ├── helpers/
-│   ├── fake_engine.dart              # Mock MediaEngine
-│   └── fake_platform_service.dart    # Mock PlatformService
+│   └── fake_engine.dart              # Mock MediaEngine
 ├── kernel/                           # 内核层单元测试
 │   ├── bridge/window_bridge_test.dart
 │   ├── engine/

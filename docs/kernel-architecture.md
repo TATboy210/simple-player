@@ -22,16 +22,12 @@ lib/kernel/
 │   ├── playback_navigator.dart  141L  mixin PlaybackNavigator
 │   ├── state_monitor.dart       147L  mixin StateMonitor
 │   ├── file_operations.dart      81L  mixin FileOperations
-│   ├── video_processing_service.dart 121L  VideoProcessingService
-│   └── platform_service.dart     41L  abstract PlatformService (singleton)
+│   └── video_processing_service.dart 121L  VideoProcessingService
 ├── persistence/               # 持久化层
 │   ├── settings_store.dart      314L  SettingsStore + AppSettings
 │   └── playlist_store.dart      172L  PlaylistStore
 ├── playlist/                  # 播放列表模型
 │   └── playlist.dart           310L  Playlist
-├── platform/                  # 平台适配层
-│   ├── windows_platform_service.dart  13L  WindowsPlatformService
-│   └── linux_platform_service.dart    12L  LinuxPlatformService
 ├── ui/                        # 内核 UI
 │   └── theme/
 │       ├── tokens.dart          53L  Tokens (33 static const)
@@ -69,7 +65,7 @@ lib/kernel/
 │   └────────────┘  └───────────────┘  └──────────────┘               │
 │                                                                      │
 │   ┌──────────────────────┐  ┌──────────────────┐                    │
-│   │VideoProcessingService│  │ PlatformService   │                    │
+│   │VideoProcessingService│  │  WindowBridge    │                    │
 │   │    (concrete)        │  │   (abstract)      │                    │
 │   └──────────────────────┘  └──────────────────┘                    │
 └────┬──────────┬───────────────┬──────────────┬───────────────────────┘
@@ -241,16 +237,6 @@ classDiagram
         +VideoProcessingService(MediaEngine, {AppSettings?})
         +resetAll() void
         +dispose() void
-    }
-
-    class PlatformService {
-        <<abstract>>
-        +static PlatformService I
-        +static bool isInitialized
-        +static init(PlatformService impl) void
-        +static reset() void
-        +initService() Future~void~
-        +dispose() Future~void~
     }
 
     PlaybackController ..|> PlaybackNavigator : with
@@ -496,32 +482,47 @@ classDiagram
 
 ---
 
-## 8. Platform Layer — 平台适配层
+## 8. Window Management — 窗口管理层
 
 ```mermaid
 classDiagram
-    class PlatformService {
-        <<abstract singleton>>
-        +static PlatformService I
-        +static bool isInitialized
-        +static init(PlatformService) void
-        +static reset() void
-        +initService() Future~void~
-        +dispose() Future~void~
+    class WindowBridge {
+        <<abstract>>
+        +static WindowBridge I
+        +static inject(WindowBridge) void
+        +minimize() Future~void~
+        +toggleMaximize() Future~void~
+        +close() Future~void~
+        +toggleFullscreen() Future~void~
+        +exitFullscreen() Future~void~
+        +toggleAlwaysOnTop() Future~void~
+        +startDragging() Future~void~
+        +ValueNotifier~WindowMode~ mode
+        +ValueNotifier~bool~ isAlwaysOnTop
+        +ValueNotifier~bool~ isMaximized
+        +ValueNotifier~bool~ isResizing
     }
 
-    class WindowsPlatformService {
-        +initService() Future~void~
-        +dispose() Future~void~
+    class WindowService {
+        Windows Win32 FFI 实现
     }
 
-    class LinuxPlatformService {
-        +initService() Future~void~
-        +dispose() Future~void~
+    class LinuxWindowService {
+        window_manager API 实现
     }
 
-    PlatformService <|.. WindowsPlatformService : implements
-    PlatformService <|.. LinuxPlatformService : implements
+    class MacosWindowService {
+        window_manager API 实现
+    }
+
+    class NoopWindowBridge {
+        安全降级（全空操作）
+    }
+
+    WindowBridge <|.. WindowService : implements
+    WindowBridge <|.. LinuxWindowService : implements
+    WindowBridge <|.. MacosWindowService : implements
+    WindowBridge <|.. NoopWindowBridge : implements
 ```
 
 ---
@@ -625,9 +626,10 @@ main.dart
             ├─→ PlaylistStore ←→ File (JSON)
             ├─→ VideoProcessingService
             │    └─→ SettingsStore
-            ├─→ PlatformService (singleton)
-            │    ├─→ WindowsPlatformService
-            │    └─→ LinuxPlatformService
+            ├─→ WindowBridge (inject singleton)
+            │    ├─→ WindowService (Windows)
+            │    ├─→ LinuxWindowService (Linux)
+            │    └─→ MacosWindowService (macOS)
             └─→ AppTheme → Tokens
 ```
 
@@ -647,7 +649,7 @@ main.dart
 | 8 | `StateMonitor` | mixin | `services/state_monitor.dart` | 147 | 状态监听 + 持久化 |
 | 9 | `FileOperations` | mixin | `services/file_operations.dart` | 81 | 文件打开/批量添加 |
 | 10 | `VideoProcessingService` | concrete | `services/video_processing_service.dart` | 121 | 亮度/对比度/饱和度/色调/旋转/去隔行/宽高比 |
-| 11 | `PlatformService` | abstract | `services/platform_service.dart` | 41 | 平台抽象 (singleton) |
+| 11 | `WindowBridge` | abstract | `bridge/window_bridge.dart` | 72 | 窗口操作接口 (inject singleton) |
 | 12 | `SettingsStore` | static | `persistence/settings_store.dart` | 314 | SharedPreferences 封装 |
 | 13 | `PlaylistStore` | static | `persistence/playlist_store.dart` | 172 | JSON 文件持久化 |
 | 14 | `Playlist` | concrete | `playlist/playlist.dart` | 310 | 播放列表模型 + 4种播放模式 |

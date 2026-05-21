@@ -9,6 +9,7 @@ class GlassIconButton extends StatelessWidget {
   final double iconSize;
   final Color? color;
   final VoidCallback? onPressed;
+  final void Function(TapUpDetails details)? onSecondaryTapUp;
   final String? tooltip;
 
   const GlassIconButton({
@@ -18,6 +19,7 @@ class GlassIconButton extends StatelessWidget {
     this.iconSize = Tokens.iconLg,
     this.color = Tokens.textPrimary,
     this.onPressed,
+    this.onSecondaryTapUp,
     this.tooltip,
   }) : assert(
          icon != null || child != null,
@@ -39,6 +41,7 @@ class GlassIconButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(Tokens.radiusBtn),
           child: InkWell(
             onTap: onPressed,
+            onSecondaryTapUp: onSecondaryTapUp,
             hoverColor: Tokens.bgHover,
             highlightColor: Colors.transparent,
             borderRadius: BorderRadius.circular(Tokens.radiusBtn),

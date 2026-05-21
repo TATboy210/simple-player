@@ -92,9 +92,6 @@ class Tokens {
   static const progressPlayed = Color(0xFF6C5CE7);
   static const progressBuffer = Color(0x44FFFFFF);
 
-  // ── 播放列表面板 ──
-  static const playlistPanelWidth = 300.0;
-
   // ── 缩放 ──
   static const hoverScale = 1.02;
   static const pressScale = 0.98;

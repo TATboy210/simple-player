@@ -242,6 +242,36 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// General settings tab label
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get generalTab;
+
+  /// Language setting label
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// Theme setting label
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get theme;
+
+  /// Shortcuts settings tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get shortcutsTab;
+
+  /// About tab label
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get aboutTab;
+
   /// Equalizer tab label in settings
   ///
   /// In en, this message translates to:
@@ -763,6 +793,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playback Progress'**
   String get progressBar;
+
+  /// Tooltip for speed decrease button
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease Speed'**
+  String get speedDecrease;
+
+  /// Tooltip for speed label showing reset hint
+  ///
+  /// In en, this message translates to:
+  /// **'Speed (double-click to reset)'**
+  String get speedReset;
+
+  /// Tooltip for speed increase button
+  ///
+  /// In en, this message translates to:
+  /// **'Increase Speed'**
+  String get speedIncrease;
+
+  /// Tab label for folder scan view in floating playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get folderTab;
+
+  /// Context menu item to resume from breakpoint
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get resumeAction;
+
+  /// Context menu item to open containing folder
+  ///
+  /// In en, this message translates to:
+  /// **'Open File Location'**
+  String get openFileLocation;
+
+  /// Context menu item to clear all playback history
+  ///
+  /// In en, this message translates to:
+  /// **'Clear History'**
+  String get clearHistory;
+
+  /// Context menu item to scan folder for other videos
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Folder'**
+  String get scanFolder;
+
+  /// Shown when folder scan finds no video files
+  ///
+  /// In en, this message translates to:
+  /// **'No videos in folder'**
+  String get noVideosInFolder;
+
+  /// Theme preset: midnight blue
+  ///
+  /// In en, this message translates to:
+  /// **'Midnight'**
+  String get themeMidnight;
+
+  /// Theme preset: ocean cyan
+  ///
+  /// In en, this message translates to:
+  /// **'Ocean'**
+  String get themeOcean;
+
+  /// Theme preset: forest green
+  ///
+  /// In en, this message translates to:
+  /// **'Forest'**
+  String get themeForest;
+
+  /// Label for app version
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get version;
+
+  /// Label for technology stack
+  ///
+  /// In en, this message translates to:
+  /// **'Tech Stack'**
+  String get techStack;
+
+  /// Button to show open source licenses
+  ///
+  /// In en, this message translates to:
+  /// **'Licenses'**
+  String get licenses;
+
+  /// Copyright/technology description
+  ///
+  /// In en, this message translates to:
+  /// **'Built with Flutter + fvp (MDK/FFmpeg)'**
+  String get copyright;
+
+  /// Button to reset all keyboard shortcuts to defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Default'**
+  String get resetShortcuts;
+
+  /// Hint shown when waiting for user to press a key for binding
+  ///
+  /// In en, this message translates to:
+  /// **'Press a key...'**
+  String get pressKeyToBind;
+
+  /// Warning when a key is already assigned to another action
+  ///
+  /// In en, this message translates to:
+  /// **'Key already bound'**
+  String get shortcutConflict;
+
+  /// Shortcut label for cycling aspect ratio
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle Aspect Ratio'**
+  String get shortcutAspectCycle;
+
+  /// Quick menu label for current theme section
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get currentTheme;
+
+  /// Confirm button
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// Cancel button
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// Apply button - save without closing
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
 }
 
 class _AppLocalizationsDelegate

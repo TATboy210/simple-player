@@ -1,390 +1,266 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../l10n/app_localizations.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
-import '../../kernel/utils/time_utils.dart';
 import '../../kernel/ui/theme/tokens.dart';
+import '../../l10n/app_localizations.dart';
+import 'folder_tab.dart';
+import 'history_tab.dart';
 
-/// 右侧播放列表面板 — 播放列表 / 播放历史 标签页切换
+/// 沉浸式浮窗播放列表 — 浮在控制栏上方，毛玻璃背景，水平缩略图
 ///
-/// 功能：
-/// - 拖拽排序、点击播放、关闭按钮
-/// - 断点位置显示（subtitle）
-/// - 右键菜单（播放/复制路径/属性/移除）
-/// - Tooltip（断点/总时长信息）
-/// - 播放列表 / 播放历史 标签切换
+/// 结构：
+/// - 上 1/5: tab 切换（文件夹 / 历史）
+/// - 下 4/5: 水平缩略图列表
+///
+/// 交互：
+/// - 点击按钮切换显示/隐藏（由父组件控制 [visible]）
+/// - 点击外部区域关闭
+/// - Escape 关闭
 class PlaylistPanel extends StatefulWidget {
   final Playlist playlist;
+  final bool visible;
+  final VoidCallback onClose;
   final void Function(int index) onSelectIndex;
   final void Function(int index) onRemoveIndex;
-  final void Function(int oldIndex, int newIndex) onReorder;
-  final VoidCallback onClear;
   final void Function(String path)? onShowProperties;
+  final void Function(String folderPath, List<PlaylistItem> scanned)?
+  onFolderScanned;
+  final VoidCallback? onClearHistory;
 
   const PlaylistPanel({
     super.key,
     required this.playlist,
+    required this.visible,
+    required this.onClose,
     required this.onSelectIndex,
     required this.onRemoveIndex,
-    required this.onReorder,
-    required this.onClear,
     this.onShowProperties,
+    this.onFolderScanned,
+    this.onClearHistory,
   });
 
   @override
   State<PlaylistPanel> createState() => _PlaylistPanelState();
 }
 
-class _PlaylistPanelState extends State<PlaylistPanel> {
-  int _selectedTab = 0; // 0=播放列表, 1=播放历史
+class _PlaylistPanelState extends State<PlaylistPanel>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+  late final Animation<Offset> _slideAnim;
+  late final Animation<double> _fadeAnim;
+  final _focusNode = FocusNode();
+  int _selectedTab = 0; // 0=文件夹, 1=历史
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: Tokens.playlistPanelWidth,
-      decoration: const BoxDecoration(
-        color: Tokens.bgPanel,
-        border: Border(
-          left: BorderSide(color: Tokens.borderHighlight, width: 1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Header(
-            itemCount: widget.playlist.items.length,
-            selectedTab: _selectedTab,
-            onTabChanged: (i) => setState(() => _selectedTab = i),
-            onClear: widget.onClear,
-          ),
-          const Divider(height: 1, color: Tokens.bgHover),
-          Expanded(
-            child: _selectedTab == 0 ? _buildPlaylist() : _buildHistory(),
-          ),
-        ],
-      ),
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      duration: const Duration(milliseconds: Tokens.durationSlide),
+      vsync: this,
     );
-  }
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+    _fadeAnim = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
 
-  Widget _buildPlaylist() {
-    final items = widget.playlist.items;
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          AppLocalizations.of(context).playlistEmpty,
-          style: const TextStyle(
-            color: Tokens.textDisabled,
-            fontSize: Tokens.fontCaption,
-          ),
-        ),
-      );
+    if (widget.visible) {
+      _anim.forward();
+      _requestFocus();
     }
-    return ReorderableListView.builder(
-      itemCount: items.length,
-      onReorderItem: (oldIndex, newIndex) {
-        // onReorderItem passes unadjusted newIndex; Playlist.reorder expects adjusted
-        if (oldIndex < newIndex) newIndex -= 1;
-        widget.onReorder(oldIndex, newIndex);
-      },
-      itemBuilder: (_, index) {
-        final item = items[index];
-        final isCurrent = index == widget.playlist.currentIndex;
-        return _PlaylistItemTile(
-          key: ValueKey(item.path),
-          item: item,
-          isCurrent: isCurrent,
-          onSelect: () => widget.onSelectIndex(index),
-          onRemove: () => widget.onRemoveIndex(index),
-          onShowProperties: widget.onShowProperties,
-        );
-      },
-    );
   }
-
-  Widget _buildHistory() {
-    // 播放历史：显示有播放记录的项目（按最近播放排序）
-    final historyItems =
-        widget.playlist.items
-            .asMap()
-            .entries
-            .where((e) => (e.value.timestamp ?? 0) > 0)
-            .toList()
-          ..sort(
-            (a, b) =>
-                (b.value.timestamp ?? 0).compareTo(a.value.timestamp ?? 0),
-          );
-
-    if (historyItems.isEmpty) {
-      return Center(
-        child: Text(
-          AppLocalizations.of(context).noHistory,
-          style: const TextStyle(
-            color: Tokens.textDisabled,
-            fontSize: Tokens.fontCaption,
-          ),
-        ),
-      );
-    }
-    return ListView.builder(
-      itemCount: historyItems.length,
-      itemBuilder: (_, i) {
-        final entry = historyItems[i];
-        final item = entry.value;
-        final originalIndex = entry.key;
-        final isCurrent = originalIndex == widget.playlist.currentIndex;
-        return _PlaylistItemTile(
-          key: ValueKey('history_${item.path}'),
-          item: item,
-          isCurrent: isCurrent,
-          onSelect: () => widget.onSelectIndex(originalIndex),
-          onRemove: () => widget.onRemoveIndex(originalIndex),
-          onShowProperties: widget.onShowProperties,
-        );
-      },
-    );
-  }
-}
-
-/// 播放列表单项 — 断点显示 + Tooltip + 右键菜单
-class _PlaylistItemTile extends StatelessWidget {
-  final PlaylistItem item;
-  final bool isCurrent;
-  final VoidCallback onSelect;
-  final VoidCallback onRemove;
-  final void Function(String path)? onShowProperties;
-
-  const _PlaylistItemTile({
-    super.key,
-    required this.item,
-    required this.isCurrent,
-    required this.onSelect,
-    required this.onRemove,
-    this.onShowProperties,
-  });
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final hasBreakpoint = (item.positionMs ?? 0) > 0;
-    final baseTooltip = hasBreakpoint
-        ? l10n.lastPlayedAt(formatMs(item.positionMs!))
-        : '';
-    final durationPart = item.durationMs != null
-        ? ' / ${formatMs(item.durationMs!)}'
-        : '';
-    final tooltipText = hasBreakpoint ? '$baseTooltip$durationPart' : '';
-
-    Widget tile = Material(
-      color: isCurrent ? Tokens.bgHover : Colors.transparent,
-      child: ListTile(
-        dense: true,
-        selected: isCurrent,
-        selectedTileColor: Tokens.bgHover,
-        leading: Icon(
-          hasBreakpoint ? Icons.play_circle : Icons.play_arrow,
-          color: isCurrent
-              ? Tokens.accent
-              : (hasBreakpoint ? Tokens.accent : Tokens.textDisabled),
-          size: Tokens.iconMd,
-        ),
-        title: Text(
-          item.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: isCurrent ? Tokens.accent : Tokens.textPrimary,
-            fontSize: Tokens.fontCaption,
-          ),
-        ),
-        subtitle: hasBreakpoint
-            ? Text(
-                l10n.breakpointAt(formatMs(item.positionMs!)),
-                style: const TextStyle(
-                  color: Tokens.accent,
-                  fontSize: Tokens.fontOverline,
-                ),
-              )
-            : null,
-        trailing: IconButton(
-          icon: const Icon(Icons.close, size: 14, color: Tokens.textDisabled),
-          onPressed: onRemove,
-          splashRadius: 14,
-          tooltip: l10n.remove,
-        ),
-        onTap: onSelect,
-      ),
-    );
-
-    // Tooltip（仅有断点时显示）
-    if (tooltipText.isNotEmpty) {
-      tile = Tooltip(
-        message: tooltipText,
-        waitDuration: const Duration(milliseconds: 400),
-        child: tile,
-      );
-    }
-
-    // 右键菜单
-    return GestureDetector(
-      onSecondaryTap: () => _showContextMenu(context),
-      child: tile,
-    );
-  }
-
-  void _showContextMenu(BuildContext context) {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final button = context.findRenderObject() as RenderBox;
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(
-          button.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
-    );
-
-    final l10n = AppLocalizations.of(context);
-    showMenu<String>(
-      context: context,
-      position: position,
-      color: Tokens.bgElevated,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Tokens.radiusPopup),
-      ),
-      items: [
-        PopupMenuItem(
-          value: 'play',
-          child: _MenuItemRow(Icons.play_arrow, l10n.playAction),
-        ),
-        PopupMenuItem(
-          value: 'copy',
-          child: _MenuItemRow(Icons.copy, l10n.copyPath),
-        ),
-        const PopupMenuDivider(),
-        if (onShowProperties != null)
-          PopupMenuItem(
-            value: 'properties',
-            child: _MenuItemRow(Icons.info_outline, l10n.properties),
-          ),
-        PopupMenuItem(
-          value: 'remove',
-          child: _MenuItemRow(Icons.delete_outline, l10n.remove),
-        ),
-      ],
-    ).then((value) {
-      if (value == null || !context.mounted) return;
-      switch (value) {
-        case 'play':
-          onSelect();
-          break;
-        case 'copy':
-          Clipboard.setData(ClipboardData(text: item.path));
-          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-            SnackBar(
-              content: Text(l10n.pathCopied),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-          break;
-        case 'properties':
-          onShowProperties?.call(item.path);
-          break;
-        case 'remove':
-          onRemove();
-          break;
+  void didUpdateWidget(covariant PlaylistPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible != oldWidget.visible) {
+      if (widget.visible) {
+        _anim.forward();
+        _requestFocus();
+      } else {
+        _anim.reverse();
+        _focusNode.unfocus();
       }
+    }
+  }
+
+  void _requestFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
     });
   }
-}
 
-class _MenuItemRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _MenuItemRow(this.icon, this.label);
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    _anim.dispose();
+    super.dispose();
+  }
+
+  static const _panelWidth = 420.0;
+  static const _panelHeight = 240.0;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Stack(
       children: [
-        Icon(icon, size: Tokens.iconMd, color: Tokens.textSecondary),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Tokens.textPrimary,
-            fontSize: Tokens.fontCaption,
+        // 全屏透明层 — 点击外部关闭
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: widget.onClose,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        // 浮窗面板
+        Positioned(
+          right: Tokens.controlBarMarginH,
+          bottom:
+              Tokens.controlBarMarginBottom +
+              Tokens.controlBarHeight +
+              Tokens.spLg,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: _buildPanel(_panelWidth, _panelHeight),
+            ),
           ),
         ),
       ],
     );
   }
-}
 
-class _Header extends StatelessWidget {
-  final int itemCount;
-  final int selectedTab;
-  final ValueChanged<int> onTabChanged;
-  final VoidCallback onClear;
+  Widget _buildPanel(double width, double height) {
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: false,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          widget.onClose();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: () {}, // 拦截点击，不穿透到外部关闭层
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(
+                sigmaX: Tokens.glassBlurThick,
+                sigmaY: Tokens.glassBlurThick,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Tokens.bgGlass,
+                  borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                  border: Border.all(color: Tokens.borderHighlight, width: 1),
+                ),
+                child: Column(
+                  children: [
+                    // tab 切换
+                    SizedBox(height: 36, child: _buildTabBar()),
+                    // 光条分隔线
+                    Container(
+                      height: 1,
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: Tokens.spMd,
+                      ),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            Tokens.borderHighlight,
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                    // 内容
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-  const _Header({
-    required this.itemCount,
-    required this.selectedTab,
-    required this.onTabChanged,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildTabBar() {
     final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: Tokens.spMd,
-        vertical: Tokens.spSm,
+        vertical: Tokens.spXs,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 标签行：播放列表 / 播放历史
-          Row(
-            children: [
-              _TabButton(
-                label: l10n.playlistTab,
-                selected: selectedTab == 0,
-                onTap: () => onTabChanged(0),
-              ),
-              const SizedBox(width: Tokens.spSm),
-              _TabButton(
-                label: l10n.historyTab,
-                selected: selectedTab == 1,
-                onTap: () => onTabChanged(1),
-              ),
-              const Spacer(),
-              if (itemCount > 0 && selectedTab == 0)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: Tokens.iconMd),
-                  color: Tokens.textDisabled,
-                  onPressed: onClear,
-                  splashRadius: 16,
-                  tooltip: l10n.clear,
-                ),
-            ],
+          _TabChip(
+            icon: Icons.folder,
+            label: l10n.folderTab,
+            selected: _selectedTab == 0,
+            onTap: () => setState(() => _selectedTab = 0),
+          ),
+          const SizedBox(width: Tokens.spLg),
+          _TabChip(
+            icon: Icons.history,
+            label: l10n.historyTab,
+            selected: _selectedTab == 1,
+            onTap: () => setState(() => _selectedTab = 1),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildContent() {
+    final items = widget.playlist.items;
+    final currentIndex = widget.playlist.currentIndex;
+
+    if (_selectedTab == 0) {
+      return FolderTab(
+        items: items,
+        currentIndex: currentIndex,
+        onSelectIndex: widget.onSelectIndex,
+        onRemoveIndex: widget.onRemoveIndex,
+        onShowProperties: widget.onShowProperties,
+        onFolderScanned: widget.onFolderScanned,
+      );
+    }
+    return HistoryTab(
+      items: items,
+      currentIndex: currentIndex,
+      onSelectIndex: widget.onSelectIndex,
+      onRemoveIndex: widget.onRemoveIndex,
+      onShowProperties: widget.onShowProperties,
+      onClearHistory: widget.onClearHistory,
+    );
+  }
 }
 
-class _TabButton extends StatelessWidget {
+/// Tab 芯片 — 图标 + 文字，选中时 accent 高亮
+class _TabChip extends StatelessWidget {
+  final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _TabButton({
+  const _TabChip({
+    required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -392,12 +268,10 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: GestureDetector(
-        onTap: onTap,
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         child: Container(
           padding: const EdgeInsets.symmetric(
             horizontal: Tokens.spSm,
@@ -406,14 +280,30 @@ class _TabButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? Tokens.bgHover : Colors.transparent,
             borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            border: selected
+                ? Border.all(color: Tokens.borderHighlight, width: 1)
+                : null,
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Tokens.accent : Tokens.textDisabled,
-              fontSize: Tokens.fontCaption,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: selected ? Tokens.accent : Tokens.textDisabled,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Tokens.accent : Tokens.textDisabled,
+                  fontSize: Tokens.fontCaption,
+                  fontWeight: selected
+                      ? Tokens.weightSemiBold
+                      : Tokens.weightRegular,
+                ),
+              ),
+            ],
           ),
         ),
       ),

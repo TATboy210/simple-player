@@ -27,6 +27,11 @@
   "shortcutMediaKeys": "播放/暂停/上一首/下一首",
 
   "settings": "设置",
+  "generalTab": "通用",
+  "language": "语言",
+  "theme": "主题",
+  "shortcutsTab": "快捷键",
+  "aboutTab": "关于",
   "equalizer": "均衡器",
   "audioTrack": "音轨",
   "videoTab": "视频",
@@ -124,5 +129,35 @@
   "aspectRatioCropFill": "裁剪填充",
   "aspectRatioFree": "自由",
 
-  "progressBar": "播放进度"
+  "progressBar": "播放进度",
+
+  "speedDecrease": "减速",
+  "speedReset": "倍速 (双击重置)",
+  "speedIncrease": "加速",
+
+  "folderTab": "文件夹",
+  "resumeAction": "继续播放",
+  "openFileLocation": "打开文件所在目录",
+  "clearHistory": "清空历史",
+  "scanFolder": "扫描文件夹",
+  "noVideosInFolder": "文件夹中无视频",
+
+  "themeMidnight": "午夜",
+  "themeOcean": "海洋",
+  "themeForest": "森林",
+  "version": "版本",
+  "techStack": "技术栈",
+  "licenses": "开源许可",
+  "copyright": "基于 Flutter + fvp (MDK/FFmpeg) 构建",
+
+  "resetShortcuts": "恢复默认",
+  "pressKeyToBind": "请按下新按键...",
+  "shortcutConflict": "按键已被占用",
+  "shortcutAspectCycle": "切换宽高比",
+
+  "currentTheme": "当前主题",
+
+  "ok": "确定",
+  "cancel": "取消",
+  "apply": "应用"
 }
