@@ -19,6 +19,10 @@ class PlaylistStore {
   static const _historyFileName = 'history.json';
   static const _debounceMs = 300;
 
+  /// 写入重试配置 — 指数退避，覆盖磁盘满/临时锁等瞬态故障
+  static const _maxRetries = 3;
+  static const _retryBaseDelayMs = 100;
+
   static Timer? _debounce;
 
   /// 存 JSON 快照（String），不存 Playlist 引用。
@@ -46,7 +50,7 @@ class PlaylistStore {
     _debounce = Timer(const Duration(milliseconds: _debounceMs), _flush);
   }
 
-  /// C3: 原子写入 — 写 .tmp 文件后 rename，防止崩溃/并发导致损坏
+  /// C3: 原子写入 + 指数退避重试 — 写 .tmp 后 rename，失败最多重试 3 次
   static Future<void> _flush() async {
     final json = _pendingJson;
     if (json == null) return;
@@ -61,12 +65,22 @@ class PlaylistStore {
 
     try {
       final f = await _file();
-      final tmpFile = File('${f.path}.tmp');
-      await tmpFile.writeAsString(json, flush: true);
-      // 原子重命名 — 在 Windows/POSIX 上都是原子操作
-      await tmpFile.rename(f.path);
-    } on Exception catch (e) {
-      debugPrint('PlaylistStore._flush failed: $e');
+      for (var attempt = 0; attempt < _maxRetries; attempt++) {
+        try {
+          final tmpFile = File('${f.path}.tmp');
+          await tmpFile.writeAsString(json, flush: true);
+          await tmpFile.rename(f.path);
+          return; // 写入成功
+        } on Exception catch (e) {
+          debugPrint('PlaylistStore._flush attempt ${attempt + 1} failed: $e');
+          if (attempt < _maxRetries - 1) {
+            await Future<void>.delayed(
+              Duration(milliseconds: _retryBaseDelayMs * (1 << attempt)),
+            );
+          }
+        }
+      }
+      debugPrint('PlaylistStore._flush: all $_maxRetries attempts failed');
     } finally {
       completer.complete();
       if (_writeInFlight == completer.future) {

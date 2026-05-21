@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -124,6 +126,8 @@ class SettingsStore {
   static const _keyVideoAspectRatio = 'videoAspectRatio';
   static const _keyVideoDeinterlace = 'videoDeinterlace';
   static const _keyLocale = 'locale';
+  static const _keyThemeIndex = 'themeIndex';
+  static const _keyShortcuts = 'shortcuts';
 
   static Future<AppSettings> load() async {
     try {
@@ -289,6 +293,43 @@ class SettingsStore {
   /// 保存语言偏好
   static Future<void> saveLocale(String localeCode) =>
       _save('saveLocale', (p) => p.setString(_keyLocale, localeCode));
+
+  /// 加载主题索引，默认 0（Midnight）
+  static Future<int> loadThemeIndex() async {
+    try {
+      final prefs = await _getPrefs();
+      return (prefs.getInt(_keyThemeIndex) ?? 0).clamp(0, 2);
+    } on Exception catch (e) {
+      debugPrint('SettingsStore.loadThemeIndex failed: $e');
+      return 0;
+    }
+  }
+
+  /// 保存主题索引
+  static Future<void> saveThemeIndex(int index) => _save(
+    'saveThemeIndex',
+    (p) => p.setInt(_keyThemeIndex, index.clamp(0, 2)),
+  );
+
+  /// 加载自定义快捷键映射 (action → LogicalKeyboardKey.keyName)
+  static Future<Map<String, String>> loadShortcuts() async {
+    try {
+      final prefs = await _getPrefs();
+      final json = prefs.getString(_keyShortcuts);
+      if (json == null || json.isEmpty) return {};
+      final decoded = jsonDecode(json) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, v as String));
+    } on Exception catch (e) {
+      debugPrint('SettingsStore.loadShortcuts failed: $e');
+      return {};
+    }
+  }
+
+  /// 保存自定义快捷键映射
+  static Future<void> saveShortcuts(Map<String, String> bindings) => _save(
+    'saveShortcuts',
+    (p) => p.setString(_keyShortcuts, jsonEncode(bindings)),
+  );
 
   static Future<void> saveSubtitleFontSize(double value) => _save(
     'saveSubtitleFontSize',

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../kernel/models/play_mode.dart';
 
-/// PlayMode → IconData 映射（避免 ControlBar + PlaylistPanel 两处 switch 重复）
+/// PlayMode → IconData 映射（避免多处 switch 重复）
 IconData playModeIcon(PlayMode mode) {
   return switch (mode) {
     PlayMode.loopAll => Icons.repeat,

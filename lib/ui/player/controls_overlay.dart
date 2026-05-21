@@ -22,6 +22,7 @@ class ControlsOverlay extends StatefulWidget {
   final VoidCallback? onNext;
   final VoidCallback? onTogglePlaylist;
   final VoidCallback? onSettings;
+  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onTogglePlayMode;
@@ -45,6 +46,7 @@ class ControlsOverlay extends StatefulWidget {
     this.onNext,
     this.onTogglePlaylist,
     this.onSettings,
+    this.onSettingsSecondary,
     this.onOpenFile,
     this.onToggleFullscreen,
     this.onTogglePlayMode,
@@ -162,6 +164,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                           onNext: widget.onNext,
                           onTogglePlaylist: widget.onTogglePlaylist,
                           onSettings: widget.onSettings,
+                          onSettingsSecondary: widget.onSettingsSecondary,
                           onOpenFile: widget.onOpenFile,
                           onToggleFullscreen: widget.onToggleFullscreen,
                           onTogglePlayMode: widget.onTogglePlayMode,

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,42 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'dart:ffi' hide Size;
+import 'package:ffi/ffi.dart';
 
 import '../kernel/bridge/window_bridge.dart';
 import '../kernel/persistence/settings_store.dart';
-import 'aspect_ratio_service.dart';
+import '../kernel/window/aspect_ratio_service.dart';
 import 'geometry_store.dart';
 
-const int _wsThickFrame = 0x00040000;
-
-final _user32 = DynamicLibrary.open('user32.dll');
-final _getWindowLongPtrW = _user32
-    .lookupFunction<IntPtr Function(IntPtr, Int32), int Function(int, int)>(
-      'GetWindowLongPtrW',
-    );
-final _setWindowLongPtrW = _user32
-    .lookupFunction<
-      IntPtr Function(IntPtr, Int32, IntPtr),
-      int Function(int, int, int)
-    >('SetWindowLongPtrW');
-final _getForegroundWindow = _user32
-    .lookupFunction<IntPtr Function(), int Function()>('GetForegroundWindow');
-
-/// Restore WS_THICKFRAME after setAsFrameless() strips it.
-/// Without this, WM_NCHITTEST resize borders don't work.
-void _restoreThickFrame() {
-  final hwnd = _getForegroundWindow();
-  if (hwnd == 0) return;
-  final style = _getWindowLongPtrW(hwnd, -16); // GWL_STYLE
-  if ((style & _wsThickFrame) == 0) {
-    _setWindowLongPtrW(hwnd, -16, style | _wsThickFrame);
-  }
-}
-
-/// 绐楀彛绠＄悊鏈嶅姟 鈥?Singleton锛屽疄鐜?WindowBridge
+/// Windows 窗口管理服务 — 实现 WindowBridge
 ///
 /// Runtime operations (fullscreen, drag, minimize, etc.) go through a unified
-/// MethodChannel `com.simple_player/window` 鈫?native C++ handler.
+/// MethodChannel `com.simple_player/window` ← native C++ handler.
 /// window_manager is only used for one-time initial setup.
 ///
 /// Reactive state via ValueNotifier, UI binds with ValueListenableBuilder.
@@ -52,7 +26,77 @@ class WindowService implements WindowBridge {
   final SharedPreferences _prefs;
   late final WindowGeometryStore _geometry;
 
-  // 鈹€鈹€鈹€ Reactive State 鈹€鈹€鈹€
+  // ─── Win32 FFI (lazy — only initialized on first use) ───
+
+  static const _wsThickFrame = 0x00040000;
+  static const _wsCaption = 0x00C00000;
+  static const _gwlStyle = -16;
+  static const _hwndTop = 0;
+  static const _swpFrameChanged = 0x0020;
+  static const _swpNoOwnerZOrder = 0x0200;
+  static const _monitorDefaultToNearest = 2;
+
+  static DynamicLibrary? _user32Lib;
+  static DynamicLibrary get _user32 =>
+      _user32Lib ??= DynamicLibrary.open('user32.dll');
+
+  static final _getWindowLongPtrW = _user32.lookupFunction<
+      IntPtr Function(IntPtr, Int32),
+      int Function(int, int)>('GetWindowLongPtrW');
+
+  static final _setWindowLongPtrW = _user32.lookupFunction<
+      IntPtr Function(IntPtr, Int32, IntPtr),
+      int Function(int, int, int)>('SetWindowLongPtrW');
+
+  static final _getForegroundWindow = _user32.lookupFunction<
+      IntPtr Function(),
+      int Function()>('GetForegroundWindow');
+
+  static final _monitorFromWindow = _user32.lookupFunction<
+      IntPtr Function(IntPtr, Uint32),
+      int Function(int, int)>('MonitorFromWindow');
+
+  static final _getMonitorInfoW = _user32.lookupFunction<
+      Int32 Function(IntPtr, Pointer<Void>),
+      int Function(int, Pointer<Void>)>('GetMonitorInfoW');
+
+  static final _setWindowPos = _user32.lookupFunction<
+      Int32 Function(
+          IntPtr, IntPtr, Int32, Int32, Int32, Int32, Uint32),
+      int Function(int, int, int, int, int, int, int)>('SetWindowPos');
+
+  /// Restore WS_THICKFRAME after setAsFrameless() strips it.
+  static void _restoreThickFrame() {
+    final hwnd = _getForegroundWindow();
+    if (hwnd == 0) return;
+    final style = _getWindowLongPtrW(hwnd, _gwlStyle);
+    if ((style & _wsThickFrame) == 0) {
+      _setWindowLongPtrW(hwnd, _gwlStyle, style | _wsThickFrame);
+    }
+  }
+
+  /// Get the monitor rect that covers the entire screen (including taskbar).
+  static RECT _getFullscreenMonitorRect(int hwnd) {
+    final monitor = _monitorFromWindow(hwnd, _monitorDefaultToNearest);
+    // MONITORINFO: cbSize(4) + rcMonitor(16) + rcWork(16) + dwFlags(4) = 40
+    final mi = calloc.allocate<Uint8>(40);
+    mi.cast<Uint32>().value = 40;
+    final ok = _getMonitorInfoW(monitor, mi.cast());
+    if (ok == 0) {
+      calloc.free(mi);
+      throw Exception('GetMonitorInfoW failed');
+    }
+    final base = mi.cast<Int32>();
+    final rect = RECT()
+      ..left = (base + 1).value
+      ..top = (base + 2).value
+      ..right = (base + 3).value
+      ..bottom = (base + 4).value;
+    calloc.free(mi);
+    return rect;
+  }
+
+  // ─── Reactive State ───
 
   @override
   final mode = ValueNotifier<WindowMode>(WindowMode.windowed);
@@ -63,12 +107,12 @@ class WindowService implements WindowBridge {
   @override
   final isResizing = ValueNotifier<bool>(false);
 
-  // 鈹€鈹€鈹€ Constants 鈹€鈹€鈹€
+  // ─── Constants ───
 
   static const _minSize = Size(800, 450);
   static const _resizeDebounceMs = 500;
 
-  /// Unified MethodChannel 鈥?all runtime window operations + C++ events
+  /// Unified MethodChannel — all runtime window operations + C++ events
   static const _channel = MethodChannel('com.simple_player/window');
 
   // 鈹€鈹€鈹€ Internal 鈹€鈹€鈹€
@@ -86,6 +130,7 @@ class WindowService implements WindowBridge {
   Offset? _windowedPosition;
   bool _closing = false;
   Completer<void>? _persistInFlight;
+  int _hwnd = 0;
 
   // 鈹€鈹€鈹€ Lifecycle 鈹€鈹€鈹€
 
@@ -142,6 +187,9 @@ class WindowService implements WindowBridge {
 
           await windowManager.show();
           await windowManager.focus();
+
+          // Cache HWND for Win32 fullscreen operations
+          _hwnd = _getForegroundWindow();
 
           // Restore fullscreen after frameless is confirmed
           if (saved.isFullscreen) {
@@ -266,7 +314,15 @@ class WindowService implements WindowBridge {
     }
   }
 
+  // PORTING: _enterFullscreenInternal/_exitFullscreenInternal use raw Win32.
+  // Linux: use window_manager.setFullScreen(true) or X11 _NET_WM_STATE_FULLSCREEN.
+  // macOS: use window_manager.setFullScreen(true) or NSWindow.toggleFullScreen.
   Future<void> _enterFullscreenInternal() async {
+    if (_hwnd == 0) {
+      debugPrint('[WindowService] enterFullscreen: HWND not available');
+      return;
+    }
+
     // Unlock aspect ratio so WM_SIZING won't constrain the resize
     _savedRatio = AspectRatioService.I.current;
     if (_savedRatio > 0) await AspectRatioService.I.unlock();
@@ -275,17 +331,28 @@ class WindowService implements WindowBridge {
     _windowedSize = await windowManager.getSize();
     _windowedPosition = await windowManager.getPosition();
 
-    // Optimistic update — UI reacts immediately
-    mode.value = WindowMode.fullscreen;
-
     try {
-      // Manual borderless fullscreen (setFullScreen doesn't work on frameless)
-      await windowManager.setHasShadow(false);
-      final screen = ui.PlatformDispatcher.instance.views.first;
-      final screenW = screen.physicalSize.width / screen.devicePixelRatio;
-      final screenH = screen.physicalSize.height / screen.devicePixelRatio;
-      await windowManager.setPosition(Offset.zero);
-      await windowManager.setSize(Size(screenW, screenH));
+      // 1. Get the monitor rect (covers entire screen including taskbar)
+      final rect = _getFullscreenMonitorRect(_hwnd);
+
+      // 2. Strip window border styles for true borderless fullscreen
+      final style = _getWindowLongPtrW(_hwnd, _gwlStyle);
+      _setWindowLongPtrW(
+          _hwnd, _gwlStyle, style & ~(_wsCaption | _wsThickFrame));
+
+      // 3. Atomically set position + size to cover entire monitor
+      _setWindowPos(
+        _hwnd,
+        _hwndTop,
+        rect.left,
+        rect.top,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+        _swpFrameChanged | _swpNoOwnerZOrder,
+      );
+
+      // 4. Update state after window has been resized
+      mode.value = WindowMode.fullscreen;
       await SettingsStore.saveIsFullscreen(true);
     } on Exception catch (e) {
       // Rollback on failure
@@ -299,24 +366,39 @@ class WindowService implements WindowBridge {
   }
 
   Future<void> _exitFullscreenInternal() async {
-    // Optimistic update
-    mode.value = WindowMode.windowed;
+    if (_hwnd == 0) {
+      debugPrint('[WindowService] exitFullscreen: HWND not available');
+      return;
+    }
 
     try {
-      // Restore windowed geometry
-      if (_windowedSize != null) {
-        await windowManager.setSize(_windowedSize!);
+      // 1. Restore WS_THICKFRAME for window resize borders
+      final style = _getWindowLongPtrW(_hwnd, _gwlStyle);
+      _setWindowLongPtrW(_hwnd, _gwlStyle, style | _wsThickFrame);
+
+      // 2. Restore windowed geometry atomically (avoids size→position flash)
+      if (_windowedSize != null && _windowedPosition != null) {
+        _setWindowPos(
+          _hwnd,
+          _hwndTop,
+          _windowedPosition!.dx.toInt(),
+          _windowedPosition!.dy.toInt(),
+          _windowedSize!.width.toInt(),
+          _windowedSize!.height.toInt(),
+          _swpFrameChanged | _swpNoOwnerZOrder,
+        );
       }
-      if (_windowedPosition != null) {
-        await windowManager.setPosition(_windowedPosition!);
-      }
+
       await windowManager.setHasShadow(true);
 
-      // Restore aspect ratio
+      // 3. Restore aspect ratio
       if (_savedRatio > 0) {
         await AspectRatioService.I.setAspectRatio(_savedRatio);
         _savedRatio = 0.0;
       }
+
+      // 4. Update state after window has been restored
+      mode.value = WindowMode.windowed;
       await SettingsStore.saveIsFullscreen(false);
     } on Exception catch (e) {
       // Rollback on failure
@@ -420,6 +502,13 @@ class WindowService implements WindowBridge {
   }
 }
 
+class RECT {
+  int left = 0;
+  int top = 0;
+  int right = 0;
+  int bottom = 0;
+}
+
 /// WindowListener adapter 鈥?routes resize/move events to WindowService
 class _WindowListener extends WindowListener {
   _WindowListener(this._service);
@@ -461,13 +550,12 @@ class _WindowListener extends WindowListener {
 
   @override
   void onWindowEnterFullScreen() {
-    _service.mode.value = WindowMode.fullscreen;
+    // Manual fullscreen handles mode.value directly — only persist here
     _service._geometry.saveFullscreen(true);
   }
 
   @override
   void onWindowLeaveFullScreen() {
-    _service.mode.value = WindowMode.windowed;
     _service._geometry.saveFullscreen(false);
   }
 

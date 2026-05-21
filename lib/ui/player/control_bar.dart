@@ -20,6 +20,7 @@ class ControlBar extends StatelessWidget {
   final VoidCallback? onNext;
   final VoidCallback? onTogglePlaylist;
   final VoidCallback? onSettings;
+  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onTogglePlayMode;
@@ -38,6 +39,7 @@ class ControlBar extends StatelessWidget {
     this.onNext,
     this.onTogglePlaylist,
     this.onSettings,
+    this.onSettingsSecondary,
     this.onOpenFile,
     this.onToggleFullscreen,
     this.onTogglePlayMode,
@@ -172,6 +174,9 @@ class ControlBar extends StatelessWidget {
           GlassIconButton(
             icon: Icons.settings,
             onPressed: onSettings,
+            onSecondaryTapUp: onSettingsSecondary != null
+                ? (d) => onSettingsSecondary!(context, d)
+                : null,
             tooltip: l10n.settings,
           ),
         if (onToggleFullscreen != null)

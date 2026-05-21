@@ -21,6 +21,10 @@ dependencies:
   dynamic_color: ^1.8.1
   widgets_easier: ^0.0.10
   flutter_easy_animations: ^0.0.2
+  ffi: ^2.1.4
+  path: ^1.9.1
+  win32: ^5.12.0
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:

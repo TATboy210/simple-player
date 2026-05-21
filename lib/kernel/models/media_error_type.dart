@@ -9,6 +9,9 @@ enum MediaErrorType {
   /// 播放错误（播放失败、跳转失败）
   playback,
 
+  /// 网络错误（URL 超时、连接失败、流中断）
+  network,
+
   /// 未知/其他错误
   unknown,
 }

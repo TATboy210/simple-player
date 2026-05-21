@@ -2,22 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/services/platform_service.dart';
+import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
 import 'package:simple_player_flutter/kernel/ui/window/custom_title_bar.dart';
 import 'package:simple_player_flutter/kernel/window/aspect_ratio_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
-import '../../helpers/fake_platform_service.dart';
+
+class _TestWindowBridge extends NoopWindowBridge {
+  @override
+  final isAlwaysOnTop = ValueNotifier<bool>(false);
+  @override
+  final isMaximized = ValueNotifier<bool>(false);
+  @override
+  final isResizing = ValueNotifier<bool>(false);
+}
 
 void main() {
-  late FakePlatformService fake;
+  late _TestWindowBridge fake;
 
   setUp(() {
-    fake = FakePlatformService();
-    PlatformService.init(fake);
+    fake = _TestWindowBridge();
+    WindowBridge.inject(fake);
   });
 
   tearDown(() {
-    PlatformService.reset();
+    WindowBridge.inject(NoopWindowBridge());
   });
 
   Widget buildSubject({ValueNotifier<String>? fileName}) {

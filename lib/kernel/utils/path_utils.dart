@@ -1,3 +1,7 @@
+import 'dart:io' show Process;
+
+import 'package:flutter/foundation.dart';
+
 /// 路径工具函数
 ///
 /// 统一的文件名提取，替代 4 处不一致的 split 逻辑。
@@ -39,5 +43,22 @@ class PathUtils {
       }
     }
     return lastSep >= 0 ? path.substring(0, lastSep) : '.';
+  }
+
+  /// 打开文件所在目录（平台感知）
+  ///
+  /// Windows: explorer, Linux: xdg-open, macOS: open
+  static void openFileLocation(String path) {
+    final dir = dirname(path);
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.windows:
+        Process.run('explorer', [dir]);
+      case TargetPlatform.linux:
+        Process.run('xdg-open', [dir]);
+      case TargetPlatform.macOS:
+        Process.run('open', [dir]);
+      default:
+        debugPrint('openFileLocation: unsupported platform');
+    }
   }
 }

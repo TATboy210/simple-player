@@ -40,6 +40,7 @@ class ErrorBanner extends StatelessWidget {
             callback = onOpenFile;
             actionLabel = l10n.selectOtherFile;
           case MediaErrorType.playback:
+          case MediaErrorType.network:
           case MediaErrorType.unknown:
             callback = onRetry;
             actionLabel = l10n.retry;

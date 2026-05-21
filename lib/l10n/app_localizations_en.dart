@@ -81,6 +81,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get generalTab => 'General';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get theme => 'Theme';
+
+  @override
+  String get shortcutsTab => 'Shortcuts';
+
+  @override
+  String get aboutTab => 'About';
+
+  @override
   String get equalizer => 'Equalizer';
 
   @override
@@ -356,4 +371,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get progressBar => 'Playback Progress';
+
+  @override
+  String get speedDecrease => 'Decrease Speed';
+
+  @override
+  String get speedReset => 'Speed (double-click to reset)';
+
+  @override
+  String get speedIncrease => 'Increase Speed';
+
+  @override
+  String get folderTab => 'Folder';
+
+  @override
+  String get resumeAction => 'Resume';
+
+  @override
+  String get openFileLocation => 'Open File Location';
+
+  @override
+  String get clearHistory => 'Clear History';
+
+  @override
+  String get scanFolder => 'Scan Folder';
+
+  @override
+  String get noVideosInFolder => 'No videos in folder';
+
+  @override
+  String get themeMidnight => 'Midnight';
+
+  @override
+  String get themeOcean => 'Ocean';
+
+  @override
+  String get themeForest => 'Forest';
+
+  @override
+  String get version => 'Version';
+
+  @override
+  String get techStack => 'Tech Stack';
+
+  @override
+  String get licenses => 'Licenses';
+
+  @override
+  String get copyright => 'Built with Flutter + fvp (MDK/FFmpeg)';
+
+  @override
+  String get resetShortcuts => 'Reset to Default';
+
+  @override
+  String get pressKeyToBind => 'Press a key...';
+
+  @override
+  String get shortcutConflict => 'Key already bound';
+
+  @override
+  String get shortcutAspectCycle => 'Cycle Aspect Ratio';
+
+  @override
+  String get currentTheme => 'Theme';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get apply => 'Apply';
 }

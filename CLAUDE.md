@@ -15,49 +15,73 @@ flutter test
 
 ```
 lib/
-├── main.dart              # Entry point (fvp init, window setup)
-├── app.dart               # MaterialApp shell
-├── core/                  # Business logic (no UI)
-│   ├── player_adapter.dart   # fvp wrapper, 13 ValueNotifiers
-│   ├── player_state.dart     # 9-state enum
-│   └── playlist.dart         # Playlist model, 4 play modes
-├── models/
-│   └── playlist_item.dart    # Data class (path + name)
-├── persistence/           # JSON/shared_preferences storage
-│   ├── history_storage.dart     # MRU history, max 50
-│   ├── settings_storage.dart    # Window/volume/mute prefs
-│   └── playlist_storage.dart    # Last playlist save
+├── main.dart                    # Entry point (fvp init, window setup)
+├── app.dart                     # MaterialApp shell, service wiring
+├── kernel/                      # Core logic (no UI)
+│   ├── engine/                  # fvp/MDK engine wrapper
+│   │   ├── media_engine.dart       # Abstract engine interface
+│   │   ├── fvp_engine.dart         # Concrete fvp implementation
+│   │   ├── position_poller.dart    # Timer-based position updates
+│   │   └── track_manager.dart      # Audio/subtitle track management
+│   ├── bridge/
+│   │   └── window_bridge.dart      # Win32 window control (MethodChannel)
+│   ├── models/                  # Data classes
+│   │   ├── playlist_item.dart      # PlaylistItem (path, timestamp, position)
+│   │   ├── media_state.dart        # Playback state enum
+│   │   ├── play_mode.dart          # LoopAll/LoopSingle/Shuffle
+│   │   └── media_info.dart         # Codec/resolution metadata
+│   ├── persistence/             # Storage
+│   │   ├── playlist_store.dart     # Playlist save/load
+│   │   └── settings_store.dart     # Preferences (locale, volume, etc.)
+│   ├── playlist/
+│   │   └── playlist.dart           # Playlist model + play mode logic
+│   ├── scanner/
+│   │   └── folder_scanner.dart     # Directory video file scanner
+│   ├── services/
+│   │   ├── playback_controller.dart   # Orchestrator (open/next/prev/seek)
+│   │   ├── playback_navigator.dart    # Track advancement logic
+│   │   ├── thumbnail_service.dart     # Win32 COM thumbnail extraction
+│   │   ├── video_processing_service.dart # Color correction, rotation
+│   │   └── file_operations.dart       # File open/drop handling
+│   ├── ui/theme/
+│   │   ├── tokens.dart              # Design tokens (colors, spacing, radius)
+│   │   └── app_theme.dart           # ThemeData bridge
+│   └── utils/
+│       ├── time_utils.dart          # formatMs()
+│       └── path_utils.dart          # Path validation
 ├── ui/
-│   ├── screens/
-│   │   └── player_screen.dart   # Main screen (Stack compositing)
-│   ├── shortcuts/
-│   │   └── keyboard_handler.dart # 14-key Focus handler
-│   ├── theme/              # Design tokens (compile-time const)
-│   │   ├── theme_config.dart      # 50 tokens (immutable)
-│   │   ├── design_tokens.dart     # Static facade
-│   │   ├── app_theme.dart         # ThemeData bridge
-│   │   └── ambient_background.dart # Star river animation
-│   └── widgets/            # Reusable UI components
-│       ├── control_bar.dart       # Bottom glass bar
-│       ├── progress_bar.dart      # 3-layer seekbar + thumbnails
-│       ├── playlist_panel.dart    # Right side panel
-│       ├── empty_state_buttons.dart
-│       ├── equalizer_dialog.dart  # 10-band EQ
-│       ├── osd_overlay.dart       # Floating pill
-│       ├── ab_loop_button.dart    # 3-state AB loop
-│       ├── buffering_indicator.dart
-│       ├── audio_track_selector.dart
-│       ├── subtitle_overlay.dart
-│       ├── video_view.dart        # Texture renderer
-│       └── settings_dialog.dart
-└── utils/
-    └── time_utils.dart     # formatMs() shared utility
+│   ├── player/                  # Player screen components
+│   │   ├── player_screen.dart      # Main screen (Stack compositing)
+│   │   ├── controls_overlay.dart   # Auto-hide control layer
+│   │   ├── control_bar.dart        # Bottom glass bar
+│   │   ├── progress_bar.dart       # Seekbar + thumbnails
+│   │   ├── volume_controls.dart    # Volume slider + mute
+│   │   ├── speed_button.dart       # Playback speed selector
+│   │   ├── keyboard_handler.dart   # 20+ key Focus handler
+│   │   ├── video_surface.dart      # Texture renderer
+│   │   └── drop_handler.dart       # Drag-and-drop files
+│   ├── playlist/                # Immersive floating playlist
+│   │   ├── playlist_panel.dart     # Floating window (glass, animation)
+│   │   ├── folder_tab.dart         # Folder-grouped thumbnails
+│   │   ├── history_tab.dart        # Timestamp-sorted history
+│   │   └── thumbnail_tile.dart     # 16:9 thumbnail card
+│   ├── shared/                  # Reusable components
+│   │   ├── glass_container.dart    # Glassmorphism wrapper
+│   │   ├── empty_state.dart        # Empty state screen
+│   │   └── play_mode_utils.dart    # PlayMode → icon/label
+│   ├── widgets/
+│   │   └── osd_overlay.dart        # Floating OSD pill
+│   └── dialogs/
+│       ├── settings_dialog.dart    # Settings (EQ, video, tracks)
+│       └── media_info_dialog.dart  # File properties dialog
+└── l10n/                        # Localization (ARB + generated)
 ```
 
 ## State Management
 
 - **ValueNotifier + ValueListenableBuilder** (no Provider/Riverpod/Bloc)
-- `PlayerAdapter` exposes 13 ValueNotifiers as reactive state
+- `MediaEngine` exposes ValueNotifiers for playback state (position, volume, mute, etc.)
+- `PlaybackController` orchestrates playlist + engine state
 - Widgets rebuild via `ValueListenableBuilder` wrappers
 
 ## Keyboard Shortcuts
@@ -72,22 +96,24 @@ lib/
 | N | Previous track |
 | P | Next track |
 | O | Open file |
-| A | Set AB loop A point |
-| B | Set AB loop B point |
+| A | Cycle aspect ratio |
 | S | Toggle subtitle |
-| ESC | Exit fullscreen |
+| [ / ] | Subtitle delay ±500ms |
+| F1 / ? | Show shortcuts help |
+| ESC | Exit fullscreen / Close playlist |
+| Media keys | Play/Pause, Next, Previous |
 
 ## Design System
 
 - Single theme: Midnight (compile-time const)
-- 50 tokens in `ThemeConfig`, exposed via `DesignTokens` static facade
+- Design tokens in `kernel/ui/theme/tokens.dart` — `Tokens.*` static constants
 - Glass-morphism: `BackdropFilter` + `bgGlass` + `borderHighlight`
-- All colors/fonts/spacing via `DesignTokens.*` (no hardcoded values)
+- All colors/fonts/spacing via `Tokens.*` (no hardcoded values)
 
 ## Coding Conventions
 
 - Use `debugPrint()` not `print()` for logging
-- Use `DesignTokens.*` for all visual values
+- Use `Tokens.*` for all visual values
 - Errors: catch with `debugPrint` + graceful fallback (never silent `catch (_) {}`)
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Chinese comments are OK (existing codebase convention)

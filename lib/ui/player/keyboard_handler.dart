@@ -24,15 +24,18 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('媒体键', l10n.shortcutMediaKeys),
 ];
 
-/// 键盘快捷键包装器 — 19 个快捷键
+/// 键盘快捷键包装器 — 支持自定义绑定
 ///
 /// Space → 播放/暂停 | ← → 后退/前进 5s | ↑ ↓ → 音量 ±5%
 /// F → 全屏 | M → 静音 | N/P → 上/下一首
 /// O → 打开文件 | S → 字幕开关 | ESC → 退出全屏
 /// ]/[ → 字幕延迟 ± | F1 → 帮助
 /// MediaPlayPause/MediaTrackNext/MediaTrackPrevious → 媒体键
+///
+/// [customBindings] 覆盖默认按键映射 (action → LogicalKeyboardKey.keyName)
 class KeyboardHandler extends StatelessWidget {
   final Widget child;
+  final Map<String, String> customBindings;
   final VoidCallback? onPlayPause;
   final VoidCallback? onSeekBackward;
   final VoidCallback? onSeekForward;
@@ -56,6 +59,7 @@ class KeyboardHandler extends StatelessWidget {
   const KeyboardHandler({
     super.key,
     required this.child,
+    this.customBindings = const {},
     this.onPlayPause,
     this.onSeekBackward,
     this.onSeekForward,
@@ -82,6 +86,16 @@ class KeyboardHandler extends StatelessWidget {
     return Focus(autofocus: true, onKeyEvent: _handleKeyEvent, child: child);
   }
 
+  /// 检查按键是否匹配指定动作（优先自定义绑定，否则使用默认按键）
+  /// customBindings 存储 keyId 字符串
+  bool _keyMatches(LogicalKeyboardKey key, String action,
+      LogicalKeyboardKey defaultKey) {
+    if (customBindings.isEmpty) return key == defaultKey;
+    final bound = customBindings[action];
+    if (bound == null) return key == defaultKey;
+    return key.keyId.toString() == bound;
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
@@ -94,76 +108,78 @@ class KeyboardHandler extends StatelessWidget {
 
     final key = event.logicalKey;
 
-    if (key == LogicalKeyboardKey.space) {
+    if (_keyMatches(key, 'playPause', LogicalKeyboardKey.space)) {
       onPlayPause?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowLeft) {
+    if (_keyMatches(key, 'seekBackward', LogicalKeyboardKey.arrowLeft)) {
       onSeekBackward?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight) {
+    if (_keyMatches(key, 'seekForward', LogicalKeyboardKey.arrowRight)) {
       onSeekForward?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowUp) {
+    if (_keyMatches(key, 'volumeUp', LogicalKeyboardKey.arrowUp)) {
       onVolumeUp?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown) {
+    if (_keyMatches(key, 'volumeDown', LogicalKeyboardKey.arrowDown)) {
       onVolumeDown?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyF) {
+    if (_keyMatches(key, 'fullscreen', LogicalKeyboardKey.keyF)) {
       onToggleFullscreen?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyM) {
+    if (_keyMatches(key, 'mute', LogicalKeyboardKey.keyM)) {
       onToggleMute?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyN) {
+    if (_keyMatches(key, 'next', LogicalKeyboardKey.keyN)) {
       onNext?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyP) {
+    if (_keyMatches(key, 'previous', LogicalKeyboardKey.keyP)) {
       onPrevious?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyO) {
+    if (_keyMatches(key, 'openFile', LogicalKeyboardKey.keyO)) {
       onOpenFile?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyS) {
+    if (_keyMatches(key, 'subtitle', LogicalKeyboardKey.keyS)) {
       onToggleSubtitle?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.escape) {
+    if (_keyMatches(key, 'exitFullscreen', LogicalKeyboardKey.escape)) {
       onExitFullscreen?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.f1 ||
+    if (_keyMatches(key, 'help', LogicalKeyboardKey.f1) ||
         (key == LogicalKeyboardKey.slash && event.character == '?')) {
       onShowHelp?.call();
       return KeyEventResult.handled;
     }
 
     // FEAT-04: Subtitle timing
-    if (key == LogicalKeyboardKey.bracketRight) {
+    if (_keyMatches(key, 'subtitleDelayForward',
+        LogicalKeyboardKey.bracketRight)) {
       onSubtitleDelayForward?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.bracketLeft) {
+    if (_keyMatches(key, 'subtitleDelayBackward',
+        LogicalKeyboardKey.bracketLeft)) {
       onSubtitleDelayBackward?.call();
       return KeyEventResult.handled;
     }
 
-    if (key == LogicalKeyboardKey.keyA) {
+    if (_keyMatches(key, 'aspectCycle', LogicalKeyboardKey.keyA)) {
       onCycleAspectRatio?.call();
       return KeyEventResult.handled;
     }
 
-    // FEAT-06: Media keys
+    // FEAT-06: Media keys (always hardcoded, not customizable)
     if (key == LogicalKeyboardKey.mediaPlayPause) {
       onMediaPlayPause?.call();
       return KeyEventResult.handled;

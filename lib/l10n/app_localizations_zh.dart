@@ -81,6 +81,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
+  String get generalTab => '通用';
+
+  @override
+  String get language => '语言';
+
+  @override
+  String get theme => '主题';
+
+  @override
+  String get shortcutsTab => '快捷键';
+
+  @override
+  String get aboutTab => '关于';
+
+  @override
   String get equalizer => '均衡器';
 
   @override
@@ -356,4 +371,76 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get progressBar => '播放进度';
+
+  @override
+  String get speedDecrease => '减速';
+
+  @override
+  String get speedReset => '倍速 (双击重置)';
+
+  @override
+  String get speedIncrease => '加速';
+
+  @override
+  String get folderTab => '文件夹';
+
+  @override
+  String get resumeAction => '继续播放';
+
+  @override
+  String get openFileLocation => '打开文件所在目录';
+
+  @override
+  String get clearHistory => '清空历史';
+
+  @override
+  String get scanFolder => '扫描文件夹';
+
+  @override
+  String get noVideosInFolder => '文件夹中无视频';
+
+  @override
+  String get themeMidnight => '午夜';
+
+  @override
+  String get themeOcean => '海洋';
+
+  @override
+  String get themeForest => '森林';
+
+  @override
+  String get version => '版本';
+
+  @override
+  String get techStack => '技术栈';
+
+  @override
+  String get licenses => '开源许可';
+
+  @override
+  String get copyright => '基于 Flutter + fvp (MDK/FFmpeg) 构建';
+
+  @override
+  String get resetShortcuts => '恢复默认';
+
+  @override
+  String get pressKeyToBind => '请按下新按键...';
+
+  @override
+  String get shortcutConflict => '按键已被占用';
+
+  @override
+  String get shortcutAspectCycle => '切换宽高比';
+
+  @override
+  String get currentTheme => '当前主题';
+
+  @override
+  String get ok => '确定';
+
+  @override
+  String get cancel => '取消';
+
+  @override
+  String get apply => '应用';
 }
