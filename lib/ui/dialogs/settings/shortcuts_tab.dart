@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../../../kernel/ui/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../shared/settings_card.dart';
 
 /// 快捷键自定义 tab — 显示/录制/重置快捷键绑定
 ///
@@ -95,24 +96,24 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
             focusNode: FocusNode(),
             autofocus: _recordingAction != null,
             onKeyEvent: _onKeyPressed,
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount: defs.length,
-              itemBuilder: (context, index) {
-                final def = defs[index];
-                final currentKey = _currentKeyFor(
-                  def.action,
-                  def.defaultKey,
-                );
-                final isRecording = _recordingAction == def.action;
-                return _ShortcutRow(
-                  label: def.label,
-                  keyDisplayName: friendlyKeyName(currentKey),
-                  isRecording: isRecording,
-                  onModify: () => _startRecording(def.action),
-                  onCancel: isRecording ? _cancelRecording : null,
-                );
-              },
+            child: SettingsCard(
+              title: l10n.shortcutsTab,
+              icon: Icons.keyboard,
+              margin: EdgeInsets.zero,
+              children: [
+                for (final def in defs)
+                  _ShortcutRow(
+                    label: def.label,
+                    keyDisplayName: friendlyKeyName(
+                      _currentKeyFor(def.action, def.defaultKey),
+                    ),
+                    isRecording: _recordingAction == def.action,
+                    onModify: () => _startRecording(def.action),
+                    onCancel: _recordingAction == def.action
+                        ? _cancelRecording
+                        : null,
+                  ),
+              ],
             ),
           ),
         ),
@@ -130,10 +131,7 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
                   vertical: Tokens.spXs,
                 ),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Tokens.borderHighlight,
-                    width: 1,
-                  ),
+                  border: Border.all(color: Tokens.borderHighlight, width: 1),
                   borderRadius: BorderRadius.circular(Tokens.radiusSm),
                 ),
                 child: Text(
@@ -168,15 +166,31 @@ List<_ShortcutDef> _shortcutDefs(AppLocalizations l10n) => [
   _ShortcutDef('volumeUp', LogicalKeyboardKey.arrowUp, l10n.shortcutVolume),
   _ShortcutDef('volumeDown', LogicalKeyboardKey.arrowDown, l10n.shortcutVolume),
   _ShortcutDef('fullscreen', LogicalKeyboardKey.keyF, l10n.shortcutFullscreen),
-  _ShortcutDef('exitFullscreen', LogicalKeyboardKey.escape, l10n.shortcutExitFullscreen),
+  _ShortcutDef(
+    'exitFullscreen',
+    LogicalKeyboardKey.escape,
+    l10n.shortcutExitFullscreen,
+  ),
   _ShortcutDef('mute', LogicalKeyboardKey.keyM, l10n.shortcutMute),
   _ShortcutDef('next', LogicalKeyboardKey.keyN, l10n.shortcutNext),
   _ShortcutDef('previous', LogicalKeyboardKey.keyP, l10n.shortcutPrevious),
   _ShortcutDef('openFile', LogicalKeyboardKey.keyO, l10n.shortcutOpenFile),
   _ShortcutDef('subtitle', LogicalKeyboardKey.keyS, l10n.shortcutSubtitle),
-  _ShortcutDef('subtitleDelayForward', LogicalKeyboardKey.bracketRight, l10n.shortcutSubtitleDelay),
-  _ShortcutDef('subtitleDelayBackward', LogicalKeyboardKey.bracketLeft, l10n.shortcutSubtitleDelay),
-  _ShortcutDef('aspectCycle', LogicalKeyboardKey.keyA, l10n.shortcutAspectCycle),
+  _ShortcutDef(
+    'subtitleDelayForward',
+    LogicalKeyboardKey.bracketRight,
+    l10n.shortcutSubtitleDelay,
+  ),
+  _ShortcutDef(
+    'subtitleDelayBackward',
+    LogicalKeyboardKey.bracketLeft,
+    l10n.shortcutSubtitleDelay,
+  ),
+  _ShortcutDef(
+    'aspectCycle',
+    LogicalKeyboardKey.keyA,
+    l10n.shortcutAspectCycle,
+  ),
   _ShortcutDef('help', LogicalKeyboardKey.f1, l10n.shortcutHelp),
 ];
 
@@ -279,8 +293,9 @@ class _ShortcutRow extends StatelessWidget {
               style: TextStyle(
                 color: isRecording ? Tokens.accent : Tokens.textSecondary,
                 fontSize: Tokens.fontCaption,
-                fontWeight:
-                    isRecording ? Tokens.weightMedium : Tokens.weightRegular,
+                fontWeight: isRecording
+                    ? Tokens.weightMedium
+                    : Tokens.weightRegular,
               ),
             ),
           ),

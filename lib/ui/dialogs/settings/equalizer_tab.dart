@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../kernel/engine/media_engine.dart';
 import '../../../kernel/ui/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../shared/settings_card.dart';
 
 /// 均衡器设置 tab — 5 个预设模式
 class EqualizerTab extends StatefulWidget {
@@ -38,31 +39,33 @@ class _EqualizerTabState extends State<EqualizerTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return ListView.builder(
-      itemCount: _presetValues.length,
-      itemBuilder: (_, i) {
-        final selected = i == _selectedIndex;
-        return ListTile(
-          leading: Icon(
-            selected
-                ? Icons.radio_button_checked
-                : Icons.radio_button_unchecked,
-            color: selected ? Tokens.accent : Tokens.textDisabled,
-            size: Tokens.iconLg,
-          ),
-          title: Text(
-            _presetLabel(i, l10n),
-            style: const TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontCaption,
-            ),
-          ),
-          onTap: () {
-            setState(() => _selectedIndex = i);
-            widget.engine.setEqualizer(_presetValues[i]);
-          },
-        );
-      },
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        SettingsCard(
+          title: l10n.equalizer,
+          icon: Icons.equalizer,
+          children: [
+            for (int i = 0; i < _presetValues.length; i++)
+              SettingRow(
+                title: _presetLabel(i, l10n),
+                control: Icon(
+                  i == _selectedIndex
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: i == _selectedIndex
+                      ? Tokens.accent
+                      : Tokens.textDisabled,
+                  size: Tokens.iconLg,
+                ),
+                onTap: () {
+                  setState(() => _selectedIndex = i);
+                  widget.engine.setEqualizer(_presetValues[i]);
+                },
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
