@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../kernel/ui/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../shared/settings_card.dart';
 
 /// 通用设置 tab — 语言切换 + 主题选择
 ///
@@ -27,41 +28,27 @@ class GeneralTab extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        _SectionHeader(l10n.language),
-        _LanguageSelector(
-          currentLocale: currentLocale,
-          onChanged: onLocaleChanged,
+        SettingsCard(
+          title: l10n.language,
+          icon: Icons.language,
+          children: [
+            _LanguageSelector(
+              currentLocale: currentLocale,
+              onChanged: onLocaleChanged,
+            ),
+          ],
         ),
-        const SizedBox(height: Tokens.spMd),
-        _SectionHeader(l10n.theme),
-        _ThemeSelector(
-          currentIndex: currentThemeIndex,
-          onChanged: onThemeChanged,
+        SettingsCard(
+          title: l10n.theme,
+          icon: Icons.palette,
+          children: [
+            _ThemeSelector(
+              currentIndex: currentThemeIndex,
+              onChanged: onThemeChanged,
+            ),
+          ],
         ),
       ],
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(
-        top: Tokens.spSm,
-        bottom: Tokens.spXs,
-      ),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Tokens.textSecondary,
-          fontSize: Tokens.fontOverline,
-          fontWeight: Tokens.weightMedium,
-        ),
-      ),
     );
   }
 }
@@ -70,10 +57,7 @@ class _LanguageSelector extends StatelessWidget {
   final String currentLocale;
   final ValueChanged<String>? onChanged;
 
-  const _LanguageSelector({
-    required this.currentLocale,
-    this.onChanged,
-  });
+  const _LanguageSelector({required this.currentLocale, this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -129,8 +113,7 @@ class _LangChip extends StatelessWidget {
           style: TextStyle(
             color: selected ? Tokens.accent : Tokens.textPrimary,
             fontSize: Tokens.fontCaption,
-            fontWeight:
-                selected ? Tokens.weightMedium : Tokens.weightRegular,
+            fontWeight: selected ? Tokens.weightMedium : Tokens.weightRegular,
           ),
         ),
       ),
@@ -142,10 +125,7 @@ class _ThemeSelector extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int>? onChanged;
 
-  const _ThemeSelector({
-    required this.currentIndex,
-    this.onChanged,
-  });
+  const _ThemeSelector({required this.currentIndex, this.onChanged});
 
   static const _themes = [
     _ThemeData(0, 'Midnight', Color(0xFF2C58F4)),
@@ -218,10 +198,7 @@ class _ThemeChip extends StatelessWidget {
             Container(
               width: 12,
               height: 12,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: Tokens.spXs),
             Text(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../kernel/engine/media_engine.dart';
 import '../../../kernel/ui/theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../shared/settings_card.dart';
 
 /// 音轨选择 tab — 列出可用音轨，点击切换
 class AudioTab extends StatelessWidget {
@@ -21,42 +22,61 @@ class AudioTab extends StatelessWidget {
         ),
       );
     }
-    return ListView.builder(
-      itemCount: tracks.length,
-      itemBuilder: (_, i) {
-        final track = tracks[i];
-        final active = engine.activeAudioTracks.contains(i);
-        final label = track.codec.isEmpty
-            ? l10n.audioTrackN(i + 1)
-            : '${track.codec} (${track.channels}ch)';
-        return ListTile(
-          leading: Icon(
-            active ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: active ? Tokens.accent : Tokens.textDisabled,
-            size: Tokens.iconLg,
-          ),
-          title: Text(
-            label,
-            style: const TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontCaption,
-            ),
-          ),
-          subtitle: track.language.isNotEmpty
-              ? Text(
-                  track.language,
-                  style: const TextStyle(
-                    color: Tokens.textSecondary,
-                    fontSize: Tokens.fontOverline,
-                  ),
-                )
-              : null,
-          onTap: () {
-            engine.switchAudioTrack(i);
-            Navigator.of(context).pop();
-          },
-        );
-      },
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        SettingsCard(
+          title: l10n.audioTrack,
+          icon: Icons.headphones,
+          children: [
+            for (int i = 0; i < tracks.length; i++)
+              _AudioTrackRow(
+                track: tracks[i],
+                index: i,
+                active: engine.activeAudioTracks.contains(i),
+                l10n: l10n,
+                onTap: () {
+                  engine.switchAudioTrack(i);
+                  Navigator.of(context).pop();
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AudioTrackRow extends StatelessWidget {
+  final dynamic track;
+  final int index;
+  final bool active;
+  final AppLocalizations l10n;
+  final VoidCallback onTap;
+
+  const _AudioTrackRow({
+    required this.track,
+    required this.index,
+    required this.active,
+    required this.l10n,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = track.codec.isEmpty
+        ? l10n.audioTrackN(index + 1)
+        : '${track.codec} (${track.channels}ch)';
+
+    return SettingRow(
+      title: label,
+      description: track.language.isNotEmpty ? track.language : null,
+      control: Icon(
+        active ? Icons.check_circle : Icons.radio_button_unchecked,
+        color: active ? Tokens.accent : Tokens.textDisabled,
+        size: Tokens.iconLg,
+      ),
+      onTap: onTap,
     );
   }
 }
