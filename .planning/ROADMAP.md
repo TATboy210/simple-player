@@ -43,10 +43,10 @@ Plans:
   1. DevTools Timeline profile captured in profile mode (`flutter run --profile -d windows`) showing UI thread, raster thread, and GPU thread activity
   2. Root cause of title bar jitter identified (BackdropFilter GPU readback vs ValueNotifier rebuild storm vs other)
   3. Ranked list of worst rebuild offenders (which widgets rebuild most, which notifiers trigger them)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md — DevTools profiling: idle baseline + resize sessions + root cause analysis
 
 ### Phase 3: fvp D3D11 Hardware Tuning
 **Goal**: Validate and ship the highest-impact single optimization (d3d11.sync.cpu=0) across hardware configurations
@@ -109,7 +109,7 @@ Plans:
 
 | Requirement | Phase | Plan |
 |-------------|-------|------|
-| PERF-01 | 2 | TBD |
+| PERF-01 | 2 | 02-01 |
 | PERF-02 | 1 | 01-01 |
 | PERF-03 | 3 | TBD |
 | PERF-04 | 4 | TBD |
