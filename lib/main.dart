@@ -11,9 +11,9 @@ void main() async {
 
   final decoders = getOptimalDecoders();
   if (decoders != null) {
-    fvp.registerWith(options: {'video.decoders': decoders.join(':')});
+    fvp.registerWith(options: {'video.decoders': decoders, 'log': 'warning'});
   } else {
-    fvp.registerWith();
+    fvp.registerWith(options: {'log': 'warning'});
   }
 
   final prefs = await SharedPreferences.getInstance();
