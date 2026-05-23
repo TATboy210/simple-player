@@ -93,33 +93,7 @@ class ControlBar extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: Row(
-                    children: [
-                      GlassIconButton(
-                        icon: playModeIcon ?? Icons.repeat,
-                        tooltip: playModeLabel ?? '顺序',
-                        onPressed: onTogglePlayMode,
-                      ),
-                      if (showSecondary) ...[
-                        const SizedBox(width: Tokens.spXs),
-                        VolumeButton(engine: engine),
-                        VolumeSlider(engine: engine),
-                        const SizedBox(width: Tokens.spXs),
-                        SpeedButton(engine: engine),
-                      ],
-                      const Spacer(),
-                      CenterGroup(
-                        engine: engine,
-                        isIdle: isIdle,
-                        prevTooltip: prevTooltip,
-                        nextTooltip: nextTooltip,
-                        onPrevious: onPrevious,
-                        onNext: onNext,
-                      ),
-                      const Spacer(),
-                      _buildRightGroup(context, l10n),
-                    ],
-                  ),
+                  child: _buildButtonRow(context, l10n, showSecondary, prevTooltip, nextTooltip),
                 ),
               ],
             );
@@ -145,6 +119,45 @@ class ControlBar extends StatelessWidget {
               ),
             ),
       child: RepaintBoundary(child: content),
+    );
+  }
+
+  /// 按钮行：左右组 + 居中播放按钮群
+  ///
+  /// 三段等 flex Spacer 将播放按钮群精确置于 Row 50% 位置。
+  Widget _buildButtonRow(
+    BuildContext context,
+    AppLocalizations l10n,
+    bool showSecondary,
+    String prevTooltip,
+    String nextTooltip,
+  ) {
+    return Row(
+      children: [
+        GlassIconButton(
+          icon: playModeIcon ?? Icons.repeat,
+          tooltip: playModeLabel ?? '顺序',
+          onPressed: onTogglePlayMode,
+        ),
+        if (showSecondary) ...[
+          const SizedBox(width: Tokens.spXs),
+          VolumeButton(engine: engine),
+          VolumeSlider(engine: engine),
+          const SizedBox(width: Tokens.spXs),
+          SpeedButton(engine: engine),
+        ],
+        const Spacer(),
+        CenterGroup(
+          engine: engine,
+          isIdle: isIdle,
+          prevTooltip: prevTooltip,
+          nextTooltip: nextTooltip,
+          onPrevious: onPrevious,
+          onNext: onNext,
+        ),
+        const Spacer(),
+        _buildRightGroup(context, l10n),
+      ],
     );
   }
 
