@@ -9,8 +9,8 @@ List<String>? getOptimalDecoders() {
   final isArm = _isArmArchitecture();
   return switch (defaultTargetPlatform) {
     TargetPlatform.windows => isArm
-        ? ['MFT:d3d=1', 'D3D11', 'FFmpeg']
-        : ['MFT:d3d=1', 'NVDEC', 'D3D11', 'FFmpeg'],
+        ? ['MFT:d3d=11', 'D3D11:shader_resource=1', 'FFmpeg']
+        : ['MFT:d3d=11', 'NVDEC', 'D3D11:shader_resource=1', 'FFmpeg'],
     TargetPlatform.linux => isArm
         ? ['V4L2M2M', 'RKMPP', 'VAAPI', 'FFmpeg']
         : ['VAAPI', 'VDPAU', 'NVDEC', 'FFmpeg'],
