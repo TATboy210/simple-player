@@ -50,22 +50,22 @@
 
 ## Traceability
 
-| Requirement | Phase | Research Source |
-|-------------|-------|-----------------|
-| PERF-01 | Phase 2 | PITFALLS.md #1, SUMMARY.md |
-| PERF-02 | Phase 1 | STACK.md, FEATURES.md |
-| PERF-03 | Phase 3 | STACK.md, PITFALLS.md #3 |
-| PERF-04 | Phase 1/4 | STACK.md, PITFALLS.md #2 |
-| PERF-05 | Phase 4 | FEATURES.md, STACK.md |
-| PERF-06 | Phase 4 | FEATURES.md |
-| ARCH-01 | Phase 5 | ARCHITECTURE.md, CONCERNS.md |
-| ARCH-02 | Phase 6 | CONCERNS.md, FEATURES.md |
-| ARCH-03 | Phase 1 | CONCERNS.md |
-| ARCH-04 | Phase 6 | ARCHITECTURE.md |
-| TEST-01 | Phase 6 | ARCHITECTURE.md, CONCERNS.md |
-| TEST-02 | Phase 6 | CONCERNS.md |
-| TEST-03 | Phase 6 | CONCERNS.md |
-| TEST-04 | Phase 6 | ARCHITECTURE.md |
+| Requirement | Phase | Status | Research Source |
+|-------------|-------|--------|-----------------|
+| PERF-01 | Phase 2 | Pending | PITFALLS.md #1, SUMMARY.md |
+| PERF-02 | Phase 1 | Pending | STACK.md, FEATURES.md |
+| PERF-03 | Phase 3 | Pending | STACK.md, PITFALLS.md #3 |
+| PERF-04 | Phase 4 | Pending | STACK.md, PITFALLS.md #2 |
+| PERF-05 | Phase 4 | Pending | FEATURES.md, STACK.md |
+| PERF-06 | Phase 4 | Pending | FEATURES.md |
+| ARCH-01 | Phase 5 | Pending | ARCHITECTURE.md, CONCERNS.md |
+| ARCH-02 | Phase 6 | Pending | CONCERNS.md, FEATURES.md |
+| ARCH-03 | Phase 1 | Pending | CONCERNS.md |
+| ARCH-04 | Phase 6 | Pending | ARCHITECTURE.md |
+| TEST-01 | Phase 6 | Pending | ARCHITECTURE.md, CONCERNS.md |
+| TEST-02 | Phase 6 | Pending | CONCERNS.md |
+| TEST-03 | Phase 6 | Pending | CONCERNS.md |
+| TEST-04 | Phase 6 | Pending | ARCHITECTURE.md |
 
 ---
-*Last updated: 2026-05-23 after research synthesis*
+*Last updated: 2026-05-23 after roadmap creation*
