@@ -6,7 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../kernel/models/media_state.dart';
 import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 
 /// 极光呼吸背景 — 3 个椭圆光团沿 Lissajous 曲线缓慢漂移
 ///

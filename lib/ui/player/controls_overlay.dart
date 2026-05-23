@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../widgets/osd_overlay.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';

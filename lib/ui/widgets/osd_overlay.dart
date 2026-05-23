@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 
 /// OSD 消息数据
 class OsdMessage {

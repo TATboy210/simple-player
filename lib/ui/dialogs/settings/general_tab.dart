@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../kernel/ui/theme/tokens.dart';
+import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 

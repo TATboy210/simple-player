@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/playlist_item.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import 'thumbnail_tile.dart';
 

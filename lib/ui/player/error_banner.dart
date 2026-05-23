@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_error_type.dart';
 import '../../kernel/models/media_state.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 错误横幅 — 显示可操作的错误信息

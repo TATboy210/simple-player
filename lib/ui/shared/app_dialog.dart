@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 共享对话框包装器 — 统一视觉风格和关闭按钮

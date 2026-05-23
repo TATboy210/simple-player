@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/video_processing_service.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import 'settings/_settings_nav_item.dart';
 import 'settings/about_tab.dart';

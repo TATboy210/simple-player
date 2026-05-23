@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 
 /// 设置卡片 — 阴影 + 圆角 + section header + children 嵌套
 ///

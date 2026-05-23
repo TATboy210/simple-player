@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 
 /// 毛玻璃风格选项芯片 — 用于倍速选择器、音质切换等横向选项
 class GlassChip extends StatelessWidget {

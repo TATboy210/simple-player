@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import 'folder_tab.dart';
 import 'history_tab.dart';

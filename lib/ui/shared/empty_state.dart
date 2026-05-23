@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../kernel/models/media_state.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import 'aurora_background.dart';
 import 'glass_container.dart';
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/media_engine.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../shared/merged_listenable.dart';
 

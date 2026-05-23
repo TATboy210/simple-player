@@ -43,15 +43,15 @@ lib/
 │   │   ├── thumbnail_service.dart     # Win32 COM thumbnail extraction
 │   │   ├── video_processing_service.dart # Color correction, rotation
 │   │   └── file_operations.dart       # File open/drop handling
-│   ├── ui/theme/
-│   │   ├── tokens.dart              # Design tokens (colors, spacing, radius)
-│   │   └── app_theme.dart           # ThemeData bridge
 │   └── utils/
 │       ├── time_utils.dart          # formatMs()
 │       └── path_utils.dart          # Path validation
 ├── ui/
+│   ├── theme/
+│   │   └── tokens.dart              # Design tokens (colors, spacing, radius)
 │   ├── player/                  # Player screen components
 │   │   ├── player_screen.dart      # Main screen (Stack compositing)
+│   │   ├── custom_title_bar.dart   # Window title bar (glass, drag, controls)
 │   │   ├── controls_overlay.dart   # Auto-hide control layer
 │   │   ├── control_bar.dart        # Bottom glass bar
 │   │   ├── progress_bar.dart       # Seekbar + thumbnails

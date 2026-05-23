@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 
 /// 毛玻璃模糊层级
 enum GlassTier {
