@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../kernel/ui/theme/tokens.dart';
+import '../../theme/tokens.dart';
 
 /// 侧边栏导航项 — 图标 + 标签，选中高亮
 class SettingsNavItem extends StatelessWidget {

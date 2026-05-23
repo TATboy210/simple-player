@@ -1,7 +1,7 @@
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../kernel/services/path_validator.dart';
 
 /// 文件拖放处理器 — 使用 desktop_drop 接收 Windows Explorer 拖拽

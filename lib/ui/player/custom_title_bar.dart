@@ -2,9 +2,9 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../../l10n/app_localizations.dart';
-import '../../bridge/window_bridge.dart';
-import '../../window/aspect_ratio_service.dart';
+import '../../l10n/app_localizations.dart';
+import '../../kernel/bridge/window_bridge.dart';
+import '../../kernel/window/aspect_ratio_service.dart';
 import '../theme/tokens.dart';
 
 /// 自定义标题栏 — 毛玻璃 + 拖拽 + 窗口控制

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/media_engine.dart';
-import '../../kernel/ui/theme/tokens.dart';
+import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_icon_button.dart';
 import 'center_controls.dart';
