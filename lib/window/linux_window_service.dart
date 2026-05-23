@@ -5,48 +5,45 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../kernel/bridge/window_bridge.dart';
-import '../kernel/persistence/settings_store.dart';
-import '../kernel/window/aspect_ratio_service.dart';
-import 'geometry_store.dart';
+import 'window_persistence_service.dart';
+import 'window_state_service.dart';
 
 /// Linux 窗口管理服务 — 实现 WindowBridge
 ///
-/// 使用 window_manager 跨平台 API（X11/Wayland）。
-/// 无需 GTK FFI — window_manager 内部处理 X11/Wayland 差异。
+/// Uses window_manager for X11/Wayland.
+/// Composes WindowStateService + WindowPersistenceService.
 class LinuxWindowService implements WindowBridge {
   LinuxWindowService(this._prefs);
 
   final SharedPreferences _prefs;
-  late final WindowGeometryStore _geometry;
 
-  // ─── Reactive State ───
+  late final WindowStateService _state;
+  late final WindowPersistenceService _persistence;
+
+  // ─── Reactive State (delegate to _state) ───
 
   @override
-  final mode = ValueNotifier<WindowMode>(WindowMode.windowed);
+  ValueNotifier<WindowMode> get mode => _state.mode;
   @override
-  final isAlwaysOnTop = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isAlwaysOnTop => _state.isAlwaysOnTop;
   @override
-  final isMaximized = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isMaximized => _state.isMaximized;
   @override
-  final isResizing = ValueNotifier<bool>(false);
+  ValueNotifier<WindowInteractionState> get interaction => _state.interaction;
+  @override
+  bool get isResizing => _state.interaction.value == WindowInteractionState.resizing;
 
   // ─── Constants ───
 
   static const _minSize = Size(800, 450);
-  static const _resizeDebounceMs = 500;
 
   // ─── Internal ───
 
   bool _initialized = false;
   bool _disposed = false;
   Completer<void>? _initCompleter;
-
-  Timer? _resizeEndDebounce;
-  Timer? _persistDebounce;
-
   bool _togglingFullscreen = false;
   bool _closing = false;
-  Completer<void>? _persistInFlight;
 
   // ─── Lifecycle ───
 
@@ -55,16 +52,17 @@ class LinuxWindowService implements WindowBridge {
     if (_initialized) return;
     _initCompleter = Completer<void>();
 
+    _state = WindowStateService();
+    _persistence = WindowPersistenceService(_prefs);
+
     try {
-      _geometry = WindowGeometryStore(_prefs);
-      final saved = _geometry.load();
-      final clamped = WindowGeometryStore.clampToVisibleBounds(saved);
+      final clamped = _persistence.loadAndClamp();
 
       await windowManager.ensureInitialized();
 
       final windowOptions = WindowOptions(
         size: clamped.size,
-        center: !_geometry.hasSavedPosition,
+        center: !_persistence.geometry.hasSavedPosition,
         backgroundColor: Colors.black,
         skipTaskbar: false,
         titleBarStyle: TitleBarStyle.hidden,
@@ -76,7 +74,7 @@ class LinuxWindowService implements WindowBridge {
         try {
           await windowManager.setMinimumSize(_minSize);
 
-          if (_geometry.hasSavedPosition) {
+          if (_persistence.geometry.hasSavedPosition) {
             await windowManager.setPosition(clamped.position);
           }
 
@@ -90,9 +88,8 @@ class LinuxWindowService implements WindowBridge {
           await windowManager.show();
           await windowManager.focus();
 
-          if (saved.isFullscreen) {
+          if (clamped.isFullscreen) {
             await windowManager.setFullScreen(true);
-            mode.value = WindowMode.fullscreen;
           }
 
           windowManager.addListener(_WindowListener(this));
@@ -122,15 +119,9 @@ class LinuxWindowService implements WindowBridge {
       await _initCompleter!.future;
     }
 
-    _resizeEndDebounce?.cancel();
-    _persistDebounce?.cancel();
-    await _geometry.flush();
-
-    mode.dispose();
-    isAlwaysOnTop.dispose();
-    isMaximized.dispose();
-    isResizing.dispose();
-    _geometry.dispose();
+    await _persistence.flush();
+    _state.dispose();
+    _persistence.dispose();
   }
 
   // ─── Commands ───
@@ -162,7 +153,7 @@ class LinuxWindowService implements WindowBridge {
     if (_closing) return;
     _closing = true;
     try {
-      await _geometry.flush();
+      await _persistence.flush();
       await windowManager.setPreventClose(false);
       await windowManager.close();
     } on Exception catch (e) {
@@ -187,20 +178,12 @@ class LinuxWindowService implements WindowBridge {
     _togglingFullscreen = true;
     try {
       final entering = mode.value != WindowMode.fullscreen;
-
-      if (entering) {
-        await AspectRatioService.I.unlock();
-      }
-
       await windowManager.setFullScreen(entering);
-      mode.value = entering ? WindowMode.fullscreen : WindowMode.windowed;
-      await SettingsStore.saveIsFullscreen(entering);
     } on Exception catch (e) {
       debugPrint('[LinuxWindowService] toggleFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
-      _resizeEndDebounce?.cancel();
-      isResizing.value = false;
+      _state.onResizeEnd();
     }
   }
 
@@ -211,14 +194,11 @@ class LinuxWindowService implements WindowBridge {
     _togglingFullscreen = true;
     try {
       await windowManager.setFullScreen(false);
-      mode.value = WindowMode.windowed;
-      await SettingsStore.saveIsFullscreen(false);
     } on Exception catch (e) {
       debugPrint('[LinuxWindowService] exitFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
-      _resizeEndDebounce?.cancel();
-      isResizing.value = false;
+      _state.onResizeEnd();
     }
   }
 
@@ -234,72 +214,9 @@ class LinuxWindowService implements WindowBridge {
       debugPrint('[LinuxWindowService] toggleAlwaysOnTop failed: $e');
     }
   }
-
-  // ─── Resize/move debounce ───
-
-  void _onResizeStart() {
-    if (!isResizing.value) isResizing.value = true;
-    _resizeEndDebounce?.cancel();
-  }
-
-  void _onResizeEnd() {
-    _resizeEndDebounce?.cancel();
-    _resizeEndDebounce = Timer(
-      const Duration(milliseconds: _resizeDebounceMs),
-      () {
-        isResizing.value = false;
-      },
-    );
-    _schedulePersist();
-  }
-
-  void _onMove() {
-    _schedulePersist();
-  }
-
-  // ─── Persistence ───
-
-  static const _persistDebounceMs = 500;
-
-  void _schedulePersist() {
-    _persistDebounce?.cancel();
-    _persistDebounce = Timer(
-      const Duration(milliseconds: _persistDebounceMs),
-      _persistWindowState,
-    );
-  }
-
-  Future<void> _persistWindowState() async {
-    if (_disposed) return;
-    if (_persistInFlight != null) return _persistInFlight!.future;
-    _persistInFlight = Completer<void>();
-    try {
-      final results = await Future.wait([
-        windowManager.getSize(),
-        windowManager.getPosition(),
-        windowManager.isMaximized(),
-      ]);
-      final size = results[0] as Size;
-      final position = results[1] as Offset;
-      final maximized = results[2] as bool;
-
-      if (mode.value != WindowMode.fullscreen) {
-        _geometry.saveDebounced(
-          size: size,
-          position: position,
-          isMaximized: maximized,
-        );
-      }
-      _persistInFlight!.complete();
-    } on Exception catch (e) {
-      debugPrint('[LinuxWindowService] persist failed: $e');
-      if (!_persistInFlight!.isCompleted) _persistInFlight!.complete();
-    } finally {
-      _persistInFlight = null;
-    }
-  }
 }
 
+/// WindowListener adapter — routes events to LinuxWindowService + shared services.
 class _WindowListener extends WindowListener {
   _WindowListener(this._service);
   final LinuxWindowService _service;
@@ -308,45 +225,51 @@ class _WindowListener extends WindowListener {
   void onWindowClose() => _service.close();
 
   @override
-  void onWindowResize() => _service._onResizeStart();
+  void onWindowResize() => _service._state.onResizeStart();
 
   @override
-  void onWindowResized() => _service._onResizeEnd();
+  void onWindowResized() {
+    _service._state.onResizeEnd();
+    _service._persistence.schedulePersist();
+  }
 
   @override
-  void onWindowMove() => _service._onMove();
+  void onWindowMove() => _service._persistence.schedulePersist();
 
   @override
-  void onWindowMoved() => _service._onMove();
+  void onWindowMoved() => _service._persistence.schedulePersist();
 
+  @override
+  void onWindowMaximize() {
+    _service.isMaximized.value = true;
+    _service._persistence.persistNow();
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    _service.isMaximized.value = false;
+    _service._persistence.persistNow();
+  }
+
+  @override
+  void onWindowEnterFullScreen() {
+    _service.mode.value = WindowMode.fullscreen;
+    _service._persistence.saveFullscreen(true);
+  }
+
+  @override
+  void onWindowLeaveFullScreen() {
+    _service.mode.value = WindowMode.windowed;
+    _service._persistence.saveFullscreen(false);
+  }
+
+  // No-op overrides
   @override
   void onWindowEvent(String eventName) {}
   @override
   void onWindowFocus() {}
   @override
   void onWindowBlur() {}
-  @override
-  void onWindowMaximize() {
-    _service.isMaximized.value = true;
-    _service._persistWindowState();
-  }
-
-  @override
-  void onWindowUnmaximize() {
-    _service.isMaximized.value = false;
-    _service._persistWindowState();
-  }
-
-  @override
-  void onWindowEnterFullScreen() {
-    _service._geometry.saveFullscreen(true);
-  }
-
-  @override
-  void onWindowLeaveFullScreen() {
-    _service._geometry.saveFullscreen(false);
-  }
-
   @override
   void onWindowMinimize() {}
   @override

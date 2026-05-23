@@ -13,7 +13,7 @@ class _TestWindowBridge extends NoopWindowBridge {
   @override
   final isMaximized = ValueNotifier<bool>(false);
   @override
-  final isResizing = ValueNotifier<bool>(false);
+  final interaction = ValueNotifier<WindowInteractionState>(WindowInteractionState.idle);
 }
 
 void main() {
@@ -108,25 +108,20 @@ void main() {
       // BackdropFilter 始终挂载（避免树突变抖动），通过 AnimatedOpacity 控制可见性
       expect(find.byType(BackdropFilter), findsOneWidget);
 
-      fake.isResizing.value = true;
+      fake.interaction.value = WindowInteractionState.resizing;
       await tester.pump();
 
-      // AnimatedOpacity opacity=0 时 GPU 跳过 compositing，BackdropFilter 不可见
-      final opacity = tester.widget<AnimatedOpacity>(
-        find.byType(AnimatedOpacity).first,
-      );
-      expect(opacity.opacity, 0.0);
+      // 条件渲染：resizing 时 BackdropFilter 节点不存在
+      expect(find.byType(BackdropFilter), findsNothing);
     });
 
     testWidgets('isResizing 为 false 时 AnimatedOpacity 显示模糊层', (tester) async {
       await tester.pumpWidget(buildSubject());
-      fake.isResizing.value = false;
+      fake.interaction.value = WindowInteractionState.idle;
       await tester.pump();
 
-      final opacity = tester.widget<AnimatedOpacity>(
-        find.byType(AnimatedOpacity).first,
-      );
-      expect(opacity.opacity, 1.0);
+      // idle 时 BackdropFilter 恢复
+      expect(find.byType(BackdropFilter), findsOneWidget);
     });
   });
 
@@ -140,7 +135,7 @@ void main() {
       await gesture.moveTo(tester.getCenter(find.byIcon(Icons.push_pin)));
       await tester.pump();
 
-      // 此时 isResizing = false，hover 应该生效
+      // 此时 interaction = idle，hover 应该生效
       // 按钮背景应该不是透明色（hover 高亮）
       // 检查 push_pin 图标的颜色 — hover 时应为 textPrimary
       final iconBefore = tester.widget<Icon>(find.byIcon(Icons.push_pin));
@@ -149,16 +144,15 @@ void main() {
         isNot(const Color(0xFF9999AA)),
       ); // 不是 textSecondary
 
-      // 模拟 resize 开始 → isResizing = true
-      fake.isResizing.value = true;
+      // 模拟 resize 开始 → interaction = resizing
+      fake.interaction.value = WindowInteractionState.resizing;
       await tester.pump();
 
-      // isResizing listener 应在 resize 结束时重置 hover
-      fake.isResizing.value = false;
+      // resize 结束 → interaction = idle，IgnorePointer 解除
+      fake.interaction.value = WindowInteractionState.idle;
       await tester.pump();
 
-      // resize 结束后，_onResizingChanged 应将 _hovered 设为 false
-      // 图标颜色应回到非 hover 状态
+      // resize 结束后，IgnorePointer 解除，按钮可交互
       final iconAfter = tester.widget<Icon>(find.byIcon(Icons.push_pin));
       // 非 hover 状态: isActive=false → textSecondary
       expect(iconAfter.color, const Color(0xFF9999AA));

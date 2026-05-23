@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/ui/theme/tokens.dart';
@@ -77,7 +78,13 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       popupCloseNotifier: _popupCloseNotifier,
     );
     widget.engine.state.addListener(_onEngineStateChanged);
+    WindowBridge.I.interaction.addListener(_onInteractionChanged);
     _autoHide.init();
+  }
+
+  void _onInteractionChanged() {
+    _autoHide.resizing =
+        WindowBridge.I.interaction.value != WindowInteractionState.idle;
   }
 
   void _handleTap() {
@@ -110,6 +117,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
+    WindowBridge.I.interaction.removeListener(_onInteractionChanged);
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
     _autoHide.dispose();

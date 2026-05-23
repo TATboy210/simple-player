@@ -54,7 +54,7 @@ class CenterGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedOpacity(
-      opacity: isIdle ? 0.38 : 1.0,
+      opacity: isIdle ? 0.20 : 1.0,
       duration: const Duration(milliseconds: Tokens.durationFade),
       curve: Curves.easeOut,
       child: Row(

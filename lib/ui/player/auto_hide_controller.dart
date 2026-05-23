@@ -33,6 +33,7 @@ class AutoHideController {
   late final Animation<double> _opacity;
 
   bool _hovering = false;
+  bool _resizing = false;
   Timer? _hideTimer;
   DateTime _lastHoverTime = DateTime.fromMillisecondsSinceEpoch(0);
   static const _hoverThrottle = Duration(milliseconds: 100);
@@ -83,9 +84,19 @@ class AutoHideController {
     });
   }
 
+  /// 更新 resize 状态 — resize 期间冻结自动隐藏逻辑
+  set resizing(bool value) {
+    _resizing = value;
+    if (value) {
+      _hideTimer?.cancel();
+    } else {
+      scheduleHide();
+    }
+  }
+
   /// 鼠标移动（节流 100ms）
   void onMouseMove() {
-    if (_engineState.value == MediaState.idle) return;
+    if (_engineState.value == MediaState.idle || _resizing) return;
     final now = DateTime.now();
     if (now.difference(_lastHoverTime) < _hoverThrottle) return;
     _lastHoverTime = now;

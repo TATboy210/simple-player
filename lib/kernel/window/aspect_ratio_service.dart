@@ -1,17 +1,15 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../models/aspect_ratio_mode.dart';
 
-/// 宽高比约束服务 — 通过 MethodChannel 调用原生 WM_SIZING 处理
+/// 宽高比约束服务 — 通过 windowManager.setAspectRatio() 控制
 ///
 /// 无视频时锁定 16:9，播放视频时匹配视频比例。
 /// 设置为 0 取消约束。
 class AspectRatioService {
   AspectRatioService._();
   static final AspectRatioService I = AspectRatioService._();
-
-  static const _channel = MethodChannel('com.simple_player/aspect_ratio');
 
   /// 16:9（默认空闲比例）
   static final ratio16x9 = AspectRatioMode.ratio16_9.mdkValue;
@@ -33,7 +31,7 @@ class AspectRatioService {
     _current = ratio;
     ratioNotifier.value = ratio;
     try {
-      await _channel.invokeMethod('setAspectRatio', ratio);
+      await windowManager.setAspectRatio(ratio);
     } on Exception catch (e) {
       _current = previous; // RC-6: 回滚到之前的状态
       ratioNotifier.value = previous;

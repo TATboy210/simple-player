@@ -130,9 +130,9 @@ class ControlBar extends StatelessWidget {
 
     if (!enableBlur) return RepaintBoundary(child: content);
 
-    return ValueListenableBuilder<bool>(
-      valueListenable: WindowBridge.I.isResizing,
-      builder: (_, resizing, child) => resizing
+    return ValueListenableBuilder<WindowInteractionState>(
+      valueListenable: WindowBridge.I.interaction,
+      builder: (_, state, child) => state != WindowInteractionState.idle
           ? child!
           : ClipRRect(
               borderRadius: borderRadius,

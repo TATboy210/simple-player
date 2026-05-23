@@ -59,7 +59,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     _ticker.start();
     _generateBlobImage();
     widget.engineState?.addListener(_onEngineStateChanged);
-    WindowBridge.I.isResizing.addListener(_syncTicker);
+    WindowBridge.I.interaction.addListener(_syncTicker);
   }
 
   @override
@@ -75,7 +75,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   @override
   void dispose() {
     widget.engineState?.removeListener(_onEngineStateChanged);
-    WindowBridge.I.isResizing.removeListener(_syncTicker);
+    WindowBridge.I.interaction.removeListener(_syncTicker);
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
     _repaint.dispose();
@@ -93,7 +93,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     final engineIdle =
         widget.engineState?.value == MediaState.idle ||
         widget.engineState == null;
-    final resizing = WindowBridge.I.isResizing.value;
+    final resizing = WindowBridge.I.interaction.value != WindowInteractionState.idle;
     final shouldRun = _isRunning && engineIdle && !resizing;
 
     if (shouldRun && !_ticker.isActive) {

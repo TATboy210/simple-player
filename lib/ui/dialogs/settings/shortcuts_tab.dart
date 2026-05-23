@@ -102,14 +102,15 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
               margin: EdgeInsets.zero,
               children: [
                 for (final def in defs)
-                  _ShortcutRow(
+                  SettingActionRow(
                     label: def.label,
-                    keyDisplayName: friendlyKeyName(
+                    valueText: friendlyKeyName(
                       _currentKeyFor(def.action, def.defaultKey),
                     ),
-                    isRecording: _recordingAction == def.action,
-                    onModify: () => _startRecording(def.action),
-                    onCancel: _recordingAction == def.action
+                    isActive: _recordingAction == def.action,
+                    activeText: l10n.pressKeyToBind,
+                    onAction: () => _startRecording(def.action),
+                    onDeactivate: _recordingAction == def.action
                         ? _cancelRecording
                         : null,
                   ),
@@ -237,84 +238,3 @@ String friendlyKeyName(String keyIdStr) {
 }
 
 // ── 行组件 ──
-
-class _ShortcutRow extends StatelessWidget {
-  final String label;
-  final String keyDisplayName;
-  final bool isRecording;
-  final VoidCallback onModify;
-  final VoidCallback? onCancel;
-
-  const _ShortcutRow({
-    required this.label,
-    required this.keyDisplayName,
-    required this.isRecording,
-    required this.onModify,
-    this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          // 功能名称
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Tokens.textPrimary,
-                fontSize: Tokens.fontCaption,
-              ),
-            ),
-          ),
-          // 当前按键 / 录制状态
-          Container(
-            constraints: const BoxConstraints(minWidth: 64),
-            padding: const EdgeInsets.symmetric(
-              horizontal: Tokens.spSm,
-              vertical: 3,
-            ),
-            decoration: BoxDecoration(
-              color: isRecording
-                  ? Tokens.accent.withValues(alpha: 0.15)
-                  : Tokens.bgHover,
-              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-              border: Border.all(
-                color: isRecording ? Tokens.accent : Tokens.borderHighlight,
-                width: 1,
-              ),
-            ),
-            child: Text(
-              isRecording ? l10n.pressKeyToBind : keyDisplayName,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isRecording ? Tokens.accent : Tokens.textSecondary,
-                fontSize: Tokens.fontCaption,
-                fontWeight: isRecording
-                    ? Tokens.weightMedium
-                    : Tokens.weightRegular,
-              ),
-            ),
-          ),
-          const SizedBox(width: Tokens.spXs),
-          // 修改/取消按钮
-          InkWell(
-            onTap: isRecording ? onCancel : onModify,
-            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-            child: Padding(
-              padding: const EdgeInsets.all(Tokens.spXs),
-              child: Icon(
-                isRecording ? Icons.close : Icons.edit,
-                size: Tokens.iconSm,
-                color: isRecording ? Tokens.danger : Tokens.textTertiary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -3,6 +3,12 @@ import 'package:flutter/foundation.dart';
 /// 窗口模式枚举
 enum WindowMode { windowed, fullscreen }
 
+/// 窗口交互状态 — resize/moving session 模型
+///
+/// 替代 bool isResizing debounce：resize 是持续的 interaction session，
+/// 不是 start→end 事件。500ms debounce 防止拖拽期间反复 toggle。
+enum WindowInteractionState { idle, resizing, moving }
+
 /// 窗口操作抽象 — kernel 通过此接口控制窗口，不依赖 window/ 实现
 ///
 /// 注入方式: main.dart 中调用 WindowBridge.inject(impl)
@@ -31,7 +37,10 @@ abstract class WindowBridge {
   ValueNotifier<WindowMode> get mode;
   ValueNotifier<bool> get isAlwaysOnTop;
   ValueNotifier<bool> get isMaximized;
-  ValueNotifier<bool> get isResizing;
+  ValueNotifier<WindowInteractionState> get interaction;
+
+  /// 兼容 getter — 等价于 `interaction.value == resizing`
+  bool get isResizing => interaction.value == WindowInteractionState.resizing;
 
   // ── Lifecycle ──
 
@@ -48,7 +57,10 @@ class NoopWindowBridge implements WindowBridge {
   @override
   final isMaximized = ValueNotifier(false);
   @override
-  final isResizing = ValueNotifier(false);
+  final interaction =
+      ValueNotifier(WindowInteractionState.idle);
+  @override
+  bool get isResizing => interaction.value == WindowInteractionState.resizing;
 
   @override
   Future<void> minimize() async {}

@@ -41,8 +41,12 @@ void main() {
       expect(bridge.isMaximized.value, false);
     });
 
-    test('default isResizing is false', () {
-      expect(bridge.isResizing.value, false);
+    test('default interaction is idle', () {
+      expect(bridge.interaction.value, WindowInteractionState.idle);
+    });
+
+    test('isResizing compatibility getter returns false when idle', () {
+      expect(bridge.isResizing, false);
     });
 
     test('all commands complete without error', () async {
@@ -67,7 +71,9 @@ class _FakeWindowBridge implements WindowBridge {
   @override
   final isMaximized = ValueNotifier(false);
   @override
-  final isResizing = ValueNotifier(false);
+  final interaction = ValueNotifier(WindowInteractionState.idle);
+  @override
+  bool get isResizing => interaction.value == WindowInteractionState.resizing;
 
   @override
   Future<void> minimize() async {}
