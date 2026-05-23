@@ -30,10 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. GPU-accelerated YUV-to-RGB conversion is enabled (shader_resource=1)
   3. Debug string formatting overhead is eliminated (log=warning)
   4. Dead code file `lib/models/playlist_item.dart` no longer exists in the codebase
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 01-01: TBD
+- [ ] 01-01-PLAN.md — fvp配置修复：D3D11解码器 + 日志级别 + 死代码清理
 
 ### Phase 2: Profile and Measure
 **Goal**: Establish frame-level performance baselines and identify the exact bottleneck causing title bar frame drops
@@ -98,22 +98,28 @@ Plans:
   2. OsdService is instance-based (enables mock injection for testing)
   3. Unit tests pass for WindowStateService, WindowPersistenceService, and FullscreenController
   4. Unit tests pass for ThumbnailService (after instance-based refactor)
-  5. Widget tests pass for settings panel (deferred-apply pattern verified)
+  5. Unit tests pass for SettingsStore covering all preference types and default values
+  6. Test coverage for window + settings layers reaches 80%+
 **Plans**: TBD
 
 Plans:
 - [ ] 06-01: TBD
 
-## Progress
+## Requirement Traceability
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Zero-Risk Rendering Fixes | 0/1 | Not started | - |
-| 2. Profile and Measure | 0/1 | Not started | - |
-| 3. fvp D3D11 Hardware Tuning | 0/1 | Not started | - |
-| 4. BackdropFilter and ValueNotifier Optimization | 0/1 | Not started | - |
-| 5. Window Service Deduplication | 0/1 | Not started | - |
-| 6. Singleton Cleanup and Test Coverage | 0/1 | Not started | - |
+| Requirement | Phase | Plan |
+|-------------|-------|------|
+| PERF-01 | 2 | TBD |
+| PERF-02 | 1 | 01-01 |
+| PERF-03 | 3 | TBD |
+| PERF-04 | 4 | TBD |
+| PERF-05 | 4 | TBD |
+| PERF-06 | 4 | TBD |
+| ARCH-01 | 5 | TBD |
+| ARCH-02 | 6 | TBD |
+| ARCH-03 | 1 | 01-01 |
+| ARCH-04 | 6 | TBD |
+| TEST-01 | 6 | TBD |
+| TEST-02 | 6 | TBD |
+| TEST-03 | 6 | TBD |
+| TEST-04 | 6 | TBD |
