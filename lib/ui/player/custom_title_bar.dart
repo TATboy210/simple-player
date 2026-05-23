@@ -80,7 +80,7 @@ class CustomTitleBar extends StatelessWidget {
                       sigmaX: Tokens.glassBlurThin,
                       sigmaY: Tokens.glassBlurThin,
                     ),
-                    child: child,
+                    child: RepaintBoundary(child: child!),
                   ),
                 )
               : child!,

@@ -163,7 +163,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                         sigmaX: Tokens.glassBlurThick,
                         sigmaY: Tokens.glassBlurThick,
                       ),
-                      child: child,
+                      child: RepaintBoundary(child: child!),
                     ),
                   )
                 : child!,
