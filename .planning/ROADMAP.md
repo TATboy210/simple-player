@@ -12,7 +12,7 @@ Eliminate frame drops and rendering bottlenecks through a "measure first, fix ch
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Zero-Risk Rendering Fixes** - fvp config tuning + dead code removal (no profiling needed)
+- [x] **Phase 1: Zero-Risk Rendering Fixes** - fvp config tuning + dead code removal (no profiling needed)
 - [ ] **Phase 2: Profile and Measure** - Establish frame-level baselines with DevTools before optimizing
 - [ ] **Phase 3: fvp D3D11 Hardware Tuning** - d3d11.sync.cpu=0 with multi-config hardware validation
 - [ ] **Phase 4: BackdropFilter and ValueNotifier Optimization** - Targeted widget-layer fixes guided by profiling data
@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — fvp配置修复：D3D11解码器 + 日志级别 + 死代码清理
+- [x] 01-01-PLAN.md — fvp配置修复：D3D11解码器 + 日志级别 + 死代码清理
 
 ### Phase 2: Profile and Measure
 **Goal**: Establish frame-level performance baselines and identify the exact bottleneck causing title bar frame drops
