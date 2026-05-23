@@ -50,10 +50,19 @@ class _SettingsPanelState extends State<SettingsPanel> {
   late String _originalLocale;
   late int _originalThemeIndex;
   Map<String, String> _originalShortcuts = {};
+  bool _depsInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    _loadOriginalShortcuts();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_depsInitialized) return;
+    _depsInitialized = true;
     final current = Theme.of(context).colorScheme.primary;
     const accents = [Color(0xFF2C58F4), Color(0xFF00B4D8), Color(0xFF2D6A4F)];
     final idx = accents.indexWhere((c) => c == current);
@@ -62,8 +71,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
     _pendingLocale = Localizations.localeOf(context).languageCode;
     _originalLocale = _pendingLocale;
-
-    _loadOriginalShortcuts();
   }
 
   Future<void> _loadOriginalShortcuts() async {

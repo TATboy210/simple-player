@@ -47,27 +47,6 @@ bool FlutterWindow::OnCreate() {
           }
       });
 
-  // Aspect ratio channel — Dart 侧设置窗口宽高比约束
-  aspect_ratio_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-      flutter_controller_->engine()->messenger(),
-      "com.simple_player/aspect_ratio",
-      &flutter::StandardMethodCodec::GetInstance());
-  aspect_ratio_channel_->SetMethodCallHandler(
-      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
-             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-          if (call.method_name() == "setAspectRatio") {
-              const auto* args = std::get_if<double>(call.arguments());
-              if (args) {
-                  aspect_ratio_ = *args;
-                  result->Success(nullptr);
-              } else {
-                  result->Error("INVALID_ARGS", "Expected a double value");
-              }
-          } else {
-              result->NotImplemented();
-          }
-      });
-
   return true;
 }
 
@@ -98,71 +77,6 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
 
-    case WM_SIZING: {
-      if (aspect_ratio_ > 0.0) {
-        auto* rect = reinterpret_cast<RECT*>(lparam);
-
-        // Skip ratio constraint when window covers entire monitor (fullscreen)
-        MONITORINFO mi = { sizeof(mi) };
-        GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
-        if (rect->left <= mi.rcMonitor.left && rect->top <= mi.rcMonitor.top &&
-            rect->right >= mi.rcMonitor.right && rect->bottom >= mi.rcMonitor.bottom) {
-          break;
-        }
-
-        LONG w = rect->right - rect->left;
-        LONG h = rect->bottom - rect->top;
-        // Frameless window (TitleBarStyle.hidden): non-client area is
-        // effectively zero.  Using GetClientRect here returns stale
-        // pre-resize values, causing jittery ncW/ncH on every frame.
-        LONG cw = w;
-        LONG ch = h;
-
-        // Calculate target client size based on drag edge
-        int edge = static_cast<int>(wparam);
-        switch (edge) {
-          case WMSZ_LEFT:
-          case WMSZ_RIGHT:
-            ch = static_cast<LONG>(cw / aspect_ratio_);
-            break;
-          case WMSZ_TOP:
-          case WMSZ_BOTTOM:
-            cw = static_cast<LONG>(ch * aspect_ratio_);
-            break;
-          default:
-            // Corners: use width as driver
-            ch = static_cast<LONG>(cw / aspect_ratio_);
-            break;
-        }
-
-        // Apply back to window rect (frameless: window == client)
-        LONG newW = cw;
-        LONG newH = ch;
-
-        // Anchor opposite edge
-        switch (edge) {
-          case WMSZ_LEFT:
-          case WMSZ_TOPLEFT:
-          case WMSZ_BOTTOMLEFT:
-            rect->left = rect->right - newW;
-            break;
-          default:
-            rect->right = rect->left + newW;
-            break;
-        }
-        switch (edge) {
-          case WMSZ_TOP:
-          case WMSZ_TOPLEFT:
-          case WMSZ_TOPRIGHT:
-            rect->top = rect->bottom - newH;
-            break;
-          default:
-            rect->bottom = rect->top + newH;
-            break;
-        }
-      }
-      break;
-    }
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);

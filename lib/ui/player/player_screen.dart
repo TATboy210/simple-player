@@ -14,7 +14,7 @@ import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
 import '../../kernel/window/aspect_ratio_service.dart';
 import 'controls_overlay.dart';
-import 'custom_title_bar.dart';
+import '../../kernel/ui/window/custom_title_bar.dart';
 import 'drop_handler.dart';
 import 'keyboard_handler.dart';
 import 'video_surface.dart';

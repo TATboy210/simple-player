@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../kernel/ui/theme/tokens.dart';
@@ -152,14 +153,21 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         child: SizedBox(
           width: width,
           height: height,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(
-                sigmaX: Tokens.glassBlurThick,
-                sigmaY: Tokens.glassBlurThick,
-              ),
-              child: Container(
+          child: ValueListenableBuilder<WindowInteractionState>(
+            valueListenable: WindowBridge.I.interaction,
+            builder: (_, state, child) => state == WindowInteractionState.idle
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(
+                        sigmaX: Tokens.glassBlurThick,
+                        sigmaY: Tokens.glassBlurThick,
+                      ),
+                      child: child,
+                    ),
+                  )
+                : child!,
+            child: Container(
                 decoration: BoxDecoration(
                   color: Tokens.bgGlass,
                   borderRadius: BorderRadius.circular(Tokens.radiusLarge),
@@ -195,8 +203,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildTabBar() {

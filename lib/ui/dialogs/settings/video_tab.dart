@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../kernel/models/aspect_ratio_mode.dart';
@@ -33,16 +31,16 @@ class VideoTab extends StatelessWidget {
           title: l10n.brightness,
           icon: Icons.color_lens,
           children: [
-            _DebouncedSlider(
-              notifier: service.brightness,
+            SettingSliderRow(
               label: l10n.brightness,
+              notifier: service.brightness,
             ),
-            _DebouncedSlider(notifier: service.contrast, label: l10n.contrast),
-            _DebouncedSlider(
-              notifier: service.saturation,
+            SettingSliderRow(label: l10n.contrast, notifier: service.contrast),
+            SettingSliderRow(
               label: l10n.saturation,
+              notifier: service.saturation,
             ),
-            _DebouncedSlider(notifier: service.hue, label: l10n.hue),
+            SettingSliderRow(label: l10n.hue, notifier: service.hue),
           ],
         ),
         // 旋转
@@ -61,7 +59,13 @@ class VideoTab extends StatelessWidget {
         SettingsCard(
           title: l10n.enableDeinterlace,
           icon: Icons.deblur,
-          children: [_DeinterlaceToggle(notifier: service.deinterlaceEnabled)],
+          children: [
+            SettingSwitchRow(
+              title: l10n.enableDeinterlace,
+              description: l10n.softwareDecoderOnly,
+              notifier: service.deinterlaceEnabled,
+            ),
+          ],
         ),
         // 重置
         Align(
@@ -97,88 +101,6 @@ class VideoTab extends StatelessWidget {
 }
 
 // ── 内部控件 ──
-
-class _DebouncedSlider extends StatefulWidget {
-  final ValueNotifier<double> notifier;
-  final String label;
-  const _DebouncedSlider({required this.notifier, required this.label});
-
-  @override
-  State<_DebouncedSlider> createState() => _DebouncedSliderState();
-}
-
-class _DebouncedSliderState extends State<_DebouncedSlider> {
-  bool _dragging = false;
-  double _dragValue = 0;
-  Timer? _debounce;
-
-  double get _effectiveValue => _dragging ? _dragValue : widget.notifier.value;
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<double>(
-      valueListenable: widget.notifier,
-      builder: (_, _, _) {
-        final display = _effectiveValue;
-        return Row(
-          children: [
-            SizedBox(
-              width: 64,
-              child: Text(
-                widget.label,
-                style: const TextStyle(
-                  color: Tokens.textSecondary,
-                  fontSize: Tokens.fontOverline,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Slider(
-                value: display,
-                min: -1.0,
-                max: 1.0,
-                onChanged: (v) {
-                  setState(() {
-                    _dragging = true;
-                    _dragValue = v;
-                  });
-                  _debounce?.cancel();
-                  _debounce = Timer(
-                    const Duration(milliseconds: 50),
-                    () => widget.notifier.value = v,
-                  );
-                },
-                onChangeEnd: (_) {
-                  setState(() => _dragging = false);
-                },
-                activeColor: Tokens.accent,
-                inactiveColor: Tokens.bgHover,
-              ),
-            ),
-            SizedBox(
-              width: 36,
-              child: Text(
-                '${(display * 100).round()}',
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                  color: Tokens.textTertiary,
-                  fontSize: Tokens.fontOverline,
-                  fontFeatures: [Tokens.tabularFigures],
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
 
 class _RotationPicker extends StatelessWidget {
   final ValueNotifier<int> notifier;
@@ -255,50 +177,5 @@ class _AspectRatioSelector extends StatelessWidget {
       AspectRatioMode.cropFill => l10n.aspectRatioCropFill,
       _ => mode.label,
     };
-  }
-}
-
-class _DeinterlaceToggle extends StatelessWidget {
-  final ValueNotifier<bool> notifier;
-  const _DeinterlaceToggle({required this.notifier});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return ValueListenableBuilder<bool>(
-      valueListenable: notifier,
-      builder: (_, enabled, _) {
-        return Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.enableDeinterlace,
-                    style: const TextStyle(
-                      color: Tokens.textPrimary,
-                      fontSize: Tokens.fontCaption,
-                    ),
-                  ),
-                  Text(
-                    l10n.softwareDecoderOnly,
-                    style: const TextStyle(
-                      color: Tokens.textTertiary,
-                      fontSize: Tokens.fontOverline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Switch(
-              value: enabled,
-              onChanged: (v) => notifier.value = v,
-              activeThumbColor: Tokens.accent,
-            ),
-          ],
-        );
-      },
-    );
   }
 }

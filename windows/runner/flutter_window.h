@@ -34,13 +34,6 @@ class FlutterWindow : public Win32Window {
   // MethodChannel for Dart-triggered ForceRedraw after frameless setup.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> redraw_channel_;
 
-  // MethodChannel for aspect ratio constraint.
-  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> aspect_ratio_channel_;
-
-  // Current aspect ratio constraint (0 = none, >0 = width/height ratio).
-  double aspect_ratio_ = 0.0;
-
-
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

@@ -73,10 +73,10 @@ class GlassContainer extends StatelessWidget {
     }
 
     // respectResizeState == true: resize 期间降级为纯色
-    return ValueListenableBuilder<bool>(
-      valueListenable: WindowBridge.I.isResizing,
-      builder: (_, resizing, child) {
-        if (resizing) {
+    return ValueListenableBuilder<WindowInteractionState>(
+      valueListenable: WindowBridge.I.interaction,
+      builder: (_, state, child) {
+        if (state != WindowInteractionState.idle) {
           return ClipRRect(
             borderRadius: rRect,
             child: RepaintBoundary(child: child),

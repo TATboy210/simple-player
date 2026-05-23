@@ -10,7 +10,7 @@ import '../theme/tokens.dart';
 /// 自定义标题栏 — 毛玻璃 + 拖拽 + 窗口控制
 ///
 /// 36px 高度（Win11 标准 32px + 4px 触摸目标）。
-/// resize 时降级为纯色（跳过 BackdropFilter GPU 开销）。
+/// resize 时条件渲染跳过 BackdropFilter（零合成开销）。
 class CustomTitleBar extends StatelessWidget {
   final VoidCallback? onOpenFile;
   final ValueNotifier<String>? fileName;
@@ -68,36 +68,22 @@ class CustomTitleBar extends StatelessWidget {
       behavior: HitTestBehavior.translucent,
       onPanStart: (_) => wm.startDragging(),
       onDoubleTap: () => wm.toggleMaximize(),
-      child: ValueListenableBuilder<bool>(
-        valueListenable: wm.isResizing,
+      child: ValueListenableBuilder<WindowInteractionState>(
+        valueListenable: wm.interaction,
         child: content,
-        builder: (_, resizing, child) => SizedBox(
+        builder: (_, state, child) => SizedBox(
           height: Tokens.titleBarHeight,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Blur layer — AnimatedOpacity avoids tree mutation.
-              // opacity: 0 → RenderOpacity.needsCompositing = false → GPU blur skipped.
-              // 80ms fade-in masks stale-bitmap flash on resize end.
-              RepaintBoundary(
-                child: AnimatedOpacity(
-                  opacity: resizing ? 0.0 : 1.0,
-                  duration: const Duration(milliseconds: Tokens.durationFast),
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(
-                        sigmaX: Tokens.glassBlurThin,
-                        sigmaY: Tokens.glassBlurThin,
-                      ),
-                      child: const SizedBox.expand(),
+          child: state == WindowInteractionState.idle
+              ? ClipRect(
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(
+                      sigmaX: Tokens.glassBlurThin,
+                      sigmaY: Tokens.glassBlurThin,
                     ),
+                    child: child,
                   ),
-                ),
-              ),
-              // Content layer — RepaintBoundary isolates from blur dirty marks.
-              Positioned.fill(child: RepaintBoundary(child: child!)),
-            ],
-          ),
+                )
+              : child!,
         ),
       ),
     );
@@ -105,6 +91,8 @@ class CustomTitleBar extends StatelessWidget {
 }
 
 /// 标题栏控制按钮组 — Pin / Minimize / Maximize / Close
+///
+/// resize 时通过 IgnorePointer 统一禁用所有按钮交互。
 class TitleBarControls extends StatelessWidget {
   const TitleBarControls({super.key});
 
@@ -112,54 +100,61 @@ class TitleBarControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final wm = WindowBridge.I;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Aspect ratio cycle (visible when ratio is locked)
-        ValueListenableBuilder<double>(
-          valueListenable: AspectRatioService.I.ratioNotifier,
-          builder: (_, ratio, _) {
-            if (ratio <= 0) return const SizedBox.shrink();
-            return _TitleBarButton(
-              icon: Icons.aspect_ratio,
-              tooltip: _aspectRatioLabel(ratio, l10n),
-              onPressed: () => AspectRatioService.I.cycleRatio(),
-            );
-          },
-        ),
-        // Pin (always on top)
-        ValueListenableBuilder<bool>(
-          valueListenable: wm.isAlwaysOnTop,
-          builder: (_, pinned, _) => _TitleBarButton(
-            icon: Icons.push_pin,
-            isActive: pinned,
-            tooltip: pinned ? l10n.unpin : l10n.pin,
-            onPressed: wm.toggleAlwaysOnTop,
+    return ValueListenableBuilder<WindowInteractionState>(
+      valueListenable: wm.interaction,
+      builder: (_, state, child) => IgnorePointer(
+        ignoring: state != WindowInteractionState.idle,
+        child: child,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Aspect ratio cycle (visible when ratio is locked)
+          ValueListenableBuilder<double>(
+            valueListenable: AspectRatioService.I.ratioNotifier,
+            builder: (_, ratio, _) {
+              if (ratio <= 0) return const SizedBox.shrink();
+              return _TitleBarButton(
+                icon: Icons.aspect_ratio,
+                tooltip: _aspectRatioLabel(ratio, l10n),
+                onPressed: () => AspectRatioService.I.cycleRatio(),
+              );
+            },
           ),
-        ),
-        // Minimize
-        _TitleBarButton(
-          icon: Icons.minimize,
-          tooltip: l10n.minimize,
-          onPressed: wm.minimize,
-        ),
-        // Maximize
-        ValueListenableBuilder<bool>(
-          valueListenable: wm.isMaximized,
-          builder: (_, maximized, _) => _TitleBarButton(
-            icon: maximized ? Icons.filter_none : Icons.crop_square,
-            tooltip: maximized ? l10n.restore : l10n.maximize,
-            onPressed: wm.toggleMaximize,
+          // Pin (always on top)
+          ValueListenableBuilder<bool>(
+            valueListenable: wm.isAlwaysOnTop,
+            builder: (_, pinned, _) => _TitleBarButton(
+              icon: Icons.push_pin,
+              isActive: pinned,
+              tooltip: pinned ? l10n.unpin : l10n.pin,
+              onPressed: wm.toggleAlwaysOnTop,
+            ),
           ),
-        ),
-        // Close
-        _TitleBarButton(
-          icon: Icons.close,
-          tooltip: l10n.close,
-          isClose: true,
-          onPressed: wm.close,
-        ),
-      ],
+          // Minimize
+          _TitleBarButton(
+            icon: Icons.minimize,
+            tooltip: l10n.minimize,
+            onPressed: wm.minimize,
+          ),
+          // Maximize
+          ValueListenableBuilder<bool>(
+            valueListenable: wm.isMaximized,
+            builder: (_, maximized, _) => _TitleBarButton(
+              icon: maximized ? Icons.filter_none : Icons.crop_square,
+              tooltip: maximized ? l10n.restore : l10n.maximize,
+              onPressed: wm.toggleMaximize,
+            ),
+          ),
+          // Close
+          _TitleBarButton(
+            icon: Icons.close,
+            tooltip: l10n.close,
+            isClose: true,
+            onPressed: wm.close,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -173,6 +168,9 @@ String _aspectRatioLabel(double ratio, AppLocalizations l10n) {
 }
 
 /// 标题栏按钮 — 46×36，hover 高亮，close hover = danger 红底
+///
+/// resize 期间由父级 TitleBarControls 的 IgnorePointer 统一禁用，
+/// 按钮自身不再监听 isResizing。
 class _TitleBarButton extends StatefulWidget {
   final IconData icon;
   final String tooltip;
@@ -196,24 +194,6 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
   bool _hovered = false;
 
   @override
-  void initState() {
-    super.initState();
-    WindowBridge.I.isResizing.addListener(_onResizingChanged);
-  }
-
-  @override
-  void dispose() {
-    WindowBridge.I.isResizing.removeListener(_onResizingChanged);
-    super.dispose();
-  }
-
-  void _onResizingChanged() {
-    if (!WindowBridge.I.isResizing.value && mounted) {
-      setState(() => _hovered = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final bgColor = _hovered
         ? (widget.isClose ? Tokens.danger : Tokens.bgHover)
@@ -227,16 +207,8 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
       waitDuration: const Duration(milliseconds: 400),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        onEnter: (_) {
-          if (!WindowBridge.I.isResizing.value) {
-            setState(() => _hovered = true);
-          }
-        },
-        onExit: (_) {
-          if (!WindowBridge.I.isResizing.value) {
-            setState(() => _hovered = false);
-          }
-        },
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onPressed,

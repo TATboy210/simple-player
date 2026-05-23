@@ -12,7 +12,8 @@ void main() {
       expect(noop.mode.value, WindowMode.windowed);
       expect(noop.isAlwaysOnTop.value, false);
       expect(noop.isMaximized.value, false);
-      expect(noop.isResizing.value, false);
+      expect(noop.interaction.value, WindowInteractionState.idle);
+      expect(noop.isResizing, false);
     });
 
     test('NoopWindowBridge commands all complete', () async {
@@ -52,40 +53,25 @@ void main() {
     });
   });
 
-  group('WindowService ValueNotifier defaults', () {
-    test('mode starts as windowed', () {
-      final notifier = ValueNotifier<WindowMode>(WindowMode.windowed);
-      expect(notifier.value, WindowMode.windowed);
-      notifier.dispose();
-    });
-
-    test('isMaximized starts as false', () {
-      final notifier = ValueNotifier<bool>(false);
-      expect(notifier.value, false);
-      notifier.dispose();
-    });
-
-    test('isAlwaysOnTop starts as false', () {
-      final notifier = ValueNotifier<bool>(false);
-      expect(notifier.value, false);
-      notifier.dispose();
-    });
-
-    test('isResizing starts as false', () {
-      final notifier = ValueNotifier<bool>(false);
-      expect(notifier.value, false);
-      notifier.dispose();
+  group('WindowInteractionState enum', () {
+    test('has idle, resizing, and moving values', () {
+      expect(WindowInteractionState.values, hasLength(3));
+      expect(WindowInteractionState.values, contains(WindowInteractionState.idle));
+      expect(WindowInteractionState.values, contains(WindowInteractionState.resizing));
+      expect(WindowInteractionState.values, contains(WindowInteractionState.moving));
     });
   });
 
   group('WindowService resize debounce pattern', () {
     test('debounce timer resets on rapid calls', () async {
       // Simulate the resize debounce pattern used in WindowService
-      bool isResizing = false;
+      var state = WindowInteractionState.idle;
       int callCount = 0;
 
       void onResizeStart() {
-        if (!isResizing) isResizing = true;
+        if (state != WindowInteractionState.resizing) {
+          state = WindowInteractionState.resizing;
+        }
         callCount++;
       }
 
@@ -94,7 +80,7 @@ void main() {
       onResizeStart();
       onResizeStart();
 
-      expect(isResizing, true);
+      expect(state, WindowInteractionState.resizing);
       expect(callCount, 3);
     });
 
@@ -172,7 +158,9 @@ class _FakeWindowBridge implements WindowBridge {
   @override
   final isMaximized = ValueNotifier(false);
   @override
-  final isResizing = ValueNotifier(false);
+  final interaction = ValueNotifier(WindowInteractionState.idle);
+  @override
+  bool get isResizing => interaction.value == WindowInteractionState.resizing;
 
   @override
   Future<void> minimize() async {}
