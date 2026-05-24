@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -68,24 +66,7 @@ class CustomTitleBar extends StatelessWidget {
       behavior: HitTestBehavior.translucent,
       onPanStart: (_) => wm.startDragging(),
       onDoubleTap: () => wm.toggleMaximize(),
-      child: ValueListenableBuilder<WindowInteractionState>(
-        valueListenable: wm.interaction,
-        child: content,
-        builder: (_, state, child) => SizedBox(
-          height: Tokens.titleBarHeight,
-          child: state == WindowInteractionState.idle
-              ? ClipRect(
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: Tokens.glassBlurThin,
-                      sigmaY: Tokens.glassBlurThin,
-                    ),
-                    child: RepaintBoundary(child: child!),
-                  ),
-                )
-              : child!,
-        ),
-      ),
+      child: RepaintBoundary(child: content),
     );
   }
 }
