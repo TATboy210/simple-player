@@ -5,7 +5,6 @@ import 'linux_thumbnail_provider.dart';
 import 'macos_thumbnail_provider.dart';
 import 'noop_thumbnail_provider.dart';
 import 'thumbnail_provider.dart';
-import 'windows_thumbnail_provider.dart';
 
 /// 平台感知的缩略图服务门面。
 ///
@@ -25,7 +24,7 @@ class ThumbnailService {
   static ThumbnailProvider get _provider {
     if (_impl != null) return _impl!;
     _impl = switch (defaultTargetPlatform) {
-      TargetPlatform.windows => WindowsThumbnailProvider.I,
+      TargetPlatform.windows => const NoopThumbnailProvider(),
       TargetPlatform.linux => const LinuxThumbnailProvider(),
       TargetPlatform.macOS => const MacosThumbnailProvider(),
       _ => const NoopThumbnailProvider(),

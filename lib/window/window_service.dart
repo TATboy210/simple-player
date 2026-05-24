@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../kernel/bridge/window_bridge.dart';
-import 'fullscreen_controller.dart';
+import '../kernel/window/aspect_ratio_service.dart';
 import 'window_persistence_service.dart';
 import 'window_state_service.dart';
 
@@ -22,7 +22,7 @@ class WindowService implements WindowBridge {
 
   late final WindowStateService _state;
   late final WindowPersistenceService _persistence;
-  FullscreenController? _fullscreen;
+  double _savedRatio = 0.0;
 
   // ─── Reactive State (delegate to _state) ───
 
@@ -35,7 +35,8 @@ class WindowService implements WindowBridge {
   @override
   ValueNotifier<WindowInteractionState> get interaction => _state.interaction;
   @override
-  bool get isResizing => _state.interaction.value == WindowInteractionState.resizing;
+  bool get isResizing =>
+      _state.interaction.value == WindowInteractionState.resizing;
 
   // ─── Constants ───
 
@@ -57,7 +58,10 @@ class WindowService implements WindowBridge {
     _initCompleter = Completer<void>();
 
     _state = WindowStateService();
-    _persistence = WindowPersistenceService(_prefs);
+    _persistence = WindowPersistenceService(
+      _prefs,
+      isMaximized: () => _state.isMaximized.value,
+    );
 
     try {
       final clamped = _persistence.loadAndClamp();
@@ -89,25 +93,12 @@ class WindowService implements WindowBridge {
 
           await windowManager.setPreventClose(true);
           await windowManager.setAsFrameless();
-          FullscreenController.restoreThickFrame();
-
-          // Force layout + redraw after frameless
-          try {
-            final size = await windowManager.getSize();
-            if (size.width > 0 && size.height > 0) {
-              await windowManager.setSize(size);
-            }
-          } on Exception catch (e) {
-            debugPrint('[WindowService] force layout failed: $e');
-          }
 
           await windowManager.show();
           await windowManager.focus();
 
-          _fullscreen = FullscreenController.init();
-
           if (clamped.isFullscreen) {
-            await _fullscreen!.enter();
+            await windowManager.setFullScreen(true);
           }
 
           windowManager.addListener(_WindowListener(this));
@@ -195,12 +186,10 @@ class WindowService implements WindowBridge {
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
     try {
-      final fc = _fullscreen;
-      if (fc == null) return;
       if (mode.value == WindowMode.fullscreen) {
-        await fc.exit();
+        await _exitFullscreenImpl();
       } else {
-        await fc.enter();
+        await _enterFullscreenImpl();
       }
     } on Exception catch (e) {
       debugPrint('[WindowService] toggleFullscreen failed: $e');
@@ -216,12 +205,28 @@ class WindowService implements WindowBridge {
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
     try {
-      await _fullscreen?.exit();
+      await _exitFullscreenImpl();
     } on Exception catch (e) {
       debugPrint('[WindowService] exitFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
       _state.onResizeEnd();
+    }
+  }
+
+  // ─── Fullscreen Helpers ───
+
+  Future<void> _enterFullscreenImpl() async {
+    _savedRatio = AspectRatioService.I.current;
+    if (_savedRatio > 0) await AspectRatioService.I.unlock();
+    await windowManager.setFullScreen(true);
+  }
+
+  Future<void> _exitFullscreenImpl() async {
+    await windowManager.setFullScreen(false);
+    if (_savedRatio > 0) {
+      await AspectRatioService.I.setAspectRatio(_savedRatio);
+      _savedRatio = 0.0;
     }
   }
 
