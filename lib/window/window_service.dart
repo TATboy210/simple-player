@@ -1,117 +1,97 @@
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../kernel/bridge/window_bridge.dart';
+import '../kernel/persistence/settings_store.dart';
 import '../kernel/window/aspect_ratio_service.dart';
-import 'window_persistence_service.dart';
-import 'window_state_service.dart';
+import 'window_state.dart';
 
-/// Windows 窗口管理服务 — 实现 WindowBridge
-///
-/// Fullscreen via FullscreenController (Win32 FFI).
-/// Other operations via window_manager.
-///
-/// Composes WindowStateService + WindowPersistenceService.
-class WindowService implements WindowBridge {
-  WindowService(this._prefs);
+// ═══════════════════════════════════════════════════════════════════════
+// WindowService — Concrete 实现, UI 不直接访问
+// ═══════════════════════════════════════════════════════════════════════
 
-  final SharedPreferences _prefs;
+class WindowService {
+  WindowService(this._s);
+  final WindowState _s;
 
-  late final WindowStateService _state;
-  late final WindowPersistenceService _persistence;
-  double _savedRatio = 0.0;
-
-  // ─── Reactive State (delegate to _state) ───
-
-  @override
-  ValueNotifier<WindowMode> get mode => _state.mode;
-  @override
-  ValueNotifier<bool> get isAlwaysOnTop => _state.isAlwaysOnTop;
-  @override
-  ValueNotifier<bool> get isMaximized => _state.isMaximized;
-  @override
-  ValueNotifier<WindowInteractionState> get interaction => _state.interaction;
-  @override
-  bool get isResizing =>
-      _state.interaction.value == WindowInteractionState.resizing;
-
-  // ─── Constants ───
-
-  static const _minSize = Size(800, 450);
-
-  // ─── Internal ───
+  // ── 内部状态 ──
 
   bool _initialized = false;
   bool _disposed = false;
   Completer<void>? _initCompleter;
   bool _togglingFullscreen = false;
   bool _closing = false;
+  double _savedRatio = 0.0;
 
-  // ─── Lifecycle ───
+  late SharedPreferences _prefs;
+  Timer? _persistDebounce;
+  Completer<void>? _persistInFlight;
+  Timer? _resizeDebounce;
 
-  @override
-  Future<void> init() async {
+  // ═══════════════════════════════════════════════════════════════════
+  // Lifecycle
+  // ═══════════════════════════════════════════════════════════════════
+
+  Future<void> init(SharedPreferences prefs) async {
     if (_initialized) return;
+    _prefs = prefs;
     _initCompleter = Completer<void>();
 
-    _state = WindowStateService();
-    _persistence = WindowPersistenceService(
-      _prefs,
-      isMaximized: () => _state.isMaximized.value,
-    );
-
     try {
-      final clamped = _persistence.loadAndClamp();
+      final geo = _loadGeometry();
+      final clamped = _clampToVisibleBounds(geo);
 
       await windowManager.ensureInitialized();
 
       final windowOptions = WindowOptions(
-        size: clamped.size,
-        center: !_persistence.geometry.hasSavedPosition,
-
+        size: Size(clamped[kWWidth]!, clamped[kWHeight]!),
+        center: !_prefs.containsKey(kWPosX),
         backgroundColor: Colors.black,
         skipTaskbar: false,
         titleBarStyle: TitleBarStyle.hidden,
-        windowButtonVisibility: false,
+        windowButtonVisibility:
+            defaultTargetPlatform == TargetPlatform.macOS,
       );
 
       windowManager.waitUntilReadyToShow(windowOptions, () async {
         if (_disposed) return;
         try {
-          await windowManager.setMinimumSize(_minSize);
+          await windowManager.setMinimumSize(kWMinSize);
 
-          if (_persistence.geometry.hasSavedPosition) {
-            await windowManager.setPosition(clamped.position);
+          if (_prefs.containsKey(kWPosX)) {
+            await windowManager.setPosition(
+              Offset(clamped[kWPosX]!, clamped[kWPosY]!),
+            );
           }
 
-          if (clamped.isMaximized) {
+          if (clamped[kWMaximized] == true) {
             await windowManager.maximize();
           }
 
           await windowManager.setPreventClose(true);
           await windowManager.setAsFrameless();
-
           await windowManager.show();
           await windowManager.focus();
 
-          if (clamped.isFullscreen) {
+          if (clamped[kWFullscreen] == true) {
             await windowManager.setFullScreen(true);
           }
 
           windowManager.addListener(_WindowListener(this));
           _initialized = true;
         } on Exception catch (e) {
-          debugPrint('[WindowService] init failed: $e');
+          debugPrint('[WindowState] init failed: $e');
           _initialized = true;
         } finally {
           if (!_initCompleter!.isCompleted) _initCompleter!.complete();
         }
       });
     } on Exception catch (e) {
-      debugPrint('[WindowService] init setup failed: $e');
+      debugPrint('[WindowState] init setup failed: $e');
       _initialized = true;
       if (_initCompleter != null && !_initCompleter!.isCompleted) {
         _initCompleter!.complete();
@@ -119,110 +99,116 @@ class WindowService implements WindowBridge {
     }
   }
 
-  @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-
     if (_initCompleter != null && !_initCompleter!.isCompleted) {
       await _initCompleter!.future;
     }
-
-    await _persistence.flush();
-    _state.dispose();
-    _persistence.dispose();
+    await _flush();
+    _resizeDebounce?.cancel();
+    _s.mode.dispose();
+    _s.isAlwaysOnTop.dispose();
+    _s.isMaximized.dispose();
+    _s.interaction.dispose();
   }
 
-  // ─── Commands ───
+  // ═══════════════════════════════════════════════════════════════════
+  // Commands
+  // ═══════════════════════════════════════════════════════════════════
 
-  @override
   Future<void> minimize() async {
     try {
       await windowManager.minimize();
     } on Exception catch (e) {
-      debugPrint('[WindowService] minimize failed: $e');
+      debugPrint('[WindowState] minimize failed: $e');
     }
   }
 
-  @override
   Future<void> toggleMaximize() async {
     try {
-      if (isMaximized.value) {
+      if (_s.isMaximized.value) {
         await windowManager.unmaximize();
       } else {
         await windowManager.maximize();
       }
     } on Exception catch (e) {
-      debugPrint('[WindowService] toggleMaximize failed: $e');
+      debugPrint('[WindowState] toggleMaximize failed: $e');
     }
   }
 
-  @override
   Future<void> close() async {
     if (_closing) return;
     _closing = true;
     try {
-      await _persistence.flush();
+      await _flush();
       await windowManager.setPreventClose(false);
       await windowManager.close();
     } on Exception catch (e) {
-      debugPrint('[WindowService] close failed: $e');
+      debugPrint('[WindowState] close failed: $e');
     }
   }
 
-  @override
   Future<void> startDragging() async {
     try {
       await windowManager.startDragging();
     } on Exception catch (e) {
-      debugPrint('[WindowService] startDragging failed: $e');
+      debugPrint('[WindowState] startDragging failed: $e');
     }
   }
 
-  // ─── Fullscreen ───
+  Future<void> toggleAlwaysOnTop() async {
+    try {
+      final next = !_s.isAlwaysOnTop.value;
+      await windowManager.setAlwaysOnTop(next);
+      _s.isAlwaysOnTop.value = next;
+    } on Exception catch (e) {
+      debugPrint('[WindowState] toggleAlwaysOnTop failed: $e');
+    }
+  }
 
-  @override
   Future<void> toggleFullscreen() async {
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
     try {
-      if (mode.value == WindowMode.fullscreen) {
-        await _exitFullscreenImpl();
+      if (_s.mode.value == WindowMode.fullscreen) {
+        await _exitFullscreen();
       } else {
-        await _enterFullscreenImpl();
+        await _enterFullscreen();
       }
     } on Exception catch (e) {
-      debugPrint('[WindowService] toggleFullscreen failed: $e');
+      debugPrint('[WindowState] toggleFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
-      _state.onResizeEnd();
+      _onResizeEnd();
     }
   }
 
-  @override
   Future<void> exitFullscreen() async {
-    if (mode.value != WindowMode.fullscreen) return;
+    if (_s.mode.value != WindowMode.fullscreen) return;
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
     try {
-      await _exitFullscreenImpl();
+      await _exitFullscreen();
     } on Exception catch (e) {
-      debugPrint('[WindowService] exitFullscreen failed: $e');
+      debugPrint('[WindowState] exitFullscreen failed: $e');
     } finally {
       _togglingFullscreen = false;
-      _state.onResizeEnd();
+      _onResizeEnd();
     }
   }
 
-  // ─── Fullscreen Helpers ───
+  // ═══════════════════════════════════════════════════════════════════
+  // Fullscreen (内联, 原 FullscreenManager)
+  // ═══════════════════════════════════════════════════════════════════
 
-  Future<void> _enterFullscreenImpl() async {
+  Future<void> _enterFullscreen() async {
     _savedRatio = AspectRatioService.I.current;
     if (_savedRatio > 0) await AspectRatioService.I.unlock();
     await windowManager.setFullScreen(true);
   }
 
-  Future<void> _exitFullscreenImpl() async {
+  Future<void> _exitFullscreen() async {
     await windowManager.setFullScreen(false);
     if (_savedRatio > 0) {
       await AspectRatioService.I.setAspectRatio(_savedRatio);
@@ -230,68 +216,173 @@ class WindowService implements WindowBridge {
     }
   }
 
-  // ─── Always on Top ───
+  // ═══════════════════════════════════════════════════════════════════
+  // Geometry Persistence
+  // ═══════════════════════════════════════════════════════════════════
 
-  @override
-  Future<void> toggleAlwaysOnTop() async {
+  Map<String, double> _loadGeometry() {
+    return {
+      kWWidth: _prefs.getDouble(kWWidth) ?? kWDefaultWidth,
+      kWHeight: _prefs.getDouble(kWHeight) ?? kWDefaultHeight,
+      kWPosX: _prefs.getDouble(kWPosX) ?? 10.0,
+      kWPosY: _prefs.getDouble(kWPosY) ?? 10.0,
+    };
+  }
+
+  Map<String, dynamic> _clampToVisibleBounds(Map<String, double> geo) {
+    final result = <String, dynamic>{
+      kWWidth: geo[kWWidth],
+      kWHeight: geo[kWHeight],
+      kWPosX: geo[kWPosX],
+      kWPosY: geo[kWPosY],
+      kWMaximized: _prefs.getBool(kWMaximized) ?? false,
+      kWFullscreen: _prefs.getBool(kWFullscreen) ?? false,
+    };
     try {
-      final next = !isAlwaysOnTop.value;
-      await windowManager.setAlwaysOnTop(next);
-      isAlwaysOnTop.value = next;
+      final display = PlatformDispatcher.instance.views.first;
+      final screenW =
+          display.physicalSize.width / display.devicePixelRatio;
+      final screenH =
+          display.physicalSize.height / display.devicePixelRatio;
+
+      final w = geo[kWWidth]!;
+      final h = geo[kWHeight]!;
+      final x = geo[kWPosX]!;
+      final y = geo[kWPosY]!;
+
+      final isOffScreen = x + w < kWMinVisible ||
+          y + h < kWMinVisible ||
+          x > screenW - kWMinVisible ||
+          y > screenH - kWMinVisible;
+
+      if (isOffScreen) {
+        result[kWPosX] =
+            ((screenW - w) / 2).clamp(0, screenW - kWMinVisible);
+        result[kWPosY] =
+            ((screenH - h) / 2).clamp(0, screenH - kWMinVisible);
+      }
     } on Exception catch (e) {
-      debugPrint('[WindowService] toggleAlwaysOnTop failed: $e');
+      debugPrint('[WindowState] bounds check failed: $e');
     }
+    return result;
+  }
+
+  void _schedulePersist() {
+    _persistDebounce?.cancel();
+    _persistDebounce = Timer(
+      const Duration(milliseconds: kWResizeDebounceMs),
+      _persistNow,
+    );
+  }
+
+  Future<void> _persistNow() async {
+    if (_persistInFlight != null) return _persistInFlight!.future;
+    _persistInFlight = Completer<void>();
+    try {
+      final results = await Future.wait([
+        windowManager.getSize(),
+        windowManager.getPosition(),
+      ]);
+      final size = results[0] as Size;
+      final position = results[1] as Offset;
+      await Future.wait([
+        _prefs.setDouble(kWWidth, size.width),
+        _prefs.setDouble(kWHeight, size.height),
+        _prefs.setDouble(kWPosX, position.dx),
+        _prefs.setDouble(kWPosY, position.dy),
+        _prefs.setBool(kWMaximized, _s.isMaximized.value),
+      ]);
+      _persistInFlight!.complete();
+    } on Exception catch (e) {
+      debugPrint('[WindowState] persist failed: $e');
+      if (!_persistInFlight!.isCompleted) _persistInFlight!.complete();
+    } finally {
+      _persistInFlight = null;
+    }
+  }
+
+  void _saveFullscreen(bool value) {
+    _prefs.setBool(kWFullscreen, value);
+    SettingsStore.saveIsFullscreen(value);
+  }
+
+  Future<void> _flush() async {
+    _persistDebounce?.cancel();
+    if (_persistInFlight != null && !_persistInFlight!.isCompleted) {
+      await _persistInFlight!.future;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Resize Debounce
+  // ═══════════════════════════════════════════════════════════════════
+
+  void _onResizeStart() {
+    if (_s.interaction.value != WindowInteractionState.resizing) {
+      _s.interaction.value = WindowInteractionState.resizing;
+    }
+    _resizeDebounce?.cancel();
+  }
+
+  void _onResizeEnd() {
+    _resizeDebounce?.cancel();
+    _resizeDebounce = Timer(
+      const Duration(milliseconds: kWResizeDebounceMs),
+      () => _s.interaction.value = WindowInteractionState.idle,
+    );
   }
 }
 
-/// WindowListener adapter — routes events to WindowService + shared services.
+// ═══════════════════════════════════════════════════════════════════════
+// WindowListener — 引用 WindowService
+// ═══════════════════════════════════════════════════════════════════════
+
 class _WindowListener extends WindowListener {
-  _WindowListener(this._service);
-  final WindowService _service;
+  _WindowListener(this._svc);
+  final WindowService _svc;
 
   @override
-  void onWindowClose() => _service.close();
+  void onWindowClose() => _svc.close();
 
   @override
-  void onWindowResize() => _service._state.onResizeStart();
+  void onWindowResize() => _svc._onResizeStart();
 
   @override
   void onWindowResized() {
-    _service._state.onResizeEnd();
-    _service._persistence.schedulePersist();
+    _svc._onResizeEnd();
+    _svc._schedulePersist();
   }
 
   @override
-  void onWindowMove() => _service._persistence.schedulePersist();
+  void onWindowMove() => _svc._schedulePersist();
 
   @override
-  void onWindowMoved() => _service._persistence.schedulePersist();
+  void onWindowMoved() => _svc._schedulePersist();
 
   @override
   void onWindowMaximize() {
-    _service.isMaximized.value = true;
-    _service._persistence.persistNow();
+    _svc._s.isMaximized.value = true;
+    _svc._persistNow();
   }
 
   @override
   void onWindowUnmaximize() {
-    _service.isMaximized.value = false;
-    _service._persistence.persistNow();
+    _svc._s.isMaximized.value = false;
+    _svc._persistNow();
   }
 
   @override
   void onWindowEnterFullScreen() {
-    _service.mode.value = WindowMode.fullscreen;
-    _service._persistence.saveFullscreen(true);
+    _svc._s.mode.value = WindowMode.fullscreen;
+    _svc._saveFullscreen(true);
   }
 
   @override
   void onWindowLeaveFullScreen() {
-    _service.mode.value = WindowMode.windowed;
-    _service._persistence.saveFullscreen(false);
+    _svc._s.mode.value = WindowMode.windowed;
+    _svc._saveFullscreen(false);
   }
 
-  // No-op overrides
   @override
   void onWindowEvent(String eventName) {}
   @override
