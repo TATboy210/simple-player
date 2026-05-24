@@ -14,13 +14,26 @@ import 'time_range_display.dart';
 import 'volume_controls.dart';
 
 class ControlBar extends StatelessWidget {
+  static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
+  static final _decoration = BoxDecoration(
+    color: Tokens.bgGlass,
+    borderRadius: ControlBar._borderRadius,
+    border: Border.fromBorderSide(
+      BorderSide(color: Tokens.controlBarBorder, width: 0.5),
+    ),
+    boxShadow: [
+      BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+    ],
+  );
+
   final MediaEngine engine;
   final bool isFullscreen;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onTogglePlaylist;
   final VoidCallback? onSettings;
-  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
+  final void Function(BuildContext context, TapUpDetails details)?
+  onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onTogglePlayMode;
@@ -30,6 +43,9 @@ class ControlBar extends StatelessWidget {
   final bool isVideo;
   final bool enableBlur;
   final bool isIdle;
+
+  /// 淡入淡出动画 — opacity=0 时跳过 BackdropFilter
+  final Animation<double>? opacity;
 
   const ControlBar({
     super.key,
@@ -49,6 +65,7 @@ class ControlBar extends StatelessWidget {
     this.isVideo = false,
     this.enableBlur = true,
     this.isIdle = false,
+    this.opacity,
   });
 
   @override
@@ -57,23 +74,11 @@ class ControlBar extends StatelessWidget {
     final prevTooltip = l10n.previousTrack;
     final nextTooltip = l10n.nextTrack;
 
-    final borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
     final content = Material(
       color: Colors.transparent,
       child: Container(
         height: Tokens.controlBarHeight,
-        decoration: BoxDecoration(
-          color: Tokens.bgGlass,
-          borderRadius: borderRadius,
-          border: Border.all(color: Tokens.controlBarBorder, width: 0.5),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 20,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
+        decoration: _decoration,
         padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -93,7 +98,13 @@ class ControlBar extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: _buildButtonRow(context, l10n, showSecondary, prevTooltip, nextTooltip),
+                  child: _buildButtonRow(
+                    context,
+                    l10n,
+                    showSecondary,
+                    prevTooltip,
+                    nextTooltip,
+                  ),
                 ),
               ],
             );
@@ -104,21 +115,40 @@ class ControlBar extends StatelessWidget {
 
     if (!enableBlur) return RepaintBoundary(child: content);
 
+    // opacity=0 时跳过 BackdropFilter（fade-out 尾部帧零 GPU readback）
+    final blurContent = RepaintBoundary(child: content);
+    final filter = ui.ImageFilter.blur(
+      sigmaX: Tokens.glassBlur,
+      sigmaY: Tokens.glassBlur,
+    );
+
+    if (opacity != null) {
+      return AnimatedBuilder(
+        animation: Listenable.merge([opacity!, WindowBridge.I.interaction]),
+        builder: (_, child) {
+          if (opacity!.value < 0.01) return child!;
+          if (WindowBridge.I.interaction.value !=
+              WindowInteractionState.idle) {
+            return child!;
+          }
+          return ClipRRect(
+            borderRadius: _borderRadius,
+            child: BackdropFilter(filter: filter, child: child),
+          );
+        },
+        child: blurContent,
+      );
+    }
+
     return ValueListenableBuilder<WindowInteractionState>(
       valueListenable: WindowBridge.I.interaction,
       builder: (_, state, child) => state != WindowInteractionState.idle
           ? child!
           : ClipRRect(
-              borderRadius: borderRadius,
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(
-                  sigmaX: Tokens.glassBlur,
-                  sigmaY: Tokens.glassBlur,
-                ),
-                child: child,
-              ),
+              borderRadius: _borderRadius,
+              child: BackdropFilter(filter: filter, child: child),
             ),
-      child: RepaintBoundary(child: content),
+      child: blurContent,
     );
   }
 
@@ -134,6 +164,58 @@ class ControlBar extends StatelessWidget {
   ) {
     return Row(
       children: [
+        _LeftButtonGroup(
+          engine: engine,
+          showSecondary: showSecondary,
+          playModeIcon: playModeIcon,
+          playModeLabel: playModeLabel,
+          onTogglePlayMode: onTogglePlayMode,
+        ),
+        const Spacer(),
+        CenterGroup(
+          engine: engine,
+          isIdle: isIdle,
+          prevTooltip: prevTooltip,
+          nextTooltip: nextTooltip,
+          onPrevious: onPrevious,
+          onNext: onNext,
+        ),
+        const Spacer(),
+        _RightButtonGroup(
+          isFullscreen: isFullscreen,
+          onOpenFile: onOpenFile,
+          onOpenSubtitle: onOpenSubtitle,
+          onTogglePlaylist: onTogglePlaylist,
+          onSettings: onSettings,
+          onSettingsSecondary: onSettingsSecondary,
+          onToggleFullscreen: onToggleFullscreen,
+        ),
+      ],
+    );
+  }
+}
+
+/// 左侧按钮组：播放模式 + 音量 + 倍速
+class _LeftButtonGroup extends StatelessWidget {
+  final MediaEngine engine;
+  final bool showSecondary;
+  final IconData? playModeIcon;
+  final String? playModeLabel;
+  final VoidCallback? onTogglePlayMode;
+
+  const _LeftButtonGroup({
+    required this.engine,
+    required this.showSecondary,
+    this.playModeIcon,
+    this.playModeLabel,
+    this.onTogglePlayMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         GlassIconButton(
           icon: playModeIcon ?? Icons.repeat,
           tooltip: playModeLabel ?? '顺序',
@@ -146,22 +228,35 @@ class ControlBar extends StatelessWidget {
           const SizedBox(width: Tokens.spXs),
           SpeedButton(engine: engine),
         ],
-        const Spacer(),
-        CenterGroup(
-          engine: engine,
-          isIdle: isIdle,
-          prevTooltip: prevTooltip,
-          nextTooltip: nextTooltip,
-          onPrevious: onPrevious,
-          onNext: onNext,
-        ),
-        const Spacer(),
-        _buildRightGroup(context, l10n),
       ],
     );
   }
+}
 
-  Widget _buildRightGroup(BuildContext context, AppLocalizations l10n) {
+/// 右侧按钮组：文件、字幕、播放列表、设置、全屏
+class _RightButtonGroup extends StatelessWidget {
+  final bool isFullscreen;
+  final VoidCallback? onOpenFile;
+  final VoidCallback? onOpenSubtitle;
+  final VoidCallback? onTogglePlaylist;
+  final VoidCallback? onSettings;
+  final void Function(BuildContext context, TapUpDetails details)?
+  onSettingsSecondary;
+  final VoidCallback? onToggleFullscreen;
+
+  const _RightButtonGroup({
+    required this.isFullscreen,
+    this.onOpenFile,
+    this.onOpenSubtitle,
+    this.onTogglePlaylist,
+    this.onSettings,
+    this.onSettingsSecondary,
+    this.onToggleFullscreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
