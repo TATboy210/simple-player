@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
+import '../shared/resize_notifier.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
@@ -153,9 +153,9 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         child: SizedBox(
           width: width,
           height: height,
-          child: ValueListenableBuilder<WindowInteractionState>(
-            valueListenable: WindowBridge.I.interaction,
-            builder: (_, state, child) => state == WindowInteractionState.idle
+          child: ValueListenableBuilder<bool>(
+            valueListenable: ResizeNotifier.instance,
+            builder: (_, state, child) => !state
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(Tokens.radiusLarge),
                     child: BackdropFilter(
@@ -168,42 +168,40 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                   )
                 : child!,
             child: Container(
-                decoration: BoxDecoration(
-                  color: Tokens.bgGlass,
-                  borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                  border: Border.all(color: Tokens.borderHighlight, width: 1),
-                ),
-                child: Column(
-                  children: [
-                    // tab 切换
-                    SizedBox(height: 36, child: _buildTabBar()),
-                    // 光条分隔线
-                    Container(
-                      height: 1,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: Tokens.spMd,
-                      ),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.transparent,
-                            Tokens.borderHighlight,
-                            Colors.transparent,
-                          ],
-                        ),
+              decoration: BoxDecoration(
+                color: Tokens.bgGlass,
+                borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                border: Border.all(color: Tokens.borderHighlight, width: 1),
+              ),
+              child: Column(
+                children: [
+                  // tab 切换
+                  SizedBox(height: 36, child: _buildTabBar()),
+                  // 光条分隔线
+                  Container(
+                    height: 1,
+                    margin: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.transparent,
+                          Tokens.borderHighlight,
+                          Colors.transparent,
+                        ],
                       ),
                     ),
-                    // 内容
-                    Expanded(child: _buildContent()),
-                  ],
-                ),
+                  ),
+                  // 内容
+                  Expanded(child: _buildContent()),
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildTabBar() {

@@ -2,7 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'kernel/bridge/window_bridge.dart';
+import 'window/window_service.dart';
 import 'kernel/engine/fvp_engine.dart';
 import 'kernel/persistence/settings_store.dart';
 import 'kernel/playlist/playlist.dart';
@@ -88,7 +88,7 @@ class _AppState extends State<App> {
     _videoProcessing.dispose();
     _controller.dispose();
     _engine.dispose();
-    WindowBridge.I.dispose();
+    WindowService.instance.dispose();
     super.dispose();
   }
 
@@ -149,26 +149,18 @@ class _AppState extends State<App> {
   }
 
   void _showSettingsQuickMenu(
-      BuildContext barCtx, BuildContext appCtx, TapUpDetails tap) {
+    BuildContext barCtx,
+    BuildContext appCtx,
+    TapUpDetails tap,
+  ) {
     final l10n = AppLocalizations.of(appCtx);
     final currentAccent = Theme.of(barCtx).colorScheme.primary;
 
-    const accents = [
-      Color(0xFF2C58F4),
-      Color(0xFF00B4D8),
-      Color(0xFF2D6A4F),
-    ];
-    final themeNames = [
-      l10n.themeMidnight,
-      l10n.themeOcean,
-      l10n.themeForest,
-    ];
-    final currentThemeIdx = accents.indexWhere(
-      (c) => c == currentAccent,
-    );
+    const accents = [Color(0xFF2C58F4), Color(0xFF00B4D8), Color(0xFF2D6A4F)];
+    final themeNames = [l10n.themeMidnight, l10n.themeOcean, l10n.themeForest];
+    final currentThemeIdx = accents.indexWhere((c) => c == currentAccent);
 
-    final overlay =
-        Overlay.of(barCtx).context.findRenderObject()! as RenderBox;
+    final overlay = Overlay.of(barCtx).context.findRenderObject()! as RenderBox;
     final pos = overlay.globalToLocal(tap.globalPosition);
 
     showMenu(
@@ -185,10 +177,7 @@ class _AppState extends State<App> {
           height: 32,
           child: Text(
             l10n.language,
-            style: const TextStyle(
-              color: Color(0x99FFFFFF),
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 11),
           ),
         ),
         _QuickMenuItem(
@@ -213,10 +202,7 @@ class _AppState extends State<App> {
           height: 32,
           child: Text(
             l10n.currentTheme,
-            style: const TextStyle(
-              color: Color(0x99FFFFFF),
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 11),
           ),
         ),
         for (var i = 0; i < accents.length; i++)
@@ -240,10 +226,7 @@ class _AppState extends State<App> {
     ];
     final accent = accents[themeIndex.clamp(0, accents.length - 1)];
     return ThemeData.dark().copyWith(
-      colorScheme: ColorScheme.dark(
-        primary: accent,
-        secondary: accent,
-      ),
+      colorScheme: ColorScheme.dark(primary: accent, secondary: accent),
     );
   }
 
@@ -260,67 +243,65 @@ class _AppState extends State<App> {
 
     return ValueListenableBuilder<int>(
       valueListenable: _themeIndex,
-      builder: (context, themeIdx, _) =>
-          ValueListenableBuilder<Locale>(
+      builder: (context, themeIdx, _) => ValueListenableBuilder<Locale>(
         valueListenable: _locale,
         builder: (context, locale, _) => MaterialApp(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          onGenerateTitle: (context) =>
-              AppLocalizations.of(context).appTitle,
+          onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
           debugShowCheckedModeBanner: false,
           theme: _buildTheme(themeIdx),
-        home: Builder(
-          builder: (ctx) => Stack(
-            children: [
-              PlayerScreen(
-                engine: _engine,
-                controller: _controller,
-                playlist: _playlist,
-                customBindings: _customBindings,
-                playlistGeneration: _playlistGeneration,
-                isVideo: _engine.textureId.value != null,
-                onOpenFile: _openFile,
-                onPrevious: () => _controller.playPrevious(),
-                onNext: () => _controller.playNext(),
-                onTogglePlayMode: () {
-                  _controller.togglePlayMode();
-                  final l10n = AppLocalizations.of(ctx);
-                  OsdService.I.show(
-                    playModeLabel(_playlist.mode, l10n),
-                    icon: playModeIcon(_playlist.mode),
-                  );
-                },
-                onSettings: () => _showSettingsPanel(ctx),
-                onSettingsSecondary: (barCtx, details) =>
-                    _showSettingsQuickMenu(barCtx, ctx, details),
-                onFilesDropped: _onFilesDropped,
-                onDragHoverChanged: (hovering) {
-                  setState(() => _isDragHovering = hovering);
-                },
-                onFolderScanned: (folderPath, scanned) {
-                  _playlist.addAll(scanned.map((i) => i.path).toList());
-                  _playlistGeneration.value++;
-                },
-                onClearHistory: () {
-                  final keptPaths = _playlist.items
-                      .where((i) => (i.timestamp ?? 0) == 0)
-                      .map((i) => i.path)
-                      .toList();
-                  _playlist.clear();
-                  _playlist.addAll(keptPaths);
-                  _playlistGeneration.value++;
-                },
-                emptyState: EmptyState(
+          home: Builder(
+            builder: (ctx) => Stack(
+              children: [
+                PlayerScreen(
+                  engine: _engine,
+                  controller: _controller,
+                  playlist: _playlist,
+                  customBindings: _customBindings,
+                  playlistGeneration: _playlistGeneration,
+                  isVideo: _engine.textureId.value != null,
                   onOpenFile: _openFile,
-                  isDragHovering: _isDragHovering,
-                  engineState: _engine.state,
+                  onPrevious: () => _controller.playPrevious(),
+                  onNext: () => _controller.playNext(),
+                  onTogglePlayMode: () {
+                    _controller.togglePlayMode();
+                    final l10n = AppLocalizations.of(ctx);
+                    OsdService.I.show(
+                      playModeLabel(_playlist.mode, l10n),
+                      icon: playModeIcon(_playlist.mode),
+                    );
+                  },
+                  onSettings: () => _showSettingsPanel(ctx),
+                  onSettingsSecondary: (barCtx, details) =>
+                      _showSettingsQuickMenu(barCtx, ctx, details),
+                  onFilesDropped: _onFilesDropped,
+                  onDragHoverChanged: (hovering) {
+                    setState(() => _isDragHovering = hovering);
+                  },
+                  onFolderScanned: (folderPath, scanned) {
+                    _playlist.addAll(scanned.map((i) => i.path).toList());
+                    _playlistGeneration.value++;
+                  },
+                  onClearHistory: () {
+                    final keptPaths = _playlist.items
+                        .where((i) => (i.timestamp ?? 0) == 0)
+                        .map((i) => i.path)
+                        .toList();
+                    _playlist.clear();
+                    _playlist.addAll(keptPaths);
+                    _playlistGeneration.value++;
+                  },
+                  emptyState: EmptyState(
+                    onOpenFile: _openFile,
+                    isDragHovering: _isDragHovering,
+                    engineState: _engine.state,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -335,25 +316,25 @@ class _QuickMenuItem extends PopupMenuItem<void> {
     required bool selected,
     required VoidCallback onTap,
   }) : super(
-          onTap: onTap,
-          height: 36,
-          child: Row(
-            children: [
-              if (selected)
-                const Icon(Icons.check, size: 14, color: Color(0xFF2C58F4))
-              else
-                const SizedBox(width: 14),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected
-                      ? const Color(0xFF2C58F4)
-                      : const Color(0xCCFFFFFF),
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        );
+         onTap: onTap,
+         height: 36,
+         child: Row(
+           children: [
+             if (selected)
+               const Icon(Icons.check, size: 14, color: Color(0xFF2C58F4))
+             else
+               const SizedBox(width: 14),
+             const SizedBox(width: 8),
+             Text(
+               label,
+               style: TextStyle(
+                 color: selected
+                     ? const Color(0xFF2C58F4)
+                     : const Color(0xCCFFFFFF),
+                 fontSize: 13,
+               ),
+             ),
+           ],
+         ),
+       );
 }

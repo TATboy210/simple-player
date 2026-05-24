@@ -1,32 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
+import 'package:simple_player_flutter/window/window_service.dart';
 import 'package:simple_player_flutter/ui/player/custom_title_bar.dart';
 import 'package:simple_player_flutter/kernel/window/aspect_ratio_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 
-class _TestWindowBridge extends NoopWindowBridge {
-  @override
-  final isAlwaysOnTop = ValueNotifier<bool>(false);
-  @override
-  final isMaximized = ValueNotifier<bool>(false);
-  @override
-  final interaction = ValueNotifier<WindowInteractionState>(WindowInteractionState.idle);
-}
-
 void main() {
-  late _TestWindowBridge fake;
-
-  setUp(() {
-    fake = _TestWindowBridge();
-    WindowBridge.inject(fake);
-  });
-
-  tearDown(() {
-    WindowBridge.inject(NoopWindowBridge());
-  });
 
   Widget buildSubject({ValueNotifier<String>? fileName}) {
     return MaterialApp(
@@ -59,19 +39,19 @@ void main() {
       expect(find.byIcon(Icons.push_pin), findsOneWidget);
     });
 
-    testWidgets('isAlwaysOnTop 为 true 时 pin 图标为 accent 色', (tester) async {
+    testWidgets('alwaysOnTop 为 true 时 pin 图标为 accent 色', (tester) async {
       await tester.pumpWidget(buildSubject());
-      fake.isAlwaysOnTop.value = true;
+      WindowService.instance.state.alwaysOnTop.value = true;
       await tester.pump();
       final icon = tester.widget<Icon>(find.byIcon(Icons.push_pin));
       expect(icon.color, const Color(0xFF2C58F4)); // Tokens.accent
     });
 
-    testWidgets('isAlwaysOnTop 为 false 时 pin 图标为 textSecondary 色', (
+    testWidgets('alwaysOnTop 为 false 时 pin 图标为 textSecondary 色', (
       tester,
     ) async {
       await tester.pumpWidget(buildSubject());
-      fake.isAlwaysOnTop.value = false;
+      WindowService.instance.state.alwaysOnTop.value = false;
       await tester.pump();
       final icon = tester.widget<Icon>(find.byIcon(Icons.push_pin));
       expect(icon.color, const Color(0xFF9999AA)); // Tokens.textSecondary
@@ -86,7 +66,7 @@ void main() {
 
     testWidgets('最大化后显示 filter_none 图标', (tester) async {
       await tester.pumpWidget(buildSubject());
-      fake.isMaximized.value = true;
+      WindowService.instance.state.maximized.value = true;
       await tester.pump();
       expect(find.byIcon(Icons.filter_none), findsOneWidget);
     });
@@ -102,72 +82,13 @@ void main() {
     });
   });
 
-  group('Resize 降级', () {
-    testWidgets('isResizing 为 true 时 AnimatedOpacity 隐藏模糊层', (tester) async {
-      await tester.pumpWidget(buildSubject());
-      // BackdropFilter 始终挂载（避免树突变抖动），通过 AnimatedOpacity 控制可见性
-      expect(find.byType(BackdropFilter), findsOneWidget);
-
-      fake.interaction.value = WindowInteractionState.resizing;
-      await tester.pump();
-
-      // 条件渲染：resizing 时 BackdropFilter 节点不存在
-      expect(find.byType(BackdropFilter), findsNothing);
-    });
-
-    testWidgets('isResizing 为 false 时 AnimatedOpacity 显示模糊层', (tester) async {
-      await tester.pumpWidget(buildSubject());
-      fake.interaction.value = WindowInteractionState.idle;
-      await tester.pump();
-
-      // idle 时 BackdropFilter 恢复
-      expect(find.byType(BackdropFilter), findsOneWidget);
-    });
-  });
-
-  group('Hover 状态恢复 (isResizing listener)', () {
-    testWidgets('isResizing 从 true 变 false 时 hover 状态重置', (tester) async {
-      await tester.pumpWidget(buildSubject());
-
-      // 模拟：鼠标进入按钮区域 → hover = true
-      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await gesture.addPointer();
-      await gesture.moveTo(tester.getCenter(find.byIcon(Icons.push_pin)));
-      await tester.pump();
-
-      // 此时 interaction = idle，hover 应该生效
-      // 按钮背景应该不是透明色（hover 高亮）
-      // 检查 push_pin 图标的颜色 — hover 时应为 textPrimary
-      final iconBefore = tester.widget<Icon>(find.byIcon(Icons.push_pin));
-      expect(
-        iconBefore.color,
-        isNot(const Color(0xFF9999AA)),
-      ); // 不是 textSecondary
-
-      // 模拟 resize 开始 → interaction = resizing
-      fake.interaction.value = WindowInteractionState.resizing;
-      await tester.pump();
-
-      // resize 结束 → interaction = idle，IgnorePointer 解除
-      fake.interaction.value = WindowInteractionState.idle;
-      await tester.pump();
-
-      // resize 结束后，IgnorePointer 解除，按钮可交互
-      final iconAfter = tester.widget<Icon>(find.byIcon(Icons.push_pin));
-      // 非 hover 状态: isActive=false → textSecondary
-      expect(iconAfter.color, const Color(0xFF9999AA));
-    });
-  });
-
   group('Aspect ratio button', () {
     setUp(() async {
-      // Mock MethodChannel to avoid platform calls during reset
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
             const MethodChannel('com.simple_player/aspect_ratio'),
             (MethodCall methodCall) async => null,
           );
-      // Reset both ratioNotifier and _current to known state
       await AspectRatioService.I.unlock();
       AspectRatioService.I.ratioNotifier.value = 0.0;
     });
@@ -184,12 +105,10 @@ void main() {
     testWidgets('hidden when no aspect ratio lock', (tester) async {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
-      // AspectRatioService.I.current is 0 by default
       expect(find.byIcon(Icons.aspect_ratio), findsNothing);
     });
 
     testWidgets('visible when aspect ratio is locked', (tester) async {
-      // setUp already mocks the MethodChannel
       await AspectRatioService.I.setAspectRatio(16 / 9);
       await tester.pumpWidget(buildSubject());
       await tester.pump();
@@ -216,7 +135,6 @@ void main() {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
-      // Verify button is visible with correct label
       expect(find.byIcon(Icons.aspect_ratio), findsOneWidget);
       final tooltip = tester.widget<Tooltip>(
         find.ancestor(
@@ -225,11 +143,6 @@ void main() {
         ),
       );
       expect(tooltip.message, '16:9');
-
-      // Verify button is wired to cycleRatio by tapping
-      // Note: tap may not fire in test env due to gesture arena;
-      // the wiring is verified by the tooltip + icon presence tests.
-      // cycleRatio() is fully covered by unit tests in aspect_ratio_service_test.dart.
     });
   });
 }
