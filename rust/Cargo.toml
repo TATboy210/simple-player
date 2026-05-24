@@ -9,6 +9,7 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 flutter_rust_bridge = "=2.12.0"
 libmpv2 = "6.0"
+libmpv2-sys = "4.0.1"
 anyhow = "1"
 
 [lints.rust]
