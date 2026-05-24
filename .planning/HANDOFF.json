@@ -1,56 +1,37 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-25T02:45:00+08:00",
-  "phase": null,
-  "phase_name": "window-simplify",
+  "timestamp": "2026-05-25T03:30:00+08:00",
+  "phase": "player-feature-refactor",
+  "phase_name": "Player Feature 重构 — 一个模块一个职责",
   "phase_dir": null,
-  "plan": null,
-  "task": 12,
-  "total_tasks": 12,
-  "status": "complete",
+  "plan": 1,
+  "task": 1,
+  "total_tasks": 7,
+  "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "window_constants.dart — keep as-is", "status": "done"},
-    {"id": 2, "name": "window_state.dart — rewrite to 4 bool notifiers", "status": "done"},
-    {"id": 3, "name": "window_service.dart — rewrite singleton + state + actions + onResize stream", "status": "done"},
-    {"id": 4, "name": "resize_notifier.dart — new UI-layer shared resize state", "status": "done"},
-    {"id": 5, "name": "main.dart — adapt init sequence", "status": "done"},
-    {"id": 6, "name": "app.dart — adapt dispose", "status": "done"},
-    {"id": 7, "name": "player_screen.dart — WindowMode→fullscreen bool", "status": "done"},
-    {"id": 8, "name": "custom_title_bar.dart — full adaptation", "status": "done"},
-    {"id": 9, "name": "control_bar/controls_overlay/aurora_background/glass_container/playlist_panel — interaction→ResizeNotifier", "status": "done"},
-    {"id": 10, "name": "flutter analyze — 0 errors, 0 warnings", "status": "done"},
-    {"id": 11, "name": "test files — all 3 rewritten for new API", "status": "done"},
-    {"id": 12, "name": "search for missed references — confirmed clean", "status": "done"}
+    {"id": 35, "name": "Phase 1: Extract AppBootstrap", "status": "done", "commit": "uncommitted"}
   ],
-  "remaining_tasks": [],
+  "remaining_tasks": [
+    {"id": 36, "name": "Phase 2: Move PlaybackController + mixins to features/player/", "status": "not_started"},
+    {"id": 37, "name": "Phase 3: Move VideoProcessing + unify SubtitleService", "status": "not_started"},
+    {"id": 38, "name": "Phase 4: Create PlayerServices + PlayerFeature", "status": "not_started"},
+    {"id": 39, "name": "Phase 5: Slim down app.dart", "status": "not_started"},
+    {"id": 40, "name": "Phase 6: Reduce PlayerScreen props", "status": "not_started"},
+    {"id": 41, "name": "Phase 7: Clean up re-exports + update CLAUDE.md", "status": "not_started"}
+  ],
   "blockers": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "Run flutter analyze to verify Phase 1", "context": "Shell environment can't run flutter CLI", "blocking": false}
+  ],
   "decisions": [
-    {"decision": "WindowService is singleton (not WindowState)", "rationale": "Whoever owns state is the entry point"},
-    {"decision": "Resize tracking moved to UI layer (ResizeNotifier)", "rationale": "User chose '移到 UI 层'"},
-    {"decision": "interaction enum replaced with ValueNotifier<bool>", "rationale": "Simpler binary state"},
-    {"decision": "Removed: persistence, geometry clamping, resize debounce, AspectRatioService fullscreen", "rationale": "Not window responsibilities"},
-    {"decision": "alwaysOnTop added back to WindowState", "rationale": "custom_title_bar pin button uses it"},
-    {"decision": "@visibleForTesting overrideInstance for testability", "rationale": "Standard Flutter singleton test pattern"}
+    {"decision": "PlayerServices + PlayerFeature split", "rationale": "User chose to separate service creation/lifecycle from UI composition for single responsibility", "phase": "planning"},
+    {"decision": "Settings stays in app.dart", "rationale": "SettingsPanel/QuickMenu need MaterialApp-level BuildContext for dialog/overlay", "phase": "planning"},
+    {"decision": "Re-export strategy for migration", "rationale": "Old kernel/services/ files become re-exports to avoid breaking all imports at once", "phase": "planning"}
   ],
   "uncommitted_files": [
-    "lib/window/window_constants.dart",
-    "lib/window/window_state.dart",
-    "lib/window/window_service.dart",
-    "lib/ui/shared/resize_notifier.dart",
     "lib/main.dart",
-    "lib/app.dart",
-    "lib/ui/player/player_screen.dart",
-    "lib/ui/player/custom_title_bar.dart",
-    "lib/ui/player/control_bar.dart",
-    "lib/ui/player/controls_overlay.dart",
-    "lib/ui/shared/aurora_background.dart",
-    "lib/ui/shared/glass_container.dart",
-    "lib/ui/playlist/playlist_panel.dart",
-    "test/window/window_service_test.dart",
-    "test/window/window_shell_test.dart",
-    "test/widget/window/custom_title_bar_test.dart"
+    "lib/bootstrap/app_bootstrap.dart"
   ],
-  "next_action": "Window simplification complete. Commit all changes. Next: consider what to work on next (performance optimization, rust-mpv-bridge, etc.).",
-  "context_notes": "All 12 tasks done. flutter analyze clean (0 errors, 0 warnings, 3 pre-existing infos). 16 files modified/created, 7 old files deleted. Window layer reduced from ~355 lines to ~140 lines across 3 files + 1 UI helper."
+  "next_action": "Run flutter analyze on Phase 1 files, then start Phase 2: move 5 playback files from kernel/services/ to features/player/services/",
+  "context_notes": "Plan approved with 7 phases. Phase 1 (AppBootstrap extraction) complete. Plan file at C:\\Users\\35490\\.claude\\plans\\transient-juggling-brook.md has full details."
 }
