@@ -1,97 +1,79 @@
-import 'dart:async';
-import 'dart:ui';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
+import 'package:simple_player_flutter/window/window_state.dart';
+import 'package:simple_player_flutter/window/window_constants.dart';
 
 void main() {
-  group('WindowService via WindowBridge', () {
-    test('NoopWindowBridge initial state', () {
-      final noop = NoopWindowBridge();
-      expect(noop.mode.value, WindowMode.windowed);
-      expect(noop.isAlwaysOnTop.value, false);
-      expect(noop.isMaximized.value, false);
-      expect(noop.interaction.value, WindowInteractionState.idle);
-      expect(noop.isResizing, false);
-    });
-
-    test('NoopWindowBridge commands all complete', () async {
-      final noop = NoopWindowBridge();
-      await noop.minimize();
-      await noop.toggleMaximize();
-      await noop.close();
-      await noop.startDragging();
-      await noop.toggleFullscreen();
-      await noop.exitFullscreen();
-      await noop.toggleAlwaysOnTop();
-      await noop.init();
-      await noop.dispose();
-    });
-
-    test('WindowBridge.I returns NoopWindowBridge by default', () {
-      // Reset injection
-      WindowBridge.inject(NoopWindowBridge());
-      expect(WindowBridge.I, isA<NoopWindowBridge>());
-    });
-
-    test('WindowBridge.inject replaces instance', () {
-      final fake = _FakeWindowBridge();
-      WindowBridge.inject(fake);
-      expect(WindowBridge.I, same(fake));
-
-      // Reset
-      WindowBridge.inject(NoopWindowBridge());
+  group('WindowState initial state', () {
+    test('ValueNotifiers have correct defaults', () {
+      final ws = WindowState();
+      expect(ws.fullscreen.value, false);
+      expect(ws.maximized.value, false);
+      expect(ws.alwaysOnTop.value, false);
+      expect(ws.focused.value, true);
+      ws.dispose();
     });
   });
 
-  group('WindowMode enum', () {
-    test('has windowed and fullscreen values', () {
-      expect(WindowMode.values, hasLength(2));
-      expect(WindowMode.values, contains(WindowMode.windowed));
-      expect(WindowMode.values, contains(WindowMode.fullscreen));
+  group('WindowState value changes', () {
+    test('fullscreen can be toggled', () {
+      final ws = WindowState();
+      ws.fullscreen.value = true;
+      expect(ws.fullscreen.value, true);
+      ws.fullscreen.value = false;
+      expect(ws.fullscreen.value, false);
+      ws.dispose();
+    });
+
+    test('maximized can be toggled', () {
+      final ws = WindowState();
+      ws.maximized.value = true;
+      expect(ws.maximized.value, true);
+      ws.dispose();
+    });
+
+    test('alwaysOnTop can be toggled', () {
+      final ws = WindowState();
+      ws.alwaysOnTop.value = true;
+      expect(ws.alwaysOnTop.value, true);
+      ws.dispose();
+    });
+
+    test('focused defaults to true', () {
+      final ws = WindowState();
+      expect(ws.focused.value, true);
+      ws.focused.value = false;
+      expect(ws.focused.value, false);
+      ws.dispose();
     });
   });
 
-  group('WindowInteractionState enum', () {
-    test('has idle, resizing, and moving values', () {
-      expect(WindowInteractionState.values, hasLength(3));
-      expect(WindowInteractionState.values, contains(WindowInteractionState.idle));
-      expect(WindowInteractionState.values, contains(WindowInteractionState.resizing));
-      expect(WindowInteractionState.values, contains(WindowInteractionState.moving));
-    });
-  });
-
-  group('WindowService resize debounce pattern', () {
+  group('Resize debounce pattern', () {
     test('debounce timer resets on rapid calls', () async {
-      // Simulate the resize debounce pattern used in WindowService
-      var state = WindowInteractionState.idle;
+      var resizing = false;
       int callCount = 0;
 
       void onResizeStart() {
-        if (state != WindowInteractionState.resizing) {
-          state = WindowInteractionState.resizing;
+        if (!resizing) {
+          resizing = true;
         }
         callCount++;
       }
 
-      // Simulate rapid resize events
       onResizeStart();
       onResizeStart();
       onResizeStart();
 
-      expect(state, WindowInteractionState.resizing);
+      expect(resizing, true);
       expect(callCount, 3);
     });
 
     test('debounce uses 500ms duration', () {
-      // Verify the constant matches the expected value
       const debounceMs = 500;
       expect(debounceMs, 500);
     });
   });
 
-  group('WindowService closing guard pattern', () {
+  group('Closing guard pattern', () {
     test('double close is prevented by guard', () async {
       bool closing = false;
       int closeCount = 0;
@@ -100,84 +82,23 @@ void main() {
         if (closing) return;
         closing = true;
         closeCount++;
-        // Simulate async work
         await Future<void>.delayed(Duration.zero);
       }
 
       await onClose();
-      await onClose(); // Second call should be no-op
+      await onClose();
 
       expect(closeCount, 1);
       expect(closing, true);
     });
   });
 
-  group('WindowService persist guard pattern', () {
-    test('concurrent persist returns existing future', () async {
-      int persistCount = 0;
-      Completer<void>? inFlight;
-
-      Future<void> persist() async {
-        if (inFlight != null) return inFlight!.future;
-        inFlight = Completer<void>();
-        try {
-          persistCount++;
-          await Future<void>.delayed(const Duration(milliseconds: 50));
-          inFlight!.complete();
-        } finally {
-          inFlight = null;
-        }
-      }
-
-      // Fire two concurrent persists
-      final f1 = persist();
-      final f2 = persist();
-
-      await Future.wait([f1, f2]);
-
-      // Only one actual persist should have run
-      expect(persistCount, 1);
-    });
-  });
-
-  group('WindowService min size constant', () {
-    test('min size is 640x360 (360p 16:9)', () {
-      const minSize = Size(640, 360);
-      expect(minSize.width, 640);
-      expect(minSize.height, 360);
+  group('Min size constant', () {
+    test('min size is 800x450 (16:9)', () {
+      const minSize = WindowConstants.minSize;
+      expect(minSize.width, 800);
+      expect(minSize.height, 450);
       expect(minSize.width / minSize.height, closeTo(16.0 / 9.0, 0.01));
     });
   });
-}
-
-class _FakeWindowBridge implements WindowBridge {
-  @override
-  final mode = ValueNotifier(WindowMode.windowed);
-  @override
-  final isAlwaysOnTop = ValueNotifier(false);
-  @override
-  final isMaximized = ValueNotifier(false);
-  @override
-  final interaction = ValueNotifier(WindowInteractionState.idle);
-  @override
-  bool get isResizing => interaction.value == WindowInteractionState.resizing;
-
-  @override
-  Future<void> minimize() async {}
-  @override
-  Future<void> toggleMaximize() async {}
-  @override
-  Future<void> close() async {}
-  @override
-  Future<void> startDragging() async {}
-  @override
-  Future<void> toggleFullscreen() async {}
-  @override
-  Future<void> exitFullscreen() async {}
-  @override
-  Future<void> toggleAlwaysOnTop() async {}
-  @override
-  Future<void> init() async {}
-  @override
-  Future<void> dispose() async {}
 }

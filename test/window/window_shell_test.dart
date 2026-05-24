@@ -1,47 +1,46 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
 
 void main() {
   group('WindowShell fullscreen-aware resize pattern', () {
     test('fullscreen mode disables resize edges', () {
-      final mode = ValueNotifier<WindowMode>(WindowMode.fullscreen);
+      final fullscreen = ValueNotifier<bool>(true);
 
       // Simulate the WindowShell logic
-      final enableResizeEdges = mode.value == WindowMode.fullscreen
+      final enableResizeEdges = fullscreen.value
           ? <dynamic>[]
           : null; // null = all edges enabled
 
       expect(enableResizeEdges, isEmpty);
-      mode.dispose();
+      fullscreen.dispose();
     });
 
     test('windowed mode enables all resize edges', () {
-      final mode = ValueNotifier<WindowMode>(WindowMode.windowed);
+      final fullscreen = ValueNotifier<bool>(false);
 
-      final enableResizeEdges = mode.value == WindowMode.fullscreen
+      final enableResizeEdges = fullscreen.value
           ? <dynamic>[]
           : null;
 
       expect(enableResizeEdges, isNull);
-      mode.dispose();
+      fullscreen.dispose();
     });
 
     test('mode change updates resize edge behavior', () {
-      final mode = ValueNotifier<WindowMode>(WindowMode.windowed);
+      final fullscreen = ValueNotifier<bool>(false);
 
       // Windowed: edges enabled
-      expect(mode.value == WindowMode.fullscreen, isFalse);
+      expect(fullscreen.value, isFalse);
 
       // Switch to fullscreen
-      mode.value = WindowMode.fullscreen;
-      expect(mode.value == WindowMode.fullscreen, isTrue);
+      fullscreen.value = true;
+      expect(fullscreen.value, isTrue);
 
       // Back to windowed
-      mode.value = WindowMode.windowed;
-      expect(mode.value == WindowMode.fullscreen, isFalse);
+      fullscreen.value = false;
+      expect(fullscreen.value, isFalse);
 
-      mode.dispose();
+      fullscreen.dispose();
     });
   });
 

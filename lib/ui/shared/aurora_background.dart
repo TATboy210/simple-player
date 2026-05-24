@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../kernel/models/media_state.dart';
-import '../../kernel/bridge/window_bridge.dart';
+import 'resize_notifier.dart';
 import '../theme/tokens.dart';
 
 /// 极光呼吸背景 — 3 个椭圆光团沿 Lissajous 曲线缓慢漂移
@@ -68,7 +68,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     _ticker.start();
     _generateBlobImages();
     widget.engineState?.addListener(_onEngineStateChanged);
-    WindowBridge.I.interaction.addListener(_syncTicker);
+    ResizeNotifier.instance.addListener(_syncTicker);
   }
 
   @override
@@ -89,7 +89,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   @override
   void dispose() {
     widget.engineState?.removeListener(_onEngineStateChanged);
-    WindowBridge.I.interaction.removeListener(_syncTicker);
+    ResizeNotifier.instance.removeListener(_syncTicker);
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
     _repaint.dispose();
@@ -118,7 +118,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
         widget.engineState?.value == MediaState.idle ||
         widget.engineState == null;
     final resizing =
-        WindowBridge.I.interaction.value != WindowInteractionState.idle;
+        ResizeNotifier.instance.value;
     final shouldRun = _isRunning && engineIdle && !resizing;
 
     if (shouldRun && !_ticker.isActive) {

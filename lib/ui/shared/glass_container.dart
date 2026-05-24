@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
+import 'resize_notifier.dart';
 import '../theme/tokens.dart';
 
 /// 毛玻璃模糊层级
@@ -73,10 +73,10 @@ class GlassContainer extends StatelessWidget {
     }
 
     // respectResizeState == true: resize 期间降级为纯色
-    return ValueListenableBuilder<WindowInteractionState>(
-      valueListenable: WindowBridge.I.interaction,
+    return ValueListenableBuilder<bool>(
+      valueListenable: ResizeNotifier.instance,
       builder: (_, state, child) {
-        if (state != WindowInteractionState.idle) {
+        if (state) {
           return ClipRRect(
             borderRadius: rRect,
             child: RepaintBoundary(child: child),

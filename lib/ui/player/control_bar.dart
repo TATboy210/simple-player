@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
+import '../shared/resize_notifier.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
@@ -124,11 +124,10 @@ class ControlBar extends StatelessWidget {
 
     if (opacity != null) {
       return AnimatedBuilder(
-        animation: Listenable.merge([opacity!, WindowBridge.I.interaction]),
+        animation: Listenable.merge([opacity!, ResizeNotifier.instance]),
         builder: (_, child) {
           if (opacity!.value < 0.01) return child!;
-          if (WindowBridge.I.interaction.value !=
-              WindowInteractionState.idle) {
+          if (ResizeNotifier.instance.value) {
             return child!;
           }
           return ClipRRect(
@@ -140,9 +139,9 @@ class ControlBar extends StatelessWidget {
       );
     }
 
-    return ValueListenableBuilder<WindowInteractionState>(
-      valueListenable: WindowBridge.I.interaction,
-      builder: (_, state, child) => state != WindowInteractionState.idle
+    return ValueListenableBuilder<bool>(
+      valueListenable: ResizeNotifier.instance,
+      builder: (_, state, child) => state
           ? child!
           : ClipRRect(
               borderRadius: _borderRadius,

@@ -1,30 +1,14 @@
 import 'dart:ui';
 
 // ═══════════════════════════════════════════════════════════════════════
-// Enums
+// WindowConstants — 固定值
 // ═══════════════════════════════════════════════════════════════════════
 
-enum WindowMode { windowed, fullscreen }
+class WindowConstants {
+  WindowConstants._();
 
-enum WindowInteractionState { idle, resizing, moving }
-
-// ═══════════════════════════════════════════════════════════════════════
-// SharedPreferences keys
-// ═══════════════════════════════════════════════════════════════════════
-
-const kWWidth = 'windowWidth';
-const kWHeight = 'windowHeight';
-const kWPosX = 'windowX';
-const kWPosY = 'windowY';
-const kWMaximized = 'windowIsMaximized';
-const kWFullscreen = 'windowIsFullscreen';
-
-// ═══════════════════════════════════════════════════════════════════════
-// Defaults
-// ═══════════════════════════════════════════════════════════════════════
-
-const kWDefaultWidth = 1280.0;
-const kWDefaultHeight = 720.0;
-const kWMinSize = Size(800, 450);
-const kWMinVisible = 100.0;
-const kWResizeDebounceMs = 500;
+  static const defaultWidth = 1280.0;
+  static const defaultHeight = 720.0;
+  static const minSize = Size(800, 450);
+  static const autoHideCursor = true;
+}

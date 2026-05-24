@@ -1,37 +1,37 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-25T02:20:00+08:00",
+  "timestamp": "2026-05-25T02:45:00+08:00",
   "phase": null,
   "phase_name": "window-simplify",
   "phase_dir": null,
   "plan": null,
-  "task": 3,
-  "total_tasks": 4,
-  "status": "paused",
+  "task": 12,
+  "total_tasks": 12,
+  "status": "complete",
   "completed_tasks": [
-    {"id": 1, "name": "window_constants.dart — keep as-is (already target format)", "status": "done"},
+    {"id": 1, "name": "window_constants.dart — keep as-is", "status": "done"},
     {"id": 2, "name": "window_state.dart — rewrite to 4 bool notifiers", "status": "done"},
-    {"id": 3, "name": "window_service.dart — rewrite singleton + state + platform config + actions + onResize stream", "status": "done"},
+    {"id": 3, "name": "window_service.dart — rewrite singleton + state + actions + onResize stream", "status": "done"},
     {"id": 4, "name": "resize_notifier.dart — new UI-layer shared resize state", "status": "done"},
     {"id": 5, "name": "main.dart — adapt init sequence", "status": "done"},
     {"id": 6, "name": "app.dart — adapt dispose", "status": "done"},
     {"id": 7, "name": "player_screen.dart — WindowMode→fullscreen bool", "status": "done"},
-    {"id": 8, "name": "custom_title_bar.dart — WindowState.I→WindowService.instance", "status": "done"},
-    {"id": 9, "name": "control_bar/controls_overlay/aurora_background/glass_container/playlist_panel — interaction→ResizeNotifier", "status": "done"}
+    {"id": 8, "name": "custom_title_bar.dart — full adaptation", "status": "done"},
+    {"id": 9, "name": "control_bar/controls_overlay/aurora_background/glass_container/playlist_panel — interaction→ResizeNotifier", "status": "done"},
+    {"id": 10, "name": "flutter analyze — 0 errors, 0 warnings", "status": "done"},
+    {"id": 11, "name": "test files — all 3 rewritten for new API", "status": "done"},
+    {"id": 12, "name": "search for missed references — confirmed clean", "status": "done"}
   ],
-  "remaining_tasks": [
-    {"id": 10, "name": "flutter analyze — run and fix remaining errors", "status": "not_started"},
-    {"id": 11, "name": "test files — update window_service_test.dart and window_shell_test.dart", "status": "not_started"},
-    {"id": 12, "name": "search for missed references — WindowState.I, WindowMode, WindowInteractionState", "status": "not_started"}
-  ],
+  "remaining_tasks": [],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "WindowService is singleton (not WindowState)", "rationale": "Whoever owns state is the entry point — WindowService owns WindowState"},
-    {"decision": "Resize tracking moved to UI layer (ResizeNotifier)", "rationale": "User chose '移到 UI 层' — WindowService only exposes onResize stream"},
-    {"decision": "interaction enum replaced with ValueNotifier<bool>", "rationale": "Simpler, no enum needed for idle/resizing binary state"},
-    {"decision": "Removed: SharedPreferences persistence, geometry clamping, resize debounce, AspectRatioService fullscreen", "rationale": "Not window responsibilities — one module one responsibility"},
-    {"decision": "alwaysOnTop added back to WindowState", "rationale": "custom_title_bar.dart pin button still uses it"}
+    {"decision": "WindowService is singleton (not WindowState)", "rationale": "Whoever owns state is the entry point"},
+    {"decision": "Resize tracking moved to UI layer (ResizeNotifier)", "rationale": "User chose '移到 UI 层'"},
+    {"decision": "interaction enum replaced with ValueNotifier<bool>", "rationale": "Simpler binary state"},
+    {"decision": "Removed: persistence, geometry clamping, resize debounce, AspectRatioService fullscreen", "rationale": "Not window responsibilities"},
+    {"decision": "alwaysOnTop added back to WindowState", "rationale": "custom_title_bar pin button uses it"},
+    {"decision": "@visibleForTesting overrideInstance for testability", "rationale": "Standard Flutter singleton test pattern"}
   ],
   "uncommitted_files": [
     "lib/window/window_constants.dart",
@@ -46,8 +46,11 @@
     "lib/ui/player/controls_overlay.dart",
     "lib/ui/shared/aurora_background.dart",
     "lib/ui/shared/glass_container.dart",
-    "lib/ui/playlist/playlist_panel.dart"
+    "lib/ui/playlist/playlist_panel.dart",
+    "test/window/window_service_test.dart",
+    "test/window/window_shell_test.dart",
+    "test/widget/window/custom_title_bar_test.dart"
   ],
-  "next_action": "Run `flutter analyze` and fix remaining compilation errors, then update test files.",
-  "context_notes": "Window layer flat-restructure complete (3 files). 13 files modified/created. Core design: WindowService singleton owns WindowState (4 bool notifiers). UI accesses via WindowService.instance.state. Resize tracking via ResizeNotifier (UI-layer singleton subscribing to onResize stream). Deleted 7 files (bootstrap, geometry_store, linux/macos services, persistence, state_service, window_bridge). Deleted 3 test files. flutter analyze NOT yet run — expect compilation errors."
+  "next_action": "Window simplification complete. Commit all changes. Next: consider what to work on next (performance optimization, rust-mpv-bridge, etc.).",
+  "context_notes": "All 12 tasks done. flutter analyze clean (0 errors, 0 warnings, 3 pre-existing infos). 16 files modified/created, 7 old files deleted. Window layer reduced from ~355 lines to ~140 lines across 3 files + 1 UI helper."
 }

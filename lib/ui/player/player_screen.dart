@@ -2,7 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
+import '../../window/window_service.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/models/playlist_item.dart';
@@ -34,7 +34,8 @@ class PlayerScreen extends StatefulWidget {
   final VoidCallback? onNext;
   final VoidCallback? onTogglePlaylist;
   final VoidCallback? onSettings;
-  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
+  final void Function(BuildContext context, TapUpDetails details)?
+  onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final VoidCallback? onTogglePlayMode;
   final bool isVideo;
@@ -43,7 +44,7 @@ class PlayerScreen extends StatefulWidget {
   final Widget? emptyState;
 
   final void Function(String folderPath, List<PlaylistItem> scanned)?
-      onFolderScanned;
+  onFolderScanned;
   final VoidCallback? onClearHistory;
   final void Function(String path)? onShowProperties;
 
@@ -88,14 +89,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _closePlaylist() {
     _playlistVisible.value = false;
     // 延迟卸载，等待淡出动画完成
-    Future.delayed(
-      const Duration(milliseconds: Tokens.durationSlide),
-      () {
-        if (mounted && !_playlistVisible.value) {
-          setState(() => _playlistMounted = false);
-        }
-      },
-    );
+    Future.delayed(const Duration(milliseconds: Tokens.durationSlide), () {
+      if (mounted && !_playlistVisible.value) {
+        setState(() => _playlistMounted = false);
+      }
+    });
   }
 
   Future<void> _openSubtitle() async {
@@ -116,13 +114,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final wm = WindowBridge.I;
+    final ws = WindowService.instance;
 
-    return ValueListenableBuilder<WindowMode>(
-      valueListenable: wm.mode,
-      builder: (context, windowMode, _) {
-        final isFullscreen = windowMode == WindowMode.fullscreen;
-
+    return ValueListenableBuilder<bool>(
+      valueListenable: ws.state.fullscreen,
+      builder: (context, isFullscreen, _) {
         return KeyboardHandler(
           customBindings: widget.customBindings,
           onPlayPause: () => widget.engine.togglePlayPause(),
@@ -132,8 +128,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
               widget.engine.setVolume(widget.engine.volume.value + 0.05),
           onVolumeDown: () =>
               widget.engine.setVolume(widget.engine.volume.value - 0.05),
-          onToggleFullscreen: wm.toggleFullscreen,
-          onExitFullscreen: isFullscreen ? wm.exitFullscreen : null,
+          onToggleFullscreen: () =>
+              ws.setFullscreen(!isFullscreen),
+          onExitFullscreen: isFullscreen
+              ? () => ws.setFullscreen(false)
+              : null,
           onToggleMute: () =>
               widget.engine.setMute(!widget.engine.isMuted.value),
           onPrevious: widget.onPrevious,
@@ -186,8 +185,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                       VideoSurface(engine: widget.engine),
                                       if (widget.emptyState != null)
                                         ValueListenableBuilder<MediaState>(
-                                          valueListenable:
-                                              widget.engine.state,
+                                          valueListenable: widget.engine.state,
                                           builder: (_, state, child) =>
                                               state == MediaState.idle
                                               ? child!
@@ -196,10 +194,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                             child: widget.emptyState!,
                                           ),
                                         ),
-                                      ValueListenableBuilder<int>(
-                                        valueListenable:
-                                            widget.playlistGeneration,
-                                        builder: (context, _, _) {
+                                      Builder(
+                                        builder: (context) {
                                           final l10n = AppLocalizations.of(
                                             context,
                                           );
@@ -210,14 +206,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                                 widget.emptyState != null,
                                             onPrevious: widget.onPrevious,
                                             onNext: widget.onNext,
-                                            onTogglePlaylist:
-                                                _togglePlaylist,
+                                            onTogglePlaylist: _togglePlaylist,
                                             onSettings: widget.onSettings,
                                             onSettingsSecondary:
                                                 widget.onSettingsSecondary,
                                             onOpenFile: widget.onOpenFile,
-                                            onToggleFullscreen:
-                                                wm.toggleFullscreen,
+                                            onToggleFullscreen: () =>
+                                                WindowService.instance.setFullscreen(
+                                                    !WindowService.instance.state.fullscreen.value),
                                             onTogglePlayMode:
                                                 widget.onTogglePlayMode,
                                             onOpenSubtitle: _openSubtitle,

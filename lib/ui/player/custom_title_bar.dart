@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../kernel/bridge/window_bridge.dart';
+import '../../window/window_service.dart';
+import '../shared/resize_notifier.dart';
 import '../../kernel/window/aspect_ratio_service.dart';
 import '../theme/tokens.dart';
 
@@ -17,7 +18,7 @@ class CustomTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wm = WindowBridge.I;
+    final ws = WindowService.instance;
 
     final content = Container(
       height: Tokens.titleBarHeight,
@@ -64,8 +65,8 @@ class CustomTitleBar extends StatelessWidget {
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onPanStart: (_) => wm.startDragging(),
-      onDoubleTap: () => wm.toggleMaximize(),
+      onPanStart: (_) => ws.startDragging(),
+      onDoubleTap: () => ws.toggleMaximize(),
       child: RepaintBoundary(child: content),
     );
   }
@@ -80,11 +81,11 @@ class TitleBarControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final wm = WindowBridge.I;
-    return ValueListenableBuilder<WindowInteractionState>(
-      valueListenable: wm.interaction,
-      builder: (_, state, child) => IgnorePointer(
-        ignoring: state != WindowInteractionState.idle,
+    final ws = WindowService.instance;
+    return ValueListenableBuilder<bool>(
+      valueListenable: ResizeNotifier.instance,
+      builder: (_, resizing, child) => IgnorePointer(
+        ignoring: resizing,
         child: child,
       ),
       child: Row(
@@ -104,27 +105,28 @@ class TitleBarControls extends StatelessWidget {
           ),
           // Pin (always on top)
           ValueListenableBuilder<bool>(
-            valueListenable: wm.isAlwaysOnTop,
+            valueListenable: ws.state.alwaysOnTop,
             builder: (_, pinned, _) => _TitleBarButton(
               icon: Icons.push_pin,
               isActive: pinned,
               tooltip: pinned ? l10n.unpin : l10n.pin,
-              onPressed: wm.toggleAlwaysOnTop,
+              onPressed: () =>
+                  ws.setAlwaysOnTop(!pinned),
             ),
           ),
           // Minimize
           _TitleBarButton(
             icon: Icons.minimize,
             tooltip: l10n.minimize,
-            onPressed: wm.minimize,
+            onPressed: () => ws.minimize(),
           ),
           // Maximize
           ValueListenableBuilder<bool>(
-            valueListenable: wm.isMaximized,
+            valueListenable: ws.state.maximized,
             builder: (_, maximized, _) => _TitleBarButton(
               icon: maximized ? Icons.filter_none : Icons.crop_square,
               tooltip: maximized ? l10n.restore : l10n.maximize,
-              onPressed: wm.toggleMaximize,
+              onPressed: () => ws.toggleMaximize(),
             ),
           ),
           // Close
@@ -132,7 +134,7 @@ class TitleBarControls extends StatelessWidget {
             icon: Icons.close,
             tooltip: l10n.close,
             isClose: true,
-            onPressed: wm.close,
+            onPressed: () => ws.close(),
           ),
         ],
       ),
