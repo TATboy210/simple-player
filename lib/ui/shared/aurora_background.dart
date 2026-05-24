@@ -46,10 +46,19 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   late final Ticker _ticker;
   final _repaint = _RepaintNotifier();
   double _time = 0;
+  int _lastRepaintMs = 0;
   bool _isRunning = true;
 
   // 预渲染的着色+模糊光团 Image 缓存（每色一张，启动时一次性生成）
   List<ui.Image>? _blobImages;
+
+  // 噪点 Picture 缓存 — seed 每 2 秒变化一次，避免每帧重绘
+  ui.Picture? _cachedNoisePicture;
+  int _cachedNoiseSeed = -1;
+  Size _cachedNoiseSize = Size.zero;
+
+  // 缓存 layout 尺寸，避免每帧触发 LayoutBuilder
+  Size _layoutSize = Size.zero;
 
   @override
   void initState() {
@@ -85,6 +94,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     _ticker.dispose();
     _repaint.dispose();
     _disposeBlobImages();
+    _cachedNoisePicture?.dispose();
     super.dispose();
   }
 
@@ -107,7 +117,8 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     final engineIdle =
         widget.engineState?.value == MediaState.idle ||
         widget.engineState == null;
-    final resizing = WindowBridge.I.interaction.value != WindowInteractionState.idle;
+    final resizing =
+        WindowBridge.I.interaction.value != WindowInteractionState.idle;
     final shouldRun = _isRunning && engineIdle && !resizing;
 
     if (shouldRun && !_ticker.isActive) {
@@ -125,7 +136,12 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 
   void _onTick(Duration elapsed) {
     _time = elapsed.inMicroseconds / 1e6;
-    _repaint.markDirty();
+    // 降级到 ~15fps — 光团移动极慢 (freq ~0.03)，60fps 与 15fps 肉眼无区别
+    final ms = elapsed.inMilliseconds;
+    if (ms - _lastRepaintMs >= 66) {
+      _repaint.markDirty();
+      _lastRepaintMs = ms;
+    }
   }
 
   /// 预渲染 3 个着色+模糊的光团 Image（一次性 saveLayer 开销）
@@ -157,16 +173,19 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     // 2. 对每个光团: 着色 + 模糊 → 预渲染 Image
     final images = <ui.Image>[];
     for (var i = 0; i < 3; i++) {
-      final color =
-          widget.blobColors[i].withValues(alpha: widget.blobOpacities[i]);
+      final color = widget.blobColors[i].withValues(
+        alpha: widget.blobOpacities[i],
+      );
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
       canvas.saveLayer(
         Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
         Paint()
           ..colorFilter = ui.ColorFilter.mode(color, ui.BlendMode.srcIn)
-          ..imageFilter =
-              ui.ImageFilter.blur(sigmaX: refSigma, sigmaY: refSigma),
+          ..imageFilter = ui.ImageFilter.blur(
+            sigmaX: refSigma,
+            sigmaY: refSigma,
+          ),
       );
       canvas.drawImage(srcImage, Offset.zero, Paint());
       canvas.restore();
@@ -184,18 +203,51 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     }
   }
 
+  /// 录制噪点 Picture 并缓存 — seed 每 2 秒变化一次时调用
+  void _regenerateNoiseCache(Size size) {
+    final seed = (_time * 0.5).floor();
+    if (seed == _cachedNoiseSeed && size == _cachedNoiseSize) return;
+
+    _cachedNoisePicture?.dispose();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()
+      ..color = const Color(0x05FFFFFF)
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round;
+
+    final rng = Random(seed);
+    for (var i = 0; i < 50; i++) {
+      final x = rng.nextDouble() * size.width;
+      final y = rng.nextDouble() * size.height;
+      canvas.drawPoints(ui.PointMode.points, [Offset(x, y)], paint);
+    }
+
+    _cachedNoisePicture = recorder.endRecording();
+    _cachedNoiseSeed = seed;
+    _cachedNoiseSize = size;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: _repaint,
-          builder: (_, _) => CustomPaint(
-            painter: _AuroraPainter(
-              time: _time,
-              blobImages: _blobImages,
-            ),
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // LayoutBuilder 只在窗口尺寸变化时触发（极低频）
+            _layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
+            _regenerateNoiseCache(_layoutSize);
+            return AnimatedBuilder(
+              animation: _repaint,
+              builder: (context, _) => CustomPaint(
+                painter: _AuroraPainter(
+                  time: _time,
+                  blobImages: _blobImages,
+                  cachedNoise: _cachedNoisePicture,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -205,6 +257,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 class _AuroraPainter extends CustomPainter {
   final double time;
   final List<ui.Image>? blobImages;
+  final ui.Picture? cachedNoise;
 
   // Lissajous 参数 — 质数比避免同步
   static const _lissajous = [
@@ -227,7 +280,11 @@ class _AuroraPainter extends CustomPainter {
   static const _breathFreqs = [0.16, 0.13, 0.11]; // 周期 ~6-9s
   static const _breathPhases = [0.0, pi / 3, 2 * pi / 3];
 
-  _AuroraPainter({required this.time, required this.blobImages});
+  _AuroraPainter({
+    required this.time,
+    required this.blobImages,
+    this.cachedNoise,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -270,22 +327,11 @@ class _AuroraPainter extends CustomPainter {
   }
 
   /// 轻量噪点层 — 防止色带，增加质感
+  ///
+  /// 噪点 Picture 由 State 层缓存，seed 每 2 秒变化一次时才重新录制。
   void _drawNoiseOverlay(Canvas canvas, Size size) {
-    // 用极低不透明度的随机点模拟噪点
-    // 实际项目中可用预渲染的 noise texture 替代
-    final paint = Paint()
-      ..color = const Color(0x05FFFFFF)
-      ..strokeWidth = 1
-      ..strokeCap = StrokeCap.round;
-
-    // 伪随机种子基于 time（每秒更新一次，避免每帧重算）
-    final seed = (time * 0.5).floor();
-    final rng = Random(seed);
-    for (var i = 0; i < 50; i++) {
-      final x = rng.nextDouble() * size.width;
-      final y = rng.nextDouble() * size.height;
-      canvas.drawPoints(ui.PointMode.points, [Offset(x, y)], paint);
-    }
+    if (cachedNoise == null) return;
+    canvas.drawPicture(cachedNoise!);
   }
 
   @override
