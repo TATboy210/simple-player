@@ -1,45 +1,49 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-24T19:15:00+08:00",
+  "timestamp": "2026-05-24T19:40:00+08:00",
   "phase": "rust-mpv-bridge",
   "phase_name": "Rust + mpv Bridge Integration",
   "phase_dir": ".planning/.continue-here.md",
   "plan": 1,
-  "task": 1,
-  "total_tasks": 5,
+  "task": 8,
+  "total_tasks": 9,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "FRB 脚手架集成", "status": "done", "detail": "flutter_rust_bridge_codegen integrate 跑通，rust/ 和 rust_builder/ 已生成"},
-    {"id": 2, "name": "Rust 工具链安装", "status": "done", "detail": "rustc 1.95.0 stable, cargo 1.95.0"},
-    {"id": 3, "name": "列表性能优化", "status": "done", "detail": "folder_tab O(1) indexOf, history_tab 缓存排序, per-tile RepaintBoundary"},
-    {"id": 4, "name": "fvp Query Fence", "status": "done", "detail": "Flush() → D3D11_QUERY_EVENT, patch 文档已创建"},
-    {"id": 5, "name": "验证 Flutter↔Rust 调用", "status": "done", "detail": "flutter build windows 成功，FRB codegen 生成 Dart 绑定"},
-    {"id": 6, "name": "Player 命令 API", "status": "done", "detail": "MpvPlayer struct: new/load_file/play/pause/toggle_pause/seek/set_volume/set_mute/set_speed/stop/get_position/get_duration/get_is_paused"}
+    {"id": 1, "name": "FRB 脚手架集成", "status": "done", "detail": "flutter_rust_bridge_codegen integrate 跑通"},
+    {"id": 2, "name": "Rust 工具链安装", "status": "done", "detail": "rustc 1.95.0 stable"},
+    {"id": 3, "name": "列表性能优化", "status": "done", "detail": "folder_tab O(1) indexOf, history_tab 缓存排序"},
+    {"id": 4, "name": "fvp Query Fence", "status": "done", "detail": "Flush() → D3D11_QUERY_EVENT"},
+    {"id": 5, "name": "验证 Flutter↔Rust 调用", "status": "done", "detail": "flutter build windows 成功"},
+    {"id": 6, "name": "Player 命令 API", "status": "done", "detail": "MpvPlayer 13 methods, Dart bindings"},
+    {"id": 7, "name": "状态同步 + 事件流", "status": "done", "detail": "PlayerEvent enum + startEventLoop + MpvEngine implements MediaEngine"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "状态同步 + 事件流", "status": "not_started", "detail": "mpv Event → StreamSink → Dart Stream → ValueNotifiers"},
     {"id": 8, "name": "视频渲染", "status": "not_started", "detail": "mpv_render_context → Flutter Texture"},
     {"id": 9, "name": "HDR + 手柄 + 跨平台", "status": "not_started", "detail": "tone mapping, input.conf, CI matrix"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "选择 libmpv2 而非 libmpv", "rationale": "libmpv2 = '6.0' 是最新版本，API 与 libmpv 相同"},
-    {"decision": "build.rs 配置链接路径", "rationale": "cargokit 在临时目录运行 cargo，.cargo/config.toml 不生效，build.rs 的 cargo:rustc-link-search 可靠"},
-    {"decision": "Mutex<Mpv> 线程安全包装", "rationale": "FRB 方法在 async 上下文调用，需要 Send+Sync，Mutex 保证线程安全"},
-    {"decision": "vo=null 暂时禁用视频输出", "rationale": "Phase 2 仅验证命令 API，Phase 4 再接入渲染"}
+    {"decision": "OnceLock<Arc<Mutex<Mpv>>> 全局 handle", "rationale": "FRB 无法生成 Arc<Mutex<Mpv>> 参数类型代码，改用全局 OnceLock 避免复杂泛型"},
+    {"decision": "event_loop.rs 放在 api/ 目录外", "rationale": "FRB 扫描 api/ 目录生成绑定，内部模块放外面避免 FRB 生成不需要的绑定"},
+    {"decision": "wait_event(0.1) 短超时轮询", "rationale": "每 100ms 释放 Mutex 让命令方法可以执行，libmpv event queue 线程安全"},
+    {"decision": "stream_dart_await 属性", "rationale": "Dart 侧 await startEventLoop() 直接获取 Stream，而非 Future<Stream>"}
   ],
   "uncommitted_files": [
-    "rust/Cargo.toml",
-    "rust/build.rs",
-    "rust/.cargo/config.toml",
-    "rust/src/api/mod.rs",
+    "rust/src/api/events.rs",
     "rust/src/api/player.rs",
+    "rust/src/api/mod.rs",
+    "rust/src/event_loop.rs",
+    "rust/src/lib.rs",
+    "lib/src/rust/api/events.dart",
+    "lib/src/rust/api/events.freezed.dart",
     "lib/src/rust/api/player.dart",
     "lib/src/rust/frb_generated.dart",
     "lib/src/rust/frb_generated.io.dart",
-    "lib/src/rust/frb_generated.web.dart"
+    "lib/src/rust/frb_generated.web.dart",
+    "lib/kernel/engine/mpv_engine.dart",
+    "pubspec.yaml"
   ],
-  "next_action": "Phase 3: 实现事件流 — 在 player.rs 添加 start_event_loop(StreamSink<PlayerEvent>)，观察 time-pos/duration/pause 属性变化，生成 Dart Stream 绑定",
-  "context_notes": "FRB 脚手架和 Player 命令 API 已完成。libmpv2 已链接成功。Dart 绑定已生成（MpvPlayer opaque 类型，所有方法 async）。DLL 需要复制到 build output。build.rs 配置了 cargo:rustc-link-search 指向 C:\\libmpv-dev\\mpv。下一步是 Phase 3 状态同步+事件流。"
+  "next_action": "Phase 4: 视频渲染 — 用 mpv_render_context 将解码帧渲染到 Flutter Texture widget。Windows 用 D3D11/ANGLE，需要研究 Flutter Texture 注册机制。",
+  "context_notes": "Phase 3 完成。Rust 侧: events.rs(PlayerEvent enum 5 variants), event_loop.rs(OnceLock 全局 Mpv + 100ms poll), player.rs(with_mpv helper 13 commands)。Dart 侧: FRB 生成 Stream<PlayerEvent> + MpvPlayer class, MpvEngine implements MediaEngine 用 pattern matching 处理事件。Flutter build windows 成功。vo=null 仍在生效，Phase 4 接入渲染。"
 }
