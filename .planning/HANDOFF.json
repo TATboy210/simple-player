@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-24T10:20:00+08:00",
+  "phase": "rust-mpv-bridge",
+  "phase_name": "Rust + mpv Bridge Integration",
+  "phase_dir": ".planning/.continue-here.md",
+  "plan": 1,
+  "task": 1,
+  "total_tasks": 5,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "FRB 脚手架集成", "status": "done", "detail": "flutter_rust_bridge_codegen integrate 跑通，rust/ 和 rust_builder/ 已生成"},
+    {"id": 2, "name": "Rust 工具链安装", "status": "done", "detail": "rustc 1.95.0 stable, cargo 1.95.0"},
+    {"id": 3, "name": "列表性能优化", "status": "done", "detail": "folder_tab O(1) indexOf, history_tab 缓存排序, per-tile RepaintBoundary"},
+    {"id": 4, "name": "fvp Query Fence", "status": "done", "detail": "Flush() → D3D11_QUERY_EVENT, patch 文档已创建"}
+  ],
+  "remaining_tasks": [
+    {"id": 5, "name": "验证 Flutter↔Rust 调用", "status": "not_started", "detail": "flutter run 验证 greet() 调用"},
+    {"id": 6, "name": "Player 命令 API", "status": "not_started", "detail": "MpvPlayer struct: play/pause/seek/load_file"},
+    {"id": 7, "name": "状态同步 + 事件流", "status": "not_started", "detail": "mpv Event → StreamSink → Dart Stream → ValueNotifiers"},
+    {"id": 8, "name": "视频渲染", "status": "not_started", "detail": "mpv_render_context → Flutter Texture"},
+    {"id": 9, "name": "HDR + 手柄 + 跨平台", "status": "not_started", "detail": "tone mapping, input.conf, CI matrix"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "选择 libmpv 而非直接 FFmpeg", "rationale": "mpv 内置播放控制/HDR/字幕/手柄，~300 行 wrapper vs ~5000 行"},
+    {"decision": "选择 flutter_rust_bridge v2", "rationale": "codegen 自动生成类型安全绑定，支持 StreamSink/Opaque"},
+    {"decision": "不动 MediaEngine 抽象接口", "rationale": "仅替换 FvpEngine → MpvEngine 实现，UI/Service 层零改动"}
+  ],
+  "uncommitted_files": [
+    "lib/ui/playlist/folder_tab.dart",
+    "lib/ui/playlist/history_tab.dart",
+    "lib/ui/playlist/thumbnail_tile.dart",
+    "lib/ui/playlist/playlist_panel.dart",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "rust/",
+    "rust_builder/",
+    "windows/flutter/generated_plugins.cmake",
+    "linux/flutter/generated_plugins.cmake"
+  ],
+  "next_action": "运行 flutter run -d windows 验证 FRB 集成，然后开始 Phase 2 Player 命令 API",
+  "context_notes": "FRB 脚手架已集成完毕。Rust crate 在 rust/，构建胶水在 rust_builder/。之前的性能优化（列表+fvp query fence）已全部完成。计划文件在 .claude/plans/transient-juggling-brook.md。"
+}
