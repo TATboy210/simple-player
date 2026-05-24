@@ -6,33 +6,55 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<MpvPlayer>>
-abstract class MpvPlayer implements RustOpaqueInterface {
-  Future<double> getDuration();
+/// Minimal mpv player wrapper. Uses global mpv handle shared with event loop.
+class MpvPlayer {
+  const MpvPlayer();
 
-  Future<bool> getIsPaused();
+  Future<double> getDuration() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerGetDuration(that: this);
 
-  Future<double> getPosition();
+  Future<bool> getIsPaused() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerGetIsPaused(that: this);
 
-  Future<void> loadFile({required String path});
+  Future<double> getPosition() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerGetPosition(that: this);
+
+  Future<void> loadFile({required String path}) => RustLib.instance.api
+      .crateApiPlayerMpvPlayerLoadFile(that: this, path: path);
 
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
   static Future<MpvPlayer> newInstance() =>
       RustLib.instance.api.crateApiPlayerMpvPlayerNew();
 
-  Future<void> pause();
+  Future<void> pause() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerPause(that: this);
 
-  Future<void> play();
+  Future<void> play() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerPlay(that: this);
 
-  Future<void> seek({required PlatformInt64 positionMs});
+  Future<void> seek({required PlatformInt64 positionMs}) => RustLib.instance.api
+      .crateApiPlayerMpvPlayerSeek(that: this, positionMs: positionMs);
 
-  Future<void> setMute({required bool muted});
+  Future<void> setMute({required bool muted}) => RustLib.instance.api
+      .crateApiPlayerMpvPlayerSetMute(that: this, muted: muted);
 
-  Future<void> setSpeed({required double speed});
+  Future<void> setSpeed({required double speed}) => RustLib.instance.api
+      .crateApiPlayerMpvPlayerSetSpeed(that: this, speed: speed);
 
-  Future<void> setVolume({required double vol});
+  Future<void> setVolume({required double vol}) => RustLib.instance.api
+      .crateApiPlayerMpvPlayerSetVolume(that: this, vol: vol);
 
-  Future<void> stop();
+  Future<void> stop() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerStop(that: this);
 
-  Future<void> togglePause();
+  Future<void> togglePause() =>
+      RustLib.instance.api.crateApiPlayerMpvPlayerTogglePause(that: this);
+
+  @override
+  int get hashCode => 0;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MpvPlayer && runtimeType == other.runtimeType;
 }

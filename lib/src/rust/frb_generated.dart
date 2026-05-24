@@ -3,6 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/events.dart';
 import 'api/player.dart';
 import 'api/simple.dart';
 import 'dart:async';
@@ -67,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 418854890;
+  int get rustContentHash => 77711258;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -79,6 +80,10 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  String crateApiSimpleGreet({required String name});
+
+  Future<void> crateApiSimpleInitApp();
+
   Future<double> crateApiPlayerMpvPlayerGetDuration({required MpvPlayer that});
 
   Future<bool> crateApiPlayerMpvPlayerGetIsPaused({required MpvPlayer that});
@@ -120,17 +125,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiPlayerMpvPlayerTogglePause({required MpvPlayer that});
 
-  String crateApiSimpleGreet({required String name});
-
-  Future<void> crateApiSimpleInitApp();
-
-  RustArcIncrementStrongCountFnType
-  get rust_arc_increment_strong_count_MpvPlayer;
-
-  RustArcDecrementStrongCountFnType
-  get rust_arc_decrement_strong_count_MpvPlayer;
-
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_MpvPlayerPtr;
+  Future<Stream<PlayerEvent>> crateApiEventsStartEventLoop();
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -142,460 +137,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  Future<double> crateApiPlayerMpvPlayerGetDuration({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 1,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_f_64,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerGetDurationConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerGetDurationConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_get_duration",
-        argNames: ["that"],
-      );
-
-  @override
-  Future<bool> crateApiPlayerMpvPlayerGetIsPaused({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 2,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_bool,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerGetIsPausedConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerGetIsPausedConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_get_is_paused",
-        argNames: ["that"],
-      );
-
-  @override
-  Future<double> crateApiPlayerMpvPlayerGetPosition({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 3,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_f_64,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerGetPositionConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerGetPositionConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_get_position",
-        argNames: ["that"],
-      );
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerLoadFile({
-    required MpvPlayer that,
-    required String path,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          sse_encode_String(path, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 4,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerLoadFileConstMeta,
-        argValues: [that, path],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerLoadFileConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_load_file",
-        argNames: ["that", "path"],
-      );
-
-  @override
-  Future<MpvPlayer> crateApiPlayerMpvPlayerNew() {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 5,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData:
-              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerNewConstMeta,
-        argValues: [],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerNewConstMeta =>
-      const TaskConstMeta(debugName: "MpvPlayer_new", argNames: []);
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerPause({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 6,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerPauseConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerPauseConstMeta =>
-      const TaskConstMeta(debugName: "MpvPlayer_pause", argNames: ["that"]);
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerPlay({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 7,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerPlayConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerPlayConstMeta =>
-      const TaskConstMeta(debugName: "MpvPlayer_play", argNames: ["that"]);
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerSeek({
-    required MpvPlayer that,
-    required PlatformInt64 positionMs,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          sse_encode_i_64(positionMs, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 8,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerSeekConstMeta,
-        argValues: [that, positionMs],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerSeekConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_seek",
-        argNames: ["that", "positionMs"],
-      );
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerSetMute({
-    required MpvPlayer that,
-    required bool muted,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          sse_encode_bool(muted, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 9,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerSetMuteConstMeta,
-        argValues: [that, muted],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerSetMuteConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_set_mute",
-        argNames: ["that", "muted"],
-      );
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerSetSpeed({
-    required MpvPlayer that,
-    required double speed,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          sse_encode_f_64(speed, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 10,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerSetSpeedConstMeta,
-        argValues: [that, speed],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerSetSpeedConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_set_speed",
-        argNames: ["that", "speed"],
-      );
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerSetVolume({
-    required MpvPlayer that,
-    required double vol,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          sse_encode_f_64(vol, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 11,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerSetVolumeConstMeta,
-        argValues: [that, vol],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerSetVolumeConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_set_volume",
-        argNames: ["that", "vol"],
-      );
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerStop({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 12,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerStopConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerStopConstMeta =>
-      const TaskConstMeta(debugName: "MpvPlayer_stop", argNames: ["that"]);
-
-  @override
-  Future<void> crateApiPlayerMpvPlayerTogglePause({required MpvPlayer that}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-            that,
-            serializer,
-          );
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 13,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiPlayerMpvPlayerTogglePauseConstMeta,
-        argValues: [that],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPlayerMpvPlayerTogglePauseConstMeta =>
-      const TaskConstMeta(
-        debugName: "MpvPlayer_toggle_pause",
-        argNames: ["that"],
-      );
-
-  @override
   String crateApiSimpleGreet({required String name}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -620,7 +168,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 2,
             port: port_,
           );
         },
@@ -638,13 +186,445 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSimpleInitAppConstMeta =>
       const TaskConstMeta(debugName: "init_app", argNames: []);
 
-  RustArcIncrementStrongCountFnType
-  get rust_arc_increment_strong_count_MpvPlayer => wire
-      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer;
+  @override
+  Future<double> crateApiPlayerMpvPlayerGetDuration({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_f_64,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerGetDurationConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
 
-  RustArcDecrementStrongCountFnType
-  get rust_arc_decrement_strong_count_MpvPlayer => wire
-      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer;
+  TaskConstMeta get kCrateApiPlayerMpvPlayerGetDurationConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_get_duration",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<bool> crateApiPlayerMpvPlayerGetIsPaused({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerGetIsPausedConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerGetIsPausedConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_get_is_paused",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<double> crateApiPlayerMpvPlayerGetPosition({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_f_64,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerGetPositionConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerGetPositionConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_get_position",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerLoadFile({
+    required MpvPlayer that,
+    required String path,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          sse_encode_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerLoadFileConstMeta,
+        argValues: [that, path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerLoadFileConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_load_file",
+        argNames: ["that", "path"],
+      );
+
+  @override
+  Future<MpvPlayer> crateApiPlayerMpvPlayerNew() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_mpv_player,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerNewConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerNewConstMeta =>
+      const TaskConstMeta(debugName: "mpv_player_new", argNames: []);
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerPause({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerPauseConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerPauseConstMeta =>
+      const TaskConstMeta(debugName: "mpv_player_pause", argNames: ["that"]);
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerPlay({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerPlayConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerPlayConstMeta =>
+      const TaskConstMeta(debugName: "mpv_player_play", argNames: ["that"]);
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerSeek({
+    required MpvPlayer that,
+    required PlatformInt64 positionMs,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          sse_encode_i_64(positionMs, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerSeekConstMeta,
+        argValues: [that, positionMs],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerSeekConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_seek",
+        argNames: ["that", "positionMs"],
+      );
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerSetMute({
+    required MpvPlayer that,
+    required bool muted,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          sse_encode_bool(muted, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerSetMuteConstMeta,
+        argValues: [that, muted],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerSetMuteConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_set_mute",
+        argNames: ["that", "muted"],
+      );
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerSetSpeed({
+    required MpvPlayer that,
+    required double speed,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          sse_encode_f_64(speed, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerSetSpeedConstMeta,
+        argValues: [that, speed],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerSetSpeedConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_set_speed",
+        argNames: ["that", "speed"],
+      );
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerSetVolume({
+    required MpvPlayer that,
+    required double vol,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          sse_encode_f_64(vol, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 13,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerSetVolumeConstMeta,
+        argValues: [that, vol],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerSetVolumeConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_set_volume",
+        argNames: ["that", "vol"],
+      );
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerStop({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerStopConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerStopConstMeta =>
+      const TaskConstMeta(debugName: "mpv_player_stop", argNames: ["that"]);
+
+  @override
+  Future<void> crateApiPlayerMpvPlayerTogglePause({required MpvPlayer that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_mpv_player(that, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPlayerMpvPlayerTogglePauseConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPlayerMpvPlayerTogglePauseConstMeta =>
+      const TaskConstMeta(
+        debugName: "mpv_player_toggle_pause",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<Stream<PlayerEvent>> crateApiEventsStartEventLoop() async {
+    final sink = RustStreamSink<PlayerEvent>();
+    await handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_StreamSink_player_event_Sse(sink, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiEventsStartEventLoopConstMeta,
+        argValues: [sink],
+        apiImpl: this,
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiEventsStartEventLoopConstMeta =>
+      const TaskConstMeta(debugName: "start_event_loop", argNames: ["sink"]);
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
@@ -653,30 +633,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MpvPlayer
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
+  RustStreamSink<PlayerEvent> dco_decode_StreamSink_player_event_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MpvPlayerImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  MpvPlayer
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MpvPlayerImpl.frbInternalDcoDecode(raw as List<dynamic>);
-  }
-
-  @protected
-  MpvPlayer
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    dynamic raw,
-  ) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return MpvPlayerImpl.frbInternalDcoDecode(raw as List<dynamic>);
+    throw UnimplementedError();
   }
 
   @protected
@@ -689,6 +650,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   bool dco_decode_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
+  }
+
+  @protected
+  MpvPlayer dco_decode_box_autoadd_mpv_player(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_mpv_player(raw);
   }
 
   @protected
@@ -710,6 +677,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  MpvPlayer dco_decode_mpv_player(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.isNotEmpty)
+      throw Exception('unexpected arr length: expect 0 but see ${arr.length}');
+    return MpvPlayer();
+  }
+
+  @protected
+  PlayerEvent dco_decode_player_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    switch (raw[0]) {
+      case 0:
+        return PlayerEvent_Position(ms: dco_decode_f_64(raw[1]));
+      case 1:
+        return PlayerEvent_Duration(ms: dco_decode_f_64(raw[1]));
+      case 2:
+        return PlayerEvent_Paused(paused: dco_decode_bool(raw[1]));
+      case 3:
+        return PlayerEvent_State(state: dco_decode_String(raw[1]));
+      case 4:
+        return PlayerEvent_Error(message: dco_decode_String(raw[1]));
+      default:
+        throw Exception("unreachable");
+    }
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -722,12 +717,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  BigInt dco_decode_usize(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dcoDecodeU64(raw);
-  }
-
-  @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_String(deserializer);
@@ -735,39 +724,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  MpvPlayer
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
+  RustStreamSink<PlayerEvent> sse_decode_StreamSink_player_event_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return MpvPlayerImpl.frbInternalSseDecode(
-      sse_decode_usize(deserializer),
-      sse_decode_i_32(deserializer),
-    );
-  }
-
-  @protected
-  MpvPlayer
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MpvPlayerImpl.frbInternalSseDecode(
-      sse_decode_usize(deserializer),
-      sse_decode_i_32(deserializer),
-    );
-  }
-
-  @protected
-  MpvPlayer
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return MpvPlayerImpl.frbInternalSseDecode(
-      sse_decode_usize(deserializer),
-      sse_decode_i_32(deserializer),
-    );
+    throw UnimplementedError('Unreachable ()');
   }
 
   @protected
@@ -781,6 +742,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
+  MpvPlayer sse_decode_box_autoadd_mpv_player(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_mpv_player(deserializer));
   }
 
   @protected
@@ -803,6 +770,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  MpvPlayer sse_decode_mpv_player(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return MpvPlayer();
+  }
+
+  @protected
+  PlayerEvent sse_decode_player_event(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var tag_ = sse_decode_i_32(deserializer);
+    switch (tag_) {
+      case 0:
+        var var_ms = sse_decode_f_64(deserializer);
+        return PlayerEvent_Position(ms: var_ms);
+      case 1:
+        var var_ms = sse_decode_f_64(deserializer);
+        return PlayerEvent_Duration(ms: var_ms);
+      case 2:
+        var var_paused = sse_decode_bool(deserializer);
+        return PlayerEvent_Paused(paused: var_paused);
+      case 3:
+        var var_state = sse_decode_String(deserializer);
+        return PlayerEvent_State(state: var_state);
+      case 4:
+        var var_message = sse_decode_String(deserializer);
+        return PlayerEvent_Error(message: var_message);
+      default:
+        throw UnimplementedError('');
+    }
+  }
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -811,12 +810,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_decode_unit(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-  }
-
-  @protected
-  BigInt sse_decode_usize(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getBigUint64();
   }
 
   @protected
@@ -835,40 +828,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    MpvPlayer self,
+  void sse_encode_StreamSink_player_event_Sse(
+    RustStreamSink<PlayerEvent> self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-      (self as MpvPlayerImpl).frbInternalSseEncode(move: true),
-      serializer,
-    );
-  }
-
-  @protected
-  void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    MpvPlayer self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-      (self as MpvPlayerImpl).frbInternalSseEncode(move: false),
-      serializer,
-    );
-  }
-
-  @protected
-  void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerMpvPlayer(
-    MpvPlayer self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_usize(
-      (self as MpvPlayerImpl).frbInternalSseEncode(move: null),
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_player_event,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
       serializer,
     );
   }
@@ -883,6 +854,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_mpv_player(
+    MpvPlayer self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_mpv_player(self, serializer);
   }
 
   @protected
@@ -908,6 +888,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_mpv_player(MpvPlayer self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  void sse_encode_player_event(PlayerEvent self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    switch (self) {
+      case PlayerEvent_Position(ms: final ms):
+        sse_encode_i_32(0, serializer);
+        sse_encode_f_64(ms, serializer);
+      case PlayerEvent_Duration(ms: final ms):
+        sse_encode_i_32(1, serializer);
+        sse_encode_f_64(ms, serializer);
+      case PlayerEvent_Paused(paused: final paused):
+        sse_encode_i_32(2, serializer);
+        sse_encode_bool(paused, serializer);
+      case PlayerEvent_State(state: final state):
+        sse_encode_i_32(3, serializer);
+        sse_encode_String(state, serializer);
+      case PlayerEvent_Error(message: final message):
+        sse_encode_i_32(4, serializer);
+        sse_encode_String(message, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -919,70 +926,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_usize(BigInt self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putBigUint64(self);
-  }
-
-  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
   }
-}
-
-@sealed
-class MpvPlayerImpl extends RustOpaque implements MpvPlayer {
-  // Not to be used by end users
-  MpvPlayerImpl.frbInternalDcoDecode(List<dynamic> wire)
-    : super.frbInternalDcoDecode(wire, _kStaticData);
-
-  // Not to be used by end users
-  MpvPlayerImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
-    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
-
-  static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount:
-        RustLib.instance.api.rust_arc_increment_strong_count_MpvPlayer,
-    rustArcDecrementStrongCount:
-        RustLib.instance.api.rust_arc_decrement_strong_count_MpvPlayer,
-    rustArcDecrementStrongCountPtr:
-        RustLib.instance.api.rust_arc_decrement_strong_count_MpvPlayerPtr,
-  );
-
-  Future<double> getDuration() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerGetDuration(that: this);
-
-  Future<bool> getIsPaused() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerGetIsPaused(that: this);
-
-  Future<double> getPosition() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerGetPosition(that: this);
-
-  Future<void> loadFile({required String path}) => RustLib.instance.api
-      .crateApiPlayerMpvPlayerLoadFile(that: this, path: path);
-
-  Future<void> pause() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerPause(that: this);
-
-  Future<void> play() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerPlay(that: this);
-
-  Future<void> seek({required PlatformInt64 positionMs}) => RustLib.instance.api
-      .crateApiPlayerMpvPlayerSeek(that: this, positionMs: positionMs);
-
-  Future<void> setMute({required bool muted}) => RustLib.instance.api
-      .crateApiPlayerMpvPlayerSetMute(that: this, muted: muted);
-
-  Future<void> setSpeed({required double speed}) => RustLib.instance.api
-      .crateApiPlayerMpvPlayerSetSpeed(that: this, speed: speed);
-
-  Future<void> setVolume({required double vol}) => RustLib.instance.api
-      .crateApiPlayerMpvPlayerSetVolume(that: this, vol: vol);
-
-  Future<void> stop() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerStop(that: this);
-
-  Future<void> togglePause() =>
-      RustLib.instance.api.crateApiPlayerMpvPlayerTogglePause(that: this);
 }
