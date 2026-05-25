@@ -2,52 +2,48 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../kernel/engine/media_engine.dart';
 import '../../../kernel/models/media_state.dart';
 import '../../../kernel/models/play_mode.dart';
-import '../../../kernel/playlist/playlist.dart';
 import '../../../kernel/persistence/playlist_store.dart';
 import '../../../kernel/persistence/settings_store.dart';
-import '../../../kernel/window/aspect_ratio_service.dart';
+import '../../../window/aspect_ratio_service.dart';
+import 'playback_controller.dart';
 
-/// 状态监听 mixin — 自动连播、断点保存、设置恢复、播放列表管理
+/// 状态监听 — 自动连播、断点保存、设置恢复
 ///
-/// 职责: init, dispose, _onStateChanged, removeAt, reorder, clearPlaylist, togglePlayMode
-mixin StateMonitor {
-  MediaEngine get engine;
-  Playlist get playlist;
-  ValueNotifier<String> get currentFileName;
-  VoidCallback get onNeedRebuild;
-  void Function(Object error)? get onError;
-
-  Future<void> playIndex(int index);
-  Future<void> playNext();
-  void savePlaylist();
+/// 职责: init, dispose, _onStateChanged
+class StateMonitor {
+  StateMonitor(this._rt);
+  final PlaybackController _rt;
 
   bool _initialized = false;
 
   /// 初始化: 恢复设置 + 监听引擎状态
-  Future<void> init() async {
+  ///
+  /// [settings] 可选 — 调用方已加载时传入，避免重复 IO。
+  Future<void> init({AppSettings? settings}) async {
     if (_initialized) return;
     _initialized = true;
-    engine.state.addListener(_onStateChanged);
+    _rt.engine.state.addListener(_onStateChanged);
 
-    final settingsFuture = SettingsStore.load();
     unawaited(_loadPlaylistForMigration());
 
     try {
-      final settings = await settingsFuture;
-      engine.setVolume(settings.volume);
-      engine.setMute(settings.isMuted);
+      final s = settings ?? await SettingsStore.load();
+      _rt.engine.setVolume(s.volume);
+      _rt.engine.setMute(s.isMuted);
     } on Exception catch (e) {
       debugPrint('StateMonitor.init load settings failed: $e');
     }
   }
 
   /// 加载播放列表仅用于历史迁移副作用，结果不恢复
+  ///
+  /// 使用 loadInBackground() 将文件 I/O + JSON 解析移至独立 Isolate，
+  /// 不阻塞主 UI 线程。迁移逻辑仍在主 Isolate 回调中执行。
   Future<void> _loadPlaylistForMigration() async {
     try {
-      await PlaylistStore.load();
+      await PlaylistStore.loadInBackground();
     } on Exception catch (e) {
       debugPrint('PlaylistStore.load migration failed: $e');
     }
@@ -55,17 +51,17 @@ mixin StateMonitor {
 
   /// 自动连播：引擎状态变为 completed 时根据播放模式决定行为
   void _onStateChanged() {
-    final state = engine.state.value;
+    final state = _rt.engine.state.value;
 
-    // 播放时锁定宽高比到视频原生比例（per WP-01, WP-03）
+    // 播放时锁定宽高比到视频原生比例
     if (state == MediaState.playing) {
-      final ratio = engine.aspectRatio.value;
+      final ratio = _rt.engine.aspectRatio.value;
       if (ratio > 0) {
         AspectRatioService.I.matchVideo(ratio);
       }
     }
 
-    // 停止/空闲/完成/错误时解锁宽高比（per WP-04）
+    // 停止/空闲/完成/错误时解锁宽高比
     // 暂停保持锁定 — 用户暂停不应对窗口行为产生干扰
     if (state == MediaState.stopped ||
         state == MediaState.idle ||
@@ -76,91 +72,51 @@ mixin StateMonitor {
 
     // 暂停时保存断点位置
     if (state == MediaState.paused) {
-      final idx = playlist.currentIndex;
+      final idx = _rt.playlist.currentIndex;
       if (idx >= 0) {
-        playlist.updatePosition(
+        _rt.playlist.updatePosition(
           idx,
-          engine.position.value,
-          engine.duration.value,
+          _rt.engine.position.value,
+          _rt.engine.duration.value,
         );
-        savePlaylist();
+        _rt.savePlaylist();
       }
       return;
     }
 
     if (state != MediaState.completed) return;
 
-    if (playlist.mode == PlayMode.loopSingle) {
-      final idx = playlist.currentIndex;
+    if (_rt.playlist.mode == PlayMode.loopSingle) {
+      final idx = _rt.playlist.currentIndex;
       if (idx >= 0) {
-        playIndex(idx).catchError((e) {
+        _rt.navigator.playIndex(idx).catchError((e) {
           debugPrint('StateMonitor loopSingle replay failed: $e');
-          onError?.call(e);
+          _rt.onError?.call(e);
         });
       }
     } else {
-      playNext().catchError((e) {
+      _rt.navigator.playNext().catchError((e) {
         debugPrint('StateMonitor auto-advance failed: $e');
-        onError?.call(e);
+        _rt.onError?.call(e);
       });
     }
   }
 
-  /// 移除播放列表中指定索引
-  Future<void> removeAt(int index) async {
-    final wasCurrent = playlist.currentIndex == index;
-    playlist.removeAt(index);
-    if (wasCurrent) {
-      engine.stop();
-      final next = playlist.peekNext();
-      if (next >= 0) {
-        await playIndex(next);
-      }
-    }
-    onNeedRebuild();
-    savePlaylist();
-  }
-
-  /// 拖拽排序
-  void reorder(int oldIndex, int newIndex) {
-    playlist.reorder(oldIndex, newIndex);
-    onNeedRebuild();
-    savePlaylist();
-  }
-
-  /// 清空播放列表
-  void clearPlaylist() {
-    engine.stop();
-    playlist.clear();
-    currentFileName.value = '';
-    onNeedRebuild();
-    savePlaylist();
-  }
-
-  /// 切换播放模式
-  void togglePlayMode() {
-    final next = (playlist.mode.index + 1) % PlayMode.values.length;
-    playlist.mode = PlayMode.values[next];
-    onNeedRebuild();
-    SettingsStore.savePlayMode(playlist.mode.index);
-  }
-
   /// 释放资源
   void dispose() {
-    engine.state.removeListener(_onStateChanged);
-    final idx = playlist.currentIndex;
-    if (idx >= 0 && engine.position.value > 0) {
-      playlist.updatePosition(
+    _rt.engine.state.removeListener(_onStateChanged);
+    final idx = _rt.playlist.currentIndex;
+    if (idx >= 0 && _rt.engine.position.value > 0) {
+      _rt.playlist.updatePosition(
         idx,
-        engine.position.value,
-        engine.duration.value,
+        _rt.engine.position.value,
+        _rt.engine.duration.value,
       );
-      savePlaylist();
+      _rt.savePlaylist();
     }
-    unawaited(SettingsStore.saveVolume(engine.volume.value));
-    unawaited(SettingsStore.saveIsMuted(engine.isMuted.value));
-    unawaited(SettingsStore.savePlayMode(playlist.mode.index));
+    unawaited(SettingsStore.saveVolume(_rt.engine.volume.value));
+    unawaited(SettingsStore.saveIsMuted(_rt.engine.isMuted.value));
+    unawaited(SettingsStore.savePlayMode(_rt.playlist.mode.index));
     unawaited(PlaylistStore.dispose());
-    currentFileName.dispose();
   }
 }
