@@ -1,61 +1,52 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'window/window_service.dart';
-import 'kernel/engine/fvp_engine.dart';
 import 'kernel/persistence/settings_store.dart';
-import 'kernel/playlist/playlist.dart';
-import 'kernel/services/playback_controller.dart';
-import 'kernel/services/video_processing_service.dart';
+import 'kernel/startup/startup_coordinator.dart';
+import 'features/player/deferred_player_feature.dart';
 import 'ui/dialogs/settings_panel.dart';
+import 'ui/shared/progress_splash_screen.dart';
 import 'l10n/app_localizations.dart';
-import 'ui/player/player_screen.dart';
-import 'ui/shared/empty_state.dart';
-import 'ui/shared/play_mode_utils.dart';
-import 'ui/widgets/osd_overlay.dart';
 
-/// 应用壳 — 引擎/服务初始化 + 窗口管理 + 完整播放器 UI
+/// 应用壳 — MaterialApp + 主题/语言 + 设置 UI
+///
+/// 播放器服务创建和 UI 组合已下沉到 PlayerFeature。
+/// 本类仅负责：
+///   - MaterialApp 壳（主题、国际化）
+///   - 设置面板（需要 MaterialApp 级 BuildContext）
+///   - 右键快捷菜单（语言/主题切换）
 class App extends StatefulWidget {
-  const App({super.key, required this.sharedPreferences});
+  final StartupCoordinator coordinator;
 
-  final SharedPreferences sharedPreferences;
+  const App({super.key, required this.coordinator});
 
   @override
   State<App> createState() => _AppState();
 }
 
 class _AppState extends State<App> {
-  late final FvpEngine _engine;
-  late final Playlist _playlist;
-  late final PlaybackController _controller;
+  static const _accents = [
+    Color(0xFF2C58F4), // Midnight
+    Color(0xFF00B4D8), // Ocean
+    Color(0xFF2D6A4F), // Forest
+  ];
+
   final ValueNotifier<Locale> _locale = ValueNotifier(const Locale('zh'));
   final ValueNotifier<int> _themeIndex = ValueNotifier(0);
-  late final VideoProcessingService _videoProcessing;
-  final ValueNotifier<int> _playlistGeneration = ValueNotifier(0);
-  Map<String, String> _customBindings = {};
   bool _ready = false;
-  bool _isDragHovering = false;
 
   @override
   void initState() {
     super.initState();
-    SettingsStore.prewarm(widget.sharedPreferences);
-    _engine = FvpEngine();
-    _playlist = Playlist();
-    _controller = PlaybackController(
-      engine: _engine,
-      playlist: _playlist,
-      onNeedRebuild: () => _playlistGeneration.value++,
-    );
     _init();
   }
 
   Future<void> _init() async {
-    final sw = Stopwatch()..start();
+    widget.coordinator.report(
+      StartupPhase.settings,
+      0.0,
+      'Loading preferences...',
+    );
     try {
-      final results = await Future.wait([
-        _controller.init(),
+      await Future.wait([
         SettingsStore.loadLocale().then((code) {
           _locale.value = Locale(code);
           return code;
@@ -64,75 +55,40 @@ class _AppState extends State<App> {
           _themeIndex.value = index;
           return index;
         }),
-        SettingsStore.load(),
       ]);
-      final settings = results[3] as AppSettings;
-      _videoProcessing = VideoProcessingService(
-        _engine,
-        initialSettings: settings,
-      );
-      _customBindings = await SettingsStore.loadShortcuts();
     } on Exception catch (e) {
-      debugPrint('[App] init failed (continuing): $e');
-      _videoProcessing = VideoProcessingService(_engine);
+      debugPrint('[App] settings load failed (continuing): $e');
     }
-    debugPrint('[App] init completed in ${sw.elapsedMilliseconds}ms');
+    widget.coordinator.report(StartupPhase.settings, 1.0, 'Preferences loaded');
     if (mounted) setState(() => _ready = true);
   }
 
   @override
   void dispose() {
-    _playlistGeneration.dispose();
     _locale.dispose();
     _themeIndex.dispose();
-    _videoProcessing.dispose();
-    _controller.dispose();
-    _engine.dispose();
-    WindowService.instance.dispose();
     super.dispose();
   }
 
-  Future<void> _openFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: [
-        'mp4',
-        'mkv',
-        'avi',
-        'mov',
-        'wmv',
-        'flv',
-        'webm',
-        'mp3',
-        'flac',
-        'wav',
-        'aac',
-        'ogg',
-        'wma',
-        'm4a',
-      ],
+  static ThemeData _buildTheme(int themeIndex) {
+    final accent = _accents[themeIndex.clamp(0, _accents.length - 1)];
+    return ThemeData.dark().copyWith(
+      colorScheme: ColorScheme.dark(primary: accent, secondary: accent),
     );
-    if (result != null && result.files.isNotEmpty) {
-      for (final file in result.files) {
-        if (file.path != null) {
-          await _controller.openAndPlay(file.path!);
-        }
-      }
-    }
   }
 
-  void _onFilesDropped(List<String> paths) {
-    _controller.addFiles(paths);
-  }
-
-  void _showSettingsPanel(BuildContext context) {
+  void _showSettingsPanel(
+    BuildContext context,
+    dynamic engine,
+    dynamic videoProcessing,
+  ) {
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.transparent,
       builder: (dialogCtx) => SettingsPanel(
-        engine: _engine,
-        videoProcessing: _videoProcessing,
+        engine: engine,
+        videoProcessing: videoProcessing,
         onLocaleChanged: (code) {
           _locale.value = Locale(code);
           SettingsStore.saveLocale(code);
@@ -148,17 +104,12 @@ class _AppState extends State<App> {
     );
   }
 
-  void _showSettingsQuickMenu(
-    BuildContext barCtx,
-    BuildContext appCtx,
-    TapUpDetails tap,
-  ) {
-    final l10n = AppLocalizations.of(appCtx);
+  void _showSettingsQuickMenu(BuildContext barCtx, TapUpDetails tap) {
+    final l10n = AppLocalizations.of(barCtx);
     final currentAccent = Theme.of(barCtx).colorScheme.primary;
 
-    const accents = [Color(0xFF2C58F4), Color(0xFF00B4D8), Color(0xFF2D6A4F)];
     final themeNames = [l10n.themeMidnight, l10n.themeOcean, l10n.themeForest];
-    final currentThemeIdx = accents.indexWhere((c) => c == currentAccent);
+    final currentThemeIdx = _accents.indexWhere((c) => c == currentAccent);
 
     final overlay = Overlay.of(barCtx).context.findRenderObject()! as RenderBox;
     final pos = overlay.globalToLocal(tap.globalPosition);
@@ -205,7 +156,7 @@ class _AppState extends State<App> {
             style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 11),
           ),
         ),
-        for (var i = 0; i < accents.length; i++)
+        for (var i = 0; i < _accents.length; i++)
           _QuickMenuItem(
             label: themeNames[i],
             selected: i == currentThemeIdx,
@@ -218,25 +169,14 @@ class _AppState extends State<App> {
     );
   }
 
-  static ThemeData _buildTheme(int themeIndex) {
-    const accents = [
-      Color(0xFF2C58F4), // Midnight
-      Color(0xFF00B4D8), // Ocean
-      Color(0xFF2D6A4F), // Forest
-    ];
-    final accent = accents[themeIndex.clamp(0, accents.length - 1)];
-    return ThemeData.dark().copyWith(
-      colorScheme: ColorScheme.dark(primary: accent, secondary: accent),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
-      return const MaterialApp(
-        home: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(child: CircularProgressIndicator()),
+      return MaterialApp(
+        home: ValueListenableBuilder<StartupState>(
+          valueListenable: widget.coordinator.state,
+          builder: (context, startupState, _) =>
+              ProgressSplashScreen(state: startupState),
         ),
       );
     }
@@ -245,61 +185,21 @@ class _AppState extends State<App> {
       valueListenable: _themeIndex,
       builder: (context, themeIdx, _) => ValueListenableBuilder<Locale>(
         valueListenable: _locale,
-        builder: (context, locale, _) => MaterialApp(
-          locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-          debugShowCheckedModeBanner: false,
-          theme: _buildTheme(themeIdx),
-          home: Builder(
-            builder: (ctx) => Stack(
-              children: [
-                PlayerScreen(
-                  engine: _engine,
-                  controller: _controller,
-                  playlist: _playlist,
-                  customBindings: _customBindings,
-                  playlistGeneration: _playlistGeneration,
-                  isVideo: _engine.textureId.value != null,
-                  onOpenFile: _openFile,
-                  onPrevious: () => _controller.playPrevious(),
-                  onNext: () => _controller.playNext(),
-                  onTogglePlayMode: () {
-                    _controller.togglePlayMode();
-                    final l10n = AppLocalizations.of(ctx);
-                    OsdService.I.show(
-                      playModeLabel(_playlist.mode, l10n),
-                      icon: playModeIcon(_playlist.mode),
-                    );
-                  },
-                  onSettings: () => _showSettingsPanel(ctx),
-                  onSettingsSecondary: (barCtx, details) =>
-                      _showSettingsQuickMenu(barCtx, ctx, details),
-                  onFilesDropped: _onFilesDropped,
-                  onDragHoverChanged: (hovering) {
-                    setState(() => _isDragHovering = hovering);
-                  },
-                  onFolderScanned: (folderPath, scanned) {
-                    _playlist.addAll(scanned.map((i) => i.path).toList());
-                    _playlistGeneration.value++;
-                  },
-                  onClearHistory: () {
-                    final keptPaths = _playlist.items
-                        .where((i) => (i.timestamp ?? 0) == 0)
-                        .map((i) => i.path)
-                        .toList();
-                    _playlist.clear();
-                    _playlist.addAll(keptPaths);
-                    _playlistGeneration.value++;
-                  },
-                  emptyState: EmptyState(
-                    onOpenFile: _openFile,
-                    isDragHovering: _isDragHovering,
-                    engineState: _engine.state,
-                  ),
-                ),
-              ],
+        builder: (context, locale, _) => AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: MaterialApp(
+            key: const ValueKey('material-app'),
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+            debugShowCheckedModeBanner: false,
+            theme: _buildTheme(themeIdx),
+            home: DeferredPlayerFeature(
+              coordinator: widget.coordinator,
+              onSettings: (ctx, engine, videoProcessing) =>
+                  _showSettingsPanel(ctx, engine, videoProcessing),
+              onSettingsSecondary: _showSettingsQuickMenu,
             ),
           ),
         ),
