@@ -41,7 +41,12 @@ Future<void> main() async {
   final windowFuture = WindowService.instance.initialize();
 
   // fire-and-forget: 预热 MDK 引擎（FFmpeg codec 注册 + D3D11 上下文）
-  unawaited(EnginePrewarm.prewarm());
+  unawaited(
+    EnginePrewarm.prewarm(
+      onProgress: (p, msg) =>
+          coordinator.report(StartupPhase.infrastructure, 0.4 + p * 0.2, msg),
+    ),
+  );
 
   // SharedPreferences 完成后立即 prewarm（WindowService 可能间接依赖）
   final prefs = await prefsFuture;

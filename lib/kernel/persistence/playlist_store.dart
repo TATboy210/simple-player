@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -108,6 +109,37 @@ class PlaylistStore {
       return playlist;
     } on Exception catch (e) {
       debugPrint('PlaylistStore.load failed: $e');
+      return null;
+    }
+  }
+
+  /// 后台 Isolate 加载播放列表（文件 I/O + JSON 解析不阻塞 UI）
+  ///
+  /// 文件读取和 JSON 解析在独立 Isolate 中执行，
+  /// 迁移逻辑在主 Isolate 回调中执行（低频一次性操作）。
+  /// Isolate 失败时自动回退到 [load]。
+  static Future<Playlist?> loadInBackground() async {
+    try {
+      final f = await _file();
+      final path = f.path;
+      final playlist = await Isolate.run(() => _loadPlaylistSync(path));
+      return await _migrateHistory(playlist);
+    } on Exception catch (e) {
+      debugPrint('PlaylistStore.loadInBackground failed, falling back: $e');
+      return load();
+    }
+  }
+
+  /// Isolate 入口 — 纯 Dart 文件 I/O + JSON 解析
+  static Playlist? _loadPlaylistSync(String path) {
+    try {
+      final f = File(path);
+      if (!f.existsSync()) return null;
+      final content = f.readAsStringSync();
+      final json = jsonDecode(content) as Map<String, dynamic>;
+      return Playlist.fromJson(json);
+    } on Exception catch (e) {
+      debugPrint('PlaylistStore._loadPlaylistSync failed: $e');
       return null;
     }
   }

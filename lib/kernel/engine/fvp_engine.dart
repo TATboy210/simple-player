@@ -26,7 +26,8 @@ import 'track_manager.dart';
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
 class FvpEngine implements MediaEngine {
-  final mdk.Player _player = mdk.Player();
+  mdk.Player? _playerInstance;
+  mdk.Player get _player => _playerInstance ??= _createPlayer();
   bool _disposed = false;
 
   // ─── Constants ───
@@ -45,9 +46,9 @@ class FvpEngine implements MediaEngine {
 
   // ─── Helpers ───
 
-  late final FvpCallbackHandler _callbackHandler;
-  late final PositionPoller _positionPoller;
-  late final TrackManager _trackManager;
+  late FvpCallbackHandler _callbackHandler;
+  late PositionPoller _positionPoller;
+  late TrackManager _trackManager;
 
   // ─── ValueNotifier 实现 ───
 
@@ -101,23 +102,27 @@ class FvpEngine implements MediaEngine {
   @override
   MediaInfo get mediaInfo => _trackManager.mediaInfo;
 
-  FvpEngine() {
+  FvpEngine();
+
+  mdk.Player _createPlayer() {
+    final p = mdk.Player();
     _callbackHandler = FvpCallbackHandler(
-      _player,
+      p,
       state: state,
       isBuffering: isBuffering,
       onStopPositionPolling: () => _positionPoller.stop(),
     );
     _positionPoller = PositionPoller(
-      _player,
+      p,
       position: position,
       buffered: buffered,
       currentPathGetter: () => _currentPath,
     );
-    _trackManager = TrackManager(_player);
+    _trackManager = TrackManager(p);
 
-    _player.textureId.addListener(_onTextureIdChanged);
+    p.textureId.addListener(_onTextureIdChanged);
     _callbackHandler.init();
+    return p;
   }
 
   void _onTextureIdChanged() {
@@ -246,8 +251,8 @@ class FvpEngine implements MediaEngine {
         state.value = MediaState.error;
         _errorType = prepareResult == -99
             ? (PathValidator.isUrl(trimmed)
-                ? MediaErrorType.network
-                : MediaErrorType.file)
+                  ? MediaErrorType.network
+                  : MediaErrorType.file)
             : MediaErrorType.codec;
         errorMessage.value = prepareResult == -99
             ? '打开超时: ${PathUtils.basename(trimmed)}'
@@ -533,6 +538,7 @@ class FvpEngine implements MediaEngine {
 
   @override
   int get subtitleDelay {
+    if (_disposed) return 0;
     try {
       return int.parse(_player.getProperty('subtitle.delay') ?? '0');
     } on Exception catch (_) {
@@ -603,11 +609,13 @@ class FvpEngine implements MediaEngine {
   @override
   void dispose() {
     _disposed = true;
-    _positionPoller.dispose();
-    _callbackHandler.dispose();
-
-    _player.textureId.removeListener(_onTextureIdChanged);
-    _player.dispose();
+    final p = _playerInstance;
+    if (p != null) {
+      _positionPoller.dispose();
+      _callbackHandler.dispose();
+      p.textureId.removeListener(_onTextureIdChanged);
+      p.dispose();
+    }
 
     textureId.dispose();
     state.dispose();
