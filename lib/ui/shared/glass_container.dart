@@ -43,7 +43,7 @@ class GlassContainer extends StatelessWidget {
     this.borderRadius,
     this.border,
     this.tier = GlassTier.normal,
-    this.respectResizeState = false,
+    this.respectResizeState = true,
   });
 
   @override
@@ -120,7 +120,7 @@ class GlassButton extends StatefulWidget {
     this.isPrimary = false,
     this.enabled = true,
     required this.onPressed,
-    this.respectResizeState = false,
+    this.respectResizeState = true,
   });
 
   /// 便捷构造：icon-only 模式
@@ -131,7 +131,7 @@ class GlassButton extends StatefulWidget {
     this.isPrimary = false,
     this.enabled = true,
     required this.onPressed,
-    this.respectResizeState = false,
+    this.respectResizeState = true,
   }) : label = null;
 
   bool get _isIconOnly => label == null;
@@ -141,75 +141,98 @@ class GlassButton extends StatefulWidget {
 }
 
 class _GlassButtonState extends State<GlassButton> {
-  bool _hovered = false;
-  bool _pressed = false;
+  final _hovered = ValueNotifier<bool>(false);
+  final _pressed = ValueNotifier<bool>(false);
+  late final Listenable _interaction;
+
+  @override
+  void initState() {
+    super.initState();
+    _interaction = Listenable.merge([_hovered, _pressed]);
+  }
+
+  @override
+  void dispose() {
+    _hovered.dispose();
+    _pressed.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final textColor = widget.isPrimary
         ? Tokens.textPrimary
         : Tokens.textSecondary;
-    final scale = _pressed
-        ? Tokens.pressScale
-        : (_hovered ? Tokens.hoverScale : 1.0);
+
+    // 静态子组件 — 只构建一次，hover/press 时复用
+    final content = widget._isIconOnly
+        ? GlassContainer(
+            width: Tokens.iconButtonSizeLarge,
+            height: Tokens.iconButtonSizeLarge,
+            borderRadius: BorderRadius.circular(Tokens.iconButtonRadius),
+            respectResizeState: widget.respectResizeState,
+            child: Icon(widget.icon, size: 20, color: textColor),
+          )
+        : GlassContainer(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.iconButtonPaddingH,
+              vertical: Tokens.iconButtonPaddingV,
+            ),
+            respectResizeState: widget.respectResizeState,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(widget.icon, size: 18, color: textColor),
+                const SizedBox(width: Tokens.spSm),
+                Text(
+                  widget.label!,
+                  style: TextStyle(
+                    fontSize: Tokens.fontBody,
+                    fontWeight: Tokens.weightMedium,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: widget.enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapDown: widget.enabled ? (_) => _pressed.value = true : null,
       onTap: widget.enabled
           ? () {
-              setState(() => _pressed = false);
+              _pressed.value = false;
               widget.onPressed();
             }
           : null,
-      onTapCancel: () => setState(() => _pressed = false),
+      onTapCancel: () => _pressed.value = false,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() {
-          _hovered = false;
-          _pressed = false;
-        }),
+        onEnter: (_) => _hovered.value = true,
+        onExit: (_) {
+          _hovered.value = false;
+          _pressed.value = false;
+        },
         child: Tooltip(
           message: widget.tooltip ?? widget.label ?? '',
-          child: AnimatedContainer(
-            duration: Duration(
-              milliseconds: _pressed
-                  ? Tokens.durationFast
-                  : Tokens.durationNormal,
-            ),
-            transform: Matrix4.diagonal3Values(scale, scale, 1),
-            transformAlignment: Alignment.center,
-            child: widget._isIconOnly
-                ? GlassContainer(
-                    width: 48,
-                    height: 48,
-                    borderRadius: BorderRadius.circular(24),
-                    respectResizeState: widget.respectResizeState,
-                    child: Icon(widget.icon, size: 20, color: textColor),
-                  )
-                : GlassContainer(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    respectResizeState: widget.respectResizeState,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(widget.icon, size: 18, color: textColor),
-                        const SizedBox(width: Tokens.spSm),
-                        Text(
-                          widget.label!,
-                          style: TextStyle(
-                            fontSize: Tokens.fontBody,
-                            fontWeight: Tokens.weightMedium,
-                            color: textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          child: AnimatedBuilder(
+            animation: _interaction,
+            builder: (context, child) {
+              final scale = _pressed.value
+                  ? Tokens.pressScale
+                  : (_hovered.value ? Tokens.hoverScale : 1.0);
+              return AnimatedContainer(
+                duration: Duration(
+                  milliseconds: _pressed.value
+                      ? Tokens.durationFast
+                      : Tokens.durationNormal,
+                ),
+                transform: Matrix4.diagonal3Values(scale, scale, 1),
+                transformAlignment: Alignment.center,
+                child: child,
+              );
+            },
+            child: content,
           ),
         ),
       ),

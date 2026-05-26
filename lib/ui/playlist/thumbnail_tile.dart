@@ -5,12 +5,21 @@ import '../../kernel/services/thumbnail_service.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/context_menu_row.dart';
 
 /// 缩略图组件 — 16:9 圆角卡片，支持加载占位、播放高亮、断点进度
 ///
 /// 用于沉浸式浮窗的文件夹 tab 和历史 tab。
 /// 缩略图来自 [ThumbnailService]（Win32 COM 系统缩略图）。
-class ThumbnailTile extends StatefulWidget {
+///
+/// StatelessWidget — 静态布局（label、breakpoint、border）不随加载状态重建。
+/// 图片加载隔离到内部 [_ThumbnailImage]。
+class ThumbnailTile extends StatelessWidget {
+  static const _tileWidth = 160.0;
+  static const _aspectRatio = 16.0 / 9.0;
+  static const _thumbHeight = _tileWidth / _aspectRatio;
+  static const _nameHeight = 28.0;
+
   final PlaylistItem item;
   final bool isCurrent;
   final VoidCallback onPlay;
@@ -29,53 +38,14 @@ class ThumbnailTile extends StatefulWidget {
   });
 
   @override
-  State<ThumbnailTile> createState() => _ThumbnailTileState();
-}
-
-class _ThumbnailTileState extends State<ThumbnailTile> {
-  static const _tileWidth = 160.0;
-  static const _aspectRatio = 16.0 / 9.0;
-  static const _thumbHeight = _tileWidth / _aspectRatio;
-  static const _nameHeight = 28.0;
-
-  ImageProvider? _thumbnail;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThumbnail();
-  }
-
-  @override
-  void didUpdateWidget(covariant ThumbnailTile oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.path != widget.item.path) {
-      _loadThumbnail();
-    }
-  }
-
-  Future<void> _loadThumbnail() async {
-    setState(() {
-      _loading = true;
-      _thumbnail = null;
-    });
-    final provider = await ThumbnailService.getThumbnail(widget.item.path);
-    if (!mounted) return;
-    setState(() {
-      _thumbnail = provider;
-      _loading = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final hasBreakpoint = (widget.item.positionMs ?? 0) > 0 &&
-        widget.item.durationMs != null &&
-        widget.item.durationMs! > 0;
+    final hasBreakpoint =
+        (item.positionMs ?? 0) > 0 &&
+        item.durationMs != null &&
+        item.durationMs! > 0;
 
     return GestureDetector(
-      onTap: widget.onPlay,
+      onTap: onPlay,
       onSecondaryTap: () => _showContextMenu(context),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
@@ -100,7 +70,7 @@ class _ThumbnailTileState extends State<ThumbnailTile> {
       height: _thumbHeight,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        border: widget.isCurrent
+        border: isCurrent
             ? Border.all(color: Tokens.accent, width: 2)
             : Border.all(color: Tokens.borderHighlight, width: 1),
       ),
@@ -109,10 +79,8 @@ class _ThumbnailTileState extends State<ThumbnailTile> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 缩略图 or 占位符
-            _buildImage(),
-            // 播放中图标覆盖
-            if (widget.isCurrent)
+            _ThumbnailImage(path: item.path),
+            if (isCurrent)
               Container(
                 color: Colors.black26,
                 child: const Center(
@@ -123,14 +91,13 @@ class _ThumbnailTileState extends State<ThumbnailTile> {
                   ),
                 ),
               ),
-            // 断点进度条覆盖
-            if (hasBreakpoint && !widget.isCurrent)
+            if (hasBreakpoint && !isCurrent)
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: _BreakpointBar(
-                  progress: widget.item.positionMs! / widget.item.durationMs!,
+                  progress: item.positionMs! / item.durationMs!,
                 ),
               ),
           ],
@@ -139,7 +106,141 @@ class _ThumbnailTileState extends State<ThumbnailTile> {
     );
   }
 
-  Widget _buildImage() {
+  Widget _buildNameLabel() {
+    return SizedBox(
+      height: _nameHeight - 4,
+      child: Tooltip(
+        message: item.name,
+        waitDuration: const Duration(milliseconds: 600),
+        child: Text(
+          item.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: isCurrent ? Tokens.accent : Tokens.textSecondary,
+            fontSize: Tokens.fontOverline,
+            fontWeight: isCurrent ? Tokens.weightMedium : Tokens.weightRegular,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showContextMenu(BuildContext context) {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final button = context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final hasBreakpoint = (item.positionMs ?? 0) > 0;
+    final l10n = AppLocalizations.of(context);
+
+    showMenu<String>(
+      context: context,
+      position: position,
+      color: Tokens.bgElevated,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Tokens.radiusPopup),
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'play',
+          child: ContextMenuRow(Icons.play_arrow, l10n.playAction),
+        ),
+        if (hasBreakpoint)
+          PopupMenuItem(
+            value: 'resume',
+            child: ContextMenuRow(Icons.play_circle, l10n.resumeAction),
+          ),
+        PopupMenuItem(
+          value: 'openFolder',
+          child: ContextMenuRow(Icons.folder_open, l10n.openFileLocation),
+        ),
+        if (onRemove != null)
+          PopupMenuItem(
+            value: 'remove',
+            child: ContextMenuRow(Icons.delete_outline, l10n.remove),
+          ),
+        const PopupMenuDivider(),
+        if (onShowProperties != null)
+          PopupMenuItem(
+            value: 'properties',
+            child: ContextMenuRow(Icons.info_outline, l10n.properties),
+          ),
+      ],
+    ).then((value) {
+      if (value == null || !context.mounted) return;
+      switch (value) {
+        case 'play':
+          onPlay();
+          break;
+        case 'resume':
+          onResume?.call();
+          break;
+        case 'openFolder':
+          PathUtils.openFileLocation(item.path);
+          break;
+        case 'remove':
+          onRemove?.call();
+          break;
+        case 'properties':
+          onShowProperties?.call(item.path);
+          break;
+      }
+    });
+  }
+}
+
+/// 图片加载 — StatefulWidget 隔离加载状态，path 变化时重建
+class _ThumbnailImage extends StatefulWidget {
+  final String path;
+  const _ThumbnailImage({required this.path});
+
+  @override
+  State<_ThumbnailImage> createState() => _ThumbnailImageState();
+}
+
+class _ThumbnailImageState extends State<_ThumbnailImage> {
+  ImageProvider? _thumbnail;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ThumbnailImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      setState(() {
+        _loading = true;
+        _thumbnail = null;
+      });
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final provider = await ThumbnailService.getThumbnail(widget.path);
+    if (!mounted) return;
+    setState(() {
+      _thumbnail = provider;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     if (_loading) {
       return Container(
         color: Tokens.bgHover,
@@ -173,103 +274,6 @@ class _ThumbnailTileState extends State<ThumbnailTile> {
       ),
     );
   }
-
-  Widget _buildNameLabel() {
-    return SizedBox(
-      height: _nameHeight - 4,
-      child: Tooltip(
-        message: widget.item.name,
-        waitDuration: const Duration(milliseconds: 600),
-        child: Text(
-          widget.item.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: widget.isCurrent ? Tokens.accent : Tokens.textSecondary,
-            fontSize: Tokens.fontOverline,
-            fontWeight:
-                widget.isCurrent ? Tokens.weightMedium : Tokens.weightRegular,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showContextMenu(BuildContext context) {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final button = context.findRenderObject() as RenderBox;
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(
-          button.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
-    );
-
-    final hasBreakpoint = (widget.item.positionMs ?? 0) > 0;
-    final l10n = AppLocalizations.of(context);
-
-    showMenu<String>(
-      context: context,
-      position: position,
-      color: Tokens.bgElevated,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Tokens.radiusPopup),
-      ),
-      items: [
-        PopupMenuItem(
-          value: 'play',
-          child: _MenuItemRow(Icons.play_arrow, l10n.playAction),
-        ),
-        if (hasBreakpoint)
-          PopupMenuItem(
-            value: 'resume',
-            child: _MenuItemRow(Icons.play_circle, l10n.resumeAction),
-          ),
-        PopupMenuItem(
-          value: 'openFolder',
-          child: _MenuItemRow(Icons.folder_open, l10n.openFileLocation),
-        ),
-        if (widget.onRemove != null)
-          PopupMenuItem(
-            value: 'remove',
-            child: _MenuItemRow(Icons.delete_outline, l10n.remove),
-          ),
-        const PopupMenuDivider(),
-        if (widget.onShowProperties != null)
-          PopupMenuItem(
-            value: 'properties',
-            child: _MenuItemRow(Icons.info_outline, l10n.properties),
-          ),
-      ],
-    ).then((value) {
-      if (value == null || !context.mounted) return;
-      switch (value) {
-        case 'play':
-          widget.onPlay();
-          break;
-        case 'resume':
-          widget.onResume?.call();
-          break;
-        case 'openFolder':
-          _openFileLocation();
-          break;
-        case 'remove':
-          widget.onRemove?.call();
-          break;
-        case 'properties':
-          widget.onShowProperties?.call(widget.item.path);
-          break;
-      }
-    });
-  }
-
-  void _openFileLocation() {
-    PathUtils.openFileLocation(widget.item.path);
-  }
 }
 
 class _BreakpointBar extends StatelessWidget {
@@ -280,9 +284,7 @@ class _BreakpointBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 3,
-      decoration: const BoxDecoration(
-        color: Color(0x44000000),
-      ),
+      decoration: const BoxDecoration(color: Color(0x44000000)),
       child: FractionallySizedBox(
         alignment: Alignment.centerLeft,
         widthFactor: progress.clamp(0.0, 1.0),
@@ -292,29 +294,6 @@ class _BreakpointBar extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MenuItemRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _MenuItemRow(this.icon, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: Tokens.iconMd, color: Tokens.textSecondary),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Tokens.textPrimary,
-            fontSize: Tokens.fontCaption,
-          ),
-        ),
-      ],
     );
   }
 }

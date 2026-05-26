@@ -7,12 +7,11 @@ import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
-import '../../kernel/services/playback_controller.dart';
+import '../../features/player/services/playback_controller.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
-import '../../kernel/window/aspect_ratio_service.dart';
 import 'controls_overlay.dart';
 import 'custom_title_bar.dart';
 import 'drop_handler.dart';
@@ -30,15 +29,12 @@ class PlayerScreen extends StatefulWidget {
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
   final Map<String, String> customBindings;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
   final VoidCallback? onTogglePlaylist;
   final VoidCallback? onSettings;
   final void Function(BuildContext context, TapUpDetails details)?
   onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final VoidCallback? onTogglePlayMode;
-  final bool isVideo;
   final void Function(List<String> paths)? onFilesDropped;
   final void Function(bool hovering)? onDragHoverChanged;
   final Widget? emptyState;
@@ -55,14 +51,11 @@ class PlayerScreen extends StatefulWidget {
     required this.playlist,
     required this.playlistGeneration,
     this.customBindings = const {},
-    this.onPrevious,
-    this.onNext,
     this.onTogglePlaylist,
     this.onSettings,
     this.onSettingsSecondary,
     this.onOpenFile,
     this.onTogglePlayMode,
-    this.isVideo = false,
     this.onFilesDropped,
     this.onDragHoverChanged,
     this.emptyState,
@@ -115,10 +108,60 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final ws = WindowService.instance;
+    final isVideo = widget.engine.textureId.value != null;
+
+    // 预计算播放模式显示值（避免 Builder 包裹 ControlsOverlay）
+    final l10n = AppLocalizations.of(context);
+    final modeIcon = playModeIcon(widget.playlist.mode);
+    final modeLabel = playModeLabel(widget.playlist.mode, l10n);
+
+    // 视频内容区 — 不依赖 fullscreen / playlistVisible，作为 child 避免重建
+    final videoContent = Row(
+      children: [
+        Expanded(
+          child: DropHandler(
+            onFilesDropped: widget.onFilesDropped ?? (_) {},
+            onHoverChanged: widget.onDragHoverChanged,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                VideoSurface(engine: widget.engine),
+                if (widget.emptyState != null)
+                  ValueListenableBuilder<MediaState>(
+                    valueListenable: widget.engine.state,
+                    builder: (_, state, child) =>
+                        state == MediaState.idle
+                        ? child!
+                        : const SizedBox.shrink(),
+                    child: Positioned.fill(
+                      child: widget.emptyState!,
+                    ),
+                  ),
+                ControlsOverlay(
+                  engine: widget.engine,
+                  emptyStatePresent: widget.emptyState != null,
+                  onPrevious: () => widget.controller.playPrevious(),
+                  onNext: () => widget.controller.playNext(),
+                  onTogglePlaylist: _togglePlaylist,
+                  onSettings: widget.onSettings,
+                  onSettingsSecondary: widget.onSettingsSecondary,
+                  onOpenFile: widget.onOpenFile,
+                  onTogglePlayMode: widget.onTogglePlayMode,
+                  onOpenSubtitle: _openSubtitle,
+                  playModeIcon: modeIcon,
+                  playModeLabel: modeLabel,
+                  isVideo: isVideo,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
 
     return ValueListenableBuilder<bool>(
       valueListenable: ws.state.fullscreen,
-      builder: (context, isFullscreen, _) {
+      builder: (context, isFullscreen, scaffold) {
         return KeyboardHandler(
           customBindings: widget.customBindings,
           onPlayPause: () => widget.engine.togglePlayPause(),
@@ -135,8 +178,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               : null,
           onToggleMute: () =>
               widget.engine.setMute(!widget.engine.isMuted.value),
-          onPrevious: widget.onPrevious,
-          onNext: widget.onNext,
+          onPrevious: () => widget.controller.playPrevious(),
+          onNext: () => widget.controller.playNext(),
           onOpenFile: widget.onOpenFile,
           onToggleSubtitle: widget.engine.toggleSubtitle,
           onShowHelp: () => _showShortcutsHelp(context),
@@ -151,121 +194,83 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onMediaPlayPause: () => widget.engine.togglePlayPause(),
           onMediaNext: () => widget.controller.playNext(),
           onMediaPrevious: () => widget.controller.playPrevious(),
-          onCycleAspectRatio: () => AspectRatioService.I.cycleRatio(),
           child: DragToResizeArea(
             enableResizeEdges: isFullscreen ? [] : null,
-            child: Scaffold(
-              backgroundColor: Tokens.bgBase,
-              body: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 标题栏：全屏时跳过构建（Offstage 仍运行 BackdropFilter）
-                  if (!isFullscreen)
-                    CustomTitleBar(
-                      fileName: widget.controller.currentFileName,
-                      onOpenFile: widget.onOpenFile,
-                    ),
-
-                  // 主内容区
-                  Expanded(
-                    child: ValueListenableBuilder<bool>(
-                      valueListenable: _playlistVisible,
-                      builder: (context, playlistVisible, _) => Stack(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropHandler(
-                                  onFilesDropped:
-                                      widget.onFilesDropped ?? (_) {},
-                                  onHoverChanged: widget.onDragHoverChanged,
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      VideoSurface(engine: widget.engine),
-                                      if (widget.emptyState != null)
-                                        ValueListenableBuilder<MediaState>(
-                                          valueListenable: widget.engine.state,
-                                          builder: (_, state, child) =>
-                                              state == MediaState.idle
-                                              ? child!
-                                              : const SizedBox.shrink(),
-                                          child: Positioned.fill(
-                                            child: widget.emptyState!,
-                                          ),
-                                        ),
-                                      Builder(
-                                        builder: (context) {
-                                          final l10n = AppLocalizations.of(
-                                            context,
-                                          );
-                                          return ControlsOverlay(
-                                            engine: widget.engine,
-                                            isFullscreen: isFullscreen,
-                                            emptyStatePresent:
-                                                widget.emptyState != null,
-                                            onPrevious: widget.onPrevious,
-                                            onNext: widget.onNext,
-                                            onTogglePlaylist: _togglePlaylist,
-                                            onSettings: widget.onSettings,
-                                            onSettingsSecondary:
-                                                widget.onSettingsSecondary,
-                                            onOpenFile: widget.onOpenFile,
-                                            onToggleFullscreen: () =>
-                                                WindowService.instance.setFullscreen(
-                                                    !WindowService.instance.state.fullscreen.value),
-                                            onTogglePlayMode:
-                                                widget.onTogglePlayMode,
-                                            onOpenSubtitle: _openSubtitle,
-                                            playModeIcon: playModeIcon(
-                                              widget.playlist.mode,
-                                            ),
-                                            playModeLabel: playModeLabel(
-                                              widget.playlist.mode,
-                                              l10n,
-                                            ),
-                                            isVideo: widget.isVideo,
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          // 沉浸式浮窗播放列表
-                          if (_playlistMounted)
-                            IgnorePointer(
-                              ignoring: !playlistVisible,
-                              child: PlaylistPanel(
-                                playlist: widget.playlist,
-                                visible: playlistVisible,
-                                onClose: _closePlaylist,
-                                onSelectIndex: (i) {
-                                  widget.controller.playIndex(i);
-                                  _closePlaylist();
-                                },
-                                onRemoveIndex: (i) {
-                                  widget.playlist.removeAt(i);
-                                  widget.playlistGeneration.value++;
-                                },
-                                onShowProperties: widget.onShowProperties,
-                                onFolderScanned: widget.onFolderScanned,
-                                onClearHistory: widget.onClearHistory,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: scaffold!,
           ),
         );
       },
+      child: Scaffold(
+        backgroundColor: Tokens.bgBase,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题栏：全屏时向上滑出（依赖 isFullscreen，通过 VLB 重建）
+            ValueListenableBuilder<bool>(
+              valueListenable: ws.state.fullscreen,
+              builder: (context, isFullscreen, _) => AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) {
+                  final offsetAnim = Tween<Offset>(
+                    begin: const Offset(0, -0.5),
+                    end: Offset.zero,
+                  ).animate(animation);
+                  return SlideTransition(
+                    position: offsetAnim,
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                  );
+                },
+                child: isFullscreen
+                    ? const SizedBox.shrink(key: ValueKey('hidden'))
+                    : CustomTitleBar(
+                        key: const ValueKey('titlebar'),
+                        fileName: widget.controller.currentFileName,
+                        onOpenFile: widget.onOpenFile,
+                      ),
+              ),
+            ),
+
+            // 主内容区
+            Expanded(
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _playlistVisible,
+                builder: (context, playlistVisible, videoContent) => Stack(
+                  children: [
+                    videoContent!,
+                    // 沉浸式浮窗播放列表
+                    if (_playlistMounted)
+                      IgnorePointer(
+                        ignoring: !playlistVisible,
+                        child: PlaylistPanel(
+                          playlist: widget.playlist,
+                          visible: playlistVisible,
+                          onClose: _closePlaylist,
+                          onSelectIndex: (i) {
+                            widget.controller.playIndex(i);
+                            _closePlaylist();
+                          },
+                          onRemoveIndex: (i) {
+                            widget.playlist.removeAt(i);
+                            widget.playlistGeneration.value++;
+                          },
+                          onShowProperties: widget.onShowProperties,
+                          onFolderScanned: widget.onFolderScanned,
+                          onClearHistory: widget.onClearHistory,
+                        ),
+                      ),
+                  ],
+                ),
+                child: videoContent,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

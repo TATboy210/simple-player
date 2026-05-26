@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import '../../kernel/services/path_validator.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 文件拖放处理器 — 使用 desktop_drop 接收 Windows Explorer 拖拽
 ///
@@ -64,7 +65,7 @@ class _DropHandlerState extends State<DropHandler> {
                   color: Tokens.bgGlass,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Tokens.accent.withAlpha(128),
+                    color: Tokens.accent.withValues(alpha: 0.5),
                     width: 2,
                   ),
                 ),
@@ -79,8 +80,8 @@ class _DropHandlerState extends State<DropHandler> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '释放以添加文件',
-                        style: TextStyle(
+                        AppLocalizations.of(context).dragHint,
+                        style: const TextStyle(
                           color: Tokens.textPrimary,
                           fontSize: Tokens.fontBody,
                           fontWeight: Tokens.weightMedium,
@@ -88,8 +89,8 @@ class _DropHandlerState extends State<DropHandler> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '支持常见音视频格式',
-                        style: TextStyle(
+                        AppLocalizations.of(context).dragHintIdle,
+                        style: const TextStyle(
                           color: Tokens.textSecondary,
                           fontSize: Tokens.fontCaption,
                         ),

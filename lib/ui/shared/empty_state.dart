@@ -55,9 +55,8 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       curve: Curves.easeOut,
       reverseCurve: Curves.easeIn,
     );
-    // 用 addListener + setState 驱动重建，避免 AnimatedBuilder
-    // 产生 _RenderLayoutSurrogateProxyBox 阻断 hit test
-    _dragAnim.addListener(() => setState(() {}));
+    // AnimatedBuilder 驱动重建，addListener+setState 会导致整个 build() 每帧重建
+    // （包括 AuroraBackground），AnimatedBuilder 只重建包裹的子树
 
     _idleAnim = AnimationController(
       vsync: this,
@@ -70,7 +69,7 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       curve: Curves.easeOut,
       reverseCurve: Curves.easeIn,
     );
-    _idleAnim.addListener(() => setState(() {}));
+    // _idleAnim 由 AnimatedBuilder 监听，无需 addListener+setState
 
     if (widget.isDragHovering) {
       _dragAnim.forward();
@@ -116,70 +115,79 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 静态子组件 — 只构建一次，跨动画帧复用
+    final openButton = GlassButton(
+      icon: Icons.folder_open,
+      label: l10n.openFile,
+      tooltip: l10n.openFileTooltip,
+      isPrimary: true,
+      respectResizeState: true,
+      onPressed: widget.onOpenFile!,
+    );
+    final dragHint = _buildDragHint(context);
+
     return Stack(
       children: [
-        // Layer 0: 极光呼吸背景
+        // Layer 0: 极光呼吸背景（不参与动画，不重建）
         AuroraBackground(engineState: widget.engineState),
 
-        // Layer 1: 居中悬浮内容
-        Align(
-          alignment: const Alignment(0, 0.1),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── 品牌名 ──
-              _buildBranding(context),
-              if (widget.onOpenFile != null) ...[
-                const SizedBox(height: Tokens.spXl),
-                // ── 按钮 + 拖拽提示（交叉淡入淡出） ──
-                // addListener + setState 驱动，无需 AnimatedBuilder
-                SizedBox(
-                  height: 56, // 固定高度防止布局跳动
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // 打开文件按钮 — 仅拖拽时淡出，闲置时保持可见
-                      Opacity(
-                        opacity: 1.0 - _dragCurve.value,
-                        child: Transform.scale(
-                          scale: 1.0 - 0.05 * _dragCurve.value,
-                          child: GlassButton(
-                            icon: Icons.folder_open,
-                            label: l10n.openFile,
-                            tooltip: l10n.openFileTooltip,
-                            isPrimary: true,
-                            respectResizeState: true,
-                            onPressed: widget.onOpenFile!,
+        // Layer 1: 居中悬浮内容 — AnimatedBuilder 只重建动画相关子树
+        if (widget.onOpenFile != null)
+          AnimatedBuilder(
+            animation: Listenable.merge([_dragAnim, _idleAnim]),
+            builder: (context, _) {
+              return RepaintBoundary(
+              child: Align(
+                alignment: const Alignment(0, 0.1),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildBranding(context),
+                    const SizedBox(height: Tokens.spXl),
+                    SizedBox(
+                      height: 56,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          FadeTransition(
+                            opacity: ReverseAnimation(_dragCurve),
+                            child: Transform.scale(
+                              scale: 1.0 - 0.05 * _dragCurve.value,
+                              child: openButton,
+                            ),
                           ),
-                        ),
-                      ),
-                      // 拖拽提示 — 拖拽时淡入（IgnorePointer 阻止 BackdropFilter 拦截 hit test）
-                      IgnorePointer(
-                        child: Opacity(
-                          opacity: _dragCurve.value,
-                          child: Transform.translate(
-                            offset: Offset(0, 8 * (1 - _dragCurve.value)),
-                            child: _buildDragHint(context),
+                          IgnorePointer(
+                            child: FadeTransition(
+                              opacity: _dragCurve,
+                              child: Transform.translate(
+                                offset: Offset(0, 8 * (1 - _dragCurve.value)),
+                                child: dragHint,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                // 闲置提示 — 5 秒后渐入，纯文字沉浸式
-                IgnorePointer(
-                  child: Opacity(
-                    opacity: _idleCurve.value,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: Tokens.spSm),
-                      child: _buildIdleHint(context),
                     ),
-                  ),
+                    IgnorePointer(
+                      child: FadeTransition(
+                        opacity: _idleCurve,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: Tokens.spSm),
+                          child: _buildIdleHint(context),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ],
+              ),
+              );
+            },
+          )
+        else
+          Align(
+            alignment: const Alignment(0, 0.1),
+            child: _buildBranding(context),
           ),
-        ),
       ],
     );
   }
@@ -191,7 +199,7 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       children: [
         Text(
           l10n.brandName,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: Tokens.fontBranding,
             fontWeight: Tokens.weightExtraLight,
             color: Tokens.textPrimary,
@@ -201,7 +209,7 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
         const SizedBox(height: 6),
         Text(
           l10n.emptyStateSubtitle,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: Tokens.fontCaption,
             color: Tokens.textDisabled,
             letterSpacing: 2,

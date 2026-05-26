@@ -18,10 +18,8 @@ class ControlBar extends StatelessWidget {
   static final _decoration = BoxDecoration(
     color: Tokens.bgGlass,
     borderRadius: ControlBar._borderRadius,
-    border: Border.fromBorderSide(
-      BorderSide(color: Tokens.controlBarBorder, width: 0.5),
-    ),
-    boxShadow: [
+    border: Border.all(color: Tokens.controlBarBorder, width: 0.5),
+    boxShadow: const [
       BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
     ],
   );
@@ -83,7 +81,7 @@ class ControlBar extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final w = constraints.maxWidth;
-            final showSecondary = w >= 500;
+            final showSecondary = w >= Tokens.compactBreakpoint;
 
             return Column(
               children: [

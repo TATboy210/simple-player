@@ -23,8 +23,8 @@ class ProgressBar extends StatefulWidget {
 }
 
 class _ProgressBarState extends State<ProgressBar> {
-  bool _dragging = false;
-  double _dragFraction = 0;
+  /// null = 未拖拽，非 null = 拖拽中的 fraction
+  final _dragNotifier = ValueNotifier<double?>(null);
   final _hoverNotifier = ValueNotifier<_HoverState>(_HoverState.empty);
   DateTime _lastHoverUpdate = DateTime.fromMillisecondsSinceEpoch(0);
   double _barWidth = 0;
@@ -34,12 +34,13 @@ class _ProgressBarState extends State<ProgressBar> {
   double get _effectiveFraction {
     final dur = widget.engine.duration.value;
     if (dur <= 0) return 0;
-    if (_dragging) return _dragFraction;
+    final drag = _dragNotifier.value;
+    if (drag != null) return drag;
     return (widget.engine.position.value / dur).clamp(0.0, 1.0);
   }
 
   int get _dragPositionMs =>
-      (_dragFraction * widget.engine.duration.value).round();
+      ((_dragNotifier.value ?? 0) * widget.engine.duration.value).round();
 
   int get _hoverPositionMs => (_hoverX * widget.engine.duration.value).round();
 
@@ -47,6 +48,7 @@ class _ProgressBarState extends State<ProgressBar> {
 
   @override
   void dispose() {
+    _dragNotifier.dispose();
     _hoverNotifier.dispose();
     super.dispose();
   }
@@ -77,30 +79,21 @@ class _ProgressBarState extends State<ProgressBar> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onHorizontalDragStart: (details) {
-                setState(() {
-                  _dragging = true;
-                  _dragFraction = (details.localPosition.dx / barWidth).clamp(
-                    0.0,
-                    1.0,
-                  );
-                });
+                _dragNotifier.value =
+                    (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
               },
               onHorizontalDragUpdate: (details) {
-                setState(() {
-                  _dragFraction = (details.localPosition.dx / barWidth).clamp(
-                    0.0,
-                    1.0,
-                  );
-                });
+                _dragNotifier.value =
+                    (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
               },
               onHorizontalDragEnd: (_) {
                 if (widget.engine.duration.value <= 0) {
-                  setState(() => _dragging = false);
+                  _dragNotifier.value = null;
                   return;
                 }
                 final ms = _dragPositionMs;
                 widget.engine.seekTo(ms);
-                setState(() => _dragging = false);
+                _dragNotifier.value = null;
               },
               onTapDown: (details) {
                 if (widget.engine.duration.value <= 0) return;
@@ -117,16 +110,27 @@ class _ProgressBarState extends State<ProgressBar> {
                   alignment: Alignment.bottomCenter,
                   children: [
                     _buildBarLayers(),
-                    if (_dragging) _buildDragTooltip(),
+                    if (_dragNotifier.value != null) _buildTooltip(
+                      fraction: _dragNotifier.value!,
+                      text: formatMs(_dragPositionMs),
+                      bgColor: Tokens.accent,
+                      textColor: Colors.white,
+                    ),
                     ValueListenableBuilder<_HoverState>(
                       valueListenable: _hoverNotifier,
                       builder: (_, hover, _) {
                         if (!hover.hovering ||
-                            _dragging ||
+                            _dragNotifier.value != null ||
                             widget.engine.duration.value <= 0) {
                           return const SizedBox.shrink();
                         }
-                        return _buildHoverTooltip();
+                        return _buildTooltip(
+                          fraction: _hoverX,
+                          text: formatMs(_hoverPositionMs),
+                          bgColor: Tokens.bgGlass,
+                          textColor: Tokens.textPrimary,
+                          border: Border.all(color: Tokens.borderHighlight, width: 0.5),
+                        );
                       },
                     ),
                   ],
@@ -146,6 +150,7 @@ class _ProgressBarState extends State<ProgressBar> {
           engine.position,
           engine.duration,
           engine.buffered,
+          _dragNotifier,
         ]),
         builder: (_, _) {
           final dur = engine.duration.value;
@@ -157,7 +162,7 @@ class _ProgressBarState extends State<ProgressBar> {
             painter: _BarPainter(
               playedFraction: playedFrac,
               bufferedFraction: bufFrac,
-              dragging: _dragging,
+              dragging: _dragNotifier.value != null,
             ),
           );
         },
@@ -165,51 +170,32 @@ class _ProgressBarState extends State<ProgressBar> {
     );
   }
 
-  Widget _buildDragTooltip() {
+  Widget _buildTooltip({
+    required double fraction,
+    required String text,
+    required Color bgColor,
+    required Color textColor,
+    Border? border,
+  }) {
     return Positioned(
       bottom: 24,
-      left: (_dragFraction * _barWidth).clamp(40, _barWidth - 40).toDouble(),
+      left: (fraction * _barWidth).clamp(40, _barWidth - 40).toDouble(),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: Tokens.spSm,
           vertical: Tokens.spXs,
         ),
         decoration: BoxDecoration(
-          color: Tokens.accent,
+          color: bgColor,
           borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+          border: border,
         ),
         child: Text(
-          formatMs(_dragPositionMs),
-          style: const TextStyle(
-            color: Colors.white,
+          text,
+          style: TextStyle(
+            color: textColor,
             fontSize: Tokens.fontOverline,
-            fontFeatures: [Tokens.tabularFigures],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHoverTooltip() {
-    return Positioned(
-      bottom: 24,
-      left: (_hoverX * _barWidth).clamp(40, _barWidth - 40).toDouble(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Tokens.spSm,
-          vertical: Tokens.spXs,
-        ),
-        decoration: BoxDecoration(
-          color: Tokens.bgGlass,
-          borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-          border: Border.all(color: Tokens.borderHighlight, width: 0.5),
-        ),
-        child: Text(
-          formatMs(_hoverPositionMs),
-          style: const TextStyle(
-            color: Tokens.textPrimary,
-            fontSize: Tokens.fontOverline,
-            fontFeatures: [Tokens.tabularFigures],
+            fontFeatures: const [Tokens.tabularFigures],
           ),
         ),
       ),
