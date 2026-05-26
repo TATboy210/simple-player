@@ -54,7 +54,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   late final Animation<Offset> _slideAnim;
   late final Animation<double> _fadeAnim;
   final _focusNode = FocusNode();
-  int _selectedTab = 0; // 0=文件夹, 1=历史
+  final _selectedTab = ValueNotifier<int>(0); // 0=文件夹, 1=历史
 
   @override
   void initState() {
@@ -98,12 +98,13 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   @override
   void dispose() {
     _focusNode.dispose();
+    _selectedTab.dispose();
     _anim.dispose();
     super.dispose();
   }
 
-  static const _panelWidth = 420.0;
-  static const _panelHeight = 240.0;
+  static const _panelWidth = Tokens.playlistPanelWidth;
+  static const _panelHeight = Tokens.playlistPanelHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -173,29 +174,32 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                 borderRadius: BorderRadius.circular(Tokens.radiusLarge),
                 border: Border.all(color: Tokens.borderHighlight, width: 1),
               ),
-              child: Column(
-                children: [
-                  // tab 切换
-                  SizedBox(height: 36, child: _buildTabBar()),
-                  // 光条分隔线
-                  Container(
-                    height: 1,
-                    margin: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Colors.transparent,
-                          Tokens.borderHighlight,
-                          Colors.transparent,
-                        ],
+              child: AnimatedBuilder(
+                animation: _selectedTab,
+                builder: (context, _) => Column(
+                  children: [
+                    // tab 切换
+                    SizedBox(height: 36, child: _buildTabBar()),
+                    // 光条分隔线
+                    Container(
+                      height: 1,
+                      margin: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            Tokens.borderHighlight,
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  // 内容
-                  Expanded(child: _buildContent()),
-                ],
+                    // 内容
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
               ),
             ),
           ),
@@ -217,15 +221,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           _TabChip(
             icon: Icons.folder,
             label: l10n.folderTab,
-            selected: _selectedTab == 0,
-            onTap: () => setState(() => _selectedTab = 0),
+            selected: _selectedTab.value == 0,
+            onTap: () => _selectedTab.value = 0,
           ),
           const SizedBox(width: Tokens.spLg),
           _TabChip(
             icon: Icons.history,
             label: l10n.historyTab,
-            selected: _selectedTab == 1,
-            onTap: () => setState(() => _selectedTab = 1),
+            selected: _selectedTab.value == 1,
+            onTap: () => _selectedTab.value = 1,
           ),
         ],
       ),
@@ -236,7 +240,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     final items = widget.playlist.items;
     final currentIndex = widget.playlist.currentIndex;
 
-    if (_selectedTab == 0) {
+    if (_selectedTab.value == 0) {
       return FolderTab(
         items: items,
         currentIndex: currentIndex,

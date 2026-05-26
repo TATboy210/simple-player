@@ -38,6 +38,20 @@ class SpeedButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 静态箭头段 — 速度变化时不重建（StatelessWidget 引用不变）
+    final leftArrow = _Segment(
+      width: 18,
+      icon: Icons.chevron_left,
+      tooltip: l10n.speedDecrease,
+      onTap: () => _shift(-1),
+    );
+    final rightArrow = _Segment(
+      width: 18,
+      icon: Icons.chevron_right,
+      tooltip: l10n.speedIncrease,
+      onTap: () => _shift(1),
+    );
+
     return SizedBox(
       width: 72,
       height: 36,
@@ -55,24 +69,14 @@ class SpeedButton extends StatelessWidget {
                 : speed.toStringAsFixed(2);
             return Row(
               children: [
-                _Segment(
-                  width: 18,
-                  icon: Icons.chevron_left,
-                  tooltip: l10n.speedDecrease,
-                  onTap: () => _shift(-1),
-                ),
+                leftArrow,
                 _Segment(
                   width: 36,
                   label: '${label}x',
                   tooltip: l10n.speedReset,
                   onDoubleTap: _reset,
                 ),
-                _Segment(
-                  width: 18,
-                  icon: Icons.chevron_right,
-                  tooltip: l10n.speedIncrease,
-                  onTap: () => _shift(1),
-                ),
+                rightArrow,
               ],
             );
           },
@@ -105,7 +109,7 @@ class _Segment extends StatelessWidget {
         ? Icon(icon, size: 18, color: Tokens.textPrimary)
         : Text(
             label ?? '',
-            style: TextStyle(
+            style: const TextStyle(
               color: Tokens.textPrimary,
               fontSize: Tokens.fontCaption,
               fontWeight: Tokens.weightMedium,

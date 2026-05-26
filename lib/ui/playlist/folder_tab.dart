@@ -5,6 +5,7 @@ import '../../kernel/scanner/folder_scanner.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/context_menu_row.dart';
 import 'thumbnail_tile.dart';
 
 /// 文件夹分组数据
@@ -27,7 +28,7 @@ class FolderTab extends StatefulWidget {
   final void Function(int originalIndex) onRemoveIndex;
   final void Function(String path)? onShowProperties;
   final void Function(String folderPath, List<PlaylistItem> scanned)?
-      onFolderScanned;
+  onFolderScanned;
 
   const FolderTab({
     super.key,
@@ -44,8 +45,10 @@ class FolderTab extends StatefulWidget {
 }
 
 class _FolderTabState extends State<FolderTab> {
+  static final _pathSeparator = RegExp(r'[/\\]');
   List<_FolderGroup>? _cachedGroups;
   List<PlaylistItem>? _cachedItems;
+  Map<String, int>? _cachedPathIndexMap;
 
   List<_FolderGroup> _getGroups() {
     if (_cachedGroups != null && identical(_cachedItems, widget.items)) {
@@ -53,6 +56,9 @@ class _FolderTabState extends State<FolderTab> {
     }
     _cachedItems = widget.items;
     _cachedGroups = _groupByFolder(widget.items);
+    _cachedPathIndexMap = {
+      for (var i = 0; i < widget.items.length; i++) widget.items[i].path: i,
+    };
     return _cachedGroups!;
   }
 
@@ -71,6 +77,7 @@ class _FolderTabState extends State<FolderTab> {
     }
 
     final groups = _getGroups();
+    final pathIndexMap = _cachedPathIndexMap!;
 
     return ListView.builder(
       scrollDirection: Axis.vertical,
@@ -79,8 +86,9 @@ class _FolderTabState extends State<FolderTab> {
         final group = groups[index];
         final isLast = index == groups.length - 1;
         return _FolderGroupWidget(
+          key: ValueKey(group.folderPath),
           group: group,
-          allItems: widget.items,
+          pathIndexMap: pathIndexMap,
           currentIndex: widget.currentIndex,
           onSelectIndex: widget.onSelectIndex,
           onRemoveIndex: widget.onRemoveIndex,
@@ -95,7 +103,7 @@ class _FolderTabState extends State<FolderTab> {
   static List<_FolderGroup> _groupByFolder(List<PlaylistItem> items) {
     final map = <String, List<PlaylistItem>>{};
     for (final item in items) {
-      final sep = item.path.lastIndexOf(RegExp(r'[/\\]'));
+      final sep = item.path.lastIndexOf(_pathSeparator);
       final folder = sep > 0 ? item.path.substring(0, sep) : item.path;
       map.putIfAbsent(folder, () => []).add(item);
     }
@@ -107,18 +115,19 @@ class _FolderTabState extends State<FolderTab> {
 
 class _FolderGroupWidget extends StatelessWidget {
   final _FolderGroup group;
-  final List<PlaylistItem> allItems;
+  final Map<String, int> pathIndexMap;
   final int currentIndex;
   final void Function(int originalIndex) onSelectIndex;
   final void Function(int originalIndex) onRemoveIndex;
   final void Function(String path)? onShowProperties;
   final void Function(String folderPath, List<PlaylistItem> scanned)?
-      onFolderScanned;
+  onFolderScanned;
   final bool showDivider;
 
   const _FolderGroupWidget({
+    super.key,
     required this.group,
-    required this.allItems,
+    required this.pathIndexMap,
     required this.currentIndex,
     required this.onSelectIndex,
     required this.onRemoveIndex,
@@ -141,25 +150,28 @@ class _FolderGroupWidget extends StatelessWidget {
         ),
         // 水平缩略图列表
         SizedBox(
-          height: 124, // thumbnail(90) + name(28) + padding(6)
+          height: Tokens.thumbnailTileHeight, // thumbnail(90) + name(28) + padding(6)
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
             itemCount: group.items.length,
             itemBuilder: (context, index) {
               final item = group.items[index];
-              final originalIndex = allItems.indexOf(item);
+              final originalIndex = pathIndexMap[item.path] ?? 0;
               return Padding(
                 padding: const EdgeInsets.only(right: Tokens.spSm),
-                child: ThumbnailTile(
-                  item: item,
-                  isCurrent: originalIndex == currentIndex,
-                  onPlay: () => onSelectIndex(originalIndex),
-                  onResume: (item.positionMs ?? 0) > 0
-                      ? () => onSelectIndex(originalIndex)
-                      : null,
-                  onRemove: () => onRemoveIndex(originalIndex),
-                  onShowProperties: onShowProperties,
+                child: RepaintBoundary(
+                  child: ThumbnailTile(
+                    key: ValueKey(item.path),
+                    item: item,
+                    isCurrent: originalIndex == currentIndex,
+                    onPlay: () => onSelectIndex(originalIndex),
+                    onResume: (item.positionMs ?? 0) > 0
+                        ? () => onSelectIndex(originalIndex)
+                        : null,
+                    onRemove: () => onRemoveIndex(originalIndex),
+                    onShowProperties: onShowProperties,
+                  ),
                 ),
               );
             },
@@ -182,9 +194,10 @@ class _FolderGroupWidget extends StatelessWidget {
   void _scanFolder(BuildContext context) {
     final scanned = FolderScanner.scan(group.folderPath);
     if (scanned.isNotEmpty) {
-      onFolderScanned?.call(group.folderPath, scanned
-          .map((vf) => PlaylistItem(path: vf.path))
-          .toList());
+      onFolderScanned?.call(
+        group.folderPath,
+        scanned.map((vf) => PlaylistItem(path: vf.path)).toList(),
+      );
     }
   }
 }
@@ -213,11 +226,7 @@ class _FolderPathLabel extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.folder,
-              size: 14,
-              color: Tokens.textTertiary,
-            ),
+            const Icon(Icons.folder, size: 14, color: Tokens.textTertiary),
             const SizedBox(width: 4),
             Flexible(
               child: Tooltip(
@@ -273,11 +282,11 @@ class _FolderPathLabel extends StatelessWidget {
       items: [
         PopupMenuItem(
           value: 'open',
-          child: _MenuItemRow(Icons.folder_open, l10n.openFileLocation),
+          child: ContextMenuRow(Icons.folder_open, l10n.openFileLocation),
         ),
         PopupMenuItem(
           value: 'scan',
-          child: _MenuItemRow(Icons.refresh, l10n.scanFolder),
+          child: ContextMenuRow(Icons.refresh, l10n.scanFolder),
         ),
       ],
     ).then((value) {
@@ -294,25 +303,3 @@ class _FolderPathLabel extends StatelessWidget {
   }
 }
 
-class _MenuItemRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _MenuItemRow(this.icon, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: Tokens.iconMd, color: Tokens.textSecondary),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Tokens.textPrimary,
-            fontSize: Tokens.fontCaption,
-          ),
-        ),
-      ],
-    );
-  }
-}

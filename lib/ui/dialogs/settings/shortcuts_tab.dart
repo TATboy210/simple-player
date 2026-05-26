@@ -25,10 +25,18 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
   /// 正在录制的动作 ID，null 表示未在录制
   String? _recordingAction;
 
+  final _keyListenerFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
     _loadBindings();
+  }
+
+  @override
+  void dispose() {
+    _keyListenerFocus.dispose();
+    super.dispose();
   }
 
   Future<void> _loadBindings() async {
@@ -93,7 +101,7 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
         // 快捷键列表
         Expanded(
           child: KeyboardListener(
-            focusNode: FocusNode(),
+            focusNode: _keyListenerFocus,
             autofocus: _recordingAction != null,
             onKeyEvent: _onKeyPressed,
             child: SettingsCard(
@@ -186,11 +194,6 @@ List<_ShortcutDef> _shortcutDefs(AppLocalizations l10n) => [
     'subtitleDelayBackward',
     LogicalKeyboardKey.bracketLeft,
     l10n.shortcutSubtitleDelay,
-  ),
-  _ShortcutDef(
-    'aspectCycle',
-    LogicalKeyboardKey.keyA,
-    l10n.shortcutAspectCycle,
   ),
   _ShortcutDef('help', LogicalKeyboardKey.f1, l10n.shortcutHelp),
 ];

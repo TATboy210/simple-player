@@ -64,7 +64,7 @@ class ControlsOverlay extends StatefulWidget {
 }
 
 class _ControlsOverlayState extends State<ControlsOverlay>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late final AutoHideController _autoHide;
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
@@ -148,14 +148,14 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             child: RepaintBoundary(
               child: Stack(
                 children: [
-                  Positioned(
+                  const Positioned(
                     bottom:
                         Tokens.controlBarMarginBottom +
                         Tokens.controlBarHeight +
                         12,
                     left: Tokens.controlBarMarginH,
                     right: Tokens.controlBarMarginH,
-                    child: const OsdOverlay(),
+                    child: OsdOverlay(),
                   ),
                   Positioned(
                     left: Tokens.controlBarMarginH,

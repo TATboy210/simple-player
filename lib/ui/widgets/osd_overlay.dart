@@ -39,7 +39,7 @@ class OsdService {
     String text, {
     IconData? icon,
     double? progress,
-    Duration hold = const Duration(milliseconds: 1200),
+    Duration hold = const Duration(milliseconds: Tokens.osdDefaultHoldMs),
   }) {
     _hideTimer?.cancel();
     _hideTimer = Timer(hold, hide);
@@ -63,7 +63,7 @@ class OsdService {
 class OsdOverlay extends StatelessWidget {
   const OsdOverlay({super.key});
 
-  static const _fadeDuration = Duration(milliseconds: 200);
+  static const _fadeDuration = Duration(milliseconds: Tokens.osdFadeDurationMs);
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +76,7 @@ class OsdOverlay extends StatelessWidget {
             duration: _fadeDuration,
             curve: Curves.easeOut,
             child: msg != null
-                ? Center(child: _OsdBubble(message: msg))
+                ? Center(child: RepaintBoundary(child: _OsdBubble(message: msg)))
                 : const SizedBox.shrink(),
           ),
         );
@@ -106,7 +106,7 @@ class _OsdBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (message.icon != null) ...[
-              Icon(message.icon, size: 22, color: Tokens.textPrimary),
+              Icon(message.icon, size: Tokens.osdIconSize, color: Tokens.textPrimary),
               const SizedBox(width: 8),
             ],
             Text(message.text, style: _textStyle),
@@ -127,7 +127,7 @@ class _MiniProgressBar extends StatelessWidget {
   const _MiniProgressBar({required this.value});
 
   static const _trackColor = Color(0x22FFFFFF);
-  static final _fillAnim = AlwaysStoppedAnimation<Color>(Tokens.accent);
+  static const _fillAnim = AlwaysStoppedAnimation<Color>(Tokens.accent);
 
   @override
   Widget build(BuildContext context) {
