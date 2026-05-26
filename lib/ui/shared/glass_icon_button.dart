@@ -4,6 +4,8 @@ import '../theme/tokens.dart';
 
 /// 毛玻璃风格图标按钮，36x36 Material + InkWell
 class GlassIconButton extends StatelessWidget {
+  static final _radius = BorderRadius.circular(Tokens.radiusBtn);
+
   final IconData? icon;
   final Widget? child;
   final double iconSize;
@@ -38,13 +40,13 @@ class GlassIconButton extends StatelessWidget {
         height: 36,
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+          borderRadius: _radius,
           child: InkWell(
             onTap: onPressed,
             onSecondaryTapUp: onSecondaryTapUp,
             hoverColor: Tokens.bgHover,
             highlightColor: Colors.transparent,
-            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            borderRadius: _radius,
             splashFactory: InkRipple.splashFactory,
             child: Center(child: content),
           ),

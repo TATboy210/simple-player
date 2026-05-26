@@ -68,6 +68,12 @@ class _VolumeButtonState extends State<VolumeButton> {
 
 /// 音量滑块（内联水平条）
 class VolumeSlider extends StatelessWidget {
+  static const _sliderTheme = SliderThemeData(
+    trackHeight: 3,
+    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+    overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
+  );
+
   final MediaEngine engine;
 
   const VolumeSlider({super.key, required this.engine});
@@ -88,11 +94,7 @@ class VolumeSlider extends StatelessWidget {
         child: ValueListenableBuilder<double>(
           valueListenable: engine.volume,
           builder: (_, volume, _) => SliderTheme(
-            data: const SliderThemeData(
-              trackHeight: 3,
-              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
-            ),
+            data: _sliderTheme,
             child: Slider(
               value: volume,
               onChanged: (v) {
