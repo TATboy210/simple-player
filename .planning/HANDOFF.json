@@ -1,41 +1,55 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-25T18:30:00+08:00",
-  "phase": "startup-optimization-v2",
-  "phase_name": "Startup Optimization — State Machine + Progress UI + Lazy Engine",
-  "task": 4,
-  "total_tasks": 6,
+  "timestamp": "2026-05-26T19:30:00+08:00",
+  "phase": "ui-widget-layer-optimization",
+  "phase_name": "UI Widget Layer Over-Rebuild Optimization",
+  "task": "phase2",
+  "total_tasks": "phase2",
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Create StartupState + StartupCoordinator", "status": "done"},
-    {"id": 2, "name": "Create ProgressSplashScreen widget", "status": "done"},
-    {"id": 3, "name": "Wire StartupCoordinator into main.dart and app.dart", "status": "done"},
-    {"id": 4, "name": "Report phases from deferred_player_feature and player_feature", "status": "done"}
+    {"id": 1, "name": "Phase 1: PlayerScreen VLB child params", "status": "done"},
+    {"id": 2, "name": "Phase 1: EmptyState AnimatedBuilder", "status": "done"},
+    {"id": 3, "name": "Phase 1: ProgressBar drag ValueNotifier", "status": "done"},
+    {"id": 4, "name": "Phase 1: GlassButton hover/press ValueNotifier", "status": "done"},
+    {"id": 5, "name": "Phase 1: SpeedButton pre-build static segments", "status": "done"},
+    {"id": 6, "name": "Phase 1: PlaylistPanel tab ValueNotifier", "status": "done"},
+    {"id": 7, "name": "Phase 1: ThumbnailTile split widget", "status": "done"},
+    {"id": 8, "name": "Phase 1: const constructor audit", "status": "done"},
+    {"id": 9, "name": "Phase 2: FocusNode leak fix", "status": "done"},
+    {"id": 10, "name": "Phase 2: ListView ValueKey", "status": "done"},
+    {"id": 11, "name": "Phase 2: OSD + EmptyState RepaintBoundary", "status": "done"},
+    {"id": 12, "name": "Phase 2: GlassButton resize default + TickerProvider", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "Lazy FvpEngine player creation", "status": "not_started", "priority": "P1", "impact": "50-150ms"},
-    {"id": 6, "name": "EnginePrewarm tier tracking + PlaylistStore isolate", "status": "not_started", "priority": "P2", "impact": "5-20ms"}
+    {"id": 13, "name": "Manual verification with DevTools", "status": "not_started"},
+    {"id": 14, "name": "git commit all changes", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [
-    {"action": "运行 flutter run -d windows 验证进度条 Splash", "blocking": false},
-    {"action": "Task #5 需要读 fvp_engine.dart 全文确认 20+ _player 引用", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "FFI 对象不能跨 Isolate", "rationale": "Dart VM 限制，mdk.Player()/RustLib.init()/SharedPreferences 全部绑定主 Isolate"},
-    {"decision": "Splash 由 App 层统一驱动", "rationale": "移除 DeferredPlayerFeature 中的重复 SplashScreen，通过 StartupCoordinator 广播"},
-    {"decision": "AnimatedSwitcher 300ms fade", "rationale": "splash → MaterialApp 平滑过渡"},
-    {"decision": "FvpEngine 懒加载 _player", "rationale": "mdk.Player() 从构造函数延迟到 open()，节省 50-150ms"}
+    {"decision": "ValueNotifier+AnimatedBuilder replaces bool+setState", "rationale": "Avoids rebuilding entire widget subtree on interaction state changes"},
+    {"decision": "child parameter on VLB/AnimatedBuilder hoists static subtrees", "rationale": "Flutter skips subtree when same widget instance returned"},
+    {"decision": "GlassButton respectResizeState defaults to true", "rationale": "Standalone usage should skip BackdropFilter during resize"},
+    {"decision": "RepaintBoundary on AnimatedBuilder subtrees", "rationale": "Caches rasterized output so animation frames only composite"}
   ],
   "uncommitted_files": [
-    "lib/kernel/startup/startup_state.dart",
-    "lib/kernel/startup/startup_coordinator.dart",
-    "lib/ui/shared/progress_splash_screen.dart",
-    "lib/main.dart",
-    "lib/app.dart",
-    "lib/features/player/deferred_player_feature.dart",
-    "lib/features/player/player_feature.dart"
+    "analysis_options.yaml",
+    "lib/ui/player/player_screen.dart",
+    "lib/ui/shared/empty_state.dart",
+    "lib/ui/player/progress_bar.dart",
+    "lib/ui/shared/glass_container.dart",
+    "lib/ui/player/speed_button.dart",
+    "lib/ui/playlist/playlist_panel.dart",
+    "lib/ui/playlist/thumbnail_tile.dart",
+    "lib/ui/dialogs/settings/about_tab.dart",
+    "lib/ui/player/drop_handler.dart",
+    "lib/ui/widgets/osd_overlay.dart",
+    "lib/ui/player/controls_overlay.dart",
+    "lib/ui/player/control_bar.dart",
+    "lib/ui/dialogs/settings/shortcuts_tab.dart",
+    "lib/ui/playlist/folder_tab.dart",
+    "lib/ui/playlist/history_tab.dart"
   ],
-  "next_action": "Task #5: Read fvp_engine.dart, change eager mdk.Player() to lazy _playerInstance with _createPlayer() factory",
-  "context_notes": "Phase 1 (Opt 2+5) 完成: 状态机 + 进度 Splash + 全链路上报。Phase 2 (Opt 1/3/4) 待做: lazy FvpEngine 最大收益 50-150ms。flutter analyze 零错误。"
+  "next_action": "flutter run -d windows to verify with DevTools, then git commit",
+  "context_notes": "Phase 1 (8 phases) + Phase 2 (6 fixes) complete. All 16 files pass flutter analyze. Awaiting manual verification."
 }
