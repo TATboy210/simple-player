@@ -1,55 +1,45 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-26T19:30:00+08:00",
-  "phase": "ui-widget-layer-optimization",
-  "phase_name": "UI Widget Layer Over-Rebuild Optimization",
-  "task": "phase2",
-  "total_tasks": "phase2",
+  "timestamp": "2026-05-26T21:30:00+08:00",
+  "phase": "ui-widget-layer-redesign",
+  "phase_name": "UI Widget Layer Redesign",
+  "task": "design-complete",
+  "total_tasks": "implementation-pending",
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Phase 1: PlayerScreen VLB child params", "status": "done"},
-    {"id": 2, "name": "Phase 1: EmptyState AnimatedBuilder", "status": "done"},
-    {"id": 3, "name": "Phase 1: ProgressBar drag ValueNotifier", "status": "done"},
-    {"id": 4, "name": "Phase 1: GlassButton hover/press ValueNotifier", "status": "done"},
-    {"id": 5, "name": "Phase 1: SpeedButton pre-build static segments", "status": "done"},
-    {"id": 6, "name": "Phase 1: PlaylistPanel tab ValueNotifier", "status": "done"},
-    {"id": 7, "name": "Phase 1: ThumbnailTile split widget", "status": "done"},
-    {"id": 8, "name": "Phase 1: const constructor audit", "status": "done"},
-    {"id": 9, "name": "Phase 2: FocusNode leak fix", "status": "done"},
-    {"id": 10, "name": "Phase 2: ListView ValueKey", "status": "done"},
-    {"id": 11, "name": "Phase 2: OSD + EmptyState RepaintBoundary", "status": "done"},
-    {"id": 12, "name": "Phase 2: GlassButton resize default + TickerProvider", "status": "done"}
+    {"id": 1, "name": "Phase 1+2 optimization commit d9adab6", "status": "done"},
+    {"id": 2, "name": "Phase 2 additional optimizations (4 files)", "status": "done", "progress": "uncommitted"},
+    {"id": 3, "name": "Brainstorming: explore 44 UI files", "status": "done"},
+    {"id": 4, "name": "Brainstorming: propose 3 approaches", "status": "done"},
+    {"id": 5, "name": "Brainstorming: design spec approved", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 13, "name": "Manual verification with DevTools", "status": "not_started"},
-    {"id": 14, "name": "git commit all changes", "status": "not_started"}
+    {"id": 6, "name": "Invoke writing-plans for implementation plan", "status": "not_started"},
+    {"id": 7, "name": "Execute: glass.dart consolidation", "status": "not_started"},
+    {"id": 8, "name": "Execute: player_controls.dart (no BackdropFilter)", "status": "not_started"},
+    {"id": 9, "name": "Execute: player_screen.dart (PlayerConfig)", "status": "not_started"},
+    {"id": 10, "name": "Execute: playlist_panel.dart merge", "status": "not_started"},
+    {"id": 11, "name": "Execute: settings_panel.dart merge", "status": "not_started"},
+    {"id": 12, "name": "Delete ~26 redundant files", "status": "not_started"},
+    {"id": 13, "name": "Verify: flutter analyze + flutter run", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "ValueNotifier+AnimatedBuilder replaces bool+setState", "rationale": "Avoids rebuilding entire widget subtree on interaction state changes"},
-    {"decision": "child parameter on VLB/AnimatedBuilder hoists static subtrees", "rationale": "Flutter skips subtree when same widget instance returned"},
-    {"decision": "GlassButton respectResizeState defaults to true", "rationale": "Standalone usage should skip BackdropFilter during resize"},
-    {"decision": "RepaintBoundary on AnimatedBuilder subtrees", "rationale": "Caches rasterized output so animation frames only composite"}
+    {"decision": "Approach A: Layered Refactoring", "rationale": "User chose over data-flow-driven and from-scratch approaches"},
+    {"decision": "Minimalist ~18 files", "rationale": "Delete all single-use utilities, merge similar components"},
+    {"decision": "动静分离: no BackdropFilter over video", "rationale": "Desktop GPU readback expensive; only use in independent floating windows"},
+    {"decision": "PlayerScreen 14 params → PlayerActions object", "rationale": "Eliminate god-widget anti-pattern"},
+    {"decision": "Glass consolidation: 3 files → 1 glass.dart", "rationale": "GlassContainer+GlassButton+GlassIconButton redundant"},
+    {"decision": "Delete manual caching patterns", "rationale": "Trust Flutter identical() optimization, use const+child pattern"}
   ],
   "uncommitted_files": [
-    "analysis_options.yaml",
-    "lib/ui/player/player_screen.dart",
-    "lib/ui/shared/empty_state.dart",
-    "lib/ui/player/progress_bar.dart",
-    "lib/ui/shared/glass_container.dart",
+    "lib/ui/shared/glass_icon_button.dart",
     "lib/ui/player/speed_button.dart",
-    "lib/ui/playlist/playlist_panel.dart",
-    "lib/ui/playlist/thumbnail_tile.dart",
-    "lib/ui/dialogs/settings/about_tab.dart",
-    "lib/ui/player/drop_handler.dart",
-    "lib/ui/widgets/osd_overlay.dart",
     "lib/ui/player/controls_overlay.dart",
-    "lib/ui/player/control_bar.dart",
-    "lib/ui/dialogs/settings/shortcuts_tab.dart",
-    "lib/ui/playlist/folder_tab.dart",
-    "lib/ui/playlist/history_tab.dart"
+    "lib/ui/player/volume_controls.dart",
+    "docs/superpowers/specs/2026-05-26-ui-widget-layer-redesign.md"
   ],
-  "next_action": "flutter run -d windows to verify with DevTools, then git commit",
-  "context_notes": "Phase 1 (8 phases) + Phase 2 (6 fixes) complete. All 16 files pass flutter analyze. Awaiting manual verification."
+  "next_action": "Commit uncommitted files, then invoke writing-plans skill for implementation plan",
+  "context_notes": "Brainstorming complete. Design spec approved. User wants all 44 UI files rewritten with minimalist approach. Key insight: previous optimization was surface-level patching. Now doing architectural redesign."
 }

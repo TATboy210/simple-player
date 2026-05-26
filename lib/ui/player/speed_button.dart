@@ -87,6 +87,8 @@ class SpeedButton extends StatelessWidget {
 }
 
 class _Segment extends StatelessWidget {
+  static final _radius = BorderRadius.circular(Tokens.radiusBtn);
+
   final double width;
   final IconData? icon;
   final String? label;
@@ -127,12 +129,12 @@ class _Segment extends StatelessWidget {
           height: 36,
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            borderRadius: _radius,
             child: InkWell(
               onTap: onTap,
               hoverColor: Tokens.bgHover,
               highlightColor: Colors.transparent,
-              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+              borderRadius: _radius,
               splashFactory: InkRipple.splashFactory,
               child: Center(child: child),
             ),

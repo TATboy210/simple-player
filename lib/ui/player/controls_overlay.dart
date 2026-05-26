@@ -69,6 +69,75 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
 
+  // ControlBar 缓存 — 仅在视觉属性变化时重建，避免回调变化触发级联刷新
+  ControlBar? _cachedBar;
+  MediaEngine? _cachedEngine;
+  bool? _cachedIsFullscreen;
+  bool? _cachedIsIdle;
+  bool? _cachedIsVideo;
+  bool? _cachedEmptyStatePresent;
+  IconData? _cachedPlayModeIcon;
+  String? _cachedPlayModeLabel;
+
+  ControlBar _buildCachedBar({
+    required MediaEngine engine,
+    required bool isFullscreen,
+    required bool isIdle,
+    required bool isVideo,
+    required bool emptyStatePresent,
+    VoidCallback? onPrevious,
+    VoidCallback? onNext,
+    VoidCallback? onTogglePlaylist,
+    VoidCallback? onSettings,
+    void Function(BuildContext, TapUpDetails)? onSettingsSecondary,
+    VoidCallback? onOpenFile,
+    VoidCallback? onToggleFullscreen,
+    VoidCallback? onTogglePlayMode,
+    VoidCallback? onOpenSubtitle,
+    IconData? playModeIcon,
+    String? playModeLabel,
+    Animation<double>? opacity,
+    required bool enableBlur,
+  }) {
+    final needsRebuild = _cachedBar == null ||
+        !identical(engine, _cachedEngine) ||
+        isFullscreen != _cachedIsFullscreen ||
+        isIdle != _cachedIsIdle ||
+        isVideo != _cachedIsVideo ||
+        emptyStatePresent != _cachedEmptyStatePresent ||
+        playModeIcon != _cachedPlayModeIcon ||
+        playModeLabel != _cachedPlayModeLabel;
+    if (needsRebuild) {
+      _cachedEngine = engine;
+      _cachedIsFullscreen = isFullscreen;
+      _cachedIsIdle = isIdle;
+      _cachedIsVideo = isVideo;
+      _cachedEmptyStatePresent = emptyStatePresent;
+      _cachedPlayModeIcon = playModeIcon;
+      _cachedPlayModeLabel = playModeLabel;
+      _cachedBar = ControlBar(
+        engine: engine,
+        isFullscreen: isFullscreen,
+        isIdle: isIdle,
+        isVideo: isVideo,
+        onPrevious: onPrevious,
+        onNext: onNext,
+        onTogglePlaylist: onTogglePlaylist,
+        onSettings: onSettings,
+        onSettingsSecondary: onSettingsSecondary,
+        onOpenFile: onOpenFile,
+        onToggleFullscreen: onToggleFullscreen,
+        onTogglePlayMode: onTogglePlayMode,
+        onOpenSubtitle: onOpenSubtitle,
+        playModeIcon: playModeIcon,
+        playModeLabel: playModeLabel,
+        opacity: opacity,
+        enableBlur: enableBlur,
+      );
+    }
+    return _cachedBar!;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -163,10 +232,12 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                     bottom: Tokens.controlBarMarginBottom,
                     child: FadeTransition(
                       opacity: _autoHide.opacity,
-                      child: ControlBar(
+                      child: _buildCachedBar(
                         engine: widget.engine,
                         isFullscreen: widget.isFullscreen,
                         isIdle: isIdle,
+                        isVideo: widget.isVideo,
+                        emptyStatePresent: widget.emptyStatePresent,
                         onPrevious: widget.onPrevious,
                         onNext: widget.onNext,
                         onTogglePlaylist: widget.onTogglePlaylist,
@@ -178,9 +249,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         onOpenSubtitle: widget.onOpenSubtitle,
                         playModeIcon: widget.playModeIcon,
                         playModeLabel: widget.playModeLabel,
-                        isVideo: widget.isVideo,
-                        enableBlur: _autoHide.visible.value,
                         opacity: _autoHide.opacity,
+                        enableBlur: _autoHide.visible.value,
                       ),
                     ),
                   ),
