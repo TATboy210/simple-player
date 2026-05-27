@@ -157,7 +157,7 @@ class _VideoSliderState extends State<_VideoSlider> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: Tokens.durationFast),
-        height: 42,
+        height: Tokens.sliderHeight,
         padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
         decoration: BoxDecoration(
           color: _hovered ? Tokens.bgHover : Colors.transparent,
@@ -166,7 +166,7 @@ class _VideoSliderState extends State<_VideoSlider> {
         child: Row(
           children: [
             SizedBox(
-              width: 64,
+              width: Tokens.sliderLabelWidth,
               child: Text(
                 widget.label,
                 style: const TextStyle(
@@ -199,7 +199,7 @@ class _VideoSliderState extends State<_VideoSlider> {
               ),
             ),
             SizedBox(
-              width: 36,
+              width: Tokens.sliderValueWidth,
               child: Text(
                 '${(_effectiveValue * 100).round()}',
                 textAlign: TextAlign.right,
@@ -301,5 +301,6 @@ class _BoolNotifier extends ValueNotifier<bool> {
   @override
   set value(bool newValue) {
     _onChanged(newValue);
+    super.value = newValue;
   }
 }

@@ -60,60 +60,55 @@ class CenterGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: isIdle ? 0.20 : 1.0),
-      duration: const Duration(milliseconds: Tokens.durationFade),
-      curve: Curves.easeOut,
-      builder: (context, alpha, _) {
-        final dimmed = Tokens.textPrimary.withValues(
-          alpha: Tokens.textPrimary.a * alpha,
-        );
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GlassIconButton(
-              icon: Icons.skip_previous,
-              color: dimmed,
-              onPressed: isIdle ? null : onPrevious,
-              tooltip: prevTooltip,
-            ),
-            const SizedBox(width: Tokens.spXs),
-            GlassIconButton(
-              icon: Icons.replay_10,
-              color: dimmed,
-              onPressed: isIdle ? null : () => engine.skipBack(10),
-              tooltip: AppLocalizations.of(context).rewind10,
-            ),
-            const SizedBox(width: Tokens.spSm),
-            PlayPauseButton(
-              engine: engine,
-              isIdle: isIdle,
-              iconAlpha: alpha,
-            ),
-            const SizedBox(width: Tokens.spSm),
-            GlassIconButton(
-              icon: Icons.forward_30,
-              color: dimmed,
-              onPressed: isIdle ? null : () => engine.skipForward(30),
-              tooltip: AppLocalizations.of(context).forward30,
-            ),
-            const SizedBox(width: Tokens.spXs),
-            GlassIconButton(
-              icon: Icons.skip_next,
-              color: dimmed,
-              onPressed: isIdle ? null : onNext,
-              tooltip: nextTooltip,
-            ),
-            const SizedBox(width: Tokens.spXs),
-            GlassIconButton(
-              icon: Icons.stop,
-              color: dimmed,
-              onPressed: isIdle ? null : engine.stop,
-              tooltip: AppLocalizations.of(context).stop,
-            ),
-          ],
-        );
-      },
+    final dimmed = isIdle
+        ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
+        : Tokens.textPrimary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GlassIconButton(
+          icon: Icons.skip_previous,
+          color: dimmed,
+          onPressed: isIdle ? null : onPrevious,
+          tooltip: prevTooltip,
+        ),
+        const SizedBox(width: Tokens.spXs),
+        GlassIconButton(
+          icon: Icons.replay_10,
+          color: dimmed,
+          onPressed: isIdle ? null : () => engine.skipBack(Tokens.skipSecondsShort),
+          tooltip: AppLocalizations.of(context).rewind10,
+        ),
+        const SizedBox(width: Tokens.spSm),
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: isIdle ? 0.20 : 1.0),
+          duration: const Duration(milliseconds: Tokens.durationFade),
+          curve: Curves.easeOut,
+          builder: (context, alpha, _) =>
+              PlayPauseButton(engine: engine, isIdle: isIdle, iconAlpha: alpha),
+        ),
+        const SizedBox(width: Tokens.spSm),
+        GlassIconButton(
+          icon: Icons.forward_30,
+          color: dimmed,
+          onPressed: isIdle ? null : () => engine.skipForward(Tokens.skipSecondsLong),
+          tooltip: AppLocalizations.of(context).forward30,
+        ),
+        const SizedBox(width: Tokens.spXs),
+        GlassIconButton(
+          icon: Icons.skip_next,
+          color: dimmed,
+          onPressed: isIdle ? null : onNext,
+          tooltip: nextTooltip,
+        ),
+        const SizedBox(width: Tokens.spXs),
+        GlassIconButton(
+          icon: Icons.stop,
+          color: dimmed,
+          onPressed: isIdle ? null : engine.stop,
+          tooltip: AppLocalizations.of(context).stop,
+        ),
+      ],
     );
   }
 }

@@ -10,5 +10,6 @@
     "editor.suggestSelection": "recentlyUsed",
     "editor.tabCompletion": "onlySnippets",
     "editor.wordBasedSuggestions": "off"
-  }
+  },
+  "cmake.sourceDirectory": "D:/simple_player_flutter/linux"
 }

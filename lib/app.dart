@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'kernel/persistence/settings_store.dart';
+import 'kernel/engine/media_engine.dart';
+import 'kernel/services/locale_service.dart';
+import 'kernel/services/theme_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
 import 'features/player/deferred_player_feature.dart';
+import 'features/player/services/video_processing_service.dart';
 import 'ui/dialogs/settings_panel.dart';
 import 'ui/shared/progress_splash_screen.dart';
 import 'l10n/app_localizations.dart';
@@ -23,14 +26,6 @@ class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> {
-  static const _accents = [
-    Color(0xFF2C58F4), // Midnight
-    Color(0xFF00B4D8), // Ocean
-    Color(0xFF2D6A4F), // Forest
-  ];
-
-  final ValueNotifier<Locale> _locale = ValueNotifier(const Locale('zh'));
-  final ValueNotifier<int> _themeIndex = ValueNotifier(0);
   bool _ready = false;
 
   @override
@@ -47,14 +42,8 @@ class _AppState extends State<App> {
     );
     try {
       await Future.wait([
-        SettingsStore.loadLocale().then((code) {
-          _locale.value = Locale(code);
-          return code;
-        }),
-        SettingsStore.loadThemeIndex().then((index) {
-          _themeIndex.value = index;
-          return index;
-        }),
+        LocaleService.I.init(),
+        ThemeService.I.init(),
       ]);
     } on Exception catch (e) {
       debugPrint('[App] settings load failed (continuing): $e');
@@ -63,43 +52,18 @@ class _AppState extends State<App> {
     if (mounted) setState(() => _ready = true);
   }
 
-  @override
-  void dispose() {
-    _locale.dispose();
-    _themeIndex.dispose();
-    super.dispose();
-  }
-
-  static ThemeData _buildTheme(int themeIndex) {
-    final accent = _accents[themeIndex.clamp(0, _accents.length - 1)];
-    return ThemeData.dark().copyWith(
-      colorScheme: ColorScheme.dark(primary: accent, secondary: accent),
-    );
-  }
-
   void _showSettingsPanel(
     BuildContext context,
-    dynamic engine,
-    dynamic videoProcessing,
+    Object? engine,
+    Object? videoProcessing,
   ) {
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.transparent,
       builder: (dialogCtx) => SettingsPanel(
-        engine: engine,
-        videoProcessing: videoProcessing,
-        onLocaleChanged: (code) {
-          _locale.value = Locale(code);
-          SettingsStore.saveLocale(code);
-        },
-        onThemeChanged: (index) {
-          _themeIndex.value = index;
-          SettingsStore.saveThemeIndex(index);
-        },
-        onShortcutsChanged: (bindings) {
-          SettingsStore.saveShortcuts(bindings);
-        },
+        engine: engine as MediaEngine,
+        videoProcessing: videoProcessing as VideoProcessingService?,
       ),
     );
   }
@@ -109,7 +73,8 @@ class _AppState extends State<App> {
     final currentAccent = Theme.of(barCtx).colorScheme.primary;
 
     final themeNames = [l10n.themeMidnight, l10n.themeOcean, l10n.themeForest];
-    final currentThemeIdx = _accents.indexWhere((c) => c == currentAccent);
+    final currentThemeIdx =
+        ThemeService.accents.indexWhere((c) => c == currentAccent);
 
     final overlay = Overlay.of(barCtx).context.findRenderObject()! as RenderBox;
     final pos = overlay.globalToLocal(tap.globalPosition);
@@ -133,19 +98,13 @@ class _AppState extends State<App> {
         ),
         _QuickMenuItem(
           label: '中文',
-          selected: _locale.value == const Locale('zh'),
-          onTap: () {
-            _locale.value = const Locale('zh');
-            SettingsStore.saveLocale('zh');
-          },
+          selected: LocaleService.I.locale.value == const Locale('zh'),
+          onTap: () => LocaleService.I.setLocale('zh'),
         ),
         _QuickMenuItem(
           label: 'English',
-          selected: _locale.value == const Locale('en'),
-          onTap: () {
-            _locale.value = const Locale('en');
-            SettingsStore.saveLocale('en');
-          },
+          selected: LocaleService.I.locale.value == const Locale('en'),
+          onTap: () => LocaleService.I.setLocale('en'),
         ),
         const PopupMenuDivider(height: 1),
         PopupMenuItem(
@@ -156,14 +115,11 @@ class _AppState extends State<App> {
             style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 11),
           ),
         ),
-        for (var i = 0; i < _accents.length; i++)
+        for (var i = 0; i < ThemeService.accents.length; i++)
           _QuickMenuItem(
             label: themeNames[i],
             selected: i == currentThemeIdx,
-            onTap: () {
-              _themeIndex.value = i;
-              SettingsStore.saveThemeIndex(i);
-            },
+            onTap: () => ThemeService.I.setTheme(i),
           ),
       ],
     );
@@ -181,26 +137,23 @@ class _AppState extends State<App> {
       );
     }
 
-    return ValueListenableBuilder<int>(
-      valueListenable: _themeIndex,
-      builder: (context, themeIdx, _) => ValueListenableBuilder<Locale>(
-        valueListenable: _locale,
-        builder: (context, locale, _) => AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: MaterialApp(
-            key: const ValueKey('material-app'),
-            locale: locale,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-            debugShowCheckedModeBanner: false,
-            theme: _buildTheme(themeIdx),
-            home: DeferredPlayerFeature(
-              coordinator: widget.coordinator,
-              onSettings: (ctx, engine, videoProcessing) =>
-                  _showSettingsPanel(ctx, engine, videoProcessing),
-              onSettingsSecondary: _showSettingsQuickMenu,
-            ),
+    return AnimatedTheme(
+      data: ThemeService.I.currentTheme,
+      duration: const Duration(milliseconds: 250),
+      child: ValueListenableBuilder<Locale>(
+        valueListenable: LocaleService.I.locale,
+        builder: (context, locale, _) => MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+          debugShowCheckedModeBanner: false,
+          theme: ThemeService.I.currentTheme,
+          home: DeferredPlayerFeature(
+            coordinator: widget.coordinator,
+            onSettings: (ctx, engine, videoProcessing) =>
+                _showSettingsPanel(ctx, engine, videoProcessing),
+            onSettingsSecondary: _showSettingsQuickMenu,
           ),
         ),
       ),

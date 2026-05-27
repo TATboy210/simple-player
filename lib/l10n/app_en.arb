@@ -313,9 +313,6 @@
   "@pressKeyToBind": { "description": "Hint shown when waiting for user to press a key for binding" },
   "shortcutConflict": "Key already bound",
   "@shortcutConflict": { "description": "Warning when a key is already assigned to another action" },
-  "shortcutAspectCycle": "Cycle Aspect Ratio",
-  "@shortcutAspectCycle": { "description": "Shortcut label for cycling aspect ratio" },
-
   "currentTheme": "Theme",
   "@currentTheme": { "description": "Quick menu label for current theme section" },
 
@@ -324,5 +321,8 @@
   "cancel": "Cancel",
   "@cancel": { "description": "Cancel button" },
   "apply": "Apply",
-  "@apply": { "description": "Apply button - save without closing" }
+  "@apply": { "description": "Apply button - save without closing" },
+
+  "playerLoadError": "Failed to load player module",
+  "@playerLoadError": { "description": "Error message when deferred player module fails to load" }
 }

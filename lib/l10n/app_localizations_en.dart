@@ -430,9 +430,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutConflict => 'Key already bound';
 
   @override
-  String get shortcutAspectCycle => 'Cycle Aspect Ratio';
-
-  @override
   String get currentTheme => 'Theme';
 
   @override
@@ -443,4 +440,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apply => 'Apply';
+
+  @override
+  String get playerLoadError => 'Failed to load player module';
 }

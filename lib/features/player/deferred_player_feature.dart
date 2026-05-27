@@ -11,14 +11,16 @@ import '../../l10n/app_localizations.dart';
 /// 在首次 build 时异步加载播放器模块库。
 /// 加载期间通过 StartupCoordinator 上报进度（Splash 已在 App 层驱动）。
 ///
-/// 回调参数使用 dynamic 以避免 eager 导入 FvpEngine 等重型类型。
-/// 实际类型由 PlayerFeature 内部保证，SettingsPanel 内部也有正确的类型约束。
+/// 回调参数使用 Object? 以避免 eager 导入 FvpEngine 等重型类型。
+/// Object? 比 dynamic 更 AOT 友好（避免运行时方法分发），
+/// 且强制显式 cast（防止隐式成员访问编译通过但运行时崩溃）。
+/// 实际类型由 PlayerFeature 内部保证，Dart 函数协变保证类型安全传递。
 class DeferredPlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
   final void Function(
     BuildContext context,
-    dynamic engine,
-    dynamic videoProcessing,
+    Object? engine,
+    Object? videoProcessing,
   )
   onSettings;
   final void Function(BuildContext barCtx, TapUpDetails details)
@@ -59,8 +61,8 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
         'Player module loaded',
       );
       if (mounted) setState(() => _loaded = true);
-    } catch (e) {
-      debugPrint('[DeferredPlayerFeature] loadLibrary failed: $e');
+    } catch (e, stackTrace) {
+      debugPrint('[DeferredPlayerFeature] loadLibrary failed: $e\n$stackTrace');
       if (mounted) setState(() => _error = true);
     }
   }

@@ -25,6 +25,10 @@ class StartupCoordinator {
   final _stopwatch = Stopwatch();
   final _phaseTimestamps = <StartupPhase, int>{};
 
+  // ── 逐阶段独立计时 ──
+  final _phaseWatches = <StartupPhase, Stopwatch>{};
+  final _phaseDurations = <StartupPhase, Duration>{};
+
   /// 当前启动状态
   ValueNotifier<StartupState> get state => _state;
 
@@ -36,6 +40,15 @@ class StartupCoordinator {
   void report(StartupPhase phase, double progress, String message) {
     if (!_phaseTimestamps.containsKey(phase)) {
       _phaseTimestamps[phase] = _stopwatch.elapsedMilliseconds;
+    }
+    // 阶段开始时启动独立 Stopwatch
+    if (progress == 0.0 && !_phaseWatches.containsKey(phase)) {
+      _phaseWatches[phase] = Stopwatch()..start();
+    }
+    // 阶段完成时记录耗时
+    if (progress >= 1.0 && _phaseWatches.containsKey(phase)) {
+      _phaseWatches[phase]!.stop();
+      _phaseDurations[phase] = _phaseWatches[phase]!.elapsed;
     }
     _state.value = StartupState(
       phase: phase,
@@ -56,19 +69,27 @@ class StartupCoordinator {
     _logTimeline();
   }
 
-  /// 输出各阶段耗时日志
+  /// 输出逐阶段结构化耗时日志
   void _logTimeline() {
-    final total = _stopwatch.elapsedMilliseconds;
-    debugPrint('[Startup] completed in ${total}ms');
-    var prev = 0;
+    debugPrint('━━━ Startup Timeline ━━━');
     for (final phase in StartupPhase.values) {
-      final ts = _phaseTimestamps[phase];
-      if (ts != null) {
-        final delta = ts - prev;
-        debugPrint('  ${phase.name}: +${delta}ms (at ${ts}ms)');
-        prev = ts;
+      if (phase == StartupPhase.ready) continue;
+      final duration = _phaseDurations[phase];
+      if (duration != null) {
+        final ms = duration.inMicroseconds / 1000;
+        debugPrint('  ✓ ${phase.name.padRight(16)} ${ms.toStringAsFixed(1)}ms');
+      } else if (_phaseTimestamps.containsKey(phase)) {
+        debugPrint('  ○ ${phase.name.padRight(16)} (no duration)');
+      } else {
+        debugPrint('  ○ ${phase.name.padRight(16)} (skipped)');
       }
     }
+    final total = _stopwatch.elapsed;
+    debugPrint('  ────────────────────────');
+    debugPrint(
+      '  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms',
+    );
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   void dispose() {

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../window/window_service.dart';
 import '../shared/resize_notifier.dart';
-import '../../kernel/window/aspect_ratio_service.dart';
 import '../theme/tokens.dart';
 
 /// 自定义标题栏 — 毛玻璃 + 拖拽 + 窗口控制
@@ -58,7 +57,7 @@ class CustomTitleBar extends StatelessWidget {
               ),
             ),
           const Spacer(),
-          const TitleBarControls(),
+          const _TitleBarControls(),
         ],
       ),
     );
@@ -75,8 +74,8 @@ class CustomTitleBar extends StatelessWidget {
 /// 标题栏控制按钮组 — Pin / Minimize / Maximize / Close
 ///
 /// resize 时通过 IgnorePointer 统一禁用所有按钮交互。
-class TitleBarControls extends StatelessWidget {
-  const TitleBarControls({super.key});
+class _TitleBarControls extends StatelessWidget {
+  const _TitleBarControls();
 
   @override
   Widget build(BuildContext context) {
@@ -91,18 +90,6 @@ class TitleBarControls extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Aspect ratio cycle (visible when ratio is locked)
-          ValueListenableBuilder<double>(
-            valueListenable: AspectRatioService.I.ratioNotifier,
-            builder: (_, ratio, _) {
-              if (ratio <= 0) return const SizedBox.shrink();
-              return _TitleBarButton(
-                icon: Icons.aspect_ratio,
-                tooltip: _aspectRatioLabel(ratio, l10n),
-                onPressed: () => AspectRatioService.I.cycleRatio(),
-              );
-            },
-          ),
           // Pin (always on top)
           ValueListenableBuilder<bool>(
             valueListenable: ws.state.alwaysOnTop,
@@ -142,17 +129,9 @@ class TitleBarControls extends StatelessWidget {
   }
 }
 
-/// 宽高比标签本地化 — 标准比例用 l10n key，数值比例用 fallback
-String _aspectRatioLabel(double ratio, AppLocalizations l10n) {
-  if ((ratio - 16.0 / 9.0).abs() < 0.01) return '16:9';
-  if ((ratio - 4.0 / 3.0).abs() < 0.01) return '4:3';
-  if ((ratio - 21.0 / 9.0).abs() < 0.01) return '21:9';
-  return '${ratio.toStringAsFixed(2)}:1';
-}
-
 /// 标题栏按钮 — 46×36，hover 高亮，close hover = danger 红底
 ///
-/// resize 期间由父级 TitleBarControls 的 IgnorePointer 统一禁用，
+/// resize 期间由父级 _TitleBarControls 的 IgnorePointer 统一禁用，
 /// 按钮自身不再监听 isResizing。
 class _TitleBarButton extends StatefulWidget {
   final IconData icon;

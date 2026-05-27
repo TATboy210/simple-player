@@ -114,9 +114,14 @@ class StateMonitor {
       );
       _rt.savePlaylist();
     }
-    unawaited(SettingsStore.saveVolume(_rt.engine.volume.value));
-    unawaited(SettingsStore.saveIsMuted(_rt.engine.isMuted.value));
-    unawaited(SettingsStore.savePlayMode(_rt.playlist.mode.index));
-    unawaited(PlaylistStore.dispose());
+    unawaited(SettingsStore.saveVolume(_rt.engine.volume.value)
+        .catchError((e) => debugPrint('SettingsStore.saveVolume failed: $e')));
+    unawaited(SettingsStore.saveIsMuted(_rt.engine.isMuted.value)
+        .catchError((e) => debugPrint('SettingsStore.saveIsMuted failed: $e')));
+    unawaited(SettingsStore.savePlayMode(_rt.playlist.mode.index)
+        .catchError((e) => debugPrint('SettingsStore.savePlayMode failed: $e')));
+    unawaited(PlaylistStore.dispose().catchError((e) {
+      debugPrint('PlaylistStore.dispose failed: $e');
+    }));
   }
 }

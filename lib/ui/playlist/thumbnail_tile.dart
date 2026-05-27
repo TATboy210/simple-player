@@ -15,9 +15,9 @@ import '../shared/context_menu_row.dart';
 /// StatelessWidget — 静态布局（label、breakpoint、border）不随加载状态重建。
 /// 图片加载隔离到内部 [_ThumbnailImage]。
 class ThumbnailTile extends StatelessWidget {
-  static const _tileWidth = 160.0;
+  static const tileWidth = 160.0;
   static const _aspectRatio = 16.0 / 9.0;
-  static const _thumbHeight = _tileWidth / _aspectRatio;
+  static const _thumbHeight = tileWidth / _aspectRatio;
   static const _nameHeight = 28.0;
 
   final PlaylistItem item;
@@ -50,7 +50,7 @@ class ThumbnailTile extends StatelessWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: SizedBox(
-          width: _tileWidth,
+          width: tileWidth,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -66,7 +66,7 @@ class ThumbnailTile extends StatelessWidget {
 
   Widget _buildThumbnail(bool hasBreakpoint) {
     return Container(
-      width: _tileWidth,
+      width: tileWidth,
       height: _thumbHeight,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(Tokens.radiusSm),
@@ -257,8 +257,12 @@ class _ThumbnailImageState extends State<_ThumbnailImage> {
       );
     }
     if (_thumbnail != null) {
+      // ResizeImage: 按逻辑像素×设备像素比解码，避免全分辨率解码浪费内存
+      final dpr = MediaQuery.devicePixelRatioOf(context);
+      final cacheW = (ThumbnailTile.tileWidth * dpr).round();
+      final resized = ResizeImage.resizeIfNeeded(cacheW, null, _thumbnail!);
       return Image(
-        image: _thumbnail!,
+        image: resized,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _buildPlaceholder(),
       );

@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'aspect_ratio_service.dart';
 import 'window_constants.dart';
+import 'window_lifecycle.dart';
 import 'window_state.dart';
 
 class WindowService {
@@ -20,6 +21,9 @@ class WindowService {
 
   final _resizeController = StreamController<bool>.broadcast();
   Stream<bool> get onResize => _resizeController.stream;
+
+  final _moveController = StreamController<bool>.broadcast();
+  Stream<bool> get onMove => _moveController.stream;
 
   Future<void> initialize() async {
     await windowManager.ensureInitialized();
@@ -45,36 +49,21 @@ class WindowService {
       await windowManager.focus();
       windowManager.addListener(_WindowListener(this));
     });
-
-    if (Platform.isLinux) {
-      await _configureLinux();
-    }
-    if (Platform.isMacOS) {
-      await _configureMacOS();
-    }
-  }
-
-  Future<void> _configureLinux() async {
-    debugPrint('[WindowService] Linux window config');
-  }
-
-  Future<void> _configureMacOS() async {
-    debugPrint('[WindowService] macOS window config');
   }
 
   Future<void> setFullscreen(bool value) async {
     await windowManager.setFullScreen(value);
-    state.fullscreen.value = value;
+    // state 由 _WindowListener.onWindowEnterFullScreen/LeaveFullScreen 驱动
   }
 
   Future<void> maximize() async {
     await windowManager.maximize();
-    state.maximized.value = true;
+    // state 由 _WindowListener.onWindowMaximize 驱动
   }
 
   Future<void> restore() async {
     await windowManager.unmaximize();
-    state.maximized.value = false;
+    // state 由 _WindowListener.onWindowUnmaximize 驱动
   }
 
   Future<void> toggleMaximize() async {
@@ -95,7 +84,7 @@ class WindowService {
 
   Future<void> setAlwaysOnTop(bool value) async {
     await windowManager.setAlwaysOnTop(value);
-    state.alwaysOnTop.value = value;
+    state.alwaysOnTop.value = value; // 无 OS listener，必须手动同步
   }
 
   Future<void> close() async {
@@ -103,13 +92,11 @@ class WindowService {
     await windowManager.close();
   }
 
-  Future<void> hideCursor() async {
-    if (!WindowConstants.autoHideCursor) return;
-    debugPrint('[WindowService] Hide cursor');
-  }
-
   void dispose() {
     _resizeController.close();
+    _moveController.close();
+    WindowLifecycleBus.instance.dispose();
+    AspectRatioService.I.dispose();
     state.dispose();
   }
 }
@@ -142,8 +129,35 @@ class _WindowListener extends WindowListener {
   void onWindowClose() => _svc.close();
 
   @override
-  void onWindowResize() => _svc._resizeController.add(true);
+  void onWindowResize() {
+    _svc._resizeController.add(true);
+    _dispatchWithSize(WindowEventType.resizeStart);
+  }
 
   @override
-  void onWindowResized() => _svc._resizeController.add(false);
+  void onWindowResized() {
+    _svc._resizeController.add(false);
+    _dispatchWithSize(WindowEventType.resizeEnd);
+  }
+
+  @override
+  void onWindowMove() {
+    _svc._moveController.add(true);
+    WindowLifecycleBus.instance.dispatch(
+      WindowEvent(WindowEventType.moveStart),
+    );
+  }
+
+  @override
+  void onWindowMoved() {
+    _svc._moveController.add(false);
+    WindowLifecycleBus.instance.dispatch(
+      WindowEvent(WindowEventType.moveEnd),
+    );
+  }
+
+  Future<void> _dispatchWithSize(WindowEventType type) async {
+    final size = await windowManager.getSize();
+    WindowLifecycleBus.instance.dispatch(WindowEvent(type, size: size));
+  }
 }

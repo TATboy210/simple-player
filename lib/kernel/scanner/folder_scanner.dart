@@ -22,9 +22,20 @@ class FolderScanner {
   FolderScanner._();
 
   static const _extensions = {
-    '.mp4', '.mkv', '.avi', '.mov', '.wmv',
-    '.flv', '.webm', '.m4v', '.ts', '.rmvb',
-    '.mpg', '.mpeg', '.3gp', '.vob',
+    '.mp4',
+    '.mkv',
+    '.avi',
+    '.mov',
+    '.wmv',
+    '.flv',
+    '.webm',
+    '.m4v',
+    '.ts',
+    '.rmvb',
+    '.mpg',
+    '.mpeg',
+    '.3gp',
+    '.vob',
   };
 
   /// Scan [directory] for video files. Returns empty list on error.
@@ -40,11 +51,13 @@ class FolderScanner {
             final ext = p.extension(f.path).toLowerCase();
             return _extensions.contains(ext);
           })
-          .map((f) => VideoFile(
-                path: f.path,
-                name: p.basename(f.path),
-                folderPath: directory,
-              ))
+          .map(
+            (f) => VideoFile(
+              path: f.path,
+              name: p.basename(f.path),
+              folderPath: directory,
+            ),
+          )
           .toList()
         ..sort((a, b) => a.name.compareTo(b.name));
     } on Exception {
