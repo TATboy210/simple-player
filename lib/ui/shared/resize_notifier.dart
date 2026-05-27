@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
-import '../../window/window_lifecycle.dart';
 import '../../window/window_service.dart';
 
 /// Resize 期间的窗口尺寸快照
