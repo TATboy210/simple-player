@@ -158,9 +158,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ],
     );
 
-    return ValueListenableBuilder<bool>(
-      valueListenable: ws.state.fullscreen,
-      builder: (context, isFullscreen, scaffold) {
+    return ListenableBuilder(
+      listenable: ws.state.fullscreen,
+      builder: (context, _) {
+        final isFullscreen = ws.state.fullscreen.value;
         return KeyboardHandler(
           customBindings: widget.customBindings,
           onPlayPause: () => widget.engine.togglePlayPause(),
@@ -195,81 +196,78 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onMediaPrevious: () => widget.controller.playPrevious(),
           child: DragToResizeArea(
             enableResizeEdges: isFullscreen ? [] : null,
-            child: scaffold!,
+            child: Scaffold(
+              backgroundColor: Tokens.bgBase,
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 标题栏：全屏时向上滑出
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) {
+                      final offsetAnim = Tween<Offset>(
+                        begin: const Offset(0, -0.5),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return SlideTransition(
+                        position: offsetAnim,
+                        child: FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: isFullscreen
+                        ? const SizedBox.shrink(key: ValueKey('hidden'))
+                        : CustomTitleBar(
+                            key: const ValueKey('titlebar'),
+                            fileName: widget.controller.currentFileName,
+                            onOpenFile: widget.onOpenFile,
+                          ),
+                  ),
+
+                  // 主内容区
+                  Expanded(
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _playlistVisible,
+                      builder: (context, playlistVisible, videoContent) =>
+                          Stack(
+                        children: [
+                          videoContent!,
+                          // 沉浸式浮窗播放列表
+                          if (_playlistMounted)
+                            IgnorePointer(
+                              ignoring: !playlistVisible,
+                              child: PlaylistPanel(
+                                playlist: widget.playlist,
+                                visible: playlistVisible,
+                                onClose: _closePlaylist,
+                                onSelectIndex: (i) {
+                                  widget.controller.playIndex(i);
+                                  _closePlaylist();
+                                },
+                                onRemoveIndex: (i) {
+                                  widget.playlist.removeAt(i);
+                                  widget.playlistGeneration.value++;
+                                },
+                                onShowProperties: widget.onShowProperties,
+                                onFolderScanned: widget.onFolderScanned,
+                                onClearHistory: widget.onClearHistory,
+                              ),
+                            ),
+                        ],
+                      ),
+                      child: videoContent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
-      child: Scaffold(
-        backgroundColor: Tokens.bgBase,
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 标题栏：全屏时向上滑出（依赖 isFullscreen，通过 VLB 重建）
-            ValueListenableBuilder<bool>(
-              valueListenable: ws.state.fullscreen,
-              builder: (context, isFullscreen, _) => AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                transitionBuilder: (child, animation) {
-                  final offsetAnim = Tween<Offset>(
-                    begin: const Offset(0, -0.5),
-                    end: Offset.zero,
-                  ).animate(animation);
-                  return SlideTransition(
-                    position: offsetAnim,
-                    child: FadeTransition(
-                      opacity: animation,
-                      child: child,
-                    ),
-                  );
-                },
-                child: isFullscreen
-                    ? const SizedBox.shrink(key: ValueKey('hidden'))
-                    : CustomTitleBar(
-                        key: const ValueKey('titlebar'),
-                        fileName: widget.controller.currentFileName,
-                        onOpenFile: widget.onOpenFile,
-                      ),
-              ),
-            ),
-
-            // 主内容区
-            Expanded(
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _playlistVisible,
-                builder: (context, playlistVisible, videoContent) => Stack(
-                  children: [
-                    videoContent!,
-                    // 沉浸式浮窗播放列表
-                    if (_playlistMounted)
-                      IgnorePointer(
-                        ignoring: !playlistVisible,
-                        child: PlaylistPanel(
-                          playlist: widget.playlist,
-                          visible: playlistVisible,
-                          onClose: _closePlaylist,
-                          onSelectIndex: (i) {
-                            widget.controller.playIndex(i);
-                            _closePlaylist();
-                          },
-                          onRemoveIndex: (i) {
-                            widget.playlist.removeAt(i);
-                            widget.playlistGeneration.value++;
-                          },
-                          onShowProperties: widget.onShowProperties,
-                          onFolderScanned: widget.onFolderScanned,
-                          onClearHistory: widget.onClearHistory,
-                        ),
-                      ),
-                  ],
-                ),
-                child: videoContent,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
