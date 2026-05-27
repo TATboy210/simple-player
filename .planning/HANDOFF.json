@@ -1,45 +1,51 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-26T21:30:00+08:00",
-  "phase": "ui-widget-layer-redesign",
-  "phase_name": "UI Widget Layer Redesign",
-  "task": "design-complete",
-  "total_tasks": "implementation-pending",
+  "timestamp": "2026-05-27T23:31:00+08:00",
+  "phase": "cross-platform-window-optimization",
+  "phase_name": "LAYER 8 Window Cross-Platform + LAYER 9 UI Widget Analysis",
+  "task": "layer9-structural-optimization",
+  "total_tasks": 9,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Phase 1+2 optimization commit d9adab6", "status": "done"},
-    {"id": 2, "name": "Phase 2 additional optimizations (4 files)", "status": "done", "progress": "uncommitted"},
-    {"id": 3, "name": "Brainstorming: explore 44 UI files", "status": "done"},
-    {"id": 4, "name": "Brainstorming: propose 3 approaches", "status": "done"},
-    {"id": 5, "name": "Brainstorming: design spec approved", "status": "done"}
+    {"id": 1, "name": "LAYER 8: windowButtonVisibility unified to false (all platforms)", "status": "done", "file": "lib/window/window_service.dart"},
+    {"id": 2, "name": "LAYER 8: macOS setHasShadow(false) after setAsFrameless()", "status": "done", "file": "lib/window/window_service.dart"},
+    {"id": 3, "name": "LAYER 8: DragToResizeArea re-export from window_service.dart", "status": "done", "file": "lib/window/window_service.dart"},
+    {"id": 4, "name": "LAYER 8: VirtualWindowFrame added to app.dart MaterialApp.builder", "status": "done", "file": "lib/app.dart"},
+    {"id": 5, "name": "LAYER 8: player_screen.dart uses window_service re-export", "status": "done", "file": "lib/ui/player/player_screen.dart"},
+    {"id": 6, "name": "LAYER 9: Context7 analysis of UI Widget Layer (44 files, 7800 lines)", "status": "done"},
+    {"id": 7, "name": "LAYER 9: Verified controls_overlay.dart has NO addListener+setState anti-pattern", "status": "done"},
+    {"id": 8, "name": "LAYER 9: Verified aurora_background.dart has NO addListener+setState anti-pattern", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 6, "name": "Invoke writing-plans for implementation plan", "status": "not_started"},
-    {"id": 7, "name": "Execute: glass.dart consolidation", "status": "not_started"},
-    {"id": 8, "name": "Execute: player_controls.dart (no BackdropFilter)", "status": "not_started"},
-    {"id": 9, "name": "Execute: player_screen.dart (PlayerConfig)", "status": "not_started"},
-    {"id": 10, "name": "Execute: playlist_panel.dart merge", "status": "not_started"},
-    {"id": 11, "name": "Execute: settings_panel.dart merge", "status": "not_started"},
-    {"id": 12, "name": "Delete ~26 redundant files", "status": "not_started"},
-    {"id": 13, "name": "Verify: flutter analyze + flutter run", "status": "not_started"}
+    {"id": 9, "name": "LAYER 9 Phase 2.1: Split settings_card.dart (744 lines) into 3 files", "status": "not_started"},
+    {"id": 10, "name": "LAYER 9 Phase 2.2: Simplify custom_title_bar.dart 4-layer nested VLB with ListenableBuilder.merge", "status": "not_started"},
+    {"id": 11, "name": "LAYER 9 Phase 3.1: shortcuts_tab.dart 7x setState consolidation", "status": "not_started"},
+    {"id": 12, "name": "LAYER 9 Phase 3.2: player_screen.dart nested VLB simplification", "status": "not_started"},
+    {"id": 13, "name": "LAYER 9: dart analyze + flutter test verification", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Approach A: Layered Refactoring", "rationale": "User chose over data-flow-driven and from-scratch approaches"},
-    {"decision": "Minimalist ~18 files", "rationale": "Delete all single-use utilities, merge similar components"},
-    {"decision": "动静分离: no BackdropFilter over video", "rationale": "Desktop GPU readback expensive; only use in independent floating windows"},
-    {"decision": "PlayerScreen 14 params → PlayerActions object", "rationale": "Eliminate god-widget anti-pattern"},
-    {"decision": "Glass consolidation: 3 files → 1 glass.dart", "rationale": "GlassContainer+GlassButton+GlassIconButton redundant"},
-    {"decision": "Delete manual caching patterns", "rationale": "Trust Flutter identical() optimization, use const+child pattern"}
+    {"decision": "windowButtonVisibility: false on ALL platforms (not just Windows)", "rationale": "Unified Windows-style custom title bar across Win/Linux/Mac"},
+    {"decision": "macOS: setHasShadow(false) to disable native shadow", "rationale": "VirtualWindowFrame provides its own shadow; native shadow conflicts"},
+    {"decision": "DragToResizeArea re-exported from window_service.dart", "rationale": "Avoid direct window_manager package import in UI layer"},
+    {"decision": "LAYER 9 Phase 1 (addListener+setState) needs NO changes", "rationale": "Manual code review confirmed both files delegate to controllers without setState. Explore agent false positive."},
+    {"decision": "Aurora background ticker only controls Ticker lifecycle", "rationale": "_syncTicker() start/stop, animation driven by _repaint.markDirty() ValueNotifier for CustomPainter"},
+    {"decision": "AutoHideController drives ControlsOverlay visibility", "rationale": "ValueListenableBuilder<bool> for _autoHide.visible, FadeTransition with _autoHide.opacity"},
+    {"decision": "LAYER 9 plan: structural optimizations only (no frame rate fixes needed)", "rationale": "16 RepaintBoundary, BackdropFilter resize skip, all const constructors already in place"}
   ],
   "uncommitted_files": [
-    "lib/ui/shared/glass_icon_button.dart",
-    "lib/ui/player/speed_button.dart",
-    "lib/ui/player/controls_overlay.dart",
-    "lib/ui/player/volume_controls.dart",
-    "docs/superpowers/specs/2026-05-26-ui-widget-layer-redesign.md"
+    "lib/app.dart",
+    "lib/ui/player/player_screen.dart",
+    "lib/ui/shared/resize_notifier.dart",
+    "lib/window/aspect_ratio_service.dart",
+    "lib/window/window_constants.dart",
+    "lib/window/window_lifecycle.dart",
+    "lib/window/window_service.dart",
+    "lib/window/window_state.dart",
+    "integration_test/simple_test.dart",
+    "test/kernel/models/media_info_test.dart"
   ],
-  "next_action": "Commit uncommitted files, then invoke writing-plans skill for implementation plan",
-  "context_notes": "Brainstorming complete. Design spec approved. User wants all 44 UI files rewritten with minimalist approach. Key insight: previous optimization was surface-level patching. Now doing architectural redesign."
+  "next_action": "Run dart analyze to verify LAYER 8 changes, then proceed to LAYER 9 Phase 2.1 (settings_card.dart split)",
+  "context_notes": "LAYER 8 window cross-platform changes are complete and uncommitted. LAYER 9 analysis revealed the codebase already has good performance patterns (16 RepaintBoundary, BackdropFilter skip, VLB usage). The plan's Phase 1 (addListener+setState) was a false positive from Explore agent — both files use controller delegation without setState. Remaining work is purely structural: settings_card.dart file split, VLB nesting simplification, setState consolidation in shortcuts_tab."
 }
