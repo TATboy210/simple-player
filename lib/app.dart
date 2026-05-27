@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart' as wm;
 import 'kernel/engine/media_engine.dart';
 import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';
@@ -149,6 +150,8 @@ class _AppState extends State<App> {
           onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
           debugShowCheckedModeBanner: false,
           theme: ThemeService.I.currentTheme,
+          builder: (context, child) =>
+              wm.VirtualWindowFrame(child: child!),
           home: DeferredPlayerFeature(
             coordinator: widget.coordinator,
             onSettings: (ctx, engine, videoProcessing) =>
