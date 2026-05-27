@@ -154,6 +154,7 @@ class _FolderGroupWidget extends StatelessWidget {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+            itemExtent: ThumbnailTile.tileWidth + Tokens.spSm,
             itemCount: group.items.length,
             itemBuilder: (context, index) {
               final item = group.items[index];

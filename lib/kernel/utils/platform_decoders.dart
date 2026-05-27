@@ -8,12 +8,14 @@ import 'package:flutter/foundation.dart';
 List<String>? getOptimalDecoders() {
   final isArm = _isArmArchitecture();
   return switch (defaultTargetPlatform) {
-    TargetPlatform.windows => isArm
-        ? ['MFT:d3d=11', 'D3D11:shader_resource=1', 'FFmpeg']
-        : ['MFT:d3d=11', 'NVDEC', 'D3D11:shader_resource=1', 'FFmpeg'],
-    TargetPlatform.linux => isArm
-        ? ['V4L2M2M', 'RKMPP', 'VAAPI', 'FFmpeg']
-        : ['VAAPI', 'VDPAU', 'NVDEC', 'FFmpeg'],
+    TargetPlatform.windows =>
+      isArm
+          ? ['MFT:d3d=11', 'D3D11:shader_resource=1', 'FFmpeg']
+          : ['MFT:d3d=11', 'NVDEC', 'D3D11:shader_resource=1', 'FFmpeg'],
+    TargetPlatform.linux =>
+      isArm
+          ? ['V4L2M2M', 'RKMPP', 'VAAPI', 'FFmpeg']
+          : ['VAAPI', 'VDPAU', 'NVDEC', 'FFmpeg'],
     TargetPlatform.macOS => ['VT', 'FFmpeg'],
     _ => null,
   };

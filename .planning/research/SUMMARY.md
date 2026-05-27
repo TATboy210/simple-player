@@ -61,7 +61,7 @@ The project already uses the right stack. No technology changes are needed. The 
 
 ### Architecture Approach
 
-The codebase follows a 4-layer architecture: Kernel (engine, models, persistence), Bridge (WindowBridge static injection + C++ MethodChannel), Service (PlaybackController with 3 mixins, window services), and UI (ValueNotifier-driven widgets with glassmorphism). The architecture is sound. The main structural issue is window service triplication (3 files with 90%+ identical code) and static singleton services (ThumbnailService, OsdService) that prevent testing.
+The codebase follows a 3-layer architecture: Kernel (engine, models, persistence), Window (WindowService singleton + WindowLifecycleBus event bus + C++ MethodChannel), and UI (ValueNotifier-driven widgets with glassmorphism). The architecture is sound. The main structural issue is static singleton services (ThumbnailService) that prevent testing.
 
 **Major components to refactor:**
 1. WindowService (302 lines) + MacosWindowService (286 lines) + LinuxWindowService (279 lines) -- extract WindowServiceBase mixin, shrink each to 40-60 lines
@@ -70,7 +70,7 @@ The codebase follows a 4-layer architecture: Kernel (engine, models, persistence
 
 **Components to preserve as-is:**
 - PlaybackController mixin composition (FileOperations + PlaybackNavigator + StateMonitor) -- well-structured
-- WindowBridge static injection pattern -- true application singleton, used in 15+ places
+- WindowService.instance singleton + WindowLifecycleBus event bus
 - ValueNotifier state management -- project constraint, optimize within pattern
 
 ### Critical Pitfalls

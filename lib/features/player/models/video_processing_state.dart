@@ -70,3 +70,39 @@ class VideoProcessingState {
     aspectRatioMode,
   );
 }
+
+/// 记录两个 VideoProcessingState 之间哪些字段发生了变化
+///
+/// 用于 diff-based 同步：只将变化的属性推送给 engine，
+/// 避免拖动 brightness 时重复设置 contrast/saturation/hue。
+class VideoProcessingPatch {
+  const VideoProcessingPatch({
+    this.brightness = false,
+    this.contrast = false,
+    this.saturation = false,
+    this.hue = false,
+    this.deinterlaceEnabled = false,
+    this.rotation = false,
+    this.aspectRatioMode = false,
+  });
+
+  final bool brightness;
+  final bool contrast;
+  final bool saturation;
+  final bool hue;
+  final bool deinterlaceEnabled;
+  final bool rotation;
+  final bool aspectRatioMode;
+
+  bool get hasAny =>
+      brightness ||
+      contrast ||
+      saturation ||
+      hue ||
+      deinterlaceEnabled ||
+      rotation ||
+      aspectRatioMode;
+
+  /// 亮度/对比度/饱和度/色调中任一变化
+  bool get isColorAdjustment => brightness || contrast || saturation || hue;
+}

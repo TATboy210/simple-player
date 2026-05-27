@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../kernel/models/media_state.dart';
-import 'resize_notifier.dart';
+import 'resize_aware_builder.dart';
 import '../theme/tokens.dart';
 
 /// 极光呼吸背景 — 3 个椭圆光团沿 Lissajous 曲线缓慢漂移
@@ -42,7 +42,7 @@ class AuroraBackground extends StatefulWidget {
 }
 
 class _AuroraBackgroundState extends State<AuroraBackground>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver, ResizeAwareTickerMixin {
   late final Ticker _ticker;
   final _repaint = _RepaintNotifier();
   double _time = 0;
@@ -68,7 +68,6 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     _ticker.start();
     _generateBlobImages();
     widget.engineState?.addListener(_onEngineStateChanged);
-    ResizeNotifier.instance.addListener(_syncTicker);
   }
 
   @override
@@ -89,7 +88,6 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   @override
   void dispose() {
     widget.engineState?.removeListener(_onEngineStateChanged);
-    ResizeNotifier.instance.removeListener(_syncTicker);
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
     _repaint.dispose();
@@ -112,14 +110,15 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     _syncTicker();
   }
 
-  /// 根据 app 前后台 + 引擎状态决定 Ticker 启停
+  @override
+  void onWindowOperatingChanged(bool operating) => _syncTicker();
+
+  /// 根据 app 前后台 + 引擎状态 + 窗口操作状态决定 Ticker 启停
   void _syncTicker() {
     final engineIdle =
         widget.engineState?.value == MediaState.idle ||
         widget.engineState == null;
-    final resizing =
-        ResizeNotifier.instance.value;
-    final shouldRun = _isRunning && engineIdle && !resizing;
+    final shouldRun = _isRunning && engineIdle && !isWindowOperating;
 
     if (shouldRun && !_ticker.isActive) {
       _ticker.start();

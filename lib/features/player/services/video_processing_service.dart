@@ -15,9 +15,9 @@ import '../models/video_processing_state.dart';
 /// 50ms 防抖自动持久化到 SettingsStore。
 class VideoProcessingService {
   VideoProcessingService(this._engine, {AppSettings? initialSettings}) {
-    state = ValueNotifier<VideoProcessingState>(
-      _fromSettings(initialSettings),
-    );
+    final initial = _fromSettings(initialSettings);
+    state = ValueNotifier<VideoProcessingState>(initial);
+    _previousState = initial;
     state.addListener(_syncEngine);
     state.addListener(_schedulePersist);
   }
@@ -25,6 +25,7 @@ class VideoProcessingService {
   final MediaEngine _engine;
   bool _disposed = false;
   Timer? _persistDebounce;
+  late VideoProcessingState _previousState;
 
   /// 完整视频处理状态（UI 绑定入口）
   late final ValueNotifier<VideoProcessingState> state;
@@ -65,17 +66,42 @@ class VideoProcessingService {
 
   // ── 内部 ──
 
-  /// 状态变化 → 委托给 MediaEngine
+  /// 状态变化 → diff-based 委托给 MediaEngine（只同步变化的属性）
   void _syncEngine() {
-    final s = state.value;
-    _engine.setVideoEffect(VideoEffectType.brightness, s.brightness);
-    _engine.setVideoEffect(VideoEffectType.contrast, s.contrast);
-    _engine.setVideoEffect(VideoEffectType.saturation, s.saturation);
-    _engine.setVideoEffect(VideoEffectType.hue, s.hue);
-    _engine.setDeinterlace(s.deinterlaceEnabled);
-    _engine.rotate(s.rotation);
-    _engine.setAspectRatio(s.aspectRatioMode.mdkValue);
+    final next = state.value;
+    final patch = _diff(_previousState, next);
+    _previousState = next;
+    if (!patch.hasAny) return;
+
+    if (patch.isColorAdjustment) {
+      _engine.setVideoEffect(VideoEffectType.brightness, next.brightness);
+      _engine.setVideoEffect(VideoEffectType.contrast, next.contrast);
+      _engine.setVideoEffect(VideoEffectType.saturation, next.saturation);
+      _engine.setVideoEffect(VideoEffectType.hue, next.hue);
+    }
+    if (patch.deinterlaceEnabled) {
+      _engine.setDeinterlace(next.deinterlaceEnabled);
+    }
+    if (patch.rotation) {
+      _engine.rotate(next.rotation);
+    }
+    if (patch.aspectRatioMode) {
+      _engine.setAspectRatio(next.aspectRatioMode.mdkValue);
+    }
   }
+
+  static VideoProcessingPatch _diff(
+    VideoProcessingState prev,
+    VideoProcessingState next,
+  ) => VideoProcessingPatch(
+    brightness: prev.brightness != next.brightness,
+    contrast: prev.contrast != next.contrast,
+    saturation: prev.saturation != next.saturation,
+    hue: prev.hue != next.hue,
+    deinterlaceEnabled: prev.deinterlaceEnabled != next.deinterlaceEnabled,
+    rotation: prev.rotation != next.rotation,
+    aspectRatioMode: prev.aspectRatioMode != next.aspectRatioMode,
+  );
 
   /// 50ms 防抖持久化
   void _schedulePersist() {

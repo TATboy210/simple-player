@@ -106,6 +106,7 @@ class _HistoryTabState extends State<HistoryTab> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+            itemExtent: ThumbnailTile.tileWidth + Tokens.spSm,
             itemCount: historyItems.length,
             itemBuilder: (context, index) {
               final entry = historyItems[index];

@@ -18,17 +18,9 @@ dependencies:
   shared_preferences: ^2.5.5
   desktop_drop: ^0.7.1
   logger: ^2.5.0
-  dynamic_color: ^1.8.1
-  widgets_easier: ^0.0.10
-  flutter_easy_animations: ^0.0.2
   ffi: ^2.1.4
   path: ^1.9.1
   crypto: ^3.0.6
-  rust_lib_simple_player_flutter:
-    path: rust_builder
-  flutter_rust_bridge: 2.12.0
-  video_texture_plugin:
-    path: plugins/video_texture_plugin
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
 

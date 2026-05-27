@@ -14,7 +14,7 @@
 |------|---------|---------|-----|
 | **Flutter DevTools** (bundled with SDK) | 3.x (matches project SDK 3.11.5) | Frame timeline, widget rebuild tracking, GPU profiling | Only tool that shows Flutter-specific raster/UI thread split and widget rebuild counts |
 | **`flutter run --profile -d windows`** | SDK built-in | Release-like performance with DevTools hooks | Debug mode disables optimizations; profile mode is mandatory for accurate measurement |
-| **`--trace-startup`** | SDK built-in | Startup timing breakdown | Identifies cold-start bottlenecks (fvp init, SharedPreferences, WindowBootstrap) |
+| **`--trace-startup`** | SDK built-in | Startup timing breakdown | Identifies cold-start bottlenecks (fvp init, SharedPreferences, WindowService) |
 | **DevTools Performance Overlay** | SDK built-in | Real-time frame time bars (green/red) | Quick visual check during development; red bars = jank |
 | **DevTools Widget Rebuild Tracker** | SDK built-in | Per-widget rebuild count + frequency | Identifies which `ValueListenableBuilder` instances fire most often |
 | **Dart DevTools Timeline** | SDK built-in | CPU flame chart, async event tracing | Pinpoints expensive operations in the UI thread (build, layout, paint) |
@@ -299,7 +299,7 @@ These require forking `fvp_plugin.cpp` (193 lines). Ranked by priority.
 
 **2. Resize debounce for BackdropFilter (ALREADY IMPLEMENTED)**
 
-`WindowBridge.I.interaction` exposes `WindowInteractionState` (idle/resizing/moving). Glass components check this and skip BackdropFilter during interaction. This is the correct pattern.
+`WindowLifecycleBus.instance.isOperating` exposes whether the window is being resized or moved. Glass components check `ResizeNotifier.instance` (which delegates to the bus) and skip BackdropFilter during interaction. This is the correct pattern.
 
 **3. WS_THICKFRAME invisible border (HANDLED)**
 

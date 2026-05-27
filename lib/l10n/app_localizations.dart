@@ -908,12 +908,6 @@ abstract class AppLocalizations {
   /// **'Key already bound'**
   String get shortcutConflict;
 
-  /// Shortcut label for cycling aspect ratio
-  ///
-  /// In en, this message translates to:
-  /// **'Cycle Aspect Ratio'**
-  String get shortcutAspectCycle;
-
   /// Quick menu label for current theme section
   ///
   /// In en, this message translates to:
@@ -937,6 +931,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Apply'**
   String get apply;
+
+  /// Error message when deferred player module fails to load
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load player module'**
+  String get playerLoadError;
 }
 
 class _AppLocalizationsDelegate

@@ -430,9 +430,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutConflict => '按键已被占用';
 
   @override
-  String get shortcutAspectCycle => '切换宽高比';
-
-  @override
   String get currentTheme => '当前主题';
 
   @override
@@ -443,4 +440,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get apply => '应用';
+
+  @override
+  String get playerLoadError => '播放器模块加载失败';
 }

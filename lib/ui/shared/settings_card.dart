@@ -18,6 +18,15 @@ import '../theme/tokens.dart';
 /// )
 /// ```
 class SettingsCard extends StatelessWidget {
+  /// 共享的卡片装饰 — SettingsCard、SettingsExpanderCard、SettingsActionCard 复用
+  static const cardDecoration = BoxDecoration(
+    color: Tokens.bgPanel,
+    borderRadius: BorderRadius.all(Radius.circular(Tokens.radiusLarge)),
+    boxShadow: [
+      BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+    ],
+  );
+
   final String title;
   final String? description;
   final IconData? icon;
@@ -39,13 +48,7 @@ class SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: margin ?? const EdgeInsets.only(bottom: Tokens.spMd),
-      decoration: BoxDecoration(
-        color: Tokens.bgPanel,
-        borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
+      decoration: SettingsCard.cardDecoration,
       child: Padding(
         padding:
             padding ??
@@ -496,8 +499,7 @@ class SettingsExpanderCard extends StatefulWidget {
   State<SettingsExpanderCard> createState() => _SettingsExpanderCardState();
 }
 
-class _SettingsExpanderCardState extends State<SettingsExpanderCard>
-    with SingleTickerProviderStateMixin {
+class _SettingsExpanderCardState extends State<SettingsExpanderCard> {
   late bool _expanded;
 
   @override
@@ -510,13 +512,7 @@ class _SettingsExpanderCardState extends State<SettingsExpanderCard>
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: Tokens.spMd),
-      decoration: BoxDecoration(
-        color: Tokens.bgPanel,
-        borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
+      decoration: SettingsCard.cardDecoration,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Tokens.spLg,
@@ -654,13 +650,7 @@ class SettingsActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: Tokens.spMd),
-      decoration: BoxDecoration(
-        color: Tokens.bgPanel,
-        borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-        boxShadow: const [
-          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
+      decoration: SettingsCard.cardDecoration,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(Tokens.radiusLarge),

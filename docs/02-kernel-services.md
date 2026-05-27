@@ -124,23 +124,23 @@ mixin StateMonitor on PlaybackContract {
 
 ## 2. Platform Integration (平台集成)
 
-### 2.1 WindowBridge -- 窗口操作接口
+### 2.1 WindowService -- 窗口操作
 
-**文件:** `lib/kernel/bridge/window_bridge.dart`
+**文件:** `lib/window/window_service.dart`
 
-**职责:** 窗口管理操作的抽象接口。UI 代码通过 `WindowBridge.I` 访问窗口状态和操作。
-
-**设计模式:** 带 NoopWindowBridge 回退的注入式单例。通过 `WindowBridge.inject()` 注入平台实现（由 `WindowBootstrap` 调用）。
+**职责:** 窗口管理操作的 singleton。UI 代码通过 `WindowService.instance` 访问窗口状态和操作。
 
 **关键 API:**
 ```dart
 // 窗口操作
-minimize(), toggleMaximize(), close(), startDragging()
-toggleFullscreen(), exitFullscreen(), toggleAlwaysOnTop()
+minimize(), toggleMaximize(), restore(), close(), startDragging()
+setFullscreen(bool), setAlwaysOnTop(bool)
 
-// 响应式状态
-ValueNotifier<WindowMode> mode
-ValueNotifier<bool> isAlwaysOnTop, isMaximized, isResizing
+// 响应式状态 (WindowState)
+ValueNotifier<bool> fullscreen, maximized, alwaysOnTop, focused
+
+// 事件流
+Stream<bool> onResize, onMove
 ```
 
 ---
@@ -428,10 +428,10 @@ PlaylistStore
   ├── Playlist (序列化)
   └── path_provider (文件系统)
 
-WindowBridge (原生窗口操作)
-  ├── WindowService (Windows)
-  ├── LinuxWindowService (Linux)
-  └── MacosWindowService (macOS)
+WindowService (窗口操作, singleton)
+  ├── window_manager (平台窗口)
+  ├── AspectRatioService (画面比例)
+  └── WindowLifecycleBus (事件总线)
 ```
 
 ---
@@ -446,7 +446,7 @@ WindowBridge (原生窗口操作)
 | CQS | Playlist | peekNext/Previous 纯查询不修改状态 |
 | 防抖持久化 | PlaylistStore(300ms), VideoProcessing(50ms) | 合并快速状态变更为单次磁盘写入 |
 | 原子文件写入 | PlaylistStore._flush | 先写.tmp再rename |
-| 带 Noop 回退的注入单例 | WindowBridge | NoopWindowBridge 安全降级 |
+| Singleton 窗口服务 | WindowService.instance | 直接访问，无 DI 桥接 |
 | 响应式ValueNotifier | 全局 | 无外部状态管理包 |
 | 防御性序列化 | Playlist.fromJson, SettingsStore.load | 钳位索引、跳过损坏项、回退默认值 |
 | 输入安全 | PathValidator | 扩展名白名单 + 路径遍历防护 |

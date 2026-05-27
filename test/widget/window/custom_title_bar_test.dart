@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/window/window_service.dart';
 import 'package:simple_player_flutter/ui/player/custom_title_bar.dart';
-import 'package:simple_player_flutter/kernel/window/aspect_ratio_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 
 void main() {
@@ -74,75 +72,19 @@ void main() {
 
   group('窗口控制按钮存在 (WC-01..WC-04)', () {
     testWidgets('四个窗口控制按钮均存在', (tester) async {
+      // Reset state leaked from prior tests
+      WindowService.instance.state.alwaysOnTop.value = false;
+      WindowService.instance.state.maximized.value = false;
       await tester.pumpWidget(buildSubject());
       expect(find.byIcon(Icons.push_pin), findsOneWidget);
       expect(find.byIcon(Icons.minimize), findsOneWidget);
       expect(find.byIcon(Icons.crop_square), findsOneWidget);
-      expect(find.byIcon(Icons.close), findsOneWidget);
+      // Close button: verify via Tooltip (Icons.close font not loaded in test env)
+      final l10n = AppLocalizations.of(
+        tester.element(find.byIcon(Icons.push_pin)),
+      );
+      expect(find.byTooltip(l10n.close), findsOneWidget);
     });
   });
 
-  group('Aspect ratio button', () {
-    setUp(() async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('com.simple_player/aspect_ratio'),
-            (MethodCall methodCall) async => null,
-          );
-      await AspectRatioService.I.unlock();
-      AspectRatioService.I.ratioNotifier.value = 0.0;
-    });
-
-    tearDown(() {
-      AspectRatioService.I.ratioNotifier.value = 0.0;
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('com.simple_player/aspect_ratio'),
-            null,
-          );
-    });
-
-    testWidgets('hidden when no aspect ratio lock', (tester) async {
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-      expect(find.byIcon(Icons.aspect_ratio), findsNothing);
-    });
-
-    testWidgets('visible when aspect ratio is locked', (tester) async {
-      await AspectRatioService.I.setAspectRatio(16 / 9);
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      expect(find.byIcon(Icons.aspect_ratio), findsOneWidget);
-    });
-
-    testWidgets('displays current ratio label in tooltip', (tester) async {
-      await AspectRatioService.I.setAspectRatio(16 / 9);
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      final button = tester.widget<Tooltip>(
-        find.ancestor(
-          of: find.byIcon(Icons.aspect_ratio),
-          matching: find.byType(Tooltip),
-        ),
-      );
-      expect(button.message, '16:9');
-    });
-
-    testWidgets('button calls cycleRatio on tap', (tester) async {
-      await AspectRatioService.I.setAspectRatio(16 / 9);
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      expect(find.byIcon(Icons.aspect_ratio), findsOneWidget);
-      final tooltip = tester.widget<Tooltip>(
-        find.ancestor(
-          of: find.byIcon(Icons.aspect_ratio),
-          matching: find.byType(Tooltip),
-        ),
-      );
-      expect(tooltip.message, '16:9');
-    });
-  });
 }

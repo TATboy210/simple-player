@@ -12,7 +12,7 @@ class Tokens {
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
-  static const accentegg = Color.fromARGB(255, 102, 204, 255);
+  static const accentEgg = Color.fromARGB(255, 102, 204, 255);
   static const danger = Color.fromARGB(255, 250, 55, 55);
 
   static const textPrimary = Color(0xFFE8E8F0);
@@ -54,8 +54,8 @@ class Tokens {
   static const radiusPopup = 8.0;
 
   // ── 毛玻璃 ──
-  static const glassBlurThin = 12.0;
-  static const glassBlur = 16.0;
+  static const glassBlurThin = 8.0;
+  static const glassBlur = 10.0;
   static const glassBlurThick = 24.0;
 
   // ── 动画 ──
@@ -98,4 +98,36 @@ class Tokens {
 
   // ── 字体特性 ──
   static const tabularFigures = FontFeature.tabularFigures();
+
+  // ── OSD ──
+  static const double osdIconSize = 22;
+  static const int osdFadeDurationMs = 200;
+  static const int osdDefaultHoldMs = 1200;
+
+  // ── 滑块 ──
+  static const double sliderHeight = 42;
+  static const double sliderLabelWidth = 64;
+  static const double sliderValueWidth = 36;
+
+  // ── 按钮尺寸 ──
+  static const double iconButtonSizeLarge = 48;
+  static const double iconButtonSizeSmall = 24;
+  static const double iconButtonRadius = 24;
+  static const double iconButtonPaddingH = 20;
+  static const double iconButtonPaddingV = 12;
+
+  // ── 播放列表 ──
+  static const double playlistPanelWidth = 420;
+  static const double playlistPanelHeight = 240;
+  static const double thumbnailTileHeight = 124;
+
+  // ── 断点 ──
+  static const double compactBreakpoint = 500;
+
+  // ── 跳秒 ──
+  static const int skipSecondsShort = 10;
+  static const int skipSecondsLong = 30;
+
+  // ── 字体补充 ──
+  static const double fontSizeSmall = 9.0;
 }

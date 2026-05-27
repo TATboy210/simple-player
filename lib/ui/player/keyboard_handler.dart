@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../kernel/utils/perf_monitor.dart';
 import '../../l10n/app_localizations.dart';
 
 /// 快捷键定义 — KeyboardHandler 和帮助对话框共享的单一数据源
@@ -20,7 +24,6 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('S', l10n.shortcutSubtitle),
   ('] / [', l10n.shortcutSubtitleDelay),
   ('F1 / ?', l10n.shortcutHelp),
-  ('A', l10n.aspectRatio),
   ('媒体键', l10n.shortcutMediaKeys),
 ];
 
@@ -54,8 +57,6 @@ class KeyboardHandler extends StatelessWidget {
   final VoidCallback? onMediaPlayPause;
   final VoidCallback? onMediaNext;
   final VoidCallback? onMediaPrevious;
-  final VoidCallback? onCycleAspectRatio;
-
   const KeyboardHandler({
     super.key,
     required this.child,
@@ -78,7 +79,6 @@ class KeyboardHandler extends StatelessWidget {
     this.onMediaPlayPause,
     this.onMediaNext,
     this.onMediaPrevious,
-    this.onCycleAspectRatio,
   });
 
   @override
@@ -88,8 +88,11 @@ class KeyboardHandler extends StatelessWidget {
 
   /// 检查按键是否匹配指定动作（优先自定义绑定，否则使用默认按键）
   /// customBindings 存储 keyId 字符串
-  bool _keyMatches(LogicalKeyboardKey key, String action,
-      LogicalKeyboardKey defaultKey) {
+  bool _keyMatches(
+    LogicalKeyboardKey key,
+    String action,
+    LogicalKeyboardKey defaultKey,
+  ) {
     if (customBindings.isEmpty) return key == defaultKey;
     final bound = customBindings[action];
     if (bound == null) return key == defaultKey;
@@ -163,19 +166,30 @@ class KeyboardHandler extends StatelessWidget {
     }
 
     // FEAT-04: Subtitle timing
-    if (_keyMatches(key, 'subtitleDelayForward',
-        LogicalKeyboardKey.bracketRight)) {
+    if (_keyMatches(
+      key,
+      'subtitleDelayForward',
+      LogicalKeyboardKey.bracketRight,
+    )) {
       onSubtitleDelayForward?.call();
       return KeyEventResult.handled;
     }
-    if (_keyMatches(key, 'subtitleDelayBackward',
-        LogicalKeyboardKey.bracketLeft)) {
+    if (_keyMatches(
+      key,
+      'subtitleDelayBackward',
+      LogicalKeyboardKey.bracketLeft,
+    )) {
       onSubtitleDelayBackward?.call();
       return KeyEventResult.handled;
     }
 
-    if (_keyMatches(key, 'aspectCycle', LogicalKeyboardKey.keyA)) {
-      onCycleAspectRatio?.call();
+    // 调试快捷键: F12 导出性能统计
+    if (key == LogicalKeyboardKey.f12) {
+      final stats = PerfMonitor.instance.exportStats();
+      developer.log(
+        'Performance Stats:\n${const JsonEncoder.withIndent('  ').convert(stats)}',
+        name: 'Perf',
+      );
       return KeyEventResult.handled;
     }
 
