@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../playlist/playlist.dart';
+import '../utils/log.dart';
 
 /// 播放列表 JSON 持久化
 ///
@@ -165,8 +166,8 @@ class PlaylistStore {
           final map = entry as Map<String, dynamic>;
           final path = map['path'] as String?;
           if (path != null) historyMap[path] = map;
-        } catch (_) {
-          // 跳过损坏项
+        } on Exception catch (e) {
+          log.d('PlaylistStore._migrateHistory: skipping corrupt entry: $e');
         }
       }
 
