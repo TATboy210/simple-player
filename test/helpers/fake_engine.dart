@@ -297,6 +297,28 @@ class FakeEngine implements MediaEngine {
     lastDeinterlaceValue = enable;
   }
 
+  // ─── D3D11 Performance ───
+
+  int setD3d11SyncEnabledCallCount = 0;
+  bool? lastD3d11SyncEnabled;
+
+  @override
+  void setD3d11SyncEnabled(bool enabled) {
+    if (_disposed) return;
+    setD3d11SyncEnabledCallCount++;
+    lastD3d11SyncEnabled = enabled;
+  }
+
+  int setHardwareDecodingCallCount = 0;
+  bool? lastHardwareDecodingEnabled;
+
+  @override
+  void setHardwareDecoding(bool enabled) {
+    if (_disposed) return;
+    setHardwareDecodingCallCount++;
+    lastHardwareDecodingEnabled = enabled;
+  }
+
   // ─── Lifecycle ───
 
   @override

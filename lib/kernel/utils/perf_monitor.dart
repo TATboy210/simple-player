@@ -3,15 +3,23 @@ import 'dart:developer' as developer;
 import 'package:flutter/scheduler.dart';
 
 /// 性能监控工具 — 记录 build/raster 耗时
+///
+/// 使用固定容量环形缓冲区（_maxFrames=300），避免无界列表内存泄漏。
+/// 每 100 帧输出一次统计，不主动清空缓冲区（环形覆盖最旧数据）。
 class PerfMonitor {
   static final PerfMonitor _instance = PerfMonitor._();
   static PerfMonitor get instance => _instance;
 
   PerfMonitor._();
 
+  /// 环形缓冲区最大容量
+  static const _maxFrames = 300;
+
   bool _enabled = false;
-  final _buildTimes = <Duration>[];
-  final _rasterTimes = <Duration>[];
+  final _buildTimes = List<Duration?>.filled(_maxFrames, null);
+  final _rasterTimes = List<Duration?>.filled(_maxFrames, null);
+  int _writeIndex = 0;
+  int _totalFrames = 0;
 
   /// 启用性能监控
   void enable() {
@@ -37,8 +45,12 @@ class PerfMonitor {
       final rasterDuration = timing.rasterDuration;
       final totalDuration = timing.totalSpan;
 
-      _buildTimes.add(buildDuration);
-      _rasterTimes.add(rasterDuration);
+      // 环形缓冲区写入 — 覆盖最旧数据
+      final idx = _writeIndex % _maxFrames;
+      _buildTimes[idx] = buildDuration;
+      _rasterTimes[idx] = rasterDuration;
+      _writeIndex++;
+      _totalFrames++;
 
       // 记录超过阈值的帧
       if (totalDuration.inMilliseconds > 16) {
@@ -51,7 +63,7 @@ class PerfMonitor {
       }
 
       // 每 100 帧输出统计
-      if (_buildTimes.length % 100 == 0) {
+      if (_totalFrames % 100 == 0) {
         _printStats();
       }
     }
@@ -59,76 +71,74 @@ class PerfMonitor {
 
   /// 输出统计信息
   void _printStats() {
-    if (_buildTimes.isEmpty) return;
+    final count = _totalFrames < _maxFrames ? _totalFrames : _maxFrames;
+    if (count == 0) return;
 
-    final avgBuild =
-        _buildTimes.fold<int>(0, (sum, d) => sum + d.inMicroseconds) /
-        _buildTimes.length /
-        1000;
+    var buildSum = 0;
+    var rasterSum = 0;
+    var maxBuild = 0;
+    var maxRaster = 0;
 
-    final avgRaster =
-        _rasterTimes.fold<int>(0, (sum, d) => sum + d.inMicroseconds) /
-        _rasterTimes.length /
-        1000;
+    for (var i = 0; i < count; i++) {
+      final bt = _buildTimes[i];
+      final rt = _rasterTimes[i];
+      if (bt != null) {
+        final us = bt.inMicroseconds;
+        buildSum += us;
+        if (us > maxBuild) maxBuild = us;
+      }
+      if (rt != null) {
+        final us = rt.inMicroseconds;
+        rasterSum += us;
+        if (us > maxRaster) maxRaster = us;
+      }
+    }
 
-    final maxBuild = _buildTimes
-        .map((d) => d.inMicroseconds)
-        .reduce((a, b) => a > b ? a : b);
-    final maxRaster = _rasterTimes
-        .map((d) => d.inMicroseconds)
-        .reduce((a, b) => a > b ? a : b);
+    final avgBuild = buildSum / count / 1000;
+    final avgRaster = rasterSum / count / 1000;
 
     developer.log(
-      'Stats (last ${_buildTimes.length} frames):\n'
+      'Stats (last $count frames):\n'
       '  Build:  avg=${avgBuild.toStringAsFixed(2)}ms, max=${maxBuild / 1000}ms\n'
       '  Raster: avg=${avgRaster.toStringAsFixed(2)}ms, max=${maxRaster / 1000}ms',
       name: 'Perf',
     );
-
-    // 清空历史
-    if (_buildTimes.length > 1000) {
-      _buildTimes.clear();
-      _rasterTimes.clear();
-    }
-  }
-
-  /// 手动记录标记
-  void mark(String label) {
-    developer.Timeline.startSync(label);
-  }
-
-  /// 结束标记
-  void markEnd(String label) {
-    developer.Timeline.finishSync();
   }
 
   /// 导出统计为 JSON
   Map<String, dynamic> exportStats() {
     final result = <String, dynamic>{};
 
-    if (_buildTimes.isNotEmpty) {
-      result['frameCount'] = _buildTimes.length;
+    final count = _totalFrames < _maxFrames ? _totalFrames : _maxFrames;
+    if (count > 0) {
+      var buildSum = 0;
+      var rasterSum = 0;
+      var maxBuild = 0;
+      var maxRaster = 0;
+
+      for (var i = 0; i < count; i++) {
+        final bt = _buildTimes[i];
+        final rt = _rasterTimes[i];
+        if (bt != null) {
+          final us = bt.inMicroseconds;
+          buildSum += us;
+          if (us > maxBuild) maxBuild = us;
+        }
+        if (rt != null) {
+          final us = rt.inMicroseconds;
+          rasterSum += us;
+          if (us > maxRaster) maxRaster = us;
+        }
+      }
+
+      result['frameCount'] = count;
       result['build'] = {
-        'avgMs':
-            _buildTimes.fold<int>(0, (sum, d) => sum + d.inMicroseconds) /
-            _buildTimes.length /
-            1000,
-        'maxMs':
-            _buildTimes
-                .map((d) => d.inMicroseconds)
-                .reduce((a, b) => a > b ? a : b) /
-            1000,
+        'avgMs': buildSum / count / 1000,
+        'maxMs': maxBuild / 1000,
       };
       result['raster'] = {
-        'avgMs':
-            _rasterTimes.fold<int>(0, (sum, d) => sum + d.inMicroseconds) /
-            _rasterTimes.length /
-            1000,
-        'maxMs':
-            _rasterTimes
-                .map((d) => d.inMicroseconds)
-                .reduce((a, b) => a > b ? a : b) /
-            1000,
+        'avgMs': rasterSum / count / 1000,
+        'maxMs': maxRaster / 1000,
       };
     }
 
