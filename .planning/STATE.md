@@ -1,55 +1,50 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: context exhaustion at 78% (2026-05-27)
-last_updated: "2026-05-27T11:49:18.366Z"
-last_activity: 2026-05-23 — Phase 2 planning complete (1 plan, verification passed)
+milestone_name: window-ui-unification
+status: ready
+stopped_at: null
+last_updated: "2026-05-28T07:30:00.000Z"
+last_activity: 2026-05-28 — Reinitialized: window management + UI unification project
 progress:
-  total_phases: 6
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 1
-  percent: 17
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-23)
+See: .planning/PROJECT.md (updated 2026-05-28)
 
-**Core value:** Eliminate frame drops and rendering bottlenecks so the player delivers smooth, responsive playback and UI interaction on Windows desktop.
-**Current focus:** Phase 1 — Zero-Risk Rendering Fixes
+**Core value:** Build clean, dependency-free window management and unified widget system for smooth desktop playback.
+**Current focus:** Phase 1 — Window Management Foundation
 
 ## Current Position
 
-Phase: 2 of 6 (Profile and Measure)
-Plan: 1 of 1 in current phase
-Status: Ready to execute
-Last activity: 2026-05-23 — Phase 2 planning complete (1 plan, verification passed)
+Phase: 1 of 4 (Window Management Foundation)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-05-28 — Reinitialized with new direction
 
-Progress: [██░░░░░░░░] 17%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 1
-- Average duration: ~5min
-- Total execution time: ~5min
+- Total plans completed: 0
+- Average duration: N/A
+- Total execution time: N/A
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 | 1 | ~5min | ~5min |
-
-**Recent Trend:**
-
-- Last 5 plans: 01-01 (~5min)
-- Trend: Fast (config-only changes)
+| — | — | — | — |
 
 *Updated after each plan completion*
 
@@ -57,12 +52,15 @@ Progress: [██░░░░░░░░] 17%
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- [Roadmap]: "Measure first, fix cheap, refactor clean" — zero-risk fixes before profiling, profiling before optimization
-- [Roadmap]: Phase 7 (fvp fork) deferred to v2 — only if Phases 1-4 insufficient
-- [Roadmap]: Phase 5 (WindowService dedup) independent of performance work — can parallel if needed
+- [User]: Self-built MethodChannel for window management (no third-party packages)
+- [User]: Windows first, macOS/Linux stubs follow
+- [User]: Unified glass component library (GlassContainer/GlassButton/GlassIconButton)
+- [User]: ValueNotifier pattern preserved (no state management migration)
+- [Research]: Flutter has no native window mutation API — all window ops require platform code
+- [Research]: `window_manager` package NOT in pubspec — window layer fully removed
+- [Research]: Fullscreen/always-on-top UI exists but has no backend implementation
+- [Codebase]: Architecture simplified from 4-layer to 3-layer (Kernel/Features/UI)
+- [Codebase]: 94 Dart files, 13,623 lines, 27 test files, 64% coverage
 
 ### Pending Todos
 
@@ -70,25 +68,23 @@ None yet.
 
 ### Blockers/Concerns
 
-- PERF-03 (d3d11.sync.cpu=0) requires testing on 3+ hardware configs — may need external hardware access
-- Phase 4 optimization targets depend on Phase 2 profiling results — cannot pre-determine exact fixes
+- PERF-01 (d3d11.sync.cpu=0) requires testing on 3+ hardware configs
+- Flutter C++ embedder has internal WindowManager APIs but no public Dart binding
+- macOS/Linux window APIs (NSWindow/GTK) require Objective-C/Val bindings
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
-
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| v2 | Triple buffering in fvp C++ layer | Deferred | Roadmap init |
-| v2 | Fence替代Flush in fvp C++ layer | Deferred | Roadmap init |
-| v2 | Impeller FragmentShader for BackdropFilter | Deferred | Roadmap init |
-| v2 | Integration tests | Deferred | Roadmap init |
-| v2 | Golden tests | Deferred | Roadmap init |
-| v2 | PlayerActions record refactor | Deferred | Roadmap init |
-| v2 | SettingsCard split | Deferred | Roadmap init |
+| v2 | Triple buffering in fvp C++ layer | Deferred | Reinit |
+| v2 | Impeller FragmentShader for BackdropFilter | Deferred | Reinit |
+| v2 | Integration tests | Deferred | Reinit |
+| v2 | Golden tests | Deferred | Reinit |
+| v2 | HLS/ABR streaming | Deferred | Reinit |
+| v2 | Steam/SteamOS distribution | Deferred | Reinit |
 
 ## Session Continuity
 
-Last session: 2026-05-27T11:49:18.359Z
-Stopped at: context exhaustion at 78% (2026-05-27)
+Last session: 2026-05-28
+Stopped at: null
 Resume file: None
