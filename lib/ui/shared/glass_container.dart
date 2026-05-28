@@ -66,19 +66,26 @@ class GlassContainer extends StatelessWidget {
   }
 }
 
-/// 毛玻璃风格按钮 — 支持 icon+label 和 icon-only 两种模式
+/// 毛玻璃风格按钮 — 双模式 StatelessWidget
 ///
-/// label 为 null 时切换为 icon-only 模式（圆形 48×48）。
+/// - label 非空 → GlassContainer + Material + InkWell（带模糊背景）
+/// - label 为 null（iconOnly 构造）→ SizedBox + Material + InkWell（轻量无模糊）
 ///
-/// 设计：GestureDetector + MouseRegion 在最外层（BackdropFilter 之外），
-/// 确保 Windows 上 hit test 不被 ClipRRect/BackdropFilter 拦截。
-class GlassButton extends StatefulWidget {
+/// 两种模式都使用 InkWell 处理 hover/press 反馈，无缩放动画。
+class GlassButton extends StatelessWidget {
+  static final _radiusBtn = BorderRadius.circular(Tokens.radiusBtn);
+  static final _radiusIcon = BorderRadius.circular(Tokens.iconButtonRadius);
+
   final IconData icon;
   final String? label;
   final String? tooltip;
   final bool isPrimary;
   final bool enabled;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final void Function(TapUpDetails details)? onSecondaryTapUp;
+  final double iconSize;
+  final Color? color;
+  final Widget? child;
 
   const GlassButton({
     super.key,
@@ -88,9 +95,13 @@ class GlassButton extends StatefulWidget {
     this.isPrimary = false,
     this.enabled = true,
     required this.onPressed,
+    this.onSecondaryTapUp,
+    this.iconSize = Tokens.iconLg,
+    this.color,
+    this.child,
   });
 
-  /// 便捷构造：icon-only 模式
+  /// 便捷构造：icon-only 模式（轻量，无 BackdropFilter）
   const GlassButton.iconOnly({
     super.key,
     required this.icon,
@@ -98,104 +109,91 @@ class GlassButton extends StatefulWidget {
     this.isPrimary = false,
     this.enabled = true,
     required this.onPressed,
+    this.onSecondaryTapUp,
+    this.iconSize = Tokens.iconLg,
+    this.color,
+    this.child,
   }) : label = null;
 
   bool get _isIconOnly => label == null;
 
   @override
-  State<GlassButton> createState() => _GlassButtonState();
-}
-
-class _GlassButtonState extends State<GlassButton> {
-  final _hovered = ValueNotifier<bool>(false);
-  final _pressed = ValueNotifier<bool>(false);
-  late final Listenable _interaction;
-
-  @override
-  void initState() {
-    super.initState();
-    _interaction = Listenable.merge([_hovered, _pressed]);
-  }
-
-  @override
-  void dispose() {
-    _hovered.dispose();
-    _pressed.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final textColor = widget.isPrimary
-        ? Tokens.textPrimary
-        : Tokens.textSecondary;
+    if (_isIconOnly) {
+      return _buildIconOnly();
+    }
+    return _buildLabel();
+  }
 
-    // 静态子组件 — 只构建一次，hover/press 时复用
-    final content = widget._isIconOnly
-        ? GlassContainer(
-            width: Tokens.iconButtonSizeLarge,
-            height: Tokens.iconButtonSizeLarge,
-            borderRadius: BorderRadius.circular(Tokens.iconButtonRadius),
-            child: Icon(widget.icon, size: 20, color: textColor),
-          )
-        : GlassContainer(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Tokens.iconButtonPaddingH,
-              vertical: Tokens.iconButtonPaddingV,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(widget.icon, size: 18, color: textColor),
-                const SizedBox(width: Tokens.spSm),
-                Text(
-                  widget.label!,
-                  style: TextStyle(
-                    fontSize: Tokens.fontBody,
-                    fontWeight: Tokens.weightMedium,
-                    color: textColor,
-                  ),
-                ),
-              ],
-            ),
-          );
+  /// icon-only 轻量路径：SizedBox + Material + InkWell，无 BackdropFilter
+  Widget _buildIconOnly() {
+    final effectiveColor = color ??
+        (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
+    final content = child ?? Icon(icon, size: iconSize, color: effectiveColor);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: widget.enabled ? (_) => _pressed.value = true : null,
-      onTap: widget.enabled
-          ? () {
-              _pressed.value = false;
-              widget.onPressed();
-            }
-          : null,
-      onTapCancel: () => _pressed.value = false,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => _hovered.value = true,
-        onExit: (_) {
-          _hovered.value = false;
-          _pressed.value = false;
-        },
-        child: Tooltip(
-          message: widget.tooltip ?? widget.label ?? '',
-          child: AnimatedBuilder(
-            animation: _interaction,
-            builder: (context, child) {
-              final scale = _pressed.value
-                  ? Tokens.pressScale
-                  : (_hovered.value ? Tokens.hoverScale : 1.0);
-              return AnimatedContainer(
-                duration: const Duration(
-                  milliseconds: Tokens.durationFast,
-                ),
-                transform: Matrix4.diagonal3Values(scale, scale, 1),
-                transformAlignment: Alignment.center,
-                child: child,
-              );
-            },
-            child: content,
+    return Tooltip(
+      message: tooltip ?? '',
+      waitDuration: const Duration(milliseconds: 400),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: _radiusBtn,
+          child: InkWell(
+            onTap: enabled ? onPressed : null,
+            onSecondaryTapUp: onSecondaryTapUp,
+            hoverColor: Tokens.bgHover,
+            highlightColor: Colors.transparent,
+            borderRadius: _radiusBtn,
+            splashFactory: NoSplash.splashFactory,
+            child: Center(child: content),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// label 路径：GlassContainer + Material + InkWell，带模糊背景
+  Widget _buildLabel() {
+    final effectiveColor = color ??
+        (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
+
+    final content = GlassContainer(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Tokens.iconButtonPaddingH,
+        vertical: Tokens.iconButtonPaddingV,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: effectiveColor),
+          const SizedBox(width: Tokens.spSm),
+          Text(
+            label!,
+            style: TextStyle(
+              fontSize: Tokens.fontBody,
+              fontWeight: Tokens.weightMedium,
+              color: effectiveColor,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: _radiusIcon,
+      child: InkWell(
+        onTap: enabled ? onPressed : null,
+        hoverColor: Tokens.bgHover,
+        highlightColor: Colors.transparent,
+        borderRadius: _radiusIcon,
+        splashFactory: NoSplash.splashFactory,
+        child: Tooltip(
+          message: tooltip ?? label ?? '',
+          waitDuration: const Duration(milliseconds: 400),
+          child: content,
         ),
       ),
     );
