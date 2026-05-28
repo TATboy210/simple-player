@@ -1,4 +1,4 @@
-﻿#include "flutter_window.h"
+#include "flutter_window.h"
 
 #include <optional>
 
@@ -27,11 +27,6 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // D-35: Register window channel handler after HWND is available
-  window_registrar_ = std::make_unique<flutter::PluginRegistrarWindows>(
-      flutter_controller_->engine()->GetRegistrarForPlugin("WindowChannel"));
-  window_channel_.Register(window_registrar_.get(), GetHandle());
-
   return true;
 }
 
@@ -57,53 +52,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     }
   }
 
-  // ─── Frameless window handling (D-08, D-09, D-10) ───
-  if (window_channel_.is_frameless()) {
-    switch (message) {
-      case WM_NCCALCSIZE: {
-        // D-08: Frameless via WM_NCCALCSIZE — delegate to WindowChannel
-        LRESULT nc_result = window_channel_.HandleNcCalcSize(hwnd, wparam, lparam);
-        if (nc_result >= 0) return nc_result;
-        break;
-      }
-      case WM_NCHITTEST:
-        // D-09 + D-10: Resize edges + drag region
-        return window_channel_.HitTest(hwnd, lparam);
-    }
-  }
-
-  // ─── Minimum size enforcement (D-19) — always active ───
-  switch (message) {
-    case WM_GETMINMAXINFO:
-      window_channel_.OnGetMinMaxInfo(lparam);
-      return 0;
-  }
-
-  // ─── EventChannel dispatch ───
-  switch (message) {
-    case WM_SIZE:
-      window_channel_.OnResize(hwnd);
-      // Detect maximize/restore state changes (from title bar double-click,
-      // Win+Up arrow, snap layouts, etc.)
-      if (wparam == SIZE_MAXIMIZED || wparam == SIZE_RESTORED) {
-        window_channel_.OnMaximizeChanged(hwnd, wparam == SIZE_MAXIMIZED);
-      }
-      break;
-    case WM_CLOSE:
-      window_channel_.OnClose();
-      break;
-    case WM_SYSCOMMAND:
-      if ((wparam & 0xFFF0) == SC_MINIMIZE) {
-        window_channel_.OnMinimize();
-      }
-      break;
-  }
-
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
-
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);

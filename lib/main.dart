@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'kernel/engine/engine_prewarm.dart';
@@ -9,6 +10,21 @@ import 'kernel/startup/startup_coordinator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // window_manager 初始化 — 一步到位配置窗口，避免启动闪烁
+  await windowManager.ensureInitialized();
+  const windowOptions = WindowOptions(
+    size: Size(960, 540),
+    center: true,
+    backgroundColor: Colors.transparent,
+    titleBarStyle: TitleBarStyle.hidden,
+    windowButtonVisibility: false,
+    minimumSize: Size(854, 480),
+  );
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
 
   final coordinator = StartupCoordinator();
   coordinator.report(StartupPhase.infrastructure, 0.1, 'Initializing...');

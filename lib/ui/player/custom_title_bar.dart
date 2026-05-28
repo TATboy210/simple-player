@@ -63,6 +63,7 @@ class _TitleBarContentState extends State<_TitleBarContent> {
       onExit: (_) => _hovered.value = false,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
+        onPanStart: (_) => widget.windowService.startDragging(),
         onDoubleTap: _toggleMaximize,
         child: ValueListenableBuilder<bool>(
           valueListenable: _hovered,
