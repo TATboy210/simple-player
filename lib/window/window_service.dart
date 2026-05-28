@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart' as wm;
 
 import '../kernel/models/aspect_ratio_mode.dart';
-import '../kernel/utils/perf_monitor.dart';
 
 /// Re-export DragToResizeArea for UI 层 — 避免消费者直接 import window_manager 包
 export 'package:window_manager/window_manager.dart' show DragToResizeArea;
@@ -95,9 +95,9 @@ class WindowLifecycleBus {
     if (event.isStart) {
       if (event.isResize) _resizeCount++;
       if (event.isMove) _moveCount++;
-      PerfMonitor.instance.mark(label);
+      developer.Timeline.startSync(label);
     } else {
-      PerfMonitor.instance.markEnd(label);
+      developer.Timeline.finishSync();
     }
   }
 
