@@ -253,6 +253,18 @@ void main() {
       expect(shortcuts, isEmpty);
     });
 
+    test('loadShortcuts returns empty map on corrupt JSON', () async {
+      SharedPreferences.setMockInitialValues({'shortcuts': 'not valid json'});
+      final shortcuts = await SettingsStore.loadShortcuts();
+      expect(shortcuts, isEmpty);
+    });
+
+    test('loadShortcuts returns empty map on empty string', () async {
+      SharedPreferences.setMockInitialValues({'shortcuts': ''});
+      final shortcuts = await SettingsStore.loadShortcuts();
+      expect(shortcuts, isEmpty);
+    });
+
     test('saveShortcuts/loadShortcuts round-trip', () async {
       final bindings = {'play_pause': 'space', 'next': 'n'};
       await SettingsStore.saveShortcuts(bindings);

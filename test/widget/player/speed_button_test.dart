@@ -1,7 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/speed_button.dart';
+import 'package:simple_player_flutter/ui/widgets/osd_overlay.dart';
 import '../../helpers/fake_engine.dart';
 
 void main() {
@@ -13,6 +15,7 @@ void main() {
     });
 
     tearDown(() {
+      OsdService.I.hide();
       engine.dispose();
     });
 
@@ -69,7 +72,6 @@ void main() {
 
     testWidgets('renders three segments in a Row', (tester) async {
       await tester.pumpWidget(buildSubject());
-      // SpeedButton builds a Row with 3 children
       final row = tester.widget<Row>(
         find.descendant(
           of: find.byType(SpeedButton),
@@ -77,6 +79,121 @@ void main() {
         ),
       );
       expect(row.children.length, 3);
+    });
+
+    // ── Scroll wheel tests ──
+
+    testWidgets('scroll wheel up increases speed', (tester) async {
+      engine.playbackSpeed.value = 1.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final button = find.byType(SpeedButton);
+      final center = tester.getRect(button).center;
+
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, -100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, greaterThan(1.0));
+      OsdService.I.hide();
+    });
+
+    testWidgets('scroll wheel down decreases speed', (tester) async {
+      engine.playbackSpeed.value = 1.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final button = find.byType(SpeedButton);
+      final center = tester.getRect(button).center;
+
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, 100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, lessThan(1.0));
+      OsdService.I.hide();
+    });
+
+    testWidgets('scroll wheel at max speed clamps', (tester) async {
+      engine.playbackSpeed.value = 4.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final button = find.byType(SpeedButton);
+      final center = tester.getRect(button).center;
+
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, -100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, 4.0);
+      OsdService.I.hide();
+    });
+
+    testWidgets('scroll wheel at min speed clamps', (tester) async {
+      engine.playbackSpeed.value = 0.5;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final button = find.byType(SpeedButton);
+      final center = tester.getRect(button).center;
+
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, 100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, 0.5);
+      OsdService.I.hide();
+    });
+
+    // ── Double-tap reset test ──
+
+    // ── Rendering assertions ──
+
+    testWidgets('left arrow segment has chevron_left icon', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      expect(find.byIcon(Icons.chevron_left), findsOneWidget);
+    });
+
+    testWidgets('right arrow segment has chevron_right icon', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+    });
+
+    testWidgets('each segment has a Tooltip', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      // 3 segments → 3 Tooltips
+      expect(find.byType(Tooltip), findsNWidgets(3));
+    });
+
+    testWidgets('each segment has InkWell for hover feedback', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      expect(find.byType(InkWell), findsNWidgets(3));
+    });
+
+    testWidgets('SizedBox is 72x36', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      // SpeedButton wraps everything in SizedBox(72, 36)
+      final box = tester.widget<SizedBox>(
+        find.byWidgetPredicate(
+          (w) => w is SizedBox && w.width == 72 && w.height == 36,
+        ),
+      );
+      expect(box.width, 72);
+      expect(box.height, 36);
     });
   });
 }
