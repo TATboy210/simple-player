@@ -75,7 +75,7 @@ Plans:
   4. Control bar frame drops eliminated or reduced to <5% jank in profile mode
   5. Root cause of control bar jitter identified and fixed
 
-**Plans**: 3 plans in 2 waves
+**Plans**: 4 plans in 2 waves
 
 Plans:
 **Wave 1**
@@ -86,6 +86,10 @@ Plans:
 
 - [x] 03-02-PLAN.md — Control bar profiling + frame drop fix (PERF-03)
 - [x] 03-03-PLAN.md — Error re-scan + performance report (PERF-01, PERF-03)
+
+**Wave 3** *(gap closure)*
+
+- [ ] 03-04-PLAN.md — Settings persistence + D3D11 hardware testing template + DevTools profiling guide (PERF-01, PERF-03)
 
 ### Phase 4: Platform Stubs & Test Coverage
 
@@ -119,9 +123,9 @@ Plans:
 | WIN-03 | 1 | 01-02, 01-03 |
 | WIDGET-01 | 2 | 02-01 |
 | WIDGET-02 | 2 | 02-02 |
-| PERF-01 | 3 | 03-01, 03-03 |
+| PERF-01 | 3 | 03-01, 03-03, 03-04 |
 | PERF-02 | 1 | 01-04 |
-| PERF-03 | 3 | 03-02, 03-03 |
+| PERF-03 | 3 | 03-02, 03-03, 03-04 |
 | PLATFORM-01 | 1 | 01-01, 01-02 |
 | PLATFORM-02 | 4 | 04-01 |
 | TEST-01 | 4 | 04-02 |
@@ -130,4 +134,4 @@ Plans:
 | TEST-04 | 4 | 04-03 |
 
 ---
-*Last updated: 2026-05-29 — Phase 3 planning complete (3 plans, 2 waves)*
+*Last updated: 2026-05-29 — Phase 3 gap closure plan added (plan 04)*
