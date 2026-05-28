@@ -11,7 +11,7 @@ Build self-managed window control via MethodChannel + Win32 FFI, unify the glass
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Window Management Foundation** — MethodChannel + Win32 FFI + state persistence + error handling fixes ✅ 2026-05-28
-- [ ] **Phase 2: Widget Unification** — Glass component library + ValueNotifier rebuild optimization
+- [x] **Phase 2: Widget Unification** — Glass component library + ValueNotifier rebuild optimization ✅ 2026-05-28
 - [ ] **Phase 3: Performance Optimization** — D3D11 tuning + control bar profiling + frame drop fixes
 - [ ] **Phase 4: Platform Stubs & Test Coverage** — macOS/Linux stubs + test coverage 64% → 80%
 
@@ -50,8 +50,8 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 02-01-PLAN.md — Glass component merge + barrel file + migration + tests (WIDGET-01)
-- [ ] 02-02-PLAN.md — Glass performance optimizations + ValueNotifier audit (WIDGET-02)
+- [x] 02-01-PLAN.md — Glass component merge + barrel file + migration + tests (WIDGET-01) ✅
+- [x] 02-02-PLAN.md — Glass performance optimizations + ValueNotifier audit (WIDGET-02) ✅
 
 ### Phase 3: Performance Optimization
 **Goal**: Apply D3D11 hardware tuning and fix control bar frame drops based on profiling data
