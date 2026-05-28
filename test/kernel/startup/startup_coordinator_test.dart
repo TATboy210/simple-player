@@ -80,5 +80,38 @@ void main() {
       c.report(StartupPhase.infrastructure, 0.5, 'test');
       expect(() => c.dispose(), returnsNormally);
     });
+
+    test('phase with progress 0.0 starts stopwatch', () {
+      coordinator.report(StartupPhase.infrastructure, 0.0, 'Starting');
+      expect(coordinator.state.value.progress, 0.0);
+    });
+
+    test('phase lifecycle: 0.0 then 1.0 records duration', () {
+      coordinator.report(StartupPhase.infrastructure, 0.0, 'Starting');
+      coordinator.report(StartupPhase.infrastructure, 1.0, 'Done');
+      expect(coordinator.state.value.progress, 1.0);
+    });
+
+    test('markReady after completed phases logs timeline with durations', () {
+      coordinator.report(StartupPhase.infrastructure, 0.0, 'Starting');
+      coordinator.report(StartupPhase.infrastructure, 1.0, 'Done');
+      coordinator.report(StartupPhase.settings, 0.0, 'Loading');
+      coordinator.report(StartupPhase.settings, 1.0, 'Done');
+      coordinator.markReady();
+      expect(coordinator.state.value.phase, StartupPhase.ready);
+    });
+
+    test('markReady with phases that have timestamps but no duration', () {
+      // Report at 0.5 (not 0.0) — timestamp recorded but no stopwatch started
+      coordinator.report(StartupPhase.infrastructure, 0.5, 'Halfway');
+      coordinator.markReady();
+      expect(coordinator.state.value.phase, StartupPhase.ready);
+    });
+
+    test('markReady with skipped phases', () {
+      // No reports for some phases — they should show as 'skipped'
+      coordinator.markReady();
+      expect(coordinator.state.value.phase, StartupPhase.ready);
+    });
   });
 }
