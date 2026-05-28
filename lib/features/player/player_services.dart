@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../kernel/bridge/window_service.dart';
 import '../../kernel/engine/fvp_engine.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/playlist/playlist.dart';
@@ -15,6 +16,7 @@ class PlayerServices {
   late final Playlist playlist;
   late final PlaybackController controller;
   late final VideoProcessingService videoProcessing;
+  late final WindowService windowService;
 
   final ValueNotifier<int> playlistGeneration = ValueNotifier(0);
 
@@ -29,10 +31,13 @@ class PlayerServices {
     final settings = await SettingsStore.load();
     await controller.init(settings: settings);
     videoProcessing = VideoProcessingService(engine, initialSettings: settings);
+    windowService = WindowService();
+    windowService.init();
   }
 
   void dispose() {
     playlistGeneration.dispose();
+    windowService.dispose();
     videoProcessing.dispose();
     controller.dispose();
     engine.dispose();
