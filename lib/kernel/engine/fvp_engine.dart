@@ -44,6 +44,10 @@ class FvpEngine implements MediaEngine {
   static const _networkAnalyzeDurationUs = 5000000; // 5s
   static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
 
+  // D3D11 性能参数默认值
+  static const _defaultD3d11SyncCpu = '1'; // 1=同步（安全默认），0=异步（低延迟）
+  static const _defaultVideoDecoders = 'D3D11,NVDEC,FFmpeg'; // 硬件优先
+
   // ─── Helpers ───
 
   late FvpCallbackHandler _callbackHandler;
@@ -122,7 +126,29 @@ class FvpEngine implements MediaEngine {
 
     p.textureId.addListener(_onTextureIdChanged);
     _callbackHandler.init();
+
+    // D3D11 性能参数 — 在 init 后、open 前设置
+    _applyD3d11Defaults(p);
+
     return p;
+  }
+
+  /// 应用 D3D11 渲染管线默认参数
+  ///
+  /// 在 player 创建后立即调用，确保后续 open() 使用优化配置。
+  /// 参考: MDK SDK Player.setProperty, fvp_plugin.cpp D3D11RenderAPI
+  void _applyD3d11Defaults(mdk.Player p) {
+    // d3d11.sync.cpu: CPU/GPU 同步控制
+    //   0 = 异步（低延迟，可能撕裂）
+    //   1 = 同步（安全默认，完整画面）
+    p.setProperty('d3d11.sync.cpu', _defaultD3d11SyncCpu);
+
+    // video.decoders: 解码器优先级列表
+    //   硬件解码器优先，软件解码器兜底
+    p.setProperty('video.decoders', _defaultVideoDecoders);
+
+    debugPrint('FvpEngine: D3D11 defaults applied (sync.cpu=$_defaultD3d11SyncCpu, '
+        'decoders=$_defaultVideoDecoders)');
   }
 
   void _onTextureIdChanged() {
@@ -601,6 +627,31 @@ class FvpEngine implements MediaEngine {
         'video.avfilter',
         enable ? 'yadif=mode=send_frame:deint=all' : '',
       );
+    });
+  }
+
+  // ─── D3D11 性能参数 ───
+
+  @override
+  void setD3d11SyncEnabled(bool enabled) {
+    _guardedAction('setD3d11SyncEnabled', () {
+      // 0=异步（低延迟），1=同步（安全默认）
+      _player.setProperty('d3d11.sync.cpu', enabled ? '1' : '0');
+      debugPrint('FvpEngine: d3d11.sync.cpu = ${enabled ? 1 : 0}');
+    });
+  }
+
+  @override
+  void setHardwareDecoding(bool enabled) {
+    _guardedAction('setHardwareDecoding', () {
+      if (enabled) {
+        // 硬件解码器优先，软件解码器兜底
+        _player.setProperty('video.decoders', _defaultVideoDecoders);
+      } else {
+        // 仅软件解码器
+        _player.setProperty('video.decoders', 'FFmpeg');
+      }
+      debugPrint('FvpEngine: video.decoders = ${enabled ? _defaultVideoDecoders : "FFmpeg"}');
     });
   }
 
