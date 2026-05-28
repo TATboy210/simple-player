@@ -1,29 +1,20 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show Size;
+import 'package:window_manager/window_manager.dart';
 
-import '../utils/log.dart';
-
-/// Window management service — wraps MethodChannel/EventChannel.
+/// Window management service — wraps window_manager package.
 ///
 /// Provides ValueNotifier state for reactive UI binding via
-/// ValueListenableBuilder. Follows the FvpEngine pattern:
-/// _guardedCall for disposed-safe error handling, ValueNotifier for state.
+/// ValueListenableBuilder. Delegates all window operations to
+/// the windowManager singleton.
 ///
-/// MethodChannel: com.simple_player/window (7 commands)
-/// EventChannel: com.simple_player/window_events (5 event types)
-class WindowService {
+/// Uses WindowListener mixin to receive events and update ValueNotifiers.
+class WindowService with WindowListener {
   WindowService();
 
-  static const _channel = MethodChannel('com.simple_player/window');
-  static const _eventChannel =
-      EventChannel('com.simple_player/window_events');
-
   bool _disposed = false;
-  StreamSubscription<dynamic>? _eventSubscription;
 
-  // ─── State (ValueNotifier pattern from FvpEngine) ───
+  // ─── State (ValueNotifier pattern) ───
 
   final ValueNotifier<bool> isFullscreen = ValueNotifier(false);
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
@@ -32,94 +23,68 @@ class WindowService {
 
   /// Initialize event listener — call after construction.
   void init() {
-    _eventSubscription = _eventChannel
-        .receiveBroadcastStream()
-        .listen(_handleEvent, onError: (Object e) {
-      log.e('WindowService event stream error', error: e);
+    windowManager.addListener(this);
+  }
+
+  // ─── WindowListener callbacks → update ValueNotifiers ───
+
+  @override
+  void onWindowMaximize() {
+    if (!_disposed) isMaximized.value = true;
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    if (!_disposed) isMaximized.value = false;
+  }
+
+  @override
+  void onWindowEnterFullScreen() {
+    if (!_disposed) isFullscreen.value = true;
+  }
+
+  @override
+  void onWindowLeaveFullScreen() {
+    if (!_disposed) isFullscreen.value = false;
+  }
+
+  @override
+  void onWindowResize() {
+    if (_disposed) return;
+    windowManager.getSize().then((size) {
+      if (!_disposed) windowSize.value = size;
     });
   }
 
-  void _handleEvent(dynamic event) {
-    if (_disposed) return;
-    final map = event as Map;
-    switch (map['event'] as String) {
-      case 'onResize':
-        windowSize.value = Size(
-          (map['width'] as num).toDouble(),
-          (map['height'] as num).toDouble(),
-        );
-      case 'onFullscreenChange':
-        isFullscreen.value = map['fullscreen'] as bool;
-      case 'onMove':
-        log.d('WindowService: onMove');
-      case 'onClose':
-        log.d('WindowService: onClose');
-      case 'onMinimize':
-        log.d('WindowService: onMinimize');
-      case 'onMaximize':
-        isMaximized.value = map['maximized'] as bool;
-    }
-  }
-
-  // ─── Commands (guardedCall pattern from FvpEngine) ───
-
-  Future<void> _guardedCall(String name, Map<String, dynamic> args) async {
-    if (_disposed) return;
-    try {
-      await _channel.invokeMethod(name, args);
-    } on Exception catch (e) {
-      log.e('WindowService.$name failed', error: e);
-    }
-  }
+  // ─── Commands (delegate to windowManager) ───
 
   Future<void> setFullscreen(bool value) =>
-      _guardedCall('setFullscreen', {'fullscreen': value});
+      windowManager.setFullScreen(value);
 
   Future<void> setAlwaysOnTop(bool value) =>
-      _guardedCall('setAlwaysOnTop', {'alwaysOnTop': value});
+      windowManager.setAlwaysOnTop(value);
 
   Future<void> setSize(double width, double height) =>
-      _guardedCall('setSize', {'width': width, 'height': height});
-
-  Future<void> setPosition(double x, double y) =>
-      _guardedCall('setPosition', {'x': x, 'y': y});
+      windowManager.setSize(Size(width, height));
 
   Future<void> setMinSize(double width, double height) =>
-      _guardedCall('setMinSize', {'width': width, 'height': height});
+      windowManager.setMinimumSize(Size(width, height));
 
-  Future<void> setFrameless(bool value) =>
-      _guardedCall('setFrameless', {'frameless': value});
+  Future<void> minimize() => windowManager.minimize();
 
-  Future<void> minimize() => _guardedCall('minimize', {});
+  Future<void> maximize() => windowManager.maximize();
 
-  Future<void> maximize() => _guardedCall('maximize', {});
+  Future<void> restore() => windowManager.restore();
 
-  Future<void> restore() => _guardedCall('restore', {});
+  Future<void> close() => windowManager.close();
 
-  Future<void> close() => _guardedCall('close', {});
+  Future<void> center() => windowManager.center();
 
-  Future<void> center() => _guardedCall('center', {});
-
-  Future<Rect> getTitleBarBounds() async {
-    if (_disposed) return Rect.zero;
-    try {
-      final result = await _channel.invokeMethod('getTitleBarBounds');
-      final map = result as Map;
-      return Rect.fromLTWH(
-        (map['x'] as num).toDouble(),
-        (map['y'] as num).toDouble(),
-        (map['width'] as num).toDouble(),
-        (map['height'] as num).toDouble(),
-      );
-    } on Exception catch (e) {
-      log.e('WindowService.getTitleBarBounds failed', error: e);
-      return Rect.zero;
-    }
-  }
+  Future<void> startDragging() => windowManager.startDragging();
 
   void dispose() {
     _disposed = true;
-    _eventSubscription?.cancel();
+    windowManager.removeListener(this);
     isFullscreen.dispose();
     isAlwaysOnTop.dispose();
     isMaximized.dispose();

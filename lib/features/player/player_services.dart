@@ -33,9 +33,6 @@ class PlayerServices {
     videoProcessing = VideoProcessingService(engine, initialSettings: settings);
     windowService = WindowService();
     windowService.init();
-    // D-20: 默认窗口大小 960x540, D-24: 每次启动居中
-    windowService.setSize(960, 540);
-    windowService.center();
   }
 
   void dispose() {
