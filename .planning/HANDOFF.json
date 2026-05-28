@@ -1,59 +1,48 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T12:00:00+08:00",
-  "phase": "3",
-  "phase_name": "Performance Optimization",
-  "phase_dir": ".planning/phases/03-performance-optimization",
-  "plan": 5,
+  "timestamp": "2026-05-29T13:30:00+08:00",
+  "phase": "4",
+  "phase_name": "test-coverage",
+  "phase_dir": ".planning/phases/04-test-coverage",
+  "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "migration_complete_awaiting_manual_test",
+  "status": "wave1_wave2_complete_wave3_pending",
   "completed_tasks": [
-    {"id": 1, "name": "Phase 1+2+3 execution", "status": "done", "commit": "213c421"},
-    {"id": 2, "name": "Window visibility fix (window.Show())", "status": "done", "commit": "0e1fed9"},
-    {"id": 3, "name": "Security audit of window management code", "status": "done"},
-    {"id": 4, "name": "Window frameless anti-pattern documentation", "status": "done"},
-    {"id": 5, "name": "window_manager research + comparison (vs nativeapi vs custom C++)", "status": "done"},
-    {"id": 6, "name": "Delete C++ window_channel.cpp/h (696 lines)", "status": "done"},
-    {"id": 7, "name": "Clean up flutter_window.cpp/h + CMakeLists.txt + main.cpp", "status": "done"},
-    {"id": 8, "name": "Rewrite WindowService to window_manager wrapper", "status": "done"},
-    {"id": 9, "name": "Update main.dart with windowManager init + waitUntilReadyToShow", "status": "done"},
-    {"id": 10, "name": "Update player_services.dart + custom_title_bar.dart", "status": "done"},
-    {"id": 11, "name": "Build + analyze + 312 tests pass", "status": "done"}
+    {"id": 1, "name": "Wave 1: startup_state_test.dart (NEW, 7 tests)", "status": "done"},
+    {"id": 2, "name": "Wave 1: startup_coordinator_test.dart (NEW, 8 tests)", "status": "done"},
+    {"id": 3, "name": "Wave 1: video_processing_state_test.dart (NEW, 10 tests)", "status": "done"},
+    {"id": 4, "name": "Wave 1: path_utils_dirname_test.dart (NEW, 9 tests)", "status": "done"},
+    {"id": 5, "name": "Wave 1: media_info_test.dart (EXPAND, +4 tests)", "status": "done"},
+    {"id": 6, "name": "Wave 1: fvp_callback_handler_test.dart (already 4 tests)", "status": "done"},
+    {"id": 7, "name": "Wave 2: settings_store_test.dart (EXPAND, +12 tests)", "status": "done"},
+    {"id": 8, "name": "Wave 2: subtitle_service_test.dart (NEW, 6 tests)", "status": "done"},
+    {"id": 9, "name": "All 371 tests passing", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 12, "name": "Manual test: launch app, verify no startup flash, drag, DWM animation, resize", "status": "not_started"},
-    {"id": 13, "name": "Manual: D3D11 multi-hardware testing (3+ GPU configs)", "status": "not_started"},
-    {"id": 14, "name": "Phase 4: Platform Stubs & Test Coverage", "status": "not_started"}
+    {"id": 10, "name": "Wave 3: progress_bar widget test (~30 lines gain)", "status": "not_started"},
+    {"id": 11, "name": "Wave 3: window_service test with mock (~30 lines gain)", "status": "not_started"},
+    {"id": 12, "name": "Expand playlist_store test (loadInBackground, ~30 lines gain)", "status": "not_started"},
+    {"id": 13, "name": "Verify coverage reaches 80%+", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [
-    {"action": "Run flutter run -d windows and manually verify window behavior", "context": "Test: no startup flash, title bar drag, DWM maximize animation, Win11 rounded corners, edge resize, fullscreen F key, close button", "blocking": true}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Use window_manager (v0.5.1) over nativeapi (v0.1.3) and custom C++", "rationale": "window_manager: 836 stars, production-ready, preserves DWM animations (NCCALCSIZE not WS_CAPTION removal), 12 WindowListener events, DragToResizeArea built-in. nativeapi: 97 stars, WIP, v0.1.3 unstable API. Custom C++: 696 lines to maintain, Flutter intercepts WM_NCHITTEST.", "phase": "3"},
-    {"decision": "TitleBarStyle.hidden over setAsFrameless()", "rationale": "Hidden style uses NCCALCSIZE to hide title bar while keeping WS_CAPTION/WS_THICKFRAME intact, preserving DWM animations. setAsFrameless sets a boolean flag without storing title bar style.", "phase": "3"},
-    {"decision": "Window initialization in main.dart via waitUntilReadyToShow", "rationale": "One-step window config (size, center, titleBarStyle, minimumSize) at startup. Eliminates intermediate frame with native title bar. window.Show() removed from main.cpp.", "phase": "3"},
-    {"decision": "WindowService kept as thin wrapper over windowManager singleton", "rationale": "Maintains ValueNotifier pattern for existing UI code (CustomTitleBar, PlayerScreen). WindowListener mixin updates notifiers. Avoids direct window_manager dependency in kernel/UI layers.", "phase": "3"}
+    {"decision": "Phase 4 focuses on test coverage only, skip platform stubs", "rationale": "window_manager provides cross-platform support natively, no need for PlatformWindow abstraction", "phase": "4"},
+    {"decision": "Kernel/bridge layer tests first (pure Dart, no platform deps)", "rationale": "Highest coverage-per-effort ratio. UI widget tests are lower priority.", "phase": "4"},
+    {"decision": "Skip l10n testing (generated files)", "rationale": "app_localizations_en/zh.dart are auto-generated, testing them provides no value", "phase": "4"}
   ],
   "uncommitted_files": [
-    "lib/features/player/player_services.dart",
-    "lib/kernel/bridge/window_service.dart",
-    "lib/main.dart",
-    "lib/ui/player/custom_title_bar.dart",
-    "pubspec.lock",
-    "pubspec.yaml",
-    "windows/flutter/generated_plugin_registrant.cc",
-    "windows/flutter/generated_plugins.cmake",
-    "windows/runner/CMakeLists.txt",
-    "windows/runner/flutter_window.cpp",
-    "windows/runner/flutter_window.h",
-    "windows/runner/main.cpp"
+    "test/kernel/models/media_info_test.dart",
+    "test/kernel/persistence/settings_store_test.dart",
+    "test/kernel/models/video_processing_state_test.dart",
+    "test/kernel/utils/path_utils_dirname_test.dart",
+    ".planning/phases/04-test-coverage/04-CONTEXT.md",
+    ".planning/phases/04-test-coverage/04-01-PLAN.md",
+    "test/features/player/services/subtitle_service_test.dart",
+    "test/kernel/startup/startup_state_test.dart",
+    "test/kernel/startup/startup_coordinator_test.dart"
   ],
-  "deleted_files": [
-    "windows/runner/window_channel.cpp",
-    "windows/runner/window_channel.h"
-  ],
-  "next_action": "Run flutter run -d windows, manually verify: (1) no startup flash, (2) window 960x540 centered, (3) title bar drag moves window, (4) double-click maximize/restore with DWM animation, (5) edge resize, (6) Win11 rounded corners, (7) minimize/maximize/close buttons, (8) fullscreen F key, (9) close button works",
-  "context_notes": "window_manager migration complete. -839 lines C++, +124 lines Dart. 312 tests pass. Build succeeds. Key insight: window_manager uses NCCALCSIZE internally (not WS_CAPTION removal) to hide title bar, solving the root cause of DWM animation loss. DragToResizeArea not yet wrapped around PlayerScreen — startDragging() added to title bar onPanStart, but edge resize may need DragToResizeArea widget wrapper if WM_NCHITTEST resize doesn't work through window_manager."
+  "next_action": "Commit Wave 1+2 tests, then write Wave 3 tests (progress_bar widget, window_service mock, playlist_store expansion). Run flutter test --coverage to verify 80%+ target. Gap: 234 lines remaining.",
+  "context_notes": "Coverage went from 62.8% (1201/1912) to 66.1% (1296/1961), +95 lines gained from 59 new tests. Need 234 more lines for 80% target. Highest remaining targets: progress_bar.dart (53.8%, 130 lines), playlist_store.dart (56.8%, 81 lines), window_service.dart (0%, 93 lines). Window service needs window_manager mock — may need to create a thin interface or use MethodChannel mock. The subtitle_service test uses _FakeEngine with noSuchMethod to avoid implementing full MediaEngine interface. Path separator fix applied for Windows compatibility in subtitle tests."
 }
