@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_icon_button.dart';
+import '../shared/glass_widgets.dart';
 import '../shared/value_listenable_builder2.dart';
 import '../widgets/osd_overlay.dart';
 
@@ -54,7 +54,7 @@ class _VolumeButtonState extends State<VolumeButton> {
         } else {
           icon = Icons.volume_up;
         }
-        return GlassIconButton(
+        return GlassButton.iconOnly(
           icon: icon,
           iconSize: Tokens.iconLg,
           color: muted ? Tokens.accent : Tokens.textPrimary,

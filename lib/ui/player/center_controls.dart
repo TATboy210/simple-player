@@ -4,7 +4,7 @@ import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_icon_button.dart';
+import '../shared/glass_widgets.dart';
 
 /// 播放/暂停按钮
 class PlayPauseButton extends StatelessWidget {
@@ -27,7 +27,7 @@ class PlayPauseButton extends StatelessWidget {
       builder: (_, state, _) {
         final playing = state == MediaState.playing;
         final baseColor = playing ? Tokens.accent : Tokens.textPrimary;
-        return GlassIconButton(
+        return GlassButton.iconOnly(
           icon: playing ? Icons.pause : Icons.play_arrow,
           iconSize: Tokens.iconXl,
           color: baseColor.withValues(alpha: baseColor.a * iconAlpha),
@@ -66,14 +66,14 @@ class CenterGroup extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GlassIconButton(
+        GlassButton.iconOnly(
           icon: Icons.skip_previous,
           color: dimmed,
           onPressed: isIdle ? null : onPrevious,
           tooltip: prevTooltip,
         ),
         const SizedBox(width: Tokens.spXs),
-        GlassIconButton(
+        GlassButton.iconOnly(
           icon: Icons.replay_10,
           color: dimmed,
           onPressed: isIdle ? null : () => engine.skipBack(Tokens.skipSecondsShort),
@@ -88,21 +88,21 @@ class CenterGroup extends StatelessWidget {
               PlayPauseButton(engine: engine, isIdle: isIdle, iconAlpha: alpha),
         ),
         const SizedBox(width: Tokens.spSm),
-        GlassIconButton(
+        GlassButton.iconOnly(
           icon: Icons.forward_30,
           color: dimmed,
           onPressed: isIdle ? null : () => engine.skipForward(Tokens.skipSecondsLong),
           tooltip: AppLocalizations.of(context).forward30,
         ),
         const SizedBox(width: Tokens.spXs),
-        GlassIconButton(
+        GlassButton.iconOnly(
           icon: Icons.skip_next,
           color: dimmed,
           onPressed: isIdle ? null : onNext,
           tooltip: nextTooltip,
         ),
         const SizedBox(width: Tokens.spXs),
-        GlassIconButton(
+        GlassButton.iconOnly(
           icon: Icons.stop,
           color: dimmed,
           onPressed: isIdle ? null : engine.stop,
