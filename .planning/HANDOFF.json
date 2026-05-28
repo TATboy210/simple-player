@@ -1,48 +1,38 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T06:15:00+08:00",
+  "timestamp": "2026-05-29T07:00:00+08:00",
   "phase": "4",
   "phase_name": "test-coverage",
   "phase_dir": ".planning/phases/04-test-coverage",
   "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "paused_73.7pct_gap_remaining",
+  "status": "paused_74.4pct",
   "completed_tasks": [
-    {"id": 1, "name": "Wave 1: startup_state_test.dart (NEW, 7 tests)", "status": "done"},
-    {"id": 2, "name": "Wave 1: startup_coordinator_test.dart (NEW, 8 tests)", "status": "done"},
-    {"id": 3, "name": "Wave 1: video_processing_state_test.dart (NEW, 10 tests)", "status": "done"},
-    {"id": 4, "name": "Wave 1: path_utils_dirname_test.dart (NEW, 9 tests)", "status": "done"},
-    {"id": 5, "name": "Wave 1: media_info_test.dart (EXPAND, +4 tests)", "status": "done"},
-    {"id": 6, "name": "Wave 1: fvp_callback_handler_test.dart (already 4 tests)", "status": "done"},
-    {"id": 7, "name": "Wave 2: settings_store_test.dart (EXPAND, +12 tests)", "status": "done"},
-    {"id": 8, "name": "Wave 2: subtitle_service_test.dart (NEW, 6 tests)", "status": "done"},
-    {"id": 9, "name": "Wave 3: playlist_test.dart (EXPAND, +18 tests)", "status": "done"},
-    {"id": 10, "name": "Wave 3: playlist_store_test.dart (EXPAND, +7 tests)", "status": "done"},
-    {"id": 11, "name": "Wave 3: error_banner_test.dart (NEW, 7 tests)", "status": "done"},
-    {"id": 12, "name": "Wave 3: progress_bar_test.dart (NEW, 6 tests)", "status": "done"},
-    {"id": 13, "name": "Wave 4: progress_bar_test.dart (EXPAND +5 tests, 11 total)", "status": "done"},
-    {"id": 14, "name": "Wave 4: speed_button_test.dart (NEW, 8 tests)", "status": "done"},
-    {"id": 15, "name": "Wave 4: glass_chip_test.dart (NEW, 7 tests)", "status": "done"},
-    {"id": 16, "name": "Wave 4: settings_store_test.dart (EXPAND +20 tests)", "status": "done"},
-    {"id": 17, "name": "All 448 tests passing", "status": "done"}
+    {"id": 1, "name": "Wave 1: kernel unit tests (6 files)", "status": "done"},
+    {"id": 2, "name": "Wave 2: bridge/persistence tests (2 files)", "status": "done"},
+    {"id": 3, "name": "Wave 3: widget tests (4 files)", "status": "done"},
+    {"id": 4, "name": "Wave 4: expanded widget + settings tests", "status": "done"},
+    {"id": 5, "name": "Wave 5: state_monitor init/completed + subtitle_service async", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 18, "name": "state_monitor test expansion (+13 gap)", "status": "not_started", "notes": "state_monitor.dart 109 lines — init() loads settings + registers listener, _onStateChanged handles pause save + auto-advance, dispose saves volume/muted/playmode"},
-    {"id": 19, "name": "subtitle_service pure logic tests (+12 gap)", "status": "not_started", "notes": "_extractBaseName and _matchSubtitle are pure functions testable without platform deps"},
-    {"id": 20, "name": "position_poller / fvp_callback_handler coverage", "status": "not_started", "notes": "50+ lines coupled to mdk.Player FFI — may need to skip or use mock platform channel"},
-    {"id": 21, "name": "glass_container/thumbnail_tile widget tests", "status": "not_started", "notes": "glass_container.dart 245 lines (GlassTier, opacity, blurEnabled), thumbnail_tile.dart — both 0% covered"},
-    {"id": 22, "name": "Verify coverage reaches 80%+", "status": "not_started"}
+    {"id": 6, "name": "progress_bar hover/tooltip tests (+37 gap)", "status": "not_started", "notes": "MouseRegion onEnter/onExit/onHover + drag tooltip + _buildTooltip. Hardest but biggest single-file gain."},
+    {"id": 7, "name": "speed_button interaction tests (+16 gap)", "status": "not_started", "notes": "18px _Segment tap targets too small for widget tests. May need different approach."},
+    {"id": 8, "name": "playlist_store error path tests (+13 gap)", "status": "not_started", "notes": "_flush retry, _loadPlaylistSync catch, _migrateHistory corrupt entry. Need FS mocking."},
+    {"id": 9, "name": "settings_store edge cases (+11 gap)", "status": "not_started", "notes": "Mostly clamping/sanitization edge cases already covered. Remaining are deep error paths."},
+    {"id": 10, "name": "auto_hide_controller timer tests (+10 gap)", "status": "not_started", "notes": "Timer-based auto-hide logic. Needs fake_async or similar."},
+    {"id": 11, "name": "Verify coverage reaches 80%+", "status": "not_started"}
   ],
-  "blockers": [],
+  "blockers": [
+    {"description": "fvp_callback_handler.dart (29 gap) and position_poller.dart (21 gap) are FFI-coupled to mdk.Player — cannot test without platform mocking", "type": "technical", "workaround": "Skip these files, compensate with other file coverage"}
+  ],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 4 focuses on test coverage only, skip platform stubs", "rationale": "window_manager provides cross-platform support natively", "phase": "4"},
-    {"decision": "Kernel/bridge layer tests first (pure Dart, no platform deps)", "rationale": "Highest coverage-per-effort ratio", "phase": "4"},
-    {"decision": "Skip l10n testing (generated files)", "rationale": "Auto-generated, testing provides no value", "phase": "4"},
-    {"decision": "position_poller/fvp_callback_handler may be uncoverable", "rationale": "Tightly coupled to mdk.Player FFI — needs platform mocking infrastructure", "phase": "4"}
+    {"decision": "Skip FFI-coupled files (fvp_callback_handler, position_poller)", "rationale": "50+ lines untestable without mdk.Player mock infrastructure", "phase": "4"},
+    {"decision": "Use preloaded AppSettings for StateMonitor.init()", "rationale": "Avoids SettingsStore.load() platform dependency in tests", "phase": "4"},
+    {"decision": "l10n files excluded from target", "rationale": "291 lines auto-generated, testing provides no value", "phase": "4"}
   ],
   "uncommitted_files": [],
-  "next_action": "Continue closing 123-line gap. Priority: state_monitor (+13), subtitle_service (+12), glass_container (+20), thumbnail_tile. position_poller/fvp_callback_handler likely skip (FFI-coupled). Target: 1569/1961 (80%).",
-  "context_notes": "Coverage 73.7% (1446/1961). Gap 123 lines. l10n files contribute 291 untestable lines. Non-l10n coverage ~80%. 448 tests passing. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. Widget tests need AppLocalizations.localizationsDelegates in MaterialApp. 18px SpeedButton segments too small for reliable tap tests — use rendering assertions instead."
+  "next_action": "Write progress_bar hover/drag interaction tests (37 gap — biggest single-file target). Use tester.createGesture + mouse hover to trigger onEnter/onExit/onHover. Then speed_button and auto_hide_controller.",
+  "context_notes": "Coverage 74.4% (1459/1961). Gap 102 lines to 80%. 459 tests passing. Non-l10n coverage ~82%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. Widget tests need AppLocalizations.localizationsDelegates in MaterialApp. progress_bar hover tests are the hardest but highest-impact remaining target (37 lines). The _buildTooltip and _BarPainter.thumb are only reachable through interaction. 18px SpeedButton segments too small for tap tests."
 }
