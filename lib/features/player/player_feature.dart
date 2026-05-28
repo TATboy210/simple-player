@@ -144,6 +144,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       playlist: playlist,
       customBindings: _customBindings,
       playlistGeneration: _services.playlistGeneration,
+      windowService: _services.windowService,
       onOpenFile: _openFile,
       onTogglePlayMode: _onTogglePlayMode,
       onSettings: () => widget.onSettings(
