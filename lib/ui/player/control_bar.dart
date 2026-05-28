@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_icon_button.dart';
+import '../shared/glass_widgets.dart';
 import 'center_controls.dart';
 import 'progress_bar.dart';
 import 'speed_button.dart';
@@ -204,7 +204,7 @@ class _LeftButtonGroup extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GlassIconButton(
+        GlassButton.iconOnly(
           icon: playModeIcon ?? Icons.repeat,
           tooltip: playModeLabel ?? '顺序',
           onPressed: onTogglePlayMode,
@@ -249,25 +249,25 @@ class _RightButtonGroup extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (onOpenFile != null)
-          GlassIconButton(
+          GlassButton.iconOnly(
             icon: Icons.folder_open,
             onPressed: onOpenFile,
             tooltip: l10n.openFileTooltip,
           ),
         if (onOpenSubtitle != null)
-          GlassIconButton(
+          GlassButton.iconOnly(
             icon: Icons.subtitles,
             onPressed: onOpenSubtitle,
             tooltip: l10n.openSubtitle,
           ),
         if (onTogglePlaylist != null)
-          GlassIconButton(
+          GlassButton.iconOnly(
             icon: Icons.queue_music,
             onPressed: onTogglePlaylist,
             tooltip: l10n.playlist,
           ),
         if (onSettings != null)
-          GlassIconButton(
+          GlassButton.iconOnly(
             icon: Icons.settings,
             onPressed: onSettings,
             onSecondaryTapUp: onSettingsSecondary != null
@@ -276,7 +276,7 @@ class _RightButtonGroup extends StatelessWidget {
             tooltip: l10n.settings,
           ),
         if (onToggleFullscreen != null)
-          GlassIconButton(
+          GlassButton.iconOnly(
             icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
             onPressed: onToggleFullscreen,
             tooltip: isFullscreen ? l10n.exitFullscreen : l10n.fullscreen,
