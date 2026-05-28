@@ -6,7 +6,6 @@ import '../../../kernel/models/media_state.dart';
 import '../../../kernel/models/play_mode.dart';
 import '../../../kernel/persistence/playlist_store.dart';
 import '../../../kernel/persistence/settings_store.dart';
-import '../../../window/aspect_ratio_service.dart';
 import 'playback_controller.dart';
 
 /// 状态监听 — 自动连播、断点保存、设置恢复
@@ -52,23 +51,6 @@ class StateMonitor {
   /// 自动连播：引擎状态变为 completed 时根据播放模式决定行为
   void _onStateChanged() {
     final state = _rt.engine.state.value;
-
-    // 播放时锁定宽高比到视频原生比例
-    if (state == MediaState.playing) {
-      final ratio = _rt.engine.aspectRatio.value;
-      if (ratio > 0) {
-        AspectRatioService.I.matchVideo(ratio);
-      }
-    }
-
-    // 停止/空闲/完成/错误时解锁宽高比
-    // 暂停保持锁定 — 用户暂停不应对窗口行为产生干扰
-    if (state == MediaState.stopped ||
-        state == MediaState.idle ||
-        state == MediaState.completed ||
-        state == MediaState.error) {
-      AspectRatioService.I.unlock();
-    }
 
     // 暂停时保存断点位置
     if (state == MediaState.paused) {

@@ -2,8 +2,6 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/scheduler.dart';
 
-import '../../window/window_lifecycle.dart';
-
 /// 性能监控工具 — 记录 build/raster 耗时
 class PerfMonitor {
   static final PerfMonitor _instance = PerfMonitor._();
@@ -133,9 +131,6 @@ class PerfMonitor {
             1000,
       };
     }
-
-    // 窗口操作统计
-    result['window'] = WindowLifecycleBus.instance.stats;
 
     return result;
   }

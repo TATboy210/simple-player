@@ -2,7 +2,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../shared/resize_notifier.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
@@ -15,6 +14,10 @@ import 'volume_controls.dart';
 
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
+  static final _blurFilter = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlur,
+    sigmaY: Tokens.glassBlur,
+  );
   static final _decoration = BoxDecoration(
     color: Tokens.bgGlass,
     borderRadius: ControlBar._borderRadius,
@@ -88,6 +91,7 @@ class ControlBar extends StatelessWidget {
                 SizedBox(
                   height: 36,
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       TimeRangeDisplay(engine: engine),
                       const SizedBox(width: Tokens.spSm),
@@ -115,37 +119,24 @@ class ControlBar extends StatelessWidget {
 
     // opacity=0 时跳过 BackdropFilter（fade-out 尾部帧零 GPU readback）
     final blurContent = RepaintBoundary(child: content);
-    final filter = ui.ImageFilter.blur(
-      sigmaX: Tokens.glassBlur,
-      sigmaY: Tokens.glassBlur,
-    );
 
     if (opacity != null) {
       return AnimatedBuilder(
-        animation: Listenable.merge([opacity!, ResizeNotifier.instance]),
+        animation: opacity!,
         builder: (_, child) {
           if (opacity!.value < 0.01) return child!;
-          if (ResizeNotifier.instance.value) {
-            return child!;
-          }
           return ClipRRect(
             borderRadius: _borderRadius,
-            child: BackdropFilter(filter: filter, child: child),
+            child: BackdropFilter(filter: _blurFilter, child: child),
           );
         },
         child: blurContent,
       );
     }
 
-    return ValueListenableBuilder<bool>(
-      valueListenable: ResizeNotifier.instance,
-      builder: (_, state, child) => state
-          ? child!
-          : ClipRRect(
-              borderRadius: _borderRadius,
-              child: BackdropFilter(filter: filter, child: child),
-            ),
-      child: blurContent,
+    return ClipRRect(
+      borderRadius: _borderRadius,
+      child: BackdropFilter(filter: _blurFilter, child: blurContent),
     );
   }
 

@@ -2,7 +2,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import 'resize_notifier.dart';
 import '../theme/tokens.dart';
 
 /// 毛玻璃模糊层级
@@ -21,9 +20,6 @@ enum GlassTier {
 }
 
 /// 毛玻璃容器 — 可复用的 Glassmorphism 基础组件
-///
-/// [respectResizeState] 为 true 时，窗口 resize 期间跳过 BackdropFilter
-/// 以降低 GPU 开销（与 CustomTitleBar / ControlBar 行为一致）。
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double? width;
@@ -32,7 +28,6 @@ class GlassContainer extends StatelessWidget {
   final BorderRadius? borderRadius;
   final Border? border;
   final GlassTier tier;
-  final bool respectResizeState;
 
   const GlassContainer({
     super.key,
@@ -43,7 +38,6 @@ class GlassContainer extends StatelessWidget {
     this.borderRadius,
     this.border,
     this.tier = GlassTier.normal,
-    this.respectResizeState = true,
   });
 
   @override
@@ -62,35 +56,12 @@ class GlassContainer extends StatelessWidget {
       child: child,
     );
 
-    if (!respectResizeState) {
-      return ClipRRect(
-        borderRadius: rRect,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: tier.sigma, sigmaY: tier.sigma),
-          child: RepaintBoundary(child: content),
-        ),
-      );
-    }
-
-    // respectResizeState == true: resize 期间降级为纯色
-    return ValueListenableBuilder<bool>(
-      valueListenable: ResizeNotifier.instance,
-      builder: (_, state, child) {
-        if (state) {
-          return ClipRRect(
-            borderRadius: rRect,
-            child: RepaintBoundary(child: child),
-          );
-        }
-        return ClipRRect(
-          borderRadius: rRect,
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: tier.sigma, sigmaY: tier.sigma),
-            child: RepaintBoundary(child: child),
-          ),
-        );
-      },
-      child: content,
+    return ClipRRect(
+      borderRadius: rRect,
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: tier.sigma, sigmaY: tier.sigma),
+        child: RepaintBoundary(child: content),
+      ),
     );
   }
 }
@@ -101,8 +72,6 @@ class GlassContainer extends StatelessWidget {
 ///
 /// 设计：GestureDetector + MouseRegion 在最外层（BackdropFilter 之外），
 /// 确保 Windows 上 hit test 不被 ClipRRect/BackdropFilter 拦截。
-///
-/// [respectResizeState] 传递给内部 GlassContainer，resize 期间跳过模糊。
 class GlassButton extends StatefulWidget {
   final IconData icon;
   final String? label;
@@ -110,7 +79,6 @@ class GlassButton extends StatefulWidget {
   final bool isPrimary;
   final bool enabled;
   final VoidCallback onPressed;
-  final bool respectResizeState;
 
   const GlassButton({
     super.key,
@@ -120,7 +88,6 @@ class GlassButton extends StatefulWidget {
     this.isPrimary = false,
     this.enabled = true,
     required this.onPressed,
-    this.respectResizeState = true,
   });
 
   /// 便捷构造：icon-only 模式
@@ -131,7 +98,6 @@ class GlassButton extends StatefulWidget {
     this.isPrimary = false,
     this.enabled = true,
     required this.onPressed,
-    this.respectResizeState = true,
   }) : label = null;
 
   bool get _isIconOnly => label == null;
@@ -170,7 +136,6 @@ class _GlassButtonState extends State<GlassButton> {
             width: Tokens.iconButtonSizeLarge,
             height: Tokens.iconButtonSizeLarge,
             borderRadius: BorderRadius.circular(Tokens.iconButtonRadius),
-            respectResizeState: widget.respectResizeState,
             child: Icon(widget.icon, size: 20, color: textColor),
           )
         : GlassContainer(
@@ -178,7 +143,6 @@ class _GlassButtonState extends State<GlassButton> {
               horizontal: Tokens.iconButtonPaddingH,
               vertical: Tokens.iconButtonPaddingV,
             ),
-            respectResizeState: widget.respectResizeState,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -222,10 +186,8 @@ class _GlassButtonState extends State<GlassButton> {
                   ? Tokens.pressScale
                   : (_hovered.value ? Tokens.hoverScale : 1.0);
               return AnimatedContainer(
-                duration: Duration(
-                  milliseconds: _pressed.value
-                      ? Tokens.durationFast
-                      : Tokens.durationNormal,
+                duration: const Duration(
+                  milliseconds: Tokens.durationFast,
                 ),
                 transform: Matrix4.diagonal3Values(scale, scale, 1),
                 transformAlignment: Alignment.center,

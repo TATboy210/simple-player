@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../shared/resize_notifier.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
@@ -154,57 +153,73 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         child: SizedBox(
           width: width,
           height: height,
-          child: ValueListenableBuilder<bool>(
-            valueListenable: ResizeNotifier.instance,
-            builder: (_, state, child) => !state
-                ? ClipRRect(
+          child: Stack(
+              children: [
+                // 背景层：毛玻璃模糊（动画期间 sigma 渐变）
+                Positioned.fill(
+                  child: ClipRRect(
                     borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(
-                        sigmaX: Tokens.glassBlurThick,
-                        sigmaY: Tokens.glassBlurThick,
-                      ),
-                      child: RepaintBoundary(child: child!),
-                    ),
-                  )
-                : child!,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Tokens.bgGlass,
-                borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                border: Border.all(color: Tokens.borderHighlight, width: 1),
-              ),
-              child: AnimatedBuilder(
-                animation: _selectedTab,
-                builder: (context, _) => Column(
-                  children: [
-                    // tab 切换
-                    SizedBox(height: 36, child: _buildTabBar()),
-                    // 光条分隔线
-                    Container(
-                      height: 1,
-                      margin: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.transparent,
-                            Tokens.borderHighlight,
-                            Colors.transparent,
-                          ],
+                    child: AnimatedBuilder(
+                      animation: _anim,
+                      builder: (_, _) => BackdropFilter(
+                        filter: ui.ImageFilter.blur(
+                          sigmaX: ui.lerpDouble(
+                            10,
+                            Tokens.glassBlurThick,
+                            _anim.value,
+                          )!,
+                          sigmaY: ui.lerpDouble(
+                            10,
+                            Tokens.glassBlurThick,
+                            _anim.value,
+                          )!,
                         ),
+                        child: const SizedBox.expand(),
                       ),
                     ),
-                    // 内容
-                    Expanded(child: _buildContent()),
-                  ],
+                  ),
                 ),
-              ),
+                // 内容层：滚动不触发 BackdropFilter 重绘
+                RepaintBoundary(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Tokens.bgGlass,
+                      borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                      border: Border.all(color: Tokens.borderHighlight, width: 1),
+                    ),
+                    child: AnimatedBuilder(
+                      animation: _selectedTab,
+                      builder: (context, _) => Column(
+                        children: [
+                          // tab 切换
+                          SizedBox(height: 36, child: _buildTabBar()),
+                          // 光条分隔线
+                          Container(
+                            height: 1,
+                            margin: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Colors.transparent,
+                                  Tokens.borderHighlight,
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                          // 内容
+                          Expanded(child: _buildContent()),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
     );
   }
 
