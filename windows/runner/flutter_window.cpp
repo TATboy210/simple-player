@@ -60,20 +60,23 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   // ─── Frameless window handling (D-08, D-09, D-10) ───
   if (window_channel_.is_frameless()) {
     switch (message) {
-      case WM_NCCALCSIZE:
-        // D-08: Frameless via WM_NCCALCSIZE — remove non-client area
-        if (wParam == TRUE) {
-          auto params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
-          // Preserve minimal top inset for resize cursor
-          params->rgrc[0].top += 1;
-          return 0;
-        }
+      case WM_NCCALCSIZE: {
+        // D-08: Frameless via WM_NCCALCSIZE — delegate to WindowChannel
+        LRESULT nc_result = window_channel_.HandleNcCalcSize(hwnd, wparam, lparam);
+        if (nc_result >= 0) return nc_result;
         break;
-
+      }
       case WM_NCHITTEST:
         // D-09 + D-10: Resize edges + drag region
         return window_channel_.HitTest(hwnd, lparam);
     }
+  }
+
+  // ─── Minimum size enforcement (D-19) — always active ───
+  switch (message) {
+    case WM_GETMINMAXINFO:
+      window_channel_.OnGetMinMaxInfo(lparam);
+      return 0;
   }
 
   // ─── EventChannel dispatch ───
