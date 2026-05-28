@@ -7,6 +7,14 @@
 
 #include <algorithm>
 
+// DWM attributes for rounded corners (may be missing from older SDKs)
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+#ifndef DWMWCP_ROUND
+#define DWMWCP_ROUND 2
+#endif
+
 // ─── Constants ───
 
 static const char kChannelName[] = "com.simple_player/window";
@@ -17,6 +25,10 @@ static constexpr int kTitleBarHeight = 32;
 
 // Resize edge width (D-09: 8px)
 static constexpr int kResizeEdge = 8;
+
+// Default minimum window size (D-19: > 640x360)
+static constexpr LONG kDefaultMinWidth = 640;
+static constexpr LONG kDefaultMinHeight = 360;
 
 WindowChannel::WindowChannel() = default;
 WindowChannel::~WindowChannel() = default;
@@ -234,6 +246,12 @@ void WindowChannel::SetFullscreen(
 
   is_fullscreen_ = fullscreen;
 
+  // D-21: Re-apply rounded corners after fullscreen transition.
+  // Windows 11 DWM resets DWMWA_WINDOW_CORNER_PREFERENCE during transitions.
+  DWORD corner = DWMWCP_ROUND;
+  DwmSetWindowAttribute(hwnd_, DWMWA_WINDOW_CORNER_PREFERENCE,
+                        &corner, sizeof(corner));
+
   // Send event to Dart
   flutter::EncodableMap data;
   data[flutter::EncodableValue("event")] =
@@ -306,11 +324,14 @@ void WindowChannel::SetFrameless(
   is_frameless_ = frameless;
 
   if (hwnd_) {
-    // Toggle WS_THICKFRAME style for resize capability
     LONG_PTR style = GetWindowLongPtr(hwnd_, GWL_STYLE);
     if (frameless) {
+      // Remove WS_CAPTION (title bar + borders), keep WS_THICKFRAME for
+      // resize edges and snap layout support (D-08, D-31).
+      style &= ~WS_CAPTION;
       style |= WS_THICKFRAME;
     } else {
+      // Restore full overlapped window style
       style |= (WS_CAPTION | WS_THICKFRAME);
     }
     SetWindowLongPtr(hwnd_, GWL_STYLE, style);
@@ -343,6 +364,36 @@ void WindowChannel::GetTitleBarBounds(
 }
 
 // ─── MessageHandler delegates ───
+
+LRESULT WindowChannel::HandleNcCalcSize(HWND hwnd, WPARAM wparam,
+                                         LPARAM lparam) {
+  // D-08: Frameless via WM_NCCALCSIZE — remove non-client area
+  // Only intercept when wParam == TRUE (client area validation)
+  if (wparam != TRUE || !is_frameless_) {
+    return -1;  // Not handled — use default processing
+  }
+
+  // Preserve minimal top inset for resize cursor.
+  // WS_THICKFRAME provides the resize borders for snap layout support (D-31).
+  auto params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+  params->rgrc[0].top += 1;
+  return 0;
+}
+
+void WindowChannel::OnGetMinMaxInfo(LPARAM lparam) {
+  // D-19: Enforce minimum window size (> 640x360)
+  auto mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+  if (min_width_ > 0) {
+    mmi->ptMinTrackSize.x = min_width_;
+  } else {
+    mmi->ptMinTrackSize.x = kDefaultMinWidth;
+  }
+  if (min_height_ > 0) {
+    mmi->ptMinTrackSize.y = min_height_;
+  } else {
+    mmi->ptMinTrackSize.y = kDefaultMinHeight;
+  }
+}
 
 LRESULT WindowChannel::HitTest(HWND hwnd, LPARAM lparam) {
   if (!is_frameless_) {
