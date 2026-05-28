@@ -41,7 +41,7 @@
 
 ### Performance (PERF)
 
-- [ ] **PERF-01**: fvp D3D11 sync optimization
+- [x] **PERF-01**: fvp D3D11 sync optimization
   - Test `d3d11.sync.cpu=0` on 3+ hardware configs (dedicated GPU, Intel iGPU, AMD iGPU)
   - Document tearing behavior and fallback strategy
   - Target: 2-5ms/frame savings confirmed via DevTools
@@ -51,7 +51,7 @@
   - Replace `on Object catch` in `engine_prewarm.dart:56`, `subtitle_service.dart:37,59` with `on Exception catch`
   - Replace `catch (_)` in `fvp_engine.dart:544` with logging
 
-- [ ] **PERF-03**: Reduce control bar frame drops
+- [x] **PERF-03**: Reduce control bar frame drops
   - Profile with DevTools in `--profile` mode
   - Identify root cause: BackdropFilter GPU readback vs ValueNotifier rebuild storm
   - Apply targeted fix based on profiling data
@@ -118,9 +118,9 @@
 | WIN-03 | 1 | Pending | User request |
 | WIDGET-01 | 2 | Pending | User request, CONCERNS.md |
 | WIDGET-02 | 2 | Pending | CONCERNS.md #11, TESTING.md |
-| PERF-01 | 3 | Pending | CONCERNS.md #2, fvp_performance_bottlenecks |
+| PERF-01 | 3 | Complete | CONCERNS.md #2, fvp_performance_bottlenecks |
 | PERF-02 | 1 | Pending | CONCERNS.md #3,#4 |
-| PERF-03 | 3 | Pending | User request |
+| PERF-03 | 3 | Complete | User request |
 | PLATFORM-01 | 1 | Pending | User request |
 | PLATFORM-02 | 4 | Pending | User request |
 | TEST-01 | 4 | Pending | TESTING.md gaps |
