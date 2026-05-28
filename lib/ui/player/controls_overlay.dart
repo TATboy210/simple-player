@@ -10,6 +10,25 @@ import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
 
+/// ValueNotifier 重建审计参考模式（02-02 审计结果）
+///
+/// 审计范围：ui/ 目录下所有 ValueListenableBuilder 实例
+/// 审计维度：child 缓存、notifier 合并、重建基线、不必要的监听
+///
+/// 结论：所有实例均已优化，无需修改。
+///
+/// - controls_overlay: child 缓存 Stack（静态子树）
+/// - control_bar: AnimatedBuilder + opacity child（D-13 模式）
+/// - progress_bar: MergedListenable（position+duration+buffered+drag），
+///   hover tooltip 无法缓存（依赖 hover 状态）
+/// - volume_controls: ValueListenableBuilder2 双 notifier，Slider 依赖 volume
+/// - speed_button: 箭头为 StatelessWidget 局部变量引用（不重建），中间段依赖 speed
+/// - playlist_panel: 内容依赖 _selectedTab，无法缓存
+/// - player_screen: playlistVisible 的 child 缓存 videoContent，
+///   emptyState 的 child 缓存 Positioned.fill(emptyState)
+///
+/// D-12 目标：child 缓存 + MergedListenable 已在位，定性分析支持现有优化。
+
 /// 控制栏容器 — 鼠标移动时显示，静止后自动隐藏
 ///
 /// 手势统一处理：单击空白区域隐藏控制栏，双击切换全屏。
@@ -67,75 +86,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   late final AutoHideController _autoHide;
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
-
-  // ControlBar 缓存 — 仅在视觉属性变化时重建，避免回调变化触发级联刷新
-  ControlBar? _cachedBar;
-  MediaEngine? _cachedEngine;
-  bool? _cachedIsFullscreen;
-  bool? _cachedIsIdle;
-  bool? _cachedIsVideo;
-  bool? _cachedEmptyStatePresent;
-  IconData? _cachedPlayModeIcon;
-  String? _cachedPlayModeLabel;
-
-  ControlBar _buildCachedBar({
-    required MediaEngine engine,
-    required bool isFullscreen,
-    required bool isIdle,
-    required bool isVideo,
-    required bool emptyStatePresent,
-    VoidCallback? onPrevious,
-    VoidCallback? onNext,
-    VoidCallback? onTogglePlaylist,
-    VoidCallback? onSettings,
-    void Function(BuildContext, TapUpDetails)? onSettingsSecondary,
-    VoidCallback? onOpenFile,
-    VoidCallback? onToggleFullscreen,
-    VoidCallback? onTogglePlayMode,
-    VoidCallback? onOpenSubtitle,
-    IconData? playModeIcon,
-    String? playModeLabel,
-    Animation<double>? opacity,
-    required bool enableBlur,
-  }) {
-    final needsRebuild = _cachedBar == null ||
-        !identical(engine, _cachedEngine) ||
-        isFullscreen != _cachedIsFullscreen ||
-        isIdle != _cachedIsIdle ||
-        isVideo != _cachedIsVideo ||
-        emptyStatePresent != _cachedEmptyStatePresent ||
-        playModeIcon != _cachedPlayModeIcon ||
-        playModeLabel != _cachedPlayModeLabel;
-    if (needsRebuild) {
-      _cachedEngine = engine;
-      _cachedIsFullscreen = isFullscreen;
-      _cachedIsIdle = isIdle;
-      _cachedIsVideo = isVideo;
-      _cachedEmptyStatePresent = emptyStatePresent;
-      _cachedPlayModeIcon = playModeIcon;
-      _cachedPlayModeLabel = playModeLabel;
-      _cachedBar = ControlBar(
-        engine: engine,
-        isFullscreen: isFullscreen,
-        isIdle: isIdle,
-        isVideo: isVideo,
-        onPrevious: onPrevious,
-        onNext: onNext,
-        onTogglePlaylist: onTogglePlaylist,
-        onSettings: onSettings,
-        onSettingsSecondary: onSettingsSecondary,
-        onOpenFile: onOpenFile,
-        onToggleFullscreen: onToggleFullscreen,
-        onTogglePlayMode: onTogglePlayMode,
-        onOpenSubtitle: onOpenSubtitle,
-        playModeIcon: playModeIcon,
-        playModeLabel: playModeLabel,
-        opacity: opacity,
-        enableBlur: enableBlur,
-      );
-    }
-    return _cachedBar!;
-  }
 
   @override
   void initState() {
@@ -224,12 +174,11 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                     bottom: Tokens.controlBarMarginBottom,
                     child: FadeTransition(
                       opacity: _autoHide.opacity,
-                      child: _buildCachedBar(
+                      child: ControlBar(
                         engine: widget.engine,
                         isFullscreen: widget.isFullscreen,
                         isIdle: isIdle,
                         isVideo: widget.isVideo,
-                        emptyStatePresent: widget.emptyStatePresent,
                         onPrevious: widget.onPrevious,
                         onNext: widget.onNext,
                         onTogglePlaylist: widget.onTogglePlaylist,
