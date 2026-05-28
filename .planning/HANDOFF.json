@@ -1,25 +1,25 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-28T22:09:04+08:00",
+  "timestamp": "2026-05-28T22:30:00+08:00",
   "phase": "2",
   "phase_name": "Widget Unification",
   "phase_dir": ".planning/phases/02-widget-unification",
   "plan": 0,
   "task": 0,
-  "total_tasks": 0,
-  "status": "research_complete",
+  "total_tasks": 4,
+  "status": "plans_ready",
   "completed_tasks": [
     {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
     {"id": 2, "name": "Phase 1 pause-work handoff", "status": "done", "commit": "c0a3c1f"},
     {"id": 3, "name": "Phase 2 discuss-phase (8 areas, 17 decisions)", "status": "done", "commit": "b068e87"},
     {"id": 4, "name": "Phase 2 CONTEXT.md + DISCUSSION-LOG.md", "status": "done", "commit": "b068e87"},
     {"id": 5, "name": "STATE.md updated for Phase 2", "status": "done", "commit": "dccb0bc"},
-    {"id": 6, "name": "Phase 2 research (RESEARCH.md + VALIDATION.md)", "status": "done", "commit": "pending"}
+    {"id": 6, "name": "Phase 2 research (RESEARCH.md + VALIDATION.md)", "status": "done", "commit": "pending"},
+    {"id": 7, "name": "Phase 2 plan-phase (planner + checker passed)", "status": "done", "commit": "pending"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "Phase 2 plan-phase (spawn planner)", "status": "not_started"},
-    {"id": 8, "name": "Phase 2 plan verification (plan-checker)", "status": "not_started"},
-    {"id": 9, "name": "Phase 2 execution", "status": "not_started"},
+    {"id": 8, "name": "Phase 2 execution — Plan 01: Glass component merge (Wave 1)", "status": "not_started"},
+    {"id": 9, "name": "Phase 2 execution — Plan 02: Glass performance + VLB audit (Wave 2)", "status": "not_started"},
     {"id": 10, "name": "Phase 2 verification", "status": "not_started"}
   ],
   "blockers": [],
@@ -43,8 +43,13 @@
     "lib/ui/playlist/playlist_panel.dart",
     "windows/runner/CMakeLists.txt",
     "windows/runner/window_channel.cpp",
-    "windows/runner/window_channel.h"
+    "windows/runner/window_channel.h",
+    ".planning/phases/02-widget-unification/02-RESEARCH.md",
+    ".planning/phases/02-widget-unification/02-VALIDATION.md",
+    ".planning/phases/02-widget-unification/02-PATTERNS.md",
+    ".planning/phases/02-widget-unification/02-01-PLAN.md",
+    ".planning/phases/02-widget-unification/02-02-PLAN.md"
   ],
-  "next_action": "Run /gsd:plan-phase 2 — research already complete, will skip to planner spawn directly",
-  "context_notes": "Phase 2 research complete. RESEARCH.md (516 lines) + VALIDATION.md created. Key finding: GlassIconButton has 15 call sites (all icon-only), rendering model incompatible with GlassButton (no BackdropFilter). Merged icon-only mode must preserve lightweight Material+InkWell pattern. 25+ ValueListenableBuilder instances found, most already cached. MergedListenable + ValueListenableBuilder2 already exist. GlassTier 3 levels kept until display-tested. Security: no concerns. UI-SPEC: not needed (widget consolidation, not new design). Next: spawn planner."
+  "next_action": "Run /gsd:execute-phase 2 — Wave 1 (Plan 01) then Wave 2 (Plan 02)",
+  "context_notes": "Phase 2 planning complete. 2 plans in 2 waves. Plan 01 (Wave 1): GlassIconButton→GlassButton merge, barrel file, 13 call site migration, widget tests. Plan 02 (Wave 2): conditional BackdropFilter skip, degradation mode, GlassTier eval, VLB audit. Checker passed all 12 dimensions. 3 non-blocking warnings."
 }
