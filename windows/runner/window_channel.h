@@ -52,6 +52,9 @@ class WindowChannel {
   // WM_MINIMIZE handler — sends onMinimize event via EventChannel.
   void OnMinimize();
 
+  // WM_SIZE maximize/restore handler — sends onMaximize event via EventChannel.
+  void OnMaximizeChanged(HWND hwnd, bool maximized);
+
  private:
   HWND hwnd_ = nullptr;
   bool is_frameless_ = false;
@@ -90,6 +93,11 @@ class WindowChannel {
                     const flutter::MethodResult<flutter::EncodableValue>& result);
   void GetTitleBarBounds(
       const flutter::MethodResult<flutter::EncodableValue>& result);
+  void Minimize(const flutter::MethodResult<flutter::EncodableValue>& result);
+  void Maximize(const flutter::MethodResult<flutter::EncodableValue>& result);
+  void Restore(const flutter::MethodResult<flutter::EncodableValue>& result);
+  void Close(const flutter::MethodResult<flutter::EncodableValue>& result);
+  void Center(const flutter::MethodResult<flutter::EncodableValue>& result);
 
   // ─── Event helpers ───
   void SendEvent(const std::string& event,

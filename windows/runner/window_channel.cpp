@@ -193,6 +193,16 @@ void WindowChannel::HandleMethodCall(
     SetFrameless(std::get<bool>(it->second), *result);
   } else if (method == "getTitleBarBounds") {
     GetTitleBarBounds(*result);
+  } else if (method == "minimize") {
+    Minimize(*result);
+  } else if (method == "maximize") {
+    Maximize(*result);
+  } else if (method == "restore") {
+    Restore(*result);
+  } else if (method == "close") {
+    Close(*result);
+  } else if (method == "center") {
+    Center(*result);
   } else {
     result->NotImplemented();
   }
@@ -363,6 +373,93 @@ void WindowChannel::GetTitleBarBounds(
   result->Success(bounds);
 }
 
+void WindowChannel::Minimize(
+    const flutter::MethodResult<flutter::EncodableValue>& result) {
+  if (!hwnd_) {
+    result->Error("no_window", "Window handle is null");
+    return;
+  }
+  ShowWindow(hwnd_, SW_MINIMIZE);
+  result->Success(flutter::EncodableValue(true));
+}
+
+void WindowChannel::Maximize(
+    const flutter::MethodResult<flutter::EncodableValue>& result) {
+  if (!hwnd_) {
+    result->Error("no_window", "Window handle is null");
+    return;
+  }
+  ShowWindow(hwnd_, SW_MAXIMIZE);
+
+  // Send onMaximize event
+  flutter::EncodableMap data;
+  data[flutter::EncodableValue("event")] =
+      flutter::EncodableValue("onMaximize");
+  data[flutter::EncodableValue("maximized")] =
+      flutter::EncodableValue(true);
+  SendEvent("onMaximize", data);
+
+  result->Success(flutter::EncodableValue(true));
+}
+
+void WindowChannel::Restore(
+    const flutter::MethodResult<flutter::EncodableValue>& result) {
+  if (!hwnd_) {
+    result->Error("no_window", "Window handle is null");
+    return;
+  }
+  ShowWindow(hwnd_, SW_RESTORE);
+
+  // Send onMaximize event (restored = not maximized)
+  flutter::EncodableMap data;
+  data[flutter::EncodableValue("event")] =
+      flutter::EncodableValue("onMaximize");
+  data[flutter::EncodableValue("maximized")] =
+      flutter::EncodableValue(false);
+  SendEvent("onMaximize", data);
+
+  result->Success(flutter::EncodableValue(true));
+}
+
+void WindowChannel::Close(
+    const flutter::MethodResult<flutter::EncodableValue>& result) {
+  if (!hwnd_) {
+    result->Error("no_window", "Window handle is null");
+    return;
+  }
+  PostMessage(hwnd_, WM_CLOSE, 0, 0);
+  result->Success(flutter::EncodableValue(true));
+}
+
+void WindowChannel::Center(
+    const flutter::MethodResult<flutter::EncodableValue>& result) {
+  if (!hwnd_) {
+    result->Error("no_window", "Window handle is null");
+    return;
+  }
+
+  // Get current window size
+  RECT window_rect;
+  GetWindowRect(hwnd_, &window_rect);
+  LONG w = window_rect.right - window_rect.left;
+  LONG h = window_rect.bottom - window_rect.top;
+
+  // Get primary monitor work area
+  HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO mi = {};
+  mi.cbSize = sizeof(mi);
+  GetMonitorInfo(monitor, &mi);
+
+  // Calculate centered position within work area
+  LONG x = mi.rcWork.left + (mi.rcWork.right - mi.rcWork.left - w) / 2;
+  LONG y = mi.rcWork.top + (mi.rcWork.bottom - mi.rcWork.top - h) / 2;
+
+  SetWindowPos(hwnd_, nullptr, x, y, 0, 0,
+               SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
+
+  result->Success(flutter::EncodableValue(true));
+}
+
 // ─── MessageHandler delegates ───
 
 LRESULT WindowChannel::HandleNcCalcSize(HWND hwnd, WPARAM wparam,
@@ -459,6 +556,20 @@ void WindowChannel::OnMinimize() {
   data[flutter::EncodableValue("event")] =
       flutter::EncodableValue("onMinimize");
   SendEvent("onMinimize", data);
+}
+
+void WindowChannel::OnMaximizeChanged(HWND hwnd, bool maximized) {
+  flutter::EncodableMap data;
+  data[flutter::EncodableValue("event")] =
+      flutter::EncodableValue("onMaximize");
+  data[flutter::EncodableValue("maximized")] =
+      flutter::EncodableValue(maximized);
+  SendEvent("onMaximize", data);
+
+  // Re-apply rounded corners after maximize/restore (D-21)
+  DWORD corner = DWMWCP_ROUND;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
+                        &corner, sizeof(corner));
 }
 
 // ─── Event helpers ───

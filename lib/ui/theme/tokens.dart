@@ -70,7 +70,7 @@ class Tokens {
   static const hideDelayWindowed = 5;
 
   // ── 标题栏 ──
-  static const titleBarHeight = 36.0;
+  static const titleBarHeight = 32.0;
   static const titleBarButtonWidth = 36.0;
   static const titleBarBg = Color(0xE61A1A24);
   static const titleBarBorder = Color(0x33FFFFFF);

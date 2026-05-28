@@ -56,6 +56,8 @@ class WindowService {
         log.d('WindowService: onClose');
       case 'onMinimize':
         log.d('WindowService: onMinimize');
+      case 'onMaximize':
+        isMaximized.value = map['maximized'] as bool;
     }
   }
 
@@ -87,6 +89,16 @@ class WindowService {
 
   Future<void> setFrameless(bool value) =>
       _guardedCall('setFrameless', {'frameless': value});
+
+  Future<void> minimize() => _guardedCall('minimize', {});
+
+  Future<void> maximize() => _guardedCall('maximize', {});
+
+  Future<void> restore() => _guardedCall('restore', {});
+
+  Future<void> close() => _guardedCall('close', {});
+
+  Future<void> center() => _guardedCall('center', {});
 
   Future<Rect> getTitleBarBounds() async {
     if (_disposed) return Rect.zero;
