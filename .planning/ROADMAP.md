@@ -10,7 +10,7 @@ Build self-managed window control via MethodChannel + Win32 FFI, unify the glass
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Window Management Foundation** — MethodChannel + Win32 FFI + state persistence + error handling fixes
+- [x] **Phase 1: Window Management Foundation** — MethodChannel + Win32 FFI + state persistence + error handling fixes ✅ 2026-05-28
 - [ ] **Phase 2: Widget Unification** — Glass component library + ValueNotifier rebuild optimization
 - [ ] **Phase 3: Performance Optimization** — D3D11 tuning + control bar profiling + frame drop fixes
 - [ ] **Phase 4: Platform Stubs & Test Coverage** — macOS/Linux stubs + test coverage 64% → 80%
@@ -31,10 +31,10 @@ Build self-managed window control via MethodChannel + Win32 FFI, unify the glass
 **Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 01-01-PLAN.md — C++ WindowChannel + Dart WindowService (WIN-01, PLATFORM-01)
-- [ ] 01-02-PLAN.md — Frameless window + WM_NCHITTEST resize/drag (WIN-01, WIN-03, PLATFORM-01)
-- [ ] 01-03-PLAN.md — CustomTitleBar + PlayerScreen integration + centering (WIN-02, WIN-03)
-- [ ] 01-04-PLAN.md — Error handling anti-pattern fixes (PERF-02)
+- [x] 01-01-PLAN.md — C++ WindowChannel + Dart WindowService (WIN-01, PLATFORM-01) ✅
+- [x] 01-02-PLAN.md — Frameless window + WM_NCHITTEST resize/drag (WIN-01, WIN-03, PLATFORM-01) ✅
+- [x] 01-03-PLAN.md — CustomTitleBar + PlayerScreen integration + centering (WIN-02, WIN-03) ✅
+- [x] 01-04-PLAN.md — Error handling anti-pattern fixes (PERF-02) ✅
 
 ### Phase 2: Widget Unification
 **Goal**: Unify glass component library and optimize ValueNotifier rebuild patterns
