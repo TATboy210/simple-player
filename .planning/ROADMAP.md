@@ -41,17 +41,17 @@ Plans:
 **Depends on**: Phase 1 (window layer stable before UI work)
 **Requirements**: WIDGET-01, WIDGET-02
 **Success Criteria** (what must be TRUE):
-  1. Single `glass_widgets.dart` export file with consistent `GlassTier` enum
-  2. `GlassButton` supports both `icon` and `iconOnly` constructors (merged from `GlassIconButton`)
-  3. Shared hover/press animation extracted into reusable mixin
-  4. All `ValueListenableBuilder` instances audited — static subtrees cached via `child`
-  5. `ControlsOverlay` 8-field cache replaced with single immutable state object
-  6. Measurable: 30%+ reduction in control bar rebuild count
-**Plans**: TBD
+  1. Single `glass_widgets.dart` export file with consistent `GlassTier` enum (D-03)
+  2. `GlassButton` supports both `icon` and `iconOnly` constructors (merged from `GlassIconButton`) (D-01)
+  3. All modes use InkWell hover/press feedback only — no scale animation (D-06, D-07)
+  4. All `ValueListenableBuilder` instances audited — static subtrees cached via `child` (D-10, D-11)
+  5. GlassContainer supports conditional BackdropFilter skip and degradation mode (D-13, D-14)
+  6. Measurable: 30%+ reduction in control bar rebuild count (D-12: qualitative judgment + code analysis)
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 02-01: TBD — Glass component unification
-- [ ] 02-02: TBD — ValueNotifier rebuild optimization
+- [ ] 02-01-PLAN.md — Glass component merge + barrel file + migration + tests (WIDGET-01)
+- [ ] 02-02-PLAN.md — Glass performance optimizations + ValueNotifier audit (WIDGET-02)
 
 ### Phase 3: Performance Optimization
 **Goal**: Apply D3D11 hardware tuning and fix control bar frame drops based on profiling data
@@ -108,4 +108,4 @@ Plans:
 | TEST-04 | 4 | 04-03 |
 
 ---
-*Last updated: 2026-05-28 — Phase 1 planning complete*
+*Last updated: 2026-05-28 — Phase 2 planning complete*
