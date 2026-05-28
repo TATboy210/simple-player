@@ -80,7 +80,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — D3D11 engine parameters + PerfMonitor cleanup + settings panel + queryFence (PERF-01)
+- [x] 03-01-PLAN.md — D3D11 engine parameters + PerfMonitor cleanup + settings panel + queryFence (PERF-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
