@@ -33,8 +33,15 @@ class WindowChannel {
 
   // ─── MessageHandler delegates (called from FlutterWindow) ───
 
+  // WM_NCCALCSIZE handler — returns 0 when frameless (removes non-client area).
+  // Returns -1 if not frameless (caller should use default handling).
+  LRESULT HandleNcCalcSize(HWND hwnd, WPARAM wparam, LPARAM lparam);
+
   // WM_NCHITTEST handler — returns hit-test result for frameless window.
   LRESULT HitTest(HWND hwnd, LPARAM lparam);
+
+  // WM_GETMINMAXINFO handler — enforces minimum window size.
+  void OnGetMinMaxInfo(LPARAM lparam);
 
   // WM_SIZE handler — sends onResize event via EventChannel.
   void OnResize(HWND hwnd);
