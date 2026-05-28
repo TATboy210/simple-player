@@ -1,39 +1,46 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-28T18:45:00+08:00",
+  "timestamp": "2026-05-28T19:50:00+08:00",
   "phase": "1",
   "phase_name": "Window Management Foundation",
   "phase_dir": ".planning/phases/01-window-management",
   "plan": 0,
   "task": 0,
-  "total_tasks": 0,
+  "total_tasks": 8,
   "status": "paused",
   "completed_tasks": [
     {"id": 1, "name": "Codebase map refresh (7 documents)", "status": "done", "commit": "133554d"},
     {"id": 2, "name": "Project reinitialization (PROJECT/REQUIREMENTS/ROADMAP/STATE)", "status": "done", "commit": "133554d"},
-    {"id": 3, "name": "Phase 1 discuss-phase (CONTEXT.md with 37 decisions)", "status": "done", "commit": "345128e"}
+    {"id": 3, "name": "Phase 1 discuss-phase (CONTEXT.md with 37 decisions)", "status": "done", "commit": "345128e"},
+    {"id": 4, "name": "Phase 1 research (RESEARCH.md)", "status": "done", "commit": "9d78285"},
+    {"id": 5, "name": "Phase 1 planning (4 PLAN.md files in 3 waves)", "status": "done", "commit": "c32b72a"},
+    {"id": 6, "name": "Phase 1 plan verification (12 dimensions passed)", "status": "done", "commit": "c32b72a"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "Phase 1 research (RESEARCH.md)", "status": "not_started"},
-    {"id": 5, "name": "Phase 1 planning (PLAN.md files)", "status": "not_started"},
-    {"id": 6, "name": "Phase 1 execution", "status": "not_started"}
+    {"id": 7, "name": "Phase 1 execution — Wave 1 (Plan 01 + Plan 04 parallel)", "status": "not_started"},
+    {"id": 8, "name": "Phase 1 execution — Wave 2 (Plan 02: frameless + resize)", "status": "not_started"},
+    {"id": 9, "name": "Phase 1 execution — Wave 3 (Plan 03: CustomTitleBar + integration)", "status": "not_started"}
   ],
-  "blockers": [],
+  "blockers": [
+    {"description": "WM_NCCALCSIZE + WM_NCHITTEST intercept precedence — Flutter's HandleTopLevelWindowProc may consume messages", "type": "technical", "workaround": "Validate early in Wave 1, Plan 01 Task 1"}
+  ],
   "human_actions_pending": [],
   "decisions": [
     {"decision": "Self-built MethodChannel for window management", "rationale": "No third-party dependency, full control over window layer", "phase": "1"},
     {"decision": "Single MethodChannel + EventChannel architecture", "rationale": "Simple command dispatch + streaming events back to Dart", "phase": "1"},
-    {"decision": "WM_NCCALCSIZE for frameless window", "rationale": "Most reliable frameless approach on Windows", "phase": "1"},
+    {"decision": "WM_NCCALCSIZE for frameless window", "rationale": "Most reliable frameless approach on Windows, preserves snap layouts", "phase": "1"},
     {"decision": "No window state persistence", "rationale": "User chose center-every-time + defaults, simplifies WIN-02", "phase": "1"},
     {"decision": "32px transparent title bar, flat buttons (not GlassIconButton)", "rationale": "Immersive, Windows 11 standard height, flat/immersive style", "phase": "1"},
     {"decision": "960x540 default window size", "rationale": "User chose 540p as default", "phase": "1"},
-    {"decision": "on Exception catch + logger for error handling", "rationale": "Replace catch(_) and on Object catch anti-patterns", "phase": "1"}
+    {"decision": "on Exception catch + logger for error handling", "rationale": "Replace catch(_) and on Object catch anti-patterns", "phase": "1"},
+    {"decision": "4 plans in 3 waves", "rationale": "Wave 1 parallel (C++ + error fixes), Wave 2 frameless, Wave 3 title bar", "phase": "1"}
   ],
   "uncommitted_files": [
-    "lib/app.dart", "lib/main.dart", "lib/ui/player/*", "lib/ui/playlist/*",
-    "lib/ui/shared/*", "lib/kernel/*", "lib/features/*", "lib/window/* (deleted)",
-    "pubspec.yaml", "pubspec.lock", "windows/flutter/*", "test/*"
+    "lib/app.dart", "lib/main.dart", "lib/features/player/services/state_monitor.dart",
+    "lib/kernel/utils/perf_monitor.dart", "lib/ui/player/*", "lib/ui/playlist/*",
+    "lib/ui/shared/*", "lib/window/* (deleted)", "pubspec.yaml", "pubspec.lock",
+    "windows/flutter/*", "test/*"
   ],
-  "next_action": "Run /gsd:plan-phase 1 to plan Phase 1 using CONTEXT.md",
-  "context_notes": "Phase 1 context gathered with 37 decisions. No plans created yet. Next step is research + planning. Uncommitted changes from previous session's window_manager removal are still in working tree."
+  "next_action": "Run /gsd:execute-phase 1 to execute all 4 plans (Wave 1 → Wave 2 → Wave 3)",
+  "context_notes": "Phase 1 fully planned. 4 plans committed. Research HIGH confidence. Plan checker passed all 12 dimensions. 37 CONTEXT.md decisions all traced to plan tasks. Critical risk: WM_NCCALCSIZE intercept precedence — must validate in Wave 1. Uncommitted changes from previous session's window_manager removal still in working tree."
 }
