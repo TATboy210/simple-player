@@ -1,42 +1,48 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-28T21:35:00+08:00",
-  "phase": "1",
-  "phase_name": "Window Management Foundation",
-  "phase_dir": ".planning/phases/01-window-management",
-  "plan": 4,
+  "timestamp": "2026-05-28T21:55:00+08:00",
+  "phase": "2",
+  "phase_name": "Widget Unification",
+  "phase_dir": ".planning/phases/02-widget-unification",
+  "plan": 0,
   "task": 0,
-  "total_tasks": 8,
-  "status": "complete",
+  "total_tasks": 0,
+  "status": "context_complete",
   "completed_tasks": [
-    {"id": 1, "name": "Codebase map refresh (7 documents)", "status": "done", "commit": "133554d"},
-    {"id": 2, "name": "Project reinitialization", "status": "done", "commit": "133554d"},
-    {"id": 3, "name": "Phase 1 discuss-phase (37 decisions)", "status": "done", "commit": "345128e"},
-    {"id": 4, "name": "Phase 1 research (RESEARCH.md)", "status": "done", "commit": "9d78285"},
-    {"id": 5, "name": "Phase 1 planning (4 plans, 3 waves)", "status": "done", "commit": "c32b72a"},
-    {"id": 6, "name": "Phase 1 plan verification", "status": "done", "commit": "c32b72a"},
-    {"id": 7, "name": "Wave 1: Plan 01-01 C++ WindowChannel + Dart WindowService", "status": "done", "commit": "42de53e,c3a70da,0af5562"},
-    {"id": 8, "name": "Wave 1: Plan 01-04 Error handling fixes", "status": "done", "commit": "2879213,353a513"},
-    {"id": 9, "name": "Wave 2: Plan 01-02 Frameless + WM_NCHITTEST", "status": "done", "commit": "8b9df1c,2a5b1b0,f77a62c"},
-    {"id": 10, "name": "Wave 3: Plan 01-03 CustomTitleBar + integration", "status": "done", "commit": "6294901,ea18932,e8e8647"}
+    {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
+    {"id": 2, "name": "Phase 1 pause-work handoff", "status": "done", "commit": "c0a3c1f"},
+    {"id": 3, "name": "Phase 2 discuss-phase (8 areas, 17 decisions)", "status": "done", "commit": "b068e87"},
+    {"id": 4, "name": "Phase 2 CONTEXT.md + DISCUSSION-LOG.md", "status": "done", "commit": "b068e87"},
+    {"id": 5, "name": "STATE.md updated for Phase 2", "status": "done", "commit": "dccb0bc"}
   ],
   "remaining_tasks": [
-    {"id": 11, "name": "Phase 2 discuss-phase (Widget Unification)", "status": "not_started"},
-    {"id": 12, "name": "Phase 2 planning", "status": "not_started"},
-    {"id": 13, "name": "Phase 2 execution", "status": "not_started"}
+    {"id": 6, "name": "Phase 2 plan-phase (create plans)", "status": "not_started"},
+    {"id": 7, "name": "Phase 2 execution", "status": "not_started"},
+    {"id": 8, "name": "Phase 2 verification", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Manual smoke test: flutter run -d windows → verify frameless, resize, drag, snap, fullscreen, title bar", "context": "Phase 1 verification requires manual UI testing", "blocking": false}
+    {"action": "Manual smoke test: flutter run -d windows — verify Phase 1 frameless window, resize, drag, title bar", "context": "Phase 1 verification requires manual UI testing", "blocking": false},
+    {"action": "3 uncommitted files from pre-Phase 1: settings_panel.dart, controls_overlay.dart, playlist_panel.dart", "context": "Pre-existing modifications, not from this session", "blocking": false}
   ],
   "decisions": [
-    {"decision": "Self-built MethodChannel for window management", "rationale": "No third-party dependency", "phase": "1"},
-    {"decision": "WM_NCCALCSIZE for frameless (not SetWindowLong WS_CAPTION)", "rationale": "Most reliable, preserves snap layouts", "phase": "1"},
-    {"decision": "No window state persistence — center on startup + 960x540 defaults", "rationale": "Simplifies WIN-02", "phase": "1"},
-    {"decision": "32px flat title bar with flat/immersive buttons", "rationale": "Windows 11 standard height", "phase": "1"},
-    {"decision": "on Exception catch + logger for error handling", "rationale": "Replace catch(_) anti-patterns", "phase": "1"}
+    {"decision": "GlassIconButton merged into GlassButton", "rationale": "Unified API, single component with icon + iconOnly constructors", "phase": "2"},
+    {"decision": "Full migration + delete old file", "rationale": "~20 call sites updated in one pass, no deprecation shim", "phase": "2"},
+    {"decision": "All modes use InkWell (no scale animation)", "rationale": "User feedback: buttons should not have animation, keep hover/press feedback only", "phase": "2"},
+    {"decision": "No hover/press animation mixin", "rationale": "InkWell handles hover/press state internally, mixin would be unnecessary indirection", "phase": "2"},
+    {"decision": "ControlBar parameters unchanged", "rationale": "Stable callback references, no extra rebuild cost, premature abstraction", "phase": "2"},
+    {"decision": "ValueNotifier audit: all ui/ directory, 4 dimensions", "rationale": "Comprehensive audit for 30% rebuild reduction target", "phase": "2"},
+    {"decision": "Glass performance: conditional skip + degradation mode + tier evaluation", "rationale": "3 optimization directions for GPU-constrained scenarios", "phase": "2"},
+    {"decision": "glass_widgets.dart barrel file (glass-only scope)", "rationale": "Single import point for all glass components", "phase": "2"}
   ],
-  "uncommitted_files": [],
-  "next_action": "Run /gsd:discuss-phase 2 to start Widget Unification, or /gsd:pause-work to save and exit",
-  "context_notes": "Phase 1 fully executed. 4 plans, 11 commits, 0 failures. All must-haves verified. Window management layer complete: C++ WindowChannel (7 commands + EventChannel), Dart WindowService (ValueNotifier state), frameless window (WM_NCCALCSIZE/WM_NCHITTEST), CustomTitleBar (32px, 3 buttons), center on startup (960x540). Error handling anti-patterns eliminated. Manual smoke test still needed."
+  "uncommitted_files": [
+    "lib/ui/dialogs/settings_panel.dart",
+    "lib/ui/player/controls_overlay.dart",
+    "lib/ui/playlist/playlist_panel.dart",
+    "windows/runner/CMakeLists.txt",
+    "windows/runner/window_channel.cpp",
+    "windows/runner/window_channel.h"
+  ],
+  "next_action": "Run /gsd:plan-phase 2 to create executable plans for Widget Unification",
+  "context_notes": "Phase 2 context gathered via discuss-phase. 8 areas discussed, 17 decisions captured in CONTEXT.md. Key direction: merge GlassIconButton into GlassButton with InkWell (no scale animation), barrel file export, full ValueNotifier audit across all ui/. Glass performance optimization deferred to Phase 3 execution but directions locked. Next step is planning."
 }
