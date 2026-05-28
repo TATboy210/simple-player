@@ -24,17 +24,17 @@ Build self-managed window control via MethodChannel + Win32 FFI, unify the glass
 **Success Criteria** (what must be TRUE):
   1. `WindowService` class exists with typed API for all window operations
   2. C++ MethodChannel handler in `windows/runner/` implements fullscreen, always-on-top, resize, position, frameless
-  3. Window geometry saved on close and restored on startup via `SettingsStore`
+  3. Window centered on startup with 960x540 defaults (D-29: no persistence)
   4. Frameless window with custom title bar: drag, resize edges, close/minimize/maximize buttons
   5. All `catch (_)` and `on Object catch` anti-patterns replaced with proper error handling
   6. `didChangeMetrics()` wired to update window state on resize/fullscreen
-**Plans**: TBD
+**Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 01-01: TBD — MethodChannel + Win32 C++ handler
-- [ ] 01-02: TBD — Window state persistence + restoration
-- [ ] 01-03: TBD — Frameless window + custom title bar
-- [ ] 01-04: TBD — Error handling fixes
+- [ ] 01-01-PLAN.md — C++ WindowChannel + Dart WindowService (WIN-01, PLATFORM-01)
+- [ ] 01-02-PLAN.md — Frameless window + WM_NCHITTEST resize/drag (WIN-01, WIN-03, PLATFORM-01)
+- [ ] 01-03-PLAN.md — CustomTitleBar + PlayerScreen integration + centering (WIN-02, WIN-03)
+- [ ] 01-04-PLAN.md — Error handling anti-pattern fixes (PERF-02)
 
 ### Phase 2: Widget Unification
 **Goal**: Unify glass component library and optimize ValueNotifier rebuild patterns
@@ -92,15 +92,15 @@ Plans:
 
 | Requirement | Phase | Plan |
 |-------------|-------|------|
-| WIN-01 | 1 | 01-01 |
-| WIN-02 | 1 | 01-02 |
-| WIN-03 | 1 | 01-03 |
+| WIN-01 | 1 | 01-01, 01-02 |
+| WIN-02 | 1 | 01-03 |
+| WIN-03 | 1 | 01-02, 01-03 |
 | WIDGET-01 | 2 | 02-01 |
 | WIDGET-02 | 2 | 02-02 |
 | PERF-01 | 3 | 03-01 |
 | PERF-02 | 1 | 01-04 |
 | PERF-03 | 3 | 03-02 |
-| PLATFORM-01 | 1 | 01-01 |
+| PLATFORM-01 | 1 | 01-01, 01-02 |
 | PLATFORM-02 | 4 | 04-01 |
 | TEST-01 | 4 | 04-02 |
 | TEST-02 | 4 | 04-03 |
@@ -108,4 +108,4 @@ Plans:
 | TEST-04 | 4 | 04-03 |
 
 ---
-*Last updated: 2026-05-28 after reinitialization*
+*Last updated: 2026-05-28 — Phase 1 planning complete*

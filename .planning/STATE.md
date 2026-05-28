@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: window-ui-unification
-status: ready
-stopped_at: null
-last_updated: "2026-05-28T07:30:00.000Z"
-last_activity: 2026-05-28 — Reinitialized: window management + UI unification project
+milestone_name: milestone
+status: planning
+stopped_at: planning complete
+last_updated: "2026-05-28T19:41:00.000Z"
+last_activity: 2026-05-28 — Phase 1 planning complete (4 plans, 3 waves)
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-28)
 
 **Core value:** Build clean, dependency-free window management and unified widget system for smooth desktop playback.
-**Current focus:** Phase 1 — Window Management Foundation
+**Current focus:** Phase 1 — Window Management Foundation (planned, ready to execute)
 
 ## Current Position
 
 Phase: 1 of 4 (Window Management Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-05-28 — Reinitialized with new direction
+Plan: 0 of 4 in current phase
+Status: Plans created, ready to execute
+Last activity: 2026-05-28 — Phase 1 planning complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 0% (4 plans created)
 
 ## Performance Metrics
 
@@ -44,7 +44,7 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| — | — | — | — |
+| 1 | 4 | 0 | N/A |
 
 *Updated after each plan completion*
 
@@ -64,13 +64,17 @@ Progress: [░░░░░░░░░░] 0%
 
 ### Pending Todos
 
-None yet.
+- Execute Phase 1 Plan 01: C++ WindowChannel + Dart WindowService
+- Execute Phase 1 Plan 04: Error handling fixes (parallel with Plan 01)
+- Execute Phase 1 Plan 02: Frameless window + WM_NCHITTEST (after Plan 01)
+- Execute Phase 1 Plan 03: CustomTitleBar + integration (after Plan 02)
 
 ### Blockers/Concerns
 
 - PERF-01 (d3d11.sync.cpu=0) requires testing on 3+ hardware configs
 - Flutter C++ embedder has internal WindowManager APIs but no public Dart binding
 - macOS/Linux window APIs (NSWindow/GTK) require Objective-C/Val bindings
+- WM_NCCALCSIZE + WM_NCHITTEST intercept precedence — Flutter's HandleTopLevelWindowProc may consume messages (validate early in Wave 1)
 
 ## Deferred Items
 
@@ -85,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-28
-Stopped at: null
+Last session: 2026-05-28T19:41:00.000Z
+Stopped at: Phase 1 planning complete
 Resume file: None
