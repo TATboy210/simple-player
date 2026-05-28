@@ -26,7 +26,8 @@ import 'track_manager.dart';
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
 class FvpEngine implements MediaEngine {
-  final mdk.Player _player = mdk.Player();
+  mdk.Player? _playerInstance;
+  mdk.Player get _player => _playerInstance ??= _createPlayer();
   bool _disposed = false;
 
   // ─── Constants ───
@@ -43,11 +44,15 @@ class FvpEngine implements MediaEngine {
   static const _networkAnalyzeDurationUs = 5000000; // 5s
   static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
 
+  // D3D11 性能参数默认值
+  static const _defaultD3d11SyncCpu = '1'; // 1=同步（安全默认），0=异步（低延迟）
+  static const _defaultVideoDecoders = 'D3D11,NVDEC,FFmpeg'; // 硬件优先
+
   // ─── Helpers ───
 
-  late final FvpCallbackHandler _callbackHandler;
-  late final PositionPoller _positionPoller;
-  late final TrackManager _trackManager;
+  late FvpCallbackHandler _callbackHandler;
+  late PositionPoller _positionPoller;
+  late TrackManager _trackManager;
 
   // ─── ValueNotifier 实现 ───
 
@@ -101,23 +106,49 @@ class FvpEngine implements MediaEngine {
   @override
   MediaInfo get mediaInfo => _trackManager.mediaInfo;
 
-  FvpEngine() {
+  FvpEngine();
+
+  mdk.Player _createPlayer() {
+    final p = mdk.Player();
     _callbackHandler = FvpCallbackHandler(
-      _player,
+      p,
       state: state,
       isBuffering: isBuffering,
       onStopPositionPolling: () => _positionPoller.stop(),
     );
     _positionPoller = PositionPoller(
-      _player,
+      p,
       position: position,
       buffered: buffered,
       currentPathGetter: () => _currentPath,
     );
-    _trackManager = TrackManager(_player);
+    _trackManager = TrackManager(p);
 
-    _player.textureId.addListener(_onTextureIdChanged);
+    p.textureId.addListener(_onTextureIdChanged);
     _callbackHandler.init();
+
+    // D3D11 性能参数 — 在 init 后、open 前设置
+    _applyD3d11Defaults(p);
+
+    return p;
+  }
+
+  /// 应用 D3D11 渲染管线默认参数
+  ///
+  /// 在 player 创建后立即调用，确保后续 open() 使用优化配置。
+  /// 参考: MDK SDK Player.setProperty, fvp_plugin.cpp D3D11RenderAPI
+  void _applyD3d11Defaults(mdk.Player p) {
+    // d3d11.sync.cpu: CPU/GPU 同步控制
+    //   0 = 异步（低延迟，可能撕裂）
+    //   1 = 同步（安全默认，完整画面）
+    p.setProperty('d3d11.sync.cpu', _defaultD3d11SyncCpu);
+
+    // video.decoders: 解码器优先级列表
+    //   硬件解码器优先，软件解码器兜底
+    p.setProperty('video.decoders', _defaultVideoDecoders);
+
+    debugPrint('FvpEngine: D3D11 defaults applied (sync.cpu=$_defaultD3d11SyncCpu, '
+        'decoders=$_defaultVideoDecoders)');
   }
 
   void _onTextureIdChanged() {
@@ -246,8 +277,8 @@ class FvpEngine implements MediaEngine {
         state.value = MediaState.error;
         _errorType = prepareResult == -99
             ? (PathValidator.isUrl(trimmed)
-                ? MediaErrorType.network
-                : MediaErrorType.file)
+                  ? MediaErrorType.network
+                  : MediaErrorType.file)
             : MediaErrorType.codec;
         errorMessage.value = prepareResult == -99
             ? '打开超时: ${PathUtils.basename(trimmed)}'
@@ -533,6 +564,7 @@ class FvpEngine implements MediaEngine {
 
   @override
   int get subtitleDelay {
+    if (_disposed) return 0;
     try {
       return int.parse(_player.getProperty('subtitle.delay') ?? '0');
     } on Exception catch (_) {
@@ -598,16 +630,43 @@ class FvpEngine implements MediaEngine {
     });
   }
 
+  // ─── D3D11 性能参数 ───
+
+  @override
+  void setD3d11SyncEnabled(bool enabled) {
+    _guardedAction('setD3d11SyncEnabled', () {
+      // 0=异步（低延迟），1=同步（安全默认）
+      _player.setProperty('d3d11.sync.cpu', enabled ? '1' : '0');
+      debugPrint('FvpEngine: d3d11.sync.cpu = ${enabled ? 1 : 0}');
+    });
+  }
+
+  @override
+  void setHardwareDecoding(bool enabled) {
+    _guardedAction('setHardwareDecoding', () {
+      if (enabled) {
+        // 硬件解码器优先，软件解码器兜底
+        _player.setProperty('video.decoders', _defaultVideoDecoders);
+      } else {
+        // 仅软件解码器
+        _player.setProperty('video.decoders', 'FFmpeg');
+      }
+      debugPrint('FvpEngine: video.decoders = ${enabled ? _defaultVideoDecoders : "FFmpeg"}');
+    });
+  }
+
   // ─── 生命周期 ───
 
   @override
   void dispose() {
     _disposed = true;
-    _positionPoller.dispose();
-    _callbackHandler.dispose();
-
-    _player.textureId.removeListener(_onTextureIdChanged);
-    _player.dispose();
+    final p = _playerInstance;
+    if (p != null) {
+      _positionPoller.dispose();
+      _callbackHandler.dispose();
+      p.textureId.removeListener(_onTextureIdChanged);
+      p.dispose();
+    }
 
     textureId.dispose();
     state.dispose();

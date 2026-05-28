@@ -430,9 +430,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutConflict => 'Key already bound';
 
   @override
-  String get shortcutAspectCycle => 'Cycle Aspect Ratio';
-
-  @override
   String get currentTheme => 'Theme';
 
   @override
@@ -443,4 +440,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apply => 'Apply';
+
+  @override
+  String get playerLoadError => 'Failed to load player module';
+
+  @override
+  String get performanceTab => 'Performance';
+
+  @override
+  String get d3d11Rendering => 'D3D11 Rendering';
+
+  @override
+  String get d3d11Sync => 'D3D11 CPU Sync';
+
+  @override
+  String get d3d11SyncDesc =>
+      'Synchronize CPU and GPU per frame. Disable for lower latency, may cause tearing.';
+
+  @override
+  String get decoderSettings => 'Decoder';
+
+  @override
+  String get hardwareDecoding => 'Hardware Decoding';
+
+  @override
+  String get hardwareDecodingDesc =>
+      'Use GPU for video decoding. Disable if experiencing artifacts.';
+
+  @override
+  String get performanceHint => 'Changes take effect on next file open.';
 }

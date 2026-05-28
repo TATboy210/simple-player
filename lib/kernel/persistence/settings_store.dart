@@ -32,6 +32,10 @@ class AppSettings {
   final int videoAspectRatioIndex;
   final bool videoDeinterlace;
 
+  // 性能设置
+  final bool d3d11Sync;
+  final bool hardwareDecoding;
+
   const AppSettings({
     required this.volume,
     required this.lastFile,
@@ -54,6 +58,8 @@ class AppSettings {
     this.videoRotation = 0,
     this.videoAspectRatioIndex = 0,
     this.videoDeinterlace = false,
+    this.d3d11Sync = true,
+    this.hardwareDecoding = true,
   });
 }
 
@@ -125,6 +131,8 @@ class SettingsStore {
   static const _keyVideoRotation = 'videoRotation';
   static const _keyVideoAspectRatio = 'videoAspectRatio';
   static const _keyVideoDeinterlace = 'videoDeinterlace';
+  static const _keyD3d11Sync = 'd3d11Sync';
+  static const _keyHardwareDecoding = 'hardwareDecoding';
   static const _keyLocale = 'locale';
   static const _keyThemeIndex = 'themeIndex';
   static const _keyShortcuts = 'shortcuts';
@@ -195,6 +203,8 @@ class SettingsStore {
           AspectRatioMode.values.length - 1,
         ),
         videoDeinterlace: prefs.getBool(_keyVideoDeinterlace) ?? false,
+        d3d11Sync: prefs.getBool(_keyD3d11Sync) ?? true,
+        hardwareDecoding: prefs.getBool(_keyHardwareDecoding) ?? true,
       );
     } on Exception catch (e) {
       debugPrint('SettingsStore.load failed: $e');
@@ -217,6 +227,8 @@ class SettingsStore {
         videoRotation: 0,
         videoAspectRatioIndex: 0,
         videoDeinterlace: false,
+        d3d11Sync: true,
+        hardwareDecoding: true,
       );
     }
   }
@@ -386,6 +398,40 @@ class SettingsStore {
     (p) => p.setBool(_keyVideoDeinterlace, enable),
   );
 
+  // ─── 性能设置持久化 ───
+
+  static Future<void> saveD3d11SyncEnabled(bool value) => _save(
+    'saveD3d11SyncEnabled',
+    (p) => p.setBool(_keyD3d11Sync, value),
+  );
+
+  static Future<void> saveHardwareDecoding(bool value) => _save(
+    'saveHardwareDecoding',
+    (p) => p.setBool(_keyHardwareDecoding, value),
+  );
+
+  /// 加载 D3D11 同步设置，默认 true（同步模式）
+  static Future<bool> loadD3d11SyncEnabled() async {
+    try {
+      final prefs = await _getPrefs();
+      return prefs.getBool(_keyD3d11Sync) ?? true;
+    } on Exception catch (e) {
+      debugPrint('SettingsStore.loadD3d11SyncEnabled failed: $e');
+      return true;
+    }
+  }
+
+  /// 加载硬件解码设置，默认 true（硬件解码优先）
+  static Future<bool> loadHardwareDecoding() async {
+    try {
+      final prefs = await _getPrefs();
+      return prefs.getBool(_keyHardwareDecoding) ?? true;
+    } on Exception catch (e) {
+      debugPrint('SettingsStore.loadHardwareDecoding failed: $e');
+      return true;
+    }
+  }
+
   /// 批量保存所有设置（顺序写入保证一致性）
   ///
   /// RC-3: 窗口尺寸验证。
@@ -431,6 +477,9 @@ class SettingsStore {
       s.videoAspectRatioIndex.clamp(0, AspectRatioMode.values.length - 1),
     );
     await p.setBool(_keyVideoDeinterlace, s.videoDeinterlace);
+    // 性能设置
+    await p.setBool(_keyD3d11Sync, s.d3d11Sync);
+    await p.setBool(_keyHardwareDecoding, s.hardwareDecoding);
     // RC-8: null 时显式清除旧键，防止残留值导致下次启动位置错误
     if (s.windowX != null) {
       await p.setDouble(_keyWindowX, _sanitizeCoordinate(s.windowX!, 0));
