@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T13:30:00+08:00",
+  "timestamp": "2026-05-29T05:40:00+08:00",
   "phase": "4",
   "phase_name": "test-coverage",
   "phase_dir": ".planning/phases/04-test-coverage",
   "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "wave1_wave2_complete_wave3_pending",
+  "status": "wave3_partial_gap_remaining",
   "completed_tasks": [
     {"id": 1, "name": "Wave 1: startup_state_test.dart (NEW, 7 tests)", "status": "done"},
     {"id": 2, "name": "Wave 1: startup_coordinator_test.dart (NEW, 8 tests)", "status": "done"},
@@ -17,32 +17,28 @@
     {"id": 6, "name": "Wave 1: fvp_callback_handler_test.dart (already 4 tests)", "status": "done"},
     {"id": 7, "name": "Wave 2: settings_store_test.dart (EXPAND, +12 tests)", "status": "done"},
     {"id": 8, "name": "Wave 2: subtitle_service_test.dart (NEW, 6 tests)", "status": "done"},
-    {"id": 9, "name": "All 371 tests passing", "status": "done"}
+    {"id": 9, "name": "Wave 3: playlist_test.dart (EXPAND, +18 tests)", "status": "done"},
+    {"id": 10, "name": "Wave 3: playlist_store_test.dart (EXPAND, +7 tests)", "status": "done"},
+    {"id": 11, "name": "Wave 3: error_banner_test.dart (NEW, 7 tests)", "status": "done"},
+    {"id": 12, "name": "Wave 3: progress_bar_test.dart (NEW, 6 tests)", "status": "done"},
+    {"id": 13, "name": "All 410 tests passing", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 10, "name": "Wave 3: progress_bar widget test (~30 lines gain)", "status": "not_started"},
-    {"id": 11, "name": "Wave 3: window_service test with mock (~30 lines gain)", "status": "not_started"},
-    {"id": 12, "name": "Expand playlist_store test (loadInBackground, ~30 lines gain)", "status": "not_started"},
-    {"id": 13, "name": "Verify coverage reaches 80%+", "status": "not_started"}
+    {"id": 14, "name": "Expand progress_bar widget test (drag/seek tooltip, +38 lines)", "status": "not_started"},
+    {"id": 15, "name": "settings_store test expansion (more saveAll paths, +22 lines)", "status": "not_started"},
+    {"id": 16, "name": "glass_chip widget test (NEW, +20 lines)", "status": "not_started"},
+    {"id": 17, "name": "speed_button widget test expansion (+17 lines)", "status": "not_started"},
+    {"id": 18, "name": "state_monitor test (+13 lines)", "status": "not_started"},
+    {"id": 19, "name": "Verify coverage reaches 80%+", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 4 focuses on test coverage only, skip platform stubs", "rationale": "window_manager provides cross-platform support natively, no need for PlatformWindow abstraction", "phase": "4"},
-    {"decision": "Kernel/bridge layer tests first (pure Dart, no platform deps)", "rationale": "Highest coverage-per-effort ratio. UI widget tests are lower priority.", "phase": "4"},
-    {"decision": "Skip l10n testing (generated files)", "rationale": "app_localizations_en/zh.dart are auto-generated, testing them provides no value", "phase": "4"}
+    {"decision": "Phase 4 focuses on test coverage only, skip platform stubs", "rationale": "window_manager provides cross-platform support natively", "phase": "4"},
+    {"decision": "Kernel/bridge layer tests first (pure Dart, no platform deps)", "rationale": "Highest coverage-per-effort ratio", "phase": "4"},
+    {"decision": "Skip l10n testing (generated files)", "rationale": "Auto-generated, testing provides no value", "phase": "4"}
   ],
-  "uncommitted_files": [
-    "test/kernel/models/media_info_test.dart",
-    "test/kernel/persistence/settings_store_test.dart",
-    "test/kernel/models/video_processing_state_test.dart",
-    "test/kernel/utils/path_utils_dirname_test.dart",
-    ".planning/phases/04-test-coverage/04-CONTEXT.md",
-    ".planning/phases/04-test-coverage/04-01-PLAN.md",
-    "test/features/player/services/subtitle_service_test.dart",
-    "test/kernel/startup/startup_state_test.dart",
-    "test/kernel/startup/startup_coordinator_test.dart"
-  ],
-  "next_action": "Commit Wave 1+2 tests, then write Wave 3 tests (progress_bar widget, window_service mock, playlist_store expansion). Run flutter test --coverage to verify 80%+ target. Gap: 234 lines remaining.",
-  "context_notes": "Coverage went from 62.8% (1201/1912) to 66.1% (1296/1961), +95 lines gained from 59 new tests. Need 234 more lines for 80% target. Highest remaining targets: progress_bar.dart (53.8%, 130 lines), playlist_store.dart (56.8%, 81 lines), window_service.dart (0%, 93 lines). Window service needs window_manager mock — may need to create a thin interface or use MethodChannel mock. The subtitle_service test uses _FakeEngine with noSuchMethod to avoid implementing full MediaEngine interface. Path separator fix applied for Windows compatibility in subtitle tests."
+  "uncommitted_files": [],
+  "next_action": "Write more widget tests (progress_bar drag/seek, glass_chip, speed_button) and settings_store expansion to close 159-line gap. l10n files drag overall % down — need more non-l10n coverage. Target: 1569/1961 (80%).",
+  "context_notes": "Coverage 71.9% (1410/1961). Gap 159 lines. l10n files contribute 291-line gap that cannot be closed (generated). Non-l10n coverage ~67%. Highest remaining targets: progress_bar.dart (70.8%, 38 gap), fvp_callback_handler.dart (12.1%, 29 gap — but mapMdkState already fully tested, instance needs mdk mock), settings_store.dart (87.2%, 22 gap), position_poller.dart (0%, 21 gap — needs mdk.Player FFI mock), glass_chip.dart (0%, 20 gap), speed_button.dart (69.6%, 17 gap). Shared FakeEngine at test/helpers/fake_engine.dart works well for widget tests."
 }
