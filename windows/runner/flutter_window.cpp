@@ -83,6 +83,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   switch (message) {
     case WM_SIZE:
       window_channel_.OnResize(hwnd);
+      // Detect maximize/restore state changes (from title bar double-click,
+      // Win+Up arrow, snap layouts, etc.)
+      if (wparam == SIZE_MAXIMIZED || wparam == SIZE_RESTORED) {
+        window_channel_.OnMaximizeChanged(hwnd, wparam == SIZE_MAXIMIZED);
+      }
       break;
     case WM_CLOSE:
       window_channel_.OnClose();
