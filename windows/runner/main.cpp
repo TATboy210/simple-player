@@ -32,6 +32,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
+  // WS_OVERLAPPEDWINDOW does not include WS_VISIBLE — must call Show() explicitly.
+  window.Show();
+
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
     ::TranslateMessage(&msg);
