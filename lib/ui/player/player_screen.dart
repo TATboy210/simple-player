@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../kernel/bridge/window_service.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/models/playlist_item.dart';
@@ -11,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
 import 'controls_overlay.dart';
+import 'custom_title_bar.dart';
 import 'drop_handler.dart';
 import 'keyboard_handler.dart';
 import 'video_surface.dart';
@@ -39,6 +41,7 @@ class PlayerScreen extends StatefulWidget {
   onFolderScanned;
   final VoidCallback? onClearHistory;
   final void Function(String path)? onShowProperties;
+  final WindowService windowService;
 
   const PlayerScreen({
     super.key,
@@ -46,6 +49,7 @@ class PlayerScreen extends StatefulWidget {
     required this.controller,
     required this.playlist,
     required this.playlistGeneration,
+    required this.windowService,
     this.customBindings = const {},
     this.onTogglePlaylist,
     this.onSettings,
@@ -106,130 +110,141 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return ValueListenableBuilder<int?>(
       valueListenable: widget.engine.textureId,
       builder: (context, textureId, _) {
-    final isVideo = textureId != null;
+        final isVideo = textureId != null;
+        final l10n = AppLocalizations.of(context);
+        final modeIcon = playModeIcon(widget.playlist.mode);
+        final modeLabel = playModeLabel(widget.playlist.mode, l10n);
 
-    // 预计算播放模式显示值（避免 Builder 包裹 ControlsOverlay）
-    final l10n = AppLocalizations.of(context);
-    final modeIcon = playModeIcon(widget.playlist.mode);
-    final modeLabel = playModeLabel(widget.playlist.mode, l10n);
+        final videoContent = _buildVideoContent(isVideo, modeIcon, modeLabel);
 
-    // 视频内容区 — 作为 child 避免重建
-    final videoContent = Row(
-      children: [
-        Expanded(
-          child: DropHandler(
-            onFilesDropped: widget.onFilesDropped ?? (_) {},
-            onHoverChanged: widget.onDragHoverChanged,
-            child: Stack(
-              fit: StackFit.expand,
+        return KeyboardHandler(
+          customBindings: widget.customBindings,
+          onPlayPause: () => widget.engine.togglePlayPause(),
+          onSeekBackward: () => _seek(widget.engine, -5000),
+          onSeekForward: () => _seek(widget.engine, 5000),
+          onVolumeUp: () =>
+              widget.engine.setVolume(widget.engine.volume.value + 0.05),
+          onVolumeDown: () =>
+              widget.engine.setVolume(widget.engine.volume.value - 0.05),
+          onToggleMute: () =>
+              widget.engine.setMute(!widget.engine.isMuted.value),
+          onPrevious: () => widget.controller.playPrevious(),
+          onNext: () => widget.controller.playNext(),
+          onOpenFile: widget.onOpenFile,
+          onToggleSubtitle: widget.engine.toggleSubtitle,
+          onShowHelp: () => _showShortcutsHelp(context),
+          onSubtitleDelayForward: () {
+            final delay = widget.engine.subtitleDelay;
+            widget.engine.setSubtitleDelay(delay + 500);
+          },
+          onSubtitleDelayBackward: () {
+            final delay = widget.engine.subtitleDelay;
+            widget.engine.setSubtitleDelay(delay - 500);
+          },
+          onMediaPlayPause: () => widget.engine.togglePlayPause(),
+          onMediaNext: () => widget.controller.playNext(),
+          onMediaPrevious: () => widget.controller.playPrevious(),
+          child: Scaffold(
+            backgroundColor: Tokens.bgBase,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                VideoSurface(engine: widget.engine),
-                if (widget.emptyState != null)
-                  ValueListenableBuilder<MediaState>(
-                    valueListenable: widget.engine.state,
-                    builder: (_, state, child) =>
-                        state == MediaState.idle
-                        ? child!
-                        : const SizedBox.shrink(),
-                    child: Positioned.fill(
-                      child: widget.emptyState!,
+                Expanded(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _playlistVisible,
+                    builder: (context, playlistVisible, videoContent) =>
+                        Stack(
+                      children: [
+                        videoContent!,
+                        // 标题栏 — 独立于视频内容的层 (D-13)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: CustomTitleBar(
+                            windowService: widget.windowService,
+                          ),
+                        ),
+                        if (_playlistMounted)
+                          IgnorePointer(
+                            ignoring: !playlistVisible,
+                            child: PlaylistPanel(
+                              playlist: widget.playlist,
+                              visible: playlistVisible,
+                              onClose: _closePlaylist,
+                              onSelectIndex: (i) {
+                                widget.controller.playIndex(i);
+                                _closePlaylist();
+                              },
+                              onRemoveIndex: (i) {
+                                widget.playlist.removeAt(i);
+                                widget.playlistGeneration.value++;
+                              },
+                              onShowProperties: widget.onShowProperties,
+                              onFolderScanned: widget.onFolderScanned,
+                              onClearHistory: widget.onClearHistory,
+                            ),
+                          ),
+                      ],
                     ),
+                    child: videoContent,
                   ),
-                ControlsOverlay(
-                  engine: widget.engine,
-                  emptyStatePresent: widget.emptyState != null,
-                  onPrevious: () => widget.controller.playPrevious(),
-                  onNext: () => widget.controller.playNext(),
-                  onTogglePlaylist: _togglePlaylist,
-                  onSettings: widget.onSettings,
-                  onSettingsSecondary: widget.onSettingsSecondary,
-                  onOpenFile: widget.onOpenFile,
-                  onTogglePlayMode: widget.onTogglePlayMode,
-                  onOpenSubtitle: _openSubtitle,
-                  playModeIcon: modeIcon,
-                  playModeLabel: modeLabel,
-                  isVideo: isVideo,
                 ),
               ],
             ),
           ),
-        ),
-      ],
-    );
-
-    return KeyboardHandler(
-      customBindings: widget.customBindings,
-      onPlayPause: () => widget.engine.togglePlayPause(),
-      onSeekBackward: () => _seek(widget.engine, -5000),
-      onSeekForward: () => _seek(widget.engine, 5000),
-      onVolumeUp: () =>
-          widget.engine.setVolume(widget.engine.volume.value + 0.05),
-      onVolumeDown: () =>
-          widget.engine.setVolume(widget.engine.volume.value - 0.05),
-      onToggleMute: () =>
-          widget.engine.setMute(!widget.engine.isMuted.value),
-      onPrevious: () => widget.controller.playPrevious(),
-      onNext: () => widget.controller.playNext(),
-      onOpenFile: widget.onOpenFile,
-      onToggleSubtitle: widget.engine.toggleSubtitle,
-      onShowHelp: () => _showShortcutsHelp(context),
-      onSubtitleDelayForward: () {
-        final delay = widget.engine.subtitleDelay;
-        widget.engine.setSubtitleDelay(delay + 500);
+        );
       },
-      onSubtitleDelayBackward: () {
-        final delay = widget.engine.subtitleDelay;
-        widget.engine.setSubtitleDelay(delay - 500);
-      },
-      onMediaPlayPause: () => widget.engine.togglePlayPause(),
-      onMediaNext: () => widget.controller.playNext(),
-      onMediaPrevious: () => widget.controller.playPrevious(),
-      child: Scaffold(
-        backgroundColor: Tokens.bgBase,
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 主内容区
-            Expanded(
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _playlistVisible,
-                builder: (context, playlistVisible, videoContent) =>
-                    Stack(
-                  children: [
-                    videoContent!,
-                    // 沉浸式浮窗播放列表
-                    if (_playlistMounted)
-                      IgnorePointer(
-                        ignoring: !playlistVisible,
-                        child: PlaylistPanel(
-                          playlist: widget.playlist,
-                          visible: playlistVisible,
-                          onClose: _closePlaylist,
-                          onSelectIndex: (i) {
-                            widget.controller.playIndex(i);
-                            _closePlaylist();
-                          },
-                          onRemoveIndex: (i) {
-                            widget.playlist.removeAt(i);
-                            widget.playlistGeneration.value++;
-                          },
-                          onShowProperties: widget.onShowProperties,
-                          onFolderScanned: widget.onFolderScanned,
-                          onClearHistory: widget.onClearHistory,
-                        ),
-                      ),
-                  ],
-                ),
-                child: videoContent,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    },
     );
   }
+
+  Widget _buildVideoContent(
+    bool isVideo,
+    IconData modeIcon,
+    String modeLabel,
+  ) =>
+      Row(
+        children: [
+          Expanded(
+            child: DropHandler(
+              onFilesDropped: widget.onFilesDropped ?? (_) {},
+              onHoverChanged: widget.onDragHoverChanged,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  VideoSurface(engine: widget.engine),
+                  if (widget.emptyState != null)
+                    ValueListenableBuilder<MediaState>(
+                      valueListenable: widget.engine.state,
+                      builder: (_, state, child) =>
+                          state == MediaState.idle
+                          ? child!
+                          : const SizedBox.shrink(),
+                      child: Positioned.fill(
+                        child: widget.emptyState!,
+                      ),
+                    ),
+                  ControlsOverlay(
+                    engine: widget.engine,
+                    emptyStatePresent: widget.emptyState != null,
+                    onPrevious: () => widget.controller.playPrevious(),
+                    onNext: () => widget.controller.playNext(),
+                    onTogglePlaylist: _togglePlaylist,
+                    onSettings: widget.onSettings,
+                    onSettingsSecondary: widget.onSettingsSecondary,
+                    onOpenFile: widget.onOpenFile,
+                    onTogglePlayMode: widget.onTogglePlayMode,
+                    onOpenSubtitle: _openSubtitle,
+                    playModeIcon: modeIcon,
+                    playModeLabel: modeLabel,
+                    isVideo: isVideo,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
 
   void _seek(MediaEngine engine, int deltaMs) {
     final target = engine.position.value + deltaMs;
