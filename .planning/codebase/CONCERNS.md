@@ -9,28 +9,22 @@
 **Impact:** Git status shows 12 files modified — large refactor in progress. Any code referencing WindowService or ResizeNotifier will fail at compile time.
 **Fix:** Verify all references updated before merge. Ensure functionality absorbed into new architecture.
 
-### 2. fvp D3D11 sync CPU/GPU bottleneck
-**File:** `lib/kernel/engine/fvp_engine.dart:322-334`
-**Impact:** `updateTexture()` does D3D11 CopyResource + sync flush per frame. On 4K content, causes frame drops. `_textureTimeoutSeconds = 5` suggests known slow path.
-**Fix:** Monitor fvp upstream for async texture APIs. Consider D3D11 MAP_WRITE_DISCARD pattern.
+### 2. fvp D3D11 sync CPU/GPU bottleneck [MITIGATED Phase 3]
+**File:** `lib/kernel/engine/fvp_engine.dart:141-153`
+**Impact:** `updateTexture()` does D3D11 CopyResource + sync flush per frame. On 4K content, causes frame drops.
+**Mitigation:** Phase 3 Plan 01 added `_applyD3d11Defaults()` with `d3d11.sync.cpu=1` (safe default) + `video.decoders=D3D11,NVDEC,FFmpeg` (hardware-first). Runtime-tunable via Performance settings tab. See PERFORMANCE.md for details.
+**Remaining:** Monitor fvp upstream for async texture APIs. Consider D3D11 MAP_WRITE_DISCARD pattern.
 
-### 3. Single `catch (_)` silently swallows errors
+### 3. ~~Single `catch (_)` silently swallows errors~~ [RESOLVED Phase 1]
 **File:** `lib/kernel/persistence/playlist_store.dart:168`
-```dart
-} catch (_) {
-  // 跳过损坏项
-}
-```
-**Impact:** Discards all error information including Error subtypes.
-**Fix:** Change to `on Exception catch (e)` + `debugPrint`.
+**Resolution:** Changed to `on Exception catch (e)` + `log.d()` (Phase 1, commit f4f50bf). Verified 2026-05-29: zero `catch (_)` patterns remain in lib/.
 
-### 4. `on Object catch` catches Error subtypes (3 places)
+### 4. ~~`on Object catch` catches Error subtypes (3 places)~~ [RESOLVED Phase 1]
 **Files:**
 - `lib/kernel/engine/engine_prewarm.dart:56`
 - `lib/features/player/services/subtitle_service.dart:37`
 - `lib/features/player/services/subtitle_service.dart:59`
-**Impact:** Catches programming bugs (TypeError, RangeError) that should propagate.
-**Fix:** Change to `on Exception catch (e)`.
+**Resolution:** All 3 changed to `on Exception catch (e)` with `log.d()` (Phase 1, commit f4f50bf). Verified 2026-05-29: zero `on Object catch` patterns remain in lib/.
 
 ## MEDIUM Severity
 
@@ -93,14 +87,13 @@ videoProcessing: videoProcessing as VideoProcessingService?,
 **Coverage:** 1,161 / 1,822 lines = 63.7%
 **Untested:** settings_panel, aurora_background, startup_coordinator, localization
 
-### 14. PerfMonitor unbounded list growth
-**File:** `lib/kernel/utils/perf_monitor.dart:89-93`
-**Impact:** Lists grow to 1000 then clear entirely — periodic memory spikes.
-**Fix:** Use circular buffer with fixed capacity.
+### 14. ~~PerfMonitor unbounded list growth~~ [RESOLVED Phase 3 Plan 01]
+**File:** `lib/kernel/utils/perf_monitor.dart`
+**Resolution:** Replaced unbounded lists with fixed-capacity ring buffer (`_maxFrames = 300`). Uses `_writeIndex % _maxFrames` for overwrite semantics. No periodic memory spikes.
 
-### 15. PerfMonitor.mark()/markEnd() dead code
-**File:** `lib/kernel/utils/perf_monitor.dart:96-103`
-**Impact:** No callers in codebase.
+### 15. ~~PerfMonitor.mark()/markEnd() dead code~~ [RESOLVED Phase 3 Plan 01]
+**File:** `lib/kernel/utils/perf_monitor.dart`
+**Resolution:** `mark()`/`markEnd()` wrapper methods removed. `window_service.dart` updated to use `developer.Timeline.startSync/finishSync` directly.
 
 ### 16. EnginePrewarm fire-and-forget
 **File:** `lib/main.dart:17-22`
@@ -110,6 +103,6 @@ videoProcessing: videoProcessing as VideoProcessingService?,
 **File:** `lib/kernel/persistence/settings_store.dart:11-57`
 **Impact:** No `copyWith()`, no `==`/`hashCode`. VideoProcessingState uses freezed — AppSettings should follow.
 
-### 18. FvpEngine.subtitleDelay catches silently
-**File:** `lib/kernel/engine/fvp_engine.dart:544`
-**Impact:** Only place in engine using `catch (_)` instead of logging.
+### 18. ~~FvpEngine.subtitleDelay catches silently~~ [RESOLVED Phase 1]
+**File:** `lib/kernel/engine/fvp_engine.dart:567`
+**Resolution:** Changed to `on Exception catch (e)` with `log.d()` (Phase 1). Verified 2026-05-29: uses typed exception catch with logging.
