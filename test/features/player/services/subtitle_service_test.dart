@@ -83,5 +83,72 @@ void main() {
       expect(SubtitleService.subtitleExtensions, contains('.vtt'));
       expect(SubtitleService.subtitleExtensions, contains('.sub'));
     });
+
+    test('detectAndLoad finds matching subtitle asynchronously', () async {
+      final mediaFile = File('${tempDir.path}/movie.mp4');
+      final subFile = File('${tempDir.path}/movie.srt');
+      await mediaFile.create();
+      await subFile.create();
+
+      await service.detectAndLoad(mediaFile.path);
+      expect(engine.lastSubtitle, subFile.path.replaceAll('/', Platform.pathSeparator));
+    });
+
+    test('detectAndLoad finds subtitle with language tag async', () async {
+      final mediaFile = File('${tempDir.path}/movie.mp4');
+      final subFile = File('${tempDir.path}/movie.english.ass');
+      await mediaFile.create();
+      await subFile.create();
+
+      await service.detectAndLoad(mediaFile.path);
+      expect(engine.lastSubtitle, isNotNull);
+    });
+
+    test('detectAndLoad ignores non-subtitle files', () async {
+      final mediaFile = File('${tempDir.path}/movie.mp4');
+      final txtFile = File('${tempDir.path}/movie.txt');
+      await mediaFile.create();
+      await txtFile.create();
+
+      await service.detectAndLoad(mediaFile.path);
+      expect(engine.lastSubtitle, isNull);
+    });
+
+    test('detectAndLoad handles missing directory', () async {
+      await service.detectAndLoad('/nonexistent/path/movie.mp4');
+      expect(engine.lastSubtitle, isNull);
+    });
+
+    test('detectAndLoadSync stops at first match', () async {
+      final mediaFile = File('${tempDir.path}/movie.mp4');
+      final sub1 = File('${tempDir.path}/movie.srt');
+      final sub2 = File('${tempDir.path}/movie.ass');
+      await mediaFile.create();
+      await sub1.create();
+      await sub2.create();
+
+      service.detectAndLoadSync(mediaFile.path);
+      // Should load exactly one subtitle (first match)
+      expect(engine.lastSubtitle, isNotNull);
+    });
+
+    test('detectAndLoad loads all subtitle extensions', () async {
+      for (final ext in ['.srt', '.ass', '.vtt', '.sub', '.ssa']) {
+        final subDir = await Directory.systemTemp.createTemp('sub_ext_');
+        try {
+          final mediaFile = File('${subDir.path}/video.mp4');
+          final subFile = File('${subDir.path}/video$ext');
+          await mediaFile.create();
+          await subFile.create();
+
+          final fakeEngine = _FakeEngine();
+          final svc = SubtitleService(fakeEngine);
+          await svc.detectAndLoad(mediaFile.path);
+          expect(fakeEngine.lastSubtitle, isNotNull, reason: 'Extension $ext should match');
+        } finally {
+          if (await subDir.exists()) await subDir.delete(recursive: true);
+        }
+      }
+    });
   });
 }

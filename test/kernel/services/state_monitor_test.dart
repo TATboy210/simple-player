@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
+import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/models/media_state.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
@@ -134,6 +135,101 @@ void main() {
         await Future.microtask(() {});
         final item = playlist.items[0];
         expect(item.positionMs, 5000);
+      });
+    });
+
+    group('StateMonitor.init', () {
+      test('init with preloaded settings sets volume and mute', () async {
+        const settings = AppSettings(
+          volume: 0.7,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: true,
+        );
+        await controller.init(settings: settings);
+        expect(engine.volume.value, closeTo(0.7, 0.01));
+        expect(engine.isMuted.value, isTrue);
+      });
+
+      test('init is idempotent', () async {
+        const settings = AppSettings(
+          volume: 0.5,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        // Second init should be a no-op
+        await controller.init(settings: settings);
+        expect(engine.volume.value, closeTo(0.5, 0.01));
+      });
+    });
+
+    group('StateMonitor auto-advance via init', () {
+      test('completed + loopSingle replays via StateMonitor listener',
+          () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopSingle;
+        await controller.playIndex(0);
+        // Trigger completed state — StateMonitor._onStateChanged should replay
+        engine.simulateCompleted();
+        await Future(() {});
+        expect(playlist.currentIndex, 0);
+      });
+
+      test('completed + loopAll advances via StateMonitor listener', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopAll;
+        await controller.playIndex(0);
+        engine.simulateCompleted();
+        await Future(() {});
+        expect(playlist.currentIndex, 1);
+      });
+
+      test('completed + loopAll wraps around via StateMonitor', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopAll;
+        await controller.playIndex(1); // play last item
+        engine.simulateCompleted();
+        await Future(() {});
+        expect(playlist.currentIndex, 0); // wraps to first
       });
     });
   });
