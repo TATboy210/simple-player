@@ -1,47 +1,42 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T04:30:00+08:00",
+  "timestamp": "2026-05-29T05:00:00+08:00",
   "phase": "3",
   "phase_name": "Performance Optimization",
   "phase_dir": ".planning/phases/03-performance-optimization",
   "plan": 4,
   "task": 0,
-  "total_tasks": 6,
-  "status": "gaps_closed",
+  "total_tasks": 0,
+  "status": "research_complete",
   "completed_tasks": [
     {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
     {"id": 2, "name": "Phase 2 execution (2 plans, verification passed)", "status": "done", "commit": "b85b1d2"},
-    {"id": 3, "name": "Phase 3 discuss-phase (4 areas, 41 decisions)", "status": "done", "commit": "907faa0"},
-    {"id": 4, "name": "Phase 3 plan-phase (3 plans, 2 waves, verification passed)", "status": "done", "commit": "30f4f40"},
-    {"id": 5, "name": "Phase 3 Plan 01: D3D11 engine params + PerfMonitor + settings + queryFence", "status": "done", "commit": "a7331b2"},
-    {"id": 6, "name": "Phase 3 Plan 02: Control bar profiling + frame drop fix + regression tests", "status": "done", "commit": "d36f8b4"},
-    {"id": 7, "name": "Phase 3 Plan 03: Error handling re-scan + performance report", "status": "done", "commit": "043d639"},
-    {"id": 8, "name": "Phase 3 verification (11/14 passed, 3 gaps found)", "status": "done", "commit": "043d639"},
-    {"id": 9, "name": "Phase 3 gap closure plan 04 (settings persistence + testing templates)", "status": "done", "commit": "213c421"}
+    {"id": 3, "name": "Phase 3 execution (3 plans + gap closure)", "status": "done", "commit": "213c421"},
+    {"id": 4, "name": "Window visibility fix (window.Show())", "status": "done", "commit": "0e1fed9"},
+    {"id": 5, "name": "Min resolution 480p 854x480", "status": "done", "commit": "0e1fed9"},
+    {"id": 6, "name": "Security audit of window management code", "status": "done"},
+    {"id": 7, "name": "Window frameless anti-pattern documentation", "status": "done"},
+    {"id": 8, "name": "nativeapi research (v0.1.3, FFI, window management)", "status": "done"}
   ],
   "remaining_tasks": [
+    {"id": 9, "name": "Migrate window management from custom C++ to nativeapi", "status": "not_started"},
     {"id": 10, "name": "Manual: D3D11 multi-hardware testing (3+ GPU configs)", "status": "not_started"},
-    {"id": 11, "name": "Manual: DevTools frame time profiling (baseline vs optimized)", "status": "not_started"},
+    {"id": 11, "name": "Manual: DevTools frame time profiling", "status": "not_started"},
     {"id": 12, "name": "Phase 4: Platform Stubs & Test Coverage", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Test D3D11 params on 3+ hardware configs using D3D11_HARDWARE_TEST.md template", "context": "ROADMAP SC1 requires multi-hardware validation. Template at .planning/phases/03-performance-optimization/D3D11_HARDWARE_TEST.md", "blocking": false},
-    {"action": "Run DevTools frame timeline profiling using DEVTOOLS_PROFILING_GUIDE.md template", "context": "ROADMAP SC3 requires measurable 2-5ms/frame savings. Guide at .planning/phases/03-performance-optimization/DEVTOOLS_PROFILING_GUIDE.md", "blocking": false}
+    {"action": "Implement nativeapi package integration for window management", "context": "User decided to use nativeapi (libnativeapi/nativeapi-flutter v0.1.3) instead of custom C++ or window_manager. FFI path bypasses Flutter HandleTopLevelWindowProc.", "blocking": true},
+    {"action": "Test D3D11 params on 3+ hardware configs", "context": "Template at .planning/phases/03-performance-optimization/D3D11_HARDWARE_TEST.md", "blocking": false}
   ],
   "decisions": [
-    {"decision": "Settings persistence via StatefulWidget + async SettingsStore load", "rationale": "ValueNotifier constructor is synchronous, so PerformanceTab became StatefulWidget to load persisted values in initState", "phase": "3"},
-    {"decision": "Gap closure plan as single 03-04 with 2 tasks", "rationale": "Gap 3 is code fix (autonomous), Gaps 1-2 are testing docs (also autonomous). Single plan simpler than splitting", "phase": "3"},
-    {"decision": "Testing templates as fill-in documents, not completed reports", "reason": "Gaps 1-2 require physical hardware and DevTools GUI — cannot be automated. Templates enable structured manual testing", "phase": "3"}
+    {"decision": "Custom C++ window management has fundamental flaws", "rationale": "WM_NCHITTEST intercepted by Flutter HandleTopLevelWindowProc, WS_CAPTION removal breaks DWM animation, 3 approaches all failed", "phase": "3"},
+    {"decision": "Security audit: no CRITICAL/HIGH, 1 MEDIUM (NaN/Inf UB)", "rationale": "All Win32 API calls scoped to own window, input validation correct", "phase": "3"},
+    {"decision": "Migrate to nativeapi package for window management", "rationale": "FFI bypasses Flutter message pipeline, TitleBarStyle.hidden handles frameless natively, cross-platform. User pointed to nativeapi-flutter repo.", "phase": "3"}
   ],
   "uncommitted_files": [
-    "lib/ui/dialogs/settings_panel.dart",
-    "lib/ui/playlist/playlist_panel.dart",
-    "windows/runner/CMakeLists.txt",
-    "windows/runner/window_channel.cpp",
-    "windows/runner/window_channel.h",
-    ".planning/config.json"
+    "lib/features/player/player_services.dart"
   ],
-  "next_action": "Manual testing: run D3D11_HARDWARE_TEST.md on 3+ GPU configs, then run DEVTOOLS_PROFILING_GUIDE.md for frame time measurement. After manual gaps closed, proceed to /gsd:plan-phase 4",
-  "context_notes": "Phase 3 gap closure complete. Gap 3 (settings persistence) closed via code — D3D11 sync + hardware decoding now persist to SharedPreferences. Gaps 1-2 have structured testing templates for manual execution. 312 tests passing. Worktree merge had conflict in settings_tab_performance.dart (import path + StatefulWidget vs StatelessWidget) — resolved by taking worktree logic with correct import paths. Context at 81% — pausing here."
+  "next_action": "Implement nativeapi: add dependency, rewrite WindowService to use nativeapi FFI, remove custom C++ window_channel.cpp/h, test frameless + resize + DWM animation",
+  "context_notes": "Research complete. User chose nativeapi over window_manager and custom C++. nativeapi v0.1.3 (pub 2026-05-26) provides Window class via FFI to C library. Key APIs: titleBarStyle=hidden, setSize, center, maximize, minimize, VisualEffect (blur/acrylic/mica). Bypasses HandleTopLevelWindowProc. Risk: WIP status, fvp D3D11 compatibility unknown. Security audit saved to memory. Anti-patterns documented in memory."
 }
