@@ -39,7 +39,7 @@ class SettingsPanel extends StatefulWidget {
 
 class _SettingsPanelState extends State<SettingsPanel> {
   int _selectedIndex = 0;
-  Offset _offset = Offset.zero;
+  final ValueNotifier<Offset> _offset = ValueNotifier(Offset.zero);
 
   // ── GeneralTab 延迟应用的 pending 值 ──
   late String _pendingLocale;
@@ -74,6 +74,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   Future<void> _loadOriginalShortcuts() async {
     _originalShortcuts = await SettingsStore.loadShortcuts();
+  }
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
   }
 
   /// 应用语言和主题变更（在对话框关闭后调用，避免 MaterialApp 重建丢失对话框状态）
@@ -124,9 +130,11 @@ class _SettingsPanelState extends State<SettingsPanel> {
             child: Container(color: Colors.black54),
           ),
         ),
-        // 可拖拽面板
-        Transform.translate(
-          offset: _offset,
+        // 可拖拽面板 — ValueListenableBuilder 隔离拖拽 rebuild
+        ValueListenableBuilder<Offset>(
+          valueListenable: _offset,
+          builder: (context, offset, panel) =>
+              Transform.translate(offset: offset, child: panel),
           child: Align(
             alignment: Alignment.topLeft,
             child: Padding(
@@ -145,7 +153,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       GestureDetector(
                         onPanStart: (_) {},
                         onPanUpdate: (d) {
-                          setState(() => _offset += d.delta);
+                          _offset.value += d.delta;
                         },
                         child: Container(
                           height: 44,

@@ -105,6 +105,12 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   static const _panelWidth = Tokens.playlistPanelWidth;
   static const _panelHeight = Tokens.playlistPanelHeight;
 
+  // 缓存固定 blur filter，避免动画期间每帧分配 ImageFilter
+  static final _blurFilter = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlurThick,
+    sigmaY: Tokens.glassBlurThick,
+  );
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -155,25 +161,14 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           height: height,
           child: Stack(
               children: [
-                // 背景层：毛玻璃模糊（动画期间 sigma 渐变）
+                // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                    child: AnimatedBuilder(
-                      animation: _anim,
-                      builder: (_, _) => BackdropFilter(
-                        filter: ui.ImageFilter.blur(
-                          sigmaX: ui.lerpDouble(
-                            10,
-                            Tokens.glassBlurThick,
-                            _anim.value,
-                          )!,
-                          sigmaY: ui.lerpDouble(
-                            10,
-                            Tokens.glassBlurThick,
-                            _anim.value,
-                          )!,
-                        ),
+                    child: FadeTransition(
+                      opacity: _fadeAnim,
+                      child: BackdropFilter(
+                        filter: _blurFilter,
                         child: const SizedBox.expand(),
                       ),
                     ),

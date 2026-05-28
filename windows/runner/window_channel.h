@@ -79,25 +79,25 @@ class WindowChannel {
 
   // ─── Command handlers ───
   void SetFullscreen(bool fullscreen,
-                     const flutter::MethodResult<flutter::EncodableValue>& result);
+                     flutter::MethodResult<flutter::EncodableValue>& result);
   void SetAlwaysOnTop(
       bool always_on_top,
-      const flutter::MethodResult<flutter::EncodableValue>& result);
+      flutter::MethodResult<flutter::EncodableValue>& result);
   void SetSize(double width, double height,
-               const flutter::MethodResult<flutter::EncodableValue>& result);
+               flutter::MethodResult<flutter::EncodableValue>& result);
   void SetPosition(double x, double y,
-                   const flutter::MethodResult<flutter::EncodableValue>& result);
+                   flutter::MethodResult<flutter::EncodableValue>& result);
   void SetMinSize(double width, double height,
-                  const flutter::MethodResult<flutter::EncodableValue>& result);
+                  flutter::MethodResult<flutter::EncodableValue>& result);
   void SetFrameless(bool frameless,
-                    const flutter::MethodResult<flutter::EncodableValue>& result);
+                    flutter::MethodResult<flutter::EncodableValue>& result);
   void GetTitleBarBounds(
-      const flutter::MethodResult<flutter::EncodableValue>& result);
-  void Minimize(const flutter::MethodResult<flutter::EncodableValue>& result);
-  void Maximize(const flutter::MethodResult<flutter::EncodableValue>& result);
-  void Restore(const flutter::MethodResult<flutter::EncodableValue>& result);
-  void Close(const flutter::MethodResult<flutter::EncodableValue>& result);
-  void Center(const flutter::MethodResult<flutter::EncodableValue>& result);
+      flutter::MethodResult<flutter::EncodableValue>& result);
+  void Minimize(flutter::MethodResult<flutter::EncodableValue>& result);
+  void Maximize(flutter::MethodResult<flutter::EncodableValue>& result);
+  void Restore(flutter::MethodResult<flutter::EncodableValue>& result);
+  void Close(flutter::MethodResult<flutter::EncodableValue>& result);
+  void Center(flutter::MethodResult<flutter::EncodableValue>& result);
 
   // ─── Event helpers ───
   void SendEvent(const std::string& event,

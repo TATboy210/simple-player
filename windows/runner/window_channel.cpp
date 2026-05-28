@@ -4,6 +4,7 @@
 #include <windowsx.h>
 
 #include <flutter/encodable_value.h>
+#include <flutter/event_stream_handler_functions.h>
 
 #include <algorithm>
 
@@ -212,14 +213,14 @@ void WindowChannel::HandleMethodCall(
 
 void WindowChannel::SetFullscreen(
     bool fullscreen,
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
 
   if (fullscreen == is_fullscreen_) {
-    result->Success(flutter::EncodableValue(true));
+    result.Success(flutter::EncodableValue(true));
     return;
   }
 
@@ -270,14 +271,14 @@ void WindowChannel::SetFullscreen(
       flutter::EncodableValue(fullscreen);
   SendEvent("onFullscreenChange", data);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::SetAlwaysOnTop(
     bool always_on_top,
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
 
@@ -285,14 +286,14 @@ void WindowChannel::SetAlwaysOnTop(
   SetWindowPos(hwnd_, insert_after, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::SetSize(
     double width, double height,
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
 
@@ -303,34 +304,34 @@ void WindowChannel::SetSize(
   SetWindowPos(hwnd_, nullptr, 0, 0, w, h,
                SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::SetPosition(
     double x, double y,
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
 
   SetWindowPos(hwnd_, nullptr, static_cast<int>(x), static_cast<int>(y), 0, 0,
                SWP_NOZORDER | SWP_NOSIZE);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::SetMinSize(
     double width, double height,
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   min_width_ = static_cast<LONG>(width);
   min_height_ = static_cast<LONG>(height);
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::SetFrameless(
     bool frameless,
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   is_frameless_ = frameless;
 
   if (hwnd_) {
@@ -349,13 +350,13 @@ void WindowChannel::SetFrameless(
                  SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
   }
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::GetTitleBarBounds(
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
 
@@ -370,23 +371,23 @@ void WindowChannel::GetTitleBarBounds(
   bounds[flutter::EncodableValue("height")] =
       flutter::EncodableValue(static_cast<double>(kTitleBarHeight));
 
-  result->Success(bounds);
+  result.Success(bounds);
 }
 
 void WindowChannel::Minimize(
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
   ShowWindow(hwnd_, SW_MINIMIZE);
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::Maximize(
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
   ShowWindow(hwnd_, SW_MAXIMIZE);
@@ -399,13 +400,13 @@ void WindowChannel::Maximize(
       flutter::EncodableValue(true);
   SendEvent("onMaximize", data);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::Restore(
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
   ShowWindow(hwnd_, SW_RESTORE);
@@ -418,23 +419,23 @@ void WindowChannel::Restore(
       flutter::EncodableValue(false);
   SendEvent("onMaximize", data);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::Close(
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
   PostMessage(hwnd_, WM_CLOSE, 0, 0);
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 void WindowChannel::Center(
-    const flutter::MethodResult<flutter::EncodableValue>& result) {
+    flutter::MethodResult<flutter::EncodableValue>& result) {
   if (!hwnd_) {
-    result->Error("no_window", "Window handle is null");
+    result.Error("no_window", "Window handle is null");
     return;
   }
 
@@ -457,7 +458,7 @@ void WindowChannel::Center(
   SetWindowPos(hwnd_, nullptr, x, y, 0, 0,
                SWP_NOZORDER | SWP_NOSIZE | SWP_FRAMECHANGED);
 
-  result->Success(flutter::EncodableValue(true));
+  result.Success(flutter::EncodableValue(true));
 }
 
 // ─── MessageHandler delegates ───
