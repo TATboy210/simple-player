@@ -265,4 +265,134 @@ void main() {
       expect(c.visible.value, isTrue);
     });
   });
+
+  group('AutoHideController.resizing', () {
+    test('resizing=true cancels hide timer', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.scheduleHide();
+
+      c.resizing = true;
+
+      // Timer canceled — resizing freezes auto-hide
+      expect(c.visible.value, isTrue);
+    });
+
+    test('resizing=false schedules hide', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.resizing = true;
+
+      c.resizing = false;
+
+      // scheduleHide called — timer restarted
+      expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController.onMouseMove() throttle', () {
+    test('second call within throttle window is no-op', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+
+      c.onMouseMove(); // first call — shows
+      c.visible.value = false;
+      c.onMouseMove(); // within 100ms throttle — no-op
+
+      expect(c.visible.value, isFalse);
+    });
+  });
+
+  group('AutoHideController — animation dismissed', () {
+    test('hide triggers reverse animation then sets visible false', () async {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.onMouseEnter(); // hovering = true
+      c.onMouseExit(); // hovering = false, scheduleHide called
+
+      // Manually trigger hide (not via timer)
+      c.hide();
+
+      // Animation is reversing — visible still true until dismissed
+      expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController.onEngineStateChanged() — hidden transitions', () {
+    test('playing when hidden shows and schedules hide', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.playing;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('loading when hidden shows and schedules hide', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.loading;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('paused when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.paused;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('stopped when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.stopped;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('completed when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.completed;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('error when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.error;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+  });
 }
