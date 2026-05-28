@@ -53,7 +53,7 @@ class EnginePrewarm {
       player.dispose();
       _prewarmed = true;
       onProgress?.call(1.0, 'Prewarm complete');
-    } on Object catch (e) {
+    } on Exception catch (e) {
       _prewarmed = false;
       log.d('EnginePrewarm failed: $e');
     }

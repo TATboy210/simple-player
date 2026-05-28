@@ -13,6 +13,7 @@ import '../utils/path_utils.dart';
 import 'fvp_callback_handler.dart';
 import 'media_engine.dart';
 import 'position_poller.dart';
+import '../utils/log.dart';
 import 'track_manager.dart';
 
 /// fvp/MDK 引擎实现
@@ -541,7 +542,8 @@ class FvpEngine implements MediaEngine {
     if (_disposed) return 0;
     try {
       return int.parse(_player.getProperty('subtitle.delay') ?? '0');
-    } on Exception catch (_) {
+    } on Exception catch (e) {
+      log.d('FvpEngine.subtitleDelay parse error: $e');
       return 0;
     }
   }

@@ -34,7 +34,7 @@ class SubtitleService {
           _engine.setExternalSubtitle(match);
         }
       }
-    } on Object catch (e) {
+    } on Exception catch (e) {
       log.d('SubtitleService.detectAndLoad error: $e');
     }
   }
@@ -56,7 +56,7 @@ class SubtitleService {
           break;
         }
       }
-    } on Object catch (e) {
+    } on Exception catch (e) {
       log.d('SubtitleService.detectAndLoadSync error: $e');
     }
   }
