@@ -12,6 +12,7 @@ import 'settings/equalizer_tab.dart';
 import 'settings/general_tab.dart';
 import 'settings/shortcuts_tab.dart';
 import 'settings/video_tab.dart';
+import 'settings/settings_tab_performance.dart';
 
 /// 设置面板 — 可拖拽 + 侧边栏导航 + 确定/取消/应用
 ///
@@ -253,6 +254,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
           onShortcutsChanged: widget.onShortcutsChanged,
         ),
       5 => const AboutTab(key: ValueKey(5)),
+      6 => PerformanceTab(key: const ValueKey(6), engine: widget.engine),
       _ => GeneralTab(
           key: const ValueKey(0),
           currentLocale: _pendingLocale,
@@ -381,6 +383,12 @@ class _Sidebar extends StatelessWidget {
             label: l10n.aboutTab,
             selected: selectedIndex == 5,
             onTap: () => onSelect(5),
+          ),
+          SettingsNavItem(
+            icon: Icons.speed,
+            label: l10n.performanceTab,
+            selected: selectedIndex == 6,
+            onTap: () => onSelect(6),
           ),
         ],
       ),

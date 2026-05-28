@@ -165,6 +165,19 @@ abstract class MediaEngine {
   /// 启用/禁用去隔行（仅软件解码器生效）
   void setDeinterlace(bool enable);
 
+  // ─── D3D11 性能参数 ───
+
+  /// 启用/禁用 D3D11 CPU/GPU 同步（d3d11.sync.cpu）
+  ///
+  /// 关闭可降低延迟（异步模式），但可能产生画面撕裂。
+  /// 默认开启（同步模式）以保证画面完整性。
+  void setD3d11SyncEnabled(bool enabled);
+
+  /// 启用/禁用硬件解码
+  ///
+  /// 默认开启。如出现画面异常可关闭回退到软件解码。
+  void setHardwareDecoding(bool enabled);
+
   // ─── 生命周期 ───
 
   /// 释放所有资源

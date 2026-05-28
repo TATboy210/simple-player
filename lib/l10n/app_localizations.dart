@@ -908,12 +908,6 @@ abstract class AppLocalizations {
   /// **'Key already bound'**
   String get shortcutConflict;
 
-  /// Shortcut label for cycling aspect ratio
-  ///
-  /// In en, this message translates to:
-  /// **'Cycle Aspect Ratio'**
-  String get shortcutAspectCycle;
-
   /// Quick menu label for current theme section
   ///
   /// In en, this message translates to:
@@ -937,6 +931,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Apply'**
   String get apply;
+
+  /// Error message when deferred player module fails to load
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load player module'**
+  String get playerLoadError;
+
+  /// Performance settings tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Performance'**
+  String get performanceTab;
+
+  /// Section header for D3D11 rendering settings
+  ///
+  /// In en, this message translates to:
+  /// **'D3D11 Rendering'**
+  String get d3d11Rendering;
+
+  /// Toggle label for D3D11 CPU/GPU synchronization
+  ///
+  /// In en, this message translates to:
+  /// **'D3D11 CPU Sync'**
+  String get d3d11Sync;
+
+  /// Description for D3D11 sync toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Synchronize CPU and GPU per frame. Disable for lower latency, may cause tearing.'**
+  String get d3d11SyncDesc;
+
+  /// Section header for decoder settings
+  ///
+  /// In en, this message translates to:
+  /// **'Decoder'**
+  String get decoderSettings;
+
+  /// Toggle label for hardware decoding
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Decoding'**
+  String get hardwareDecoding;
+
+  /// Description for hardware decoding toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Use GPU for video decoding. Disable if experiencing artifacts.'**
+  String get hardwareDecodingDesc;
+
+  /// Hint that performance changes require reopening file
+  ///
+  /// In en, this message translates to:
+  /// **'Changes take effect on next file open.'**
+  String get performanceHint;
 }
 
 class _AppLocalizationsDelegate

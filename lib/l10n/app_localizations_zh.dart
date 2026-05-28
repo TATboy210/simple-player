@@ -430,9 +430,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutConflict => '按键已被占用';
 
   @override
-  String get shortcutAspectCycle => '切换宽高比';
-
-  @override
   String get currentTheme => '当前主题';
 
   @override
@@ -443,4 +440,31 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get apply => '应用';
+
+  @override
+  String get playerLoadError => '播放器模块加载失败';
+
+  @override
+  String get performanceTab => '性能';
+
+  @override
+  String get d3d11Rendering => 'D3D11 渲染';
+
+  @override
+  String get d3d11Sync => 'D3D11 CPU 同步';
+
+  @override
+  String get d3d11SyncDesc => '每帧同步 CPU 和 GPU。关闭可降低延迟，可能产生画面撕裂。';
+
+  @override
+  String get decoderSettings => '解码器';
+
+  @override
+  String get hardwareDecoding => '硬件解码';
+
+  @override
+  String get hardwareDecodingDesc => '使用 GPU 进行视频解码。如出现画面异常请关闭。';
+
+  @override
+  String get performanceHint => '更改在下次打开文件时生效。';
 }
