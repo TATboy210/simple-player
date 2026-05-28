@@ -1,24 +1,26 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-28T21:55:00+08:00",
+  "timestamp": "2026-05-28T22:09:04+08:00",
   "phase": "2",
   "phase_name": "Widget Unification",
   "phase_dir": ".planning/phases/02-widget-unification",
   "plan": 0,
   "task": 0,
   "total_tasks": 0,
-  "status": "context_complete",
+  "status": "research_complete",
   "completed_tasks": [
     {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
     {"id": 2, "name": "Phase 1 pause-work handoff", "status": "done", "commit": "c0a3c1f"},
     {"id": 3, "name": "Phase 2 discuss-phase (8 areas, 17 decisions)", "status": "done", "commit": "b068e87"},
     {"id": 4, "name": "Phase 2 CONTEXT.md + DISCUSSION-LOG.md", "status": "done", "commit": "b068e87"},
-    {"id": 5, "name": "STATE.md updated for Phase 2", "status": "done", "commit": "dccb0bc"}
+    {"id": 5, "name": "STATE.md updated for Phase 2", "status": "done", "commit": "dccb0bc"},
+    {"id": 6, "name": "Phase 2 research (RESEARCH.md + VALIDATION.md)", "status": "done", "commit": "pending"}
   ],
   "remaining_tasks": [
-    {"id": 6, "name": "Phase 2 plan-phase (create plans)", "status": "not_started"},
-    {"id": 7, "name": "Phase 2 execution", "status": "not_started"},
-    {"id": 8, "name": "Phase 2 verification", "status": "not_started"}
+    {"id": 7, "name": "Phase 2 plan-phase (spawn planner)", "status": "not_started"},
+    {"id": 8, "name": "Phase 2 plan verification (plan-checker)", "status": "not_started"},
+    {"id": 9, "name": "Phase 2 execution", "status": "not_started"},
+    {"id": 10, "name": "Phase 2 verification", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
@@ -43,6 +45,6 @@
     "windows/runner/window_channel.cpp",
     "windows/runner/window_channel.h"
   ],
-  "next_action": "Run /gsd:plan-phase 2 to create executable plans for Widget Unification",
-  "context_notes": "Phase 2 context gathered via discuss-phase. 8 areas discussed, 17 decisions captured in CONTEXT.md. Key direction: merge GlassIconButton into GlassButton with InkWell (no scale animation), barrel file export, full ValueNotifier audit across all ui/. Glass performance optimization deferred to Phase 3 execution but directions locked. Next step is planning."
+  "next_action": "Run /gsd:plan-phase 2 — research already complete, will skip to planner spawn directly",
+  "context_notes": "Phase 2 research complete. RESEARCH.md (516 lines) + VALIDATION.md created. Key finding: GlassIconButton has 15 call sites (all icon-only), rendering model incompatible with GlassButton (no BackdropFilter). Merged icon-only mode must preserve lightweight Material+InkWell pattern. 25+ ValueListenableBuilder instances found, most already cached. MergedListenable + ValueListenableBuilder2 already exist. GlassTier 3 levels kept until display-tested. Security: no concerns. UI-SPEC: not needed (widget consolidation, not new design). Next: spawn planner."
 }
