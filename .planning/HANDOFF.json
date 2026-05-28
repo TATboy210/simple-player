@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T00:15:00+08:00",
-  "phase": "2",
-  "phase_name": "Widget Unification",
-  "phase_dir": ".planning/phases/02-widget-unification",
-  "plan": 2,
+  "timestamp": "2026-05-29T00:44:00+08:00",
+  "phase": "3",
+  "phase_name": "Performance Optimization",
+  "phase_dir": ".planning/phases/03-performance-optimization",
+  "plan": 0,
   "task": 0,
   "total_tasks": 0,
-  "status": "phase_complete",
+  "status": "context_gathered",
   "completed_tasks": [
     {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
     {"id": 2, "name": "Phase 2 discuss-phase (8 areas, 17 decisions)", "status": "done", "commit": "b068e87"},
@@ -15,10 +15,10 @@
     {"id": 4, "name": "Phase 2 plan-phase (planner + checker passed)", "status": "done", "commit": "49369e2"},
     {"id": 5, "name": "Phase 2 Plan 01: GlassButton merge + barrel file + migration", "status": "done", "commit": "b1d6ec4"},
     {"id": 6, "name": "Phase 2 Plan 02: GlassContainer perf + VLB audit", "status": "done", "commit": "c925dc8"},
-    {"id": 7, "name": "Phase 2 verification (13/13 passed)", "status": "done", "commit": "b85b1d2"}
+    {"id": 7, "name": "Phase 2 verification (13/13 passed)", "status": "done", "commit": "b85b1d2"},
+    {"id": 8, "name": "Phase 3 discuss-phase (4 areas, 41 decisions)", "status": "done", "commit": "907faa0"}
   ],
   "remaining_tasks": [
-    {"id": 8, "name": "Phase 3 discuss-phase", "status": "not_started"},
     {"id": 9, "name": "Phase 3 plan-phase", "status": "not_started"},
     {"id": 10, "name": "Phase 3 execution", "status": "not_started"},
     {"id": 11, "name": "Phase 4 execution", "status": "not_started"}
@@ -26,24 +26,30 @@
   "blockers": [],
   "human_actions_pending": [
     {"action": "Manual smoke test: flutter run -d windows — verify Phase 1 frameless window + Phase 2 glass buttons", "context": "Both phases need manual UI verification", "blocking": false},
-    {"action": "3 uncommitted files from pre-Phase 1: settings_panel.dart, playlist_panel.dart", "context": "Pre-existing modifications, not from this workflow", "blocking": false}
+    {"action": "Prepare test videos (different resolutions/codecs) for performance profiling", "context": "User chose to prepare test videos for profiling", "blocking": false}
   ],
   "decisions": [
-    {"decision": "GlassIconButton merged into GlassButton (dual-mode StatelessWidget)", "rationale": "Single unified API, icon-only preserves lightweight Material+InkWell", "phase": "2"},
-    {"decision": "InkWell-only interaction — no scale animation", "rationale": "User feedback: buttons should not have animation", "phase": "2"},
-    {"decision": "Barrel file glass_widgets.dart (glass-only scope)", "rationale": "Single import point for all glass components", "phase": "2"},
-    {"decision": "Conditional BackdropFilter skip (opacity < 0.01)", "rationale": "Eliminate GPU readback for invisible overlays", "phase": "2"},
-    {"decision": "blurEnabled degradation mode", "rationale": "Low-end hardware fallback", "phase": "2"},
-    {"decision": "GlassTier 3 tiers kept", "rationale": "Maintenance cost negligible, 4K visual distinction worth preserving", "phase": "2"},
-    {"decision": "VLB audit: all instances already optimal", "rationale": "Existing child caching + MergedListenable patterns already correct", "phase": "2"}
+    {"decision": "Profile-first strategy for control bar frame drops", "rationale": "Use DevTools frame timeline to identify root cause before fixing", "phase": "3"},
+    {"decision": "16.6ms (60fps) as frame drop threshold", "rationale": "Standard 60fps target", "phase": "3"},
+    {"decision": "Low-end hardware (10-year-old PC) as primary baseline", "rationale": "Optimize for worst case first", "phase": "3"},
+    {"decision": "Multiple fvp/MDK parameters (not just d3d11.sync.cpu=0)", "rationale": "Comprehensive tuning scope", "phase": "3"},
+    {"decision": "Single-variable then combination testing", "rationale": "Isolate parameter effects first", "phase": "3"},
+    {"decision": "D3D11 tuning first, then control bar profiling", "rationale": "Engine-level improvements may cascade to UI", "phase": "3"},
+    {"decision": "blurEnabled comparison test for BackdropFilter isolation", "rationale": "Directly quantify BackdropFilter overhead", "phase": "3"},
+    {"decision": "Comprehensive fix strategy (fix all bottlenecks found)", "rationale": "User chose prevention-focused approach", "phase": "3"},
+    {"decision": "PerfMonitor cleanup: dead code + unbounded lists", "rationale": "CONCERNS #14, clean maintenance burden", "phase": "3"},
+    {"decision": "queryFence patch automation in build flow", "rationale": "Ensure consistent D3D11 performance across builds", "phase": "3"},
+    {"decision": "Add performance options to settings panel", "rationale": "User control over blurEnabled, D3D11 params", "phase": "3"},
+    {"decision": "Automated DevTools profiling script", "rationale": "Repeatable performance measurements", "phase": "3"}
   ],
   "uncommitted_files": [
     "lib/ui/dialogs/settings_panel.dart",
     "lib/ui/playlist/playlist_panel.dart",
     "windows/runner/CMakeLists.txt",
     "windows/runner/window_channel.cpp",
-    "windows/runner/window_channel.h"
+    "windows/runner/window_channel.h",
+    ".planning/config.json"
   ],
-  "next_action": "Run /gsd:discuss-phase 3 to start Performance Optimization phase",
-  "context_notes": "Phase 2 fully complete. 2 plans executed (Wave 1: GlassButton merge, Wave 2: perf + VLB audit). 304 tests green. 13/13 must-haves verified. Progress at 50%. Ready for Phase 3 (D3D11 tuning + control bar profiling). No blockers."
+  "next_action": "Run /gsd:plan-phase 3 to create executable plans for Performance Optimization",
+  "context_notes": "Phase 3 discuss-phase complete. 4 areas discussed (Control Bar Root Cause 19q, D3D11 Tuning Scope 21q, Measurement Approach 11q, Additional Scope 9q). 41 decisions captured in CONTEXT.md. Key themes: Profile-first, low-end baseline, comprehensive optimization, data-driven. Priority: D3D11 first then control bar. Ready for planning."
 }
