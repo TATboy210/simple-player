@@ -289,6 +289,171 @@ void main() {
     });
   });
 
+  group('SettingsStore saveAll RC-8 window position', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('saveAll with windowX/windowY set persists coordinates', () async {
+      const settings = AppSettings(
+        volume: 1.0,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+        windowX: 100.0,
+        windowY: 200.0,
+      );
+      await SettingsStore.saveAll(settings);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('windowX'), closeTo(100.0, 0.01));
+      expect(prefs.getDouble('windowY'), closeTo(200.0, 0.01));
+    });
+
+    test('saveAll with null windowX/windowY removes keys', () async {
+      // First set values
+      SharedPreferences.setMockInitialValues({
+        'windowX': 500.0,
+        'windowY': 600.0,
+      });
+      const settings = AppSettings(
+        volume: 1.0,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+        // windowX and windowY default to null
+      );
+      await SettingsStore.saveAll(settings);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('windowX'), isNull);
+      expect(prefs.getDouble('windowY'), isNull);
+    });
+  });
+
+  group('SettingsStore prewarm', () {
+    test('prewarm caches SharedPreferences instance', () async {
+      SharedPreferences.setMockInitialValues({'volume': 0.8});
+      final prefs = await SharedPreferences.getInstance();
+      SettingsStore.prewarm(prefs);
+      final settings = await SettingsStore.load();
+      expect(settings.volume, closeTo(0.8, 0.01));
+      SettingsStore.resetPrewarm();
+    });
+
+    test('resetPrewarm clears cached instance', () {
+      SettingsStore.resetPrewarm();
+      // Should not crash, next load creates new instance
+    });
+  });
+
+  group('SettingsStore individual save methods', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('saveLastFile writes path', () async {
+      await SettingsStore.saveLastFile('/test/video.mp4');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('lastFile'), '/test/video.mp4');
+    });
+
+    test('savePlayMode writes mode', () async {
+      await SettingsStore.savePlayMode(2);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('playMode'), 2);
+    });
+
+    test('saveIsMuted writes value', () async {
+      await SettingsStore.saveIsMuted(true);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('isMuted'), true);
+    });
+
+    test('saveSubtitleFontSize writes value', () async {
+      await SettingsStore.saveSubtitleFontSize(20.0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('subtitleFontSize'), closeTo(20.0, 0.01));
+    });
+
+    test('saveSubtitleColorIndex writes value', () async {
+      await SettingsStore.saveSubtitleColorIndex(1);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('subtitleColorIndex'), 1);
+    });
+
+    test('saveSubtitleBottomOffset writes value', () async {
+      await SettingsStore.saveSubtitleBottomOffset(100.0);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('subtitleBottomOffset'), closeTo(100.0, 0.01));
+    });
+
+    test('saveVideoContrast writes value', () async {
+      await SettingsStore.saveVideoContrast(0.5);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('videoContrast'), closeTo(0.5, 0.01));
+    });
+
+    test('saveVideoSaturation writes value', () async {
+      await SettingsStore.saveVideoSaturation(-0.3);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('videoSaturation'), closeTo(-0.3, 0.01));
+    });
+
+    test('saveVideoHue writes value', () async {
+      await SettingsStore.saveVideoHue(0.7);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('videoHue'), closeTo(0.7, 0.01));
+    });
+
+    test('saveVideoAspectRatioIndex writes value', () async {
+      await SettingsStore.saveVideoAspectRatioIndex(2);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('videoAspectRatio'), 2);
+    });
+  });
+
+  group('SettingsStore load edge cases', () {
+    test('load returns defaults on empty prefs', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = await SettingsStore.load();
+      expect(settings.volume, 1.0);
+      expect(settings.lastFile, '');
+      expect(settings.windowWidth, 1280);
+      expect(settings.windowHeight, 720);
+      expect(settings.windowX, isNull);
+      expect(settings.windowY, isNull);
+      expect(settings.isMaximized, false);
+      expect(settings.playMode, 0);
+      expect(settings.isMuted, false);
+      expect(settings.subtitleFontSize, 17.0);
+      expect(settings.subtitleColorIndex, 0);
+      expect(settings.subtitleBottomOffset, 80.0);
+    });
+
+    test('load reads windowX/windowY when present', () async {
+      SharedPreferences.setMockInitialValues({
+        'windowX': 150.0,
+        'windowY': 250.0,
+      });
+      final settings = await SettingsStore.load();
+      expect(settings.windowX, closeTo(150.0, 0.01));
+      expect(settings.windowY, closeTo(250.0, 0.01));
+    });
+
+    test('load sanitizes infinite window coordinates', () async {
+      SharedPreferences.setMockInitialValues({
+        'windowX': double.infinity,
+        'windowY': double.negativeInfinity,
+      });
+      final settings = await SettingsStore.load();
+      expect(settings.windowX, 0); // fallback
+      expect(settings.windowY, 0); // fallback
+    });
+  });
+
   group('SettingsStore sanitize helpers', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({});

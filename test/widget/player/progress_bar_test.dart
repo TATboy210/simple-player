@@ -54,11 +54,8 @@ void main() {
       engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
 
-      // Tap at the center of the progress bar
       final bar = find.byType(ProgressBar);
-      await tester.tapAt(
-        tester.getRect(bar).center,
-      );
+      await tester.tapAt(tester.getRect(bar).center);
       await tester.pump();
 
       expect(engine.seekToCallCount, greaterThanOrEqualTo(1));
@@ -89,6 +86,79 @@ void main() {
       await tester.pump();
 
       expect(engine.seekToCallCount, greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('drag does not seek when duration is zero', (tester) async {
+      engine.duration.value = 0;
+      await tester.pumpWidget(buildSubject());
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+      final start = rect.centerLeft + const Offset(50, 0);
+      final end = rect.centerRight - const Offset(50, 0);
+
+      await tester.dragFrom(start, end - start);
+      await tester.pump();
+
+      expect(engine.seekToCallCount, 0);
+    });
+
+    testWidgets('tap near left edge seeks to start', (tester) async {
+      engine.duration.value = 10000;
+      await tester.pumpWidget(buildSubject());
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+      await tester.tapAt(rect.centerLeft + const Offset(2, 0));
+      await tester.pump();
+
+      expect(engine.seekToCallCount, 1);
+      expect(engine.lastSeekToMs, lessThanOrEqualTo(500));
+    });
+
+    testWidgets('tap near right edge seeks to end', (tester) async {
+      engine.duration.value = 10000;
+      await tester.pumpWidget(buildSubject());
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+      await tester.tapAt(rect.centerRight - const Offset(2, 0));
+      await tester.pump();
+
+      expect(engine.seekToCallCount, 1);
+      expect(engine.lastSeekToMs, greaterThanOrEqualTo(9500));
+    });
+
+    testWidgets('renders with buffered content', (tester) async {
+      engine.duration.value = 10000;
+      engine.position.value = 3000;
+      engine.buffered.value = 6000;
+      await tester.pumpWidget(buildSubject());
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    testWidgets('Semantics slider is present', (tester) async {
+      engine.duration.value = 10000;
+      engine.position.value = 5000;
+      await tester.pumpWidget(buildSubject());
+
+      // The Semantics widget with slider:true should exist
+      final semantics = find.byWidgetPredicate(
+        (w) => w is Semantics && (w.properties.slider ?? false),
+      );
+      expect(semantics, findsOneWidget);
+    });
+
+    testWidgets('MouseRegion cursor is click', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      // ProgressBar wraps content in MouseRegion with click cursor
+      final mouseRegions = tester.widgetList<MouseRegion>(
+        find.byType(MouseRegion),
+      );
+      final clickCursor = mouseRegions.any(
+        (m) => m.cursor == SystemMouseCursors.click,
+      );
+      expect(clickCursor, isTrue);
     });
   });
 }
