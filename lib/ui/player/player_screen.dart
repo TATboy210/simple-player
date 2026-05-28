@@ -1,7 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../../window/window_service.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../../kernel/models/playlist_item.dart';
@@ -12,16 +11,14 @@ import '../../l10n/app_localizations.dart';
 import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
 import 'controls_overlay.dart';
-import 'custom_title_bar.dart';
 import 'drop_handler.dart';
 import 'keyboard_handler.dart';
 import 'video_surface.dart';
 
-/// 播放器主屏幕 — 组合层，接线窗口管理 + 键盘 + 标题栏
+/// 播放器主屏幕 — 组合层，接线键盘 + 控制层
 ///
 /// 宽屏（≥600dp）: Row 布局，面板在右侧
 /// 窄屏（<600dp）: 面板叠加为 overlay
-/// 全屏: 隐藏标题栏
 class PlayerScreen extends StatefulWidget {
   final MediaEngine engine;
   final PlaybackController controller;
@@ -106,15 +103,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ws = WindowService.instance;
-    final isVideo = widget.engine.textureId.value != null;
+    return ValueListenableBuilder<int?>(
+      valueListenable: widget.engine.textureId,
+      builder: (context, textureId, _) {
+    final isVideo = textureId != null;
 
     // 预计算播放模式显示值（避免 Builder 包裹 ControlsOverlay）
     final l10n = AppLocalizations.of(context);
     final modeIcon = playModeIcon(widget.playlist.mode);
     final modeLabel = playModeLabel(widget.playlist.mode, l10n);
 
-    // 视频内容区 — 不依赖 fullscreen / playlistVisible，作为 child 避免重建
+    // 视频内容区 — 作为 child 避免重建
     final videoContent = Row(
       children: [
         Expanded(
@@ -158,116 +157,77 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ],
     );
 
-    return ListenableBuilder(
-      listenable: ws.state.fullscreen,
-      builder: (context, _) {
-        final isFullscreen = ws.state.fullscreen.value;
-        return KeyboardHandler(
-          customBindings: widget.customBindings,
-          onPlayPause: () => widget.engine.togglePlayPause(),
-          onSeekBackward: () => _seek(widget.engine, -5000),
-          onSeekForward: () => _seek(widget.engine, 5000),
-          onVolumeUp: () =>
-              widget.engine.setVolume(widget.engine.volume.value + 0.05),
-          onVolumeDown: () =>
-              widget.engine.setVolume(widget.engine.volume.value - 0.05),
-          onToggleFullscreen: () =>
-              ws.setFullscreen(!isFullscreen),
-          onExitFullscreen: isFullscreen
-              ? () => ws.setFullscreen(false)
-              : null,
-          onToggleMute: () =>
-              widget.engine.setMute(!widget.engine.isMuted.value),
-          onPrevious: () => widget.controller.playPrevious(),
-          onNext: () => widget.controller.playNext(),
-          onOpenFile: widget.onOpenFile,
-          onToggleSubtitle: widget.engine.toggleSubtitle,
-          onShowHelp: () => _showShortcutsHelp(context),
-          onSubtitleDelayForward: () {
-            final delay = widget.engine.subtitleDelay;
-            widget.engine.setSubtitleDelay(delay + 500);
-          },
-          onSubtitleDelayBackward: () {
-            final delay = widget.engine.subtitleDelay;
-            widget.engine.setSubtitleDelay(delay - 500);
-          },
-          onMediaPlayPause: () => widget.engine.togglePlayPause(),
-          onMediaNext: () => widget.controller.playNext(),
-          onMediaPrevious: () => widget.controller.playPrevious(),
-          child: DragToResizeArea(
-            enableResizeEdges: isFullscreen ? [] : null,
-            child: Scaffold(
-              backgroundColor: Tokens.bgBase,
-              body: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 标题栏：全屏时向上滑出
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: (child, animation) {
-                      final offsetAnim = Tween<Offset>(
-                        begin: const Offset(0, -0.5),
-                        end: Offset.zero,
-                      ).animate(animation);
-                      return SlideTransition(
-                        position: offsetAnim,
-                        child: FadeTransition(
-                          opacity: animation,
-                          child: child,
+    return KeyboardHandler(
+      customBindings: widget.customBindings,
+      onPlayPause: () => widget.engine.togglePlayPause(),
+      onSeekBackward: () => _seek(widget.engine, -5000),
+      onSeekForward: () => _seek(widget.engine, 5000),
+      onVolumeUp: () =>
+          widget.engine.setVolume(widget.engine.volume.value + 0.05),
+      onVolumeDown: () =>
+          widget.engine.setVolume(widget.engine.volume.value - 0.05),
+      onToggleMute: () =>
+          widget.engine.setMute(!widget.engine.isMuted.value),
+      onPrevious: () => widget.controller.playPrevious(),
+      onNext: () => widget.controller.playNext(),
+      onOpenFile: widget.onOpenFile,
+      onToggleSubtitle: widget.engine.toggleSubtitle,
+      onShowHelp: () => _showShortcutsHelp(context),
+      onSubtitleDelayForward: () {
+        final delay = widget.engine.subtitleDelay;
+        widget.engine.setSubtitleDelay(delay + 500);
+      },
+      onSubtitleDelayBackward: () {
+        final delay = widget.engine.subtitleDelay;
+        widget.engine.setSubtitleDelay(delay - 500);
+      },
+      onMediaPlayPause: () => widget.engine.togglePlayPause(),
+      onMediaNext: () => widget.controller.playNext(),
+      onMediaPrevious: () => widget.controller.playPrevious(),
+      child: Scaffold(
+        backgroundColor: Tokens.bgBase,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 主内容区
+            Expanded(
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _playlistVisible,
+                builder: (context, playlistVisible, videoContent) =>
+                    Stack(
+                  children: [
+                    videoContent!,
+                    // 沉浸式浮窗播放列表
+                    if (_playlistMounted)
+                      IgnorePointer(
+                        ignoring: !playlistVisible,
+                        child: PlaylistPanel(
+                          playlist: widget.playlist,
+                          visible: playlistVisible,
+                          onClose: _closePlaylist,
+                          onSelectIndex: (i) {
+                            widget.controller.playIndex(i);
+                            _closePlaylist();
+                          },
+                          onRemoveIndex: (i) {
+                            widget.playlist.removeAt(i);
+                            widget.playlistGeneration.value++;
+                          },
+                          onShowProperties: widget.onShowProperties,
+                          onFolderScanned: widget.onFolderScanned,
+                          onClearHistory: widget.onClearHistory,
                         ),
-                      );
-                    },
-                    child: isFullscreen
-                        ? const SizedBox.shrink(key: ValueKey('hidden'))
-                        : CustomTitleBar(
-                            key: const ValueKey('titlebar'),
-                            fileName: widget.controller.currentFileName,
-                            onOpenFile: widget.onOpenFile,
-                          ),
-                  ),
-
-                  // 主内容区
-                  Expanded(
-                    child: ValueListenableBuilder<bool>(
-                      valueListenable: _playlistVisible,
-                      builder: (context, playlistVisible, videoContent) =>
-                          Stack(
-                        children: [
-                          videoContent!,
-                          // 沉浸式浮窗播放列表
-                          if (_playlistMounted)
-                            IgnorePointer(
-                              ignoring: !playlistVisible,
-                              child: PlaylistPanel(
-                                playlist: widget.playlist,
-                                visible: playlistVisible,
-                                onClose: _closePlaylist,
-                                onSelectIndex: (i) {
-                                  widget.controller.playIndex(i);
-                                  _closePlaylist();
-                                },
-                                onRemoveIndex: (i) {
-                                  widget.playlist.removeAt(i);
-                                  widget.playlistGeneration.value++;
-                                },
-                                onShowProperties: widget.onShowProperties,
-                                onFolderScanned: widget.onFolderScanned,
-                                onClearHistory: widget.onClearHistory,
-                              ),
-                            ),
-                        ],
                       ),
-                      child: videoContent,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+                child: videoContent,
               ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
+    );
+    },
     );
   }
 

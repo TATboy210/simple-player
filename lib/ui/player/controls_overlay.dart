@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../shared/resize_notifier.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/models/media_state.dart';
 import '../theme/tokens.dart';
@@ -148,13 +147,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       popupCloseNotifier: _popupCloseNotifier,
     );
     widget.engine.state.addListener(_onEngineStateChanged);
-    ResizeNotifier.instance.addListener(_onInteractionChanged);
     _autoHide.init();
-  }
-
-  void _onInteractionChanged() {
-    _autoHide.resizing =
-        ResizeNotifier.instance.value;
   }
 
   void _handleTap() {
@@ -187,7 +180,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
-    ResizeNotifier.instance.removeListener(_onInteractionChanged);
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
     _autoHide.dispose();
@@ -261,11 +253,11 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         Tokens.controlBarMarginBottom +
                         Tokens.controlBarHeight +
                         8,
-                    child: ErrorBanner(
+                    child: RepaintBoundary(child: ErrorBanner(
                       engine: widget.engine,
                       onOpenFile: widget.onOpenFile,
                       onRetry: widget.onOpenFile,
-                    ),
+                    )),
                   ),
                 ],
               ),

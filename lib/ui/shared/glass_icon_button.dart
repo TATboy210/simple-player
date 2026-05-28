@@ -47,7 +47,7 @@ class GlassIconButton extends StatelessWidget {
             hoverColor: Tokens.bgHover,
             highlightColor: Colors.transparent,
             borderRadius: _radius,
-            splashFactory: InkRipple.splashFactory,
+            splashFactory: NoSplash.splashFactory,
             child: Center(child: content),
           ),
         ),

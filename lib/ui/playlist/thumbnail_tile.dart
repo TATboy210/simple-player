@@ -233,8 +233,14 @@ class _ThumbnailImageState extends State<_ThumbnailImage> {
   Future<void> _load() async {
     final provider = await ThumbnailService.getThumbnail(widget.path);
     if (!mounted) return;
+    if (provider == null) {
+      if (mounted) setState(() { _loading = false; });
+      return;
+    }
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheW = (ThumbnailTile.tileWidth * dpr).round();
     setState(() {
-      _thumbnail = provider;
+      _thumbnail = ResizeImage.resizeIfNeeded(cacheW, null, provider);
       _loading = false;
     });
   }
@@ -257,12 +263,8 @@ class _ThumbnailImageState extends State<_ThumbnailImage> {
       );
     }
     if (_thumbnail != null) {
-      // ResizeImage: 按逻辑像素×设备像素比解码，避免全分辨率解码浪费内存
-      final dpr = MediaQuery.devicePixelRatioOf(context);
-      final cacheW = (ThumbnailTile.tileWidth * dpr).round();
-      final resized = ResizeImage.resizeIfNeeded(cacheW, null, _thumbnail!);
       return Image(
-        image: resized,
+        image: _thumbnail!,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _buildPlaceholder(),
       );

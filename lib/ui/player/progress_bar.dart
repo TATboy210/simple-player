@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../kernel/engine/media_engine.dart';
 import '../theme/tokens.dart';
@@ -26,8 +29,11 @@ class _ProgressBarState extends State<ProgressBar> {
   /// null = 未拖拽，非 null = 拖拽中的 fraction
   final _dragNotifier = ValueNotifier<double?>(null);
   final _hoverNotifier = ValueNotifier<_HoverState>(_HoverState.empty);
-  DateTime _lastHoverUpdate = DateTime.fromMillisecondsSinceEpoch(0);
   double _barWidth = 0;
+
+  late final Listenable _barListenable;
+  Timer? _seekThrottle;
+  bool _hoverScheduled = false;
 
   double get _hoverX => _hoverNotifier.value.x;
 
@@ -47,7 +53,19 @@ class _ProgressBarState extends State<ProgressBar> {
   MediaEngine get engine => widget.engine;
 
   @override
+  void initState() {
+    super.initState();
+    _barListenable = Listenable.merge([
+      engine.position,
+      engine.duration,
+      engine.buffered,
+      _dragNotifier,
+    ]);
+  }
+
+  @override
   void dispose() {
+    _seekThrottle?.cancel();
     _dragNotifier.dispose();
     _hoverNotifier.dispose();
     super.dispose();
@@ -64,13 +82,16 @@ class _ProgressBarState extends State<ProgressBar> {
           onEnter: (_) => _hoverNotifier.value = _HoverState(true, _hoverX),
           onExit: (_) => _hoverNotifier.value = _HoverState.empty,
           onHover: (details) {
-            final now = DateTime.now();
-            if (now.difference(_lastHoverUpdate).inMilliseconds < 16) return;
-            _lastHoverUpdate = now;
-            _hoverNotifier.value = _HoverState(
-              true,
-              (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
-            );
+            if (_hoverScheduled) return;
+            _hoverScheduled = true;
+            SchedulerBinding.instance.addPostFrameCallback((_) {
+              _hoverScheduled = false;
+              if (!mounted) return;
+              _hoverNotifier.value = _HoverState(
+                true,
+                (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
+              );
+            });
           },
           child: Semantics(
             label: AppLocalizations.of(context).progressBar,
@@ -85,14 +106,25 @@ class _ProgressBarState extends State<ProgressBar> {
               onHorizontalDragUpdate: (details) {
                 _dragNotifier.value =
                     (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
+                // 节流 seek：拖拽期间每 150ms 更新一次视频帧
+                _seekThrottle?.cancel();
+                _seekThrottle = Timer(
+                  const Duration(milliseconds: 150),
+                  () {
+                    if (_dragNotifier.value != null &&
+                        widget.engine.duration.value > 0) {
+                      widget.engine.seekTo(_dragPositionMs);
+                    }
+                  },
+                );
               },
               onHorizontalDragEnd: (_) {
+                _seekThrottle?.cancel();
                 if (widget.engine.duration.value <= 0) {
                   _dragNotifier.value = null;
                   return;
                 }
-                final ms = _dragPositionMs;
-                widget.engine.seekTo(ms);
+                widget.engine.seekTo(_dragPositionMs);
                 _dragNotifier.value = null;
               },
               onTapDown: (details) {
@@ -146,12 +178,7 @@ class _ProgressBarState extends State<ProgressBar> {
   Widget _buildBarLayers() {
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([
-          engine.position,
-          engine.duration,
-          engine.buffered,
-          _dragNotifier,
-        ]),
+        animation: _barListenable,
         builder: (_, _) {
           final dur = engine.duration.value;
           final buf = engine.buffered.value;

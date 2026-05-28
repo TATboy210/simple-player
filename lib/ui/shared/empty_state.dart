@@ -121,7 +121,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       label: l10n.openFile,
       tooltip: l10n.openFileTooltip,
       isPrimary: true,
-      respectResizeState: true,
       onPressed: widget.onOpenFile!,
     );
     final dragHint = _buildDragHint(context);
@@ -235,7 +234,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
   Widget _buildDragHint(BuildContext context) {
     return GlassContainer(
       tier: GlassTier.thin,
-      respectResizeState: true,
       borderRadius: BorderRadius.circular(Tokens.radiusPopup),
       padding: const EdgeInsets.symmetric(
         horizontal: Tokens.spMd,
