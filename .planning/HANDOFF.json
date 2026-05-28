@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T00:44:00+08:00",
+  "timestamp": "2026-05-29T01:04:17+08:00",
   "phase": "3",
   "phase_name": "Performance Optimization",
   "phase_dir": ".planning/phases/03-performance-optimization",
   "plan": 0,
   "task": 0,
-  "total_tasks": 0,
-  "status": "context_gathered",
+  "total_tasks": 6,
+  "status": "planned",
   "completed_tasks": [
     {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
     {"id": 2, "name": "Phase 2 discuss-phase (8 areas, 17 decisions)", "status": "done", "commit": "b068e87"},
@@ -16,12 +16,13 @@
     {"id": 5, "name": "Phase 2 Plan 01: GlassButton merge + barrel file + migration", "status": "done", "commit": "b1d6ec4"},
     {"id": 6, "name": "Phase 2 Plan 02: GlassContainer perf + VLB audit", "status": "done", "commit": "c925dc8"},
     {"id": 7, "name": "Phase 2 verification (13/13 passed)", "status": "done", "commit": "b85b1d2"},
-    {"id": 8, "name": "Phase 3 discuss-phase (4 areas, 41 decisions)", "status": "done", "commit": "907faa0"}
+    {"id": 8, "name": "Phase 3 discuss-phase (4 areas, 41 decisions)", "status": "done", "commit": "907faa0"},
+    {"id": 9, "name": "Phase 3 plan-phase (3 plans, 2 waves, verification passed)", "status": "done", "commit": "30f4f40"}
   ],
   "remaining_tasks": [
-    {"id": 9, "name": "Phase 3 plan-phase", "status": "not_started"},
-    {"id": 10, "name": "Phase 3 execution", "status": "not_started"},
-    {"id": 11, "name": "Phase 4 execution", "status": "not_started"}
+    {"id": 10, "name": "Phase 3 Plan 01: D3D11 engine parameters + PerfMonitor + settings + queryFence", "status": "not_started", "wave": 1},
+    {"id": 11, "name": "Phase 3 Plan 02: Control bar profiling + frame drop fix + regression tests", "status": "not_started", "wave": 2, "depends_on": 10},
+    {"id": 12, "name": "Phase 3 Plan 03: Error handling re-scan + performance report", "status": "not_started", "wave": 2, "depends_on": 10}
   ],
   "blockers": [],
   "human_actions_pending": [
@@ -50,6 +51,6 @@
     "windows/runner/window_channel.h",
     ".planning/config.json"
   ],
-  "next_action": "Run /gsd:plan-phase 3 to create executable plans for Performance Optimization",
-  "context_notes": "Phase 3 discuss-phase complete. 4 areas discussed (Control Bar Root Cause 19q, D3D11 Tuning Scope 21q, Measurement Approach 11q, Additional Scope 9q). 41 decisions captured in CONTEXT.md. Key themes: Profile-first, low-end baseline, comprehensive optimization, data-driven. Priority: D3D11 first then control bar. Ready for planning."
+  "next_action": "Run /gsd:execute-phase 3 to execute all 3 plans (Wave 1 first, then Wave 2)",
+  "context_notes": "Phase 3 plan-phase complete. 3 plans created in 2 waves: 03-01 (D3D11 foundation, Wave 1), 03-02 (control bar fix, Wave 2), 03-03 (error re-scan + report, Wave 2). Verification passed all 12 dimensions. Gap analysis confirmed PERF-01 and PERF-03 covered. Ready for execution."
 }
