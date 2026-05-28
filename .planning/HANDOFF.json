@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T10:30:00+08:00",
+  "timestamp": "2026-05-29T12:00:00+08:00",
   "phase": "4",
   "phase_name": "test-coverage",
   "phase_dir": ".planning/phases/04-test-coverage",
   "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "paused_77.4pct",
+  "status": "paused_78.6pct",
   "completed_tasks": [
     {"id": 1, "name": "Wave 1: kernel unit tests (6 files)", "status": "done"},
     {"id": 2, "name": "Wave 2: bridge/persistence tests (2 files)", "status": "done"},
@@ -18,34 +18,33 @@
     {"id": 7, "name": "auto_hide_controller resizing/hidden-state tests (+10 gap)", "status": "done"},
     {"id": 8, "name": "glass_container blurEnabled/opacity tests (+8 gap)", "status": "done"},
     {"id": 9, "name": "volume_controls scroll wheel tests (+6 gap)", "status": "done"},
-    {"id": 10, "name": "startup_coordinator phase lifecycle tests (+6 gap)", "status": "done"}
+    {"id": 10, "name": "startup_coordinator phase lifecycle tests (+6 gap)", "status": "done"},
+    {"id": 11, "name": "speed_button scroll wheel + rendering tests (+16 gap)", "status": "done"},
+    {"id": 12, "name": "playlist_store flush retry + migration edge tests (+7 gap)", "status": "done"},
+    {"id": 13, "name": "settings_store loadShortcuts corrupt JSON test (+3 gap)", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 11, "name": "speed_button interaction tests (+16 gap)", "status": "not_started", "notes": "18px _Segment tap targets too small. Use rendering assertions or find.byWidgetPredicate."},
-    {"id": 12, "name": "playlist_store error path tests (+13 gap)", "status": "not_started", "notes": "_flush retry, _loadPlaylistSync catch, _migrateHistory corrupt entry. Need FS mocking."},
-    {"id": 13, "name": "settings_store edge cases (+11 gap)", "status": "not_started", "notes": "Clamping/sanitization edge cases. Most already covered."},
-    {"id": 14, "name": "state_monitor error paths (+8 gap)", "status": "not_started", "notes": "init catch block, migration catch block."},
-    {"id": 15, "name": "progress_bar remaining (+6 gap)", "status": "not_started", "notes": "6 lines still uncovered in hover/tooltip edge cases."},
-    {"id": 16, "name": "Verify coverage reaches 80%+", "status": "not_started"}
+    {"id": 14, "name": "settings_store catch blocks (+5 gap)", "status": "not_started", "notes": "loadLocale/loadThemeIndex/loadD3d11SyncEnabled/loadHardwareDecoding catch blocks. Need SharedPreferences mock that throws on getInstance()."},
+    {"id": 15, "name": "state_monitor error paths (+8 gap)", "status": "not_started", "notes": "init catch (L34-35), migration catch (L46-47), loopSingle catchError (L75-76), auto-advance catchError (L81-82). Need engine.open() to throw or navigator to fail."},
+    {"id": 16, "name": "progress_bar remaining (+6 gap)", "status": "not_started", "notes": "6 lines still uncovered in hover/tooltip edge cases."},
+    {"id": 17, "name": "path_utils openFileLocation (+11 gap)", "status": "not_started", "notes": "Process.run calls — platform-dependent, needs refactoring to inject runner for testability."},
+    {"id": 18, "name": "Verify coverage reaches 80%+", "status": "not_started"}
   ],
   "blockers": [
     {"description": "fvp_callback_handler.dart (29 gap) and position_poller.dart (21 gap) are FFI-coupled to mdk.Player — cannot test without platform mocking", "type": "technical", "workaround": "Skip these files, compensate with other file coverage"},
-    {"description": "l10n generated files (291 lines) inflate total denominator", "type": "technical", "workaround": "Non-l10n coverage ~88%, overall 77.4%"}
+    {"description": "l10n generated files (291 lines) inflate total denominator", "type": "technical", "workaround": "Non-l10n coverage ~89%, overall 78.6%"},
+    {"description": "settings_store/state_monitor catch blocks require SharedPreferences/Process.run failure injection", "type": "technical", "workaround": "Refactor to inject dependencies or accept as defensive code"},
+    {"description": "path_utils.openFileLocation uses Process.run — needs refactoring for testability", "type": "technical", "workaround": "Inject ProcessRunner interface or skip"}
   ],
   "human_actions_pending": [],
   "decisions": [
     {"decision": "Skip FFI-coupled files (fvp_callback_handler, position_poller)", "rationale": "50+ lines untestable without mdk.Player mock infrastructure", "phase": "4"},
     {"decision": "Use preloaded AppSettings for StateMonitor.init()", "rationale": "Avoids SettingsStore.load() platform dependency in tests", "phase": "4"},
     {"decision": "l10n files excluded from target", "rationale": "291 lines auto-generated, testing provides no value", "phase": "4"},
-    {"decision": "GestureBinding.instance.handlePointerEvent for scroll wheel tests", "rationale": "WidgetTester.sendPointerEvent does not exist; direct binding dispatch works", "phase": "4"}
+    {"decision": "GestureBinding.instance.handlePointerEvent for scroll wheel tests", "rationale": "WidgetTester.sendPointerEvent does not exist; direct binding dispatch works", "phase": "4"},
+    {"decision": "Drop double-tap speed_button test", "rationale": "GestureDetector.onDoubleTap vs InkWell.onTap arena conflict; scroll wheel tests cover _shift logic (10/16 lines)", "phase": "4"}
   ],
-  "uncommitted_files": [
-    "test/widget/player/progress_bar_test.dart",
-    "test/widget/player/auto_hide_controller_test.dart",
-    "test/widget/shared/glass_container_test.dart",
-    "test/kernel/startup/startup_coordinator_test.dart",
-    "test/widget/player/volume_controls_test.dart"
-  ],
-  "next_action": "Write speed_button rendering tests (+16 gap) and playlist_store error path tests (+13 gap). Those two + settings_store (+11) = 40 lines, bringing coverage to ~79.4%. Then state_monitor (+8) and progress_bar (+6) to cross 80%.",
-  "context_notes": "Coverage 77.4% (1518/1961). Gap 51 lines to 80%. 501 tests passing. Non-l10n coverage ~88%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. speed_button 18px segments too small for tap — use rendering assertions. GestureBinding.instance.handlePointerEvent is the correct API for dispatching PointerScrollEvent in widget tests. GlassContainer blurEnabled=false and opacity near-zero paths now covered. AutoHideController resizing, throttle, and hidden-state transitions all covered. StartupCoordinator phase lifecycle (0.0→1.0) triggers Stopwatch start/stop."
+  "uncommitted_files": [],
+  "next_action": "To reach 80%, need 28 more lines. Options: (1) Refactor path_utils.openFileLocation to inject ProcessRunner (+11), (2) Mock SharedPreferences to throw for settings_store catch blocks (+5), (3) Trigger state_monitor error paths by making engine.open() throw (+8). Best ROI: path_utils refactor (+11) + progress_bar edge cases (+6) + one more = 80%.",
+  "context_notes": "Coverage 78.6% (1541/1961). Gap 28 lines to 80%. 517 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. PlaylistStore._flush retry test triggers all 3 attempts by mocking path_provider to invalid path. speed_button scroll wheel covers _shift (lines 23-30) and onPointerSignal (lines 59-61). Double-tap test dropped due to InkWell vs GestureDetector gesture arena conflict."
 }
