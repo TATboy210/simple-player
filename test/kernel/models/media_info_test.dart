@@ -41,6 +41,39 @@ void main() {
     });
   });
 
+  group('AudioTrackInfo', () {
+    test('toString includes index, language, codec, channels', () {
+      const track = AudioTrackInfo(
+        index: 0,
+        language: 'eng',
+        codec: 'aac',
+        channels: 2,
+      );
+      expect(track.toString(), 'AudioTrack(0, eng, aac, 2ch)');
+    });
+
+    test('toString with defaults', () {
+      const track = AudioTrackInfo(index: 1);
+      expect(track.toString(), 'AudioTrack(1, , , 0ch)');
+    });
+  });
+
+  group('SubtitleTrackInfo', () {
+    test('toString includes index, language, title', () {
+      const track = SubtitleTrackInfo(
+        index: 0,
+        language: 'chi',
+        title: '简体中文',
+      );
+      expect(track.toString(), 'SubtitleTrack(0, chi, 简体中文)');
+    });
+
+    test('toString with defaults', () {
+      const track = SubtitleTrackInfo(index: 2);
+      expect(track.toString(), 'SubtitleTrack(2, , )');
+    });
+  });
+
   group('MediaInfo', () {
     // hasVideo：video 非 null 且宽高 > 0
     group('hasVideo', () {

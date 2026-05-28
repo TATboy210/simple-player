@@ -208,4 +208,132 @@ void main() {
       expect(prefs.getBool('videoDeinterlace'), true);
     });
   });
+
+  group('SettingsStore locale/theme persistence', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('loadLocale defaults to zh', () async {
+      final locale = await SettingsStore.loadLocale();
+      expect(locale, 'zh');
+    });
+
+    test('saveLocale/loadLocale round-trip', () async {
+      await SettingsStore.saveLocale('en');
+      final locale = await SettingsStore.loadLocale();
+      expect(locale, 'en');
+    });
+
+    test('loadThemeIndex defaults to 0', () async {
+      final index = await SettingsStore.loadThemeIndex();
+      expect(index, 0);
+    });
+
+    test('saveThemeIndex/loadThemeIndex round-trip', () async {
+      await SettingsStore.saveThemeIndex(2);
+      final index = await SettingsStore.loadThemeIndex();
+      expect(index, 2);
+    });
+
+    test('loadThemeIndex clamps to 0..2', () async {
+      SharedPreferences.setMockInitialValues({'themeIndex': 99});
+      final index = await SettingsStore.loadThemeIndex();
+      expect(index, 2);
+    });
+  });
+
+  group('SettingsStore shortcuts persistence', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('loadShortcuts returns empty map when absent', () async {
+      final shortcuts = await SettingsStore.loadShortcuts();
+      expect(shortcuts, isEmpty);
+    });
+
+    test('saveShortcuts/loadShortcuts round-trip', () async {
+      final bindings = {'play_pause': 'space', 'next': 'n'};
+      await SettingsStore.saveShortcuts(bindings);
+      final loaded = await SettingsStore.loadShortcuts();
+      expect(loaded, bindings);
+    });
+  });
+
+  group('SettingsStore performance settings', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('loadD3d11SyncEnabled defaults to true', () async {
+      final value = await SettingsStore.loadD3d11SyncEnabled();
+      expect(value, true);
+    });
+
+    test('saveD3d11SyncEnabled/loadD3d11SyncEnabled round-trip', () async {
+      await SettingsStore.saveD3d11SyncEnabled(false);
+      final value = await SettingsStore.loadD3d11SyncEnabled();
+      expect(value, false);
+    });
+
+    test('loadHardwareDecoding defaults to true', () async {
+      final value = await SettingsStore.loadHardwareDecoding();
+      expect(value, true);
+    });
+
+    test('saveHardwareDecoding/loadHardwareDecoding round-trip', () async {
+      await SettingsStore.saveHardwareDecoding(false);
+      final value = await SettingsStore.loadHardwareDecoding();
+      expect(value, false);
+    });
+  });
+
+  group('SettingsStore sanitize helpers', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('load rejects NaN window dimensions', () async {
+      SharedPreferences.setMockInitialValues({
+        'windowWidth': double.nan,
+        'windowHeight': double.nan,
+      });
+      final settings = await SettingsStore.load();
+      expect(settings.windowWidth, 1280);
+      expect(settings.windowHeight, 720);
+    });
+
+    test('load rejects negative window dimensions', () async {
+      SharedPreferences.setMockInitialValues({
+        'windowWidth': -100.0,
+        'windowHeight': -200.0,
+      });
+      final settings = await SettingsStore.load();
+      expect(settings.windowWidth, 1280);
+      expect(settings.windowHeight, 720);
+    });
+
+    test('saveWindowGeometry sanitizes inputs', () async {
+      await SettingsStore.saveWindowGeometry(
+        width: double.nan,
+        height: 99999.0,
+        x: double.infinity,
+        y: 100.0,
+        isMaximized: true,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('windowWidth'), 1280); // NaN → fallback
+      expect(prefs.getDouble('windowHeight'), 4608); // clamped to max
+      expect(prefs.getDouble('windowX'), 0); // Infinity → fallback
+      expect(prefs.getDouble('windowY'), closeTo(100.0, 0.01));
+      expect(prefs.getBool('isMaximized'), true);
+    });
+
+    test('saveVolume clamps to 0..1', () async {
+      await SettingsStore.saveVolume(1.5);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('volume'), 1.0);
+    });
+  });
 }
