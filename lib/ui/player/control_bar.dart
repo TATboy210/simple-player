@@ -14,6 +14,12 @@ import 'time_range_display.dart';
 import 'volume_controls.dart';
 
 class ControlBar extends StatelessWidget {
+  static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
+  static final _blurFilter = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlur,
+    sigmaY: Tokens.glassBlur,
+  );
+
   final MediaEngine engine;
   final bool isFullscreen;
   final VoidCallback? onPrevious;
@@ -57,14 +63,13 @@ class ControlBar extends StatelessWidget {
     final prevTooltip = l10n.previousTrack;
     final nextTooltip = l10n.nextTrack;
 
-    final borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
     final content = Material(
       color: Colors.transparent,
       child: Container(
         height: Tokens.controlBarHeight,
         decoration: BoxDecoration(
           color: Tokens.bgGlass,
-          borderRadius: borderRadius,
+          borderRadius: _borderRadius,
           border: Border.all(color: Tokens.controlBarBorder, width: 0.5),
           boxShadow: const [
             BoxShadow(
@@ -135,12 +140,9 @@ class ControlBar extends StatelessWidget {
       builder: (_, state, child) => state != WindowInteractionState.idle
           ? child!
           : ClipRRect(
-              borderRadius: borderRadius,
+              borderRadius: _borderRadius,
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(
-                  sigmaX: Tokens.glassBlur,
-                  sigmaY: Tokens.glassBlur,
-                ),
+                filter: _blurFilter,
                 child: child,
               ),
             ),

@@ -142,27 +142,25 @@ class _ControlsOverlayState extends State<ControlsOverlay>
           onExit: (_) => _autoHide.onMouseExit(),
           child: ValueListenableBuilder<bool>(
             valueListenable: _autoHide.visible,
-            builder: (_, isVisible, child) =>
-                IgnorePointer(ignoring: !isVisible, child: child),
-            child: RepaintBoundary(
-              child: Stack(
-                children: [
-                  Positioned(
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        12,
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    child: const OsdOverlay(),
-                  ),
-                  Positioned(
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    bottom: Tokens.controlBarMarginBottom,
-                    child: ValueListenableBuilder<bool>(
-                      valueListenable: _autoHide.visible,
-                      builder: (_, isVisible, _) => FadeTransition(
+            builder: (_, isVisible, _) => IgnorePointer(
+              ignoring: !isVisible,
+              child: RepaintBoundary(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      bottom:
+                          Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight +
+                          12,
+                      left: Tokens.controlBarMarginH,
+                      right: Tokens.controlBarMarginH,
+                      child: const OsdOverlay(),
+                    ),
+                    Positioned(
+                      left: Tokens.controlBarMarginH,
+                      right: Tokens.controlBarMarginH,
+                      bottom: Tokens.controlBarMarginBottom,
+                      child: FadeTransition(
                         opacity: _autoHide.opacity,
                         child: ControlBar(
                           engine: widget.engine,
@@ -184,21 +182,21 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: Tokens.controlBarMarginH + 16,
-                    right: Tokens.controlBarMarginH + 16,
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        8,
-                    child: ErrorBanner(
-                      engine: widget.engine,
-                      onOpenFile: widget.onOpenFile,
-                      onRetry: widget.onOpenFile,
+                    Positioned(
+                      left: Tokens.controlBarMarginH + 16,
+                      right: Tokens.controlBarMarginH + 16,
+                      bottom:
+                          Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight +
+                          8,
+                      child: ErrorBanner(
+                        engine: widget.engine,
+                        onOpenFile: widget.onOpenFile,
+                        onRetry: widget.onOpenFile,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
