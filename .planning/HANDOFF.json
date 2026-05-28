@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T02:44:00+08:00",
+  "timestamp": "2026-05-29T04:30:00+08:00",
   "phase": "3",
   "phase_name": "Performance Optimization",
   "phase_dir": ".planning/phases/03-performance-optimization",
-  "plan": 0,
+  "plan": 4,
   "task": 0,
   "total_tasks": 6,
-  "status": "verification_gaps",
+  "status": "gaps_closed",
   "completed_tasks": [
     {"id": 1, "name": "Phase 1 execution (4 plans, 11 commits)", "status": "done", "commit": "f42e5b6"},
     {"id": 2, "name": "Phase 2 execution (2 plans, verification passed)", "status": "done", "commit": "b85b1d2"},
@@ -16,24 +16,23 @@
     {"id": 5, "name": "Phase 3 Plan 01: D3D11 engine params + PerfMonitor + settings + queryFence", "status": "done", "commit": "a7331b2"},
     {"id": 6, "name": "Phase 3 Plan 02: Control bar profiling + frame drop fix + regression tests", "status": "done", "commit": "d36f8b4"},
     {"id": 7, "name": "Phase 3 Plan 03: Error handling re-scan + performance report", "status": "done", "commit": "043d639"},
-    {"id": 8, "name": "Phase 3 verification (11/14 passed, 3 gaps found)", "status": "done", "commit": "043d639"}
+    {"id": 8, "name": "Phase 3 verification (11/14 passed, 3 gaps found)", "status": "done", "commit": "043d639"},
+    {"id": 9, "name": "Phase 3 gap closure plan 04 (settings persistence + testing templates)", "status": "done", "commit": "213c421"}
   ],
   "remaining_tasks": [
-    {"id": 9, "name": "Phase 3 gap closure (3 gaps: hardware testing, DevTools measurement, settings persistence)", "status": "not_started"},
-    {"id": 10, "name": "Phase 4: Platform Stubs & Test Coverage", "status": "not_started"}
+    {"id": 10, "name": "Manual: D3D11 multi-hardware testing (3+ GPU configs)", "status": "not_started"},
+    {"id": 11, "name": "Manual: DevTools frame time profiling (baseline vs optimized)", "status": "not_started"},
+    {"id": 12, "name": "Phase 4: Platform Stubs & Test Coverage", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Test D3D11 params on 3+ hardware configs (dedicated GPU, Intel iGPU, AMD iGPU)", "context": "ROADMAP SC1 requires multi-hardware validation", "blocking": false},
-    {"action": "Run DevTools frame timeline profiling (baseline vs optimized)", "context": "ROADMAP SC3 requires measurable 2-5ms/frame savings", "blocking": false},
-    {"action": "Wire performance settings to SettingsStore for persistence", "context": "Gap 3: _D3d11SyncNotifier/_HardwareDecodingNotifier revert on restart", "blocking": false}
+    {"action": "Test D3D11 params on 3+ hardware configs using D3D11_HARDWARE_TEST.md template", "context": "ROADMAP SC1 requires multi-hardware validation. Template at .planning/phases/03-performance-optimization/D3D11_HARDWARE_TEST.md", "blocking": false},
+    {"action": "Run DevTools frame timeline profiling using DEVTOOLS_PROFILING_GUIDE.md template", "context": "ROADMAP SC3 requires measurable 2-5ms/frame savings. Guide at .planning/phases/03-performance-optimization/DEVTOOLS_PROFILING_GUIDE.md", "blocking": false}
   ],
   "decisions": [
-    {"decision": "Profile-first strategy for control bar frame drops", "rationale": "Use DevTools frame timeline to identify root cause before fixing", "phase": "3"},
-    {"decision": "16.6ms (60fps) as frame drop threshold", "rationale": "Standard 60fps target", "phase": "3"},
-    {"decision": "Low-end hardware (10-year-old PC) as primary baseline", "rationale": "Optimize for worst case first", "phase": "3"},
-    {"decision": "Static final caching for ImageFilter.blur and BorderRadius", "rationale": "Eliminates per-build allocation in ControlBar", "phase": "3"},
-    {"decision": "VLB dedup in ControlsOverlay", "rationale": "Remove redundant inner ValueListenableBuilder listening to same notifier", "phase": "3"}
+    {"decision": "Settings persistence via StatefulWidget + async SettingsStore load", "rationale": "ValueNotifier constructor is synchronous, so PerformanceTab became StatefulWidget to load persisted values in initState", "phase": "3"},
+    {"decision": "Gap closure plan as single 03-04 with 2 tasks", "rationale": "Gap 3 is code fix (autonomous), Gaps 1-2 are testing docs (also autonomous). Single plan simpler than splitting", "phase": "3"},
+    {"decision": "Testing templates as fill-in documents, not completed reports", "reason": "Gaps 1-2 require physical hardware and DevTools GUI — cannot be automated. Templates enable structured manual testing", "phase": "3"}
   ],
   "uncommitted_files": [
     "lib/ui/dialogs/settings_panel.dart",
@@ -43,6 +42,6 @@
     "windows/runner/window_channel.h",
     ".planning/config.json"
   ],
-  "next_action": "Run /gsd:plan-phase 3 --gaps to create gap closure plan for the 3 verification gaps",
-  "context_notes": "Phase 3 execution complete. 3/3 plans executed, verification scored 11/14. 3 gaps: (1) hardware testing needs 3+ configs, (2) DevTools frame time measurement needed, (3) settings persistence wiring incomplete. Gaps 1-2 are manual testing, gap 3 is a code fix. Worktree merge had import path conflicts (kernel/ui/theme vs ui/theme) — resolved by cherry-picking optimization commit onto main branch."
+  "next_action": "Manual testing: run D3D11_HARDWARE_TEST.md on 3+ GPU configs, then run DEVTOOLS_PROFILING_GUIDE.md for frame time measurement. After manual gaps closed, proceed to /gsd:plan-phase 4",
+  "context_notes": "Phase 3 gap closure complete. Gap 3 (settings persistence) closed via code — D3D11 sync + hardware decoding now persist to SharedPreferences. Gaps 1-2 have structured testing templates for manual execution. 312 tests passing. Worktree merge had conflict in settings_tab_performance.dart (import path + StatefulWidget vs StatelessWidget) — resolved by taking worktree logic with correct import paths. Context at 81% — pausing here."
 }
