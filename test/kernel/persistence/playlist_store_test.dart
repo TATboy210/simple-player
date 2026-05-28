@@ -219,5 +219,72 @@ void main() {
       // Should not crash, returns null or empty
       expect(loaded, isNull);
     });
+
+    test('migrateHistory skips entries without path field', () async {
+      final historyFile = File('${tempDir.path}/history.json');
+      // Entry with no 'path' key — triggers inner catch block (line 169-170)
+      await historyFile.writeAsString('[{"timestamp":123,"positionMs":500}]');
+
+      final loaded = await PlaylistStore.load();
+      // No valid entries → history deleted, returns null
+      expect(loaded, isNull);
+    });
+
+    test('loadInBackground handles corrupt JSON via _loadPlaylistSync',
+        () async {
+      final f = File('${tempDir.path}/playlist.json');
+      await f.writeAsString('{corrupt json!!!}');
+
+      // _loadPlaylistSync catches FormatException, returns null
+      // Then _migrateHistory runs (no history file) → returns null
+      final loaded = await PlaylistStore.loadInBackground();
+      expect(loaded, isNull);
+    });
+  });
+
+  group('PlaylistStore error paths', () {
+    test('clear does not throw when file does not exist', () async {
+      await PlaylistStore.clear();
+    });
+
+    test('clear with previously saved data deletes file', () async {
+      final playlist = Playlist();
+      playlist.add('/test_clear.mp4');
+      PlaylistStore.save(playlist);
+      await PlaylistStore.dispose();
+
+      final f = File('${tempDir.path}/playlist.json');
+      expect(await f.exists(), isTrue);
+
+      await PlaylistStore.clear();
+      expect(await f.exists(), isFalse);
+    });
+
+    test('_flush retries on write failure', () async {
+      // Replace temp dir mock with an invalid path to force write failure
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (call) async => '/nonexistent_dir_xyz',
+          );
+
+      final playlist = Playlist();
+      playlist.add('/retry_test.mp4');
+      PlaylistStore.save(playlist);
+      // dispose triggers _flush — retries 3 times then gives up
+      await PlaylistStore.dispose();
+
+      // Restore mock for tearDown
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('plugins.flutter.io/path_provider'),
+            (call) async {
+              if (call.method == 'getApplicationSupportDirectory') {
+                return tempDir.path;
+              }
+              return null;
+            },
+          );
+    });
   });
 }
