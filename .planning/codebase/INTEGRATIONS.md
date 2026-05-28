@@ -1,150 +1,112 @@
-# External Integrations
+# Integrations
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-28
 
-## APIs & External Services
+## fvp/MDK Engine
 
-**Media Engine (fvp/MDK):**
-- fvp plugin wrapping MDK (FFmpeg-based media framework)
-- SDK/Client: `package:fvp` (Dart bindings to native MDK library)
-- Provides: `mdk.Player` for playback, D3D11 texture rendering, hardware decoding
-- Integration point: `lib/kernel/engine/fvp_engine.dart`
-- Registration: `fvp.registerWith()` in `lib/main.dart` with platform-specific decoder chain
+**Plugin:** `fvp` 0.36.2
+**Interface:** `MediaEngine` (abstract) → `FvpEngine` (concrete)
+**File:** `lib/kernel/engine/fvp_engine.dart` (633 lines)
 
-**Network Streaming:**
-- Supported via fvp/FFmpeg: HTTP/HTTPS, RTSP, RTMP, SRT, UDP, TCP
-- Configuration: Network timeouts, probe sizes, buffer ranges set in `lib/kernel/engine/fvp_engine.dart`
-- No external HTTP client — all network access through MDK's FFmpeg backend
+### API Surface
+- `open(path)` — Open media file or URL
+- `play()` / `pause()` / `stop()` — Playback control
+- `seekTo(ms)` — Position seeking
+- `setVolume(0.0-1.0)` — Volume control
+- `setRate(speed)` — Playback speed
+- `setAudioTrack(index)` / `setSubtitleTrack(index)` — Track selection
+- `updateTexture()` — D3D11 texture sync (per-frame)
 
-## Data Storage
+### State Exposure
+10+ ValueNotifiers for reactive UI binding:
+- `state` (MediaState), `position`, `duration`, `volume`, `isMuted`
+- `buffering`, `errorMessage`, `errorType`
+- `audioTracks`, `subtitleTracks`
 
-**Local Key-Value Store:**
-- `SharedPreferences` — Primary persistence for all settings
-  - Connection: Platform-native (Registry on Windows, files on Linux/macOS)
-  - Client: `package:shared_preferences`
-  - Used by: `SettingsStore` (`lib/kernel/persistence/settings_store.dart`), `WindowGeometryStore` (`lib/window/geometry_store.dart`)
-  - Keys: volume, lastFile, window geometry, playMode, isMuted, locale, themeIndex, shortcuts, video effects, subtitle settings
+### Network Streams
+- Supports RTSP, HTTP, HLS via FFmpeg
+- Configurable timeouts: `_networkTimeoutMs`, `_prepareTimeoutSeconds`
 
-**File-Based Storage:**
-- `PlaylistStore` (`lib/kernel/persistence/playlist_store.dart`)
-  - Location: `getApplicationSupportDirectory()` via `path_provider`
-  - Files: `playlist.json` (current playlist), `history.json` (legacy, auto-migrated)
-  - Format: JSON with 300ms debounce write, atomic write (.tmp + rename), exponential backoff retry
+## Win32 Runner (C++)
 
-**Thumbnail Caching:**
-- In-memory LRU cache (200 entries) in `ThumbnailService` (`lib/kernel/services/thumbnail_service.dart`)
-- Platform-specific thumbnail sources:
-  - Windows: COM FFI via `IShellItemImageFactory` (`lib/kernel/services/windows_thumbnail_provider.dart`)
-  - Linux: XDG thumbnail cache (`~/.cache/thumbnails/{size}/{md5}.png`) (`lib/kernel/services/linux_thumbnail_provider.dart`)
-  - macOS: Not implemented (returns null) (`lib/kernel/services/macos_thumbnail_provider.dart`)
+**File:** `windows/runner/main.cpp`
+**Integration:** Flutter's default C++ runner with customizations
 
-**Caching:**
-- No external cache service (Redis, Memcached, etc.)
-- All caching is in-process: LRU thumbnail cache, `SharedPreferences` prewarm in `SettingsStore`
+### Customizations
+- `WM_NCCALCSIZE` — Frameless window (removes title bar chrome)
+- `WM_NCHITTEST` — Custom hit testing for resize areas
+- DWM dark mode preference (`DWMWA_USE_IMMERSIVE_DARK_MODE`)
+- Rounded corner preference (`DWMWA_WINDOW_CORNER_PREFERENCE`)
 
-## Native Platform Integrations
+### Window Manager Package
+- `window_manager` handles cross-platform window operations
+- No custom MethodChannel — all via package API
+- Frameless mode, resize constraints, fullscreen toggle
 
-**Windows Win32 FFI (via `dart:ffi`):**
+## File System
 
-| Integration | DLL | Purpose | File |
-|-------------|-----|---------|------|
-| Fullscreen control | user32.dll | WS_CAPTION/WS_THICKFRAME style, SetWindowPos, MonitorFromWindow | `lib/window/fullscreen_controller.dart` |
-| Thumbnail extraction | shell32.dll, ole32.dll, gdi32.dll, user32.dll | COM IShellItemImageFactory for Explorer thumbnails | `lib/kernel/services/windows_thumbnail_provider.dart` |
-| Window bridge | MethodChannel `com.simple_player/redraw` | ForceRedraw after frameless setup | `windows/runner/flutter_window.cpp` |
+### File Picker
+- `file_picker` package for native open dialog
+- Supports video file filtering
 
-**Window Manager Plugin:**
-- `window_manager` ^0.5.1 — Cross-platform window management
-  - Used by: `WindowService` (Windows), `LinuxWindowService`, `MacosWindowService`
-  - Operations: frameless mode, min/max/close, drag, fullscreen, always-on-top, size/position persistence
-  - Files: `lib/window/window_service.dart`, `lib/window/linux_window_service.dart`, `lib/window/macos_window_service.dart`
+### Drag & Drop
+- `desktop_drop` package for drag-drop onto window
+- `DropHandler` widget wraps the player surface
 
-**C++ Native Runner:**
-- `windows/runner/flutter_window.cpp` — Hosts Flutter view, registers MethodChannel handler for `forceRedraw`
-- `windows/runner/win32_window.cpp` — Base Win32 window class
-- DWM integration: `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND` in OnCreate for rounded corners
+### Folder Scanner
+- `lib/kernel/scanner/folder_scanner.dart`
+- Recursive directory scan for video files
+- Extension-based filtering (mp4, mkv, avi, etc.)
 
-## Authentication & Identity
+## Thumbnail System
 
-**Auth Provider:**
-- Not applicable — standalone desktop application, no user accounts
+| Platform | Provider | Status |
+|----------|----------|--------|
+| Windows | `NoopThumbnailProvider` | **Disabled** — returns null |
+| macOS | `MacosThumbnailProvider` | Stub — TODO: QLThumbnailGenerator FFI |
+| Linux | `NoopThumbnailProvider` | Disabled |
 
-## File System Access
+**File:** `lib/kernel/services/thumbnail_service.dart`
+**Note:** CLAUDE.md mentions "Win32 COM thumbnail extraction" but currently wired to NoopThumbnailProvider.
 
-**File Operations:**
-- `FilePicker.pickFiles()` — Native file open dialog (`lib/app.dart`)
-- `FolderScanner` — Directory listing for video files (`lib/kernel/scanner/folder_scanner.dart`)
-- `desktop_drop` — Drag-and-drop file handling (`lib/ui/player/drop_handler.dart`)
-- `dart:io` File — Direct file existence checks, playlist JSON read/write
+## SharedPreferences Persistence
 
-**Supported File Extensions:**
-- Video: mp4, mkv, avi, mov, wmv, flv, webm, m4v, ts, rmvb, mpg, mpeg, 3gp, vob
-- Audio: mp3, flac, wav, aac, ogg, wma, m4a
+**Package:** `shared_preferences` 2.5.3
+**File:** `lib/kernel/persistence/settings_store.dart` (446 lines)
 
-## Monitoring & Observability
+### Stored Keys (~24 keys)
+- Volume, mute state, play mode
+- Last played file, position
+- Brightness, contrast, saturation (video processing)
+- Audio/subtitle track preferences
+- UI preferences (locale, theme)
 
-**Error Tracking:**
-- None — no Sentry, Crashlytics, or external error reporting
+## Localization (l10n)
 
-**Logs:**
-- `debugPrint()` — Flutter's debug-only logging (stripped in release)
-- `logger` package — Available but primarily `debugPrint` used throughout
-- No structured logging or log aggregation
+**Framework:** `intl` + Flutter's built-in l10n
+**Files:** `lib/l10n/` (ARB source + generated `AppLocalizations`)
+**Locales:** en, zh (Chinese)
+**Generated file:** `app_localizations.dart` (974 lines — auto-generated)
 
-## CI/CD & Deployment
+## Theme System
 
-**Hosting:**
-- Standalone desktop application — distributed as native binaries
-- `packaging/` directory exists (not explored — likely installer config)
-- `production/` directory exists (not explored)
+**Single theme:** Midnight (compile-time const)
+**Tokens:** `lib/ui/theme/tokens.dart` — `Tokens.*` static constants
+**Glass:** `GlassContainer` with `BackdropFilter` + `bgGlass` + `borderHighlight`
 
-**CI Pipeline:**
-- Not detected in repository root (no `.github/workflows/`, no `Jenkinsfile`, no `azure-pipelines.yml`)
+## Startup Sequence
 
-## Environment Configuration
+1. `main()` — fvp init, window setup
+2. `StartupCoordinator` — Phase-based initialization tracking
+3. `EnginePrewarm` — Fire-and-forget `mdk.Player()` creation
+4. `DeferredPlayerFeature` — Deferred loading of player UI
+5. `PlaybackController` init — Service wiring
 
-**Required env vars:**
-- None — all configuration via `SharedPreferences` at runtime
-- Hardware decoder selection is automatic based on platform+architecture detection
+## No Custom MethodChannels
 
-**Secrets location:**
-- Not applicable — no API keys, no external service credentials
-
-## Webhooks & Callbacks
-
-**Incoming:**
-- MethodChannel `com.simple_player/redraw` — Dart triggers C++ `ForceRedraw` after frameless window setup (`windows/runner/flutter_window.cpp`)
-
-**Outgoing:**
-- None — no outbound webhooks or callbacks to external services
-
-## Platform Bridge Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Dart (Flutter)                                          │
-│  ├── FvpEngine ─── mdk.Player (fvp plugin)              │
-│  ├── WindowService ── window_manager plugin              │
-│  ├── AspectRatioService ── MethodChannel                 │
-│  └── WindowsThumbnailProvider ─── COM FFI (shell32.dll) │
-├─────────────────────────────────────────────────────────┤
-│  C++ (windows/runner/)                                   │
-│  ├── FlutterWindow ─── FlutterViewController             │
-│  ├── MethodChannel `com.simple_player/redraw`            │
-│  └── Win32Window ─── HWND message loop                   │
-├─────────────────────────────────────────────────────────┤
-│  Native Libraries                                        │
-│  ├── MDK (via fvp) ─── FFmpeg + D3D11                   │
-│  ├── user32.dll ─── Window management                    │
-│  ├── shell32.dll ─── COM thumbnail extraction            │
-│  └── gdi32.dll ─── Bitmap manipulation                   │
-└─────────────────────────────────────────────────────────┘
-```
-
-## Dependency Injection Pattern
-
-- `WindowService` uses static singleton: `WindowService.instance`
-- `ThumbnailService` uses lazy platform dispatch with `_impl` singleton
-
----
-
-*Integration audit: 2026-05-23*
+All platform integration uses third-party packages:
+- `fvp` — engine (no custom channel)
+- `window_manager` — window control
+- `desktop_drop` — drag-drop
+- `file_picker` — file dialogs
+- `shared_preferences` — persistence
