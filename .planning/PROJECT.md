@@ -1,12 +1,24 @@
-# Simple Player Flutter — Window Management & UI Unification
+# Simple Player Flutter
 
 ## What This Is
 
-Flutter desktop media player powered by fvp (MDK/FFmpeg). Shipped v1.0 with self-managed window control via MethodChannel + Win32 FFI, unified glassmorphism UI component library, and optimized playback performance on Windows.
+Flutter desktop media player powered by fvp (MDK/FFmpeg). Shipped v1.0 with self-managed window control via MethodChannel + Win32 FFI, unified glassmorphism UI component library, and optimized playback performance on Windows. v1.1 focuses on testing infrastructure, code quality, and architecture optimization.
 
 ## Core Value
 
 Build a clean, dependency-free window management layer and unified widget system that delivers smooth, responsive playback on all desktop platforms.
+
+## Current Milestone: v1.1 Testing, Quality & Code Optimization
+
+**Goal:** 测试基础设施 + 窗口层代码精简 + 架构优化 + 死代码清理
+
+**Target features:**
+- 窗口层代码优化精简 (保持依赖/功能不变，重构代码结构)
+- 集成测试 (关键用户流程 E2E)
+- Golden 测试 (glassmorphism 组件视觉回归)
+- 架构优化 (Context7 查最新文档指导重构)
+- 死代码清理 (删除无用代码、简化冗余)
+- 代码质量 (静态分析、覆盖率维护)
 
 ## Requirements
 
@@ -37,12 +49,19 @@ Build a clean, dependency-free window management layer and unified widget system
 - ✓ TEST-03: Startup coordinator tests — v1.0
 - ✓ TEST-04: Coverage 64% → 80% — v1.0
 
-### Active (v2)
+### Active (v1.1)
+
+- [ ] OPT-01: Window layer code optimization (keep deps/features, refactor structure)
+- [ ] TEST-05: Integration tests for critical user flows (E2E)
+- [ ] TEST-06: Golden tests for glassmorphism components (visual regression)
+- [ ] QUAL-01: Architecture optimization (Context7-guided refactoring)
+- [ ] QUAL-02: Dead code cleanup (remove unused code, simplify redundancy)
+- [ ] QUAL-03: Code quality maintenance (static analysis, coverage)
+
+### Future (v1.2+)
 
 - [ ] PLATFORM-02: macOS/Linux platform stubs (deferred from v1)
 - [ ] Impeller FragmentShader for BackdropFilter (requires Impeller stable on Windows)
-- [ ] Integration tests for critical flows (Flutter desktop integration testing immature)
-- [ ] Golden tests for glassmorphism components (GPU-dependent, flaky across machines)
 - [ ] HLS/ABR streaming — adaptive bitrate architecture
 - [ ] Steam/SteamOS distribution — Linux + Steam Deck
 
@@ -94,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-29 after v1.0 milestone*
+*Last updated: 2026-05-29 after v1.1 milestone start*
