@@ -1,28 +1,27 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T23:50:00+08:00",
-  "phase": 5,
-  "phase_name": "technical-debt-cleanup",
+  "timestamp": "2026-05-30T00:00:00+08:00",
+  "phase": null,
+  "phase_name": "milestone-close",
   "phase_dir": null,
   "plan": null,
   "task": null,
   "total_tasks": null,
-  "status": "complete",
+  "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Wave 1: Dead code cleanup + type safety", "status": "done", "commit": "ff35d9b"},
-    {"id": 2, "name": "Wave 2: AppSettings copyWith/==/hashCode", "status": "done", "commit": "08fe99d"},
-    {"id": 3, "name": "Wave 3: Singleton testability (@visibleForTesting reset)", "status": "done", "commit": "91100e1"},
-    {"id": 4, "name": "Wave 4: Documentation updates (CLAUDE.md + CONCERNS.md)", "status": "done", "commit": "ec3ea37"}
+    {"id": 1, "name": "v1.0 milestone audit", "status": "done", "commit": null}
   ],
-  "remaining_tasks": [],
+  "remaining_tasks": [
+    {"id": 2, "name": "Run /gsd:complete-milestone — archive, update docs, tag v1.0", "status": "not_started"},
+    {"id": 3, "name": "Start v2 milestone planning", "status": "not_started"}
+  ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Used sentinel pattern for nullable copyWith fields", "rationale": "Dart cannot distinguish 'not passed' from 'passed null' for optional params", "phase": 5},
-    {"decision": "Used Object.hashAll instead of Object.hash", "rationale": "23 fields exceed Object.hash 20-arg limit", "phase": 5},
-    {"decision": "@visibleForTesting reset over full DI", "rationale": "Lightweight test isolation without framework overhead", "phase": 5}
+    {"decision": "PLATFORM-02 (macOS/Linux stubs) deferred to v2", "rationale": "Not blocking v1 release, low priority", "phase": null},
+    {"decision": "Phase 3 measurement gaps accepted as tech debt", "rationale": "Code changes solid, only measurement/validation missing", "phase": 3}
   ],
-  "uncommitted_files": [],
-  "next_action": "All 5 phases complete. Options: merge fix/window-startup to master, or start v2 planning.",
-  "context_notes": "Phase 5 tech debt cleanup fully done. 564 tests passing, 0 analysis errors. CONCERNS.md #5 partially resolved (reset methods), #6/#9/#11/#17 fully resolved."
+  "uncommitted_files": [".planning/v1.0-MILESTONE-AUDIT.md"],
+  "next_action": "Run /gsd:complete-milestone to archive v1.0, update PROJECT.md, tag v1.0, then start v2 milestone",
+  "context_notes": "v1.0 audit complete (12/13 requirements, tech_debt status). Audit report written to .planning/v1.0-MILESTONE-AUDIT.md. Ready for milestone completion flow. Branch: fix/window-startup. 564 tests, 80% coverage, 0 analysis errors."
 }
