@@ -322,6 +322,44 @@ void main() {
     });
   });
 
+  group('AutoHideController — scheduleHide timer fires hide', () {
+    testWidgets('timer callback hides when not hovering', (tester) async {
+      // Use a widget test so AnimationController/Ticker works properly.
+      // scheduleHide creates Timer(5s) in windowed mode.
+      // After pump(Duration(seconds: 6)), the timer fires and calls hide().
+      // hide() reverses the animation (300ms). pumpAndSettle() completes it.
+      // _onAnimStatus(dismissed) → visible = false.
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _TestAutoHideWrapper(
+            engineState: engineState,
+            isFullscreen: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final state = tester
+          .state<_TestAutoHideWrapperState>(
+            find.byType(_TestAutoHideWrapper),
+          );
+      final c = state.controller;
+
+      // Start auto-hide timer via scheduleHide
+      c.scheduleHide();
+
+      // Advance past the 5s windowed hide delay
+      await tester.pump(const Duration(seconds: 6));
+      // Timer fired → hide() → _animController.reverse()
+      // Now let the reverse animation (300ms) complete
+      await tester.pumpAndSettle();
+
+      // _onAnimStatus(dismissed) should have fired → visible = false
+      expect(c.visible.value, isFalse);
+    });
+  });
+
   group('AutoHideController.onEngineStateChanged() — hidden transitions', () {
     test('playing when hidden shows and schedules hide', () {
       engineState.value = MediaState.idle;
@@ -395,4 +433,42 @@ void main() {
       expect(c.visible.value, isTrue);
     });
   });
+}
+
+/// Wrapper widget that provides a real TickerProvider for AutoHideController.
+/// Used in widget tests where AnimationController + pump() is needed.
+class _TestAutoHideWrapper extends StatefulWidget {
+  final ValueNotifier<MediaState> engineState;
+  final bool isFullscreen;
+  const _TestAutoHideWrapper({
+    required this.engineState,
+    this.isFullscreen = false,
+  });
+  @override
+  State<_TestAutoHideWrapper> createState() => _TestAutoHideWrapperState();
+}
+
+class _TestAutoHideWrapperState extends State<_TestAutoHideWrapper>
+    with SingleTickerProviderStateMixin {
+  late final AutoHideController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AutoHideController(
+      vsync: this,
+      engineState: widget.engineState,
+      isFullscreen: widget.isFullscreen,
+    );
+    controller.init();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox();
 }
