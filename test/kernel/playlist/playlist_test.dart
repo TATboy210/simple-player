@@ -232,6 +232,14 @@ void main() {
         playlist.updatePosition(5, 1000, null);
         // No crash
       });
+
+      test('preserves existing durationMs when null', () {
+        playlist.add('/a.mp4');
+        playlist.updateHistory(0, positionMs: 1000, durationMs: 5000);
+        playlist.updatePosition(0, 2000, null);
+        expect(playlist.items[0].positionMs, 2000);
+        expect(playlist.items[0].durationMs, 5000); // preserved
+      });
     });
 
     group('mergeHistory', () {
@@ -294,6 +302,17 @@ void main() {
         playlist.reorder(5, 0);
         // No crash, list unchanged
         expect(playlist.length, 3);
+      });
+
+      test('decrements currentIndex when item crosses current', () {
+        playlist.add('/d.mp4');
+        playlist.currentIndex = 3; // playing d
+        // reorder(1, 3): removeAt(1)→[a,c,d], insert(3,b)→[a,c,d,b]
+        // oldIndex=1 < currentIndex=3, newIndex=3 >= currentIndex=3
+        // → currentIndex-- → 2
+        playlist.reorder(1, 3);
+        expect(playlist.currentIndex, 2);
+        expect(playlist.current!.path, '/d.mp4');
       });
     });
 

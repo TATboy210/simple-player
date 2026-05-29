@@ -258,6 +258,43 @@ void main() {
       });
     });
 
+    // ─── reorder ───
+
+    group('reorder', () {
+      test('reorders items and triggers rebuild + save', () async {
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.add('C:/c.mp4');
+        playlist.currentIndex = 0;
+        final before = rebuildCount;
+
+        controller.reorder(0, 2);
+
+        // removeAt(0) → [b, c], insert(2, a) → [b, c, a]
+        expect(playlist.items[0].path, 'C:/b.mp4');
+        expect(playlist.items[2].path, 'C:/a.mp4');
+        // currentIndex tracked: was 0 == oldIndex → becomes newIndex 2
+        expect(playlist.currentIndex, 2);
+        expect(rebuildCount, greaterThan(before));
+      });
+
+      test('reorder non-current item keeps currentIndex stable', () async {
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.add('C:/c.mp4');
+        playlist.currentIndex = 2; // playing c
+
+        controller.reorder(0, 1);
+
+        // removeAt(0) → [b, c], insert(1, a) → [b, a, c]
+        expect(playlist.items[0].path, 'C:/b.mp4');
+        expect(playlist.items[1].path, 'C:/a.mp4');
+        expect(playlist.items[2].path, 'C:/c.mp4');
+        // currentIndex=2, oldIndex=0<2 but newIndex=1<2 → neither branch fires
+        expect(playlist.currentIndex, 2);
+      });
+    });
+
     // ─── togglePlayMode ───
 
     group('togglePlayMode', () {
