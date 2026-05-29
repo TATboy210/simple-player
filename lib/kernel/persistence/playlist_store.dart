@@ -74,7 +74,7 @@ class PlaylistStore {
           await tmpFile.rename(f.path);
           return; // 写入成功
         } on Exception catch (e) {
-          debugPrint('PlaylistStore._flush attempt ${attempt + 1} failed: $e');
+          log.w('PlaylistStore._flush attempt ${attempt + 1} failed: $e');
           if (attempt < _maxRetries - 1) {
             await Future<void>.delayed(
               Duration(milliseconds: _retryBaseDelayMs * (1 << attempt)),
@@ -82,7 +82,7 @@ class PlaylistStore {
           }
         }
       }
-      debugPrint('PlaylistStore._flush: all $_maxRetries attempts failed');
+      log.e('PlaylistStore._flush: all $_maxRetries attempts failed');
     } finally {
       completer.complete();
       if (_writeInFlight == completer.future) {
@@ -109,7 +109,7 @@ class PlaylistStore {
       playlist = await _migrateHistory(playlist);
       return playlist;
     } on Exception catch (e) {
-      debugPrint('PlaylistStore.load failed: $e');
+      log.e('PlaylistStore.load failed: $e');
       return null;
     }
   }
@@ -126,7 +126,7 @@ class PlaylistStore {
       final playlist = await Isolate.run(() => _loadPlaylistSync(path));
       return await _migrateHistory(playlist);
     } on Exception catch (e) {
-      debugPrint('PlaylistStore.loadInBackground failed, falling back: $e');
+      log.w('PlaylistStore.loadInBackground failed, falling back: $e');
       return load();
     }
   }
@@ -140,7 +140,7 @@ class PlaylistStore {
       final json = jsonDecode(content) as Map<String, dynamic>;
       return Playlist.fromJson(json);
     } on Exception catch (e) {
-      debugPrint('PlaylistStore._loadPlaylistSync failed: $e');
+      log.e('PlaylistStore._loadPlaylistSync failed: $e');
       return null;
     }
   }
@@ -182,9 +182,9 @@ class PlaylistStore {
 
       // 迁移成功，删除旧文件
       await historyFile.delete();
-      debugPrint('PlaylistStore: migrated history.json');
+      log.d('PlaylistStore: migrated history.json');
     } on Exception catch (e) {
-      debugPrint('PlaylistStore._migrateHistory failed: $e');
+      log.e('PlaylistStore._migrateHistory failed: $e');
     }
     return playlist;
   }
@@ -197,7 +197,7 @@ class PlaylistStore {
       final f = await _file();
       if (await f.exists()) await f.delete();
     } on Exception catch (e) {
-      debugPrint('PlaylistStore.clear failed: $e');
+      log.e('PlaylistStore.clear failed: $e');
     }
   }
 

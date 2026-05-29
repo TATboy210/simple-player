@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../kernel/services/path_validator.dart';
+import '../../../kernel/utils/log.dart';
 import 'playback_controller.dart';
 
 /// 文件操作 — 打开/批量添加文件
@@ -59,7 +60,7 @@ class FileOperations {
       try {
         await _rt.navigator.playIndex(0);
       } on Exception catch (e) {
-        debugPrint('addFiles: playIndex(0) failed: $e');
+        log.e('addFiles: playIndex(0) failed: $e');
         validationError.value = e.toString();
       }
     } else if (addedCount > 0) {

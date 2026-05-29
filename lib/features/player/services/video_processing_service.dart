@@ -46,8 +46,7 @@ class VideoProcessingService {
   void updateDeinterlace(bool v) =>
       state.value = state.value.copyWith(deinterlaceEnabled: v);
 
-  void updateRotation(int v) =>
-      state.value = state.value.copyWith(rotation: v);
+  void updateRotation(int v) => state.value = state.value.copyWith(rotation: v);
 
   void updateAspectRatio(AspectRatioMode v) =>
       state.value = state.value.copyWith(aspectRatioMode: v);
@@ -131,10 +130,11 @@ class VideoProcessingService {
       hue: s.videoHue,
       deinterlaceEnabled: s.videoDeinterlace,
       rotation: s.videoRotation,
-      aspectRatioMode: AspectRatioMode.values[s.videoAspectRatioIndex.clamp(
-        0,
-        AspectRatioMode.values.length - 1,
-      )],
+      aspectRatioMode:
+          AspectRatioMode.values[s.videoAspectRatioIndex.clamp(
+            0,
+            AspectRatioMode.values.length - 1,
+          )],
     );
   }
 }

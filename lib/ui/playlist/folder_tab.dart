@@ -150,7 +150,8 @@ class _FolderGroupWidget extends StatelessWidget {
         ),
         // 水平缩略图列表
         SizedBox(
-          height: Tokens.thumbnailTileHeight, // thumbnail(90) + name(28) + padding(6)
+          height: Tokens
+              .thumbnailTileHeight, // thumbnail(90) + name(28) + padding(6)
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
@@ -303,4 +304,3 @@ class _FolderPathLabel extends StatelessWidget {
     });
   }
 }
-

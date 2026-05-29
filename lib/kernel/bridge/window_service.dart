@@ -58,8 +58,7 @@ class WindowService with WindowListener {
 
   // ─── Commands (delegate to windowManager) ───
 
-  Future<void> setFullscreen(bool value) =>
-      windowManager.setFullScreen(value);
+  Future<void> setFullscreen(bool value) => windowManager.setFullScreen(value);
 
   Future<void> setAlwaysOnTop(bool value) =>
       windowManager.setAlwaysOnTop(value);

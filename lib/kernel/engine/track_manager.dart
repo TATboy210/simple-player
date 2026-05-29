@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
 
 import '../models/media_info.dart';
+import '../utils/log.dart';
 
 /// 轨道管理器 — 音频/字幕轨道选择与切换
 ///
@@ -33,7 +33,7 @@ class TrackManager {
     try {
       _player.activeAudioTracks = [trackIndex];
     } on Exception catch (e) {
-      debugPrint('TrackManager.switchAudioTrack error: $e');
+      log.e('TrackManager.switchAudioTrack error: $e');
     }
   }
 
@@ -52,7 +52,7 @@ class TrackManager {
         _player.activeSubtitleTracks = [trackIndex];
       }
     } on Exception catch (e) {
-      debugPrint('TrackManager.switchSubtitleTrack error: $e');
+      log.e('TrackManager.switchSubtitleTrack error: $e');
     }
   }
 

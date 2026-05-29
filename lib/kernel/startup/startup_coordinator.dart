@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../utils/log.dart';
+
 import 'startup_state.dart';
 
 export 'startup_state.dart';
@@ -71,25 +73,23 @@ class StartupCoordinator {
 
   /// 输出逐阶段结构化耗时日志
   void _logTimeline() {
-    debugPrint('━━━ Startup Timeline ━━━');
+    log.i('━━━ Startup Timeline ━━━');
     for (final phase in StartupPhase.values) {
       if (phase == StartupPhase.ready) continue;
       final duration = _phaseDurations[phase];
       if (duration != null) {
         final ms = duration.inMicroseconds / 1000;
-        debugPrint('  ✓ ${phase.name.padRight(16)} ${ms.toStringAsFixed(1)}ms');
+        log.i('  ✓ ${phase.name.padRight(16)} ${ms.toStringAsFixed(1)}ms');
       } else if (_phaseTimestamps.containsKey(phase)) {
-        debugPrint('  ○ ${phase.name.padRight(16)} (no duration)');
+        log.i('  ○ ${phase.name.padRight(16)} (no duration)');
       } else {
-        debugPrint('  ○ ${phase.name.padRight(16)} (skipped)');
+        log.i('  ○ ${phase.name.padRight(16)} (skipped)');
       }
     }
     final total = _stopwatch.elapsed;
-    debugPrint('  ────────────────────────');
-    debugPrint(
-      '  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms',
-    );
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━');
+    log.i('  ────────────────────────');
+    log.i('  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms');
+    log.i('━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   void dispose() {

@@ -1,6 +1,5 @@
-import 'package:flutter/foundation.dart';
-
 import '../../../kernel/models/media_state.dart';
+import '../../../kernel/utils/log.dart';
 import '../../../kernel/utils/path_utils.dart';
 import '../../../kernel/services/path_validator.dart';
 import 'playback_controller.dart';
@@ -30,7 +29,7 @@ class PlaybackNavigator {
     // 安全：验证路径防止播放列表注入的路径遍历
     final validationError = PathValidator.validate(current.path);
     if (validationError != null) {
-      debugPrint('playIndex: rejected unsafe path: $validationError');
+      log.w('playIndex: rejected unsafe path: $validationError');
       _rt.onError?.call(Exception(validationError));
       return;
     }
@@ -53,7 +52,7 @@ class PlaybackNavigator {
 
       _rt.engine.play();
     } on Exception catch (e) {
-      debugPrint('PlaybackNavigator.playIndex($index) failed: $e');
+      log.e('PlaybackNavigator.playIndex($index) failed: $e');
       if (gen == _openGeneration) {
         _rt.playlist.currentIndex = oldIndex;
       }

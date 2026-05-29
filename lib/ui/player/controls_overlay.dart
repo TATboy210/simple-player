@@ -202,11 +202,13 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         Tokens.controlBarMarginBottom +
                         Tokens.controlBarHeight +
                         8,
-                    child: RepaintBoundary(child: ErrorBanner(
-                      engine: widget.engine,
-                      onOpenFile: widget.onOpenFile,
-                      onRetry: widget.onOpenFile,
-                    )),
+                    child: RepaintBoundary(
+                      child: ErrorBanner(
+                        engine: widget.engine,
+                        onOpenFile: widget.onOpenFile,
+                        onRetry: widget.onOpenFile,
+                      ),
+                    ),
                   ),
                 ],
               ),

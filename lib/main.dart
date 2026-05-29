@@ -7,9 +7,11 @@ import 'app.dart';
 import 'kernel/engine/engine_prewarm.dart';
 import 'kernel/persistence/settings_store.dart';
 import 'kernel/startup/startup_coordinator.dart';
+import 'kernel/utils/log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initLog();
 
   // window_manager 初始化 — 一步到位配置窗口，避免启动闪烁
   await windowManager.ensureInitialized();

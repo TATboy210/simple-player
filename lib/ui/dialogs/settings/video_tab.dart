@@ -64,13 +64,23 @@ class VideoTab extends StatelessWidget {
           SettingsCard(
             title: l10n.rotation,
             icon: Icons.rotate_right,
-            children: [_RotationPicker(value: s.rotation, onChanged: service.updateRotation)],
+            children: [
+              _RotationPicker(
+                value: s.rotation,
+                onChanged: service.updateRotation,
+              ),
+            ],
           ),
           // 画面比例
           SettingsCard(
             title: l10n.aspectRatio,
             icon: Icons.aspect_ratio,
-            children: [_AspectRatioSelector(value: s.aspectRatioMode, onChanged: service.updateAspectRatio)],
+            children: [
+              _AspectRatioSelector(
+                value: s.aspectRatioMode,
+                onChanged: service.updateAspectRatio,
+              ),
+            ],
           ),
           // 去隔行
           SettingsCard(
@@ -80,7 +90,10 @@ class VideoTab extends StatelessWidget {
               SettingSwitchRow(
                 title: l10n.enableDeinterlace,
                 description: l10n.softwareDecoderOnly,
-                notifier: _BoolNotifier.fromState(s.deinterlaceEnabled, service.updateDeinterlace),
+                notifier: _BoolNotifier.fromState(
+                  s.deinterlaceEnabled,
+                  service.updateDeinterlace,
+                ),
               ),
             ],
           ),
@@ -265,10 +278,8 @@ class _AspectRatioSelector extends StatelessWidget {
       ),
       items: AspectRatioMode.values
           .map(
-            (mode) => DropdownMenuItem(
-              value: mode,
-              child: Text(_label(mode, l10n)),
-            ),
+            (mode) =>
+                DropdownMenuItem(value: mode, child: Text(_label(mode, l10n))),
           )
           .toList(),
       onChanged: (mode) {

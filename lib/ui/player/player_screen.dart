@@ -153,8 +153,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 Expanded(
                   child: ValueListenableBuilder<bool>(
                     valueListenable: _playlistVisible,
-                    builder: (context, playlistVisible, videoContent) =>
-                        Stack(
+                    builder: (context, playlistVisible, videoContent) => Stack(
                       children: [
                         videoContent!,
                         if (_playlistMounted)
@@ -194,55 +193,51 @@ class _PlayerScreenState extends State<PlayerScreen> {
     bool isVideo,
     IconData modeIcon,
     String modeLabel,
-  ) =>
-      Row(
-        children: [
-          Expanded(
-            child: DropHandler(
-              onFilesDropped: widget.onFilesDropped ?? (_) {},
-              onHoverChanged: widget.onDragHoverChanged,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  VideoSurface(engine: widget.engine),
-                  if (widget.emptyState != null)
-                    ValueListenableBuilder<MediaState>(
-                      valueListenable: widget.engine.state,
-                      builder: (_, state, child) =>
-                          state == MediaState.idle
-                          ? child!
-                          : const SizedBox.shrink(),
-                      child: Positioned.fill(
-                        child: widget.emptyState!,
-                      ),
-                    ),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: widget.windowService.isFullscreen,
-                    builder: (context, isFullscreen, _) => ControlsOverlay(
-                      engine: widget.engine,
-                      emptyStatePresent: widget.emptyState != null,
-                      isFullscreen: isFullscreen,
-                      onToggleFullscreen: () =>
-                          widget.windowService.setFullscreen(!isFullscreen),
-                      onPrevious: () => widget.controller.playPrevious(),
-                      onNext: () => widget.controller.playNext(),
-                      onTogglePlaylist: _togglePlaylist,
-                      onSettings: widget.onSettings,
-                      onSettingsSecondary: widget.onSettingsSecondary,
-                      onOpenFile: widget.onOpenFile,
-                      onTogglePlayMode: widget.onTogglePlayMode,
-                      onOpenSubtitle: _openSubtitle,
-                      playModeIcon: modeIcon,
-                      playModeLabel: modeLabel,
-                      isVideo: isVideo,
-                    ),
-                  ),
-                ],
+  ) => Row(
+    children: [
+      Expanded(
+        child: DropHandler(
+          onFilesDropped: widget.onFilesDropped ?? (_) {},
+          onHoverChanged: widget.onDragHoverChanged,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              VideoSurface(engine: widget.engine),
+              if (widget.emptyState != null)
+                ValueListenableBuilder<MediaState>(
+                  valueListenable: widget.engine.state,
+                  builder: (_, state, child) => state == MediaState.idle
+                      ? child!
+                      : const SizedBox.shrink(),
+                  child: Positioned.fill(child: widget.emptyState!),
+                ),
+              ValueListenableBuilder<bool>(
+                valueListenable: widget.windowService.isFullscreen,
+                builder: (context, isFullscreen, _) => ControlsOverlay(
+                  engine: widget.engine,
+                  emptyStatePresent: widget.emptyState != null,
+                  isFullscreen: isFullscreen,
+                  onToggleFullscreen: () =>
+                      widget.windowService.setFullscreen(!isFullscreen),
+                  onPrevious: () => widget.controller.playPrevious(),
+                  onNext: () => widget.controller.playNext(),
+                  onTogglePlaylist: _togglePlaylist,
+                  onSettings: widget.onSettings,
+                  onSettingsSecondary: widget.onSettingsSecondary,
+                  onOpenFile: widget.onOpenFile,
+                  onTogglePlayMode: widget.onTogglePlayMode,
+                  onOpenSubtitle: _openSubtitle,
+                  playModeIcon: modeIcon,
+                  playModeLabel: modeLabel,
+                  isVideo: isVideo,
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 
   void _seek(MediaEngine engine, int deltaMs) {
     final target = engine.position.value + deltaMs;

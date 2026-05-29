@@ -1,8 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-
 import '../../../kernel/models/media_state.dart';
+import '../../../kernel/utils/log.dart';
 import '../../../kernel/models/play_mode.dart';
 import '../../../kernel/persistence/playlist_store.dart';
 import '../../../kernel/persistence/settings_store.dart';
@@ -32,7 +31,7 @@ class StateMonitor {
       _rt.engine.setVolume(s.volume);
       _rt.engine.setMute(s.isMuted);
     } on Exception catch (e) {
-      debugPrint('StateMonitor.init load settings failed: $e');
+      log.e('StateMonitor.init load settings failed: $e');
     }
   }
 
@@ -44,7 +43,7 @@ class StateMonitor {
     try {
       await PlaylistStore.loadInBackground();
     } on Exception catch (e) {
-      debugPrint('PlaylistStore.load migration failed: $e');
+      log.e('PlaylistStore.load migration failed: $e');
     }
   }
 
@@ -72,13 +71,13 @@ class StateMonitor {
       final idx = _rt.playlist.currentIndex;
       if (idx >= 0) {
         _rt.navigator.playIndex(idx).catchError((e) {
-          debugPrint('StateMonitor loopSingle replay failed: $e');
+          log.e('StateMonitor loopSingle replay failed: $e');
           _rt.onError?.call(e);
         });
       }
     } else {
       _rt.navigator.playNext().catchError((e) {
-        debugPrint('StateMonitor auto-advance failed: $e');
+        log.e('StateMonitor auto-advance failed: $e');
         _rt.onError?.call(e);
       });
     }
@@ -96,14 +95,25 @@ class StateMonitor {
       );
       _rt.savePlaylist();
     }
-    unawaited(SettingsStore.saveVolume(_rt.engine.volume.value)
-        .catchError((e) => debugPrint('SettingsStore.saveVolume failed: $e')));
-    unawaited(SettingsStore.saveIsMuted(_rt.engine.isMuted.value)
-        .catchError((e) => debugPrint('SettingsStore.saveIsMuted failed: $e')));
-    unawaited(SettingsStore.savePlayMode(_rt.playlist.mode.index)
-        .catchError((e) => debugPrint('SettingsStore.savePlayMode failed: $e')));
-    unawaited(PlaylistStore.dispose().catchError((e) {
-      debugPrint('PlaylistStore.dispose failed: $e');
-    }));
+    unawaited(
+      SettingsStore.saveVolume(
+        _rt.engine.volume.value,
+      ).catchError((e) => log.e('SettingsStore.saveVolume failed: $e')),
+    );
+    unawaited(
+      SettingsStore.saveIsMuted(
+        _rt.engine.isMuted.value,
+      ).catchError((e) => log.e('SettingsStore.saveIsMuted failed: $e')),
+    );
+    unawaited(
+      SettingsStore.savePlayMode(
+        _rt.playlist.mode.index,
+      ).catchError((e) => log.e('SettingsStore.savePlayMode failed: $e')),
+    );
+    unawaited(
+      PlaylistStore.dispose().catchError((e) {
+        log.e('PlaylistStore.dispose failed: $e');
+      }),
+    );
   }
 }

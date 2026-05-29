@@ -136,49 +136,49 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
             animation: Listenable.merge([_dragAnim, _idleAnim]),
             builder: (context, _) {
               return RepaintBoundary(
-              child: Align(
-                alignment: const Alignment(0, 0.1),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildBranding(context),
-                    const SizedBox(height: Tokens.spXl),
-                    SizedBox(
-                      height: 56,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          FadeTransition(
-                            opacity: ReverseAnimation(_dragCurve),
-                            child: Transform.scale(
-                              scale: 1.0 - 0.05 * _dragCurve.value,
-                              child: openButton,
-                            ),
-                          ),
-                          IgnorePointer(
-                            child: FadeTransition(
-                              opacity: _dragCurve,
-                              child: Transform.translate(
-                                offset: Offset(0, 8 * (1 - _dragCurve.value)),
-                                child: dragHint,
+                child: Align(
+                  alignment: const Alignment(0, 0.1),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildBranding(context),
+                      const SizedBox(height: Tokens.spXl),
+                      SizedBox(
+                        height: 56,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            FadeTransition(
+                              opacity: ReverseAnimation(_dragCurve),
+                              child: Transform.scale(
+                                scale: 1.0 - 0.05 * _dragCurve.value,
+                                child: openButton,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IgnorePointer(
-                      child: FadeTransition(
-                        opacity: _idleCurve,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: Tokens.spSm),
-                          child: _buildIdleHint(context),
+                            IgnorePointer(
+                              child: FadeTransition(
+                                opacity: _dragCurve,
+                                child: Transform.translate(
+                                  offset: Offset(0, 8 * (1 - _dragCurve.value)),
+                                  child: dragHint,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      IgnorePointer(
+                        child: FadeTransition(
+                          opacity: _idleCurve,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: Tokens.spSm),
+                            child: _buildIdleHint(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               );
             },
           )

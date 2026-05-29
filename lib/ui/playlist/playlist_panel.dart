@@ -160,61 +160,63 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           width: width,
           height: height,
           child: Stack(
-              children: [
-                // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                    child: FadeTransition(
-                      opacity: _fadeAnim,
-                      child: BackdropFilter(
-                        filter: _blurFilter,
-                        child: const SizedBox.expand(),
-                      ),
+            children: [
+              // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                  child: FadeTransition(
+                    opacity: _fadeAnim,
+                    child: BackdropFilter(
+                      filter: _blurFilter,
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 ),
-                // 内容层：滚动不触发 BackdropFilter 重绘
-                RepaintBoundary(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Tokens.bgGlass,
-                      borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                      border: Border.all(color: Tokens.borderHighlight, width: 1),
-                    ),
-                    child: AnimatedBuilder(
-                      animation: _selectedTab,
-                      builder: (context, _) => Column(
-                        children: [
-                          // tab 切换
-                          SizedBox(height: 36, child: _buildTabBar()),
-                          // 光条分隔线
-                          Container(
-                            height: 1,
-                            margin: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  Colors.transparent,
-                                  Tokens.borderHighlight,
-                                  Colors.transparent,
-                                ],
-                              ),
+              ),
+              // 内容层：滚动不触发 BackdropFilter 重绘
+              RepaintBoundary(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Tokens.bgGlass,
+                    borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                    border: Border.all(color: Tokens.borderHighlight, width: 1),
+                  ),
+                  child: AnimatedBuilder(
+                    animation: _selectedTab,
+                    builder: (context, _) => Column(
+                      children: [
+                        // tab 切换
+                        SizedBox(height: 36, child: _buildTabBar()),
+                        // 光条分隔线
+                        Container(
+                          height: 1,
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: Tokens.spMd,
+                          ),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.transparent,
+                                Tokens.borderHighlight,
+                                Colors.transparent,
+                              ],
                             ),
                           ),
-                          // 内容
-                          Expanded(child: _buildContent()),
-                        ],
-                      ),
+                        ),
+                        // 内容
+                        Expanded(child: _buildContent()),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
     );
   }
 

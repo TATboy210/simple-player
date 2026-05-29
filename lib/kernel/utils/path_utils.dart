@@ -2,6 +2,8 @@ import 'dart:io' show Process;
 
 import 'package:flutter/foundation.dart';
 
+import 'log.dart';
+
 /// 路径工具函数
 ///
 /// 统一的文件名提取，替代 4 处不一致的 split 逻辑。
@@ -63,7 +65,7 @@ class PathUtils {
       case TargetPlatform.macOS:
         run('open', [dir]);
       default:
-        debugPrint('openFileLocation: unsupported platform');
+        log.w('openFileLocation: unsupported platform');
     }
   }
 }
