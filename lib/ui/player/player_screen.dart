@@ -144,6 +144,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onMediaPlayPause: () => widget.engine.togglePlayPause(),
           onMediaNext: () => widget.controller.playNext(),
           onMediaPrevious: () => widget.controller.playPrevious(),
+          onExitFullscreen: () => widget.windowService.setFullscreen(false),
           child: Scaffold(
             backgroundColor: Tokens.bgBase,
             body: Column(

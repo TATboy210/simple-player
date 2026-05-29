@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'kernel/bridge/window_service.dart';
 import 'kernel/engine/media_engine.dart';
 import 'kernel/utils/log.dart';
 import 'kernel/services/locale_service.dart';
@@ -29,6 +30,7 @@ class App extends StatefulWidget {
 
 class _AppState extends State<App> {
   bool _ready = false;
+  final WindowService _windowService = WindowService()..init();
 
   @override
   void initState() {
@@ -49,6 +51,12 @@ class _AppState extends State<App> {
     }
     widget.coordinator.report(StartupPhase.settings, 1.0, 'Preferences loaded');
     if (mounted) setState(() => _ready = true);
+  }
+
+  @override
+  void dispose() {
+    _windowService.dispose();
+    super.dispose();
   }
 
   void _showSettingsPanel(
@@ -149,9 +157,14 @@ class _AppState extends State<App> {
           onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
           debugShowCheckedModeBanner: false,
           theme: ThemeService.I.currentTheme,
-          home: DragToResizeArea(
-            resizeEdgeSize: 11,
-            resizeEdgeColor: Colors.transparent,
+          home: ValueListenableBuilder<bool>(
+            valueListenable: _windowService.isFullscreen,
+            builder: (context, isFullscreen, child) => DragToResizeArea(
+              resizeEdgeSize: isFullscreen ? 0 : 6,
+              enableResizeEdges: isFullscreen ? [] : null,
+              resizeEdgeColor: Colors.transparent,
+              child: child!,
+            ),
             child: DeferredPlayerFeature(
               coordinator: widget.coordinator,
               onSettings: (ctx, engine, videoProcessing) =>
