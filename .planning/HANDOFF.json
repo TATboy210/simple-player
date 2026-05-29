@@ -1,9 +1,12 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T01:00:00+08:00",
+  "timestamp": "2026-05-30T12:30:00+08:00",
   "phase": 7,
   "phase_name": "Integration & Golden Tests",
   "phase_dir": ".planning/phases/07-integration-golden-tests",
+  "plan": 3,
+  "task": 0,
+  "total_tasks": 3,
   "status": "paused",
   "completed_tasks": [
     {"id": 1, "name": "Fix 1: DWM shadow restore (margins 0,0,1,0)", "status": "done", "commit": "0c32e12"},
@@ -14,24 +17,26 @@
     {"id": 6, "name": "Fix 6: DWM transition disable for maximize/restore", "status": "done", "commit": "adc3b79"},
     {"id": 7, "name": "Custom maximize using rcWork (taskbar not covered)", "status": "done", "commit": "bdff0a5"},
     {"id": 8, "name": "Video BoxFit.contain (letterbox/pillarbox)", "status": "done", "commit": "bdff0a5"},
-    {"id": 9, "name": "Window management architecture doc in STRUCTURE.md", "status": "done", "commit": "adc3b79"}
+    {"id": 9, "name": "Window management architecture doc in STRUCTURE.md", "status": "done", "commit": "adc3b79"},
+    {"id": 10, "name": "Window optimization plan doc (07-03-PLAN.md)", "status": "done", "commit": "53c8d19"},
+    {"id": 11, "name": "Smooth maximize/restore animation (remove DWM transition disable)", "status": "done", "commit": "679c128"}
   ],
   "remaining_tasks": [
-    {"id": 10, "name": "Phase 7: Execute 07-01-PLAN.md (Integration tests)", "status": "not_started"},
-    {"id": 11, "name": "Phase 7: Execute 07-02-PLAN.md (Golden tests)", "status": "not_started"},
-    {"id": 12, "name": "Phase 8: Architecture & Dead Code cleanup", "status": "not_started"}
+    {"id": 12, "name": "Phase 7: Execute 07-01-PLAN.md (Integration tests)", "status": "not_started"},
+    {"id": 13, "name": "Phase 7: Execute 07-02-PLAN.md (Golden tests)", "status": "not_started"},
+    {"id": 14, "name": "Phase 8: Architecture & Dead Code cleanup", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Manual test: maximize button covers work area (taskbar visible)", "context": "Custom FFI maximize using rcWork + SetWindowPos", "blocking": true},
-    {"action": "Manual test: 4:3 video shows pillarbox (black bars)", "context": "BoxFit.contain change", "blocking": true}
+    {"action": "Manual test: maximize button should have smooth DWM animation", "context": "Removed DWMWA_TRANSITIONS_FORCEDISABLED to restore smooth transitions", "blocking": false},
+    {"action": "Manual test: if white border flash returns, may need to re-enable _setTransitionsDisabled", "context": "Trade-off: smooth animation vs white border flash prevention", "blocking": false}
   ],
   "decisions": [
     {"decision": "Custom FFI maximize using rcWork instead of windowManager.maximize()", "rationale": "window_manager plugin adjustNCCALCSIZE expands client area to full monitor on frameless windows, covering taskbar", "phase": 7},
     {"decision": "BoxFit.contain instead of BoxFit.cover", "rationale": "User wants full video visible with black letterbox/pillarbox, not cropped", "phase": 7},
-    {"decision": "DWMWA_TRANSITIONS_FORCEDISABLED wraps maximize/restore", "rationale": "Eliminates white border flash and laggy DWM animation on frameless windows", "phase": 7}
+    {"decision": "Remove DWMWA_TRANSITIONS_FORCEDISABLED from maximize/restore", "rationale": "User reported maximize transition is not smooth; disabling DWM transitions removes animation entirely", "phase": 7}
   ],
   "uncommitted_files": [],
-  "next_action": "Manual test maximize + video contain → then /gsd:execute-phase 7",
-  "context_notes": "All window stability fixes complete (8 fixes total). Branch fix/window-startup ahead of origin by 49 commits. 564 tests passing. Phase 7 has 2 plans (integration + golden tests) ready to execute."
+  "next_action": "Manual test smooth maximize animation → then /gsd:execute-phase 7 for integration tests",
+  "context_notes": "All window stability fixes complete (11 fixes total). Latest fix: removed DWM transition disable to restore smooth maximize/restore animation. Branch fix/window-startup ahead of origin by 51 commits. 564 tests passing. Phase 7 has 3 plans (07-01 integration, 07-02 golden, 07-03 window optimization complete)."
 }
