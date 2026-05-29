@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T12:00:00+08:00",
+  "timestamp": "2026-05-29T15:30:00+08:00",
   "phase": "4",
   "phase_name": "test-coverage",
   "phase_dir": ".planning/phases/04-test-coverage",
   "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "paused_78.6pct",
+  "status": "paused_78.9pct",
   "completed_tasks": [
     {"id": 1, "name": "Wave 1: kernel unit tests (6 files)", "status": "done"},
     {"id": 2, "name": "Wave 2: bridge/persistence tests (2 files)", "status": "done"},
@@ -21,30 +21,35 @@
     {"id": 10, "name": "startup_coordinator phase lifecycle tests (+6 gap)", "status": "done"},
     {"id": 11, "name": "speed_button scroll wheel + rendering tests (+16 gap)", "status": "done"},
     {"id": 12, "name": "playlist_store flush retry + migration edge tests (+7 gap)", "status": "done"},
-    {"id": 13, "name": "settings_store loadShortcuts corrupt JSON test (+3 gap)", "status": "done"}
+    {"id": 13, "name": "settings_store loadShortcuts corrupt JSON test (+3 gap)", "status": "done"},
+    {"id": 14, "name": "path_utils openFileLocation refactor + tests (+10 gap)", "status": "done"},
+    {"id": 15, "name": "settings_store catch block tests (+4 gap attempted)", "status": "done"},
+    {"id": 16, "name": "progress_bar drag seekTo + tooltip tests", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 14, "name": "settings_store catch blocks (+5 gap)", "status": "not_started", "notes": "loadLocale/loadThemeIndex/loadD3d11SyncEnabled/loadHardwareDecoding catch blocks. Need SharedPreferences mock that throws on getInstance()."},
-    {"id": 15, "name": "state_monitor error paths (+8 gap)", "status": "not_started", "notes": "init catch (L34-35), migration catch (L46-47), loopSingle catchError (L75-76), auto-advance catchError (L81-82). Need engine.open() to throw or navigator to fail."},
-    {"id": 16, "name": "progress_bar remaining (+6 gap)", "status": "not_started", "notes": "6 lines still uncovered in hover/tooltip edge cases."},
-    {"id": 17, "name": "path_utils openFileLocation (+11 gap)", "status": "not_started", "notes": "Process.run calls — platform-dependent, needs refactoring to inject runner for testability."},
-    {"id": 18, "name": "Verify coverage reaches 80%+", "status": "not_started"}
+    {"id": 17, "name": "playback_controller reorder test (+4 gap)", "status": "not_started", "notes": "Simple method test: controller.reorder(0, 1) with 2+ item playlist."},
+    {"id": 18, "name": "playback_navigator path validation rejection (+2 gap)", "status": "not_started", "notes": "Add unsafe path to playlist, call playIndex, expect onError."},
+    {"id": 19, "name": "settings_store catch blocks coverage fix (+8 gap)", "status": "not_started", "notes": "Tests pass but coverage not reflecting. Investigate PlatformException type or use direct channel mock."},
+    {"id": 20, "name": "progress_bar timer callback (+4 gap)", "status": "not_started", "notes": "L113-116: Timer in onHorizontalDragUpdate. pump(duration) doesn't fire timers. Need fakeAsync or tester.runAsync."},
+    {"id": 21, "name": "state_monitor error paths (+8 gap)", "status": "not_started", "notes": "init catch (L34-35), migration catch (L46-47). Auto-advance catchError (L75-76, L81-82) is dead code — playIndex catches internally."},
+    {"id": 22, "name": "Verify coverage reaches 80%+", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "fvp_callback_handler.dart (29 gap) and position_poller.dart (21 gap) are FFI-coupled to mdk.Player — cannot test without platform mocking", "type": "technical", "workaround": "Skip these files, compensate with other file coverage"},
-    {"description": "l10n generated files (291 lines) inflate total denominator", "type": "technical", "workaround": "Non-l10n coverage ~89%, overall 78.6%"},
-    {"description": "settings_store/state_monitor catch blocks require SharedPreferences/Process.run failure injection", "type": "technical", "workaround": "Refactor to inject dependencies or accept as defensive code"},
-    {"description": "path_utils.openFileLocation uses Process.run — needs refactoring for testability", "type": "technical", "workaround": "Inject ProcessRunner interface or skip"}
+    {"description": "fvp_callback_handler.dart (29 gap) and position_poller.dart (21 gap) are FFI-coupled to mdk.Player", "type": "technical", "workaround": "Skip these files"},
+    {"description": "l10n generated files (291 lines) inflate total denominator", "type": "technical", "workaround": "Non-l10n coverage ~89%"},
+    {"description": "file_operations catch blocks (5 gap) are dead code — playIndex catches internally", "type": "technical", "workaround": "Accept as untestable defensive code"},
+    {"description": "progress_bar timer callback (L113-116) not testable with pump(duration)", "type": "technical", "workaround": "Try fakeAsync or accept as untestable"},
+    {"description": "settings_store catch block tests pass but coverage not reflecting", "type": "technical", "workaround": "Investigate PlatformException type mismatch or use alternative mock approach"}
   ],
   "human_actions_pending": [],
   "decisions": [
     {"decision": "Skip FFI-coupled files (fvp_callback_handler, position_poller)", "rationale": "50+ lines untestable without mdk.Player mock infrastructure", "phase": "4"},
     {"decision": "Use preloaded AppSettings for StateMonitor.init()", "rationale": "Avoids SettingsStore.load() platform dependency in tests", "phase": "4"},
     {"decision": "l10n files excluded from target", "rationale": "291 lines auto-generated, testing provides no value", "phase": "4"},
-    {"decision": "GestureBinding.instance.handlePointerEvent for scroll wheel tests", "rationale": "WidgetTester.sendPointerEvent does not exist; direct binding dispatch works", "phase": "4"},
-    {"decision": "Drop double-tap speed_button test", "rationale": "GestureDetector.onDoubleTap vs InkWell.onTap arena conflict; scroll wheel tests cover _shift logic (10/16 lines)", "phase": "4"}
+    {"decision": "PathUtils.openFileLocation injectable runner", "rationale": "Clean DI pattern for platform-dependent Process.run calls", "phase": "4"},
+    {"decision": "Timer callback (L113-116) not testable with pump(duration)", "rationale": "Flutter widget tests use fake clock that doesn't fire dart:async Timer callbacks via pump", "phase": "4"}
   ],
   "uncommitted_files": [],
-  "next_action": "To reach 80%, need 28 more lines. Options: (1) Refactor path_utils.openFileLocation to inject ProcessRunner (+11), (2) Mock SharedPreferences to throw for settings_store catch blocks (+5), (3) Trigger state_monitor error paths by making engine.open() throw (+8). Best ROI: path_utils refactor (+11) + progress_bar edge cases (+6) + one more = 80%.",
-  "context_notes": "Coverage 78.6% (1541/1961). Gap 28 lines to 80%. 517 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. PlaylistStore._flush retry test triggers all 3 attempts by mocking path_provider to invalid path. speed_button scroll wheel covers _shift (lines 23-30) and onPointerSignal (lines 59-61). Double-tap test dropped due to InkWell vs GestureDetector gesture arena conflict."
+  "next_action": "To reach 80%, need 21 more lines. Easy wins: playback_controller.reorder (+4) + playback_navigator path validation (+2) = 6 lines. Then investigate settings_store catch block coverage issue (+8). Timer callback (+4) and state_monitor (+8) are hard/dead code. Best path: easy wins (+6) + settings_store fix (+8) + one more = 80%.",
+  "context_notes": "Coverage 78.9% (1548/1961). Gap 21 lines to 80%. 528 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. PathUtils.openFileLocation refactored with injectable runner parameter. settings_store catch block tests pass (PlatformException caught) but coverage tool shows lines as uncovered — likely coverage instrumentation issue. progress_bar timer callback (L113-116) requires fakeAsync; pump(duration) doesn't fire dart:async timers."
 }

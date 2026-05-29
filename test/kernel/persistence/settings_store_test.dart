@@ -1,9 +1,12 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/models/aspect_ratio_mode.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('AppSettings', () {
     test('default isAlwaysOnTop is false', () {
       const settings = AppSettings(
@@ -511,6 +514,50 @@ void main() {
       await SettingsStore.saveVolume(1.5);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getDouble('volume'), 1.0);
+    });
+  });
+
+  group('SettingsStore catch blocks (SharedPreferences failure)', () {
+    setUp(() {
+      SettingsStore.resetPrewarm();
+      // Override platform channel to throw on getInstance()
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/shared_preferences'),
+        (call) async =>
+            throw PlatformException(code: 'TEST', message: 'mock error'),
+      );
+    });
+
+    tearDown(() {
+      // Restore normal mock
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('plugins.flutter.io/shared_preferences'),
+        null,
+      );
+      SharedPreferences.setMockInitialValues({});
+      SettingsStore.resetPrewarm();
+    });
+
+    test('loadLocale returns default zh on exception', () async {
+      final locale = await SettingsStore.loadLocale();
+      expect(locale, 'zh');
+    });
+
+    test('loadThemeIndex returns default 0 on exception', () async {
+      final index = await SettingsStore.loadThemeIndex();
+      expect(index, 0);
+    });
+
+    test('loadD3d11SyncEnabled returns default true on exception', () async {
+      final value = await SettingsStore.loadD3d11SyncEnabled();
+      expect(value, true);
+    });
+
+    test('loadHardwareDecoding returns default true on exception', () async {
+      final value = await SettingsStore.loadHardwareDecoding();
+      expect(value, true);
     });
   });
 }
