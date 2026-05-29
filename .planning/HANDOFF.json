@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T15:30:00+08:00",
+  "timestamp": "2026-05-29T16:00:00+08:00",
   "phase": "4",
   "phase_name": "test-coverage",
   "phase_dir": ".planning/phases/04-test-coverage",
   "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "paused_78.9pct",
+  "status": "paused_79.6pct",
   "completed_tasks": [
     {"id": 1, "name": "Wave 1: kernel unit tests (6 files)", "status": "done"},
     {"id": 2, "name": "Wave 2: bridge/persistence tests (2 files)", "status": "done"},
@@ -24,22 +24,28 @@
     {"id": 13, "name": "settings_store loadShortcuts corrupt JSON test (+3 gap)", "status": "done"},
     {"id": 14, "name": "path_utils openFileLocation refactor + tests (+10 gap)", "status": "done"},
     {"id": 15, "name": "settings_store catch block tests (+4 gap attempted)", "status": "done"},
-    {"id": 16, "name": "progress_bar drag seekTo + tooltip tests", "status": "done"}
+    {"id": 16, "name": "progress_bar drag seekTo + tooltip tests", "status": "done"},
+    {"id": 17, "name": "playback_controller reorder test (+4 gap)", "status": "done"},
+    {"id": 18, "name": "playback_navigator path validation rejection (+2 gap)", "status": "done"},
+    {"id": 19, "name": "playlist reorder _currentIndex-- branch + updatePosition null durationMs", "status": "done"},
+    {"id": 20, "name": "playlist_item copyWith + toString tests", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 17, "name": "playback_controller reorder test (+4 gap)", "status": "not_started", "notes": "Simple method test: controller.reorder(0, 1) with 2+ item playlist."},
-    {"id": 18, "name": "playback_navigator path validation rejection (+2 gap)", "status": "not_started", "notes": "Add unsafe path to playlist, call playIndex, expect onError."},
-    {"id": 19, "name": "settings_store catch blocks coverage fix (+8 gap)", "status": "not_started", "notes": "Tests pass but coverage not reflecting. Investigate PlatformException type or use direct channel mock."},
-    {"id": 20, "name": "progress_bar timer callback (+4 gap)", "status": "not_started", "notes": "L113-116: Timer in onHorizontalDragUpdate. pump(duration) doesn't fire timers. Need fakeAsync or tester.runAsync."},
-    {"id": 21, "name": "state_monitor error paths (+8 gap)", "status": "not_started", "notes": "init catch (L34-35), migration catch (L46-47). Auto-advance catchError (L75-76, L81-82) is dead code — playIndex catches internally."},
-    {"id": 22, "name": "Verify coverage reaches 80%+", "status": "not_started"}
+    {"id": 21, "name": "auto_hide_controller L81+L89 animation callback + timer fire (+2 gap)", "status": "not_started", "notes": "L81: _onAnimStatus dismissed sets visible=false. Need pumpAndSettle or manual animation forward. L89: scheduleHide timer fire when !_hovering. Need tester.runAsync or fakeAsync."},
+    {"id": 22, "name": "controls_overlay L120+L154 engine state + mouse exit (+2 gap)", "status": "not_started", "notes": "L120: _onEngineStateChanged. L154: onExit callback. Both need widget test with mouse/keyboard interaction."},
+    {"id": 23, "name": "subtitle_service catch blocks L37-38+L59-60 (+4 gap)", "status": "not_started", "notes": "Same coverage tool issue as settings_store — tests may pass but coverage not reflecting. Try filesystem mock or accept."},
+    {"id": 24, "name": "playlist_store catch blocks L169-170+L199-200 (+4 gap)", "status": "not_started", "notes": "MigrateHistory corrupt entry + clear file failure. Same coverage tool issue pattern."},
+    {"id": 25, "name": "speed_button arrow onTap L33-35+L46+L52 (+5 gap)", "status": "not_started", "notes": "Gesture arena conflict — InkWell claims taps before GestureDetector."},
+    {"id": 26, "name": "settings_store catch blocks coverage fix (+8 gap)", "status": "not_started", "notes": "Tests pass but coverage tool not reflecting. PlatformException implements Exception, debugPrint fires. Likely Dart coverage instrumentation bug with platform channel mocks."},
+    {"id": 27, "name": "Verify coverage reaches 80%+", "status": "not_started"}
   ],
   "blockers": [
     {"description": "fvp_callback_handler.dart (29 gap) and position_poller.dart (21 gap) are FFI-coupled to mdk.Player", "type": "technical", "workaround": "Skip these files"},
     {"description": "l10n generated files (291 lines) inflate total denominator", "type": "technical", "workaround": "Non-l10n coverage ~89%"},
     {"description": "file_operations catch blocks (5 gap) are dead code — playIndex catches internally", "type": "technical", "workaround": "Accept as untestable defensive code"},
     {"description": "progress_bar timer callback (L113-116) not testable with pump(duration)", "type": "technical", "workaround": "Try fakeAsync or accept as untestable"},
-    {"description": "settings_store catch block tests pass but coverage not reflecting", "type": "technical", "workaround": "Investigate PlatformException type mismatch or use alternative mock approach"}
+    {"description": "settings_store/subtitle_service/playlist_store catch block tests pass but coverage not reflecting", "type": "technical", "workaround": "Likely Dart coverage instrumentation bug with platform channel mocks"},
+    {"description": "state_monitor auto-advance catchError (L75-76, L81-82) is dead code", "type": "technical", "workaround": "playIndex catches internally, these branches are unreachable"}
   ],
   "human_actions_pending": [],
   "decisions": [
@@ -47,9 +53,10 @@
     {"decision": "Use preloaded AppSettings for StateMonitor.init()", "rationale": "Avoids SettingsStore.load() platform dependency in tests", "phase": "4"},
     {"decision": "l10n files excluded from target", "rationale": "291 lines auto-generated, testing provides no value", "phase": "4"},
     {"decision": "PathUtils.openFileLocation injectable runner", "rationale": "Clean DI pattern for platform-dependent Process.run calls", "phase": "4"},
-    {"decision": "Timer callback (L113-116) not testable with pump(duration)", "rationale": "Flutter widget tests use fake clock that doesn't fire dart:async Timer callbacks via pump", "phase": "4"}
+    {"decision": "Timer callback (L113-116) not testable with pump(duration)", "rationale": "Flutter widget tests use fake clock that doesn't fire dart:async Timer callbacks via pump", "phase": "4"},
+    {"decision": "Catch block coverage tool issue is Dart instrumentation bug", "rationale": "PlatformException implements Exception, tests pass with correct defaults, debugPrint fires — but DA count stays 0. Not worth further investigation.", "phase": "4"}
   ],
   "uncommitted_files": [],
-  "next_action": "To reach 80%, need 21 more lines. Easy wins: playback_controller.reorder (+4) + playback_navigator path validation (+2) = 6 lines. Then investigate settings_store catch block coverage issue (+8). Timer callback (+4) and state_monitor (+8) are hard/dead code. Best path: easy wins (+6) + settings_store fix (+8) + one more = 80%.",
-  "context_notes": "Coverage 78.9% (1548/1961). Gap 21 lines to 80%. 528 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. PathUtils.openFileLocation refactored with injectable runner parameter. settings_store catch block tests pass (PlatformException caught) but coverage tool shows lines as uncovered — likely coverage instrumentation issue. progress_bar timer callback (L113-116) requires fakeAsync; pump(duration) doesn't fire dart:async timers."
+  "next_action": "To reach 80%, need 7 more lines. Best targets: auto_hide_controller L81+L89 (+2), controls_overlay L120+L154 (+2), and 3 more from subtitle_service/playlist_store/speed_button. Widget test timing (animation callbacks, timer fire) is the main challenge — may need fakeAsync or tester.runAsync.",
+  "context_notes": "Coverage 79.6% (1562/1961). Gap 7 lines to 80%. 536 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. Catch block coverage (settings_store/subtitle_service/playlist_store) is a Dart coverage instrumentation bug — tests pass but DA count stays 0. Widget timer/animation tests need fakeAsync, not pump(duration)."
 }
