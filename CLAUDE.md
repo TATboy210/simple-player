@@ -40,7 +40,7 @@ lib/
 │   ├── services/
 │   │   ├── playback_controller.dart   # Orchestrator (open/next/prev/seek)
 │   │   ├── playback_navigator.dart    # Track advancement logic
-│   │   ├── thumbnail_service.dart     # Win32 COM thumbnail extraction
+│   │   ├── thumbnail_service.dart     # Platform-aware thumbnail facade (LRU cache)
 │   │   ├── video_processing_service.dart # Color correction, rotation
 │   │   └── file_operations.dart       # File open/drop handling
 │   └── utils/
