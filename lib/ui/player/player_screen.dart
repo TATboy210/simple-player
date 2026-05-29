@@ -149,6 +149,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                CustomTitleBar(windowService: widget.windowService),
                 Expanded(
                   child: ValueListenableBuilder<bool>(
                     valueListenable: _playlistVisible,
@@ -156,15 +157,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         Stack(
                       children: [
                         videoContent!,
-                        // 标题栏 — 独立于视频内容的层 (D-13)
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: CustomTitleBar(
-                            windowService: widget.windowService,
-                          ),
-                        ),
                         if (_playlistMounted)
                           IgnorePointer(
                             ignoring: !playlistVisible,
@@ -224,20 +216,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         child: widget.emptyState!,
                       ),
                     ),
-                  ControlsOverlay(
-                    engine: widget.engine,
-                    emptyStatePresent: widget.emptyState != null,
-                    onPrevious: () => widget.controller.playPrevious(),
-                    onNext: () => widget.controller.playNext(),
-                    onTogglePlaylist: _togglePlaylist,
-                    onSettings: widget.onSettings,
-                    onSettingsSecondary: widget.onSettingsSecondary,
-                    onOpenFile: widget.onOpenFile,
-                    onTogglePlayMode: widget.onTogglePlayMode,
-                    onOpenSubtitle: _openSubtitle,
-                    playModeIcon: modeIcon,
-                    playModeLabel: modeLabel,
-                    isVideo: isVideo,
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.windowService.isFullscreen,
+                    builder: (context, isFullscreen, _) => ControlsOverlay(
+                      engine: widget.engine,
+                      emptyStatePresent: widget.emptyState != null,
+                      isFullscreen: isFullscreen,
+                      onToggleFullscreen: () =>
+                          widget.windowService.setFullscreen(!isFullscreen),
+                      onPrevious: () => widget.controller.playPrevious(),
+                      onNext: () => widget.controller.playNext(),
+                      onTogglePlaylist: _togglePlaylist,
+                      onSettings: widget.onSettings,
+                      onSettingsSecondary: widget.onSettingsSecondary,
+                      onOpenFile: widget.onOpenFile,
+                      onTogglePlayMode: widget.onTogglePlayMode,
+                      onOpenSubtitle: _openSubtitle,
+                      playModeIcon: modeIcon,
+                      playModeLabel: modeLabel,
+                      isVideo: isVideo,
+                    ),
                   ),
                 ],
               ),
