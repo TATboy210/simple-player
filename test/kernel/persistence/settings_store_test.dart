@@ -31,6 +31,119 @@ void main() {
       );
       expect(settings.isFullscreen, isFalse);
     });
+
+    test('copyWith no args returns equal instance', () {
+      const original = AppSettings(
+        volume: 0.8,
+        lastFile: 'test.mp4',
+        windowWidth: 1920,
+        windowHeight: 1080,
+        windowX: 100.0,
+        windowY: 200.0,
+        playMode: 1,
+        isMuted: true,
+      );
+      final copy = original.copyWith();
+      expect(copy, equals(original));
+      expect(copy.hashCode, equals(original.hashCode));
+    });
+
+    test('copyWith replaces only specified fields', () {
+      const original = AppSettings(
+        volume: 0.5,
+        lastFile: 'a.mp4',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+      );
+      final copy = original.copyWith(volume: 0.9, isMuted: true);
+      expect(copy.volume, 0.9);
+      expect(copy.isMuted, isTrue);
+      expect(copy.lastFile, 'a.mp4');
+      expect(copy.windowWidth, 1280);
+    });
+
+    test('copyWith can set nullable fields to null', () {
+      const original = AppSettings(
+        volume: 1.0,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        windowX: 50.0,
+        windowY: 60.0,
+        playMode: 0,
+        isMuted: false,
+      );
+      final copy = original.copyWith(windowX: null, windowY: null);
+      expect(copy.windowX, isNull);
+      expect(copy.windowY, isNull);
+      expect(copy.volume, 1.0);
+    });
+
+    test('== returns true for identical field values', () {
+      const a = AppSettings(
+        volume: 1.0,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+      );
+      const b = AppSettings(
+        volume: 1.0,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+      );
+      expect(a, equals(b));
+    });
+
+    test('== returns false when single field differs', () {
+      const a = AppSettings(
+        volume: 1.0,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+      );
+      const b = AppSettings(
+        volume: 0.5,
+        lastFile: '',
+        windowWidth: 1280,
+        windowHeight: 720,
+        playMode: 0,
+        isMuted: false,
+      );
+      expect(a == b, isFalse);
+    });
+
+    test('hashCode is consistent for equal objects', () {
+      const a = AppSettings(
+        volume: 1.0,
+        lastFile: 'x.mp4',
+        windowWidth: 1280,
+        windowHeight: 720,
+        windowX: 10.0,
+        playMode: 2,
+        isMuted: true,
+        videoBrightness: 0.3,
+      );
+      const b = AppSettings(
+        volume: 1.0,
+        lastFile: 'x.mp4',
+        windowWidth: 1280,
+        windowHeight: 720,
+        windowX: 10.0,
+        playMode: 2,
+        isMuted: true,
+        videoBrightness: 0.3,
+      );
+      expect(a.hashCode, equals(b.hashCode));
+    });
   });
 
   group('SettingsStore isAlwaysOnTop persistence', () {
