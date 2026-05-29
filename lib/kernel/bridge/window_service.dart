@@ -138,6 +138,10 @@ class WindowService with WindowListener {
   ///
   /// 最大化/恢复时禁用动画，消除白边闪现和卡顿。
   /// PostMessage(SC_MAXIMIZE) 是异步的，发送后立即恢复设置即可。
+  ///
+  /// 注意：当前最大化/恢复已移除此调用以保留平滑动画。
+  /// 如果白边闪现重新出现，可考虑使用此方法或 AnimateWindow API。
+  // ignore: unused_element
   static Future<void> _setTransitionsDisabled(bool disabled) async {
     final hwnd = await windowManager.getId();
     final value = calloc<Uint32>()..value = disabled ? 1 : 0;
@@ -372,8 +376,7 @@ class WindowService with WindowListener {
     mi.ref.cbSize = sizeOf<_MonitorInfo>();
     _getMonitorInfo(hMonitor, mi);
 
-    // 定位到工作区
-    await _setTransitionsDisabled(true);
+    // 定位到工作区（不禁用 DWM 过渡，保留平滑动画）
     _setWindowPos(
       hwnd,
       _hwndTop,
@@ -383,7 +386,6 @@ class WindowService with WindowListener {
       mi.ref.rcWork.bottom - mi.ref.rcWork.top,
       _swpNoOwnerZOrder | _swpFrameChanged,
     );
-    await _setTransitionsDisabled(false);
 
     calloc.free(mi);
     if (!isMaximized.value) isMaximized.value = true;
@@ -394,7 +396,7 @@ class WindowService with WindowListener {
     if (!isMaximized.value || _savedMaximizeFrame == null) return;
     final hwnd = await windowManager.getId();
 
-    await _setTransitionsDisabled(true);
+    // 恢复窗口位置（不禁用 DWM 过渡，保留平滑动画）
     _setWindowPos(
       hwnd,
       0,
@@ -404,7 +406,6 @@ class WindowService with WindowListener {
       _savedMaximizeFrame!.ref.bottom - _savedMaximizeFrame!.ref.top,
       _swpNoOwnerZOrder | _swpFrameChanged,
     );
-    await _setTransitionsDisabled(false);
 
     calloc.free(_savedMaximizeFrame!);
     _savedMaximizeFrame = null;
