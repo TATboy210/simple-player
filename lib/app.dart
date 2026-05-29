@@ -53,16 +53,16 @@ class _AppState extends State<App> {
 
   void _showSettingsPanel(
     BuildContext context,
-    Object? engine,
-    Object? videoProcessing,
+    MediaEngine engine,
+    VideoProcessingService? videoProcessing,
   ) {
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.transparent,
       builder: (dialogCtx) => SettingsPanel(
-        engine: engine as MediaEngine,
-        videoProcessing: videoProcessing as VideoProcessingService?,
+        engine: engine,
+        videoProcessing: videoProcessing,
       ),
     );
   }

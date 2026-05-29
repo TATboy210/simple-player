@@ -9,7 +9,7 @@ import '../../ui/shared/empty_state.dart';
 import '../../ui/shared/play_mode_utils.dart';
 import '../../ui/widgets/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
-import '../../kernel/engine/fvp_engine.dart';
+import '../../kernel/engine/media_engine.dart';
 import 'services/video_processing_service.dart';
 import 'player_services.dart';
 
@@ -27,7 +27,7 @@ class PlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
   final void Function(
     BuildContext context,
-    FvpEngine engine,
+    MediaEngine engine,
     VideoProcessingService videoProcessing,
   )
   onSettings;
