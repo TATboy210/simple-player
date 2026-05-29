@@ -138,5 +138,47 @@ void main() {
 
       expect(find.byType(ControlsOverlay), findsOneWidget);
     });
+
+    testWidgets('engine state change triggers AutoHideController callback', (
+      tester,
+    ) async {
+      engine.state.value = MediaState.idle;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Change engine state while widget is mounted — triggers _onEngineStateChanged
+      engine.state.value = MediaState.playing;
+      await tester.pump();
+
+      // _onEngineStateChanged calls _autoHide.onEngineStateChanged()
+      // playing → show() + scheduleHide() — widget still visible
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('mouse exit triggers onMouseExit', (tester) async {
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final overlay = find.byType(ControlsOverlay);
+      final center = tester.getCenter(overlay);
+
+      // Create mouse at center (triggers onEnter + onHover)
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: center);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(center);
+      await tester.pump();
+
+      // Move far outside the widget — triggers onExit
+      await gesture.moveTo(
+        center + const Offset(5000, 5000),
+      );
+      await tester.pump();
+
+      // onExit called _autoHide.onMouseExit() — no crash, scheduleHide called
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
   });
 }

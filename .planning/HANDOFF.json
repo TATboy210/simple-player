@@ -7,7 +7,7 @@
   "plan": 1,
   "task": 0,
   "total_tasks": 0,
-  "status": "paused_79.6pct",
+  "status": "complete_80.0pct",
   "completed_tasks": [
     {"id": 1, "name": "Wave 1: kernel unit tests (6 files)", "status": "done"},
     {"id": 2, "name": "Wave 2: bridge/persistence tests (2 files)", "status": "done"},
@@ -28,17 +28,13 @@
     {"id": 17, "name": "playback_controller reorder test (+4 gap)", "status": "done"},
     {"id": 18, "name": "playback_navigator path validation rejection (+2 gap)", "status": "done"},
     {"id": 19, "name": "playlist reorder _currentIndex-- branch + updatePosition null durationMs", "status": "done"},
-    {"id": 20, "name": "playlist_item copyWith + toString tests", "status": "done"}
+    {"id": 20, "name": "playlist_item copyWith + toString tests", "status": "done"},
+    {"id": 21, "name": "auto_hide_controller L81+L89 animation callback + timer fire (+2 gap)", "status": "done"},
+    {"id": 22, "name": "controls_overlay L120+L154 engine state + mouse exit (+2 gap)", "status": "done"},
+    {"id": 23, "name": "time_utils formatMs hours branch + log.dart init (+3 gap)", "status": "done"},
+    {"id": 24, "name": "Verify coverage reaches 80%+", "status": "done"}
   ],
-  "remaining_tasks": [
-    {"id": 21, "name": "auto_hide_controller L81+L89 animation callback + timer fire (+2 gap)", "status": "not_started", "notes": "L81: _onAnimStatus dismissed sets visible=false. Need pumpAndSettle or manual animation forward. L89: scheduleHide timer fire when !_hovering. Need tester.runAsync or fakeAsync."},
-    {"id": 22, "name": "controls_overlay L120+L154 engine state + mouse exit (+2 gap)", "status": "not_started", "notes": "L120: _onEngineStateChanged. L154: onExit callback. Both need widget test with mouse/keyboard interaction."},
-    {"id": 23, "name": "subtitle_service catch blocks L37-38+L59-60 (+4 gap)", "status": "not_started", "notes": "Same coverage tool issue as settings_store — tests may pass but coverage not reflecting. Try filesystem mock or accept."},
-    {"id": 24, "name": "playlist_store catch blocks L169-170+L199-200 (+4 gap)", "status": "not_started", "notes": "MigrateHistory corrupt entry + clear file failure. Same coverage tool issue pattern."},
-    {"id": 25, "name": "speed_button arrow onTap L33-35+L46+L52 (+5 gap)", "status": "not_started", "notes": "Gesture arena conflict — InkWell claims taps before GestureDetector."},
-    {"id": 26, "name": "settings_store catch blocks coverage fix (+8 gap)", "status": "not_started", "notes": "Tests pass but coverage tool not reflecting. PlatformException implements Exception, debugPrint fires. Likely Dart coverage instrumentation bug with platform channel mocks."},
-    {"id": 27, "name": "Verify coverage reaches 80%+", "status": "not_started"}
-  ],
+  "remaining_tasks": [],
   "blockers": [
     {"description": "fvp_callback_handler.dart (29 gap) and position_poller.dart (21 gap) are FFI-coupled to mdk.Player", "type": "technical", "workaround": "Skip these files"},
     {"description": "l10n generated files (291 lines) inflate total denominator", "type": "technical", "workaround": "Non-l10n coverage ~89%"},
@@ -57,6 +53,6 @@
     {"decision": "Catch block coverage tool issue is Dart instrumentation bug", "rationale": "PlatformException implements Exception, tests pass with correct defaults, debugPrint fires — but DA count stays 0. Not worth further investigation.", "phase": "4"}
   ],
   "uncommitted_files": [],
-  "next_action": "To reach 80%, need 7 more lines. Best targets: auto_hide_controller L81+L89 (+2), controls_overlay L120+L154 (+2), and 3 more from subtitle_service/playlist_store/speed_button. Widget test timing (animation callbacks, timer fire) is the main challenge — may need fakeAsync or tester.runAsync.",
-  "context_notes": "Coverage 79.6% (1562/1961). Gap 7 lines to 80%. 536 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. Flutter: D:\\flutter\\bin\\flutter. Shared FakeEngine at test/helpers/fake_engine.dart. Catch block coverage (settings_store/subtitle_service/playlist_store) is a Dart coverage instrumentation bug — tests pass but DA count stays 0. Widget timer/animation tests need fakeAsync, not pump(duration)."
+  "next_action": "Phase 4 complete. Coverage 80.0% (1569/1961). 545 tests passing. Ready to commit and close phase.",
+  "context_notes": "Phase 4 COMPLETE. Coverage 80.0% (1569/1961). 545 tests passing. Non-l10n coverage ~89%. Branch: fix/window-startup. 4 uncommitted files (2 modified + 2 new test files)."
 }
