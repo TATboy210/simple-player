@@ -24,6 +24,9 @@
   Plans:
   - [x] 06-01-PLAN.md — DragToResizeArea fullscreen-aware + ESC key fullscreen exit
 - [ ] **Phase 7: Integration & Golden Tests** — E2E flows + visual regression (TEST-05, TEST-06)
+  Plans:
+  - [ ] 07-01-PLAN.md — Integration tests: FFI guard refactor, FakeWindowService, E2E playback/controls/playlist flows
+  - [ ] 07-02-PLAN.md — Golden tests: custom comparator, glass widget snapshots, control layout snapshots
 - [ ] **Phase 8: Architecture & Dead Code** — Context7-guided optimization + cleanup (QUAL-01, QUAL-02, QUAL-03)
 
 ## Progress
@@ -35,8 +38,8 @@
 | 3. Performance Optimization | v1.0 | 4/4 | Complete | 2026-05-28 |
 | 4. Test Coverage | v1.0 | 1/1 | Complete | 2026-05-29 |
 | 5. Technical Debt Cleanup | v1.0 | 3 waves | Complete | 2026-05-29 |
-| 6. Window Code Optimization | v1.1 | 1/1 | Complete   | 2026-05-29 |
-| 7. Integration & Golden Tests | v1.1 | 0/? | Not started | — |
+| 6. Window Code Optimization | v1.1 | 1/1 | Complete | 2026-05-29 |
+| 7. Integration & Golden Tests | v1.1 | 0/2 | Planning | — |
 | 8. Architecture & Dead Code | v1.1 | 0/? | Not started | — |
 
 ## Requirement Traceability
@@ -44,11 +47,11 @@
 | Requirement | Phase | Plan |
 |-------------|-------|------|
 | OPT-01 | 6 | 06-01 |
-| TEST-05 | 7 | TBD |
-| TEST-06 | 7 | TBD |
+| TEST-05 | 7 | 07-01 |
+| TEST-06 | 7 | 07-02 |
 | QUAL-01 | 8 | TBD |
 | QUAL-02 | 8 | TBD |
 | QUAL-03 | 8 | TBD |
 
 ---
-*Last updated: 2026-05-29 — Phase 6 planned*
+*Last updated: 2026-05-29 — Phase 7 planned*
