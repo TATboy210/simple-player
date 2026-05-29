@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:ffi' hide Size;
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show Size;
 import 'package:window_manager/window_manager.dart';
+
+import '../persistence/settings_store.dart';
 
 /// Win32 API bindings for fullscreen management.
 final _user32 = DynamicLibrary.open('user32.dll');
@@ -51,10 +54,19 @@ final _dwmExtendFrameIntoClientArea = _dwmapi.lookupFunction<
     _DwmExtendFrameIntoClientAreaNative,
     _DwmExtendFrameIntoClientAreaDart>('DwmExtendFrameIntoClientArea');
 
+typedef _DwmSetWindowAttributeNative = Int32 Function(
+    IntPtr, IntPtr, Pointer<Uint32>, Uint32);
+typedef _DwmSetWindowAttributeDart = int Function(
+    int, int, Pointer<Uint32>, int);
+
+final _dwmSetWindowAttribute = _dwmapi.lookupFunction<
+    _DwmSetWindowAttributeNative,
+    _DwmSetWindowAttributeDart>('DwmSetWindowAttribute');
+
 const _gwlStyle = -16;
-const _wsThickFrame = 0x00040000;
 const _wsCaption = 0x00C00000;
 const _wsPopup = 0x80000000;
+const _dwmwaTransitionsForcedisabled = 3;
 const _hwndTop = 0;
 const _swpNoOwnerZOrder = 0x0200;
 const _swpFrameChanged = 0x0020;
@@ -106,6 +118,7 @@ class WindowService with WindowListener {
   int? _savedStyle;
   Pointer<_Rect>? _savedFrame;
   int? _baseStyle;  // _removeBorder() 完成后的基准 style
+  Timer? _resizeDebounce;
 
   // ─── State (ValueNotifier pattern) ───
 
@@ -120,11 +133,30 @@ class WindowService with WindowListener {
     _removeBorder();
   }
 
+  /// 禁用/启用 DWM 过渡动画。
+  ///
+  /// 最大化/恢复时禁用动画，消除白边闪现和卡顿。
+  /// PostMessage(SC_MAXIMIZE) 是异步的，发送后立即恢复设置即可。
+  static Future<void> _setTransitionsDisabled(bool disabled) async {
+    final hwnd = await windowManager.getId();
+    final value = calloc<Uint32>()..value = disabled ? 1 : 0;
+    _dwmSetWindowAttribute(
+        hwnd, _dwmwaTransitionsForcedisabled, value, sizeOf<Uint32>());
+    calloc.free(value);
+  }
+
   /// 移除窗口标题栏，保留缩放边框和 DWM 阴影。
   ///
   /// 只移除 WS_CAPTION（标题栏文字+按钮），保留 WS_THICKFRAME（原生缩放支持）。
   /// DwmExtendFrameIntoClientArea(0,0,1,0) 在顶部扩展 1px 让 DWM 保留窗口阴影。
   Future<void> _removeBorder() async {
+    _baseStyle = await removeBorderImmediate();
+  }
+
+  /// 静态版本 — 可在 main.dart 中 windowManager.show() 之前调用。
+  ///
+  /// 返回设置后的 style，供 _baseStyle 缓存。
+  static Future<int> removeBorderImmediate() async {
     final hwnd = await windowManager.getId();
     final style = _getWindowLongPtr(hwnd, _gwlStyle);
     // 只移除 WS_CAPTION，保留 WS_THICKFRAME 用于原生缩放
@@ -145,7 +177,7 @@ class WindowService with WindowListener {
       _swpNoOwnerZOrder | _swpFrameChanged | 0x0001 | 0x0002, // NOMOVE | NOSIZE
     );
 
-    _baseStyle = newStyle;
+    return newStyle;
   }
 
   // ─── WindowListener callbacks → update ValueNotifiers ───
@@ -174,7 +206,31 @@ class WindowService with WindowListener {
   void onWindowResize() {
     if (_disposed) return;
     windowManager.getSize().then((size) {
-      if (!_disposed) windowSize.value = size;
+      if (!_disposed) {
+        windowSize.value = size;
+        _scheduleGeometrySave();
+      }
+    });
+  }
+
+  /// 500ms 去抖保存窗口几何到 SettingsStore
+  void _scheduleGeometrySave() {
+    _resizeDebounce?.cancel();
+    _resizeDebounce = Timer(const Duration(milliseconds: 500), () async {
+      if (_disposed || isFullscreen.value || isMaximized.value) return;
+      try {
+        final pos = await windowManager.getPosition();
+        final size = windowSize.value;
+        await SettingsStore.saveWindowGeometry(
+          width: size.width,
+          height: size.height,
+          x: pos.dx,
+          y: pos.dy,
+          isMaximized: false,
+        );
+      } on Exception catch (e) {
+        debugPrint('WindowService: geometry save failed: $e');
+      }
     });
   }
 
@@ -205,7 +261,7 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // Save current style and frame for restoration.
-    _savedStyle = _getWindowLongPtr(hwnd, _gwlStyle);
+    _savedStyle = _baseStyle ?? _getWindowLongPtr(hwnd, _gwlStyle);
     final frame = calloc<_Rect>();
     _getWindowRect(hwnd, frame);
     final saved = calloc<_Rect>();
@@ -289,9 +345,17 @@ class WindowService with WindowListener {
 
   Future<void> minimize() => windowManager.minimize();
 
-  Future<void> maximize() => windowManager.maximize();
+  Future<void> maximize() async {
+    await _setTransitionsDisabled(true);
+    await windowManager.maximize();
+    await _setTransitionsDisabled(false);
+  }
 
-  Future<void> restore() => windowManager.restore();
+  Future<void> restore() async {
+    await _setTransitionsDisabled(true);
+    await windowManager.restore();
+    await _setTransitionsDisabled(false);
+  }
 
   Future<void> close() => windowManager.close();
 
@@ -301,6 +365,7 @@ class WindowService with WindowListener {
 
   void dispose() {
     _disposed = true;
+    _resizeDebounce?.cancel();
     windowManager.removeListener(this);
     isFullscreen.dispose();
     isAlwaysOnTop.dispose();

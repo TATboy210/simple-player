@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'kernel/bridge/window_service.dart';
 import 'kernel/engine/engine_prewarm.dart';
 import 'kernel/persistence/settings_store.dart';
 import 'kernel/startup/startup_coordinator.dart';
@@ -24,6 +25,7 @@ Future<void> main() async {
     minimumSize: Size(854, 480),
   );
   windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await WindowService.removeBorderImmediate();
     await windowManager.show();
     await windowManager.focus();
   });
