@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 
 /// 性能监控工具 — 记录 build/raster 耗时
@@ -103,6 +104,18 @@ class PerfMonitor {
       '  Raster: avg=${avgRaster.toStringAsFixed(2)}ms, max=${maxRaster / 1000}ms',
       name: 'Perf',
     );
+  }
+
+  /// 重置全部状态（仅供测试使用）。
+  @visibleForTesting
+  void reset() {
+    _enabled = false;
+    for (var i = 0; i < _maxFrames; i++) {
+      _buildTimes[i] = null;
+      _rasterTimes[i] = null;
+    }
+    _writeIndex = 0;
+    _totalFrames = 0;
   }
 
   /// 导出统计为 JSON

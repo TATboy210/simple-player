@@ -60,6 +60,14 @@ class ThumbnailService {
     _order.clear();
   }
 
+  /// 重置全部状态（仅供测试使用）。
+  @visibleForTesting
+  static void reset() {
+    _impl = null;
+    _cache.clear();
+    _order.clear();
+  }
+
   /// 命中时移到末尾（最近访问）
   static void _touch(String filePath) {
     _order.remove(filePath);
