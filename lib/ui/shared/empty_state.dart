@@ -137,7 +137,7 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
             builder: (context, _) {
               return RepaintBoundary(
                 child: Align(
-                  alignment: const Alignment(0, 0.1),
+                  alignment: Alignment.center,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -184,7 +184,7 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
           )
         else
           Align(
-            alignment: const Alignment(0, 0.1),
+            alignment: Alignment.center,
             child: _buildBranding(context),
           ),
       ],
