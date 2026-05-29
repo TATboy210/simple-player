@@ -1,34 +1,36 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T23:30:00+08:00",
+  "timestamp": "2026-05-29T19:42:00+08:00",
   "phase": 6,
   "phase_name": "Window Code Optimization",
   "phase_dir": ".planning/phases/06-window-code-optimization",
-  "plan": 1,
+  "plan": null,
   "task": null,
   "total_tasks": 2,
-  "status": "planned",
+  "status": "complete",
   "completed_tasks": [
     {"id": 1, "name": "v1.0 milestone archive", "status": "done", "commit": "969dec7"},
     {"id": 2, "name": "v1.1 milestone initialization", "status": "done", "commit": "6a9ebbb"},
     {"id": 3, "name": "Phase 6 discuss-phase", "status": "done", "commit": "d457786"},
     {"id": 4, "name": "Phase 6 research", "status": "done", "commit": "7566a27"},
-    {"id": 5, "name": "Phase 6 plan + verification", "status": "done", "commit": "74dbcb6"}
+    {"id": 5, "name": "Phase 6 plan + verification", "status": "done", "commit": "74dbcb6"},
+    {"id": 6, "name": "Execute 06-01: DragToResizeArea + ESC key", "status": "done", "commit": "21c98e5"}
   ],
   "remaining_tasks": [
-    {"id": 6, "name": "Execute 06-01: DragToResizeArea fullscreen-aware + ESC key", "status": "not_started"},
     {"id": 7, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
     {"id": 8, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "Manual verification of D-01~D-06", "context": "Run flutter run -d windows, test fullscreen button, ESC exit, resize disable, title bar hide, 16:9 video", "blocking": false}
+  ],
   "decisions": [
-    {"decision": "resizeEdgeSize: 6px windowed, 0 fullscreen", "rationale": "window_manager default is 8, user reported 11 too large", "phase": 6},
+    {"decision": "App-level WindowService for DragToResizeArea fullscreen awareness", "rationale": "WindowService wraps same windowManager singleton; both instances receive WindowListener callbacks", "phase": 6},
+    {"decision": "resizeEdgeSize: 6px windowed, 0px fullscreen", "rationale": "window_manager default 8, user reported 11 too large", "phase": 6},
     {"decision": "enableResizeEdges: [] in fullscreen", "rationale": "empty list disables all resize edges via DragToResizeArea API", "phase": 6},
-    {"decision": "ESC key wires to setFullscreen(false)", "rationale": "KeyboardHandler has onExitFullscreen but PlayerScreen never passed it", "phase": 6},
-    {"decision": "CustomTitleBar and 16:9 rendering confirmed working", "rationale": "Research verified both already work correctly, no changes needed", "phase": 6}
+    {"decision": "ESC key wires to setFullscreen(false)", "rationale": "KeyboardHandler has onExitFullscreen, PlayerScreen now passes it", "phase": 6}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd:execute-phase 6 to execute plan 06-01 (2 tasks, 2 files, ~15 lines)",
-  "context_notes": "Phase 6 fully planned. Research found 3 real bugs (DragToResizeArea not fullscreen-aware, ESC key unwired, resizeEdgeSize wrong) and confirmed 2 non-issues (title bar hide, 16:9 rendering). Plan 06-01 has 2 tasks: Task 1 fixes app.dart (ValueListenableBuilder wrapper + resizeEdgeSize 6/0), Task 2 fixes player_screen.dart (add onExitFullscreen callback). VALIDATION.md created. All checker issues resolved. Context at ~73% — recommend /clear before execute."
+  "next_action": "Run /gsd:discuss-phase 7 or /gsd:plan-phase 7 for Integration & Golden Tests",
+  "context_notes": "Phase 6 complete. 2 tasks executed in 1 plan (06-01). DragToResizeArea now fullscreen-aware via ValueListenableBuilder<bool>. ESC key exits fullscreen. All flutter analyze checks passed. Manual verification needed for D-01~D-06. Next: Phase 7 (TEST-05, TEST-06)."
 }
