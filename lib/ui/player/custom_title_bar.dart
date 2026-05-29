@@ -101,11 +101,12 @@ class _TitleBarContentState extends State<_TitleBarContent> {
                     icon: Icons.minimize,
                     onPressed: widget.windowService.minimize,
                   ),
-                  _TitleBarButton(
-                    icon: widget.windowService.isMaximized.value
-                        ? Icons.filter_none
-                        : Icons.crop_square,
-                    onPressed: _toggleMaximize,
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.windowService.isMaximized,
+                    builder: (context, isMax, _) => _TitleBarButton(
+                      icon: isMax ? Icons.filter_none : Icons.crop_square,
+                      onPressed: _toggleMaximize,
+                    ),
                   ),
                   _TitleBarButton(
                     icon: Icons.close,

@@ -159,11 +159,19 @@ class _AppState extends State<App> {
           theme: ThemeService.I.currentTheme,
           home: ValueListenableBuilder<bool>(
             valueListenable: _windowService.isFullscreen,
-            builder: (context, isFullscreen, child) => DragToResizeArea(
-              resizeEdgeSize: isFullscreen ? 0 : 6,
-              enableResizeEdges: isFullscreen ? [] : null,
-              resizeEdgeColor: Colors.transparent,
-              child: child!,
+            builder: (context, isFullscreen, child) =>
+                ValueListenableBuilder<bool>(
+              valueListenable: _windowService.isMaximized,
+              builder: (context, isMaximized, child) {
+                final noResize = isFullscreen || isMaximized;
+                return DragToResizeArea(
+                  resizeEdgeSize: noResize ? 0 : 6,
+                  enableResizeEdges: noResize ? [] : null,
+                  resizeEdgeColor: Colors.transparent,
+                  child: child!,
+                );
+              },
+              child: child,
             ),
             child: DeferredPlayerFeature(
               coordinator: widget.coordinator,
