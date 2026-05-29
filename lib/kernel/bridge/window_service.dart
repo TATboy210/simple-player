@@ -52,6 +52,8 @@ final _dwmExtendFrameIntoClientArea = _dwmapi.lookupFunction<
     _DwmExtendFrameIntoClientAreaDart>('DwmExtendFrameIntoClientArea');
 
 const _gwlStyle = -16;
+const _wsThickFrame = 0x00040000;
+const _wsCaption = 0x00C00000;
 const _wsPopup = 0x80000000;
 const _hwndTop = 0;
 const _swpNoOwnerZOrder = 0x0200;
@@ -114,6 +116,33 @@ class WindowService with WindowListener {
   /// Initialize event listener — call after construction.
   void init() {
     windowManager.addListener(this);
+    _removeBorder();
+  }
+
+  /// 移除窗口非客户区边框（WS_THICKFRAME + WS_CAPTION + DWM 阴影）。
+  ///
+  /// TitleBarStyle.hidden 只移除了标题栏，但保留了 WS_THICKFRAME
+  /// 用于窗口缩放，导致窗口周围出现灰/白边。此方法将其彻底移除，
+  /// 并通过 DwmExtendFrameIntoClientArea(-1) 消除 DWM 合成边框。
+  Future<void> _removeBorder() async {
+    final hwnd = await windowManager.getId();
+    final style = _getWindowLongPtr(hwnd, _gwlStyle);
+    final newStyle = style & ~_wsThickFrame & ~_wsCaption;
+    _setWindowLongPtr(hwnd, _gwlStyle, newStyle);
+
+    // 消除 DWM 窗口阴影和合成边框
+    final margins = calloc<_Margins>()
+      ..ref.left = -1
+      ..ref.right = -1
+      ..ref.top = -1
+      ..ref.bottom = -1;
+    _dwmExtendFrameIntoClientArea(hwnd, margins);
+    calloc.free(margins);
+
+    _setWindowPos(
+      hwnd, 0, 0, 0, 0, 0,
+      _swpNoOwnerZOrder | _swpFrameChanged | 0x0001 | 0x0002, // NOMOVE | NOSIZE
+    );
   }
 
   // ─── WindowListener callbacks → update ValueNotifiers ───
