@@ -109,6 +109,16 @@ void main() {
       });
     });
 
+    group('path validation', () {
+      test('rejects path traversal via onError', () async {
+        // Add path directly to playlist, bypassing openAndPlay validation
+        playlist.add('../../../etc/passwd.mp4');
+        await controller.playIndex(0);
+        expect(errors, isNotEmpty);
+        expect(errors.first.toString(), contains('路径不安全'));
+      });
+    });
+
     group('playNext / playPrevious', () {
       test('playPrevious at start in loopAll wraps to end', () async {
         engine.configureMedia(durationMs: 60000);
