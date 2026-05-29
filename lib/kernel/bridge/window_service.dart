@@ -40,10 +40,19 @@ final _getWindowRect = _user32
     .lookupFunction<_GetWindowRectNative, _GetWindowRectDart>(
         'GetWindowRect');
 
+final _dwmapi = DynamicLibrary.open('dwmapi.dll');
+
+typedef _DwmExtendFrameIntoClientAreaNative = Int32 Function(
+    IntPtr, Pointer<_Margins>);
+typedef _DwmExtendFrameIntoClientAreaDart = int Function(
+    int, Pointer<_Margins>);
+
+final _dwmExtendFrameIntoClientArea = _dwmapi.lookupFunction<
+    _DwmExtendFrameIntoClientAreaNative,
+    _DwmExtendFrameIntoClientAreaDart>('DwmExtendFrameIntoClientArea');
+
 const _gwlStyle = -16;
-const _wsCaption = 0x00C00000;
-const _wsThickframe = 0x00040000;
-const _wsMaximizebox = 0x00010000;
+const _wsPopup = 0x80000000;
 const _hwndTop = 0;
 const _swpNoOwnerZOrder = 0x0200;
 const _swpFrameChanged = 0x0020;
@@ -67,6 +76,17 @@ final class _MonitorInfo extends Struct {
   external _Rect rcWork;
   @Uint32()
   external int dwFlags;
+}
+
+final class _Margins extends Struct {
+  @Int32()
+  external int left;
+  @Int32()
+  external int right;
+  @Int32()
+  external int top;
+  @Int32()
+  external int bottom;
 }
 
 /// Window management service — wraps window_manager package.
@@ -129,10 +149,9 @@ class WindowService with WindowListener {
 
   /// Toggle true borderless fullscreen.
   ///
-  /// window_manager's setFullScreen only removes WS_THICKFRAME and
-  /// WS_MAXIMIZEBOX but keeps WS_CAPTION, resulting in a maximized look.
-  /// We fix this by also removing WS_CAPTION via Win32 FFI and positioning
-  /// the window to cover the full monitor.
+  /// Uses WS_POPUP + DwmExtendFrameIntoClientArea(-1) for zero-border
+  /// fullscreen, bypassing window_manager's setFullScreen which keeps
+  /// WS_CAPTION and leaves a visible frame.
   Future<void> setFullscreen(bool value) async {
     if (value) {
       await _enterFullscreen();
@@ -158,12 +177,17 @@ class WindowService with WindowListener {
     _savedFrame = saved;
     calloc.free(frame);
 
-    // Remove WS_CAPTION | WS_THICKFRAME | WS_MAXIMIZEBOX.
-    _setWindowLongPtr(
-      hwnd,
-      _gwlStyle,
-      _savedStyle! & ~(_wsCaption | _wsThickframe | _wsMaximizebox),
-    );
+    // Set WS_POPUP — fully borderless, no DWM frame.
+    _setWindowLongPtr(hwnd, _gwlStyle, _wsPopup);
+
+    // Remove DWM shadow/border.
+    final margins = calloc<_Margins>()
+      ..ref.left = -1
+      ..ref.right = -1
+      ..ref.top = -1
+      ..ref.bottom = -1;
+    _dwmExtendFrameIntoClientArea(hwnd, margins);
+    calloc.free(margins);
 
     // Get monitor bounds.
     final hMonitor = _monitorFromWindow(hwnd, _monitorDefaultToNearest);
@@ -191,12 +215,8 @@ class WindowService with WindowListener {
 
     final hwnd = await windowManager.getId();
 
-    // Restore original style (includes WS_CAPTION).
-    _setWindowLongPtr(
-      hwnd,
-      _gwlStyle,
-      _savedStyle! | _wsThickframe | _wsMaximizebox,
-    );
+    // Restore original style.
+    _setWindowLongPtr(hwnd, _gwlStyle, _savedStyle!);
 
     // Restore original window frame.
     if (_savedFrame != null) {
