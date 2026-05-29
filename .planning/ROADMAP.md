@@ -25,6 +25,7 @@
   - [x] 06-01-PLAN.md — DragToResizeArea fullscreen-aware + ESC key fullscreen exit
 - [ ] **Phase 7: Integration & Golden Tests** — E2E flows + visual regression (TEST-05, TEST-06)
   Plans:
+  - [x] 07-03-PLAN.md — Window optimization: BoxFit.contain + custom maximize with rcWork (completed 2026-05-30)
   - [ ] 07-01-PLAN.md — Integration tests: FFI guard refactor, FakeWindowService, E2E playback/controls/playlist flows
   - [ ] 07-02-PLAN.md — Golden tests: custom comparator, glass widget snapshots, control layout snapshots
 - [ ] **Phase 8: Architecture & Dead Code** — Context7-guided optimization + cleanup (QUAL-01, QUAL-02, QUAL-03)
@@ -39,7 +40,7 @@
 | 4. Test Coverage | v1.0 | 1/1 | Complete | 2026-05-29 |
 | 5. Technical Debt Cleanup | v1.0 | 3 waves | Complete | 2026-05-29 |
 | 6. Window Code Optimization | v1.1 | 1/1 | Complete | 2026-05-29 |
-| 7. Integration & Golden Tests | v1.1 | 0/2 | Planning | — |
+| 7. Integration & Golden Tests | v1.1 | 1/3 | Planning | — |
 | 8. Architecture & Dead Code | v1.1 | 0/? | Not started | — |
 
 ## Requirement Traceability
@@ -47,6 +48,7 @@
 | Requirement | Phase | Plan |
 |-------------|-------|------|
 | OPT-01 | 6 | 06-01 |
+| OPT-02 | 7 | 07-03 |
 | TEST-05 | 7 | 07-01 |
 | TEST-06 | 7 | 07-02 |
 | QUAL-01 | 8 | TBD |
