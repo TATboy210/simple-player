@@ -1,35 +1,34 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T21:00:00+08:00",
+  "timestamp": "2026-05-29T23:30:00+08:00",
   "phase": 6,
   "phase_name": "Window Code Optimization",
   "phase_dir": ".planning/phases/06-window-code-optimization",
-  "plan": null,
+  "plan": 1,
   "task": null,
-  "total_tasks": null,
-  "status": "paused",
+  "total_tasks": 2,
+  "status": "planned",
   "completed_tasks": [
     {"id": 1, "name": "v1.0 milestone archive", "status": "done", "commit": "969dec7"},
     {"id": 2, "name": "v1.1 milestone initialization", "status": "done", "commit": "6a9ebbb"},
-    {"id": 3, "name": "Phase 6 discuss-phase — context gathered", "status": "done", "commit": "d457786"}
+    {"id": 3, "name": "Phase 6 discuss-phase", "status": "done", "commit": "d457786"},
+    {"id": 4, "name": "Phase 6 research", "status": "done", "commit": "7566a27"},
+    {"id": 5, "name": "Phase 6 plan + verification", "status": "done", "commit": "74dbcb6"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "Run /gsd:plan-phase 6 — create execution plan", "status": "not_started"},
-    {"id": 5, "name": "Run /gsd:execute-phase 6 — execute window optimization", "status": "not_started"},
-    {"id": 6, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
-    {"id": 7, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
+    {"id": 6, "name": "Execute 06-01: DragToResizeArea fullscreen-aware + ESC key", "status": "not_started"},
+    {"id": 7, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
+    {"id": 8, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Window optimization scope: 4 small fixes (fullscreen, title bar, resize edge, 16:9)", "rationale": "User explicitly wants small changes only, not architecture refactoring", "phase": 6},
-    {"decision": "Fullscreen button: verify visibility, fix auto-hide interaction for exit", "rationale": "User reports button missing and can't exit fullscreen", "phase": 6},
-    {"decision": "DragToResizeArea: resizeEdgeSize from 11px to 5-8px", "rationale": "User reports resize detection area too small", "phase": 6},
-    {"decision": "Title bar: must hide in fullscreen", "rationale": "User reports title bar still visible in fullscreen", "phase": 6},
-    {"decision": "16:9 videos must perfectly match 16:9 window (960x540)", "rationale": "User wants perfect ratio match for 16:9 content", "phase": 6},
-    {"decision": "WindowService passing: keep constructor injection (not InheritedWidget)", "rationale": "User did not select this optimization scope", "phase": 6}
+    {"decision": "resizeEdgeSize: 6px windowed, 0 fullscreen", "rationale": "window_manager default is 8, user reported 11 too large", "phase": 6},
+    {"decision": "enableResizeEdges: [] in fullscreen", "rationale": "empty list disables all resize edges via DragToResizeArea API", "phase": 6},
+    {"decision": "ESC key wires to setFullscreen(false)", "rationale": "KeyboardHandler has onExitFullscreen but PlayerScreen never passed it", "phase": 6},
+    {"decision": "CustomTitleBar and 16:9 rendering confirmed working", "rationale": "Research verified both already work correctly, no changes needed", "phase": 6}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd:plan-phase 6 to create executable plan for 4 window fixes",
-  "context_notes": "Phase 6 discuss-phase complete. 4 specific fixes identified: fullscreen button/exit, title bar fullscreen hide, DragToResizeArea edge size, 16:9 video matching. CONTEXT.md and DISCUSSION-LOG.md committed. Ready for planning."
+  "next_action": "Run /gsd:execute-phase 6 to execute plan 06-01 (2 tasks, 2 files, ~15 lines)",
+  "context_notes": "Phase 6 fully planned. Research found 3 real bugs (DragToResizeArea not fullscreen-aware, ESC key unwired, resizeEdgeSize wrong) and confirmed 2 non-issues (title bar hide, 16:9 rendering). Plan 06-01 has 2 tasks: Task 1 fixes app.dart (ValueListenableBuilder wrapper + resizeEdgeSize 6/0), Task 2 fixes player_screen.dart (add onExitFullscreen callback). VALIDATION.md created. All checker issues resolved. Context at ~73% — recommend /clear before execute."
 }
