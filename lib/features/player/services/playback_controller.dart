@@ -21,9 +21,9 @@ class PlaybackController {
     required VoidCallback onNeedRebuild,
     void Function(Object error)? onError,
     SubtitleService? subtitleService,
-  })  : _onNeedRebuild = onNeedRebuild,
-        _onError = onError,
-        _subtitleService = subtitleService {
+  }) : _onNeedRebuild = onNeedRebuild,
+       _onError = onError,
+       _subtitleService = subtitleService {
     navigator = PlaybackNavigator(this);
     fileOps = FileOperations(this);
     monitor = StateMonitor(this);

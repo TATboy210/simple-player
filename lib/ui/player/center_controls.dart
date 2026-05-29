@@ -76,7 +76,9 @@ class CenterGroup extends StatelessWidget {
         GlassButton.iconOnly(
           icon: Icons.replay_10,
           color: dimmed,
-          onPressed: isIdle ? null : () => engine.skipBack(Tokens.skipSecondsShort),
+          onPressed: isIdle
+              ? null
+              : () => engine.skipBack(Tokens.skipSecondsShort),
           tooltip: AppLocalizations.of(context).rewind10,
         ),
         const SizedBox(width: Tokens.spSm),
@@ -91,7 +93,9 @@ class CenterGroup extends StatelessWidget {
         GlassButton.iconOnly(
           icon: Icons.forward_30,
           color: dimmed,
-          onPressed: isIdle ? null : () => engine.skipForward(Tokens.skipSecondsLong),
+          onPressed: isIdle
+              ? null
+              : () => engine.skipForward(Tokens.skipSecondsLong),
           tooltip: AppLocalizations.of(context).forward30,
         ),
         const SizedBox(width: Tokens.spXs),

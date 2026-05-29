@@ -1,10 +1,9 @@
 // ignore_for_file: unnecessary_getters_setters
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 import '../models/playlist_item.dart';
 import '../models/play_mode.dart';
+import '../utils/log.dart';
 
 /// 播放列表管理 — 状态机
 ///
@@ -260,7 +259,7 @@ class Playlist {
           PlaylistItem.fromJson(item as Map<String, dynamic>),
         );
       } on Exception catch (e) {
-        debugPrint('Playlist.fromJson: skipping corrupted item: $e');
+        log.w('Playlist.fromJson: skipping corrupted item: $e');
       }
     }
 

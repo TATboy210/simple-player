@@ -109,7 +109,7 @@ class _D3d11SyncNotifier extends ValueNotifier<bool> {
   final MediaEngine _engine;
 
   _D3d11SyncNotifier(this._engine, {required bool initialValue})
-      : super(initialValue);
+    : super(initialValue);
 
   @override
   set value(bool newValue) {
@@ -127,7 +127,7 @@ class _HardwareDecodingNotifier extends ValueNotifier<bool> {
   final MediaEngine _engine;
 
   _HardwareDecodingNotifier(this._engine, {required bool initialValue})
-      : super(initialValue);
+    : super(initialValue);
 
   @override
   set value(bool newValue) {

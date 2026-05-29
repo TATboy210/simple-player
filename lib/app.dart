@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'kernel/engine/media_engine.dart';
+import 'kernel/utils/log.dart';
 import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
@@ -42,12 +43,9 @@ class _AppState extends State<App> {
       'Loading preferences...',
     );
     try {
-      await Future.wait([
-        LocaleService.I.init(),
-        ThemeService.I.init(),
-      ]);
+      await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
     } on Exception catch (e) {
-      debugPrint('[App] settings load failed (continuing): $e');
+      log.w('[App] settings load failed (continuing): $e');
     }
     widget.coordinator.report(StartupPhase.settings, 1.0, 'Preferences loaded');
     if (mounted) setState(() => _ready = true);
@@ -74,8 +72,9 @@ class _AppState extends State<App> {
     final currentAccent = Theme.of(barCtx).colorScheme.primary;
 
     final themeNames = [l10n.themeMidnight, l10n.themeOcean, l10n.themeForest];
-    final currentThemeIdx =
-        ThemeService.accents.indexWhere((c) => c == currentAccent);
+    final currentThemeIdx = ThemeService.accents.indexWhere(
+      (c) => c == currentAccent,
+    );
 
     final overlay = Overlay.of(barCtx).context.findRenderObject()! as RenderBox;
     final pos = overlay.globalToLocal(tap.globalPosition);

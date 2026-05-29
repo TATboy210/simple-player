@@ -146,7 +146,11 @@ class _HistoryTileWrapper extends StatelessWidget {
   final int? timestamp;
   final Widget child;
 
-  const _HistoryTileWrapper({super.key, required this.timestamp, required this.child});
+  const _HistoryTileWrapper({
+    super.key,
+    required this.timestamp,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {

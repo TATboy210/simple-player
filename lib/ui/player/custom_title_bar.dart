@@ -86,6 +86,16 @@ class _TitleBarContentState extends State<_TitleBarContent> {
                     ),
                   ),
                   const Spacer(),
+                  // 置顶按钮
+                  ValueListenableBuilder<bool>(
+                    valueListenable: widget.windowService.isAlwaysOnTop,
+                    builder: (context, isPinned, _) => _TitleBarButton(
+                      icon: isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      activeColor: isPinned ? Tokens.accent : null,
+                      onPressed: () =>
+                          widget.windowService.setAlwaysOnTop(!isPinned),
+                    ),
+                  ),
                   // 窗口控制按钮 (D-11)
                   _TitleBarButton(
                     icon: Icons.minimize,
@@ -122,11 +132,13 @@ class _TitleBarButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onPressed;
   final bool isClose;
+  final Color? activeColor;
 
   const _TitleBarButton({
     required this.icon,
     required this.onPressed,
     this.isClose = false,
+    this.activeColor,
   });
 
   @override
@@ -159,13 +171,15 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
               height: Tokens.titleBarHeight,
               color: hovered
                   ? (widget.isClose
-                      ? Tokens.closeHoverBg
-                      : Tokens.titleBarHover)
+                        ? Tokens.closeHoverBg
+                        : Tokens.titleBarHover)
                   : Colors.transparent,
               child: Icon(
                 widget.icon,
                 size: Tokens.iconSm,
-                color: hovered ? Tokens.textPrimary : Tokens.textSecondary,
+                color:
+                    widget.activeColor ??
+                    (hovered ? Tokens.textPrimary : Tokens.textSecondary),
               ),
             );
           },

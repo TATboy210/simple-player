@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
 
 import '../services/path_validator.dart';
+import '../utils/log.dart';
 
 /// 位置轮询器 — 250ms 定时器轮询播放位置
 ///
@@ -68,7 +69,7 @@ class PositionPoller {
         if (buffered.value != newBuf) buffered.value = newBuf;
       }
     } on Exception catch (e) {
-      debugPrint('PositionPoller._poll error: $e');
+      log.e('PositionPoller._poll error: $e');
     }
   }
 }

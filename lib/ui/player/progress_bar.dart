@@ -100,23 +100,20 @@ class _ProgressBarState extends State<ProgressBar> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onHorizontalDragStart: (details) {
-                _dragNotifier.value =
-                    (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
+                _dragNotifier.value = (details.localPosition.dx / barWidth)
+                    .clamp(0.0, 1.0);
               },
               onHorizontalDragUpdate: (details) {
-                _dragNotifier.value =
-                    (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
+                _dragNotifier.value = (details.localPosition.dx / barWidth)
+                    .clamp(0.0, 1.0);
                 // 节流 seek：拖拽期间每 150ms 更新一次视频帧
                 _seekThrottle?.cancel();
-                _seekThrottle = Timer(
-                  const Duration(milliseconds: 150),
-                  () {
-                    if (_dragNotifier.value != null &&
-                        widget.engine.duration.value > 0) {
-                      widget.engine.seekTo(_dragPositionMs);
-                    }
-                  },
-                );
+                _seekThrottle = Timer(const Duration(milliseconds: 150), () {
+                  if (_dragNotifier.value != null &&
+                      widget.engine.duration.value > 0) {
+                    widget.engine.seekTo(_dragPositionMs);
+                  }
+                });
               },
               onHorizontalDragEnd: (_) {
                 _seekThrottle?.cancel();
@@ -142,12 +139,13 @@ class _ProgressBarState extends State<ProgressBar> {
                   alignment: Alignment.bottomCenter,
                   children: [
                     _buildBarLayers(),
-                    if (_dragNotifier.value != null) _buildTooltip(
-                      fraction: _dragNotifier.value!,
-                      text: formatMs(_dragPositionMs),
-                      bgColor: Tokens.accent,
-                      textColor: Colors.white,
-                    ),
+                    if (_dragNotifier.value != null)
+                      _buildTooltip(
+                        fraction: _dragNotifier.value!,
+                        text: formatMs(_dragPositionMs),
+                        bgColor: Tokens.accent,
+                        textColor: Colors.white,
+                      ),
                     ValueListenableBuilder<_HoverState>(
                       valueListenable: _hoverNotifier,
                       builder: (_, hover, _) {
@@ -161,7 +159,10 @@ class _ProgressBarState extends State<ProgressBar> {
                           text: formatMs(_hoverPositionMs),
                           bgColor: Tokens.bgGlass,
                           textColor: Tokens.textPrimary,
-                          border: Border.all(color: Tokens.borderHighlight, width: 0.5),
+                          border: Border.all(
+                            color: Tokens.borderHighlight,
+                            width: 0.5,
+                          ),
                         );
                       },
                     ),

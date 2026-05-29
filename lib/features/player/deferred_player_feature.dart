@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../kernel/utils/log.dart';
 import 'player_feature.dart' deferred as player_feature;
 
 import '../../kernel/startup/startup_coordinator.dart';
@@ -62,7 +63,11 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
       );
       if (mounted) setState(() => _loaded = true);
     } catch (e, stackTrace) {
-      debugPrint('[DeferredPlayerFeature] loadLibrary failed: $e\n$stackTrace');
+      log.e(
+        '[DeferredPlayerFeature] loadLibrary failed: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       if (mounted) setState(() => _error = true);
     }
   }

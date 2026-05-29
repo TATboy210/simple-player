@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/aspect_ratio_mode.dart';
 import '../models/play_mode.dart';
+import '../utils/log.dart';
 
 /// 应用设置数据容器
 class AppSettings {
@@ -207,7 +208,7 @@ class SettingsStore {
         hardwareDecoding: prefs.getBool(_keyHardwareDecoding) ?? true,
       );
     } on Exception catch (e) {
-      debugPrint('SettingsStore.load failed: $e');
+      log.e('SettingsStore.load failed: $e');
       return const AppSettings(
         volume: 1.0,
         lastFile: '',
@@ -242,7 +243,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       await op(prefs);
     } on Exception catch (e) {
-      debugPrint('SettingsStore.$method failed: $e');
+      log.e('SettingsStore.$method failed: $e');
     }
   }
 
@@ -297,7 +298,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return prefs.getString(_keyLocale) ?? 'zh';
     } on Exception catch (e) {
-      debugPrint('SettingsStore.loadLocale failed: $e');
+      log.e('SettingsStore.loadLocale failed: $e');
       return 'zh';
     }
   }
@@ -312,7 +313,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return (prefs.getInt(_keyThemeIndex) ?? 0).clamp(0, 2);
     } on Exception catch (e) {
-      debugPrint('SettingsStore.loadThemeIndex failed: $e');
+      log.e('SettingsStore.loadThemeIndex failed: $e');
       return 0;
     }
   }
@@ -332,7 +333,7 @@ class SettingsStore {
       final decoded = jsonDecode(json) as Map<String, dynamic>;
       return decoded.map((k, v) => MapEntry(k, v as String));
     } on Exception catch (e) {
-      debugPrint('SettingsStore.loadShortcuts failed: $e');
+      log.e('SettingsStore.loadShortcuts failed: $e');
       return {};
     }
   }
@@ -400,10 +401,8 @@ class SettingsStore {
 
   // ─── 性能设置持久化 ───
 
-  static Future<void> saveD3d11SyncEnabled(bool value) => _save(
-    'saveD3d11SyncEnabled',
-    (p) => p.setBool(_keyD3d11Sync, value),
-  );
+  static Future<void> saveD3d11SyncEnabled(bool value) =>
+      _save('saveD3d11SyncEnabled', (p) => p.setBool(_keyD3d11Sync, value));
 
   static Future<void> saveHardwareDecoding(bool value) => _save(
     'saveHardwareDecoding',
@@ -416,7 +415,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return prefs.getBool(_keyD3d11Sync) ?? true;
     } on Exception catch (e) {
-      debugPrint('SettingsStore.loadD3d11SyncEnabled failed: $e');
+      log.e('SettingsStore.loadD3d11SyncEnabled failed: $e');
       return true;
     }
   }
@@ -427,7 +426,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return prefs.getBool(_keyHardwareDecoding) ?? true;
     } on Exception catch (e) {
-      debugPrint('SettingsStore.loadHardwareDecoding failed: $e');
+      log.e('SettingsStore.loadHardwareDecoding failed: $e');
       return true;
     }
   }

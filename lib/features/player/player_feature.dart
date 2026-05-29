@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/persistence/settings_store.dart';
+import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
@@ -73,9 +74,9 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       );
       _customBindings = await SettingsStore.loadShortcuts();
     } on Exception catch (e) {
-      debugPrint('[PlayerFeature] init failed: $e');
+      log.e('[PlayerFeature] init failed: $e');
     }
-    debugPrint('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
+    log.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
     widget.coordinator.markReady();
     if (mounted) setState(() => _ready = true);
   }

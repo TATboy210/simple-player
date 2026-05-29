@@ -148,8 +148,10 @@ class FvpEngine implements MediaEngine {
     //   硬件解码器优先，软件解码器兜底
     p.setProperty('video.decoders', _defaultVideoDecoders);
 
-    debugPrint('FvpEngine: D3D11 defaults applied (sync.cpu=$_defaultD3d11SyncCpu, '
-        'decoders=$_defaultVideoDecoders)');
+    log.d(
+      'FvpEngine: D3D11 defaults applied '
+      '(sync.cpu=$_defaultD3d11SyncCpu, decoders=$_defaultVideoDecoders)',
+    );
   }
 
   void _onTextureIdChanged() {
@@ -208,13 +210,13 @@ class FvpEngine implements MediaEngine {
     }
   }
 
-  /// 通用守卫：disposed 检查 + try-catch + debugPrint
+  /// 通用守卫：disposed 检查 + try-catch + log
   void _guardedAction(String name, void Function() action) {
     if (_disposed) return;
     try {
       action();
     } on Exception catch (e) {
-      debugPrint('FvpEngine.$name error: $e');
+      log.e('FvpEngine.$name error: $e');
       _errorType = MediaErrorType.playback;
       errorMessage.value = '$name 失败: $e';
     }
@@ -226,7 +228,7 @@ class FvpEngine implements MediaEngine {
   Future<void> open(String path) async {
     if (_disposed) return;
     if (_isOpening) {
-      debugPrint('FvpEngine.open() blocked — already opening');
+      log.w('FvpEngine.open() blocked — already opening');
       return;
     }
 
@@ -397,7 +399,7 @@ class FvpEngine implements MediaEngine {
       state.value = MediaState.paused;
       _positionPoller.stop();
     } on Exception catch (e) {
-      debugPrint('FvpEngine.pause error: $e');
+      log.e('FvpEngine.pause error: $e');
     }
   }
 
@@ -410,7 +412,7 @@ class FvpEngine implements MediaEngine {
       position.value = 0;
       _positionPoller.stop();
     } on Exception catch (e) {
-      debugPrint('FvpEngine.stop error: $e');
+      log.e('FvpEngine.stop error: $e');
     }
   }
 
@@ -605,7 +607,7 @@ class FvpEngine implements MediaEngine {
       // mdk 只接受 0/90/180/270
       final valid = {0, 90, 180, 270};
       if (!valid.contains(degree)) {
-        debugPrint(
+        log.w(
           'FvpEngine.rotate invalid degree: $degree, expected 0/90/180/270',
         );
         return;
@@ -639,7 +641,7 @@ class FvpEngine implements MediaEngine {
     _guardedAction('setD3d11SyncEnabled', () {
       // 0=异步（低延迟），1=同步（安全默认）
       _player.setProperty('d3d11.sync.cpu', enabled ? '1' : '0');
-      debugPrint('FvpEngine: d3d11.sync.cpu = ${enabled ? 1 : 0}');
+      log.d('FvpEngine: d3d11.sync.cpu = ${enabled ? 1 : 0}');
     });
   }
 
@@ -653,7 +655,9 @@ class FvpEngine implements MediaEngine {
         // 仅软件解码器
         _player.setProperty('video.decoders', 'FFmpeg');
       }
-      debugPrint('FvpEngine: video.decoders = ${enabled ? _defaultVideoDecoders : "FFmpeg"}');
+      log.d(
+        'FvpEngine: video.decoders = ${enabled ? _defaultVideoDecoders : "FFmpeg"}',
+      );
     });
   }
 

@@ -234,7 +234,10 @@ class _ThumbnailImageState extends State<_ThumbnailImage> {
     final provider = await ThumbnailService.getThumbnail(widget.path);
     if (!mounted) return;
     if (provider == null) {
-      if (mounted) setState(() { _loading = false; });
+      if (mounted)
+        setState(() {
+          _loading = false;
+        });
       return;
     }
     final dpr = MediaQuery.devicePixelRatioOf(context);
@@ -303,4 +306,3 @@ class _BreakpointBar extends StatelessWidget {
     );
   }
 }
-

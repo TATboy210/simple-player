@@ -171,8 +171,8 @@ class GlassButton extends StatelessWidget {
 
   /// icon-only 轻量路径：SizedBox + Material + InkWell，无 BackdropFilter
   Widget _buildIconOnly() {
-    final effectiveColor = color ??
-        (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
+    final effectiveColor =
+        color ?? (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
     final content = child ?? Icon(icon, size: iconSize, color: effectiveColor);
 
     return Tooltip(
@@ -200,8 +200,8 @@ class GlassButton extends StatelessWidget {
 
   /// label 路径：GlassContainer + Material + InkWell，带模糊背景
   Widget _buildLabel() {
-    final effectiveColor = color ??
-        (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
+    final effectiveColor =
+        color ?? (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
 
     final content = GlassContainer(
       padding: const EdgeInsets.symmetric(

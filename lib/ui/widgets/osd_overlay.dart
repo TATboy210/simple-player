@@ -76,7 +76,9 @@ class OsdOverlay extends StatelessWidget {
             duration: _fadeDuration,
             curve: Curves.easeOut,
             child: msg != null
-                ? Center(child: RepaintBoundary(child: _OsdBubble(message: msg)))
+                ? Center(
+                    child: RepaintBoundary(child: _OsdBubble(message: msg)),
+                  )
                 : const SizedBox.shrink(),
           ),
         );
@@ -106,7 +108,11 @@ class _OsdBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (message.icon != null) ...[
-              Icon(message.icon, size: Tokens.osdIconSize, color: Tokens.textPrimary),
+              Icon(
+                message.icon,
+                size: Tokens.osdIconSize,
+                color: Tokens.textPrimary,
+              ),
               const SizedBox(width: 8),
             ],
             Text(message.text, style: _textStyle),
