@@ -33,12 +33,14 @@ class VideoSurface extends StatelessWidget {
             return SizedBox.expand(
               child: id == null
                   ? const SizedBox.shrink()
-                  : FittedBox(
-                      fit: BoxFit.cover,
-                      child: SizedBox(
-                        width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
-                        height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
-                        child: Texture(textureId: id),
+                  : ClipRect(
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
+                          height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
+                          child: Texture(textureId: id),
+                        ),
                       ),
                     ),
             );

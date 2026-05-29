@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T22:30:00+08:00",
+  "timestamp": "2026-05-29T23:30:00+08:00",
   "phase": 6,
   "phase_name": "Window Code Optimization",
   "phase_dir": ".planning/phases/06-window-code-optimization",
@@ -12,25 +12,36 @@
     {"id": 4, "name": "Phase 6 research", "status": "done"},
     {"id": 5, "name": "Phase 6 plan + verification", "status": "done"},
     {"id": 6, "name": "Execute 06-01: DragToResizeArea + ESC key", "status": "done"},
-    {"id": 7, "name": "Manual verification D-01~D-06", "status": "in_progress", "progress": "D-01/D-02/D-04/D-05/D-06 passed; D-03 upgraded to WS_POPUP + DWM, pending test"}
+    {"id": 7, "name": "Fix: maximize button reactive icon", "status": "done"},
+    {"id": 8, "name": "Fix: always-on-top state sync", "status": "done"},
+    {"id": 9, "name": "Fix: fullscreen re-entrancy guard", "status": "done"},
+    {"id": 10, "name": "Fix: video surface ClipRect overflow", "status": "done"},
+    {"id": 11, "name": "Fix: maximize disables resize edges", "status": "done"},
+    {"id": 12, "name": "D-03 WS_POPUP fullscreen (code done, pending test)", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 8, "name": "Test D-03 WS_POPUP fullscreen fix", "status": "not_started"},
-    {"id": 9, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
-    {"id": 10, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
+    {"id": 13, "name": "Manual test all fixes (fullscreen, maximize, always-on-top, video overflow, white border)", "status": "not_started"},
+    {"id": 14, "name": "Commit verified fixes", "status": "not_started"},
+    {"id": 15, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
+    {"id": 16, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Test D-03 true borderless fullscreen (WS_POPUP + DWM)", "context": "Run flutter run -d windows, click fullscreen, verify window covers entire screen with zero border/shadow", "blocking": true}
+    {"action": "Test all 5 fixes", "context": "flutter run -d windows, then: (1) click maximize → icon should update immediately, (2) click always-on-top → toggle works + blue color feedback, (3) double-click control bar → no freeze, (4) play video with different aspect ratio → video doesn't overflow title bar, (5) maximize → no white border", "blocking": true}
   ],
   "decisions": [
     {"decision": "WS_POPUP + DwmExtendFrameIntoClientArea(-1) for fullscreen", "rationale": "v1 window_manager.setFullScreen kept WS_CAPTION; v2 FFI style bit removal still left DWM shadow; v3 WS_POPUP + DWM margins=-1 achieves true borderless", "phase": 6},
-    {"decision": "BoxFit.cover for video surface", "rationale": "BoxFit.contain shows black bars for aspect ratio mismatches. BoxFit.cover fills window by cropping.", "phase": 6},
-    {"decision": "resizeEdgeSize: 6px windowed, 0px fullscreen", "rationale": "window_manager default 8, user reported 11 too large", "phase": 6}
+    {"decision": "BoxFit.cover + ClipRect for video surface", "rationale": "BoxFit.cover fills window by cropping; ClipRect prevents FittedBox transform overflow into title bar", "phase": 6},
+    {"decision": "resizeEdgeSize: 0 when fullscreen OR maximized", "rationale": "WS_THICKFRAME non-client area + DragToResizeArea 6px = visible white border on maximize", "phase": 6},
+    {"decision": "_fullscreenTransitioning lock for setFullscreen", "rationale": "Rapid double-click caused concurrent FFI calls corrupting _savedStyle/_savedFrame", "phase": 6},
+    {"decision": "Manual isAlwaysOnTop.value update in setAlwaysOnTop", "rationale": "WindowListener has no onWindowAlwaysOnTopChanged callback; must sync ValueNotifier manually", "phase": 6}
   ],
   "uncommitted_files": [
-    "lib/kernel/bridge/window_service.dart"
+    "lib/app.dart",
+    "lib/kernel/bridge/window_service.dart",
+    "lib/ui/player/custom_title_bar.dart",
+    "lib/ui/player/video_surface.dart"
   ],
-  "next_action": "Run flutter run -d windows, test D-03 (WS_POPUP fullscreen). If pass, commit and proceed to Phase 7.",
-  "context_notes": "D-05/D-06 verified (BoxFit.cover). D-03 fullscreen upgraded from style bit removal to WS_POPUP + DwmExtendFrameIntoClientArea(-1). Removed unused _wsCaption/_wsThickframe/_wsMaximizebox constants. 564 tests pass, analyze clean."
+  "next_action": "flutter run -d windows → test all 5 fixes → commit → Phase 7",
+  "context_notes": "5 fixes applied this session: (1) maximize icon VLB, (2) setAlwaysOnTop sync, (3) fullscreen re-entrancy guard, (4) video ClipRect, (5) maximize disables resize edges. 564 tests pass, analyze clean (no new issues)."
 }

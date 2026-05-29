@@ -100,6 +100,7 @@ class WindowService with WindowListener {
   WindowService();
 
   bool _disposed = false;
+  bool _fullscreenTransitioning = false;
   int? _savedStyle;
   Pointer<_Rect>? _savedFrame;
 
@@ -153,10 +154,16 @@ class WindowService with WindowListener {
   /// fullscreen, bypassing window_manager's setFullScreen which keeps
   /// WS_CAPTION and leaves a visible frame.
   Future<void> setFullscreen(bool value) async {
-    if (value) {
-      await _enterFullscreen();
-    } else {
-      await _exitFullscreen();
+    if (_fullscreenTransitioning) return;
+    _fullscreenTransitioning = true;
+    try {
+      if (value) {
+        await _enterFullscreen();
+      } else {
+        await _exitFullscreen();
+      }
+    } finally {
+      _fullscreenTransitioning = false;
     }
   }
 
@@ -237,8 +244,10 @@ class WindowService with WindowListener {
     if (isFullscreen.value) isFullscreen.value = false;
   }
 
-  Future<void> setAlwaysOnTop(bool value) =>
-      windowManager.setAlwaysOnTop(value);
+  Future<void> setAlwaysOnTop(bool value) async {
+    await windowManager.setAlwaysOnTop(value);
+    if (!_disposed) isAlwaysOnTop.value = value;
+  }
 
   Future<void> setSize(double width, double height) =>
       windowManager.setSize(Size(width, height));
