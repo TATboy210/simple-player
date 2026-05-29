@@ -117,6 +117,7 @@ class WindowService with WindowListener {
   bool _fullscreenTransitioning = false;
   int? _savedStyle;
   Pointer<_Rect>? _savedFrame;
+  Pointer<_Rect>? _savedMaximizeFrame;  // 最大化前的窗口位置
   int? _baseStyle;  // _removeBorder() 完成后的基准 style
   Timer? _resizeDebounce;
 
@@ -345,16 +346,69 @@ class WindowService with WindowListener {
 
   Future<void> minimize() => windowManager.minimize();
 
+  /// 自定义最大化 — 使用 rcWork（工作区）而非全监视器。
+  ///
+  /// windowManager.maximize() 在无边框窗口上会覆盖任务栏，
+  /// 因为插件的 adjustNCCALCSIZE 将客户区扩展到整个监视器。
+  /// 此处直接用 GetMonitorInfoW 获取工作区矩形 + SetWindowPos 定位。
   Future<void> maximize() async {
+    if (isMaximized.value) return;
+    final hwnd = await windowManager.getId();
+
+    // 保存当前窗口位置（用于 restore）
+    final frame = calloc<_Rect>();
+    _getWindowRect(hwnd, frame);
+    final saved = calloc<_Rect>()
+      ..ref.left = frame.ref.left
+      ..ref.top = frame.ref.top
+      ..ref.right = frame.ref.right
+      ..ref.bottom = frame.ref.bottom;
+    _savedMaximizeFrame = saved;
+    calloc.free(frame);
+
+    // 获取工作区（排除任务栏）
+    final hMonitor = _monitorFromWindow(hwnd, _monitorDefaultToNearest);
+    final mi = calloc<_MonitorInfo>();
+    mi.ref.cbSize = sizeOf<_MonitorInfo>();
+    _getMonitorInfo(hMonitor, mi);
+
+    // 定位到工作区
     await _setTransitionsDisabled(true);
-    await windowManager.maximize();
+    _setWindowPos(
+      hwnd,
+      _hwndTop,
+      mi.ref.rcWork.left,
+      mi.ref.rcWork.top,
+      mi.ref.rcWork.right - mi.ref.rcWork.left,
+      mi.ref.rcWork.bottom - mi.ref.rcWork.top,
+      _swpNoOwnerZOrder | _swpFrameChanged,
+    );
     await _setTransitionsDisabled(false);
+
+    calloc.free(mi);
+    if (!isMaximized.value) isMaximized.value = true;
   }
 
+  /// 从自定义最大化恢复到之前的位置。
   Future<void> restore() async {
+    if (!isMaximized.value || _savedMaximizeFrame == null) return;
+    final hwnd = await windowManager.getId();
+
     await _setTransitionsDisabled(true);
-    await windowManager.restore();
+    _setWindowPos(
+      hwnd,
+      0,
+      _savedMaximizeFrame!.ref.left,
+      _savedMaximizeFrame!.ref.top,
+      _savedMaximizeFrame!.ref.right - _savedMaximizeFrame!.ref.left,
+      _savedMaximizeFrame!.ref.bottom - _savedMaximizeFrame!.ref.top,
+      _swpNoOwnerZOrder | _swpFrameChanged,
+    );
     await _setTransitionsDisabled(false);
+
+    calloc.free(_savedMaximizeFrame!);
+    _savedMaximizeFrame = null;
+    if (isMaximized.value) isMaximized.value = false;
   }
 
   Future<void> close() => windowManager.close();
@@ -366,6 +420,9 @@ class WindowService with WindowListener {
   void dispose() {
     _disposed = true;
     _resizeDebounce?.cancel();
+    if (_savedMaximizeFrame != null) {
+      calloc.free(_savedMaximizeFrame!);
+    }
     windowManager.removeListener(this);
     isFullscreen.dispose();
     isAlwaysOnTop.dispose();
