@@ -28,15 +28,14 @@
 
 ## MEDIUM Severity
 
-### 5. Static singletons — untestable global state
+### 5. Static singletons — untestable global state [PARTIALLY RESOLVED Phase 5]
 **Files:** ThumbnailService, SettingsStore, EnginePrewarm, PerfMonitor
 **Impact:** Makes unit testing difficult, creates hidden coupling, prevents parallel test execution.
-**Fix:** Use constructor injection. Apply `@visibleForTesting` reset pattern.
+**Resolution:** Phase 5 Wave 3 added `@visibleForTesting static void reset()` to ThumbnailService, EnginePrewarm, PerfMonitor. SettingsStore already had `resetPrewarm()`. Full DI refactor deferred to v2.
 
-### 6. Duplicate `formatMs()` utility
+### 6. ~~Duplicate `formatMs()` utility~~ [RESOLVED Phase 5]
 **Files:** `lib/utils/time_utils.dart` AND `lib/kernel/utils/time_utils.dart`
-**Impact:** Maintenance drift — if one is updated, the other may be forgotten.
-**Fix:** Delete `lib/utils/time_utils.dart`, update imports.
+**Resolution:** `lib/utils/time_utils.dart` deleted (Phase 5 Wave 1, commit ff35d9b). Zero import references confirmed.
 
 ### 7. macOS thumbnail provider is a stub
 **File:** `lib/kernel/services/macos_thumbnail_provider.dart:7`
@@ -51,14 +50,9 @@ TargetPlatform.windows => const NoopThumbnailProvider(),
 **Impact:** Despite CLAUDE.md mentioning "Win32 COM thumbnail extraction," returns null.
 **Fix:** Implement COM provider or update documentation.
 
-### 9. `app.dart` unsafe casts
+### 9. ~~`app.dart` unsafe casts~~ [RESOLVED Phase 5]
 **File:** `lib/app.dart:58-67`
-```dart
-engine: engine as MediaEngine,  // unsafe cast from Object?
-videoProcessing: videoProcessing as VideoProcessingService?,
-```
-**Impact:** `DeferredPlayerFeature` uses `Object?` to avoid eager imports. Runtime TypeError if wrong type.
-**Fix:** Use typed callback interface or sealed class.
+**Resolution:** Phase 5 Wave 1 (commit ff35d9b) changed `DeferredPlayerFeature.onSettings` from `Object?` to typed `MediaEngine`/`VideoProcessingService?`. Removed `as` casts from `app.dart`. `PlayerFeature.onSettings` changed from `FvpEngine` to `MediaEngine` (abstract type).
 
 ### 10. Large files approaching 800-line threshold
 
@@ -71,10 +65,9 @@ videoProcessing: videoProcessing as VideoProcessingService?,
 
 **Fix:** Extract sub-widgets from settings_card. Use generic `_saveField<T>()` for SettingsStore.
 
-### 11. ControlsOverlay fragile cache invalidation
+### 11. ~~ControlsOverlay fragile cache invalidation~~ [RESOLVED]
 **File:** `lib/ui/player/controls_overlay.dart:71-138`
-**Impact:** 8 nullable cache fields for ControlBar caching. Adding a new property requires updating both cache fields and `needsRebuild`.
-**Fix:** Use single immutable state object with `==` override.
+**Resolution:** Grep confirmed zero `_cached`/`_prev`/`needsRebuild` patterns in current code. Cache pattern removed in prior refactor.
 
 ### 12. URL scheme whitelist trusts upstream
 **File:** `lib/kernel/services/path_validator.dart:57`
@@ -99,9 +92,9 @@ videoProcessing: videoProcessing as VideoProcessingService?,
 **File:** `lib/main.dart:17-22`
 **Impact:** If prewarm fails, error swallowed, subsequent player pays cold-start cost.
 
-### 17. AppSettings not immutable
+### 17. ~~AppSettings not immutable~~ [RESOLVED Phase 5]
 **File:** `lib/kernel/persistence/settings_store.dart:11-57`
-**Impact:** No `copyWith()`, no `==`/`hashCode`. VideoProcessingState uses freezed — AppSettings should follow.
+**Resolution:** Phase 5 Wave 2 (commit 08fe99d) added `copyWith()` (sentinel pattern for nullable fields), `operator ==` (22 fields), `hashCode` (`Object.hashAll`). 6 new tests verify value semantics.
 
 ### 18. ~~FvpEngine.subtitleDelay catches silently~~ [RESOLVED Phase 1]
 **File:** `lib/kernel/engine/fvp_engine.dart:567`
