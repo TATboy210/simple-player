@@ -1,42 +1,36 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T21:15:00+08:00",
+  "timestamp": "2026-05-29T22:30:00+08:00",
   "phase": 6,
   "phase_name": "Window Code Optimization",
   "phase_dir": ".planning/phases/06-window-code-optimization",
-  "plan": null,
-  "task": null,
-  "total_tasks": 2,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "v1.0 milestone archive", "status": "done", "commit": "969dec7"},
-    {"id": 2, "name": "v1.1 milestone initialization", "status": "done", "commit": "6a9ebbb"},
-    {"id": 3, "name": "Phase 6 discuss-phase", "status": "done", "commit": "d457786"},
-    {"id": 4, "name": "Phase 6 research", "status": "done", "commit": "7566a27"},
-    {"id": 5, "name": "Phase 6 plan + verification", "status": "done", "commit": "74dbcb6"},
-    {"id": 6, "name": "Execute 06-01: DragToResizeArea + ESC key", "status": "done", "commit": "21c98e5"},
-    {"id": 7, "name": "Manual verification D-01~D-06", "status": "in_progress", "progress": "D-01 OK, D-02 OK, D-04 OK; D-03/D-05/D-06 fixes applied, not yet tested"}
+    {"id": 1, "name": "v1.0 milestone archive", "status": "done"},
+    {"id": 2, "name": "v1.1 milestone initialization", "status": "done"},
+    {"id": 3, "name": "Phase 6 discuss-phase", "status": "done"},
+    {"id": 4, "name": "Phase 6 research", "status": "done"},
+    {"id": 5, "name": "Phase 6 plan + verification", "status": "done"},
+    {"id": 6, "name": "Execute 06-01: DragToResizeArea + ESC key", "status": "done"},
+    {"id": 7, "name": "Manual verification D-01~D-06", "status": "in_progress", "progress": "D-01/D-02/D-04/D-05/D-06 passed; D-03 upgraded to WS_POPUP + DWM, pending test"}
   ],
   "remaining_tasks": [
-    {"id": 8, "name": "Test D-03/D-05/D-06 fixes (FFI fullscreen + BoxFit.cover)", "status": "not_started"},
+    {"id": 8, "name": "Test D-03 WS_POPUP fullscreen fix", "status": "not_started"},
     {"id": 9, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
     {"id": 10, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "Test D-03 true fullscreen (WS_CAPTION removal via FFI)", "context": "Run flutter run -d windows, click fullscreen, verify window covers entire screen including taskbar area", "blocking": true},
-    {"action": "Test D-05/D-06 video BoxFit.cover (no black bars)", "context": "Open 4096x2160 video, verify it fills window without letterboxing", "blocking": true}
+    {"action": "Test D-03 true borderless fullscreen (WS_POPUP + DWM)", "context": "Run flutter run -d windows, click fullscreen, verify window covers entire screen with zero border/shadow", "blocking": true}
   ],
   "decisions": [
-    {"decision": "App-level WindowService for DragToResizeArea fullscreen awareness", "rationale": "WindowService wraps same windowManager singleton; both instances receive WindowListener callbacks", "phase": 6},
-    {"decision": "resizeEdgeSize: 6px windowed, 0px fullscreen", "rationale": "window_manager default 8, user reported 11 too large", "phase": 6},
-    {"decision": "FFI-based true fullscreen bypassing window_manager's setFullScreen", "rationale": "window_manager only removes WS_THICKFRAME|WS_MAXIMIZEBOX, keeps WS_CAPTION — results in maximize not fullscreen. Manual FFI removes WS_CAPTION too.", "phase": 6},
-    {"decision": "BoxFit.cover for video surface", "rationale": "BoxFit.contain shows black bars for aspect ratio mismatches (e.g. 4096x2160 on 16:9 window). BoxFit.cover fills window by cropping.", "phase": 6}
+    {"decision": "WS_POPUP + DwmExtendFrameIntoClientArea(-1) for fullscreen", "rationale": "v1 window_manager.setFullScreen kept WS_CAPTION; v2 FFI style bit removal still left DWM shadow; v3 WS_POPUP + DWM margins=-1 achieves true borderless", "phase": 6},
+    {"decision": "BoxFit.cover for video surface", "rationale": "BoxFit.contain shows black bars for aspect ratio mismatches. BoxFit.cover fills window by cropping.", "phase": 6},
+    {"decision": "resizeEdgeSize: 6px windowed, 0px fullscreen", "rationale": "window_manager default 8, user reported 11 too large", "phase": 6}
   ],
   "uncommitted_files": [
-    "lib/kernel/bridge/window_service.dart",
-    "lib/ui/player/video_surface.dart"
+    "lib/kernel/bridge/window_service.dart"
   ],
-  "next_action": "Run flutter run -d windows, test D-03 (true fullscreen) and D-05/D-06 (no black bars). If all pass, commit and proceed to Phase 7.",
-  "context_notes": "Phase 6 code changes complete. During manual verification, found 3 issues: D-03 fullscreen only maximized (WS_CAPTION not removed by window_manager), D-05/D-06 video has black bars (BoxFit.contain). Fixed with FFI Win32 API (GetWindowLongPtrW/SetWindowLongPtrW/SetWindowPos/GetMonitorInfoW) to remove WS_CAPTION and BoxFit.cover. All 564 tests pass, flutter analyze clean. Need user to manually test the fixes before committing."
+  "next_action": "Run flutter run -d windows, test D-03 (WS_POPUP fullscreen). If pass, commit and proceed to Phase 7.",
+  "context_notes": "D-05/D-06 verified (BoxFit.cover). D-03 fullscreen upgraded from style bit removal to WS_POPUP + DwmExtendFrameIntoClientArea(-1). Removed unused _wsCaption/_wsThickframe/_wsMaximizebox constants. 564 tests pass, analyze clean."
 }
