@@ -103,6 +103,81 @@ lib/
     └── app_localizations.dart         # Generated (974 lines)
 ```
 
+## Window Management Architecture
+
+### Layer Stack
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Dart UI (custom_title_bar.dart, app.dart)           │
+│  ValueListenableBuilder on isMaximized/isFullscreen  │
+├──────────────────────────────────────────────────────┤
+│  WindowService (window_service.dart)                 │
+│  Win32 FFI + DWM API + window_manager delegates     │
+├──────────────────────────────────────────────────────┤
+│  window_manager plugin (C++)                         │
+│  WM_NCCALCSIZE / WM_NCHITTEST / WM_SIZE handling    │
+│  MethodChannel: maximize, restore, setFullScreen     │
+├──────────────────────────────────────────────────────┤
+│  C++ Runner (flutter_window.cpp, win32_window.cpp)   │
+│  Message routing: plugin first → runner fallback     │
+│  ApplyRoundedCorners on WM_SIZE                      │
+├──────────────────────────────────────────────────────┤
+│  Win32 / DWM                                         │
+│  ShowWindow, SetWindowPos, DwmExtendFrameIntoClient  │
+│  DwmSetWindowAttribute (transitions, corners, dark)  │
+└──────────────────────────────────────────────────────┘
+```
+
+### Message Processing Chain
+
+```
+Win32 message → WndProc → FlutterWindow::MessageHandler
+  ├─ flutter_controller_->HandleTopLevelWindowProc()
+  │   └─ window_manager_plugin::HandleWindowProc()
+  │       ├─ WM_NCCALCSIZE → adjustNCCALCSIZE (border expansion)
+  │       ├─ WM_NCHITTEST → hit test zones (resize, caption, buttons)
+  │       └─ WM_SIZE → emit "maximize"/"unmaximize" events
+  └─ Win32Window::MessageHandler()
+      ├─ WM_SIZE → MoveWindow(child) + ApplyRoundedCorners
+      ├─ WM_ERASEBKGND → return 1 (skip black flash)
+      └─ WM_DPICHANGED → reposition
+```
+
+### Window State Machine
+
+| State | WS_STYLE | DWM Margins | Resize | Transitions |
+|-------|----------|-------------|--------|-------------|
+| Normal | `~WS_CAPTION` (keeps WS_THICKFRAME) | `{0,0,1,0}` | 6px edges | DWM enabled |
+| Maximized | No change | No change | Disabled | **DWM disabled** |
+| Fullscreen | `WS_POPUP` only | `{-1,-1,-1,-1}` | Disabled | DWM disabled |
+
+### Key FFI Calls
+
+| Win32 API | Dart Wrapper | Purpose |
+|-----------|-------------|---------|
+| `GetWindowLongPtrW` | `_getWindowLongPtr` | Read window style |
+| `SetWindowLongPtrW` | `_setWindowLongPtr` | Set window style |
+| `SetWindowPos` | `_setWindowPos` | Apply frame changes (SWP_FRAMECHANGED) |
+| `DwmExtendFrameIntoClientArea` | `_dwmExtendFrameIntoClientArea` | Shadow preservation (top=1px) |
+| `DwmSetWindowAttribute` | `_dwmSetWindowAttribute` | Disable transitions (DWMWA=3) |
+| `MonitorFromWindow` | `_monitorFromWindow` | Get monitor for fullscreen |
+| `GetMonitorInfoW` | `_getMonitorInfo` | Monitor bounds |
+| `GetWindowRect` | `_getWindowRect` | Save/restore window frame |
+
+### Startup Sequence
+
+```
+main.dart:
+  1. windowManager.ensureInitialized()
+  2. WindowOptions(titleBarStyle: hidden, backgroundColor: transparent)
+  3. waitUntilReadyToShow callback:
+     a. WindowService.removeBorderImmediate()  ← FFI: ~WS_CAPTION + DWM margins
+     b. windowManager.show()
+     c. windowManager.focus()
+  4. WindowService.init() → windowManager.addListener(this)
+```
+
 ## Recent Structural Changes
 
 | Change | Before | After |
@@ -125,5 +200,5 @@ lib/
 
 ## Entry Points
 
-- **main.dart** — App entry, fvp init, window setup, startup coordinator
-- **app.dart** — MaterialApp, service wiring, deferred player feature
+- **main.dart** — App entry, fvp init, window setup (removeBorderImmediate before show), startup coordinator
+- **app.dart** — MaterialApp, service wiring, DragToResizeArea wrapper (disabled when maximized/fullscreen), deferred player feature
