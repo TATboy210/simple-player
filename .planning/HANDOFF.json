@@ -1,32 +1,35 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-29T20:00:00+08:00",
-  "phase": null,
-  "phase_name": "milestone-start",
-  "phase_dir": null,
+  "timestamp": "2026-05-29T21:00:00+08:00",
+  "phase": 6,
+  "phase_name": "Window Code Optimization",
+  "phase_dir": ".planning/phases/06-window-code-optimization",
   "plan": null,
   "task": null,
   "total_tasks": null,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "v1.0 milestone complete-milestone flow", "status": "done", "commit": "969dec7"},
-    {"id": 2, "name": "v1.1 milestone initialization (goals, requirements, roadmap)", "status": "done", "commit": "6a9ebbb"}
+    {"id": 1, "name": "v1.0 milestone archive", "status": "done", "commit": "969dec7"},
+    {"id": 2, "name": "v1.1 milestone initialization", "status": "done", "commit": "6a9ebbb"},
+    {"id": 3, "name": "Phase 6 discuss-phase — context gathered", "status": "done", "commit": "d457786"}
   ],
   "remaining_tasks": [
-    {"id": 3, "name": "Run /gsd:plan-phase 6 — Window Code Optimization", "status": "not_started"},
-    {"id": 4, "name": "Run /gsd:execute-phase 6", "status": "not_started"},
-    {"id": 5, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
-    {"id": 6, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
+    {"id": 4, "name": "Run /gsd:plan-phase 6 — create execution plan", "status": "not_started"},
+    {"id": 5, "name": "Run /gsd:execute-phase 6 — execute window optimization", "status": "not_started"},
+    {"id": 6, "name": "Phase 7: Integration & Golden Tests", "status": "not_started"},
+    {"id": 7, "name": "Phase 8: Architecture & Dead Code", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "v1.1 scope: Testing + Quality + Window optimization + Dead code cleanup", "rationale": "User chose quality/stability over new features (Impeller/HLS/Steam deferred)", "phase": null},
-    {"decision": "Window code optimization: keep deps/features, refactor structure only", "rationale": "User explicitly wants to preserve existing behavior", "phase": null},
-    {"decision": "Use Context7 for latest Flutter/fvp docs during optimization", "rationale": "User requested frequent Context7 usage for up-to-date guidance", "phase": null},
-    {"decision": "v1.1 uses continued phase numbering (6-8)", "rationale": "Default behavior, no --reset-phase-numbers flag", "phase": null}
+    {"decision": "Window optimization scope: 4 small fixes (fullscreen, title bar, resize edge, 16:9)", "rationale": "User explicitly wants small changes only, not architecture refactoring", "phase": 6},
+    {"decision": "Fullscreen button: verify visibility, fix auto-hide interaction for exit", "rationale": "User reports button missing and can't exit fullscreen", "phase": 6},
+    {"decision": "DragToResizeArea: resizeEdgeSize from 11px to 5-8px", "rationale": "User reports resize detection area too small", "phase": 6},
+    {"decision": "Title bar: must hide in fullscreen", "rationale": "User reports title bar still visible in fullscreen", "phase": 6},
+    {"decision": "16:9 videos must perfectly match 16:9 window (960x540)", "rationale": "User wants perfect ratio match for 16:9 content", "phase": 6},
+    {"decision": "WindowService passing: keep constructor injection (not InheritedWidget)", "rationale": "User did not select this optimization scope", "phase": 6}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd:plan-phase 6 to create executable plan for Window Code Optimization (OPT-01)",
-  "context_notes": "v1.0 fully archived (tag v1.0 pushed). v1.1 initialized with 3 phases, 6 requirements. Research done via Context7 (integration tests, golden tests, desktop testing patterns). Roadmap committed. Ready to plan Phase 6."
+  "next_action": "Run /gsd:plan-phase 6 to create executable plan for 4 window fixes",
+  "context_notes": "Phase 6 discuss-phase complete. 4 specific fixes identified: fullscreen button/exit, title bar fullscreen hide, DragToResizeArea edge size, 16:9 video matching. CONTEXT.md and DISCUSSION-LOG.md committed. Ready for planning."
 }
