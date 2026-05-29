@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
 
 import '../utils/log.dart';
@@ -57,5 +58,14 @@ class EnginePrewarm {
       _prewarmed = false;
       log.d('EnginePrewarm failed: $e');
     }
+  }
+
+  /// 重置全部状态标志（仅供测试使用）。
+  @visibleForTesting
+  static void reset() {
+    _prewarmed = false;
+    _playerCreated = false;
+    _codecsReady = false;
+    _gpuReady = false;
   }
 }
