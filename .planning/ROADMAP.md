@@ -20,9 +20,9 @@
 
 ### v1.1 Testing, Quality & Code Optimization (In Progress)
 
-- [ ] **Phase 6: Window Code Optimization** — Fix fullscreen interaction, DragToResizeArea config, ESC key wiring (OPT-01)
+- [x] **Phase 6: Window Code Optimization** — Fix fullscreen interaction, DragToResizeArea config, ESC key wiring (OPT-01) (completed 2026-05-29)
   Plans:
-  - [ ] 06-01-PLAN.md — DragToResizeArea fullscreen-aware + ESC key fullscreen exit
+  - [x] 06-01-PLAN.md — DragToResizeArea fullscreen-aware + ESC key fullscreen exit
 - [ ] **Phase 7: Integration & Golden Tests** — E2E flows + visual regression (TEST-05, TEST-06)
 - [ ] **Phase 8: Architecture & Dead Code** — Context7-guided optimization + cleanup (QUAL-01, QUAL-02, QUAL-03)
 
@@ -35,7 +35,7 @@
 | 3. Performance Optimization | v1.0 | 4/4 | Complete | 2026-05-28 |
 | 4. Test Coverage | v1.0 | 1/1 | Complete | 2026-05-29 |
 | 5. Technical Debt Cleanup | v1.0 | 3 waves | Complete | 2026-05-29 |
-| 6. Window Code Optimization | v1.1 | 0/1 | Planned | — |
+| 6. Window Code Optimization | v1.1 | 1/1 | Complete   | 2026-05-29 |
 | 7. Integration & Golden Tests | v1.1 | 0/? | Not started | — |
 | 8. Architecture & Dead Code | v1.1 | 0/? | Not started | — |
 
