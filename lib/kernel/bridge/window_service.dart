@@ -105,6 +105,7 @@ class WindowService with WindowListener {
   bool _fullscreenTransitioning = false;
   int? _savedStyle;
   Pointer<_Rect>? _savedFrame;
+  int? _baseStyle;  // _removeBorder() 完成后的基准 style
 
   // ─── State (ValueNotifier pattern) ───
 
@@ -119,23 +120,23 @@ class WindowService with WindowListener {
     _removeBorder();
   }
 
-  /// 移除窗口非客户区边框（WS_THICKFRAME + WS_CAPTION + DWM 阴影）。
+  /// 移除窗口标题栏，保留缩放边框和 DWM 阴影。
   ///
-  /// TitleBarStyle.hidden 只移除了标题栏，但保留了 WS_THICKFRAME
-  /// 用于窗口缩放，导致窗口周围出现灰/白边。此方法将其彻底移除，
-  /// 并通过 DwmExtendFrameIntoClientArea(-1) 消除 DWM 合成边框。
+  /// 只移除 WS_CAPTION（标题栏文字+按钮），保留 WS_THICKFRAME（原生缩放支持）。
+  /// DwmExtendFrameIntoClientArea(0,0,1,0) 在顶部扩展 1px 让 DWM 保留窗口阴影。
   Future<void> _removeBorder() async {
     final hwnd = await windowManager.getId();
     final style = _getWindowLongPtr(hwnd, _gwlStyle);
-    final newStyle = style & ~_wsThickFrame & ~_wsCaption;
+    // 只移除 WS_CAPTION，保留 WS_THICKFRAME 用于原生缩放
+    final newStyle = style & ~_wsCaption;
     _setWindowLongPtr(hwnd, _gwlStyle, newStyle);
 
-    // 消除 DWM 窗口阴影和合成边框
+    // 保留 DWM 阴影：顶部 1px frame 让 DWM 认为窗口有边框
     final margins = calloc<_Margins>()
-      ..ref.left = -1
-      ..ref.right = -1
-      ..ref.top = -1
-      ..ref.bottom = -1;
+      ..ref.left = 0
+      ..ref.right = 0
+      ..ref.top = 1
+      ..ref.bottom = 0;
     _dwmExtendFrameIntoClientArea(hwnd, margins);
     calloc.free(margins);
 
@@ -143,6 +144,8 @@ class WindowService with WindowListener {
       hwnd, 0, 0, 0, 0, 0,
       _swpNoOwnerZOrder | _swpFrameChanged | 0x0001 | 0x0002, // NOMOVE | NOSIZE
     );
+
+    _baseStyle = newStyle;
   }
 
   // ─── WindowListener callbacks → update ValueNotifiers ───
