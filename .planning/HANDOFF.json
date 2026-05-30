@@ -19,10 +19,15 @@
     {"id": 8, "name": "Video BoxFit.contain (letterbox/pillarbox)", "status": "done", "commit": "bdff0a5"},
     {"id": 9, "name": "Window management architecture doc in STRUCTURE.md", "status": "done", "commit": "adc3b79"},
     {"id": 10, "name": "Window optimization plan doc (07-03-PLAN.md)", "status": "done", "commit": "53c8d19"},
-    {"id": 11, "name": "Smooth maximize/restore animation (remove DWM transition disable)", "status": "done", "commit": "679c128"}
+    {"id": 11, "name": "Smooth maximize/restore animation (remove DWM transition disable)", "status": "done", "commit": "679c128"},
+    {"id": 12, "name": "WindowService FFI lazy initialization refactor", "status": "done"},
+    {"id": 13, "name": "FakeWindowService + integration_helpers", "status": "done"},
+    {"id": 14, "name": "Integration tests: playback_flow (6 tests)", "status": "done"},
+    {"id": 15, "name": "Integration tests: controls_flow (6 tests)", "status": "done"},
+    {"id": 16, "name": "Integration tests: playlist_flow (6 tests)", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 12, "name": "Phase 7: Execute 07-01-PLAN.md (Integration tests)", "status": "not_started"},
+    {"id": 12, "name": "Phase 7: Execute 07-01-PLAN.md (Integration tests)", "status": "done"},
     {"id": 13, "name": "Phase 7: Execute 07-02-PLAN.md (Golden tests)", "status": "not_started"},
     {"id": 14, "name": "Phase 8: Architecture & Dead Code cleanup", "status": "not_started"}
   ],
@@ -37,6 +42,6 @@
     {"decision": "Remove DWMWA_TRANSITIONS_FORCEDISABLED from maximize/restore", "rationale": "User reported maximize transition is not smooth; disabling DWM transitions removes animation entirely", "phase": 7}
   ],
   "uncommitted_files": [],
-  "next_action": "Manual test smooth maximize animation → then /gsd:execute-phase 7 for integration tests",
-  "context_notes": "All window stability fixes complete (11 fixes total). Latest fix: removed DWM transition disable to restore smooth maximize/restore animation. Branch fix/window-startup ahead of origin by 51 commits. 564 tests passing. Phase 7 has 3 plans (07-01 integration, 07-02 golden, 07-03 window optimization complete)."
+  "next_action": "Execute 07-02-PLAN.md (Golden tests)",
+  "context_notes": "07-01 complete: 18 integration tests (6 playback + 6 controls + 6 playlist), FFI lazy init refactor, FakeWindowService. 582 tests passing (564 existing + 18 new). Phase 7 has 2 of 3 plans done (07-01 + 07-03). 07-02 golden tests remaining."
 }
