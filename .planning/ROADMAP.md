@@ -4,7 +4,8 @@
 
 - **v1.0 Window Management & UI Unification** — Phases 1-5 (shipped 2026-05-29)
 - **v1.1 Testing, Quality & Code Optimization** — Phases 6-8 (shipped 2026-05-30)
-- **v1.2 Security, Architecture & Kernel** — Phases 9-12 (in progress)
+- **v1.2 Security, Architecture & Kernel** — Phases 9-12 (shipped 2026-05-31)
+- **v1.2.1 Window Polish & Architecture Simplification** — Phases 13-15 (in progress)
 
 ## Phases
 
@@ -130,13 +131,68 @@ Plans:
 
 Plans:
 
-- [ ] 12-01: PrefixPrinter + 模块 logger + initLog 更新 (log.dart)
-- [ ] 12-02: Timeline 追踪 FvpEngine.open/seek + WindowService fullscreen (4 方法)
+- [x] 12-01: PrefixPrinter + 模块 logger + initLog 更新 (log.dart)
+- [x] 12-02: Timeline 追踪 FvpEngine.open/seek + WindowService fullscreen (4 方法)
+
+### Phase 13: Window Foundation
+
+**Goal**: 窗口从第一帧起即为无边框，启动零闪烁；Window 层代码精简至 50% 行数
+**Depends on**: Phase 12
+**Requirements**: WIN-05, WIN-06
+**Success Criteria** (what must be TRUE):
+
+  1. C++ `WM_NCCALCSIZE` 在 `HandleTopLevelWindowProc` 之前拦截，非客户区折叠为零
+  2. `WS_CAPTION` 保留以维持 DWM 最大化/还原动画
+  3. 启动时无边框闪烁（第一帧即为无边框状态）
+  4. Dart 端三重异步边框移除路径合并为单一同步路径
+  5. Window 层代码行数减少 50%+
+
+**Spike**: WM_NCCALCSIZE 拦截验证（0.5 天）— `OutputDebugString` 确认消息顺序
+
+**Plans**: TBD（待 /gsd:plan-phase 13 规划）
+
+### Phase 14: HLS ABR
+
+**Goal**: HLS 流媒体自适应码率播放，带宽波动时自动切换质量
+**Depends on**: Nothing（独立于 Phase 13）
+**Requirements**: HLS-01
+**Success Criteria** (what must be TRUE):
+
+  1. EWMA 吞吐量估计覆盖 80%+ 桌面场景
+  2. `.m3u8` URL 自动启用 ABR 配置（移除低延迟标志）
+  3. 非 HLS URL 保持现有低延迟配置
+  4. 带宽波动时自动降级/升级画质，无卡顿
+
+**Spike**: MDK MediaInfo 比特率/缓冲指标可用性验证（0.5 天）
+
+**Plans**: TBD（待 /gsd:plan-phase 14 规划）
+
+### Phase 15: Architecture Simplification
+
+**Goal**: SettingsStore 样板代码减少 80%，单例消除，平台抽象层接口就绪
+**Depends on**: Phase 13（窗口层 DI 需要 Phase 13 决策）
+**Requirements**: ARCH-02, ARCH-03, PLATFORM-03
+**Success Criteria** (what must be TRUE):
+
+  1. SettingsStore 使用 `_get<T>`/`_set<T>` 泛型模式，25+ 方法减至 5 个核心方法
+  2. 6 个 static mutable 单例全部迁移至构造函数注入
+  3. `PlatformService` 抽象接口定义完成，`WindowsPlatformService` 委托现有实现
+  4. 所有现有测试通过，无功能回归
+
+**Plans**: TBD（待 /gsd:plan-phase 15 规划）
+
+### v1.2.1 Window Polish & Architecture Simplification (In Progress)
+
+**Milestone Goal:** 消除边框闪烁，达到 Apple 级窗口动效流畅度，同时精简架构
+
+- [ ] **Phase 13: Window Foundation** - C++ WM_NCCALCSIZE 同步帧无边框 + Window 层精简 (WIN-05, WIN-06)
+- [ ] **Phase 14: HLS ABR** - 基于吞吐量的自适应码率流媒体 (HLS-01)
+- [ ] **Phase 15: Architecture Simplification** - SettingsStore + 单例迁移 + 平台抽象层 (ARCH-02, ARCH-03, PLATFORM-03)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 9 -> 10 -> 11 -> 12
+Phases execute in numeric order: 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -151,7 +207,10 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
 | 10. Window Optimization | v1.2 | 5/5 | Complete | 2026-05-30 |
 | 11. Performance Optimization | v1.2 | 4/4 | Complete | 2026-05-30 |
-| 12. Debug Tooling | v1.2 | 0/2 | In progress | - |
+| 12. Debug Tooling | v1.2 | 2/2 | Complete | 2026-05-31 |
+| 13. Window Foundation | v1.2.1 | 0/TBD | Pending | - |
+| 14. HLS ABR | v1.2.1 | 0/TBD | Pending | - |
+| 15. Architecture Simplification | v1.2.1 | 0/TBD | Pending | - |
 
 ## Requirement Traceability
 
@@ -169,6 +228,12 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | WIN-04 | 10 | 10-01, 10-02, 10-03 |
 | PERF-04 | 11 | 11-01, 11-02, 11-03, 11-04 |
 | DBG-01 | 12 | 12-01, 12-02 |
+| WIN-05 | 13 | TBD |
+| WIN-06 | 13 | TBD |
+| HLS-01 | 14 | TBD |
+| ARCH-02 | 15 | TBD |
+| ARCH-03 | 15 | TBD |
+| PLATFORM-03 | 15 | TBD |
 
 ---
-*Last updated: 2026-05-30 — Phase 12 planned: 2 plans (12-01 PrefixPrinter+loggers, 12-02 Timeline tracing). Both Wave 1 parallel.*
+*Last updated: 2026-05-31 — v1.2.1 milestone: Phase 13 (Window Foundation), Phase 14 (HLS ABR), Phase 15 (Architecture Simplification)*
