@@ -112,7 +112,7 @@ Plans:
 
 - [x] 11-01: ThumbnailService LRU O(1) with LinkedHashMap
 - [x] 11-02: PositionPoller adaptive polling intervals
-- [ ] 11-03: D3D11 refresh-rate-aware sync mode
+- [x] 11-03: D3D11 refresh-rate-aware sync mode
 - [ ] 11-04: Rendering pipeline audit + Phase 11 verification
 
 ### Phase 12: Debug Tooling
