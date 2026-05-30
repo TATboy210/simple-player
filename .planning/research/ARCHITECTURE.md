@@ -1,411 +1,495 @@
-# Architecture Integration Research
+# Architecture Patterns
 
-**Project:** Simple Player Flutter v1.2
-**Researched:** 2026-05-30
-**Focus:** How v1.2 changes integrate with existing 3-layer architecture
+**Domain:** Flutter desktop media player (Windows)
+**Researched:** 2026-05-31
+**Confidence:** HIGH (based on direct codebase analysis + memory files)
 
 ---
 
-## 1. FvpEngine Decomposition
+## 1. C++ WM_NCCALCSIZE Integration
 
 ### Current State
 
-`FvpEngine` (690 lines) already uses 3 helper composition:
-- `FvpCallbackHandler` — mdk callback registration, state mapping
-- `PositionPoller` — 250ms timer position polling
-- `TrackManager` — audio/subtitle track selection
+The `flutter_window.cpp` is **stock Flutter template** -- only handles `WM_FONTCHANGE`. No custom `WM_NCCALCSIZE`, `WM_NCHITTEST`, or `WM_SIZING` handlers exist yet. The current frameless approach uses Dart-side FFI (`WindowService.removeBorderImmediate()`) which removes `WS_CAPTION` via `SetWindowLongPtr`, losing DWM animations.
 
-Remaining responsibilities in the main file:
-- 13 ValueNotifier declarations (~40 lines)
-- Constants (network, D3D11, playback) (~20 lines)
-- `_createPlayer()` + helper wiring (~25 lines)
-- `_configureNetworkOptions()` — protocol-specific config (~50 lines)
-- `_guardedAction()` — disposed check + try-catch (~10 lines)
-- `open()` — file/URL validation, prepare, texture, media info extraction (~150 lines)
-- Playback control: play/pause/stop/seekTo/skipForward/skipBack (~80 lines)
-- Volume/mute control (~30 lines)
-- Track delegation to TrackManager (~30 lines)
-- Subtitle: external, delay, equalizer (~30 lines)
-- Video effects: brightness/contrast/saturation/hue/rotate/aspect/deinterlace (~50 lines)
-- D3D11 performance: sync, hardware decoding (~25 lines)
-- dispose() — cleanup all notifiers + helpers (~25 lines)
+### The Flutter Message Interception Problem
 
-### Decomposition Strategy
+Documented in `anti_pattern_window_frameless.md` -- 3 previous C++ approaches all failed because:
 
-**Extract 2 new modules, keep FvpEngine as facade:**
+```
+Win32 message pipeline:
+  WndProc -> FlutterWindow::MessageHandler
+    -> flutter_controller_->HandleTopLevelWindowProc  <- Flutter may consume message
+    -> custom handler  <- NEVER REACHED if Flutter consumed it
+    -> Win32Window::MessageHandler  <- default processing
+```
 
-| New Module | Responsibility | Lines (est.) |
-|------------|---------------|--------------|
-| `NetworkConfigurator` | `_configureNetworkOptions()` + protocol constants | ~70 |
-| `VideoEffectsManager` | setVideoEffect, rotate, setAspectRatio, setDeinterlace + D3D11 settings | ~80 |
+**Root cause:** `HandleTopLevelWindowProc` runs BEFORE custom handlers. If Flutter processes `WM_NCCALCSIZE` or `WM_NCHITTEST`, custom logic is bypassed.
 
-**FvpEngine remains:** ValueNotifiers, `_createPlayer()`, `open()`, playback control, volume, track delegation, dispose. (~450 lines)
+### Correct Integration Pattern
 
-**Why not extract more:**
-- `open()` is the core method — extracting it would require passing 6+ ValueNotifiers and 3 helpers, creating a data class just for parameter passing
-- Playback control (play/pause/stop/seek) are thin wrappers around `_player` — 5-10 lines each, not worth extraction
-- Volume/mute logic has state coupling (auto-mute at 0) — extracting adds indirection for 15 lines
+**The handler MUST run BEFORE `HandleTopLevelWindowProc`.** This means restructuring `flutter_window.cpp`:
 
-### Interface Preservation
+```cpp
+LRESULT FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
+                                      WPARAM const wparam,
+                                      LPARAM const lparam) noexcept {
+  // Phase 1: Custom non-client handling BEFORE Flutter
+  switch (message) {
+    case WM_NCCALCSIZE:
+      return OnNcCalcSize(hwnd, wparam, lparam);
+    case WM_NCHITTEST:
+      return OnNcHitTest(hwnd, wparam, lparam);
+    case WM_SIZING:
+      return OnSizing(hwnd, wparam, lparam);
+    case WM_SIZE:
+      return OnSize(hwnd, wparam, lparam);
+  }
 
-`MediaEngine` abstract class (185 lines) is untouched. FvpEngine implements it. After decomposition:
+  // Phase 2: Let Flutter handle everything else
+  if (flutter_controller_) {
+    auto result = flutter_controller_->HandleTopLevelWindowProc(
+        hwnd, message, wparam, lparam);
+    if (result) return *result;
+  }
 
-```dart
-class FvpEngine implements MediaEngine {
-  // Existing ValueNotifiers (unchanged)
-  // Existing helper composition (FvpCallbackHandler, PositionPoller, TrackManager)
-  // NEW: NetworkConfigurator _networkConfig;
-  // NEW: VideoEffectsManager _videoEffects;
-
-  // open() delegates network config: _networkConfig.configure(url, _player)
-  // Video effect methods delegate: _videoEffects.setBrightness(value, _player)
+  // Phase 3: Default handling
+  return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
 }
 ```
 
-**No changes to MediaEngine interface.** No changes to FakeEngine. No changes to any consumer.
+**Critical:** The `WM_NCCALCSIZE` handler must NOT set `WS_CAPTION` removal -- it must KEEP `WS_CAPTION` for DWM animations, and instead use the `WM_NCCALCSIZE` trick to collapse the non-client area to zero:
 
-### Build Order
+```cpp
+LRESULT OnNcCalcSize(HWND hwnd, WPARAM wparam, LPARAM lparam) {
+  if (wparam == TRUE) {
+    auto params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+    // Keep client area = window area (no non-client border)
+    params->rgrc[0] = params->rgrc[1];
+    return 0;
+  }
+  return DefWindowProc(hwnd, WM_NCCALCSIZE, wparam, lparam);
+}
+```
 
-1. Extract `NetworkConfigurator` (pure function, no state, easy to test)
-2. Extract `VideoEffectsManager` (stateless, delegates to `_player`)
-3. Update FvpEngine to use new modules
-4. Verify all existing tests pass (no interface change)
+**Why this works:**
+- `WS_CAPTION` remains set -> DWM animations preserved
+- `WM_NCCALCSIZE` collapses client area to fill entire window -> no visible title bar
+- `WS_THICKFRAME` remains set -> native resize edges work
+- DWM shadow preserved by `DwmExtendFrameIntoClientArea(0,0,1,0)`
+
+### Integration with Existing WindowService
+
+The C++ handler replaces the Dart-side `_removeBorder()` and `removeBorderImmediate()`. The flow becomes:
+
+1. `CreateWindow` with `WS_OVERLAPPEDWINDOW` (full frame)
+2. `OnCreate()` in `FlutterWindow` -- sets up MethodChannel, applies `WM_NCCALCSIZE` frameless
+3. `ApplyRoundedCorners()` -- re-apply Win11 rounded corners
+4. Dart-side `WindowService.init()` -- no longer calls `_removeBorder()`, only registers listeners
+
+### New C++ Files/Changes
+
+| File | Change | Lines (est.) |
+|------|--------|--------------|
+| `windows/runner/flutter_window.h` | Add handler methods + state fields | +20 |
+| `windows/runner/flutter_window.cpp` | WM_NCCALCSIZE/NCHITTEST/SIZING/Size handlers | +80 |
+| `windows/runner/win32_window.h` | Expose fullscreen state flag | +5 |
+| `lib/kernel/bridge/window_service.dart` | Remove `_removeBorder()`, add MethodChannel commands | -30/+20 |
+
+### Hit Test Zones (WM_NCHITTEST)
+
+```
++--------------------------------------+
+| HTCAPTION (drag area, top 36px)      |
++----+---------------------------+-----+
+|    |                           |     |
+| HT |   HTCLIENT (video area)   | HT  |
+| LEFT|                          |RIGHT|
+| 8px|                           |8px  |
+|    |                           |     |
++----+---------------------------+-----+
+| HTBOTTOMLEFT  HTBOTTOM  HTBOTRIGHT  |
+|         8px resize edges            |
++--------------------------------------+
+```
+
+### Sizing Handler (WM_SIZING)
+
+The existing `AspectRatioService` in Dart handles aspect ratio via MethodChannel. Moving this to C++ eliminates the MethodChannel round-trip during resize:
+
+```cpp
+LRESULT OnSizing(HWND hwnd, WPARAM wparam, LPARAM lparam) {
+  auto rect = reinterpret_cast<RECT*>(lparam);
+  if (aspect_ratio_ > 0) {
+    ApplyAspectRatio(rect, wparam, aspect_ratio_);
+  }
+  EnforceMinSize(rect, min_width_, min_height_);
+  return TRUE;
+}
+```
 
 ---
 
-## 2. SettingsStore Simplification
+## 2. Platform Abstraction Layer
 
-### Current State
+### Current Architecture
 
-439 lines, 24+ individual save methods, all following identical pattern:
-
-```dart
-static Future<void> saveXxx(T value) => _save(
-  'saveXxx',
-  (p) => p.setXxx(_keyXxx, value.clamp(min, max)),
-);
+```
+WindowBridge (abstract) <- lib/kernel/bridge/
+  +-- WindowService (concrete) <- lib/kernel/bridge/window_service.dart
+  +-- NoopWindowBridge (fallback) <- lib/kernel/bridge/
 ```
 
-Plus `load()` (80 lines) building `AppSettings` from individual keys, and `saveAll()` (55 lines) writing all fields sequentially.
+The `WindowService` currently:
+- Uses `window_manager` package for init (ensureInitialized, setAsFrameless, setMinimumSize, show, focus)
+- Uses Dart FFI (`win32_bindings.dart`) for runtime ops (fullscreen, maximize, minimize)
+- Uses `WindowListener` mixin for events
+- Persists geometry via `SettingsStore`
 
-### Simplification Strategy
+### Problem: Platform Coupling
 
-**Option A: Generic save with validator map (RECOMMENDED)**
+The `WindowService` directly imports `window_manager` and `dart:ffi` + `win32_bindings.dart`. This makes it impossible to test without platform mocking and blocks macOS/Linux porting.
 
-```dart
-// Validator registry — maps key to clamp/sanitize function
-static final _validators = <String, dynamic Function(dynamic)>{
-  _keyVolume: (v) => (v as double).clamp(0.0, 1.0),
-  _keySubtitleFontSize: (v) => (v as double).clamp(14.0, 28.0),
-  _keyVideoBrightness: (v) => (v as double).clamp(-1.0, 1.0),
-  // ... etc
-};
-
-// Generic save — eliminates 20+ boilerplate methods
-static Future<void> _saveValue<T>(String key, T value) => _save(
-  'saveValue($key)',
-  (p) async {
-    final validated = _validators[key]?.call(value) ?? value;
-    if (validated is double) await p.setDouble(key, validated);
-    else if (validated is int) await p.setInt(key, validated);
-    else if (validated is bool) await p.setBool(key, validated);
-    else if (validated is String) await p.setString(key, validated);
-  },
-);
-```
-
-**Keep domain-specific methods for complex cases:**
-- `saveWindowGeometry()` — multi-field atomic write
-- `saveAll()` — batch write with null handling
-- `saveShortcuts()` — JSON encode
-- `loadLocale()`, `loadThemeIndex()`, `loadShortcuts()` — non-AppSettings loads
-
-**Result:** ~20 individual save methods collapse to ~5 complex methods + generic helper.
-
-**Option B: AppSettings.copyWith + saveAll (SIMPLER but different)**
-
-Make `AppSettings` immutable with `copyWith`, always save via `saveAll()`:
+### Recommended Abstraction: PlatformService Interface
 
 ```dart
-// Instead of: SettingsStore.saveVolume(0.5)
-// Do: final s = currentSettings.copyWith(volume: 0.5); SettingsStore.saveAll(s);
-```
+/// Platform-specific window operations.
+///
+/// Each platform provides one implementation:
+/// - WindowsPlatformService (FFI + MethodChannel)
+/// - MacOSPlatformService (NSWindow via MethodChannel)
+/// - LinuxPlatformService (GTK via MethodChannel)
+///
+/// NoopPlatformService for testing.
+abstract interface class PlatformService {
+  // Lifecycle
+  Future<void> init();
+  void dispose();
 
-**Problem:** Requires callers to hold current settings reference. Breaks existing pattern where individual services save their own settings independently.
+  // Window state (ValueNotifier pattern -- matches existing)
+  ValueNotifier<bool> get isFullscreen;
+  ValueNotifier<bool> get isMaximized;
+  ValueNotifier<bool> get isAlwaysOnTop;
+  ValueNotifier<Size> get windowSize;
 
-**Recommendation:** Option A. Preserves existing call patterns, eliminates boilerplate, keeps individual save methods as thin wrappers.
-
-### Integration Points
-
-- `VideoProcessingService` calls `SettingsStore.saveVideoBrightness/Contrast/Saturation/Hue/Rotation` individually with 50ms debounce
-- `LocaleService` calls `SettingsStore.saveLocale()`
-- `ThemeService` calls `SettingsStore.saveThemeIndex()`
-- `WindowService` calls `SettingsStore.saveWindowGeometry()`
-- `StateMonitor` calls `SettingsStore.saveLastFile()`
-
-**After simplification:** Callers unchanged. Internal implementation uses generic helper.
-
-### Build Order
-
-1. Add `_saveValue<T>()` generic helper + validator map
-2. Rewrite individual save methods as thin wrappers: `saveVolume(v) => _saveValue(_keyVolume, v)`
-3. Verify all tests pass (no API change)
-4. Optionally: deprecate individual methods, migrate callers to direct `_saveValue` calls
-
----
-
-## 3. Singleton Migration
-
-### Current Singletons
-
-| Singleton | Pattern | Location | Consumers |
-|-----------|---------|----------|-----------|
-| `LocaleService.I` | Private constructor + static final | `lib/kernel/services/locale_service.dart` | `App`, settings dialog |
-| `ThemeService.I` | Private constructor + static final | `lib/kernel/services/theme_service.dart` | `App`, settings dialog |
-| `SettingsStore._cachedPrefs` | Static mutable field | `lib/kernel/persistence/settings_store.dart` | Everything |
-| `ThumbnailService._impl` | Lazy static field | `lib/kernel/services/thumbnail_service.dart` | Playlist UI |
-| `log` | Top-level final | `lib/kernel/utils/log.dart` | Everything |
-| `win32` | Top-level final | `lib/kernel/bridge/win32_bindings.dart` | WindowService |
-
-### Migration Strategy: Constructor Injection (NOT Service Locator)
-
-**Why not get_it / service locator:**
-- Adds dependency for a problem that doesn't exist at this scale
-- Hides dependencies — you can't tell what a class needs from its constructor
-- Flutter's widget tree IS a service locator via `InheritedWidget`
-
-**Why constructor injection:**
-- Explicit dependencies visible in constructor signature
-- Testable — pass fakes/mocks via constructor
-- No new dependencies
-- Already used by `PlaybackController`, `PlayerServices`
-
-### Migration Plan
-
-**Phase 1: LocaleService + ThemeService (easy)**
-
-These are only consumed by `App` (root widget) and settings dialog. Convert from singleton to instance created in `App`:
-
-```dart
-// Before
-class LocaleService {
-  LocaleService._();
-  static final LocaleService I = LocaleService._();
-  // ...
-}
-
-// After
-class LocaleService {
-  LocaleService();  // public constructor
-  // ...
-}
-
-// In App
-class _AppState extends State<App> {
-  final _localeService = LocaleService();
-  final _themeService = ThemeService();
-  // Pass down via constructor or InheritedWidget
+  // Window commands
+  Future<void> setFullscreen(bool value);
+  Future<void> maximize();
+  Future<void> restore();
+  Future<void> minimize();
+  Future<void> close();
+  Future<void> center();
+  Future<void> startDragging();
+  Future<void> setAlwaysOnTop(bool value);
+  Future<void> setSize(double width, double height);
+  Future<void> setMinSize(double width, double height);
+  Future<void> setAspectRatio(double ratio);
 }
 ```
 
-**Phase 2: SettingsStore (medium)**
+### Implementation Strategy
 
-`SettingsStore` is static class with static methods. Convert to instance with constructor-injected `SharedPreferences`:
+**Phase 1 (v1.2.1):** Extract interface only -- no macOS/Linux impl
+- Create `PlatformService` abstract interface in `lib/kernel/platform/`
+- Move `WindowService` to `lib/kernel/platform/windows_platform_service.dart`
+- Inject via constructor in `main.dart`
+- `NoopPlatformService` for tests
+
+**Phase 2 (v2):** macOS/Linux stubs
+- `MacOSPlatformService` using `MethodChannel` to native Cocoa
+- `LinuxPlatformService` using `MethodChannel` to native GTK
+
+### Singleton Migration
+
+Current 6 static singletons to migrate:
+
+| Singleton | Current | Target |
+|-----------|---------|--------|
+| `SettingsStore` | Static methods + `_cachedPrefs` | Instance with constructor injection |
+| `WindowService` | Global `win32` bindings | Injected `PlatformService` |
+| `DisplayConfig` | Static `_cachedHz` | Instance in `PlatformService` |
+| `Win32Bindings` | `final win32 = Win32Bindings()` | Injected via `PlatformService` |
+| `PathValidator` | Static methods | Keep static (pure utility, no state) |
+| `WindowBootstrap` | Static methods | Keep static (init-only, no runtime state) |
+
+**Migration pattern:**
 
 ```dart
-// Before
+// Before: static singleton
 class SettingsStore {
   static SharedPreferences? _cachedPrefs;
-  static Future<void> saveVolume(double value) => _save(...);
+  static void prewarm(SharedPreferences prefs) => _cachedPrefs = prefs;
+  static Future<void> saveVolume(double value) async { ... }
 }
 
-// After
+// After: injectable instance
 class SettingsStore {
   SettingsStore(this._prefs);
   final SharedPreferences _prefs;
-  Future<void> saveVolume(double value) => _save(...);
+  Future<void> saveVolume(double value) async { ... }
 }
 ```
 
-**Problem:** `SettingsStore` is used by 8+ classes across all 3 layers. Converting to instance requires threading it through constructors everywhere.
+### File Structure After Migration
 
-**Pragmatic approach:** Keep `SettingsStore` as static for now. The `_cachedPrefs` singleton is already set once in `main.dart` and never changes. The real issue is testability — solve with `@visibleForTesting static void resetPrewarm()` (already exists).
-
-**Phase 3: ThumbnailService (easy)**
-
-Already has lazy `_impl`. Consumers only in playlist UI. Pass as constructor parameter to `PlaylistPanel`.
-
-**Phase 4: log + win32 (skip)**
-
-These are true globals — logger and FFI bindings. No benefit to injection. Keep as-is.
-
-### Recommended Priority
-
-1. **LocaleService + ThemeService** — low risk, high visibility, teaches the pattern
-2. **ThumbnailService** — isolated consumer, easy win
-3. **SettingsStore** — defer, static is acceptable for persistence layer
-4. **log + win32** — skip, true globals
-
-### Build Order
-
-1. Make `LocaleService` + `ThemeService` constructors public
-2. Create instances in `App` widget state
-3. Pass to settings dialog via constructor
-4. Remove `I` static accessor (breaking change, but only 2-3 consumers)
-5. Repeat for `ThumbnailService`
+```
+lib/kernel/
++-- platform/
+|   +-- platform_service.dart          <- abstract interface
+|   +-- noop_platform_service.dart     <- test fallback
+|   +-- windows/
+|       +-- windows_platform_service.dart  <- FFI + MethodChannel
+|       +-- win32_bindings.dart            <- FFI definitions (moved)
+|       +-- display_config.dart            <- refresh rate detection
++-- bridge/
+|   +-- window_bridge.dart             <- keep (DI entry point)
+|   +-- window_bootstrap.dart          <- keep (init sequence)
++-- persistence/
+|   +-- settings_store.dart            <- simplified (see below)
++-- ... (engine, models, services unchanged)
+```
 
 ---
 
-## 4. FFI Safety Layer
+## 3. SettingsStore Simplification
 
-### Current State
+### Current Problem
 
-`WindowService` (329 lines) uses Win32 FFI via `win32_bindings.dart`:
+25+ individual `save*` methods, each wrapping `SharedPreferences` with try-catch:
 
 ```dart
-// Direct FFI calls — no try/finally
-final hwnd = await windowManager.getId();
-final style = win32.getWindowLongPtr(hwnd, gwlStyle);
-win32.setWindowLongPtr(hwnd, gwlStyle, newStyle);
-win32.dwmExtendFrameIntoClientArea(hwnd, margins);
-calloc.free(margins);
+static Future<void> saveVolume(double value) => _save('saveVolume', (p) => p.setDouble(_keyVolume, value.clamp(0.0, 1.0)));
+static Future<void> saveLastFile(String path) => _save('saveLastFile', (p) => p.setString(_keyLastFile, path));
+// ... 23 more methods
 ```
 
-**Problems:**
-- `calloc.free(margins)` not in `finally` block — if `dwmExtendFrameIntoClientArea` throws, memory leaks
-- No timeout protection on async window operations
-- `_fullscreenTransitioning` flag can get stuck if operation fails mid-way
-
-### Safety Layer Strategy
-
-**Add `FfiGuard` utility (NOT a wrapper class):**
+### Recommended: Generic Read/Write Pattern
 
 ```dart
-/// Safe FFI execution with automatic memory cleanup
-T ffiGuard<T>(Pointer pointer, T Function() action) {
-  try {
-    return action();
-  } finally {
-    calloc.free(pointer);
+class SettingsStore {
+  SettingsStore(this._prefs);
+  final SharedPreferences _prefs;
+
+  // Generic typed read
+  T read<T>(String key, T defaultValue) {
+    final value = _prefs.get(key);
+    return (value is T) ? value : defaultValue;
+  }
+
+  // Generic typed write with validation
+  Future<void> write<T>(String key, T value) async {
+    try {
+      switch (value) {
+        case double v: await _prefs.setDouble(key, v);
+        case int v: await _prefs.setInt(key, v);
+        case String v: await _prefs.setString(key, v);
+        case bool v: await _prefs.setBool(key, v);
+      }
+    } on Exception catch (e) {
+      log.e('SettingsStore.write($key) failed: $e');
+    }
+  }
+
+  // Domain-specific getters with validation (keep these)
+  double get volume => read<double>('volume', 1.0).clamp(0.0, 1.0);
+  set volume(double v) => write('volume', v.clamp(0.0, 1.0));
+
+  // Batch save for atomic updates
+  Future<void> saveAll(AppSettings s) async { ... }
+}
+```
+
+**Benefits:**
+- 25+ methods -> ~5 generic methods + property accessors
+- Validation stays at the accessor level (domain knowledge preserved)
+- `saveAll()` remains for atomic multi-key writes
+
+---
+
+## 4. HLS ABR Integration with fvp/MDK
+
+### How FFmpeg HLS Works in fvp
+
+fvp uses FFmpeg's built-in HLS demuxer (`hls.c`). When a `.m3u8` URL is opened:
+
+1. FFmpeg fetches the master playlist
+2. Parses variant streams (different bitrates)
+3. Selects a variant (default: first/highest)
+4. Downloads segments sequentially
+
+**Current fvp config gap:** The `_configureNetworkOptions()` in `fvp_engine.dart` treats all HTTP URLs the same -- no HLS-specific buffering or ABR logic.
+
+### Architecture: Where ABR Fits
+
+```
++---------------------------------------------+
+|  UI Layer                                    |
+|  +-----------------+ +------------------+   |
+|  | ABR indicator   | | Quality selector |   |
+|  | (OSD pill)      | | (settings panel) |   |
+|  +--------+--------+ +--------+---------+   |
++-----------+--------------------+-------------+
+|  Kernel Layer                  |             |
+|  +--------+--------------------+----------+  |
+|  | AbrService (NEW)                       |  |
+|  |  +-- BandwidthEstimator                |  |
+|  |  +-- QualitySelector (BBA algorithm)   |  |
+|  |  +-- SegmentMonitor                    |  |
+|  +----------------+-----------------------+  |
+|  +----------------+-----------------------+  |
+|  | FvpEngine (MODIFIED)                   |  |
+|  |  +-- _configureNetworkOptions()        |  |
+|  |  +-- _configureHlsAbr()  <- NEW        |  |
+|  |  +-- mdk.Player.setProperty(...)       |  |
+|  +----------------------------------------+  |
++---------------------------------------------+
+|  fvp/MDK                                     |
+|  FFmpeg HLS demuxer -> variant selection      |
+|  avformat.hls_* properties                   |
++---------------------------------------------+
+```
+
+### Key Conflict: Low-Latency vs ABR
+
+| Parameter | Low-Latency (RTSP/RTMP) | ABR (HLS) | Resolution |
+|-----------|------------------------|-----------|------------|
+| `fflags +nobuffer` | Required | Harmful | Route by URL type |
+| `setBufferRange(drop:true)` | Required | Harmful | Route by URL type |
+| `demux.buffer.ranges` | 0-1 | 3+ | Route by URL type |
+| `timeout` | 10s | 10s | Same |
+| `probesize` | 1MB | 1MB | Same |
+
+**Solution:** URL-type routing in `_configureNetworkOptions()`:
+
+```dart
+void _configureNetworkOptions(String url) {
+  // Common settings
+  _player.setProperty('timeout', _networkTimeoutMs.toString());
+  _player.setProperty('avformat.probesize', _networkProbeSize.toString());
+
+  if (_isHlsUrl(url)) {
+    _configureHlsAbr(url);
+  } else if (url.startsWith('rtsp://')) {
+    _configureRtspLowLatency();
+  } // ... etc
+}
+
+bool _isHlsUrl(String url) =>
+    url.contains('.m3u8') || url.contains('/hls/');
+```
+
+### AbrService Design
+
+```dart
+class AbrService {
+  AbrService(this._player);
+
+  final mdk.Player _player;
+  final _estimator = BandwidthEstimator(windowSize: 5);
+  QualityLevel _currentQuality = QualityLevel.auto;
+
+  /// Configure HLS ABR on the player
+  void configure() {
+    // Disable low-latency buffering
+    // Let FFmpeg HLS demuxer manage buffering
+    _player.setProperty('demux.buffer.ranges', '3');
+    // Do NOT set fflags +nobuffer
+    // Do NOT set drop:true
+  }
+
+  /// Called periodically with segment download metrics
+  void onSegmentDownloaded(int bytes, Duration downloadTime) {
+    _estimator.record(bytes, downloadTime);
+    if (_currentQuality == QualityLevel.auto) {
+      _selectQuality();
+    }
+  }
+
+  void _selectQuality() {
+    final bandwidth = _estimator.estimate();
+    // BBA: select highest bitrate that fits in buffer
+    // For now: simple throughput-based
+    final level = _selectByThroughput(bandwidth);
+    if (level != _currentQuality) {
+      _player.setProperty('avformat.hls_prefer_list', level.name);
+    }
   }
 }
-
-/// Safe FFI execution with timeout + disposed check
-Future<T> ffiGuardAsync<T>(
-  bool disposed,
-  Future<T> Function() action, {
-  Duration timeout = const Duration(seconds: 5),
-}) async {
-  if (disposed) throw StateError('Service disposed');
-  return action().timeout(timeout);
-}
 ```
 
-### Integration Points in WindowService
+### MDK Properties for HLS ABR
 
-**Where to add try/finally:**
+| Property | Purpose | Example |
+|----------|---------|---------|
+| `avformat.hls_prefer_list` | Preferred quality variants | `'1080p:720p:480p'` |
+| `protocol_whitelist` | Allowed protocols | `'file,http,https,tcp,tls'` |
+| `demux.buffer.ranges` | Buffer depth for HLS | `'3'` |
+| `avformat.allow_static_reoptimize` | Allow re-optimization | `'1'` |
 
-1. `removeBorderImmediate()` — `calloc<Margins>()` needs `finally { calloc.free(margins) }`
-2. `setFullscreen()` — `_savedFrame` allocation needs cleanup on failure
-3. `setMaximized()` — `_savedMaximizeFrame` allocation needs cleanup
+**Note:** FFmpeg's HLS demuxer has built-in ABR via `hls_prefer_list`. For basic ABR, the application only needs to set the prefer list -- FFmpeg handles segment selection. For advanced ABR (BBA/MPC), the application needs to monitor buffer levels and override the prefer list dynamically.
 
-**Where to add timeout:**
+### Integration Points
 
-1. `windowManager.getId()` — can hang if window not ready
-2. `windowManager.getSize()` / `getPosition()` — can hang during transitions
-
-**Where to add disposed check:**
-
-1. All `WindowListener` callbacks — already have `if (_disposed)` guards
-2. All public methods — some missing guards
-
-### What NOT to Change
-
-- **WindowService API** — no signature changes. Safety is internal.
-- **win32_bindings.dart** — FFI type definitions are correct, no changes needed
-- **MethodChannel path** — not used for critical operations (direct FFI is faster)
-
-### Build Order
-
-1. Add `ffiGuard` / `ffiGuardAsync` to `lib/kernel/utils/ffi_safety.dart`
-2. Wrap `removeBorderImmediate()` allocations in `ffiGuard`
-3. Wrap `setFullscreen()` / `setMaximized()` allocations
-4. Add timeout to async window manager calls
-5. Add disposed guards to any missing public methods
-6. Verify WindowService tests pass
+1. **FvpEngine._configureNetworkOptions()** -- add HLS branch
+2. **New AbrService** -- bandwidth estimation + quality selection
+3. **MediaEngine interface** -- add `ValueNotifier<AbrState> get abrState` (optional, for UI)
+4. **SettingsStore** -- add ABR mode preference (auto/manual/off)
 
 ---
 
-## Integration Summary
+## 5. Build Order (Dependencies)
 
-### New Files
-
-| File | Layer | Purpose |
-|------|-------|---------|
-| `lib/kernel/engine/network_configurator.dart` | Kernel | Network stream protocol config |
-| `lib/kernel/engine/video_effects_manager.dart` | Kernel | Video effect + D3D11 settings |
-| `lib/kernel/utils/ffi_safety.dart` | Kernel | FFI guard utilities |
-
-### Modified Files
-
-| File | Change | Risk |
-|------|--------|------|
-| `lib/kernel/engine/fvp_engine.dart` | Delegate to new modules | LOW — no interface change |
-| `lib/kernel/persistence/settings_store.dart` | Add generic save helper | LOW — internal only |
-| `lib/kernel/services/locale_service.dart` | Public constructor | LOW — 2-3 consumers |
-| `lib/kernel/services/theme_service.dart` | Public constructor | LOW — 2-3 consumers |
-| `lib/kernel/bridge/window_service.dart` | Add ffiGuard calls | LOW — internal only |
-| `lib/app.dart` | Create service instances | LOW — composition root |
-
-### Unchanged
-
-| File | Reason |
-|------|--------|
-| `lib/kernel/engine/media_engine.dart` | Interface stable |
-| `lib/features/player/player_services.dart` | Already uses constructor injection |
-| `lib/features/player/services/playback_controller.dart` | Already uses constructor injection |
-| All UI files | No layer boundary changes |
-
-### Build Order (Dependency-Aware)
+### Phase Dependency Graph
 
 ```
-Phase 1: FFI Safety (no dependencies)
-  1. ffi_safety.dart
-  2. WindowService ffiGuard integration
-
-Phase 2: Engine Decomposition (no dependencies)
-  3. NetworkConfigurator extraction
-  4. VideoEffectsManager extraction
-  5. FvpEngine delegation
-
-Phase 3: SettingsStore (depends on nothing)
-  6. Generic save helper
-  7. Rewrite individual methods as wrappers
-
-Phase 4: Singleton Migration (depends on Phase 3 for SettingsStore)
-  8. LocaleService + ThemeService public constructors
-  9. App widget instance creation
-  10. ThumbnailService instance
+1. PlatformService interface + singleton migration
+   | (no external dependency)
+   v
+2. C++ WM_NCCALCSIZE handler
+   | (depends on PlatformService for Dart-side cleanup)
+   v
+3. Window layer simplification
+   | (depends on C++ handler replacing Dart FFI)
+   v
+4. SettingsStore simplification
+   | (independent, but easier after singleton migration)
+   v
+5. HLS ABR integration
+   (independent of window work, but touches FvpEngine)
 ```
 
-Phases 1-3 are independent and can be parallelized. Phase 4 depends on Phase 3 only if SettingsStore is migrated (currently deferred).
+### Recommended Build Order
+
+| Step | Task | Dependencies | Risk |
+|------|------|-------------|------|
+| 1 | Extract `PlatformService` interface | None | Low -- pure extraction |
+| 2 | Migrate singletons to constructor injection | Step 1 | Medium -- touches many files |
+| 3 | C++ `WM_NCCALCSIZE` handler | Step 1 (for Dart cleanup) | High -- Win32 API complexity |
+| 4 | C++ `WM_NCHITTEST` handler | Step 3 | Medium -- hit zone tuning |
+| 5 | C++ `WM_SIZING` aspect ratio | Step 3 | Medium -- 8-edge math |
+| 6 | Remove Dart `_removeBorder()` | Steps 3-5 | Low -- deletion |
+| 7 | Window layer file consolidation | Step 6 | Low -- reorganization |
+| 8 | `SettingsStore` generic pattern | Step 2 | Low -- refactor |
+| 9 | `AbrService` + HLS routing | None (independent) | Medium -- FFmpeg config |
+| 10 | ABR UI integration | Step 9 | Low -- display only |
+
+### Parallel Work Streams
+
+- **Window stream:** Steps 1-7 (sequential, high risk)
+- **Settings stream:** Step 8 (independent, low risk)
+- **HLS stream:** Steps 9-10 (independent, medium risk)
+
+Steps 8 and 9 can run in parallel with the window stream.
 
 ---
 
-## Confidence Assessment
+## Sources
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| FvpEngine decomposition | HIGH | Clear section boundaries, 3 existing helpers prove pattern works |
-| SettingsStore simplification | HIGH | Pattern is obvious (20+ identical methods), generic helper is standard Dart |
-| Singleton migration | MEDIUM | LocaleService/ThemeService easy, SettingsStore has 8+ consumers |
-| FFI safety | HIGH | try/finally is straightforward, WindowService already has disposed guards |
-
-## Risks
-
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| FvpEngine extraction breaks callback wiring | LOW | Helpers already receive ValueNotifiers via constructor |
-| SettingsStore generic loses type safety | LOW | Validator map provides runtime clamping, tests catch regressions |
-| Singleton removal breaks settings dialog | LOW | Only 2-3 consumers, easy to update |
-| FFI guard hides original exception | LOW | Use `rethrow` in catch, log before rethrow |
+- Codebase: `windows/runner/flutter_window.cpp`, `win32_window.cpp` (stock template)
+- Memory: `anti_pattern_window_frameless.md` (3 failed approaches)
+- Memory: `project_native_layer_interfaces.md` (MethodChannel contract)
+- Memory: `project_bridge_layer_design.md` (bridge architecture)
+- Memory: `project_hls_abr_plan.md` (ABR architecture + MDK properties)
+- Memory: `reference_fvp_source_structure.md` (fvp internals)
+- Memory: `reference_fvp_performance_bottlenecks.md` (rendering pipeline)
+- Memory: `reference_desktop_embedder_api.md` (Flutter embedder API)

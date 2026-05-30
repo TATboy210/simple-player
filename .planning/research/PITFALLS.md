@@ -1,352 +1,485 @@
-# Domain Pitfalls: v1.2 Refactoring Risks
+# Domain Pitfalls: v1.2.1 Window Smoothness, HLS ABR, Architecture Simplification
 
-**Domain:** Flutter desktop media player refactoring
-**Researched:** 2026-05-30
-**Overall confidence:** HIGH (based on codebase analysis + established Dart/FFI patterns)
-
----
-
-## 1. FFI try/finally Around Existing Pointer Code
-
-### Pitfall 1a: Pointer Lifetime Assumption Breakage
-
-**What goes wrong:** Wrapping FFI calls in try/finally can free pointers that are still referenced by other code paths. In `WindowService`, `_savedFrame` and `_savedMaximizeFrame` are allocated in one method and freed in a different method (`_exitFullscreen` / `restore` / `dispose`). Adding try/finally to `_enterFullscreen` that frees `_savedFrame` on exception would break `_exitFullscreen` which assumes the pointer is still valid.
-
-**Why it happens:** The current code has implicit pointer ownership transfer: `_enterFullscreen` allocates `_savedFrame`, then `_exitFullscreen` reads and frees it. try/finally makes ownership boundaries explicit, but if the "finally" frees the pointer, the consumer method gets a use-after-free.
-
-**Consequences:** Crash or undefined behavior when `_exitFullscreen` tries to read `_savedFrame.ref.left` after it was already freed by a try/finally in `_enterFullscreen`.
-
-**Prevention:**
-- Map pointer ownership BEFORE adding try/finally. Draw a lifecycle diagram: allocate -> use -> free. Each pointer must have exactly ONE owner at any time.
-- For `_savedFrame`: owner is `_enterFullscreen` (alloc) -> `_exitFullscreen` (free). The try/finally in `setFullscreen` already correctly resets `_fullscreenTransitioning` without touching pointers.
-- Add try/finally only to SHORT-LIVED pointers (allocated and freed within the same method scope), like the `frame`, `margins`, and `mi` temporaries in `_enterFullscreen`.
-
-**Detection:** After adding try/finally, run the test suite. Any `StateError` or pointer access violation in `_exitFullscreen` or `restore` signals ownership conflict.
-
-**Code reference:** `window_service.dart` lines 165-173 (`_savedFrame` alloc), 217-228 (`_savedFrame` free), 258-266 (`_savedMaximizeFrame` alloc), 305-306 (`_savedMaximizeFrame` free).
-
-### Pitfall 1b: Double-Free on Exception Path
-
-**What goes wrong:** If `_enterFullscreen` throws after allocating `_savedFrame` but before the method completes, and the existing `setFullscreen` try/finally resets state, a subsequent `_exitFullscreen` call may attempt to free `_savedFrame` again (if the pointer was partially set).
-
-**Why it happens:** The guard `_savedFrame = null` on line 231 only runs if `_exitFullscreen` completes normally. If `_exitFullscreen` itself throws at line 218 (`setWindowPos`), the pointer leaks AND a retry could double-free.
-
-**Prevention:**
-```dart
-// SAFE: null-check-then-free with immediate null
-if (_savedFrame != null) {
-  final ptr = _savedFrame!;
-  _savedFrame = null;  // null BEFORE free
-  calloc.free(ptr);
-}
-```
-- Always null the reference BEFORE calling `calloc.free`, not after.
-- This prevents double-free even if `calloc.free` throws (which it shouldn't, but defensive).
-
-**Detection:** Add a test that simulates `_exitFullscreen` failure (mock `windowManager.getId()` to throw), then verify `dispose()` does not crash.
-
-### Pitfall 1c: Arena Allocator Misuse
-
-**What goes wrong:** Using `package:ffi`'s `Arena` allocator for pointers that outlive the Arena scope. Arena frees everything on scope exit, which is correct for temporaries but destroys long-lived pointers like `_savedFrame`.
-
-**Prevention:** Only use Arena for truly temporary allocations (the `frame`, `margins`, `mi` pointers in `_enterFullscreen`/`_exitFullscreen`). Keep manual `calloc`/`free` for `_savedFrame` and `_savedMaximizeFrame` since they cross method boundaries.
-
-**Phase:** SEC-01 (FFI memory safety)
+**Domain:** Flutter desktop media player -- Win32 frameless window, HLS adaptive bitrate, platform abstraction
+**Researched:** 2026-05-31
+**Overall confidence:** HIGH (Win32/HLS based on prior project experience + domain knowledge; Platform abstraction MEDIUM -- fewer battle-tested patterns for Flutter desktop)
 
 ---
 
-## 2. Decomposing FvpEngine (690 lines)
+## 1. Win32 Frameless Window Smoothness (WIN-05)
 
-### Pitfall 2a: Interface Breakage Cascade
+### Pitfall 1a: Flutter Engine Message Interception Kills Custom WM_NCCALCSIZE
 
-**What goes wrong:** `MediaEngine` is a 185-line abstract interface with 30+ members. `FvpEngine` is the only production implementation, but `FakeEngine` (376 lines) also implements it. Extracting methods from `FvpEngine` into sub-classes requires either: (a) the sub-class holds a reference to `mdk.Player`, breaking the `MediaEngine` abstraction, or (b) a new internal interface is created, adding indirection.
+**What goes wrong:** Adding `WM_NCCALCSIZE` handling in `flutter_window.cpp` `MessageHandler` does nothing because Flutter's `HandleTopLevelWindowProc` (line 46-53) runs FIRST and may consume the message. The current code at `flutter_window.cpp:46` shows:
 
-**Why it happens:** `FvpEngine` mixes playback control, network configuration, track management, video effects, and D3D11 settings. These all need `_player` (the `mdk.Player` instance). Extracting `NetworkConfigurator` or `VideoEffectController` means they need the player reference, creating a new coupling surface.
-
-**Consequences:** If extraction creates a new internal interface (e.g., `_PlayerAccessor`), every test that mocks `FakeEngine` must also mock the accessor. If extraction passes `mdk.Player` directly, the sub-classes become platform-specific and untestable with `FakeEngine`.
-
-**Prevention:**
-- Extract BEHAVIOR + STATE together. `NetworkConfigurator` should own the network-related constants and the `_configureNetworkOptions` method, receiving `mdk.Player` as a method parameter (not constructor injection).
-- Keep `MediaEngine` interface unchanged. The decomposition is internal to `FvpEngine` — callers never see the sub-classes.
-- Each extracted class should be independently testable with a mock player object, NOT through `FakeEngine`.
-
-**Detection:** If any test file changes during decomposition, the extraction is leaking internals.
-
-### Pitfall 2b: State Fragmentation
-
-**What goes wrong:** `FvpEngine` has 12 `ValueNotifier` fields. If `VideoEffectController` is extracted, it might need access to `errorMessage` (for error reporting) and `state` (for state transitions). This creates a dependency from the sub-class back to the parent, defeating the purpose of extraction.
-
-**Why it happens:** Error handling in `_guardedAction` updates both `errorMessage` and `_errorType`. If video effect methods are extracted, they need this error reporting mechanism.
-
-**Prevention:**
-- Extract an `ErrorHandler` mixin or callback pattern:
-```dart
-typedef ErrorCallback = void Function(String message, MediaErrorType type);
-
-class VideoEffectController {
-  final mdk.Player _player;
-  final ErrorCallback _onError;
-  // ...
-}
-```
-- The parent `FvpEngine` passes its error handler to the sub-class.
-- ValueNotifiers stay on `FvpEngine`. Sub-classes update state through callbacks, not direct ValueNotifier access.
-
-**Detection:** If an extracted class imports `media_engine.dart` or holds a `ValueNotifier` reference, it has state fragmentation.
-
-### Pitfall 2c: Breaking the _guardedAction Pattern
-
-**What goes wrong:** `FvpEngine._guardedAction` wraps every operation with `_disposed` check + try-catch + error logging. Extracting methods means each sub-class needs its own guard, or the guard is lost.
-
-**Prevention:** Extract `_guardedAction` into a shared utility (or keep it on `FvpEngine` and have sub-classes call back to it):
-```dart
-// On FvpEngine
-void _guardedAction(String name, void Function() action) { ... }
-
-// Sub-class calls parent's guard via callback
-class D3D11Configurator {
-  final mdk.Player _player;
-  final void Function(String, void Function()) _guarded;
-  // ...
-  void setSyncEnabled(bool enabled) {
-    _guarded('setD3d11SyncEnabled', () { ... });
-  }
-}
-```
-
-**Phase:** ARCH-01 (fvp_engine decomposition)
-
----
-
-## 3. Migrating Singletons to DI
-
-### Pitfall 3a: Test Breakage from Missing Reset
-
-**What goes wrong:** The 6 singletons (`LocaleService.I`, `ThemeService.I`, `OsdService.I`, `PerfMonitor.instance`, `EnginePrewarm._prewarmed`, `ThumbnailService._cache`) use `static final` initialization. Tests that call `reset()` (where it exists) work. Tests that DON'T call `reset()` leak state. Migrating to DI without updating ALL test setUp/tearDown breaks tests that relied on implicit singleton lifecycle.
-
-**Why it happens:** Singletons hide initialization. DI makes it explicit. A test that previously worked because `LocaleService.I` was already initialized from a prior test will fail when DI requires explicit registration.
-
-**Prevention:**
-- BEFORE migrating: Add `reset()` to every singleton that lacks it (`OsdService.I`, `EnginePrewarm`). Verify all tests call reset in tearDown.
-- Migrate ONE singleton at a time. Run full test suite after each.
-- Keep the static accessor (`X.I`) as a convenience that delegates to the DI container during production and to a test double during tests:
-```dart
-class LocaleService {
-  static LocaleService get I => _di.get<LocaleService>();
-  // ...
-}
-```
-
-**Detection:** Run `flutter test` after each singleton migration. Any `StateError: Locale not initialized` or similar signals missing DI registration.
-
-### Pitfall 3b: Circular Dependencies
-
-**What goes wrong:** `LocaleService` depends on `SettingsStore` (static methods). `ThemeService` depends on `SettingsStore`. `SettingsStore` depends on `SharedPreferences` (static prewarm). If DI wiring requires constructor injection, and `SettingsStore` becomes non-static, then `LocaleService` -> `SettingsStore` -> `SharedPreferences` is a chain. If any service in the chain also needs `LocaleService` (e.g., for error messages), you get a cycle.
-
-**Why it happens:** The current static pattern hides the dependency graph. DI makes it explicit, and cycles that were invisible become compile errors.
-
-**Prevention:**
-- Map the dependency graph BEFORE migration:
-```
-LocaleService -> SettingsStore -> SharedPreferences
-ThemeService  -> SettingsStore -> SharedPreferences
-OsdService    -> (no deps)
-PerfMonitor   -> (no deps)
-EnginePrewarm -> fvp (external)
-ThumbnailService -> (no deps, static cache only)
-```
-- Migrate LEAF nodes first (OsdService, PerfMonitor) — they have no deps and no cycle risk.
-- Keep `SettingsStore` as static methods. It's a utility, not a service. Converting it to injectable would force all dependents to accept it as a constructor parameter, adding noise for no benefit.
-
-**Detection:** If `dart analyze` reports import cycles after migration, the DI graph has a cycle.
-
-### Pitfall 3c: get_it vs Constructor Injection Inconsistency
-
-**What goes wrong:** Mixing `get_it` service locator with constructor injection creates two dependency mechanisms. Some classes get deps via constructor, others via `GetIt.I<T>()`. Tests must now mock both patterns.
-
-**Prevention:** Pick ONE mechanism:
-- **Constructor injection** for all services (preferred — explicit, testable).
-- **get_it** only at the composition root (main.dart) for wiring.
-- NEVER call `GetIt.I<T>()` inside business logic. Always receive deps via constructor.
-
-**Phase:** ARCH-03 (singleton migration)
-
----
-
-## 4. Adding Validation to URL/Path Handling
-
-### Pitfall 4a: False Rejection of Valid URLs
-
-**What goes wrong:** `Uri.tryParse()` is stricter than FFmpeg's URL parser. Valid media URLs that FFmpeg handles correctly may fail Dart's `Uri` validation:
-- `rtsp://user:pass@host/path` (credentials in URL)
-- `srt://host:port?mode=caller&latency=50000` (query params with special chars)
-- URLs with unencoded spaces (FFmpeg tolerates them)
-- `udp://239.0.0.1:1234` (multicast — valid but no path component)
-
-**Why it happens:** The current `PathValidator.isUrl()` only checks prefix (`startsWith`), which is permissive. Replacing it with `Uri.tryParse()` structural validation would reject URLs that FFmpeg handles fine.
-
-**Prevention:**
-- Keep prefix-based scheme detection (`isUrl`). Do NOT replace with `Uri.tryParse`.
-- Add structural validation ONLY for http/https URLs (where `Uri.tryParse` is reliable):
-```dart
-static bool isValidUrl(String url) {
-  if (!isUrl(url)) return false;
-  // Only validate HTTP/HTTPS structure
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    final uri = Uri.tryParse(url);
-    return uri != null && uri.host.isNotEmpty;
-  }
-  // RTSP/RTMP/SRT/UDP/TCP — trust FFmpeg's parser
-  return true;
-}
-```
-- Never reject a URL that the current code accepts. Validation should only ADD checks for obviously malformed input (empty host, null bytes).
-
-**Detection:** Add test cases for every URL scheme in `_urlSchemes`. If any existing test URL fails validation, the check is too strict.
-
-### Pitfall 4b: Path Length False Rejection on Long Filenames
-
-**What goes wrong:** Adding MAX_PATH (260) validation rejects valid paths on modern Windows with long path support enabled. Windows 10+ with registry key `LongPathsEnabled` supports paths up to 32,767 characters. FFmpeg also handles long paths.
-
-**Why it happens:** The 260-char limit is a legacy Win32 API constraint, not a filesystem constraint. `File.exists()` in Dart handles long paths correctly.
-
-**Prevention:**
-- Do NOT add path length validation. `File.exists()` already handles invalid paths gracefully.
-- If you must add a safety limit, use 32,767 (not 260).
-- The current code's `File.exists()` check in `FvpEngine.open()` is sufficient.
-
-**Detection:** Test with a 300-character path. If it's rejected, the limit is too low.
-
-### Pitfall 4c: Null Byte Injection Already Handled
-
-**What goes wrong:** Adding redundant null byte checks when `PathValidator.isPathTraversal` already checks for `\x00`. Over-validation adds maintenance burden and can conflict (one check rejects, another allows).
-
-**Prevention:** The existing `PathValidator.isPathTraversal` at line 69 already checks `path.contains('\x00')`. Do not add duplicate checks. Focus validation effort on areas that are ACTUALLY missing (URL structure for http/https).
-
-**Phase:** SEC-02 (input validation)
-
----
-
-## 5. Adding Timeout Guards to Async Operations
-
-### Pitfall 5a: Fullscreen Transition Timeout Race
-
-**What goes wrong:** The `_fullscreenTransitioning` boolean guard (line 145) has no timeout. Adding a `Timer` that resets it after N seconds creates a race: if the timer fires AND the real transition completes, both paths execute, potentially calling `_exitFullscreen` while `_enterFullscreen` is still running.
-
-**Why it happens:** The timer callback and the `finally` block in `setFullscreen` both set `_fullscreenTransitioning = false`. If the timer fires first, the guard is released, allowing a concurrent `setFullscreen(!value)` call that starts `_exitFullscreen` while the original `_enterFullscreen` is still awaiting `windowManager.getId()`.
-
-**Consequences:** Both `_enterFullscreen` and `_exitFullscreen` run concurrently, both call `setWindowPos`, and the window flickers or ends up in an inconsistent state.
-
-**Prevention:**
-```dart
-Timer? _fullscreenTimeout;
-
-Future<void> setFullscreen(bool value) async {
-  if (_fullscreenTransitioning) return;
-  _fullscreenTransitioning = true;
-  _fullscreenTimeout?.cancel();
-  _fullscreenTimeout = Timer(const Duration(seconds: 2), () {
-    if (_fullscreenTransitioning) {
-      debugPrint('WindowService: fullscreen transition timed out');
-      _fullscreenTransitioning = false;
+```cpp
+if (flutter_controller_) {
+    std::optional<LRESULT> result =
+        flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam, lparam);
+    if (result) {
+        return *result;  // <-- custom handler never reached
     }
-  });
-  try {
-    if (value) {
-      await _enterFullscreen();
-    } else {
-      await _exitFullscreen();
-    }
-  } finally {
-    _fullscreenTimeout?.cancel();
-    _fullscreenTransitioning = false;
-  }
 }
 ```
-- The `finally` block cancels the timer. If the timer already fired, the `finally` still runs (setting `_fullscreenTransitioning = false` again is idempotent).
-- The timer callback checks `_fullscreenTransitioning` before resetting, avoiding unnecessary state changes.
 
-**Detection:** Test with a simulated slow `windowManager.getId()` (add 3-second delay in FakeWindowService). Verify the timeout fires and subsequent calls work.
+If Flutter returns a value for `WM_NCCALCSIZE`, your custom handler below it is dead code.
 
-### Pitfall 5b: Future.timeout vs Manual Timer
+**Why it happens:** Flutter's embedder registers its own window proc that intercepts certain messages. `WM_NCCALCSIZE` and `WM_NCHITTEST` are among the messages Flutter may handle.
 
-**What goes wrong:** Using `Future.timeout()` on the Win32 API calls in `_enterFullscreen`/`_exitFullscreen` throws `TimeoutException`, which the existing try/finally in `setFullscreen` catches. But the Win32 API call (e.g., `setWindowPos`) is a synchronous FFI call — it doesn't return a Future. `Future.timeout()` only works on async operations.
-
-**Why it happens:** `win32.setWindowPos(...)` is a synchronous native call. Wrapping it in `Future.timeout()` has no effect — the timeout never fires because the call blocks the isolate.
+**Consequences:** The C++ `WM_NCCALCSIZE` handler compiles and runs but has zero effect. The title bar remains visible or the border flash persists. Developer wastes hours debugging a handler that never executes.
 
 **Prevention:**
-- For synchronous FFI calls, timeout must be implemented at the C++ level (not Dart).
-- For async operations (`windowManager.getId()`, `windowManager.getSize()`), `Future.timeout()` works correctly.
-- The fullscreen transition timeout should guard the OVERALL operation (the boolean flag), not individual FFI calls.
+- Option A: Move custom handling BEFORE `HandleTopLevelWindowProc` -- but this risks breaking Flutter's own DPI/layout logic.
+- Option B: Use `DwmExtendFrameIntoClientArea` with `margins = {-1, -1, -1, -1}` in `OnCreate()` BEFORE the Flutter controller is created. This operates at the DWM level, not the message level.
+- Option C: Register a separate `WNDPROC` via `SetWindowLongPtr(GWLP_WNDPROC, ...)` that runs BEFORE Flutter's handler. This is what `bitsdojo_window` does.
+- Option D (recommended): Keep `WS_CAPTION` style, use `WM_NCCALCSIZE` to zero the non-client area, but call `DwmExtendFrameIntoClientArea` for shadow. Test that `HandleTopLevelWindowProc` does NOT consume `WM_NCCALCSIZE` first -- it may not.
 
-**Detection:** If adding `Future.timeout()` to a synchronous FFI call and the test shows the timeout never fires, this pitfall is active.
+**Detection:** Add `OutputDebugStringW(L"WM_NCCALCSIZE hit\n")` in your handler. If it doesn't appear in debug output when resizing, Flutter consumed it.
 
-### Pitfall 5c: open() Prepare Timeout Already Exists
-
-**What goes wrong:** `FvpEngine.open()` already has `_prepareTimeoutSeconds = 10` and `_textureTimeoutSeconds = 5` timeouts (lines 274, 351). Adding a SECOND timeout at a higher level (e.g., in `PlaybackController`) creates nested timeouts where the outer timeout fires before the inner one, causing confusing error messages.
-
-**Prevention:**
-- Do NOT add redundant timeouts. The existing `prepare().timeout()` and `updateTexture().timeout()` are sufficient.
-- If adding a timeout guard to `setFullscreen`, it should be the ONLY timeout for that operation.
-- Document which layer owns the timeout for each async operation.
-
-**Detection:** If two timeouts can fire for the same operation, one is redundant.
-
-**Phase:** SEC-01 (fullscreen timeout), SEC-02 (URL validation)
+**Phase:** WIN-05 (C++ WM_NCCALCSIZE)
 
 ---
 
-## Cross-Cutting Pitfalls
+### Pitfall 1b: WS_CAPTION Removal Kills DWM Animation (Already Proven)
 
-### Pitfall X1: SettingsStore Refactor Breaks Load/Save Symmetry
+**What goes wrong:** The current `SetFrameless` in `window_channel.cpp` removes `WS_CAPTION`:
 
-**What goes wrong:** `SettingsStore.load()` returns an `AppSettings` with 20+ fields, each with clamped defaults. `saveXxx()` methods write individual fields. Simplifying to "serialize entire object" breaks the per-field try-catch isolation — one corrupted field no longer prevents loading other fields.
+```cpp
+style &= ~WS_CAPTION;      // removes title bar
+style |= WS_THICKFRAME;    // keeps resize border
+```
 
-**Prevention:** If switching to bulk serialization, keep per-field validation in the deserializer. The `_sanitizeDimension`/`_sanitizeCoordinate`/`_sanitizeRotation` helpers must survive the refactor.
+This destroys DWM maximize/restore animation, Win11 rounded corners, and window shadow. This is the EXISTING behavior and has been documented as an anti-pattern in `anti_pattern_window_frameless.md`.
 
-**Phase:** ARCH-02 (SettingsStore simplification)
+**Why it happens:** `WS_CAPTION` is not just the title bar text -- it is the DWM animation pipeline's required style flag. Without it, DWM skips smooth transitions.
 
-### Pitfall X2: FakeEngine Must Track New Sub-Class Calls
+**Consequences:** Maximize/restore becomes a jarring snap. Win11 corners become square. Shadow disappears. The "Apple-level smoothness" goal is impossible with this approach.
 
-**What goes wrong:** After extracting `NetworkConfigurator` from `FvpEngine`, tests that verify `_configureNetworkOptions` behavior (6 protocol branches) must now either: test `NetworkConfigurator` directly (preferred) or keep testing through `FvpEngine` (which means `FakeEngine` needs updating).
+**Prevention:**
+- DO NOT remove `WS_CAPTION`. Instead, keep it and use `WM_NCCALCSIZE` to collapse the non-client area to zero pixels. This preserves DWM's animation pipeline while hiding the visual title bar.
+- If `WM_NCCALCSIZE` is intercepted by Flutter (Pitfall 1a), use `DwmExtendFrameIntoClientArea` with `{-1,-1,-1,-1}` margins as the fallback.
+- The fullscreen transition (`WS_POPUP` switch) is separate and should use `SetWindowPos` atomically (already proven in `project_fullscreen_win32_fix.md`).
 
-**Prevention:** Test extracted sub-classes directly with a mock `mdk.Player`. Do NOT update `FakeEngine` to mirror internal decomposition — `FakeEngine` tests the `MediaEngine` interface, not internals.
+**Detection:** After implementing, press Win+Left/Right to snap, then Win+Up to maximize. If the animation is not smooth (snaps instead of gliding), `WS_CAPTION` was removed.
 
-**Phase:** ARCH-01 (fvp_engine decomposition)
+**Phase:** WIN-05 (unified border removal)
 
-### Pitfall X3: dispose() Order Sensitivity
+---
 
-**What goes wrong:** `FvpEngine.dispose()` disposes 12 ValueNotifiers + 3 helpers. If decomposition moves some ValueNotifiers to sub-classes, the dispose order matters — disposing a ValueNotifier that a sub-class still references causes `A dismissed ChangeNotifier was used` error.
+### Pitfall 1c: Startup Border Flash (First Frame Problem)
 
-**Prevention:** Sub-classes should NOT own ValueNotifiers. Only `FvpEngine` disposes them. Sub-classes receive ValueNotifiers as constructor parameters (read-only access).
+**What goes wrong:** `CreateWindow` in `win32_window.cpp` creates the window with `WS_OVERLAPPEDWINDOW` (full native title bar + borders). Then Dart calls `setFrameless(true)` which removes `WS_CAPTION`. Between creation and the Dart call, ONE frame with the native title bar is visible -- the "startup flash."
 
-**Phase:** ARCH-01
+**Why it happens:** The init sequence is:
+```
+CreateWindow (WS_OVERLAPPEDWINDOW) → show window → Flutter engine starts →
+Dart main() → WindowService.init() → setFrameless(true)
+```
+
+The window is visible for several frames before `setFrameless` runs.
+
+**Consequences:** User sees a brief flash of the native Windows title bar before it disappears. On slow machines or high-DPI displays, this can last 100-200ms.
+
+**Prevention:**
+- Option A: Create the window with `WS_POPUP` style initially (no borders at all), then add `WS_THICKFRAME` after Flutter is ready. This avoids the flash but may lose DWM shadow.
+- Option B: Create the window off-screen at `(-32000, -32000)`, apply `WM_NCCALCSIZE` handling, then move to correct position after first frame.
+- Option C (recommended): Apply `WM_NCCALCSIZE` handling in `Win32Window::OnCreate()` BEFORE `ShowWindow()`. The message handler runs during `CreateWindow`, so `WM_NCCALCSIZE` is processed before the window is visible.
+- Option D: Use `SetWindowPos` with `SWP_HIDEWINDOW` to create hidden, apply frameless, then `ShowWindow`.
+
+**Detection:** Use screen recording at 60fps. Play back frame by frame. If any frame shows the native title bar, the flash exists.
+
+**Phase:** WIN-05 (unified border removal)
+
+---
+
+### Pitfall 1d: WM_NCHITTEST Conflict with DragToResizeArea
+
+**What goes wrong:** The current codebase uses `DragToResizeArea` (from `window_manager` package) for resize edges. Adding C++ `WM_NCHITTEST` handling creates TWO resize systems that conflict: the C++ handler returns `HTLEFT`/`HTRIGHT` etc. for edge detection, while `DragToResizeArea` also detects edges via `MouseRegion` + `GestureDetector`.
+
+**Why it happens:** `DragToResizeArea` works at the Flutter widget level (hit testing on transparent edge regions). `WM_NCHITTEST` works at the Win32 level (returning hit test constants to Windows). Both try to handle the same 8px edge areas.
+
+**Consequences:** Double resize triggers, jittery edge behavior, or one system overriding the other depending on message processing order.
+
+**Prevention:**
+- If implementing native `WM_NCHITTEST` in C++, REMOVE `DragToResizeArea` from the widget tree. The native handler replaces it.
+- If keeping `DragToResizeArea`, do NOT add `WM_NCHITTEST` handling. Pick one system.
+- The recommended path: native `WM_NCHITTEST` is superior (zero-latency, no Flutter widget overhead), but requires Pitfall 1a to be resolved first.
+
+**Detection:** Drag a window edge. If resize starts then stops, or starts twice, both systems are active.
+
+**Phase:** WIN-05 (C++ WM_NCCALCSIZE)
+
+---
+
+### Pitfall 1e: DWM Corner Preference Reset on Snap/Maximize
+
+**What goes wrong:** Windows 11 DWM resets `DWMWA_WINDOW_CORNER_PREFERENCE` during snap/maximize/restore transitions. The current `ApplyRoundedCorners` in `win32_window.cpp` is called once during creation, but not after state changes.
+
+**Why it happens:** DWM re-applies default corner style (square) during certain transitions. The attribute must be re-applied after every `WM_SIZE` or `WM_NCCALCSIZE` cycle.
+
+**Consequences:** After snapping or maximizing, the window corners become square instead of round. The fix in `project_window_corner_fix.md` addressed this partially, but a full WM_NCCALCSIZE implementation may re-trigger it.
+
+**Prevention:**
+- Call `ApplyRoundedCorners(hwnd)` in the `WM_SIZE` handler, not just in `OnCreate()`.
+- The existing `ApplyRoundedCorners` function is correct; it just needs to be called more often.
+
+**Detection:** On Win11: snap window left, snap right, maximize, restore. If corners are square at any point, the reset happened.
+
+**Phase:** WIN-05
+
+---
+
+## 2. HLS ABR with BBA Algorithm (HLS-01)
+
+### Pitfall 2a: Low-Latency Config Conflicts with ABR Buffer Requirements
+
+**What goes wrong:** The current `FvpEngine` applies low-latency settings for ALL network streams:
+- `fflags +nobuffer` (minimize buffering)
+- `setBufferRange(drop:true)` (drop frames to maintain latency)
+- Small `demux.buffer.ranges`
+
+ABR requires the OPPOSITE: large buffers to measure bandwidth, preload segments, and absorb network jitter. Applying ABR without removing low-latency settings causes constant rebuffering and quality oscillation.
+
+**Why it happens:** The network configuration in `fvp_engine.dart` applies uniformly based on URL detection (`isUrl()`). There is no stream-type routing.
+
+**Consequences:** HLS streams rebuffer constantly. BBA algorithm sees empty buffer, selects lowest quality. User gets 360p on a 50Mbps connection.
+
+**Prevention:**
+- Route configuration by stream type BEFORE applying:
+```dart
+if (isHlsUrl(url)) {
+  // ABR config: larger buffers, no frame drop
+  _player.setProperty('demux.buffer.ranges', '3');
+  // Do NOT set fflags +nobuffer
+  // Do NOT set drop:true
+} else {
+  // Low-latency config: minimal buffer, drop frames
+  _player.setProperty('fflags', '+nobuffer');
+  _player.setProperty('demux.buffer.ranges', '1');
+  _player.setProperty('demux.buffer.ranges', '1:drop:true');
+}
+```
+- The `PathValidator.isUrl()` check is insufficient. Need `isHlsUrl()` that checks for `.m3u8` extension or HLS-specific query params.
+
+**Detection:** Play an HLS stream. Monitor buffer level (via `MediaEngine` position polling). If buffer stays below 2 seconds, low-latency config is still active.
+
+**Phase:** HLS-01
+
+---
+
+### Pitfall 2b: BBA Reservoir/Cushion Tuning Sensitivity
+
+**What goes wrong:** BBA maps buffer occupancy to quality levels using a piecewise function with two thresholds: `reservoir` (minimum buffer, always select lowest quality) and `cushion` (buffer range for quality ramping). Poor tuning causes:
+
+- **Reservoir too high:** Startup takes forever to ramp quality. User watches 360p for 30 seconds.
+- **Reservoir too low:** Rebuffering on first network hiccup. Buffer has no safety margin.
+- **Cushion too narrow:** Quality oscillates between two levels as buffer hovers near threshold.
+- **Cushion too wide:** Quality ramp is too slow. User never reaches highest quality even with good bandwidth.
+
+**Why it happens:** BBA's original paper uses `reservoir = 1 segment duration`, `cushion = max buffer - reservoir`. But optimal values depend on content segment duration (2s vs 6s vs 10s), available quality ladder, and typical network conditions.
+
+**Consequences:** Either constant quality oscillation (user-visible stutter in quality) or unnecessarily low quality on good connections.
+
+**Prevention:**
+- Start with `reservoir = 2 * segmentDuration` (safety margin for 2 segments).
+- Set `cushion = targetBufferLevel - reservoir` where `targetBufferLevel` is 30 seconds (common default).
+- Add hysteresis: only switch quality when buffer crosses threshold by >1 segment duration, not just touches it.
+- Log quality switches. If switches/minute > 3, increase hysteresis margin.
+
+**Detection:** Play a 10-minute HLS stream with stable network. Count quality switches. More than 5 total = tuning problem.
+
+**Phase:** HLS-01
+
+---
+
+### Pitfall 2c: MDK/FFmpeg HLS Demuxer Does Not Expose Segment-Level Metrics
+
+**What goes wrong:** BBA needs per-segment download time and buffer level. MDK's `mdk::Player` API exposes `buffered()` (total buffered duration) but may NOT expose per-segment download metrics (segment URL, download time, bytes received). Without per-segment metrics, bandwidth estimation is impossible.
+
+**Why it happens:** MDK wraps FFmpeg's HLS demuxer internally. FFmpeg's `hls.c` handles segment downloading, but this information is not surfaced through MDK's public API.
+
+**Consequences:** Cannot implement accurate bandwidth estimation. Must fall back to FFmpeg's built-in ABR (which is less configurable) or estimate bandwidth from overall buffer fill rate (less accurate).
+
+**Prevention:**
+- First, verify what MDK exposes: check `mdk::Player` properties for `avformat.hls_*` and `demux.*` options.
+- If per-segment metrics are unavailable, use the "buffer delta" approach: measure `buffered()` change over time to estimate effective download rate. This is less accurate but workable.
+- Alternative: use FFmpeg's `hls_prefer_list` for coarse quality selection, and implement fine-grained control at the application level only if metrics are available.
+
+**Detection:** Attempt to read `avformat.hls_current_stream` or similar property after segment switch. If null/empty, metrics are not exposed.
+
+**Phase:** HLS-01 (research spike)
+
+---
+
+### Pitfall 2d: Quality Switch Causes Audio Glitch
+
+**What goes wrong:** When BBA switches quality (e.g., 720p to 1080p), the decoder must flush and re-initialize with the new stream parameters. If the switch happens mid-segment, there is a brief audio/video glitch.
+
+**Why it happens:** HLS quality switches should happen at segment boundaries (keyframe-aligned). If the implementation switches immediately on buffer threshold crossing (not waiting for segment boundary), the decoder gets a discontinuous stream.
+
+**Consequences:** Brief audio pop or video freeze at each quality switch. With frequent oscillation (Pitfall 2b), this becomes very noticeable.
+
+**Prevention:**
+- Only switch quality at segment boundaries. Track current segment index and apply the new quality for the NEXT segment, not the current one.
+- MDK/FFmpeg may handle this automatically if `hls_prefer_list` is used. Verify by testing with a multi-bitrate HLS stream and checking for audio continuity.
+- Pre-buffer 1-2 seconds of the new quality before switching (overlap approach).
+
+**Detection:** Play HLS stream with artificial bandwidth throttling. Listen for audio pops during quality transitions.
+
+**Phase:** HLS-01
+
+---
+
+### Pitfall 2e: HLS URL Detection Ambiguity
+
+**What goes wrong:** Not all HTTP URLs ending in `.m3u8` are HLS. Some CDN URLs use query parameters for format selection (`?format=hls`), and some HLS URLs don't have `.m3u8` in the URL (CDN rewrites). The `PathValidator.isUrl()` check is too coarse.
+
+**Why it happens:** HLS is identified by the master playlist URL, which may or may not have a recognizable extension. CDN-specific URL patterns vary.
+
+**Consequences:** Non-HLS HTTP streams get ABR treatment (wrong buffer config). HLS streams get low-latency treatment (constant rebuffering).
+
+**Prevention:**
+- Use a two-stage detection:
+  1. URL pattern: contains `.m3u8` or `m3u8` query param -- likely HLS
+  2. Content inspection: first response contains `#EXTM3U` -- confirmed HLS
+- Apply ABR config only after confirmation. Default to low-latency for unknown URLs.
+- MDK may handle this internally -- check if `setProperty('avformat.hls_prefer_list', ...)` has no effect on non-HLS URLs.
+
+**Detection:** Open a non-HLS HTTP video URL. If ABR config is applied (large buffer, no frame drop), detection is wrong.
+
+**Phase:** HLS-01
+
+---
+
+## 3. Platform Abstraction Layer (PLATFORM-03)
+
+### Pitfall 3a: Interface-First Design Without Implementation Validation
+
+**What goes wrong:** Defining platform interfaces (`PlatformWindowService`, `PlatformEngine`) without any macOS/Linux implementation means the interface is untested. Methods that work on Windows may have no equivalent on macOS (e.g., `WS_THICKFRAME` has no macOS analog) or may need completely different parameters.
+
+**Why it happens:** Windows-specific concepts (HWND, WS_* styles, MonitorFromWindow) leak into the interface. When macOS implementation starts, the interface must be redesigned, breaking all consumers.
+
+**Consequences:** Interface redesign at macOS implementation time. All Windows code that depends on the interface must be updated. The "platform abstraction" becomes a Windows abstraction that pretends to be cross-platform.
+
+**Prevention:**
+- Define interfaces in terms of USER INTENTS, not platform APIs:
+  - BAD: `setWindowStyle(int style)` -- Windows-specific
+  - GOOD: `setDecorated(bool decorated)` -- cross-platform intent
+  - BAD: `setWindowPos(IntPtr hwnd, int x, int y, int w, int h)` -- Win32 specific
+  - GOOD: `setWindowGeometry(Rect rect)` -- platform-independent
+- For each interface method, write a one-line comment explaining what macOS/Linux would do:
+  ```dart
+  /// Enter fullscreen mode.
+  /// Windows: WS_POPUP + monitor cover
+  /// macOS: NSWindow.toggleFullScreen
+  /// Linux: _NET_WM_STATE_FULLSCREEN
+  Future<void> setFullscreen(bool value);
+  ```
+- If a method has NO macOS/Linux equivalent, it should NOT be in the interface. Keep it as a Windows-specific extension.
+
+**Detection:** For each interface method, can you describe the macOS implementation in one sentence? If not, the method is too Windows-specific.
+
+**Phase:** PLATFORM-03
+
+---
+
+### Pitfall 3b: NoopWindowBridge Becomes a Silent Failure Trap
+
+**What goes wrong:** `NoopWindowBridge` returns silently for all operations (no-op). Code that depends on window state (e.g., `isFullscreen.value`) gets `false` from `NoopWindowBridge` even when the actual window is fullscreen. This creates subtle bugs where UI logic thinks the window is windowed when it's actually fullscreen.
+
+**Why it happens:** `NoopWindowBridge` is designed for safe degradation, but callers assume the state is accurate. If the platform implementation is missing (macOS/Linux), the UI shows wrong state without any error.
+
+**Consequences:** On macOS (future), the player UI shows windowed controls when the window is actually fullscreen. Keyboard shortcuts that check `isFullscreen.value` behave incorrectly.
+
+**Prevention:**
+- `NoopWindowBridge` should log a warning on first use: `debugPrint('WARNING: NoopWindowBridge active -- window operations are no-ops')`.
+- Consider making `NoopWindowBridge` throw `UnsupportedError` for state queries (not just commands). This makes missing implementations fail loudly.
+- Alternative: `NoopWindowBridge` could use platform channel fallbacks where available (e.g., `MethodChannel` to macOS runner for basic fullscreen).
+
+**Detection:** On Windows, inject `NoopWindowBridge` manually and run the app. If any UI behavior is wrong, the consumer is relying on state accuracy.
+
+**Phase:** PLATFORM-03
+
+---
+
+### Pitfall 3c: Singleton Migration Breaks Init Order
+
+**What goes wrong:** The current init sequence in `main()` is:
+```
+1. WidgetsFlutterBinding.ensureInitialized()
+2. fvp.registerWith()
+3. SharedPreferences.getInstance()
+4. SettingsStore.prewarm(prefs)
+5. WindowBootstrap.init(prefs)
+6. runApp(App(prefs))
+```
+
+Migrating singletons to DI (constructor injection) changes this to:
+```
+1. WidgetsFlutterBinding.ensureInitialized()
+2. fvp.registerWith()
+3. Create DI container
+4. Register SharedPreferences
+5. Register SettingsStore
+6. Register WindowService
+7. Register all other services
+8. runApp(App(di: container))
+```
+
+If any service's constructor depends on another service that hasn't been registered yet, the DI container throws at startup.
+
+**Why it happens:** Static singletons hide ordering dependencies. `LocaleService.I` works because `SettingsStore.prewarm()` was called earlier. With DI, the registration order must match the dependency graph.
+
+**Consequences:** App crashes on startup with `StateError: Service not registered`. The error message may not indicate WHICH dependency is missing.
+
+**Prevention:**
+- Draw the dependency graph BEFORE migration (already documented in `PITFALLS.md` section 3b).
+- Register in topological order: leaves first (`OsdService`, `PerfMonitor`), then dependents (`LocaleService`, `ThemeService`), then root (`WindowService`).
+- Use lazy registration where possible: `GetIt.I.registerLazySingleton(() => LocaleService(GetIt.I<SettingsStore>()))`.
+- Test init order by running `flutter test` after EACH singleton migration.
+
+**Detection:** App fails to start after DI migration. Check registration order against dependency graph.
+
+**Phase:** ARCH-03
+
+---
+
+### Pitfall 3d: SettingsStore Simplification Breaks Per-Field Error Isolation
+
+**What goes wrong:** The current `SettingsStore` has 25+ `saveXxx()` methods and per-field `load()` with try-catch isolation. Simplifying to bulk serialization (JSON encode/decode of `AppSettings` object) means one corrupted field prevents loading ALL fields.
+
+**Why it happens:** The per-field approach was designed so that if `volume` is corrupted in SharedPreferences, `brightness` still loads correctly. Bulk serialization loses this isolation.
+
+**Consequences:** A single corrupted preference key (e.g., from a crash during write) causes the entire settings to reset to defaults. User loses all custom settings.
+
+**Prevention:**
+- Keep per-field validation in the deserializer, even with bulk serialization:
+```dart
+AppSettings load() {
+  return AppSettings(
+    volume: _sanitizeDouble(prefs.getDouble('volume'), 0.5, 0.0, 1.0),
+    brightness: _sanitizeDouble(prefs.getDouble('brightness'), 1.0, 0.0, 2.0),
+    // ... each field independently validated
+  );
+}
+```
+- The `_sanitizeDimension`, `_sanitizeCoordinate`, `_sanitizeRotation` helpers must survive the refactor.
+- Write a test that corrupts ONE key and verifies all others still load.
+
+**Detection:** Set `prefs.setDouble('volume', double.nan)` manually, then call `load()`. If other fields also return defaults, isolation is broken.
+
+**Phase:** ARCH-02
+
+---
+
+## 4. Cross-Cutting Pitfalls
+
+### Pitfall 4a: Triple Border Removal Becomes Quadruple
+
+**What goes wrong:** The project already has THREE border removal mechanisms: (1) `window_manager`'s `setAsFrameless()`, (2) main.dart FFI `_restoreThickFrame()`, (3) app.dart init. Adding a C++ `WM_NCCALCSIZE` handler creates a fourth mechanism. If any two overlap, they fight each other.
+
+**Why it happens:** Each layer was added to fix a specific symptom without removing the previous layer. The result is a fragile stack of patches.
+
+**Consequences:** Border removal works on most machines but fails on specific DPI configurations, Win10 vs Win11, or after certain window state transitions. Debugging requires understanding all four layers.
+
+**Prevention:**
+- When implementing the C++ `WM_NCCALCSIZE` approach, REMOVE the other three mechanisms:
+  - Remove `setAsFrameless()` call from `WindowService.init()`
+  - Remove `_restoreThickFrame()` FFI call from main.dart
+  - Remove any border-related code from app.dart init
+- The C++ handler should be the SOLE owner of border removal.
+- If `WM_NCCALCSIZE` doesn't work (Pitfall 1a), fall back to ONE mechanism, not four.
+
+**Detection:** Comment out the C++ handler. If borders still disappear, another mechanism is active.
+
+**Phase:** WIN-05
+
+---
+
+### Pitfall 4b: fvp HLS Config Overrides Persist Across File Opens
+
+**What goes wrong:** `mdk::Player` properties set via `setProperty()` may persist across `open()` calls. If ABR config is set for an HLS stream, then the user opens a local file, the ABR config (large buffer, no frame drop) is still active.
+
+**Why it happens:** MDK properties are player-instance level, not per-media. `setProperty` modifies the player state, not the media state.
+
+**Consequences:** Local file playback uses ABR buffer settings (unnecessary memory usage, different latency characteristics).
+
+**Prevention:**
+- Reset network config before each `open()` call:
+```dart
+void open(String url) {
+  _resetNetworkConfig();  // reset to defaults
+  if (isHlsUrl(url)) {
+    _applyAbrConfig();
+  } else if (isLowLatencyUrl(url)) {
+    _applyLowLatencyConfig();
+  }
+  _player.open(url);
+}
+```
+- Document which properties are per-player vs per-media.
+
+**Detection:** Open HLS stream, then open local file. Check `demux.buffer.ranges` value. If it's still the ABR value, config persisted.
+
+**Phase:** HLS-01
+
+---
+
+### Pitfall 4c: ValueNotifier Incompatibility with Platform Abstraction
+
+**What goes wrong:** The `WindowBridge` interface exposes `ValueNotifier<bool> isFullscreen`, `ValueNotifier<bool> isMaximized`, etc. These are Dart `ValueNotifier` objects. A macOS implementation using `NSWindow` notifications would need to update these notifiers from native callbacks, which requires platform channel threading awareness.
+
+**Why it happens:** `ValueNotifier` is single-threaded (main isolate). Native callbacks from macOS (`NSWindowDelegate`) arrive on the platform thread. Updating a `ValueNotifier` from the platform thread without `SchedulerBinding.instance.scheduleTask` causes "setState called during build" errors.
+
+**Consequences:** macOS implementation (future) has threading bugs. `isFullscreen.value` is updated from wrong thread, causing UI glitches or assertion failures.
+
+**Prevention:**
+- The `WindowService` already handles this for C++ events (via `MethodChannel.setMethodCallHandler` which runs on main isolate). Ensure the same pattern is documented for future platform implementations.
+- Add a comment on each `ValueNotifier` in the interface: "Must be updated from main isolate only."
+- Consider wrapping the notifier update in `WidgetsBinding.instance.addPostFrameCallback` for safety.
+
+**Detection:** On macOS (future), rapid fullscreen toggle causes "setState during build" assertion.
+
+**Phase:** PLATFORM-03 (interface design)
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| SEC-01: FFI try/finally | Pointer ownership conflict with `_savedFrame`/`_savedMaximizeFrame` | Map ownership before adding try/finally. Only wrap SHORT-LIVED pointers. |
-| SEC-01: Fullscreen timeout | Timer + finally race condition | Cancel timer in finally. Timer callback checks guard before resetting. |
-| SEC-02: URL validation | False rejection of RTSP/RTMP/SRT/UDP URLs | Keep prefix-based detection. Only validate http/https structure. |
-| SEC-02: Path length | Rejecting valid long paths on modern Windows | Do NOT add MAX_PATH=260 limit. Rely on `File.exists()`. |
-| ARCH-01: FvpEngine split | Interface breakage cascade to FakeEngine | Internal decomposition only. MediaEngine interface unchanged. |
-| ARCH-01: State fragmentation | Sub-classes reaching back to parent ValueNotifiers | Sub-classes receive callbacks, not ValueNotifier refs. |
-| ARCH-02: SettingsStore | Breaking per-field try-catch isolation | Keep per-field validation in bulk serializer. |
-| ARCH-03: Singleton DI | Test breakage from missing reset/registration | Migrate one singleton at a time. Run full suite after each. |
-| ARCH-03: Circular deps | SettingsStore static -> DI constructor mismatch | Keep SettingsStore static. Migrate leaf singletons first. |
+| Phase | Pitfall | Severity | Mitigation |
+|-------|---------|----------|------------|
+| WIN-05: C++ WM_NCCALCSIZE | Flutter engine intercepts message (1a) | CRITICAL | Test with OutputDebugString first. If intercepted, use DwmExtendFrameIntoClientArea |
+| WIN-05: Unified border removal | WS_CAPTION removal kills DWM animation (1b) | HIGH | Keep WS_CAPTION, use WM_NCCALCSIZE to hide non-client area |
+| WIN-05: Startup flash | First frame shows native title bar (1c) | MEDIUM | Apply WM_NCCALCSIZE in OnCreate before ShowWindow |
+| WIN-05: Hit test conflict | DragToResizeArea + WM_NCHITTEST double-handling (1d) | HIGH | Pick one system, remove the other |
+| WIN-05: Corner reset | DWMWA_WINDOW_CORNER_PREFERENCE reset on snap (1e) | MEDIUM | Call ApplyRoundedCorners in WM_SIZE handler |
+| HLS-01: Buffer config | Low-latency config conflicts with ABR (2a) | CRITICAL | Route config by stream type, not URL presence |
+| HLS-01: BBA tuning | Reservoir/cushion sensitivity (2b) | HIGH | Start conservative, add hysteresis, log switches |
+| HLS-01: MDK metrics | Per-segment download metrics unavailable (2c) | HIGH | Research spike first. Fallback to buffer-delta estimation |
+| HLS-01: Quality switch | Audio glitch at segment boundary (2d) | MEDIUM | Only switch at segment boundaries, pre-buffer new quality |
+| HLS-01: URL detection | HLS vs non-HLS HTTP ambiguity (2e) | MEDIUM | Two-stage detection: URL pattern + content inspection |
+| PLATFORM-03: Interface design | Windows-specific methods in interface (3a) | HIGH | Define by user intent, not platform API |
+| PLATFORM-03: Noop fallback | Silent failure on missing platform (3b) | MEDIUM | Log warning, consider throwing for state queries |
+| ARCH-03: DI migration | Init order breakage (3c) | HIGH | Topological registration order, lazy singletons |
+| ARCH-02: SettingsStore | Per-field error isolation loss (3d) | HIGH | Keep per-field validation in bulk serializer |
+| Cross-cutting | Quadruple border removal (4a) | HIGH | Remove old mechanisms when adding C++ handler |
+| Cross-cutting | fvp config persistence across opens (4b) | MEDIUM | Reset network config before each open() |
 
 ---
 
 ## Sources
 
-- Codebase analysis: `window_service.dart` (328 lines), `fvp_engine.dart` (690 lines), `settings_store.dart` (439 lines), `path_validator.dart` (92 lines), `media_engine.dart` (185 lines)
-- Test helpers: `fake_engine.dart` (376 lines), `fake_window_service.dart` (73 lines)
-- Anti-pattern memory: `project_window_anti_patterns.md` (kernel coupling, god objects, over-abstraction lessons)
-- Concerns audit: `.planning/codebase/CONCERNS.md` (FFI memory safety, singleton anti-pattern)
+- Anti-pattern memory: `anti_pattern_window_frameless.md` (3 failed C++ approaches, DWM animation dependency on WS_CAPTION)
+- Window anti-patterns: `project_window_anti_patterns.md` (kernel coupling, god objects, over-abstraction)
+- Fullscreen fix: `project_fullscreen_win32_fix.md` (WS_THICKFRAME invisible border root cause, SetWindowPos atomic)
+- Window resize: `project_window_resize.md` (DragToResizeArea, WM_NCHITTEST Flutter interception)
+- Native interfaces: `project_native_layer_interfaces.md` (MethodChannel design, WM_NCCALCSIZE/NCHITTEST/SIZING)
+- Bridge design: `project_bridge_layer_design.md` (WindowBridge vs PlatformService, unified MethodChannel)
+- Layer 8 analysis: `project_layer8_window_analysis.md` (5 files 337 lines, isOperating signal value)
+- HLS ABR plan: `project_hls_abr_plan.md` (BBA algorithm, low-latency conflict, 4-phase implementation)
+- Current code: `flutter_window.cpp` (HandleTopLevelWindowProc priority), `win32_window.cpp` (ApplyRoundedCorners)
+- Prior pitfalls: `.planning/research/PITFALLS.md` (FFI pointer ownership, singleton migration, SettingsStore)
 
 ---
 
-*Pitfall analysis: 2026-05-30*
+*Pitfall analysis: 2026-05-31 -- v1.2.1 milestone scope*
