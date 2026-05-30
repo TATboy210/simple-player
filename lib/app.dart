@@ -175,6 +175,7 @@ class _AppState extends State<App> {
             ),
             child: DeferredPlayerFeature(
               coordinator: widget.coordinator,
+              windowService: _windowService,
               onSettings: (ctx, engine, videoProcessing) =>
                   _showSettingsPanel(ctx, engine, videoProcessing),
               onSettingsSecondary: _showSettingsQuickMenu,
