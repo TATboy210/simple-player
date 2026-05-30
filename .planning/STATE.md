@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Security, Architecture & Kernel
 status: executing
-stopped_at: Phase 10 complete, ready for Phase 11
-last_updated: "2026-05-30T18:30:00.000Z"
-last_activity: 2026-05-30 -- Phase 10 verification passed, all 5 plans complete
+stopped_at: Phase 11 complete, ready for Phase 12
+last_updated: "2026-05-30T21:45:00.000Z"
+last_activity: 2026-05-30 -- Phase 11 complete (4/4 plans: LRU, Poller, D3D11, Audit)
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 2
-  percent: 25
+  completed_phases: 3
+  total_plans: 10
+  completed_plans: 10
+  percent: 75
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30)
 
 **Core value:** Build clean, dependency-free window management and unified widget system for smooth desktop playback.
-**Current focus:** Phase 10 — Window Optimization
+**Current focus:** Phase 12 — Debug Tooling
 
 ## Current Position
 
-Phase: 10 (Window Optimization) — COMPLETE
-Plan: 5 of 5
-Status: Phase 10 verified, ready for Phase 11
-Last activity: 2026-05-30 -- Phase 10 verification passed
+Phase: 11 (Performance Optimization) — COMPLETE
+Plan: 4 of 4
+Status: Phase 11 verified, ready for Phase 12
+Last activity: 2026-05-30 -- Phase 11 checkpoint approved, all 4 optimizations verified
 
-Progress: [▓▓▓▓▓▓▓▓░░] 75% (3/4 phases in v1.2, Phase 9+10 done)
+Progress: [▓▓▓▓▓▓▓▓▓░] 90% (3/4 phases in v1.2, Phase 9+10+11 done)
 
 ## Accumulated Context
 
@@ -44,6 +44,10 @@ Progress: [▓▓▓▓▓▓▓▓░░] 75% (3/4 phases in v1.2, Phase 9+10 d
 - [v1.1]: Custom FFI maximize using rcWork
 - [v1.2]: SEC-01 + SEC-02 combined in Phase 9 (both security, overlapping files)
 - [v1.2]: ARCH-01/02/03 deferred to v1.3+ (need detailed reports)
+- [v1.2]: LRU cache uses LinkedHashMap for O(1) touch/evict (pure Dart)
+- [v1.2]: PositionPoller adaptive: 100ms seek / 250ms steady / 1s auto-revert
+- [v1.2]: D3D11 sync mode: async (0) for 120Hz+, sync (1) for 60Hz
+- [v1.2]: DevMode FFI struct uses Array<Uint16> not Array<Utf16>
 
 ### Deferred Items
 
@@ -58,6 +62,6 @@ Progress: [▓▓▓▓▓▓▓▓░░] 75% (3/4 phases in v1.2, Phase 9+10 d
 
 ## Session Continuity
 
-Last session: 2026-05-30T18:30:00.000Z
-Stopped at: Phase 10 complete, ready for Phase 11
+Last session: 2026-05-30T21:45:00.000Z
+Stopped at: Phase 11 complete, ready for Phase 12
 Resume file: None
