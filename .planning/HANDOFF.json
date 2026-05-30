@@ -1,39 +1,41 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-31T00:30:00+08:00",
-  "phase": 12,
-  "phase_name": "Debug Tooling",
-  "phase_dir": ".planning/phases/12-debug-tooling",
-  "plan": 0,
-  "task": 0,
-  "total_tasks": 0,
+  "timestamp": "2026-05-30T16:37:20.443Z",
+  "phase": null,
+  "phase_name": null,
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
   "status": "paused",
-  "milestone": "v1.2",
-  "milestone_name": "Security, Architecture & Kernel",
+  "milestone": "v1.2.1",
+  "milestone_name": "Window Polish & Architecture Simplification",
   "completed_tasks": [
-    {"id": "12-discuss", "name": "Phase 12 context gathering (discuss-phase)", "status": "done", "commit": "2423ad4"},
-    {"id": "12-research", "name": "Phase 12 research (PrefixPrinter, Timeline, logger API)", "status": "done", "commit": "931b719"},
-    {"id": "12-plan", "name": "Phase 12 planning (2 plans: 12-01 + 12-02)", "status": "done", "commit": "073391d"},
-    {"id": "12-01", "name": "PrefixPrinter + 4 module loggers + initLog update + unit tests", "status": "done", "commit": "75f4afd"},
-    {"id": "12-02", "name": "Timeline tracing on FvpEngine.open/seek + WindowService fullscreen", "status": "done", "commit": "d805b08"}
+    {"id": 1, "name": "Milestone questioning", "status": "done", "commit": "3722d89"},
+    {"id": 2, "name": "Research (4 agents: Stack, Features, Architecture, Pitfalls)", "status": "done", "commit": "e200cbe"},
+    {"id": 3, "name": "Research synthesis (SUMMARY.md)", "status": "done", "commit": "e200cbe"},
+    {"id": 4, "name": "Requirements definition (REQUIREMENTS.md)", "status": "done", "commit": "7cba215"},
+    {"id": 5, "name": "Roadmap creation (ROADMAP.md)", "status": "done", "commit": "7cba215"},
+    {"id": 6, "name": "MILESTONES.md update", "status": "done", "commit": "9412617"}
   ],
   "remaining_tasks": [
-    {"id": "12-verify", "name": "Phase 12 verification (VERIFICATION.md)", "status": "not_started"},
-    {"id": "12-complete", "name": "Phase 12 completion (STATE.md + ROADMAP.md update)", "status": "not_started"}
+    {"id": 7, "name": "Plan Phase 13: Window Foundation", "status": "not_started"},
+    {"id": 8, "name": "Execute Phase 13: Window Foundation", "status": "not_started"},
+    {"id": 9, "name": "Plan Phase 14: HLS ABR", "status": "not_started"},
+    {"id": 10, "name": "Execute Phase 14: HLS ABR", "status": "not_started"},
+    {"id": 11, "name": "Plan Phase 15: Architecture Simplification", "status": "not_started"},
+    {"id": 12, "name": "Execute Phase 15: Architecture Simplification", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "PrefixPrinter wraps inner printer, prepends [module] prefix", "rationale": "Logger 2.7.0 has no name/prefix parameter (verified from source)", "phase": 12},
-    {"decision": "JsonPrinter exported as optional constant, PrettyPrinter is default output", "rationale": "D-01 vs D-14 contradiction resolved", "phase": 12},
-    {"decision": "Module loggers: logEngine, logBridge, logServices, logUi coexist with global log", "rationale": "Backward compat, gradual migration", "phase": 12},
-    {"decision": "ProductionFilter(Level.warning) explicit threshold", "rationale": "D-13: Release only warning+ to file", "phase": 12},
-    {"decision": "Timeline: fvp.open, fvp.seek, window.enterFullscreen, window.exitFullscreen", "rationale": "D-08~D-11: 4 async methods with try/finally wrapping", "phase": 12}
+    {"decision": "WM_NCCALCSIZE must be handled BEFORE HandleTopLevelWindowProc", "rationale": "Flutter engine consumes the message first; 3 prior C++ attempts failed", "phase": "13"},
+    {"decision": "HLS ABR uses throughput-based EWMA, NOT BBA", "rationale": "Desktop bandwidth stable; BBA over-engineered for 80% of use cases", "phase": "14"},
+    {"decision": "URL-type routing for ABR vs low-latency", "rationale": "fflags +nobuffer conflicts with ABR buffer requirements", "phase": "14"},
+    {"decision": "PlatformService abstract interface with constructor injection", "rationale": "Simplest, most testable; not service locator", "phase": "15"},
+    {"decision": "Fullscreen smooth transition deferred to v1.3+", "rationale": "Blocked by Flutter engine HandleTopLevelWindowProc interception", "phase": "13"}
   ],
-  "uncommitted_files": [
-    "CLAUDE.md (modified)",
-    "pubspec.lock (modified)"
-  ],
-  "next_action": "Run /gsd:execute-phase 12 to complete verification and phase completion. Both plans are done — only verification and tracking updates remain.",
-  "context_notes": "Phase 12 execution COMPLETE (both plans). 641 tests passing (was 630 + 11 new). Worktrees merged and cleaned. Key deviation: window_service.dart path was lib/window/ in plan but lib/kernel/bridge/ in reality — manually applied Timeline changes to correct file. Logger 2.7.0 deviations: has own PrefixPrinter (used hide), no JsonPrinter (custom impl), ProductionFilter() takes no args (used Logger(level:)). Remaining: phase verification + STATE.md/ROADMAP.md update."
+  "uncommitted_files": [],
+  "next_action": "Run /gsd:plan-phase 13 to plan Window Foundation (C++ WM_NCCALCSIZE spike + Window layer simplification)",
+  "context_notes": "v1.2.1 milestone creation complete. Research phase done with 4 parallel agents. Key finding: WM_NCCALCSIZE must be intercepted BEFORE Flutter HandleTopLevelWindowProc. Phase 13 is highest risk (needs 0.5-day spike). Phase 14 is independent. Phase 15 depends on Phase 13."
 }
