@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T19:00:00+08:00",
+  "timestamp": "2026-05-30T20:00:00+08:00",
   "phase": 11,
   "phase_name": "Performance Optimization",
   "phase_dir": ".planning/phases/11-performance-optimization",
@@ -11,27 +11,24 @@
   "milestone": "v1.2",
   "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [
-    {"id": "10-VERIFY", "name": "Phase 10 verification — all must-haves pass", "status": "done", "commit": "pending"}
+    {"id": "11-01", "name": "ThumbnailService LRU O(1) with LinkedHashMap", "status": "done", "commit": "7f8b37f"},
+    {"id": "11-02", "name": "PositionPoller adaptive polling intervals", "status": "done", "commit": "12147d1"}
   ],
   "remaining_tasks": [
-    {"id": "11-01", "name": "ThumbnailService LRU O(1) with LinkedHashMap", "status": "not_started"},
-    {"id": "11-02", "name": "PositionPoller adaptive polling intervals", "status": "not_started"},
     {"id": "11-03", "name": "D3D11 refresh-rate-aware sync mode", "status": "not_started"},
     {"id": "11-04", "name": "Rendering pipeline audit + Phase 11 verification", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 11 uses 3-wave execution: Wave 1 (11-01+11-02 parallel), Wave 2 (11-03), Wave 3 (11-04 checkpoint)", "rationale": "Risk ordering: LRU/poller lowest, D3D11 FFI medium, audit last", "phase": 11},
-    {"decision": "LRU cache uses LinkedHashMap (pure Dart, zero dependencies)", "rationale": "O(1) operations replace O(n) Map+List pattern", "phase": 11},
-    {"decision": "D3D11 sync mode adapts to display refresh rate via Win32 EnumDisplaySettings FFI", "rationale": "120Hz+ displays benefit from async mode for lower latency", "phase": 11}
+    {"decision": "Wave 1 executed on main working tree (no worktree isolation)", "rationale": "Anti-pattern: prior session worktree remove deleted commits", "phase": 11},
+    {"decision": "LRU cache uses LinkedHashMap for O(1) touch/evict", "rationale": "Pure Dart, zero dependencies, replaces O(n) Map+List", "phase": 11},
+    {"decision": "PositionPoller adaptive: 100ms seek / 250ms steady / 1s auto-revert", "rationale": "Reduces CPU during steady playback, responsive during seek", "phase": 11}
   ],
   "uncommitted_files": [
-    ".planning/STATE.md (modified)",
-    ".planning/ROADMAP.md (modified)",
     "CLAUDE.md (modified)",
     "pubspec.lock (modified)"
   ],
-  "next_action": "Run /gsd:execute-phase 11 to start Phase 11 execution. Wave 1 (11-01 LRU + 11-02 Poller) can run in parallel.",
-  "context_notes": "Phase 10 verified complete. Phase 11 fully planned with 4 plans in 3 waves. Research complete (11-RESEARCH.md). All plan files created. Ready for execution."
+  "next_action": "Run /gsd:execute-phase 11 to continue Wave 2 (11-03 D3D11 sync) + Wave 3 (11-04 audit)",
+  "context_notes": "Wave 1 complete (2/4 plans). 623 tests passing, dart analyze clean. Wave 2 is 11-03 D3D11 refresh-rate FFI (medium risk). Wave 3 is 11-04 rendering audit (checkpoint)."
 }
