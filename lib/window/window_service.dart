@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -194,6 +195,7 @@ class WindowService implements WindowBridge {
   Future<void> toggleFullscreen() async {
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
+    Timeline.startSync('window.toggleFullscreen');
     try {
       final fc = _fullscreen;
       if (fc == null) return;
@@ -205,6 +207,7 @@ class WindowService implements WindowBridge {
     } on Exception catch (e) {
       debugPrint('[WindowService] toggleFullscreen failed: $e');
     } finally {
+      Timeline.finishSync();
       _togglingFullscreen = false;
       _state.onResizeEnd();
     }
@@ -215,11 +218,13 @@ class WindowService implements WindowBridge {
     if (mode.value != WindowMode.fullscreen) return;
     if (_togglingFullscreen || _disposed) return;
     _togglingFullscreen = true;
+    Timeline.startSync('window.exitFullscreen');
     try {
       await _fullscreen?.exit();
     } on Exception catch (e) {
       debugPrint('[WindowService] exitFullscreen failed: $e');
     } finally {
+      Timeline.finishSync();
       _togglingFullscreen = false;
       _state.onResizeEnd();
     }
