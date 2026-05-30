@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T19:30:00+08:00",
+  "timestamp": "2026-05-30T22:30:00+08:00",
   "phase": 10,
   "phase_name": "Window Optimization",
   "phase_dir": ".planning/phases/10-window-optimization",
@@ -15,16 +15,21 @@
   "plans": [],
   "blockers": [],
   "decisions": [
-    "D-09-01: try/finally for FFI cleanup (Arena not available in dart:ffi)",
-    "D-09-02: host.isNotEmpty check alongside hasAuthority for URL validation",
-    "D-09-03: Tab character (0x09) excluded from control char filter"
+    "D-10-01: Keep existing 500ms debounce + close handler for geometry save (no crash-safe additions)",
+    "D-10-02: Do NOT auto-restore fullscreen on startup (_savedFrame is in-memory only, crash loses it)",
+    "D-10-03: Startup geometry restore, multi-monitor bounds, double WindowService fix, maximize restore — Claude's discretion (research recommendations available)"
   ],
   "key_findings": [
-    "Phase 9 complete: FFI safety (09-01) + input validation (09-02) + E2E verification (09-03)",
-    "608 tests passing, dart analyze clean",
-    "Phase 10 research agent launched but not yet complete"
+    "10-RESEARCH.md complete: 5 key issues found (startup geometry not restored, double WindowService, no multi-monitor validation, fullscreen not restored, solid existing infra)",
+    "10-CONTEXT.md complete: 2 user decisions + Claude's discretion items",
+    "No PLAN.md files yet — planning step not started"
   ],
-  "uncommitted_files": [],
-  "next_action": "/gsd:plan-phase 10 — research agent was in progress, resume will need to re-run research or check if RESEARCH.md was written",
-  "context_notes": "Phase 9 complete. Phase 10 planning started — researcher agent was spawned but session ended before completion. Need to check if 10-RESEARCH.md exists on resume."
+  "uncommitted_files": [
+    "integration_test/simple_test.dart (modified)",
+    "pubspec.lock (modified)",
+    "test/perf/control_bar_perf_test.dart (modified)",
+    ".codegraph/ (untracked)"
+  ],
+  "next_action": "/gsd:plan-phase 10 — RESEARCH.md and CONTEXT.md both exist, will skip research and go straight to planner",
+  "context_notes": "Phase 10 discuss-phase completed. Research agent finished (10-RESEARCH.md). CONTEXT.md written with 2 user decisions (crash-safe geometry = keep existing, fullscreen = no auto-restore). 3 other gray areas deferred to Claude's discretion. Ready for planning step. Context was at 75% so paused before planning."
 }
