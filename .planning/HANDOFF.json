@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T22:30:00+08:00",
+  "timestamp": "2026-05-30T15:45:00+08:00",
   "phase": 10,
   "phase_name": "Window Optimization",
   "phase_dir": ".planning/phases/10-window-optimization",
@@ -12,24 +12,25 @@
   "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [],
   "remaining_tasks": [],
-  "plans": [],
+  "plans": ["10-01", "10-02", "10-03"],
   "blockers": [],
   "decisions": [
-    "D-10-01: Keep existing 500ms debounce + close handler for geometry save (no crash-safe additions)",
-    "D-10-02: Do NOT auto-restore fullscreen on startup (_savedFrame is in-memory only, crash loses it)",
-    "D-10-03: Startup geometry restore, multi-monitor bounds, double WindowService fix, maximize restore — Claude's discretion (research recommendations available)"
+    "D-10-01: Keep existing 500ms debounce + close handler for geometry save",
+    "D-10-02: Do NOT auto-restore fullscreen on startup",
+    "D-10-03: Startup restore, multi-monitor, double WindowService, maximize restore — Claude's discretion"
   ],
   "key_findings": [
-    "10-RESEARCH.md complete: 5 key issues found (startup geometry not restored, double WindowService, no multi-monitor validation, fullscreen not restored, solid existing infra)",
-    "10-CONTEXT.md complete: 2 user decisions + Claude's discretion items",
-    "No PLAN.md files yet — planning step not started"
+    "3 PLAN.md files created: 10-01 (WindowBootstrap TDD), 10-02 (onWindowClose save), 10-03 (startup wiring + singleton fix)",
+    "2 waves: Wave 1 = 10-01 + 10-02 (parallel), Wave 2 = 10-03 (depends on Wave 1)",
+    "Plan checker passed with 1 warning (RESEARCH.md Open Questions — fixed)",
+    "PATTERNS.md, VALIDATION.md created",
+    "All artifacts committed as 31f96b0"
   ],
   "uncommitted_files": [
-    "integration_test/simple_test.dart (modified)",
     "pubspec.lock (modified)",
     "test/perf/control_bar_perf_test.dart (modified)",
     ".codegraph/ (untracked)"
   ],
-  "next_action": "/gsd:plan-phase 10 — RESEARCH.md and CONTEXT.md both exist, will skip research and go straight to planner",
-  "context_notes": "Phase 10 discuss-phase completed. Research agent finished (10-RESEARCH.md). CONTEXT.md written with 2 user decisions (crash-safe geometry = keep existing, fullscreen = no auto-restore). 3 other gray areas deferred to Claude's discretion. Ready for planning step. Context was at 75% so paused before planning."
+  "next_action": "/gsd:execute-phase 10 — run all 3 plans",
+  "context_notes": "Phase 10 planning complete. 3 plans in 2 waves verified and committed. Ready for execution. Context was at 74% so paused before executing."
 }
