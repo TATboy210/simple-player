@@ -41,7 +41,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 9: Security Hardening** - FFI memory safety and input validation (SEC-01, SEC-02)
 - [x] **Phase 10: Window Optimization** - Window management and UX continued improvement (WIN-04)
-- [ ] **Phase 11: Performance Optimization** - Player performance tuning and rendering pipeline audit (PERF-04)
+- [x] **Phase 11: Performance Optimization** - Player performance tuning and rendering pipeline audit (PERF-04)
 - [ ] **Phase 12: Debug Tooling** - Structured logging, named loggers, and performance tracing (DBG-01)
 
 ## Phase Details
@@ -113,7 +113,7 @@ Plans:
 - [x] 11-01: ThumbnailService LRU O(1) with LinkedHashMap
 - [x] 11-02: PositionPoller adaptive polling intervals
 - [x] 11-03: D3D11 refresh-rate-aware sync mode
-- [ ] 11-04: Rendering pipeline audit + Phase 11 verification
+- [x] 11-04: Rendering pipeline audit + Phase 11 verification
 
 ### Phase 12: Debug Tooling
 
@@ -149,7 +149,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
 | 10. Window Optimization | v1.2 | 5/5 | Complete | 2026-05-30 |
-| 11. Performance Optimization | v1.2 | 2/4 | Executing | - |
+| 11. Performance Optimization | v1.2 | 4/4 | Complete | 2026-05-30 |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
 
 ## Requirement Traceability
@@ -170,4 +170,4 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | DBG-01 | 12 | TBD |
 
 ---
-*Last updated: 2026-05-30 — Phase 11 PLANNED: 4 plans (11-01 LRU, 11-02 Poller, 11-03 D3D11, 11-04 Audit). Phase 10 complete.*
+*Last updated: 2026-05-30 — Phase 11 COMPLETE: 4 plans (11-01 LRU, 11-02 Poller, 11-03 D3D11, 11-04 Audit). Phase 12 next.*
