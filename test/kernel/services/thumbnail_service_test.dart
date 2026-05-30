@@ -1,4 +1,3 @@
-import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/services/thumbnail_service.dart';
 
