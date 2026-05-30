@@ -77,7 +77,7 @@ Plans:
   2. Fullscreen enter/exit animations are smooth with no visual glitches or compositing artifacts
   3. Window geometry state persists reliably (no lost/corrupt values after crash or force-quit)
 
-**Plans**: 3 plans (2 Wave 1 parallel + 1 Wave 2)
+**Plans**: 5 plans (2 Wave 1 original + 1 Wave 2 + 2 Gap Closure Wave 1)
 
 Plans:
 **Wave 1**
@@ -88,6 +88,11 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 10-03: 启动流程集成 + 双重 WindowService 修复
+
+**Gap Closure** *(Wave 1 — closing worktree losses)*
+
+- [ ] 10-01-GAP: WindowBootstrap tests (6+ test cases)
+- [ ] 10-02-GAP: onWindowClose + _saveGeometryImmediate re-implementation
 
 ### Phase 11: Performance Optimization
 
@@ -140,7 +145,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 7. Integration & Golden Tests | v1.1 | 3/3 | Complete | 2026-05-30 |
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
-| 10. Window Optimization | v1.2 | 1/3 | In Progress|  |
+| 10. Window Optimization | v1.2 | 1/5 | In Progress|  |
 | 11. Performance Optimization | v1.2 | 0/TBD | Not started | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
 
@@ -162,4 +167,4 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | DBG-01 | 12 | TBD |
 
 ---
-*Last updated: 2026-05-30 — Phase 10 planning complete: 3 plans (10-01 WindowBootstrap TDD, 10-02 onWindowClose save, 10-03 startup wiring + singleton fix)*
+*Last updated: 2026-05-30 — Phase 10 gap closure: 2 plans added (10-01-GAP WindowBootstrap tests, 10-02-GAP onWindowClose immediate save)*
