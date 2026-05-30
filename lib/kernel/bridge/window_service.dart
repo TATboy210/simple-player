@@ -26,15 +26,9 @@ typedef _DwmExtendFrameIntoClientAreaNative =
     Int32 Function(IntPtr, Pointer<_Margins>);
 typedef _DwmExtendFrameIntoClientAreaDart =
     int Function(int, Pointer<_Margins>);
-typedef _DwmSetWindowAttributeNative =
-    Int32 Function(IntPtr, IntPtr, Pointer<Uint32>, Uint32);
-typedef _DwmSetWindowAttributeDart =
-    int Function(int, int, Pointer<Uint32>, int);
-
 const _gwlStyle = -16;
 const _wsCaption = 0x00C00000;
 const _wsPopup = 0x80000000;
-const _dwmwaTransitionsForcedisabled = 3;
 const _hwndTop = 0;
 const _swpNoOwnerZOrder = 0x0200;
 const _swpFrameChanged = 0x0020;
@@ -86,7 +80,6 @@ class _Win32Bindings {
   late final _GetMonitorInfoDart getMonitorInfo;
   late final _GetWindowRectDart getWindowRect;
   late final _DwmExtendFrameIntoClientAreaDart dwmExtendFrameIntoClientArea;
-  late final _DwmSetWindowAttributeDart dwmSetWindowAttribute;
 
   _Win32Bindings() {
     _user32 = DynamicLibrary.open('user32.dll');
@@ -119,11 +112,6 @@ class _Win32Bindings {
           _DwmExtendFrameIntoClientAreaNative,
           _DwmExtendFrameIntoClientAreaDart
         >('DwmExtendFrameIntoClientArea');
-    dwmSetWindowAttribute = _dwmapi
-        .lookupFunction<
-          _DwmSetWindowAttributeNative,
-          _DwmSetWindowAttributeDart
-        >('DwmSetWindowAttribute');
   }
 }
 
@@ -159,26 +147,6 @@ class WindowService with WindowListener {
   void init() {
     windowManager.addListener(this);
     _removeBorder();
-  }
-
-  /// 禁用/启用 DWM 过渡动画。
-  ///
-  /// 最大化/恢复时禁用动画，消除白边闪现和卡顿。
-  /// PostMessage(SC_MAXIMIZE) 是异步的，发送后立即恢复设置即可。
-  ///
-  /// 注意：当前最大化/恢复已移除此调用以保留平滑动画。
-  /// 如果白边闪现重新出现，可考虑使用此方法或 AnimateWindow API。
-  // ignore: unused_element
-  static Future<void> _setTransitionsDisabled(bool disabled) async {
-    final hwnd = await windowManager.getId();
-    final value = calloc<Uint32>()..value = disabled ? 1 : 0;
-    _win32.dwmSetWindowAttribute(
-      hwnd,
-      _dwmwaTransitionsForcedisabled,
-      value,
-      sizeOf<Uint32>(),
-    );
-    calloc.free(value);
   }
 
   /// 移除窗口标题栏，保留缩放边框和 DWM 阴影。
