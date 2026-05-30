@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Testing, Quality & Code Optimization
-status: completed
+status: in_progress
 stopped_at: context limit approaching (2026-05-30)
-last_updated: "2026-05-30T10:35:00+08:00"
-last_activity: 2026-05-30 -- Golden tests (07-02) completed
+last_updated: "2026-05-30T11:30:00+08:00"
+last_activity: 2026-05-30 -- Phase 8 Architecture & Dead Code (3/6 tasks done)
 progress:
   total_phases: 6
   completed_phases: 4
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-29)
 
 **Core value:** Build clean, dependency-free window management and unified widget system for smooth desktop playback.
-**Current focus:** Phase 07 — Integration & Golden Tests
+**Current focus:** Phase 08 — Architecture & Dead Code
 
 ## Current Position
 
-Phase: 07 (Integration & Golden Tests) — COMPLETE
-Plan: 3 of 3 complete
-Status: All plans done (07-01 integration + 07-02 golden + 07-03 window optimization)
-Last activity: 2026-05-30 -- Golden tests (07-02) completed
+Phase: 08 (Architecture & Dead Code) — IN PROGRESS
+Plan: 3 of 6 tasks complete
+Status: 08-01 done, 08-02b done, 08-02c done; 08-02d, 08-02a, 08-03 remaining
+Last activity: 2026-05-30 -- settings_card.dart split (08-02c)
 
 Progress: [███████░░░] 73%
 
@@ -41,9 +41,10 @@ Progress: [███████░░░] 73%
 - [v1.0]: D3D11 sync safe default (d3d11.sync.cpu=1)
 - [v1.0]: 3-layer architecture (Kernel/Features/UI)
 - [v1.1]: Window code optimization without changing deps/features
-- [v1.1]: Use Context7 for latest library docs during optimization
-- [v1.1]: BoxFit.contain for video rendering (complete video visible with black borders)
-- [v1.1]: Custom FFI maximize using rcWork (taskbar not covered)
+- [v1.1]: BoxFit.contain for video rendering
+- [v1.1]: Custom FFI maximize using rcWork
+- [v1.1]: Remove DWMWA_TRANSITIONS_FORCEDISABLED for smooth animation
+- [v1.1]: Re-export extracted classes to preserve import surfaces
 
 ### Deferred Items
 
@@ -54,9 +55,10 @@ Progress: [███████░░░] 73%
 | v1.2+ | HLS/ABR streaming | Deferred | v1.0 |
 | v1.2+ | Steam/SteamOS distribution | Deferred | v1.0 |
 | tech_debt | PERF-01 multi-GPU D3D11 testing | Deferred | v1.0 |
+| v1.1 | Hardcoded i18n strings in startup progress | Skipped | Phase 8 |
 
 ## Session Continuity
 
-Last session: 2026-05-30T02:13:22.090Z
+Last session: 2026-05-30T03:30:00.000Z
 Stopped at: context exhaustion at 75% (2026-05-30)
-Resume file: None
+Resume file: .planning/.continue-here.md
