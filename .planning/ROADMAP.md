@@ -140,7 +140,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 7. Integration & Golden Tests | v1.1 | 3/3 | Complete | 2026-05-30 |
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
-| 10. Window Optimization | v1.2 | 0/3 | Not started | - |
+| 10. Window Optimization | v1.2 | 0/3 | Planned    |  |
 | 11. Performance Optimization | v1.2 | 0/TBD | Not started | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
 
