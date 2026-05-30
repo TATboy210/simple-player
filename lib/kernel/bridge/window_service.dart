@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:ffi' hide Size;
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
@@ -195,6 +196,8 @@ class WindowService with WindowListener {
   }
 
   Future<void> _enterFullscreen() async {
+    Timeline.startSync('window.enterFullscreen');
+    try {
     if (isFullscreen.value) return;
 
     final hwnd = await windowManager.getId();
@@ -251,9 +254,14 @@ class WindowService with WindowListener {
     }
 
     if (!isFullscreen.value) isFullscreen.value = true;
+    } finally {
+      Timeline.finishSync();
+    }
   }
 
   Future<void> _exitFullscreen() async {
+    Timeline.startSync('window.exitFullscreen');
+    try {
     if (!isFullscreen.value) return;
 
     final hwnd = await windowManager.getId();
@@ -285,6 +293,9 @@ class WindowService with WindowListener {
     }
 
     if (isFullscreen.value) isFullscreen.value = false;
+    } finally {
+      Timeline.finishSync();
+    }
   }
 
   Future<void> setAlwaysOnTop(bool value) async {
