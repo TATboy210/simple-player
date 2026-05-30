@@ -12,11 +12,13 @@ import 'services/video_processing_service.dart';
 /// 单一职责：持有播放器所有服务实例，提供 init/dispose 生命周期。
 /// 不涉及 UI 状态，不涉及 BuildContext。
 class PlayerServices {
+  PlayerServices({required this.windowService});
+
   late final FvpEngine engine;
   late final Playlist playlist;
   late final PlaybackController controller;
   late final VideoProcessingService videoProcessing;
-  late final WindowService windowService;
+  final WindowService windowService;
 
   final ValueNotifier<int> playlistGeneration = ValueNotifier(0);
 
@@ -31,8 +33,6 @@ class PlayerServices {
     final settings = await SettingsStore.load();
     await controller.init(settings: settings);
     videoProcessing = VideoProcessingService(engine, initialSettings: settings);
-    windowService = WindowService();
-    windowService.init();
   }
 
   void dispose() {

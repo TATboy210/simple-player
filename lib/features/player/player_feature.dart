@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../kernel/bridge/window_service.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
@@ -25,6 +26,7 @@ import 'player_services.dart';
 /// 由 App 通过构造函数传入。
 class PlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
+  final WindowService windowService;
   final void Function(
     BuildContext context,
     MediaEngine engine,
@@ -37,6 +39,7 @@ class PlayerFeature extends StatefulWidget {
   const PlayerFeature({
     super.key,
     required this.coordinator,
+    required this.windowService,
     required this.onSettings,
     required this.onSettingsSecondary,
   });
@@ -54,7 +57,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   @override
   void initState() {
     super.initState();
-    _services = PlayerServices();
+    _services = PlayerServices(windowService: widget.windowService);
     _init();
   }
 

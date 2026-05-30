@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../kernel/bridge/window_service.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
@@ -17,6 +18,7 @@ import 'services/video_processing_service.dart';
 /// 回调使用抽象类型 MediaEngine（FvpEngine implements MediaEngine）。
 class DeferredPlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
+  final WindowService windowService;
   final void Function(
     BuildContext context,
     MediaEngine engine,
@@ -29,6 +31,7 @@ class DeferredPlayerFeature extends StatefulWidget {
   const DeferredPlayerFeature({
     super.key,
     required this.coordinator,
+    required this.windowService,
     required this.onSettings,
     required this.onSettingsSecondary,
   });
@@ -86,6 +89,7 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
     }
     return player_feature.PlayerFeature(
       coordinator: widget.coordinator,
+      windowService: widget.windowService,
       onSettings: widget.onSettings,
       onSettingsSecondary: widget.onSettingsSecondary,
     );
