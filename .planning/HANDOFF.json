@@ -1,51 +1,30 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T10:35:00+08:00",
-  "phase": 7,
-  "phase_name": "Integration & Golden Tests",
-  "phase_dir": ".planning/phases/07-integration-golden-tests",
-  "plan": 3,
-  "task": 0,
-  "total_tasks": 3,
+  "timestamp": "2026-05-30T11:30:00+08:00",
+  "phase": 8,
+  "phase_name": "Architecture & Dead Code",
+  "plan": 1,
+  "task": 4,
+  "total_tasks": 6,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Fix 1: DWM shadow restore (margins 0,0,1,0)", "status": "done", "commit": "0c32e12"},
-    {"id": 2, "name": "Fix 2: Preserve WS_THICKFRAME native resize", "status": "done", "commit": "0c32e12"},
-    {"id": 3, "name": "Fix 3: Startup flash elimination (removeBorderImmediate)", "status": "done", "commit": "adc3b79"},
-    {"id": 4, "name": "Fix 4: Fullscreen exit restores _baseStyle", "status": "done", "commit": "adc3b79"},
-    {"id": 5, "name": "Fix 5: Window geometry persistence (500ms debounce)", "status": "done", "commit": "adc3b79"},
-    {"id": 6, "name": "Fix 6: DWM transition disable for maximize/restore", "status": "done", "commit": "adc3b79"},
-    {"id": 7, "name": "Custom maximize using rcWork (taskbar not covered)", "status": "done", "commit": "bdff0a5"},
-    {"id": 8, "name": "Video BoxFit.contain (letterbox/pillarbox)", "status": "done", "commit": "bdff0a5"},
-    {"id": 9, "name": "Window management architecture doc in STRUCTURE.md", "status": "done", "commit": "adc3b79"},
-    {"id": 10, "name": "Window optimization plan doc (07-03-PLAN.md)", "status": "done", "commit": "53c8d19"},
-    {"id": 11, "name": "Smooth maximize/restore animation (remove DWM transition disable)", "status": "done", "commit": "679c128"},
-    {"id": 12, "name": "WindowService FFI lazy initialization refactor", "status": "done"},
-    {"id": 13, "name": "FakeWindowService + integration_helpers", "status": "done"},
-    {"id": 14, "name": "Integration tests: playback_flow (6 tests)", "status": "done"},
-    {"id": 15, "name": "Integration tests: controls_flow (6 tests)", "status": "done"},
-    {"id": 16, "name": "Integration tests: playlist_flow (6 tests)", "status": "done"},
-    {"id": 17, "name": "Golden test infrastructure (TolerantGoldenComparator)", "status": "done"},
-    {"id": 18, "name": "Glass widget golden tests (7 tests)", "status": "done"},
-    {"id": 19, "name": "Control layout golden tests (7 tests)", "status": "done"},
-    {"id": 20, "name": "Golden baselines (15 PNGs)", "status": "done"}
+    {"id": 1, "name": "08-01: Delete dead files + remove dead _setTransitionsDisabled", "status": "done", "commit": "88fb98b"},
+    {"id": 2, "name": "08-02b: Extract AppSettings from settings_store.dart", "status": "done", "commit": "9113606"},
+    {"id": 3, "name": "08-02c: Extract SettingSliderRow and SettingActionRow from settings_card.dart", "status": "done", "commit": "a4799c5"}
   ],
   "remaining_tasks": [
-    {"id": 12, "name": "Phase 7: Execute 07-01-PLAN.md (Integration tests)", "status": "done"},
-    {"id": 13, "name": "Phase 7: Execute 07-02-PLAN.md (Golden tests)", "status": "done"},
-    {"id": 14, "name": "Phase 8: Architecture & Dead Code cleanup", "status": "not_started"}
+    {"id": 4, "name": "08-02d: Extract Win32 FFI types to win32_bindings.dart", "status": "not_started"},
+    {"id": 5, "name": "08-02a: Extract VideoConfigManager from FvpEngine", "status": "not_started"},
+    {"id": 6, "name": "08-03: Hover pattern dedup + final verification", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [
-    {"action": "Manual test: maximize button should have smooth DWM animation", "context": "Removed DWMWA_TRANSITIONS_FORCEDISABLED to restore smooth transitions", "blocking": false},
-    {"action": "Manual test: if white border flash returns, may need to re-enable _setTransitionsDisabled", "context": "Trade-off: smooth animation vs white border flash prevention", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Custom FFI maximize using rcWork instead of windowManager.maximize()", "rationale": "window_manager plugin adjustNCCALCSIZE expands client area to full monitor on frameless windows, covering taskbar", "phase": 7},
-    {"decision": "BoxFit.contain instead of BoxFit.cover", "rationale": "User wants full video visible with black letterbox/pillarbox, not cropped", "phase": 7},
-    {"decision": "Remove DWMWA_TRANSITIONS_FORCEDISABLED from maximize/restore", "rationale": "User reported maximize transition is not smooth; disabling DWM transitions removes animation entirely", "phase": 7}
+    {"decision": "Remove dwmSetWindowAttribute binding along with dead _setTransitionsDisabled", "rationale": "dwmSetWindowAttribute was only used by the dead method; dwmExtendFrameIntoClientArea (used by _removeBorder) kept", "phase": 8},
+    {"decision": "Re-export extracted classes from original files", "rationale": "Preserves import surfaces so consumers don't break", "phase": 8},
+    {"decision": "Skip hardcoded i18n strings in startup progress", "rationale": "Splash screen progress <2 seconds, minimal user benefit vs threading BuildContext", "phase": 8}
   ],
   "uncommitted_files": [],
-  "next_action": "Phase 7 complete. Begin Phase 8: Architecture & Dead Code cleanup",
-  "context_notes": "07-02 complete: 14 golden tests (7 glass widgets + 7 control layouts), TolerantGoldenComparator with per-channel tolerance, 15 baseline PNGs. 596 tests passing (582 existing + 14 new golden). Phase 7 fully done (3/3 plans: 07-01 + 07-02 + 07-03)."
+  "next_action": "Continue Phase 8: 08-02d (Win32 FFI extraction) → 08-02a (VideoConfigManager) → 08-03 (hover dedup)",
+  "context_notes": "3/6 tasks done. 88 lines deleted (08-01), AppSettings extracted (08-02b), settings_card split from 513→270 lines (08-02c). 596 tests passing. Plan at ~/.claude/plans/purring-meandering-lagoon.md."
 }
