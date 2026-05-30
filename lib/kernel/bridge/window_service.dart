@@ -117,6 +117,12 @@ class WindowService with WindowListener {
     });
   }
 
+  @override
+  void onWindowClose() {
+    _saveGeometryImmediate();
+    windowManager.destroy();
+  }
+
   /// 500ms 去抖保存窗口几何到 SettingsStore
   void _scheduleGeometrySave() {
     _resizeDebounce?.cancel();
@@ -136,6 +142,27 @@ class WindowService with WindowListener {
         debugPrint('WindowService: geometry save failed: $e');
       }
     });
+  }
+
+  /// 立即保存窗口几何（关闭时调用，不跳过全屏/最大化）。
+  void _saveGeometryImmediate() {
+    if (_disposed) return;
+    _resizeDebounce?.cancel();
+    () async {
+      try {
+        final pos = await windowManager.getPosition();
+        final size = windowSize.value;
+        await SettingsStore.saveWindowGeometry(
+          width: size.width,
+          height: size.height,
+          x: pos.dx,
+          y: pos.dy,
+          isMaximized: isMaximized.value,
+        );
+      } on Exception catch (e) {
+        debugPrint('WindowService: immediate geometry save failed: $e');
+      }
+    }();
   }
 
   // ─── Commands (delegate to windowManager) ───
