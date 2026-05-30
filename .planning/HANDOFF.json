@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T17:20:00+08:00",
+  "timestamp": "2026-05-30T18:00:00+08:00",
   "phase": 10,
   "phase_name": "Window Optimization",
   "phase_dir": ".planning/phases/10-window-optimization",
@@ -12,28 +12,24 @@
   "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [
     {"id": "10-03", "name": "Startup wiring + singleton fix", "status": "done", "commit": "91fde04, 19d3eca"},
-    {"id": "10-02-GAP", "name": "onWindowClose gap closure plan", "status": "planned", "note": "Plan written to 10-02-GAP-PLAN.md, not yet executed"},
-    {"id": "10-01-GAP", "name": "WindowBootstrap tests gap closure plan", "status": "planned", "note": "Plan written to 10-01-GAP-PLAN.md, not yet executed"}
+    {"id": "10-02-GAP", "name": "onWindowClose + _saveGeometryImmediate", "status": "done", "commit": "7312eeb"},
+    {"id": "10-01-GAP", "name": "WindowBootstrap test suite (7 tests)", "status": "done", "commit": "e1e7b95"}
   ],
   "remaining_tasks": [
-    {"id": "10-02-GAP", "name": "Execute: onWindowClose + _saveGeometryImmediate", "status": "not_started"},
-    {"id": "10-01-GAP", "name": "Execute: WindowBootstrap test suite", "status": "not_started"}
+    {"id": "10-VERIFY", "name": "Phase 10 verification — confirm all must-haves pass", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "WindowBootstrap uses PlatformDispatcher.instance.views instead of screen_retriever", "rationale": "screen_retriever is not a project dependency", "phase": 10},
-    {"decision": "WindowService singleton injection via constructor", "rationale": "Fixes double instantiation race condition", "phase": 10},
-    {"decision": "WindowOptions no longer has hardcoded size/center", "rationale": "WindowBootstrap handles geometry restoration", "phase": 10},
-    {"decision": "Gap closure plans use --gaps-only mode", "rationale": "Two gaps from worktree loss: onWindowClose and tests", "phase": 10}
+    {"decision": "onWindowClose does NOT skip fullscreen/maximized (unlike debounce)", "rationale": "Close handler must save actual window state", "phase": 10},
+    {"decision": "clampToVisibleBounds exposed as @visibleForTesting", "rationale": "Direct unit testing of bounds logic without mocking PlatformDispatcher", "phase": 10},
+    {"decision": "SharedPreferences.setMockInitialValues for clearFullscreenIfSaved tests", "rationale": "Standard Flutter test pattern for persistence layer", "phase": 10}
   ],
   "uncommitted_files": [
-    ".planning/ROADMAP.md (modified by planner)",
-    ".planning/phases/10-window-optimization/10-01-GAP-PLAN.md (new)",
-    ".planning/phases/10-window-optimization/10-02-GAP-PLAN.md (new)",
-    "pubspec.lock (modified)",
-    "test/perf/control_bar_perf_test.dart (modified)"
+    ".planning/STATE.md (modified)",
+    "CLAUDE.md (modified)",
+    "pubspec.lock (modified)"
   ],
-  "next_action": "/gsd:execute-phase 10 --gaps-only — execute 10-02-GAP (onWindowClose) then 10-01-GAP (tests)",
-  "context_notes": "Phase 10 gap closure planning complete. 2 gap plans written. Wave 1: 10-02-GAP (onWindowClose, ~15min) + 10-01-GAP (tests, ~30min). Both in same wave, no dependencies. 608 tests pass, dart analyze clean. Next: execute --gaps-only."
+  "next_action": "Run Phase 10 verification: verifier agent checks 10-VERIFICATION.md must-haves against codebase, confirms 3 gaps resolved",
+  "context_notes": "Phase 10 gap closure EXECUTED successfully. Both 10-02-GAP (onWindowClose) and 10-01-GAP (tests) committed. 615 tests passing (was 608). Next: verification to confirm all must-haves pass, then mark Phase 10 complete."
 }
