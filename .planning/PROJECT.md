@@ -2,23 +2,22 @@
 
 ## What This Is
 
-Flutter desktop media player powered by fvp (MDK/FFmpeg). Shipped v1.0 with self-managed window control via MethodChannel + Win32 FFI, unified glassmorphism UI component library, and optimized playback performance on Windows. v1.1 focuses on testing infrastructure, code quality, and architecture optimization.
+Flutter desktop media player powered by fvp (MDK/FFmpeg). Shipped v1.0 with self-managed window control via MethodChannel + Win32 FFI, unified glassmorphism UI component library, and optimized playback performance on Windows. v1.1 delivered testing infrastructure (596 tests), architecture cleanup (file splitting, dead code removal), and code quality improvements. v1.2 focuses on security hardening, deep architecture optimization, and kernel improvements.
 
 ## Core Value
 
 Build a clean, dependency-free window management layer and unified widget system that delivers smooth, responsive playback on all desktop platforms.
 
-## Current Milestone: v1.1 Testing, Quality & Code Optimization
+## Current Milestone: v1.2 Security, Architecture & Kernel
 
-**Goal:** 测试基础设施 + 窗口层代码精简 + 架构优化 + 死代码清理
+**Goal:** 安全加固 + 深度架构优化 + 窗口持续改进 + 内核优化 + Debug 工具
 
 **Target features:**
-- 窗口层代码优化精简 (保持依赖/功能不变，重构代码结构)
-- 集成测试 (关键用户流程 E2E)
-- Golden 测试 (glassmorphism 组件视觉回归)
-- 架构优化 (Context7 查最新文档指导重构)
-- 死代码清理 (删除无用代码、简化冗余)
-- 代码质量 (静态分析、覆盖率维护)
+- 安全加固 (FFI 内存安全、URL/路径验证、fullscreen 超时保护)
+- 架构优化 (fvp_engine 拆分、SettingsStore 简化、单例迁移)
+- 窗口优化 (持续改进窗口管理和用户体验)
+- 内核改进 (引擎层优化、性能提升)
+- Debug 工具 (调试日志、诊断能力改进)
 
 ## Requirements
 
@@ -49,16 +48,27 @@ Build a clean, dependency-free window management layer and unified widget system
 - ✓ TEST-03: Startup coordinator tests — v1.0
 - ✓ TEST-04: Coverage 64% → 80% — v1.0
 
-### Active (v1.1)
+### Validated (v1.1)
 
-- [ ] OPT-01: Window layer code optimization (keep deps/features, refactor structure)
-- [ ] TEST-05: Integration tests for critical user flows (E2E)
-- [ ] TEST-06: Golden tests for glassmorphism components (visual regression)
-- [ ] QUAL-01: Architecture optimization (Context7-guided refactoring)
-- [ ] QUAL-02: Dead code cleanup (remove unused code, simplify redundancy)
-- [ ] QUAL-03: Code quality maintenance (static analysis, coverage)
+- ✓ OPT-01: Window layer code optimization — v1.1 Phase 6
+- ✓ TEST-05: Integration tests for critical user flows (E2E) — v1.1 Phase 7
+- ✓ TEST-06: Golden tests for glassmorphism components — v1.1 Phase 7
+- ✓ QUAL-01: Architecture optimization (Context7-guided) — v1.1 Phase 8
+- ✓ QUAL-02: Dead code cleanup — v1.1 Phase 8
+- ✓ QUAL-03: Code quality maintenance — v1.1 Phase 8
 
-### Future (v1.2+)
+### Active (v1.2)
+
+- [ ] SEC-01: FFI memory safety (dispose leak fix, try/finally, fullscreen timeout)
+- [ ] SEC-02: Input validation (URL structure, path length, null bytes)
+- [ ] ARCH-01: fvp_engine.dart decomposition (690 → focused modules)
+- [ ] ARCH-02: SettingsStore simplification (25+ save methods → generic pattern)
+- [ ] ARCH-03: Singleton migration (6 static mutable singletons → DI)
+- [ ] WIN-04: Window management continued optimization
+- [ ] KERN-01: Kernel layer improvements (engine, bridge, persistence)
+- [ ] DBG-01: Debug tooling and diagnostics improvements
+
+### Future (v1.3+)
 
 - [ ] PLATFORM-02: macOS/Linux platform stubs (deferred from v1)
 - [ ] Impeller FragmentShader for BackdropFilter (requires Impeller stable on Windows)
@@ -79,7 +89,7 @@ Build a clean, dependency-free window management layer and unified widget system
 - **State management**: ValueNotifier + ValueListenableBuilder (no Provider/Riverpod/Bloc)
 - **Architecture**: 3-layer (Kernel/Features/UI)
 - **Rendering**: D3D11 hardware-accelerated via fvp
-- **Codebase**: 22,004 Dart LOC, 147 files, 564 tests, 80.0% coverage
+- **Codebase**: ~15,000 Dart LOC, 98 files, 596 tests, 80%+ coverage
 - **Platform target**: Windows primary, macOS/Linux planned for v2
 
 ## Constraints
@@ -113,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-29 after v1.1 milestone start*
+*Last updated: 2026-05-30 after v1.2 milestone start*
