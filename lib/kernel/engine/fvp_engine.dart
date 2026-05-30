@@ -47,7 +47,6 @@ class FvpEngine implements MediaEngine {
   static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
 
   // D3D11 性能参数默认值
-  static const _defaultD3d11SyncCpu = '1'; // 1=同步（安全默认），0=异步（低延迟）
   static const _defaultVideoDecoders = 'D3D11,NVDEC,FFmpeg'; // 硬件优先
 
   // ─── Helpers ───
