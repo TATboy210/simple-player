@@ -8,16 +8,17 @@ Flutter desktop media player powered by fvp (MDK/FFmpeg). Shipped v1.0 with self
 
 Build a clean, dependency-free window management layer and unified widget system that delivers smooth, responsive playback on all desktop platforms.
 
-## Current Milestone: v1.2 Security, Architecture & Kernel
+## Current Milestone: v1.2.1 Window Polish & Architecture Simplification
 
-**Goal:** 安全加固 + 深度架构优化 + 窗口持续改进 + 内核优化 + Debug 工具
+**Goal:** 消除边框闪烁，达到 Apple 级窗口动效流畅度，同时精简架构
 
 **Target features:**
-- 安全加固 (FFI 内存安全、URL/路径验证、fullscreen 超时保护)
-- 架构优化 (fvp_engine 拆分、SettingsStore 简化、单例迁移)
-- 窗口优化 (持续改进窗口管理和用户体验)
-- 内核改进 (引擎层优化、性能提升)
-- Debug 工具 (调试日志、诊断能力改进)
+- 窗口丝滑化 (C++ WM_NCCALCSIZE、合并边框移除、全屏动画、帧间隙消除)
+- Window 层精简 (725 行 4 文件 → 更紧凑)
+- SettingsStore 简化 (25+ save 方法 → 通用模式)
+- 单例迁移 (6 个 static 单例 → 构造函数注入)
+- 平台抽象层 (接口定义，不做具体 macOS/Linux 实现)
+- HLS 完整 ABR (BBA 算法)
 
 ## Requirements
 
@@ -57,16 +58,22 @@ Build a clean, dependency-free window management layer and unified widget system
 - ✓ QUAL-02: Dead code cleanup — v1.1 Phase 8
 - ✓ QUAL-03: Code quality maintenance — v1.1 Phase 8
 
-### Active (v1.2)
+### Validated (v1.2)
 
-- [ ] SEC-01: FFI memory safety (dispose leak fix, try/finally, fullscreen timeout)
-- [ ] SEC-02: Input validation (URL structure, path length, null bytes)
-- [ ] ARCH-01: fvp_engine.dart decomposition (690 → focused modules)
+- ✓ SEC-01: FFI memory safety (dispose leak fix, try/finally, fullscreen timeout) — v1.2
+- ✓ SEC-02: Input validation (URL structure, path length, null bytes) — v1.2
+- ✓ WIN-04: Window management continued optimization — v1.2
+- ✓ PERF-04: Performance optimization (LRU, polling, D3D11 sync) — v1.2
+- ✓ DBG-01: Debug tooling and diagnostics improvements — v1.2
+
+### Active (v1.2.1)
+
+- [ ] WIN-05: Window smoothness — C++ WM_NCCALCSIZE, unified border removal, fullscreen animation
+- [ ] WIN-06: Window layer simplification (725 lines → compact)
 - [ ] ARCH-02: SettingsStore simplification (25+ save methods → generic pattern)
 - [ ] ARCH-03: Singleton migration (6 static mutable singletons → DI)
-- [ ] WIN-04: Window management continued optimization
-- [ ] KERN-01: Kernel layer improvements (engine, bridge, persistence)
-- [ ] DBG-01: Debug tooling and diagnostics improvements
+- [ ] PLATFORM-03: Platform abstraction layer (interface only, no macOS/Linux impl)
+- [ ] HLS-01: HLS adaptive bitrate streaming (BBA algorithm)
 
 ### Future (v1.3+)
 
@@ -123,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-30 after v1.2 milestone start*
+*Last updated: 2026-05-31 after v1.2.1 milestone start*
