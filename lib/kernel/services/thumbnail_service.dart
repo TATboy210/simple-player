@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
@@ -20,7 +18,7 @@ class ThumbnailService {
   static ThumbnailProvider? _impl;
 
   /// LRU 缓存 — LinkedHashMap 维护插入顺序，访问时 remove+reinsert 移到末尾
-  static final _cache = LinkedHashMap<String, ImageProvider>();
+  static final _cache = <String, ImageProvider>{};
 
   static ThumbnailProvider get _provider {
     if (_impl != null) return _impl!;
