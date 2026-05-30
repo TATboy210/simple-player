@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T23:30:00+08:00",
+  "timestamp": "2026-05-31T00:30:00+08:00",
   "phase": 12,
   "phase_name": "Debug Tooling",
   "phase_dir": ".planning/phases/12-debug-tooling",
@@ -13,29 +13,27 @@
   "completed_tasks": [
     {"id": "12-discuss", "name": "Phase 12 context gathering (discuss-phase)", "status": "done", "commit": "2423ad4"},
     {"id": "12-research", "name": "Phase 12 research (PrefixPrinter, Timeline, logger API)", "status": "done", "commit": "931b719"},
-    {"id": "12-plan", "name": "Phase 12 planning (2 plans: 12-01 + 12-02)", "status": "done", "commit": "073391d"}
+    {"id": "12-plan", "name": "Phase 12 planning (2 plans: 12-01 + 12-02)", "status": "done", "commit": "073391d"},
+    {"id": "12-01", "name": "PrefixPrinter + 4 module loggers + initLog update + unit tests", "status": "done", "commit": "75f4afd"},
+    {"id": "12-02", "name": "Timeline tracing on FvpEngine.open/seek + WindowService fullscreen", "status": "done", "commit": "d805b08"}
   ],
   "remaining_tasks": [
-    {"id": "12-01", "name": "PrefixPrinter + 4 module loggers + initLog update + unit tests", "status": "not_started"},
-    {"id": "12-02", "name": "Timeline tracing on FvpEngine.open/seek + WindowService fullscreen", "status": "not_started"}
+    {"id": "12-verify", "name": "Phase 12 verification (VERIFICATION.md)", "status": "not_started"},
+    {"id": "12-complete", "name": "Phase 12 completion (STATE.md + ROADMAP.md update)", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "LRU cache uses LinkedHashMap for O(1) touch/evict", "rationale": "Pure Dart, zero dependencies", "phase": 11},
-    {"decision": "PositionPoller adaptive: 100ms seek / 250ms steady / 1s auto-revert", "rationale": "Reduced CPU, responsive seek", "phase": 11},
-    {"decision": "D3D11 sync mode: async (0) for 120Hz+, sync (1) for 60Hz", "rationale": "High-refresh optimization", "phase": 11},
-    {"decision": "PrefixPrinter extends LogPrinter — wraps inner printer, prepends [module] prefix", "rationale": "Logger 2.7.0 has no name/prefix parameter (verified from source)", "phase": 12},
-    {"decision": "D-01 clarified: JsonPrinter exported as optional constant, PrettyPrinter is default output per D-14", "rationale": "D-01 vs D-14 contradiction resolved — JsonPrinter capability exists but default is human-readable", "phase": 12},
-    {"decision": "Module loggers: logEngine, logBridge, logServices, logUi — coexist with global log", "rationale": "Backward compat, gradual migration", "phase": 12},
+    {"decision": "PrefixPrinter wraps inner printer, prepends [module] prefix", "rationale": "Logger 2.7.0 has no name/prefix parameter (verified from source)", "phase": 12},
+    {"decision": "JsonPrinter exported as optional constant, PrettyPrinter is default output", "rationale": "D-01 vs D-14 contradiction resolved", "phase": 12},
+    {"decision": "Module loggers: logEngine, logBridge, logServices, logUi coexist with global log", "rationale": "Backward compat, gradual migration", "phase": 12},
     {"decision": "ProductionFilter(Level.warning) explicit threshold", "rationale": "D-13: Release only warning+ to file", "phase": 12},
     {"decision": "Timeline: fvp.open, fvp.seek, window.enterFullscreen, window.exitFullscreen", "rationale": "D-08~D-11: 4 async methods with try/finally wrapping", "phase": 12}
   ],
   "uncommitted_files": [
     "CLAUDE.md (modified)",
-    "pubspec.lock (modified)",
-    "test files (modified)"
+    "pubspec.lock (modified)"
   ],
-  "next_action": "Run /gsd:execute-phase 12 to execute both plans (12-01 + 12-02) in Wave 1. Context budget warning: use fresh session for execution.",
-  "context_notes": "Phase 12 plan-phase COMPLETE. 2 plans in 1 wave. Checker found 2 blockers (D-01/D-14 contradiction + missing tests), both resolved in revision. Plans committed as 073391d. v1.2 milestone 3/4 phases done (9+10+11), Phase 12 is final. Execute-phase attempted but paused at 75% context — needs fresh session."
+  "next_action": "Run /gsd:execute-phase 12 to complete verification and phase completion. Both plans are done — only verification and tracking updates remain.",
+  "context_notes": "Phase 12 execution COMPLETE (both plans). 641 tests passing (was 630 + 11 new). Worktrees merged and cleaned. Key deviation: window_service.dart path was lib/window/ in plan but lib/kernel/bridge/ in reality — manually applied Timeline changes to correct file. Logger 2.7.0 deviations: has own PrefixPrinter (used hide), no JsonPrinter (custom impl), ProductionFilter() takes no args (used Logger(level:)). Remaining: phase verification + STATE.md/ROADMAP.md update."
 }
