@@ -40,7 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Milestone Goal:** Security hardening + window continued improvement + performance optimization + debug tooling
 
 - [x] **Phase 9: Security Hardening** - FFI memory safety and input validation (SEC-01, SEC-02)
-- [ ] **Phase 10: Window Optimization** - Window management and UX continued improvement (WIN-04)
+- [x] **Phase 10: Window Optimization** - Window management and UX continued improvement (WIN-04)
 - [ ] **Phase 11: Performance Optimization** - Player performance tuning and rendering pipeline audit (PERF-04)
 - [ ] **Phase 12: Debug Tooling** - Structured logging, named loggers, and performance tracing (DBG-01)
 
@@ -82,8 +82,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 10-01: WindowBootstrap 启动几何恢复 + 多显示器验证 (TDD)
-- [ ] 10-02: WindowService onWindowClose 即时几何保存
+- [x] 10-01: WindowBootstrap 启动几何恢复 + 多显示器验证 (TDD)
+- [x] 10-02: WindowService onWindowClose 即时几何保存
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -91,8 +91,8 @@ Plans:
 
 **Gap Closure** *(Wave 1 — closing worktree losses)*
 
-- [ ] 10-01-GAP: WindowBootstrap tests (6+ test cases)
-- [ ] 10-02-GAP: onWindowClose + _saveGeometryImmediate re-implementation
+- [x] 10-01-GAP: WindowBootstrap tests (6+ test cases)
+- [x] 10-02-GAP: onWindowClose + _saveGeometryImmediate re-implementation
 
 ### Phase 11: Performance Optimization
 
@@ -106,11 +106,14 @@ Plans:
   3. D3D11 sync mode intelligently switches based on display refresh rate (async on 120Hz+)
   4. Rendering pipeline audit completed with documented findings and mitigations
 
-**Plans**: TBD
+**Plans**: 4 plans (2 Wave 1 parallel + 1 Wave 2 + 1 Wave 3 checkpoint)
 
 Plans:
 
-- [ ] 11-01: TBD
+- [ ] 11-01: ThumbnailService LRU O(1) with LinkedHashMap
+- [ ] 11-02: PositionPoller adaptive polling intervals
+- [ ] 11-03: D3D11 refresh-rate-aware sync mode
+- [ ] 11-04: Rendering pipeline audit + Phase 11 verification
 
 ### Phase 12: Debug Tooling
 
@@ -145,8 +148,8 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 7. Integration & Golden Tests | v1.1 | 3/3 | Complete | 2026-05-30 |
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
-| 10. Window Optimization | v1.2 | 1/5 | In Progress|  |
-| 11. Performance Optimization | v1.2 | 0/TBD | Not started | - |
+| 10. Window Optimization | v1.2 | 5/5 | Complete | 2026-05-30 |
+| 11. Performance Optimization | v1.2 | 0/4 | Planned | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
 
 ## Requirement Traceability
@@ -163,8 +166,8 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | SEC-01 | 9 | 09-01 |
 | SEC-02 | 9 | 09-02 |
 | WIN-04 | 10 | 10-01, 10-02, 10-03 |
-| PERF-04 | 11 | TBD |
+| PERF-04 | 11 | 11-01, 11-02, 11-03, 11-04 |
 | DBG-01 | 12 | TBD |
 
 ---
-*Last updated: 2026-05-30 — Phase 10 gap closure: 2 plans added (10-01-GAP WindowBootstrap tests, 10-02-GAP onWindowClose immediate save)*
+*Last updated: 2026-05-30 — Phase 11 PLANNED: 4 plans (11-01 LRU, 11-02 Poller, 11-03 D3D11, 11-04 Audit). Phase 10 complete.*
