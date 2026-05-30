@@ -9,6 +9,7 @@
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (9, 10, 11, 12): Planned milestone work
 - Decimal phases (9.1, 9.2): Urgent insertions (marked with INSERTED)
 
@@ -46,59 +47,81 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 9: Security Hardening
+
 **Goal**: FFI pointers are safely managed and user input is properly validated
 **Depends on**: Phase 8 (v1.1 final)
 **Requirements**: SEC-01, SEC-02
 **Success Criteria** (what must be TRUE):
+
   1. No memory leaks from undisposed `calloc` pointers across all code paths (including error/exception paths)
   2. Fullscreen transition cannot permanently lock (`_fullscreenTransitioning` has timeout protection)
   3. HTTP/HTTPS URLs are validated with `Uri.tryParse()` and rejected if structurally invalid
   4. File paths containing control characters are filtered before reaching the engine
+
 **Plans**: 3 plans (2 Wave 1 parallel + 1 Wave 2 checkpoint)
 
 Plans:
+
 - [x] 09-01: FFI 指针生命周期安全加固 (Arena + try/finally + dispose 补全 + fullscreen 超时)
 - [x] 09-02: 输入验证强化 (HTTP/HTTPS Uri.tryParse + 控制字符过滤)
 - [x] 09-03: 安全加固端到端验证 (checkpoint)
 
 ### Phase 10: Window Optimization
+
 **Goal**: Window startup, fullscreen transitions, and multi-monitor behavior are smooth and reliable
 **Depends on**: Phase 9
 **Requirements**: WIN-04
 **Success Criteria** (what must be TRUE):
+
   1. Window restores to correct position and size on startup across single and multi-monitor setups
   2. Fullscreen enter/exit animations are smooth with no visual glitches or compositing artifacts
   3. Window geometry state persists reliably (no lost/corrupt values after crash or force-quit)
-**Plans**: TBD
+
+**Plans**: 3 plans (2 Wave 1 parallel + 1 Wave 2)
 
 Plans:
-- [ ] 10-01: TBD
+**Wave 1**
+
+- [ ] 10-01: WindowBootstrap 启动几何恢复 + 多显示器验证 (TDD)
+- [ ] 10-02: WindowService onWindowClose 即时几何保存
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 10-03: 启动流程集成 + 双重 WindowService 修复
 
 ### Phase 11: Performance Optimization
+
 **Goal**: Reduce CPU overhead, optimize rendering pipeline, and improve responsiveness on high-refresh-rate displays
 **Depends on**: Phase 9 (security hardening may touch same files)
 **Requirements**: PERF-04
 **Success Criteria** (what must be TRUE):
+
   1. PositionPoller polling strategy is optimized (reduced frequency or callback-based where possible)
   2. ThumbnailService LRU cache uses O(1) operations (LinkedHashMap replaces List)
   3. D3D11 sync mode intelligently switches based on display refresh rate (async on 120Hz+)
   4. Rendering pipeline audit completed with documented findings and mitigations
+
 **Plans**: TBD
 
 Plans:
+
 - [ ] 11-01: TBD
 
 ### Phase 12: Debug Tooling
+
 **Goal**: Developers can diagnose issues with structured, module-scoped logs and performance traces
 **Depends on**: Nothing (independent)
 **Requirements**: DBG-01
 **Success Criteria** (what must be TRUE):
+
   1. Log output is structured JSON format (parseable by log aggregation tools)
   2. Each module uses a named logger instance (engine, bridge, services, UI are distinguishable in logs)
   3. Key performance-sensitive methods (3-5 paths) emit `dart:developer` Timeline events for DevTools profiling
+
 **Plans**: TBD
 
 Plans:
+
 - [ ] 12-01: TBD
 
 ## Progress
@@ -117,7 +140,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 7. Integration & Golden Tests | v1.1 | 3/3 | Complete | 2026-05-30 |
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
-| 10. Window Optimization | v1.2 | 0/TBD | Not started | - |
+| 10. Window Optimization | v1.2 | 0/3 | Not started | - |
 | 11. Performance Optimization | v1.2 | 0/TBD | Not started | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
 
@@ -134,9 +157,9 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | QUAL-03 | 8 | TBD |
 | SEC-01 | 9 | 09-01 |
 | SEC-02 | 9 | 09-02 |
-| WIN-04 | 10 | TBD |
+| WIN-04 | 10 | 10-01, 10-02, 10-03 |
 | PERF-04 | 11 | TBD |
 | DBG-01 | 12 | TBD |
 
 ---
-*Last updated: 2026-05-30 — Phase 9 planning complete: 3 plans (09-01 FFI safety, 09-02 input validation, 09-03 verification)*
+*Last updated: 2026-05-30 — Phase 10 planning complete: 3 plans (10-01 WindowBootstrap TDD, 10-02 onWindowClose save, 10-03 startup wiring + singleton fix)*
