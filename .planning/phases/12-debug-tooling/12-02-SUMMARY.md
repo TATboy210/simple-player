@@ -115,6 +115,15 @@ None - no external service configuration required.
 - Timeline tracing infrastructure in place for DevTools profiling
 - Remaining Phase 12 plans (module loggers, JSON output) can proceed independently
 
+## Self-Check: PASSED
+
+- [x] lib/kernel/engine/fvp_engine.dart exists
+- [x] lib/window/window_service.dart exists
+- [x] .planning/phases/12-debug-tooling/12-02-SUMMARY.md exists
+- [x] Commit 4bab308 exists (Task 1)
+- [x] Commit 3886fd5 exists (Task 2)
+- [x] Commit f43bb65 exists (docs summary)
+
 ---
 *Phase: 12-debug-tooling*
 *Completed: 2026-05-30*
