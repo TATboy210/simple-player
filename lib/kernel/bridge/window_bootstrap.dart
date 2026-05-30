@@ -34,7 +34,7 @@ class WindowBootstrap {
   /// 否则居中显示默认大小。
   static Future<void> restoreOrCenter(AppSettings settings) async {
     if (settings.windowX != null && settings.windowY != null) {
-      final clamped = _clampToVisibleBounds(
+      final clamped = clampToVisibleBounds(
         x: settings.windowX!,
         y: settings.windowY!,
         width: settings.windowWidth,
@@ -56,7 +56,8 @@ class WindowBootstrap {
   ///
   /// 使用 PlatformDispatcher 获取主显示器尺寸（无需 screen_retriever）。
   /// 至少 _minVisible 像素必须在屏幕内，否则居中。
-  static Offset _clampToVisibleBounds({
+  @visibleForTesting
+  static Offset clampToVisibleBounds({
     required double x,
     required double y,
     required double width,
