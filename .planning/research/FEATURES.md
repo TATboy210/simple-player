@@ -1,285 +1,110 @@
-# Feature Landscape: v1.2 Improvements
+# Feature Landscape: v1.2.1 Window Polish & HLS ABR
 
-**Domain:** Flutter desktop media player (Win32 FFI, fvp/MDK engine)
-**Researched:** 2026-05-30
-**Confidence:** HIGH (codebase analysis + existing patterns)
+**Domain:** Flutter desktop media player — window smoothness, HLS ABR, architecture simplification
+**Researched:** 2026-05-31
+**Confidence:** HIGH (existing codebase analysis + documented anti-patterns + fvp/MDK constraints)
 
 ## Table Stakes
 
-Features the v1.2 milestone explicitly targets. Missing any = incomplete milestone.
+Features the v1.2.1 milestone explicitly targets. Missing any = incomplete milestone.
 
-### 1. FFI Pointer Lifecycle Safety
+### 1. Startup Border Flash Elimination
 
-**Why Expected:** SEC-01 in PROJECT.md. WindowService has 6 `calloc` calls with manual `free()` — `_savedFrame`, `_savedMaximizeFrame`, margins, MonitorInfo. One leaked free path in `_exitFullscreen()` when `_savedFrame` is null after an exception leaves native memory orphaned. `dispose()` only frees `_savedMaximizeFrame`, not `_savedFrame`.
-
-**Current State:**
-- `WindowService._enterFullscreen()`: allocates `_savedFrame` (Rect), margins (Margins), mi (MonitorInfo). Each `calloc.free()` is called inline — but if an exception occurs between alloc and free, the pointer leaks.
-- `WindowService.maximize()`: allocates frame + `_savedMaximizeFrame` + mi. Same pattern.
-- No `Arena`, `NativeFinalizer`, or `Finalizer` usage anywhere in the codebase (confirmed via grep).
-- `_savedFrame` is a field (`Pointer<Rect>?`) — freed in `_exitFullscreen()` and `dispose()` only for `_savedMaximizeFrame`.
-
-**Complexity:** Medium
-
-**Recommended Pattern: Arena for scoped allocations + try/finally for field-held pointers**
-
-```dart
-// Scoped allocations (margins, MonitorInfo) — use Arena
-using((Arena arena) {
-  final margins = arena<Margins>()
-    ..ref.left = -1
-    ..ref.right = -1
-    ..ref.top = -1
-    ..ref.bottom = -1;
-  win32.dwmExtendFrameIntoClientArea(hwnd, margins);
-  // auto-freed when scope exits
-});
-
-// Field-held pointers (_savedFrame, _savedMaximizeFrame) — use try/finally
-try {
-  _savedFrame = calloc<Rect>();
-  // ... use _savedFrame ...
-} on Exception catch (e) {
-  if (_savedFrame != null) {
-    calloc.free(_savedFrame!);
-    _savedFrame = null;
-  }
-  rethrow;
-}
-```
-
-**Why not NativeFinalizer:** NativeFinalizer requires a `Finalizable` Dart object wrapping the native pointer. For short-lived Win32 structs (Rect, Margins, MonitorInfo) used in a single method call, Arena is simpler. For long-lived pointers (`_savedFrame` that persists across fullscreen enter/exit), `try/finally` is the idiomatic Dart pattern — the pointer lifetime is tied to a logical operation, not a Dart object's GC.
-
-**Dependencies:** `package:ffi` (already a transitive dependency via fvp)
-
----
-
-### 2. Input Validation Hardening
-
-**Why Expected:** SEC-02 in PROJECT.md. PathValidator exists but is incomplete.
+**Why Expected:** Win11 shows 1-frame straight-corner flash when `setAsFrameless()` strips `WS_CAPTION`. Every modern desktop app (Spotify, VS Code, Discord) launches without visual artifacts. Users notice immediately.
 
 **Current State:**
-- `PathValidator.validate()`: checks empty, URL, path traversal (`../`, `..\\`, UNC `\\`, `~`), null byte, extension whitelist.
-- Missing: URL structure validation (no `Uri.tryParse`), no path length limit, no symlink resolution, no check for control characters.
-- `FvpEngine.open()` does file existence check but passes URL straight to MDK without structural validation.
+- C++ `Win32Window::Create` uses `WS_OVERLAPPEDWINDOW` (default rounded corners on Win11)
+- Dart `WindowService.init()` calls `_removeBorder()` which strips `WS_CAPTION`
+- Between create and border removal, DWM resets corner preference to default (may show straight corners)
+- Fix already documented: `DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)` in `OnCreate`
 
-**Complexity:** Low-Medium
-
-**Recommended additions:**
-
-```dart
-// URL structural validation — prevent injection
-static String? validateUrl(String url) {
-  final uri = Uri.tryParse(url);
-  if (uri == null) return 'Invalid URL: $url';
-  if (!_urlSchemes.any((s) => url.startsWith(s))) {
-    return 'Unsupported protocol: ${uri.scheme}';
-  }
-  // Block file:// and data: schemes
-  if (uri.scheme == 'file' || uri.scheme == 'data') {
-    return 'Blocked protocol: ${uri.scheme}';
-  }
-  return null;
-}
-
-// Path length limit (Windows MAX_PATH = 260, UNC = 32767)
-static const _maxPathLength = 1024; // reasonable desktop limit
-
-// Control character check (bytes < 0x20 except tab/newline)
-static bool _hasControlChars(String s) =>
-    s.runes.any((r) => r < 0x20 && r != 0x09 && r != 0x0A && r != 0x0D);
-```
-
-**Dependencies:** None (pure Dart)
+**Complexity:** Low (3-line C++ fix in `flutter_window.cpp:OnCreate`)
+**Dependencies:** None — purely C++ layer change
 
 ---
 
-### 3. Structured Debug Logging
+### 2. Fullscreen Smooth Transition
 
-**Why Expected:** DBG-01 in PROJECT.md. Current logging is basic (`logger` package with PrettyPrinter).
+**Why Expected:** Current fullscreen uses `SetWindowPos` atomic resize (correct) but loses DWM maximize/restore animation. Users expect macOS-style smooth transition.
 
 **Current State:**
-- `lib/kernel/utils/log.dart`: 135 lines. Global `Logger` instance. Debug=console, Release=console+rotating file.
-- No structured categories, no performance timing, no diagnostic zones.
-- Logging calls use `[ClassName]` prefix convention but no formal structure.
+- `WindowService._enterFullscreen()`: strips `WS_THICKFRAME | WS_CAPTION`, then `SetWindowPos` to fill monitor
+- `WindowService._exitFullscreen()`: restores style + position atomically
+- DWM animation lost because `WS_CAPTION` removal breaks DWM animation pipeline (documented anti-pattern)
 
-**Complexity:** Medium
+**Complexity:** Very High
+**Blocker:** Flutter engine's `HandleTopLevelWindowProc` intercepts `WM_NCCALCSIZE` before custom C++ handler. 3 documented failed approaches:
+1. Direct `WS_CAPTION` removal → loses DWM animation
+2. `WM_NCCALCSIZE` to hide title bar → conflicts with Flutter engine
+3. Mixed approach → each fix introduces new side effects
 
-**Recommended approach — incremental enhancement, not replacement:**
+**Viable Path:** Keep current `SetWindowPos` approach (no animation) OR investigate Microsoft Terminal's `NonClientIslandWindow` pattern (custom `WM_NCHITTEST` + DWM API bypass). The latter is a multi-week investigation.
 
-**a) Add `Timeline` tracing for performance-critical paths:**
-```dart
-import 'dart:developer';
-
-Future<void> open(String path) async {
-  final task = TimelineTask()..start('FvpEngine.open');
-  try {
-    // ... existing open logic ...
-    task.finish(arguments: {'path': path, 'duration_ms': duration.value});
-  } finally {
-    // task.finish already called above, but guard against early return
-  }
-}
-```
-
-**b) Add log categories via named logger instances:**
-```dart
-// lib/kernel/utils/log.dart — add category factory
-Logger createLog(String category) => Logger(
-  printer: PrettyPrinter(methodCount: 0, ...),
-  // same config, but category name enables filtering
-);
-```
-
-**c) Keep the `logger` package** — it already provides levels, file rotation, and pretty printing. Don't replace with `dart:developer` log() — that's for DevTools, not production logging.
-
-**Why not replace the logging system:** The existing `logger` + `_RotatingFileOutput` is solid. The improvement is adding `Timeline` for perf paths and structured context, not rewriting the output layer.
-
-**Dependencies:** None (`dart:developer` is core Dart)
+**Recommendation:** Accept current behavior for v1.2.1. Flag for deeper research in v1.3.
 
 ---
 
-### 4. Large File Decomposition
+### 3. HLS Single-Variant Stream Playback
 
-**Why Expected:** ARCH-01 in PROJECT.md. `fvp_engine.dart` is 690 lines.
+**Why Expected:** Any media player must handle `.m3u8` URLs. FFmpeg's HLS demuxer is built-in.
 
-**Current State of large files:**
-| File | Lines | Already Extracted | Remaining Concern |
-|------|-------|-------------------|-------------------|
-| `fvp_engine.dart` | 690 | FvpCallbackHandler, PositionPoller, TrackManager | Network config (50 lines), open() method (150 lines), video effects (30 lines) |
-| `settings_store.dart` | 439 | None | 25+ individual save methods, load() is 95 lines |
-| `window_service.dart` | 328 | None | Fullscreen + maximize logic, FFI pointer management |
+**Current State:**
+- `FvpEngine.open()` already passes URLs to MDK/FFmpeg
+- Single-variant HLS (one bitrate) works out of the box
+- No ABR logic exists
 
-**Complexity:** Medium
-
-**Recommended decomposition strategy:**
-
-**a) `fvp_engine.dart` (690 -> ~400): Extract `NetworkConfigurator`**
-- `_configureNetworkOptions()` (50 lines) + protocol-specific constants -> `network_configurator.dart`
-- `_applyD3d11Defaults()` (15 lines) -> same file or stays (too small to extract alone)
-- `open()` stays — it's the core orchestration, splitting would hurt readability
-
-**b) `settings_store.dart` (439 -> ~200): Generic save pattern**
-- Current: 25+ `saveX(value)` methods that all follow `_save('name', (p) => p.setTYPE(key, clamp(value)))`.
-- Extract: `_saveTyped<T>(String key, T value, T Function(T) clamp)` or use `AppSettings.copyWith` + `saveAll`.
-- The `saveAll` method already exists and handles all fields. Individual saves can delegate to it:
-```dart
-static Future<void> saveVolume(double value) async {
-  final current = await load();
-  await saveAll(current.copyWith(volume: value.clamp(0.0, 1.0)));
-}
-```
-
-**c) `window_service.dart` (328 -> ~250): Extract fullscreen/maximize FSM**
-- `_enterFullscreen` + `_exitFullscreen` + `setFullscreen` + fullscreen state -> `fullscreen_manager.dart` (mixin or separate class)
-- `maximize` + `restore` -> same file or `maximize_manager.dart`
-
-**Anti-pattern to avoid:** `part/part of` directives. Dart's official guidance discourages them for file splitting — use composition/imports instead.
-
-**Dependencies:** None (pure refactoring)
-
----
-
-### 5. Singleton-to-DI Migration
-
-**Why Expected:** ARCH-03 in PROJECT.md. 6 static mutable singletons identified.
-
-**Current singletons:**
-| Singleton | Pattern | Mutable State | Files Using |
-|-----------|---------|---------------|-------------|
-| `LocaleService.I` | `static final I = LocaleService._()` | `ValueNotifier<Locale>` | 5 files |
-| `ThemeService.I` | `static final I = ThemeService._()` | `ValueNotifier<int>` | 5 files |
-| `SettingsStore._cachedPrefs` | Static mutable field | `SharedPreferences?` | 15+ files |
-| `ThumbnailService._impl` | Lazy static | `ThumbnailProvider?` + LRU cache | 3 files |
-| `PerfMonitor.instance` | `static final _instance` | Metrics counters | 2 files |
-| `OsdService.I` | `static final I = OsdService._()` | Overlay state | 3 files |
-
-**Complexity:** High (touches 21+ files)
-
-**Recommended approach: Incremental constructor injection, not `get_it`**
-
-The project explicitly states "no Provider/Riverpod/Bloc" — adding `get_it` would be a new dependency that contradicts this constraint. Instead:
-
-**Phase 1: Make singletons accept injection (backward compatible)**
-```dart
-class LocaleService {
-  LocaleService({SettingsStore? settingsStore})
-      : _settingsStore = settingsStore ?? SettingsStore();
-  final SettingsStore _settingsStore;
-  // ... remove static final I, keep as convenience
-  static LocaleService? _default;
-  static LocaleService get I => _default ??= LocaleService();
-}
-```
-
-**Phase 2: Inject via constructor at composition root**
-```dart
-// PlayerServices (already the composition root) — inject dependencies
-class PlayerServices {
-  late final LocaleService localeService;
-  late final ThemeService themeService;
-
-  Future<void> init() async {
-    localeService = LocaleService();
-    themeService = ThemeService();
-    // ... rest of init
-  }
-}
-```
-
-**Phase 3: Remove static `I` getters** (after all call sites migrated)
-
-**Why not get_it:** The codebase uses `ValueNotifier` + manual composition via `PlayerServices`. Adding `get_it` introduces a service locator that hides dependencies. Constructor injection is simpler, testable, and consistent with the existing `PlayerServices` composition root pattern.
-
-**Why incremental:** `LocaleService.I` and `ThemeService.I` are used in 5+ UI files each. Big-bang migration risks regressions. The backward-compatible `_default` getter allows gradual migration.
-
-**Dependencies:** None (pure refactoring)
-
----
-
-## Differentiators
-
-Features that improve quality of life beyond the milestone requirements.
-
-### 6. Fullscreen Timeout Protection
-
-**Value:** Prevents fullscreen from getting stuck if Win32 API hangs or `_fullscreenTransitioning` flag gets stuck.
-
-**Complexity:** Low
-
-**Implementation:** Add a timeout timer to `setFullscreen()`:
-```dart
-Future<void> setFullscreen(bool value) async {
-  if (_fullscreenTransitioning) return;
-  _fullscreenTransitioning = true;
-  final timeout = Timer(const Duration(seconds: 3), () {
-    if (_fullscreenTransitioning) {
-      _fullscreenTransitioning = false;
-      log.e('WindowService: fullscreen transition timed out');
-    }
-  });
-  try {
-    if (value) await _enterFullscreen();
-    else await _exitFullscreen();
-  } finally {
-    timeout.cancel();
-    _fullscreenTransitioning = false;
-  }
-}
-```
-
+**Complexity:** Low (already works)
 **Dependencies:** None
 
 ---
 
-### 7. SettingsStore Key-Value Generic Pattern
+### 4. HLS Adaptive Bitrate Streaming (Throughput-Based)
 
-**Value:** Reduces 439-line file to ~200 lines by eliminating 25+ boilerplate save methods.
+**Why Expected:** Multi-variant HLS streams (360p/720p/1080p/4K) require quality switching. Without ABR, users get stuck on lowest quality or suffer buffering.
 
-**Complexity:** Low
+**Current State:**
+- No ABR implementation exists
+- MDK's FFmpeg HLS demuxer has basic ABR via `avformat.hls_prefer_list` but no fine-grained control
+- Existing low-latency config (`fflags +nobuffer`, `drop:true`) conflicts with ABR buffering needs
+- Architecture planned in memory: `AbrService` with `BandwidthEstimator` + `QualitySelector` + `SegmentPrefetcher`
 
-**Implementation:**
+**Complexity:** High
+**Recommended Scope (v1.2.1):** Throughput-based only (not BBA/MPC)
+
+```
+New files:
+├── lib/kernel/services/abr_service.dart       ← ABR decision engine
+│   ├── BandwidthEstimator  (sliding window, EWMA)
+│   ├── QualitySelector     (throughput-based, not BBA)
+│   └── SegmentPrefetcher   (next-segment preload)
+├── lib/kernel/models/abr_state.dart           ← ABR state model
+│   ├── AbrState (currentBitrate, bufferLevel, bandwidth)
+│   └── QualityVariant (resolution, bitrate, url)
+└── lib/kernel/engine/network_configurator.dart ← URL-type routing
+    └── Low-latency (RTSP/RTMP) vs ABR (HLS) config switching
+```
+
+**Key Design Decision:** URL-based routing — if URL contains `.m3u8`, apply ABR buffer config; otherwise apply low-latency config. No conflict.
+
+**Dependencies:** MDK `setProperty('avformat.hls_*', ...)` API
+
+---
+
+### 5. SettingsStore Simplification
+
+**Why Expected:** ARCH-02 in PROJECT.md. 25+ individual `saveX()` methods that all follow identical pattern.
+
+**Current State:**
+- `settings_store.dart`: 439 lines, 25+ typed save methods
+- Each method: `_save('key', (p) => p.setTYPE(key, clamp(value)))`
+- `load()` is 95 lines with individual field reads
+- `AppSettings` model with `copyWith` already exists
+
+**Complexity:** Medium
+**Recommended Pattern:**
+
 ```dart
-// Generic typed save with clamping
+// Generic typed save
 static Future<void> _saveValue<T>(
   String key, T value, T Function(T) sanitize,
 ) => _save(key, (p) async {
@@ -290,29 +115,129 @@ static Future<void> _saveValue<T>(
   else if (safe is String) await p.setString(key, safe);
 });
 
-// Usage
+// Individual methods become one-liners
 static Future<void> saveVolume(double value) =>
     _saveValue(_keyVolume, value, (v) => v.clamp(0.0, 1.0));
 ```
 
+**Dependencies:** None (pure refactoring)
+
+---
+
+### 6. Window Layer Simplification
+
+**Why Expected:** WIN-06 in PROJECT.md. 5 files / 337 lines in `lib/kernel/bridge/` can be consolidated.
+
+**Current State (from LAYER 8 analysis):**
+| File | Lines | Role |
+|------|-------|------|
+| `window_constants.dart` | 14 | Compile-time constants |
+| `window_state.dart` | 15 | 4 ValueNotifiers |
+| `window_service.dart` | 163 | Init + 8 actions + OS callbacks |
+| `aspect_ratio_service.dart` | 69 | Aspect ratio + rollback |
+| `window_lifecycle.dart` | 76 | `isOperating` event bus + PerfMonitor |
+
+**Core Value:** `WindowLifecycleBus.isOperating` — unique signal not provided by `window_manager` (resize/move pause)
+
+**Complexity:** Low
+**Recommended:** Merge into 1 `WindowManager` class in `kernel/services/`. Keep `isOperating` signal.
+
+**Dependencies:** None (pure refactoring)
+
+---
+
+### 7. Platform Abstraction Interface
+
+**Why Expected:** PLATFORM-03 in PROJECT.md. Interface definition only (no macOS/Linux implementation).
+
+**Current State:**
+- `WindowService` is Windows-only (Win32 FFI, `window_manager`)
+- `ThumbnailService` already has platform-aware facade pattern
+- macOS/Linux are v2
+
+**Complexity:** Medium
+**Recommended:**
+
+```dart
+abstract interface class PlatformService {
+  Future<void> setFullscreen(bool value);
+  Future<void> setAlwaysOnTop(bool value);
+  Future<void> setAsFrameless();
+  ValueNotifier<bool> get isFullscreen;
+  ValueNotifier<bool> get isAlwaysOnTop;
+  // ... etc
+}
+
+class WindowsPlatformService implements PlatformService {
+  // wraps existing WindowService
+}
+```
+
+**Dependencies:** Window layer simplification (blocks on #6)
+
+## Differentiators
+
+Features that improve quality of life beyond the milestone requirements.
+
+### 8. ABR Quality Indicator OSD
+
+**Value:** Transparency on stream quality. Users see current bitrate/resolution in OSD pill.
+
+**Complexity:** Low (once ABR engine exists)
+**Dependencies:** HLS ABR (#4)
+
+---
+
+### 9. Manual Quality Override
+
+**Value:** User control over auto ABR. Accessibility for bandwidth-limited users.
+
+**Complexity:** Medium
+**Implementation:** Settings panel toggle: Auto/1080p/720p/480p. Needs `QualityVariant` model.
+**Dependencies:** HLS ABR (#4) + Settings panel tab
+
+---
+
+### 10. Window Entrance Animation
+
+**Value:** First-launch delight. 200ms scale-up from 95% with ease-out curve.
+
+**Complexity:** Low
+**Implementation:** `AnimatedBuilder` + `Transform.scale` on first frame. No Win32 dependency.
 **Dependencies:** None
 
 ---
 
-### 8. Performance Timeline Tracing
+### 11. Singleton-to-DI Migration
 
-**Value:** Enables Flutter DevTools timeline analysis for startup, open, and seek operations.
+**Value:** Testability. Eliminate global mutable state.
 
-**Complexity:** Low
+**Current Singletons:**
+| Singleton | Pattern | Consumers |
+|-----------|---------|-----------|
+| `LocaleService.I` | `static final I` | 5 files |
+| `ThemeService.I` | `static final I` | 5 files |
+| `SettingsStore._cachedPrefs` | Static mutable | 15+ files |
+| `ThumbnailService._impl` | Lazy static | 3 files |
+| `PerfMonitor.instance` | `static final` | 2 files |
+| `OsdService.I` | `static final I` | 3 files |
 
-**Implementation:** Wrap 3-5 key methods with `TimelineTask`:
-- `FvpEngine.open()` — measures load + prepare + texture time
-- `PlaybackController.openAndPlay()` — end-to-end open latency
-- `WindowService._enterFullscreen()` — fullscreen transition time
+**Complexity:** High (21+ files touched)
+**Recommended:** Incremental constructor injection via `PlayerServices` composition root. NOT `get_it` (contradicts "no state management library" constraint).
 
-**Dependencies:** None (`dart:developer`)
+**Dependencies:** SettingsStore simplification (#5) reduces migration surface
 
 ---
+
+### 12. BBA Algorithm (Buffer-Based Approach)
+
+**Value:** More stable quality switching than throughput-based. Avoids oscillation on variable bandwidth.
+
+**Complexity:** High
+**Algorithm:** Huang et al. (2014) — maps buffer occupancy to bitrate selection via utility function.
+**Dependencies:** Throughput-based ABR (#4) as baseline
+
+**Recommendation:** DEFER to v1.3. Throughput-based covers 80% of desktop use cases (stable bandwidth).
 
 ## Anti-Features
 
@@ -320,61 +245,79 @@ Features to explicitly NOT build.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| `get_it` / service locator | Contradicts "no state management library" constraint; hides dependencies | Constructor injection via PlayerServices composition root |
+| Custom `WM_NCCALCSIZE` handler in C++ | Flutter engine intercepts before custom code; 3 documented failed approaches | Use Dart-side `setFrameless()` + `DWMWA_WINDOW_CORNER_PREFERENCE` in C++ `OnCreate` |
+| Replace `window_manager` package | Already the best option for frameless; self-built MethodChannel wraps it | Keep as dependency; simplify wrapper layer |
+| Full ABR algorithm suite (BBA + BOLA + MPC) | Over-engineering for desktop player; browser players need this because network is shared | Implement throughput-based first; skip BOLA/MPC |
+| Custom HLS demuxer | FFmpeg already handles HLS | Use FFmpeg's built-in demuxer; configure via `setProperty()` |
+| Offline HLS segment caching | Desktop has local files; different use case than mobile | Not needed |
+| Picture-in-picture / multi-player | Out of scope; complexity explosion with shared D3D11 device | Defer to v2+ |
+| `get_it` / service locator | Contradicts "no state management library" constraint; hides dependencies | Constructor injection via PlayerServices |
 | `part/part of` for file splitting | Dart officially discourages; creates hidden coupling | Separate files with explicit imports |
-| Replace `logger` package | Working well, 135 lines, rotation implemented | Enhance with Timeline tracing, don't replace |
-| Full Riverpod/Bloc migration | Out of scope per PROJECT.md | ValueNotifier preserved |
-| NativeFinalizer for short-lived FFI structs | Over-engineering for 1-method-scoped pointers | Arena for scoped, try/finally for field-held |
-| Custom FFI memory allocator | Unnecessary complexity | Use `calloc` from `package:ffi` (already imported) |
+| State management migration | ValueNotifier works; migration cost with zero user-visible benefit | Keep ValueNotifier pattern |
 
 ## Feature Dependencies
 
 ```
-FFI Pointer Safety (1) ──> no dependencies (standalone)
-Input Validation (2) ──> no dependencies (standalone)
-Debug Logging (3) ──> no dependencies (standalone)
-File Decomposition (4) ──> can be done in parallel with 1-3
-Singleton-to-DI (5) ──> depends on 4 (SettingsStore simplification reduces migration surface)
-Fullscreen Timeout (6) ──> depends on 1 (uses same try/finally pattern)
-SettingsStore Generic (7) ──> standalone, simplifies 5
-Timeline Tracing (8) ──> depends on 3 (uses same log infrastructure)
+Startup border flash fix (1) ──> C++ only, no Dart dependency
+Fullscreen smooth transition (2) ──> BLOCKED by Flutter engine WM_NCCALCSIZE interception
+HLS single-variant (3) ──> already works
+HLS ABR throughput-based (4) ──> BandwidthEstimator → QualitySelector → MDK buffer config
+SettingsStore simplification (5) ──> standalone, simplifies DI migration
+Window layer simplification (6) ──> standalone
+Platform abstraction (7) ──> depends on 6 (WindowService refactor)
+ABR quality OSD (8) ──> depends on 4
+Manual quality override (9) ──> depends on 4 + Settings panel
+Window entrance animation (10) ──> standalone
+Singleton-to-DI (11) ──> depends on 5 (SettingsStore simplification)
+BBA algorithm (12) ──> depends on 4 (throughput-based as baseline)
 ```
 
 ## MVP Recommendation
 
-Prioritize in this order:
-1. **FFI Pointer Safety (1)** — prevents memory leaks in production, highest risk
-2. **Input Validation (2)** — security hardening, low effort high value
-3. **Fullscreen Timeout (6)** — 20 lines, prevents stuck state
-4. **SettingsStore Generic (7)** — reduces code surface, simplifies DI migration
-5. **File Decomposition (4)** — fvp_engine + settings_store splitting
-6. **Singleton-to-DI (5)** — incremental migration, start with LocaleService + ThemeService
-7. **Debug Logging (3)** — Timeline tracing for 3-5 methods
-8. **Timeline Tracing (8)** — DevTools integration
+**Prioritize (v1.2.1 scope):**
 
-Defer: None — all are table stakes for v1.2.
+1. **Startup border flash fix (#1)** — 3-line C++ fix. HIGH impact, LOW effort. Documented in memory.
+2. **HLS throughput-based ABR (#4)** — New feature, MEDIUM effort. Covers 80% of streaming use cases.
+3. **SettingsStore simplification (#5)** — Code reduction, MEDIUM effort. 439 → ~200 lines.
+4. **Window layer simplification (#6)** — Consolidation, LOW effort. 5 files → 1.
+5. **Platform abstraction interface (#7)** — Interface only, MEDIUM effort. No implementation.
+
+**Defer:**
+
+- **Fullscreen smooth transition (#2)** — BLOCKED by Flutter engine. Needs deep investigation. Flag for v1.3 research.
+- **BBA algorithm (#12)** — Throughput-based covers desktop. BBA adds marginal value. DEFER to v1.3.
+- **Singleton-to-DI (#11)** — Architecture improvement, not user-visible. Incremental. DEFER to v1.3.
+- **Manual quality override (#9)** — Nice-to-have. DEFER to v1.3.
 
 ## Complexity Summary
 
 | Feature | Complexity | Files Changed | Risk |
 |---------|-----------|---------------|------|
-| FFI Pointer Safety | Medium | 2 (window_service, win32_bindings) | Low — additive, doesn't change behavior |
-| Input Validation | Low-Medium | 2 (path_validator, fvp_engine) | Low — additive checks |
-| Debug Logging | Medium | 3-5 (log.dart, fvp_engine, playback_controller) | Low — additive |
-| File Decomposition | Medium | 4-6 (fvp_engine, settings_store, window_service + new files) | Medium — refactoring risk |
-| Singleton-to-DI | High | 21+ files | Medium — behavioral change across codebase |
-| Fullscreen Timeout | Low | 1 (window_service) | Low — additive guard |
-| SettingsStore Generic | Low | 1 (settings_store) | Low — internal refactor |
-| Timeline Tracing | Low | 3-5 (same as debug logging) | Low — additive |
+| Startup border flash (#1) | Low | 1 (flutter_window.cpp) | Low — additive, documented |
+| Fullscreen smooth (#2) | Very High | 3+ (C++ + Dart) | High — Flutter engine blocker |
+| HLS single-variant (#3) | Low | 0 (already works) | None |
+| HLS ABR (#4) | High | 4-5 new files + fvp_engine | Medium — new feature, MDK dependency |
+| SettingsStore simplification (#5) | Medium | 1 (settings_store.dart) | Low — internal refactor |
+| Window layer simplification (#6) | Low | 5→1 files | Low — consolidation |
+| Platform abstraction (#7) | Medium | 2-3 new + modified | Low — interface only |
+| ABR quality OSD (#8) | Low | 1-2 (osd_overlay + abr_service) | Low — additive |
+| Manual quality override (#9) | Medium | 2-3 (settings + abr) | Low — additive |
+| Window entrance animation (#10) | Low | 1 (player_screen.dart) | Low — additive |
+| Singleton-to-DI (#11) | High | 21+ files | Medium — behavioral change |
+| BBA algorithm (#12) | High | 2-3 (abr_service) | Medium — algorithm complexity |
 
 ## Sources
 
-- Codebase analysis: `lib/kernel/bridge/window_service.dart` (328 lines, 6 calloc sites)
-- Codebase analysis: `lib/kernel/engine/fvp_engine.dart` (690 lines, 3 helpers extracted)
-- Codebase analysis: `lib/kernel/persistence/settings_store.dart` (439 lines, 25+ save methods)
-- Codebase analysis: `lib/kernel/utils/log.dart` (135 lines, logger + rotation)
-- Codebase analysis: `lib/kernel/services/path_validator.dart` (92 lines)
-- Codebase analysis: 6 singleton patterns across 21+ consuming files
-- Dart FFI docs: `dart:ffi` Arena, NativeFinalizer, calloc patterns (HIGH confidence)
-- Flutter architecture: ValueNotifier + composition root pattern (existing codebase convention)
-- Project constraints: PROJECT.md — "no Provider/Riverpod/Bloc", "ValueNotifier preserved"
+- Memory: `project_window_corner_fix` — DWM corner preference fix (C++ OnCreate)
+- Memory: `anti_pattern_window_frameless` — 3 failed C++ frameless approaches
+- Memory: `project_fullscreen_win32_fix` — Win32 FFI fullscreen rewrite (SetWindowPos atomic)
+- Memory: `project_hls_abr_plan` — HLS ABR architecture, BBA/throughput/MPC comparison
+- Memory: `project_layer8_window_analysis` — Window layer 5-file analysis, isOperating signal
+- Memory: `project_startup_optimization` — Startup state machine, lazy FvpEngine
+- Memory: `project_settings_panel_redesign` — Settings panel architecture, deferred apply
+- Memory: `project_service_layer_design` — Mixin composition, PlaybackContract
+- Memory: `reference_fvp_optimization_plan` — fvp D3D11 pipeline, 3-tier optimization
+- Codebase: `lib/kernel/bridge/window_service.dart` (328 lines, Win32 FFI)
+- Codebase: `lib/kernel/persistence/settings_store.dart` (439 lines, 25+ save methods)
+- Codebase: `lib/kernel/engine/fvp_engine.dart` (690 lines, network config)
+- PROJECT.md — v1.2.1 milestone scope and constraints
