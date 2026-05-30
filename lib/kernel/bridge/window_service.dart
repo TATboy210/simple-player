@@ -7,116 +7,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../persistence/settings_store.dart';
 
-// ─── FFI type definitions (no side effects at import time) ───
-
-typedef _GetWindowLongPtrNative = IntPtr Function(IntPtr, IntPtr);
-typedef _GetWindowLongPtrDart = int Function(int, int);
-typedef _SetWindowLongPtrNative = IntPtr Function(IntPtr, IntPtr, IntPtr);
-typedef _SetWindowLongPtrDart = int Function(int, int, int);
-typedef _SetWindowPosNative =
-    Int32 Function(IntPtr, IntPtr, Int32, Int32, Int32, Int32, Uint32);
-typedef _SetWindowPosDart = int Function(int, int, int, int, int, int, int);
-typedef _MonitorFromWindowNative = IntPtr Function(IntPtr, Uint32);
-typedef _MonitorFromWindowDart = int Function(int, int);
-typedef _GetMonitorInfoNative = Int32 Function(IntPtr, Pointer);
-typedef _GetMonitorInfoDart = int Function(int, Pointer);
-typedef _GetWindowRectNative = Int32 Function(IntPtr, Pointer<_Rect>);
-typedef _GetWindowRectDart = int Function(int, Pointer<_Rect>);
-typedef _DwmExtendFrameIntoClientAreaNative =
-    Int32 Function(IntPtr, Pointer<_Margins>);
-typedef _DwmExtendFrameIntoClientAreaDart =
-    int Function(int, Pointer<_Margins>);
-const _gwlStyle = -16;
-const _wsCaption = 0x00C00000;
-const _wsPopup = 0x80000000;
-const _hwndTop = 0;
-const _swpNoOwnerZOrder = 0x0200;
-const _swpFrameChanged = 0x0020;
-const _monitorDefaultToNearest = 2;
-
-final class _Rect extends Struct {
-  @Int32()
-  external int left;
-  @Int32()
-  external int top;
-  @Int32()
-  external int right;
-  @Int32()
-  external int bottom;
-}
-
-final class _MonitorInfo extends Struct {
-  @Uint32()
-  external int cbSize;
-  external _Rect rcMonitor;
-  external _Rect rcWork;
-  @Uint32()
-  external int dwFlags;
-}
-
-final class _Margins extends Struct {
-  @Int32()
-  external int left;
-  @Int32()
-  external int right;
-  @Int32()
-  external int top;
-  @Int32()
-  external int bottom;
-}
-
-/// Win32 API bindings — lazy singleton to avoid import-time DLL loading.
-///
-/// All FFI lookups execute on first access, not at import time.
-/// This makes importing WindowService safe in test environments.
-class _Win32Bindings {
-  late final DynamicLibrary _user32;
-  late final DynamicLibrary _dwmapi;
-
-  late final _GetWindowLongPtrDart getWindowLongPtr;
-  late final _SetWindowLongPtrDart setWindowLongPtr;
-  late final _SetWindowPosDart setWindowPos;
-  late final _MonitorFromWindowDart monitorFromWindow;
-  late final _GetMonitorInfoDart getMonitorInfo;
-  late final _GetWindowRectDart getWindowRect;
-  late final _DwmExtendFrameIntoClientAreaDart dwmExtendFrameIntoClientArea;
-
-  _Win32Bindings() {
-    _user32 = DynamicLibrary.open('user32.dll');
-    _dwmapi = DynamicLibrary.open('dwmapi.dll');
-
-    getWindowLongPtr = _user32
-        .lookupFunction<_GetWindowLongPtrNative, _GetWindowLongPtrDart>(
-          'GetWindowLongPtrW',
-        );
-    setWindowLongPtr = _user32
-        .lookupFunction<_SetWindowLongPtrNative, _SetWindowLongPtrDart>(
-          'SetWindowLongPtrW',
-        );
-    setWindowPos = _user32
-        .lookupFunction<_SetWindowPosNative, _SetWindowPosDart>('SetWindowPos');
-    monitorFromWindow = _user32
-        .lookupFunction<_MonitorFromWindowNative, _MonitorFromWindowDart>(
-          'MonitorFromWindow',
-        );
-    getMonitorInfo = _user32
-        .lookupFunction<_GetMonitorInfoNative, _GetMonitorInfoDart>(
-          'GetMonitorInfoW',
-        );
-    getWindowRect = _user32
-        .lookupFunction<_GetWindowRectNative, _GetWindowRectDart>(
-          'GetWindowRect',
-        );
-    dwmExtendFrameIntoClientArea = _dwmapi
-        .lookupFunction<
-          _DwmExtendFrameIntoClientAreaNative,
-          _DwmExtendFrameIntoClientAreaDart
-        >('DwmExtendFrameIntoClientArea');
-  }
-}
-
-/// Lazy-initialized Win32 bindings. First access triggers DLL loading.
-final _win32 = _Win32Bindings();
+import 'win32_bindings.dart';
 
 /// Window management service — wraps window_manager package.
 ///
@@ -131,8 +22,8 @@ class WindowService with WindowListener {
   bool _disposed = false;
   bool _fullscreenTransitioning = false;
   int? _savedStyle;
-  Pointer<_Rect>? _savedFrame;
-  Pointer<_Rect>? _savedMaximizeFrame; // 最大化前的窗口位置
+  Pointer<Rect>? _savedFrame;
+  Pointer<Rect>? _savedMaximizeFrame; // 最大化前的窗口位置
   int? _baseStyle; // _removeBorder() 完成后的基准 style
   Timer? _resizeDebounce;
 
@@ -162,28 +53,28 @@ class WindowService with WindowListener {
   /// 返回设置后的 style，供 _baseStyle 缓存。
   static Future<int> removeBorderImmediate() async {
     final hwnd = await windowManager.getId();
-    final style = _win32.getWindowLongPtr(hwnd, _gwlStyle);
+    final style = win32.getWindowLongPtr(hwnd, gwlStyle);
     // 只移除 WS_CAPTION，保留 WS_THICKFRAME 用于原生缩放
-    final newStyle = style & ~_wsCaption;
-    _win32.setWindowLongPtr(hwnd, _gwlStyle, newStyle);
+    final newStyle = style & ~wsCaption;
+    win32.setWindowLongPtr(hwnd, gwlStyle, newStyle);
 
     // 保留 DWM 阴影：顶部 1px frame 让 DWM 认为窗口有边框
-    final margins = calloc<_Margins>()
+    final margins = calloc<Margins>()
       ..ref.left = 0
       ..ref.right = 0
       ..ref.top = 1
       ..ref.bottom = 0;
-    _win32.dwmExtendFrameIntoClientArea(hwnd, margins);
+    win32.dwmExtendFrameIntoClientArea(hwnd, margins);
     calloc.free(margins);
 
-    _win32.setWindowPos(
+    win32.setWindowPos(
       hwnd,
       0,
       0,
       0,
       0,
       0,
-      _swpNoOwnerZOrder | _swpFrameChanged | 0x0001 | 0x0002, // NOMOVE | NOSIZE
+      swpNoOwnerZOrder | swpFrameChanged | 0x0001 | 0x0002, // NOMOVE | NOSIZE
     );
 
     return newStyle;
@@ -270,10 +161,10 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // Save current style and frame for restoration.
-    _savedStyle = _baseStyle ?? _win32.getWindowLongPtr(hwnd, _gwlStyle);
-    final frame = calloc<_Rect>();
-    _win32.getWindowRect(hwnd, frame);
-    final saved = calloc<_Rect>();
+    _savedStyle = _baseStyle ?? win32.getWindowLongPtr(hwnd, gwlStyle);
+    final frame = calloc<Rect>();
+    win32.getWindowRect(hwnd, frame);
+    final saved = calloc<Rect>();
     saved.ref.left = frame.ref.left;
     saved.ref.top = frame.ref.top;
     saved.ref.right = frame.ref.right;
@@ -282,32 +173,32 @@ class WindowService with WindowListener {
     calloc.free(frame);
 
     // Set WS_POPUP — fully borderless, no DWM frame.
-    _win32.setWindowLongPtr(hwnd, _gwlStyle, _wsPopup);
+    win32.setWindowLongPtr(hwnd, gwlStyle, wsPopup);
 
     // Remove DWM shadow/border.
-    final margins = calloc<_Margins>()
+    final margins = calloc<Margins>()
       ..ref.left = -1
       ..ref.right = -1
       ..ref.top = -1
       ..ref.bottom = -1;
-    _win32.dwmExtendFrameIntoClientArea(hwnd, margins);
+    win32.dwmExtendFrameIntoClientArea(hwnd, margins);
     calloc.free(margins);
 
     // Get monitor bounds.
-    final hMonitor = _win32.monitorFromWindow(hwnd, _monitorDefaultToNearest);
-    final mi = calloc<_MonitorInfo>();
-    mi.ref.cbSize = sizeOf<_MonitorInfo>();
-    _win32.getMonitorInfo(hMonitor, mi);
+    final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
+    final mi = calloc<MonitorInfo>();
+    mi.ref.cbSize = sizeOf<MonitorInfo>();
+    win32.getMonitorInfo(hMonitor, mi);
 
     // Position window to fill entire monitor.
-    _win32.setWindowPos(
+    win32.setWindowPos(
       hwnd,
-      _hwndTop,
+      hwndTop,
       mi.ref.rcMonitor.left,
       mi.ref.rcMonitor.top,
       mi.ref.rcMonitor.right - mi.ref.rcMonitor.left,
       mi.ref.rcMonitor.bottom - mi.ref.rcMonitor.top,
-      _swpNoOwnerZOrder | _swpFrameChanged,
+      swpNoOwnerZOrder | swpFrameChanged,
     );
     calloc.free(mi);
 
@@ -320,18 +211,18 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // Restore original style.
-    _win32.setWindowLongPtr(hwnd, _gwlStyle, _savedStyle!);
+    win32.setWindowLongPtr(hwnd, gwlStyle, _savedStyle!);
 
     // Restore original window frame.
     if (_savedFrame != null) {
-      _win32.setWindowPos(
+      win32.setWindowPos(
         hwnd,
         0,
         _savedFrame!.ref.left,
         _savedFrame!.ref.top,
         _savedFrame!.ref.right - _savedFrame!.ref.left,
         _savedFrame!.ref.bottom - _savedFrame!.ref.top,
-        _swpNoOwnerZOrder | _swpFrameChanged,
+        swpNoOwnerZOrder | swpFrameChanged,
       );
       calloc.free(_savedFrame!);
     }
@@ -364,9 +255,9 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // 保存当前窗口位置（用于 restore）
-    final frame = calloc<_Rect>();
-    _win32.getWindowRect(hwnd, frame);
-    final saved = calloc<_Rect>()
+    final frame = calloc<Rect>();
+    win32.getWindowRect(hwnd, frame);
+    final saved = calloc<Rect>()
       ..ref.left = frame.ref.left
       ..ref.top = frame.ref.top
       ..ref.right = frame.ref.right
@@ -375,20 +266,20 @@ class WindowService with WindowListener {
     calloc.free(frame);
 
     // 获取工作区（排除任务栏）
-    final hMonitor = _win32.monitorFromWindow(hwnd, _monitorDefaultToNearest);
-    final mi = calloc<_MonitorInfo>();
-    mi.ref.cbSize = sizeOf<_MonitorInfo>();
-    _win32.getMonitorInfo(hMonitor, mi);
+    final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
+    final mi = calloc<MonitorInfo>();
+    mi.ref.cbSize = sizeOf<MonitorInfo>();
+    win32.getMonitorInfo(hMonitor, mi);
 
     // 定位到工作区（不禁用 DWM 过渡，保留平滑动画）
-    _win32.setWindowPos(
+    win32.setWindowPos(
       hwnd,
-      _hwndTop,
+      hwndTop,
       mi.ref.rcWork.left,
       mi.ref.rcWork.top,
       mi.ref.rcWork.right - mi.ref.rcWork.left,
       mi.ref.rcWork.bottom - mi.ref.rcWork.top,
-      _swpNoOwnerZOrder | _swpFrameChanged,
+      swpNoOwnerZOrder | swpFrameChanged,
     );
 
     calloc.free(mi);
@@ -401,14 +292,14 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // 恢复窗口位置（不禁用 DWM 过渡，保留平滑动画）
-    _win32.setWindowPos(
+    win32.setWindowPos(
       hwnd,
       0,
       _savedMaximizeFrame!.ref.left,
       _savedMaximizeFrame!.ref.top,
       _savedMaximizeFrame!.ref.right - _savedMaximizeFrame!.ref.left,
       _savedMaximizeFrame!.ref.bottom - _savedMaximizeFrame!.ref.top,
-      _swpNoOwnerZOrder | _swpFrameChanged,
+      swpNoOwnerZOrder | swpFrameChanged,
     );
 
     calloc.free(_savedMaximizeFrame!);
