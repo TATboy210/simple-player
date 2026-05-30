@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
@@ -229,6 +230,7 @@ class FvpEngine implements MediaEngine {
     state.value = MediaState.loading;
     _currentPath = trimmed;
 
+    Timeline.startSync('fvp.open');
     try {
       _player.media = trimmed;
 
@@ -338,6 +340,7 @@ class FvpEngine implements MediaEngine {
           : MediaErrorType.playback;
       errorMessage.value = '无法打开: ${PathUtils.basename(path)}\n$e';
     } finally {
+      Timeline.finishSync();
       isBuffering.value = false;
       _isOpening = false;
     }
@@ -390,6 +393,7 @@ class FvpEngine implements MediaEngine {
     final wasPlaying = _player.state == mdk.PlaybackState.playing;
     _positionPoller.seeking = true;
     state.value = MediaState.seeking;
+    Timeline.startSync('fvp.seek');
     try {
       await _player.seek(position: clamped);
       if (_disposed) return;
@@ -400,6 +404,7 @@ class FvpEngine implements MediaEngine {
       errorMessage.value = '跳转失败: $e';
       position.value = _player.position;
     } finally {
+      Timeline.finishSync();
       _positionPoller.seeking = false;
     }
     if (_disposed) return;
