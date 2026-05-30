@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'kernel/bridge/window_bootstrap.dart';
 import 'kernel/bridge/window_service.dart';
 import 'kernel/engine/engine_prewarm.dart';
 import 'kernel/persistence/settings_store.dart';
@@ -14,11 +15,13 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initLog();
 
+  // SettingsStore 预热 — 在 waitUntilReadyToShow 回调前缓存 prefs
+  final prefs = await SharedPreferences.getInstance();
+  SettingsStore.prewarm(prefs);
+
   // window_manager 初始化 — 一步到位配置窗口，避免启动闪烁
   await windowManager.ensureInitialized();
   const windowOptions = WindowOptions(
-    size: Size(960, 540),
-    center: true,
     backgroundColor: Colors.transparent,
     titleBarStyle: TitleBarStyle.hidden,
     windowButtonVisibility: false,
@@ -26,8 +29,19 @@ Future<void> main() async {
   );
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await WindowService.removeBorderImmediate();
+
+    // 恢复保存的窗口几何（D-02: 清除全屏标志避免崩溃锁死）
+    final settings = await SettingsStore.load();
+    await WindowBootstrap.clearFullscreenIfSaved(settings);
+    await WindowBootstrap.restoreOrCenter(settings);
+
     await windowManager.show();
     await windowManager.focus();
+
+    // 恢复最大化状态（show 后调用，窗口管理器已就绪）
+    if (settings.isMaximized) {
+      await windowManager.maximize();
+    }
   });
 
   final coordinator = StartupCoordinator();
@@ -41,8 +55,6 @@ Future<void> main() async {
     ),
   );
 
-  final prefs = await SharedPreferences.getInstance();
-  SettingsStore.prewarm(prefs);
   coordinator.report(StartupPhase.infrastructure, 1.0, 'Infrastructure ready');
 
   runApp(App(coordinator: coordinator));
