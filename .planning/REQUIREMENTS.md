@@ -1,82 +1,87 @@
-# Requirements — Simple Player Flutter v1.2
+# Requirements — Simple Player Flutter v1.2.1
 
-**日期:** 2026-05-30
-**策略:** 安全加固 + 窗口持续优化 + Debug 工具（架构优化延后至有详细报告）
+**日期:** 2026-05-31
+**策略:** 窗口丝滑化（最高优先级）+ 架构精简 + HLS ABR
 
-## v1.2 需求
+## v1.2.1 需求
 
-### 安全加固 (SEC)
+### 窗口丝滑化 (WIN)
 
-- [ ] **SEC-01**: FFI 内存安全
-  - WindowService 中 6 处 `calloc` 手动管理指针的生命周期安全
-  - `_savedFrame` 在 `dispose()` 中缺失清理（内存泄漏路径）
-  - 短生命周期指针（margins, MonitorInfo, frame）用 try/finally 包裹
-  - 长生命周期指针（_savedFrame, _savedMaximizeFrame）确保所有异常路径都释放
-  - fullscreen 转换超时保护（防止 `_fullscreenTransitioning` 永久锁定）
-  - 文件: `lib/kernel/bridge/window_service.dart`, `lib/kernel/bridge/win32_bindings.dart`
-  - 风险: 指针所有权跨方法边界（_enterFullscreen 分配, _exitFullscreen 释放）
+- [ ] **WIN-05**: 窗口边框闪烁消除
+  - C++ `WM_NCCALCSIZE` 同步帧无边框处理（在 `HandleTopLevelWindowProc` 之前拦截）
+  - 保留 `WS_CAPTION` 以维持 DWM 动画能力
+  - 移除 Dart 端三重异步边框移除路径冲突
+  - 启动时零闪烁（窗口从第一帧起即为无边框）
+  - 文件: `windows/runner/flutter_window.cpp`, `windows/runner/win32_window.cpp`, `lib/main.dart`, `lib/app.dart`
+  - 风险: Flutter 引擎可能在自定义处理器之前消费 WM_NCCALCSIZE（需要 spike 验证）
 
-- [ ] **SEC-02**: 输入验证（HTTP/HTTPS 结构化验证）
-  - HTTP/HTTPS URL 使用 `Uri.tryParse()` 结构化验证
-  - RTSP/RTMP/SRT/UDP 保持前缀检测（不阻断 FFmpeg 支持的协议）
-  - 文件路径控制字符过滤
-  - 文件: `lib/kernel/services/path_validator.dart`, `lib/kernel/engine/fvp_engine.dart`
+- [ ] **WIN-06**: Window 层精简
+  - 725 行 4 文件 → 更紧凑的实现
+  - 合并 `window_service.dart` + `window_bootstrap.dart` 冗余逻辑
+  - 移除已废弃的边框移除代码路径
+  - 文件: `lib/kernel/bridge/window_service.dart`, `lib/kernel/bridge/window_bootstrap.dart`, `windows/runner/win32_window.cpp`, `windows/runner/flutter_window.cpp`
 
-### 窗口优化 (WIN)
+### 架构精简 (ARCH)
 
-- [ ] **WIN-04**: 窗口管理和用户体验持续改进
-  - 窗口启动和恢复流程优化
-  - 全屏/最大化/恢复动画平滑度
-  - 多显示器场景边界检查
-  - 窗口几何状态持久化可靠性
-  - 文件: `lib/kernel/bridge/window_service.dart`, `lib/ui/player/custom_title_bar.dart`
+- [ ] **ARCH-02**: SettingsStore 简化
+  - 25+ save 方法 → 通用 `_get<T>`/`_set<T>` 泛型模式
+  - 减少样板代码，统一存储接口
+  - 文件: `lib/kernel/persistence/settings_store.dart`
 
-### 性能优化 (PERF)
+- [ ] **ARCH-03**: 单例迁移
+  - 6 个 static mutable 单例 → 构造函数注入（DI）
+  - 接口定义 + 具体实现分离
+  - 提升可测试性，消除隐式全局状态
+  - 文件: 涉及 `WindowService`, `PlaybackController`, `SettingsStore`, `PlaylistStore`, `ThumbnailService`, `MediaEngine` 等
 
-- [ ] **PERF-04**: 播放器性能优化
-  - PositionPoller 250ms 轮询优化（减少 CPU 唤醒或使用回调）
-  - ThumbnailService LRU 缓存从 List O(n) 改为 LinkedHashMap O(1)
-  - D3D11 sync 模式智能切换（高刷新率显示器异步模式）
-  - 渲染管线性能审计（基于 Flutter #97334 Windows 动画卡顿分析）
-  - 文件: `lib/kernel/engine/position_poller.dart`, `lib/kernel/services/thumbnail_service.dart`, `lib/kernel/engine/fvp_engine.dart`
+- [ ] **PLATFORM-03**: 平台抽象层
+  - 定义 `PlatformService` 抽象接口（窗口、系统、路径操作）
+  - `WindowsPlatformService` 委托现有 `WindowService`（不重写）
+  - 仅接口定义，不做 macOS/Linux 具体实现
+  - 文件: `lib/kernel/platform/` (新建)
 
-### Debug 工具 (DBG)
+### HLS 自适应码率 (HLS)
 
-- [ ] **DBG-01**: Debug 工具和诊断改进
-  - 结构化日志输出（JSON 格式 LogPrinter）
-  - 命名 logger 实例（按模块分类）
-  - `dart:developer` Timeline 追踪关键方法（3-5 个性能敏感路径）
-  - 文件: `lib/kernel/utils/log.dart`
+- [ ] **HLS-01**: HLS ABR 流媒体支持
+  - 基于吞吐量的带宽估计（EWMA），非 BBA 算法
+  - URL 类型路由：`.m3u8` → ABR 配置，其他 → 低延迟配置
+  - `fflags +nobuffer` 仅应用于非 HLS URL
+  - MDK/FFmpeg 内置 `hls.c` demuxer 变体选择
+  - 文件: `lib/kernel/services/abr_service.dart` (新建), `lib/kernel/engine/fvp_engine.dart`
+  - 风险: MDK `MediaInfo` 是否暴露比特率/缓冲指标（需要 spike 验证）
 
-## v1.3+ 延后需求（需要详细报告）
+## 延后需求 (v1.3+)
 
-### 架构优化 (ARCH) — 需要详细分析报告
-
-- [ ] **ARCH-01**: FvpEngine 拆分 — 需要引擎层详细报告（方法分析、依赖图、拆分方案）
-- [ ] **ARCH-02**: SettingsStore 简化 — 需要持久化层详细报告（存储格式、迁移策略）
-- [ ] **ARCH-03**: 单例迁移 — 需要依赖关系详细报告（21+ 文件影响分析）
-
-### 保留但不改动
-
-- 流媒体相关代码（HLS/ABR）— 保留现有代码，暂不实现新功能
-- 平台相关代码 — 保留 Win32 FFI，暂不添加 macOS/Linux 支持
+- **WIN-07**: 全屏平滑过渡动画 — 被 Flutter 引擎 `HandleTopLevelWindowProc` 拦截阻塞
+- **PLATFORM-02**: macOS/Linux 平台实现 — 当前仅需接口定义
+- **ARCH-01**: FvpEngine 拆分 — 需要引擎层详细报告
 
 ## 不在范围内
 
-- 新依赖引入 — 使用 Dart SDK 内建能力
-- 状态管理迁移 — ValueNotifier 保留
-- 流媒体新功能 — 播放器支持本地运行
-- 跨平台支持 — Windows 优先
+| 功能 | 原因 |
+|------|------|
+| 第三方窗口包 (window_manager) | 自建方案，完全控制 |
+| 移动平台 (iOS/Android) | 仅桌面端 |
+| 状态管理迁移 (Provider/Riverpod/Bloc) | ValueNotifier 保留 |
+| BBA 算法 | 桌面带宽稳定，吞吐量方案覆盖 80% 场景 |
+| macOS/Linux 平台实现 | v1.2.1 仅定义接口 |
 
 ## 可追溯性
 
 | 需求 | Phase | 状态 | 来源 |
 |------|-------|------|------|
-| SEC-01 | 9 | 待规划 | CONCERNS.md (HIGH) |
-| SEC-02 | 9 | 待规划 | CONCERNS.md (MEDIUM) |
-| WIN-04 | 10 | 待规划 | 用户请求 |
-| PERF-04 | 11 | 待规划 | CONCERNS.md + Flutter #97334 |
-| DBG-01 | 12 | 待规划 | 用户请求 |
+| WIN-05 | Phase 13 | 待规划 | 用户请求 + 研究分析 |
+| WIN-06 | Phase 13 | 待规划 | 用户请求 |
+| ARCH-02 | Phase 15 | 待规划 | 用户请求 |
+| ARCH-03 | Phase 15 | 待规划 | 用户请求 |
+| PLATFORM-03 | Phase 15 | 待规划 | 用户请求 |
+| HLS-01 | Phase 14 | 待规划 | 用户请求 + 研究分析 |
+
+**覆盖率:**
+- v1.2.1 需求: 6 个
+- 已映射到 phase: 6
+- 未映射: 0 ✓
 
 ---
-*最后更新: 2026-05-30 — v1.2 roadmap updated: 4 phases (9-12), PERF-04 added*
+*需求定义: 2026-05-31*
+*最后更新: 2026-05-31 after v1.2.1 milestone research*
