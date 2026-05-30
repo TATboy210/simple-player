@@ -1,33 +1,61 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T12:30:00+08:00",
-  "phase": 8,
-  "phase_name": "Architecture & Dead Code",
-  "plan": 1,
-  "task": 5,
-  "total_tasks": 6,
+  "timestamp": "2026-05-30T13:29:42+08:00",
+  "phase": null,
+  "phase_name": null,
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
   "status": "paused",
+  "milestone": "v1.2",
+  "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [
-    {"id": 1, "name": "08-01: Delete dead files + remove dead _setTransitionsDisabled", "status": "done", "commit": "88fb98b"},
-    {"id": 2, "name": "08-02b: Extract AppSettings from settings_store.dart", "status": "done", "commit": "9113606"},
-    {"id": 3, "name": "08-02c: Extract SettingSliderRow and SettingActionRow from settings_card.dart", "status": "done", "commit": "a4799c5"},
-    {"id": 4, "name": "08-02d: Extract Win32 FFI types to win32_bindings.dart", "status": "done", "commit": "0b87599"}
+    {"id": 1, "name": "Refresh codebase map (7 documents)", "status": "done", "commit": "bca9ec8"},
+    {"id": 2, "name": "Parallel research (4 agents + synthesizer)", "status": "done", "commit": "bca9ec8"},
+    {"id": 3, "name": "Define v1.2 requirements (SEC-01, SEC-02, WIN-04, PERF-04, DBG-01)", "status": "done", "commit": "uncommitted"},
+    {"id": 4, "name": "Update ROADMAP.md to 4 phases (9-12)", "status": "done", "commit": "uncommitted"},
+    {"id": 5, "name": "Update STATE.md for 4 phases", "status": "done", "commit": "uncommitted"},
+    {"id": 6, "name": "Update REQUIREMENTS.md traceability table", "status": "done", "commit": "uncommitted"}
   ],
-  "skipped_tasks": [
-    {"id": 5, "name": "08-02a: Extract VideoConfigManager from FvpEngine", "reason": "7 thin _guardedAction wrappers; extraction adds ~30 lines net with 4 callback params. YAGNI."},
-    {"id": 6, "name": "08-03: Hover pattern dedup", "reason": "3/4 hover instances need hover state for child content. 5-line MouseRegion+AnimatedContainer pattern insufficient for abstraction cost."}
+  "remaining_tasks": [
+    {"id": 7, "name": "Commit planning docs (ROADMAP, STATE, REQUIREMENTS, research)", "status": "not_started"},
+    {"id": 8, "name": "User approval of v1.2 roadmap", "status": "not_started"},
+    {"id": 9, "name": "/gsd:plan-phase 9 — Security Hardening detailed plan", "status": "not_started"},
+    {"id": 10, "name": "SEC-01 FFI memory safety 1000+ word report", "status": "not_started"}
   ],
-  "remaining_tasks": [],
   "blockers": [],
-  "human_actions_pending": [],
-  "decisions": [
-    {"decision": "Remove dwmSetWindowAttribute binding along with dead _setTransitionsDisabled", "rationale": "dwmSetWindowAttribute was only used by the dead method; dwmExtendFrameIntoClientArea (used by _removeBorder) kept", "phase": 8},
-    {"decision": "Re-export extracted classes from original files", "rationale": "Preserves import surfaces so consumers don't break", "phase": 8},
-    {"decision": "Skip hardcoded i18n strings in startup progress", "rationale": "Splash screen progress <2 seconds, minimal user benefit vs threading BuildContext", "phase": 8},
-    {"decision": "Skip VideoConfigManager extraction (08-02a)", "rationale": "7 methods are thin _guardedAction wrappers (1-3 lines each). Extraction needs 4 callbacks + constructor, net +30 lines. Setup methods (_applyD3d11Defaults, _configureNetworkOptions) called during init, not via _guardedAction.", "phase": 8},
-    {"decision": "Skip hover pattern dedup (08-03)", "rationale": "3/4 instances (SettingRow, SettingActionRow, _VideoSlider) use hover state to modify child content (colors/text/icons). Simple wrapper can't solve this. 5-line pattern insufficient for builder abstraction cost.", "phase": 8}
+  "human_actions_pending": [
+    {"action": "Approve v1.2 roadmap (4 phases: 9-12)", "context": "Roadmap presented but not yet confirmed by user", "blocking": true},
+    {"action": "Provide detailed FFI memory safety report (1000+ words)", "context": "User explicitly requested detailed report before Phase 9 planning", "blocking": false}
   ],
-  "uncommitted_files": [],
-  "next_action": "Phase 8 complete (4/6 done, 2 skipped). Ready for Phase 9 or final verification.",
-  "context_notes": "4/6 tasks done, 2 skipped with rationale. 88 lines deleted (08-01), AppSettings extracted (08-02b), settings_card split (08-02c), Win32 FFI extracted (08-02d). 596 tests passing, dart analyze clean. window_service.dart: 438→329 lines. win32_bindings.dart: ~110 lines (new)."
+  "decisions": [
+    {"decision": "v1.2 has 4 phases (9-12), not 3", "rationale": "PERF-04 added as Phase 11 after Flutter #97334 analysis", "phase": null},
+    {"decision": "ARCH-01/02/03 deferred to v1.3+", "rationale": "Need detailed reports for engine/persistence/singleton analysis", "phase": null},
+    {"decision": "SEC-01 + SEC-02 combined in Phase 9", "rationale": "Both security, overlapping files (window_service.dart, fvp_engine.dart)", "phase": "9"},
+    {"decision": "Phase 11 depends on Phase 9 (not Phase 10)", "rationale": "Security hardening may touch same files as performance optimization", "phase": "11"},
+    {"decision": "Phase 12 (Debug) is independent", "rationale": "No file overlap with other phases", "phase": "12"},
+    {"decision": "Zero new dependencies for v1.2", "rationale": "Use Dart SDK built-ins: dart:ffi Arena, Uri.tryParse, dart:developer Timeline", "phase": null},
+    {"decision": "Only HTTP/HTTPS get Uri.tryParse validation", "rationale": "RTSP/RTMP/SRT/UDP keep prefix detection to not block FFmpeg protocols", "phase": "9"},
+    {"decision": "Local playback only, keep streaming code", "rationale": "User: no streaming plans, preserve existing HLS/ABR code", "phase": null}
+  ],
+  "uncommitted_files": [
+    ".planning/REQUIREMENTS.md",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md",
+    ".planning/codebase/ARCHITECTURE.md",
+    ".planning/codebase/CONCERNS.md",
+    ".planning/codebase/CONVENTIONS.md",
+    ".planning/codebase/INTEGRATIONS.md",
+    ".planning/codebase/STACK.md",
+    ".planning/codebase/STRUCTURE.md",
+    ".planning/codebase/TESTING.md",
+    ".planning/research/ARCHITECTURE.md",
+    ".planning/research/FEATURES.md",
+    ".planning/research/PITFALLS.md",
+    ".planning/research/STACK.md",
+    ".planning/research/SUMMARY.md"
+  ],
+  "next_action": "Commit planning docs as WIP, then present roadmap for user approval. After approval, run /gsd:plan-phase 9 for Security Hardening detailed planning (with 1000+ word FFI memory safety report).",
+  "context_notes": "v1.2 roadmap planning is complete. 4 phases defined (9-12). All planning files updated and consistent. User wants Chinese responses, multi-agent/skills/context7 usage encouraged, and detailed 1000+ word reports for FFI work. Window bugs should be constantly checked."
 }
