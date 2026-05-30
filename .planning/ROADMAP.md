@@ -54,11 +54,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Fullscreen transition cannot permanently lock (`_fullscreenTransitioning` has timeout protection)
   3. HTTP/HTTPS URLs are validated with `Uri.tryParse()` and rejected if structurally invalid
   4. File paths containing control characters are filtered before reaching the engine
-**Plans**: TBD
+**Plans**: 3 plans (2 Wave 1 parallel + 1 Wave 2 checkpoint)
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 09-01: FFI 指针生命周期安全加固 (Arena + try/finally + dispose 补全 + fullscreen 超时)
+- [ ] 09-02: 输入验证强化 (HTTP/HTTPS Uri.tryParse + 控制字符过滤)
+- [ ] 09-03: 安全加固端到端验证 (checkpoint)
 
 ### Phase 10: Window Optimization
 **Goal**: Window startup, fullscreen transitions, and multi-monitor behavior are smooth and reliable
@@ -115,7 +116,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 6. Window Code Optimization | v1.1 | 1/1 | Complete | 2026-05-29 |
 | 7. Integration & Golden Tests | v1.1 | 3/3 | Complete | 2026-05-30 |
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
-| 9. Security Hardening | v1.2 | 0/TBD | Not started | - |
+| 9. Security Hardening | v1.2 | 0/3 | Planning | - |
 | 10. Window Optimization | v1.2 | 0/TBD | Not started | - |
 | 11. Performance Optimization | v1.2 | 0/TBD | Not started | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
@@ -131,11 +132,11 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | QUAL-01 | 8 | TBD |
 | QUAL-02 | 8 | TBD |
 | QUAL-03 | 8 | TBD |
-| SEC-01 | 9 | TBD |
-| SEC-02 | 9 | TBD |
+| SEC-01 | 9 | 09-01 |
+| SEC-02 | 9 | 09-02 |
 | WIN-04 | 10 | TBD |
 | PERF-04 | 11 | TBD |
 | DBG-01 | 12 | TBD |
 
 ---
-*Last updated: 2026-05-30 — v1.2 roadmap updated: 4 phases (9-12), PERF-04 added*
+*Last updated: 2026-05-30 — Phase 9 planning complete: 3 plans (09-01 FFI safety, 09-02 input validation, 09-03 verification)*
