@@ -14,7 +14,7 @@ Debug 工具和诊断改进：结构化 JSON 日志输出、按模块命名的 l
 ## Implementation Decisions
 
 ### JSON 日志格式
-- **D-01:** 使用 `logger` 包自带 `JsonPrinter`，零额外自定义代码
+- **D-01:** 使用 `logger` 包自带 `JsonPrinter`，零额外自定义代码。**注意：** D-14 指定默认输出为 PrettyPrinter（人类可读）。JsonPrinter 作为已配置选项导出（`jsonPrinter`），供日志聚合工具按需使用。默认输出不使用 JsonPrinter。
 - **D-02:** 字段由 JsonPrinter 默认提供：level, message, time, error, stackTrace
 - **D-03:** 不添加自定义 module 字段到 JSON（命名 logger 的 prefix 已区分来源）
 
