@@ -495,7 +495,7 @@ static bool _hasControlCharacters(String path) {
 | A3 | 0x09 (tab) 不需要过滤（Windows 文件名允许 tab） | D-06 | 如果需要过滤 tab，需调整 `_hasControlCharacters` 范围 |
 | A4 | Timer 5 秒超时适合所有硬件 | D-03 | 较慢机器可能需要更长时间，但 5 秒有足够余量 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Arena 在 `using()` 中分配后赋值给实例字段是否安全？**
    - What we know: Arena 在 `using()` 块结束时释放所有分配。如果 `_savedFrame = calloc<Rect>()` 在 Arena 内但赋值给实例字段，Arena 结束后指针被释放。
