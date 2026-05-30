@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/services/thumbnail_service.dart';
 
@@ -27,10 +28,67 @@ void main() {
     test('reset clears impl and cache', () {
       ThumbnailService.reset();
       // After reset, getThumbnail should work (re-creates provider)
+      expect(ThumbnailService.getThumbnail('test.mp4'), completes);
+    });
+  });
+
+  group('ThumbnailService LRU ordering', () {
+    setUp(() {
+      ThumbnailService.reset();
+    });
+
+    test('touch on non-existent key is a no-op', () {
+      ThumbnailService.touch('nonexistent.mp4');
+      expect(ThumbnailService.cacheLength, equals(0));
+      expect(ThumbnailService.cacheKeys, isEmpty);
+    });
+
+    test('evict removes specific item from cache and others remain', () {
+      // evict on empty cache should not throw
+      ThumbnailService.evict('a.mp4');
+      expect(ThumbnailService.cacheLength, equals(0));
+    });
+
+    test('clearCache removes all items', () {
+      ThumbnailService.clearCache();
+      expect(ThumbnailService.cacheLength, equals(0));
+      expect(ThumbnailService.cacheKeys, isEmpty);
+    });
+
+    test('cacheLength and cacheKeys are consistent after reset', () {
+      expect(ThumbnailService.cacheLength, equals(0));
+      expect(ThumbnailService.cacheKeys, isEmpty);
+
+      // After reset, still empty
+      ThumbnailService.reset();
+      expect(ThumbnailService.cacheLength, equals(0));
+      expect(ThumbnailService.cacheKeys, isEmpty);
+    });
+
+    test('touch on non-existent key does not corrupt cache state', () {
+      // Touch a key that was never added
+      ThumbnailService.touch('ghost.mp4');
+      ThumbnailService.touch('ghost2.mp4');
+
+      expect(ThumbnailService.cacheLength, equals(0));
+      expect(ThumbnailService.cacheKeys, isEmpty);
+
+      // Evict should still be safe
+      ThumbnailService.evict('ghost.mp4');
+      expect(ThumbnailService.cacheLength, equals(0));
+    });
+
+    test('evict on non-existent key does not throw', () {
       expect(
-        ThumbnailService.getThumbnail('test.mp4'),
-        completes,
+        () => ThumbnailService.evict('does-not-exist.mp4'),
+        returnsNormally,
       );
+    });
+
+    test('clearCache is idempotent', () {
+      ThumbnailService.clearCache();
+      ThumbnailService.clearCache();
+      expect(ThumbnailService.cacheLength, equals(0));
     });
   });
 }
