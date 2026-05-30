@@ -110,8 +110,8 @@ Plans:
 
 Plans:
 
-- [ ] 11-01: ThumbnailService LRU O(1) with LinkedHashMap
-- [ ] 11-02: PositionPoller adaptive polling intervals
+- [x] 11-01: ThumbnailService LRU O(1) with LinkedHashMap
+- [x] 11-02: PositionPoller adaptive polling intervals
 - [ ] 11-03: D3D11 refresh-rate-aware sync mode
 - [ ] 11-04: Rendering pipeline audit + Phase 11 verification
 
@@ -149,7 +149,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
 | 10. Window Optimization | v1.2 | 5/5 | Complete | 2026-05-30 |
-| 11. Performance Optimization | v1.2 | 0/4 | Planned | - |
+| 11. Performance Optimization | v1.2 | 2/4 | Executing | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
 
 ## Requirement Traceability
