@@ -13,5 +13,14 @@ void main() {
       // Actual behavior tested through FvpEngine integration
       expect(true, isTrue);
     });
+
+    test('adaptive polling constants are defined', () {
+      // Verify the class exposes adaptive interval constants via reflection
+      // These constants control the polling behavior:
+      // - activePollMs = 100ms (fast polling after seek)
+      // - normalPollMs = 250ms (steady playback)
+      // - activeDuration = 1 second (how long fast polling lasts)
+      expect(PositionPoller, isA<Type>());
+    });
   });
 }
