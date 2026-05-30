@@ -1,61 +1,45 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T14:30:00+08:00",
+  "timestamp": "2026-05-30T15:00:00+08:00",
   "phase": 9,
   "phase_name": "Security Hardening",
   "phase_dir": ".planning/phases/09-security-hardening",
-  "plan": null,
+  "plan": "09-03",
   "task": null,
   "total_tasks": null,
-  "status": "ready_to_execute",
+  "status": "paused",
   "milestone": "v1.2",
   "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [
-    {"id": 1, "name": "Refresh codebase map (7 documents)", "status": "done", "commit": "bca9ec8"},
-    {"id": 2, "name": "Parallel research (4 agents + synthesizer)", "status": "done", "commit": "bca9ec8"},
-    {"id": 3, "name": "Define v1.2 requirements (SEC-01, SEC-02, WIN-04, PERF-04, DBG-01)", "status": "done"},
-    {"id": 4, "name": "Update ROADMAP.md to 4 phases (9-12)", "status": "done"},
-    {"id": 5, "name": "Update STATE.md for 4 phases", "status": "done"},
-    {"id": 6, "name": "Update REQUIREMENTS.md traceability table", "status": "done"},
-    {"id": 7, "name": "Phase 9 discuss-phase analysis (09-CONTEXT.md)", "status": "done"},
-    {"id": 8, "name": "Phase 9 research (09-RESEARCH.md)", "status": "done"},
-    {"id": 9, "name": "Phase 9 plan 09-01: FFI Pointer Lifecycle Safety", "status": "done"},
-    {"id": 10, "name": "Phase 9 plan 09-02: Input Validation Hardening", "status": "done"},
-    {"id": 11, "name": "Phase 9 plan 09-03: E2E Security Verification", "status": "done"}
+    {"id": 1, "name": "09-01: FFI Pointer Lifecycle Safety", "status": "done", "commit": "9131e1f"},
+    {"id": 2, "name": "09-02: Input Validation Hardening", "status": "done", "commit": "4e009df"}
   ],
   "remaining_tasks": [
-    {"id": 12, "name": "Execute 09-01: FFI safety in window_service.dart", "status": "not_started"},
-    {"id": 13, "name": "Execute 09-02: Input validation in path_validator.dart", "status": "not_started"},
-    {"id": 14, "name": "Execute 09-03: E2E verification checkpoint", "status": "not_started"}
+    {"id": 3, "name": "09-03: E2E Security Verification (human-verify checkpoint)", "status": "not_started"}
   ],
   "plans": [
-    {"id": "09-01", "name": "FFI Pointer Lifecycle Safety", "wave": 1, "status": "ready", "files": ["lib/kernel/bridge/window_service.dart"]},
-    {"id": "09-02", "name": "Input Validation Hardening", "wave": 1, "status": "ready", "files": ["lib/kernel/services/path_validator.dart", "test/kernel/services/path_validator_test.dart"]},
+    {"id": "09-01", "name": "FFI Pointer Lifecycle Safety", "wave": 1, "status": "complete", "commit": "9131e1f"},
+    {"id": "09-02", "name": "Input Validation Hardening", "wave": 1, "status": "complete", "commit": "4e009df"},
     {"id": "09-03", "name": "E2E Security Verification", "wave": 2, "status": "ready", "depends_on": ["09-01", "09-02"]}
   ],
   "blockers": [],
   "decisions": [
-    "D-01: Short-lived pointers use Arena (using())",
+    "D-01: Short-lived pointers use try/finally (Arena not available in current dart:ffi version)",
     "D-02: Long-lived pointers (_savedFrame, _savedMaximizeFrame) use try/finally",
     "D-03: Fullscreen transition 5s timeout protection",
-    "D-04: dispose() must free both _savedFrame AND _savedMaximizeFrame",
-    "D-05: HTTP/HTTPS URLs need Uri.tryParse validation",
-    "D-06: Control character filtering (0x01-0x1F)",
+    "D-04: dispose() frees both _savedFrame AND _savedMaximizeFrame",
+    "D-05: HTTP/HTTPS URLs validated with Uri.tryParse + hasAuthority + host.isNotEmpty",
+    "D-06: Control character filtering (0x01-0x1F, excludes 0x00 and 0x09)",
     "D-07: RTSP/RTMP/SRT/UDP/TCP keep prefix passthrough"
   ],
   "key_findings": [
-    "dispose() leaks _savedFrame (only frees _savedMaximizeFrame)",
-    "_exitFullscreen L214 _savedStyle! can throw, preventing _savedFrame free",
-    "PathValidator.validate() skips ALL URL validation when isUrl() returns true",
-    "6 calloc calls in window_service.dart need safety wrapping"
+    "dispose() was leaking _savedFrame — fixed by adding null check + free",
+    "_exitFullscreen _savedStyle! could throw — fixed with null check",
+    "PathValidator.validate() skipped ALL URL validation — fixed with Uri.tryParse for HTTP/HTTPS",
+    "Uri.tryParse('http://') has hasAuthority=true but empty host — added host.isNotEmpty check",
+    "6 calloc calls wrapped in try/finally for exception-safe cleanup"
   ],
-  "uncommitted_files": [
-    ".planning/phases/09-security-hardening/09-CONTEXT.md",
-    ".planning/phases/09-security-hardening/09-RESEARCH.md",
-    ".planning/phases/09-security-hardening/09-01-PLAN.md",
-    ".planning/phases/09-security-hardening/09-02-PLAN.md",
-    ".planning/phases/09-security-hardening/09-03-PLAN.md"
-  ],
-  "next_action": "/gsd:execute-phase 9",
-  "context_notes": "Phase 9 planning complete. 3 plans (2 waves). Zero new dependencies. Arena for short-lived FFI pointers, try/finally for long-lived. dispose() has _savedFrame leak. Fullscreen needs 5s timeout. HTTP/HTTPS need Uri.tryParse."
+  "uncommitted_files": [],
+  "next_action": "/gsd:execute-phase 9 — resumes at 09-03 (Wave 2 checkpoint)",
+  "context_notes": "Wave 1 complete. 09-01 (FFI safety) + 09-02 (input validation) committed. 608 tests passing, dart analyze clean. 09-03 is human-verify checkpoint — needs user to verify safety changes and run flutter test + dart analyze."
 }
