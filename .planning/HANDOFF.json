@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T22:00:00+08:00",
+  "timestamp": "2026-05-30T22:30:00+08:00",
   "phase": 12,
   "phase_name": "Debug Tooling",
   "phase_dir": ".planning/phases/12-debug-tooling",
@@ -14,7 +14,8 @@
     {"id": "11-01", "name": "ThumbnailService LRU O(1) with LinkedHashMap", "status": "done", "commit": "7f8b37f"},
     {"id": "11-02", "name": "PositionPoller adaptive polling intervals", "status": "done", "commit": "12147d1"},
     {"id": "11-03", "name": "D3D11 refresh-rate-aware sync mode", "status": "done", "commit": "5339de1"},
-    {"id": "11-04", "name": "Rendering pipeline audit + Phase 11 verification", "status": "done", "commit": "68ad8a0"}
+    {"id": "11-04", "name": "Rendering pipeline audit + Phase 11 verification", "status": "done", "commit": "68ad8a0"},
+    {"id": "12-discuss", "name": "Phase 12 context gathering (discuss-phase)", "status": "done", "commit": "2423ad4"}
   ],
   "remaining_tasks": [
     {"id": "12-plan", "name": "Plan Phase 12 (Debug Tooling)", "status": "not_started"},
@@ -26,14 +27,16 @@
     {"decision": "LRU cache uses LinkedHashMap for O(1) touch/evict", "rationale": "Pure Dart, zero dependencies", "phase": 11},
     {"decision": "PositionPoller adaptive: 100ms seek / 250ms steady / 1s auto-revert", "rationale": "Reduced CPU, responsive seek", "phase": 11},
     {"decision": "D3D11 sync mode: async (0) for 120Hz+, sync (1) for 60Hz", "rationale": "High-refresh optimization", "phase": 11},
-    {"decision": "Rendering pipeline audit found no changes needed", "rationale": "VideoSurface/RepaintBoundary already optimal", "phase": 11},
-    {"decision": "Removed unused dart:collection import from thumbnail_service.dart", "rationale": "Map literal is already LinkedHashMap by default in Dart", "phase": 11}
+    {"decision": "JSON logs: use logger package built-in JsonPrinter", "rationale": "Zero custom code", "phase": 12},
+    {"decision": "Named loggers: Logger('engine'), Logger('bridge'), Logger('services'), Logger('ui')", "rationale": "Module-scoped, backward compatible with global log", "phase": 12},
+    {"decision": "Timeline tracking: open, seek, fullscreen (3 methods)", "rationale": "Most user-perceptible performance paths", "phase": 12},
+    {"decision": "Release log level: warning+ only to file", "rationale": "Reduce noise, Debug mode keeps all levels", "phase": 12}
   ],
   "uncommitted_files": [
     "CLAUDE.md (modified)",
     "pubspec.lock (modified)",
     "test files (modified)"
   ],
-  "next_action": "Run /gsd:plan-phase 12 to plan Phase 12: Debug Tooling (structured logging, named loggers, dart:developer Timeline events)",
-  "context_notes": "Phase 11 fully complete (4/4 plans, 630 tests, dart analyze clean). v1.2 milestone 3/4 phases done (9+10+11). Phase 12 is the final phase. Context at ~78% — fresh session recommended for Phase 12 planning which needs researcher + planner + checker agents."
+  "next_action": "Run /gsd:plan-phase 12 to plan Phase 12: Debug Tooling (CONTEXT.md already exists)",
+  "context_notes": "Phase 12 discuss-phase complete. CONTEXT.md captured 14 decisions (D-01~D-14). Next: research + plan + execute. v1.2 milestone 3/4 phases done (9+10+11), Phase 12 is final."
 }
