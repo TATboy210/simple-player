@@ -26,6 +26,7 @@ class WindowService with WindowListener {
   Pointer<Rect>? _savedMaximizeFrame; // 最大化前的窗口位置
   int? _baseStyle; // _removeBorder() 完成后的基准 style
   Timer? _resizeDebounce;
+  Timer? _fullscreenTimeout;
 
   // ─── State (ValueNotifier pattern) ───
 
@@ -64,8 +65,11 @@ class WindowService with WindowListener {
       ..ref.right = 0
       ..ref.top = 1
       ..ref.bottom = 0;
-    win32.dwmExtendFrameIntoClientArea(hwnd, margins);
-    calloc.free(margins);
+    try {
+      win32.dwmExtendFrameIntoClientArea(hwnd, margins);
+    } finally {
+      calloc.free(margins);
+    }
 
     win32.setWindowPos(
       hwnd,
@@ -144,6 +148,13 @@ class WindowService with WindowListener {
   Future<void> setFullscreen(bool value) async {
     if (_fullscreenTransitioning) return;
     _fullscreenTransitioning = true;
+    _fullscreenTimeout?.cancel();
+    _fullscreenTimeout = Timer(const Duration(seconds: 5), () {
+      if (_fullscreenTransitioning) {
+        debugPrint('WindowService: fullscreen transition timeout, force reset');
+        _fullscreenTransitioning = false;
+      }
+    });
     try {
       if (value) {
         await _enterFullscreen();
@@ -151,6 +162,7 @@ class WindowService with WindowListener {
         await _exitFullscreen();
       }
     } finally {
+      _fullscreenTimeout?.cancel();
       _fullscreenTransitioning = false;
     }
   }
@@ -163,14 +175,17 @@ class WindowService with WindowListener {
     // Save current style and frame for restoration.
     _savedStyle = _baseStyle ?? win32.getWindowLongPtr(hwnd, gwlStyle);
     final frame = calloc<Rect>();
-    win32.getWindowRect(hwnd, frame);
-    final saved = calloc<Rect>();
-    saved.ref.left = frame.ref.left;
-    saved.ref.top = frame.ref.top;
-    saved.ref.right = frame.ref.right;
-    saved.ref.bottom = frame.ref.bottom;
-    _savedFrame = saved;
-    calloc.free(frame);
+    try {
+      win32.getWindowRect(hwnd, frame);
+      final saved = calloc<Rect>();
+      saved.ref.left = frame.ref.left;
+      saved.ref.top = frame.ref.top;
+      saved.ref.right = frame.ref.right;
+      saved.ref.bottom = frame.ref.bottom;
+      _savedFrame = saved;
+    } finally {
+      calloc.free(frame);
+    }
 
     // Set WS_POPUP — fully borderless, no DWM frame.
     win32.setWindowLongPtr(hwnd, gwlStyle, wsPopup);
@@ -181,26 +196,32 @@ class WindowService with WindowListener {
       ..ref.right = -1
       ..ref.top = -1
       ..ref.bottom = -1;
-    win32.dwmExtendFrameIntoClientArea(hwnd, margins);
-    calloc.free(margins);
+    try {
+      win32.dwmExtendFrameIntoClientArea(hwnd, margins);
+    } finally {
+      calloc.free(margins);
+    }
 
     // Get monitor bounds.
     final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
     final mi = calloc<MonitorInfo>();
     mi.ref.cbSize = sizeOf<MonitorInfo>();
-    win32.getMonitorInfo(hMonitor, mi);
+    try {
+      win32.getMonitorInfo(hMonitor, mi);
 
-    // Position window to fill entire monitor.
-    win32.setWindowPos(
-      hwnd,
-      hwndTop,
-      mi.ref.rcMonitor.left,
-      mi.ref.rcMonitor.top,
-      mi.ref.rcMonitor.right - mi.ref.rcMonitor.left,
-      mi.ref.rcMonitor.bottom - mi.ref.rcMonitor.top,
-      swpNoOwnerZOrder | swpFrameChanged,
-    );
-    calloc.free(mi);
+      // Position window to fill entire monitor.
+      win32.setWindowPos(
+        hwnd,
+        hwndTop,
+        mi.ref.rcMonitor.left,
+        mi.ref.rcMonitor.top,
+        mi.ref.rcMonitor.right - mi.ref.rcMonitor.left,
+        mi.ref.rcMonitor.bottom - mi.ref.rcMonitor.top,
+        swpNoOwnerZOrder | swpFrameChanged,
+      );
+    } finally {
+      calloc.free(mi);
+    }
 
     if (!isFullscreen.value) isFullscreen.value = true;
   }
@@ -211,24 +232,31 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // Restore original style.
-    win32.setWindowLongPtr(hwnd, gwlStyle, _savedStyle!);
-
-    // Restore original window frame.
-    if (_savedFrame != null) {
-      win32.setWindowPos(
-        hwnd,
-        0,
-        _savedFrame!.ref.left,
-        _savedFrame!.ref.top,
-        _savedFrame!.ref.right - _savedFrame!.ref.left,
-        _savedFrame!.ref.bottom - _savedFrame!.ref.top,
-        swpNoOwnerZOrder | swpFrameChanged,
-      );
-      calloc.free(_savedFrame!);
+    if (_savedStyle != null) {
+      win32.setWindowLongPtr(hwnd, gwlStyle, _savedStyle!);
     }
 
-    _savedStyle = null;
-    _savedFrame = null;
+    // Restore original window frame.
+    try {
+      if (_savedFrame != null) {
+        win32.setWindowPos(
+          hwnd,
+          0,
+          _savedFrame!.ref.left,
+          _savedFrame!.ref.top,
+          _savedFrame!.ref.right - _savedFrame!.ref.left,
+          _savedFrame!.ref.bottom - _savedFrame!.ref.top,
+          swpNoOwnerZOrder | swpFrameChanged,
+        );
+      }
+    } finally {
+      if (_savedFrame != null) {
+        calloc.free(_savedFrame!);
+        _savedFrame = null;
+      }
+      _savedStyle = null;
+    }
+
     if (isFullscreen.value) isFullscreen.value = false;
   }
 
@@ -256,33 +284,38 @@ class WindowService with WindowListener {
 
     // 保存当前窗口位置（用于 restore）
     final frame = calloc<Rect>();
-    win32.getWindowRect(hwnd, frame);
-    final saved = calloc<Rect>()
-      ..ref.left = frame.ref.left
-      ..ref.top = frame.ref.top
-      ..ref.right = frame.ref.right
-      ..ref.bottom = frame.ref.bottom;
-    _savedMaximizeFrame = saved;
-    calloc.free(frame);
+    try {
+      win32.getWindowRect(hwnd, frame);
+      final saved = calloc<Rect>()
+        ..ref.left = frame.ref.left
+        ..ref.top = frame.ref.top
+        ..ref.right = frame.ref.right
+        ..ref.bottom = frame.ref.bottom;
+      _savedMaximizeFrame = saved;
+    } finally {
+      calloc.free(frame);
+    }
 
     // 获取工作区（排除任务栏）
     final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
     final mi = calloc<MonitorInfo>();
     mi.ref.cbSize = sizeOf<MonitorInfo>();
-    win32.getMonitorInfo(hMonitor, mi);
+    try {
+      win32.getMonitorInfo(hMonitor, mi);
 
-    // 定位到工作区（不禁用 DWM 过渡，保留平滑动画）
-    win32.setWindowPos(
-      hwnd,
-      hwndTop,
-      mi.ref.rcWork.left,
-      mi.ref.rcWork.top,
-      mi.ref.rcWork.right - mi.ref.rcWork.left,
-      mi.ref.rcWork.bottom - mi.ref.rcWork.top,
-      swpNoOwnerZOrder | swpFrameChanged,
-    );
-
-    calloc.free(mi);
+      // 定位到工作区（不禁用 DWM 过渡，保留平滑动画）
+      win32.setWindowPos(
+        hwnd,
+        hwndTop,
+        mi.ref.rcWork.left,
+        mi.ref.rcWork.top,
+        mi.ref.rcWork.right - mi.ref.rcWork.left,
+        mi.ref.rcWork.bottom - mi.ref.rcWork.top,
+        swpNoOwnerZOrder | swpFrameChanged,
+      );
+    } finally {
+      calloc.free(mi);
+    }
     if (!isMaximized.value) isMaximized.value = true;
   }
 
@@ -291,19 +324,22 @@ class WindowService with WindowListener {
     if (!isMaximized.value || _savedMaximizeFrame == null) return;
     final hwnd = await windowManager.getId();
 
-    // 恢复窗口位置（不禁用 DWM 过渡，保留平滑动画）
-    win32.setWindowPos(
-      hwnd,
-      0,
-      _savedMaximizeFrame!.ref.left,
-      _savedMaximizeFrame!.ref.top,
-      _savedMaximizeFrame!.ref.right - _savedMaximizeFrame!.ref.left,
-      _savedMaximizeFrame!.ref.bottom - _savedMaximizeFrame!.ref.top,
-      swpNoOwnerZOrder | swpFrameChanged,
-    );
+    try {
+      // 恢复窗口位置（不禁用 DWM 过渡，保留平滑动画）
+      win32.setWindowPos(
+        hwnd,
+        0,
+        _savedMaximizeFrame!.ref.left,
+        _savedMaximizeFrame!.ref.top,
+        _savedMaximizeFrame!.ref.right - _savedMaximizeFrame!.ref.left,
+        _savedMaximizeFrame!.ref.bottom - _savedMaximizeFrame!.ref.top,
+        swpNoOwnerZOrder | swpFrameChanged,
+      );
+    } finally {
+      calloc.free(_savedMaximizeFrame!);
+      _savedMaximizeFrame = null;
+    }
 
-    calloc.free(_savedMaximizeFrame!);
-    _savedMaximizeFrame = null;
     if (isMaximized.value) isMaximized.value = false;
   }
 
@@ -316,8 +352,14 @@ class WindowService with WindowListener {
   void dispose() {
     _disposed = true;
     _resizeDebounce?.cancel();
+    _fullscreenTimeout?.cancel();
+    if (_savedFrame != null) {
+      calloc.free(_savedFrame!);
+      _savedFrame = null;
+    }
     if (_savedMaximizeFrame != null) {
       calloc.free(_savedMaximizeFrame!);
+      _savedMaximizeFrame = null;
     }
     windowManager.removeListener(this);
     isFullscreen.dispose();
