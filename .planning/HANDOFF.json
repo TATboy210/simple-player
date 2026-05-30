@@ -1,30 +1,33 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T11:30:00+08:00",
+  "timestamp": "2026-05-30T12:30:00+08:00",
   "phase": 8,
   "phase_name": "Architecture & Dead Code",
   "plan": 1,
-  "task": 4,
+  "task": 5,
   "total_tasks": 6,
   "status": "paused",
   "completed_tasks": [
     {"id": 1, "name": "08-01: Delete dead files + remove dead _setTransitionsDisabled", "status": "done", "commit": "88fb98b"},
     {"id": 2, "name": "08-02b: Extract AppSettings from settings_store.dart", "status": "done", "commit": "9113606"},
-    {"id": 3, "name": "08-02c: Extract SettingSliderRow and SettingActionRow from settings_card.dart", "status": "done", "commit": "a4799c5"}
+    {"id": 3, "name": "08-02c: Extract SettingSliderRow and SettingActionRow from settings_card.dart", "status": "done", "commit": "a4799c5"},
+    {"id": 4, "name": "08-02d: Extract Win32 FFI types to win32_bindings.dart", "status": "done", "commit": "0b87599"}
   ],
-  "remaining_tasks": [
-    {"id": 4, "name": "08-02d: Extract Win32 FFI types to win32_bindings.dart", "status": "not_started"},
-    {"id": 5, "name": "08-02a: Extract VideoConfigManager from FvpEngine", "status": "not_started"},
-    {"id": 6, "name": "08-03: Hover pattern dedup + final verification", "status": "not_started"}
+  "skipped_tasks": [
+    {"id": 5, "name": "08-02a: Extract VideoConfigManager from FvpEngine", "reason": "7 thin _guardedAction wrappers; extraction adds ~30 lines net with 4 callback params. YAGNI."},
+    {"id": 6, "name": "08-03: Hover pattern dedup", "reason": "3/4 hover instances need hover state for child content. 5-line MouseRegion+AnimatedContainer pattern insufficient for abstraction cost."}
   ],
+  "remaining_tasks": [],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
     {"decision": "Remove dwmSetWindowAttribute binding along with dead _setTransitionsDisabled", "rationale": "dwmSetWindowAttribute was only used by the dead method; dwmExtendFrameIntoClientArea (used by _removeBorder) kept", "phase": 8},
     {"decision": "Re-export extracted classes from original files", "rationale": "Preserves import surfaces so consumers don't break", "phase": 8},
-    {"decision": "Skip hardcoded i18n strings in startup progress", "rationale": "Splash screen progress <2 seconds, minimal user benefit vs threading BuildContext", "phase": 8}
+    {"decision": "Skip hardcoded i18n strings in startup progress", "rationale": "Splash screen progress <2 seconds, minimal user benefit vs threading BuildContext", "phase": 8},
+    {"decision": "Skip VideoConfigManager extraction (08-02a)", "rationale": "7 methods are thin _guardedAction wrappers (1-3 lines each). Extraction needs 4 callbacks + constructor, net +30 lines. Setup methods (_applyD3d11Defaults, _configureNetworkOptions) called during init, not via _guardedAction.", "phase": 8},
+    {"decision": "Skip hover pattern dedup (08-03)", "rationale": "3/4 instances (SettingRow, SettingActionRow, _VideoSlider) use hover state to modify child content (colors/text/icons). Simple wrapper can't solve this. 5-line pattern insufficient for builder abstraction cost.", "phase": 8}
   ],
   "uncommitted_files": [],
-  "next_action": "Continue Phase 8: 08-02d (Win32 FFI extraction) → 08-02a (VideoConfigManager) → 08-03 (hover dedup)",
-  "context_notes": "3/6 tasks done. 88 lines deleted (08-01), AppSettings extracted (08-02b), settings_card split from 513→270 lines (08-02c). 596 tests passing. Plan at ~/.claude/plans/purring-meandering-lagoon.md."
+  "next_action": "Phase 8 complete (4/6 done, 2 skipped). Ready for Phase 9 or final verification.",
+  "context_notes": "4/6 tasks done, 2 skipped with rationale. 88 lines deleted (08-01), AppSettings extracted (08-02b), settings_card split (08-02c), Win32 FFI extracted (08-02d). 596 tests passing, dart analyze clean. window_service.dart: 438→329 lines. win32_bindings.dart: ~110 lines (new)."
 }
