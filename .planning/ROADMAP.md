@@ -42,7 +42,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 9: Security Hardening** - FFI memory safety and input validation (SEC-01, SEC-02)
 - [x] **Phase 10: Window Optimization** - Window management and UX continued improvement (WIN-04)
 - [x] **Phase 11: Performance Optimization** - Player performance tuning and rendering pipeline audit (PERF-04)
-- [ ] **Phase 12: Debug Tooling** - Structured logging, named loggers, and performance tracing (DBG-01)
+- [x] **Phase 12: Debug Tooling** - Structured logging, named loggers, and performance tracing (DBG-01) — completed 2026-05-31
 
 ## Phase Details
 
