@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
@@ -17,9 +19,8 @@ class ThumbnailService {
 
   static ThumbnailProvider? _impl;
 
-  /// LRU 缓存 — Map 维护数据，List 维护访问顺序（最近访问在末尾）
-  static final _cache = <String, ImageProvider>{};
-  static final _order = <String>[]; // 末尾 = 最近访问
+  /// LRU 缓存 — LinkedHashMap 维护插入顺序，访问时 remove+reinsert 移到末尾
+  static final _cache = LinkedHashMap<String, ImageProvider>();
 
   static ThumbnailProvider get _provider {
     if (_impl != null) return _impl!;
@@ -42,7 +43,6 @@ class ThumbnailService {
     final provider = await _provider.getThumbnail(filePath);
     if (provider != null) {
       _cache[filePath] = provider;
-      _order.add(filePath);
       _evictIfNeeded();
     }
     return provider;
@@ -51,13 +51,11 @@ class ThumbnailService {
   /// 移除单个缓存条目。
   static void evict(String filePath) {
     _cache.remove(filePath);
-    _order.remove(filePath);
   }
 
   /// 清空全部缓存。
   static void clearCache() {
     _cache.clear();
-    _order.clear();
   }
 
   /// 重置全部状态（仅供测试使用）。
@@ -65,20 +63,30 @@ class ThumbnailService {
   static void reset() {
     _impl = null;
     _cache.clear();
-    _order.clear();
   }
 
-  /// 命中时移到末尾（最近访问）
+  /// 手动触发 LRU 触摸（仅供测试使用）。
+  @visibleForTesting
+  static void touch(String filePath) => _touch(filePath);
+
+  /// 缓存条目数量（仅供测试使用）。
+  @visibleForTesting
+  static int get cacheLength => _cache.length;
+
+  /// 缓存键的迭代顺序（仅供测试使用，oldest-first）。
+  @visibleForTesting
+  static Iterable<String> get cacheKeys => _cache.keys;
+
+  /// 命中时移到末尾（最近访问）— O(1) remove + reinsert
   static void _touch(String filePath) {
-    _order.remove(filePath);
-    _order.add(filePath);
+    final value = _cache.remove(filePath);
+    if (value != null) _cache[filePath] = value;
   }
 
-  /// 超出容量时淘汰最久未访问的条目（列表头部）
+  /// 超出容量时淘汰最久未访问的条目（迭代器首位）— O(1)
   static void _evictIfNeeded() {
     while (_cache.length > _maxCacheSize) {
-      final oldest = _order.removeAt(0);
-      _cache.remove(oldest);
+      _cache.remove(_cache.keys.first);
     }
   }
 }
