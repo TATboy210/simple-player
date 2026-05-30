@@ -1,9 +1,9 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T18:00:00+08:00",
-  "phase": 10,
-  "phase_name": "Window Optimization",
-  "phase_dir": ".planning/phases/10-window-optimization",
+  "timestamp": "2026-05-30T19:00:00+08:00",
+  "phase": 11,
+  "phase_name": "Performance Optimization",
+  "phase_dir": ".planning/phases/11-performance-optimization",
   "plan": null,
   "task": null,
   "total_tasks": null,
@@ -11,25 +11,27 @@
   "milestone": "v1.2",
   "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [
-    {"id": "10-03", "name": "Startup wiring + singleton fix", "status": "done", "commit": "91fde04, 19d3eca"},
-    {"id": "10-02-GAP", "name": "onWindowClose + _saveGeometryImmediate", "status": "done", "commit": "7312eeb"},
-    {"id": "10-01-GAP", "name": "WindowBootstrap test suite (7 tests)", "status": "done", "commit": "e1e7b95"}
+    {"id": "10-VERIFY", "name": "Phase 10 verification — all must-haves pass", "status": "done", "commit": "pending"}
   ],
   "remaining_tasks": [
-    {"id": "10-VERIFY", "name": "Phase 10 verification — confirm all must-haves pass", "status": "not_started"}
+    {"id": "11-01", "name": "ThumbnailService LRU O(1) with LinkedHashMap", "status": "not_started"},
+    {"id": "11-02", "name": "PositionPoller adaptive polling intervals", "status": "not_started"},
+    {"id": "11-03", "name": "D3D11 refresh-rate-aware sync mode", "status": "not_started"},
+    {"id": "11-04", "name": "Rendering pipeline audit + Phase 11 verification", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "onWindowClose does NOT skip fullscreen/maximized (unlike debounce)", "rationale": "Close handler must save actual window state", "phase": 10},
-    {"decision": "clampToVisibleBounds exposed as @visibleForTesting", "rationale": "Direct unit testing of bounds logic without mocking PlatformDispatcher", "phase": 10},
-    {"decision": "SharedPreferences.setMockInitialValues for clearFullscreenIfSaved tests", "rationale": "Standard Flutter test pattern for persistence layer", "phase": 10}
+    {"decision": "Phase 11 uses 3-wave execution: Wave 1 (11-01+11-02 parallel), Wave 2 (11-03), Wave 3 (11-04 checkpoint)", "rationale": "Risk ordering: LRU/poller lowest, D3D11 FFI medium, audit last", "phase": 11},
+    {"decision": "LRU cache uses LinkedHashMap (pure Dart, zero dependencies)", "rationale": "O(1) operations replace O(n) Map+List pattern", "phase": 11},
+    {"decision": "D3D11 sync mode adapts to display refresh rate via Win32 EnumDisplaySettings FFI", "rationale": "120Hz+ displays benefit from async mode for lower latency", "phase": 11}
   ],
   "uncommitted_files": [
     ".planning/STATE.md (modified)",
+    ".planning/ROADMAP.md (modified)",
     "CLAUDE.md (modified)",
     "pubspec.lock (modified)"
   ],
-  "next_action": "Run Phase 10 verification: verifier agent checks 10-VERIFICATION.md must-haves against codebase, confirms 3 gaps resolved",
-  "context_notes": "Phase 10 gap closure EXECUTED successfully. Both 10-02-GAP (onWindowClose) and 10-01-GAP (tests) committed. 615 tests passing (was 608). Next: verification to confirm all must-haves pass, then mark Phase 10 complete."
+  "next_action": "Run /gsd:execute-phase 11 to start Phase 11 execution. Wave 1 (11-01 LRU + 11-02 Poller) can run in parallel.",
+  "context_notes": "Phase 10 verified complete. Phase 11 fully planned with 4 plans in 3 waves. Research complete (11-RESEARCH.md). All plan files created. Ready for execution."
 }
