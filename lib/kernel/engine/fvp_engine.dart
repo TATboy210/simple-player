@@ -13,6 +13,7 @@ import '../utils/path_utils.dart';
 import 'fvp_callback_handler.dart';
 import 'media_engine.dart';
 import 'position_poller.dart';
+import '../bridge/display_config.dart';
 import '../utils/log.dart';
 import 'track_manager.dart';
 
@@ -140,9 +141,10 @@ class FvpEngine implements MediaEngine {
   /// 参考: MDK SDK Player.setProperty, fvp_plugin.cpp D3D11RenderAPI
   void _applyD3d11Defaults(mdk.Player p) {
     // d3d11.sync.cpu: CPU/GPU 同步控制
-    //   0 = 异步（低延迟，可能撕裂）
+    //   0 = 异步（低延迟，高刷屏适用）
     //   1 = 同步（安全默认，完整画面）
-    p.setProperty('d3d11.sync.cpu', _defaultD3d11SyncCpu);
+    final syncMode = DisplayConfig.d3d11SyncMode();
+    p.setProperty('d3d11.sync.cpu', syncMode);
 
     // video.decoders: 解码器优先级列表
     //   硬件解码器优先，软件解码器兜底
@@ -150,7 +152,8 @@ class FvpEngine implements MediaEngine {
 
     log.d(
       'FvpEngine: D3D11 defaults applied '
-      '(sync.cpu=$_defaultD3d11SyncCpu, decoders=$_defaultVideoDecoders)',
+      '(sync.cpu=$syncMode, refreshRate=${DisplayConfig.getRefreshRate()}Hz, '
+      'decoders=$_defaultVideoDecoders)',
     );
   }
 
