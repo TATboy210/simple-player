@@ -1,45 +1,30 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T15:00:00+08:00",
-  "phase": 9,
-  "phase_name": "Security Hardening",
-  "phase_dir": ".planning/phases/09-security-hardening",
-  "plan": "09-03",
+  "timestamp": "2026-05-30T19:30:00+08:00",
+  "phase": 10,
+  "phase_name": "Window Optimization",
+  "phase_dir": ".planning/phases/10-window-optimization",
+  "plan": null,
   "task": null,
   "total_tasks": null,
   "status": "paused",
   "milestone": "v1.2",
   "milestone_name": "Security, Architecture & Kernel",
-  "completed_tasks": [
-    {"id": 1, "name": "09-01: FFI Pointer Lifecycle Safety", "status": "done", "commit": "9131e1f"},
-    {"id": 2, "name": "09-02: Input Validation Hardening", "status": "done", "commit": "4e009df"}
-  ],
-  "remaining_tasks": [
-    {"id": 3, "name": "09-03: E2E Security Verification (human-verify checkpoint)", "status": "not_started"}
-  ],
-  "plans": [
-    {"id": "09-01", "name": "FFI Pointer Lifecycle Safety", "wave": 1, "status": "complete", "commit": "9131e1f"},
-    {"id": "09-02", "name": "Input Validation Hardening", "wave": 1, "status": "complete", "commit": "4e009df"},
-    {"id": "09-03", "name": "E2E Security Verification", "wave": 2, "status": "ready", "depends_on": ["09-01", "09-02"]}
-  ],
+  "completed_tasks": [],
+  "remaining_tasks": [],
+  "plans": [],
   "blockers": [],
   "decisions": [
-    "D-01: Short-lived pointers use try/finally (Arena not available in current dart:ffi version)",
-    "D-02: Long-lived pointers (_savedFrame, _savedMaximizeFrame) use try/finally",
-    "D-03: Fullscreen transition 5s timeout protection",
-    "D-04: dispose() frees both _savedFrame AND _savedMaximizeFrame",
-    "D-05: HTTP/HTTPS URLs validated with Uri.tryParse + hasAuthority + host.isNotEmpty",
-    "D-06: Control character filtering (0x01-0x1F, excludes 0x00 and 0x09)",
-    "D-07: RTSP/RTMP/SRT/UDP/TCP keep prefix passthrough"
+    "D-09-01: try/finally for FFI cleanup (Arena not available in dart:ffi)",
+    "D-09-02: host.isNotEmpty check alongside hasAuthority for URL validation",
+    "D-09-03: Tab character (0x09) excluded from control char filter"
   ],
   "key_findings": [
-    "dispose() was leaking _savedFrame — fixed by adding null check + free",
-    "_exitFullscreen _savedStyle! could throw — fixed with null check",
-    "PathValidator.validate() skipped ALL URL validation — fixed with Uri.tryParse for HTTP/HTTPS",
-    "Uri.tryParse('http://') has hasAuthority=true but empty host — added host.isNotEmpty check",
-    "6 calloc calls wrapped in try/finally for exception-safe cleanup"
+    "Phase 9 complete: FFI safety (09-01) + input validation (09-02) + E2E verification (09-03)",
+    "608 tests passing, dart analyze clean",
+    "Phase 10 research agent launched but not yet complete"
   ],
   "uncommitted_files": [],
-  "next_action": "/gsd:execute-phase 9 — resumes at 09-03 (Wave 2 checkpoint)",
-  "context_notes": "Wave 1 complete. 09-01 (FFI safety) + 09-02 (input validation) committed. 608 tests passing, dart analyze clean. 09-03 is human-verify checkpoint — needs user to verify safety changes and run flutter test + dart analyze."
+  "next_action": "/gsd:plan-phase 10 — research agent was in progress, resume will need to re-run research or check if RESEARCH.md was written",
+  "context_notes": "Phase 9 complete. Phase 10 planning started — researcher agent was spawned but session ended before completion. Need to check if 10-RESEARCH.md exists on resume."
 }
