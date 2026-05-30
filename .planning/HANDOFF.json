@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T15:45:00+08:00",
+  "timestamp": "2026-05-30T09:06:10.400Z",
   "phase": 10,
   "phase_name": "Window Optimization",
   "phase_dir": ".planning/phases/10-window-optimization",
@@ -10,27 +10,29 @@
   "status": "paused",
   "milestone": "v1.2",
   "milestone_name": "Security, Architecture & Kernel",
-  "completed_tasks": [],
-  "remaining_tasks": [],
-  "plans": ["10-01", "10-02", "10-03"],
-  "blockers": [],
-  "decisions": [
-    "D-10-01: Keep existing 500ms debounce + close handler for geometry save",
-    "D-10-02: Do NOT auto-restore fullscreen on startup",
-    "D-10-03: Startup restore, multi-monitor, double WindowService, maximize restore — Claude's discretion"
+  "completed_tasks": [
+    {"id": "10-03", "name": "Startup wiring + singleton fix", "status": "done", "commit": "91fde04, 19d3eca"},
+    {"id": "10-01", "name": "WindowBootstrap TDD", "status": "partial", "note": "Class created by 10-03 but tests lost with worktree"},
+    {"id": "10-02", "name": "onWindowClose immediate save", "status": "lost", "note": "Entire commit lost during worktree cleanup"}
   ],
-  "key_findings": [
-    "3 PLAN.md files created: 10-01 (WindowBootstrap TDD), 10-02 (onWindowClose save), 10-03 (startup wiring + singleton fix)",
-    "2 waves: Wave 1 = 10-01 + 10-02 (parallel), Wave 2 = 10-03 (depends on Wave 1)",
-    "Plan checker passed with 1 warning (RESEARCH.md Open Questions — fixed)",
-    "PATTERNS.md, VALIDATION.md created",
-    "All artifacts committed as 31f96b0"
+  "remaining_tasks": [
+    {"id": "10-02", "name": "Re-implement onWindowClose + _saveGeometryImmediate", "status": "not_started"},
+    {"id": "10-01", "name": "Re-create window_bootstrap_test.dart + fake_screen_retriever.dart", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Wave 1 worktree commits lost during git worktree remove — 10-02 onWindowClose changes and 10-01 test files need re-implementation", "type": "technical", "workaround": "Run /gsd:plan-phase 10 --gaps to create gap closure plans"}
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "WindowBootstrap uses PlatformDispatcher.instance.views instead of screen_retriever", "rationale": "screen_retriever is not a project dependency", "phase": 10},
+    {"decision": "WindowService singleton injection via constructor", "rationale": "Fixes double instantiation race condition", "phase": 10},
+    {"decision": "WindowOptions no longer has hardcoded size/center", "rationale": "WindowBootstrap handles geometry restoration", "phase": 10}
   ],
   "uncommitted_files": [
     "pubspec.lock (modified)",
     "test/perf/control_bar_perf_test.dart (modified)",
     ".codegraph/ (untracked)"
   ],
-  "next_action": "/gsd:execute-phase 10 — run all 3 plans",
-  "context_notes": "Phase 10 planning complete. 3 plans in 2 waves verified and committed. Ready for execution. Context was at 74% so paused before executing."
+  "next_action": "/gsd:plan-phase 10 --gaps — create gap closure plans for 10-02 onWindowClose and 10-01 tests",
+  "context_notes": "Phase 10 execution partially complete. Wave 1 (10-01 + 10-02) ran in parallel worktrees but commits were lost during worktree cleanup. Wave 2 (10-03) succeeded and covers WindowBootstrap wiring + singleton fix. Two gaps remain: onWindowClose immediate save (10-02) and WindowBootstrap tests (10-01). 608 tests pass, dart analyze clean."
 }
