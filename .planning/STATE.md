@@ -5,13 +5,13 @@ milestone_name: Security, Architecture & Kernel
 status: ready_to_execute
 stopped_at: null
 last_updated: "2026-05-30T18:00:00+08:00"
-last_activity: 2026-05-30 — Phase 9 planned (3 plans, 2 waves)
+last_activity: 2026-05-30 — Phase 9 Wave 1 complete (2/3 plans)
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-30)
 ## Current Position
 
 Phase: 9 of 12 (Security Hardening)
-Plan: 3 plans (09-01, 09-02, 09-03)
-Status: Ready to execute
-Last activity: 2026-05-30 — Phase 9 planned (3 plans, 2 waves)
+Plan: 2/3 complete (09-01 ✓, 09-02 ✓, 09-03 pending)
+Status: Wave 1 complete, Wave 2 (checkpoint) pending
+Last activity: 2026-05-30 — Wave 1 complete: FFI safety + input validation
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [░░░░░░▓▓▓░] 67%
 
 ## Accumulated Context
 

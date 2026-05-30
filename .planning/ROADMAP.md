@@ -57,8 +57,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans (2 Wave 1 parallel + 1 Wave 2 checkpoint)
 
 Plans:
-- [ ] 09-01: FFI 指针生命周期安全加固 (Arena + try/finally + dispose 补全 + fullscreen 超时)
-- [ ] 09-02: 输入验证强化 (HTTP/HTTPS Uri.tryParse + 控制字符过滤)
+- [x] 09-01: FFI 指针生命周期安全加固 (Arena + try/finally + dispose 补全 + fullscreen 超时)
+- [x] 09-02: 输入验证强化 (HTTP/HTTPS Uri.tryParse + 控制字符过滤)
 - [ ] 09-03: 安全加固端到端验证 (checkpoint)
 
 ### Phase 10: Window Optimization
@@ -116,7 +116,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 6. Window Code Optimization | v1.1 | 1/1 | Complete | 2026-05-29 |
 | 7. Integration & Golden Tests | v1.1 | 3/3 | Complete | 2026-05-30 |
 | 8. Architecture & Dead Code | v1.1 | 2/2 | Complete | 2026-05-30 |
-| 9. Security Hardening | v1.2 | 0/3 | Planning | - |
+| 9. Security Hardening | v1.2 | 2/3 | In Progress | - |
 | 10. Window Optimization | v1.2 | 0/TBD | Not started | - |
 | 11. Performance Optimization | v1.2 | 0/TBD | Not started | - |
 | 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
