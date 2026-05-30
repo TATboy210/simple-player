@@ -36,6 +36,6 @@
     "pubspec.lock (modified)",
     "test files (modified)"
   ],
-  "next_action": "Run /gsd:execute-phase 12 to execute both plans (12-01 + 12-02) in Wave 1",
-  "context_notes": "Phase 12 plan-phase COMPLETE. 2 plans in 1 wave. Checker found 2 blockers (D-01/D-14 contradiction + missing tests), both resolved in revision. Plans committed as 073391d. v1.2 milestone 3/4 phases done (9+10+11), Phase 12 is final."
+  "next_action": "Run /gsd:execute-phase 12 to execute both plans (12-01 + 12-02) in Wave 1. Context budget warning: use fresh session for execution.",
+  "context_notes": "Phase 12 plan-phase COMPLETE. 2 plans in 1 wave. Checker found 2 blockers (D-01/D-14 contradiction + missing tests), both resolved in revision. Plans committed as 073391d. v1.2 milestone 3/4 phases done (9+10+11), Phase 12 is final. Execute-phase attempted but paused at 75% context — needs fresh session."
 }
