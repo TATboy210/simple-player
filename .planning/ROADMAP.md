@@ -122,15 +122,16 @@ Plans:
 **Requirements**: DBG-01
 **Success Criteria** (what must be TRUE):
 
-  1. Log output is structured JSON format (parseable by log aggregation tools)
-  2. Each module uses a named logger instance (engine, bridge, services, UI are distinguishable in logs)
-  3. Key performance-sensitive methods (3-5 paths) emit `dart:developer` Timeline events for DevTools profiling
+  1. Each module uses a named logger instance (engine, bridge, services, UI are distinguishable in logs)
+  2. Release mode filters to warning+ only; debug mode preserves current behavior
+  3. Key performance-sensitive methods (4 paths) emit `dart:developer` Timeline events for DevTools profiling
 
-**Plans**: TBD
+**Plans**: 2 plans (2 Wave 1 parallel)
 
 Plans:
 
-- [ ] 12-01: TBD
+- [ ] 12-01: PrefixPrinter + 模块 logger + initLog 更新 (log.dart)
+- [ ] 12-02: Timeline 追踪 FvpEngine.open/seek + WindowService fullscreen (4 方法)
 
 ## Progress
 
@@ -150,7 +151,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | 9. Security Hardening | v1.2 | 3/3 | Complete | 2026-05-30 |
 | 10. Window Optimization | v1.2 | 5/5 | Complete | 2026-05-30 |
 | 11. Performance Optimization | v1.2 | 4/4 | Complete | 2026-05-30 |
-| 12. Debug Tooling | v1.2 | 0/TBD | Not started | - |
+| 12. Debug Tooling | v1.2 | 0/2 | In progress | - |
 
 ## Requirement Traceability
 
@@ -167,7 +168,7 @@ Phases execute in numeric order: 9 -> 10 -> 11 -> 12
 | SEC-02 | 9 | 09-02 |
 | WIN-04 | 10 | 10-01, 10-02, 10-03 |
 | PERF-04 | 11 | 11-01, 11-02, 11-03, 11-04 |
-| DBG-01 | 12 | TBD |
+| DBG-01 | 12 | 12-01, 12-02 |
 
 ---
-*Last updated: 2026-05-30 — Phase 11 COMPLETE: 4 plans (11-01 LRU, 11-02 Poller, 11-03 D3D11, 11-04 Audit). Phase 12 next.*
+*Last updated: 2026-05-30 — Phase 12 planned: 2 plans (12-01 PrefixPrinter+loggers, 12-02 Timeline tracing). Both Wave 1 parallel.*
