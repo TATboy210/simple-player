@@ -324,22 +324,25 @@ class PlayerServices {
 | A4 | `windowManager.setBounds()` is atomic on Windows (single WM message) | Don't Hand-Roll | May need separate setPosition + setSize calls |
 | A5 | DWM transitions (animate maximize/restore) work correctly when using FFI SetWindowPos | Pitfall 3 | Animation may be choppy; may need DWMWA_TRANSITIONS_DISABLED |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **WindowOptions ordering**
+1. **WindowOptions ordering** — RESOLVED
    - What we know: `WindowOptions(size: Size(960, 540))` is passed to `waitUntilReadyToShow`. The callback runs when the window is ready.
    - What's unclear: Does `windowManager.setPosition/setSize` called INSIDE the callback override WindowOptions, or does WindowOptions apply AFTER the callback?
    - Recommendation: Test empirically. If overridden, change `WindowOptions` to use saved size, or remove size from WindowOptions entirely and set it manually.
+   - **Resolution:** Plan 10-03 removes `size` and `center` from `WindowOptions`, sets geometry manually inside callback via `WindowBootstrap.restoreOrCenter()`.
 
-2. **ensureVisible() timing**
+2. **ensureVisible() timing** — RESOLVED
    - What we know: `ensureVisible()` is documented to move the window onto a connected screen.
    - What's unclear: Does it work correctly when called before `show()`? Does it handle partial visibility (e.g., window 50% off-screen)?
    - Recommendation: Call after `show()` + `focus()` to be safe. Test with window partially off-screen.
+   - **Resolution:** Plan 10-01 calls `ensureVisible()` after `show()` + `focus()`. Partial visibility handled by 100px overlap threshold.
 
-3. **Fullscreen auto-restore safety**
+3. **Fullscreen auto-restore safety** — RESOLVED
    - What we know: `_savedFrame` is in-memory only, lost on crash.
    - What's unclear: Should we persist `_savedFrame` to SettingsStore for crash recovery?
    - Recommendation: Do NOT auto-restore fullscreen. Clear `isFullscreen` on clean startup. The user can re-enter fullscreen manually.
+   - **Resolution:** User decision D-02. Plan 10-01 implements `clearFullscreenIfSaved()`. Plan 10-03 calls it on startup.
 
 ## Environment Availability
 
