@@ -1,61 +1,61 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T13:29:42+08:00",
-  "phase": null,
-  "phase_name": null,
-  "phase_dir": null,
+  "timestamp": "2026-05-30T14:30:00+08:00",
+  "phase": 9,
+  "phase_name": "Security Hardening",
+  "phase_dir": ".planning/phases/09-security-hardening",
   "plan": null,
   "task": null,
   "total_tasks": null,
-  "status": "paused",
+  "status": "ready_to_execute",
   "milestone": "v1.2",
   "milestone_name": "Security, Architecture & Kernel",
   "completed_tasks": [
     {"id": 1, "name": "Refresh codebase map (7 documents)", "status": "done", "commit": "bca9ec8"},
     {"id": 2, "name": "Parallel research (4 agents + synthesizer)", "status": "done", "commit": "bca9ec8"},
-    {"id": 3, "name": "Define v1.2 requirements (SEC-01, SEC-02, WIN-04, PERF-04, DBG-01)", "status": "done", "commit": "uncommitted"},
-    {"id": 4, "name": "Update ROADMAP.md to 4 phases (9-12)", "status": "done", "commit": "uncommitted"},
-    {"id": 5, "name": "Update STATE.md for 4 phases", "status": "done", "commit": "uncommitted"},
-    {"id": 6, "name": "Update REQUIREMENTS.md traceability table", "status": "done", "commit": "uncommitted"}
+    {"id": 3, "name": "Define v1.2 requirements (SEC-01, SEC-02, WIN-04, PERF-04, DBG-01)", "status": "done"},
+    {"id": 4, "name": "Update ROADMAP.md to 4 phases (9-12)", "status": "done"},
+    {"id": 5, "name": "Update STATE.md for 4 phases", "status": "done"},
+    {"id": 6, "name": "Update REQUIREMENTS.md traceability table", "status": "done"},
+    {"id": 7, "name": "Phase 9 discuss-phase analysis (09-CONTEXT.md)", "status": "done"},
+    {"id": 8, "name": "Phase 9 research (09-RESEARCH.md)", "status": "done"},
+    {"id": 9, "name": "Phase 9 plan 09-01: FFI Pointer Lifecycle Safety", "status": "done"},
+    {"id": 10, "name": "Phase 9 plan 09-02: Input Validation Hardening", "status": "done"},
+    {"id": 11, "name": "Phase 9 plan 09-03: E2E Security Verification", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "Commit planning docs (ROADMAP, STATE, REQUIREMENTS, research)", "status": "not_started"},
-    {"id": 8, "name": "User approval of v1.2 roadmap", "status": "not_started"},
-    {"id": 9, "name": "/gsd:plan-phase 9 — Security Hardening detailed plan", "status": "not_started"},
-    {"id": 10, "name": "SEC-01 FFI memory safety 1000+ word report", "status": "not_started"}
+    {"id": 12, "name": "Execute 09-01: FFI safety in window_service.dart", "status": "not_started"},
+    {"id": 13, "name": "Execute 09-02: Input validation in path_validator.dart", "status": "not_started"},
+    {"id": 14, "name": "Execute 09-03: E2E verification checkpoint", "status": "not_started"}
+  ],
+  "plans": [
+    {"id": "09-01", "name": "FFI Pointer Lifecycle Safety", "wave": 1, "status": "ready", "files": ["lib/kernel/bridge/window_service.dart"]},
+    {"id": "09-02", "name": "Input Validation Hardening", "wave": 1, "status": "ready", "files": ["lib/kernel/services/path_validator.dart", "test/kernel/services/path_validator_test.dart"]},
+    {"id": "09-03", "name": "E2E Security Verification", "wave": 2, "status": "ready", "depends_on": ["09-01", "09-02"]}
   ],
   "blockers": [],
-  "human_actions_pending": [
-    {"action": "Approve v1.2 roadmap (4 phases: 9-12)", "context": "Roadmap presented but not yet confirmed by user", "blocking": true},
-    {"action": "Provide detailed FFI memory safety report (1000+ words)", "context": "User explicitly requested detailed report before Phase 9 planning", "blocking": false}
-  ],
   "decisions": [
-    {"decision": "v1.2 has 4 phases (9-12), not 3", "rationale": "PERF-04 added as Phase 11 after Flutter #97334 analysis", "phase": null},
-    {"decision": "ARCH-01/02/03 deferred to v1.3+", "rationale": "Need detailed reports for engine/persistence/singleton analysis", "phase": null},
-    {"decision": "SEC-01 + SEC-02 combined in Phase 9", "rationale": "Both security, overlapping files (window_service.dart, fvp_engine.dart)", "phase": "9"},
-    {"decision": "Phase 11 depends on Phase 9 (not Phase 10)", "rationale": "Security hardening may touch same files as performance optimization", "phase": "11"},
-    {"decision": "Phase 12 (Debug) is independent", "rationale": "No file overlap with other phases", "phase": "12"},
-    {"decision": "Zero new dependencies for v1.2", "rationale": "Use Dart SDK built-ins: dart:ffi Arena, Uri.tryParse, dart:developer Timeline", "phase": null},
-    {"decision": "Only HTTP/HTTPS get Uri.tryParse validation", "rationale": "RTSP/RTMP/SRT/UDP keep prefix detection to not block FFmpeg protocols", "phase": "9"},
-    {"decision": "Local playback only, keep streaming code", "rationale": "User: no streaming plans, preserve existing HLS/ABR code", "phase": null}
+    "D-01: Short-lived pointers use Arena (using())",
+    "D-02: Long-lived pointers (_savedFrame, _savedMaximizeFrame) use try/finally",
+    "D-03: Fullscreen transition 5s timeout protection",
+    "D-04: dispose() must free both _savedFrame AND _savedMaximizeFrame",
+    "D-05: HTTP/HTTPS URLs need Uri.tryParse validation",
+    "D-06: Control character filtering (0x01-0x1F)",
+    "D-07: RTSP/RTMP/SRT/UDP/TCP keep prefix passthrough"
+  ],
+  "key_findings": [
+    "dispose() leaks _savedFrame (only frees _savedMaximizeFrame)",
+    "_exitFullscreen L214 _savedStyle! can throw, preventing _savedFrame free",
+    "PathValidator.validate() skips ALL URL validation when isUrl() returns true",
+    "6 calloc calls in window_service.dart need safety wrapping"
   ],
   "uncommitted_files": [
-    ".planning/REQUIREMENTS.md",
-    ".planning/ROADMAP.md",
-    ".planning/STATE.md",
-    ".planning/codebase/ARCHITECTURE.md",
-    ".planning/codebase/CONCERNS.md",
-    ".planning/codebase/CONVENTIONS.md",
-    ".planning/codebase/INTEGRATIONS.md",
-    ".planning/codebase/STACK.md",
-    ".planning/codebase/STRUCTURE.md",
-    ".planning/codebase/TESTING.md",
-    ".planning/research/ARCHITECTURE.md",
-    ".planning/research/FEATURES.md",
-    ".planning/research/PITFALLS.md",
-    ".planning/research/STACK.md",
-    ".planning/research/SUMMARY.md"
+    ".planning/phases/09-security-hardening/09-CONTEXT.md",
+    ".planning/phases/09-security-hardening/09-RESEARCH.md",
+    ".planning/phases/09-security-hardening/09-01-PLAN.md",
+    ".planning/phases/09-security-hardening/09-02-PLAN.md",
+    ".planning/phases/09-security-hardening/09-03-PLAN.md"
   ],
-  "next_action": "Commit planning docs as WIP, then present roadmap for user approval. After approval, run /gsd:plan-phase 9 for Security Hardening detailed planning (with 1000+ word FFI memory safety report).",
-  "context_notes": "v1.2 roadmap planning is complete. 4 phases defined (9-12). All planning files updated and consistent. User wants Chinese responses, multi-agent/skills/context7 usage encouraged, and detailed 1000+ word reports for FFI work. Window bugs should be constantly checked."
+  "next_action": "/gsd:execute-phase 9",
+  "context_notes": "Phase 9 planning complete. 3 plans (2 waves). Zero new dependencies. Arena for short-lived FFI pointers, try/finally for long-lived. dispose() has _savedFrame leak. Fullscreen needs 5s timeout. HTTP/HTTPS need Uri.tryParse."
 }
