@@ -46,19 +46,10 @@ class FakeWindowService extends WindowService {
   }
 
   @override
-  Future<void> setSize(double width, double height) async {}
-
-  @override
-  Future<void> setMinSize(double width, double height) async {}
-
-  @override
   Future<void> minimize() async {}
 
   @override
   Future<void> close() async {}
-
-  @override
-  Future<void> center() async {}
 
   @override
   Future<void> startDragging() async {}

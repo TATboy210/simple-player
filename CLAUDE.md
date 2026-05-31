@@ -117,3 +117,79 @@ lib/
 - Errors: catch with `debugPrint` + graceful fallback (never silent `catch (_) {}`)
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Chinese comments are OK (existing codebase convention)
+
+## Dart/Flutter Rules (from GitHub best practices)
+
+> Synthesized from GitHubGenUI, flex_color_scheme, webf CLAUDE.md files.
+
+### Type Safety (strict mode enabled in analysis_options.yaml)
+
+- **Avoid `!` (bang operator)** — prefer `?.`, `??`, `if (x != null)`, or Dart 3 pattern matching. Reserve `!` only where a null value is a programming error and crashing is correct
+- **Avoid `late`** — prefer nullable types or constructor initialization
+- **Avoid `as` casts** — use pattern matching (`switch`, `if (x is Type)`) for type-safe downcasts
+- **Prefer `final` for all local variables** — `const` for compile-time constants
+- **Use `required` for constructor params** that must always be provided
+
+```dart
+// BAD
+final name = user!.name;
+final item = data as Map<String, dynamic>;
+
+// GOOD
+final name = user?.name ?? 'Unknown';
+final (:name, :age) = user;  // Dart 3 destructuring
+```
+
+### Function & File Size
+
+- **Functions < 50 lines** (20 for pure logic, 50 for UI builders)
+- **Files < 500 lines** — extract modules when approaching limit
+- **Switch expressions over if/else chains** (except in declarative widget contexts)
+
+### Error Handling
+
+- **Specify exception types** in `on` clauses — never bare `catch (e)`
+- **Never catch `Error` subtypes** — they indicate programming bugs
+- Use sealed classes for recoverable errors:
+
+```dart
+sealed class Result<T> {
+  const Result();
+}
+final class Ok<T> extends Result<T> {
+  const Ok(this.value);
+  final T value;
+}
+final class Err<T> extends Result<T> {
+  const Err(this.error);
+  final Object error;
+}
+```
+
+### FFI / C++ Bridge Patterns (from webf)
+
+- **Always free FFI memory in `finally` blocks** — `malloc.free()` for `toNativeUtf8()`
+- **Copy strings that cross thread boundaries** — `const char*` from Dart may be freed after call
+- **Use persistent handles for async Dart callbacks** — regular handles become invalid across threads
+- **Document memory ownership** — who allocates, who frees
+- **MethodChannel naming**: `com.simple_player/window` for Win32 bridge
+
+### Testing
+
+- **Widget tests double as integration tests** — test full app flows, not isolated components
+- **Never skip tests, never remove assertions** — failing tests are OK, silent failures are not
+- **Fakes over mocks** for complex dependencies (hand-written test doubles)
+- **Unique controller names** in tests: `'test-${name}-${DateTime.now().millisecondsSinceEpoch}'`
+
+### Design System Enforcement
+
+- **All visual values via `Tokens.*`** — no hardcoded colors, fonts, or spacing
+- **Don't fight the design system** — use Flutter's theming properly
+- **Glass-morphism pattern**: `BackdropFilter` + `bgGlass` + `borderHighlight` (see `GlassContainer`)
+
+### Async Best Practices
+
+- Always `await` Futures or explicitly call `unawaited()` for fire-and-forget
+- Never mark a function `async` if it never `await`s anything
+- Check `context.mounted` before using `BuildContext` after any `await`
+- Prefer `Future.wait` for concurrent operations

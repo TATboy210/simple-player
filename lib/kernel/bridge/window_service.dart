@@ -10,13 +10,7 @@ import '../persistence/settings_store.dart';
 
 import 'win32_bindings.dart';
 
-/// Window management service — wraps window_manager package.
-///
-/// Provides ValueNotifier state for reactive UI binding via
-/// ValueListenableBuilder. Delegates all window operations to
-/// the windowManager singleton.
-///
-/// Uses WindowListener mixin to receive events and update ValueNotifiers.
+/// 窗口管理服务 — 封装 window_manager，暴露 ValueNotifier 状态。
 class WindowService with WindowListener {
   WindowService();
 
@@ -40,9 +34,7 @@ class WindowService with WindowListener {
     windowManager.addListener(this);
   }
 
-  /// 静态版本 — 可在 main.dart 中 windowManager.show() 之前调用。
-  ///
-  /// 返回设置后的 style。
+  /// 在 show() 之前调用，移除 WS_CAPTION 保留 WS_THICKFRAME。返回新 style。
   static Future<int> removeBorderImmediate() async {
     final hwnd = await windowManager.getId();
     final style = win32.getWindowLongPtr(hwnd, gwlStyle);
@@ -115,31 +107,23 @@ class WindowService with WindowListener {
     });
   }
 
-  /// 500ms 去抖保存窗口几何到 SettingsStore
+  /// 500ms 去抖保存窗口几何
   void _scheduleGeometrySave() {
     _resizeDebounce?.cancel();
-    _resizeDebounce = Timer(const Duration(milliseconds: 500), () async {
+    _resizeDebounce = Timer(const Duration(milliseconds: 500), () {
       if (_disposed || isFullscreen.value || isMaximized.value) return;
-      try {
-        final pos = await windowManager.getPosition();
-        final size = windowSize.value;
-        await SettingsStore.saveWindowGeometry(
-          width: size.width,
-          height: size.height,
-          x: pos.dx,
-          y: pos.dy,
-          isMaximized: false,
-        );
-      } on Exception catch (e) {
-        debugPrint('WindowService: geometry save failed: $e');
-      }
+      _saveGeometry(isMaximized: false);
     });
   }
 
-  /// 立即保存窗口几何（关闭时调用，不跳过全屏/最大化）。
+  /// 立即保存窗口几何（关闭时调用）。
   Future<void> _saveGeometryImmediate() async {
     if (_disposed) return;
     _resizeDebounce?.cancel();
+    await _saveGeometry(isMaximized: isMaximized.value);
+  }
+
+  Future<void> _saveGeometry({required bool isMaximized}) async {
     try {
       final pos = await windowManager.getPosition();
       final size = windowSize.value;
@@ -148,20 +132,34 @@ class WindowService with WindowListener {
         height: size.height,
         x: pos.dx,
         y: pos.dy,
-        isMaximized: isMaximized.value,
+        isMaximized: isMaximized,
       );
     } on Exception catch (e) {
-      debugPrint('WindowService: immediate geometry save failed: $e');
+      debugPrint('WindowService: geometry save failed: $e');
     }
   }
 
   // ─── Commands (delegate to windowManager) ───
 
-  /// Toggle true borderless fullscreen.
-  ///
-  /// Uses WS_POPUP + DwmExtendFrameIntoClientArea(-1) for zero-border
-  /// fullscreen, bypassing window_manager's setFullScreen which keeps
-  /// WS_CAPTION and leaves a visible frame.
+  /// 读取当前窗口矩形，返回新分配的 `Pointer<Rect>`（调用方负责 free）。
+  Pointer<Rect> _readWindowRect(int hwnd) {
+    final rect = calloc<Rect>();
+    win32.getWindowRect(hwnd, rect);
+    return rect;
+  }
+
+  /// 用保存的矩形恢复窗口位置。
+  void _restoreWindowRect(int hwnd, Pointer<Rect> rect) => win32.setWindowPos(
+        hwnd,
+        0,
+        rect.ref.left,
+        rect.ref.top,
+        rect.ref.right - rect.ref.left,
+        rect.ref.bottom - rect.ref.top,
+        swpNoOwnerZOrder | swpFrameChanged,
+      );
+
+  /// 真正的无边框全屏（WS_POPUP，绕过 window_manager 的 setFullScreen）。
   Future<void> setFullscreen(bool value) async {
     if (_fullscreenTransitioning) return;
     _fullscreenTransitioning = true;
@@ -187,66 +185,49 @@ class WindowService with WindowListener {
   Future<void> _enterFullscreen() async {
     Timeline.startSync('window.enterFullscreen');
     try {
-    if (isFullscreen.value) return;
+      if (isFullscreen.value) return;
+      final hwnd = await windowManager.getId();
 
-    final hwnd = await windowManager.getId();
+      // 保存 style + frame 用于恢复
+      _savedStyle = win32.getWindowLongPtr(hwnd, gwlStyle);
+      if (_savedFrame != null) calloc.free(_savedFrame!);
+      _savedFrame = _readWindowRect(hwnd);
 
-    // Save current style and frame for restoration.
-    _savedStyle = win32.getWindowLongPtr(hwnd, gwlStyle);
-    final frame = calloc<Rect>();
-    try {
-      win32.getWindowRect(hwnd, frame);
-      // Free old saved frame before allocating new (H-2).
-      if (_savedFrame != null) {
-        calloc.free(_savedFrame!);
+      // WS_POPUP — 完全无边框
+      win32.setWindowLongPtr(hwnd, gwlStyle, wsPopup);
+
+      // 移除 DWM 阴影
+      final margins = calloc<Margins>()
+        ..ref.left = -1
+        ..ref.right = -1
+        ..ref.top = -1
+        ..ref.bottom = -1;
+      try {
+        win32.dwmExtendFrameIntoClientArea(hwnd, margins);
+      } finally {
+        calloc.free(margins);
       }
-      final saved = calloc<Rect>();
-      saved.ref.left = frame.ref.left;
-      saved.ref.top = frame.ref.top;
-      saved.ref.right = frame.ref.right;
-      saved.ref.bottom = frame.ref.bottom;
-      _savedFrame = saved;
-    } finally {
-      calloc.free(frame);
-    }
 
-    // Set WS_POPUP — fully borderless, no DWM frame.
-    win32.setWindowLongPtr(hwnd, gwlStyle, wsPopup);
+      // 定位到整个监视器
+      final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
+      final mi = calloc<MonitorInfo>();
+      mi.ref.cbSize = sizeOf<MonitorInfo>();
+      try {
+        win32.getMonitorInfo(hMonitor, mi);
+        win32.setWindowPos(
+          hwnd,
+          hwndTop,
+          mi.ref.rcMonitor.left,
+          mi.ref.rcMonitor.top,
+          mi.ref.rcMonitor.right - mi.ref.rcMonitor.left,
+          mi.ref.rcMonitor.bottom - mi.ref.rcMonitor.top,
+          swpNoOwnerZOrder | swpFrameChanged,
+        );
+      } finally {
+        calloc.free(mi);
+      }
 
-    // Remove DWM shadow/border.
-    final margins = calloc<Margins>()
-      ..ref.left = -1
-      ..ref.right = -1
-      ..ref.top = -1
-      ..ref.bottom = -1;
-    try {
-      win32.dwmExtendFrameIntoClientArea(hwnd, margins);
-    } finally {
-      calloc.free(margins);
-    }
-
-    // Get monitor bounds.
-    final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
-    final mi = calloc<MonitorInfo>();
-    mi.ref.cbSize = sizeOf<MonitorInfo>();
-    try {
-      win32.getMonitorInfo(hMonitor, mi);
-
-      // Position window to fill entire monitor.
-      win32.setWindowPos(
-        hwnd,
-        hwndTop,
-        mi.ref.rcMonitor.left,
-        mi.ref.rcMonitor.top,
-        mi.ref.rcMonitor.right - mi.ref.rcMonitor.left,
-        mi.ref.rcMonitor.bottom - mi.ref.rcMonitor.top,
-        swpNoOwnerZOrder | swpFrameChanged,
-      );
-    } finally {
-      calloc.free(mi);
-    }
-
-    if (!isFullscreen.value) isFullscreen.value = true;
+      if (!isFullscreen.value) isFullscreen.value = true;
     } finally {
       Timeline.finishSync();
     }
@@ -255,37 +236,20 @@ class WindowService with WindowListener {
   Future<void> _exitFullscreen() async {
     Timeline.startSync('window.exitFullscreen');
     try {
-    if (!isFullscreen.value) return;
+      if (!isFullscreen.value) return;
+      final hwnd = await windowManager.getId();
 
-    final hwnd = await windowManager.getId();
-
-    // Restore original style.
-    if (_savedStyle != null) {
-      win32.setWindowLongPtr(hwnd, gwlStyle, _savedStyle!);
-    }
-
-    // Restore original window frame.
-    try {
-      if (_savedFrame != null) {
-        win32.setWindowPos(
-          hwnd,
-          0,
-          _savedFrame!.ref.left,
-          _savedFrame!.ref.top,
-          _savedFrame!.ref.right - _savedFrame!.ref.left,
-          _savedFrame!.ref.bottom - _savedFrame!.ref.top,
-          swpNoOwnerZOrder | swpFrameChanged,
-        );
+      if (_savedStyle != null) {
+        win32.setWindowLongPtr(hwnd, gwlStyle, _savedStyle!);
       }
-    } finally {
       if (_savedFrame != null) {
+        _restoreWindowRect(hwnd, _savedFrame!);
         calloc.free(_savedFrame!);
         _savedFrame = null;
       }
       _savedStyle = null;
-    }
 
-    if (isFullscreen.value) isFullscreen.value = false;
+      if (isFullscreen.value) isFullscreen.value = false;
     } finally {
       Timeline.finishSync();
     }
@@ -296,12 +260,6 @@ class WindowService with WindowListener {
     if (!_disposed) isAlwaysOnTop.value = value;
   }
 
-  Future<void> setSize(double width, double height) =>
-      windowManager.setSize(Size(width, height));
-
-  Future<void> setMinSize(double width, double height) =>
-      windowManager.setMinimumSize(Size(width, height));
-
   Future<void> minimize() => windowManager.minimize();
 
   /// 自定义最大化 — 使用 rcWork（工作区）而非全监视器。
@@ -310,73 +268,55 @@ class WindowService with WindowListener {
   /// 因为插件的 adjustNCCALCSIZE 将客户区扩展到整个监视器。
   /// 此处直接用 GetMonitorInfoW 获取工作区矩形 + SetWindowPos 定位。
   Future<void> maximize() async {
-    if (isMaximized.value) return;
-    final hwnd = await windowManager.getId();
-
-    // 保存当前窗口位置（用于 restore）
-    final frame = calloc<Rect>();
+    Timeline.startSync('window.maximize');
     try {
-      win32.getWindowRect(hwnd, frame);
-      final saved = calloc<Rect>()
-        ..ref.left = frame.ref.left
-        ..ref.top = frame.ref.top
-        ..ref.right = frame.ref.right
-        ..ref.bottom = frame.ref.bottom;
-      _savedMaximizeFrame = saved;
-    } finally {
-      calloc.free(frame);
-    }
+      if (isMaximized.value) return;
+      final hwnd = await windowManager.getId();
 
-    // 获取工作区（排除任务栏）
-    final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
-    final mi = calloc<MonitorInfo>();
-    mi.ref.cbSize = sizeOf<MonitorInfo>();
-    try {
-      win32.getMonitorInfo(hMonitor, mi);
+      _savedMaximizeFrame = _readWindowRect(hwnd);
 
-      // 定位到工作区（不禁用 DWM 过渡，保留平滑动画）
-      win32.setWindowPos(
-        hwnd,
-        hwndTop,
-        mi.ref.rcWork.left,
-        mi.ref.rcWork.top,
-        mi.ref.rcWork.right - mi.ref.rcWork.left,
-        mi.ref.rcWork.bottom - mi.ref.rcWork.top,
-        swpNoOwnerZOrder | swpFrameChanged,
-      );
+      // 获取工作区（排除任务栏）
+      final hMonitor = win32.monitorFromWindow(hwnd, monitorDefaultToNearest);
+      final mi = calloc<MonitorInfo>();
+      mi.ref.cbSize = sizeOf<MonitorInfo>();
+      try {
+        win32.getMonitorInfo(hMonitor, mi);
+        win32.setWindowPos(
+          hwnd,
+          hwndTop,
+          mi.ref.rcWork.left,
+          mi.ref.rcWork.top,
+          mi.ref.rcWork.right - mi.ref.rcWork.left,
+          mi.ref.rcWork.bottom - mi.ref.rcWork.top,
+          swpNoOwnerZOrder | swpFrameChanged,
+        );
+      } finally {
+        calloc.free(mi);
+      }
+      if (!isMaximized.value) isMaximized.value = true;
     } finally {
-      calloc.free(mi);
+      Timeline.finishSync();
     }
-    if (!isMaximized.value) isMaximized.value = true;
   }
 
   /// 从自定义最大化恢复到之前的位置。
   Future<void> restore() async {
-    if (!isMaximized.value || _savedMaximizeFrame == null) return;
-    final hwnd = await windowManager.getId();
-
+    Timeline.startSync('window.restore');
     try {
-      // 恢复窗口位置（不禁用 DWM 过渡，保留平滑动画）
-      win32.setWindowPos(
-        hwnd,
-        0,
-        _savedMaximizeFrame!.ref.left,
-        _savedMaximizeFrame!.ref.top,
-        _savedMaximizeFrame!.ref.right - _savedMaximizeFrame!.ref.left,
-        _savedMaximizeFrame!.ref.bottom - _savedMaximizeFrame!.ref.top,
-        swpNoOwnerZOrder | swpFrameChanged,
-      );
-    } finally {
+      if (!isMaximized.value || _savedMaximizeFrame == null) return;
+      final hwnd = await windowManager.getId();
+
+      _restoreWindowRect(hwnd, _savedMaximizeFrame!);
       calloc.free(_savedMaximizeFrame!);
       _savedMaximizeFrame = null;
-    }
 
-    if (isMaximized.value) isMaximized.value = false;
+      if (isMaximized.value) isMaximized.value = false;
+    } finally {
+      Timeline.finishSync();
+    }
   }
 
   Future<void> close() => windowManager.close();
-
-  Future<void> center() => windowManager.center();
 
   Future<void> startDragging() => windowManager.startDragging();
 
