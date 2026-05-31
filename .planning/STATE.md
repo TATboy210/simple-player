@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2.1
 milestone_name: Window Polish & Architecture Simplification
-status: planned
-stopped_at: null
-last_updated: "2026-05-31T18:00:00.000Z"
-last_activity: 2026-05-31 — Phase 13 plan created (3-wave: Spike → C++ + Dart → 精简)
+status: in-progress
+stopped_at: "2026-05-31T20:17:49.000Z"
+last_updated: "2026-05-31T20:17:49.000Z"
+last_activity: 2026-05-31 — Phase 13 Wave 2 complete (pure Dart), Wave 3 pending
 progress:
-  total_phases: 3
-  completed_phases: 0
-  total_plans: 1
-  completed_plans: 0
-  percent: 0
+  total_phases: 11
+  completed_phases: 7
+  total_plans: 30
+  completed_plans: 24
+  percent: 64
 ---
 
 # Project State
@@ -25,10 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-31)
 
 ## Current Position
 
-Phase: Phase 13 — Window Foundation (planned)
+Phase: Phase 13 — Window Foundation (in-progress)
 Plan: .planning/phases/13-window-foundation/PLAN.md
-Status: Plan ready, awaiting execution
-Last activity: 2026-05-31 — Phase 13 plan created (3-wave: Spike → C++ + Dart → 精简)
+Approach: Pure Dart (user chose over C++ WndProc)
+Status: Wave 2 complete, Wave 3 pending
+Resume: .planning/phases/13-window-foundation/.continue-here.md
+Last activity: 2026-05-31 — Phase 13 Wave 2 complete (H-1/H-2/H-4 fixes, _removeBorder/_baseStyle removed)
 
 ## Accumulated Context
 
@@ -44,10 +46,8 @@ Last activity: 2026-05-31 — Phase 13 plan created (3-wave: Spike → C++ + Dar
 - [v1.2]: LRU cache uses LinkedHashMap for O(1) touch/evict (pure Dart)
 - [v1.2]: PositionPoller adaptive: 100ms seek / 250ms steady / 1s auto-revert
 - [v1.2]: D3D11 sync mode: async (0) for 120Hz+, sync (1) for 60Hz
-- [v1.2.1]: WM_NCCALCSIZE must be handled BEFORE HandleTopLevelWindowProc (C++ spike needed)
-- [v1.2.1]: WndProc is the earliest message entry point — intercept there, not in MessageHandler
-- [v1.2.1]: Fullscreen compatibility via WS_POPUP self-check (方案 B), no extra FFI needed
-- [v1.2.1]: removeBorderImmediate() will be fully removed — C++ handles frameless synchronously
+- [v1.2.1]: Pure Dart approach for window frameless (not C++ WndProc)
+- [v1.2.1]: removeBorderImmediate() kept as static, _removeBorder() instance method removed
 - [v1.2.1]: HLS ABR uses throughput-based EWMA, NOT BBA (desktop bandwidth stable)
 - [v1.2.1]: URL-type routing for ABR vs low-latency config
 - [v1.2.1]: PlatformService abstract interface with constructor injection (not service locator)
@@ -64,6 +64,6 @@ Last activity: 2026-05-31 — Phase 13 plan created (3-wave: Spike → C++ + Dar
 
 ## Session Continuity
 
-Last session: 2026-05-31T11:16:12.326Z
-Stopped at: context exhaustion at 76% (2026-05-31)
-Resume file: None
+Last session: 2026-05-31T20:17:49.000Z
+Stopped at: Context at 69%, natural pause after Wave 2
+Resume file: .planning/phases/13-window-foundation/.continue-here.md
