@@ -1,44 +1,52 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-31T18:00:00.000Z",
+  "timestamp": "2026-05-31T20:30:00+08:00",
   "phase": 13,
   "phase_name": "Window Foundation",
   "phase_dir": ".planning/phases/13-window-foundation",
   "plan": ".planning/phases/13-window-foundation/PLAN.md",
-  "task": null,
-  "total_tasks": null,
-  "status": "planned",
+  "task": 4,
+  "total_tasks": 4,
+  "status": "paused",
   "milestone": "v1.2.1",
   "milestone_name": "Window Polish & Architecture Simplification",
   "completed_tasks": [
     {"id": 1, "name": "Milestone questioning", "status": "done", "commit": "3722d89"},
-    {"id": 2, "name": "Research (4 agents: Stack, Features, Architecture, Pitfalls)", "status": "done", "commit": "e200cbe"},
-    {"id": 3, "name": "Research synthesis (SUMMARY.md)", "status": "done", "commit": "e200cbe"},
-    {"id": 4, "name": "Requirements definition (REQUIREMENTS.md)", "status": "done", "commit": "7cba215"},
-    {"id": 5, "name": "Roadmap creation (ROADMAP.md)", "status": "done", "commit": "7cba215"},
-    {"id": 6, "name": "MILESTONES.md update", "status": "done", "commit": "9412617"},
-    {"id": 7, "name": "Plan Phase 13: Window Foundation", "status": "done"}
+    {"id": 2, "name": "Research (4 agents)", "status": "done", "commit": "e200cbe"},
+    {"id": 3, "name": "Roadmap + Requirements", "status": "done", "commit": "7cba215"},
+    {"id": 4, "name": "Plan Phase 13", "status": "done", "commit": "6ba4306"},
+    {"id": 5, "name": "Wave 2: pure Dart frameless (removeBorderImmediate + cleanup)", "status": "done", "commit": "3e1616a"},
+    {"id": 6, "name": "Wave 3: WindowService 401→341 lines, Timeline, helpers", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 8, "name": "Execute Phase 13: Window Foundation (3-wave)", "status": "not_started"},
-    {"id": 9, "name": "Plan Phase 14: HLS ABR", "status": "not_started"},
-    {"id": 10, "name": "Execute Phase 14: HLS ABR", "status": "not_started"},
-    {"id": 11, "name": "Plan Phase 15: Architecture Simplification", "status": "not_started"},
-    {"id": 12, "name": "Execute Phase 15: Architecture Simplification", "status": "not_started"}
+    {"id": 7, "name": "Commit Wave 2+3 changes (11 files uncommitted)", "status": "not_started"},
+    {"id": 8, "name": "Plan Phase 14: HLS ABR", "status": "not_started"},
+    {"id": 9, "name": "Execute Phase 14: HLS ABR", "status": "not_started"},
+    {"id": 10, "name": "Plan + Execute Phase 15: Architecture Simplification", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [],
-  "decisions": [
-    {"decision": "WM_NCCALCSIZE must be handled BEFORE HandleTopLevelWindowProc", "rationale": "Flutter engine consumes the message first; 3 prior C++ attempts failed", "phase": "13"},
-    {"decision": "WndProc is the earliest message entry point — intercept there", "rationale": "WndProc runs before MessageHandler and HandleTopLevelWindowProc, engine cannot intercept", "phase": "13"},
-    {"decision": "Fullscreen compatibility via WS_POPUP self-check (方案 B)", "rationale": "No extra FFI bindings needed, pure C++ self-check", "phase": "13"},
-    {"decision": "removeBorderImmediate() fully removed — C++ handles frameless synchronously", "rationale": "Eliminates triple async race condition", "phase": "13"},
-    {"decision": "HLS ABR uses throughput-based EWMA, NOT BBA", "rationale": "Desktop bandwidth stable; BBA over-engineered for 80% of use cases", "phase": "14"},
-    {"decision": "URL-type routing for ABR vs low-latency", "rationale": "fflags +nobuffer conflicts with ABR buffer requirements", "phase": "14"},
-    {"decision": "PlatformService abstract interface with constructor injection", "rationale": "Simplest, most testable; not service locator", "phase": "15"},
-    {"decision": "Fullscreen smooth transition deferred to v1.3+", "rationale": "Blocked by Flutter engine HandleTopLevelWindowProc interception", "phase": "13"}
+  "human_actions_pending": [
+    {"action": "提交 Wave 2+3 更改", "context": "11个文件未提交: window_service.dart, fake_window_service.dart, CLAUDE.md, analysis_options.yaml, pubspec.*, l10n/*, windows/*", "blocking": false}
   ],
-  "uncommitted_files": [],
-  "next_action": "Execute Phase 13 Wave 1: WM_NCCALCSIZE Spike (C++ WndProc intercept)",
-  "context_notes": "Phase 13 plan complete. Key insight: WndProc is the earliest message entry point, before MessageHandler and HandleTopLevelWindowProc. 3-wave plan: Spike (1-2h) → C++ + Dart merge (2-3h) → Window simplification (3-4h). Code review found 1 CRITICAL + 4 HIGH issues, all addressed in plan."
+  "decisions": [
+    {"decision": "纯 Dart 无边框方案（非 C++ WndProc）", "rationale": "用户选择更简单的 Dart-only 方案，waitUntilReadyToShow → removeBorderImmediate → show 流程已防止闪烁", "phase": "13"},
+    {"decision": "提取 _readWindowRect/_restoreWindowRect helpers", "rationale": "全屏和最大化共享相同窗口矩形保存/恢复模式", "phase": "13"},
+    {"decision": "合并 _saveGeometry 去抖/立即保存", "rationale": "共享核心逻辑，只在 isMaximized 参数上不同", "phase": "13"},
+    {"decision": "HLS ABR uses throughput-based EWMA, NOT BBA", "rationale": "Desktop bandwidth stable; BBA over-engineered for 80% of use cases", "phase": "14"}
+  ],
+  "uncommitted_files": [
+    "CLAUDE.md",
+    "analysis_options.yaml",
+    "lib/kernel/bridge/window_service.dart",
+    "lib/l10n/app_localizations.dart",
+    "lib/l10n/app_localizations_en.dart",
+    "lib/l10n/app_localizations_zh.dart",
+    "pubspec.lock",
+    "pubspec.yaml",
+    "test/helpers/fake_window_service.dart",
+    "windows/flutter/generated_plugin_registrant.cc",
+    "windows/flutter/generated_plugins.cmake"
+  ],
+  "next_action": "提交 Wave 2+3 更改 (git add + commit)，然后决定 Phase 14 (HLS ABR) 或其他优先级",
+  "context_notes": "Phase 13 Wave 3 完成。WindowService 401→341 行 (-15%)。641 测试全通过，analyze 零问题。Phase 13 Window Foundation 整体完成。"
 }
