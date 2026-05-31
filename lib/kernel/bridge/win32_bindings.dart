@@ -34,6 +34,8 @@ const wsPopup = 0x80000000;
 const hwndTop = 0;
 const swpNoOwnerZOrder = 0x0200;
 const swpFrameChanged = 0x0020;
+const swpNomove = 0x0002;
+const swpNosize = 0x0001;
 const monitorDefaultToNearest = 2;
 const enumCurrentSettings = 0;
 

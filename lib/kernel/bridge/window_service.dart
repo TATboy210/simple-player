@@ -25,7 +25,6 @@ class WindowService with WindowListener {
   int? _savedStyle;
   Pointer<Rect>? _savedFrame;
   Pointer<Rect>? _savedMaximizeFrame; // 最大化前的窗口位置
-  int? _baseStyle; // _removeBorder() 完成后的基准 style
   Timer? _resizeDebounce;
   Timer? _fullscreenTimeout;
 
@@ -39,20 +38,11 @@ class WindowService with WindowListener {
   /// Initialize event listener — call after construction.
   void init() {
     windowManager.addListener(this);
-    _removeBorder();
-  }
-
-  /// 移除窗口标题栏，保留缩放边框和 DWM 阴影。
-  ///
-  /// 只移除 WS_CAPTION（标题栏文字+按钮），保留 WS_THICKFRAME（原生缩放支持）。
-  /// DwmExtendFrameIntoClientArea(0,0,1,0) 在顶部扩展 1px 让 DWM 保留窗口阴影。
-  Future<void> _removeBorder() async {
-    _baseStyle = await removeBorderImmediate();
   }
 
   /// 静态版本 — 可在 main.dart 中 windowManager.show() 之前调用。
   ///
-  /// 返回设置后的 style，供 _baseStyle 缓存。
+  /// 返回设置后的 style。
   static Future<int> removeBorderImmediate() async {
     final hwnd = await windowManager.getId();
     final style = win32.getWindowLongPtr(hwnd, gwlStyle);
@@ -79,7 +69,7 @@ class WindowService with WindowListener {
       0,
       0,
       0,
-      swpNoOwnerZOrder | swpFrameChanged | 0x0001 | 0x0002, // NOMOVE | NOSIZE
+      swpNoOwnerZOrder | swpFrameChanged | swpNomove | swpNosize,
     );
 
     return newStyle;
@@ -120,8 +110,9 @@ class WindowService with WindowListener {
 
   @override
   void onWindowClose() {
-    _saveGeometryImmediate();
-    windowManager.destroy();
+    _saveGeometryImmediate().whenComplete(() {
+      windowManager.destroy();
+    });
   }
 
   /// 500ms 去抖保存窗口几何到 SettingsStore
@@ -146,24 +137,22 @@ class WindowService with WindowListener {
   }
 
   /// 立即保存窗口几何（关闭时调用，不跳过全屏/最大化）。
-  void _saveGeometryImmediate() {
+  Future<void> _saveGeometryImmediate() async {
     if (_disposed) return;
     _resizeDebounce?.cancel();
-    () async {
-      try {
-        final pos = await windowManager.getPosition();
-        final size = windowSize.value;
-        await SettingsStore.saveWindowGeometry(
-          width: size.width,
-          height: size.height,
-          x: pos.dx,
-          y: pos.dy,
-          isMaximized: isMaximized.value,
-        );
-      } on Exception catch (e) {
-        debugPrint('WindowService: immediate geometry save failed: $e');
-      }
-    }();
+    try {
+      final pos = await windowManager.getPosition();
+      final size = windowSize.value;
+      await SettingsStore.saveWindowGeometry(
+        width: size.width,
+        height: size.height,
+        x: pos.dx,
+        y: pos.dy,
+        isMaximized: isMaximized.value,
+      );
+    } on Exception catch (e) {
+      debugPrint('WindowService: immediate geometry save failed: $e');
+    }
   }
 
   // ─── Commands (delegate to windowManager) ───
@@ -203,10 +192,14 @@ class WindowService with WindowListener {
     final hwnd = await windowManager.getId();
 
     // Save current style and frame for restoration.
-    _savedStyle = _baseStyle ?? win32.getWindowLongPtr(hwnd, gwlStyle);
+    _savedStyle = win32.getWindowLongPtr(hwnd, gwlStyle);
     final frame = calloc<Rect>();
     try {
       win32.getWindowRect(hwnd, frame);
+      // Free old saved frame before allocating new (H-2).
+      if (_savedFrame != null) {
+        calloc.free(_savedFrame!);
+      }
       final saved = calloc<Rect>();
       saved.ref.left = frame.ref.left;
       saved.ref.top = frame.ref.top;
