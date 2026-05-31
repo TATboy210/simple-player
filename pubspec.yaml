@@ -23,6 +23,10 @@ dependencies:
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
   window_manager: ^0.5.1
+  file_selector: any
+  xdg_directories: any
+  animations: any
+  cross_file: any
 
 dev_dependencies:
   flutter_test:
@@ -32,6 +36,7 @@ dev_dependencies:
     sdk: flutter
   freezed: ^3.2.5
   build_runner: ^2.15.0
+  pigeon: any
 
 flutter:
   generate: true
