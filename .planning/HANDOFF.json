@@ -1,13 +1,13 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-30T16:37:20.443Z",
-  "phase": null,
-  "phase_name": null,
-  "phase_dir": null,
-  "plan": null,
+  "timestamp": "2026-05-31T18:00:00.000Z",
+  "phase": 13,
+  "phase_name": "Window Foundation",
+  "phase_dir": ".planning/phases/13-window-foundation",
+  "plan": ".planning/phases/13-window-foundation/PLAN.md",
   "task": null,
   "total_tasks": null,
-  "status": "paused",
+  "status": "planned",
   "milestone": "v1.2.1",
   "milestone_name": "Window Polish & Architecture Simplification",
   "completed_tasks": [
@@ -16,11 +16,11 @@
     {"id": 3, "name": "Research synthesis (SUMMARY.md)", "status": "done", "commit": "e200cbe"},
     {"id": 4, "name": "Requirements definition (REQUIREMENTS.md)", "status": "done", "commit": "7cba215"},
     {"id": 5, "name": "Roadmap creation (ROADMAP.md)", "status": "done", "commit": "7cba215"},
-    {"id": 6, "name": "MILESTONES.md update", "status": "done", "commit": "9412617"}
+    {"id": 6, "name": "MILESTONES.md update", "status": "done", "commit": "9412617"},
+    {"id": 7, "name": "Plan Phase 13: Window Foundation", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "Plan Phase 13: Window Foundation", "status": "not_started"},
-    {"id": 8, "name": "Execute Phase 13: Window Foundation", "status": "not_started"},
+    {"id": 8, "name": "Execute Phase 13: Window Foundation (3-wave)", "status": "not_started"},
     {"id": 9, "name": "Plan Phase 14: HLS ABR", "status": "not_started"},
     {"id": 10, "name": "Execute Phase 14: HLS ABR", "status": "not_started"},
     {"id": 11, "name": "Plan Phase 15: Architecture Simplification", "status": "not_started"},
@@ -30,12 +30,15 @@
   "human_actions_pending": [],
   "decisions": [
     {"decision": "WM_NCCALCSIZE must be handled BEFORE HandleTopLevelWindowProc", "rationale": "Flutter engine consumes the message first; 3 prior C++ attempts failed", "phase": "13"},
+    {"decision": "WndProc is the earliest message entry point — intercept there", "rationale": "WndProc runs before MessageHandler and HandleTopLevelWindowProc, engine cannot intercept", "phase": "13"},
+    {"decision": "Fullscreen compatibility via WS_POPUP self-check (方案 B)", "rationale": "No extra FFI bindings needed, pure C++ self-check", "phase": "13"},
+    {"decision": "removeBorderImmediate() fully removed — C++ handles frameless synchronously", "rationale": "Eliminates triple async race condition", "phase": "13"},
     {"decision": "HLS ABR uses throughput-based EWMA, NOT BBA", "rationale": "Desktop bandwidth stable; BBA over-engineered for 80% of use cases", "phase": "14"},
     {"decision": "URL-type routing for ABR vs low-latency", "rationale": "fflags +nobuffer conflicts with ABR buffer requirements", "phase": "14"},
     {"decision": "PlatformService abstract interface with constructor injection", "rationale": "Simplest, most testable; not service locator", "phase": "15"},
     {"decision": "Fullscreen smooth transition deferred to v1.3+", "rationale": "Blocked by Flutter engine HandleTopLevelWindowProc interception", "phase": "13"}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd:plan-phase 13 to plan Window Foundation (C++ WM_NCCALCSIZE spike + Window layer simplification)",
-  "context_notes": "v1.2.1 milestone creation complete. Research phase done with 4 parallel agents. Key finding: WM_NCCALCSIZE must be intercepted BEFORE Flutter HandleTopLevelWindowProc. Phase 13 is highest risk (needs 0.5-day spike). Phase 14 is independent. Phase 15 depends on Phase 13."
+  "next_action": "Execute Phase 13 Wave 1: WM_NCCALCSIZE Spike (C++ WndProc intercept)",
+  "context_notes": "Phase 13 plan complete. Key insight: WndProc is the earliest message entry point, before MessageHandler and HandleTopLevelWindowProc. 3-wave plan: Spike (1-2h) → C++ + Dart merge (2-3h) → Window simplification (3-4h). Code review found 1 CRITICAL + 4 HIGH issues, all addressed in plan."
 }
