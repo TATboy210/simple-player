@@ -15,8 +15,8 @@ class FakeWindowService extends WindowService {
   int restoreCallCount = 0;
 
   @override
-  void init() {
-    // No-op: skip windowManager.addListener and _removeBorder.
+  Future<void> init() async {
+    // No-op: skip windowManager.ensureInitialized and listener registration.
   }
 
   @override
