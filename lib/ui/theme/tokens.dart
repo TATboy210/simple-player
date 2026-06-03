@@ -64,6 +64,8 @@ class Tokens {
   static const durationFade = 300;
   static const durationSlide = 300;
   static const durationDebounce = 500;
+  static const durationFullscreenAnim = 300;
+  static const durationWindowResize = 100;
 
   // ── 自动隐藏 ──
   static const hideDelayFullscreen = 3;

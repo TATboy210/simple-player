@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../ui/theme/tokens.dart';
 import '../persistence/settings_store.dart';
 import '../utils/log.dart';
 import 'window_geometry_store.dart';
@@ -91,13 +92,13 @@ class WindowService with WindowListener {
   @override
   void onWindowMaximize() {
     logBridge.d('[WindowService.onWindowMaximize]');
-    _safeSet(isMaximized, true);
+    if (!isMaximized.value) _safeSet(isMaximized, true);
   }
 
   @override
   void onWindowUnmaximize() {
     logBridge.d('[WindowService.onWindowUnmaximize]');
-    _safeSet(isMaximized, false);
+    if (isMaximized.value) _safeSet(isMaximized, false);
   }
 
   @override
@@ -120,7 +121,7 @@ class WindowService with WindowListener {
   void onWindowResize() {
     if (_disposed || _isAnimating) return;
     _resizeDebounce?.cancel();
-    _resizeDebounce = Timer(const Duration(milliseconds: 100), () {
+    _resizeDebounce = Timer(const Duration(milliseconds: Tokens.durationWindowResize), () {
       if (_disposed) return;
       windowManager.getSize().then((size) {
         if (!_disposed) {
@@ -138,6 +139,7 @@ class WindowService with WindowListener {
     logBridge.d(
       '[WindowService.onWindowClose] saving geometry then destroying',
     );
+    _resizeDebounce?.cancel();
     _disposed = true;
     _geometry.saveGeometry().whenComplete(() => windowManager.destroy());
   }
@@ -168,7 +170,7 @@ class WindowService with WindowListener {
       if (value) await SettingsStore.saveIsFullscreen(true);
       if (!_disposed) isFullscreen.value = value;
       _fsAnimTimer = Timer(
-        const Duration(milliseconds: 300),
+        const Duration(milliseconds: Tokens.durationFullscreenAnim),
         () {
           _isAnimating = false;
           if (!value && !_disposed) SettingsStore.saveIsFullscreen(false);
