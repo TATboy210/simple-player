@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-30
+**Analysis Date:** 2026-06-01
 
 ## Framework
 
@@ -35,7 +35,7 @@ test/
 │   ├── glass_widgets_golden_test.dart        # GlassContainer/Button goldens
 │   └── golden_comparator.dart                # TolerantGoldenComparator helper
 ├── helpers/
-│   ├── fake_engine.dart                      # FakeEngine (376 lines, implements MediaEngine)
+│   ├── fake_engine.dart                      # FakeEngine (377 lines, implements MediaEngine)
 │   ├── fake_window_service.dart              # FakeWindowService (73 lines)
 │   └── integration_helpers.dart              # buildTestApp(), createTestController()
 ├── integration/
@@ -43,6 +43,9 @@ test/
 │   ├── playback_flow_test.dart               # Playback state transitions
 │   └── playlist_flow_test.dart               # Playlist operations flow
 ├── kernel/
+│   ├── bridge/
+│   │   ├── display_config_test.dart          # DisplayConfig
+│   │   └── window_bootstrap_test.dart        # WindowBootstrap
 │   ├── engine/
 │   │   ├── engine_prewarm_test.dart          # EnginePrewarm
 │   │   ├── fvp_callback_handler_test.dart    # FvpCallbackHandler
@@ -101,7 +104,7 @@ test/
         └── glass_container_test.dart         # GlassContainer widget
 ```
 
-**Total: 51 test files**
+**Total: 50 test files**
 
 ## Test Types
 
@@ -113,7 +116,7 @@ test/
 ### Widget Tests (`test/widget/`)
 - Flutter widget rendering and interaction
 - Uses `testWidgets()` + `tester.pumpWidget()`
-- Requires `MaterialApp` wrapper for localization
+- Requires `MaterialApp` wrapper with localization delegates
 
 ### Golden Tests (`test/golden/`)
 - Visual regression testing
@@ -132,7 +135,7 @@ test/
 
 ## FakeEngine Pattern
 
-**File:** `test/helpers/fake_engine.dart` (376 lines)
+**File:** `test/helpers/fake_engine.dart` (377 lines)
 **Purpose:** Implements `MediaEngine` without FFI dependency — runs purely in Dart
 
 ### Key Features
@@ -245,14 +248,19 @@ group('PlaybackController', () {
   late FakeEngine engine;
   late Playlist playlist;
   late PlaybackController controller;
+  int rebuildCount = 0;
+  List<Object> errors = [];
 
   setUp(() {
     engine = FakeEngine();
     playlist = Playlist();
+    rebuildCount = 0;
+    errors = [];
     controller = PlaybackController(
       engine: engine,
       playlist: playlist,
-      onNeedRebuild: () {},
+      onNeedRebuild: () => rebuildCount++,
+      onError: (e) => errors.add(e),
     );
   });
 
@@ -380,18 +388,16 @@ void enableTolerantGoldens({double tolerance = 0.05}) {
 ```dart
 setUp(() => enableTolerantGoldens());
 
-testWidgets('ControlBar idle state', (tester) async {
-  await tester.pumpWidget(buildControlSubject(child: ControlBar(...)));
+testWidgets('GlassContainer thin tier', (tester) async {
+  await tester.pumpWidget(
+    wrapForGolden(GlassContainer(tier: GlassTier.thin, child: const Text('Thin'))),
+  );
   await expectLater(
-    find.byType(ControlBar),
-    matchesGoldenFile('goldens/control_bar_idle.png'),
+    find.byType(GlassContainer),
+    matchesGoldenFile('goldens/glass_container_thin.png'),
   );
 });
 ```
-
-**Golden test locations:**
-- `test/golden/control_layouts_golden_test.dart` — ControlBar, ProgressBar, VolumeControls
-- `test/golden/glass_widgets_golden_test.dart` — GlassContainer, GlassButton
 
 **Update goldens:**
 ```bash
@@ -568,7 +574,7 @@ testWidgets('hides secondary controls at width < 500', (tester) async {
 
 | Metric | Value |
 |--------|-------|
-| Test files | 51 |
+| Test files | 50 |
 | Test types | Unit, Widget, Golden, Integration, Performance |
 | Target | 80% |
 | Enforcement | None (no CI threshold) |
@@ -614,6 +620,7 @@ flutter test --coverage
 | kernel/persistence | PlaylistStore, SettingsStore | `test/kernel/persistence/*` |
 | kernel/services | PathValidator, ThumbnailService | `test/kernel/services/*` |
 | kernel/engine | FvpCallbackHandler, TrackManager, EnginePrewarm | `test/kernel/engine/*` |
+| kernel/bridge | DisplayConfig, WindowBootstrap | `test/kernel/bridge/*` |
 | features/services | PlaybackController (343 lines), PlaybackNavigator, FileOperations | `test/kernel/services/*` |
 | features/services | StateMonitor, VideoProcessingService, SubtitleService | `test/kernel/services/*`, `test/features/*` |
 | ui/player | AutoHideController, VolumeControls, OsdOverlay, SpeedButton | `test/widget/player/*` |
@@ -624,4 +631,4 @@ flutter test --coverage
 
 ---
 
-*Testing analysis: 2026-05-30*
+*Testing analysis: 2026-06-01*

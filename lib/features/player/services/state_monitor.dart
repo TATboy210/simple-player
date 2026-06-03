@@ -70,13 +70,13 @@ class StateMonitor {
     if (_rt.playlist.mode == PlayMode.loopSingle) {
       final idx = _rt.playlist.currentIndex;
       if (idx >= 0) {
-        _rt.navigator.playIndex(idx).catchError((e) {
+        _rt.navigator.playIndex(idx).catchError((Object e) {
           log.e('StateMonitor loopSingle replay failed: $e');
           _rt.onError?.call(e);
         });
       }
     } else {
-      _rt.navigator.playNext().catchError((e) {
+      _rt.navigator.playNext().catchError((Object e) {
         log.e('StateMonitor auto-advance failed: $e');
         _rt.onError?.call(e);
       });
@@ -98,20 +98,20 @@ class StateMonitor {
     unawaited(
       SettingsStore.saveVolume(
         _rt.engine.volume.value,
-      ).catchError((e) => log.e('SettingsStore.saveVolume failed: $e')),
+      ).catchError((Object e) => log.e('SettingsStore.saveVolume failed: $e')),
     );
     unawaited(
       SettingsStore.saveIsMuted(
         _rt.engine.isMuted.value,
-      ).catchError((e) => log.e('SettingsStore.saveIsMuted failed: $e')),
+      ).catchError((Object e) => log.e('SettingsStore.saveIsMuted failed: $e')),
     );
     unawaited(
       SettingsStore.savePlayMode(
         _rt.playlist.mode.index,
-      ).catchError((e) => log.e('SettingsStore.savePlayMode failed: $e')),
+      ).catchError((Object e) => log.e('SettingsStore.savePlayMode failed: $e')),
     );
     unawaited(
-      PlaylistStore.dispose().catchError((e) {
+      PlaylistStore.dispose().catchError((Object e) {
         log.e('PlaylistStore.dispose failed: $e');
       }),
     );

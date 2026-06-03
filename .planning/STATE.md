@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2.1
 milestone_name: Window Polish & Architecture Simplification
-status: in-progress
-stopped_at: "2026-05-31T20:17:49.000Z"
-last_updated: "2026-05-31T20:17:49.000Z"
-last_activity: 2026-05-31 — Phase 13 Wave 2 complete (pure Dart), Wave 3 pending
+status: completed
+stopped_at: context exhaustion at 75% (2026-06-01)
+last_updated: "2026-06-01T08:21:34.072Z"
+last_activity: 2026-05-31 — Phase 13 Wave 2 complete (H-1/H-2/H-4 fixes, _removeBorder/_baseStyle removed)
 progress:
   total_phases: 11
   completed_phases: 7
@@ -64,6 +64,6 @@ Last activity: 2026-05-31 — Phase 13 Wave 2 complete (H-1/H-2/H-4 fixes, _remo
 
 ## Session Continuity
 
-Last session: 2026-05-31T20:17:49.000Z
-Stopped at: Context at 69%, natural pause after Wave 2
+Last session: 2026-06-01T08:21:34.044Z
+Stopped at: context exhaustion at 75% (2026-06-01)
 Resume file: .planning/phases/13-window-foundation/.continue-here.md

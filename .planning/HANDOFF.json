@@ -1,52 +1,48 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-31T20:30:00+08:00",
-  "phase": 13,
-  "phase_name": "Window Foundation",
-  "phase_dir": ".planning/phases/13-window-foundation",
-  "plan": ".planning/phases/13-window-foundation/PLAN.md",
-  "task": 4,
-  "total_tasks": 4,
+  "timestamp": "2026-06-03T13:39:57.000Z",
+  "phase": "09",
+  "phase_name": "Port Align",
+  "phase_dir": "../flutter_windows/.planning/phases/09-port-align",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
   "status": "paused",
-  "milestone": "v1.2.1",
-  "milestone_name": "Window Polish & Architecture Simplification",
   "completed_tasks": [
-    {"id": 1, "name": "Milestone questioning", "status": "done", "commit": "3722d89"},
-    {"id": 2, "name": "Research (4 agents)", "status": "done", "commit": "e200cbe"},
-    {"id": 3, "name": "Roadmap + Requirements", "status": "done", "commit": "7cba215"},
-    {"id": 4, "name": "Plan Phase 13", "status": "done", "commit": "6ba4306"},
-    {"id": 5, "name": "Wave 2: pure Dart frameless (removeBorderImmediate + cleanup)", "status": "done", "commit": "3e1616a"},
-    {"id": 6, "name": "Wave 3: WindowService 401→341 lines, Timeline, helpers", "status": "done"}
+    {"id": 1, "name": "Fullscreen bug fix: restore windowManager.setFullScreen()", "status": "done"},
+    {"id": 2, "name": "Cleanup: remove _preFullscreenSize, _preFullscreenPosition, _getScreenSize, dart:ui import", "status": "done"},
+    {"id": 3, "name": "Confirm Win32/FFI fully removed from both projects", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "Commit Wave 2+3 changes (11 files uncommitted)", "status": "not_started"},
-    {"id": 8, "name": "Plan Phase 14: HLS ABR", "status": "not_started"},
-    {"id": 9, "name": "Execute Phase 14: HLS ABR", "status": "not_started"},
-    {"id": 10, "name": "Plan + Execute Phase 15: Architecture Simplification", "status": "not_started"}
+    {"id": 4, "name": "09-01: 移植幂等守卫 + onWindowClose 清理 + Tokens 常量", "status": "not_started"},
+    {"id": 5, "name": "09-02: 修复 FakeWindowService.init() 返回类型", "status": "not_started"},
+    {"id": 6, "name": "手动测试全屏功能", "status": "not_started"},
+    {"id": 7, "name": "提交 15 个未提交文件", "status": "not_started"}
   ],
   "blockers": [],
   "human_actions_pending": [
-    {"action": "提交 Wave 2+3 更改", "context": "11个文件未提交: window_service.dart, fake_window_service.dart, CLAUDE.md, analysis_options.yaml, pubspec.*, l10n/*, windows/*", "blocking": false}
+    {"action": "手动测试 player 全屏功能", "context": "F11 全屏/退出，验证 windowManager.setFullScreen() 正常工作", "blocking": true}
   ],
   "decisions": [
-    {"decision": "纯 Dart 无边框方案（非 C++ WndProc）", "rationale": "用户选择更简单的 Dart-only 方案，waitUntilReadyToShow → removeBorderImmediate → show 流程已防止闪烁", "phase": "13"},
-    {"decision": "提取 _readWindowRect/_restoreWindowRect helpers", "rationale": "全屏和最大化共享相同窗口矩形保存/恢复模式", "phase": "13"},
-    {"decision": "合并 _saveGeometry 去抖/立即保存", "rationale": "共享核心逻辑，只在 isMaximized 参数上不同", "phase": "13"},
-    {"decision": "HLS ABR uses throughput-based EWMA, NOT BBA", "rationale": "Desktop bandwidth stable; BBA over-engineered for 80% of use cases", "phase": "14"}
+    {"decision": "恢复 windowManager.setFullScreen() 替代手动 frameless+alwaysOnTop", "rationale": "手动方案在 Windows 上无法真正全屏，setFullScreen 才是正确调用", "phase": "09"}
   ],
   "uncommitted_files": [
-    "CLAUDE.md",
-    "analysis_options.yaml",
+    ".planning/STATE.md",
+    ".planning/codebase/CONVENTIONS.md",
+    ".planning/codebase/TESTING.md",
+    "lib/app.dart",
+    "lib/features/player/services/state_monitor.dart",
+    "lib/kernel/bridge/display_config.dart",
+    "lib/kernel/bridge/win32_bindings.dart",
+    "lib/kernel/bridge/window_bootstrap.dart",
     "lib/kernel/bridge/window_service.dart",
-    "lib/l10n/app_localizations.dart",
-    "lib/l10n/app_localizations_en.dart",
-    "lib/l10n/app_localizations_zh.dart",
+    "lib/main.dart",
+    "lib/ui/playlist/thumbnail_tile.dart",
     "pubspec.lock",
     "pubspec.yaml",
     "test/helpers/fake_window_service.dart",
-    "windows/flutter/generated_plugin_registrant.cc",
-    "windows/flutter/generated_plugins.cmake"
+    "test/kernel/bridge/window_bootstrap_test.dart"
   ],
-  "next_action": "提交 Wave 2+3 更改 (git add + commit)，然后决定 Phase 14 (HLS ABR) 或其他优先级",
-  "context_notes": "Phase 13 Wave 3 完成。WindowService 401→341 行 (-15%)。641 测试全通过，analyze 零问题。Phase 13 Window Foundation 整体完成。"
+  "next_action": "执行 09-01: 在 window_service.dart 中添加 onWindowMaximize/Unmaximize 幂等守卫 + onWindowClose 取消 _resizeDebounce，在 tokens.dart 中添加 durationFullscreenAnim/durationWindowResize 常量",
+  "context_notes": "全屏 bug 已修复（恢复 setFullScreen 调用）。Phase 09 计划已在 demo 项目中创建。15 个文件未提交（Win32 清理 + 全屏修复 + 其他精简）。"
 }
