@@ -10,7 +10,7 @@ import '../shared/context_menu_row.dart';
 /// 缩略图组件 — 16:9 圆角卡片，支持加载占位、播放高亮、断点进度
 ///
 /// 用于沉浸式浮窗的文件夹 tab 和历史 tab。
-/// 缩略图来自 [ThumbnailService]（Win32 COM 系统缩略图）。
+/// 缩略图来自 [ThumbnailService]（当前 Windows 平台为 no-op）。
 ///
 /// StatelessWidget — 静态布局（label、breakpoint、border）不随加载状态重建。
 /// 图片加载隔离到内部 [_ThumbnailImage]。

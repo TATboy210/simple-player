@@ -23,6 +23,14 @@ class WindowService with WindowListener {
   bool _disposed = false;
   Timer? _resizeDebounce;
 
+  // ─── Fullscreen animation ───
+  bool _isAnimating = false;
+  Timer? _fsAnimTimer;
+
+  void _safeSet<T>(ValueNotifier<T> notifier, T value) {
+    if (!_disposed) notifier.value = value;
+  }
+
   // ─── Init ───
 
   /// 初始化窗口 — 在 main() 中 runApp() 之前调用。
@@ -83,13 +91,13 @@ class WindowService with WindowListener {
   @override
   void onWindowMaximize() {
     logBridge.d('[WindowService.onWindowMaximize]');
-    if (!_disposed) isMaximized.value = true;
+    _safeSet(isMaximized, true);
   }
 
   @override
   void onWindowUnmaximize() {
     logBridge.d('[WindowService.onWindowUnmaximize]');
-    if (!_disposed) isMaximized.value = false;
+    _safeSet(isMaximized, false);
   }
 
   @override
@@ -97,7 +105,7 @@ class WindowService with WindowListener {
     logBridge.d(
       '[WindowService.onWindowEnterFullScreen] current=${isFullscreen.value}',
     );
-    if (!_disposed && !isFullscreen.value) isFullscreen.value = true;
+    if (!isFullscreen.value) _safeSet(isFullscreen, true);
   }
 
   @override
@@ -105,12 +113,12 @@ class WindowService with WindowListener {
     logBridge.d(
       '[WindowService.onWindowLeaveFullScreen] current=${isFullscreen.value}',
     );
-    if (!_disposed && isFullscreen.value) isFullscreen.value = false;
+    if (isFullscreen.value) _safeSet(isFullscreen, false);
   }
 
   @override
   void onWindowResize() {
-    if (_disposed) return;
+    if (_disposed || _isAnimating) return;
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(const Duration(milliseconds: 100), () {
       if (_disposed) return;
@@ -151,14 +159,23 @@ class WindowService with WindowListener {
     logBridge.d(
       '[WindowService.setFullscreen] value=$value current=${isFullscreen.value}',
     );
-    if (value == isFullscreen.value) return;
+    if (value == isFullscreen.value || _isAnimating) return;
 
     try {
+      _isAnimating = true;
+      _fsAnimTimer?.cancel();
       await windowManager.setFullScreen(value);
-      await windowManager.setResizable(!value);
-      isFullscreen.value = value;
-      await SettingsStore.saveIsFullscreen(value);
+      if (value) await SettingsStore.saveIsFullscreen(true);
+      if (!_disposed) isFullscreen.value = value;
+      _fsAnimTimer = Timer(
+        const Duration(milliseconds: 300),
+        () {
+          _isAnimating = false;
+          if (!value && !_disposed) SettingsStore.saveIsFullscreen(false);
+        },
+      );
     } on Exception catch (e) {
+      _isAnimating = false;
       logBridge.w('[WindowService.setFullscreen] FAILED: $e');
     }
   }
@@ -212,6 +229,7 @@ class WindowService with WindowListener {
     logBridge.d('[WindowService.dispose]');
     _disposed = true;
     _resizeDebounce?.cancel();
+    _fsAnimTimer?.cancel();
     isFullscreen.dispose();
     isAlwaysOnTop.dispose();
     isMaximized.dispose();

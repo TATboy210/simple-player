@@ -1,8 +1,8 @@
 import 'package:simple_player_flutter/kernel/bridge/window_service.dart';
 
-/// Test double for WindowService — no FFI, no window_manager.
+/// Test double for WindowService — no window_manager.
 ///
-/// Overrides all methods that touch Win32 APIs or windowManager.
+/// Overrides all methods that touch windowManager.
 /// Provides call tracking for test assertions.
 class FakeWindowService extends WindowService {
   // ─── Call tracking ───

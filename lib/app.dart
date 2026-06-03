@@ -21,8 +21,9 @@ import 'l10n/app_localizations.dart';
 ///   - 右键快捷菜单（语言/主题切换）
 class App extends StatefulWidget {
   final StartupCoordinator coordinator;
+  final WindowService windowService;
 
-  const App({super.key, required this.coordinator});
+  const App({super.key, required this.coordinator, required this.windowService});
 
   @override
   State<App> createState() => _AppState();
@@ -30,7 +31,6 @@ class App extends StatefulWidget {
 
 class _AppState extends State<App> {
   bool _ready = false;
-  final WindowService _windowService = WindowService()..init();
 
   @override
   void initState() {
@@ -55,7 +55,7 @@ class _AppState extends State<App> {
 
   @override
   void dispose() {
-    _windowService.dispose();
+    widget.windowService.dispose();
     super.dispose();
   }
 
@@ -158,10 +158,10 @@ class _AppState extends State<App> {
           debugShowCheckedModeBanner: false,
           theme: ThemeService.I.currentTheme,
           home: ValueListenableBuilder<bool>(
-            valueListenable: _windowService.isFullscreen,
+            valueListenable: widget.windowService.isFullscreen,
             builder: (context, isFullscreen, child) =>
                 ValueListenableBuilder<bool>(
-              valueListenable: _windowService.isMaximized,
+              valueListenable: widget.windowService.isMaximized,
               builder: (context, isMaximized, child) {
                 final noResize = isFullscreen || isMaximized;
                 return DragToResizeArea(
@@ -175,7 +175,7 @@ class _AppState extends State<App> {
             ),
             child: DeferredPlayerFeature(
               coordinator: widget.coordinator,
-              windowService: _windowService,
+              windowService: widget.windowService,
               onSettings: (ctx, engine, videoProcessing) =>
                   _showSettingsPanel(ctx, engine, videoProcessing),
               onSettingsSecondary: _showSettingsQuickMenu,

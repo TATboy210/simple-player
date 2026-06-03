@@ -1,6 +1,6 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-30
+**Analysis Date:** 2026-06-01
 
 ## Naming Patterns
 
@@ -56,20 +56,29 @@
 - Line length: 80 characters (dart format default)
 - Trailing commas on multi-line argument/parameter lists to improve diffs
 
-**Linting:**
-- Config: `analysis_options.yaml` extends `package:flutter_lints/flutter.yaml`
-- Additional rules:
+**Linting (analysis_options.yaml):**
+- Base: `package:flutter_lints/flutter.yaml`
+- Strict mode: `strict-casts: true`, `strict-inference: true`, `strict-raw-types: true`
+- Errors: `missing_required_param: error`, `missing_return: error`, `dead_code: warning`
+- Key rules:
   ```yaml
-  linter:
-    rules:
-      prefer_const_constructors: true
-      prefer_const_literals_to_create_immutables: true
+  prefer_const_constructors: true
+  prefer_const_literals_to_create_immutables: true
+  prefer_final_locals: true
+  prefer_final_in_for_each: true
+  avoid_print: true
+  prefer_single_quotes: true
+  always_declare_return_types: true
+  avoid_void_async: true
+  cancel_subscriptions: true
+  close_sinks: true
+  unawaited_futures: true
   ```
 
 **Const usage:**
 - Use `const` constructors wherever possible
 - Use `const` for compile-time constant values
-- `final` for local variables that are assigned once
+- `final` for local variables that are assigned once (enforced by `prefer_final_locals`)
 
 ## Design Token System
 
@@ -242,7 +251,7 @@ Future<void> playIndex(int index) async {
 
 ## Logging
 
-**Framework:** `logger` package (v2.5.0) with custom `Logger` instance in `lib/kernel/utils/log.dart`
+**Framework:** `logger` package with custom `Logger` instance in `lib/kernel/utils/log.dart`
 
 **Global instance:**
 ```dart
@@ -337,6 +346,12 @@ ValueListenableBuilder<bool>(
       ),
   child: child,
 )
+```
+
+**Pattern: MergedListenable for multi-notifier rebuilds:**
+```dart
+// lib/ui/shared/merged_listenable.dart
+// Combines multiple ValueNotifiers into one for single ValueListenableBuilder
 ```
 
 **Pattern: StatefulWidget with private State:**
@@ -512,12 +527,6 @@ ValueListenableBuilder<bool>(
 )
 ```
 
-**MergedListenable for multi-notifier rebuilds:**
-```dart
-// lib/ui/shared/merged_listenable.dart
-// Combines multiple ValueNotifiers into one for single ValueListenableBuilder
-```
-
 ## Commit Format
 
 Conventional Commits: `<type>: <description>`
@@ -536,4 +545,4 @@ perf: skip BackdropFilter when opacity < 0.01
 
 ---
 
-*Convention analysis: 2026-05-30*
+*Convention analysis: 2026-06-01*
