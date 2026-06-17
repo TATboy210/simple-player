@@ -4,15 +4,11 @@ import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
+import 'package:player_engine/player_engine.dart';
 
-import '../models/media_error_type.dart';
-import '../models/media_state.dart';
-import '../models/media_info.dart';
-import '../models/video_effect_type.dart';
 import '../services/path_validator.dart';
 import '../utils/path_utils.dart';
 import 'fvp_callback_handler.dart';
-import 'media_engine.dart';
 import 'position_poller.dart';
 import '../bridge/display_config.dart';
 import '../utils/log.dart';
@@ -28,7 +24,7 @@ import 'track_manager.dart';
 ///
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
-class FvpEngine implements MediaEngine {
+class FvpEngine extends PlayerEngine {
   mdk.Player? _playerInstance;
   mdk.Player get _player => _playerInstance ??= _createPlayer();
   bool _disposed = false;
@@ -37,7 +33,6 @@ class FvpEngine implements MediaEngine {
 
   static const _prepareTimeoutSeconds = 10;
   static const _textureTimeoutSeconds = 5;
-  static const _defaultSkipSeconds = 10;
   static const _minPlaybackRate = 0.25;
   static const _maxPlaybackRate = 4.0;
 
@@ -485,16 +480,6 @@ class FvpEngine implements MediaEngine {
         state.value == MediaState.completed) {
       play();
     }
-  }
-
-  @override
-  void skipForward([int seconds = _defaultSkipSeconds]) {
-    seekTo((position.value + seconds * 1000).clamp(0, duration.value));
-  }
-
-  @override
-  void skipBack([int seconds = _defaultSkipSeconds]) {
-    seekTo((position.value - seconds * 1000).clamp(0, duration.value));
   }
 
   @override

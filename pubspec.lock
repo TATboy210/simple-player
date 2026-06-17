@@ -315,6 +315,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_fullscreen:
+    dependency: "direct main"
+    description:
+      name: flutter_fullscreen
+      sha256: "37fc83866ded6477efdd5653bed3a6edaaa831dada48a3ca58b2395ce1cc282f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.0"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -660,6 +668,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.6"
+  player_engine:
+    dependency: "direct main"
+    description:
+      path: "../widget_tree_flutter/player_engine"
+      relative: true
+    source: path
+    version: "0.1.0"
   plugin_platform_interface:
     dependency: transitive
     description:

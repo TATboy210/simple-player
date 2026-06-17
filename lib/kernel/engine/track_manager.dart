@@ -1,6 +1,6 @@
 import 'package:fvp/mdk.dart' as mdk;
+import 'package:player_engine/player_engine.dart';
 
-import '../models/media_info.dart';
 import '../utils/log.dart';
 
 /// 轨道管理器 — 音频/字幕轨道选择与切换

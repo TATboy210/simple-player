@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  player_engine:
+    path: ../widget_tree_flutter/player_engine
   fvp: ^0.36.2
   path_provider: ^2.1.5
   file_picker: ^11.0.2
@@ -22,6 +24,7 @@ dependencies:
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
   window_manager: ^0.5.1
+  flutter_fullscreen: ^1.2.0
   file_selector: any
   xdg_directories: any
   animations: any
