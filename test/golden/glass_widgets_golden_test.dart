@@ -12,10 +12,10 @@ void main() {
     testWidgets('thin tier', (tester) async {
       await tester.pumpWidget(
         wrapForGolden(
-          GlassContainer(
+          const GlassContainer(
             tier: GlassTier.thin,
             blurEnabled: false,
-            child: const Text('Thin'),
+            child: Text('Thin'),
           ),
         ),
       );
@@ -28,10 +28,10 @@ void main() {
     testWidgets('normal tier', (tester) async {
       await tester.pumpWidget(
         wrapForGolden(
-          GlassContainer(
+          const GlassContainer(
             tier: GlassTier.normal,
             blurEnabled: false,
-            child: const Text('Normal'),
+            child: Text('Normal'),
           ),
         ),
       );
@@ -44,10 +44,10 @@ void main() {
     testWidgets('thick tier', (tester) async {
       await tester.pumpWidget(
         wrapForGolden(
-          GlassContainer(
+          const GlassContainer(
             tier: GlassTier.thick,
             blurEnabled: false,
-            child: const Text('Thick'),
+            child: Text('Thick'),
           ),
         ),
       );
@@ -62,11 +62,7 @@ void main() {
     testWidgets('label mode', (tester) async {
       await tester.pumpWidget(
         wrapForGolden(
-          GlassButton(
-            icon: Icons.play_arrow,
-            label: 'Play',
-            onPressed: () {},
-          ),
+          GlassButton(icon: Icons.play_arrow, label: 'Play', onPressed: () {}),
         ),
       );
       await expectLater(
@@ -78,10 +74,7 @@ void main() {
     testWidgets('icon-only mode', (tester) async {
       await tester.pumpWidget(
         wrapForGolden(
-          GlassButton.iconOnly(
-            icon: Icons.pause,
-            onPressed: () {},
-          ),
+          GlassButton.iconOnly(icon: Icons.pause, onPressed: () {}),
         ),
       );
       await expectLater(
@@ -94,13 +87,7 @@ void main() {
   group('GlassChip golden', () {
     testWidgets('selected', (tester) async {
       await tester.pumpWidget(
-        wrapForGolden(
-          GlassChip(
-            label: '1.0x',
-            selected: true,
-            onTap: () {},
-          ),
-        ),
+        wrapForGolden(GlassChip(label: '1.0x', selected: true, onTap: () {})),
       );
       await expectLater(
         find.byType(GlassChip),
@@ -110,13 +97,7 @@ void main() {
 
     testWidgets('unselected', (tester) async {
       await tester.pumpWidget(
-        wrapForGolden(
-          GlassChip(
-            label: '1.5x',
-            selected: false,
-            onTap: () {},
-          ),
-        ),
+        wrapForGolden(GlassChip(label: '1.5x', selected: false, onTap: () {})),
       );
       await expectLater(
         find.byType(GlassChip),

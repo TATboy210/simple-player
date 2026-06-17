@@ -1,10 +1,10 @@
+import 'package:player_engine/player_engine.dart';
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../../kernel/models/media_state.dart';
 import '../theme/tokens.dart';
 
 /// 极光呼吸背景 — 3 个椭圆光团沿 Lissajous 曲线缓慢漂移

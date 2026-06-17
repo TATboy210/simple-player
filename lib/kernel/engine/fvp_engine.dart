@@ -492,6 +492,16 @@ class FvpEngine extends PlayerEngine {
   }
 
   @override
+  void skipForward([int ms = 10000]) {
+    seekTo((position.value + ms).clamp(0, duration.value));
+  }
+
+  @override
+  void skipBack([int ms = 10000]) {
+    seekTo((position.value - ms).clamp(0, duration.value));
+  }
+
+  @override
   void setRange({required int from, int to = -1}) {
     _guardedAction('setRange', () {
       if (from >= 0 && to >= 0 && from > to) {

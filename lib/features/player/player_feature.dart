@@ -10,7 +10,7 @@ import '../../ui/shared/empty_state.dart';
 import '../../ui/shared/play_mode_utils.dart';
 import '../../ui/widgets/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import 'services/video_processing_service.dart';
 import 'player_services.dart';
 
@@ -29,7 +29,7 @@ class PlayerFeature extends StatefulWidget {
   final WindowService windowService;
   final void Function(
     BuildContext context,
-    MediaEngine engine,
+    PlayerEngine engine,
     VideoProcessingService videoProcessing,
   )
   onSettings;

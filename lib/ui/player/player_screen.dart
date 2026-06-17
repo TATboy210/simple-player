@@ -1,9 +1,9 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../kernel/bridge/window_service.dart';
-import '../../kernel/engine/media_engine.dart';
-import '../../kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../features/player/services/playback_controller.dart';
@@ -22,7 +22,7 @@ import 'video_surface.dart';
 /// 宽屏（≥600dp）: Row 布局，面板在右侧
 /// 窄屏（<600dp）: 面板叠加为 overlay
 class PlayerScreen extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final PlaybackController controller;
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
@@ -117,7 +117,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
         final videoContent = _buildVideoContent(isVideo, modeIcon, modeLabel);
 
-        return KeyboardHandler(
+        final keyboardHandler = KeyboardHandler(
           customBindings: widget.customBindings,
           onPlayPause: () => widget.engine.togglePlayPause(),
           onSeekBackward: () => _seek(widget.engine, -5000),
@@ -148,13 +148,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: Scaffold(
             backgroundColor: Tokens.bgBase,
             body: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 CustomTitleBar(windowService: widget.windowService),
                 Expanded(
                   child: ValueListenableBuilder<bool>(
                     valueListenable: _playlistVisible,
-                    builder: (context, playlistVisible, videoContent) => Stack(
+                    builder: (context, playlistVisible, videoContent) =>
+                        Stack(
                       children: [
                         videoContent!,
                         if (_playlistMounted)
@@ -179,12 +179,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           ),
                       ],
                     ),
-                    child: videoContent,
+                    child: _buildVideoContent(isVideo, modeIcon, modeLabel),
                   ),
                 ),
               ],
             ),
           ),
+        );
+
+        return AnimatedBuilder(
+          animation: Listenable.merge([
+            widget.windowService.isFullscreen,
+            widget.windowService.isMaximized,
+          ]),
+          builder: (context, child) {
+            final isFs = widget.windowService.isFullscreen.value;
+            final isMax = widget.windowService.isMaximized.value;
+            if (isFs || isMax) {
+              return MouseRegion(
+                cursor: SystemMouseCursors.basic,
+                child: child,
+              );
+            }
+            return DragToResizeArea(child: child!);
+          },
+          child: keyboardHandler,
         );
       },
     );
@@ -240,7 +259,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ],
   );
 
-  void _seek(MediaEngine engine, int deltaMs) {
+  void _seek(PlayerEngine engine, int deltaMs) {
     final target = engine.position.value + deltaMs;
     engine.seekTo(target.clamp(0, engine.duration.value));
   }

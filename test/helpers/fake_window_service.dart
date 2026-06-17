@@ -52,9 +52,6 @@ class FakeWindowService extends WindowService {
   Future<void> close() async {}
 
   @override
-  Future<void> startDragging() async {}
-
-  @override
   void dispose() {
     isFullscreen.dispose();
     isAlwaysOnTop.dispose();

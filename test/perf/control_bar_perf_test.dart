@@ -18,12 +18,12 @@
 /// - ControlBar enableBlur=true 时通过 WindowInteractionState 跳过 resize 期间 BackdropFilter
 /// - GlassContainer respectResizeState=true 时 resize 期间降级为纯色
 /// - GlassIconButton 使用 Material+InkWell，无 BackdropFilter（无双层模糊）
+library;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
@@ -80,10 +80,7 @@ Widget _buildControlsOverlay(FakeEngine engine) {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
-      body: ControlsOverlay(
-        engine: engine,
-        onToggleFullscreen: () {},
-      ),
+      body: ControlsOverlay(engine: engine, onToggleFullscreen: () {}),
     ),
   );
 }
@@ -102,38 +99,39 @@ void main() {
       engine.dispose();
     });
 
-    testWidgets('rebuild count during playback — position updates at 250ms intervals',
-        (tester) async {
-      final rebuildCount = ValueNotifier<int>(0);
-      await tester.pumpWidget(
-        _RebuildCounter(
-          count: rebuildCount,
-          child: _buildControlBar(engine),
-        ),
-      );
-      await tester.pump();
-      final initialCount = rebuildCount.value;
+    testWidgets(
+      'rebuild count during playback — position updates at 250ms intervals',
+      (tester) async {
+        final rebuildCount = ValueNotifier<int>(0);
+        await tester.pumpWidget(
+          _RebuildCounter(count: rebuildCount, child: _buildControlBar(engine)),
+        );
+        await tester.pump();
+        final initialCount = rebuildCount.value;
 
-      // Simulate 10 position updates at 250ms intervals (PositionPoller rate)
-      for (var i = 1; i <= 10; i++) {
-        engine.position.value = i * 3000; // 3s increments
-        await tester.pump(const Duration(milliseconds: 250));
-      }
+        // Simulate 10 position updates at 250ms intervals (PositionPoller rate)
+        for (var i = 1; i <= 10; i++) {
+          engine.position.value = i * 3000; // 3s increments
+          await tester.pump(const Duration(milliseconds: 250));
+        }
 
-      final totalRebuilds = rebuildCount.value - initialCount;
-      // Parent should NOT rebuild on position updates — children handle via
-      // their own ValueListenableBuilder/AnimatedBuilder.
-      // Allow small margin for framework overhead.
-      expect(
-        totalRebuilds,
-        lessThanOrEqualTo(2),
-        reason: 'ControlBar parent rebuilt $totalRebuilds times during '
-            '10 position updates (expected <= 2)',
-      );
-    });
+        final totalRebuilds = rebuildCount.value - initialCount;
+        // Parent should NOT rebuild on position updates — children handle via
+        // their own ValueListenableBuilder/AnimatedBuilder.
+        // Allow small margin for framework overhead.
+        expect(
+          totalRebuilds,
+          lessThanOrEqualTo(2),
+          reason:
+              'ControlBar parent rebuilt $totalRebuilds times during '
+              '10 position updates (expected <= 2)',
+        );
+      },
+    );
 
-    testWidgets('rebuild count — enableBlur true vs false isolation (D-08)',
-        (tester) async {
+    testWidgets('rebuild count — enableBlur true vs false isolation (D-08)', (
+      tester,
+    ) async {
       // With blur enabled
       final blurCount = ValueNotifier<int>(0);
       await tester.pumpWidget(
@@ -175,13 +173,12 @@ void main() {
       expect(noBlurTotal, lessThanOrEqualTo(2));
     });
 
-    testWidgets('rebuild count during seek — rapid position updates', (tester) async {
+    testWidgets('rebuild count during seek — rapid position updates', (
+      tester,
+    ) async {
       final rebuildCount = ValueNotifier<int>(0);
       await tester.pumpWidget(
-        _RebuildCounter(
-          count: rebuildCount,
-          child: _buildControlBar(engine),
-        ),
+        _RebuildCounter(count: rebuildCount, child: _buildControlBar(engine)),
       );
       await tester.pump();
       final initialCount = rebuildCount.value;
@@ -198,13 +195,15 @@ void main() {
       expect(
         totalRebuilds,
         lessThanOrEqualTo(5),
-        reason: 'ControlBar parent rebuilt $totalRebuilds times during '
+        reason:
+            'ControlBar parent rebuilt $totalRebuilds times during '
             '50 rapid seek updates (expected <= 5)',
       );
     });
 
-    testWidgets('Phase 2 verification — enableBlur=false skips BackdropFilter',
-        (tester) async {
+    testWidgets('Phase 2 verification — enableBlur=false skips BackdropFilter', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildControlBar(engine, enableBlur: false));
       await tester.pump();
 
@@ -220,24 +219,28 @@ void main() {
       );
     });
 
-    testWidgets('Phase 2 verification — enableBlur=true includes BackdropFilter',
-        (tester) async {
-      await tester.pumpWidget(_buildControlBar(engine, enableBlur: true));
-      await tester.pump();
+    testWidgets(
+      'Phase 2 verification — enableBlur=true includes BackdropFilter',
+      (tester) async {
+        await tester.pumpWidget(_buildControlBar(engine, enableBlur: true));
+        await tester.pump();
 
-      // When enableBlur=true and WindowInteractionState is idle,
-      // BackdropFilter should be present.
-      expect(
-        find.descendant(
-          of: find.byType(ControlBar),
-          matching: find.byType(BackdropFilter),
-        ),
-        findsOneWidget,
-        reason: 'enableBlur=true + idle state should include BackdropFilter',
-      );
-    });
+        // When enableBlur=true and WindowInteractionState is idle,
+        // BackdropFilter should be present.
+        expect(
+          find.descendant(
+            of: find.byType(ControlBar),
+            matching: find.byType(BackdropFilter),
+          ),
+          findsOneWidget,
+          reason: 'enableBlur=true + idle state should include BackdropFilter',
+        );
+      },
+    );
 
-    testWidgets('Phase 2 verification — RepaintBoundary wraps content', (tester) async {
+    testWidgets('Phase 2 verification — RepaintBoundary wraps content', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildControlBar(engine, enableBlur: false));
       await tester.pump();
 
@@ -266,49 +269,52 @@ void main() {
       engine.dispose();
     });
 
-    testWidgets('rebuild count during mouse movement — AutoHideController throttle',
-        (tester) async {
-      final rebuildCount = ValueNotifier<int>(0);
-      await tester.pumpWidget(
-        _RebuildCounter(
-          count: rebuildCount,
-          child: _buildControlsOverlay(engine),
-        ),
-      );
-      await tester.pump();
-      final initialCount = rebuildCount.value;
-
-      // Simulate rapid mouse movement — AutoHideController has 100ms throttle
-      final gesture =
-          await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await gesture.addPointer(
-        location: tester.getCenter(find.byType(ControlsOverlay)),
-      );
-      addTearDown(gesture.removePointer);
-
-      // Move mouse 20 times in quick succession
-      final center = tester.getCenter(find.byType(ControlsOverlay));
-      for (var i = 0; i < 20; i++) {
-        await gesture.moveTo(
-          center + Offset(i.toDouble() * 5, 0),
+    testWidgets(
+      'rebuild count during mouse movement — AutoHideController throttle',
+      (tester) async {
+        final rebuildCount = ValueNotifier<int>(0);
+        await tester.pumpWidget(
+          _RebuildCounter(
+            count: rebuildCount,
+            child: _buildControlsOverlay(engine),
+          ),
         );
-        await tester.pump(const Duration(milliseconds: 16));
-      }
+        await tester.pump();
+        final initialCount = rebuildCount.value;
 
-      final totalRebuilds = rebuildCount.value - initialCount;
-      // AutoHideController throttles at 100ms, so 20 moves at 16ms intervals
-      // should result in ~3-4 effective updates (not 20).
-      // Parent rebuild count depends on how many times _autoHide.visible changes.
-      expect(
-        totalRebuilds,
-        lessThanOrEqualTo(10),
-        reason: 'ControlsOverlay parent rebuilt $totalRebuilds times during '
-            '20 rapid mouse moves (expected <= 10 due to 100ms throttle)',
-      );
-    });
+        // Simulate rapid mouse movement — AutoHideController has 100ms throttle
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(
+          location: tester.getCenter(find.byType(ControlsOverlay)),
+        );
+        addTearDown(gesture.removePointer);
 
-    testWidgets('ControlsOverlay child caching — Stack is static subtree',
-        (tester) async {
+        // Move mouse 20 times in quick succession
+        final center = tester.getCenter(find.byType(ControlsOverlay));
+        for (var i = 0; i < 20; i++) {
+          await gesture.moveTo(center + Offset(i.toDouble() * 5, 0));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+
+        final totalRebuilds = rebuildCount.value - initialCount;
+        // AutoHideController throttles at 100ms, so 20 moves at 16ms intervals
+        // should result in ~3-4 effective updates (not 20).
+        // Parent rebuild count depends on how many times _autoHide.visible changes.
+        expect(
+          totalRebuilds,
+          lessThanOrEqualTo(10),
+          reason:
+              'ControlsOverlay parent rebuilt $totalRebuilds times during '
+              '20 rapid mouse moves (expected <= 10 due to 100ms throttle)',
+        );
+      },
+    );
+
+    testWidgets('ControlsOverlay child caching — Stack is static subtree', (
+      tester,
+    ) async {
       // The outer ValueListenableBuilder<bool> on _autoHide.visible
       // caches the Stack as `child`. Verify the Stack doesn't rebuild
       // when visibility toggles.

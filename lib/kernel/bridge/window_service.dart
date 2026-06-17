@@ -1,18 +1,20 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../../ui/theme/tokens.dart';
 import '../persistence/settings_store.dart';
 import '../utils/log.dart';
-import 'window_geometry_store.dart';
 
 /// 窗口管理服务 — 状态 + 监听者 + 命令 + 几何协调。
 class WindowService with WindowListener {
   WindowService();
 
-  late final WindowGeometryStore _geometry = WindowGeometryStore(this);
+  // ─── Animation constants (moved from Tokens to fix inverted dependency) ───
+  static const int _durationFullscreenAnim = 300;
+  static const int _durationWindowResize = 100;
 
   // ─── Public state ───
 
@@ -36,9 +38,11 @@ class WindowService with WindowListener {
 
   /// 初始化窗口 — 在 main() 中 runApp() 之前调用。
   Future<void> init() async {
-    logBridge.d('[WindowService.init] start');
     await windowManager.ensureInitialized();
-    logBridge.d('[WindowService.init] ensureInitialized done');
+
+    // 同步 flutter_fullscreen 初始状态
+    isFullscreen.value = FullScreen.isFullScreen;
+    logBridge.d('[WindowService] FullScreen initialized, isFullScreen=${FullScreen.isFullScreen}');
 
     const options = WindowOptions(
       backgroundColor: Colors.transparent,
@@ -47,130 +51,85 @@ class WindowService with WindowListener {
       minimumSize: Size(854, 480),
     );
 
-    unawaited(
-      windowManager.waitUntilReadyToShow(options, () async {
-        logBridge.d('[WindowService.waitUntilReadyToShow] callback entered');
+    unawaited(windowManager.waitUntilReadyToShow(options, () async {
+      final settings = await SettingsStore.load();
+      if (settings.isFullscreen) await SettingsStore.saveIsFullscreen(false);
 
-        final settings = await SettingsStore.load();
-        logBridge.d(
-          '[WindowService.waitUntilReadyToShow] settings loaded: ${settings.windowWidth}×${settings.windowHeight}, '
-          'max=${settings.isMaximized}, fs=${settings.isFullscreen}',
+      if (settings.windowX != null && settings.windowY != null) {
+        final clamped = _clampToScreen(
+          x: settings.windowX!,
+          y: settings.windowY!,
+          width: settings.windowWidth,
+          height: settings.windowHeight,
         );
-
-        if (settings.isFullscreen) {
-          logBridge.d(
-            '[WindowService.waitUntilReadyToShow] clearing stale fullscreen flag',
-          );
-          await SettingsStore.saveIsFullscreen(false);
-        }
-
-        await _geometry.restoreGeometry(settings);
-        logBridge.d('[WindowService.waitUntilReadyToShow] geometry restored');
-
-        await windowManager.show();
-        await windowManager.focus();
-        logBridge.d(
-          '[WindowService.waitUntilReadyToShow] window shown + focused',
+        await windowManager.setPosition(clamped);
+        await windowManager.setSize(
+          Size(settings.windowWidth, settings.windowHeight),
         );
+      } else {
+        await windowManager.setSize(
+          Size(settings.windowWidth, settings.windowHeight),
+        );
+        await windowManager.center();
+      }
 
-        if (settings.isMaximized) {
-          logBridge.d(
-            '[WindowService.waitUntilReadyToShow] restoring maximized state',
-          );
-          await windowManager.maximize();
-        }
-        logBridge.d('[WindowService.init] complete');
-      }),
-    );
+      await windowManager.show();
+      await windowManager.focus();
+      if (settings.isMaximized) await windowManager.maximize();
+    }));
 
     windowManager.addListener(this);
-    logBridge.d('[WindowService.init] listener registered');
   }
 
   // ─── WindowListener ───
 
   @override
   void onWindowMaximize() {
-    logBridge.d('[WindowService.onWindowMaximize]');
     if (!isMaximized.value) _safeSet(isMaximized, true);
   }
 
   @override
   void onWindowUnmaximize() {
-    logBridge.d('[WindowService.onWindowUnmaximize]');
     if (isMaximized.value) _safeSet(isMaximized, false);
   }
 
-  @override
-  void onWindowEnterFullScreen() {
-    logBridge.d(
-      '[WindowService.onWindowEnterFullScreen] current=${isFullscreen.value}',
-    );
-    if (!isFullscreen.value) _safeSet(isFullscreen, true);
-  }
-
-  @override
-  void onWindowLeaveFullScreen() {
-    logBridge.d(
-      '[WindowService.onWindowLeaveFullScreen] current=${isFullscreen.value}',
-    );
-    if (isFullscreen.value) _safeSet(isFullscreen, false);
-  }
+  // ─── Fullscreen 由 flutter_fullscreen 驱动 ───
 
   @override
   void onWindowResize() {
     if (_disposed || _isAnimating) return;
     _resizeDebounce?.cancel();
-    _resizeDebounce = Timer(const Duration(milliseconds: Tokens.durationWindowResize), () {
+    _resizeDebounce = Timer(const Duration(milliseconds: _durationWindowResize), () {
       if (_disposed) return;
       windowManager.getSize().then((size) {
-        if (!_disposed) {
-          logBridge.d(
-            '[WindowService.onWindowResize] ${size.width.toInt()}×${size.height.toInt()}',
-          );
-          windowSize.value = size;
-        }
+        if (size != windowSize.value) _safeSet(windowSize, size);
       });
     });
   }
 
   @override
   void onWindowClose() {
-    logBridge.d(
-      '[WindowService.onWindowClose] saving geometry then destroying',
-    );
     _resizeDebounce?.cancel();
     _disposed = true;
-    _geometry.saveGeometry().whenComplete(() => windowManager.destroy());
+    _saveGeometry().whenComplete(() {
+      dispose();
+      windowManager.destroy();
+    });
   }
 
   // ─── Commands ───
 
-  Future<void> _runWindowAction(
-    String label,
-    Future<void> Function() action,
-  ) async {
-    try {
-      await action();
-    } on Exception catch (e) {
-      logBridge.w('[WindowService.$label] FAILED: $e');
-    }
-  }
-
   Future<void> setFullscreen(bool value) async {
-    logBridge.d(
-      '[WindowService.setFullscreen] value=$value current=${isFullscreen.value}',
-    );
     if (value == isFullscreen.value || _isAnimating) return;
-
     try {
       _isAnimating = true;
       _fsAnimTimer?.cancel();
-      await windowManager.setFullScreen(value);
-      if (value) await SettingsStore.saveIsFullscreen(true);
+      logBridge.d('[WindowService] setFullscreen($value)');
+      FullScreen.setFullScreen(value);
       if (!_disposed) isFullscreen.value = value;
+      if (value) await SettingsStore.saveIsFullscreen(true);
       _fsAnimTimer = Timer(
-        const Duration(milliseconds: Tokens.durationFullscreenAnim),
+        const Duration(milliseconds: _durationFullscreenAnim),
         () {
           _isAnimating = false;
           if (!value && !_disposed) SettingsStore.saveIsFullscreen(false);
@@ -178,7 +137,7 @@ class WindowService with WindowListener {
       );
     } on Exception catch (e) {
       _isAnimating = false;
-      logBridge.w('[WindowService.setFullscreen] FAILED: $e');
+      logBridge.e('[WindowService.setFullscreen] FAILED: $e');
     }
   }
 
@@ -186,52 +145,81 @@ class WindowService with WindowListener {
   Future<void> exitFullscreen() => setFullscreen(false);
 
   Future<void> setAlwaysOnTop(bool value) async {
-    logBridge.d('[WindowService.setAlwaysOnTop] value=$value');
-    await _runWindowAction('setAlwaysOnTop', () async {
-      await windowManager.setAlwaysOnTop(value);
-      isAlwaysOnTop.value = value;
-      await SettingsStore.saveIsAlwaysOnTop(value);
-    });
+    await windowManager.setAlwaysOnTop(value);
+    isAlwaysOnTop.value = value;
+    await SettingsStore.saveIsAlwaysOnTop(value);
   }
 
-  Future<void> minimize() async {
-    logBridge.d('[WindowService.minimize]');
-    await _runWindowAction('minimize', windowManager.minimize);
-  }
+  Future<void> minimize() => windowManager.minimize();
 
   Future<void> maximize() async {
-    logBridge.d('[WindowService.maximize]');
-    await _runWindowAction('maximize', () async {
-      await windowManager.maximize();
-      isMaximized.value = true;
-    });
+    await windowManager.maximize();
+    isMaximized.value = true;
   }
 
   Future<void> restore() async {
-    logBridge.d('[WindowService.restore]');
-    await _runWindowAction('restore', () async {
-      await windowManager.unmaximize();
-      isMaximized.value = false;
-    });
+    await windowManager.unmaximize();
+    isMaximized.value = false;
   }
 
-  Future<void> close() async {
-    logBridge.d('[WindowService.close]');
-    await _runWindowAction('close', windowManager.close);
+  Future<void> close() => windowManager.close();
+
+  Future<void> startDragging() => windowManager.startDragging();
+
+  // ─── Geometry persistence ───
+
+  Future<void> _saveGeometry() async {
+    try {
+      final pos = await windowManager.getPosition();
+      final size = await windowManager.getSize();
+      await SettingsStore.saveWindowGeometry(
+        width: size.width,
+        height: size.height,
+        x: pos.dx,
+        y: pos.dy,
+        isMaximized: isMaximized.value,
+      );
+    } on Exception catch (e) {
+      logBridge.e('[WindowService._saveGeometry] $e');
+    }
   }
 
-  Future<void> startDragging() async {
-    logBridge.d('[WindowService.startDragging]');
-    await _runWindowAction('startDragging', windowManager.startDragging);
+  static Offset _clampToScreen({
+    required double x,
+    required double y,
+    required double width,
+    required double height,
+  }) {
+    const minVisible = 100.0;
+    try {
+      final display = PlatformDispatcher.instance.views.first;
+      final screenW = display.physicalSize.width / display.devicePixelRatio;
+      final screenH = display.physicalSize.height / display.devicePixelRatio;
+
+      final offScreen =
+          x + width < minVisible ||
+          y + height < minVisible ||
+          x > screenW - minVisible ||
+          y > screenH - minVisible;
+
+      if (offScreen) {
+        return Offset(
+          ((screenW - width) / 2).clamp(0.0, screenW - minVisible),
+          ((screenH - height) / 2).clamp(0.0, screenH - minVisible),
+        );
+      }
+    } on Exception catch (e) {
+      logBridge.e('[WindowService._clampToScreen] $e');
+    }
+    return Offset(x, y);
   }
 
   // ─── Lifecycle ───
 
   void dispose() {
-    logBridge.d('[WindowService.dispose]');
+    _fsAnimTimer?.cancel();
     _disposed = true;
     _resizeDebounce?.cancel();
-    _fsAnimTimer?.cancel();
     isFullscreen.dispose();
     isAlwaysOnTop.dispose();
     isMaximized.dispose();

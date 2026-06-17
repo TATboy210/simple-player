@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import '../../helpers/fake_engine.dart';
 

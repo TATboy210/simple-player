@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
@@ -12,6 +13,7 @@ import 'kernel/utils/memory_monitor.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FullScreen.ensureInitialized();
   await initLog();
   MemoryMonitor.start();
 

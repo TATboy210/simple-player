@@ -1,8 +1,8 @@
+import 'package:player_engine/player_engine.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/models/media_state.dart';
 import '../theme/tokens.dart';
 
 /// 自动隐藏控制器 — 管理控制栏可见性、淡入淡出动画、自动隐藏定时器、鼠标悬停节流

@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
@@ -27,7 +27,7 @@ class ControlBar extends StatelessWidget {
     ],
   );
 
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final bool isFullscreen;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
@@ -185,7 +185,7 @@ class ControlBar extends StatelessWidget {
 
 /// 左侧按钮组：播放模式 + 音量 + 倍速
 class _LeftButtonGroup extends StatelessWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final bool showSecondary;
   final IconData? playModeIcon;
   final String? playModeLabel;
