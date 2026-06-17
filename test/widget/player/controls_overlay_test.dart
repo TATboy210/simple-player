@@ -1,8 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import '../../helpers/fake_engine.dart';
@@ -19,7 +18,7 @@ void main() {
   });
 
   Widget buildSubject({
-    MediaEngine? eng,
+    PlayerEngine? eng,
     bool isFullscreen = false,
     VoidCallback? onToggleFullscreen,
     bool emptyStatePresent = false,

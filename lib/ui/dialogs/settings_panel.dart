@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/locale_service.dart';
 import '../../kernel/services/theme_service.dart';
@@ -22,7 +22,7 @@ import 'settings/settings_tab_performance.dart';
 /// GeneralTab 接收 pending 值，用户选择时更新 pending 状态，不立即触发服务状态变更。
 /// ShortcutsTab 通过回调通知变更，取消时恢复原始绑定。
 class SettingsPanel extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final VideoProcessingService? videoProcessing;
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
 

@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
@@ -10,7 +10,7 @@ import '../widgets/osd_overlay.dart';
 
 /// 音量按钮（单击静音）
 class VolumeButton extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   const VolumeButton({super.key, required this.engine});
 
@@ -74,7 +74,7 @@ class VolumeSlider extends StatelessWidget {
     overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
   );
 
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   const VolumeSlider({super.key, required this.engine});
 

@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../widgets/osd_overlay.dart';
@@ -13,7 +13,7 @@ import '../widgets/osd_overlay.dart';
 /// - 双击数字重置 1.0
 /// - 滚轮切换挡位
 class SpeedButton extends StatelessWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   static const _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
   static const _normal = 1.0;

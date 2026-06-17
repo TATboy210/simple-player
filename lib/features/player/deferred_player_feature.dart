@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_service.dart';
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
@@ -15,13 +15,13 @@ import 'services/video_processing_service.dart';
 /// 加载期间通过 StartupCoordinator 上报进度（Splash 已在 App 层驱动）。
 ///
 /// 延迟加载播放器模块 — deferred as 避免 eager 导入 FvpEngine 等重型类型。
-/// 回调使用抽象类型 MediaEngine（FvpEngine implements MediaEngine）。
+/// 回调使用抽象类型 PlayerEngine（FvpEngine implements PlayerEngine）。
 class DeferredPlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
   final WindowService windowService;
   final void Function(
     BuildContext context,
-    MediaEngine engine,
+    PlayerEngine engine,
     VideoProcessingService? videoProcessing,
   )
   onSettings;

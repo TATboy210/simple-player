@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/widgets/osd_overlay.dart';
@@ -19,7 +19,7 @@ void main() {
     engine.dispose();
   });
 
-  Widget buildSubject({MediaEngine? eng, required Widget child}) {
+  Widget buildSubject({PlayerEngine? eng, required Widget child}) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

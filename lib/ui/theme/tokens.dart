@@ -77,7 +77,9 @@ class Tokens {
   static const titleBarBg = Color(0xE61A1A24);
   static const titleBarBorder = Color(0x33FFFFFF);
   static const titleBarHover = Color(0x1AFFFFFF);
+  static const titleBarPressed = Color(0x33FFFFFF);
   static const closeHoverBg = Color(0xFFC42B1C);
+  static const closePressedBg = Color(0xFFB01C14);
 
   // ── 控制栏 ──
   static const controlBarHeight = 84.0;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:window_manager/window_manager.dart';
 import 'kernel/bridge/window_service.dart';
-import 'kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import 'kernel/utils/log.dart';
 import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';
@@ -61,7 +60,7 @@ class _AppState extends State<App> {
 
   void _showSettingsPanel(
     BuildContext context,
-    MediaEngine engine,
+    PlayerEngine engine,
     VideoProcessingService? videoProcessing,
   ) {
     showDialog(
@@ -157,29 +156,12 @@ class _AppState extends State<App> {
           onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
           debugShowCheckedModeBanner: false,
           theme: ThemeService.I.currentTheme,
-          home: ValueListenableBuilder<bool>(
-            valueListenable: widget.windowService.isFullscreen,
-            builder: (context, isFullscreen, child) =>
-                ValueListenableBuilder<bool>(
-              valueListenable: widget.windowService.isMaximized,
-              builder: (context, isMaximized, child) {
-                final noResize = isFullscreen || isMaximized;
-                return DragToResizeArea(
-                  resizeEdgeSize: noResize ? 0 : 6,
-                  enableResizeEdges: noResize ? [] : null,
-                  resizeEdgeColor: Colors.transparent,
-                  child: child!,
-                );
-              },
-              child: child,
-            ),
-            child: DeferredPlayerFeature(
-              coordinator: widget.coordinator,
-              windowService: widget.windowService,
-              onSettings: (ctx, engine, videoProcessing) =>
-                  _showSettingsPanel(ctx, engine, videoProcessing),
-              onSettingsSecondary: _showSettingsQuickMenu,
-            ),
+          home: DeferredPlayerFeature(
+            coordinator: widget.coordinator,
+            windowService: widget.windowService,
+            onSettings: (ctx, engine, videoProcessing) =>
+                _showSettingsPanel(ctx, engine, videoProcessing),
+            onSettingsSecondary: _showSettingsQuickMenu,
           ),
         ),
       ),

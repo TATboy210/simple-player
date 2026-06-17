@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/services/subtitle_service.dart';
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 
-class _FakeEngine implements MediaEngine {
+class _FakeEngine implements PlayerEngine {
   String? lastSubtitle;
   @override
   dynamic noSuchMethod(Invocation invocation) {

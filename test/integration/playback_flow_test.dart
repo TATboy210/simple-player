@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 
 import '../helpers/fake_engine.dart';
 import '../helpers/integration_helpers.dart';
@@ -56,7 +56,7 @@ void main() {
       await engine.open('C:/test.mp4');
       engine.play();
       engine.position.value = 10000;
-      engine.skipForward(10);
+      engine.skipForward(10000);
       expect(engine.position.value, 20000);
     });
 
@@ -64,7 +64,7 @@ void main() {
       await engine.open('C:/test.mp4');
       engine.play();
       engine.position.value = 30000;
-      engine.skipBack(10);
+      engine.skipBack(10000);
       expect(engine.position.value, 20000);
     });
   });

@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
-import '../../kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../widgets/osd_overlay.dart';
 import 'auto_hide_controller.dart';
@@ -35,7 +34,7 @@ import 'error_banner.dart';
 /// ControlBar 按钮通过子 GestureDetector 优先赢得手势竞技场，不触发隐藏。
 class ControlsOverlay extends StatefulWidget {
   static const _clickDelayMs = 250; // 等待可能的双击
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final bool isFullscreen;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;

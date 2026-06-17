@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../../kernel/models/play_mode.dart';
 import '../../../kernel/persistence/playlist_store.dart';
 import '../../../kernel/persistence/settings_store.dart';
@@ -29,7 +29,7 @@ class PlaybackController {
     monitor = StateMonitor(this);
   }
 
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final Playlist playlist;
   final VoidCallback _onNeedRebuild;
   final void Function(Object error)? _onError;

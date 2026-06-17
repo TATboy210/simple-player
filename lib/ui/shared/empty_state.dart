@@ -1,9 +1,9 @@
+import 'package:player_engine/player_engine.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../kernel/models/media_state.dart';
 import '../theme/tokens.dart';
 import 'aurora_background.dart';
 import 'glass_container.dart';

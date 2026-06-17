@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -17,7 +17,7 @@ class _HoverState {
 
 /// 进度条 — 已播放/已缓冲/未播放三层，拖拽 seek + 时间提示
 class ProgressBar extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   const ProgressBar({super.key, required this.engine});
 
@@ -50,7 +50,7 @@ class _ProgressBarState extends State<ProgressBar> {
 
   int get _hoverPositionMs => (_hoverX * widget.engine.duration.value).round();
 
-  MediaEngine get engine => widget.engine;
+  PlayerEngine get engine => widget.engine;
 
   @override
   void initState() {

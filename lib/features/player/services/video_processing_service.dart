@@ -2,9 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../../kernel/models/aspect_ratio_mode.dart';
-import '../../../kernel/models/video_effect_type.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../models/video_processing_state.dart';
 
@@ -22,7 +21,7 @@ class VideoProcessingService {
     state.addListener(_schedulePersist);
   }
 
-  final MediaEngine _engine;
+  final PlayerEngine _engine;
   bool _disposed = false;
   Timer? _persistDebounce;
   late VideoProcessingState _previousState;
@@ -65,7 +64,7 @@ class VideoProcessingService {
 
   // ── 内部 ──
 
-  /// 状态变化 → diff-based 委托给 MediaEngine（只同步变化的属性）
+  /// 状态变化 → diff-based 委托给 PlayerEngine（只同步变化的属性）
   void _syncEngine() {
     final next = state.value;
     final patch = _diff(_previousState, next);

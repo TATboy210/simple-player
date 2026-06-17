@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
 /// 均衡器设置 tab — 5 个预设模式
 class EqualizerTab extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   const EqualizerTab({super.key, required this.engine});
 
   @override
