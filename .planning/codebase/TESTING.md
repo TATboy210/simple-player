@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-06-01
+**Analysis Date:** 2026-06-21
 
 ## Framework
 
@@ -35,8 +35,8 @@ test/
 │   ├── glass_widgets_golden_test.dart        # GlassContainer/Button goldens
 │   └── golden_comparator.dart                # TolerantGoldenComparator helper
 ├── helpers/
-│   ├── fake_engine.dart                      # FakeEngine (377 lines, implements MediaEngine)
-│   ├── fake_window_service.dart              # FakeWindowService (73 lines)
+│   ├── fake_engine.dart                      # FakeEngine (implements PlayerEngine)
+│   ├── fake_window_service.dart              # FakeWindowService (extends WindowService)
 │   └── integration_helpers.dart              # buildTestApp(), createTestController()
 ├── integration/
 │   ├── controls_flow_test.dart               # Controls interaction flow
@@ -104,7 +104,7 @@ test/
         └── glass_container_test.dart         # GlassContainer widget
 ```
 
-**Total: 50 test files**
+**Total: 50+ test files**
 
 ## Test Types
 
@@ -135,12 +135,12 @@ test/
 
 ## FakeEngine Pattern
 
-**File:** `test/helpers/fake_engine.dart` (377 lines)
-**Purpose:** Implements `MediaEngine` without FFI dependency — runs purely in Dart
+**File:** `test/helpers/fake_engine.dart`
+**Purpose:** Implements `PlayerEngine` without FFI dependency — runs purely in Dart
 
 ### Key Features
 ```dart
-class FakeEngine implements MediaEngine {
+class FakeEngine implements PlayerEngine {
   // ─── ValueNotifier fields (defaults match FvpEngine) ───
   final ValueNotifier<int?> textureId = ValueNotifier<int?>(null);
   final ValueNotifier<MediaState> state = ValueNotifier<MediaState>(MediaState.idle);
@@ -194,7 +194,7 @@ test('opens file and starts playback', () async {
 
 ## FakeWindowService Pattern
 
-**File:** `test/helpers/fake_window_service.dart` (73 lines)
+**File:** `test/helpers/fake_window_service.dart`
 **Purpose:** Test double for WindowService — no FFI, no window_manager
 
 ```dart
@@ -204,7 +204,7 @@ class FakeWindowService extends WindowService {
   int maximizeCallCount = 0;
 
   @override
-  void init() { /* No-op */ }
+  Future<void> init() async { /* No-op */ }
 
   @override
   Future<void> setFullscreen(bool value) async {
@@ -334,8 +334,8 @@ testWidgets('blurEnabled=false skips BackdropFilter', (tester) async { ... });
 **No mockito — hand-written fakes only:**
 
 ```dart
-// FakeEngine — implements MediaEngine interface
-class FakeEngine implements MediaEngine {
+// FakeEngine — implements PlayerEngine interface
+class FakeEngine implements PlayerEngine {
   int openCallCount = 0;
   final List<String> openPaths = [];
   String? failNextOpenWith;
@@ -356,7 +356,7 @@ class FakeEngine implements MediaEngine {
 ```
 
 **What to Fake:**
-- `MediaEngine` → `FakeEngine` (FFI boundary)
+- `PlayerEngine` → `FakeEngine` (FFI boundary)
 - `WindowService` → `FakeWindowService` (Win32 boundary)
 - `SharedPreferences` → `SharedPreferences.setMockInitialValues({})`
 
@@ -406,7 +406,7 @@ flutter test --update-goldens
 
 ## Performance Tests
 
-**File:** `test/perf/control_bar_perf_test.dart` (324 lines)
+**File:** `test/perf/control_bar_perf_test.dart`
 
 **Pattern: Rebuild counting:**
 ```dart
@@ -518,7 +518,7 @@ test('detects UNC path', () {
 **Pattern: buildSubject helper:**
 ```dart
 Widget buildSubject({
-  MediaEngine? eng,
+  PlayerEngine? eng,
   bool isFullscreen = false,
   VoidCallback? onOpenFile,
 }) {
@@ -574,7 +574,7 @@ testWidgets('hides secondary controls at width < 500', (tester) async {
 
 | Metric | Value |
 |--------|-------|
-| Test files | 50 |
+| Test files | 50+ |
 | Test types | Unit, Widget, Golden, Integration, Performance |
 | Target | 80% |
 | Enforcement | None (no CI threshold) |
@@ -631,4 +631,4 @@ flutter test --coverage
 
 ---
 
-*Testing analysis: 2026-06-01*
+*Testing analysis: 2026-06-21*
