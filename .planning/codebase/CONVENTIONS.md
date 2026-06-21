@@ -1,6 +1,6 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-06-01
+**Analysis Date:** 2026-06-21
 
 ## Naming Patterns
 
@@ -12,7 +12,7 @@
 **Classes:**
 - `PascalCase` for classes, enums, typedefs (e.g., `PlaybackController`, `MediaState`, `GlassTier`)
 - Private classes prefixed with `_` (e.g., `_QuickMenuItem`, `_RotatingFileOutput`, `_ShortcutsHelpDialog`)
-- Abstract interfaces use `abstract class` (e.g., `abstract class MediaEngine`)
+- Abstract interfaces use `abstract class` (e.g., `abstract class PlayerEngine`)
 - Extensions use `PascalCase` descriptive names
 
 **Functions/Methods:**
@@ -25,29 +25,31 @@
 - `camelCase` for local variables and parameters (e.g., `rebuildCount`, `onNeedRebuild`)
 - Private fields prefixed with `_` (e.g., `_openGeneration`, `_onError`, `_disposed`)
 - Constants use `camelCase` (Dart convention, NOT `SCREAMING_SNAKE_CASE`)
-  ```dart
-  // Tokens class constants
-  static const bgBase = Color(0xFF0A0A0F);
-  static const fontTitle = 18.0;
-  static const durationFast = 80;
 
-  // Class-level constants
-  static const _prepareTimeoutSeconds = 10;
-  static const _defaultSkipSeconds = 10;
-  ```
+```dart
+// Tokens class constants
+static const bgBase = Color(0xFF0A0A0F);
+static const fontTitle = 18.0;
+static const durationFast = 80;
+
+// Class-level constants
+static const _prepareTimeoutSeconds = 10;
+static const _defaultSkipSeconds = 10;
+```
 
 **Enums:**
 - `PascalCase` for enum type name (e.g., `MediaState`, `PlayMode`, `GlassTier`)
 - `camelCase` for enum values (e.g., `idle`, `loopAll`, `pathEmpty`)
 - Enum values documented with `///` comments:
-  ```dart
-  enum MediaState {
-    /// 初始状态，未加载任何媒体
-    idle,
-    /// 正在播放
-    playing,
-  }
-  ```
+
+```dart
+enum MediaState {
+  /// 初始状态，未加载任何媒体
+  idle,
+  /// 正在播放
+  playing,
+}
+```
 
 ## Code Style
 
@@ -61,19 +63,20 @@
 - Strict mode: `strict-casts: true`, `strict-inference: true`, `strict-raw-types: true`
 - Errors: `missing_required_param: error`, `missing_return: error`, `dead_code: warning`
 - Key rules:
-  ```yaml
-  prefer_const_constructors: true
-  prefer_const_literals_to_create_immutables: true
-  prefer_final_locals: true
-  prefer_final_in_for_each: true
-  avoid_print: true
-  prefer_single_quotes: true
-  always_declare_return_types: true
-  avoid_void_async: true
-  cancel_subscriptions: true
-  close_sinks: true
-  unawaited_futures: true
-  ```
+
+```yaml
+prefer_const_constructors: true
+prefer_const_literals_to_create_immutables: true
+prefer_final_locals: true
+prefer_final_in_for_each: true
+avoid_print: true
+prefer_single_quotes: true
+always_declare_return_types: true
+avoid_void_async: true
+cancel_subscriptions: true
+close_sinks: true
+unawaited_futures: true
+```
 
 **Const usage:**
 - Use `const` constructors wherever possible
@@ -244,6 +247,20 @@ Future<void> playIndex(int index) async {
 }
 ```
 
+**Pattern: Guarded action with disposed check:**
+```dart
+void _guardedAction(String name, void Function() action) {
+  if (_disposed) return;
+  try {
+    action();
+  } on Exception catch (e) {
+    log.e('FvpEngine.$name error: $e');
+    _errorType = MediaErrorType.playback;
+    errorMessage.value = '$name failed: $e';
+  }
+}
+```
+
 **NEVER use:**
 - `catch (e)` without type specification — always `on Exception catch (e)`
 - `print()` — use `debugPrint()` or `log.d()`/`log.w()`/`log.e()`
@@ -253,13 +270,15 @@ Future<void> playIndex(int index) async {
 
 **Framework:** `logger` package with custom `Logger` instance in `lib/kernel/utils/log.dart`
 
-**Global instance:**
+**Module-scoped loggers:**
 ```dart
 import '../utils/log.dart';
 
-Logger log = Logger(
-  printer: PrettyPrinter(methodCount: 0, printEmojis: false, ...),
-);
+Logger log = Logger(...);          // Global logger (no prefix)
+Logger logEngine = Logger(...);    // [engine] prefix
+Logger logBridge = Logger(...);    // [bridge] prefix
+Logger logServices = Logger(...);  // [services] prefix
+Logger logUi = Logger(...);        // [ui] prefix
 ```
 
 **Usage levels:**
@@ -416,7 +435,7 @@ class PlaybackController {
     monitor = StateMonitor(this);
   }
 
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final Playlist playlist;
   late final PlaybackNavigator navigator;
   late final FileOperations fileOps;
@@ -475,7 +494,7 @@ await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
 ## Module Design
 
 **Exports:** Each file exports one primary class/concept
-- `media_engine.dart` exports `MediaEngine` abstract class
+- `player_engine.dart` exports `PlayerEngine` abstract class
 - `playback_controller.dart` exports `PlaybackController`
 - `glass_container.dart` exports `GlassContainer`, `GlassTier`, `GlassButton`
 
@@ -501,7 +520,7 @@ lib/features/player/
 
 ```dart
 // Engine exposes state as ValueNotifiers
-abstract class MediaEngine {
+abstract class PlayerEngine {
   ValueNotifier<MediaState> get state;
   ValueNotifier<int> get position;
   ValueNotifier<double> get volume;
@@ -545,4 +564,4 @@ perf: skip BackdropFilter when opacity < 0.01
 
 ---
 
-*Convention analysis: 2026-06-01*
+*Convention analysis: 2026-06-21*

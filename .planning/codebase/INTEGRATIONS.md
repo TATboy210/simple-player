@@ -1,119 +1,118 @@
 # External Integrations
 
-**Analysis Date:** 2026-05-30
+**Analysis Date:** 2026-06-21
 
 ## APIs & External Services
 
-**Media Engine:**
+**Media Engine (fvp/MDK):**
 - fvp (MDK/FFmpeg) — Video playback, decoding, rendering
-  - SDK/Client: `fvp` package (^0.36.2) — `pubspec.yaml:14`
-  - Interface: `MediaEngine` abstract class — `lib/kernel/engine/media_engine.dart`
+  - SDK/Client: `fvp` package 0.36.2 — `pubspec.yaml:14`
+  - Interface: `PlayerEngine` abstract class — `package:player_engine/player_engine.dart` (local dependency at `../widget_tree_flutter/player_engine`)
   - Implementation: `FvpEngine` — `lib/kernel/engine/fvp_engine.dart`
-  - Helpers: `FvpCallbackHandler`, `PositionPoller`, `TrackManager`
-  - Auth: N/A (local playback)
+  - Helpers:
+    - `FvpCallbackHandler` — mdk callback registration, state mapping, main-thread dispatch (`lib/kernel/engine/fvp_callback_handler.dart`)
+    - `PositionPoller` — Adaptive timer-based position polling (250ms steady, 100ms post-seek) (`lib/kernel/engine/position_poller.dart`)
+    - `TrackManager` — Audio/subtitle track selection and switching (`lib/kernel/engine/track_manager.dart`)
+  - Auth: N/A (local playback + optional URL streams)
+  - Network protocols: HTTP/HTTPS, RTSP, RTMP, SRT, UDP/TCP (with per-protocol low-latency config in `FvpEngine._configureNetworkOptions()`)
 
 **Window Management:**
-- window_manager — Cross-platform window control
-  - SDK/Client: `window_manager` package (^0.5.1) — `pubspec.yaml:25`
-  - Interface: `WindowService` wrapper — `lib/kernel/bridge/window_service.dart`
-  - Events: `WindowListener` mixin for maximize/fullscreen/resize
+- window_manager 0.5.1 — Cross-platform window control
+  - SDK/Client: `window_manager` package — `pubspec.yaml:25`
+  - Wrapper: `WindowService` — `lib/kernel/bridge/window_service.dart`
+  - Events: `WindowListener` mixin for maximize/unmaximize/resize/close
+  - Commands: setFullscreen, setAlwaysOnTop, minimize, maximize, restore, close, startDragging
+  - Geometry persistence: `_saveGeometry()` writes position + size + maximized state to `SettingsStore`
+
+- flutter_fullscreen 1.2.0 — Native fullscreen toggle
+  - SDK/Client: `flutter_fullscreen` package — `pubspec.yaml:16`
+  - Usage: `FullScreen.ensureInitialized()` in `main()`, `FullScreen.setFullScreen()` in `WindowService`
+  - State sync: `WindowService.isFullscreen` ValueNotifier mirrors `FullScreen.isFullScreen`
 
 ## Data Storage
 
-**Key-Value Persistence:**
+**Key-Value Persistence (SharedPreferences):**
 - SharedPreferences — App settings storage
-  - Connection: Platform-specific (Registry on Windows)
-  - Client: `shared_preferences` package (^2.5.5) — `pubspec.yaml:17`
+  - Connection: Platform-specific (Windows Registry)
+  - Client: `shared_preferences` 2.5.5 — `pubspec.yaml:17`
   - Wrapper: `SettingsStore` — `lib/kernel/persistence/settings_store.dart`
-  - Keys: ~25 keys (volume, mute, play mode, window geometry, video effects, locale, theme)
-  - Validation: Input sanitization for window dimensions, coordinates, rotation angles
+  - Prewarm: `SettingsStore.prewarm()` caches instance in `main()` before `runApp()` to avoid repeated `getInstance()` I/O
+  - Keys (~25): volume, lastFile, windowWidth/Height/X/Y, playMode, isMuted, isFullscreen, isAlwaysOnTop, isMaximized, subtitleFontSize/ColorIndex/BottomOffset, videoBrightness/Contrast/Saturation/Hue/Rotation/AspectRatio/Deinterlace, d3d11Sync, hardwareDecoding, locale, themeIndex, shortcuts
+  - Validation: Input sanitization for window dimensions (NaN/Infinity/negative), coordinates (clamp -30000..30000), rotation angles (0/90/180/270 only)
+  - Batch save: `saveAll()` uses sequential writes (not `Future.wait`) for data consistency
 
-**JSON File Storage:**
+**JSON File Storage (Playlist):**
 - Playlist persistence — Application support directory
-  - Client: `path_provider` package (^2.1.5) — `pubspec.yaml:15`
+  - Client: `path_provider` 2.1.5 — `pubspec.yaml:15`
   - Location: `%APPDATA%/SimplePlayer/` (via `getApplicationSupportDirectory()`)
-  - Files: `playlist.json`, `history.json` (legacy, auto-migrated)
+  - Files: `playlist.json`
   - Implementation: `PlaylistStore` — `lib/kernel/persistence/playlist_store.dart`
-  - Features: 300ms debounced writes, atomic file operations (.tmp + rename), exponential backoff retry
+  - Features: Debounced writes, atomic file operations (.tmp + rename)
 
 **File Storage:**
-- Local filesystem — Media files (read-only)
-  - Access: `file_picker` for open dialog — `pubspec.yaml:16`
-  - Access: `desktop_drop` for drag-and-drop — `pubspec.yaml:18`
+- Local filesystem — Media files (read-only access)
+  - Open dialog: `file_picker` 11.0.2 — `pubspec.yaml:16`
+  - Drag-and-drop: `desktop_drop` 0.7.1 — `pubspec.yaml:18`
   - Scanner: `FolderScanner` — `lib/kernel/scanner/folder_scanner.dart`
   - Supported formats: mp4, mkv, avi, mov, wmv, flv, webm, m4v, ts, rmvb, mpg, mpeg, 3gp, vob
 
 **Caching:**
 - In-memory LRU cache — Thumbnail images
-  - Location: `ThumbnailService` — `lib/kernel/services/thumbnail_service.dart`
+  - Implementation: `ThumbnailService` — `lib/kernel/services/thumbnail_service.dart`
   - Capacity: 200 entries
-  - Eviction: Least Recently Used (LRU)
-
-## Win32 FFI Integration
-
-**Native Bindings:**
-- user32.dll — Window manipulation
-  - Functions: `GetWindowLongPtrW`, `SetWindowLongPtrW`, `SetWindowPos`, `MonitorFromWindow`, `GetMonitorInfoW`, `GetWindowRect`
-  - Implementation: `Win32Bindings` lazy singleton — `lib/kernel/bridge/win32_bindings.dart`
-
-- dwmapi.dll — Desktop Window Manager
-  - Functions: `DwmExtendFrameIntoClientArea`
-  - Purpose: Window shadow preservation, fullscreen border removal
-
-**Constants:**
-- `gwlStyle` (-16) — Window style index
-- `wsCaption` (0x00C00000) — Title bar style flag
-- `wsPopup` (0x80000000) — Popup window style (fullscreen)
-- `swpFrameChanged` (0x0020) — SetWindowPos flag for frame update
-
-**Structs:**
-- `Rect` — Window rectangle (left, top, right, bottom)
-- `MonitorInfo` — Monitor info (rcMonitor, rcWork, dwFlags)
-- `Margins` — DWM frame margins (left, right, top, bottom)
-
-## Windows Runner (C++)
-
-**Entry Point:**
-- `windows/runner/main.cpp` — Win32 message loop, COM initialization
-- `windows/runner/flutter_window.cpp` — Flutter view hosting
-- `windows/runner/win32_window.cpp` — Win32 window class
-
-**COM Initialization:**
-- `CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)` — Required for COM-based features
-- `CoUninitialize()` — Cleanup on exit
-
-**Build System:**
-- CMake 3.14+ — `windows/CMakeLists.txt`
-- C++17 standard — `target_compile_features(${TARGET} PUBLIC cxx_std_17)`
-- Unicode build — `add_definitions(-DUNICODE -D_UNICODE)`
+  - Eviction: Least Recently Used (LinkedHashMap-based)
+  - Platform-aware provider selection via `defaultTargetPlatform`
 
 ## Thumbnail System
 
 **Platform Providers:**
-- Windows: `NoopThumbnailProvider` — Returns null (disabled) — `lib/kernel/services/noop_thumbnail_provider.dart`
-- Linux: `LinuxThumbnailProvider` — Implementation present — `lib/kernel/services/linux_thumbnail_provider.dart`
-- macOS: `MacosThumbnailProvider` — Stub — `lib/kernel/services/macos_thumbnail_provider.dart`
+- Windows: `NoopThumbnailProvider` — Returns null (thumbnails disabled) — `lib/kernel/services/noop_thumbnail_provider.dart`
+- Linux: `LinuxThumbnailProvider` — XDG Thumbnail Factory (`~/.cache/thumbnails/{size}/{md5(uri)}.png`) — `lib/kernel/services/linux_thumbnail_provider.dart`
+- macOS: `MacosThumbnailProvider` — Stub, returns null (TODO: QLThumbnailGenerator FFI) — `lib/kernel/services/macos_thumbnail_provider.dart`
 
 **Interface:**
 - `ThumbnailProvider` abstract class — `lib/kernel/services/thumbnail_provider.dart`
 - `ThumbnailService` facade — `lib/kernel/services/thumbnail_service.dart`
-- LRU cache (200 entries) with platform-aware provider selection
+  - Lazy platform detection via `defaultTargetPlatform`
+  - LRU cache (200 entries) with `evict()` and `clearCache()` methods
+  - `@visibleForTesting` reset/touch/cacheLength accessors
+
+## Display Configuration
+
+**Refresh Rate Detection:**
+- `DisplayConfig` — `lib/kernel/bridge/display_config.dart`
+  - Policy: 120Hz+ displays use async D3D11 sync (`'0'`), sub-120Hz use sync (`'1'`)
+  - Current: Defaults to 60Hz (safe fallback), returns `'1'` (sync mode)
+  - Used by: `FvpEngine._applyD3d11Defaults()` to set `d3d11.sync.cpu` property
+
+## Windows Runner (C++)
+
+**Entry Point:**
+- `windows/runner/main.cpp` — Win32 message loop (`GetMessage`/`TranslateMessage`/`DispatchMessage`), COM initialization (`CoInitializeEx` with `COINIT_APARTMENTTHREADED`)
+- `windows/runner/flutter_window.cpp` — Flutter view hosting, plugin registration, `WM_FONTCHANGE` handling
+- `windows/runner/win32_window.cpp` — Win32 window class registration, DPI scaling, window creation
+
+**Key Details:**
+- Window visibility managed by `window_manager` Flutter plugin via `waitUntilReadyToShow` — C++ runner does NOT call `Show()` directly
+- COM required for plugin system
+- Build: CMake 3.14+, C++17, MSVC `/W4 /WX`, Unicode (`-DUNICODE -D_UNICODE`), UTF-8 source (`/utf-8`)
 
 ## Localization (l10n)
 
 **Framework:**
 - Flutter built-in localization with ARB files
 - Config: `l10n.yaml`
-- Output: `lib/l10n/app_localizations.dart` (generated)
+- Generated output: `lib/l10n/app_localizations.dart`
 
 **Supported Locales:**
-- English (en) — `lib/l10n/app_localizations_en.dart`
-- Chinese (zh) — `lib/l10n/app_localizations_zh.dart`
+- English (en) — `lib/l10n/app_localizations_en.dart`, `lib/l10n/app_en.arb`
+- Chinese (zh) — `lib/l10n/app_localizations_zh.dart`, `lib/l10n/app_zh.arb`
 
 **Service:**
 - `LocaleService` — `lib/kernel/services/locale_service.dart`
 - Persistence: SharedPreferences key `locale`
-- Default: 'zh' (Chinese)
+- Default: `'zh'` (Chinese)
+- Reactive: `ValueNotifier<Locale>` drives `MaterialApp.locale`
 
 ## Theme System
 
@@ -121,37 +120,53 @@
 - `ThemeService` — `lib/kernel/services/theme_service.dart`
 - 3 themes: Midnight, Ocean, Forest
 - Persistence: SharedPreferences key `themeIndex`
-- Design tokens: `lib/ui/theme/tokens.dart` — `Tokens.*` static constants
+- Design tokens: `lib/ui/theme/tokens.dart` — `Tokens.*` static constants (colors, spacing, radius, typography)
+- Reactive: `AnimatedTheme` with 250ms duration wraps `MaterialApp`
 
 ## Logging
 
 **Framework:**
-- `logger` package (^2.5.0) — `pubspec.yaml:19`
+- `logger` 2.7.0 — `pubspec.yaml:19`
 - Implementation: `lib/kernel/utils/log.dart`
 
+**Module-Scoped Loggers:**
+- `log` — Global logger (no prefix)
+- `logEngine` — `[engine]` prefix
+- `logBridge` — `[bridge]` prefix
+- `logServices` — `[services]` prefix
+- `logUi` — `[ui]` prefix
+
 **Configuration:**
-- Debug mode: Console output only (`PrettyPrinter`)
+- Debug mode: Console output only (`PrettyPrinter`, colors enabled, no emojis)
 - Release mode: Console + rotating file output
-- File location: `%APPDATA%/SimplePlayer/logs/`
-- Rotation: 2 MB max per file, keep 5 archives
-- Format: `app_<timestamp>.log`
+  - File location: `%APPDATA%/SimplePlayer/logs/app_<timestamp>.log`
+  - Rotation: 2 MB max per file, keep 5 archives
+  - Filter: `ProductionFilter` (warning+ level only)
+  - Custom `_RotatingFileOutput` class handles size-based rotation
 
 ## Startup Coordination
 
 **Coordinator:**
 - `StartupCoordinator` — `lib/kernel/startup/startup_coordinator.dart`
-- Phases: `infrastructure`, `settings`, `ready`
-- Progress tracking: 0.0 → 1.0 per phase
-- UI: `ProgressSplashScreen` driven by `ValueNotifier<StartupState>`
+- Phases: `infrastructure` (engine prewarm), `settings` (locale/theme load), `ready`
+- Progress: `ValueNotifier<StartupState>` drives `ProgressSplashScreen`
+- Per-phase timing: Individual `Stopwatch` instances with structured timeline logging
 
 **Pre-warming:**
 - `EnginePrewarm` — `lib/kernel/engine/engine_prewarm.dart`
-  - Creates temporary `mdk.Player()` to trigger FFmpeg codec registration + D3D11 context init
+  - Creates temporary `mdk.Player()` to trigger FFmpeg codec registration + D3D11 context initialization
   - Fire-and-forget in `main()` — `lib/main.dart:38-42`
-  - Idempotent: Safe to call multiple times
-
+  - Idempotent: Safe to call multiple times (boolean guard)
 - `SettingsStore.prewarm()` — `lib/kernel/persistence/settings_store.dart:26`
-  - Caches `SharedPreferences` instance to avoid repeated `getInstance()` I/O
+  - Caches `SharedPreferences` instance before `runApp()` to avoid repeated platform I/O
+
+## Memory Monitoring
+
+**Debug-Only:**
+- `MemoryMonitor` — `lib/kernel/utils/memory_monitor.dart`
+  - Periodic RSS logging every 30 seconds (debug builds only)
+  - Warning threshold: 50 MB growth since last reading
+  - Uses `ProcessInfo.currentRss` from `dart:io`
 
 ## Environment Configuration
 
@@ -162,8 +177,9 @@
 - N/A — no external API keys or secrets
 
 **Platform detection:**
-- `defaultTargetPlatform` — Used for thumbnail provider selection
-- `Platform.environment['APPDATA']` — Used for log file location
+- `defaultTargetPlatform` — Thumbnail provider selection
+- `Platform.environment['APPDATA']` — Log file location (release builds)
+- `Platform.environment['HOME']` — Linux thumbnail cache path
 
 ## Webhooks & Callbacks
 
@@ -171,7 +187,7 @@
 - None — local-only application
 
 **Outgoing:**
-- None — no network communication (except optional URL playback)
+- None — no network communication (except optional URL/stream playback via fvp)
 
 ## CI/CD & Deployment
 
@@ -184,14 +200,14 @@
 
 **Build Commands:**
 ```bash
-flutter pub get                    # Install dependencies
-flutter run -d windows             # Development run
-flutter analyze                    # Static analysis
-flutter test                       # Run tests
-flutter build windows              # Release build
-dart run build_runner build        # Code generation (freezed, json_serializable)
+flutter pub get                              # Install dependencies
+flutter run -d windows                       # Development run
+flutter analyze                              # Static analysis
+flutter test                                 # Run unit/widget tests
+flutter build windows                        # Release build
+dart run build_runner build --delete-conflicting-outputs  # Code generation
 ```
 
 ---
 
-*Integration audit: 2026-05-30*
+*Integration audit: 2026-06-21*
