@@ -9,6 +9,7 @@ void main() {
       GlassTier tier = GlassTier.normal,
       ValueListenable<double>? opacity,
       bool blurEnabled = true,
+      ValueListenable<bool>? resizing,
     }) {
       return MaterialApp(
         home: Scaffold(
@@ -16,6 +17,7 @@ void main() {
             tier: tier,
             opacity: opacity,
             blurEnabled: blurEnabled,
+            resizing: resizing,
             child: const Text('test'),
           ),
         ),
@@ -81,6 +83,46 @@ void main() {
 
       expect(find.text('test'), findsOneWidget);
       opacity.dispose();
+    });
+
+    testWidgets('resizing=true skips BackdropFilter', (tester) async {
+      final resizing = ValueNotifier<bool>(true);
+      await tester.pumpWidget(buildSubject(resizing: resizing));
+      await tester.pump();
+      // resizing=true → ClipRRect + RepaintBoundary, no BackdropFilter
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.text('test'), findsOneWidget);
+      resizing.dispose();
+    });
+
+    testWidgets('resizing=false renders BackdropFilter', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      await tester.pumpWidget(buildSubject(resizing: resizing));
+      await tester.pump();
+      // resizing=false → normal blur path with BackdropFilter
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      resizing.dispose();
+    });
+
+    testWidgets('resizing transition rebuilds correctly', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      await tester.pumpWidget(buildSubject(resizing: resizing));
+      await tester.pump();
+
+      // Start without resize → BackdropFilter present
+      expect(find.byType(BackdropFilter), findsOneWidget);
+
+      // Simulate resize start → skip BackdropFilter
+      resizing.value = true;
+      await tester.pump();
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.text('test'), findsOneWidget);
+
+      // Resize end → restore BackdropFilter
+      resizing.value = false;
+      await tester.pump();
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      resizing.dispose();
     });
   });
 

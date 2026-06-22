@@ -45,6 +45,9 @@ class GlassContainer extends StatelessWidget {
   /// 低配硬件降级模式 — false 时跳过 BackdropFilter（D-14）
   final bool blurEnabled;
 
+  /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
+  final ValueListenable<bool>? resizing;
+
   const GlassContainer({
     super.key,
     required this.child,
@@ -56,6 +59,7 @@ class GlassContainer extends StatelessWidget {
     this.tier = GlassTier.normal,
     this.opacity,
     this.blurEnabled = true,
+    this.resizing,
   });
 
   @override
@@ -82,6 +86,27 @@ class GlassContainer extends StatelessWidget {
       );
     }
 
+    // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
+    if (resizing != null) {
+      return AnimatedBuilder(
+        animation: resizing!,
+        builder: (_, child) {
+          if (resizing!.value) {
+            return ClipRRect(
+              borderRadius: rRect,
+              child: RepaintBoundary(child: child),
+            );
+          }
+          return _buildBlurContent(rRect, child!);
+        },
+        child: content,
+      );
+    }
+
+    return _buildBlurContent(rRect, content);
+  }
+
+  Widget _buildBlurContent(BorderRadius rRect, Widget content) {
     final blurContent = RepaintBoundary(child: content);
     final blurFilter = ui.ImageFilter.blur(
       sigmaX: tier.sigma,
