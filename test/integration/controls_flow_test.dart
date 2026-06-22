@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
 
 import '../helpers/fake_engine.dart';
 import '../helpers/integration_helpers.dart';
@@ -45,15 +46,15 @@ void main() {
     test('fullscreen toggle updates state', () async {
       final windowService = createFakeWindowService();
 
-      await windowService.setFullscreen(true);
-      expect(windowService.isFullscreen.value, true);
-      expect(windowService.fullscreenCallCount, 1);
-      expect(windowService.lastFullscreenValue, true);
+      await windowService.setMode(WindowMode.fullscreen);
+      expect(windowService.mode.value.isFullscreen, true);
+      expect(windowService.modeCallCount, 1);
+      expect(windowService.lastModeValue, WindowMode.fullscreen);
 
-      await windowService.setFullscreen(false);
-      expect(windowService.isFullscreen.value, false);
-      expect(windowService.fullscreenCallCount, 2);
-      expect(windowService.lastFullscreenValue, false);
+      await windowService.setMode(WindowMode.windowed);
+      expect(windowService.mode.value.isFullscreen, false);
+      expect(windowService.modeCallCount, 2);
+      expect(windowService.lastModeValue, WindowMode.windowed);
 
       windowService.dispose();
     });
