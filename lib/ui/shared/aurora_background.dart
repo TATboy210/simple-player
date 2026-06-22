@@ -281,10 +281,14 @@ class _AuroraPainter extends CustomPainter {
     this.cachedNoise,
   });
 
+  // 静态 Paint 缓存 — 避免每帧分配（PERF-07）
+  static final _bgPaint = Paint()..color = Tokens.bgBase;
+  static final _compositePaint = Paint();
+
   @override
   void paint(Canvas canvas, Size size) {
     // Layer 0: 深色底
-    canvas.drawRect(Offset.zero & size, Paint()..color = Tokens.bgBase);
+    canvas.drawRect(Offset.zero & size, _bgPaint);
 
     if (blobImages == null || blobImages!.length < 3) return;
 
@@ -313,7 +317,7 @@ class _AuroraPainter extends CustomPainter {
       canvas.save();
       canvas.translate(cx, cy);
       canvas.scale(blobW / img.width, blobH / img.height);
-      canvas.drawImage(img, Offset(-img.width / 2, -img.height / 2), Paint());
+      canvas.drawImage(img, Offset(-img.width / 2, -img.height / 2), _compositePaint);
       canvas.restore();
     }
 
