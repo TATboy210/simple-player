@@ -15,19 +15,11 @@ void main() {
       service.dispose();
     });
 
-    test('isFullscreen proxy reads from state.mode', () {
+    test('mode getter delegates to state.mode', () {
       final service = WindowService();
-      expect(service.isFullscreen.value, false);
+      expect(service.mode.value, WindowMode.windowed);
       service.state.mode.value = WindowMode.fullscreen;
-      expect(service.isFullscreen.value, true);
-      service.dispose();
-    });
-
-    test('isMaximized proxy reads from state.mode', () {
-      final service = WindowService();
-      expect(service.isMaximized.value, false);
-      service.state.mode.value = WindowMode.maximized;
-      expect(service.isMaximized.value, true);
+      expect(service.mode.value, WindowMode.fullscreen);
       service.dispose();
     });
 
@@ -50,7 +42,6 @@ void main() {
       final service = WindowService();
       service.onWindowMaximize();
       expect(service.state.mode.value, WindowMode.maximized);
-      expect(service.isMaximized.value, true);
       service.dispose();
     });
 
@@ -59,7 +50,6 @@ void main() {
       service.state.mode.value = WindowMode.maximized;
       service.onWindowUnmaximize();
       expect(service.state.mode.value, WindowMode.windowed);
-      expect(service.isMaximized.value, false);
       service.dispose();
     });
 

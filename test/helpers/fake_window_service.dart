@@ -1,29 +1,45 @@
-import 'package:simple_player_flutter/kernel/bridge/window_service.dart';
+import 'package:flutter/foundation.dart';
 
-/// Test double for WindowService — no window_manager.
+import 'dart:ui';
+
+import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
+import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
+
+/// 测试替身 — 实现 WindowBridge 接口，无 window_manager 依赖。
 ///
-/// Overrides all methods that touch windowManager.
-/// Provides call tracking for test assertions.
-class FakeWindowService extends WindowService {
+/// 提供调用计数用于测试断言。
+class FakeWindowService implements WindowBridge {
   // ─── Call tracking ───
 
-  int fullscreenCallCount = 0;
-  bool? lastFullscreenValue;
+  int modeCallCount = 0;
+  WindowMode? lastModeValue;
   int alwaysOnTopCallCount = 0;
   bool? lastAlwaysOnTopValue;
-  int maximizeCallCount = 0;
-  int restoreCallCount = 0;
+  int minimizeCallCount = 0;
+  int closeCallCount = 0;
+  int startDraggingCallCount = 0;
+
+  // ─── ValueNotifiers ───
 
   @override
-  Future<void> init() async {
-    // No-op: skip windowManager.ensureInitialized and listener registration.
-  }
+  final ValueNotifier<WindowMode> mode = ValueNotifier(WindowMode.windowed);
+  @override
+  final ValueNotifier<Size> windowSize = ValueNotifier(const Size(1280, 720));
+  @override
+  final ValueNotifier<bool> isResizing = ValueNotifier(false);
+  @override
+  final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
+
+  // ─── WindowBridge implementation ───
 
   @override
-  Future<void> setFullscreen(bool value) async {
-    fullscreenCallCount++;
-    lastFullscreenValue = value;
-    isFullscreen.value = value;
+  Future<void> init() async {}
+
+  @override
+  Future<void> setMode(WindowMode target) async {
+    modeCallCount++;
+    lastModeValue = target;
+    mode.value = target;
   }
 
   @override
@@ -34,28 +50,25 @@ class FakeWindowService extends WindowService {
   }
 
   @override
-  Future<void> maximize() async {
-    maximizeCallCount++;
-    isMaximized.value = true;
+  Future<void> minimize() async {
+    minimizeCallCount++;
   }
 
   @override
-  Future<void> restore() async {
-    restoreCallCount++;
-    isMaximized.value = false;
+  Future<void> close() async {
+    closeCallCount++;
   }
 
   @override
-  Future<void> minimize() async {}
-
-  @override
-  Future<void> close() async {}
+  Future<void> startDragging() async {
+    startDraggingCallCount++;
+  }
 
   @override
   void dispose() {
-    isFullscreen.dispose();
-    isAlwaysOnTop.dispose();
-    isMaximized.dispose();
+    mode.dispose();
     windowSize.dispose();
+    isResizing.dispose();
+    isAlwaysOnTop.dispose();
   }
 }

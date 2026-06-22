@@ -45,22 +45,19 @@ class WindowService with WindowListener implements WindowBridge {
   Timer? _resizeDebounce;
   Timer? _resizeEndTimer;
 
-  // ─── WindowBridge backward-compatible getters ───
+  // ─── WindowBridge state getters ───
 
   @override
-  ValueNotifier<bool> get isFullscreen => _state.isFullscreen;
-
-  @override
-  ValueNotifier<bool> get isAlwaysOnTop => _state.isAlwaysOnTop;
-
-  @override
-  ValueNotifier<bool> get isMaximized => _state.isMaximized;
+  ValueNotifier<WindowMode> get mode => _state.mode;
 
   @override
   ValueNotifier<Size> get windowSize => _state.windowSize;
 
   @override
   ValueNotifier<bool> get isResizing => _state.isResizing;
+
+  @override
+  ValueNotifier<bool> get isAlwaysOnTop => _state.isAlwaysOnTop;
 
   // ─── Extended accessors (new API) ───
 
@@ -74,7 +71,7 @@ class WindowService with WindowListener implements WindowBridge {
     await windowManager.ensureInitialized();
 
     // 同步 flutter_fullscreen 初始状态
-    _state.isFullscreen.value = FullScreen.isFullScreen;
+    if (FullScreen.isFullScreen) _state.mode.value = WindowMode.fullscreen;
     logBridge.d('[WindowService] FullScreen initialized, isFullScreen=${FullScreen.isFullScreen}');
 
     const options = WindowOptions(
@@ -174,22 +171,31 @@ class WindowService with WindowListener implements WindowBridge {
   // ─── Commands ───
 
   @override
-  Future<void> setFullscreen(bool value) async {
-    if (_disposed) return;
-    final ctrl = _fullscreenCtrl;
-    if (ctrl == null) {
-      logBridge.e('[WindowService.setFullscreen] controller not initialized');
-      return;
-    }
-    await ctrl.setFullscreen(value);
-    // 持久化全屏状态
-    if (value) {
-      await _persistence.saveIsFullscreen(true);
-    } else {
-      // 延迟保存退出全屏（等待动画完成）
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (!_disposed) _persistence.saveIsFullscreen(false);
-      });
+  Future<void> setMode(WindowMode target) async {
+    if (_disposed || target == _state.mode.value) return;
+
+    switch (target) {
+      case WindowMode.fullscreen:
+        final ctrl = _fullscreenCtrl;
+        if (ctrl == null) {
+          logBridge.e('[WindowService.setMode] controller not initialized');
+          return;
+        }
+        await ctrl.setFullscreen(true);
+        await _persistence.saveIsFullscreen(true);
+      case WindowMode.windowed:
+        final ctrl = _fullscreenCtrl;
+        if (ctrl == null) return;
+        await ctrl.setFullscreen(false);
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (!_disposed) _persistence.saveIsFullscreen(false);
+        });
+      case WindowMode.maximized:
+        await windowManager.maximize();
+        // OS 回调 onWindowMaximize 驱动 mode
+      case WindowMode.minimized:
+        await windowManager.minimize();
+        // OS 回调 onWindowMinimize 驱动 mode
     }
   }
 
@@ -202,18 +208,6 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   Future<void> minimize() => windowManager.minimize();
-
-  @override
-  Future<void> maximize() async {
-    await windowManager.maximize();
-    // OS 回调 onWindowMaximize 会驱动 mode
-  }
-
-  @override
-  Future<void> restore() async {
-    await windowManager.unmaximize();
-    // OS 回调 onWindowUnmaximize 会驱动 mode
-  }
 
   @override
   Future<void> close() => windowManager.close();
@@ -232,7 +226,7 @@ class WindowService with WindowListener implements WindowBridge {
         y: pos.dy,
         width: size.width,
         height: size.height,
-        isMaximized: _state.isMaximized.value,
+        isMaximized: _state.mode.value.isMaximized,
       );
     } catch (e, st) {
       logBridge.e('[WindowService._saveGeometry] $e\n$st');
