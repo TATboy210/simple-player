@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../kernel/bridge/window_service.dart';
+import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/fvp_engine.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/playlist/playlist.dart';
@@ -18,7 +18,7 @@ class PlayerServices {
   late final Playlist playlist;
   late final PlaybackController controller;
   late final VideoProcessingService videoProcessing;
-  final WindowService windowService;
+  final WindowBridge windowService;
 
   final ValueNotifier<int> playlistGeneration = ValueNotifier(0);
 

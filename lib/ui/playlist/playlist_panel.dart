@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -31,6 +32,9 @@ class PlaylistPanel extends StatefulWidget {
   onFolderScanned;
   final VoidCallback? onClearHistory;
 
+  /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
+  final ValueListenable<bool>? resizing;
+
   const PlaylistPanel({
     super.key,
     required this.playlist,
@@ -41,6 +45,7 @@ class PlaylistPanel extends StatefulWidget {
     this.onShowProperties,
     this.onFolderScanned,
     this.onClearHistory,
+    this.resizing,
   });
 
   @override
@@ -100,6 +105,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     _selectedTab.dispose();
     _anim.dispose();
     super.dispose();
+  }
+
+  Widget _buildBackdrop() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: BackdropFilter(
+          filter: _blurFilter,
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
   }
 
   static const _panelWidth = Tokens.playlistPanelWidth;
@@ -162,17 +180,24 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           child: Stack(
             children: [
               // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
+              // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
               Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                  child: FadeTransition(
-                    opacity: _fadeAnim,
-                    child: BackdropFilter(
-                      filter: _blurFilter,
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                ),
+                child: widget.resizing != null
+                    ? AnimatedBuilder(
+                        animation: widget.resizing!,
+                        builder: (_, __) {
+                          if (widget.resizing!.value) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                Tokens.radiusLarge,
+                              ),
+                              child: Container(color: Tokens.bgGlass),
+                            );
+                          }
+                          return _buildBackdrop();
+                        },
+                      )
+                    : _buildBackdrop(),
               ),
               // 内容层：滚动不触发 BackdropFilter 重绘
               RepaintBoundary(
