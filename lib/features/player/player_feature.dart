@@ -1,14 +1,14 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/bridge/window_service.dart';
+import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
 import '../../ui/shared/play_mode_utils.dart';
-import '../../ui/widgets/osd_overlay.dart';
+import '../../ui/shared/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:player_engine/player_engine.dart';
 import 'services/video_processing_service.dart';
@@ -26,7 +26,7 @@ import 'player_services.dart';
 /// 由 App 通过构造函数传入。
 class PlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
-  final WindowService windowService;
+  final WindowBridge windowService;
   final void Function(
     BuildContext context,
     PlayerEngine engine,

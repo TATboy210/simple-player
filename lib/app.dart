@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'kernel/bridge/window_service.dart';
+import 'kernel/bridge/window_bridge.dart';
 import 'package:player_engine/player_engine.dart';
 import 'kernel/utils/log.dart';
 import 'kernel/services/locale_service.dart';
@@ -20,7 +20,7 @@ import 'l10n/app_localizations.dart';
 ///   - 右键快捷菜单（语言/主题切换）
 class App extends StatefulWidget {
   final StartupCoordinator coordinator;
-  final WindowService windowService;
+  final WindowBridge windowService;
 
   const App({super.key, required this.coordinator, required this.windowService});
 
