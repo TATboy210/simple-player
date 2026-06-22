@@ -1,13 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
-import '../widgets/osd_overlay.dart';
+import '../shared/osd_overlay.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
+import 'player_actions.dart';
 
 /// ValueNotifier 重建审计参考模式（02-02 审计结果）
 ///
@@ -35,45 +37,22 @@ import 'error_banner.dart';
 class ControlsOverlay extends StatefulWidget {
   static const _clickDelayMs = 250; // 等待可能的双击
   final PlayerEngine engine;
+  final PlayerActions actions;
   final bool isFullscreen;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final VoidCallback? onTogglePlaylist;
-  final VoidCallback? onSettings;
-  final void Function(BuildContext context, TapUpDetails details)?
-  onSettingsSecondary;
-  final VoidCallback? onOpenFile;
-  final VoidCallback? onToggleFullscreen;
-  final VoidCallback? onTogglePlayMode;
-  final VoidCallback? onOpenSubtitle;
-  final IconData? playModeIcon;
-
-  /// 播放模式名称（如"顺序播放"、"列表循环"）
-  final String? playModeLabel;
-
-  /// 是否为视频媒体（影响 prev/next 按钮的 tooltip）
-  final bool isVideo;
 
   /// 空状态存在时，控制栏不拦截 hit test（让下层 EmptyState 按钮可点击）
   final bool emptyStatePresent;
 
+  /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter
+  final ValueListenable<bool>? resizing;
+
   const ControlsOverlay({
     super.key,
     required this.engine,
+    this.actions = const PlayerActions(),
     this.isFullscreen = false,
-    this.onPrevious,
-    this.onNext,
-    this.onTogglePlaylist,
-    this.onSettings,
-    this.onSettingsSecondary,
-    this.onOpenFile,
-    this.onToggleFullscreen,
-    this.onTogglePlayMode,
-    this.onOpenSubtitle,
-    this.playModeIcon,
-    this.playModeLabel,
-    this.isVideo = false,
     this.emptyStatePresent = false,
+    this.resizing,
   });
 
   @override
@@ -113,7 +92,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
 
   void _handleDoubleTap() {
     _clickTimer?.cancel();
-    widget.onToggleFullscreen?.call();
+    widget.actions.onToggleFullscreen?.call();
   }
 
   void _onEngineStateChanged() => _autoHide.onEngineStateChanged();
@@ -175,22 +154,12 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                       opacity: _autoHide.opacity,
                       child: ControlBar(
                         engine: widget.engine,
+                        actions: widget.actions,
                         isFullscreen: widget.isFullscreen,
                         isIdle: isIdle,
-                        isVideo: widget.isVideo,
-                        onPrevious: widget.onPrevious,
-                        onNext: widget.onNext,
-                        onTogglePlaylist: widget.onTogglePlaylist,
-                        onSettings: widget.onSettings,
-                        onSettingsSecondary: widget.onSettingsSecondary,
-                        onOpenFile: widget.onOpenFile,
-                        onToggleFullscreen: widget.onToggleFullscreen,
-                        onTogglePlayMode: widget.onTogglePlayMode,
-                        onOpenSubtitle: widget.onOpenSubtitle,
-                        playModeIcon: widget.playModeIcon,
-                        playModeLabel: widget.playModeLabel,
                         opacity: _autoHide.opacity,
                         enableBlur: _autoHide.visible.value,
+                        resizing: widget.resizing,
                       ),
                     ),
                   ),
@@ -204,8 +173,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                     child: RepaintBoundary(
                       child: ErrorBanner(
                         engine: widget.engine,
-                        onOpenFile: widget.onOpenFile,
-                        onRetry: widget.onOpenFile,
+                        onOpenFile: widget.actions.onOpenFile,
+                        onRetry: widget.actions.onOpenFile,
                       ),
                     ),
                   ),

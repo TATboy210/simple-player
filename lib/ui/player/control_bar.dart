@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:player_engine/player_engine.dart';
@@ -7,6 +8,7 @@ import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import 'center_controls.dart';
+import 'player_actions.dart';
 import 'progress_bar.dart';
 import 'speed_button.dart';
 import 'time_range_display.dart';
@@ -28,45 +30,26 @@ class ControlBar extends StatelessWidget {
   );
 
   final PlayerEngine engine;
+  final PlayerActions actions;
   final bool isFullscreen;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final VoidCallback? onTogglePlaylist;
-  final VoidCallback? onSettings;
-  final void Function(BuildContext context, TapUpDetails details)?
-  onSettingsSecondary;
-  final VoidCallback? onOpenFile;
-  final VoidCallback? onToggleFullscreen;
-  final VoidCallback? onTogglePlayMode;
-  final VoidCallback? onOpenSubtitle;
-  final IconData? playModeIcon;
-  final String? playModeLabel;
-  final bool isVideo;
   final bool enableBlur;
   final bool isIdle;
 
   /// 淡入淡出动画 — opacity=0 时跳过 BackdropFilter
   final Animation<double>? opacity;
 
+  /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
+  final ValueListenable<bool>? resizing;
+
   const ControlBar({
     super.key,
     required this.engine,
+    this.actions = const PlayerActions(),
     this.isFullscreen = false,
-    this.onPrevious,
-    this.onNext,
-    this.onTogglePlaylist,
-    this.onSettings,
-    this.onSettingsSecondary,
-    this.onOpenFile,
-    this.onToggleFullscreen,
-    this.onTogglePlayMode,
-    this.onOpenSubtitle,
-    this.playModeIcon,
-    this.playModeLabel,
-    this.isVideo = false,
     this.enableBlur = true,
     this.isIdle = false,
     this.opacity,
+    this.resizing,
   });
 
   @override
@@ -117,6 +100,22 @@ class ControlBar extends StatelessWidget {
 
     if (!enableBlur) return RepaintBoundary(child: content);
 
+    // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
+    if (resizing != null) {
+      return AnimatedBuilder(
+        animation: resizing!,
+        builder: (_, child) {
+          if (resizing!.value) return RepaintBoundary(child: child!);
+          return _buildBlur(child!);
+        },
+        child: content,
+      );
+    }
+
+    return _buildBlur(content);
+  }
+
+  Widget _buildBlur(Widget content) {
     // opacity=0 时跳过 BackdropFilter（fade-out 尾部帧零 GPU readback）
     final blurContent = RepaintBoundary(child: content);
 
@@ -155,9 +154,7 @@ class ControlBar extends StatelessWidget {
         _LeftButtonGroup(
           engine: engine,
           showSecondary: showSecondary,
-          playModeIcon: playModeIcon,
-          playModeLabel: playModeLabel,
-          onTogglePlayMode: onTogglePlayMode,
+          actions: actions,
         ),
         const Spacer(),
         CenterGroup(
@@ -165,18 +162,13 @@ class ControlBar extends StatelessWidget {
           isIdle: isIdle,
           prevTooltip: prevTooltip,
           nextTooltip: nextTooltip,
-          onPrevious: onPrevious,
-          onNext: onNext,
+          onPrevious: actions.onPrevious,
+          onNext: actions.onNext,
         ),
         const Spacer(),
         _RightButtonGroup(
           isFullscreen: isFullscreen,
-          onOpenFile: onOpenFile,
-          onOpenSubtitle: onOpenSubtitle,
-          onTogglePlaylist: onTogglePlaylist,
-          onSettings: onSettings,
-          onSettingsSecondary: onSettingsSecondary,
-          onToggleFullscreen: onToggleFullscreen,
+          actions: actions,
         ),
       ],
     );
@@ -187,16 +179,12 @@ class ControlBar extends StatelessWidget {
 class _LeftButtonGroup extends StatelessWidget {
   final PlayerEngine engine;
   final bool showSecondary;
-  final IconData? playModeIcon;
-  final String? playModeLabel;
-  final VoidCallback? onTogglePlayMode;
+  final PlayerActions actions;
 
   const _LeftButtonGroup({
     required this.engine,
     required this.showSecondary,
-    this.playModeIcon,
-    this.playModeLabel,
-    this.onTogglePlayMode,
+    required this.actions,
   });
 
   @override
@@ -205,9 +193,9 @@ class _LeftButtonGroup extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         GlassButton.iconOnly(
-          icon: playModeIcon ?? Icons.repeat,
-          tooltip: playModeLabel ?? '顺序',
-          onPressed: onTogglePlayMode,
+          icon: actions.playModeIcon ?? Icons.repeat,
+          tooltip: actions.playModeLabel ?? '顺序',
+          onPressed: actions.onTogglePlayMode,
         ),
         if (showSecondary) ...[
           const SizedBox(width: Tokens.spXs),
@@ -224,22 +212,11 @@ class _LeftButtonGroup extends StatelessWidget {
 /// 右侧按钮组：文件、字幕、播放列表、设置、全屏
 class _RightButtonGroup extends StatelessWidget {
   final bool isFullscreen;
-  final VoidCallback? onOpenFile;
-  final VoidCallback? onOpenSubtitle;
-  final VoidCallback? onTogglePlaylist;
-  final VoidCallback? onSettings;
-  final void Function(BuildContext context, TapUpDetails details)?
-  onSettingsSecondary;
-  final VoidCallback? onToggleFullscreen;
+  final PlayerActions actions;
 
   const _RightButtonGroup({
     required this.isFullscreen,
-    this.onOpenFile,
-    this.onOpenSubtitle,
-    this.onTogglePlaylist,
-    this.onSettings,
-    this.onSettingsSecondary,
-    this.onToggleFullscreen,
+    required this.actions,
   });
 
   @override
@@ -248,37 +225,37 @@ class _RightButtonGroup extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (onOpenFile != null)
+        if (actions.onOpenFile != null)
           GlassButton.iconOnly(
             icon: Icons.folder_open,
-            onPressed: onOpenFile,
+            onPressed: actions.onOpenFile,
             tooltip: l10n.openFileTooltip,
           ),
-        if (onOpenSubtitle != null)
+        if (actions.onOpenSubtitle != null)
           GlassButton.iconOnly(
             icon: Icons.subtitles,
-            onPressed: onOpenSubtitle,
+            onPressed: actions.onOpenSubtitle,
             tooltip: l10n.openSubtitle,
           ),
-        if (onTogglePlaylist != null)
+        if (actions.onTogglePlaylist != null)
           GlassButton.iconOnly(
             icon: Icons.queue_music,
-            onPressed: onTogglePlaylist,
+            onPressed: actions.onTogglePlaylist,
             tooltip: l10n.playlist,
           ),
-        if (onSettings != null)
+        if (actions.onSettings != null)
           GlassButton.iconOnly(
             icon: Icons.settings,
-            onPressed: onSettings,
-            onSecondaryTapUp: onSettingsSecondary != null
-                ? (d) => onSettingsSecondary!(context, d)
+            onPressed: actions.onSettings,
+            onSecondaryTapUp: actions.onSettingsSecondary != null
+                ? (d) => actions.onSettingsSecondary!(context, d)
                 : null,
             tooltip: l10n.settings,
           ),
-        if (onToggleFullscreen != null)
+        if (actions.onToggleFullscreen != null)
           GlassButton.iconOnly(
             icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-            onPressed: onToggleFullscreen,
+            onPressed: actions.onToggleFullscreen,
             tooltip: isFullscreen ? l10n.exitFullscreen : l10n.fullscreen,
           ),
       ],

@@ -27,7 +27,10 @@ import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
+import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import '../helpers/fake_engine.dart';
+
+void _noop() {}
 
 /// 包装 widget，统计 build 次数
 class _RebuildCounter extends StatefulWidget {
@@ -63,12 +66,14 @@ Widget _buildControlBar(
         height: 200,
         child: ControlBar(
           engine: engine,
+          actions: const PlayerActions(
+            onOpenFile: _noop,
+            onSettings: _noop,
+            onToggleFullscreen: _noop,
+          ),
           enableBlur: enableBlur,
           isFullscreen: isFullscreen,
           isIdle: isIdle,
-          onOpenFile: () {},
-          onSettings: () {},
-          onToggleFullscreen: () {},
         ),
       ),
     ),
@@ -80,7 +85,10 @@ Widget _buildControlsOverlay(FakeEngine engine) {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
-      body: ControlsOverlay(engine: engine, onToggleFullscreen: () {}),
+      body: ControlsOverlay(
+        engine: engine,
+        actions: const PlayerActions(onToggleFullscreen: _noop),
+      ),
     ),
   );
 }
