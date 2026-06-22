@@ -237,15 +237,13 @@ class _AuroraPainter extends CustomPainter {
 
 ## Open Questions
 
-1. **Should PlaylistPanel get a `resizing` parameter or should it use an inherited widget / provider?**
-   - What we know: GlassContainer, ControlBar, and PlaylistPanel all need the signal
-   - What's unclear: Whether to thread it through constructor params or use a more decoupled approach
-   - Recommendation: Constructor params — consistent with existing patterns (engine, windowService already threaded this way). An InheritedWidget would be over-engineering for 3 consumers.
+1. **(RESOLVED)** Should PlaylistPanel get a `resizing` parameter or should it use an inherited widget / provider?
+   - Resolution: Constructor params — consistent with existing patterns. An InheritedWidget would be over-engineering for 3 consumers.
+   - Rationale: GlassContainer, ControlBar, and PlaylistPanel all get `resizing` as constructor param, threaded from PlayerScreen.
 
-2. **Should resize degradation also affect the AuroraBackground Ticker?**
-   - What we know: AuroraBackground runs at ~15fps via Ticker. During resize, the compositor is already under stress.
-   - What's unclear: Whether pausing the Ticker during resize would cause visible jank when resize ends
-   - Recommendation: Do not pause Ticker — it's already throttled to 15fps and the repaint boundary isolates it. BackdropFilter is the real GPU bottleneck.
+2. **(RESOLVED)** Should resize degradation also affect the AuroraBackground Ticker?
+   - Resolution: No — do not pause Ticker during resize.
+   - Rationale: Already throttled to 15fps and isolated by RepaintBoundary. BackdropFilter is the real GPU bottleneck, not the Ticker.
 
 ## Validation Architecture
 

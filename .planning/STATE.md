@@ -2,16 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2.1
 milestone_name: Window Polish & Architecture Simplification
+current_phase: 13
+current_phase_name: in-progress
 status: completed
-stopped_at: context exhaustion at 75% (2026-06-01)
-last_updated: "2026-06-01T08:21:34.072Z"
-last_activity: 2026-05-31 — Phase 13 Wave 2 complete (H-1/H-2/H-4 fixes, _removeBorder/_baseStyle removed)
+stopped_at: context exhaustion at 75% (2026-06-22)
+last_updated: "2026-06-22T05:53:30.178Z"
+last_activity: 2026-05-31
+last_activity_desc: Phase 13 Wave 2 complete (H-1/H-2/H-4 fixes, _removeBorder/_baseStyle removed)
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 7
   total_plans: 30
   completed_plans: 24
-  percent: 64
+  percent: 58
 ---
 
 # Project State
@@ -64,6 +67,6 @@ Last activity: 2026-05-31 — Phase 13 Wave 2 complete (H-1/H-2/H-4 fixes, _remo
 
 ## Session Continuity
 
-Last session: 2026-06-01T08:21:34.044Z
-Stopped at: context exhaustion at 75% (2026-06-01)
+Last session: 2026-06-22T05:53:30.152Z
+Stopped at: context exhaustion at 75% (2026-06-22)
 Resume file: .planning/phases/13-window-foundation/.continue-here.md
