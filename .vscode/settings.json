@@ -4,12 +4,14 @@
   "[dart]": {
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
-    "editor.rulers": [80],
+    "editor.rulers": [
+      80
+    ],
     "editor.selectionHighlight": false,
     "editor.suggest.snippetsPreventQuickSuggestions": false,
     "editor.suggestSelection": "recentlyUsed",
     "editor.tabCompletion": "onlySnippets",
     "editor.wordBasedSuggestions": "off"
   },
-  "cmake.sourceDirectory": "D:/simple_player_flutter/linux"
+  "cmake.sourceDirectory": "D:/simple_player_flutter/windows"
 }
