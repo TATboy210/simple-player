@@ -184,12 +184,18 @@ class WindowService with WindowListener implements WindowBridge {
         await ctrl.setFullscreen(true);
         await _persistence.saveIsFullscreen(true);
       case WindowMode.windowed:
-        final ctrl = _fullscreenCtrl;
-        if (ctrl == null) return;
-        await ctrl.setFullscreen(false);
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (!_disposed) _persistence.saveIsFullscreen(false);
-        });
+        final current = _state.mode.value;
+        if (current == WindowMode.fullscreen) {
+          final ctrl = _fullscreenCtrl;
+          if (ctrl == null) return;
+          await ctrl.setFullscreen(false);
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (!_disposed) _persistence.saveIsFullscreen(false);
+          });
+        } else if (current == WindowMode.maximized) {
+          await windowManager.unmaximize();
+          // OS 回调 onWindowUnmaximize 驱动 mode
+        }
       case WindowMode.maximized:
         await windowManager.maximize();
         // OS 回调 onWindowMaximize 驱动 mode
