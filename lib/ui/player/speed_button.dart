@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
-import '../widgets/osd_overlay.dart';
+import '../shared/osd_overlay.dart';
 
 /// 三段式倍速控件 — 72×36
 ///

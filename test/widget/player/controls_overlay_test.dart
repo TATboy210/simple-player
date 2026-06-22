@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
+import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import '../../helpers/fake_engine.dart';
+
+void _noop() {}
 
 void main() {
   late FakeEngine engine;
@@ -19,8 +22,8 @@ void main() {
 
   Widget buildSubject({
     PlayerEngine? eng,
+    PlayerActions? actions,
     bool isFullscreen = false,
-    VoidCallback? onToggleFullscreen,
     bool emptyStatePresent = false,
   }) {
     return MaterialApp(
@@ -29,8 +32,8 @@ void main() {
       home: Scaffold(
         body: ControlsOverlay(
           engine: eng ?? engine,
+          actions: actions ?? const PlayerActions(),
           isFullscreen: isFullscreen,
-          onToggleFullscreen: onToggleFullscreen,
           emptyStatePresent: emptyStatePresent,
         ),
       ),
@@ -57,7 +60,9 @@ void main() {
       var toggled = false;
       engine.state.value = MediaState.playing;
       await tester.pumpWidget(
-        buildSubject(onToggleFullscreen: () => toggled = true),
+        buildSubject(
+          actions: PlayerActions(onToggleFullscreen: () => toggled = true),
+        ),
       );
       await tester.pump();
 

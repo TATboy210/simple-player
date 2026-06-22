@@ -6,7 +6,7 @@ import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import '../shared/value_listenable_builder2.dart';
-import '../widgets/osd_overlay.dart';
+import '../shared/osd_overlay.dart';
 
 /// 音量按钮（单击静音）
 class VolumeButton extends StatefulWidget {
