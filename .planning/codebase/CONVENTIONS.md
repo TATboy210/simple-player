@@ -5,595 +5,243 @@
 ## Naming Patterns
 
 **Files:**
-- `snake_case.dart` for all Dart files (e.g., `playback_controller.dart`, `glass_container.dart`, `path_validator.dart`)
-- Private files prefixed with `_` (e.g., `_settings_nav_item.dart`)
-- Test files suffixed with `_test.dart` (e.g., `playlist_test.dart`, `path_validator_test.dart`)
+- Use `snake_case.dart` for all Dart files
+- Test files: `{name}_test.dart` (mirrors lib structure)
+- Pattern: descriptive names like `playback_controller.dart`, `glass_container.dart`
 
 **Classes:**
-- `PascalCase` for classes, enums, typedefs (e.g., `PlaybackController`, `MediaState`, `GlassTier`)
-- Private classes prefixed with `_` (e.g., `_QuickMenuItem`, `_RotatingFileOutput`, `_AppState`)
-- Abstract interfaces use `abstract class` (e.g., `abstract class PlayerEngine`)
-- Extensions use `PascalCase` descriptive names
-
-**Test Fakes:**
-- `Fake` prefix + interface name (e.g., `FakeEngine implements PlayerEngine`, `FakeWindowService implements WindowBridge`, `FakeWindowOps implements WindowOps`, `FakePlatformFullscreen implements PlatformFullscreen`)
+- Use `PascalCase` for all classes and enums
+- Examples: `PlaybackController`, `GlassContainer`, `MediaState`, `PlayMode`
 
 **Functions/Methods:**
-- `camelCase` for all functions and methods (e.g., `openAndPlay`, `togglePlayPause`, `isAllowedMedia`)
-- Private methods prefixed with `_` (e.g., `_init`, `_buildVideoContent`, `_poll`, `_sanitizeDimension`)
-- Boolean getters use `is`/`has`/`can` prefixes (e.g., `isEmpty`, `hasNext`, `isUrl`, `isAllowedMedia`, `_isIconOnly`)
-- Named constructors use `camelCase` (e.g., `GlassButton.iconOnly`)
+- Use `camelCase` for all functions and methods
+- Private methods prefixed with underscore: `_flush()`, `_ensureSink()`
+- Getters use `is/has/should` prefix for booleans: `isEmpty`, `hasVideo`, `hasAudio`
 
 **Variables:**
-- `camelCase` for local variables and parameters (e.g., `rebuildCount`, `onNeedRebuild`)
-- Private fields prefixed with `_` (e.g., `_openGeneration`, `_onError`, `_disposed`)
-- Constants use `camelCase` (Dart convention, NOT `SCREAMING_SNAKE_CASE`)
-
-```dart
-// Tokens class constants
-static const bgBase = Color(0xFF0A0A0F);
-static const fontTitle = 18.0;
-static const durationFast = 80;
-
-// Class-level private constants
-static const _prepareTimeoutSeconds = 10;
-static const _defaultSkipSeconds = 10;
-static const _networkTimeoutMs = 10000;
-```
+- Use `camelCase` for all variables and parameters
+- Private fields prefixed with underscore: `_debounce`, `_pendingJson`
+- Constants use `camelCase` (Dart convention): `static const _fileName = 'playlist.json'`
+- Public constants: `supportedExtensions`, `allowedExtensions`
 
 **Enums:**
-- `PascalCase` for enum type name (e.g., `MediaState`, `PlayMode`, `GlassTier`, `PlayerErrorCode`)
-- `camelCase` for enum values (e.g., `idle`, `loopAll`, `pathEmpty`, `thin`)
-- Enum values documented with `///` comments:
-
-```dart
-enum MediaState {
-  /// 初始状态，未加载任何媒体
-  idle,
-  /// 正在播放
-  playing,
-}
-```
+- Use `PascalCase` for enum names: `MediaState`, `PlayMode`, `GlassTier`
+- Use `camelCase` for enum values: `MediaState.playing`, `PlayMode.loopAll`
 
 ## Code Style
 
 **Formatting:**
-- `dart format` for all `.dart` files
-- Line length: 80 characters (dart format default)
-- Trailing commas on multi-line argument/parameter lists to improve diffs
+- Follow Dart default formatting (dart format)
 - 2-space indentation
+- Single quotes preferred (enforced by `prefer_single_quotes` lint)
 
-**Linting (analysis_options.yaml):**
-- Base: `package:flutter_lints/flutter.yaml`
-- Strict mode: `strict-casts: true`, `strict-inference: true`, `strict-raw-types: true`
-- Errors: `missing_required_param: error`, `missing_return: error`, `dead_code: warning`
-- Key rules:
+**Linting:**
+- Strict mode enabled: `strict-casts`, `strict-inference`, `strict-raw-types`
+- Missing required params → error
+- Missing return → error
+- Dead code → warning
+- Key lints enforced:
+  - `prefer_const_constructors`
+  - `prefer_final_locals`
+  - `avoid_print`
+  - `always_declare_return_types`
+  - `unawaited_futures`
 
-```yaml
-prefer_const_constructors: true
-prefer_const_literals_to_create_immutables: true
-prefer_final_locals: true
-prefer_final_in_for_each: true
-avoid_print: true
-prefer_single_quotes: true
-always_declare_return_types: true
-avoid_void_async: true
-cancel_subscriptions: true
-close_sinks: true
-unawaited_futures: true
-```
+**File Length:**
+- Target < 500 lines (see `control_bar.dart` at 350 lines)
+- Maximum 800 lines (extract modules when approaching)
 
-**Const usage:**
-- Use `const` constructors wherever possible
-- Use `const` for compile-time constant values
-- `final` for local variables that are assigned once (enforced by `prefer_final_locals`)
-
-## Design Token System
-
-**All visual values use `Tokens.*` constants from `lib/ui/theme/tokens.dart`:**
-
-```dart
-// Colors — Background
-Tokens.bgBase        // 0xFF0A0A0F — Base background
-Tokens.bgPanel       // 0xFF1A1A24 — Panel background
-Tokens.bgElevated    // 0xFF242432 — Elevated surfaces
-Tokens.bgHover       // 0xFF2A2A3A — Hover state
-Tokens.bgGlass       // 0x801A1A24 — Glass background (50% alpha)
-
-// Colors — Accent
-Tokens.accent        // 0xFF2C58F4 — Primary accent
-Tokens.accentLight   // 0xB42C57F4 — Light accent (70% alpha)
-Tokens.danger        // 0xFFFA3737 — Error/danger
-
-// Colors — Text
-Tokens.textPrimary   // 0xFFE8E8F0 — Primary text
-Tokens.textSecondary // 0xFF9999AA — Secondary text
-Tokens.textTertiary  // 0xFF666677 — Tertiary text
-Tokens.textDisabled  // 0xFF444455 — Disabled text
-
-// Colors — Border
-Tokens.borderHighlight // 0x33FFFFFF — Glass border (20% white)
-
-// Typography
-Tokens.fontFamily    // 'Noto Sans SC'
-Tokens.fontTitle     // 18.0
-Tokens.fontBody      // 14.0
-Tokens.fontCaption   // 12.0
-Tokens.fontOverline  // 10.0
-Tokens.weightMedium  // FontWeight.w500
-Tokens.weightSemiBold // FontWeight.w600
-
-// Spacing
-Tokens.spXs          // 4.0
-Tokens.spSm          // 8.0
-Tokens.spMd          // 12.0
-Tokens.spLg          // 16.0
-Tokens.spXl          // 24.0
-
-// Border Radius
-Tokens.radiusSm      // 6.0
-Tokens.radiusMd      // 10.0
-Tokens.radiusLarge   // 12.0
-Tokens.radiusBtn     // 4.0
-Tokens.radiusPopup   // 8.0
-
-// Glass Blur
-Tokens.glassBlurThin  // 8.0 — Title bar
-Tokens.glassBlur      // 10.0 — Control bar
-Tokens.glassBlurThick // 24.0 — Dialogs
-
-// Animation Durations (milliseconds)
-Tokens.durationFast    // 80
-Tokens.durationNormal  // 150
-Tokens.durationFade    // 300
-Tokens.durationSlide   // 300
-Tokens.durationDebounce // 500
-
-// Component Sizes
-Tokens.titleBarHeight      // 32.0
-Tokens.controlBarHeight    // 84.0
-Tokens.progressBarHeight   // 32.0
-Tokens.compactBreakpoint   // 500.0
-Tokens.playlistPanelWidth  // 420.0
-
-// Icon Sizes
-Tokens.iconSm    // 16.0
-Tokens.iconMd    // 18.0
-Tokens.iconLg    // 20.0
-Tokens.iconXl    // 28.0
-```
-
-**Rule:** NEVER hardcode color, spacing, radius, or duration values. Always use `Tokens.*`.
+**Function Length:**
+- Target < 50 lines for pure logic
+- Target < 50 lines for UI builders
+- Maximum 80 lines (split into smaller functions)
 
 ## Import Organization
 
 **Order:**
-1. `dart:` imports (e.g., `dart:async`, `dart:io`, `dart:ui`)
-2. External `package:` imports (e.g., `package:flutter/material.dart`, `package:fvp/mdk.dart`)
-3. Internal `package:` imports (e.g., `package:simple_player_flutter/kernel/...`)
-4. Relative imports within same feature/layer (e.g., `../theme/tokens.dart`, `./playback_navigator.dart`)
+1. Dart core libraries (`dart:io`, `dart:convert`, `dart:async`)
+2. Flutter framework (`package:flutter/...`)
+3. Third-party packages (`package:player_engine/...`, `package:logger/...`)
+4. Project imports (relative paths for same layer, absolute for cross-layer)
 
-**Path Style:**
-- Use relative imports within the same package/feature (e.g., `import '../theme/tokens.dart'`)
-- Use `package:` imports in tests for cross-layer references (e.g., `import 'package:simple_player_flutter/kernel/...'`)
-- Use relative imports in tests for test helpers (e.g., `import '../../helpers/fake_engine.dart'`)
+**Path Aliases:**
+- No path aliases configured
+- Use relative imports for files in same directory/layer
+- Use package imports for cross-layer dependencies
 
-**Example from source:**
+**Example:**
 ```dart
 import 'dart:async';
-
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-
-import '../../kernel/engine/media_engine.dart';
-import '../../kernel/models/media_state.dart';
-import '../theme/tokens.dart';
-```
-
-**Example from tests:**
-```dart
-import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
-import '../../helpers/fake_engine.dart';
+import 'package:player_engine/player_engine.dart';
+import '../models/play_mode.dart';
+import '../playlist/playlist.dart';
 ```
 
 ## Error Handling
 
-**Pattern: try-catch with specific exception types:**
+**Patterns:**
+- Always use `on Exception catch (e)` (never bare `catch (e)`)
+- Log errors with context: `log.e('PlaylistStore.load failed: $e')`
+- Provide graceful fallbacks (return null, empty list, or default value)
+- Never silently swallow errors (`catch (_) {}` is forbidden)
+
+**Error Types:**
+- Use `FormatException` for data parsing errors
+- Use `Exception` for general errors
+- Never catch `Error` subtypes (they indicate programming bugs)
+
+**Example:**
 ```dart
 try {
-  await someOperation();
+  // risky operation
 } on Exception catch (e) {
-  log.e('[ClassName] operation failed: $e');
-  onError?.call(e);
+  log.e('Operation failed: $e');
+  return null; // graceful fallback
 }
 ```
-
-**Pattern: Guard clauses with early return:**
-```dart
-Future<void> playIndex(int index) async {
-  if (index < 0 || index >= playlist.length) return;
-  // ... rest of logic
-}
-```
-
-**Pattern: Disposed check (for classes with dispose):**
-```dart
-void play() {
-  if (_disposed) return;
-  state.value = MediaState.playing;
-}
-```
-
-**Pattern: Null-safe error propagation:**
-```dart
-_rt.onError?.call(Exception(validationError));
-```
-
-**Pattern: Graceful fallback with error state:**
-```dart
-try {
-  await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
-} on Exception catch (e) {
-  log.w('[App] settings load failed (continuing): $e');
-}
-```
-
-**Pattern: Async guard with generation counter:**
-```dart
-int _openGeneration = 0;
-
-Future<void> playIndex(int index) async {
-  final gen = ++_openGeneration;
-  await engine.open(path);
-  if (gen != _openGeneration) return;  // Stale request discarded
-  // ...
-}
-```
-
-**Pattern: Guarded action with disposed check:**
-```dart
-void _guardedAction(String name, void Function() action) {
-  if (_disposed) return;
-  try {
-    action();
-  } on Exception catch (e) {
-    log.e('FvpEngine.$name error: $e');
-    errorMessage.value = '$name failed: $e';
-  }
-}
-```
-
-**NEVER use:**
-- `catch (e)` without type specification — always `on Exception catch (e)`
-- `print()` — use `debugPrint()` or `log.d()`/`log.w()`/`log.e()`
-- Silent catch blocks (`catch (_) {}`)
 
 ## Logging
 
-**Framework:** `logger` package with custom `Logger` instance in `lib/kernel/utils/log.dart`
+**Framework:** `package:logger` with custom `PrefixPrinter`
 
-**Module-scoped loggers:**
-```dart
-import '../utils/log.dart';
+**Module Loggers:**
+- `log` — global logger (no prefix)
+- `logEngine` — engine layer (`[engine]` prefix)
+- `logBridge` — bridge layer (`[bridge]` prefix)
+- `logServices` — services layer (`[services]` prefix)
+- `logUi` — UI layer (`[ui]` prefix)
 
-Logger log = Logger(...);          // Global logger (no prefix)
-Logger logEngine = Logger(...);    // [engine] prefix
-Logger logBridge = Logger(...);    // [bridge] prefix
-Logger logServices = Logger(...);  // [services] prefix
-Logger logUi = Logger(...);        // [ui] prefix
-```
+**Log Levels:**
+- `log.d(...)` — debug info (development only)
+- `log.i(...)` — informational
+- `log.w(...)` — warnings (failures with fallback)
+- `log.e(...)` — errors (failures requiring attention)
 
-**Usage levels:**
-```dart
-log.d('Debug message');     // Debug level
-log.w('Warning message');   // Warning level
-log.e('Error message');     // Error level
-```
+**Production Behavior:**
+- Debug mode: console output only
+- Release mode: warning+ level, file rotation (2MB max, 5 archives)
+- Log location: `%APPDATA%\SimplePlayer\logs\`
 
-**Prefix convention:** Use `[ClassName]` prefix for context:
-```dart
-log.w('[App] settings load failed (continuing): $e');
-log.e('[PlayerFeature] init failed: $e');
-log.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
-log.w('playIndex: rejected unsafe path: $validationError');
-```
+## Comments
 
-**Initialization:**
-- Debug mode: Console output only (no-op)
-- Release mode: File output to `%APPDATA%\SimplePlayer\logs\` with 2 MB rotation, 5 archive limit
+**When to Comment:**
+- Always document public APIs with `///` doc comments
+- Explain "why" not "what" for complex logic
+- Use Chinese comments (codebase convention)
+- Document edge cases and security considerations
 
-## Comment Style
-
-**Language:** Chinese comments are acceptable and common throughout the codebase
-
-**Doc comments:** Use `///` for public API documentation:
-```dart
-/// 播放控制器 — 播放器全部运行时能力的统一入口
+**Doc Comment Format:**
+```dart/// 路径安全校验工具
 ///
-/// 组合 PlaybackNavigator / FileOperations / StateMonitor 三个子模块，
-/// UI 层只与本类交互。
-class PlaybackController {
+/// 统一的文件路径校验：扩展名白名单、路径遍历检测。
+/// 所有文件打开入口（FilePicker、拖放、历史记录）必须通过此工具校验。class PathValidator { ... }
 ```
 
-**Section separators:** Use `// ─── Section Name ───` for logical grouping:
+**Inline Comments:**
+- Use Chinese for explanations: `// 从末尾找最后一个 / 或 \`
+- Use English for technical notes: `// Wait for async yield`
+
+## Design System
+
+**Tokens:**
+- All visual values via `Tokens.*` constants (defined in `lib/ui/theme/tokens.dart`)
+- Colors: `Tokens.bgBase`, `Tokens.accent`, `Tokens.textPrimary`
+- Spacing: `Tokens.spXs` (4), `Tokens.spSm` (8), `Tokens.spMd` (12), `Tokens.spLg` (16)
+- Border radius: `Tokens.radiusSm` (6), `Tokens.radiusMd` (10), `Tokens.radiusLarge` (12)
+- Animation durations: `Tokens.durationFast` (80ms), `Tokens.durationNormal` (150ms)
+
+**Glassmorphism Pattern:**
 ```dart
-// ─── ValueNotifier fields ───
-// ─── Call tracking ───
-// ─── Playback control ───
-// ─── Lifecycle ───
-// ─── Test helper methods ───
-```
-
-**Inline comments:** Explain WHY, not WHAT:
-```dart
-// fire-and-forget: 预热 MDK 引擎（FFmpeg codec 注册 + D3D11 上下文）
-unawaited(EnginePrewarm.prewarm(...));
-
-// seek 期间暂停轮询，防止旧位置覆盖 seek 目标
-```
-
-**Design decision comments:** Reference decision IDs:
-```dart
-/// opacity < 0.01 时跳过 BackdropFilter GPU readback（D-13）
-/// blurEnabled 为 false 时跳过 BackdropFilter，仅渲染 Container（D-14）
-```
-
-## Widget Composition Patterns
-
-**Pattern: ValueListenableBuilder for reactive UI:**
-```dart
-ValueListenableBuilder<MediaState>(
-  valueListenable: engine.state,
-  builder: (context, state, child) => state == MediaState.idle
-      ? child!
-      : const SizedBox.shrink(),
-  child: Positioned.fill(child: emptyState!),  // Cached child
+GlassContainer(
+  tier: GlassTier.normal,  // thin/normal/thick
+  blurEnabled: true,
+  resizing: resizingNotifier,  // optional ValueNotifier<bool>
+  child: ...,
 )
 ```
 
-**Pattern: AnimatedBuilder for multi-notifier rebuilds:**
+**Theme:**
+- Single theme: Midnight (compile-time const)
+- Font: Noto Sans SC (Regular 400, Medium 500, SemiBold 600)
+- No dynamic theming (no ThemeMode.light)
+
+## State Management
+
+**Pattern:** ValueNotifier + ValueListenableBuilder (no Provider/Riverpod/Bloc)
+
+**Engine State:**
+- `PlayerEngine` exposes `ValueNotifier` fields: `state`, `position`, `duration`, `volume`, etc.
+- Widgets rebuild via `ValueListenableBuilder`
+- Example:
 ```dart
-AnimatedBuilder(
-  animation: Listenable.merge([engine.textureId, engine.aspectRatio]),
-  builder: (_, _) {
-    final id = engine.textureId.value;
-    final ratio = engine.aspectRatio.value;
-    return SizedBox.expand(child: Texture(textureId: id));
+ValueListenableBuilder<MediaState>(
+  valueListenable: engine.state,
+  builder: (context, state, child) {
+    if (state == MediaState.playing) return PauseButton();
+    return PlayButton();
   },
 )
 ```
 
-**Pattern: MergedListenable for multi-notifier rebuilds:**
-```dart
-// lib/ui/shared/merged_listenable.dart
-// Combines multiple ValueNotifiers into one for single ValueListenableBuilder
-```
+**Controller Pattern:**
+- `PlaybackController` orchestrates playlist + engine state
+- Uses composition: `PlaybackNavigator`, `FileOperations`, `StateMonitor`
+- Callbacks for UI updates: `onNeedRebuild`, `onError`
 
-**Pattern: StatefulWidget with private State:**
-```dart
-class PlayerScreen extends StatefulWidget {
-  final PlayerEngine engine;
-  const PlayerScreen({super.key, required this.engine, ...});
+## Immutability
 
-  @override
-  State<PlayerScreen> createState() => _PlayerScreenState();
-}
+**Data Classes:**
+- Use `final` fields
+- Provide `copyWith()` method for immutable updates
+- Override `==` and `hashCode` for value equality
+- Example: `PlaylistItem` with `path`, `timestamp`, `positionMs`
 
-class _PlayerScreenState extends State<PlayerScreen> {
-  @override
-  Widget build(BuildContext context) { ... }
-}
-```
-
-**Pattern: Callback drilling with optional callbacks:**
-```dart
-class ControlsOverlay extends StatefulWidget {
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
-}
-```
-
-**Pattern: GlassContainer for glassmorphism:**
-```dart
-GlassContainer(
-  tier: GlassTier.normal,
-  padding: const EdgeInsets.symmetric(horizontal: Tokens.spLg, vertical: Tokens.spMd),
-  child: Text('Hello', style: TextStyle(color: Tokens.textPrimary)),
-)
-```
-
-**Pattern: GlassButton dual mode:**
-```dart
-// Icon-only mode (lightweight, no BackdropFilter)
-GlassButton.iconOnly(
-  icon: Icons.play_arrow,
-  tooltip: 'Play',
-  onPressed: () => engine.play(),
-)
-
-// Label mode (with GlassContainer + blur)
-GlassButton(
-  icon: Icons.open_in_new,
-  label: 'Open',
-  onPressed: () => openFile(),
-)
-```
-
-## Service Architecture
-
-**Composition pattern (PlaybackController):**
-```dart
-class PlaybackController {
-  PlaybackController({required this.engine, required this.playlist, ...}) {
-    navigator = PlaybackNavigator(this);
-    fileOps = FileOperations(this);
-    monitor = StateMonitor(this);
-  }
-
-  final PlayerEngine engine;
-  final Playlist playlist;
-  late final PlaybackNavigator navigator;
-  late final FileOperations fileOps;
-  late final StateMonitor monitor;
-
-  // Forward methods to sub-modules
-  Future<void> playIndex(int i) => navigator.playIndex(i);
-  Future<void> playNext() => navigator.playNext();
-  Future<bool> openAndPlay(String p) => fileOps.openAndPlay(p);
-}
-```
-
-**WindowService composition pattern:**
-```dart
-class WindowService with WindowListener implements WindowBridge {
-  final WindowState _state = WindowState();
-  final WindowPersistence _persistence = WindowPersistence();
-  FullscreenController? _fullscreenCtrl;
-
-  // Delegate to components
-  @override
-  ValueNotifier<WindowMode> get mode => _state.mode;
-  @override
-  ValueNotifier<Size> get windowSize => _state.windowSize;
-}
-```
-
-**Singleton pattern with `I` getter:**
-```dart
-class LocaleService {
-  static final LocaleService I = LocaleService._();
-  LocaleService._();
-  // ...
-}
-
-// Usage
-await LocaleService.I.init();
-```
-
-**Sub-module pattern (navigator, fileOps, monitor):**
-```dart
-class PlaybackNavigator {
-  PlaybackNavigator(this._rt);
-  final PlaybackController _rt;  // Back-reference to parent
-
-  Future<void> playIndex(int index) async {
-    // Access _rt.engine, _rt.playlist, _rt.onNeedRebuild()
-  }
-}
-```
+**Collections:**
+- Use `List.unmodifiable()` for read-only lists
+- Avoid mutating passed-in collections
 
 ## Async Patterns
 
-**Fire-and-forget with `unawaited()`:**
-```dart
-import 'dart:async';
-unawaited(EnginePrewarm.prewarm(...));
-```
+**Future Handling:**
+- Always `await` Futures or explicitly call `unawaited()`
+- Never mark function `async` if it never `await`s
+- Check `context.mounted` before using `BuildContext` after `await`
 
-**Backgrounded async with yield:**
-```dart
-await controller.openAndPlay('C:/test.mp4');
-await Future(() {});  // yield for backgrounded async
-```
+**Isolate Usage:**
+- Use `Isolate.run()` for heavy I/O operations
+- Example: `PlaylistStore.loadInBackground()` runs JSON parsing in isolate
+- Fallback to main isolate on failure
 
-**Future.wait for parallel init:**
-```dart
-await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
-```
+## FFI / Platform Integration
 
-## Module Design
+**MethodChannel Naming:**
+- Channel: `com.simple_player/window`
+- Commands: `setFullscreen`, `setTitle`, `setFrameless`, etc.
+- Events: `onResize`, `onClose`, `onMaximize`
 
-**Exports:** Each file exports one primary class/concept
-- `player_engine.dart` exports `PlayerEngine` abstract class
-- `playback_controller.dart` exports `PlaybackController`
-- `glass_container.dart` exports `GlassContainer`, `GlassTier`, `GlassButton`
-- `startup_coordinator.dart` re-exports `startup_state.dart`
+**Memory Management:**
+- Always free FFI memory in `finally` blocks
+- Copy strings crossing thread boundaries
+- Document memory ownership
 
-**No barrel files:** Each import references the specific file
+## Testing Conventions
 
-**Feature organization:**
-```
-lib/features/player/
-├── player_feature.dart        # StatefulWidget (UI composition)
-├── player_services.dart       # Service wiring (creates engine, controller, etc.)
-├── deferred_player_feature.dart # Lazy-loaded feature wrapper
-└── services/                  # Business logic services
-    ├── playback_controller.dart
-    ├── playback_navigator.dart
-    ├── file_operations.dart
-    ├── state_monitor.dart
-    └── subtitle_service.dart
-```
+**Test Structure:**
+- Follow AAA pattern (Arrange-Act-Assert)
+- Use `group()` for logical test grouping
+- Use descriptive test names: `'rejects invalid path (empty string)'`
 
-## ValueNotifier Pattern (State Management)
+**Mocking:**
+- Prefer hand-written fakes over mocks
+- Example: `FakeEngine` implements `PlayerEngine`
+- Track call counts for verification: `openCallCount`, `playCallCount`
 
-**No Provider/Riverpod/Bloc — use ValueNotifier + ValueListenableBuilder:**
-
-```dart
-// Engine exposes state as ValueNotifiers
-abstract class PlayerEngine {
-  ValueNotifier<MediaState> get state;
-  ValueNotifier<int> get position;
-  ValueNotifier<double> get volume;
-  ValueNotifier<bool> get isMuted;
-  // ... 10+ ValueNotifiers
-}
-
-// Widgets listen via ValueListenableBuilder
-ValueListenableBuilder<MediaState>(
-  valueListenable: engine.state,
-  builder: (context, state, _) => Text(state.name),
-)
-```
-
-**Optimization: Use `child` parameter for static subtrees:**
-```dart
-ValueListenableBuilder<bool>(
-  valueListenable: _playlistVisible,
-  builder: (context, visible, videoContent) => Stack(
-    children: [videoContent!, if (visible) PlaylistPanel(...)],
-  ),
-  child: videoContent,  // Cached — doesn't rebuild
-)
-```
-
-**Dispose pattern:** Always dispose ValueNotifiers:
-```dart
-@override
-void dispose() {
-  engine.dispose();
-  super.dispose();
-}
-```
-
-## File Size Limits
-
-**Target:** < 500 lines per file. Current largest non-generated files:
-- `lib/kernel/engine/fvp_engine.dart`: 724 lines (over limit, but complex engine wrapper)
-- `lib/kernel/persistence/settings_store.dart`: 439 lines
-- `lib/ui/dialogs/settings_panel.dart`: 402 lines
-- `lib/ui/shared/aurora_background.dart`: 362 lines
-
-**Generated files exempt:** `lib/l10n/app_localizations.dart` (1022 lines) is auto-generated.
-
-## Commit Format
-
-Conventional Commits: `<type>: <description>`
-
-Types: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `perf:`, `chore:`, `wip:`
-
-Examples:
-```
-feat: add subtitle delay controls
-fix: prevent stale open() from overwriting current playback
-refactor: extract PlaybackNavigator from PlaybackController
-test: add playlist serialization round-trip tests
-docs: update architecture diagram
-perf: skip BackdropFilter when opacity < 0.01
-```
+**Widget Tests:**
+- Wrap in `MaterialApp` + `Scaffold`
+- Use `buildSubject()` helper for widget construction
+- Test with `FakeEngine` instead of real engine
 
 ---
 

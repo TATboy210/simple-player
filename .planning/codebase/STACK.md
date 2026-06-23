@@ -1,147 +1,137 @@
 # Technology Stack
 
-**Analysis Date:** 2026/06/23
+**Analysis Date:** 2026-06-23
 
 ## Languages
 
 **Primary:**
-- Dart 3.11.5+ — Application logic, UI, state management (`lib/`)
-- C++ 17 — Windows runner, COM initialization, Flutter view hosting (`windows/runner/`)
-- CMake 3.14+ — Build system for native Windows runner (`windows/CMakeLists.txt`)
+- Dart 3.11.5+ — Application logic, UI, state management, FFI bindings
+- C++17 — Windows runner (`windows/runner/`), Win32 window management
 
 **Secondary:**
+- CMake — Native build system for Windows runner and plugins
 - ARB (JSON) — Localization strings (`lib/l10n/app_en.arb`, `lib/l10n/app_zh.arb`)
-- Dart FFI — Win32 API calls from Dart (`lib/kernel/bridge/win32/win32_platform_fullscreen.dart`)
 
 ## Runtime
 
 **Environment:**
-- Flutter SDK (stable channel) — UI framework, rendering, platform integration
-- Dart SDK ^3.11.5 — Language runtime
+- Flutter SDK (stable channel, version 3.45.0-0.1.pre per `.flutter-plugins-dependencies`)
+- Dart SDK ^3.11.5 (strict mode enabled)
 
 **Package Manager:**
-- pub (Dart built-in) — Dependency management
-- Lockfile: `pubspec.lock` present and committed
+- Pub (Flutter's built-in package manager)
+- Lockfile: `pubspec.lock` (present, 31898 bytes)
+- Node.js/npm also present (`package.json` for `@opengsd/gsd-core` tooling only)
 
 ## Frameworks
 
 **Core:**
-- Flutter SDK — UI framework with Material Design 3
-- fvp ^0.37.2 — MDK/FFmpeg media playback engine with D3D11 rendering (`pubspec.yaml:16`)
-- player_engine (local path: `../widget_tree_flutter/player_engine`) — Abstract player engine interface with 12 ValueNotifiers (`pubspec.yaml:15`)
-
-**Window Management:**
-- window_manager ^0.5.1 — Cross-platform window control (size, position, maximize, always-on-top, close) (`pubspec.yaml:27`)
-- Win32 FFI — Direct fullscreen control via `user32.dll` (FindWindow, GetWindowLongPtr, SetWindowLongPtr, SetWindowPos) (`lib/kernel/bridge/win32/win32_platform_fullscreen.dart`)
+- Flutter — UI framework (Material Design 3)
+- `fvp` ^0.37.2 — MDK/FFmpeg video playback engine (D3D11 texture rendering on Windows)
+- `window_manager` ^0.5.1 — Cross-platform window management (titlebar, size, position, fullscreen)
 
 **State Management:**
-- ValueNotifier + ValueListenableBuilder — Raw Flutter reactive primitives (no Provider/Riverpod/Bloc)
+- ValueNotifier + ValueListenableBuilder — No Provider/Riverpod/Bloc
+- Custom `MergedListenable` for combining multiple ValueNotifiers (`lib/ui/shared/merged_listenable.dart`)
+
+**Code Generation:**
+- `freezed` ^3.2.5 + `freezed_annotation` ^3.1.0 — Immutable data classes
+- `json_annotation` ^4.12.0 — JSON serialization
+- `build_runner` ^2.15.0 — Code generation runner
+- `pigeon` (any) — Platform channel code generation (TypeScript/Dart)
 
 **Testing:**
-- flutter_test (SDK) — Unit and widget testing
-- integration_test (SDK) — Integration testing
+- `flutter_test` (SDK) — Unit and widget tests
+- `integration_test` (SDK) — Integration/E2E tests
+- `flutter_lints` ^6.0.0 — Lint rules
 
 **Build/Dev:**
-- build_runner ^2.15.0 — Code generation runner (`pubspec.yaml:40`)
-- freezed ^3.2.5 — Immutable data class generation (`pubspec.yaml:39`)
-- pigeon — Platform channel code generation (`pubspec.yaml:41`)
-- flutter_lints ^6.0.0 — Lint rules extending `package:flutter_lints/flutter.yaml` (`pubspec.yaml:36`)
+- CMake 3.14+ — Windows native build
+- DevTools — Flutter DevTools with `shared_preferences` extension enabled
 
 ## Key Dependencies
 
-**Critical (media pipeline):**
-- fvp ^0.37.2 — Core media engine. Wraps MDK SDK (FFmpeg decoding + D3D11 rendering). Provides `mdk.Player` with FFI bindings for play/pause/seek/texture/video effects/track management. Hardware decoders: D3D11, NVDEC, with FFmpeg software fallback.
-- player_engine (local) — Abstract `PlayerEngine` class (`lib/kernel/engine/` consumers import from `package:player_engine/player_engine.dart`). Defines 12 ValueNotifiers (textureId, state, position, duration, volume, isMuted, isBuffering, subtitleText, buffered, aspectRatio, errorMessage, playbackSpeed) + playback control methods. `FvpEngine` is the concrete implementation.
-
-**Critical (window control):**
-- window_manager ^0.5.1 — Window lifecycle management. `WindowService` wraps it with `WindowListener` mixin for maximize/unmaximize/resize/close events. All window geometry persistence flows through `SettingsStore`.
-- ffi ^2.1.0 — Dart FFI for direct Win32 API calls (fullscreen, style manipulation) (`pubspec.yaml:26`)
+**Critical (media playback):**
+- `fvp` ^0.37.2 — MDK/FFmpeg wrapper, provides `mdk.Player` API, D3D11 texture rendering, hardware decoding (D3D11/NVDEC/FFmpeg fallback)
+- `player_engine` (local path: `../widget_tree_flutter/player_engine`) — Abstract `PlayerEngine` interface defining playback contract (open/play/pause/seek/volume/tracks/effects)
 
 **Infrastructure:**
-- shared_preferences ^2.5.5 — Key-value persistence for ~25 settings keys (volume, mute, play mode, window geometry, video effects, locale, theme, shortcuts) (`pubspec.yaml:19`)
-- path_provider ^2.1.5 — Platform-specific directory paths (`pubspec.yaml:17`)
-- file_picker ^11.0.2 — Native file open dialog (`pubspec.yaml:18`)
-- desktop_drop ^0.7.1 — Drag-and-drop file support (`pubspec.yaml:20`)
-- logger ^2.5.0 — Structured logging with module-scoped loggers (`pubspec.yaml:21`)
-- crypto ^3.0.6 — MD5 hashing for thumbnail cache keys (`pubspec.yaml:23`)
-- path ^1.9.1 — Cross-platform path manipulation (`pubspec.yaml:22`)
+- `window_manager` ^0.5.1 — Window lifecycle, position/size control, fullscreen, always-on-top, drag support
+- `shared_preferences` ^2.5.5 — Key-value persistence (settings, window geometry, play mode)
+- `path_provider` ^2.1.5 — Application support directory for playlist JSON storage
+- `file_picker` ^11.0.2 — Native file open dialog
+- `file_selector` (any) — Cross-platform file selection
+- `desktop_drop` ^0.7.1 — Drag-and-drop file support
 
-**Data/Serialization:**
-- freezed_annotation ^3.1.0 — Annotations for freezed code generation (`pubspec.yaml:24`)
-- json_annotation ^4.12.0 — Annotations for json_serializable (`pubspec.yaml:25`)
-
-**UI/UX:**
-- animations — Material motion transitions (`pubspec.yaml:30`)
-- xdg_directories — Linux XDG directory resolution for thumbnail cache (`pubspec.yaml:29`)
-- cross_file — Cross-platform file abstraction (`pubspec.yaml:31`)
-- file_selector — File selection abstraction (`pubspec.yaml:28`)
-
-**Localization:**
-- flutter_localizations (SDK) — Material/Cupertino localization delegates
-- intl — Date/number formatting (via `package:intl`)
+**Utilities:**
+- `ffi` ^2.1.0 — Dart FFI for Win32 API calls (fullscreen, display config)
+- `path` ^1.9.1 — Path manipulation
+- `crypto` ^3.0.6 — MD5 hashing for Linux XDG thumbnail cache lookup
+- `logger` ^2.5.0 — Structured logging with PrettyPrinter, module-scoped loggers, file rotation
+- `xdg_directories` (any) — XDG directory paths (Linux)
+- `cross_file` (any) — Cross-platform file abstraction
+- `animations` (any) — Material motion transitions
 
 ## Configuration
 
-**Analysis Options:**
-- `analysis_options.yaml` — Strict mode enabled:
-  - `strict-casts: true`
-  - `strict-inference: true`
-  - `strict-raw-types: true`
-  - Errors: `missing_required_param: error`, `missing_return: error`, `dead_code: warning`
-  - Key lint rules: `prefer_const_constructors`, `prefer_const_literals_to_create_immutables`, `prefer_final_locals`, `prefer_final_in_for_each`, `avoid_print`, `prefer_single_quotes`, `always_declare_return_types`, `avoid_void_async`, `cancel_subscriptions`, `close_sinks`, `unawaited_futures`
+**Environment:**
+- `.env` file present — contains environment configuration (not read for security)
+- `SettingsStore` (`lib/kernel/persistence/settings_store.dart`) — 25+ persistent settings via SharedPreferences
+- `DisplayConfig` (`lib/kernel/bridge/display_config.dart`) — Refresh-rate-aware D3D11 sync policy
 
-**Localization:**
-- `l10n.yaml` — ARB-based localization config
-  - Template: `app_en.arb`
-  - Output class: `AppLocalizations`
-  - Supported locales: English (en), Chinese (zh)
-  - Default: `preferred-supported-locales: ["en"]`
-  - Nullable getter: false
+**Build:**
+- `pubspec.yaml` — Main project config, dependencies, font assets, l10n generation
+- `analysis_options.yaml` — Strict Dart analysis (strict-casts, strict-inference, strict-raw-types)
+- `l10n.yaml` — Localization config (ARB → Dart codegen, `AppLocalizations` class)
+- `windows/CMakeLists.txt` — Windows build config (C++17, /W4 /WX, UNICODE)
+- `windows/runner/CMakeLists.txt` — Runner build config (UTF-8 source, dwmapi.lib)
 
-**Build (Windows CMake):**
-- `windows/CMakeLists.txt` — C++17, MSVC `/W4 /WX`, Unicode (`-DUNICODE -D_UNICODE`)
-- `windows/runner/CMakeLists.txt` — Runner executable build (UTF-8 source via `/utf-8`, `NOMINMAX` defined)
-- Linker: `dwmapi.lib` (Desktop Window Manager API)
-- Preprocessor: `_HAS_EXCEPTIONS=0`
-
-**DevTools:**
-- `devtools_options.yaml` — shared_preferences extension enabled
-
-**Code Generation:**
-- freezed — Generates immutable data classes with `copyWith`, `==`, `hashCode`
-- json_serializable — Generates `fromJson`/`toJson` for model classes
-- Run: `dart run build_runner build --delete-conflicting-outputs`
-
-## Build Commands
-
-```bash
-flutter pub get                              # Install dependencies
-flutter run -d windows                       # Development run
-flutter analyze                              # Static analysis
-flutter test                                 # Run unit/widget tests
-flutter build windows                        # Release build
-flutter generate                             # Regenerate l10n + code gen
-dart run build_runner build --delete-conflicting-outputs  # Code generation
+**Analysis Rules (strict mode):**
+```yaml
+# analysis_options.yaml
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    missing_required_param: error
+    missing_return: error
+    dead_code: warning
 ```
+
+**Lint Rules:**
+- `prefer_const_constructors`, `prefer_const_literals_to_create_immutables`
+- `prefer_final_locals`, `prefer_final_in_for_each`
+- `avoid_print` (use `debugPrint()` or `log.*()`)
+- `prefer_single_quotes`, `always_declare_return_types`
+- `avoid_void_async`, `cancel_subscriptions`, `close_sinks`
+- `unawaited_futures`
 
 ## Platform Requirements
 
 **Development:**
-- Windows 10/11 with Visual Studio 2022 (C++ desktop workload)
-- Flutter SDK (stable channel)
+- Windows 10/11 (primary target)
+- Flutter SDK with Windows desktop support enabled
+- Visual Studio 2022+ with C++ workload (for CMake/MSVC)
 - Dart SDK 3.11.5+
-- MSVC compiler (C++17 standard)
+- Node.js/npm (for `@opengsd/gsd-core` tooling only)
 
 **Production:**
-- Windows 10 version 1903+ (for D3D11 support)
-- GPU with D3D11 hardware acceleration (or software fallback via FFmpeg)
-- Minimum window size: 854x480 (`lib/kernel/bridge/window_service.dart:76`)
-- Default window size: 1280x720 (`windows/runner/main.cpp:29`)
+- Windows 10/11 (x64)
+- Minimum window size: 854x480
+- D3D11-capable GPU (hardware decoding) with FFmpeg software fallback
+- COM initialization (apartment-threaded, in `main.cpp`)
 
-**Fonts:**
-- Noto Sans SC (Chinese font) — bundled in `assets/fonts/`
-  - Regular (400), Medium (500), SemiBold (600)
+**Fonts Bundled:**
+- Noto Sans SC (Regular/Medium/SemiBold) — Chinese UI text
+- Assets: `assets/fonts/NotoSansSC-Regular.ttf`, `NotoSansSC-Medium.ttf`, `NotoSansSC-SemiBold.ttf`
+
+**Network Protocols Supported (via MDK/FFmpeg):**
+- Local files: mp4, mkv, avi, mov, flv, webm, m4v, wmv, ts, rmvb, mpg, mpeg, 3gp, vob
+- Audio: mp3, flac, wav, aac, ogg, opus, m4a, wma, ape, alac, aiff
+- Streaming: http, https, rtmp, rtsp, srt, udp, tcp
 
 ---
 
-*Stack analysis: 2026/06/23*
+*Stack analysis: 2026-06-23*

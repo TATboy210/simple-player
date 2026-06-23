@@ -1,312 +1,279 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-06-23
+**Analysis Date:** 2026/06/23
 
-## Compilation Errors (CRITICAL)
+## Tech Debt
 
-### audio_tab.dart Type Errors
+### 1. Hardcoded Colors Violate Design System
 
-- Issue: `_AudioTrackRow.track` is typed as `dynamic` instead of `AudioTrackInfo`. Lines 67 and 73 fail because `dynamic` properties can't be used in `bool` conditions or assigned to `String?`.
-- Files: `lib/ui/dialogs/settings/audio_tab.dart` (lines 51, 67, 73)
-- Impact: Build fails with 3 analyzer errors: `non_bool_condition`, `argument_type_not_assignable`.
-- Fix approach: Change `final dynamic track;` to `final AudioTrackInfo track;` on line 51.
+**Issue:** Many UI files contain hardcoded `Color(0x...)` values instead of using `Tokens.*` constants, violating the project's design system contract.
 
-### v2 Archived Code Errors
+**Files:**
+- `lib/app.dart:92,95,103,122,185,193,194` — 7 hardcoded colors in quick menu
+- `lib/ui/shared/aurora_background.dart:31-33,161,210` — 5 hardcoded colors
+- `lib/ui/playlist/thumbnail_tile.dart:297` — hardcoded overlay color
+- `lib/ui/shared/osd_overlay.dart:135` — track color
+- `lib/kernel/services/theme_service.dart:18-20` — accent colors defined here AND in `general_tab.dart:131-133` AND `settings_panel.dart:66`
 
-- Issue: `v2/` directory contains archived mpv+ANGLE prototype with broken imports (`package:flutter_fullscreen/flutter_fullscreen.dart` doesn't exist)
-- Files: `v2/lib/infra/window/window_service.dart` (lines 5, 46, 48, 118)
-- Impact: 4 errors from v2/ pollute analyzer output, confuse CI
-- Fix approach: Add `v2/` to `.gitignore` or move to separate branch
+**Impact:** Theme changes require hunting through 10+ files. Inconsistent colors if one file is missed.
 
-### showDialog Type Inference Warnings
+**Fix approach:** Extract all hardcoded colors to `Tokens.*` constants. For theme-specific accents, centralize in `ThemeService.accents` and reference from there.
 
-- Issue: `showDialog` calls lack explicit type arguments, causing inference warnings
-- Files: `lib/app.dart:66`, `lib/ui/player/player_screen.dart:278`
-- Impact: Warning-only. May cause issues with strict analysis.
-- Fix approach: Add explicit `<void>` type argument to `showDialog<void>()` calls.
+### 2. Duplicated Theme Accent Colors
 
-### Unused Variables
+**Issue:** The same 3 accent colors (`0xFF2C58F4`, `0xFF00B4D8`, `0xFF2D6A4F`) are defined in 4 separate locations:
 
-- Issue: `videoContent` in `player_screen.dart:120` is assigned but never read
-- Files: `lib/ui/player/player_screen.dart:120`
-- Impact: Warning-only.
-- Fix approach: Remove or prefix with `_` if intentionally unused.
+| File | Line(s) |
+|------|---------|
+| `lib/kernel/services/theme_service.dart` | 18-20 |
+| `lib/ui/dialogs/settings/general_tab.dart` | 131-133 |
+| `lib/ui/dialogs/settings_panel.dart` | 66 |
+| `lib/app.dart` | 185, 193 |
 
-### Unused Import
+**Impact:** Adding a new theme requires editing 4 files. Risk of color mismatch if one is updated but not others.
 
-- Issue: `window_persistence.dart` imports `log.dart` but doesn't use it
-- Files: `lib/kernel/bridge/window_persistence.dart:4`
-- Impact: Warning-only.
-- Fix approach: Remove the import.
+**Fix approach:** Single source of truth in `ThemeService.accents`. All other locations should reference `ThemeService.accents[i]`.
 
-## FvpEngine God Object (HIGH)
+### 3. Large Files Approaching Limit
 
-### 724 Lines, 12+ Responsibilities
+**Issue:** Several files exceed the 500-line guideline or are close to it.
 
-- Issue: `FvpEngine` is the largest non-generated file at 724 lines. It handles: playback control, network stream configuration (6 protocol branches), track management delegation, video effects, D3D11 settings, subtitle delay, equalizer, rotation, aspect ratio, deinterlace, and lifecycle management.
-- Files: `lib/kernel/engine/fvp_engine.dart` (724 lines)
-- Impact: Difficult to test individual concerns in isolation. Adding a new feature requires modifying this file. 12 `ValueNotifier` fields and 15+ public methods.
-- Fix approach: Extract `NetworkConfigurator` (already done at `lib/kernel/engine/network_configurator.dart`), `VideoEffectController` (already done at `lib/kernel/engine/video_effect_controller.dart`), and `D3d11Configurator` (already done at `lib/kernel/engine/d3d11_configurator.dart`). However, `FvpEngine` still holds 12 ValueNotifiers and 724 lines. Further decomposition needed: extract `MediaOpener` (already done at `lib/kernel/engine/media_opener.dart`) and consider splitting playback control from configuration.
+| File | Lines | Concern |
+|------|-------|---------|
+| `lib/kernel/engine/fvp_engine.dart` | 724 | **Exceeds 500** — God object with 15+ ValueNotifiers |
+| `lib/l10n/app_localizations.dart` | 1022 | Generated — acceptable |
+| `lib/kernel/persistence/settings_store.dart` | 439 | 26+ save/load methods, all static |
+| `lib/ui/dialogs/settings_panel.dart` | 402 | Complex state management for deferred apply |
+| `lib/ui/shared/aurora_background.dart` | 362 | Custom painting + ticker logic |
+| `lib/ui/playlist/playlist_panel.dart` | 358 | Dual-tab layout |
+| `lib/ui/player/control_bar.dart` | 350 | Responsive layout logic |
 
-## SettingsStore Monolithic Persistence (HIGH)
+**Impact:** Hard to navigate, test, and modify. `fvp_engine.dart` is the most concerning — it handles open/play/pause/stop/seek/volume/mute/subtitle/tracks/error in one class.
 
-### 439 Lines, 26+ Save Methods
+**Fix approach:** Extract `FvpEngine` into smaller mixins or delegates (already has `FvpCallbackHandler`, `PositionPoller`, `TrackManager` — consider further decomposition).
 
-- Issue: Each setting has its own `saveX()` method wrapping `SharedPreferences` with try-catch. The `load()` method duplicates all defaults from `AppSettings`. Adding a new setting requires 6 touch points: key constant, `AppSettings` field, save method, `load()`, `saveAll()`, default fallback.
-- Files: `lib/kernel/persistence/settings_store.dart` (439 lines), `lib/kernel/models/app_settings.dart`
-- Impact: High maintenance cost. Defaults are defined in two places (`AppSettings` constructor and `SettingsStore.load()` catch block).
-- Fix approach: Serialize/deserialize the entire `AppSettings` object in one pass using JSON. Or switch to structured storage with schema migration. The `_save()` helper already centralizes try-catch, but individual methods still proliferate.
+### 4. Static Mutable State in Persistence Layer
 
-## Static Mutable Singletons (MEDIUM)
+**Issue:** `PlaylistStore` and `SettingsStore` use static fields for caching, making test isolation fragile.
 
-### Global State Anti-Pattern
+**Files:**
+- `lib/kernel/persistence/playlist_store.dart:28-35` — `static Timer? _debounce`, `static String? _pendingJson`, `static Future<void>? _writeInFlight`
+- `lib/kernel/persistence/settings_store.dart:23` — `static SharedPreferences? _cachedPrefs`
 
-- Issue: Multiple services use `static final X I = X._()` singleton pattern. These create hidden global state that's difficult to test and prevents dependency injection.
-- Files:
-  - `lib/kernel/services/locale_service.dart:18` — `LocaleService.I`
-  - `lib/kernel/services/theme_service.dart:15` — `ThemeService.I`
-  - `lib/ui/shared/osd_overlay.dart:27` — `OsdService.I`
-  - `lib/kernel/utils/perf_monitor.dart:11` — `PerfMonitor._instance`
-  - `lib/kernel/services/thumbnail_service.dart` — static `_impl` and `_cache`
-  - `lib/kernel/persistence/playlist_store.dart` — static `_debounce`, `_pendingJson`, `_writeInFlight`
-  - `lib/kernel/bridge/display_config.dart` — static `_cachedHz`, `_initialized`
-- Impact: Tests must call `reset()` on each singleton before/after each test. Any test that forgets to reset leaks state into subsequent tests. Prevents parallel test execution.
-- Fix approach: Migrate to constructor injection. `LocaleService` and `ThemeService` are used in `app.dart` — inject them as constructor parameters. `OsdService` is used via `OsdService.I.show()` — convert to a provider pattern. `PlaylistStore` and `ThumbnailService` should become instance-based with injection.
+**Impact:** Tests must call `reset()` methods to avoid state leakage. Concurrent test runs may interfere.
 
-## Large Files (MEDIUM)
+**Fix approach:** Consider instance-based stores with dependency injection, or ensure all static state is properly reset in `@visibleForTesting` reset methods (already partially done with `SettingsStore.resetPrewarm()`).
 
-### Files Exceeding 300 Lines
+## Platform-Specific Risks
 
-- Issue: 10 files exceed 300 lines (excluding generated l10n files). The top 5 are architectural concerns.
-- Files (by size):
-  - `lib/kernel/engine/fvp_engine.dart` — 724 lines (god object)
-  - `lib/kernel/persistence/settings_store.dart` — 439 lines (monolithic)
-  - `lib/ui/dialogs/settings_panel.dart` — 402 lines (complex dialog)
-  - `lib/ui/shared/aurora_background.dart` — 362 lines (custom painter)
-  - `lib/ui/playlist/playlist_panel.dart` — 358 lines (floating panel)
-  - `lib/ui/player/control_bar.dart` — 350 lines (control bar)
-  - `lib/ui/player/player_screen.dart` — 338 lines (main screen)
-  - `lib/ui/dialogs/settings/video_tab.dart` — 317 lines (settings tab)
-  - `lib/ui/playlist/thumbnail_tile.dart` — 309 lines (thumbnail card)
-  - `lib/ui/playlist/folder_tab.dart` — 306 lines (folder grouping)
-- Impact: Hard to navigate and test. `settings_panel.dart` has complex deferred-apply logic with OK/Cancel/Apply buttons.
-- Fix approach: Extract sub-components from `settings_panel.dart`. Extract `AuroraPainter` from `aurora_background.dart`. The `player_screen.dart` Stack compositing is inherently complex but could extract the overlay logic.
+### 5. Windows-Only Platform Code
 
-## Late Keyword Overuse (MEDIUM)
+**Issue:** Core window management features are Windows-only with no macOS/Linux fallback.
 
-### Deferred Initialization Pattern
+**Files:**
+- `lib/kernel/bridge/win32/win32_platform_fullscreen.dart` — Entire file is Win32 FFI (140 lines)
+- `lib/kernel/bridge/window_service.dart:245-247` — Factory throws `UnsupportedError` for non-Windows
+- `lib/kernel/bridge/display_config.dart:49` — TODO for Win32 FFI refresh rate detection
 
-- Issue: Multiple classes use `late final` for fields that are initialized in `init()` methods rather than constructors. This creates a runtime crash risk if `init()` isn't called before access.
-- Files:
-  - `lib/features/player/player_services.dart:17-20` — 4 `late final` fields (engine, playlist, controller, videoProcessing)
-  - `lib/features/player/services/playback_controller.dart:38-40` — 3 `late final` fields (navigator, fileOps, monitor)
-  - `lib/kernel/engine/fvp_engine.dart:56-58` — 3 `late final` fields (callbackHandler, positionPoller, trackManager)
-  - `lib/features/player/services/video_processing_service.dart:27,30` — 2 `late` fields
-- Impact: If `PlayerServices.init()` throws halfway through, `controller` and `videoProcessing` are uninitialized. Accessing them crashes with `LateInitializationError`.
-- Fix approach: Use nullable types or factory constructors. For `FvpEngine`, the `late` fields are initialized in `_createPlayer()` which is called lazily — this is intentional but fragile.
+**Impact:** App crashes on macOS/Linux launch due to `UnsupportedError` in `WindowService._createPlatformFullscreen()`.
 
-## Platform Lock-in (MEDIUM)
+**Fix approach:** Implement `PlatformFullscreen` for macOS (NSWindow style mask) and Linux (GTK window state). The TODO at `window_service.dart:246` tracks this.
 
-### Windows-Only Implementation
+### 6. Stub Platform Implementations
 
-- Issue: Core window management uses Win32 FFI directly (`win32_platform_fullscreen.dart`). `WindowService._createPlatformFullscreen()` returns `Win32PlatformFullscreen()` on Windows, but macOS/Linux paths are TODO stubs.
-- Files: `lib/kernel/bridge/win32/win32_platform_fullscreen.dart`, `lib/kernel/bridge/window_service.dart:245-246`
-- Impact: Porting to macOS/Linux requires implementing `PlatformFullscreen` for each platform, plus `WindowService` platform branching.
-- Fix approach: The `PlatformFullscreen` interface is already defined. Implement `MacosPlatformFullscreen` (NSWindow style mask) and `LinuxPlatformFullscreen` (GTK window state).
+**Issue:** macOS and Linux thumbnail providers are stubs that return empty results.
 
-### ThumbnailService Platform Gaps
+**Files:**
+- `lib/kernel/services/macos_thumbnail_provider.dart:7` — `/// TODO: 实现 QLThumbnailGenerator Objective-C FFI 提取真实缩略图。`
+- `lib/kernel/services/linux_thumbnail_provider.dart` — Likely stub (not read but exists alongside noop provider)
+- `lib/kernel/services/noop_thumbnail_provider.dart` — Explicit noop fallback
 
-- Issue: `ThumbnailService` maps `TargetPlatform.windows` to `NoopThumbnailProvider()` — no real thumbnails on the primary platform. macOS provider returns `null` with a TODO for QLThumbnailGenerator.
-- Files: `lib/kernel/services/thumbnail_service.dart:26`, `lib/kernel/services/macos_thumbnail_provider.dart:7`
-- Impact: Playlist panel shows empty thumbnail placeholders on Windows and macOS. Only Linux has a real provider (XDG thumbnail cache).
-- Fix approach: Implement Windows thumbnail extraction via `IThumbnailProvider` COM interface or `ShellItemImageFactory`. For macOS, use `QLThumbnailGenerator` via Objective-C FFI.
+**Impact:** No thumbnail previews on macOS/Linux. Users see empty playlist tiles.
 
-### DisplayConfig Refresh Rate Detection
+**Fix approach:** Implement `QLThumbnailGenerator` FFI for macOS, `ThumbnailFactory` for Linux (GNOME/KDE).
 
-- Issue: `_detectRefreshRate()` always returns 60Hz. TODO to use Win32 FFI `GetDeviceCaps(VREFRESH)`.
-- Files: `lib/kernel/bridge/display_config.dart:49`
-- Impact: 120Hz+ displays always get sync mode (`d3d11.sync.cpu=1`), adding 1-2 frames of input lag.
-- Fix approach: Use Win32 FFI `GetDeviceCaps(hdc, VREFRESH)` or `display_size` package.
+### 7. Windows-Only Log Path
 
-## Deferred Import Complexity (MEDIUM)
+**Issue:** Log file path uses `%APPDATA%` environment variable, which is Windows-specific.
 
-### DeferredPlayerFeature
+**File:** `lib/kernel/utils/log.dart:148-151`
 
-- Issue: `deferred as` import adds async loading complexity, error handling for load failures, and an empty screen during load. On desktop, code splitting is less critical than on web/mobile.
-- Files: `lib/features/player/deferred_player_feature.dart` (97 lines)
-- Impact: Adds a code path that can fail silently (shows error text). The `EnginePrewarm` already runs fire-and-forget in `main()`, so engine init happens in parallel anyway.
-- Fix approach: Measure actual startup time difference. If <500ms savings, remove deferred import and simplify to direct import.
+```dart
+final appData = Platform.environment['APPDATA'];
+if (appData == null) return;
+final dir = Directory('$appData\\SimplePlayer\\logs');
+```
 
-## Bare Catch Clauses (MEDIUM)
+**Impact:** Logging silently fails on macOS/Linux (returns early when `APPDATA` is null).
 
-### Exception Type Erosion
+**Fix approach:** Use `path_provider`'s `getApplicationSupportDirectory()` for cross-platform log path.
 
-- Issue: Some catch blocks use bare `catch (e, st)` instead of `on Exception catch (e)`, catching Error subtypes (programming bugs) that should propagate.
-- Files:
-  - `lib/kernel/bridge/display_config.dart:52` — `catch (e, st)`
-  - `lib/features/player/deferred_player_feature.dart:67` — `catch (e, stackTrace)`
-  - `lib/kernel/services/linux_thumbnail_provider.dart:35` — `on Exception {}` (silent swallow)
-- Impact: Programming bugs (AssertionError, TypeError) get logged and swallowed instead of crashing with stack trace.
-- Fix approach: Use `on Exception catch (e)` consistently. For `linux_thumbnail_provider.dart`, at minimum log the exception.
+## Error Handling Gaps
 
-## Security Considerations (MEDIUM)
+### 8. Silent Error Swallowing in Scanner
 
-### URL Input Validation
+**Issue:** `FolderScanner.scan()` catches all exceptions and returns empty list without logging.
 
-- Risk: Network URLs (http/https/rtsp/rtmp/srt/udp/tcp) are passed directly to FFmpeg. Only HTTP/HTTPS get structural validation via `Uri.tryParse()`. Other protocols skip validation entirely.
-- Files: `lib/kernel/services/path_validator.dart:93-101`, `lib/kernel/engine/fvp_engine.dart:190-231`
-- Current mitigation: `PathValidator.isUrl()` checks URL prefix. `_configureNetworkOptions()` sets timeouts.
-- Recommendations: Use `Uri.tryParse()` to validate URL structure for all protocols. Reject URLs with unexpected schemes or excessively long components.
+**File:** `lib/kernel/scanner/folder_scanner.dart:63-65`
 
-### File Path Handling
+```dart
+} on Exception {
+  return [];
+}
+```
 
-- Risk: User-provided file paths passed directly to `mdk.Player.media` and `File()`. No length validation.
-- Files: `lib/features/player/services/file_operations.dart`, `lib/kernel/engine/fvp_engine.dart:248-280`
-- Current mitigation: `PathValidator` checks extensions and path traversal. `fvp_engine.dart` checks `File.exists()`.
-- Recommendations: Add path length validation (Windows MAX_PATH = 260). Consider symlink resolution check.
+**Impact:** Permission errors, disk failures, or invalid paths are silently ignored. User sees empty folder with no explanation.
 
-### Win32 FFI Raw Calls
+**Fix approach:** Log the error and consider returning a result type that includes error information.
 
-- Risk: Direct FFI calls to user32.dll without sandboxing. HWND lookup by class name string.
-- Files: `lib/kernel/bridge/win32/win32_platform_fullscreen.dart`
-- Current mitigation: Class name `FLUTTER_RUNNER_WIN32_WINDOW` is Flutter-specific. FFI functions are static final (DLL handle shared).
-- Recommendations: Validate HWND is not null/zero before operations. Add error handling for DLL load failures.
+### 9. Inconsistent Error Reporting in Engine
 
-## Performance Bottlenecks (LOW)
+**Issue:** Some engine operations set `errorMessage` (user-visible), others only log (developer-visible), with no clear pattern.
 
-### PositionPoller Timer
+**File:** `lib/kernel/engine/fvp_engine.dart`
 
-- Problem: Polls playback position every 100-250ms via `Timer.periodic`. Necessary because fvp/MDK doesn't provide a position-changed callback.
-- Files: `lib/kernel/engine/position_poller.dart`
-- Current mitigation: Adaptive intervals (100ms after seek, 250ms steady, auto-revert after 1s). Already optimized.
-- Improvement path: fvp upstream could expose a position callback to eliminate polling.
+| Operation | Error handling |
+|-----------|---------------|
+| `open()` (line 399) | Sets `errorMessage` + `_errorType` |
+| `play()` (line 419) | Sets `errorMessage` + `_errorType` |
+| `pause()` (line 434) | Only `log.e()` |
+| `stop()` (line 447) | Only `log.e()` |
+| `seekTo()` (line 464) | Sets `errorMessage` |
+| `setVolume()` (line 482) | Via `_guardedAction` — only `log.e()` |
 
-### Thumbnail LRU Cache Unbounded
+**Impact:** User has no visibility into pause/stop/volume failures. Inconsistent UX.
 
-- Problem: `ThumbnailService._cache` holds 200 `ImageProvider` objects in memory with no byte-size limit.
-- Files: `lib/kernel/services/thumbnail_service.dart:16-21`
-- Cause: LRU cache tracks entry count, not byte size. 200 entries at 1080p = ~90MB.
-- Improvement path: Track approximate byte size (width * height * 4), evict when exceeding memory budget.
+**Fix approach:** Define error severity levels — critical (open/play) shows UI banner, non-critical (pause/stop) logs only. Document the convention.
 
-### PlaylistStore Static Timers
+## Performance Concerns
 
-- Problem: `_debounce` Timer and `_writeInFlight` Future are static, persist across test runs.
-- Files: `lib/kernel/persistence/playlist_store.dart:28-35`
-- Cause: Static mutable state for debounce logic.
-- Improvement path: Move to instance-based PlaylistStore, inject via constructor.
+### 10. No Debouncing on Playlist Save Triggers
+
+**Issue:** `PlaybackController` calls `savePlaylist()` on every state change (reorder, remove, clear, mode toggle), each triggering the 300ms debounce timer.
+
+**Files:**
+- `lib/features/player/services/playback_controller.dart:81,88,98,105` — 4 call sites
+- `lib/kernel/persistence/playlist_store.dart:49-52` — debounce implementation
+
+**Impact:** Rapid operations (batch remove, quick reorder) still trigger multiple serializations within the debounce window. The debounce only coalesces the I/O, not the JSON encoding.
+
+**Fix approach:** Move `jsonEncode` into the debounced callback, or debounce at the `PlaybackController` level before calling `PlaylistStore.save()`.
+
+### 11. Aurora Background Ticker Runs During Video Playback
+
+**Issue:** `AuroraBackground` starts a `Ticker` that runs every frame, even when the background is fully obscured by video.
+
+**File:** `lib/ui/shared/aurora_background.dart:66-68`
+
+The `engineState` listener pauses the ticker only when state is not `idle`, but the check is incomplete — it doesn't account for `paused` state where the video surface may still be visible.
+
+**Impact:** Unnecessary GPU usage during paused video (background is still hidden behind the video texture).
+
+**Fix approach:** Pause ticker when `engineState` is `playing` OR `paused` (video surface is visible in both states). Only resume on `idle` or `stopped`.
 
 ## Fragile Areas
 
-**FvpEngine Open Method:**
-- Files: `lib/kernel/engine/fvp_engine.dart:248-410`
-- Why fragile: 162 lines, 15+ early returns, multiple timeout paths, texture creation race conditions
-- Safe modification: Always test with: local file, HTTP URL, RTSP stream, invalid file, timeout scenario
-- Test coverage: Unit tests exist for callback handler, but open() integration requires real MDK
+### 12. Window HWND Lookup by Class Name
 
-**FullscreenController Mutex:**
-- Files: `lib/kernel/bridge/fullscreen_controller.dart:105-142`
-- Why fragile: Boolean mutex (`_isAnimating`) with try/finally, rollback on failure, OS callback interference
-- Safe modification: Test enter/exit/rapid-toggle/failure-rollback scenarios
-- Test coverage: Good — has FakeWindowOps and FakePlatformFullscreen test doubles
+**Issue:** `Win32PlatformFullscreen._getHwnd()` finds the Flutter window by searching for class name `FLUTTER_RUNNER_WIN32_WINDOW`.
 
-**PlayerScreen Callback Drilling:**
-- Files: `lib/ui/player/player_screen.dart`
-- Why fragile: 15+ callback parameters passed through constructor, any change cascades
-- Safe modification: Group related callbacks into action objects or use InheritedWidget
-- Test coverage: Integration tests exist but don't cover all callback paths
+**File:** `lib/kernel/bridge/win32/win32_platform_fullscreen.dart:127-133`
 
-**SettingsPanel Deferred Apply:**
-- Files: `lib/ui/dialogs/settings_panel.dart`
-- Why fragile: Pending/original state tracking for locale and theme, cancel must restore both
-- Safe modification: Test OK/Cancel/Apply with locale change, theme change, and both together
-- Test coverage: No dedicated settings panel tests found
+```dart
+static int _getHwnd() {
+  final className = 'FLUTTER_RUNNER_WIN32_WINDOW'.toNativeUtf16();
+  try {
+    return _findWindow(className, nullptr);
+  } finally {
+    calloc.free(className);
+  }
+}
+```
 
-## Scaling Limits
+**Impact:** If Flutter changes the window class name in a future version, or if multiple Flutter windows are open, this returns the wrong HWND or 0.
 
-**Playlist JSON Serialization:**
-- Current capacity: ~1000 items typical, no hard limit
-- Limit: JSON encode/decode becomes slow at 10K+ items, SharedPreferences has size limits
-- Scaling path: Migrate to SQLite for large playlists, use streaming JSON parser
+**Fix approach:** Cache the HWND on first successful lookup. Consider using `GetActiveWindow()` or the Flutter engine's view ID as fallback.
 
-**Thumbnail Cache Memory:**
-- Current capacity: 200 entries, ~90MB at 1080p (1920*1080*4*200)
-- Limit: 4K thumbnails would be ~6GB for 200 entries
-- Scaling path: Store thumbnails on disk, use memory-mapped files, limit cache to available RAM
+### 13. Race Condition in Fullscreen Controller
 
-## Dependencies at Risk
+**Issue:** `FullscreenController` uses a `Completer`-based mutex to prevent concurrent fullscreen transitions, but the mutex is not reentrant-safe.
 
-**player_engine (Local Path):**
-- Risk: `path: ../widget_tree_flutter/player_engine` — local dependency, not published
-- Impact: Build breaks if sibling repo is missing, no version pinning
-- Migration plan: Publish to private pub.dev, or use git dependency with version tag
+**File:** `lib/kernel/bridge/fullscreen_controller.dart`
 
-**fvp (v0.37.2):**
-- Risk: Core dependency — single maintainer (WangBin). Provides entire media playback engine (MDK + FFmpeg + D3D11 texture).
-- Impact: No drop-in alternative for Flutter desktop texture-based playback.
-- Migration plan: Long-term, consider wrapping mpv or FFmpeg directly via FFI + custom texture plugin (v2 prototype was archived).
+If `enter()` is called while `exit()` is in progress (e.g., rapid F key presses), the second call may fail silently or corrupt the saved window state.
 
-**window_manager (v0.5.1):**
-- Risk: Community-maintained. Custom fullscreen logic bypasses `window_manager.setFullScreen()` with raw Win32 FFI.
-- Impact: Breaking changes in `WindowListener` callback behavior would require updating `WindowService`.
-- Current mitigation: Only stable API surface is used. `WindowBridge` interface abstracts the dependency.
+**Impact:** Window stuck in partial fullscreen state with wrong dimensions.
 
-**desktop_drop (v0.7.1):**
-- Risk: Community-maintained, infrequent updates. Could break on new Flutter/Windows versions.
-- Impact: Drag-and-drop file support breaks.
-- Migration plan: Implement native drag-and-drop via Win32 `DragAcceptFiles` + `WM_DROPFILES` in C++ runner.
+**Fix approach:** Queue pending transitions instead of dropping them, or add a cooldown period after each transition.
+
+## Security Considerations
+
+### 14. No Input Validation on File Paths
+
+**Issue:** `FolderScanner.scan()` and `FileOperations.openAndPlay()` accept arbitrary file paths without sanitization.
+
+**Files:**
+- `lib/kernel/scanner/folder_scanner.dart:42-66`
+- `lib/features/player/services/file_operations.dart`
+
+**Impact:** Low risk for desktop app — user controls their own filesystem. But path traversal could access files outside intended directories if paths come from drag-and-drop or CLI args.
+
+**Fix approach:** Validate that paths are within expected directories. Already partially addressed by `PathValidator.isUrl()` check in engine.
+
+### 15. Hardcoded Win32 Constants
+
+**Issue:** Win32 API constants are defined as module-level `const` values without documentation of their Windows SDK origin.
+
+**File:** `lib/kernel/bridge/win32/win32_platform_fullscreen.dart:14-20`
+
+```dart
+const int _gwlStyle = -16;
+const int _wsCaption = 0x00C00000;
+const int _wsThickframe = 0x00040000;
+```
+
+**Impact:** If these values change in a future Windows SDK (unlikely but possible), or if the constants are wrong, the fullscreen behavior breaks silently.
+
+**Fix approach:** Add comments referencing the Windows SDK header (`winuser.h`) or use the `win32` package's named constants.
 
 ## Test Coverage Gaps
 
-**Settings Panel:**
-- What's not tested: OK/Cancel/Apply flows, locale/theme deferred apply, drag behavior
-- Files: `lib/ui/dialogs/settings_panel.dart`
-- Risk: Locale/theme changes could corrupt state on cancel
-- Priority: Medium
+### 16. No Integration Tests for Engine Lifecycle
 
-**Window Service Integration:**
-- What's not tested: WindowListener callbacks, resize debounce, fullscreen toggle with OS interference
-- Files: `lib/kernel/bridge/window_service.dart`
-- Risk: Race conditions between Dart and OS window management
-- Priority: High
+**Issue:** The engine open/play/pause/stop/seek lifecycle has complex state transitions and error paths, but no integration tests exercise the full flow.
 
-**Network Stream Handling:**
-- What's not tested: RTSP/RTMP/SRT connection, timeout, reconnection, low-latency config
-- Files: `lib/kernel/engine/fvp_engine.dart:190-231`
-- Risk: Network stream failures silently set error state
-- Priority: Medium
+**Files:**
+- `lib/kernel/engine/fvp_engine.dart` — 724 lines, 15+ state transitions
+- `lib/features/player/services/playback_controller.dart` — orchestrates engine + playlist
 
-**PlayerScreen Callback Integration:**
-- What's not tested: All 15+ callback parameters, callback chains, error propagation
-- Files: `lib/ui/player/player_screen.dart`
-- Risk: Callback drilling makes it easy to miss wiring
-- Priority: Medium
+**Impact:** Regressions in state machine transitions (e.g., seeking while buffering, opening while playing) are only caught by manual testing.
 
-## Resolved Since 2026-05-30
+**Priority:** High — engine state bugs cause user-visible playback failures.
 
-- ~~Win32 FFI from Dart~~ — Removed. `window_service.dart` now uses `window_manager` + `flutter_fullscreen` packages only.
-- ~~`_savedFrame` memory leak~~ — Fixed in Phase 13 Wave 2 (H-2).
-- ~~`onWindowClose` async race~~ — Fixed in Phase 13 Wave 2 (H-1). Now uses `whenComplete()`.
-- ~~Triple async border removal~~ — Fixed in Phase 13 Wave 2 (CR-1). C++ WM_NCCALCSIZE handles frameless.
-- ~~`catch (_)` silent errors~~ — All changed to `on Exception catch (e)` + logging.
-- ~~LRU cache O(n) scan~~ — Fixed. `ThumbnailService._touch()` uses `LinkedHashMap` O(1) remove+reinsert.
-- ~~PerfMonitor unbounded list~~ — Fixed with ring buffer.
-- ~~AppSettings not immutable~~ — Has `copyWith()`, `operator ==`, `hashCode`.
-- ~~NetworkConfigurator extraction~~ — Done. `lib/kernel/engine/network_configurator.dart`.
-- ~~VideoEffectController extraction~~ — Done. `lib/kernel/engine/video_effect_controller.dart`.
-- ~~D3d11Configurator extraction~~ — Done. `lib/kernel/engine/d3d11_configurator.dart`.
-- ~~MediaOpener extraction~~ — Done. `lib/kernel/engine/media_opener.dart`.
+### 17. No Widget Tests for Settings Panel
 
-## Deferred Items
+**Issue:** `SettingsPanel` has complex deferred-apply logic for locale and theme changes, with cancel/OK/Apply paths.
 
-| Category | Item | Status | Deferred At |
-|----------|------|--------|-------------|
-| v1.3+ | WIN-07: Fullscreen smooth transition | Blocked by engine (fvp doesn't expose transition callbacks) | v1.2.1 |
-| v1.3+ | PLATFORM-02: macOS/Linux platform stubs | Interface only, implementations are TODO | v1.0 |
-| v1.3+ | ARCH-01: FvpEngine further decomposition | Partially done (4 extractors), still 724 lines | v1.2 |
-| v1.3+ | Steam/SteamOS distribution | Deferred | v1.0 |
-| v1.3+ | Windows thumbnail extraction | NoopThumbnailProvider on Windows | v1.0 |
-| v1.3+ | DisplayConfig real refresh rate detection | Always returns 60Hz | v1.2 |
+**File:** `lib/ui/dialogs/settings_panel.dart` — 402 lines
+
+**Impact:** The deferred-apply pattern (changes visible during editing, reverted on cancel) is error-prone and untested.
+
+**Priority:** Medium — settings UI correctness affects user experience.
+
+## Missing Critical Features
+
+### 18. No Crash Recovery
+
+**Issue:** If the app crashes mid-playback, the saved state may be inconsistent (playlist saved but position not, or vice versa).
+
+**Files:**
+- `lib/kernel/persistence/playlist_store.dart` — atomic write with retry
+- `lib/kernel/persistence/settings_store.dart` — individual key saves
+
+**Impact:** On restart, the app may resume at wrong position or lose recent playlist changes.
+
+**Fix approach:** Use a single atomic write for all state (playlist + position + settings) or implement a write-ahead log.
 
 ---
 
-*Concerns audit: 2026-06-23*
+*Concerns audit: 2026/06/23*
