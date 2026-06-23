@@ -1,446 +1,561 @@
-# Domain Pitfalls: v1.2.1 Window Smoothness, HLS ABR, Architecture Simplification
+# Domain Pitfalls: Flutter Desktop Cross-Platform Window Management
 
-**Domain:** Flutter desktop media player -- Win32 frameless window, HLS adaptive bitrate, platform abstraction
-**Researched:** 2026-05-31
-**Overall confidence:** HIGH (Win32/HLS based on prior project experience + domain knowledge; Platform abstraction MEDIUM -- fewer battle-tested patterns for Flutter desktop)
-
----
-
-## 1. Win32 Frameless Window Smoothness (WIN-05)
-
-### Pitfall 1a: Flutter Engine Message Interception Kills Custom WM_NCCALCSIZE
-
-**What goes wrong:** Adding `WM_NCCALCSIZE` handling in `flutter_window.cpp` `MessageHandler` does nothing because Flutter's `HandleTopLevelWindowProc` (line 46-53) runs FIRST and may consume the message. The current code at `flutter_window.cpp:46` shows:
-
-```cpp
-if (flutter_controller_) {
-    std::optional<LRESULT> result =
-        flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam, lparam);
-    if (result) {
-        return *result;  // <-- custom handler never reached
-    }
-}
-```
-
-If Flutter returns a value for `WM_NCCALCSIZE`, your custom handler below it is dead code.
-
-**Why it happens:** Flutter's embedder registers its own window proc that intercepts certain messages. `WM_NCCALCSIZE` and `WM_NCHITTEST` are among the messages Flutter may handle.
-
-**Consequences:** The C++ `WM_NCCALCSIZE` handler compiles and runs but has zero effect. The title bar remains visible or the border flash persists. Developer wastes hours debugging a handler that never executes.
-
-**Prevention:**
-- Option A: Move custom handling BEFORE `HandleTopLevelWindowProc` -- but this risks breaking Flutter's own DPI/layout logic.
-- Option B: Use `DwmExtendFrameIntoClientArea` with `margins = {-1, -1, -1, -1}` in `OnCreate()` BEFORE the Flutter controller is created. This operates at the DWM level, not the message level.
-- Option C: Register a separate `WNDPROC` via `SetWindowLongPtr(GWLP_WNDPROC, ...)` that runs BEFORE Flutter's handler. This is what `bitsdojo_window` does.
-- Option D (recommended): Keep `WS_CAPTION` style, use `WM_NCCALCSIZE` to zero the non-client area, but call `DwmExtendFrameIntoClientArea` for shadow. Test that `HandleTopLevelWindowProc` does NOT consume `WM_NCCALCSIZE` first -- it may not.
-
-**Detection:** Add `OutputDebugStringW(L"WM_NCCALCSIZE hit\n")` in your handler. If it doesn't appear in debug output when resizing, Flutter consumed it.
-
-**Phase:** WIN-05 (C++ WM_NCCALCSIZE)
+**Domain:** Flutter desktop media player expanding from Windows-only to Windows/Linux/macOS
+**Researched:** 2026-06-23
+**Overall confidence:** MEDIUM (Windows pitfalls HIGH from direct project experience; Linux/macOS pitfalls MEDIUM from ecosystem research and known Flutter issues)
 
 ---
 
-### Pitfall 1b: WS_CAPTION Removal Kills DWM Animation (Already Proven)
+## 1. Linux Pitfalls (X11 vs Wayland)
 
-**What goes wrong:** The current `SetFrameless` in `window_channel.cpp` removes `WS_CAPTION`:
+### Pitfall L1: Wayland Forbids Client-Side Window Positioning
 
-```cpp
-style &= ~WS_CAPTION;      // removes title bar
-style |= WS_THICKFRAME;    // keeps resize border
-```
+**What goes wrong:** `window_manager`'s `setPosition()`, `setAlignment()`, and `Bounds` persistence all become no-ops on Wayland. The `xdg_shell` protocol intentionally forbids clients from controlling their own window placement -- this is a security feature, not a bug. Your `WindowPersistence` center-on-startup logic will silently fail.
 
-This destroys DWM maximize/restore animation, Win11 rounded corners, and window shadow. This is the EXISTING behavior and has been documented as an anti-pattern in `anti_pattern_window_frameless.md`.
+**Why it happens:** Wayland's design philosophy is compositor-controlled placement. Unlike X11 where apps can position themselves freely, Wayland compositors (GNOME/Mutter, KDE/KWin, wlroots-based) own window placement decisions.
 
-**Why it happens:** `WS_CAPTION` is not just the title bar text -- it is the DWM animation pipeline's required style flag. Without it, DWM skips smooth transitions.
-
-**Consequences:** Maximize/restore becomes a jarring snap. Win11 corners become square. Shadow disappears. The "Apple-level smoothness" goal is impossible with this approach.
+**Consequences:**
+- Window always opens at compositor-chosen position (usually top-left or center)
+- `WindowPersistence.saveBounds()` saves coordinates but `restoreBounds()` cannot apply them
+- "Open centered on screen" feature breaks silently
+- Multi-window positioning (if ever added) is impossible
 
 **Prevention:**
-- DO NOT remove `WS_CAPTION`. Instead, keep it and use `WM_NCCALCSIZE` to collapse the non-client area to zero pixels. This preserves DWM's animation pipeline while hiding the visual title bar.
-- If `WM_NCCALCSIZE` is intercepted by Flutter (Pitfall 1a), use `DwmExtendFrameIntoClientArea` with `{-1,-1,-1,-1}` margins as the fallback.
-- The fullscreen transition (`WS_POPUP` switch) is separate and should use `SetWindowPos` atomically (already proven in `project_fullscreen_win32_fix.md`).
+- Detect Wayland at runtime: check `GDK_BACKEND` environment variable or `Platform.environment['XDG_SESSION_TYPE'] == 'wayland'`
+- On Wayland, skip position persistence entirely -- only save/restore size
+- Use `window_manager`'s size-only methods (`setSize`, `setMinimumSize`) which DO work on Wayland
+- Document that position persistence is X11/macOS/Windows only
 
-**Detection:** After implementing, press Win+Left/Right to snap, then Win+Up to maximize. If the animation is not smooth (snaps instead of gliding), `WS_CAPTION` was removed.
+**Warning signs:** Window always opens at (0,0) or compositor default regardless of saved position. No error thrown.
 
-**Phase:** WIN-05 (unified border removal)
+**Detection:** Run on GNOME Wayland. Save window position, close, reopen. If position differs from saved, Wayland positioning block is active.
+
+**Phase:** LINUX-01 (initial port)
 
 ---
 
-### Pitfall 1c: Startup Border Flash (First Frame Problem)
+### Pitfall L2: Wayland Has No Global Coordinate System
 
-**What goes wrong:** `CreateWindow` in `win32_window.cpp` creates the window with `WS_OVERLAPPEDWINDOW` (full native title bar + borders). Then Dart calls `setFrameless(true)` which removes `WS_CAPTION`. Between creation and the Dart call, ONE frame with the native title bar is visible -- the "startup flash."
+**What goes wrong:** Code that uses `windowManager.getPosition()` to compute relative placement (e.g., OSD positioning, popup menus relative to window) returns meaningless values on Wayland. Wayland windows don't have global screen coordinates -- each window exists in its own coordinate space.
 
-**Why it happens:** The init sequence is:
-```
-CreateWindow (WS_OVERLAPPEDWINDOW) → show window → Flutter engine starts →
-Dart main() → WindowService.init() → setFrameless(true)
-```
+**Why it happens:** Wayland's security model prevents apps from knowing where they are on screen or where other windows are. This prevents keyloggers/screen-scrapers but breaks position-dependent UI.
 
-The window is visible for several frames before `setFrameless` runs.
-
-**Consequences:** User sees a brief flash of the native Windows title bar before it disappears. On slow machines or high-DPI displays, this can last 100-200ms.
+**Consequences:**
+- `windowManager.getPosition()` returns (0,0) or last-known X11 position on Wayland
+- Any logic that computes "screen center - window offset" breaks
+- Popup positioning relative to screen coordinates fails
 
 **Prevention:**
-- Option A: Create the window with `WS_POPUP` style initially (no borders at all), then add `WS_THICKFRAME` after Flutter is ready. This avoids the flash but may lose DWM shadow.
-- Option B: Create the window off-screen at `(-32000, -32000)`, apply `WM_NCCALCSIZE` handling, then move to correct position after first frame.
-- Option C (recommended): Apply `WM_NCCALCSIZE` handling in `Win32Window::OnCreate()` BEFORE `ShowWindow()`. The message handler runs during `CreateWindow`, so `WM_NCCALCSIZE` is processed before the window is visible.
-- Option D: Use `SetWindowPos` with `SWP_HIDEWINDOW` to create hidden, apply frameless, then `ShowWindow`.
+- Never use absolute screen coordinates for in-app positioning
+- Use Flutter's `Overlay` and `CompositedTransform` for popup positioning (widget-relative, not screen-relative)
+- For fullscreen detection, use `window_manager`'s `isFullScreen()` which queries the compositor state, not coordinates
 
-**Detection:** Use screen recording at 60fps. Play back frame by frame. If any frame shows the native title bar, the flash exists.
+**Warning signs:** OSD or popup appears at wrong position on Wayland but correct on X11.
 
-**Phase:** WIN-05 (unified border removal)
+**Detection:** Open the speed button popup or OSD overlay on GNOME Wayland. If it appears at screen origin instead of near the triggering widget, absolute coordinates are being used.
+
+**Phase:** LINUX-01
 
 ---
 
-### Pitfall 1d: WM_NCHITTEST Conflict with DragToResizeArea
+### Pitfall L3: X11/Wayland Session Detection Is Fragile
 
-**What goes wrong:** The current codebase uses `DragToResizeArea` (from `window_manager` package) for resize edges. Adding C++ `WM_NCHITTEST` handling creates TWO resize systems that conflict: the C++ handler returns `HTLEFT`/`HTRIGHT` etc. for edge detection, while `DragToResizeArea` also detects edges via `MouseRegion` + `GestureDetector`.
+**What goes wrong:** The app needs to behave differently on X11 vs Wayland, but detecting which session is active is unreliable. `XDG_SESSION_TYPE` may be missing, `WAYLAND_DISPLAY` may be set even under XWayland, and users can run X11 apps under Wayland via XWayland.
 
-**Why it happens:** `DragToResizeArea` works at the Flutter widget level (hit testing on transparent edge regions). `WM_NCHITTEST` works at the Win32 level (returning hit test constants to Windows). Both try to handle the same 8px edge areas.
+**Why it happens:** There is no single canonical way to detect the display server. Environment variables are set by the session manager, not the app. XWayland adds a layer where X11 APIs work but Wayland behavior applies to the compositor.
 
-**Consequences:** Double resize triggers, jittery edge behavior, or one system overriding the other depending on message processing order.
-
-**Prevention:**
-- If implementing native `WM_NCHITTEST` in C++, REMOVE `DragToResizeArea` from the widget tree. The native handler replaces it.
-- If keeping `DragToResizeArea`, do NOT add `WM_NCHITTEST` handling. Pick one system.
-- The recommended path: native `WM_NCHITTEST` is superior (zero-latency, no Flutter widget overhead), but requires Pitfall 1a to be resolved first.
-
-**Detection:** Drag a window edge. If resize starts then stops, or starts twice, both systems are active.
-
-**Phase:** WIN-05 (C++ WM_NCCALCSIZE)
-
----
-
-### Pitfall 1e: DWM Corner Preference Reset on Snap/Maximize
-
-**What goes wrong:** Windows 11 DWM resets `DWMWA_WINDOW_CORNER_PREFERENCE` during snap/maximize/restore transitions. The current `ApplyRoundedCorners` in `win32_window.cpp` is called once during creation, but not after state changes.
-
-**Why it happens:** DWM re-applies default corner style (square) during certain transitions. The attribute must be re-applied after every `WM_SIZE` or `WM_NCCALCSIZE` cycle.
-
-**Consequences:** After snapping or maximizing, the window corners become square instead of round. The fix in `project_window_corner_fix.md` addressed this partially, but a full WM_NCCALCSIZE implementation may re-trigger it.
+**Consequences:**
+- App applies X11 window positioning logic under Wayland (fails silently)
+- App skips Wayland-specific workarounds when running under XWayland
+- Feature flags based on session type produce wrong behavior
 
 **Prevention:**
-- Call `ApplyRoundedCorners(hwnd)` in the `WM_SIZE` handler, not just in `OnCreate()`.
-- The existing `ApplyRoundedCorners` function is correct; it just needs to be called more often.
-
-**Detection:** On Win11: snap window left, snap right, maximize, restore. If corners are square at any point, the reset happened.
-
-**Phase:** WIN-05
-
----
-
-## 2. HLS ABR with BBA Algorithm (HLS-01)
-
-### Pitfall 2a: Low-Latency Config Conflicts with ABR Buffer Requirements
-
-**What goes wrong:** The current `FvpEngine` applies low-latency settings for ALL network streams:
-- `fflags +nobuffer` (minimize buffering)
-- `setBufferRange(drop:true)` (drop frames to maintain latency)
-- Small `demux.buffer.ranges`
-
-ABR requires the OPPOSITE: large buffers to measure bandwidth, preload segments, and absorb network jitter. Applying ABR without removing low-latency settings causes constant rebuffering and quality oscillation.
-
-**Why it happens:** The network configuration in `fvp_engine.dart` applies uniformly based on URL detection (`isUrl()`). There is no stream-type routing.
-
-**Consequences:** HLS streams rebuffer constantly. BBA algorithm sees empty buffer, selects lowest quality. User gets 360p on a 50Mbps connection.
-
-**Prevention:**
-- Route configuration by stream type BEFORE applying:
+- Use a multi-signal detection approach:
 ```dart
-if (isHlsUrl(url)) {
-  // ABR config: larger buffers, no frame drop
-  _player.setProperty('demux.buffer.ranges', '3');
-  // Do NOT set fflags +nobuffer
-  // Do NOT set drop:true
-} else {
-  // Low-latency config: minimal buffer, drop frames
-  _player.setProperty('fflags', '+nobuffer');
-  _player.setProperty('demux.buffer.ranges', '1');
-  _player.setProperty('demux.buffer.ranges', '1:drop:true');
+bool get isWayland {
+  if (Platform.environment['XDG_SESSION_TYPE'] == 'wayland') return true;
+  if (Platform.environment['WAYLAND_DISPLAY']?.isNotEmpty == true) return true;
+  return false;
 }
 ```
-- The `PathValidator.isUrl()` check is insufficient. Need `isHlsUrl()` that checks for `.m3u8` extension or HLS-specific query params.
+- Prefer capability detection over session detection: try `setPosition()` and check if it worked, rather than guessing based on session type
+- Accept that XWayland is a hybrid: some X11 APIs work, some don't. Test on both pure X11 and XWayland.
 
-**Detection:** Play an HLS stream. Monitor buffer level (via `MediaEngine` position polling). If buffer stays below 2 seconds, low-latency config is still active.
+**Warning signs:** Features work on X11 but break on XWayland, or vice versa.
 
-**Phase:** HLS-01
+**Phase:** LINUX-01
 
 ---
 
-### Pitfall 2b: BBA Reservoir/Cushion Tuning Sensitivity
+### Pitfall L4: GTK3 vs GTK4 Embedder Differences
 
-**What goes wrong:** BBA maps buffer occupancy to quality levels using a piecewise function with two thresholds: `reservoir` (minimum buffer, always select lowest quality) and `cushion` (buffer range for quality ramping). Poor tuning causes:
+**What goes wrong:** Flutter's Linux embedder uses GTK3 (as of Flutter 3.x). `window_manager` and other plugins interact with GTK3 APIs. If the target system uses GTK4 or if Flutter migrates to GTK4, window management APIs change significantly. GTK4 removed `gtk_window_set_decorated()`, changed resize behavior, and altered CSD (Client-Side Decoration) handling.
 
-- **Reservoir too high:** Startup takes forever to ramp quality. User watches 360p for 30 seconds.
-- **Reservoir too low:** Rebuffering on first network hiccup. Buffer has no safety margin.
-- **Cushion too narrow:** Quality oscillates between two levels as buffer hovers near threshold.
-- **Cushion too wide:** Quality ramp is too slow. User never reaches highest quality even with good bandwidth.
+**Why it happens:** GTK3 and GTK4 have different window management APIs. Flutter's Linux embedder is pinned to GTK3, but the ecosystem is migrating to GTK4. Plugin authors may target different GTK versions.
 
-**Why it happens:** BBA's original paper uses `reservoir = 1 segment duration`, `cushion = max buffer - reservoir`. But optimal values depend on content segment duration (2s vs 6s vs 10s), available quality ladder, and typical network conditions.
-
-**Consequences:** Either constant quality oscillation (user-visible stutter in quality) or unnecessarily low quality on good connections.
+**Consequences:**
+- `window_manager` may not compile if GTK headers don't match system version
+- CSD vs SSD (Server-Side Decorations) conflicts: GNOME forces CSD, KDE uses SSD
+- Custom title bar rendering may conflict with GTK's own decoration rendering
 
 **Prevention:**
-- Start with `reservoir = 2 * segmentDuration` (safety margin for 2 segments).
-- Set `cushion = targetBufferLevel - reservoir` where `targetBufferLevel` is 30 seconds (common default).
-- Add hysteresis: only switch quality when buffer crosses threshold by >1 segment duration, not just touches it.
-- Log quality switches. If switches/minute > 3, increase hysteresis margin.
+- Pin `window_manager` to a tested version and verify GTK3 headers are available at build time
+- On GNOME (CSD): Flutter's custom title bar may coexist with GTK's header bar -- test for double-rendering
+- On KDE (SSD): Custom title bar works as expected since the compositor doesn't draw decorations
+- Document the GTK3 dependency and monitor Flutter's GTK4 migration (tracked in flutter/flutter#126955)
 
-**Detection:** Play a 10-minute HLS stream with stable network. Count quality switches. More than 5 total = tuning problem.
+**Warning signs:** Double title bar on GNOME. Build failures on systems with only GTK4 dev headers.
 
-**Phase:** HLS-01
+**Phase:** LINUX-01
 
 ---
 
-### Pitfall 2c: MDK/FFmpeg HLS Demuxer Does Not Expose Segment-Level Metrics
+### Pitfall L5: X11 Window Manager Quirks (Tiling WMs, Compositors)
 
-**What goes wrong:** BBA needs per-segment download time and buffer level. MDK's `mdk::Player` API exposes `buffered()` (total buffered duration) but may NOT expose per-segment download metrics (segment URL, download time, bytes received). Without per-segment metrics, bandwidth estimation is impossible.
+**What goes wrong:** X11 window managers like i3, Sway (Wayland), and bspwm intercept window geometry requests. `windowManager.setSize()` may be overridden by the tiling layout. `setAlwaysOnTop()` may be ignored or cause focus-stealing alerts.
 
-**Why it happens:** MDK wraps FFmpeg's HLS demuxer internally. FFmpeg's `hls.c` handles segment downloading, but this information is not surfaced through MDK's public API.
+**Why it happens:** Tiling WMs enforce their own layout algorithm. Floating window requests can be denied or overridden. Some compositors (like picom) add their own shadows and transparency that conflict with Flutter's rendering.
 
-**Consequences:** Cannot implement accurate bandwidth estimation. Must fall back to FFmpeg's built-in ABR (which is less configurable) or estimate bandwidth from overall buffer fill rate (less accurate).
+**Consequences:**
+- Window size/position changes are ignored by tiling WM
+- `setAlwaysOnTop()` has no effect or causes compositor warnings
+- Frameless window borders reappear because the WM adds its own decorations
 
 **Prevention:**
-- First, verify what MDK exposes: check `mdk::Player` properties for `avformat.hls_*` and `demux.*` options.
-- If per-segment metrics are unavailable, use the "buffer delta" approach: measure `buffered()` change over time to estimate effective download rate. This is less accurate but workable.
-- Alternative: use FFmpeg's `hls_prefer_list` for coarse quality selection, and implement fine-grained control at the application level only if metrics are available.
+- Accept that tiling WMs will control window geometry. Don't fight it.
+- For `setAlwaysOnTop()`, use `_NET_WM_STATE_ABOVE` X11 hint (which most WMs respect) rather than `window_manager`'s generic method
+- Test on at least: GNOME (floating), KDE (floating), i3 (tiling), Sway (Wayland tiling)
+- Document that tiling WM behavior is unsupported but should degrade gracefully
 
-**Detection:** Attempt to read `avformat.hls_current_stream` or similar property after segment switch. If null/empty, metrics are not exposed.
+**Warning signs:** User reports on i3/Sway that window size can't be changed or decorations appear.
 
-**Phase:** HLS-01 (research spike)
+**Phase:** LINUX-02 (polish)
 
 ---
 
-### Pitfall 2d: Quality Switch Causes Audio Glitch
+### Pitfall L6: Fractional Scaling Blurs Flutter Content on Linux
 
-**What goes wrong:** When BBA switches quality (e.g., 720p to 1080p), the decoder must flush and re-initialize with the new stream parameters. If the switch happens mid-segment, there is a brief audio/video glitch.
+**What goes wrong:** Linux fractional scaling (125%, 150%, 175%) causes Flutter content to render at 1x and then get scaled up by the compositor, resulting in blurry text and UI. This is a known Flutter/Linux issue.
 
-**Why it happens:** HLS quality switches should happen at segment boundaries (keyframe-aligned). If the implementation switches immediately on buffer threshold crossing (not waiting for segment boundary), the decoder gets a discontinuous stream.
+**Why it happens:** Flutter's Linux embedder renders at the logical DPI, but the compositor scales the buffer. Unlike Windows (which has per-monitor DPI awareness) and macOS (which has Retina backing), Linux fractional scaling is compositor-dependent and often blurry.
 
-**Consequences:** Brief audio pop or video freeze at each quality switch. With frequent oscillation (Pitfall 2b), this becomes very noticeable.
+**Consequences:**
+- Text and UI elements appear blurry at 125%/150% scaling
+- User reports "app looks fuzzy" on HiDPI Linux displays
+- No app-side fix exists -- it's an embedder limitation
 
 **Prevention:**
-- Only switch quality at segment boundaries. Track current segment index and apply the new quality for the NEXT segment, not the current one.
-- MDK/FFmpeg may handle this automatically if `hls_prefer_list` is used. Verify by testing with a multi-bitrate HLS stream and checking for audio continuity.
-- Pre-buffer 1-2 seconds of the new quality before switching (overlap approach).
+- Set `GDK_SCALE=2` environment variable to force integer scaling (crisp but larger)
+- Monitor Flutter engine issues for fractional scaling fixes
+- Accept this as a known limitation and document it
+- On GNOME, users can switch to 100% or 200% scaling for crisp rendering
 
-**Detection:** Play HLS stream with artificial bandwidth throttling. Listen for audio pops during quality transitions.
+**Warning signs:** User reports blurry text on Linux with fractional DPI. Looks fine at 100% or 200%.
 
-**Phase:** HLS-01
+**Phase:** LINUX-02 (document, no code fix)
 
 ---
 
-### Pitfall 2e: HLS URL Detection Ambiguity
+## 2. macOS Pitfalls
 
-**What goes wrong:** Not all HTTP URLs ending in `.m3u8` are HLS. Some CDN URLs use query parameters for format selection (`?format=hls`), and some HLS URLs don't have `.m3u8` in the URL (CDN rewrites). The `PathValidator.isUrl()` check is too coarse.
+### Pitfall M1: NSWindow Thread Safety Crashes
 
-**Why it happens:** HLS is identified by the master playlist URL, which may or may not have a recognizable extension. CDN-specific URL patterns vary.
+**What goes wrong:** macOS Cocoa APIs require ALL `NSWindow` operations on the main thread. Flutter's platform channel callbacks may arrive on the platform thread (not the main thread). Calling `NSWindow.setFrame()`, `NSWindow.toggleFullScreen()`, or invalidating drag regions from a background thread causes `NSInternalInconsistencyException` crashes.
 
-**Consequences:** Non-HLS HTTP streams get ABR treatment (wrong buffer config). HLS streams get low-latency treatment (constant rebuffering).
+**Why it happens:** Flutter's macOS embedder uses a separate platform thread for channel communication. `window_manager`'s macOS implementation must dispatch all `NSWindow` calls to the main thread via `dispatch_async(dispatch_get_main_queue(), ...)`. If any code path skips this dispatch, the app crashes.
+
+**Consequences:**
+- Random crashes during fullscreen toggle, window resize, or drag operations
+- Crash message: `"NSWindow drag regions should only be invalidated from the Main Thread"`
+- Crashes are non-deterministic (depend on timing), making them hard to reproduce
 
 **Prevention:**
-- Use a two-stage detection:
-  1. URL pattern: contains `.m3u8` or `m3u8` query param -- likely HLS
-  2. Content inspection: first response contains `#EXTM3U` -- confirmed HLS
-- Apply ABR config only after confirmation. Default to low-latency for unknown URLs.
-- MDK may handle this internally -- check if `setProperty('avformat.hls_prefer_list', ...)` has no effect on non-HLS URLs.
-
-**Detection:** Open a non-HLS HTTP video URL. If ABR config is applied (large buffer, no frame drop), detection is wrong.
-
-**Phase:** HLS-01
-
----
-
-## 3. Platform Abstraction Layer (PLATFORM-03)
-
-### Pitfall 3a: Interface-First Design Without Implementation Validation
-
-**What goes wrong:** Defining platform interfaces (`PlatformWindowService`, `PlatformEngine`) without any macOS/Linux implementation means the interface is untested. Methods that work on Windows may have no equivalent on macOS (e.g., `WS_THICKFRAME` has no macOS analog) or may need completely different parameters.
-
-**Why it happens:** Windows-specific concepts (HWND, WS_* styles, MonitorFromWindow) leak into the interface. When macOS implementation starts, the interface must be redesigned, breaking all consumers.
-
-**Consequences:** Interface redesign at macOS implementation time. All Windows code that depends on the interface must be updated. The "platform abstraction" becomes a Windows abstraction that pretends to be cross-platform.
-
-**Prevention:**
-- Define interfaces in terms of USER INTENTS, not platform APIs:
-  - BAD: `setWindowStyle(int style)` -- Windows-specific
-  - GOOD: `setDecorated(bool decorated)` -- cross-platform intent
-  - BAD: `setWindowPos(IntPtr hwnd, int x, int y, int w, int h)` -- Win32 specific
-  - GOOD: `setWindowGeometry(Rect rect)` -- platform-independent
-- For each interface method, write a one-line comment explaining what macOS/Linux would do:
-  ```dart
-  /// Enter fullscreen mode.
-  /// Windows: WS_POPUP + monitor cover
-  /// macOS: NSWindow.toggleFullScreen
-  /// Linux: _NET_WM_STATE_FULLSCREEN
-  Future<void> setFullscreen(bool value);
-  ```
-- If a method has NO macOS/Linux equivalent, it should NOT be in the interface. Keep it as a Windows-specific extension.
-
-**Detection:** For each interface method, can you describe the macOS implementation in one sentence? If not, the method is too Windows-specific.
-
-**Phase:** PLATFORM-03
-
----
-
-### Pitfall 3b: NoopWindowBridge Becomes a Silent Failure Trap
-
-**What goes wrong:** `NoopWindowBridge` returns silently for all operations (no-op). Code that depends on window state (e.g., `isFullscreen.value`) gets `false` from `NoopWindowBridge` even when the actual window is fullscreen. This creates subtle bugs where UI logic thinks the window is windowed when it's actually fullscreen.
-
-**Why it happens:** `NoopWindowBridge` is designed for safe degradation, but callers assume the state is accurate. If the platform implementation is missing (macOS/Linux), the UI shows wrong state without any error.
-
-**Consequences:** On macOS (future), the player UI shows windowed controls when the window is actually fullscreen. Keyboard shortcuts that check `isFullscreen.value` behave incorrectly.
-
-**Prevention:**
-- `NoopWindowBridge` should log a warning on first use: `debugPrint('WARNING: NoopWindowBridge active -- window operations are no-ops')`.
-- Consider making `NoopWindowBridge` throw `UnsupportedError` for state queries (not just commands). This makes missing implementations fail loudly.
-- Alternative: `NoopWindowBridge` could use platform channel fallbacks where available (e.g., `MethodChannel` to macOS runner for basic fullscreen).
-
-**Detection:** On Windows, inject `NoopWindowBridge` manually and run the app. If any UI behavior is wrong, the consumer is relying on state accuracy.
-
-**Phase:** PLATFORM-03
-
----
-
-### Pitfall 3c: Singleton Migration Breaks Init Order
-
-**What goes wrong:** The current init sequence in `main()` is:
+- Verify `window_manager`'s macOS implementation dispatches to main thread (check source: `macos/Classes/WindowManager.swift`)
+- If writing custom macOS code (Swift/ObjC), ALWAYS wrap NSWindow calls:
+```swift
+DispatchQueue.main.async {
+    self.window?.setFrame(newFrame, display: true)
+}
 ```
-1. WidgetsFlutterBinding.ensureInitialized()
-2. fvp.registerWith()
-3. SharedPreferences.getInstance()
-4. SettingsStore.prewarm(prefs)
-5. WindowBootstrap.init(prefs)
-6. runApp(App(prefs))
-```
+- For frameless windows: `mouseDownCanMoveWindow` must be overridden on the `contentView`, and drag region invalidation must happen on main thread
+- Test with thread sanitizer enabled: `flutter run --enable-experiment=impeller -d macos`
 
-Migrating singletons to DI (constructor injection) changes this to:
-```
-1. WidgetsFlutterBinding.ensureInitialized()
-2. fvp.registerWith()
-3. Create DI container
-4. Register SharedPreferences
-5. Register SettingsStore
-6. Register WindowService
-7. Register all other services
-8. runApp(App(di: container))
-```
+**Warning signs:** Random crash during fullscreen toggle. Crash log mentions `NSWindow` + thread assertion.
 
-If any service's constructor depends on another service that hasn't been registered yet, the DI container throws at startup.
+**Detection:** Rapidly toggle fullscreen 20+ times. If crash occurs, thread safety issue exists.
 
-**Why it happens:** Static singletons hide ordering dependencies. `LocaleService.I` works because `SettingsStore.prewarm()` was called earlier. With DI, the registration order must match the dependency graph.
-
-**Consequences:** App crashes on startup with `StateError: Service not registered`. The error message may not indicate WHICH dependency is missing.
-
-**Prevention:**
-- Draw the dependency graph BEFORE migration (already documented in `PITFALLS.md` section 3b).
-- Register in topological order: leaves first (`OsdService`, `PerfMonitor`), then dependents (`LocaleService`, `ThemeService`), then root (`WindowService`).
-- Use lazy registration where possible: `GetIt.I.registerLazySingleton(() => LocaleService(GetIt.I<SettingsStore>()))`.
-- Test init order by running `flutter test` after EACH singleton migration.
-
-**Detection:** App fails to start after DI migration. Check registration order against dependency graph.
-
-**Phase:** ARCH-03
+**Phase:** MACOS-01 (initial port)
 
 ---
 
-### Pitfall 3d: SettingsStore Simplification Breaks Per-Field Error Isolation
+### Pitfall M2: NSWindowStyleMask Manipulation Breaks Window Dragging
 
-**What goes wrong:** The current `SettingsStore` has 25+ `saveXxx()` methods and per-field `load()` with try-catch isolation. Simplifying to bulk serialization (JSON encode/decode of `AppSettings` object) means one corrupted field prevents loading ALL fields.
+**What goes wrong:** Removing `NSWindowStyleMask.titled` (the macOS equivalent of `WS_CAPTION`) to create a frameless window also removes the title bar drag region. The window becomes immovable unless custom drag handling is implemented.
 
-**Why it happens:** The per-field approach was designed so that if `volume` is corrupted in SharedPreferences, `brightness` still loads correctly. Bulk serialization loses this isolation.
+**Why it happens:** On macOS, the title bar is the drag handle. Without `NSWindowStyleMask.titled`, there's no native drag region. `window_manager`'s `setAsFrameless()` removes the titled style, relying on Flutter's `DragToResizeArea` or custom `mouseDownCanMoveWindow` for drag.
 
-**Consequences:** A single corrupted preference key (e.g., from a crash during write) causes the entire settings to reset to defaults. User loses all custom settings.
+**Consequences:**
+- Window cannot be dragged by the title bar area
+- If Flutter's `startDragging()` is not wired up correctly, the window is stuck
+- On macOS, `startDragging()` calls `NSWindow.performWindowDrag()` which requires the titled style to be present (or custom `contentView` override)
 
 **Prevention:**
-- Keep per-field validation in the deserializer, even with bulk serialization:
+- Keep `NSWindowStyleMask.titled` and hide the title bar text using `titleVisibility = .hidden` instead of removing the style mask
+- This preserves the drag region while hiding the visual title bar
+- Alternatively, override `mouseDownCanMoveWindow` on the Flutter view's `NSView` to return `true`
+- Test that `startDragging()` from `window_manager` works after frameless setup
+
+**Warning signs:** Window can't be dragged on macOS after setting frameless. Works on Windows.
+
+**Phase:** MACOS-01
+
+---
+
+### Pitfall M3: macOS Fullscreen Uses Different Paradigm Than Windows
+
+**What goes wrong:** macOS fullscreen (`NSWindow.toggleFullScreen()`) creates a new "Space" (virtual desktop) with a transition animation. Windows fullscreen (`WS_POPUP` + monitor cover) is instant and in-place. Code that assumes fullscreen is instant (like the Windows `SetWindowPos` atomic approach) breaks on macOS.
+
+**Why it happens:** macOS fullscreen is a system-level feature with:
+- 1-second animation to new Space
+- Menu bar auto-hide
+- Different `NSWindowStyleMask` during fullscreen
+- `windowWillEnterFullScreen` / `windowDidEnterFullScreen` delegate callbacks with timing gaps
+
+**Consequences:**
+- If code reads `isFullscreen` immediately after calling `setFullScreen(true)`, it returns `false` (animation not complete)
+- Window geometry queries during the transition return intermediate values
+- Exiting fullscreen has a different animation and timing
+
+**Prevention:**
+- Use delegate callbacks, not polling, to detect fullscreen state:
 ```dart
-AppSettings load() {
-  return AppSettings(
-    volume: _sanitizeDouble(prefs.getDouble('volume'), 0.5, 0.0, 1.0),
-    brightness: _sanitizeDouble(prefs.getDouble('brightness'), 1.0, 0.0, 2.0),
-    // ... each field independently validated
-  );
-}
+// Wait for delegate callback, not immediate check
+await windowManager.setFullScreen(true);
+// State is updated via WindowListener callbacks, not return value
 ```
-- The `_sanitizeDimension`, `_sanitizeCoordinate`, `_sanitizeRotation` helpers must survive the refactor.
-- Write a test that corrupts ONE key and verifies all others still load.
+- The `WindowBridge.mode` ValueNotifier should be updated by the `windowDidEnterFullScreen` callback, not by the `setFullScreen` return
+- Add a "transitioning" state to `WindowMode` if fullscreen toggle UI needs to show intermediate feedback
+- Test that keyboard shortcuts (F key) work during the fullscreen animation
 
-**Detection:** Set `prefs.setDouble('volume', double.nan)` manually, then call `load()`. If other fields also return defaults, isolation is broken.
+**Warning signs:** UI shows wrong fullscreen state during animation. F key does nothing during 1-second transition.
 
-**Phase:** ARCH-02
-
----
-
-## 4. Cross-Cutting Pitfalls
-
-### Pitfall 4a: Triple Border Removal Becomes Quadruple
-
-**What goes wrong:** The project already has THREE border removal mechanisms: (1) `window_manager`'s `setAsFrameless()`, (2) main.dart FFI `_restoreThickFrame()`, (3) app.dart init. Adding a C++ `WM_NCCALCSIZE` handler creates a fourth mechanism. If any two overlap, they fight each other.
-
-**Why it happens:** Each layer was added to fix a specific symptom without removing the previous layer. The result is a fragile stack of patches.
-
-**Consequences:** Border removal works on most machines but fails on specific DPI configurations, Win10 vs Win11, or after certain window state transitions. Debugging requires understanding all four layers.
-
-**Prevention:**
-- When implementing the C++ `WM_NCCALCSIZE` approach, REMOVE the other three mechanisms:
-  - Remove `setAsFrameless()` call from `WindowService.init()`
-  - Remove `_restoreThickFrame()` FFI call from main.dart
-  - Remove any border-related code from app.dart init
-- The C++ handler should be the SOLE owner of border removal.
-- If `WM_NCCALCSIZE` doesn't work (Pitfall 1a), fall back to ONE mechanism, not four.
-
-**Detection:** Comment out the C++ handler. If borders still disappear, another mechanism is active.
-
-**Phase:** WIN-05
+**Phase:** MACOS-01
 
 ---
 
-### Pitfall 4b: fvp HLS Config Overrides Persist Across File Opens
+### Pitfall M4: macOS Retina/HiDPI Texture Rendering
 
-**What goes wrong:** `mdk::Player` properties set via `setProperty()` may persist across `open()` calls. If ABR config is set for an HLS stream, then the user opens a local file, the ABR config (large buffer, no frame drop) is still active.
+**What goes wrong:** Flutter's texture rendering on macOS uses `FlutterTextureRegistry`. The `fvp` plugin's texture may render at 1x resolution on Retina displays, appearing blurry. The backing store scale factor must match `NSScreen.backingScaleFactor` (typically 2.0).
 
-**Why it happens:** MDK properties are player-instance level, not per-media. `setProperty` modifies the player state, not the media state.
+**Why it happens:** macOS Retina displays have a 2x pixel ratio. If the texture buffer is created at logical resolution (e.g., 1920x1080) instead of pixel resolution (3840x2160), the compositor upscales it, causing blur.
 
-**Consequences:** Local file playback uses ABR buffer settings (unnecessary memory usage, different latency characteristics).
+**Consequences:**
+- Video appears blurry on Retina MacBooks and iMacs
+- UI elements (Flutter widgets) are crisp, but video texture is soft
+- User reports "video quality looks worse on Mac than Windows"
 
 **Prevention:**
-- Reset network config before each `open()` call:
-```dart
-void open(String url) {
-  _resetNetworkConfig();  // reset to defaults
-  if (isHlsUrl(url)) {
-    _applyAbrConfig();
-  } else if (isLowLatencyUrl(url)) {
-    _applyLowLatencyConfig();
-  }
-  _player.open(url);
-}
-```
-- Document which properties are per-player vs per-media.
+- Verify `fvp` creates textures at the correct scale factor
+- Check `fvp` source for `NSScreen.main?.backingScaleFactor` usage
+- If `fvp` doesn't handle this, it's an upstream issue -- file against `fvp` repo
+- Workaround: force texture resolution to 2x logical size
 
-**Detection:** Open HLS stream, then open local file. Check `demux.buffer.ranges` value. If it's still the ABR value, config persisted.
+**Warning signs:** Crisp Flutter UI but blurry video on Retina displays. Looks fine on non-Retina external monitor.
 
-**Phase:** HLS-01
+**Phase:** MACOS-02 (polish)
 
 ---
 
-### Pitfall 4c: ValueNotifier Incompatibility with Platform Abstraction
+### Pitfall M5: macOS App Nap Kills Background Playback
 
-**What goes wrong:** The `WindowBridge` interface exposes `ValueNotifier<bool> isFullscreen`, `ValueNotifier<bool> isMaximized`, etc. These are Dart `ValueNotifier` objects. A macOS implementation using `NSWindow` notifications would need to update these notifiers from native callbacks, which requires platform channel threading awareness.
+**What goes wrong:** macOS "App Nap" suspends or throttles apps that are not visible or are occluded. If the user minimizes the player or covers it with another window, macOS may pause the playback timer, causing audio stutter or position polling to freeze.
 
-**Why it happens:** `ValueNotifier` is single-threaded (main isolate). Native callbacks from macOS (`NSWindowDelegate`) arrive on the platform thread. Updating a `ValueNotifier` from the platform thread without `SchedulerBinding.instance.scheduleTask` causes "setState called during build" errors.
+**Why it happens:** macOS aggressively manages power. Apps that are fully occluded or minimized are candidates for App Nap. Flutter's Dart isolate may be throttled, causing `Timer.periodic` (used by `PositionPoller`) to fire irregularly.
 
-**Consequences:** macOS implementation (future) has threading bugs. `isFullscreen.value` is updated from wrong thread, causing UI glitches or assertion failures.
+**Consequences:**
+- Audio continues (native decoder runs independently) but position updates freeze
+- When the window is restored, position jumps forward (timer catches up)
+- `PositionPoller` reports stale position during App Nap
 
 **Prevention:**
-- The `WindowService` already handles this for C++ events (via `MethodChannel.setMethodCallHandler` which runs on main isolate). Ensure the same pattern is documented for future platform implementations.
-- Add a comment on each `ValueNotifier` in the interface: "Must be updated from main isolate only."
-- Consider wrapping the notifier update in `WidgetsBinding.instance.addPostFrameCallback` for safety.
+- Disable App Nap for the process: `NSProcessInfo.processInfo.processInfo.disableAutomaticTermination("Media playback")`
+- Or use `NSProcessInfo.processInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .suddenTerminationDisabled], reason: "Playback")`
+- This can be done via platform channel from Dart
+- Alternative: use `NSBackgroundActivityScheduler` for position polling that survives App Nap
 
-**Detection:** On macOS (future), rapid fullscreen toggle causes "setState during build" assertion.
+**Warning signs:** Position bar freezes while minimized. Audio keeps playing. Position jumps when window is restored.
 
-**Phase:** PLATFORM-03 (interface design)
+**Phase:** MACOS-01 (critical for media player)
+
+---
+
+### Pitfall M6: macOS Sandbox Restrictions Block File Access
+
+**What goes wrong:** If the app is sandboxed (required for Mac App Store), file access is restricted to user-selected files via `NSOpenPanel`. Direct path access to arbitrary directories (like the current `FolderScanner` does) fails with permission errors.
+
+**Why it happens:** macOS sandbox enforces `com.apple.security.files.user-selected.read-only` entitlement. Opening a file via drag-and-drop or `NSOpenPanel` grants temporary access, but the path cannot be reused after app restart without a security-scoped bookmark.
+
+**Consequences:**
+- `FolderScanner` can't scan arbitrary directories
+- Playlist persistence saves paths that become inaccessible after restart
+- Drag-and-drop works once but saved paths fail on next launch
+
+**Prevention:**
+- Use security-scoped bookmarks to persist file access across launches
+- For non-App-Store distribution: disable sandbox in entitlements
+- For App Store: implement `NSSecurityScopedBookmark` creation on file open, and resolve bookmarks on restore
+- This is a significant architecture change for `PlaylistStore` and `FolderScanner`
+
+**Warning signs:** Files opened previously can't be reopened after app restart. "Operation not permitted" errors in console.
+
+**Phase:** MACOS-03 (App Store prep, if applicable)
+
+---
+
+## 3. ARM Architecture Pitfalls
+
+### Pitfall A1: macOS Apple Silicon (ARM64) Native Plugin Compilation
+
+**What goes wrong:** Native plugins with C/C++ code (like `fvp` which wraps MDK/FFmpeg) must provide ARM64 binaries for macOS. If `fvp` ships only x86_64 binaries, the app runs under Rosetta 2 emulation with performance penalty.
+
+**Why it happens:** MDK/FFmpeg native libraries must be compiled for `arm64-apple-darwin`. If `fvp` bundles pre-built x86_64 `.dylib` files, they work via Rosetta but lose native performance.
+
+**Consequences:**
+- Video decoding runs at 50-70% of native ARM64 performance
+- Battery drain is higher than native
+- User reports "app is slow on M1/M2/M3 Macs"
+
+**Prevention:**
+- Check `fvp` pubspec for macOS binary architecture: `file libfvp.dylib` should show `arm64`
+- If `fvp` doesn't provide ARM64, request it or build MDK/FFmpeg from source for arm64
+- Universal binary (x86_64 + arm64) is the ideal solution
+- Test on actual Apple Silicon hardware, not just Rosetta
+
+**Warning signs:** Activity Monitor shows "Intel" next to the process name on Apple Silicon Mac.
+
+**Phase:** MACOS-01
+
+---
+
+### Pitfall A2: Windows ARM64 Flutter Plugin Availability
+
+**What goes wrong:** Flutter's Windows ARM64 support is newer and less mature. Many plugins assume x86_64 and may not compile or run on Windows ARM64 devices (Surface Pro X, Snapdragon laptops).
+
+**Why it happens:** Windows ARM64 has a smaller market share. Plugin authors may not test on ARM64. Native dependencies (DLLs) must be compiled for ARM64.
+
+**Consequences:**
+- `window_manager` may work (pure Dart + Win32 API which has ARM64 support)
+- `fvp` may not have ARM64 Windows binaries
+- Build failures or runtime crashes on ARM64 Windows
+
+**Prevention:**
+- Check each native plugin for ARM64 Windows support before committing to the platform
+- For `fvp`: verify MDK provides `arm64-windows` binaries
+- If ARM64 Windows is a target, test early and often -- don't treat it as an afterthought
+- Consider ARM64 Windows as a "best effort" tier rather than fully supported
+
+**Warning signs:** Build errors on ARM64 Windows about missing `.dll` or architecture mismatch.
+
+**Phase:** ARM-01 (if Windows ARM64 is a target)
+
+---
+
+### Pitfall A3: Linux ARM64 (Raspberry Pi) Build Toolchain
+
+**What goes wrong:** Building Flutter for Linux ARM64 requires cross-compilation or native ARM64 build environment. The toolchain setup is significantly more complex than x86_64 Linux.
+
+**Why it happens:** Flutter's Linux build uses the host toolchain. Building on x86_64 for ARM64 requires cross-compilation flags and ARM64 sysroot. Building natively on ARM64 (e.g., Raspberry Pi) is slow.
+
+**Consequences:**
+- Build times are 5-10x longer on ARM64 Linux
+- Some plugins may not compile for ARM64 Linux at all
+- CI/CD pipeline needs ARM64 runners or cross-compilation setup
+
+**Prevention:**
+- Use Docker with ARM64 image for cross-compilation: `docker run --platform linux/arm64`
+- Or build natively on ARM64 hardware (slow but reliable)
+- Check `fvp` for Linux ARM64 binary availability
+- Consider Linux ARM64 as unsupported unless there's specific user demand
+
+**Warning signs:** Build errors about missing `aarch64-linux-gnu` toolchain. Linker errors about architecture mismatch.
+
+**Phase:** ARM-02 (if Linux ARM64 is a target)
+
+---
+
+## 4. Cross-Platform Abstraction Pitfalls
+
+### Pitfall C1: Platform Interface Leaks Windows Concepts
+
+**What goes wrong:** The current `WindowBridge` interface is clean (6 commands, 4 states), but extending it for cross-platform risks leaking Windows-specific concepts. Methods like `setFrameless(bool)` map cleanly to macOS (`NSWindowStyleMask`), but methods like `setWindowStyle(int)` or `setThickFrame(bool)` have no macOS/Linux equivalent.
+
+**Why it happens:** The developer knows Windows deeply and naturally models the interface around Win32 concepts. macOS and Linux have fundamentally different window management models.
+
+**Consequences:**
+- Interface redesign when macOS implementation starts (already predicted in existing PITFALLS.md)
+- Windows-specific methods become dead code on other platforms
+- Consumers of the interface must handle platform-specific behavior
+
+**Prevention:**
+- Current `WindowBridge` is already well-designed (intent-based, not API-based). Protect this property.
+- Every new method must have a one-line macOS and Linux equivalent documented before adding it
+- If a method only works on one platform, it should be a platform-specific extension, not in the interface
+- Use `Platform.isWindows` guards in consumers, not `if (bridge is NoopWindowBridge)` checks
+
+**Warning signs:** Interface methods that say "Windows only" in their docs. `UnsupportedError` thrown on macOS/Linux for basic operations.
+
+**Phase:** LINUX-01, MACOS-01 (interface evolution)
+
+---
+
+### Pitfall C2: NoopWindowBridge Masks Platform Gaps
+
+**What goes wrong:** The existing `NoopWindowBridge` returns safe defaults for all operations. On macOS/Linux, if the real implementation isn't ready, `NoopWindowBridge` makes the app appear to work while silently failing to control the window. The UI shows "windowed" state when the window is actually fullscreen.
+
+**Why it happens:** `NoopWindowBridge` was designed for testing, not for production platform gaps. But during cross-platform rollout, it may be used as a placeholder.
+
+**Consequences:**
+- User presses F for fullscreen -- nothing visual happens but `mode.value` stays `windowed`
+- User closes fullscreen via OS shortcut -- `mode.value` still says `windowed`
+- Keyboard shortcuts that check `isFullscreen` behave incorrectly
+
+**Prevention:**
+- Log a warning on first `NoopWindowBridge` use in debug mode
+- Make state queries (`mode`, `windowSize`) throw `UnsupportedError` in `NoopWindowBridge` to fail fast
+- Never ship `NoopWindowBridge` to production -- either implement the platform or disable the feature
+- The existing warning in PITFALLS.md (3b) applies here too
+
+**Warning signs:** App "works" on macOS but fullscreen button does nothing. No error in console.
+
+**Phase:** LINUX-01, MACOS-01
+
+---
+
+### Pitfall C3: window_manager Plugin Version Fragmentation
+
+**What goes wrong:** `window_manager` is a community plugin with varying platform support quality. Its Linux implementation has known Wayland gaps. Its macOS implementation has threading edge cases. Pinning to one version means missing fixes; upgrading may introduce regressions on a platform you just fixed.
+
+**Why it happens:** The plugin maintainer balances 3 platforms with different maturity levels. A fix for macOS may break Linux. A Wayland fix may require GTK API changes.
+
+**Consequences:**
+- Upgrading `window_manager` to fix macOS issues breaks Linux behavior
+- Each platform requires a different tested version
+- Plugin issues become your issues with no workaround
+
+**Prevention:**
+- Test `window_manager` upgrades on ALL supported platforms before merging
+- Maintain a compatibility matrix: `window_manager` version x platform x behavior
+- If `window_manager` becomes a blocker, consider forking or writing platform-specific implementations
+- The existing `Win32PlatformFullscreen` bypass pattern (bypassing `window_manager` for Windows fullscreen) may need to be replicated for macOS/Linux
+
+**Warning signs:** `window_manager` upgrade fixes one platform but breaks another. Open issues on GitHub with no response.
+
+**Phase:** LINUX-01, MACOS-01
+
+---
+
+### Pitfall C4: DragToResizeArea Widget Is Platform-Agnostic But Behavior Isn't
+
+**What goes wrong:** `DragToResizeArea` (from `window_manager`) provides resize handles at window edges using Flutter widget hit-testing. This works on all platforms visually, but the underlying resize mechanism differs: Windows uses `WM_NCHITTEST`, macOS uses `NSWindow` resize edges, Linux uses GTK window resize.
+
+**Why it happens:** The widget provides a unified interface, but the platform channel calls differ. On Windows, native `WM_NCHITTEST` is superior (Pitfall 1d from existing PITFALLS.md). On macOS, the native resize behavior may conflict with `DragToResizeArea`.
+
+**Consequences:**
+- On Windows: `DragToResizeArea` + native `WM_NCHITTEST` = double-handling (already documented)
+- On macOS: `DragToResizeArea` may fight with `NSWindow`'s built-in resize behavior
+- On Linux: Resize behavior depends on compositor and may not respect `DragToResizeArea` at all
+
+**Prevention:**
+- On Windows: Remove `DragToResizeArea` when using native `WM_NCHITTEST` (existing plan)
+- On macOS: Test if `DragToResizeArea` works alongside `NSWindow` resize. If conflicts, remove it and rely on native resize.
+- On Linux: `DragToResizeArea` may be the ONLY resize mechanism if GTK doesn't provide resize handles for frameless windows
+- Document per-platform resize strategy
+
+**Warning signs:** Resize jitter on macOS. Double-resize on Windows. No resize on Linux.
+
+**Phase:** LINUX-01, MACOS-01
+
+---
+
+### Pitfall C5: Platform Channel Threading Model Differs Per OS
+
+**What goes wrong:** `MethodChannel` callbacks run on the platform thread, but the platform thread differs per OS:
+- **Windows:** Main thread (UI thread)
+- **macOS:** Platform thread (separate from main thread)
+- **Linux:** Main thread (GTK main loop)
+
+Updating `ValueNotifier` objects (used by `WindowBridge`) from a non-main thread causes "setState during build" assertions on macOS.
+
+**Why it happens:** Flutter's threading model is documented but not uniform across platforms. macOS's separation of main thread and platform thread is the primary source of issues.
+
+**Consequences:**
+- macOS: Crashes or assertion failures when `WindowListener` callbacks update `ValueNotifier`
+- Windows/Linux: Works fine (same thread)
+- Code that works on Windows may crash on macOS
+
+**Prevention:**
+- Always update `ValueNotifier` via `WidgetsBinding.instance.addPostFrameCallback` when coming from platform channels
+- Or use `SchedulerBinding.instance.scheduleTask` to ensure main thread execution
+- The existing `WindowService` already uses `WindowListener` which runs on the platform thread -- verify this is safe on macOS
+- Add a comment: "macOS: WindowListener callbacks arrive on platform thread, not main thread"
+
+**Warning signs:** Random "setState during build" on macOS. Works perfectly on Windows.
+
+**Phase:** MACOS-01
+
+---
+
+## 5. Cross-Cutting Pitfalls
+
+### Pitfall X1: Testing Matrix Explosion
+
+**What goes wrong:** Three platforms x two display servers (X11/Wayland) x two architectures (x86_64/ARM64) = 12+ test configurations. Manual testing on all of them is impractical.
+
+**Why it happens:** Each combination has unique quirks. A bug on GNOME Wayland ARM64 may not reproduce on GNOME X11 x86_64.
+
+**Consequences:**
+- Bugs ship to users on untested configurations
+- CI/CD matrix becomes expensive
+- Developer only tests on their own machine (Windows x86_64)
+
+**Prevention:**
+- Define tier system:
+  - **Tier 1 (always test):** Windows x86_64, macOS ARM64, Ubuntu GNOME X11 x86_64
+  - **Tier 2 (test before release):** Ubuntu GNOME Wayland x86_64, macOS x86_64
+  - **Tier 3 (best effort):** Linux ARM64, Windows ARM64, KDE, Sway, i3
+- Use GitHub Actions matrix builds for Tier 1
+- Manual test on Tier 2 before releases
+- Accept community reports for Tier 3
+
+**Warning signs:** Bug reports from Tier 3 users. "Works on my machine" syndrome.
+
+**Phase:** LINUX-01, MACOS-01
+
+---
+
+### Pitfall X2: Build System Complexity Multiplies Per Platform
+
+**What goes wrong:** Each platform requires different build tooling:
+- **Windows:** Visual Studio, MSVC, Windows SDK
+- **macOS:** Xcode, macOS SDK, code signing
+- **Linux:** GCC/Clang, GTK3 dev headers, pkg-config
+
+CI/CD must support all three. Local development on one platform can't verify the others.
+
+**Consequences:**
+- Linux-specific build failures only discovered in CI
+- macOS code signing issues block releases
+- GTK3 header version mismatches cause cryptic linker errors
+
+**Prevention:**
+- Use Flutter's built-in build system (`flutter build`) which handles platform specifics
+- For native code: document required SDK versions in CONTRIBUTING.md
+- CI matrix: use `macos-latest`, `ubuntu-latest`, `windows-latest` runners
+- Test release builds, not just debug (different optimization levels may expose different bugs)
+
+**Warning signs:** CI passes but release build fails. Linux build works on Ubuntu but not Fedora.
+
+**Phase:** LINUX-01, MACOS-01
 
 ---
 
@@ -448,38 +563,45 @@ void open(String url) {
 
 | Phase | Pitfall | Severity | Mitigation |
 |-------|---------|----------|------------|
-| WIN-05: C++ WM_NCCALCSIZE | Flutter engine intercepts message (1a) | CRITICAL | Test with OutputDebugString first. If intercepted, use DwmExtendFrameIntoClientArea |
-| WIN-05: Unified border removal | WS_CAPTION removal kills DWM animation (1b) | HIGH | Keep WS_CAPTION, use WM_NCCALCSIZE to hide non-client area |
-| WIN-05: Startup flash | First frame shows native title bar (1c) | MEDIUM | Apply WM_NCCALCSIZE in OnCreate before ShowWindow |
-| WIN-05: Hit test conflict | DragToResizeArea + WM_NCHITTEST double-handling (1d) | HIGH | Pick one system, remove the other |
-| WIN-05: Corner reset | DWMWA_WINDOW_CORNER_PREFERENCE reset on snap (1e) | MEDIUM | Call ApplyRoundedCorners in WM_SIZE handler |
-| HLS-01: Buffer config | Low-latency config conflicts with ABR (2a) | CRITICAL | Route config by stream type, not URL presence |
-| HLS-01: BBA tuning | Reservoir/cushion sensitivity (2b) | HIGH | Start conservative, add hysteresis, log switches |
-| HLS-01: MDK metrics | Per-segment download metrics unavailable (2c) | HIGH | Research spike first. Fallback to buffer-delta estimation |
-| HLS-01: Quality switch | Audio glitch at segment boundary (2d) | MEDIUM | Only switch at segment boundaries, pre-buffer new quality |
-| HLS-01: URL detection | HLS vs non-HLS HTTP ambiguity (2e) | MEDIUM | Two-stage detection: URL pattern + content inspection |
-| PLATFORM-03: Interface design | Windows-specific methods in interface (3a) | HIGH | Define by user intent, not platform API |
-| PLATFORM-03: Noop fallback | Silent failure on missing platform (3b) | MEDIUM | Log warning, consider throwing for state queries |
-| ARCH-03: DI migration | Init order breakage (3c) | HIGH | Topological registration order, lazy singletons |
-| ARCH-02: SettingsStore | Per-field error isolation loss (3d) | HIGH | Keep per-field validation in bulk serializer |
-| Cross-cutting | Quadruple border removal (4a) | HIGH | Remove old mechanisms when adding C++ handler |
-| Cross-cutting | fvp config persistence across opens (4b) | MEDIUM | Reset network config before each open() |
+| LINUX-01: Initial port | L1: Wayland no positioning | HIGH | Skip position save on Wayland, size-only |
+| LINUX-01: Initial port | L2: No global coordinates | HIGH | Use widget-relative positioning, not screen coords |
+| LINUX-01: Initial port | L3: Session detection fragile | MEDIUM | Multi-signal detection + capability probing |
+| LINUX-01: Initial port | L4: GTK3 vs GTK4 | MEDIUM | Pin GTK3, test CSD vs SSD on GNOME/KDE |
+| LINUX-02: Polish | L5: Tiling WM quirks | LOW | Accept degradation, don't fight tiling WMs |
+| LINUX-02: Polish | L6: Fractional scaling blur | MEDIUM | Document as known limitation, no code fix |
+| MACOS-01: Initial port | M1: NSWindow thread safety | CRITICAL | Dispatch all NSWindow calls to main thread |
+| MACOS-01: Initial port | M2: Frameless breaks dragging | HIGH | Keep titled style, hide titleVisibility |
+| MACOS-01: Initial port | M3: Fullscreen paradigm difference | HIGH | Use delegate callbacks, not polling |
+| MACOS-02: Polish | M4: Retina texture blur | MEDIUM | Verify fvp scale factor handling |
+| MACOS-01: Initial port | M5: App Nap kills playback | HIGH | Disable App Nap via NSProcessInfo |
+| MACOS-03: App Store | M6: Sandbox blocks file access | HIGH | Security-scoped bookmarks |
+| ARM-01: macOS ARM64 | A1: Plugin ARM64 binaries | HIGH | Verify fvp ships arm64 macOS binaries |
+| ARM-02: Windows ARM64 | A2: Plugin ARM64 availability | MEDIUM | Check each plugin, consider unsupported |
+| ARM-03: Linux ARM64 | A3: Build toolchain complexity | LOW | Docker cross-compile or native build |
+| Cross-platform | C1: Interface leaks Windows concepts | HIGH | Intent-based methods, document per-platform |
+| Cross-platform | C2: NoopWindowBridge masks gaps | MEDIUM | Throw on state queries, never ship to prod |
+| Cross-platform | C3: window_manager version fragmentation | HIGH | Test all platforms before upgrading |
+| Cross-platform | C4: DragToResize platform differences | MEDIUM | Per-platform resize strategy |
+| Cross-platform | C5: Channel threading differs per OS | HIGH | Always update ValueNotifier on main thread |
+| Cross-cutting | X1: Test matrix explosion | MEDIUM | Tier system: T1 always, T2 pre-release |
+| Cross-cutting | X2: Build system complexity | MEDIUM | CI matrix + documented SDK requirements |
 
 ---
 
 ## Sources
 
-- Anti-pattern memory: `anti_pattern_window_frameless.md` (3 failed C++ approaches, DWM animation dependency on WS_CAPTION)
-- Window anti-patterns: `project_window_anti_patterns.md` (kernel coupling, god objects, over-abstraction)
-- Fullscreen fix: `project_fullscreen_win32_fix.md` (WS_THICKFRAME invisible border root cause, SetWindowPos atomic)
-- Window resize: `project_window_resize.md` (DragToResizeArea, WM_NCHITTEST Flutter interception)
-- Native interfaces: `project_native_layer_interfaces.md` (MethodChannel design, WM_NCCALCSIZE/NCHITTEST/SIZING)
-- Bridge design: `project_bridge_layer_design.md` (WindowBridge vs PlatformService, unified MethodChannel)
-- Layer 8 analysis: `project_layer8_window_analysis.md` (5 files 337 lines, isOperating signal value)
-- HLS ABR plan: `project_hls_abr_plan.md` (BBA algorithm, low-latency conflict, 4-phase implementation)
-- Current code: `flutter_window.cpp` (HandleTopLevelWindowProc priority), `win32_window.cpp` (ApplyRoundedCorners)
-- Prior pitfalls: `.planning/research/PITFALLS.md` (FFI pointer ownership, singleton migration, SettingsStore)
+- Existing anti-patterns: `anti_pattern_window_frameless.md` (WS_CAPTION removal, DWM animation dependency)
+- Existing pitfalls: `.planning/research/PITFALLS.md` (Win32 frameless, HLS ABR, platform abstraction)
+- Window bridge design: `project_bridge_layer_design.md` (WindowBridge interface, 3 bridge domains)
+- Window cross-platform strategy: `project_window_cross_platform.md` (window_manager as cross-platform, Win32 FFI as platform-specific)
+- Fullscreen fix: `project_fullscreen_win32_fix.md` (WS_THICKFRAME 7px gap, SetWindowPos atomic)
+- Native interfaces: `project_native_layer_interfaces.md` (MethodChannel unified, WM_NCCALCSIZE/NCHITTEST)
+- Flutter desktop docs: docs.flutter.dev/platform-integration/desktop
+- Flutter macOS embedder: `flutter/engine/shell/platform/darwin/macos/` (NSWindow thread model)
+- Flutter Linux embedder: `flutter/engine/shell/platform/linux/` (GTK3, fl_view, xdg_shell)
+- Wayland protocol: `xdg_shell` spec (no client-side positioning by design)
+- window_manager GitHub: leanflutter/window_manager (Linux/macOS issues, Wayland gaps)
 
 ---
 
-*Pitfall analysis: 2026-05-31 -- v1.2.1 milestone scope*
+*Pitfall analysis: 2026-06-23 -- Cross-platform window management expansion scope*
