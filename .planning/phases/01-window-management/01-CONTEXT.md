@@ -1,72 +1,68 @@
-# Phase 1: Window Management Foundation - Context
+# Phase 1: Platform Abstraction Layer - Context
 
-**Gathered:** 2026-05-28
+**Gathered:** 2026-06-23
 **Status:** Ready for planning
 
 <domain>
 ## Phase Boundary
 
-Build self-managed window control via MethodChannel + Win32 C++ FFI. Deliver: fullscreen, always-on-top, resize, position, frameless window with custom title bar, and fix error handling anti-patterns. Windows primary implementation with macOS/Linux stubs deferred to Phase 4.
+Refactor WindowBridge into a platform-agnostic abstraction with factory pattern. The current `WindowService` mixes Windows-specific logic (window_manager, Win32PlatformFullscreen) with bridge implementation. This phase extracts the interface, creates a factory for platform selection, adds capability querying, and ensures the shared WindowState model works across platforms — without changing any behavior.
+
+**Deliverables:**
+- WindowBridge interface with zero Windows-specific code
+- PlatformBridgeFactory that selects correct implementation at startup
+- WindowCapabilities enum for platform feature queries
+- Shared WindowState model verified platform-agnostic
+- All existing Windows tests pass unchanged
+
+**Not in scope:** Linux/macOS bridge implementations (Phases 3/4), new features, behavior changes.
 
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-### MethodChannel Protocol Design
-- **D-01:** Single MethodChannel `com.simple_player/window` with string command dispatch (not multiple channels)
-- **D-02:** EventChannel `com.simple_player/window_events` for streaming window events from C++ to Dart
-- **D-03:** PlatformException with error codes `{code: string, message: string}` for error passing
-- **D-04:** C++ handler files in `windows/runner/` directory (window_channel.cpp/h), not separate directory
-- **D-05:** 7 core commands: `setFullscreen(bool)`, `setAlwaysOnTop(bool)`, `setSize(w,h)`, `setPosition(x,y)`, `setMinSize(w,h)`, `setFrameless(bool)`, `getTitleBarBounds()`
-- **D-06:** 5 event types: `onResize(Size)`, `onMove(Position)`, `onFullscreenChange(bool)`, `onClose`, `onMinimize`
-- **D-07:** WindowService class wraps MethodChannel calls + EventChannel listener, exposes `ValueNotifier<WindowState>` for UI integration via ValueListenableBuilder
+### Factory Pattern
+- **D-01:** Static factory method `PlatformBridgeFactory.create()` on a dedicated class (not embedded in WindowService)
+- **D-02:** Factory uses `defaultTargetPlatform` for platform detection (Flutter standard, no custom detection)
+- **D-03:** Factory throws `UnsupportedError` for unimplemented platforms (Linux/macOS until Phases 3/4)
+- [auto] Selected: dedicated factory class, recommended default
 
-### Frameless Window Implementation
-- **D-08:** WM_NCCALCSIZE (return 0) approach for frameless window, not SetWindowLong WS_CAPTION removal
-- **D-09:** WM_NCHITTEST for 8-direction resize edges, 8px edge width
-- **D-10:** WM_NCHITTEST HTCAPTION return for title bar drag region
-- **D-11:** Standard 3 buttons (minimize/maximize/close) on right side, flat/immersive style — NOT GlassIconButton style
-- **D-12:** Double-click title bar toggles maximize/restore (Windows standard behavior)
-- **D-13:** Title bar as independent layer above video content (not embedded in video Stack)
-- **D-14:** Title bar always visible, no auto-hide
-- **D-15:** Transparent title bar, semi-transparent background on hover
-- **D-16:** Title bar height 32px (Windows 11 standard)
-- **D-17:** Fullscreen mode hides title bar
-- **D-18:** CustomTitleBar widget independent of ControlsOverlay (separate widget, separate visibility logic)
-- **D-19:** Window minimum size: larger than 640x360 in 16:9 ratio
-- **D-20:** Default initial window size: 960x540 (540p)
-- **D-21:** Windows 11 native rounded corners via DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_DEFAULT
-- **D-22:** Use existing Flutter app icon for taskbar (no custom icon)
-- **D-23:** Title bar theme follows app theme (Tokens.*) for cross-platform consistency — no DWM dark mode API
-- **D-24:** Window centered on every startup (no position persistence)
-- **D-25:** No visible window border (fully frameless)
-- **D-26:** No window shadow
-- **D-27:** Title bar displays app name only, not current file name
-- **D-28:** Aurora background when no video is playing (existing behavior preserved)
-- **D-29:** No window state persistence — no save/restore of position, size, fullscreen, or always-on-top
-- **D-30:** Free window resize, no aspect ratio lock
-- **D-31:** Preserve Windows snap layout functionality
+### File Organization
+- **D-04:** Platform implementations in `lib/kernel/bridge/{platform}/` subdirectories (e.g., `win32/`, `linux/`, `macos/`)
+- **D-05:** Current `win32/` directory already exists with `win32_platform_fullscreen.dart` — extend this pattern
+- **D-06:** Shared abstractions (`WindowBridge`, `WindowState`, `WindowMode`, `WindowCapabilities`) stay in `lib/kernel/bridge/` root
+- [auto] Selected: subdirectory-per-platform, recommended default
 
-### Error Handling (PERF-02)
-- **D-32:** Replace all `catch (_)` and `on Object catch` with `on Exception catch (e)` + logger
-- **D-33:** Fix scope: 4 known locations + global search for additional occurrences
-- **D-34:** Use `logger` package (already a dependency) for error logging, not debugPrint
+### WindowCapabilities
+- **D-07:** `WindowCapabilities` as a class with boolean fields (not an enum) — allows per-platform composition
+- **D-08:** Fields: `supportsRoundedCorners`, `supportsNativeFullscreen`, `supportsAlwaysOnTop`, `supportsWindowPersistence`, `supportsDragToResize`, `supportsMinimize`
+- **D-09:** Each platform bridge returns its capabilities via a `capabilities` getter on WindowBridge
+- [auto] Selected: class with boolean fields, recommended default
 
-### C++ Integration
-- **D-35:** Register MethodChannel handler in `FlutterWindow::OnCreate` (alongside existing DPI/dark mode setup)
+### WindowService Refactoring
+- **D-10:** Rename `WindowService` → `WindowsBridge` implementing `WindowBridge` (clearer naming)
+- **D-11:** `WindowsBridge` moves to `lib/kernel/bridge/win32/windows_bridge.dart`
+- **D-12:** Existing `FullscreenController`, `WindowPersistence`, `DisplayConfig` stay as internal components of WindowsBridge
+- **D-13:** `PlatformFullscreen` strategy pattern stays as-is (already clean abstraction)
+- [auto] Selected: rename + move, recommended default
 
-### Dart Architecture
-- **D-36:** WindowService placed at `lib/kernel/bridge/window_service.dart` (kernel layer, no UI dependency)
+### WindowState Model
+- **D-14:** `WindowState` stays in `lib/kernel/bridge/window_state.dart` — already platform-agnostic
+- **D-15:** No changes to WindowState fields (mode, windowSize, isResizing, isAlwaysOnTop)
+- **D-16:** Platform-specific state (e.g., Win32 DPI) handled internally by platform bridge, not in shared state
+- [auto] Selected: no changes, recommended default
 
-### Title Bar Widget
-- **D-37:** CustomTitleBar at `lib/ui/player/custom_title_bar.dart` as independent file
+### Integration
+- **D-17:** `main.dart` creates bridge via `PlatformBridgeFactory.create()` instead of `WindowService()`
+- **D-18:** All UI code depends on `WindowBridge` interface — no changes needed (already abstract)
+- **D-19:** `FakeWindowService` renamed to `FakeWindowBridge` for consistency
+- [auto] Selected: factory in main.dart, rename fake, recommended default
 
 ### Claude's Discretion
-- WindowState data class structure (which fields, ValueNotifier wrapping)
-- C++ error code enum values
-- EventChannel event map structure
-- WindowService initialization sequence within StartupCoordinator
+- WindowCapabilities exact field list (may adjust during implementation)
+- Whether to extract WindowBootstrap into WindowsBridge or keep separate
+- Exact import path restructuring
 
 </decisions>
 
@@ -75,29 +71,29 @@ Build self-managed window control via MethodChannel + Win32 C++ FFI. Deliver: fu
 
 **Downstream agents MUST read these before planning or implementing.**
 
-### Architecture & Stack
-- `.planning/codebase/ARCHITECTURE.md` — 3-layer architecture (Kernel/Features/UI), state management patterns, cross-layer dependency rules
-- `.planning/codebase/STACK.md` — Flutter 3.44 beta, fvp 0.36.2, C++17 Windows runner, D3D11 rendering
-- `.planning/codebase/INTEGRATIONS.md` — fvp/MDK engine integration, Win32 runner structure, startup sequence
+### Architecture & Patterns
+- `.planning/codebase/ARCHITECTURE.md` — 3-layer architecture, component responsibilities, import rules
+- `.planning/codebase/STRUCTURE.md` — Directory layout, naming conventions, where to add new code
+- `.planning/codebase/STACK.md` — Flutter/fvp/window_manager versions, platform constraints
 
-### Requirements & Concerns
-- `.planning/REQUIREMENTS.md` — WIN-01, WIN-02, WIN-03, PERF-02, PLATFORM-01 requirement specs
-- `.planning/codebase/CONCERNS.md` — #1 platform files deleted, #3 catch(_) swallows errors, #4 on Object catch
-- `.planning/ROADMAP.md` — Phase 1 goal, success criteria, requirement traceability
+### Requirements
+- `.planning/REQUIREMENTS.md` — PLAT-01..04, ARCH-01..04 requirement specs with traceability
+- `.planning/ROADMAP.md` — Phase 1 goal, success criteria
 
-### Windows Runner (existing C++ code)
-- `windows/runner/flutter_window.cpp` — FlutterWindow class, OnCreate, existing DPI/dark mode setup
-- `windows/runner/flutter_window.h` — FlutterWindow header
-- `windows/runner/main.cpp` — WinMain, window creation
-- `windows/runner/CMakeLists.txt` — Build configuration for runner
+### Existing Bridge Code (read before refactoring)
+- `lib/kernel/bridge/window_bridge.dart` — Current abstract interface (4 state + 6 commands)
+- `lib/kernel/bridge/window_service.dart` — Current implementation to refactor into WindowsBridge
+- `lib/kernel/bridge/window_state.dart` — Shared state container (platform-agnostic)
+- `lib/kernel/bridge/window_mode.dart` — WindowMode enum
+- `lib/kernel/bridge/fullscreen_controller.dart` — Atomic fullscreen with mutex + PlatformFullscreen strategy
+- `lib/kernel/bridge/platform_fullscreen.dart` — Platform fullscreen interface
+- `lib/kernel/bridge/win32/win32_platform_fullscreen.dart` — Win32 fullscreen implementation
+- `lib/kernel/bridge/window_persistence.dart` — Debounce geometry persistence
+- `lib/kernel/bridge/display_config.dart` — D3D11 refresh-rate policy
 
-### Existing Dart Code (patterns to follow)
-- `lib/kernel/engine/media_engine.dart` — Abstract interface pattern (model for PlatformWindow)
-- `lib/kernel/engine/fvp_engine.dart` — `_guardedAction` error handling pattern, ValueNotifier usage
-- `lib/features/player/services/playback_controller.dart` — Service composition pattern
-- `lib/ui/player/controls_overlay.dart` — Auto-hide pattern, widget caching
-- `lib/ui/player/player_screen.dart` — Stack compositing, layout structure
-- `lib/ui/shared/glass_container.dart` — Glassmorphism components (NOT for title bar, but for reference)
+### Test Code
+- `test/helpers/fake_window_service.dart` — Test double to rename
+- `test/` — All existing tests must pass unchanged
 
 </canonical_refs>
 
@@ -105,47 +101,46 @@ Build self-managed window control via MethodChannel + Win32 C++ FFI. Deliver: fu
 ## Existing Code Insights
 
 ### Reusable Assets
-- `ValueNotifier<WindowState>` pattern: same as engine state notifiers (position, volume, etc.)
-- `ValueListenableBuilder` widget: standard pattern for reactive UI updates
-- `Tokens.*` design system: all visual constants for title bar styling
-- `logger` package: already a dependency, use for error logging
-- `AuroraBackground` widget: existing empty-state background
+- `WindowBridge` abstract interface: already clean (4 ValueNotifiers + 6 commands), no changes needed to interface itself
+- `WindowState` pure state container: already platform-agnostic, reusable across all platform bridges
+- `WindowMode` enum: platform-neutral (windowed, fullscreen, maximized, minimized)
+- `PlatformFullscreen` strategy pattern: already demonstrates platform abstraction for fullscreen
+- `FullscreenController` with mutex + Completer: reusable pattern for any platform bridge
 
 ### Established Patterns
-- Abstract interface → concrete implementation: MediaEngine/FvpEngine pattern applies to PlatformWindow
-- Service composition: PlaybackController composes sub-modules — WindowService should follow same pattern
-- `_guardedAction` in FvpEngine: disposed-safe error handling — consider similar pattern for WindowService
-- ValueNotifier + ValueListenableBuilder: standard reactive pattern throughout codebase
+- Abstract interface → concrete implementation: `PlayerEngine`/`FvpEngine` pattern — same approach for `WindowBridge`/`WindowsBridge`
+- Strategy pattern: `PlatformFullscreen` already uses this for fullscreen — extend for full bridge
+- Subdirectory per platform: `win32/` already exists — extend to `linux/`, `macos/`
+- ValueNotifier + ValueListenableBuilder: all window state exposed this way
 
 ### Integration Points
-- `StartupCoordinator`: window initialization must fit into existing phase-based init sequence
-- `PlayerScreen`: CustomTitleBar layers above video in the Stack
-- `ControlsOverlay`: independent from CustomTitleBar but shares screen space
-- `SettingsStore`: window geometry fields exist but will NOT be used (no persistence decision)
+- `main.dart`: WindowService initialization — change to factory call
+- `PlayerScreen`: depends on WindowBridge interface — no changes needed
+- `SettingsPanel`: queries window state via WindowBridge — no changes needed
+- `StartupCoordinator`: window init phase — may need factory call adjustment
 
 </code_context>
 
 <specifics>
 ## Specific Ideas
 
-- Title bar buttons: flat/immersive style, NOT the GlassIconButton glassmorphism look. User explicitly rejected GlassIconButton style for title bar.
-- Window always centered on startup — no position memory. Simple and predictable.
-- No window state persistence at all — simplifies WIN-02 significantly (just center + defaults on startup)
-- User chose "每次居中" (center every time) — no saved position restoration needed
-- User chose 540p (960x540) as default window size — smaller than typical media player defaults
+- WindowBridge 接口本身已经很干净，不需要修改接口签名
+- 重点是把 Windows 特定代码从 WindowService 中分离出来
+- Factory pattern 参考 `PlayerEngine` 的抽象模式
+- `window_manager` 包是跨平台的，但 WindowsBridge 会用到它；Linux/macOS 可能需要不同的包
 
 </specifics>
 
 <deferred>
 ## Deferred Ideas
 
-- DPI change events: user chose not to include onDpiChange in EventChannel (deferred to future if needed)
-- Display change events: user chose not to include onDisplayChange for multi-monitor scenarios
-- Full implementation of macOS/Linux stubs: deferred to Phase 4 (PLATFORM-02)
+- Linux/macOS bridge implementations: Phase 3/4
+- Platform-specific keyboard shortcuts: Phase 2
+- Multi-monitor support: v2
 
 </deferred>
 
 ---
 
-*Phase: 01-Window Management Foundation*
-*Context gathered: 2026-05-28*
+*Phase: 01-Platform Abstraction Layer*
+*Context gathered: 2026-06-23*
