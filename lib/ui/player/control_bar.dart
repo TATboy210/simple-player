@@ -142,6 +142,7 @@ class ControlBar extends StatelessWidget {
   /// 按钮行：左右组 + 居中播放按钮群
   ///
   /// 三段等 flex Spacer 将播放按钮群精确置于 Row 50% 位置。
+  /// 窄窗口分级隐藏：≤360 隐藏左右组，≤500 隐藏次要按钮。
   Widget _buildButtonRow(
     BuildContext context,
     AppLocalizations l10n,
@@ -149,6 +150,44 @@ class ControlBar extends StatelessWidget {
     String prevTooltip,
     String nextTooltip,
   ) {
+    final w = MediaQuery.sizeOf(context).width;
+    // 仅中心播放按钮（隐藏左右组 + stop/rewind/forward）
+    final ultraCompact = w <= 360;
+    // 隐藏左右组，中心保留全部按钮
+    final compact = !ultraCompact && w <= 500;
+
+    if (ultraCompact) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _CompactCenterGroup(
+            engine: engine,
+            isIdle: isIdle,
+            prevTooltip: prevTooltip,
+            nextTooltip: nextTooltip,
+            onPrevious: actions.onPrevious,
+            onNext: actions.onNext,
+          ),
+        ],
+      );
+    }
+
+    if (compact) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CenterGroup(
+            engine: engine,
+            isIdle: isIdle,
+            prevTooltip: prevTooltip,
+            nextTooltip: nextTooltip,
+            onPrevious: actions.onPrevious,
+            onNext: actions.onNext,
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         _LeftButtonGroup(
@@ -204,6 +243,53 @@ class _LeftButtonGroup extends StatelessWidget {
           const SizedBox(width: Tokens.spXs),
           SpeedButton(engine: engine),
         ],
+      ],
+    );
+  }
+}
+
+/// 超紧凑中心组：仅上一首/播放暂停/下一首（窗口 ≤360px 时）
+class _CompactCenterGroup extends StatelessWidget {
+  final PlayerEngine engine;
+  final bool isIdle;
+  final String prevTooltip;
+  final String nextTooltip;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  const _CompactCenterGroup({
+    super.key,
+    required this.engine,
+    required this.isIdle,
+    required this.prevTooltip,
+    required this.nextTooltip,
+    this.onPrevious,
+    this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dimmed = isIdle
+        ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
+        : Tokens.textPrimary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GlassButton.iconOnly(
+          icon: Icons.skip_previous,
+          color: dimmed,
+          onPressed: isIdle ? null : onPrevious,
+          tooltip: prevTooltip,
+        ),
+        const SizedBox(width: Tokens.spSm),
+        PlayPauseButton(engine: engine, isIdle: isIdle),
+        const SizedBox(width: Tokens.spSm),
+        GlassButton.iconOnly(
+          icon: Icons.skip_next,
+          color: dimmed,
+          onPressed: isIdle ? null : onNext,
+          tooltip: nextTooltip,
+        ),
       ],
     );
   }
