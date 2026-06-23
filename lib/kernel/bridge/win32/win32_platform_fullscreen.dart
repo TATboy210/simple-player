@@ -45,8 +45,35 @@ typedef _SetWindowPosNative = Int32 Function(
 typedef _SetWindowPosDart = int Function(
     int hWnd, int hWndInsertAfter, int X, int Y, int cx, int cy, int uFlags);
 
-typedef _GetSystemMetricsNative = Int32 Function(Int32 nIndex);
-typedef _GetSystemMetricsDart = int Function(int nIndex);
+typedef _MonitorFromWindowNative = IntPtr Function(IntPtr hwnd, Uint32 dwFlags);
+typedef _MonitorFromWindowDart = int Function(int hwnd, int dwFlags);
+
+typedef _GetMonitorInfoWNative = Int32 Function(
+    IntPtr hMonitor, Pointer<MONITORINFO> lpmi);
+typedef _GetMonitorInfoWDart = int Function(
+    int hMonitor, Pointer<MONITORINFO> lpmi);
+
+final class RECT extends Struct {
+  @Int32()
+  external int left;
+  @Int32()
+  external int top;
+  @Int32()
+  external int right;
+  @Int32()
+  external int bottom;
+}
+
+final class MONITORINFO extends Struct {
+  @Uint32()
+  external int cbSize;
+  external RECT rcMonitor;
+  external RECT rcWork;
+  @Uint32()
+  external int dwFlags;
+}
+
+const int _monitorDefaultToNearest = 2;
 
 /// Win32 平台全屏 — 实现 PlatformFullscreen 接口。
 ///
@@ -69,9 +96,13 @@ class Win32PlatformFullscreen implements PlatformFullscreen {
   static final _setWindowPos = _user32
       .lookupFunction<_SetWindowPosNative, _SetWindowPosDart>('SetWindowPos');
 
-  static final _getSystemMetrics = _user32
-      .lookupFunction<_GetSystemMetricsNative, _GetSystemMetricsDart>(
-          'GetSystemMetrics');
+  static final _monitorFromWindow = _user32
+      .lookupFunction<_MonitorFromWindowNative, _MonitorFromWindowDart>(
+          'MonitorFromWindow');
+
+  static final _getMonitorInfoW = _user32
+      .lookupFunction<_GetMonitorInfoWNative, _GetMonitorInfoWDart>(
+          'GetMonitorInfoW');
 
   // ─── PlatformFullscreen 接口 ───
 
@@ -89,11 +120,20 @@ class Win32PlatformFullscreen implements PlatformFullscreen {
     _setWindowLongPtr(
         hwnd, _gwlStyle, (style & ~_wsCaption & ~_wsThickframe) | _wsVisible);
 
-    // 获取主显示器尺寸并铺满
-    final screenW = _getSystemMetrics(0); // SM_CXSCREEN
-    final screenH = _getSystemMetrics(1); // SM_CYSCREEN
-    _setWindowPos(hwnd, _hwndTop, 0, 0, screenW, screenH,
-        _swpFrameChanged | _swpNoZOrder);
+    // 获取当前显示器尺寸并铺满（支持多显示器）
+    final monitor = _monitorFromWindow(hwnd, _monitorDefaultToNearest);
+    final mi = calloc<MONITORINFO>();
+    try {
+      mi.ref.cbSize = sizeOf<MONITORINFO>();
+      _getMonitorInfoW(monitor, mi);
+      final rc = mi.ref.rcMonitor;
+      final screenW = rc.right - rc.left;
+      final screenH = rc.bottom - rc.top;
+      _setWindowPos(hwnd, _hwndTop, rc.left, rc.top, screenW, screenH,
+          _swpFrameChanged | _swpNoZOrder);
+    } finally {
+      calloc.free(mi);
+    }
 
     // 返回快照（位置/大小由 FullscreenController 通过 WindowOps 保存）
     return Future.value(FullscreenSnapshot(
