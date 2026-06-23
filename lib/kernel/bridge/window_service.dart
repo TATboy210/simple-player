@@ -15,6 +15,8 @@ import 'window_bridge.dart';
 import 'window_mode.dart';
 import 'window_persistence.dart';
 import 'window_state.dart';
+import 'linux/linux_platform_fullscreen.dart';
+import 'macos/macos_platform_fullscreen.dart';
 import 'win32/win32_platform_fullscreen.dart';
 
 /// 窗口管理服务 — 薄协调者，组合 4 个职责组件。
@@ -243,7 +245,8 @@ class WindowService with WindowListener implements WindowBridge {
 
   PlatformFullscreen _createPlatformFullscreen() {
     if (Platform.isWindows) return Win32PlatformFullscreen();
-    // TODO: Phase 3/4 — 添加 macOS/Linux 实现
+    if (Platform.isMacOS) return MacosPlatformFullscreen();
+    if (Platform.isLinux) return LinuxPlatformFullscreen();
     throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
   }
 
