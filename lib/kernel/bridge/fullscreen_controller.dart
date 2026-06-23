@@ -1,4 +1,4 @@
-/// 纯 Flutter 全屏控制器 — 使用 window_manager API，无 FFI 依赖。
+/// 全屏控制器 — 通过 PlatformFullscreen 接口操作平台特定全屏。
 ///
 /// 设计原则:
 /// - 实例级状态，无全局可变变量
@@ -6,11 +6,13 @@
 /// - 失败时回滚到保存的窗口状态
 /// - 通过 WindowState.mode 读写模式（OS 回调驱动）
 /// - WindowManager 操作可注入（测试用 FakeWindowOps）
+/// - 平台全屏操作可注入（测试用 FakePlatformFullscreen）
 import 'dart:ui';
 
 import 'package:window_manager/window_manager.dart';
 
 import '../utils/log.dart';
+import 'platform_fullscreen.dart';
 import 'window_mode.dart';
 import 'window_state.dart';
 
@@ -64,10 +66,13 @@ class RealWindowOps implements WindowOps {
 class FullscreenController {
   FullscreenController({
     required this.state,
+    required PlatformFullscreen platform,
     WindowOps? ops,
-  }) : _ops = ops ?? RealWindowOps();
+  })  : _platform = platform,
+        _ops = ops ?? RealWindowOps();
 
   final WindowState state;
+  final PlatformFullscreen _platform;
   final WindowOps _ops;
 
   // ─── Mutex guard ───
@@ -79,8 +84,10 @@ class FullscreenController {
 
   // ─── Saved state for rollback ───
 
+  WindowMode? _savedMode;
   Offset? _savedPosition;
   Size? _savedSize;
+  FullscreenSnapshot? _savedSnapshot;
 
   // ─── Public API ───
 
@@ -92,6 +99,7 @@ class FullscreenController {
 
   /// 设置全屏状态。
   ///
+  /// 通过 PlatformFullscreen 接口操作平台特定全屏。
   /// 使用 mutex try/finally 保证异常时解锁。
   /// 失败时回滚窗口位置和大小。
   Future<void> setFullscreen(bool enter) async {
@@ -106,21 +114,22 @@ class FullscreenController {
 
       if (enter) {
         await _saveWindowState();
-        await _ops.setFullScreen(true);
+        _savedSnapshot = await _platform.enter();
+        state.mode.value = WindowMode.fullscreen;
       } else {
-        await _ops.setFullScreen(false);
-        await _restoreWindowState();
+        final previousMode = _savedMode ?? WindowMode.windowed;
+        if (_savedSnapshot != null) {
+          _platform.exit(_buildExitSnapshot());
+        }
+        _clearSavedState();
+        state.mode.value = previousMode;
       }
-
-      // 写入 mode — 通知 UI 层。
-      state.mode.value = enter ? WindowMode.fullscreen : WindowMode.windowed;
     } on Exception catch (e) {
       logBridge.e('[FullscreenController.setFullscreen] FAILED: $e');
-      // 回滚: 如果进入失败，恢复保存的状态。回滚本身也可能失败。
-      if (enter && _savedPosition != null) {
+      if (enter && _savedSnapshot != null) {
         try {
-          await _ops.setFullScreen(false);
-          await _restoreWindowState();
+          _platform.exit(_buildExitSnapshot());
+          _clearSavedState();
         } on Exception catch (rollbackError) {
           logBridge.e('[FullscreenController] ROLLBACK ALSO FAILED: $rollbackError');
           _clearSavedState();
@@ -135,22 +144,24 @@ class FullscreenController {
   // ─── Internal: save/restore/apply ───
 
   Future<void> _saveWindowState() async {
+    _savedMode = state.mode.value;
     _savedPosition = await _ops.getPosition();
     _savedSize = await _ops.getSize();
   }
 
-  Future<void> _restoreWindowState() async {
-    if (_savedPosition != null) {
-      await _ops.setPosition(_savedPosition!);
-    }
-    if (_savedSize != null) {
-      await _ops.setSize(_savedSize!);
-    }
-    _clearSavedState();
-  }
-
   void _clearSavedState() {
+    _savedMode = null;
     _savedPosition = null;
     _savedSize = null;
+    _savedSnapshot = null;
+  }
+
+  /// 构建退出全屏用的快照 — 合并平台快照和控制器保存的位置/大小。
+  FullscreenSnapshot _buildExitSnapshot() {
+    return FullscreenSnapshot(
+      windowStyle: _savedSnapshot!.windowStyle,
+      position: _savedPosition ?? _savedSnapshot!.position,
+      size: _savedSize ?? _savedSnapshot!.size,
+    );
   }
 }

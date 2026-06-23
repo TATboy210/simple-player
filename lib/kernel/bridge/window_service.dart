@@ -1,19 +1,21 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../persistence/settings_store.dart';
 import '../utils/log.dart';
 import '../utils/screen_utils.dart';
 import 'fullscreen_controller.dart';
+import 'platform_fullscreen.dart';
 import 'window_bridge.dart';
 import 'window_mode.dart';
 import 'window_persistence.dart';
 import 'window_state.dart';
+import 'win32/win32_platform_fullscreen.dart';
 
 /// 窗口管理服务 — 薄协调者，组合 4 个职责组件。
 ///
@@ -21,7 +23,6 @@ import 'window_state.dart';
 /// - WindowState: 状态容器 (mode, windowSize, isResizing, isAlwaysOnTop)
 /// - FullscreenController: 原子全屏 + mutex + 回滚
 /// - WindowPersistence: debounce 持久化
-/// - lastInteractionTime: 窗口交互时间戳（防误触）
 ///
 /// OS 回调驱动状态（WindowListener → WindowState.mode/isResizing）。
 class WindowService with WindowListener implements WindowBridge {
@@ -31,9 +32,6 @@ class WindowService with WindowListener implements WindowBridge {
 
   final WindowState _state = WindowState();
   final WindowPersistence _persistence = WindowPersistence();
-
-  /// 最后一次窗口交互时间（毫秒时间戳）。
-  final ValueNotifier<int> lastInteractionTime = ValueNotifier<int>(0);
 
   FullscreenController? _fullscreenCtrl;
   bool _disposed = false;
@@ -70,10 +68,6 @@ class WindowService with WindowListener implements WindowBridge {
   Future<void> init() async {
     await windowManager.ensureInitialized();
 
-    // 同步 flutter_fullscreen 初始状态
-    if (FullScreen.isFullScreen) _state.mode.value = WindowMode.fullscreen;
-    logBridge.d('[WindowService] FullScreen initialized, isFullScreen=${FullScreen.isFullScreen}');
-
     const options = WindowOptions(
       backgroundColor: Colors.transparent,
       titleBarStyle: TitleBarStyle.hidden,
@@ -81,36 +75,41 @@ class WindowService with WindowListener implements WindowBridge {
       minimumSize: Size(854, 480),
     );
 
-    unawaited(windowManager.waitUntilReadyToShow(options, () async {
-      final settings = await SettingsStore.load();
-      if (settings.isFullscreen) await SettingsStore.saveIsFullscreen(false);
+    unawaited(
+      windowManager.waitUntilReadyToShow(options, () async {
+        final settings = await SettingsStore.load();
+        if (settings.isFullscreen) await SettingsStore.saveIsFullscreen(false);
 
-      if (settings.windowX != null && settings.windowY != null) {
-        final clamped = ScreenUtils.clampToPrimaryDisplay(
-          x: settings.windowX!,
-          y: settings.windowY!,
-          width: settings.windowWidth,
-          height: settings.windowHeight,
+        if (settings.windowX != null && settings.windowY != null) {
+          final clamped = ScreenUtils.clampToPrimaryDisplay(
+            x: settings.windowX!,
+            y: settings.windowY!,
+            width: settings.windowWidth,
+            height: settings.windowHeight,
+          );
+          await windowManager.setPosition(clamped);
+          await windowManager.setSize(
+            Size(settings.windowWidth, settings.windowHeight),
+          );
+        } else {
+          await windowManager.setSize(
+            Size(settings.windowWidth, settings.windowHeight),
+          );
+          await windowManager.center();
+        }
+
+        await windowManager.show();
+        await windowManager.focus();
+
+        // 初始化全屏控制器（注入平台特定实现）
+        _fullscreenCtrl = FullscreenController(
+          state: _state,
+          platform: _createPlatformFullscreen(),
         );
-        await windowManager.setPosition(clamped);
-        await windowManager.setSize(
-          Size(settings.windowWidth, settings.windowHeight),
-        );
-      } else {
-        await windowManager.setSize(
-          Size(settings.windowWidth, settings.windowHeight),
-        );
-        await windowManager.center();
-      }
 
-      await windowManager.show();
-      await windowManager.focus();
-
-      // 初始化全屏控制器
-      _fullscreenCtrl = FullscreenController(state: _state);
-
-      if (settings.isMaximized) await windowManager.maximize();
-    }));
+        if (settings.isMaximized) await windowManager.maximize();
+      }),
+    );
 
     windowManager.addListener(this);
   }
@@ -122,7 +121,6 @@ class WindowService with WindowListener implements WindowBridge {
     if (_disposed) return;
     if (_state.mode.value != WindowMode.maximized) {
       _state.mode.value = WindowMode.maximized;
-      lastInteractionTime.value = DateTime.now().millisecondsSinceEpoch;
     }
   }
 
@@ -131,30 +129,32 @@ class WindowService with WindowListener implements WindowBridge {
     if (_disposed) return;
     if (_state.mode.value == WindowMode.maximized) {
       _state.mode.value = WindowMode.windowed;
-      lastInteractionTime.value = DateTime.now().millisecondsSinceEpoch;
     }
   }
 
   @override
   void onWindowResize() {
     if (_disposed || (_fullscreenCtrl?.isAnimating ?? false)) return;
-    _safeSet(_state.isResizing, true);
+    _state.isResizing.value = true;
     _resizeEndTimer?.cancel();
     _resizeEndTimer = Timer(const Duration(milliseconds: 200), () {
-      if (!_disposed) _safeSet(_state.isResizing, false);
+      if (!_disposed) _state.isResizing.value = false;
     });
     _resizeDebounce?.cancel();
-    _resizeDebounce = Timer(const Duration(milliseconds: _durationWindowResize), () {
-      if (_disposed) return;
-      windowManager.getSize().then((size) {
-        if (size != _state.windowSize.value) {
-          _safeSet(_state.windowSize, Size(
-            math.max(size.width, 854),
-            math.max(size.height, 480),
-          ));
-        }
-      });
-    });
+    _resizeDebounce = Timer(
+      const Duration(milliseconds: _durationWindowResize),
+      () {
+        if (_disposed) return;
+        windowManager.getSize().then((size) {
+          if (!_disposed && size != _state.windowSize.value) {
+            _state.windowSize.value = Size(
+              math.max(size.width, 854),
+              math.max(size.height, 480),
+            );
+          }
+        });
+      },
+    );
   }
 
   @override
@@ -198,10 +198,10 @@ class WindowService with WindowListener implements WindowBridge {
         }
       case WindowMode.maximized:
         await windowManager.maximize();
-        // OS 回调 onWindowMaximize 驱动 mode
+      // OS 回调 onWindowMaximize 驱动 mode
       case WindowMode.minimized:
         await windowManager.minimize();
-        // OS 回调 onWindowMinimize 驱动 mode
+      // OS 回调 onWindowMinimize 驱动 mode
     }
   }
 
@@ -239,11 +239,15 @@ class WindowService with WindowListener implements WindowBridge {
     }
   }
 
-  // ─── Lifecycle ───
+  // ─── Platform factory ───
 
-  void _safeSet<T>(ValueNotifier<T> notifier, T value) {
-    if (!_disposed) notifier.value = value;
+  PlatformFullscreen _createPlatformFullscreen() {
+    if (Platform.isWindows) return Win32PlatformFullscreen();
+    // TODO: Phase 3/4 — 添加 macOS/Linux 实现
+    throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
   }
+
+  // ─── Lifecycle ───
 
   @override
   void dispose() {
@@ -252,7 +256,6 @@ class WindowService with WindowListener implements WindowBridge {
     _resizeDebounce?.cancel();
     _resizeEndTimer?.cancel();
     _state.dispose();
-    lastInteractionTime.dispose();
     _persistence.dispose();
     windowManager.removeListener(this);
   }
