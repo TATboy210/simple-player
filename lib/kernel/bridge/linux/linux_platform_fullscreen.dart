@@ -10,6 +10,7 @@ import 'dart:ffi' hide Size;
 import 'dart:ui';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/services.dart';
 
 import '../platform_fullscreen.dart';
 
@@ -39,6 +40,10 @@ typedef _GtkWindowGetPositionDart = void Function(
 ///
 /// 使用 GTK3 FFI 操作窗口，自动适配 X11 和 Wayland。
 class LinuxPlatformFullscreen implements PlatformFullscreen {
+  // MethodChannel — 从 native 端获取 GtkWindow 指针
+  static const _channel = MethodChannel('com.simple_player/window');
+  static int? _cachedGtkWindow;
+
   // 尝试加载 GTK3 共享库
   static final DynamicLibrary? _gtk = _loadGtk();
 
@@ -76,8 +81,8 @@ class LinuxPlatformFullscreen implements PlatformFullscreen {
 
   @override
   Future<FullscreenSnapshot> enter() async {
-    final gtkWindow = _getGtkWindow();
-    if (gtkWindow == 0 || _gtkWindowFullscreen == null) {
+    final gtkWindow = await _getGtkWindowAsync();
+    if (_gtkWindowFullscreen == null) {
       // GTK 不可用，返回空快照
       return const FullscreenSnapshot(
         windowStyle: 0,
@@ -102,22 +107,33 @@ class LinuxPlatformFullscreen implements PlatformFullscreen {
 
   @override
   void exit(FullscreenSnapshot snapshot) {
-    final gtkWindow = _getGtkWindow();
-    if (gtkWindow == 0 || _gtkWindowUnfullscreen == null) return;
+    // fire-and-forget — 调用端不 await
+    _exitAsync(snapshot);
+  }
+
+  Future<void> _exitAsync(FullscreenSnapshot snapshot) async {
+    final gtkWindow = await _getGtkWindowAsync();
+    if (_gtkWindowUnfullscreen == null) return;
     _gtkWindowUnfullscreen!(gtkWindow);
   }
 
-  /// 获取 Flutter GTK 窗口指针。
+  /// 通过 MethodChannel 获取 Flutter GTK 窗口指针。
   ///
-  /// Flutter GTK embedding 将窗口存储在 GtkApplication 中，
-  /// 通过 gtk_application_get_active_window() 获取。
-  static int _getGtkWindow() {
-    // TODO: Phase 3.2 — 实现 GTK 窗口句柄获取
-    // 方案1: 通过 MethodChannel 从 Dart 侧获取
-    // 方案2: 通过 FFI 调用 gtk_application_get_active_window()
-    // 方案3: 通过 Flutter engine 的 embedder API
-    return 0;
+  /// 结果缓存到 _cachedGtkWindow — GTK 窗口指针在应用生命周期内不变。
+  static Future<int> _getGtkWindowAsync() async {
+    if (_cachedGtkWindow != null && _cachedGtkWindow != 0) {
+      return _cachedGtkWindow!;
+    }
+    final handle = await _channel.invokeMethod<int>('getGtkWindowHandle');
+    if (handle == null || handle == 0) {
+      throw StateError('Failed to get GTK window handle from native side');
+    }
+    _cachedGtkWindow = handle;
+    return handle;
   }
+
+  /// 重置缓存（供测试用）。
+  static void resetCache() => _cachedGtkWindow = null;
 
   /// 获取窗口位置。
   static Offset _getWindowPosition(int gtkWindow) {
