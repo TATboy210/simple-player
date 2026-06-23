@@ -1,10 +1,9 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
+import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
+import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
-import 'package:simple_player_flutter/kernel/window/aspect_ratio_service.dart';
 import '../../helpers/fake_engine.dart';
 
 void main() {
@@ -132,184 +131,106 @@ void main() {
         await controller.playIndex(0);
         engine.position.value = 5000;
         engine.state.value = MediaState.paused;
-        await Future(() {});
+        // allow synchronous listeners and microtasks to run
+        await Future.microtask(() {});
         final item = playlist.items[0];
         expect(item.positionMs, 5000);
       });
     });
-  });
 
-  group('aspect ratio integration (WP-01..WP-04)', () {
-    final List<MethodCall> aspectCalls = [];
+    group('StateMonitor.init', () {
+      test('init with preloaded settings sets volume and mute', () async {
+        const settings = AppSettings(
+          volume: 0.7,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: true,
+        );
+        await controller.init(settings: settings);
+        expect(engine.volume.value, closeTo(0.7, 0.01));
+        expect(engine.isMuted.value, isTrue);
+      });
 
-    setUp(() {
-      aspectCalls.clear();
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('com.simple_player/aspect_ratio'),
-            (MethodCall methodCall) async {
-              aspectCalls.add(methodCall);
-              return null;
-            },
-          );
-      // Reset AspectRatioService internal state by setting ratio to 0
-      AspectRatioService.I.setAspectRatio(0.0);
-      aspectCalls.clear();
+      test('init is idempotent', () async {
+        const settings = AppSettings(
+          volume: 0.5,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        // Second init should be a no-op
+        await controller.init(settings: settings);
+        expect(engine.volume.value, closeTo(0.5, 0.01));
+      });
     });
 
-    tearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('com.simple_player/aspect_ratio'),
-            null,
-          );
-    });
+    group('StateMonitor auto-advance via init', () {
+      test('completed + loopSingle replays via StateMonitor listener',
+          () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopSingle;
+        await controller.playIndex(0);
+        // Trigger completed state — StateMonitor._onStateChanged should replay
+        engine.simulateCompleted();
+        await Future(() {});
+        expect(playlist.currentIndex, 0);
+      });
 
-    test('playing locks aspect ratio to video ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 2.35; // Cinema ratio
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
+      test('completed + loopAll advances via StateMonitor listener', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopAll;
+        await controller.playIndex(0);
+        engine.simulateCompleted();
+        await Future(() {});
+        expect(playlist.currentIndex, 1);
+      });
 
-      // StateMonitor._onStateChanged fires synchronously on state change
-      // AspectRatioService.I.matchVideo(2.35) should have been called
-      expect(aspectCalls, isNotEmpty);
-      expect(aspectCalls.last.method, 'setAspectRatio');
-      expect(aspectCalls.last.arguments, closeTo(2.35, 0.01));
-    });
-
-    test('stopped unlocks aspect ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 1.78;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-      aspectCalls.clear();
-
-      engine.stop();
-      await Future(() {});
-
-      expect(aspectCalls, isNotEmpty);
-      expect(aspectCalls.last.method, 'setAspectRatio');
-      final unlockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
-      );
-      expect(unlockCalls, isNotEmpty);
-    });
-
-    test('paused does NOT unlock aspect ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 1.78;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-      aspectCalls.clear();
-
-      engine.pause();
-      await Future(() {});
-
-      // No new aspect ratio call should have been made
-      // (pause saves breakpoint but does not touch aspect ratio)
-      final unlockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
-      );
-      expect(unlockCalls, isEmpty);
-    });
-
-    test('completed unlocks aspect ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 1.78;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-      aspectCalls.clear();
-
-      engine.simulateCompleted();
-      await Future(() {});
-
-      expect(aspectCalls, isNotEmpty);
-      expect(aspectCalls.last.method, 'setAspectRatio');
-      final unlockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
-      );
-      expect(unlockCalls, isNotEmpty);
-    });
-
-    test('error unlocks aspect ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 1.78;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-      aspectCalls.clear();
-
-      engine.simulateError('test error');
-      await Future(() {});
-
-      expect(aspectCalls, isNotEmpty);
-      expect(aspectCalls.last.method, 'setAspectRatio');
-      final unlockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
-      );
-      expect(unlockCalls, isNotEmpty);
-    });
-
-    test('idle unlocks aspect ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 1.78;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-      aspectCalls.clear();
-
-      engine.state.value = MediaState.idle;
-      await Future(() {});
-
-      expect(aspectCalls, isNotEmpty);
-      expect(aspectCalls.last.method, 'setAspectRatio');
-      final unlockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
-      );
-      expect(unlockCalls, isNotEmpty);
-    });
-
-    test('playing with zero ratio does not call matchVideo', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 0.0;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-
-      // matchVideo(0) is a no-op, so no setAspectRatio call
-      final lockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && (c.arguments as double) > 0,
-      );
-      expect(lockCalls, isEmpty);
-    });
-
-    test('rapid state changes maintain correct ratio', () async {
-      await controller.init();
-      engine.configureMedia(durationMs: 60000);
-      engine.aspectRatio.value = 2.35;
-      playlist.add('C:/a.mp4');
-      await controller.playIndex(0);
-
-      // Playing -> pause -> playing should maintain lock
-      engine.pause();
-      engine.play();
-      await Future(() {});
-
-      // The last call should be matchVideo(2.35) from the second play
-      expect(aspectCalls, isNotEmpty);
-      expect(aspectCalls.last.method, 'setAspectRatio');
-      expect(aspectCalls.last.arguments, closeTo(2.35, 0.01));
-
-      // No unlock calls should have occurred during pause
-      final unlockCalls = aspectCalls.where(
-        (c) => c.method == 'setAspectRatio' && c.arguments == 0.0,
-      );
-      expect(unlockCalls, isEmpty);
+      test('completed + loopAll wraps around via StateMonitor', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopAll;
+        await controller.playIndex(1); // play last item
+        engine.simulateCompleted();
+        await Future(() {});
+        expect(playlist.currentIndex, 0); // wraps to first
+      });
     });
   });
 }

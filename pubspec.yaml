@@ -11,25 +11,34 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  fvp: ^0.36.2
+  player_engine:
+    path: ../widget_tree_flutter/player_engine
+  fvp: ^0.37.2
   path_provider: ^2.1.5
   file_picker: ^11.0.2
-  window_manager: ^0.5.1
   shared_preferences: ^2.5.5
   desktop_drop: ^0.7.1
   logger: ^2.5.0
-  dynamic_color: ^1.8.1
-  widgets_easier: ^0.0.10
-  flutter_easy_animations: ^0.0.2
-  ffi: ^2.1.4
   path: ^1.9.1
-  win32: ^5.12.0
   crypto: ^3.0.6
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
+  ffi: ^2.1.0
+  window_manager: ^0.5.1
+  file_selector: any
+  xdg_directories: any
+  animations: any
+  cross_file: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
+  freezed: ^3.2.5
+  build_runner: ^2.15.0
+  pigeon: any
 
 flutter:
   generate: true

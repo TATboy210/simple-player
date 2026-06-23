@@ -1,9 +1,9 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
@@ -32,6 +32,9 @@ class PlaylistPanel extends StatefulWidget {
   onFolderScanned;
   final VoidCallback? onClearHistory;
 
+  /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
+  final ValueListenable<bool>? resizing;
+
   const PlaylistPanel({
     super.key,
     required this.playlist,
@@ -42,6 +45,7 @@ class PlaylistPanel extends StatefulWidget {
     this.onShowProperties,
     this.onFolderScanned,
     this.onClearHistory,
+    this.resizing,
   });
 
   @override
@@ -54,7 +58,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   late final Animation<Offset> _slideAnim;
   late final Animation<double> _fadeAnim;
   final _focusNode = FocusNode();
-  int _selectedTab = 0; // 0=文件夹, 1=历史
+  final _selectedTab = ValueNotifier<int>(0); // 0=文件夹, 1=历史
 
   @override
   void initState() {
@@ -98,12 +102,32 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   @override
   void dispose() {
     _focusNode.dispose();
+    _selectedTab.dispose();
     _anim.dispose();
     super.dispose();
   }
 
-  static const _panelWidth = 420.0;
-  static const _panelHeight = 240.0;
+  Widget _buildBackdrop() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: BackdropFilter(
+          filter: _blurFilter,
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+
+  static const _panelWidth = Tokens.playlistPanelWidth;
+  static const _panelHeight = Tokens.playlistPanelHeight;
+
+  // 缓存固定 blur filter，避免动画期间每帧分配 ImageFilter
+  static final _blurFilter = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlurThick,
+    sigmaY: Tokens.glassBlurThick,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -153,57 +177,72 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         child: SizedBox(
           width: width,
           height: height,
-          child: ValueListenableBuilder<WindowInteractionState>(
-            valueListenable: WindowBridge.I.interaction,
-            builder: (_, state, child) => state == WindowInteractionState.idle
-                ? ClipRRect(
+          child: Stack(
+            children: [
+              // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
+              // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
+              Positioned.fill(
+                child: widget.resizing != null
+                    ? AnimatedBuilder(
+                        animation: widget.resizing!,
+                        builder: (_, __) {
+                          if (widget.resizing!.value) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                Tokens.radiusLarge,
+                              ),
+                              child: Container(color: Tokens.bgGlass),
+                            );
+                          }
+                          return _buildBackdrop();
+                        },
+                      )
+                    : _buildBackdrop(),
+              ),
+              // 内容层：滚动不触发 BackdropFilter 重绘
+              RepaintBoundary(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Tokens.bgGlass,
                     borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(
-                        sigmaX: Tokens.glassBlurThick,
-                        sigmaY: Tokens.glassBlurThick,
-                      ),
-                      child: child,
-                    ),
-                  )
-                : child!,
-            child: Container(
-                decoration: BoxDecoration(
-                  color: Tokens.bgGlass,
-                  borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                  border: Border.all(color: Tokens.borderHighlight, width: 1),
-                ),
-                child: Column(
-                  children: [
-                    // tab 切换
-                    SizedBox(height: 36, child: _buildTabBar()),
-                    // 光条分隔线
-                    Container(
-                      height: 1,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: Tokens.spMd,
-                      ),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.transparent,
-                            Tokens.borderHighlight,
-                            Colors.transparent,
-                          ],
+                    border: Border.all(color: Tokens.borderHighlight, width: 1),
+                  ),
+                  child: AnimatedBuilder(
+                    animation: _selectedTab,
+                    builder: (context, _) => Column(
+                      children: [
+                        // tab 切换
+                        SizedBox(height: 36, child: _buildTabBar()),
+                        // 光条分隔线
+                        Container(
+                          height: 1,
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: Tokens.spMd,
+                          ),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.transparent,
+                                Tokens.borderHighlight,
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                        // 内容
+                        Expanded(child: _buildContent()),
+                      ],
                     ),
-                    // 内容
-                    Expanded(child: _buildContent()),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildTabBar() {
@@ -219,15 +258,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           _TabChip(
             icon: Icons.folder,
             label: l10n.folderTab,
-            selected: _selectedTab == 0,
-            onTap: () => setState(() => _selectedTab = 0),
+            selected: _selectedTab.value == 0,
+            onTap: () => _selectedTab.value = 0,
           ),
           const SizedBox(width: Tokens.spLg),
           _TabChip(
             icon: Icons.history,
             label: l10n.historyTab,
-            selected: _selectedTab == 1,
-            onTap: () => setState(() => _selectedTab = 1),
+            selected: _selectedTab.value == 1,
+            onTap: () => _selectedTab.value = 1,
           ),
         ],
       ),
@@ -238,7 +277,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     final items = widget.playlist.items;
     final currentIndex = widget.playlist.currentIndex;
 
-    if (_selectedTab == 0) {
+    if (_selectedTab.value == 0) {
       return FolderTab(
         items: items,
         currentIndex: currentIndex,

@@ -1,9 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
-import 'package:simple_player_flutter/ui/widgets/osd_overlay.dart';
+import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import '../../helpers/fake_engine.dart';
 
 void main() {
@@ -18,7 +19,7 @@ void main() {
     engine.dispose();
   });
 
-  Widget buildSubject({MediaEngine? eng, required Widget child}) {
+  Widget buildSubject({PlayerEngine? eng, required Widget child}) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -156,6 +157,50 @@ void main() {
 
       // Pump past OsdService hold timer to avoid pending timer
       await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('scroll wheel up increases volume', (tester) async {
+      engine.volume.value = 0.5;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeSlider(engine: engine)),
+      );
+      await tester.pump();
+
+      final slider = find.byType(VolumeSlider);
+      final center = tester.getRect(slider).center;
+
+      // Scroll up → volume increases
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, -100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      expect(engine.volume.value, greaterThan(0.5));
+      OsdService.I.hide();
+    });
+
+    testWidgets('scroll wheel down decreases volume', (tester) async {
+      engine.volume.value = 0.5;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeSlider(engine: engine)),
+      );
+      await tester.pump();
+
+      final slider = find.byType(VolumeSlider);
+      final center = tester.getRect(slider).center;
+
+      // Scroll down → volume decreases
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, 100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      expect(engine.volume.value, lessThan(0.5));
+      OsdService.I.hide();
     });
   });
 }

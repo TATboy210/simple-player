@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../playlist/playlist.dart';
+import '../utils/log.dart';
 
 /// 播放列表 JSON 持久化
 ///
@@ -72,7 +74,7 @@ class PlaylistStore {
           await tmpFile.rename(f.path);
           return; // 写入成功
         } on Exception catch (e) {
-          debugPrint('PlaylistStore._flush attempt ${attempt + 1} failed: $e');
+          log.w('PlaylistStore._flush attempt ${attempt + 1} failed: $e');
           if (attempt < _maxRetries - 1) {
             await Future<void>.delayed(
               Duration(milliseconds: _retryBaseDelayMs * (1 << attempt)),
@@ -80,7 +82,7 @@ class PlaylistStore {
           }
         }
       }
-      debugPrint('PlaylistStore._flush: all $_maxRetries attempts failed');
+      log.e('PlaylistStore._flush: all $_maxRetries attempts failed');
     } finally {
       completer.complete();
       if (_writeInFlight == completer.future) {
@@ -107,7 +109,38 @@ class PlaylistStore {
       playlist = await _migrateHistory(playlist);
       return playlist;
     } on Exception catch (e) {
-      debugPrint('PlaylistStore.load failed: $e');
+      log.e('PlaylistStore.load failed: $e');
+      return null;
+    }
+  }
+
+  /// 后台 Isolate 加载播放列表（文件 I/O + JSON 解析不阻塞 UI）
+  ///
+  /// 文件读取和 JSON 解析在独立 Isolate 中执行，
+  /// 迁移逻辑在主 Isolate 回调中执行（低频一次性操作）。
+  /// Isolate 失败时自动回退到 [load]。
+  static Future<Playlist?> loadInBackground() async {
+    try {
+      final f = await _file();
+      final path = f.path;
+      final playlist = await Isolate.run(() => _loadPlaylistSync(path));
+      return await _migrateHistory(playlist);
+    } on Exception catch (e) {
+      log.w('PlaylistStore.loadInBackground failed, falling back: $e');
+      return load();
+    }
+  }
+
+  /// Isolate 入口 — 纯 Dart 文件 I/O + JSON 解析
+  static Playlist? _loadPlaylistSync(String path) {
+    try {
+      final f = File(path);
+      if (!f.existsSync()) return null;
+      final content = f.readAsStringSync();
+      final json = jsonDecode(content) as Map<String, dynamic>;
+      return Playlist.fromJson(json);
+    } on Exception catch (e) {
+      log.e('PlaylistStore._loadPlaylistSync failed: $e');
       return null;
     }
   }
@@ -133,8 +166,8 @@ class PlaylistStore {
           final map = entry as Map<String, dynamic>;
           final path = map['path'] as String?;
           if (path != null) historyMap[path] = map;
-        } catch (_) {
-          // 跳过损坏项
+        } on Exception catch (e) {
+          log.d('PlaylistStore._migrateHistory: skipping corrupt entry: $e');
         }
       }
 
@@ -149,9 +182,9 @@ class PlaylistStore {
 
       // 迁移成功，删除旧文件
       await historyFile.delete();
-      debugPrint('PlaylistStore: migrated history.json');
+      log.d('PlaylistStore: migrated history.json');
     } on Exception catch (e) {
-      debugPrint('PlaylistStore._migrateHistory failed: $e');
+      log.e('PlaylistStore._migrateHistory failed: $e');
     }
     return playlist;
   }
@@ -164,7 +197,7 @@ class PlaylistStore {
       final f = await _file();
       if (await f.exists()) await f.delete();
     } on Exception catch (e) {
-      debugPrint('PlaylistStore.clear failed: $e');
+      log.e('PlaylistStore.clear failed: $e');
     }
   }
 

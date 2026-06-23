@@ -1,173 +1,326 @@
-# Feature Landscape
+# Feature Landscape: Cross-Platform Window Management
 
-**Domain:** Flutter Desktop Media Player (Performance Optimization)
-**Researched:** 2026-05-23
-**Confidence:** HIGH (based on codebase analysis, prior architecture research, fvp/MDK bottleneck documentation)
+**Domain:** Flutter desktop media player window management (Windows / Linux / macOS)
+**Researched:** 2026-06-23
+**Confidence:** HIGH (mpv/VLC/Kodi documented behaviors + existing codebase analysis + window_manager API surface)
 
 ## Table Stakes
 
-These are the baseline performance and quality fixes. Without them, the player feels sluggish and the codebase becomes unmaintainable.
+Features every desktop media player must have. Missing any = users switch to VLC/mpv.
 
-### Rendering Pipeline
+### 1. Frameless Window with Custom Title Bar
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Fix MFT:d3d=1 to MFT:d3d=11 | Eliminates D3D9-to-D3D11 surface copy on every frame. Current config in `platform_decoders.dart` forces a redundant conversion. | Low (1-line change) | Zero risk, automatic fallback for old drivers |
-| Enable shader_resource=1 | GPU-accelerated YUV-to-RGB color conversion instead of CPU fallback. Currently disabled by fvp default. | Low (1-line in registerWith) | May need driver compatibility testing |
-| Set log=warning in production | fvp default `log=all` wastes CPU on string formatting and I/O for every MDK event. | Low (1-line in registerWith) | Zero risk |
-| Snapshot debounce on Texture | Already implemented (verified in memory). Keep as-is. | N/A | Already done |
-| Disable d3d11.sync.cpu for testing | The #1 bottleneck: forces CPU to wait for GPU every frame. Setting to 0 may eliminate visible title bar jitter. | Low (1-line in registerWith) | Medium risk: may cause tearing on integrated GPUs. Must test on target hardware. |
+**Why Expected:** VLC (minimal interface), mpv (`--no-border`), Kodi (borderless mode) all support this. Users expect clean, distraction-free video viewing without OS chrome eating screen space.
 
-### State Management
+**Current State:** DONE. `WindowService` uses `window_manager` with `TitleBarStyle.hidden`, custom `CustomTitleBar` widget provides drag-to-move + window controls.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| MergedListenable for position+duration | ControlBar currently nests multiple ValueListenableBuilders. Merging related state into one notifier halves rebuild count for the most frequently updated widget. | Medium | Pattern: custom ValueNotifier that listens to 2 upstream notifiers |
-| Selector/ValueListenableBuilder scoping | Widgets that only need `isMuted` rebuild on `volume` changes. Tighten each VLB to the exact notifier it needs. | Medium (audit pass) | Systematic: grep all VLBs, verify they listen to minimum required notifiers |
-| Resize degradation (skip BackdropFilter) | Already implemented per memory. BackdropFilter skipped during `isResizing`. | N/A | Already done |
-| RepaintBoundary on hot widgets | Already implemented per memory. ControlBar, VideoSurface, Aurora, progress bar isolated. | N/A | Already done |
+**Complexity:** Already implemented.
 
-### Window Management
+---
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Extract WindowServiceBase mixin | WindowService (302 lines), MacosWindowService (286 lines), LinuxWindowService (279 lines) share 90%+ identical code: init lifecycle, Completer guard, `_togglingFullscreen`/`_closing` mutex, dispose, toggleAlwaysOnTop, minimize, close, startDragging. Every bug fix must be replicated 3 times. | Medium | Extract mixin with shared lifecycle/error-handling. Platform services override only fullscreen/native-specific methods. |
+### 2. Fullscreen Toggle (Atomic, No Flicker)
 
-### LRU Cache
+**Why Expected:** Every media player has this. mpv (`f` key), VLC (`F`/`F11`), Kodi (dedicated fullscreen mode). The transition must be atomic -- no flash, no intermediate frames showing border.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| LinkedHashMap-based LRU for thumbnails | Current `ThumbnailService` uses `Map<String, ImageProvider>` + `List<String>`. `_touch()` calls `_order.remove(filePath)` which is O(n) on every cache hit. With 200 items, this is a linear scan on every thumbnail access. | Low | Replace with `LinkedHashMap` (access-order) for O(1) touch+evict. ~20 lines changed. |
-| Instance-based ThumbnailService | Static singleton (`_impl`, `_cache`, `_order`) cannot be tested, state leaks between test runs, no way to inject fakes. | Medium | Convert to instance with constructor-injected `ThumbnailProvider`. Register via service locator or pass through widget tree. |
+**Current State:** DONE. `FullscreenController` with mutex + `SetWindowPos` atomic resize. Win32 FFI handles `WS_THICKFRAME` removal/restoration.
 
-### Testing
+**Complexity:** Already implemented (Windows). Linux/macOS need `window_manager.setFullScreen()` wrapper.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Unit tests for window layer | FullscreenController, WindowStateService, WindowPersistenceService have zero test coverage. Window management is the most platform-sensitive code. | Medium | FullscreenController needs Win32 mock/stub. StateService and PersistenceService are testable with SharedPreferences fake. |
-| Unit tests for ThumbnailService | Static singleton prevents testing. After instance-based refactor, test LRU eviction, cache hit/miss, provider fallback. | Low (after refactor) | Depends on instance-based refactor |
-| Widget tests for settings panel | SettingsCard (754 lines), SettingsPanel, ShortcutsTab, VideoTab untested. Deferred-apply pattern adds complexity. | Medium | Test locale switching, theme application, keyboard shortcut binding |
+---
+
+### 3. Always-on-Top
+
+**Why Expected:** mpv (`--ontop`), VLC (`Ctrl+T`), all support pinning window above others. Essential for multitasking -- watching video while working.
+
+**Current State:** DONE. `WindowService.setAlwaysOnTop()` with `ValueNotifier<bool>` state.
+
+**Complexity:** Already implemented. Cross-platform via `window_manager`.
+
+---
+
+### 4. Window Geometry Persistence (Position + Size)
+
+**Why Expected:** mpv (watch-later files), VLC (`save-window-geometry` setting), Kodi (guisettings.xml). Users expect window to reopen where they left it.
+
+**Current State:** DONE. `WindowPersistence` with 500ms debounce + atomic `.tmp` write. Saves position, size, maximized state.
+
+**Complexity:** Already implemented.
+
+---
+
+### 5. Edge Resize with Minimum Size Constraint
+
+**Why Expected:** Standard window behavior. All platforms enforce minimum size to prevent UI breakage.
+
+**Current State:** DONE. `minimumSize: Size(854, 480)` in `WindowOptions`. `DragToResizeArea` widget for frameless resize.
+
+**Complexity:** Already implemented.
+
+---
+
+### 6. DPI / Per-Monitor Scaling Awareness
+
+**Why Expected:** Multi-monitor setups are common (laptop + external). Windows 10+ has Per-Monitor v2, macOS uses Retina 2x, Linux Wayland has `wl_output.scale`. Media players must render correctly on all monitors.
+
+**Current State:** DONE. Flutter handles per-monitor DPI natively. No custom code needed.
+
+**Complexity:** Already handled by framework.
+
+---
+
+### 7. Keyboard Shortcut for All Window Operations
+
+**Why Expected:** mpv (20+ keys), VLC (comprehensive shortcuts). Power users never touch the mouse for window control.
+
+**Current State:** DONE. `KeyboardHandler` handles 20+ keys including Space, F (fullscreen), M (mute), arrows, etc.
+
+**Complexity:** Already implemented.
+
+---
+
+### 8. Aspect Ratio Lock During Resize
+
+**Why Expected:** mpv (`--keepaspect`), VLC (aspect ratio menu). Video windows should maintain 16:9 (or native ratio) when user drags to resize. Prevents distorted video.
+
+**Current State:** DONE. C++ `WM_SIZING` handler enforces ratio on all 8 edges. `AspectRatioService` manages toggle.
+
+**Complexity:** Already implemented (Windows C++). Linux/macOS need `window_manager`-based approach.
+
+---
 
 ## Differentiators
 
-Features that set this player apart from generic video players. Not expected by default, but provide competitive advantage.
+Features that go beyond expectations. These make users prefer your player over VLC/mpv.
 
-### Rendering Pipeline
+### 9. Rounded Corners on Windows 11
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Triple buffering in fvp C++ layer | Eliminates 90% of mutex contention between MDK render thread and Flutter raster thread. Current double-buffer (rt + tex) shares one lock. Third buffer enables lockless swap. | High (requires fvp fork) | ~50 lines C++ change. 8MB extra VRAM for 1080p BGRA. Per prior analysis: highest-impact C++ optimization. |
-| Fence替代Flush | Replace `ctx->Flush()` with `ID3D11Query` event query. Flush drains entire GPU pipeline; fence only waits for CopyResource completion. Saves 1-3ms per frame at 60fps. | Medium (requires fvp fork) | ~15 lines C++ change. Low risk. |
-| Remove redundant D3D11 multithread protection | `SetMultithreadProtected(TRUE)` adds internal locks to every D3D11 API call, but `mutex mtx` already protects cross-thread access. Two lock layers are redundant. | Low (requires fvp fork, delete 3 lines) | Must verify no uncovered code paths. |
-| Shared D3D11 device across textures | Currently `D3D11CreateDevice` per texture. Shared device saves ~50ms init and device-level VRAM. | Low (requires fvp fork) | Only matters for multi-texture (PiP) scenarios. |
+**Value:** Matches OS design language. Win11 apps without rounded corners look broken. VLC/mpv don't do this -- they show square corners.
 
-### State Management
+**Complexity:** Low (3-line C++ fix: `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND` in `OnCreate`).
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| PlayerActions record (callback deduplication) | PlayerScreen takes 15+ VoidCallbacks, ControlsOverlay takes 10+. Grouping into a single `record` type eliminates callback drilling through 5 widget layers. | Medium | `typedef PlayerActions = ({VoidCallback onPlay, VoidCallback onPause, ...})`. Requires touching ~8 files. |
-| ChangeNotifier grouping for related state | Group volume+mute+playbackSpeed into one notifier, position+duration+buffered into another. Reduces total notifier count from 12 to ~5, cutting VLB rebuild surface. | High | Architectural change. Must preserve individual notifier access for widgets that only need one field. Can coexist: expose grouped notifier + individual getters. |
+**Dependencies:** None. Windows-only.
 
-### Window Management
+**Status:** Documented in memory (`project_window_corner_fix`). Needs verification on current branch.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Platform-agnostic fullscreen abstraction | Current Windows fullscreen uses Win32 FFI (SetWindowLongW, SetWindowPos). macOS uses NSWindow.toggleFullScreen. Linux uses window_manager. Abstract behind a `FullscreenStrategy` interface so platform service only calls `strategy.enter()`/`strategy.exit()`. | Medium | Isolates all FFI code into strategy implementations. Platform service becomes pure lifecycle management. |
+---
 
-### Testing
+### 10. Responsive Layout for Narrow Windows
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Integration tests for critical flows | Zero integration tests exist. Open -> play -> seek -> pause -> next is the core user flow. Catching platform-specific regressions requires real device testing. | High | Needs `integration_test/` directory. Requires fvp engine mock or test media files. Flutter desktop integration testing is less mature than mobile. |
-| Golden tests for glassmorphism UI | Control bar, progress bar, playlist panel use complex glassmorphism (BackdropFilter + gradient + border). Visual regressions are invisible without golden comparison. | Medium | Need `test/golden/` directory. Platform-specific rendering differences (Windows vs macOS) require per-platform golden files. |
-| Fake engine for deterministic testing | Current `FakeEngine` in `test/helpers/fake_engine.dart` exists. Extend it to cover all 12 ValueNotifiers and error scenarios for comprehensive widget testing. | Low | Incremental extension of existing fake. |
+**Value:** Player adapts when squeezed below 600dp -- control bar collapses to single row, playlist panel overlays instead of side-by-side. VLC/mpv don't adapt well to small sizes.
+
+**Complexity:** Medium. Already partially done (responsive breakpoints in `PlayerScreen`).
+
+**Dependencies:** None.
+
+---
+
+### 11. Glass-Morphism Control Bar (Blur + Transparency)
+
+**Value:** Visual polish that VLC/mpv lack. `BackdropFilter` + `bgGlass` + `borderHighlight` creates modern aesthetic. Matches Fluent Design (Win11) and macOS vibrancy.
+
+**Complexity:** Medium. `GlassContainer` widget already exists with 3-tier blur (thin/normal/thick).
+
+**Dependencies:** None. Already implemented.
+
+---
+
+### 12. Auto-Hide Controls in Fullscreen
+
+**Value:** mpv hides cursor after timeout, VLC has minimal mode. But auto-hide with smooth fade animation is rare. Controls reappear on mouse movement.
+
+**Complexity:** Medium. `ControlsOverlay` with `AnimationController` + mouse listener. Fullscreen 3s / windowed 5s timeout.
+
+**Dependencies:** Fullscreen toggle (#2).
+
+**Status:** DONE.
+
+---
+
+### 13. Drag-and-Drop File Opening
+
+**Value:** Convenience feature. Drop video files onto player window to open. VLC supports this, mpv does not natively.
+
+**Complexity:** Low. `DropHandler` widget with `DragTarget`.
+
+**Dependencies:** None.
+
+**Status:** DONE.
+
+---
+
+### 14. OSD (On-Screen Display) Pill Notifications
+
+**Value:** mpv shows volume/position in OSD. Custom OSD pill for volume change, speed change, aspect ratio switch gives feedback without looking at controls.
+
+**Complexity:** Low. `OsdOverlay` widget with fade animation.
+
+**Dependencies:** None.
+
+**Status:** DONE.
+
+---
+
+### 15. Window Entrance Animation (First Launch)
+
+**Value:** Delight moment. 200ms scale-up from 95% with ease-out curve. Spotify does this. VLC/mpv don't.
+
+**Complexity:** Low. `AnimatedBuilder` + `Transform.scale` on first frame. Pure Dart, no platform dependency.
+
+**Dependencies:** None.
+
+**Status:** NOT IMPLEMENTED. Low priority.
+
+---
+
+### 16. Multi-Monitor Window Clamping
+
+**Value:** When monitors are disconnected, window can end up off-screen. Smart clamping detects available displays and repositions window. Most apps don't handle this -- users have to edit config files.
+
+**Complexity:** Medium. `ScreenUtils` already has display detection. Need to add clamping logic in `WindowPersistence.load()`.
+
+**Dependencies:** Geometry persistence (#4).
+
+**Status:** Partially done (window_manager handles some cases).
+
+---
+
+### 17. System Tray Minimize (Audio Continues)
+
+**Value:** VLC has this. Minimize to tray while audio keeps playing. Useful for music/podcast playback in background.
+
+**Complexity:** Medium. Need `system_tray` package + minimize-to-tray logic. Cross-platform but platform-specific icon handling.
+
+**Dependencies:** None.
+
+**Status:** NOT IMPLEMENTED. Defer to v2.
+
+---
+
+### 18. Picture-in-Picture (Floating Mini Player)
+
+**Value:** Windows 11 native PiP, VLC floating window. Small always-on-top window for casual viewing while working.
+
+**Complexity:** High. Need small window instance OR overlay window. Platform-specific (Win32 `WS_EX_TOOLWINDOW`, macOS `NSPanel`, Linux `_NET_WM_WINDOW_TYPE_DOCK`).
+
+**Dependencies:** Always-on-top (#3).
+
+**Status:** NOT IMPLEMENTED. Defer to v2+. Complexity explosion with shared D3D11 device.
+
+---
+
+### 19. Video Wallpaper / Desktop Mode
+
+**Value:** mpv (`--wid=0`), VLC (DirectX wallpaper mode). Render video behind desktop icons as animated wallpaper.
+
+**Complexity:** Very High. Win32: find `WorkerW` window, render behind it. macOS: `NSWindow.level = .desktopWindow`. Linux: `_NET_WM_WINDOW_TYPE_DESKTOP`.
+
+**Dependencies:** Platform-specific FFI.
+
+**Status:** NOT IMPLEMENTED. Niche feature, defer to v2+.
+
+---
+
+### 20. Window Snap Assist Integration
+
+**Value:** Windows 11 Snap Layouts (`Win+Z`), macOS tiling (Sequoia+), Linux tiling WMs. App should respond correctly to OS snap commands.
+
+**Complexity:** Low. Standard `WS_THICKFRAME` window on Windows gets snap for free. Frameless windows need `WS_THICKFRAME` restored (already handled in fullscreen exit).
+
+**Dependencies:** Frameless implementation (#1).
+
+**Status:** Works automatically when `WS_THICKFRAME` is present during windowed mode.
+
+---
 
 ## Anti-Features
 
-Features to explicitly NOT build. These are tempting but waste time or introduce complexity without proportional value.
+Features to explicitly NOT build. Complexity explosion with minimal user value.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| State management migration (Provider/Riverpod/Bloc) | ValueNotifier is the project constraint. Migration touches every widget, every test, every service. Risk of regression is enormous for marginal DX improvement. | Optimize within ValueNotifier pattern: MergedListenable, Selector, tighter scoping. |
-| Full macOS/Linux implementation | Stubs exist, not priority per PROJECT.md. Real implementation requires platform-specific FFI, thumbnail extraction, fullscreen strategy. 3-6 days per platform. | Keep stubs. Focus on Windows. Port after Windows is production-quality. |
-| Custom frame scheduling (ExoPlayer-style 6-action decision tree) | Flutter Texture API does not expose frame release timing. MDK handles A/V sync internally. Implementing custom scheduling would require forking both fvp and Flutter engine. | Trust MDK's internal scheduling. Focus on reducing rendering overhead so frames arrive on time. |
-| HDR/ICC color management pipeline | mpv's libplacebo pipeline is thousands of lines. Flutter Texture does not support color space metadata. | Out of scope. MDK handles basic tone mapping. Full HDR requires Flutter engine changes. |
-| Frame interpolation (motion compensation) | mpv's pl_queue multi-frame mixing is GPU-shader-level work. No Flutter API support. | Out of scope. |
-| Atomic file writes for PlaylistStore | Current 3-attempt flush loop mitigates crash corruption. Atomic write (write-to-temp + rename) adds complexity for a rare edge case. | Keep retry logic. Add a comment documenting the tradeoff. Only revisit if users report data loss. |
-| UNC path / symlink blocking in PathValidator | Desktop media player is not a security-critical application. Users open their own files. | Keep current validation (existence + extension check). Document limitation. |
-| Equalizer / audio effects UI | Per PROJECT.md: "New UI features (equalizer, video filters) -- focus on optimization, not new features" | Defer to separate feature project. |
+|---|---|---|
+| Custom window chrome per-platform (native title bar buttons on macOS) | `window_manager` already handles this; custom implementation breaks on OS updates | Use `window_manager`'s `windowButtonVisibility` + platform defaults |
+| Skin/theme system (VLC-style) | Massive UI framework for minimal value; VLC skins are mostly abandoned | Single design system (`Tokens.*`) with dark/light toggle at most |
+| Window state sync across instances | Multi-instance state sync needs IPC/sockets; edge case complexity | Single instance enforcement OR independent persistence per instance |
+| Custom WM_NCCALCSIZE handler in C++ | Flutter engine intercepts before custom code; 3 documented failed approaches | Use Dart-side `setFrameless()` + `DWMWA_WINDOW_CORNER_PREFERENCE` in C++ `OnCreate` |
+| Full ABR algorithm suite (BBA + BOLA + MPC) | Over-engineering for desktop player; browser players need this because network is shared | Implement throughput-based first; skip BOLA/MPC |
+| Custom HLS demuxer | FFmpeg already handles HLS | Use FFmpeg's built-in demuxer; configure via `setProperty()` |
+| Offline HLS segment caching | Desktop has local files; different use case than mobile | Not needed |
+| Multi-player / multi-window | Complexity explosion with shared D3D11 device; each window needs own swap chain | Defer to v2+ with separate engine instances |
+| `get_it` / service locator | Contradicts "no state management library" constraint; hides dependencies | Constructor injection via PlayerServices |
+| `part/part of` for file splitting | Dart officially discourages; creates hidden coupling | Separate files with explicit imports |
+| State management migration (Riverpod/Bloc) | ValueNotifier works; migration cost with zero user-visible benefit | Keep ValueNotifier pattern |
+| Skinnable UI / user-customizable layouts | Massive abstraction layer; 95% of users never change defaults | Single polished design |
 
 ## Feature Dependencies
 
 ```
-MFT:d3d=11 ─┐
-shader_resource=1 ─┤─── fvp registerWith config (all 3 are 1-line changes in same location)
-log=warning ─┘
-
-d3d11.sync.cpu=0 ──── requires hardware testing (independent of above 3)
-
-LinkedHashMap LRU ──── ThumbnailService instance-based refactor (do LinkedHashMap first, then extract instance)
-
-MergedListenable ──── Selector/audit pass (do merge first, then tighten scoping)
-
-WindowServiceBase mixin ──── FullscreenStrategy abstraction (mixin first, then strategy extraction)
-
-Unit tests (window) ──── WindowServiceBase mixin (test the extracted base)
-
-Unit tests (thumbnail) ──── ThumbnailService instance-based refactor (test after refactor)
-
-Integration tests ──── FakeEngine extension (extend fake first, then build integration flows)
-
-Golden tests ──── RepaintBoundary audit (ensure boundaries are correct before golden comparison)
+Frameless window (1) ──> all other features depend on this
+Fullscreen (2) ──> auto-hide controls (12), window snap (20)
+Always-on-top (3) ──> PiP (18)
+Geometry persistence (4) ──> multi-monitor clamping (16)
+Edge resize (5) ──> aspect ratio lock (8)
+Aspect ratio lock (8) ──> C++ WM_SIZING (Windows), window_manager (Linux/macOS)
+Rounded corners (9) ──> C++ DWMWA (Windows only)
+Glass-morphism (11) ──> independent, no dependencies
+OSD (14) ──> independent, no dependencies
+Entrance animation (15) ──> independent, no dependencies
+System tray (17) ──> independent, adds system_tray dependency
+PiP (18) ──> always-on-top (3), high platform complexity
+Video wallpaper (19) ──> platform FFI, very high complexity
 ```
+
+## Cross-Platform Gaps
+
+Features that work on Windows but need Linux/macOS implementation:
+
+| Feature | Windows Status | Linux Approach | macOS Approach | Effort |
+|---|---|---|---|---|
+| Frameless window | DONE (Win32 FFI) | `window_manager` API | `window_manager` API | Low |
+| Fullscreen (atomic) | DONE (SetWindowPos) | `window_manager.setFullScreen()` | `NSWindow.toggleFullScreen` via FFI | Medium |
+| Aspect ratio lock | DONE (C++ WM_SIZING) | `window_manager` setAspectRatio | `NSWindow.contentAspectRatio` | Medium |
+| Edge resize (frameless) | DONE (DragToResizeArea) | Works via `window_manager` | Works via `window_manager` | Low |
+| Rounded corners | DONE (DWMWA) | N/A (depends on WM) | N/A (always rounded) | N/A |
+| Window persistence | DONE | Same Dart code | Same Dart code | None |
+| Always-on-top | DONE | `window_manager` API | `NSWindow.level` via FFI | Low |
+
+**Estimated porting effort:** 3-6 days per platform (Linux, macOS). Only `WindowService` internals change.
 
 ## MVP Recommendation
 
-Prioritize in this order:
+**Already Done (table stakes complete):**
+1. Frameless window + custom title bar
+2. Fullscreen toggle (atomic)
+3. Always-on-top
+4. Geometry persistence
+5. Edge resize + minimum size
+6. DPI awareness
+7. Keyboard shortcuts
+8. Aspect ratio lock (Windows)
+9. Glass-morphism controls
+10. Auto-hide controls
+11. Drag-and-drop
+12. OSD notifications
 
-**Phase 1 - Zero-risk rendering fixes (1-2 days)**
-1. MFT:d3d=1 to MFT:d3d=11 (1 line)
-2. shader_resource=1 (1 line)
-3. log=warning (1 line)
-4. Test d3d11.sync.cpu=0 on target hardware (1 line, needs validation)
-
-**Phase 2 - State management cleanup (2-3 days)**
-5. MergedListenable for position+duration
-6. VLB audit pass (tighten scoping)
-
-**Phase 3 - LRU cache fix (1 day)**
-7. LinkedHashMap-based LRU (O(1) touch)
-8. Instance-based ThumbnailService
-
-**Phase 4 - Window deduplication (2-3 days)**
-9. Extract WindowServiceBase mixin
-10. Unit tests for extracted base
-
-**Phase 5 - Test coverage (3-4 days)**
-11. Unit tests for window layer (WindowStateService, WindowPersistenceService)
-12. Unit tests for ThumbnailService
-13. Widget tests for settings panel
-14. Golden tests for critical UI components
-
-**Phase 6 - Advanced optimizations (requires fvp fork)**
-15. Triple buffering (C++ plugin layer)
-16. Fence替代Flush (C++ plugin layer)
+**Prioritize Next:**
+1. **Rounded corners (#9)** -- 3-line C++ fix, high visual impact
+2. **Multi-monitor clamping (#16)** -- prevents user frustration on monitor disconnect
+3. **Window snap integration (#20)** -- works automatically, just verify
 
 **Defer:**
-- Integration tests: Flutter desktop integration testing is immature. Build after unit/widget coverage is solid.
-- PlayerActions record: Nice refactor but not a performance fix. Do after core optimizations.
-- ChangeNotifier grouping: High risk architectural change. Only if VLB audit proves insufficient.
+- **Entrance animation (#15)** -- polish, not functional
+- **System tray (#17)** -- v2, needs new dependency
+- **PiP (#18)** -- v2+, very high complexity
+- **Video wallpaper (#19)** -- v2+, niche
 
 ## Sources
 
-- `reference_fvp_performance_bottlenecks.md` — 9 bottlenecks ranked by severity
-- `reference_fvp_optimization_plan.md` — 3-tier optimization plan with code examples
-- `reference_rendering_pipeline_comparison.md` — mpv vs ExoPlayer vs Flutter+fvp pipeline comparison
-- `project_widget_layer_redesign.md` — Widget gap analysis, MergedListenable, PlayerActions record
-- `project_window_cross_platform.md` — Window platform abstraction strategy
-- `.planning/PROJECT.md` — Active requirements (PERF-01 through TEST-03)
-- `.planning/codebase/CONCERNS.md` — Tech debt, bottlenecks, test gaps
-- `lib/kernel/services/thumbnail_service.dart` — Current O(n) LRU implementation
-- `lib/window/window_service.dart`, `macos_window_service.dart`, `linux_window_service.dart` — 90%+ code duplication
-- `lib/kernel/engine/media_engine.dart` — 12 ValueNotifiers exposed
-- Dart/Flutter testing docs (flutter_test, integration_test patterns)
+- mpv manual: https://mpv.io/manual/master/ -- window options (geometry, autofit, ontop, border, keepaspect)
+- VLC documentation: https://www.videolan.org/vlc/ -- minimal interface, save geometry, resume playback
+- Kodi wiki: https://kodi.wiki/ -- display modes (fullscreen, borderless, windowed)
+- Memory: `project_window_cross_platform` -- window_manager cross-platform strategy
+- Memory: `project_full_architecture` -- 5-layer architecture, WindowService composition
+- Memory: `anti_pattern_window_frameless` -- 3 failed C++ frameless approaches
+- Memory: `project_window_corner_fix` -- DWM corner preference fix
+- Memory: `project_fullscreen_win32_fix` -- Win32 FFI fullscreen rewrite
+- Codebase: `lib/kernel/bridge/window_service.dart` -- current WindowService implementation
+- Codebase: `lib/ui/player/player_screen.dart` -- PlayerScreen responsive layout

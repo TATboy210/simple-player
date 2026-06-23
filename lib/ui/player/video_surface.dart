@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 
 /// 视频纹理渲染 — 根据引擎 textureId 和 aspectRatio 显示视频
 ///
@@ -9,7 +9,7 @@ import '../../kernel/engine/media_engine.dart';
 /// 此组件仅负责渲染纹理 + 滚轮音量调节。
 /// Listener 提升到 AnimatedBuilder 外层，避免每次纹理重建时重建回调。
 class VideoSurface extends StatelessWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   const VideoSurface({super.key, required this.engine});
 
@@ -33,12 +33,14 @@ class VideoSurface extends StatelessWidget {
             return SizedBox.expand(
               child: id == null
                   ? const SizedBox.shrink()
-                  : FittedBox(
-                      fit: BoxFit.contain,
-                      child: SizedBox(
-                        width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
-                        height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
-                        child: Texture(textureId: id),
+                  : ClipRect(
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: SizedBox(
+                          width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
+                          height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
+                          child: Texture(textureId: id),
+                        ),
                       ),
                     ),
             );

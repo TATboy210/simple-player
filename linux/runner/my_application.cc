@@ -1,5 +1,6 @@
 #include "my_application.h"
 
+#include <cstring>
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
@@ -7,47 +8,50 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
-// ─── Aspect Ratio MethodChannel handler ───
-
-static GtkWindow* g_window = nullptr;
-
-static void aspect_ratio_method_cb(FlMethodChannel* channel,
-                                   FlMethodCall* method_call,
-                                   gpointer user_data) {
-  const gchar* method = fl_method_call_get_name(method_call);
-  g_autoptr(FlMethodResponse) response = nullptr;
-
-  if (strcmp(method, "setAspectRatio") == 0) {
-    FlValue* args = fl_method_call_get_args(method_call);
-    double ratio = fl_value_get_float(args);
-
-    if (g_window != nullptr) {
-      GdkGeometry hints;
-      hints.min_aspect = ratio > 0 ? ratio : 0.0;
-      hints.max_aspect = ratio > 0 ? ratio : G_MAXDOUBLE;
-      GdkWindowHints hint_mask =
-          ratio > 0 ? static_cast<GdkWindowHints>(GDK_HINT_ASPECT)
-                    : static_cast<GdkWindowHints>(0);
-
-      gtk_window_set_geometry_hints(g_window, nullptr, &hints, hint_mask);
-    }
-
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(
-        fl_value_new_null()));
-  } else {
-    response = FL_METHOD_RESPONSE(
-        fl_method_not_implemented_response_new());
-  }
-
-  fl_method_call_respond(method_call, response, nullptr);
-}
-
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+// ─── MethodChannel: com.simple_player/window ───
+
+static FlMethodChannel* window_channel = nullptr;
+
+static void window_method_handler(FlMethodChannel* channel,
+                                   FlMethodCall* method_call,
+                                   gpointer user_data) {
+  g_autoptr(FlMethodResponse) response = nullptr;
+  const gchar* method = fl_method_call_get_name(method_call);
+
+  if (strcmp(method, "getGtkWindowHandle") == 0) {
+    GtkApplication* app = GTK_APPLICATION(user_data);
+    GtkWindow* window = gtk_application_get_active_window(app);
+    if (window != nullptr) {
+      g_autoptr(FlValue) result = fl_value_new_int(
+          static_cast<int64_t>(reinterpret_cast<intptr_t>(window)));
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+    } else {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new(
+          "NO_WINDOW", "No active GTK window found", nullptr));
+    }
+  } else {
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  }
+  fl_method_call_respond(method_call, response, nullptr);
+}
+
+static void register_window_channel(GtkApplication* app, FlView* view) {
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  window_channel = fl_method_channel_new(
+      fl_engine_get_binary_message_engine(fl_view_get_engine(view)),
+      "com.simple_player/window", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      window_channel, window_method_handler, app, nullptr);
+}
+
+// ─── Flutter lifecycle ───
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
@@ -80,11 +84,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "simple-player");
+    gtk_header_bar_set_title(header_bar, "simple_player_flutter");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "simple-player");
+    gtk_window_set_title(window, "simple_player_flutter");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
@@ -110,18 +114,8 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
-  // Store window reference for aspect ratio handler
-  g_window = window;
-
-  // Register aspect ratio MethodChannel
-  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
-  g_autoptr(FlMethodChannel) channel = fl_method_channel_new(
-      fl_engine_get_binary_messenger(
-          fl_view_get_engine(view)),
-      "com.simple_player/aspect_ratio",
-      FL_METHOD_CODEC(codec));
-  fl_method_channel_set_method_call_handler(
-      channel, aspect_ratio_method_cb, nullptr, nullptr);
+  // 注册窗口 MethodChannel（Dart 端获取 GtkWindow 指针）
+  register_window_channel(GTK_APPLICATION(application), view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

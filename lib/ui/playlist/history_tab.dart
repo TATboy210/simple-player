@@ -8,7 +8,7 @@ import 'thumbnail_tile.dart';
 /// 播放历史 Tab — 水平缩略图，按时间戳降序，相对时间标签
 ///
 /// 最新在最左，每个缩略图下方有相对时间（"2小时前"）。
-class HistoryTab extends StatelessWidget {
+class HistoryTab extends StatefulWidget {
   final List<PlaylistItem> items;
   final int currentIndex;
   final void Function(int originalIndex) onSelectIndex;
@@ -27,16 +27,34 @@ class HistoryTab extends StatelessWidget {
   });
 
   @override
+  State<HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends State<HistoryTab> {
+  List<MapEntry<int, PlaylistItem>>? _cachedHistoryItems;
+  List<PlaylistItem>? _cachedItems;
+
+  List<MapEntry<int, PlaylistItem>> _getHistoryItems() {
+    if (_cachedHistoryItems != null && identical(_cachedItems, widget.items)) {
+      return _cachedHistoryItems!;
+    }
+    _cachedItems = widget.items;
+    _cachedHistoryItems =
+        widget.items
+            .asMap()
+            .entries
+            .where((e) => (e.value.timestamp ?? 0) > 0)
+            .toList()
+          ..sort(
+            (a, b) =>
+                (b.value.timestamp ?? 0).compareTo(a.value.timestamp ?? 0),
+          );
+    return _cachedHistoryItems!;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 过滤有 timestamp 的项，按时间降序
-    final historyItems = items
-        .asMap()
-        .entries
-        .where((e) => (e.value.timestamp ?? 0) > 0)
-        .toList()
-      ..sort(
-        (a, b) => (b.value.timestamp ?? 0).compareTo(a.value.timestamp ?? 0),
-      );
+    final historyItems = _getHistoryItems();
 
     if (historyItems.isEmpty) {
       return Center(
@@ -54,7 +72,7 @@ class HistoryTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 清空历史按钮
-        if (onClearHistory != null)
+        if (widget.onClearHistory != null)
           Padding(
             padding: const EdgeInsets.only(
               left: Tokens.spMd,
@@ -62,7 +80,7 @@ class HistoryTab extends StatelessWidget {
               bottom: Tokens.spXs,
             ),
             child: GestureDetector(
-              onTap: onClearHistory,
+              onTap: widget.onClearHistory,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -88,26 +106,30 @@ class HistoryTab extends StatelessWidget {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+            itemExtent: ThumbnailTile.tileWidth + Tokens.spSm,
             itemCount: historyItems.length,
             itemBuilder: (context, index) {
               final entry = historyItems[index];
               final item = entry.value;
               final originalIndex = entry.key;
-              final isCurrent = originalIndex == currentIndex;
+              final isCurrent = originalIndex == widget.currentIndex;
 
               return Padding(
                 padding: const EdgeInsets.only(right: Tokens.spSm),
-                child: _HistoryTileWrapper(
-                  timestamp: item.timestamp,
-                  child: ThumbnailTile(
-                    item: item,
-                    isCurrent: isCurrent,
-                    onPlay: () => onSelectIndex(originalIndex),
-                    onResume: (item.positionMs ?? 0) > 0
-                        ? () => onSelectIndex(originalIndex)
-                        : null,
-                    onRemove: () => onRemoveIndex(originalIndex),
-                    onShowProperties: onShowProperties,
+                child: RepaintBoundary(
+                  child: _HistoryTileWrapper(
+                    key: ValueKey(item.path),
+                    timestamp: item.timestamp,
+                    child: ThumbnailTile(
+                      item: item,
+                      isCurrent: isCurrent,
+                      onPlay: () => widget.onSelectIndex(originalIndex),
+                      onResume: (item.positionMs ?? 0) > 0
+                          ? () => widget.onSelectIndex(originalIndex)
+                          : null,
+                      onRemove: () => widget.onRemoveIndex(originalIndex),
+                      onShowProperties: widget.onShowProperties,
+                    ),
                   ),
                 ),
               );
@@ -124,7 +146,11 @@ class _HistoryTileWrapper extends StatelessWidget {
   final int? timestamp;
   final Widget child;
 
-  const _HistoryTileWrapper({required this.timestamp, required this.child});
+  const _HistoryTileWrapper({
+    super.key,
+    required this.timestamp,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -141,10 +167,7 @@ class _HistoryTileWrapper extends StatelessWidget {
           padding: const EdgeInsets.only(top: 2),
           child: Text(
             relativeTime,
-            style: const TextStyle(
-              color: Tokens.textDisabled,
-              fontSize: 9,
-            ),
+            style: const TextStyle(color: Tokens.textDisabled, fontSize: 9),
           ),
         ),
       ],

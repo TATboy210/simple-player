@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
-import '../../kernel/models/media_error_type.dart';
-import '../../kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/value_listenable_builder2.dart';
 
 /// 错误横幅 — 显示可操作的错误信息
 class ErrorBanner extends StatelessWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final VoidCallback? onOpenFile;
   final VoidCallback? onRetry;
 
@@ -21,10 +20,11 @@ class ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String?>(
-      valueListenable: engine.errorMessage,
-      builder: (context, msg, _) {
-        if (engine.state.value != MediaState.error || msg == null) {
+    return ValueListenableBuilder2<MediaState, String?>(
+      first: engine.state,
+      second: engine.errorMessage,
+      builder: (context, state, msg, _) {
+        if (state != MediaState.error || msg == null) {
           return const SizedBox.shrink();
         }
 
@@ -49,7 +49,7 @@ class ErrorBanner extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: Tokens.danger.withAlpha(200),
+            color: Tokens.danger.withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(

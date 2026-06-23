@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../helpers/fake_engine.dart';
 
 void main() {
-  group('MediaEngine new methods', () {
+  group('PlayerEngine new methods', () {
     late FakeEngine engine;
 
     setUp(() {

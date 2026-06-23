@@ -222,7 +222,7 @@ static MediaState mapMdkState(mdk.PlaybackState mdkState) {
 static WindowBridge get I => _instance ?? _noop;
 static void inject(WindowBridge impl) => _instance = impl;
 ```
-- `inject()` 由 `WindowBootstrap` 在应用初始化时调用
+- `inject()` 由 `WindowService` 在初始化时调用
 - 注入前，`I` 返回 `NoopWindowBridge` (安全降级)
 
 **命令方法 (全部 `Future<void>`):**

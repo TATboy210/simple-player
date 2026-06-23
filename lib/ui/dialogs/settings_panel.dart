@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../../kernel/persistence/settings_store.dart';
-import '../../kernel/services/video_processing_service.dart';
+import '../../kernel/services/locale_service.dart';
+import '../../kernel/services/theme_service.dart';
+import '../../features/player/services/video_processing_service.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import 'settings/_settings_nav_item.dart';
@@ -12,25 +14,22 @@ import 'settings/equalizer_tab.dart';
 import 'settings/general_tab.dart';
 import 'settings/shortcuts_tab.dart';
 import 'settings/video_tab.dart';
+import 'settings/settings_tab_performance.dart';
 
 /// 设置面板 — 可拖拽 + 侧边栏导航 + 确定/取消/应用
 ///
 /// 语言和主题变更延迟到对话框关闭时应用（避免 MaterialApp 重建导致对话框丢失）。
-/// GeneralTab 接收 pending 值，用户选择时更新 pending 状态，不立即触发 App 状态变更。
+/// GeneralTab 接收 pending 值，用户选择时更新 pending 状态，不立即触发服务状态变更。
 /// ShortcutsTab 通过回调通知变更，取消时恢复原始绑定。
 class SettingsPanel extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   final VideoProcessingService? videoProcessing;
-  final ValueChanged<String>? onLocaleChanged;
-  final ValueChanged<int>? onThemeChanged;
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
 
   const SettingsPanel({
     super.key,
     required this.engine,
     this.videoProcessing,
-    this.onLocaleChanged,
-    this.onThemeChanged,
     this.onShortcutsChanged,
   });
 
@@ -40,7 +39,7 @@ class SettingsPanel extends StatefulWidget {
 
 class _SettingsPanelState extends State<SettingsPanel> {
   int _selectedIndex = 0;
-  Offset _offset = Offset.zero;
+  final ValueNotifier<Offset> _offset = ValueNotifier(Offset.zero);
 
   // ── GeneralTab 延迟应用的 pending 值 ──
   late String _pendingLocale;
@@ -77,18 +76,31 @@ class _SettingsPanelState extends State<SettingsPanel> {
     _originalShortcuts = await SettingsStore.loadShortcuts();
   }
 
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
   /// 应用语言和主题变更（在对话框关闭后调用，避免 MaterialApp 重建丢失对话框状态）
   void _commitChanges() {
     if (_pendingLocale != _originalLocale) {
-      widget.onLocaleChanged?.call(_pendingLocale);
+      LocaleService.I.setLocale(_pendingLocale);
     }
     if (_pendingThemeIndex != _originalThemeIndex) {
-      widget.onThemeChanged?.call(_pendingThemeIndex);
+      ThemeService.I.setTheme(_pendingThemeIndex);
     }
   }
 
   void _cancel() {
-    // 恢复快捷键（语言/主题未变更，无需恢复）
+    // 恢复语言/主题到打开 dialog 时的值
+    if (_pendingLocale != _originalLocale) {
+      LocaleService.I.setLocale(_originalLocale);
+    }
+    if (_pendingThemeIndex != _originalThemeIndex) {
+      ThemeService.I.setTheme(_originalThemeIndex);
+    }
+    // 恢复快捷键
     widget.onShortcutsChanged?.call(_originalShortcuts);
     SettingsStore.saveShortcuts(_originalShortcuts);
     Navigator.of(context).pop();
@@ -118,9 +130,11 @@ class _SettingsPanelState extends State<SettingsPanel> {
             child: Container(color: Colors.black54),
           ),
         ),
-        // 可拖拽面板
-        Transform.translate(
-          offset: _offset,
+        // 可拖拽面板 — ValueListenableBuilder 隔离拖拽 rebuild
+        ValueListenableBuilder<Offset>(
+          valueListenable: _offset,
+          builder: (context, offset, panel) =>
+              Transform.translate(offset: offset, child: panel),
           child: Align(
             alignment: Alignment.topLeft,
             child: Padding(
@@ -139,7 +153,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       GestureDetector(
                         onPanStart: (_) {},
                         onPanUpdate: (d) {
-                          setState(() => _offset += d.delta);
+                          _offset.value += d.delta;
                         },
                         child: Container(
                           height: 44,
@@ -182,10 +196,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                           ),
                         ),
                       ),
-                      const Divider(
-                        height: 1,
-                        color: Tokens.borderHighlight,
-                      ),
+                      const Divider(height: 1, color: Tokens.borderHighlight),
                       // 内容区：侧边栏 + 内容
                       Expanded(
                         child: Row(
@@ -214,10 +225,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                           ],
                         ),
                       ),
-                      const Divider(
-                        height: 1,
-                        color: Tokens.borderHighlight,
-                      ),
+                      const Divider(height: 1, color: Tokens.borderHighlight),
                       // 底部按钮行
                       _buildBottomBar(l10n),
                     ],
@@ -234,30 +242,29 @@ class _SettingsPanelState extends State<SettingsPanel> {
   Widget _buildTab(int index) {
     return switch (index) {
       0 => GeneralTab(
-          key: const ValueKey(0),
-          currentLocale: _pendingLocale,
-          currentThemeIndex: _pendingThemeIndex,
-          onLocaleChanged: (code) =>
-              setState(() => _pendingLocale = code),
-          onThemeChanged: (idx) =>
-              setState(() => _pendingThemeIndex = idx),
-        ),
+        key: const ValueKey(0),
+        currentLocale: _pendingLocale,
+        currentThemeIndex: _pendingThemeIndex,
+        onLocaleChanged: (code) => setState(() => _pendingLocale = code),
+        onThemeChanged: (idx) => setState(() => _pendingThemeIndex = idx),
+      ),
       1 => EqualizerTab(key: const ValueKey(1), engine: widget.engine),
       2 => AudioTab(key: const ValueKey(2), engine: widget.engine),
       3 => VideoTab(
-          key: const ValueKey(3),
-          videoProcessing: widget.videoProcessing,
-        ),
+        key: const ValueKey(3),
+        videoProcessing: widget.videoProcessing,
+      ),
       4 => ShortcutsTab(
-          key: const ValueKey(4),
-          onShortcutsChanged: widget.onShortcutsChanged,
-        ),
+        key: const ValueKey(4),
+        onShortcutsChanged: widget.onShortcutsChanged,
+      ),
       5 => const AboutTab(key: ValueKey(5)),
+      6 => PerformanceTab(key: const ValueKey(6), engine: widget.engine),
       _ => GeneralTab(
-          key: const ValueKey(0),
-          currentLocale: _pendingLocale,
-          currentThemeIndex: _pendingThemeIndex,
-        ),
+        key: const ValueKey(0),
+        currentLocale: _pendingLocale,
+        currentThemeIndex: _pendingThemeIndex,
+      ),
     };
   }
 
@@ -381,6 +388,12 @@ class _Sidebar extends StatelessWidget {
             label: l10n.aboutTab,
             selected: selectedIndex == 5,
             onTap: () => onSelect(5),
+          ),
+          SettingsNavItem(
+            icon: Icons.speed,
+            label: l10n.performanceTab,
+            selected: selectedIndex == 6,
+            onTap: () => onSelect(6),
           ),
         ],
       ),

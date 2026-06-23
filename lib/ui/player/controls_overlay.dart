@@ -1,15 +1,34 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/engine/media_engine.dart';
-import '../../kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
-import '../widgets/osd_overlay.dart';
+import '../shared/osd_overlay.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
+import 'player_actions.dart';
+
+/// ValueNotifier 重建审计参考模式（02-02 审计结果）
+///
+/// 审计范围：ui/ 目录下所有 ValueListenableBuilder 实例
+/// 审计维度：child 缓存、notifier 合并、重建基线、不必要的监听
+///
+/// 结论：所有实例均已优化，无需修改。
+///
+/// - controls_overlay: child 缓存 Stack（静态子树）
+/// - control_bar: AnimatedBuilder + opacity child（D-13 模式）
+/// - progress_bar: MergedListenable（position+duration+buffered+drag），
+///   hover tooltip 无法缓存（依赖 hover 状态）
+/// - volume_controls: ValueListenableBuilder2 双 notifier，Slider 依赖 volume
+/// - speed_button: 箭头为 StatelessWidget 局部变量引用（不重建），中间段依赖 speed
+/// - playlist_panel: 内容依赖 _selectedTab，无法缓存
+/// - player_screen: playlistVisible 的 child 缓存 videoContent，
+///   emptyState 的 child 缓存 Positioned.fill(emptyState)
+///
+/// D-12 目标：child 缓存 + MergedListenable 已在位，定性分析支持现有优化。
 
 /// 控制栏容器 — 鼠标移动时显示，静止后自动隐藏
 ///
@@ -17,45 +36,23 @@ import 'error_banner.dart';
 /// ControlBar 按钮通过子 GestureDetector 优先赢得手势竞技场，不触发隐藏。
 class ControlsOverlay extends StatefulWidget {
   static const _clickDelayMs = 250; // 等待可能的双击
-  final MediaEngine engine;
+  final PlayerEngine engine;
+  final PlayerActions actions;
   final bool isFullscreen;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final VoidCallback? onTogglePlaylist;
-  final VoidCallback? onSettings;
-  final void Function(BuildContext context, TapUpDetails details)? onSettingsSecondary;
-  final VoidCallback? onOpenFile;
-  final VoidCallback? onToggleFullscreen;
-  final VoidCallback? onTogglePlayMode;
-  final VoidCallback? onOpenSubtitle;
-  final IconData? playModeIcon;
-
-  /// 播放模式名称（如"顺序播放"、"列表循环"）
-  final String? playModeLabel;
-
-  /// 是否为视频媒体（影响 prev/next 按钮的 tooltip）
-  final bool isVideo;
 
   /// 空状态存在时，控制栏不拦截 hit test（让下层 EmptyState 按钮可点击）
   final bool emptyStatePresent;
 
+  /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter
+  final ValueListenable<bool>? resizing;
+
   const ControlsOverlay({
     super.key,
     required this.engine,
+    this.actions = const PlayerActions(),
     this.isFullscreen = false,
-    this.onPrevious,
-    this.onNext,
-    this.onTogglePlaylist,
-    this.onSettings,
-    this.onSettingsSecondary,
-    this.onOpenFile,
-    this.onToggleFullscreen,
-    this.onTogglePlayMode,
-    this.onOpenSubtitle,
-    this.playModeIcon,
-    this.playModeLabel,
-    this.isVideo = false,
     this.emptyStatePresent = false,
+    this.resizing,
   });
 
   @override
@@ -63,7 +60,7 @@ class ControlsOverlay extends StatefulWidget {
 }
 
 class _ControlsOverlayState extends State<ControlsOverlay>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late final AutoHideController _autoHide;
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
@@ -78,13 +75,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       popupCloseNotifier: _popupCloseNotifier,
     );
     widget.engine.state.addListener(_onEngineStateChanged);
-    WindowBridge.I.interaction.addListener(_onInteractionChanged);
     _autoHide.init();
-  }
-
-  void _onInteractionChanged() {
-    _autoHide.resizing =
-        WindowBridge.I.interaction.value != WindowInteractionState.idle;
   }
 
   void _handleTap() {
@@ -101,7 +92,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
 
   void _handleDoubleTap() {
     _clickTimer?.cancel();
-    widget.onToggleFullscreen?.call();
+    widget.actions.onToggleFullscreen?.call();
   }
 
   void _onEngineStateChanged() => _autoHide.onEngineStateChanged();
@@ -117,7 +108,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
-    WindowBridge.I.interaction.removeListener(_onInteractionChanged);
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
     _autoHide.dispose();
@@ -147,41 +137,29 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             child: RepaintBoundary(
               child: Stack(
                 children: [
-                  Positioned(
+                  const Positioned(
                     bottom:
                         Tokens.controlBarMarginBottom +
                         Tokens.controlBarHeight +
                         12,
                     left: Tokens.controlBarMarginH,
                     right: Tokens.controlBarMarginH,
-                    child: const OsdOverlay(),
+                    child: OsdOverlay(),
                   ),
                   Positioned(
                     left: Tokens.controlBarMarginH,
                     right: Tokens.controlBarMarginH,
                     bottom: Tokens.controlBarMarginBottom,
-                    child: ValueListenableBuilder<bool>(
-                      valueListenable: _autoHide.visible,
-                      builder: (_, isVisible, _) => FadeTransition(
+                    child: FadeTransition(
+                      opacity: _autoHide.opacity,
+                      child: ControlBar(
+                        engine: widget.engine,
+                        actions: widget.actions,
+                        isFullscreen: widget.isFullscreen,
+                        isIdle: isIdle,
                         opacity: _autoHide.opacity,
-                        child: ControlBar(
-                          engine: widget.engine,
-                          isFullscreen: widget.isFullscreen,
-                          isIdle: isIdle,
-                          onPrevious: widget.onPrevious,
-                          onNext: widget.onNext,
-                          onTogglePlaylist: widget.onTogglePlaylist,
-                          onSettings: widget.onSettings,
-                          onSettingsSecondary: widget.onSettingsSecondary,
-                          onOpenFile: widget.onOpenFile,
-                          onToggleFullscreen: widget.onToggleFullscreen,
-                          onTogglePlayMode: widget.onTogglePlayMode,
-                          onOpenSubtitle: widget.onOpenSubtitle,
-                          playModeIcon: widget.playModeIcon,
-                          playModeLabel: widget.playModeLabel,
-                          isVideo: widget.isVideo,
-                          enableBlur: isVisible,
-                        ),
+                        enableBlur: _autoHide.visible.value,
+                        resizing: widget.resizing,
                       ),
                     ),
                   ),
@@ -192,10 +170,12 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         Tokens.controlBarMarginBottom +
                         Tokens.controlBarHeight +
                         8,
-                    child: ErrorBanner(
-                      engine: widget.engine,
-                      onOpenFile: widget.onOpenFile,
-                      onRetry: widget.onOpenFile,
+                    child: RepaintBoundary(
+                      child: ErrorBanner(
+                        engine: widget.engine,
+                        onOpenFile: widget.actions.onOpenFile,
+                        onRetry: widget.actions.onOpenFile,
+                      ),
                     ),
                   ),
                 ],
