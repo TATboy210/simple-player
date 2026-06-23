@@ -1,87 +1,129 @@
-# Requirements — Simple Player Flutter v1.2.1
+# Requirements: Simple Player — Cross-Platform Window Management
 
-**日期:** 2026-05-31
-**策略:** 窗口丝滑化（最高优先级）+ 架构精简 + HLS ABR
+**Defined:** 2026-06-23
+**Core Value:** Seamless, native-quality window management across Windows/Linux/macOS without regressions
 
-## v1.2.1 需求
+## v1 Requirements
 
-### 窗口丝滑化 (WIN)
+### Platform Abstraction
 
-- [ ] **WIN-05**: 窗口边框闪烁消除
-  - C++ `WM_NCCALCSIZE` 同步帧无边框处理（在 `HandleTopLevelWindowProc` 之前拦截）
-  - 保留 `WS_CAPTION` 以维持 DWM 动画能力
-  - 移除 Dart 端三重异步边框移除路径冲突
-  - 启动时零闪烁（窗口从第一帧起即为无边框）
-  - 文件: `windows/runner/flutter_window.cpp`, `windows/runner/win32_window.cpp`, `lib/main.dart`, `lib/app.dart`
-  - 风险: Flutter 引擎可能在自定义处理器之前消费 WM_NCCALCSIZE（需要 spike 验证）
+- [ ] **PLAT-01**: WindowBridge interface supports platform-specific implementations (Windows/Linux/macOS)
+- [ ] **PLAT-02**: Platform detection at startup selects correct WindowBridge implementation
+- [ ] **PLAT-03**: Platform capabilities are queryable (supportsRoundedCorners, supportsNativeFullscreen, etc.)
+- [ ] **PLAT-04**: Shared state model (WindowState) works identically across all platforms
 
-- [ ] **WIN-06**: Window 层精简
-  - 725 行 4 文件 → 更紧凑的实现
-  - 合并 `window_service.dart` + `window_bootstrap.dart` 冗余逻辑
-  - 移除已废弃的边框移除代码路径
-  - 文件: `lib/kernel/bridge/window_service.dart`, `lib/kernel/bridge/window_bootstrap.dart`, `windows/runner/win32_window.cpp`, `windows/runner/flutter_window.cpp`
+### Linux Window Management
 
-### 架构精简 (ARCH)
+- [ ] **LNX-01**: X11 window management via _NET_WM_STATE_FULLSCREEN and XChangeProperty
+- [ ] **LNX-02**: Wayland window management via xdg_toplevel_set_fullscreen
+- [ ] **LNX-03**: Runtime X11/Wayland detection and appropriate backend selection
+- [ ] **LNX-04**: Linux title bar (GTK header bar or custom frameless)
+- [ ] **LNX-05**: Linux window geometry persistence (position/size/state)
+- [ ] **LNX-06**: Linux always-on-top via _NET_WM_STATE_ABOVE
+- [ ] **LNX-07**: Linux minimize/maximize via EWMH hints
 
-- [ ] **ARCH-02**: SettingsStore 简化
-  - 25+ save 方法 → 通用 `_get<T>`/`_set<T>` 泛型模式
-  - 减少样板代码，统一存储接口
-  - 文件: `lib/kernel/persistence/settings_store.dart`
+### macOS Window Management
 
-- [ ] **ARCH-03**: 单例迁移
-  - 6 个 static mutable 单例 → 构造函数注入（DI）
-  - 接口定义 + 具体实现分离
-  - 提升可测试性，消除隐式全局状态
-  - 文件: 涉及 `WindowService`, `PlaybackController`, `SettingsStore`, `PlaylistStore`, `ThumbnailService`, `MediaEngine` 等
+- [ ] **MAC-01**: NSWindow-based fullscreen via toggleFullScreen: (native API)
+- [ ] **MAC-02**: macOS title bar (native NSWindow title bar or custom traffic lights)
+- [ ] **MAC-03**: macOS window geometry persistence (NSWindow frame autosave)
+- [ ] **MAC-04**: macOS always-on-top via NSWindow.level
+- [ ] **MAC-05**: macOS minimize via NSWindow.miniaturize
+- [ ] **MAC-06**: macOS HiDPI/Retina scaling support
+- [ ] **MAC-07**: macOS animation lock for fullscreen transitions (NSCondition)
 
-- [ ] **PLATFORM-03**: 平台抽象层
-  - 定义 `PlatformService` 抽象接口（窗口、系统、路径操作）
-  - `WindowsPlatformService` 委托现有 `WindowService`（不重写）
-  - 仅接口定义，不做 macOS/Linux 具体实现
-  - 文件: `lib/kernel/platform/` (新建)
+### Windows Enhancements
 
-### HLS 自适应码率 (HLS)
+- [ ] **WIN-01**: Preserve existing Win32 FFI fullscreen (WS_THICKFRAME removal)
+- [ ] **WIN-02**: Preserve existing DWM rounded corners + dark mode
+- [ ] **WIN-03**: Preserve existing DPI adaptation (PerMonitor V1)
+- [ ] **WIN-04**: Preserve existing DragToResizeArea edge resize
 
-- [ ] **HLS-01**: HLS ABR 流媒体支持
-  - 基于吞吐量的带宽估计（EWMA），非 BBA 算法
-  - URL 类型路由：`.m3u8` → ABR 配置，其他 → 低延迟配置
-  - `fflags +nobuffer` 仅应用于非 HLS URL
-  - MDK/FFmpeg 内置 `hls.c` demuxer 变体选择
-  - 文件: `lib/kernel/services/abr_service.dart` (新建), `lib/kernel/engine/fvp_engine.dart`
-  - 风险: MDK `MediaInfo` 是否暴露比特率/缓冲指标（需要 spike 验证）
+### Cross-Platform Features
 
-## 延后需求 (v1.3+)
+- [ ] **XP-01**: Unified keyboard shortcuts across all platforms (Space/F/M/N/P/O etc.)
+- [ ] **XP-02**: Cross-platform window geometry persistence (same SettingsStore API)
+- [ ] **XP-03**: Cross-platform fullscreen with atomic mutex guard (existing pattern)
+- [ ] **XP-04**: Cross-platform auto-hide title bar on fullscreen
+- [ ] **XP-05**: Cross-platform minimum window size enforcement
+- [ ] **XP-06**: Cross-platform window centering on first launch
 
-- **WIN-07**: 全屏平滑过渡动画 — 被 Flutter 引擎 `HandleTopLevelWindowProc` 拦截阻塞
-- **PLATFORM-02**: macOS/Linux 平台实现 — 当前仅需接口定义
-- **ARCH-01**: FvpEngine 拆分 — 需要引擎层详细报告
+### Architecture
 
-## 不在范围内
+- [ ] **ARCH-01**: Platform implementations behind WindowBridge abstraction (no platform code in UI)
+- [ ] **ARCH-02**: Each platform has its own bridge implementation file
+- [ ] **ARCH-03**: Factory pattern for platform bridge instantiation
+- [ ] **ARCH-04**: Existing v1 tests continue passing on Windows
 
-| 功能 | 原因 |
-|------|------|
-| 第三方窗口包 (window_manager) | 自建方案，完全控制 |
-| 移动平台 (iOS/Android) | 仅桌面端 |
-| 状态管理迁移 (Provider/Riverpod/Bloc) | ValueNotifier 保留 |
-| BBA 算法 | 桌面带宽稳定，吞吐量方案覆盖 80% 场景 |
-| macOS/Linux 平台实现 | v1.2.1 仅定义接口 |
+## v2 Requirements
 
-## 可追溯性
+### Advanced Platform Features
 
-| 需求 | Phase | 状态 | 来源 |
-|------|-------|------|------|
-| WIN-05 | Phase 13 | 待规划 | 用户请求 + 研究分析 |
-| WIN-06 | Phase 13 | 待规划 | 用户请求 |
-| ARCH-02 | Phase 15 | 待规划 | 用户请求 |
-| ARCH-03 | Phase 15 | 待规划 | 用户请求 |
-| PLATFORM-03 | Phase 15 | 待规划 | 用户请求 |
-| HLS-01 | Phase 14 | 待规划 | 用户请求 + 研究分析 |
+- **ADV-01**: Multi-monitor support (detect, move window, remember per-monitor settings)
+- **ADV-02**: Linux snap layouts (tiling window manager hints)
+- **ADV-03**: macOS Stage Manager integration
+- **ADV-04**: Windows snap layouts (Win11 snap assist)
+- **ADV-05**: Platform-specific gesture support (trackpad pinch-zoom, three-finger swipe)
 
-**覆盖率:**
-- v1.2.1 需求: 6 个
-- 已映射到 phase: 6
-- 未映射: 0 ✓
+### Media Engine Cross-Platform
+
+- **ENG-01**: fvp engine with Vulkan backend on Linux (instead of D3D11)
+- **ENG-02**: fvp engine with Metal/OpenGL backend on macOS
+- **ENG-03**: ARM-native fvp builds (Linux ARM64, macOS ARM64/Apple Silicon)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Exclusive fullscreen (ChangeDisplaySettingsEx) | Media players use borderless fullscreen; exclusive mode is gaming-specific |
+| Multi-monitor blanking (Kodi-style) | Niche feature, high complexity, low user demand |
+| Mobile platforms (Android/iOS) | Desktop-only player; different UI paradigm |
+| Wayland-only builds | Older distros still need X11; use runtime detection instead |
+| Custom window chrome on Linux (CSD) | GTK header bar or frameless sufficient; CSD adds complexity |
+| Window tiling WM integration (i3/sway) | WMs handle tiling; player just needs to respect WM hints |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PLAT-01 | Phase 1 | Pending |
+| PLAT-02 | Phase 1 | Pending |
+| PLAT-03 | Phase 1 | Pending |
+| PLAT-04 | Phase 1 | Pending |
+| ARCH-01 | Phase 1 | Pending |
+| ARCH-02 | Phase 1 | Pending |
+| ARCH-03 | Phase 1 | Pending |
+| ARCH-04 | Phase 1 | Pending |
+| WIN-01 | Phase 2 | Pending |
+| WIN-02 | Phase 2 | Pending |
+| WIN-03 | Phase 2 | Pending |
+| WIN-04 | Phase 2 | Pending |
+| XP-01 | Phase 2 | Pending |
+| XP-03 | Phase 2 | Pending |
+| XP-04 | Phase 2 | Pending |
+| XP-05 | Phase 2 | Pending |
+| XP-06 | Phase 2 | Pending |
+| LNX-01 | Phase 3 | Pending |
+| LNX-02 | Phase 3 | Pending |
+| LNX-03 | Phase 3 | Pending |
+| LNX-04 | Phase 3 | Pending |
+| LNX-05 | Phase 3 | Pending |
+| LNX-06 | Phase 3 | Pending |
+| LNX-07 | Phase 3 | Pending |
+| XP-02 | Phase 3 | Pending |
+| MAC-01 | Phase 4 | Pending |
+| MAC-02 | Phase 4 | Pending |
+| MAC-03 | Phase 4 | Pending |
+| MAC-04 | Phase 4 | Pending |
+| MAC-05 | Phase 4 | Pending |
+| MAC-06 | Phase 4 | Pending |
+| MAC-07 | Phase 4 | Pending |
+
+**Coverage:**
+- v1 requirements: 28 total
+- Mapped to phases: 28
+- Unmapped: 0 ✓
 
 ---
-*需求定义: 2026-05-31*
-*最后更新: 2026-05-31 after v1.2.1 milestone research*
+*Requirements defined: 2026-06-23*
+*Last updated: 2026-06-23 after initial definition*
