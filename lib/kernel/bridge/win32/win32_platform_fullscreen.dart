@@ -18,6 +18,7 @@ const int _wsVisible = 0x10000000;
 const int _hwndTop = 0;
 const int _swpFrameChanged = 0x0020;
 const int _swpNoZOrder = 0x0004;
+const int _swpNoActivate = 0x0010;
 
 // ─── Win32 函数签名 ───
 
@@ -130,7 +131,7 @@ class Win32PlatformFullscreen implements PlatformFullscreen {
       final screenW = rc.right - rc.left;
       final screenH = rc.bottom - rc.top;
       _setWindowPos(hwnd, _hwndTop, rc.left, rc.top, screenW, screenH,
-          _swpFrameChanged | _swpNoZOrder);
+          _swpFrameChanged | _swpNoZOrder | _swpNoActivate);
     } finally {
       calloc.free(mi);
     }
@@ -147,7 +148,11 @@ class Win32PlatformFullscreen implements PlatformFullscreen {
   void exit(FullscreenSnapshot snapshot) {
     final hwnd = _getHwnd();
 
-    // 先恢复位置和大小（含 WS_THICKFRAME 样式刷新）
+    // 1. 先恢复窗口样式（WS_THICKFRAME/WS_CAPTION），再设置位置大小。
+    //    反序会导致 SetWindowPos 使用全屏样式计算布局，恢复样式后窗口偏移。
+    _setWindowLongPtr(hwnd, _gwlStyle, snapshot.windowStyle);
+
+    // 2. 恢复位置和大小 + SWP_FRAMECHANGED 触发 WM_NCCALCSIZE 重算帧区域
     _setWindowPos(
         hwnd,
         _hwndTop,
@@ -155,10 +160,7 @@ class Win32PlatformFullscreen implements PlatformFullscreen {
         snapshot.position.dy.toInt(),
         snapshot.size.width.toInt(),
         snapshot.size.height.toInt(),
-        _swpFrameChanged | _swpNoZOrder);
-
-    // 恢复原始窗口样式
-    _setWindowLongPtr(hwnd, _gwlStyle, snapshot.windowStyle);
+        _swpFrameChanged | _swpNoZOrder | _swpNoActivate);
   }
 
   // ─── 工具方法 ───
