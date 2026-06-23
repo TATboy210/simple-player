@@ -1,24 +1,27 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-06-21
+**Analysis Date:** 2026-06-23
 
 ## Naming Patterns
 
 **Files:**
-- `snake_case.dart` for all Dart files (e.g., `playback_controller.dart`, `glass_container.dart`)
+- `snake_case.dart` for all Dart files (e.g., `playback_controller.dart`, `glass_container.dart`, `path_validator.dart`)
 - Private files prefixed with `_` (e.g., `_settings_nav_item.dart`)
-- Test files suffixed with `_test.dart` (e.g., `playlist_test.dart`)
+- Test files suffixed with `_test.dart` (e.g., `playlist_test.dart`, `path_validator_test.dart`)
 
 **Classes:**
 - `PascalCase` for classes, enums, typedefs (e.g., `PlaybackController`, `MediaState`, `GlassTier`)
-- Private classes prefixed with `_` (e.g., `_QuickMenuItem`, `_RotatingFileOutput`, `_ShortcutsHelpDialog`)
+- Private classes prefixed with `_` (e.g., `_QuickMenuItem`, `_RotatingFileOutput`, `_AppState`)
 - Abstract interfaces use `abstract class` (e.g., `abstract class PlayerEngine`)
 - Extensions use `PascalCase` descriptive names
 
+**Test Fakes:**
+- `Fake` prefix + interface name (e.g., `FakeEngine implements PlayerEngine`, `FakeWindowService implements WindowBridge`, `FakeWindowOps implements WindowOps`, `FakePlatformFullscreen implements PlatformFullscreen`)
+
 **Functions/Methods:**
-- `camelCase` for all functions and methods (e.g., `openAndPlay`, `togglePlayPause`)
-- Private methods prefixed with `_` (e.g., `_init`, `_buildVideoContent`, `_seek`)
-- Boolean getters use `is`/`has`/`can` prefixes (e.g., `isEmpty`, `hasNext`, `isUrl`, `isAllowedMedia`)
+- `camelCase` for all functions and methods (e.g., `openAndPlay`, `togglePlayPause`, `isAllowedMedia`)
+- Private methods prefixed with `_` (e.g., `_init`, `_buildVideoContent`, `_poll`, `_sanitizeDimension`)
+- Boolean getters use `is`/`has`/`can` prefixes (e.g., `isEmpty`, `hasNext`, `isUrl`, `isAllowedMedia`, `_isIconOnly`)
 - Named constructors use `camelCase` (e.g., `GlassButton.iconOnly`)
 
 **Variables:**
@@ -32,14 +35,15 @@ static const bgBase = Color(0xFF0A0A0F);
 static const fontTitle = 18.0;
 static const durationFast = 80;
 
-// Class-level constants
+// Class-level private constants
 static const _prepareTimeoutSeconds = 10;
 static const _defaultSkipSeconds = 10;
+static const _networkTimeoutMs = 10000;
 ```
 
 **Enums:**
-- `PascalCase` for enum type name (e.g., `MediaState`, `PlayMode`, `GlassTier`)
-- `camelCase` for enum values (e.g., `idle`, `loopAll`, `pathEmpty`)
+- `PascalCase` for enum type name (e.g., `MediaState`, `PlayMode`, `GlassTier`, `PlayerErrorCode`)
+- `camelCase` for enum values (e.g., `idle`, `loopAll`, `pathEmpty`, `thin`)
 - Enum values documented with `///` comments:
 
 ```dart
@@ -57,6 +61,7 @@ enum MediaState {
 - `dart format` for all `.dart` files
 - Line length: 80 characters (dart format default)
 - Trailing commas on multi-line argument/parameter lists to improve diffs
+- 2-space indentation
 
 **Linting (analysis_options.yaml):**
 - Base: `package:flutter_lints/flutter.yaml`
@@ -255,7 +260,6 @@ void _guardedAction(String name, void Function() action) {
     action();
   } on Exception catch (e) {
     log.e('FvpEngine.$name error: $e');
-    _errorType = MediaErrorType.playback;
     errorMessage.value = '$name failed: $e';
   }
 }
@@ -327,8 +331,7 @@ class PlaybackController {
 // fire-and-forget: 预热 MDK 引擎（FFmpeg codec 注册 + D3D11 上下文）
 unawaited(EnginePrewarm.prewarm(...));
 
-// 延迟卸载，等待淡出动画完成
-Future.delayed(const Duration(milliseconds: Tokens.durationSlide), () { ... });
+// seek 期间暂停轮询，防止旧位置覆盖 seek 目标
 ```
 
 **Design decision comments:** Reference decision IDs:
@@ -350,20 +353,15 @@ ValueListenableBuilder<MediaState>(
 )
 ```
 
-**Pattern: Nested ValueListenableBuilders for multiple notifiers:**
+**Pattern: AnimatedBuilder for multi-notifier rebuilds:**
 ```dart
-ValueListenableBuilder<bool>(
-  valueListenable: windowService.isFullscreen,
-  builder: (context, isFullscreen, child) =>
-      ValueListenableBuilder<bool>(
-        valueListenable: windowService.isMaximized,
-        builder: (context, isMaximized, child) {
-          final noResize = isFullscreen || isMaximized;
-          return DragToResizeArea(resizeEdgeSize: noResize ? 0 : 6, ...);
-        },
-        child: child,
-      ),
-  child: child,
+AnimatedBuilder(
+  animation: Listenable.merge([engine.textureId, engine.aspectRatio]),
+  builder: (_, _) {
+    final id = engine.textureId.value;
+    final ratio = engine.aspectRatio.value;
+    return SizedBox.expand(child: Texture(textureId: id));
+  },
 )
 ```
 
@@ -376,7 +374,7 @@ ValueListenableBuilder<bool>(
 **Pattern: StatefulWidget with private State:**
 ```dart
 class PlayerScreen extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
   const PlayerScreen({super.key, required this.engine, ...});
 
   @override
@@ -448,6 +446,21 @@ class PlaybackController {
 }
 ```
 
+**WindowService composition pattern:**
+```dart
+class WindowService with WindowListener implements WindowBridge {
+  final WindowState _state = WindowState();
+  final WindowPersistence _persistence = WindowPersistence();
+  FullscreenController? _fullscreenCtrl;
+
+  // Delegate to components
+  @override
+  ValueNotifier<WindowMode> get mode => _state.mode;
+  @override
+  ValueNotifier<Size> get windowSize => _state.windowSize;
+}
+```
+
 **Singleton pattern with `I` getter:**
 ```dart
 class LocaleService {
@@ -497,6 +510,7 @@ await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
 - `player_engine.dart` exports `PlayerEngine` abstract class
 - `playback_controller.dart` exports `PlaybackController`
 - `glass_container.dart` exports `GlassContainer`, `GlassTier`, `GlassButton`
+- `startup_coordinator.dart` re-exports `startup_state.dart`
 
 **No barrel files:** Each import references the specific file
 
@@ -546,6 +560,25 @@ ValueListenableBuilder<bool>(
 )
 ```
 
+**Dispose pattern:** Always dispose ValueNotifiers:
+```dart
+@override
+void dispose() {
+  engine.dispose();
+  super.dispose();
+}
+```
+
+## File Size Limits
+
+**Target:** < 500 lines per file. Current largest non-generated files:
+- `lib/kernel/engine/fvp_engine.dart`: 724 lines (over limit, but complex engine wrapper)
+- `lib/kernel/persistence/settings_store.dart`: 439 lines
+- `lib/ui/dialogs/settings_panel.dart`: 402 lines
+- `lib/ui/shared/aurora_background.dart`: 362 lines
+
+**Generated files exempt:** `lib/l10n/app_localizations.dart` (1022 lines) is auto-generated.
+
 ## Commit Format
 
 Conventional Commits: `<type>: <description>`
@@ -564,4 +597,4 @@ perf: skip BackdropFilter when opacity < 0.01
 
 ---
 
-*Convention analysis: 2026-06-21*
+*Convention analysis: 2026-06-23*

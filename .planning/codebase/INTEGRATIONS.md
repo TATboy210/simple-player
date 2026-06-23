@@ -1,40 +1,55 @@
 # External Integrations
 
-**Analysis Date:** 2026-06-21
+**Analysis Date:** 2026/06/23
 
 ## APIs & External Services
 
 **Media Engine (fvp/MDK):**
 - fvp (MDK/FFmpeg) — Video playback, decoding, rendering
-  - SDK/Client: `fvp` package 0.36.2 — `pubspec.yaml:14`
+  - SDK/Client: `fvp` package ^0.37.2 — `pubspec.yaml:16`
   - Interface: `PlayerEngine` abstract class — `package:player_engine/player_engine.dart` (local dependency at `../widget_tree_flutter/player_engine`)
   - Implementation: `FvpEngine` — `lib/kernel/engine/fvp_engine.dart`
   - Helpers:
     - `FvpCallbackHandler` — mdk callback registration, state mapping, main-thread dispatch (`lib/kernel/engine/fvp_callback_handler.dart`)
-    - `PositionPoller` — Adaptive timer-based position polling (250ms steady, 100ms post-seek) (`lib/kernel/engine/position_poller.dart`)
+    - `PositionPoller` — Timer-based position polling (250ms steady) (`lib/kernel/engine/position_poller.dart`)
     - `TrackManager` — Audio/subtitle track selection and switching (`lib/kernel/engine/track_manager.dart`)
+    - `MediaOpener` — Media file opening logic (`lib/kernel/engine/media_opener.dart`)
+    - `D3d11Configurator` — D3D11 rendering pipeline configuration (`lib/kernel/engine/d3d11_configurator.dart`)
+    - `NetworkConfigurator` — Network stream parameters (`lib/kernel/engine/network_configurator.dart`)
+    - `VideoEffectController` — Video effects (brightness, contrast, hue, saturation) (`lib/kernel/engine/video_effect_controller.dart`)
+    - `VolumeController` — Volume and mute control (`lib/kernel/engine/volume_controller.dart`)
+    - `SubtitleConfigurator` — External subtitle and delay settings (`lib/kernel/engine/subtitle_configurator.dart`)
   - Auth: N/A (local playback + optional URL streams)
   - Network protocols: HTTP/HTTPS, RTSP, RTMP, SRT, UDP/TCP (with per-protocol low-latency config in `FvpEngine._configureNetworkOptions()`)
 
 **Window Management:**
-- window_manager 0.5.1 — Cross-platform window control
-  - SDK/Client: `window_manager` package — `pubspec.yaml:25`
+- window_manager ^0.5.1 — Cross-platform window control
+  - SDK/Client: `window_manager` package — `pubspec.yaml:27`
   - Wrapper: `WindowService` — `lib/kernel/bridge/window_service.dart`
   - Events: `WindowListener` mixin for maximize/unmaximize/resize/close
-  - Commands: setFullscreen, setAlwaysOnTop, minimize, maximize, restore, close, startDragging
+  - Commands: setMode (fullscreen/maximized/windowed/minimized), setAlwaysOnTop, minimize, close, startDragging
   - Geometry persistence: `_saveGeometry()` writes position + size + maximized state to `SettingsStore`
+  - Components:
+    - `WindowState` — State container (mode, windowSize, isResizing, isAlwaysOnTop) (`lib/kernel/bridge/window_state.dart`)
+    - `FullscreenController` — Atomic fullscreen + mutex + rollback (`lib/kernel/bridge/fullscreen_controller.dart`)
+    - `WindowPersistence` — Debounced geometry persistence (`lib/kernel/bridge/window_persistence.dart`)
+    - `WindowBridge` — Abstract interface for UI layer dependency (`lib/kernel/bridge/window_bridge.dart`)
 
-- flutter_fullscreen 1.2.0 — Native fullscreen toggle
-  - SDK/Client: `flutter_fullscreen` package — `pubspec.yaml:16`
-  - Usage: `FullScreen.ensureInitialized()` in `main()`, `FullScreen.setFullScreen()` in `WindowService`
-  - State sync: `WindowService.isFullscreen` ValueNotifier mirrors `FullScreen.isFullScreen`
+**Win32 FFI (Fullscreen):**
+- `Win32PlatformFullscreen` — Direct Win32 API calls for fullscreen control
+  - File: `lib/kernel/bridge/win32/win32_platform_fullscreen.dart`
+  - DLL: `user32.dll` (DynamicLibrary.open)
+  - Functions: `FindWindowW`, `GetWindowLongPtrW`, `SetWindowLongPtrW`, `SetWindowPos`, `GetSystemMetrics`
+  - Purpose: Bypasses `window_manager.setFullScreen()` to properly handle WS_THICKFRAME (eliminates 7px border gap)
+  - Interface: `PlatformFullscreen` — `lib/kernel/bridge/platform_fullscreen.dart`
+  - Snapshot: `FullscreenSnapshot` — Immutable value object for rollback on failure
 
 ## Data Storage
 
 **Key-Value Persistence (SharedPreferences):**
 - SharedPreferences — App settings storage
   - Connection: Platform-specific (Windows Registry)
-  - Client: `shared_preferences` 2.5.5 — `pubspec.yaml:17`
+  - Client: `shared_preferences` ^2.5.5 — `pubspec.yaml:19`
   - Wrapper: `SettingsStore` — `lib/kernel/persistence/settings_store.dart`
   - Prewarm: `SettingsStore.prewarm()` caches instance in `main()` before `runApp()` to avoid repeated `getInstance()` I/O
   - Keys (~25): volume, lastFile, windowWidth/Height/X/Y, playMode, isMuted, isFullscreen, isAlwaysOnTop, isMaximized, subtitleFontSize/ColorIndex/BottomOffset, videoBrightness/Contrast/Saturation/Hue/Rotation/AspectRatio/Deinterlace, d3d11Sync, hardwareDecoding, locale, themeIndex, shortcuts
@@ -43,7 +58,7 @@
 
 **JSON File Storage (Playlist):**
 - Playlist persistence — Application support directory
-  - Client: `path_provider` 2.1.5 — `pubspec.yaml:15`
+  - Client: `path_provider` ^2.1.5 — `pubspec.yaml:17`
   - Location: `%APPDATA%/SimplePlayer/` (via `getApplicationSupportDirectory()`)
   - Files: `playlist.json`
   - Implementation: `PlaylistStore` — `lib/kernel/persistence/playlist_store.dart`
@@ -51,8 +66,8 @@
 
 **File Storage:**
 - Local filesystem — Media files (read-only access)
-  - Open dialog: `file_picker` 11.0.2 — `pubspec.yaml:16`
-  - Drag-and-drop: `desktop_drop` 0.7.1 — `pubspec.yaml:18`
+  - Open dialog: `file_picker` ^11.0.2 — `pubspec.yaml:18`
+  - Drag-and-drop: `desktop_drop` ^0.7.1 — `pubspec.yaml:20`
   - Scanner: `FolderScanner` — `lib/kernel/scanner/folder_scanner.dart`
   - Supported formats: mp4, mkv, avi, mov, wmv, flv, webm, m4v, ts, rmvb, mpg, mpeg, 3gp, vob
 
@@ -91,11 +106,13 @@
 - `windows/runner/main.cpp` — Win32 message loop (`GetMessage`/`TranslateMessage`/`DispatchMessage`), COM initialization (`CoInitializeEx` with `COINIT_APARTMENTTHREADED`)
 - `windows/runner/flutter_window.cpp` — Flutter view hosting, plugin registration, `WM_FONTCHANGE` handling
 - `windows/runner/win32_window.cpp` — Win32 window class registration, DPI scaling, window creation
+- `windows/runner/win32_window.h` — Win32Window class definition with `Create`, `Show`, `Destroy`, `SetChildContent`, `GetHandle`, `SetQuitOnClose`, `GetClientArea`
 
 **Key Details:**
 - Window visibility managed by `window_manager` Flutter plugin via `waitUntilReadyToShow` — C++ runner does NOT call `Show()` directly
 - COM required for plugin system
 - Build: CMake 3.14+, C++17, MSVC `/W4 /WX`, Unicode (`-DUNICODE -D_UNICODE`), UTF-8 source (`/utf-8`)
+- Linker: `dwmapi.lib` (Desktop Window Manager API)
 
 ## Localization (l10n)
 
@@ -126,7 +143,7 @@
 ## Logging
 
 **Framework:**
-- `logger` 2.7.0 — `pubspec.yaml:19`
+- `logger` ^2.5.0 — `pubspec.yaml:21`
 - Implementation: `lib/kernel/utils/log.dart`
 
 **Module-Scoped Loggers:**
@@ -142,7 +159,6 @@
   - File location: `%APPDATA%/SimplePlayer/logs/app_<timestamp>.log`
   - Rotation: 2 MB max per file, keep 5 archives
   - Filter: `ProductionFilter` (warning+ level only)
-  - Custom `_RotatingFileOutput` class handles size-based rotation
 
 ## Startup Coordination
 
@@ -155,8 +171,9 @@
 **Pre-warming:**
 - `EnginePrewarm` — `lib/kernel/engine/engine_prewarm.dart`
   - Creates temporary `mdk.Player()` to trigger FFmpeg codec registration + D3D11 context initialization
-  - Fire-and-forget in `main()` — `lib/main.dart:38-42`
+  - Fire-and-forget in `main()` — `lib/main.dart:29-35`
   - Idempotent: Safe to call multiple times (boolean guard)
+  - Tier model: playerCreated, codecsReady, gpuReady, prewarmed
 - `SettingsStore.prewarm()` — `lib/kernel/persistence/settings_store.dart:26`
   - Caches `SharedPreferences` instance before `runApp()` to avoid repeated platform I/O
 
@@ -198,16 +215,6 @@
 **CI Pipeline:**
 - Not configured — manual build via `flutter build windows`
 
-**Build Commands:**
-```bash
-flutter pub get                              # Install dependencies
-flutter run -d windows                       # Development run
-flutter analyze                              # Static analysis
-flutter test                                 # Run unit/widget tests
-flutter build windows                        # Release build
-dart run build_runner build --delete-conflicting-outputs  # Code generation
-```
-
 ---
 
-*Integration audit: 2026-06-21*
+*Integration audit: 2026/06/23*

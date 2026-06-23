@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-06-21
+**Analysis Date:** 2026-06-23
 
 ## Framework
 
@@ -33,10 +33,11 @@ test/
 ├── golden/
 │   ├── control_layouts_golden_test.dart      # ControlBar/ProgressBar/Volume goldens
 │   ├── glass_widgets_golden_test.dart        # GlassContainer/Button goldens
-│   └── golden_comparator.dart                # TolerantGoldenComparator helper
+│   ├── golden_comparator.dart                # TolerantGoldenComparator helper
+│   └── goldens/                              # Golden file storage
 ├── helpers/
 │   ├── fake_engine.dart                      # FakeEngine (implements PlayerEngine)
-│   ├── fake_window_service.dart              # FakeWindowService (extends WindowService)
+│   ├── fake_window_service.dart              # FakeWindowService (implements WindowBridge)
 │   └── integration_helpers.dart              # buildTestApp(), createTestController()
 ├── integration/
 │   ├── controls_flow_test.dart               # Controls interaction flow
@@ -44,8 +45,7 @@ test/
 │   └── playlist_flow_test.dart               # Playlist operations flow
 ├── kernel/
 │   ├── bridge/
-│   │   ├── display_config_test.dart          # DisplayConfig
-│   │   └── window_bootstrap_test.dart        # WindowBootstrap
+│   │   └── display_config_test.dart          # DisplayConfig
 │   ├── engine/
 │   │   ├── engine_prewarm_test.dart          # EnginePrewarm
 │   │   ├── fvp_callback_handler_test.dart    # FvpCallbackHandler
@@ -59,14 +59,14 @@ test/
 │   │   └── video_processing_state_test.dart  # VideoProcessingState
 │   ├── persistence/
 │   │   ├── playlist_store_test.dart          # PlaylistStore
-│   │   └── settings_store_test.dart          # SettingsStore
+│   │   └── settings_store_test.dart          # SettingsStore (676 lines, comprehensive)
 │   ├── playlist/
-│   │   └── playlist_test.dart                # Playlist (comprehensive, 392 lines)
+│   │   └── playlist_test.dart                # Playlist (392 lines, all operations)
 │   ├── services/
 │   │   ├── external_subtitle_test.dart       # ExternalSubtitle
 │   │   ├── file_operations_test.dart         # FileOperations
-│   │   ├── path_validator_test.dart          # PathValidator
-│   │   ├── playback_controller_test.dart     # PlaybackController (343 lines)
+│   │   ├── path_validator_test.dart          # PathValidator (165 lines, security tests)
+│   │   ├── playback_controller_test.dart     # PlaybackController (342 lines)
 │   │   ├── playback_navigator_test.dart      # PlaybackNavigator
 │   │   ├── state_monitor_test.dart           # StateMonitor
 │   │   ├── thumbnail_service_test.dart       # ThumbnailService
@@ -81,30 +81,42 @@ test/
 │       ├── perf_monitor_test.dart            # PerfMonitor
 │       └── time_utils_test.dart              # formatMs
 ├── perf/
-│   └── control_bar_perf_test.dart            # Rebuild profiling (324 lines)
+│   └── control_bar_perf_test.dart            # Rebuild profiling (337 lines)
 ├── unit/
-│   ├── kernel/engine/
-│   │   └── media_engine_extension_test.dart  # MediaEngine extension
+│   ├── bridge/
+│   │   ├── fullscreen_controller_test.dart   # FullscreenController (184 lines)
+│   │   ├── window_mode_test.dart             # WindowMode enum
+│   │   ├── window_persistence_test.dart      # WindowPersistence
+│   │   └── window_state_test.dart            # WindowState
+│   ├── kernel/
+│   │   ├── bridge/
+│   │   │   └── window_service_test.dart      # WindowService
+│   │   ├── engine/
+│   │   │   └── media_engine_extension_test.dart # MediaEngine extension
+│   │   └── utils/
+│   │       ├── log_test.dart                 # Logger (unit variant)
+│   │       └── memory_monitor_test.dart      # MemoryMonitor
 │   └── perf/
 │       └── startup_parallel_init_test.dart   # Startup parallel init
 └── widget/
     ├── player/
-    │   ├── auto_hide_controller_test.dart    # AutoHideController
-    │   ├── control_bar_test.dart             # ControlBar widget
+    │   ├── auto_hide_controller_test.dart    # AutoHideController (474 lines)
+    │   ├── control_bar_test.dart             # ControlBar widget (188 lines)
     │   ├── controls_overlay_test.dart        # ControlsOverlay widget
     │   ├── error_banner_test.dart            # ErrorBanner widget
     │   ├── osd_overlay_test.dart             # OsdOverlay widget
-    │   ├── progress_bar_test.dart            # ProgressBar widget
+    │   ├── progress_bar_test.dart            # ProgressBar widget (499 lines)
     │   ├── speed_button_test.dart            # SpeedButton widget
     │   ├── video_surface_test.dart           # VideoSurface widget
     │   └── volume_controls_test.dart         # VolumeControls widget
     └── shared/
+        ├── aurora_background_test.dart       # AuroraBackground widget
         ├── glass_button_test.dart            # GlassButton widget
         ├── glass_chip_test.dart              # GlassChip widget
-        └── glass_container_test.dart         # GlassContainer widget
+        └── glass_container_test.dart         # GlassContainer widget (139 lines)
 ```
 
-**Total: 50+ test files**
+**Total: 61 test files**
 
 ## Test Types
 
@@ -136,7 +148,7 @@ test/
 ## FakeEngine Pattern
 
 **File:** `test/helpers/fake_engine.dart`
-**Purpose:** Implements `PlayerEngine` without FFI dependency — runs purely in Dart
+**Purpose:** Implements `PlayerEngine` without FFI dependency -- runs purely in Dart
 
 ### Key Features
 ```dart
@@ -195,24 +207,25 @@ test('opens file and starts playback', () async {
 ## FakeWindowService Pattern
 
 **File:** `test/helpers/fake_window_service.dart`
-**Purpose:** Test double for WindowService — no FFI, no window_manager
+**Purpose:** Test double for WindowBridge -- no FFI, no window_manager
 
 ```dart
-class FakeWindowService extends WindowService {
-  int fullscreenCallCount = 0;
-  bool? lastFullscreenValue;
-  int maximizeCallCount = 0;
+class FakeWindowService implements WindowBridge {
+  // Call tracking
+  int modeCallCount = 0;
+  WindowMode? lastModeValue;
+  int alwaysOnTopCallCount = 0;
+  int minimizeCallCount = 0;
+  int closeCallCount = 0;
+  int startDraggingCallCount = 0;
 
-  @override
-  Future<void> init() async { /* No-op */ }
+  // ValueNotifiers
+  final ValueNotifier<WindowMode> mode = ValueNotifier(WindowMode.windowed);
+  final ValueNotifier<Size> windowSize = ValueNotifier(const Size(1280, 720));
+  final ValueNotifier<bool> isResizing = ValueNotifier(false);
+  final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
-  @override
-  Future<void> setFullscreen(bool value) async {
-    fullscreenCallCount++;
-    lastFullscreenValue = value;
-    isFullscreen.value = value;
-  }
-  // ... all methods are no-op stubs with call tracking
+  // All methods are no-op stubs with call tracking
 }
 ```
 
@@ -331,7 +344,7 @@ testWidgets('blurEnabled=false skips BackdropFilter', (tester) async { ... });
 
 ## Mocking Patterns
 
-**No mockito — hand-written fakes only:**
+**No mockito -- hand-written fakes only:**
 
 ```dart
 // FakeEngine — implements PlayerEngine interface
@@ -356,15 +369,18 @@ class FakeEngine implements PlayerEngine {
 ```
 
 **What to Fake:**
-- `PlayerEngine` → `FakeEngine` (FFI boundary)
-- `WindowService` → `FakeWindowService` (Win32 boundary)
-- `SharedPreferences` → `SharedPreferences.setMockInitialValues({})`
+- `PlayerEngine` -> `FakeEngine` (FFI boundary)
+- `WindowBridge` -> `FakeWindowService` (Win32 boundary)
+- `WindowOps` -> `FakeWindowOps` (platform operations)
+- `PlatformFullscreen` -> `FakePlatformFullscreen` (fullscreen enter/exit)
+- `SharedPreferences` -> `SharedPreferences.setMockInitialValues({})`
 
 **What NOT to Fake:**
-- `Playlist` — pure Dart, use real implementation
-- `PlaybackController` — use real with FakeEngine
-- `PathValidator` — pure Dart, use real
-- Models (`MediaState`, `PlayMode`, etc.) — use real
+- `Playlist` -- pure Dart, use real implementation
+- `PlaybackController` -- use real with FakeEngine
+- `PathValidator` -- pure Dart, use real
+- `WindowState` -- pure Dart, use real
+- Models (`MediaState`, `PlayMode`, etc.) -- use real
 
 ## Golden Tests
 
@@ -570,11 +586,30 @@ testWidgets('hides secondary controls at width < 500', (tester) async {
 });
 ```
 
+**Pattern: ValueNotifier manipulation in widget tests:**
+```dart
+testWidgets('opacity near zero skips BackdropFilter', (tester) async {
+  final opacity = ValueNotifier<double>(0.0);
+  await tester.pumpWidget(buildSubject(opacity: opacity));
+  await tester.pump();
+  expect(find.text('test'), findsOneWidget);
+  opacity.dispose();
+});
+
+testWidgets('resizing=true skips BackdropFilter', (tester) async {
+  final resizing = ValueNotifier<bool>(true);
+  await tester.pumpWidget(buildSubject(resizing: resizing));
+  await tester.pump();
+  expect(find.byType(BackdropFilter), findsNothing);
+  resizing.dispose();
+});
+```
+
 ## Coverage
 
 | Metric | Value |
 |--------|-------|
-| Test files | 50+ |
+| Test files | 61 |
 | Test types | Unit, Widget, Golden, Integration, Performance |
 | Target | 80% |
 | Enforcement | None (no CI threshold) |
@@ -590,25 +625,30 @@ flutter test --coverage
 **High Risk (not tested):**
 | Component | File | Risk |
 |-----------|------|------|
-| FvpEngine (full) | `lib/kernel/engine/fvp_engine.dart` | FFI boundary |
-| PlayerScreen | `lib/ui/player/player_screen.dart` | Complex composition |
-| PlaylistPanel | `lib/ui/playlist/playlist_panel.dart` | Complex UI |
-| SettingsPanel | `lib/ui/dialogs/settings_panel.dart` | Complex UI |
+| FvpEngine (full) | `lib/kernel/engine/fvp_engine.dart` | FFI boundary, 724 lines |
+| PlayerScreen | `lib/ui/player/player_screen.dart` | Complex composition, 338 lines |
+| PlaylistPanel | `lib/ui/playlist/playlist_panel.dart` | Complex UI, 358 lines |
+| SettingsPanel | `lib/ui/dialogs/settings_panel.dart` | Complex UI, 402 lines |
 | KeyboardHandler | `lib/ui/player/keyboard_handler.dart` | 20+ key bindings |
-| CustomTitleBar | `lib/ui/player/custom_title_bar.dart` | Win32 integration |
+| CustomTitleBar | `lib/ui/window/custom_title_bar.dart` | Win32 integration |
 | FolderScanner | `lib/kernel/scanner/folder_scanner.dart` | File system |
+| DropHandler | `lib/ui/player/drop_handler.dart` | Drag-and-drop |
+| AppDialog | `lib/ui/shared/app_dialog.dart` | Dialog composition |
 
 **Medium Risk (basic coverage):**
 | Component | File | Gap |
 |-----------|------|-----|
 | PositionPoller | `lib/kernel/engine/position_poller.dart` | API surface only |
 | StartupCoordinator | `lib/kernel/startup/startup_coordinator.dart` | State machine |
+| WindowService | `lib/kernel/bridge/window_service.dart` | Integration test missing |
 
 **Low Risk (acceptable gaps):**
 | Component | File | Reason |
 |-----------|------|--------|
 | AuroraBackground | `lib/ui/shared/aurora_background.dart` | Visual only |
 | Localization | `lib/l10n/` | Generated code |
+| SplashScreen | `lib/ui/shared/splash_screen.dart` | Visual only |
+| ProgressSplashScreen | `lib/ui/shared/progress_splash_screen.dart` | Visual only |
 
 ## What Is Tested (Comprehensive)
 
@@ -616,19 +656,23 @@ flutter test --coverage
 |-------|-----------|-----------|
 | kernel/models | PlaylistItem, MediaInfo, PlayerError, MediaState | `test/kernel/models/*` |
 | kernel/playlist | Playlist (392 lines, all operations) | `test/kernel/playlist/playlist_test.dart` |
-| kernel/utils | PathUtils, TimeUtils, PerfMonitor, Log | `test/kernel/utils/*` |
-| kernel/persistence | PlaylistStore, SettingsStore | `test/kernel/persistence/*` |
+| kernel/utils | PathUtils, TimeUtils, PerfMonitor, Log, MemoryMonitor | `test/kernel/utils/*`, `test/unit/kernel/utils/*` |
+| kernel/persistence | PlaylistStore, SettingsStore (676 lines) | `test/kernel/persistence/*` |
 | kernel/services | PathValidator, ThumbnailService | `test/kernel/services/*` |
 | kernel/engine | FvpCallbackHandler, TrackManager, EnginePrewarm | `test/kernel/engine/*` |
-| kernel/bridge | DisplayConfig, WindowBootstrap | `test/kernel/bridge/*` |
-| features/services | PlaybackController (343 lines), PlaybackNavigator, FileOperations | `test/kernel/services/*` |
+| kernel/bridge | DisplayConfig, WindowMode, WindowState, WindowPersistence | `test/kernel/bridge/*`, `test/unit/bridge/*` |
+| kernel/bridge | FullscreenController (184 lines, FakeWindowOps + FakePlatformFullscreen) | `test/unit/bridge/fullscreen_controller_test.dart` |
+| kernel/bridge | WindowService | `test/unit/kernel/bridge/window_service_test.dart` |
+| kernel/startup | StartupCoordinator, StartupState | `test/kernel/startup/*` |
+| features/services | PlaybackController (342 lines), PlaybackNavigator, FileOperations | `test/kernel/services/*` |
 | features/services | StateMonitor, VideoProcessingService, SubtitleService | `test/kernel/services/*`, `test/features/*` |
 | ui/player | AutoHideController, VolumeControls, OsdOverlay, SpeedButton | `test/widget/player/*` |
 | ui/player | ControlBar, ControlsOverlay, ProgressBar, ErrorBanner | `test/widget/player/*` |
-| ui/shared | GlassContainer, GlassButton, GlassChip | `test/widget/shared/*` |
+| ui/player | VideoSurface | `test/widget/player/video_surface_test.dart` |
+| ui/shared | GlassContainer, GlassButton, GlassChip, AuroraBackground | `test/widget/shared/*` |
 | golden | ControlBar, ProgressBar, VolumeControls, GlassContainer | `test/golden/*` |
 | perf | Rebuild profiling, BackdropFilter optimization | `test/perf/*` |
 
 ---
 
-*Testing analysis: 2026-06-21*
+*Testing analysis: 2026-06-23*
