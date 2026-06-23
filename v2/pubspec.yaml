@@ -1,0 +1,23 @@
+name: simple_player_v2
+description: "Simple Player v2 — mpv-powered, plugin-extensible media player"
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  path: ^1.9.1
+  ffi: ^2.1.0
+  window_manager: ^0.5.1
+  flutter_fullscreen: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

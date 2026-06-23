@@ -1,16 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
-import 'package:simple_player_flutter/kernel/models/media_error_type.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
-import 'package:simple_player_flutter/kernel/models/media_info.dart';
-import 'package:simple_player_flutter/kernel/models/video_effect_type.dart';
+import 'package:player_engine/player_engine.dart';
 
-/// Hand-written Fake implementing MediaEngine for testing.
+/// Hand-written Fake implementing PlayerEngine for testing.
 ///
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
-class FakeEngine implements MediaEngine {
+class FakeEngine implements PlayerEngine {
   bool _disposed = false;
 
   // ─── ValueNotifier fields (defaults match FvpEngine) ───
@@ -181,13 +177,13 @@ class FakeEngine implements MediaEngine {
   }
 
   @override
-  void skipForward([int seconds = 10]) {
-    seekTo((position.value + seconds * 1000).clamp(0, duration.value));
+  void skipForward([int ms = 10000]) {
+    seekTo((position.value + ms).clamp(0, duration.value));
   }
 
   @override
-  void skipBack([int seconds = 10]) {
-    seekTo((position.value - seconds * 1000).clamp(0, duration.value));
+  void skipBack([int ms = 10000]) {
+    seekTo((position.value - ms).clamp(0, duration.value));
   }
 
   // ─── AB loop / range ───
@@ -295,6 +291,28 @@ class FakeEngine implements MediaEngine {
     if (_disposed) return;
     setDeinterlaceCallCount++;
     lastDeinterlaceValue = enable;
+  }
+
+  // ─── D3D11 Performance ───
+
+  int setD3d11SyncEnabledCallCount = 0;
+  bool? lastD3d11SyncEnabled;
+
+  @override
+  void setD3d11SyncEnabled(bool enabled) {
+    if (_disposed) return;
+    setD3d11SyncEnabledCallCount++;
+    lastD3d11SyncEnabled = enabled;
+  }
+
+  int setHardwareDecodingCallCount = 0;
+  bool? lastHardwareDecodingEnabled;
+
+  @override
+  void setHardwareDecoding(bool enabled) {
+    if (_disposed) return;
+    setHardwareDecodingCallCount++;
+    lastHardwareDecodingEnabled = enabled;
   }
 
   // ─── Lifecycle ───

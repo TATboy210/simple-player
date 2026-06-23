@@ -2,6 +2,8 @@ import 'dart:io' show Process;
 
 import 'package:flutter/foundation.dart';
 
+import 'log.dart';
+
 /// 路径工具函数
 ///
 /// 统一的文件名提取，替代 4 处不一致的 split 逻辑。
@@ -48,17 +50,22 @@ class PathUtils {
   /// 打开文件所在目录（平台感知）
   ///
   /// Windows: explorer, Linux: xdg-open, macOS: open
-  static void openFileLocation(String path) {
+  /// [runner] 可注入 — 测试时传入 mock，生产环境使用 Process.run。
+  static void openFileLocation(
+    String path, {
+    Future<void> Function(String, List<String>)? runner,
+  }) {
+    final run = runner ?? Process.run;
     final dir = dirname(path);
     switch (defaultTargetPlatform) {
       case TargetPlatform.windows:
-        Process.run('explorer', [dir]);
+        run('explorer', [dir]);
       case TargetPlatform.linux:
-        Process.run('xdg-open', [dir]);
+        run('xdg-open', [dir]);
       case TargetPlatform.macOS:
-        Process.run('open', [dir]);
+        run('open', [dir]);
       default:
-        debugPrint('openFileLocation: unsupported platform');
+        log.w('openFileLocation: unsupported platform');
     }
   }
 }

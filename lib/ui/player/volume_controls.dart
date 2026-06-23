@@ -1,16 +1,16 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_icon_button.dart';
+import '../shared/glass_widgets.dart';
 import '../shared/value_listenable_builder2.dart';
-import '../widgets/osd_overlay.dart';
+import '../shared/osd_overlay.dart';
 
 /// 音量按钮（单击静音）
 class VolumeButton extends StatefulWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   const VolumeButton({super.key, required this.engine});
 
@@ -54,7 +54,7 @@ class _VolumeButtonState extends State<VolumeButton> {
         } else {
           icon = Icons.volume_up;
         }
-        return GlassIconButton(
+        return GlassButton.iconOnly(
           icon: icon,
           iconSize: Tokens.iconLg,
           color: muted ? Tokens.accent : Tokens.textPrimary,
@@ -68,7 +68,13 @@ class _VolumeButtonState extends State<VolumeButton> {
 
 /// 音量滑块（内联水平条）
 class VolumeSlider extends StatelessWidget {
-  final MediaEngine engine;
+  static const _sliderTheme = SliderThemeData(
+    trackHeight: 3,
+    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+    overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
+  );
+
+  final PlayerEngine engine;
 
   const VolumeSlider({super.key, required this.engine});
 
@@ -88,11 +94,7 @@ class VolumeSlider extends StatelessWidget {
         child: ValueListenableBuilder<double>(
           valueListenable: engine.volume,
           builder: (_, volume, _) => SliderTheme(
-            data: const SliderThemeData(
-              trackHeight: 3,
-              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
-            ),
+            data: _sliderTheme,
             child: Slider(
               value: volume,
               onChanged: (v) {

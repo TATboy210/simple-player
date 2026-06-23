@@ -1,10 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
-import '../widgets/osd_overlay.dart';
+import '../shared/osd_overlay.dart';
 
 /// 三段式倍速控件 — 72×36
 ///
@@ -13,7 +13,7 @@ import '../widgets/osd_overlay.dart';
 /// - 双击数字重置 1.0
 /// - 滚轮切换挡位
 class SpeedButton extends StatelessWidget {
-  final MediaEngine engine;
+  final PlayerEngine engine;
 
   static const _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
   static const _normal = 1.0;
@@ -38,6 +38,20 @@ class SpeedButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 静态箭头段 — 速度变化时不重建（StatelessWidget 引用不变）
+    final leftArrow = _Segment(
+      width: 18,
+      icon: Icons.chevron_left,
+      tooltip: l10n.speedDecrease,
+      onTap: () => _shift(-1),
+    );
+    final rightArrow = _Segment(
+      width: 18,
+      icon: Icons.chevron_right,
+      tooltip: l10n.speedIncrease,
+      onTap: () => _shift(1),
+    );
+
     return SizedBox(
       width: 72,
       height: 36,
@@ -55,24 +69,14 @@ class SpeedButton extends StatelessWidget {
                 : speed.toStringAsFixed(2);
             return Row(
               children: [
-                _Segment(
-                  width: 18,
-                  icon: Icons.chevron_left,
-                  tooltip: l10n.speedDecrease,
-                  onTap: () => _shift(-1),
-                ),
+                leftArrow,
                 _Segment(
                   width: 36,
                   label: '${label}x',
                   tooltip: l10n.speedReset,
                   onDoubleTap: _reset,
                 ),
-                _Segment(
-                  width: 18,
-                  icon: Icons.chevron_right,
-                  tooltip: l10n.speedIncrease,
-                  onTap: () => _shift(1),
-                ),
+                rightArrow,
               ],
             );
           },
@@ -83,6 +87,8 @@ class SpeedButton extends StatelessWidget {
 }
 
 class _Segment extends StatelessWidget {
+  static final _radius = BorderRadius.circular(Tokens.radiusBtn);
+
   final double width;
   final IconData? icon;
   final String? label;
@@ -105,7 +111,7 @@ class _Segment extends StatelessWidget {
         ? Icon(icon, size: 18, color: Tokens.textPrimary)
         : Text(
             label ?? '',
-            style: TextStyle(
+            style: const TextStyle(
               color: Tokens.textPrimary,
               fontSize: Tokens.fontCaption,
               fontWeight: Tokens.weightMedium,
@@ -123,12 +129,12 @@ class _Segment extends StatelessWidget {
           height: 36,
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            borderRadius: _radius,
             child: InkWell(
               onTap: onTap,
               hoverColor: Tokens.bgHover,
               highlightColor: Colors.transparent,
-              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+              borderRadius: _radius,
               splashFactory: InkRipple.splashFactory,
               child: Center(child: child),
             ),

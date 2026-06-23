@@ -49,8 +49,9 @@ class SettingsNavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 color: selected ? Tokens.accent : Tokens.textSecondary,
-                fontWeight:
-                    selected ? Tokens.weightMedium : Tokens.weightRegular,
+                fontWeight: selected
+                    ? Tokens.weightMedium
+                    : Tokens.weightRegular,
               ),
             ),
           ],

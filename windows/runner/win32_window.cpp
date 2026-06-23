@@ -236,6 +236,18 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
     }
 
+    case WM_NCCALCSIZE: {
+      // Frameless window: fold non-client area to zero for ALL states
+      // (windowed, maximized, fullscreen). Eliminates WS_THICKFRAME ~7px
+      // invisible borders. DragToResizeArea in Flutter handles edge resize.
+      // Note: maximized window covers taskbar — use rcWork in SetWindowPos
+      // for correct maximize bounds (already handled in WindowService).
+      if (wparam == TRUE) {
+        return 0;
+      }
+      break;
+    }
+
     case WM_ERASEBKGND:
       // Skip background erase - Flutter handles its own surface.
       // Prevents black-flash during resize when CS_HREDRAW/CS_VREDRAW is off.

@@ -313,9 +313,6 @@
   "@pressKeyToBind": { "description": "Hint shown when waiting for user to press a key for binding" },
   "shortcutConflict": "Key already bound",
   "@shortcutConflict": { "description": "Warning when a key is already assigned to another action" },
-  "shortcutAspectCycle": "Cycle Aspect Ratio",
-  "@shortcutAspectCycle": { "description": "Shortcut label for cycling aspect ratio" },
-
   "currentTheme": "Theme",
   "@currentTheme": { "description": "Quick menu label for current theme section" },
 
@@ -324,5 +321,25 @@
   "cancel": "Cancel",
   "@cancel": { "description": "Cancel button" },
   "apply": "Apply",
-  "@apply": { "description": "Apply button - save without closing" }
+  "@apply": { "description": "Apply button - save without closing" },
+
+  "playerLoadError": "Failed to load player module",
+  "@playerLoadError": { "description": "Error message when deferred player module fails to load" },
+
+  "performanceTab": "Performance",
+  "@performanceTab": { "description": "Performance settings tab label" },
+  "d3d11Rendering": "D3D11 Rendering",
+  "@d3d11Rendering": { "description": "Section header for D3D11 rendering settings" },
+  "d3d11Sync": "D3D11 CPU Sync",
+  "@d3d11Sync": { "description": "Toggle label for D3D11 CPU/GPU synchronization" },
+  "d3d11SyncDesc": "Synchronize CPU and GPU per frame. Disable for lower latency, may cause tearing.",
+  "@d3d11SyncDesc": { "description": "Description for D3D11 sync toggle" },
+  "decoderSettings": "Decoder",
+  "@decoderSettings": { "description": "Section header for decoder settings" },
+  "hardwareDecoding": "Hardware Decoding",
+  "@hardwareDecoding": { "description": "Toggle label for hardware decoding" },
+  "hardwareDecodingDesc": "Use GPU for video decoding. Disable if experiencing artifacts.",
+  "@hardwareDecodingDesc": { "description": "Description for hardware decoding toggle" },
+  "performanceHint": "Changes take effect on next file open.",
+  "@performanceHint": { "description": "Hint that performance changes require reopening file" }
 }

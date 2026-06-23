@@ -153,11 +153,20 @@
   "resetShortcuts": "恢复默认",
   "pressKeyToBind": "请按下新按键...",
   "shortcutConflict": "按键已被占用",
-  "shortcutAspectCycle": "切换宽高比",
-
   "currentTheme": "当前主题",
 
   "ok": "确定",
   "cancel": "取消",
-  "apply": "应用"
+  "apply": "应用",
+
+  "playerLoadError": "播放器模块加载失败",
+
+  "performanceTab": "性能",
+  "d3d11Rendering": "D3D11 渲染",
+  "d3d11Sync": "D3D11 CPU 同步",
+  "d3d11SyncDesc": "每帧同步 CPU 和 GPU。关闭可降低延迟，可能产生画面撕裂。",
+  "decoderSettings": "解码器",
+  "hardwareDecoding": "硬件解码",
+  "hardwareDecodingDesc": "使用 GPU 进行视频解码。如出现画面异常请关闭。",
+  "performanceHint": "更改在下次打开文件时生效。"
 }

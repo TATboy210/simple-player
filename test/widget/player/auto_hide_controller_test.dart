@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/models/media_state.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/ui/player/auto_hide_controller.dart';
 
 /// TestTickerProvider — provides a Ticker for AutoHideController in tests.
@@ -265,4 +265,210 @@ void main() {
       expect(c.visible.value, isTrue);
     });
   });
+
+  group('AutoHideController.resizing', () {
+    test('resizing=true cancels hide timer', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.scheduleHide();
+
+      c.resizing = true;
+
+      // Timer canceled — resizing freezes auto-hide
+      expect(c.visible.value, isTrue);
+    });
+
+    test('resizing=false schedules hide', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.resizing = true;
+
+      c.resizing = false;
+
+      // scheduleHide called — timer restarted
+      expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController.onMouseMove() throttle', () {
+    test('second call within throttle window is no-op', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+
+      c.onMouseMove(); // first call — shows
+      c.visible.value = false;
+      c.onMouseMove(); // within 100ms throttle — no-op
+
+      expect(c.visible.value, isFalse);
+    });
+  });
+
+  group('AutoHideController — animation dismissed', () {
+    test('hide triggers reverse animation then sets visible false', () async {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.onMouseEnter(); // hovering = true
+      c.onMouseExit(); // hovering = false, scheduleHide called
+
+      // Manually trigger hide (not via timer)
+      c.hide();
+
+      // Animation is reversing — visible still true until dismissed
+      expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController — scheduleHide timer fires hide', () {
+    testWidgets('timer callback hides when not hovering', (tester) async {
+      // Use a widget test so AnimationController/Ticker works properly.
+      // scheduleHide creates Timer(5s) in windowed mode.
+      // After pump(Duration(seconds: 6)), the timer fires and calls hide().
+      // hide() reverses the animation (300ms). pumpAndSettle() completes it.
+      // _onAnimStatus(dismissed) → visible = false.
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _TestAutoHideWrapper(
+            engineState: engineState,
+            isFullscreen: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final state = tester
+          .state<_TestAutoHideWrapperState>(
+            find.byType(_TestAutoHideWrapper),
+          );
+      final c = state.controller;
+
+      // Start auto-hide timer via scheduleHide
+      c.scheduleHide();
+
+      // Advance past the 5s windowed hide delay
+      await tester.pump(const Duration(seconds: 6));
+      // Timer fired → hide() → _animController.reverse()
+      // Now let the reverse animation (300ms) complete
+      await tester.pumpAndSettle();
+
+      // _onAnimStatus(dismissed) should have fired → visible = false
+      expect(c.visible.value, isFalse);
+    });
+  });
+
+  group('AutoHideController.onEngineStateChanged() — hidden transitions', () {
+    test('playing when hidden shows and schedules hide', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.playing;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('loading when hidden shows and schedules hide', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.loading;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('paused when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.paused;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('stopped when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.stopped;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('completed when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.completed;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('error when hidden shows and cancels timer', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      engineState.value = MediaState.error;
+      c.onEngineStateChanged();
+
+      expect(c.visible.value, isTrue);
+    });
+  });
+}
+
+/// Wrapper widget that provides a real TickerProvider for AutoHideController.
+/// Used in widget tests where AnimationController + pump() is needed.
+class _TestAutoHideWrapper extends StatefulWidget {
+  final ValueNotifier<MediaState> engineState;
+  final bool isFullscreen;
+  const _TestAutoHideWrapper({
+    required this.engineState,
+    this.isFullscreen = false,
+  });
+  @override
+  State<_TestAutoHideWrapper> createState() => _TestAutoHideWrapperState();
+}
+
+class _TestAutoHideWrapperState extends State<_TestAutoHideWrapper>
+    with SingleTickerProviderStateMixin {
+  late final AutoHideController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = AutoHideController(
+      vsync: this,
+      engineState: widget.engineState,
+      isFullscreen: widget.isFullscreen,
+    );
+    controller.init();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox();
 }

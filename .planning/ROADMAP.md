@@ -1,125 +1,171 @@
-# Roadmap: Simple Player Flutter — Performance Optimization
+# Cross-Platform Window Management — Roadmap
 
 ## Overview
 
-Eliminate frame drops and rendering bottlenecks through a "measure first, fix cheap, refactor clean" strategy. Start with zero-risk fvp configuration fixes, profile to establish baselines, apply targeted optimizations, then clean up architecture debt and add test coverage. Each phase delivers a verifiable capability — either measurable performance improvement or structural cleanup that unblocks testing.
+**5 phases** | **22 requirements mapped** | All v1 requirements covered ✓
 
-## Phases
+| # | Phase | Goal | Requirements | Success Criteria |
+|---|-------|------|--------------|------------------|
+| 1 | Platform Abstraction | 定义跨平台窗口接口 + 注册机制 | PLATFORM-01, PLATFORM-02, PLATFORM-03, INT-01 | 3 |
+| 2 | Windows Refactor | 基于 PlatformWindow 重构 Windows 实现 | WIN-01~04, INT-02~04 | 4 |
+| 3 | Linux Implementation | 实现 Linux 窗口管理（X11 + Wayland） | LINUX-01~05 | 5 |
+| 4 | macOS Implementation | 实现 macOS 窗口管理（NSWindow） | MACOS-01~05 | 5 |
+| 5 | Multi-Monitor & Polish | 多显示器支持 + 跨平台测试 | MULTI-01~03 | 3 |
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+---
 
-Decimal phases appear between their surrounding integers in numeric order.
+### Phase 1: Platform Abstraction
 
-- [x] **Phase 1: Zero-Risk Rendering Fixes** - fvp config tuning + dead code removal (no profiling needed)
-- [ ] **Phase 2: Profile and Measure** - Establish frame-level baselines with DevTools before optimizing
-- [ ] **Phase 3: fvp D3D11 Hardware Tuning** - d3d11.sync.cpu=0 with multi-config hardware validation
-- [ ] **Phase 4: BackdropFilter and ValueNotifier Optimization** - Targeted widget-layer fixes guided by profiling data
-- [ ] **Phase 5: Window Service Deduplication** - Extract mixin from 3 triplicated platform services (~600 lines removed)
-- [ ] **Phase 6: Singleton Cleanup and Test Coverage** - Instance-based services + unit tests for window/settings layers
+**Goal:** 定义跨平台窗口抽象接口，建立平台注册机制，WindowService 通过接口分发命令
 
-## Phase Details
+**Mode:** mvp
 
-### Phase 1: Zero-Risk Rendering Fixes
-**Goal**: Apply fvp configuration fixes that eliminate known rendering inefficiencies with zero risk of regression
-**Depends on**: Nothing (first phase)
-**Requirements**: PERF-02, ARCH-03
-**Success Criteria** (what must be TRUE):
-  1. fvp uses D3D11 hardware decoding (MFT:d3d=11) instead of D3D9-to-D3D11 surface copy
-  2. GPU-accelerated YUV-to-RGB conversion is enabled (shader_resource=1)
-  3. Debug string formatting overhead is eliminated (log=warning)
-  4. Dead code file `lib/models/playlist_item.dart` no longer exists in the codebase
-**Plans**: 1 plan
+**Requirements:**
+- PLATFORM-01: 定义 PlatformWindow 抽象接口
+- PLATFORM-02: 平台注册机制（PlatformRegistry）
+- PLATFORM-03: WindowService 通过 PlatformWindow 接口分发命令
+- INT-01: WindowBridge 接口零改动
 
-Plans:
-- [x] 01-01-PLAN.md — fvp配置修复：D3D11解码器 + 日志级别 + 死代码清理
+**Success Criteria:**
+1. PlatformWindow 接口定义完成，包含所有窗口操作方法
+2. PlatformRegistry 能根据 Platform.operatingSystem 自动选择正确实现
+3. WindowBridge 接口保持不变，UI 层零改动
 
-### Phase 2: Profile and Measure
-**Goal**: Establish frame-level performance baselines and identify the exact bottleneck causing title bar frame drops
-**Depends on**: Phase 1
-**Requirements**: PERF-01
-**Success Criteria** (what must be TRUE):
-  1. DevTools Timeline profile captured in profile mode (`flutter run --profile -d windows`) showing UI thread, raster thread, and GPU thread activity
-  2. Root cause of title bar jitter identified (BackdropFilter GPU readback vs ValueNotifier rebuild storm vs other)
-  3. Ranked list of worst rebuild offenders (which widgets rebuild most, which notifiers trigger them)
-**Plans:** 1 plan
+**Key Files:**
+- `lib/kernel/platform/platform_window.dart` — 新建
+- `lib/kernel/platform/platform_registry.dart` — 新建
+- `lib/kernel/bridge/window_service.dart` — 修改（注入 PlatformWindow）
 
-Plans:
-- [ ] 02-01-PLAN.md — DevTools profiling: idle baseline + resize sessions + root cause analysis
+---
 
-### Phase 3: fvp D3D11 Hardware Tuning
-**Goal**: Validate and ship the highest-impact single optimization (d3d11.sync.cpu=0) across hardware configurations
-**Depends on**: Phase 2
-**Requirements**: PERF-03
-**Success Criteria** (what must be TRUE):
-  1. d3d11.sync.cpu=0 tested on at least 3 hardware configs (dedicated GPU, Intel iGPU, AMD iGPU)
-  2. No visible tearing on any tested configuration, OR tearing documented with fallback strategy
-  3. Measurable frame time improvement (2-5ms/frame savings confirmed via DevTools)
-**Plans**: TBD
+### Phase 2: Windows Refactor
 
-Plans:
-- [ ] 03-01: TBD
+**Goal:** 将现有 Windows 窗口管理代码重构为 PlatformWindow 实现，确保零回归
 
-### Phase 4: BackdropFilter and ValueNotifier Optimization
-**Goal**: Apply targeted widget-layer optimizations that reduce GPU readback and unnecessary rebuilds
-**Depends on**: Phase 2
-**Requirements**: PERF-04, PERF-05, PERF-06
-**Success Criteria** (what must be TRUE):
-  1. All 6 BackdropFilter usages verified to have ClipRect wrappers; resize-aware degradation active in playlist_panel.dart and empty_state.dart
-  2. All 35 ValueListenableBuilder instances audited — static subtrees cached via `child` parameter where applicable
-  3. MergedListenable implemented for position+duration, halving rebuild count for time display widgets
-  4. Measurable reduction in raster thread jank compared to Phase 2 baseline
-**Plans**: TBD
+**Mode:** mvp
 
-Plans:
-- [ ] 04-01: TBD
+**Requirements:**
+- WIN-01: 基于现有代码重构 WindowsPlatformWindow
+- WIN-02: 保留 isOperating Completer 防重入机制
+- WIN-03: 保留圆角修复（DWMWCP_ROUND）
+- WIN-04: 保留 DPI 自适应（PerMonitor V1）
+- INT-02: WindowState 4 个 ValueNotifier 正常工作
+- INT-03: WindowPersistence 防抖持久化跨平台兼容
+- INT-04: SettingsStore 读写跨平台兼容
 
-### Phase 5: Window Service Deduplication
-**Goal**: Eliminate 90%+ code duplication across 3 platform window services by extracting a shared mixin
-**Depends on**: Nothing (independent of performance work)
-**Requirements**: ARCH-01
-**Success Criteria** (what must be TRUE):
-  1. WindowServiceBase mixin exists with shared logic extracted from all 3 platform services
-  2. Each platform service (Windows, macOS, Linux) reduced to 40-60 lines of platform-specific code
-  3. All existing window functionality preserved (fullscreen, resize, drag, always-on-top, persistence)
-  4. Approximately 600 lines of duplicated code eliminated
-**Plans**: TBD
+**Success Criteria:**
+1. WindowsPlatformWindow 实现 PlatformWindow 接口
+2. 现有全屏/最大化/最小化/置顶功能零回归
+3. 圆角、DPI、防重入机制正常工作
+4. 窗口几何持久化正常工作
 
-Plans:
-- [ ] 05-01: TBD
+**Key Files:**
+- `lib/kernel/platform/windows/windows_platform_window.dart` — 新建
+- `lib/kernel/bridge/fullscreen_controller.dart` — 修改（使用 PlatformWindow）
+- `lib/kernel/bridge/window_persistence.dart` — 验证跨平台兼容
 
-### Phase 6: Singleton Cleanup and Test Coverage
-**Goal**: Make services testable by converting static singletons to instance-based, then add unit test coverage for untested layers
-**Depends on**: Phase 5 (window services deduplicated before testing them)
-**Requirements**: ARCH-02, ARCH-04, TEST-01, TEST-02, TEST-03, TEST-04
-**Success Criteria** (what must be TRUE):
-  1. ThumbnailService is instance-based with constructor-injected ThumbnailProvider (not static singleton)
-  2. OsdService is instance-based (enables mock injection for testing)
-  3. Unit tests pass for WindowStateService, WindowPersistenceService, and FullscreenController
-  4. Unit tests pass for ThumbnailService (after instance-based refactor)
-  5. Unit tests pass for SettingsStore covering all preference types and default values
-  6. Test coverage for window + settings layers reaches 80%+
-**Plans**: TBD
+---
 
-Plans:
-- [ ] 06-01: TBD
+### Phase 3: Linux Implementation
 
-## Requirement Traceability
+**Goal:** 实现 Linux 窗口管理，支持 X11 和 Wayland 两种显示服务器
 
-| Requirement | Phase | Plan |
-|-------------|-------|------|
-| PERF-01 | 2 | 02-01 |
-| PERF-02 | 1 | 01-01 |
-| PERF-03 | 3 | TBD |
-| PERF-04 | 4 | TBD |
-| PERF-05 | 4 | TBD |
-| PERF-06 | 4 | TBD |
-| ARCH-01 | 5 | TBD |
-| ARCH-02 | 6 | TBD |
-| ARCH-03 | 1 | 01-01 |
-| ARCH-04 | 6 | TBD |
-| TEST-01 | 6 | TBD |
-| TEST-02 | 6 | TBD |
-| TEST-03 | 6 | TBD |
-| TEST-04 | 6 | TBD |
+**Mode:** mvp
+
+**Requirements:**
+- LINUX-01: LinuxPlatformWindow 实现（GTK 窗口管理）
+- LINUX-02: X11 全屏（_NET_WM_STATE_FULLSCREEN）
+- LINUX-03: Wayland 全屏（xdg_toplevel_set_fullscreen）
+- LINUX-04: 圆角支持（GTK CSS 或 DRI3）
+- LINUX-05: DPI 自适应（GTK scale factor）
+
+**Success Criteria:**
+1. LinuxPlatformWindow 实现 PlatformWindow 接口
+2. X11 全屏切换正常工作，无边框缝隙
+3. Wayland 全屏切换正常工作
+4. 圆角和 DPI 自适应正常工作
+
+**Key Files:**
+- `lib/kernel/platform/linux/linux_platform_window.dart` — 新建
+- `linux/runner/` — 可能需要扩展原生层
+
+---
+
+### Phase 4: macOS Implementation
+
+**Goal:** 实现 macOS 窗口管理，使用 NSWindow 原生 API
+
+**Mode:** mvp
+
+**Requirements:**
+- MACOS-01: MacOSPlatformWindow 实现（NSWindow）
+- MACOS-02: 原生 toggleFullScreen（NSWindow.toggleFullScreen:）
+- MACOS-03: NSCondition 防动画重入
+- MACOS-04: 圆角支持（NSWindow.styleMask）
+- MACOS-05: DPI 自适应（Retina scale factor）
+
+**Success Criteria:**
+1. MacOSPlatformWindow 实现 PlatformWindow 接口
+2. 全屏切换使用原生动画，无卡顿
+3. 圆角和 DPI 自适应正常工作
+4. 防动画重入机制正常工作
+
+**Key Files:**
+- `lib/kernel/platform/macos/macos_platform_window.dart` — 新建
+- `macos/runner/` — 可能需要扩展原生层
+
+---
+
+### Phase 5: Multi-Monitor & Polish
+
+**Goal:** 实现多显示器支持，完成跨平台测试和文档
+
+**Mode:** mvp
+
+**Requirements:**
+- MULTI-01: 获取所有显示器信息（尺寸/位置/DPI）
+- MULTI-02: 全屏时指定目标显示器
+- MULTI-03: 窗口位置防越界（跨显示器边界）
+
+**Success Criteria:**
+1. 能获取所有显示器信息
+2. 全屏时能指定目标显示器
+3. 窗口位置防越界正常工作
+
+**Key Files:**
+- `lib/kernel/platform/platform_window.dart` — 扩展显示器相关方法
+- 各平台实现 — 添加显示器枚举和全屏目标指定
+
+---
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PLATFORM-01 | 1 | Pending |
+| PLATFORM-02 | 1 | Pending |
+| PLATFORM-03 | 1 | Pending |
+| INT-01 | 1 | Pending |
+| WIN-01 | 2 | Pending |
+| WIN-02 | 2 | Pending |
+| WIN-03 | 2 | Pending |
+| WIN-04 | 2 | Pending |
+| INT-02 | 2 | Pending |
+| INT-03 | 2 | Pending |
+| INT-04 | 2 | Pending |
+| LINUX-01 | 3 | Pending |
+| LINUX-02 | 3 | Pending |
+| LINUX-03 | 3 | Pending |
+| LINUX-04 | 3 | Pending |
+| LINUX-05 | 3 | Pending |
+| MACOS-01 | 4 | Pending |
+| MACOS-02 | 4 | Pending |
+| MACOS-03 | 4 | Pending |
+| MACOS-04 | 4 | Pending |
+| MACOS-05 | 4 | Pending |
+| MULTI-01 | 5 | Pending |
+| MULTI-02 | 5 | Pending |
+| MULTI-03 | 5 | Pending |
+
+---
+*Last updated: 2026-06-23 after initialization*

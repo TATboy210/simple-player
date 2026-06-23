@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:player_engine/player_engine.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
+import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/player/time_range_display.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
 import '../../helpers/fake_engine.dart';
+
+void _noop() {}
 
 void main() {
   late FakeEngine engine;
@@ -21,14 +24,10 @@ void main() {
   });
 
   Widget buildSubject({
-    MediaEngine? eng,
+    PlayerEngine? eng,
+    PlayerActions? actions,
     bool isFullscreen = false,
     bool isIdle = false,
-    VoidCallback? onOpenFile,
-    VoidCallback? onOpenSubtitle,
-    VoidCallback? onTogglePlaylist,
-    VoidCallback? onSettings,
-    VoidCallback? onToggleFullscreen,
   }) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -39,13 +38,9 @@ void main() {
           height: 200,
           child: ControlBar(
             engine: eng ?? engine,
+            actions: actions ?? const PlayerActions(),
             isFullscreen: isFullscreen,
             isIdle: isIdle,
-            onOpenFile: onOpenFile,
-            onOpenSubtitle: onOpenSubtitle,
-            onTogglePlaylist: onTogglePlaylist,
-            onSettings: onSettings,
-            onToggleFullscreen: onToggleFullscreen,
           ),
         ),
       ),
@@ -119,7 +114,9 @@ void main() {
     testWidgets('shows folder_open button when onOpenFile is provided', (
       tester,
     ) async {
-      await tester.pumpWidget(buildSubject(onOpenFile: () {}));
+      await tester.pumpWidget(
+        buildSubject(actions: const PlayerActions(onOpenFile: _noop)),
+      );
       await tester.pump();
 
       expect(find.byIcon(Icons.folder_open), findsOneWidget);
@@ -137,7 +134,9 @@ void main() {
     testWidgets('shows fullscreen button when onToggleFullscreen is provided', (
       tester,
     ) async {
-      await tester.pumpWidget(buildSubject(onToggleFullscreen: () {}));
+      await tester.pumpWidget(
+        buildSubject(actions: const PlayerActions(onToggleFullscreen: _noop)),
+      );
       await tester.pump();
 
       expect(find.byIcon(Icons.fullscreen), findsOneWidget);
@@ -145,7 +144,10 @@ void main() {
 
     testWidgets('shows fullscreen_exit when isFullscreen', (tester) async {
       await tester.pumpWidget(
-        buildSubject(isFullscreen: true, onToggleFullscreen: () {}),
+        buildSubject(
+          isFullscreen: true,
+          actions: const PlayerActions(onToggleFullscreen: _noop),
+        ),
       );
       await tester.pump();
 
@@ -155,7 +157,9 @@ void main() {
     testWidgets('shows subtitles button when onOpenSubtitle is provided', (
       tester,
     ) async {
-      await tester.pumpWidget(buildSubject(onOpenSubtitle: () {}));
+      await tester.pumpWidget(
+        buildSubject(actions: const PlayerActions(onOpenSubtitle: _noop)),
+      );
       await tester.pump();
 
       expect(find.byIcon(Icons.subtitles), findsOneWidget);
@@ -164,14 +168,18 @@ void main() {
     testWidgets('shows queue_music when onTogglePlaylist is provided', (
       tester,
     ) async {
-      await tester.pumpWidget(buildSubject(onTogglePlaylist: () {}));
+      await tester.pumpWidget(
+        buildSubject(actions: const PlayerActions(onTogglePlaylist: _noop)),
+      );
       await tester.pump();
 
       expect(find.byIcon(Icons.queue_music), findsOneWidget);
     });
 
     testWidgets('shows settings when onSettings is provided', (tester) async {
-      await tester.pumpWidget(buildSubject(onSettings: () {}));
+      await tester.pumpWidget(
+        buildSubject(actions: const PlayerActions(onSettings: _noop)),
+      );
       await tester.pump();
 
       expect(find.byIcon(Icons.settings), findsOneWidget);

@@ -55,7 +55,6 @@ lib/
 │       ├── path_utils.dart            # 路径解析
 │       └── time_utils.dart            # 时间格式化
 ├── window/                            # 窗口管理系统
-│   ├── bootstrap.dart                 # 启动编排
 │   ├── window_service.dart            # 核心窗口服务 (Win32 FFI)
 │   ├── geometry_store.dart            # 窗口几何持久化
 │   └── aspect_ratio_service.dart      # 画面比例约束
@@ -195,21 +194,14 @@ lib/
 ```
 main()
   ├── WidgetsFlutterBinding.ensureInitialized()
-  ├── fvp.registerWith()                    // FFmpeg/MDK 平台注册
-  ├── SharedPreferences.getInstance()       // 获取持久化单例
+  ├── 并行启动:
+  │     ├── RustLib.init()                   // Rust FFI 桥接
+  │     ├── SharedPreferences.getInstance()  // 持久化单例
+  │     └── WindowService.instance.initialize() // 窗口系统
+  ├── EnginePrewarm.prewarm()               // MDK 引擎预热 (fire-and-forget)
   ├── SettingsStore.prewarm(prefs)          // 同步缓存预热
-  ├── WindowBootstrap.init(prefs)           // 窗口系统初始化
-  │     ├── WindowService(prefs)
-  │     ├── WindowBridge.inject(service)
-  │     └── service.init()
-  │           ├── WindowGeometryStore → load + clamp
-  │           ├── windowManager.ensureInitialized()
-  │           └── waitUntilReadyToShow:
-  │                 ├── setMinimumSize(800, 450)
-  │                 ├── setPosition (恢复/居中)
-  │                 ├── setAsFrameless() → _restoreThickFrame()
-  │                 ├── show() + focus()
-  │                 └── 恢复全屏状态
+  ├── await Future.wait([rust, window])     // 等待并行任务
+  └── runApp(App())
   └── runApp(App(prefs))
         └── _AppState._init() [异步]
               ├── Future.wait([

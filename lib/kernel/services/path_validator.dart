@@ -73,13 +73,36 @@ class PathValidator {
     return false;
   }
 
+  /// 检查路径是否包含 ASCII 控制字符 (0x01-0x1F，排除 0x00 和 0x09)
+  ///
+  /// 0x00 已在 [isPathTraversal] 检测，0x09 (tab) 在 Windows 文件名中合法。
+  static bool _hasControlCharacters(String path) {
+    for (var i = 0; i < path.length; i++) {
+      final code = path.codeUnitAt(i);
+      if (code < 0x20 && code != 0x00 && code != 0x09) return true;
+    }
+    return false;
+  }
+
   /// 完整校验：扩展名 + 路径遍历
   ///
   /// 返回 null = 合法，返回 String = 错误消息
   static String? validate(String path) {
     final trimmed = path.trim();
     if (trimmed.isEmpty) return '路径为空';
-    if (isUrl(trimmed)) return null; // URL 跳过路径遍历检查
+    if (isUrl(trimmed)) {
+      // HTTP/HTTPS 需要结构化验证
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        final uri = Uri.tryParse(trimmed);
+        if (uri == null || !uri.hasAuthority || uri.host.isEmpty) {
+          return 'URL 格式无效: $trimmed';
+        }
+      }
+      return null; // 其他协议（RTSP/RTMP/SRT/UDP/TCP）跳过
+    }
+    if (_hasControlCharacters(trimmed)) {
+      return '路径包含非法控制字符: $trimmed';
+    }
     if (isPathTraversal(trimmed)) return '路径不安全: $trimmed';
     if (!isAllowedMedia(trimmed)) return '不支持的文件类型: $trimmed';
     return null;

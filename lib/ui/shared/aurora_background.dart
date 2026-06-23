@@ -1,11 +1,10 @@
+import 'package:player_engine/player_engine.dart';
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../../kernel/models/media_state.dart';
-import '../../kernel/bridge/window_bridge.dart';
 import '../theme/tokens.dart';
 
 /// 极光呼吸背景 — 3 个椭圆光团沿 Lissajous 曲线缓慢漂移
@@ -46,10 +45,19 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   late final Ticker _ticker;
   final _repaint = _RepaintNotifier();
   double _time = 0;
+  int _lastRepaintMs = 0;
   bool _isRunning = true;
 
-  // 预渲染的光团 Image 缓存
-  ui.Image? _blobImage;
+  // 预渲染的着色+模糊光团 Image 缓存（每色一张，启动时一次性生成）
+  List<ui.Image>? _blobImages;
+
+  // 噪点 Picture 缓存 — seed 每 2 秒变化一次，避免每帧重绘
+  ui.Picture? _cachedNoisePicture;
+  int _cachedNoiseSeed = -1;
+  Size _cachedNoiseSize = Size.zero;
+
+  // 缓存 layout 尺寸，避免每帧触发 LayoutBuilder
+  Size _layoutSize = Size.zero;
 
   @override
   void initState() {
@@ -57,9 +65,8 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_onTick);
     _ticker.start();
-    _generateBlobImage();
+    _generateBlobImages();
     widget.engineState?.addListener(_onEngineStateChanged);
-    WindowBridge.I.interaction.addListener(_syncTicker);
   }
 
   @override
@@ -70,17 +77,31 @@ class _AuroraBackgroundState extends State<AuroraBackground>
       widget.engineState?.addListener(_onEngineStateChanged);
       _syncTicker();
     }
+    if (oldWidget.blobColors != widget.blobColors ||
+        oldWidget.blobOpacities != widget.blobOpacities) {
+      _disposeBlobImages();
+      _generateBlobImages();
+    }
   }
 
   @override
   void dispose() {
     widget.engineState?.removeListener(_onEngineStateChanged);
-    WindowBridge.I.interaction.removeListener(_syncTicker);
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
     _repaint.dispose();
-    _blobImage?.dispose();
+    _disposeBlobImages();
+    _cachedNoisePicture?.dispose();
     super.dispose();
+  }
+
+  void _disposeBlobImages() {
+    if (_blobImages != null) {
+      for (final img in _blobImages!) {
+        img.dispose();
+      }
+      _blobImages = null;
+    }
   }
 
   /// 引擎状态变化时同步 Ticker 生命周期
@@ -93,8 +114,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     final engineIdle =
         widget.engineState?.value == MediaState.idle ||
         widget.engineState == null;
-    final resizing = WindowBridge.I.interaction.value != WindowInteractionState.idle;
-    final shouldRun = _isRunning && engineIdle && !resizing;
+    final shouldRun = _isRunning && engineIdle;
 
     if (shouldRun && !_ticker.isActive) {
       _ticker.start();
@@ -111,45 +131,118 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 
   void _onTick(Duration elapsed) {
     _time = elapsed.inMicroseconds / 1e6;
-    _repaint.markDirty();
+    // 降级到 ~15fps — 光团移动极慢 (freq ~0.03)，60fps 与 15fps 肉眼无区别
+    final ms = elapsed.inMilliseconds;
+    if (ms - _lastRepaintMs >= 66) {
+      _repaint.markDirty();
+      _lastRepaintMs = ms;
+    }
   }
 
-  /// 预渲染一个光团的 RadialGradient 为 Image（256×256）
-  Future<void> _generateBlobImage() async {
+  /// 预渲染 3 个着色+模糊的光团 Image（一次性 saveLayer 开销）
+  ///
+  /// 每张图: 白色径向渐变 + ColorFilter 着色 + ImageFilter.blur。
+  /// blur sigma = 256 × 0.6 × 0.3 = 46.08（breathScale=1.0 时的参考值）。
+  /// 运行时通过 drawImage + scale 变换实现呼吸效果，零 saveLayer。
+  Future<void> _generateBlobImages() async {
     const size = 256;
+    const refSigma = size * 0.6 * 0.3; // 46.08
+
+    // 1. 创建白色径向渐变源图
+    final srcRecorder = ui.PictureRecorder();
+    final srcCanvas = Canvas(srcRecorder);
+    srcCanvas.drawCircle(
+      const Offset(size / 2, size / 2),
+      size / 2,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          const Offset(size / 2, size / 2),
+          size / 2,
+          [const Color(0xFFFFFFFF), const Color(0x00FFFFFF)],
+          [0.0, 1.0],
+        ),
+    );
+    final srcPicture = srcRecorder.endRecording();
+    final srcImage = await srcPicture.toImage(size, size);
+
+    // 2. 对每个光团: 着色 + 模糊 → 预渲染 Image
+    final images = <ui.Image>[];
+    for (var i = 0; i < 3; i++) {
+      final color = widget.blobColors[i].withValues(
+        alpha: widget.blobOpacities[i],
+      );
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.saveLayer(
+        Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+        Paint()
+          ..colorFilter = ui.ColorFilter.mode(color, ui.BlendMode.srcIn)
+          ..imageFilter = ui.ImageFilter.blur(
+            sigmaX: refSigma,
+            sigmaY: refSigma,
+          ),
+      );
+      canvas.drawImage(srcImage, Offset.zero, Paint());
+      canvas.restore();
+      final picture = recorder.endRecording();
+      images.add(await picture.toImage(size, size));
+    }
+    srcImage.dispose();
+
+    if (mounted) {
+      setState(() => _blobImages = images);
+    } else {
+      for (final img in images) {
+        img.dispose();
+      }
+    }
+  }
+
+  /// 录制噪点 Picture 并缓存 — seed 每 2 秒变化一次时调用
+  void _regenerateNoiseCache(Size size) {
+    final seed = (_time * 0.5).floor();
+    if (seed == _cachedNoiseSeed && size == _cachedNoiseSize) return;
+
+    _cachedNoisePicture?.dispose();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final paint = Paint()
-      ..shader = ui.Gradient.radial(
-        const Offset(size / 2, size / 2),
-        size / 2,
-        [const Color(0xFFFFFFFF), const Color(0x00FFFFFF)],
-        [0.0, 1.0],
-      );
-    canvas.drawCircle(const Offset(size / 2, size / 2), size / 2, paint);
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(size, size);
-    if (mounted) {
-      setState(() => _blobImage = image);
-    } else {
-      image.dispose();
+      ..color = const Color(0x05FFFFFF)
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round;
+
+    final rng = Random(seed);
+    for (var i = 0; i < 50; i++) {
+      final x = rng.nextDouble() * size.width;
+      final y = rng.nextDouble() * size.height;
+      canvas.drawPoints(ui.PointMode.points, [Offset(x, y)], paint);
     }
+
+    _cachedNoisePicture = recorder.endRecording();
+    _cachedNoiseSeed = seed;
+    _cachedNoiseSize = size;
   }
 
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: _repaint,
-          builder: (_, _) => CustomPaint(
-            painter: _AuroraPainter(
-              time: _time,
-              blobColors: widget.blobColors,
-              blobOpacities: widget.blobOpacities,
-              blobImage: _blobImage,
-            ),
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // LayoutBuilder 只在窗口尺寸变化时触发（极低频）
+            _layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
+            _regenerateNoiseCache(_layoutSize);
+            return AnimatedBuilder(
+              animation: _repaint,
+              builder: (context, _) => CustomPaint(
+                painter: _AuroraPainter(
+                  time: _time,
+                  blobImages: _blobImages,
+                  cachedNoise: _cachedNoisePicture,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -158,9 +251,8 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 
 class _AuroraPainter extends CustomPainter {
   final double time;
-  final List<Color> blobColors;
-  final List<double> blobOpacities;
-  final ui.Image? blobImage;
+  final List<ui.Image>? blobImages;
+  final ui.Picture? cachedNoise;
 
   // Lissajous 参数 — 质数比避免同步
   static const _lissajous = [
@@ -185,17 +277,20 @@ class _AuroraPainter extends CustomPainter {
 
   _AuroraPainter({
     required this.time,
-    required this.blobColors,
-    required this.blobOpacities,
-    required this.blobImage,
+    required this.blobImages,
+    this.cachedNoise,
   });
+
+  // 静态 Paint 缓存 — 避免每帧分配（PERF-07）
+  static final _bgPaint = Paint()..color = Tokens.bgBase;
+  static final _compositePaint = Paint();
 
   @override
   void paint(Canvas canvas, Size size) {
     // Layer 0: 深色底
-    canvas.drawRect(Offset.zero & size, Paint()..color = Tokens.bgBase);
+    canvas.drawRect(Offset.zero & size, _bgPaint);
 
-    if (blobImage == null) return;
+    if (blobImages == null || blobImages!.length < 3) return;
 
     for (var i = 0; i < 3; i++) {
       final params = _lissajous[i];
@@ -217,30 +312,12 @@ class _AuroraPainter extends CustomPainter {
       final blobW = size.width * 0.6 * breathScale;
       final blobH = size.height * 0.4 * breathScale;
 
-      // 颜色 + 不透明度
-      final color = blobColors[i].withValues(alpha: blobOpacities[i]);
-
-      // 绘制光团（预渲染的 radial gradient image + 颜色滤镜）
-      canvas.saveLayer(
-        Rect.fromCenter(center: Offset(cx, cy), width: blobW, height: blobH),
-        Paint()
-          ..colorFilter = ui.ColorFilter.mode(color, ui.BlendMode.srcIn)
-          ..imageFilter = ui.ImageFilter.blur(
-            sigmaX: blobW * 0.3,
-            sigmaY: blobH * 0.3,
-          ),
-      );
-      canvas.drawImageRect(
-        blobImage!,
-        Rect.fromLTWH(
-          0,
-          0,
-          blobImage!.width.toDouble(),
-          blobImage!.height.toDouble(),
-        ),
-        Rect.fromCenter(center: Offset(cx, cy), width: blobW, height: blobH),
-        Paint(),
-      );
+      // 绘制预渲染的着色+模糊光团（仅 affine transform，零 saveLayer）
+      final img = blobImages![i];
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.scale(blobW / img.width, blobH / img.height);
+      canvas.drawImage(img, Offset(-img.width / 2, -img.height / 2), _compositePaint);
       canvas.restore();
     }
 
@@ -249,27 +326,16 @@ class _AuroraPainter extends CustomPainter {
   }
 
   /// 轻量噪点层 — 防止色带，增加质感
+  ///
+  /// 噪点 Picture 由 State 层缓存，seed 每 2 秒变化一次时才重新录制。
   void _drawNoiseOverlay(Canvas canvas, Size size) {
-    // 用极低不透明度的随机点模拟噪点
-    // 实际项目中可用预渲染的 noise texture 替代
-    final paint = Paint()
-      ..color = const Color(0x05FFFFFF)
-      ..strokeWidth = 1
-      ..strokeCap = StrokeCap.round;
-
-    // 伪随机种子基于 time（每秒更新一次，避免每帧重算）
-    final seed = (time * 0.5).floor();
-    final rng = Random(seed);
-    for (var i = 0; i < 50; i++) {
-      final x = rng.nextDouble() * size.width;
-      final y = rng.nextDouble() * size.height;
-      canvas.drawPoints(ui.PointMode.points, [Offset(x, y)], paint);
-    }
+    if (cachedNoise == null) return;
+    canvas.drawPicture(cachedNoise!);
   }
 
   @override
   bool shouldRepaint(covariant _AuroraPainter oldDelegate) {
-    return oldDelegate.time != time || oldDelegate.blobImage != blobImage;
+    return oldDelegate.time != time || oldDelegate.blobImages != blobImages;
   }
 }
 

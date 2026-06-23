@@ -80,6 +80,33 @@ void main() {
       });
     });
 
+    group('copyWith', () {
+      test('preserves positionMs when not provided', () {
+        final item = PlaylistItem(
+          path: '/test.mp4',
+          positionMs: 1000,
+          durationMs: 5000,
+        );
+        final updated = item.copyWith(durationMs: 8000);
+        expect(updated.positionMs, 1000); // preserved
+        expect(updated.durationMs, 8000); // updated
+      });
+
+      test('preserves durationMs when not provided', () {
+        final item = PlaylistItem(path: '/test.mp4', durationMs: 5000);
+        final updated = item.copyWith(positionMs: 2000);
+        expect(updated.durationMs, 5000); // preserved
+        expect(updated.positionMs, 2000); // updated
+      });
+    });
+
+    group('toString', () {
+      test('returns PlaylistItem(name)', () {
+        final item = PlaylistItem(path: '/videos/movie.mp4');
+        expect(item.toString(), 'PlaylistItem(movie.mp4)');
+      });
+    });
+
     group('serialization', () {
       // toJson → fromJson 往返一致
       test('round-trip', () {

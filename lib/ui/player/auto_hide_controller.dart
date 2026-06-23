@@ -1,8 +1,8 @@
+import 'package:player_engine/player_engine.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/models/media_state.dart';
 import '../theme/tokens.dart';
 
 /// 自动隐藏控制器 — 管理控制栏可见性、淡入淡出动画、自动隐藏定时器、鼠标悬停节流
@@ -24,6 +24,8 @@ class AutoHideController {
       value: 1,
     );
     _opacity = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    // fade-out 完成后立即关闭 hit test，避免透明 overlay 拦截点击
+    _animController.addStatusListener(_onAnimStatus);
   }
 
   final ValueNotifier<MediaState> _engineState;
@@ -70,9 +72,13 @@ class AutoHideController {
     if (_engineState.value == MediaState.idle) return;
     if (visible.value && !_hovering) {
       _popupCloseNotifier?.value++;
-      _animController.reverse().then((_) {
-        visible.value = false;
-      });
+      _animController.reverse();
+    }
+  }
+
+  void _onAnimStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed) {
+      visible.value = false;
     }
   }
 
@@ -158,6 +164,7 @@ class AutoHideController {
   /// 清理资源
   void dispose() {
     _hideTimer?.cancel();
+    _animController.removeStatusListener(_onAnimStatus);
     visible.dispose();
     _animController.dispose();
   }

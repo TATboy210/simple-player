@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
+import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import '../../helpers/fake_engine.dart';
@@ -60,7 +60,7 @@ void main() {
         await f2;
         await f3;
         expect(playlist.currentIndex, 2);
-        expect(controller.currentGeneration, 3);
+        expect(controller.navigator.currentGeneration, 3);
       });
 
       test('reports error via onError callback on failure', () async {
@@ -106,6 +106,16 @@ void main() {
         engine.seekToCallCount = 0;
         await controller.playIndex(0);
         expect(engine.seekToCallCount, 0);
+      });
+    });
+
+    group('path validation', () {
+      test('rejects path traversal via onError', () async {
+        // Add path directly to playlist, bypassing openAndPlay validation
+        playlist.add('../../../etc/passwd.mp4');
+        await controller.playIndex(0);
+        expect(errors, isNotEmpty);
+        expect(errors.first.toString(), contains('路径不安全'));
       });
     });
 

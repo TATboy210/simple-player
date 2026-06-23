@@ -1,4 +1,4 @@
-﻿#include "flutter_window.h"
+#include "flutter_window.h"
 
 #include <optional>
 
@@ -26,26 +26,6 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
-
-  // ForceRedraw 由 Dart 侧 WindowService 通过 MethodChannel 触发，
-  // 确保在 setAsFrameless() 完成后、show() 之前执行，
-  // 使 Flutter 首帧在正确的 frameless 客户区尺寸下渲染。
-  redraw_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-      flutter_controller_->engine()->messenger(),
-      "com.simple_player/redraw",
-      &flutter::StandardMethodCodec::GetInstance());
-  redraw_channel_->SetMethodCallHandler(
-      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
-             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-          if (call.method_name() == "forceRedraw") {
-              if (flutter_controller_) {
-                  flutter_controller_->ForceRedraw();
-              }
-              result->Success(true);
-          } else {
-              result->NotImplemented();
-          }
-      });
 
   return true;
 }
@@ -76,7 +56,6 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
-
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
