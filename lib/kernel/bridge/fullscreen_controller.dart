@@ -121,6 +121,10 @@ class FullscreenController {
         if (_savedSnapshot != null) {
           _platform.exit(_buildExitSnapshot());
         }
+        // 同步窗口大小到状态（退出全屏后 UI 需要正确的尺寸）
+        if (_savedSize != null) {
+          state.windowSize.value = _savedSize!;
+        }
         _clearSavedState();
         state.mode.value = previousMode;
       }
