@@ -2,96 +2,135 @@
 
 ## What This Is
 
-A Flutter desktop media player (Simple Player) that currently runs on Windows only. This project adds cross-platform window management to support Windows, Linux, and macOS on both x86 and ARM architectures. The player uses fvp (MDK/FFmpeg) for media playback with D3D11 texture rendering.
+将 v1 播放器的窗口管理功能从 Windows-only 重构为跨平台架构，支持 Windows、Linux、macOS 三大桌面平台（x86 + ARM）。
 
 ## Core Value
 
-Seamless, native-quality window management across all three desktop platforms — fullscreen, maximize, minimize, drag, resize, persistence — without sacrificing the existing Windows experience.
+**跨平台窗口管理抽象层** — 保持 WindowBridge 接口不变，底层实现按平台特化，参考 mpv/Kodi/VLC 的成熟方案。
 
-## Requirements
+## Current State
 
-### Validated
+### v1 窗口框架（Windows-only）
 
-- ✓ Custom frameless title bar (32px) — existing
-- ✓ Drag-to-move window (window_manager) — existing
-- ✓ Double-click title bar toggle maximize — existing
-- ✓ Minimize / maximize / restore / close — existing
-- ✓ Always-on-top toggle + persistence — existing
-- ✓ Fullscreen toggle (FullscreenController, mutex + atomic + rollback) — existing
-- ✓ Window geometry persistence (position/size/state) — existing
-- ✓ DragToResizeArea edge resize — existing
-- ✓ Resize BackdropFilter skip (GPU optimization) — existing
-- ✓ Rounded corners (DWMWCP_ROUND) — existing
-- ✓ DPI adaptation (Win32 PerMonitor V1) — existing
-- ✓ Minimum window size (854×480) — existing
+核心组件：
+- **WindowBridge**（抽象接口）：4 状态 ValueNotifier + 6 命令 Future
+- **WindowService**（薄协调者）：组合 WindowState + FullscreenController + WindowPersistence
+- **FullscreenController**：原子全屏（mutex + save/rollback）
+- **WindowPersistence**：防抖持久化（500ms debounce + 写入锁）
+- **SettingsStore**：SharedPreferences 持久化（26 个键）
+- **C++ 原生层**：Win32 runner（main.cpp/win32_window/flutter_window）
 
-### Active
+### 已解决的问题
 
-- [ ] Cross-platform WindowBridge abstraction (Windows/Linux/macOS)
-- [ ] Linux window management (X11 + Wayland)
-- [ ] macOS window management (NSWindow + native fullscreen)
-- [ ] Platform-specific fullscreen (Win32 FFI / NSWindow / _NET_WM_STATE)
-- [ ] Cross-platform window geometry persistence
-- [ ] Platform-detection and capability negotiation
-- [ ] Cross-platform title bar (macOS native / Linux GTK / Windows custom)
-- [ ] ARM architecture validation (fvp + window management)
-- [ ] Unified keyboard shortcuts across platforms
-- [ ] Cross-platform DPI/HiDPI scaling
+- ✅ 移除 WS_CAPTION + WS_THICKFRAME 全屏方案
+- ✅ isOperating Completer 防重入
+- ✅ 边框缝隙问题、圆角修复、DPI 自适应
+- ✅ 500ms debounce 窗口几何持久化
 
-### Out of Scope
+## Cross-Platform Reference (mpv/Kodi/VLC)
 
-- Exclusive fullscreen (ChangeDisplaySettingsEx) — media players use borderless fullscreen
-- Multi-monitor blanking (Kodi-style) — niche feature
-- Mobile platforms (Android/iOS) — desktop-only player
-- Wayland-only builds — X11 compatibility layer still needed for older distros
+### mpv 方案
+- **Windows**：移除 WS_THICKFRAME，保留 WS_OVERLAPPED | WS_MINIMIZEBOX
+- **macOS**：borderless + NSApp.presentationOptions，NSCondition 防动画重入
+- **Linux X11**：_NET_WM_STATE_FULLSCREEN 属性
+- **Linux Wayland**：xdg_toplevel_set_fullscreen
 
-## Context
+### Kodi 方案
+- **Windows**：FULLSCREEN_WINDOW_STYLE 移除 WS_CAPTION，支持独占全屏和窗口全屏
+- **macOS**：原生 toggleFullScreen API
+- **Linux**：_NET_WM_STATE（X11）/ xdg-shell（Wayland）
 
-### Current Architecture (v1 Windows-only)
+### 我们当前方案
+- **Windows**：移除 WS_CAPTION + WS_THICKFRAME，isOperating Completer 防重入
+- 已解决边框缝隙问题、圆角修复、DPI 自适应
 
-The v1 player uses:
-- **window_manager** (0.5.1) — Flutter plugin for window control (setFullScreen, setAsFrameless, startDragging)
-- **Win32 C++ runner** — custom main.cpp with DWM dark mode, rounded corners, DPI support
-- **FullscreenController** — atomic fullscreen with mutex guard, save/rollback, Completer-based isOperating signal
-- **WindowService** — thin coordinator composing WindowState + FullscreenController + WindowPersistence
-- **WindowBridge** — abstract interface (4 state ValueNotifiers + 6 command methods)
+## Architecture
 
-### Cross-Platform Research Findings
+```
+lib/
+├── kernel/bridge/                 ← 窗口管理层（需要跨平台化）
+│   ├── window_bridge.dart         ★ 抽象接口（保持不变）
+│   ├── window_service.dart        ★ 薄协调者（需要平台分发）
+│   ├── window_state.dart          状态容器（纯 Dart，无需改）
+│   ├── window_mode.dart           枚举（纯 Dart，无需改）
+│   ├── window_persistence.dart    防抖持久化（纯 Dart，无需改）
+│   └── fullscreen_controller.dart 原子全屏（需要平台特化）
+│
+├── kernel/platform/               ← 新增：平台抽象层
+│   ├── platform_window.dart       ★ 平台窗口抽象接口
+│   ├── platform_registry.dart     平台实现注册
+│   ├── windows/
+│   │   └── windows_platform_window.dart  Win32 实现
+│   ├── linux/
+│   │   └── linux_platform_window.dart    GTK/X11/Wayland 实现
+│   └── macos/
+│       └── macos_platform_window.dart    NSWindow 实现
+│
+└── windows/runner/                ← C++ 原生层（需要扩展）
+    ├── main.cpp                   Win32 入口
+    ├── win32_window.h/cpp         Win32 窗口基类
+    └── flutter_window.h/cpp       Flutter 窗口子类
+```
 
-From analyzing mpv, Kodi, and VLC:
+## Dependencies
 
-1. **mpv Windows**: Removes WS_THICKFRAME for fullscreen, keeps WS_OVERLAPPED | WS_MINIMIZEBOX
-2. **mpv macOS**: Uses NSWindow.styleMask = .borderless + NSApp.presentationOptions for fullscreen
-3. **mpv Linux**: _NET_WM_STATE_FULLSCREEN (X11) / xdg_toplevel_set_fullscreen (Wayland)
-4. **Kodi**: FULLSCREEN_WINDOW_STYLE removes WS_CAPTION, supports fake fullscreen + exclusive mode
-5. **All mature players**: Use animation locks (NSCondition / m_IsAlteringWindow / Completer)
-6. **macOS fullscreen**: All players use NSWindow.toggleFullScreen: — one-line solution
-7. **Flutter limitation**: window_manager is a thin wrapper; platform-specific FFI needed for fine control
+### 当前依赖
+- window_manager (0.5.1) — 窗口位置/大小/最大化/最小化/置顶/拖拽
+- fvp (0.37.2) — MDK/FFmpeg 播放引擎
+- shared_preferences (2.5.5) — 键值对持久化
 
-### Key Technical Decisions
-
-- Keep window_manager as base layer, extend with platform-specific FFI where needed
-- WS_POPUP approach for Windows fullscreen (already proven in v1)
-- Native NSWindow APIs for macOS (no FFI needed — Flutter's macOS runner uses NSWindow directly)
-- XDG shell for Wayland, _NET_WM_STATE for X11
-- Preserve existing WindowBridge abstraction — add platform implementations
+### 跨平台需要
+- window_manager — 继续使用，但需要平台特化补充
+- 各平台原生 API（Win32/GTK/Cocoa）— 通过 FFI 或 MethodChannel
 
 ## Constraints
 
-- **Flutter desktop**: All three platforms must use Flutter's official desktop support
-- **fvp engine**: Media engine uses D3D11 on Windows, needs Vulkan/OpenGL backends on Linux/macOS
-- **window_manager 0.5.1**: Current dependency — may need to fork or replace for Linux/macOS gaps
-- **No breaking changes**: v1 Windows experience must not regress
-- **Architecture**: Keep WindowBridge as abstract interface; platform impls behind it
+- 保持 WindowBridge 抽象接口不变（4 状态 + 6 命令）
+- 不可变数据模式（AppSettings copyWith）
+- ValueNotifier + ValueListenableBuilder 状态管理
+- 80%+ 测试覆盖
+- 渐进式迁移，不破坏现有 Windows 功能
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Keep WindowBridge abstraction | Clean platform separation, testable | — Pending |
-| Use native platform APIs over Flutter plugins | Fine-grained control (mpv/Kodi pattern) | — Pending |
-| Borderless fullscreen only (no exclusive) | Media player standard, simpler, no resolution changes | — Pending |
-| Preserve v1 Windows FFI approach | Proven WS_THICKFRAME removal + SetWindowPos atomic | — Pending |
+| 保持 WindowBridge 接口 | 最小化 UI 层改动 | — Pending |
+| 平台抽象层独立于 window_manager | 允许精细控制各平台行为 | — Pending |
+| 参考 mpv WS_THICKFRAME 方案 | 成熟方案，已验证 | — Pending |
+| macOS 用原生 toggleFullScreen | 最简单可靠 | — Pending |
+
+## Requirements
+
+### Validated
+
+- ✓ 自定义无边框标题栏 (32px) — existing
+- ✓ 拖拽标题栏移动窗口 — existing
+- ✓ 双击标题栏切换最大化 — existing
+- ✓ 最小化/最大化/还原/关闭 — existing
+- ✓ 置顶 (Always on Top) — existing
+- ✓ 全屏切换（原子 + mutex + 回滚）— existing
+- ✓ 窗口几何持久化 — existing
+- ✓ DragToResizeArea 窗口边缘拖拽缩放 — existing
+- ✓ 圆角窗口 (DWMWCP_ROUND) — existing
+- ✓ DPI 自适应 — existing
+
+### Active
+
+- [ ] 跨平台窗口抽象层（PlatformWindow 接口）
+- [ ] Windows 平台实现（基于现有代码重构）
+- [ ] Linux 平台实现（GTK + X11/Wayland）
+- [ ] macOS 平台实现（Cocoa + NSWindow）
+- [ ] 跨平台全屏（各平台原生方案）
+- [ ] 多显示器支持
+- [ ] 平台特化圆角/暗色模式/DPI
+
+### Out of Scope
+
+- 移动端（Android/iOS）— 不同窗口模型
+- Web 端 — 无窗口管理概念
+- 独占全屏（改分辨率）— 复杂度高，用户需求低
+- HDR/色彩管理 — 独立功能
 
 ## Evolution
 
