@@ -1,73 +1,33 @@
-# Research Summary — v1.2.1 Window Polish & Architecture Simplification
+# Research Summary — Cross-Platform Window Management
 
-**Date:** 2026-05-31
-**Source:** Context7 (Flutter docs), claude-mem (project history), codebase analysis, 4 parallel research agents
+**Synthesized:** 2026-06-23
+
+## Executive Summary
+
+Simple Player Flutter is a Windows desktop media player built on Flutter + fvp (MDK/FFmpeg) with a mature, clean architecture. All 12 table-stakes window management features are complete on Windows. The goal is expanding to Linux and macOS using the existing `PlatformFullscreen` strategy pattern — the architecture already has the right abstraction seams, so the work is adding concrete implementations, not restructuring. No new packages needed.
 
 ## Key Findings
 
-### Window Smoothness (WIN-05)
+1. **Stack:** Keep `window_manager` ^0.5.1 + `ffi` ^2.1.0 + `fvp` ^0.37.2. No new dependencies needed.
+2. **Features:** 12/12 table stakes done on Windows. Cross-platform porting estimated 3-6 days per platform.
+3. **Architecture:** 4-layer with `PlatformFullscreen` strategy pattern. Adding macOS/Linux = 2 files (~150 lines each) + factory method update.
+4. **Top Risks:** macOS NSWindow thread safety (CRITICAL), Wayland blocks client positioning (HIGH), macOS fullscreen paradigm difference (HIGH), macOS App Nap (HIGH), ARM64 plugin binaries (MEDIUM).
 
-**Root Cause**: 4 overlapping timing issues cause a single ugly frame to flash at startup and fullscreen transitions:
-1. Startup: async `removeBorderImmediate()` races with `windowManager.show()`
-2. Fullscreen: two-step transition (style change + position change) has gap
-3. Triple border removal: `window_manager` plugin + main.dart FFI + app.dart `WindowService.init()` create path conflicts
-4. No C++ `WM_NCCALCSIZE` handler for synchronous frameless enforcement
+## Roadmap Implications
 
-**Solution — C++ WM_NCCALCSIZE (synchronous)**:
-- Handle `WM_NCCALCSIZE` in `flutter_window.cpp` BEFORE `HandleTopLevelWindowProc` (lines 46-53)
-- Collapse non-client area to zero while preserving `WS_CAPTION` for DWM animations
-- Eliminates ALL async border removal timing issues — window is frameless from first paint
-- **Risk**: Flutter engine may consume WM_NCCALCSIZE before custom handlers (3 prior failed C++ attempts documented in anti-pattern memory)
-- **Mitigation**: Spike with `OutputDebugString` verification (0.5 day)
+1. **Phase 1 — Platform Abstraction:** Refactor WindowBridge, add factory pattern. Validates seam with existing Windows code.
+2. **Phase 2 — Windows Bridge:** Extract current impl into WindowsBridge. Zero-risk validation of abstraction.
+3. **Phase 3 — Linux:** X11 + Wayland. Highest compositor fragmentation. Wayland positioning is a silent failure.
+4. **Phase 4 — macOS:** NSWindow native fullscreen. Thread safety is CRITICAL risk.
+5. **Phase 5 — ARM Validation:** fvp ARM64 binaries are gating factor.
+6. **Phase 6 — Integration Testing:** CI matrix across 3 platforms.
 
-**Fullscreen smooth transition**: BLOCKED by Flutter engine's `HandleTopLevelWindowProc` interception. Deferred to v1.3+.
+## Sources
 
-### HLS ABR (HLS-01)
-
-**Algorithm choice**: Throughput-based (EWMA), NOT BBA.
-- Desktop bandwidth is stable; BBA's buffer-level approach is over-engineering
-- FFmpeg's built-in `hls.c` demuxer handles variant selection
-- Throughput estimation via EWMA covers 80% of desktop use cases
-
-**Critical conflict**: `fflags +nobuffer` and `setBufferRange(drop:true)` applied to ALL URLs conflicts with ABR buffer requirements.
-- **Solution**: URL-type routing — `.m3u8` → ABR config (remove low-latency flags), else → low-latency config
-
-**MDK metric availability**: Need spike (0.5 day) to verify `MediaInfo` exposes bitrate/buffer metrics for EWMA calculation.
-
-### Architecture Simplification (ARCH-02, ARCH-03, PLATFORM-03)
-
-**SettingsStore**: 25+ save methods → generic `_get<T>`/`_set<T>` pattern. Standard refactoring, no research needed.
-
-**Singleton migration**: 6 static mutable singletons → constructor injection.
-- Pattern: `PlatformService` abstract interface with `WindowsPlatformService` implementation
-- Constructor injection (NOT service locator) — simplest, most testable
-- `WindowsPlatformService` delegates to existing `WindowService` (no rewrite)
-
-**Platform abstraction**: Interface definitions only, no macOS/Linux implementation yet.
-- Main interface: `PlatformService` (window, system, path operations)
-- FFI/C++ runner is the ONLY platform-specific binding
-
-## Recommended Phase Order
-
-| Phase | Focus | Risk | Rationale |
-|-------|-------|------|-----------|
-| Phase 13 | Window Foundation (C++ WM_NCCALCSIZE) | HIGH | Highest impact, needs spike first, unblocks Phase 15 |
-| Phase 14 | HLS ABR (AbrService + URL Routing) | MEDIUM | Independent of Phase 13, can run in parallel |
-| Phase 15 | Architecture Simplification (SettingsStore + PlatformService) | LOW | Standard patterns, benefits from Phase 13 decisions |
-
-## Research Flags
-
-- Phase 13 needs WM_NCCALCSIZE spike (0.5 day) with `OutputDebugString` verification
-- Phase 14 needs MDK metric availability spike (0.5 day)
-- Phase 15 uses standard patterns, no research needed
-- Fullscreen smooth transition deferred to v1.3+ (blocked by engine)
-
-## Source Documents
-
-- STACK.md — fvp/MDK engine capabilities, D3D11 pipeline, FFmpeg HLS demuxer
-- FEATURES.md — Window smoothness patterns, HLS ABR architecture, platform abstraction
-- ARCHITECTURE.md — WM_NCCALCSIZE integration, bridge layer design, DI patterns
-- PITFALLS.md — Anti-patterns from project history, timing conflicts, engine limitations
+- `.planning/research/STACK.md`
+- `.planning/research/FEATURES.md`
+- `.planning/research/ARCHITECTURE.md`
+- `.planning/research/PITFALLS.md`
 
 ---
-*Research completed: 2026-05-31*
+*Synthesized: 2026-06-23*
