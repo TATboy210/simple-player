@@ -1,129 +1,84 @@
-# Requirements: Simple Player — Cross-Platform Window Management
+# Cross-Platform Window Management — Requirements
 
-**Defined:** 2026-06-23
-**Core Value:** Seamless, native-quality window management across Windows/Linux/macOS without regressions
+## User Stories
+
+**As a** 播放器用户, **I want** 在 Windows/Linux/macOS 上获得一致的窗口管理体验, **so that** 我可以在任何桌面平台上使用相同的快捷键和窗口操作。
 
 ## v1 Requirements
 
-### Platform Abstraction
+### Platform Abstraction (PLATFORM)
 
-- [ ] **PLAT-01**: WindowBridge interface supports platform-specific implementations (Windows/Linux/macOS)
-- [ ] **PLAT-02**: Platform detection at startup selects correct WindowBridge implementation
-- [ ] **PLAT-03**: Platform capabilities are queryable (supportsRoundedCorners, supportsNativeFullscreen, etc.)
-- [ ] **PLAT-04**: Shared state model (WindowState) works identically across all platforms
+- [ ] **PLATFORM-01**: 定义 PlatformWindow 抽象接口（全屏/最大化/最小化/置顶/拖拽/几何管理）
+- [ ] **PLATFORM-02**: 平台注册机制（PlatformRegistry 根据 Platform.operatingSystem 自动选择实现）
+- [ ] **PLATFORM-03**: WindowService 通过 PlatformWindow 接口分发命令，不再直接调用 window_manager
 
-### Linux Window Management
+### Windows Implementation (WIN)
 
-- [ ] **LNX-01**: X11 window management via _NET_WM_STATE_FULLSCREEN and XChangeProperty
-- [ ] **LNX-02**: Wayland window management via xdg_toplevel_set_fullscreen
-- [ ] **LNX-03**: Runtime X11/Wayland detection and appropriate backend selection
-- [ ] **LNX-04**: Linux title bar (GTK header bar or custom frameless)
-- [ ] **LNX-05**: Linux window geometry persistence (position/size/state)
-- [ ] **LNX-06**: Linux always-on-top via _NET_WM_STATE_ABOVE
-- [ ] **LNX-07**: Linux minimize/maximize via EWMH hints
+- [ ] **WIN-01**: 基于现有代码重构 WindowsPlatformWindow（保持 WS_CAPTION+WS_THICKFRAME 全屏方案）
+- [ ] **WIN-02**: 保留 isOperating Completer 防重入机制
+- [ ] **WIN-03**: 保留圆角修复（DWMWCP_ROUND + snap/maximize 后修复）
+- [ ] **WIN-04**: 保留 DPI 自适应（PerMonitor V1）
 
-### macOS Window Management
+### Linux Implementation (LINUX)
 
-- [ ] **MAC-01**: NSWindow-based fullscreen via toggleFullScreen: (native API)
-- [ ] **MAC-02**: macOS title bar (native NSWindow title bar or custom traffic lights)
-- [ ] **MAC-03**: macOS window geometry persistence (NSWindow frame autosave)
-- [ ] **MAC-04**: macOS always-on-top via NSWindow.level
-- [ ] **MAC-05**: macOS minimize via NSWindow.miniaturize
-- [ ] **MAC-06**: macOS HiDPI/Retina scaling support
-- [ ] **MAC-07**: macOS animation lock for fullscreen transitions (NSCondition)
+- [ ] **LINUX-01**: LinuxPlatformWindow 实现（GTK 窗口管理）
+- [ ] **LINUX-02**: X11 全屏（_NET_WM_STATE_FULLSCREEN）
+- [ ] **LINUX-03**: Wayland 全屏（xdg_toplevel_set_fullscreen）
+- [ ] **LINUX-04**: 圆角支持（GTK CSS 或 DRI3）
+- [ ] **LINUX-05**: DPI 自适应（GTK scale factor）
 
-### Windows Enhancements
+### macOS Implementation (MACOS)
 
-- [ ] **WIN-01**: Preserve existing Win32 FFI fullscreen (WS_THICKFRAME removal)
-- [ ] **WIN-02**: Preserve existing DWM rounded corners + dark mode
-- [ ] **WIN-03**: Preserve existing DPI adaptation (PerMonitor V1)
-- [ ] **WIN-04**: Preserve existing DragToResizeArea edge resize
+- [ ] **MACOS-01**: MacOSPlatformWindow 实现（NSWindow）
+- [ ] **MACOS-02**: 原生 toggleFullScreen（NSWindow.toggleFullScreen:）
+- [ ] **MACOS-03**: NSCondition 防动画重入（参考 mpv）
+- [ ] **MACOS-04**: 圆角支持（NSWindow.styleMask）
+- [ ] **MACOS-05**: DPI 自适应（Retina scale factor）
 
-### Cross-Platform Features
+### Multi-Monitor (MULTI)
 
-- [ ] **XP-01**: Unified keyboard shortcuts across all platforms (Space/F/M/N/P/O etc.)
-- [ ] **XP-02**: Cross-platform window geometry persistence (same SettingsStore API)
-- [ ] **XP-03**: Cross-platform fullscreen with atomic mutex guard (existing pattern)
-- [ ] **XP-04**: Cross-platform auto-hide title bar on fullscreen
-- [ ] **XP-05**: Cross-platform minimum window size enforcement
-- [ ] **XP-06**: Cross-platform window centering on first launch
+- [ ] **MULTI-01**: 获取所有显示器信息（尺寸/位置/DPI）
+- [ ] **MULTI-02**: 全屏时指定目标显示器
+- [ ] **MULTI-03**: 窗口位置防越界（跨显示器边界）
 
-### Architecture
+### Integration (INT)
 
-- [ ] **ARCH-01**: Platform implementations behind WindowBridge abstraction (no platform code in UI)
-- [ ] **ARCH-02**: Each platform has its own bridge implementation file
-- [ ] **ARCH-03**: Factory pattern for platform bridge instantiation
-- [ ] **ARCH-04**: Existing v1 tests continue passing on Windows
+- [ ] **INT-01**: WindowBridge 接口零改动（UI 层无感知）
+- [ ] **INT-02**: WindowState 4 个 ValueNotifier 正常工作
+- [ ] **INT-03**: WindowPersistence 防抖持久化跨平台兼容
+- [ ] **INT-04**: SettingsStore 读写跨平台兼容
 
-## v2 Requirements
+## v2 Requirements (Deferred)
 
-### Advanced Platform Features
-
-- **ADV-01**: Multi-monitor support (detect, move window, remember per-monitor settings)
-- **ADV-02**: Linux snap layouts (tiling window manager hints)
-- **ADV-03**: macOS Stage Manager integration
-- **ADV-04**: Windows snap layouts (Win11 snap assist)
-- **ADV-05**: Platform-specific gesture support (trackpad pinch-zoom, three-finger swipe)
-
-### Media Engine Cross-Platform
-
-- **ENG-01**: fvp engine with Vulkan backend on Linux (instead of D3D11)
-- **ENG-02**: fvp engine with Metal/OpenGL backend on macOS
-- **ENG-03**: ARM-native fvp builds (Linux ARM64, macOS ARM64/Apple Silicon)
+- [ ] 独占全屏（改分辨率）— 复杂度高，用户需求低
+- [ ] 多显示器黑屏其他屏幕（Kodi BlankOtherDisplays 模式）
+- [ ] HDR/色彩管理 — 独立功能
+- [ ] 移动端窗口管理 — 不同窗口模型
 
 ## Out of Scope
 
-| Feature | Reason |
-|---------|--------|
-| Exclusive fullscreen (ChangeDisplaySettingsEx) | Media players use borderless fullscreen; exclusive mode is gaming-specific |
-| Multi-monitor blanking (Kodi-style) | Niche feature, high complexity, low user demand |
-| Mobile platforms (Android/iOS) | Desktop-only player; different UI paradigm |
-| Wayland-only builds | Older distros still need X11; use runtime detection instead |
-| Custom window chrome on Linux (CSD) | GTK header bar or frameless sufficient; CSD adds complexity |
-| Window tiling WM integration (i3/sway) | WMs handle tiling; player just needs to respect WM hints |
+- **Android/iOS** — 移动端无窗口管理概念，使用系统原生行为
+- **Web** — 浏览器全屏 API 完全不同
+- **独占全屏** — ChangeDisplaySettingsEx 复杂度高，窗口全屏已满足需求
 
-## Traceability
+## Acceptance Criteria
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| PLAT-01 | Phase 1 | Pending |
-| PLAT-02 | Phase 1 | Pending |
-| PLAT-03 | Phase 1 | Pending |
-| PLAT-04 | Phase 1 | Pending |
-| ARCH-01 | Phase 1 | Pending |
-| ARCH-02 | Phase 1 | Pending |
-| ARCH-03 | Phase 1 | Pending |
-| ARCH-04 | Phase 1 | Pending |
-| WIN-01 | Phase 2 | Pending |
-| WIN-02 | Phase 2 | Pending |
-| WIN-03 | Phase 2 | Pending |
-| WIN-04 | Phase 2 | Pending |
-| XP-01 | Phase 2 | Pending |
-| XP-03 | Phase 2 | Pending |
-| XP-04 | Phase 2 | Pending |
-| XP-05 | Phase 2 | Pending |
-| XP-06 | Phase 2 | Pending |
-| LNX-01 | Phase 3 | Pending |
-| LNX-02 | Phase 3 | Pending |
-| LNX-03 | Phase 3 | Pending |
-| LNX-04 | Phase 3 | Pending |
-| LNX-05 | Phase 3 | Pending |
-| LNX-06 | Phase 3 | Pending |
-| LNX-07 | Phase 3 | Pending |
-| XP-02 | Phase 3 | Pending |
-| MAC-01 | Phase 4 | Pending |
-| MAC-02 | Phase 4 | Pending |
-| MAC-03 | Phase 4 | Pending |
-| MAC-04 | Phase 4 | Pending |
-| MAC-05 | Phase 4 | Pending |
-| MAC-06 | Phase 4 | Pending |
-| MAC-07 | Phase 4 | Pending |
+1. 在 Windows 上，现有全屏/最大化/最小化/置顶功能零回归
+2. 在 Linux (X11) 上，全屏切换正常工作，无边框缝隙
+3. 在 Linux (Wayland) 上，全屏切换正常工作
+4. 在 macOS 上，全屏切换使用原生动画，无卡顿
+5. 所有平台上，窗口几何持久化正常工作
+6. 所有平台上，DPI 自适应正常工作
+7. WindowBridge 接口零改动，UI 层无需修改
 
-**Coverage:**
-- v1 requirements: 28 total
-- Mapped to phases: 28
-- Unmapped: 0 ✓
+## Definition of Done
+
+- [ ] 所有 PLATFORM-* 需求完成
+- [ ] 至少一个平台实现完成（Windows）
+- [ ] 单元测试覆盖 ≥ 80%
+- [ ] 集成测试覆盖关键路径（全屏切换、窗口几何持久化）
+- [ ] 文档更新（README、架构文档）
+- [ ] 零回归（现有 Windows 功能正常）
 
 ---
-*Requirements defined: 2026-06-23*
-*Last updated: 2026-06-23 after initial definition*
+*Last updated: 2026-06-23 after initialization*
