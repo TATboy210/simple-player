@@ -45,6 +45,12 @@ class FvpEngine extends PlayerEngine {
   // D3D11 性能参数默认值
   static const _defaultVideoDecoders = 'D3D11,NVDEC,FFmpeg'; // 硬件优先
 
+  // 内存优化参数（适合 1080p，4K HEVC 软解时可能需要放宽）
+  static const _ffmpegDecoderThreads = '2'; // FFmpeg 软解线程数（默认=CPU核心数，8-16）
+  static const _localBufferMinMs = 500; // 本地文件最小缓冲 500ms（默认 1000）
+  static const _localBufferMaxMs = 2000; // 本地文件最大缓冲 2s（默认 4000）
+  static const _maxBufferFrames = '3'; // 渲染器最大帧缓冲（2 帧过紧，3 帧更安全）
+
   // ─── Helpers ───
 
   late FvpCallbackHandler _callbackHandler;
@@ -130,7 +136,7 @@ class FvpEngine extends PlayerEngine {
     return p;
   }
 
-  /// 应用 D3D11 渲染管线默认参数
+  /// 应用 D3D11 渲染管线 + 内存优化默认参数
   ///
   /// 在 player 创建后立即调用，确保后续 open() 使用优化配置。
   /// 参考: MDK SDK Player.setProperty, fvp_plugin.cpp D3D11RenderAPI
@@ -145,10 +151,26 @@ class FvpEngine extends PlayerEngine {
     //   硬件解码器优先，软件解码器兜底
     p.setProperty('video.decoders', _defaultVideoDecoders);
 
+    // ── 内存优化 ──
+
+    // avcodec.threads: FFmpeg 软解线程数
+    //   默认=CPU核心数(8-16)，每线程有独立工作缓冲
+    //   限制到 2 线程可省 10-30MB，对单文件播放足够
+    p.setProperty('avcodec.threads', _ffmpegDecoderThreads);
+
+    // videoout.buffer_frames: 渲染器最大帧缓冲
+    //   减少参考帧在渲染管线中的驻留数量
+    p.setProperty('videoout.buffer_frames', _maxBufferFrames);
+
+    // reader.starts_with_key: 丢弃首个关键帧前的非关键包
+    //   减少初始缓冲分配
+    p.setProperty('reader.starts_with_key', '1');
+
     log.d(
-      'FvpEngine: D3D11 defaults applied '
+      'FvpEngine: D3D11 + memory defaults applied '
       '(sync.cpu=$syncMode, refreshRate=${DisplayConfig.getRefreshRate()}Hz, '
-      'decoders=$_defaultVideoDecoders)',
+      'decoders=$_defaultVideoDecoders, threads=$_ffmpegDecoderThreads, '
+      'bufferFrames=$_maxBufferFrames)',
     );
   }
 
@@ -265,9 +287,19 @@ class FvpEngine extends PlayerEngine {
     try {
       _player.media = trimmed;
 
-      // URL 源自动配置网络参数，本地文件跳过
       if (PathValidator.isUrl(trimmed)) {
+        // URL 源：配置网络参数
         _configureNetworkOptions(trimmed);
+      } else {
+        // 本地文件：紧凑缓冲，减少内存占用
+        //   默认 buffer.range=1000-4000ms，本地文件不需要这么大的缓冲
+        _player.setBufferRange(
+          min: _localBufferMinMs,
+          max: _localBufferMaxMs,
+          drop: true,
+        );
+        // 本地文件不需要 demux 缓存（已禁用网络流的 demux.buffer.ranges）
+        _player.setProperty('demux.buffer.ranges', '0');
       }
 
       final prepareResult = await _player.prepare().timeout(
