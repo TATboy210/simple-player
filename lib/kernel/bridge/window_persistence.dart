@@ -6,16 +6,16 @@ import '../utils/log.dart';
 /// 窗口持久化服务 — 防抖保存 + 写入锁。
 ///
 /// 包装 [SettingsStore] 的窗口相关写入，解决：
-/// - W-08: 拖拽期间高频保存（防抖 500ms）
+/// - W-08: 拖拽期间高频保存（防抖 150ms，合并 ~60fps 的 WM_SIZE 事件）
 /// - 写入锁：上一次 save 未完成时，新请求合并为最新值
 class WindowPersistence {
-  WindowPersistence({this.debounceMs = 500});
+  WindowPersistence({this.debounceMs = 150});
 
   final int debounceMs;
 
   Timer? _debounce;
   Future<void>? _inFlight;
-  bool _hasPending = false;
+  Future<void> Function()? _pendingAction;
 
   /// 保存窗口几何（防抖 + 写入锁）。
   void saveWindowGeometry({
@@ -27,13 +27,15 @@ class WindowPersistence {
   }) {
     _debounce?.cancel();
     _debounce = Timer(Duration(milliseconds: debounceMs), () {
-      _enqueue(() => SettingsStore.saveWindowGeometry(
-            x: x,
-            y: y,
-            width: width,
-            height: height,
-            isMaximized: isMaximized,
-          ));
+      _enqueue(
+        () => SettingsStore.saveWindowGeometry(
+          x: x,
+          y: y,
+          width: width,
+          height: height,
+          isMaximized: isMaximized,
+        ),
+      );
     });
   }
 
@@ -42,10 +44,10 @@ class WindowPersistence {
     return _enqueue(() => SettingsStore.saveIsFullscreen(value));
   }
 
-  /// 写入锁：排队执行，上一个未完成时标记 pending。
+  /// 写入锁：排队执行，上一个未完成时暂存最新闭包。
   Future<void> _enqueue(Future<void> Function() action) async {
     if (_inFlight != null) {
-      _hasPending = true;
+      _pendingAction = action; // 覆盖旧的 pending，只保留最新值
       return;
     }
 
@@ -54,9 +56,10 @@ class WindowPersistence {
       await _inFlight;
     } finally {
       _inFlight = null;
-      if (_hasPending) {
-        _hasPending = false;
-        // 有 pending 请求 — 重新执行（最新值已在闭包中）
+      if (_pendingAction != null) {
+        final next = _pendingAction!;
+        _pendingAction = null;
+        await _enqueue(next); // 递归执行最新 pending
       }
     }
   }
