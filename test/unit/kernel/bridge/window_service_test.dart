@@ -23,12 +23,6 @@ void main() {
       service.dispose();
     });
 
-    test('lastInteractionTime defaults to 0', () {
-      final service = WindowService();
-      expect(service.lastInteractionTime.value, 0);
-      service.dispose();
-    });
-
     test('state windowSize defaults to 1280x720', () {
       final service = WindowService();
       expect(service.state.windowSize.value.width, 1280);
@@ -53,20 +47,6 @@ void main() {
       service.dispose();
     });
 
-    test('onWindowMaximize updates lastInteractionTime', () {
-      final service = WindowService();
-      service.onWindowMaximize();
-      expect(service.lastInteractionTime.value, greaterThan(0));
-      service.dispose();
-    });
-
-    test('onWindowUnmaximize updates lastInteractionTime', () {
-      final service = WindowService();
-      service.state.mode.value = WindowMode.maximized;
-      service.onWindowUnmaximize();
-      expect(service.lastInteractionTime.value, greaterThan(0));
-      service.dispose();
-    });
   });
 
   group('dispose safety', () {

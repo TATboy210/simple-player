@@ -315,14 +315,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_fullscreen:
-    dependency: "direct main"
-    description:
-      name: flutter_fullscreen
-      sha256: "37fc83866ded6477efdd5653bed3a6edaaa831dada48a3ca58b2395ce1cc282f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.2.0"
   flutter_lints:
     dependency: "direct dev"
     description:
