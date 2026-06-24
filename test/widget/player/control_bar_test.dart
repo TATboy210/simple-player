@@ -26,7 +26,6 @@ void main() {
   Widget buildSubject({
     PlayerEngine? eng,
     PlayerActions? actions,
-    bool isFullscreen = false,
     bool isIdle = false,
   }) {
     return MaterialApp(
@@ -39,7 +38,6 @@ void main() {
           child: ControlBar(
             engine: eng ?? engine,
             actions: actions ?? const PlayerActions(),
-            isFullscreen: isFullscreen,
             isIdle: isIdle,
           ),
         ),
@@ -140,18 +138,6 @@ void main() {
       await tester.pump();
 
       expect(find.byIcon(Icons.fullscreen), findsOneWidget);
-    });
-
-    testWidgets('shows fullscreen_exit when isFullscreen', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(
-          isFullscreen: true,
-          actions: const PlayerActions(onToggleFullscreen: _noop),
-        ),
-      );
-      await tester.pump();
-
-      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
     });
 
     testWidgets('shows subtitles button when onOpenSubtitle is provided', (
