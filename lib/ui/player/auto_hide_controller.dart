@@ -13,8 +13,10 @@ class AutoHideController {
   AutoHideController({
     required TickerProvider vsync,
     required ValueNotifier<MediaState> engineState,
+    required bool isFullscreen,
     ValueNotifier<int>? popupCloseNotifier,
   }) : _engineState = engineState,
+       _isFullscreen = isFullscreen,
        _popupCloseNotifier = popupCloseNotifier {
     _animController = AnimationController(
       vsync: vsync,
@@ -28,6 +30,7 @@ class AutoHideController {
 
   final ValueNotifier<MediaState> _engineState;
   final ValueNotifier<int>? _popupCloseNotifier;
+  bool _isFullscreen;
   late final AnimationController _animController;
   late final Animation<double> _opacity;
 
@@ -46,8 +49,15 @@ class AutoHideController {
   /// 是否正在悬停
   bool get isHovering => _hovering;
 
-  Duration get _hideDelay =>
-      const Duration(seconds: Tokens.hideDelayWindowed);
+  /// 更新全屏状态（窗口/全屏切换时调用）
+  set isFullscreen(bool value) {
+    _isFullscreen = value;
+    scheduleHide();
+  }
+
+  Duration get _hideDelay => _isFullscreen
+      ? const Duration(seconds: Tokens.hideDelayFullscreen)
+      : const Duration(seconds: Tokens.hideDelayWindowed);
 
   /// 显示控制栏（带动画）
   void show() {

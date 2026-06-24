@@ -89,7 +89,7 @@ steps:
 | `fvp` | ^0.36.2 | MDK/FFmpeg 视频播放引擎 |
 | `path_provider` | ^2.1.5 | 平台路径获取 |
 | `file_picker` | ^11.0.2 | 文件选择对话框 |
-| `window_manager` | ^0.5.1 | 窗口管理 (标题栏、窗口控制) |
+| `window_manager` | ^0.5.1 | 窗口管理 (标题栏、全屏) |
 | `shared_preferences` | ^2.5.5 | 键值存储 |
 | `desktop_drop` | ^0.7.1 | 拖放支持 |
 | `logger` | ^2.5.0 | 日志框架 |

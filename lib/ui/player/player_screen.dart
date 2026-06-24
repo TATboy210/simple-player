@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
+import '../../kernel/bridge/window_mode.dart';
 import 'package:player_engine/player_engine.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
@@ -116,6 +117,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         final modeIcon = playModeIcon(widget.playlist.mode);
         final modeLabel = playModeLabel(widget.playlist.mode, l10n);
 
+        final videoContent = _buildVideoContent(isVideo, modeIcon, modeLabel);
+
         final keyboardHandler = KeyboardHandler(
           customBindings: widget.customBindings,
           onPlayPause: () => widget.engine.togglePlayPause(),
@@ -143,6 +146,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           onMediaPlayPause: () => widget.engine.togglePlayPause(),
           onMediaNext: () => widget.controller.playNext(),
           onMediaPrevious: () => widget.controller.playPrevious(),
+          onExitFullscreen: () => widget.windowService.setMode(WindowMode.windowed),
           child: Scaffold(
             backgroundColor: Tokens.bgBase,
             body: Column(
@@ -190,7 +194,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           animation: widget.windowService.mode,
           builder: (context, child) {
             final m = widget.windowService.mode.value;
-            if (m.isMaximized) {
+            if (m.isFullscreen || m.isMaximized) {
               return MouseRegion(
                 cursor: SystemMouseCursors.basic,
                 child: child,
@@ -226,28 +230,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       : const SizedBox.shrink(),
                   child: Positioned.fill(child: widget.emptyState!),
                 ),
-              ControlsOverlay(
-                engine: widget.engine,
-                actions: PlayerActions(
-                  onPrevious: () => widget.controller.playPrevious(),
-                  onNext: () => widget.controller.playNext(),
-                  onTogglePlaylist: _togglePlaylist,
-                  onSettings: widget.onSettings,
-                  onSettingsSecondary: widget.onSettingsSecondary,
-                  onOpenFile: widget.onOpenFile,
-                  onTogglePlayMode: widget.onTogglePlayMode,
-                  onOpenSubtitle: _openSubtitle,
-                  onFilesDropped: widget.onFilesDropped,
-                  onDragHoverChanged: widget.onDragHoverChanged,
-                  onFolderScanned: widget.onFolderScanned,
-                  onClearHistory: widget.onClearHistory,
-                  onShowProperties: widget.onShowProperties,
-                  playModeIcon: modeIcon,
-                  playModeLabel: modeLabel,
-                  isVideo: isVideo,
-                ),
-                emptyStatePresent: widget.emptyState != null,
-                resizing: widget.windowService.isResizing,
+              AnimatedBuilder(
+                animation: widget.windowService.mode,
+                builder: (context, _) {
+                  final isFullscreen = widget.windowService.mode.value.isFullscreen;
+                  return ControlsOverlay(
+                  engine: widget.engine,
+                  actions: PlayerActions(
+                    onPrevious: () => widget.controller.playPrevious(),
+                    onNext: () => widget.controller.playNext(),
+                    onTogglePlaylist: _togglePlaylist,
+                    onSettings: widget.onSettings,
+                    onSettingsSecondary: widget.onSettingsSecondary,
+                    onOpenFile: widget.onOpenFile,
+                    onToggleFullscreen: () =>
+                        widget.windowService.setMode(isFullscreen ? WindowMode.windowed : WindowMode.fullscreen),
+                    onTogglePlayMode: widget.onTogglePlayMode,
+                    onOpenSubtitle: _openSubtitle,
+                    onFilesDropped: widget.onFilesDropped,
+                    onDragHoverChanged: widget.onDragHoverChanged,
+                    onFolderScanned: widget.onFolderScanned,
+                    onClearHistory: widget.onClearHistory,
+                    onShowProperties: widget.onShowProperties,
+                    playModeIcon: modeIcon,
+                    playModeLabel: modeLabel,
+                    isVideo: isVideo,
+                  ),
+                  emptyStatePresent: widget.emptyState != null,
+                  isFullscreen: isFullscreen,
+                  resizing: widget.windowService.isResizing,
+                );
+                },
               ),
             ],
           ),

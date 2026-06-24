@@ -176,6 +176,18 @@ abstract class AppLocalizations {
   /// **'Volume +/- 5%'**
   String get shortcutVolume;
 
+  /// Keyboard shortcut description for F key
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Fullscreen'**
+  String get shortcutFullscreen;
+
+  /// Keyboard shortcut description for ESC key
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Fullscreen'**
+  String get shortcutExitFullscreen;
+
   /// Keyboard shortcut description for M key
   ///
   /// In en, this message translates to:
@@ -427,6 +439,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playlist'**
   String get playlist;
+
+  /// Tooltip for fullscreen button
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen (F)'**
+  String get fullscreen;
+
+  /// Tooltip for exit fullscreen button
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Fullscreen (F)'**
+  String get exitFullscreen;
 
   /// Tooltip for subtitle import button
   ///

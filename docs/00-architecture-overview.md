@@ -142,7 +142,7 @@ lib/
 │               Persistence/Window Layer                    │
 │  PlaylistStore  (JSON防抖写入 + 原子文件操作)              │
 │  SettingsStore  (SharedPreferences, 21个设置字段)          │
-│  WindowService  (Win32 FFI, 无边框窗口, 几何持久化)        │
+│  WindowService  (Win32 FFI, 无边框全屏, 几何持久化)        │
 │  AspectRatioService (MethodChannel画面比例约束)            │
 │  WindowBridge   (抽象接口 + NoopWindowBridge回退)          │
 └─────────────────────────────────────────────────────────┘
@@ -165,7 +165,7 @@ lib/
 | **Dependency Injection** | `WindowBridge.inject` | 运行时注入具体实现 |
 | **Reactive State** | 全局 `ValueNotifier` | 无Provider/Riverpod/Bloc，纯ValueNotifier |
 | **RepaintBoundary** | VideoSurface/ControlsOverlay/Aurora | 重绘隔离，防止GPU浪费 |
-| **Optimistic UI + Rollback** | 画面比例切换 | 先更新UI，失败时回滚 |
+| **Optimistic UI + Rollback** | 全屏/画面比例切换 | 先更新UI，失败时回滚 |
 
 ---
 

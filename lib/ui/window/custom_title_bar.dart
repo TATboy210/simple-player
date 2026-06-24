@@ -7,6 +7,8 @@ import '../../kernel/bridge/window_mode.dart';
 import '../theme/tokens.dart';
 
 /// 自定义标题栏 — 平面/沉浸式按钮，32px 高度
+///
+/// 全屏时整体透明 + 忽略交互。
 class CustomTitleBar extends StatelessWidget {
   final WindowBridge windowService;
 
@@ -17,74 +19,84 @@ class CustomTitleBar extends StatelessWidget {
     return AnimatedBuilder(
       animation: windowService.mode,
       builder: (context, _) {
+        final isFullscreen = windowService.mode.value.isFullscreen;
         final isMaximized = windowService.mode.value.isMaximized;
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onPanStart: (_) {
-            unawaited(windowService.startDragging());
-          },
-          onDoubleTap: () {
-            if (isMaximized) {
-              unawaited(windowService.setMode(WindowMode.windowed));
-            } else {
-              unawaited(windowService.setMode(WindowMode.maximized));
-            }
-          },
-          child: Container(
-            height: Tokens.titleBarHeight,
-            color: Colors.transparent,
-            child: Row(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(left: Tokens.spMd),
-                  child: Text(
-                    'Simple Player',
-                    style: TextStyle(
-                      fontSize: Tokens.fontCaption,
-                      fontWeight: Tokens.weightMedium,
-                      color: Tokens.textPrimary,
+        return AnimatedOpacity(
+          opacity: isFullscreen ? 0.0 : 1.0,
+          duration:
+              const Duration(milliseconds: Tokens.durationFullscreenAnim),
+          curve: Curves.easeInOut,
+          child: IgnorePointer(
+            ignoring: isFullscreen,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanStart: (_) {
+                unawaited(windowService.startDragging());
+              },
+              onDoubleTap: () {
+                if (isMaximized) {
+                  unawaited(windowService.setMode(WindowMode.windowed));
+                } else {
+                  unawaited(windowService.setMode(WindowMode.maximized));
+                }
+              },
+              child: Container(
+                height: Tokens.titleBarHeight,
+                color: Colors.transparent,
+                child: Row(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: Tokens.spMd),
+                      child: Text(
+                        'Simple Player',
+                        style: TextStyle(
+                          fontSize: Tokens.fontCaption,
+                          fontWeight: Tokens.weightMedium,
+                          color: Tokens.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
+                    const Spacer(),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: windowService.isAlwaysOnTop,
+                      builder: (context, isPinned, _) => _TitleBarButton(
+                        icon: Icons.push_pin_outlined,
+                        isActive: isPinned,
+                        onPressed: () {
+                          unawaited(
+                            windowService.setAlwaysOnTop(!isPinned),
+                          );
+                        },
+                      ),
+                    ),
+                    _TitleBarButton(
+                      icon: Icons.minimize,
+                      onPressed: () {
+                        unawaited(windowService.minimize());
+                      },
+                    ),
+                    _TitleBarButton(
+                      icon: isMaximized
+                          ? Icons.filter_none
+                          : Icons.crop_square,
+                      onPressed: () {
+                        if (isMaximized) {
+                          unawaited(windowService.setMode(WindowMode.windowed));
+                        } else {
+                          unawaited(windowService.setMode(WindowMode.maximized));
+                        }
+                      },
+                    ),
+                    _TitleBarButton(
+                      icon: Icons.close,
+                      isClose: true,
+                      onPressed: () {
+                        unawaited(windowService.close());
+                      },
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                ValueListenableBuilder<bool>(
-                  valueListenable: windowService.isAlwaysOnTop,
-                  builder: (context, isPinned, _) => _TitleBarButton(
-                    icon: Icons.push_pin_outlined,
-                    isActive: isPinned,
-                    onPressed: () {
-                      unawaited(
-                        windowService.setAlwaysOnTop(!isPinned),
-                      );
-                    },
-                  ),
-                ),
-                _TitleBarButton(
-                  icon: Icons.minimize,
-                  onPressed: () {
-                    unawaited(windowService.minimize());
-                  },
-                ),
-                _TitleBarButton(
-                  icon: isMaximized
-                      ? Icons.filter_none
-                      : Icons.crop_square,
-                  onPressed: () {
-                    if (isMaximized) {
-                      unawaited(windowService.setMode(WindowMode.windowed));
-                    } else {
-                      unawaited(windowService.setMode(WindowMode.maximized));
-                    }
-                  },
-                ),
-                _TitleBarButton(
-                  icon: Icons.close,
-                  isClose: true,
-                  onPressed: () {
-                    unawaited(windowService.close());
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         );
