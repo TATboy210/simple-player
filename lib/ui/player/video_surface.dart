@@ -35,7 +35,8 @@ class VideoSurface extends StatelessWidget {
                   ? const SizedBox.shrink()
                   : ClipRect(
                       child: FittedBox(
-                        fit: BoxFit.contain,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
                         child: SizedBox(
                           width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
                           height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,

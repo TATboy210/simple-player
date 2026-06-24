@@ -334,6 +334,12 @@ class _RightButtonGroup extends StatelessWidget {
                 : null,
             tooltip: l10n.settings,
           ),
+        if (actions.onToggleFullscreen != null)
+          GlassButton.iconOnly(
+            icon: Icons.fullscreen,
+            onPressed: actions.onToggleFullscreen,
+            tooltip: l10n.shortcutFullscreen,
+          ),
       ],
     );
   }
