@@ -54,6 +54,7 @@ class _RebuildCounterState extends State<_RebuildCounter> {
 Widget _buildControlBar(
   FakeEngine engine, {
   bool enableBlur = true,
+  bool isFullscreen = false,
   bool isIdle = false,
 }) {
   return MaterialApp(
@@ -68,8 +69,10 @@ Widget _buildControlBar(
           actions: const PlayerActions(
             onOpenFile: _noop,
             onSettings: _noop,
+            onToggleFullscreen: _noop,
           ),
           enableBlur: enableBlur,
+          isFullscreen: isFullscreen,
           isIdle: isIdle,
         ),
       ),
@@ -84,7 +87,7 @@ Widget _buildControlsOverlay(FakeEngine engine) {
     home: Scaffold(
       body: ControlsOverlay(
         engine: engine,
-        actions: const PlayerActions(),
+        actions: const PlayerActions(onToggleFullscreen: _noop),
       ),
     ),
   );

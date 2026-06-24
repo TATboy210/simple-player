@@ -23,6 +23,7 @@ void main() {
   Widget buildSubject({
     PlayerEngine? eng,
     PlayerActions? actions,
+    bool isFullscreen = false,
     bool emptyStatePresent = false,
   }) {
     return MaterialApp(
@@ -32,6 +33,7 @@ void main() {
         body: ControlsOverlay(
           engine: eng ?? engine,
           actions: actions ?? const PlayerActions(),
+          isFullscreen: isFullscreen,
           emptyStatePresent: emptyStatePresent,
         ),
       ),
@@ -52,6 +54,27 @@ void main() {
       await tester.pump();
 
       expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('double tap triggers onToggleFullscreen', (tester) async {
+      var toggled = false;
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(
+        buildSubject(
+          actions: PlayerActions(onToggleFullscreen: () => toggled = true),
+        ),
+      );
+      await tester.pump();
+
+      final center = tester.getCenter(find.byType(ControlsOverlay));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pump();
+      // Pump past the click timer (250ms) to let it resolve
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(toggled, isTrue);
     });
 
     testWidgets('single tap hides controls after delay', (tester) async {
@@ -85,6 +108,21 @@ void main() {
       await tester.pump();
 
       // Should render without error
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    testWidgets('didUpdateWidget propagates isFullscreen change', (
+      tester,
+    ) async {
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject(isFullscreen: false));
+      await tester.pump();
+
+      // Rebuild with isFullscreen = true
+      await tester.pumpWidget(buildSubject(isFullscreen: true));
+      await tester.pump();
+
+      // No crash, AutoHideController updated
       expect(find.byType(ControlsOverlay), findsOneWidget);
     });
 

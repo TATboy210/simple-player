@@ -174,6 +174,12 @@ List<_ShortcutDef> _shortcutDefs(AppLocalizations l10n) => [
   _ShortcutDef('seekForward', LogicalKeyboardKey.arrowRight, l10n.shortcutSeek),
   _ShortcutDef('volumeUp', LogicalKeyboardKey.arrowUp, l10n.shortcutVolume),
   _ShortcutDef('volumeDown', LogicalKeyboardKey.arrowDown, l10n.shortcutVolume),
+  _ShortcutDef('fullscreen', LogicalKeyboardKey.keyF, l10n.shortcutFullscreen),
+  _ShortcutDef(
+    'exitFullscreen',
+    LogicalKeyboardKey.escape,
+    l10n.shortcutExitFullscreen,
+  ),
   _ShortcutDef('mute', LogicalKeyboardKey.keyM, l10n.shortcutMute),
   _ShortcutDef('next', LogicalKeyboardKey.keyN, l10n.shortcutNext),
   _ShortcutDef('previous', LogicalKeyboardKey.keyP, l10n.shortcutPrevious),

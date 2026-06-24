@@ -5,9 +5,11 @@ void main() {
   group('WindowMode', () {
     test('convenience getters return correct values', () {
       expect(WindowMode.windowed.isWindowed, isTrue);
+      expect(WindowMode.windowed.isFullscreen, isFalse);
       expect(WindowMode.windowed.isMaximized, isFalse);
       expect(WindowMode.windowed.isMinimized, isFalse);
 
+      expect(WindowMode.fullscreen.isFullscreen, isTrue);
       expect(WindowMode.maximized.isMaximized, isTrue);
       expect(WindowMode.minimized.isMinimized, isTrue);
     });

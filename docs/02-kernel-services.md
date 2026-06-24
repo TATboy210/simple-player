@@ -134,10 +134,10 @@ mixin StateMonitor on PlaybackContract {
 ```dart
 // 窗口操作
 minimize(), toggleMaximize(), restore(), close(), startDragging()
-setAlwaysOnTop(bool)
+setFullscreen(bool), setAlwaysOnTop(bool)
 
 // 响应式状态 (WindowState)
-ValueNotifier<bool> maximized, alwaysOnTop, focused
+ValueNotifier<bool> fullscreen, maximized, alwaysOnTop, focused
 
 // 事件流
 Stream<bool> onResize, onMove
@@ -242,16 +242,16 @@ static void prewarm(SharedPreferences prefs);  // 缓存实例
 static Future<AppSettings> load();             // 加载全部设置
 // 个别保存方法:
 saveVolume(), saveLastFile(), saveWindowGeometry(), savePlayMode()
-saveIsMuted(), saveIsAlwaysOnTop()
+saveIsMuted(), saveIsAlwaysOnTop(), saveIsFullscreen()
 saveSubtitleFontSize(), saveSubtitleColorIndex(), saveSubtitleBottomOffset()
 saveVideoBrightness/Contrast/Saturation/Hue/Rotation/AspectRatioIndex/Deinterlace()
 saveLocale()
 static Future<void> saveAll(AppSettings s);    // 批量保存
 ```
 
-**AppSettings 数据类 (20个字段):**
+**AppSettings 数据类 (21个字段):**
 ```
-volume, lastFile, windowWidth/Height/X/Y, isMaximized,
+volume, lastFile, windowWidth/Height/X/Y, isMaximized, isFullscreen,
 playMode, isMuted, isAlwaysOnTop,
 subtitleFontSize, subtitleColorIndex, subtitleBottomOffset,
 videoBrightness/Contrast/Saturation/Hue/Rotation/AspectRatioIndex/Deinterlace,
