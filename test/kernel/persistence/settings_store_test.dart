@@ -20,18 +20,6 @@ void main() {
       expect(settings.isAlwaysOnTop, isFalse);
     });
 
-    test('default isFullscreen is false', () {
-      const settings = AppSettings(
-        volume: 1.0,
-        lastFile: '',
-        windowWidth: 1280,
-        windowHeight: 720,
-        playMode: 0,
-        isMuted: false,
-      );
-      expect(settings.isFullscreen, isFalse);
-    });
-
     test('copyWith no args returns equal instance', () {
       const original = AppSettings(
         volume: 0.8,
@@ -176,36 +164,6 @@ void main() {
     });
   });
 
-  group('SettingsStore isFullscreen persistence', () {
-    setUp(() {
-      SharedPreferences.setMockInitialValues({});
-    });
-
-    test('load reads isFullscreen from SharedPreferences', () async {
-      SharedPreferences.setMockInitialValues({'isFullscreen': true});
-      final settings = await SettingsStore.load();
-      expect(settings.isFullscreen, isTrue);
-    });
-
-    test('load defaults isFullscreen to false when absent', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = await SettingsStore.load();
-      expect(settings.isFullscreen, isFalse);
-    });
-
-    test('saveIsFullscreen writes to SharedPreferences', () async {
-      await SettingsStore.saveIsFullscreen(true);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('isFullscreen'), isTrue);
-    });
-
-    test('saveIsFullscreen false writes to SharedPreferences', () async {
-      await SettingsStore.saveIsFullscreen(false);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('isFullscreen'), isFalse);
-    });
-  });
-
   group('SettingsStore saveAll includes new fields', () {
     setUp(() {
       SharedPreferences.setMockInitialValues({});
@@ -220,12 +178,10 @@ void main() {
         playMode: 0,
         isMuted: false,
         isAlwaysOnTop: true,
-        isFullscreen: true,
       );
       await SettingsStore.saveAll(settings);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('isAlwaysOnTop'), isTrue);
-      expect(prefs.getBool('isFullscreen'), isTrue);
     });
   });
 
@@ -550,7 +506,7 @@ void main() {
       expect(settings.volume, 1.0);
       expect(settings.lastFile, '');
       expect(settings.windowWidth, 1280);
-      expect(settings.windowHeight, 720);
+      expect(settings.windowHeight, 752);
       expect(settings.windowX, isNull);
       expect(settings.windowY, isNull);
       expect(settings.isMaximized, false);
@@ -594,7 +550,7 @@ void main() {
       });
       final settings = await SettingsStore.load();
       expect(settings.windowWidth, 1280);
-      expect(settings.windowHeight, 720);
+      expect(settings.windowHeight, 752);
     });
 
     test('load rejects negative window dimensions', () async {
@@ -604,7 +560,7 @@ void main() {
       });
       final settings = await SettingsStore.load();
       expect(settings.windowWidth, 1280);
-      expect(settings.windowHeight, 720);
+      expect(settings.windowHeight, 752);
     });
 
     test('saveWindowGeometry sanitizes inputs', () async {

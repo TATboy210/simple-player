@@ -69,7 +69,6 @@ class SettingsStore {
   static const _keyWindowY = 'windowY';
   static const _keyIsMaximized = 'isMaximized';
   static const _keyIsAlwaysOnTop = 'isAlwaysOnTop';
-  static const _keyIsFullscreen = 'isFullscreen';
   static const _keyVideoBrightness = 'videoBrightness';
   static const _keyVideoContrast = 'videoContrast';
   static const _keyVideoSaturation = 'videoSaturation';
@@ -97,9 +96,9 @@ class SettingsStore {
           8192,
         ),
         windowHeight: _sanitizeDimension(
-          prefs.getDouble(_keyWindowHeight) ?? 720,
-          720,
-          576,
+          prefs.getDouble(_keyWindowHeight) ?? 752,
+          752,
+          513,
           4608,
         ),
         windowX: prefs.getDouble(_keyWindowX) != null
@@ -115,7 +114,6 @@ class SettingsStore {
         ),
         isMuted: prefs.getBool(_keyIsMuted) ?? false,
         isAlwaysOnTop: prefs.getBool(_keyIsAlwaysOnTop) ?? false,
-        isFullscreen: prefs.getBool(_keyIsFullscreen) ?? false,
         subtitleFontSize: (prefs.getDouble(_keySubtitleFontSize) ?? 17.0).clamp(
           14.0,
           28.0,
@@ -158,11 +156,10 @@ class SettingsStore {
         volume: 1.0,
         lastFile: '',
         windowWidth: 1280,
-        windowHeight: 720,
+        windowHeight: 752,
         playMode: 0,
         isMuted: false,
         isAlwaysOnTop: false,
-        isFullscreen: false,
         subtitleFontSize: 17.0,
         subtitleColorIndex: 0,
         subtitleBottomOffset: 80.0,
@@ -212,7 +209,7 @@ class SettingsStore {
     required bool isMaximized,
   }) => _save('saveWindowGeometry', (p) async {
     final safeWidth = _sanitizeDimension(width, 1280, 1024, 8192);
-    final safeHeight = _sanitizeDimension(height, 720, 576, 4608);
+    final safeHeight = _sanitizeDimension(height, 752, 513, 4608);
     final safeX = _sanitizeCoordinate(x, 0);
     final safeY = _sanitizeCoordinate(y, 0);
     // RC-4: 顺序写入 — 避免 Future.wait 部分成功导致数据不一致
@@ -233,9 +230,6 @@ class SettingsStore {
 
   static Future<void> saveIsAlwaysOnTop(bool value) =>
       _save('saveIsAlwaysOnTop', (p) => p.setBool(_keyIsAlwaysOnTop, value));
-
-  static Future<void> saveIsFullscreen(bool value) =>
-      _save('saveIsFullscreen', (p) => p.setBool(_keyIsFullscreen, value));
 
   /// 加载语言偏好，默认 'zh'（中文）
   static Future<String> loadLocale() async {
@@ -391,7 +385,7 @@ class SettingsStore {
     );
     await p.setDouble(
       _keyWindowHeight,
-      _sanitizeDimension(s.windowHeight, 720, 576, 4608),
+      _sanitizeDimension(s.windowHeight, 752, 513, 4608),
     );
     await p.setInt(
       _keyPlayMode,
@@ -409,7 +403,6 @@ class SettingsStore {
     );
     await p.setBool(_keyIsMaximized, s.isMaximized);
     await p.setBool(_keyIsAlwaysOnTop, s.isAlwaysOnTop);
-    await p.setBool(_keyIsFullscreen, s.isFullscreen);
     // 视频处理
     await p.setDouble(_keyVideoBrightness, s.videoBrightness.clamp(-1.0, 1.0));
     await p.setDouble(_keyVideoContrast, s.videoContrast.clamp(-1.0, 1.0));

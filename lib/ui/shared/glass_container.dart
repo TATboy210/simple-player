@@ -135,13 +135,16 @@ class GlassContainer extends StatelessWidget {
   }
 }
 
-/// 毛玻璃风格按钮 — 双模式 StatelessWidget
+/// 毛玻璃风格按钮 — 双模式 StatefulWidget
 ///
 /// - label 非空 → GlassContainer + Material + InkWell（带模糊背景）
 /// - label 为 null（iconOnly 构造）→ SizedBox + Material + InkWell（轻量无模糊）
 ///
-/// 两种模式都使用 InkWell 处理 hover/press 反馈，无缩放动画。
-class GlassButton extends StatelessWidget {
+/// 悬停/按压缩放反馈（Phase 6）：
+/// - hover → scale 1.02（Tokens.hoverScale）
+/// - press → scale 0.98（Tokens.pressScale）
+/// - disabled → cursor=basic, 无缩放（Phase 4）
+class GlassButton extends StatefulWidget {
   static final _radiusBtn = BorderRadius.circular(Tokens.radiusBtn);
   static final _radiusIcon = BorderRadius.circular(Tokens.iconButtonRadius);
 
@@ -187,8 +190,56 @@ class GlassButton extends StatelessWidget {
   bool get _isIconOnly => label == null;
 
   @override
+  State<GlassButton> createState() => _GlassButtonState();
+}
+
+class _GlassButtonState extends State<GlassButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleController;
+  late final Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationFast),
+      lowerBound: Tokens.pressScale,
+      upperBound: Tokens.hoverScale,
+      value: 1.0,
+    );
+    _scaleAnim = _scaleController;
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _onHoverChanged(bool hovering) {
+    if (!widget.enabled) return;
+    _scaleController.animateTo(hovering ? Tokens.hoverScale : 1.0);
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    if (!widget.enabled) return;
+    _scaleController.value = Tokens.pressScale;
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    if (!widget.enabled) return;
+    _scaleController.animateTo(1.0);
+  }
+
+  void _onTapCancel() {
+    if (!widget.enabled) return;
+    _scaleController.animateTo(1.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_isIconOnly) {
+    if (widget._isIconOnly) {
       return _buildIconOnly();
     }
     return _buildLabel();
@@ -196,37 +247,51 @@ class GlassButton extends StatelessWidget {
 
   /// icon-only 轻量路径：SizedBox + Material + InkWell，无 BackdropFilter
   Widget _buildIconOnly() {
-    final effectiveColor =
-        color ?? (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
-    final content = child ?? Icon(icon, size: iconSize, color: effectiveColor);
+    final effectiveColor = widget.color ??
+        (widget.isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
+    final content = widget.child ??
+        Icon(widget.icon, size: widget.iconSize, color: effectiveColor);
 
-    return Tooltip(
-      message: tooltip ?? '',
-      waitDuration: const Duration(milliseconds: 400),
+    final button = Tooltip(
+      message: widget.tooltip ?? '',
+      waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
       child: SizedBox(
         width: 36,
         height: 36,
         child: Material(
           color: Colors.transparent,
-          borderRadius: _radiusBtn,
+          borderRadius: GlassButton._radiusBtn,
           child: InkWell(
-            onTap: enabled ? onPressed : null,
-            onSecondaryTapUp: onSecondaryTapUp,
-            hoverColor: Tokens.bgHover,
+            onTap: widget.enabled ? widget.onPressed : null,
+            onSecondaryTapUp: widget.onSecondaryTapUp,
+            onTapDown: _onTapDown,
+            onTapUp: _onTapUp,
+            onTapCancel: _onTapCancel,
+            hoverColor:
+                widget.enabled ? Tokens.bgHover : Colors.transparent,
             highlightColor: Colors.transparent,
-            borderRadius: _radiusBtn,
+            borderRadius: GlassButton._radiusBtn,
             splashFactory: NoSplash.splashFactory,
             child: Center(child: content),
           ),
         ),
       ),
     );
+
+    return MouseRegion(
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: (_) => _onHoverChanged(true),
+      onExit: (_) => _onHoverChanged(false),
+      child: ScaleTransition(scale: _scaleAnim, child: button),
+    );
   }
 
   /// label 路径：GlassContainer + Material + InkWell，带模糊背景
   Widget _buildLabel() {
-    final effectiveColor =
-        color ?? (isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
+    final effectiveColor = widget.color ??
+        (widget.isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
 
     final content = GlassContainer(
       padding: const EdgeInsets.symmetric(
@@ -236,10 +301,10 @@ class GlassButton extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: effectiveColor),
+          Icon(widget.icon, size: 18, color: effectiveColor),
           const SizedBox(width: Tokens.spSm),
           Text(
-            label!,
+            widget.label!,
             style: TextStyle(
               fontSize: Tokens.fontBody,
               fontWeight: Tokens.weightMedium,
@@ -250,21 +315,35 @@ class GlassButton extends StatelessWidget {
       ),
     );
 
-    return Material(
+    final button = Material(
       color: Colors.transparent,
-      borderRadius: _radiusIcon,
+      borderRadius: GlassButton._radiusIcon,
       child: InkWell(
-        onTap: enabled ? onPressed : null,
-        hoverColor: Tokens.bgHover,
+        onTap: widget.enabled ? widget.onPressed : null,
+        onSecondaryTapUp: widget.onSecondaryTapUp,
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        hoverColor:
+            widget.enabled ? Tokens.bgHover : Colors.transparent,
         highlightColor: Colors.transparent,
-        borderRadius: _radiusIcon,
+        borderRadius: GlassButton._radiusIcon,
         splashFactory: NoSplash.splashFactory,
         child: Tooltip(
-          message: tooltip ?? label ?? '',
-          waitDuration: const Duration(milliseconds: 400),
+          message: widget.tooltip ?? widget.label ?? '',
+          waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
           child: content,
         ),
       ),
+    );
+
+    return MouseRegion(
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: (_) => _onHoverChanged(true),
+      onExit: (_) => _onHoverChanged(false),
+      child: ScaleTransition(scale: _scaleAnim, child: button),
     );
   }
 }

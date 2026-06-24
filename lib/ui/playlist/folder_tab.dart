@@ -233,7 +233,7 @@ class _FolderPathLabel extends StatelessWidget {
             Flexible(
               child: Tooltip(
                 message: folderPath,
-                waitDuration: const Duration(milliseconds: 600),
+                waitDuration: const Duration(milliseconds: Tokens.tooltipDelayLong),
                 child: Text(
                   _truncateMiddle(folderPath, 36),
                   maxLines: 1,

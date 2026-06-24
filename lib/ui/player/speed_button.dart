@@ -40,21 +40,21 @@ class SpeedButton extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     // 静态箭头段 — 速度变化时不重建（StatelessWidget 引用不变）
     final leftArrow = _Segment(
-      width: 18,
+      width: Tokens.speedArrowWidth,
       icon: Icons.chevron_left,
       tooltip: l10n.speedDecrease,
       onTap: () => _shift(-1),
     );
     final rightArrow = _Segment(
-      width: 18,
+      width: Tokens.speedArrowWidth,
       icon: Icons.chevron_right,
       tooltip: l10n.speedIncrease,
       onTap: () => _shift(1),
     );
 
     return SizedBox(
-      width: 72,
-      height: 36,
+      width: Tokens.speedButtonWidth,
+      height: Tokens.speedButtonHeight,
       child: Listener(
         onPointerSignal: (event) {
           if (event is PointerScrollEvent) {
@@ -71,7 +71,7 @@ class SpeedButton extends StatelessWidget {
               children: [
                 leftArrow,
                 _Segment(
-                  width: 36,
+                  width: Tokens.speedSegmentWidth,
                   label: '${label}x',
                   tooltip: l10n.speedReset,
                   onDoubleTap: _reset,
@@ -121,12 +121,12 @@ class _Segment extends StatelessWidget {
 
     return Tooltip(
       message: tooltip ?? '',
-      waitDuration: const Duration(milliseconds: 400),
+      waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
       child: GestureDetector(
         onDoubleTap: onDoubleTap,
         child: SizedBox(
           width: width,
-          height: 36,
+          height: Tokens.speedButtonHeight,
           child: Material(
             color: Colors.transparent,
             borderRadius: _radius,

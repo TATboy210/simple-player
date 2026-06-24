@@ -81,7 +81,7 @@ class VolumeSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 100,
+      width: Tokens.volumeSliderWidth,
       child: Listener(
         onPointerSignal: (event) {
           if (event is PointerScrollEvent) {

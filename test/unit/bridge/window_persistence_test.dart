@@ -14,9 +14,9 @@ void main() {
     });
 
     group('construction', () {
-      test('default debounce is 500ms', () {
+      test('default debounce is 150ms', () {
         final p = WindowPersistence();
-        expect(p.debounceMs, 500);
+        expect(p.debounceMs, 150);
         p.dispose();
       });
 
@@ -51,13 +51,6 @@ void main() {
             isMaximized: false,
           );
         }
-      });
-    });
-
-    group('saveIsFullscreen', () {
-      test('method exists and accepts bool', () {
-        // Verify method signature; actual save needs SharedPreferences binding
-        expect(persistence.saveIsFullscreen, isA<Function>());
       });
     });
 

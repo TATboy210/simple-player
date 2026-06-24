@@ -20,19 +20,14 @@ void main() {
       expect(state.mode.value, WindowMode.windowed);
     });
 
-    test('initial windowSize is 1280x720', () {
-      expect(state.windowSize.value, const Size(1280, 720));
+    test('initial windowSize is 1280x752', () {
+      expect(state.windowSize.value, const Size(1280, 752));
     });
 
     test('custom initialSize is applied', () {
       final custom = WindowState(initialSize: const Size(1920, 1080));
       expect(custom.windowSize.value, const Size(1920, 1080));
       custom.dispose();
-    });
-
-    test('mode can be set to fullscreen', () {
-      state.mode.value = WindowMode.fullscreen;
-      expect(state.mode.value.isFullscreen, isTrue);
     });
 
     test('mode can be set to maximized', () {
@@ -43,9 +38,9 @@ void main() {
     test('mode notifies listeners on change', () {
       final modes = <WindowMode>[];
       state.mode.addListener(() => modes.add(state.mode.value));
-      state.mode.value = WindowMode.fullscreen;
+      state.mode.value = WindowMode.maximized;
       state.mode.value = WindowMode.windowed;
-      expect(modes, [WindowMode.fullscreen, WindowMode.windowed]);
+      expect(modes, [WindowMode.maximized, WindowMode.windowed]);
     });
 
     test('dispose sets disposed flag', () {

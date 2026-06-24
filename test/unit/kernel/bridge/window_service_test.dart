@@ -18,15 +18,15 @@ void main() {
     test('mode getter delegates to state.mode', () {
       final service = WindowService();
       expect(service.mode.value, WindowMode.windowed);
-      service.state.mode.value = WindowMode.fullscreen;
-      expect(service.mode.value, WindowMode.fullscreen);
+      service.state.mode.value = WindowMode.maximized;
+      expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
-    test('state windowSize defaults to 1280x720', () {
+    test('state windowSize defaults to 1280x752', () {
       final service = WindowService();
       expect(service.state.windowSize.value.width, 1280);
-      expect(service.state.windowSize.value.height, 720);
+      expect(service.state.windowSize.value.height, 752);
       service.dispose();
     });
   });
