@@ -111,7 +111,7 @@ class ThumbnailTile extends StatelessWidget {
       height: _nameHeight - 4,
       child: Tooltip(
         message: item.name,
-        waitDuration: const Duration(milliseconds: 600),
+        waitDuration: const Duration(milliseconds: Tokens.tooltipDelayLong),
         child: Text(
           item.name,
           maxLines: 1,

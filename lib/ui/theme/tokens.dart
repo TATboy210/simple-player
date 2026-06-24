@@ -64,11 +64,9 @@ class Tokens {
   static const durationFade = 300;
   static const durationSlide = 300;
   static const durationDebounce = 500;
-  static const durationFullscreenAnim = 300;
   static const durationWindowResize = 100;
 
   // ── 自动隐藏 ──
-  static const hideDelayFullscreen = 3;
   static const hideDelayWindowed = 5;
 
   // ── 标题栏 ──
@@ -134,4 +132,15 @@ class Tokens {
 
   // ── 字体补充 ──
   static const double fontSizeSmall = 9.0;
+
+  // ── Tooltip 延迟 ──
+  static const int tooltipDelayShort = 400;
+  static const int tooltipDelayLong = 600;
+
+  // ── 音量/倍速控件 ──
+  static const double volumeSliderWidth = 100;
+  static const double speedButtonWidth = 72;
+  static const double speedButtonHeight = 36;
+  static const double speedSegmentWidth = 36;
+  static const double speedArrowWidth = 18;
 }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -9,21 +8,15 @@ import 'package:window_manager/window_manager.dart';
 import '../persistence/settings_store.dart';
 import '../utils/log.dart';
 import '../utils/screen_utils.dart';
-import 'fullscreen_controller.dart';
-import 'platform_fullscreen.dart';
 import 'window_bridge.dart';
 import 'window_mode.dart';
 import 'window_persistence.dart';
 import 'window_state.dart';
-import 'linux/linux_platform_fullscreen.dart';
-import 'macos/macos_platform_fullscreen.dart';
-import 'win32/win32_platform_fullscreen.dart';
 
-/// 窗口管理服务 — 薄协调者，组合 4 个职责组件。
+/// 窗口管理服务 — 薄协调者，组合职责组件。
 ///
 /// 职责:
 /// - WindowState: 状态容器 (mode, windowSize, isResizing, isAlwaysOnTop)
-/// - FullscreenController: 原子全屏 + mutex + 回滚
 /// - WindowPersistence: debounce 持久化
 ///
 /// OS 回调驱动状态（WindowListener → WindowState.mode/isResizing）。
@@ -35,12 +28,12 @@ class WindowService with WindowListener implements WindowBridge {
   final WindowState _state = WindowState();
   final WindowPersistence _persistence = WindowPersistence();
 
-  FullscreenController? _fullscreenCtrl;
   bool _disposed = false;
 
   // ─── Animation constants ───
 
   static const int _durationWindowResize = 100;
+  static const int _durationResizeEnd = 500; // 覆盖 Windows ~300ms 最大化动画
 
   Timer? _resizeDebounce;
   Timer? _resizeEndTimer;
@@ -74,13 +67,12 @@ class WindowService with WindowListener implements WindowBridge {
       backgroundColor: Colors.transparent,
       titleBarStyle: TitleBarStyle.hidden,
       windowButtonVisibility: false,
-      minimumSize: Size(854, 480),
+      minimumSize: Size(854, 513), // 480 内容高度 + 32px 标题栏 = 16:9 最小比例
     );
 
     unawaited(
       windowManager.waitUntilReadyToShow(options, () async {
         final settings = await SettingsStore.load();
-        if (settings.isFullscreen) await SettingsStore.saveIsFullscreen(false);
 
         if (settings.windowX != null && settings.windowY != null) {
           final clamped = ScreenUtils.clampToPrimaryDisplay(
@@ -103,12 +95,6 @@ class WindowService with WindowListener implements WindowBridge {
         await windowManager.show();
         await windowManager.focus();
 
-        // 初始化全屏控制器（注入平台特定实现）
-        _fullscreenCtrl = FullscreenController(
-          state: _state,
-          platform: _createPlatformFullscreen(),
-        );
-
         if (settings.isMaximized) await windowManager.maximize();
       }),
     );
@@ -118,9 +104,20 @@ class WindowService with WindowListener implements WindowBridge {
 
   // ─── WindowListener: OS callbacks drive state ───
 
+  /// 统一的 resize 结束定时器 — 冻结 blur 直到动画完全结束
+  void _startResizeEndTimer() {
+    _resizeEndTimer?.cancel();
+    _state.isResizing.value = true;
+    _resizeEndTimer = Timer(
+      Duration(milliseconds: _durationResizeEnd),
+      () { if (!_disposed) _state.isResizing.value = false; },
+    );
+  }
+
   @override
   void onWindowMaximize() {
     if (_disposed) return;
+    _startResizeEndTimer(); // 冻结 blur 覆盖整个动画周期
     if (_state.mode.value != WindowMode.maximized) {
       _state.mode.value = WindowMode.maximized;
     }
@@ -129,6 +126,7 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowUnmaximize() {
     if (_disposed) return;
+    _startResizeEndTimer(); // 冻结 blur 覆盖整个动画周期
     if (_state.mode.value == WindowMode.maximized) {
       _state.mode.value = WindowMode.windowed;
     }
@@ -136,12 +134,8 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   void onWindowResize() {
-    if (_disposed || (_fullscreenCtrl?.isAnimating ?? false)) return;
-    _state.isResizing.value = true;
-    _resizeEndTimer?.cancel();
-    _resizeEndTimer = Timer(const Duration(milliseconds: 200), () {
-      if (!_disposed) _state.isResizing.value = false;
-    });
+    if (_disposed) return;
+    _startResizeEndTimer(); // 统一逻辑
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(
       const Duration(milliseconds: _durationWindowResize),
@@ -151,7 +145,7 @@ class WindowService with WindowListener implements WindowBridge {
           if (!_disposed && size != _state.windowSize.value) {
             _state.windowSize.value = Size(
               math.max(size.width, 854),
-              math.max(size.height, 480),
+              math.max(size.height, 513),
             );
           }
         });
@@ -177,24 +171,8 @@ class WindowService with WindowListener implements WindowBridge {
     if (_disposed || target == _state.mode.value) return;
 
     switch (target) {
-      case WindowMode.fullscreen:
-        final ctrl = _fullscreenCtrl;
-        if (ctrl == null) {
-          logBridge.e('[WindowService.setMode] controller not initialized');
-          return;
-        }
-        await ctrl.setFullscreen(true);
-        await _persistence.saveIsFullscreen(true);
       case WindowMode.windowed:
-        final current = _state.mode.value;
-        if (current == WindowMode.fullscreen) {
-          final ctrl = _fullscreenCtrl;
-          if (ctrl == null) return;
-          await ctrl.setFullscreen(false);
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (!_disposed) _persistence.saveIsFullscreen(false);
-          });
-        } else if (current == WindowMode.maximized) {
+        if (_state.mode.value == WindowMode.maximized) {
           await windowManager.unmaximize();
           // OS 回调 onWindowUnmaximize 驱动 mode
         }
@@ -239,15 +217,6 @@ class WindowService with WindowListener implements WindowBridge {
     } catch (e, st) {
       logBridge.e('[WindowService._saveGeometry] $e\n$st');
     }
-  }
-
-  // ─── Platform factory ───
-
-  PlatformFullscreen _createPlatformFullscreen() {
-    if (Platform.isWindows) return Win32PlatformFullscreen();
-    if (Platform.isMacOS) return MacosPlatformFullscreen();
-    if (Platform.isLinux) return LinuxPlatformFullscreen();
-    throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
   }
 
   // ─── Lifecycle ───

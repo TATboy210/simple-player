@@ -38,7 +38,6 @@ class ControlsOverlay extends StatefulWidget {
   static const _clickDelayMs = 250; // 等待可能的双击
   final PlayerEngine engine;
   final PlayerActions actions;
-  final bool isFullscreen;
 
   /// 空状态存在时，控制栏不拦截 hit test（让下层 EmptyState 按钮可点击）
   final bool emptyStatePresent;
@@ -50,7 +49,6 @@ class ControlsOverlay extends StatefulWidget {
     super.key,
     required this.engine,
     this.actions = const PlayerActions(),
-    this.isFullscreen = false,
     this.emptyStatePresent = false,
     this.resizing,
   });
@@ -71,7 +69,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     _autoHide = AutoHideController(
       vsync: this,
       engineState: widget.engine.state,
-      isFullscreen: widget.isFullscreen,
       popupCloseNotifier: _popupCloseNotifier,
     );
     widget.engine.state.addListener(_onEngineStateChanged);
@@ -90,20 +87,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     );
   }
 
-  void _handleDoubleTap() {
-    _clickTimer?.cancel();
-    widget.actions.onToggleFullscreen?.call();
-  }
-
   void _onEngineStateChanged() => _autoHide.onEngineStateChanged();
-
-  @override
-  void didUpdateWidget(covariant ControlsOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isFullscreen != widget.isFullscreen) {
-      _autoHide.isFullscreen = widget.isFullscreen;
-    }
-  }
 
   @override
   void dispose() {
@@ -121,9 +105,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: gestureActive ? _handleTap : null,
-      onDoubleTap: gestureActive ? _handleDoubleTap : null,
       child: IgnorePointer(
-        ignoring: widget.emptyStatePresent && !isIdle,
+        // idle 时让 EmptyState 接收点击；播放中控制栏必须可交互
+        ignoring: widget.emptyStatePresent && isIdle,
         child: MouseRegion(
           opaque: false,
           hitTestBehavior: HitTestBehavior.translucent,
@@ -155,7 +139,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                       child: ControlBar(
                         engine: widget.engine,
                         actions: widget.actions,
-                        isFullscreen: widget.isFullscreen,
                         isIdle: isIdle,
                         opacity: _autoHide.opacity,
                         enableBlur: _autoHide.visible.value,

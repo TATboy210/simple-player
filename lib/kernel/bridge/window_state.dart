@@ -11,10 +11,10 @@ import 'window_mode.dart';
 /// 设计约束:
 /// - 纯状态容器，不含业务逻辑
 /// - 不可继承（final class）
-/// - mode 是窗口模式的 SSOT（isFullscreen/isMaximized 通过 mode.value 读取）
+/// - mode 是窗口模式的 SSOT（isMaximized 通过 mode.value 读取）
 final class WindowState {
   WindowState({
-    Size initialSize = const Size(1280, 720),
+    Size initialSize = const Size(1280, 752), // 720 内容高度 + 32px 标题栏 = 16:9
   }) : _windowSize = ValueNotifier(initialSize);
 
   // ─── 核心状态 ───

@@ -31,7 +31,6 @@ class ControlBar extends StatelessWidget {
 
   final PlayerEngine engine;
   final PlayerActions actions;
-  final bool isFullscreen;
   final bool enableBlur;
   final bool isIdle;
 
@@ -45,7 +44,6 @@ class ControlBar extends StatelessWidget {
     super.key,
     required this.engine,
     this.actions = const PlayerActions(),
-    this.isFullscreen = false,
     this.enableBlur = true,
     this.isIdle = false,
     this.opacity,
@@ -206,7 +204,6 @@ class ControlBar extends StatelessWidget {
         ),
         const Spacer(),
         _RightButtonGroup(
-          isFullscreen: isFullscreen,
           actions: actions,
         ),
       ],
@@ -228,12 +225,13 @@ class _LeftButtonGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         GlassButton.iconOnly(
           icon: actions.playModeIcon ?? Icons.repeat,
-          tooltip: actions.playModeLabel ?? '顺序',
+          tooltip: actions.playModeLabel ?? l10n.playModeLoopAll,
           onPressed: actions.onTogglePlayMode,
         ),
         if (showSecondary) ...[
@@ -295,13 +293,11 @@ class _CompactCenterGroup extends StatelessWidget {
   }
 }
 
-/// 右侧按钮组：文件、字幕、播放列表、设置、全屏
+/// 右侧按钮组：文件、字幕、播放列表、设置
 class _RightButtonGroup extends StatelessWidget {
-  final bool isFullscreen;
   final PlayerActions actions;
 
   const _RightButtonGroup({
-    required this.isFullscreen,
     required this.actions,
   });
 
@@ -337,12 +333,6 @@ class _RightButtonGroup extends StatelessWidget {
                 ? (d) => actions.onSettingsSecondary!(context, d)
                 : null,
             tooltip: l10n.settings,
-          ),
-        if (actions.onToggleFullscreen != null)
-          GlassButton.iconOnly(
-            icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
-            onPressed: actions.onToggleFullscreen,
-            tooltip: isFullscreen ? l10n.exitFullscreen : l10n.fullscreen,
           ),
       ],
     );
