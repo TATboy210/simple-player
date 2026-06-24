@@ -48,12 +48,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutVolume => 'Volume +/- 5%';
 
   @override
-  String get shortcutFullscreen => 'Toggle Fullscreen';
-
-  @override
-  String get shortcutExitFullscreen => 'Exit Fullscreen';
-
-  @override
   String get shortcutMute => 'Toggle Mute';
 
   @override
@@ -180,12 +174,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playlist => 'Playlist';
-
-  @override
-  String get fullscreen => 'Fullscreen (F)';
-
-  @override
-  String get exitFullscreen => 'Exit Fullscreen (F)';
 
   @override
   String get openSubtitle => 'Open Subtitle';

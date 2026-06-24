@@ -17,7 +17,7 @@ KeyboardListener (onKeyEvent)
   GestureDetector (onAspectRatioCycle, onMediaPlayPause)
     Scaffold (backgroundColor: Tokens.bgBase)
       Column
-        CustomTitleBar (全屏时省略)
+        CustomTitleBar
         Expanded
           Row
             Expanded
@@ -29,10 +29,6 @@ KeyboardListener (onKeyEvent)
             PlaylistPanel (AnimatedSwitcher 切换)
 ```
 
-### 全屏处理
-
-全屏时 `CustomTitleBar` 从树中完全排除 (非 `Offstage` 包装)，避免 `BackdropFilter` GPU 开销。
-
 ### 键盘快捷键
 
 | 按键 | 动作 |
@@ -40,7 +36,6 @@ KeyboardListener (onKeyEvent)
 | Space | 播放/暂停 |
 | Left/Right | 快退/快进 5秒 |
 | Up/Down | 音量 +/-5% |
-| F | 切换全屏 |
 | M | 切换静音 |
 | N | 上一首 |
 | P | 下一首 |
@@ -48,7 +43,6 @@ KeyboardListener (onKeyEvent)
 | A | 设置AB循环A点 |
 | B | 设置AB循环B点 |
 | S | 切换字幕 |
-| ESC | 退出全屏 |
 
 ---
 
@@ -91,14 +85,14 @@ GlassContainer (tier: normal, respectResizeState: true)
 
 **文件:** `lib/ui/player/controls_overlay.dart` (~250行)
 
-**职责:** 全屏手势和动画层，管理控制栏可见性、淡入淡出过渡、居中控件和用户交互。
+**职责:** 手势和动画层，管理控制栏可见性、淡入淡出过渡、居中控件和用户交互。
 
 ### Widget 树
 
 ```
 GestureDetector (behavior: translucent)
   onTap → 切换可见性
-  onDoubleTap → 切换全屏
+  onDoubleTap → (已移除)
   MouseRegion
     onEnter → 显示控件
     onExit → 计划隐藏
@@ -120,7 +114,7 @@ GestureDetector (behavior: translucent)
 ### 手势处理
 
 - **单击** 空白区域: 切换控制栏可见性 (300ms防抖区分双击)
-- **双击**: 调用 `onToggleFullscreen`
+- **双击**: 无默认动作
 - **鼠标进入**: 立即显示控件
 - **鼠标退出**: 计划隐藏 (尊重idle状态)
 - 当 `emptyStatePresent && isIdle`: 手势识别器禁用，让点击穿透到 EmptyState 按钮
@@ -145,7 +139,6 @@ GestureDetector (behavior: translucent)
 
 ### 隐藏延迟逻辑
 
-- 全屏: 3秒
 - 窗口模式: 5秒
 - 弹窗显示时: 延迟隐藏
 

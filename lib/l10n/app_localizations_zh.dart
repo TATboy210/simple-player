@@ -48,12 +48,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutVolume => '音量 +/- 5%';
 
   @override
-  String get shortcutFullscreen => '全屏切换';
-
-  @override
-  String get shortcutExitFullscreen => '退出全屏';
-
-  @override
   String get shortcutMute => '静音切换';
 
   @override
@@ -180,12 +174,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playlist => '播放列表';
-
-  @override
-  String get fullscreen => '全屏 (F)';
-
-  @override
-  String get exitFullscreen => '退出全屏 (F)';
 
   @override
   String get openSubtitle => '打开字幕';

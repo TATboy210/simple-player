@@ -113,7 +113,7 @@ WindowService.instance.initialize()  ← 直接初始化 (并行)
     │         ├──→ window_manager        ← 平台窗口操作
     │         └──→ WindowLifecycleBus    ← 窗口事件总线
     │
-    └──→ WindowState                 ← 响应式状态 (fullscreen/maximized/focused)
+    └──→ WindowState                 ← 响应式状态 (windowed/maximized/minimized/focused)
 ```
 
 ---
@@ -126,7 +126,6 @@ WindowService.instance.initialize()  ← 直接初始化 (并行)
 
 | Notifier | 类型 | 用途 |
 |----------|------|------|
-| `fullscreen` | `ValueNotifier<bool>` | 全屏状态 |
 | `alwaysOnTop` | `ValueNotifier<bool>` | 置顶状态 |
 | `maximized` | `ValueNotifier<bool>` | 最大化状态 |
 | `focused` | `ValueNotifier<bool>` | 焦点状态 |
@@ -155,11 +154,6 @@ WindowService.instance.initialize()  ← 直接初始化 (并行)
      └── 注册 _WindowListener
 ```
 
-#### 全屏管理
-
-通过 `WindowService.setFullscreen(bool)` 调用 `windowManager.setFullScreen()`。
-状态由 `_WindowListener.onWindowEnterFullScreen/onWindowLeaveFullScreen` 驱动。
-
 #### 关闭处理
 
 1. `setPreventClose(false)` 允许实际关闭
@@ -181,9 +175,7 @@ resize/move 事件通过 `WindowLifecycleBus` 统一广播:
 | `onWindowResize/Resized` | `_resizeController` + `WindowLifecycleBus` |
 | `onWindowMove/Moved` | `_moveController` + `WindowLifecycleBus` |
 | `onWindowMaximize/Unmaximize` | `state.maximized` |
-| `onWindowEnter/LeaveFullScreen` | `state.fullscreen` |
 | `onWindowFocus/Blur` | `state.focused` |
-| `onWindowEnter/LeaveFullScreen` | 更新 `mode` + 保存全屏标志 |
 
 ---
 
@@ -236,11 +228,11 @@ resize/move 事件通过 `WindowLifecycleBus` 统一广播:
 | 应用标识 | `appTitle`, `brandName`, `emptyStateSubtitle` |
 | 文件操作 | `openFile`, `dragHint`, `dragHintIdle` |
 | 播放模式 | `playModeNormal`, `playModeLoopAll`, `playModeLoopSingle`, `playModeShuffle` |
-| 键盘快捷键 | `shortcutPlayPause`, `shortcutSeek`, `shortcutVolume`, `shortcutFullscreen` |
+| 键盘快捷键 | `shortcutPlayPause`, `shortcutSeek`, `shortcutVolume` |
 | 设置 | `settings`, `equalizer`, `audioTrack`, `videoTab` |
 | 视频处理 | `brightness`, `contrast`, `saturation`, `hue`, `rotation`, `deinterlace` |
 | 传输控制 | `play`, `pause`, `stop`, `rewind10`, `forward10` |
-| 窗口控制 | `fullscreen`, `pin`, `unpin`, `minimize`, `maximize` |
+| 窗口控制 | `pin`, `unpin`, `minimize`, `maximize` |
 | 播放列表 | `playlist`, `playlistEmpty`, `clear`, `playAction`, `properties`, `remove` |
 | 媒体信息 | `filePath`, `fileName`, `resolution`, `codec`, `duration` |
 | 参数化字符串 | `audioTrackN(int)`, `breakpointAt(String)`, `volumePercent(String)`, `speedLabel(num)`, `minutesAgo(int)` |

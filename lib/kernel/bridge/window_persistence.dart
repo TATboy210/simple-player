@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../persistence/settings_store.dart';
-import '../utils/log.dart';
 
 /// 窗口持久化服务 — 防抖保存 + 写入锁。
 ///
@@ -37,11 +36,6 @@ class WindowPersistence {
         ),
       );
     });
-  }
-
-  /// 保存全屏状态（立即，无防抖）。
-  Future<void> saveIsFullscreen(bool value) {
-    return _enqueue(() => SettingsStore.saveIsFullscreen(value));
   }
 
   /// 写入锁：排队执行，上一个未完成时暂存最新闭包。

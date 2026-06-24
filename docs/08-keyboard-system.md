@@ -11,13 +11,12 @@
 | `→` | `seekForward` | `onSeekForward` | 前进 5s |
 | `↑` | `volumeUp` | `onVolumeUp` | 音量 +5% |
 | `↓` | `volumeDown` | `onVolumeDown` | 音量 -5% |
-| `F` | `fullscreen` | `onToggleFullscreen` | 切换全屏 |
 | `M` | `mute` | `onToggleMute` | 切换静音 |
 | `N` | `next` | `onNext` | 下一首 |
 | `P` | `previous` | `onPrevious` | 上一首 |
 | `O` | `openFile` | `onOpenFile` | 打开文件 |
 | `S` | `subtitle` | `onToggleSubtitle` | 字幕开关 |
-| `ESC` | `exitFullscreen` | `onExitFullscreen` | 退出全屏/关闭面板 |
+| `ESC` | `closePanel` | `onClosePanel` | 关闭面板 |
 | `F1` / `?` | `help` | `onShowHelp` | 快捷键帮助 |
 | `]` | `subtitleDelayForward` | `onSubtitleDelayForward` | 字幕延迟 +500ms |
 | `[` | `subtitleDelayBackward` | `onSubtitleDelayBackward` | 字幕延迟 -500ms |
@@ -103,7 +102,6 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('Space', l10n.shortcutPlayPause),
   ('← / →', l10n.shortcutSeek),
   ('↑ / ↓', l10n.shortcutVolume),
-  ('F', l10n.shortcutFullscreen),
   // ... 14 条总表
 ];
 ```
@@ -120,10 +118,8 @@ KeyboardHandler(
   onSeekForward: () => engine.skipForward(5),
   onSeekBackward: () => engine.skipBack(5),
   onVolumeUp: () => engine.setVolume(engine.volume.value + 0.05),
-  onToggleFullscreen: windowService.toggleFullscreen,
-  onExitFullscreen: () {
-    if (isFullscreen) windowService.exitFullscreen();
-    else if (playlistVisible) togglePlaylist();
+  onClosePanel: () {
+    if (playlistVisible) togglePlaylist();
   },
   // ... 所有回调
   child: Stack([...]),

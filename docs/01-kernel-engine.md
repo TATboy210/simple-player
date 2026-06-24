@@ -215,7 +215,7 @@ static MediaState mapMdkState(mdk.PlaybackState mdkState) {
 
 **职责:** 解耦内核与窗口管理实现。内核通过此抽象接口控制窗口操作，不依赖任何 `window/` 包。
 
-**枚举:** `WindowMode { windowed, fullscreen }`
+**枚举:** `WindowMode { windowed, maximized, minimized }`
 
 **依赖注入模式:**
 ```dart
@@ -233,15 +233,13 @@ static void inject(WindowBridge impl) => _instance = impl;
 | `toggleMaximize()` | 最大化/还原切换 |
 | `close()` | 关闭窗口 |
 | `startDragging()` | 开始拖拽 (无边框窗口) |
-| `toggleFullscreen()` | 全屏切换 |
-| `exitFullscreen()` | 退出全屏 |
 | `toggleAlwaysOnTop()` | 置顶切换 |
 
 **响应式状态 (ValueNotifier):**
 
 | Notifier | 类型 | 说明 |
 |----------|------|------|
-| `mode` | `ValueNotifier<WindowMode>` | 当前窗口模式 |
+| `mode` | `ValueNotifier<WindowMode>` | 当前窗口模式 (windowed/maximized/minimized) |
 | `isAlwaysOnTop` | `ValueNotifier<bool>` | 置顶状态 |
 | `isMaximized` | `ValueNotifier<bool>` | 最大化状态 |
 | `isResizing` | `ValueNotifier<bool>` | 正在调整大小 |
