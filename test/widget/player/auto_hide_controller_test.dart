@@ -25,13 +25,11 @@ void main() {
   });
 
   AutoHideController createController({
-    bool isFullscreen = false,
     ValueNotifier<int>? popupCloseNotifier,
   }) {
     final controller = AutoHideController(
       vsync: vsync,
       engineState: engineState,
-      isFullscreen: isFullscreen,
       popupCloseNotifier: popupCloseNotifier,
     );
     addTearDown(controller.dispose);
@@ -229,19 +227,6 @@ void main() {
     });
   });
 
-  group('AutoHideController.isFullscreen setter', () {
-    test('changing isFullscreen triggers scheduleHide', () {
-      engineState.value = MediaState.playing;
-      final c = createController(isFullscreen: false);
-      c.init();
-
-      c.isFullscreen = true;
-
-      // No crash, scheduleHide was called
-      expect(c.visible.value, isTrue);
-    });
-  });
-
   group('AutoHideController opacity', () {
     test('opacity animation is available', () {
       final c = createController();
@@ -334,7 +319,6 @@ void main() {
         MaterialApp(
           home: _TestAutoHideWrapper(
             engineState: engineState,
-            isFullscreen: false,
           ),
         ),
       );
@@ -439,10 +423,8 @@ void main() {
 /// Used in widget tests where AnimationController + pump() is needed.
 class _TestAutoHideWrapper extends StatefulWidget {
   final ValueNotifier<MediaState> engineState;
-  final bool isFullscreen;
   const _TestAutoHideWrapper({
     required this.engineState,
-    this.isFullscreen = false,
   });
   @override
   State<_TestAutoHideWrapper> createState() => _TestAutoHideWrapperState();
@@ -458,7 +440,6 @@ class _TestAutoHideWrapperState extends State<_TestAutoHideWrapper>
     controller = AutoHideController(
       vsync: this,
       engineState: widget.engineState,
-      isFullscreen: widget.isFullscreen,
     );
     controller.init();
   }

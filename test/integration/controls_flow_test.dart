@@ -43,16 +43,16 @@ void main() {
       expect(engine.isMuted.value, true);
     });
 
-    test('fullscreen toggle updates state', () async {
+    test('window mode toggle updates state', () async {
       final windowService = createFakeWindowService();
 
-      await windowService.setMode(WindowMode.fullscreen);
-      expect(windowService.mode.value.isFullscreen, true);
+      await windowService.setMode(WindowMode.maximized);
+      expect(windowService.mode.value.isMaximized, true);
       expect(windowService.modeCallCount, 1);
-      expect(windowService.lastModeValue, WindowMode.fullscreen);
+      expect(windowService.lastModeValue, WindowMode.maximized);
 
       await windowService.setMode(WindowMode.windowed);
-      expect(windowService.mode.value.isFullscreen, false);
+      expect(windowService.mode.value.isWindowed, true);
       expect(windowService.modeCallCount, 2);
       expect(windowService.lastModeValue, WindowMode.windowed);
 

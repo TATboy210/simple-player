@@ -66,7 +66,7 @@
 
 ### 自动隐藏
 
-`hideDelayFullscreen` (3s) / `hideDelayWindowed` (5s)
+`hideDelayWindowed` (5s)
 
 ### 缩放
 

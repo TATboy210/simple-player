@@ -13,7 +13,6 @@ class PlayerActions {
   final void Function(BuildContext context, TapUpDetails details)?
   onSettingsSecondary;
   final VoidCallback? onOpenFile;
-  final VoidCallback? onToggleFullscreen;
   final VoidCallback? onTogglePlayMode;
   final VoidCallback? onOpenSubtitle;
   final void Function(List<String> paths)? onFilesDropped;
@@ -39,7 +38,6 @@ class PlayerActions {
     this.onSettings,
     this.onSettingsSecondary,
     this.onOpenFile,
-    this.onToggleFullscreen,
     this.onTogglePlayMode,
     this.onOpenSubtitle,
     this.onFilesDropped,

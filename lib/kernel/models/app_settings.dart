@@ -12,7 +12,6 @@ class AppSettings {
   final int playMode;
   final bool isMuted;
   final bool isAlwaysOnTop;
-  final bool isFullscreen;
   final double subtitleFontSize;
   final int subtitleColorIndex;
   final double subtitleBottomOffset;
@@ -41,7 +40,6 @@ class AppSettings {
     required this.playMode,
     required this.isMuted,
     this.isAlwaysOnTop = false,
-    this.isFullscreen = false,
     this.subtitleFontSize = 17.0,
     this.subtitleColorIndex = 0,
     this.subtitleBottomOffset = 80.0,
@@ -67,7 +65,6 @@ class AppSettings {
     int? playMode,
     bool? isMuted,
     bool? isAlwaysOnTop,
-    bool? isFullscreen,
     double? subtitleFontSize,
     int? subtitleColorIndex,
     double? subtitleBottomOffset,
@@ -92,7 +89,6 @@ class AppSettings {
       playMode: playMode ?? this.playMode,
       isMuted: isMuted ?? this.isMuted,
       isAlwaysOnTop: isAlwaysOnTop ?? this.isAlwaysOnTop,
-      isFullscreen: isFullscreen ?? this.isFullscreen,
       subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
       subtitleColorIndex: subtitleColorIndex ?? this.subtitleColorIndex,
       subtitleBottomOffset:
@@ -124,7 +120,6 @@ class AppSettings {
           playMode == other.playMode &&
           isMuted == other.isMuted &&
           isAlwaysOnTop == other.isAlwaysOnTop &&
-          isFullscreen == other.isFullscreen &&
           subtitleFontSize == other.subtitleFontSize &&
           subtitleColorIndex == other.subtitleColorIndex &&
           subtitleBottomOffset == other.subtitleBottomOffset &&
@@ -150,7 +145,6 @@ class AppSettings {
     playMode,
     isMuted,
     isAlwaysOnTop,
-    isFullscreen,
     subtitleFontSize,
     subtitleColorIndex,
     subtitleBottomOffset,

@@ -424,7 +424,6 @@ classDiagram
         +static saveIsMuted(bool) Future~void~
         +static saveIsMaximized(bool) Future~void~
         +static saveIsAlwaysOnTop(bool) Future~void~
-        +static saveIsFullscreen(bool) Future~void~
         +static loadLocale() Future~String~
         +static saveLocale(String) Future~void~
         +static saveSubtitleFontSize(double) Future~void~
@@ -452,7 +451,6 @@ classDiagram
         +final int playMode
         +final bool isMuted
         +final bool isAlwaysOnTop
-        +final bool isFullscreen
         +final double subtitleFontSize
         +final int subtitleColorIndex
         +final double subtitleBottomOffset
@@ -493,8 +491,6 @@ classDiagram
         +minimize() Future~void~
         +toggleMaximize() Future~void~
         +close() Future~void~
-        +toggleFullscreen() Future~void~
-        +exitFullscreen() Future~void~
         +toggleAlwaysOnTop() Future~void~
         +startDragging() Future~void~
         +ValueNotifier~WindowMode~ mode

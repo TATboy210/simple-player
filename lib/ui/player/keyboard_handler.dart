@@ -15,8 +15,6 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('Space', l10n.shortcutPlayPause),
   ('← / →', l10n.shortcutSeek),
   ('↑ / ↓', l10n.shortcutVolume),
-  ('F', l10n.shortcutFullscreen),
-  ('ESC', l10n.shortcutExitFullscreen),
   ('M', l10n.shortcutMute),
   ('N', l10n.shortcutNext),
   ('P', l10n.shortcutPrevious),
@@ -30,8 +28,8 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
 /// 键盘快捷键包装器 — 支持自定义绑定
 ///
 /// Space → 播放/暂停 | ← → 后退/前进 5s | ↑ ↓ → 音量 ±5%
-/// F → 全屏 | M → 静音 | N/P → 上/下一首
-/// O → 打开文件 | S → 字幕开关 | ESC → 退出全屏
+/// M → 静音 | N/P → 上/下一首
+/// O → 打开文件 | S → 字幕开关
 /// ]/[ → 字幕延迟 ± | F1 → 帮助
 /// MediaPlayPause/MediaTrackNext/MediaTrackPrevious → 媒体键
 ///
@@ -44,13 +42,11 @@ class KeyboardHandler extends StatelessWidget {
   final VoidCallback? onSeekForward;
   final VoidCallback? onVolumeUp;
   final VoidCallback? onVolumeDown;
-  final VoidCallback? onToggleFullscreen;
   final VoidCallback? onToggleMute;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onOpenFile;
   final VoidCallback? onToggleSubtitle;
-  final VoidCallback? onExitFullscreen;
   final VoidCallback? onShowHelp;
   final VoidCallback? onSubtitleDelayForward;
   final VoidCallback? onSubtitleDelayBackward;
@@ -66,13 +62,11 @@ class KeyboardHandler extends StatelessWidget {
     this.onSeekForward,
     this.onVolumeUp,
     this.onVolumeDown,
-    this.onToggleFullscreen,
     this.onToggleMute,
     this.onPrevious,
     this.onNext,
     this.onOpenFile,
     this.onToggleSubtitle,
-    this.onExitFullscreen,
     this.onShowHelp,
     this.onSubtitleDelayForward,
     this.onSubtitleDelayBackward,
@@ -131,10 +125,6 @@ class KeyboardHandler extends StatelessWidget {
       onVolumeDown?.call();
       return KeyEventResult.handled;
     }
-    if (_keyMatches(key, 'fullscreen', LogicalKeyboardKey.keyF)) {
-      onToggleFullscreen?.call();
-      return KeyEventResult.handled;
-    }
     if (_keyMatches(key, 'mute', LogicalKeyboardKey.keyM)) {
       onToggleMute?.call();
       return KeyEventResult.handled;
@@ -153,10 +143,6 @@ class KeyboardHandler extends StatelessWidget {
     }
     if (_keyMatches(key, 'subtitle', LogicalKeyboardKey.keyS)) {
       onToggleSubtitle?.call();
-      return KeyEventResult.handled;
-    }
-    if (_keyMatches(key, 'exitFullscreen', LogicalKeyboardKey.escape)) {
-      onExitFullscreen?.call();
       return KeyEventResult.handled;
     }
     if (_keyMatches(key, 'help', LogicalKeyboardKey.f1) ||

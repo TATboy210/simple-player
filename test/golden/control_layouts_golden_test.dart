@@ -79,7 +79,7 @@ void main() {
       );
     });
 
-    testWidgets('fullscreen state', (tester) async {
+    testWidgets('maximized state', (tester) async {
       engine.configureMedia(durationMs: 60000);
       engine.position.value = 30000;
       engine.state.value = MediaState.playing;
@@ -88,14 +88,13 @@ void main() {
         buildControlSubject(
           child: ControlBar(
             engine: engine,
-            isFullscreen: true,
             enableBlur: false,
           ),
         ),
       );
       await expectLater(
         find.byType(ControlBar),
-        matchesGoldenFile('goldens/control_bar_fullscreen.png'),
+        matchesGoldenFile('goldens/control_bar_maximized.png'),
       );
     });
   });
