@@ -1,84 +1,97 @@
-# Cross-Platform Window Management — Requirements
+/// Fact-Forcing Gate Context:
+/// - Importers: /gsd-new-project, /gsd-plan-phase workflows
+/// - Affected API: REQUIREMENTS.md project requirements tracking
+/// - Data schema: Markdown requirements with checkboxes
+/// - User verbatim: "视频播放区域除开上标题栏是16比9，包括控制栏在内16比9比例，然后播放16比9视频时视频直接铺满画面即可，然后调整窗口大小，允许有黑边，不能裁切画面，然后优化播放视频时调整窗口会卡顿的问题"
+
+# Video Area 16:9 Ratio Optimization — Requirements
 
 ## User Stories
 
-**As a** 播放器用户, **I want** 在 Windows/Linux/macOS 上获得一致的窗口管理体验, **so that** 我可以在任何桌面平台上使用相同的快捷键和窗口操作。
+**As a** 播放器用户, **I want** 视频播放区域保持 16:9 比例, **so that** 播放 16:9 视频时画面铺满，调整窗口时有黑边但不裁切。
 
-## v1 Requirements
+## Requirements
 
-### Platform Abstraction (PLATFORM)
+### R1: 16:9 比例约束
 
-- [ ] **PLATFORM-01**: 定义 PlatformWindow 抽象接口（全屏/最大化/最小化/置顶/拖拽/几何管理）
-- [ ] **PLATFORM-02**: 平台注册机制（PlatformRegistry 根据 Platform.operatingSystem 自动选择实现）
-- [ ] **PLATFORM-03**: WindowService 通过 PlatformWindow 接口分发命令，不再直接调用 window_manager
+- [ ] **R1-1**: 视频播放区域（标题栏+视频+控制栏）整体保持 16:9 比例
+- [ ] **R1-2**: 窗口调整大小时，视频区域自动居中
+- [ ] **R1-3**: 视频区域超出窗口时，显示黑色背景
 
-### Windows Implementation (WIN)
+### R2: 视频显示
 
-- [ ] **WIN-01**: 基于现有代码重构 WindowsPlatformWindow（保持 WS_CAPTION+WS_THICKFRAME 全屏方案）
-- [ ] **WIN-02**: 保留 isOperating Completer 防重入机制
-- [ ] **WIN-03**: 保留圆角修复（DWMWCP_ROUND + snap/maximize 后修复）
-- [ ] **WIN-04**: 保留 DPI 自适应（PerMonitor V1）
+- [ ] **R2-1**: 16:9 视频铺满视频区域
+- [ ] **R2-2**: 非 16:9 视频保持原始比例，黑边填充
+- [ ] **R2-3**: 视频不能被裁切
 
-### Linux Implementation (LINUX)
+### R3: 性能优化
 
-- [ ] **LINUX-01**: LinuxPlatformWindow 实现（GTK 窗口管理）
-- [ ] **LINUX-02**: X11 全屏（_NET_WM_STATE_FULLSCREEN）
-- [ ] **LINUX-03**: Wayland 全屏（xdg_toplevel_set_fullscreen）
-- [ ] **LINUX-04**: 圆角支持（GTK CSS 或 DRI3）
-- [ ] **LINUX-05**: DPI 自适应（GTK scale factor）
+- [ ] **R3-1**: 窗口调整时流畅无卡顿
+- [ ] **R3-2**: 使用 RepaintBoundary 隔离重绘区域
+- [ ] **R3-3**: 优化 Texture 重绘逻辑
 
-### macOS Implementation (MACOS)
+### R4: 兼容性
 
-- [ ] **MACOS-01**: MacOSPlatformWindow 实现（NSWindow）
-- [ ] **MACOS-02**: 原生 toggleFullScreen（NSWindow.toggleFullScreen:）
-- [ ] **MACOS-03**: NSCondition 防动画重入（参考 mpv）
-- [ ] **MACOS-04**: 圆角支持（NSWindow.styleMask）
-- [ ] **MACOS-05**: DPI 自适应（Retina scale factor）
+- [ ] **R4-1**: 全屏模式正常工作
+- [ ] **R4-2**: 最大化模式正常工作
+- [ ] **R4-3**: 控制栏正常显示和交互
+- [ ] **R4-4**: 播放列表面板正常显示
 
-### Multi-Monitor (MULTI)
+## Technical Approach
 
-- [ ] **MULTI-01**: 获取所有显示器信息（尺寸/位置/DPI）
-- [ ] **MULTI-02**: 全屏时指定目标显示器
-- [ ] **MULTI-03**: 窗口位置防越界（跨显示器边界）
+### 布局结构
 
-### Integration (INT)
+```dart
+Column
+├── CustomTitleBar (固定高度 32dp)
+└── Expanded
+    └── ColoredBox(
+        color: Colors.black,  // 黑色背景
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack
+                ├── VideoSurface
+                ├── ControlsOverlay
+                └── EmptyState
+          )
+        )
+      )
+```
 
-- [ ] **INT-01**: WindowBridge 接口零改动（UI 层无感知）
-- [ ] **INT-02**: WindowState 4 个 ValueNotifier 正常工作
-- [ ] **INT-03**: WindowPersistence 防抖持久化跨平台兼容
-- [ ] **INT-04**: SettingsStore 读写跨平台兼容
+### 视频渲染策略
 
-## v2 Requirements (Deferred)
+- **16:9 视频**: `BoxFit.fill` 铺满视频区域
+- **非 16:9 视频**: `BoxFit.contain` 保持比例
 
-- [ ] 独占全屏（改分辨率）— 复杂度高，用户需求低
-- [ ] 多显示器黑屏其他屏幕（Kodi BlankOtherDisplays 模式）
-- [ ] HDR/色彩管理 — 独立功能
-- [ ] 移动端窗口管理 — 不同窗口模型
+### 性能优化策略
+
+1. **RepaintBoundary**: 在视频区域外层包裹 RepaintBoundary
+2. **缓存动画**: 使用 AnimatedBuilder 缓存窗口尺寸变化
+3. **防抖更新**: 窗口调整时使用防抖减少重绘频率
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `lib/ui/player/player_screen.dart` | 布局重构，添加 AspectRatio 约束 |
+| `lib/ui/player/video_surface.dart` | 视频渲染优化 |
+| `lib/ui/player/controls_overlay.dart` | 控制栏布局调整 |
+| `lib/ui/theme/tokens.dart` | 新增 16:9 相关常量 |
+
+## Success Criteria
+
+- [ ] 视频区域始终保持 16:9 比例
+- [ ] 16:9 视频铺满画面
+- [ ] 非 16:9 视频有黑边但不裁切
+- [ ] 窗口调整流畅无卡顿
+- [ ] 所有现有测试通过
 
 ## Out of Scope
 
-- **Android/iOS** — 移动端无窗口管理概念，使用系统原生行为
-- **Web** — 浏览器全屏 API 完全不同
-- **独占全屏** — ChangeDisplaySettingsEx 复杂度高，窗口全屏已满足需求
-
-## Acceptance Criteria
-
-1. 在 Windows 上，现有全屏/最大化/最小化/置顶功能零回归
-2. 在 Linux (X11) 上，全屏切换正常工作，无边框缝隙
-3. 在 Linux (Wayland) 上，全屏切换正常工作
-4. 在 macOS 上，全屏切换使用原生动画，无卡顿
-5. 所有平台上，窗口几何持久化正常工作
-6. 所有平台上，DPI 自适应正常工作
-7. WindowBridge 接口零改动，UI 层无需修改
-
-## Definition of Done
-
-- [ ] 所有 PLATFORM-* 需求完成
-- [ ] 至少一个平台实现完成（Windows）
-- [ ] 单元测试覆盖 ≥ 80%
-- [ ] 集成测试覆盖关键路径（全屏切换、窗口几何持久化）
-- [ ] 文档更新（README、架构文档）
-- [ ] 零回归（现有 Windows 功能正常）
+- 自定义比例（4:3, 21:9 等）
+- 视频旋转
+- 画中画模式
 
 ---
-*Last updated: 2026-06-23 after initialization*
+*Created: 2026-06-25*
