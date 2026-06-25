@@ -182,6 +182,9 @@ class WindowService with WindowListener implements WindowBridge {
       case WindowMode.minimized:
         await windowManager.minimize();
       // OS 回调 onWindowMinimize 驱动 mode
+      case WindowMode.fullscreen:
+        await windowManager.setFullScreen(true);
+      // OS 回调 onWindowEnterFullScreen 驱动 mode
     }
   }
 

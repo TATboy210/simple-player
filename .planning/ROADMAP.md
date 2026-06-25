@@ -1,140 +1,149 @@
-# Cross-Platform Window Management — Roadmap
+/// Fact-Forcing Gate Context:
+/// - Importers: /gsd-new-project, /gsd-plan-phase workflows
+/// - Affected API: ROADMAP.md project roadmap tracking
+/// - Data schema: Markdown phases with requirements mapping
+/// - User verbatim: "视频播放区域除开上标题栏是16比9，包括控制栏在内16比9比例，然后播放16比9视频时视频直接铺满画面即可，然后调整窗口大小，允许有黑边，不能裁切画面，然后优化播放视频时调整窗口会卡顿的问题"
+
+# Video Area 16:9 Ratio Optimization — Roadmap
 
 ## Overview
 
-**5 phases** | **22 requirements mapped** | All v1 requirements covered ✓
+**4 phases** | **12 requirements mapped** | All requirements covered ✓
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 1 | Platform Abstraction | 定义跨平台窗口接口 + 注册机制 | PLATFORM-01, PLATFORM-02, PLATFORM-03, INT-01 | 3 |
-| 2 | Windows Refactor | 基于 PlatformWindow 重构 Windows 实现 | WIN-01~04, INT-02~04 | 4 |
-| 3 | Linux Implementation | 实现 Linux 窗口管理（X11 + Wayland） | LINUX-01~05 | 5 |
-| 4 | macOS Implementation | 实现 macOS 窗口管理（NSWindow） | MACOS-01~05 | 5 |
-| 5 | Multi-Monitor & Polish | 多显示器支持 + 跨平台测试 | MULTI-01~03 | 3 |
+| 1 | 布局重构 | 使用 AspectRatio 约束视频区域 | R1-1, R1-2, R1-3 | 3 |
+| 2 | 视频显示 | 16:9 视频铺满，非 16:9 黑边 | R2-1, R2-2, R2-3 | 3 |
+| 3 | 性能优化 | 窗口调整流畅无卡顿 | R3-1, R3-2, R3-3 | 3 |
+| 4 | 兼容性 | 全屏/最大化/控制栏正常 | R4-1, R4-2, R4-3, R4-4 | 4 |
 
 ---
 
-### Phase 1: Platform Abstraction
+### Phase 1: 布局重构
 
-**Goal:** 定义跨平台窗口抽象接口，建立平台注册机制，WindowService 通过接口分发命令
+**Goal:** 使用 AspectRatio 约束视频区域，使其保持 16:9 比例
 
 **Mode:** mvp
 
 **Requirements:**
-- PLATFORM-01: 定义 PlatformWindow 抽象接口
-- PLATFORM-02: 平台注册机制（PlatformRegistry）
-- PLATFORM-03: WindowService 通过 PlatformWindow 接口分发命令
-- INT-01: WindowBridge 接口零改动
+- R1-1: 视频播放区域（标题栏+视频+控制栏）整体保持 16:9 比例
+- R1-2: 窗口调整大小时，视频区域自动居中
+- R1-3: 视频区域超出窗口时，显示黑色背景
 
 **Success Criteria:**
-1. PlatformWindow 接口定义完成，包含所有窗口操作方法
-2. PlatformRegistry 能根据 Platform.operatingSystem 自动选择正确实现
-3. WindowBridge 接口保持不变，UI 层零改动
+1. 视频区域始终保持 16:9 比例
+2. 窗口调整时视频区域自动居中
+3. 超出部分显示黑色背景
 
 **Key Files:**
-- `lib/kernel/platform/platform_window.dart` — 新建
-- `lib/kernel/platform/platform_registry.dart` — 新建
-- `lib/kernel/bridge/window_service.dart` — 修改（注入 PlatformWindow）
+- `lib/ui/player/player_screen.dart` — 布局重构
+
+**Implementation:**
+```dart
+// 当前布局
+Column
+├── CustomTitleBar
+└── Expanded ← 问题：没有 16:9 约束
+    └── Stack [VideoSurface, ControlsOverlay]
+
+// 目标布局
+Column
+├── CustomTitleBar
+└── Expanded
+    └── ColoredBox(color: Colors.black)
+        └── Center
+            └── AspectRatio(16/9)
+                └── Stack [VideoSurface, ControlsOverlay]
+```
 
 ---
 
-### Phase 2: Windows Refactor
+### Phase 2: 视频显示
 
-**Goal:** 将现有 Windows 窗口管理代码重构为 PlatformWindow 实现，确保零回归
+**Goal:** 16:9 视频铺满视频区域，非 16:9 视频保持比例
 
 **Mode:** mvp
 
 **Requirements:**
-- WIN-01: 基于现有代码重构 WindowsPlatformWindow
-- WIN-02: 保留 isOperating Completer 防重入机制
-- WIN-03: 保留圆角修复（DWMWCP_ROUND）
-- WIN-04: 保留 DPI 自适应（PerMonitor V1）
-- INT-02: WindowState 4 个 ValueNotifier 正常工作
-- INT-03: WindowPersistence 防抖持久化跨平台兼容
-- INT-04: SettingsStore 读写跨平台兼容
+- R2-1: 16:9 视频铺满视频区域
+- R2-2: 非 16:9 视频保持原始比例，黑边填充
+- R2-3: 视频不能被裁切
 
 **Success Criteria:**
-1. WindowsPlatformWindow 实现 PlatformWindow 接口
-2. 现有全屏/最大化/最小化/置顶功能零回归
-3. 圆角、DPI、防重入机制正常工作
-4. 窗口几何持久化正常工作
+1. 16:9 视频铺满画面
+2. 非 16:9 视频有黑边但不裁切
+3. 视频始终保持原始比例
 
 **Key Files:**
-- `lib/kernel/platform/windows/windows_platform_window.dart` — 新建
-- `lib/kernel/bridge/fullscreen_controller.dart` — 修改（使用 PlatformWindow）
-- `lib/kernel/bridge/window_persistence.dart` — 验证跨平台兼容
+- `lib/ui/player/video_surface.dart` — 视频渲染策略
+
+**Implementation:**
+```dart
+// 视频渲染策略
+BoxFit get videoFit {
+  final videoRatio = engine.aspectRatio.value;
+  final isStandard = (videoRatio - 16/9).abs() < 0.01;
+  return isStandard ? BoxFit.fill : BoxFit.contain;
+}
+```
 
 ---
 
-### Phase 3: Linux Implementation
+### Phase 3: 性能优化
 
-**Goal:** 实现 Linux 窗口管理，支持 X11 和 Wayland 两种显示服务器
+**Goal:** 优化窗口调整时的卡顿问题
 
 **Mode:** mvp
 
 **Requirements:**
-- LINUX-01: LinuxPlatformWindow 实现（GTK 窗口管理）
-- LINUX-02: X11 全屏（_NET_WM_STATE_FULLSCREEN）
-- LINUX-03: Wayland 全屏（xdg_toplevel_set_fullscreen）
-- LINUX-04: 圆角支持（GTK CSS 或 DRI3）
-- LINUX-05: DPI 自适应（GTK scale factor）
+- R3-1: 窗口调整时流畅无卡顿
+- R3-2: 使用 RepaintBoundary 隔离重绘区域
+- R3-3: 优化 Texture 重绘逻辑
 
 **Success Criteria:**
-1. LinuxPlatformWindow 实现 PlatformWindow 接口
-2. X11 全屏切换正常工作，无边框缝隙
-3. Wayland 全屏切换正常工作
-4. 圆角和 DPI 自适应正常工作
+1. 窗口调整流畅无卡顿
+2. 使用 RepaintBoundary 隔离重绘区域
+3. Texture 重绘优化
 
 **Key Files:**
-- `lib/kernel/platform/linux/linux_platform_window.dart` — 新建
-- `linux/runner/` — 可能需要扩展原生层
+- `lib/ui/player/video_surface.dart` — Texture 渲染优化
+- `lib/ui/player/player_screen.dart` — RepaintBoundary 包裹
+
+**Implementation:**
+```dart
+// RepaintBoundary 隔离
+RepaintBoundary(
+  child: AspectRatio(
+    aspectRatio: 16 / 9,
+    child: Stack [...]
+  )
+)
+```
 
 ---
 
-### Phase 4: macOS Implementation
+### Phase 4: 兼容性
 
-**Goal:** 实现 macOS 窗口管理，使用 NSWindow 原生 API
+**Goal:** 确保全屏、最大化、控制栏等功能正常工作
 
 **Mode:** mvp
 
 **Requirements:**
-- MACOS-01: MacOSPlatformWindow 实现（NSWindow）
-- MACOS-02: 原生 toggleFullScreen（NSWindow.toggleFullScreen:）
-- MACOS-03: NSCondition 防动画重入
-- MACOS-04: 圆角支持（NSWindow.styleMask）
-- MACOS-05: DPI 自适应（Retina scale factor）
+- R4-1: 全屏模式正常工作
+- R4-2: 最大化模式正常工作
+- R4-3: 控制栏正常显示和交互
+- R4-4: 播放列表面板正常显示
 
 **Success Criteria:**
-1. MacOSPlatformWindow 实现 PlatformWindow 接口
-2. 全屏切换使用原生动画，无卡顿
-3. 圆角和 DPI 自适应正常工作
-4. 防动画重入机制正常工作
+1. 全屏模式正常工作
+2. 最大化模式正常工作
+3. 控制栏正常显示和交互
+4. 播放列表面板正常显示
 
 **Key Files:**
-- `lib/kernel/platform/macos/macos_platform_window.dart` — 新建
-- `macos/runner/` — 可能需要扩展原生层
-
----
-
-### Phase 5: Multi-Monitor & Polish
-
-**Goal:** 实现多显示器支持，完成跨平台测试和文档
-
-**Mode:** mvp
-
-**Requirements:**
-- MULTI-01: 获取所有显示器信息（尺寸/位置/DPI）
-- MULTI-02: 全屏时指定目标显示器
-- MULTI-03: 窗口位置防越界（跨显示器边界）
-
-**Success Criteria:**
-1. 能获取所有显示器信息
-2. 全屏时能指定目标显示器
-3. 窗口位置防越界正常工作
-
-**Key Files:**
-- `lib/kernel/platform/platform_window.dart` — 扩展显示器相关方法
-- 各平台实现 — 添加显示器枚举和全屏目标指定
+- `lib/ui/player/player_screen.dart` — 全屏/最大化处理
+- `lib/ui/player/controls_overlay.dart` — 控制栏布局
+- `lib/ui/playlist/playlist_panel.dart` — 播放列表
 
 ---
 
@@ -142,30 +151,19 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLATFORM-01 | 1 | Pending |
-| PLATFORM-02 | 1 | Pending |
-| PLATFORM-03 | 1 | Pending |
-| INT-01 | 1 | Pending |
-| WIN-01 | 2 | Pending |
-| WIN-02 | 2 | Pending |
-| WIN-03 | 2 | Pending |
-| WIN-04 | 2 | Pending |
-| INT-02 | 2 | Pending |
-| INT-03 | 2 | Pending |
-| INT-04 | 2 | Pending |
-| LINUX-01 | 3 | Pending |
-| LINUX-02 | 3 | Pending |
-| LINUX-03 | 3 | Pending |
-| LINUX-04 | 3 | Pending |
-| LINUX-05 | 3 | Pending |
-| MACOS-01 | 4 | Pending |
-| MACOS-02 | 4 | Pending |
-| MACOS-03 | 4 | Pending |
-| MACOS-04 | 4 | Pending |
-| MACOS-05 | 4 | Pending |
-| MULTI-01 | 5 | Pending |
-| MULTI-02 | 5 | Pending |
-| MULTI-03 | 5 | Pending |
+| R1-1 | 1 | Pending |
+| R1-2 | 1 | Pending |
+| R1-3 | 1 | Pending |
+| R2-1 | 2 | Pending |
+| R2-2 | 2 | Pending |
+| R2-3 | 2 | Pending |
+| R3-1 | 3 | Pending |
+| R3-2 | 3 | Pending |
+| R3-3 | 3 | Pending |
+| R4-1 | 4 | Pending |
+| R4-2 | 4 | Pending |
+| R4-3 | 4 | Pending |
+| R4-4 | 4 | Pending |
 
 ---
-*Last updated: 2026-06-23 after initialization*
+*Created: 2026-06-25*

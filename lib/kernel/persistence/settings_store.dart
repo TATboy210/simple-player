@@ -69,6 +69,7 @@ class SettingsStore {
   static const _keyWindowY = 'windowY';
   static const _keyIsMaximized = 'isMaximized';
   static const _keyIsAlwaysOnTop = 'isAlwaysOnTop';
+  static const _keyIsFullscreen = 'isFullscreen';
   static const _keyVideoBrightness = 'videoBrightness';
   static const _keyVideoContrast = 'videoContrast';
   static const _keyVideoSaturation = 'videoSaturation';
@@ -230,6 +231,9 @@ class SettingsStore {
 
   static Future<void> saveIsAlwaysOnTop(bool value) =>
       _save('saveIsAlwaysOnTop', (p) => p.setBool(_keyIsAlwaysOnTop, value));
+
+  static Future<void> saveIsFullscreen(bool value) =>
+      _save('saveIsFullscreen', (p) => p.setBool(_keyIsFullscreen, value));
 
   /// 加载语言偏好，默认 'zh'（中文）
   static Future<String> loadLocale() async {
