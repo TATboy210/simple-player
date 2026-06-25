@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../shared/osd_overlay.dart';
+import '../shared/transmitted_light.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
@@ -42,15 +43,23 @@ class ControlsOverlay extends StatefulWidget {
   /// 空状态存在时，控制栏不拦截 hit test（让下层 EmptyState 按钮可点击）
   final bool emptyStatePresent;
 
+  /// 全屏状态 — 传递给 AutoHideController 控制隐藏延迟
+  final bool isFullscreen;
+
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter
   final ValueListenable<bool>? resizing;
+
+  /// 视频标题（传递给 ControlBar Row 1 左侧）
+  final String? title;
 
   const ControlsOverlay({
     super.key,
     required this.engine,
     this.actions = const PlayerActions(),
     this.emptyStatePresent = false,
+    this.isFullscreen = false,
     this.resizing,
+    this.title,
   });
 
   @override
@@ -69,6 +78,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     _autoHide = AutoHideController(
       vsync: this,
       engineState: widget.engine.state,
+      isFullscreen: widget.isFullscreen,
       popupCloseNotifier: _popupCloseNotifier,
     );
     widget.engine.state.addListener(_onEngineStateChanged);
@@ -121,6 +131,18 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             child: RepaintBoundary(
               child: Stack(
                 children: [
+                  // 光透射效果 — 控制栏下方的蓝色辉光
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: Tokens.controlBarHeight + 60,
+                    child: TransmittedLight(
+                      type: TransmissionType.bottom,
+                      intensity: 0.6,
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
                   const Positioned(
                     bottom:
                         Tokens.controlBarMarginBottom +
@@ -140,6 +162,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         engine: widget.engine,
                         actions: widget.actions,
                         isIdle: isIdle,
+                        title: widget.title,
                         opacity: _autoHide.opacity,
                         enableBlur: _autoHide.visible.value,
                         resizing: widget.resizing,

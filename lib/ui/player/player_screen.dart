@@ -72,12 +72,43 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   final ValueNotifier<bool> _playlistVisible = ValueNotifier(false);
-  bool _playlistMounted = false;
+  final ValueNotifier<bool> _playlistMounted = ValueNotifier(false);
+
+  /// 视频加载后自动调整窗口比例（仅窗口模式）
+  void _onAspectRatioChanged() {
+    final ratio = widget.engine.aspectRatio.value;
+    if (ratio <= 0 || !ratio.isFinite) return;
+    // 全屏时不调整窗口尺寸
+    if (widget.windowService.mode.value.isFullscreen) return;
+    _fitWindowToVideo(ratio);
+  }
+
+  Future<void> _fitWindowToVideo(double ratio) async {
+    try {
+      final currentSize = await windowManager.getSize();
+      // 保持当前高度，按视频比例计算宽度
+      double w = currentSize.height * ratio;
+      double h = currentSize.height;
+      // 合理范围限制（1920*0.9 ≈ 1728）
+      if (w > 1728) {
+        w = 1728;
+        h = w / ratio;
+      }
+      if (h > 1080) {
+        h = 1080;
+        w = h * ratio;
+      }
+      await windowManager.setSize(Size(w, h));
+      await windowManager.center();
+    } catch (_) {
+      // 静默失败，不影响播放
+    }
+  }
 
   void _togglePlaylist() {
     final nowVisible = !_playlistVisible.value;
     _playlistVisible.value = nowVisible;
-    if (nowVisible) _playlistMounted = true;
+    if (nowVisible) _playlistMounted.value = true;
     widget.onTogglePlaylist?.call();
   }
 
@@ -86,7 +117,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // 延迟卸载，等待淡出动画完成
     Future.delayed(const Duration(milliseconds: Tokens.durationSlide), () {
       if (mounted && !_playlistVisible.value) {
-        setState(() => _playlistMounted = false);
+        _playlistMounted.value = false;
       }
     });
   }
@@ -102,8 +133,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    widget.engine.aspectRatio.addListener(_onAspectRatioChanged);
+  }
+
+  @override
   void dispose() {
+    widget.engine.aspectRatio.removeListener(_onAspectRatioChanged);
     _playlistVisible.dispose();
+    _playlistMounted.dispose();
     super.dispose();
   }
 
@@ -116,8 +155,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         final l10n = AppLocalizations.of(context);
         final modeIcon = playModeIcon(widget.playlist.mode);
         final modeLabel = playModeLabel(widget.playlist.mode, l10n);
-
-        final videoContent = _buildVideoContent(isVideo, modeIcon, modeLabel);
 
         final keyboardHandler = KeyboardHandler(
           customBindings: widget.customBindings,
@@ -156,10 +193,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   child: ValueListenableBuilder<bool>(
                     valueListenable: _playlistVisible,
                     builder: (context, playlistVisible, videoContent) =>
-                        Stack(
+                      ValueListenableBuilder<bool>(
+                    valueListenable: _playlistMounted,
+                    builder: (context, mounted, _) => Stack(
                       children: [
                         videoContent!,
-                        if (_playlistMounted)
+                        if (mounted)
                           IgnorePointer(
                             ignoring: !playlistVisible,
                             child: PlaylistPanel(
@@ -182,6 +221,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           ),
                       ],
                     ),
+                  ),
                     child: _buildVideoContent(isVideo, modeIcon, modeLabel),
                   ),
                 ),
@@ -216,11 +256,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     children: [
       Expanded(
         child: DropHandler(
-          onFilesDropped: widget.onFilesDropped ?? (_) {},
-          onHoverChanged: widget.onDragHoverChanged,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
+            onFilesDropped: widget.onFilesDropped ?? (_) {},
+            onHoverChanged: widget.onDragHoverChanged,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
               VideoSurface(engine: widget.engine),
               if (widget.emptyState != null)
                 ValueListenableBuilder<MediaState>(
@@ -259,6 +299,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   emptyStatePresent: widget.emptyState != null,
                   isFullscreen: isFullscreen,
                   resizing: widget.windowService.isResizing,
+                  title: widget.playlist.current?.name,
                 );
                 },
               ),

@@ -87,7 +87,7 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
-    testWidgets('scroll down decreases volume', (tester) async {
+    testWidgets('scroll on video does not change volume', (tester) async {
       engine.textureId.value = 1;
       engine.volume.value = 0.8;
       await tester.pumpWidget(buildSubject());
@@ -96,7 +96,6 @@ void main() {
       final target = find.byType(Texture);
       final center = tester.getCenter(target);
 
-      // Dispatch a PointerScrollEvent directly
       final event = PointerScrollEvent(
         position: center,
         scrollDelta: const Offset(0, 50),
@@ -104,64 +103,8 @@ void main() {
       tester.binding.handlePointerEvent(event);
       await tester.pump();
 
-      expect(engine.volume.value, closeTo(0.75, 0.01));
-    });
-
-    testWidgets('scroll up increases volume', (tester) async {
-      engine.textureId.value = 1;
-      engine.volume.value = 0.5;
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      final target = find.byType(Texture);
-      final center = tester.getCenter(target);
-
-      final event = PointerScrollEvent(
-        position: center,
-        scrollDelta: const Offset(0, -50),
-      );
-      tester.binding.handlePointerEvent(event);
-      await tester.pump();
-
-      expect(engine.volume.value, closeTo(0.55, 0.01));
-    });
-
-    testWidgets('volume is clamped to 1.0', (tester) async {
-      engine.textureId.value = 1;
-      engine.volume.value = 0.98;
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      final target = find.byType(Texture);
-      final center = tester.getCenter(target);
-
-      final event = PointerScrollEvent(
-        position: center,
-        scrollDelta: const Offset(0, -50),
-      );
-      tester.binding.handlePointerEvent(event);
-      await tester.pump();
-
-      expect(engine.volume.value, 1.0);
-    });
-
-    testWidgets('volume is clamped to 0.0', (tester) async {
-      engine.textureId.value = 1;
-      engine.volume.value = 0.02;
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      final target = find.byType(Texture);
-      final center = tester.getCenter(target);
-
-      final event = PointerScrollEvent(
-        position: center,
-        scrollDelta: const Offset(0, 50),
-      );
-      tester.binding.handlePointerEvent(event);
-      await tester.pump();
-
-      expect(engine.volume.value, 0.0);
+      // 音量不再由视频区域滚轮调节
+      expect(engine.volume.value, closeTo(0.8, 0.01));
     });
   });
 }

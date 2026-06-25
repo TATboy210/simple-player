@@ -4,26 +4,36 @@ import 'package:flutter/material.dart';
 class Tokens {
   Tokens._();
 
-  static const bgBase = Color(0xFF0A0A0F);
-  static const bgPanel = Color(0xFF1A1A24);
-  static const bgElevated = Color(0xFF242432);
-  static const bgHover = Color(0xFF2A2A3A);
-  static const bgGlass = Color(0x801A1A24);
+  static const bgDeep = Color(0xFF060810);      // 最深背景 - 加深
+  static const bgBase = Color(0xFF0C0F18);      // 加深
+  static const bgPanel = Color(0xFF111520);     // 加深
+  static const bgElevated = Color(0xFF161A28);  // 加深
+  static const bgHover = Color(0xFF1E2232);     // 加深
+  static const bgGlass = Color(0x8C0C0F18);    // 加深
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
+  static const accentBlue = Color(0xFF4A8EFF); // 蓝色辉光（进度条/边框）
   static const accentEgg = Color.fromARGB(255, 102, 204, 255);
   static const danger = Color.fromARGB(255, 250, 55, 55);
 
-  static const textPrimary = Color(0xFFE8E8F0);
-  static const textSecondary = Color(0xFF9999AA);
-  static const textTertiary = Color(0xFF666677);
+  // ── 边缘微光 ──
+  static const glowCore = Color(0xE6A0BEFF);     // rgba(160,190,255,0.9)
+  static const glowMid = Color(0x40648CFF);       // rgba(100,140,255,0.25)
+  static const glowEdge = Color(0x265078FF);      // rgba(80,120,255,0.15)
+  static const glowEdgeStrong = Color(0x596496FF); // rgba(100,150,255,0.35)
+
+  static const textPrimary = Color(0xEBFFFFFF); // rgba(255,255,255,0.92)
+  static const textSecondary = Color(0x73FFFFFF); // rgba(255,255,255,0.45)
+  static const textTertiary = Color(0x38FFFFFF); // rgba(255,255,255,0.22)
   static const textDisabled = Color(0xFF444455);
 
   static const borderHighlight = Color(0x33FFFFFF);
+  static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 字体 ──
-  static const fontFamily = 'Noto Sans SC';
+  static const fontFamily = 'SF Pro Display';    // 主字体（Windows 回退 Segoe UI）
+  static const fontFamilyMono = 'SF Mono';       // 等宽字体
   static const fontTitle = 18.0;
   static const fontBody = 14.0;
   static const fontCaption = 12.0;
@@ -47,10 +57,12 @@ class Tokens {
   static const spLg = 16.0;
   static const spXl = 24.0;
 
-  static const radiusSm = 6.0;
-  static const radiusMd = 10.0;
+  static const radiusSm = 8.0;       // 按钮、speed 标签
+  static const radiusMd = 14.0;      // 色板方块、透射卡片图标
+  static const radiusLg = 22.0;      // 卡片、控制栏、hover 区域
+  static const radiusXl = 32.0;      // 外框容器
   static const radiusBtn = 4.0;
-  static const radiusLarge = 12.0;
+  static const radiusLarge = 12.0;   // 保留兼容
   static const radiusPopup = 8.0;
 
   // ── 毛玻璃 ──
@@ -68,6 +80,10 @@ class Tokens {
 
   // ── 自动隐藏 ──
   static const hideDelayWindowed = 5;
+  static const hideDelayFullscreen = 3;
+
+  // ── 全屏动画 ──
+  static const durationFullscreenAnim = 200;
 
   // ── 标题栏 ──
   static const titleBarHeight = 32.0;
@@ -80,19 +96,27 @@ class Tokens {
   static const closePressedBg = Color(0xFFB01C14);
 
   // ── 控制栏 ──
-  static const controlBarHeight = 84.0;
-  static const controlBarRadius = 16.0;
+  static const controlBarHeight = 110.0;
+  static const controlBarRadius = 22.0;   // 修正为 22px（与设计稿一致）
   static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;
-  static const controlBarBorder = Color(0x1AFFFFFF);
+  static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 进度条 ──
+  static const progressBarRadius = 2.0;
   static const progressBarHeight = 32.0;
   static const progressBarThickness = 3.0;
   static const progressBarThicknessDrag = 5.0;
   static const progressThumbRadius = 7.0;
-  static const progressPlayed = Color(0xFF6C5CE7);
+  static const progressPlayed = Color(0xFFFFFFFF); // 白色（与设计稿一致）
   static const progressBuffer = Color(0x44FFFFFF);
+  static const Color progressThumb = Color(0xFFFFFFFF);
+  static const int progressSeekThrottleMs = 150;
+  static const int progressExpandDurationMs = 200;
+  static const double progressDragThreshold = 5.0;
+  static const double progressDisabledBgAlpha = 0.3;
+  static const double progressDisabledBufferAlpha = 0.2;
+  static const double progressDisabledPlayedAlpha = 0.3;
 
   // ── 缩放 ──
   static const hoverScale = 1.02;

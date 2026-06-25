@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:player_engine/player_engine.dart';
@@ -15,15 +14,7 @@ class VideoSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerSignal: (event) {
-        if (event is PointerScrollEvent) {
-          final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
-          final v = (engine.volume.value + delta).clamp(0.0, 1.0);
-          engine.setVolume(v);
-        }
-      },
-      child: RepaintBoundary(
+    return RepaintBoundary(
         child: AnimatedBuilder(
           animation: Listenable.merge([engine.textureId, engine.aspectRatio]),
           builder: (_, _) {
@@ -33,21 +24,18 @@ class VideoSurface extends StatelessWidget {
             return SizedBox.expand(
               child: id == null
                   ? const SizedBox.shrink()
-                  : ClipRect(
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
-                          height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
-                          child: Texture(textureId: id),
-                        ),
+                  : FittedBox(
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
+                        height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
+                        child: Texture(textureId: id),
                       ),
                     ),
             );
           },
         ),
-      ),
-    );
+      );
   }
 }
