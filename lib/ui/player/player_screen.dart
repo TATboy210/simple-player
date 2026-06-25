@@ -7,6 +7,7 @@ import '../../kernel/bridge/window_mode.dart';
 import 'package:player_engine/player_engine.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
+import '../../kernel/window/aspect_ratio_service.dart';
 import '../../features/player/services/playback_controller.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
@@ -75,11 +76,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final ValueNotifier<bool> _playlistMounted = ValueNotifier(false);
 
   /// 视频加载后自动调整窗口比例（仅窗口模式）
+  ///
+  /// mpv 风格：先锁定窗口宽高比（WM_SIZING 拖拽时自动约束），
+  /// 再调整窗口尺寸以匹配视频。
   void _onAspectRatioChanged() {
     final ratio = widget.engine.aspectRatio.value;
     if (ratio <= 0 || !ratio.isFinite) return;
     // 全屏时不调整窗口尺寸
     if (widget.windowService.mode.value.isFullscreen) return;
+    // 锁定窗口宽高比（拖拽时自动约束）
+    AspectRatioService.I.matchVideo(ratio);
+    // 调整窗口尺寸以匹配视频
     _fitWindowToVideo(ratio);
   }
 
