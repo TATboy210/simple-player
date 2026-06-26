@@ -153,12 +153,13 @@ class _EdgeGlowState extends State<EdgeGlow>
 
   /// 变体 C — 脉冲呼吸
   Widget _buildPulseGlow() {
-    if (_pulseController == null) return widget.child;
+    final pulseController = _pulseController;
+    if (pulseController == null) return widget.child;
 
     return AnimatedBuilder(
-      animation: _pulseController!,
+      animation: pulseController,
       builder: (context, child) {
-        final t = _pulseController!.value;
+        final t = pulseController.value;
         // 正弦曲线：0 → 1 → 0
         final pulse = math.sin(t * math.pi);
 

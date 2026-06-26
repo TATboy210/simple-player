@@ -28,9 +28,9 @@ class AuroraBackground extends StatefulWidget {
   const AuroraBackground({
     super.key,
     this.blobColors = const [
-      Color(0xFF3B82F6), // primary blue
-      Color(0xFF1130A3), // accent blue (logo)
-      Color(0xFF5578DC), // light accent blue
+      Tokens.auroraBlue1,
+      Tokens.auroraBlue2,
+      Tokens.auroraBlue3,
     ],
     this.blobOpacities = const [0.08, 0.06, 0.05],
     this.engineState,

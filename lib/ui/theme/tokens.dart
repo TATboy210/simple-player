@@ -42,6 +42,15 @@ class Tokens {
   static const glowOmniLeft = Color(0x1A7850DC);
   static const glowOmniUp = Color(0x0A5082FF);
 
+  // ── Aurora 背景 blob ──
+  static const auroraBlue1 = Color(0xFF3B82F6);  // primary blue
+  static const auroraBlue2 = Color(0xFF1130A3);  // accent blue (logo)
+  static const auroraBlue3 = Color(0xFF5578DC);  // light accent blue
+
+  // ── 缩略图叠加层 ──
+  static const thumbnailOverlay = Color(0x42000000);  // 半透明黑色 (≈Colors.black26)
+  static const progressBarBg = Color(0x44000000);    // 进度条底色
+
   // ── 控制栏装饰 ──
   static const controlBarBg = Color(0x990E111E);
   static const controlBarBorderWhite = Color(0x0AFFFFFF);

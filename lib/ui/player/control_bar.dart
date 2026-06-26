@@ -156,11 +156,12 @@ class ControlBar extends StatelessWidget {
     if (!enableBlur) return RepaintBoundary(child: content);
 
     // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
-    if (resizing != null) {
+    final resizingNotifier = resizing;
+    if (resizingNotifier != null) {
       return AnimatedBuilder(
-        animation: resizing!,
+        animation: resizingNotifier,
         builder: (_, child) {
-          if (resizing!.value) return RepaintBoundary(child: child!);
+          if (resizingNotifier.value) return RepaintBoundary(child: child!);
           return _buildBlur(child!);
         },
         child: content,
@@ -183,11 +184,12 @@ class ControlBar extends StatelessWidget {
       ),
     );
 
-    if (opacity != null) {
+    final opacityNotifier = opacity;
+    if (opacityNotifier != null) {
       return AnimatedBuilder(
-        animation: opacity!,
+        animation: opacityNotifier,
         builder: (_, child) {
-          if (opacity!.value < 0.01) return child!;
+          if (opacityNotifier.value < 0.01) return child!;
           return withBlur(child!);
         },
         child: blurContent,
@@ -393,7 +395,7 @@ class _RightButtonGroup extends StatelessWidget {
             icon: Icons.settings,
             onPressed: actions.onSettings,
             onSecondaryTapUp: actions.onSettingsSecondary != null
-                ? (d) => actions.onSettingsSecondary!(context, d)
+                ? (d) => actions.onSettingsSecondary?.call(context, d)
                 : null,
             tooltip: l10n.settings,
           ),

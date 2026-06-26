@@ -82,7 +82,7 @@ class ThumbnailTile extends StatelessWidget {
             _ThumbnailImage(path: item.path),
             if (isCurrent)
               Container(
-                color: Colors.black26,
+                color: Tokens.thumbnailOverlay,
                 child: const Center(
                   child: Icon(
                     Icons.play_circle_filled,
@@ -294,7 +294,7 @@ class _BreakpointBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 3,
-      decoration: const BoxDecoration(color: Color(0x44000000)),
+      decoration: const BoxDecoration(color: Tokens.progressBarBg),
       child: FractionallySizedBox(
         alignment: Alignment.centerLeft,
         widthFactor: progress.clamp(0.0, 1.0),

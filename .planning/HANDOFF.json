@@ -1,37 +1,47 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-26T08:52:39.142Z",
-  "phase": "4",
-  "phase_name": "启动优化",
-  "phase_dir": "4-startup",
-  "plan": 1,
-  "task": 3,
-  "total_tasks": 5,
-  "status": "paused",
+  "timestamp": "2026-06-26T12:00:00.000Z",
+  "milestone": "v1.7",
+  "milestone_name": "Stability, Architecture & Cross-Platform Prep",
+  "phase": "wave1",
+  "phase_name": "Wave 1 — Stability & Code Quality",
+  "status": "in_progress",
+  "progress": {
+    "total_tasks": 5,
+    "completed_tasks": 4,
+    "percent": 80
+  },
   "completed_tasks": [
-    {"id": 1, "name": "Phase 4 实现验证 — 确认 R4-1/R4-2/R4-3 已在 master 上", "status": "done", "commit": "15c82a6, cb7a045"},
-    {"id": 2, "name": "测试修复: golden + perf test isFullscreen 参数移除", "status": "done", "commit": "uncommitted"},
-    {"id": 3, "name": "测试修复: subtitle_service 单独运行通过确认", "status": "done", "commit": "n/a"}
+    {"id": "R1-1", "name": "FullscreenController debounce", "status": "done", "commit": "59cc6e5"},
+    {"id": "R1-2", "name": "Bang operator elimination (10 files)", "status": "done", "commit": "uncommitted"},
+    {"id": "R1-3", "name": "Hardcoded Colors → Tokens", "status": "done", "commit": "uncommitted"},
+    {"id": "R1-4", "name": "Silent Catch → Proper Logging", "status": "done", "commit": "uncommitted"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "测试修复: controls_overlay 双击测试 — 功能未实现，需决定删测试还是加功能", "status": "not_started"},
-    {"id": 5, "name": "测试修复: progress_bar cursor 测试 — disabled 状态下断言失败", "status": "not_started"}
+    {"id": "R1-5", "name": "Magic Numbers → Named Constants", "status": "not_started"}
   ],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "决定 controls_overlay 双击测试策略：删除测试 vs 实现双击功能", "context": "ControlsOverlay 只有单击隐藏逻辑，无双击检测。测试期望双击触发 onToggleFullscreen", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 4 已在 master 实现，不需要重新计划", "rationale": "15c82a6 (lazy FvpEngine + prewarm) + cb7a045 (state machine + progress splash) 已覆盖 R4-1~R4-3", "phase": "4"},
-    {"decision": "跳过 Phase 4 研究，直接验证已有实现", "rationale": "上下文有限，任务明确，已有 memory 记录", "phase": "4"},
-    {"decision": "先修复 5 个失败测试再标记 v1.6 完成", "rationale": "用户选择，确保测试全绿", "phase": "4"}
+    {"decision": "Bang operator fix pattern: capture nullable field in local var before AnimatedBuilder", "rationale": "Dart flow analysis guarantees non-null after null check for local vars, but not for field access in closures", "phase": "wave1"},
+    {"decision": "Aurora blob colors get dedicated tokens (auroraBlue1/2/3), not reused from glow section", "rationale": "Decorative gradient colors are semantically distinct from glow effect colors", "phase": "wave1"},
+    {"decision": "Colors.transparent and aurora internal white gradient kept as hardcoded", "rationale": "Flutter standard constant and effect-internal colors don't benefit from tokenization", "phase": "wave1"},
+    {"decision": "Silent catch fix: debugPrint with [ComponentName] prefix", "rationale": "Consistent logging format, GTK only logs on final fallback to avoid spam", "phase": "wave1"},
+    {"decision": "onSettingsSecondary callback: use ?.call() instead of bang operator", "rationale": "Ternary with case pattern doesn't compile in Dart; ?.call() is idiomatic", "phase": "wave1"}
   ],
   "uncommitted_files": [
-    "test/golden/control_layouts_golden_test.dart",
-    "test/perf/control_bar_perf_test.dart",
-    ".planning/STATE.md"
+    ".planning/.continue-here.md",
+    "lib/kernel/bridge/linux/linux_platform_fullscreen.dart",
+    "lib/kernel/scanner/folder_scanner.dart",
+    "lib/ui/player/control_bar.dart",
+    "lib/ui/playlist/playlist_panel.dart",
+    "lib/ui/playlist/thumbnail_tile.dart",
+    "lib/ui/shared/aurora_background.dart",
+    "lib/ui/shared/edge_glow.dart",
+    "lib/ui/shared/glass_container.dart",
+    "lib/ui/theme/tokens.dart"
   ],
-  "next_action": "修复剩余 2 个测试（controls_overlay 双击 + progress_bar cursor），然后运行 flutter test 验证全绿，最后标记 v1.6 Complete",
-  "context_notes": "v1.6 里程碑 75% 完成 (3/4 phases)。Phase 4 已在 master 实现但未验证。5 个测试失败中 2 个已修复 (isFullscreen 参数)，1 个确认非真实失败 (subtitle_service)，2 个待修 (controls_overlay 双击功能缺失、progress_bar cursor)。用户选择先修测试再标记完成。"
+  "next_action": "Execute R1-5: Magic Numbers → Named Constants. Scan lib/ for magic numbers (thresholds, delays, limits), extract to Tokens.* or local named constants.",
+  "context_notes": "v1.7 Wave 1 80% complete (4/5 tasks). R1-2~R1-4 done in this session. 697 tests all green. 10 uncommitted files. R1-5 is the last task before Wave 1 is complete."
 }
