@@ -1,21 +1,25 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Rendering Performance Optimization
-current_phase: 4
-current_phase_name: 启动优化
-status: complete
-stopped_at: "2026-06-26T10:15:00.000Z"
-last_updated: "2026-06-26T10:15:00.000Z"
+milestone: v1.7
+milestone_name: Stability, Architecture & Cross-Platform Prep
+current_phase: 1
+current_phase_name: Wave 1 — Stability & Code Quality
+status: in_progress
+stopped_at: "2026-06-26T11:00:00.000Z"
+last_updated: "2026-06-26T11:00:00.000Z"
 progress:
   total_phases: 4
-  completed_phases: 4
+  completed_phases: 0
   total_plans: 1
   completed_plans: 1
-  percent: 100
+  percent: 15
 ---
 
-# Project State: v1.6 ✅ COMPLETE
+# Project State: v1.7 — in progress
+
+## Current Position
+
+Wave 1 (Stability & Code Quality) — 部分完成
 
 ## Project Reference
 
