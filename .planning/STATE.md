@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Rendering Performance Optimization
-current_phase: 3
-current_phase_name: d3d11-bottleneck
+current_phase: 4
+current_phase_name: startup
 status: planned
 last_updated: "2026-06-26T00:00:00.000Z"
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 1
   completed_plans: 1
-  percent: 50
+  percent: 75
 ---
 
 # Project State: v1.6
@@ -25,9 +25,13 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: Phase 3 — D3D11 瓶颈优化 ⏳ PLANNED
+Phase: Phase 4 — 启动优化 ⏳ PLANNED
 
 ## Completed
+
+- Phase 3: D3D11 瓶颈优化 ✅ (3fcb343)
+  - shader_resource=1 启用 GPU 色彩转换
+  - 日志级别优化 (log=warning)
 
 - Phase 2: 渲染管线优化 ✅ (94fa167, 43fe4f8)
   - PositionPoller 静默模式 (500ms)
@@ -49,5 +53,5 @@ Phase: Phase 3 — D3D11 瓶颈优化 ⏳ PLANNED
 
 ## Next Steps
 
-1. 手动验证 Phase 2 的 CPU 降低目标 (>30%)
-2. `/gsd-execute-phase 3` — 执行 D3D11 瓶颈优化
+1. 手动验证 Phase 2 & 3 的 CPU 降低目标 (>30%)
+2. `/gsd-execute-phase 4` — 执行启动优化
