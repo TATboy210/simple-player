@@ -88,7 +88,6 @@ void main() {
         buildControlSubject(
           child: ControlBar(
             engine: engine,
-            isFullscreen: true,
             enableBlur: false,
           ),
         ),
