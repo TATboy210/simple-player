@@ -395,6 +395,7 @@ class FvpEngine extends PlayerEngine {
       }
 
       position.value = 0;
+      state.value = MediaState.idle;
       _errorType = MediaErrorType.unknown;
       errorMessage.value = null;
     } on Exception catch (e) {
