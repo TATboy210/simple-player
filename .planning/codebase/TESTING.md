@@ -1,381 +1,150 @@
-# Testing Patterns
+<!-- refreshed: 2026-06-26 -->
 
-**Analysis Date:** 2026-06-23
+# Test Infrastructure
 
-## Test Framework
+## Directory Structure
 
-**Runner:**
-- Flutter Test (built-in)
-- Config: `analysis_options.yaml` with strict lints
-
-**Assertion Library:**
-- Flutter Test built-in matchers: `expect()`, `findsOneWidget`, `findsNothing`
-- Custom matchers: `closeTo()` for floating point, `contains()` for strings
-
-**Run Commands:**
-```bash
-flutter test                    # Run all tests
-flutter test --watch            # Watch mode
-flutter test --coverage         # Coverage (requires lcov)
-flutter test test/path/to/file.dart  # Single file
-```
-
-## Test File Organization
-
-**Location:**
-- Tests mirror lib/ structure
-- Separate directories for test types: `test/unit/`, `test/widget/`, `test/integration/`, `test/golden/`, `test/perf/`
-
-**Naming:**
-- Pattern: `{feature}_test.dart`
-- Examples: `playback_controller_test.dart`, `glass_container_test.dart`
-
-**Structure:**
 ```
 test/
-├── features/player/services/    # Feature-specific tests
-├── golden/                      # Golden file tests
-├── helpers/                     # Test utilities and fakes
-│   ├── fake_engine.dart         # Hand-written FakeEngine
-│   ├── fake_window_service.dart # Hand-written FakeWindowService
-│   └── integration_helpers.dart # Shared test utilities
-├── integration/                 # Integration flow tests
-├── kernel/                      # Kernel layer tests
-│   ├── bridge/
-│   ├── engine/
-│   ├── models/
-│   ├── persistence/
-│   ├── playlist/
-│   ├── services/
-│   ├── startup/
-│   └── utils/
-├── perf/                        # Performance tests
-├── unit/                        # Unit tests
-└── widget/                      # Widget tests
-    ├── player/
-    └── shared/
+├── features/player/services/     # Feature-layer service tests (1 file)
+├── golden/                       # Golden image tests + comparator (3 files)
+├── helpers/                      # Test doubles and utilities (3 files)
+├── integration/                  # Integration flow tests (3 files)
+├── kernel/
+│   ├── bridge/                   # Window/display bridge tests (1 file)
+│   ├── engine/                   # Engine component tests (4 files)
+│   ├── models/                   # Model unit tests (5 files)
+│   ├── persistence/              # Store tests (2 files)
+│   ├── playlist/                 # Playlist logic tests (1 file)
+│   ├── services/                 # Service tests (7 files)
+│   ├── startup/                  # Startup coordinator tests (2 files)
+│   └── utils/                    # Utility tests (5 files)
+├── perf/                         # Performance benchmark tests (1 file)
+├── unit/
+│   ├── bridge/                   # Bridge unit tests (6 files)
+│   ├── kernel/                   # Kernel unit tests (3 files)
+│   └── perf/                     # Startup perf tests (1 file)
+└── widget/
+    ├── player/                   # Player widget tests (9 files)
+    └── shared/                   # Shared widget tests (3 files)
 ```
 
-## Test Structure
+## Test Counts
 
-**Suite Organization:**
+- **60 test files**, **~815 test/testWidgets calls**
+- **115 source files** in `lib/`
+- Test file ratio: ~0.52 test files per source file
+
+## Testing Patterns
+
+### AAA (Arrange-Act-Assert)
+
+All tests follow Arrange-Act-Assert structure:
+
 ```dart
-void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  late FakeEngine engine;
-  late PlaybackController controller;
-
-  setUp(() {
-    engine = FakeEngine();
-    controller = PlaybackController(
-      engine: engine,
-      playlist: Playlist(),
-      onNeedRebuild: () {},
-    );
-  });
-
-  tearDown(() {
-    controller.dispose();
-    engine.dispose();
-  });
-
-  group('PlaybackController', () {
-    group('openAndPlay', () {
-      test('adds file to playlist and starts playback', () async {
-        // Arrange
-        engine.configureMedia(durationMs: 120000);
-
-        // Act
-        final result = await controller.openAndPlay('C:/test/video.mp4');
-
-        // Assert
-        expect(result, true);
-        expect(playlist.length, 1);
-        expect(engine.state.value, MediaState.playing);
-      });
-    });
-  });
-}
-```
-
-**Patterns:**
-- `setUp()` for common initialization
-- `tearDown()` for cleanup (dispose ValueNotifiers)
-- Nested `group()` for logical organization
-- Chinese comments for test descriptions (codebase convention)
-
-## Mocking
-
-**Framework:** Hand-written fakes (NO mockito)
-
-**Why Fakes Over Mocks:**
-- Full control over behavior
-- No code generation required
-- Easier to maintain
-- Better type safety
-
-**FakeEngine Implementation:**
-```dart
-class FakeEngine implements PlayerEngine {
-  // ValueNotifier fields (matches real engine API)
-  final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
-  final ValueNotifier<int> position = ValueNotifier(0);
-  final ValueNotifier<int> duration = ValueNotifier(0);
-
-  // Call tracking for test introspection
-  int openCallCount = 0;
-  int playCallCount = 0;
-  int pauseCallCount = 0;
-  int stopCallCount = 0;
-  final List<String> openPaths = [];
-
-  // Configurable behavior
-  String? failNextOpenWith;
-
-  // Helper methods
-  void configureMedia({int durationMs = 60000, ...}) { ... }
-  void simulateCompleted() { ... }
-  void simulateError(String message) { ... }
-}
-```
-
-**What to Mock:**
-- External dependencies (file system, platform channels)
-- Engine (FFI layer)
-- Window service (Win32 API)
-- SharedPreferences (persistence)
-
-**What NOT to Mock:**
-- Pure Dart logic (test directly)
-- ValueNotifier state (use real instances)
-- Business logic (test through public API)
-
-## Fixtures and Factories
-
-**Test Data:**
-```dart
-// Helper function for common widget wrapping
-Widget buildSubject({
-  PlayerEngine? eng,
-  PlayerActions? actions,
-  bool isFullscreen = false,
-}) {
-  return MaterialApp(
-    home: Scaffold(
-      body: ControlBar(
-        engine: eng ?? engine,
-        actions: actions ?? const PlayerActions(),
-        isFullscreen: isFullscreen,
-      ),
-    ),
-  );
-}
-```
-
-**Shared Helpers:**
-- `test/helpers/fake_engine.dart` — FakeEngine for all tests
-- `test/helpers/fake_window_service.dart` — FakeWindowService
-- `test/helpers/integration_helpers.dart` — `buildTestApp()`, `createTestController()`
-
-## Coverage
-
-**Requirements:** 80% minimum (per project rules)
-
-**View Coverage:**
-```bash
-flutter test --coverage
-# Open coverage/lcov.info in VS Code with Coverage Gutters
-```
-
-**Coverage Gaps:**
-- FFI layer (cannot test in pure Dart)
-- Platform channels (requires integration tests)
-- File I/O errors (edge cases)
-
-## Test Types
-
-**Unit Tests:**
-- Location: `test/unit/`, `test/kernel/`
-- Scope: Individual functions, utilities, models
-- Examples: `path_utils_test.dart`, `media_info_test.dart`
-
-**Widget Tests:**
-- Location: `test/widget/`
-- Scope: UI components, interactions
-- Examples: `control_bar_test.dart`, `glass_container_test.dart`
-- Pattern: `testWidgets()` with `tester.pumpWidget()`
-
-**Integration Tests:**
-- Location: `test/integration/`
-- Scope: Multi-component flows
-- Examples: `playback_flow_test.dart`, `playlist_flow_test.dart`
-- Pattern: FakeEngine + real controllers
-
-**Golden Tests:**
-- Location: `test/golden/`
-- Scope: Visual regression
-- Examples: `glass_widgets_golden_test.dart`, `control_layouts_golden_test.dart`
-- Pattern: `matchesGoldenFile()` with tolerance settings
-
-**Performance Tests:**
-- Location: `test/perf/`
-- Scope: Startup time, rendering performance
-- Examples: `startup_parallel_init_test.dart`, `control_bar_perf_test.dart`
-
-## Common Patterns
-
-**Async Testing:**
-```dart
-test('async operation completes', () async {
+testWidgets('renders without error', (tester) async {
   // Arrange
-  engine.configureMedia(durationMs: 60000);
-
+  engine = FakeEngine();
   // Act
-  await controller.openAndPlay('C:/test.mp4');
-  await Future(() {}); // yield to microtask queue
-
+  await tester.pumpWidget(buildSubject(eng: engine));
   // Assert
-  expect(engine.state.value, MediaState.playing);
-});
-```
-
-**ValueNotifier Testing:**
-```dart
-test('state changes trigger listeners', () {
-  // Arrange
-  final notifier = ValueNotifier<int>(0);
-  int lastValue = -1;
-  notifier.addListener(() => lastValue = notifier.value);
-
-  // Act
-  notifier.value = 42;
-
-  // Assert
-  expect(lastValue, 42);
-  notifier.dispose();
-});
-```
-
-**Widget Testing:**
-```dart
-testWidgets('renders with correct text', (tester) async {
-  // Arrange & Act
-  await tester.pumpWidget(buildSubject());
-
-  // Assert
-  expect(find.text('test'), findsOneWidget);
   expect(find.byType(ControlBar), findsOneWidget);
 });
 ```
 
-**Error Testing:**
-```dart
-test('handles invalid path gracefully', () async {
-  // Arrange
-  engine.failNextOpenWith = 'File not found';
+### Fakes Over Mocks
 
-  // Act
-  final result = await controller.openAndPlay('C:/bad.mp4');
+Hand-written test doubles -- no Mockito dependency:
 
-  // Assert
-  expect(result, false);
-  expect(engine.state.value, MediaState.error);
-});
+- `FakeEngine` -- implements `PlayerEngine`, all `ValueNotifier` fields with defaults
+- `FakeWindowService` -- implements `WindowBridge`, tracks call counts (`modeCallCount`, `lastModeValue`)
+- `integration_helpers.dart` -- shared setup for integration tests
+
+Fakes provide:
+- Call tracking via integer counters and stored last-values
+- Default `ValueNotifier` state matching real implementations
+- `dispose()` for cleanup in `tearDown`
+
+### Test Naming
+
+Descriptive `testWidgets` names describing observed behavior:
+```
+testWidgets('renders TimeRangeDisplay', ...)
+testWidgets('shows secondary controls at width >= 500', ...)
+testWidgets('hides secondary controls at width < 500', ...)
+testWidgets('hides folder_open button when onOpenFile is null', ...)
 ```
 
-**Golden Testing:**
-```dart
-testWidgets('glass container renders correctly', (tester) async {
-  await tester.pumpWidget(
-    wrapForGolden(
-      const GlassContainer(
-        tier: GlassTier.normal,
-        blurEnabled: false,
-        child: Text('Test'),
-      ),
-    ),
-  );
-  await expectLater(
-    find.byType(GlassContainer),
-    matchesGoldenFile('goldens/glass_container_normal.png'),
-  );
-});
-```
+## Widget Test Patterns
+
+- `MaterialApp` wrapper with `theme: ThemeData.dark()` for consistent styling
+- `AppLocalizations` delegates for i18n-dependent widgets
+- `MediaQuery` sizing for responsive layout tests
+- `pumpWidget` + `pump` for async state updates
+- `find.byType`, `find.text`, `find.byIcon` for assertions
+- Cleanup in `tearDown`: `engine.dispose()`, timer cancellation
+- `buildSubject()` helper function in each test file
+
+## Test Categories
+
+### Unit Tests (kernel/models, kernel/utils, kernel/engine)
+- Pure logic, no widget pumping
+- Test enum values, serialization, path manipulation, time formatting
+- Engine components: position poller, track manager, callback handler
+
+### Widget Tests (widget/player, widget/shared)
+- Player UI components: control bar, progress bar, volume controls, speed button
+- Shared components: glass container, glass button, glass chip, aurora background
+- Responsive layout verification at different widths
+
+### Integration Tests (integration/)
+- `controls_flow_test.dart` -- control bar interaction flow
+- `playback_flow_test.dart` -- play/pause/seek flow
+- `playlist_flow_test.dart` -- playlist navigation flow
+
+### Golden Tests (golden/)
+- Visual regression for control layouts and glass widgets
+- Custom `golden_comparator.dart` for tolerance handling
+
+### Performance Tests (perf/)
+- `control_bar_perf_test.dart` -- control bar build performance
+- `startup_parallel_init_test.dart` -- parallel initialization benchmark
+
+## What's Tested
+
+- Models: `AspectRatioMode`, `MediaInfo`, `PlayerError`, `PlaylistItem`, `VideoProcessingState`
+- Engine: `PositionPoller`, `TrackManager`, `FvpCallbackHandler`, `EnginePrewarm`
+- Services: `PlaybackController`, `PlaybackNavigator`, `StateMonitor`, `ThumbnailService`, `VideoProcessingService`, `FileOperations`, `PathValidator`, `SubtitleService`
+- Bridge: `FullscreenController`, `WindowMode`, `WindowPersistence`, `WindowState`, `DisplayConfig`, `PlatformFullscreen` (Win32/macOS/Linux)
+- UI: `ControlBar`, `ControlsOverlay`, `ProgressBar`, `VolumeControls`, `SpeedButton`, `VideoSurface`, `ErrorBanner`, `OsdOverlay`, `AutoHideController`
+- Startup: `StartupCoordinator`, `StartupState`
+
+## What's Not Tested
+
+- `PlayerScreen` (complex composite -- no dedicated widget test)
+- `CustomTitleBar` (Win32 platform dependency)
+- `KeyboardHandler` (20+ key bindings -- no unit test)
+- `DropHandler` (drag-and-drop platform events)
+- `SettingsPanel` / `MediaInfoDialog` (dialog widgets)
+- `PlaylistPanel` / `FolderTab` / `HistoryTab` (playlist UI)
+- `FolderScanner` (filesystem I/O)
+- `DeferredPlayerFeature` (deferred loading)
+- `VideoEffectController` (shader operations)
 
 ## Test Helpers
 
-**FakeEngine Features:**
-- `configureMedia()` — pre-configure duration, tracks
-- `simulateCompleted()` — trigger completion state
-- `simulateError()` — trigger error state
-- `simulateBuffering()` — trigger buffering state
-- Call tracking: `openCallCount`, `playCallCount`, `openPaths`
+| File | Purpose |
+|------|---------|
+| `helpers/fake_engine.dart` | `FakeEngine` -- pure Dart PlayerEngine implementation |
+| `helpers/fake_window_service.dart` | `FakeWindowService` -- WindowBridge with call tracking |
+| `helpers/integration_helpers.dart` | Shared integration test setup utilities |
+| `golden/golden_comparator.dart` | Golden image comparison with tolerance |
 
-**Widget Test Helpers:**
-```dart
-Widget buildTestApp({required Widget child}) {
-  return MaterialApp(home: Scaffold(body: child));
-}
+## Running Tests
 
-PlaybackController createTestController(FakeEngine engine) {
-  return PlaybackController(
-    engine: engine,
-    playlist: Playlist(),
-    onNeedRebuild: () {},
-  );
-}
+```bash
+flutter test                    # All tests
+flutter test test/kernel/       # Kernel tests only
+flutter test test/widget/       # Widget tests only
+flutter test --update-goldens   # Update golden files
 ```
-
-## Test Count Summary
-
-**Total Test Files:** 57
-
-**By Type:**
-- Unit/Kernel: 35 tests
-- Widget: 12 tests
-- Integration: 3 tests
-- Golden: 3 tests
-- Performance: 2 tests
-- Feature: 1 test
-- Helpers: 1 file (not tests)
-
-## Best Practices
-
-**Do:**
-- Use `FakeEngine` instead of mocking
-- Test edge cases (empty inputs, invalid paths, errors)
-- Test async operations with `await Future(() {})`
-- Dispose ValueNotifiers in `tearDown()`
-- Use descriptive test names in Chinese
-
-**Don't:**
-- Use mockito (prefer hand-written fakes)
-- Skip tests or remove assertions
-- Test private methods directly
-- Hardcode file paths (use `C:/test.mp4` pattern)
-- Ignore async warnings
-
-## Coverage Gaps
-
-**Not Tested:**
-- FFI/native layer (C++ code)
-- Platform channel implementations
-- Real file I/O operations
-- Win32 API calls
-- Actual MDK/FFmpeg integration
-
-**Partially Tested:**
-- Error recovery paths
-- Edge cases in playlist operations
-- Concurrency scenarios
-
-**Well Tested:**
-- Business logic (PlaybackController, Playlist)
-- Data models (PlaylistItem, MediaInfo)
-- UI components (GlassContainer, ControlBar)
-- State management (ValueNotifier patterns)
-
----
-
-*Testing analysis: 2026-06-23*
