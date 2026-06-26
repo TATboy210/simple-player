@@ -86,15 +86,21 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   }
 
   void _handleTap() {
-    _clickTimer?.cancel();
-    _clickTimer = Timer(
-      const Duration(milliseconds: ControlsOverlay._clickDelayMs),
-      () {
-        if (!mounted) return;
-        if (widget.engine.state.value == MediaState.idle) return;
-        _autoHide.hide();
-      },
-    );
+    if (_clickTimer?.isActive ?? false) {
+      // 第二次点击在延迟内 → 双击，切换全屏
+      _clickTimer?.cancel();
+      widget.actions.onToggleFullscreen?.call();
+    } else {
+      // 第一次点击 → 等待可能的第二次点击
+      _clickTimer = Timer(
+        const Duration(milliseconds: ControlsOverlay._clickDelayMs),
+        () {
+          if (!mounted) return;
+          if (widget.engine.state.value == MediaState.idle) return;
+          _autoHide.hide();
+        },
+      );
+    }
   }
 
   void _onEngineStateChanged() => _autoHide.onEngineStateChanged();

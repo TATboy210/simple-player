@@ -150,6 +150,7 @@ void main() {
     });
 
     testWidgets('MouseRegion cursor is click', (tester) async {
+      engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
       final mouseRegions = tester.widgetList<MouseRegion>(
         find.byType(MouseRegion),
