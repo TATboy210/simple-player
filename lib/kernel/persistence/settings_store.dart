@@ -19,6 +19,37 @@ import '../utils/log.dart';
 /// PERF: 启动预热 — prewarm() 在 main.dart 中调用，缓存 SharedPreferences 实例，
 /// 避免 load()/save() 重复调用 SharedPreferences.getInstance() 的平台 I/O 开销。
 class SettingsStore {
+  // ── 窗口尺寸边界 ──
+  static const double windowWidthDefault = 1280;
+  static const double windowHeightDefault = 752;
+  static const double windowWidthMin = 1024;
+  static const double windowWidthMax = 8192;
+  static const double windowHeightMin = 513;
+  static const double windowHeightMax = 4608;
+
+  // ── 窗口坐标边界（覆盖多显示器场景） ──
+  static const double coordinateMin = -30000;
+  static const double coordinateMax = 30000;
+
+  // ── 字幕设置边界 ──
+  static const double subtitleFontSizeMin = 14;
+  static const double subtitleFontSizeMax = 28;
+  static const double subtitleFontSizeDefault = 17;
+  static const int subtitleColorIndexMax = 2;
+  static const double subtitleOffsetMin = 60;
+  static const double subtitleOffsetMax = 200;
+  static const double subtitleOffsetDefault = 80;
+
+  // ── 视频效果边界 ──
+  static const double videoEffectMin = -1;
+  static const double videoEffectMax = 1;
+
+  // ── 主题索引边界 ──
+  static const int themeIndexMax = 2;
+
+  // ── 默认语言 ──
+  static const String defaultLocale = 'zh';
+
   /// 预热缓存的 SharedPreferences 实例（由 main.dart 在 runApp 前设置）
   static SharedPreferences? _cachedPrefs;
 
@@ -47,7 +78,7 @@ class SettingsStore {
   /// RC-3: 验证并修正窗口坐标 — 防止 NaN/Infinity 损坏持久化数据
   static double _sanitizeCoordinate(double v, double fallback) {
     if (v.isNaN || v.isInfinite) return fallback;
-    return v.clamp(-30000.0, 30000.0); // 覆盖多显示器场景
+    return v.clamp(coordinateMin, coordinateMax);
   }
 
   /// 验证旋转角度 — 仅允许 0/90/180/270
@@ -91,16 +122,16 @@ class SettingsStore {
         lastFile: prefs.getString(_keyLastFile) ?? '',
         // RC-3: 验证窗口尺寸 — 防止 NaN/损坏数据导致启动失败
         windowWidth: _sanitizeDimension(
-          prefs.getDouble(_keyWindowWidth) ?? 1280,
-          1280,
-          1024,
-          8192,
+          prefs.getDouble(_keyWindowWidth) ?? windowWidthDefault,
+          windowWidthDefault,
+          windowWidthMin,
+          windowWidthMax,
         ),
         windowHeight: _sanitizeDimension(
-          prefs.getDouble(_keyWindowHeight) ?? 752,
-          752,
-          513,
-          4608,
+          prefs.getDouble(_keyWindowHeight) ?? windowHeightDefault,
+          windowHeightDefault,
+          windowHeightMin,
+          windowHeightMax,
         ),
         windowX: prefs.getDouble(_keyWindowX) != null
             ? _sanitizeCoordinate(prefs.getDouble(_keyWindowX)!, 0)
@@ -115,33 +146,33 @@ class SettingsStore {
         ),
         isMuted: prefs.getBool(_keyIsMuted) ?? false,
         isAlwaysOnTop: prefs.getBool(_keyIsAlwaysOnTop) ?? false,
-        subtitleFontSize: (prefs.getDouble(_keySubtitleFontSize) ?? 17.0).clamp(
-          14.0,
-          28.0,
+        subtitleFontSize: (prefs.getDouble(_keySubtitleFontSize) ?? subtitleFontSizeDefault).clamp(
+          subtitleFontSizeMin,
+          subtitleFontSizeMax,
         ),
         subtitleColorIndex: (prefs.getInt(_keySubtitleColorIndex) ?? 0).clamp(
           0,
-          2,
+          subtitleColorIndexMax,
         ),
         subtitleBottomOffset:
-            (prefs.getDouble(_keySubtitleBottomOffset) ?? 80.0).clamp(
-              60.0,
-              200.0,
+            (prefs.getDouble(_keySubtitleBottomOffset) ?? subtitleOffsetDefault).clamp(
+              subtitleOffsetMin,
+              subtitleOffsetMax,
             ),
         // 视频处理 — 防篡改：clamp 到有效范围，解析失败用默认值
         videoBrightness: (prefs.getDouble(_keyVideoBrightness) ?? 0.0).clamp(
-          -1.0,
-          1.0,
+          videoEffectMin,
+          videoEffectMax,
         ),
         videoContrast: (prefs.getDouble(_keyVideoContrast) ?? 0.0).clamp(
-          -1.0,
-          1.0,
+          videoEffectMin,
+          videoEffectMax,
         ),
         videoSaturation: (prefs.getDouble(_keyVideoSaturation) ?? 0.0).clamp(
-          -1.0,
-          1.0,
+          videoEffectMin,
+          videoEffectMax,
         ),
-        videoHue: (prefs.getDouble(_keyVideoHue) ?? 0.0).clamp(-1.0, 1.0),
+        videoHue: (prefs.getDouble(_keyVideoHue) ?? 0.0).clamp(videoEffectMin, videoEffectMax),
         videoRotation: _sanitizeRotation(prefs.getInt(_keyVideoRotation) ?? 0),
         videoAspectRatioIndex: (prefs.getInt(_keyVideoAspectRatio) ?? 0).clamp(
           0,
@@ -156,14 +187,14 @@ class SettingsStore {
       return const AppSettings(
         volume: 1.0,
         lastFile: '',
-        windowWidth: 1280,
-        windowHeight: 752,
+        windowWidth: windowWidthDefault,
+        windowHeight: windowHeightDefault,
         playMode: 0,
         isMuted: false,
         isAlwaysOnTop: false,
-        subtitleFontSize: 17.0,
+        subtitleFontSize: subtitleFontSizeDefault,
         subtitleColorIndex: 0,
-        subtitleBottomOffset: 80.0,
+        subtitleBottomOffset: subtitleOffsetDefault,
         videoBrightness: 0.0,
         videoContrast: 0.0,
         videoSaturation: 0.0,
@@ -209,8 +240,8 @@ class SettingsStore {
     required double y,
     required bool isMaximized,
   }) => _save('saveWindowGeometry', (p) async {
-    final safeWidth = _sanitizeDimension(width, 1280, 1024, 8192);
-    final safeHeight = _sanitizeDimension(height, 752, 513, 4608);
+    final safeWidth = _sanitizeDimension(width, windowWidthDefault, windowWidthMin, windowWidthMax);
+    final safeHeight = _sanitizeDimension(height, windowHeightDefault, windowHeightMin, windowHeightMax);
     final safeX = _sanitizeCoordinate(x, 0);
     final safeY = _sanitizeCoordinate(y, 0);
     // RC-4: 顺序写入 — 避免 Future.wait 部分成功导致数据不一致
@@ -239,7 +270,7 @@ class SettingsStore {
   static Future<String> loadLocale() async {
     try {
       final prefs = await _getPrefs();
-      return prefs.getString(_keyLocale) ?? 'zh';
+      return prefs.getString(_keyLocale) ?? defaultLocale;
     } on Exception catch (e) {
       log.e('SettingsStore.loadLocale failed: $e');
       return 'zh';
@@ -254,7 +285,7 @@ class SettingsStore {
   static Future<int> loadThemeIndex() async {
     try {
       final prefs = await _getPrefs();
-      return (prefs.getInt(_keyThemeIndex) ?? 0).clamp(0, 2);
+      return (prefs.getInt(_keyThemeIndex) ?? 0).clamp(0, themeIndexMax);
     } on Exception catch (e) {
       log.e('SettingsStore.loadThemeIndex failed: $e');
       return 0;
@@ -264,7 +295,7 @@ class SettingsStore {
   /// 保存主题索引
   static Future<void> saveThemeIndex(int index) => _save(
     'saveThemeIndex',
-    (p) => p.setInt(_keyThemeIndex, index.clamp(0, 2)),
+    (p) => p.setInt(_keyThemeIndex, index.clamp(0, themeIndexMax)),
   );
 
   /// 加载自定义快捷键映射 (action → LogicalKeyboardKey.keyName)
@@ -289,39 +320,39 @@ class SettingsStore {
 
   static Future<void> saveSubtitleFontSize(double value) => _save(
     'saveSubtitleFontSize',
-    (p) => p.setDouble(_keySubtitleFontSize, value.clamp(14.0, 28.0)),
+    (p) => p.setDouble(_keySubtitleFontSize, value.clamp(subtitleFontSizeMin, subtitleFontSizeMax)),
   );
 
   static Future<void> saveSubtitleColorIndex(int index) => _save(
     'saveSubtitleColorIndex',
-    (p) => p.setInt(_keySubtitleColorIndex, index.clamp(0, 2)),
+    (p) => p.setInt(_keySubtitleColorIndex, index.clamp(0, subtitleColorIndexMax)),
   );
 
   static Future<void> saveSubtitleBottomOffset(double value) => _save(
     'saveSubtitleBottomOffset',
-    (p) => p.setDouble(_keySubtitleBottomOffset, value.clamp(60.0, 200.0)),
+    (p) => p.setDouble(_keySubtitleBottomOffset, value.clamp(subtitleOffsetMin, subtitleOffsetMax)),
   );
 
   // ─── 视频处理持久化 ───
 
   static Future<void> saveVideoBrightness(double value) => _save(
     'saveVideoBrightness',
-    (p) => p.setDouble(_keyVideoBrightness, value.clamp(-1.0, 1.0)),
+    (p) => p.setDouble(_keyVideoBrightness, value.clamp(videoEffectMin, videoEffectMax)),
   );
 
   static Future<void> saveVideoContrast(double value) => _save(
     'saveVideoContrast',
-    (p) => p.setDouble(_keyVideoContrast, value.clamp(-1.0, 1.0)),
+    (p) => p.setDouble(_keyVideoContrast, value.clamp(videoEffectMin, videoEffectMax)),
   );
 
   static Future<void> saveVideoSaturation(double value) => _save(
     'saveVideoSaturation',
-    (p) => p.setDouble(_keyVideoSaturation, value.clamp(-1.0, 1.0)),
+    (p) => p.setDouble(_keyVideoSaturation, value.clamp(videoEffectMin, videoEffectMax)),
   );
 
   static Future<void> saveVideoHue(double value) => _save(
     'saveVideoHue',
-    (p) => p.setDouble(_keyVideoHue, value.clamp(-1.0, 1.0)),
+    (p) => p.setDouble(_keyVideoHue, value.clamp(videoEffectMin, videoEffectMax)),
   );
 
   static Future<void> saveVideoRotation(int degree) => _save(
@@ -385,11 +416,11 @@ class SettingsStore {
     // RC-3: 验证窗口尺寸
     await p.setDouble(
       _keyWindowWidth,
-      _sanitizeDimension(s.windowWidth, 1280, 1024, 8192),
+      _sanitizeDimension(s.windowWidth, windowWidthDefault, windowWidthMin, windowWidthMax),
     );
     await p.setDouble(
       _keyWindowHeight,
-      _sanitizeDimension(s.windowHeight, 752, 513, 4608),
+      _sanitizeDimension(s.windowHeight, windowHeightDefault, windowHeightMin, windowHeightMax),
     );
     await p.setInt(
       _keyPlayMode,
@@ -398,20 +429,20 @@ class SettingsStore {
     await p.setBool(_keyIsMuted, s.isMuted);
     await p.setDouble(
       _keySubtitleFontSize,
-      s.subtitleFontSize.clamp(14.0, 28.0),
+      s.subtitleFontSize.clamp(subtitleFontSizeMin, subtitleFontSizeMax),
     );
-    await p.setInt(_keySubtitleColorIndex, s.subtitleColorIndex.clamp(0, 2));
+    await p.setInt(_keySubtitleColorIndex, s.subtitleColorIndex.clamp(0, subtitleColorIndexMax));
     await p.setDouble(
       _keySubtitleBottomOffset,
-      s.subtitleBottomOffset.clamp(60.0, 200.0),
+      s.subtitleBottomOffset.clamp(subtitleOffsetMin, subtitleOffsetMax),
     );
     await p.setBool(_keyIsMaximized, s.isMaximized);
     await p.setBool(_keyIsAlwaysOnTop, s.isAlwaysOnTop);
     // 视频处理
-    await p.setDouble(_keyVideoBrightness, s.videoBrightness.clamp(-1.0, 1.0));
-    await p.setDouble(_keyVideoContrast, s.videoContrast.clamp(-1.0, 1.0));
-    await p.setDouble(_keyVideoSaturation, s.videoSaturation.clamp(-1.0, 1.0));
-    await p.setDouble(_keyVideoHue, s.videoHue.clamp(-1.0, 1.0));
+    await p.setDouble(_keyVideoBrightness, s.videoBrightness.clamp(videoEffectMin, videoEffectMax));
+    await p.setDouble(_keyVideoContrast, s.videoContrast.clamp(videoEffectMin, videoEffectMax));
+    await p.setDouble(_keyVideoSaturation, s.videoSaturation.clamp(videoEffectMin, videoEffectMax));
+    await p.setDouble(_keyVideoHue, s.videoHue.clamp(videoEffectMin, videoEffectMax));
     await p.setInt(_keyVideoRotation, _sanitizeRotation(s.videoRotation));
     await p.setInt(
       _keyVideoAspectRatio,
