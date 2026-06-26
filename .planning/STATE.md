@@ -73,17 +73,19 @@ Phase: v1.6 COMPLETE ✅
 
 ## Next Steps
 
-Wave 1 完成。下一步：
+Wave 2 进行中。已完成：
 
-1. 执行 Wave 2: Architecture Refactoring
-   - R2-1: FvpEngine Decomposition — Phase 1: NetworkConfigurator
-   - R2-2: FvpEngine Decomposition — Phase 2: MediaOpener
-   - R2-3: FvpEngine Decomposition — Phase 3: VideoEffectController
-   - R2-4: Large File Splits
-   - R2-5: Static Mutable State Cleanup
+- ✅ R2-1: NetworkConfigurator 提取 (commit 0f0cb26)
+- ✅ R2-2: MediaOpener 集成 (commit 0f0cb26)
+- ✅ R2-3: VideoEffectController 集成 (本会话, FvpEngine 555→539行)
+
+剩余：
+1. R2-4: Large File Splits (精简版 — SettingsValidator 提取)
+2. R2-5: Static Mutable State Cleanup
+3. 提交本次改动
 
 ## Session
 
-**Last session:** 2026-06-26T13:25:44.290Z
-**Stopped at:** context exhaustion at 75% (2026-06-26)
+**Last session:** 2026-06-26T21:30:00.000Z
+**Stopped at:** VideoEffectController 集成完成, 718 测试全绿
 **Resume file:** .planning/.continue-here.md
