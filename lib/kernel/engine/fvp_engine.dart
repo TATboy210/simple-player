@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
@@ -9,6 +8,8 @@ import 'package:player_engine/player_engine.dart';
 import '../services/path_validator.dart';
 import '../utils/path_utils.dart';
 import 'fvp_callback_handler.dart';
+import 'media_opener.dart';
+import 'open_result.dart';
 import 'position_poller.dart';
 import '../bridge/display_config.dart';
 import '../utils/log.dart';
@@ -31,16 +32,8 @@ class FvpEngine extends PlayerEngine {
 
   // ─── Constants ───
 
-  static const _prepareTimeoutSeconds = 10;
-  static const _textureTimeoutSeconds = 5;
   static const _minPlaybackRate = 0.25;
   static const _maxPlaybackRate = 4.0;
-
-  // 网络流常量 — 仅对 URL 生效，本地文件不受影响
-  static const _networkTimeoutMs = 10000;
-  static const _networkProbeSize = 1000000; // 1MB
-  static const _networkAnalyzeDurationUs = 5000000; // 5s
-  static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
 
   // D3D11 性能参数默认值
   // shader_resource=1: 启用 GPU 色彩空间转换（YUV→RGB），减少 CPU 负担
@@ -48,8 +41,6 @@ class FvpEngine extends PlayerEngine {
 
   // 内存优化参数（适合 1080p，4K HEVC 软解时可能需要放宽）
   static const _ffmpegDecoderThreads = '2'; // FFmpeg 软解线程数（默认=CPU核心数，8-16）
-  static const _localBufferMinMs = 500; // 本地文件最小缓冲 500ms（默认 1000）
-  static const _localBufferMaxMs = 2000; // 本地文件最大缓冲 2s（默认 4000）
   static const _maxBufferFrames = '3'; // 渲染器最大帧缓冲（2 帧过紧，3 帧更安全）
 
   // ─── Helpers ───
@@ -57,6 +48,7 @@ class FvpEngine extends PlayerEngine {
   late FvpCallbackHandler _callbackHandler;
   late PositionPoller _positionPoller;
   late TrackManager _trackManager;
+  late MediaOpener _mediaOpener;
 
   // ─── ValueNotifier 实现 ───
 
@@ -127,6 +119,7 @@ class FvpEngine extends PlayerEngine {
       currentPathGetter: () => _currentPath,
     );
     _trackManager = TrackManager(p);
+    _mediaOpener = MediaOpener(p, _trackManager);
 
     p.textureId.addListener(_onTextureIdChanged);
     _callbackHandler.init();
@@ -179,58 +172,6 @@ class FvpEngine extends PlayerEngine {
     textureId.value = _player.textureId.value;
   }
 
-  /// 为 URL 源配置 FFmpeg 网络参数
-  ///
-  /// 仅对 http/https/rtmp/rtsp 等 URL 生效，本地文件不调用。
-  /// 设置超时、探测大小、分析时长和协议特定参数。
-  void _configureNetworkOptions(String url) {
-    // 通用网络超时
-    _player.setProperty('timeout', _networkTimeoutMs.toString());
-
-    // FFmpeg 流探测参数 — 减少首帧延迟
-    _player.setProperty('avformat.probesize', _networkProbeSize.toString());
-    _player.setProperty(
-      'avformat.analyzeduration',
-      _networkAnalyzeDurationUs.toString(),
-    );
-
-    // RTSP 低延迟配置
-    if (url.startsWith('rtsp://')) {
-      _player.setProperty('avformat.probesize', _rtspProbeSize.toString());
-      _player.setProperty('avformat.fflags', '+nobuffer');
-      _player.setProperty('avformat.fpsprobesize', '0');
-      _player.setProperty('avformat.avioflags', 'direct');
-      // RTSP 实时流：min=0, max=MAX, drop=true (低延迟丢帧)
-      _player.setBufferRange(min: 0, max: 0, drop: true);
-    }
-
-    // RTMP 低延迟配置
-    if (url.startsWith('rtmp://')) {
-      _player.setProperty('avformat.fflags', '+nobuffer');
-      _player.setProperty('avformat.fpsprobesize', '0');
-      _player.setBufferRange(min: 0, max: 0, drop: true);
-    }
-
-    // SRT 低延迟配置
-    if (url.startsWith('srt://')) {
-      _player.setProperty('avformat.fflags', '+nobuffer');
-      _player.setProperty('avformat.fpsprobesize', '0');
-      _player.setBufferRange(min: 0, max: 0, drop: true);
-    }
-
-    // UDP/TCP 实时流低延迟
-    if (url.startsWith('udp://') || url.startsWith('tcp://')) {
-      _player.setProperty('avformat.fflags', '+nobuffer');
-      _player.setProperty('avformat.fpsprobesize', '0');
-      _player.setBufferRange(min: 0, max: 0, drop: true);
-    }
-
-    // HTTP/HTTPS 启用解复用缓存（加速 seek）
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      _player.setProperty('demux.buffer.ranges', '1');
-    }
-  }
-
   /// 通用守卫：disposed 检查 + try-catch + log
   void _guardedAction(String name, void Function() action) {
     if (_disposed) return;
@@ -261,143 +202,31 @@ class FvpEngine extends PlayerEngine {
       return;
     }
 
-    // 非 URL 路径检查文件是否存在
-    if (!PathValidator.isUrl(trimmed)) {
-      try {
-        final file = File(trimmed);
-        if (!await file.exists()) {
-          state.value = MediaState.error;
-          _errorType = MediaErrorType.file;
-          errorMessage.value = '文件不存在: ${PathUtils.basename(trimmed)}';
-          return;
-        }
-      } on Exception catch (e) {
-        state.value = MediaState.error;
-        _errorType = MediaErrorType.file;
-        errorMessage.value = '路径无效: $e';
-        return;
-      }
-    }
-    if (_disposed) return;
-
     _isOpening = true;
     state.value = MediaState.loading;
     _currentPath = trimmed;
 
     Timeline.startSync('fvp.open');
     try {
-      _player.media = trimmed;
-
-      if (PathValidator.isUrl(trimmed)) {
-        // URL 源：配置网络参数
-        _configureNetworkOptions(trimmed);
-      } else {
-        // 本地文件：紧凑缓冲，减少内存占用
-        //   默认 buffer.range=1000-4000ms，本地文件不需要这么大的缓冲
-        _player.setBufferRange(
-          min: _localBufferMinMs,
-          max: _localBufferMaxMs,
-          drop: true,
-        );
-        // 本地文件不需要 demux 缓存（已禁用网络流的 demux.buffer.ranges）
-        _player.setProperty('demux.buffer.ranges', '0');
-      }
-
-      final prepareResult = await _player.prepare().timeout(
-        const Duration(seconds: _prepareTimeoutSeconds),
-        onTimeout: () => -99,
-      );
+      final result = await _mediaOpener.open(trimmed);
       if (_disposed) return;
-      if (prepareResult < 0) {
-        state.value = MediaState.error;
-        _errorType = prepareResult == -99
-            ? (PathValidator.isUrl(trimmed)
-                  ? MediaErrorType.network
-                  : MediaErrorType.file)
-            : MediaErrorType.codec;
-        errorMessage.value = prepareResult == -99
-            ? '打开超时: ${PathUtils.basename(trimmed)}'
-            : '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)';
-        return;
+
+      switch (result) {
+        case OpenSuccess(:final mediaInfo):
+          duration.value = mediaInfo.duration;
+          final video = mediaInfo.video;
+          if (video != null && video.width > 0 && video.height > 0) {
+            aspectRatio.value = (video.width * video.par) / video.height;
+          }
+          position.value = 0;
+          state.value = MediaState.idle;
+          _errorType = MediaErrorType.unknown;
+          errorMessage.value = null;
+        case OpenError(:final type, :final message):
+          state.value = MediaState.error;
+          _errorType = type;
+          errorMessage.value = message;
       }
-
-      final info = _player.mediaInfo;
-      duration.value = info.duration;
-
-      // PAR 修正：物理像素宽高比 ≠ 显示宽高比
-      final videos = info.video;
-      VideoCodecInfo? videoInfo;
-      if (videos != null && videos.isNotEmpty) {
-        final vc = videos.first.codec;
-        if (vc.width > 0 && vc.height > 0) {
-          aspectRatio.value = (vc.width * vc.par) / vc.height;
-          videoInfo = VideoCodecInfo(
-            width: vc.width,
-            height: vc.height,
-            par: vc.par,
-            codec: vc.codec,
-          );
-        }
-      }
-
-      // 音轨信息
-      final audioTracks = <AudioTrackInfo>[];
-      final audio = info.audio;
-      if (audio != null) {
-        for (final t in audio) {
-          audioTracks.add(
-            AudioTrackInfo(
-              index: t.index,
-              language: t.metadata['language'] ?? '',
-              codec: t.codec.codec,
-              channels: t.codec.channels,
-            ),
-          );
-        }
-      }
-
-      // 字幕轨道信息
-      final subtitleTracks = <SubtitleTrackInfo>[];
-      final subtitle = info.subtitle;
-      if (subtitle != null) {
-        for (final t in subtitle) {
-          subtitleTracks.add(
-            SubtitleTrackInfo(
-              index: t.index,
-              language: t.metadata['language'] ?? '',
-              title: t.metadata['title'] ?? '',
-            ),
-          );
-        }
-      }
-
-      _trackManager.updateMediaInfo(
-        MediaInfo(
-          duration: info.duration,
-          video: videoInfo,
-          audioTracks: audioTracks,
-          subtitleTracks: subtitleTracks,
-        ),
-      );
-
-      final textureResult = await _player.updateTexture().timeout(
-        const Duration(seconds: _textureTimeoutSeconds),
-        onTimeout: () => -99,
-      );
-      if (_disposed) return;
-      if (textureResult < 0) {
-        state.value = MediaState.error;
-        _errorType = MediaErrorType.codec;
-        errorMessage.value = textureResult == -99
-            ? '纹理创建超时: ${PathUtils.basename(trimmed)}'
-            : '纹理创建失败: ${PathUtils.basename(trimmed)}';
-        return;
-      }
-
-      position.value = 0;
-      state.value = MediaState.idle;
-      _errorType = MediaErrorType.unknown;
-      errorMessage.value = null;
     } on Exception catch (e) {
       state.value = MediaState.error;
       _errorType = PathValidator.isUrl(trimmed)
