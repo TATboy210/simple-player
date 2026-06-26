@@ -495,5 +495,99 @@ void main() {
       // The tooltip text should contain formatted time (e.g., "1:00")
       expect(find.byType(ProgressBar), findsOneWidget);
     });
+
+    // ── Resize freeze tests ──
+
+    testWidgets('renders with resizing parameter', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      engine.duration.value = 10000;
+      engine.position.value = 5000;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 48,
+              child: ProgressBar(engine: engine, resizing: resizing),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(ProgressBar), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+      resizing.dispose();
+    });
+
+    testWidgets('skips internal rebuild when resizing is true', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      engine.duration.value = 10000;
+      engine.position.value = 5000;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 48,
+              child: ProgressBar(engine: engine, resizing: resizing),
+            ),
+          ),
+        ),
+      );
+
+      // Start resizing
+      resizing.value = true;
+      await tester.pump();
+
+      // Change position during resize — should not crash
+      engine.position.value = 8000;
+      await tester.pump();
+
+      expect(find.byType(ProgressBar), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+      resizing.dispose();
+    });
+
+    testWidgets('resumes rebuild after resize ends', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      engine.duration.value = 10000;
+      engine.position.value = 5000;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 48,
+              child: ProgressBar(engine: engine, resizing: resizing),
+            ),
+          ),
+        ),
+      );
+
+      // Start resizing
+      resizing.value = true;
+      await tester.pump();
+
+      // Change position during resize
+      engine.position.value = 8000;
+      await tester.pump();
+
+      // End resizing — triggers rebuild with latest values
+      resizing.value = false;
+      await tester.pump();
+
+      expect(find.byType(ProgressBar), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+      resizing.dispose();
+    });
   });
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
@@ -122,6 +123,87 @@ void main() {
       await tester.pump();
 
       expect(find.text('test'), findsNothing);
+    });
+
+    // ── Resize freeze tests ──
+
+    testWidgets('renders with resizing parameter', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: OsdOverlay(resizing: resizing)),
+        ),
+      );
+
+      expect(find.byType(OsdOverlay), findsOneWidget);
+      resizing.dispose();
+    });
+
+    testWidgets('skips rebuild when resizing is true', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: OsdOverlay(resizing: resizing)),
+        ),
+      );
+
+      // Show a message first so there is something to cache
+      OsdService.I.show('before');
+      await tester.pump();
+      expect(find.text('before'), findsOneWidget);
+
+      // Start resizing — cached child should be returned
+      resizing.value = true;
+      await tester.pump();
+
+      // Change message during resize — the ValueListenableBuilder fires
+      // but the cached child is returned instead of rebuilding
+      OsdService.I.show('during resize');
+      await tester.pump();
+
+      // Cached 'before' text should still be visible
+      expect(find.text('before'), findsOneWidget);
+      expect(find.text('during resize'), findsNothing);
+
+      // Clean up timers
+      OsdService.I.hide();
+      await tester.pump(const Duration(seconds: 2));
+      resizing.dispose();
+    });
+
+    testWidgets('resumes rebuild after resize ends', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: OsdOverlay(resizing: resizing)),
+        ),
+      );
+
+      OsdService.I.show('first');
+      await tester.pump();
+      expect(find.text('first'), findsOneWidget);
+
+      // Start resizing
+      resizing.value = true;
+      await tester.pump();
+
+      // End resizing
+      resizing.value = false;
+      await tester.pump();
+
+      // Show a new message after resize ends — should rebuild normally
+      OsdService.I.show('after');
+      await tester.pump();
+
+      expect(find.text('after'), findsOneWidget);
+
+      // Clean up timers
+      OsdService.I.hide();
+      await tester.pump(const Duration(seconds: 2));
+      resizing.dispose();
     });
   });
 }
