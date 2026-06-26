@@ -26,6 +26,10 @@ class MediaOpener {
   static const _prepareTimeoutSeconds = 10;
   static const _textureTimeoutSeconds = 5;
 
+  // 本地文件缓冲参数 — 紧凑配置，减少内存占用
+  static const _localBufferMinMs = 500; // 默认 1000
+  static const _localBufferMaxMs = 2000; // 默认 4000
+
   MediaOpener(this._player, this._trackManager);
 
   /// 打开媒体文件或 URL
@@ -60,6 +64,8 @@ class MediaOpener {
 
     if (PathValidator.isUrl(trimmed)) {
       NetworkConfigurator.configure(_player, trimmed);
+    } else {
+      _configureLocalBuffer();
     }
 
     final prepareResult = await _player.prepare().timeout(
@@ -103,14 +109,13 @@ class MediaOpener {
     // 字幕轨道信息
     final subtitleTracks = _parseSubtitleTracks(info);
 
-    _trackManager.updateMediaInfo(
-      MediaInfo(
-        duration: info.duration,
-        video: videoInfo,
-        audioTracks: audioTracks,
-        subtitleTracks: subtitleTracks,
-      ),
+    final mediaInfo = MediaInfo(
+      duration: info.duration,
+      video: videoInfo,
+      audioTracks: audioTracks,
+      subtitleTracks: subtitleTracks,
     );
+    _trackManager.updateMediaInfo(mediaInfo);
 
     // ─── 纹理创建 ───
     final textureResult = await _player.updateTexture().timeout(
@@ -124,7 +129,20 @@ class MediaOpener {
       return OpenError(MediaErrorType.codec, message);
     }
 
-    return OpenResult.success;
+    return OpenSuccess(mediaInfo);
+  }
+
+  /// 本地文件紧凑缓冲 — 减少内存占用
+  ///
+  /// 默认 buffer.range=1000-4000ms，本地文件不需要这么大的缓冲。
+  /// 同时禁用 demux 缓存（网络流才需要）。
+  void _configureLocalBuffer() {
+    _player.setBufferRange(
+      min: _localBufferMinMs,
+      max: _localBufferMaxMs,
+      drop: true,
+    );
+    _player.setProperty('demux.buffer.ranges', '0');
   }
 
   /// 解析音轨信息

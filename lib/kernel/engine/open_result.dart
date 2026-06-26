@@ -3,14 +3,12 @@ import 'package:player_engine/player_engine.dart';
 /// 媒体打开结果 — sealed class 表示成功或失败
 sealed class OpenResult {
   const OpenResult();
-
-  /// 成功打开
-  static const success = OpenSuccess();
 }
 
-/// 打开成功
+/// 打开成功 — 携带解析后的 MediaInfo
 final class OpenSuccess extends OpenResult {
-  const OpenSuccess();
+  final MediaInfo mediaInfo;
+  const OpenSuccess(this.mediaInfo);
 }
 
 /// 打开失败

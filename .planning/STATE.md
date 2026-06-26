@@ -2,24 +2,25 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Stability, Architecture & Cross-Platform Prep
-current_phase: 1
-current_phase_name: Wave 1 — Stability & Code Quality
+current_phase: 6
 status: in_progress
-stopped_at: "2026-06-26T11:00:00.000Z"
-last_updated: "2026-06-26T11:00:00.000Z"
+stopped_at: context exhaustion at 75% (2026-06-26)
+last_updated: "2026-06-26T18:30:00.000Z"
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 1
+  completed_phases: 2
+  total_plans: 2
   completed_plans: 1
-  percent: 15
+  percent: 50
+current_phase_name: Wave 2 — Architecture Refactoring
 ---
 
 # Project State: v1.7 — in progress
 
 ## Current Position
 
-Wave 1 (Stability & Code Quality) — 部分完成
+Wave 1 (Stability & Code Quality) — ✅ 完成
+Wave 2 (Architecture Refactoring) — 待开始
 
 ## Project Reference
 
@@ -33,6 +34,13 @@ See: .planning/PROJECT.md
 Phase: v1.6 COMPLETE ✅
 
 ## Completed
+
+- Wave 1: Stability & Code Quality ✅ (59cc6e5, 48de238, 3057492, e15cd6e)
+  - R1-1: Fullscreen State Machine
+  - R1-2: Bang Operator Elimination (~20处)
+  - R1-3: Hardcoded Colors → Tokens
+  - R1-4: Silent Catch → Proper Logging
+  - R1-5: Magic Numbers → Named Constants (SettingsStore 18个常量)
 
 - Phase 4: 启动优化 ✅ (15c82a6, cb7a045, d39ecf5)
   - FvpEngine 延迟初始化 (R4-1)
@@ -65,14 +73,17 @@ Phase: v1.6 COMPLETE ✅
 
 ## Next Steps
 
-v1.6 已完成。下一步：
+Wave 1 完成。下一步：
 
-1. 规划 v1.7 或其他新 milestone
-2. 考虑 HLS ABR (P3 长期计划)
-3. 考虑 Steam/SteamOS 上架计划
+1. 执行 Wave 2: Architecture Refactoring
+   - R2-1: FvpEngine Decomposition — Phase 1: NetworkConfigurator
+   - R2-2: FvpEngine Decomposition — Phase 2: MediaOpener
+   - R2-3: FvpEngine Decomposition — Phase 3: VideoEffectController
+   - R2-4: Large File Splits
+   - R2-5: Static Mutable State Cleanup
 
 ## Session
 
-**Last session:** 2026-06-26T08:52:39.142Z
-**Stopped at:** 测试修复进行中，2/5 已修，2/5 待修
+**Last session:** 2026-06-26T13:25:44.290Z
+**Stopped at:** context exhaustion at 75% (2026-06-26)
 **Resume file:** .planning/.continue-here.md
