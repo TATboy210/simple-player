@@ -1,169 +1,80 @@
-/// Fact-Forcing Gate Context:
-/// - Importers: /gsd-new-project, /gsd-plan-phase workflows
-/// - Affected API: ROADMAP.md project roadmap tracking
-/// - Data schema: Markdown phases with requirements mapping
-/// - User verbatim: "视频播放区域除开上标题栏是16比9，包括控制栏在内16比9比例，然后播放16比9视频时视频直接铺满画面即可，然后调整窗口大小，允许有黑边，不能裁切画面，然后优化播放视频时调整窗口会卡顿的问题"
-
-# Video Area 16:9 Ratio Optimization — Roadmap
+# v1.6 Rendering Performance — Roadmap
 
 ## Overview
 
-**4 phases** | **12 requirements mapped** | All requirements covered ✓
+**4 phases** | **15 requirements mapped** | All requirements covered ✓
 
-| # | Phase | Goal | Requirements | Success Criteria |
-|---|-------|------|--------------|------------------|
-| 1 | 布局重构 | 使用 AspectRatio 约束视频区域 | R1-1, R1-2, R1-3 | 3 |
-| 2 | 视频显示 | 16:9 视频铺满，非 16:9 黑边 | R2-1, R2-2, R2-3 | 3 |
-| 3 | 性能优化 | 窗口调整流畅无卡顿 | R3-1, R3-2, R3-3 | 3 |
-| 4 | 兼容性 | 全屏/最大化/控制栏正常 | R4-1, R4-2, R4-3, R4-4 | 4 |
+| # | Phase | Goal | Requirements | Risk |
+|---|-------|------|--------------|------|
+| 1 | Widget 层优化 | 低成本高收益的 UI 层优化 | R3-1~R3-5 | 低 |
+| 2 | 渲染管线优化 | 帧调度和纹理路径优化 | R2-1~R2-4 | 中 |
+| 3 | fvp D3D11 瓶颈 | 引擎层性能突破 | R1-1~R1-4 | 高 |
+| 4 | 启动优化 | 首帧时间 <500ms | R4-1~R4-3 | 中 |
 
----
-
-### Phase 1: 布局重构
-
-**Goal:** 使用 AspectRatio 约束视频区域，使其保持 16:9 比例
-
-**Mode:** mvp
-
-**Requirements:**
-- R1-1: 视频播放区域（标题栏+视频+控制栏）整体保持 16:9 比例
-- R1-2: 窗口调整大小时，视频区域自动居中
-- R1-3: 视频区域超出窗口时，显示黑色背景
-
-**Success Criteria:**
-1. 视频区域始终保持 16:9 比例
-2. 窗口调整时视频区域自动居中
-3. 超出部分显示黑色背景
-
-**Key Files:**
-- `lib/ui/player/player_screen.dart` — 布局重构
-
-**Implementation:**
-```dart
-// 当前布局
-Column
-├── CustomTitleBar
-└── Expanded ← 问题：没有 16:9 约束
-    └── Stack [VideoSurface, ControlsOverlay]
-
-// 目标布局
-Column
-├── CustomTitleBar
-└── Expanded
-    └── ColoredBox(color: Colors.black)
-        └── Center
-            └── AspectRatio(16/9)
-                └── Stack [VideoSurface, ControlsOverlay]
-```
+**策略：** Phase 1 先做（低风险、立竿见影），Phase 2-3 可并行（独立领域），Phase 4 收尾。
 
 ---
 
-### Phase 2: 视频显示
+### Phase 1: Widget 层优化
 
-**Goal:** 16:9 视频铺满视频区域，非 16:9 视频保持比例
+**Goal:** 消除不必要的 rebuild 和 saveLayer，窗口调整 120fps
 
-**Mode:** mvp
+**Requirements:** R3-1, R3-2, R3-3, R3-4, R3-5
 
-**Requirements:**
-- R2-1: 16:9 视频铺满视频区域
-- R2-2: 非 16:9 视频保持原始比例，黑边填充
-- R2-3: 视频不能被裁切
+**Tasks:**
+1. PlayerScreen 添加 RepaintBoundary 分离视频/控制栏/播放列表
+2. AuroraBackground Ticker 在 paused 状态暂停
+3. 全局搜索 Opacity widget → AnimatedOpacity/FadeTransition
+4. 审查 ValueListenableBuilder 绑定粒度
+5. 硬编码颜色迁移到 Tokens.*
 
-**Success Criteria:**
-1. 16:9 视频铺满画面
-2. 非 16:9 视频有黑边但不裁切
-3. 视频始终保持原始比例
-
-**Key Files:**
-- `lib/ui/player/video_surface.dart` — 视频渲染策略
-
-**Implementation:**
-```dart
-// 视频渲染策略
-BoxFit get videoFit {
-  final videoRatio = engine.aspectRatio.value;
-  final isStandard = (videoRatio - 16/9).abs() < 0.01;
-  return isStandard ? BoxFit.fill : BoxFit.contain;
-}
-```
+**验证:** 窗口调整时 DevTools Timeline 显示 120fps
 
 ---
 
-### Phase 3: 性能优化
+### Phase 2: 渲染管线优化
 
-**Goal:** 优化窗口调整时的卡顿问题
+**Goal:** 减少非关键更新对渲染管线的干扰
 
-**Mode:** mvp
+**Requirements:** R2-1, R2-2, R2-3, R2-4
 
-**Requirements:**
-- R3-1: 窗口调整时流畅无卡顿
-- R3-2: 使用 RepaintBoundary 隔离重绘区域
-- R3-3: 优化 Texture 重绘逻辑
+**Tasks:**
+1. PositionPoller：resize 期间暂停轮询
+2. Snapshot Debounce 策略验证和调整
+3. Texture 零拷贝路径确认（fvp 源码验证）
+4. resize 期间暂停 OSD/进度条更新
 
-**Success Criteria:**
-1. 窗口调整流畅无卡顿
-2. 使用 RepaintBoundary 隔离重绘区域
-3. Texture 重绘优化
-
-**Key Files:**
-- `lib/ui/player/video_surface.dart` — Texture 渲染优化
-- `lib/ui/player/player_screen.dart` — RepaintBoundary 包裹
-
-**Implementation:**
-```dart
-// RepaintBoundary 隔离
-RepaintBoundary(
-  child: AspectRatio(
-    aspectRatio: 16 / 9,
-    child: Stack [...]
-  )
-)
-```
+**验证:** resize 期间 CPU 占用下降 >30%
 
 ---
 
-### Phase 4: 兼容性
+### Phase 3: fvp D3D11 瓶颈
 
-**Goal:** 确保全屏、最大化、控制栏等功能正常工作
+**Goal:** 突破引擎层性能瓶颈，GPU 占用 <30%
 
-**Mode:** mvp
+**Requirements:** R1-1, R1-2, R1-3, R1-4
 
-**Requirements:**
-- R4-1: 全屏模式正常工作
-- R4-2: 最大化模式正常工作
-- R4-3: 控制栏正常显示和交互
-- R4-4: 播放列表面板正常显示
+**Tasks:**
+1. `d3d11.sync.cpu=0` 实验（120Hz 稳定性测试）
+2. Flush 频率优化（评估批量提交可行性）
+3. UpdateSubresource 直写实验
+4. FvpEngine 拆分（配合 FVPENGINE-DECOMPOSITION.md）
 
-**Success Criteria:**
-1. 全屏模式正常工作
-2. 最大化模式正常工作
-3. 控制栏正常显示和交互
-4. 播放列表面板正常显示
+**风险:** 引擎层修改可能影响播放稳定性，需要 A/B 测试
 
-**Key Files:**
-- `lib/ui/player/player_screen.dart` — 全屏/最大化处理
-- `lib/ui/player/controls_overlay.dart` — 控制栏布局
-- `lib/ui/playlist/playlist_panel.dart` — 播放列表
+**验证:** 4K 视频 GPU 占用 <30%
 
 ---
 
-## Traceability
+### Phase 4: 启动优化
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| R1-1 | 1 | Pending |
-| R1-2 | 1 | Pending |
-| R1-3 | 1 | Pending |
-| R2-1 | 2 | Pending |
-| R2-2 | 2 | Pending |
-| R2-3 | 2 | Pending |
-| R3-1 | 3 | Pending |
-| R3-2 | 3 | Pending |
-| R3-3 | 3 | Pending |
-| R4-1 | 4 | Pending |
-| R4-2 | 4 | Pending |
-| R4-3 | 4 | Pending |
-| R4-4 | 4 | Pending |
+**Goal:** 启动到首帧 <500ms
 
----
-*Created: 2026-06-25*
+**Requirements:** R4-1, R4-2, R4-3
+
+**Tasks:**
+1. FvpEngine 延迟初始化（仅加载纹理渲染，其余懒加载）
+2. engine_prewarm 效果验证
+3. StartupCoordinator 阶段并行化评估
+
+**验证:** 冷启动到首帧 <500ms（3 次取平均）

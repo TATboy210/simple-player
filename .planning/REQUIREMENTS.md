@@ -1,97 +1,52 @@
-/// Fact-Forcing Gate Context:
-/// - Importers: /gsd-new-project, /gsd-plan-phase workflows
-/// - Affected API: REQUIREMENTS.md project requirements tracking
-/// - Data schema: Markdown requirements with checkboxes
-/// - User verbatim: "视频播放区域除开上标题栏是16比9，包括控制栏在内16比9比例，然后播放16比9视频时视频直接铺满画面即可，然后调整窗口大小，允许有黑边，不能裁切画面，然后优化播放视频时调整窗口会卡顿的问题"
-
-# Video Area 16:9 Ratio Optimization — Requirements
+# v1.6 Rendering Performance Optimization — Requirements
 
 ## User Stories
 
-**As a** 播放器用户, **I want** 视频播放区域保持 16:9 比例, **so that** 播放 16:9 视频时画面铺满，调整窗口时有黑边但不裁切。
+**As a** 4K 视频用户, **I want** 播放时 CPU/GPU 占用低且窗口调整流畅, **so that** 不影响其他应用同时运行。
+
+## Performance Targets
+
+| 指标 | 当前值 | 目标值 | 测量方法 |
+|------|--------|--------|----------|
+| 4K CPU 占用 | ~25% | <15% | Task Manager |
+| 4K GPU 占用 | ~45% | <30% | GPU-Z / DevTools |
+| 窗口调整 fps | ~45fps | 120fps | Timeline tracing |
+| 启动到首帧 | ~800ms | <500ms | Stopwatch |
 
 ## Requirements
 
-### R1: 16:9 比例约束
+### R1: fvp D3D11 瓶颈优化
 
-- [ ] **R1-1**: 视频播放区域（标题栏+视频+控制栏）整体保持 16:9 比例
-- [ ] **R1-2**: 窗口调整大小时，视频区域自动居中
-- [ ] **R1-3**: 视频区域超出窗口时，显示黑色背景
+- [ ] **R1-1**: 评估 `d3d11.sync.cpu=0`（async mode）在 120Hz 显示器上的稳定性
+- [ ] **R1-2**: 减少 Flush 阻塞频率（批量提交 vs 逐帧 Flush）
+- [ ] **R1-3**: 纹理更新路径优化（CopyResource → UpdateSubresource 直写）
+- [ ] **R1-4**: FvpEngine 拆分（724→<300 行），提取 MediaOpener、D3D11Configurator 等
 
-### R2: 视频显示
+### R2: 渲染管线优化
 
-- [ ] **R2-1**: 16:9 视频铺满视频区域
-- [ ] **R2-2**: 非 16:9 视频保持原始比例，黑边填充
-- [ ] **R2-3**: 视频不能被裁切
+- [ ] **R2-1**: PositionPoller 自适应策略优化（视频播放时降低频率）
+- [ ] **R2-2**: Snapshot Debounce 与窗口 resize 事件解耦
+- [ ] **R2-3**: Texture 更新零拷贝路径验证（fvp 已优化，确认无额外拷贝）
+- [ ] **R2-4**: 帧调度：resize 期间暂停非关键更新（进度条、OSD）
 
-### R3: 性能优化
+### R3: Widget 层优化
 
-- [ ] **R3-1**: 窗口调整时流畅无卡顿
-- [ ] **R3-2**: 使用 RepaintBoundary 隔离重绘区域
-- [ ] **R3-3**: 优化 Texture 重绘逻辑
+- [ ] **R3-1**: PlayerScreen RepaintBoundary 隔离（视频/控制栏/播放列表分离）
+- [ ] **R3-2**: AuroraBackground Ticker 在 paused 状态暂停
+- [ ] **R3-3**: Opacity 动画 → AnimatedOpacity 或 FadeTransition（避免 saveLayer）
+- [ ] **R3-4**: ValueListenableBuilder 精确绑定（避免父级 rebuild）
+- [ ] **R3-5**: 硬编码颜色 → Tokens.*（减少 theme rebuild 影响范围）
 
-### R4: 兼容性
+### R4: 启动优化
 
-- [ ] **R4-1**: 全屏模式正常工作
-- [ ] **R4-2**: 最大化模式正常工作
-- [ ] **R4-3**: 控制栏正常显示和交互
-- [ ] **R4-4**: 播放列表面板正常显示
+- [ ] **R4-1**: FvpEngine 延迟初始化（首帧后再初始化完整引擎）
+- [ ] **R4-2**: fvp 预热策略（engine_prewarm 验证有效性）
+- [ ] **R4-3**: StartupCoordinator 阶段并行化
 
-## Technical Approach
+## Definition of Done
 
-### 布局结构
-
-```dart
-Column
-├── CustomTitleBar (固定高度 32dp)
-└── Expanded
-    └── ColoredBox(
-        color: Colors.black,  // 黑色背景
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Stack
-                ├── VideoSurface
-                ├── ControlsOverlay
-                └── EmptyState
-          )
-        )
-      )
-```
-
-### 视频渲染策略
-
-- **16:9 视频**: `BoxFit.fill` 铺满视频区域
-- **非 16:9 视频**: `BoxFit.contain` 保持比例
-
-### 性能优化策略
-
-1. **RepaintBoundary**: 在视频区域外层包裹 RepaintBoundary
-2. **缓存动画**: 使用 AnimatedBuilder 缓存窗口尺寸变化
-3. **防抖更新**: 窗口调整时使用防抖减少重绘频率
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `lib/ui/player/player_screen.dart` | 布局重构，添加 AspectRatio 约束 |
-| `lib/ui/player/video_surface.dart` | 视频渲染优化 |
-| `lib/ui/player/controls_overlay.dart` | 控制栏布局调整 |
-| `lib/ui/theme/tokens.dart` | 新增 16:9 相关常量 |
-
-## Success Criteria
-
-- [ ] 视频区域始终保持 16:9 比例
-- [ ] 16:9 视频铺满画面
-- [ ] 非 16:9 视频有黑边但不裁切
-- [ ] 窗口调整流畅无卡顿
+- [ ] 4K 视频播放 CPU <15%、GPU <30%
+- [ ] 窗口调整 120fps 无卡顿
+- [ ] 启动到首帧 <500ms
 - [ ] 所有现有测试通过
-
-## Out of Scope
-
-- 自定义比例（4:3, 21:9 等）
-- 视频旋转
-- 画中画模式
-
----
-*Created: 2026-06-25*
+- [ ] 新增性能基准测试

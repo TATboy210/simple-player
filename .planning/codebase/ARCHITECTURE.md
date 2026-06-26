@@ -1,158 +1,164 @@
-<!-- refreshed: 2026-06-23 -->
+<!-- refreshed: 2026-06-26 -->
+
 # Architecture
 
-**Analysis Date:** 2026-06-23
-
-## System Overview
-
-```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              UI Layer                                    │
-│   PlayerScreen │ ControlsOverlay │ PlaylistPanel │ SettingsPanel          │
-│   `lib/ui/`                                                             │
-├────────────────────────────────────┬────────────────────────────────────┤
-│         Feature Layer              │         Shared Widgets              │
-│   PlayerFeature                    │   GlassContainer │ OsdOverlay       │
-│   `lib/features/player/`           │   `lib/ui/shared/`                  │
-├────────────────────────────────────┴────────────────────────────────────┤
-│                           Service Layer                                   │
-│   PlaybackController │ PlaybackNavigator │ StateMonitor                   │
-│   `lib/features/player/services/`                                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                            Kernel Layer                                   │
-│   ┌─────────────┐ ┌─────────────┐ ┌──────────────┐ ┌─────────────────┐  │
-│   │   Engine     │ │   Bridge    │ │  Persistence │ │    Models       │  │
-│   │ FvpEngine    │ │ WindowService│ │ SettingsStore│ │ PlaylistItem    │  │
-│   │ `engine/`    │ │ `bridge/`   │ │ `persistence/`│ │ `models/`      │  │
-│   └─────────────┘ └─────────────┘ └──────────────┘ └─────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────┘
-         │                    │
-         ▼                    ▼
-┌─────────────────┐  ┌─────────────────┐
-│  fvp/MDK SDK    │  │  window_manager │
-│  (FFmpeg+D3D11) │  │  (Win32/macOS)  │
-└─────────────────┘  └─────────────────┘
-```
-
-## Component Responsibilities
-
-| Component | Responsibility | File |
-|-----------|----------------|------|
-| App | MaterialApp shell, theme/locale, settings panel | `lib/app.dart` |
-| DeferredPlayerFeature | Lazy-loads PlayerFeature via `deferred as` | `lib/features/player/deferred_player_feature.dart` |
-| PlayerFeature | UI state, file picker, drag-drop, composes PlayerScreen | `lib/features/player/player_feature.dart` |
-| PlayerServices | Service container: engine + playlist + controller lifecycle | `lib/features/player/player_services.dart` |
-| PlaybackController | Unified entry for all playback operations | `lib/features/player/services/playback_controller.dart` |
-| PlaybackNavigator | Index navigation, open generation guard, resume position | `lib/features/player/services/playback_navigator.dart` |
-| StateMonitor | Auto-advance, breakpoint save, settings restore | `lib/features/player/services/state_monitor.dart` |
-| FvpEngine | fvp/MDK wrapper, ValueNotifier state, D3D11 config | `lib/kernel/engine/fvp_engine.dart` |
-| WindowService | Window management, OS callbacks, fullscreen, persistence | `lib/kernel/bridge/window_service.dart` |
-| WindowBridge | Abstract window interface for testability | `lib/kernel/bridge/window_bridge.dart` |
-| FullscreenController | Atomic fullscreen + mutex + rollback | `lib/kernel/bridge/fullscreen_controller.dart` |
-| Playlist | Ordered item list, CQS navigation, JSON serialization | `lib/kernel/playlist/playlist.dart` |
-| SettingsStore | SharedPreferences persistence, prewarm cache | `lib/kernel/persistence/settings_store.dart` |
-| PathValidator | Path security: extension whitelist, traversal detection | `lib/kernel/services/path_validator.dart` |
-
-## Pattern Overview
-
-**Overall:** Layered architecture with ValueNotifier-based reactive state
-
-**Key Characteristics:**
-- 4-layer separation: Kernel (engine/bridge/models) -> Service (playback orchestration) -> Feature (UI state + composition) -> UI (widgets)
-- ValueNotifier + ValueListenableBuilder for all reactive state (no Provider/Riverpod/Bloc)
-- Abstract interfaces for platform dependencies (WindowBridge, PlatformFullscreen) enabling test doubles
-- Composition over inheritance: PlaybackController composes 3 sub-modules via delegation
-- Immutable data models with `copyWith()` pattern (PlaylistItem, AppSettings)
-- CQS (Command-Query Separation) in Playlist navigation (peekNext/peekPrevious are pure queries)
-
-## Layers
-
-### Kernel Layer
-- **Purpose:** Core logic with zero UI dependencies. Engine wrappers, platform bridge, data models, persistence.
-- **Location:** `lib/kernel/`
-- **Contains:** `engine/`, `bridge/`, `models/`, `persistence/`, `playlist/`, `scanner/`, `services/`, `startup/`, `utils/`
-- **Depends on:** fvp SDK, window_manager, shared_preferences, ffi
-- **Used by:** Feature layer, UI layer
-
-### Feature Layer
-- **Purpose:** Combines kernel services with UI state. Owns service lifecycle.
-- **Location:** `lib/features/player/`
-- **Contains:** `PlayerFeature` (StatefulWidget), `PlayerServices` (service container), `services/` (PlaybackController, PlaybackNavigator, StateMonitor, SubtitleService, VideoProcessingService, FileOperations)
-- **Depends on:** Kernel layer
-- **Used by:** UI layer via `DeferredPlayerFeature`
-
-### UI Layer
-- **Purpose:** Pure Flutter widgets. No business logic, only presentation.
-- **Location:** `lib/ui/`
-- **Contains:** `player/` (PlayerScreen, ControlBar, ProgressBar, KeyboardHandler), `playlist/` (PlaylistPanel, FolderTab, HistoryTab), `dialogs/` (SettingsPanel, MediaInfoDialog), `shared/` (GlassContainer, OsdOverlay, EmptyState), `theme/` (Tokens), `window/` (CustomTitleBar)
-- **Depends on:** Feature layer (via callbacks), Kernel models
-- **Used by:** App shell
-
-## Data Flow
-
-### Primary Playback Flow
-
-1. **User opens file** -> `PlayerFeature._openFile()` -> `FilePicker.pickFiles()` (`lib/features/player/player_feature.dart:87`)
-2. **Files added** -> `PlaybackController.openAndPlay(path)` -> `FileOperations.openAndPlay()` (`lib/features/player/services/playback_controller.dart:63`)
-3. **Navigation** -> `PlaybackNavigator.playIndex(index)` -> validates path via `PathValidator.validate()` (`lib/features/player/services/playback_navigator.dart:21`)
-4. **Engine open** -> `FvpEngine.open(path)` -> `_player.media = trimmed` -> `_player.prepare()` -> `_player.updateTexture()` (`lib/kernel/engine/fvp_engine.dart:248`)
-5. **State update** -> `FvpEngine.state` ValueNotifier -> `StateMonitor._onStateChanged()` listens for auto-advance (`lib/features/player/services/state_monitor.dart:51`)
-6. **UI rebuild** -> `ValueListenableBuilder<PlayerState>` in `ControlsOverlay` rebuilds control bar (`lib/ui/player/controls_overlay.dart`)
-
-### State Propagation Pattern
+## Layer Diagram
 
 ```
-FvpEngine (ValueNotifiers: state, position, volume, ...)
-    │
-    ├──► StateMonitor._onStateChanged()  [auto-advance, breakpoint save]
-    ├──► ControlsOverlay (ValueListenableBuilder)  [UI controls]
-    ├──► ProgressBar (MergedListenable)  [seek position]
-    └──► VolumeControls (ValueListenableBuilder2)  [volume slider]
+┌─────────────────────────────────────────────────────────────────┐
+│  UI Layer (lib/ui/)                          8,540 lines / 51   │
+│  player/ playlist/ shared/ dialogs/ theme/ window/              │
+│  PlayerScreen · ControlBar · PlaylistPanel · SettingsPanel      │
+├─────────────────────────────────────────────────────────────────┤
+│  Feature Layer (lib/features/)               1,050 lines / 10   │
+│  PlayerFeature → PlayerServices (service container)             │
+│  PlaybackController → Navigator + FileOps + StateMonitor        │
+├─────────────────────────────────────────────────────────────────┤
+│  Kernel Layer (lib/kernel/)                  5,150 lines / 49   │
+│  engine/    FvpEngine (MDK/FFmpeg + D3D11)                      │
+│  bridge/    WindowBridge → WindowService (Win32 window_manager) │
+│  playlist/  Playlist model + play mode logic                    │
+│  persistence/ SettingsStore + PlaylistStore (SharedPreferences)  │
+│  services/  ThemeService, LocaleService, ThumbnailService       │
+│  models/    PlaylistItem, PlayMode, AppSettings, MediaState     │
+│  startup/   StartupCoordinator + StartupState                   │
+│  utils/     log, time, path, screen, memory, perf               │
+├─────────────────────────────────────────────────────────────────┤
+│  Native / Platform                                                │
+│  fvp (MDK + FFmpeg + D3D11) · window_manager · file_picker      │
+│  SharedPreferences · path_provider                              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Window Mode Flow
+## Key Design Patterns
 
-1. **User presses F** -> `KeyboardHandler` -> `PlayerActions.onToggleFullscreen` (`lib/ui/player/keyboard_handler.dart`)
-2. **Action** -> `WindowService.setMode(WindowMode.fullscreen)` (`lib/kernel/bridge/window_service.dart:174`)
-3. **FullscreenController.setFullscreen(true)** -> saves state -> `PlatformFullscreen.enter()` -> `Win32PlatformFullscreen` FFI (`lib/kernel/bridge/fullscreen_controller.dart:105`)
-4. **State update** -> `WindowState.mode` ValueNotifier -> UI rebuilds (`lib/kernel/bridge/window_state.dart:23`)
-5. **OS callback** -> `WindowService.onWindowMaximize()` drives mode from OS events (`lib/kernel/bridge/window_service.dart:120`)
+### ValueNotifier / Observer
 
-## Key Abstractions
+Primary state management. No Provider, Riverpod, or Bloc.
 
-**PlayerEngine (abstract):**
-- Purpose: Abstract engine interface for testability
-- Concrete: `FvpEngine` (`lib/kernel/engine/fvp_engine.dart`)
-- Test double: `FakeEngine` (`test/helpers/fake_engine.dart`)
-- Pattern: ValueNotifiers for all state (state, position, volume, etc.)
+- `PlayerEngine` exposes `ValueNotifier<int?> textureId`, `state`, `position`, `duration`, `volume`, `isMuted`, `isBuffering`, `aspectRatio`, `playbackSpeed`, `errorMessage`
+- `WindowBridge` exposes `ValueNotifier<WindowMode> mode`, `windowSize`, `isResizing`, `isAlwaysOnTop`
+- Widgets rebuild via `ValueListenableBuilder` wrappers
+- `ValueListenableBuilder2` merges two listenables into one builder
+- `MergedListenable` combines multiple notifiers for progress bar
 
-**WindowBridge (abstract):**
-- Purpose: Window management abstraction
-- Concrete: `WindowService` (`lib/kernel/bridge/window_service.dart`)
-- Test double: `FakeWindowService` (`test/helpers/fake_window_service.dart`)
-- Pattern: 4 ValueNotifiers (mode, windowSize, isResizing, isAlwaysOnTop) + 6 commands
+### Abstract Interface / Strategy
 
-**PlatformFullscreen (abstract):**
-- Purpose: Platform-specific fullscreen operations
-- Concrete: `Win32PlatformFullscreen` (`lib/kernel/bridge/win32/win32_platform_fullscreen.dart`)
-- Pattern: Returns `FullscreenSnapshot` for rollback on failure
+`WindowBridge` is the abstract interface; `WindowService` is the Win32 implementation. Tests use `FakeWindowService`. Same pattern for `PlayerEngine` (abstract) / `FvpEngine` (concrete), `PlatformFullscreen` (abstract) / `Win32PlatformFullscreen` (concrete), `ThumbnailProvider` (abstract) / platform-specific implementations.
+
+### Composition / Facade
+
+`PlaybackController` composes three sub-modules:
+- `PlaybackNavigator` — index jumps, next/prev, openGeneration guard
+- `FileOperations` — open/add files, path validation
+- `StateMonitor` — auto-advance on completion, play mode handling
+
+`WindowService` composes `WindowState` + `WindowPersistence`.
+
+### Deferred Loading
+
+`DeferredPlayerFeature` uses `deferred as` to lazy-load the player module, avoiding eager import of heavy FvpEngine types during splash.
+
+### Startup Coordinator
+
+`StartupCoordinator` reports phase/progress via `ValueNotifier<StartupState>`, driving `ProgressSplashScreen` during init. Phases: infrastructure → settings → playerModule → playerInit.
+
+## Data Flow: Main User Actions
+
+### Open File
+
+```
+UI (FilePicker / DropHandler)
+  → PlayerFeature._openFile() / _onFilesDropped()
+    → PlaybackController.openAndPlay(path) / addFiles(paths)
+      → PathValidator.validate(path)
+      → Playlist.add(path) → PlaylistStore.save()
+      → PlaybackNavigator.playIndex(idx)
+        → engine.open(path)
+        → engine.seekTo(savedPosition)  // resume if > 1s
+        → engine.play()
+        → playlist.updateHistory()
+```
+
+### Play / Pause
+
+```
+UI (Space key / ControlBar tap)
+  → engine.play() / engine.pause()
+    → mdk.Player.play() / pause()
+    → FvpCallbackHandler maps mdk state → ValueNotifier<MediaState>
+```
+
+### Seek
+
+```
+UI (ProgressBar drag / arrow keys)
+  → engine.seekTo(ms)
+    → mdk.Player.seek(ms)
+    → PositionPoller picks up new position on next 250ms tick
+```
+
+### Next / Previous
+
+```
+UI (N/P keys / ControlBar buttons)
+  → PlaybackController.playNext() / playPrevious()
+    → Playlist.peekNext() / peekPrevious()  // respects PlayMode
+    → PlaybackNavigator.playIndex(targetIndex)
+      → engine.open() + engine.play()
+```
+
+### Fullscreen
+
+```
+UI (F key / title bar button)
+  → WindowService.setMode(WindowMode.fullscreen)
+    → windowManager.setFullScreen(true)
+    → OS callback: onWindowEnterFullScreen
+      → WindowState.mode = WindowMode.fullscreen
+        → UI rebuilds via ValueListenableBuilder
+```
+
+## State Management Approach
+
+All state flows through `ValueNotifier`:
+- **Engine state** (12 notifiers): owned by `FvpEngine`, read by UI
+- **Window state** (4 notifiers): owned by `WindowState` inside `WindowService`
+- **UI state**: `_playlistVisible`, `_isDragHovering`, etc. local to widget state
+- **Cross-cutting**: `playlistGeneration` in `PlayerServices` notifies playlist UI changes
+
+No global state container. Services are created in `PlayerServices.init()`, passed down via constructor injection.
+
+## Service Wiring / Dependency Injection
+
+Manual constructor injection — no DI framework.
+
+```
+main()
+  → WindowService() + SettingsStore.prewarm()
+  → StartupCoordinator
+  → App(coordinator, windowService)
+    → DeferredPlayerFeature(coordinator, windowService)
+      → PlayerFeature(coordinator, windowService)
+        → PlayerServices(windowService)
+          → FvpEngine()
+          → Playlist()
+          → PlaybackController(engine, playlist, onNeedRebuild)
+          → VideoProcessingService(engine)
+        → PlayerScreen(engine, controller, playlist, windowService, ...)
+```
+
+`App` handles MaterialApp shell + settings panel (needs MaterialApp-level BuildContext). `PlayerFeature` handles player UI state + callbacks. `PlayerServices` is the service container with `init()`/`dispose()` lifecycle.
 
 ## Entry Points
 
-**main():**
-- Location: `lib/main.dart`
-- Triggers: Flutter app bootstrap
-- Responsibilities: Init logging, prewarm SharedPreferences, create WindowService, create StartupCoordinator, fire-and-forget EnginePrewarm, runApp(App)
-
-**App:**
-- Location: `lib/app.dart`
-- Triggers: runApp
-- Responsibilities: MaterialApp shell, theme/locale via ValueListenableBuilder, DeferredPlayerFeature loading
-
-**DeferredPlayerFeature:**
-- Location: `lib/features/player/deferred_player_feature.dart`
-- Triggers: App.build()
-- Responsibilities: Lazy-loads PlayerFeature via Dart `deferred as` to avoid eager FvpEngine import
+| Entry Point | Location | Responsibility |
+|-------------|----------|----------------|
+| `main()` | `lib/main.dart` | Logging, prewarm, WindowService, StartupCoordinator, EnginePrewarm, runApp |
+| `App` | `lib/app.dart` | MaterialApp shell, theme/locale, settings panel, DeferredPlayerFeature |
+| `DeferredPlayerFeature` | `lib/features/player/deferred_player_feature.dart` | Lazy-loads PlayerFeature via `deferred as` |
+| `PlayerFeature` | `lib/features/player/player_feature.dart` | UI state, file picker, drag-drop, composes PlayerScreen |
+| `PlayerServices` | `lib/features/player/player_services.dart` | Service container: engine + playlist + controller lifecycle |
 
 ## Architectural Constraints
 
@@ -161,84 +167,16 @@ FvpEngine (ValueNotifiers: state, position, volume, ...)
 - **Circular imports:** None detected. Kernel does not import Feature/UI. Feature imports Kernel. UI imports Feature and Kernel models.
 - **Platform coupling:** Win32-specific code isolated in `lib/kernel/bridge/win32/` and `PlatformFullscreen` interface. `window_manager` package abstracts cross-platform window ops.
 
-## Design Patterns
+## Key Dependencies
 
-### Observer Pattern (ValueNotifier)
-All reactive state uses `ValueNotifier<T>` exposed as public fields. UI subscribes via `ValueListenableBuilder`. No event bus or streams for state propagation.
-
-```dart
-// FvpEngine exposes state
-final ValueNotifier<MediaState> state = ValueNotifier<MediaState>(MediaState.idle);
-
-// UI subscribes
-ValueListenableBuilder<MediaState>(
-  valueListenable: engine.state,
-  builder: (context, state, child) => ...
-)
-```
-
-### Composition Pattern (PlaybackController)
-`PlaybackController` delegates to 3 sub-modules, each receiving `_rt` (the controller itself) as a back-reference:
-
-```dart
-class PlaybackController {
-  late final PlaybackNavigator navigator;  // navigation logic
-  late final FileOperations fileOps;       // file open/drop
-  late final StateMonitor monitor;         // auto-advance, persistence
-}
-```
-
-### Strategy Pattern (PlatformFullscreen)
-Platform-specific fullscreen via abstract interface + DI:
-
-```dart
-abstract class PlatformFullscreen {
-  Future<FullscreenSnapshot> enter();
-  void exit(FullscreenSnapshot snapshot);
-}
-```
-
-### Factory Pattern (ThumbnailService)
-Platform-aware thumbnail provider selection:
-
-```dart
-_impl = switch (defaultTargetPlatform) {
-  TargetPlatform.windows => const NoopThumbnailProvider(),
-  TargetPlatform.linux => const LinuxThumbnailProvider(),
-  TargetPlatform.macOS => const MacosThumbnailProvider(),
-};
-```
-
-### Guard Pattern (openGeneration)
-Concurrent open() requests are guarded by generation counter. Stale async results are discarded:
-
-```dart
-final gen = ++_openGeneration;
-await engine.open(path);
-if (gen != _openGeneration) return; // stale, discard
-```
-
-## Error Handling
-
-**Strategy:** Catch at boundaries, log with context, expose via ValueNotifier, never crash.
-
-**Patterns:**
-- `_guardedAction(name, action)` in FvpEngine wraps every engine call with try-catch + `errorMessage` ValueNotifier
-- `SettingsStore` load/save methods try-catch with safe defaults on failure
-- `Playlist.fromJson` skips corrupted items with warning log
-- `PathValidator.validate()` returns null (ok) or error string (never throws)
-- All `dispose()` methods check `_disposed` flag to prevent double-dispose
-
-## Cross-Cutting Concerns
-
-**Logging:** Module-scoped `Logger` instances (`log`, `logEngine`, `logBridge`, `logServices`, `logUi`) via `package:logger`. Release mode adds rotating file output to `%APPDATA%\SimplePlayer\logs\`. (`lib/kernel/utils/log.dart`)
-
-**Validation:** `PathValidator` validates all file paths at entry points (FilePicker, drag-drop, history). Checks: empty, extension whitelist, path traversal, control characters, URL format. (`lib/kernel/services/path_validator.dart`)
-
-**Persistence:** `SettingsStore` (SharedPreferences) for app settings. `PlaylistStore` for playlist JSON. Both use defensive serialization with safe defaults.
-
-**Design System:** All visual values via `Tokens.*` static constants. Glass-morphism via `GlassContainer` with 3 blur tiers (thin/normal/thick). (`lib/ui/theme/tokens.dart`, `lib/ui/shared/glass_container.dart`)
+| Package | Role |
+|---------|------|
+| `fvp` | MDK/FFmpeg player engine with D3D11 texture rendering |
+| `window_manager` | Cross-platform window control (frameless, fullscreen, bounds) |
+| `file_picker` | Native file open dialog |
+| `shared_preferences` | Key-value persistence (settings, playlist) |
+| `player_engine` | Abstract `PlayerEngine` interface (local package) |
 
 ---
 
-*Architecture analysis: 2026-06-23*
+*Architecture analysis: 2026-06-26*
