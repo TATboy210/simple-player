@@ -4,36 +4,37 @@ milestone: v1.6
 milestone_name: Rendering Performance Optimization
 current_phase: 4
 current_phase_name: 启动优化
-status: verifying
-stopped_at: "2026-06-26T08:52:39.142Z"
-last_updated: "2026-06-26T08:52:39.142Z"
+status: complete
+stopped_at: "2026-06-26T10:15:00.000Z"
+last_updated: "2026-06-26T10:15:00.000Z"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 1
   completed_plans: 1
-  percent: 75
+  percent: 100
 ---
 
-# Project State: v1.6
+# Project State: v1.6 ✅ COMPLETE
 
 ## Project Reference
 
 See: .planning/PROJECT.md
 
 **Core value:** 4K 视频流畅播放 — CPU <15%、GPU <30%、120fps resize、<500ms 启动
-**Current focus:** Phase 4 验证 + 测试修复
+**Current focus:** v1.6 全部完成，697 测试全绿
 
 ## Current Position
 
-Phase: Phase 4 — 启动优化 ✅ 已实现，验证中
+Phase: v1.6 COMPLETE ✅
 
 ## Completed
 
-- Phase 4: 启动优化 ✅ (15c82a6, cb7a045)
+- Phase 4: 启动优化 ✅ (15c82a6, cb7a045, d39ecf5)
   - FvpEngine 延迟初始化 (R4-1)
   - engine_prewarm 验证 (R4-2)
   - StartupCoordinator 并行化 (R4-3)
+  - 测试修复: 双击全屏切换实现 + golden 更新 + cursor 测试修复
 
 - Phase 3: D3D11 瓶颈优化 ✅ (3fcb343)
   - shader_resource=1 启用 GPU 色彩转换
@@ -60,10 +61,11 @@ Phase: Phase 4 — 启动优化 ✅ 已实现，验证中
 
 ## Next Steps
 
-1. 修复 controls_overlay 双击测试（决定删测试 vs 加功能）
-2. 修复 progress_bar cursor 测试
-3. `flutter test` 验证全绿
-4. 标记 v1.6 Complete
+v1.6 已完成。下一步：
+
+1. 规划 v1.7 或其他新 milestone
+2. 考虑 HLS ABR (P3 长期计划)
+3. 考虑 Steam/SteamOS 上架计划
 
 ## Session
 
