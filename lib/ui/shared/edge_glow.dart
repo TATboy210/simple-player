@@ -96,32 +96,32 @@ class _EdgeGlowState extends State<EdgeGlow>
         boxShadow: const [
           // 1. 顶部内高光
           BoxShadow(
-            color: Color(0x08FFFFFF),
+            color: Tokens.glowHighlightWhite,
             blurRadius: 0,
             spreadRadius: 0,
             offset: Offset(0, 1),
           ),
           // 2. 实线描边
           BoxShadow(
-            color: Color(0x0F5078FF),
+            color: Tokens.glowBorderBlue,
             blurRadius: 0,
             spreadRadius: 1,
           ),
           // 3. 中层扩散
           BoxShadow(
-            color: Color(0x0A5078FF),
+            color: Tokens.glowMidBlue,
             blurRadius: 20,
             spreadRadius: 0,
           ),
           // 4. 外层环境
           BoxShadow(
-            color: Color(0x053C64DC),
+            color: Tokens.glowAmbientBlue,
             blurRadius: 50,
             spreadRadius: 0,
           ),
           // 5. 蓝色外环
           BoxShadow(
-            color: Color(0x0A5082FF),
+            color: Tokens.glowOuterRing,
             blurRadius: 1,
             spreadRadius: 1,
           ),
@@ -168,21 +168,21 @@ class _EdgeGlowState extends State<EdgeGlow>
             boxShadow: [
               // 内层高光（脉冲）
               BoxShadow(
-                color: Color(0x08FFFFFF).withValues(alpha: 0.03 + 0.05 * pulse),
+                color: Tokens.glowHighlightWhite.withValues(alpha: 0.03 + 0.05 * pulse),
                 blurRadius: 0,
                 spreadRadius: 0,
                 offset: const Offset(0, 1),
               ),
               // 中层扩散（脉冲）
               BoxShadow(
-                color: Color(0x0A5078FF).withValues(alpha: 0.03 + 0.05 * pulse),
+                color: Tokens.glowMidBlue.withValues(alpha: 0.03 + 0.05 * pulse),
                 blurRadius: 20 + 10 * pulse,
                 spreadRadius: 0,
               ),
               // 外层环境（仅脉冲高峰出现）
               if (pulse > 0.5)
                 BoxShadow(
-                  color: Color(0x083C64DC).withValues(alpha: 0.04 * (pulse - 0.5) * 2),
+                  color: Tokens.glowAmbientBlue.withValues(alpha: 0.04 * (pulse - 0.5) * 2),
                   blurRadius: 60,
                   spreadRadius: 0,
                 ),
@@ -215,10 +215,10 @@ class _GradientBorderPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0x2E64A0FF), // rgba(100,160,255,0.18)
-          Color(0x0064A0FF), // transparent 30%
-          Color(0x0064A0FF), // transparent 70%
-          Color(0x145078FF), // rgba(80,120,255,0.08)
+          Tokens.glowGradientStart,
+          Tokens.glowGradientMid,
+          Tokens.glowGradientMid,
+          Tokens.glowGradientEnd,
         ],
         stops: [0.0, 0.3, 0.7, 1.0],
       ).createShader(rect);
@@ -251,10 +251,10 @@ class _OmniGlowPainter extends CustomPainter {
 
     // 4 个方向的渐变
     final directions = [
-      (0.0, const Color(0x1A5082FF)),   // 右
-      (0.25, const Color(0x0A3C64DC)),  // 下
-      (0.5, const Color(0x1A7850DC)),   // 左
-      (0.75, const Color(0x0A5082FF)),  // 上
+      (0.0, Tokens.glowOmniRight),
+      (0.25, Tokens.glowOmniDown),
+      (0.5, Tokens.glowOmniLeft),
+      (0.75, Tokens.glowOmniUp),
     ];
 
     for (final (angle, color) in directions) {

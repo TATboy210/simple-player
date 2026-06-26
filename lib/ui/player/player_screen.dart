@@ -71,53 +71,31 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  final ValueNotifier<bool> _playlistVisible = ValueNotifier(false);
-  final ValueNotifier<bool> _playlistMounted = ValueNotifier(false);
+  /// (visible, mounted) — 合并为单一 notifier 消除嵌套 VLB
+  final ValueNotifier<(bool, bool)> _playlistState =
+      ValueNotifier((false, false));
 
-  /// 视频加载后自动调整窗口比例（仅窗口模式）
+  /// B: 视频加载后锁定窗口比例 — OS 级约束，拖边框自动保持比例
   void _onAspectRatioChanged() {
     final ratio = widget.engine.aspectRatio.value;
     if (ratio <= 0 || !ratio.isFinite) return;
-    // 全屏时不调整窗口尺寸
     if (widget.windowService.mode.value.isFullscreen) return;
-    _fitWindowToVideo(ratio);
-  }
-
-  Future<void> _fitWindowToVideo(double ratio) async {
-    try {
-      final currentSize = await windowManager.getSize();
-      // 保持当前高度，按视频比例计算宽度
-      double w = currentSize.height * ratio;
-      double h = currentSize.height;
-      // 合理范围限制（1920*0.9 ≈ 1728）
-      if (w > 1728) {
-        w = 1728;
-        h = w / ratio;
-      }
-      if (h > 1080) {
-        h = 1080;
-        w = h * ratio;
-      }
-      await windowManager.setSize(Size(w, h));
-      await windowManager.center();
-    } catch (_) {
-      // 静默失败，不影响播放
-    }
+    widget.windowService.setAspectRatio(ratio);
   }
 
   void _togglePlaylist() {
-    final nowVisible = !_playlistVisible.value;
-    _playlistVisible.value = nowVisible;
-    if (nowVisible) _playlistMounted.value = true;
+    final (visible, mounted) = _playlistState.value;
+    final nowVisible = !visible;
+    _playlistState.value = (nowVisible, nowVisible || mounted);
     widget.onTogglePlaylist?.call();
   }
 
   void _closePlaylist() {
-    _playlistVisible.value = false;
+    _playlistState.value = (false, _playlistState.value.$2);
     // 延迟卸载，等待淡出动画完成
     Future.delayed(const Duration(milliseconds: Tokens.durationSlide), () {
-      if (mounted && !_playlistVisible.value) {
-        _playlistMounted.value = false;
+      if (mounted && !_playlistState.value.$1) {
+        _playlistState.value = (false, false);
       }
     });
   }
@@ -141,8 +119,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     widget.engine.aspectRatio.removeListener(_onAspectRatioChanged);
-    _playlistVisible.dispose();
-    _playlistMounted.dispose();
+    _playlistState.dispose();
     super.dispose();
   }
 
@@ -190,18 +167,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
               children: [
                 CustomTitleBar(windowService: widget.windowService),
                 Expanded(
-                  child: ValueListenableBuilder<bool>(
-                    valueListenable: _playlistVisible,
-                    builder: (context, playlistVisible, videoContent) =>
-                      ValueListenableBuilder<bool>(
-                    valueListenable: _playlistMounted,
-                    builder: (context, mounted, _) => Stack(
+                  child: ValueListenableBuilder<(bool, bool)>(
+                    valueListenable: _playlistState,
+                    builder: (context, state, videoContent) {
+                      final (playlistVisible, playlistMounted) = state;
+                      return Stack(
                       children: [
-                        videoContent!,
-                        if (mounted)
-                          IgnorePointer(
-                            ignoring: !playlistVisible,
-                            child: PlaylistPanel(
+                        RepaintBoundary(child: videoContent!),
+                        if (playlistMounted)
+                          RepaintBoundary(
+                            child: IgnorePointer(
+                              ignoring: !playlistVisible,
+                              child: PlaylistPanel(
                               playlist: widget.playlist,
                               visible: playlistVisible,
                               onClose: _closePlaylist,
@@ -219,9 +196,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               resizing: widget.windowService.isResizing,
                             ),
                           ),
+                        ),
                       ],
-                    ),
-                  ),
+                    );
+                    },
                     child: _buildVideoContent(isVideo, modeIcon, modeLabel),
                   ),
                 ),

@@ -308,11 +308,9 @@ class _ProgressBarState extends State<ProgressBar>
     return Positioned(
       bottom: tooltipOffset,
       left: left,
-      child: AnimatedBuilder(
-        animation: _tooltipOpacity,
-        builder: (_, _) => Opacity(
-          opacity: _tooltipOpacity.value,
-          child: Container(
+      child: FadeTransition(
+        opacity: _tooltipOpacity,
+        child: Container(
             width: tooltipWidth,
             padding: const EdgeInsets.symmetric(
               horizontal: Tokens.spXs,
@@ -334,7 +332,6 @@ class _ProgressBarState extends State<ProgressBar>
             ),
           ),
         ),
-      ),
     );
   }
 }

@@ -15,10 +15,13 @@ abstract class WindowBridge {
   ValueNotifier<bool> get isResizing;
   ValueNotifier<bool> get isAlwaysOnTop;
 
-  // ─── 6 个命令 ───
+  // ─── 7 个命令 ───
+  // Importers: WindowService, player_screen.dart, test fakes
+  // Affected API: setAspectRatio is new, wraps windowManager.setAspectRatio
   Future<void> init();
   Future<void> setMode(WindowMode target);
   Future<void> setAlwaysOnTop(bool value);
+  Future<void> setAspectRatio(double ratio);
   Future<void> minimize();
   Future<void> close();
   Future<void> startDragging();
