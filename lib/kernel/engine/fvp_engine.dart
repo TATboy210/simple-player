@@ -14,6 +14,7 @@ import 'position_poller.dart';
 import '../bridge/display_config.dart';
 import '../utils/log.dart';
 import 'track_manager.dart';
+import 'video_effect_controller.dart';
 
 /// fvp/MDK 引擎实现
 ///
@@ -49,6 +50,7 @@ class FvpEngine extends PlayerEngine {
   late PositionPoller _positionPoller;
   late TrackManager _trackManager;
   late MediaOpener _mediaOpener;
+  late VideoEffectController _videoEffectController;
 
   // ─── ValueNotifier 实现 ───
 
@@ -119,6 +121,7 @@ class FvpEngine extends PlayerEngine {
       currentPathGetter: () => _currentPath,
     );
     _trackManager = TrackManager(p);
+    _videoEffectController = VideoEffectController(p);
     _mediaOpener = MediaOpener(p, _trackManager);
 
     p.textureId.addListener(_onTextureIdChanged);
@@ -450,52 +453,33 @@ class FvpEngine extends PlayerEngine {
     });
   }
 
-  // ─── 视频处理 ───
+  // ─── 视频处理 (delegated to VideoEffectController) ───
 
   @override
   void setVideoEffect(VideoEffectType effect, double value) {
     _guardedAction('setVideoEffect', () {
-      final clamped = value.clamp(-1.0, 1.0);
-      final mdkEffect = switch (effect) {
-        VideoEffectType.brightness => mdk.VideoEffect.brightness,
-        VideoEffectType.contrast => mdk.VideoEffect.contrast,
-        VideoEffectType.hue => mdk.VideoEffect.hue,
-        VideoEffectType.saturation => mdk.VideoEffect.saturation,
-      };
-      _player.setVideoEffect(mdkEffect, [clamped]);
+      _videoEffectController.setEffect(effect, value);
     });
   }
 
   @override
   void rotate(int degree) {
     _guardedAction('rotate', () {
-      // mdk 只接受 0/90/180/270
-      final valid = {0, 90, 180, 270};
-      if (!valid.contains(degree)) {
-        log.w(
-          'FvpEngine.rotate invalid degree: $degree, expected 0/90/180/270',
-        );
-        return;
-      }
-      _player.rotate(degree);
+      _videoEffectController.rotate(degree);
     });
   }
 
   @override
   void setAspectRatio(double ratio) {
     _guardedAction('setAspectRatio', () {
-      _player.setAspectRatio(ratio);
+      _videoEffectController.setAspectRatio(ratio);
     });
   }
 
   @override
   void setDeinterlace(bool enable) {
     _guardedAction('setDeinterlace', () {
-      // yadif 仅对软件解码器生效（硬件解码器忽略此设置）
-      _player.setProperty(
-        'video.avfilter',
-        enable ? 'yadif=mode=send_frame:deint=all' : '',
-      );
+      _videoEffectController.setDeinterlace(enable);
     });
   }
 

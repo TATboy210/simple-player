@@ -26,10 +26,16 @@ class VideoEffectController {
     _player.setVideoEffect(mdkEffect, [clamped]);
   }
 
+  /// Valid rotation degrees accepted by mdk.
+  static const validRotationDegrees = {0, 90, 180, 270};
+
+  /// Returns true if [degree] is a valid mdk rotation value.
+  static bool isValidRotation(int degree) =>
+      validRotationDegrees.contains(degree);
+
   /// Rotates video by [degree] (must be 0, 90, 180, or 270).
   void rotate(int degree) {
-    const valid = {0, 90, 180, 270};
-    if (!valid.contains(degree)) {
+    if (!isValidRotation(degree)) {
       log.w('VideoEffectController.rotate invalid: $degree, expected 0/90/180/270');
       return;
     }
