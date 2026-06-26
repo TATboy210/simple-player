@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-26",
+  "phase": "16",
+  "phase_name": "widget-layer-perf",
+  "phase_dir": "16-widget-layer-perf",
+  "plan": 1,
+  "task": 5,
+  "total_tasks": 5,
+  "status": "complete",
+  "completed_tasks": [
+    {"id": 1, "name": "PlayerScreen RepaintBoundary 隔离", "status": "done", "commit": "6d64cf6"},
+    {"id": 2, "name": "Progress Bar Opacity → FadeTransition", "status": "done", "commit": "6d64cf6"},
+    {"id": 3, "name": "VLB 嵌套扁平化", "status": "done", "commit": "6d64cf6"},
+    {"id": 4, "name": "硬编码颜色迁移", "status": "done", "commit": "6d64cf6"},
+    {"id": 5, "name": "测试验证", "status": "done", "commit": "6d64cf6"}
+  ],
+  "remaining_tasks": [],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "FadeTransition 替代 AnimatedBuilder+Opacity", "rationale": "避免 saveLayer GPU 开销", "phase": "16"},
+    {"decision": "双 VLB 合并为单 VLB<(bool,bool)>", "rationale": "playlistVisible/playlistMounted 联动，用 record 消除嵌套", "phase": "16"},
+    {"decision": "新增 20+ Tokens 颜色常量", "rationale": "edge_glow/control_bar/app 硬编码颜色统一迁移到设计系统", "phase": "16"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Phase 2: 渲染管线优化 — PositionPoller resize 暂停 / Texture 零拷贝验证 / resize 期间暂停 OSD 更新",
+  "context_notes": "Phase 16 全部 5 任务完成并提交 (6d64cf6)。672 测试通过，4 个预已有失败。下一步是 Phase 2 渲染管线优化，涉及 engine 层修改，风险中等。"
+}
