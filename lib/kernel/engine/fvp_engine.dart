@@ -415,7 +415,7 @@ class FvpEngine extends PlayerEngine {
     try {
       _player.state = mdk.PlaybackState.playing;
       state.value = MediaState.playing;
-      _positionPoller.start();
+      _positionPoller.startSilent();
     } on Exception catch (e) {
       state.value = MediaState.error;
       _errorType = MediaErrorType.playback;
