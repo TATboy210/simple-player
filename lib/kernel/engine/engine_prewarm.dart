@@ -46,6 +46,7 @@ class EnginePrewarm {
     try {
       onProgress?.call(0.0, 'Creating player...');
       final player = mdk.Player();
+      player.setProperty('log', 'warning'); // 只输出警告和错误，减少 I/O 开销
       _playerCreated = true;
       _codecsReady = true;
       _gpuReady = true;

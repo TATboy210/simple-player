@@ -43,7 +43,8 @@ class FvpEngine extends PlayerEngine {
   static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
 
   // D3D11 性能参数默认值
-  static const _defaultVideoDecoders = 'D3D11,NVDEC,FFmpeg'; // 硬件优先
+  // shader_resource=1: 启用 GPU 色彩空间转换（YUV→RGB），减少 CPU 负担
+  static const _defaultVideoDecoders = 'D3D11:shader_resource=1,NVDEC,FFmpeg'; // 硬件优先
 
   // 内存优化参数（适合 1080p，4K HEVC 软解时可能需要放宽）
   static const _ffmpegDecoderThreads = '2'; // FFmpeg 软解线程数（默认=CPU核心数，8-16）
