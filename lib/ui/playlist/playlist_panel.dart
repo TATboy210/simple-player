@@ -161,6 +161,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   }
 
   Widget _buildPanel(double width, double height) {
+    final resizingNotifier = widget.resizing;
     return Focus(
       focusNode: _focusNode,
       autofocus: false,
@@ -182,11 +183,11 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
               // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
               Positioned.fill(
-                child: widget.resizing != null
+                child: resizingNotifier != null
                     ? AnimatedBuilder(
-                        animation: widget.resizing!,
+                        animation: resizingNotifier,
                         builder: (_, __) {
-                          if (widget.resizing!.value) {
+                          if (resizingNotifier.value) {
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(
                                 Tokens.radiusLarge,

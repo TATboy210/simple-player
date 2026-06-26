@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 /// Represents a video file discovered in a directory scan.
@@ -60,7 +61,8 @@ class FolderScanner {
           )
           .toList()
         ..sort((a, b) => a.name.compareTo(b.name));
-    } on Exception {
+    } on Exception catch (e) {
+      debugPrint('[FolderScanner] Failed to scan "$directory": $e');
       return [];
     }
   }

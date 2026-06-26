@@ -87,11 +87,12 @@ class GlassContainer extends StatelessWidget {
     }
 
     // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
-    if (resizing != null) {
+    final resizingNotifier = resizing;
+    if (resizingNotifier != null) {
       return AnimatedBuilder(
-        animation: resizing!,
+        animation: resizingNotifier,
         builder: (_, child) {
-          if (resizing!.value) {
+          if (resizingNotifier.value) {
             return ClipRRect(
               borderRadius: rRect,
               child: RepaintBoundary(child: child),
@@ -114,11 +115,12 @@ class GlassContainer extends StatelessWidget {
     );
 
     // opacity < 0.01 时跳过 BackdropFilter GPU readback（D-13）
-    if (opacity != null) {
+    final opacityNotifier = opacity;
+    if (opacityNotifier != null) {
       return AnimatedBuilder(
-        animation: opacity!,
+        animation: opacityNotifier,
         builder: (_, child) {
-          if (opacity!.value < 0.01) return child!;
+          if (opacityNotifier.value < 0.01) return child!;
           return ClipRRect(
             borderRadius: rRect,
             child: BackdropFilter(filter: blurFilter, child: child),
@@ -304,7 +306,7 @@ class _GlassButtonState extends State<GlassButton>
           Icon(widget.icon, size: 18, color: effectiveColor),
           const SizedBox(width: Tokens.spSm),
           Text(
-            widget.label!,
+            widget.label ?? '',
             style: TextStyle(
               fontSize: Tokens.fontBody,
               fontWeight: Tokens.weightMedium,

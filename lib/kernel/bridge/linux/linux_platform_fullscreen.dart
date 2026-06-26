@@ -10,6 +10,7 @@ import 'dart:ffi' hide Size;
 import 'dart:ui';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../platform_fullscreen.dart';
@@ -54,6 +55,7 @@ class LinuxPlatformFullscreen implements PlatformFullscreen {
       try {
         return DynamicLibrary.open('libgtk-3.so');
       } catch (_) {
+        debugPrint('[LinuxFullscreen] GTK3 not available, fullscreen disabled');
         return null;
       }
     }
