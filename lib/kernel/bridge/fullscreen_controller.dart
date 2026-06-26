@@ -75,9 +75,10 @@ class FullscreenController {
   final PlatformFullscreen _platform;
   final WindowOps _ops;
 
-  // ─── Mutex guard ───
+  // ─── Mutex guard + debounce ───
 
   bool _isAnimating = false;
+  bool _pendingToggle = false;
 
   /// 是否正在执行全屏切换。
   bool get isAnimating => _isAnimating;
@@ -105,7 +106,8 @@ class FullscreenController {
   Future<void> setFullscreen(bool enter) async {
     if (enter == state.mode.value.isFullscreen) return;
     if (_isAnimating) {
-      logBridge.d('[FullscreenController] blocked by mutex');
+      _pendingToggle = true;
+      logBridge.d('[FullscreenController] queued pending toggle');
       return;
     }
 
@@ -142,6 +144,10 @@ class FullscreenController {
       }
     } finally {
       _isAnimating = false;
+      if (_pendingToggle) {
+        _pendingToggle = false;
+        toggle();
+      }
     }
   }
 
@@ -162,10 +168,14 @@ class FullscreenController {
 
   /// 构建退出全屏用的快照 — 合并平台快照和控制器保存的位置/大小。
   FullscreenSnapshot _buildExitSnapshot() {
+    final snapshot = _savedSnapshot;
+    if (snapshot == null) {
+      throw StateError('No saved snapshot for fullscreen exit');
+    }
     return FullscreenSnapshot(
-      windowStyle: _savedSnapshot!.windowStyle,
-      position: _savedPosition ?? _savedSnapshot!.position,
-      size: _savedSize ?? _savedSnapshot!.size,
+      windowStyle: snapshot.windowStyle,
+      position: _savedPosition ?? snapshot.position,
+      size: _savedSize ?? snapshot.size,
     );
   }
 }

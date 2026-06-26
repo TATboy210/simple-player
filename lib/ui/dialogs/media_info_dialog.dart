@@ -48,21 +48,15 @@ class MediaInfoDialog extends StatelessWidget {
           _CopyableRow(l10n.filePath, path),
           _CopyableRow(l10n.fileName, _basename(path)),
 
-          if (info.hasVideo) ...[
+          if (info.hasVideo && info.video case final vid?) ...[
             _Section(l10n.videoSection),
-            _InfoRow(
-              l10n.resolution,
-              '${info.video!.width} × ${info.video!.height}',
-            ),
-            _InfoRow(l10n.codec, info.video!.codec.toUpperCase()),
-            if (info.video!.par != 1.0)
-              _InfoRow(
-                l10n.pixelAspectRatio,
-                info.video!.par.toStringAsFixed(2),
-              ),
+            _InfoRow(l10n.resolution, '${vid.width} × ${vid.height}'),
+            _InfoRow(l10n.codec, vid.codec.toUpperCase()),
+            if (vid.par != 1.0)
+              _InfoRow(l10n.pixelAspectRatio, vid.par.toStringAsFixed(2)),
             _InfoRow(
               l10n.aspectRatioLabel,
-              info.video!.aspectRatio.toStringAsFixed(2),
+              vid.aspectRatio.toStringAsFixed(2),
             ),
           ],
 

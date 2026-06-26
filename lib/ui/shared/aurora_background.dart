@@ -290,7 +290,8 @@ class _AuroraPainter extends CustomPainter {
     // Layer 0: 深色底
     canvas.drawRect(Offset.zero & size, _bgPaint);
 
-    if (blobImages == null || blobImages!.length < 3) return;
+    final images = blobImages;
+    if (images == null || images.length < 3) return;
 
     for (var i = 0; i < 3; i++) {
       final params = _lissajous[i];
@@ -313,7 +314,7 @@ class _AuroraPainter extends CustomPainter {
       final blobH = size.height * 0.4 * breathScale;
 
       // 绘制预渲染的着色+模糊光团（仅 affine transform，零 saveLayer）
-      final img = blobImages![i];
+      final img = images[i];
       canvas.save();
       canvas.translate(cx, cy);
       canvas.scale(blobW / img.width, blobH / img.height);

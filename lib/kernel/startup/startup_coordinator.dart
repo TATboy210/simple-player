@@ -48,9 +48,10 @@ class StartupCoordinator {
       _phaseWatches[phase] = Stopwatch()..start();
     }
     // 阶段完成时记录耗时
-    if (progress >= 1.0 && _phaseWatches.containsKey(phase)) {
-      _phaseWatches[phase]!.stop();
-      _phaseDurations[phase] = _phaseWatches[phase]!.elapsed;
+    final watch = _phaseWatches[phase];
+    if (progress >= 1.0 && watch != null) {
+      watch.stop();
+      _phaseDurations[phase] = watch.elapsed;
     }
     _state.value = StartupState(
       phase: phase,

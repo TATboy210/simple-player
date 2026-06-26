@@ -226,10 +226,12 @@ class _RotatingFileOutput extends LogOutput {
   @override
   void output(OutputEvent event) {
     _ensureSink();
+    final sink = _sink;
+    if (sink == null) return;
     for (final line in event.lines) {
-      _sink!.writeln(line);
+      sink.writeln(line);
     }
-    _sink!.flush();
+    sink.flush();
 
     if (_file.existsSync() && _file.lengthSync() > maxBytes) {
       _rotate();

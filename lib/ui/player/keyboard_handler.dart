@@ -104,8 +104,9 @@ class KeyboardHandler extends StatelessWidget {
 
     // 不拦截文本输入框的按键事件
     final focused = FocusManager.instance.primaryFocus;
-    if (focused != null && focused.context != null) {
-      final widget = focused.context!.widget;
+    final context = focused?.context;
+    if (context != null) {
+      final widget = context.widget;
       if (widget is EditableText) return KeyEventResult.ignored;
     }
 
