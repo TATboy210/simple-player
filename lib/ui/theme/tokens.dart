@@ -23,6 +23,38 @@ class Tokens {
   static const glowEdge = Color(0x265078FF);      // rgba(80,120,255,0.15)
   static const glowEdgeStrong = Color(0x596496FF); // rgba(100,150,255,0.35)
 
+  // ── 边缘微光 — gradient 变体 box-shadow ──
+  static const glowHighlightWhite = Color(0x08FFFFFF);
+  static const glowBorderBlue = Color(0x0F5078FF);
+  static const glowMidBlue = Color(0x0A5078FF);
+  static const glowAmbientBlue = Color(0x053C64DC);
+  static const glowOuterRing = Color(0x0A5082FF);
+  static const glowAccent = Color(0x1F5082FF);
+
+  // ── 边缘微光 — gradient 描边渐变 ──
+  static const glowGradientStart = Color(0x2E64A0FF);
+  static const glowGradientMid = Color(0x0064A0FF);
+  static const glowGradientEnd = Color(0x145078FF);
+
+  // ── 边缘微光 — omni 变体方向色 ──
+  static const glowOmniRight = Color(0x1A5082FF);
+  static const glowOmniDown = Color(0x0A3C64DC);
+  static const glowOmniLeft = Color(0x1A7850DC);
+  static const glowOmniUp = Color(0x0A5082FF);
+
+  // ── 控制栏装饰 ──
+  static const controlBarBg = Color(0x990E111E);
+  static const controlBarBorderWhite = Color(0x0AFFFFFF);
+  static const controlBarShadowBlack = Color(0x1A000000);
+  static const controlBarOuterShadow = Color(0x40000000);
+
+  // ── 右键菜单 ──
+  static const menuBg = Color(0xE61A1A2E);
+  static const menuBorder = Color(0x22FFFFFF);
+  static const menuTextMuted = Color(0x99FFFFFF);
+  static const menuAccent = Color(0xFF2C58F4);
+  static const menuTextNormal = Color(0xCCFFFFFF);
+
   static const textPrimary = Color(0xEBFFFFFF); // rgba(255,255,255,0.92)
   static const textSecondary = Color(0x73FFFFFF); // rgba(255,255,255,0.45)
   static const textTertiary = Color(0x38FFFFFF); // rgba(255,255,255,0.22)

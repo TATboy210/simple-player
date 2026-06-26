@@ -24,18 +24,18 @@ class ControlBar extends StatelessWidget {
 
   /// CSS: .player-controls — rgba(14,17,30,0.6) + blur(24px)
   static final _decoration = BoxDecoration(
-    color: const Color(0x990E111E), // rgba(14,17,30,0.6)
+    color: Tokens.controlBarBg,
     borderRadius: ControlBar._borderRadius,
-    border: Border.all(color: const Color(0x0AFFFFFF), width: 1), // rgba(255,255,255,0.04)
+    border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
       // CSS: inset 0 1px 0 rgba(255,255,255,0.04) — 顶部内高光
-      BoxShadow(color: Color(0x0AFFFFFF), blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
       // CSS: inset 0 -1px 0 rgba(0,0,0,0.1) — 底部内阴影
-      BoxShadow(color: Color(0x1A000000), blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
       // CSS: 0 8px 32px rgba(0,0,0,0.25) — 外层投影
-      BoxShadow(color: Color(0x40000000), blurRadius: 32, offset: Offset(0, 8)),
+      BoxShadow(color: Tokens.controlBarOuterShadow, blurRadius: 32, offset: Offset(0, 8)),
       // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
-      BoxShadow(color: Color(0x0A5082FF), blurRadius: 1, spreadRadius: 1),
+      BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
     ],
   );
 
@@ -92,7 +92,7 @@ class ControlBar extends StatelessWidget {
                     gradient: LinearGradient(
                       colors: const [
                         Color(0x005082FF), // transparent
-                        Color(0x1F5082FF), // rgba(80,130,255,0.12)
+                        Tokens.glowAccent,
                         Color(0x005082FF), // transparent
                       ],
                     ),

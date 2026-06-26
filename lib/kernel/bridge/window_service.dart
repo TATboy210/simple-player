@@ -28,7 +28,12 @@ class WindowService with WindowListener implements WindowBridge {
   final WindowState _state = WindowState();
   final WindowPersistence _persistence = WindowPersistence();
 
+  // Importers: app.dart creates WindowService; player_screen.dart uses WindowBridge
+  // Affected API: init() uses setBounds, onWindowResize uses _isProgrammaticResize/_skipNextResize
+  // User verbatim: "A+B+C+D 实施计划 — setBounds 原子操作 + setAspectRatio 锁定 + 防循环 + 跳过首次回调"
   bool _disposed = false;
+  bool _isProgrammaticResize = false; // C: 防止程序化 resize 触发 UI 循环
+  bool _skipNextResize = false;       // D: 跳过 init 首次 resize 回调
 
   // ─── Animation constants ───
 
@@ -81,16 +86,22 @@ class WindowService with WindowListener implements WindowBridge {
             width: settings.windowWidth,
             height: settings.windowHeight,
           );
-          await windowManager.setPosition(clamped);
-          await windowManager.setSize(
-            Size(settings.windowWidth, settings.windowHeight),
+          // A: setBounds 原子操作 — position+size 一次 SetWindowPos
+          await windowManager.setBounds(
+            null,
+            position: clamped,
+            size: Size(settings.windowWidth, settings.windowHeight),
           );
         } else {
-          await windowManager.setSize(
-            Size(settings.windowWidth, settings.windowHeight),
+          await windowManager.setBounds(
+            null,
+            size: Size(settings.windowWidth, settings.windowHeight),
           );
           await windowManager.center();
         }
+
+        // D: 跳过 init 首次 resize 回调
+        _skipNextResize = true;
 
         await windowManager.show();
         await windowManager.focus();
@@ -135,6 +146,10 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowResize() {
     if (_disposed) return;
+    // D: 跳过 init 首次 resize 回调
+    if (_skipNextResize) { _skipNextResize = false; return; }
+    // C: 程序化 resize 不触发 UI rebuild
+    if (_isProgrammaticResize) { _isProgrammaticResize = false; return; }
     _startResizeEndTimer(); // 统一逻辑
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(
@@ -186,6 +201,11 @@ class WindowService with WindowListener implements WindowBridge {
         await windowManager.setFullScreen(true);
       // OS 回调 onWindowEnterFullScreen 驱动 mode
     }
+  }
+
+  @override
+  Future<void> setAspectRatio(double ratio) async {
+    await windowManager.setAspectRatio(ratio);
   }
 
   @override

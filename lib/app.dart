@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ui/theme/tokens.dart';
 import 'kernel/bridge/window_bridge.dart';
 import 'package:player_engine/player_engine.dart';
 import 'kernel/utils/log.dart';
@@ -89,10 +90,10 @@ class _AppState extends State<App> {
     showMenu(
       context: barCtx,
       position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx, pos.dy),
-      color: const Color(0xE61A1A2E),
+      color: Tokens.menuBg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0x22FFFFFF)),
+        side: const BorderSide(color: Tokens.menuBorder),
       ),
       items: <PopupMenuEntry<dynamic>>[
         PopupMenuItem(
@@ -100,7 +101,7 @@ class _AppState extends State<App> {
           height: 32,
           child: Text(
             l10n.language,
-            style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 11),
+            style: const TextStyle(color: Tokens.menuTextMuted, fontSize: 11),
           ),
         ),
         _QuickMenuItem(
@@ -119,7 +120,7 @@ class _AppState extends State<App> {
           height: 32,
           child: Text(
             l10n.currentTheme,
-            style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 11),
+            style: const TextStyle(color: Tokens.menuTextMuted, fontSize: 11),
           ),
         ),
         for (var i = 0; i < ThemeService.accents.length; i++)
@@ -182,7 +183,7 @@ class _QuickMenuItem extends PopupMenuItem<void> {
          child: Row(
            children: [
              if (selected)
-               const Icon(Icons.check, size: 14, color: Color(0xFF2C58F4))
+               const Icon(Icons.check, size: 14, color: Tokens.menuAccent)
              else
                const SizedBox(width: 14),
              const SizedBox(width: 8),
@@ -190,8 +191,8 @@ class _QuickMenuItem extends PopupMenuItem<void> {
                label,
                style: TextStyle(
                  color: selected
-                     ? const Color(0xFF2C58F4)
-                     : const Color(0xCCFFFFFF),
+                     ? Tokens.menuAccent
+                     : Tokens.menuTextNormal,
                  fontSize: 13,
                ),
              ),

@@ -42,6 +42,11 @@ class FakeWindowService implements WindowBridge {
     mode.value = target;
   }
 
+  // Importers: integration tests, widget tests
+  // Affected API: setAspectRatio — new WindowBridge method stub
+  @override
+  Future<void> setAspectRatio(double ratio) async {}
+
   @override
   Future<void> setAlwaysOnTop(bool value) async {
     alwaysOnTopCallCount++;
