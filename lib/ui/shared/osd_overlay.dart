@@ -60,17 +60,30 @@ class OsdService {
 /// - `IgnorePointer` 确保事件穿透到视频层
 /// - 只监听 message，visible 通过 message==null 判断
 /// - AnimatedOpacity 淡入/淡出，AnimatedSwitcher 文本交叉淡入
-class OsdOverlay extends StatelessWidget {
-  const OsdOverlay({super.key});
+/// - `resizing` 信号：resize 期间跳过 rebuild，返回缓存的上一帧
+class OsdOverlay extends StatefulWidget {
+  /// Window resize signal — when true, skip rebuild to save CPU.
+  final ValueListenable<bool>? resizing;
 
-  static const _fadeDuration = Duration(milliseconds: Tokens.osdFadeDurationMs);
+  const OsdOverlay({super.key, this.resizing});
+
+  @override
+  State<OsdOverlay> createState() => _OsdOverlayState();
+}
+
+class _OsdOverlayState extends State<OsdOverlay> {
+  Widget? _cachedChild;
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<OsdMessage?>(
       valueListenable: OsdService.I.message,
       builder: (_, msg, _) {
-        return IgnorePointer(
+        final resizing = widget.resizing;
+        if (resizing != null && resizing.value) {
+          return _cachedChild ?? const SizedBox.shrink();
+        }
+        final child = IgnorePointer(
           child: AnimatedOpacity(
             opacity: msg != null ? 1.0 : 0.0,
             duration: _fadeDuration,
@@ -82,9 +95,13 @@ class OsdOverlay extends StatelessWidget {
                 : const SizedBox.shrink(),
           ),
         );
+        _cachedChild = child;
+        return child;
       },
     );
   }
+
+  static const _fadeDuration = Duration(milliseconds: Tokens.osdFadeDurationMs);
 }
 
 /// OSD 气泡 — 纯文字 + 可选图标/进度条

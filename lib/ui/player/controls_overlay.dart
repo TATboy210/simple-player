@@ -143,14 +143,14 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                       child: const SizedBox.expand(),
                     ),
                   ),
-                  const Positioned(
+                  Positioned(
                     bottom:
                         Tokens.controlBarMarginBottom +
                         Tokens.controlBarHeight +
                         12,
                     left: Tokens.controlBarMarginH,
                     right: Tokens.controlBarMarginH,
-                    child: OsdOverlay(),
+                    child: OsdOverlay(resizing: widget.resizing),
                   ),
                   Positioned(
                     left: Tokens.controlBarMarginH,

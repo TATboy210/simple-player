@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -21,7 +22,10 @@ class _HoverState {
 class ProgressBar extends StatefulWidget {
   final PlayerEngine engine;
 
-  const ProgressBar({super.key, required this.engine});
+  /// Window resize signal — when true, skip internal bar rebuild to save CPU.
+  final ValueListenable<bool>? resizing;
+
+  const ProgressBar({super.key, required this.engine, this.resizing});
 
   @override
   State<ProgressBar> createState() => _ProgressBarState();
@@ -67,13 +71,7 @@ class _ProgressBarState extends State<ProgressBar>
   @override
   void initState() {
     super.initState();
-    _barListenable = Listenable.merge([
-      engine.position,
-      engine.duration,
-      engine.buffered,
-      _dragNotifier,
-      _hoverNotifier,
-    ]);
+    _barListenable = _buildBarListenable();
     _expandController = AnimationController(
       duration: const Duration(milliseconds: Tokens.progressExpandDurationMs),
       vsync: this,
@@ -94,17 +92,25 @@ class _ProgressBarState extends State<ProgressBar>
     );
   }
 
+  Listenable _buildBarListenable() {
+    final listenables = <Listenable>[
+      engine.position,
+      engine.duration,
+      engine.buffered,
+      _dragNotifier,
+      _hoverNotifier,
+    ];
+    final resizing = widget.resizing;
+    if (resizing != null) listenables.add(resizing);
+    return Listenable.merge(listenables);
+  }
+
   @override
   void didUpdateWidget(ProgressBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.engine != widget.engine) {
-      _barListenable = Listenable.merge([
-        engine.position,
-        engine.duration,
-        engine.buffered,
-        _dragNotifier,
-        _hoverNotifier,
-      ]);
+    if (oldWidget.engine != widget.engine ||
+        oldWidget.resizing != widget.resizing) {
+      _barListenable = _buildBarListenable();
     }
   }
 
@@ -273,16 +279,22 @@ class _ProgressBarState extends State<ProgressBar>
     );
   }
 
+  Widget? _cachedCustomPaint;
+
   Widget _buildBarLayers() {
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: _barListenable,
         builder: (_, _) {
+          final resizing = widget.resizing;
+          if (resizing != null && resizing.value) {
+            return _cachedCustomPaint ?? const SizedBox.shrink();
+          }
           final dur = engine.duration.value;
           final buf = engine.buffered.value;
           final playedFrac = _effectiveFraction;
           final bufFrac = dur > 0 ? (buf / dur).clamp(0.0, 1.0) : 0.0;
-          return CustomPaint(
+          final child = CustomPaint(
             size: Size.infinite,
             painter: _BarPainter(
               playedFraction: playedFrac,
@@ -293,6 +305,8 @@ class _ProgressBarState extends State<ProgressBar>
               disabled: _disabled,
             ),
           );
+          _cachedCustomPaint = child;
+          return child;
         },
       ),
     );
