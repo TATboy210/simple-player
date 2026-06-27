@@ -155,18 +155,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             child: RepaintBoundary(
               child: Stack(
                 children: [
-                  // 光透射效果 — 控制栏下方的蓝色辉光
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: Tokens.controlBarHeight + 60,
-                    child: TransmittedLight(
-                      type: TransmissionType.bottom,
-                      intensity: 0.6,
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
                   Positioned(
                     bottom:
                         Tokens.controlBarMarginBottom +
@@ -188,7 +176,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         isIdle: isIdle,
                         title: widget.title,
                         opacity: _autoHide.opacity,
-                        enableBlur: false, // TODO: 临时禁用模糊测试点击
+                        enableBlur: true,
                         resizing: widget.resizing,
                       ),
                     ),
