@@ -70,134 +70,141 @@ class ControlBar extends StatelessWidget {
     final prevTooltip = l10n.previousTrack;
     final nextTooltip = l10n.nextTrack;
 
-    final content = EdgeGlow(
-      variant: EdgeGlowVariant.gradient,
-      borderRadius: _borderRadius,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          height: Tokens.controlBarHeight,
-          decoration: _decoration,
+    // 交互层 — 按钮、进度条、标题（不受 BackdropFilter 影响）
+    final interactive = Material(
+      color: Colors.transparent,
+      child: SizedBox(
+        height: Tokens.controlBarHeight,
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
-          child: Stack(
-            children: [
-              // CSS .player-controls::before — 顶部渐变光线
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: const [
-                        Color(0x005082FF), // transparent
-                        Tokens.glowAccent,
-                        Color(0x005082FF), // transparent
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final showSecondary = w >= Tokens.compactBreakpoint;
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title ?? '',
+                            style: const TextStyle(
+                              color: Tokens.textPrimary,
+                              fontSize: Tokens.fontBody,
+                              fontWeight: Tokens.weightMedium,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        TimeRangeDisplay(engine: engine),
                       ],
                     ),
                   ),
-                ),
-              ),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final w = constraints.maxWidth;
-                  final showSecondary = w >= Tokens.compactBreakpoint;
-
-                  return Column(
-                    children: [
-                      // Row 1 (Top): 标题 | 时间显示 — 等分空间
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title ?? '',
-                                style: const TextStyle(
-                                  color: Tokens.textPrimary,
-                                  fontSize: Tokens.fontBody,
-                                  fontWeight: Tokens.weightMedium,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            TimeRangeDisplay(engine: engine),
-                          ],
-                        ),
-                      ),
-                      // Row 2 (Middle): ProgressBar — 等分空间
-                      Expanded(
-                        child: Center(
-                          child: _ProgressRow(engine: engine),
-                        ),
-                      ),
-                      // Row 3 (Bottom): Left | Spacer | Center | Spacer | Right — 等分空间
-                      Expanded(
-                        child: _buildButtonRow(
-                          context,
-                          l10n,
-                          showSecondary,
-                          prevTooltip,
-                          nextTooltip,
-                          w,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
+                  Expanded(
+                    child: Center(
+                      child: _ProgressRow(engine: engine),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildButtonRow(
+                      context,
+                      l10n,
+                      showSecondary,
+                      prevTooltip,
+                      nextTooltip,
+                      w,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
     );
 
+    // 背景层 — 纯视觉装饰（BackdropFilter 仅作用于此）
+    final background = Container(
+      height: Tokens.controlBarHeight,
+      decoration: _decoration,
+    );
+
+    final content = EdgeGlow(
+      variant: EdgeGlowVariant.gradient,
+      borderRadius: _borderRadius,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: const [
+                    Color(0x005082FF),
+                    Tokens.glowAccent,
+                    Color(0x005082FF),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          interactive,
+        ],
+      ),
+    );
+
     if (!enableBlur) return RepaintBoundary(child: content);
 
-    // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
     final resizingNotifier = resizing;
     if (resizingNotifier != null) {
       return AnimatedBuilder(
         animation: resizingNotifier,
         builder: (_, child) {
           if (resizingNotifier.value) return RepaintBoundary(child: child!);
-          return _buildBlur(child!);
+          return _buildBlur(background, child!);
         },
         child: content,
       );
     }
 
-    return _buildBlur(content);
+    return _buildBlur(background, content);
   }
 
-  Widget _buildBlur(Widget content) {
-    // opacity=0 时跳过 BackdropFilter（fade-out 尾部帧零 GPU readback）
-    final blurContent = RepaintBoundary(child: content);
-
-    // P1 优化：移除 ColorFilter.matrix 饱和度矩阵（每帧 GPU pass）
-    Widget withBlur(Widget child) => ClipRRect(
+  /// BackdropFilter 仅包裹背景层，交互层不受影响
+  Widget _buildBlur(Widget background, Widget foreground) {
+    Widget withBlur(Widget bg) => ClipRRect(
       borderRadius: _borderRadius,
       child: BackdropFilter(
         filter: _blurFilter,
-        child: child,
+        child: bg,
       ),
     );
 
     final opacityNotifier = opacity;
+    Widget blurredBg;
     if (opacityNotifier != null) {
-      return AnimatedBuilder(
+      blurredBg = AnimatedBuilder(
         animation: opacityNotifier,
         builder: (_, child) {
           if (opacityNotifier.value < 0.01) return child!;
           return withBlur(child!);
         },
-        child: blurContent,
+        child: RepaintBoundary(child: background),
       );
+    } else {
+      blurredBg = withBlur(RepaintBoundary(child: background));
     }
 
-    return withBlur(blurContent);
+    return Stack(
+      children: [blurredBg, foreground],
+    );
   }
 
   /// 按钮行：左右组 + 居中播放按钮群
