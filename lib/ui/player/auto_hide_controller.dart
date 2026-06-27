@@ -70,7 +70,7 @@ class AutoHideController {
   /// 隐藏控制栏（带动画，idle 时不隐藏）
   void hide() {
     if (_engineState.value == MediaState.idle) return;
-    if (visible.value && !_hovering) {
+    if (visible.value) {
       _popupCloseNotifier?.value++;
       _animController.reverse();
     }
@@ -114,6 +114,7 @@ class AutoHideController {
   void onMouseEnter() {
     _hovering = true;
     show();
+    scheduleHide();
   }
 
   /// 鼠标离开

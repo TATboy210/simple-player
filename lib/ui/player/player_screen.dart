@@ -76,12 +76,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ValueNotifier((false, false));
 
   /// B: 视频加载后锁定窗口比例 — OS 级约束，拖边框自动保持比例
-  void _onAspectRatioChanged() {
-    final ratio = widget.engine.aspectRatio.value;
-    if (ratio <= 0 || !ratio.isFinite) return;
-    if (widget.windowService.mode.value.isFullscreen) return;
-    widget.windowService.setAspectRatio(ratio);
-  }
+  // 窗口自由缩放 — 不锁定宽高比，VideoSurface 用 FittedBox(contain) 自适应
 
   void _togglePlaylist() {
     final (visible, mounted) = _playlistState.value;
@@ -113,12 +108,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    widget.engine.aspectRatio.addListener(_onAspectRatioChanged);
   }
 
   @override
   void dispose() {
-    widget.engine.aspectRatio.removeListener(_onAspectRatioChanged);
     _playlistState.dispose();
     super.dispose();
   }

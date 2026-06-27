@@ -52,7 +52,7 @@ class Tokens {
   static const progressBarBg = Color(0x44000000);    // 进度条底色
 
   // ── 控制栏装饰 ──
-  static const controlBarBg = Color(0x990E111E);
+  static const controlBarBg = Color(0xB30E111E);
   static const controlBarBorderWhite = Color(0x0AFFFFFF);
   static const controlBarShadowBlack = Color(0x1A000000);
   static const controlBarOuterShadow = Color(0x40000000);
@@ -145,7 +145,7 @@ class Tokens {
 
   // ── 进度条 ──
   static const progressBarRadius = 2.0;
-  static const progressBarHeight = 32.0;
+  static const progressBarHeight = 24.0;
   static const progressBarThickness = 3.0;
   static const progressBarThicknessDrag = 5.0;
   static const progressThumbRadius = 7.0;
