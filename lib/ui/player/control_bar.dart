@@ -76,7 +76,7 @@ class ControlBar extends StatelessWidget {
       child: SizedBox(
         height: Tokens.controlBarHeight,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+          padding: const EdgeInsets.symmetric(horizontal: Tokens.spXs),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final w = constraints.maxWidth;
@@ -85,6 +85,7 @@ class ControlBar extends StatelessWidget {
               return Column(
                 children: [
                   Expanded(
+                    flex: 2,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -105,18 +106,23 @@ class ControlBar extends StatelessWidget {
                     ),
                   ),
                   Expanded(
+                    flex: 2,
                     child: Center(
                       child: _ProgressRow(engine: engine),
                     ),
                   ),
                   Expanded(
-                    child: _buildButtonRow(
-                      context,
-                      l10n,
-                      showSecondary,
-                      prevTooltip,
-                      nextTooltip,
-                      w,
+                    flex: 3,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _buildButtonRow(
+                        context,
+                        l10n,
+                        showSecondary,
+                        prevTooltip,
+                        nextTooltip,
+                        w,
+                      ),
                     ),
                   ),
                 ],
@@ -256,9 +262,7 @@ class ControlBar extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
+    return Row(
       children: [
         _LeftButtonGroup(
           engine: engine,
@@ -279,7 +283,6 @@ class ControlBar extends StatelessWidget {
           actions: actions,
         ),
       ],
-    ),
     );
   }
 }
