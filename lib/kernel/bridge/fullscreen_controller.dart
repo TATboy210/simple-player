@@ -7,6 +7,7 @@
 /// - 通过 WindowState.mode 读写模式（OS 回调驱动）
 /// - WindowManager 操作可注入（测试用 FakeWindowOps）
 /// - 平台全屏操作可注入（测试用 FakePlatformFullscreen）
+library;
 import 'dart:ui';
 
 import 'package:flutter/scheduler.dart';
@@ -102,6 +103,7 @@ class FullscreenController {
   /// 切换全屏 — 读取当前 mode 决定进入/退出。
   Future<void> toggle() async {
     final target = !state.mode.value.isFullscreen;
+    logBridge.i('toggle() → fullscreen=$target');
     await setFullscreen(target);
   }
 
@@ -112,6 +114,7 @@ class FullscreenController {
   /// 失败时回滚窗口位置和大小。
   Future<void> setFullscreen(bool enter) async {
     if (enter == state.mode.value.isFullscreen) return;
+    logBridge.i('setFullscreen($enter)');
     if (_isAnimating) {
       _pendingToggle = true;
       logBridge.d('[FullscreenController] queued pending toggle');

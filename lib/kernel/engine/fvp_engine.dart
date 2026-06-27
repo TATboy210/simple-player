@@ -225,10 +225,14 @@ class FvpEngine extends PlayerEngine {
           state.value = MediaState.idle;
           _errorType = MediaErrorType.unknown;
           errorMessage.value = null;
+          logEngine.i('open() success — ${PathUtils.basename(trimmed)} '
+              '${video?.width}x${video?.height} '
+              '${mediaInfo.duration}ms');
         case OpenError(:final type, :final message):
           state.value = MediaState.error;
           _errorType = type;
           errorMessage.value = message;
+          logEngine.e('open() error — ${PathUtils.basename(trimmed)}: $message');
       }
     } on Exception catch (e) {
       state.value = MediaState.error;
@@ -250,10 +254,12 @@ class FvpEngine extends PlayerEngine {
       _player.state = mdk.PlaybackState.playing;
       state.value = MediaState.playing;
       _positionPoller.startSilent();
+      logEngine.d('play() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e) {
       state.value = MediaState.error;
       _errorType = MediaErrorType.playback;
       errorMessage.value = '播放失败: $e';
+      logEngine.e('play() error: $e');
     }
   }
 
@@ -264,8 +270,9 @@ class FvpEngine extends PlayerEngine {
       _player.state = mdk.PlaybackState.paused;
       state.value = MediaState.paused;
       _positionPoller.stop();
+      logEngine.d('pause() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e) {
-      log.e('FvpEngine.pause error: $e');
+      logEngine.e('pause() error: $e');
     }
   }
 
@@ -277,8 +284,9 @@ class FvpEngine extends PlayerEngine {
       state.value = MediaState.stopped;
       position.value = 0;
       _positionPoller.stop();
+      logEngine.d('stop() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e) {
-      log.e('FvpEngine.stop error: $e');
+      logEngine.e('stop() error: $e');
     }
   }
 
