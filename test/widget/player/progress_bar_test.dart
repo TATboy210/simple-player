@@ -447,10 +447,8 @@ void main() {
       // Drag tooltip: Positioned with Container containing formatted time
       // The drag tooltip uses accent bg color
       final containers = tester.widgetList<Container>(find.byType(Container));
-      final hasTooltip = containers.any((c) =>
-          c.decoration is BoxDecoration &&
-          (c.decoration as BoxDecoration).color == const Color(0xFF6C63FF));
       // Tooltip may or may not match exact color; just verify no crash
+      expect(containers, isNotEmpty);
       expect(find.byType(Stack), findsWidgets);
 
       await gesture.up();

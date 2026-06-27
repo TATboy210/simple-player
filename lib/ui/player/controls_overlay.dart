@@ -85,7 +85,22 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     _autoHide.init();
   }
 
-  void _handleTap() {
+  Offset? _pointerDownPos;
+
+  void _onPointerDown(PointerDownEvent event) {
+    _pointerDownPos = event.localPosition;
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    final downPos = _pointerDownPos;
+    _pointerDownPos = null;
+    if (downPos == null) return;
+
+    // 允许 18px 的手指抖动容差
+    final dx = (event.localPosition.dx - downPos.dx).abs();
+    final dy = (event.localPosition.dy - downPos.dy).abs();
+    if (dx > 18 || dy > 18) return;
+
     if (_clickTimer?.isActive ?? false) {
       // 第二次点击在延迟内 → 双击，切换全屏
       _clickTimer?.cancel();
@@ -118,9 +133,12 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   Widget build(BuildContext context) {
     final isIdle = widget.engine.state.value == MediaState.idle;
     final gestureActive = !(widget.emptyStatePresent && isIdle);
-    return GestureDetector(
+    // Listener 接收原始指针事件，不参与手势竞技场 —
+    // 子控件按钮的 InkWell 独立处理点击，两者互不干扰。
+    return Listener(
       behavior: HitTestBehavior.translucent,
-      onTap: gestureActive ? _handleTap : null,
+      onPointerDown: gestureActive ? _onPointerDown : null,
+      onPointerUp: gestureActive ? _onPointerUp : null,
       child: IgnorePointer(
         // idle 时让 EmptyState 接收点击；播放中控制栏必须可交互
         ignoring: widget.emptyStatePresent && isIdle,
@@ -170,7 +188,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         isIdle: isIdle,
                         title: widget.title,
                         opacity: _autoHide.opacity,
-                        enableBlur: _autoHide.visible.value,
+                        enableBlur: false, // TODO: 临时禁用模糊测试点击
                         resizing: widget.resizing,
                       ),
                     ),

@@ -3,8 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import 'log.dart';
-
 /// Periodic RSS memory logger — debug builds only.
 ///
 /// Reads [ProcessInfo.currentRss] every [interval] seconds and logs via
@@ -32,22 +30,20 @@ class MemoryMonitor {
   void _startImpl({
     Duration interval = const Duration(seconds: 30),
   }) {
-    if (!kDebugMode) return;
-
     _lastRss = ProcessInfo.currentRss;
     final currentMB = (_lastRss / (1024 * 1024)).toStringAsFixed(1);
-    logBridge.i('[MemoryMonitor] RSS: $currentMB MB');
+    debugPrint('[MemoryMonitor] RSS: $currentMB MB');
 
     _timer?.cancel();
     _timer = Timer.periodic(interval, (_) {
       final current = ProcessInfo.currentRss;
       final delta = current - _lastRss;
       final mb = (current / (1024 * 1024)).toStringAsFixed(1);
-      logBridge.i('[MemoryMonitor] RSS: $mb MB');
+      debugPrint('[MemoryMonitor] RSS: $mb MB');
 
       if (delta > _thresholdBytes) {
         final deltaMB = (delta / (1024 * 1024)).toStringAsFixed(1);
-        logBridge.w(
+        debugPrint(
           '[MemoryMonitor] RSS growth +$deltaMB MB exceeds threshold',
         );
       }

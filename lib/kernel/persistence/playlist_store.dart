@@ -21,6 +21,9 @@ class PlaylistStore {
   static const _historyFileName = 'history.json';
   static const _debounceMs = 300;
 
+  /// 默认实例 — 静态方法委托目标
+  static PlaylistStore _instance = PlaylistStore();
+
   /// 写入重试配置 — 指数退避，覆盖磁盘满/临时锁等瞬态故障
   static const _maxRetries = 3;
   static const _retryBaseDelayMs = 100;
@@ -28,20 +31,20 @@ class PlaylistStore {
   /// 可选的自定义存储路径（测试注入临时目录）
   final String? _storagePath;
 
-  PlaylistStore._({String? storagePath}) : _storagePath = storagePath;
-
-  /// 创建独立实例 — 测试注入临时目录，生产环境使用默认路径
+  /// 创建播放列表存储实例
   ///
+  /// 生产环境使用默认路径（无参数）；测试注入临时目录：
   /// ```dart
-  /// final store = PlaylistStore.create(storagePath: tempDir.path);
+  /// final store = PlaylistStore(storagePath: tempDir.path);
   /// store.save(playlist);
   /// ```
-  factory PlaylistStore.create({required String storagePath}) {
-    return PlaylistStore._(storagePath: storagePath);
-  }
+  PlaylistStore({String? storagePath}) : _storagePath = storagePath;
 
-  /// 默认实例 — 生产环境使用
-  static PlaylistStore _instance = PlaylistStore._();
+  /// 创建独立实例 — 与默认构造函数等价，保留向后兼容
+  @Deprecated('Use PlaylistStore(storagePath: ...) directly')
+  factory PlaylistStore.create({required String storagePath}) {
+    return PlaylistStore(storagePath: storagePath);
+  }
 
   Timer? _debounce;
 

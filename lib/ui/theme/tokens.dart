@@ -190,6 +190,12 @@ class Tokens {
 
   // ── 断点 ──
   static const double compactBreakpoint = 500;
+  static const double breakpointWide = 600; // 播放列表并排 vs 覆盖
+  static const double breakpointUltraCompact = 360;
+
+  // ── 窄布局下的播放列表尺寸 ──
+  static const double playlistPanelWidthNarrow = 320;
+  static const double playlistPanelHeightNarrow = 200;
 
   // ── 跳秒 ──
   static const int skipSecondsShort = 10;

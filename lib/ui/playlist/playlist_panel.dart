@@ -35,6 +35,9 @@ class PlaylistPanel extends StatefulWidget {
   /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
   final ValueListenable<bool>? resizing;
 
+  /// 父 Stack 可用宽度 — 用于窄布局自适应
+  final double availableWidth;
+
   const PlaylistPanel({
     super.key,
     required this.playlist,
@@ -46,6 +49,7 @@ class PlaylistPanel extends StatefulWidget {
     this.onFolderScanned,
     this.onClearHistory,
     this.resizing,
+    this.availableWidth = 800,
   });
 
   @override
@@ -120,9 +124,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     );
   }
 
-  static const _panelWidth = Tokens.playlistPanelWidth;
-  static const _panelHeight = Tokens.playlistPanelHeight;
-
   // 缓存固定 blur filter，避免动画期间每帧分配 ImageFilter
   static final _blurFilter = ui.ImageFilter.blur(
     sigmaX: Tokens.glassBlurThick,
@@ -131,6 +132,14 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   Widget build(BuildContext context) {
+    final isNarrow = widget.availableWidth < Tokens.breakpointWide;
+    final panelWidth = isNarrow
+        ? Tokens.playlistPanelWidthNarrow
+        : Tokens.playlistPanelWidth;
+    final panelHeight = isNarrow
+        ? Tokens.playlistPanelHeightNarrow
+        : Tokens.playlistPanelHeight;
+
     return Stack(
       children: [
         // 全屏透明层 — 点击外部关闭
@@ -152,7 +161,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             position: _slideAnim,
             child: FadeTransition(
               opacity: _fadeAnim,
-              child: _buildPanel(_panelWidth, _panelHeight),
+              child: _buildPanel(panelWidth, panelHeight),
             ),
           ),
         ),

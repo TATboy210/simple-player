@@ -3,11 +3,14 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../persistence/settings_store.dart';
 import '../utils/log.dart';
 import '../utils/screen_utils.dart';
+import 'display_enumerator.dart';
+import 'win32/win32_display_enumerator.dart';
 import 'window_bridge.dart';
 import 'window_mode.dart';
 import 'window_persistence.dart';
@@ -21,12 +24,14 @@ import 'window_state.dart';
 ///
 /// OS 回调驱动状态（WindowListener → WindowState.mode/isResizing）。
 class WindowService with WindowListener implements WindowBridge {
-  WindowService();
+  WindowService({DisplayEnumerator? displayEnumerator})
+      : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
 
   // ─── Components ───
 
   final WindowState _state = WindowState();
   final WindowPersistence _persistence = WindowPersistence();
+  final DisplayEnumerator _displayEnumerator;
 
   // Importers: app.dart creates WindowService; player_screen.dart uses WindowBridge
   // Affected API: init() uses setBounds, onWindowResize uses _isProgrammaticResize/_skipNextResize
@@ -80,7 +85,9 @@ class WindowService with WindowListener implements WindowBridge {
         final settings = await SettingsStore.load();
 
         if (settings.windowX != null && settings.windowY != null) {
-          final clamped = ScreenUtils.clampToPrimaryDisplay(
+          final displays = _displayEnumerator.enumerateDisplays();
+          final clamped = ScreenUtils.clampToNearestMonitor(
+            displays: displays,
             x: settings.windowX!,
             y: settings.windowY!,
             width: settings.windowWidth,
@@ -115,13 +122,36 @@ class WindowService with WindowListener implements WindowBridge {
 
   // ─── WindowListener: OS callbacks drive state ───
 
+  /// 确保 ValueNotifier 更新在 UI 线程执行。
+  ///
+  /// macOS/Linux 的 WindowListener 回调可能在 platform thread，
+  /// 直接更新 ValueNotifier 会触发 notifyListeners() 跨线程崩溃。
+  void _updateOnUIThread(VoidCallback update) {
+    try {
+      final phase = SchedulerBinding.instance.schedulerPhase;
+      if (phase == SchedulerPhase.idle ||
+          phase == SchedulerPhase.postFrameCallbacks) {
+        update();
+      } else {
+        SchedulerBinding.instance.addPostFrameCallback((_) => update());
+      }
+    } catch (_) {
+      // 测试环境或 binding 未初始化时直接执行
+      update();
+    }
+  }
+
   /// 统一的 resize 结束定时器 — 冻结 blur 直到动画完全结束
   void _startResizeEndTimer() {
     _resizeEndTimer?.cancel();
-    _state.isResizing.value = true;
+    _updateOnUIThread(() => _state.isResizing.value = true);
     _resizeEndTimer = Timer(
       Duration(milliseconds: _durationResizeEnd),
-      () { if (!_disposed) _state.isResizing.value = false; },
+      () {
+        if (!_disposed) {
+          _updateOnUIThread(() => _state.isResizing.value = false);
+        }
+      },
     );
   }
 
@@ -129,18 +159,22 @@ class WindowService with WindowListener implements WindowBridge {
   void onWindowMaximize() {
     if (_disposed) return;
     _startResizeEndTimer(); // 冻结 blur 覆盖整个动画周期
-    if (_state.mode.value != WindowMode.maximized) {
-      _state.mode.value = WindowMode.maximized;
-    }
+    _updateOnUIThread(() {
+      if (_state.mode.value != WindowMode.maximized) {
+        _state.mode.value = WindowMode.maximized;
+      }
+    });
   }
 
   @override
   void onWindowUnmaximize() {
     if (_disposed) return;
     _startResizeEndTimer(); // 冻结 blur 覆盖整个动画周期
-    if (_state.mode.value == WindowMode.maximized) {
-      _state.mode.value = WindowMode.windowed;
-    }
+    _updateOnUIThread(() {
+      if (_state.mode.value == WindowMode.maximized) {
+        _state.mode.value = WindowMode.windowed;
+      }
+    });
   }
 
   @override
@@ -158,10 +192,12 @@ class WindowService with WindowListener implements WindowBridge {
         if (_disposed) return;
         windowManager.getSize().then((size) {
           if (!_disposed && size != _state.windowSize.value) {
-            _state.windowSize.value = Size(
-              math.max(size.width, 854),
-              math.max(size.height, 513),
-            );
+            _updateOnUIThread(() {
+              _state.windowSize.value = Size(
+                math.max(size.width, 854),
+                math.max(size.height, 513),
+              );
+            });
           }
         });
       },
