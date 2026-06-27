@@ -167,40 +167,66 @@ class _PlayerScreenState extends State<PlayerScreen> {
               children: [
                 CustomTitleBar(windowService: widget.windowService),
                 Expanded(
-                  child: ValueListenableBuilder<(bool, bool)>(
-                    valueListenable: _playlistState,
-                    builder: (context, state, videoContent) {
-                      final (playlistVisible, playlistMounted) = state;
-                      return Stack(
-                      children: [
-                        RepaintBoundary(child: videoContent!),
-                        if (playlistMounted)
-                          RepaintBoundary(
-                            child: IgnorePointer(
-                              ignoring: !playlistVisible,
-                              child: PlaylistPanel(
-                              playlist: widget.playlist,
-                              visible: playlistVisible,
-                              onClose: _closePlaylist,
-                              onSelectIndex: (i) {
-                                widget.controller.playIndex(i);
-                                _closePlaylist();
-                              },
-                              onRemoveIndex: (i) {
-                                widget.playlist.removeAt(i);
-                                widget.playlistGeneration.value++;
-                              },
-                              onShowProperties: widget.onShowProperties,
-                              onFolderScanned: widget.onFolderScanned,
-                              onClearHistory: widget.onClearHistory,
-                              resizing: widget.windowService.isResizing,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final w = constraints.maxWidth;
+                      return ValueListenableBuilder<(bool, bool)>(
+                        valueListenable: _playlistState,
+                        builder: (context, state, videoContent) {
+                          final (playlistVisible, playlistMounted) = state;
+                          final useRow = w >= Tokens.breakpointWide && playlistMounted;
+
+                          final playlistPanel = PlaylistPanel(
+                            playlist: widget.playlist,
+                            visible: playlistVisible,
+                            onClose: _closePlaylist,
+                            onSelectIndex: (i) {
+                              widget.controller.playIndex(i);
+                              _closePlaylist();
+                            },
+                            onRemoveIndex: (i) {
+                              widget.playlist.removeAt(i);
+                              widget.playlistGeneration.value++;
+                            },
+                            onShowProperties: widget.onShowProperties,
+                            onFolderScanned: widget.onFolderScanned,
+                            onClearHistory: widget.onClearHistory,
+                            resizing: widget.windowService.isResizing,
+                            availableWidth: w,
+                          );
+
+                          if (useRow) {
+                            // 宽屏: Row 布局，视频左、播放列表右
+                            return Row(
+                              children: [
+                                Expanded(child: RepaintBoundary(child: videoContent!)),
+                                RepaintBoundary(
+                                  child: IgnorePointer(
+                                    ignoring: !playlistVisible,
+                                    child: playlistPanel,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+
+                          // 窄屏: Stack overlay
+                          return Stack(
+                            children: [
+                              RepaintBoundary(child: videoContent!),
+                              if (playlistMounted)
+                                RepaintBoundary(
+                                  child: IgnorePointer(
+                                    ignoring: !playlistVisible,
+                                    child: playlistPanel,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                        child: _buildVideoContent(isVideo, modeIcon, modeLabel),
+                      );
                     },
-                    child: _buildVideoContent(isVideo, modeIcon, modeLabel),
                   ),
                 ),
               ],

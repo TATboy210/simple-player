@@ -141,6 +141,7 @@ class ControlBar extends StatelessWidget {
                           showSecondary,
                           prevTooltip,
                           nextTooltip,
+                          w,
                         ),
                       ),
                     ],
@@ -209,12 +210,12 @@ class ControlBar extends StatelessWidget {
     bool showSecondary,
     String prevTooltip,
     String nextTooltip,
+    double availableWidth,
   ) {
-    final w = MediaQuery.sizeOf(context).width;
     // 仅中心播放按钮（隐藏左右组 + stop/rewind/forward）
-    final ultraCompact = w <= 360;
+    final ultraCompact = availableWidth <= Tokens.breakpointUltraCompact;
     // 隐藏左右组，中心保留全部按钮
-    final compact = !ultraCompact && w <= 500;
+    final compact = !ultraCompact && availableWidth <= Tokens.compactBreakpoint;
 
     if (ultraCompact) {
       return Row(

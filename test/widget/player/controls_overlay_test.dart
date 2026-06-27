@@ -7,8 +7,6 @@ import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import '../../helpers/fake_engine.dart';
 
-void _noop() {}
-
 void main() {
   late FakeEngine engine;
 

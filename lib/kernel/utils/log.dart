@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart' hide PrefixPrinter;
+import 'package:path_provider/path_provider.dart';
 
 /// Kernel-wide logger. Uses PrettyPrinter with minimal method count
 /// for compact desktop output. Only logs in debug mode (default filter).
@@ -141,19 +142,23 @@ class JsonPrinter extends LogPrinter {
 /// In release mode, configures all 5 loggers (global + 4 module) with
 /// shared [PrettyPrinter] (no colors), [ProductionFilter] (warning+),
 /// and [MultiOutput] (console + rotating file).
+///
+/// Logs are written to application support directory /logs/.
 Future<void> initLog() async {
   if (kDebugMode) return;
 
   try {
-    final appData = Platform.environment['APPDATA'];
-    if (appData == null) return;
-
-    final dir = Directory('$appData\\SimplePlayer\\logs');
+    final appDir = await getApplicationSupportDirectory();
+    final sep = Platform.pathSeparator;
+    final dir = Directory('${appDir.path}${sep}logs');
+    if (!dir.existsSync()) {
+      dir.createSync(recursive: true);
+    }
     final timestamp = DateTime.now()
         .toIso8601String()
         .replaceAll(RegExp(r'[:.]'), '-')
         .replaceAll('T', '_');
-    final file = File('${dir.path}\\app_$timestamp.log');
+    final file = File('${dir.path}${sep}app_$timestamp.log');
 
     final printer = PrettyPrinter(
       methodCount: 0,

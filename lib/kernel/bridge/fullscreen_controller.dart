@@ -9,10 +9,14 @@
 /// - 平台全屏操作可注入（测试用 FakePlatformFullscreen）
 import 'dart:ui';
 
+import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../utils/log.dart';
+import '../utils/screen_utils.dart';
+import 'display_enumerator.dart';
 import 'platform_fullscreen.dart';
+import 'win32/win32_display_enumerator.dart';
 import 'window_mode.dart';
 import 'window_state.dart';
 
@@ -68,12 +72,15 @@ class FullscreenController {
     required this.state,
     required PlatformFullscreen platform,
     WindowOps? ops,
+    DisplayEnumerator? displayEnumerator,
   })  : _platform = platform,
-        _ops = ops ?? RealWindowOps();
+        _ops = ops ?? RealWindowOps(),
+        _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
 
   final WindowState state;
   final PlatformFullscreen _platform;
   final WindowOps _ops;
+  final DisplayEnumerator _displayEnumerator;
 
   // ─── Mutex guard + debounce ───
 
@@ -117,7 +124,7 @@ class FullscreenController {
       if (enter) {
         await _saveWindowState();
         _savedSnapshot = await _platform.enter();
-        state.mode.value = WindowMode.fullscreen;
+        _safeUpdate(() => state.mode.value = WindowMode.fullscreen);
       } else {
         final previousMode = _savedMode ?? WindowMode.windowed;
         if (_savedSnapshot != null) {
@@ -125,10 +132,10 @@ class FullscreenController {
         }
         // 同步窗口大小到状态（退出全屏后 UI 需要正确的尺寸）
         if (_savedSize != null) {
-          state.windowSize.value = _savedSize!;
+          _safeUpdate(() => state.windowSize.value = _savedSize!);
         }
         _clearSavedState();
-        state.mode.value = previousMode;
+        _safeUpdate(() => state.mode.value = previousMode);
       }
     } on Exception catch (e) {
       logBridge.e('[FullscreenController.setFullscreen] FAILED: $e');
@@ -140,7 +147,7 @@ class FullscreenController {
           logBridge.e('[FullscreenController] ROLLBACK ALSO FAILED: $rollbackError');
           _clearSavedState();
         }
-        state.mode.value = WindowMode.windowed;
+        _safeUpdate(() => state.mode.value = WindowMode.windowed);
       }
     } finally {
       _isAnimating = false;
@@ -148,6 +155,27 @@ class FullscreenController {
         _pendingToggle = false;
         toggle();
       }
+    }
+  }
+
+  // ─── Thread safety ───
+
+  /// 确保 ValueNotifier 更新在 UI 线程执行。
+  ///
+  /// PlatformFullscreen 的 MethodChannel 回调可能在 platform thread，
+  /// 直接更新 ValueNotifier 会触发 notifyListeners() 跨线程崩溃。
+  void _safeUpdate(VoidCallback update) {
+    try {
+      final phase = SchedulerBinding.instance.schedulerPhase;
+      if (phase == SchedulerPhase.idle ||
+          phase == SchedulerPhase.postFrameCallbacks) {
+        update();
+      } else {
+        SchedulerBinding.instance.addPostFrameCallback((_) => update());
+      }
+    } catch (_) {
+      // 测试环境或 binding 未初始化时直接执行
+      update();
     }
   }
 
@@ -167,15 +195,30 @@ class FullscreenController {
   }
 
   /// 构建退出全屏用的快照 — 合并平台快照和控制器保存的位置/大小。
+  ///
+  /// 恢复前钳制到最近显示器，防止窗口恢复到已断开的显示器。
   FullscreenSnapshot _buildExitSnapshot() {
     final snapshot = _savedSnapshot;
     if (snapshot == null) {
       throw StateError('No saved snapshot for fullscreen exit');
     }
+    final pos = _savedPosition ?? snapshot.position;
+    final size = _savedSize ?? snapshot.size;
+
+    // 钳制到最近显示器 — 防止窗口恢复到已断开的显示器
+    final displays = _displayEnumerator.enumerateDisplays();
+    final clamped = ScreenUtils.clampToNearestMonitor(
+      displays: displays,
+      x: pos.dx,
+      y: pos.dy,
+      width: size.width,
+      height: size.height,
+    );
+
     return FullscreenSnapshot(
       windowStyle: snapshot.windowStyle,
-      position: _savedPosition ?? snapshot.position,
-      size: _savedSize ?? snapshot.size,
+      position: clamped,
+      size: size,
     );
   }
 }

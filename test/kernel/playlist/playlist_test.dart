@@ -373,7 +373,7 @@ void main() {
       });
 
       test('fromJson clamps out-of-range mode', () {
-        final restored = Playlist.fromJson({'mode': 99, 'items': []});
+        final restored = Playlist.fromJson(<String, dynamic>{'mode': 99, 'items': <dynamic>[]});
         expect(restored.mode, PlayMode.loopAll);
       });
 
