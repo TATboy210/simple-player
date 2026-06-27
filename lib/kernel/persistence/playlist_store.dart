@@ -15,7 +15,7 @@ import '../utils/log.dart';
 /// 合并多次 save() 为一次磁盘写入，减少 I/O 次数。
 ///
 /// C3: 原子写入 — 先写 .tmp 再 rename，防止并发/崩溃导致文件损坏。
-/// C4: 测试隔离 — reset() 清除所有静态状态，防止跨测试泄漏。
+/// C4: 测试隔离 — create() 创建独立实例，reset() 清除默认实例状态。
 class PlaylistStore {
   static const _fileName = 'playlist.json';
   static const _historyFileName = 'history.json';
@@ -25,20 +25,39 @@ class PlaylistStore {
   static const _maxRetries = 3;
   static const _retryBaseDelayMs = 100;
 
-  static Timer? _debounce;
+  /// 可选的自定义存储路径（测试注入临时目录）
+  final String? _storagePath;
+
+  PlaylistStore._({String? storagePath}) : _storagePath = storagePath;
+
+  /// 创建独立实例 — 测试注入临时目录，生产环境使用默认路径
+  ///
+  /// ```dart
+  /// final store = PlaylistStore.create(storagePath: tempDir.path);
+  /// store.save(playlist);
+  /// ```
+  factory PlaylistStore.create({required String storagePath}) {
+    return PlaylistStore._(storagePath: storagePath);
+  }
+
+  /// 默认实例 — 生产环境使用
+  static PlaylistStore _instance = PlaylistStore._();
+
+  Timer? _debounce;
 
   /// 存 JSON 快照（String），不存 Playlist 引用。
   /// 防抖期间 Playlist 可能被修改，快照保证写入 save() 调用时的状态。
-  static String? _pendingJson;
+  String? _pendingJson;
 
   /// C3: 原子写入守卫 — 防止并发 _flush 交错写入
-  static Future<void>? _writeInFlight;
+  Future<void>? _writeInFlight;
 
-  static Future<Directory> _appDir() async {
+  Future<Directory> _appDir() async {
+    if (_storagePath != null) return Directory(_storagePath!);
     return getApplicationSupportDirectory();
   }
 
-  static Future<File> _file() async {
+  Future<File> _file() async {
     final dir = await _appDir();
     return File('${dir.path}/$_fileName');
   }
@@ -47,13 +66,19 @@ class PlaylistStore {
   ///
   /// 立即序列化为 JSON 快照，防抖期间 Playlist 修改不影响已保存的快照。
   static void save(Playlist playlist) {
+    _instance._saveImpl(playlist);
+  }
+
+  void _saveImpl(Playlist playlist) {
     _pendingJson = jsonEncode(playlist.toJson());
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: _debounceMs), _flush);
+    _debounce = Timer(const Duration(milliseconds: _debounceMs), _flushImpl);
   }
 
   /// C3: 原子写入 + 指数退避重试 — 写 .tmp 后 rename，失败最多重试 3 次
-  static Future<void> _flush() async {
+  static Future<void> _flush() => _instance._flushImpl();
+
+  Future<void> _flushImpl() async {
     final json = _pendingJson;
     if (json == null) return;
 
@@ -94,7 +119,9 @@ class PlaylistStore {
   /// 加载播放列表，失败返回 null
   ///
   /// 首次加载时自动迁移旧 history.json 数据：按 path 合并元数据到 playlist items。
-  static Future<Playlist?> load() async {
+  static Future<Playlist?> load() => _instance._loadImpl();
+
+  Future<Playlist?> _loadImpl() async {
     try {
       final f = await _file();
       Playlist? playlist;
@@ -119,7 +146,9 @@ class PlaylistStore {
   /// 文件读取和 JSON 解析在独立 Isolate 中执行，
   /// 迁移逻辑在主 Isolate 回调中执行（低频一次性操作）。
   /// Isolate 失败时自动回退到 [load]。
-  static Future<Playlist?> loadInBackground() async {
+  static Future<Playlist?> loadInBackground() => _instance._loadInBackgroundImpl();
+
+  Future<Playlist?> _loadInBackgroundImpl() async {
     try {
       final f = await _file();
       final path = f.path;
@@ -127,7 +156,7 @@ class PlaylistStore {
       return await _migrateHistory(playlist);
     } on Exception catch (e) {
       log.w('PlaylistStore.loadInBackground failed, falling back: $e');
-      return load();
+      return _loadImpl();
     }
   }
 
@@ -150,7 +179,7 @@ class PlaylistStore {
   /// - playlist 有数据：将 history 的 timestamp/positionMs/durationMs 合并到匹配项
   /// - playlist 为空但 history 有数据：从 history 创建 playlist
   /// - 迁移成功后删除 history.json
-  static Future<Playlist?> _migrateHistory(Playlist? playlist) async {
+  Future<Playlist?> _migrateHistory(Playlist? playlist) async {
     try {
       final dir = await _appDir();
       final historyFile = File('${dir.path}/$_historyFileName');
@@ -190,7 +219,9 @@ class PlaylistStore {
   }
 
   /// 清空（取消防抖，防止清空后回写旧数据）
-  static Future<void> clear() async {
+  static Future<void> clear() => _instance._clearImpl();
+
+  Future<void> _clearImpl() async {
     _debounce?.cancel();
     _pendingJson = null;
     try {
@@ -202,17 +233,22 @@ class PlaylistStore {
   }
 
   /// 释放资源（flush 未写入的数据）
-  static Future<void> dispose() async {
+  static Future<void> dispose() => _instance._disposeImpl();
+
+  Future<void> _disposeImpl() async {
     _debounce?.cancel();
-    await _flush();
+    await _flushImpl();
   }
 
-  /// C4: 重置所有静态状态 — 仅供测试使用，防止跨测试泄漏
+  /// C4: 重置所有实例状态 — 仅供测试使用，防止跨测试泄漏
+  ///
+  /// 可选 [newInstance] 替换默认实例（用于注入自定义存储路径）。
   @visibleForTesting
-  static void reset() {
-    _debounce?.cancel();
-    _debounce = null;
-    _pendingJson = null;
-    _writeInFlight = null;
+  static void reset({PlaylistStore? newInstance}) {
+    _instance._debounce?.cancel();
+    _instance._debounce = null;
+    _instance._pendingJson = null;
+    _instance._writeInFlight = null;
+    if (newInstance != null) _instance = newInstance;
   }
 }

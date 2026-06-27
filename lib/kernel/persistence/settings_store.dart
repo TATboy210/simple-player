@@ -20,18 +20,39 @@ import 'settings_validator.dart';
 class SettingsStore {
   // ── 常量已迁移至 SettingsValidator ──
 
+  SettingsStore._(SharedPreferences? prefs) : _cachedPrefs = prefs;
+
+  /// 创建独立实例 — 测试注入 SharedPreferences，生产环境使用 prewarm()
+  ///
+  /// ```dart
+  /// final store = SettingsStore.create(prefs);
+  /// final settings = await store.load();
+  /// ```
+  factory SettingsStore.create(SharedPreferences prefs) {
+    return SettingsStore._(prefs);
+  }
+
+  /// 默认实例 — 生产环境使用
+  static SettingsStore? _instance;
+
   /// 预热缓存的 SharedPreferences 实例（由 main.dart 在 runApp 前设置）
-  static SharedPreferences? _cachedPrefs;
+  final SharedPreferences? _cachedPrefs;
 
   /// 预热：缓存已获取的 SharedPreferences 实例，避免后续重复 getInstance() 调用
-  static void prewarm(SharedPreferences prefs) => _cachedPrefs = prefs;
+  static void prewarm(SharedPreferences prefs) {
+    _instance = SettingsStore._(prefs);
+  }
 
   /// 重置预热缓存（仅供测试使用）
+  ///
+  /// 可选 [newInstance] 替换默认实例（用于注入自定义 SharedPreferences）。
   @visibleForTesting
-  static void resetPrewarm() => _cachedPrefs = null;
+  static void resetPrewarm({SettingsStore? newInstance}) {
+    _instance = newInstance;
+  }
 
   /// 获取 SharedPreferences 实例（优先使用缓存）
-  static Future<SharedPreferences> _getPrefs() async =>
+  Future<SharedPreferences> _getPrefs() async =>
       _cachedPrefs ?? await SharedPreferences.getInstance();
 
   static const _keyVolume = 'volume';
@@ -61,7 +82,9 @@ class SettingsStore {
   static const _keyThemeIndex = 'themeIndex';
   static const _keyShortcuts = 'shortcuts';
 
-  static Future<AppSettings> load() async {
+  static Future<AppSettings> load() async => (_instance ?? SettingsStore._(null))._loadImpl();
+
+  Future<AppSettings> _loadImpl() async {
     try {
       final prefs = await _getPrefs();
       
@@ -140,7 +163,7 @@ class SettingsStore {
   }
 
   /// 通用 save 辅助 — 消除 SharedPreferences.getInstance + try-catch 样板
-  static Future<void> _save(
+  Future<void> _saveImpl(
     String method,
     Future<void> Function(SharedPreferences prefs) op,
   ) async {
@@ -151,6 +174,12 @@ class SettingsStore {
       log.e('SettingsStore.$method failed: $e');
     }
   }
+
+  /// 默认实例的 _save 包装
+  static Future<void> _save(
+    String method,
+    Future<void> Function(SharedPreferences prefs) op,
+  ) async => (_instance ?? SettingsStore._(null))._saveImpl(method, op);
 
   static Future<void> saveVolume(double value) => _save(
     'saveVolume',
@@ -199,7 +228,9 @@ class SettingsStore {
       _save('saveIsFullscreen', (p) => p.setBool(_keyIsFullscreen, value));
 
   /// 加载语言偏好，默认 'zh'（中文）
-  static Future<String> loadLocale() async {
+  static Future<String> loadLocale() async => (_instance ?? SettingsStore._(null))._loadLocaleImpl();
+
+  Future<String> _loadLocaleImpl() async {
     try {
       final prefs = await _getPrefs();
       return prefs.getString(_keyLocale) ?? SettingsValidator.defaultLocale;
@@ -214,7 +245,9 @@ class SettingsStore {
       _save('saveLocale', (p) => p.setString(_keyLocale, localeCode));
 
   /// 加载主题索引，默认 0（Midnight）
-  static Future<int> loadThemeIndex() async {
+  static Future<int> loadThemeIndex() async => (_instance ?? SettingsStore._(null))._loadThemeIndexImpl();
+
+  Future<int> _loadThemeIndexImpl() async {
     try {
       final prefs = await _getPrefs();
       return SettingsValidator.themeIndex(prefs.getInt(_keyThemeIndex) ?? 0);
@@ -231,7 +264,9 @@ class SettingsStore {
   );
 
   /// 加载自定义快捷键映射 (action → LogicalKeyboardKey.keyName)
-  static Future<Map<String, String>> loadShortcuts() async {
+  static Future<Map<String, String>> loadShortcuts() async => (_instance ?? SettingsStore._(null))._loadShortcutsImpl();
+
+  Future<Map<String, String>> _loadShortcutsImpl() async {
     try {
       final prefs = await _getPrefs();
       final json = prefs.getString(_keyShortcuts);
@@ -316,7 +351,9 @@ class SettingsStore {
   );
 
   /// 加载 D3D11 同步设置，默认 true（同步模式）
-  static Future<bool> loadD3d11SyncEnabled() async {
+  static Future<bool> loadD3d11SyncEnabled() async => (_instance ?? SettingsStore._(null))._loadD3d11SyncEnabledImpl();
+
+  Future<bool> _loadD3d11SyncEnabledImpl() async {
     try {
       final prefs = await _getPrefs();
       return prefs.getBool(_keyD3d11Sync) ?? true;
@@ -327,7 +364,9 @@ class SettingsStore {
   }
 
   /// 加载硬件解码设置，默认 true（硬件解码优先）
-  static Future<bool> loadHardwareDecoding() async {
+  static Future<bool> loadHardwareDecoding() async => (_instance ?? SettingsStore._(null))._loadHardwareDecodingImpl();
+
+  Future<bool> _loadHardwareDecodingImpl() async {
     try {
       final prefs = await _getPrefs();
       return prefs.getBool(_keyHardwareDecoding) ?? true;

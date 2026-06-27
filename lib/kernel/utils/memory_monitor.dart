@@ -13,8 +13,11 @@ import 'log.dart';
 class MemoryMonitor {
   MemoryMonitor._();
 
-  static Timer? _timer;
-  static int _lastRss = 0;
+  /// 内部实例 — 持有定时器状态，消除 static mutable state
+  static final MemoryMonitor _instance = MemoryMonitor._();
+
+  Timer? _timer;
+  int _lastRss = 0;
 
   /// 50 MB growth threshold.
   static const int _thresholdBytes = 50 * 1024 * 1024;
@@ -23,6 +26,10 @@ class MemoryMonitor {
   ///
   /// No-op in release builds ([kDebugMode] guard).
   static void start({
+    Duration interval = const Duration(seconds: 30),
+  }) => _instance._startImpl(interval: interval);
+
+  void _startImpl({
     Duration interval = const Duration(seconds: 30),
   }) {
     if (!kDebugMode) return;
@@ -51,7 +58,7 @@ class MemoryMonitor {
 
   /// Cancel periodic timer.
   static void stop() {
-    _timer?.cancel();
-    _timer = null;
+    _instance._timer?.cancel();
+    _instance._timer = null;
   }
 }

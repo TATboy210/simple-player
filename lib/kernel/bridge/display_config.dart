@@ -10,25 +10,32 @@ import '../utils/log.dart';
 ///
 /// 调用 [init] 检测实际刷新率；未调用时安全降级为 60Hz。
 class DisplayConfig {
-  static int _cachedHz = 60;
-  static bool _initialized = false;
+  DisplayConfig._();
+
+  /// 内部实例 — 持有缓存状态，消除 static mutable state
+  static final DisplayConfig _instance = DisplayConfig._();
+
+  int _cachedHz = 60;
+  bool _initialized = false;
 
   /// 检测并缓存主显示器刷新率。
   ///
   /// 应在窗口就绪后调用（确保 PlatformDispatcher 已初始化）。
   /// 未调用时 [getRefreshRate] 返回安全默认值 60Hz。
-  static void init() {
+  static void init() => _instance._initImpl();
+
+  void _initImpl() {
     if (_initialized) return;
     _initialized = true;
     _cachedHz = _detectRefreshRate();
-    logBridge.d('[DisplayConfig] refreshRate=${_cachedHz}Hz');
+    logBridge.d('[DisplayConfig] refreshRate=$_cachedHz Hz');
   }
 
   /// Returns primary display refresh rate (60Hz if [init] not called).
-  static int getRefreshRate() => _cachedHz;
+  static int getRefreshRate() => _instance._cachedHz;
 
   /// Returns d3d11.sync.cpu value based on display refresh rate.
-  static String d3d11SyncMode() => syncModeForHz(_cachedHz);
+  static String d3d11SyncMode() => syncModeForHz(_instance._cachedHz);
 
   /// Pure policy: returns '0' (async) for 120Hz+, '1' (sync) otherwise.
   @visibleForTesting
@@ -37,8 +44,8 @@ class DisplayConfig {
   /// 重置状态（仅测试用）。
   @visibleForTesting
   static void reset() {
-    _cachedHz = 60;
-    _initialized = false;
+    _instance._cachedHz = 60;
+    _instance._initialized = false;
   }
 
   /// Detect refresh rate via PlatformDispatcher. Defaults to 60Hz on failure.
