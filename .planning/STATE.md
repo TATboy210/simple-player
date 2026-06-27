@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Stability, Architecture & Cross-Platform Prep
 current_phase: 6
-status: in_progress
-stopped_at: context exhaustion at 83% (2026-06-26)
-last_updated: "2026-06-26T14:09:10.469Z"
+status: complete
+stopped_at: context exhaustion at 75% (2026-06-27)
+last_updated: "2026-06-27T08:32:41.975Z"
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 1
-  percent: 25
-current_phase_name: Wave 2 — Architecture Refactoring
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 100
+current_phase_name: Wave 4 — Cross-Platform Prep
 ---
 
 # Project State: v1.7 — in progress
@@ -20,7 +20,9 @@ current_phase_name: Wave 2 — Architecture Refactoring
 ## Current Position
 
 Wave 1 (Stability & Code Quality) — ✅ 完成
-Wave 2 (Architecture Refactoring) — 待开始
+Wave 2 (Architecture Refactoring) — ✅ 完成
+Wave 3 (Feature Polish) — ✅ 完成
+Wave 4 (Cross-Platform Prep) — ✅ 完成
 
 ## Project Reference
 
@@ -79,14 +81,29 @@ Wave 2 进行中。已完成：
 - ✅ R2-2: MediaOpener 集成 (commit 0f0cb26)
 - ✅ R2-3: VideoEffectController 集成 (本会话, FvpEngine 555→539行)
 
-剩余：
+Wave 2 全部完成 ✅
 
-1. R2-4: Large File Splits (精简版 — SettingsValidator 提取)
-2. R2-5: Static Mutable State Cleanup
-3. 提交本次改动
+- ✅ R2-1: NetworkConfigurator 提取 (commit 0f0cb26)
+- ✅ R2-2: MediaOpener 集成 (commit 0f0cb26)
+- ✅ R2-3: VideoEffectController 集成 (commit ac48a1e)
+- ✅ R2-4: SettingsValidator 提取 (commit d27ac2d)
+- ✅ R2-5: Static Mutable State Cleanup (commit e4a9f11)
+
+- Wave 3: Feature Polish ✅ (2026-06-27)
+  - R3-1: Win11 Rounded Corners — 已有实现，无需改动
+  - R3-2: Multi-Monitor Window Clamping — Win32DisplayEnumerator + ScreenUtils + WindowService/FullscreenController
+  - R3-3: Window Snap Assist — 手动验证通过
+  - R3-4: Responsive Narrow Layout — 600dp断点 + PlaylistPanel自适应 + ControlBar宽度统一
+  - Fix: PlaylistStore._instance — R2-5 遗漏修复
+
+## Decisions
+
+- **原生 FFI vs win32 包:** 项目约定不引入 win32 包，使用 dart:ffi + DynamicLibrary.open 模式
+- **响应式断点:** breakpointWide=600 (播放列表并排), compactBreakpoint=500 (ControlBar), breakpointUltraCompact=360
+- **ControlBar 宽度:** 统一使用 LayoutBuilder constraints.maxWidth，不用 MediaQuery
 
 ## Session
 
-**Last session:** 2026-06-26T14:09:10.438Z
-**Stopped at:** context exhaustion at 83% (2026-06-26)
+**Last session:** 2026-06-27
+**Stopped at:** v1.7 complete — all 4 waves done
 **Resume file:** .planning/.continue-here.md
