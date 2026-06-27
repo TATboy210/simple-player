@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/persistence/playlist_store.dart';
@@ -13,25 +12,12 @@ void main() {
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('playlist_store_test_');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('plugins.flutter.io/path_provider'),
-          (call) async {
-            if (call.method == 'getApplicationSupportDirectory') {
-              return tempDir.path;
-            }
-            return null;
-          },
-        );
+    // R2-5: 使用 create() 注入临时目录，无需 mock platform channel
+    PlaylistStore.reset(newInstance: PlaylistStore.create(storagePath: tempDir.path));
   });
 
   tearDown(() async {
     PlaylistStore.reset();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('plugins.flutter.io/path_provider'),
-          null,
-        );
     if (await tempDir.exists()) await tempDir.delete(recursive: true);
   });
 
@@ -261,12 +247,8 @@ void main() {
     });
 
     test('_flush retries on write failure', () async {
-      // Replace temp dir mock with an invalid path to force write failure
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('plugins.flutter.io/path_provider'),
-            (call) async => '/nonexistent_dir_xyz',
-          );
+      // R2-5: 使用 create() 注入无效路径，无需 mock platform channel
+      PlaylistStore.reset(newInstance: PlaylistStore.create(storagePath: '/nonexistent_dir_xyz'));
 
       final playlist = Playlist();
       playlist.add('/retry_test.mp4');
@@ -274,17 +256,8 @@ void main() {
       // dispose triggers _flush — retries 3 times then gives up
       await PlaylistStore.dispose();
 
-      // Restore mock for tearDown
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('plugins.flutter.io/path_provider'),
-            (call) async {
-              if (call.method == 'getApplicationSupportDirectory') {
-                return tempDir.path;
-              }
-              return null;
-            },
-          );
+      // Restore valid instance for tearDown
+      PlaylistStore.reset(newInstance: PlaylistStore.create(storagePath: tempDir.path));
     });
   });
 }
