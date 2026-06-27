@@ -29,11 +29,25 @@ class ControlBar extends StatelessWidget {
     border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
       // CSS: inset 0 1px 0 rgba(255,255,255,0.04) — 顶部内高光
-      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      BoxShadow(
+        color: Tokens.controlBarBorderWhite,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, -1),
+      ),
       // CSS: inset 0 -1px 0 rgba(0,0,0,0.1) — 底部内阴影
-      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      BoxShadow(
+        color: Tokens.controlBarShadowBlack,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, 1),
+      ),
       // CSS: 0 8px 32px rgba(0,0,0,0.25) — 外层投影
-      BoxShadow(color: Tokens.controlBarOuterShadow, blurRadius: 32, offset: Offset(0, 8)),
+      BoxShadow(
+        color: Tokens.controlBarOuterShadow,
+        blurRadius: 32,
+        offset: Offset(0, 8),
+      ),
       // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
       BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
     ],
@@ -76,7 +90,7 @@ class ControlBar extends StatelessWidget {
       child: SizedBox(
         height: Tokens.controlBarHeight,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Tokens.spXs),
+          padding: const EdgeInsets.symmetric(horizontal: Tokens.controlBarMarginH),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final w = constraints.maxWidth;
@@ -107,14 +121,12 @@ class ControlBar extends StatelessWidget {
                   ),
                   Expanded(
                     flex: 2,
-                    child: Center(
-                      child: _ProgressRow(engine: engine),
-                    ),
+                    child: Center(child: _ProgressRow(engine: engine)),
                   ),
                   Expanded(
                     flex: 3,
                     child: Align(
-                      alignment: Alignment.bottomCenter,
+                      alignment: Alignment.center,
                       child: _buildButtonRow(
                         context,
                         l10n,
@@ -144,7 +156,7 @@ class ControlBar extends StatelessWidget {
       borderRadius: _borderRadius,
       child: Stack(
         children: [
-          Positioned(
+          const Positioned(
             top: 0,
             left: 0,
             right: 0,
@@ -152,7 +164,7 @@ class ControlBar extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: const [
+                  colors: [
                     Color(0x005082FF),
                     Tokens.glowAccent,
                     Color(0x005082FF),
@@ -187,10 +199,7 @@ class ControlBar extends StatelessWidget {
   Widget _buildBlur(Widget background, Widget foreground) {
     Widget withBlur(Widget bg) => ClipRRect(
       borderRadius: _borderRadius,
-      child: BackdropFilter(
-        filter: _blurFilter,
-        child: bg,
-      ),
+      child: BackdropFilter(filter: _blurFilter, child: bg),
     );
 
     final opacityNotifier = opacity;
@@ -208,9 +217,7 @@ class ControlBar extends StatelessWidget {
       blurredBg = withBlur(RepaintBoundary(child: background));
     }
 
-    return Stack(
-      children: [blurredBg, foreground],
-    );
+    return Stack(children: [blurredBg, foreground]);
   }
 
   /// 按钮行：左右组 + 居中播放按钮群
@@ -279,9 +286,7 @@ class ControlBar extends StatelessWidget {
           onNext: actions.onNext,
         ),
         const Spacer(),
-        _RightButtonGroup(
-          actions: actions,
-        ),
+        _RightButtonGroup(actions: actions),
       ],
     );
   }
@@ -332,7 +337,6 @@ class _CompactCenterGroup extends StatelessWidget {
   final VoidCallback? onNext;
 
   const _CompactCenterGroup({
-    super.key,
     required this.engine,
     required this.isIdle,
     required this.prevTooltip,
@@ -373,9 +377,7 @@ class _CompactCenterGroup extends StatelessWidget {
 class _RightButtonGroup extends StatelessWidget {
   final PlayerActions actions;
 
-  const _RightButtonGroup({
-    required this.actions,
-  });
+  const _RightButtonGroup({required this.actions});
 
   @override
   Widget build(BuildContext context) {

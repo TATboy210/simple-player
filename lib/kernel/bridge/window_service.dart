@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -25,7 +24,7 @@ import 'window_state.dart';
 /// OS 回调驱动状态（WindowListener → WindowState.mode/isResizing）。
 class WindowService with WindowListener implements WindowBridge {
   WindowService({DisplayEnumerator? displayEnumerator})
-      : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
+    : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
 
   // ─── Components ───
 
@@ -38,7 +37,7 @@ class WindowService with WindowListener implements WindowBridge {
   // User verbatim: "A+B+C+D 实施计划 — setBounds 原子操作 + setAspectRatio 锁定 + 防循环 + 跳过首次回调"
   bool _disposed = false;
   bool _isProgrammaticResize = false; // C: 防止程序化 resize 触发 UI 循环
-  bool _skipNextResize = false;       // D: 跳过 init 首次 resize 回调
+  bool _skipNextResize = false; // D: 跳过 init 首次 resize 回调
 
   // ─── Animation constants ───
 
@@ -146,7 +145,7 @@ class WindowService with WindowListener implements WindowBridge {
     _resizeEndTimer?.cancel();
     _updateOnUIThread(() => _state.isResizing.value = true);
     _resizeEndTimer = Timer(
-      Duration(milliseconds: _durationResizeEnd),
+      const Duration(milliseconds: _durationResizeEnd),
       () {
         if (!_disposed) {
           _updateOnUIThread(() => _state.isResizing.value = false);
@@ -158,6 +157,7 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowMaximize() {
     if (_disposed) return;
+    logBridge.d('onWindowMaximize()');
     _startResizeEndTimer(); // 冻结 blur 覆盖整个动画周期
     _updateOnUIThread(() {
       if (_state.mode.value != WindowMode.maximized) {
@@ -169,6 +169,7 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowUnmaximize() {
     if (_disposed) return;
+    logBridge.d('onWindowUnmaximize()');
     _startResizeEndTimer(); // 冻结 blur 覆盖整个动画周期
     _updateOnUIThread(() {
       if (_state.mode.value == WindowMode.maximized) {
@@ -181,9 +182,15 @@ class WindowService with WindowListener implements WindowBridge {
   void onWindowResize() {
     if (_disposed) return;
     // D: 跳过 init 首次 resize 回调
-    if (_skipNextResize) { _skipNextResize = false; return; }
+    if (_skipNextResize) {
+      _skipNextResize = false;
+      return;
+    }
     // C: 程序化 resize 不触发 UI rebuild
-    if (_isProgrammaticResize) { _isProgrammaticResize = false; return; }
+    if (_isProgrammaticResize) {
+      _isProgrammaticResize = false;
+      return;
+    }
     _startResizeEndTimer(); // 统一逻辑
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(
@@ -206,6 +213,7 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   void onWindowClose() {
+    logBridge.i('onWindowClose() — saving geometry');
     _resizeDebounce?.cancel();
     _resizeEndTimer?.cancel();
     _disposed = true;
@@ -220,6 +228,7 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   Future<void> setMode(WindowMode target) async {
     if (_disposed || target == _state.mode.value) return;
+    logBridge.i('setMode($target) ← ${_state.mode.value}');
 
     switch (target) {
       case WindowMode.windowed:

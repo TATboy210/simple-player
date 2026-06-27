@@ -137,6 +137,7 @@ class _AppState extends State<App> {
   Widget build(BuildContext context) {
     if (!_ready) {
       return MaterialApp(
+        theme: ThemeService.I.currentTheme,
         home: ValueListenableBuilder<StartupState>(
           valueListenable: widget.coordinator.state,
           builder: (context, startupState, _) =>

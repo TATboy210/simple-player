@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../shared/osd_overlay.dart';
-import '../shared/transmitted_light.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
@@ -102,23 +101,50 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     if (dx > 18 || dy > 18) return;
 
     if (_clickTimer?.isActive ?? false) {
-      // 第二次点击在延迟内 → 双击，切换全屏
       _clickTimer?.cancel();
-      widget.actions.onToggleFullscreen?.call();
+      // 控制栏区域内的双击不触发全屏（留给倍速重置等子控件处理）
+      if (!_isInControlBar(event.localPosition)) {
+        widget.actions.onToggleFullscreen?.call();
+      }
     } else {
       // 第一次点击 → 等待可能的第二次点击
-      _clickTimer = Timer(
-        const Duration(milliseconds: ControlsOverlay._clickDelayMs),
-        () {
-          if (!mounted) return;
-          if (widget.engine.state.value == MediaState.idle) return;
-          _autoHide.hide();
-        },
-      );
+      // 控制栏区域内的点击不触发隐藏（留给按钮处理）
+      if (!_isInControlBar(event.localPosition)) {
+        _clickTimer = Timer(
+          const Duration(milliseconds: ControlsOverlay._clickDelayMs),
+          () {
+            if (!mounted) return;
+            if (widget.engine.state.value == MediaState.idle) return;
+            _autoHide.hide();
+          },
+        );
+      }
     }
   }
 
+  /// 判断点击位置是否在控制栏区域内（精确边界匹配）
+  bool _isInControlBar(Offset local) {
+    final size = context.size;
+    if (size == null) return false;
+    final cbLeft = Tokens.controlBarMarginH;
+    final cbRight = size.width - Tokens.controlBarMarginH;
+    final cbBottom = size.height - Tokens.controlBarMarginBottom;
+    final cbTop = cbBottom - Tokens.controlBarHeight;
+    return local.dx >= cbLeft &&
+        local.dx <= cbRight &&
+        local.dy >= cbTop &&
+        local.dy <= cbBottom;
+  }
+
   void _onEngineStateChanged() => _autoHide.onEngineStateChanged();
+
+  @override
+  void didUpdateWidget(covariant ControlsOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isFullscreen != widget.isFullscreen) {
+      _autoHide.isFullscreen = widget.isFullscreen;
+    }
+  }
 
   @override
   void dispose() {
@@ -131,77 +157,86 @@ class _ControlsOverlayState extends State<ControlsOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final isIdle = widget.engine.state.value == MediaState.idle;
-    final gestureActive = !(widget.emptyStatePresent && isIdle);
-    // Listener 接收原始指针事件，不参与手势竞技场 —
-    // 子控件按钮的 InkWell 独立处理点击，两者互不干扰。
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: gestureActive ? _onPointerDown : null,
-      onPointerUp: gestureActive ? _onPointerUp : null,
-      child: IgnorePointer(
-        // idle 时让 EmptyState 接收点击；播放中控制栏必须可交互
-        ignoring: widget.emptyStatePresent && isIdle,
-        child: MouseRegion(
-          opaque: false,
-          hitTestBehavior: HitTestBehavior.translucent,
-          onHover: (_) => _autoHide.onMouseMove(),
-          onEnter: (_) => _autoHide.onMouseEnter(),
-          onExit: (_) => _autoHide.onMouseExit(),
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _autoHide.visible,
-            builder: (_, isVisible, child) =>
-                IgnorePointer(ignoring: !isVisible, child: child),
-            child: RepaintBoundary(
-              child: Stack(
-                children: [
-                  Positioned(
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        12,
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    child: OsdOverlay(resizing: widget.resizing),
-                  ),
-                  Positioned(
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    bottom: Tokens.controlBarMarginBottom,
-                    child: FadeTransition(
-                      opacity: _autoHide.opacity,
-                      child: ControlBar(
-                        engine: widget.engine,
-                        actions: widget.actions,
-                        isIdle: isIdle,
-                        title: widget.title,
-                        opacity: _autoHide.opacity,
-                        enableBlur: true,
-                        resizing: widget.resizing,
+    // 直接监听 engine.state — 状态变化自动触发重建，不依赖手动 setState
+    return ValueListenableBuilder<MediaState>(
+      valueListenable: widget.engine.state,
+      builder: (context, engineState, _) {
+        final isIdle = engineState == MediaState.idle;
+        // 有空状态且引擎空闲时，控制栏不拦截 hit test
+        final blockInteraction = widget.emptyStatePresent && isIdle;
+        // Listener 接收原始指针事件，不参与手势竞技场 —
+        // 子控件按钮的 InkWell 独立处理点击，两者互不干扰。
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: blockInteraction ? null : _onPointerDown,
+          onPointerUp: blockInteraction ? null : _onPointerUp,
+          child: IgnorePointer(
+            ignoring: blockInteraction,
+            child: MouseRegion(
+              opaque: false,
+              hitTestBehavior: HitTestBehavior.translucent,
+              onHover: (_) => _autoHide.onMouseMove(),
+              onEnter: (_) => _autoHide.onMouseEnter(),
+              onExit: (_) => _autoHide.onMouseExit(),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _autoHide.visible,
+                builder: (_, isVisible, child) =>
+                    IgnorePointer(ignoring: !isVisible, child: child),
+                child: RepaintBoundary(
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        bottom:
+                            Tokens.controlBarMarginBottom +
+                            Tokens.controlBarHeight +
+                            12,
+                        left: Tokens.controlBarMarginH,
+                        right: Tokens.controlBarMarginH,
+                        child: OsdOverlay(resizing: widget.resizing),
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    left: Tokens.controlBarMarginH + 16,
-                    right: Tokens.controlBarMarginH + 16,
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        8,
-                    child: RepaintBoundary(
-                      child: ErrorBanner(
-                        engine: widget.engine,
-                        onOpenFile: widget.actions.onOpenFile,
-                        onRetry: widget.actions.onOpenFile,
+                      Positioned(
+                        left: Tokens.controlBarMarginH,
+                        right: Tokens.controlBarMarginH,
+                        bottom: Tokens.controlBarMarginBottom,
+                        child: Offstage(
+                          offstage: blockInteraction,
+                          child: FadeTransition(
+                            opacity: _autoHide.opacity,
+                            child: ControlBar(
+                              engine: widget.engine,
+                              actions: widget.actions,
+                              isIdle: isIdle,
+                              title: widget.title,
+                              opacity: _autoHide.opacity,
+                              enableBlur: true,
+                              resizing: widget.resizing,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      Positioned(
+                        left: Tokens.controlBarMarginH + 16,
+                        right: Tokens.controlBarMarginH + 16,
+                        bottom:
+                            Tokens.controlBarMarginBottom +
+                            Tokens.controlBarHeight +
+                            8,
+                        child: RepaintBoundary(
+                          child: ErrorBanner(
+                            engine: widget.engine,
+                            onOpenFile: widget.actions.onOpenFile,
+                            onRetry: widget.actions.onOpenFile,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
