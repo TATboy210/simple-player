@@ -27,6 +27,7 @@ import 'player_services.dart';
 class PlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
   final WindowBridge windowService;
+  final PlayerEngine? engineOverride;
   final void Function(
     BuildContext context,
     PlayerEngine engine,
@@ -40,6 +41,7 @@ class PlayerFeature extends StatefulWidget {
     super.key,
     required this.coordinator,
     required this.windowService,
+    this.engineOverride,
     required this.onSettings,
     required this.onSettingsSecondary,
   });
@@ -57,7 +59,10 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   @override
   void initState() {
     super.initState();
-    _services = PlayerServices(windowService: widget.windowService);
+    _services = PlayerServices(
+      windowService: widget.windowService,
+      engineOverride: widget.engineOverride,
+    );
     _init();
   }
 

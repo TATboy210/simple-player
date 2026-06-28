@@ -19,6 +19,7 @@ import 'services/video_processing_service.dart';
 class DeferredPlayerFeature extends StatefulWidget {
   final StartupCoordinator coordinator;
   final WindowBridge windowService;
+  final PlayerEngine? engineOverride;
   final void Function(
     BuildContext context,
     PlayerEngine engine,
@@ -32,6 +33,7 @@ class DeferredPlayerFeature extends StatefulWidget {
     super.key,
     required this.coordinator,
     required this.windowService,
+    this.engineOverride,
     required this.onSettings,
     required this.onSettingsSecondary,
   });
@@ -90,6 +92,7 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
     return player_feature.PlayerFeature(
       coordinator: widget.coordinator,
       windowService: widget.windowService,
+      engineOverride: widget.engineOverride,
       onSettings: widget.onSettings,
       onSettingsSecondary: widget.onSettingsSecondary,
     );

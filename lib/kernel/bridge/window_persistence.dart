@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../persistence/settings_store.dart';
-import '../utils/log.dart';
 
 /// 窗口持久化服务 — 防抖保存 + 写入锁。
 ///

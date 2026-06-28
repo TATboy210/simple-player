@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "code-review-graph": {
+      "command": "D:\\python xuniji\\.ai\\Scripts\\code-review-graph.exe",
+      "args": [
+        "serve"
+      ],
+      "cwd": "D:\\simple_player_flutter",
+      "env": { "PYTHONUTF8": "1" },
+      "type": "stdio"
+    }
+  }
+}

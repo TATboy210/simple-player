@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../kernel/utils/debug_exporter.dart';
 import '../../kernel/utils/perf_monitor.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -191,6 +193,19 @@ class KeyboardHandler extends StatelessWidget {
         'Performance Stats:\n${const JsonEncoder.withIndent('  ').convert(stats)}',
         name: 'Perf',
       );
+      return KeyEventResult.handled;
+    }
+
+    // 调试快捷键: Ctrl+Shift+D 导出全部调试数据
+    if (kDebugMode &&
+        key == LogicalKeyboardKey.keyD &&
+        HardwareKeyboard.instance.isControlPressed &&
+        HardwareKeyboard.instance.isShiftPressed) {
+      DebugExporter.saveToFile().then((path) {
+        if (path != null) {
+          developer.log('Debug data saved to: $path', name: 'Debug');
+        }
+      });
       return KeyEventResult.handled;
     }
 

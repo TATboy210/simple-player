@@ -5,6 +5,7 @@ import '../../../kernel/models/play_mode.dart';
 import '../../../kernel/persistence/playlist_store.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../../../kernel/playlist/playlist.dart';
+import '../../../kernel/utils/debug_probe.dart';
 import 'file_operations.dart';
 import 'playback_navigator.dart';
 import 'state_monitor.dart';
@@ -38,6 +39,9 @@ class PlaybackController {
   late final PlaybackNavigator navigator;
   late final FileOperations fileOps;
   late final StateMonitor monitor;
+
+  /// 调试探针 — 记录播放控制操作的耗时和事件。
+  final DebugProbe probe = DebugProbeRegistry.register('playback');
 
   final ValueNotifier<String> currentFileName = ValueNotifier('');
 
@@ -108,7 +112,7 @@ class PlaybackController {
   // ── 生命周期 ──
 
   Future<void> init({AppSettings? settings}) =>
-      monitor.init(settings: settings);
+      probe.measureAsync('init', () => monitor.init(settings: settings));
 
   void dispose() {
     monitor.dispose();

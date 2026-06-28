@@ -3,6 +3,8 @@
 /// 测试覆盖:
 /// - FullscreenSnapshot 值对象语义
 /// - PlatformFullscreen 接口方法签名（编译期 + 运行期）
+library;
+
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';

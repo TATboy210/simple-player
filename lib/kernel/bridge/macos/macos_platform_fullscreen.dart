@@ -2,7 +2,7 @@
 ///
 /// macOS 原生全屏自带动画（从标题栏展开），不需要手动保存/恢复窗口样式。
 /// 使用 NSWindowDelegate 监听进入/退出全屏完成事件，防止动画重入。
-import 'dart:ui';
+library;
 
 import 'package:flutter/services.dart';
 
@@ -26,8 +26,8 @@ class MacosPlatformFullscreen implements PlatformFullscreen {
     await _channel.invokeMethod<void>('enterFullscreen');
     return FullscreenSnapshot(
       windowStyle: 0, // macOS 不使用窗口样式位
-      position: Offset(rect['x']! as double, rect['y']! as double),
-      size: Size(rect['width']! as double, rect['height']! as double),
+      position: Offset(rect['x']!, rect['y']!),
+      size: Size(rect['width']!, rect['height']!),
     );
   }
 
