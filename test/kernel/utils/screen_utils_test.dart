@@ -7,14 +7,14 @@ import 'package:simple_player_flutter/kernel/utils/screen_utils.dart';
 void main() {
   // 模拟双显示器: 主屏 1920x1080, 副屏 2560x1440 位于右侧
   // Rect.fromLTWH(left, top, width, height)
-  final primary = DisplayInfo(
-    bounds: const Rect.fromLTWH(0, 0, 1920, 1080),
-    workArea: const Rect.fromLTWH(0, 0, 1920, 1040),
+  final primary = const DisplayInfo(
+    bounds: Rect.fromLTWH(0, 0, 1920, 1080),
+    workArea: Rect.fromLTWH(0, 0, 1920, 1040),
     isPrimary: true,
   );
-  final secondary = DisplayInfo(
-    bounds: const Rect.fromLTWH(1920, 0, 2560, 1440),
-    workArea: const Rect.fromLTWH(1920, 0, 2560, 1400),
+  final secondary = const DisplayInfo(
+    bounds: Rect.fromLTWH(1920, 0, 2560, 1440),
+    workArea: Rect.fromLTWH(1920, 0, 2560, 1400),
     isPrimary: false,
   );
   final dualDisplays = [primary, secondary];
@@ -98,9 +98,9 @@ void main() {
     });
 
     test('triple monitor: window on third stays on third', () {
-      final third = DisplayInfo(
-        bounds: const Rect.fromLTWH(-1920, 0, 1920, 1080),
-        workArea: const Rect.fromLTWH(-1920, 0, 1920, 1040),
+      final third = const DisplayInfo(
+        bounds: Rect.fromLTWH(-1920, 0, 1920, 1080),
+        workArea: Rect.fromLTWH(-1920, 0, 1920, 1040),
         isPrimary: false,
       );
       final result = ScreenUtils.clampToNearestMonitor(

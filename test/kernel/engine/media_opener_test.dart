@@ -7,11 +7,20 @@ void main() {
     test('OpenSuccess carries MediaInfo', () {
       const info = MediaInfo(
         duration: 60000,
-        video: VideoCodecInfo(width: 1920, height: 1080, par: 1.0, codec: 'h264'),
-        audioTracks: [AudioTrackInfo(index: 0, language: 'eng', codec: 'aac', channels: 2)],
-        subtitleTracks: [SubtitleTrackInfo(index: 0, language: 'chi', title: '中文')],
+        video: VideoCodecInfo(
+          width: 1920,
+          height: 1080,
+          par: 1.0,
+          codec: 'h264',
+        ),
+        audioTracks: [
+          AudioTrackInfo(index: 0, language: 'eng', codec: 'aac', channels: 2),
+        ],
+        subtitleTracks: [
+          SubtitleTrackInfo(index: 0, language: 'chi', title: '中文'),
+        ],
       );
-      final result = OpenSuccess(info);
+      final result = const OpenSuccess(info);
 
       expect(result, isA<OpenResult>());
       expect(result.mediaInfo.duration, 60000);
@@ -29,7 +38,7 @@ void main() {
     });
 
     test('sealed class pattern matching works', () {
-      final success = OpenSuccess(const MediaInfo(duration: 1000));
+      final success = const OpenSuccess(MediaInfo(duration: 1000));
       const error = OpenError(MediaErrorType.codec, '无法解码');
 
       String describe(OpenResult r) => switch (r) {
@@ -42,7 +51,7 @@ void main() {
     });
 
     test('OpenSuccess with minimal MediaInfo', () {
-      final result = OpenSuccess(const MediaInfo());
+      final result = const OpenSuccess(MediaInfo());
       expect(result.mediaInfo.duration, 0);
       expect(result.mediaInfo.video, isNull);
       expect(result.mediaInfo.audioTracks, isEmpty);

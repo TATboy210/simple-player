@@ -4,6 +4,7 @@
 /// - enter() 返回不可变快照，用于失败回滚
 /// - requiresStyleSave 能力标志，让控制器跳过不需要的保存逻辑
 /// - macOS/Linux 平台内部处理状态保存/恢复，Win32 需要外部保存
+library;
 import 'dart:ui';
 
 /// 全屏操作快照 — 不可变值对象，用于回滚。

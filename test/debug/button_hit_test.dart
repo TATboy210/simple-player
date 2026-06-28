@@ -1,6 +1,8 @@
 /// R1 调试测试 — 验证按钮在 ControlsOverlay 内是否可点击
 ///
 /// 运行: flutter test test/debug/button_hit_test.dart
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:player_engine/player_engine.dart';
@@ -34,7 +36,9 @@ void main() {
           height: 600,
           child: ControlsOverlay(
             engine: engine,
-            actions: actions ?? const PlayerActions(onPrevious: _noop, onNext: _noop),
+            actions:
+                actions ??
+                const PlayerActions(onPrevious: _noop, onNext: _noop),
           ),
         ),
       ),
@@ -51,7 +55,9 @@ void main() {
           height: 200,
           child: ControlBar(
             engine: engine,
-            actions: actions ?? const PlayerActions(onPrevious: _noop, onNext: _noop),
+            actions:
+                actions ??
+                const PlayerActions(onPrevious: _noop, onNext: _noop),
           ),
         ),
       ),
@@ -69,8 +75,11 @@ void main() {
       await tester.tap(playButton);
       await tester.pump();
 
-      expect(engine.state.value, MediaState.paused,
-        reason: 'togglePlayPause should change state to paused');
+      expect(
+        engine.state.value,
+        MediaState.paused,
+        reason: 'togglePlayPause should change state to paused',
+      );
     });
 
     testWidgets('ControlsOverlay — play/pause button tappable', (tester) async {
@@ -79,20 +88,32 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       final playButton = find.byIcon(Icons.pause);
-      expect(playButton, findsOneWidget, reason: 'Should find pause icon inside ControlsOverlay');
+      expect(
+        playButton,
+        findsOneWidget,
+        reason: 'Should find pause icon inside ControlsOverlay',
+      );
 
       await tester.tap(playButton);
       await tester.pump();
 
-      expect(engine.state.value, MediaState.paused,
-        reason: 'togglePlayPause should work through ControlsOverlay');
+      expect(
+        engine.state.value,
+        MediaState.paused,
+        reason: 'togglePlayPause should work through ControlsOverlay',
+      );
     });
 
     testWidgets('ControlsOverlay — previous button tappable', (tester) async {
       var prevCalled = false;
-      await tester.pumpWidget(buildFullOverlay(
-        actions: PlayerActions(onPrevious: () => prevCalled = true, onNext: _noop),
-      ));
+      await tester.pumpWidget(
+        buildFullOverlay(
+          actions: PlayerActions(
+            onPrevious: () => prevCalled = true,
+            onNext: _noop,
+          ),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
@@ -107,9 +128,14 @@ void main() {
 
     testWidgets('ControlsOverlay — next button tappable', (tester) async {
       var nextCalled = false;
-      await tester.pumpWidget(buildFullOverlay(
-        actions: PlayerActions(onPrevious: _noop, onNext: () => nextCalled = true),
-      ));
+      await tester.pumpWidget(
+        buildFullOverlay(
+          actions: PlayerActions(
+            onPrevious: _noop,
+            onNext: () => nextCalled = true,
+          ),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
@@ -124,9 +150,15 @@ void main() {
 
     testWidgets('ControlsOverlay — fullscreen button tappable', (tester) async {
       var fsCalled = false;
-      await tester.pumpWidget(buildFullOverlay(
-        actions: PlayerActions(onPrevious: _noop, onNext: _noop, onToggleFullscreen: () => fsCalled = true),
-      ));
+      await tester.pumpWidget(
+        buildFullOverlay(
+          actions: PlayerActions(
+            onPrevious: _noop,
+            onNext: _noop,
+            onToggleFullscreen: () => fsCalled = true,
+          ),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 

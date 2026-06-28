@@ -195,7 +195,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                 child: resizingNotifier != null
                     ? AnimatedBuilder(
                         animation: resizingNotifier,
-                        builder: (_, __) {
+                        builder: (_, _) {
                           if (resizingNotifier.value) {
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(

@@ -7,9 +7,9 @@ import 'package:simple_player_flutter/kernel/bridge/win32/win32_display_enumerat
 void main() {
   group('DisplayInfo', () {
     test('toString includes bounds, work, and primary flag', () {
-      final info = DisplayInfo(
-        bounds: const Rect.fromLTWH(0, 0, 1920, 1080),
-        workArea: const Rect.fromLTWH(0, 0, 1920, 1040),
+      final info = const DisplayInfo(
+        bounds: Rect.fromLTWH(0, 0, 1920, 1080),
+        workArea: Rect.fromLTWH(0, 0, 1920, 1040),
         isPrimary: true,
       );
       final str = info.toString();
@@ -43,7 +43,7 @@ void main() {
     test('Win32DisplayInfo typedef works correctly', () {
       const bounds = Rect.fromLTWH(1920, 0, 3840, 1080);
       const workArea = Rect.fromLTWH(1920, 40, 3840, 1040);
-      final info = Win32DisplayInfo(
+      final info = const Win32DisplayInfo(
         bounds: bounds,
         workArea: workArea,
         isPrimary: false,

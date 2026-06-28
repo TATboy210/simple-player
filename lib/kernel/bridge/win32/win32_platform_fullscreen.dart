@@ -2,6 +2,7 @@
 ///
 /// 从 win32_fullscreen.dart 重构为实例类，实现 PlatformFullscreen 接口。
 /// FFI 函数查找保持 static final（DLL 句柄全局共享）。
+library;
 import 'dart:ffi' hide Size;
 import 'dart:ui';
 

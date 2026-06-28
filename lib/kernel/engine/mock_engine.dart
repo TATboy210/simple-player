@@ -1,10 +1,38 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:player_engine/player_engine.dart';
 
 import '../utils/log.dart';
 import '../utils/path_utils.dart';
+
+// ─── 调试事件 ───
+
+/// MockEngine 操作事件 — 记录每次播放控制调用。
+class MockEvent {
+  const MockEvent({
+    required this.type,
+    required this.timestamp,
+    this.path = '',
+    this.data,
+  });
+
+  final String type;
+  final String path;
+  final DateTime timestamp;
+  final Map<String, Object>? data;
+
+  Map<String, Object> toJson() {
+    final json = <String, Object>{
+      'type': type,
+      'timestamp': timestamp.toIso8601String(),
+    };
+    if (path.isNotEmpty) json['path'] = path;
+    if (data != null) json['data'] = data!;
+    return json;
+  }
+}
 
 /// 模拟播放引擎 — 用于开发调试，无需真实视频文件即可测试完整 UI 流程。
 ///
@@ -96,6 +124,18 @@ class MockEngine implements PlayerEngine {
   /// 状态变化历史
   List<MediaState> get stateHistory => List.unmodifiable(_stateHistory);
 
+  // ─── 事件流（调试用） ───
+
+  static const int _maxEventHistory = 500;
+
+  final List<MockEvent> _eventHistory = [];
+
+  /// 操作事件历史
+  List<MockEvent> get eventHistory => List.unmodifiable(_eventHistory);
+
+  /// 最新事件 — UI 层可通过 ValueListenableBuilder 监听。
+  final ValueNotifier<MockEvent?> onEvent = ValueNotifier<MockEvent?>(null);
+
   // ─── 错误注入 ───
 
   /// 设置后下一次 open() 会模拟失败
@@ -125,6 +165,7 @@ class MockEngine implements PlayerEngine {
     _recordState(MediaState.loading);
     state.value = MediaState.loading;
     logEngine.d('[Mock] open() — ${PathUtils.basename(path)}');
+    _recordEvent('open', {'path': path});
 
     await Future<void>.delayed(openDelay);
     if (_disposed) return;
@@ -160,6 +201,7 @@ class MockEngine implements PlayerEngine {
     state.value = MediaState.playing;
     _startPositionTimer();
     logEngine.d('[Mock] play() — ${PathUtils.basename(_currentPath)}');
+    _recordEvent('play');
   }
 
   @override
@@ -169,6 +211,7 @@ class MockEngine implements PlayerEngine {
     state.value = MediaState.paused;
     _stopPositionTimer();
     logEngine.d('[Mock] pause() — ${PathUtils.basename(_currentPath)}');
+    _recordEvent('pause');
   }
 
   @override
@@ -179,6 +222,7 @@ class MockEngine implements PlayerEngine {
     position.value = 0;
     _stopPositionTimer();
     logEngine.d('[Mock] stop() — ${PathUtils.basename(_currentPath)}');
+    _recordEvent('stop');
   }
 
   @override
@@ -187,6 +231,7 @@ class MockEngine implements PlayerEngine {
     final clamped = milliseconds.clamp(0, duration.value);
     position.value = clamped;
     logEngine.d('[Mock] seekTo($clamped)');
+    _recordEvent('seek', {'position': clamped});
   }
 
   @override
@@ -306,6 +351,7 @@ class MockEngine implements PlayerEngine {
     aspectRatio.value = 1.0;
     errorMessage.dispose();
     playbackSpeed.dispose();
+    onEvent.dispose();
     logEngine.d('[Mock] dispose()');
   }
 
@@ -315,6 +361,48 @@ class MockEngine implements PlayerEngine {
     _stateHistory.add(s);
     if (_stateHistory.length > 100) _stateHistory.removeAt(0);
   }
+
+  void _recordEvent(String type, [Map<String, Object>? data]) {
+    final event = MockEvent(
+      type: type,
+      path: _currentPath,
+      timestamp: DateTime.now(),
+      data: data,
+    );
+    _eventHistory.add(event);
+    while (_eventHistory.length > _maxEventHistory) {
+      _eventHistory.removeAt(0);
+    }
+    onEvent.value = event;
+  }
+
+  // ─── 调试数据导出 ───
+
+  /// 导出完整调试数据 — 当前状态 + 事件历史 + 状态转换历史。
+  Map<String, Object> exportDebugData() {
+    return {
+      'currentPath': _currentPath,
+      'state': state.value.name,
+      'position': position.value,
+      'duration': duration.value,
+      'volume': volume.value,
+      'isMuted': isMuted.value,
+      'playbackSpeed': playbackSpeed.value,
+      'aspectRatio': aspectRatio.value,
+      'errorMessage': errorMessage.value ?? '',
+      'config': {
+        'openDelay': openDelay.inMilliseconds,
+        'autoPlay': autoPlay,
+      },
+      'stateHistory': _stateHistory.map((s) => s.name).toList(),
+      'eventHistory': _eventHistory.map((e) => e.toJson()).toList(),
+      'eventCount': _eventHistory.length,
+      'exportedAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  /// 导出 JSON 字符串。
+  String exportDebugJson() => jsonEncode(exportDebugData());
 
   /// 播放时每 250ms 递增 position，模拟真实播放
   void _startPositionTimer() {

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:player_engine/player_engine.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/fvp_engine.dart';
@@ -12,9 +13,12 @@ import 'services/video_processing_service.dart';
 /// 单一职责：持有播放器所有服务实例，提供 init/dispose 生命周期。
 /// 不涉及 UI 状态，不涉及 BuildContext。
 class PlayerServices {
-  PlayerServices({required this.windowService});
+  PlayerServices({required this.windowService, this.engineOverride});
 
-  late final FvpEngine engine;
+  /// 可选的引擎覆盖（用于 MockEngine 调试模式）。
+  final PlayerEngine? engineOverride;
+
+  late final PlayerEngine engine;
   late final Playlist playlist;
   late final PlaybackController controller;
   late final VideoProcessingService videoProcessing;
@@ -23,7 +27,7 @@ class PlayerServices {
   final ValueNotifier<int> playlistGeneration = ValueNotifier(0);
 
   Future<void> init() async {
-    engine = FvpEngine();
+    engine = engineOverride ?? FvpEngine();
     playlist = Playlist();
     controller = PlaybackController(
       engine: engine,

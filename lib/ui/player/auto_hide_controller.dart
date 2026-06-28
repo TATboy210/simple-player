@@ -135,10 +135,9 @@ class AutoHideController {
       return;
     }
     if (s == MediaState.loading || s == MediaState.playing) {
-      if (!visible.value) {
-        show();
-        scheduleHide();
-      }
+      show();
+      // 无论当前是否可见，始终重置隐藏定时器
+      scheduleHide();
       return;
     }
     final alwaysShow =

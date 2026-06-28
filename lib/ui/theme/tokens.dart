@@ -107,9 +107,9 @@ class Tokens {
   static const radiusPopup = 8.0;
 
   // ── 毛玻璃 ──
-  static const glassBlurThin = 8.0;
-  static const glassBlur = 10.0;
-  static const glassBlurThick = 24.0;
+  static const glassBlurThin = 0.08;
+  static const glassBlur = 0.10;
+  static const glassBlurThick = 0.24;
 
   // ── 动画 ──
   static const durationFast = 80;

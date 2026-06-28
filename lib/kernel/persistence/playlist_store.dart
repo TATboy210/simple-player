@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../playlist/playlist.dart';
+import '../utils/debug_probe.dart';
 import '../utils/log.dart';
 
 /// 播放列表 JSON 持久化
@@ -20,6 +21,9 @@ class PlaylistStore {
   static const _fileName = 'playlist.json';
   static const _historyFileName = 'history.json';
   static const _debounceMs = 300;
+
+  /// 调试探针 — 记录播放列表持久化操作的耗时。
+  static final DebugProbe probe = DebugProbeRegistry.register('playlistStore');
 
   /// 默认实例 — 静态方法委托目标
   static PlaylistStore _instance = PlaylistStore();
@@ -56,7 +60,7 @@ class PlaylistStore {
   Future<void>? _writeInFlight;
 
   Future<Directory> _appDir() async {
-    if (_storagePath != null) return Directory(_storagePath!);
+    if (_storagePath != null) return Directory(_storagePath);
     return getApplicationSupportDirectory();
   }
 
@@ -149,7 +153,8 @@ class PlaylistStore {
   /// 文件读取和 JSON 解析在独立 Isolate 中执行，
   /// 迁移逻辑在主 Isolate 回调中执行（低频一次性操作）。
   /// Isolate 失败时自动回退到 [load]。
-  static Future<Playlist?> loadInBackground() => _instance._loadInBackgroundImpl();
+  static Future<Playlist?> loadInBackground() =>
+      probe.measureAsync('loadInBackground', () => _instance._loadInBackgroundImpl());
 
   Future<Playlist?> _loadInBackgroundImpl() async {
     try {

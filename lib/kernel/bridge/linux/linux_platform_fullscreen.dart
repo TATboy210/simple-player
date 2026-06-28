@@ -6,8 +6,9 @@
 /// - Wayland: 调用 xdg_toplevel_set_fullscreen
 ///
 /// requiresStyleSave = false，GTK 内部管理窗口状态。
+library;
+
 import 'dart:ffi' hide Size;
-import 'dart:ui';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
@@ -26,16 +27,15 @@ typedef _GtkWindowUnfullscreenNative = Void Function(IntPtr window);
 typedef _GtkWindowUnfullscreenDart = void Function(int window);
 
 // GtkWidget*, int*, int* -> void (gtk_window_get_size)
-typedef _GtkWindowGetSizeNative = Void Function(
-    IntPtr window, IntPtr width, IntPtr height);
-typedef _GtkWindowGetSizeDart = void Function(
-    int window, int width, int height);
+typedef _GtkWindowGetSizeNative =
+    Void Function(IntPtr window, IntPtr width, IntPtr height);
+typedef _GtkWindowGetSizeDart =
+    void Function(int window, int width, int height);
 
 // GtkWidget*, int*, int* -> void (gtk_window_get_position)
-typedef _GtkWindowGetPositionNative = Void Function(
-    IntPtr window, IntPtr x, IntPtr y);
-typedef _GtkWindowGetPositionDart = void Function(
-    int window, int x, int y);
+typedef _GtkWindowGetPositionNative =
+    Void Function(IntPtr window, IntPtr x, IntPtr y);
+typedef _GtkWindowGetPositionDart = void Function(int window, int x, int y);
 
 /// Linux 平台全屏 — 实现 PlatformFullscreen 接口。
 ///
@@ -62,21 +62,26 @@ class LinuxPlatformFullscreen implements PlatformFullscreen {
   }
 
   // GTK3 函数绑定（延迟初始化）
-  static final _gtkWindowFullscreen = _gtk?.lookupFunction<
-      _GtkWindowFullscreenNative,
-      _GtkWindowFullscreenDart>('gtk_window_fullscreen');
+  static final _gtkWindowFullscreen = _gtk
+      ?.lookupFunction<_GtkWindowFullscreenNative, _GtkWindowFullscreenDart>(
+        'gtk_window_fullscreen',
+      );
 
-  static final _gtkWindowUnfullscreen = _gtk?.lookupFunction<
-      _GtkWindowUnfullscreenNative,
-      _GtkWindowUnfullscreenDart>('gtk_window_unfullscreen');
+  static final _gtkWindowUnfullscreen = _gtk
+      ?.lookupFunction<
+        _GtkWindowUnfullscreenNative,
+        _GtkWindowUnfullscreenDart
+      >('gtk_window_unfullscreen');
 
-  static final _gtkWindowGetSize = _gtk?.lookupFunction<
-      _GtkWindowGetSizeNative,
-      _GtkWindowGetSizeDart>('gtk_window_get_size');
+  static final _gtkWindowGetSize = _gtk
+      ?.lookupFunction<_GtkWindowGetSizeNative, _GtkWindowGetSizeDart>(
+        'gtk_window_get_size',
+      );
 
-  static final _gtkWindowGetPosition = _gtk?.lookupFunction<
-      _GtkWindowGetPositionNative,
-      _GtkWindowGetPositionDart>('gtk_window_get_position');
+  static final _gtkWindowGetPosition = _gtk
+      ?.lookupFunction<_GtkWindowGetPositionNative, _GtkWindowGetPositionDart>(
+        'gtk_window_get_position',
+      );
 
   @override
   bool get requiresStyleSave => false;
@@ -100,11 +105,7 @@ class LinuxPlatformFullscreen implements PlatformFullscreen {
     // 进入全屏
     _gtkWindowFullscreen!(gtkWindow);
 
-    return FullscreenSnapshot(
-      windowStyle: 0,
-      position: position,
-      size: size,
-    );
+    return FullscreenSnapshot(windowStyle: 0, position: position, size: size);
   }
 
   @override
