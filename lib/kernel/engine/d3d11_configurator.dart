@@ -1,16 +1,15 @@
-import 'package:fvp/mdk.dart' as mdk;
-
 import '../bridge/display_config.dart';
 import '../utils/log.dart';
+import 'player_proxy.dart';
 
-/// Encapsulates D3D11 rendering configuration for mdk.Player.
+/// Encapsulates D3D11 rendering configuration for a player.
 ///
 /// Controls hardware decoding and CPU-GPU sync settings
 /// specific to the Windows D3D11 rendering backend.
 class D3D11Configurator {
   D3D11Configurator(this._player);
 
-  final mdk.Player _player;
+  final PlayerProxy _player;
 
   /// Hardware decoder priority chain: D3D11 → NVDEC → FFmpeg fallback.
   /// shader_resource=1 enables GPU colorspace conversion (YUV→RGB),

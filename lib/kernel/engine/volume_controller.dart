@@ -1,14 +1,15 @@
 import 'package:flutter/foundation.dart';
-import 'package:fvp/mdk.dart' as mdk;
 
-/// Manages volume and mute state for mdk.Player.
+import 'player_proxy.dart';
+
+/// Manages volume and mute state for a player.
 ///
-/// Synchronizes mdk.Player volume/mute with Flutter ValueNotifiers.
+/// Synchronizes player volume/mute with Flutter ValueNotifiers.
 /// Handles auto-mute when volume reaches zero.
 class VolumeController {
   VolumeController(this._player, {required this.volume, required this.isMuted});
 
-  final mdk.Player _player;
+  final PlayerProxy _player;
   final ValueNotifier<double> volume;
   final ValueNotifier<bool> isMuted;
 
