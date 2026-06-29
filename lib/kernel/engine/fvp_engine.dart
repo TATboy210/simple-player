@@ -8,7 +8,7 @@ import 'media_state.dart';
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
-import 'player_engine_base.dart';
+import '../../kernel/engine/engine_state.dart';
 import 'video_effect_type.dart';
 
 import '../services/path_validator.dart';
@@ -38,7 +38,7 @@ import 'mdk_player_proxy.dart';
 ///
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
-class FvpEngine extends PlayerEngine {
+class FvpEngine with EngineState {
   mdk.Player? _playerInstance;
   mdk.Player get _player => _playerInstance ??= _createPlayer();
   bool _disposed = false;

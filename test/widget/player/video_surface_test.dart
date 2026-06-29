@@ -1,7 +1,7 @@
-﻿import 'package:flutter/gestures.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
+import '../../../lib/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/ui/player/video_surface.dart';
 import '../../helpers/fake_engine.dart';
 
@@ -16,7 +16,7 @@ void main() {
     engine.dispose();
   });
 
-  Widget buildSubject({PlayerEngine? eng}) {
+  Widget buildSubject({EngineState? eng}) {
     return MaterialApp(
       home: Scaffold(body: VideoSurface(engine: eng ?? engine)),
     );

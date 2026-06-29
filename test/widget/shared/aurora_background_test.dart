@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
+import '../../../lib/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/ui/shared/aurora_background.dart';
 
 /// Helper — AuroraBackground needs a Stack ancestor (uses Positioned internally)

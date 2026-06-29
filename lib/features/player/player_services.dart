@@ -1,5 +1,5 @@
-﻿import 'package:flutter/foundation.dart';
-import '../../kernel/engine/player_engine.dart';
+import 'package:flutter/foundation.dart';
+import '../../kernel/engine/engine_state.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/fvp_engine.dart';
@@ -16,9 +16,9 @@ class PlayerServices {
   PlayerServices({required this.windowService, this.engineOverride});
 
   /// 可选的引擎覆盖（用于 MockEngine 调试模式）。
-  final PlayerEngine? engineOverride;
+  final EngineState? engineOverride;
 
-  late final PlayerEngine engine;
+  late final EngineState engine;
   late final Playlist playlist;
   late final PlaybackController controller;
   late final VideoProcessingService videoProcessing;

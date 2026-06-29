@@ -1,13 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 
 /// 播放/暂停按钮
 class PlayPauseButton extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   final bool isIdle;
   final double iconAlpha;
 
@@ -40,7 +40,7 @@ class PlayPauseButton extends StatelessWidget {
 
 /// 中央控制组（上一首/后退/播放暂停/前进/下一首/停止）
 class CenterGroup extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   final bool isIdle;
   final String prevTooltip;
   final String nextTooltip;

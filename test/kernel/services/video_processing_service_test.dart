@@ -1,4 +1,4 @@
-﻿import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
+import '../../../lib/kernel/engine/engine_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/models/aspect_ratio_mode.dart';

@@ -1,12 +1,12 @@
-﻿import 'dart:io';
+import 'dart:io';
 
-import '../../../kernel/engine/player_engine.dart';
+import '../../../kernel/engine/engine_state.dart';
 import '../../../kernel/utils/path_utils.dart';
 import '../../../kernel/utils/log.dart';
 
 /// 字幕服务 — 外挂字幕自动检测与管理
 class SubtitleService {
-  final PlayerEngine _engine;
+  final EngineState _engine;
 
   SubtitleService(this._engine);
 

@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -29,7 +29,7 @@ class MediaInfoDialog extends StatelessWidget {
   static Future<void> showForEngine(
     BuildContext context, {
     required String path,
-    required PlayerEngine engine,
+    required EngineState engine,
   }) {
     return show(context, path: path, info: engine.mediaInfo);
   }

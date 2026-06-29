@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 
 /// 视频纹理渲染 — 根据引擎 textureId 和 aspectRatio 显示视频
 ///
@@ -8,7 +8,7 @@ import '../../kernel/engine/player_engine.dart';
 /// 此组件仅负责渲染纹理 + 滚轮音量调节。
 /// Listener 提升到 AnimatedBuilder 外层，避免每次纹理重建时重建回调。
 class VideoSurface extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
 
   const VideoSurface({super.key, required this.engine});
 
