@@ -1,31 +1,48 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-29T16:15:00.000Z",
+  "timestamp": "2026-06-29T13:21:08.869Z",
   "milestone": "v1.0",
   "milestone_name": "PlayerEngine Refactoring",
-  "phase": "02",
-  "phase_name": "engine-composition",
-  "phase_dir": ".planning/phases/02-engine-composition",
-  "status": "paused",
+  "phase": "03",
+  "phase_name": "接口优化",
+  "phase_dir": ".planning/phases/03-iface-optimization",
+  "status": "context_complete_ready_for_planning",
   "progress": {
     "total_plans": 0,
     "completed_plans": 0,
     "percent": 0
   },
-  "completed_tasks": [],
-  "remaining_tasks": [
-    {"id": "02-01", "name": "Plan Phase 2 — create execution plan for engine composition refactoring", "status": "not_started"}
+  "completed_tasks": [
+    {"id": 1, "name": "Phase 3 讨论 — 4 个灰色领域决策", "status": "done", "commit": "04b025b"},
+    {"id": 2, "name": "03-CONTEXT.md 创建", "status": "done", "commit": "04b025b"},
+    {"id": 3, "name": "03-DISCUSSION-LOG.md 创建", "status": "done", "commit": "04b025b"}
   ],
-  "blockers": [],
+  "remaining_tasks": [
+    {"id": 4, "name": "/gsd-plan-phase 3 — 生成实施计划", "status": "not_started"},
+    {"id": 5, "name": "诊断启动'只有边框'问题", "status": "not_started"},
+    {"id": 6, "name": "评估移除 PlayerEngine 影响", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "启动后只有边框 — 未诊断，可能是 DeferredPlayerFeature 加载失败", "type": "technical", "workaround": "flutter run --dart-define=USE_MOCK_ENGINE=true 测试"},
+    {"description": "用户要求移除 PlayerEngine — 大规模重构影响 57 个文件", "type": "human_action", "workaround": null}
+  ],
   "async_jobs": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "运行 flutter run -d windows 诊断'只有边框'问题", "context": "确认是引擎问题还是窗口问题", "blocking": false},
+    {"action": "确认是否要移除 PlayerEngine 抽象层", "context": "这会改变 Phase 3 的范围", "blocking": true}
+  ],
   "decisions": [
+    {"decision": "mixin on PlayerEngine 形式", "rationale": "编译器约束 mixin 只在 PlayerEngine 体系内", "phase": "03"},
+    {"decision": "纯 abstract 接口（不提供默认实现）", "rationale": "最简单，FvpEngine 保持现有委托模式", "phase": "03"},
+    {"decision": "按功能域分组方法", "rationale": "TrackControl(9) VideoEffects(4) RendererConfig(2)", "phase": "03"},
+    {"decision": "MockEngine with 全部 mixin", "rationale": "测试中 engine is TrackControl == true", "phase": "03"},
+    {"decision": "仅改 FvpEngine 签名，UI 零修改", "rationale": "57 个 UI 文件向后兼容", "phase": "03"},
     {"decision": "D3D11: all 5 setProperty calls move to D3D11Configurator.applyDefaults()", "rationale": "Consolidate D3D11 + memory optimization into one helper", "phase": "02"},
     {"decision": "FvpEngine keeps _guardedAction — helpers are pure logic", "rationale": "Lifecycle management belongs to FvpEngine, not helpers", "phase": "02"},
     {"decision": "ValueNotifier ownership stays in FvpEngine final fields", "rationale": "COMP-05 CRITICAL — changing to getter breaks MockEngine", "phase": "02"},
     {"decision": "Phase 1 complete — player_engine dependency fully removed", "rationale": "commits a5e4882 + c354d1b, 806 tests pass", "phase": "01"}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd-plan-phase 2 to create Phase 2 execution plan. CONTEXT.md already has all decisions recorded.",
-  "context_notes": "Phase 1 fully complete (2 commits). Phase 2 discussion done — 3 helper classes already exist but unused by FvpEngine. The work is 'activation' not 'creation'. 9 methods mapped for delegation, est. 553→484 lines. CONTEXT.md in .planning/phases/02-engine-composition/ has full decision record."
+  "next_action": "诊断'只有边框'问题或执行 /gsd-plan-phase 3",
+  "context_notes": "Phase 3 讨论完成。用户提出新需求（移除 PlayerEngine）和 bug（启动只有边框）。建议先诊断 bug 再决定下一步。"
 }
