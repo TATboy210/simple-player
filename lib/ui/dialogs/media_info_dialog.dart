@@ -48,7 +48,7 @@ class MediaInfoDialog extends StatelessWidget {
           _CopyableRow(l10n.filePath, path),
           _CopyableRow(l10n.fileName, _basename(path)),
 
-          if (info.hasVideo && info.video case final vid) ...[
+          if (info.video case final vid?) ...[
             _Section(l10n.videoSection),
             _InfoRow(l10n.resolution, '${vid.width} × ${vid.height}'),
             _InfoRow(l10n.codec, vid.codec.toUpperCase()),

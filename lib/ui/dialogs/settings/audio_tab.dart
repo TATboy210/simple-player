@@ -48,7 +48,7 @@ class AudioTab extends StatelessWidget {
 }
 
 class _AudioTrackRow extends StatelessWidget {
-  final dynamic track;
+  final AudioTrackInfo track;
   final int index;
   final bool active;
   final AppLocalizations l10n;

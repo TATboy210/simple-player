@@ -52,7 +52,7 @@ class Tokens {
   static const progressBarBg = Color(0x44000000);    // 进度条底色
 
   // ── 控制栏装饰 ──
-  static const controlBarBg = Color(0xB30E111E);
+  static const controlBarBg = Color(0x800E111E);
   static const controlBarBorderWhite = Color(0x0AFFFFFF);
   static const controlBarShadowBlack = Color(0x1A000000);
   static const controlBarOuterShadow = Color(0x40000000);
@@ -106,10 +106,10 @@ class Tokens {
   static const radiusLarge = 12.0;   // 保留兼容
   static const radiusPopup = 8.0;
 
-  // ── 毛玻璃 ──
-  static const glassBlurThin = 0.08;
-  static const glassBlur = 0.10;
-  static const glassBlurThick = 0.24;
+  // ── 毛玻璃 (ImageFilter.blur sigma, 单位=像素) ──
+  static const glassBlurThin = 8.0;    // 标题栏 — 轻模糊
+  static const glassBlur = 12.0;       // 控制栏 — 默认模糊
+  static const glassBlurThick = 20.0;  // 弹窗/对话框 — 深模糊
 
   // ── 动画 ──
   static const durationFast = 80;
