@@ -1,14 +1,13 @@
-import 'package:fvp/mdk.dart' as mdk;
-
 import '../utils/log.dart';
+import 'player_proxy.dart';
 
-/// Encapsulates subtitle and audio filter configuration for mdk.Player.
+/// Encapsulates subtitle and audio filter configuration for a player.
 ///
 /// Handles external subtitle loading, subtitle delay, and equalizer filters.
 class SubtitleConfigurator {
   SubtitleConfigurator(this._player);
 
-  final mdk.Player _player;
+  final PlayerProxy _player;
 
   /// Loads an external subtitle file at [path].
   void setExternalSubtitle(String path) {
