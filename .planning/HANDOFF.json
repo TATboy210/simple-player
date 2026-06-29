@@ -1,48 +1,29 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-29T13:21:08.869Z",
-  "milestone": "v1.0",
-  "milestone_name": "PlayerEngine Refactoring",
-  "phase": "03",
-  "phase_name": "接口优化",
-  "phase_dir": ".planning/phases/03-iface-optimization",
-  "status": "context_complete_ready_for_planning",
-  "progress": {
-    "total_plans": 0,
-    "completed_plans": 0,
-    "percent": 0
-  },
+  "timestamp": "2026-06-29",
+  "context": "default",
+  "task": "PlayerEngine removal cleanup",
+  "status": "in_progress",
   "completed_tasks": [
-    {"id": 1, "name": "Phase 3 讨论 — 4 个灰色领域决策", "status": "done", "commit": "04b025b"},
-    {"id": 2, "name": "03-CONTEXT.md 创建", "status": "done", "commit": "04b025b"},
-    {"id": 3, "name": "03-DISCUSSION-LOG.md 创建", "status": "done", "commit": "04b025b"}
+    {"id": 1, "name": "Fix border issue (catch clause)", "status": "done", "commit": "2db5580"},
+    {"id": 2, "name": "Delete PlayerEngine files", "status": "done"},
+    {"id": 3, "name": "Create EngineState mixin", "status": "done"},
+    {"id": 4, "name": "Update 51 files (imports + types)", "status": "done"},
+    {"id": 5, "name": "Fix FvpEngine/MockEngine signatures", "status": "done"},
+    {"id": 6, "name": "Fix import paths + BOM", "status": "done", "commit": "0022403"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "/gsd-plan-phase 3 — 生成实施计划", "status": "not_started"},
-    {"id": 5, "name": "诊断启动'只有边框'问题", "status": "not_started"},
-    {"id": 6, "name": "评估移除 PlayerEngine 影响", "status": "not_started"}
+    {"id": 7, "name": "Fix 18 analyze errors (3 categories)", "status": "in_progress"},
+    {"id": 8, "name": "Run flutter test", "status": "not_started"},
+    {"id": 9, "name": "Update planning docs", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "启动后只有边框 — 未诊断，可能是 DeferredPlayerFeature 加载失败", "type": "technical", "workaround": "flutter run --dart-define=USE_MOCK_ENGINE=true 测试"},
-    {"description": "用户要求移除 PlayerEngine — 大规模重构影响 57 个文件", "type": "human_action", "workaround": null}
-  ],
-  "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "运行 flutter run -d windows 诊断'只有边框'问题", "context": "确认是引擎问题还是窗口问题", "blocking": false},
-    {"action": "确认是否要移除 PlayerEngine 抽象层", "context": "这会改变 Phase 3 的范围", "blocking": true}
+    {"description": "18 analyze errors block flutter test", "type": "technical", "workaround": "3 categories: const init (12), D3D11 refs (2), FakeEngine overrides (4)"}
   ],
   "decisions": [
-    {"decision": "mixin on PlayerEngine 形式", "rationale": "编译器约束 mixin 只在 PlayerEngine 体系内", "phase": "03"},
-    {"decision": "纯 abstract 接口（不提供默认实现）", "rationale": "最简单，FvpEngine 保持现有委托模式", "phase": "03"},
-    {"decision": "按功能域分组方法", "rationale": "TrackControl(9) VideoEffects(4) RendererConfig(2)", "phase": "03"},
-    {"decision": "MockEngine with 全部 mixin", "rationale": "测试中 engine is TrackControl == true", "phase": "03"},
-    {"decision": "仅改 FvpEngine 签名，UI 零修改", "rationale": "57 个 UI 文件向后兼容", "phase": "03"},
-    {"decision": "D3D11: all 5 setProperty calls move to D3D11Configurator.applyDefaults()", "rationale": "Consolidate D3D11 + memory optimization into one helper", "phase": "02"},
-    {"decision": "FvpEngine keeps _guardedAction — helpers are pure logic", "rationale": "Lifecycle management belongs to FvpEngine, not helpers", "phase": "02"},
-    {"decision": "ValueNotifier ownership stays in FvpEngine final fields", "rationale": "COMP-05 CRITICAL — changing to getter breaks MockEngine", "phase": "02"},
-    {"decision": "Phase 1 complete — player_engine dependency fully removed", "rationale": "commits a5e4882 + c354d1b, 806 tests pass", "phase": "01"}
+    {"decision": "mixin EngineState replaces abstract class PlayerEngine", "rationale": "No inheritance chain, direct mixin composition"},
+    {"decision": "D3D11 methods removed from interface", "rationale": "FvpEngine-only concerns"},
+    {"decision": "Track/subtitle methods synchronous (not Future)", "rationale": "Matches actual FvpEngine implementation"}
   ],
-  "uncommitted_files": [],
-  "next_action": "诊断'只有边框'问题或执行 /gsd-plan-phase 3",
-  "context_notes": "Phase 3 讨论完成。用户提出新需求（移除 PlayerEngine）和 bug（启动只有边框）。建议先诊断 bug 再决定下一步。"
+  "next_action": "Fix 18 errors: add D3D11 back to mixin, align FakeEngine signatures, add missing test imports"
 }
