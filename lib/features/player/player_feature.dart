@@ -53,6 +53,8 @@ class PlayerFeature extends StatefulWidget {
 class _PlayerFeatureState extends State<PlayerFeature> {
   late final PlayerServices _services;
   bool _ready = false;
+  bool _error = false;
+  String _errorMessage = '';
   bool _isDragHovering = false;
   Map<String, String> _customBindings = {};
 
@@ -81,8 +83,13 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         'Loading settings...',
       );
       _customBindings = await SettingsStore.loadShortcuts();
-    } on Exception catch (e) {
-      log.e('[PlayerFeature] init failed: $e');
+    } catch (e, stackTrace) {
+      log.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
+      if (mounted) setState(() {
+        _error = true;
+        _errorMessage = '$e';
+      });
+      return;
     }
     log.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
     widget.coordinator.markReady();
@@ -139,6 +146,27 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'Player initialization failed',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage,
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
     if (!_ready) {
       return const SizedBox.shrink();
     }
