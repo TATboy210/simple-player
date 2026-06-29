@@ -11,8 +11,6 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  player_engine:
-    path: ../widget_tree_flutter/player_engine
   fvp: ^0.37.2
   path_provider: ^2.1.5
   file_picker: ^11.0.2

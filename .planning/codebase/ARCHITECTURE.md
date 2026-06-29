@@ -175,7 +175,7 @@ main()
 | `window_manager` | Cross-platform window control (frameless, fullscreen, bounds) |
 | `file_picker` | Native file open dialog |
 | `shared_preferences` | Key-value persistence (settings, playlist) |
-| `player_engine` | Abstract `PlayerEngine` interface (local package) |
+| `player_engine` | Abstract `PlayerEngine` interface (local imports — path dependency removed in Phase 1) |
 
 ---
 

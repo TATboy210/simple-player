@@ -14,7 +14,7 @@
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `fvp` | ^0.37.2 | MDK/FFmpeg video engine, D3D11 texture rendering |
-| `player_engine` | local path | Abstract PlayerEngine interface |
+| `player_engine` | removed (Phase 1) | Abstract PlayerEngine interface — now uses local relative imports |
 | `window_manager` | ^0.5.1 | Cross-platform window control |
 | `shared_preferences` | ^2.5.5 | Settings KV persistence (25+ keys) |
 | `path_provider` | ^2.1.5 | App directory for playlist JSON |

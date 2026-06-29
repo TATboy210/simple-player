@@ -78,7 +78,7 @@ UI Layer (57 files)
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 移除外部 player_engine 依赖 | 本地已有 1:1 副本，跨目录依赖脆弱 | — Pending |
+| 移除外部 player_engine 依赖 | 本地已有 1:1 副本，跨目录依赖脆弱 | ✅ Done (Phase 1, commit a5e4882 + 01-02) |
 | 保留 PlayerEngine 抽象层 | MockEngine 测试价值 + 接口隔离 | — Pending |
 | 保留 fvp 作为唯一引擎 | setProperty/D3D11/均衡器无法替代 | — Pending |
 | 不引入 media_kit | API 能力不兼容，功能损失严重 | — Pending |
@@ -96,8 +96,8 @@ UI Layer (57 files)
 
 ### Active
 
-- [ ] 移除 pubspec.yaml 中的 `player_engine` path 依赖
-- [ ] 将 57 个文件的 import 从 `package:player_engine/` 改为本地相对路径
+- [x] 移除 pubspec.yaml 中的 `player_engine` path 依赖
+- [x] 将 56 个文件的 import 从 `package:player_engine/` 改为本地相对路径
 - [ ] FvpEngine 委托 VolumeController/SubtitleConfigurator/D3D11Configurator 而非内联
 - [ ] 生成 media_kit 1.2.6 深度 API 对比报告
 
