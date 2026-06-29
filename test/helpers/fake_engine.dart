@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 
-import 'package:player_engine/player_engine.dart';
+import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
 
 /// Hand-written Fake implementing PlayerEngine for testing.
 ///

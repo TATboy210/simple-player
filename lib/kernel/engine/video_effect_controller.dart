@@ -1,5 +1,5 @@
 import 'package:fvp/mdk.dart' as mdk;
-import 'package:player_engine/player_engine.dart';
+import 'video_effect_type.dart';
 
 import '../utils/log.dart';
 

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
-import 'package:player_engine/player_engine.dart';
+import '../../kernel/engine/player_engine.dart';
 import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';

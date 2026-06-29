@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:fvp/mdk.dart' as mdk;
-import 'package:player_engine/player_engine.dart';
+import 'media_state.dart';
 
 /// mdk 回调处理器 — 将底层状态变化映射到 Flutter ValueNotifier
 ///

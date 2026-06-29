@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+﻿import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
@@ -10,7 +10,7 @@ import '../../ui/shared/empty_state.dart';
 import '../../ui/shared/play_mode_utils.dart';
 import '../../ui/shared/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
-import 'package:player_engine/player_engine.dart';
+import '../../kernel/engine/player_engine.dart';
 import 'services/video_processing_service.dart';
 import 'player_services.dart';
 
@@ -146,6 +146,11 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     final engine = _services.engine;
     final controller = _services.controller;
     final playlist = _services.playlist;
+
+    // DEBUG: 首帧渲染后 dump widget 树
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugDumpApp();
+    });
 
     return PlayerScreen(
       engine: engine,

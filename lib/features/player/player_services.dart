@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
-import 'package:player_engine/player_engine.dart';
+﻿import 'package:flutter/foundation.dart';
+import '../../kernel/engine/player_engine.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/fvp_engine.dart';

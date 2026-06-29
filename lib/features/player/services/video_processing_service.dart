@@ -1,8 +1,8 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:player_engine/player_engine.dart';
+import '../../../kernel/engine/player_engine.dart';
 import '../../../kernel/models/aspect_ratio_mode.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../models/video_processing_state.dart';

@@ -1,10 +1,10 @@
-import 'package:file_picker/file_picker.dart';
+﻿import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/bridge/window_mode.dart';
-import 'package:player_engine/player_engine.dart';
+import '../../kernel/engine/player_engine.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../features/player/services/playback_controller.dart';

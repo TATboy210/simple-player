@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:player_engine/player_engine.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
 import 'package:simple_player_flutter/kernel/engine/video_effect_controller.dart';
 
 void main() {

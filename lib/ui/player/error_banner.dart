@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
-import 'package:player_engine/player_engine.dart';
+import '../../kernel/engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/value_listenable_builder2.dart';

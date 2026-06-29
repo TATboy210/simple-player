@@ -1,6 +1,6 @@
-import 'dart:io';
+﻿import 'dart:io';
 
-import 'package:player_engine/player_engine.dart';
+import '../../../kernel/engine/player_engine.dart';
 import '../../../kernel/utils/path_utils.dart';
 import '../../../kernel/utils/log.dart';
 

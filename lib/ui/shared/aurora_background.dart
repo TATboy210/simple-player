@@ -1,4 +1,4 @@
-import 'package:player_engine/player_engine.dart';
+﻿import '../../kernel/engine/player_engine.dart';
 import 'dart:math';
 import 'dart:ui' as ui;
 
