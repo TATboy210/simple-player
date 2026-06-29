@@ -37,6 +37,11 @@ Plans:
 **Goal:** FvpEngine 委托 VolumeController/SubtitleConfigurator/D3D11Configurator，消除内联逻辑
 **Mode:** mvp
 **Requirements:** COMP-01, COMP-02, COMP-03, COMP-04, COMP-05
+**Plans:** 2 plans
+Plans:
+- [ ] 02-01-PLAN.md — Expand D3D11Configurator + write unit tests for all 3 helpers
+- [ ] 02-02-PLAN.md — Wire delegation in FvpEngine + verify all tests pass
+
 **Success Criteria**:
 
 1. FvpEngine 中 VolumeController/SubtitleConfigurator/D3D11Configurator 相关逻辑委托给 helper 类
