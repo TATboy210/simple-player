@@ -16,16 +16,16 @@
 Plans:
 **Wave 2**
 
-- [ ] 01-01-PLAN.md — Migrate 56 source file imports from package:player_engine to local relative paths
+- [x] 01-01-PLAN.md — Migrate 56 source file imports from package:player_engine to local relative paths
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-02-PLAN.md — Remove pubspec dependency, update docs, run full verification
+- [x] 01-02-PLAN.md — Remove pubspec dependency, update docs, run full verification
 
 **Success Criteria**:
 
 1. `pubspec.yaml` 中不存在 `player_engine` path 依赖
-2. `grep -r "package:player_engine" lib/` 返回零结果
+2. `grep -r "package:player_engine" lib/ test/` 返回零结果（PowerShell: `(Get-ChildItem -Path lib, test -Recurse -Filter *.dart | Select-String -Pattern "package:player_engine").Count` = 0）
 3. `flutter analyze` 零错误零警告
 4. `flutter test` 全部通过
 5. `lib/kernel/engine/player_engine.dart` barrel export 包含全部 8 个符号

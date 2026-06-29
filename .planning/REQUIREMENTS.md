@@ -7,8 +7,8 @@
 
 ### 依赖清理 (DEP)
 
-- [ ] **DEP-01**: 移除 pubspec.yaml 中的 `player_engine` path 依赖
-- [ ] **DEP-02**: 将 37 个文件的 import 从 `package:player_engine/player_engine.dart` 改为本地相对路径
+- [x] **DEP-01**: 移除 pubspec.yaml 中的 `player_engine` path 依赖
+- [x] **DEP-02**: 将 56 个文件的 import 从 `package:player_engine/player_engine.dart` 改为本地相对路径
 - [ ] **DEP-03**: 验证 barrel export 文件 `player_engine.dart` 包含所有 8 个导出符号
 - [ ] **DEP-04**: 确认 6 个 engine 内部文件的自引用 import 正确解析
 
