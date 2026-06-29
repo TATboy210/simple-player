@@ -39,7 +39,12 @@ Plans:
 **Requirements:** COMP-01, COMP-02, COMP-03, COMP-04, COMP-05
 **Plans:** 2 plans
 Plans:
+**Wave 1**
+
 - [ ] 02-01-PLAN.md — Expand D3D11Configurator + write unit tests for all 3 helpers
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 02-02-PLAN.md — Wire delegation in FvpEngine + verify all tests pass
 
 **Success Criteria**:
