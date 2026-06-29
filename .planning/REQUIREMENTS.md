@@ -14,11 +14,11 @@
 
 ### 引擎组合重构 (COMP)
 
-- [ ] **COMP-01**: 提取 VolumeController 为独立 helper（音量/静音逻辑）
-- [ ] **COMP-02**: 提取 SubtitleConfigurator 为独立 helper（字幕配置逻辑）
-- [ ] **COMP-03**: 提取 D3D11Configurator 为独立 helper（D3D11 属性配置）
-- [ ] **COMP-04**: FvpEngine 通过委托调用新 helper 而非内联逻辑
-- [ ] **COMP-05**: 保持 ValueNotifier 所有权在 FvpEngine 中不变（CRITICAL — 改为 getter 会破坏 MockEngine）
+- [x] **COMP-01**: 提取 VolumeController 为独立 helper（音量/静音逻辑）
+- [x] **COMP-02**: 提取 SubtitleConfigurator 为独立 helper（字幕配置逻辑）
+- [x] **COMP-03**: 提取 D3D11Configurator 为独立 helper（D3D11 属性配置）
+- [x] **COMP-04**: FvpEngine 通过委托调用新 helper 而非内联逻辑
+- [x] **COMP-05**: 保持 ValueNotifier 所有权在 FvpEngine 中不变（CRITICAL — 改为 getter 会破坏 MockEngine）
 
 ### 接口优化 (IFACE)
 
@@ -73,11 +73,11 @@
 | DEP-02 | Phase 1 | Pending |
 | DEP-03 | Phase 1 | Pending |
 | DEP-04 | Phase 1 | Pending |
-| COMP-01 | Phase 2 | Pending |
-| COMP-02 | Phase 2 | Pending |
-| COMP-03 | Phase 2 | Pending |
-| COMP-04 | Phase 2 | Pending |
-| COMP-05 | Phase 2 | Pending |
+| COMP-01 | Phase 2 | Complete |
+| COMP-02 | Phase 2 | Complete |
+| COMP-03 | Phase 2 | Complete |
+| COMP-04 | Phase 2 | Complete |
+| COMP-05 | Phase 2 | Complete |
 | IFACE-01 | Phase 3 | Pending |
 | IFACE-02 | Phase 3 | Pending |
 | IFACE-03 | Phase 3 | Pending |
@@ -93,6 +93,7 @@
 | PLAT-04 | Phase 4 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 22 total
 - Mapped to phases: 22
 - Unmapped: 0 ✓
