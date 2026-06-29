@@ -8,14 +8,22 @@
 ---
 
 ### Phase 1: 依赖清理
+
 **Goal:** 移除外部 `player_engine` path 依赖，统一为本地相对路径导入
 **Mode:** mvp
 **Requirements:** DEP-01, DEP-02, DEP-03, DEP-04
 **Plans:** 2 plans
 Plans:
+**Wave 2**
+
 - [ ] 01-01-PLAN.md — Migrate 56 source file imports from package:player_engine to local relative paths
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 01-02-PLAN.md — Remove pubspec dependency, update docs, run full verification
+
 **Success Criteria**:
+
 1. `pubspec.yaml` 中不存在 `player_engine` path 依赖
 2. `grep -r "package:player_engine" lib/` 返回零结果
 3. `flutter analyze` 零错误零警告
@@ -25,10 +33,12 @@ Plans:
 ---
 
 ### Phase 2: 引擎组合重构
+
 **Goal:** FvpEngine 委托 VolumeController/SubtitleConfigurator/D3D11Configurator，消除内联逻辑
 **Mode:** mvp
 **Requirements:** COMP-01, COMP-02, COMP-03, COMP-04, COMP-05
 **Success Criteria**:
+
 1. FvpEngine 中 VolumeController/SubtitleConfigurator/D3D11Configurator 相关逻辑委托给 helper 类
 2. FvpEngine 行数从 ~547 降至 ~350
 3. ValueNotifier 所有权保持在 FvpEngine 的 `final` 字段中（未改为 getter）
@@ -38,10 +48,12 @@ Plans:
 ---
 
 ### Phase 3: 接口优化
+
 **Goal:** 通过 mixin 拆分 PlayerEngine 接口，实现能力隔离
 **Mode:** mvp
 **Requirements:** IFACE-01, IFACE-02, IFACE-03, IFACE-04, IFACE-05
 **Success Criteria**:
+
 1. TrackControl/VideoEffects/RendererConfig mixin 接口定义完成
 2. 现有 57 个 UI 文件的 PlayerEngine import 无需修改（向后兼容）
 3. `engine is TrackControl` 能力检查在 UI 层可用
@@ -51,10 +63,12 @@ Plans:
 ---
 
 ### Phase 4: 测试与平台验证
+
 **Goal:** 确保重构后所有测试通过，平台特定行为正确
 **Mode:** mvp
 **Requirements:** TEST-01, TEST-02, TEST-03, TEST-04, PLAT-01, PLAT-02, PLAT-03, PLAT-04
 **Success Criteria**:
+
 1. MockEngine 继续实现完整 PlayerEngine 接口（含 mixin 检查）
 2. 所有现有 widget 测试在重构后通过（零回归）
 3. 新 helper 组件（VolumeController/SubtitleConfigurator/D3D11Configurator）有独立单元测试
