@@ -17,18 +17,24 @@ import 'fvp_callback_handler.dart';
 import 'media_opener.dart';
 import 'open_result.dart';
 import 'position_poller.dart';
-import '../bridge/display_config.dart';
 import '../utils/log.dart';
 import 'track_manager.dart';
 import 'video_effect_controller.dart';
+import 'volume_controller.dart';
+import 'subtitle_configurator.dart';
+import 'd3d11_configurator.dart';
+import 'mdk_player_proxy.dart';
 
 /// fvp/MDK 引擎实现
 ///
 /// 封装 fvp/MDK 播放器，暴露 Flutter 友好的 ValueNotifier 接口。
-/// 由 3 个 helper 组合而成:
+/// 由 6 个 helper 组合而成:
 ///   - FvpCallbackHandler: mdk 回调注册、状态映射、主线程调度
 ///   - PositionPoller: 250ms 定时器轮询播放位置
 ///   - TrackManager: 音频/字幕轨道选择与切换
+///   - VolumeController: 音量/静音控制
+///   - SubtitleConfigurator: 外挂字幕、字幕延迟、均衡器
+///   - D3D11Configurator: D3D11 渲染管线配置
 ///
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
@@ -42,14 +48,6 @@ class FvpEngine extends PlayerEngine {
   static const _minPlaybackRate = 0.25;
   static const _maxPlaybackRate = 4.0;
 
-  // D3D11 性能参数默认值
-  // shader_resource=1: 启用 GPU 色彩空间转换（YUV→RGB），减少 CPU 负担
-  static const _defaultVideoDecoders = 'D3D11:shader_resource=1,NVDEC,FFmpeg'; // 硬件优先
-
-  // 内存优化参数（适合 1080p，4K HEVC 软解时可能需要放宽）
-  static const _ffmpegDecoderThreads = '2'; // FFmpeg 软解线程数（默认=CPU核心数，8-16）
-  static const _maxBufferFrames = '3'; // 渲染器最大帧缓冲（2 帧过紧，3 帧更安全）
-
   // ─── Helpers ───
 
   late FvpCallbackHandler _callbackHandler;
@@ -57,6 +55,9 @@ class FvpEngine extends PlayerEngine {
   late TrackManager _trackManager;
   late MediaOpener _mediaOpener;
   late VideoEffectController _videoEffectController;
+  late VolumeController _volumeController;
+  late SubtitleConfigurator _subtitleConfigurator;
+  late D3D11Configurator _d3d11Configurator;
 
   // ─── ValueNotifier 实现 ───
 
@@ -129,52 +130,18 @@ class FvpEngine extends PlayerEngine {
     _trackManager = TrackManager(p);
     _videoEffectController = VideoEffectController(p);
     _mediaOpener = MediaOpener(p, _trackManager);
+    final proxy = MdkPlayerProxy(p);
+    _volumeController = VolumeController(proxy, volume: volume, isMuted: isMuted);
+    _subtitleConfigurator = SubtitleConfigurator(proxy);
+    _d3d11Configurator = D3D11Configurator(proxy);
 
     p.textureId.addListener(_onTextureIdChanged);
     _callbackHandler.init();
 
-    // D3D11 性能参数 — 在 init 后、open 前设置
-    _applyD3d11Defaults(p);
+    // D3D11 性能参数 via D3D11Configurator — 在 init 后、open 前设置
+    _d3d11Configurator.applyDefaults();
 
     return p;
-  }
-
-  /// 应用 D3D11 渲染管线 + 内存优化默认参数
-  ///
-  /// 在 player 创建后立即调用，确保后续 open() 使用优化配置。
-  /// 参考: MDK SDK Player.setProperty, fvp_plugin.cpp D3D11RenderAPI
-  void _applyD3d11Defaults(mdk.Player p) {
-    // d3d11.sync.cpu: CPU/GPU 同步控制
-    //   0 = 异步（低延迟，高刷屏适用）
-    //   1 = 同步（安全默认，完整画面）
-    final syncMode = DisplayConfig.d3d11SyncMode();
-    p.setProperty('d3d11.sync.cpu', syncMode);
-
-    // video.decoders: 解码器优先级列表
-    //   硬件解码器优先，软件解码器兜底
-    p.setProperty('video.decoders', _defaultVideoDecoders);
-
-    // ── 内存优化 ──
-
-    // avcodec.threads: FFmpeg 软解线程数
-    //   默认=CPU核心数(8-16)，每线程有独立工作缓冲
-    //   限制到 2 线程可省 10-30MB，对单文件播放足够
-    p.setProperty('avcodec.threads', _ffmpegDecoderThreads);
-
-    // videoout.buffer_frames: 渲染器最大帧缓冲
-    //   减少参考帧在渲染管线中的驻留数量
-    p.setProperty('videoout.buffer_frames', _maxBufferFrames);
-
-    // reader.starts_with_key: 丢弃首个关键帧前的非关键包
-    //   减少初始缓冲分配
-    p.setProperty('reader.starts_with_key', '1');
-
-    log.d(
-      'FvpEngine: D3D11 + memory defaults applied '
-      '(sync.cpu=$syncMode, refreshRate=${DisplayConfig.getRefreshRate()}Hz, '
-      'decoders=$_defaultVideoDecoders, threads=$_ffmpegDecoderThreads, '
-      'bufferFrames=$_maxBufferFrames)',
-    );
   }
 
   void _onTextureIdChanged() {
@@ -328,24 +295,14 @@ class FvpEngine extends PlayerEngine {
   @override
   void setVolume(double value) {
     _guardedAction('setVolume', () {
-      final clamped = value.clamp(0.0, 1.0);
-      _player.volume = clamped;
-      volume.value = clamped;
-      if (clamped == 0 && !isMuted.value) {
-        _player.mute = true;
-        isMuted.value = true;
-      } else if (clamped > 0 && isMuted.value) {
-        _player.mute = false;
-        isMuted.value = false;
-      }
+      _volumeController.setVolume(value);
     });
   }
 
   @override
   void setMute(bool mute) {
     _guardedAction('setMute', () {
-      _player.mute = mute;
-      isMuted.value = mute;
+      _volumeController.setMute(mute);
     });
   }
 
@@ -434,7 +391,7 @@ class FvpEngine extends PlayerEngine {
   @override
   void setExternalSubtitle(String path) {
     _guardedAction('setExternalSubtitle', () {
-      _player.setProperty('subtitle.external', path);
+      _subtitleConfigurator.setExternalSubtitle(path);
     });
   }
 
@@ -443,19 +400,14 @@ class FvpEngine extends PlayerEngine {
   @override
   void setSubtitleDelay(int milliseconds) {
     _guardedAction('setSubtitleDelay', () {
-      _player.setProperty('subtitle.delay', milliseconds.toString());
+      _subtitleConfigurator.setSubtitleDelay(milliseconds);
     });
   }
 
   @override
   int get subtitleDelay {
     if (_disposed) return 0;
-    try {
-      return int.parse(_player.getProperty('subtitle.delay') ?? '0');
-    } on Exception catch (e) {
-      log.d('FvpEngine.subtitleDelay parse error: $e');
-      return 0;
-    }
+    return _subtitleConfigurator.getSubtitleDelay();
   }
 
   // ─── 均衡器 ───
@@ -463,7 +415,7 @@ class FvpEngine extends PlayerEngine {
   @override
   void setEqualizer(String afFilter) {
     _guardedAction('setEqualizer', () {
-      _player.setProperty('af', afFilter);
+      _subtitleConfigurator.setEqualizer(afFilter);
     });
   }
 
@@ -502,25 +454,14 @@ class FvpEngine extends PlayerEngine {
   @override
   void setD3d11SyncEnabled(bool enabled) {
     _guardedAction('setD3d11SyncEnabled', () {
-      // 0=异步（低延迟），1=同步（安全默认）
-      _player.setProperty('d3d11.sync.cpu', enabled ? '1' : '0');
-      log.d('FvpEngine: d3d11.sync.cpu = ${enabled ? 1 : 0}');
+      _d3d11Configurator.setSyncEnabled(enabled);
     });
   }
 
   @override
   void setHardwareDecoding(bool enabled) {
     _guardedAction('setHardwareDecoding', () {
-      if (enabled) {
-        // 硬件解码器优先，软件解码器兜底
-        _player.setProperty('video.decoders', _defaultVideoDecoders);
-      } else {
-        // 仅软件解码器
-        _player.setProperty('video.decoders', 'FFmpeg');
-      }
-      log.d(
-        'FvpEngine: video.decoders = ${enabled ? _defaultVideoDecoders : "FFmpeg"}',
-      );
+      _d3d11Configurator.setHardwareDecoding(enabled);
     });
   }
 
