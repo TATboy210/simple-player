@@ -1,35 +1,34 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-26T22:00:00.000Z",
-  "milestone": "v1.7",
-  "milestone_name": "Stability, Architecture & Cross-Platform Prep",
-  "phase": "wave2",
-  "phase_name": "Wave 2 — Architecture Refactoring",
+  "timestamp": "2026-06-29T15:45:00.000Z",
+  "milestone": "v1.0",
+  "milestone_name": "PlayerEngine Refactoring",
+  "phase": "01",
+  "phase_name": "dep-cleanup",
+  "phase_dir": ".planning/phases/01-dep-cleanup",
   "status": "paused",
   "progress": {
-    "total_tasks": 5,
-    "completed_tasks": 4,
-    "percent": 80
+    "total_plans": 2,
+    "completed_plans": 1,
+    "percent": 50
   },
   "completed_tasks": [
-    {"id": "R2-1", "name": "NetworkConfigurator extraction", "status": "done", "commit": "0f0cb26"},
-    {"id": "R2-2", "name": "MediaOpener integration", "status": "done", "commit": "0f0cb26"},
-    {"id": "R2-3", "name": "VideoEffectController integration", "status": "done", "commit": "ac48a1e"},
-    {"id": "R2-4", "name": "SettingsValidator extraction", "status": "done", "commit": "d27ac2d"}
+    {"id": "01-01", "name": "Migrate 56 files from package:player_engine to local imports", "status": "done", "commit": "a5e4882"}
   ],
   "remaining_tasks": [
-    {"id": "R2-5", "name": "Static Mutable State Cleanup", "status": "not_started"}
+    {"id": "01-02-1", "name": "Remove player_engine dependency from pubspec.yaml", "status": "not_started"},
+    {"id": "01-02-2", "name": "Update planning docs with corrected counts", "status": "not_started"},
+    {"id": "01-02-3", "name": "Update ARCHITECTURE.md, STACK.md, ROADMAP.md, PROJECT.md", "status": "not_started"}
   ],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "SettingsValidator as pure static class with private constructor", "rationale": "No I/O, no state, no side effects — purely testable validation functions", "phase": "wave2"},
-    {"decision": "Replace inline .clamp() with SettingsValidator.*() method calls", "rationale": "Centralizes 37 clamp sites into single source of truth, eliminates duplication", "phase": "wave2"},
-    {"decision": "VideoEffectController gets isValidRotation() static method", "rationale": "Enables testing rotation validation logic without FFI dependency", "phase": "wave2"},
-    {"decision": "FvpEngine delegates video effects via _guardedAction wrapper", "rationale": "Keeps error handling in FvpEngine while delegating logic to VideoEffectController", "phase": "wave2"}
+    {"decision": "test/ files use package: imports instead of relative paths", "rationale": "avoid_relative_lib_imports lint rule", "phase": "01"},
+    {"decision": "Engine internal files use direct leaf type imports", "rationale": "Avoid circular dependencies per D-09/D-10", "phase": "01"},
+    {"decision": "media_opener.dart needs 5 direct imports not 1", "rationale": "Uses MediaInfo, AudioTrackInfo, SubtitleTrackInfo, VideoCodecInfo beyond MediaErrorType", "phase": "01"}
   ],
   "uncommitted_files": [],
-  "next_action": "Execute R2-5: Static Mutable State Cleanup. Identify mutable static fields in SettingsStore and other singletons, refactor to instance-based or dependency-injected patterns.",
-  "context_notes": "v1.7 Wave 2 80% complete (4/5 tasks). R2-3 and R2-4 done this session. 745 tests all green. FvpEngine 555→539 lines, SettingsStore 467→312 lines. No blockers."
+  "next_action": "Execute Plan 01-02: remove pubspec.yaml player_engine dependency (lines 14-15), update docs, run full verification",
+  "context_notes": "Plan 01-01 completed successfully. 56 files migrated, zero package:player_engine references remain. media_opener.dart needed extra imports beyond plan spec. Test files switched to package: imports to satisfy lint rules. flutter analyze zero errors."
 }
