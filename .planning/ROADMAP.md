@@ -11,6 +11,10 @@
 **Goal:** 移除外部 `player_engine` path 依赖，统一为本地相对路径导入
 **Mode:** mvp
 **Requirements:** DEP-01, DEP-02, DEP-03, DEP-04
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Migrate 56 source file imports from package:player_engine to local relative paths
+- [ ] 01-02-PLAN.md — Remove pubspec dependency, update docs, run full verification
 **Success Criteria**:
 1. `pubspec.yaml` 中不存在 `player_engine` path 依赖
 2. `grep -r "package:player_engine" lib/` 返回零结果
