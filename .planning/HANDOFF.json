@@ -1,34 +1,31 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-29T15:45:00.000Z",
+  "timestamp": "2026-06-29T16:15:00.000Z",
   "milestone": "v1.0",
   "milestone_name": "PlayerEngine Refactoring",
-  "phase": "01",
-  "phase_name": "dep-cleanup",
-  "phase_dir": ".planning/phases/01-dep-cleanup",
+  "phase": "02",
+  "phase_name": "engine-composition",
+  "phase_dir": ".planning/phases/02-engine-composition",
   "status": "paused",
   "progress": {
-    "total_plans": 2,
-    "completed_plans": 1,
-    "percent": 50
+    "total_plans": 0,
+    "completed_plans": 0,
+    "percent": 0
   },
-  "completed_tasks": [
-    {"id": "01-01", "name": "Migrate 56 files from package:player_engine to local imports", "status": "done", "commit": "a5e4882"}
-  ],
+  "completed_tasks": [],
   "remaining_tasks": [
-    {"id": "01-02-1", "name": "Remove player_engine dependency from pubspec.yaml", "status": "not_started"},
-    {"id": "01-02-2", "name": "Update planning docs with corrected counts", "status": "not_started"},
-    {"id": "01-02-3", "name": "Update ARCHITECTURE.md, STACK.md, ROADMAP.md, PROJECT.md", "status": "not_started"}
+    {"id": "02-01", "name": "Plan Phase 2 — create execution plan for engine composition refactoring", "status": "not_started"}
   ],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "test/ files use package: imports instead of relative paths", "rationale": "avoid_relative_lib_imports lint rule", "phase": "01"},
-    {"decision": "Engine internal files use direct leaf type imports", "rationale": "Avoid circular dependencies per D-09/D-10", "phase": "01"},
-    {"decision": "media_opener.dart needs 5 direct imports not 1", "rationale": "Uses MediaInfo, AudioTrackInfo, SubtitleTrackInfo, VideoCodecInfo beyond MediaErrorType", "phase": "01"}
+    {"decision": "D3D11: all 5 setProperty calls move to D3D11Configurator.applyDefaults()", "rationale": "Consolidate D3D11 + memory optimization into one helper", "phase": "02"},
+    {"decision": "FvpEngine keeps _guardedAction — helpers are pure logic", "rationale": "Lifecycle management belongs to FvpEngine, not helpers", "phase": "02"},
+    {"decision": "ValueNotifier ownership stays in FvpEngine final fields", "rationale": "COMP-05 CRITICAL — changing to getter breaks MockEngine", "phase": "02"},
+    {"decision": "Phase 1 complete — player_engine dependency fully removed", "rationale": "commits a5e4882 + c354d1b, 806 tests pass", "phase": "01"}
   ],
   "uncommitted_files": [],
-  "next_action": "Execute Plan 01-02: remove pubspec.yaml player_engine dependency (lines 14-15), update docs, run full verification",
-  "context_notes": "Plan 01-01 completed successfully. 56 files migrated, zero package:player_engine references remain. media_opener.dart needed extra imports beyond plan spec. Test files switched to package: imports to satisfy lint rules. flutter analyze zero errors."
+  "next_action": "Run /gsd-plan-phase 2 to create Phase 2 execution plan. CONTEXT.md already has all decisions recorded.",
+  "context_notes": "Phase 1 fully complete (2 commits). Phase 2 discussion done — 3 helper classes already exist but unused by FvpEngine. The work is 'activation' not 'creation'. 9 methods mapped for delegation, est. 553→484 lines. CONTEXT.md in .planning/phases/02-engine-composition/ has full decision record."
 }
