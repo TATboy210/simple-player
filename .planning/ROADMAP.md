@@ -37,15 +37,15 @@ Plans:
 **Goal:** FvpEngine 委托 VolumeController/SubtitleConfigurator/D3D11Configurator，消除内联逻辑
 **Mode:** mvp
 **Requirements:** COMP-01, COMP-02, COMP-03, COMP-04, COMP-05
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Expand D3D11Configurator + write unit tests for all 3 helpers
+- [x] 02-01-PLAN.md — Expand D3D11Configurator + write unit tests for all 3 helpers
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Wire delegation in FvpEngine + verify all tests pass
+- [x] 02-02-PLAN.md — Wire delegation in FvpEngine + verify all tests pass
 
 **Success Criteria**:
 
