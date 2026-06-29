@@ -1,607 +1,425 @@
-# Domain Pitfalls: Flutter Desktop Cross-Platform Window Management
+# Pitfalls Research: PlayerEngine Refactoring
 
-**Domain:** Flutter desktop media player expanding from Windows-only to Windows/Linux/macOS
-**Researched:** 2026-06-23
-**Overall confidence:** MEDIUM (Windows pitfalls HIGH from direct project experience; Linux/macOS pitfalls MEDIUM from ecosystem research and known Flutter issues)
-
----
-
-## 1. Linux Pitfalls (X11 vs Wayland)
-
-### Pitfall L1: Wayland Forbids Client-Side Window Positioning
-
-**What goes wrong:** `window_manager`'s `setPosition()`, `setAlignment()`, and `Bounds` persistence all become no-ops on Wayland. The `xdg_shell` protocol intentionally forbids clients from controlling their own window placement -- this is a security feature, not a bug. Your `WindowPersistence` center-on-startup logic will silently fail.
-
-**Why it happens:** Wayland's design philosophy is compositor-controlled placement. Unlike X11 where apps can position themselves freely, Wayland compositors (GNOME/Mutter, KDE/KWin, wlroots-based) own window placement decisions.
-
-**Consequences:**
-- Window always opens at compositor-chosen position (usually top-left or center)
-- `WindowPersistence.saveBounds()` saves coordinates but `restoreBounds()` cannot apply them
-- "Open centered on screen" feature breaks silently
-- Multi-window positioning (if ever added) is impossible
-
-**Prevention:**
-- Detect Wayland at runtime: check `GDK_BACKEND` environment variable or `Platform.environment['XDG_SESSION_TYPE'] == 'wayland'`
-- On Wayland, skip position persistence entirely -- only save/restore size
-- Use `window_manager`'s size-only methods (`setSize`, `setMinimumSize`) which DO work on Wayland
-- Document that position persistence is X11/macOS/Windows only
-
-**Warning signs:** Window always opens at (0,0) or compositor default regardless of saved position. No error thrown.
-
-**Detection:** Run on GNOME Wayland. Save window position, close, reopen. If position differs from saved, Wayland positioning block is active.
-
-**Phase:** LINUX-01 (initial port)
+> Specific to simple_player_flutter engine layer refactoring.
+> Based on codebase analysis: 57 files importing `player_engine`, FvpEngine 547 lines, 13 ValueNotifiers, 5 helpers.
 
 ---
 
-### Pitfall L2: Wayland Has No Global Coordinate System
+## Import Migration Pitfalls
 
-**What goes wrong:** Code that uses `windowManager.getPosition()` to compute relative placement (e.g., OSD positioning, popup menus relative to window) returns meaningless values on Wayland. Wayland windows don't have global screen coordinates -- each window exists in its own coordinate space.
+### PIT-01: Barrel File Substitution Mismatch
 
-**Why it happens:** Wayland's security model prevents apps from knowing where they are on screen or where other windows are. This prevents keyloggers/screen-scrapers but breaks position-dependent UI.
+**Risk: HIGH**
 
-**Consequences:**
-- `windowManager.getPosition()` returns (0,0) or last-known X11 position on Wayland
-- Any logic that computes "screen center - window offset" breaks
-- Popup positioning relative to screen coordinates fails
+The external `player_engine` barrel exports exactly 8 symbols:
 
-**Prevention:**
-- Never use absolute screen coordinates for in-app positioning
-- Use Flutter's `Overlay` and `CompositedTransform` for popup positioning (widget-relative, not screen-relative)
-- For fullscreen detection, use `window_manager`'s `isFullScreen()` which queries the compositor state, not coordinates
+```
+PlayerEngine (from player_engine_base.dart)
+MediaState, MediaErrorType
+MediaInfo, AudioTrackInfo, SubtitleTrackInfo, VideoCodecInfo
+VideoEffectType
+```
 
-**Warning signs:** OSD or popup appears at wrong position on Wayland but correct on X11.
+Every one of the 57 files does a single `import 'package:player_engine/player_engine.dart'` and relies on this barrel. When migrating, the replacement barrel file (`lib/kernel/engine/player_engine.dart`) must export the exact same 8 symbols with identical APIs. If any method signature, enum value, or type changes during migration, all 57 files break simultaneously.
 
-**Detection:** Open the speed button popup or OSD overlay on GNOME Wayland. If it appears at screen origin instead of near the triggering widget, absolute coordinates are being used.
+**Specific failure mode**: `player_engine_base.dart` already exists locally and uses `package:simple_player_flutter/kernel/engine/...` imports. But the external package has its own copies of these types. If the local `MediaState` enum has even one different value name, runtime behavior changes silently.
 
-**Phase:** LINUX-01
+**Prevention**: Before changing any import, run a symbol diff:
+```bash
+# Compare exported symbols from old vs new barrel
+dart analyze ../widget_tree_flutter/player_engine/lib/player_engine.dart
+dart analyze lib/kernel/engine/player_engine.dart
+```
+
+### PIT-02: Relative Path Depth Errors
+
+**Risk: MEDIUM**
+
+Files at different directory depths need different relative paths after migration:
+
+| Location | Current import | New relative import |
+|----------|---------------|-------------------|
+| `lib/app.dart` | `package:player_engine/player_engine.dart` | `kernel/engine/player_engine.dart` |
+| `lib/features/player/player_feature.dart` | `package:player_engine/player_engine.dart` | `../../kernel/engine/player_engine.dart` |
+| `lib/ui/player/control_bar.dart` | `package:player_engine/player_engine.dart` | `../../kernel/engine/player_engine.dart` |
+| `test/helpers/fake_engine.dart` | `package:player_engine/player_engine.dart` | `../../lib/kernel/engine/player_engine.dart` |
+
+Test files need `../../lib/` prefix, which is different from lib files. A mechanical find-replace that only handles lib/ will miss 20 test files.
+
+**Prevention**: Separate the migration into lib/ and test/ passes. Verify with `dart analyze` after each pass.
+
+### PIT-03: Internal Engine Files Importing External Package
+
+**Risk: HIGH**
+
+6 engine-layer files themselves import the external package:
+
+```
+lib/kernel/engine/fvp_callback_handler.dart
+lib/kernel/engine/fvp_engine.dart
+lib/kernel/engine/media_opener.dart
+lib/kernel/engine/mock_engine.dart
+lib/kernel/engine/open_result.dart
+lib/kernel/engine/track_manager.dart
+lib/kernel/engine/video_effect_controller.dart
+```
+
+These are the most dangerous to migrate because they use internal types (like `mdk.Player` callbacks that reference `MediaState`). If the import changes but the file still references types from the old package path, you get a "type not found" error that looks like a missing import rather than a wrong path.
+
+**Prevention**: Migrate these 6 files FIRST, run `dart analyze` on just the engine directory before touching any UI files.
+
+### PIT-04: Unused Import Masking
+
+**Risk: LOW**
+
+Many files import the barrel for just one type (e.g., `MediaState`). After migration, if you switch to direct file imports for tree-shaking, unused imports will cause analysis warnings. The reverse is also true: some files may import `player_engine` for a type they no longer use after refactoring.
+
+**Prevention**: After migration, run `dart fix --apply` to clean unused imports. Do NOT manually fix unused imports during the migration commit -- keep it mechanical.
+
+### PIT-05: Circular Dependency Creation
+
+**Risk: MEDIUM**
+
+Current dependency flow is clean:
+```
+player_engine (external) --> types only (no deps on simple_player_flutter)
+simple_player_flutter --> player_engine (one-way)
+```
+
+After migration, all types live inside `lib/kernel/engine/`. If any engine file imports from `lib/features/` or `lib/ui/`, a circular dependency forms. This is especially risky with helper classes that might need `PlaybackController` or service types.
+
+**Specific risk**: `FvpCallbackHandler` currently takes `state: ValueNotifier<MediaState>` and `isBuffering: ValueNotifier<bool>` as constructor params. If you refactor it to take a `PlaybackController` reference instead, you create `kernel/engine --> features/player` circularity.
+
+**Prevention**: Enforce unidirectional dependency: `kernel/` never imports from `features/` or `ui/`. Use dependency injection (pass ValueNotifiers, not controllers) to maintain this.
 
 ---
 
-### Pitfall L3: X11/Wayland Session Detection Is Fragile
+## Composition Refactoring Pitfalls
 
-**What goes wrong:** The app needs to behave differently on X11 vs Wayland, but detecting which session is active is unreliable. `XDG_SESSION_TYPE` may be missing, `WAYLAND_DISPLAY` may be set even under XWayland, and users can run X11 apps under Wayland via XWayland.
+### PIT-06: ValueNotifier Ownership Ambiguity
 
-**Why it happens:** There is no single canonical way to detect the display server. Environment variables are set by the session manager, not the app. XWayland adds a layer where X11 APIs work but Wayland behavior applies to the compositor.
+**Risk: CRITICAL**
 
-**Consequences:**
-- App applies X11 window positioning logic under Wayland (fails silently)
-- App skips Wayland-specific workarounds when running under XWayland
-- Feature flags based on session type produce wrong behavior
+FvpEngine owns 13 ValueNotifier instances as `final` fields. When extracting helpers (VolumeController, SubtitleConfigurator, D3D11Configurator), there are two approaches:
 
-**Prevention:**
-- Use a multi-signal detection approach:
+1. **Helpers receive ValueNotifiers** (current pattern): FvpEngine owns them, passes references to helpers
+2. **Helpers own ValueNotifiers**: Each helper creates and exposes its own notifiers
+
+Approach 2 breaks the `PlayerEngine` contract because the abstract class declares `ValueNotifier<double> get volume` etc. as a flat interface. If VolumeController owns the volume notifier, FvpEngine must delegate: `ValueNotifier<double> get volume => _volumeController.volume`. This works but:
+
+- Widget tests using `engine.volume.value = 0.5` still work (same object reference)
+- But `engine.volume = ValueNotifier(0.5)` (reassignment) breaks because it's now a getter
+- Any code that does `final vn = engine.volume; vn.value = ...` works fine because it's the same object
+
+**Specific risk**: MockEngine creates its own ValueNotifier instances. If the refactoring changes how FvpEngine exposes them (getter vs field), MockEngine must match. Since MockEngine `implements PlayerEngine` (not extends), it must provide the exact same getter/field shape.
+
+**Prevention**: Keep ValueNotifier ownership in FvpEngine. Pass them to helpers as constructor params. Never change a `final field` to a `getter` in the abstract class -- it's a breaking change for all implementors.
+
+### PIT-07: Helper Initialization Order
+
+**Risk: HIGH**
+
+FvpEngine uses `late` for 5 helpers:
 ```dart
-bool get isWayland {
-  if (Platform.environment['XDG_SESSION_TYPE'] == 'wayland') return true;
-  if (Platform.environment['WAYLAND_DISPLAY']?.isNotEmpty == true) return true;
-  return false;
-}
+late FvpCallbackHandler _callbackHandler;
+late PositionPoller _positionPoller;
+late TrackManager _trackManager;
+late MediaOpener _mediaOpener;
+late VideoEffectController _videoEffectController;
 ```
-- Prefer capability detection over session detection: try `setPosition()` and check if it worked, rather than guessing based on session type
-- Accept that XWayland is a hybrid: some X11 APIs work, some don't. Test on both pure X11 and XWayland.
 
-**Warning signs:** Features work on X11 but break on XWayland, or vice versa.
+They're initialized inside `_createPlayer()` which is called lazily via `_player` getter. Adding new helpers (VolumeController, SubtitleConfigurator, D3D11Configurator) means more `late` fields with initialization dependencies:
 
-**Phase:** LINUX-01
+- D3D11Configurator needs `mdk.Player` (created first)
+- SubtitleConfigurator needs `mdk.Player` + possibly `TrackManager`
+- VolumeController needs `mdk.Player` + the `volume` and `isMuted` ValueNotifiers
 
----
+If any helper references another helper before initialization, you get a `LateInitializationError` at runtime. This won't show up in static analysis.
 
-### Pitfall L4: GTK3 vs GTK4 Embedder Differences
+**Prevention**: Initialize all helpers in `_createPlayer()` in strict dependency order. Add a `_helpersInitialized` guard bool. Test with a fresh engine instance (not reusing across tests).
 
-**What goes wrong:** Flutter's Linux embedder uses GTK3 (as of Flutter 3.x). `window_manager` and other plugins interact with GTK3 APIs. If the target system uses GTK4 or if Flutter migrates to GTK4, window management APIs change significantly. GTK4 removed `gtk_window_set_decorated()`, changed resize behavior, and altered CSD (Client-Side Decoration) handling.
+### PIT-08: Callback Wiring Gaps
 
-**Why it happens:** GTK3 and GTK4 have different window management APIs. Flutter's Linux embedder is pinned to GTK3, but the ecosystem is migrating to GTK4. Plugin authors may target different GTK versions.
+**Risk: HIGH**
 
-**Consequences:**
-- `window_manager` may not compile if GTK headers don't match system version
-- CSD vs SSD (Server-Side Decorations) conflicts: GNOME forces CSD, KDE uses SSD
-- Custom title bar rendering may conflict with GTK's own decoration rendering
-
-**Prevention:**
-- Pin `window_manager` to a tested version and verify GTK3 headers are available at build time
-- On GNOME (CSD): Flutter's custom title bar may coexist with GTK's header bar -- test for double-rendering
-- On KDE (SSD): Custom title bar works as expected since the compositor doesn't draw decorations
-- Document the GTK3 dependency and monitor Flutter's GTK4 migration (tracked in flutter/flutter#126955)
-
-**Warning signs:** Double title bar on GNOME. Build failures on systems with only GTK4 dev headers.
-
-**Phase:** LINUX-01
-
----
-
-### Pitfall L5: X11 Window Manager Quirks (Tiling WMs, Compositors)
-
-**What goes wrong:** X11 window managers like i3, Sway (Wayland), and bspwm intercept window geometry requests. `windowManager.setSize()` may be overridden by the tiling layout. `setAlwaysOnTop()` may be ignored or cause focus-stealing alerts.
-
-**Why it happens:** Tiling WMs enforce their own layout algorithm. Floating window requests can be denied or overridden. Some compositors (like picom) add their own shadows and transparency that conflict with Flutter's rendering.
-
-**Consequences:**
-- Window size/position changes are ignored by tiling WM
-- `setAlwaysOnTop()` has no effect or causes compositor warnings
-- Frameless window borders reappear because the WM adds its own decorations
-
-**Prevention:**
-- Accept that tiling WMs will control window geometry. Don't fight it.
-- For `setAlwaysOnTop()`, use `_NET_WM_STATE_ABOVE` X11 hint (which most WMs respect) rather than `window_manager`'s generic method
-- Test on at least: GNOME (floating), KDE (floating), i3 (tiling), Sway (Wayland tiling)
-- Document that tiling WM behavior is unsupported but should degrade gracefully
-
-**Warning signs:** User reports on i3/Sway that window size can't be changed or decorations appear.
-
-**Phase:** LINUX-02 (polish)
-
----
-
-### Pitfall L6: Fractional Scaling Blurs Flutter Content on Linux
-
-**What goes wrong:** Linux fractional scaling (125%, 150%, 175%) causes Flutter content to render at 1x and then get scaled up by the compositor, resulting in blurry text and UI. This is a known Flutter/Linux issue.
-
-**Why it happens:** Flutter's Linux embedder renders at the logical DPI, but the compositor scales the buffer. Unlike Windows (which has per-monitor DPI awareness) and macOS (which has Retina backing), Linux fractional scaling is compositor-dependent and often blurry.
-
-**Consequences:**
-- Text and UI elements appear blurry at 125%/150% scaling
-- User reports "app looks fuzzy" on HiDPI Linux displays
-- No app-side fix exists -- it's an embedder limitation
-
-**Prevention:**
-- Set `GDK_SCALE=2` environment variable to force integer scaling (crisp but larger)
-- Monitor Flutter engine issues for fractional scaling fixes
-- Accept this as a known limitation and document it
-- On GNOME, users can switch to 100% or 200% scaling for crisp rendering
-
-**Warning signs:** User reports blurry text on Linux with fractional DPI. Looks fine at 100% or 200%.
-
-**Phase:** LINUX-02 (document, no code fix)
-
----
-
-## 2. macOS Pitfalls
-
-### Pitfall M1: NSWindow Thread Safety Crashes
-
-**What goes wrong:** macOS Cocoa APIs require ALL `NSWindow` operations on the main thread. Flutter's platform channel callbacks may arrive on the platform thread (not the main thread). Calling `NSWindow.setFrame()`, `NSWindow.toggleFullScreen()`, or invalidating drag regions from a background thread causes `NSInternalInconsistencyException` crashes.
-
-**Why it happens:** Flutter's macOS embedder uses a separate platform thread for channel communication. `window_manager`'s macOS implementation must dispatch all `NSWindow` calls to the main thread via `dispatch_async(dispatch_get_main_queue(), ...)`. If any code path skips this dispatch, the app crashes.
-
-**Consequences:**
-- Random crashes during fullscreen toggle, window resize, or drag operations
-- Crash message: `"NSWindow drag regions should only be invalidated from the Main Thread"`
-- Crashes are non-deterministic (depend on timing), making them hard to reproduce
-
-**Prevention:**
-- Verify `window_manager`'s macOS implementation dispatches to main thread (check source: `macos/Classes/WindowManager.swift`)
-- If writing custom macOS code (Swift/ObjC), ALWAYS wrap NSWindow calls:
-```swift
-DispatchQueue.main.async {
-    self.window?.setFrame(newFrame, display: true)
-}
-```
-- For frameless windows: `mouseDownCanMoveWindow` must be overridden on the `contentView`, and drag region invalidation must happen on main thread
-- Test with thread sanitizer enabled: `flutter run --enable-experiment=impeller -d macos`
-
-**Warning signs:** Random crash during fullscreen toggle. Crash log mentions `NSWindow` + thread assertion.
-
-**Detection:** Rapidly toggle fullscreen 20+ times. If crash occurs, thread safety issue exists.
-
-**Phase:** MACOS-01 (initial port)
-
----
-
-### Pitfall M2: NSWindowStyleMask Manipulation Breaks Window Dragging
-
-**What goes wrong:** Removing `NSWindowStyleMask.titled` (the macOS equivalent of `WS_CAPTION`) to create a frameless window also removes the title bar drag region. The window becomes immovable unless custom drag handling is implemented.
-
-**Why it happens:** On macOS, the title bar is the drag handle. Without `NSWindowStyleMask.titled`, there's no native drag region. `window_manager`'s `setAsFrameless()` removes the titled style, relying on Flutter's `DragToResizeArea` or custom `mouseDownCanMoveWindow` for drag.
-
-**Consequences:**
-- Window cannot be dragged by the title bar area
-- If Flutter's `startDragging()` is not wired up correctly, the window is stuck
-- On macOS, `startDragging()` calls `NSWindow.performWindowDrag()` which requires the titled style to be present (or custom `contentView` override)
-
-**Prevention:**
-- Keep `NSWindowStyleMask.titled` and hide the title bar text using `titleVisibility = .hidden` instead of removing the style mask
-- This preserves the drag region while hiding the visual title bar
-- Alternatively, override `mouseDownCanMoveWindow` on the Flutter view's `NSView` to return `true`
-- Test that `startDragging()` from `window_manager` works after frameless setup
-
-**Warning signs:** Window can't be dragged on macOS after setting frameless. Works on Windows.
-
-**Phase:** MACOS-01
-
----
-
-### Pitfall M3: macOS Fullscreen Uses Different Paradigm Than Windows
-
-**What goes wrong:** macOS fullscreen (`NSWindow.toggleFullScreen()`) creates a new "Space" (virtual desktop) with a transition animation. Windows fullscreen (`WS_POPUP` + monitor cover) is instant and in-place. Code that assumes fullscreen is instant (like the Windows `SetWindowPos` atomic approach) breaks on macOS.
-
-**Why it happens:** macOS fullscreen is a system-level feature with:
-- 1-second animation to new Space
-- Menu bar auto-hide
-- Different `NSWindowStyleMask` during fullscreen
-- `windowWillEnterFullScreen` / `windowDidEnterFullScreen` delegate callbacks with timing gaps
-
-**Consequences:**
-- If code reads `isFullscreen` immediately after calling `setFullScreen(true)`, it returns `false` (animation not complete)
-- Window geometry queries during the transition return intermediate values
-- Exiting fullscreen has a different animation and timing
-
-**Prevention:**
-- Use delegate callbacks, not polling, to detect fullscreen state:
+FvpEngine wires callbacks through FvpCallbackHandler:
 ```dart
-// Wait for delegate callback, not immediate check
-await windowManager.setFullScreen(true);
-// State is updated via WindowListener callbacks, not return value
+_callbackHandler = FvpCallbackHandler(
+  p,
+  state: state,
+  isBuffering: isBuffering,
+  onStopPositionPolling: () => _positionPoller.stop(),
+);
 ```
-- The `WindowBridge.mode` ValueNotifier should be updated by the `windowDidEnterFullScreen` callback, not by the `setFullScreen` return
-- Add a "transitioning" state to `WindowMode` if fullscreen toggle UI needs to show intermediate feedback
-- Test that keyboard shortcuts (F key) work during the fullscreen animation
 
-**Warning signs:** UI shows wrong fullscreen state during animation. F key does nothing during 1-second transition.
+The `onStopPositionPolling` callback creates a cross-helper dependency (callback handler stops the position poller). When extracting more helpers, similar cross-cutting callbacks will emerge:
 
-**Phase:** MACOS-01
+- VolumeController might need to notify state changes
+- SubtitleConfigurator needs to update `subtitleText` notifier
+- D3D11Configurator needs to trigger re-render on config change
 
----
+If you extract a helper but forget to wire a callback, the symptom is subtle: a ValueNotifier never updates, so the UI shows stale data. No error, no crash.
 
-### Pitfall M4: macOS Retina/HiDPI Texture Rendering
+**Prevention**: For each helper, document its callback contract:
+- What ValueNotifiers does it write to?
+- What callbacks does it expose?
+- What external events does it need to receive?
 
-**What goes wrong:** Flutter's texture rendering on macOS uses `FlutterTextureRegistry`. The `fvp` plugin's texture may render at 1x resolution on Retina displays, appearing blurry. The backing store scale factor must match `NSScreen.backingScaleFactor` (typically 2.0).
+Wire all callbacks in `_createPlayer()`. Add integration tests that verify notifier values after state transitions.
 
-**Why it happens:** macOS Retina displays have a 2x pixel ratio. If the texture buffer is created at logical resolution (e.g., 1920x1080) instead of pixel resolution (3840x2160), the compositor upscales it, causing blur.
+### PIT-09: Dispose Ordering
 
-**Consequences:**
-- Video appears blurry on Retina MacBooks and iMacs
-- UI elements (Flutter widgets) are crisp, but video texture is soft
-- User reports "video quality looks worse on Mac than Windows"
+**Risk: MEDIUM**
 
-**Prevention:**
-- Verify `fvp` creates textures at the correct scale factor
-- Check `fvp` source for `NSScreen.main?.backingScaleFactor` usage
-- If `fvp` doesn't handle this, it's an upstream issue -- file against `fvp` repo
-- Workaround: force texture resolution to 2x logical size
+FvpEngine.dispose() must:
+1. Stop position polling (Timer.cancel)
+2. Unregister mdk callbacks
+3. Dispose all 13 ValueNotifiers
+4. Dispose the mdk.Player
 
-**Warning signs:** Crisp Flutter UI but blurry video on Retina displays. Looks fine on non-Retina external monitor.
+If helpers own any of these resources, dispose must cascade correctly. Missing a dispose causes:
+- Timer leak (position keeps polling a dead player)
+- Memory leak (ValueNotifier listeners accumulate)
+- Crash (mdk.Player accessed after native resource freed)
 
-**Phase:** MACOS-02 (polish)
+**Specific risk**: Current dispose does `_positionPoller.stop()` but the new helpers (VolumeController, etc.) may have their own cleanup needs. If FvpEngine.dispose() doesn't call `_volumeController.dispose()`, the mdk.Player might receive volume commands after it's freed.
 
----
-
-### Pitfall M5: macOS App Nap Kills Background Playback
-
-**What goes wrong:** macOS "App Nap" suspends or throttles apps that are not visible or are occluded. If the user minimizes the player or covers it with another window, macOS may pause the playback timer, causing audio stutter or position polling to freeze.
-
-**Why it happens:** macOS aggressively manages power. Apps that are fully occluded or minimized are candidates for App Nap. Flutter's Dart isolate may be throttled, causing `Timer.periodic` (used by `PositionPoller`) to fire irregularly.
-
-**Consequences:**
-- Audio continues (native decoder runs independently) but position updates freeze
-- When the window is restored, position jumps forward (timer catches up)
-- `PositionPoller` reports stale position during App Nap
-
-**Prevention:**
-- Disable App Nap for the process: `NSProcessInfo.processInfo.processInfo.disableAutomaticTermination("Media playback")`
-- Or use `NSProcessInfo.processInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .suddenTerminationDisabled], reason: "Playback")`
-- This can be done via platform channel from Dart
-- Alternative: use `NSBackgroundActivityScheduler` for position polling that survives App Nap
-
-**Warning signs:** Position bar freezes while minimized. Audio keeps playing. Position jumps when window is restored.
-
-**Phase:** MACOS-01 (critical for media player)
+**Prevention**: Each helper implements a `dispose()` method. FvpEngine.dispose() calls them in reverse initialization order. Add a `_disposed` guard in each helper.
 
 ---
 
-### Pitfall M6: macOS Sandbox Restrictions Block File Access
+## Platform-Specific Pitfalls
 
-**What goes wrong:** If the app is sandboxed (required for Mac App Store), file access is restricted to user-selected files via `NSOpenPanel`. Direct path access to arbitrary directories (like the current `FolderScanner` does) fails with permission errors.
+### PIT-10: D3D11 Property Timing
 
-**Why it happens:** macOS sandbox enforces `com.apple.security.files.user-selected.read-only` entitlement. Opening a file via drag-and-drop or `NSOpenPanel` grants temporary access, but the path cannot be reused after app restart without a security-scoped bookmark.
+**Risk: CRITICAL**
 
-**Consequences:**
-- `FolderScanner` can't scan arbitrary directories
-- Playlist persistence saves paths that become inaccessible after restart
-- Drag-and-drop works once but saved paths fail on next launch
+D3D11 properties MUST be set between player creation and first `open()` call:
+```dart
+p.setProperty('d3d11.sync.cpu', syncMode);
+p.setProperty('video.decoders', _defaultVideoDecoders);
+p.setProperty('avcodec.threads', _ffmpegDecoderThreads);
+p.setProperty('videoout.buffer_frames', _maxBufferFrames);
+p.setProperty('reader.starts_with_key', '1');
+```
 
-**Prevention:**
-- Use security-scoped bookmarks to persist file access across launches
-- For non-App-Store distribution: disable sandbox in entitlements
-- For App Store: implement `NSSecurityScopedBookmark` creation on file open, and resolve bookmarks on restore
-- This is a significant architecture change for `PlaylistStore` and `FolderScanner`
+If D3D11Configurator.applyDefaults() is called AFTER `open()`, the properties are ignored silently -- mdk applies them only at open time. The video will play with wrong decoder settings, wrong buffer sizes, or wrong sync mode. Symptoms: black screen, tearing, high CPU usage, or crash on certain hardware.
 
-**Warning signs:** Files opened previously can't be reopened after app restart. "Operation not permitted" errors in console.
+**Prevention**: D3D11Configurator must be called inside `_createPlayer()`, before any `open()` call. Add an assertion: `assert(!_isOpening, 'D3D11 config must be applied before open()')`.
 
-**Phase:** MACOS-03 (App Store prep, if applicable)
+### PIT-11: DisplayConfig Platform Channel Race
 
----
+**Risk: MEDIUM**
 
-## 3. ARM Architecture Pitfalls
+`DisplayConfig.d3d11SyncMode()` and `DisplayConfig.getRefreshRate()` call platform channels to query monitor refresh rate. These are async by nature but used synchronously in `_applyD3d11Defaults()`. If the platform channel hasn't responded yet (cold start, slow platform), the values fall back to defaults.
 
-### Pitfall A1: macOS Apple Silicon (ARM64) Native Plugin Compilation
+**Current mitigation**: DisplayConfig likely caches the first response. But if you extract D3D11Configurator as a separate class that constructs independently, it might query DisplayConfig before the cache is warm.
 
-**What goes wrong:** Native plugins with C/C++ code (like `fvp` which wraps MDK/FFmpeg) must provide ARM64 binaries for macOS. If `fvp` ships only x86_64 binaries, the app runs under Rosetta 2 emulation with performance penalty.
+**Prevention**: D3D11Configurator should receive DisplayConfig values as constructor params, not query them directly. This makes the dependency explicit and testable.
 
-**Why it happens:** MDK/FFmpeg native libraries must be compiled for `arm64-apple-darwin`. If `fvp` bundles pre-built x86_64 `.dylib` files, they work via Rosetta but lose native performance.
+### PIT-12: mdk.Player Singleton Behavior
 
-**Consequences:**
-- Video decoding runs at 50-70% of native ARM64 performance
-- Battery drain is higher than native
-- User reports "app is slow on M1/M2/M3 Macs"
+**Risk: HIGH**
 
-**Prevention:**
-- Check `fvp` pubspec for macOS binary architecture: `file libfvp.dylib` should show `arm64`
-- If `fvp` doesn't provide ARM64, request it or build MDK/FFmpeg from source for arm64
-- Universal binary (x86_64 + arm64) is the ideal solution
-- Test on actual Apple Silicon hardware, not just Rosetta
+`mdk.Player()` is a native resource with global state implications. Creating multiple mdk.Player instances can:
+- Conflict on D3D11 device context (shared GPU resources)
+- Cause texture ID collisions
+- Lead to audio device contention
 
-**Warning signs:** Activity Monitor shows "Intel" next to the process name on Apple Silicon Mac.
+FvpEngine uses lazy initialization (`_playerInstance ??= _createPlayer()`). If the refactoring accidentally creates a second player (e.g., helper creates its own for testing), it corrupts the first player's state.
 
-**Phase:** MACOS-01
+**Prevention**: mdk.Player creation stays ONLY in FvpEngine._createPlayer(). Helpers receive the player instance, never create their own. Add a singleton assertion in debug mode.
 
----
+### PIT-13: Texture ID Lifecycle
 
-### Pitfall A2: Windows ARM64 Flutter Plugin Availability
+**Risk: HIGH**
 
-**What goes wrong:** Flutter's Windows ARM64 support is newer and less mature. Many plugins assume x86_64 and may not compile or run on Windows ARM64 devices (Surface Pro X, Snapdragon laptops).
+The texture ID flow is:
+```
+mdk.Player created --> textureId = null
+mdk.Player.open() --> mdk internally creates D3D11 texture
+_p.textureId.addListener(_onTextureIdChanged) --> copies to FvpEngine.textureId
+UI reads engine.textureId --> Texture(textureId: id)
+```
 
-**Why it happens:** Windows ARM64 has a smaller market share. Plugin authors may not test on ARM64. Native dependencies (DLLs) must be compiled for ARM64.
+If you extract the texture ID forwarding to a helper, the timing must be preserved exactly. The texture ID is only valid while the mdk.Player is alive. If a helper holds a stale reference to the old texture ID after a new `open()` call, the Texture widget renders garbage or crashes.
 
-**Consequences:**
-- `window_manager` may work (pure Dart + Win32 API which has ARM64 support)
-- `fvp` may not have ARM64 Windows binaries
-- Build failures or runtime crashes on ARM64 Windows
+**Prevention**: Keep `_onTextureIdChanged` in FvpEngine. It's a 1-liner: `textureId.value = _player.textureId.value`. Don't extract it.
 
-**Prevention:**
-- Check each native plugin for ARM64 Windows support before committing to the platform
-- For `fvp`: verify MDK provides `arm64-windows` binaries
-- If ARM64 Windows is a target, test early and often -- don't treat it as an afterthought
-- Consider ARM64 Windows as a "best effort" tier rather than fully supported
+### PIT-14: Win32 Window Manager Interactions
 
-**Warning signs:** Build errors on ARM64 Windows about missing `.dll` or architecture mismatch.
+**Risk: MEDIUM**
 
-**Phase:** ARM-01 (if Windows ARM64 is a target)
+The engine layer doesn't directly touch Win32 window management, but `DisplayConfig` bridges to it. If the refactoring moves DisplayConfig into a helper, and that helper is constructed before the window is fully initialized, the refresh rate query fails silently.
 
----
+**Specific scenario**: App starts --> FvpEngine created --> D3D11Configurator queries DisplayConfig --> Window not yet shown --> fallback to 60Hz --> user's 144Hz monitor gets wrong sync mode.
 
-### Pitfall A3: Linux ARM64 (Raspberry Pi) Build Toolchain
-
-**What goes wrong:** Building Flutter for Linux ARM64 requires cross-compilation or native ARM64 build environment. The toolchain setup is significantly more complex than x86_64 Linux.
-
-**Why it happens:** Flutter's Linux build uses the host toolchain. Building on x86_64 for ARM64 requires cross-compilation flags and ARM64 sysroot. Building natively on ARM64 (e.g., Raspberry Pi) is slow.
-
-**Consequences:**
-- Build times are 5-10x longer on ARM64 Linux
-- Some plugins may not compile for ARM64 Linux at all
-- CI/CD pipeline needs ARM64 runners or cross-compilation setup
-
-**Prevention:**
-- Use Docker with ARM64 image for cross-compilation: `docker run --platform linux/arm64`
-- Or build natively on ARM64 hardware (slow but reliable)
-- Check `fvp` for Linux ARM64 binary availability
-- Consider Linux ARM64 as unsupported unless there's specific user demand
-
-**Warning signs:** Build errors about missing `aarch64-linux-gnu` toolchain. Linker errors about architecture mismatch.
-
-**Phase:** ARM-02 (if Linux ARM64 is a target)
+**Prevention**: D3D11Configurator should have a `refresh()` method that re-queries DisplayConfig after window is shown. Or defer D3D11 config until first `open()`.
 
 ---
 
-## 4. Cross-Platform Abstraction Pitfalls
+## Testing Pitfalls
 
-### Pitfall C1: Platform Interface Leaks Windows Concepts
+### PIT-15: MockEngine Contract Drift
 
-**What goes wrong:** The current `WindowBridge` interface is clean (6 commands, 4 states), but extending it for cross-platform risks leaking Windows-specific concepts. Methods like `setFrameless(bool)` map cleanly to macOS (`NSWindowStyleMask`), but methods like `setWindowStyle(int)` or `setThickFrame(bool)` have no macOS/Linux equivalent.
+**Risk: CRITICAL**
 
-**Why it happens:** The developer knows Windows deeply and naturally models the interface around Win32 concepts. macOS and Linux have fundamentally different window management models.
+MockEngine `implements PlayerEngine` (not `extends`). This means:
+- Every abstract method/property in PlayerEngine MUST be implemented in MockEngine
+- If you add a new abstract method to PlayerEngine, MockEngine breaks at compile time (good)
+- If you change a method signature, MockEngine breaks at compile time (good)
+- If you change a field to a getter in PlayerEngine, MockEngine must match (subtle)
 
-**Consequences:**
-- Interface redesign when macOS implementation starts (already predicted in existing PITFALLS.md)
-- Windows-specific methods become dead code on other platforms
-- Consumers of the interface must handle platform-specific behavior
+MockEngine currently has all 13 ValueNotifiers as `final` fields, matching PlayerEngine's abstract getters. This works because Dart allows a field to satisfy a getter contract. But if PlayerEngine changes any getter to require a different implementation pattern, MockEngine must be updated.
 
-**Prevention:**
-- Current `WindowBridge` is already well-designed (intent-based, not API-based). Protect this property.
-- Every new method must have a one-line macOS and Linux equivalent documented before adding it
-- If a method only works on one platform, it should be a platform-specific extension, not in the interface
-- Use `Platform.isWindows` guards in consumers, not `if (bridge is NoopWindowBridge)` checks
+**Specific risk**: MockEngine imports `package:player_engine/player_engine.dart`. After migration, it must import the local barrel. If MockEngine still references types from the old package (e.g., `MediaState` from the wrong import), it will compile but use a different type than the rest of the app.
 
-**Warning signs:** Interface methods that say "Windows only" in their docs. `UnsupportedError` thrown on macOS/Linux for basic operations.
+**Prevention**: Migrate MockEngine FIRST. Run `dart analyze lib/kernel/engine/mock_engine.dart` in isolation. Verify all 13 ValueNotifier types match exactly.
 
-**Phase:** LINUX-01, MACOS-01 (interface evolution)
+### PIT-16: FakeEngine in Tests
 
----
+**Risk: HIGH**
 
-### Pitfall C2: NoopWindowBridge Masks Platform Gaps
+`test/helpers/fake_engine.dart` contains `FakeEngine implements PlayerEngine`. It's used by multiple test files. If the PlayerEngine interface changes during refactoring, FakeEngine breaks and cascades to all tests that use it.
 
-**What goes wrong:** The existing `NoopWindowBridge` returns safe defaults for all operations. On macOS/Linux, if the real implementation isn't ready, `NoopWindowBridge` makes the app appear to work while silently failing to control the window. The UI shows "windowed" state when the window is actually fullscreen.
+Additionally, `test/features/player/services/subtitle_service_test.dart` has its own `_FakeEngine` class. Multiple fake implementations drift apart over time.
 
-**Why it happens:** `NoopWindowBridge` was designed for testing, not for production platform gaps. But during cross-platform rollout, it may be used as a placeholder.
+**Prevention**: After any PlayerEngine interface change, immediately update FakeEngine and all _FakeEngine variants. Run `flutter test` before committing.
 
-**Consequences:**
-- User presses F for fullscreen -- nothing visual happens but `mode.value` stays `windowed`
-- User closes fullscreen via OS shortcut -- `mode.value` still says `windowed`
-- Keyboard shortcuts that check `isFullscreen` behave incorrectly
+### PIT-17: Widget Test Texture Assumptions
 
-**Prevention:**
-- Log a warning on first `NoopWindowBridge` use in debug mode
-- Make state queries (`mode`, `windowSize`) throw `UnsupportedError` in `NoopWindowBridge` to fail fast
-- Never ship `NoopWindowBridge` to production -- either implement the platform or disable the feature
-- The existing warning in PITFALLS.md (3b) applies here too
+**Risk: MEDIUM**
 
-**Warning signs:** App "works" on macOS but fullscreen button does nothing. No error in console.
+Widget tests that render `VideoSurface` depend on `engine.textureId.value`. MockEngine sets this to `null` (no real texture). If the refactoring changes when textureId is set (e.g., before vs after open()), widget tests that check for texture rendering may break.
 
-**Phase:** LINUX-01, MACOS-01
+**Specific tests at risk**: `test/widget/player/controls_overlay_test.dart`, `test/golden/control_layouts_golden_test.dart`.
 
----
+**Prevention**: MockEngine's texture behavior should remain: `textureId` stays null unless explicitly configured. Don't change the mock's texture lifecycle.
 
-### Pitfall C3: window_manager Plugin Version Fragmentation
+### PIT-18: Integration Test Engine Setup
 
-**What goes wrong:** `window_manager` is a community plugin with varying platform support quality. Its Linux implementation has known Wayland gaps. Its macOS implementation has threading edge cases. Pinning to one version means missing fixes; upgrading may introduce regressions on a platform you just fixed.
+**Risk: MEDIUM**
 
-**Why it happens:** The plugin maintainer balances 3 platforms with different maturity levels. A fix for macOS may break Linux. A Wayland fix may require GTK API changes.
+`test/integration/playback_flow_test.dart` imports player_engine and likely creates a full engine setup. If the engine's initialization sequence changes (new helpers, different order), integration tests that exercise the full open->play->pause->seek flow may break at different points.
 
-**Consequences:**
-- Upgrading `window_manager` to fix macOS issues breaks Linux behavior
-- Each platform requires a different tested version
-- Plugin issues become your issues with no workaround
+**Prevention**: Run integration tests after EACH helper extraction, not just at the end. Each extraction should be a separate commit with passing tests.
 
-**Prevention:**
-- Test `window_manager` upgrades on ALL supported platforms before merging
-- Maintain a compatibility matrix: `window_manager` version x platform x behavior
-- If `window_manager` becomes a blocker, consider forking or writing platform-specific implementations
-- The existing `Win32PlatformFullscreen` bypass pattern (bypassing `window_manager` for Windows fullscreen) may need to be replicated for macOS/Linux
+### PIT-19: Test Helper Import Path Sensitivity
 
-**Warning signs:** `window_manager` upgrade fixes one platform but breaks another. Open issues on GitHub with no response.
+**Risk: LOW**
 
-**Phase:** LINUX-01, MACOS-01
+20 test files import `package:player_engine/player_engine.dart`. After migration, they need `package:simple_player_flutter/kernel/engine/player_engine.dart` or relative paths. The relative path from `test/` to `lib/kernel/engine/` is `../../lib/kernel/engine/player_engine.dart`, which is fragile -- moving any test file breaks its imports.
+
+**Prevention**: Use package imports in tests: `import 'package:simple_player_flutter/kernel/engine/player_engine.dart'`. This is stable regardless of test file location.
 
 ---
 
-### Pitfall C4: DragToResizeArea Widget Is Platform-Agnostic But Behavior Isn't
+## Flutter Desktop-Specific Gotchas
 
-**What goes wrong:** `DragToResizeArea` (from `window_manager`) provides resize handles at window edges using Flutter widget hit-testing. This works on all platforms visually, but the underlying resize mechanism differs: Windows uses `WM_NCHITTEST`, macOS uses `NSWindow` resize edges, Linux uses GTK window resize.
+### PIT-20: Texture Widget Null Safety
 
-**Why it happens:** The widget provides a unified interface, but the platform channel calls differ. On Windows, native `WM_NCHITTEST` is superior (Pitfall 1d from existing PITFALLS.md). On macOS, the native resize behavior may conflict with `DragToResizeArea`.
+**Risk: MEDIUM**
 
-**Consequences:**
-- On Windows: `DragToResizeArea` + native `WM_NCHITTEST` = double-handling (already documented)
-- On macOS: `DragToResizeArea` may fight with `NSWindow`'s built-in resize behavior
-- On Linux: Resize behavior depends on compositor and may not respect `DragToResizeArea` at all
+Flutter's `Texture` widget requires a valid texture ID. If `textureId.value` is:
+- `null` --> Texture widget throws or renders nothing
+- Stale ID (from previous open) --> renders wrong video or crashes
+- Negative --> undefined behavior
 
-**Prevention:**
-- On Windows: Remove `DragToResizeArea` when using native `WM_NCHITTEST` (existing plan)
-- On macOS: Test if `DragToResizeArea` works alongside `NSWindow` resize. If conflicts, remove it and rely on native resize.
-- On Linux: `DragToResizeArea` may be the ONLY resize mechanism if GTK doesn't provide resize handles for frameless windows
-- Document per-platform resize strategy
+During refactoring, if a helper resets textureId at the wrong time (e.g., during dispose), the Texture widget in `VideoSurface` may receive an invalid ID.
 
-**Warning signs:** Resize jitter on macOS. Double-resize on Windows. No resize on Linux.
+**Prevention**: Only set textureId in `_onTextureIdChanged`. Never reset it to null except in dispose.
 
-**Phase:** LINUX-01, MACOS-01
+### PIT-21: BackdropFilter Performance with Engine State
 
----
+**Risk: LOW**
 
-### Pitfall C5: Platform Channel Threading Model Differs Per OS
+The control bar uses `BackdropFilter` (glass-morphism). This widget captures the layer behind it and applies a blur. If the engine's texture rendering changes timing (e.g., due to helper initialization adding latency), the BackdropFilter may capture a frame with wrong content.
 
-**What goes wrong:** `MethodChannel` callbacks run on the platform thread, but the platform thread differs per OS:
-- **Windows:** Main thread (UI thread)
-- **macOS:** Platform thread (separate from main thread)
-- **Linux:** Main thread (GTK main loop)
+This is unlikely but worth noting: D3D11Configurator initialization adds a few ms to startup. If this happens during the first frame render, the glass effect may briefly show wrong content.
 
-Updating `ValueNotifier` objects (used by `WindowBridge`) from a non-main thread causes "setState during build" assertions on macOS.
+**Prevention**: D3D11Configurator initialization is synchronous (just `setProperty` calls), so this risk is minimal. If it becomes async (e.g., querying hardware capabilities), defer it.
 
-**Why it happens:** Flutter's threading model is documented but not uniform across platforms. macOS's separation of main thread and platform thread is the primary source of issues.
+### PIT-22: ValueNotifier Listener Accumulation
 
-**Consequences:**
-- macOS: Crashes or assertion failures when `WindowListener` callbacks update `ValueNotifier`
-- Windows/Linux: Works fine (same thread)
-- Code that works on Windows may crash on macOS
+**Risk: MEDIUM**
 
-**Prevention:**
-- Always update `ValueNotifier` via `WidgetsBinding.instance.addPostFrameCallback` when coming from platform channels
-- Or use `SchedulerBinding.instance.scheduleTask` to ensure main thread execution
-- The existing `WindowService` already uses `WindowListener` which runs on the platform thread -- verify this is safe on macOS
-- Add a comment: "macOS: WindowListener callbacks arrive on platform thread, not main thread"
+If helpers add listeners to ValueNotifiers but don't remove them in dispose, listeners accumulate across test runs. Widget tests create and dispose engines repeatedly. A leaked listener from test 1 fires in test 2, causing unexpected state changes.
 
-**Warning signs:** Random "setState during build" on macOS. Works perfectly on Windows.
+**Specific pattern**: `_player.textureId.addListener(_onTextureIdChanged)` in `_createPlayer()`. If `_createPlayer()` is called multiple times (re-creation after dispose), the listener is added again without removing the old one.
 
-**Phase:** MACOS-01
+**Prevention**: Track all added listeners. Remove them in dispose. Consider using `removeListener` in a `_cleanup` method called before re-creation.
 
 ---
 
-## 5. Cross-Cutting Pitfalls
+## Prevention Strategies Summary
 
-### Pitfall X1: Testing Matrix Explosion
-
-**What goes wrong:** Three platforms x two display servers (X11/Wayland) x two architectures (x86_64/ARM64) = 12+ test configurations. Manual testing on all of them is impractical.
-
-**Why it happens:** Each combination has unique quirks. A bug on GNOME Wayland ARM64 may not reproduce on GNOME X11 x86_64.
-
-**Consequences:**
-- Bugs ship to users on untested configurations
-- CI/CD matrix becomes expensive
-- Developer only tests on their own machine (Windows x86_64)
-
-**Prevention:**
-- Define tier system:
-  - **Tier 1 (always test):** Windows x86_64, macOS ARM64, Ubuntu GNOME X11 x86_64
-  - **Tier 2 (test before release):** Ubuntu GNOME Wayland x86_64, macOS x86_64
-  - **Tier 3 (best effort):** Linux ARM64, Windows ARM64, KDE, Sway, i3
-- Use GitHub Actions matrix builds for Tier 1
-- Manual test on Tier 2 before releases
-- Accept community reports for Tier 3
-
-**Warning signs:** Bug reports from Tier 3 users. "Works on my machine" syndrome.
-
-**Phase:** LINUX-01, MACOS-01
-
----
-
-### Pitfall X2: Build System Complexity Multiplies Per Platform
-
-**What goes wrong:** Each platform requires different build tooling:
-- **Windows:** Visual Studio, MSVC, Windows SDK
-- **macOS:** Xcode, macOS SDK, code signing
-- **Linux:** GCC/Clang, GTK3 dev headers, pkg-config
-
-CI/CD must support all three. Local development on one platform can't verify the others.
-
-**Consequences:**
-- Linux-specific build failures only discovered in CI
-- macOS code signing issues block releases
-- GTK3 header version mismatches cause cryptic linker errors
-
-**Prevention:**
-- Use Flutter's built-in build system (`flutter build`) which handles platform specifics
-- For native code: document required SDK versions in CONTRIBUTING.md
-- CI matrix: use `macos-latest`, `ubuntu-latest`, `windows-latest` runners
-- Test release builds, not just debug (different optimization levels may expose different bugs)
-
-**Warning signs:** CI passes but release build fails. Linux build works on Ubuntu but not Fedora.
-
-**Phase:** LINUX-01, MACOS-01
+| Pitfall | Severity | Prevention |
+|---------|----------|------------|
+| PIT-01: Barrel symbol mismatch | HIGH | Symbol diff before/after migration |
+| PIT-02: Relative path depth | MEDIUM | Separate lib/ and test/ migration passes |
+| PIT-03: Engine internal imports | HIGH | Migrate engine files first, verify in isolation |
+| PIT-05: Circular dependency | MEDIUM | Enforce unidirectional kernel/ -> features/ |
+| PIT-06: ValueNotifier ownership | CRITICAL | Keep ownership in FvpEngine, pass to helpers |
+| PIT-07: Helper init order | HIGH | Strict ordering in _createPlayer(), guard bool |
+| PIT-08: Callback wiring gaps | HIGH | Document callback contracts, integration tests |
+| PIT-09: Dispose ordering | MEDIUM | Reverse-order dispose, _disposed guards |
+| PIT-10: D3D11 property timing | CRITICAL | Apply in _createPlayer() before open(), assert |
+| PIT-11: DisplayConfig race | MEDIUM | Pass values as constructor params |
+| PIT-12: mdk.Player singleton | HIGH | Player creation ONLY in FvpEngine |
+| PIT-13: Texture ID lifecycle | HIGH | Keep _onTextureIdChanged in FvpEngine |
+| PIT-14: Win32 window race | MEDIUM | Defer DisplayConfig query to first open() |
+| PIT-15: MockEngine drift | CRITICAL | Migrate first, verify all 13 notifiers match |
+| PIT-16: FakeEngine cascade | HIGH | Update all fakes immediately on interface change |
+| PIT-17: Widget test texture | MEDIUM | Don't change mock texture lifecycle |
+| PIT-18: Integration test order | MEDIUM | Run after each extraction, not just at end |
+| PIT-19: Test import paths | LOW | Use package imports, not relative |
+| PIT-20: Texture null safety | MEDIUM | Only set textureId in _onTextureIdChanged |
+| PIT-22: Listener accumulation | MEDIUM | Track and remove all listeners in dispose |
 
 ---
 
-## Phase-Specific Warnings
+## Phase Mapping
 
-| Phase | Pitfall | Severity | Mitigation |
-|-------|---------|----------|------------|
-| LINUX-01: Initial port | L1: Wayland no positioning | HIGH | Skip position save on Wayland, size-only |
-| LINUX-01: Initial port | L2: No global coordinates | HIGH | Use widget-relative positioning, not screen coords |
-| LINUX-01: Initial port | L3: Session detection fragile | MEDIUM | Multi-signal detection + capability probing |
-| LINUX-01: Initial port | L4: GTK3 vs GTK4 | MEDIUM | Pin GTK3, test CSD vs SSD on GNOME/KDE |
-| LINUX-02: Polish | L5: Tiling WM quirks | LOW | Accept degradation, don't fight tiling WMs |
-| LINUX-02: Polish | L6: Fractional scaling blur | MEDIUM | Document as known limitation, no code fix |
-| MACOS-01: Initial port | M1: NSWindow thread safety | CRITICAL | Dispatch all NSWindow calls to main thread |
-| MACOS-01: Initial port | M2: Frameless breaks dragging | HIGH | Keep titled style, hide titleVisibility |
-| MACOS-01: Initial port | M3: Fullscreen paradigm difference | HIGH | Use delegate callbacks, not polling |
-| MACOS-02: Polish | M4: Retina texture blur | MEDIUM | Verify fvp scale factor handling |
-| MACOS-01: Initial port | M5: App Nap kills playback | HIGH | Disable App Nap via NSProcessInfo |
-| MACOS-03: App Store | M6: Sandbox blocks file access | HIGH | Security-scoped bookmarks |
-| ARM-01: macOS ARM64 | A1: Plugin ARM64 binaries | HIGH | Verify fvp ships arm64 macOS binaries |
-| ARM-02: Windows ARM64 | A2: Plugin ARM64 availability | MEDIUM | Check each plugin, consider unsupported |
-| ARM-03: Linux ARM64 | A3: Build toolchain complexity | LOW | Docker cross-compile or native build |
-| Cross-platform | C1: Interface leaks Windows concepts | HIGH | Intent-based methods, document per-platform |
-| Cross-platform | C2: NoopWindowBridge masks gaps | MEDIUM | Throw on state queries, never ship to prod |
-| Cross-platform | C3: window_manager version fragmentation | HIGH | Test all platforms before upgrading |
-| Cross-platform | C4: DragToResize platform differences | MEDIUM | Per-platform resize strategy |
-| Cross-platform | C5: Channel threading differs per OS | HIGH | Always update ValueNotifier on main thread |
-| Cross-cutting | X1: Test matrix explosion | MEDIUM | Tier system: T1 always, T2 pre-release |
-| Cross-cutting | X2: Build system complexity | MEDIUM | CI matrix + documented SDK requirements |
+### Phase 1: Import Migration (57 files)
 
----
+**Address these pitfalls in this phase:**
+- PIT-01 (barrel symbol mismatch) -- verify before starting
+- PIT-02 (relative path depth) -- separate lib/ and test/ passes
+- PIT-03 (engine internal imports) -- migrate engine files first
+- PIT-15 (MockEngine drift) -- migrate MockEngine first
+- PIT-16 (FakeEngine cascade) -- update all fakes
+- PIT-19 (test import paths) -- use package imports
 
-## Sources
+**Gate**: `dart analyze` passes with zero errors. All existing tests pass.
 
-- Existing anti-patterns: `anti_pattern_window_frameless.md` (WS_CAPTION removal, DWM animation dependency)
-- Existing pitfalls: `.planning/research/PITFALLS.md` (Win32 frameless, HLS ABR, platform abstraction)
-- Window bridge design: `project_bridge_layer_design.md` (WindowBridge interface, 3 bridge domains)
-- Window cross-platform strategy: `project_window_cross_platform.md` (window_manager as cross-platform, Win32 FFI as platform-specific)
-- Fullscreen fix: `project_fullscreen_win32_fix.md` (WS_THICKFRAME 7px gap, SetWindowPos atomic)
-- Native interfaces: `project_native_layer_interfaces.md` (MethodChannel unified, WM_NCCALCSIZE/NCHITTEST)
-- Flutter desktop docs: docs.flutter.dev/platform-integration/desktop
-- Flutter macOS embedder: `flutter/engine/shell/platform/darwin/macos/` (NSWindow thread model)
-- Flutter Linux embedder: `flutter/engine/shell/platform/linux/` (GTK3, fl_view, xdg_shell)
-- Wayland protocol: `xdg_shell` spec (no client-side positioning by design)
-- window_manager GitHub: leanflutter/window_manager (Linux/macOS issues, Wayland gaps)
+### Phase 2: Helper Extraction (FvpEngine decomposition)
 
----
+**Address these pitfalls in this phase:**
+- PIT-06 (ValueNotifier ownership) -- keep in FvpEngine
+- PIT-07 (helper init order) -- strict ordering
+- PIT-08 (callback wiring gaps) -- document contracts
+- PIT-09 (dispose ordering) -- reverse-order cascade
+- PIT-13 (texture ID lifecycle) -- keep in FvpEngine
+- PIT-22 (listener accumulation) -- track all listeners
 
-*Pitfall analysis: 2026-06-23 -- Cross-platform window management expansion scope*
+**Gate**: FvpEngine < 200 lines. All ValueNotifiers still owned by FvpEngine. Integration tests pass.
+
+### Phase 3: Platform Helper Extraction (D3D11, Subtitle, Volume)
+
+**Address these pitfalls in this phase:**
+- PIT-10 (D3D11 property timing) -- apply in _createPlayer()
+- PIT-11 (DisplayConfig race) -- pass values as params
+- PIT-12 (mdk.Player singleton) -- creation only in FvpEngine
+- PIT-14 (Win32 window race) -- defer to first open()
+
+**Gate**: D3D11Configurator is a pure function (no side effects, no async). All platform tests pass.
+
+### Phase 4: Verification
+
+**Address all remaining risks:**
+- PIT-05 (circular dependency) -- verify with `dart analyze` dependency graph
+- PIT-17 (widget test texture) -- run golden tests
+- PIT-18 (integration test order) -- run full test suite
+- PIT-20 (texture null safety) -- manual smoke test on Windows
+
+**Gate**: Full `flutter test` passes. Manual smoke test on Windows with real video file.

@@ -1,270 +1,471 @@
-# Architecture Patterns — Cross-Platform Window Management
+# Architecture Research: PlayerEngine Refactoring
 
-**Domain:** Flutter desktop cross-platform window management
-**Researched:** 2026-06-23
-**Confidence:** HIGH (based on current codebase analysis + ecosystem knowledge)
+## Current Architecture Analysis
 
-## Recommended Architecture
+### What Exists
 
-### Current Architecture (Windows-Only)
-
-The existing codebase has a clean layered architecture with well-defined seams for cross-platform extension:
+**Engine layer** (22 files, 2069 lines total in `lib/kernel/engine/`):
 
 ```
-UI Layer (ValueListenableBuilder)
-    |
-    v
-WindowBridge (abstract interface: 4 ValueNotifiers + 6 commands)
-    |
-    v
-WindowService (thin coordinator, implements WindowBridge)
-    |-- WindowState (pure state container: mode/windowSize/isResizing/isAlwaysOnTop)
-    |-- WindowPersistence (debounce + write lock, wraps SettingsStore)
-    |-- FullscreenController (mutex + rollback, injects PlatformFullscreen)
-    |       |-- PlatformFullscreen (abstract: enter() -> Snapshot, exit(Snapshot))
-    |       |       +-- Win32PlatformFullscreen (FFI user32.dll, WS_THICKFRAME fix)
-    |       |-- WindowOps (abstract: getPosition/setSize/etc, injectable for tests)
-    |       +-- RealWindowOps (delegates to window_manager)
-    |
-    v
-window_manager package (cross-platform: Win/Mac/Linux)
+PlayerEngine (abstract, 178 lines)
+  ├── 12 ValueNotifiers (state exposure)
+  ├── 30+ methods (playback control, tracks, effects, D3D11)
+  └── 3 plain getters (errorType, mediaInfo, subtitleDelay)
+
+FvpEngine (concrete, 547 lines) extends PlayerEngine
+  ├── FvpCallbackHandler (99 lines) — mdk callbacks → ValueNotifier mapping
+  ├── PositionPoller (150 lines) — adaptive timer polling
+  ├── TrackManager (70 lines) — audio/subtitle track switching
+  ├── MediaOpener (184 lines) — open/prepare/metadata/texture
+  ├── VideoEffectController (57 lines) — brightness/contrast/hue/saturation/rotate
+  ├── VolumeController (35 lines) — volume/mute sync
+  ├── SubtitleConfigurator (37 lines) — external subtitle/delay/equalizer
+  ├── D3D11Configurator (37 lines) — hardware decode/sync toggle
+  ├── NetworkConfigurator (84 lines) — protocol-specific FFmpeg params
+  ├── EnginePrewarm (79 lines) — startup FFmpeg+D3D11 init
+  └── MockEngine (432 lines) — test double with event recording
+
+Models (6 files):
+  ├── MediaInfo, AudioTrackInfo, SubtitleTrackInfo, VideoCodecInfo
+  ├── MediaState enum, MediaErrorType enum, VideoEffectType enum
+  └── OpenResult sealed class
 ```
 
-**Key files:**
-- `lib/kernel/bridge/window_bridge.dart` — abstract interface (26 lines)
-- `lib/kernel/bridge/window_service.dart` — coordinator (262 lines)
-- `lib/kernel/bridge/fullscreen_controller.dart` — mutex + rollback (167 lines)
-- `lib/kernel/bridge/platform_fullscreen.dart` — platform abstraction (43 lines)
-- `lib/kernel/bridge/window_state.dart` — state container (47 lines)
-- `lib/kernel/bridge/window_persistence.dart` — debounce persistence (78 lines)
-- `lib/kernel/bridge/win32/win32_platform_fullscreen.dart` — Win32 FFI impl (140 lines)
+**External dependency**: `player_engine` package at `../widget_tree_flutter/player_engine` — 1:1 copy of abstract interface + models. Path dependency in pubspec.yaml.
 
-### Component Boundaries for Cross-Platform
+**Service layer** (5 files in `lib/features/player/services/`):
+- PlaybackController — orchestrator, delegates to PlaybackNavigator + FileOperations + StateMonitor
+- PlaybackNavigator — index/next/prev with openGeneration guard
+- StateMonitor — auto-advance, breakpoint save, settings restore
+- SubtitleService — external subtitle detection
+- VideoProcessingService — color correction presets
 
-The architecture already has the right abstraction seams. The work is adding concrete implementations, not restructuring.
+**UI layer** (18 files access engine):
+- All go through PlaybackController or direct `engine.xxx` ValueNotifier reads
+- ValueListenableBuilder pattern throughout
+
+### Strengths
+
+1. **Clean abstraction**: PlayerEngine interface enables MockEngine for testing
+2. **Composition helpers**: FvpEngine delegates to 9 focused helpers (not a god class)
+3. **ValueNotifier pattern**: Flutter-native reactive state, no external state management
+4. **Guard clauses**: `_disposed` check + try-catch in every method
+5. **Timeline tracing**: `Timeline.startSync/finishSync` for performance profiling
+6. **Adaptive polling**: PositionPoller uses 3-tier intervals (100ms/250ms/500ms) to save CPU
+
+### Weaknesses
+
+1. **External path dependency**: `player_engine` package is a 1:1 copy, adds complexity without benefit
+2. **Flat interface bloat**: PlayerEngine has 30+ methods mixing playback, tracks, effects, D3D11 config — violates ISP
+3. **Helper duplication**: VolumeController/SubtitleConfigurator/D3D11Configurator exist but FvpEngine duplicates their logic inline
+4. **Inconsistent delegation**: FvpEngine uses VideoEffectController and TrackManager but NOT VolumeController/SubtitleConfigurator/D3D11Configurator
+5. **Mixed import paths**: Some files import `package:player_engine/player_engine.dart` (external), others import `package:simple_player_flutter/kernel/engine/...` (local)
+6. **No barrel export**: `player_engine.dart` exports models but not all engine files
+7. **MockEngine bloat**: 432 lines, duplicates all 30+ method stubs
+
+## Target Architecture
+
+### Design Principles
+
+1. **Single responsibility per interface**: Split PlayerEngine into focused capability interfaces
+2. **Composition over inheritance**: FvpEngine composes helpers, each helper implements one interface
+3. **Local-only dependency**: Remove external path dependency, use local barrel export
+4. **Minimal UI surface**: UI layer only sees what it needs
+
+### Target Structure
 
 ```
-+-----------------------------------------------------------------------+
-|  UI Layer (unchanged -- depends only on WindowBridge interface)        |
-|  CustomTitleBar, ControlsOverlay, KeyboardHandler, PlayerScreen       |
-+----------------------------------+------------------------------------+
-                                   | WindowBridge (abstract)
-+----------------------------------+------------------------------------+
-|  WindowService (thin coordinator -- minor platform factory change)    |
-|  +---------------+ +------------------+ +-------------------------+  |
-|  | WindowState    | | WindowPersistence| | FullscreenController    |  |
-|  | (platform-     | | (platform-       | | (platform-agnostic,    |  |
-|  |  agnostic)     | |  agnostic)       | |  injects PlatformFS)   |  |
-|  +---------------+ +------------------+ +------------+------------+  |
-+-------------------------------------------------------+--------------+
-                                                        | PlatformFullscreen
-                                                        | (abstract)
-                              +-------------------------+--------------+
-                              |                        |               |
-                    +---------+---------+  +-----------+-----+  +------+---------+
-                    | Win32PlatformFS    |  | MacosPlatformFS |  | LinuxPlatformFS|
-                    | (exists, FFI)      |  | (new)           |  | (new)          |
-                    +-------------------+  +-----------------+  +----------------+
+lib/kernel/engine/
+  ├── player_engine.dart          # Barrel export (all public types)
+  ├── player_engine_base.dart     # Core interface: state + playback control only
+  │
+  ├── fvp_engine.dart             # Concrete implementation (thin coordinator)
+  │   ├── fvp_callback_handler.dart   # mdk callbacks → ValueNotifier
+  │   ├── position_poller.dart        # Adaptive timer polling
+  │   └── media_opener.dart           # Open/prepare/metadata/texture
+  │
+  ├── capabilities/               # Optional capability interfaces
+  │   ├── track_control.dart      # Audio/subtitle track switching
+  │   ├── video_effects.dart      # Brightness/contrast/hue/saturation/rotate
+  │   ├── subtitle_config.dart    # External subtitle/delay
+  │   ├── equalizer_config.dart   # Audio equalizer
+  │   └── renderer_config.dart    # D3D11/hardware decode config
+  │
+  ├── helpers/                    # FvpEngine internal helpers
+  │   ├── track_manager.dart
+  │   ├── video_effect_controller.dart
+  │   ├── subtitle_configurator.dart
+  │   ├── volume_controller.dart
+  │   ├── d3d11_configurator.dart
+  │   └── network_configurator.dart
+  │
+  ├── models/                     # Data classes (unchanged)
+  │   ├── media_info.dart
+  │   ├── audio_track_info.dart
+  │   ├── subtitle_track_info.dart
+  │   ├── video_codec_info.dart
+  │   ├── media_state.dart
+  │   ├── media_error_type.dart
+  │   ├── video_effect_type.dart
+  │   └── open_result.dart
+  │
+  ├── mock_engine.dart            # Test double
+  └── engine_prewarm.dart         # Startup optimization
 ```
 
-**Platform isolation points (what changes per platform):**
+### Interface Hierarchy
 
-| Component | Windows (exists) | macOS (new) | Linux (new) |
-|-----------|-----------------|-------------|-------------|
-| `PlatformFullscreen` impl | `Win32PlatformFullscreen` (FFI user32.dll) | `MacosPlatformFullscreen` (NSWindow) | `LinuxPlatformFullscreen` (GTK/GdkWindow) |
-| `window_manager` calls | All work | All work (uses NSWindow internally) | All work (uses GTK internally) |
-| Aspect ratio lock | C++ `WM_SIZING` (8-edge support) | NSWindow `willResize` delegate or manual | Not natively supported, manual only |
-| Frameless window | C++ `WM_NCCALCSIZE` + `setAsFrameless` | `window_manager` `TitleBarStyle.hidden` | `window_manager` `TitleBarStyle.hidden` |
-| DPI awareness | `WM_DPICHANGED` + `GetDpiForWindow` | Retina auto-handled by NSWindow | `GdkMonitor` or `PlatformDispatcher` |
-| Window corner rounding | `DWMWA_WINDOW_CORNER_PREFERENCE` (Win11) | Native NSWindow corners | Native GTK corners |
-| Refresh rate detection | `GetDeviceCaps(VREFRESH)` or `EnumDisplaySettings` | `NSScreen.maximumFramesPerSecond` | `GdkMonitor` or hardcoded 60Hz |
+```dart
+/// Core interface — playback state + transport controls
+/// 90% of UI code only needs this.
+abstract class PlayerEngine {
+  // 12 ValueNotifiers (state exposure)
+  // 8 core methods: open, play, pause, stop, seekTo, setVolume, setMute, togglePlayPause
+  // 3 getters: errorType, mediaInfo, subtitleDelay
+  // 1 lifecycle: dispose
+}
+
+/// Optional capabilities — UI/settings panels use these via cast
+mixin TrackControl on PlayerEngine {
+  List<AudioTrackInfo> getAudioTracks();
+  void switchAudioTrack(int index);
+  List<int> get activeAudioTracks;
+  List<SubtitleTrackInfo> getSubtitleTracks();
+  void switchSubtitleTrack(int index);
+  void toggleSubtitle();
+  void setExternalSubtitle(String path);
+}
+
+mixin VideoEffects on PlayerEngine {
+  void setVideoEffect(VideoEffectType effect, double value);
+  void rotate(int degree);
+  void setAspectRatio(double ratio);
+  void setDeinterlace(bool enable);
+  void setPlaybackRate(double rate);
+}
+
+mixin RendererConfig on PlayerEngine {
+  void setD3d11SyncEnabled(bool enabled);
+  void setHardwareDecoding(bool enabled);
+}
+```
+
+### Why Mixins Over Separate Interfaces
+
+- **Backward compatible**: Existing code casting to PlayerEngine still works
+- **Progressive adoption**: UI can check `if (engine is TrackControl)` without breaking
+- **Single implementation**: FvpEngine implements all mixins, MockEngine implements only core
+- **No wrapper boilerplate**: Unlike separate interfaces, no delegation classes needed
+
+## Component Boundaries
+
+### Layer Dependency Graph
+
+```
+UI Layer (18 files)
+  ↓ depends on
+PlaybackController (orchestrator)
+  ↓ depends on
+PlayerEngine (abstract interface)
+  ↑ implemented by
+FvpEngine (concrete)
+  ↓ delegates to
+  ├── FvpCallbackHandler (mdk → Flutter state)
+  ├── PositionPoller (timer → position updates)
+  ├── MediaOpener (open/prepare/metadata)
+  ├── TrackManager (audio/subtitle tracks)
+  ├── VideoEffectController (color/rotation)
+  ├── VolumeController (volume/mute)
+  ├── SubtitleConfigurator (external subtitle)
+  ├── D3D11Configurator (hardware config)
+  └── NetworkConfigurator (protocol params)
+```
+
+### Who Talks to Whom
+
+| Caller | Calls | Purpose |
+|--------|-------|---------|
+| UI widgets | `engine.state`, `engine.position`, etc. (ValueListenableBuilder) | Read state |
+| UI widgets | `controller.playNext()`, `controller.openAndPlay()` | User actions |
+| PlaybackController | `engine.open()`, `engine.play()`, `engine.seekTo()` | Orchestrate playback |
+| StateMonitor | `engine.state.addListener()` | Auto-advance, breakpoint save |
+| FvpEngine | `_callbackHandler.init()` | Register mdk callbacks |
+| FvpEngine | `_positionPoller.start/stop()` | Position tracking |
+| FvpEngine | `_trackManager.switchAudioTrack()` | Track switching |
+| FvpEngine | `_mediaOpener.open()` | File open flow |
+| FvpCallbackHandler | `state.value = mapped` | Push state changes |
+| PositionPoller | `position.value = newPos` | Push position updates |
+| MediaOpener | `_player.prepare()`, `_player.updateTexture()` | MDK operations |
+| TrackManager | `_player.activeAudioTracks = [...]` | MDK track control |
+
+### Boundary Rules
+
+1. **UI → Engine**: Read-only via ValueNotifier. Commands via PlaybackController.
+2. **PlaybackController → Engine**: All playback commands. Never touches helpers directly.
+3. **FvpEngine → Helpers**: Each helper owns one concern. FvpEngine coordinates.
+4. **Helpers → mdk.Player**: Direct FFI calls. No cross-helper dependencies.
+5. **Callbacks → ValueNotifier**: FvpCallbackHandler and PositionPoller write to ValueNotifiers. Nobody else writes.
 
 ## Data Flow
 
-### Window mode change (e.g., fullscreen toggle)
+### Playback State Flow
 
 ```
-User presses F
-  -> KeyboardHandler.onKeyEvent
-  -> WindowService.setMode(WindowMode.fullscreen)
-  -> FullscreenController.setFullscreen(true)
-    -> mutex check (_isAnimating)
-    -> _saveWindowState() via WindowOps (position, size)
-    -> PlatformFullscreen.enter() -> FullscreenSnapshot
-      -> [Win32] FFI: GetWindowLongPtr -> remove WS_THICKFRAME|WS_CAPTION -> SetWindowPos
-      -> [macOS]  NSWindow.toggleFullScreen or NSWindow.styleMask manipulation
-      -> [Linux]  gtk_window_fullscreen or GdkWindow property
-    -> state.mode.value = WindowMode.fullscreen
-  -> UI rebuilds via ValueListenableBuilder (hide title bar, resize controls)
+mdk.Player state change
+  → FvpCallbackHandler.onStateChanged stream
+  → mapMdkState() (pure function)
+  → SchedulerBinding.addPostFrameCallback (main thread)
+  → state.value = MediaState.xxx
+  → ValueListenableBuilder in UI rebuilds
 ```
 
-### OS-driven state change (e.g., user drags window to maximize)
+### Position Update Flow
 
 ```
-OS sends maximize event
-  -> window_manager WindowListener callback
-  -> WindowService.onWindowMaximize()
-  -> state.mode.value = WindowMode.maximized
-  -> UI rebuilds
+Timer.periodic (250ms/100ms/500ms adaptive)
+  → PositionPoller._poll()
+  → _player.position (FFI call)
+  → position.value = newPos (only if changed)
+  → ValueListenableBuilder in ProgressBar rebuilds
 ```
 
-### Window close with persistence
+### Open File Flow
 
 ```
-User clicks close
-  -> WindowService.onWindowClose()
-  -> _saveGeometry() (get position + size from window_manager)
-  -> WindowPersistence.saveWindowGeometry() (debounce 150ms + write lock)
-  -> SettingsStore.saveWindowGeometry() (SharedPreferences)
-  -> dispose() + windowManager.destroy()
+UI: onOpenFile callback
+  → PlaybackController.openAndPlay(path)
+  → FileOperations.openAndPlay(path)
+    → PathValidator.validate(path)
+    → engine.open(path)
+      → FvpEngine.open(path)
+        → MediaOpener.open(path)
+          → path validation
+          → _player.media = path
+          → NetworkConfigurator.configure() or _configureLocalBuffer()
+          → _player.prepare() (async, 10s timeout)
+          → metadata parsing → MediaInfo
+          → _player.updateTexture() (async, 5s timeout)
+          → return OpenSuccess/OpenError
+        → update ValueNotifiers (duration, aspectRatio, state)
+    → engine.play()
+    → StateMonitor saves breakpoint
 ```
 
-## Patterns to Follow
+### Seek Flow
 
-### Pattern 1: PlatformFullscreen Strategy (already exists)
+```
+UI: ProgressBar drag end
+  → engine.seekTo(ms)
+  → FvpEngine.seekTo(ms)
+    → _positionPoller.seeking = true (pause polling)
+    → state.value = MediaState.seeking
+    → _player.seek(position: clamped) (async)
+    → position.value = clamped
+    → _positionPoller.seeking = false (resume with fast polling)
+    → state.value = playing/paused (restore)
+```
 
-**What:** Abstract `PlatformFullscreen` interface with `enter() -> FullscreenSnapshot` and `exit(FullscreenSnapshot)`. Each platform provides a concrete implementation. `FullscreenController` is platform-agnostic.
+## Build Order
 
-**When:** Any platform-specific window operation that needs rollback on failure.
+### Phase 1: Remove External Dependency (Low Risk)
 
-**Example (existing Win32 implementation):**
+**Goal**: Eliminate `player_engine` path dependency.
+
+**Steps**:
+1. Copy all types from `../widget_tree_flutter/player_engine/lib/src/` into `lib/kernel/engine/models/`
+2. Create `lib/kernel/engine/player_engine.dart` barrel export
+3. Update all `import 'package:player_engine/player_engine.dart'` → `import 'package:simple_player_flutter/kernel/engine/player_engine.dart'`
+4. Remove `player_engine` from pubspec.yaml
+5. Verify: `flutter analyze` clean
+
+**Risk**: Low. Pure import path change, no logic changes.
+
+**Files affected**: ~37 files (all files importing player_engine).
+
+### Phase 2: Split PlayerEngine Interface (Medium Risk)
+
+**Goal**: Extract capability mixins from flat interface.
+
+**Steps**:
+1. Create `lib/kernel/engine/capabilities/track_control.dart` — mixin with track methods
+2. Create `lib/kernel/engine/capabilities/video_effects.dart` — mixin with effect methods
+3. Create `lib/kernel/engine/capabilities/renderer_config.dart` — mixin with D3D11 methods
+4. Move methods from PlayerEngine to appropriate mixins
+5. FvpEngine: `class FvpEngine extends PlayerEngine with TrackControl, VideoEffects, RendererConfig`
+6. MockEngine: only implement core PlayerEngine (stubs for mixins)
+7. Verify: `flutter analyze` clean, all tests pass
+
+**Risk**: Medium. Interface change affects all consumers, but mixins are additive.
+
+**Migration strategy**: Add mixins alongside existing interface first, then remove methods from base.
+
+### Phase 3: Consolidate Helpers (Low Risk)
+
+**Goal**: Use all extracted helpers consistently.
+
+**Steps**:
+1. Move VolumeController/SubtitleConfigurator/D3D11Configurator to `helpers/` directory
+2. FvpEngine: delegate to these helpers instead of inline logic
+3. Move NetworkConfigurator to `helpers/` directory
+4. Verify: behavior unchanged, `flutter analyze` clean
+
+**Risk**: Low. Internal refactoring, no API change.
+
+### Phase 4: Slim FvpEngine (Low Risk)
+
+**Goal**: FvpEngine becomes thin coordinator (~200 lines).
+
+**Steps**:
+1. Move D3D11 defaults to D3D11Configurator
+2. Move open() flow entirely to MediaOpener
+3. Move play/pause/stop state management to a PlaybackStateMachine helper
+4. FvpEngine retains: constructor, helper wiring, method delegation, dispose
+
+**Risk**: Low. Internal only.
+
+### Phase 5: Clean Up MockEngine (Low Risk)
+
+**Goal**: MockEngine only implements core PlayerEngine.
+
+**Steps**:
+1. Remove mixin stubs from MockEngine (track, effects, renderer)
+2. Add `configureMedia()` for test setup (already exists)
+3. Verify: all widget tests still pass
+
+**Risk**: Low. Test-only change.
+
+## Migration Strategy
+
+### Principle: Zero Downtime
+
+Each phase is independently shippable. No phase depends on a later phase.
+
+### Import Migration (Phase 1)
+
+**Strategy**: Big-bang import replacement.
+
+```bash
+# Find all files
+grep -r "import.*player_engine" lib/ --include="*.dart" -l
+
+# Replace each
+sed -i "s|import 'package:player_engine/player_engine.dart'|import 'package:simple_player_flutter/kernel/engine/player_engine.dart'|g" <file>
+```
+
+**Verification**: `flutter analyze` + `flutter test` after each file batch.
+
+### Interface Migration (Phase 2)
+
+**Strategy**: Additive-first, then remove.
+
+1. Add mixins alongside existing methods (duplicate temporarily)
+2. Update FvpEngine to use mixins
+3. Update MockEngine to use mixins
+4. Remove duplicate methods from base PlayerEngine
+5. Verify no UI code breaks (UI only uses ValueNotifiers, rarely calls methods directly)
+
+**Fallback**: If mixin approach causes issues, keep flat interface but move methods to extension methods on PlayerEngine.
+
+### Helper Consolidation (Phase 3)
+
+**Strategy**: Move files, update imports within engine directory.
+
+No external API changes. Pure internal reorganization.
+
+### Testing Strategy
+
+- **Phase 1**: Run full test suite after import migration
+- **Phase 2**: Add mixin-specific tests, verify MockEngine still works
+- **Phase 3**: Behavior tests (no API change)
+- **Phase 4**: Behavior tests (no API change)
+- **Phase 5**: Widget tests verify UI still works with slimmer MockEngine
+
+## Reference Architectures
+
+### IINA (macOS, Swift)
+
+**Pattern**: `MPVController` wraps mpv, exposes `MPVOption` property bag.
+
+```
+MPVController (God class, ~2000 lines)
+  → mpv_handle* (C API)
+  → property observation via mpv_observe_property
+  → DispatchQueue for thread safety
+```
+
+**Relevance to our project**:
+- IINA uses property observation (like our ValueNotifier pattern)
+- IINA's MPVController is too large — we should NOT follow this pattern
+- IINA separates `PlayerCore` (orchestration) from `MPVController` (mpv wrapper) — good pattern
+- Lesson: Keep FvpEngine as coordinator, not as god class
+
+### VLC (Cross-platform, C)
+
+**Pattern**: `libvlc` API with event callbacks.
+
+```
+libvlc_instance_t (global config)
+  → libvlc_media_player_t (per-player)
+    → event callbacks (vlc events → UI)
+    → media options (key-value property bag)
+```
+
+**Relevance**:
+- VLC separates instance (global) from player (per-media) — we have EnginePrewarm (global) + FvpEngine (per-player)
+- VLC uses event-based state propagation — we use ValueNotifier (Flutter equivalent)
+- VLC's media options pattern is similar to our `setProperty()` calls
+- Lesson: Keep global prewarm separate from per-player engine
+
+### media_kit (Flutter, Dart)
+
+**Pattern**: `Player` class with `Stream`-based state.
+
 ```dart
-class Win32PlatformFullscreen implements PlatformFullscreen {
-  @override
-  bool get requiresStyleSave => true;
-
-  @override
-  Future<FullscreenSnapshot> enter() {
-    final hwnd = _getHwnd();
-    final style = _getWindowLongPtr(hwnd, _gwlStyle);
-    _setWindowLongPtr(hwnd, _gwlStyle, (style & ~_wsCaption & ~_wsThickframe) | _wsVisible);
-    final screenW = _getSystemMetrics(0);
-    final screenH = _getSystemMetrics(1);
-    _setWindowPos(hwnd, _hwndTop, 0, 0, screenW, screenH, _swpFrameChanged | _swpNoZOrder);
-    return Future.value(FullscreenSnapshot(windowStyle: style, position: Offset.zero, size: Size.zero));
-  }
-
-  @override
-  void exit(FullscreenSnapshot snapshot) {
-    final hwnd = _getHwnd();
-    _setWindowPos(hwnd, _hwndTop, snapshot.position.dx.toInt(), snapshot.position.dy.toInt(),
-        snapshot.size.width.toInt(), snapshot.size.height.toInt(), _swpFrameChanged | _swpNoZOrder);
-    _setWindowLongPtr(hwnd, _gwlStyle, snapshot.windowStyle);
-  }
+class Player {
+  Stream<Duration> get positionStream;
+  Stream<PlayerState> get stateStream;
+  Stream<Tracks> get tracks;
+  // ... 15+ streams
 }
 ```
 
-### Pattern 2: Platform Factory with Graceful Degradation
+**Relevance**:
+- media_kit uses Streams, we use ValueNotifiers — both are valid for Flutter
+- media_kit has a single Player class with all capabilities — similar to our current flat design
+- media_kit's `Media` class is similar to our `PlaylistItem`
+- Lesson: Our ValueNotifier approach is simpler than Streams for single-subscriber UI binding
 
-**What:** `_createPlatformFullscreen()` in WindowService returns the correct implementation based on `Platform.isX`. Unsupported platforms throw `UnsupportedError` (not silently fail).
+### mpv (C library)
 
-**When:** Adding new platform implementations.
+**Pattern**: Property-based API with observe/set/get.
 
-**Example:**
-```dart
-PlatformFullscreen _createPlatformFullscreen() {
-  if (Platform.isWindows) return Win32PlatformFullscreen();
-  if (Platform.isMacOS) return MacosPlatformFullscreen();
-  if (Platform.isLinux) return LinuxPlatformFullscreen();
-  throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
-}
+```c
+mpv_observe_property(ctx, 0, "pause", MPV_FORMAT_FLAG);
+mpv_set_property_string(ctx, "pause", "yes");
 ```
 
-### Pattern 3: WindowOps Injection for Testability
+**Relevance**:
+- mpv's property observation is the gold standard for media player state
+- Our ValueNotifiers are the Flutter equivalent
+- mpv separates rendering (VO) from playback (AO) — we separate via helpers
+- Lesson: Property-based state (ValueNotifier) is the right pattern for Flutter
 
-**What:** `WindowOps` abstract class wraps `window_manager` calls. `FullscreenController` accepts `WindowOps` via constructor injection. Tests use `FakeWindowOps`.
+### Common Patterns Across All References
 
-**When:** Any new code that needs to call window_manager from bridge layer.
+| Pattern | IINA | VLC | media_kit | mpv | Ours |
+|---------|------|-----|-----------|-----|------|
+| State propagation | Property observe | Events | Streams | Property observe | ValueNotifier |
+| Thread safety | DispatchQueue | vlc_mutex | Dart isolate | mpv_lock | main thread only |
+| Capability split | PlayerCore/MPVController | instance/player | single Player | property namespace | interface mixins |
+| Config model | MPVOption dict | media options | constructor params | set_property | method params |
 
-## Anti-Patterns to Avoid
+## Decision Log
 
-### Anti-Pattern 1: Abstracting `window_manager` away further
-
-**What:** Adding another abstraction layer between WindowService and window_manager.
-
-**Why bad:** `window_manager` IS the cross-platform abstraction. Adding another layer doubles maintenance surface with zero benefit. The `WindowOps` abstraction in FullscreenController is sufficient for testability.
-
-**Instead:** Use `window_manager` directly in WindowService. Use `PlatformFullscreen` only for operations that `window_manager` cannot handle (like WS_THICKFRAME removal on Windows).
-
-### Anti-Pattern 2: Platform-specific code in WindowService
-
-**What:** Putting `Platform.isWindows` checks or platform-specific logic in WindowService body.
-
-**Why bad:** WindowService is a thin coordinator. Platform differences belong in `PlatformFullscreen` implementations.
-
-**Instead:** The factory `_createPlatformFullscreen()` is the ONLY place `Platform.isX` checks should appear in bridge code.
-
-### Anti-Pattern 3: Feature parity pressure
-
-**What:** Implementing all features on all platforms before shipping any.
-
-**Why bad:** Aspect ratio lock via C++ `WM_SIZING` is Windows-only with no macOS/Linux native equivalent. Forcing parity delays shipping.
-
-**Instead:** Ship macOS first (highest user overlap with Flutter desktop), then Linux. Aspect ratio lock on Linux can be deferred if the manual constraint proves unreliable.
-
-### Anti-Pattern 4: Conditional imports for platform detection
-
-**What:** Using `import 'stub.dart' if (dart.library.io)` for window management.
-
-**Why bad:** All desktop platforms are `dart:io`. Conditional imports add complexity with no benefit for window management code.
-
-**Instead:** Use `dart:io Platform.isX` (already used in WindowService).
-
-## Scalability Considerations
-
-| Concern | At current scale | With cross-platform |
-|---------|-----------------|---------------------|
-| Platform code | 1 file (140 lines) | 3 files (~300 lines total) |
-| Testing surface | 1 platform | 3 platforms, CI matrix |
-| window_manager quirks | Known (WS_THICKFRAME) | Unknown per platform, needs discovery |
-| Aspect ratio | C++ native (8-edge) | Varies: native on Win, manual on Mac/Linux |
-| Fullscreen rollback | Tested (Win32 FFI) | Needs per-platform validation |
-
-## Suggested Build Order
-
-**Phase 1: macOS PlatformFullscreen** (2-3 days)
-- Add `MacosPlatformFullscreen` implementing `PlatformFullscreen`
-- Uses `NSWindow.styleMask` manipulation or `windowManager.setFullScreen()` (macOS handles WS_THICKFRAME gap natively)
-- Update `_createPlatformFullscreen()` factory in WindowService
-- Test fullscreen enter/exit/rollback on macOS
-- **Why first:** macOS is the most common second platform for Flutter desktop apps, and NSWindow fullscreen is well-documented
-
-**Phase 2: Linux PlatformFullscreen** (2-3 days)
-- Add `LinuxPlatformFullscreen` implementing `PlatformFullscreen`
-- X11: `gtk_window_fullscreen()` via FFI or `windowManager.setFullScreen()`
-- Wayland: same GTK API, but compositor-dependent behavior
-- Update factory
-- **Why second:** Linux has more compositor fragmentation (X11 vs Wayland vs tiling WMs), needs more testing surface
-
-**Phase 3: Aspect Ratio Lock Cross-Platform** (2-4 days)
-- Current: C++ `WM_SIZING` in `windows/runner/flutter_window.cpp` — Windows only
-- macOS: `NSWindowWillResizeNotification` delegate or manual constraint in `WindowListener.onWindowResize`
-- Linux: Manual constraint in `onWindowResize` (no native equivalent)
-- Extract `AspectRatioConstraint` as an injectable component like `PlatformFullscreen`
-- **Why separate:** Aspect ratio lock is optional functionality, not blocking basic window management
-
-**Phase 4: Platform Detection and Graceful Degradation** (1-2 days)
-- `DisplayConfig` currently hardcoded to 60Hz — add macOS (`NSScreen.maximumFramesPerSecond`) and Linux (`GdkMonitor`) detection
-- DPI scaling: macOS auto-handles Retina, Linux varies by compositor
-- Ensure `window_manager` minimum size constraints work cross-platform
-
-**Phase 5: Build System and CI** (1-2 days)
-- macOS: `macos/` runner, entitlements for window management, code signing
-- Linux: `linux/` runner, GTK3/4 dependency, Flatpak/snap packaging
-- CI matrix: build + test on all three platforms
-
-## Open Questions for Phase-Specific Research
-
-1. **macOS fullscreen + Spaces behavior:** Does `NSWindow.toggleFullScreen` work correctly with Flutter's texture rendering, or does it need the same manual style manipulation as Win32?
-2. **Linux Wayland fullscreen:** Which compositors support `gtk_window_fullscreen` reliably? (GNOME/Mutter yes, Sway/Wlroots uncertain)
-3. **Aspect ratio on macOS:** Can `NSWindowWillResizeNotification` be hooked from Dart FFI, or does it require a C++ plugin?
-4. **window_manager on Linux:** Does `setFullScreen()` produce the same 7px gap issue as on Windows, or does GTK handle it correctly?
-
-## Sources
-
-- Current codebase: `lib/kernel/bridge/` (9 files, all analyzed)
-- Memory: `project_window_cross_platform.md` (confirms window_manager is cross-platform)
-- Memory: `project_full_architecture.md` (5-layer architecture reference)
-- Memory: `project_layer8_window_analysis.md` (WindowService analysis, 3 replacement options)
-- Flutter embedder architecture: `shell/platform/{windows,darwin,linux}/` in flutter/engine
-- window_manager package: pub.dev, leanflutter, supports Win/Mac/Linux natively
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Interface split strategy | Mixins | Backward compatible, progressive adoption, no wrapper boilerplate |
+| Helper location | `helpers/` subdirectory | Clear separation from public API files |
+| External dependency | Remove entirely | 1:1 copy adds no value, import path confusion |
+| State management | Keep ValueNotifier | Flutter-native, simpler than Streams for UI binding |
+| MockEngine scope | Core PlayerEngine only | Don't mock what UI doesn't use |
+| Build order | External dep first | Lowest risk, biggest win (eliminates confusion) |
