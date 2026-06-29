@@ -1,13 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../shared/merged_listenable.dart';
 
 /// 时间显示 (当前 / 总时长)
 class TimeRangeDisplay extends StatefulWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
 
   const TimeRangeDisplay({super.key, required this.engine});
 

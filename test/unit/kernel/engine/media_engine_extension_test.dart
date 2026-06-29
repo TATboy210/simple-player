@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../helpers/fake_engine.dart';
 
 void main() {
-  group('PlayerEngine new methods', () {
+  group('EngineState new methods', () {
     late FakeEngine engine;
 
     setUp(() {

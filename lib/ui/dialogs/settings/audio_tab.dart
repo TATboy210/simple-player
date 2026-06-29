@@ -1,13 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../../kernel/engine/player_engine.dart';
+import '../../../kernel/engine/engine_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
 /// 音轨选择 tab — 列出可用音轨，点击切换
 class AudioTab extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   const AudioTab({super.key, required this.engine});
 
   @override

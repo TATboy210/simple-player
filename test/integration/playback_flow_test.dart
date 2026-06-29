@@ -1,5 +1,5 @@
-﻿import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../../lib/kernel/engine/engine_state.dart';
 
 import '../helpers/fake_engine.dart';
 import '../helpers/integration_helpers.dart';

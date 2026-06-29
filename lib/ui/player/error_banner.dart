@@ -1,13 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/value_listenable_builder2.dart';
 
 /// 错误横幅 — 显示可操作的错误信息
 class ErrorBanner extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   final VoidCallback? onOpenFile;
   final VoidCallback? onRetry;
 

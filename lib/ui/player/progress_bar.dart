@@ -1,10 +1,10 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -20,7 +20,7 @@ class _HoverState {
 /// 支持：拖拽 seek（节流+阈值）、悬停展开动画、Tooltip 淡入淡出、
 /// 滚轮 seek、悬停 thumb、禁用状态、缓冲指示器
 class ProgressBar extends StatefulWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
 
   /// Window resize signal — when true, skip internal bar rebuild to save CPU.
   final ValueListenable<bool>? resizing;
@@ -66,7 +66,7 @@ class _ProgressBarState extends State<ProgressBar>
 
   bool get _disabled => widget.engine.duration.value <= 0;
 
-  PlayerEngine get engine => widget.engine;
+  EngineState get engine => widget.engine;
 
   @override
   void initState() {

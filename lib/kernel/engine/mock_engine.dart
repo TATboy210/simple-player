@@ -7,7 +7,7 @@ import 'media_state.dart';
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
-import 'player_engine_base.dart';
+import '../../kernel/engine/engine_state.dart';
 import 'video_effect_type.dart';
 
 import '../utils/log.dart';
@@ -54,7 +54,7 @@ class MockEvent {
 /// - 完整状态机：idle → loading → playing ↔ paused → stopped/completed
 /// - 可配置 open 延迟、错误注入
 /// - 状态变化历史记录（调试用）
-class MockEngine implements PlayerEngine {
+class MockEngine with EngineState {
   bool _disposed = false;
   Timer? _positionTimer;
 
@@ -71,54 +71,14 @@ class MockEngine implements PlayerEngine {
   /// open() 后自动进入 playing 状态
   final bool autoPlay;
 
-  // ─── ValueNotifier 字段 ───
+  // ─── 非 mixin 状态 ───
 
-  @override
-  final ValueNotifier<int?> textureId = ValueNotifier<int?>(null);
-
-  @override
-  final ValueNotifier<MediaState> state = ValueNotifier<MediaState>(
-    MediaState.idle,
-  );
-
-  @override
-  final ValueNotifier<int> position = ValueNotifier<int>(0);
-
-  @override
-  final ValueNotifier<int> duration = ValueNotifier<int>(0);
-
-  @override
-  final ValueNotifier<double> volume = ValueNotifier<double>(1.0);
-
-  @override
-  final ValueNotifier<bool> isMuted = ValueNotifier<bool>(false);
-
-  @override
-  final ValueNotifier<bool> isBuffering = ValueNotifier<bool>(false);
-
-  @override
-  final ValueNotifier<String> subtitleText = ValueNotifier<String>('');
-
-  @override
-  final ValueNotifier<int> buffered = ValueNotifier<int>(0);
-
-  @override
-  final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
-
-  @override
-  final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
-
-  @override
   MediaErrorType errorType = MediaErrorType.unknown;
-
-  @override
-  final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
 
   // ─── 内部状态 ───
 
   MediaInfo _mediaInfo = const MediaInfo();
 
-  @override
   MediaInfo get mediaInfo => _mediaInfo;
 
   String _currentPath = '';
@@ -164,7 +124,6 @@ class MockEngine implements PlayerEngine {
 
   // ─── 播放控制 ───
 
-  @override
   Future<void> open(String path) async {
     if (_disposed) return;
     _currentPath = path;
@@ -200,7 +159,6 @@ class MockEngine implements PlayerEngine {
     }
   }
 
-  @override
   void play() {
     if (_disposed) return;
     _recordState(MediaState.playing);
@@ -210,7 +168,6 @@ class MockEngine implements PlayerEngine {
     _recordEvent('play');
   }
 
-  @override
   void pause() {
     if (_disposed) return;
     _recordState(MediaState.paused);
@@ -220,7 +177,6 @@ class MockEngine implements PlayerEngine {
     _recordEvent('pause');
   }
 
-  @override
   void stop() {
     if (_disposed) return;
     _recordState(MediaState.stopped);
@@ -231,7 +187,6 @@ class MockEngine implements PlayerEngine {
     _recordEvent('stop');
   }
 
-  @override
   Future<void> seekTo(int milliseconds) async {
     if (_disposed) return;
     final clamped = milliseconds.clamp(0, duration.value);
@@ -240,20 +195,17 @@ class MockEngine implements PlayerEngine {
     _recordEvent('seek', {'position': clamped});
   }
 
-  @override
   void setVolume(double value) {
     if (_disposed) return;
     volume.value = value.clamp(0.0, 1.0);
     isMuted.value = volume.value == 0;
   }
 
-  @override
   void setMute(bool mute) {
     if (_disposed) return;
     isMuted.value = mute;
   }
 
-  @override
   void togglePlayPause() {
     if (_disposed) return;
     if (state.value == MediaState.playing) {
@@ -263,85 +215,60 @@ class MockEngine implements PlayerEngine {
     }
   }
 
-  @override
   void setPlaybackRate(double rate) {
     if (_disposed) return;
     playbackSpeed.value = rate.clamp(0.25, 4.0);
   }
 
-  @override
   void skipForward([int ms = 10000]) {
     seekTo((position.value + ms).clamp(0, duration.value));
   }
 
-  @override
   void skipBack([int ms = 10000]) {
     seekTo((position.value - ms).clamp(0, duration.value));
   }
 
-  @override
   void setRange({required int from, int to = -1}) {
     // Mock: no-op
   }
 
   // ─── 音轨/字幕（Mock 实现） ───
 
-  @override
   List<AudioTrackInfo> getAudioTracks() => [];
 
-  @override
   void switchAudioTrack(int trackIndex) {}
 
-  @override
   List<int> get activeAudioTracks => [];
 
-  @override
   List<SubtitleTrackInfo> getSubtitleTracks() => [];
 
-  @override
   void switchSubtitleTrack(int trackIndex) {}
 
-  @override
   void toggleSubtitle() {}
 
-  @override
   void setExternalSubtitle(String path) {}
 
-  @override
   void setSubtitleDelay(int milliseconds) {}
 
-  @override
   int get subtitleDelay => 0;
 
   // ─── 视频效果（Mock 实现） ───
 
-  @override
   void setEqualizer(String afFilter) {}
 
-  @override
   void setVideoEffect(VideoEffectType effect, double value) {}
 
-  @override
   void rotate(int degree) {}
 
-  @override
   void setAspectRatio(double ratio) {
     if (_disposed) return;
     aspectRatio.value = ratio;
   }
 
-  @override
   void setDeinterlace(bool enable) {}
-
-  @override
-  void setD3d11SyncEnabled(bool enabled) {}
-
-  @override
-  void setHardwareDecoding(bool enabled) {}
 
   // ─── 生命周期 ───
 
-  @override
   void dispose() {
     _disposed = true;
     _stopPositionTimer();

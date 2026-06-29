@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../../kernel/engine/player_engine.dart';
+import '../../../kernel/engine/engine_state.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
@@ -8,10 +8,10 @@ import '../../shared/settings_card.dart';
 
 /// 性能设置 tab — D3D11 渲染参数 + 硬件解码开关
 ///
-/// 通过 PlayerEngine 接口控制引擎参数，不直接依赖 FvpEngine 实现。
+/// 通过 EngineState 接口控制引擎参数，不直接依赖 FvpEngine 实现。
 /// 设置通过 SettingsStore 持久化，重启后保持用户选择。
 class PerformanceTab extends StatefulWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   const PerformanceTab({super.key, required this.engine});
 
   @override
@@ -101,12 +101,12 @@ class _PerformanceTabState extends State<PerformanceTab> {
   }
 }
 
-/// D3D11 同步开关 — 桥接 PlayerEngine.setD3d11SyncEnabled 到 `ValueNotifier<bool>`
+/// D3D11 同步开关 — 桥接 EngineState.setD3d11SyncEnabled 到 `ValueNotifier<bool>`
 ///
 /// 默认开启（同步模式），关闭后切换到异步模式（低延迟，可能撕裂）。
 /// 切换时通过 SettingsStore 持久化，重启后保持用户选择。
 class _D3d11SyncNotifier extends ValueNotifier<bool> {
-  final PlayerEngine _engine;
+  final EngineState _engine;
 
   _D3d11SyncNotifier(this._engine, {required bool initialValue})
     : super(initialValue);
@@ -119,12 +119,12 @@ class _D3d11SyncNotifier extends ValueNotifier<bool> {
   }
 }
 
-/// 硬件解码开关 — 桥接 PlayerEngine.setHardwareDecoding 到 `ValueNotifier<bool>`
+/// 硬件解码开关 — 桥接 EngineState.setHardwareDecoding 到 `ValueNotifier<bool>`
 ///
 /// 默认开启（硬件解码优先），关闭后回退到软件解码。
 /// 切换时通过 SettingsStore 持久化，重启后保持用户选择。
 class _HardwareDecodingNotifier extends ValueNotifier<bool> {
-  final PlayerEngine _engine;
+  final EngineState _engine;
 
   _HardwareDecodingNotifier(this._engine, {required bool initialValue})
     : super(initialValue);

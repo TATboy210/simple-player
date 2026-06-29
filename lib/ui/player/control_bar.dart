@@ -1,9 +1,9 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/edge_glow.dart';
@@ -53,7 +53,7 @@ class ControlBar extends StatelessWidget {
     ],
   );
 
-  final PlayerEngine engine;
+  final EngineState engine;
   final PlayerActions actions;
   final bool enableBlur;
   final bool isIdle;
@@ -294,7 +294,7 @@ class ControlBar extends StatelessWidget {
 
 /// 左侧按钮组：播放模式 + 音量 + 倍速
 class _LeftButtonGroup extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   final bool showSecondary;
   final PlayerActions actions;
 
@@ -329,7 +329,7 @@ class _LeftButtonGroup extends StatelessWidget {
 
 /// 超紧凑中心组：仅上一首/播放暂停/下一首（窗口 ≤360px 时）
 class _CompactCenterGroup extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   final bool isIdle;
   final String prevTooltip;
   final String nextTooltip;
@@ -425,7 +425,7 @@ class _RightButtonGroup extends StatelessWidget {
 
 /// ProgressBar 圆角边框容器 — hover 时边框高亮反馈
 class _ProgressRow extends StatelessWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
 
   const _ProgressRow({required this.engine});
 

@@ -1,10 +1,10 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/services/subtitle_service.dart';
-import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
+import '../../../../lib/kernel/engine/engine_state.dart';
 
-class _FakeEngine implements PlayerEngine {
+class _FakeEngine with EngineState {
   String? lastSubtitle;
   @override
   dynamic noSuchMethod(Invocation invocation) {

@@ -1,10 +1,10 @@
-﻿import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/bridge/window_mode.dart';
-import '../../kernel/engine/player_engine.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../features/player/services/playback_controller.dart';
@@ -24,7 +24,7 @@ import 'video_surface.dart';
 /// 宽屏（≥600dp）: Row 布局，面板在右侧
 /// 窄屏（<600dp）: 面板叠加为 overlay
 class PlayerScreen extends StatefulWidget {
-  final PlayerEngine engine;
+  final EngineState engine;
   final PlaybackController controller;
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
@@ -307,7 +307,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ],
   );
 
-  void _seek(PlayerEngine engine, int deltaMs) {
+  void _seek(EngineState engine, int deltaMs) {
     final target = engine.position.value + deltaMs;
     engine.seekTo(target.clamp(0, engine.duration.value));
   }

@@ -40,7 +40,7 @@ enum PlayerErrorCode {
 /// 播放器结构化错误
 ///
 /// 替代纯字符串 errorMessage，携带错误码 + 人类可读消息 + 原始异常。
-/// 通过 PlayerEngine.errorStream 传递，UI 层可监听并展示精准提示。
+/// 通过 EngineState.errorStream 传递，UI 层可监听并展示精准提示。
 class PlayerError {
   final PlayerErrorCode code;
   final String message;
