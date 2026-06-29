@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
-import 'package:player_engine/player_engine.dart';
+import '../../../kernel/engine/player_engine.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';

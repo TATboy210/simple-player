@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:player_engine/player_engine.dart';
+import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
 import 'package:simple_player_flutter/ui/player/auto_hide_controller.dart';
 
 /// TestTickerProvider — provides a Ticker for AutoHideController in tests.

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
-import 'package:player_engine/player_engine.dart';
+import '../../kernel/engine/player_engine.dart';
 
 /// 视频纹理渲染 — 根据引擎 textureId 和 aspectRatio 显示视频
 ///

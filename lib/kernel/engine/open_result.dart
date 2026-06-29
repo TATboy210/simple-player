@@ -1,4 +1,5 @@
-import 'package:player_engine/player_engine.dart';
+import 'media_error_type.dart';
+import 'models/media_info.dart';
 
 /// 媒体打开结果 — sealed class 表示成功或失败
 sealed class OpenResult {

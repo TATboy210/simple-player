@@ -2,7 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:player_engine/player_engine.dart';
+import 'media_error_type.dart';
+import 'media_state.dart';
+import 'models/audio_track_info.dart';
+import 'models/media_info.dart';
+import 'models/subtitle_track_info.dart';
+import 'player_engine_base.dart';
+import 'video_effect_type.dart';
 
 import '../utils/log.dart';
 import '../utils/path_utils.dart';

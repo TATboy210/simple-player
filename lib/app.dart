@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'ui/theme/tokens.dart';
 import 'kernel/bridge/window_bridge.dart';
-import 'package:player_engine/player_engine.dart';
+import 'kernel/engine/player_engine.dart';
 import 'kernel/utils/log.dart';
 import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';

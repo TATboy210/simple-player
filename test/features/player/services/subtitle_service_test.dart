@@ -1,8 +1,8 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/services/subtitle_service.dart';
-import 'package:player_engine/player_engine.dart';
+import 'package:simple_player_flutter/kernel/engine/player_engine.dart';
 
 class _FakeEngine implements PlayerEngine {
   String? lastSubtitle;

@@ -1,4 +1,4 @@
-import 'package:player_engine/player_engine.dart';
+﻿import '../../../kernel/engine/player_engine.dart';
 import '../../../kernel/utils/log.dart';
 import '../../../kernel/utils/path_utils.dart';
 import '../../../kernel/services/path_validator.dart';

@@ -1,9 +1,9 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'package:player_engine/player_engine.dart';
+import '../../kernel/engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../shared/osd_overlay.dart';
 import 'auto_hide_controller.dart';
@@ -162,75 +162,70 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       valueListenable: widget.engine.state,
       builder: (context, engineState, _) {
         final isIdle = engineState == MediaState.idle;
-        // 有空状态且引擎空闲时，控制栏不拦截 hit test
-        final blockInteraction = widget.emptyStatePresent && isIdle;
+        // 有空状态且引擎空闲时，仅禁用背景点击（让下层 EmptyState 按钮可点击），
+        // 控制栏本身保持可见和可交互。
+        final blockBackgroundTap = widget.emptyStatePresent && isIdle;
         // Listener 接收原始指针事件，不参与手势竞技场 —
         // 子控件按钮的 InkWell 独立处理点击，两者互不干扰。
         return Listener(
           behavior: HitTestBehavior.translucent,
-          onPointerDown: blockInteraction ? null : _onPointerDown,
-          onPointerUp: blockInteraction ? null : _onPointerUp,
-          child: IgnorePointer(
-            ignoring: blockInteraction,
-            child: MouseRegion(
-              opaque: false,
-              hitTestBehavior: HitTestBehavior.translucent,
-              onHover: (_) => _autoHide.onMouseMove(),
-              onEnter: (_) => _autoHide.onMouseEnter(),
-              onExit: (_) => _autoHide.onMouseExit(),
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _autoHide.visible,
-                builder: (_, isVisible, child) =>
-                    IgnorePointer(ignoring: !isVisible, child: child),
-                child: RepaintBoundary(
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        bottom:
-                            Tokens.controlBarMarginBottom +
-                            Tokens.controlBarHeight +
-                            12,
-                        left: Tokens.controlBarMarginH,
-                        right: Tokens.controlBarMarginH,
-                        child: OsdOverlay(resizing: widget.resizing),
-                      ),
-                      Positioned(
-                        left: Tokens.controlBarMarginH,
-                        right: Tokens.controlBarMarginH,
-                        bottom: Tokens.controlBarMarginBottom,
-                        child: Offstage(
-                          offstage: blockInteraction,
-                          child: FadeTransition(
-                            opacity: _autoHide.opacity,
-                            child: ControlBar(
-                              engine: widget.engine,
-                              actions: widget.actions,
-                              isIdle: isIdle,
-                              title: widget.title,
-                              opacity: _autoHide.opacity,
-                              enableBlur: true,
-                              resizing: widget.resizing,
-                            ),
-                          ),
+          onPointerDown: blockBackgroundTap ? null : _onPointerDown,
+          onPointerUp: blockBackgroundTap ? null : _onPointerUp,
+          child: MouseRegion(
+            opaque: false,
+            hitTestBehavior: HitTestBehavior.translucent,
+            onHover: (_) => _autoHide.onMouseMove(),
+            onEnter: (_) => _autoHide.onMouseEnter(),
+            onExit: (_) => _autoHide.onMouseExit(),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _autoHide.visible,
+              builder: (_, isVisible, child) =>
+                  IgnorePointer(ignoring: !isVisible, child: child),
+              child: RepaintBoundary(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      bottom:
+                          Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight +
+                          12,
+                      left: Tokens.controlBarMarginH,
+                      right: Tokens.controlBarMarginH,
+                      child: OsdOverlay(resizing: widget.resizing),
+                    ),
+                    Positioned(
+                      left: Tokens.controlBarMarginH,
+                      right: Tokens.controlBarMarginH,
+                      bottom: Tokens.controlBarMarginBottom,
+                      child: FadeTransition(
+                        opacity: _autoHide.opacity,
+                        child: ControlBar(
+                          engine: widget.engine,
+                          actions: widget.actions,
+                          isIdle: isIdle,
+                          title: widget.title,
+                          opacity: _autoHide.opacity,
+                          enableBlur: true,
+                          resizing: widget.resizing,
                         ),
                       ),
-                      Positioned(
-                        left: Tokens.controlBarMarginH + 16,
-                        right: Tokens.controlBarMarginH + 16,
-                        bottom:
-                            Tokens.controlBarMarginBottom +
-                            Tokens.controlBarHeight +
-                            8,
-                        child: RepaintBoundary(
-                          child: ErrorBanner(
-                            engine: widget.engine,
-                            onOpenFile: widget.actions.onOpenFile,
-                            onRetry: widget.actions.onOpenFile,
-                          ),
+                    ),
+                    Positioned(
+                      left: Tokens.controlBarMarginH + 16,
+                      right: Tokens.controlBarMarginH + 16,
+                      bottom:
+                          Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight +
+                          8,
+                      child: RepaintBoundary(
+                        child: ErrorBanner(
+                          engine: widget.engine,
+                          onOpenFile: widget.actions.onOpenFile,
+                          onRetry: widget.actions.onOpenFile,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

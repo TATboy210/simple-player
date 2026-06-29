@@ -1,7 +1,11 @@
 import 'dart:io' show File;
 
 import 'package:fvp/mdk.dart' as mdk;
-import 'package:player_engine/player_engine.dart';
+import 'media_error_type.dart';
+import 'models/audio_track_info.dart';
+import 'models/media_info.dart';
+import 'models/subtitle_track_info.dart';
+import 'models/video_codec_info.dart';
 
 import '../services/path_validator.dart';
 import '../utils/path_utils.dart';

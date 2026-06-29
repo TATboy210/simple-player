@@ -1,5 +1,7 @@
 import 'package:fvp/mdk.dart' as mdk;
-import 'package:player_engine/player_engine.dart';
+import 'models/audio_track_info.dart';
+import 'models/media_info.dart';
+import 'models/subtitle_track_info.dart';
 
 import '../utils/log.dart';
 
