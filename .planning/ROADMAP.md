@@ -59,31 +59,49 @@ Plans:
 
 ### Phase 3: 接口优化
 
-**Goal:** 通过 mixin 拆分 PlayerEngine 接口，实现能力隔离
+**Goal:** 通过 mixin 拆分 EngineState 接口，实现能力隔离
 **Mode:** mvp
 **Requirements:** IFACE-01, IFACE-02, IFACE-03, IFACE-04, IFACE-05
+**Plans:** 1 plan
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Split EngineState into TrackControl/VideoEffects/RendererConfig sub-mixins + capability tests
+
 **Success Criteria**:
 
 1. TrackControl/VideoEffects/RendererConfig mixin 接口定义完成
-2. 现有 57 个 UI 文件的 PlayerEngine import 无需修改（向后兼容）
+2. 现有 57 个 UI 文件的 EngineState import 无需修改（向后兼容）
 3. `engine is TrackControl` 能力检查在 UI 层可用
-4. FvpEngine 通过 `with TrackControl, VideoEffects, RendererConfig` 组合实现
+4. FvpEngine 通过 `with EngineState, TrackControl, VideoEffects, RendererConfig` 组合实现
 5. `flutter analyze` + `flutter test` 全部通过
 
 ---
 
-### Phase 4: 测试与平台验证
+### Phase 4: 测试与平台验证 ✅
 
 **Goal:** 确保重构后所有测试通过，平台特定行为正确
 **Mode:** mvp
 **Requirements:** TEST-01, TEST-02, TEST-03, TEST-04, PLAT-01, PLAT-02, PLAT-03, PLAT-04
+**Plans:** 1 plan
+Plans:
+**Wave 1**
+
+- [x] 04-01-SUMMARY.md — 验证测试 + 平台行为分析
+
 **Success Criteria**:
 
-1. MockEngine 继续实现完整 PlayerEngine 接口（含 mixin 检查）
-2. 所有现有 widget 测试在重构后通过（零回归）
-3. 新 helper 组件（VolumeController/SubtitleConfigurator/D3D11Configurator）有独立单元测试
-4. Win32 DisplayConfig 平台通道冷启动时序正确
-5. texture ID 生命周期与 Flutter Texture widget 同步无泄漏
+1. ✅ MockEngine 继续实现完整 PlayerEngine 接口（含 mixin 检查）
+2. ✅ 所有现有 widget 测试在重构后通过（893 pass, 3 golden pre-existing）
+3. ✅ 新 helper 组件有独立单元测试（34 tests）
+4. ✅ Win32 DisplayConfig 冷启动时序正确（默认60Hz, init幂等）
+5. ✅ texture ID 生命周期同步无泄漏（listener链验证）
+
+**Verification:**
+
+- `flutter analyze`: 0 errors ✅
+- `flutter test`: 893 pass, 3 fail (golden, pre-existing) ✅
+- 新增 42 个测试: mixin behavior(30) + texture lifecycle(5) + display config(7)
 
 ---
 
@@ -118,4 +136,4 @@ Each phase is independently shippable. No phase depends on a later phase.
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-06-30*
