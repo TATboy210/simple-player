@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/services/subtitle_service.dart';
-import '../../../../lib/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 
 class _FakeEngine with EngineState {
   String? lastSubtitle;

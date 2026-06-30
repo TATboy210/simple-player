@@ -38,7 +38,7 @@ import 'mdk_player_proxy.dart';
 ///
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
-class FvpEngine with EngineState {
+class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   mdk.Player? _playerInstance;
   mdk.Player get _player => _playerInstance ??= _createPlayer();
   bool _disposed = false;
@@ -111,7 +111,12 @@ class FvpEngine with EngineState {
   @override
   MediaInfo get mediaInfo => _trackManager.mediaInfo;
 
-  FvpEngine();
+  FvpEngine() {
+    // Eagerly create player so helper fields (_volumeController etc.) are
+    // initialized before any method can be called.  Without this, calling
+    // setVolume/setMute before open() triggers LateInitializationError.
+    _player;
+  }
 
   mdk.Player _createPlayer() {
     final p = mdk.Player();
