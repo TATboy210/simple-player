@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../kernel/engine/engine_state.dart';
 import '../../../kernel/utils/log.dart';
 import '../../../kernel/utils/path_utils.dart';
@@ -48,7 +50,14 @@ class PlaybackNavigator {
       }
 
       // FEAT-03: Auto-detect external subtitles
-      _controller.subtitleService?.detectAndLoadSync(current.path);
+      final subtitlePath = current.path;
+      unawaited(
+        _controller.subtitleService?.detectAndLoad(subtitlePath).catchError(
+          (Object e) {
+            log.d('Subtitle detection failed: $e');
+          },
+        ),
+      );
 
       _controller.engine.play();
     } on Exception catch (e) {
