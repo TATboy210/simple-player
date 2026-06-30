@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../persistence/settings_store.dart';
@@ -243,7 +244,7 @@ class WindowService with WindowListener implements WindowBridge {
         await windowManager.minimize();
       // OS 回调 onWindowMinimize 驱动 mode
       case WindowMode.fullscreen:
-        await windowManager.setFullScreen(true);
+        await fullScreenWindow.setFullScreen(true);
       // OS 回调 onWindowEnterFullScreen 驱动 mode
     }
   }

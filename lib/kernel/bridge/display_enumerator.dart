@@ -1,7 +1,7 @@
 /// 平台无关的显示器枚举抽象。
 ///
 /// 定义 [DisplayInfo] 数据类和 [DisplayEnumerator] 接口，
-/// 使 [ScreenUtils] 和 [FullscreenController] 不直接依赖 Win32 FFI。
+/// 使 [ScreenUtils] 不直接依赖 Win32 FFI。
 ///
 /// macOS/Linux 移植只需实现此接口。
 library;
