@@ -69,17 +69,29 @@ class StateMonitor {
 
     if (_rt.playlist.mode == PlayMode.loopSingle) {
       final idx = _rt.playlist.currentIndex;
-      if (idx >= 0) {
-        _rt.navigator.playIndex(idx).catchError((Object e) {
-          log.e('StateMonitor loopSingle replay failed: $e');
-          _rt.onError?.call(e);
-        });
-      }
+      if (idx >= 0) _replayIndex(idx);
     } else {
-      _rt.navigator.playNext().catchError((Object e) {
-        log.e('StateMonitor auto-advance failed: $e');
-        _rt.onError?.call(e);
-      });
+      _autoAdvance();
+    }
+  }
+
+  /// 单曲循环：重新播放指定索引
+  void _replayIndex(int index) async {
+    try {
+      await _rt.navigator.playIndex(index);
+    } on Exception catch (e, st) {
+      log.e('StateMonitor loopSingle replay failed: $e', stackTrace: st);
+      _rt.onError?.call(e);
+    }
+  }
+
+  /// 自动连播：播放下一首
+  void _autoAdvance() async {
+    try {
+      await _rt.navigator.playNext();
+    } on Exception catch (e, st) {
+      log.e('StateMonitor auto-advance failed: $e', stackTrace: st);
+      _rt.onError?.call(e);
     }
   }
 
