@@ -1,29 +1,42 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-29",
-  "context": "default",
-  "task": "PlayerEngine removal cleanup",
-  "status": "in_progress",
+  "timestamp": "2026-06-30T13:39:34.076Z",
+  "phase": "05",
+  "phase_name": "layer3-quality",
+  "phase_dir": ".planning/phases/05-layer3-quality",
+  "plan": 1,
+  "task": 6,
+  "total_tasks": 6,
+  "status": "complete",
   "completed_tasks": [
-    {"id": 1, "name": "Fix border issue (catch clause)", "status": "done", "commit": "2db5580"},
-    {"id": 2, "name": "Delete PlayerEngine files", "status": "done"},
-    {"id": 3, "name": "Create EngineState mixin", "status": "done"},
-    {"id": 4, "name": "Update 51 files (imports + types)", "status": "done"},
-    {"id": 5, "name": "Fix FvpEngine/MockEngine signatures", "status": "done"},
-    {"id": 6, "name": "Fix import paths + BOM", "status": "done", "commit": "0022403"}
+    {"id": 1, "name": "diff逐属性检查", "status": "done", "commit": "c5750c7"},
+    {"id": 2, "name": "catchError→try-catch + stackTrace", "status": "done", "commit": "f844c2f"},
+    {"id": 3, "name": "_rt→_controller 重命名", "status": "done", "commit": "95bf811"},
+    {"id": 4, "name": "硬编码英文→l10n", "status": "done", "commit": "266b6a6"},
+    {"id": 5, "name": "build()拆分子方法", "status": "done", "commit": "19e4d2b"},
+    {"id": 6, "name": "字幕扫描异步化", "status": "done", "commit": "7324c90"}
   ],
-  "remaining_tasks": [
-    {"id": 7, "name": "Fix 18 analyze errors (3 categories)", "status": "in_progress"},
-    {"id": 8, "name": "Run flutter test", "status": "not_started"},
-    {"id": 9, "name": "Update planning docs", "status": "not_started"}
-  ],
-  "blockers": [
-    {"description": "18 analyze errors block flutter test", "type": "technical", "workaround": "3 categories: const init (12), D3D11 refs (2), FakeEngine overrides (4)"}
+  "remaining_tasks": [],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "手动验证视频效果滑块独立调节", "context": "diff逐属性修改后需运行时测试", "blocking": false},
+    {"action": "手动验证自动连播正常", "context": "catchError→try-catch修改后需测试", "blocking": false},
+    {"action": "手动验证字幕自动检测", "context": "字幕异步化后需测试", "blocking": false}
   ],
   "decisions": [
-    {"decision": "mixin EngineState replaces abstract class PlayerEngine", "rationale": "No inheritance chain, direct mixin composition"},
-    {"decision": "D3D11 methods removed from interface", "rationale": "FvpEngine-only concerns"},
-    {"decision": "Track/subtitle methods synchronous (not Future)", "rationale": "Matches actual FvpEngine implementation"}
+    {"decision": "保留 isColorAdjustment getter", "rationale": "可能被外部使用", "phase": "05"},
+    {"decision": "_onStateChanged 保持 void 返回", "rationale": "addListener回调签名要求", "phase": "05"},
+    {"decision": "on Exception 不捕获 Error 子类", "rationale": "CLAUDE.md规范", "phase": "05"}
   ],
-  "next_action": "Fix 18 errors: add D3D11 back to mixin, align FakeEngine signatures, add missing test imports"
+  "uncommitted_files": [
+    "lib/kernel/engine/engine_state.dart",
+    "lib/kernel/engine/fvp_engine.dart",
+    "lib/kernel/engine/mock_engine.dart",
+    "lib/l10n/app_localizations.dart",
+    "lib/l10n/app_localizations_en.dart",
+    "lib/l10n/app_localizations_zh.dart"
+  ],
+  "next_action": "Phase 5 complete. Run /gsd-verify-work 5 for manual playback testing, or /gsd-progress to see roadmap.",
+  "context_notes": "Phase 5 LAYER 3 代码质量治理执行完毕。6/6任务完成，7个提交，验证通过(5/5 must-haves)。3项需手动播放测试。"
 }
