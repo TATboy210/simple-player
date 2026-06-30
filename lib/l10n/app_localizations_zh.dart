@@ -445,6 +445,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playerLoadError => '播放器模块加载失败';
 
   @override
+  String get playerInitFailed => '播放器初始化失败';
+
+  @override
   String get performanceTab => '性能';
 
   @override
