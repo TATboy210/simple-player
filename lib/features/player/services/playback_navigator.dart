@@ -8,8 +8,8 @@ import 'playback_controller.dart';
 ///
 /// 职责: playIndex, playNext, playPrevious, openGeneration 守卫
 class PlaybackNavigator {
-  PlaybackNavigator(this._rt);
-  final PlaybackController _rt;
+  PlaybackNavigator(this._controller);
+  final PlaybackController _controller;
 
   /// 并发 open() 守卫：快速切换歌曲时，丢弃过期的异步请求
   int _openGeneration = 0;
@@ -19,65 +19,65 @@ class PlaybackNavigator {
 
   /// 播放指定索引
   Future<void> playIndex(int index) async {
-    if (index < 0 || index >= _rt.playlist.length) return;
+    if (index < 0 || index >= _controller.playlist.length) return;
     final gen = ++_openGeneration;
-    final oldIndex = _rt.playlist.currentIndex;
-    _rt.playlist.currentIndex = index;
-    final current = _rt.playlist.current;
+    final oldIndex = _controller.playlist.currentIndex;
+    _controller.playlist.currentIndex = index;
+    final current = _controller.playlist.current;
     if (current == null) return;
 
     // 安全：验证路径防止播放列表注入的路径遍历
     final validationError = PathValidator.validate(current.path);
     if (validationError != null) {
       log.w('playIndex: rejected unsafe path: $validationError');
-      _rt.onError?.call(Exception(validationError));
+      _controller.onError?.call(Exception(validationError));
       return;
     }
 
     try {
-      await _rt.engine.open(current.path);
+      await _controller.engine.open(current.path);
       if (gen != _openGeneration) return;
-      if (_rt.engine.state.value == MediaState.error) {
-        throw Exception(_rt.engine.errorMessage.value ?? '打开失败');
+      if (_controller.engine.state.value == MediaState.error) {
+        throw Exception(_controller.engine.errorMessage.value ?? '打开失败');
       }
 
       // FEAT-01: Resume from saved position (> 1s threshold)
       final savedMs = current.positionMs;
       if (savedMs != null && savedMs > 1000) {
-        await _rt.engine.seekTo(savedMs);
+        await _controller.engine.seekTo(savedMs);
       }
 
       // FEAT-03: Auto-detect external subtitles
-      _rt.subtitleService?.detectAndLoadSync(current.path);
+      _controller.subtitleService?.detectAndLoadSync(current.path);
 
-      _rt.engine.play();
+      _controller.engine.play();
     } on Exception catch (e) {
       log.e('PlaybackNavigator.playIndex($index) failed: $e');
       if (gen == _openGeneration) {
-        _rt.playlist.currentIndex = oldIndex;
+        _controller.playlist.currentIndex = oldIndex;
       }
-      _rt.onError?.call(e);
+      _controller.onError?.call(e);
       return;
     }
-    _rt.onNeedRebuild();
-    _rt.currentFileName.value = PathUtils.basename(current.path);
-    _rt.playlist.updateHistory(
+    _controller.onNeedRebuild();
+    _controller.currentFileName.value = PathUtils.basename(current.path);
+    _controller.playlist.updateHistory(
       index,
-      positionMs: _rt.engine.position.value,
-      durationMs: _rt.engine.duration.value,
+      positionMs: _controller.engine.position.value,
+      durationMs: _controller.engine.duration.value,
     );
-    _rt.savePlaylist();
+    _controller.savePlaylist();
   }
 
   /// 播放下一首
   Future<void> playNext() async {
-    final next = _rt.playlist.peekNext();
+    final next = _controller.playlist.peekNext();
     if (next >= 0) await playIndex(next);
   }
 
   /// 播放上一首
   Future<void> playPrevious() async {
-    final prev = _rt.playlist.peekPrevious();
+    final prev = _controller.playlist.peekPrevious();
     if (prev >= 0) await playIndex(prev);
   }
 }

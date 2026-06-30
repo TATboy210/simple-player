@@ -8,8 +8,8 @@ import 'playback_controller.dart';
 ///
 /// 职责: openAndPlay, addFiles, validationError
 class FileOperations {
-  FileOperations(this._rt);
-  final PlaybackController _rt;
+  FileOperations(this._controller);
+  final PlaybackController _controller;
 
   /// 最近一次校验失败的错误消息（null 表示无错误）
   final ValueNotifier<String?> validationError = ValueNotifier<String?>(null);
@@ -23,13 +23,13 @@ class FileOperations {
     }
     validationError.value = null;
 
-    var idx = _rt.playlist.items.indexWhere((e) => e.path == path);
+    var idx = _controller.playlist.items.indexWhere((e) => e.path == path);
     if (idx < 0) {
-      _rt.playlist.add(path);
-      idx = _rt.playlist.length - 1;
+      _controller.playlist.add(path);
+      idx = _controller.playlist.length - 1;
     }
     try {
-      await _rt.navigator.playIndex(idx);
+      await _controller.navigator.playIndex(idx);
       return true;
     } on Exception catch (e) {
       validationError.value = e.toString();
@@ -42,29 +42,29 @@ class FileOperations {
     final validPaths = PathValidator.filterValid(paths);
     if (validPaths.isEmpty) return 0;
 
-    final existing = _rt.playlist.items.map((e) => e.path).toSet();
-    final wasEmpty = _rt.playlist.isEmpty;
+    final existing = _controller.playlist.items.map((e) => e.path).toSet();
+    final wasEmpty = _controller.playlist.isEmpty;
     var addedCount = 0;
     for (final path in validPaths) {
       if (!existing.contains(path)) {
-        _rt.playlist.add(path);
+        _controller.playlist.add(path);
         existing.add(path);
         addedCount++;
       }
     }
 
     if (addedCount == 0) return 0;
-    _rt.onNeedRebuild();
+    _controller.onNeedRebuild();
 
-    if (wasEmpty && _rt.playlist.isNotEmpty) {
+    if (wasEmpty && _controller.playlist.isNotEmpty) {
       try {
-        await _rt.navigator.playIndex(0);
+        await _controller.navigator.playIndex(0);
       } on Exception catch (e) {
         log.e('addFiles: playIndex(0) failed: $e');
         validationError.value = e.toString();
       }
     } else if (addedCount > 0) {
-      _rt.savePlaylist();
+      _controller.savePlaylist();
     }
     return addedCount;
   }

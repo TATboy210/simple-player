@@ -11,8 +11,8 @@ import 'playback_controller.dart';
 ///
 /// 职责: init, dispose, _onStateChanged
 class StateMonitor {
-  StateMonitor(this._rt);
-  final PlaybackController _rt;
+  StateMonitor(this._controller);
+  final PlaybackController _controller;
 
   bool _initialized = false;
 
@@ -22,14 +22,14 @@ class StateMonitor {
   Future<void> init({AppSettings? settings}) async {
     if (_initialized) return;
     _initialized = true;
-    _rt.engine.state.addListener(_onStateChanged);
+    _controller.engine.state.addListener(_onStateChanged);
 
     unawaited(_loadPlaylistForMigration());
 
     try {
       final s = settings ?? await SettingsStore.load();
-      _rt.engine.setVolume(s.volume);
-      _rt.engine.setMute(s.isMuted);
+      _controller.engine.setVolume(s.volume);
+      _controller.engine.setMute(s.isMuted);
     } on Exception catch (e) {
       log.e('StateMonitor.init load settings failed: $e');
     }
@@ -49,77 +49,77 @@ class StateMonitor {
 
   /// 自动连播：引擎状态变为 completed 时根据播放模式决定行为
   void _onStateChanged() {
-    final state = _rt.engine.state.value;
+    final state = _controller.engine.state.value;
 
     // 暂停时保存断点位置
     if (state == MediaState.paused) {
-      final idx = _rt.playlist.currentIndex;
+      final idx = _controller.playlist.currentIndex;
       if (idx >= 0) {
-        _rt.playlist.updatePosition(
+        _controller.playlist.updatePosition(
           idx,
-          _rt.engine.position.value,
-          _rt.engine.duration.value,
+          _controller.engine.position.value,
+          _controller.engine.duration.value,
         );
-        _rt.savePlaylist();
+        _controller.savePlaylist();
       }
       return;
     }
 
     if (state != MediaState.completed) return;
 
-    if (_rt.playlist.mode == PlayMode.loopSingle) {
-      final idx = _rt.playlist.currentIndex;
-      if (idx >= 0) _replayIndex(idx);
+    if (_controller.playlist.mode == PlayMode.loopSingle) {
+      final idx = _controller.playlist.currentIndex;
+      if (idx >= 0) unawaited(_replayIndex(idx));
     } else {
-      _autoAdvance();
+      unawaited(_autoAdvance());
     }
   }
 
   /// 单曲循环：重新播放指定索引
-  void _replayIndex(int index) async {
+  Future<void> _replayIndex(int index) async {
     try {
-      await _rt.navigator.playIndex(index);
+      await _controller.navigator.playIndex(index);
     } on Exception catch (e, st) {
       log.e('StateMonitor loopSingle replay failed: $e', stackTrace: st);
-      _rt.onError?.call(e);
+      _controller.onError?.call(e);
     }
   }
 
   /// 自动连播：播放下一首
-  void _autoAdvance() async {
+  Future<void> _autoAdvance() async {
     try {
-      await _rt.navigator.playNext();
+      await _controller.navigator.playNext();
     } on Exception catch (e, st) {
       log.e('StateMonitor auto-advance failed: $e', stackTrace: st);
-      _rt.onError?.call(e);
+      _controller.onError?.call(e);
     }
   }
 
   /// 释放资源
   void dispose() {
-    _rt.engine.state.removeListener(_onStateChanged);
-    final idx = _rt.playlist.currentIndex;
-    if (idx >= 0 && _rt.engine.position.value > 0) {
-      _rt.playlist.updatePosition(
+    _controller.engine.state.removeListener(_onStateChanged);
+    final idx = _controller.playlist.currentIndex;
+    if (idx >= 0 && _controller.engine.position.value > 0) {
+      _controller.playlist.updatePosition(
         idx,
-        _rt.engine.position.value,
-        _rt.engine.duration.value,
+        _controller.engine.position.value,
+        _controller.engine.duration.value,
       );
-      _rt.savePlaylist();
+      _controller.savePlaylist();
     }
     unawaited(
       SettingsStore.saveVolume(
-        _rt.engine.volume.value,
+        _controller.engine.volume.value,
       ).catchError((Object e) => log.e('SettingsStore.saveVolume failed: $e')),
     );
     unawaited(
       SettingsStore.saveIsMuted(
-        _rt.engine.isMuted.value,
+        _controller.engine.isMuted.value,
       ).catchError((Object e) => log.e('SettingsStore.saveIsMuted failed: $e')),
     );
     unawaited(
       SettingsStore.savePlayMode(
-        _rt.playlist.mode.index,
+        _controller.playlist.mode.index,
       ).catchError((Object e) => log.e('SettingsStore.savePlayMode failed: $e')),
     );
     unawaited(
