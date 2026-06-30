@@ -154,7 +154,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
             const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
             const SizedBox(height: 16),
             Text(
-              'Player initialization failed',
+              AppLocalizations.of(context).playerInitFailed,
               style: const TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 8),
