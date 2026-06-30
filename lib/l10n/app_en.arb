@@ -326,6 +326,9 @@
   "playerLoadError": "Failed to load player module",
   "@playerLoadError": { "description": "Error message when deferred player module fails to load" },
 
+  "playerInitFailed": "Player initialization failed",
+  "@playerInitFailed": { "description": "Error title when player fails to initialize" },
+
   "performanceTab": "Performance",
   "@performanceTab": { "description": "Performance settings tab label" },
   "d3d11Rendering": "D3D11 Rendering",

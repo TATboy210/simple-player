@@ -161,6 +161,8 @@
 
   "playerLoadError": "播放器模块加载失败",
 
+  "playerInitFailed": "播放器初始化失败",
+
   "performanceTab": "性能",
   "d3d11Rendering": "D3D11 渲染",
   "d3d11Sync": "D3D11 CPU 同步",
