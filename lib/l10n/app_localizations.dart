@@ -938,6 +938,12 @@ abstract class AppLocalizations {
   /// **'Failed to load player module'**
   String get playerLoadError;
 
+  /// Error title when player fails to initialize
+  ///
+  /// In en, this message translates to:
+  /// **'Player initialization failed'**
+  String get playerInitFailed;
+
   /// Performance settings tab label
   ///
   /// In en, this message translates to:

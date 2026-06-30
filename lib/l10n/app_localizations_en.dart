@@ -445,6 +445,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playerLoadError => 'Failed to load player module';
 
   @override
+  String get playerInitFailed => 'Player initialization failed';
+
+  @override
   String get performanceTab => 'Performance';
 
   @override
