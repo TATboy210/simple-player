@@ -2,10 +2,14 @@ import 'package:flutter/foundation.dart';
 
 export 'media_error_type.dart';
 export 'models/media_info.dart';
+export 'models/video_codec_info.dart';
 export 'media_state.dart';
 export 'video_effect_type.dart';
 export 'models/audio_track_info.dart';
 export 'models/subtitle_track_info.dart';
+export 'track_control.dart';
+export 'video_effects.dart';
+export 'renderer_config.dart';
 
 import 'media_error_type.dart';
 import 'models/media_info.dart';
@@ -67,6 +71,10 @@ mixin EngineState {
   void rotate(int degrees);
   void setAspectRatio(double ratio);
   void setDeinterlace(bool enable);
+
+  // ── D3D11 性能 ──
+  void setD3d11SyncEnabled(bool enabled);
+  void setHardwareDecoding(bool enabled);
 
   // ── 生命周期 ──
   void dispose();

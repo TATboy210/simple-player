@@ -54,7 +54,7 @@ class MockEvent {
 /// - 完整状态机：idle → loading → playing ↔ paused → stopped/completed
 /// - 可配置 open 延迟、错误注入
 /// - 状态变化历史记录（调试用）
-class MockEngine with EngineState {
+class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   bool _disposed = false;
   Timer? _positionTimer;
 
@@ -266,6 +266,12 @@ class MockEngine with EngineState {
   }
 
   void setDeinterlace(bool enable) {}
+
+  // ─── D3D11 性能 ───
+
+  void setD3d11SyncEnabled(bool enabled) {}
+
+  void setHardwareDecoding(bool enabled) {}
 
   // ─── 生命周期 ───
 

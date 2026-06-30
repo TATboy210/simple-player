@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-import '../../lib/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 
 /// Hand-written Fake implementing EngineState for testing.
 ///
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
-class FakeEngine with EngineState {
+class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   bool _disposed = false;
 
   // ─── ValueNotifier fields (defaults match FvpEngine) ───
