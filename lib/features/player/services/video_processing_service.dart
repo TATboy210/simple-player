@@ -71,10 +71,16 @@ class VideoProcessingService {
     _previousState = next;
     if (!patch.hasAny) return;
 
-    if (patch.isColorAdjustment) {
+    if (patch.brightness) {
       _engine.setVideoEffect(VideoEffectType.brightness, next.brightness);
+    }
+    if (patch.contrast) {
       _engine.setVideoEffect(VideoEffectType.contrast, next.contrast);
+    }
+    if (patch.saturation) {
       _engine.setVideoEffect(VideoEffectType.saturation, next.saturation);
+    }
+    if (patch.hue) {
       _engine.setVideoEffect(VideoEffectType.hue, next.hue);
     }
     if (patch.deinterlaceEnabled) {
