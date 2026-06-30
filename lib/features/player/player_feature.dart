@@ -146,31 +146,34 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
   @override
   Widget build(BuildContext context) {
-    if (_error) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              AppLocalizations.of(context).playerInitFailed,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage,
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-    if (!_ready) {
-      return const SizedBox.shrink();
-    }
+    if (_error) return _buildErrorState(context);
+    if (!_ready) return const SizedBox.shrink();
+    return _buildPlayerScreen();
+  }
 
+  Widget _buildErrorState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            AppLocalizations.of(context).playerInitFailed,
+            style: const TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage,
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlayerScreen() {
     final engine = _services.engine;
     final controller = _services.controller;
     final playlist = _services.playlist;
@@ -194,8 +197,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         _services.engine,
         _services.videoProcessing,
       ),
-      onSettingsSecondary: (barCtx, details) =>
-          widget.onSettingsSecondary(barCtx, details),
+      onSettingsSecondary: widget.onSettingsSecondary,
       onFilesDropped: _onFilesDropped,
       onDragHoverChanged: (hovering) {
         setState(() => _isDragHovering = hovering);
