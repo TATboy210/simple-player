@@ -22,8 +22,9 @@ class SpeedButton extends StatelessWidget {
 
   void _shift(int direction) {
     final current = engine.playbackSpeed.value;
-    var idx = _gears.lastIndexWhere((g) => g <= current);
-    if (idx < 0) idx = 0;
+    // 找到第一个 >= 当前值的挡位（非标准值自动 snap 到最近的较高挡位）
+    var idx = _gears.indexWhere((g) => g >= current);
+    if (idx < 0) idx = _gears.length - 1; // 超出最大挡位，锁定最后一档
     final next = (idx + direction).clamp(0, _gears.length - 1);
     final v = _gears[next];
     engine.setPlaybackRate(v);

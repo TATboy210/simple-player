@@ -1,0 +1,334 @@
+{
+  "_meta": {
+    "description": "Simple Player Flutter — 控制栏完整设计参数表",
+    "usage": "修改此文件后，对照值修改 lib/ui/theme/tokens.dart 中的对应常量",
+    "colorFormat": "ARGB hex (0xAARRGGBB) — AA=透明度, RR=红, GG=绿, BB=蓝",
+    "date": "2026-07-01"
+  },
+
+  "colorScheme": {
+    "_section": "全局配色方案 (ThemeService + Tokens)",
+    "themeAccents": {
+      "midnight": { "value": "0xFF2C58F4", "desc": "主题1: 午夜蓝 — 主强调色" },
+      "ocean":    { "value": "0xFF00B4D8", "desc": "主题2: 海洋蓝" },
+      "forest":   { "value": "0xFF2D6A4F", "desc": "主题3: 森林绿" }
+    },
+    "accentSecondary": {
+      "accentLight": { "value": "0xB42C58F4", "alpha": "70%", "desc": "强调色半透明" },
+      "accentBlue":  { "value": "0xFF4A8EFF", "desc": "蓝色辉光（进度条/边框）" },
+      "accentEgg":   { "value": "0xFF66CCFF", "desc": "彩蛋色" },
+      "danger":      { "value": "0xFFFA3737", "desc": "危险/错误色" }
+    },
+    "backgrounds": {
+      "bgDeep":    { "value": "0xFF060810", "desc": "最深背景" },
+      "bgBase":    { "value": "0xFF0C0F18", "desc": "基础背景" },
+      "bgPanel":   { "value": "0xFF111520", "desc": "面板背景" },
+      "bgElevated":{ "value": "0xFF161A28", "desc": "抬升背景" },
+      "bgHover":   { "value": "0xFF1E2232", "desc": "悬停背景" },
+      "bgGlass":   { "value": "0x520C0F18", "alpha": "32%", "desc": "全局毛玻璃背景" }
+    },
+    "text": {
+      "textPrimary":   { "value": "0xEBFFFFFF", "alpha": "92%", "desc": "主文字" },
+      "textSecondary": { "value": "0x73FFFFFF", "alpha": "45%", "desc": "次级文字" },
+      "textTertiary":  { "value": "0x38FFFFFF", "alpha": "22%", "desc": "三级文字" },
+      "textDisabled":  { "value": "0xFF444455", "desc": "禁用文字" }
+    },
+    "borders": {
+      "borderHighlight": { "value": "0x33FFFFFF", "alpha": "20%", "desc": "白色高亮边框" },
+      "glassBorder":     { "value": "0x146482FF", "alpha": "8%",  "desc": "蓝色毛玻璃边框" }
+    }
+  },
+
+  "glow": {
+    "_section": "边缘微光系统 (GlassContainer box-shadow)",
+    "core": {
+      "glowCore":       { "value": "0xE6A0BEFF", "alpha": "90%", "desc": "核心光" },
+      "glowMid":        { "value": "0x40648CFF", "alpha": "25%", "desc": "中层光" },
+      "glowEdge":       { "value": "0x265078FF", "alpha": "15%", "desc": "边缘光" },
+      "glowEdgeStrong": { "value": "0x596496FF", "alpha": "35%", "desc": "强边缘光" }
+    },
+    "boxShadow": {
+      "glowHighlightWhite": { "value": "0x08FFFFFF", "alpha": "3%",  "desc": "白色高光" },
+      "glowBorderBlue":     { "value": "0x0F5078FF", "alpha": "6%",  "desc": "蓝色边框光" },
+      "glowMidBlue":        { "value": "0x0A5078FF", "alpha": "4%",  "desc": "蓝色中层" },
+      "glowAmbientBlue":    { "value": "0x053C64DC", "alpha": "2%",  "desc": "环境蓝光" },
+      "glowOuterRing":      { "value": "0x0A5082FF", "alpha": "4%",  "desc": "外环光" },
+      "glowAccent":         { "value": "0x1F5082FF", "alpha": "12%", "desc": "强调光" }
+    },
+    "gradientStroke": {
+      "glowGradientStart": { "value": "0x2E64A0FF", "alpha": "18%", "desc": "渐变起点" },
+      "glowGradientMid":   { "value": "0x0064A0FF", "alpha": "0%",  "desc": "渐变中点（透明）" },
+      "glowGradientEnd":   { "value": "0x145078FF", "alpha": "8%",  "desc": "渐变终点" }
+    },
+    "omniDirectional": {
+      "glowOmniRight": { "value": "0x1A5082FF", "alpha": "10%", "desc": "右向光" },
+      "glowOmniDown":  { "value": "0x0A3C64DC", "alpha": "4%",  "desc": "下向光" },
+      "glowOmniLeft":  { "value": "0x1A7850DC", "alpha": "10%", "desc": "左向光" },
+      "glowOmniUp":    { "value": "0x0A5082FF", "alpha": "4%",  "desc": "上向光" }
+    }
+  },
+
+  "aurora": {
+    "_section": "Aurora 背景动画 blob",
+    "auroraBlue1": { "value": "0xFF3B82F6", "desc": "主蓝" },
+    "auroraBlue2": { "value": "0xFF1130A3", "desc": "深蓝（logo）" },
+    "auroraBlue3": { "value": "0xFF5578DC", "desc": "浅蓝" }
+  },
+
+  "controlBar": {
+    "_section": "控制栏 — 核心装饰参数",
+    "background": {
+      "controlBarBg":         { "value": "0x4D0E111E", "alpha": "30%", "rgb": "#0E111E", "desc": "控制栏背景色" },
+      "controlBarBorderWhite":{ "value": "0x0AFFFFFF", "alpha": "4%",  "desc": "白色边框" },
+      "controlBarBorder":     { "value": "0x1F6482FF", "alpha": "12%", "rgb": "#6482FF", "desc": "蓝色微光边框" }
+    },
+    "shadow": {
+      "controlBarShadowBlack": { "value": "0x20000000", "alpha": "12%", "desc": "内阴影" },
+      "controlBarOuterShadow": { "value": "0x40000000", "alpha": "25%", "desc": "外阴影" }
+    },
+    "glassmorphism": {
+      "glassBlur":     { "value": 18.0, "unit": "px (sigma)", "desc": "控制栏模糊度" },
+      "glassBlurThin": { "value": 8.0,  "unit": "px (sigma)", "desc": "标题栏模糊度" },
+      "glassBlurThick":{ "value": 20.0, "unit": "px (sigma)", "desc": "弹窗模糊度" }
+    },
+    "layout": {
+      "controlBarHeight":      { "value": 110.0, "unit": "dp", "desc": "控制栏总高度" },
+      "controlBarRadius":      { "value": 22.0,  "unit": "dp", "desc": "控制栏圆角" },
+      "controlBarMarginH":     { "value": 18.0,  "unit": "dp", "desc": "水平外边距" },
+      "controlBarMarginBottom":{ "value": 16.0,  "unit": "dp", "desc": "底部外边距" }
+    }
+  },
+
+  "progressBar": {
+    "_section": "进度条",
+    "dimensions": {
+      "progressBarHeight":       { "value": 24.0, "unit": "dp", "desc": "进度条区域高度" },
+      "progressBarThickness":    { "value": 3.0,  "unit": "dp", "desc": "轨道粗细" },
+      "progressBarThicknessDrag":{ "value": 5.0,  "unit": "dp", "desc": "拖拽时轨道粗细" },
+      "progressThumbRadius":     { "value": 7.0,  "unit": "dp", "desc": "拖拽圆点半径" },
+      "progressBarRadius":       { "value": 2.0,  "unit": "dp", "desc": "轨道圆角" }
+    },
+    "colors": {
+      "progressPlayed":  { "value": "0xFFFFFFFF", "desc": "已播放部分颜色" },
+      "progressBuffer":  { "value": "0x44FFFFFF", "alpha": "27%", "desc": "已缓冲部分颜色" },
+      "progressThumb":   { "value": "0xFFFFFFFF", "desc": "拖拽圆点颜色" },
+      "progressBarBg":   { "value": "0x44000000", "alpha": "27%", "desc": "进度条底色" }
+    },
+    "disabled": {
+      "progressDisabledBgAlpha":     { "value": 0.3, "desc": "禁用时背景透明度" },
+      "progressDisabledBufferAlpha": { "value": 0.2, "desc": "禁用时缓冲透明度" },
+      "progressDisabledPlayedAlpha": { "value": 0.3, "desc": "禁用时已播放透明度" }
+    },
+    "interaction": {
+      "progressSeekThrottleMs":   { "value": 150, "unit": "ms", "desc": "拖拽节流" },
+      "progressExpandDurationMs": { "value": 200, "unit": "ms", "desc": "展开动画时长" },
+      "progressDragThreshold":    { "value": 5.0, "unit": "dp", "desc": "拖拽触发阈值" }
+    }
+  },
+
+  "volumeSlider": {
+    "_section": "音量滑块 (SliderThemeData)",
+    "trackHeight":   { "value": 3,  "unit": "dp", "desc": "轨道高度" },
+    "thumbRadius":   { "value": 5,  "unit": "dp", "desc": "滑块圆点半径" },
+    "overlayRadius": { "value": 10, "unit": "dp", "desc": "点击涟漪半径" },
+    "width":         { "value": 100, "unit": "dp", "desc": "滑块总宽度" },
+    "activeColor":   { "value": "→ accent (0xFF2C58F4)", "desc": "已填充颜色 = 主强调色" },
+    "inactiveColor": { "value": "→ bgHover (0xFF1E2232)", "desc": "未填充颜色 = hover背景" },
+    "scrollDelta":   { "value": 0.05, "unit": "每次滚动", "desc": "滚轮音量步进" }
+  },
+
+  "speedButton": {
+    "_section": "倍速按钮",
+    "gears":        { "value": "[0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]", "desc": "可选倍速档位" },
+    "normalSpeed":  { "value": 1.0, "desc": "正常速度（双击重置值）" },
+    "width":        { "value": 72, "unit": "dp", "desc": "按钮总宽度" },
+    "height":       { "value": 36, "unit": "dp", "desc": "按钮高度" },
+    "segmentWidth": { "value": 36, "unit": "dp", "desc": "中间数字区宽度" },
+    "arrowWidth":   { "value": 18, "unit": "dp", "desc": "左右箭头宽度" },
+    "textColor":    { "value": "→ textPrimary (0xEBFFFFFF)", "desc": "数字颜色" },
+    "hoverBg":      { "value": "→ bgHover (0xFF1E2232)", "desc": "箭头hover背景" }
+  },
+
+  "titleBar": {
+    "_section": "标题栏",
+    "titleBarHeight":      { "value": 32.0, "unit": "dp" },
+    "titleBarButtonWidth": { "value": 36.0, "unit": "dp" },
+    "titleBarBg":          { "value": "0xE61A1A24", "alpha": "90%", "desc": "标题栏背景" },
+    "titleBarBorder":      { "value": "0x33FFFFFF", "alpha": "20%", "desc": "标题栏边框" },
+    "titleBarHover":       { "value": "0x1AFFFFFF", "alpha": "10%", "desc": "按钮hover" },
+    "titleBarPressed":     { "value": "0x33FFFFFF", "alpha": "20%", "desc": "按钮pressed" },
+    "closeHoverBg":        { "value": "0xFFC42B1C", "desc": "关闭按钮hover" },
+    "closePressedBg":      { "value": "0xFFB01C14", "desc": "关闭按钮pressed" }
+  },
+
+  "menu": {
+    "_section": "右键菜单",
+    "menuBg":         { "value": "0xE61A1A2E", "alpha": "90%", "desc": "菜单背景" },
+    "menuBorder":     { "value": "0x22FFFFFF", "alpha": "13%", "desc": "菜单边框" },
+    "menuTextMuted":  { "value": "0x99FFFFFF", "alpha": "60%", "desc": "标题文字" },
+    "menuTextNormal": { "value": "0xCCFFFFFF", "alpha": "80%", "desc": "菜单项文字" },
+    "menuAccent":     { "value": "0xFF2C58F4", "desc": "选中项颜色" },
+    "menuRadius":     { "value": 10, "unit": "dp", "desc": "菜单圆角" }
+  },
+
+  "osd": {
+    "_section": "OSD 浮窗 (屏幕提示)",
+    "osdIconSize":       { "value": 22, "unit": "dp" },
+    "osdFadeDurationMs": { "value": 200, "unit": "ms" },
+    "osdDefaultHoldMs":  { "value": 1200, "unit": "ms" }
+  },
+
+  "typography": {
+    "_section": "字体系统",
+    "fontFamily":     { "value": "SF Pro Display", "fallback": "Segoe UI", "desc": "主字体" },
+    "fontFamilyMono": { "value": "SF Mono", "desc": "等宽字体" },
+    "sizes": {
+      "fontTitle":    { "value": 18.0, "unit": "dp" },
+      "fontBody":     { "value": 14.0, "unit": "dp" },
+      "fontCaption":  { "value": 12.0, "unit": "dp" },
+      "fontOverline": { "value": 10.0, "unit": "dp" },
+      "fontBranding": { "value": 18.0, "unit": "dp" },
+      "fontSizeSmall":{ "value": 9.0,  "unit": "dp" }
+    },
+    "weights": {
+      "weightExtraLight": { "value": "w200" },
+      "weightLight":      { "value": "w300" },
+      "weightRegular":    { "value": "w400" },
+      "weightMedium":     { "value": "w500" },
+      "weightSemiBold":   { "value": "w600" }
+    }
+  },
+
+  "icons": {
+    "_section": "图标尺寸",
+    "iconSm": { "value": 16.0, "unit": "dp" },
+    "iconMd": { "value": 18.0, "unit": "dp" },
+    "iconLg": { "value": 20.0, "unit": "dp" },
+    "iconXl": { "value": 28.0, "unit": "dp" }
+  },
+
+  "spacing": {
+    "_section": "间距系统",
+    "spXs": { "value": 4.0, "unit": "dp" },
+    "spSm": { "value": 8.0, "unit": "dp" },
+    "spMd": { "value": 12.0, "unit": "dp" },
+    "spLg": { "value": 16.0, "unit": "dp" },
+    "spXl": { "value": 24.0, "unit": "dp" }
+  },
+
+  "radius": {
+    "_section": "圆角系统",
+    "radiusSm":    { "value": 8.0,  "desc": "按钮、speed标签" },
+    "radiusMd":    { "value": 14.0, "desc": "色板方块" },
+    "radiusLg":    { "value": 22.0, "desc": "卡片、控制栏" },
+    "radiusXl":    { "value": 32.0, "desc": "外框容器" },
+    "radiusBtn":   { "value": 4.0,  "desc": "小按钮" },
+    "radiusLarge": { "value": 12.0, "desc": "兼容保留" },
+    "radiusPopup": { "value": 8.0,  "desc": "弹窗" }
+  },
+
+  "animation": {
+    "_section": "动画时长 (ms)",
+    "durationFast":           { "value": 80,  "desc": "快速反馈" },
+    "durationNormal":         { "value": 150, "desc": "常规过渡" },
+    "durationFade":           { "value": 300, "desc": "淡入淡出" },
+    "durationSlide":          { "value": 300, "desc": "滑入滑出" },
+    "durationDebounce":       { "value": 500, "desc": "防抖" },
+    "durationWindowResize":   { "value": 100, "desc": "窗口resize" },
+    "durationFullscreenAnim": { "value": 200, "desc": "全屏切换" }
+  },
+
+  "autoHide": {
+    "_section": "自动隐藏",
+    "hideDelayWindowed":   { "value": 5, "unit": "秒", "desc": "窗口模式隐藏延迟" },
+    "hideDelayFullscreen": { "value": 3, "unit": "秒", "desc": "全屏模式隐藏延迟" }
+  },
+
+  "scale": {
+    "_section": "缩放",
+    "hoverScale": { "value": 1.02, "desc": "hover放大" },
+    "pressScale": { "value": 0.98, "desc": "按下缩小" }
+  },
+
+  "button": {
+    "_section": "按钮尺寸",
+    "iconButtonSizeLarge": { "value": 48, "unit": "dp" },
+    "iconButtonSizeSmall": { "value": 24, "unit": "dp" },
+    "iconButtonRadius":    { "value": 24, "unit": "dp" },
+    "iconButtonPaddingH":  { "value": 20, "unit": "dp" },
+    "iconButtonPaddingV":  { "value": 12, "unit": "dp" }
+  },
+
+  "slider": {
+    "_section": "滑块通用",
+    "sliderHeight":     { "value": 42, "unit": "dp" },
+    "sliderLabelWidth": { "value": 64, "unit": "dp" },
+    "sliderValueWidth": { "value": 36, "unit": "dp" }
+  },
+
+  "thumbnail": {
+    "_section": "缩略图",
+    "thumbnailOverlay":   { "value": "0x42000000", "alpha": "26%", "desc": "缩略图叠加层" },
+    "thumbnailTileHeight":{ "value": 124, "unit": "dp" }
+  },
+
+  "playlist": {
+    "_section": "播放列表",
+    "playlistPanelWidth":       { "value": 420, "unit": "dp" },
+    "playlistPanelHeight":      { "value": 240, "unit": "dp" },
+    "playlistPanelWidthNarrow": { "value": 320, "unit": "dp" },
+    "playlistPanelHeightNarrow":{ "value": 200, "unit": "dp" }
+  },
+
+  "breakpoints": {
+    "_section": "响应式断点",
+    "compactBreakpoint":      { "value": 500, "unit": "dp", "desc": "紧凑布局切换" },
+    "breakpointWide":         { "value": 600, "unit": "dp", "desc": "播放列表并排vs覆盖" },
+    "breakpointUltraCompact": { "value": 360, "unit": "dp", "desc": "超紧凑布局" }
+  },
+
+  "tooltip": {
+    "_section": "Tooltip",
+    "tooltipDelayShort": { "value": 400, "unit": "ms" },
+    "tooltipDelayLong":  { "value": 600, "unit": "ms" }
+  },
+
+  "skip": {
+    "_section": "跳秒",
+    "skipSecondsShort": { "value": 10, "unit": "秒" },
+    "skipSecondsLong":  { "value": 30, "unit": "秒" }
+  },
+
+  "material": {
+    "_section": "Material Design 3 可扩展参数 (ThemeData.dark copyWith)",
+    "colorScheme": {
+      "primary":     { "value": "→ accent", "desc": "主色 = 当前主题强调色" },
+      "secondary":   { "value": "→ accent", "desc": "次色 = 同主色" },
+      "surface":     { "value": "ThemeData.dark default", "desc": "可自定义" },
+      "error":       { "value": "ThemeData.dark default", "desc": "可自定义" },
+      "onPrimary":   { "value": "ThemeData.dark default", "desc": "主色上的文字色" },
+      "onSecondary": { "value": "ThemeData.dark default", "desc": "次色上的文字色" },
+      "onSurface":   { "value": "ThemeData.dark default", "desc": "表面上的文字色" },
+      "brightness":  { "value": "Brightness.dark", "desc": "暗色模式" }
+    },
+    "可用扩展": [
+      "textTheme — 全局文字样式 (bodyLarge/bodyMedium/titleLarge...)",
+      "elevatedButtonTheme — ElevatedButton 默认样式",
+      "iconButtonTheme — IconButton 默认样式",
+      "sliderTheme — Slider 全局默认样式",
+      "tooltipTheme — Tooltip 全局默认样式",
+      "popupMenuTheme — PopupMenu 全局默认样式",
+      "dialogTheme — Dialog 全局默认样式",
+      "dividerTheme — Divider 全局默认样式",
+      "cardTheme — Card 全局默认样式",
+      "chipTheme — Chip 全局默认样式",
+      "switchTheme — Switch 全局默认样式",
+      "checkboxTheme — Checkbox 全局默认样式",
+      "inputDecorationTheme — TextField 全局默认样式",
+      "snackBarTheme — SnackBar 全局默认样式",
+      "bottomSheetTheme — BottomSheet 全局默认样式",
+      "navigationBarTheme — NavigationBar 全局默认样式"
+    ],
+    "note": "当前 _buildTheme 仅设置了 colorScheme.primary/secondary，其余全部使用 ThemeData.dark() 默认值。如需深度定制，可在 ThemeService._buildTheme 中扩展 copyWith 参数。"
+  }
+}
