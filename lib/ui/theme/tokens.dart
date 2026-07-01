@@ -9,7 +9,7 @@ class Tokens {
   static const bgPanel = Color(0xFF111520);     // 加深
   static const bgElevated = Color(0xFF161A28);  // 加深
   static const bgHover = Color(0xFF1E2232);     // 加深
-  static const bgGlass = Color(0x8C0C0F18);    // 加深
+  static const bgGlass = Color(0x520C0F18);    // 通透毛玻璃 (32% alpha)
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
@@ -52,9 +52,9 @@ class Tokens {
   static const progressBarBg = Color(0x44000000);    // 进度条底色
 
   // ── 控制栏装饰 ──
-  static const controlBarBg = Color(0x800E111E);
+  static const controlBarBg = Color(0x4D0E111E);  // 通透 (30% alpha)
   static const controlBarBorderWhite = Color(0x0AFFFFFF);
-  static const controlBarShadowBlack = Color(0x1A000000);
+  static const controlBarShadowBlack = Color(0x20000000);  // 微增阴影
   static const controlBarOuterShadow = Color(0x40000000);
 
   // ── 右键菜单 ──
@@ -108,7 +108,7 @@ class Tokens {
 
   // ── 毛玻璃 (ImageFilter.blur sigma, 单位=像素) ──
   static const glassBlurThin = 8.0;    // 标题栏 — 轻模糊
-  static const glassBlur = 12.0;       // 控制栏 — 默认模糊
+  static const glassBlur = 18.0;       // 控制栏 — 通透磨砂
   static const glassBlurThick = 20.0;  // 弹窗/对话框 — 深模糊
 
   // ── 动画 ──
@@ -141,7 +141,7 @@ class Tokens {
   static const controlBarRadius = 22.0;   // 修正为 22px（与设计稿一致）
   static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;
-  static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
+  static const controlBarBorder = Color(0x1F6482FF); // rgba(100,130,255,0.12) 通透边框
 
   // ── 进度条 ──
   static const progressBarRadius = 2.0;

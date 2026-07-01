@@ -21,6 +21,39 @@ class VolumeButton extends StatefulWidget {
 class _VolumeButtonState extends State<VolumeButton> {
   double _savedVolume = 1.0;
 
+  @override
+  void initState() {
+    super.initState();
+    widget.engine.volume.addListener(_onVolumeChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant VolumeButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.engine != widget.engine) {
+      oldWidget.engine.volume.removeListener(_onVolumeChanged);
+      widget.engine.volume.addListener(_onVolumeChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.engine.volume.removeListener(_onVolumeChanged);
+    super.dispose();
+  }
+
+  /// 同步 _savedVolume：用户拖滑块时自动跟踪，并在静音状态下自动取消静音
+  void _onVolumeChanged() {
+    final v = widget.engine.volume.value;
+    if (v > 0) {
+      _savedVolume = v;
+      // 静音状态下拖滑块到非零值 → 自动取消静音
+      if (widget.engine.isMuted.value) {
+        widget.engine.setMute(false);
+      }
+    }
+  }
+
   void _toggleMute() {
     final engine = widget.engine;
     final l10n = AppLocalizations.of(context);
