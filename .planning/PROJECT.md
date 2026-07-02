@@ -1,6 +1,21 @@
-# PlayerEngine 架构优化与依赖清理
+# Simple Player Flutter
 
 ## What This Is
+
+Simple Player Flutter 桌面媒体播放器持续迭代项目。
+
+## Current Milestone: v1.3 控制栏视觉协调与玻璃质感优化
+
+**Goal:** 控制栏颜色/亮度与背景融合，减少视觉突兀感
+
+**Target features:**
+- 空状态控制栏背景优化（无视频时更淡、更融合）
+- 控制栏颜色亮度向背景看齐（毛玻璃效果不变）
+- 整体玻璃质感调优（边框、透明度参数协调）
+
+---
+
+## Previous Milestone: PlayerEngine 架构优化与依赖清理
 
 Simple Player Flutter 的引擎层架构优化项目：移除外部 `player_engine` path 依赖，优化 FvpEngine 内部结构，评估 media_kit 1.2.6 作为未来替代方案的可行性。
 
@@ -94,7 +109,13 @@ UI Layer (57 files)
 - ✓ MockEngine 测试替身 — existing
 - ✓ Barrel export 文件 (player_engine.dart) — existing
 
-### Active
+### Active (v1.3)
+
+- [ ] UI-01: 空状态控制栏背景优化 — 无视频时更淡、更融合
+- [ ] UI-02: 控制栏颜色亮度向背景看齐 — 毛玻璃效果不变
+- [ ] UI-03: 整体玻璃质感调优 — 边框、透明度参数协调
+
+### Previous Active (PlayerEngine, deferred)
 
 - [x] 移除 pubspec.yaml 中的 `player_engine` path 依赖
 - [x] 将 56 个文件的 import 从 `package:player_engine/` 改为本地相对路径
@@ -119,4 +140,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. "What This Is" still accurate? → Update if drifted
 
 ---
-*Last updated: 2026-06-29 after initialization*
+*Last updated: 2026-07-02 — milestone v1.3 started*
