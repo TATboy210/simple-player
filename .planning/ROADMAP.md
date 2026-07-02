@@ -1,139 +1,112 @@
-# Roadmap: PlayerEngine Refactoring
+# Roadmap: v1.3 控制栏视觉协调与玻璃质感优化
 
-**Created:** 2026-06-29
-**Granularity:** fine
-**Mode:** interactive
-**Total Requirements:** 22 v1 requirements across 5 categories
+## Overview
 
----
+控制栏与背景的视觉协调：添加空状态 token 体系，让控制栏在无视频时自动切换到更淡的配色，调整玻璃质感参数使控制栏与 AuroraBackground 融合。
 
-### Phase 1: 依赖清理
+## Milestones
 
-**Goal:** 移除外部 `player_engine` path 依赖，统一为本地相对路径导入
-**Mode:** mvp
-**Requirements:** DEP-01, DEP-02, DEP-03, DEP-04
-**Plans:** 2 plans
-Plans:
-**Wave 2**
+- ✅ **v1.0 MVP** - Phases 1-4 (shipped 2026-05-29)
+- ✅ **v1.1 Testing & Quality** - Phases 5-7 (shipped 2026-05-30)
+- ✅ **v1.2 Security & Kernel** - Phases 8-11 (shipped 2026-05-31)
+- ✅ **v1.2.1 Window Polish** - Phases 12-15 (shipped 2026-06-28)
+- 🚧 **v1.3 Glass Morphism Coordination** - Phases 16-18 (in progress)
 
-- [x] 01-01-PLAN.md — Migrate 56 source file imports from package:player_engine to local relative paths
+## Phases
 
-**Wave 3** *(blocked on Wave 2 completion)*
+<details>
+<summary>✅ v1.0 MVP (Phases 1-4) — SHIPPED 2026-05-29</summary>
 
-- [x] 01-02-PLAN.md — Remove pubspec dependency, update docs, run full verification
+- [x] **Phase 1: Window Foundation** - C++ WindowChannel, frameless window, Win32 resize/drag
+- [x] **Phase 2: GlassMorphism & Controls** - GlassWidget library, control bar, progress bar
+- [x] **Phase 3: Playback Engine** - fvp integration, playlist, media state management
+- [x] **Phase 4: D3D11 Performance** - Hardware decoders, ring buffer, PerfMonitor
 
-**Success Criteria**:
+</details>
 
-1. `pubspec.yaml` 中不存在 `player_engine` path 依赖
-2. `grep -r "package:player_engine" lib/ test/` 返回零结果（PowerShell: `(Get-ChildItem -Path lib, test -Recurse -Filter *.dart | Select-String -Pattern "package:player_engine").Count` = 0）
-3. `flutter analyze` 零错误零警告
-4. `flutter test` 全部通过
-5. `lib/kernel/engine/player_engine.dart` barrel export 包含全部 8 个符号
+<details>
+<summary>✅ v1.1 Testing & Quality (Phases 5-7) — SHIPPED 2026-05-30</summary>
 
----
+- [x] **Phase 5: Integration Tests** - Critical user flow E2E tests
+- [x] **Phase 6: Golden Tests** - Glassmorphism component golden tests
+- [x] **Phase 7: Code Optimization** - Architecture refactoring, dead code cleanup
 
-### Phase 2: 引擎组合重构
+</details>
 
-**Goal:** FvpEngine 委托 VolumeController/SubtitleConfigurator/D3D11Configurator，消除内联逻辑
-**Mode:** mvp
-**Requirements:** COMP-01, COMP-02, COMP-03, COMP-04, COMP-05
-**Plans:** 2/2 plans complete
-Plans:
-**Wave 1**
+<details>
+<summary>✅ v1.2 Security & Kernel (Phases 8-11) — SHIPPED 2026-05-31</summary>
 
-- [x] 02-01-PLAN.md — Expand D3D11Configurator + write unit tests for all 3 helpers
+- [x] **Phase 8: FFI Safety** - Memory leak fix, try/finally, fullscreen timeout
+- [x] **Phase 9: Input Validation** - URL structure, path length, null byte checks
+- [x] **Phase 10: Window Optimization** - WM_NCCALCSIZE, D3D11 sync, PositionPoller
+- [x] **Phase 11: Debug Tooling** - Structured logging, Timeline tracing
 
-**Wave 2** *(blocked on Wave 1 completion)*
+</details>
 
-- [x] 02-02-PLAN.md — Wire delegation in FvpEngine + verify all tests pass
+<details>
+<summary>✅ v1.2.1 Window Polish (Phases 12-15) — SHIPPED 2026-06-28</summary>
 
-**Success Criteria**:
+- [x] **Phase 12: Window Foundation** - WM_NCCALCSIZE sync frame, zero-flicker startup
+- [x] **Phase 13: HLS ABR** - Adaptive bitrate streaming
+- [x] **Phase 14: Architecture Simplification** - Window layer cleanup, singleton migration
+- [x] **Phase 15: Window Polish** - Multi-monitor, responsive layout, settings fixes
 
-1. FvpEngine 中 VolumeController/SubtitleConfigurator/D3D11Configurator 相关逻辑委托给 helper 类
-2. FvpEngine 行数从 ~547 降至 ~350
-3. ValueNotifier 所有权保持在 FvpEngine 的 `final` 字段中（未改为 getter）
-4. `flutter test` 全部通过（含 MockEngine 测试）
-5. D3D11 属性在 `open()` 调用前正确设置（通过 D3D11Configurator.applyDefaults()）
+</details>
 
----
+### 🚧 v1.3 Glass Morphism Coordination (In Progress)
 
-### Phase 3: 接口优化
+**Milestone Goal:** 控制栏颜色/亮度与背景融合，减少视觉突兀感
 
-**Goal:** 通过 mixin 拆分 EngineState 接口，实现能力隔离
-**Mode:** mvp
-**Requirements:** IFACE-01, IFACE-02, IFACE-03, IFACE-04, IFACE-05
-**Plans:** 1 plan
-Plans:
-**Wave 1**
+- [ ] **Phase 16: Token Foundation & Independent Fixes** - Idle tokens, glow param, contrast fix
+- [ ] **Phase 17: Adaptive Control Bar** - GlassContainer param, ControlBar state-aware decoration
+- [ ] **Phase 18: Visual Tuning & Validation** - Alpha/sigma iteration, multi-content validation
 
-- [ ] 03-01-PLAN.md — Split EngineState into TrackControl/VideoEffects/RendererConfig sub-mixins + capability tests
+## Phase Details
 
-**Success Criteria**:
+### Phase 16: Token Foundation & Independent Fixes
+**Goal**: Project has idle-state design tokens, adjustable EdgeGlow, and WCAG-compliant contrast
+**Depends on**: Phase 15
+**Requirements**: UI-01, UI-04, UI-05
+**Success Criteria** (what must be TRUE):
+  1. Six idle-state constants exist in tokens.dart and compile without errors
+  2. EdgeGlow widget accepts optional glowIntensity parameter (default null preserves existing behavior)
+  3. Secondary text achieves WCAG AA contrast ratio (>= 4.5:1, target 5.3:1) against control bar background
+  4. All existing golden and widget tests pass with no regressions
+**Plans**: TBD
 
-1. TrackControl/VideoEffects/RendererConfig mixin 接口定义完成
-2. 现有 57 个 UI 文件的 EngineState import 无需修改（向后兼容）
-3. `engine is TrackControl` 能力检查在 UI 层可用
-4. FvpEngine 通过 `with EngineState, TrackControl, VideoEffects, RendererConfig` 组合实现
-5. `flutter analyze` + `flutter test` 全部通过
+**UI hint**: yes
 
----
+### Phase 17: Adaptive Control Bar
+**Goal**: Control bar visually adapts between idle and playing states using idle tokens
+**Depends on**: Phase 16
+**Requirements**: UI-02, UI-03
+**Success Criteria** (what must be TRUE):
+  1. GlassContainer accepts optional backgroundColor parameter (default Tokens.bgGlass, backward compatible)
+  2. ControlBar shows distinct idle-state decoration when no video is loaded (lighter, more transparent)
+  3. ControlBar shows existing decoration during playback (no change from current behavior)
+  4. Transition between idle/playing states is visually smooth (no flicker or jump)
+  5. Existing call sites of GlassContainer and ControlBar require zero modifications
+**Plans**: TBD
 
-### Phase 4: 测试与平台验证 ✅
+**UI hint**: yes
 
-**Goal:** 确保重构后所有测试通过，平台特定行为正确
-**Mode:** mvp
-**Requirements:** TEST-01, TEST-02, TEST-03, TEST-04, PLAT-01, PLAT-02, PLAT-03, PLAT-04
-**Plans:** 1 plan
-Plans:
-**Wave 1**
+### Phase 18: Visual Tuning & Validation
+**Goal**: All visual parameters are validated and tuned across diverse video content types
+**Depends on**: Phase 17
+**Requirements**: UI-06
+**Success Criteria** (what must be TRUE):
+  1. Control bar appearance is validated against dark, bright, mixed, colorful, and letterbox video content
+  2. Idle-state border remains visible (alpha >= 15%) in all tested scenarios
+  3. glassBlur vs glassBlurThick distinction is confirmed or consolidated based on visual evidence
+  4. No visual regressions: playing-state control bar appearance unchanged from pre-v1.3 baseline
+**Plans**: TBD
 
-- [x] 04-01-SUMMARY.md — 验证测试 + 平台行为分析
+**UI hint**: yes
 
-**Success Criteria**:
+## Progress
 
-1. ✅ MockEngine 继续实现完整 PlayerEngine 接口（含 mixin 检查）
-2. ✅ 所有现有 widget 测试在重构后通过（893 pass, 3 golden pre-existing）
-3. ✅ 新 helper 组件有独立单元测试（34 tests）
-4. ✅ Win32 DisplayConfig 冷启动时序正确（默认60Hz, init幂等）
-5. ✅ texture ID 生命周期同步无泄漏（listener链验证）
-
-**Verification:**
-
-- `flutter analyze`: 0 errors ✅
-- `flutter test`: 893 pass, 3 fail (golden, pre-existing) ✅
-- 新增 42 个测试: mixin behavior(30) + texture lifecycle(5) + display config(7)
-
----
-
-## Coverage Summary
-
-| Category | Count | Phase |
-|----------|-------|-------|
-| DEP (依赖清理) | 4 | Phase 1 |
-| COMP (引擎组合重构) | 5 | Phase 2 |
-| IFACE (接口优化) | 5 | Phase 3 |
-| TEST (测试保障) | 4 | Phase 4 |
-| PLAT (平台安全) | 4 | Phase 4 |
-| **Total** | **22** | **4 phases** |
-
-**Coverage: 22/22 = 100%**
-
----
-
-## Dependency Chain
-
-```
-Phase 1 (依赖清理)
-  ↓ no code dependency, but clean imports make diff readable
-Phase 2 (引擎组合重构)
-  ↓ helpers must be wired before interface split
-Phase 3 (接口优化)
-  ↓ interface must stabilize before full test validation
-Phase 4 (测试与平台验证)
-```
-
-Each phase is independently shippable. No phase depends on a later phase.
-
----
-
-*Last updated: 2026-06-30*
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 16. Token Foundation & Independent Fixes | 0/0 | Not started | - |
+| 17. Adaptive Control Bar | 0/0 | Not started | - |
+| 18. Visual Tuning & Validation | 0/0 | Not started | - |

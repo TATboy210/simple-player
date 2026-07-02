@@ -63,12 +63,13 @@
 
 | REQ | Phase | Status |
 |-----|-------|--------|
-| UI-01 | TBD | — |
-| UI-02 | TBD | — |
-| UI-03 | TBD | — |
-| UI-04 | TBD | — |
-| UI-05 | TBD | — |
-| UI-06 | TBD | — |
+| UI-01 | Phase 16 | Pending |
+| UI-02 | Phase 17 | Pending |
+| UI-03 | Phase 17 | Pending |
+| UI-04 | Phase 16 | Pending |
+| UI-05 | Phase 16 | Pending |
+| UI-06 | Phase 18 | Pending |
 
 ---
 *Created: 2026-07-02 via /gsd-new-milestone*
+*Traceability updated: 2026-07-02 via roadmap creation*
