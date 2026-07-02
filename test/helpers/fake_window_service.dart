@@ -70,6 +70,9 @@ class FakeWindowService implements WindowBridge {
   }
 
   @override
+  void showAfterFirstFrame() {}
+
+  @override
   void dispose() {
     mode.dispose();
     windowSize.dispose();

@@ -76,7 +76,7 @@ class Tokens {
 
   static const borderHighlight = Color(0x0AFFFFFF); // 4% 白色（设计稿）
   static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
-  static const glassBorderIdle = Color(0x0A6482FF); // 同色系 @ 4%（空状态）
+  static const glassBorderIdle = Color(0x276482FF); // rgba(100,130,255,0.153) — SC-2: idle border >= 15%
 
   // ── 字体 ──
   static const fontFamily = 'SF Pro Display';    // 主字体（Windows 回退 Segoe UI）

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 void main() {
   group('GlassContainer', () {
@@ -123,6 +124,42 @@ void main() {
       await tester.pump();
       expect(find.byType(BackdropFilter), findsOneWidget);
       resizing.dispose();
+    });
+
+    testWidgets('backgroundColor defaults to Tokens.bgGlass', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(GlassContainer),
+          matching: find.byType(Container).first,
+        ),
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      expect(decoration.color, Tokens.bgGlass);
+    });
+
+    testWidgets('backgroundColor overrides default when provided', (
+      tester,
+    ) async {
+      const customColor = Color(0x39080A10);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: const GlassContainer(
+              backgroundColor: customColor,
+              child: Text('test'),
+            ),
+          ),
+        ),
+      );
+      final container = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(GlassContainer),
+          matching: find.byType(Container).first,
+        ),
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      expect(decoration.color, customColor);
     });
   });
 
