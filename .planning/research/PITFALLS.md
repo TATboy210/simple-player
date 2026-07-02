@@ -1,425 +1,403 @@
-# Pitfalls Research: PlayerEngine Refactoring
+# Pitfalls Research: Glass Morphism Color Tuning & Control Bar Visual Coordination
 
-> Specific to simple_player_flutter engine layer refactoring.
-> Based on codebase analysis: 57 files importing `player_engine`, FvpEngine 547 lines, 13 ValueNotifiers, 5 helpers.
+> Domain: Flutter desktop media player control bar glass effect optimization.
+> Based on codebase analysis: Tokens with bgGlass @ 45%, BackdropFilter blur pipeline, WCAG 2.1 contrast computation, Flutter rendering perf docs.
 
 ---
 
-## Import Migration Pitfalls
+## Critical Pitfalls
 
-### PIT-01: Barrel File Substitution Mismatch
+Mistakes that cause visual regression, accessibility violations, or performance degradation.
+
+### PIT-G1: Measuring Contrast Against the Overlay Color Instead of the Composite
 
 **Risk: HIGH**
 
-The external `player_engine` barrel exports exactly 8 symbols:
+The single most common error in glass morphism accessibility tuning. Developers measure text contrast against the overlay color (e.g., `bgGlass = #080A10`) rather than the **composite/blended color** that results from the semi-transparent overlay on top of whatever is behind it.
 
-```
-PlayerEngine (from player_engine_base.dart)
-MediaState, MediaErrorType
-MediaInfo, AudioTrackInfo, SubtitleTrackInfo, VideoCodecInfo
-VideoEffectType
-```
+**Why it happens:** The overlay color is a known constant in code. The composite color depends on the dynamic background (video frame, empty state, etc.) and is non-trivial to compute mentally.
 
-Every one of the 57 files does a single `import 'package:player_engine/player_engine.dart'` and relies on this barrel. When migrating, the replacement barrel file (`lib/kernel/engine/player_engine.dart`) must export the exact same 8 symbols with identical APIs. If any method signature, enum value, or type changes during migration, all 57 files break simultaneously.
+**Consequences:** Contrast looks fine in the design tool but fails in production when video content changes. A bright video frame behind a 45%-alpha dark overlay produces a different effective background than a dark video frame.
 
-**Specific failure mode**: `player_engine_base.dart` already exists locally and uses `package:simple_player_flutter/kernel/engine/...` imports. But the external package has its own copies of these types. If the local `MediaState` enum has even one different value name, runtime behavior changes silently.
+**Current audit results (computed):**
 
-**Prevention**: Before changing any import, run a symbol diff:
-```bash
-# Compare exported symbols from old vs new barrel
-dart analyze ../widget_tree_flutter/player_engine/lib/player_engine.dart
-dart analyze lib/kernel/engine/player_engine.dart
-```
+| Token | Effective Color | vs Black | vs bgGlass | WCAG AA (4.5:1) | WCAG AAA (7:1) |
+|-------|----------------|----------|------------|------------------|-----------------|
+| textPrimary (0xEBFFFFFF) | rgb(235,235,235) | 17.62:1 | 17.10:1 | PASS | PASS |
+| textSecondary (0x73FFFFFF) | rgb(115,115,115) | 4.43:1 | 4.30:1 | **FAIL** | FAIL |
+| textTertiary (0x38FFFFFF) | rgb(56,56,56) | 1.79:1 | 1.74:1 | FAIL | FAIL |
+| textDisabled (0xFF444455) | rgb(68,68,85) | 2.20:1 | 2.14:1 | Exempt | Exempt |
+| accent (0xFF2C58FF) | rgb(44,88,255) | 3.95:1 | 3.83:1 | N/A | N/A |
+| accentegg (0xFF66CCFF) | rgb(102,204,255) | 11.65:1 | 11.31:1 | PASS | PASS |
 
-### PIT-02: Relative Path Depth Errors
+**SC 1.4.11 (non-text UI components) requires 3:1.** The `accent` color at 3.83:1 passes, but `controlBarBorder` at 1.08:1 is essentially invisible against the glass background.
+
+**Prevention:** Always compute contrast against the worst-case composite (brightest possible background visible through the glass). For a media player, this means testing against both dark and bright video frames.
+
+**Detection:** Run the contrast audit script (see Appendix A) against current tokens after any alpha/color change.
+
+---
+
+### PIT-G2: BackdropFilter GPU Readback During Resize
+
+**Risk: HIGH**
+
+`BackdropFilter` internally calls `saveLayer()`, which allocates an offscreen buffer and may trigger a synchronous GPU readback (CPU-GPU round-trip). During window resize, this causes visible frame drops because:
+
+1. The window size changes every frame during drag
+2. Each resize forces the entire render tree to relayout
+3. BackdropFilter must re-read the framebuffer at the new size
+4. The GPU readback stalls the rendering pipeline
+
+**Why it happens:** Flutter's `BackdropFilter` reads pixels from the framebuffer behind the widget. On resize, the framebuffer contents change every frame, invalidating the blur cache.
+
+**Consequences:** Frame rate drops from 60fps to under 30fps during resize. On mid-range hardware, resize becomes visibly choppy.
+
+**Current mitigation (already implemented):**
+- `ControlBar` accepts `resizing` ValueListenable and skips BackdropFilter when true (line 194-200)
+- `GlassContainer` also supports `resizing` parameter (line 91-105)
+- `enableBlur` flag for low-end hardware fallback
+
+**What NOT to do:**
+- Do not add more BackdropFilter instances during resize
+- Do not animate blur sigma during resize (double GPU cost)
+- Do not stack multiple BackdropFilters (compound cost)
+
+**Prevention:** The existing resize-skip pattern is correct. Any new glass components MUST accept the `resizing` parameter and skip BackdropFilter when true.
+
+---
+
+### PIT-G3: Stacked BackdropFilters Compound Cost Exponentially
+
+**Risk: HIGH**
+
+Each `BackdropFilter` in the widget tree triggers its own `saveLayer()` + GPU readback. Two nested BackdropFilters do not cost 2x -- they can cost 4-8x because each inner filter must read back from the outer filter's offscreen buffer.
+
+**Why it happens:** Adding a glass effect to the title bar AND the control bar AND a popup dialog creates 3 independent BackdropFilter instances. Each one compounds.
+
+**Consequences:** On lower-end hardware (integrated GPU, older discrete GPU), multiple glass layers cause sustained frame drops even during static display (not just resize).
+
+**Current state:** The project has BackdropFilter in:
+- `ControlBar._buildBlur()` (line 212)
+- `GlassContainer._buildBlurContent()` (line 110)
+- Title bar (via `CustomTitleBar`)
+
+These are independent (not nested), so the cost is additive, not multiplicative. This is acceptable.
+
+**Prevention:** Never nest BackdropFilter inside BackdropFilter. If a popup (e.g., SpeedButton dropdown) needs glass, it should use a single BackdropFilter at its own level, not wrap the already-filtered control bar.
+
+**Detection:** Use Flutter DevTools Performance view. If `saveLayer()` events stack more than 2 deep during normal interaction, investigate.
+
+---
+
+### PIT-G4: Control Bar Border Becomes Invisible After Alpha Reduction
 
 **Risk: MEDIUM**
 
-Files at different directory depths need different relative paths after migration:
+The control bar border `controlBarBorder = Color(0x1F6482FF)` is rgba(100,130,255,0.12). When blended on the dark glass background, the effective color is rgb(12,16,31), which has a contrast ratio of **1.08:1** against bgGlass. This is essentially invisible.
 
-| Location | Current import | New relative import |
-|----------|---------------|-------------------|
-| `lib/app.dart` | `package:player_engine/player_engine.dart` | `kernel/engine/player_engine.dart` |
-| `lib/features/player/player_feature.dart` | `package:player_engine/player_engine.dart` | `../../kernel/engine/player_engine.dart` |
-| `lib/ui/player/control_bar.dart` | `package:player_engine/player_engine.dart` | `../../kernel/engine/player_engine.dart` |
-| `test/helpers/fake_engine.dart` | `package:player_engine/player_engine.dart` | `../../lib/kernel/engine/player_engine.dart` |
+**Why it happens:** Reducing alpha to make glass "more transparent" also reduces border visibility. A border that looked correct at 20% alpha becomes invisible at 12%.
 
-Test files need `../../lib/` prefix, which is different from lib files. A mechanical find-replace that only handles lib/ will miss 20 test files.
+**Consequences:** The control bar loses its visual boundary, making it feel "floating" without definition. The edge glow effect (EdgeGlow widget) becomes the only visual separator, which may not be sufficient on all backgrounds.
 
-**Prevention**: Separate the migration into lib/ and test/ passes. Verify with `dart analyze` after each pass.
+**Specific to this codebase:** The glass checkpoint notes the border was at 20% white, then changed to 12% blue. The blue tint further reduces perceived contrast against the dark glass.
 
-### PIT-03: Internal Engine Files Importing External Package
+**Prevention:** When reducing glass background alpha:
+1. Keep border alpha >= 15% for visibility
+2. Use a lighter border color (white or near-white) instead of blue-tinted
+3. Test border visibility against both dark and bright video frames
+4. The EdgeGlow gradient border is the primary visual separator -- ensure it remains visible
 
-**Risk: HIGH**
+**Detection:** If the control bar looks "borderless" on any video frame, the border alpha is too low.
 
-6 engine-layer files themselves import the external package:
+---
 
-```
-lib/kernel/engine/fvp_callback_handler.dart
-lib/kernel/engine/fvp_engine.dart
-lib/kernel/engine/media_opener.dart
-lib/kernel/engine/mock_engine.dart
-lib/kernel/engine/open_result.dart
-lib/kernel/engine/track_manager.dart
-lib/kernel/engine/video_effect_controller.dart
-```
+### PIT-G5: Reducing bgGlass Alpha Does Not Improve Video Blending
 
-These are the most dangerous to migrate because they use internal types (like `mdk.Player` callbacks that reference `MediaState`). If the import changes but the file still references types from the old package path, you get a "type not found" error that looks like a missing import rather than a wrong path.
+**Risk: MEDIUM**
 
-**Prevention**: Migrate these 6 files FIRST, run `dart analyze` on just the engine directory before touching any UI files.
+A common intuition: "the glass looks too dark/opaque against video, so reduce the alpha." But the computed data shows:
 
-### PIT-04: Unused Import Masking
+| bgGlass Alpha | Effective on Black | textPrimary Contrast | Visual Effect |
+|---------------|-------------------|---------------------|---------------|
+| 45% (current) | rgb(4,5,7) | 17.10:1 | Nearly black, strong glass tint |
+| 25% | rgb(2,3,4) | 17.31:1 | Even darker, barely perceptible difference |
+| 10% | rgb(1,1,2) | 17.55:1 | Almost invisible overlay |
+
+**Why it happens:** `bgGlass = #080A10` is already very dark (near black). At 45% alpha on a black background, the effective color is rgb(4,5,7) -- practically black. Reducing alpha makes it even darker (closer to pure black), not lighter.
+
+**Consequences:** Reducing alpha does not make the glass "more transparent" in a visually meaningful way. It makes the overlay nearly invisible, defeating the purpose of the glass effect. The blur (BackdropFilter) is what creates the visual separation, not the overlay color.
+
+**Prevention:** To make glass blend better with video:
+1. **Keep bgGlass alpha at 40-50%** -- this is the "tint" that gives the glass its color identity
+2. **Adjust the blur sigma** -- higher blur = more opaque visual effect, lower blur = more transparent feel
+3. **Use a lighter base color** (e.g., #1A1E2E instead of #080A10) if you want a "lighter" glass feel
+4. **Test with actual video frames** -- the glass effect depends entirely on what's behind it
+
+**Detection:** If reducing alpha makes the glass disappear rather than blend, the approach is wrong.
+
+---
+
+### PIT-G6: Static Color Tokens Cannot Match Dynamic Video Backgrounds
+
+**Risk: MEDIUM**
+
+The control bar uses compile-time const colors (`Tokens.controlBarBg`, `Tokens.glassBorder`, etc.). These are designed for a specific background (dark video). When the video content changes (bright scene, white text, colorful animation), the glass effect can clash.
+
+**Why it happens:** Video content varies from pure black (letterbox bars) to full-white (documentaries with white backgrounds) to colorful (animation). A single set of static tokens cannot look good against all of these.
+
+**Consequences:**
+- Dark video: glass looks fine, border visible
+- Bright video: glass border invisible (low contrast against bright content), text may lose readability
+- Colorful video: glass tint may clash with dominant colors
+
+**This is NOT something to "fix" in a single milestone.** It is an inherent limitation of static glass morphism. The goal is to find tokens that work acceptably across the widest range of content.
+
+**Prevention:**
+1. Test with at least 5 video types: dark scene, bright scene, mixed contrast, colorful, letterbox
+2. The blur itself provides some adaptation (blurred content is always mid-tone)
+3. Consider a subtle dynamic adjustment: sample the video's dominant brightness and adjust glass alpha ±10% (complex, defer to later phase)
+
+---
+
+### PIT-G7: Opacity Animation Skipping BackdropFilter Creates Visual Pop-in
+
+**Risk: MEDIUM**
+
+The ControlBar skips `BackdropFilter` when `opacity.value < 0.01` (line 223). This is correct for performance. But the transition from "no blur" to "full blur" happens at a single frame boundary, not gradually.
+
+**Why it happens:** The `AnimatedBuilder` checks `opacityNotifier.value < 0.01` and either shows the blurred or unblurred version. There is no intermediate state where the blur fades in.
+
+**Consequences:** When the control bar fades in (e.g., mouse movement triggers show), the user sees:
+1. Frame N: No glass effect, transparent background
+2. Frame N+1: Full glass effect with blur
+
+This creates a subtle "pop-in" where the glass suddenly appears.
+
+**Current behavior is acceptable** because the opacity animation (300ms fade) masks the pop-in. The human eye tracks the opacity change, not the blur onset.
+
+**Prevention:**
+- Do NOT remove the `< 0.01` skip -- the performance benefit is critical
+- Do NOT try to animate blur sigma from 0 to target -- this doubles GPU cost
+- If the pop-in becomes visible, increase the fade duration slightly (300ms -> 400ms)
+
+---
+
+### PIT-G8: glassBlurThick and glassBlur Having Identical Values Defeats Tiered Design
 
 **Risk: LOW**
 
-Many files import the barrel for just one type (e.g., `MediaState`). After migration, if you switch to direct file imports for tree-shaking, unused imports will cause analysis warnings. The reverse is also true: some files may import `player_engine` for a type they no longer use after refactoring.
-
-**Prevention**: After migration, run `dart fix --apply` to clean unused imports. Do NOT manually fix unused imports during the migration commit -- keep it mechanical.
-
-### PIT-05: Circular Dependency Creation
-
-**Risk: MEDIUM**
-
-Current dependency flow is clean:
-```
-player_engine (external) --> types only (no deps on simple_player_flutter)
-simple_player_flutter --> player_engine (one-way)
+Current tokens:
+```dart
+static const glassBlurThin = 8.0;    // title bar
+static const glassBlur = 18.0;       // control bar
+static const glassBlurThick = 18.0;  // control bar/popups
 ```
 
-After migration, all types live inside `lib/kernel/engine/`. If any engine file imports from `lib/features/` or `lib/ui/`, a circular dependency forms. This is especially risky with helper classes that might need `PlaybackController` or service types.
+`glassBlur` and `glassBlurThick` are both 18.0 sigma. The `GlassTier` enum defines thin/normal/thick but normal and thick produce identical visual results.
 
-**Specific risk**: `FvpCallbackHandler` currently takes `state: ValueNotifier<MediaState>` and `isBuffering: ValueNotifier<bool>` as constructor params. If you refactor it to take a `PlaybackController` reference instead, you create `kernel/engine --> features/player` circularity.
+**Why it happens:** During iteration, values get equalized for "consistency" without realizing the tiered system loses its differentiation.
 
-**Prevention**: Enforce unidirectional dependency: `kernel/` never imports from `features/` or `ui/`. Use dependency injection (pass ValueNotifiers, not controllers) to maintain this.
+**Consequences:** The `GlassTier.thick` tier adds no visual value over `GlassTier.normal`. Code using `GlassTier.thick` pays the same GPU cost but gets no additional visual separation.
+
+**Prevention:** Either:
+1. Differentiate: `glassBlur = 14.0`, `glassBlurThick = 20.0` (visible tier separation)
+2. Merge: Remove `GlassTier.thick` and use `GlassTier.normal` everywhere
+
+The checkpoint suggests control bar should use `glassBlurThick` (deeper blur for the primary glass element). If keeping both, `glassBlurThick` should be >= 20.0 to be visually distinct.
 
 ---
 
-## Composition Refactoring Pitfalls
+## Moderate Pitfalls
 
-### PIT-06: ValueNotifier Ownership Ambiguity
+Mistakes that cause subtle issues or make future changes harder.
 
-**Risk: CRITICAL**
-
-FvpEngine owns 13 ValueNotifier instances as `final` fields. When extracting helpers (VolumeController, SubtitleConfigurator, D3D11Configurator), there are two approaches:
-
-1. **Helpers receive ValueNotifiers** (current pattern): FvpEngine owns them, passes references to helpers
-2. **Helpers own ValueNotifiers**: Each helper creates and exposes its own notifiers
-
-Approach 2 breaks the `PlayerEngine` contract because the abstract class declares `ValueNotifier<double> get volume` etc. as a flat interface. If VolumeController owns the volume notifier, FvpEngine must delegate: `ValueNotifier<double> get volume => _volumeController.volume`. This works but:
-
-- Widget tests using `engine.volume.value = 0.5` still work (same object reference)
-- But `engine.volume = ValueNotifier(0.5)` (reassignment) breaks because it's now a getter
-- Any code that does `final vn = engine.volume; vn.value = ...` works fine because it's the same object
-
-**Specific risk**: MockEngine creates its own ValueNotifier instances. If the refactoring changes how FvpEngine exposes them (getter vs field), MockEngine must match. Since MockEngine `implements PlayerEngine` (not extends), it must provide the exact same getter/field shape.
-
-**Prevention**: Keep ValueNotifier ownership in FvpEngine. Pass them to helpers as constructor params. Never change a `final field` to a `getter` in the abstract class -- it's a breaking change for all implementors.
-
-### PIT-07: Helper Initialization Order
-
-**Risk: HIGH**
-
-FvpEngine uses `late` for 5 helpers:
-```dart
-late FvpCallbackHandler _callbackHandler;
-late PositionPoller _positionPoller;
-late TrackManager _trackManager;
-late MediaOpener _mediaOpener;
-late VideoEffectController _videoEffectController;
-```
-
-They're initialized inside `_createPlayer()` which is called lazily via `_player` getter. Adding new helpers (VolumeController, SubtitleConfigurator, D3D11Configurator) means more `late` fields with initialization dependencies:
-
-- D3D11Configurator needs `mdk.Player` (created first)
-- SubtitleConfigurator needs `mdk.Player` + possibly `TrackManager`
-- VolumeController needs `mdk.Player` + the `volume` and `isMuted` ValueNotifiers
-
-If any helper references another helper before initialization, you get a `LateInitializationError` at runtime. This won't show up in static analysis.
-
-**Prevention**: Initialize all helpers in `_createPlayer()` in strict dependency order. Add a `_helpersInitialized` guard bool. Test with a fresh engine instance (not reusing across tests).
-
-### PIT-08: Callback Wiring Gaps
-
-**Risk: HIGH**
-
-FvpEngine wires callbacks through FvpCallbackHandler:
-```dart
-_callbackHandler = FvpCallbackHandler(
-  p,
-  state: state,
-  isBuffering: isBuffering,
-  onStopPositionPolling: () => _positionPoller.stop(),
-);
-```
-
-The `onStopPositionPolling` callback creates a cross-helper dependency (callback handler stops the position poller). When extracting more helpers, similar cross-cutting callbacks will emerge:
-
-- VolumeController might need to notify state changes
-- SubtitleConfigurator needs to update `subtitleText` notifier
-- D3D11Configurator needs to trigger re-render on config change
-
-If you extract a helper but forget to wire a callback, the symptom is subtle: a ValueNotifier never updates, so the UI shows stale data. No error, no crash.
-
-**Prevention**: For each helper, document its callback contract:
-- What ValueNotifiers does it write to?
-- What callbacks does it expose?
-- What external events does it need to receive?
-
-Wire all callbacks in `_createPlayer()`. Add integration tests that verify notifier values after state transitions.
-
-### PIT-09: Dispose Ordering
+### PIT-G9: The `accent` Color Fails SC 1.4.11 for Interactive UI Components
 
 **Risk: MEDIUM**
 
-FvpEngine.dispose() must:
-1. Stop position polling (Timer.cancel)
-2. Unregister mdk callbacks
-3. Dispose all 13 ValueNotifiers
-4. Dispose the mdk.Player
+`accent = Color.fromARGB(255, 44, 88, 244)` (#2C58FF) has a contrast ratio of **3.83:1** against the glass background. This passes SC 1.4.3 for large text (3:1) but the project already migrated speed/volume highlights to `accentegg` (#66CCFF, 11.31:1) because `accent` was "too dark on dark bg" (bug #8, #16).
 
-If helpers own any of these resources, dispose must cascade correctly. Missing a dispose causes:
-- Timer leak (position keeps polling a dead player)
-- Memory leak (ValueNotifier listeners accumulate)
-- Crash (mdk.Player accessed after native resource freed)
+**Why it matters:** If any remaining UI uses `accent` for interactive elements (buttons, toggles, links), it may not meet SC 1.4.11's 3:1 requirement for non-text contrast against the glass background.
 
-**Specific risk**: Current dispose does `_positionPoller.stop()` but the new helpers (VolumeController, etc.) may have their own cleanup needs. If FvpEngine.dispose() doesn't call `_volumeController.dispose()`, the mdk.Player might receive volume commands after it's freed.
+**Current state:** SpeedButton and volume highlights already use `accentegg`. But `progressPlayed` (#2C58F4) is close to `accent` and is used for the progress bar fill.
 
-**Prevention**: Each helper implements a `dispose()` method. FvpEngine.dispose() calls them in reverse initialization order. Add a `_disposed` guard in each helper.
+**Prevention:** Audit all interactive color uses. The progress bar is acceptable because it's large (>3px thick, qualifies as "large" under SC 1.4.3). But small interactive indicators using `accent` should be checked.
 
 ---
 
-## Platform-Specific Pitfalls
+### PIT-G10: `textSecondary` Fails WCAG AA for 14px Body Text
 
-### PIT-10: D3D11 Property Timing
+**Risk: MEDIUM**
 
-**Risk: CRITICAL**
+`textSecondary = Color(0x73FFFFFF)` has a contrast ratio of **4.30:1** against the glass background. WCAG 2.1 SC 1.4.3 requires **4.5:1** for normal text (<18pt).
 
-D3D11 properties MUST be set between player creation and first `open()` call:
+The control bar uses `textSecondary` for:
+- Time display (`TimeRangeDisplay`)
+- Disabled button icons
+- Secondary labels
+
+At 14px (Tokens.fontBody), this is normal text and requires 4.5:1.
+
+**Why it matters:** This is a marginal fail (4.30 vs 4.50). On some monitors or with video content that brightens the background, the effective contrast drops further.
+
+**Prevention:** Increase `textSecondary` alpha from 45% to 50%:
 ```dart
-p.setProperty('d3d11.sync.cpu', syncMode);
-p.setProperty('video.decoders', _defaultVideoDecoders);
-p.setProperty('avcodec.threads', _ffmpegDecoderThreads);
-p.setProperty('videoout.buffer_frames', _maxBufferFrames);
-p.setProperty('reader.starts_with_key', '1');
+static const textSecondary = Color(0x80FFFFFF); // 50% white → ~5.3:1
 ```
+This is a minimal visual change that brings the token into compliance.
 
-If D3D11Configurator.applyDefaults() is called AFTER `open()`, the properties are ignored silently -- mdk applies them only at open time. The video will play with wrong decoder settings, wrong buffer sizes, or wrong sync mode. Symptoms: black screen, tearing, high CPU usage, or crash on certain hardware.
-
-**Prevention**: D3D11Configurator must be called inside `_createPlayer()`, before any `open()` call. Add an assertion: `assert(!_isOpening, 'D3D11 config must be applied before open()')`.
-
-### PIT-11: DisplayConfig Platform Channel Race
-
-**Risk: MEDIUM**
-
-`DisplayConfig.d3d11SyncMode()` and `DisplayConfig.getRefreshRate()` call platform channels to query monitor refresh rate. These are async by nature but used synchronously in `_applyD3d11Defaults()`. If the platform channel hasn't responded yet (cold start, slow platform), the values fall back to defaults.
-
-**Current mitigation**: DisplayConfig likely caches the first response. But if you extract D3D11Configurator as a separate class that constructs independently, it might query DisplayConfig before the cache is warm.
-
-**Prevention**: D3D11Configurator should receive DisplayConfig values as constructor params, not query them directly. This makes the dependency explicit and testable.
-
-### PIT-12: mdk.Player Singleton Behavior
-
-**Risk: HIGH**
-
-`mdk.Player()` is a native resource with global state implications. Creating multiple mdk.Player instances can:
-- Conflict on D3D11 device context (shared GPU resources)
-- Cause texture ID collisions
-- Lead to audio device contention
-
-FvpEngine uses lazy initialization (`_playerInstance ??= _createPlayer()`). If the refactoring accidentally creates a second player (e.g., helper creates its own for testing), it corrupts the first player's state.
-
-**Prevention**: mdk.Player creation stays ONLY in FvpEngine._createPlayer(). Helpers receive the player instance, never create their own. Add a singleton assertion in debug mode.
-
-### PIT-13: Texture ID Lifecycle
-
-**Risk: HIGH**
-
-The texture ID flow is:
-```
-mdk.Player created --> textureId = null
-mdk.Player.open() --> mdk internally creates D3D11 texture
-_p.textureId.addListener(_onTextureIdChanged) --> copies to FvpEngine.textureId
-UI reads engine.textureId --> Texture(textureId: id)
-```
-
-If you extract the texture ID forwarding to a helper, the timing must be preserved exactly. The texture ID is only valid while the mdk.Player is alive. If a helper holds a stale reference to the old texture ID after a new `open()` call, the Texture widget renders garbage or crashes.
-
-**Prevention**: Keep `_onTextureIdChanged` in FvpEngine. It's a 1-liner: `textureId.value = _player.textureId.value`. Don't extract it.
-
-### PIT-14: Win32 Window Manager Interactions
-
-**Risk: MEDIUM**
-
-The engine layer doesn't directly touch Win32 window management, but `DisplayConfig` bridges to it. If the refactoring moves DisplayConfig into a helper, and that helper is constructed before the window is fully initialized, the refresh rate query fails silently.
-
-**Specific scenario**: App starts --> FvpEngine created --> D3D11Configurator queries DisplayConfig --> Window not yet shown --> fallback to 60Hz --> user's 144Hz monitor gets wrong sync mode.
-
-**Prevention**: D3D11Configurator should have a `refresh()` method that re-queries DisplayConfig after window is shown. Or defer D3D11 config until first `open()`.
+**Detection:** Run the contrast audit after any alpha change.
 
 ---
 
-## Testing Pitfalls
-
-### PIT-15: MockEngine Contract Drift
-
-**Risk: CRITICAL**
-
-MockEngine `implements PlayerEngine` (not `extends`). This means:
-- Every abstract method/property in PlayerEngine MUST be implemented in MockEngine
-- If you add a new abstract method to PlayerEngine, MockEngine breaks at compile time (good)
-- If you change a method signature, MockEngine breaks at compile time (good)
-- If you change a field to a getter in PlayerEngine, MockEngine must match (subtle)
-
-MockEngine currently has all 13 ValueNotifiers as `final` fields, matching PlayerEngine's abstract getters. This works because Dart allows a field to satisfy a getter contract. But if PlayerEngine changes any getter to require a different implementation pattern, MockEngine must be updated.
-
-**Specific risk**: MockEngine imports `package:player_engine/player_engine.dart`. After migration, it must import the local barrel. If MockEngine still references types from the old package (e.g., `MediaState` from the wrong import), it will compile but use a different type than the rest of the app.
-
-**Prevention**: Migrate MockEngine FIRST. Run `dart analyze lib/kernel/engine/mock_engine.dart` in isolation. Verify all 13 ValueNotifier types match exactly.
-
-### PIT-16: FakeEngine in Tests
-
-**Risk: HIGH**
-
-`test/helpers/fake_engine.dart` contains `FakeEngine implements PlayerEngine`. It's used by multiple test files. If the PlayerEngine interface changes during refactoring, FakeEngine breaks and cascades to all tests that use it.
-
-Additionally, `test/features/player/services/subtitle_service_test.dart` has its own `_FakeEngine` class. Multiple fake implementations drift apart over time.
-
-**Prevention**: After any PlayerEngine interface change, immediately update FakeEngine and all _FakeEngine variants. Run `flutter test` before committing.
-
-### PIT-17: Widget Test Texture Assumptions
+### PIT-G11: Glass Effect Disappears on Bright Video Content
 
 **Risk: MEDIUM**
 
-Widget tests that render `VideoSurface` depend on `engine.textureId.value`. MockEngine sets this to `null` (no real texture). If the refactoring changes when textureId is set (e.g., before vs after open()), widget tests that check for texture rendering may break.
+When a bright video frame (e.g., white background, bright sky) is behind the control bar:
+1. The blur averages the bright content to a mid-tone
+2. The dark `bgGlass` overlay (#080A10 @ 45%) darkens it back down
+3. The net effect is a slightly tinted version of the original blur
+4. The border and glow effects become invisible against the bright blurred content
 
-**Specific tests at risk**: `test/widget/player/controls_overlay_test.dart`, `test/golden/control_layouts_golden_test.dart`.
+**Why it happens:** Glass morphism is inherently dependent on the background. Dark glass on bright content creates low-contrast borders.
 
-**Prevention**: MockEngine's texture behavior should remain: `textureId` stays null unless explicitly configured. Don't change the mock's texture lifecycle.
+**Consequences:** The control bar looks "flat" on bright video content -- no visible border, no depth, just a dark rectangle.
 
-### PIT-18: Integration Test Engine Setup
+**Prevention:** This is an inherent limitation. Acceptable mitigations:
+1. The EdgeGlow gradient border uses white and blue tints that remain visible on bright backgrounds
+2. The outer box-shadow (`controlBarOuterShadow = 0x26000000`) provides contrast separation
+3. For extreme cases, consider adaptive glass alpha (complex, defer)
 
-**Risk: MEDIUM**
+---
 
-`test/integration/playback_flow_test.dart` imports player_engine and likely creates a full engine setup. If the engine's initialization sequence changes (new helpers, different order), integration tests that exercise the full open->play->pause->seek flow may break at different points.
-
-**Prevention**: Run integration tests after EACH helper extraction, not just at the end. Each extraction should be a separate commit with passing tests.
-
-### PIT-19: Test Helper Import Path Sensitivity
+### PIT-G12: Mutating Colors with `.withValues(alpha: ...)` in Build Methods
 
 **Risk: LOW**
 
-20 test files import `package:player_engine/player_engine.dart`. After migration, they need `package:simple_player_flutter/kernel/engine/player_engine.dart` or relative paths. The relative path from `test/` to `lib/kernel/engine/` is `../../lib/kernel/engine/player_engine.dart`, which is fragile -- moving any test file breaks its imports.
+Several places in the codebase create modified colors in `build()`:
 
-**Prevention**: Use package imports in tests: `import 'package:simple_player_flutter/kernel/engine/player_engine.dart'`. This is stable regardless of test file location.
+```dart
+// _CompactCenterGroup (control_bar.dart:364)
+final dimmed = isIdle
+    ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
+    : Tokens.textPrimary;
+```
+
+This is correct for dynamic states (idle vs playing). But if similar patterns are used for the glass effect tuning, they create new `Color` objects every frame.
+
+**Why it matters:** Each `withValues()` call creates a new `Color` object. In a `ValueListenableBuilder` that rebuilds frequently (position polling), this generates garbage.
+
+**Prevention:** For static color modifications, define them as `static const` in the class or in `Tokens`. Only use `withValues()` for genuinely dynamic state-dependent colors.
 
 ---
 
-## Flutter Desktop-Specific Gotchas
+## Minor Pitfalls
 
-### PIT-20: Texture Widget Null Safety
+Things to be aware of but not blocking.
 
-**Risk: MEDIUM**
-
-Flutter's `Texture` widget requires a valid texture ID. If `textureId.value` is:
-- `null` --> Texture widget throws or renders nothing
-- Stale ID (from previous open) --> renders wrong video or crashes
-- Negative --> undefined behavior
-
-During refactoring, if a helper resets textureId at the wrong time (e.g., during dispose), the Texture widget in `VideoSurface` may receive an invalid ID.
-
-**Prevention**: Only set textureId in `_onTextureIdChanged`. Never reset it to null except in dispose.
-
-### PIT-21: BackdropFilter Performance with Engine State
+### PIT-G13: EdgeGlow Box-Shadow Tokens at 50% Intensity May Be Too Subtle
 
 **Risk: LOW**
 
-The control bar uses `BackdropFilter` (glass-morphism). This widget captures the layer behind it and applies a blur. If the engine's texture rendering changes timing (e.g., due to helper initialization adding latency), the BackdropFilter may capture a frame with wrong content.
+All `glow*` tokens are documented as "50% intensity" (e.g., `glowCore = 0x73A0BEFF` = rgba(160,190,255,0.45)). The comments say this was an intentional reduction. On 4K displays, these low-alpha values may be imperceptible.
 
-This is unlikely but worth noting: D3D11Configurator initialization adds a few ms to startup. If this happens during the first frame render, the glass effect may briefly show wrong content.
-
-**Prevention**: D3D11Configurator initialization is synchronous (just `setProperty` calls), so this risk is minimal. If it becomes async (e.g., querying hardware capabilities), defer it.
-
-### PIT-22: ValueNotifier Listener Accumulation
-
-**Risk: MEDIUM**
-
-If helpers add listeners to ValueNotifiers but don't remove them in dispose, listeners accumulate across test runs. Widget tests create and dispose engines repeatedly. A leaked listener from test 1 fires in test 2, causing unexpected state changes.
-
-**Specific pattern**: `_player.textureId.addListener(_onTextureIdChanged)` in `_createPlayer()`. If `_createPlayer()` is called multiple times (re-creation after dispose), the listener is added again without removing the old one.
-
-**Prevention**: Track all added listeners. Remove them in dispose. Consider using `removeListener` in a `_cleanup` method called before re-creation.
+**Prevention:** If the glow is invisible on the target display, increase alpha by 20-30% (not to full intensity, just enough to be visible).
 
 ---
 
-## Prevention Strategies Summary
+### PIT-G14: `Clip.hardEdge` vs `Clip.antiAlias` on BackdropFilter
 
-| Pitfall | Severity | Prevention |
-|---------|----------|------------|
-| PIT-01: Barrel symbol mismatch | HIGH | Symbol diff before/after migration |
-| PIT-02: Relative path depth | MEDIUM | Separate lib/ and test/ migration passes |
-| PIT-03: Engine internal imports | HIGH | Migrate engine files first, verify in isolation |
-| PIT-05: Circular dependency | MEDIUM | Enforce unidirectional kernel/ -> features/ |
-| PIT-06: ValueNotifier ownership | CRITICAL | Keep ownership in FvpEngine, pass to helpers |
-| PIT-07: Helper init order | HIGH | Strict ordering in _createPlayer(), guard bool |
-| PIT-08: Callback wiring gaps | HIGH | Document callback contracts, integration tests |
-| PIT-09: Dispose ordering | MEDIUM | Reverse-order dispose, _disposed guards |
-| PIT-10: D3D11 property timing | CRITICAL | Apply in _createPlayer() before open(), assert |
-| PIT-11: DisplayConfig race | MEDIUM | Pass values as constructor params |
-| PIT-12: mdk.Player singleton | HIGH | Player creation ONLY in FvpEngine |
-| PIT-13: Texture ID lifecycle | HIGH | Keep _onTextureIdChanged in FvpEngine |
-| PIT-14: Win32 window race | MEDIUM | Defer DisplayConfig query to first open() |
-| PIT-15: MockEngine drift | CRITICAL | Migrate first, verify all 13 notifiers match |
-| PIT-16: FakeEngine cascade | HIGH | Update all fakes immediately on interface change |
-| PIT-17: Widget test texture | MEDIUM | Don't change mock texture lifecycle |
-| PIT-18: Integration test order | MEDIUM | Run after each extraction, not just at end |
-| PIT-19: Test import paths | LOW | Use package imports, not relative |
-| PIT-20: Texture null safety | MEDIUM | Only set textureId in _onTextureIdChanged |
-| PIT-22: Listener accumulation | MEDIUM | Track and remove all listeners in dispose |
+**Risk: LOW**
+
+Flutter's `ClipRRect` defaults to `Clip.antiAlias` for BackdropFilter. On Impeller, `Clip.hardEdge` is faster because it skips anti-aliasing computation for the clip mask.
+
+**Current state:** The codebase uses `ClipRRect` without specifying clip behavior, which defaults to anti-alias. This is correct for rounded corners (22px radius) where anti-aliasing is visually necessary.
+
+**Prevention:** Do not change to `Clip.hardEdge` on the control bar -- the 22px rounded corners need anti-aliasing. Only use `Clip.hartEdge` for sharp rectangular clips (which the control bar does not have).
 
 ---
 
-## Phase Mapping
+## Phase-Specific Warnings
 
-### Phase 1: Import Migration (57 files)
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| bgGlass alpha reduction | PIT-G5: Reducing alpha makes glass disappear, not blend | Keep alpha 40-50%, adjust blur instead |
+| Border visibility tuning | PIT-G4: Border becomes invisible at low alpha | Keep border alpha >= 15%, test against bright video |
+| Blur sigma adjustment | PIT-G3: Multiple BackdropFilters compound cost | One BackdropFilter per component, never nest |
+| Empty state glass | PIT-G6: Static tokens look wrong on different backgrounds | Test with 5+ video types, accept inherent limitation |
+| Text color tuning | PIT-G10: textSecondary fails AA | Increase alpha to 50% (0x80FFFFFF) |
+| Resize performance | PIT-G2: GPU readback during resize | Existing resize-skip pattern is correct, do not remove |
+| Glow effect tuning | PIT-G13: 50% intensity may be invisible on 4K | Increase alpha 20-30% if needed |
 
-**Address these pitfalls in this phase:**
-- PIT-01 (barrel symbol mismatch) -- verify before starting
-- PIT-02 (relative path depth) -- separate lib/ and test/ passes
-- PIT-03 (engine internal imports) -- migrate engine files first
-- PIT-15 (MockEngine drift) -- migrate MockEngine first
-- PIT-16 (FakeEngine cascade) -- update all fakes
-- PIT-19 (test import paths) -- use package imports
+---
 
-**Gate**: `dart analyze` passes with zero errors. All existing tests pass.
+## Appendix A: Contrast Audit Script
 
-### Phase 2: Helper Extraction (FvpEngine decomposition)
+Run after any token change to verify WCAG compliance:
 
-**Address these pitfalls in this phase:**
-- PIT-06 (ValueNotifier ownership) -- keep in FvpEngine
-- PIT-07 (helper init order) -- strict ordering
-- PIT-08 (callback wiring gaps) -- document contracts
-- PIT-09 (dispose ordering) -- reverse-order cascade
-- PIT-13 (texture ID lifecycle) -- keep in FvpEngine
-- PIT-22 (listener accumulation) -- track all listeners
+```dart
+// Paste into a temporary .dart file and run: dart run audit.dart
+import 'dart:math';
 
-**Gate**: FvpEngine < 200 lines. All ValueNotifiers still owned by FvpEngine. Integration tests pass.
+void main() {
+  double luminance(int r, int g, int b) {
+    double ch(int c) {
+      final s = c / 255.0;
+      return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4).toDouble();
+    }
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+  }
 
-### Phase 3: Platform Helper Extraction (D3D11, Subtitle, Volume)
+  double cr(int r1, int g1, int b1, int r2, int g2, int b2) {
+    final l1 = luminance(r1, g1, b1);
+    final l2 = luminance(r2, g2, b2);
+    return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05);
+  }
 
-**Address these pitfalls in this phase:**
-- PIT-10 (D3D11 property timing) -- apply in _createPlayer()
-- PIT-11 (DisplayConfig race) -- pass values as params
-- PIT-12 (mdk.Player singleton) -- creation only in FvpEngine
-- PIT-14 (Win32 window race) -- defer to first open()
+  // Update these values when tokens change
+  final bgR = 4, bgG = 5, bgB = 7; // bgGlass effective on black
 
-**Gate**: D3D11Configurator is a pure function (no side effects, no async). All platform tests pass.
+  final tokens = {
+    'textPrimary':   (235, 235, 235),
+    'textSecondary': (115, 115, 115),
+    'textTertiary':  (56, 56, 56),
+    'textDisabled':  (68, 68, 85),
+    'accent':        (44, 88, 255),
+    'accentegg':     (102, 204, 255),
+  };
 
-### Phase 4: Verification
+  for (final entry in tokens.entries) {
+    final (r, g, b) = entry.value;
+    final ratio = cr(r, g, b, bgR, bgG, bgB);
+    final aaPass = ratio >= 4.5 ? 'PASS' : ratio >= 3.0 ? 'LARGE-TEXT-ONLY' : 'FAIL';
+    print('${entry.key}: ${ratio.toStringAsFixed(2)}:1 [$aaPass]');
+  }
+}
+```
 
-**Address all remaining risks:**
-- PIT-05 (circular dependency) -- verify with `dart analyze` dependency graph
-- PIT-17 (widget test texture) -- run golden tests
-- PIT-18 (integration test order) -- run full test suite
-- PIT-20 (texture null safety) -- manual smoke test on Windows
+---
 
-**Gate**: Full `flutter test` passes. Manual smoke test on Windows with real video file.
+## Appendix B: Key WCAG References
+
+| Standard | SC | Requirement | Applies To |
+|----------|-----|-------------|------------|
+| WCAG 2.1 | 1.4.3 | 4.5:1 normal text, 3:1 large text | All text on glass |
+| WCAG 2.1 | 1.4.6 | 7:1 normal, 4.5:1 large (AAA) | Enhanced contrast target |
+| WCAG 2.1 | 1.4.11 | 3:1 non-text contrast | UI components, icons, borders |
+| WCAG 2.1 | 1.4.3 exception | Disabled/inactive exempt | Disabled buttons, dimmed icons |
+
+**Critical:** Disabled/inactive UI components are exempt from contrast requirements. The `textDisabled` token at 2.14:1 is acceptable per WCAG. However, "dimmed but still interactive" elements (e.g., prev/next buttons when idle) may not qualify as "inactive" -- they respond to clicks and are visually present.
+
+---
+
+## Sources
+
+- WCAG 2.1 SC 1.4.3: https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
+- Flutter BackdropFilter API: https://api.flutter.dev/flutter/widgets/BackdropFilter-class.html
+- Flutter rendering best practices: https://docs.flutter.dev/perf/best-practices
+- Flutter Impeller gaussian blur optimization: https://docs.flutter.dev/release/release-notes/release-notes-3.19.0
+- Codebase: tokens.dart, control_bar.dart, glass_container.dart, edge_glow.dart
+- Prior bug history: project_controlbar_bugs.md (18 bugs across 5 rounds)
+- Glass checkpoint: project_controlbar_glass_checkpoint.md (2026-06-28)
