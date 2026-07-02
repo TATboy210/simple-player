@@ -60,7 +60,7 @@ class CenterGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dimmed = isIdle
-        ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
+        ? Tokens.controlBarTextPrimaryIdle
         : Tokens.textPrimary;
     return Row(
       mainAxisSize: MainAxisSize.min,

@@ -22,34 +22,52 @@ class ControlBar extends StatelessWidget {
     sigmaY: Tokens.glassBlurThick,
   );
 
-  /// CSS: .player-controls — rgba(14,17,30,0.6) + blur(24px)
-  static final _decoration = BoxDecoration(
+  /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框
+  static final _decorationPlaying = BoxDecoration(
     color: Tokens.controlBarBg,
     borderRadius: ControlBar._borderRadius,
     border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
-      // CSS: inset 0 1px 0 rgba(255,255,255,0.04) — 顶部内高光
       BoxShadow(
         color: Tokens.controlBarBorderWhite,
         blurRadius: 0,
         spreadRadius: 0,
         offset: Offset(0, -1),
       ),
-      // CSS: inset 0 -1px 0 rgba(0,0,0,0.1) — 底部内阴影
       BoxShadow(
         color: Tokens.controlBarShadowBlack,
         blurRadius: 0,
         spreadRadius: 0,
         offset: Offset(0, 1),
       ),
-      // CSS: 0 8px 32px rgba(0,0,0,0.25) — 外层投影
       BoxShadow(
         color: Tokens.controlBarOuterShadow,
         blurRadius: 32,
         offset: Offset(0, 8),
       ),
-      // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
       BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
+    ],
+  );
+
+  /// 空状态装饰 — 半透明背景 + 淡化边框，与 Aurora 背景融合
+  static final _decorationIdle = BoxDecoration(
+    color: Tokens.controlBarBgIdle,
+    borderRadius: ControlBar._borderRadius,
+    border: Border.all(color: Tokens.controlBarBorderIdle, width: 1),
+    boxShadow: const [
+      BoxShadow(
+        color: Tokens.controlBarBorderIdle,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, -1),
+      ),
+      BoxShadow(
+        color: Tokens.controlBarShadowBlack,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, 1),
+      ),
+      // 空状态无外层投影 — 减轻视觉重量
     ],
   );
 
@@ -106,8 +124,10 @@ class ControlBar extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title ?? '',
-                            style: const TextStyle(
-                              color: Tokens.textPrimary,
+                            style: TextStyle(
+                              color: isIdle
+                                  ? Tokens.controlBarTextPrimaryIdle
+                                  : Tokens.textPrimary,
                               fontSize: Tokens.fontBody,
                               fontWeight: Tokens.weightMedium,
                             ),
@@ -145,15 +165,18 @@ class ControlBar extends StatelessWidget {
       ),
     );
 
-    // 背景层 — 纯视觉装饰（BackdropFilter 仅作用于此）
+    // 背景层 — 根据 idle 状态切换装饰
+    final decoration = isIdle ? _decorationIdle : _decorationPlaying;
     final background = Container(
       height: Tokens.controlBarHeight,
-      decoration: _decoration,
+      decoration: decoration,
     );
 
+    // idle 时降低 EdgeGlow 强度，播放时全强度
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
+      glowIntensity: isIdle ? 0.3 : null,
       child: Stack(
         children: [
           const Positioned(
@@ -348,7 +371,7 @@ class _CompactCenterGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dimmed = isIdle
-        ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
+        ? Tokens.controlBarTextPrimaryIdle
         : Tokens.textPrimary;
     return Row(
       mainAxisSize: MainAxisSize.min,
