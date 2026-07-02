@@ -26,7 +26,6 @@ void main() {
   Widget buildSubject({
     EngineState? eng,
     PlayerActions? actions,
-    bool isIdle = false,
   }) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -38,7 +37,6 @@ void main() {
           child: ControlBar(
             engine: eng ?? engine,
             actions: actions ?? const PlayerActions(),
-            isIdle: isIdle,
           ),
         ),
       ),
@@ -94,11 +92,14 @@ void main() {
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: SizedBox(
-              width: 400,
-              height: 200,
-              child: ControlBar(engine: engine),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(400, 600)),
+            child: Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 200,
+                child: ControlBar(engine: engine),
+              ),
             ),
           ),
         ),

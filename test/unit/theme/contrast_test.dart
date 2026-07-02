@@ -90,10 +90,12 @@ void main() {
       expect(ratio, lessThanOrEqualTo(0.6));
     });
 
-    test('glassBorderIdle is 40-60% of glassBorder alpha', () {
-      final ratio = _alphaRatio(Tokens.glassBorderIdle, Tokens.glassBorder);
-      expect(ratio, greaterThanOrEqualTo(0.4));
-      expect(ratio, lessThanOrEqualTo(0.6));
+    test('glassBorderIdle alpha >= 15% (Phase 18 SC-2 visibility)', () {
+      // Active border is 8% (0x14), idle needs >= 15% for visibility on dark bg.
+      // Idle can exceed active — this is intentional, not a regression.
+      // Color.a returns 0.0-1.0 in Flutter.
+      final alpha = Tokens.glassBorderIdle.a;
+      expect(alpha, greaterThanOrEqualTo(0.15));
     });
 
     test('controlBarTextPrimaryIdle is 40-60% of textPrimary alpha', () {

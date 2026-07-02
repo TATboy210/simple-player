@@ -48,6 +48,9 @@ class GlassContainer extends StatelessWidget {
   /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
   final ValueListenable<bool>? resizing;
 
+  /// 背景色 — 默认 Tokens.bgGlass，可传入 idle token 实现状态感知
+  final Color? backgroundColor;
+
   const GlassContainer({
     super.key,
     required this.child,
@@ -60,6 +63,7 @@ class GlassContainer extends StatelessWidget {
     this.opacity,
     this.blurEnabled = true,
     this.resizing,
+    this.backgroundColor,
   });
 
   @override
@@ -71,7 +75,7 @@ class GlassContainer extends StatelessWidget {
       height: height,
       padding: padding,
       decoration: BoxDecoration(
-        color: Tokens.bgGlass,
+        color: backgroundColor ?? Tokens.bgGlass,
         borderRadius: rRect,
         border: border ?? Border.all(color: Tokens.borderHighlight, width: 1),
       ),
