@@ -26,6 +26,7 @@ class EdgeGlow extends StatefulWidget {
   final EdgeGlowVariant variant;
   final BorderRadius? borderRadius;
   final bool enabled;
+  final double? glowIntensity;
 
   const EdgeGlow({
     super.key,
@@ -33,6 +34,7 @@ class EdgeGlow extends StatefulWidget {
     this.variant = EdgeGlowVariant.gradient,
     this.borderRadius,
     this.enabled = true,
+    this.glowIntensity,
   });
 
   @override
@@ -90,38 +92,39 @@ class _EdgeGlowState extends State<EdgeGlow>
 
   /// 变体 A — 渐变描边（5 层 box-shadow）
   Widget _buildGradientGlow() {
+    final intensity = widget.glowIntensity ?? 1.0;
     return Container(
       decoration: BoxDecoration(
         borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
-        boxShadow: const [
+        boxShadow: [
           // 1. 顶部内高光
           BoxShadow(
-            color: Tokens.glowHighlightWhite,
+            color: Tokens.glowHighlightWhite.withValues(alpha: Tokens.glowHighlightWhite.a * intensity),
             blurRadius: 0,
             spreadRadius: 0,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
           ),
           // 2. 实线描边
           BoxShadow(
-            color: Tokens.glowBorderBlue,
+            color: Tokens.glowBorderBlue.withValues(alpha: Tokens.glowBorderBlue.a * intensity),
             blurRadius: 0,
             spreadRadius: 1,
           ),
           // 3. 中层扩散
           BoxShadow(
-            color: Tokens.glowMidBlue,
+            color: Tokens.glowMidBlue.withValues(alpha: Tokens.glowMidBlue.a * intensity),
             blurRadius: 20,
             spreadRadius: 0,
           ),
           // 4. 外层环境
           BoxShadow(
-            color: Tokens.glowAmbientBlue,
+            color: Tokens.glowAmbientBlue.withValues(alpha: Tokens.glowAmbientBlue.a * intensity),
             blurRadius: 50,
             spreadRadius: 0,
           ),
           // 5. 蓝色外环
           BoxShadow(
-            color: Tokens.glowOuterRing,
+            color: Tokens.glowOuterRing.withValues(alpha: Tokens.glowOuterRing.a * intensity),
             blurRadius: 1,
             spreadRadius: 1,
           ),
@@ -162,6 +165,7 @@ class _EdgeGlowState extends State<EdgeGlow>
         final t = pulseController.value;
         // 正弦曲线：0 → 1 → 0
         final pulse = math.sin(t * math.pi);
+        final intensity = widget.glowIntensity ?? 1.0;
 
         return Container(
           decoration: BoxDecoration(
@@ -169,21 +173,21 @@ class _EdgeGlowState extends State<EdgeGlow>
             boxShadow: [
               // 内层高光（脉冲）
               BoxShadow(
-                color: Tokens.glowHighlightWhite.withValues(alpha: 0.03 + 0.05 * pulse),
+                color: Tokens.glowHighlightWhite.withValues(alpha: (0.03 + 0.05 * pulse) * intensity),
                 blurRadius: 0,
                 spreadRadius: 0,
                 offset: const Offset(0, 1),
               ),
               // 中层扩散（脉冲）
               BoxShadow(
-                color: Tokens.glowMidBlue.withValues(alpha: 0.03 + 0.05 * pulse),
+                color: Tokens.glowMidBlue.withValues(alpha: (0.03 + 0.05 * pulse) * intensity),
                 blurRadius: 20 + 10 * pulse,
                 spreadRadius: 0,
               ),
               // 外层环境（仅脉冲高峰出现）
               if (pulse > 0.5)
                 BoxShadow(
-                  color: Tokens.glowAmbientBlue.withValues(alpha: 0.04 * (pulse - 0.5) * 2),
+                  color: Tokens.glowAmbientBlue.withValues(alpha: 0.04 * (pulse - 0.5) * 2 * intensity),
                   blurRadius: 60,
                   spreadRadius: 0,
                 ),
