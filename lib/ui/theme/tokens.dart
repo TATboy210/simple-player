@@ -53,17 +53,14 @@ class Tokens {
 
   // ── 控制栏装饰 (controlbar-design-tokens.md) ──
   static const controlBarBg = Color(0x72080A10);  // #080A10 @ 45%
+  static const controlBarBgIdle = Color(0x39080A10);  // 同色系 @ 22%（空状态）
   static const controlBarBorderWhite = Color(0x0AFFFFFF); // 4% 白色描边
+  static const controlBarBorderIdle = Color(0x05FFFFFF); // 2% 白色描边（空状态）
   static const controlBarShadowBlack = Color(0x0F5078FF); // 底部辉光 6% 蓝
   static const controlBarOuterShadow = Color(0x26000000); // 外阴影 15% 黑
-
-  // ── 控制栏空状态 (idle) — alpha 约为现有值的 40-50% ──
-  static const controlBarBgIdle = Color(0x39080A10);       // #080A10 @ ~22% (45% 的 ~49%)
-  static const controlBarBorderIdle = Color(0x05FFFFFF);    // 2% 白色描边 (4% 的 50%)
-  static const glassBorderIdle = Color(0x0A6482FF);         // rgba(100,130,255,0.04) (0.08 的 50%)
-  static const controlBarTextPrimaryIdle = Color(0x76FFFFFF); // rgba(255,255,255,0.46) (0.92 的 50%)
-  static const controlBarTextSecondaryIdle = Color(0x3AFFFFFF); // rgba(255,255,255,0.23) (0.45 的 ~51%)
-  static const controlBarIconIdle = Color(0x76FFFFFF);      // rgba(255,255,255,0.46) (同 primary idle)
+  static const controlBarTextPrimaryIdle = Color(0x76FFFFFF); // 主文本 46%（空状态）
+  static const controlBarTextSecondaryIdle = Color(0x3AFFFFFF); // 次文本 23%（空状态）
+  static const controlBarIconIdle = Color(0x76FFFFFF); // 图标 46%（空状态）
 
   // ── 右键菜单 ──
   static const menuBg = Color(0xE61A1A2E);
@@ -79,6 +76,7 @@ class Tokens {
 
   static const borderHighlight = Color(0x0AFFFFFF); // 4% 白色（设计稿）
   static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
+  static const glassBorderIdle = Color(0x0A6482FF); // 同色系 @ 4%（空状态）
 
   // ── 字体 ──
   static const fontFamily = 'SF Pro Display';    // 主字体（Windows 回退 Segoe UI）
@@ -115,9 +113,10 @@ class Tokens {
   static const radiusPopup = 8.0;
 
   // ── 毛玻璃 (ImageFilter.blur sigma, 单位=像素) ──
-  static const glassBlurThin = 8.0;    // 标题栏 — 轻模糊
-  static const glassBlur = 18.0;       // 控制栏 — 通透磨砂
-  static const glassBlurThick = 18.0;  // 控制栏/弹窗 — 磨砂模糊
+  // P0优化: 降低sigma值减少GPU合成开销 (165Hz下6ms帧预算)
+  static const glassBlurThin = 4.0;    // 标题栏 — 轻模糊 (从8降到4)
+  static const glassBlur = 10.0;       // 控制栏 — 通透磨砂 (从18降到10)
+  static const glassBlurThick = 12.0;  // 控制栏/弹窗 — 磨砂模糊 (从18降到12)
 
   // ── 动画 ──
   static const durationFast = 80;
