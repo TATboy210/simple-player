@@ -193,6 +193,36 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                       right: Tokens.controlBarMarginH,
                       child: OsdOverlay(resizing: widget.resizing),
                     ),
+                    // 渐变过渡带 — 消除视频与控制栏之间的硬边
+                    Positioned(
+                      bottom: Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight,
+                      left: Tokens.controlBarMarginH,
+                      right: Tokens.controlBarMarginH,
+                      height: Tokens.gradientStripHeight,
+                      child: FadeTransition(
+                        opacity: _autoHide.opacity,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          child: RepaintBoundary(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    isIdle
+                                        ? Tokens.controlBarBgIdle
+                                        : Tokens.controlBarBg,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     Positioned(
                       left: Tokens.controlBarMarginH,
                       right: Tokens.controlBarMarginH,

@@ -60,15 +60,13 @@ class Tokens {
   // ── 控制栏装饰 (controlbar-design-tokens.md) ──
   static const controlBarBg = Color(0x72080A10);  // #080A10 @ 45%
   static const controlBarBgIdle = Color(0x39080A10);  // 同色系 @ 22%（空状态）
-  static const controlBarBorderWhite = Color(0x0AFFFFFF); // 4% 白色描边
-  static const controlBarBorderIdle = Color(0x05FFFFFF); // 2% 白色描边（空状态）
+  static const controlBarBorderWhite = Color(0x1AFFFFFF); // 10% 白色描边（playing 状态）
+  static const controlBarBorderIdle = Color(0x0DFFFFFF); // 5% 白色描边（空状态，比 playing 淡）
   static const controlBarShadowBlack = Color(0x0F5078FF); // 底部辉光 6% 蓝
   static const controlBarOuterShadow = Color(0x26000000); // 外阴影 15% 黑
   static const controlBarTextPrimaryIdle = Color(0x76FFFFFF); // 主文本 46%（空状态）
   static const controlBarTextSecondaryIdle = Color(0x3AFFFFFF); // 次文本 23%（空状态）
   static const controlBarIconIdle = Color(0x76FFFFFF); // 图标 46%（空状态）
-  static const controlBarGradientEdge = Color(0x005082FF); // 渐变边缘透明蓝
-
   // ── 右键菜单 ──
   static const menuBg = Color(0xE61A1A2E);
   static const menuBorder = Color(0x22FFFFFF);
@@ -82,7 +80,7 @@ class Tokens {
   static const textDisabled = Color(0xFF444455);
 
   static const borderHighlight = Color(0x0AFFFFFF); // 4% 白色（设计稿）
-  static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
+  static const glassBorder = Color(0x1A6482FF); // rgba(100,130,255,0.10) — 最低可见阈值
   static const glassBorderIdle = Color(0x276482FF); // rgba(100,130,255,0.153) — SC-2: idle border >= 15%
 
   // ── 字体 ──
@@ -122,8 +120,7 @@ class Tokens {
   // ── 毛玻璃 (ImageFilter.blur sigma, 单位=像素) ──
   // P0优化: 降低sigma值减少GPU合成开销 (165Hz下6ms帧预算)
   static const glassBlurThin = 4.0;    // 标题栏 — 轻模糊 (从8降到4)
-  static const glassBlur = 10.0;       // 控制栏 — 通透磨砂 (从18降到10)
-  static const glassBlurThick = 12.0;  // 控制栏/弹窗 — 磨砂模糊 (从18降到12)
+  static const glassBlur = 10.0;       // 控制栏/弹窗 — 通透磨砂 (2-tier: Thin=4, Standard=10)
 
   // ── 动画 ──
   static const durationFast = 80;
@@ -156,6 +153,9 @@ class Tokens {
   static const controlBarMarginH = 24.0;   // 设计稿: 左右 24px
   static const controlBarMarginBottom = 16.0;
   static const controlBarBorder = Color(0x1F6482FF); // rgba(100,130,255,0.12) 通透边框
+
+  // ── 渐变过渡带 ──
+  static const double gradientStripHeight = 60.0; // 控制栏上方透明→黑色渐变高度
 
   // ── 进度条 ──
   static const progressBarRadius = 2.0;
