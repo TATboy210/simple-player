@@ -314,17 +314,11 @@ Listener(
 
 **If this table is empty:** All claims in this research were verified or cited — no user confirmation needed.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the gradient strip have a rounded top corner?**
-   - What we know: UI-SPEC doesn't specify corner radius
-   - What's unclear: Whether to match ControlBar's border radius (22px) or leave sharp
-   - Recommendation: Leave sharp (no border radius) for simplicity — the gradient fades to transparent, so corners are invisible
+1. **Should the gradient strip have a rounded top corner?** — RESOLVED: Leave sharp (no border radius). The gradient fades to transparent, so corners are invisible.
 
-2. **Should the gradient strip extend to the edges of the screen or match ControlBar margins?**
-   - What we know: UI-SPEC specifies horizontal margin matching ControlBar (24px each side)
-   - What's unclear: None — this is explicitly defined
-   - Recommendation: Match ControlBar margins exactly
+2. **Should the gradient strip extend to the edges of the screen or match ControlBar margins?** — RESOLVED: Match ControlBar margins (24px each side), per UI-SPEC definition.
 
 ## Environment Availability
 
