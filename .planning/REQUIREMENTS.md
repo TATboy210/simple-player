@@ -8,7 +8,7 @@
 
 ### Token Foundation
 
-- [ ] **UI-01**: 添加 6 个空状态 Tokens 到 tokens.dart
+- [x] **UI-01**: 添加 6 个空状态 Tokens 到 tokens.dart
   - controlBarBgIdle: 空状态控制栏背景色
   - controlBarBorderIdle: 空状态控制栏边框色
   - glassBorderIdle: 空状态玻璃边框色
@@ -32,12 +32,12 @@
 
 ### Polish
 
-- [ ] **UI-04**: EdgeGlow 可选 glowIntensity 参数
+- [x] **UI-04**: EdgeGlow 可选 glowIntensity 参数
   - 类型: double?，默认值 null (保持现有行为)
   - 空状态时传入较低值减弱发光
   - 避免与 AuroraBackground 竞争视觉焦点
 
-- [ ] **UI-05**: textSecondary WCAG AA 对比度修复
+- [x] **UI-05**: textSecondary WCAG AA 对比度修复
   - 当前 alpha 45% (0x73FFFFFF) → 对比度 4.30:1
   - 修改为 50% (0x80FFFFFF) → 对比度 ~5.3:1
   - 满足 WCAG SC 1.4.3 (4.5:1 最低要求)
@@ -63,11 +63,11 @@
 
 | REQ | Phase | Status |
 |-----|-------|--------|
-| UI-01 | Phase 16 | Pending |
+| UI-01 | Phase 16 | Complete |
 | UI-02 | Phase 17 | Pending |
 | UI-03 | Phase 17 | Pending |
-| UI-04 | Phase 16 | Pending |
-| UI-05 | Phase 16 | Pending |
+| UI-04 | Phase 16 | Complete |
+| UI-05 | Phase 16 | Complete |
 | UI-06 | Phase 18 | Pending |
 
 ---
