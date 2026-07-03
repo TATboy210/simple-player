@@ -83,8 +83,6 @@ class PlaylistStore {
   }
 
   /// C3: 原子写入 + 指数退避重试 — 写 .tmp 后 rename，失败最多重试 3 次
-  static Future<void> _flush() => _instance._flushImpl();
-
   Future<void> _flushImpl() async {
     final json = _pendingJson;
     if (json == null) return;

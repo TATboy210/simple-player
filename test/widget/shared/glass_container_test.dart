@@ -168,8 +168,8 @@ void main() {
       expect(GlassTier.thin.sigma, lessThan(GlassTier.normal.sigma));
     });
 
-    test('normal sigma is less than thick', () {
-      expect(GlassTier.normal.sigma, lessThan(GlassTier.thick.sigma));
+    test('normal sigma equals thick (merged — 2-tier system)', () {
+      expect(GlassTier.normal.sigma, equals(GlassTier.thick.sigma));
     });
   });
 }

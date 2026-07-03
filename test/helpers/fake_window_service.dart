@@ -69,7 +69,6 @@ class FakeWindowService implements WindowBridge {
     startDraggingCallCount++;
   }
 
-  @override
   void showAfterFirstFrame() {}
 
   @override

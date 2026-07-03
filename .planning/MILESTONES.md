@@ -92,3 +92,25 @@
 - Phase 13: Window Foundation (WIN-05, WIN-06) — 最高风险，需要 spike
 - Phase 14: HLS ABR (HLS-01) — 独立，可与 Phase 13 并行
 - Phase 15: Architecture Simplification (ARCH-02, ARCH-03, PLATFORM-03) — 依赖 Phase 13
+
+## v1.3: Glass Morphism Coordination
+
+**Shipped:** 2026-07-03
+**Phases:** 3 | **Plans:** 3
+
+### What Was Built
+
+- 6 个 idle-state design tokens（控制栏空状态配色体系）
+- EdgeGlow 可选 glowIntensity 参数（空状态减弱发光）
+- WCAG AA 对比度修复（textSecondary 45%→50% alpha）
+- AnimatedContainer 过渡动画（idle↔playing 150ms easeInOut）
+- Token alpha 可见性修正（修复 playing/idle 边框反转）
+- Blur 2-tier 合并（删除 glassBlurThick，Thin=4 / Standard=10）
+- 5 个自动化 token alpha 验证测试（防回归）
+
+### Key Decisions
+
+- AnimatedContainer 替代手动 Tween（最小代码改动）
+- boxShadow 不参与动画（避免复杂 Tween 曲线）
+- glassBlur vs glassBlurThick 合并（2px 差异不可感知）
+- 控制栏渐变边缘 token 删除（alpha=0 是死代码）

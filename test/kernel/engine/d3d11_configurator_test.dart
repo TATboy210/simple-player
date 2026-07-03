@@ -6,10 +6,13 @@ import 'package:simple_player_flutter/kernel/engine/player_proxy.dart';
 /// Fake player that implements PlayerProxy for testing.
 /// Records all calls for verification.
 class FakePlayer implements PlayerProxy {
-  double _volume = 1.0;
-  bool _mute = false;
   final Map<String, String> _properties = {};
   final List<String> _setPropertyCalls = [];
+  double _volume = 1.0;
+  bool _mute = false;
+
+  double get volume => _volume;
+  bool get mute => _mute;
 
   @override
   set volume(double value) => _volume = value;

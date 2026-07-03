@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
 import 'package:simple_player_flutter/features/player/services/subtitle_service.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
@@ -16,6 +18,19 @@ void main() {
   late Directory tempDir;
 
   setUp(() {
+    // Mock platform channels to prevent MissingPluginException
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (MethodCall methodCall) async {
+        if (methodCall.method == 'getApplicationSupportDirectory') {
+          return Directory.systemTemp.createTempSync('app_support').path;
+        }
+        return null;
+      },
+    );
+    SharedPreferences.setMockInitialValues({});
+
     engine = FakeEngine();
     playlist = Playlist();
     controller = PlaybackController(
@@ -29,7 +44,18 @@ void main() {
   });
 
   tearDown(() {
-    controller.dispose();
+    // 清除 mock
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      null,
+    );
+    // PlaylistStore.dispose() uses path_provider which isn't available in tests
+    try {
+      controller.dispose();
+    } on Exception {
+      // ignore path_provider MissingPluginException
+    }
     engine.dispose();
     try {
       tempDir.deleteSync(recursive: true);

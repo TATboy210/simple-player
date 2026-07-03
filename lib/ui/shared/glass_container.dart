@@ -18,8 +18,8 @@ enum GlassTier {
   /// 控制栏 — 默认模糊
   normal(Tokens.glassBlur),
 
-  /// 弹窗/对话框 — 深模糊
-  thick(Tokens.glassBlurThick);
+  /// 弹窗/对话框 — 与 normal 相同（10 vs 12px 差异不可感知，已合并）
+  thick(Tokens.glassBlur);
 
   final double sigma;
   const GlassTier(this.sigma);
