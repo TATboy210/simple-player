@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../../../kernel/services/theme_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
@@ -127,12 +128,6 @@ class _ThemeSelector extends StatelessWidget {
 
   const _ThemeSelector({required this.currentIndex, this.onChanged});
 
-  static const _themes = [
-    _ThemeData(0, 'Midnight', Color(0xFF2C58F4)),
-    _ThemeData(1, 'Ocean', Color(0xFF00B4D8)),
-    _ThemeData(2, 'Forest', Color(0xFF2D6A4F)),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -140,11 +135,11 @@ class _ThemeSelector extends StatelessWidget {
 
     return Row(
       children: [
-        for (int i = 0; i < _themes.length; i++) ...[
+        for (int i = 0; i < ThemeService.accents.length; i++) ...[
           if (i > 0) const SizedBox(width: Tokens.spSm),
           _ThemeChip(
             label: labels[i],
-            color: _themes[i].color,
+            color: ThemeService.accents[i],
             selected: currentIndex == i,
             onTap: () => onChanged?.call(i),
           ),
@@ -152,13 +147,6 @@ class _ThemeSelector extends StatelessWidget {
       ],
     );
   }
-}
-
-class _ThemeData {
-  final int index;
-  final String name;
-  final Color color;
-  const _ThemeData(this.index, this.name, this.color);
 }
 
 class _ThemeChip extends StatelessWidget {

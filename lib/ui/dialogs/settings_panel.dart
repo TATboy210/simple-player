@@ -63,7 +63,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
     if (_depsInitialized) return;
     _depsInitialized = true;
     final current = Theme.of(context).colorScheme.primary;
-    const accents = [Color(0xFF2C58F4), Color(0xFF00B4D8), Color(0xFF2D6A4F)];
+    const accents = ThemeService.accents;
     final idx = accents.indexWhere((c) => c == current);
     _pendingThemeIndex = idx >= 0 ? idx : 0;
     _originalThemeIndex = _pendingThemeIndex;

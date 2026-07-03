@@ -149,7 +149,7 @@ class _MiniProgressBar extends StatelessWidget {
   final double value;
   const _MiniProgressBar({required this.value});
 
-  static const _trackColor = Color(0x22FFFFFF);
+  static const _trackColor = Tokens.osdTrackColor;
   static const _fillAnim = AlwaysStoppedAnimation<Color>(Tokens.accent);
 
   @override
