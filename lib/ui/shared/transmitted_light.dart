@@ -78,7 +78,7 @@ class TransmittedLight extends StatelessWidget {
 
   /// 中心透射 — 圆形光斑
   Widget _buildCenterTransmission() {
-    final glowColor = color ?? const Color(0xFF7864DC);
+    final glowColor = color ?? Tokens.glowPurple;
 
     return Center(
       child: Container(

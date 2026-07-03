@@ -207,7 +207,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final paint = Paint()
-      ..color = const Color(0x05FFFFFF)
+      ..color = Tokens.noiseOverlay
       ..strokeWidth = 1
       ..strokeCap = StrokeCap.round;
 

@@ -47,6 +47,12 @@ class Tokens {
   static const auroraBlue2 = Color(0xFF1130A3);  // accent blue (logo)
   static const auroraBlue3 = Color(0xFF5578DC);  // light accent blue
 
+  // ── Aurora 噪点叠加 ──
+  static const noiseOverlay = Color(0x05FFFFFF);  // 噪点纹理色 (3% 白)
+
+  // ── 透射光 ──
+  static const glowPurple = Color(0xFF7864DC);  // 中心透射默认紫色
+
   // ── 缩略图叠加层 ──
   static const thumbnailOverlay = Color(0x42000000);  // 半透明黑色 (≈Colors.black26)
   static const progressBarBg = Color(0x44000000);    // 进度条底色
@@ -61,6 +67,7 @@ class Tokens {
   static const controlBarTextPrimaryIdle = Color(0x76FFFFFF); // 主文本 46%（空状态）
   static const controlBarTextSecondaryIdle = Color(0x3AFFFFFF); // 次文本 23%（空状态）
   static const controlBarIconIdle = Color(0x76FFFFFF); // 图标 46%（空状态）
+  static const controlBarGradientEdge = Color(0x005082FF); // 渐变边缘透明蓝
 
   // ── 右键菜单 ──
   static const menuBg = Color(0xE61A1A2E);
@@ -179,6 +186,7 @@ class Tokens {
   static const double osdIconSize = 22;
   static const int osdFadeDurationMs = 200;
   static const int osdDefaultHoldMs = 1200;
+  static const osdTrackColor = Color(0x22FFFFFF); // 进度条底色 (13% 白)
 
   // ── 滑块 ──
   static const double sliderHeight = 42;

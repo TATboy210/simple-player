@@ -188,9 +188,9 @@ class ControlBar extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Color(0x005082FF),
+                    Tokens.controlBarGradientEdge,
                     Tokens.glowAccent,
-                    Color(0x005082FF),
+                    Tokens.controlBarGradientEdge,
                   ],
                 ),
               ),
