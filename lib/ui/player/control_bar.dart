@@ -18,14 +18,17 @@ import 'volume_controls.dart';
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
   static final _blurFilter = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlurThick,
-    sigmaY: Tokens.glassBlurThick,
+    sigmaX: Tokens.glassBlur,
+    sigmaY: Tokens.glassBlur,
   );
 
   /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框
-  static final _decorationPlaying = BoxDecoration(
+  ///
+  /// Getter 而非 static final：AnimatedContainer 需要每帧新建 BoxDecoration
+  /// 才能对 color 和 border 做隐式插值动画（D-01/D-07）。
+  BoxDecoration get _decorationPlaying => BoxDecoration(
     color: Tokens.controlBarBg,
-    borderRadius: ControlBar._borderRadius,
+    borderRadius: _borderRadius,
     border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
       BoxShadow(
@@ -50,9 +53,11 @@ class ControlBar extends StatelessWidget {
   );
 
   /// 空状态装饰 — 半透明背景 + 淡化边框，与 Aurora 背景融合
-  static final _decorationIdle = BoxDecoration(
+  ///
+  /// Getter：与 _decorationPlaying 同理，AnimatedContainer 需要新对象做插值。
+  BoxDecoration get _decorationIdle => BoxDecoration(
     color: Tokens.controlBarBgIdle,
-    borderRadius: ControlBar._borderRadius,
+    borderRadius: _borderRadius,
     border: Border.all(color: Tokens.controlBarBorderIdle, width: 1),
     boxShadow: const [
       BoxShadow(
@@ -165,11 +170,12 @@ class ControlBar extends StatelessWidget {
       ),
     );
 
-    // 背景层 — 根据 idle 状态切换装饰
-    final decoration = isIdle ? _decorationIdle : _decorationPlaying;
-    final background = Container(
+    // 背景层 — AnimatedContainer 对 color + border 做隐式插值（D-01/D-02/D-04）
+    final background = AnimatedContainer(
+      duration: const Duration(milliseconds: Tokens.durationNormal),
+      curve: Curves.easeInOut,
       height: Tokens.controlBarHeight,
-      decoration: decoration,
+      decoration: isIdle ? _decorationIdle : _decorationPlaying,
     );
 
     // idle 时降低 EdgeGlow 强度，播放时全强度
@@ -188,9 +194,9 @@ class ControlBar extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Tokens.controlBarGradientEdge,
+                    Colors.transparent,
                     Tokens.glowAccent,
-                    Tokens.controlBarGradientEdge,
+                    Colors.transparent,
                   ],
                 ),
               ),

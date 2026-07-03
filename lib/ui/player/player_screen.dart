@@ -313,7 +313,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   static void _showShortcutsHelp(BuildContext context) {
-    showDialog(context: context, builder: (_) => const _ShortcutsHelpDialog());
+    showDialog<void>(context: context, builder: (_) => const _ShortcutsHelpDialog());
   }
 }
 

@@ -7,25 +7,25 @@ void main() {
   group('Mixin capability checks', () {
     test('FakeEngine is TrackControl', () {
       final engine = FakeEngine();
-      expect(engine is TrackControl, isTrue);
+      expect(engine, isA<TrackControl>());
       engine.dispose();
     });
 
     test('FakeEngine is VideoEffects', () {
       final engine = FakeEngine();
-      expect(engine is VideoEffects, isTrue);
+      expect(engine, isA<VideoEffects>());
       engine.dispose();
     });
 
     test('FakeEngine is RendererConfig', () {
       final engine = FakeEngine();
-      expect(engine is RendererConfig, isTrue);
+      expect(engine, isA<RendererConfig>());
       engine.dispose();
     });
 
     test('FakeEngine is EngineState', () {
       final engine = FakeEngine();
-      expect(engine is EngineState, isTrue);
+      expect(engine, isA<EngineState>());
       engine.dispose();
     });
 

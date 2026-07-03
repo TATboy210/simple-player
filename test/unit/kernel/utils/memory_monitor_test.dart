@@ -89,7 +89,7 @@ void main() {
         MemoryMonitor.start();
         final jsonStr = MemoryMonitor.exportJson();
         final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
-        expect(parsed['history'], isA<List>());
+        expect(parsed['history'], isA<List<dynamic>>());
       });
 
       test('JSON rssMB is a string', () {
@@ -128,7 +128,7 @@ void main() {
         expect(json['rssMB'], isA<String>());
         expect(json['maxRssMB'], isA<String>());
         expect(json['historyCount'], 0);
-        expect(json['history'], isA<List>());
+        expect(json['history'], isA<List<dynamic>>());
       });
     });
 

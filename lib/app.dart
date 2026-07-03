@@ -70,7 +70,7 @@ class _AppState extends State<App> {
     EngineState engine,
     VideoProcessingService? videoProcessing,
   ) {
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.transparent,

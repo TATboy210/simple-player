@@ -15,6 +15,19 @@ import 'services/video_processing_service.dart';
 class PlayerServices {
   PlayerServices({required this.windowService, this.engineOverride});
 
+  /// 异步创建并初始化 PlayerServices 实例
+  static Future<PlayerServices> create({
+    required WindowBridge windowService,
+    EngineState? engineOverride,
+  }) async {
+    final services = PlayerServices(
+      windowService: windowService,
+      engineOverride: engineOverride,
+    );
+    await services.init();
+    return services;
+  }
+
   /// 可选的引擎覆盖（用于 MockEngine 调试模式）。
   final EngineState? engineOverride;
 

@@ -120,7 +120,7 @@ void main() {
       final parsed = jsonDecode(json) as Map<String, dynamic>;
       expect(parsed['name'], 'test');
       expect(parsed['eventCount'], 1);
-      expect(parsed['events'], isA<List>());
+      expect(parsed['events'], isA<List<dynamic>>());
     });
 
     test('eventCount reflects events', () {

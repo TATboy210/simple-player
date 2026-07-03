@@ -126,8 +126,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   // 缓存固定 blur filter，避免动画期间每帧分配 ImageFilter
   static final _blurFilter = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlurThick,
-    sigmaY: Tokens.glassBlurThick,
+    sigmaX: Tokens.glassBlur,
+    sigmaY: Tokens.glassBlur,
   );
 
   @override

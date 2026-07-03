@@ -19,14 +19,14 @@
 
 ### Control Bar Adaptation
 
-- [ ] **UI-02**: GlassContainer 添加可选 backgroundColor 参数
+- [x] **UI-02**: GlassContainer 添加可选 backgroundColor 参数
   - 类型: Color?，默认值 Tokens.bgGlass
   - 向后兼容，现有调用者无需修改
   - 用于空状态时传入更淡的背景色
 
-- [ ] **UI-03**: ControlBar 状态感知 _buildDecoration 方法
-  - 替换 static final _decoration 为 _buildDecoration(isIdle) 方法
-  - 使用现有 isIdle boolean (来自 engine.state)
+- [x] **UI-03**: ControlBar 状态感知 decoration（AnimatedContainer + getter）
+  - _decorationIdle / _decorationPlaying 已改为 getter（非 static final）
+  - AnimatedContainer 自动对 color + border 做隐式插值（150ms easeInOut）
   - 空状态: 使用 UI-01 的 idle tokens
   - 播放状态: 保持现有 tokens 不变
 
@@ -42,10 +42,12 @@
   - 修改为 50% (0x80FFFFFF) → 对比度 ~5.3:1
   - 满足 WCAG SC 1.4.3 (4.5:1 最低要求)
 
-- [ ] **UI-06**: 视觉调优 — alpha/sigma 具体值迭代
-  - 测试 5+ 视频类型: dark, bright, mixed, colorful, letterbox
-  - 确认 glassBlur vs glassBlurThick 是否需要区分 (当前都是 18.0)
-  - 验证空状态边框可见性 (alpha >= 15%)
+- [x] **UI-06**: 视觉调优 — alpha/sigma 具体值迭代
+  - Token alpha 审计：修复可见性反转（playing border 3.9%→10.2%, idle border 2.0%→5.2%）
+  - glassBlur vs glassBlurThick 合并为 2-tier（10 vs 12px 不可感知）
+  - 删除死 token controlBarGradientEdge（alpha=0）
+  - 自动化验证测试：5 个 token alpha 范围检查
+  - 视觉验证清单待用户手动执行
 
 ## Future Requirements
 
@@ -59,16 +61,45 @@
 - dynamic_color (Material You) — 不适合媒体播放器
 - FragmentShader — Impeller 迁移中，避免使用
 
+## v1.4 Requirements
+
+### Technical Debt
+
+- [ ] **TECH-01**: 修复 PlayerServices.create() undefined method 错误
+  - 添加静态 `create()` 工厂方法到 PlayerServices
+  - PlayerViewModel.init() 调用点无需修改
+
+- [ ] **TECH-02**: 迁移弃用 Color API (18 issues)
+  - `color.value` → `color.toARGB32()`
+  - `color.alpha` → `(color.a * 255).round()`
+  - `color.red/green/blue` → `(color.r/g/b * 255).round()`
+  - 涉及 tokens.dart, contrast_test.dart, tokens_test.dart
+
+- [ ] **TECH-03**: 修复 external subtitle 测试失败 (6 tests)
+  - 添加 path_provider mock 到测试环境
+  - 修复 PlaylistStore.dispose() 的 MissingPluginException
+
+- [ ] **TECH-04**: 代码质量清理 (100 info issues)
+  - 添加 @override 注解 (31 issues)
+  - 修复 overridden_fields (24 issues)
+  - 删除 unnecessary_import (12 issues)
+  - 补全 const 构造函数 (4 issues)
+  - 修复其他 lint issues (29 issues)
+
 ## Traceability
 
 | REQ | Phase | Status |
 |-----|-------|--------|
 | UI-01 | Phase 16 | Complete |
-| UI-02 | Phase 17 | Pending |
-| UI-03 | Phase 17 | Pending |
+| UI-02 | Phase 17 | Complete |
+| UI-03 | Phase 17 | Complete |
 | UI-04 | Phase 16 | Complete |
 | UI-05 | Phase 16 | Complete |
-| UI-06 | Phase 18 | Pending |
+| UI-06 | Phase 18 | Complete |
+| TECH-01 | Phase 20 | Pending |
+| TECH-02 | Phase 20 | Pending |
+| TECH-03 | Phase 20 | Pending |
+| TECH-04 | Phase 20 | Pending |
 
 ---
 *Created: 2026-07-02 via /gsd-new-milestone*

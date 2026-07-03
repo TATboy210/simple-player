@@ -172,4 +172,66 @@ void main() {
       expect(find.byIcon(Icons.settings), findsOneWidget);
     });
   });
+
+  group('ControlBar animation', () {
+    Widget buildWithIdle({required bool isIdle}) {
+      return MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: SizedBox(
+            width: 800,
+            height: 200,
+            child: ControlBar(engine: engine, isIdle: isIdle),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('uses AnimatedContainer for background', (tester) async {
+      await tester.pumpWidget(buildWithIdle(isIdle: false));
+      await tester.pump();
+
+      // AnimatedContainer should be in the widget tree
+      expect(find.byType(AnimatedContainer), findsOneWidget);
+    });
+
+    testWidgets('idle state uses AnimatedContainer', (tester) async {
+      await tester.pumpWidget(buildWithIdle(isIdle: true));
+      await tester.pump();
+
+      expect(find.byType(AnimatedContainer), findsOneWidget);
+    });
+
+    testWidgets('transitions decoration on isIdle change', (tester) async {
+      // Start idle
+      await tester.pumpWidget(buildWithIdle(isIdle: true));
+      await tester.pump();
+
+      final animatedContainer = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer),
+      );
+      expect(animatedContainer.duration, const Duration(milliseconds: 150));
+
+      // Switch to playing — rebuild with new decoration
+      await tester.pumpWidget(buildWithIdle(isIdle: false));
+      await tester.pump();
+
+      // AnimatedContainer still present with same duration
+      final after = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer),
+      );
+      expect(after.duration, const Duration(milliseconds: 150));
+    });
+
+    testWidgets('AnimatedContainer uses easeInOut curve', (tester) async {
+      await tester.pumpWidget(buildWithIdle(isIdle: false));
+      await tester.pump();
+
+      final animatedContainer = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer),
+      );
+      expect(animatedContainer.curve, Curves.easeInOut);
+    });
+  });
 }

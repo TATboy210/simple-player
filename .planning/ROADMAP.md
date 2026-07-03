@@ -10,7 +10,8 @@
 - ✅ **v1.1 Testing & Quality** - Phases 5-7 (shipped 2026-05-30)
 - ✅ **v1.2 Security & Kernel** - Phases 8-11 (shipped 2026-05-31)
 - ✅ **v1.2.1 Window Polish** - Phases 12-15 (shipped 2026-06-28)
-- 🚧 **v1.3 Glass Morphism Coordination** - Phases 16-18 (in progress)
+- ✅ **v1.3 Glass Morphism Coordination** - Phases 16-18 (shipped 2026-07-03)
+- 🚧 **v1.4 Technical Debt Cleanup** - Phase 20 (in progress)
 
 ## Phases
 
@@ -53,13 +54,13 @@
 
 </details>
 
-### 🚧 v1.3 Glass Morphism Coordination (In Progress)
+### ✅ v1.3 Glass Morphism Coordination (Completed 2026-07-03)
 
 **Milestone Goal:** 控制栏颜色/亮度与背景融合，减少视觉突兀感
 
 - [x] **Phase 16: Token Foundation & Independent Fixes** - Idle tokens, glow param, contrast fix (completed 2026-07-03)
-- [ ] **Phase 17: Adaptive Control Bar** - GlassContainer param, ControlBar state-aware decoration
-- [ ] **Phase 18: Visual Tuning & Validation** - Alpha/sigma iteration, multi-content validation
+- [x] **Phase 17: Adaptive Control Bar** - AnimatedContainer, idle/playing transition, animation tests (completed 2026-07-03)
+- [x] **Phase 18: Visual Tuning & Validation** - Token alpha fix, blur merge, validation tests (completed 2026-07-03)
 
 ## Phase Details
 
@@ -114,10 +115,29 @@
 
 **UI hint**: yes
 
+### Phase 20: Technical Debt Cleanup
+
+**Goal**: 零 warning/零 error，迁移弃用 Color API，修复预存测试失败
+**Depends on**: Phase 18
+**Requirements**: TECH-01, TECH-02, TECH-03, TECH-04
+**Success Criteria** (what must be TRUE):
+
+  1. `flutter analyze` 输出 0 errors, 0 warnings
+  2. `flutter test` 905+ tests passing, 0 failures
+  3. 所有 Color API 使用新接口（`.a`/`.r`/`.g`/`.b`/`.toARGB32()`）
+  4. 所有 `const` 构造函数已补全
+
+**Plans**: 1/1 plans complete
+
+- [ ] 20-01-PLAN.md
+
+**UI hint**: no
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 16. Token Foundation & Independent Fixes | 1/1 | Complete    | 2026-07-03 |
-| 17. Adaptive Control Bar | 0/0 | Not started | - |
-| 18. Visual Tuning & Validation | 0/0 | Not started | - |
+| 17. Adaptive Control Bar | 1/1 | Complete | 2026-07-03 |
+| 18. Visual Tuning & Validation | 1/1 | Complete | 2026-07-03 |
+| 20. Technical Debt Cleanup | 1/1 | In Progress | - |
