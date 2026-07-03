@@ -1,85 +1,201 @@
-<!-- refreshed: 2026-06-26 -->
 # External Integrations
 
-## Platform Channels
+**Analysis Date:** 2026-07-03
 
-| Channel | Platform | Methods | File |
-|---------|----------|---------|------|
-| `com.simple_player/fullscreen` | macOS | `enterFullscreen`, `exitFullscreen`, `getWindowRect` | `kernel/bridge/macos/macos_platform_fullscreen.dart` |
-| `com.simple_player/window` | Linux | `getGtkWindowHandle` | `kernel/bridge/linux/linux_platform_fullscreen.dart` |
+## APIs & External Services
 
-## Win32 FFI (user32.dll)
+**Media Engine (fvp/MDK):**
+- fvp 0.37.2 — FFmpeg + MDK media playback engine
+- SDK/Client: `package:fvp/mdk.dart` (imported as `mdk`)
+- Auth: None required (local library)
+- Usage: `FvpEngine` creates `mdk.Player` instances for media decoding and D3D11 rendering
+- Key files: `lib/kernel/engine/fvp_engine.dart`, `lib/kernel/engine/media_opener.dart`
 
-File: `lib/kernel/bridge/win32/win32_platform_fullscreen.dart`
+**Network Streaming Protocols:**
+- RTSP — Real-time streaming protocol (`rtsp://`)
+- RTMP — Real-time messaging protocol (`rtmp://`)
+- SRT — Secure reliable transport (`srt://`)
+- HTTP/HTTPS — Standard web streaming (`http://`, `https://`)
+- UDP/TCP — Raw transport protocols (`udp://`, `tcp://`)
+- Configuration: `lib/kernel/engine/network_configurator.dart`
+- URL validation: `lib/kernel/services/path_validator.dart`
 
-Bound functions:
-- `FindWindowW` — locate Flutter window by class `FLUTTER_RUNNER_WIN32_WINDOW`
-- `GetWindowLongPtrW` / `SetWindowLongPtrW` — read/write GWL_STYLE
-- `SetWindowPos` — atomic position+size+style refresh
-- `MonitorFromWindow` / `GetMonitorInfoW` — multi-monitor support
+## Data Storage
 
-FFI structs: `RECT`, `MONITORINFO`. Memory: `calloc`/`calloc.free` in `finally` blocks.
+**Local Storage:**
+- SharedPreferences — Key-value persistence
+  - Connection: Platform-specific (Windows registry, Linux GSettings, macOS NSUserDefaults)
+  - Client: `package:shared_preferences`
+  - Key file: `lib/kernel/persistence/settings_store.dart`
+  - Stores: volume, window geometry, play mode, subtitle settings, video effects, locale, theme
 
-Styles manipulated: `WS_CAPTION` (0x00C00000), `WS_THICKFRAME` (0x00040000), `WS_VISIBLE` (0x10000000).
+**Playlist Storage:**
+- JSON files in `%APPDATA%/SimplePlayer/`
+  - `playlist.json` — Current playlist state
+  - `history.json` — Playback history
+  - Client: `PlaylistStore` with 300ms debounce + atomic write (`.tmp` then rename)
+  - Key file: `lib/kernel/persistence/playlist_store.dart`
 
-## GTK3 FFI (libgtk-3.so)
+**Debug Storage:**
+- JSON files in `%APPDATA%/SimplePlayer/debug/`
+  - `debug_<timestamp>.json` — Memory snapshots, probe data
+  - Client: `DebugExporter`
+  - Key file: `lib/kernel/utils/debug_exporter.dart`
 
-File: `lib/kernel/bridge/linux/linux_platform_fullscreen.dart`
+**File Storage:**
+- Local filesystem only — No cloud storage integration
+- Video file scanning: `lib/kernel/scanner/folder_scanner.dart`
+- Supported formats: mp4, mkv, avi, mov, wmv, flv, webm, m4v, ts, rmvb, mpg, mpeg, 3gp, vob
 
-Bound functions: `gtk_window_fullscreen`, `gtk_window_unfullscreen`, `gtk_window_get_size`, `gtk_window_get_position`.
+**Caching:**
+- In-memory LRU cache for thumbnails (200 entries max)
+  - Key file: `lib/kernel/services/thumbnail_service.dart`
+- SharedPreferences prewarm cache at startup
+  - Key file: `lib/kernel/persistence/settings_store.dart`
 
-Window handle obtained via MethodChannel `com.simple_player/window` -> `getGtkWindowHandle`, cached statically.
+## Authentication & Identity
 
-## Platform Fullscreen Abstraction
+**Auth Provider:**
+- None — Desktop application with no user accounts or authentication
+- All data stored locally, no cloud sync
 
-Interface: `PlatformFullscreen` (`lib/kernel/bridge/platform_fullscreen.dart`)
+## Platform Integrations
 
-| Impl | Platform | Mechanism | requiresStyleSave |
-|------|----------|-----------|-------------------|
-| `Win32PlatformFullscreen` | Windows | FFI (user32.dll) | true |
-| `MacosPlatformFullscreen` | macOS | MethodChannel | false |
-| `LinuxPlatformFullscreen` | Linux | FFI (libgtk-3.so) + MethodChannel | false |
+**Windows Win32 API (via FFI):**
+- `user32.dll` — Display enumeration (EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow)
+  - Key file: `lib/kernel/bridge/win32/win32_display_enumerator.dart`
+- `dwmapi.dll` — Desktop Window Manager (DWMWA_WINDOW_CORNER_PREFERENCE)
+  - Used via `window_manager` package
+- Window management: `window_manager` package wraps Win32 window APIs
+  - Key file: `lib/kernel/bridge/window_service.dart`
 
-Pattern: `enter()` returns immutable `FullscreenSnapshot` for rollback; `exit()` restores from snapshot.
+**Fullscreen Control:**
+- `fullscreen_window` local package — Platform-specific fullscreen toggle
+  - Windows: `FullscreenWindowPluginCApi`
+  - Linux: `FullscreenWindowPlugin`
+  - macOS: `FullscreenWindowPlugin`
+  - Key file: `packages/fullscreen_window/`
 
-## Window Management
+**Global Hotkeys:**
+- `hotkey_manager` package — System-wide media key registration
+  - Scope: `HotKeyScope.system` (works when window is not focused)
+  - Keys: MediaPlayPause, MediaTrackNext, MediaTrackPrevious
+  - Key file: `lib/kernel/services/global_hotkey_service.dart`
 
-Interface: `WindowBridge` (`lib/kernel/bridge/window_bridge.dart`) — 4 state notifiers + 7 commands.
+**File Picker:**
+- `file_picker` package — Native file open dialog
+  - Key file: `lib/features/player/services/file_operations.dart`
 
-Impl: `WindowService` (`lib/kernel/bridge/window_service.dart`) — wraps `window_manager` singleton, listens to OS events (maximize/unmaximize/resize/close), debounce persistence via `WindowPersistence`.
+**Drag and Drop:**
+- `desktop_drop` package — Cross-platform file drag-and-drop
+  - Key file: `lib/ui/player/drop_handler.dart`
 
-## Media Engine (fvp/MDK)
+## Thumbnail Providers
 
-Package: `fvp` ^0.37.2, API: `package:fvp/mdk.dart`
+**Platform-Aware Thumbnail Service:**
+- Facade pattern: `ThumbnailService` selects platform implementation
+  - Windows: `NoopThumbnailProvider` (placeholder)
+  - Linux: `LinuxThumbnailProvider` (xdg_directories)
+  - macOS: `MacosThumbnailProvider`
+  - Key files: `lib/kernel/services/thumbnail_service.dart`, `lib/kernel/services/thumbnail_provider.dart`
 
-- `FvpEngine` (`kernel/engine/fvp_engine.dart`) implements `PlayerEngine` interface
-- `EnginePrewarm` — startup pre-init (FFmpeg codec + D3D11 context)
-- Texture rendering: `mdk.Player.textureId` -> Flutter `Texture` widget
-- Hardware decoding: D3D11 -> NVDEC -> FFmpeg software fallback
-- Key MDK properties: `d3d11.sync.cpu`, `video.decoders`, `video.avfilter`, `subtitle.external`
+## Monitoring & Observability
 
-## File System
+**Error Tracking:**
+- None (no Sentry, Crashlytics, or external error reporting)
+- Errors logged via `logger` package with PrettyPrinter
+- Error bus: `lib/features/player/services/player_error_bus.dart`
 
-| Integration | Mechanism | Purpose |
-|-------------|-----------|---------|
-| SharedPreferences | Platform KV store | 25+ settings keys (window geometry, video prefs, locale, theme, shortcuts) |
-| PlaylistStore | JSON + 300ms debounce + atomic write (.tmp + rename) | Playlist/history persistence with retry |
-| FolderScanner | Directory scan, 14 video extensions | Non-recursive media discovery |
-| ThumbnailService | LRU memory cache (200 entries) | Thumbnail caching with platform providers |
+**Logging:**
+- Framework: `logger` 2.7.0 with PrettyPrinter
+- Module-scoped loggers: `log`, `logEngine`, `logBridge`
+- Release mode: File output to `%APPDATA%/SimplePlayer/logs/` with 2 MB rotation
+- Key file: `lib/kernel/utils/log.dart`
 
-## Localization
+**Performance Monitoring:**
+- `DebugProbe` — Lightweight operation timing (debug-only, tree-shaken in release)
+  - Key file: `lib/kernel/utils/debug_probe.dart`
+- `MemoryMonitor` — RSS memory sampling every 30 seconds (debug-only)
+  - Key file: `lib/kernel/utils/memory_monitor.dart`
+- `DebugExporter` — One-click diagnostics export
+  - Key file: `lib/kernel/utils/debug_exporter.dart`
 
-- ARB files: `lib/l10n/app_en.arb`, `lib/l10n/app_zh.arb`
-- Generated: `AppLocalizations` (Flutter gen_l10n)
-- Runtime: `LocaleService` with `ValueNotifier<Locale>`, persisted via SettingsStore
+## CI/CD & Deployment
 
-## Logging & Monitoring
+**Hosting:**
+- Desktop application — No server deployment
+- Distribution: MSIX package for Windows (`distribute_options.yaml`)
 
-- `logger` ^2.5.0 with module-scoped loggers (log, logEngine, logBridge, logServices, logUi)
-- Release: file rotation (`%APPDATA%\SimplePlayer\logs\`, 2MB, 5 archives), Warning+ only
-- `MemoryMonitor` — RSS tracking every 30s in debug, 50MB growth warning
-- `PerfMonitor` — frame-level profiling via `Timeline.startSync`/`finishSync`
+**CI Pipeline:**
+- Not detected (no `.github/workflows/`, `.gitlab-ci.yml`, or similar)
+- Manual build: `flutter build windows --release`
 
-## No External APIs
+**Patching:**
+- `scripts/apply_queryfence_patch.dart` — Auto-applies fvp performance patch
+- Patch file: `patches/fvp_query_fence.patch.md`
 
-Local desktop application. No cloud services, no auth, no external API calls. Network only for optional media streaming via MDK (http/https/rtmp/rtsp/srt/udp/tcp).
+## Environment Configuration
+
+**No external API keys required:**
+- This is a local desktop media player
+- No cloud services, analytics, or external APIs
+- All configuration via SharedPreferences (local key-value store)
+
+**Compile-time defines:**
+- `USE_MOCK_ENGINE=true` — Enables MockEngine for testing without fvp/FFmpeg dependencies
+
+## Webhooks & Callbacks
+
+**Incoming:**
+- None — No server endpoints
+
+**Outgoing:**
+- None — No external API calls
+
+## Network Protocols Supported
+
+**Streaming (via FFmpeg):**
+- HTTP/HTTPS — Standard web streaming
+- RTSP — Real-time streaming protocol (low-latency config in `NetworkConfigurator`)
+- RTMP — Real-time messaging protocol
+- SRT — Secure reliable transport
+- UDP/TCP — Raw transport protocols
+
+**Configuration per protocol:**
+- `lib/kernel/engine/network_configurator.dart` — Protocol-specific FFmpeg parameters
+- Buffer ranges, probe sizes, and timeout values optimized per protocol
+
+## External Libraries (Native)
+
+**FFmpeg (via fvp):**
+- Media decoding (video/audio codecs)
+- Network streaming protocols
+- Container format parsing
+- Hardware acceleration: D3D11, NVDEC with FFmpeg fallback
+
+**D3D11 (Direct3D 11):**
+- GPU-accelerated video rendering
+- Texture-based frame delivery to Flutter
+- CPU-GPU sync mode (adaptive based on display refresh rate)
+- Key file: `lib/kernel/engine/d3d11_configurator.dart`
+
+**MDK (via fvp):**
+- Media engine abstraction layer
+- Player lifecycle management
+- Track selection (audio/subtitle)
+- Playback control (play, pause, seek, speed)
+
+## Supported Media Formats
+
+**Video Containers:**
+mp4, mkv, avi, mov, wmv, flv, webm, m4v, ts, rmvb, mpg, mpeg, 3gp, vob
+
+**Audio Formats:**
+mp3, flac, wav, aac, ogg, opus, m4a, wma, ape, alac, aiff
+
+**Streaming Protocols:**
+http, https, rtmp, rtsp, srt, udp, tcp
+
+---
+
+*Integration audit: 2026-07-03*

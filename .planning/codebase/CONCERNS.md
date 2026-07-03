@@ -1,122 +1,202 @@
-<!-- refreshed: 2026-06-25 -->
-
 # Codebase Concerns
 
-## HIGH Severity
+**Analysis Date:** 2026-07-03
 
-### 1. Bang Operator (`!.`) Proliferation (~20 usages)
-Multiple files force-unwrap nullable fields without guards. Each is a potential crash site.
+## Tech Debt
 
-| File | Line(s) | Risk |
-|------|---------|------|
-| `fullscreen_controller.dart` | 166-168 | `_savedSnapshot!` -- crash if exitFullscreen called before save |
-| `media_info_dialog.dart` | 55-65 | `info.video!.width` etc. -- crash if video stream missing |
-| `control_bar.dart` | 163, 190 | `resizing!.value`, `child!` |
-| `glass_container.dart` | 94, 121 | `resizing!.value`, `child!` |
-| `keyboard_handler.dart` | 108 | `focused.context!.widget` |
-| `playlist_panel.dart` | 189 | `widget.resizing!.value` |
-| `aurora_background.dart` | 293 | `blobImages!.length` after null check (redundant pattern) |
-| `edge_glow.dart` | 161 | `_pulseController!.value` |
-| `log.dart` | 230, 232 | `_sink!.writeln/flush` -- crash if init failed |
-| `startup_coordinator.dart` | 52-53 | `_phaseWatches[phase]!` |
+**Windows Thumbnail Provider Missing:**
+- Issue: `ThumbnailService` maps `TargetPlatform.windows` to `NoopThumbnailProvider` (returns null always). No real Windows thumbnail implementation exists.
+- Files: `lib/kernel/services/thumbnail_service.dart:29`, `lib/kernel/services/noop_thumbnail_provider.dart`
+- Impact: Windows users see no video thumbnails in playlist panel — only file icons. This is the primary platform.
+- Fix approach: Implement `WindowsThumbnailProvider` using `IThumbnailCache` COM API or `IShellItemImageFactory` via FFI. Reference: `lib/kernel/bridge/win32/win32_display_enumerator.dart` for Win32 FFI patterns.
 
-**Fix:** Replace with `?.` + null-aware operators or guard with `if (x != null)`.
+**macOS Thumbnail Provider Stub:**
+- Issue: `MacosThumbnailProvider` returns null always with a TODO comment for QLThumbnailGenerator FFI.
+- Files: `lib/kernel/services/macos_thumbnail_provider.dart`
+- Impact: macOS users see no video thumbnails. Low priority since macOS build is not primary target.
+- Fix approach: Use `QLThumbnailGenerator` via Objective-C FFI or `process.run` with `qlmanage -t`.
 
-### 2. Hardcoded Colors Violate Design System
-Many UI files contain `Color(0x...)` instead of `Tokens.*` constants.
+**DisplayConfig Refresh Rate Detection Stub:**
+- Issue: `_detectRefreshRate()` always returns 60Hz. The `PlatformDispatcher.instance.views.first` path exists but cannot actually detect refresh rate — Flutter doesn't expose it.
+- Files: `lib/kernel/bridge/display_config.dart:52-63`
+- Impact: 120Hz+ displays always get `d3d11.sync.cpu='1'` (sync mode), which adds ~1 frame latency. The async mode (value `'0'`) is never selected automatically.
+- Fix approach: Use Win32 FFI `GetDeviceCaps(hdc, VREFRESH)` to detect actual refresh rate. The TODO at line 56 documents this.
 
-- `app.dart:92,95,103,122,185,193,194` -- 7 hardcoded colors in quick menu
-- `aurora_background.dart:31-33,161,210` -- 5 hardcoded colors
-- `thumbnail_tile.dart:297` -- hardcoded overlay color
-- `osd_overlay.dart:135` -- track color
-- Theme accent colors duplicated in 4 places: `theme_service.dart`, `general_tab.dart`, `settings_panel.dart`, `app.dart`
+**Deprecated APIs Still in Codebase:**
+- Issue: `ScreenUtils.clampToPrimaryDisplay` and `PlaylistStore(storagePath:)` constructor are marked `@Deprecated` but still callable.
+- Files: `lib/kernel/utils/screen_utils.dart:53`, `lib/kernel/persistence/playlist_store.dart:48`
+- Impact: Callers may use deprecated paths that lack multi-monitor support.
+- Fix approach: Remove deprecated methods after verifying no callers exist outside tests.
 
-**Impact:** Theme changes require hunting 10+ files. Single source of truth needed in `ThemeService.accents`.
+**Duplicate Extension Lists:**
+- Issue: `PlayerViewModel.allowedExtensions` and `PathValidator.supportedExtensions` maintain separate extension lists that can drift out of sync.
+- Files: `lib/features/player/player_view_model.dart:52-55`, `lib/kernel/services/path_validator.dart:11-36`
+- Impact: FilePicker may show extensions that PathValidator rejects, or vice versa. `PlayerViewModel` list is smaller (17 items vs 25 in PathValidator).
+- Fix approach: `PlayerViewModel` should reference `PathValidator.supportedExtensions` instead of maintaining its own list.
 
-### 3. Large Files Needing Split (>400 lines, non-generated)
+**GlobalHotkeyService Uses debugPrint Instead of Logger:**
+- Issue: `GlobalHotkeyService` uses `debugPrint()` directly instead of the project's `log` / `logBridge` logger instances.
+- Files: `lib/kernel/services/global_hotkey_service.dart:27,68,72,84,90`
+- Impact: Hotkey log output doesn't go through the file logger in release builds, making debugging harder.
+- Fix approach: Replace `debugPrint` with `logBridge.d()` / `logBridge.w()`.
 
-| File | Lines | Suggestion |
-|------|-------|------------|
-| `fvp_engine.dart` | 724 | God object with 15+ ValueNotifiers. Verify existing extractions (FvpCallbackHandler, PositionPoller, TrackManager) are complete |
-| `progress_bar.dart` | 437 | Extract thumbnail tooltip widget |
-| `settings_store.dart` | 436 | Extract validation/sanitation into `settings_validator.dart`; 26+ static methods |
-| `control_bar.dart` | 429 | Extract volume/seek/speed sub-widgets |
-| `settings_panel.dart` | 402 | Complex deferred-apply logic; tabs partially extracted |
+## Known Bugs
 
-### 4. Git History: Fullscreen Instability Pattern
-Repeated reverts and fixes signal fragile fullscreen/window management:
-- `91dcc00` -- Revert WM_SIZING aspect ratio lock
-- `901e10a` -- Revert "remove fullscreen mode"
-- `7ba6ccf`, `2b902df` -- Multiple fullscreen gap/exit fixes
-- `a13e2d7`, `54348b0` -- Frameless border and mode switching fixes
+**Bang Operator on Nullable `_services`:**
+- Symptoms: `_services!` throws if `init()` fails partway or if methods called before initialization completes.
+- Files: `lib/features/player/player_view_model.dart:90,98,103,105,106`
+- Trigger: Race condition — if user triggers file open or play mode toggle before `init()` finishes, or if `init()` throws after partial setup.
+- Workaround: `_error` flag is set on init failure, but UI methods don't check it before accessing `_services!`.
 
-Needs focused integration tests and a state machine for window mode transitions.
+**MemoryMonitor History Unbounded Growth on RemoveAt(0):**
+- Symptoms: O(n) removal from front of `List` on every sample when at capacity.
+- Files: `lib/kernel/utils/memory_monitor.dart:184`
+- Trigger: Monitor runs for extended periods (200+ samples at 30s interval = 100+ minutes).
+- Workaround: `_maxHistory` cap at 200 limits the damage, but the `removeAt(0)` pattern is O(n) per call.
+- Fix approach: Use `Queue` from `dart:collection` or a ring buffer implementation.
 
-### 5. Race Condition in Fullscreen Controller
-`FullscreenController` uses Completer-based mutex that is not reentrant-safe. Rapid F-key presses during transition can corrupt saved window state, leaving the window stuck in partial fullscreen.
+**SubtitleService.detectAndLoad Loads Only First Match Without Priority:**
+- Symptoms: If multiple subtitle files match (e.g., `movie.srt` and `movie.en.srt`), only the first filesystem-ordered match is loaded.
+- Files: `lib/features/player/services/subtitle_service.dart:30-36`
+- Trigger: Directory with multiple subtitle variants for the same media file.
+- Workaround: None — user must manually select preferred subtitle.
 
-**Fix:** Queue pending transitions or add a cooldown period after each transition.
+## Security Considerations
 
-## MEDIUM Severity
+**Path Traversal Protection:**
+- Risk: `PathValidator.isPathTraversal` detects `../`, `..\\`, null bytes, UNC paths, and `~` expansion.
+- Files: `lib/kernel/services/path_validator.dart:68-74`
+- Current mitigation: Validation is enforced at `PlaybackNavigator.playIndex` before opening any file.
+- Recommendations: RTSP/RTMP/SRT/UDP/TCP URLs skip validation entirely (`isUrl` returns true). Consider validating URL authority to prevent `file://` scheme injection.
 
-### 6. Silent Catch Blocks
-`linux_platform_fullscreen.dart:53,56` -- Two `catch (_)` blocks swallow errors without logging. Platform fullscreen failures leave window in inconsistent state with no diagnostics.
+**URL Scheme Trust:**
+- Risk: `PathValidator.validate` trusts all non-HTTP URLs (RTSP, RTMP, SRT, UDP, TCP) without structure validation.
+- Files: `lib/kernel/services/path_validator.dart:93-101`
+- Current mitigation: HTTP/HTTPS URLs get `Uri.tryParse` + authority check.
+- Recommendations: Validate that RTSP/RTMP/SRT URLs at least have a valid host component.
 
-`folder_scanner.dart:63-65` -- `on Exception { return []; }` silently swallows permission errors and disk failures.
+**Shared Preferences for Sensitive Data:**
+- Risk: Window position, last opened file path, and playback settings stored in plaintext via `shared_preferences`.
+- Files: `lib/kernel/persistence/settings_store.dart`
+- Current mitigation: No credentials or tokens stored. Desktop-only app with user-level access.
+- Recommendations: Acceptable for current scope. If cloud sync is added, encrypt sensitive paths.
 
-**Fix:** At minimum `debugPrint` the error. Consider returning a result type with error info.
+## Performance Bottlenecks
 
-### 7. Static Mutable State in Persistence Layer
-`PlaylistStore` and `SettingsStore` use static fields for caching, making test isolation fragile.
+**Aurora Background Ticker:**
+- Problem: `AuroraBackground` runs a continuous `Ticker` for Lissajous curve animation even when the window is partially visible. The blob pre-rendering optimization helps, but the ticker still runs at vsync rate.
+- Files: `lib/ui/shared/aurora_background.dart`
+- Cause: Ticker pauses only when `engineState` is non-idle OR window loses focus. During idle state with focus, it runs continuously.
+- Improvement path: Add frame budget check — skip frames when no visual change detected (blob positions delta below threshold).
 
-- `playlist_store.dart:28-35` -- `static Timer? _debounce`, `static String? _pendingJson`
-- `settings_store.dart:23` -- `static SharedPreferences? _cachedPrefs`
+**PlaylistStore Isolate Fallback:**
+- Problem: `PlaylistStore.loadInBackground` spawns an Isolate for JSON parsing but falls back to main-thread `load()` on failure.
+- Files: `lib/kernel/persistence/playlist_store.dart:151-175`
+- Cause: Isolate creation can fail on resource-constrained systems or during startup contention.
+- Improvement path: Pre-validate Isolate availability; use `compute()` which has built-in fallback.
 
-Tests must call `reset()` methods. Concurrent test runs may interfere.
+**SettingsStore Static Singleton:**
+- Problem: `SettingsStore._instance` is a mutable static field. Multiple `load()` calls create new instances if `_instance` is null (after `resetPrewarm`).
+- Files: `lib/kernel/persistence/settings_store.dart:36-43,85`
+- Cause: Thread safety concern — `load()` is async, so concurrent calls could race on `_instance`.
+- Improvement path: Use a `Completer`-based initialization pattern or make `load()` always go through a single cached future.
 
-### 8. Windows-Only Log Path
-`log.dart:148-151` -- Uses `%APPDATA%` which is Windows-only. Logging silently fails on macOS/Linux.
+## Fragile Areas
 
-**Fix:** Use `path_provider`'s `getApplicationSupportDirectory()`.
+**WindowService Resize Callback Chain:**
+- Files: `lib/kernel/bridge/window_service.dart:129-213`
+- Why fragile: Three boolean flags (`_disposed`, `_isProgrammaticResize`, `_skipNextResize`) interact with async `Timer` callbacks and OS-level `WindowListener` events. The `_updateOnUIThread` method has a bare `catch (_) { update(); }` fallback that silently swallows binding errors.
+- Safe modification: Never add new boolean flags. Use a state machine enum for resize lifecycle.
+- Test coverage: `test/unit/kernel/bridge/window_service_test.dart` exists but may not cover all OS callback timing edge cases.
 
-### 9. Magic Numbers in Settings Store
-`settings_store.dart` hardcodes window dimension bounds (`1280`, `1024`, `8192`, `4608`) without named constants. Other scattered magic numbers: `playback_navigator.dart:46` (1000ms), `linux_platform_fullscreen.dart:90` (1280x720), `aspect_ratio_mode.dart:7,9` (epsilon values without explanation).
+**FvpEngine late Field Initialization:**
+- Files: `lib/kernel/engine/fvp_engine.dart:53-60`
+- Why fragile: 8 `late` fields (`_callbackHandler`, `_positionPoller`, `_trackManager`, `_mediaOpener`, `_videoEffectController`, `_volumeController`, `_subtitleConfigurator`, `_d3d11Configurator`) are initialized in `_createPlayer()`. Accessing any before `_createPlayer()` throws `LateInitializationError`.
+- Safe modification: All helpers are created together in `_createPlayer()`. Never access them from constructors or before `open()`.
+- Test coverage: `test/kernel/engine/` has individual helper tests but integration test coverage for the full init chain is limited.
 
-### 10. Unsafe Cast + Bang Double Risk
-`app.dart:86` -- `findRenderObject()! as RenderBox` chains force-unwrap with unsafe downcast. If RenderObject is not a RenderBox, throws `TypeError` at runtime with no useful message.
+**PlayerViewModel _services! Pattern:**
+- Files: `lib/features/player/player_view_model.dart:34,90,98,103,105,106`
+- Why fragile: Public methods (`openFile`, `onFilesDropped`, `onTogglePlayMode`) use `_services!` without null check. If called before `init()` completes or after `dispose()`, they crash.
+- Safe modification: Guard all public methods with `if (_services == null) return;` or expose a `bool get isReady`.
+- Test coverage: `PlayerViewModel` has limited direct test coverage.
 
-### 11. FFI Memory Safety (Mostly Good)
-- **Linux fullscreen** -- `calloc`/`free` in try/finally. Correct, but errors are silently discarded (see item 6).
-- **Win32 fullscreen** -- `Pointer<Utf16>` for window class/name lookups. Verify all allocations are freed.
-- **Window HWND lookup** (`win32_platform_fullscreen.dart:127-133`) finds Flutter window by class name `FLUTTER_RUNNER_WIN32_WINDOW`. Fragile if Flutter changes the name or multiple windows are open. Cache HWND on first lookup.
+**ProgressBar AnimationController Lifecycle:**
+- Files: `lib/ui/player/progress_bar.dart:75-87`
+- Why fragile: Two `AnimationController`s (`_expandController`, `_tooltipFadeController`) plus a `Timer? _seekThrottle` must be disposed in correct order. The `_barListenable` is rebuilt in `didUpdateWidget`.
+- Safe modification: Always call `dispose()` on old listenable before building new one. Test `didUpdateWidget` code paths.
 
-### 12. Inconsistent Engine Error Reporting
-`fvp_engine.dart` error handling varies by operation: `open()`/`play()` set user-visible `errorMessage`, but `pause()`/`stop()`/`setVolume()` only log. User has no visibility into non-critical failures.
+## Scaling Limits
 
-### 13. No Crash Recovery
-If the app crashes mid-playback, saved state may be inconsistent (playlist saved but position not, or vice versa). Use single atomic write or write-ahead log.
+**LRU Cache Fixed Size:**
+- Current capacity: 200 entries in `ThumbnailService._cache`
+- Limit: Memory pressure if thumbnails are large (high-res video frames). No memory-based eviction.
+- Scaling path: Track approximate byte size per entry; evict by memory budget instead of count.
 
-## LOW Severity
+**PlaylistStore JSON Serialization:**
+- Current capacity: Entire playlist serialized as single JSON array.
+- Limit: Playlists with 10,000+ entries may cause UI jank during save (main thread JSON encoding).
+- Scaling path: Use Isolate for JSON encoding (matching the decode path which already uses Isolate).
 
-### 14. Stub Platform Implementations
-- `macos_thumbnail_provider.dart` -- TODO for QLThumbnailGenerator FFI
-- `linux_thumbnail_provider.dart` -- Stub alongside `noop_thumbnail_provider.dart`
-- `display_config.dart:49` -- TODO for Win32 FFI refresh rate detection
+## Dependencies at Risk
 
-### 15. Test Coverage Gaps
-No tests found for:
-- **UI layer**: `player_screen`, `playlist_panel`, `glass_container`, `aurora_background`, `settings_panel`, `control_bar`, `progress_bar`
-- **Services**: `locale_service`, `theme_service`, `folder_scanner`
-- **Utils**: `screen_utils`, `memory_monitor`
+**window_manager:**
+- Risk: Core dependency for window control. Package maintenance status should be monitored.
+- Impact: `WindowService`, `WindowPersistence`, all window geometry operations depend on it.
+- Migration plan: The `WindowBridge` abstraction in `lib/kernel/bridge/window_bridge.dart` isolates the dependency — swapping requires only a new `WindowBridge` implementation.
 
-Golden tests exist but widget interaction tests are thin. No integration tests for engine lifecycle (open/play/pause/stop/seek state transitions).
+**fvp:**
+- Risk: Tightly coupled native dependency (MDK/FFmpeg). Version pinned to `^0.37.2`.
+- Impact: Entire playback pipeline depends on fvp. No abstraction layer for swapping engines.
+- Migration plan: `EngineState` mixin provides the interface contract. A new engine implementation would need to satisfy all 30+ methods.
 
-### 16. Log File Rotation
-`log.dart:169` -- `_RotatingFileOutput` with `maxBytes: 2 * 1024 * 1024` (2MB). Verify rotation doesn't lose log entries during rotation boundary.
+**fullscreen_window:**
+- Risk: Local package at `packages/fullscreen_window/`. No external version tracking.
+- Impact: Fullscreen toggle depends on this package.
+- Migration plan: The package is small (single platform channel call). Can be inlined or replaced.
 
-### 17. Aurora Background Ticker During Paused Video
-`aurora_background.dart:66-68` -- Ticker pauses only when state is not `idle`, but doesn't account for `paused` state where video surface is still visible. Unnecessary GPU usage.
+## Missing Critical Features
+
+**Cross-Platform Parity:**
+- Problem: Windows is the only fully functional platform. macOS and Linux have stub thumbnail providers and rely on `window_manager` which may have platform-specific quirks.
+- Blocks: Linux/macOS builds are functional but feature-incomplete.
+
+**HLS/ABR Streaming:**
+- Problem: No adaptive bitrate streaming support. Network URLs use fixed buffer configuration.
+- Blocks: Streaming from HTTP sources with variable quality.
+
+## Test Coverage Gaps
+
+**UI Layer (lib/ui/):**
+- What's not tested: `player_screen.dart` (376 lines), `settings_panel.dart` (402 lines), `playlist_panel.dart` (368 lines), `folder_tab.dart` (306 lines), `thumbnail_tile.dart` (309 lines) — the largest UI files have no dedicated unit/widget tests.
+- Files: `lib/ui/player/player_screen.dart`, `lib/ui/dialogs/settings_panel.dart`, `lib/ui/playlist/playlist_panel.dart`
+- Risk: Regressions in the main player screen layout, settings dialog behavior, and playlist panel go undetected.
+- Priority: High
+
+**PlayerFeature/PlayerViewModel:**
+- What's not tested: `player_feature.dart` (225 lines) and `player_view_model.dart` (122 lines) — the main feature entry points with init, file open, drag-drop, and play mode logic.
+- Files: `lib/features/player/player_feature.dart`, `lib/features/player/player_view_model.dart`
+- Risk: Init failures, file picker integration, and drag-drop regressions undetected.
+- Priority: High
+
+**Settings Dialog Tabs:**
+- What's not tested: Individual settings tabs (`video_tab.dart` 317 lines, `audio_tab.dart`, `general_tab.dart`, `shortcuts_tab.dart` 243 lines) have no unit tests.
+- Files: `lib/ui/dialogs/settings/video_tab.dart`, `lib/ui/dialogs/settings/shortcuts_tab.dart`
+- Risk: Setting persistence regressions, UI state management bugs in deferred apply pattern.
+- Priority: Medium
+
+**Keyboard Handler:**
+- What's not tested: `keyboard_handler.dart` (228 lines) — 20+ keyboard shortcuts with custom binding support.
+- Files: `lib/ui/player/keyboard_handler.dart`
+- Risk: Shortcut conflicts, binding override failures, media key handling regressions.
+- Priority: Medium
+
+**Aurora Background:**
+- What's not tested: `aurora_background.dart` (363 lines) — complex custom painter with Ticker, blob pre-rendering, noise caching.
+- Files: `lib/ui/shared/aurora_background.dart`
+- Risk: Visual regressions, memory leaks from undisposed Ticker/Images, performance degradation.
+- Priority: Low
 
 ---
 
-*Concerns audit: 2026/06/25*
+*Concerns audit: 2026-07-03*
