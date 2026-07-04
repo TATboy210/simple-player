@@ -1,14 +1,23 @@
-/// 平台无关的显示器枚举抽象。
+/// Platform-agnostic display enumeration abstraction.
 ///
-/// 定义 [DisplayInfo] 数据类和 [DisplayEnumerator] 接口，
-/// 使 [ScreenUtils] 不直接依赖 Win32 FFI。
+/// Defines [DisplayInfo] data class and [DisplayEnumerator] interface
+/// so that [ScreenUtils] does not directly depend on Win32 FFI.
 ///
-/// macOS/Linux 移植只需实现此接口。
+/// Platform implementations:
+/// - Windows: [Win32DisplayAdapter] (wraps [Win32DisplayEnumerator])
+/// - macOS/Linux: implement [DisplayEnumerator] with native APIs
+///
+/// Used by [ScreenUtils] for multi-monitor window clamping — ensures
+/// windows stay within visible display bounds when dragged across monitors.
 library;
 
 import 'dart:ui';
 
-/// 单个显示器的几何信息（平台无关）。
+/// Geometry information for a single display (platform-agnostic).
+///
+/// All coordinates are in Flutter logical pixels (not physical pixels).
+/// Platform implementations convert from native coordinates (e.g., Win32
+/// physical pixels) using the device pixel ratio.
 class DisplayInfo {
   const DisplayInfo({
     required this.bounds,
@@ -16,13 +25,14 @@ class DisplayInfo {
     required this.isPrimary,
   });
 
-  /// 完整显示器范围（含任务栏区域）。
+  /// Full display area including taskbar (logical pixels).
   final Rect bounds;
 
-  /// 工作区域（排除任务栏）。
+  /// Usable area excluding taskbar (logical pixels).
+  // bounds 含任务栏，workArea 排除任务栏 — 窗口钳制用 workArea 避免被任务栏遮挡
   final Rect workArea;
 
-  /// 是否为主显示器。
+  /// Whether this is the primary (main) display.
   final bool isPrimary;
 
   @override
@@ -41,16 +51,27 @@ class DisplayInfo {
       'DisplayInfo(bounds=$bounds, work=$workArea, primary=$isPrimary)';
 }
 
-/// 显示器枚举器抽象接口。
+/// Display enumerator abstract interface.
 ///
-/// 获取连接的显示器几何信息，用于多显示器窗口钳制。
+/// Provides platform-agnostic access to connected displays for multi-monitor
+/// window clamping. Implementations must convert native coordinates to
+/// Flutter logical pixels.
 abstract class DisplayEnumerator {
-  /// 获取所有连接的显示器及其几何信息。
+  /// Enumerates all connected displays with their geometry.
+  ///
+  /// Used by [ScreenUtils] to determine clamp bounds when a window
+  /// is dragged across monitors or snapped to screen edges.
   List<DisplayInfo> enumerateDisplays();
 
-  /// 获取包含指定窗口句柄的显示器信息。
+  /// Returns the display containing the given window handle.
+  ///
+  /// Used to determine "which monitor am I on" for positioning
+  /// relative to the current display (e.g., centering, clamping).
   DisplayInfo? getDisplayForWindow(int hwnd);
 
-  /// 获取当前 Flutter 窗口所在显示器的信息。
+  /// Convenience: returns the display for the current Flutter window.
+  ///
+  /// Equivalent to `getDisplayForWindow(flutterHwnd)` — used when
+  /// the caller doesn't need to specify a custom window handle.
   DisplayInfo? getCurrentDisplay();
 }

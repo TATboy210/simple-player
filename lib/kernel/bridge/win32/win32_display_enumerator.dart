@@ -1,7 +1,13 @@
-// Win32 显示器枚举 — 获取所有连接的显示器几何信息。
+// Win32 display enumeration via FFI.
 //
-// 使用 EnumDisplayMonitors + GetMonitorInfoW FFI 调用，
-// 返回 Flutter Rect 坐标系下的显示器 bounds 和 workArea。
+// Implements DisplayEnumerator using Win32 EnumDisplayMonitors +
+// GetMonitorInfoW FFI calls. Coordinates are converted from physical
+// pixels to Flutter logical pixels via devicePixelRatio.
+//
+// Architecture:
+// - Win32DisplayEnumerator: static utility class (direct FFI calls)
+// - Win32DisplayAdapter: instance wrapper implementing DisplayEnumerator
+//   interface for dependency injection into ScreenUtils
 import 'dart:ffi';
 import 'dart:ui';
 
@@ -59,7 +65,9 @@ typedef _FindWindowDart = int Function(
 
 // ─── Win32 常量 ───
 
+// MONITORINFOF_PRIMARY — dwFlags 标志位，标识主显示器
 const int _monitorinfoPrimary = 1;
+// MONITOR_DEFAULTTONEAREST — 窗口不在任何显示器上时，返回最近的显示器（多显示器拖拽窗口到边缘场景）
 const int _monitorDefaultToNearest = 2;
 
 // ─── DLL 函数查找 ───
@@ -83,7 +91,8 @@ final _FindWindowDart _findWindow = _user32
 
 // ─── 回调辅助 ───
 
-/// 临时存储枚举到的显示器句柄（仅在 enumerateDisplays 调用期间有效）。
+/// Temporary storage for enumerated monitor handles.
+// EnumDisplayMonitors 回调无法返回值，通过全局列表收集句柄，调用后立即清空
 final List<int> _collectedMonitors = [];
 
 /// EnumDisplayMonitors 回调 — 收集显示器句柄。
@@ -113,7 +122,8 @@ class Win32DisplayEnumerator {
       final dpr = _getDevicePixelRatio();
       _collectedMonitors.clear();
 
-      // 创建回调 — 使用 NativeCallable.isolateLocal 包装静态函数
+      // isolate-local 回调 — 不跨 isolate 传递，性能最优。
+      // EnumDisplayMonitors 回调在同一调用栈执行，无需跨 isolate 通信。
       final callback = NativeCallable<_MonitorEnumProcNative>.isolateLocal(
         _monitorEnumCallback,
         exceptionalReturn: 0,
@@ -172,6 +182,7 @@ class Win32DisplayEnumerator {
   static Win32DisplayInfo? _queryMonitorInfo(int hMonitor, double dpr) {
     final mi = calloc<_MONITORINFO>();
     try {
+      // 必须设置 cbSize — GetMonitorInfoW 用此字段判断结构体版本，不设置会返回 0（失败）
       mi.ref.cbSize = sizeOf<_MONITORINFO>();
       final result = _getMonitorInfoW(hMonitor, mi);
       if (result == 0) return null;
@@ -191,6 +202,7 @@ class Win32DisplayEnumerator {
   }
 
   /// 将 Win32 RECT 转换为 Flutter 逻辑像素 Rect。
+  // Win32 返回物理像素，Flutter 使用逻辑像素 — 除以 devicePixelRatio 转换坐标系
   static Rect _rectToFlutter(_RECT rect, double dpr) {
     return Rect.fromLTRB(
       rect.left / dpr,
@@ -210,6 +222,7 @@ class Win32DisplayEnumerator {
   }
 
   /// 查找 Flutter 窗口 HWND。
+  // Flutter 窗口类名固定为 FLUTTER_RUNNER_WIN32_WINDOW — 由 Flutter engine 注册
   static int _getFlutterHwnd() {
     final className = 'FLUTTER_RUNNER_WIN32_WINDOW'.toNativeUtf16();
     try {
@@ -220,7 +233,15 @@ class Win32DisplayEnumerator {
   }
 }
 
-/// Win32 适配器 — 将静态 [Win32DisplayEnumerator] 包装为 [DisplayEnumerator] 实例。
+/// Adapter wrapping static [Win32DisplayEnumerator] as [DisplayEnumerator] instance.
+///
+/// Use this for dependency injection into [ScreenUtils]. The adapter pattern
+/// enables testability (mock [DisplayEnumerator] in tests) while keeping
+/// the static FFI implementation isolated.
+///
+/// When to use which:
+/// - [Win32DisplayEnumerator]: direct static calls (internal/low-level)
+/// - [Win32DisplayAdapter]: DI into [ScreenUtils] (external/high-level)
 class Win32DisplayAdapter implements DisplayEnumerator {
   @override
   List<DisplayInfo> enumerateDisplays() =>
