@@ -23,10 +23,13 @@ class VideoEffectController {
       VideoEffectType.hue => mdk.VideoEffect.hue,
       VideoEffectType.saturation => mdk.VideoEffect.saturation,
     };
+    // MDK 要求效果值为单元素数组（mpv 历史 API 设计）
     _player.setVideoEffect(mdkEffect, [clamped]);
   }
 
   /// Valid rotation degrees accepted by mdk.
+  /// MDK only supports 0/90/180/270 — these correspond to hardware rotation
+  /// steps (no arbitrary angle support).
   static const validRotationDegrees = {0, 90, 180, 270};
 
   /// Returns true if [degree] is a valid mdk rotation value.
@@ -48,6 +51,10 @@ class VideoEffectController {
   }
 
   /// Enables/disables yadif deinterlace filter (software decode only).
+  ///
+  /// `yadif` = Yet Another DeInterlacing Filter (FFmpeg).
+  /// - `mode=send_frame`: outputs one frame per input (vs `send_field` for half)
+  /// - `deint=all`: deinterlaces both fields (vs `interlaced` for interlaced-only)
   void setDeinterlace(bool enable) {
     _player.setProperty(
       'video.avfilter',

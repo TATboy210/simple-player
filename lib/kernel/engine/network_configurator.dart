@@ -10,10 +10,14 @@ import 'package:fvp/mdk.dart' as mdk;
 class NetworkConfigurator {
   // ─── 常量 ───
 
+  // 10秒超时 — 网络波动容忍阈值，太短会误断，太长用户等太久
   static const _networkTimeoutMs = 10000;
-  static const _networkProbeSize = 1000000; // 1MB
-  static const _networkAnalyzeDurationUs = 5000000; // 5s
-  static const _rtspProbeSize = 500000; // 500KB — RTSP 快速探测
+  // 1MB 探测 — 足够识别大多数容器格式和码率，减少首帧延迟
+  static const _networkProbeSize = 1000000;
+  // 5秒分析 — 平衡流识别准确性和启动速度
+  static const _networkAnalyzeDurationUs = 5000000;
+  // 500KB RTSP 快速探测 — 实时流需要更小探测以降低延迟
+  static const _rtspProbeSize = 500000;
 
   const NetworkConfigurator._();
 
@@ -49,28 +53,31 @@ class NetworkConfigurator {
   /// RTSP 低延迟配置
   static void _configureRtsp(mdk.Player player) {
     player.setProperty('avformat.probesize', _rtspProbeSize.toString());
+    // 禁用 FFmpeg 内部缓冲，降低延迟
     player.setProperty('avformat.fflags', '+nobuffer');
+    // 跳过 FPS 探测（使用容器元数据），节省 1-2s 启动时间
     player.setProperty('avformat.fpsprobesize', '0');
+    // 绕过 FFmpeg IO 层缓冲
     player.setProperty('avformat.avioflags', 'direct');
-    // RTSP 实时流：min=0, max=MAX, drop=true (低延迟丢帧)
+    // min=0/max=0: 不预缓冲; drop=true: 压力下允许丢帧保实时性
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
-  /// RTMP 低延迟配置
+  /// RTMP 低延迟配置（同 RTSP，无 avioflags）
   static void _configureRtmp(mdk.Player player) {
     player.setProperty('avformat.fflags', '+nobuffer');
     player.setProperty('avformat.fpsprobesize', '0');
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
-  /// SRT 低延迟配置
+  /// SRT 低延迟配置（同 RTMP）
   static void _configureSrt(mdk.Player player) {
     player.setProperty('avformat.fflags', '+nobuffer');
     player.setProperty('avformat.fpsprobesize', '0');
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
-  /// UDP/TCP 实时流低延迟
+  /// UDP/TCP 实时流低延迟（同 SRT）
   static void _configureUdpTcp(mdk.Player player) {
     player.setProperty('avformat.fflags', '+nobuffer');
     player.setProperty('avformat.fpsprobesize', '0');
