@@ -10,8 +10,13 @@ class VideoFile {
     required this.folderPath,
   });
 
+  /// Absolute path to the video file.
   final String path;
+
+  /// File name with extension (e.g. "movie.mp4").
   final String name;
+
+  /// Parent directory path.
   final String folderPath;
 
   @override
@@ -22,6 +27,7 @@ class VideoFile {
 class FolderScanner {
   FolderScanner._();
 
+  // 14 种常见视频格式，覆盖主流容器和编码
   static const _extensions = {
     '.mp4',
     '.mkv',
