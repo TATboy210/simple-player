@@ -24,9 +24,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openFileTooltip => '打开文件 (O)';
 
   @override
-  String get dragHintIdle => '拖拽视频至窗口上松开即可播放视频';
-
-  @override
   String get dragHint => '拖拽视频至窗口松开即可播放';
 
   @override

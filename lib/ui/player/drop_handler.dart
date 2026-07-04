@@ -87,14 +87,6 @@ class _DropHandlerState extends State<DropHandler> {
                           fontWeight: Tokens.weightMedium,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        AppLocalizations.of(context).dragHintIdle,
-                        style: const TextStyle(
-                          color: Tokens.textSecondary,
-                          fontSize: Tokens.fontCaption,
-                        ),
-                      ),
                     ],
                   ),
                 ),

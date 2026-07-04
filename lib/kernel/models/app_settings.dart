@@ -52,6 +52,7 @@ class AppSettings {
     this.videoRotation = 0,
     this.videoAspectRatioIndex = 0,
     this.videoDeinterlace = false,
+    this.playbackSpeed = 1.0,
     this.d3d11Sync = true,
     this.hardwareDecoding = true,
   });
@@ -78,6 +79,7 @@ class AppSettings {
     int? videoRotation,
     int? videoAspectRatioIndex,
     bool? videoDeinterlace,
+    double? playbackSpeed,
     bool? d3d11Sync,
     bool? hardwareDecoding,
   }) {
@@ -105,6 +107,7 @@ class AppSettings {
       videoAspectRatioIndex:
           videoAspectRatioIndex ?? this.videoAspectRatioIndex,
       videoDeinterlace: videoDeinterlace ?? this.videoDeinterlace,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       d3d11Sync: d3d11Sync ?? this.d3d11Sync,
       hardwareDecoding: hardwareDecoding ?? this.hardwareDecoding,
     );
@@ -135,6 +138,7 @@ class AppSettings {
           videoRotation == other.videoRotation &&
           videoAspectRatioIndex == other.videoAspectRatioIndex &&
           videoDeinterlace == other.videoDeinterlace &&
+          playbackSpeed == other.playbackSpeed &&
           d3d11Sync == other.d3d11Sync &&
           hardwareDecoding == other.hardwareDecoding;
 
@@ -161,6 +165,7 @@ class AppSettings {
     videoRotation,
     videoAspectRatioIndex,
     videoDeinterlace,
+    playbackSpeed,
     d3d11Sync,
     hardwareDecoding,
   ]);

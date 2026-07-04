@@ -78,6 +78,7 @@ class SettingsStore {
   static const _keyVideoDeinterlace = 'videoDeinterlace';
   static const _keyD3d11Sync = 'd3d11Sync';
   static const _keyHardwareDecoding = 'hardwareDecoding';
+  static const _keyPlaybackSpeed = 'playbackSpeed';
   static const _keyLocale = 'locale';
   static const _keyThemeIndex = 'themeIndex';
   static const _keyShortcuts = 'shortcuts';
@@ -349,6 +350,28 @@ class SettingsStore {
     'saveHardwareDecoding',
     (p) => p.setBool(_keyHardwareDecoding, value),
   );
+
+  // ─── 播放速度持久化 ───
+
+  static Future<void> savePlaybackSpeed(double value) => _save(
+    'savePlaybackSpeed',
+    (p) => p.setDouble(_keyPlaybackSpeed, SettingsValidator.playbackSpeed(value)),
+  );
+
+  static Future<double> loadPlaybackSpeed() async =>
+      (_instance ?? SettingsStore._(null))._loadPlaybackSpeedImpl();
+
+  Future<double> _loadPlaybackSpeedImpl() async {
+    try {
+      final prefs = await _getPrefs();
+      return SettingsValidator.playbackSpeed(
+        prefs.getDouble(_keyPlaybackSpeed) ?? SettingsValidator.playbackSpeedDefault,
+      );
+    } on Exception catch (e) {
+      log.e('SettingsStore.loadPlaybackSpeed failed: $e');
+      return SettingsValidator.playbackSpeedDefault;
+    }
+  }
 
   /// 加载 D3D11 同步设置，默认 true（同步模式）
   static Future<bool> loadD3d11SyncEnabled() async => (_instance ?? SettingsStore._(null))._loadD3d11SyncEnabledImpl();

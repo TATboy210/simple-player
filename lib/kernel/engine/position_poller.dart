@@ -90,6 +90,25 @@ class PositionPoller {
     _scheduleSilentTransition();
   }
 
+  /// 设置拖拽模式 — 拖拽进度条时降到 16ms（60fps 跟手）
+  ///
+  /// 拖拽结束后恢复稳态间隔（250ms）。
+  static const _dragPollMs = 16;
+
+  void setDragMode(bool isDragging) {
+    _updateInterval(isDragging ? _dragPollMs : _normalPollMs);
+  }
+
+  /// 根据播放速率调整轮询间隔
+  ///
+  /// 倍速播放时按比例缩短间隔（2x → 间隔减半），
+  /// 确保高速播放时进度条更新仍然平滑。
+  void setPlaybackRate(double rate) {
+    // 基础间隔 250ms，倍速时按比例缩短，最低 50ms
+    final adjusted = (_normalPollMs / rate).round().clamp(50, _silentPollMs);
+    _updateInterval(adjusted);
+  }
+
   /// 停止轮询
   void stop() {
     _timer?.cancel();

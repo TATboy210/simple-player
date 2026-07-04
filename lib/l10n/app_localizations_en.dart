@@ -24,9 +24,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openFileTooltip => 'Open File (O)';
 
   @override
-  String get dragHintIdle => 'Drag and drop a video onto the window to play';
-
-  @override
   String get dragHint => 'Drop video here to play';
 
   @override

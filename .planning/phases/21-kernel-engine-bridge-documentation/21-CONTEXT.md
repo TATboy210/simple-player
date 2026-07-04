@@ -84,7 +84,7 @@ Engine 层（12 文件）和 Bridge 层（4 文件）的代码注释补全。目
 - `lib/kernel/bridge/display_config.dart` — DOC-13
 - `lib/kernel/bridge/window_persistence.dart` — DOC-14
 - `lib/kernel/bridge/display_enumerator.dart` — DOC-15
-- `lib/kernel/bridge/win32_display_enumerator.dart` — DOC-16
+- `lib/kernel/bridge/win32/win32_display_enumerator.dart` — DOC-16
 
 </canonical_refs>
 

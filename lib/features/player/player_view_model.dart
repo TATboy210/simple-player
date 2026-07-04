@@ -51,7 +51,9 @@ class PlayerViewModel extends ChangeNotifier {
   /// 允许的文件扩展名
   static const allowedExtensions = [
     'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm',
-    'mp3', 'flac', 'wav', 'aac', 'ogg', 'wma', 'm4a',
+    'm4v', 'ts', 'rmvb', 'mpg', 'mpeg', '3gp', 'ogv', 'vob',
+    'mp3', 'flac', 'wav', 'aac', 'ogg', 'opus', 'm4a',
+    'wma', 'ape', 'alac', 'aiff',
   ];
 
   /// 初始化服务

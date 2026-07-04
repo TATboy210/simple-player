@@ -11,8 +11,6 @@
   "@openFile": { "description": "Button label to open a file" },
   "openFileTooltip": "Open File (O)",
   "@openFileTooltip": { "description": "Tooltip for open file button showing keyboard shortcut" },
-  "dragHintIdle": "Drag and drop a video onto the window to play",
-  "@dragHintIdle": { "description": "Idle hint shown after 5 seconds on empty state" },
   "dragHint": "Drop video here to play",
   "@dragHint": { "description": "Hint shown while dragging a file over the window" },
 

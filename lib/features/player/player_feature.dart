@@ -102,20 +102,10 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: [
-        'mp4',
-        'mkv',
-        'avi',
-        'mov',
-        'wmv',
-        'flv',
-        'webm',
-        'mp3',
-        'flac',
-        'wav',
-        'aac',
-        'ogg',
-        'wma',
-        'm4a',
+        'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm',
+        'm4v', 'ts', 'rmvb', 'mpg', 'mpeg', '3gp', 'ogv', 'vob',
+        'mp3', 'flac', 'wav', 'aac', 'ogg', 'opus', 'm4a',
+        'wma', 'ape', 'alac', 'aiff',
       ],
     );
     if (result != null && result.files.isNotEmpty) {

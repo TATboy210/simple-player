@@ -118,6 +118,19 @@ lib/
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Chinese comments are OK (existing codebase convention)
 
+## Comment Policy (MANDATORY — write comments WHILE coding)
+
+**编写新功能的同时必须为重要代码添加注释，不要事后补。**
+
+触发条件（遇到以下任一情况时必须写注释）：
+- 新增/修改的公开类、mixin、非平凡函数 → `///` doc comment
+- 非显而易见的逻辑（魔法数字、算法步骤、副作用）→ 行内注释解释 *why*
+- 状态变更、I/O 操作、外部调用等副作用 → 标注 side effect
+- 3 步以上的顺序变换 → 逐步注释
+- TODO/FIXME → 附带简要说明
+
+节奏：写一段功能代码 → 立即补该段注释 → 再写下一段。不要攒到最后一起写。
+
 ## Dart/Flutter Rules (from GitHub best practices)
 
 > Synthesized from GitHubGenUI, flex_color_scheme, webf CLAUDE.md files.
