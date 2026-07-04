@@ -2,13 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'media_error_type.dart';
-import 'media_state.dart';
-import 'models/audio_track_info.dart';
-import 'models/media_info.dart';
-import 'models/subtitle_track_info.dart';
 import '../../kernel/engine/engine_state.dart';
-import 'video_effect_type.dart';
 
 import '../utils/log.dart';
 import '../utils/path_utils.dart';
@@ -73,12 +67,14 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
 
   // ─── 非 mixin 状态 ───
 
+  @override
   MediaErrorType errorType = MediaErrorType.unknown;
 
   // ─── 内部状态 ───
 
   MediaInfo _mediaInfo = const MediaInfo();
 
+  @override
   MediaInfo get mediaInfo => _mediaInfo;
 
   String _currentPath = '';
@@ -124,6 +120,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
 
   // ─── 播放控制 ───
 
+  @override
   Future<void> open(String path) async {
     if (_disposed) return;
     _currentPath = path;
@@ -159,6 +156,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     }
   }
 
+  @override
   void play() {
     if (_disposed) return;
     _recordState(MediaState.playing);
@@ -168,6 +166,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     _recordEvent('play');
   }
 
+  @override
   void pause() {
     if (_disposed) return;
     _recordState(MediaState.paused);
@@ -177,6 +176,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     _recordEvent('pause');
   }
 
+  @override
   void stop() {
     if (_disposed) return;
     _recordState(MediaState.stopped);
@@ -187,6 +187,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     _recordEvent('stop');
   }
 
+  @override
   Future<void> seekTo(int milliseconds) async {
     if (_disposed) return;
     final clamped = milliseconds.clamp(0, duration.value);
@@ -195,17 +196,20 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     _recordEvent('seek', {'position': clamped});
   }
 
+  @override
   void setVolume(double value) {
     if (_disposed) return;
     volume.value = value.clamp(0.0, 1.0);
     isMuted.value = volume.value == 0;
   }
 
+  @override
   void setMute(bool mute) {
     if (_disposed) return;
     isMuted.value = mute;
   }
 
+  @override
   void togglePlayPause() {
     if (_disposed) return;
     if (state.value == MediaState.playing) {
@@ -215,66 +219,87 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     }
   }
 
+  @override
   void setPlaybackRate(double rate) {
     if (_disposed) return;
     playbackSpeed.value = rate.clamp(0.25, 4.0);
   }
 
+  @override
   void skipForward([int ms = 10000]) {
     seekTo((position.value + ms).clamp(0, duration.value));
   }
 
+  @override
   void skipBack([int ms = 10000]) {
     seekTo((position.value - ms).clamp(0, duration.value));
   }
 
+  @override
   void setRange({required int from, int to = -1}) {
     // Mock: no-op
   }
 
   // ─── 音轨/字幕（Mock 实现） ───
 
+  @override
   List<AudioTrackInfo> getAudioTracks() => [];
 
+  @override
   void switchAudioTrack(int trackIndex) {}
 
+  @override
   List<int> get activeAudioTracks => [];
 
+  @override
   List<SubtitleTrackInfo> getSubtitleTracks() => [];
 
+  @override
   void switchSubtitleTrack(int trackIndex) {}
 
+  @override
   void toggleSubtitle() {}
 
+  @override
   void setExternalSubtitle(String path) {}
 
+  @override
   void setSubtitleDelay(int milliseconds) {}
 
+  @override
   int get subtitleDelay => 0;
 
   // ─── 视频效果（Mock 实现） ───
 
+  @override
   void setEqualizer(String afFilter) {}
 
+  @override
   void setVideoEffect(VideoEffectType effect, double value) {}
 
+  @override
   void rotate(int degree) {}
 
+  @override
   void setAspectRatio(double ratio) {
     if (_disposed) return;
     aspectRatio.value = ratio;
   }
 
+  @override
   void setDeinterlace(bool enable) {}
 
   // ─── D3D11 性能 ───
 
+  @override
   void setD3d11SyncEnabled(bool enabled) {}
 
+  @override
   void setHardwareDecoding(bool enabled) {}
 
   // ─── 生命周期 ───
 
+  @override
   void dispose() {
     _disposed = true;
     _stopPositionTimer();
