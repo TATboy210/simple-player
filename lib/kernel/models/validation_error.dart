@@ -21,7 +21,10 @@ enum ValidationErrorType {
 /// 替代纯字符串校验错误，携带错误类型枚举。
 /// UI 层可据此显示精准提示。
 class ValidationError {
+  /// The category of validation failure.
   final ValidationErrorType type;
+
+  /// Human-readable description of the error for UI display.
   final String message;
 
   const ValidationError(this.type, this.message);
