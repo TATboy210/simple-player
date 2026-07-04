@@ -1,42 +1,25 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-30T13:39:34.076Z",
-  "phase": "05",
-  "phase_name": "layer3-quality",
-  "phase_dir": ".planning/phases/05-layer3-quality",
-  "plan": 1,
-  "task": 6,
-  "total_tasks": 6,
+  "timestamp": "2026-07-04",
+  "phase": "20",
+  "phase_name": "tech-debt-cleanup",
+  "phase_dir": ".planning/phases/20-control-bar-subtraction",
+  "plan": 2,
+  "task": 0,
+  "total_tasks": 0,
   "status": "complete",
-  "completed_tasks": [
-    {"id": 1, "name": "diff逐属性检查", "status": "done", "commit": "c5750c7"},
-    {"id": 2, "name": "catchError→try-catch + stackTrace", "status": "done", "commit": "f844c2f"},
-    {"id": 3, "name": "_rt→_controller 重命名", "status": "done", "commit": "95bf811"},
-    {"id": 4, "name": "硬编码英文→l10n", "status": "done", "commit": "266b6a6"},
-    {"id": 5, "name": "build()拆分子方法", "status": "done", "commit": "19e4d2b"},
-    {"id": 6, "name": "字幕扫描异步化", "status": "done", "commit": "7324c90"}
-  ],
+  "completed_tasks": [],
   "remaining_tasks": [],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "手动验证视频效果滑块独立调节", "context": "diff逐属性修改后需运行时测试", "blocking": false},
-    {"action": "手动验证自动连播正常", "context": "catchError→try-catch修改后需测试", "blocking": false},
-    {"action": "手动验证字幕自动检测", "context": "字幕异步化后需测试", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "保留 isColorAdjustment getter", "rationale": "可能被外部使用", "phase": "05"},
-    {"decision": "_onStateChanged 保持 void 返回", "rationale": "addListener回调签名要求", "phase": "05"},
-    {"decision": "on Exception 不捕获 Error 子类", "rationale": "CLAUDE.md规范", "phase": "05"}
+    {"decision": "Phase 17 SUMMARY.md created retroactively", "rationale": "Code was done but tracking artifact was missing", "phase": "17"},
+    {"decision": "Phase 19 added to ROADMAP", "rationale": "Was completed but never recorded in ROADMAP", "phase": "19"},
+    {"decision": "Phase 20 plan count updated to 2/2", "rationale": "20-02 (subtitle test fix) was missing from ROADMAP", "phase": "20"},
+    {"decision": "STATE.md synced to 100% completion", "rationale": "Was showing 50% but all phases were actually done", "phase": "20"}
   ],
-  "uncommitted_files": [
-    "lib/kernel/engine/engine_state.dart",
-    "lib/kernel/engine/fvp_engine.dart",
-    "lib/kernel/engine/mock_engine.dart",
-    "lib/l10n/app_localizations.dart",
-    "lib/l10n/app_localizations_en.dart",
-    "lib/l10n/app_localizations_zh.dart"
-  ],
-  "next_action": "Phase 5 complete. Run /gsd-verify-work 5 for manual playback testing, or /gsd-progress to see roadmap.",
-  "context_notes": "Phase 5 LAYER 3 代码质量治理执行完毕。6/6任务完成，7个提交，验证通过(5/5 must-haves)。3项需手动播放测试。"
+  "uncommitted_files": [],
+  "next_action": "v1.4 milestone complete. Plan next milestone or run /gsd-new-project for a new project direction.",
+  "context_notes": "v1.4 Technical Debt Cleanup fully complete. All 5 phases (16-20) done, 6 plans total. Planning docs fixed this session — Phase 19 was missing from ROADMAP, Phase 20 plan count was wrong, STATE.md was stale at 50%."
 }
