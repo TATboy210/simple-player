@@ -129,7 +129,7 @@
 
 **Plans**: 1/1 plans complete
 
-- [ ] 20-01-PLAN.md
+- [x] 20-01-PLAN.md
 
 **UI hint**: no
 
@@ -140,4 +140,4 @@
 | 16. Token Foundation & Independent Fixes | 1/1 | Complete    | 2026-07-03 |
 | 17. Adaptive Control Bar | 1/1 | Complete | 2026-07-03 |
 | 18. Visual Tuning & Validation | 1/1 | Complete | 2026-07-03 |
-| 20. Technical Debt Cleanup | 1/1 | In Progress | - |
+| 20. Technical Debt Cleanup | 1/1 | Complete   | 2026-07-04 |
