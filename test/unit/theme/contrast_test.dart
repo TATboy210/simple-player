@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
-/// sRGB 通道值 (0.0-1.0) — 使用 .red/.green/.blue 避免线性空间问题
-double _sR(Color c) => c.red / 255.0;
-double _sG(Color c) => c.green / 255.0;
-double _sB(Color c) => c.blue / 255.0;
+/// sRGB 通道值 (0.0-1.0) — 使用 .r/.g/.b double API
+double _sR(Color c) => c.r;
+double _sG(Color c) => c.g;
+double _sB(Color c) => c.b;
 
 /// 计算 WCAG 相对亮度 (sRGB gamma-encoded 输入)
 double _relativeLuminance(Color c) {
@@ -27,12 +27,12 @@ double _contrastRatio(Color fg, Color bg) {
 
 /// 将前景色 alpha 混合到背景色上 (sRGB 空间)
 Color _compositeOn(Color fg, Color bg) {
-  final a = fg.alpha / 255.0;
+  final a = fg.a;
   return Color.fromARGB(
     255,
-    (fg.red * a + bg.red * (1 - a)).round(),
-    (fg.green * a + bg.green * (1 - a)).round(),
-    (fg.blue * a + bg.blue * (1 - a)).round(),
+    ((fg.r * 255 * a + bg.r * 255 * (1 - a))).round(),
+    ((fg.g * 255 * a + bg.g * 255 * (1 - a))).round(),
+    ((fg.b * 255 * a + bg.b * 255 * (1 - a))).round(),
   );
 }
 
@@ -75,17 +75,17 @@ void main() {
   });
 
   group('Idle token ratio validation', () {
-    double _alphaRatio(Color idle, Color active) => idle.a / active.a;
+    double alphaRatio(Color idle, Color active) => idle.a / active.a;
 
     test('controlBarBgIdle is 40-60% of controlBarBg alpha', () {
-      final ratio = _alphaRatio(Tokens.controlBarBgIdle, Tokens.controlBarBg);
+      final ratio = alphaRatio(Tokens.controlBarBgIdle, Tokens.controlBarBg);
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });
 
     test('controlBarBorderIdle is 40-60% of controlBarBorderWhite alpha', () {
       final ratio =
-          _alphaRatio(Tokens.controlBarBorderIdle, Tokens.controlBarBorderWhite);
+          alphaRatio(Tokens.controlBarBorderIdle, Tokens.controlBarBorderWhite);
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });
@@ -100,14 +100,14 @@ void main() {
 
     test('controlBarTextPrimaryIdle is 40-60% of textPrimary alpha', () {
       final ratio =
-          _alphaRatio(Tokens.controlBarTextPrimaryIdle, Tokens.textPrimary);
+          alphaRatio(Tokens.controlBarTextPrimaryIdle, Tokens.textPrimary);
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });
 
     test('controlBarTextSecondaryIdle is 40-60% of textSecondary alpha', () {
       final ratio =
-          _alphaRatio(Tokens.controlBarTextSecondaryIdle, Tokens.textSecondary);
+          alphaRatio(Tokens.controlBarTextSecondaryIdle, Tokens.textSecondary);
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });
