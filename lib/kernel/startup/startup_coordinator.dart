@@ -79,7 +79,7 @@ class StartupCoordinator {
       if (phase == StartupPhase.ready) continue;
       final duration = _phaseDurations[phase];
       if (duration != null) {
-        final ms = duration.inMicroseconds / 1000;
+        final ms = duration.inMicroseconds / 1000; // μs → ms 转换
         log.i('  ✓ ${phase.name.padRight(16)} ${ms.toStringAsFixed(1)}ms');
       } else if (_phaseTimestamps.containsKey(phase)) {
         log.i('  ○ ${phase.name.padRight(16)} (no duration)');
@@ -89,10 +89,11 @@ class StartupCoordinator {
     }
     final total = _stopwatch.elapsed;
     log.i('  ────────────────────────');
-    log.i('  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms');
+    log.i('  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms'); // μs → ms 转换
     log.i('━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
+  /// Releases all resources. Call during app shutdown.
   void dispose() {
     _state.dispose();
   }

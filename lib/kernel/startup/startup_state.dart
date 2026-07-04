@@ -33,8 +33,10 @@ class StartupState {
     this.message = '',
   });
 
+  /// Default initial state at app startup.
   static const initial = StartupState();
 
+  /// Current startup phase.
   final StartupPhase phase;
 
   /// 0.0 ~ 1.0 的启动进度
@@ -53,6 +55,7 @@ class StartupState {
     message: message ?? this.message,
   );
 
+  /// Whether startup is complete (phase == StartupPhase.ready).
   bool get isReady => phase == StartupPhase.ready;
 
   @override
