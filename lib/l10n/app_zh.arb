@@ -5,7 +5,6 @@
   "emptyStateSubtitle": "沉浸视听体验",
   "openFile": "打开文件",
   "openFileTooltip": "打开文件 (O)",
-  "dragHintIdle": "拖拽视频至窗口上松开即可播放视频",
   "dragHint": "拖拽视频至窗口松开即可播放",
 
   "playModeLoopAll": "顺序播放",

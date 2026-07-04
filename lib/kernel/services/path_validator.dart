@@ -22,6 +22,8 @@ class PathValidator {
     'mpg',
     '3gp',
     'ogv',
+    'vob',
+    'rmvb',
     'mp3',
     'flac',
     'wav',

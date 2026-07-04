@@ -33,6 +33,11 @@ class SettingsValidator {
   static const double videoEffectMin = -1;
   static const double videoEffectMax = 1;
 
+  // ── 播放速度边界 ──
+  static const double playbackSpeedMin = 0.25;
+  static const double playbackSpeedMax = 4.0;
+  static const double playbackSpeedDefault = 1.0;
+
   // ── 主题索引边界 ──
   static const int themeIndexMax = 2;
 
@@ -75,6 +80,10 @@ class SettingsValidator {
 
   /// 主题索引 [0, themeIndexMax]
   static int themeIndex(int v) => v.clamp(0, themeIndexMax);
+
+  /// 播放速度 [playbackSpeedMin, playbackSpeedMax]
+  static double playbackSpeed(double v) =>
+      v.clamp(playbackSpeedMin, playbackSpeedMax);
 
   /// 字幕字体大小 [subtitleFontSizeMin, subtitleFontSizeMax]
   static double subtitleFontSize(double v) =>

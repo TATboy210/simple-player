@@ -78,6 +78,8 @@ void main() {
       engine.configureMedia(durationMs: 60000);
       playlist.add('${tempDir.path}/video.mp4');
       await controller.playIndex(0);
+      // Wait for fire-and-forget detectAndLoad to complete
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('video.srt'));
     });
@@ -88,6 +90,8 @@ void main() {
       engine.configureMedia(durationMs: 60000);
       playlist.add('${tempDir.path}/movie.mp4');
       await controller.playIndex(0);
+      // Wait for fire-and-forget detectAndLoad to complete
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('movie.ass'));
     });
@@ -98,6 +102,8 @@ void main() {
       engine.configureMedia(durationMs: 60000);
       playlist.add('${tempDir.path}/film.mkv');
       await controller.playIndex(0);
+      // Wait for fire-and-forget detectAndLoad to complete
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('film.ssa'));
     });
@@ -108,6 +114,8 @@ void main() {
       engine.configureMedia(durationMs: 60000);
       playlist.add('${tempDir.path}/clip.mp4');
       await controller.playIndex(0);
+      // Wait for fire-and-forget detectAndLoad to complete
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('clip.vtt'));
     });
@@ -118,6 +126,8 @@ void main() {
       engine.configureMedia(durationMs: 60000);
       playlist.add('${tempDir.path}/movie.mp4');
       await controller.playIndex(0);
+      // Wait for fire-and-forget detectAndLoad to complete
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('movie.en.srt'));
     });
@@ -155,6 +165,8 @@ void main() {
       engine.configureMedia(durationMs: 60000);
       playlist.add('${tempDir.path}/video.mp4');
       await controller.playIndex(0);
+      // Wait for fire-and-forget detectAndLoad to complete
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       // Should load exactly one subtitle (first match found)
       expect(engine.setExternalSubtitleCallCount, 1);
     });

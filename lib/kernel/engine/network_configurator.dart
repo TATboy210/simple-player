@@ -88,4 +88,19 @@ class NetworkConfigurator {
   static void _configureHttp(mdk.Player player) {
     player.setProperty('demux.buffer.ranges', '1');
   }
+
+  /// 动态缓冲策略 — 根据网络延迟自适应调整缓冲大小
+  ///
+  /// 高延迟（>500ms）时增大缓冲到 5MB 防止频繁卡顿，
+  /// 低延迟时保持 1MB 节省内存。
+  static void configureAdaptive(
+    mdk.Player player,
+    String url, {
+    int latencyMs = 0,
+  }) {
+    configure(player, url);
+    // 根据延迟动态调整缓冲：高延迟 → 5MB，低延迟 → 1MB
+    final bufferSize = latencyMs > 500 ? 5000000 : 1000000;
+    player.setProperty('buffer', bufferSize.toString());
+  }
 }

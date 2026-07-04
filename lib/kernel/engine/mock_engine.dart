@@ -4,6 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../kernel/engine/engine_state.dart';
 
+import 'engine_constants.dart';
+import 'engine_event_log.dart';
+import 'engine_metrics.dart';
+import 'media_state.dart';
 import '../utils/log.dart';
 import '../utils/path_utils.dart';
 
@@ -222,7 +226,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   @override
   void setPlaybackRate(double rate) {
     if (_disposed) return;
-    playbackSpeed.value = rate.clamp(0.25, 4.0);
+    playbackSpeed.value = rate.clamp(EngineConstants.minPlaybackRate, EngineConstants.maxPlaybackRate);
   }
 
   @override

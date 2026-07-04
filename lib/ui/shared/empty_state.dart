@@ -1,6 +1,4 @@
 import '../../kernel/engine/engine_state.dart';
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -37,9 +35,6 @@ class EmptyState extends StatefulWidget {
 class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
   late final AnimationController _dragAnim;
   late final CurvedAnimation _dragCurve;
-  late final AnimationController _idleAnim;
-  late final CurvedAnimation _idleCurve;
-  Timer? _idleTimer;
 
   @override
   void initState() {
@@ -58,33 +53,9 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
     // AnimatedBuilder 驱动重建，addListener+setState 会导致整个 build() 每帧重建
     // （包括 AuroraBackground），AnimatedBuilder 只重建包裹的子树
 
-    _idleAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-      reverseDuration: const Duration(milliseconds: 200),
-      value: 0,
-    );
-    _idleCurve = CurvedAnimation(
-      parent: _idleAnim,
-      curve: Curves.easeOut,
-      reverseCurve: Curves.easeIn,
-    );
-    // _idleAnim 由 AnimatedBuilder 监听，无需 addListener+setState
-
     if (widget.isDragHovering) {
       _dragAnim.forward();
-    } else {
-      _startIdleTimer();
     }
-  }
-
-  void _startIdleTimer() {
-    _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && !widget.isDragHovering) {
-        _idleAnim.forward();
-      }
-    });
   }
 
   @override
@@ -92,21 +63,15 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
     super.didUpdateWidget(oldWidget);
     if (widget.isDragHovering != oldWidget.isDragHovering) {
       if (widget.isDragHovering) {
-        _idleTimer?.cancel();
-        _idleAnim.reverse();
         _dragAnim.forward();
       } else {
         _dragAnim.reverse();
-        _startIdleTimer();
       }
     }
   }
 
   @override
   void dispose() {
-    _idleTimer?.cancel();
-    _idleCurve.dispose();
-    _idleAnim.dispose();
     _dragCurve.dispose();
     _dragAnim.dispose();
     super.dispose();
@@ -133,7 +98,7 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
         // Layer 1: 居中悬浮内容 — AnimatedBuilder 只重建动画相关子树
         if (widget.onOpenFile != null)
           AnimatedBuilder(
-            animation: Listenable.merge([_dragAnim, _idleAnim]),
+            animation: _dragAnim,
             builder: (context, _) {
               return RepaintBoundary(
                 child: Align(
@@ -165,15 +130,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
                               ),
                             ),
                           ],
-                        ),
-                      ),
-                      IgnorePointer(
-                        child: FadeTransition(
-                          opacity: _idleCurve,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: Tokens.spSm),
-                            child: _buildIdleHint(context),
-                          ),
                         ),
                       ),
                     ],
@@ -215,18 +171,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
           ),
         ),
       ],
-    );
-  }
-
-  /// 闲置提示 — 5 秒后显示的沉浸式纯文字
-  Widget _buildIdleHint(BuildContext context) {
-    return Text(
-      AppLocalizations.of(context).dragHintIdle,
-      style: const TextStyle(
-        color: Tokens.textDisabled,
-        fontSize: Tokens.fontCaption,
-        letterSpacing: 1,
-      ),
     );
   }
 

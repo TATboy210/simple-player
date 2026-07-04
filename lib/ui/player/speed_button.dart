@@ -59,7 +59,7 @@ class SpeedButton extends StatelessWidget {
       child: Listener(
         onPointerSignal: (event) {
           if (event is PointerScrollEvent) {
-            _shift(event.scrollDelta.dy > 0 ? -1 : 1);
+            _shift(event.scrollDelta.dy > 0 ? 1 : -1);
           }
         },
         child: ValueListenableBuilder<double>(

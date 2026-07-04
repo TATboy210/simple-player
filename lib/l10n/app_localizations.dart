@@ -128,12 +128,6 @@ abstract class AppLocalizations {
   /// **'Open File (O)'**
   String get openFileTooltip;
 
-  /// Idle hint shown after 5 seconds on empty state
-  ///
-  /// In en, this message translates to:
-  /// **'Drag and drop a video onto the window to play'**
-  String get dragHintIdle;
-
   /// Hint shown while dragging a file over the window
   ///
   /// In en, this message translates to:

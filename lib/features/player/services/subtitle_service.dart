@@ -32,6 +32,7 @@ class SubtitleService {
         final match = _matchSubtitle(entity.path, baseName);
         if (match != null) {
           _engine.setExternalSubtitle(match);
+          return; // 只加载第一个匹配的字幕（与 detectAndLoadSync 一致）
         }
       }
     } on Exception catch (e) {
