@@ -54,6 +54,7 @@ class PerfMonitor {
       _totalFrames++;
 
       // 记录超过阈值的帧
+      // 16ms — 60fps 下一帧的预算时间（1000/60 ≈ 16.67ms），超过即视为慢帧
       if (totalDuration.inMilliseconds > 16) {
         developer.log(
           'Slow frame: ${totalDuration.inMilliseconds}ms '
@@ -63,7 +64,7 @@ class PerfMonitor {
         );
       }
 
-      // 每 100 帧输出统计
+      // 每 100 帧输出统计，平衡日志频率和信息量
       if (_totalFrames % 100 == 0) {
         _printStats();
       }
@@ -95,6 +96,7 @@ class PerfMonitor {
       }
     }
 
+    // μs → ms 转换因子
     final avgBuild = buildSum / count / 1000;
     final avgRaster = rasterSum / count / 1000;
 
