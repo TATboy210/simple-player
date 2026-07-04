@@ -1,3 +1,4 @@
+// ignore_for_file: overridden_fields — intentional: each engine needs independent ValueNotifier instances
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
