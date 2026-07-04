@@ -5,14 +5,18 @@ import 'package:flutter/scheduler.dart';
 import 'package:fvp/mdk.dart' as mdk;
 import 'media_state.dart';
 
-/// mdk 回调处理器 — 将底层状态变化映射到 Flutter ValueNotifier
+/// Maps mdk player callbacks to Flutter ValueNotifier updates.
 ///
-/// 职责:
-///   - onStateChanged: mdk 播放状态 → MediaState 映射
-///   - onMediaStatus: 缓冲/结束事件处理
-///   - 调度到主线程（SchedulerBinding.addPostFrameCallback）
+/// Three callback sources:
+///   - `onStateChanged`: play/pause/stop state transitions → MediaState mapping
+///   - `onMediaStatus`: buffering start/end, media end events
+///   - Both are dispatched to the main thread via [_scheduleOnMain]
 ///
-/// 纯函数 mapMdkState 可独立测试。
+/// Main-thread scheduling is required because ValueNotifier updates trigger
+/// Flutter widget rebuilds — these MUST happen on the main isolate to avoid
+/// race conditions with the rendering pipeline.
+///
+/// The static [mapMdkState] function is pure and independently testable.
 class FvpCallbackHandler {
   final mdk.Player _player;
   final ValueNotifier<MediaState> state;
@@ -54,6 +58,8 @@ class FvpCallbackHandler {
           }
         } else {
           if (isBuffering.value) isBuffering.value = false;
+          // 缓冲结束时恢复到正确的播放状态 — 检查 _player.state 而非
+          // 无条件设为 playing，因为用户可能在缓冲期间暂停了播放
           if (state.value == MediaState.buffering) {
             state.value = _player.state == mdk.PlaybackState.playing
                 ? MediaState.playing
@@ -78,7 +84,11 @@ class FvpCallbackHandler {
     _statusSubscription?.cancel();
   }
 
-  /// 将回调调度到主线程帧回调
+  /// Schedules [action] on the main thread during the frame callback phase.
+  ///
+  /// Uses SchedulerBinding.addPostFrameCallback to ensure ValueNotifier
+  /// updates happen between frames, preventing mid-frame rebuilds that
+  /// could cause visual glitches or assertion failures.
   void _scheduleOnMain(VoidCallback action) {
     SchedulerBinding.instance.addPostFrameCallback((_) => action());
   }

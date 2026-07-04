@@ -1,20 +1,32 @@
 import 'media_error_type.dart';
 import 'models/media_info.dart';
 
-/// 媒体打开结果 — sealed class 表示成功或失败
+/// Result of opening a media file — sealed for exhaustive pattern matching.
+///
+/// Dart 3 sealed class ensures all cases are handled in switch expressions:
+/// ```dart
+/// switch (result) {
+///   case OpenSuccess(:final mediaInfo) => // use mediaInfo
+///   case OpenError(:final type, :final message) => // show error
+/// }
+/// ```
 sealed class OpenResult {
   const OpenResult();
 }
 
-/// 打开成功 — 携带解析后的 MediaInfo
+/// Opening succeeded — carries parsed media metadata.
 final class OpenSuccess extends OpenResult {
+  /// Parsed media info (codec, resolution, duration, tracks).
   final MediaInfo mediaInfo;
   const OpenSuccess(this.mediaInfo);
 }
 
-/// 打开失败
+/// Opening failed — carries error category and human-readable message.
 final class OpenError extends OpenResult {
+  /// Error category (fileNotFound, unsupportedFormat, etc.) for programmatic handling.
   final MediaErrorType type;
+
+  /// Human-readable error description for UI display.
   final String message;
 
   const OpenError(this.type, this.message);
