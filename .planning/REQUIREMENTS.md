@@ -141,7 +141,7 @@
 
 ### Kernel Models & Utils
 
-- [ ] **DOC-17**: `aspect_ratio_mode.dart` — 宽高比模式枚举含义
+- [x] **DOC-17**: `aspect_ratio_mode.dart` — 宽高比模式枚举含义
 - [ ] **DOC-18**: `validation_error.dart` — 验证错误类型和处理策略
 - [ ] **DOC-19**: `app_settings.dart` — 设置项默认值和约束
 - [ ] **DOC-20**: `player_error.dart` — 错误类型分类和恢复策略
@@ -159,7 +159,7 @@
 - [ ] **DOC-29**: `startup_coordinator.dart` — 启动协调器、依赖顺序
 - [ ] **DOC-30**: `startup_state.dart` — 启动状态机、状态转换
 - [ ] **DOC-31**: `folder_scanner.dart` — 文件夹扫描策略、过滤规则
-- [ ] **DOC-32**: `settings_validator.dart` — 设置验证规则
+- [x] **DOC-32**: `settings_validator.dart` — 设置验证规则
 
 ### UI Dialogs 层
 
@@ -211,6 +211,7 @@
 | DOC-46 ~ DOC-50 | Phase 4: Features & Verification | Pending |
 
 **Coverage:**
+
 - v1 requirements: 50 total
 - Mapped to phases: 50
 - Unmapped: 0 ✓
