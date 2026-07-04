@@ -85,10 +85,12 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       _customBindings = await SettingsStore.loadShortcuts();
     } catch (e, stackTrace) {
       log.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
-      if (mounted) setState(() {
-        _error = true;
-        _errorMessage = '$e';
-      });
+      if (mounted) {
+        setState(() {
+          _error = true;
+          _errorMessage = '$e';
+        });
+      }
       return;
     }
     log.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');

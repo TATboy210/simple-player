@@ -31,7 +31,7 @@ void main() {
 
     test('Dart 3 pattern matching: case TrackControl', () {
       final EngineState engine = FakeEngine();
-      if (engine case TrackControl tc) {
+      if (engine case final TrackControl tc) {
         expect(tc.getAudioTracks(), isEmpty);
       } else {
         fail('engine should match TrackControl');
@@ -41,7 +41,7 @@ void main() {
 
     test('Dart 3 pattern matching: case VideoEffects', () {
       final EngineState engine = FakeEngine();
-      if (engine case VideoEffects ve) {
+      if (engine case final VideoEffects ve) {
         ve.setVideoEffect(VideoEffectType.brightness, 0.5);
       } else {
         fail('engine should match VideoEffects');
@@ -51,7 +51,7 @@ void main() {
 
     test('Dart 3 pattern matching: case RendererConfig', () {
       final EngineState engine = FakeEngine();
-      if (engine case RendererConfig rc) {
+      if (engine case final RendererConfig rc) {
         rc.setD3d11SyncEnabled(true);
         rc.setHardwareDecoding(false);
       } else {
@@ -209,7 +209,7 @@ void main() {
     test('getAudioTracks returns configured tracks', () {
       final engine = FakeEngine();
       engine.configureMedia(
-        audioTracks: [AudioTrackInfo(index: 0, language: 'en')],
+        audioTracks: [const AudioTrackInfo(index: 0, language: 'en')],
       );
       final tracks = engine.getAudioTracks();
       expect(tracks, hasLength(1));
@@ -221,7 +221,7 @@ void main() {
       final engine = FakeEngine();
       engine.configureMedia(
         subtitleTracks: [
-          SubtitleTrackInfo(index: 0, language: 'zh', title: 'Chinese'),
+          const SubtitleTrackInfo(index: 0, language: 'zh', title: 'Chinese'),
         ],
       );
       final tracks = engine.getSubtitleTracks();
