@@ -10,8 +10,8 @@
 - ✅ **v1.1 Testing & Quality** - Phases 5-7 (shipped 2026-05-30)
 - ✅ **v1.2 Security & Kernel** - Phases 8-11 (shipped 2026-05-31)
 - ✅ **v1.2.1 Window Polish** - Phases 12-15 (shipped 2026-06-28)
-- ✅ **v1.3 Glass Morphism Coordination** - Phases 16-18 (shipped 2026-07-03)
-- 🚧 **v1.4 Technical Debt Cleanup** - Phase 20 (in progress)
+- ✅ **v1.3 Glass Morphism Coordination** - Phases 16-19 (shipped 2026-07-03)
+- ✅ **v1.4 Technical Debt Cleanup** - Phase 20 (completed 2026-07-04)
 
 ## Phases
 
@@ -61,6 +61,7 @@
 - [x] **Phase 16: Token Foundation & Independent Fixes** - Idle tokens, glow param, contrast fix (completed 2026-07-03)
 - [x] **Phase 17: Adaptive Control Bar** - AnimatedContainer, idle/playing transition, animation tests (completed 2026-07-03)
 - [x] **Phase 18: Visual Tuning & Validation** - Token alpha fix, blur merge, validation tests (completed 2026-07-03)
+- [x] **Phase 19: Gradient Transition Strip** - 渐变过渡带消除视频与控制栏硬边 (completed 2026-07-03)
 
 ## Phase Details
 
@@ -113,7 +114,27 @@
   3. glassBlur vs glassBlurThick distinction is confirmed or consolidated based on visual evidence
   4. No visual regressions: playing-state control bar appearance unchanged from pre-v1.3 baseline
 
-**Plans**: TBD
+**Plans**: 1/1 plans complete
+
+- [x] 18-01-PLAN.md
+
+**UI hint**: yes
+
+### Phase 19: Gradient Transition Strip
+
+**Goal**: 控制栏上方添加渐变过渡带，消除视频内容与玻璃控制栏之间的硬边
+**Depends on**: Phase 18
+**Requirements**: UI-07
+**Success Criteria** (what must be TRUE):
+
+  1. 控制栏上方有 60px 渐变过渡带（透明→控制栏背景色）
+  2. 渐变带随控制栏 idle/playing 状态切换颜色
+  3. 渐变带与控制栏同步淡入淡出（FadeTransition）
+  4. 不拦截鼠标事件（hitTest passthrough）
+
+**Plans**: 1/1 plans complete
+
+- [x] 19-01-PLAN.md
 
 **UI hint**: yes
 
@@ -129,9 +150,10 @@
   3. 所有 Color API 使用新接口（`.a`/`.r`/`.g`/`.b`/`.toARGB32()`）
   4. 所有 `const` 构造函数已补全
 
-**Plans**: 1/1 plans complete
+**Plans**: 2/2 plans complete
 
 - [x] 20-01-PLAN.md
+- [x] 20-02-PLAN.md
 
 **UI hint**: no
 
@@ -142,4 +164,5 @@
 | 16. Token Foundation & Independent Fixes | 1/1 | Complete    | 2026-07-03 |
 | 17. Adaptive Control Bar | 1/1 | Complete | 2026-07-03 |
 | 18. Visual Tuning & Validation | 1/1 | Complete | 2026-07-03 |
-| 20. Technical Debt Cleanup | 1/1 | Complete   | 2026-07-04 |
+| 19. Gradient Transition Strip | 1/1 | Complete | 2026-07-03 |
+| 20. Technical Debt Cleanup | 2/2 | Complete   | 2026-07-04 |
