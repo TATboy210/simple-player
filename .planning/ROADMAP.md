@@ -95,7 +95,9 @@
   4. Transition between idle/playing states is visually smooth (no flicker or jump)
   5. Existing call sites of GlassContainer and ControlBar require zero modifications
 
-**Plans**: TBD
+**Plans**: 1/1 plans complete
+
+- [x] 17-01-PLAN.md
 
 **UI hint**: yes
 
