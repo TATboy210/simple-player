@@ -143,9 +143,9 @@ void main() {
     ) async {
       const customColor = Color(0x39080A10);
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
-            body: const GlassContainer(
+            body: GlassContainer(
               backgroundColor: customColor,
               child: Text('test'),
             ),
