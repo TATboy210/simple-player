@@ -12,6 +12,7 @@
 - ✅ **v1.2.1 Window Polish** - Phases 12-15 (shipped 2026-06-28)
 - ✅ **v1.3 Glass Morphism Coordination** - Phases 16-19 (shipped 2026-07-03)
 - ✅ **v1.4 Technical Debt Cleanup** - Phase 20 (completed 2026-07-04)
+- 🔲 **v1.5 Code Documentation** - Phases 21-24
 
 ## Phases
 
@@ -157,6 +158,83 @@
 
 **UI hint**: no
 
+## v1.5 Code Documentation
+
+### Phase 21: Kernel Engine & Bridge Documentation
+
+**Goal**: Engine 和 Bridge 层所有文件添加/完善注释
+**Depends on**: Phase 20
+**Requirements**: DOC-01 ~ DOC-16
+**Success Criteria** (what must be TRUE):
+
+  1. Engine 层 12 个文件均有类级 `///` doc comment 和关键方法文档
+  2. Bridge 层 4 个文件均有平台特定逻辑的解释性注释
+  3. 所有魔法数字已添加行内说明注释（D-09: 保留原始值，不提取为命名常量；3+次出现提取为文件级私有常量）
+  4. `flutter analyze` 无新增 warning/error
+
+**Plans**: 2/2 plans complete
+
+- [x] 21-01-PLAN.md — Engine files (DOC-01~DOC-12)
+- [x] 21-02-PLAN.md — Bridge files (DOC-13~DOC-16)
+
+**UI hint**: no
+
+### Phase 22: Kernel Models, Utils & Services Documentation
+
+**Goal**: Models、Utils、Services 层所有文件添加/完善注释
+**Depends on**: Phase 21
+**Requirements**: DOC-17 ~ DOC-32
+**Success Criteria** (what must be TRUE):
+
+  1. Models 层 6 个枚举/数据类均有 `///` doc comment 说明用途和取值含义
+  2. Utils 层 5 个工具文件均有函数级文档和参数说明
+  3. Services 层 7 个文件均有服务职责和依赖关系说明
+  4. `flutter analyze` 无新增 warning/error
+
+**Plans**: 0/2 plans complete
+
+- [ ] 22-01-PLAN.md — Models + Utils (DOC-17~DOC-25)
+- [ ] 22-02-PLAN.md — Services + Others (DOC-26~DOC-32)
+
+**UI hint**: no
+
+### Phase 23: UI Layer Documentation
+
+**Goal**: UI 层所有需要改进的文件添加/完善注释
+**Depends on**: Phase 22
+**Requirements**: DOC-33 ~ DOC-45
+**Success Criteria** (what must be TRUE):
+
+  1. Dialogs 层 5 个设置 tab 均有参数说明和 FFmpeg 语法解释
+  2. Player 层 4 个文件均有交互逻辑说明
+  3. Shared 层 4 个组件均有使用场景和模式说明
+  4. `flutter analyze` 无新增 warning/error
+
+**Plans**: 0/2 plans complete
+
+- [ ] 23-01-PLAN.md — Dialogs (DOC-33~DOC-37)
+- [ ] 23-02-PLAN.md — Player + Shared (DOC-38~DOC-45)
+
+**UI hint**: no
+
+### Phase 24: Features & Verification
+
+**Goal**: Features 层注释补全 + 全量验证
+**Depends on**: Phase 23
+**Requirements**: DOC-46 ~ DOC-50
+**Success Criteria** (what must be TRUE):
+
+  1. Features 层 5 个文件均有模式说明和依赖关系文档
+  2. `flutter analyze` 0 errors, 0 warnings
+  3. `flutter test` 905+ tests passing, 0 failures
+  4. 所有 50 个 DOC requirement 已验证完成
+
+**Plans**: 0/1 plans complete
+
+- [ ] 24-01-PLAN.md — Features + verification (DOC-46~DOC-50)
+
+**UI hint**: no
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -166,3 +244,7 @@
 | 18. Visual Tuning & Validation | 1/1 | Complete | 2026-07-03 |
 | 19. Gradient Transition Strip | 1/1 | Complete | 2026-07-03 |
 | 20. Technical Debt Cleanup | 2/2 | Complete   | 2026-07-04 |
+| 21. Kernel Engine & Bridge Docs | 2/2 | Complete | 2026-07-04 |
+| 22. Kernel Models/Utils/Services Docs | 0/2 | Pending | - |
+| 23. UI Layer Docs | 0/2 | Pending | - |
+| 24. Features & Verification | 0/1 | Pending | - |
