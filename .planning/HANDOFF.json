@@ -1,25 +1,34 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-04",
-  "phase": "20",
-  "phase_name": "tech-debt-cleanup",
-  "phase_dir": ".planning/phases/20-control-bar-subtraction",
-  "plan": 2,
+  "timestamp": "2026-07-05T00:00:00.000Z",
+  "phase": "22",
+  "phase_name": "kernel-models-utils-services-docs",
+  "phase_dir": ".planning/phases/22-kernel-models-utils-services-docs",
+  "plan": 0,
   "task": 0,
   "total_tasks": 0,
-  "status": "complete",
+  "status": "ready",
   "completed_tasks": [],
   "remaining_tasks": [],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 17 SUMMARY.md created retroactively", "rationale": "Code was done but tracking artifact was missing", "phase": "17"},
-    {"decision": "Phase 19 added to ROADMAP", "rationale": "Was completed but never recorded in ROADMAP", "phase": "19"},
-    {"decision": "Phase 20 plan count updated to 2/2", "rationale": "20-02 (subtitle test fix) was missing from ROADMAP", "phase": "20"},
-    {"decision": "STATE.md synced to 100% completion", "rationale": "Was showing 50% but all phases were actually done", "phase": "20"}
+    {"decision": "Phase 22 context discussion completed", "rationale": "16 files audited, 11 decisions captured (D-01~D-11)", "phase": "22"},
+    {"decision": "app_settings.dart every field gets doc comment", "rationale": "User chose most thorough option for 25+ fields", "phase": "22"},
+    {"decision": "Mixed language rules inherited from Phase 21", "rationale": "/// English + // Chinese, consistent with Phase 21", "phase": "22"},
+    {"decision": "Skip boilerplate methods (copyWith, ==, hashCode)", "rationale": "Phase 21 precedent, self-explanatory signatures", "phase": "22"},
+    {"decision": "7 C-class files skipped", "rationale": "Already well-documented, no changes needed", "phase": "22"},
+    {"decision": "4 file path corrections noted", "rationale": "REQUIREMENTS.md paths don't match actual locations", "phase": "22"},
+    {"decision": "playbackSpeed anomaly documented but not fixed", "rationale": "Documentation-only phase, bug is in operator ==/hashCode contract", "phase": "22"}
   ],
-  "uncommitted_files": [],
-  "next_action": "v1.4 milestone complete. Plan next milestone or run /gsd-new-project for a new project direction.",
-  "context_notes": "v1.4 Technical Debt Cleanup fully complete. All 5 phases (16-20) done, 6 plans total. Planning docs fixed this session — Phase 19 was missing from ROADMAP, Phase 20 plan count was wrong, STATE.md was stale at 50%."
+  "uncommitted_files": [
+    ".planning/STATE.md",
+    ".planning/phases/22-kernel-models-utils-services-docs/22-CONTEXT.md",
+    ".planning/phases/22-kernel-models-utils-services-docs/22-DISCUSSION-LOG.md",
+    ".planning/phases/22-kernel-models-utils-services-docs/22-01-PLAN.md",
+    ".planning/phases/22-kernel-models-utils-services-docs/22-02-PLAN.md"
+  ],
+  "next_action": "Execute Phase 22: run /gsd-execute-phase 22 to start documentation work",
+  "context_notes": "Phase 22 fully planned. 22-01 covers Models+Utils (5 files, 3 tasks), 22-02 covers Services+Others (4 files, 2 tasks). 9 files total to modify, 7 C-class files skipped. Context was at 76% when pausing."
 }
