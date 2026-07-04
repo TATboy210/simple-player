@@ -6,6 +6,10 @@ import 'player_proxy.dart';
 ///
 /// Controls hardware decoding and CPU-GPU sync settings
 /// specific to the Windows D3D11 rendering backend.
+///
+/// All properties use the mpv property system exposed through fvp/MDK —
+/// `setProperty(key, value)` maps directly to mpv's `mp_set_property_string`.
+/// See https://mpv.io/manual/stable/ for property semantics.
 class D3D11Configurator {
   D3D11Configurator(this._player);
 
@@ -29,6 +33,7 @@ class D3D11Configurator {
   /// Sets d3d11.sync.cpu, video.decoders, avcodec.threads,
   /// videoout.buffer_frames, and reader.starts_with_key.
   void applyDefaults() {
+    // d3d11.sync.cpu: 强制 CPU 同步，避免 D3D11 异步拷贝导致撕裂。性能换稳定性。
     _player.setProperty(
       'd3d11.sync.cpu',
       DisplayConfig.d3d11SyncMode(),
@@ -36,6 +41,7 @@ class D3D11Configurator {
     _player.setProperty('video.decoders', defaultVideoDecoders);
     _player.setProperty('avcodec.threads', _ffmpegDecoderThreads);
     _player.setProperty('videoout.buffer_frames', _maxBufferFrames);
+    // 强制从关键帧开始解码，避免 seek 后出现绿帧/花屏
     _player.setProperty('reader.starts_with_key', '1');
     log.d('D3D11Configurator: defaults applied');
   }

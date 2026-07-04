@@ -10,11 +10,17 @@ class SubtitleConfigurator {
   final PlayerProxy _player;
 
   /// Loads an external subtitle file at [path].
+  ///
+  /// MDK auto-detects subtitle format (SRT/ASS/SSA/VTT) from file extension
+  /// and content sniffing — no need to specify format explicitly.
   void setExternalSubtitle(String path) {
     _player.setProperty('subtitle.external', path);
   }
 
-  /// Sets subtitle timing offset in [milliseconds] (positive = delay).
+  /// Sets subtitle timing offset in [milliseconds].
+  ///
+  /// Positive values delay subtitles (appear later), negative values advance
+  /// them (appear earlier) relative to the audio track.
   void setSubtitleDelay(int milliseconds) {
     _player.setProperty('subtitle.delay', milliseconds.toString());
   }
@@ -29,7 +35,13 @@ class SubtitleConfigurator {
     }
   }
 
-  /// Sets audio equalizer filter (e.g., 'af=lavfi=[...]').
+  /// Sets audio equalizer filter via FFmpeg filter chain syntax.
+  ///
+  /// Format: `af=lavfi=[equalizer=f=1000:width_type=h:width=200:g=-10]`
+  /// - `af` is the audio filter property (mpv/MDK convention)
+  /// - `lavfi` bridges to FFmpeg's libavfilter
+  /// - Filter parameters are comma-separated `key=value` pairs inside brackets
+  /// - Multiple filters chain with `;` separator
   void setEqualizer(String afFilter) {
     _player.setProperty('af', afFilter);
   }
