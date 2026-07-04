@@ -191,10 +191,10 @@
   3. Services 层 7 个文件均有服务职责和依赖关系说明
   4. `flutter analyze` 无新增 warning/error
 
-**Plans**: 0/2 plans complete
+**Plans**: 2/2 plans complete
 
-- [ ] 22-01-PLAN.md — Models + Utils (DOC-17~DOC-25)
-- [ ] 22-02-PLAN.md — Services + Others (DOC-26~DOC-32)
+- [x] 22-01-PLAN.md — Models + Utils (DOC-17~DOC-25)
+- [x] 22-02-PLAN.md — Services + Others (DOC-26~DOC-32)
 
 **UI hint**: no
 
@@ -245,6 +245,6 @@
 | 19. Gradient Transition Strip | 1/1 | Complete | 2026-07-03 |
 | 20. Technical Debt Cleanup | 2/2 | Complete   | 2026-07-04 |
 | 21. Kernel Engine & Bridge Docs | 2/2 | Complete | 2026-07-04 |
-| 22. Kernel Models/Utils/Services Docs | 0/2 | Pending | - |
+| 22. Kernel Models/Utils/Services Docs | 2/2 | Complete   | 2026-07-04 |
 | 23. UI Layer Docs | 0/2 | Pending | - |
 | 24. Features & Verification | 0/1 | Pending | - |
