@@ -1,6 +1,14 @@
 import 'engine_state.dart';
 
-/// 视频效果控制能力标记 mixin
+/// Capability marker for engines that support video effects.
 ///
-/// 用于运行时能力检查: `if (engine case VideoEffects ve) { ... }`
+/// Marks engines that support brightness, contrast, hue, saturation,
+/// rotation, aspect ratio, and deinterlace controls. Used for runtime
+/// capability checks in the settings UI:
+///
+/// ```dart
+/// if (engine case VideoEffects ve) {
+///   // Show video effects tab — engine supports them
+/// }
+/// ```
 mixin VideoEffects on EngineState {}

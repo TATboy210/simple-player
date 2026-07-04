@@ -5,12 +5,16 @@ import 'models/subtitle_track_info.dart';
 
 import '../utils/log.dart';
 
-/// 轨道管理器 — 音频/字幕轨道选择与切换
+/// Manages audio and subtitle track selection for a media player.
 ///
-/// 职责:
-///   - 获取可用音轨/字幕轨列表
-///   - 切换音轨/字幕轨
-///   - 切换字幕开关
+/// MDK uses index-based track selection — tracks are numbered 0..N in the
+/// order reported by the demuxer. Track indices are NOT stable across files;
+/// always query the current track list before switching.
+///
+/// Responsibilities:
+///   - Query available audio/subtitle tracks
+///   - Switch active audio/subtitle track by index
+///   - Toggle subtitle on/off
 class TrackManager {
   final mdk.Player _player;
   MediaInfo _mediaInfo = const MediaInfo();
@@ -25,10 +29,14 @@ class TrackManager {
     _mediaInfo = info;
   }
 
-  /// 获取可用音轨列表
+  /// Returns the list of available audio tracks for the current media.
   List<AudioTrackInfo> getAudioTracks() => _mediaInfo.audioTracks;
 
-  /// 切换到指定音轨索引
+  /// Switches to the audio track at [trackIndex].
+  ///
+  /// Index must be in range [0, trackCount). Out-of-range indices are
+  /// silently ignored — MDK crashes on invalid track index, so we
+  /// defensively check bounds first.
   void switchAudioTrack(int trackIndex) {
     final tracks = _mediaInfo.audioTracks;
     if (tracks.isEmpty || trackIndex < 0 || trackIndex >= tracks.length) return;
@@ -39,13 +47,17 @@ class TrackManager {
     }
   }
 
-  /// 获取当前激活的音轨索引列表
+  /// Returns the currently active audio track indices.
   List<int> get activeAudioTracks => _player.activeAudioTracks;
 
-  /// 获取可用字幕轨道列表
+  /// Returns the list of available subtitle tracks for the current media.
   List<SubtitleTrackInfo> getSubtitleTracks() => _mediaInfo.subtitleTracks;
 
-  /// 切换到指定字幕轨道，传 -1 关闭字幕
+  /// Switches to the subtitle track at [trackIndex].
+  ///
+  /// Pass -1 (or any negative value) to disable subtitle output.
+  /// Under the hood, passing empty list `[]` disables subtitle — this is
+  /// MDK's convention, not a special "track -1".
   void switchSubtitleTrack(int trackIndex) {
     try {
       if (trackIndex < 0) {
@@ -58,7 +70,11 @@ class TrackManager {
     }
   }
 
-  /// 切换字幕开关
+  /// Toggles subtitle on/off.
+  ///
+  /// Cycles between "first subtitle track" and "no subtitle" (not all tracks).
+  /// Most content has one subtitle track, so cycling through all tracks
+  /// would add unnecessary complexity for minimal benefit.
   void toggleSubtitle() {
     final tracks = _player.activeSubtitleTracks;
     if (tracks.isEmpty) {
