@@ -15,9 +15,14 @@ import '../persistence/settings_store.dart';
 /// ```
 class LocaleService {
   LocaleService._();
+
+  /// Singleton instance accessor.
   static final LocaleService I = LocaleService._();
 
-  final ValueNotifier<Locale> locale = ValueNotifier(const Locale('zh'));
+  /// Current locale. Notifies listeners on change.
+  final ValueNotifier<Locale> locale = ValueNotifier(
+    const Locale('zh'), // 默认中文 — 与 SettingsValidator.defaultLocale 保持一致
+  );
 
   /// 从持久化存储加载语言设置
   Future<void> init() async {
@@ -31,5 +36,6 @@ class LocaleService {
     SettingsStore.saveLocale(code);
   }
 
+  /// Releases resources. Call when service is no longer needed.
   void dispose() => locale.dispose();
 }
