@@ -9,7 +9,7 @@ class Tokens {
   static const bgPanel = Color(0xFF111520);     // 加深
   static const bgElevated = Color(0xFF161A28);  // 加深
   static const bgHover = Color(0xFF1E2232);     // 加深
-  static const bgGlass = Color(0x72080A10);    // 毛玻璃 (#080A10 @ 45%)
+  static const bgGlass = Color(0x8C0C0F18);    // 加深
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
@@ -17,56 +17,38 @@ class Tokens {
   static const accentEgg = Color.fromARGB(255, 102, 204, 255);
   static const danger = Color.fromARGB(255, 250, 55, 55);
 
-  // ── 边缘微光 (50% intensity) ──
-  static const glowCore = Color(0x73A0BEFF);     // rgba(160,190,255,0.45)
-  static const glowMid = Color(0x20648CFF);       // rgba(100,140,255,0.125)
-  static const glowEdge = Color(0x135078FF);      // rgba(80,120,255,0.075)
-  static const glowEdgeStrong = Color(0x2C6496FF); // rgba(100,150,255,0.175)
+  // ── 边缘微光 ──
+  static const glowCore = Color(0xE6A0BEFF);     // rgba(160,190,255,0.9)
+  static const glowMid = Color(0x40648CFF);       // rgba(100,140,255,0.25)
+  static const glowEdge = Color(0x265078FF);      // rgba(80,120,255,0.15)
+  static const glowEdgeStrong = Color(0x596496FF); // rgba(100,150,255,0.35)
 
-  // ── 边缘微光 — gradient 变体 box-shadow (50%) ──
-  static const glowHighlightWhite = Color(0x04FFFFFF);
-  static const glowBorderBlue = Color(0x085078FF);
-  static const glowMidBlue = Color(0x055078FF);
-  static const glowAmbientBlue = Color(0x033C64DC);
-  static const glowOuterRing = Color(0x055082FF);
-  static const glowAccent = Color(0x105082FF);
+  // ── 边缘微光 — gradient 变体 box-shadow ──
+  static const glowHighlightWhite = Color(0x08FFFFFF);
+  static const glowBorderBlue = Color(0x0F5078FF);
+  static const glowMidBlue = Color(0x0A5078FF);
+  static const glowAmbientBlue = Color(0x053C64DC);
+  static const glowOuterRing = Color(0x0A5082FF);
+  static const glowAccent = Color(0x1F5082FF);
 
-  // ── 边缘微光 — gradient 描边渐变 (50%) ──
-  static const glowGradientStart = Color(0x1764A0FF);
+  // ── 边缘微光 — gradient 描边渐变 ──
+  static const glowGradientStart = Color(0x2E64A0FF);
   static const glowGradientMid = Color(0x0064A0FF);
-  static const glowGradientEnd = Color(0x0A5078FF);
+  static const glowGradientEnd = Color(0x145078FF);
 
-  // ── 边缘微光 — omni 变体方向色 (50%) ──
-  static const glowOmniRight = Color(0x0D5082FF);
-  static const glowOmniDown = Color(0x053C64DC);
-  static const glowOmniLeft = Color(0x0D7850DC);
-  static const glowOmniUp = Color(0x055082FF);
+  // ── 边缘微光 — omni 变体方向色 ──
+  static const glowOmniRight = Color(0x1A5082FF);
+  static const glowOmniDown = Color(0x0A3C64DC);
+  static const glowOmniLeft = Color(0x1A7850DC);
+  static const glowOmniUp = Color(0x0A5082FF);
 
-  // ── Aurora 背景 blob ──
-  static const auroraBlue1 = Color(0xFF3B82F6);  // primary blue
-  static const auroraBlue2 = Color(0xFF1130A3);  // accent blue (logo)
-  static const auroraBlue3 = Color(0xFF5578DC);  // light accent blue
+  // ── 控制栏装饰 ──
+  static const controlBarBg = Color(0x990E111E);
+  /// 10% 淡蓝辉光描边（playing 状态，替代白色微光 D-15/D-16）
+  static const controlBarBorderWhite = Color(0x0A6496FF);
+  static const controlBarShadowBlack = Color(0x1A000000);
+  static const controlBarOuterShadow = Color(0x40000000);
 
-  // ── Aurora 噪点叠加 ──
-  static const noiseOverlay = Color(0x05FFFFFF);  // 噪点纹理色 (3% 白)
-
-  // ── 透射光 ──
-  static const glowPurple = Color(0xFF7864DC);  // 中心透射默认紫色
-
-  // ── 缩略图叠加层 ──
-  static const thumbnailOverlay = Color(0x42000000);  // 半透明黑色 (≈Colors.black26)
-  static const progressBarBg = Color(0x44000000);    // 进度条底色
-
-  // ── 控制栏装饰 (controlbar-design-tokens.md) ──
-  static const controlBarBg = Color(0x72080A10);  // #080A10 @ 45%
-  static const controlBarBgIdle = Color(0x39080A10);  // 同色系 @ 22%（空状态）
-  static const controlBarBorderWhite = Color(0x1AFFFFFF); // 10% 白色描边（playing 状态）
-  static const controlBarBorderIdle = Color(0x0DFFFFFF); // 5% 白色描边（空状态，比 playing 淡）
-  static const controlBarShadowBlack = Color(0x0F5078FF); // 底部辉光 6% 蓝
-  static const controlBarOuterShadow = Color(0x26000000); // 外阴影 15% 黑
-  static const controlBarTextPrimaryIdle = Color(0x76FFFFFF); // 主文本 46%（空状态）
-  static const controlBarTextSecondaryIdle = Color(0x3AFFFFFF); // 次文本 23%（空状态）
-  static const controlBarIconIdle = Color(0x76FFFFFF); // 图标 46%（空状态）
   // ── 右键菜单 ──
   static const menuBg = Color(0xE61A1A2E);
   static const menuBorder = Color(0x22FFFFFF);
@@ -75,17 +57,16 @@ class Tokens {
   static const menuTextNormal = Color(0xCCFFFFFF);
 
   static const textPrimary = Color(0xEBFFFFFF); // rgba(255,255,255,0.92)
-  static const textSecondary = Color(0x80FFFFFF); // rgba(255,255,255,0.50) — WCAG AA 5.3:1
+  static const textSecondary = Color(0x73FFFFFF); // rgba(255,255,255,0.45)
   static const textTertiary = Color(0x38FFFFFF); // rgba(255,255,255,0.22)
   static const textDisabled = Color(0xFF444455);
 
-  static const borderHighlight = Color(0x0AFFFFFF); // 4% 白色（设计稿）
-  static const glassBorder = Color(0x1A6482FF); // rgba(100,130,255,0.10) — 最低可见阈值
-  static const glassBorderIdle = Color(0x276482FF); // rgba(100,130,255,0.153) — SC-2: idle border >= 15%
+  static const borderHighlight = Color(0x33FFFFFF);
+  static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 字体 ──
   static const fontFamily = 'SF Pro Display';    // 主字体（Windows 回退 Segoe UI）
-  static const fontFamilyMono = 'JetBrains Mono'; // 等宽字体（时间/倍速）
+  static const fontFamilyMono = 'SF Mono';       // 等宽字体
   static const fontTitle = 18.0;
   static const fontBody = 14.0;
   static const fontCaption = 12.0;
@@ -103,6 +84,9 @@ class Tokens {
   static const iconLg = 20.0;
   static const iconXl = 28.0;
 
+  /// 手指/鼠标点击的抖动容差，小于此距离视为点击而非拖拽
+  static const double tapJitterThreshold = 18.0;
+
   static const spXs = 4.0;
   static const spSm = 8.0;
   static const spMd = 12.0;
@@ -117,10 +101,10 @@ class Tokens {
   static const radiusLarge = 12.0;   // 保留兼容
   static const radiusPopup = 8.0;
 
-  // ── 毛玻璃 (ImageFilter.blur sigma, 单位=像素) ──
-  // P0优化: 降低sigma值减少GPU合成开销 (165Hz下6ms帧预算)
-  static const glassBlurThin = 4.0;    // 标题栏 — 轻模糊 (从8降到4)
-  static const glassBlur = 10.0;       // 控制栏/弹窗 — 通透磨砂 (2-tier: Thin=4, Standard=10)
+  // ── 毛玻璃 ──
+  static const glassBlurThin = 8.0;
+  static const glassBlur = 10.0;
+  static const glassBlurThick = 24.0;
 
   // ── 动画 ──
   static const durationFast = 80;
@@ -150,22 +134,17 @@ class Tokens {
   // ── 控制栏 ──
   static const controlBarHeight = 110.0;
   static const controlBarRadius = 22.0;   // 修正为 22px（与设计稿一致）
-  static const controlBarMarginH = 24.0;   // 设计稿: 左右 24px
+  static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;
-  static const controlBarBorder = Color(0x1F6482FF); // rgba(100,130,255,0.12) 通透边框
-
-  // ── 渐变过渡带 ──
-  static const double gradientStripHeight = 60.0; // 控制栏上方透明→黑色渐变高度
+  static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 进度条 ──
   static const progressBarRadius = 2.0;
-  static const progressBarHeight = 24.0;
+  static const progressBarHeight = 32.0;
   static const progressBarThickness = 3.0;
   static const progressBarThicknessDrag = 5.0;
   static const progressThumbRadius = 7.0;
-  static const progressPlayed = Color(0xFF2C58F4); // 渐变起点 #2C58F4
-  static const progressPlayedEnd = Color(0xFF4A8EFF); // 渐变终点 #4A8EFF
-  static const progressGlow = Color(0x4D4A8EFF); // 辉光 rgba(74,142,255,0.3)
+  static const progressPlayed = Color(0xFFFFFFFF); // 白色（与设计稿一致）
   static const progressBuffer = Color(0x44FFFFFF);
   static const Color progressThumb = Color(0xFFFFFFFF);
   static const int progressSeekThrottleMs = 150;
@@ -186,7 +165,6 @@ class Tokens {
   static const double osdIconSize = 22;
   static const int osdFadeDurationMs = 200;
   static const int osdDefaultHoldMs = 1200;
-  static const osdTrackColor = Color(0x22FFFFFF); // 进度条底色 (13% 白)
 
   // ── 滑块 ──
   static const double sliderHeight = 42;
@@ -194,7 +172,7 @@ class Tokens {
   static const double sliderValueWidth = 36;
 
   // ── 按钮尺寸 ──
-  static const double iconButtonSizeLarge = 44; // 设计稿: 播放按钮 44×44
+  static const double iconButtonSizeLarge = 48;
   static const double iconButtonSizeSmall = 24;
   static const double iconButtonRadius = 24;
   static const double iconButtonPaddingH = 20;
@@ -207,12 +185,6 @@ class Tokens {
 
   // ── 断点 ──
   static const double compactBreakpoint = 500;
-  static const double breakpointWide = 600; // 播放列表并排 vs 覆盖
-  static const double breakpointUltraCompact = 360;
-
-  // ── 窄布局下的播放列表尺寸 ──
-  static const double playlistPanelWidthNarrow = 320;
-  static const double playlistPanelHeightNarrow = 200;
 
   // ── 跳秒 ──
   static const int skipSecondsShort = 10;

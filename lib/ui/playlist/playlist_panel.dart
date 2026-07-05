@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +6,7 @@ import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/glass_container.dart';
 import 'folder_tab.dart';
 import 'history_tab.dart';
 
@@ -35,9 +34,6 @@ class PlaylistPanel extends StatefulWidget {
   /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
   final ValueListenable<bool>? resizing;
 
-  /// 父 Stack 可用宽度 — 用于窄布局自适应
-  final double availableWidth;
-
   const PlaylistPanel({
     super.key,
     required this.playlist,
@@ -49,7 +45,6 @@ class PlaylistPanel extends StatefulWidget {
     this.onFolderScanned,
     this.onClearHistory,
     this.resizing,
-    this.availableWidth = 800,
   });
 
   @override
@@ -117,29 +112,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: FadeTransition(
         opacity: _fadeAnim,
         child: BackdropFilter(
-          filter: _blurFilter,
+          // 使用 GlassTier 缓存的 ImageFilter，避免每帧创建新实例（D-10/D-11）
+          filter: GlassTier.thick.blurFilter,
           child: const SizedBox.expand(),
         ),
       ),
     );
   }
 
-  // 缓存固定 blur filter，避免动画期间每帧分配 ImageFilter
-  static final _blurFilter = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlur,
-    sigmaY: Tokens.glassBlur,
-  );
+  static const _panelWidth = Tokens.playlistPanelWidth;
+  static const _panelHeight = Tokens.playlistPanelHeight;
 
   @override
   Widget build(BuildContext context) {
-    final isNarrow = widget.availableWidth < Tokens.breakpointWide;
-    final panelWidth = isNarrow
-        ? Tokens.playlistPanelWidthNarrow
-        : Tokens.playlistPanelWidth;
-    final panelHeight = isNarrow
-        ? Tokens.playlistPanelHeightNarrow
-        : Tokens.playlistPanelHeight;
-
     return Stack(
       children: [
         // 全屏透明层 — 点击外部关闭
@@ -161,7 +146,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             position: _slideAnim,
             child: FadeTransition(
               opacity: _fadeAnim,
-              child: _buildPanel(panelWidth, panelHeight),
+              child: _buildPanel(_panelWidth, _panelHeight),
             ),
           ),
         ),
@@ -170,7 +155,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   }
 
   Widget _buildPanel(double width, double height) {
-    final resizingNotifier = widget.resizing;
     return Focus(
       focusNode: _focusNode,
       autofocus: false,
@@ -192,11 +176,11 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
               // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
               Positioned.fill(
-                child: resizingNotifier != null
+                child: widget.resizing != null
                     ? AnimatedBuilder(
-                        animation: resizingNotifier,
-                        builder: (_, _) {
-                          if (resizingNotifier.value) {
+                        animation: widget.resizing!,
+                        builder: (_, __) {
+                          if (widget.resizing!.value) {
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(
                                 Tokens.radiusLarge,

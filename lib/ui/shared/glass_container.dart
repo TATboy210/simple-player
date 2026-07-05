@@ -23,6 +23,27 @@ enum GlassTier {
 
   final double sigma;
   const GlassTier(this.sigma);
+
+  /// 获取缓存的 ImageFilter 实例 — 不可变对象，生命周期与应用一致（D-10）
+  ui.ImageFilter get blurFilter => switch (this) {
+    GlassTier.thin => _thinBlur,
+    GlassTier.normal => _normalBlur,
+    GlassTier.thick => _thickBlur,
+  };
+
+  /// 缓存的 ImageFilter 实例 — 避免每次 build 创建新对象（D-10/D-11）
+  static final ui.ImageFilter _thinBlur = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlurThin,
+    sigmaY: Tokens.glassBlurThin,
+  );
+  static final ui.ImageFilter _normalBlur = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlur,
+    sigmaY: Tokens.glassBlur,
+  );
+  static final ui.ImageFilter _thickBlur = ui.ImageFilter.blur(
+    sigmaX: Tokens.glassBlurThick,
+    sigmaY: Tokens.glassBlurThick,
+  );
 }
 
 /// 毛玻璃容器 — 可复用的 Glassmorphism 基础组件
@@ -113,10 +134,8 @@ class GlassContainer extends StatelessWidget {
 
   Widget _buildBlurContent(BorderRadius rRect, Widget content) {
     final blurContent = RepaintBoundary(child: content);
-    final blurFilter = ui.ImageFilter.blur(
-      sigmaX: tier.sigma,
-      sigmaY: tier.sigma,
-    );
+    // 使用缓存的 ImageFilter 实例，避免每次 build 创建新对象（D-10/D-11）
+    final blurFilter = tier.blurFilter;
 
     // opacity < 0.01 时跳过 BackdropFilter GPU readback（D-13）
     final opacityNotifier = opacity;
