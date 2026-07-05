@@ -7,6 +7,7 @@ import '../shared/merged_listenable.dart';
 
 /// 时间显示 (当前 / 总时长)
 class TimeRangeDisplay extends StatefulWidget {
+  /// Engine state providing [position] and [duration] ValueNotifiers.
   final EngineState engine;
 
   const TimeRangeDisplay({super.key, required this.engine});
@@ -16,6 +17,8 @@ class TimeRangeDisplay extends StatefulWidget {
 }
 
 class _TimeRangeDisplayState extends State<TimeRangeDisplay> {
+  // 使用 MergedListenable 合并 position 和 duration 两个 ValueNotifier
+  // 避免分别监听导致多次 rebuild（嵌套 ValueListenableBuilder 会 2x 触发）
   late final MergedListenable _merged;
 
   @override
