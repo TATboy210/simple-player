@@ -14,6 +14,7 @@ import 'fvp_callback_handler.dart';
 import 'media_opener.dart';
 import 'media_state.dart';
 import 'open_result.dart';
+import 'player_proxy.dart';
 import 'position_poller.dart';
 import '../utils/log.dart';
 import 'track_manager.dart';
