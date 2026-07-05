@@ -5,7 +5,24 @@ import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
-/// 均衡器设置 tab — 5 个预设模式
+/// Equalizer settings tab — provides audio frequency presets via FFmpeg filters.
+///
+/// Applies audio filters through MDK's `af` property via
+/// [EngineState.setEqualizer]. The underlying FFmpeg filter chain format is:
+/// `filter_name=param1=value1,param2=value2` — multiple filters separated by
+/// commas are applied sequentially (e.g., `bass=g=8,treble=g=6`).
+///
+/// An empty string `''` disables the equalizer, passing original audio through.
+///
+/// ## Adding a new preset
+///
+/// 1. Add a filter string to [_presetValues] using FFmpeg equalizer syntax:
+///    - `bass=g=N` — boost/cut low frequencies (gain in dB)
+///    - `treble=g=N` — boost/cut high frequencies (gain in dB)
+///    - Combine with commas: `bass=g=5,treble=g=3`
+/// 2. Add a corresponding label in [_presetLabel]
+/// 3. The filter chain hot-swaps in real time — no need to re-open the file;
+///    MDK reinitializes the audio filter graph on each call
 class EqualizerTab extends StatefulWidget {
   final EngineState engine;
   const EqualizerTab({super.key, required this.engine});
@@ -15,12 +32,15 @@ class EqualizerTab extends StatefulWidget {
 }
 
 class _EqualizerTabState extends State<EqualizerTab> {
+  // FFmpeg 滤镜字符串 — 通过 EngineState.setProperty('af', ...) 设置到 MDK 引擎
+  // 增益单位 dB（分贝）：正数增强、负数衰减。建议范围 -20dB ~ +20dB，过高可能导致削波失真
+  // 滤镜链热切换：MDK 实时重新初始化音频滤镜图，不需要重新打开文件
   static const _presetValues = [
-    '',
-    'bass=g=10',
-    'treble=g=5',
-    'bass=g=8,treble=g=6',
-    'bass=g=3,treble=g=4',
+    '', // 禁用均衡器，原始音频直通
+    'bass=g=10', // 增强低频（~60-250Hz），适合流行/嘻哈音乐
+    'treble=g=5', // 增强高频（~2kHz-16kHz），适合古典/人声突出
+    'bass=g=8,treble=g=6', // 低频增强+高频延伸，摇滚乐典型频响曲线
+    'bass=g=3,treble=g=4', // 低频柔和+高频细节，交响乐动态范围保留
   ];
 
   int _selectedIndex = 0;
