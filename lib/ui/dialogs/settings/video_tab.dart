@@ -9,9 +9,16 @@ import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
-/// 画面处理 tab — 色彩校正 + 旋转 + 画面比例 + 去隔行
+/// Video processing tab — color correction, rotation, aspect ratio, and deinterlace.
 ///
-/// 使用单个 `ValueListenableBuilder<VideoProcessingState>` 监听全部属性。
+/// Uses a single `ValueListenableBuilder<VideoProcessingState>` to listen to all
+/// properties via [VideoProcessingService]. Each color correction parameter:
+/// - brightness: 亮度调整，范围 -1.0 到 1.0，0.0 = 无变化
+/// - contrast: 对比度调整，范围 -1.0 到 1.0，0.0 = 无变化
+/// - saturation: 饱和度调整，范围 -1.0 到 1.0，0.0 = 无变化
+/// - hue: 色调调整，范围 -180 到 180 度，0.0 = 无变化
+///
+/// Rotation is limited to hardware steps: 0°, 90°, 180°, 270°.
 class VideoTab extends StatelessWidget {
   final VideoProcessingService? videoProcessing;
   const VideoTab({super.key, this.videoProcessing});
