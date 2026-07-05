@@ -232,8 +232,20 @@
 **Plans**: 0/2 plans complete
 
 Plans:
+**Wave 1**
+
 - [ ] 24-01-PLAN.md — Tool verification + core MVVM documentation (DOC-46, DOC-51~DOC-54)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 24-02-PLAN.md — Services documentation + full audit (DOC-47~DOC-50, DOC-55~DOC-60)
+
+**Cross-cutting constraints:**
+
+- Each public class has a /// doc comment explaining purpose, parameters, and behavior
+- Each non-trivial method has a /// doc comment with parameter descriptions
+- Magic numbers have inline Chinese why-explanations
+- Non-obvious logic has inline why-comments explaining the rationale
 
 **UI hint**: no
 
