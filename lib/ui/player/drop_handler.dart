@@ -10,7 +10,12 @@ import '../../l10n/app_localizations.dart';
 /// Flutter 原生 DragTarget 不支持 OS 级文件拖放，
 /// desktop_drop 通过平台通道监听窗口级 Drop 事件。
 class DropHandler extends StatefulWidget {
+  /// The widget subtree wrapped with drop detection.
   final Widget child;
+
+  /// Called with validated file paths after a successful drop.
+  ///
+  /// Only paths that pass [PathValidator.validate] are included.
   final void Function(List<String> paths) onFilesDropped;
 
   /// 拖拽悬停状态回调（暴露给父组件，用于子组件联动动效）
@@ -47,6 +52,8 @@ class _DropHandlerState extends State<DropHandler> {
       onDragDone: (detail) {
         setState(() => _hovering = false);
         widget.onHoverChanged?.call(false);
+        // PathValidator 过滤逻辑：路径长度检查、空字节检查、合法字符验证
+        // validate() 返回 null 表示通过，非 null 表示错误原因
         final paths = detail.files
             .map((f) => f.path)
             .where((p) => PathValidator.validate(p) == null)

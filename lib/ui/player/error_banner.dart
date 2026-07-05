@@ -7,8 +7,13 @@ import '../shared/value_listenable_builder2.dart';
 
 /// 错误横幅 — 显示可操作的错误信息
 class ErrorBanner extends StatelessWidget {
+  /// Engine state providing [state], [errorMessage], and [errorType].
   final EngineState engine;
+
+  /// Called when the user taps the action button for file/codec errors.
   final VoidCallback? onOpenFile;
+
+  /// Called when the user taps the action button for playback/network errors.
   final VoidCallback? onRetry;
 
   const ErrorBanner({
