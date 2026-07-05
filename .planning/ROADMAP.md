@@ -31,9 +31,9 @@
   5. `flutter analyze` 无新增 warning/error
   6. 所有现有测试通过
 
-**Plans**: 0/1 plans complete
+**Plans**: 1/1 plans complete
 
-- [ ] 25-01-PLAN.md — Resize 渐变 + decoration/blur 缓存 + 魔法数字提取 + 淡蓝辉光
+- [x] 25-01-PLAN.md — Resize 渐变 + decoration/blur 缓存 + 魔法数字提取 + 淡蓝辉光
 
 **UI hint**: yes
 
@@ -80,6 +80,6 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 25. Performance Quick Wins | 0/1 | Not started | — |
+| 25. Performance Quick Wins | 1/1 | Complete   | 2026-07-05 |
 | 26. VolumeSlider Debounce | 0/1 | Not started | — |
 | 27. Control Bar Test Coverage | 0/1 | Not started | — |
