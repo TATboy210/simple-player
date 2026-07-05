@@ -1,35 +1,28 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-06T00:00:00.000Z",
+  "timestamp": "2026-07-05T17:29:33.508Z",
   "phase": "25",
   "phase_name": "performance-quick-wins",
   "phase_dir": ".planning/phases/25-performance-quick-wins",
   "plan": 1,
-  "task": 0,
+  "task": 2,
   "total_tasks": 2,
   "status": "paused",
-  "completed_tasks": [],
-  "remaining_tasks": [
-    {"id": 1, "name": "Tokens 常量 + GlassTier blur 缓存", "status": "not_started"},
-    {"id": 2, "name": "ControlsOverlay 动画 + ControlBar/PlaylistPanel 缓存清理", "status": "not_started"}
+  "completed_tasks": [
+    {"id": 1, "name": "Tokens 常量 + GlassTier blur 缓存", "status": "done", "commit": "10a42a1"},
+    {"id": 2, "name": "ControlsOverlay 动画 + ControlBar/PlaylistPanel 缓存清理", "status": "done", "commit": "a5ba100"}
   ],
+  "remaining_tasks": [],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    {"action": "运行 app 验证控制栏淡蓝辉光色值", "context": "D-17: 色值为近似值，需在实际显示器上确认并微调", "blocking": false}
+    {"action": "确认 controlBarBorderWhite alpha 偏差 (0x0A vs 0x1A)", "context": "executor 实现与 plan 不同，蓝色色调正确但透明度偏低", "blocking": false}
   ],
   "decisions": [
-    {"decision": "SingleTickerProviderStateMixin → TickerProviderStateMixin", "rationale": "AutoHideController 已占用唯一 ticker，新增 AnimationController 需要第二个", "phase": "25"},
-    {"decision": "共享 AnimationController 驱动 resize + decoration 两个动画", "rationale": "D-09: resize 优先级更高，resize 期间 decoration 动画暂停", "phase": "25"},
-    {"decision": "控制栏颜色从白色微光改为淡蓝辉光", "rationale": "D-15~D-18: 与午夜蓝背景融合，playing 稍亮 idle 稍淡", "phase": "25"}
+    {"decision": "GlassTier.thick 使用独立缓存", "rationale": "sigma=24 与 normal=10 不同", "phase": "25"},
+    {"decision": "_resizeOpacity 接入 ControlBar.opacity", "rationale": "resize fade 独立于 auto-hide", "phase": "25"}
   ],
-  "uncommitted_files": [
-    ".planning/phases/25-performance-quick-wins/25-01-PLAN.md",
-    ".planning/phases/25-performance-quick-wins/25-RESEARCH.md",
-    ".planning/phases/25-performance-quick-wins/25-VALIDATION.md",
-    ".planning/ROADMAP.md",
-    ".planning/STATE.md"
-  ],
-  "next_action": "运行 /gsd-execute-phase 25 执行 Task 1 (Tokens + GlassTier blur 缓存)",
-  "context_notes": "Phase 25 规划阶段完成。研究(HIGH confidence)→规划(1 plan, 2 tasks)→验证(1 blocker + 2 warnings, 全部修复)。准备好执行。Context 接近 78% 上限，建议新会话执行。"
+  "uncommitted_files": [],
+  "next_action": "/gsd-execute-phase 25 继续 verification + phase complete",
+  "context_notes": "Phase 25 executor 完成，merge 冲突已修复。需 verification。"
 }
