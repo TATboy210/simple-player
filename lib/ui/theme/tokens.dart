@@ -44,7 +44,8 @@ class Tokens {
 
   // ── 控制栏装饰 ──
   static const controlBarBg = Color(0x990E111E);
-  static const controlBarBorderWhite = Color(0x0AFFFFFF);
+  /// 10% 淡蓝辉光描边（playing 状态，替代白色微光 D-15/D-16）
+  static const controlBarBorderWhite = Color(0x0A6496FF);
   static const controlBarShadowBlack = Color(0x1A000000);
   static const controlBarOuterShadow = Color(0x40000000);
 
@@ -82,6 +83,9 @@ class Tokens {
   static const iconMd = 18.0;
   static const iconLg = 20.0;
   static const iconXl = 28.0;
+
+  /// 手指/鼠标点击的抖动容差，小于此距离视为点击而非拖拽
+  static const double tapJitterThreshold = 18.0;
 
   static const spXs = 4.0;
   static const spSm = 8.0;
