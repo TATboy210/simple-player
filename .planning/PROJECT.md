@@ -4,17 +4,19 @@
 
 Simple Player Flutter 桌面媒体播放器持续迭代项目。
 
-## Current Milestone: v1.5 代码注释补全
+## Current Milestone: v1.6 控制栏质量优化与测试补全
 
-**Goal:** 为所有重要组件、程序和代码添加/完善注释，提升代码可读性和可维护性
+**Goal:** 消除控制栏 P0-P1 技术债务，修复窗口拉伸时毛玻璃突兀跳变，建立控制栏测试基础
 
 **Target features:**
-- 公共 API 补全 `///` doc comments（类、方法、属性）
-- 非显而易见逻辑添加 "why" 注释（而非 "what"）
-- 魔法数字/字符串提取为命名常量并添加说明
-- FFmpeg 滤镜语法等专业领域添加解释性注释
+- 修复窗口 resize 时毛玻璃效果突然消失/恢复的视觉跳变（渐变过渡替代二元切换）
+- 缓存 `_decorationPlaying`/`_decorationIdle` 避免每帧创建 BoxDecoration + BoxShadow
+- GlassContainer 的 ImageFilter.blur 缓存（当前每次 build 重新创建）
+- 提取魔法数字 18px 为命名常量
+- VolumeSlider 拖拽时 OSD 调用添加 debounce（当前 60+次/秒）
+- AutoHideController/ProgressBar/VolumeButton/SpeedButton 测试补全
 
-**背景:** 代码库审计显示 135 个 .dart 文件中 ~115 个已有良好注释，~20 个需要针对性改进
+**背景:** 控制栏分析报告显示 6 项技术债务和 4 个测试缺口。窗口拉伸时毛玻璃二元跳变（有→无→有）是最影响用户体验的问题。
 
 ---
 
