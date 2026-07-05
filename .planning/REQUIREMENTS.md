@@ -191,6 +191,17 @@
 - [ ] **DOC-49**: `player_error_bus.dart` — 错误总线模式
 - [ ] **DOC-50**: `playback_contract.dart` — 播放契约接口
 
+- [ ] **DOC-51**: `player_feature.dart` — MVVM View 层，UI 状态管理与 PlayerScreen 组合
+- [ ] **DOC-52**: `player_view_model.dart` — MVVM ViewModel 层，业务逻辑与 UI 状态分离
+- [ ] **DOC-53**: `player_services.dart` — DI 容器，服务创建与生命周期管理
+- [ ] **DOC-54**: `video_processing_state.dart` — 不可变值对象，diff-based 同步模式
+- [ ] **DOC-55**: `playback_controller.dart` — 播放控制器 facade，子模块编排
+- [ ] **DOC-56**: `playback_navigator.dart` — 索引导航与 openGeneration 并发守卫
+- [ ] **DOC-57**: `breakpoint_saver.dart` — 断点保存策略
+- [ ] **DOC-58**: `file_operations.dart` — 文件打开/批量添加与路径校验
+- [ ] **DOC-59**: `subtitle_service.dart` — 外挂字幕自动检测与加载
+- [ ] **DOC-60**: `video_processing_service.dart` — 视频处理服务，copyWith 状态管理
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -208,12 +219,12 @@
 | DOC-13 ~ DOC-16 | Phase 1: Kernel Bridge | Pending |
 | DOC-17 ~ DOC-32 | Phase 2: Kernel Models/Utils/Services | Pending |
 | DOC-33 ~ DOC-45 | Phase 3: UI Layer | Pending |
-| DOC-46 ~ DOC-50 | Phase 4: Features & Verification | Pending |
+| DOC-46 ~ DOC-60 | Phase 4: Features & Verification | Pending |
 
 **Coverage:**
 
-- v1 requirements: 50 total
-- Mapped to phases: 50
+- v1 requirements: 60 total
+- Mapped to phases: 60
 - Unmapped: 0 ✓
 
 ---

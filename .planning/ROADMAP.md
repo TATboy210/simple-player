@@ -221,17 +221,19 @@
 
 **Goal**: Features 层注释补全 + 全量验证
 **Depends on**: Phase 23
-**Requirements**: DOC-46 ~ DOC-50
+**Requirements**: DOC-46 ~ DOC-60
 **Success Criteria** (what must be TRUE):
 
-  1. Features 层 5 个文件均有模式说明和依赖关系文档
+  1. Features 层 15 个文件均有模式说明和依赖关系文档
   2. `flutter analyze` 0 errors, 0 warnings
   3. `flutter test` 905+ tests passing, 0 failures
-  4. 所有 50 个 DOC requirement 已验证完成
+  4. 所有 60 个 DOC requirement 已验证完成
 
-**Plans**: 0/1 plans complete
+**Plans**: 0/2 plans complete
 
-- [ ] 24-01-PLAN.md — Features + verification (DOC-46~DOC-50)
+Plans:
+- [ ] 24-01-PLAN.md — Tool verification + core MVVM documentation (DOC-46, DOC-51~DOC-54)
+- [ ] 24-02-PLAN.md — Services documentation + full audit (DOC-47~DOC-50, DOC-55~DOC-60)
 
 **UI hint**: no
 
@@ -247,4 +249,4 @@
 | 21. Kernel Engine & Bridge Docs | 2/2 | Complete | 2026-07-04 |
 | 22. Kernel Models/Utils/Services Docs | 2/2 | Complete    | 2026-07-04 |
 | 23. UI Layer Docs | 2/2 | Complete   | 2026-07-05 |
-| 24. Features & Verification | 0/1 | Pending | - |
+| 24. Features & Verification | 0/2 | Pending | - |
