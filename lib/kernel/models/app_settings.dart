@@ -79,6 +79,9 @@ class AppSettings {
   /// Whether to enable deinterlacing for interlaced content.
   final bool videoDeinterlace;
 
+  /// 播放速度倍率 — 1.0 为正常速度，MDK 以倍率表示
+  final double playbackSpeed;
+
   /// Whether to enable D3D11 CPU sync. Prevents tearing at the cost of performance.
   final bool d3d11Sync;
 

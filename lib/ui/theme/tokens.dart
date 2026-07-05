@@ -42,12 +42,34 @@ class Tokens {
   static const glowOmniLeft = Color(0x1A7850DC);
   static const glowOmniUp = Color(0x0A5082FF);
 
+  // ── 极光背景 ──
+  /// 极光光团色 — 三层蓝色渐变（高→低 alpha）
+  static const auroraBlue1 = Color(0x1A4A8EFF);
+  static const auroraBlue2 = Color(0x144A8EFF);
+  static const auroraBlue3 = Color(0x0F4A8EFF);
+  /// 噪点叠加色 — 低 alpha 白色，模拟胶片颗粒
+  static const noiseOverlay = Color(0x0AFFFFFF);
+  /// 紫色透射光斑 — 中心光效默认色
+  static const glowPurple = Color(0x1AA855F7);
+
   // ── 控制栏装饰 ──
   static const controlBarBg = Color(0x990E111E);
   /// 10% 淡蓝辉光描边（playing 状态，替代白色微光 D-15/D-16）
   static const controlBarBorderWhite = Color(0x0A6496FF);
+  /// 2% 淡蓝描边（idle 状态，比 playing 的 10% 更淡，per D-18）
+  static const controlBarBorderIdle = Color(0x056496FF);
   static const controlBarShadowBlack = Color(0x1A000000);
   static const controlBarOuterShadow = Color(0x40000000);
+  /// idle 状态下中心控件文字色 — 淡化版 textPrimary
+  static const controlBarTextPrimaryIdle = Color(0x73FFFFFF);
+  /// idle 状态下次要文字色
+  static const controlBarTextSecondaryIdle = Color(0x38FFFFFF);
+  /// idle 状态下控制栏背景
+  static const controlBarBgIdle = Color(0x660E111E);
+  /// idle 状态下玻璃边框
+  static const glassBorderIdle = Color(0x0A6482FF);
+  /// idle 状态下图标色
+  static const controlBarIconIdle = Color(0x73FFFFFF);
 
   // ── 右键菜单 ──
   static const menuBg = Color(0xE61A1A2E);
@@ -138,6 +160,12 @@ class Tokens {
   static const controlBarMarginBottom = 16.0;
   static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
+  // ── 缩略图 ──
+  /// 缩略图播放中叠加层 — 半透明黑色标识当前播放项
+  static const thumbnailOverlay = Color(0x66000000);
+  /// 缩略图迷你进度条背景轨道
+  static const progressBarBg = Color(0x33FFFFFF);
+
   // ── 进度条 ──
   static const progressBarRadius = 2.0;
   static const progressBarHeight = 32.0;
@@ -148,6 +176,8 @@ class Tokens {
   static const progressBuffer = Color(0x44FFFFFF);
   static const Color progressThumb = Color(0xFFFFFFFF);
   static const int progressSeekThrottleMs = 150;
+  /// 渐变条高度
+  static const double gradientStripHeight = 3.0;
   static const int progressExpandDurationMs = 200;
   static const double progressDragThreshold = 5.0;
   static const double progressDisabledBgAlpha = 0.3;
@@ -165,6 +195,8 @@ class Tokens {
   static const double osdIconSize = 22;
   static const int osdFadeDurationMs = 200;
   static const int osdDefaultHoldMs = 1200;
+  /// OSD 迷你进度条背景轨道色
+  static const Color osdTrackColor = Color(0x33FFFFFF);
 
   // ── 滑块 ──
   static const double sliderHeight = 42;
@@ -180,11 +212,15 @@ class Tokens {
 
   // ── 播放列表 ──
   static const double playlistPanelWidth = 420;
+  static const double playlistPanelWidthNarrow = 320;
   static const double playlistPanelHeight = 240;
+  static const double playlistPanelHeightNarrow = 180;
   static const double thumbnailTileHeight = 124;
 
   // ── 断点 ──
   static const double compactBreakpoint = 500;
+  static const double breakpointUltraCompact = 360;
+  static const double breakpointWide = 1200;
 
   // ── 跳秒 ──
   static const int skipSecondsShort = 10;

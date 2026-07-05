@@ -34,13 +34,13 @@ class ControlBar extends StatelessWidget {
     ],
   );
 
-  /// 空状态装饰 — 淡化蓝辉光 + 补齐 4 个 BoxShadow（D-01/D-04）
+  /// 空状态装饰 — 2% 淡蓝描边（idle，比 playing 淡，per D-18）+ 补齐 4 个 BoxShadow（D-01/D-04）
   static final _decorationIdle = BoxDecoration(
     color: Tokens.controlBarBg,
     borderRadius: ControlBar._borderRadius,
-    border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
+    border: Border.all(color: Tokens.controlBarBorderIdle, width: 1),
     boxShadow: const [
-      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      BoxShadow(color: Tokens.controlBarBorderIdle, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
       BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
       // 补齐 4 个 BoxShadow，让 DecorationTween 插值更平滑（D-04）
       BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
@@ -65,9 +65,6 @@ class ControlBar extends StatelessWidget {
   /// 淡入淡出动画 — opacity=0 时跳过 BackdropFilter
   final Animation<double>? opacity;
 
-  /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
-  final ValueListenable<bool>? resizing;
-
   /// 装饰动画 — 驱动 playing/idle 状态切换的 DecorationTween 插值（D-01/D-02）
   final Animation<double>? decoration;
 
@@ -79,7 +76,6 @@ class ControlBar extends StatelessWidget {
     this.isIdle = false,
     this.title,
     this.opacity,
-    this.resizing,
     this.decoration,
   });
 
@@ -179,18 +175,8 @@ class ControlBar extends StatelessWidget {
 
     if (!enableBlur) return RepaintBoundary(child: content);
 
-    // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
-    if (resizing != null) {
-      return AnimatedBuilder(
-        animation: resizing!,
-        builder: (_, child) {
-          if (resizing!.value) return RepaintBoundary(child: child!);
-          return _buildBlur(child!);
-        },
-        child: content,
-      );
-    }
-
+    // opacity 渐变由 _animController 驱动（ControlsOverlay 传入），
+    // _buildBlur 中 opacity < 0.01 时自动跳过 BackdropFilter，避免 resize 期间 GPU readback 卡顿
     return _buildBlur(content);
   }
 

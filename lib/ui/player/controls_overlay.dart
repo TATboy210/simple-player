@@ -110,6 +110,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     widget.resizing?.addListener(_onResizeChanged);
   }
 
+  // TODO: 消费 Tokens.tapJitterThreshold — 当前使用 GestureDetector.onTap，
+  // 未来如需区分 tap/drag（添加 _onPointerDown/_onPointerUp），用此常量作为 18px 抖动容差
   void _handleTap() {
     if (_clickTimer?.isActive ?? false) {
       // 第二次点击在延迟内 → 双击，切换全屏
@@ -128,7 +130,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     }
   }
 
-  /// resize 信号变化回调 — resizing=true 时 reverse() 淡出，false 时 forward() 淡入（D-07）
+  /// resize 信号变化回调 — resizing=true 时 reverse() 淡出，false 时根据 engine 状态恢复装饰（D-07）
   void _onResizeChanged() {
     final resizing = widget.resizing?.value ?? false;
     if (resizing) {
@@ -136,7 +138,13 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       _animController.reverse(); // 1.0 → 0.0，150ms easeOut
     } else {
       _isResizing = false;
-      _animController.forward(); // 0.0 → 1.0，150ms easeOut
+      // resize 结束后根据 engine 状态恢复正确装饰
+      final isIdle = widget.engine.state.value == MediaState.idle;
+      if (isIdle) {
+        _animController.reverse(); // 恢复到 idle 装饰
+      } else {
+        _animController.forward(); // 恢复到 playing 装饰
+      }
     }
   }
 
@@ -144,6 +152,14 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     // resize 期间忽略 engine 状态变化，避免 controller 竞争（Pitfall 2）
     if (_isResizing) return;
     _autoHide.onEngineStateChanged();
+
+    // engine 状态变化驱动 decoration 切换：idle→reverse（淡出），playing→forward（淡入）
+    final isIdle = widget.engine.state.value == MediaState.idle;
+    if (isIdle) {
+      _animController.reverse();
+    } else {
+      _animController.forward();
+    }
   }
 
   @override
@@ -227,7 +243,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         title: widget.title,
                         opacity: _resizeOpacity,
                         enableBlur: _autoHide.visible.value,
-                        resizing: widget.resizing,
                         decoration: _animController,
                       ),
                     ),

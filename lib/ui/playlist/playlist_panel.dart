@@ -34,6 +34,9 @@ class PlaylistPanel extends StatefulWidget {
   /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
   final ValueListenable<bool>? resizing;
 
+  /// 可用宽度 — 父组件 LayoutBuilder 提供，用于响应式布局
+  final double? availableWidth;
+
   const PlaylistPanel({
     super.key,
     required this.playlist,
@@ -45,6 +48,7 @@ class PlaylistPanel extends StatefulWidget {
     this.onFolderScanned,
     this.onClearHistory,
     this.resizing,
+    this.availableWidth,
   });
 
   @override
