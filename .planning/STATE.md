@@ -4,8 +4,8 @@ milestone: v1.6
 milestone_name: Control Bar Quality
 current_phase: 24
 status: planning
-stopped_at: context exhaustion at 76% (2026-07-05)
-last_updated: "2026-07-05T15:05:43.106Z"
+stopped_at: Phase 25 context gathered
+last_updated: "2026-07-05T16:07:04.806Z"
 last_activity: 2026-07-05
 last_activity_desc: Phase 24 complete
 progress:
@@ -83,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-05T15:05:43.075Z
-Stopped at: context exhaustion at 76% (2026-07-05)
-Resume file: null
+Last session: 2026-07-05T16:07:04.780Z
+Stopped at: Phase 25 context gathered
+Resume file: .planning/phases/25-performance-quick-wins/25-CONTEXT.md
