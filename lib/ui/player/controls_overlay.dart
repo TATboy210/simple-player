@@ -67,10 +67,21 @@ class ControlsOverlay extends StatefulWidget {
 }
 
 class _ControlsOverlayState extends State<ControlsOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  /// TickerProviderStateMixin: AutoHideController + _animController 各需一个 ticker
   late final AutoHideController _autoHide;
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
+
+  /// 共享 AnimationController — 驱动 resize 淡出/淡入和 decoration 状态切换
+  /// 150ms，初始 value=1.0（不 resize 时完全可见）
+  late final AnimationController _animController;
+
+  /// CurvedAnimation — easeOut 曲线，用于 resize 期间的 opacity 渐变（D-05/D-07）
+  late final Animation<double> _resizeOpacity;
+
+  /// resize 状态标记 — resize 期间忽略 engine 状态变化，避免 controller 竞争（Pitfall 2）
+  bool _isResizing = false;
 
   @override
   void initState() {
@@ -83,6 +94,20 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     );
     widget.engine.state.addListener(_onEngineStateChanged);
     _autoHide.init();
+
+    // 创建共享 AnimationController — 初始 value=1.0（不 resize 时完全可见）
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationNormal),
+      value: 1.0,
+    );
+    _resizeOpacity = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
+
+    // 监听 resize 信号变化
+    widget.resizing?.addListener(_onResizeChanged);
   }
 
   void _handleTap() {
@@ -103,13 +128,44 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     }
   }
 
-  void _onEngineStateChanged() => _autoHide.onEngineStateChanged();
+  /// resize 信号变化回调 — resizing=true 时 reverse() 淡出，false 时 forward() 淡入（D-07）
+  void _onResizeChanged() {
+    final resizing = widget.resizing?.value ?? false;
+    if (resizing) {
+      _isResizing = true;
+      _animController.reverse(); // 1.0 → 0.0，150ms easeOut
+    } else {
+      _isResizing = false;
+      _animController.forward(); // 0.0 → 1.0，150ms easeOut
+    }
+  }
+
+  void _onEngineStateChanged() {
+    // resize 期间忽略 engine 状态变化，避免 controller 竞争（Pitfall 2）
+    if (_isResizing) return;
+    _autoHide.onEngineStateChanged();
+  }
+
+  @override
+  void didUpdateWidget(covariant ControlsOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isFullscreen != widget.isFullscreen) {
+      _autoHide.isFullscreen = widget.isFullscreen;
+    }
+    // resizing 监听迁移 — 旧值移除，新值添加
+    if (oldWidget.resizing != widget.resizing) {
+      oldWidget.resizing?.removeListener(_onResizeChanged);
+      widget.resizing?.addListener(_onResizeChanged);
+    }
+  }
 
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
+    widget.resizing?.removeListener(_onResizeChanged);
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
+    _animController.dispose();
     _autoHide.dispose();
     super.dispose();
   }
@@ -172,6 +228,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         opacity: _autoHide.opacity,
                         enableBlur: _autoHide.visible.value,
                         resizing: widget.resizing,
+                        decoration: _animController,
                       ),
                     ),
                   ),

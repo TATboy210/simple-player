@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +5,7 @@ import 'package:player_engine/player_engine.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/edge_glow.dart';
+import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
 import 'center_controls.dart';
 import 'player_actions.dart';
@@ -17,13 +16,9 @@ import 'volume_controls.dart';
 
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
-  static final _blurFilter = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlurThick,
-    sigmaY: Tokens.glassBlurThick,
-  );
 
-  /// CSS: .player-controls — rgba(14,17,30,0.6) + blur(24px)
-  static final _decoration = BoxDecoration(
+  /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框（D-01: static final 缓存）
+  static final _decorationPlaying = BoxDecoration(
     color: Tokens.controlBarBg,
     borderRadius: ControlBar._borderRadius,
     border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
@@ -37,6 +32,26 @@ class ControlBar extends StatelessWidget {
       // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
       BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
     ],
+  );
+
+  /// 空状态装饰 — 淡化蓝辉光 + 补齐 4 个 BoxShadow（D-01/D-04）
+  static final _decorationIdle = BoxDecoration(
+    color: Tokens.controlBarBg,
+    borderRadius: ControlBar._borderRadius,
+    border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
+    boxShadow: const [
+      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      // 补齐 4 个 BoxShadow，让 DecorationTween 插值更平滑（D-04）
+      BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
+      BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
+    ],
+  );
+
+  /// DecorationTween — playing/idle 状态插值（D-01/D-02）
+  static final _decorationTween = DecorationTween(
+    begin: _decorationIdle,
+    end: _decorationPlaying,
   );
 
   final PlayerEngine engine;
@@ -53,6 +68,9 @@ class ControlBar extends StatelessWidget {
   /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
   final ValueListenable<bool>? resizing;
 
+  /// 装饰动画 — 驱动 playing/idle 状态切换的 DecorationTween 插值（D-01/D-02）
+  final Animation<double>? decoration;
+
   const ControlBar({
     super.key,
     required this.engine,
@@ -62,6 +80,7 @@ class ControlBar extends StatelessWidget {
     this.title,
     this.opacity,
     this.resizing,
+    this.decoration,
   });
 
   @override
@@ -70,6 +89,11 @@ class ControlBar extends StatelessWidget {
     final prevTooltip = l10n.previousTrack;
     final nextTooltip = l10n.nextTrack;
 
+    // decoration 非空时用 DecorationTween 插值，否则直接使用 playing 装饰
+    final effectiveDecoration = decoration != null
+        ? _decorationTween.evaluate(decoration!)
+        : _decorationPlaying;
+
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
@@ -77,7 +101,7 @@ class ControlBar extends StatelessWidget {
         color: Colors.transparent,
         child: Container(
           height: Tokens.controlBarHeight,
-          decoration: _decoration,
+          decoration: effectiveDecoration,
           padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
           child: Stack(
             children: [
@@ -178,7 +202,7 @@ class ControlBar extends StatelessWidget {
     Widget withBlur(Widget child) => ClipRRect(
       borderRadius: _borderRadius,
       child: BackdropFilter(
-        filter: _blurFilter,
+        filter: GlassTier.normal.blurFilter,
         child: child,
       ),
     );

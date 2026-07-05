@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +6,7 @@ import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/glass_container.dart';
 import 'folder_tab.dart';
 import 'history_tab.dart';
 
@@ -113,7 +112,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: FadeTransition(
         opacity: _fadeAnim,
         child: BackdropFilter(
-          filter: _blurFilter,
+          // 使用 GlassTier 缓存的 ImageFilter，避免每帧创建新实例（D-10/D-11）
+          filter: GlassTier.thick.blurFilter,
           child: const SizedBox.expand(),
         ),
       ),
@@ -122,12 +122,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   static const _panelWidth = Tokens.playlistPanelWidth;
   static const _panelHeight = Tokens.playlistPanelHeight;
-
-  // 缓存固定 blur filter，避免动画期间每帧分配 ImageFilter
-  static final _blurFilter = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlurThick,
-    sigmaY: Tokens.glassBlurThick,
-  );
 
   @override
   Widget build(BuildContext context) {
