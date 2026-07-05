@@ -6,10 +6,13 @@ import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
-/// 性能设置 tab — D3D11 渲染参数 + 硬件解码开关
+/// Performance settings tab — D3D11 sync toggle and hardware decoding switch.
 ///
-/// 通过 EngineState 接口控制引擎参数，不直接依赖 FvpEngine 实现。
-/// 设置通过 SettingsStore 持久化，重启后保持用户选择。
+/// Controls engine parameters through [EngineState] interface (no direct FvpEngine
+/// dependency). Settings are persisted via [SettingsStore] and survive app restarts.
+///
+/// - D3D11 sync (`sync.cpu`): 强制 CPU 同步，避免 D3D11 异步拷贝导致撕裂，性能换稳定性
+/// - Hardware decoding: 硬件解码（D3D11/NVDEC）降低 CPU 使用率，但可能有兼容性/驱动问题
 class PerformanceTab extends StatefulWidget {
   final EngineState engine;
   const PerformanceTab({super.key, required this.engine});

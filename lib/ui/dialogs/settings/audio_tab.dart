@@ -5,7 +5,11 @@ import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/settings_card.dart';
 
-/// 音轨选择 tab — 列出可用音轨，点击切换
+/// Audio track selection tab — lists available audio tracks and allows switching.
+///
+/// Queries [EngineState.getAudioTracks] for the current file's audio streams.
+/// Each track shows codec, channel count, and language when available.
+/// Tapping a track calls [EngineState.switchAudioTrack] and closes the dialog.
 class AudioTab extends StatelessWidget {
   final EngineState engine;
   const AudioTab({super.key, required this.engine});

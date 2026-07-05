@@ -16,11 +16,14 @@ import 'settings/shortcuts_tab.dart';
 import 'settings/video_tab.dart';
 import 'settings/settings_tab_performance.dart';
 
-/// 设置面板 — 可拖拽 + 侧边栏导航 + 确定/取消/应用
+/// Settings panel — draggable dialog with sidebar navigation and OK/Cancel/Apply.
 ///
-/// 语言和主题变更延迟到对话框关闭时应用（避免 MaterialApp 重建导致对话框丢失）。
-/// GeneralTab 接收 pending 值，用户选择时更新 pending 状态，不立即触发服务状态变更。
-/// ShortcutsTab 通过回调通知变更，取消时恢复原始绑定。
+/// Sidebar navigation pattern: 7 tabs mapped by index via [_Sidebar] → [_buildTab].
+/// Tabs: General(0), Equalizer(1), Audio(2), Video(3), Shortcuts(4), About(5), Performance(6).
+///
+/// Locale and theme changes are deferred until dialog close (avoid MaterialApp rebuild
+/// losing dialog state). GeneralTab receives pending values; ShortcutsTab notifies via
+/// callback, restoring originals on cancel.
 class SettingsPanel extends StatefulWidget {
   final EngineState engine;
   final VideoProcessingService? videoProcessing;

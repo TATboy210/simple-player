@@ -7,7 +7,17 @@ import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/app_dialog.dart';
 
-/// 视频属性对话框 — 显示媒体文件的元数据信息
+/// Media info dialog — displays technical metadata of the current media file.
+///
+/// Shows file path, video properties (resolution, codec, pixel aspect ratio),
+/// duration, audio tracks (codec, channels, language), and subtitle tracks.
+/// Data comes from [EngineState.mediaInfo] which is populated by MDK after file open.
+///
+/// Each field:
+/// - codec: 编解码器名称（如 H.264, HEVC, VP9）
+/// - resolution: 视频分辨率（如 1920×1080）
+/// - aspectRatio: 画面宽高比
+/// - pixelAspectRatio: 像素宽高比（非方形像素校正）
 class MediaInfoDialog extends StatelessWidget {
   final String path;
   final MediaInfo info;
