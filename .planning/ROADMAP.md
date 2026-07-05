@@ -210,10 +210,10 @@
   3. Shared 层 4 个组件均有使用场景和模式说明
   4. `flutter analyze` 无新增 warning/error
 
-**Plans**: 0/2 plans complete
+**Plans**: 2/2 plans complete
 
-- [ ] 23-01-PLAN.md — Dialogs (DOC-33~DOC-37)
-- [ ] 23-02-PLAN.md — Player + Shared (DOC-38~DOC-45)
+- [x] 23-01-PLAN.md — Dialogs (DOC-33~DOC-37)
+- [x] 23-02-PLAN.md — Player + Shared (DOC-38~DOC-45)
 
 **UI hint**: no
 
@@ -246,5 +246,5 @@
 | 20. Technical Debt Cleanup | 2/2 | Complete   | 2026-07-04 |
 | 21. Kernel Engine & Bridge Docs | 2/2 | Complete | 2026-07-04 |
 | 22. Kernel Models/Utils/Services Docs | 2/2 | Complete    | 2026-07-04 |
-| 23. UI Layer Docs | 0/2 | Pending | - |
+| 23. UI Layer Docs | 2/2 | Complete   | 2026-07-05 |
 | 24. Features & Verification | 0/1 | Pending | - |
