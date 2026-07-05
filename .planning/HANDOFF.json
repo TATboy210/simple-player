@@ -1,34 +1,35 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-05T00:00:00.000Z",
-  "phase": "22",
-  "phase_name": "kernel-models-utils-services-docs",
-  "phase_dir": ".planning/phases/22-kernel-models-utils-services-docs",
-  "plan": 0,
+  "timestamp": "2026-07-06T00:00:00.000Z",
+  "phase": "25",
+  "phase_name": "performance-quick-wins",
+  "phase_dir": ".planning/phases/25-performance-quick-wins",
+  "plan": 1,
   "task": 0,
-  "total_tasks": 0,
-  "status": "ready",
+  "total_tasks": 2,
+  "status": "paused",
   "completed_tasks": [],
-  "remaining_tasks": [],
+  "remaining_tasks": [
+    {"id": 1, "name": "Tokens 常量 + GlassTier blur 缓存", "status": "not_started"},
+    {"id": 2, "name": "ControlsOverlay 动画 + ControlBar/PlaylistPanel 缓存清理", "status": "not_started"}
+  ],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "运行 app 验证控制栏淡蓝辉光色值", "context": "D-17: 色值为近似值，需在实际显示器上确认并微调", "blocking": false}
+  ],
   "decisions": [
-    {"decision": "Phase 22 context discussion completed", "rationale": "16 files audited, 11 decisions captured (D-01~D-11)", "phase": "22"},
-    {"decision": "app_settings.dart every field gets doc comment", "rationale": "User chose most thorough option for 25+ fields", "phase": "22"},
-    {"decision": "Mixed language rules inherited from Phase 21", "rationale": "/// English + // Chinese, consistent with Phase 21", "phase": "22"},
-    {"decision": "Skip boilerplate methods (copyWith, ==, hashCode)", "rationale": "Phase 21 precedent, self-explanatory signatures", "phase": "22"},
-    {"decision": "7 C-class files skipped", "rationale": "Already well-documented, no changes needed", "phase": "22"},
-    {"decision": "4 file path corrections noted", "rationale": "REQUIREMENTS.md paths don't match actual locations", "phase": "22"},
-    {"decision": "playbackSpeed anomaly documented but not fixed", "rationale": "Documentation-only phase, bug is in operator ==/hashCode contract", "phase": "22"}
+    {"decision": "SingleTickerProviderStateMixin → TickerProviderStateMixin", "rationale": "AutoHideController 已占用唯一 ticker，新增 AnimationController 需要第二个", "phase": "25"},
+    {"decision": "共享 AnimationController 驱动 resize + decoration 两个动画", "rationale": "D-09: resize 优先级更高，resize 期间 decoration 动画暂停", "phase": "25"},
+    {"decision": "控制栏颜色从白色微光改为淡蓝辉光", "rationale": "D-15~D-18: 与午夜蓝背景融合，playing 稍亮 idle 稍淡", "phase": "25"}
   ],
   "uncommitted_files": [
-    ".planning/STATE.md",
-    ".planning/phases/22-kernel-models-utils-services-docs/22-CONTEXT.md",
-    ".planning/phases/22-kernel-models-utils-services-docs/22-DISCUSSION-LOG.md",
-    ".planning/phases/22-kernel-models-utils-services-docs/22-01-PLAN.md",
-    ".planning/phases/22-kernel-models-utils-services-docs/22-02-PLAN.md"
+    ".planning/phases/25-performance-quick-wins/25-01-PLAN.md",
+    ".planning/phases/25-performance-quick-wins/25-RESEARCH.md",
+    ".planning/phases/25-performance-quick-wins/25-VALIDATION.md",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md"
   ],
-  "next_action": "Execute Phase 22: run /gsd-execute-phase 22 to start documentation work",
-  "context_notes": "Phase 22 fully planned. 22-01 covers Models+Utils (5 files, 3 tasks), 22-02 covers Services+Others (4 files, 2 tasks). 9 files total to modify, 7 C-class files skipped. Context was at 76% when pausing."
+  "next_action": "运行 /gsd-execute-phase 25 执行 Task 1 (Tokens + GlassTier blur 缓存)",
+  "context_notes": "Phase 25 规划阶段完成。研究(HIGH confidence)→规划(1 plan, 2 tasks)→验证(1 blocker + 2 warnings, 全部修复)。准备好执行。Context 接近 78% 上限，建议新会话执行。"
 }

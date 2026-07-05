@@ -33,7 +33,7 @@
 
 **Plans**: 0/1 plans complete
 
-- [ ] 25-01-PLAN.md — Resize 渐变 + 缓存优化 + 魔法数字提取
+- [ ] 25-01-PLAN.md — Resize 渐变 + decoration/blur 缓存 + 魔法数字提取 + 淡蓝辉光
 
 **UI hint**: yes
 
