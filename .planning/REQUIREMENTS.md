@@ -119,88 +119,88 @@
 
 ### Kernel Engine 层
 
-- [ ] **DOC-01**: `d3d11_configurator.dart` — D3D11 参数含义、sync.cpu 作用、为什么需要这些配置
-- [ ] **DOC-02**: `subtitle_configurator.dart` — 字幕延迟参数、文件格式检测逻辑
-- [ ] **DOC-03**: `volume_controller.dart` — 音量曲线、对数/线性映射选择原因
-- [ ] **DOC-04**: `track_manager.dart` — 音轨/字幕轨管理策略、选择算法
-- [ ] **DOC-05**: `fvp_callback_handler.dart` — 回调事件类型、状态转换时机
-- [ ] **DOC-06**: `video_effect_controller.dart` — 视频特效参数、MDK effect API 说明
-- [ ] **DOC-07**: `engine_prewarm.dart` — 预热策略、超时设置、为什么需要预热
-- [ ] **DOC-08**: `network_configurator.dart` — 网络缓冲参数、协议配置
-- [ ] **DOC-09**: `renderer_config.dart` — 渲染器参数、D3D11 vs OpenGL 选择
-- [ ] **DOC-10**: `track_control.dart` — 音轨/字幕轨控制接口
-- [ ] **DOC-11**: `video_effects.dart` — 视频特效枚举和参数
-- [ ] **DOC-12**: `open_result.dart` — 打开结果数据结构
+- [x] **DOC-01**: `d3d11_configurator.dart` — D3D11 参数含义、sync.cpu 作用、为什么需要这些配置
+- [x] **DOC-02**: `subtitle_configurator.dart` — 字幕延迟参数、文件格式检测逻辑
+- [x] **DOC-03**: `volume_controller.dart` — 音量曲线、对数/线性映射选择原因
+- [x] **DOC-04**: `track_manager.dart` — 音轨/字幕轨管理策略、选择算法
+- [x] **DOC-05**: `fvp_callback_handler.dart` — 回调事件类型、状态转换时机
+- [x] **DOC-06**: `video_effect_controller.dart` — 视频特效参数、MDK effect API 说明
+- [x] **DOC-07**: `engine_prewarm.dart` — 预热策略、超时设置、为什么需要预热
+- [x] **DOC-08**: `network_configurator.dart` — 网络缓冲参数、协议配置
+- [x] **DOC-09**: `renderer_config.dart` — 渲染器参数、D3D11 vs OpenGL 选择
+- [x] **DOC-10**: `track_control.dart` — 音轨/字幕轨控制接口
+- [x] **DOC-11**: `video_effects.dart` — 视频特效枚举和参数
+- [x] **DOC-12**: `open_result.dart` — 打开结果数据结构
 
 ### Kernel Bridge 层
 
-- [ ] **DOC-13**: `display_config.dart` — 显示器配置参数、多显示器逻辑
-- [ ] **DOC-14**: `window_persistence.dart` — 窗口状态持久化策略
-- [ ] **DOC-15**: `display_enumerator.dart` — 显示器枚举接口
-- [ ] **DOC-16**: `win32_display_enumerator.dart` — Win32 EnumDisplayMonitors 回调逻辑
+- [x] **DOC-13**: `display_config.dart` — 显示器配置参数、多显示器逻辑
+- [x] **DOC-14**: `window_persistence.dart` — 窗口状态持久化策略
+- [x] **DOC-15**: `display_enumerator.dart` — 显示器枚举接口
+- [x] **DOC-16**: `win32_display_enumerator.dart` — Win32 EnumDisplayMonitors 回调逻辑
 
 ### Kernel Models & Utils
 
 - [x] **DOC-17**: `aspect_ratio_mode.dart` — 宽高比模式枚举含义
-- [ ] **DOC-18**: `validation_error.dart` — 验证错误类型和处理策略
-- [ ] **DOC-19**: `app_settings.dart` — 设置项默认值和约束
-- [ ] **DOC-20**: `player_error.dart` — 错误类型分类和恢复策略
-- [ ] **DOC-21**: `perf_monitor.dart` — 性能指标含义、阈值设置
-- [ ] **DOC-22**: `debug_probe.dart` — 调试探针工作原理
-- [ ] **DOC-23**: `memory_monitor.dart` — 内存监控策略、告警阈值
-- [ ] **DOC-24**: `debug_exporter.dart` — 调试导出格式和用途
-- [ ] **DOC-25**: `screen_utils.dart` — 屏幕工具函数、DPI 处理
+- [x] **DOC-18**: `validation_error.dart` — 验证错误类型和处理策略
+- [x] **DOC-19**: `app_settings.dart` — 设置项默认值和约束
+- [x] **DOC-20**: `player_error.dart` — 错误类型分类和恢复策略
+- [x] **DOC-21**: `perf_monitor.dart` — 性能指标含义、阈值设置
+- [x] **DOC-22**: `debug_probe.dart` — 调试探针工作原理
+- [x] **DOC-23**: `memory_monitor.dart` — 内存监控策略、告警阈值
+- [x] **DOC-24**: `debug_exporter.dart` — 调试导出格式和用途
+- [x] **DOC-25**: `screen_utils.dart` — 屏幕工具函数、DPI 处理
 
 ### Kernel Services & Others
 
-- [ ] **DOC-26**: `global_hotkey_service.dart` — 全局热键注册机制、平台差异
-- [ ] **DOC-27**: `locale_service.dart` — 国际化服务、语言回退策略
-- [ ] **DOC-28**: `thumbnail_service.dart` — 缩略图生成策略、LRU 缓存
-- [ ] **DOC-29**: `startup_coordinator.dart` — 启动协调器、依赖顺序
-- [ ] **DOC-30**: `startup_state.dart` — 启动状态机、状态转换
-- [ ] **DOC-31**: `folder_scanner.dart` — 文件夹扫描策略、过滤规则
+- [x] **DOC-26**: `global_hotkey_service.dart` — 全局热键注册机制、平台差异
+- [x] **DOC-27**: `locale_service.dart` — 国际化服务、语言回退策略
+- [x] **DOC-28**: `thumbnail_service.dart` — 缩略图生成策略、LRU 缓存
+- [x] **DOC-29**: `startup_coordinator.dart` — 启动协调器、依赖顺序
+- [x] **DOC-30**: `startup_state.dart` — 启动状态机、状态转换
+- [x] **DOC-31**: `folder_scanner.dart` — 文件夹扫描策略、过滤规则
 - [x] **DOC-32**: `settings_validator.dart` — 设置验证规则
 
 ### UI Dialogs 层
 
-- [ ] **DOC-33**: `equalizer_tab.dart` — FFmpeg 滤镜语法解释、预设值含义
-- [ ] **DOC-34**: `audio_tab.dart` — 音频设置参数说明
-- [ ] **DOC-35**: `video_tab.dart` — 视频设置参数说明
-- [ ] **DOC-36**: `settings_tab_performance.dart` — 性能设置参数说明
-- [ ] **DOC-37**: `media_info_dialog.dart` — 媒体信息字段含义
+- [x] **DOC-33**: `equalizer_tab.dart` — FFmpeg 滤镜语法解释、预设值含义
+- [x] **DOC-34**: `audio_tab.dart` — 音频设置参数说明
+- [x] **DOC-35**: `video_tab.dart` — 视频设置参数说明
+- [x] **DOC-36**: `settings_tab_performance.dart` — 性能设置参数说明
+- [x] **DOC-37**: `media_info_dialog.dart` — 媒体信息字段含义
 
 ### UI Player 层
 
-- [ ] **DOC-38**: `drop_handler.dart` — 拖放处理逻辑、文件类型过滤
-- [ ] **DOC-39**: `player_actions.dart` — 播放器动作定义和分发
-- [ ] **DOC-40**: `error_banner.dart` — 错误横幅显示策略
-- [ ] **DOC-41**: `time_range_display.dart` — 时间范围显示逻辑
+- [x] **DOC-38**: `drop_handler.dart` — 拖放处理逻辑、文件类型过滤
+- [x] **DOC-39**: `player_actions.dart` — 播放器动作定义和分发
+- [x] **DOC-40**: `error_banner.dart` — 错误横幅显示策略
+- [x] **DOC-41**: `time_range_display.dart` — 时间范围显示逻辑
 
 ### UI Shared 层
 
-- [ ] **DOC-42**: `app_dialog.dart` — 对话框基类、通用模式
-- [ ] **DOC-43**: `context_menu_row.dart` — 右键菜单行组件
-- [ ] **DOC-44**: `merged_listenable.dart` — 多 ValueNotifier 合并原理
-- [ ] **DOC-45**: `splash_screen.dart` — 启动画面逻辑、动画
+- [x] **DOC-42**: `app_dialog.dart` — 对话框基类、通用模式
+- [x] **DOC-43**: `context_menu_row.dart` — 右键菜单行组件
+- [x] **DOC-44**: `merged_listenable.dart` — 多 ValueNotifier 合并原理
+- [x] **DOC-45**: `splash_screen.dart` — 启动画面逻辑、动画
 
 ### Features 层
 
-- [ ] **DOC-46**: `deferred_player_feature.dart` — 延迟加载特性模式
-- [ ] **DOC-47**: `state_monitor.dart` — 状态监控服务
-- [ ] **DOC-48**: `auto_advance_policy.dart` — 自动跳转策略
-- [ ] **DOC-49**: `player_error_bus.dart` — 错误总线模式
-- [ ] **DOC-50**: `playback_contract.dart` — 播放契约接口
+- [x] **DOC-46**: `deferred_player_feature.dart` — 延迟加载特性模式
+- [x] **DOC-47**: `state_monitor.dart` — 状态监控服务
+- [x] **DOC-48**: `auto_advance_policy.dart` — 自动跳转策略
+- [x] **DOC-49**: `player_error_bus.dart` — 错误总线模式
+- [x] **DOC-50**: `playback_contract.dart` — 播放契约接口
 
-- [ ] **DOC-51**: `player_feature.dart` — MVVM View 层，UI 状态管理与 PlayerScreen 组合
-- [ ] **DOC-52**: `player_view_model.dart` — MVVM ViewModel 层，业务逻辑与 UI 状态分离
-- [ ] **DOC-53**: `player_services.dart` — DI 容器，服务创建与生命周期管理
-- [ ] **DOC-54**: `video_processing_state.dart` — 不可变值对象，diff-based 同步模式
-- [ ] **DOC-55**: `playback_controller.dart` — 播放控制器 facade，子模块编排
-- [ ] **DOC-56**: `playback_navigator.dart` — 索引导航与 openGeneration 并发守卫
-- [ ] **DOC-57**: `breakpoint_saver.dart` — 断点保存策略
-- [ ] **DOC-58**: `file_operations.dart` — 文件打开/批量添加与路径校验
-- [ ] **DOC-59**: `subtitle_service.dart` — 外挂字幕自动检测与加载
-- [ ] **DOC-60**: `video_processing_service.dart` — 视频处理服务，copyWith 状态管理
+- [x] **DOC-51**: `player_feature.dart` — MVVM View 层，UI 状态管理与 PlayerScreen 组合
+- [x] **DOC-52**: `player_view_model.dart` — MVVM ViewModel 层，业务逻辑与 UI 状态分离
+- [x] **DOC-53**: `player_services.dart` — DI 容器，服务创建与生命周期管理
+- [x] **DOC-54**: `video_processing_state.dart` — 不可变值对象，diff-based 同步模式
+- [x] **DOC-55**: `playback_controller.dart` — 播放控制器 facade，子模块编排
+- [x] **DOC-56**: `playback_navigator.dart` — 索引导航与 openGeneration 并发守卫
+- [x] **DOC-57**: `breakpoint_saver.dart` — 断点保存策略
+- [x] **DOC-58**: `file_operations.dart` — 文件打开/批量添加与路径校验
+- [x] **DOC-59**: `subtitle_service.dart` — 外挂字幕自动检测与加载
+- [x] **DOC-60**: `video_processing_service.dart` — 视频处理服务，copyWith 状态管理
 
 ## Out of Scope
 
@@ -215,11 +215,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOC-01 ~ DOC-12 | Phase 1: Kernel Engine | Pending |
-| DOC-13 ~ DOC-16 | Phase 1: Kernel Bridge | Pending |
-| DOC-17 ~ DOC-32 | Phase 2: Kernel Models/Utils/Services | Pending |
-| DOC-33 ~ DOC-45 | Phase 3: UI Layer | Pending |
-| DOC-46 ~ DOC-60 | Phase 4: Features & Verification | Pending |
+| DOC-01 ~ DOC-12 | Phase 21: Kernel Engine | Complete |
+| DOC-13 ~ DOC-16 | Phase 21: Kernel Bridge | Complete |
+| DOC-17 ~ DOC-32 | Phase 22: Kernel Models/Utils/Services | Complete |
+| DOC-33 ~ DOC-45 | Phase 23: UI Layer | Complete |
+| DOC-46 ~ DOC-60 | Phase 24: Features & Verification | Complete |
 
 **Coverage:**
 
