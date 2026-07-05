@@ -1,3 +1,16 @@
+/// Services 层状态监控模块 — 自动连播、断点保存、设置恢复
+///
+/// 本文件实现 [StateMonitor] 作为引擎状态变化的观察者，负责：
+/// 1. 初始化时恢复持久化设置（音量、静音状态）
+/// 2. 监听引擎状态变化，驱动断点保存和自动连播
+/// 3. 销毁时异步保存所有运行时状态
+///
+/// 架构位置：PlaybackController → **StateMonitor** → EngineState.state (ValueNotifier)
+/// 设计模式：Observer（观察者模式）— 监听 MediaState 变化触发行为
+/// 与 AutoAdvancePolicy 的关系：StateMonitor 是早期实现，包含断点保存+设置恢复+自动连播。
+/// AutoAdvancePolicy 是重构后的独立策略类，专注于自动连播逻辑。
+library;
+
 import '../../../kernel/engine/engine_state.dart';
 import 'dart:async';
 
@@ -7,23 +20,30 @@ import '../../../kernel/persistence/playlist_store.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import 'playback_controller.dart';
 
-/// 状态监听 — 自动连播、断点保存、设置恢复
+/// 状态监控服务 — 监听引擎状态变化并执行副作用
 ///
-/// 职责: init, dispose, _onStateChanged
+/// 三大职责：
+/// - **设置恢复**：init() 时从 SettingsStore 加载音量/静音状态并应用到引擎
+/// - **状态监听**：_onStateChanged() 处理 paused（断点保存）和 completed（自动连播）
+/// - **销毁保存**：dispose() 异步保存当前音量/静音/播放模式和播放列表位置
+///
+/// 使用方式：通过 PlaybackController.monitor 访问，由 PlaybackController.init() 触发初始化。
 class StateMonitor {
   StateMonitor(this._controller);
   final PlaybackController _controller;
 
   bool _initialized = false;
 
-  /// 初始化: 恢复设置 + 监听引擎状态
+  /// 初始化：恢复设置 + 注册引擎状态监听
   ///
   /// [settings] 可选 — 调用方已加载时传入，避免重复 IO。
+  ///幂等操作：多次调用只执行一次（_initialized 守卫）。
   Future<void> init({AppSettings? settings}) async {
     if (_initialized) return;
     _initialized = true;
     _controller.engine.state.addListener(_onStateChanged);
 
+    // fire-and-forget：后台加载播放列表用于历史迁移，不阻塞主 UI
     unawaited(_loadPlaylistForMigration());
 
     try {
@@ -47,7 +67,12 @@ class StateMonitor {
     }
   }
 
-  /// 自动连播：引擎状态变为 completed 时根据播放模式决定行为
+  /// 引擎状态变化回调 — 根据新状态执行相应副作用
+  ///
+  /// 状态机：
+  /// - paused → 保存当前播放位置到播放列表（断点保存）
+  /// - completed → 根据播放模式决定行为（单曲循环 or 自动下一首）
+  /// - 其他状态 → 忽略
   void _onStateChanged() {
     final state = _controller.engine.state.value;
 
@@ -95,10 +120,16 @@ class StateMonitor {
     }
   }
 
-  /// 释放资源
+  /// 释放资源 — 注销监听器，异步保存所有运行时状态
+  ///
+  /// 保存内容：
+  /// - 当前播放位置（仅在有有效播放进度时保存）
+  /// - 音量、静音状态、播放模式（fire-and-forget，不阻塞销毁流程）
+  /// - 播放列表到持久化存储
   void dispose() {
     _controller.engine.state.removeListener(_onStateChanged);
     final idx = _controller.playlist.currentIndex;
+    // position > 0 表示用户实际播放过，否则保存 "0 位置" 没有意义
     if (idx >= 0 && _controller.engine.position.value > 0) {
       _controller.playlist.updatePosition(
         idx,
@@ -107,6 +138,7 @@ class StateMonitor {
       );
       _controller.savePlaylist();
     }
+    // fire-and-forget 保存：错误仅日志记录，不阻塞销毁流程
     unawaited(
       SettingsStore.saveVolume(
         _controller.engine.volume.value,
