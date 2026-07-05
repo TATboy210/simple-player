@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +5,7 @@ import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/edge_glow.dart';
+import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
 import 'center_controls.dart';
 import 'player_actions.dart';
@@ -17,63 +16,42 @@ import 'volume_controls.dart';
 
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
-  static final _blurFilter = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlur,
-    sigmaY: Tokens.glassBlur,
-  );
 
-  /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框
-  ///
-  /// Getter 而非 static final：AnimatedContainer 需要每帧新建 BoxDecoration
-  /// 才能对 color 和 border 做隐式插值动画（D-01/D-07）。
-  BoxDecoration get _decorationPlaying => BoxDecoration(
+  /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框（D-01: static final 缓存）
+  static final _decorationPlaying = BoxDecoration(
     color: Tokens.controlBarBg,
-    borderRadius: _borderRadius,
+    borderRadius: ControlBar._borderRadius,
     border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
-      BoxShadow(
-        color: Tokens.controlBarBorderWhite,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, -1),
-      ),
-      BoxShadow(
-        color: Tokens.controlBarShadowBlack,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, 1),
-      ),
-      BoxShadow(
-        color: Tokens.controlBarOuterShadow,
-        blurRadius: 32,
-        offset: Offset(0, 8),
-      ),
+      // CSS: inset 0 1px 0 rgba(255,255,255,0.04) — 顶部内高光
+      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      // CSS: inset 0 -1px 0 rgba(0,0,0,0.1) — 底部内阴影
+      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      // CSS: 0 8px 32px rgba(0,0,0,0.25) — 外层投影
+      BoxShadow(color: Tokens.controlBarOuterShadow, blurRadius: 32, offset: Offset(0, 8)),
+      // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
       BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
     ],
   );
 
-  /// 空状态装饰 — 半透明背景 + 淡化边框，与 Aurora 背景融合
-  ///
-  /// Getter：与 _decorationPlaying 同理，AnimatedContainer 需要新对象做插值。
-  BoxDecoration get _decorationIdle => BoxDecoration(
-    color: Tokens.controlBarBgIdle,
-    borderRadius: _borderRadius,
-    border: Border.all(color: Tokens.controlBarBorderIdle, width: 1),
+  /// 空状态装饰 — 淡化蓝辉光 + 补齐 4 个 BoxShadow（D-01/D-04）
+  static final _decorationIdle = BoxDecoration(
+    color: Tokens.controlBarBg,
+    borderRadius: ControlBar._borderRadius,
+    border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
-      BoxShadow(
-        color: Tokens.controlBarBorderIdle,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, -1),
-      ),
-      BoxShadow(
-        color: Tokens.controlBarShadowBlack,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, 1),
-      ),
-      // 空状态无外层投影 — 减轻视觉重量
+      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      // 补齐 4 个 BoxShadow，让 DecorationTween 插值更平滑（D-04）
+      BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
+      BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
     ],
+  );
+
+  /// DecorationTween — playing/idle 状态插值（D-01/D-02）
+  static final _decorationTween = DecorationTween(
+    begin: _decorationIdle,
+    end: _decorationPlaying,
   );
 
   final EngineState engine;
@@ -90,6 +68,9 @@ class ControlBar extends StatelessWidget {
   /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
   final ValueListenable<bool>? resizing;
 
+  /// 装饰动画 — 驱动 playing/idle 状态切换的 DecorationTween 插值（D-01/D-02）
+  final Animation<double>? decoration;
+
   const ControlBar({
     super.key,
     required this.engine,
@@ -99,6 +80,7 @@ class ControlBar extends StatelessWidget {
     this.title,
     this.opacity,
     this.resizing,
+    this.decoration,
   });
 
   @override
@@ -107,146 +89,136 @@ class ControlBar extends StatelessWidget {
     final prevTooltip = l10n.previousTrack;
     final nextTooltip = l10n.nextTrack;
 
-    // 交互层 — 按钮、进度条、标题（不受 BackdropFilter 影响）
-    final interactive = Material(
-      color: Colors.transparent,
-      child: SizedBox(
-        height: Tokens.controlBarHeight,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Tokens.controlBarMarginH),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final w = constraints.maxWidth;
-              final showSecondary = w >= Tokens.compactBreakpoint;
+    // decoration 非空时用 DecorationTween 插值，否则直接使用 playing 装饰
+    final effectiveDecoration = decoration != null
+        ? _decorationTween.evaluate(decoration!)
+        : _decorationPlaying;
 
-              return Column(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title ?? '',
-                            style: TextStyle(
-                              color: isIdle
-                                  ? Tokens.controlBarTextPrimaryIdle
-                                  : Tokens.textPrimary,
-                              fontSize: Tokens.fontBody,
-                              fontWeight: Tokens.weightMedium,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        TimeRangeDisplay(engine: engine),
+    final content = EdgeGlow(
+      variant: EdgeGlowVariant.gradient,
+      borderRadius: _borderRadius,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          height: Tokens.controlBarHeight,
+          decoration: effectiveDecoration,
+          padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+          child: Stack(
+            children: [
+              // CSS .player-controls::before — 顶部渐变光线
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: const [
+                        Color(0x005082FF), // transparent
+                        Tokens.glowAccent,
+                        Color(0x005082FF), // transparent
                       ],
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Center(child: _ProgressRow(engine: engine)),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: _buildButtonRow(
-                        context,
-                        l10n,
-                        showSecondary,
-                        prevTooltip,
-                        nextTooltip,
-                        w,
+                ),
+              ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final w = constraints.maxWidth;
+                  final showSecondary = w >= Tokens.compactBreakpoint;
+
+                  return Column(
+                    children: [
+                      // Row 1 (Top): 标题 | 时间显示 — 等分空间
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title ?? '',
+                                style: const TextStyle(
+                                  color: Tokens.textPrimary,
+                                  fontSize: Tokens.fontBody,
+                                  fontWeight: Tokens.weightMedium,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            TimeRangeDisplay(engine: engine),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                      // Row 2 (Middle): ProgressBar — 等分空间
+                      Expanded(
+                        child: Center(
+                          child: _ProgressRow(engine: engine),
+                        ),
+                      ),
+                      // Row 3 (Bottom): Left | Spacer | Center | Spacer | Right — 等分空间
+                      Expanded(
+                        child: _buildButtonRow(
+                          context,
+                          l10n,
+                          showSecondary,
+                          prevTooltip,
+                          nextTooltip,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
     );
 
-    // 背景层 — AnimatedContainer 对 color + border 做隐式插值（D-01/D-02/D-04）
-    final background = AnimatedContainer(
-      duration: const Duration(milliseconds: Tokens.durationNormal),
-      curve: Curves.easeInOut,
-      height: Tokens.controlBarHeight,
-      decoration: isIdle ? _decorationIdle : _decorationPlaying,
-    );
-
-    // idle 时降低 EdgeGlow 强度，播放时全强度
-    final content = EdgeGlow(
-      variant: EdgeGlowVariant.gradient,
-      borderRadius: _borderRadius,
-      glowIntensity: isIdle ? 0.3 : null,
-      child: Stack(
-        children: [
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 1,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    Tokens.glowAccent,
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          interactive,
-        ],
-      ),
-    );
-
     if (!enableBlur) return RepaintBoundary(child: content);
 
-    final resizingNotifier = resizing;
-    if (resizingNotifier != null) {
+    // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
+    if (resizing != null) {
       return AnimatedBuilder(
-        animation: resizingNotifier,
+        animation: resizing!,
         builder: (_, child) {
-          if (resizingNotifier.value) return RepaintBoundary(child: child!);
-          return _buildBlur(background, child!);
+          if (resizing!.value) return RepaintBoundary(child: child!);
+          return _buildBlur(child!);
         },
         child: content,
       );
     }
 
-    return _buildBlur(background, content);
+    return _buildBlur(content);
   }
 
-  /// BackdropFilter 仅包裹背景层，交互层不受影响
-  Widget _buildBlur(Widget background, Widget foreground) {
-    Widget withBlur(Widget bg) => ClipRRect(
+  Widget _buildBlur(Widget content) {
+    // opacity=0 时跳过 BackdropFilter（fade-out 尾部帧零 GPU readback）
+    final blurContent = RepaintBoundary(child: content);
+
+    // P1 优化：移除 ColorFilter.matrix 饱和度矩阵（每帧 GPU pass）
+    Widget withBlur(Widget child) => ClipRRect(
       borderRadius: _borderRadius,
-      child: BackdropFilter(filter: _blurFilter, child: bg),
+      child: BackdropFilter(
+        filter: GlassTier.normal.blurFilter,
+        child: child,
+      ),
     );
 
-    final opacityNotifier = opacity;
-    Widget blurredBg;
-    if (opacityNotifier != null) {
-      blurredBg = AnimatedBuilder(
-        animation: opacityNotifier,
+    if (opacity != null) {
+      return AnimatedBuilder(
+        animation: opacity!,
         builder: (_, child) {
-          if (opacityNotifier.value < 0.01) return child!;
+          if (opacity!.value < 0.01) return child!;
           return withBlur(child!);
         },
-        child: RepaintBoundary(child: background),
+        child: blurContent,
       );
-    } else {
-      blurredBg = withBlur(RepaintBoundary(child: background));
     }
 
-    return Stack(children: [blurredBg, foreground]);
+    return withBlur(blurContent);
   }
 
   /// 按钮行：左右组 + 居中播放按钮群
@@ -259,12 +231,12 @@ class ControlBar extends StatelessWidget {
     bool showSecondary,
     String prevTooltip,
     String nextTooltip,
-    double availableWidth,
   ) {
+    final w = MediaQuery.sizeOf(context).width;
     // 仅中心播放按钮（隐藏左右组 + stop/rewind/forward）
-    final ultraCompact = availableWidth <= Tokens.breakpointUltraCompact;
+    final ultraCompact = w <= 360;
     // 隐藏左右组，中心保留全部按钮
-    final compact = !ultraCompact && availableWidth <= Tokens.compactBreakpoint;
+    final compact = !ultraCompact && w <= 500;
 
     if (ultraCompact) {
       return Row(
@@ -298,7 +270,9 @@ class ControlBar extends StatelessWidget {
       );
     }
 
-    return Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
       children: [
         _LeftButtonGroup(
           engine: engine,
@@ -315,8 +289,11 @@ class ControlBar extends StatelessWidget {
           onNext: actions.onNext,
         ),
         const Spacer(),
-        _RightButtonGroup(actions: actions),
+        _RightButtonGroup(
+          actions: actions,
+        ),
       ],
+    ),
     );
   }
 }
@@ -366,6 +343,7 @@ class _CompactCenterGroup extends StatelessWidget {
   final VoidCallback? onNext;
 
   const _CompactCenterGroup({
+    super.key,
     required this.engine,
     required this.isIdle,
     required this.prevTooltip,
@@ -377,7 +355,7 @@ class _CompactCenterGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dimmed = isIdle
-        ? Tokens.controlBarTextPrimaryIdle
+        ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
         : Tokens.textPrimary;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -406,7 +384,9 @@ class _CompactCenterGroup extends StatelessWidget {
 class _RightButtonGroup extends StatelessWidget {
   final PlayerActions actions;
 
-  const _RightButtonGroup({required this.actions});
+  const _RightButtonGroup({
+    required this.actions,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +417,7 @@ class _RightButtonGroup extends StatelessWidget {
             icon: Icons.settings,
             onPressed: actions.onSettings,
             onSecondaryTapUp: actions.onSettingsSecondary != null
-                ? (d) => actions.onSettingsSecondary?.call(context, d)
+                ? (d) => actions.onSettingsSecondary!(context, d)
                 : null,
             tooltip: l10n.settings,
           ),
