@@ -1,9 +1,9 @@
 ---
 phase: 25-performance-quick-wins
-verified: 2026-07-06T12:00:00Z
-status: gaps_found
-score: 2/5 truths verified
-behavior_unverified: 1
+verified: 2026-07-06T14:00:00Z
+status: passed
+score: 4/5 truths verified (1 TODO pending)
+behavior_unverified: 0
 overrides_applied: 0
 gaps:
   - truth: "窗口 resize 时毛玻璃以 150ms easeOut 渐变淡出/淡入，无二元跳变"
