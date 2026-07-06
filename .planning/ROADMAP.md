@@ -31,9 +31,10 @@
   5. `flutter analyze` 无新增 warning/error
   6. 所有现有测试通过
 
-**Plans**: 1/1 plans complete
+**Plans**: 2/2 plans complete
 
 - [x] 25-01-PLAN.md — Resize 渐变 + decoration/blur 缓存 + 魔法数字提取 + 淡蓝辉光
+- [x] 25-02-PLAN.md — Gap closure: resize fade-out 修复 + decoration state wiring + controlBarBorderIdle + build errors
 
 **UI hint**: yes
 
