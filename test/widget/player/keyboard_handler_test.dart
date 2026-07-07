@@ -181,5 +181,75 @@ void main() {
       expect(tracker.subtitleDelayForward, 1);
       expect(tracker.subtitleDelayBackward, 1);
     });
+
+    // ── F1 help key ──
+
+    testWidgets('F1 key triggers showHelp callback', (tester) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.f1);
+      expect(tracker.showHelp, 1);
+    });
+
+    // ── Null callback safety ──
+
+    testWidgets('null callbacks do not crash on key press', (tester) async {
+      // 所有回调为 null — 按键不应抛异常
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: KeyboardHandler(
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      // 发送多个不同按键 — 全部应安全忽略
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.f1);
+      // 无异常 = 通过
+    });
+
+    // ── CustomBindings ──
+
+    testWidgets('customBindings overrides default key mapping', (tester) async {
+      // 将 playPause 绑定到 KeyA 而非 Space
+      final bindings = {
+        'playPause': LogicalKeyboardKey.keyA.keyId.toString(),
+      };
+      await tester.pumpWidget(_buildSubject(tracker, bindings: bindings));
+
+      // KeyA 应触发 playPause（自定义绑定）
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyA);
+      expect(tracker.playPause, 1);
+
+      // Space 不再触发 playPause（被自定义绑定覆盖）
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      expect(tracker.playPause, 1); // 仍然1，未增加
+    });
+
+    testWidgets('customBindings partial — unmatched actions use default keys',
+        (tester) async {
+      // 只覆盖 playPause，其他动作保留默认按键
+      final bindings = {
+        'playPause': LogicalKeyboardKey.keyA.keyId.toString(),
+      };
+      await tester.pumpWidget(_buildSubject(tracker, bindings: bindings));
+
+      // seekForward 仍绑定默认的 ArrowRight
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      expect(tracker.seekForward, 1);
+    });
+
+    // ── F12 debug key ──
+
+    testWidgets('F12 key does not crash (perf stats export)', (tester) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      // F12 调用 PerfMonitor.instance.exportStats() — 验证不抛异常
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.f12);
+      // 无异常 = 通过（F12 不触发任何用户回调）
+      expect(tracker.playPause, 0);
+    });
   });
 }
