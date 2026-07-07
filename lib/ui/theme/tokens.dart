@@ -235,6 +235,8 @@ class Tokens {
 
   // ── 音量/倍速控件 ──
   static const double volumeSliderWidth = 100;
+  /// VolumeSlider 拖拽节流间隔（≤10 次/秒）
+  static const int volumeThrottleMs = 100;
   static const double speedButtonWidth = 72;
   static const double speedButtonHeight = 36;
   static const double speedSegmentWidth = 36;
