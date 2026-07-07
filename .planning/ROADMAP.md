@@ -13,7 +13,7 @@
 - ✅ **v1.3 Glass Morphism Coordination** - Phases 16-19 (shipped 2026-07-03)
 - ✅ **v1.4 Technical Debt Cleanup** - Phase 20 (completed 2026-07-04)
 - ✅ **v1.5 Code Documentation** - Phases 21-24 (completed 2026-07-05)
-- 🔲 **v1.6 Control Bar Quality** - Phases 25-27 (Phase 26 ✅)
+- 🔶 **v1.6 Control Bar Quality** - Phases 25-27 (Phase 25-26 ✅, Phase 27 in progress)
 
 ## Phases
 
@@ -64,16 +64,19 @@
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
 **Success Criteria** (what must be TRUE):
 
-  1. AutoHideController 单元测试：覆盖 idle/playing/hidden/paused 状态转换、hover 节流、resize 冻结
-  2. ProgressBar Widget 测试：覆盖拖拽阈值(5px)、seek 节流(150ms)、hover tooltip
-  3. VolumeButton Widget 测试：覆盖静音切换、音量保存/恢复、滑块联动
-  4. SpeedButton Widget 测试：覆盖双击重置(1.0x)、滚轮切换、档位循环
-  5. 新增测试全部通过，覆盖率 ≥80%
-  6. `flutter test` 无新增失败
+  1. KeyboardHandler 测试：覆盖 15+ 快捷键回调（Space/箭头/F/M/N/P/O/S/ESC/媒体键）
+  2. DropHandler 测试：覆盖文件拖放、路径过滤、hover 状态
+  3. PlayerScreen 测试：覆盖空状态、seek 钳位、响应式布局
+  4. AutoHideController 补全：resize 冻结、hover guard、throttle 边界时序
+  5. ProgressBar 补全：拖拽阈值、seek 节流、tooltip、expand 动画
+  6. VolumeButton + SpeedButton 补全：自动取消静音、箭头点击、双击重置
+  7. ControlsOverlay + ControlBar + VideoSurface 补全
+  8. 新增测试全部通过，覆盖率 ≥80%
+  9. `flutter test` 无新增失败
 
 **Plans**: 1/1 plans complete
 
-- [x] 27-01-PLAN.md — 控制栏测试补全（+14 tests: AutoHideController 3, ProgressBar 3, VolumeButton 3, SpeedButton 5）
+- [x] 27-01-PLAN.md — 控制栏测试补全（+60 tests: KeyboardHandler 15, DropHandler 5, PlayerScreen 7, AutoHideController 6, ProgressBar 9, VolumeButton 4, SpeedButton 5, ControlsOverlay 3, ControlBar 4, VideoSurface 2）
 
 **UI hint**: no
 
