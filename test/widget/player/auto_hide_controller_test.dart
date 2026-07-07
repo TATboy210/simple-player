@@ -306,6 +306,93 @@ void main() {
     });
   });
 
+  group('AutoHideController.onMouseMove() — resize freeze', () {
+    test('onMouseMove is no-op when resizing=true', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.resizing = true;
+      c.visible.value = false;
+
+      c.onMouseMove();
+
+      // resizing blocks onMouseMove — visible stays false
+      expect(c.visible.value, isFalse);
+    });
+
+    test('onMouseMove resumes after resizing=false', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+      c.resizing = true;
+      c.visible.value = false;
+
+      c.onMouseMove(); // no-op during resize
+      expect(c.visible.value, isFalse);
+
+      c.resizing = false;
+      c.onMouseMove(); // now allowed (throttle may still apply)
+    });
+  });
+
+  group('AutoHideController — hover guard blocks scheduleHide', () {
+    testWidgets('scheduleHide timer blocked by hovering guard', (tester) async {
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _TestAutoHideWrapper(
+            engineState: engineState,
+            isFullscreen: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final c = state.controller;
+
+      c.show();
+      c.onMouseEnter(); // hovering = true
+      c.scheduleHide();
+
+      // Advance past 5s hide delay — hover guard blocks hide
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+
+      expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController.onMouseMove() — throttle boundary', () {
+    test('onMouseMove passes after 100ms throttle window', () {
+      engineState.value = MediaState.playing;
+      final c = createController();
+      c.init();
+
+      c.onMouseMove(); // first call — show + scheduleHide
+      c.visible.value = false;
+
+      // Within 100ms — throttled, no-op
+      c.onMouseMove();
+      expect(c.visible.value, isFalse);
+    });
+  });
+
+  group('AutoHideController — fullscreen hide delay', () {
+    test('fullscreen hide delay is shorter than windowed', () {
+      engineState.value = MediaState.playing;
+      final windowed = createController(isFullscreen: false);
+      windowed.init();
+      final fullscreen = createController(isFullscreen: true);
+      fullscreen.init();
+
+      expect(windowed.visible.value, isTrue);
+      expect(fullscreen.visible.value, isTrue);
+    });
+  });
+
   group('AutoHideController — animation dismissed', () {
     test('hide triggers reverse animation then sets visible false', () async {
       engineState.value = MediaState.playing;

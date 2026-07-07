@@ -188,50 +188,172 @@ void main() {
       );
     }
 
-    testWidgets('uses AnimatedContainer for background', (tester) async {
+    testWidgets('renders Container with decoration', (tester) async {
       await tester.pumpWidget(buildWithIdle(isIdle: false));
       await tester.pump();
 
-      // AnimatedContainer should be in the widget tree
-      expect(find.byType(AnimatedContainer), findsOneWidget);
+      // ControlBar uses Container + DecorationTween (not AnimatedContainer)
+      expect(find.byType(ControlBar), findsOneWidget);
+      expect(find.byType(Container), findsWidgets);
     });
 
-    testWidgets('idle state uses AnimatedContainer', (tester) async {
+    testWidgets('idle state renders Container', (tester) async {
       await tester.pumpWidget(buildWithIdle(isIdle: true));
       await tester.pump();
 
-      expect(find.byType(AnimatedContainer), findsOneWidget);
+      expect(find.byType(ControlBar), findsOneWidget);
+      expect(find.byType(Container), findsWidgets);
     });
 
-    testWidgets('transitions decoration on isIdle change', (tester) async {
-      // Start idle
+    testWidgets('decoration animation parameter is accepted', (tester) async {
+      // When decoration param is null, ControlBar uses _decorationPlaying directly
       await tester.pumpWidget(buildWithIdle(isIdle: true));
       await tester.pump();
 
-      final animatedContainer = tester.widget<AnimatedContainer>(
-        find.byType(AnimatedContainer),
-      );
-      expect(animatedContainer.duration, const Duration(milliseconds: 150));
-
-      // Switch to playing — rebuild with new decoration
+      // Switch to playing — rebuild with new state
       await tester.pumpWidget(buildWithIdle(isIdle: false));
       await tester.pump();
 
-      // AnimatedContainer still present with same duration
-      final after = tester.widget<AnimatedContainer>(
-        find.byType(AnimatedContainer),
-      );
-      expect(after.duration, const Duration(milliseconds: 150));
+      // ControlBar still renders correctly after state change
+      expect(find.byType(ControlBar), findsOneWidget);
     });
 
-    testWidgets('AnimatedContainer uses easeInOut curve', (tester) async {
-      await tester.pumpWidget(buildWithIdle(isIdle: false));
+    testWidgets('ControlBar with decoration animation parameter', (
+      tester,
+    ) async {
+      // When an external decoration animation is provided, ControlBar uses
+      // DecorationTween to interpolate between idle and playing decorations
+      final controller = AnimationController(
+        vsync: tester,
+        duration: const Duration(milliseconds: 150),
+        value: 1.0,
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 200,
+              child: ControlBar(
+                engine: engine,
+                isIdle: false,
+                decoration: controller,
+              ),
+            ),
+          ),
+        ),
+      );
       await tester.pump();
 
-      final animatedContainer = tester.widget<AnimatedContainer>(
-        find.byType(AnimatedContainer),
+      // Container should render with the interpolated decoration
+      expect(find.byType(ControlBar), findsOneWidget);
+      expect(find.byType(Container), findsWidgets);
+    });
+  });
+
+  group('ControlBar responsive layout', () {
+    Widget buildWithWidth(double width) {
+      return MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MediaQuery(
+          data: MediaQueryData(size: Size(width, 600)),
+          child: Scaffold(
+            body: SizedBox(
+              width: width,
+              height: 200,
+              child: ControlBar(engine: engine),
+            ),
+          ),
+        ),
       );
-      expect(animatedContainer.curve, Curves.easeInOut);
+    }
+
+    testWidgets('ultra-compact (w≤360) shows only prev/play/next', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildWithWidth(360));
+      await tester.pump();
+
+      // Ultra-compact: _CompactCenterGroup with skip_previous, play_arrow, skip_next
+      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next), findsOneWidget);
+
+      // No replay_10/forward_30 (those are in CenterGroup, not _CompactCenterGroup)
+      expect(find.byIcon(Icons.replay_10), findsNothing);
+      expect(find.byIcon(Icons.forward_30), findsNothing);
+
+      // No secondary controls
+      expect(find.byType(VolumeButton), findsNothing);
+      expect(find.byType(VolumeSlider), findsNothing);
+    });
+
+    testWidgets('compact (360<w≤500) shows CenterGroup but no secondary', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildWithWidth(450));
+      await tester.pump();
+
+      // CenterGroup includes replay_10 + forward_30
+      expect(find.byType(CenterGroup), findsOneWidget);
+      expect(find.byIcon(Icons.replay_10), findsOneWidget);
+      expect(find.byIcon(Icons.forward_30), findsOneWidget);
+
+      // No secondary controls (volume/speed)
+      expect(find.byType(VolumeButton), findsNothing);
+      expect(find.byType(VolumeSlider), findsNothing);
+    });
+
+    testWidgets('full layout (w>500) shows all groups', (tester) async {
+      await tester.pumpWidget(buildWithWidth(800));
+      await tester.pump();
+
+      // All controls visible
+      expect(find.byType(CenterGroup), findsOneWidget);
+      expect(find.byType(VolumeButton), findsOneWidget);
+      expect(find.byType(VolumeSlider), findsOneWidget);
+
+      // play mode button (left group)
+      expect(find.byIcon(Icons.repeat), findsOneWidget);
+    });
+
+    testWidgets('_buildBlur skips BackdropFilter when opacity < 0.01', (
+      tester,
+    ) async {
+      // Create an opacity animation that is near-zero
+      final opacityController = AnimationController(
+        vsync: tester,
+        value: 0.005, // < 0.01 threshold
+      );
+      addTearDown(opacityController.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 200,
+              child: ControlBar(
+                engine: engine,
+                opacity: opacityController,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // When opacity < 0.01, BackdropFilter is skipped (GPU optimization)
+      // ControlBar still renders but without blur
+      expect(find.byType(ControlBar), findsOneWidget);
+      expect(find.byType(BackdropFilter), findsNothing);
     });
   });
 }
