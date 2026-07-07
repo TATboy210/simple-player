@@ -83,8 +83,9 @@ void main() {
       }
     });
 
-    testWidgets('buttons interactive at startup (idle + emptyState)',
+    testWidgets('buttons NOT interactive at startup (idle + emptyState)',
         (tester) async {
+      // Design: emptyStatePresent + idle → IgnorePointer 让 EmptyState 接收点击
       var fileOpened = false;
       var settingsOpened = false;
       var fullscreenToggled = false;
@@ -100,13 +101,58 @@ void main() {
       ));
       await tester.pump();
 
-      // 打开文件按钮
+      // 打开文件按钮 — 存在但被 IgnorePointer 拦截
+      final openFileBtn = find.byIcon(Icons.folder_open);
+      if (openFileBtn.evaluate().isNotEmpty) {
+        await tester.tap(openFileBtn);
+        await tester.pump();
+        expect(fileOpened, isFalse,
+            reason: 'Button should be ignored when emptyState + idle');
+      }
+
+      // 设置按钮 — 同理
+      final settingsBtn = find.byIcon(Icons.settings);
+      if (settingsBtn.evaluate().isNotEmpty) {
+        await tester.tap(settingsBtn);
+        await tester.pump();
+        expect(settingsOpened, isFalse,
+            reason: 'Button should be ignored when emptyState + idle');
+      }
+
+      // 全屏按钮 — 同理
+      final fsBtn = find.byIcon(Icons.fullscreen);
+      if (fsBtn.evaluate().isNotEmpty) {
+        await tester.tap(fsBtn);
+        await tester.pump();
+        expect(fullscreenToggled, isFalse,
+            reason: 'Button should be ignored when emptyState + idle');
+      }
+    });
+
+    testWidgets('buttons interactive when playing (no emptyState)',
+        (tester) async {
+      // 对照组：非 idle 状态下按钮应可交互
+      var fileOpened = false;
+      var settingsOpened = false;
+      var fullscreenToggled = false;
+
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject(
+        actions: PlayerActions(
+          onOpenFile: () => fileOpened = true,
+          onSettings: () => settingsOpened = true,
+          onToggleFullscreen: () => fullscreenToggled = true,
+        ),
+      ));
+      await tester.pump();
+
+      // 打开文件按钮 — 播放中可交互
       final openFileBtn = find.byIcon(Icons.folder_open);
       if (openFileBtn.evaluate().isNotEmpty) {
         await tester.tap(openFileBtn);
         await tester.pump();
         expect(fileOpened, isTrue,
-            reason: 'Open file button should be tappable at startup');
+            reason: 'Button should be tappable when playing');
       }
 
       // 设置按钮
@@ -115,7 +161,7 @@ void main() {
         await tester.tap(settingsBtn);
         await tester.pump();
         expect(settingsOpened, isTrue,
-            reason: 'Settings button should be tappable at startup');
+            reason: 'Button should be tappable when playing');
       }
 
       // 全屏按钮
@@ -124,7 +170,7 @@ void main() {
         await tester.tap(fsBtn);
         await tester.pump();
         expect(fullscreenToggled, isTrue,
-            reason: 'Fullscreen button should be tappable at startup');
+            reason: 'Button should be tappable when playing');
       }
     });
 
