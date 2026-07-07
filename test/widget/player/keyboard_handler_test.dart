@@ -242,6 +242,19 @@ void main() {
       expect(tracker.seekForward, 1);
     });
 
+    // ── ? character via slash key ──
+
+    testWidgets('? character via slash key triggers showHelp', (tester) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      // line 166: (key == LogicalKeyboardKey.slash && event.character == '?')
+      // sendKeyDownEvent 默认 character=null，需要手动构造带 character 的事件
+      await tester.sendKeyEvent(
+        LogicalKeyboardKey.slash,
+        character: '?',
+      );
+      expect(tracker.showHelp, 1);
+    });
+
     // ── F12 debug key ──
 
     testWidgets('F12 key does not crash (perf stats export)', (tester) async {
