@@ -87,6 +87,25 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
+    testWidgets('portrait ratio calculates correct dimensions', (tester) async {
+      engine.textureId.value = 1;
+      engine.aspectRatio.value = 0.5; // portrait
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      expect(find.byType(Texture), findsOneWidget);
+      expect(find.byType(FittedBox), findsOneWidget);
+    });
+
+    testWidgets('NaN ratio falls back to 16:9', (tester) async {
+      engine.textureId.value = 1;
+      engine.aspectRatio.value = double.nan;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      expect(find.byType(Texture), findsOneWidget);
+    });
+
     testWidgets('scroll on video does not change volume', (tester) async {
       engine.textureId.value = 1;
       engine.volume.value = 0.8;

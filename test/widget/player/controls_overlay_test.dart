@@ -165,7 +165,6 @@ void main() {
       final overlay = find.byType(ControlsOverlay);
       final center = tester.getCenter(overlay);
 
-      // Create mouse at center (triggers onEnter + onHover)
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: center);
       addTearDown(gesture.removePointer);
@@ -173,14 +172,92 @@ void main() {
       await gesture.moveTo(center);
       await tester.pump();
 
-      // Move far outside the widget — triggers onExit
-      await gesture.moveTo(
-        center + const Offset(5000, 5000),
+      await gesture.moveTo(center + const Offset(5000, 5000));
+      await tester.pump();
+
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+  });
+
+  group('ControlsOverlay resize flow', () {
+    testWidgets('resizing=true triggers animation reverse', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      engine.state.value = MediaState.playing;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ControlsOverlay(engine: engine, resizing: resizing),
+          ),
+        ),
       );
       await tester.pump();
 
-      // onExit called _autoHide.onMouseExit() — no crash, scheduleHide called
+      resizing.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
       expect(find.byType(ControlsOverlay), findsOneWidget);
+      resizing.dispose();
+    });
+
+    testWidgets('resizing blocks engine state changes', (tester) async {
+      final resizing = ValueNotifier<bool>(false);
+      engine.state.value = MediaState.playing;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ControlsOverlay(engine: engine, resizing: resizing),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      resizing.value = true;
+      await tester.pump();
+
+      // Engine state change during resize — _isResizing guard blocks
+      engine.state.value = MediaState.idle;
+      await tester.pump();
+      engine.state.value = MediaState.playing;
+      await tester.pump();
+
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+      resizing.dispose();
+    });
+
+    testWidgets('resizing=false restores decoration by engine state', (
+      tester,
+    ) async {
+      final resizing = ValueNotifier<bool>(false);
+      engine.state.value = MediaState.playing;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ControlsOverlay(engine: engine, resizing: resizing),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      resizing.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      resizing.value = false;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.byType(ControlsOverlay), findsOneWidget);
+      resizing.dispose();
     });
   });
 }
