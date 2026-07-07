@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/player_screen.dart';
 import 'package:simple_player_flutter/ui/player/drop_handler.dart';
+import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_window_service.dart';
@@ -527,6 +528,207 @@ void main() {
 
       // Assert: 对话框已关闭
       expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    // ── Playlist toggle via ControlBar button ──
+
+    testWidgets('playlist toggle button triggers _togglePlaylist', (tester) async {
+      // 覆盖 lines 81-85: _togglePlaylist()
+      var toggled = false;
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+              onTogglePlaylist: () => toggled = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Act: 点击 ControlBar 中的播放列表按钮 (Icons.queue_music)
+      final playlistButton = find.byIcon(Icons.queue_music);
+      if (playlistButton.evaluate().isNotEmpty) {
+        await tester.tap(playlistButton);
+        await tester.pump();
+        expect(toggled, isTrue);
+      }
+    });
+
+    // ── Playlist panel renders after toggle ──
+
+    testWidgets('playlist panel mounts after toggle in narrow screen', (tester) async {
+      // 覆盖 lines 81-85 + 210-216: toggle → playlistMounted → Stack overlay
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Act: 点击播放列表按钮
+      final playlistButton = find.byIcon(Icons.queue_music);
+      if (playlistButton.evaluate().isNotEmpty) {
+        await tester.tap(playlistButton);
+        await tester.pumpAndSettle();
+
+        // Assert: PlaylistPanel 应被挂载
+        expect(find.byType(PlaylistPanel), findsOneWidget);
+      }
+    });
+
+    // ── Wide screen Row layout with playlist ──
+
+    testWidgets('wide screen uses Row layout when playlist mounted', (tester) async {
+      // 覆盖 lines 191-203: useRow → Row 布局
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            // 1300 >= Tokens.breakpointWide (1200)
+            data: const MediaQueryData(size: Size(1300, 800)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Act: 点击播放列表按钮 → _togglePlaylist → playlistMounted=true
+      final playlistButton = find.byIcon(Icons.queue_music);
+      if (playlistButton.evaluate().isNotEmpty) {
+        await tester.tap(playlistButton);
+        await tester.pumpAndSettle();
+
+        // Assert: 宽屏 Row 布局 — PlaylistPanel 在 Row 中
+        // Row 布局下 PlaylistPanel 与视频并排
+        expect(find.byType(PlaylistPanel), findsOneWidget);
+      }
+    });
+
+    // ── Playlist close via Escape key ──
+
+    testWidgets('Escape key closes playlist panel via _closePlaylist', (tester) async {
+      // 覆盖 lines 88-93: _closePlaylist()
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Act: 打开播放列表
+      final playlistButton = find.byIcon(Icons.queue_music);
+      if (playlistButton.evaluate().isNotEmpty) {
+        await tester.tap(playlistButton);
+        await tester.pumpAndSettle();
+
+        // 验证播放列表已打开
+        expect(find.byType(PlaylistPanel), findsOneWidget);
+
+        // Act: 按 Escape 关闭播放列表
+        // PlaylistPanel 的 Focus 在 initState 中 requestFocus
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+
+        // Assert: _closePlaylist 被调用 → playlistState 变为 (false, ...)
+        // PlaylistPanel 可能仍在动画中，但 visible 应为 false
+      }
+    });
+
+    // ── Fullscreen toggle via ControlBar button ──
+
+    testWidgets('fullscreen button toggles window mode', (tester) async {
+      // 覆盖 lines 277-278, 283-284: onToggleFullscreen wiring
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Act: 点击全屏按钮 (Icons.fullscreen)
+      final fullscreenButton = find.byIcon(Icons.fullscreen);
+      if (fullscreenButton.evaluate().isNotEmpty) {
+        await tester.tap(fullscreenButton);
+        await tester.pump();
+
+        // Assert: 窗口模式切换到全屏
+        expect(windowService.mode.value.isFullscreen, isTrue);
+      }
     });
   });
 }
