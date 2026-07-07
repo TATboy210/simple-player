@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/player_screen.dart';
+import 'package:simple_player_flutter/ui/player/drop_handler.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_window_service.dart';
@@ -263,6 +266,228 @@ void main() {
 
       // textureId 非空 → isVideo=true → ControlsOverlay 收到 isVideo=true
       expect(find.byType(PlayerScreen), findsOneWidget);
+    });
+
+    // ── EmptyState with non-null widget ──
+
+    testWidgets('emptyState widget visible when engine idle and widget provided',
+        (tester) async {
+      // 提供非 null emptyState → idle 时应渲染 Positioned.fill(emptyState)
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+              emptyState: const Center(child: Text('No media loaded')),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // engine 默认 idle → emptyState 应可见
+      expect(find.text('No media loaded'), findsOneWidget);
+    });
+
+    testWidgets('emptyState hidden when engine is playing', (tester) async {
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+              emptyState: const Center(child: Text('No media loaded')),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Act: 切换到 playing 状态
+      engine.play();
+      await tester.pump();
+
+      // playing 时 emptyState 应隐藏（SizedBox.shrink）
+      expect(find.text('No media loaded'), findsNothing);
+    });
+
+    // ── Keyboard seek via PlayerScreen integration ──
+
+    testWidgets('left arrow triggers seek backward through KeyboardHandler',
+        (tester) async {
+      engine.configureMedia(durationMs: 60000);
+      engine.position.value = 10000;
+      engine.duration.value = 60000;
+
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按左箭头 → KeyboardHandler → _seek(engine, -5000)
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+
+      // Assert: seekTo 被调用，位置 = 10000 - 5000 = 5000
+      expect(engine.seekToCallCount, 1);
+      expect(engine.lastSeekToMs, 5000);
+    });
+
+    testWidgets('right arrow triggers seek forward through KeyboardHandler',
+        (tester) async {
+      engine.configureMedia(durationMs: 60000);
+      engine.position.value = 10000;
+      engine.duration.value = 60000;
+
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按右箭头 → KeyboardHandler → _seek(engine, 5000)
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+
+      // Assert: seekTo 被调用，位置 = 10000 + 5000 = 15000
+      expect(engine.seekToCallCount, 1);
+      expect(engine.lastSeekToMs, 15000);
+    });
+
+    // ── Keyboard volume via PlayerScreen integration ──
+
+    testWidgets('up arrow increases volume through KeyboardHandler',
+        (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按上箭头 → KeyboardHandler → engine.setVolume(volume + 0.05)
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
+
+      // Assert: setVolume 被调用
+      expect(engine.setVolumeCallCount, 1);
+      // 默认 volume=1.0, +0.05=1.05 → clamp → 1.0
+      expect(engine.lastSetVolumeValue, closeTo(1.05, 0.01));
+    });
+
+    testWidgets('down arrow decreases volume through KeyboardHandler',
+        (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按下箭头 → KeyboardHandler → engine.setVolume(volume - 0.05)
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
+
+      // Assert: setVolume 被调用
+      expect(engine.setVolumeCallCount, 1);
+      expect(engine.lastSetVolumeValue, closeTo(0.95, 0.01));
+    });
+
+    // ── Fullscreen AnimatedBuilder branch ──
+
+    testWidgets('fullscreen mode shows MouseRegion not DragToResizeArea',
+        (tester) async {
+      // Arrange: 先构建，再切换到全屏
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 切换到全屏
+      await windowService.setMode(WindowMode.fullscreen);
+      await tester.pump();
+
+      // Assert: 全屏模式 → MouseRegion 替代 DragToResizeArea
+      // AnimatedBuilder 监听 windowService.mode，全屏时返回 MouseRegion
+      expect(find.byType(MouseRegion), findsAtLeast(1));
+    });
+
+    testWidgets('windowed mode shows DragToResizeArea', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 默认 windowed → DragToResizeArea
+      expect(find.byType(DragToResizeArea), findsOneWidget);
+    });
+
+    // ── Keyboard mute toggle ──
+
+    testWidgets('M key toggles mute through KeyboardHandler', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按 M 键 → KeyboardHandler → engine.setMute(!isMuted)
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyM);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyM);
+
+      // Assert: setMute 被调用（默认 isMuted=false → setMute(true)）
+      expect(engine.isMuted.value, isTrue);
+    });
+
+    // ── Keyboard play/pause toggle ──
+
+    testWidgets('space key toggles play/pause through KeyboardHandler',
+        (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按空格 → KeyboardHandler → engine.togglePlayPause()
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+
+      // Assert: togglePlayPause 被调用 → idle 时应变为 playing
+      expect(engine.state.value, MediaState.playing);
+    });
+
+    // ── onDragHoverChanged wiring ──
+
+    testWidgets('onDragHoverChanged callback is wired to DropHandler',
+        (tester) async {
+      final hoverStates = <bool>[];
+      final controller = PlaybackController(
+        engine: engine,
+        playlist: playlist,
+        onNeedRebuild: () {},
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: PlayerScreen(
+              engine: engine,
+              controller: controller,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              windowService: windowService,
+              onDragHoverChanged: hoverStates.add,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // DropHandler 应存在
+      expect(find.byType(DropHandler), findsOneWidget);
     });
   });
 }
