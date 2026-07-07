@@ -78,6 +78,9 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   int setExternalSubtitleCallCount = 0;
   String? lastExternalSubtitlePath;
   int setSubtitleDelayCallCount = 0;
+  /// setVolume 调用追踪（用于节流测试）
+  int setVolumeCallCount = 0;
+  double? lastSetVolumeValue;
   int _subtitleDelayMs = 0;
   // ─── Playback control ───
 
@@ -142,6 +145,8 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   @override
   void setVolume(double value) {
     if (_disposed) return;
+    setVolumeCallCount++;
+    lastSetVolumeValue = value;
     final clamped = value.clamp(0.0, 1.0);
     volume.value = clamped;
     if (clamped == 0) {

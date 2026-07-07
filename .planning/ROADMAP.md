@@ -13,7 +13,7 @@
 - ✅ **v1.3 Glass Morphism Coordination** - Phases 16-19 (shipped 2026-07-03)
 - ✅ **v1.4 Technical Debt Cleanup** - Phase 20 (completed 2026-07-04)
 - ✅ **v1.5 Code Documentation** - Phases 21-24 (completed 2026-07-05)
-- 🔲 **v1.6 Control Bar Quality** - Phases 25-27
+- 🔲 **v1.6 Control Bar Quality** - Phases 25-27 (Phase 26 ✅)
 
 ## Phases
 
@@ -51,9 +51,9 @@
   4. `flutter analyze` 无新增 warning/error
   5. 所有现有测试通过
 
-**Plans**: 0/1 plans complete
+**Plans**: 1/1 plans complete
 
-- [ ] 26-01-PLAN.md — VolumeSlider debounce 实现
+- [x] 26-01-PLAN.md — VolumeSlider debounce 实现（含详细逐行解释）
 
 **UI hint**: no
 
@@ -71,9 +71,9 @@
   5. 新增测试全部通过，覆盖率 ≥80%
   6. `flutter test` 无新增失败
 
-**Plans**: 0/1 plans complete
+**Plans**: 1/1 plans complete
 
-- [ ] 27-01-PLAN.md — 控制栏测试补全
+- [x] 27-01-PLAN.md — 控制栏测试补全（+14 tests: AutoHideController 3, ProgressBar 3, VolumeButton 3, SpeedButton 5）
 
 **UI hint**: no
 
@@ -82,5 +82,5 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 25. Performance Quick Wins | 1/1 | Complete   | 2026-07-05 |
-| 26. VolumeSlider Debounce | 0/1 | Not started | — |
-| 27. Control Bar Test Coverage | 0/1 | Not started | — |
+| 26. VolumeSlider Debounce | 1/1 | Complete | 2026-07-07 |
+| 27. Control Bar Test Coverage | 1/1 | In Progress | — |
