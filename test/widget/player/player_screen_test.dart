@@ -5,7 +5,6 @@ import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/player_screen.dart';
-import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_window_service.dart';
 
