@@ -195,5 +195,102 @@ void main() {
       expect(box.width, 72);
       expect(box.height, 36);
     });
+
+    // ── Arrow tap tests ──
+
+    testWidgets('left arrow tap decreases speed to previous gear',
+        (tester) async {
+      engine.playbackSpeed.value = 1.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Tap left arrow (chevron_left icon)
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pump();
+
+      // 1.0 → 0.75 (previous gear)
+      expect(engine.playbackSpeed.value, 0.75);
+      OsdService.I.hide();
+    });
+
+    testWidgets('right arrow tap increases speed to next gear',
+        (tester) async {
+      engine.playbackSpeed.value = 1.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Tap right arrow (chevron_right icon)
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+
+      // 1.0 → 1.25 (next gear)
+      expect(engine.playbackSpeed.value, 1.25);
+      OsdService.I.hide();
+    });
+
+    testWidgets('left arrow at min speed (0.5) clamps', (tester) async {
+      engine.playbackSpeed.value = 0.5;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pump();
+
+      // Already at min gear → stays at 0.5
+      expect(engine.playbackSpeed.value, 0.5);
+      OsdService.I.hide();
+    });
+
+    testWidgets('right arrow at max speed (4.0) clamps', (tester) async {
+      engine.playbackSpeed.value = 4.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+
+      // Already at max gear → stays at 4.0
+      expect(engine.playbackSpeed.value, 4.0);
+      OsdService.I.hide();
+    });
+
+    // ── Double-tap reset test ──
+
+    testWidgets('double-tap center resets speed to 1.0', (tester) async {
+      engine.playbackSpeed.value = 2.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Double-tap the center segment (the text label)
+      final centerSegment = find.byWidgetPredicate(
+        (w) => w is GestureDetector && w.onDoubleTap != null,
+      );
+      await tester.tap(centerSegment);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(centerSegment);
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, 1.0);
+
+      // Pump past OSD hold timer to avoid pending timer assertion
+      await tester.pump(const Duration(seconds: 2));
+      OsdService.I.hide();
+    });
+
+    testWidgets('non-standard speed snaps to nearest higher gear on arrow tap',
+        (tester) async {
+      // Set a non-standard speed (not in _gears list)
+      // _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
+      // 1.1 → indexWhere >= 1.1 → idx=3 (1.25), right → next=4 (1.5)
+      engine.playbackSpeed.value = 1.1;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, 1.5);
+      OsdService.I.hide();
+    });
   });
 }

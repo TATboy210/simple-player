@@ -202,5 +202,74 @@ void main() {
       expect(engine.volume.value, lessThan(0.5));
       OsdService.I.hide();
     });
+
+    // ── Scroll boundary clamp ──
+
+    testWidgets('scroll wheel up at max volume (1.0) clamps', (tester) async {
+      engine.volume.value = 1.0;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeSlider(engine: engine)),
+      );
+      await tester.pump();
+
+      final slider = find.byType(VolumeSlider);
+      final center = tester.getRect(slider).center;
+
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, -100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      // Clamped at 1.0
+      expect(engine.volume.value, 1.0);
+      OsdService.I.hide();
+    });
+
+    testWidgets('scroll wheel down at min volume (0.0) clamps', (tester) async {
+      engine.volume.value = 0.0;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeSlider(engine: engine)),
+      );
+      await tester.pump();
+
+      final slider = find.byType(VolumeSlider);
+      final center = tester.getRect(slider).center;
+
+      final event = PointerScrollEvent(
+        scrollDelta: const Offset(0, 100),
+        position: center,
+      );
+      GestureBinding.instance.handlePointerEvent(event);
+      await tester.pump();
+
+      // Clamped at 0.0
+      expect(engine.volume.value, 0.0);
+      OsdService.I.hide();
+    });
+
+    testWidgets('unmute restores previously saved volume', (tester) async {
+      // Arrange: set volume to 0.7, then mute
+      engine.volume.value = 0.7;
+      engine.isMuted.value = false;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeButton(engine: engine)),
+      );
+      await tester.pump();
+
+      // Tap to mute — saves 0.7
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump();
+      expect(engine.isMuted.value, isTrue);
+      expect(engine.volume.value, 0.0);
+
+      // Tap again to unmute — restores 0.7
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump();
+      expect(engine.isMuted.value, isFalse);
+      expect(engine.volume.value, closeTo(0.7, 0.01));
+      OsdService.I.hide();
+    });
   });
 }
