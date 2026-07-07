@@ -1,28 +1,43 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-05T17:29:33.508Z",
-  "phase": "25",
-  "phase_name": "performance-quick-wins",
-  "phase_dir": ".planning/phases/25-performance-quick-wins",
-  "plan": 1,
-  "task": 2,
-  "total_tasks": 2,
+  "timestamp": "2026-07-07T15:10:00Z",
+  "phase": "0",
+  "phase_name": "planning",
+  "phase_dir": null,
+  "plan": 0,
+  "task": 0,
+  "total_tasks": 0,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Tokens 常量 + GlassTier blur 缓存", "status": "done", "commit": "10a42a1"},
-    {"id": 2, "name": "ControlsOverlay 动画 + ControlBar/PlaylistPanel 缓存清理", "status": "done", "commit": "a5ba100"}
+    {"id": 1, "name": "Read control_bar_analysis_report.md (2700 lines)", "status": "done"},
+    {"id": 2, "name": "Read control_bar.dart + auto_hide_controller.dart + tokens.dart + glass_container.dart + edge_glow.dart + controls_overlay.dart", "status": "done"},
+    {"id": 3, "name": "Research VLC control bar behavior via Context7", "status": "done"},
+    {"id": 4, "name": "Create PROJECT.md with 5 requirements (CB-01~CB-05)", "status": "done"},
+    {"id": 5, "name": "Create REQUIREMENTS.md with 14 checkable items", "status": "done"},
+    {"id": 6, "name": "Create ROADMAP.md with 5 phases (~2h total)", "status": "done"},
+    {"id": 7, "name": "Update STATE.md to v1.8 Control Bar Polish", "status": "done"}
   ],
-  "remaining_tasks": [],
+  "remaining_tasks": [
+    {"id": 8, "name": "Execute Phase 1: 动画体验优化 (fade 300→400ms, curve tuning)", "status": "not_started"},
+    {"id": 9, "name": "Execute Phase 2: 毛玻璃 +15% (glassBlur 10→11.5)", "status": "not_started"},
+    {"id": 10, "name": "Execute Phase 3: 按钮 hover 优化 (bgHover contrast + area)", "status": "not_started"},
+    {"id": 11, "name": "Execute Phase 4: 布局压缩评估 (3-row flex ratio)", "status": "not_started"},
+    {"id": 12, "name": "Execute Phase 5: 移除底部辉光 (TransmittedLight)", "status": "not_started"}
+  ],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "确认 controlBarBorderWhite alpha 偏差 (0x0A vs 0x1A)", "context": "executor 实现与 plan 不同，蓝色色调正确但透明度偏低", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "GlassTier.thick 使用独立缓存", "rationale": "sigma=24 与 normal=10 不同", "phase": "25"},
-    {"decision": "_resizeOpacity 接入 ControlBar.opacity", "rationale": "resize fade 独立于 auto-hide", "phase": "25"}
+    {"decision": "仅调参不改架构", "rationale": "AutoHideController 状态机已完善，5个状态变量+明确转换规则，仅需调优动画时长/曲线", "phase": "0"},
+    {"decision": "毛玻璃+15%改 sigma 值", "rationale": "GlassTier 已有缓存 ImageFilter 机制，改 glassBlur 常量即可", "phase": "0"},
+    {"decision": "底部辉光直接删除", "rationale": "TransmittedLight 是独立组件，删除不影响其他定位逻辑", "phase": "0"}
   ],
-  "uncommitted_files": [],
-  "next_action": "/gsd-execute-phase 25 继续 verification + phase complete",
-  "context_notes": "Phase 25 executor 完成，merge 冲突已修复。需 verification。"
+  "uncommitted_files": [
+    ".planning/PROJECT.md",
+    ".planning/REQUIREMENTS.md",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md"
+  ],
+  "next_action": "Run /gsd-plan-phase 1 to plan Phase 1 (动画体验优化), then /gsd-execute-phase 1",
+  "context_notes": "用户要求5项控制栏微调：渐隐渐显、毛玻璃+15%、hover优化、布局压缩、移除底部辉光。已完成分析报告深度阅读和VLC参考研究。所有规划文件已创建。"
 }

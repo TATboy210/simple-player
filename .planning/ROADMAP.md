@@ -1,89 +1,77 @@
-# Roadmap: v1.6 控制栏质量优化与测试补全
+# Roadmap: Control Bar Polish
 
-## Overview
+**Created:** 2026-07-07
 
-消除控制栏 P0-P1 技术债务，修复窗口拉伸时毛玻璃突兀跳变，建立控制栏测试基础。
+## Phase 1: 动画体验优化 (CB-01)
 
-## Milestones
+**Goal:** 控制栏 fade 动画更平滑自然
+**Estimated:** 30min
 
-- ✅ **v1.0 MVP** - Phases 1-4 (shipped 2026-05-29)
-- ✅ **v1.1 Testing & Quality** - Phases 5-7 (shipped 2026-05-30)
-- ✅ **v1.2 Security & Kernel** - Phases 8-11 (shipped 2026-05-31)
-- ✅ **v1.2.1 Window Polish** - Phases 12-15 (shipped 2026-06-28)
-- ✅ **v1.3 Glass Morphism Coordination** - Phases 16-19 (shipped 2026-07-03)
-- ✅ **v1.4 Technical Debt Cleanup** - Phase 20 (completed 2026-07-04)
-- ✅ **v1.5 Code Documentation** - Phases 21-24 (completed 2026-07-05)
-- 🔶 **v1.6 Control Bar Quality** - Phases 25-27 (Phase 25-26 ✅, Phase 27 in progress)
+- 调整 AutoHideController 动画时长（durationFade: 300→400ms）
+- 评估 fade 曲线（Curves.easeOut → 可能换 Curves.easeInOut）
+- 测试 idle↔playing 状态切换装饰过渡
+- 验证 resize 期间动画行为不变
 
-## Phases
+**Deliverables:**
+- tokens.dart: durationFade 更新
+- auto_hide_controller.dart: 动画参数调整（如需要）
+- 手动验证 fade 平滑度
 
-### Phase 25: Performance Quick Wins
+## Phase 2: 毛玻璃 +15% (CB-02)
 
-**Goal**: 消除 P0 性能问题 — resize 毛玻璃跳变、decoration 缓存、blur 缓存、魔法数字
-**Depends on**: Phase 24
-**Requirements**: PERF-01, PERF-02, PERF-03, PERF-04
-**Success Criteria** (what must be TRUE):
+**Goal:** 提升毛玻璃模糊质感
+**Estimated:** 15min
 
-  1. 窗口 resize 时毛玻璃以 150ms 渐变淡出/淡入，无二元跳变
-  2. `_decorationPlaying`/`_decorationIdle` 不在 build() 中重复创建
-  3. GlassContainer 的 ImageFilter.blur 按 GlassTier 缓存，不在每次 build 重建
-  4. 18px 魔法数字提取为命名常量
-  5. `flutter analyze` 无新增 warning/error
-  6. 所有现有测试通过
+- tokens.dart: glassBlur 10.0 → 11.5
+- 验证 GlassTier.normal 使用新值
+- 确认缓存 ImageFilter 正确更新
+- 验证 BackdropFilter 跳过逻辑不受影响
 
-**Plans**: 2/2 plans complete
+**Deliverables:**
+- tokens.dart: glassBlur 更新
+- 视觉验证模糊效果
 
-- [x] 25-01-PLAN.md — Resize 渐变 + decoration/blur 缓存 + 魔法数字提取 + 淡蓝辉光
-- [x] 25-02-PLAN.md — Gap closure: resize fade-out 修复 + decoration state wiring + controlBarBorderIdle + build errors
+## Phase 3: 按钮 hover 优化 (CB-03)
 
-**UI hint**: yes
+**Goal:** hover 反馈更显眼且区域更紧凑
+**Estimated:** 30min
 
-### Phase 26: VolumeSlider Debounce
+- 调整 Tokens.bgHover 颜色（提升亮度/对比度）
+- 检查 InkWell borderRadius 是否导致高亮溢出到控制栏边框
+- 测试 idle/playing 两种状态下的 hover 效果
 
-**Goal**: VolumeSlider 拖拽时 OSD 和引擎调用频率降至合理水平
-**Depends on**: Phase 25
-**Requirements**: PERF-05
-**Success Criteria** (what must be TRUE):
+**Deliverables:**
+- tokens.dart: bgHover 颜色调整
+- glass_container.dart: InkWell 参数微调（如需要）
+- 视觉验证 hover 效果
 
-  1. 拖拽期间 OSD 调用频率 ≤10/秒（从 60+/秒降低）
-  2. 拖拽结束时立即同步最终音量值（无感知延迟）
-  3. 引擎 setVolume 调用频率同步降低
-  4. `flutter analyze` 无新增 warning/error
-  5. 所有现有测试通过
+## Phase 4: 布局压缩评估 (CB-04)
 
-**Plans**: 1/1 plans complete
+**Goal:** 评估并实施控制栏高度压缩
+**Estimated:** 30min
 
-- [x] 26-01-PLAN.md — VolumeSlider debounce 实现（含详细逐行解释）
+- 分析 3 行当前 flex 比例（1:1:1）和实际内容高度需求
+- 确定最小可行高度
+- 如可压缩：调整 flex 比例或 controlBarHeight
+- 确保按钮不溢出、进度条可交互
 
-**UI hint**: no
+**Deliverables:**
+- control_bar.dart: Column flex 比例调整
+- tokens.dart: controlBarHeight 调整（如适用）
+- 响应式断点验证
 
-### Phase 27: Control Bar Test Coverage
+## Phase 5: 移除底部辉光 (CB-05)
 
-**Goal**: 补全控制栏核心组件测试覆盖
-**Depends on**: Phase 25
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
-**Success Criteria** (what must be TRUE):
+**Goal:** 删除控制栏底部的 TransmittedLight 效果
+**Estimated:** 10min
 
-  1. KeyboardHandler 测试：覆盖 15+ 快捷键回调（Space/箭头/F/M/N/P/O/S/ESC/媒体键）
-  2. DropHandler 测试：覆盖文件拖放、路径过滤、hover 状态
-  3. PlayerScreen 测试：覆盖空状态、seek 钳位、响应式布局
-  4. AutoHideController 补全：resize 冻结、hover guard、throttle 边界时序
-  5. ProgressBar 补全：拖拽阈值、seek 节流、tooltip、expand 动画
-  6. VolumeButton + SpeedButton 补全：自动取消静音、箭头点击、双击重置
-  7. ControlsOverlay + ControlBar + VideoSurface 补全
-  8. 新增测试全部通过，覆盖率 ≥80%
-  9. `flutter test` 无新增失败
+- 删除 controls_overlay.dart 中 TransmittedLight Positioned 块
+- 验证不影响 OSD/ErrorBanner 定位
+- 验证不影响控制栏 margin/position
 
-**Plans**: 1/1 plans complete
+**Deliverables:**
+- controls_overlay.dart: 移除 TransmittedLight 代码
+- 视觉验证无底部辉光
 
-- [x] 27-01-PLAN.md — 控制栏测试补全（+60 tests: KeyboardHandler 15, DropHandler 5, PlayerScreen 7, AutoHideController 6, ProgressBar 9, VolumeButton 4, SpeedButton 5, ControlsOverlay 3, ControlBar 4, VideoSurface 2）
-
-**UI hint**: no
-
-## Progress
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 25. Performance Quick Wins | 1/1 | Complete   | 2026-07-05 |
-| 26. VolumeSlider Debounce | 1/1 | Complete | 2026-07-07 |
-| 27. Control Bar Test Coverage | 1/1 | In Progress | — |
+---
+*Roadmap created: 2026-07-07*
