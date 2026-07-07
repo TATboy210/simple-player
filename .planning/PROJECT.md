@@ -1,148 +1,84 @@
-# Simple Player Flutter
+# Control Bar Polish
 
 ## What This Is
 
-Simple Player Flutter 桌面媒体播放器持续迭代项目。
+控制栏（ControlBar）微调优化项目 — 在不改变现有功能的前提下，优化控制栏的视觉效果和交互体验。目标是让控制栏在播放视频时既能响应用户操作又不遮挡观看，同时提升毛玻璃质感、按钮交互反馈和布局紧凑度。
 
-## Current Milestone: v1.6 控制栏质量优化与测试补全
+## Core Value
 
-**Goal:** 消除控制栏 P0-P1 技术债务，修复窗口拉伸时毛玻璃突兀跳变，建立控制栏测试基础
-
-**Target features:**
-- 修复窗口 resize 时毛玻璃效果突然消失/恢复的视觉跳变（渐变过渡替代二元切换）
-- 缓存 `_decorationPlaying`/`_decorationIdle` 避免每帧创建 BoxDecoration + BoxShadow
-- GlassContainer 的 ImageFilter.blur 缓存（当前每次 build 重新创建）
-- 提取魔法数字 18px 为命名常量
-- VolumeSlider 拖拽时 OSD 调用添加 debounce（当前 60+次/秒）
-- AutoHideController/ProgressBar/VolumeButton/SpeedButton 测试补全
-
-**背景:** 控制栏分析报告显示 6 项技术债务和 4 个测试缺口。窗口拉伸时毛玻璃二元跳变（有→无→有）是最影响用户体验的问题。
-
----
-
-## Previous Milestone: PlayerEngine 架构优化与依赖清理
-
-Simple Player Flutter 的引擎层架构优化项目：移除外部 `player_engine` path 依赖，优化 FvpEngine 内部结构，评估 media_kit 1.2.6 作为未来替代方案的可行性。
-
-## Why
-
-**直接原因：** 项目依赖一个外部 path 包 `player_engine`（位于 `../widget_tree_flutter/player_engine`），但本地 `lib/kernel/engine/` 已有完全相同的 1:1 副本。这个跨目录依赖脆弱且不必要。
-
-**架构原因：** FvpEngine 中 VolumeController/SubtitleConfigurator/D3D11Configurator 的逻辑被内联而非委托，违反组合模式。
-
-**战略原因：** 需要评估 media_kit 1.2.6 是否能替代 fvp，基于实际 API 能力对比而非传闻。
-
-## Context
-
-### 当前架构
-
-```
-UI Layer (57 files)
-  → import 'package:player_engine/player_engine.dart'  ← 外部 path 依赖
-  → PlayerEngine (abstract, 12 ValueNotifiers, 30 methods)
-      ↑
-  FvpEngine (concrete, 547 lines)
-      → fvp/mdk.Player (FFmpeg + D3D11)
-      → 5 helpers: FvpCallbackHandler, PositionPoller, TrackManager, MediaOpener, VideoEffectController
-```
-
-### 外部 player_engine 包结构
-
-```
-../widget_tree_flutter/player_engine/lib/
-├── player_engine.dart          # barrel (8 exports)
-└── src/
-    ├── media_error_type.dart   # 5-value enum
-    ├── media_state.dart        # 9-value enum
-    ├── player_engine_base.dart # abstract class
-    ├── video_effect_type.dart  # 4-value enum
-    └── models/
-        ├── audio_track_info.dart
-        ├── media_info.dart
-        ├── subtitle_track_info.dart
-        └── video_codec_info.dart
-```
-
-**所有文件与 `lib/kernel/engine/` 下的本地副本完全一致。**
-
-### 业界参考
-
-| 播放器 | 引擎 | 有抽象层 | 原因 |
-|--------|------|---------|------|
-| IINA (45.4k ★) | mpv | ❌ | 单引擎直接绑定 |
-| VLC | 100+ 模块 | ✅ | 多格式/协议/渲染器 |
-| media_kit (1.8k ★) | libmpv | ❌ | 直接封装 |
-| Harmonoid (1.5k ★) | media_kit | ✅ | 只做音乐，功能简单 |
-| **本项目** | **fvp** | **✅** | **单引擎 + 抽象层** |
-
-### fvp vs media_kit 能力对比
-
-| 能力 | fvp (MDK) | media_kit (libmpv) |
-|------|-----------|-------------------|
-| `setProperty()` 万能接口 | ✅ | ❌ |
-| D3D11 精确控制 | ✅ | ❌ |
-| FFmpeg 均衡器 (`af`) | ✅ | ❌ |
-| 视频特效 API | ✅ `setVideoEffect()` | ❌ |
-| 解码器链配置 | ✅ `video.decoders` | ❌ |
-| 社区规模 | 345 ★ | 1.8k ★ |
-| 跨平台 | 6 平台 | 5 平台 |
-
-### 关键技术发现
-
-1. **fvp 的 `setProperty()` 继承自 mpv 的属性系统** — 万能 key-value 接口控制一切 MDK 参数
-2. **media_kit 无法替代 fvp 的核心能力** — 成功迁移案例（Smarters IPTV、Geogram）都不使用高级功能
-3. **IINA (45.4k ★) 是最佳架构参考** — 单引擎 mpv，无抽象层，直接绑定
-4. **PlayerEngine 抽象层有测试价值** — MockEngine 用于 widget 测试，保留合理
-
-## Key Decisions
-
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| 移除外部 player_engine 依赖 | 本地已有 1:1 副本，跨目录依赖脆弱 | ✅ Done (Phase 1, commit a5e4882 + 01-02) |
-| 保留 PlayerEngine 抽象层 | MockEngine 测试价值 + 接口隔离 | — Pending |
-| 保留 fvp 作为唯一引擎 | setProperty/D3D11/均衡器无法替代 | — Pending |
-| 不引入 media_kit | API 能力不兼容，功能损失严重 | — Pending |
-| FvpEngine 委托给 helpers | 消除内联重复，符合组合模式 | — Pending |
+**沉浸式观看体验** — 控制栏在播放状态下"隐形但可用"，用户需要时立即响应，不需要时完全不干扰视频内容。
 
 ## Requirements
 
 ### Validated
 
-- ✓ PlayerEngine 抽象接口 (12 ValueNotifiers, 30 methods) — existing
-- ✓ FvpEngine 实现 (fvp/mdk.Player) — existing
-- ✓ 5 个 helper 组件 (CallbackHandler, PositionPoller, TrackManager, MediaOpener, VideoEffectController) — existing
-- ✓ MockEngine 测试替身 — existing
-- ✓ Barrel export 文件 (player_engine.dart) — existing
+- ✓ 控制栏 3 行布局（标题/进度条/按钮）— Phase 22-27
+- ✓ 自动隐藏状态机（idle/playing/paused/hidden）— Phase 22-27
+- ✓ 响应式 3 级断点（360/500/默认）— Phase 22-27
+- ✓ 毛玻璃 BackdropFilter + 跳过优化 — Phase 22-27
+- ✓ 15+ GlassButton 按钮组（左/中/右）— Phase 22-27
 
-### Active (v1.3)
+### Active
 
-- [ ] UI-01: 空状态控制栏背景优化 — 无视频时更淡、更融合
-- [ ] UI-02: 控制栏颜色亮度向背景看齐 — 毛玻璃效果不变
-- [ ] UI-03: 整体玻璃质感调优 — 边框、透明度参数协调
-
-### Previous Active (PlayerEngine, deferred)
-
-- [x] 移除 pubspec.yaml 中的 `player_engine` path 依赖
-- [x] 将 56 个文件的 import 从 `package:player_engine/` 改为本地相对路径
-- [ ] FvpEngine 委托 VolumeController/SubtitleConfigurator/D3D11Configurator 而非内联
-- [ ] 生成 media_kit 1.2.6 深度 API 对比报告
+- [ ] **CB-01**: 控制栏渐隐渐显动画优化 — 播放状态下自动隐藏/显示的过渡更加平滑自然
+- [ ] **CB-02**: 毛玻璃模糊强度 +15% — 提升 glassBlur 从 10→12（或等效调整）
+- [ ] **CB-03**: 按钮 hover 高亮区域优化 — 更显眼的 hover 反馈 + 更紧凑的高亮区域 + 不与控制栏边框重叠
+- [ ] **CB-04**: 控制栏垂直压缩 — 评估上/中/下 3 行是否可以进一步压缩高度
+- [ ] **CB-05**: 移除控制栏底部辉光 — 删除 TransmittedLight 效果
 
 ### Out of Scope
 
-- 引入 media_kit 作为引擎 — API 能力不兼容
-- 将 PlayerEngine 发布为独立包 — 只有一个消费者
-- 实现第二个引擎 — 无实际需求
+| Feature | Reason |
+|---------|--------|
+| 新增按钮/功能 | 本次仅微调现有 UI，不扩展功能 |
+| 浅色主题 | Deferred to v2+ |
+| 按钮插件化架构 | Deferred to v2+ |
+| PlayerActions 拆分 | 架构重构，非微调范围 |
+| InheritedWidget 重构 | 架构重构，非微调范围 |
 
-## Evolution
+## Context
 
-This document evolves at phase transitions and milestone boundaries.
+### 当前控制栏架构
 
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
+- **12 个核心文件**，~2578 行代码
+- **3 行布局**：Row 1 标题+时间 / Row 2 ProgressBar / Row 3 按钮组
+- **3 行等分**：Expanded × 3，每行占 1/3 高度（110px / 3 ≈ 36.7px）
+- **毛玻璃**：GlassTier.normal = 10 sigma，GlassTier.thin = 8 sigma
+- **自动隐藏**：窗口 5s / 全屏 3s 无操作后隐藏，300ms fade 动画（Curves.easeOut）
+- **底部辉光**：TransmittedLight(type: bottom, intensity: 0.6) 在 controls_overlay.dart:225-235
+
+### VLC/mpv 参考行为
+
+- VLC 默认 fadetime = 500ms（比当前 300ms 更平滑）
+- VLC 使用 CTRL_ID_VISIBLE 事件驱动显示/隐藏切换
+- mpv 的 OSC（On Screen Controller）采用类似策略：播放时自动隐藏，鼠标移动时显示
+- 业界标准：fade 动画 300-500ms，隐藏延迟 3-5s
+
+### 现有 Token 值
+
+- controlBarHeight = 110.0
+- glassBlur = 10.0（控制栏使用 GlassTier.normal）
+- glassBlurThin = 8.0
+- durationFade = 300ms（AutoHide 动画时长）
+- hideDelayWindowed = 5s
+- hideDelayFullscreen = 3s
+
+## Constraints
+
+- **功能不变**: 所有现有按钮、快捷键、手势保持不变
+- **性能不退化**: BackdropFilter 跳过优化、RepaintBoundary 隔离必须保留
+- **设计系统**: 所有视觉值通过 Tokens.* 管理
+- **向后兼容**: 不改变 PlayerActions/EngineState 接口
+
+## Key Decisions
+
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| 渐隐渐显仅调整动画参数，不改状态机 | AutoHideController 状态机已完善，仅需调优时长/曲线 | Pending |
+| 毛玻璃 +15% 通过调整 sigma 值 | 最小改动，GlassTier 已有缓存机制 | Pending |
+| 按钮 hover 通过 InkWell 参数调整 | 不改 GlassButton 架构，仅调色值和区域 | Pending |
+| 底部辉光直接移除 TransmittedLight | 最简单删除，不影响其他组件 | Pending |
 
 ---
-*Last updated: 2026-07-02 — milestone v1.3 started*
+*Created: 2026-07-07*
+*Last updated: 2026-07-07 after initial creation*
