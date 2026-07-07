@@ -489,5 +489,44 @@ void main() {
       // DropHandler 应存在
       expect(find.byType(DropHandler), findsOneWidget);
     });
+
+    // ── F1 shortcuts help dialog ──
+
+    testWidgets('F1 key shows shortcuts help dialog with shortcut table',
+        (tester) async {
+      // 覆盖 _showShortcutsHelp (line 315-316) + _ShortcutsHelpDialog (324-371)
+      // + shortcutDefinitions() (keyboard_handler.dart lines 16-29)
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // Act: 按 F1 → _showShortcutsHelp → showDialog → _ShortcutsHelpDialog
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.f1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.f1);
+      await tester.pumpAndSettle();
+
+      // Assert: AlertDialog 出现，包含快捷键标题
+      expect(find.byType(AlertDialog), findsOneWidget);
+      // shortcutDefinitions 生成的 Table 行应包含 Space 快捷键
+      expect(find.text('Space'), findsOneWidget);
+      // 关闭按钮应存在
+      expect(find.byType(TextButton), findsAtLeast(1));
+    });
+
+    testWidgets('shortcuts help dialog close button pops dialog', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 打开对话框
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.f1);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.f1);
+      await tester.pumpAndSettle();
+
+      // Act: 点击关闭按钮
+      await tester.tap(find.byType(TextButton).last);
+      await tester.pumpAndSettle();
+
+      // Assert: 对话框已关闭
+      expect(find.byType(AlertDialog), findsNothing);
+    });
   });
 }
