@@ -28,11 +28,13 @@ class ProbeEvent {
       'label': label,
       'timestamp': timestamp.toIso8601String(),
     };
-    if (elapsed != null) {
-      json['elapsedUs'] = elapsed!.inMicroseconds;
-      json['elapsedMs'] = elapsed!.inMicroseconds / 1000;
+    final e = elapsed;
+    if (e != null) {
+      json['elapsedUs'] = e.inMicroseconds;
+      json['elapsedMs'] = e.inMicroseconds / 1000;
     }
-    if (data != null) json['data'] = data!;
+    final d = data;
+    if (d != null) json['data'] = d;
     return json;
   }
 }
