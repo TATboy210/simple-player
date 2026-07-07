@@ -111,9 +111,9 @@ class ControlBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: const [
-                        Color(0x005082FF), // transparent
+                        Tokens.glowTransparent,
                         Tokens.glowAccent,
-                        Color(0x005082FF), // transparent
+                        Tokens.glowTransparent,
                       ],
                     ),
                   ),
@@ -193,11 +193,12 @@ class ControlBar extends StatelessWidget {
       ),
     );
 
-    if (opacity != null) {
+    final op = opacity;
+    if (op != null) {
       return AnimatedBuilder(
-        animation: opacity!,
+        animation: op,
         builder: (_, child) {
-          if (opacity!.value < 0.01) return child!;
+          if (op.value < 0.01) return child!;
           return withBlur(child!);
         },
         child: blurContent,

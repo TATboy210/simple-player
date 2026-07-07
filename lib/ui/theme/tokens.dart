@@ -35,6 +35,7 @@ class Tokens {
   static const glowGradientStart = Color(0x2E64A0FF);
   static const glowGradientMid = Color(0x0064A0FF);
   static const glowGradientEnd = Color(0x145078FF);
+  static const glowTransparent = Color(0x005082FF); // 全透明，用于渐变端点
 
   // ── 边缘微光 — omni 变体方向色 ──
   static const glowOmniRight = Color(0x1A5082FF);

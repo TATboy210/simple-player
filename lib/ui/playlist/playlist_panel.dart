@@ -184,7 +184,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                     ? AnimatedBuilder(
                         animation: widget.resizing!,
                         builder: (_, __) {
-                          if (widget.resizing!.value) {
+                          final resizing = widget.resizing;
+                          if (resizing != null && resizing.value) {
                             return ClipRRect(
                               borderRadius: BorderRadius.circular(
                                 Tokens.radiusLarge,
