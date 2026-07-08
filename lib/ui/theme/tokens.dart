@@ -8,7 +8,7 @@ class Tokens {
   static const bgBase = Color(0xFF0C0F18);      // 加深
   static const bgPanel = Color(0xFF111520);     // 加深
   static const bgElevated = Color(0xFF161A28);  // 加深
-  static const bgHover = Color(0xFF1E2232);     // 加深
+  static const bgHover = Color(0xFF283045);     // hover 高亮 — 比 bgElevated 明显更亮
   static const bgGlass = Color(0x8C0C0F18);    // 加深
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
