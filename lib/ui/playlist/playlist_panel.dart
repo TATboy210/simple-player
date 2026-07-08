@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
-import '../player/control_bar.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_container.dart';
@@ -140,12 +139,12 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             child: const SizedBox.expand(),
           ),
         ),
-        // 浮窗面板 — ultra-compact 时控制栏压缩高度
+        // 浮窗面板
         Positioned(
           right: Tokens.controlBarMarginH,
           bottom:
               Tokens.controlBarMarginBottom +
-              ControlBar.heightForWidth(MediaQuery.sizeOf(context).width) +
+              Tokens.controlBarHeight +
               Tokens.spLg,
           child: SlideTransition(
             position: _slideAnim,
