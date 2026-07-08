@@ -22,12 +22,12 @@ Plans:
 - controls_overlay.dart: 底部触发 + 点击立即隐藏 ✅
 - 手动验证 fade 平滑度（待运行应用验证）
 
-## Phase 2: 毛玻璃 +15% (CB-02)
+## Phase 2: 毛玻璃 +15% (CB-02) ✅ 2026-07-08
 
 **Goal:** 提升毛玻璃模糊质感
 **Estimated:** 15min
 
-- tokens.dart: glassBlur 10.0 → 11.5
+- tokens.dart: glassBlur 10.0 → 11.5 ✅
 - 验证 GlassTier.normal 使用新值
 - 确认缓存 ImageFilter 正确更新
 - 验证 BackdropFilter 跳过逻辑不受影响
@@ -36,12 +36,12 @@ Plans:
 - tokens.dart: glassBlur 更新
 - 视觉验证模糊效果
 
-## Phase 3: 按钮 hover 优化 (CB-03)
+## Phase 3: 按钮 hover 优化 (CB-03) ✅ 2026-07-08
 
 **Goal:** hover 反馈更显眼且区域更紧凑
 **Estimated:** 30min
 
-- 调整 Tokens.bgHover 颜色（提升亮度/对比度）
+- 调整 Tokens.bgHover 颜色（提升亮度/对比度） ✅ 0xFF1E2232→0xFF283045
 - 检查 InkWell borderRadius 是否导致高亮溢出到控制栏边框
 - 测试 idle/playing 两种状态下的 hover 效果
 
@@ -65,13 +65,15 @@ Plans:
 - tokens.dart: controlBarHeight 调整（如适用）
 - 响应式断点验证
 
-## Phase 5: 移除底部辉光 (CB-05)
+## Phase 5: 移除底部辉光 (CB-05) ✅ 2026-07-08
 
 **Goal:** 删除控制栏底部的 TransmittedLight 效果
 **Estimated:** 10min
 
-- 删除 controls_overlay.dart 中 TransmittedLight Positioned 块
-- 验证不影响 OSD/ErrorBanner 定位
+- 删除 controls_overlay.dart 中 TransmittedLight Positioned 块 ✅
+- 移除未使用的 transmitted_light.dart import ✅
+- 验证不影响 OSD/ErrorBanner 定位 ✅ (16/16 测试通过)
+- flutter analyze: 22 issues (全部 pre-existing) ✅
 - 验证不影响控制栏 margin/position
 
 **Deliverables:**

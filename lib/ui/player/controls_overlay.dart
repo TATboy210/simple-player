@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../shared/osd_overlay.dart';
-import '../shared/transmitted_light.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'error_banner.dart';
@@ -229,18 +228,6 @@ class _ControlsOverlayState extends State<ControlsOverlay>
           child: RepaintBoundary(
             child: Stack(
               children: [
-                // 光透射效果 — 控制栏下方的蓝色辉光
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: Tokens.controlBarHeight + 60,
-                  child: TransmittedLight(
-                    type: TransmissionType.bottom,
-                    intensity: 0.6,
-                    child: const SizedBox.expand(),
-                  ),
-                ),
                 Positioned(
                   bottom:
                       Tokens.controlBarMarginBottom +
