@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
@@ -79,13 +78,6 @@ class ControlBar extends StatelessWidget {
     this.decoration,
   });
 
-  /// 根据窗口宽度返回控制栏高度（ultra-compact 时压缩）
-  ///
-  /// ≤360px: 80dp（隐藏标题行，仅进度条+按钮）
-  /// >360px: 110dp（标准 3 行布局）
-  static double heightForWidth(double screenWidth) =>
-      screenWidth <= Tokens.breakpointUltraCompact ? 80.0 : Tokens.controlBarHeight;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -97,17 +89,13 @@ class ControlBar extends StatelessWidget {
         ? _decorationTween.evaluate(decoration!)
         : _decorationPlaying;
 
-    // ultra-compact 时压缩高度（隐藏标题行）
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final barHeight = ControlBar.heightForWidth(screenWidth);
-
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
       child: Material(
         color: Colors.transparent,
         child: Container(
-          height: barHeight,
+          height: Tokens.controlBarHeight,
           decoration: effectiveDecoration,
           padding: const EdgeInsets.only(
             left: Tokens.spSm,
@@ -134,56 +122,46 @@ class ControlBar extends StatelessWidget {
                   ),
                 ),
               ),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final w = constraints.maxWidth;
-                  final showSecondary = w >= Tokens.compactBreakpoint;
-                  // ≤360px 时隐藏标题行，仅保留进度条+按钮
-                  final isUltraCompact = w <= Tokens.breakpointUltraCompact;
-
-                  return Column(
-                    children: [
-                      // Row 1 (Top): 标题 | 时间显示 — ultra-compact 时隐藏
-                      if (!isUltraCompact)
+              // 3 行等分布局：标题+时间 / 进度条 / 按钮行
+              Column(
+                children: [
+                  // Row 1 (Top): 标题 | 时间显示
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
                         Expanded(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title ?? '',
-                                style: const TextStyle(
-                                  color: Tokens.textPrimary,
-                                  fontSize: Tokens.fontBody,
-                                  fontWeight: Tokens.weightMedium,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                          child: Text(
+                            title ?? '',
+                            style: const TextStyle(
+                              color: Tokens.textPrimary,
+                              fontSize: Tokens.fontBody,
+                              fontWeight: Tokens.weightMedium,
                             ),
-                            TimeRangeDisplay(engine: engine),
-                          ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      // Row 2 (Middle): ProgressBar — 等分空间
-                      Expanded(
-                        child: Center(
-                          child: ProgressBar(engine: engine),
-                        ),
-                      ),
-                      // Row 3 (Bottom): Left | Spacer | Center | Spacer | Right — 等分空间
-                      Expanded(
-                        child: _buildButtonRow(
-                          context,
-                          l10n,
-                          showSecondary,
-                          prevTooltip,
-                          nextTooltip,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                        TimeRangeDisplay(engine: engine),
+                      ],
+                    ),
+                  ),
+                  // Row 2 (Middle): ProgressBar
+                  Expanded(
+                    child: Center(
+                      child: ProgressBar(engine: engine),
+                    ),
+                  ),
+                  // Row 3 (Bottom): 左组 | Spacer | 中心组 | Spacer | 右组
+                  Expanded(
+                    child: _buildButtonRow(
+                      context,
+                      l10n,
+                      prevTooltip,
+                      nextTooltip,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -226,43 +204,21 @@ class ControlBar extends StatelessWidget {
     return withBlur(blurContent);
   }
 
-  /// 按钮行：左右组 + 居中播放按钮群
+  /// 按钮行：左组 | Spacer | 中心组 | Spacer | 右组
   ///
   /// 三段等 flex Spacer 将播放按钮群精确置于 Row 50% 位置。
-  /// 窄窗口分级隐藏：≤360 隐藏左右组，≤500 隐藏次要按钮。
   Widget _buildButtonRow(
     BuildContext context,
     AppLocalizations l10n,
-    bool showSecondary,
     String prevTooltip,
     String nextTooltip,
   ) {
-    final w = MediaQuery.sizeOf(context).width;
-    // 仅中心播放按钮（隐藏左右组 + stop/rewind/forward）
-    final ultraCompact = w <= 360;
-    // 隐藏左右组，中心保留全部按钮
-    final compact = !ultraCompact && w <= 500;
-
-    if (ultraCompact) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
         children: [
-          _CompactCenterGroup(
-            engine: engine,
-            isIdle: isIdle,
-            prevTooltip: prevTooltip,
-            nextTooltip: nextTooltip,
-            onPrevious: actions.onPrevious,
-            onNext: actions.onNext,
-          ),
-        ],
-      );
-    }
-
-    if (compact) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+          _LeftButtonGroup(engine: engine, actions: actions),
+          const Spacer(),
           CenterGroup(
             engine: engine,
             isIdle: isIdle,
@@ -271,34 +227,10 @@ class ControlBar extends StatelessWidget {
             onPrevious: actions.onPrevious,
             onNext: actions.onNext,
           ),
+          const Spacer(),
+          _RightButtonGroup(actions: actions),
         ],
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-      children: [
-        _LeftButtonGroup(
-          engine: engine,
-          showSecondary: showSecondary,
-          actions: actions,
-        ),
-        const Spacer(),
-        CenterGroup(
-          engine: engine,
-          isIdle: isIdle,
-          prevTooltip: prevTooltip,
-          nextTooltip: nextTooltip,
-          onPrevious: actions.onPrevious,
-          onNext: actions.onNext,
-        ),
-        const Spacer(),
-        _RightButtonGroup(
-          actions: actions,
-        ),
-      ],
-    ),
+      ),
     );
   }
 }
@@ -306,12 +238,10 @@ class ControlBar extends StatelessWidget {
 /// 左侧按钮组：播放模式 + 音量 + 倍速
 class _LeftButtonGroup extends StatelessWidget {
   final EngineState engine;
-  final bool showSecondary;
   final PlayerActions actions;
 
   const _LeftButtonGroup({
     required this.engine,
-    required this.showSecondary,
     required this.actions,
   });
 
@@ -326,61 +256,11 @@ class _LeftButtonGroup extends StatelessWidget {
           tooltip: actions.playModeLabel ?? l10n.playModeLoopAll,
           onPressed: actions.onTogglePlayMode,
         ),
-        if (showSecondary) ...[
-          const SizedBox(width: Tokens.spXs),
-          VolumeButton(engine: engine),
-          VolumeSlider(engine: engine),
-          const SizedBox(width: Tokens.spXs),
-          SpeedButton(engine: engine),
-        ],
-      ],
-    );
-  }
-}
-
-/// 超紧凑中心组：仅上一首/播放暂停/下一首（窗口 ≤360px 时）
-class _CompactCenterGroup extends StatelessWidget {
-  final EngineState engine;
-  final bool isIdle;
-  final String prevTooltip;
-  final String nextTooltip;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-
-  const _CompactCenterGroup({
-    super.key,
-    required this.engine,
-    required this.isIdle,
-    required this.prevTooltip,
-    required this.nextTooltip,
-    this.onPrevious,
-    this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dimmed = isIdle
-        ? Tokens.textPrimary.withValues(alpha: Tokens.textPrimary.a * 0.20)
-        : Tokens.textPrimary;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GlassButton.iconOnly(
-          icon: Icons.skip_previous,
-          color: dimmed,
-          onPressed: isIdle ? null : onPrevious,
-          tooltip: prevTooltip,
-        ),
-        // ultra-compact 模式收窄间距（4px vs 默认 8px）
         const SizedBox(width: Tokens.spXs),
-        PlayPauseButton(engine: engine, isIdle: isIdle),
+        VolumeButton(engine: engine),
+        VolumeSlider(engine: engine),
         const SizedBox(width: Tokens.spXs),
-        GlassButton.iconOnly(
-          icon: Icons.skip_next,
-          color: dimmed,
-          onPressed: isIdle ? null : onNext,
-          tooltip: nextTooltip,
-        ),
+        SpeedButton(engine: engine),
       ],
     );
   }
