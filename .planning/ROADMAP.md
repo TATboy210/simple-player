@@ -10,13 +10,13 @@
 
 **Goal:** 设置面板从纯色背景+阴影改为毛玻璃风格，精简组件层级，与控制栏视觉统一
 
-**Plans:** 1/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 
 - [x] 01-01-PLAN.md — Foundation: extract SectionHeader, glass panel shell, sidebar nav glass
-- [ ] 01-02-PLAN.md — Simple tabs: General, Equalizer, Audio, Performance to GlassContainer
-- [ ] 01-03-PLAN.md — Complex tabs: Video, Shortcuts, About to GlassContainer
+- [x] 01-02-PLAN.md — Simple tabs: General, Equalizer, Audio, Performance to GlassContainer
+- [x] 01-03-PLAN.md — Complex tabs: Video, Shortcuts, About to GlassContainer
 - [ ] 01-04-PLAN.md — Cleanup: remove dead components, visual verification
 
 **Requirements:** TRIG-01, TRIG-02, TRIG-03, COMP-01, COMP-02, COMP-03, COMP-04, STYLE-01, STYLE-02, STYLE-03, STYLE-04, INTX-01, INTX-02, INTX-03, INTX-04
