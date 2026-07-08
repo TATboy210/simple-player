@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'section_header.dart';
 
 export 'setting_action_row.dart';
 export 'setting_slider_row.dart';
@@ -63,7 +64,7 @@ class SettingsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Section Header
-            _SectionHeader(title: title, description: description, icon: icon),
+            SectionHeader(title: title, description: description, icon: icon),
             // Content rows
             for (int i = 0; i < children.length; i++) ...[
               if (i > 0)
@@ -230,44 +231,3 @@ class SettingSwitchRow extends StatelessWidget {
   }
 }
 
-/// Section Header — 卡片内的标题行
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String? description;
-  final IconData? icon;
-
-  const _SectionHeader({required this.title, this.description, this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Tokens.spSm),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: Tokens.iconSm, color: Tokens.textSecondary),
-            const SizedBox(width: Tokens.spXs),
-          ],
-          Text(
-            title,
-            style: const TextStyle(
-              color: Tokens.textSecondary,
-              fontSize: Tokens.fontCaption,
-              fontWeight: Tokens.weightMedium,
-            ),
-          ),
-          if (description != null) ...[
-            const SizedBox(width: Tokens.spSm),
-            Text(
-              description!,
-              style: const TextStyle(
-                color: Tokens.textTertiary,
-                fontSize: Tokens.fontOverline,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
