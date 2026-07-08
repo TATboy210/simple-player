@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../shared/settings_card.dart';
+import '../../shared/glass_container.dart';
+import '../../shared/section_header.dart';
+import '../../shared/settings_card.dart'; // keep for SettingActionRow export
 
 /// 快捷键自定义 tab — 显示/录制/重置快捷键绑定
 ///
@@ -104,25 +106,31 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
             focusNode: _keyListenerFocus,
             autofocus: _recordingAction != null,
             onKeyEvent: _onKeyPressed,
-            child: SettingsCard(
-              title: l10n.shortcutsTab,
-              icon: Icons.keyboard,
+            child: GlassContainer(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Tokens.spLg,
+                vertical: Tokens.spMd,
+              ),
               margin: EdgeInsets.zero,
-              children: [
-                for (final def in defs)
-                  SettingActionRow(
-                    label: def.label,
-                    valueText: friendlyKeyName(
-                      _currentKeyFor(def.action, def.defaultKey),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionHeader(title: l10n.shortcutsTab, icon: Icons.keyboard),
+                  for (final def in defs)
+                    SettingActionRow(
+                      label: def.label,
+                      valueText: friendlyKeyName(
+                        _currentKeyFor(def.action, def.defaultKey),
+                      ),
+                      isActive: _recordingAction == def.action,
+                      activeText: l10n.pressKeyToBind,
+                      onAction: () => _startRecording(def.action),
+                      onDeactivate: _recordingAction == def.action
+                          ? _cancelRecording
+                          : null,
                     ),
-                    isActive: _recordingAction == def.action,
-                    activeText: l10n.pressKeyToBind,
-                    onAction: () => _startRecording(def.action),
-                    onDeactivate: _recordingAction == def.action
-                        ? _cancelRecording
-                        : null,
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

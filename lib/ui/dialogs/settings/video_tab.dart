@@ -7,7 +7,9 @@ import '../../../features/player/services/video_processing_service.dart';
 import '../../../features/player/models/video_processing_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../shared/settings_card.dart';
+import '../../shared/glass_container.dart';
+import '../../shared/section_header.dart';
+import '../../shared/settings_card.dart'; // keep for SettingSwitchRow export
 
 /// Video processing tab — color correction, rotation, aspect ratio, and deinterlace.
 ///
@@ -40,69 +42,97 @@ class VideoTab extends StatelessWidget {
       builder: (_, s, _) => ListView(
         padding: EdgeInsets.zero,
         children: [
-          // 色彩校正
-          SettingsCard(
-            title: l10n.brightness,
-            icon: Icons.color_lens,
-            children: [
-              _VideoSlider(
-                label: l10n.brightness,
-                value: s.brightness,
-                onChanged: service.updateBrightness,
-              ),
-              _VideoSlider(
-                label: l10n.contrast,
-                value: s.contrast,
-                onChanged: service.updateContrast,
-              ),
-              _VideoSlider(
-                label: l10n.saturation,
-                value: s.saturation,
-                onChanged: service.updateSaturation,
-              ),
-              _VideoSlider(
-                label: l10n.hue,
-                value: s.hue,
-                onChanged: service.updateHue,
-              ),
-            ],
+          // 色彩校正 — GlassContainer + SectionHeader 替代 SettingsCard
+          GlassContainer(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.spLg,
+              vertical: Tokens.spMd,
+            ),
+            margin: const EdgeInsets.only(bottom: Tokens.spMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(title: l10n.brightness, icon: Icons.color_lens),
+                _VideoSlider(
+                  label: l10n.brightness,
+                  value: s.brightness,
+                  onChanged: service.updateBrightness,
+                ),
+                _VideoSlider(
+                  label: l10n.contrast,
+                  value: s.contrast,
+                  onChanged: service.updateContrast,
+                ),
+                _VideoSlider(
+                  label: l10n.saturation,
+                  value: s.saturation,
+                  onChanged: service.updateSaturation,
+                ),
+                _VideoSlider(
+                  label: l10n.hue,
+                  value: s.hue,
+                  onChanged: service.updateHue,
+                ),
+              ],
+            ),
           ),
           // 旋转
-          SettingsCard(
-            title: l10n.rotation,
-            icon: Icons.rotate_right,
-            children: [
-              _RotationPicker(
-                value: s.rotation,
-                onChanged: service.updateRotation,
-              ),
-            ],
+          GlassContainer(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.spLg,
+              vertical: Tokens.spMd,
+            ),
+            margin: const EdgeInsets.only(bottom: Tokens.spMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(title: l10n.rotation, icon: Icons.rotate_right),
+                _RotationPicker(
+                  value: s.rotation,
+                  onChanged: service.updateRotation,
+                ),
+              ],
+            ),
           ),
           // 画面比例
-          SettingsCard(
-            title: l10n.aspectRatio,
-            icon: Icons.aspect_ratio,
-            children: [
-              _AspectRatioSelector(
-                value: s.aspectRatioMode,
-                onChanged: service.updateAspectRatio,
-              ),
-            ],
+          GlassContainer(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.spLg,
+              vertical: Tokens.spMd,
+            ),
+            margin: const EdgeInsets.only(bottom: Tokens.spMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(title: l10n.aspectRatio, icon: Icons.aspect_ratio),
+                _AspectRatioSelector(
+                  value: s.aspectRatioMode,
+                  onChanged: service.updateAspectRatio,
+                ),
+              ],
+            ),
           ),
           // 去隔行
-          SettingsCard(
-            title: l10n.enableDeinterlace,
-            icon: Icons.deblur,
-            children: [
-              SettingSwitchRow(
-                title: l10n.enableDeinterlace,
-                description: l10n.softwareDecoderOnly,
-                notifier: _BoolNotifier.fromState(
-                  s.deinterlaceEnabled,
-                  service.updateDeinterlace,
+          GlassContainer(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.spLg,
+              vertical: Tokens.spMd,
+            ),
+            margin: const EdgeInsets.only(bottom: Tokens.spMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionHeader(title: l10n.enableDeinterlace, icon: Icons.deblur),
+                SettingSwitchRow(
+                  title: l10n.enableDeinterlace,
+                  description: l10n.softwareDecoderOnly,
+                  notifier: _BoolNotifier.fromState(
+                    s.deinterlaceEnabled,
+                    service.updateDeinterlace,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           // 重置
           Align(
