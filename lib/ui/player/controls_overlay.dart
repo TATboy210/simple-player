@@ -118,14 +118,14 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       _clickTimer?.cancel();
       widget.actions.onToggleFullscreen?.call();
     } else {
-      // 第一次点击 → 等待可能的第二次点击
+      // D-04: 第一次点击 → 立即隐藏（不等 250ms 延迟）
+      if (widget.engine.state.value != MediaState.idle) {
+        _autoHide.hide();
+      }
+      // Timer 仅用于双击检测窗口（250ms 内第二次点击 → 全屏切换）
       _clickTimer = Timer(
         const Duration(milliseconds: ControlsOverlay._clickDelayMs),
-        () {
-          if (!mounted) return;
-          if (widget.engine.state.value == MediaState.idle) return;
-          _autoHide.hide();
-        },
+        () {},
       );
     }
   }
@@ -189,85 +189,104 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   @override
   Widget build(BuildContext context) {
     final isIdle = widget.engine.state.value == MediaState.idle;
+    // idle + emptyState 时只对上方空白区域禁用手势，ControlBar 始终可交互
     final gestureActive = !(widget.emptyStatePresent && isIdle);
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: gestureActive ? _handleTap : null,
-      child: IgnorePointer(
-        // idle 时让 EmptyState 接收点击；播放中控制栏必须可交互
-        ignoring: widget.emptyStatePresent && isIdle,
-        child: MouseRegion(
-          opaque: false,
-          hitTestBehavior: HitTestBehavior.translucent,
-          onHover: (_) => _autoHide.onMouseMove(),
-          onEnter: (_) => _autoHide.onMouseEnter(),
-          onExit: (_) => _autoHide.onMouseExit(),
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _autoHide.visible,
-            builder: (_, isVisible, child) =>
-                IgnorePointer(ignoring: !isVisible, child: child),
-            child: RepaintBoundary(
-              child: Stack(
-                children: [
-                  // 光透射效果 — 控制栏下方的蓝色辉光
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: Tokens.controlBarHeight + 60,
-                    child: TransmittedLight(
-                      type: TransmissionType.bottom,
-                      intensity: 0.6,
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                  Positioned(
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        12,
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    child: OsdOverlay(resizing: widget.resizing),
-                  ),
-                  Positioned(
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    bottom: Tokens.controlBarMarginBottom,
-                    child: FadeTransition(
-                      opacity: _autoHide.opacity,
-                      child: ControlBar(
-                        engine: widget.engine,
-                        actions: widget.actions,
-                        isIdle: isIdle,
-                        title: widget.title,
-                        opacity: _resizeOpacity,
-                        enableBlur: _autoHide.visible.value,
-                        decoration: _animController,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: Tokens.controlBarMarginH + 16,
-                    right: Tokens.controlBarMarginH + 16,
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        8,
-                    child: RepaintBoundary(
-                      child: ErrorBanner(
-                        engine: widget.engine,
-                        onOpenFile: widget.actions.onOpenFile,
-                        onRetry: widget.actions.onOpenFile,
-                      ),
-                    ),
-                  ),
-                ],
+    return Stack(
+      children: [
+        // 上层手势区域 — 点击隐藏控制栏、双击全屏
+        // idle + emptyState 时 IgnorePointer 让下方 EmptyState 接收点击
+        Positioned.fill(
+          bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: gestureActive ? _handleTap : null,
+            child: IgnorePointer(
+              ignoring: widget.emptyStatePresent && isIdle,
+              child: MouseRegion(
+                opaque: false,
+                hitTestBehavior: HitTestBehavior.translucent,
+                onHover: (event) {
+                  // D-03: 仅底部区域触发 — 鼠标在距底部 150px 内才显示控制栏
+                  final size = context.size;
+                  if (size == null) return;
+                  final mouseFromBottom = size.height - event.localPosition.dy;
+                  if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
+                    _autoHide.onMouseMove();
+                  }
+                },
+                onEnter: (_) => _autoHide.onMouseEnter(),
+                onExit: (_) => _autoHide.onMouseExit(),
+                child: const SizedBox.expand(),
               ),
             ),
           ),
         ),
-      ),
+        // 下层控制栏区域 — 始终可交互，不受 emptyState 影响
+        ValueListenableBuilder<bool>(
+          valueListenable: _autoHide.visible,
+          builder: (_, isVisible, child) =>
+              IgnorePointer(ignoring: !isVisible, child: child),
+          child: RepaintBoundary(
+            child: Stack(
+              children: [
+                // 光透射效果 — 控制栏下方的蓝色辉光
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: Tokens.controlBarHeight + 60,
+                  child: TransmittedLight(
+                    type: TransmissionType.bottom,
+                    intensity: 0.6,
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+                Positioned(
+                  bottom:
+                      Tokens.controlBarMarginBottom +
+                      Tokens.controlBarHeight +
+                      12,
+                  left: Tokens.controlBarMarginH,
+                  right: Tokens.controlBarMarginH,
+                  child: OsdOverlay(resizing: widget.resizing),
+                ),
+                Positioned(
+                  left: Tokens.controlBarMarginH,
+                  right: Tokens.controlBarMarginH,
+                  bottom: Tokens.controlBarMarginBottom,
+                  child: FadeTransition(
+                    opacity: _autoHide.opacity,
+                    child: ControlBar(
+                      engine: widget.engine,
+                      actions: widget.actions,
+                      isIdle: isIdle,
+                      title: widget.title,
+                      opacity: _resizeOpacity,
+                      enableBlur: _autoHide.visible.value,
+                      decoration: _animController,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: Tokens.controlBarMarginH + 16,
+                  right: Tokens.controlBarMarginH + 16,
+                  bottom:
+                      Tokens.controlBarMarginBottom +
+                      Tokens.controlBarHeight +
+                      8,
+                  child: RepaintBoundary(
+                    child: ErrorBanner(
+                      engine: widget.engine,
+                      onOpenFile: widget.actions.onOpenFile,
+                      onRetry: widget.actions.onOpenFile,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
