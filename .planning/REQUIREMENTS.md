@@ -34,6 +34,15 @@
 - [ ] **CB-05a**: 删除 controls_overlay.dart 中 TransmittedLight 组件
 - [ ] **CB-05b**: 验证移除后不影响控制栏布局和定位
 
+### Resize 接线修复 (CB-06)
+
+- [ ] **CB-06a**: ControlBar 新增 `resizing` 字段并透传给 ProgressBar — 修复断路的 resize 缓存优化链
+- [ ] **CB-06b**: ControlsOverlay._onResizeChanged() 同步 `_autoHide.resizing` — 修复 resize 期间自动隐藏计时器泄漏
+- [ ] **CB-06c**: ControlsOverlay.initState 防御性同步 resizing 初始状态
+- [ ] **CB-06d**: ControlsOverlay.didUpdateWidget 切换 listener 后同步当前值
+- [ ] **CB-06e**: ProgressBar._cachedCustomPaint 加 doc comment 说明缓存语义
+- [ ] **CB-06f**: 手动验收 — resize 压测 5-10s 无抖动/闪隐，自动隐藏行为正确
+
 ## Out of Scope
 
 | Feature | Reason |
