@@ -1,75 +1,79 @@
-# Requirements: Control Bar Polish
+# Requirements: Settings Panel Redesign
 
-**Defined:** 2026-07-07
-**Core Value:** 沉浸式观看体验 — 控制栏"隐形但可用"
+**Defined:** 2026-07-08
+**Core Value:** 设置面板与控制栏视觉风格统一，组件层级精简，用户体验流畅
 
 ## v1 Requirements
 
-### 动画体验 (CB-01)
+### 触发优化
 
-- [ ] **CB-01a**: 播放状态下控制栏隐藏/显示 fade 动画时长优化（参考 VLC 500ms）
-- [ ] **CB-01b**: fade 动画曲线优化（可能需要调整 Curves.easeOut 参数或换用更平滑曲线）
-- [ ] **CB-01c**: idle→playing 状态切换时控制栏装饰过渡平滑
+- [ ] **TRIG-01**: 左键点击设置按钮打开完整面板（保持现有行为）
+- [ ] **TRIG-02**: 右键点击弹出快速语言/主题切换菜单（保持现有行为）
+- [ ] **TRIG-03**: 设置按钮 hover 视觉反馈与控制栏其他按钮一致
 
-### 毛玻璃质感 (CB-02)
+### 组件精简
 
-- [ ] **CB-02a**: GlassTier.normal sigma 从 10.0 提升至 ~11.5（+15%）
-- [ ] **CB-02b**: 验证 GlassContainer / EdgeGlow 缓存的 ImageFilter 正确更新
-- [ ] **CB-02c**: 确认 BackdropFilter 跳过优化（opacity<0.01 / resize / blurEnabled）不受影响
+- [ ] **COMP-01**: 设置面板主体使用 GlassContainer 毛玻璃背景（替代 SettingsCard 的纯色背景）
+- [ ] **COMP-02**: 保留 SettingRow 和 SettingSwitchRow 作为核心行组件
+- [ ] **COMP-03**: 移除 SettingsCard/SettingsExpanderCard/SettingsActionCard 中间层，直接用 GlassContainer + Column 组合
+- [ ] **COMP-04**: 设置面板标题栏与控制栏标题栏风格统一
 
-### 按钮交互 (CB-03)
+### 样式统一
 
-- [ ] **CB-03a**: GlassButton hover 颜色 Tokens.bgHover 提升对比度（当前 #1E2232 偏暗）
-- [ ] **CB-03b**: InkWell hover 高亮区域缩小，不与控制栏底部边框重叠
-- [ ] **CB-03c**: idle 和 playing 状态下 hover 反馈一致且显眼
+- [ ] **STYLE-01**: 设置面板背景使用 Tokens.bgGlass + BackdropFilter（与控制栏一致）
+- [ ] **STYLE-02**: 设置面板圆角使用 Tokens.radiusLarge（与控制栏一致）
+- [ ] **STYLE-03**: 设置面板边框使用 Tokens.borderHighlight（与控制栏一致）
+- [ ] **STYLE-04**: 侧边栏导航项 hover/selected 样式与控制栏按钮一致
 
-### 布局压缩 (CB-04)
+### 交互保持
 
-- [ ] **CB-04a**: 评估 3 行（标题/进度条/按钮）当前比例（等分 flex:1/1/1）
-- [ ] **CB-04b**: 确定是否可压缩总高度（110px → 更小值）
-- [ ] **CB-04c**: 如可压缩，调整 Row flex 比例或改用固定高度
+- [ ] **INTX-01**: OK/Cancel/Apply 延迟应用模式不变
+- [ ] **INTX-02**: locale/theme 变更推迟到对话框关闭
+- [ ] **INTX-03**: 快捷键取消恢复机制不变
+- [ ] **INTX-04**: 面板可拖拽功能不变
 
-### 底部辉光移除 (CB-05)
+## v2 Requirements
 
-- [ ] **CB-05a**: 删除 controls_overlay.dart 中 TransmittedLight 组件
-- [ ] **CB-05b**: 验证移除后不影响控制栏布局和定位
+### 后续优化
 
-### Resize 接线修复 (CB-06)
-
-- [x] **CB-06a**: ControlBar 新增 `resizing` 字段并透传给 ProgressBar — 修复断路的 resize 缓存优化链
-- [x] **CB-06b**: ControlsOverlay._onResizeChanged() 同步 `_autoHide.resizing` — 修复 resize 期间自动隐藏计时器泄漏
-- [x] **CB-06c**: ControlsOverlay.initState 防御性同步 resizing 初始状态
-- [x] **CB-06d**: ControlsOverlay.didUpdateWidget 切换 listener 后同步当前值
-- [x] **CB-06e**: ProgressBar._cachedCustomPaint 加 doc comment 说明缓存语义
-- [ ] **CB-06f**: 手动验收 — resize 压测 5-10s 无抖动/闪隐，自动隐藏行为正确
+- **COMP-05**: 提取 SwitchRow、RadioRow、SliderRow 语义化变体
+- **STYLE-05**: 设置面板响应式布局（窄屏适配）
+- **TRIG-04**: 设置按钮长按显示快捷提示
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 新增按钮/功能 | 仅微调 |
-| 浅色主题 | v2+ |
-| AutoHideController 状态机重构 | 已完善，仅调参 |
-| PlayerActions 接口变更 | 架构重构 |
+| 设置搜索功能 | 长期功能，不在本次范围 |
+| Golden tests | 后续补充 |
+| 新增设置项 | 本次只重构现有功能 |
+| 响应式布局 | v2 再做 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CB-01a | Phase 1 | Pending |
-| CB-01b | Phase 1 | Pending |
-| CB-01c | Phase 1 | Pending |
-| CB-02a | Phase 2 | Pending |
-| CB-02b | Phase 2 | Pending |
-| CB-02c | Phase 2 | Pending |
-| CB-03a | Phase 3 | Pending |
-| CB-03b | Phase 3 | Pending |
-| CB-03c | Phase 3 | Pending |
-| CB-04a | Phase 4 | Pending |
-| CB-04b | Phase 4 | Pending |
-| CB-04c | Phase 4 | Pending |
-| CB-05a | Phase 5 | Pending |
-| CB-05b | Phase 5 | Pending |
+| TRIG-01 | Phase 1 | Pending |
+| TRIG-02 | Phase 1 | Pending |
+| TRIG-03 | Phase 1 | Pending |
+| COMP-01 | Phase 1 | Pending |
+| COMP-02 | Phase 1 | Pending |
+| COMP-03 | Phase 1 | Pending |
+| COMP-04 | Phase 1 | Pending |
+| STYLE-01 | Phase 1 | Pending |
+| STYLE-02 | Phase 1 | Pending |
+| STYLE-03 | Phase 1 | Pending |
+| STYLE-04 | Phase 1 | Pending |
+| INTX-01 | Phase 1 | Pending |
+| INTX-02 | Phase 1 | Pending |
+| INTX-03 | Phase 1 | Pending |
+| INTX-04 | Phase 1 | Pending |
+
+**Coverage:**
+- v1 requirements: 15 total
+- Mapped to phases: 15
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-07-07*
+*Requirements defined: 2026-07-08*
+*Last updated: 2026-07-08 after initial definition*
