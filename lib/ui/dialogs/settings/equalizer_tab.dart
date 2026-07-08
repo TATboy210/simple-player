@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../kernel/engine/engine_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../shared/settings_card.dart';
+import '../../shared/glass_container.dart';
+import '../../shared/section_header.dart';
+import '../../shared/settings_card.dart'; // SettingRow export
 
 /// Equalizer settings tab — provides audio frequency presets via FFmpeg filters.
 ///
@@ -62,28 +64,36 @@ class _EqualizerTabState extends State<EqualizerTab> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        SettingsCard(
-          title: l10n.equalizer,
-          icon: Icons.equalizer,
-          children: [
-            for (int i = 0; i < _presetValues.length; i++)
-              SettingRow(
-                title: _presetLabel(i, l10n),
-                control: Icon(
-                  i == _selectedIndex
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                  color: i == _selectedIndex
-                      ? Tokens.accent
-                      : Tokens.textDisabled,
-                  size: Tokens.iconLg,
+        // 均衡器预设 — 毛玻璃卡片
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spLg,
+            vertical: Tokens.spMd,
+          ),
+          margin: const EdgeInsets.only(bottom: Tokens.spMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: l10n.equalizer, icon: Icons.equalizer),
+              for (int i = 0; i < _presetValues.length; i++)
+                SettingRow(
+                  title: _presetLabel(i, l10n),
+                  control: Icon(
+                    i == _selectedIndex
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: i == _selectedIndex
+                        ? Tokens.accent
+                        : Tokens.textDisabled,
+                    size: Tokens.iconLg,
+                  ),
+                  onTap: () {
+                    setState(() => _selectedIndex = i);
+                    widget.engine.setEqualizer(_presetValues[i]);
+                  },
                 ),
-                onTap: () {
-                  setState(() => _selectedIndex = i);
-                  widget.engine.setEqualizer(_presetValues[i]);
-                },
-              ),
-          ],
+            ],
+          ),
         ),
       ],
     );

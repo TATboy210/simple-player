@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../../../kernel/services/theme_service.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../shared/settings_card.dart';
+import '../../shared/glass_container.dart';
+import '../../shared/section_header.dart';
 
 /// 通用设置 tab — 语言切换 + 主题选择
 ///
@@ -29,25 +30,41 @@ class GeneralTab extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        SettingsCard(
-          title: l10n.language,
-          icon: Icons.language,
-          children: [
-            _LanguageSelector(
-              currentLocale: currentLocale,
-              onChanged: onLocaleChanged,
-            ),
-          ],
+        // 语言选择 — 毛玻璃卡片
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spLg,
+            vertical: Tokens.spMd,
+          ),
+          margin: const EdgeInsets.only(bottom: Tokens.spMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: l10n.language, icon: Icons.language),
+              _LanguageSelector(
+                currentLocale: currentLocale,
+                onChanged: onLocaleChanged,
+              ),
+            ],
+          ),
         ),
-        SettingsCard(
-          title: l10n.theme,
-          icon: Icons.palette,
-          children: [
-            _ThemeSelector(
-              currentIndex: currentThemeIndex,
-              onChanged: onThemeChanged,
-            ),
-          ],
+        // 主题选择 — 毛玻璃卡片
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spLg,
+            vertical: Tokens.spMd,
+          ),
+          margin: const EdgeInsets.only(bottom: Tokens.spMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: l10n.theme, icon: Icons.palette),
+              _ThemeSelector(
+                currentIndex: currentThemeIndex,
+                onChanged: onThemeChanged,
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -56,6 +56,7 @@ class GlassContainer extends StatelessWidget {
   final double? width;
   final double? height;
   final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
   final BorderRadius? borderRadius;
   final Border? border;
   final GlassTier tier;
@@ -78,6 +79,7 @@ class GlassContainer extends StatelessWidget {
     this.width,
     this.height,
     this.padding,
+    this.margin,
     this.borderRadius,
     this.border,
     this.tier = GlassTier.normal,
@@ -103,18 +105,19 @@ class GlassContainer extends StatelessWidget {
       child: child,
     );
 
+    // margin 在最外层，确保不被 BackdropFilter 裁剪
+    Widget result;
+
     // 降级模式：跳过 BackdropFilter，仅渲染半透明背景（D-14）
     if (!blurEnabled) {
-      return ClipRRect(
+      result = ClipRRect(
         borderRadius: rRect,
         child: RepaintBoundary(child: content),
       );
-    }
-
-    // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
-    final resizingNotifier = resizing;
-    if (resizingNotifier != null) {
-      return AnimatedBuilder(
+    } else if (resizing != null) {
+      // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
+      final resizingNotifier = resizing!;
+      result = AnimatedBuilder(
         animation: resizingNotifier,
         builder: (_, child) {
           if (resizingNotifier.value) {
@@ -127,9 +130,15 @@ class GlassContainer extends StatelessWidget {
         },
         child: content,
       );
+    } else {
+      result = _buildBlurContent(rRect, content);
     }
 
-    return _buildBlurContent(rRect, content);
+    // margin 包裹在最外层，确保毛玻璃裁剪不影响间距
+    if (margin != null) {
+      return Padding(padding: margin!, child: result);
+    }
+    return result;
   }
 
   Widget _buildBlurContent(BorderRadius rRect, Widget content) {
