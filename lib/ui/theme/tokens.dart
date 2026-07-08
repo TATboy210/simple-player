@@ -132,7 +132,7 @@ class Tokens {
   // ── 动画 ──
   static const durationFast = 80;
   static const durationNormal = 150;
-  static const durationFade = 300;
+  static const durationFade = 400;
   static const durationSlide = 300;
   static const durationDebounce = 500;
   static const durationWindowResize = 100;
@@ -140,6 +140,10 @@ class Tokens {
   // ── 自动隐藏 ──
   static const hideDelayWindowed = 5;
   static const hideDelayFullscreen = 3;
+
+  /// 鼠标距底部多少 px 内触发控制栏显示
+  /// controlBarHeight(110) + controlBarMarginBottom(16) + 24px buffer = 150
+  static const bottomTriggerZoneHeight = 150.0;
 
   // ── 全屏动画 ──
   static const durationFullscreenAnim = 200;

@@ -9,7 +9,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Fade动画参数(400ms+easeInOut) + 底部触发区域 + 点击立即隐藏
+- [x] 01-01-PLAN.md — Fade动画参数(400ms+easeInOut) + 底部触发区域 + 点击立即隐藏 ✅ 2026-07-08
 
 - 调整 AutoHideController 动画时长（durationFade: 300→400ms）
 - 评估 fade 曲线（Curves.easeOut → 可能换 Curves.easeInOut）
@@ -17,9 +17,10 @@ Plans:
 - 验证 resize 期间动画行为不变
 
 **Deliverables:**
-- tokens.dart: durationFade 更新
-- auto_hide_controller.dart: 动画参数调整（如需要）
-- 手动验证 fade 平滑度
+- tokens.dart: durationFade 400 + bottomTriggerZoneHeight 150 ✅
+- auto_hide_controller.dart: Curves.easeInOut ✅
+- controls_overlay.dart: 底部触发 + 点击立即隐藏 ✅
+- 手动验证 fade 平滑度（待运行应用验证）
 
 ## Phase 2: 毛玻璃 +15% (CB-02)
 

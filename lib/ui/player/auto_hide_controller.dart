@@ -23,7 +23,8 @@ class AutoHideController {
       duration: const Duration(milliseconds: Tokens.durationFade),
       value: 1,
     );
-    _opacity = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    // D-02: easeInOut 对称曲线 — 出现和消失速度一致
+    _opacity = CurvedAnimation(parent: _animController, curve: Curves.easeInOut);
     // fade-out 完成后立即关闭 hit test，避免透明 overlay 拦截点击
     _animController.addStatusListener(_onAnimStatus);
   }
