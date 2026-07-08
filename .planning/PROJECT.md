@@ -25,6 +25,7 @@
 - [ ] **CB-03**: 按钮 hover 高亮区域优化 — 更显眼的 hover 反馈 + 更紧凑的高亮区域 + 不与控制栏边框重叠
 - [ ] **CB-04**: 控制栏垂直压缩 — 评估上/中/下 3 行是否可以进一步压缩高度
 - [ ] **CB-05**: 移除控制栏底部辉光 — 删除 TransmittedLight 效果
+- [ ] **CB-06**: Resize 接线修复 — ControlBar→ProgressBar 透传 + AutoHideController 同步（P0 bug fix）
 
 ### Out of Scope
 
