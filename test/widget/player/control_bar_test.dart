@@ -87,16 +87,20 @@ void main() {
       expect(find.byType(VolumeSlider), findsOneWidget);
     });
 
-    testWidgets('hides secondary controls at width < 500', (tester) async {
+    testWidgets('shows all controls at narrow width (no breakpoint gating)', (
+      tester,
+    ) async {
+      // CB-04: compact/ultra-compact breakpoints removed — always show full layout
+      // Desktop player typical width 800+, use 600 to avoid Row overflow
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
-            data: const MediaQueryData(size: Size(400, 600)),
+            data: const MediaQueryData(size: Size(600, 600)),
             child: Scaffold(
               body: SizedBox(
-                width: 400,
+                width: 600,
                 height: 200,
                 child: ControlBar(engine: engine),
               ),
@@ -106,8 +110,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(VolumeButton), findsNothing);
-      expect(find.byType(VolumeSlider), findsNothing);
+      expect(find.byType(VolumeButton), findsOneWidget);
+      expect(find.byType(VolumeSlider), findsOneWidget);
     });
 
     testWidgets('shows folder_open button when onOpenFile is provided', (
@@ -273,40 +277,40 @@ void main() {
       );
     }
 
-    testWidgets('ultra-compact (w≤360) shows only prev/play/next', (
+    testWidgets('narrow width still shows full layout', (
       tester,
     ) async {
-      await tester.pumpWidget(buildWithWidth(360));
+      // CB-04: ultra-compact breakpoint removed — always show full layout
+      // Use 600px to avoid Row overflow (desktop player minimum practical width)
+      await tester.pumpWidget(buildWithWidth(600));
       await tester.pump();
 
-      // Ultra-compact: _CompactCenterGroup with skip_previous, play_arrow, skip_next
       expect(find.byIcon(Icons.skip_previous), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow), findsOneWidget);
       expect(find.byIcon(Icons.skip_next), findsOneWidget);
 
-      // No replay_10/forward_30 (those are in CenterGroup, not _CompactCenterGroup)
-      expect(find.byIcon(Icons.replay_10), findsNothing);
-      expect(find.byIcon(Icons.forward_30), findsNothing);
+      // Full CenterGroup (replay_10 + forward_30 always visible)
+      expect(find.byType(CenterGroup), findsOneWidget);
 
-      // No secondary controls
-      expect(find.byType(VolumeButton), findsNothing);
-      expect(find.byType(VolumeSlider), findsNothing);
+      // Volume always visible (no breakpoint gating)
+      expect(find.byType(VolumeButton), findsOneWidget);
+      expect(find.byType(VolumeSlider), findsOneWidget);
     });
 
-    testWidgets('compact (360<w≤500) shows CenterGroup but no secondary', (
+    testWidgets('medium width shows full layout', (
       tester,
     ) async {
-      await tester.pumpWidget(buildWithWidth(450));
+      // CB-04: compact breakpoint removed — always show full layout
+      await tester.pumpWidget(buildWithWidth(700));
       await tester.pump();
 
-      // CenterGroup includes replay_10 + forward_30
       expect(find.byType(CenterGroup), findsOneWidget);
       expect(find.byIcon(Icons.replay_10), findsOneWidget);
       expect(find.byIcon(Icons.forward_30), findsOneWidget);
 
-      // No secondary controls (volume/speed)
-      expect(find.byType(VolumeButton), findsNothing);
-      expect(find.byType(VolumeSlider), findsNothing);
+      // Volume always visible (no breakpoint gating)
+      expect(find.byType(VolumeButton), findsOneWidget);
+      expect(find.byType(VolumeSlider), findsOneWidget);
     });
 
     testWidgets('full layout (w>500) shows all groups', (tester) async {
