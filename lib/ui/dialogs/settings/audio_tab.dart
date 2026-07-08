@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../kernel/engine/engine_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../shared/settings_card.dart';
+import '../../shared/glass_container.dart';
+import '../../shared/section_header.dart';
+import '../../shared/settings_card.dart'; // SettingRow export
 
 /// Audio track selection tab — lists available audio tracks and allows switching.
 ///
@@ -29,22 +31,30 @@ class AudioTab extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        SettingsCard(
-          title: l10n.audioTrack,
-          icon: Icons.headphones,
-          children: [
-            for (int i = 0; i < tracks.length; i++)
-              _AudioTrackRow(
-                track: tracks[i],
-                index: i,
-                active: engine.activeAudioTracks.contains(i),
-                l10n: l10n,
-                onTap: () {
-                  engine.switchAudioTrack(i);
-                  Navigator.of(context).pop();
-                },
-              ),
-          ],
+        // 音轨选择 — 毛玻璃卡片
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spLg,
+            vertical: Tokens.spMd,
+          ),
+          margin: const EdgeInsets.only(bottom: Tokens.spMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: l10n.audioTrack, icon: Icons.headphones),
+              for (int i = 0; i < tracks.length; i++)
+                _AudioTrackRow(
+                  track: tracks[i],
+                  index: i,
+                  active: engine.activeAudioTracks.contains(i),
+                  l10n: l10n,
+                  onTap: () {
+                    engine.switchAudioTrack(i);
+                    Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          ),
         ),
       ],
     );

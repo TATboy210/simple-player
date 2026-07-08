@@ -4,7 +4,9 @@ import '../../../kernel/engine/engine_state.dart';
 import '../../../kernel/persistence/settings_store.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../shared/settings_card.dart';
+import '../../shared/glass_container.dart';
+import '../../shared/section_header.dart';
+import '../../shared/settings_card.dart'; // SettingSwitchRow export
 
 /// Performance settings tab — D3D11 sync toggle and hardware decoding switch.
 ///
@@ -64,29 +66,43 @@ class _PerformanceTabState extends State<PerformanceTab> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        // D3D11 渲染
-        SettingsCard(
-          title: l10n.d3d11Rendering,
-          icon: Icons.speed,
-          children: [
-            SettingSwitchRow(
-              title: l10n.d3d11Sync,
-              description: l10n.d3d11SyncDesc,
-              notifier: _d3d11Sync,
-            ),
-          ],
+        // D3D11 渲染 — 毛玻璃卡片
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spLg,
+            vertical: Tokens.spMd,
+          ),
+          margin: const EdgeInsets.only(bottom: Tokens.spMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: l10n.d3d11Rendering, icon: Icons.speed),
+              SettingSwitchRow(
+                title: l10n.d3d11Sync,
+                description: l10n.d3d11SyncDesc,
+                notifier: _d3d11Sync,
+              ),
+            ],
+          ),
         ),
-        // 解码器
-        SettingsCard(
-          title: l10n.decoderSettings,
-          icon: Icons.memory,
-          children: [
-            SettingSwitchRow(
-              title: l10n.hardwareDecoding,
-              description: l10n.hardwareDecodingDesc,
-              notifier: _hardwareDecoding,
-            ),
-          ],
+        // 解码器 — 毛玻璃卡片
+        GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spLg,
+            vertical: Tokens.spMd,
+          ),
+          margin: const EdgeInsets.only(bottom: Tokens.spMd),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: l10n.decoderSettings, icon: Icons.memory),
+              SettingSwitchRow(
+                title: l10n.hardwareDecoding,
+                description: l10n.hardwareDecodingDesc,
+                notifier: _hardwareDecoding,
+              ),
+            ],
+          ),
         ),
         // 提示
         Padding(
