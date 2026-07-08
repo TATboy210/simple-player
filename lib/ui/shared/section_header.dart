@@ -4,7 +4,7 @@ import '../theme/tokens.dart';
 
 /// Section Header — 卡片内的标题行（从 settings_card.dart 提取）
 ///
-/// 用于 SettingsCard、GlassContainer 等卡片组件的标题区域。
+/// 用于 GlassContainer 等卡片组件的标题区域。
 /// 支持可选的图标和描述文本。
 ///
 /// ```dart
