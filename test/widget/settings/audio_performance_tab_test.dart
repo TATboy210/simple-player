@@ -45,9 +45,8 @@ void main() {
         AudioTab(engine: engine),
       ));
 
-      // 应使用 GlassContainer 而非 SettingsCard
+      // 应使用 GlassContainer（SettingsCard 已移除）
       expect(find.byType(GlassContainer), findsOneWidget);
-      expect(find.byType(SettingsCard), findsNothing);
     });
 
     testWidgets('shows empty state text when no tracks', (tester) async {
@@ -146,9 +145,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
 
-      // 应使用 GlassContainer 而非 SettingsCard
+      // 应使用 GlassContainer（SettingsCard 已移除）
       expect(find.byType(GlassContainer), findsWidgets);
-      expect(find.byType(SettingsCard), findsNothing);
     });
 
     testWidgets('renders GlassContainer for decoder section', (tester) async {

@@ -1,87 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
-import 'section_header.dart';
 
 export 'setting_action_row.dart';
 export 'setting_slider_row.dart';
-export 'settings_action_card.dart';
-export 'settings_expander_card.dart';
-
-/// 设置卡片 — 阴影 + 圆角 + section header + children 嵌套
-///
-/// 平衡型视觉风格（Plex/IINA）：卡片间留白适中，内容区紧凑。
-///
-/// ```dart
-/// SettingsCard(
-///   title: '语言',
-///   icon: Icons.language,
-///   children: [
-///     SettingRow(title: '界面语言', control: DropdownButton(...)),
-///   ],
-/// )
-/// ```
-class SettingsCard extends StatelessWidget {
-  /// 共享的卡片装饰 — SettingsCard、SettingsExpanderCard、SettingsActionCard 复用
-  static const cardDecoration = BoxDecoration(
-    color: Tokens.bgPanel,
-    borderRadius: BorderRadius.all(Radius.circular(Tokens.radiusLarge)),
-    boxShadow: [
-      BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-    ],
-  );
-
-  final String title;
-  final String? description;
-  final IconData? icon;
-  final List<Widget> children;
-  final EdgeInsets? padding;
-  final EdgeInsets? margin;
-
-  const SettingsCard({
-    super.key,
-    required this.title,
-    this.description,
-    this.icon,
-    required this.children,
-    this.padding,
-    this.margin,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: margin ?? const EdgeInsets.only(bottom: Tokens.spMd),
-      decoration: SettingsCard.cardDecoration,
-      child: Padding(
-        padding:
-            padding ??
-            const EdgeInsets.symmetric(
-              horizontal: Tokens.spLg,
-              vertical: Tokens.spMd,
-            ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section Header
-            SectionHeader(title: title, description: description, icon: icon),
-            // Content rows
-            for (int i = 0; i < children.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 1,
-                  thickness: 0.5,
-                  color: Tokens.borderHighlight,
-                  indent: icon != null ? 36 : 0,
-                ),
-              children[i],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// 设置行 — 统一的 label + control 布局，带 hover/press 交互反馈
 ///
@@ -230,4 +152,3 @@ class SettingSwitchRow extends StatelessWidget {
     );
   }
 }
-

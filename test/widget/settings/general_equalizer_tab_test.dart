@@ -30,9 +30,8 @@ void main() {
         ),
       ));
 
-      // 应使用 GlassContainer 而非 SettingsCard
+      // 应使用 GlassContainer（SettingsCard 已移除）
       expect(find.byType(GlassContainer), findsWidgets);
-      expect(find.byType(SettingsCard), findsNothing);
     });
 
     testWidgets('renders language section header with icon', (tester) async {
@@ -105,9 +104,8 @@ void main() {
         EqualizerTab(engine: engine),
       ));
 
-      // 应使用 GlassContainer 而非 SettingsCard
+      // 应使用 GlassContainer（SettingsCard 已移除）
       expect(find.byType(GlassContainer), findsOneWidget);
-      expect(find.byType(SettingsCard), findsNothing);
     });
 
     testWidgets('renders equalizer section header', (tester) async {
