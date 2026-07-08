@@ -6,6 +6,10 @@
 
 **Goal:** 控制栏 fade 动画更平滑自然
 **Estimated:** 30min
+**Plans:** 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md — Fade动画参数(400ms+easeInOut) + 底部触发区域 + 点击立即隐藏
 
 - 调整 AutoHideController 动画时长（durationFade: 300→400ms）
 - 评估 fade 曲线（Curves.easeOut → 可能换 Curves.easeInOut）
