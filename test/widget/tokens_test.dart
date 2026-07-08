@@ -46,9 +46,9 @@ void main() {
       expect(Tokens.glassBlurThin, lessThan(Tokens.glassBlur));
     });
 
-    test('glassBlur is 10.0 (2-tier system)', () {
-      // glassBlurThick 已删除，2-tier：Thin=4, Standard=10
-      expect(Tokens.glassBlur, equals(10.0));
+    test('glassBlur is 11.5 (+15% from 10.0)', () {
+      // Phase 2: 提升毛玻璃模糊质感
+      expect(Tokens.glassBlur, equals(11.5));
     });
   });
 }
