@@ -10,10 +10,11 @@
 
 **Goal:** 设置面板从纯色背景+阴影改为毛玻璃风格，精简组件层级，与控制栏视觉统一
 
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
-- [ ] 01-01-PLAN.md — Foundation: extract SectionHeader, glass panel shell, sidebar nav glass
+
+- [x] 01-01-PLAN.md — Foundation: extract SectionHeader, glass panel shell, sidebar nav glass
 - [ ] 01-02-PLAN.md — Simple tabs: General, Equalizer, Audio, Performance to GlassContainer
 - [ ] 01-03-PLAN.md — Complex tabs: Video, Shortcuts, About to GlassContainer
 - [ ] 01-04-PLAN.md — Cleanup: remove dead components, visual verification
@@ -21,6 +22,7 @@ Plans:
 **Requirements:** TRIG-01, TRIG-02, TRIG-03, COMP-01, COMP-02, COMP-03, COMP-04, STYLE-01, STYLE-02, STYLE-03, STYLE-04, INTX-01, INTX-02, INTX-03, INTX-04
 
 **Success Criteria**:
+
 1. 设置面板使用 GlassContainer 毛玻璃背景，视觉与控制栏一致
 2. 移除 SettingsCard/SettingsExpanderCard/SettingsActionCard 中间层
 3. 7 个 tab 全部改为直接使用 GlassContainer + SettingRow 组合
@@ -33,6 +35,7 @@ Plans:
 **Dependencies:** None
 
 **Risks:**
+
 - 7 个 tab 全部改造，工作量较大
 - 毛玻璃效果可能影响面板可读性（需测试调整）
 
