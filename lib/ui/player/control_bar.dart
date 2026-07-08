@@ -109,7 +109,11 @@ class ControlBar extends StatelessWidget {
         child: Container(
           height: barHeight,
           decoration: effectiveDecoration,
-          padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+          padding: const EdgeInsets.only(
+            left: Tokens.spSm,
+            right: Tokens.spSm,
+            bottom: 6,
+          ),
           child: Stack(
             children: [
               // CSS .player-controls::before — 顶部渐变光线
@@ -164,7 +168,7 @@ class ControlBar extends StatelessWidget {
                       // Row 2 (Middle): ProgressBar — 等分空间
                       Expanded(
                         child: Center(
-                          child: _ProgressRow(engine: engine),
+                          child: ProgressBar(engine: engine),
                         ),
                       ),
                       // Row 3 (Bottom): Left | Spacer | Center | Spacer | Right — 等分空间
@@ -434,22 +438,3 @@ class _RightButtonGroup extends StatelessWidget {
   }
 }
 
-/// ProgressBar 圆角边框容器 — hover 时边框高亮反馈
-class _ProgressRow extends StatelessWidget {
-  final EngineState engine;
-
-  const _ProgressRow({required this.engine});
-
-  @override
-  Widget build(BuildContext context) {
-    // 隐形边框 1px + padding 1px = 总共 2px，进度条居中
-    return Container(
-      padding: const EdgeInsets.all(1),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        border: Border.all(color: Colors.transparent, width: 1),
-      ),
-      child: ProgressBar(engine: engine),
-    );
-  }
-}
