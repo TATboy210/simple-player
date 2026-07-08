@@ -47,7 +47,7 @@ class SettingsNavItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: Tokens.fontOverline,
                 color: selected ? Tokens.accent : Tokens.textSecondary,
                 fontWeight: selected
                     ? Tokens.weightMedium
