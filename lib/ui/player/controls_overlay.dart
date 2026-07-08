@@ -107,6 +107,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
 
     // 监听 resize 信号变化
     widget.resizing?.addListener(_onResizeChanged);
+    // CB-06: 防御性同步 — widget 创建时 resizing 可能已为 true
+    if (widget.resizing?.value == true) _onResizeChanged();
   }
 
   // TODO: 消费 Tokens.tapJitterThreshold — 当前使用 GestureDetector.onTap，
@@ -122,6 +124,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
         _autoHide.hide();
       }
       // Timer 仅用于双击检测窗口（250ms 内第二次点击 → 全屏切换）
+      // 空回调 — Timer.isActive 用于判断是否在双击窗口内，超时自动失效
       _clickTimer = Timer(
         const Duration(milliseconds: ControlsOverlay._clickDelayMs),
         () {},
@@ -132,6 +135,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   /// resize 信号变化回调 — resizing=true 时 reverse() 淡出，false 时根据 engine 状态恢复装饰（D-07）
   void _onResizeChanged() {
     final resizing = widget.resizing?.value ?? false;
+    // CB-06: 同步 AutoHideController — resize 期间冻结隐藏计时器
+    _autoHide.resizing = resizing;
     if (resizing) {
       _isResizing = true;
       _animController.reverse(); // 1.0 → 0.0，150ms easeOut
@@ -167,10 +172,11 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     if (oldWidget.isFullscreen != widget.isFullscreen) {
       _autoHide.isFullscreen = widget.isFullscreen;
     }
-    // resizing 监听迁移 — 旧值移除，新值添加
+    // resizing 监听迁移 — 旧值移除，新值添加（CB-06: 同步当前值）
     if (oldWidget.resizing != widget.resizing) {
       oldWidget.resizing?.removeListener(_onResizeChanged);
       widget.resizing?.addListener(_onResizeChanged);
+      _onResizeChanged();
     }
   }
 
@@ -251,6 +257,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                       opacity: _resizeOpacity,
                       enableBlur: _autoHide.visible.value,
                       decoration: _animController,
+                      resizing: widget.resizing,
                     ),
                   ),
                 ),

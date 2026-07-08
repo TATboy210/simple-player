@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
@@ -67,6 +68,9 @@ class ControlBar extends StatelessWidget {
   /// 装饰动画 — 驱动 playing/idle 状态切换的 DecorationTween 插值（D-01/D-02）
   final Animation<double>? decoration;
 
+  /// 窗口 resize 信号 — 透传给 ProgressBar 跳过内部 bar 重建（CB-06）
+  final ValueListenable<bool>? resizing;
+
   const ControlBar({
     super.key,
     required this.engine,
@@ -76,6 +80,7 @@ class ControlBar extends StatelessWidget {
     this.title,
     this.opacity,
     this.decoration,
+    this.resizing,
   });
 
   @override
@@ -149,7 +154,7 @@ class ControlBar extends StatelessWidget {
                   // Row 2 (Middle): ProgressBar
                   Expanded(
                     child: Center(
-                      child: ProgressBar(engine: engine),
+                      child: ProgressBar(engine: engine, resizing: resizing),
                     ),
                   ),
                   // Row 3 (Bottom): 左组 | Spacer | 中心组 | Spacer | 右组

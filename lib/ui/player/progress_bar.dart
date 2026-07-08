@@ -279,6 +279,7 @@ class _ProgressBarState extends State<ProgressBar>
     );
   }
 
+  /// 缓存上一帧的 CustomPaint — resize 期间直接复用，避免每帧重建 painter（CB-06 wiring 修复后此缓存才生效）
   Widget? _cachedCustomPaint;
 
   Widget _buildBarLayers() {

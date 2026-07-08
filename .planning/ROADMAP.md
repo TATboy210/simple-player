@@ -89,21 +89,21 @@ Plans:
 ### 改动清单（2 文件 7+2 处）
 
 **A — ControlBar 传递 resizing（control_bar.dart）:**
-- [ ] A1: 新增 `final ValueListenable<bool>? resizing;` 字段
-- [ ] A2: 构造函数新增 `this.resizing`
-- [ ] A3: ProgressBar 调用处传 `resizing: resizing`
+- [x] A1: 新增 `final ValueListenable<bool>? resizing;` 字段
+- [x] A2: 构造函数新增 `this.resizing`
+- [x] A3: ProgressBar 调用处传 `resizing: resizing`
 
 **B — Overlay 同步 AutoHideController（controls_overlay.dart）:**
-- [ ] B1: `_onResizeChanged()` 开头加 `_autoHide.resizing = resizing;`
-- [ ] B2: `initState` 加防御性同步
-- [ ] B3: `didUpdateWidget` 切换 listener 后同步当前值
+- [x] B1: `_onResizeChanged()` 开头加 `_autoHide.resizing = resizing;`
+- [x] B2: `initState` 加防御性同步
+- [x] B3: `didUpdateWidget` 切换 listener 后同步当前值
 
 **C — Overlay 传递 resizing 给 ControlBar:**
-- [ ] C1: ControlBar 构造处加 `resizing: widget.resizing`
+- [x] C1: ControlBar 构造处加 `resizing: widget.resizing`
 
 **D — 注释优化（P1）:**
-- [ ] D1: `_cachedCustomPaint` 加 doc comment
-- [ ] D2: `_handleTap` 空回调加注释
+- [x] D1: `_cachedCustomPaint` 加 doc comment
+- [x] D2: `_handleTap` 空回调加注释
 
 ### 验收清单
 - [ ] 拖窗 5-10s：不抖动、不闪隐

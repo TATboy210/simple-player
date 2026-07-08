@@ -20,12 +20,12 @@
 
 ### Active
 
-- [ ] **CB-01**: 控制栏渐隐渐显动画优化 — 播放状态下自动隐藏/显示的过渡更加平滑自然
-- [ ] **CB-02**: 毛玻璃模糊强度 +15% — 提升 glassBlur 从 10→12（或等效调整）
-- [ ] **CB-03**: 按钮 hover 高亮区域优化 — 更显眼的 hover 反馈 + 更紧凑的高亮区域 + 不与控制栏边框重叠
-- [ ] **CB-04**: 控制栏垂直压缩 — 评估上/中/下 3 行是否可以进一步压缩高度
-- [ ] **CB-05**: 移除控制栏底部辉光 — 删除 TransmittedLight 效果
-- [ ] **CB-06**: Resize 接线修复 — ControlBar→ProgressBar 透传 + AutoHideController 同步（P0 bug fix）
+- [x] **CB-01**: 控制栏渐隐渐显动画优化 — 播放状态下自动隐藏/显示的过渡更加平滑自然
+- [x] **CB-02**: 毛玻璃模糊强度 +15% — 提升 glassBlur 从 10→12（或等效调整）
+- [x] **CB-03**: 按钮 hover 高亮区域优化 — 更显眼的 hover 反馈 + 更紧凑的高亮区域 + 不与控制栏边框重叠
+- [x] **CB-04**: 控制栏垂直压缩 — 评估上/中/下 3 行是否可以进一步压缩高度
+- [x] **CB-05**: 移除控制栏底部辉光 — 删除 TransmittedLight 效果
+- [x] **CB-06**: Resize 接线修复 — ControlBar→ProgressBar 透传 + AutoHideController 同步（P0 bug fix）
 
 ### Out of Scope
 
