@@ -1,115 +1,64 @@
-# Roadmap: Control Bar Polish
+# Roadmap: Settings Panel Redesign
 
-**Created:** 2026-07-07
-
-## Phase 1: 动画体验优化 (CB-01)
-
-**Goal:** 控制栏 fade 动画更平滑自然
-**Estimated:** 30min
-**Plans:** 1 plan
-
-Plans:
-- [x] 01-01-PLAN.md — Fade动画参数(400ms+easeInOut) + 底部触发区域 + 点击立即隐藏 ✅ 2026-07-08
-
-- 调整 AutoHideController 动画时长（durationFade: 300→400ms）
-- 评估 fade 曲线（Curves.easeOut → 可能换 Curves.easeInOut）
-- 测试 idle↔playing 状态切换装饰过渡
-- 验证 resize 期间动画行为不变
-
-**Deliverables:**
-- tokens.dart: durationFade 400 + bottomTriggerZoneHeight 150 ✅
-- auto_hide_controller.dart: Curves.easeInOut ✅
-- controls_overlay.dart: 底部触发 + 点击立即隐藏 ✅
-- 手动验证 fade 平滑度（待运行应用验证）
-
-## Phase 2: 毛玻璃 +15% (CB-02) ✅ 2026-07-08
-
-**Goal:** 提升毛玻璃模糊质感
-**Estimated:** 15min
-
-- tokens.dart: glassBlur 10.0 → 11.5 ✅
-- 验证 GlassTier.normal 使用新值
-- 确认缓存 ImageFilter 正确更新
-- 验证 BackdropFilter 跳过逻辑不受影响
-
-**Deliverables:**
-- tokens.dart: glassBlur 更新
-- 视觉验证模糊效果
-
-## Phase 3: 按钮 hover 优化 (CB-03) ✅ 2026-07-08
-
-**Goal:** hover 反馈更显眼且区域更紧凑
-**Estimated:** 30min
-
-- 调整 Tokens.bgHover 颜色（提升亮度/对比度） ✅ 0xFF1E2232→0xFF283045
-- 检查 InkWell borderRadius 是否导致高亮溢出到控制栏边框
-- 测试 idle/playing 两种状态下的 hover 效果
-
-**Deliverables:**
-- tokens.dart: bgHover 颜色调整
-- glass_container.dart: InkWell 参数微调（如需要）
-- 视觉验证 hover 效果
-
-## Phase 4: 布局压缩评估 (CB-04)
-
-**Goal:** 评估并实施控制栏高度压缩
-**Estimated:** 30min
-
-- 分析 3 行当前 flex 比例（1:1:1）和实际内容高度需求
-- 确定最小可行高度
-- 如可压缩：调整 flex 比例或 controlBarHeight
-- 确保按钮不溢出、进度条可交互
-
-**Deliverables:**
-- control_bar.dart: Column flex 比例调整
-- tokens.dart: controlBarHeight 调整（如适用）
-- 响应式断点验证
-
-## Phase 5: 移除底部辉光 (CB-05) ✅ 2026-07-08
-
-**Goal:** 删除控制栏底部的 TransmittedLight 效果
-**Estimated:** 10min
-
-- 删除 controls_overlay.dart 中 TransmittedLight Positioned 块 ✅
-- 移除未使用的 transmitted_light.dart import ✅
-- 验证不影响 OSD/ErrorBanner 定位 ✅ (16/16 测试通过)
-- flutter analyze: 22 issues (全部 pre-existing) ✅
-- 验证不影响控制栏 margin/position
-
-**Deliverables:**
-- controls_overlay.dart: 移除 TransmittedLight 代码
-- 视觉验证无底部辉光
-
-## Phase 6: Resize 接线修复 (CB-06)
-
-**Goal:** 修复 resize 信号断路 — ControlBar→ProgressBar 透传 + AutoHideController 同步
-**Estimated:** 15min
-**Priority:** P0（性能 + 体验 bug）
-
-### 改动清单（2 文件 7+2 处）
-
-**A — ControlBar 传递 resizing（control_bar.dart）:**
-- [x] A1: 新增 `final ValueListenable<bool>? resizing;` 字段
-- [x] A2: 构造函数新增 `this.resizing`
-- [x] A3: ProgressBar 调用处传 `resizing: resizing`
-
-**B — Overlay 同步 AutoHideController（controls_overlay.dart）:**
-- [x] B1: `_onResizeChanged()` 开头加 `_autoHide.resizing = resizing;`
-- [x] B2: `initState` 加防御性同步
-- [x] B3: `didUpdateWidget` 切换 listener 后同步当前值
-
-**C — Overlay 传递 resizing 给 ControlBar:**
-- [x] C1: ControlBar 构造处加 `resizing: widget.resizing`
-
-**D — 注释优化（P1）:**
-- [x] D1: `_cachedCustomPaint` 加 doc comment
-- [x] D2: `_handleTap` 空回调加注释
-
-### 验收清单
-- [ ] 拖窗 5-10s：不抖动、不闪隐
-- [ ] 自动隐藏 windowed ~5s / fullscreen ~3s 正常
-- [ ] resize 期间冻结隐藏计时器
-- [ ] 进度条/音量/倍速/双击全屏回归正常
+**Total Phases:** 1
+**Total Requirements:** 15
+**Mode:** interactive
 
 ---
-*Roadmap created: 2026-07-07*
+
+### Phase 1: Settings Panel Glass Redesign
+
+**Goal:** 设置面板从纯色背景+阴影改为毛玻璃风格，精简组件层级，与控制栏视觉统一
+
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Foundation: extract SectionHeader, glass panel shell, sidebar nav glass
+- [ ] 01-02-PLAN.md — Simple tabs: General, Equalizer, Audio, Performance to GlassContainer
+- [ ] 01-03-PLAN.md — Complex tabs: Video, Shortcuts, About to GlassContainer
+- [ ] 01-04-PLAN.md — Cleanup: remove dead components, visual verification
+
+**Requirements:** TRIG-01, TRIG-02, TRIG-03, COMP-01, COMP-02, COMP-03, COMP-04, STYLE-01, STYLE-02, STYLE-03, STYLE-04, INTX-01, INTX-02, INTX-03, INTX-04
+
+**Success Criteria**:
+1. 设置面板使用 GlassContainer 毛玻璃背景，视觉与控制栏一致
+2. 移除 SettingsCard/SettingsExpanderCard/SettingsActionCard 中间层
+3. 7 个 tab 全部改为直接使用 GlassContainer + SettingRow 组合
+4. 侧边栏导航项样式与控制栏按钮一致
+5. OK/Cancel/Apply 延迟应用模式正常工作
+6. 左键/右键双入口触发正常
+7. 面板可拖拽功能正常
+8. flutter analyze 无新增 warning
+
+**Dependencies:** None
+
+**Risks:**
+- 7 个 tab 全部改造，工作量较大
+- 毛玻璃效果可能影响面板可读性（需测试调整）
+
+---
+
+## Requirement Coverage
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| TRIG-01 | Phase 1 | Pending |
+| TRIG-02 | Phase 1 | Pending |
+| TRIG-03 | Phase 1 | Pending |
+| COMP-01 | Phase 1 | Pending |
+| COMP-02 | Phase 1 | Pending |
+| COMP-03 | Phase 1 | Pending |
+| COMP-04 | Phase 1 | Pending |
+| STYLE-01 | Phase 1 | Pending |
+| STYLE-02 | Phase 1 | Pending |
+| STYLE-03 | Phase 1 | Pending |
+| STYLE-04 | Phase 1 | Pending |
+| INTX-01 | Phase 1 | Pending |
+| INTX-02 | Phase 1 | Pending |
+| INTX-03 | Phase 1 | Pending |
+| INTX-04 | Phase 1 | Pending |
+
+**Coverage:** 15/15 requirements mapped ✓
+
+---
+*Created: 2026-07-08*
