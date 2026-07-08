@@ -126,7 +126,7 @@ class Tokens {
 
   // ── 毛玻璃 ──
   static const glassBlurThin = 8.0;
-  static const glassBlur = 10.0;
+  static const glassBlur = 11.5;
   static const glassBlurThick = 24.0;
 
   // ── 动画 ──
