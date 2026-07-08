@@ -173,7 +173,7 @@ class Tokens {
 
   // ── 进度条 ──
   static const progressBarRadius = 2.0;
-  static const progressBarHeight = 32.0;
+  static const progressBarHeight = 31.0;
   static const progressBarThickness = 3.0;
   static const progressBarThicknessDrag = 5.0;
   static const progressThumbRadius = 7.0;
