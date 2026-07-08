@@ -79,6 +79,13 @@ class ControlBar extends StatelessWidget {
     this.decoration,
   });
 
+  /// 根据窗口宽度返回控制栏高度（ultra-compact 时压缩）
+  ///
+  /// ≤360px: 80dp（隐藏标题行，仅进度条+按钮）
+  /// >360px: 110dp（标准 3 行布局）
+  static double heightForWidth(double screenWidth) =>
+      screenWidth <= Tokens.breakpointUltraCompact ? 80.0 : Tokens.controlBarHeight;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -90,13 +97,17 @@ class ControlBar extends StatelessWidget {
         ? _decorationTween.evaluate(decoration!)
         : _decorationPlaying;
 
+    // ultra-compact 时压缩高度（隐藏标题行）
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final barHeight = ControlBar.heightForWidth(screenWidth);
+
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
       child: Material(
         color: Colors.transparent,
         child: Container(
-          height: Tokens.controlBarHeight,
+          height: barHeight,
           decoration: effectiveDecoration,
           padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
           child: Stack(
@@ -123,13 +134,16 @@ class ControlBar extends StatelessWidget {
                 builder: (context, constraints) {
                   final w = constraints.maxWidth;
                   final showSecondary = w >= Tokens.compactBreakpoint;
+                  // ≤360px 时隐藏标题行，仅保留进度条+按钮
+                  final isUltraCompact = w <= Tokens.breakpointUltraCompact;
 
                   return Column(
                     children: [
-                      // Row 1 (Top): 标题 | 时间显示 — 等分空间
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                      // Row 1 (Top): 标题 | 时间显示 — ultra-compact 时隐藏
+                      if (!isUltraCompact)
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Text(
@@ -353,9 +367,10 @@ class _CompactCenterGroup extends StatelessWidget {
           onPressed: isIdle ? null : onPrevious,
           tooltip: prevTooltip,
         ),
-        const SizedBox(width: Tokens.spSm),
+        // ultra-compact 模式收窄间距（4px vs 默认 8px）
+        const SizedBox(width: Tokens.spXs),
         PlayPauseButton(engine: engine, isIdle: isIdle),
-        const SizedBox(width: Tokens.spSm),
+        const SizedBox(width: Tokens.spXs),
         GlassButton.iconOnly(
           icon: Icons.skip_next,
           color: dimmed,

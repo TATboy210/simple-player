@@ -190,12 +190,14 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     final isIdle = widget.engine.state.value == MediaState.idle;
     // idle + emptyState 时只对上方空白区域禁用手势，ControlBar 始终可交互
     final gestureActive = !(widget.emptyStatePresent && isIdle);
+    // ultra-compact 时控制栏压缩高度
+    final barHeight = ControlBar.heightForWidth(MediaQuery.sizeOf(context).width);
     return Stack(
       children: [
         // 上层手势区域 — 点击隐藏控制栏、双击全屏
         // idle + emptyState 时 IgnorePointer 让下方 EmptyState 接收点击
         Positioned.fill(
-          bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
+          bottom: Tokens.controlBarMarginBottom + barHeight,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: gestureActive ? _handleTap : null,
@@ -231,7 +233,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                 Positioned(
                   bottom:
                       Tokens.controlBarMarginBottom +
-                      Tokens.controlBarHeight +
+                      barHeight +
                       12,
                   left: Tokens.controlBarMarginH,
                   right: Tokens.controlBarMarginH,
@@ -259,7 +261,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                   right: Tokens.controlBarMarginH + 16,
                   bottom:
                       Tokens.controlBarMarginBottom +
-                      Tokens.controlBarHeight +
+                      barHeight +
                       8,
                   child: RepaintBoundary(
                     child: ErrorBanner(
