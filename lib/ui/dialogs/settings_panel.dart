@@ -5,6 +5,7 @@ import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/locale_service.dart';
 import '../../kernel/services/theme_service.dart';
 import '../../features/player/services/video_processing_service.dart';
+import '../shared/glass_container.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import 'settings/_settings_nav_item.dart';
@@ -142,11 +143,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
             alignment: Alignment.topLeft,
             child: Padding(
               padding: const EdgeInsets.only(left: 80, top: 48),
-              child: Material(
-                elevation: 8,
-                color: Tokens.bgElevated,
+              child: GlassContainer(
                 borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-                clipBehavior: Clip.antiAlias,
                 child: SizedBox(
                   width: 600,
                   height: 480,
@@ -163,7 +161,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                           padding: const EdgeInsets.symmetric(
                             horizontal: Tokens.spMd,
                           ),
-                          color: Tokens.bgElevated,
+                          color: Tokens.bgGlass,
                           child: Row(
                             children: [
                               Text(
@@ -277,7 +275,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
         horizontal: Tokens.spMd,
         vertical: Tokens.spSm,
       ),
-      color: Tokens.bgElevated,
+      color: Tokens.bgGlass,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
