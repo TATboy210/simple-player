@@ -61,16 +61,23 @@
 5. 旧 fullscreen_window 调用点全部迁移到 FullscreenAdapter
 6. feature flag 可切换新旧实现
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — FullscreenCommandQueue 核心队列逻辑（per-window 串行化、幂等合并、超时）
+- [ ] 02-02-PLAN.md — FullscreenDriver + DesktopFullscreenAdapter 完整实现（状态回读、恢复策略、事件流）
+- [ ] 02-03-PLAN.md — WindowService 迁移 + feature flag 配置（USE_NEW_FULLSCREEN）
+
 **Files to create/modify:**
 
 - `lib/kernel/bridge/fullscreen_command_queue.dart` (新建)
 - `lib/kernel/bridge/fullscreen_driver.dart` (新建)
 - `lib/kernel/bridge/desktop_fullscreen_driver.dart` (新建)
+- `lib/kernel/bridge/desktop_fullscreen_adapter.dart` (新建)
 - `lib/kernel/bridge/window_service.dart` (修改 — 迁移全屏逻辑)
-- `lib/ui/player/player_screen.dart` (修改 — 使用 FullscreenAdapter)
-- `lib/ui/player/keyboard_handler.dart` (修改 — 使用 FullscreenAdapter)
+- `lib/app.dart` (修改 — 注入 FullscreenAdapter + feature flag)
 - `test/kernel/bridge/fullscreen_command_queue_test.dart` (新建)
-- `test/kernel/bridge/fullscreen_driver_test.dart` (新建)
+- `test/kernel/bridge/desktop_fullscreen_adapter_test.dart` (新建)
 
 **Dependencies:** Phase A 完成
 **Risk:** High — 竞态处理和恢复策略是最容易出 bug 的部分
