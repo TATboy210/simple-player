@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'kernel/bridge/desktop_fullscreen_adapter.dart';
+import 'kernel/bridge/desktop_fullscreen_driver.dart';
+import 'kernel/bridge/fullscreen_adapter.dart';
 import 'kernel/bridge/window_service.dart';
 import 'kernel/engine/engine_prewarm.dart';
 import 'kernel/engine/mock_engine.dart';
@@ -17,6 +20,15 @@ const bool _useMockEngine = bool.fromEnvironment(
   defaultValue: false,
 );
 
+/// 编译期开关：--dart-define=USE_NEW_FULLSCREEN=true 启用新全屏适配器 (D-27)。
+///
+/// 默认 false，使用旧 fullscreen_window 实现。
+/// 新实现通过 FullscreenAdapter 统一管理命令队列、状态回读和恢复策略。
+const bool _useNewFullscreen = bool.fromEnvironment(
+  'USE_NEW_FULLSCREEN',
+  defaultValue: false,
+);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initLog();
@@ -26,8 +38,20 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   SettingsStore.prewarm(prefs);
 
+  // P0-4 初始化顺序 (冻结，无循环依赖):
+  //   1. DesktopFullscreenDriver()        ← 纯 windowManager API
+  //   2. DesktopFullscreenAdapter(driver)  ← 持有 driver
+  //   3. WindowService(fullscreenAdapter)  ← 转发全屏操作
+  FullscreenAdapter? fullscreenAdapter;
+  if (_useNewFullscreen) {
+    final driver = DesktopFullscreenDriver();
+    fullscreenAdapter = DesktopFullscreenAdapter(driver);
+  }
+
   // 窗口初始化 — WindowService.init() 内部处理全部 bootstrap
-  final windowService = WindowService();
+  final windowService = WindowService(
+    fullscreenAdapter: fullscreenAdapter,
+  );
   await windowService.init();
 
   final coordinator = StartupCoordinator();
