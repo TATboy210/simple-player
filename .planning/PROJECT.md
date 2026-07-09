@@ -1,66 +1,68 @@
-# Settings Panel Redesign
+# Player Fullscreen — 核心能力升级
 
 ## What This Is
 
-重新设计 Simple Player Flutter 的设置面板系统，包括触发方式优化、组件体系精简、交互模式保持、主题样式与控制栏统一。目标是让设置面板在视觉和架构上与播放器整体风格一致，同时减少不必要的抽象层。
+将 `simple_player_flutter` 的全屏功能从"窗口命令"升级为"播放器核心能力层"。当前全屏通过 `WindowService` 内部调用 `fullscreen_window` 插件实现，缺少独立状态模型、事件流、错误处理和命令串行化。本项目建立 `FullscreenAdapter` 抽象层，使全屏成为有状态、有事件、有错误模型的独立模块。
 
 ## Core Value
 
-设置面板与控制栏视觉风格统一，组件层级精简，用户体验流畅。
+**全屏切换在任何场景下都稳定可靠** — 播放中/暂停中、最大化→全屏→退出、副屏拖拽后全屏、快速连按 F 10 次，状态始终正确。
 
 ## Requirements
 
 ### Validated
 
-- ✓ 侧边栏导航 7-tab 结构 — existing
-- ✓ 拖拽面板 + 自建遮罩 — existing
-- ✓ OK/Cancel/Apply 延迟应用模式 — existing
-- ✓ SettingsCard/ExpanderCard/ActionCard/SettingRow 组件体系 — existing
-- ✓ 左键完整面板 + 右键快速菜单双入口 — existing
+- ✓ WindowMode 枚举（windowed/maximized/minimized/fullscreen）— 已有
+- ✓ window_manager 初始化、尺寸恢复、置顶、拖动 — 已有
+- ✓ fullscreen_window.setFullScreen(true) 基础全屏 — 已有
+- ✓ F / ESC 快捷键入口 — 已有
+- ✓ Win32 FFI 重写解决 WS_THICKFRAME 7px 缝隙 — 已有 (2026-05-20)
+- ✓ 5 个全屏 bug 已修复 — 已有 (2026-05-12)
 
 ### Active
 
-- [ ] 设置面板主题样式与控制栏统一（毛玻璃风格）
-- [ ] 精简组件层级，减少不必要的抽象
-- [ ] 双入口触发体验优化
-- [ ] 保持延迟应用模式不变
+- [ ] 独立 Fullscreen 状态模型（phase: stable/entering/leaving/forcedChange/error）
+- [ ] 统一事件流（enterRequested/entered/leaveRequested/left/forcedChange/error）
+- [ ] 显式错误模型（Unsupported/InvalidWindow/PermissionDenied/BusyTransition/PlatformFailure）
+- [ ] 命令串行化（per-window 队列，快速切换不乱序）
+- [ ] 恢复策略完善（windowed→fullscreen→windowed, maximized→fullscreen→maximized, 副屏→fullscreen→原屏）
+- [ ] macOS 原生 fullscreen 生命周期适配
+- [ ] Linux GTK/WM 差异兜底
+- [ ] 多窗口/多显示器契约预留
 
 ### Out of Scope
 
-- 设置搜索功能 — 长期功能，不在本次范围
-- Golden tests — 后续补充
-- 新增设置项 — 本次只重构现有功能
+- 独立 pub 包发布 — 先在项目内完成抽象层
+- 复杂全屏动画统一 — 第一阶段不做
+- 遥测平台接入 — 只保留事件与错误码接口
+- Web/Mobile 深度适配 — 桌面优先，Web/Mobile 采用降级方案
 
 ## Context
 
-**现有架构:**
-- SettingsPanel: 600×480 可拖拽对话框，7 个 tab（通用/均衡器/音频/视频/快捷键/关于/性能）
-- 触发: app.dart 中 `_showSettingsPanel`（左键）+ `_showSettingsQuickMenu`（右键快速语言/主题切换）
-- 组件: SettingsCard、SettingsExpanderCard、SettingsActionCard、SettingRow（lib/ui/shared/）
-- 延迟应用: locale/theme 变更推迟到对话框关闭，避免 MaterialApp 重建丢失状态
-
-**控制栏风格参考:**
-- GlassContainer 毛玻璃效果（BackdropFilter + 3-tier blur）
-- Tokens.* 设计令牌统一配色
-- 圆角、半透明、高光边框
-
-**上次重构:** 2026-05-21/22 完成侧边栏导航 + 卡片化改造
+- **当前全屏实现**: `WindowService.setMode()` 内部调用 `fullscreen_window.setFullScreen(true)`
+- **Win32 FFI**: 已有 `win32_fullscreen.dart` 解决 WS_THICKFRAME 问题
+- **关键反面教训**: `win32` 包导致全屏一帧卡顿，禁止使用
+- **window_manager 风险**: pub 页面提示正迁移到统一原生核心方案，必须通过 adapter 隔离
+- **桌面成熟项目参考**: mpv（状态正确性优先）、IINA（macOS 原生生命周期）、VLC（平台能力文档化）
+- **记忆参考**: [[project_fullscreen_bugs]] [[project_fullscreen_win32_fix]] [[anti_pattern_fullscreen_ffi]] [[project_window_cross_platform]]
 
 ## Constraints
 
-- **设计系统**: 所有视觉值必须使用 Tokens.* — 不硬编码颜色/间距
-- **状态管理**: 保持 ValueNotifier + ValueListenableBuilder 模式
-- **延迟应用**: locale/theme 变更必须延迟到对话框关闭
-- **向后兼容**: 不改变外部调用接口（onSettings 回调签名）
+- **Tech Stack**: Flutter desktop (Windows/macOS/Linux), 依赖 window_manager + fullscreen_window + dart:ffi
+- **禁止依赖**: `win32` 包（导致一帧卡顿）
+- **平台优先级**: Windows > macOS > Linux > Web/Mobile
+- **兼容性**: 不破坏现有 WindowBridge 接口，渐进式迁移
+- **性能**: 全屏切换必须无感知延迟，快速连按不卡顿
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 保持双入口 | 左键完整面板 + 右键快速菜单满足不同场景 | — Pending |
-| 精简组件层级 | 减少抽象层，降低维护成本 | — Pending |
-| 毛玻璃风格统一 | 与控制栏视觉一致，提升整体感 | — Pending |
-| 保持延迟应用 | MaterialApp 重建问题依然存在 | — Pending |
+| FullscreenAdapter 独立于 WindowBridge | 全屏不是窗口命令子集，需独立状态/事件/错误模型 | — Pending |
+| per-window 命令队列 | 解决快速连按竞态，保证幂等 | — Pending |
+| 执行后回读真实状态 | 平台回调时机不一致，不能假设乐观更新正确 | — Pending |
+| 禁止 win32 包 | 用户确认导致全屏一帧卡顿 | ✓ 已确认 |
+| 桌面优先 | 当前主战场，Web/Mobile 降级处理 | — Pending |
 
 ## Evolution
 
@@ -71,7 +73,12 @@ This document evolves at phase transitions and milestone boundaries.
 2. Requirements validated? → Move to Validated with phase reference
 3. New requirements emerged? → Add to Active
 4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-07-08 after initialization*
+*Last updated: 2026-07-09 after initialization*

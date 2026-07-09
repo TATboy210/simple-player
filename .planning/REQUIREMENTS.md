@@ -1,79 +1,110 @@
-# Requirements: Settings Panel Redesign
+# Requirements: Player Fullscreen
 
-**Defined:** 2026-07-08
-**Core Value:** 设置面板与控制栏视觉风格统一，组件层级精简，用户体验流畅
+**Defined:** 2026-07-09
+**Core Value:** 全屏切换在任何场景下都稳定可靠
 
 ## v1 Requirements
 
-### 触发优化
+### 状态模型 (STATE)
 
-- [ ] **TRIG-01**: 左键点击设置按钮打开完整面板（保持现有行为）
-- [ ] **TRIG-02**: 右键点击弹出快速语言/主题切换菜单（保持现有行为）
-- [ ] **TRIG-03**: 设置按钮 hover 视觉反馈与控制栏其他按钮一致
+- [ ] **STATE-01**: FullscreenSnapshot 包含 isFullscreen、phase(stable/entering/leaving/forcedChange/error)、effectiveMode、restoreMode、displayId、lastError
+- [ ] **STATE-02**: UI 通过 ValueListenable<FullscreenSnapshot> 查询当前全屏状态，不依赖插件回调
+- [ ] **STATE-03**: 每个 windowId 独立状态容器，多窗口互不污染
 
-### 组件精简
+### 事件系统 (EVT)
 
-- [ ] **COMP-01**: 设置面板主体使用 GlassContainer 毛玻璃背景（替代 SettingsCard 的纯色背景）
-- [ ] **COMP-02**: 保留 SettingRow 和 SettingSwitchRow 作为核心行组件
-- [ ] **COMP-03**: 移除 SettingsCard/SettingsExpanderCard/SettingsActionCard 中间层，直接用 GlassContainer + Column 组合
-- [ ] **COMP-04**: 设置面板标题栏与控制栏标题栏风格统一
+- [ ] **EVT-01**: FullscreenEvent 流包含 enterRequested/entered/leaveRequested/left/forcedChange/syncCorrected/error
+- [ ] **EVT-02**: 业务层通过 Stream<FullscreenEvent> 监听全屏生命周期，不直接依赖 _WindowListener
+- [ ] **EVT-03**: forcedChange 事件携带原始状态和实际状态的差异信息
 
-### 样式统一
+### 错误处理 (ERR)
 
-- [ ] **STYLE-01**: 设置面板背景使用 Tokens.bgGlass + BackdropFilter（与控制栏一致）
-- [ ] **STYLE-02**: 设置面板圆角使用 Tokens.radiusLarge（与控制栏一致）
-- [ ] **STYLE-03**: 设置面板边框使用 Tokens.borderHighlight（与控制栏一致）
-- [ ] **STYLE-04**: 侧边栏导航项 hover/selected 样式与控制栏按钮一致
+- [ ] **ERR-01**: FullscreenError 枚举包含 Unsupported/InvalidWindow/PermissionDenied/BusyTransition/PlatformFailure/RestoreFailure/StateDesync
+- [ ] **ERR-02**: 每次全屏操作失败都通过 error 事件通知 UI，不静默吞错
+- [ ] **ERR-03**: UI 对 PermissionDenied（Web 手势拒绝）和 Unsupported 有明确用户提示
 
-### 交互保持
+### 命令队列 (CMD)
 
-- [ ] **INTX-01**: OK/Cancel/Apply 延迟应用模式不变
-- [ ] **INTX-02**: locale/theme 变更推迟到对话框关闭
-- [ ] **INTX-03**: 快捷键取消恢复机制不变
-- [ ] **INTX-04**: 面板可拖拽功能不变
+- [ ] **CMD-01**: per-window 命令队列，同一 windowId 只允许一个 in-flight 命令
+- [ ] **CMD-02**: 连续两次相同目标命令合并为一次，避免重复原生调用
+- [ ] **CMD-03**: 原生执行完成后回读真实状态，若与目标不一致发出 StateDesync
+
+### 恢复策略 (RST)
+
+- [ ] **RST-01**: windowed→fullscreen→exit 恢复到最近一次普通窗口几何
+- [ ] **RST-02**: maximized→fullscreen→exit 恢复到 maximized（不是 windowed）
+- [ ] **RST-03**: 副屏→fullscreen→exit 恢复到副屏原始位置和大小
+- [ ] **RST-04**: minimized 状态不直接切全屏，先恢复窗口再进入
+
+### 平台适配 (PLAT)
+
+- [ ] **PLAT-01**: Windows — WS_THICKFRAME 样式正确剥离和恢复，焦点恢复，TopMost 残留清理
+- [ ] **PLAT-02**: macOS — 等待系统 fullscreen 生命周期回调确认状态，不乐观更新
+- [ ] **PLAT-03**: Linux — GTK/WM 差异下的状态回读与兜底同步
+- [ ] **PLAT-04**: FullscreenCapability 查询每平台支持的能力（多窗口/多显示器/手势限制）
+
+### 架构边界 (ARCH)
+
+- [ ] **ARCH-01**: FullscreenAdapter 接口独立于 WindowBridge，UI 只依赖 FullscreenAdapter
+- [ ] **ARCH-02**: WindowBridge 继续负责通用窗口操作（setAlwaysOnTop/setAspectRatio/minimize/close）
+- [ ] **ARCH-03**: 旧 fullscreen_window 调用点渐进迁移到 FullscreenAdapter，保留 feature flag fallback
 
 ## v2 Requirements
 
-### 后续优化
+### Web/Mobile 对齐
 
-- **COMP-05**: 提取 SwitchRow、RadioRow、SliderRow 语义化变体
-- **STYLE-05**: 设置面板响应式布局（窄屏适配）
-- **TRIG-04**: 设置按钮长按显示快捷提示
+- **WEB-01**: Web 用户手势限制明确报 PermissionDenied 错误
+- **MOB-01**: Android/iOS 系统 UI 模式与播放器控件状态同步
+
+### 高级能力
+
+- **MULTI-01**: 真正的多窗口全屏支持（windowId 参数生效）
+- **DISP-01**: 多显示器感知（displayId 参数生效）
+- **ANIM-01**: 全屏过渡动画统一
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 设置搜索功能 | 长期功能，不在本次范围 |
-| Golden tests | 后续补充 |
-| 新增设置项 | 本次只重构现有功能 |
-| 响应式布局 | v2 再做 |
+| 独立 pub 包 | 先在项目内完成抽象层，稳定后再考虑 |
+| 复杂全屏动画 | 第一阶段聚焦状态正确性 |
+| 遥测平台 | 只保留事件与错误码接口 |
+| Web/Mobile 深度适配 | 桌面优先，Web/Mobile 降级 |
+| win32 包依赖 | 用户确认导致全屏一帧卡顿 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRIG-01 | Phase 1 | Pending |
-| TRIG-02 | Phase 1 | Pending |
-| TRIG-03 | Phase 1 | Pending |
-| COMP-01 | Phase 1 | Pending |
-| COMP-02 | Phase 1 | Pending |
-| COMP-03 | Phase 1 | Pending |
-| COMP-04 | Phase 1 | Pending |
-| STYLE-01 | Phase 1 | Pending |
-| STYLE-02 | Phase 1 | Pending |
-| STYLE-03 | Phase 1 | Pending |
-| STYLE-04 | Phase 1 | Pending |
-| INTX-01 | Phase 1 | Pending |
-| INTX-02 | Phase 1 | Pending |
-| INTX-03 | Phase 1 | Pending |
-| INTX-04 | Phase 1 | Pending |
+| STATE-01 | Phase A | Pending |
+| STATE-02 | Phase A | Pending |
+| STATE-03 | Phase A | Pending |
+| EVT-01 | Phase A | Pending |
+| EVT-02 | Phase A | Pending |
+| EVT-03 | Phase A | Pending |
+| ERR-01 | Phase A | Pending |
+| ERR-02 | Phase A | Pending |
+| ERR-03 | Phase A | Pending |
+| CMD-01 | Phase B | Pending |
+| CMD-02 | Phase B | Pending |
+| CMD-03 | Phase B | Pending |
+| RST-01 | Phase B | Pending |
+| RST-02 | Phase B | Pending |
+| RST-03 | Phase B | Pending |
+| RST-04 | Phase B | Pending |
+| PLAT-01 | Phase C | Pending |
+| PLAT-02 | Phase C | Pending |
+| PLAT-03 | Phase C | Pending |
+| PLAT-04 | Phase C | Pending |
+| ARCH-01 | Phase A | Pending |
+| ARCH-02 | Phase A | Pending |
+| ARCH-03 | Phase B | Pending |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
+- v1 requirements: 22 total
+- Mapped to phases: 22
 - Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-07-08*
-*Last updated: 2026-07-08 after initial definition*
+*Requirements defined: 2026-07-09*
+*Last updated: 2026-07-09 after initial definition*

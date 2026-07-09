@@ -1,67 +1,135 @@
-# Roadmap: Settings Panel Redesign
+# Roadmap: Player Fullscreen
 
-**Total Phases:** 1
-**Total Requirements:** 15
-**Mode:** interactive
-
----
-
-### Phase 1: Settings Panel Glass Redesign
-
-**Goal:** 设置面板从纯色背景+阴影改为毛玻璃风格，精简组件层级，与控制栏视觉统一
-
-**Plans:** 3/4 plans executed
-
-Plans:
-
-- [x] 01-01-PLAN.md — Foundation: extract SectionHeader, glass panel shell, sidebar nav glass
-- [x] 01-02-PLAN.md — Simple tabs: General, Equalizer, Audio, Performance to GlassContainer
-- [x] 01-03-PLAN.md — Complex tabs: Video, Shortcuts, About to GlassContainer
-- [ ] 01-04-PLAN.md — Cleanup: remove dead components, visual verification
-
-**Requirements:** TRIG-01, TRIG-02, TRIG-03, COMP-01, COMP-02, COMP-03, COMP-04, STYLE-01, STYLE-02, STYLE-03, STYLE-04, INTX-01, INTX-02, INTX-03, INTX-04
-
-**Success Criteria**:
-
-1. 设置面板使用 GlassContainer 毛玻璃背景，视觉与控制栏一致
-2. 移除 SettingsCard/SettingsExpanderCard/SettingsActionCard 中间层
-3. 7 个 tab 全部改为直接使用 GlassContainer + SettingRow 组合
-4. 侧边栏导航项样式与控制栏按钮一致
-5. OK/Cancel/Apply 延迟应用模式正常工作
-6. 左键/右键双入口触发正常
-7. 面板可拖拽功能正常
-8. flutter analyze 无新增 warning
-
-**Dependencies:** None
-
-**Risks:**
-
-- 7 个 tab 全部改造，工作量较大
-- 毛玻璃效果可能影响面板可读性（需测试调整）
+**Created:** 2026-07-09
+**Total Phases:** 4
+**Total Requirements:** 22
+**Mode:** standard
 
 ---
 
-## Requirement Coverage
+### Phase A — 架构定稿与核心模型
+**Goal:** 建立 FullscreenAdapter 抽象层、状态模型、事件流和错误模型，UI 不再直接依赖插件
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| TRIG-01 | Phase 1 | Pending |
-| TRIG-02 | Phase 1 | Pending |
-| TRIG-03 | Phase 1 | Pending |
-| COMP-01 | Phase 1 | Pending |
-| COMP-02 | Phase 1 | Pending |
-| COMP-03 | Phase 1 | Pending |
-| COMP-04 | Phase 1 | Pending |
-| STYLE-01 | Phase 1 | Pending |
-| STYLE-02 | Phase 1 | Pending |
-| STYLE-03 | Phase 1 | Pending |
-| STYLE-04 | Phase 1 | Pending |
-| INTX-01 | Phase 1 | Pending |
-| INTX-02 | Phase 1 | Pending |
-| INTX-03 | Phase 1 | Pending |
-| INTX-04 | Phase 1 | Pending |
+**Requirements:**
+- STATE-01, STATE-02, STATE-03 (状态模型)
+- EVT-01, EVT-02, EVT-03 (事件系统)
+- ERR-01, ERR-02, ERR-03 (错误处理)
+- ARCH-01, ARCH-02 (架构边界)
 
-**Coverage:** 15/15 requirements mapped ✓
+**Success Criteria:**
+1. FullscreenAdapter 接口定义完成，UI 层只依赖此接口
+2. FullscreenSnapshot 模型包含 phase/effectiveMode/restoreMode/lastError 等完整字段
+3. FullscreenEvent 流覆盖 7 种事件类型
+4. FullscreenError 枚举覆盖 7 种错误类型
+5. WindowBridge 全屏相关职责迁出，保留通用窗口操作
+6. flutter analyze 通过，无新增 warning
+
+**Files to create/modify:**
+- `lib/kernel/bridge/fullscreen_adapter.dart` (新建)
+- `lib/kernel/models/fullscreen_snapshot.dart` (新建)
+- `lib/kernel/models/fullscreen_event.dart` (新建)
+- `lib/kernel/models/fullscreen_error.dart` (新建)
+- `lib/kernel/models/fullscreen_capability.dart` (新建)
+- `lib/kernel/models/fullscreen_request.dart` (新建)
+- `test/kernel/bridge/fullscreen_adapter_test.dart` (新建)
+
+**Dependencies:** 无
+**Risk:** Medium — 接口设计决定后续所有实现
 
 ---
-*Created: 2026-07-08*
+
+### Phase B — 命令队列与恢复策略
+**Goal:** 实现 per-window 命令串行化、幂等合并、真实状态回读和完整恢复策略
+
+**Requirements:**
+- CMD-01, CMD-02, CMD-03 (命令队列)
+- RST-01, RST-02, RST-03, RST-04 (恢复策略)
+- ARCH-03 (旧实现迁移)
+
+**Success Criteria:**
+1. 快速连按 F 10 次不出现状态错位
+2. windowed→fullscreen→exit 恢复到原始窗口几何
+3. maximized→fullscreen→exit 恢复到 maximized
+4. 副屏拖拽后全屏→exit 恢复到副屏原始位置
+5. 旧 fullscreen_window 调用点全部迁移到 FullscreenAdapter
+6. feature flag 可切换新旧实现
+
+**Files to create/modify:**
+- `lib/kernel/bridge/fullscreen_command_queue.dart` (新建)
+- `lib/kernel/bridge/fullscreen_driver.dart` (新建)
+- `lib/kernel/bridge/desktop_fullscreen_driver.dart` (新建)
+- `lib/kernel/bridge/window_service.dart` (修改 — 迁移全屏逻辑)
+- `lib/ui/player/player_screen.dart` (修改 — 使用 FullscreenAdapter)
+- `lib/ui/player/keyboard_handler.dart` (修改 — 使用 FullscreenAdapter)
+- `test/kernel/bridge/fullscreen_command_queue_test.dart` (新建)
+- `test/kernel/bridge/fullscreen_driver_test.dart` (新建)
+
+**Dependencies:** Phase A 完成
+**Risk:** High — 竞态处理和恢复策略是最容易出 bug 的部分
+
+---
+
+### Phase C — 平台适配与深化
+**Goal:** Windows/macOS/Linux 三端全屏体验生产级稳定，平台差异文档化
+
+**Requirements:**
+- PLAT-01 (Windows WS_THICKFRAME)
+- PLAT-02 (macOS 原生生命周期)
+- PLAT-03 (Linux GTK/WM 兜底)
+- PLAT-04 (FullscreenCapability 查询)
+
+**Success Criteria:**
+1. Windows: 全屏无 7px 缝隙，退出后焦点正确，TopMost 无残留
+2. macOS: 全屏过渡平滑，等待系统回调确认状态
+3. Linux: GTK/WM 差异下状态回读正确
+4. capabilities() 返回每平台真实能力
+5. 三端 E2E 测试脚本通过
+6. 主路径可日常使用
+
+**Files to create/modify:**
+- `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` (新建)
+- `lib/kernel/bridge/platform/macos_fullscreen_driver.dart` (新建)
+- `lib/kernel/bridge/platform/linux_fullscreen_driver.dart` (新建)
+- `test/platform/fullscreen_driver_test.dart` (新建)
+
+**Dependencies:** Phase B 完成
+**Risk:** High — macOS/Linux 平台行为不一致是最大风险
+
+---
+
+### Phase D — 质量收尾与迁移完成
+**Goal:** 回归矩阵验证、CI 补齐、旧实现可下线、RC 版本发布
+
+**Requirements:**
+- 所有 v1 需求验收
+
+**Success Criteria:**
+1. flutter analyze 零 warning
+2. flutter test 全通过
+3. Windows/macOS/Linux 构建冒烟通过
+4. 必测场景 8 项全部通过（播放中/暂停中/连续切换/F 与按钮一致/ESC 语义/maximized 恢复/副屏恢复/多窗口隔离）
+5. 旧 fullscreen_window 直连调用可下线或保留 feature flag fallback
+6. 回归矩阵文档完成
+
+**Files to create/modify:**
+- `test/integration/fullscreen_e2e_test.dart` (新建)
+
+**Dependencies:** Phase C 完成
+**Risk:** Low — 收尾阶段，主要是验证
+
+---
+
+## Summary
+
+| Phase | Name | Requirements | Success Criteria | Risk |
+|-------|------|-------------|------------------|------|
+| A | 架构定稿与核心模型 | 11 | 6 | Medium |
+| B | 命令队列与恢复策略 | 8 | 6 | High |
+| C | 平台适配与深化 | 4 | 6 | High |
+| D | 质量收尾与迁移完成 | 0 (验收) | 6 | Low |
+
+**Total:** 22 v1 requirements + 5 v2 requirements
+
+---
+*Created: 2026-07-09*
+*Last updated: 2026-07-09 after initialization*
