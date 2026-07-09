@@ -8,15 +8,18 @@
 ---
 
 ### Phase A — 架构定稿与核心模型
+
 **Goal:** 建立 FullscreenAdapter 抽象层、状态模型、事件流和错误模型，UI 不再直接依赖插件
 
 **Requirements:**
+
 - STATE-01, STATE-02, STATE-03 (状态模型)
 - EVT-01, EVT-02, EVT-03 (事件系统)
 - ERR-01, ERR-02, ERR-03 (错误处理)
 - ARCH-01, ARCH-02 (架构边界)
 
 **Success Criteria:**
+
 1. FullscreenAdapter 接口定义完成，UI 层只依赖此接口
 2. FullscreenSnapshot 模型包含 phase/effectiveMode/restoreMode/lastError 等完整字段
 3. FullscreenEvent 流覆盖 7 种事件类型
@@ -25,6 +28,7 @@
 6. flutter analyze 通过，无新增 warning
 
 **Files to create/modify:**
+
 - `lib/kernel/bridge/fullscreen_adapter.dart` (新建)
 - `lib/kernel/models/fullscreen_snapshot.dart` (新建)
 - `lib/kernel/models/fullscreen_event.dart` (新建)
@@ -39,14 +43,17 @@
 ---
 
 ### Phase B — 命令队列与恢复策略
+
 **Goal:** 实现 per-window 命令串行化、幂等合并、真实状态回读和完整恢复策略
 
 **Requirements:**
+
 - CMD-01, CMD-02, CMD-03 (命令队列)
 - RST-01, RST-02, RST-03, RST-04 (恢复策略)
 - ARCH-03 (旧实现迁移)
 
 **Success Criteria:**
+
 1. 快速连按 F 10 次不出现状态错位
 2. windowed→fullscreen→exit 恢复到原始窗口几何
 3. maximized→fullscreen→exit 恢复到 maximized
@@ -55,6 +62,7 @@
 6. feature flag 可切换新旧实现
 
 **Files to create/modify:**
+
 - `lib/kernel/bridge/fullscreen_command_queue.dart` (新建)
 - `lib/kernel/bridge/fullscreen_driver.dart` (新建)
 - `lib/kernel/bridge/desktop_fullscreen_driver.dart` (新建)
@@ -70,15 +78,18 @@
 ---
 
 ### Phase C — 平台适配与深化
+
 **Goal:** Windows/macOS/Linux 三端全屏体验生产级稳定，平台差异文档化
 
 **Requirements:**
+
 - PLAT-01 (Windows WS_THICKFRAME)
 - PLAT-02 (macOS 原生生命周期)
 - PLAT-03 (Linux GTK/WM 兜底)
 - PLAT-04 (FullscreenCapability 查询)
 
 **Success Criteria:**
+
 1. Windows: 全屏无 7px 缝隙，退出后焦点正确，TopMost 无残留
 2. macOS: 全屏过渡平滑，等待系统回调确认状态
 3. Linux: GTK/WM 差异下状态回读正确
@@ -87,6 +98,7 @@
 6. 主路径可日常使用
 
 **Files to create/modify:**
+
 - `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` (新建)
 - `lib/kernel/bridge/platform/macos_fullscreen_driver.dart` (新建)
 - `lib/kernel/bridge/platform/linux_fullscreen_driver.dart` (新建)
@@ -98,12 +110,15 @@
 ---
 
 ### Phase D — 质量收尾与迁移完成
+
 **Goal:** 回归矩阵验证、CI 补齐、旧实现可下线、RC 版本发布
 
 **Requirements:**
+
 - 所有 v1 需求验收
 
 **Success Criteria:**
+
 1. flutter analyze 零 warning
 2. flutter test 全通过
 3. Windows/macOS/Linux 构建冒烟通过
@@ -112,6 +127,7 @@
 6. 回归矩阵文档完成
 
 **Files to create/modify:**
+
 - `test/integration/fullscreen_e2e_test.dart` (新建)
 
 **Dependencies:** Phase C 完成
