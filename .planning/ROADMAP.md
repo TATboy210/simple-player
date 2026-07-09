@@ -64,9 +64,10 @@
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — FullscreenCommandQueue 核心队列逻辑（per-window 串行化、幂等合并、超时）
-- [ ] 02-02-PLAN.md — FullscreenDriver + DesktopFullscreenAdapter 完整实现（状态回读、恢复策略、事件流）
-- [ ] 02-03-PLAN.md — WindowService 迁移 + feature flag 配置（USE_NEW_FULLSCREEN）
+
+- [x] 02-01-PLAN.md — FullscreenCommandQueue 核心队列逻辑（per-window 串行化、幂等合并、超时）
+- [x] 02-02-PLAN.md — FullscreenDriver + DesktopFullscreenAdapter 完整实现（状态回读、恢复策略、事件流）
+- [x] 02-03-PLAN.md — WindowService 迁移 + feature flag 配置（USE_NEW_FULLSCREEN）
 
 **Files to create/modify:**
 
