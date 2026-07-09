@@ -2,52 +2,53 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-stopped_at: context exhaustion at 75% (2026-07-08)
-last_updated: "2026-07-08T15:55:59.287Z"
+status: active
+stopped_at: null
+last_updated: "2026-07-09T16:30:00.000Z"
 progress:
-  total_phases: 1
+  total_phases: 4
   completed_phases: 0
-  total_plans: 4
-  completed_plans: 3
+  total_plans: 0
+  completed_plans: 0
   percent: 0
 ---
 
-# Project State: Settings Panel Redesign
+# Project State: Player Fullscreen
 
 ## Current Phase
 
-**Phase 1:** Settings Panel Glass Redesign — Pending
+**Phase A:** 架构定稿与核心模型 — Pending
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-08)
+See: .planning/PROJECT.md (updated 2026-07-09)
 
-**Core value:** 设置面板与控制栏视觉风格统一，组件层级精简，用户体验流畅
-**Current focus:** Phase 01 — settings-panel-glass-redesign
+**Core value:** 全屏切换在任何场景下都稳定可靠
+**Current focus:** Phase A — FullscreenAdapter 抽象层设计
 
 ## Progress
 
 - [x] PROJECT.md created
 - [x] config.json created
-- [x] REQUIREMENTS.md created (15 v1 requirements)
-- [x] ROADMAP.md created (1 phase)
-- [ ] Phase 1 execution
+- [x] REQUIREMENTS.md created (22 v1 requirements)
+- [x] ROADMAP.md created (4 phases)
+- [ ] Phase A execution — Pending
 
 ## Recent Decisions
 
 | Date | Decision | Outcome |
 |------|----------|---------|
-| 2026-07-08 | 保持双入口触发 | — Pending |
-| 2026-07-08 | 精简组件层级 | — Pending |
-| 2026-07-08 | 毛玻璃风格统一 | — Pending |
-| 2026-07-08 | 保持延迟应用 | — Pending |
+| 2026-07-09 | FullscreenAdapter 独立于 WindowBridge | — Pending |
+| 2026-07-09 | per-window 命令队列 | — Pending |
+| 2026-07-09 | 执行后回读真实状态 | — Pending |
+| 2026-07-09 | 禁止 win32 包 | ✓ 已确认 |
+| 2026-07-09 | 桌面优先 | — Pending |
 
 ---
-*Updated: 2026-07-08 after initialization*
+*Updated: 2026-07-09 after initialization*
 
 ## Session
 
-**Last session:** 2026-07-08T15:55:59.276Z
-**Stopped at:** context exhaustion at 75% (2026-07-08)
-**Resume file:** None
+**Last session:** 2026-07-09T16:30:00.000Z
+**Stopped at:** initialization complete
+**Resume file:** none — ready for Phase A
