@@ -1,46 +1,29 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-09T00:00:00Z",
+  "timestamp": "2026-07-09T15:09:17.069Z",
   "phase": "02",
   "phase_name": "command-queue-recovery",
   "phase_dir": ".planning/phases/02-command-queue-recovery",
-  "plan": 0,
-  "task": 0,
-  "total_tasks": 0,
-  "status": "paused",
+  "plan": 3,
+  "task": 2,
+  "total_tasks": 2,
+  "status": "complete",
   "completed_tasks": [
-    {"id": "review", "name": "Cross-AI plan review (self-review)", "status": "done", "commit": "cbdcd22"},
-    {"id": "p0-1", "name": "_callbackConfirm concurrency safety", "status": "done"},
-    {"id": "p0-2", "name": "Level-1 Completer<bool> fix", "status": "done"},
-    {"id": "p0-3", "name": "Adapter→Driver only rule", "status": "done"},
-    {"id": "p0-4", "name": "Dependency cycle cut + init order", "status": "done"},
-    {"id": "p1-5", "name": "Queue dispose lifecycle", "status": "done"}
+    {"id": 1, "name": "02-01 FullscreenCommandQueue", "status": "done", "commit": "716ffaa"},
+    {"id": 2, "name": "02-02 FullscreenDriver + Adapter", "status": "done", "commit": "00aa6a7"},
+    {"id": 3, "name": "02-03 WindowService migration", "status": "done", "commit": "c6ac289"}
   ],
-  "remaining_tasks": [
-    {"id": "p1-6", "name": "Queue capacity strategy", "status": "not_started"},
-    {"id": "p1-7", "name": "_RestoreSnapshot semantic unification", "status": "not_started"},
-    {"id": "p2-8", "name": "Driver interface convergence", "status": "not_started"},
-    {"id": "p2-9", "name": "Documentation consistency", "status": "not_started"},
-    {"id": "tests", "name": "Test checklist supplement", "status": "not_started"}
-  ],
+  "remaining_tasks": [],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "Install external AI CLI for cross-review", "context": "Only self-review done", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "_confirmByWindowId Map<int, Completer<bool>> replaces single _callbackConfirm", "rationale": "Multi-window concurrency safety", "phase": "02"},
-    {"decision": "Completer<bool> replaces Completer<void> for callback confirmation", "rationale": "Level-1 timeout detection was broken", "phase": "02"},
-    {"decision": "Adapter forbidden from direct windowManager/fullScreenWindow calls", "rationale": "Preserves Driver abstraction", "phase": "02"},
-    {"decision": "FullscreenDriver must not hold WindowBridge reference", "rationale": "No circular dependency", "phase": "02"},
-    {"decision": "Queue dispose: pending complete(false), in-flight lets executor finish", "rationale": "Predictable lifecycle", "phase": "02"}
+    {"decision": "Completer<bool> replaces Completer<void>", "rationale": "Distinguish timeout from success", "phase": "02"},
+    {"decision": "Map<int, Completer<bool>> per-windowId", "rationale": "Prevent cross-contamination in multi-window", "phase": "02"},
+    {"decision": "Adapter forbidden from direct windowManager calls", "rationale": "All native calls via Driver abstraction", "phase": "02"},
+    {"decision": "Compile-time feature flag USE_NEW_FULLSCREEN", "rationale": "Legacy path default, opt-in to new impl", "phase": "02"}
   ],
-  "uncommitted_files": [
-    ".planning/phases/02-command-queue-recovery/02-REVIEWS.md",
-    ".planning/phases/02-command-queue-recovery/02-01-PLAN.md",
-    ".planning/phases/02-command-queue-recovery/02-02-PLAN.md",
-    ".planning/phases/02-command-queue-recovery/02-03-PLAN.md"
-  ],
-  "next_action": "Complete P1-6/P1-7/P2-8/P2-9, then begin implementation with Plan 01",
-  "context_notes": "Phase B plan review done. P0 all complete. P1 1/3 done. Plans updated with concrete code fixes."
+  "uncommitted_files": [],
+  "next_action": "Run /gsd-execute-phase 3 or /gsd-discuss-phase 3 for platform adaptation",
+  "context_notes": "Phase B fully complete. 3/3 plans executed, 36 tests passing, 8/8 requirements verified. Next phase is C (platform adaptation)."
 }
