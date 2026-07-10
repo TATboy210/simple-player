@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:ffi' hide Size;
 import 'dart:ui';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
+import 'package:simple_player_flutter/kernel/bridge/platform/windows_fullscreen_driver.dart';
+import 'package:simple_player_flutter/kernel/bridge/win32/win32_fullscreen_ffi.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_capability.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_error.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_event.dart';
@@ -120,6 +124,59 @@ void confirmLeave(MockFullscreenDriver driver, DesktopFullscreenAdapter adapter,
     {int windowId = 0}) {
   driver.fullscreenState = false;
   adapter.onNativeFullScreenChanged(windowId, false);
+}
+
+/// Mock WindowsFullscreenDriver — 用于测试 Adapter 快速路径。
+///
+/// 继承 WindowsFullscreenDriver 但注入 mock API，
+/// 验证 Adapter 对 Windows 平台的快速路径分支。
+class MockWindowsDriver extends WindowsFullscreenDriver {
+  MockWindowsDriver() : super(api: MockWin32ApiForAdapter());
+
+  final List<String> fastCalls = [];
+
+  @override
+  Future<void> enterFullscreenFast({int displayId = 0}) async {
+    fastCalls.add('enterFullscreenFast(displayId: $displayId)');
+  }
+
+  @override
+  Future<void> leaveFullscreenFast() async {
+    fastCalls.add('leaveFullscreenFast()');
+  }
+}
+
+/// 简化版 MockWin32Api — 仅用于 MockWindowsDriver 构造。
+class MockWin32ApiForAdapter extends Win32FullscreenApiWrapper {
+  @override
+  int getFlutterHwnd() => 12345;
+  @override
+  bool isWindow(int hwnd) => true;
+  @override
+  int getWindowLong(int hwnd, int index) => 0;
+  @override
+  int setWindowLong(int hwnd, int index, int value) => 0;
+  @override
+  bool setWindowPos(int hwnd, int insertAfter, int x, int y, int cx, int cy,
+          int flags) =>
+      true;
+  @override
+  int monitorFromWindow(int hwnd) => 9999;
+  @override
+  ({int left, int top, int right, int bottom})? getMonitorRect(int hMonitor) =>
+      (left: 0, top: 0, right: 1920, bottom: 1080);
+  @override
+  Pointer<WindowPlacement>? getWindowPlacement(int hwnd) => null;
+  @override
+  bool setWindowPlacement(int hwnd, Pointer<WindowPlacement> placement) => true;
+  @override
+  bool isWindowVisible(int hwnd) => true;
+  @override
+  bool isIconic(int hwnd) => false;
+  @override
+  bool setForegroundWindow(int hwnd) => true;
+  @override
+  int setFocus(int hwnd) => hwnd;
 }
 
 void main() {
@@ -412,6 +469,106 @@ void main() {
     test('dispose — subsequent calls are no-ops', () {
       adapter.dispose();
       adapter.dispose(); // 不应崩溃
+    });
+  });
+
+  // ─── Windows 快速路径测试 (PERF-01/02) ───
+
+  group('DesktopFullscreenAdapter — Windows fast path', () {
+    late MockWindowsDriver winDriver;
+    late DesktopFullscreenAdapter adapter;
+
+    setUp(() {
+      winDriver = MockWindowsDriver();
+      adapter = DesktopFullscreenAdapter(winDriver);
+    });
+
+    tearDown(() {
+      adapter.dispose();
+    });
+
+    test('enter uses enterFullscreenFast when driver is WindowsFullscreenDriver',
+        () async {
+      await adapter.setFullscreen(true);
+
+      expect(winDriver.fastCalls, contains(contains('enterFullscreenFast')));
+      // 不应调用标准 enterFullscreen
+      expect(
+        winDriver.fastCalls.any((c) => c == 'enterFullscreen(displayId: 0)'),
+        isFalse,
+      );
+    });
+
+    test('leave uses leaveFullscreenFast when driver is WindowsFullscreenDriver',
+        () async {
+      // 先进入全屏
+      await adapter.setFullscreen(true);
+      winDriver.fastCalls.clear();
+
+      await adapter.setFullscreen(false);
+
+      expect(winDriver.fastCalls, contains(contains('leaveFullscreenFast')));
+    });
+
+    test('snapshot updates to stable immediately after fast path enter',
+        () async {
+      await adapter.setFullscreen(true);
+
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
+      expect(adapter.snapshot().value.effectiveMode, FullscreenMode.borderless);
+    });
+
+    test('snapshot updates to stable immediately after fast path leave',
+        () async {
+      await adapter.setFullscreen(true);
+      await adapter.setFullscreen(false);
+
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.snapshot().value.effectiveMode, FullscreenMode.windowed);
+    });
+
+    test('emits entered event on fast path enter', () async {
+      final events = <FullscreenEvent>[];
+      adapter.events.listen(events.add);
+
+      await adapter.setFullscreen(true);
+
+      expect(events.whereType<Entered>(), isNotEmpty);
+    });
+
+    test('emits left event on fast path leave', () async {
+      final events = <FullscreenEvent>[];
+      adapter.events.listen(events.add);
+
+      await adapter.setFullscreen(true);
+      await adapter.setFullscreen(false);
+
+      expect(events.whereType<Left>(), isNotEmpty);
+    });
+
+    test('skips _waitForConfirmation on Windows — no delay', () async {
+      final stopwatch = Stopwatch()..start();
+      await adapter.setFullscreen(true);
+      stopwatch.stop();
+
+      // 快速路径应几乎瞬间完成 (< 100ms vs 标准路径 500ms+ timeout)
+      expect(stopwatch.elapsedMilliseconds, lessThan(100));
+    });
+
+    test('standard driver still uses confirmation chain', () async {
+      final standardDriver = MockFullscreenDriver();
+      final standardAdapter = DesktopFullscreenAdapter(standardDriver);
+
+      // 标准路径需要回调确认
+      scheduleMicrotask(() => confirmEnter(standardDriver, standardAdapter));
+      await standardAdapter.setFullscreen(true);
+
+      expect(standardAdapter.snapshot().value.isFullscreen, isTrue);
+      expect(standardDriver.calls, contains('enterFullscreen(displayId: 0)'));
+
+      standardAdapter.dispose();
     });
   });
 }

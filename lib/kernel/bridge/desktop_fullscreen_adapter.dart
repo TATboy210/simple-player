@@ -11,6 +11,7 @@ import '../models/fullscreen_snapshot.dart';
 import 'fullscreen_adapter.dart';
 import 'fullscreen_command_queue.dart';
 import 'fullscreen_driver.dart';
+import 'platform/windows_fullscreen_driver.dart';
 import 'window_mode.dart';
 
 /// Desktop 平台全屏适配器 — Phase B 核心实现。
@@ -217,7 +218,19 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
 
-      // P0-3: 通过 _driver 调用，不直调 windowManager
+      // PERF-01/02: Windows 快速路径 — 跳过确认链
+      // Windows FFI 同步操作，无需等待原生回调或轮询
+      if (_driver is WindowsFullscreenDriver) {
+        await _driver.enterFullscreenFast(displayId: 0);
+        notifier.value = notifier.value.copyWith(
+          phase: FullscreenPhase.stable,
+          effectiveMode: request.mode,
+        );
+        _events.add(FullscreenEvent.entered(finalMode: request.mode));
+        return true;
+      }
+
+      // macOS/Linux: 标准路径 + 三级确认链
       await _driver.enterFullscreen(displayId: 0);
 
       // D-19: 三级状态回读
@@ -262,7 +275,21 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
     _events.add(FullscreenEvent.leaveRequested());
 
     try {
-      // P0-3: 通过 _driver 调用
+      // PERF-01/02: Windows 快速路径 — 跳过确认链
+      if (_driver is WindowsFullscreenDriver) {
+        await _driver.leaveFullscreenFast();
+        // D-22~D-25: 恢复策略仍需执行
+        await _restoreFromSnapshot(request.windowId);
+        notifier.value = notifier.value.copyWith(
+          phase: FullscreenPhase.stable,
+          effectiveMode: FullscreenMode.windowed,
+          clearError: true,
+        );
+        _events.add(FullscreenEvent.left());
+        return true;
+      }
+
+      // macOS/Linux: 标准路径 + 三级确认链
       await _driver.leaveFullscreen();
 
       // D-19: 三级状态回读
