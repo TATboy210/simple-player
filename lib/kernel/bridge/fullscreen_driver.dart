@@ -13,6 +13,11 @@ import '../models/fullscreen_capability.dart';
 /// - Phase B 使用 window_manager 实现，Phase C 可替换为平台特定驱动
 /// - 不持有 WindowBridge 引用 (P0-4)
 abstract class FullscreenDriver {
+  /// 释放平台事件订阅和其他原生资源。
+  ///
+  /// 默认实现为空，保证不需要资源的测试/通用驱动无需额外代码。
+  void dispose() {}
+
   /// 进入全屏。
   ///
   /// [displayId] 目标显示器 ID，默认 0（主显示器）。
@@ -70,6 +75,13 @@ abstract class FullscreenDriver {
   ) {
     // 默认空实现 — Windows FFI 驱动不需要回调机制
   }
+
+  /// 清除显示器信息缓存 (T1)。
+  ///
+  /// Windows 驱动缓存 monitorFromWindow + getMonitorRect 结果，
+  /// WM_DISPLAYCHANGE 时应调用此方法刷新。
+  /// 默认空实现 — 仅 WindowsFullscreenDriver 有实际缓存。
+  void clearMonitorCache() {}
 
   /// 获取平台全屏能力 — 每平台 Driver 返回真实值 (PLAT-04)。
   ///

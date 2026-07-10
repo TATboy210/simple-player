@@ -61,12 +61,16 @@ class MockWin32Api extends Win32FullscreenApiWrapper {
   @override
   int setWindowLong(int hwnd, int index, int value) {
     calls.add('setWindowLong($hwnd, $index, 0x${value.toRadixString(16)})');
+    // Win32 SetWindowLong 返回旧值并设置新值 — mock 需同步更新状态
+    final oldValue = index == gwlStyle ? style : exStyle;
     if (index == gwlStyle) {
       lastSetStyle = value;
+      style = value;
     } else {
       lastSetExStyle = value;
+      exStyle = value;
     }
-    return index == gwlStyle ? style : exStyle;
+    return oldValue;
   }
 
   @override
@@ -551,25 +555,39 @@ void main() {
     // ─── queryFullscreen ───
 
     group('queryFullscreen', () {
-      test('returns true after IsZoomed reports zoomed', () async {
-        api.zoomed = true;
+      test('returns true when WS_THICKFRAME is absent (fullscreen style)', () async {
+        // 模拟已进入全屏: style 中无 WS_THICKFRAME
+        api.style = 0x00C00000; // WS_OVERLAPPEDWINDOW minus WS_THICKFRAME
         final result = await driver.queryFullscreen();
         expect(result, isTrue);
       });
 
-      test('returns false after IsZoomed reports not zoomed', () async {
-        api.zoomed = false;
+      test('returns false when WS_THICKFRAME is present (windowed style)', () async {
+        // 默认 style 包含 WS_THICKFRAME → 非全屏
+        api.style = 0x00CF0000; // WS_OVERLAPPEDWINDOW
         final result = await driver.queryFullscreen();
         expect(result, isFalse);
       });
 
-      test('uses IsZoomed for real state query', () async {
+      test('uses getWindowLong to verify actual window style (T3)', () async {
         await driver.queryFullscreen();
 
         expect(
-          api.calls.any((c) => c.startsWith('isZoomed')),
+          api.calls.any((c) => c.startsWith('getWindowLong')),
           isTrue,
         );
+      });
+
+      test('auto-corrects _isFullscreen on desync (T3)', () async {
+        // 先进入全屏 (设置 _isFullscreen=true, 剥离 WS_THICKFRAME)
+        await driver.enterFullscreenFast();
+        expect(await driver.queryFullscreen(), isTrue);
+
+        // 模拟外部操作恢复了 WS_THICKFRAME (如 Win+↑ 最大化)
+        api.style = 0x00CF0000; // WS_OVERLAPPEDWINDOW 含 WS_THICKFRAME
+        final result = await driver.queryFullscreen();
+        // 应自动修正: _isFullscreen 变为 false
+        expect(result, isFalse);
       });
 
       test('falls back to internal state when HWND is 0', () async {
@@ -577,6 +595,64 @@ void main() {
         // 内部状态为 false (未进入全屏)
         final result = await driver.queryFullscreen();
         expect(result, isFalse);
+      });
+    });
+
+    // ─── monitor cache (T1) ───
+
+    group('monitor cache (T1)', () {
+      test('enterFullscreenFast caches monitor rect on first call', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        // 第二次全屏应使用缓存，不调用 getMonitorRect
+        await driver.leaveFullscreenFast();
+        await driver.enterFullscreenFast();
+
+        final getRectCalls = api.calls
+            .where((c) => c.startsWith('getMonitorRect'))
+            .toList();
+        expect(getRectCalls, isEmpty);
+      });
+
+      test('enterFullscreen caches monitor rect on first call', () async {
+        await driver.enterFullscreen();
+        api.calls.clear();
+
+        await driver.leaveFullscreen();
+        await driver.enterFullscreen();
+
+        final getRectCalls = api.calls
+            .where((c) => c.startsWith('getMonitorRect'))
+            .toList();
+        expect(getRectCalls, isEmpty);
+      });
+
+      test('clearMonitorCache forces re-query on next enter', () async {
+        await driver.enterFullscreenFast();
+        driver.clearMonitorCache();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+        await driver.enterFullscreenFast();
+
+        final getRectCalls = api.calls
+            .where((c) => c.startsWith('getMonitorRect'))
+            .toList();
+        expect(getRectCalls, isNotEmpty);
+      });
+
+      test('monitorFromWindow still called every time (depends on window position)', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+        await driver.enterFullscreenFast();
+
+        final monitorCalls = api.calls
+            .where((c) => c.startsWith('monitorFromWindow'))
+            .toList();
+        expect(monitorCalls.length, 1);
       });
     });
 
