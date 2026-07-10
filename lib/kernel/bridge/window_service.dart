@@ -299,6 +299,8 @@ class WindowService with WindowListener implements WindowBridge {
           await _fullscreenAdapter.setFullscreen(true);
           // FullscreenAdapter Entered 事件驱动 mode 更新
         } else {
+          // TODO(ARCH-03): v1.2 移除此分支 — D-46: RC 后 2 版本内无 blocker 则删除
+          // @deprecated(v1.2) — 旧 fullscreen_window 直连，保留为 fallback。新实现通过 FullscreenAdapter。
           await fullScreenWindow.setFullScreen(true);
           // OS 回调 onWindowEnterFullScreen 驱动 mode
         }

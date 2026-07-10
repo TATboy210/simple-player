@@ -22,11 +22,11 @@ const bool _useMockEngine = bool.fromEnvironment(
 
 /// 编译期开关：--dart-define=USE_NEW_FULLSCREEN=true 启用新全屏适配器 (D-27)。
 ///
-/// 默认 false，使用旧 fullscreen_window 实现。
+/// 默认 true（RC 版本）。设为 false 回退到旧 fullscreen_window 实现。
 /// 新实现通过 FullscreenAdapter 统一管理命令队列、状态回读和恢复策略。
 const bool _useNewFullscreen = bool.fromEnvironment(
   'USE_NEW_FULLSCREEN',
-  defaultValue: false,
+  defaultValue: true,
 );
 
 // 编译期开关: --dart-define=USE_WINDOWS_NATIVE_FULLSCREEN=true 启用 Windows FFI 驱动 (D-P03)。
