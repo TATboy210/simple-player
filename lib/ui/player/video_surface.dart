@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
@@ -21,6 +22,11 @@ class VideoSurface extends StatelessWidget {
             final id = engine.textureId.value;
             final ratio = engine.aspectRatio.value;
             final safeRatio = (ratio > 0 && ratio.isFinite) ? ratio : 16 / 9;
+            // 诊断日志: 记录视频宽高比 (全屏黑边排查用)
+            debugPrint(
+              '[VideoSurface] textureId=$id, ratio=${ratio.toStringAsFixed(3)}, '
+              'safeRatio=${safeRatio.toStringAsFixed(3)}',
+            );
             return SizedBox.expand(
               child: id == null
                   ? const SizedBox.shrink()

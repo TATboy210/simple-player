@@ -101,6 +101,23 @@ class WindowsFullscreenDriver implements FullscreenDriver {
           wsExWindowedge | wsExClientedge | wsExStaticedge),
     );
 
+    // 防御性验证: 确认样式已正确应用 (T-05-01)
+    // 在 setWindowPos 前回读样式，检测 Win32 API 静默失败
+    final verifyStyle = _api.getWindowLong(hwnd, gwlStyle);
+    final verifyExStyle = _api.getWindowLong(hwnd, gwlExStyle);
+    if (verifyStyle & (wsCaption | wsThickframe | wsMaximize) != 0) {
+      debugPrint(
+        '[WindowsFullscreenDriver] WARN: style strip failed '
+        '(expected border bits cleared, got 0x${verifyStyle.toRadixString(16)})',
+      );
+    }
+    if (verifyExStyle & wsExTopmost == 0) {
+      debugPrint(
+        '[WindowsFullscreenDriver] WARN: WS_EX_TOPMOST not set '
+        '(got 0x${verifyExStyle.toRadixString(16)})',
+      );
+    }
+
     // 获取显示器区域并覆盖整个显示器
     final monitor = _api.monitorFromWindow(hwnd);
     if (monitor != 0) {
