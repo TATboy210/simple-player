@@ -8,11 +8,14 @@
 
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
+
 import 'desktop_fullscreen_driver.dart';
 import 'fullscreen_driver.dart';
 import 'platform/linux_fullscreen_driver.dart';
 import 'platform/macos_fullscreen_driver.dart';
 import 'platform/windows_fullscreen_driver.dart';
+import 'win32/win32_fullscreen_ffi.dart';
 
 /// 平台驱动工厂 — 根据 Platform.isXXX 选择具体 Driver (D-P01 混合策略 + D-P02 每平台一个 Driver)。
 ///
@@ -38,7 +41,7 @@ class DesktopFullscreenDriverFactory {
   /// 创建当前平台的 FullscreenDriver。
   ///
   /// 平台选择逻辑:
-  /// - Windows + _useWindowsNative: WindowsFullscreenDriver (FFI)
+  /// - Windows + _useWindowsNative: WindowsFullscreenDriver (FFI)，HWND 无效时降级
   /// - Windows (default): DesktopFullscreenDriver (window_manager)
   /// - macOS: MacosFullscreenDriver (fullscreen_window + delegate)
   /// - Linux: LinuxFullscreenDriver (fullscreen_window + state-changed)
@@ -47,7 +50,7 @@ class DesktopFullscreenDriverFactory {
     if (Platform.isWindows) {
       // D-P03: USE_WINDOWS_NATIVE_FULLSCREEN=true 时使用 FFI 驱动
       if (_useWindowsNative) {
-        return WindowsFullscreenDriver();
+        return createWindowsNative();
       }
       return DesktopFullscreenDriver();
     }
@@ -59,5 +62,40 @@ class DesktopFullscreenDriverFactory {
     }
     // 未知平台: 降级到 window_manager
     return DesktopFullscreenDriver();
+  }
+
+  /// 创建 Windows FFI 驱动 — HWND 有效性探测 + 运行时降级 (T5)。
+  ///
+  /// 如果 HWND 无效 (0) 或 FFI 调用异常，自动降级到 DesktopFullscreenDriver。
+  /// 特殊环境 (无窗口、服务模式、远程桌面) 下避免崩溃。
+  ///
+  /// [apiOverride] 仅用于测试注入 mock API。
+  @visibleForTesting
+  static FullscreenDriver createWindowsNative({
+    Win32FullscreenApiWrapper? apiOverride,
+  }) {
+    try {
+      final driver = WindowsFullscreenDriver(
+        api: apiOverride ?? const Win32FullscreenApiWrapper(),
+      );
+      // 探测 HWND 有效性 — Win32 FFI 调用
+      final api = driver.apiForTesting;
+      final hwnd = api.getFlutterHwnd();
+      if (hwnd == 0 || !api.isWindow(hwnd)) {
+        debugPrint(
+          '[DesktopFullscreenDriverFactory] HWND invalid ($hwnd), '
+          'falling back to DesktopFullscreenDriver (window_manager)',
+        );
+        return DesktopFullscreenDriver();
+      }
+      return driver;
+    } on Exception catch (e) {
+      // FFI 初始化异常 (DLL 缺失、权限等) — 降级到 window_manager
+      debugPrint(
+        '[DesktopFullscreenDriverFactory] WindowsFullscreenDriver init failed: $e, '
+        'falling back to DesktopFullscreenDriver',
+      );
+      return DesktopFullscreenDriver();
+    }
   }
 }

@@ -36,11 +36,9 @@ class MacosFullscreenDriver implements FullscreenDriver {
   ///
   /// [plugin] fullscreen_window 插件平台接口，用于全屏操作和回调。
   /// [wm] window_manager 窗口管理器，用于其他窗口操作。
-  MacosFullscreenDriver({
-    FullScreenWindowPlatform? plugin,
-    WindowManager? wm,
-  })  : _plugin = plugin ?? FullScreenWindowPlatform.instance,
-        _wm = wm ?? windowManager {
+  MacosFullscreenDriver({FullScreenWindowPlatform? plugin, WindowManager? wm})
+    : _plugin = plugin ?? FullScreenWindowPlatform.instance,
+      _wm = wm ?? windowManager {
     // 订阅原生回调流 (D-P09)
     // windowId=0 单窗口场景
     _stateStreamSub = _plugin.onFullScreenChanged.listen((isFullscreen) {
@@ -107,9 +105,7 @@ class MacosFullscreenDriver implements FullscreenDriver {
       try {
         return await _wm.isFullScreen();
       } on Exception catch (e2) {
-        debugPrint(
-          '[MacosFullscreenDriver] wm.isFullScreen also failed: $e2',
-        );
+        debugPrint('[MacosFullscreenDriver] wm.isFullScreen also failed: $e2');
         return false;
       }
     }
@@ -169,7 +165,8 @@ class MacosFullscreenDriver implements FullscreenDriver {
       supportsMultiDisplay: true,
       supportsExclusive: false,
       requiresUserGesture: false,
-      platformNotes: 'Native macOS fullscreen animation (green button). '
+      platformNotes:
+          'Native macOS fullscreen animation (green button). '
           'Confirmation via NSWindow delegate callback. '
           'Transition time ~700ms.',
     );
@@ -177,7 +174,12 @@ class MacosFullscreenDriver implements FullscreenDriver {
 
   // ─── Lifecycle ───
 
+  /// macOS 驱动无显示器缓存。
+  @override
+  void clearMonitorCache() {}
+
   /// 释放资源 — 取消流订阅。
+  @override
   void dispose() {
     _stateStreamSub?.cancel();
     _stateStreamSub = null;

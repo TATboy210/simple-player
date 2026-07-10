@@ -12,6 +12,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_driver.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_driver_factory.dart';
+import 'package:simple_player_flutter/kernel/bridge/platform/windows_fullscreen_driver.dart';
+import 'package:simple_player_flutter/kernel/bridge/win32/win32_fullscreen_ffi.dart';
 
 void main() {
   // 初始化 Flutter test binding — windowManager 单例需要 binaryMessenger。
@@ -44,6 +46,37 @@ void main() {
     });
   });
 
+  // ─── T5: 工厂运行时降级 ───
+
+  group('DesktopFullscreenDriverFactory — runtime fallback (T5)', () {
+    test('createWindowsNative returns WindowsFullscreenDriver when HWND is valid', () {
+      // 默认 mock API: hwnd=12345, isWindow=true
+      final driver = DesktopFullscreenDriverFactory.createWindowsNative();
+      expect(driver, isA<WindowsFullscreenDriver>());
+    });
+
+    test('createWindowsNative falls back when HWND is 0', () {
+      final driver = DesktopFullscreenDriverFactory.createWindowsNative(
+        apiOverride: _MockApiHwnd0(),
+      );
+      expect(driver, isA<DesktopFullscreenDriver>());
+    });
+
+    test('createWindowsNative falls back when isWindow returns false', () {
+      final driver = DesktopFullscreenDriverFactory.createWindowsNative(
+        apiOverride: _MockApiNotWindow(),
+      );
+      expect(driver, isA<DesktopFullscreenDriver>());
+    });
+
+    test('createWindowsNative falls back when getFlutterHwnd throws', () {
+      final driver = DesktopFullscreenDriverFactory.createWindowsNative(
+        apiOverride: _MockApiThrows(),
+      );
+      expect(driver, isA<DesktopFullscreenDriver>());
+    });
+  });
+
   group('FullscreenDriver interface extensions', () {
     test('capabilities() returns FullscreenCapability', () {
       final driver = DesktopFullscreenDriverFactory.create();
@@ -70,4 +103,28 @@ void main() {
       );
     });
   });
+}
+
+// ─── T5 mock APIs ───
+
+/// HWND=0 — 模拟无窗口环境。
+class _MockApiHwnd0 extends Win32FullscreenApiWrapper {
+  @override
+  int getFlutterHwnd() => 0;
+  @override
+  bool isWindow(int hwnd) => false;
+}
+
+/// isWindow=false — 模拟窗口已销毁。
+class _MockApiNotWindow extends Win32FullscreenApiWrapper {
+  @override
+  int getFlutterHwnd() => 12345;
+  @override
+  bool isWindow(int hwnd) => false;
+}
+
+/// getFlutterHwnd 抛异常 — 模拟 FFI 初始化失败。
+class _MockApiThrows extends Win32FullscreenApiWrapper {
+  @override
+  int getFlutterHwnd() => throw Exception('FFI DLL not loaded');
 }
