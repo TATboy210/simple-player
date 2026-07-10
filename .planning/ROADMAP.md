@@ -154,8 +154,24 @@ Plans:
 5. 旧 fullscreen_window 直连调用可下线或保留 feature flag fallback
 6. 回归矩阵文档完成
 
+**Plans:** 3 plans
+
+Plans:
+
+- [ ] 04-01-PLAN.md — 回归测试矩阵（高风险套件 + 冒烟套件 + 矩阵文档）
+- [ ] 04-02-PLAN.md — CI/CD 流水线 + MSIX 打包配置
+- [ ] 04-03-PLAN.md — 旧实现废弃标记 + RC 版本号 + E2E 测试脚手架
+
 **Files to create/modify:**
 
+- `test/regression/high_risk_suite_test.dart` (新建)
+- `test/regression/smoke_suite_test.dart` (新建)
+- `test/regression/regression_matrix.md` (新建)
+- `.github/workflows/ci.yml` (新建)
+- `.github/workflows/release.yml` (新建)
+- `lib/kernel/bridge/window_service.dart` (修改 — deprecated 标记)
+- `lib/main.dart` (修改 — 默认 flag 切换)
+- `pubspec.yaml` (修改 — RC 版本号 + msix 配置)
 - `test/integration/fullscreen_e2e_test.dart` (新建)
 
 **Dependencies:** Phase C 完成
