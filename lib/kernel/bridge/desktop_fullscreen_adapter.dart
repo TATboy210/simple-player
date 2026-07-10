@@ -69,8 +69,8 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
 
   @override
   Future<FullscreenCapability> capabilities() async {
-    // Phase B 默认能力，Phase C 每平台返回真实值
-    return const FullscreenCapability();
+    // Phase C: 委托给 driver，每平台返回真实能力
+    return _driver.capabilities();
   }
 
   // ─── FullscreenAdapter: 命令 ───
