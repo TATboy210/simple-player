@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0-rc.1)'
+        required: true
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # Build with new fullscreen enabled for RC releases
+      - name: Build Windows
+        run: flutter build windows --dart-define=USE_NEW_FULLSCREEN=true
+
+      # Create MSIX package using pubspec.yaml msix_config
+      - name: Create MSIX
+        run: dart run msix:create
+
+      # Upload MSIX as workflow artifact
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix-package
+          path: build/windows/x64/runner/Release/*.msix
+
+      # Create GitHub Release with MSIX attached (prerelease)
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          prerelease: true
+          files: build/windows/x64/runner/Release/*.msix
