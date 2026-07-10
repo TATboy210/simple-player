@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:window_manager/window_manager.dart';
 
+import '../models/fullscreen_capability.dart';
 import 'fullscreen_driver.dart';
 
 /// Desktop 平台全屏驱动 — 使用 window_manager 包实现。
@@ -76,5 +77,27 @@ class DesktopFullscreenDriver implements FullscreenDriver {
   @override
   Future<bool> isMinimized() async {
     return _wm.isMinimized();
+  }
+
+  // ─── 回调桥接 ───
+
+  /// window_manager fallback 驱动不需要原生回调机制 (D-P11)。
+  ///
+  /// 接受但不使用回调 — 与 WindowsFullscreenDriver 行为一致。
+  @override
+  set onNativeStateChanged(
+    void Function(int windowId, bool isFullscreen)? callback,
+  ) {
+    // fallback 驱动无需回调
+  }
+
+  // ─── 能力查询 ───
+
+  /// 返回 window_manager fallback 的默认能力。
+  ///
+  /// 作为通用 fallback，不报告平台特定能力。
+  @override
+  FullscreenCapability capabilities() {
+    return const FullscreenCapability();
   }
 }

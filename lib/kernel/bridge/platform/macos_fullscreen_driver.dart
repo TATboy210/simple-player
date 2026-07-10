@@ -72,6 +72,7 @@ class MacosFullscreenDriver implements FullscreenDriver {
   ///
   /// DesktopFullscreenAdapter 通过此 setter 注册回调，
   /// 当 NSWindowDelegate 触发时收到通知。
+  @override
   set onNativeStateChanged(
     void Function(int windowId, bool isFullscreen)? callback,
   ) {
@@ -160,6 +161,7 @@ class MacosFullscreenDriver implements FullscreenDriver {
   ///
   /// macOS 使用原生全屏动画 (绿色按钮效果)，
   /// 通过 NSWindow delegate 回调确认状态。
+  @override
   FullscreenCapability capabilities() {
     return const FullscreenCapability(
       supportsFullscreen: true,

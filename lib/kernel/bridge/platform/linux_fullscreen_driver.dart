@@ -103,6 +103,7 @@ class LinuxFullscreenDriver implements FullscreenDriver {
   ///
   /// DesktopFullscreenAdapter 通过此 setter 注册回调，
   /// 当 GdkWindow state-changed 信号触发时收到通知。
+  @override
   set onNativeStateChanged(
     void Function(int windowId, bool isFullscreen)? callback,
   ) {
@@ -192,6 +193,7 @@ class LinuxFullscreenDriver implements FullscreenDriver {
   /// 使用 GTK fullscreen/unfullscreen 原生 API，
   /// 通过 GdkWindow state-changed 信号确认状态。
   /// WM 差异通过三级确认链覆盖。
+  @override
   FullscreenCapability capabilities() {
     return FullscreenCapability(
       supportsFullscreen: true,

@@ -54,6 +54,19 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// 内部全屏状态跟踪。
   bool _isFullscreen = false;
 
+  // ─── 回调桥接 ───
+
+  /// Windows FFI 驱动不需要原生回调机制 (D-P11)。
+  ///
+  /// FFI 同步操作完成后 queryFullscreen() 直接返回真实状态，
+  /// 不需要 delegate 回调确认。此 setter 接受但不使用回调。
+  @override
+  set onNativeStateChanged(
+    void Function(int windowId, bool isFullscreen)? callback,
+  ) {
+    // Windows FFI 驱动无需回调 — 操作同步完成
+  }
+
   // ─── FullscreenDriver 接口实现 ───
 
   @override
@@ -279,6 +292,7 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// 返回 Windows 平台全屏能力。
   ///
   /// Windows 支持多显示器全屏 (MonitorFromWindow + GetMonitorInfoW)。
+  @override
   FullscreenCapability capabilities() {
     return const FullscreenCapability(
       supportsFullscreen: true,
