@@ -1,12 +1,13 @@
+// ignore_for_file: overridden_fields — intentional: each engine needs independent ValueNotifier instances
 import 'package:flutter/foundation.dart';
 
-import 'package:player_engine/player_engine.dart';
+import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 
-/// Hand-written Fake implementing PlayerEngine for testing.
+/// Hand-written Fake implementing EngineState for testing.
 ///
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
-class FakeEngine implements PlayerEngine {
+class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   bool _disposed = false;
 
   // ─── ValueNotifier fields (defaults match FvpEngine) ───
@@ -77,6 +78,9 @@ class FakeEngine implements PlayerEngine {
   int setExternalSubtitleCallCount = 0;
   String? lastExternalSubtitlePath;
   int setSubtitleDelayCallCount = 0;
+  /// setVolume 调用追踪（用于节流测试）
+  int setVolumeCallCount = 0;
+  double? lastSetVolumeValue;
   int _subtitleDelayMs = 0;
   // ─── Playback control ───
 
@@ -141,6 +145,8 @@ class FakeEngine implements PlayerEngine {
   @override
   void setVolume(double value) {
     if (_disposed) return;
+    setVolumeCallCount++;
+    lastSetVolumeValue = value;
     final clamped = value.clamp(0.0, 1.0);
     volume.value = clamped;
     if (clamped == 0) {
