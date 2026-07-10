@@ -1,57 +1,65 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Milestone complete — v1.6 audit closed (all items already resolved)
-stopped_at: context exhaustion at 76% (2026-07-10)
-last_updated: "2026-07-10T10:39:55.701Z"
+milestone: v2.0
+milestone_name: fullscreen-optimization
+status: v2 project initialized — ready for Phase E
+stopped_at: context exhaustion at 75% (2026-07-10)
+last_updated: "2026-07-10T12:17:04.154Z"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
+  percent: 0
 ---
 
-# Project State: Player Fullscreen
+# Project State: Player Fullscreen v2
 
 ## Current Phase
 
-**Phase D:** 质量收尾与迁移完成 — Planned (3 plans, 2 waves)
+**Phase E:** 性能与Bug修复 — PENDING
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-09)
+See: .planning/PROJECT.md (updated 2026-07-10)
 
-**Core value:** 全屏切换在任何场景下都稳定可靠
-**Current focus:** Phase 04 — quality-migration
+**Core value:** 全屏切换像 mpv 一样快 — <100ms，零闪烁，零黑边
+**Current focus:** Phase E — 性能与Bug修复
 
 ## Progress
 
-- [x] PROJECT.md created
-- [x] config.json created
-- [x] REQUIREMENTS.md created (22 v1 requirements)
-- [x] ROADMAP.md created (4 phases)
-- [x] Phase A — architecture core models (complete)
-- [x] Phase B — command queue & recovery (complete)
-- [x] Phase C — platform adaptation & deepening (complete)
-- [ ] Phase D — quality closure & migration (pending)
+### v1 Milestone (Complete)
 
-## Recent Decisions
+- [x] Phase A — 架构定稿与核心模型 (3 plans)
+- [x] Phase B — 命令队列与恢复策略 (3 plans)
+- [x] Phase C — 平台适配与深化 (4 plans)
+- [x] Phase D — 质量收尾与迁移完成 (3 plans)
+- **v1 Total: 11/11 plans, 87+ tests, Milestone v1.0 DONE**
+
+### v2 Milestone (In Progress)
+
+- [ ] Phase E — 性能与Bug修复 (5 requirements, 2-3 plans)
+- [ ] Phase F — 用户体验升级 (2 requirements, 1-2 plans)
+- [ ] Phase G — 技术探索与代码质量 (4 requirements, 2-3 plans)
+- **v2 Total: 0/11 requirements, 0/3 phases**
+
+## Key Decisions
 
 | Date | Decision | Outcome |
 |------|----------|---------|
-| 2026-07-09 | FullscreenAdapter 独立于 WindowBridge | — Pending |
-| 2026-07-09 | per-window 命令队列 | — Pending |
-| 2026-07-09 | 执行后回读真实状态 | — Pending |
+| 2026-07-09 | FullscreenAdapter 独立于 WindowBridge | ✓ v1 Implemented |
+| 2026-07-09 | per-window 命令队列 | ✓ v1 Implemented |
+| 2026-07-09 | 执行后回读真实状态 | ✓ v1 Implemented |
 | 2026-07-09 | 禁止 win32 包 | ✓ 已确认 |
-| 2026-07-09 | 桌面优先 | — Pending |
+| 2026-07-10 | D3D11 独占全屏探索 | — Pending Phase G |
+| 2026-07-10 | FFI 路径优化 | — Pending Phase E |
+| 2026-07-10 | <100ms 零闪烁目标 | ✓ 用户确认 |
 
 ---
-*Updated: 2026-07-09 after initialization*
+*Updated: 2026-07-10 — v2 optimization project initialized*
 
 ## Session
 
-**Last session:** 2026-07-10T10:39:55.684Z
-**Stopped at:** context exhaustion at 76% (2026-07-10)
-**Resume file:** none — milestone complete, plan next milestone when ready
+**Last session:** 2026-07-10T12:17:04.144Z
+**Stopped at:** context exhaustion at 75% (2026-07-10)
+**Resume file:** `.continue-here.md`

@@ -1,195 +1,161 @@
-# Roadmap: Player Fullscreen
+# Roadmap: Player Fullscreen v2
 
 **Created:** 2026-07-09
-**Total Phases:** 4
-**Total Requirements:** 22
+**v2 Phases:** 3
+**v2 Requirements:** 11
 **Mode:** standard
 
 ---
 
-### Phase A — 架构定稿与核心模型
+## v1 Phases (已完成)
 
-**Goal:** 建立 FullscreenAdapter 抽象层、状态模型、事件流和错误模型，UI 不再直接依赖插件
+<details>
+<summary>✅ v1.0 Fullscreen Architecture (Phases 1-4) — SHIPPED 2026-07-10</summary>
 
-**Requirements:**
+### Phase 1: 架构定稿与核心模型
 
-- STATE-01, STATE-02, STATE-03 (状态模型)
-- EVT-01, EVT-02, EVT-03 (事件系统)
-- ERR-01, ERR-02, ERR-03 (错误处理)
-- ARCH-01, ARCH-02 (架构边界)
+**Goal:** FullscreenAdapter 抽象层、状态模型、事件流、错误模型
+**Status:** Complete (3 plans)
 
-**Success Criteria:**
+Plans:
 
-1. FullscreenAdapter 接口定义完成，UI 层只依赖此接口
-2. FullscreenSnapshot 模型包含 phase/effectiveMode/restoreMode/lastError 等完整字段
-3. FullscreenEvent 流覆盖 7 种事件类型
-4. FullscreenError 枚举覆盖 7 种错误类型
-5. WindowBridge 全屏相关职责迁出，保留通用窗口操作
-6. flutter analyze 通过，无新增 warning
+- [x] 01-01: FullscreenAdapter 接口定义
+- [x] 01-02: 状态模型与事件系统
+- [x] 01-03: 错误处理与恢复策略
 
-**Files to create/modify:**
+### Phase 2: 命令队列与恢复策略
 
-- `lib/kernel/bridge/fullscreen_adapter.dart` (新建)
-- `lib/kernel/models/fullscreen_snapshot.dart` (新建)
-- `lib/kernel/models/fullscreen_event.dart` (新建)
-- `lib/kernel/models/fullscreen_error.dart` (新建)
-- `lib/kernel/models/fullscreen_capability.dart` (新建)
-- `lib/kernel/models/fullscreen_request.dart` (新建)
-- `test/kernel/bridge/fullscreen_adapter_test.dart` (新建)
+**Goal:** per-window 命令串行化、幂等合并、状态回读、恢复策略
+**Status:** Complete (3 plans)
 
-**Dependencies:** 无
-**Risk:** Medium — 接口设计决定后续所有实现
+Plans:
+
+- [x] 02-01: 命令队列实现
+- [x] 02-02: 幂等合并与状态回读
+- [x] 02-03: 恢复策略全覆盖
+
+### Phase 3: 平台适配与深化
+
+**Goal:** Windows/macOS/Linux 三端全屏驱动生产级稳定
+**Status:** Complete (4 plans)
+
+Plans:
+
+- [x] 03-01: Windows WS_THICKFRAME 剥离/恢复
+- [x] 03-02: macOS 系统全屏生命周期
+- [x] 03-03: Linux GTK/WM 差异兜底
+- [x] 03-04: FullscreenCapability 能力查询
+
+### Phase 4: 质量收尾与迁移完成
+
+**Goal:** 回归矩阵、CI 补齐、旧实现可下线、RC 版本
+**Status:** Complete (3 plans)
+
+Plans:
+
+- [x] 04-01: 回归测试矩阵
+- [x] 04-02: 旧代码清理 + deprecated 标记
+- [x] 04-03: RC 版本 + E2E 验证
+
+</details>
 
 ---
 
-### Phase B — 命令队列与恢复策略
+## v2 Phases
 
-**Goal:** 实现 per-window 命令串行化、幂等合并、真实状态回读和完整恢复策略
+### Phase 5: 性能与Bug修复
 
-**Requirements:**
+**Goal:** 全屏切换 <100ms 零闪烁，16:9视频无黑边，边框残留修复
+**Depends on:** Phase 4
+**Requirements:** PERF-01, PERF-02, PERF-03, FIX-01, FIX-02
 
-- CMD-01, CMD-02, CMD-03 (命令队列)
-- RST-01, RST-02, RST-03, RST-04 (恢复策略)
-- ARCH-03 (旧实现迁移)
+**Success Criteria** (what must be TRUE):
 
-**Success Criteria:**
+  1. 全屏切换从按下 F 到画面填满 <100ms
+  2. 全屏进入/退出无黑帧/白帧/撕裂
+  3. 16:9 视频在16:9显示器上全屏无黑边
+  4. 全屏时无 WS_THICKFRAME 边框残留
+  5. Win32 FFI 系统调用次数减少50%+
+  6. flutter test 全通过，无 regression
 
-1. 快速连按 F 10 次不出现状态错位
-2. windowed→fullscreen→exit 恢复到原始窗口几何
-3. maximized→fullscreen→exit 恢复到 maximized
-4. 副屏拖拽后全屏→exit 恢复到副屏原始位置
-5. 旧 fullscreen_window 调用点全部迁移到 FullscreenAdapter
-6. feature flag 可切换新旧实现
+**Plans:** 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01: FIX-01+02: 视频黑边修复 + 边框残留修复（渲染层排查 + FFI 样式剥离）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02: PERF-01+02+03: FFI 路径优化 + 零闪烁过渡（合并系统调用、原子性操作）
+
+**Risk:** High — 性能优化涉及底层 FFI 和渲染层
+
+---
+
+### Phase 6: 用户体验升级
+
+**Goal:** 全屏过渡动画平滑，控制栏交互响应快
+**Depends on:** Phase 5
+**Requirements:** UX-01, UX-02
+
+**Success Criteria** (what must be TRUE):
+
+  1. 全屏进入/退出有平滑过渡效果（不突兀跳变）
+  2. 全屏时鼠标移动唤醒控制栏响应 <200ms
+  3. OSD 提示在全屏时正确显示和消失
+  4. 控制栏在全屏时自动隐藏/显示行为符合预期
+
+**Plans:** 2 plans
+
+Plans:
+
+- [ ] 06-01: UX-01: 全屏过渡动画实现（Flutter AnimatedContainer + 淡入淡出）
+- [ ] 06-02: UX-02: 控制栏交互优化（鼠标唤醒区域、OSD 响应）
+
+**Risk:** Medium — 动画可能影响性能，需平衡
+
+---
+
+### Phase 7: 技术探索与代码质量
+
+**Goal:** D3D11 可行性验证、旧代码清理、测试覆盖80%+
+**Depends on:** Phase 5
+**Requirements:** EXP-01, CLEAN-01, CLEAN-02, CLEAN-03
+
+**Success Criteria** (what must be TRUE):
+
+  1. D3D11 独占全屏 POC 验证完成（可行/不可行 + 原因）
+  2. 旧 fullscreen_window 直连代码已清理或标记 @deprecated
+  3. 全屏相关代码测试覆盖率 ≥80%
+  4. 职责不清的模块已重构，flutter analyze 零 warning
+  5. 架构文档更新
 
 **Plans:** 3 plans
 
 Plans:
 
-- [x] 02-01-PLAN.md — FullscreenCommandQueue 核心队列逻辑（per-window 串行化、幂等合并、超时）
-- [x] 02-02-PLAN.md — FullscreenDriver + DesktopFullscreenAdapter 完整实现（状态回读、恢复策略、事件流）
-- [x] 02-03-PLAN.md — WindowService 迁移 + feature flag 配置（USE_NEW_FULLSCREEN）
+- [ ] 07-01: EXP-01: D3D11 独占全屏 POC（Win32 DXGI 互操作探索）
+- [ ] 07-02: CLEAN-01+03: 旧代码清理 + 架构重构
+- [ ] 07-03: CLEAN-02: 测试覆盖率提升（全屏切换路径全覆盖）
 
-**Files to create/modify:**
-
-- `lib/kernel/bridge/fullscreen_command_queue.dart` (新建)
-- `lib/kernel/bridge/fullscreen_driver.dart` (新建)
-- `lib/kernel/bridge/desktop_fullscreen_driver.dart` (新建)
-- `lib/kernel/bridge/desktop_fullscreen_adapter.dart` (新建)
-- `lib/kernel/bridge/window_service.dart` (修改 — 迁移全屏逻辑)
-- `lib/app.dart` (修改 — 注入 FullscreenAdapter + feature flag)
-- `test/kernel/bridge/fullscreen_command_queue_test.dart` (新建)
-- `test/kernel/bridge/desktop_fullscreen_adapter_test.dart` (新建)
-
-**Dependencies:** Phase A 完成
-**Risk:** High — 竞态处理和恢复策略是最容易出 bug 的部分
+**Risk:** Medium — D3D11 探索可能证明不可行
 
 ---
 
-### Phase C — 平台适配与深化
+## Progress
 
-**Goal:** Windows/macOS/Linux 三端全屏体验生产级稳定，平台差异文档化
-
-**Requirements:**
-
-- PLAT-01 (Windows WS_THICKFRAME)
-- PLAT-02 (macOS 原生生命周期)
-- PLAT-03 (Linux GTK/WM 兜底)
-- PLAT-04 (FullscreenCapability 查询)
-
-**Success Criteria:**
-
-1. Windows: 全屏无 7px 缝隙，退出后焦点正确，TopMost 无残留
-2. macOS: 全屏过渡平滑，等待系统回调确认状态
-3. Linux: GTK/WM 差异下状态回读正确
-4. capabilities() 返回每平台真实能力
-5. 三端 E2E 测试脚本通过
-6. 主路径可日常使用
-
-**Plans:** 4 plans
-
-Plans:
-
-- [x] 03-01-PLAN.md — WindowsFullscreenDriver (Win32 FFI: WS_THICKFRAME 剥离 + 焦点恢复 + TopMost 清理)
-- [x] 03-02-PLAN.md — macOSFullscreenDriver (fullscreen_window 插件 + NSWindowDelegate 回调确认)
-- [x] 03-03-PLAN.md — LinuxFullscreenDriver (fullscreen_window 插件 + window-state-event 信号 + WM 检测)
-- [x] 03-04-PLAN.md — DesktopFullscreenDriverFactory + capabilities() + 集成接线
-
-**Files to create/modify:**
-
-- `lib/kernel/bridge/win32/win32_fullscreen_ffi.dart` (新建)
-- `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` (新建)
-- `lib/kernel/bridge/platform/macos_fullscreen_driver.dart` (新建)
-- `lib/kernel/bridge/platform/linux_fullscreen_driver.dart` (新建)
-- `lib/kernel/bridge/desktop_fullscreen_driver_factory.dart` (新建)
-- `lib/kernel/bridge/fullscreen_driver.dart` (修改 — 添加 onNativeStateChanged + capabilities)
-- `lib/kernel/bridge/desktop_fullscreen_adapter.dart` (修改 — 回调转发)
-- `lib/main.dart` (修改 — 使用工厂)
-- `packages/fullscreen_window/macos/Classes/FullscreenWindowPlugin.{h,m}` (修改 — NSWindowDelegate)
-- `packages/fullscreen_window/linux/fullscreen_window_plugin.cc` (修改 — window-state-event)
-- `packages/fullscreen_window/lib/fullscreen_window_{method_channel,platform_interface}.dart` (修改 — 回调流)
-- `test/platform/windows_fullscreen_driver_test.dart` (新建)
-- `test/platform/macos_fullscreen_driver_test.dart` (新建)
-- `test/platform/linux_fullscreen_driver_test.dart` (新建)
-- `test/platform/fullscreen_driver_factory_test.dart` (新建)
-
-**Dependencies:** Phase B 完成
-**Risk:** High — macOS/Linux 平台行为不一致是最大风险
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. 架构定稿与核心模型 | v1.0 | 3/3 | Complete | 2026-07-10 |
+| 2. 命令队列与恢复策略 | v1.0 | 3/3 | Complete | 2026-07-10 |
+| 3. 平台适配与深化 | v1.0 | 4/4 | Complete | 2026-07-10 |
+| 4. 质量收尾与迁移完成 | v1.0 | 3/3 | Complete | 2026-07-10 |
+| 5. 性能与Bug修复 | v2.0 | 0/2 | Not started | - |
+| 6. 用户体验升级 | v2.0 | 0/2 | Not started | - |
+| 7. 技术探索与代码质量 | v2.0 | 0/3 | Not started | - |
 
 ---
 
-### Phase D — 质量收尾与迁移完成
-
-**Goal:** 回归矩阵验证、CI 补齐、旧实现可下线、RC 版本发布
-
-**Requirements:**
-
-- 所有 v1 需求验收
-
-**Success Criteria:**
-
-1. flutter analyze 零 warning
-2. flutter test 全通过
-3. Windows/macOS/Linux 构建冒烟通过
-4. 必测场景 8 项全部通过（播放中/暂停中/连续切换/F 与按钮一致/ESC 语义/maximized 恢复/副屏恢复/多窗口隔离）
-5. 旧 fullscreen_window 直连调用可下线或保留 feature flag fallback
-6. 回归矩阵文档完成
-
-**Plans:** 3 plans
-
-Plans:
-
-- [x] 04-01-PLAN.md — 回归测试矩阵（高风险套件 + 冒烟套件 + 矩阵文档）
-- [x] 04-02-PLAN.md — CI/CD 流水线 + MSIX 打包配置
-- [x] 04-03-PLAN.md — 旧实现废弃标记 + RC 版本号 + E2E 测试脚手架
-
-**Files to create/modify:**
-
-- `test/regression/high_risk_suite_test.dart` (新建)
-- `test/regression/smoke_suite_test.dart` (新建)
-- `test/regression/regression_matrix.md` (新建)
-- `.github/workflows/ci.yml` (新建)
-- `.github/workflows/release.yml` (新建)
-- `lib/kernel/bridge/window_service.dart` (修改 — deprecated 标记)
-- `lib/main.dart` (修改 — 默认 flag 切换)
-- `pubspec.yaml` (修改 — RC 版本号 + msix 配置)
-- `test/integration/fullscreen_e2e_test.dart` (新建)
-
-**Dependencies:** Phase C 完成
-**Risk:** Low — 收尾阶段，主要是验证
-
----
-
-## Summary
-
-| Phase | Name | Requirements | Success Criteria | Risk |
-|-------|------|-------------|------------------|------|
-| A | 架构定稿与核心模型 | 11 | 6 | Medium |
-| B | 命令队列与恢复策略 | 8 | 6 | High |
-| C | 平台适配与深化 | 4 | 6 | High |
-| D | 质量收尾与迁移完成 | 0 (验收) | 6 | Low |
-
-**Total:** 22 v1 requirements + 5 v2 requirements
-
----
 *Created: 2026-07-09*
-*Last updated: 2026-07-09 after initialization*
+*Last updated: 2026-07-10 — v2 optimization roadmap, numeric phase format*
