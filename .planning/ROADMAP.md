@@ -78,12 +78,14 @@ Plans:
   5. Win32 FFI 系统调用次数减少50%+
   6. flutter test 全通过，无 regression
 
-**Plans:** 2/2 plans complete
+**Plans:** 4 plans
 
 Plans:
 
-- [x] 05-01-PLAN.md
-- [x] 05-02-PLAN.md
+- [x] 05-01-PLAN.md — FIX-01+02: 视频黑边修复 + 边框残留修复
+- [x] 05-02-PLAN.md — PERF-01+02+03: FFI 路径优化 + 零闪烁过渡
+- [x] 05-03-PLAN.md — Driver 层深度优化 — 缓存、状态同步、乐观更新、工厂降级
+- [ ] 05-04-PLAN.md — PERF-03 gap closure: HWND 缓存 + FFI 调用计数验证
 
 **Wave 1**
 
@@ -91,7 +93,15 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-02: PERF-01+02+03: FFI 路径优化 + 零闪烁过渡（合并系统调用、原子性操作）
+- [x] 05-02: PERF-01+02+03: FFI 路径优化 + 零闪烁过渡（合并系统调用、原子性操作）
+
+**Wave 3** *(Driver 层深度优化)*
+
+- [x] 05-03: Driver 层深度优化 — FFI 调用缓存、状态同步修复、macOS/Linux 乐观更新、工厂降级
+
+**Wave 4** *(Gap closure)*
+
+- [ ] 05-04: PERF-03 gap closure — HWND 缓存 + FFI 调用计数精确验证
 
 **Risk:** High — 性能优化涉及底层 FFI 和渲染层
 
@@ -155,7 +165,7 @@ Plans:
 | 2. 命令队列与恢复策略 | v1.0 | 3/3 | Complete | 2026-07-10 |
 | 3. 平台适配与深化 | v1.0 | 4/4 | Complete | 2026-07-10 |
 | 4. 质量收尾与迁移完成 | v1.0 | 3/3 | Complete | 2026-07-10 |
-| 5. 性能与Bug修复 | v2.0 | 2/2 | Complete   | 2026-07-10 |
+| 5. 性能与Bug修复 | v2.0 | 3/3 | Complete | 2026-07-10 |
 | 6. 用户体验升级 | v2.0 | 0/2 | Not started | - |
 | 7. 技术探索与代码质量 | v2.0 | 0/3 | Not started | - |
 
