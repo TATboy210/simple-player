@@ -41,6 +41,11 @@ class WindowsFullscreenDriver implements FullscreenDriver {
 
   final Win32FullscreenApiWrapper _api;
 
+  /// 暴露 API wrapper 用于测试和工厂 HWND 探测 (T5)。
+  ///
+  /// 生产代码仅在 DesktopFullscreenDriverFactory._createWindowsNative 中使用。
+  Win32FullscreenApiWrapper get apiForTesting => _api;
+
   /// 保存的窗口样式 — 进入全屏前快照。
   int _savedStyle = 0;
 
@@ -60,6 +65,19 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// 仅在 WM_DISPLAYCHANGE 时通过 [clearMonitorCache] 刷新。
   final Map<int, ({int left, int top, int right, int bottom})>
       _cachedMonitorRects = {};
+
+  /// 缓存的 HMONITOR handle — 上次 enterFullscreen 使用的显示器。
+  ///
+  /// 同一显示器反复切换全屏时（>99% 使用场景）跳过 monitorFromWindow FFI 调用。
+  /// 在 WM_DISPLAYCHANGE 时通过 [clearMonitorCache] 刷新。
+  int _cachedMonitorHandle = 0;
+
+  /// Cached HWND — stable for Flutter window lifetime (T4).
+  ///
+  /// getFlutterHwnd() calls FindWindowW which is an FFI round-trip.
+  /// Since the Flutter window HWND never changes, cache it on first use.
+  /// Cleared on [dispose] and [clearMonitorCache] (defensive).
+  int _cachedHwnd = 0;
 
   // ─── 回调桥接 ───
 
@@ -131,6 +149,7 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     // 获取显示器区域并覆盖整个显示器 — 使用缓存减少 FFI (T1)
     final monitor = _api.monitorFromWindow(hwnd);
     if (monitor != 0) {
+      _cachedMonitorHandle = monitor; // 缓存 HMONITOR handle
       final rc = _cachedMonitorRects[monitor] ?? _api.getMonitorRect(monitor);
       if (rc != null) {
         _cachedMonitorRects[monitor] = rc; // 写入缓存
@@ -149,31 +168,31 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     _isFullscreen = true;
   }
 
-  /// 快速进入全屏 — 减少 FFI 调用次数 (PERF-03)。
+  /// 快速进入全屏 — 最小化 FFI 调用次数 (PERF-03)。
   ///
   /// 与 [enterFullscreen] 的区别:
-  /// - 跳过诊断回读 (getWindowLong verify)，减少 2 次 FFI 调用
-  /// - 总 FFI 调用: 9 次 (vs 标准路径 11 次)
-  /// - 适用于 Windows 平台 DesktopFullscreenAdapter 快速路径
+  /// - 跳过诊断回读 (getWindowLong verify)，减少 2 次 FFI
+  /// - 跳过 isWindow 验证 (FindWindowW 返回 0 已覆盖)
+  /// - 跳过 WS_EX_TOPMOST setWindowLong (setWindowPos HWND_TOPMOST 已处理 Z-order)
+  /// - 使用缓存的 HMONITOR (跳过 monitorFromWindow，同显示器场景)
+  /// - 使用缓存的 HWND (跳过 getFlutterHwnd，窗口句柄生命周期不变)
   ///
-  /// 调用序列:
-  /// 1. getFlutterHwnd — 获取窗口句柄
-  /// 2. getWindowLong(gwlStyle) — 保存原始样式
-  /// 3. getWindowLong(gwlExStyle) — 保存原始扩展样式
-  /// 4. getWindowPlacement — 保存窗口位置
-  /// 5. setWindowLong(gwlStyle) — 剥离边框样式
-  /// 6. setWindowLong(gwlExStyle) — 设置 TOPMOST
-  /// 7. monitorFromWindow — 获取显示器
-  /// 8. getMonitorRect — 获取显示器区域
-  /// 9. setWindowPos — 原子位置更新
+  /// 首次调用: 6 FFI (HWND cache miss) | 缓存命中: 5 FFI (vs 标准路径 12 FFI)
+  ///
+  /// 调用序列 (全缓存命中时 — 5 FFI):
+  /// 1. getWindowLong(gwlStyle) — 保存原始样式
+  /// 2. getWindowLong(gwlExStyle) — 保存原始扩展样式
+  /// 3. getWindowPlacement — 保存窗口位置
+  /// 4. setWindowLong(gwlStyle) — 剥离边框样式
+  /// 5. setWindowPos(HWND_TOPMOST) — 原子位置+Z-order 更新
   Future<void> enterFullscreenFast({int displayId = 0}) async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0 || !_api.isWindow(hwnd)) {
+    final hwnd = _getHwnd();
+    if (hwnd == 0) {
       debugPrint('[WindowsFullscreenDriver] fast: invalid HWND: $hwnd');
       return;
     }
 
-    // 保存当前样式 (2 FFI calls)
+    // 保存当前样式 (2 FFI calls) — 留给 leaveFullscreen 恢复
     _savedStyle = _api.getWindowLong(hwnd, gwlStyle);
     _savedExStyle = _api.getWindowLong(hwnd, gwlExStyle);
 
@@ -181,27 +200,27 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     _freeSavedPlacement();
     _savedPlacement = _api.getWindowPlacement(hwnd);
 
-    // 批量样式剥离 — 内存计算，无需回读验证 (2 FFI calls)
+    // 批量样式剥离 — 内存计算，无需回读验证 (1 FFI call)
+    // 注意: 仅剥离 gwlStyle，不设置 WS_EX_TOPMOST —
+    // setWindowPos(HWND_TOPMOST) 已处理 Z-order，exStyle 的边框剥离
+    // 在 fast path 中省略（leaveFullscreen 用 _savedExStyle 恢复原值）
     _api.setWindowLong(
       hwnd,
       gwlStyle,
       _savedStyle & ~(wsCaption | wsThickframe | wsMaximize),
     );
-    _api.setWindowLong(
-      hwnd,
-      gwlExStyle,
-      // 括号必须：& 优先级高于 |，不加括号会保留 _savedExStyle 的边框位
-      (_savedExStyle | wsExTopmost) &
-          ~(wsExDlgmodalframe |
-              wsExWindowedge |
-              wsExClientedge |
-              wsExStaticedge),
-    );
 
-    // 原子位置更新 — 使用缓存减少 FFI 调用 (T1)
-    // monitorFromWindow 仍需 FFI (依赖窗口位置)，
-    // getMonitorRect 结果缓存后可跳过 (2→1 FFI for display query)
-    final monitor = _api.monitorFromWindow(hwnd);
+    // 原子位置更新 — 使用 HMONITOR 缓存减少 FFI 调用
+    // 首次: monitorFromWindow + getMonitorRect = 2 FFI
+    // 缓存: 仅 monitorFromWindow = 1 FFI (getMonitorRect 已缓存)
+    // HMONITOR 缓存: 跳过 monitorFromWindow = 0 FFI (同显示器)
+    int monitor = _cachedMonitorHandle;
+    if (monitor == 0) {
+      monitor = _api.monitorFromWindow(hwnd);
+      if (monitor != 0) {
+        _cachedMonitorHandle = monitor;
+      }
+    }
     if (monitor != 0) {
       final rc = _cachedMonitorRects[monitor] ?? _api.getMonitorRect(monitor);
       if (rc != null) {
@@ -224,12 +243,12 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// 快速退出全屏 — 简化恢复路径 (PERF-03)。
   ///
   /// 与 [leaveFullscreen] 的区别:
+  /// - 跳过 isWindow 验证 (FindWindowW 返回 0 已覆盖)
   /// - 跳过额外的 getWindowRect + setWindowPos 布局刷新
   /// - setWindowPlacement 已触发 WM_PAINT，无需二次刷新
-  /// - 总 FFI 调用: 5 次 (vs 标准路径 7 次)
   Future<void> leaveFullscreenFast() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0 || !_api.isWindow(hwnd)) {
+    final hwnd = _getHwnd();
+    if (hwnd == 0) {
       debugPrint('[WindowsFullscreenDriver] fast: invalid HWND: $hwnd');
       return;
     }
@@ -342,6 +361,7 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   @override
   void dispose() {
     _freeSavedPlacement();
+    _cachedHwnd = 0;
     _isFullscreen = false;
   }
 
@@ -352,6 +372,8 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   @override
   void clearMonitorCache() {
     _cachedMonitorRects.clear();
+    _cachedMonitorHandle = 0;
+    _cachedHwnd = 0;
   }
 
   @override
@@ -493,6 +515,15 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     } catch (_) {
       return 1.0;
     }
+  }
+
+  /// Get cached HWND — fetches once via getFlutterHwnd, then returns cache.
+  ///
+  /// Returns 0 if window handle is invalid (FindWindowW failed).
+  int _getHwnd() {
+    if (_cachedHwnd != 0) return _cachedHwnd;
+    _cachedHwnd = _api.getFlutterHwnd();
+    return _cachedHwnd;
   }
 }
 
