@@ -12,66 +12,107 @@
 /// FS-REG-007: 副屏位置恢复（自定义 position）
 /// FS-REG-008: 错误事件通知（enter 失败 → 回滚）
 ///
-/// 所有测试使用 FakeWindowOps + FakePlatformFullscreen，不依赖真实窗口管理器。
+/// 所有测试使用 MockFullscreenDriver + DesktopFullscreenAdapter，
+/// 通过 Level-2 轮询确认（设置 driver.fullscreenState 后 adapter 自动匹配）。
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/bridge/fullscreen_controller.dart';
-import 'package:simple_player_flutter/kernel/bridge/platform_fullscreen.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_state.dart';
+import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
+import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
+import 'package:simple_player_flutter/kernel/models/fullscreen_capability.dart';
+import 'package:simple_player_flutter/kernel/models/fullscreen_error.dart';
+import 'package:simple_player_flutter/kernel/models/fullscreen_snapshot.dart';
 
 // ─── 测试替身 ───
 
-/// 模拟窗口操作。
-class _FakeWindowOps implements WindowOps {
-  Offset position = const Offset(100, 100);
-  Size size = const Size(1280, 720);
+/// Mock FullscreenDriver — 记录调用参数，可控返回值。
+class _MockFullscreenDriver implements FullscreenDriver {
+  final List<String> calls = [];
+
+  bool fullscreenState = false;
+  bool minimizedState = false;
+  bool maximizedState = false;
+  Offset currentPosition = const Offset(100, 100);
+  Size currentSize = const Size(1280, 720);
+
+  Exception? throwOnEnter;
 
   @override
-  Future<bool> isFullScreen() async => false;
-
-  @override
-  Future<void> setFullScreen(bool value) async {}
-
-  @override
-  Future<Offset> getPosition() async => position;
-
-  @override
-  Future<void> setPosition(Offset pos) async => position = pos;
-
-  @override
-  Future<Size> getSize() async => size;
-
-  @override
-  Future<void> setSize(Size s) async => size = s;
-}
-
-/// 平台全屏测试替身 — 可配置失败。
-class _FakePlatformFullscreen implements PlatformFullscreen {
-  int enterCallCount = 0;
-  int exitCallCount = 0;
-  bool shouldThrowOnEnter = false;
-  FullscreenSnapshot? lastExitSnapshot;
-
-  @override
-  bool get requiresStyleSave => true;
-
-  @override
-  Future<FullscreenSnapshot> enter() async {
-    enterCallCount++;
-    if (shouldThrowOnEnter) throw Exception('enter failed');
-    return const FullscreenSnapshot(
-      windowStyle: 0x00CF0000,
-      position: Offset(100, 100),
-      size: Size(1280, 720),
-    );
+  Future<void> enterFullscreen({int displayId = 0}) async {
+    calls.add('enterFullscreen(displayId: $displayId)');
+    if (throwOnEnter != null) throw throwOnEnter!;
   }
 
   @override
-  void exit(FullscreenSnapshot snapshot) {
-    exitCallCount++;
-    lastExitSnapshot = snapshot;
+  Future<void> leaveFullscreen() async {
+    calls.add('leaveFullscreen()');
+  }
+
+  @override
+  Future<bool> queryFullscreen() async {
+    calls.add('queryFullscreen()');
+    return fullscreenState;
+  }
+
+  @override
+  Future<Offset> getPosition() async {
+    calls.add('getPosition()');
+    return currentPosition;
+  }
+
+  @override
+  Future<Size> getSize() async {
+    calls.add('getSize()');
+    return currentSize;
+  }
+
+  @override
+  Future<void> setBounds(Offset? position, Size? size) async {
+    calls.add('setBounds($position, $size)');
+    if (position != null) currentPosition = position;
+    if (size != null) currentSize = size;
+  }
+
+  @override
+  Future<void> maximize() async {
+    calls.add('maximize()');
+    maximizedState = true;
+  }
+
+  @override
+  Future<void> restore() async {
+    calls.add('restore()');
+    minimizedState = false;
+    maximizedState = false;
+  }
+
+  @override
+  Future<void> focus() async {
+    calls.add('focus()');
+  }
+
+  @override
+  Future<bool> isMaximized() async {
+    calls.add('isMaximized()');
+    return maximizedState;
+  }
+
+  @override
+  Future<bool> isMinimized() async {
+    calls.add('isMinimized()');
+    return minimizedState;
+  }
+
+  @override
+  set onNativeStateChanged(
+    void Function(int windowId, bool isFullscreen)? callback,
+  ) {
+    // 空实现 — 测试通过 Level-2 轮询确认
+  }
+
+  @override
+  FullscreenCapability capabilities() {
+    return const FullscreenCapability();
   }
 }
 
@@ -79,154 +120,148 @@ class _FakePlatformFullscreen implements PlatformFullscreen {
 
 void main() {
   group('Smoke Suite — 8 Mandatory Scenarios', () {
-    late WindowState state;
-    late _FakeWindowOps ops;
-    late _FakePlatformFullscreen platform;
-    late FullscreenController ctrl;
+    late _MockFullscreenDriver driver;
+    late DesktopFullscreenAdapter adapter;
 
     setUp(() {
-      state = WindowState();
-      ops = _FakeWindowOps();
-      platform = _FakePlatformFullscreen();
-      ctrl = FullscreenController(
-        state: state,
-        platform: platform,
-        ops: ops,
-      );
+      driver = _MockFullscreenDriver();
+      adapter = DesktopFullscreenAdapter(driver);
     });
 
     tearDown(() {
-      state.dispose();
+      adapter.dispose();
     });
 
     // FS-REG-001: 播放中 + 全屏
     test('FS-REG-001: playing + fullscreen enters and exits correctly',
         () async {
-      // 模拟播放状态（mode 为 windowed，正在播放中）
-      expect(state.mode.value, WindowMode.windowed);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
 
-      // 进入全屏
-      await ctrl.setFullscreen(true);
-      expect(state.mode.value, WindowMode.fullscreen);
-      expect(platform.enterCallCount, 1);
-      expect(ctrl.isAnimating, isFalse);
+      // 进入全屏 — 设置 driver 状态让 Level-2 轮询首次命中
+      driver.fullscreenState = true;
+      await adapter.setFullscreen(true);
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
 
       // 退出全屏
-      await ctrl.setFullscreen(false);
-      expect(state.mode.value, WindowMode.windowed);
-      expect(platform.exitCallCount, 1);
+      driver.fullscreenState = false;
+      await adapter.setFullscreen(false);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
     });
 
     // FS-REG-002: 暂停中 + 全屏
     test('FS-REG-002: paused + fullscreen enters and exits correctly',
         () async {
-      // 暂停状态下进入全屏
-      expect(state.mode.value, WindowMode.windowed);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
 
-      await ctrl.setFullscreen(true);
-      expect(state.mode.value, WindowMode.fullscreen);
+      driver.fullscreenState = true;
+      await adapter.setFullscreen(true);
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
 
-      await ctrl.setFullscreen(false);
-      expect(state.mode.value, WindowMode.windowed);
+      driver.fullscreenState = false;
+      await adapter.setFullscreen(false);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
     });
 
     // FS-REG-003: F 键与按钮一致性
-    // toggle(true) 和 setFullscreen(true) 结果相同
+    // toggle() 和 setFullscreen() 结果相同
     test('FS-REG-003: toggle and setFullscreen produce same result', () async {
       // 使用 toggle 进入全屏
-      await ctrl.toggle();
-      expect(state.mode.value, WindowMode.fullscreen);
-      expect(platform.enterCallCount, 1);
+      driver.fullscreenState = true;
+      await adapter.toggle();
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
 
       // 退出
-      await ctrl.toggle();
-      expect(state.mode.value, WindowMode.windowed);
-      expect(platform.exitCallCount, 1);
+      driver.fullscreenState = false;
+      await adapter.toggle();
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
 
       // 使用 setFullscreen 进入全屏
-      await ctrl.setFullscreen(true);
-      expect(state.mode.value, WindowMode.fullscreen);
-      expect(platform.enterCallCount, 2);
+      driver.fullscreenState = true;
+      await adapter.setFullscreen(true);
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
 
       // 退出
-      await ctrl.setFullscreen(false);
-      expect(state.mode.value, WindowMode.windowed);
-      expect(platform.exitCallCount, 2);
+      driver.fullscreenState = false;
+      await adapter.setFullscreen(false);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
     });
 
     // FS-REG-004: ESC 语义 — fullscreen 状态下 setFullscreen(false) 退出全屏
     test('FS-REG-004: ESC exits fullscreen (setFullscreen(false))', () async {
-      await ctrl.setFullscreen(true);
-      expect(state.mode.value, WindowMode.fullscreen);
+      driver.fullscreenState = true;
+      await adapter.setFullscreen(true);
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
 
       // ESC 语义 = setFullscreen(false)
-      await ctrl.setFullscreen(false);
-      expect(state.mode.value, WindowMode.windowed);
-      expect(platform.exitCallCount, 1);
+      driver.fullscreenState = false;
+      await adapter.setFullscreen(false);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
     });
 
     // FS-REG-005: 连续切换稳定性（10 次 toggle）
+    // 10 次 toggle 从 windowed 开始 → 偶数次 → 最终回到 windowed
     test('FS-REG-005: 10 consecutive toggles end in stable state', () async {
       for (var i = 0; i < 10; i++) {
-        await ctrl.toggle();
+        // 每次 toggle 前设置 driver 状态，让 Level-2 轮询首次命中
+        driver.fullscreenState = !driver.fullscreenState;
+        await adapter.toggle();
       }
 
-      // 10 次 toggle 从 windowed 开始，偶数次回到 windowed
-      expect(state.mode.value, WindowMode.windowed);
-      expect(ctrl.isAnimating, isFalse);
-      expect(platform.enterCallCount, 5);
-      expect(platform.exitCallCount, 5);
+      // 10 次 toggle（偶数）从 windowed 开始 → 最终 windowed
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
     });
 
     // FS-REG-006: windowed -> fullscreen -> windowed 恢复原始窗口几何
     test('FS-REG-006: windowed -> fullscreen -> windowed restores geometry',
         () async {
-      ops.position = const Offset(200, 150);
-      ops.size = const Size(1000, 700);
+      driver.currentPosition = const Offset(200, 150);
+      driver.currentSize = const Size(1000, 700);
 
-      await ctrl.setFullscreen(true);
-      expect(state.mode.value, WindowMode.fullscreen);
+      driver.fullscreenState = true;
+      await adapter.setFullscreen(true);
+      expect(adapter.snapshot().value.isFullscreen, isTrue);
 
-      await ctrl.setFullscreen(false);
-      expect(state.mode.value, WindowMode.windowed);
+      driver.fullscreenState = false;
+      await adapter.setFullscreen(false);
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
 
-      // 验证退出时使用了保存的位置和大小
-      expect(platform.lastExitSnapshot, isNotNull);
-      expect(platform.lastExitSnapshot!.position, const Offset(200, 150));
-      expect(platform.lastExitSnapshot!.size, const Size(1000, 700));
+      // 验证退出时恢复了保存的位置和大小
+      expect(driver.calls,
+          contains('setBounds(Offset(200.0, 150.0), Size(1000.0, 700.0))'));
     });
 
     // FS-REG-007: 副屏位置恢复 — 自定义 position
-    test('FS-REG-007: secondary display position is preserved in snapshot',
-        () async {
+    test('FS-REG-007: secondary display position is restored', () async {
       // 模拟副屏位置（非主显示器）
-      ops.position = const Offset(2560, 300); // 副屏 x 偏移
-      ops.size = const Size(1920, 1080);
+      driver.currentPosition = const Offset(2560, 300);
+      driver.currentSize = const Size(1920, 1080);
 
-      await ctrl.setFullscreen(true);
-      await ctrl.setFullscreen(false);
+      driver.fullscreenState = true;
+      await adapter.setFullscreen(true);
 
-      // 验证快照包含副屏位置
-      expect(platform.lastExitSnapshot, isNotNull);
-      expect(platform.lastExitSnapshot!.position, const Offset(2560, 300));
-      expect(platform.lastExitSnapshot!.size, const Size(1920, 1080));
+      driver.fullscreenState = false;
+      await adapter.setFullscreen(false);
+
+      // 验证恢复了副屏位置
+      expect(driver.calls,
+          contains('setBounds(Offset(2560.0, 300.0), Size(1920.0, 1080.0))'));
     });
 
-    // FS-REG-008: 错误事件通知 — enter 失败时回滚到 windowed
-    test('FS-REG-008: enter failure rolls back to windowed', () async {
-      platform.shouldThrowOnEnter = true;
+    // FS-REG-008: 错误事件通知 — enter 失败时进入 error 状态
+    test('FS-REG-008: enter failure results in error state', () async {
+      driver.throwOnEnter = Exception('platform enter failed');
 
-      await ctrl.setFullscreen(true);
+      await adapter.setFullscreen(true);
 
-      // 失败后应回滚到 windowed
-      expect(state.mode.value, WindowMode.windowed);
-      expect(ctrl.isAnimating, isFalse);
-
-      // enter 被调用但失败
-      expect(platform.enterCallCount, 1);
-      // enter 抛异常时 _savedSnapshot 为 null，不会调用 exit
-      // 控制器直接设置 mode = windowed（回滚）
-      expect(platform.exitCallCount, 0);
+      // 失败后应进入 error 状态
+      expect(adapter.snapshot().value.phase, FullscreenPhase.error);
+      expect(adapter.snapshot().value.lastError, isA<PlatformFailure>());
+      expect(adapter.snapshot().value.isFullscreen, isFalse);
     });
   });
 }
