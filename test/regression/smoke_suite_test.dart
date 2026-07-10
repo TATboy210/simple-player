@@ -14,6 +14,8 @@
 ///
 /// 所有测试使用 MockFullscreenDriver + DesktopFullscreenAdapter，
 /// 通过 Level-2 轮询确认（设置 driver.fullscreenState 后 adapter 自动匹配）。
+library;
+
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -133,37 +135,41 @@ void main() {
     });
 
     // FS-REG-001: 播放中 + 全屏
-    test('FS-REG-001: playing + fullscreen enters and exits correctly',
-        () async {
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+    test(
+      'FS-REG-001: playing + fullscreen enters and exits correctly',
+      () async {
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
 
-      // 进入全屏 — 设置 driver 状态让 Level-2 轮询首次命中
-      driver.fullscreenState = true;
-      await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        // 进入全屏 — 设置 driver 状态让 Level-2 轮询首次命中
+        driver.fullscreenState = true;
+        await adapter.setFullscreen(true);
+        expect(adapter.snapshot().value.isFullscreen, isTrue);
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
 
-      // 退出全屏
-      driver.fullscreenState = false;
-      await adapter.setFullscreen(false);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-    });
+        // 退出全屏
+        driver.fullscreenState = false;
+        await adapter.setFullscreen(false);
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+      },
+    );
 
     // FS-REG-002: 暂停中 + 全屏
-    test('FS-REG-002: paused + fullscreen enters and exits correctly',
-        () async {
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+    test(
+      'FS-REG-002: paused + fullscreen enters and exits correctly',
+      () async {
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
 
-      driver.fullscreenState = true;
-      await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+        driver.fullscreenState = true;
+        await adapter.setFullscreen(true);
+        expect(adapter.snapshot().value.isFullscreen, isTrue);
 
-      driver.fullscreenState = false;
-      await adapter.setFullscreen(false);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-    });
+        driver.fullscreenState = false;
+        await adapter.setFullscreen(false);
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
+      },
+    );
 
     // FS-REG-003: F 键与按钮一致性
     // toggle() 和 setFullscreen() 结果相同
@@ -217,23 +223,27 @@ void main() {
     });
 
     // FS-REG-006: windowed -> fullscreen -> windowed 恢复原始窗口几何
-    test('FS-REG-006: windowed -> fullscreen -> windowed restores geometry',
-        () async {
-      driver.currentPosition = const Offset(200, 150);
-      driver.currentSize = const Size(1000, 700);
+    test(
+      'FS-REG-006: windowed -> fullscreen -> windowed restores geometry',
+      () async {
+        driver.currentPosition = const Offset(200, 150);
+        driver.currentSize = const Size(1000, 700);
 
-      driver.fullscreenState = true;
-      await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+        driver.fullscreenState = true;
+        await adapter.setFullscreen(true);
+        expect(adapter.snapshot().value.isFullscreen, isTrue);
 
-      driver.fullscreenState = false;
-      await adapter.setFullscreen(false);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+        driver.fullscreenState = false;
+        await adapter.setFullscreen(false);
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
 
-      // 验证退出时恢复了保存的位置和大小
-      expect(driver.calls,
-          contains('setBounds(Offset(200.0, 150.0), Size(1000.0, 700.0))'));
-    });
+        // 验证退出时恢复了保存的位置和大小
+        expect(
+          driver.calls,
+          contains('setBounds(Offset(200.0, 150.0), Size(1000.0, 700.0))'),
+        );
+      },
+    );
 
     // FS-REG-007: 副屏位置恢复 — 自定义 position
     test('FS-REG-007: secondary display position is restored', () async {
@@ -248,8 +258,10 @@ void main() {
       await adapter.setFullscreen(false);
 
       // 验证恢复了副屏位置
-      expect(driver.calls,
-          contains('setBounds(Offset(2560.0, 300.0), Size(1920.0, 1080.0))'));
+      expect(
+        driver.calls,
+        contains('setBounds(Offset(2560.0, 300.0), Size(1920.0, 1080.0))'),
+      );
     });
 
     // FS-REG-008: 错误事件通知 — enter 失败时进入 error 状态

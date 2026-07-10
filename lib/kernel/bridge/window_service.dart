@@ -160,6 +160,12 @@ class WindowService with WindowListener implements WindowBridge {
               ? WindowMode.windowed
               : WindowMode.fullscreen;
         });
+      case SyncCorrected(actual: final actual):
+        _updateOnUIThread(() {
+          _state.mode.value = actual == FullscreenMode.windowed
+              ? WindowMode.windowed
+              : WindowMode.fullscreen;
+        });
       default:
         break;
     }
@@ -262,7 +268,6 @@ class WindowService with WindowListener implements WindowBridge {
     logBridge.i('onWindowClose() — saving geometry');
     _resizeDebounce?.cancel();
     _resizeEndTimer?.cancel();
-    _disposed = true;
     _saveGeometry().whenComplete(() {
       dispose();
       windowManager.destroy();
@@ -286,6 +291,10 @@ class WindowService with WindowListener implements WindowBridge {
         } else if (_state.mode.value == WindowMode.maximized) {
           await windowManager.unmaximize();
           // OS 回调 onWindowUnmaximize 驱动 mode
+        } else if (_fullscreenAdapter == null) {
+          // Legacy fallback 必须与进入路径对称，否则进入后无法退出。
+          await fullScreenWindow.setFullScreen(false);
+          _state.mode.value = WindowMode.windowed;
         }
       case WindowMode.maximized:
         await windowManager.maximize();
@@ -302,7 +311,7 @@ class WindowService with WindowListener implements WindowBridge {
           // TODO(ARCH-03): v1.2 移除此分支 — D-46: RC 后 2 版本内无 blocker 则删除
           // @deprecated(v1.2) — 旧 fullscreen_window 直连，保留为 fallback。新实现通过 FullscreenAdapter。
           await fullScreenWindow.setFullScreen(true);
-          // OS 回调 onWindowEnterFullScreen 驱动 mode
+          _state.mode.value = WindowMode.fullscreen;
         }
     }
   }

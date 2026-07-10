@@ -24,11 +24,25 @@ class ControlBar extends StatelessWidget {
     border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
     boxShadow: const [
       // CSS: inset 0 1px 0 rgba(255,255,255,0.04) — 顶部内高光
-      BoxShadow(color: Tokens.controlBarBorderWhite, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
+      BoxShadow(
+        color: Tokens.controlBarBorderWhite,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, -1),
+      ),
       // CSS: inset 0 -1px 0 rgba(0,0,0,0.1) — 底部内阴影
-      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      BoxShadow(
+        color: Tokens.controlBarShadowBlack,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, 1),
+      ),
       // CSS: 0 8px 32px rgba(0,0,0,0.25) — 外层投影
-      BoxShadow(color: Tokens.controlBarOuterShadow, blurRadius: 32, offset: Offset(0, 8)),
+      BoxShadow(
+        color: Tokens.controlBarOuterShadow,
+        blurRadius: 32,
+        offset: Offset(0, 8),
+      ),
       // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
       BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
     ],
@@ -40,8 +54,18 @@ class ControlBar extends StatelessWidget {
     borderRadius: ControlBar._borderRadius,
     border: Border.all(color: Tokens.controlBarBorderIdle, width: 1),
     boxShadow: const [
-      BoxShadow(color: Tokens.controlBarBorderIdle, blurRadius: 0, spreadRadius: 0, offset: Offset(0, -1)),
-      BoxShadow(color: Tokens.controlBarShadowBlack, blurRadius: 0, spreadRadius: 0, offset: Offset(0, 1)),
+      BoxShadow(
+        color: Tokens.controlBarBorderIdle,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, -1),
+      ),
+      BoxShadow(
+        color: Tokens.controlBarShadowBlack,
+        blurRadius: 0,
+        spreadRadius: 0,
+        offset: Offset(0, 1),
+      ),
       // 补齐 4 个 BoxShadow，让 DecorationTween 插值更平滑（D-04）
       BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
       BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
@@ -110,7 +134,7 @@ class ControlBar extends StatelessWidget {
           child: Stack(
             children: [
               // CSS .player-controls::before — 顶部渐变光线
-              Positioned(
+              const Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
@@ -118,7 +142,7 @@ class ControlBar extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: const [
+                      colors: [
                         Tokens.glowTransparent,
                         Tokens.glowAccent,
                         Tokens.glowTransparent,
@@ -188,10 +212,7 @@ class ControlBar extends StatelessWidget {
     // P1 优化：移除 ColorFilter.matrix 饱和度矩阵（每帧 GPU pass）
     Widget withBlur(Widget child) => ClipRRect(
       borderRadius: _borderRadius,
-      child: BackdropFilter(
-        filter: GlassTier.normal.blurFilter,
-        child: child,
-      ),
+      child: BackdropFilter(filter: GlassTier.normal.blurFilter, child: child),
     );
 
     final op = opacity;
@@ -245,10 +266,7 @@ class _LeftButtonGroup extends StatelessWidget {
   final EngineState engine;
   final PlayerActions actions;
 
-  const _LeftButtonGroup({
-    required this.engine,
-    required this.actions,
-  });
+  const _LeftButtonGroup({required this.engine, required this.actions});
 
   @override
   Widget build(BuildContext context) {
@@ -275,9 +293,7 @@ class _LeftButtonGroup extends StatelessWidget {
 class _RightButtonGroup extends StatelessWidget {
   final PlayerActions actions;
 
-  const _RightButtonGroup({
-    required this.actions,
-  });
+  const _RightButtonGroup({required this.actions});
 
   @override
   Widget build(BuildContext context) {
@@ -322,4 +338,3 @@ class _RightButtonGroup extends StatelessWidget {
     );
   }
 }
-

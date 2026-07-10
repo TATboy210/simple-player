@@ -5,9 +5,6 @@ import 'package:flutter/foundation.dart';
 import '../../kernel/engine/engine_state.dart';
 
 import 'engine_constants.dart';
-import 'engine_event_log.dart';
-import 'engine_metrics.dart';
-import 'media_state.dart';
 import '../utils/log.dart';
 import '../utils/path_utils.dart';
 
@@ -150,8 +147,10 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     position.value = 0;
     buffered.value = _mediaInfo.duration; // 模拟已全部缓冲
     errorMessage.value = null;
-    logEngine.i('[Mock] open() success — ${PathUtils.basename(path)} '
-        '${_mediaInfo.duration}ms');
+    logEngine.i(
+      '[Mock] open() success — ${PathUtils.basename(path)} '
+      '${_mediaInfo.duration}ms',
+    );
 
     if (autoPlay) {
       play();
@@ -226,7 +225,10 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   @override
   void setPlaybackRate(double rate) {
     if (_disposed) return;
-    playbackSpeed.value = rate.clamp(EngineConstants.minPlaybackRate, EngineConstants.maxPlaybackRate);
+    playbackSpeed.value = rate.clamp(
+      EngineConstants.minPlaybackRate,
+      EngineConstants.maxPlaybackRate,
+    );
   }
 
   @override
@@ -358,10 +360,7 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       'playbackSpeed': playbackSpeed.value,
       'aspectRatio': aspectRatio.value,
       'errorMessage': errorMessage.value ?? '',
-      'config': {
-        'openDelay': openDelay.inMilliseconds,
-        'autoPlay': autoPlay,
-      },
+      'config': {'openDelay': openDelay.inMilliseconds, 'autoPlay': autoPlay},
       'stateHistory': _stateHistory.map((s) => s.name).toList(),
       'eventHistory': _eventHistory.map((e) => e.toJson()).toList(),
       'eventCount': _eventHistory.length,
@@ -375,22 +374,19 @@ class MockEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   /// 播放时每 250ms 递增 position，模拟真实播放
   void _startPositionTimer() {
     _stopPositionTimer();
-    _positionTimer = Timer.periodic(
-      const Duration(milliseconds: 250),
-      (_) {
-        if (_disposed) return;
-        final next = position.value + (250 * playbackSpeed.value).round();
-        if (next >= duration.value) {
-          position.value = duration.value;
-          _stopPositionTimer();
-          _recordState(MediaState.completed);
-          state.value = MediaState.completed;
-          logEngine.d('[Mock] playback completed');
-        } else {
-          position.value = next;
-        }
-      },
-    );
+    _positionTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (_disposed) return;
+      final next = position.value + (250 * playbackSpeed.value).round();
+      if (next >= duration.value) {
+        position.value = duration.value;
+        _stopPositionTimer();
+        _recordState(MediaState.completed);
+        state.value = MediaState.completed;
+        logEngine.d('[Mock] playback completed');
+      } else {
+        position.value = next;
+      }
+    });
   }
 
   void _stopPositionTimer() {

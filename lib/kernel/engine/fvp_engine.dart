@@ -12,7 +12,6 @@ import 'engine_event_log.dart';
 import 'engine_metrics.dart';
 import 'fvp_callback_handler.dart';
 import 'media_opener.dart';
-import 'media_state.dart';
 import 'open_result.dart';
 import 'player_proxy.dart';
 import 'position_poller.dart';
@@ -209,9 +208,7 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     final current = state.value;
     if (!current.canTransitionTo(next)) {
       assert(() {
-        debugPrint(
-          '⚠️ FvpEngine.$caller: illegal transition $current → $next',
-        );
+        debugPrint('⚠️ FvpEngine.$caller: illegal transition $current → $next');
         return true;
       }());
       if (!kDebugMode) return;
@@ -273,9 +270,11 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
           _errorType = MediaErrorType.unknown;
           errorMessage.value = null;
           metrics.recordOpen(success: true);
-          logEngine.i('open() success — ${PathUtils.basename(trimmed)} '
-              '${video?.width}x${video?.height} '
-              '${mediaInfo.duration}ms');
+          logEngine.i(
+            'open() success — ${PathUtils.basename(trimmed)} '
+            '${video?.width}x${video?.height} '
+            '${mediaInfo.duration}ms',
+          );
         case OpenError(:final type, :final message):
           // 错误恢复：codec 错误且非 URL 时尝试软解降级
           if (type == MediaErrorType.codec && !PathValidator.isUrl(trimmed)) {
@@ -293,7 +292,9 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
           _errorType = type;
           errorMessage.value = message;
           metrics.recordOpen(success: false);
-          logEngine.e('open() error — ${PathUtils.basename(trimmed)}: $message');
+          logEngine.e(
+            'open() error — ${PathUtils.basename(trimmed)}: $message',
+          );
       }
     } on Exception catch (e) {
       _safeSetState(MediaState.error, 'open');

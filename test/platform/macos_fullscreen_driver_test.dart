@@ -7,7 +7,6 @@
 // 窗口管理方法的委托由编译器保证类型安全。
 
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -128,21 +127,23 @@ void main() {
     // ─── 原生回调桥接 (D-P09) ───
 
     group('native callback bridge (D-P09)', () {
-      test('forwards plugin onFullScreenChanged to onNativeStateChanged',
-          () async {
-        final List<(int, bool)> callbacks = [];
-        driver.onNativeStateChanged = (windowId, isFullscreen) {
-          callbacks.add((windowId, isFullscreen));
-        };
+      test(
+        'forwards plugin onFullScreenChanged to onNativeStateChanged',
+        () async {
+          final List<(int, bool)> callbacks = [];
+          driver.onNativeStateChanged = (windowId, isFullscreen) {
+            callbacks.add((windowId, isFullscreen));
+          };
 
-        // 模拟 NSWindowDelegate windowDidEnterFullScreen 回调
-        plugin.controller.add(true);
-        await Future<void>.delayed(Duration.zero);
+          // 模拟 NSWindowDelegate windowDidEnterFullScreen 回调
+          plugin.controller.add(true);
+          await Future<void>.delayed(Duration.zero);
 
-        expect(callbacks, hasLength(1));
-        expect(callbacks[0].$1, 0); // windowId=0 单窗口
-        expect(callbacks[0].$2, true); // isFullscreen
-      });
+          expect(callbacks, hasLength(1));
+          expect(callbacks[0].$1, 0); // windowId=0 单窗口
+          expect(callbacks[0].$2, true); // isFullscreen
+        },
+      );
 
       test('forwards exit-fullscreen callback', () async {
         final List<(int, bool)> callbacks = [];

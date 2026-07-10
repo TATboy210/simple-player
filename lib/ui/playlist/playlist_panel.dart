@@ -183,7 +183,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                 child: widget.resizing != null
                     ? AnimatedBuilder(
                         animation: widget.resizing!,
-                        builder: (_, __) {
+                        builder: (_, _) {
                           final resizing = widget.resizing;
                           if (resizing != null && resizing.value) {
                             return ClipRRect(
