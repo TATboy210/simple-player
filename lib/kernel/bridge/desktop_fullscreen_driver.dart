@@ -100,4 +100,12 @@ class DesktopFullscreenDriver implements FullscreenDriver {
   FullscreenCapability capabilities() {
     return const FullscreenCapability();
   }
+
+  @override
+  void clearMonitorCache() {
+    // 通用 fallback 驱动无显示器缓存
+  }
+
+  @override
+  void dispose() {}
 }

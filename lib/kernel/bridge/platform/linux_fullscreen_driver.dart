@@ -43,11 +43,9 @@ class LinuxFullscreenDriver implements FullscreenDriver {
   ///
   /// [plugin] fullscreen_window 插件平台接口，用于全屏操作和回调。
   /// [wm] window_manager 窗口管理器，用于其他窗口操作。
-  LinuxFullscreenDriver({
-    FullScreenWindowPlatform? plugin,
-    WindowManager? wm,
-  })  : _plugin = plugin ?? FullScreenWindowPlatform.instance,
-        _wm = wm ?? windowManager {
+  LinuxFullscreenDriver({FullScreenWindowPlatform? plugin, WindowManager? wm})
+    : _plugin = plugin ?? FullScreenWindowPlatform.instance,
+      _wm = wm ?? windowManager {
     // 订阅原生回调流 (D-P12)
     // window-state-event 信号通过 MethodChannel 到达此流
     _stateStreamSub = _plugin.onFullScreenChanged.listen((isFullscreen) {
@@ -91,7 +89,8 @@ class LinuxFullscreenDriver implements FullscreenDriver {
   static String _detectWindowManager() {
     final sessionType = Platform.environment['XDG_SESSION_TYPE'] ?? 'unknown';
     final desktop = Platform.environment['XDG_CURRENT_DESKTOP'] ?? '';
-    final wmName = Platform.environment['GDMSESSION'] ??
+    final wmName =
+        Platform.environment['GDMSESSION'] ??
         Platform.environment['DESKTOP_SESSION'] ??
         '';
     return 'session=$sessionType, desktop=$desktop, wm=$wmName';
@@ -138,9 +137,7 @@ class LinuxFullscreenDriver implements FullscreenDriver {
       try {
         return await _wm.isFullScreen();
       } on Exception catch (e2) {
-        debugPrint(
-          '[LinuxFullscreenDriver] wm.isFullScreen also failed: $e2',
-        );
+        debugPrint('[LinuxFullscreenDriver] wm.isFullScreen also failed: $e2');
         return false;
       }
     }
@@ -201,7 +198,8 @@ class LinuxFullscreenDriver implements FullscreenDriver {
       supportsMultiDisplay: true,
       supportsExclusive: false,
       requiresUserGesture: false,
-      platformNotes: 'GTK fullscreen via fullscreen_window plugin. '
+      platformNotes:
+          'GTK fullscreen via fullscreen_window plugin. '
           'WM: $_wmInfo. '
           'Three-tier confirmation (callback -> poll -> timeout). '
           'Tiling WMs (i3, Sway) may have non-standard behavior.',
@@ -210,7 +208,12 @@ class LinuxFullscreenDriver implements FullscreenDriver {
 
   // ─── Lifecycle ───
 
+  /// Linux 驱动无显示器缓存。
+  @override
+  void clearMonitorCache() {}
+
   /// 释放资源 — 取消流订阅。
+  @override
   void dispose() {
     _stateStreamSub?.cancel();
     _stateStreamSub = null;
