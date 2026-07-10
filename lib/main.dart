@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'kernel/bridge/desktop_fullscreen_adapter.dart';
-import 'kernel/bridge/desktop_fullscreen_driver.dart';
+import 'kernel/bridge/desktop_fullscreen_driver_factory.dart';
 import 'kernel/bridge/fullscreen_adapter.dart';
 import 'kernel/bridge/window_service.dart';
 import 'kernel/engine/engine_prewarm.dart';
@@ -29,6 +29,12 @@ const bool _useNewFullscreen = bool.fromEnvironment(
   defaultValue: false,
 );
 
+// 编译期开关: --dart-define=USE_WINDOWS_NATIVE_FULLSCREEN=true 启用 Windows FFI 驱动 (D-P03)。
+// 仅在 USE_NEW_FULLSCREEN=true 时生效。
+// 默认 false，Windows 使用 window_manager 包装。
+// macOS/Linux 始终使用各自的平台驱动，此 flag 仅影响 Windows。
+// 此 flag 由 DesktopFullscreenDriverFactory 内部读取 (bool.fromEnvironment)。
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initLog();
@@ -38,13 +44,13 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   SettingsStore.prewarm(prefs);
 
-  // P0-4 初始化顺序 (冻结，无循环依赖):
-  //   1. DesktopFullscreenDriver()        ← 纯 windowManager API
-  //   2. DesktopFullscreenAdapter(driver)  ← 持有 driver
-  //   3. WindowService(fullscreenAdapter)  ← 转发全屏操作
+  // P0-4 初始化顺序 (Phase C 更新):
+  //   1. DesktopFullscreenDriverFactory.create() ← 每平台最优驱动 (D-P02)
+  //   2. DesktopFullscreenAdapter(driver)         ← 持有 driver + 回调转发 (D-P11)
+  //   3. WindowService(fullscreenAdapter)         ← 转发全屏操作
   FullscreenAdapter? fullscreenAdapter;
   if (_useNewFullscreen) {
-    final driver = DesktopFullscreenDriver();
+    final driver = DesktopFullscreenDriverFactory.create();
     fullscreenAdapter = DesktopFullscreenAdapter(driver);
   }
 

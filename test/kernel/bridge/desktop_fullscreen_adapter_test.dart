@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
+import 'package:simple_player_flutter/kernel/models/fullscreen_capability.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_error.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_event.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_snapshot.dart';
@@ -89,6 +90,21 @@ class MockFullscreenDriver implements FullscreenDriver {
   Future<bool> isMinimized() async {
     calls.add('isMinimized()');
     return minimizedState;
+  }
+
+  /// 记录原生回调设置。
+  void Function(int windowId, bool isFullscreen)? nativeCallback;
+
+  @override
+  set onNativeStateChanged(
+    void Function(int windowId, bool isFullscreen)? callback,
+  ) {
+    nativeCallback = callback;
+  }
+
+  @override
+  FullscreenCapability capabilities() {
+    return const FullscreenCapability();
   }
 }
 
