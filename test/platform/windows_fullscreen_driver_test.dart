@@ -278,6 +278,152 @@ void main() {
       });
     });
 
+    // ─── enterFullscreenFast ───
+
+    group('enterFullscreenFast', () {
+      test('uses fewer FFI calls than enterFullscreen', () async {
+        // 标准路径: 11 FFI calls (含 2 次诊断回读)
+        await driver.enterFullscreen();
+        final standardCalls = List<String>.from(api.calls);
+        api.calls.clear();
+
+        // 快速路径: 9 FFI calls (跳过诊断回读)
+        final driver2 = WindowsFullscreenDriver(api: api);
+        await driver2.enterFullscreenFast();
+        final fastCalls = List<String>.from(api.calls);
+
+        // 快速路径应比标准路径少 2 次 getWindowLong (诊断回读)
+        final standardGetLong =
+            standardCalls.where((c) => c.startsWith('getWindowLong')).length;
+        final fastGetLong =
+            fastCalls.where((c) => c.startsWith('getWindowLong')).length;
+        expect(fastGetLong, lessThan(standardGetLong));
+        // 标准路径 4 次 getWindowLong，快速路径 2 次
+        expect(standardGetLong, 4);
+        expect(fastGetLong, 2);
+      });
+
+      test('still strips WS_THICKFRAME, WS_CAPTION, and WS_MAXIMIZE', () async {
+        await driver.enterFullscreenFast();
+
+        expect(api.lastSetStyle, isNotNull);
+        expect(api.lastSetStyle! & wsThickframe, 0);
+        expect(api.lastSetStyle! & wsCaption, 0);
+        expect(api.lastSetStyle! & wsMaximize, 0);
+      });
+
+      test('still sets WS_EX_TOPMOST', () async {
+        await driver.enterFullscreenFast();
+
+        expect(api.lastSetExStyle, isNotNull);
+        expect(api.lastSetExStyle! & wsExTopmost, wsExTopmost);
+      });
+
+      test('sets HWND_TOPMOST via setWindowPos', () async {
+        await driver.enterFullscreenFast();
+
+        expect(api.lastSetWindowPosInsertAfter, hwndTopmost);
+      });
+
+      test('saves placement before modifying styles', () async {
+        await driver.enterFullscreenFast();
+
+        final placementIdx =
+            api.calls.indexWhere((c) => c.startsWith('getWindowPlacement'));
+        final setStyleIdx =
+            api.calls.indexWhere((c) => c.startsWith('setWindowLong'));
+        expect(placementIdx, lessThan(setStyleIdx));
+      });
+
+      test('does nothing when HWND is 0', () async {
+        api.hwnd = 0;
+        await driver.enterFullscreenFast();
+
+        expect(api.lastSetStyle, isNull);
+        expect(api.lastSetExStyle, isNull);
+      });
+    });
+
+    // ─── leaveFullscreenFast ───
+
+    group('leaveFullscreenFast', () {
+      test('restores original window style', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        final setStyleCalls =
+            api.calls.where((c) => c.startsWith('setWindowLong')).toList();
+        // leave 恢复 style + exStyle = 2 次
+        expect(setStyleCalls.length, 2);
+      });
+
+      test('clears TopMost via HWND_NOTOPMOST', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        expect(
+          api.calls.any(
+              (c) => c.startsWith('setWindowPos') && c.contains('$hwndNotopmost')),
+          isTrue,
+        );
+      });
+
+      test('restores window placement', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        expect(
+          api.calls.any((c) => c.startsWith('setWindowPlacement')),
+          isTrue,
+        );
+      });
+
+      test('recovers focus when window is visible and not iconic', () async {
+        api.visible = true;
+        api.iconic = false;
+
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        expect(
+          api.calls.any((c) => c.startsWith('setForegroundWindow')),
+          isTrue,
+        );
+      });
+
+      test('skips focus recovery when window is not visible', () async {
+        api.visible = false;
+
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        expect(
+          api.calls.any((c) => c.startsWith('setForegroundWindow')),
+          isFalse,
+        );
+      });
+
+      test('does nothing when HWND is 0', () async {
+        api.hwnd = 0;
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        expect(api.calls.where((c) => c.startsWith('setWindowLong')), isEmpty);
+      });
+    });
+
     // ─── leaveFullscreen ───
 
     group('leaveFullscreen', () {
