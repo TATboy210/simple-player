@@ -109,10 +109,10 @@ Plans:
 
 Plans:
 
-- [ ] 03-01-PLAN.md — WindowsFullscreenDriver (Win32 FFI: WS_THICKFRAME 剥离 + 焦点恢复 + TopMost 清理)
-- [ ] 03-02-PLAN.md — macOSFullscreenDriver (fullscreen_window 插件 + NSWindowDelegate 回调确认)
-- [ ] 03-03-PLAN.md — LinuxFullscreenDriver (fullscreen_window 插件 + window-state-event 信号 + WM 检测)
-- [ ] 03-04-PLAN.md — DesktopFullscreenDriverFactory + capabilities() + 集成接线
+- [x] 03-01-PLAN.md — WindowsFullscreenDriver (Win32 FFI: WS_THICKFRAME 剥离 + 焦点恢复 + TopMost 清理)
+- [x] 03-02-PLAN.md — macOSFullscreenDriver (fullscreen_window 插件 + NSWindowDelegate 回调确认)
+- [x] 03-03-PLAN.md — LinuxFullscreenDriver (fullscreen_window 插件 + window-state-event 信号 + WM 检测)
+- [x] 03-04-PLAN.md — DesktopFullscreenDriverFactory + capabilities() + 集成接线
 
 **Files to create/modify:**
 
