@@ -106,6 +106,33 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
+    testWidgets('16:9 ratio renders FittedBox with BoxFit.contain', (tester) async {
+      engine.textureId.value = 1;
+      engine.aspectRatio.value = 16 / 9;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 验证渲染链: SizedBox.expand → FittedBox(contain) → Texture
+      expect(find.byType(FittedBox), findsOneWidget);
+      final fittedBox = tester.widget<FittedBox>(find.byType(FittedBox));
+      expect(fittedBox.fit, BoxFit.contain);
+      expect(fittedBox.alignment, Alignment.center);
+      expect(find.byType(Texture), findsOneWidget);
+    });
+
+    testWidgets('4:3 ratio renders with FittedBox and Texture', (tester) async {
+      engine.textureId.value = 1;
+      engine.aspectRatio.value = 4 / 3;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 4:3 横屏也应使用 FittedBox(contain) + Texture
+      expect(find.byType(FittedBox), findsOneWidget);
+      final fittedBox = tester.widget<FittedBox>(find.byType(FittedBox));
+      expect(fittedBox.fit, BoxFit.contain);
+      expect(find.byType(Texture), findsOneWidget);
+    });
+
     testWidgets('scroll on video does not change volume', (tester) async {
       engine.textureId.value = 1;
       engine.volume.value = 0.8;

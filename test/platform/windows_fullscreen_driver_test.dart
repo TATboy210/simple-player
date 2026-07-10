@@ -181,14 +181,15 @@ void main() {
     // ─── enterFullscreen ───
 
     group('enterFullscreen', () {
-      test('strips WS_THICKFRAME and WS_CAPTION from window style', () async {
+      test('strips WS_THICKFRAME, WS_CAPTION, and WS_MAXIMIZE from style', () async {
         await driver.enterFullscreen();
 
         // 验证 setWindowLong 被调用来修改样式
         expect(api.lastSetStyle, isNotNull);
-        // WS_THICKFRAME (0x00040000) 和 WS_CAPTION (0x00C00000) 应被剥离
+        // WS_THICKFRAME (0x00040000), WS_CAPTION (0x00C00000), WS_MAXIMIZE (0x01000000) 应全部被剥离
         expect(api.lastSetStyle! & wsThickframe, 0);
         expect(api.lastSetStyle! & wsCaption, 0);
+        expect(api.lastSetStyle! & wsMaximize, 0);
       });
 
       test('sets WS_EX_TOPMOST on extended style', () async {
@@ -227,6 +228,53 @@ void main() {
         final setStyleIdx =
             api.calls.indexWhere((c) => c.startsWith('setWindowLong'));
         expect(placementIdx, lessThan(setStyleIdx));
+      });
+
+      test('call order: setWindowLong → setWindowLong → getWindowLong (verify) → setWindowPos', () async {
+        await driver.enterFullscreen();
+
+        // 收集所有调用的索引，避免 indexOf 因重复字符串返回错误位置
+        final setLongIndices = <int>[];
+        final getLongIndices = <int>[];
+        int? posIndex;
+        for (var i = 0; i < api.calls.length; i++) {
+          if (api.calls[i].startsWith('setWindowLong')) setLongIndices.add(i);
+          if (api.calls[i].startsWith('getWindowLong')) getLongIndices.add(i);
+          if (api.calls[i].startsWith('setWindowPos')) posIndex = i;
+        }
+
+        // 2 次 setWindowLong (剥离 gwlStyle + 设置 gwlExStyle)
+        expect(setLongIndices.length, 2);
+        // 4 次 getWindowLong: 2 次保存初始样式 + 2 次诊断验证
+        expect(getLongIndices.length, 4);
+        expect(posIndex, isNotNull);
+
+        final lastSetIdx = setLongIndices.last;
+
+        // setWindowPos 应在最后一次 setWindowLong 之后
+        expect(posIndex, greaterThan(lastSetIdx));
+
+        // 第 3 和第 4 次 getWindowLong (诊断验证) 应在 setWindowLong 之后、setWindowPos 之前
+        expect(getLongIndices[2], greaterThan(lastSetIdx));
+        expect(posIndex, greaterThan(getLongIndices[3]));
+      });
+
+      test('diagnostic read-back confirms all border bits are cleared', () async {
+        // 设置初始样式包含所有边框位
+        api.style = wsCaption | wsThickframe | wsMaximize;
+        await driver.enterFullscreen();
+
+        // 进入全屏后读取的样式不应包含任何边框位
+        // lastSetStyle 是写入的值，诊断读取应确认边框已清除
+        expect(api.lastSetStyle, isNotNull);
+        expect(api.lastSetStyle! & (wsCaption | wsThickframe | wsMaximize), 0);
+
+        // 验证诊断 getWindowLong 被调用 (回读确认)
+        final verifyCalls = api.calls
+            .where((c) => c.startsWith('getWindowLong'))
+            .toList();
+        // 至少 4 次: 2 次保存初始样式 + 2 次诊断验证
+        expect(verifyCalls.length, greaterThanOrEqualTo(4));
       });
     });
 
