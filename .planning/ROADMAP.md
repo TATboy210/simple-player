@@ -105,12 +105,32 @@ Plans:
 5. 三端 E2E 测试脚本通过
 6. 主路径可日常使用
 
+**Plans:** 4 plans
+
+Plans:
+
+- [ ] 03-01-PLAN.md — WindowsFullscreenDriver (Win32 FFI: WS_THICKFRAME 剥离 + 焦点恢复 + TopMost 清理)
+- [ ] 03-02-PLAN.md — macOSFullscreenDriver (fullscreen_window 插件 + NSWindowDelegate 回调确认)
+- [ ] 03-03-PLAN.md — LinuxFullscreenDriver (fullscreen_window 插件 + window-state-event 信号 + WM 检测)
+- [ ] 03-04-PLAN.md — DesktopFullscreenDriverFactory + capabilities() + 集成接线
+
 **Files to create/modify:**
 
+- `lib/kernel/bridge/win32/win32_fullscreen_ffi.dart` (新建)
 - `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` (新建)
 - `lib/kernel/bridge/platform/macos_fullscreen_driver.dart` (新建)
 - `lib/kernel/bridge/platform/linux_fullscreen_driver.dart` (新建)
-- `test/platform/fullscreen_driver_test.dart` (新建)
+- `lib/kernel/bridge/desktop_fullscreen_driver_factory.dart` (新建)
+- `lib/kernel/bridge/fullscreen_driver.dart` (修改 — 添加 onNativeStateChanged + capabilities)
+- `lib/kernel/bridge/desktop_fullscreen_adapter.dart` (修改 — 回调转发)
+- `lib/main.dart` (修改 — 使用工厂)
+- `packages/fullscreen_window/macos/Classes/FullscreenWindowPlugin.{h,m}` (修改 — NSWindowDelegate)
+- `packages/fullscreen_window/linux/fullscreen_window_plugin.cc` (修改 — window-state-event)
+- `packages/fullscreen_window/lib/fullscreen_window_{method_channel,platform_interface}.dart` (修改 — 回调流)
+- `test/platform/windows_fullscreen_driver_test.dart` (新建)
+- `test/platform/macos_fullscreen_driver_test.dart` (新建)
+- `test/platform/linux_fullscreen_driver_test.dart` (新建)
+- `test/platform/fullscreen_driver_factory_test.dart` (新建)
 
 **Dependencies:** Phase B 完成
 **Risk:** High — macOS/Linux 平台行为不一致是最大风险
