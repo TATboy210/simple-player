@@ -54,6 +54,13 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// 内部全屏状态跟踪。
   bool _isFullscreen = false;
 
+  /// 显示器信息缓存 — key=monitor handle, value=monitor rect (T1)。
+  ///
+  /// 消除每次全屏时 monitorFromWindow + getMonitorRect 的重复 FFI 查询。
+  /// 仅在 WM_DISPLAYCHANGE 时通过 [clearMonitorCache] 刷新。
+  final Map<int, ({int left, int top, int right, int bottom})>
+      _cachedMonitorRects = {};
+
   // ─── 回调桥接 ───
 
   /// Windows FFI 驱动不需要原生回调机制 (D-P11)。
@@ -97,8 +104,11 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     _api.setWindowLong(
       hwnd,
       gwlExStyle,
-      _savedExStyle | wsExTopmost & ~(wsExDlgmodalframe |
-          wsExWindowedge | wsExClientedge | wsExStaticedge),
+      (_savedExStyle | wsExTopmost) &
+          ~(wsExDlgmodalframe |
+              wsExWindowedge |
+              wsExClientedge |
+              wsExStaticedge),
     );
 
     // 防御性验证: 确认样式已正确应用 (T-05-01)
@@ -118,11 +128,12 @@ class WindowsFullscreenDriver implements FullscreenDriver {
       );
     }
 
-    // 获取显示器区域并覆盖整个显示器
+    // 获取显示器区域并覆盖整个显示器 — 使用缓存减少 FFI (T1)
     final monitor = _api.monitorFromWindow(hwnd);
     if (monitor != 0) {
-      final rc = _api.getMonitorRect(monitor);
+      final rc = _cachedMonitorRects[monitor] ?? _api.getMonitorRect(monitor);
       if (rc != null) {
+        _cachedMonitorRects[monitor] = rc; // 写入缓存
         _api.setWindowPos(
           hwnd,
           hwndTopmost,
@@ -179,15 +190,22 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     _api.setWindowLong(
       hwnd,
       gwlExStyle,
-      _savedExStyle | wsExTopmost & ~(wsExDlgmodalframe |
-          wsExWindowedge | wsExClientedge | wsExStaticedge),
+      // 括号必须：& 优先级高于 |，不加括号会保留 _savedExStyle 的边框位
+      (_savedExStyle | wsExTopmost) &
+          ~(wsExDlgmodalframe |
+              wsExWindowedge |
+              wsExClientedge |
+              wsExStaticedge),
     );
 
-    // 原子位置更新 (3 FFI calls: monitor + rect + pos)
+    // 原子位置更新 — 使用缓存减少 FFI 调用 (T1)
+    // monitorFromWindow 仍需 FFI (依赖窗口位置)，
+    // getMonitorRect 结果缓存后可跳过 (2→1 FFI for display query)
     final monitor = _api.monitorFromWindow(hwnd);
     if (monitor != 0) {
-      final rc = _api.getMonitorRect(monitor);
+      final rc = _cachedMonitorRects[monitor] ?? _api.getMonitorRect(monitor);
       if (rc != null) {
+        _cachedMonitorRects[monitor] = rc; // 写入缓存
         _api.setWindowPos(
           hwnd,
           hwndTopmost,
@@ -220,21 +238,22 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     _api.setWindowLong(hwnd, gwlStyle, _savedStyle);
     _api.setWindowLong(hwnd, gwlExStyle, _savedExStyle);
 
-    // 清理 TopMost (1 FFI call)
+    // 清理 TopMost (1 FFI call) — 移除 SWP_FRAMECHANGED (T2)
+    // setWindowPlacement 已触发 WM_PAINT 布局刷新，此处只做 Z-order 清理
     _api.setWindowPos(
       hwnd,
       hwndNotopmost,
       0, 0, 0, 0,
-      swpNomove | swpNosize | swpNoownerzorder | swpFramechanged,
+      swpNomove | swpNosize | swpNoownerzorder,
     );
 
-    // 恢复窗口位置 (1 FFI call) — 触发 WM_PAINT 布局刷新
+    // 恢复窗口位置 (1 FFI call) — 同时触发 WM_PAINT 布局刷新
     if (_savedPlacement != null) {
       _api.setWindowPlacement(hwnd, _savedPlacement!);
       _freeSavedPlacement();
     }
 
-    // 焦点恢复 (1 FFI call) — 安全护栏
+    // 焦点恢复 — 安全护栏: 仅在窗口可见且未最小化时执行
     if (_api.isWindowVisible(hwnd) && !_api.isIconic(hwnd)) {
       _api.setForegroundWindow(hwnd);
       _api.setFocus(hwnd);
@@ -298,12 +317,41 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   @override
   Future<bool> queryFullscreen() async {
     final hwnd = _api.getFlutterHwnd();
-    // 优先使用 IsZoomed 查询真实状态
     if (hwnd != 0 && _api.isWindow(hwnd)) {
-      return _api.isZoomed(hwnd);
+      // T3: 验证实际窗口样式与 _isFullscreen 是否一致。
+      // WS_THICKFRAME 缺失 = 无边框全屏 (enterFullscreen 时剥离了它)。
+      // 如果外部操作 (Win+↑ 最大化等) 改变了样式，自动修正内部状态。
+      final currentStyle = _api.getWindowLong(hwnd, gwlStyle);
+      final actuallyFullscreen = currentStyle & wsThickframe == 0;
+
+      if (actuallyFullscreen != _isFullscreen) {
+        debugPrint(
+          '[WindowsFullscreenDriver] state desync: '
+          '_isFullscreen=$_isFullscreen, actual=$actuallyFullscreen. '
+          'Auto-correcting.',
+        );
+        _isFullscreen = actuallyFullscreen;
+      }
+
+      return _isFullscreen;
     }
     // HWND 无效时回退到内部状态
     return _isFullscreen;
+  }
+
+  @override
+  void dispose() {
+    _freeSavedPlacement();
+    _isFullscreen = false;
+  }
+
+  /// 清除显示器信息缓存 (T1)。
+  ///
+  /// WindowService 监听 WM_DISPLAYCHANGE 后通过 Adapter 调用此方法，
+  /// 确保下次全屏查询使用最新的显示器信息。
+  @override
+  void clearMonitorCache() {
+    _cachedMonitorRects.clear();
   }
 
   @override
