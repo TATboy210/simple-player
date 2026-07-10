@@ -158,9 +158,9 @@ Plans:
 
 Plans:
 
-- [ ] 04-01-PLAN.md — 回归测试矩阵（高风险套件 + 冒烟套件 + 矩阵文档）
-- [ ] 04-02-PLAN.md — CI/CD 流水线 + MSIX 打包配置
-- [ ] 04-03-PLAN.md — 旧实现废弃标记 + RC 版本号 + E2E 测试脚手架
+- [x] 04-01-PLAN.md — 回归测试矩阵（高风险套件 + 冒烟套件 + 矩阵文档）
+- [x] 04-02-PLAN.md — CI/CD 流水线 + MSIX 打包配置
+- [x] 04-03-PLAN.md — 旧实现废弃标记 + RC 版本号 + E2E 测试脚手架
 
 **Files to create/modify:**
 
