@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ffi' hide Size;
 import 'dart:ui';
 
-import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
@@ -107,21 +106,37 @@ class MockFullscreenDriver implements FullscreenDriver {
   }
 
   @override
+  void clearMonitorCache() {
+    calls.add('clearMonitorCache()');
+  }
+
+  @override
+  void dispose() {
+    calls.add('dispose()');
+  }
+
+  @override
   FullscreenCapability capabilities() {
     return const FullscreenCapability();
   }
 }
 
 /// Helper: 模拟原生回调确认进入全屏。
-void confirmEnter(MockFullscreenDriver driver, DesktopFullscreenAdapter adapter,
-    {int windowId = 0}) {
+void confirmEnter(
+  MockFullscreenDriver driver,
+  DesktopFullscreenAdapter adapter, {
+  int windowId = 0,
+}) {
   driver.fullscreenState = true;
   adapter.onNativeFullScreenChanged(windowId, true);
 }
 
 /// Helper: 模拟原生回调确认退出全屏。
-void confirmLeave(MockFullscreenDriver driver, DesktopFullscreenAdapter adapter,
-    {int windowId = 0}) {
+void confirmLeave(
+  MockFullscreenDriver driver,
+  DesktopFullscreenAdapter adapter, {
+  int windowId = 0,
+}) {
   driver.fullscreenState = false;
   adapter.onNativeFullScreenChanged(windowId, false);
 }
@@ -157,9 +172,15 @@ class MockWin32ApiForAdapter extends Win32FullscreenApiWrapper {
   @override
   int setWindowLong(int hwnd, int index, int value) => 0;
   @override
-  bool setWindowPos(int hwnd, int insertAfter, int x, int y, int cx, int cy,
-          int flags) =>
-      true;
+  bool setWindowPos(
+    int hwnd,
+    int insertAfter,
+    int x,
+    int y,
+    int cx,
+    int cy,
+    int flags,
+  ) => true;
   @override
   int monitorFromWindow(int hwnd) => 9999;
   @override
@@ -195,29 +216,31 @@ void main() {
 
     // ─── T12: enter → leave 流程: phase 变化 ───
 
-    test('T12: enter → leave — phase stable→entering→stable→leaving→stable',
-        () async {
-      final phases = <FullscreenPhase>[];
-      adapter.snapshot().addListener(() {
-        phases.add(adapter.snapshot().value.phase);
-      });
+    test(
+      'T12: enter → leave — phase stable→entering→stable→leaving→stable',
+      () async {
+        final phases = <FullscreenPhase>[];
+        adapter.snapshot().addListener(() {
+          phases.add(adapter.snapshot().value.phase);
+        });
 
-      scheduleMicrotask(() => confirmEnter(driver, adapter));
-      await adapter.setFullscreen(true);
+        scheduleMicrotask(() => confirmEnter(driver, adapter));
+        await adapter.setFullscreen(true);
 
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.snapshot().value.isFullscreen, isTrue);
 
-      scheduleMicrotask(() => confirmLeave(driver, adapter));
-      await adapter.setFullscreen(false);
+        scheduleMicrotask(() => confirmLeave(driver, adapter));
+        await adapter.setFullscreen(false);
 
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
 
-      expect(phases, contains(FullscreenPhase.entering));
-      expect(phases, contains(FullscreenPhase.leaving));
-      expect(phases.last, FullscreenPhase.stable);
-    });
+        expect(phases, contains(FullscreenPhase.entering));
+        expect(phases, contains(FullscreenPhase.leaving));
+        expect(phases.last, FullscreenPhase.stable);
+      },
+    );
 
     // ─── T13: maximized→enter→leave → 恢复 maximize() ───
 
@@ -237,40 +260,47 @@ void main() {
 
     // ─── T14: windowed→enter→leave → 恢复 position+size ───
 
-    test('T14: windowed → enter → leave — restores position and size', () async {
-      driver.currentPosition = const Offset(100, 200);
-      driver.currentSize = const Size(800, 600);
+    test(
+      'T14: windowed → enter → leave — restores position and size',
+      () async {
+        driver.currentPosition = const Offset(100, 200);
+        driver.currentSize = const Size(800, 600);
 
-      scheduleMicrotask(() => confirmEnter(driver, adapter));
-      await adapter.setFullscreen(true);
+        scheduleMicrotask(() => confirmEnter(driver, adapter));
+        await adapter.setFullscreen(true);
 
-      scheduleMicrotask(() => confirmLeave(driver, adapter));
-      await adapter.setFullscreen(false);
+        scheduleMicrotask(() => confirmLeave(driver, adapter));
+        await adapter.setFullscreen(false);
 
-      expect(driver.calls,
-          contains('setBounds(Offset(100.0, 200.0), Size(800.0, 600.0))'));
-    });
+        expect(
+          driver.calls,
+          contains('setBounds(Offset(100.0, 200.0), Size(800.0, 600.0))'),
+        );
+      },
+    );
 
     // ─── T15: StateDesync: snapshot 更新真实状态 + error 事件 ───
 
-    test('T15: StateDesync — snapshot updates to real state + error event',
-        () async {
-      final events = <FullscreenEvent>[];
-      adapter.events.listen(events.add);
+    test(
+      'T15: StateDesync — snapshot updates to real state + error event',
+      () async {
+        final events = <FullscreenEvent>[];
+        adapter.events.listen(events.add);
 
-      // 不触发回调，driver 状态保持 false → 轮询发现不匹配
-      driver.fullscreenState = false;
+        // 不触发回调，driver 状态保持 false → 轮询发现不匹配
+        driver.fullscreenState = false;
 
-      await adapter.setFullscreen(true);
+        await adapter.setFullscreen(true);
 
-      expect(adapter.snapshot().value.phase, FullscreenPhase.error);
-      expect(adapter.snapshot().value.effectiveMode, FullscreenMode.windowed);
-      expect(adapter.snapshot().value.lastError, isA<StateDesync>());
+        expect(adapter.snapshot().value.phase, FullscreenPhase.error);
+        expect(adapter.snapshot().value.effectiveMode, FullscreenMode.windowed);
+        expect(adapter.snapshot().value.lastError, isA<StateDesync>());
 
-      final errorEvents = events.whereType<FullscreenErrorEvent>().toList();
-      expect(errorEvents, isNotEmpty);
-      expect(errorEvents.first.error, isA<StateDesync>());
-    });
+        final errorEvents = events.whereType<FullscreenErrorEvent>().toList();
+        expect(errorEvents, isNotEmpty);
+        expect(errorEvents.first.error, isA<StateDesync>());
+      },
+    );
 
     // ─── T16: error 状态下新操作自动清理 ───
 
@@ -413,8 +443,10 @@ void main() {
       scheduleMicrotask(() => confirmLeave(driver, adapter));
       await adapter.setFullscreen(false);
 
-      expect(driver.calls,
-          contains('setBounds(Offset(2000.0, 100.0), Size(1920.0, 1080.0))'));
+      expect(
+        driver.calls,
+        contains('setBounds(Offset(2000.0, 100.0), Size(1920.0, 1080.0))'),
+      );
     });
 
     // ─── T26: 副屏不可用 → 降级 center ───
@@ -429,8 +461,9 @@ void main() {
       scheduleMicrotask(() => confirmLeave(driver, adapter));
       await adapter.setFullscreen(false);
 
-      final setBoundsCalls =
-          driver.calls.where((c) => c.startsWith('setBounds')).toList();
+      final setBoundsCalls = driver.calls
+          .where((c) => c.startsWith('setBounds'))
+          .toList();
       expect(setBoundsCalls, isNotEmpty);
     });
 
@@ -470,6 +503,51 @@ void main() {
       adapter.dispose();
       adapter.dispose(); // 不应崩溃
     });
+
+    // ─── T4: 乐观更新测试 ───
+
+    test('T4: effectiveMode updates to target mode during entering phase', () async {
+      final phases = <FullscreenPhase>[];
+      final modes = <FullscreenMode>[];
+      adapter.snapshot().addListener(() {
+        phases.add(adapter.snapshot().value.phase);
+        modes.add(adapter.snapshot().value.effectiveMode);
+      });
+
+      scheduleMicrotask(() => confirmEnter(driver, adapter));
+      await adapter.setFullscreen(true);
+
+      // entering 阶段 effectiveMode 应已设置为目标模式 (T4 乐观更新)
+      final enteringIdx = phases.indexOf(FullscreenPhase.entering);
+      expect(enteringIdx, greaterThanOrEqualTo(0));
+      expect(modes[enteringIdx], FullscreenMode.borderless);
+    });
+
+    test('T4: isFullscreen stays false during entering (phase guard)', () async {
+      bool? isFullscreenDuringEntering;
+      adapter.snapshot().addListener(() {
+        if (adapter.snapshot().value.phase == FullscreenPhase.entering) {
+          isFullscreenDuringEntering = adapter.snapshot().value.isFullscreen;
+        }
+      });
+
+      scheduleMicrotask(() => confirmEnter(driver, adapter));
+      await adapter.setFullscreen(true);
+
+      // isFullscreen 需要 phase=stable，entering 时应为 false
+      expect(isFullscreenDuringEntering, isFalse);
+    });
+
+    test('T4: enterRequested event fires with targetMode before driver call', () async {
+      final events = <FullscreenEvent>[];
+      adapter.events.listen(events.add);
+
+      scheduleMicrotask(() => confirmEnter(driver, adapter));
+      await adapter.setFullscreen(true);
+
+      final enterReq = events.whereType<EnterRequested>().first;
+      expect(enterReq.targetMode, FullscreenMode.borderless);
+    });
   });
 
   // ─── Windows 快速路径测试 (PERF-01/02) ───
@@ -487,47 +565,58 @@ void main() {
       adapter.dispose();
     });
 
-    test('enter uses enterFullscreenFast when driver is WindowsFullscreenDriver',
-        () async {
-      await adapter.setFullscreen(true);
+    test(
+      'enter uses enterFullscreenFast when driver is WindowsFullscreenDriver',
+      () async {
+        await adapter.setFullscreen(true);
 
-      expect(winDriver.fastCalls, contains(contains('enterFullscreenFast')));
-      // 不应调用标准 enterFullscreen
-      expect(
-        winDriver.fastCalls.any((c) => c == 'enterFullscreen(displayId: 0)'),
-        isFalse,
-      );
-    });
+        expect(winDriver.fastCalls, contains(contains('enterFullscreenFast')));
+        // 不应调用标准 enterFullscreen
+        expect(
+          winDriver.fastCalls.any((c) => c == 'enterFullscreen(displayId: 0)'),
+          isFalse,
+        );
+      },
+    );
 
-    test('leave uses leaveFullscreenFast when driver is WindowsFullscreenDriver',
-        () async {
-      // 先进入全屏
-      await adapter.setFullscreen(true);
-      winDriver.fastCalls.clear();
+    test(
+      'leave uses leaveFullscreenFast when driver is WindowsFullscreenDriver',
+      () async {
+        // 先进入全屏
+        await adapter.setFullscreen(true);
+        winDriver.fastCalls.clear();
 
-      await adapter.setFullscreen(false);
+        await adapter.setFullscreen(false);
 
-      expect(winDriver.fastCalls, contains(contains('leaveFullscreenFast')));
-    });
+        expect(winDriver.fastCalls, contains(contains('leaveFullscreenFast')));
+      },
+    );
 
-    test('snapshot updates to stable immediately after fast path enter',
-        () async {
-      await adapter.setFullscreen(true);
+    test(
+      'snapshot updates to stable immediately after fast path enter',
+      () async {
+        await adapter.setFullscreen(true);
 
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
-      expect(adapter.snapshot().value.effectiveMode, FullscreenMode.borderless);
-    });
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.snapshot().value.isFullscreen, isTrue);
+        expect(
+          adapter.snapshot().value.effectiveMode,
+          FullscreenMode.borderless,
+        );
+      },
+    );
 
-    test('snapshot updates to stable immediately after fast path leave',
-        () async {
-      await adapter.setFullscreen(true);
-      await adapter.setFullscreen(false);
+    test(
+      'snapshot updates to stable immediately after fast path leave',
+      () async {
+        await adapter.setFullscreen(true);
+        await adapter.setFullscreen(false);
 
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-      expect(adapter.snapshot().value.effectiveMode, FullscreenMode.windowed);
-    });
+        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.snapshot().value.effectiveMode, FullscreenMode.windowed);
+      },
+    );
 
     test('emits entered event on fast path enter', () async {
       final events = <FullscreenEvent>[];
