@@ -28,7 +28,14 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
   /// 创建 DesktopFullscreenAdapter。
   ///
   /// [driver] 平台全屏驱动，负责原生调用。
-  DesktopFullscreenAdapter(this._driver);
+  /// 构造时自动将 driver 的原生回调转发到 Adapter 确认信号 (D-P11)。
+  DesktopFullscreenAdapter(this._driver) {
+    // D-P11: 将 driver 的原生回调转发到 Adapter 的确认信号
+    // macOS: NSWindow delegate → onFullScreenChanged → _confirmByWindowId
+    // Linux: GdkWindow state-changed → onFullScreenChanged → _confirmByWindowId
+    // Windows: 无需此机制 (FFI 同步操作)
+    _driver.onNativeStateChanged = onNativeFullScreenChanged;
+  }
 
   /// 平台驱动 — 所有原生操作通过此接口转发 (P0-3)。
   final FullscreenDriver _driver;
