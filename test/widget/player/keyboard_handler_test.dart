@@ -195,10 +195,10 @@ void main() {
     testWidgets('null callbacks do not crash on key press', (tester) async {
       // 所有回调为 null — 按键不应抛异常
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: KeyboardHandler(
-              child: const SizedBox.expand(),
+              child: SizedBox.expand(),
             ),
           ),
         ),

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/video_tab.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
-import 'package:simple_player_flutter/ui/shared/section_header.dart';
 
 void main() {
   Widget buildTestWidget(Widget child) {

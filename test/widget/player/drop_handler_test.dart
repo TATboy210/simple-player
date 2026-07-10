@@ -160,7 +160,7 @@ void main() {
 
       final dropTarget = tester.widget<DropTarget>(find.byType(DropTarget));
       // 模拟拖入空文件列表
-      dropTarget.onDragDone?.call(DropDoneDetails(
+      dropTarget.onDragDone?.call(const DropDoneDetails(
         files: [],
         localPosition: Offset.zero,
         globalPosition: Offset.zero,

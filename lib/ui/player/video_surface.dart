@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
@@ -16,32 +15,32 @@ class VideoSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: Listenable.merge([engine.textureId, engine.aspectRatio]),
-          builder: (_, _) {
-            final id = engine.textureId.value;
-            final ratio = engine.aspectRatio.value;
-            final safeRatio = (ratio > 0 && ratio.isFinite) ? ratio : 16 / 9;
-            // 诊断日志: 记录视频宽高比 (全屏黑边排查用)
-            debugPrint(
-              '[VideoSurface] textureId=$id, ratio=${ratio.toStringAsFixed(3)}, '
-              'safeRatio=${safeRatio.toStringAsFixed(3)}',
-            );
-            return SizedBox.expand(
-              child: id == null
-                  ? const SizedBox.shrink()
-                  : FittedBox(
-                      fit: BoxFit.contain,
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
-                        height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
-                        child: Texture(textureId: id),
-                      ),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([engine.textureId, engine.aspectRatio]),
+        builder: (_, _) {
+          final id = engine.textureId.value;
+          final ratio = engine.aspectRatio.value;
+          final safeRatio = (ratio > 0 && ratio.isFinite) ? ratio : 16 / 9;
+          // 诊断日志: 记录视频宽高比 (全屏黑边排查用)
+          debugPrint(
+            '[VideoSurface] textureId=$id, ratio=${ratio.toStringAsFixed(3)}, '
+            'safeRatio=${safeRatio.toStringAsFixed(3)}',
+          );
+          return SizedBox.expand(
+            child: id == null
+                ? const SizedBox.shrink()
+                : FittedBox(
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: safeRatio >= 1 ? safeRatio * 1000 : 1000,
+                      height: safeRatio >= 1 ? 1000 : 1000 / safeRatio,
+                      child: Texture(textureId: id),
                     ),
-            );
-          },
-        ),
-      );
+                  ),
+          );
+        },
+      ),
+    );
   }
 }

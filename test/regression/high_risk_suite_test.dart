@@ -9,6 +9,8 @@
 ///
 /// 确认策略: 通过 Level-2 轮询确认（设置 driver.fullscreenState）。
 /// 每次 toggle/setFullscreen 前翻转 driver 状态，轮询首次命中（~100ms 延迟）。
+library;
+
 import 'dart:async';
 import 'dart:ui';
 
@@ -16,7 +18,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_capability.dart';
-import 'package:simple_player_flutter/kernel/models/fullscreen_error.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_snapshot.dart';
 
 // ─── 测试替身 ───

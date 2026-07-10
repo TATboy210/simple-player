@@ -153,8 +153,16 @@ class _WindowQueue {
 
     // 启动超时 Timer (D-13)
     command.timer = Timer(timeout, () {
+      if (_inFlight != command) return;
+      // 让后续请求不再等待一个已经超时的原生调用。
+      _inFlight = null;
       if (!command.completer.isCompleted) {
         command.completer.complete(false);
+      }
+      final next = _pending;
+      _pending = null;
+      if (next != null && !disposed && !next.completer.isCompleted) {
+        unawaited(_execute(next, timeout: timeout));
       }
     });
 
@@ -175,13 +183,14 @@ class _WindowQueue {
       }
     } finally {
       command.timer?.cancel();
-      _inFlight = null;
-
-      // 消费 pending — 但 disposed 后不 drain (P1-5)
-      final next = _pending;
-      _pending = null;
-      if (next != null && !disposed && !next.completer.isCompleted) {
-        unawaited(_execute(next, timeout: timeout));
+      // 超时回调可能已经把 in-flight 交给了下一个命令。
+      if (_inFlight == command) {
+        _inFlight = null;
+        final next = _pending;
+        _pending = null;
+        if (next != null && !disposed && !next.completer.isCompleted) {
+          unawaited(_execute(next, timeout: timeout));
+        }
       }
     }
   }
