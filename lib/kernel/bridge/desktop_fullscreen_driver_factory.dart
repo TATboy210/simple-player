@@ -15,7 +15,6 @@ import 'fullscreen_driver.dart';
 import 'platform/linux_fullscreen_driver.dart';
 import 'platform/macos_fullscreen_driver.dart';
 import 'platform/windows_fullscreen_driver.dart';
-import 'win32/win32_fullscreen_ffi.dart';
 
 /// 平台驱动工厂 — 根据 Platform.isXXX 选择具体 Driver (D-P01 混合策略 + D-P02 每平台一个 Driver)。
 ///
