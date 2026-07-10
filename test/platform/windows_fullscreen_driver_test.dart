@@ -291,7 +291,7 @@ void main() {
         final standardCalls = List<String>.from(api.calls);
         api.calls.clear();
 
-        // 快速路径: 9 FFI calls (跳过诊断回读)
+        // 快速路径: 6 FFI calls (跳过诊断回读, HWND cache miss on new driver)
         final driver2 = WindowsFullscreenDriver(api: api);
         await driver2.enterFullscreenFast();
         final fastCalls = List<String>.from(api.calls);
@@ -316,11 +316,12 @@ void main() {
         expect(api.lastSetStyle! & wsMaximize, 0);
       });
 
-      test('still sets WS_EX_TOPMOST', () async {
+      test('skips WS_EX_TOPMOST setWindowLong (setWindowPos handles Z-order)', () async {
         await driver.enterFullscreenFast();
 
-        expect(api.lastSetExStyle, isNotNull);
-        expect(api.lastSetExStyle! & wsExTopmost, wsExTopmost);
+        // fast path 不再设置 WS_EX_TOPMOST — setWindowPos(HWND_TOPMOST) 已处理
+        // lastSetExStyle 应为 null（无 setWindowLong(gwlExStyle) 调用）
+        expect(api.lastSetExStyle, isNull);
       });
 
       test('sets HWND_TOPMOST via setWindowPos', () async {
@@ -345,6 +346,27 @@ void main() {
 
         expect(api.lastSetStyle, isNull);
         expect(api.lastSetExStyle, isNull);
+      });
+
+      test('uses exactly 5 FFI calls on second toggle (same driver)', () async {
+        // First call: populate caches (HWND + HMONITOR)
+        await driver.enterFullscreenFast();
+        await driver.leaveFullscreenFast();
+        api.calls.clear();
+
+        // Third operation: HWND cached from previous calls, HMONITOR cached
+        await driver.enterFullscreenFast();
+
+        // Expected: getWindowLong x2 + getWindowPlacement + setWindowLong + setWindowPos = 5
+        // No getFlutterHwnd (HWND cached), no monitorFromWindow/getMonitorRect (HMONITOR cached)
+        expect(api.calls.length, 5,
+          reason: 'Same driver, second enter: HWND + HMONITOR both cached = 5 FFI');
+        expect(api.calls.where((c) => c.startsWith('getFlutterHwnd')), isEmpty,
+          reason: 'HWND should be cached');
+        expect(api.calls.where((c) => c.startsWith('monitorFromWindow')), isEmpty,
+          reason: 'HMONITOR should be cached');
+        expect(api.calls.where((c) => c.startsWith('getMonitorRect')), isEmpty,
+          reason: 'Monitor rect should be cached');
       });
     });
 
@@ -425,6 +447,25 @@ void main() {
         await driver.leaveFullscreenFast();
 
         expect(api.calls.where((c) => c.startsWith('setWindowLong')), isEmpty);
+      });
+
+      test('uses exactly 4 FFI calls with cached HWND (core path)', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        await driver.leaveFullscreenFast();
+
+        // Core path: setWindowLong x2 + setWindowPos + setWindowPlacement = 4
+        // Focus recovery adds 4 more (isWindowVisible, isIconic, setForegroundWindow, setFocus)
+        // Total = 8, but core leave logic = 4 FFI
+        expect(api.calls.where((c) => c.startsWith('getFlutterHwnd')), isEmpty,
+          reason: 'HWND should be cached');
+        expect(api.calls.where((c) => c.startsWith('setWindowLong')).length, 2,
+          reason: 'Restore style + exStyle = 2 setWindowLong');
+        expect(api.calls.where((c) => c.startsWith('setWindowPos')).length, 1,
+          reason: 'Clear TopMost = 1 setWindowPos');
+        expect(api.calls.where((c) => c.startsWith('setWindowPlacement')).length, 1,
+          reason: 'Restore placement = 1 setWindowPlacement');
       });
     });
 
@@ -642,17 +683,55 @@ void main() {
         expect(getRectCalls, isNotEmpty);
       });
 
-      test('monitorFromWindow still called every time (depends on window position)', () async {
+      test('HMONITOR cached — monitorFromWindow skipped on second call', () async {
         await driver.enterFullscreenFast();
         api.calls.clear();
 
         await driver.leaveFullscreenFast();
         await driver.enterFullscreenFast();
 
+        // HMONITOR 已缓存，第二次 enterFullscreenFast 应跳过 monitorFromWindow
         final monitorCalls = api.calls
             .where((c) => c.startsWith('monitorFromWindow'))
             .toList();
-        expect(monitorCalls.length, 1);
+        expect(monitorCalls, isEmpty);
+      });
+    });
+
+    // ─── HWND cache ───
+
+    group('HWND cache', () {
+      test('caches HWND after first getFlutterHwnd call', () async {
+        await driver.enterFullscreenFast();
+        final firstCallCount = api.calls.where((c) => c.startsWith('getFlutterHwnd')).length;
+        expect(firstCallCount, 1, reason: 'First call fetches HWND');
+
+        api.calls.clear();
+        await driver.leaveFullscreenFast();
+        final secondCallCount = api.calls.where((c) => c.startsWith('getFlutterHwnd')).length;
+        expect(secondCallCount, 0, reason: 'Second call uses cached HWND');
+      });
+
+      test('clearMonitorCache also clears HWND cache', () async {
+        await driver.enterFullscreenFast();
+        api.calls.clear();
+
+        driver.clearMonitorCache();
+
+        await driver.enterFullscreenFast();
+        expect(api.calls.where((c) => c.startsWith('getFlutterHwnd')).length, 1,
+          reason: 'After cache clear, HWND re-fetched');
+      });
+
+      test('dispose clears HWND cache', () async {
+        await driver.enterFullscreenFast();
+        driver.dispose();
+        api.calls.clear();
+
+        final driver2 = WindowsFullscreenDriver(api: api);
+        await driver2.enterFullscreenFast();
+        expect(api.calls.where((c) => c.startsWith('getFlutterHwnd')).length, 1,
+          reason: 'New driver instance fetches HWND after dispose cleared cache');
       });
     });
 
