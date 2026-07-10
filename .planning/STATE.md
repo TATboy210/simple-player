@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: fullscreen-optimization
-status: Phase 5 gap closure planned — 05-04-PLAN.md (HWND caching, FFI ≤5/4)
-stopped_at: context exhaustion at 75% (2026-07-10)
-last_updated: "2026-07-10T16:27:54.577Z"
+status: Phase 5 flicker fix planned — 05-05-PLAN.md (5 tasks, Flutter SDK 级修复)
+stopped_at: plan written, ready for implementation (2026-07-11)
+last_updated: "2026-07-11T00:00:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 4
+  total_plans: 5
   completed_plans: 3
   percent: 0
 ---
