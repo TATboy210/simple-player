@@ -58,7 +58,12 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
   ///
   /// key = windowId，value = 等待该窗口原生回调确认的 Completer。
   /// 防止多窗口并发时互相覆盖确认信号。
-  final Map<int, Completer<bool>> _confirmByWindowId = {};
+  final Map<int, _PendingConfirmation> _confirmByWindowId = {};
+
+  /// 单调递增的请求 ID — 防止迟到回调错误确认后续操作。
+  ///
+  /// 每次 _registerConfirmation 递增，回调必须匹配 windowId + requestId。
+  int _nextRequestId = 0;
 
   /// 已 dispose 标志。
   bool _disposed = false;
@@ -102,14 +107,6 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
       );
     }
 
-    // D-12: 正在过渡中 → BusyTransition
-    if (notifier.value.isTransitioning) {
-      _events.add(FullscreenEvent.error(
-        error: FullscreenError.busyTransition(notifier.value.phase),
-      ));
-      return;
-    }
-
     // 构造请求
     final request = fullscreen
         ? FullscreenRequest.enter(mode: mode, windowId: windowId)
@@ -148,12 +145,19 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
     if (_disposed) return;
     _disposed = true;
     _queue.dispose();
+    _driver.onNativeStateChanged = null;
+    _driver.dispose();
     _events.close();
     for (final notifier in _snapshots.values) {
       notifier.dispose();
     }
     _snapshots.clear();
     _restoreSnapshots.clear();
+    for (final pending in _confirmByWindowId.values) {
+      if (!pending.completer.isCompleted) {
+        pending.completer.complete(false);
+      }
+    }
     _confirmByWindowId.clear();
   }
 
@@ -163,9 +167,36 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
   ///
   /// P0-1: 按 windowId 隔离确认信号，只完成对应窗口的 Completer。
   void onNativeFullScreenChanged(int windowId, bool isFullscreen) {
-    final completer = _confirmByWindowId.remove(windowId);
-    if (completer != null && !completer.isCompleted) {
-      completer.complete(true);
+    if (_disposed) return;
+    final pending = _confirmByWindowId[windowId];
+    if (pending != null) {
+      // requestId 匹配才确认 — 拒绝迟到的旧回调 (P1-1)
+      if (pending.expectedFullscreen == isFullscreen &&
+          pending.requestId == _nextRequestId - 1) {
+        _confirmByWindowId.remove(windowId);
+        if (!pending.completer.isCompleted) {
+          pending.completer.complete(true);
+        }
+      }
+      // requestId 不匹配 → 过时回调，静默丢弃
+      return;
+    }
+
+    final notifier = _snapshotFor(windowId);
+    final previousMode = notifier.value.effectiveMode;
+    final actualMode = isFullscreen
+        ? FullscreenMode.borderless
+        : FullscreenMode.windowed;
+    notifier.value = notifier.value.copyWith(
+      phase: FullscreenPhase.stable,
+      effectiveMode: actualMode,
+      clearError: true,
+    );
+    if (previousMode != actualMode) {
+      _events.add(FullscreenEvent.forcedChange(
+        previousMode: previousMode,
+        actualMode: actualMode,
+      ));
     }
   }
 
@@ -207,8 +238,14 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
       await _captureRestoreSnapshot(request.windowId);
     }
 
-    // D-16: 命令开始执行时更新 phase
-    notifier.value = current.copyWith(phase: FullscreenPhase.entering);
+    // D-16 + T4: 命令开始执行时更新 phase + 乐观更新 effectiveMode。
+    // macOS/Linux 进入全屏有 ~700ms 动画延迟，提前设置 effectiveMode
+    // 使 UI 层收到 enterRequested 后可立即开始过渡动画，消除感知延迟。
+    // isFullscreen 仍为 false (phase=entering)，不会误触发全屏逻辑。
+    notifier.value = current.copyWith(
+      phase: FullscreenPhase.entering,
+      effectiveMode: request.mode,
+    );
     _events.add(FullscreenEvent.enterRequested(targetMode: request.mode));
 
     try {
@@ -230,7 +267,8 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
         return true;
       }
 
-      // macOS/Linux: 标准路径 + 三级确认链
+      // 先注册 waiter，避免原生调用同步发出回调时丢失确认。
+      _registerConfirmation(request.windowId, true);
       await _driver.enterFullscreen(displayId: 0);
 
       // D-19: 三级状态回读
@@ -289,7 +327,8 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
         return true;
       }
 
-      // macOS/Linux: 标准路径 + 三级确认链
+      // 先注册 waiter，避免原生调用同步发出回调时丢失确认。
+      _registerConfirmation(request.windowId, false);
       await _driver.leaveFullscreen();
 
       // D-19: 三级状态回读
@@ -350,6 +389,10 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
         actual: actualMode,
       ),
     ));
+    _events.add(FullscreenEvent.syncCorrected(
+      expected: expected,
+      actual: actualMode,
+    ));
   }
 
   /// 捕获恢复快照 (D-22, P0-4 修正版)。
@@ -398,14 +441,18 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
     int windowId,
     bool expectedFullscreen,
   ) async {
-    // Level 1: 等待原生回调确认
-    // P0-1: 使用 per-windowId 的 Completer<bool>
-    // P0-2: Completer<bool> 可判定成功/超时
-    final completer = Completer<bool>();
-    _confirmByWindowId[windowId] = completer;
+    final pending = _confirmByWindowId[windowId];
+    if (pending == null ||
+        pending.expectedFullscreen != expectedFullscreen) {
+      _registerConfirmation(windowId, expectedFullscreen);
+    }
 
     try {
-      final confirmed = await completer.future.timeout(
+      final waiter = _confirmByWindowId[windowId];
+      if (waiter == null) {
+        return false;
+      }
+      final confirmed = await waiter.completer.future.timeout(
         const Duration(milliseconds: 500),
         onTimeout: () => false,
       );
@@ -425,6 +472,28 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
     // Level 3: 超时
     return false;
   }
+
+  void _registerConfirmation(int windowId, bool expectedFullscreen) {
+    _confirmByWindowId[windowId] = _PendingConfirmation(
+      expectedFullscreen: expectedFullscreen,
+      completer: Completer<bool>(),
+      requestId: _nextRequestId++,
+    );
+  }
+}
+
+final class _PendingConfirmation {
+  const _PendingConfirmation({
+    required this.expectedFullscreen,
+    required this.completer,
+    required this.requestId,
+  });
+
+  final bool expectedFullscreen;
+  final Completer<bool> completer;
+
+  /// 注册时分配的单调 ID — 回调必须匹配才确认。
+  final int requestId;
 }
 
 /// 退出全屏前的窗口快照 — 用于恢复策略 (D-22)。
