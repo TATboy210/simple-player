@@ -78,12 +78,16 @@ Plans:
   5. Win32 FFI 系统调用次数减少50%+
   6. flutter test 全通过，无 regression
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
+
+- [x] 05-01-PLAN.md
+- [x] 05-02-PLAN.md
+
 **Wave 1**
 
-- [ ] 05-01: FIX-01+02: 视频黑边修复 + 边框残留修复（渲染层排查 + FFI 样式剥离）
+- [x] 05-01: FIX-01+02: 视频黑边修复 + 边框残留修复（渲染层排查 + FFI 样式剥离）
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -151,7 +155,7 @@ Plans:
 | 2. 命令队列与恢复策略 | v1.0 | 3/3 | Complete | 2026-07-10 |
 | 3. 平台适配与深化 | v1.0 | 4/4 | Complete | 2026-07-10 |
 | 4. 质量收尾与迁移完成 | v1.0 | 3/3 | Complete | 2026-07-10 |
-| 5. 性能与Bug修复 | v2.0 | 0/2 | Not started | - |
+| 5. 性能与Bug修复 | v2.0 | 2/2 | Complete   | 2026-07-10 |
 | 6. 用户体验升级 | v2.0 | 0/2 | Not started | - |
 | 7. 技术探索与代码质量 | v2.0 | 0/3 | Not started | - |
 
