@@ -181,8 +181,8 @@ class KeyboardHandler extends StatelessWidget {
       return KeyEventResult.handled;
     }
 
-    // 调试快捷键: F12 导出性能统计
-    if (key == LogicalKeyboardKey.f12) {
+    // 调试快捷键: F12 导出性能统计（仅 debug 模式）
+    if (kDebugMode && key == LogicalKeyboardKey.f12) {
       final stats = PerfMonitor.instance.exportStats();
       developer.log(
         'Performance Stats:\n${const JsonEncoder.withIndent('  ').convert(stats)}',

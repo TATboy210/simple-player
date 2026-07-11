@@ -8,11 +8,11 @@ import '../shared/edge_glow.dart';
 import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
 import 'center_controls.dart';
+import 'left_button_group.dart';
 import 'player_actions.dart';
 import 'progress_bar.dart';
-import 'speed_button.dart';
+import 'right_button_group.dart';
 import 'time_range_display.dart';
-import 'volume_controls.dart';
 
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
@@ -243,7 +243,7 @@ class ControlBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          _LeftButtonGroup(engine: engine, actions: actions),
+          LeftButtonGroup(engine: engine, actions: actions),
           const Spacer(),
           CenterGroup(
             engine: engine,
@@ -254,87 +254,9 @@ class ControlBar extends StatelessWidget {
             onNext: actions.onNext,
           ),
           const Spacer(),
-          _RightButtonGroup(actions: actions),
+          RightButtonGroup(actions: actions),
         ],
       ),
-    );
-  }
-}
-
-/// 左侧按钮组：播放模式 + 音量 + 倍速
-class _LeftButtonGroup extends StatelessWidget {
-  final EngineState engine;
-  final PlayerActions actions;
-
-  const _LeftButtonGroup({required this.engine, required this.actions});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GlassButton.iconOnly(
-          icon: actions.playModeIcon ?? Icons.repeat,
-          tooltip: actions.playModeLabel ?? l10n.playModeLoopAll,
-          onPressed: actions.onTogglePlayMode,
-        ),
-        const SizedBox(width: Tokens.spXs),
-        VolumeButton(engine: engine),
-        VolumeSlider(engine: engine),
-        const SizedBox(width: Tokens.spXs),
-        SpeedButton(engine: engine),
-      ],
-    );
-  }
-}
-
-/// 右侧按钮组：文件、字幕、播放列表、设置
-class _RightButtonGroup extends StatelessWidget {
-  final PlayerActions actions;
-
-  const _RightButtonGroup({required this.actions});
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (actions.onOpenFile != null)
-          GlassButton.iconOnly(
-            icon: Icons.folder_open,
-            onPressed: actions.onOpenFile,
-            tooltip: l10n.openFileTooltip,
-          ),
-        if (actions.onOpenSubtitle != null)
-          GlassButton.iconOnly(
-            icon: Icons.subtitles,
-            onPressed: actions.onOpenSubtitle,
-            tooltip: l10n.openSubtitle,
-          ),
-        if (actions.onTogglePlaylist != null)
-          GlassButton.iconOnly(
-            icon: Icons.queue_music,
-            onPressed: actions.onTogglePlaylist,
-            tooltip: l10n.playlist,
-          ),
-        if (actions.onSettings != null)
-          GlassButton.iconOnly(
-            icon: Icons.settings,
-            onPressed: actions.onSettings,
-            onSecondaryTapUp: actions.onSettingsSecondary != null
-                ? (d) => actions.onSettingsSecondary!(context, d)
-                : null,
-            tooltip: l10n.settings,
-          ),
-        if (actions.onToggleFullscreen != null)
-          GlassButton.iconOnly(
-            icon: Icons.fullscreen,
-            onPressed: actions.onToggleFullscreen,
-            tooltip: l10n.shortcutFullscreen,
-          ),
-      ],
     );
   }
 }
