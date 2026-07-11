@@ -18,7 +18,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_capability.dart';
-import 'package:simple_player_flutter/kernel/models/fullscreen_snapshot.dart';
 
 // ─── 测试替身 ───
 
@@ -105,6 +104,18 @@ class _MockFullscreenDriver implements FullscreenDriver {
   }
 
   @override
+  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
+    calls.add('captureSnapshot()');
+    return (isMaximized: maximizedState, position: currentPosition, size: currentSize);
+  }
+
+  @override
+  void clearMonitorCache() {}
+
+  @override
+  void dispose() {}
+
+  @override
   set onNativeStateChanged(
     void Function(int windowId, bool isFullscreen)? callback,
   ) {
@@ -114,6 +125,22 @@ class _MockFullscreenDriver implements FullscreenDriver {
   @override
   FullscreenCapability capabilities() {
     return const FullscreenCapability();
+  }
+
+  @override
+  bool get supportsFastPath => false;
+
+  @override
+  bool get supportsBatchSnapshot => false;
+
+  @override
+  Future<void> enterFullscreenFast({int displayId = 0}) async {
+    calls.add('enterFullscreenFast(displayId: $displayId)');
+  }
+
+  @override
+  Future<void> leaveFullscreenFast() async {
+    calls.add('leaveFullscreenFast()');
   }
 }
 
@@ -133,18 +160,16 @@ void main() {
       adapter.dispose();
     });
 
-    // HR-001: 快速连按 F 10 次 — 验证最终 phase == stable，无残留错误
+    // HR-001: 快速连按 F 10 次 — 验证最终状态正确
     // 每次 toggle 前翻转 driver 状态，Level-2 轮询首次命中
-    test('rapid toggle 10 times ends in stable state', () async {
+    test('rapid toggle 10 times ends in correct state', () async {
       for (var i = 0; i < 10; i++) {
         driver.fullscreenState = !driver.fullscreenState;
         await adapter.toggle();
       }
 
       // 10 次 toggle（偶数）从 windowed 开始 → 最终 windowed
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-      expect(adapter.snapshot().value.hasError, isFalse);
+      expect(adapter.isFullscreen.value, isFalse);
     });
 
     // HR-002: 快速连按 F 20 次 — 验证命令队列不崩溃
@@ -158,8 +183,7 @@ void main() {
         }
 
         // 20 次 toggle（偶数）后应恢复到稳定状态
-        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.isFullscreen.value, isFalse);
       },
       timeout: const Timeout(Duration(seconds: 120)),
     );
@@ -172,12 +196,12 @@ void main() {
       // 进入全屏
       driver.fullscreenState = true;
       await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+      expect(adapter.isFullscreen.value, isTrue);
 
       // 退出全屏，应恢复到 maximized
       driver.fullscreenState = false;
       await adapter.setFullscreen(false);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.isFullscreen.value, isFalse);
 
       // 验证调用了 maximize() 恢复
       expect(driver.calls, contains('maximize()'));
@@ -189,16 +213,14 @@ void main() {
       // 第一次 enter 失败（模拟平台异常）
       driver.throwOnEnter = Exception('platform failure');
       await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.error);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      // 失败后 isFullscreen 应为 false
+      expect(adapter.isFullscreen.value, isFalse);
 
       // 修复平台，重试 enter
       driver.throwOnEnter = null;
       driver.fullscreenState = true;
       await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
-      expect(adapter.snapshot().value.hasError, isFalse);
+      expect(adapter.isFullscreen.value, isTrue);
     });
 
     // HR-005: 回调缺失超时 — 平台 enter 延迟但 Level-2 轮询成功
@@ -214,8 +236,7 @@ void main() {
       });
 
       await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+      expect(adapter.isFullscreen.value, isTrue);
     });
 
     // HR-006: per-window 隔离 — 两个独立 adapter 互不污染
@@ -229,28 +250,28 @@ void main() {
         // adapter1 进入全屏
         driver1.fullscreenState = true;
         await adapter1.setFullscreen(true);
-        expect(adapter1.snapshot().value.isFullscreen, isTrue);
+        expect(adapter1.isFullscreen.value, isTrue);
         // adapter2 应保持 windowed
-        expect(adapter2.snapshot().value.isFullscreen, isFalse);
+        expect(adapter2.isFullscreen.value, isFalse);
 
         // adapter2 进入全屏
         driver2.fullscreenState = true;
         await adapter2.setFullscreen(true);
-        expect(adapter2.snapshot().value.isFullscreen, isTrue);
+        expect(adapter2.isFullscreen.value, isTrue);
         // adapter1 仍为 fullscreen
-        expect(adapter1.snapshot().value.isFullscreen, isTrue);
+        expect(adapter1.isFullscreen.value, isTrue);
 
         // adapter1 退出全屏
         driver1.fullscreenState = false;
         await adapter1.setFullscreen(false);
-        expect(adapter1.snapshot().value.isFullscreen, isFalse);
+        expect(adapter1.isFullscreen.value, isFalse);
         // adapter2 仍为 fullscreen
-        expect(adapter2.snapshot().value.isFullscreen, isTrue);
+        expect(adapter2.isFullscreen.value, isTrue);
 
         // adapter2 退出全屏
         driver2.fullscreenState = false;
         await adapter2.setFullscreen(false);
-        expect(adapter2.snapshot().value.isFullscreen, isFalse);
+        expect(adapter2.isFullscreen.value, isFalse);
       } finally {
         adapter1.dispose();
         adapter2.dispose();

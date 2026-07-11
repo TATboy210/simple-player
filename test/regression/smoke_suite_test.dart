@@ -22,8 +22,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'package:simple_player_flutter/kernel/bridge/fullscreen_driver.dart';
 import 'package:simple_player_flutter/kernel/models/fullscreen_capability.dart';
-import 'package:simple_player_flutter/kernel/models/fullscreen_error.dart';
-import 'package:simple_player_flutter/kernel/models/fullscreen_snapshot.dart';
 
 // ─── 测试替身 ───
 
@@ -106,6 +104,18 @@ class _MockFullscreenDriver implements FullscreenDriver {
   }
 
   @override
+  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
+    calls.add('captureSnapshot()');
+    return (isMaximized: maximizedState, position: currentPosition, size: currentSize);
+  }
+
+  @override
+  void clearMonitorCache() {}
+
+  @override
+  void dispose() {}
+
+  @override
   set onNativeStateChanged(
     void Function(int windowId, bool isFullscreen)? callback,
   ) {
@@ -115,6 +125,22 @@ class _MockFullscreenDriver implements FullscreenDriver {
   @override
   FullscreenCapability capabilities() {
     return const FullscreenCapability();
+  }
+
+  @override
+  bool get supportsFastPath => false;
+
+  @override
+  bool get supportsBatchSnapshot => false;
+
+  @override
+  Future<void> enterFullscreenFast({int displayId = 0}) async {
+    calls.add('enterFullscreenFast(displayId: $displayId)');
+  }
+
+  @override
+  Future<void> leaveFullscreenFast() async {
+    calls.add('leaveFullscreenFast()');
   }
 }
 
@@ -138,20 +164,17 @@ void main() {
     test(
       'FS-REG-001: playing + fullscreen enters and exits correctly',
       () async {
-        expect(adapter.snapshot().value.isFullscreen, isFalse);
-        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.isFullscreen.value, isFalse);
 
         // 进入全屏 — 设置 driver 状态让 Level-2 轮询首次命中
         driver.fullscreenState = true;
         await adapter.setFullscreen(true);
-        expect(adapter.snapshot().value.isFullscreen, isTrue);
-        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.isFullscreen.value, isTrue);
 
         // 退出全屏
         driver.fullscreenState = false;
         await adapter.setFullscreen(false);
-        expect(adapter.snapshot().value.isFullscreen, isFalse);
-        expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+        expect(adapter.isFullscreen.value, isFalse);
       },
     );
 
@@ -159,15 +182,15 @@ void main() {
     test(
       'FS-REG-002: paused + fullscreen enters and exits correctly',
       () async {
-        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.isFullscreen.value, isFalse);
 
         driver.fullscreenState = true;
         await adapter.setFullscreen(true);
-        expect(adapter.snapshot().value.isFullscreen, isTrue);
+        expect(adapter.isFullscreen.value, isTrue);
 
         driver.fullscreenState = false;
         await adapter.setFullscreen(false);
-        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.isFullscreen.value, isFalse);
       },
     );
 
@@ -177,35 +200,34 @@ void main() {
       // 使用 toggle 进入全屏
       driver.fullscreenState = true;
       await adapter.toggle();
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+      expect(adapter.isFullscreen.value, isTrue);
 
       // 退出
       driver.fullscreenState = false;
       await adapter.toggle();
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.isFullscreen.value, isFalse);
 
       // 使用 setFullscreen 进入全屏
       driver.fullscreenState = true;
       await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+      expect(adapter.isFullscreen.value, isTrue);
 
       // 退出
       driver.fullscreenState = false;
       await adapter.setFullscreen(false);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      expect(adapter.isFullscreen.value, isFalse);
     });
 
     // FS-REG-004: ESC 语义 — fullscreen 状态下 setFullscreen(false) 退出全屏
     test('FS-REG-004: ESC exits fullscreen (setFullscreen(false))', () async {
       driver.fullscreenState = true;
       await adapter.setFullscreen(true);
-      expect(adapter.snapshot().value.isFullscreen, isTrue);
+      expect(adapter.isFullscreen.value, isTrue);
 
       // ESC 语义 = setFullscreen(false)
       driver.fullscreenState = false;
       await adapter.setFullscreen(false);
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+      expect(adapter.isFullscreen.value, isFalse);
     });
 
     // FS-REG-005: 连续切换稳定性（10 次 toggle）
@@ -218,8 +240,7 @@ void main() {
       }
 
       // 10 次 toggle（偶数）从 windowed 开始 → 最终 windowed
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
-      expect(adapter.snapshot().value.phase, FullscreenPhase.stable);
+      expect(adapter.isFullscreen.value, isFalse);
     });
 
     // FS-REG-006: windowed -> fullscreen -> windowed 恢复原始窗口几何
@@ -231,11 +252,11 @@ void main() {
 
         driver.fullscreenState = true;
         await adapter.setFullscreen(true);
-        expect(adapter.snapshot().value.isFullscreen, isTrue);
+        expect(adapter.isFullscreen.value, isTrue);
 
         driver.fullscreenState = false;
         await adapter.setFullscreen(false);
-        expect(adapter.snapshot().value.isFullscreen, isFalse);
+        expect(adapter.isFullscreen.value, isFalse);
 
         // 验证退出时恢复了保存的位置和大小
         expect(
@@ -264,16 +285,14 @@ void main() {
       );
     });
 
-    // FS-REG-008: 错误事件通知 — enter 失败时进入 error 状态
-    test('FS-REG-008: enter failure results in error state', () async {
+    // FS-REG-008: 错误事件通知 — enter 失败时 isFullscreen 保持 false
+    test('FS-REG-008: enter failure keeps isFullscreen false', () async {
       driver.throwOnEnter = Exception('platform enter failed');
 
       await adapter.setFullscreen(true);
 
-      // 失败后应进入 error 状态
-      expect(adapter.snapshot().value.phase, FullscreenPhase.error);
-      expect(adapter.snapshot().value.lastError, isA<PlatformFailure>());
-      expect(adapter.snapshot().value.isFullscreen, isFalse);
+      // 失败后 isFullscreen 应为 false
+      expect(adapter.isFullscreen.value, isFalse);
     });
   });
 }

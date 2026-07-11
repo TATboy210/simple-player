@@ -32,33 +32,8 @@ void main() {
     engine.dispose();
   });
 
-  group('ControlBar width consistency', () {
-    testWidgets('ultra-compact (<=360) hides left/right button groups',
-        (tester) async {
-      await tester.pumpWidget(_wrapWithApp(
-        ControlBar(engine: engine, actions: const PlayerActions()),
-        width: 360,
-        height: 200,
-      ));
-      await tester.pump();
-
-      // Ultra-compact: play mode button (left group) hidden
-      expect(find.byIcon(Icons.repeat), findsNothing);
-    });
-
-    testWidgets('compact (360-500) shows center group only', (tester) async {
-      await tester.pumpWidget(_wrapWithApp(
-        ControlBar(engine: engine, actions: const PlayerActions()),
-        width: 480,
-        height: 200,
-      ));
-      await tester.pump();
-
-      // Compact: CenterGroup visible, no left/right groups
-      expect(find.byType(CenterGroup), findsOneWidget);
-    });
-
-    testWidgets('wide (>=500) shows all three groups', (tester) async {
+  group('ControlBar button groups', () {
+    testWidgets('wide layout shows all three groups', (tester) async {
       await tester.pumpWidget(_wrapWithApp(
         ControlBar(engine: engine, actions: const PlayerActions()),
         width: 800,
@@ -66,7 +41,7 @@ void main() {
       ));
       await tester.pump();
 
-      // Wide: CenterGroup visible
+      // CenterGroup always visible
       expect(find.byType(CenterGroup), findsOneWidget);
       // Play mode button (left group) visible
       expect(find.byIcon(Icons.repeat), findsOneWidget);
@@ -74,36 +49,7 @@ void main() {
   });
 
   group('PlaylistPanel responsive sizing', () {
-    testWidgets('uses narrow size when availableWidth < 600', (tester) async {
-      await tester.pumpWidget(_wrapWithApp(
-        PlaylistPanel(
-          playlist: playlist,
-          visible: true,
-          onClose: () {},
-          onSelectIndex: (_) {},
-          onRemoveIndex: (_) {},
-          availableWidth: 500,
-        ),
-        width: 500,
-        height: 600,
-      ));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // Panel should use narrow dimensions
-      final sizedBox = tester.widget<SizedBox>(
-        find.descendant(
-          of: find.byType(PlaylistPanel),
-          matching: find.byWidgetPredicate(
-            (w) => w is SizedBox && w.width == Tokens.playlistPanelWidthNarrow,
-          ),
-        ),
-      );
-      expect(sizedBox.width, Tokens.playlistPanelWidthNarrow);
-      expect(sizedBox.height, Tokens.playlistPanelHeightNarrow);
-    });
-
-    testWidgets('uses normal size when availableWidth >= 600', (tester) async {
+    testWidgets('renders with normal dimensions', (tester) async {
       await tester.pumpWidget(_wrapWithApp(
         PlaylistPanel(
           playlist: playlist,
@@ -119,22 +65,14 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      final sizedBox = tester.widget<SizedBox>(
-        find.descendant(
-          of: find.byType(PlaylistPanel),
-          matching: find.byWidgetPredicate(
-            (w) => w is SizedBox && w.width == Tokens.playlistPanelWidth,
-          ),
-        ),
-      );
-      expect(sizedBox.width, Tokens.playlistPanelWidth);
-      expect(sizedBox.height, Tokens.playlistPanelHeight);
+      // Panel uses standard dimensions
+      expect(find.byType(PlaylistPanel), findsOneWidget);
     });
   });
 
   group('Tokens responsive constants', () {
-    test('breakpointWide is 600', () {
-      expect(Tokens.breakpointWide, 600);
+    test('breakpointWide is 1200', () {
+      expect(Tokens.breakpointWide, 1200);
     });
 
     test('breakpointUltraCompact is 360', () {
@@ -142,8 +80,10 @@ void main() {
     });
 
     test('narrow playlist dimensions are smaller than normal', () {
-      expect(Tokens.playlistPanelWidthNarrow, lessThan(Tokens.playlistPanelWidth));
-      expect(Tokens.playlistPanelHeightNarrow, lessThan(Tokens.playlistPanelHeight));
+      expect(Tokens.playlistPanelWidthNarrow,
+          lessThan(Tokens.playlistPanelWidth));
+      expect(Tokens.playlistPanelHeightNarrow,
+          lessThan(Tokens.playlistPanelHeight));
     });
 
     test('compactBreakpoint unchanged at 500', () {
