@@ -90,4 +90,45 @@ abstract class FullscreenDriver {
   FullscreenCapability capabilities() {
     return const FullscreenCapability();
   }
+
+  /// 批量捕获窗口快照 — isMaximized + position + size (T4)。
+  ///
+  /// 默认实现依次调用 [isMaximized]、[getPosition]、[getSize] (3 次 async)。
+  /// Windows 驱动覆盖为 2 次 FFI (isZoomed + getWindowPlacement)。
+  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
+    return (
+      isMaximized: await isMaximized(),
+      position: await getPosition(),
+      size: await getSize(),
+    );
+  }
+
+  // ─── 能力标志 (ARCH-01) ───
+  // 用能力查询替代 `is WindowsFullscreenDriver` 类型检查，
+  // 遵循 Liskov 替换原则：任何 Driver 实现都能通过能力标志声明自己的优化。
+
+  /// 是否支持快速路径全屏操作（跳过确认链）。
+  ///
+  /// Windows FFI 驱动同步操作，无需等待原生回调或轮询。
+  /// 默认 false — 仅 WindowsFullscreenDriver 覆盖为 true。
+  bool get supportsFastPath => false;
+
+  /// 是否支持批量快照查询。
+  ///
+  /// Windows FFI 驱动用 2 次 FFI 替代 3 次 async 调用。
+  /// 默认 false — 仅 WindowsFullscreenDriver 覆盖为 true。
+  bool get supportsBatchSnapshot => false;
+
+  /// 快速进入全屏 — 跳过确认链。
+  ///
+  /// 仅 [supportsFastPath] 为 true 时调用。
+  /// 默认实现委托给 [enterFullscreen]。
+  Future<void> enterFullscreenFast({int displayId = 0}) =>
+      enterFullscreen(displayId: displayId);
+
+  /// 快速退出全屏 — 跳过确认链。
+  ///
+  /// 仅 [supportsFastPath] 为 true 时调用。
+  /// 默认实现委托给 [leaveFullscreen]。
+  Future<void> leaveFullscreenFast() => leaveFullscreen();
 }

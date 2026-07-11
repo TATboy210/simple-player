@@ -25,6 +25,19 @@ class DesktopFullscreenDriver implements FullscreenDriver {
   final WindowManager _wm;
 
   @override
+  bool get supportsFastPath => false;
+
+  @override
+  bool get supportsBatchSnapshot => false;
+
+  @override
+  Future<void> enterFullscreenFast({int displayId = 0}) =>
+      enterFullscreen(displayId: displayId);
+
+  @override
+  Future<void> leaveFullscreenFast() => leaveFullscreen();
+
+  @override
   Future<void> enterFullscreen({int displayId = 0}) async {
     await _wm.setFullScreen(true);
   }
@@ -104,6 +117,15 @@ class DesktopFullscreenDriver implements FullscreenDriver {
   @override
   void clearMonitorCache() {
     // 通用 fallback 驱动无显示器缓存
+  }
+
+  @override
+  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
+    return (
+      isMaximized: await isMaximized(),
+      position: await getPosition(),
+      size: await getSize(),
+    );
   }
 
   @override

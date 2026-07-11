@@ -77,6 +77,14 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// getFlutterHwnd() calls FindWindowW which is an FFI round-trip.
   /// Since the Flutter window HWND never changes, cache it on first use.
   /// Cleared on [dispose] and [clearMonitorCache] (defensive).
+
+  // ─── 能力标志 (ARCH-01) ───
+
+  @override
+  bool get supportsFastPath => true;
+
+  @override
+  bool get supportsBatchSnapshot => true;
   int _cachedHwnd = 0;
 
   // ─── 回调桥接 ───
@@ -185,6 +193,7 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// 3. getWindowPlacement — 保存窗口位置
   /// 4. setWindowLong(gwlStyle) — 剥离边框样式
   /// 5. setWindowPos(HWND_TOPMOST) — 原子位置+Z-order 更新
+  @override
   Future<void> enterFullscreenFast({int displayId = 0}) async {
     final hwnd = _getHwnd();
     if (hwnd == 0) {
@@ -246,6 +255,7 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   /// - 跳过 isWindow 验证 (FindWindowW 返回 0 已覆盖)
   /// - 跳过额外的 getWindowRect + setWindowPos 布局刷新
   /// - setWindowPlacement 已触发 WM_PAINT，无需二次刷新
+  @override
   Future<void> leaveFullscreenFast() async {
     final hwnd = _getHwnd();
     if (hwnd == 0) {
@@ -495,6 +505,39 @@ class WindowsFullscreenDriver implements FullscreenDriver {
       platformNotes:
           'Win32 FFI: WS_THICKFRAME removal, focus recovery, TopMost cleanup',
     );
+  }
+
+  // ─── T4: 批量快照 ───
+
+  /// 批量捕获窗口快照 — 2 次 FFI (vs 默认 3 次 async)。
+  ///
+  /// 使用 [_getHwnd] 缓存避免 FindWindowW 重复调用。
+  /// isZoomed(hwnd) + getWindowPlacement(hwnd) 合并为一次批量操作。
+  @override
+  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
+    final hwnd = _getHwnd();
+    if (hwnd == 0) {
+      return (isMaximized: false, position: Offset.zero, size: Size.zero);
+    }
+
+    final maximized = _api.isZoomed(hwnd); // 1 FFI
+    final placement = _api.getWindowPlacement(hwnd); // 1 FFI
+
+    Offset position = Offset.zero;
+    Size size = Size.zero;
+
+    if (placement != null) {
+      try {
+        final dpr = _getDevicePixelRatio();
+        final rc = placement.ref.rcNormalPosition;
+        position = Offset(rc.left / dpr, rc.top / dpr);
+        size = Size((rc.right - rc.left) / dpr, (rc.bottom - rc.top) / dpr);
+      } finally {
+        calloc.free(placement);
+      }
+    }
+
+    return (isMaximized: maximized, position: position, size: size);
   }
 
   // ─── 内部辅助 ───

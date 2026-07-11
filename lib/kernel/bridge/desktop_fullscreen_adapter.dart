@@ -4,154 +4,91 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 import '../models/fullscreen_capability.dart';
-import '../models/fullscreen_error.dart';
-import '../models/fullscreen_event.dart';
-import '../models/fullscreen_request.dart';
-import '../models/fullscreen_snapshot.dart';
-import 'fullscreen_adapter.dart';
-import 'fullscreen_command_queue.dart';
 import 'fullscreen_driver.dart';
-import 'platform/windows_fullscreen_driver.dart';
-import 'window_mode.dart';
 
-/// Desktop 平台全屏适配器 — Phase B 核心实现。
+/// Desktop 平台全屏适配器 — v3 简化版。
 ///
-/// 串联命令队列、状态回读、恢复策略和事件广播。
+/// 直接调用 driver，不经过命令队列。
+/// 状态用 ValueNotifier&lt;bool&gt; 表示，替代复杂的 FullscreenSnapshot。
 ///
 /// 设计约束:
-/// - 实现 FullscreenAdapter 抽象接口
 /// - ⛔ P0-3: 禁止直调 windowManager/fullScreenWindow，所有原生操作通过 _driver 转发
 /// - P0-4: 不持有 WindowBridge 引用，状态查询全由 driver 直接调原生 API
-/// - per-window 状态容器 (D-04)
-/// - 内部持有 FullscreenCommandQueue (D-15)
-/// - 事件流使用 broadcast StreamController (D-06/D-07)
-class DesktopFullscreenAdapter implements FullscreenAdapter {
+/// - 保留三级确认链、恢复策略、快速路径
+class DesktopFullscreenAdapter {
   /// 创建 DesktopFullscreenAdapter。
   ///
   /// [driver] 平台全屏驱动，负责原生调用。
-  /// 构造时自动将 driver 的原生回调转发到 Adapter 确认信号 (D-P11)。
+  /// 构造时自动将 driver 的原生回调转发到确认信号 (D-P11)。
   DesktopFullscreenAdapter(this._driver) {
     // D-P11: 将 driver 的原生回调转发到 Adapter 的确认信号
-    // macOS: NSWindow delegate → onFullScreenChanged → _confirmByWindowId
-    // Linux: GdkWindow state-changed → onFullScreenChanged → _confirmByWindowId
-    // Windows: 无需此机制 (FFI 同步操作)
     _driver.onNativeStateChanged = onNativeFullScreenChanged;
   }
 
   /// 平台驱动 — 所有原生操作通过此接口转发 (P0-3)。
   final FullscreenDriver _driver;
 
-  /// 命令队列 — per-windowId 串行化 (D-15)。
-  final FullscreenCommandQueue _queue = FullscreenCommandQueue();
+  /// 全屏状态 — 替代旧的 Map&lt;int, ValueNotifier&lt;FullscreenSnapshot&gt;&gt;。
+  final ValueNotifier<bool> _isFullscreen = ValueNotifier(false);
 
-  /// per-window 状态容器 (D-04)。
-  final Map<int, ValueNotifier<FullscreenSnapshot>> _snapshots = {};
+  /// 全屏状态 getter — WindowService 监听此 notifier。
+  ValueNotifier<bool> get isFullscreen => _isFullscreen;
 
-  /// 事件广播流 (D-06/D-07)。
-  final StreamController<FullscreenEvent> _events =
-      StreamController<FullscreenEvent>.broadcast();
+  /// 当前全屏状态的便捷访问。
+  bool get _currentFullscreen => _isFullscreen.value;
 
   /// 退出全屏前的窗口几何快照 — 用于恢复 (D-22)。
   final Map<int, _RestoreSnapshot> _restoreSnapshots = {};
 
   /// per-windowId 回调确认信号 (P0-1)。
-  ///
-  /// key = windowId，value = 等待该窗口原生回调确认的 Completer。
-  /// 防止多窗口并发时互相覆盖确认信号。
   final Map<int, _PendingConfirmation> _confirmByWindowId = {};
 
   /// 单调递增的请求 ID — 防止迟到回调错误确认后续操作。
-  ///
-  /// 每次 _registerConfirmation 递增，回调必须匹配 windowId + requestId。
   int _nextRequestId = 0;
 
   /// 已 dispose 标志。
   bool _disposed = false;
 
-  // ─── FullscreenAdapter: 状态查询 ───
+  // ─── 能力查询 ───
 
-  @override
-  ValueNotifier<FullscreenSnapshot> snapshot([int windowId = 0]) {
-    return _snapshotFor(windowId);
-  }
-
-  @override
-  Stream<FullscreenEvent> get events => _events.stream;
-
-  // ─── FullscreenAdapter: 能力查询 ───
-
-  @override
+  /// 查询当前平台的全屏能力。
   Future<FullscreenCapability> capabilities() async {
-    // Phase C: 委托给 driver，每平台返回真实能力
     return _driver.capabilities();
   }
 
-  // ─── FullscreenAdapter: 命令 ───
+  // ─── 命令 ───
 
-  @override
-  Future<void> setFullscreen(
-    bool fullscreen, {
-    int windowId = 0,
-    FullscreenMode mode = FullscreenMode.borderless,
-  }) async {
+  /// 设置全屏状态。
+  ///
+  /// [fullscreen] true 进入全屏，false 退出全屏。
+  /// 直接调用 _handleEnter/_handleLeave，不经过命令队列。
+  Future<void> setFullscreen(bool fullscreen, {int windowId = 0}) async {
     if (_disposed) return;
-
-    final notifier = _snapshotFor(windowId);
-    final current = notifier.value;
-
-    // D-09: error 状态自动清理为 stable
-    if (current.hasError) {
-      notifier.value = current.copyWith(
-        phase: FullscreenPhase.stable,
-        clearError: true,
-      );
+    if (fullscreen) {
+      await _handleEnter(windowId);
+    } else {
+      await _handleLeave(windowId);
     }
-
-    // 构造请求
-    final request = fullscreen
-        ? FullscreenRequest.enter(mode: mode, windowId: windowId)
-        : FullscreenRequest.leave(windowId: windowId);
-
-    // 入队，executor 回调在队列调度时执行
-    await _queue.enqueue(
-      request,
-      _executeCommand,
-      currentFullscreen: notifier.value.isFullscreen,
-    );
   }
 
-  @override
-  Future<void> toggle({
-    int windowId = 0,
-    FullscreenMode? preferredMode,
-  }) async {
+  /// 切换全屏状态。
+  Future<void> toggle({int windowId = 0}) async {
     if (_disposed) return;
-    final notifier = _snapshotFor(windowId);
-    final request = FullscreenRequest.toggle(
-      preferredMode: preferredMode,
-      windowId: windowId,
-    );
-    await _queue.enqueue(
-      request,
-      _executeCommand,
-      currentFullscreen: notifier.value.isFullscreen,
-    );
+    if (_currentFullscreen) {
+      await _handleLeave(windowId);
+    } else {
+      await _handleEnter(windowId);
+    }
   }
 
-  // ─── FullscreenAdapter: Lifecycle ───
+  // ─── Lifecycle ───
 
-  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _queue.dispose();
     _driver.onNativeStateChanged = null;
     _driver.dispose();
-    _events.close();
-    for (final notifier in _snapshots.values) {
-      notifier.dispose();
-    }
-    _snapshots.clear();
+    _isFullscreen.dispose();
     _restoreSnapshots.clear();
     for (final pending in _confirmByWindowId.values) {
       if (!pending.completer.isCompleted) {
@@ -178,75 +115,21 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
           pending.completer.complete(true);
         }
       }
-      // requestId 不匹配 → 过时回调，静默丢弃
       return;
     }
 
-    final notifier = _snapshotFor(windowId);
-    final previousMode = notifier.value.effectiveMode;
-    final actualMode = isFullscreen
-        ? FullscreenMode.borderless
-        : FullscreenMode.windowed;
-    notifier.value = notifier.value.copyWith(
-      phase: FullscreenPhase.stable,
-      effectiveMode: actualMode,
-      clearError: true,
-    );
-    if (previousMode != actualMode) {
-      _events.add(FullscreenEvent.forcedChange(
-        previousMode: previousMode,
-        actualMode: actualMode,
-      ));
-    }
+    // 无 pending 确认 — 外部强制变更，直接更新状态
+    _isFullscreen.value = isFullscreen;
   }
 
   // ─── 内部实现 ───
 
-  /// 获取/创建指定 windowId 的 snapshot notifier (D-04)。
-  ValueNotifier<FullscreenSnapshot> _snapshotFor(int windowId) {
-    return _snapshots.putIfAbsent(
-      windowId,
-      () => ValueNotifier(const FullscreenSnapshot()),
-    );
-  }
-
-  /// 命令队列 executor — 由 FullscreenCommandQueue 调度执行。
-  Future<bool> _executeCommand(FullscreenRequest request) async {
-    final notifier = _snapshotFor(request.windowId);
-    final current = notifier.value;
-
-    if (request is EnterFullscreen) {
-      return _handleEnter(request, notifier, current);
-    }
-
-    if (request is LeaveFullscreen) {
-      return _handleLeave(request, notifier, current);
-    }
-
-    // ToggleFullscreen 应在队列中被解析为 Enter/Leave
-    return false;
-  }
-
   /// 处理进入全屏命令。
-  Future<bool> _handleEnter(
-    EnterFullscreen request,
-    ValueNotifier<FullscreenSnapshot> notifier,
-    FullscreenSnapshot current,
-  ) async {
+  Future<bool> _handleEnter(int windowId) async {
     // D-22: 调用原生前快照（仅非全屏→全屏时采集）
-    if (!current.isFullscreen) {
-      await _captureRestoreSnapshot(request.windowId);
+    if (!_currentFullscreen) {
+      await _captureRestoreSnapshot(windowId);
     }
-
-    // D-16 + T4: 命令开始执行时更新 phase + 乐观更新 effectiveMode。
-    // macOS/Linux 进入全屏有 ~700ms 动画延迟，提前设置 effectiveMode
-    // 使 UI 层收到 enterRequested 后可立即开始过渡动画，消除感知延迟。
-    // isFullscreen 仍为 false (phase=entering)，不会误触发全屏逻辑。
-    notifier.value = current.copyWith(
-      phase: FullscreenPhase.entering,
-      effectiveMode: request.mode,
-    );
-    _events.add(FullscreenEvent.enterRequested(targetMode: request.mode));
 
     try {
       // D-25: minimized 状态下先 restore 再全屏
@@ -255,158 +138,84 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
 
-      // PERF-01/02: Windows 快速路径 — 跳过确认链
-      // Windows FFI 同步操作，无需等待原生回调或轮询
-      if (_driver is WindowsFullscreenDriver) {
+      // PERF-01/02: 快速路径 — 跳过确认链
+      if (_driver.supportsFastPath) {
         await _driver.enterFullscreenFast(displayId: 0);
-        notifier.value = notifier.value.copyWith(
-          phase: FullscreenPhase.stable,
-          effectiveMode: request.mode,
-        );
-        _events.add(FullscreenEvent.entered(finalMode: request.mode));
+        _isFullscreen.value = true;
         return true;
       }
 
       // 先注册 waiter，避免原生调用同步发出回调时丢失确认。
-      _registerConfirmation(request.windowId, true);
+      _registerConfirmation(windowId, true);
       await _driver.enterFullscreen(displayId: 0);
 
       // D-19: 三级状态回读
-      final confirmed = await _waitForConfirmation(request.windowId, true);
+      final confirmed = await _waitForConfirmation(windowId, true);
 
       if (confirmed) {
-        notifier.value = notifier.value.copyWith(
-          phase: FullscreenPhase.stable,
-          effectiveMode: request.mode,
-        );
-        _events.add(FullscreenEvent.entered(finalMode: request.mode));
+        _isFullscreen.value = true;
         return true;
       } else {
-        // D-20: StateDesync — 报错 + 不自动重试 + 更新真实状态
-        await _applyDesync(
-          notifier,
-          expected: request.mode,
-          windowId: request.windowId,
-        );
+        // D-20: StateDesync — 查询真实状态
+        await _applyDesync(windowId);
         return false;
       }
     } on Exception catch (e) {
-      // 平台调用失败
-      notifier.value = notifier.value.copyWith(
-        phase: FullscreenPhase.error,
-        lastError: FullscreenError.platformFailure('$e', e),
-      );
-      _events.add(FullscreenEvent.error(
-        error: FullscreenError.platformFailure('$e', e),
-      ));
+      debugPrint('[DesktopFullscreenAdapter] enter failed: $e');
+      _isFullscreen.value = false;
       return false;
     }
   }
 
   /// 处理退出全屏命令。
-  Future<bool> _handleLeave(
-    LeaveFullscreen request,
-    ValueNotifier<FullscreenSnapshot> notifier,
-    FullscreenSnapshot current,
-  ) async {
-    notifier.value = current.copyWith(phase: FullscreenPhase.leaving);
-    _events.add(FullscreenEvent.leaveRequested());
-
+  Future<bool> _handleLeave(int windowId) async {
     try {
-      // PERF-01/02: Windows 快速路径 — 跳过确认链
-      if (_driver is WindowsFullscreenDriver) {
+      // PERF-01/02: 快速路径 — 跳过确认链
+      if (_driver.supportsFastPath) {
         await _driver.leaveFullscreenFast();
         // D-22~D-25: 恢复策略仍需执行
-        await _restoreFromSnapshot(request.windowId);
-        notifier.value = notifier.value.copyWith(
-          phase: FullscreenPhase.stable,
-          effectiveMode: FullscreenMode.windowed,
-          clearError: true,
-        );
-        _events.add(FullscreenEvent.left());
+        await _restoreFromSnapshot(windowId);
+        _isFullscreen.value = false;
         return true;
       }
 
       // 先注册 waiter，避免原生调用同步发出回调时丢失确认。
-      _registerConfirmation(request.windowId, false);
+      _registerConfirmation(windowId, false);
       await _driver.leaveFullscreen();
 
       // D-19: 三级状态回读
-      final confirmed = await _waitForConfirmation(request.windowId, false);
+      final confirmed = await _waitForConfirmation(windowId, false);
 
       if (confirmed) {
         // D-22~D-25: 恢复策略
-        await _restoreFromSnapshot(request.windowId);
-        notifier.value = notifier.value.copyWith(
-          phase: FullscreenPhase.stable,
-          effectiveMode: FullscreenMode.windowed,
-          clearError: true,
-        );
-        _events.add(FullscreenEvent.left());
+        await _restoreFromSnapshot(windowId);
+        _isFullscreen.value = false;
         return true;
       } else {
         // D-20: StateDesync
-        await _applyDesync(
-          notifier,
-          expected: FullscreenMode.windowed,
-          windowId: request.windowId,
-        );
+        await _applyDesync(windowId);
         return false;
       }
     } on Exception catch (e) {
-      notifier.value = notifier.value.copyWith(
-        phase: FullscreenPhase.error,
-        lastError: FullscreenError.platformFailure('$e', e),
-      );
-      _events.add(FullscreenEvent.error(
-        error: FullscreenError.platformFailure('$e', e),
-      ));
+      debugPrint('[DesktopFullscreenAdapter] leave failed: $e');
       return false;
     }
   }
 
-  /// 应用 StateDesync — snapshot 更新为真实状态 + 发出错误事件 (D-20)。
-  Future<void> _applyDesync(
-    ValueNotifier<FullscreenSnapshot> notifier, {
-    required FullscreenMode expected,
-    required int windowId,
-  }) async {
+  /// 应用 StateDesync — 查询真实状态并更新 (D-20)。
+  Future<void> _applyDesync(int windowId) async {
     final actualFullscreen = await _driver.queryFullscreen();
-    final actualMode = actualFullscreen
-        ? FullscreenMode.borderless
-        : FullscreenMode.windowed;
-    notifier.value = notifier.value.copyWith(
-      phase: FullscreenPhase.error,
-      effectiveMode: actualMode,
-      lastError: FullscreenError.stateDesync(
-        expected: expected,
-        actual: actualMode,
-      ),
-    );
-    _events.add(FullscreenEvent.error(
-      error: FullscreenError.stateDesync(
-        expected: expected,
-        actual: actualMode,
-      ),
-    ));
-    _events.add(FullscreenEvent.syncCorrected(
-      expected: expected,
-      actual: actualMode,
-    ));
+    debugPrint('[DesktopFullscreenAdapter] desync detected, correcting to $actualFullscreen');
+    _isFullscreen.value = actualFullscreen;
   }
 
   /// 捕获恢复快照 (D-22, P0-4 修正版)。
-  ///
-  /// 读取 isMaximized/position/size 通过 _driver 直接查询原生 API。
   Future<void> _captureRestoreSnapshot(int windowId) async {
-    final maximized = await _driver.isMaximized();
-    final position = await _driver.getPosition();
-    final size = await _driver.getSize();
+    final snapshot = await _driver.captureSnapshot();
     _restoreSnapshots[windowId] = _RestoreSnapshot(
-      mode: WindowMode.windowed, // 退出全屏后恢复到 windowed
-      position: position,
-      size: size,
-      isMaximized: maximized,
+      position: snapshot.position,
+      size: snapshot.size,
+      isMaximized: snapshot.isMaximized,
     );
   }
 
@@ -458,7 +267,6 @@ class DesktopFullscreenAdapter implements FullscreenAdapter {
       );
       if (confirmed) return true;
     } finally {
-      // 防止泄漏：无论成功/超时/异常，都清理
       _confirmByWindowId.remove(windowId);
     }
 
@@ -491,24 +299,16 @@ final class _PendingConfirmation {
 
   final bool expectedFullscreen;
   final Completer<bool> completer;
-
-  /// 注册时分配的单调 ID — 回调必须匹配才确认。
   final int requestId;
 }
 
 /// 退出全屏前的窗口快照 — 用于恢复策略 (D-22)。
-///
-/// 使用 WindowMode + bool isMaximized 而非 FullscreenMode (P1-7)。
 final class _RestoreSnapshot {
   const _RestoreSnapshot({
-    required this.mode,
     required this.position,
     required this.size,
     this.isMaximized = false,
   });
-
-  /// 窗口模式（恢复到 windowed）。
-  final WindowMode mode;
 
   /// 全屏前的窗口位置。
   final Offset position;
