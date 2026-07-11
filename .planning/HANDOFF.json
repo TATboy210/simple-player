@@ -1,42 +1,34 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-11T10:15:00Z",
+  "timestamp": "2026-07-11T12:30:00Z",
   "phase": "8",
-  "phase_name": "删除不必要的抽象层",
-  "phase_dir": null,
-  "plan": 0,
-  "task": 0,
-  "total_tasks": 2,
+  "phase_name": "delete-abstraction",
+  "phase_dir": ".planning/phase-8",
+  "plan": 1,
+  "task": 3,
+  "total_tasks": 3,
   "status": "paused",
-  "completed_tasks": [],
+  "completed_tasks": [
+    {"id": 1, "name": "Simplify DesktopFullscreenAdapter — remove CommandQueue + model dependencies", "status": "done", "commit": "25832fe"},
+    {"id": 2, "name": "Update WindowService + main.dart, delete 9 files", "status": "done", "commit": "25832fe"}
+  ],
   "remaining_tasks": [
-    {"id": 1, "name": "08-01: 删除 CommandQueue + 4 Model 类", "status": "not_started"},
-    {"id": 2, "name": "08-02: 删除 FullscreenAdapter 抽象层", "status": "not_started"}
+    {"id": 3, "name": "08-01 Task 3: Human verification — flutter test + residual check", "status": "pending"},
+    {"id": 4, "name": "08-02 Task 1: Update smoke_suite_test.dart", "status": "not_started"},
+    {"id": 5, "name": "08-02 Task 2: Update high_risk_suite_test.dart + fullscreen_e2e_test.dart", "status": "not_started"},
+    {"id": 6, "name": "08-02 Task 3: Phase 8 final verification", "status": "not_started"}
   ],
   "blockers": [],
   "async_jobs": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "Run flutter test to verify 08-01 changes don't break existing tests", "context": "08-01 committed, flutter analyze passes, tests not yet run", "blocking": false}
+  ],
   "decisions": [
-    {"decision": "删除 Adapter+CommandQueue+4 Model 类", "rationale": "单窗口 app 不需要 per-window 队列和多态接口，过度工程化 ~5x", "phase": "8"},
-    {"decision": "保留 Win32 FFI 核心", "rationale": "解决真实问题（多显示器、WS_THICKFRAME、防闪烁）", "phase": "8"},
-    {"decision": "借鉴 plugin_platform_interface 联合插件模式", "rationale": "编译时类型安全 + 平台注入", "phase": "10"},
-    {"decision": "x86/ARM 不需要分支代码", "rationale": "Win32 API 跨架构一致", "phase": "10"},
-    {"decision": "macOS/Linux 复用 fullscreen_window 原生代码", "rationale": "原生代码写得好，不需要重写", "phase": "10"}
+    {"decision": "ValueNotifier<bool> replaces FullscreenSnapshot/FullscreenPhase/FullscreenMode", "rationale": "v3 simplification — single-window app needs only bool state", "phase": "8"},
+    {"decision": "Remove FullscreenCommandQueue, use direct async calls", "rationale": "Queue over-engineered for single-window case", "phase": "8"},
+    {"decision": "Preserve 3-level confirmation chain + restore strategy + fast path", "rationale": "These solve real problems (native callback timing, window geometry restore)", "phase": "8"}
   ],
-  "uncommitted_files": [
-    "CLAUDE.md",
-    "lib/ui/player/keyboard_handler.dart",
-    "test/widget/player/keyboard_handler_test.dart",
-    ".planning/PROJECT.md",
-    ".planning/ROADMAP.md",
-    ".planning/STATE.md",
-    ".planning/research/fullscreen-window-reverse-engineering.md",
-    ".planning/research/current-fullscreen-analysis.md",
-    ".planning/research/ARCHITECTURE.md",
-    ".planning/research/STACK.md",
-    ".planning/research/FEATURES.md",
-    ".planning/research/PITFALLS.md"
-  ],
-  "next_action": "Run /gsd-plan-phase 8 to create execution plan for deleting unnecessary abstractions",
-  "context_notes": "Reverse engineering of fullscreen_window v1.2.1 complete. Current impl is 3,248 lines across 18 files, target ~800 lines. Win32 FFI core is good, abstraction layers above it are over-engineered. v1/v2 shipped, v3 simplification roadmap created."
+  "uncommitted_files": [],
+  "next_action": "Run flutter test, then /gsd-execute-phase 8 to continue Wave 2 (08-02: update 3 regression test files)",
+  "context_notes": "08-01 committed (25832fe): 9 files deleted (-2,852 lines), DesktopFullscreenAdapter 520→280 lines. flutter analyze zero errors. Wave 2 (08-02) updates 3 regression test files to use new ValueNotifier<bool> API."
 }
