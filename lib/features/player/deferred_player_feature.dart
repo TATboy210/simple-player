@@ -38,8 +38,6 @@ class DeferredPlayerFeature extends StatefulWidget {
   /// 窗口桥接服务，传递给 PlayerFeature 用于 Win32 窗口控制
   final WindowBridge windowService;
 
-  /// 可选的引擎覆盖实例（调试模式下注入 MockEngine）
-  final EngineState? engineOverride;
 
   /// 打开设置面板的回调（需要 MaterialApp 级 BuildContext）
   final void Function(
@@ -57,7 +55,6 @@ class DeferredPlayerFeature extends StatefulWidget {
     super.key,
     required this.coordinator,
     required this.windowService,
-    this.engineOverride,
     required this.onSettings,
     required this.onSettingsSecondary,
   });
@@ -130,7 +127,6 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
     return player_feature.PlayerFeature(
       coordinator: widget.coordinator,
       windowService: widget.windowService,
-      engineOverride: widget.engineOverride,
       onSettings: widget.onSettings,
       onSettingsSecondary: widget.onSettingsSecondary,
     );

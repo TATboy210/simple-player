@@ -49,7 +49,7 @@ class PlaybackController {
     monitor = StateMonitor(this);
   }
 
-  /// 视频渲染引擎实例（FvpEngine 或 MockEngine）
+  /// 视频渲染引擎实例
   final EngineState engine;
 
   /// 播放列表管理器 — 包含当前播放索引、播放模式、历史记录
