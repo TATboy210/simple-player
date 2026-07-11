@@ -44,8 +44,8 @@ FFI 路径优化、HWND 缓存、零闪烁过渡。核心 FFI 优化保留。
 
 **Plans:**
 
-- [ ] 08-01: 删除 CommandQueue + 4 Model 类
-- [ ] 08-02: 删除 FullscreenAdapter 抽象层
+- [ ] 08-01-PLAN.md — 简化 DesktopFullscreenAdapter + 删除 model/test 文件（Wave 1）
+- [ ] 08-02-PLAN.md — 更新回归/E2E 测试适配新 API（Wave 2）
 
 ---
 
@@ -95,7 +95,7 @@ FFI 路径优化、HWND 缓存、零闪烁过渡。核心 FFI 优化保留。
 |-------|-------|--------|
 | 1-4. v1 架构建立 | 13/13 | ✅ Complete |
 | 5. 性能优化 | 4/4 | ✅ Complete |
-| 8. 删除抽象层 | 0/2 | Not started |
+| 8. 删除抽象层 | 0/2 | Planned |
 | 9. 合并与精简 | 0/2 | Not started |
 | 10. 平台整合 | 0/3 | Not started |
 
