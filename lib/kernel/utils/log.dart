@@ -252,14 +252,15 @@ class _RotatingFileOutput extends LogOutput {
         .toIso8601String()
         .replaceAll(RegExp(r'[:.]'), '-')
         .replaceAll('T', '_');
-    final archive = File('${_dir.path}\\app_$timestamp.log');
+    final sep = Platform.pathSeparator;
+    final archive = File('${_dir.path}${sep}app_$timestamp.log');
     try {
       _file.renameSync(archive.path);
     } on Exception {
       // rename failed — continue with current file
     }
     _file = File(
-      '${_dir.path}\\app_${DateTime.now().millisecondsSinceEpoch}.log',
+      '${_dir.path}${sep}app_${DateTime.now().millisecondsSinceEpoch}.log',
     );
     _cleanupArchives();
   }
