@@ -66,6 +66,21 @@ class MacosFullscreenDriver implements FullscreenDriver {
 
   // ─── 回调桥接 (D-P09) ───
 
+  // ─── 能力标志 (ARCH-01) ───
+
+  @override
+  bool get supportsFastPath => false;
+
+  @override
+  bool get supportsBatchSnapshot => false;
+
+  @override
+  Future<void> enterFullscreenFast({int displayId = 0}) =>
+      enterFullscreen(displayId: displayId);
+
+  @override
+  Future<void> leaveFullscreenFast() => leaveFullscreen();
+
   /// 设置原生状态变化回调。
   ///
   /// DesktopFullscreenAdapter 通过此 setter 注册回调，
@@ -177,6 +192,15 @@ class MacosFullscreenDriver implements FullscreenDriver {
   /// macOS 驱动无显示器缓存。
   @override
   void clearMonitorCache() {}
+
+  @override
+  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
+    return (
+      isMaximized: await isMaximized(),
+      position: await getPosition(),
+      size: await getSize(),
+    );
+  }
 
   /// 释放资源 — 取消流订阅。
   @override

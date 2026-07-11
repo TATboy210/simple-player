@@ -3,16 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:fullscreen_window/fullscreen_window.dart';
+
 import 'package:window_manager/window_manager.dart';
 
-import '../models/fullscreen_event.dart';
-import '../models/fullscreen_snapshot.dart';
 import '../persistence/settings_store.dart';
 import '../utils/log.dart';
 import '../utils/screen_utils.dart';
+import 'desktop_fullscreen_adapter.dart';
 import 'display_enumerator.dart';
-import 'fullscreen_adapter.dart';
 import 'win32/win32_display_enumerator.dart';
 import 'window_bridge.dart';
 import 'window_mode.dart';
@@ -29,12 +27,11 @@ import 'window_state.dart';
 class WindowService with WindowListener implements WindowBridge {
   WindowService({
     DisplayEnumerator? displayEnumerator,
-    FullscreenAdapter? fullscreenAdapter,
+    DesktopFullscreenAdapter? fullscreenAdapter,
   }) : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter(),
        _fullscreenAdapter = fullscreenAdapter {
-    // D-28: 监听 FullscreenAdapter 事件，同步 fullscreen 状态到 WindowService.mode。
-    // 订阅在构造函数中完成，确保在 init() 之前就绑定。
-    _fullscreenAdapter?.events.listen(_onFullscreenEvent);
+    // D-28: 监听 FullscreenAdapter 状态变化，同步 fullscreen 到 WindowService.mode。
+    _fullscreenAdapter?.isFullscreen.addListener(_onFullscreenChanged);
   }
 
   // ─── Components ───
@@ -44,7 +41,7 @@ class WindowService with WindowListener implements WindowBridge {
   final DisplayEnumerator _displayEnumerator;
 
   /// 全屏适配器 — 非 null 时 fullscreen 操作委托给此适配器 (D-28)。
-  final FullscreenAdapter? _fullscreenAdapter;
+  final DesktopFullscreenAdapter? _fullscreenAdapter;
 
   // Importers: app.dart creates WindowService; player_screen.dart uses WindowBridge
   // Affected API: init() uses setBounds, onWindowResize uses _isProgrammaticResize/_skipNextResize
@@ -133,42 +130,22 @@ class WindowService with WindowListener implements WindowBridge {
     windowManager.addListener(this);
   }
 
-  // ─── FullscreenAdapter event sync (D-28) ───
+  // ─── FullscreenAdapter state sync (D-28) ───
 
-  /// FullscreenAdapter 事件回调 — 将全屏状态同步到 WindowService.mode。
+  /// FullscreenAdapter 状态回调 — 将全屏状态同步到 WindowService.mode。
   ///
   /// 仅在 _fullscreenAdapter 非 null 时生效。
-  /// Entered → mode = fullscreen, Left → mode = windowed。
-  void _onFullscreenEvent(FullscreenEvent event) {
+  /// isFullscreen.value = true → mode = fullscreen, false → mode = windowed。
+  void _onFullscreenChanged() {
     if (_disposed) return;
-    switch (event) {
-      case Entered():
-        _updateOnUIThread(() {
-          if (_state.mode.value != WindowMode.fullscreen) {
-            _state.mode.value = WindowMode.fullscreen;
-          }
-        });
-      case Left():
-        _updateOnUIThread(() {
-          if (_state.mode.value == WindowMode.fullscreen) {
-            _state.mode.value = WindowMode.windowed;
-          }
-        });
-      case ForcedChange(actualMode: final actual):
-        _updateOnUIThread(() {
-          _state.mode.value = actual == FullscreenMode.windowed
-              ? WindowMode.windowed
-              : WindowMode.fullscreen;
-        });
-      case SyncCorrected(actual: final actual):
-        _updateOnUIThread(() {
-          _state.mode.value = actual == FullscreenMode.windowed
-              ? WindowMode.windowed
-              : WindowMode.fullscreen;
-        });
-      default:
-        break;
-    }
+    _updateOnUIThread(() {
+      final target = _fullscreenAdapter!.isFullscreen.value
+          ? WindowMode.fullscreen
+          : WindowMode.windowed;
+      if (_state.mode.value != target) {
+        _state.mode.value = target;
+      }
+    });
   }
 
   // ─── WindowListener: OS callbacks drive state ───
@@ -286,15 +263,19 @@ class WindowService with WindowListener implements WindowBridge {
         // D-28: 退出全屏委托给 FullscreenAdapter
         if (_state.mode.value == WindowMode.fullscreen &&
             _fullscreenAdapter != null) {
-          await _fullscreenAdapter.setFullscreen(false);
-          // FullscreenAdapter Left 事件驱动 mode 更新
+          // T2: 同步更新 mode — 不等 FullscreenAdapter Left 事件。
+          // 与 fullscreen 分支对称，消除 1 帧延迟。
+          _state.mode.value = WindowMode.windowed;
+          // BUG-03 修正: 退出全屏失败时回滚 mode
+          try {
+            await _fullscreenAdapter.setFullscreen(false);
+          } on Exception catch (e) {
+            _state.mode.value = WindowMode.fullscreen;
+            debugPrint('[WindowService] fullscreen exit failed: $e');
+          }
         } else if (_state.mode.value == WindowMode.maximized) {
           await windowManager.unmaximize();
           // OS 回调 onWindowUnmaximize 驱动 mode
-        } else if (_fullscreenAdapter == null) {
-          // Legacy fallback 必须与进入路径对称，否则进入后无法退出。
-          await fullScreenWindow.setFullScreen(false);
-          _state.mode.value = WindowMode.windowed;
         }
       case WindowMode.maximized:
         await windowManager.maximize();
@@ -305,13 +286,18 @@ class WindowService with WindowListener implements WindowBridge {
       case WindowMode.fullscreen:
         // D-28: 进入全屏委托给 FullscreenAdapter (D-31: 不在 WindowService 加 flag)
         if (_fullscreenAdapter != null) {
-          await _fullscreenAdapter.setFullscreen(true);
-          // FullscreenAdapter Entered 事件驱动 mode 更新
-        } else {
-          // TODO(ARCH-03): v1.2 移除此分支 — D-46: RC 后 2 版本内无 blocker 则删除
-          // @deprecated(v1.2) — 旧 fullscreen_window 直连，保留为 fallback。新实现通过 FullscreenAdapter。
-          await fullScreenWindow.setFullScreen(true);
+          // T2: 同步更新 mode — 不等 FullscreenAdapter Entered 事件。
+          // _updateOnUIThread 在非 idle 阶段用 addPostFrameCallback 延迟 1 帧，
+          // 导致 DragToResizeArea 以 windowed 布局渲染到全屏窗口 = 布局错位。
+          // 先设 mode，Adapter 事件到达时已是目标值，不触发额外 rebuild。
           _state.mode.value = WindowMode.fullscreen;
+          // BUG-03 修正: 全屏失败时回滚 mode，避免状态不一致
+          try {
+            await _fullscreenAdapter.setFullscreen(true);
+          } on Exception catch (e) {
+            _state.mode.value = WindowMode.windowed;
+            debugPrint('[WindowService] fullscreen enter failed: $e');
+          }
         }
     }
   }
@@ -363,6 +349,7 @@ class WindowService with WindowListener implements WindowBridge {
     _disposed = true;
     _resizeDebounce?.cancel();
     _resizeEndTimer?.cancel();
+    _fullscreenAdapter?.isFullscreen.removeListener(_onFullscreenChanged);
     _fullscreenAdapter?.dispose();
     _state.dispose();
     _persistence.dispose();

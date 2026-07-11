@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'kernel/bridge/desktop_fullscreen_adapter.dart';
 import 'kernel/bridge/desktop_fullscreen_driver_factory.dart';
-import 'kernel/bridge/fullscreen_adapter.dart';
 import 'kernel/bridge/window_service.dart';
 import 'kernel/engine/engine_prewarm.dart';
 import 'kernel/engine/mock_engine.dart';
@@ -48,7 +47,7 @@ Future<void> main() async {
   //   1. DesktopFullscreenDriverFactory.create() ← 每平台最优驱动 (D-P02)
   //   2. DesktopFullscreenAdapter(driver)         ← 持有 driver + 回调转发 (D-P11)
   //   3. WindowService(fullscreenAdapter)         ← 转发全屏操作
-  FullscreenAdapter? fullscreenAdapter;
+  DesktopFullscreenAdapter? fullscreenAdapter;
   if (_useNewFullscreen) {
     final driver = DesktopFullscreenDriverFactory.create();
     fullscreenAdapter = DesktopFullscreenAdapter(driver);
