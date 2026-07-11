@@ -597,6 +597,7 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
         'playbackSpeed': playbackSpeed,
       };
       for (final entry in notifiers.entries) {
+        // ignore: invalid_use_of_protected_member
         if (entry.value.hasListeners) {
           debugPrint('⚠️ FvpEngine.dispose: ${entry.key} still has listeners');
         }
