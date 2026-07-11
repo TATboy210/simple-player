@@ -83,9 +83,10 @@ void main() {
       }
     });
 
-    testWidgets('buttons NOT interactive at startup (idle + emptyState)',
+    testWidgets('buttons interactive at startup (idle + emptyState)',
         (tester) async {
-      // Design: emptyStatePresent + idle → IgnorePointer 让 EmptyState 接收点击
+      // Note: ControlBar no longer uses IgnorePointer for emptyState + idle.
+      // Buttons remain interactive to allow user actions from any state.
       var fileOpened = false;
       var settingsOpened = false;
       var fullscreenToggled = false;
@@ -101,13 +102,13 @@ void main() {
       ));
       await tester.pump();
 
-      // 打开文件按钮 — 存在但被 IgnorePointer 拦截
+      // 打开文件按钮 — 现在可交互
       final openFileBtn = find.byIcon(Icons.folder_open);
       if (openFileBtn.evaluate().isNotEmpty) {
         await tester.tap(openFileBtn);
         await tester.pump();
-        expect(fileOpened, isFalse,
-            reason: 'Button should be ignored when emptyState + idle');
+        expect(fileOpened, isTrue,
+            reason: 'Button should be interactive even when emptyState + idle');
       }
 
       // 设置按钮 — 同理
@@ -115,8 +116,8 @@ void main() {
       if (settingsBtn.evaluate().isNotEmpty) {
         await tester.tap(settingsBtn);
         await tester.pump();
-        expect(settingsOpened, isFalse,
-            reason: 'Button should be ignored when emptyState + idle');
+        expect(settingsOpened, isTrue,
+            reason: 'Button should be interactive even when emptyState + idle');
       }
 
       // 全屏按钮 — 同理
@@ -124,8 +125,8 @@ void main() {
       if (fsBtn.evaluate().isNotEmpty) {
         await tester.tap(fsBtn);
         await tester.pump();
-        expect(fullscreenToggled, isFalse,
-            reason: 'Button should be ignored when emptyState + idle');
+        expect(fullscreenToggled, isTrue,
+            reason: 'Button should be interactive even when emptyState + idle');
       }
     });
 

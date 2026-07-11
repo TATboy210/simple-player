@@ -13,7 +13,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_driver.dart';
 import 'package:simple_player_flutter/kernel/bridge/desktop_fullscreen_driver_factory.dart';
 import 'package:simple_player_flutter/kernel/bridge/platform/windows_fullscreen_driver.dart';
-import 'package:simple_player_flutter/kernel/bridge/win32/win32_fullscreen_ffi.dart';
 
 void main() {
   // 初始化 Flutter test binding — windowManager 单例需要 binaryMessenger。

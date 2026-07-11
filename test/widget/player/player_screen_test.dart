@@ -181,8 +181,8 @@ void main() {
 
       // PlayerScreen 正常构建，callback 被接受
       expect(find.byType(PlayerScreen), findsOneWidget);
-      // onTogglePlaylist 通过 ControlsOverlay 的 PlayerActions 触发
-      // 无法直接点击（需要 ControlsOverlay 完整渲染），只验证 wiring 无 crash
+      // toggled 在此作用域仅用于验证 callback 无 crash，非直接触发
+      expect(toggled, isFalse);
     });
 
     // ── onOpenFile callback wiring ──
@@ -213,6 +213,8 @@ void main() {
       );
       await tester.pump();
       expect(find.byType(PlayerScreen), findsOneWidget);
+      // opened 在此作用域仅用于验证 callback 无 crash，非直接触发
+      expect(opened, isFalse);
     });
 
     // ── onFilesDropped callback wiring ──

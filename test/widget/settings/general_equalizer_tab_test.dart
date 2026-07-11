@@ -6,8 +6,6 @@ import 'package:simple_player_flutter/ui/dialogs/settings/equalizer_tab.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import 'package:simple_player_flutter/ui/shared/section_header.dart';
 import 'package:simple_player_flutter/ui/shared/settings_card.dart';
-import 'package:simple_player_flutter/ui/theme/tokens.dart';
-import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 
 import '../../helpers/fake_engine.dart';
 
