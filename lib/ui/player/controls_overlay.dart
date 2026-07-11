@@ -82,6 +82,12 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   /// resize 状态标记 — resize 期间忽略 engine 状态变化，避免 controller 竞争（Pitfall 2）
   bool _isResizing = false;
 
+  /// 全屏切换过渡标记 — 跳过 isResizing 触发的控制栏淡出。
+  ///
+  /// 全屏切换 (F键/双击) 触发 isResizing=true 时，reverse() 会让控制栏
+  /// 闪烁消失。此标记在 isFullscreen 变化时设置，在 resize 结束时清除。
+  bool _isFullscreenTransition = false;
+
   @override
   void initState() {
     super.initState();
@@ -133,15 +139,22 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   }
 
   /// resize 信号变化回调 — resizing=true 时 reverse() 淡出，false 时根据 engine 状态恢复装饰（D-07）
+  ///
+  /// T3: 全屏切换期间 (isFullscreenTransition=true) 跳过 reverse()，
+  /// 避免控制栏因 isResizing 信号闪烁消失。
   void _onResizeChanged() {
     final resizing = widget.resizing?.value ?? false;
     // CB-06: 同步 AutoHideController — resize 期间冻结隐藏计时器
     _autoHide.resizing = resizing;
     if (resizing) {
       _isResizing = true;
-      _animController.reverse(); // 1.0 → 0.0，150ms easeOut
+      if (!_isFullscreenTransition) {
+        // 仅用户拖拽调整窗口大小时淡出，全屏切换不触发
+        _animController.reverse(); // 1.0 → 0.0，150ms easeOut
+      }
     } else {
       _isResizing = false;
+      _isFullscreenTransition = false; // 清除标记，恢复正常 resize 行为
       // resize 结束后根据 engine 状态恢复正确装饰
       final isIdle = widget.engine.state.value == MediaState.idle;
       if (isIdle) {
@@ -171,6 +184,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isFullscreen != widget.isFullscreen) {
       _autoHide.isFullscreen = widget.isFullscreen;
+      // T3: 标记全屏切换过渡 — 下次 isResizing=true 时跳过 reverse()
+      _isFullscreenTransition = true;
     }
     // resizing 监听迁移 — 旧值移除，新值添加（CB-06: 同步当前值）
     if (oldWidget.resizing != widget.resizing) {
