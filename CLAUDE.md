@@ -91,7 +91,6 @@ lib/
 | Space | Play/Pause |
 | Left/Right | Seek ±5s |
 | Up/Down | Volume ±5% |
-| F | Toggle fullscreen |
 | M | Toggle mute |
 | N | Previous track |
 | P | Next track |

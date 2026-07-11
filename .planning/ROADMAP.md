@@ -1,175 +1,104 @@
-# Roadmap: Player Fullscreen v2
+# Roadmap: Player Fullscreen v3 Simplification
 
 **Created:** 2026-07-09
-**v2 Phases:** 3
-**v2 Requirements:** 11
+**v3 Phases:** 3
+**v3 Requirements:** 8
 **Mode:** standard
 
 ---
 
-## v1 Phases (已完成)
+## v1/v2 Phases (已完成)
 
 <details>
 <summary>✅ v1.0 Fullscreen Architecture (Phases 1-4) — SHIPPED 2026-07-10</summary>
 
-### Phase 1: 架构定稿与核心模型
+v1 建立了 FullscreenAdapter、CommandQueue、状态机、错误模型。现已确认过度工程化。
 
-**Goal:** FullscreenAdapter 抽象层、状态模型、事件流、错误模型
-**Status:** Complete (3 plans)
+</details>
 
-Plans:
+<details>
+<summary>✅ v2.0 Performance (Phase 5) — SHIPPED 2026-07-11</summary>
 
-- [x] 01-01: FullscreenAdapter 接口定义
-- [x] 01-02: 状态模型与事件系统
-- [x] 01-03: 错误处理与恢复策略
-
-### Phase 2: 命令队列与恢复策略
-
-**Goal:** per-window 命令串行化、幂等合并、状态回读、恢复策略
-**Status:** Complete (3 plans)
-
-Plans:
-
-- [x] 02-01: 命令队列实现
-- [x] 02-02: 幂等合并与状态回读
-- [x] 02-03: 恢复策略全覆盖
-
-### Phase 3: 平台适配与深化
-
-**Goal:** Windows/macOS/Linux 三端全屏驱动生产级稳定
-**Status:** Complete (4 plans)
-
-Plans:
-
-- [x] 03-01: Windows WS_THICKFRAME 剥离/恢复
-- [x] 03-02: macOS 系统全屏生命周期
-- [x] 03-03: Linux GTK/WM 差异兜底
-- [x] 03-04: FullscreenCapability 能力查询
-
-### Phase 4: 质量收尾与迁移完成
-
-**Goal:** 回归矩阵、CI 补齐、旧实现可下线、RC 版本
-**Status:** Complete (3 plans)
-
-Plans:
-
-- [x] 04-01: 回归测试矩阵
-- [x] 04-02: 旧代码清理 + deprecated 标记
-- [x] 04-03: RC 版本 + E2E 验证
+FFI 路径优化、HWND 缓存、零闪烁过渡。核心 FFI 优化保留。
 
 </details>
 
 ---
 
-## v2 Phases
+## v3 Phases — 架构简化
 
-### Phase 5: 性能与Bug修复
+### Phase 8: 删除不必要的抽象层
 
-**Goal:** 全屏切换 <100ms 零闪烁，16:9视频无黑边，边框残留修复
-**Depends on:** Phase 4
-**Requirements:** PERF-01, PERF-02, PERF-03, FIX-01, FIX-02
+**Goal:** 删除 Adapter、CommandQueue、4 个 Model 类，减少 ~757 行源码 + ~2,000 行测试
+**Requirements:** SIMPLIFY-01, SIMPLIFY-02, SIMPLIFY-03
 
-**Success Criteria** (what must be TRUE):
+**Success Criteria:**
 
-  1. 全屏切换从按下 F 到画面填满 <100ms
-  2. 全屏进入/退出无黑帧/白帧/撕裂
-  3. 16:9 视频在16:9显示器上全屏无黑边
-  4. 全屏时无 WS_THICKFRAME 边框残留
-  5. Win32 FFI 系统调用次数减少50%+
-  6. flutter test 全通过，无 regression
+1. `fullscreen_adapter.dart` (68行) 已删除
+2. `fullscreen_command_queue.dart` (258行) 已删除
+3. `fullscreen_snapshot.dart` (127行) 已删除
+4. `fullscreen_error.dart` (145行) 已删除
+5. `fullscreen_event.dart` (108行) 已删除
+6. `fullscreen_request.dart` (51行) 已删除
+7. `flutter analyze` 零 error，`flutter test` 全通过
 
-**Plans:** 4 plans
+**Plans:**
 
-Plans:
-
-- [x] 05-01-PLAN.md — FIX-01+02: 视频黑边修复 + 边框残留修复
-- [x] 05-02-PLAN.md — PERF-01+02+03: FFI 路径优化 + 零闪烁过渡
-- [x] 05-03-PLAN.md — Driver 层深度优化 — 缓存、状态同步、乐观更新、工厂降级
-- [x] 05-04-PLAN.md — PERF-03 gap closure: HWND 缓存 + FFI 调用计数验证
-
-**Wave 1**
-
-- [x] 05-01: FIX-01+02: 视频黑边修复 + 边框残留修复（渲染层排查 + FFI 样式剥离）
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 05-02: PERF-01+02+03: FFI 路径优化 + 零闪烁过渡（合并系统调用、原子性操作）
-
-**Wave 3** *(Driver 层深度优化)*
-
-- [x] 05-03: Driver 层深度优化 — FFI 调用缓存、状态同步修复、macOS/Linux 乐观更新、工厂降级
-
-**Wave 4** *(Gap closure)*
-
-- [x] 05-04: PERF-03 gap closure — HWND 缓存 + FFI 调用计数精确验证
-
-**Risk:** High — 性能优化涉及底层 FFI 和渲染层
+- [ ] 08-01: 删除 CommandQueue + 4 Model 类
+- [ ] 08-02: 删除 FullscreenAdapter 抽象层
 
 ---
 
-### Phase 6: 用户体验升级
+### Phase 9: 合并与精简
 
-**Goal:** 全屏过渡动画平滑，控制栏交互响应快
-**Depends on:** Phase 5
-**Requirements:** UX-01, UX-02
+**Goal:** 合并 DesktopFullscreenAdapter 逻辑进 WindowService，精简 Driver 接口到 5 方法
+**Requirements:** SIMPLIFY-04, SIMPLIFY-05
 
-**Success Criteria** (what must be TRUE):
+**Success Criteria:**
 
-  1. 全屏进入/退出有平滑过渡效果（不突兀跳变）
-  2. 全屏时鼠标移动唤醒控制栏响应 <200ms
-  3. OSD 提示在全屏时正确显示和消失
-  4. 控制栏在全屏时自动隐藏/显示行为符合预期
+1. WindowService 直接调用 FullscreenDriver，无中间层
+2. FullscreenDriver 接口只有 5 个方法
+3. 双状态系统已消除（单一 ValueNotifier<bool>）
+4. flutter test 全通过
 
-**Plans:** 2 plans
+**Plans:**
 
-Plans:
-
-- [ ] 06-01: UX-01: 全屏过渡动画实现（Flutter AnimatedContainer + 淡入淡出）
-- [ ] 06-02: UX-02: 控制栏交互优化（鼠标唤醒区域、OSD 响应）
-
-**Risk:** Medium — 动画可能影响性能，需平衡
+- [ ] 09-01: WindowService 直接调用 Driver + 简化状态管理
+- [ ] 09-02: 精简 FullscreenDriver 接口
 
 ---
 
-### Phase 7: 技术探索与代码质量
+### Phase 10: 平台整合与测试清理
 
-**Goal:** D3D11 可行性验证、旧代码清理、测试覆盖80%+
-**Depends on:** Phase 5
-**Requirements:** EXP-01, CLEAN-01, CLEAN-02, CLEAN-03
+**Goal:** 借鉴 plugin_platform_interface 建立联合插件地基，macOS/Linux 复用原生代码，清理测试
+**Requirements:** SIMPLIFY-06, SIMPLIFY-07, SIMPLIFY-08
 
-**Success Criteria** (what must be TRUE):
+**Success Criteria:**
 
-  1. D3D11 独占全屏 POC 验证完成（可行/不可行 + 原因）
-  2. 旧 fullscreen_window 直连代码已清理或标记 @deprecated
-  3. 全屏相关代码测试覆盖率 ≥80%
-  4. 职责不清的模块已重构，flutter analyze 零 warning
-  5. 架构文档更新
+1. FullscreenPlatform 接口使用 PlatformInterface + _token 模式
+2. Windows FFI（x86 + ARM 自适应）
+3. macOS/Linux 复用 fullscreen_window 原生代码
+4. 总代码从 3,248 行减少到 ~800 行
+5. 测试从 3,555 行减少到 ~1,500 行
 
-**Plans:** 3 plans
+**Plans:**
 
-Plans:
-
-- [ ] 07-01: EXP-01: D3D11 独占全屏 POC（Win32 DXGI 互操作探索）
-- [ ] 07-02: CLEAN-01+03: 旧代码清理 + 架构重构
-- [ ] 07-03: CLEAN-02: 测试覆盖率提升（全屏切换路径全覆盖）
-
-**Risk:** Medium — D3D11 探索可能证明不可行
+- [ ] 10-01: FullscreenPlatform 接口 + Windows FFI 实现
+- [ ] 10-02: macOS/Linux 原生代码整合
+- [ ] 10-03: 测试清理
 
 ---
 
 ## Progress
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. 架构定稿与核心模型 | v1.0 | 3/3 | Complete | 2026-07-10 |
-| 2. 命令队列与恢复策略 | v1.0 | 3/3 | Complete | 2026-07-10 |
-| 3. 平台适配与深化 | v1.0 | 4/4 | Complete | 2026-07-10 |
-| 4. 质量收尾与迁移完成 | v1.0 | 3/3 | Complete | 2026-07-10 |
-| 5. 性能与Bug修复 | v2.0 | 4/4 | Complete | 2026-07-11 |
-| 6. 用户体验升级 | v2.0 | 0/2 | Not started | - |
-| 7. 技术探索与代码质量 | v2.0 | 0/3 | Not started | - |
+| Phase | Plans | Status |
+|-------|-------|--------|
+| 1-4. v1 架构建立 | 13/13 | ✅ Complete |
+| 5. 性能优化 | 4/4 | ✅ Complete |
+| 8. 删除抽象层 | 0/2 | Not started |
+| 9. 合并与精简 | 0/2 | Not started |
+| 10. 平台整合 | 0/3 | Not started |
 
 ---
 
-*Created: 2026-07-09*
-*Last updated: 2026-07-10 — v2 optimization roadmap, numeric phase format*
+*Last updated: 2026-07-11 — v3 simplification roadmap*

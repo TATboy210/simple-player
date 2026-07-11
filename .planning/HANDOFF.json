@@ -1,29 +1,42 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-10T09:49:37.721Z",
-  "phase": "04",
-  "phase_name": "quality-migration",
-  "phase_dir": ".planning/phases/04-quality-migration",
-  "plan": 3,
-  "task": 2,
-  "total_tasks": 6,
-  "status": "complete",
-  "completed_tasks": [
-    {"id": 1, "name": "04-01: regression test matrix", "status": "done", "commit": "b76253aa"},
-    {"id": 2, "name": "04-02: CI/CD + MSIX", "status": "done", "commit": "cabf04db"},
-    {"id": 3, "name": "04-03: deprecated + RC version", "status": "done", "commit": "6cfd6b13"}
+  "timestamp": "2026-07-11T10:15:00Z",
+  "phase": "8",
+  "phase_name": "删除不必要的抽象层",
+  "phase_dir": null,
+  "plan": 0,
+  "task": 0,
+  "total_tasks": 2,
+  "status": "paused",
+  "completed_tasks": [],
+  "remaining_tasks": [
+    {"id": 1, "name": "08-01: 删除 CommandQueue + 4 Model 类", "status": "not_started"},
+    {"id": 2, "name": "08-02: 删除 FullscreenAdapter 抽象层", "status": "not_started"}
   ],
-  "remaining_tasks": [],
-  "blockers": [
-    {"description": "04-01 regression tests reference wrong class names (FullscreenController vs FullscreenAdapter), need API rewrite", "type": "technical", "workaround": "Test structure and matrix docs are correct, only code needs adaptation"}
-  ],
+  "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "USE_NEW_FULLSCREEN default switched to true", "rationale": "D-46: RC uses new implementation by default", "phase": "04"},
-    {"decision": "Version bumped to 1.0.0-rc.1", "rationale": "D-48: Semantic versioning RC tag", "phase": "04"}
+    {"decision": "删除 Adapter+CommandQueue+4 Model 类", "rationale": "单窗口 app 不需要 per-window 队列和多态接口，过度工程化 ~5x", "phase": "8"},
+    {"decision": "保留 Win32 FFI 核心", "rationale": "解决真实问题（多显示器、WS_THICKFRAME、防闪烁）", "phase": "8"},
+    {"decision": "借鉴 plugin_platform_interface 联合插件模式", "rationale": "编译时类型安全 + 平台注入", "phase": "10"},
+    {"decision": "x86/ARM 不需要分支代码", "rationale": "Win32 API 跨架构一致", "phase": "10"},
+    {"decision": "macOS/Linux 复用 fullscreen_window 原生代码", "rationale": "原生代码写得好，不需要重写", "phase": "10"}
   ],
-  "uncommitted_files": [],
-  "next_action": "Milestone v1.0 complete. All 4 phases done. Run /gsd-resume-work or plan next milestone.",
-  "context_notes": "All 4 phases (A/B/C/D) complete. Phase D verification passed with noted gap."
+  "uncommitted_files": [
+    "CLAUDE.md",
+    "lib/ui/player/keyboard_handler.dart",
+    "test/widget/player/keyboard_handler_test.dart",
+    ".planning/PROJECT.md",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md",
+    ".planning/research/fullscreen-window-reverse-engineering.md",
+    ".planning/research/current-fullscreen-analysis.md",
+    ".planning/research/ARCHITECTURE.md",
+    ".planning/research/STACK.md",
+    ".planning/research/FEATURES.md",
+    ".planning/research/PITFALLS.md"
+  ],
+  "next_action": "Run /gsd-plan-phase 8 to create execution plan for deleting unnecessary abstractions",
+  "context_notes": "Reverse engineering of fullscreen_window v1.2.1 complete. Current impl is 3,248 lines across 18 files, target ~800 lines. Win32 FFI core is good, abstraction layers above it are over-engineered. v1/v2 shipped, v3 simplification roadmap created."
 }

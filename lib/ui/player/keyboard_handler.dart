@@ -17,7 +17,6 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('Space', l10n.shortcutPlayPause),
   ('← / →', l10n.shortcutSeek),
   ('↑ / ↓', l10n.shortcutVolume),
-  ('F', l10n.shortcutFullscreen),
   ('ESC', l10n.shortcutExitFullscreen),
   ('M', l10n.shortcutMute),
   ('N', l10n.shortcutNext),
@@ -32,7 +31,7 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
 /// 键盘快捷键包装器 — 支持自定义绑定
 ///
 /// Space → 播放/暂停 | ← → 后退/前进 5s | ↑ ↓ → 音量 ±5%
-/// F → 全屏 | M → 静音 | N/P → 上/下一首
+/// M → 静音 | N/P → 上/下一首
 /// O → 打开文件 | S → 字幕开关 | ESC → 退出全屏
 /// ]/[ → 字幕延迟 ± | F1 → 帮助
 /// MediaPlayPause/MediaTrackNext/MediaTrackPrevious → 媒体键
@@ -132,10 +131,6 @@ class KeyboardHandler extends StatelessWidget {
     }
     if (_keyMatches(key, 'volumeDown', LogicalKeyboardKey.arrowDown)) {
       onVolumeDown?.call();
-      return KeyEventResult.handled;
-    }
-    if (_keyMatches(key, 'fullscreen', LogicalKeyboardKey.keyF)) {
-      onToggleFullscreen?.call();
       return KeyEventResult.handled;
     }
     if (_keyMatches(key, 'mute', LogicalKeyboardKey.keyM)) {
