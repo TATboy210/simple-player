@@ -12,6 +12,5 @@ import 'engine_state.dart';
 ///
 /// The actual track methods (switchAudioTrack, switchSubtitleTrack,
 /// toggleSubtitle) are defined on [EngineState] because all FvpEngine
-/// instances support track control. This marker exists to enable future
-/// MockEngine implementations to omit track support in tests.
+/// instances support track control.
 mixin TrackControl on EngineState {}

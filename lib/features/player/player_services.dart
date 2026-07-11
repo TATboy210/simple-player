@@ -3,7 +3,6 @@
 /// 本文件实现了播放器的服务容器模式，负责：
 /// 1. 创建并持有所有播放服务实例（Engine、Playlist、PlaybackController、VideoProcessingService）
 /// 2. 提供 init/dispose 生命周期管理
-/// 3. 通过 engineOverride 支持调试模式下的 MockEngine 注入
 ///
 /// 设计原则：
 /// - 单一职责：只负责服务的创建、初始化和销毁，不涉及 UI 状态
@@ -27,7 +26,7 @@ import 'services/video_processing_service.dart';
 /// 播放器服务容器 — 创建并管理所有播放服务的生命周期
 ///
 /// [PlayerServices] 是播放器核心服务的 DI 容器，持有以下服务实例：
-/// - [EngineState] (engine) — 视频渲染引擎（FvpEngine 或 MockEngine）
+/// - [EngineState] (engine) — 视频渲染引擎
 /// - [Playlist] (playlist) — 播放列表管理
 /// - [PlaybackController] (controller) — 播放控制编排器
 /// - [VideoProcessingService] (videoProcessing) — 视频处理（亮度/对比度/旋转等）
@@ -35,7 +34,7 @@ import 'services/video_processing_service.dart';
 ///
 /// 不涉及 UI 状态，不涉及 BuildContext — 可独立于 Widget 树进行单元测试。
 class PlayerServices {
-  PlayerServices({required this.windowService, this.engineOverride});
+  PlayerServices({required this.windowService});
 
   /// 异步创建并初始化 PlayerServices 实例
   ///
@@ -44,23 +43,15 @@ class PlayerServices {
   /// 创建流程：构造 → init() → 返回已初始化的实例。
   static Future<PlayerServices> create({
     required WindowBridge windowService,
-    EngineState? engineOverride,
   }) async {
     final services = PlayerServices(
       windowService: windowService,
-      engineOverride: engineOverride,
     );
     await services.init();
     return services;
   }
 
-  /// 可选的引擎覆盖 — 调试模式下注入 MockEngine 替代 FvpEngine
-  ///
-  /// 传递此参数时，init() 会使用覆盖引擎而非创建新的 FvpEngine。
-  /// 用于单元测试和 Widget 测试中模拟引擎行为。
-  final EngineState? engineOverride;
-
-  /// 视频渲染引擎实例（FvpEngine 或 engineOverride）
+  /// 视频渲染引擎实例
   late final EngineState engine;
 
   /// 播放列表管理器
@@ -85,7 +76,7 @@ class PlayerServices {
   /// 初始化所有播放服务
   ///
   /// 初始化顺序：
-  /// 1. 创建引擎（FvpEngine 或 engineOverride）
+  /// 1. 创建引擎（FvpEngine）
   /// 2. 创建播放列表
   /// 3. 创建 PlaybackController 并注入 engine + playlist
   /// 4. 从 SettingsStore 加载设置并传递给 controller
@@ -93,7 +84,7 @@ class PlayerServices {
   ///
   /// 每个服务的创建都依赖前一个服务的结果，因此必须顺序执行。
   Future<void> init() async {
-    engine = engineOverride ?? FvpEngine();
+    engine = FvpEngine();
     playlist = Playlist();
     controller = PlaybackController(
       engine: engine,

@@ -22,13 +22,11 @@ import 'l10n/app_localizations.dart';
 class App extends StatefulWidget {
   final StartupCoordinator coordinator;
   final WindowBridge windowService;
-  final EngineState? engineOverride;
 
   const App({
     super.key,
     required this.coordinator,
     required this.windowService,
-    this.engineOverride,
   });
 
   @override
@@ -167,7 +165,6 @@ class _AppState extends State<App> {
           home: DeferredPlayerFeature(
             coordinator: widget.coordinator,
             windowService: widget.windowService,
-            engineOverride: widget.engineOverride,
             onSettings: (ctx, engine, videoProcessing) =>
                 _showSettingsPanel(ctx, engine, videoProcessing),
             onSettingsSecondary: _showSettingsQuickMenu,

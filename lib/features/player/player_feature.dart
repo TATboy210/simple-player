@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/persistence/settings_store.dart';
+import '../../kernel/services/path_validator.dart';
 import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../ui/player/player_screen.dart';
@@ -49,8 +50,6 @@ class PlayerFeature extends StatefulWidget {
   /// Win32 窗口桥接服务，用于全屏/窗口控制等原生操作
   final WindowBridge windowService;
 
-  /// 可选的引擎覆盖实例（调试模式下注入 MockEngine 替代 FvpEngine）
-  final EngineState? engineOverride;
 
   /// 打开设置面板的回调 — 需要 MaterialApp 级 BuildContext 和引擎/视频处理服务引用
   final void Function(
@@ -68,7 +67,6 @@ class PlayerFeature extends StatefulWidget {
     super.key,
     required this.coordinator,
     required this.windowService,
-    this.engineOverride,
     required this.onSettings,
     required this.onSettingsSecondary,
   });
@@ -102,7 +100,6 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     // 创建服务容器（同步构造），然后异步初始化
     _services = PlayerServices(
       windowService: widget.windowService,
-      engineOverride: widget.engineOverride,
     );
     _init();
   }
@@ -157,12 +154,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   Future<void> _openFile() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: [
-        'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm',
-        'm4v', 'ts', 'rmvb', 'mpg', 'mpeg', '3gp', 'ogv', 'vob',
-        'mp3', 'flac', 'wav', 'aac', 'ogg', 'opus', 'm4a',
-        'wma', 'ape', 'alac', 'aiff',
-      ],
+      allowedExtensions: PathValidator.supportedExtensions,
     );
     if (result != null && result.files.isNotEmpty) {
       for (final file in result.files) {
@@ -242,9 +234,12 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     final playlist = _services.playlist;
 
     // DEBUG: 首帧渲染后 dump widget 树，帮助调试布局结构（仅 debug 模式生效）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      debugDumpApp();
-    });
+    assert(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugDumpApp();
+      });
+      return true;
+    }());
 
     return PlayerScreen(
       engine: engine,
