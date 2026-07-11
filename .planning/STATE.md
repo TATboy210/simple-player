@@ -1,65 +1,61 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: fullscreen-optimization
-status: Phase 5 flicker fix planned — 05-05-PLAN.md (5 tasks, Flutter SDK 级修复)
-stopped_at: plan written, ready for implementation (2026-07-11)
-last_updated: "2026-07-11T00:00:00.000Z"
+milestone: v3.0
+milestone_name: fullscreen-simplification
+status: Research complete, roadmap created — ready for Phase 8
+last_updated: "2026-07-11T10:00:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 5
-  completed_plans: 3
+  total_plans: 7
+  completed_plans: 0
   percent: 0
 ---
 
-# Project State: Player Fullscreen v2
+# Project State: Player Fullscreen v3 Simplification
 
 ## Current Phase
 
-**Phase E:** 性能与Bug修复 — COMPLETE (3/3 plans, 85+ tests)
+**Phase 8:** 删除不必要的抽象层 — NOT STARTED
 
-## Project Reference
+## Core Value
 
-See: .planning/PROJECT.md (updated 2026-07-10)
-
-**Core value:** 全屏切换像 mpv 一样快 — <100ms，零闪烁，零黑边
-**Current focus:** Phase E — 性能与Bug修复
+全屏 = 视频占满屏幕 + 控制栏正常工作。从 3,248 行简化到 ~800 行。
 
 ## Progress
 
 ### v1 Milestone (Complete)
 
-- [x] Phase A — 架构定稿与核心模型 (3 plans)
-- [x] Phase B — 命令队列与恢复策略 (3 plans)
-- [x] Phase C — 平台适配与深化 (4 plans)
-- [x] Phase D — 质量收尾与迁移完成 (3 plans)
-- **v1 Total: 11/11 plans, 87+ tests, Milestone v1.0 DONE**
+- ✓ Phase 1-4: 架构建立（Adapter、CommandQueue、状态机）
+- **v1 Total: 13/13 plans, SHIPPED 2026-07-10**
 
-### v2 Milestone (In Progress)
+### v2 Milestone (Complete)
 
-- [ ] Phase E — 性能与Bug修复 (5 requirements, 2-3 plans)
-- [ ] Phase F — 用户体验升级 (2 requirements, 1-2 plans)
-- [ ] Phase G — 技术探索与代码质量 (4 requirements, 2-3 plans)
-- **v2 Total: 0/11 requirements, 0/3 phases**
+- ✓ Phase 5: 性能优化（FFI 路径、HWND 缓存、零闪烁）
+- **v2 Total: 4/4 plans, SHIPPED 2026-07-11**
+
+### v3 Milestone (In Progress)
+
+- [ ] Phase 8: 删除抽象层（757 行源码 + 2,000 行测试）
+- [ ] Phase 9: 合并与精简（WindowService 直调 Driver）
+- [ ] Phase 10: 平台整合（plugin_platform_interface + FFI + 原生代码）
+- **v3 Total: 0/8 requirements, 0/7 plans**
 
 ## Key Decisions
 
 | Date | Decision | Outcome |
 |------|----------|---------|
-| 2026-07-09 | FullscreenAdapter 独立于 WindowBridge | ✓ v1 Implemented |
-| 2026-07-09 | per-window 命令队列 | ✓ v1 Implemented |
-| 2026-07-09 | 执行后回读真实状态 | ✓ v1 Implemented |
-| 2026-07-09 | 禁止 win32 包 | ✓ 已确认 |
-| 2026-07-10 | D3D11 独占全屏探索 | — Pending Phase G |
-| 2026-07-10 | FFI 路径优化 | — Pending Phase E |
-| 2026-07-10 | <100ms 零闪烁目标 | ✓ 用户确认 |
-
----
-*Updated: 2026-07-10 — v2 optimization project initialized*
+| 2026-07-09 | FullscreenAdapter 独立 | ✓ v1 实施，v3 删除 |
+| 2026-07-09 | per-window 命令队列 | ✓ v1 实施，v3 删除 |
+| 2026-07-11 | 借鉴 plugin_platform_interface | — Pending Phase 10 |
+| 2026-07-11 | 保留 Win32 FFI 核心 | ✓ 已确认 |
+| 2026-07-11 | x86/ARM 不需要分支 | ✓ 已确认 |
 
 ## Session
 
-**Last session:** 2026-07-10T16:27:54.566Z
-**Stopped at:** context exhaustion at 75% (2026-07-10)
-**Resume file:** `.continue-here.md`
+**Last session:** 2026-07-11
+**Resume:** `/gsd-plan-phase 8`
+
+---
+
+*Updated: 2026-07-11 — v3 simplification initialized*
