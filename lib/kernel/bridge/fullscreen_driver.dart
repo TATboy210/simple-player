@@ -1,21 +1,15 @@
-import 'dart:ui';
-
 import '../models/fullscreen_capability.dart';
 
 /// 全屏驱动抽象接口 — 封装平台原生全屏操作。
 ///
-/// DesktopFullscreenAdapter 通过此接口与窗口管理器交互，
+/// WindowService 通过此接口与窗口管理器交互，
 /// 不直接依赖 window_manager 或 fullscreen_window。
 ///
-/// 设计约束:
-/// - 与 WindowBridge 并列，不继承
-/// - 每个方法对应一个原生调用，不做状态管理
-/// - Phase B 使用 window_manager 实现，Phase C 可替换为平台特定驱动
-/// - 不持有 WindowBridge 引用 (P0-4)
+/// v3 简化: 仅保留 fullscreen 核心操作。
+/// 窗口管理操作 (getPosition/setBounds/maximize 等) 由 WindowService
+/// 直接通过 windowManager 调用，不在 Driver 接口中重复抽象。
 abstract class FullscreenDriver {
   /// 释放平台事件订阅和其他原生资源。
-  ///
-  /// 默认实现为空，保证不需要资源的测试/通用驱动无需额外代码。
   void dispose() {}
 
   /// 进入全屏。
@@ -27,108 +21,65 @@ abstract class FullscreenDriver {
   Future<void> leaveFullscreen();
 
   /// 查询当前是否全屏。
-  ///
-  /// 返回 true 表示处于全屏状态。
   Future<bool> queryFullscreen();
-
-  /// 获取窗口当前位置。
-  Future<Offset> getPosition();
-
-  /// 获取窗口当前尺寸。
-  Future<Size> getSize();
-
-  /// 设置窗口位置和尺寸。
-  ///
-  /// [position] 为 null 时只设置尺寸。
-  /// [size] 为 null 时只设置位置。
-  Future<void> setBounds(Offset? position, Size? size);
-
-  /// 最大化窗口。
-  Future<void> maximize();
-
-  /// 恢复窗口（从最大化/最小化恢复到普通状态）。
-  Future<void> restore();
-
-  /// 聚焦窗口。
-  Future<void> focus();
-
-  /// 查询当前是否最大化。
-  ///
-  /// 通过 windowManager.isMaximized() 查询，不依赖 WindowBridge。
-  Future<bool> isMaximized();
-
-  /// 当前是否最小化。
-  ///
-  /// P2-8: RST-04 需要检测 minimized 状态。
-  Future<bool> isMinimized();
 
   /// 设置原生全屏状态变化回调 — 用于三级确认链的 Level 1 (D-P11)。
   ///
-  /// macOS: NSWindow delegate 回调 (windowDidEnterFullScreen/windowDidExitFullScreen)
+  /// macOS: NSWindow delegate 回调
   /// Linux: GdkWindow window-state-event 信号
-  /// Windows: 无需此机制 (FFI 同步操作，queryFullscreen 直接返回)
-  ///
-  /// [callback] 参数: (windowId, isFullscreen)
-  /// 默认空实现 — 不支持原生回调的 Driver (如 WindowsFullscreenDriver) 无需覆盖。
+  /// Windows: 无需此机制 (FFI 同步操作)
   set onNativeStateChanged(
     void Function(int windowId, bool isFullscreen)? callback,
-  ) {
-    // 默认空实现 — Windows FFI 驱动不需要回调机制
-  }
+  ) {}
+
+  /// 是否支持快速路径全屏操作（跳过确认链）。
+  ///
+  /// Windows FFI 驱动同步操作，无需等待原生回调或轮询。
+  bool get supportsFastPath => false;
+
+  /// 快速进入全屏 — 跳过确认链。
+  Future<void> enterFullscreenFast({int displayId = 0}) =>
+      enterFullscreen(displayId: displayId);
+
+  /// 快速退出全屏 — 跳过确认链。
+  Future<void> leaveFullscreenFast() => leaveFullscreen();
+
+  /// 获取平台全屏能力 (PLAT-04)。
+  FullscreenCapability capabilities() => const FullscreenCapability();
 
   /// 清除显示器信息缓存 (T1)。
   ///
   /// Windows 驱动缓存 monitorFromWindow + getMonitorRect 结果，
   /// WM_DISPLAYCHANGE 时应调用此方法刷新。
-  /// 默认空实现 — 仅 WindowsFullscreenDriver 有实际缓存。
   void clearMonitorCache() {}
+}
 
-  /// 获取平台全屏能力 — 每平台 Driver 返回真实值 (PLAT-04)。
-  ///
-  /// Phase B DesktopFullscreenDriver 返回默认值，
-  /// Phase C 平台驱动返回真实能力矩阵。
-  FullscreenCapability capabilities() {
-    return const FullscreenCapability();
-  }
+/// 全屏操作结果 — sealed for exhaustive pattern matching.
+///
+/// 用于 WindowService._handleEnter / _handleLeave 的类型安全错误处理。
+/// 替代原来的 `bool` 返回值，携带恢复状态信息。
+///
+/// ```dart
+/// switch (result) {
+///   case FullscreenSuccess() => // 全屏成功
+///   case FullscreenFailure(:final restored) => // 全屏失败，restored 表示是否已恢复窗口
+/// }
+/// ```
+sealed class FullscreenResult {
+  const FullscreenResult();
+}
 
-  /// 批量捕获窗口快照 — isMaximized + position + size (T4)。
-  ///
-  /// 默认实现依次调用 [isMaximized]、[getPosition]、[getSize] (3 次 async)。
-  /// Windows 驱动覆盖为 2 次 FFI (isZoomed + getWindowPlacement)。
-  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
-    return (
-      isMaximized: await isMaximized(),
-      position: await getPosition(),
-      size: await getSize(),
-    );
-  }
+/// 全屏操作成功。
+final class FullscreenSuccess extends FullscreenResult {
+  const FullscreenSuccess();
+}
 
-  // ─── 能力标志 (ARCH-01) ───
-  // 用能力查询替代 `is WindowsFullscreenDriver` 类型检查，
-  // 遵循 Liskov 替换原则：任何 Driver 实现都能通过能力标志声明自己的优化。
-
-  /// 是否支持快速路径全屏操作（跳过确认链）。
-  ///
-  /// Windows FFI 驱动同步操作，无需等待原生回调或轮询。
-  /// 默认 false — 仅 WindowsFullscreenDriver 覆盖为 true。
-  bool get supportsFastPath => false;
-
-  /// 是否支持批量快照查询。
-  ///
-  /// Windows FFI 驱动用 2 次 FFI 替代 3 次 async 调用。
-  /// 默认 false — 仅 WindowsFullscreenDriver 覆盖为 true。
-  bool get supportsBatchSnapshot => false;
-
-  /// 快速进入全屏 — 跳过确认链。
-  ///
-  /// 仅 [supportsFastPath] 为 true 时调用。
-  /// 默认实现委托给 [enterFullscreen]。
-  Future<void> enterFullscreenFast({int displayId = 0}) =>
-      enterFullscreen(displayId: displayId);
-
-  /// 快速退出全屏 — 跳过确认链。
-  ///
-  /// 仅 [supportsFastPath] 为 true 时调用。
-  /// 默认实现委托给 [leaveFullscreen]。
-  Future<void> leaveFullscreenFast() => leaveFullscreen();
+/// 全屏操作失败 — 携带窗口是否已恢复到原始状态。
+///
+/// [restored] 为 true 表示窗口已恢复到全屏前的状态，
+/// 为 false 表示恢复失败或未尝试恢复。
+final class FullscreenFailure extends FullscreenResult {
+  /// 窗口是否已恢复到全屏前的状态。
+  final bool restored;
+  const FullscreenFailure({this.restored = false});
 }
