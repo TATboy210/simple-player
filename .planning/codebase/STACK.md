@@ -1,166 +1,117 @@
 # Technology Stack
 
-**Analysis Date:** 2026-07-03
+**Analysis Date:** 2026-07-12
 
 ## Languages
 
 **Primary:**
-- Dart 3.12.2 (stable) — All application logic, UI, services, models
-- C++ 17 — Windows runner (`windows/runner/*.cpp`), Win32 window management
+- Dart 3.11.5+ - All application code (`lib/`), UI layer, business logic, persistence
 
 **Secondary:**
-- CMake — Build system for native platform runners (`windows/CMakeLists.txt`, `linux/CMakeLists.txt`)
-- ARB (JSON) — Localization strings (`lib/l10n/app_en.arb`, `lib/l10n/app_zh.arb`)
+- C++ - Windows native runner (`windows/runner/main.cpp`, `win32_window.cpp`, `flutter_window.cpp`)
+- C - Linux native runner (`linux/runner/main.cc`, `my_application.cc`)
+- Swift - macOS native runner (`macos/Runner/AppDelegate.swift`, `MainFlutterWindow.swift`)
+- C (FFI) - Win32 API bindings (`lib/kernel/bridge/win32/win32_fullscreen_ffi.dart`, `win32_display_enumerator.dart`)
 
 ## Runtime
 
 **Environment:**
-- Flutter 3.44.4 (stable channel) — Framework revision `ad70ec4617`
-- Dart SDK ^3.11.5 (resolved: 3.12.2)
-- Engine: Flutter engine `700aebeca4`
+- Flutter 3.x (desktop targets: Windows, macOS, Linux)
+- Dart SDK ^3.11.5
 
 **Package Manager:**
-- pub (Dart built-in)
-- Lockfile: present (`pubspec.lock`)
-
-**Target Platform:**
-- Windows desktop (primary, x64)
-- Linux desktop (secondary, CMake build)
-- macOS desktop (secondary, Xcode build)
+- pub (Flutter built-in)
+- Lockfile: `pubspec.lock` (present, committed)
 
 ## Frameworks
 
 **Core:**
-- Flutter 3.44.4 — UI framework, Material Design, platform channels
-- fvp 0.37.2 — Media playback engine (MDK/FFmpeg + D3D11 rendering)
-
-**State Management:**
-- ValueNotifier + ValueListenableBuilder — No Provider/Riverpod/Bloc, pure Flutter reactive state
+- Flutter - Cross-platform UI framework (desktop-focused)
+- fvp ^0.37.2 - Media playback engine (MDK/FFmpeg wrapper, D3D11 rendering on Windows)
+- window_manager ^0.5.2 - Window management (positioning, frameless, title bar)
+- hotkey_manager ^0.2.3 - Global hotkey registration
 
 **Testing:**
-- flutter_test (SDK) — Unit and widget tests
-- integration_test (SDK) — Integration tests
-- flutter_goldens — Golden image tests (`test/golden/`)
+- flutter_test (SDK) - Widget and unit testing
+- integration_test (SDK) - Integration testing
+- build_runner ^2.15.0 - Code generation runner (for freezed)
 
 **Build/Dev:**
-- build_runner 2.15.0 — Code generation (freezed, json_serializable)
-- freezed 3.2.5 — Immutable data classes with copyWith/JSON support
-- pigeon 27.1.0 — Platform channel code generation
+- flutter_lints ^6.0.0 - Lint rules
+- freezed ^3.2.5 (dev) - Immutable data class code generation
+- pigeon (dev) - Type-safe platform channel code generation
+- msix ^3.16.0 (dev) - Windows MSIX packaging
 
 ## Key Dependencies
 
-**Critical (Media Playback):**
-- fvp 0.37.2 — FFmpeg + MDK media engine, D3D11 texture rendering
-- ffi 2.2.0 — Dart FFI for Win32 API calls (display enumeration, window management)
+**Critical (media playback):**
+- fvp ^0.37.2 - MDK/FFmpeg playback engine; D3D11 hardware decoding on Windows, NVDEC GPU acceleration
+- ffi ^2.1.0 - Dart FFI for direct Win32 API calls (fullscreen, display enumeration)
 
-**Window Management:**
-- window_manager 0.5.1 — Cross-platform window control (position, size, fullscreen, always-on-top)
-- fullscreen_window 1.3.0 (local package) — Platform-specific fullscreen toggle (`packages/fullscreen_window/`)
-- hotkey_manager 0.2.3 — System-wide media key registration (play/pause/next/prev)
+**Infrastructure:**
+- shared_preferences ^2.5.5 - Key-value persistence (settings, window geometry)
+- path_provider ^2.1.5 - Platform-appropriate file paths (logs, playlists)
+- path ^1.9.1 - Cross-platform path manipulation
+- crypto ^3.0.6 - Hash generation (file identification)
+- logger ^2.5.0 - Structured logging with PrettyPrinter
 
-**File System:**
-- file_picker 11.0.2 — Native file open dialog
-- desktop_drop 0.7.1 — Drag-and-drop file support
-- path_provider 2.1.6 — Platform-specific app data directories
-- path 1.9.1 — Path manipulation utilities
-- xdg_directories 1.1.0 — Linux XDG directory resolution
-- file_selector 1.1.0 — File selection abstraction
-
-**Data/Storage:**
-- shared_preferences 2.5.5 — Key-value persistence (settings, window geometry)
-- crypto 3.0.7 — Hash functions for cache keys
-
-**UI/UX:**
-- animations 2.2.0 — Material motion transitions
-- cross_file 0.3.5+2 — Cross-platform file abstraction
+**UI:**
+- window_manager ^0.5.2 - Window frame, position, fullscreen, always-on-top
+- hotkey_manager ^0.2.3 - Global keyboard shortcuts
+- desktop_drop ^0.7.1 - Drag-and-drop file support
+- file_picker ^11.0.2 - Native file picker dialog
+- file_selector - Platform file selection
+- animations - Material motion transitions
+- xdg_directories - Linux XDG base directory support
 
 **Code Generation:**
-- freezed_annotation 3.1.0 — Annotations for freezed code generation
-- json_annotation 4.12.0 — Annotations for json_serializable
+- freezed_annotation ^3.1.0 - Annotations for freezed immutable classes
+- json_annotation ^4.12.0 - JSON serialization annotations
 
-**Logging:**
-- logger 2.7.0 — Structured logging with PrettyPrinter, file rotation in release mode
+**Local Package:**
+- fullscreen_window (path: `packages/fullscreen_window`) - Forked fullscreen plugin (v1.3.0), provides platform-specific fullscreen via native plugin classes
 
 ## Configuration
 
 **Environment:**
-- `--dart-define=USE_MOCK_ENGINE=true` — Compile-time switch to use MockEngine for testing
-- `.env` file: Not used (no external API keys required)
+- No `.env` files detected - configuration is compile-time or runtime-persisted
+- Compile-time flags via `--dart-define`:
+  - `USE_WINDOWS_NATIVE_FULLSCREEN=true` - Enables Win32 FFI fullscreen driver (default: false, uses window_manager)
+- Runtime settings stored via `shared_preferences` (key-value)
 
 **Build:**
-- `pubspec.yaml` — Dart/Flutter package configuration
-- `analysis_options.yaml` — Strict mode enabled (strict-casts, strict-inference, strict-raw-types)
-- `l10n.yaml` — Localization generation config (ARB → Dart)
-- `distribute_options.yaml` — MSIX packaging config for Windows releases
-- `devtools_options.yaml` — DevTools extension settings
+- `pubspec.yaml` - Package manifest, dependencies, MSIX config
+- `analysis_options.yaml` - Strict Dart analysis (strict-casts, strict-inference, strict-raw-types)
+- `windows/CMakeLists.txt` - Windows native build
+- `linux/CMakeLists.txt` - Linux native build
+- `macos/Runner.xcodeproj/` - macOS Xcode project
 
-**Design System:**
-- Compile-time const design tokens in `lib/ui/theme/tokens.dart`
-- All visual values via `Tokens.*` static constants
-- Glassmorphism pattern: `BackdropFilter` + `bgGlass` + `borderHighlight`
-
-**Fonts:**
-- Noto Sans SC (Regular 400, Medium 500, SemiBold 600) — Bundled in `assets/fonts/`
-
-**Localization:**
-- English (en) and Chinese (zh) supported
-- Generated via `flutter gen-l10n` from ARB files
+**Linting (analysis_options.yaml):**
+- Base: `package:flutter_lints/flutter.yaml`
+- Strict mode: `strict-casts: true`, `strict-inference: true`, `strict-raw-types: true`
+- Errors elevated: `missing_required_param: error`, `missing_return: error`
+- Key rules: `prefer_const_constructors`, `prefer_final_locals`, `avoid_print`, `unawaited_futures`, `cancel_subscriptions`
 
 ## Platform Requirements
 
 **Development:**
-- Windows 10/11 (x64) — Primary development platform
-- Flutter 3.44.4+ SDK
-- Dart 3.12.2+ SDK
-- Visual Studio 2022 with C++ workload (for Windows runner build)
-- CMake 3.14+
+- Flutter SDK with desktop support enabled
+- Windows: Visual Studio 2022+ with C++ desktop development workload
+- macOS: Xcode 14+
+- Linux: GTK 3 development libraries, CMake
 
 **Production:**
-- Windows 10/11 (x64) — Primary deployment target
-- D3D11-capable GPU (hardware decoding) or CPU fallback (FFmpeg soft decode)
-- Minimum window size: 854x513 (16:9 ratio)
+- Windows: MSIX packaging (msix ^3.16.0), `internetClient` capability
+- Windows: D3D11-capable GPU for hardware-accelerated playback
+- macOS/Linux: Standard desktop runtime
 
-**Build Commands:**
-```bash
-flutter pub get                 # Install dependencies
-flutter run -d windows          # Run in debug mode
-flutter analyze                 # Static analysis (strict mode)
-flutter test                    # Run all tests
-flutter build windows --release # Production build
-```
+## Package Highlights
 
-## Native Platform Layer
-
-**Windows (`windows/`):**
-- `runner/main.cpp` — Win32 entry point
-- `runner/win32_window.cpp` — Window creation with DWM integration
-- `runner/flutter_window.cpp` — Flutter view host
-- CMake build system with C++17 standard
-
-**Dart FFI (`lib/kernel/bridge/win32/`):**
-- `win32_display_enumerator.dart` — Direct Win32 FFI calls (EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow)
-- Uses `user32.dll` for display enumeration
-- No win32 package dependency (raw FFI as per project policy)
-
-**Local Package (`packages/fullscreen_window/`):**
-- Forked fullscreen plugin with Windows, Linux, macOS, web, Android, iOS support
-- Platform-specific implementations via pluginClass registrations
-
-## Development Tools
-
-**Code Generation:**
-- `build_runner` — `dart run build_runner build` for freezed/json_serializable
-- `pigeon` — Platform channel interface generation
-
-**Debugging:**
-- `DebugProbe` — Lightweight operation timing (`lib/kernel/utils/debug_probe.dart`)
-- `MemoryMonitor` — RSS memory sampling (`lib/kernel/utils/memory_monitor.dart`)
-- `DebugExporter` — One-click diagnostics export to `%APPDATA%/SimplePlayer/debug/`
-- `scripts/apply_queryfence_patch.dart` — Auto-apply fvp performance patch
-
-**MCP Integration:**
-- `code-review-graph` MCP server configured in `.mcp.json`
+**fullscreen_window (local fork at `packages/fullscreen_window/`):**
+- Version 1.3.0, forked from `jakky1/fullscreen_window`
+- Platform plugin classes: `FullscreenWindowPluginCApi` (Windows), `FullscreenWindowPlugin` (Linux/macOS)
+- Supplemented by app-level Win32 FFI driver (`lib/kernel/bridge/win32/win32_fullscreen_ffi.dart`)
 
 ---
 
-*Stack analysis: 2026-07-03*
+*Stack analysis: 2026-07-12*

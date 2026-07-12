@@ -1,283 +1,238 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-07-03
+**Analysis Date:** 2026-07-12
 
 ## Naming Patterns
 
 **Files:**
-- `snake_case.dart` for all source files: `glass_container.dart`, `playback_controller.dart`, `position_poller.dart`
-- Private files prefixed with underscore: `_settings_nav_item.dart`
-- Test files suffixed `_test.dart`, mirroring source path: `test/kernel/utils/time_utils_test.dart` for `lib/kernel/utils/time_utils.dart`
+- snake_case for all Dart files: `display_config.dart`, `engine_state.dart`
+- Test files use `_test.dart` suffix: `display_config_test.dart`, `control_bar_test.dart`
+- Feature directories use lowercase: `features/player/`, `kernel/engine/`
 
-**Classes:**
-- `PascalCase` for classes, enums, mixins, typedefs: `GlassContainer`, `MediaState`, `EngineState`
-- Private classes prefixed with `_`: `_RotatingFileOutput`, `_OsdOverlayState`
-- Capability marker mixins: `TrackControl`, `VideoEffects`, `RendererConfig`
-
-**Functions/Methods:**
-- `camelCase`: `formatMs()`, `openAndPlay()`, `seekTo()`
-- Private prefixed with `_`: `_flushImpl()`, `_migrateHistory()`
-- Boolean getters: `isAllowedMedia()`, `isPathTraversal()`, `hasVideo`, `isEmpty`
+**Functions:**
+- camelCase for all functions and methods: `getRefreshRate()`, `syncModeForHz()`
+- Private methods prefixed with underscore: `_initImpl()`, `_detectRefreshRate()`
+- Boolean getters use `is`/`has`/`can` prefix: `isPrimary`, `isBuffering`
 
 **Variables:**
-- `camelCase` for locals and fields: `rebuildCount`, `currentFileName`
-- Private fields prefixed with `_`: `_disposed`, `_debounce`, `_pendingJson`
-- Constants: `camelCase` for private (`_debounceMs`, `_maxRetries`), `UPPER_SNAKE_CASE` rarely used
+- camelCase for instance variables: `_cachedHz`, `_initialized`
+- Private fields prefixed with underscore: `_displays`, `_inner`
+- Constants use `static const`: `static const bgDeep = Color(...)`
 
-**Enum Values:**
-- `camelCase`: `loopAll`, `loopSingle`, `seeking`, `buffering`
+**Types:**
+- PascalCase for classes and enums: `DisplayConfig`, `MediaState`, `PlayMode`
+- Enums use PascalCase values: `PlayMode.loopAll`, `MediaState.playing`
 
 ## Code Style
 
 **Formatting:**
-- `dart format` (standard Dart formatter)
-- Trailing commas on multi-line argument lists
-- 2-space indentation
+- Tool: `dart format` (standard Flutter formatter)
+- Line length: 80 characters (default)
+- Single quotes for strings: `'text'` not `"text"`
 
 **Linting:**
-- Config: `analysis_options.yaml`
-- Base: `package:flutter_lints/flutter.yaml`
-- Strict mode: `strict-casts: true`, `strict-inference: true`, `strict-raw-types: true`
-- Errors: `missing_required_param: error`, `missing_return: error`
-- Key rules: `prefer_const_constructors`, `prefer_final_locals`, `avoid_print`, `prefer_single_quotes`, `always_declare_return_types`, `avoid_void_async`, `cancel_subscriptions`, `close_sinks`, `unawaited_futures`
-
-**Key Style Rules:**
-- Always use `Tokens.*` for colors, spacing, radius, fonts -- never hardcode visual values
-- Always use `debugPrint()` or the `log` module logger -- never `print()`
-- Use `const` constructors where possible
-- Use `final` for all local variables that are not reassigned
-- Prefer single quotes for strings
+- Tool: `flutter_lints` with strict mode enabled
+- Key rules from `analysis_options.yaml`:
+  - `strict-casts: true` — no implicit downcasts
+  - `strict-inference: true` — explicit types required
+  - `strict-raw-types: true` — no raw generic types
+  - `prefer_const_constructors: true`
+  - `prefer_final_locals: true`
+  - `avoid_print: true` — use `debugPrint()` or logger
+  - `unawaited_futures: true` — explicit async handling
 
 ## Import Organization
 
 **Order:**
-1. `dart:` imports (`dart:async`, `dart:convert`, `dart:io`, `dart:developer`)
-2. `package:flutter/` imports
-3. `package:` third-party imports (`package:logger/logger.dart`, `package:path/path.dart`)
-4. Relative imports (kernel, features, ui)
+1. Dart SDK imports: `dart:async`, `dart:io`, `dart:ui`
+2. Flutter imports: `package:flutter/material.dart`, `package:flutter_test/flutter_test.dart`
+3. Third-party imports: `package:fvp/mdk.dart`, `package:logger/logger.dart`
+4. Project imports: `package:simple_player_flutter/...`
+5. Relative imports: `../../helpers/fake_engine.dart`
 
 **Path Aliases:**
-- No path aliases used -- all imports are relative or package-based
-
-**Barrel Files:**
-- `engine_state.dart` re-exports `media_state.dart`, `media_error_type.dart`, `models/media_info.dart`, `track_control.dart`, `video_effects.dart`, `renderer_config.dart`
-- `glass_widgets.dart` re-exports `glass_container.dart`, `glass_chip.dart`
-- `settings_store.dart` re-exports `models/app_settings.dart`
-- Usage: `import '../shared/glass_widgets.dart';`
-
-## State Management
-
-**Pattern:** `ValueNotifier` + `ValueListenableBuilder` (no Provider/Riverpod/Bloc)
-
-```dart
-// Engine exposes ValueNotifiers
-final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
-final ValueNotifier<int> position = ValueNotifier(0);
-final ValueNotifier<double> volume = ValueNotifier(1.0);
-
-// Widgets listen via ValueListenableBuilder
-ValueListenableBuilder<MediaState>(
-  valueListenable: engine.state,
-  builder: (context, state, child) { ... },
-)
-```
-
-**File:** `lib/kernel/engine/engine_state.dart` -- `EngineState` mixin defines all ValueNotifier fields
-
-**Rules:**
-- UI widgets never directly modify engine state -- use `PlayerActions` callbacks or engine methods
-- `PlayerActions` (`lib/ui/player/player_actions.dart`) bundles all UI-to-controller callbacks
-- Widgets receive `EngineState` (mixin), never `FvpEngine` (concrete class)
+- No aliases — use full package paths: `package:simple_player_flutter/kernel/...`
+- Relative imports allowed within same feature/test directory
 
 ## Error Handling
 
 **Patterns:**
-- `try-catch` with typed `on Exception` (not bare `catch (e)`)
-- Graceful fallback: log error + return safe default, never crash
-
 ```dart
-// Storage: log + return null/empty
-} on Exception catch (e) {
-  log.e('PlaylistStore.load failed: $e');
-  return null;
+// Pattern 1: try-catch with logger
+try {
+  final display = PlatformDispatcher.instance.views.first;
+  return 60;
+} catch (e, st) {
+  logBridge.e('[DisplayConfig._detectRefreshRate] $e\n$st');
+  return 60; // safe default
 }
 
-// UI actions: log + no-op
-} on Exception catch (e) {
-  debugPrint('[FolderScanner] Failed to scan "$directory": $e');
-  return [];
+// Pattern 2: Specific exception types
+on Exception catch (e) {
+  debugPrint('[Log] file logging init failed: $e');
 }
-```
 
-**Structured Errors:**
-- `PlayerError` (`lib/kernel/models/player_error.dart`) with `PlayerErrorCode` enum
-- `ValidationResult` pattern: `String? validate(path)` returns null for valid, error message for invalid
-
-**Singleton Reset for Tests:**
-- `@visibleForTesting` static `reset()` / `resetPrewarm()` methods on singletons
-- Example: `SettingsStore.resetPrewarm()`, `PlaylistStore.reset()`
-
-## Logging
-
-**Framework:** `package:logger` with custom `PrefixPrinter`
-
-**File:** `lib/kernel/utils/log.dart`
-
-**Module Loggers:**
-```dart
-log         // global (no prefix)
-logEngine   // [engine] prefix
-logBridge   // [bridge] prefix
-logServices // [services] prefix
-logUi       // [ui] prefix
+// Pattern 3: Silent cleanup (only for non-critical operations)
+try {
+  _file.renameSync(archive.path);
+} on Exception {
+  // rename failed — continue with current file
+}
 ```
 
 **Rules:**
-- Use `debugPrint()` for simple debug output
-- Use `log.d()` / `log.w()` / `log.e()` for structured logging with module context
-- Release mode: `ProductionFilter` (warning+), rotating file output at `%APPDATA%\SimplePlayer\logs\`
-- Debug mode: console-only, all levels
+- Always catch specific exception types (not bare `catch (e)`)
+- Provide safe fallback values for non-critical operations
+- Log errors with context: `logBridge.e('[ClassName.method] $e')`
+- Never silently swallow errors in critical paths
 
-**Performance Logging:**
-- `DebugProbe` (`lib/kernel/utils/debug_probe.dart`) -- compile-time gated (`kDebugMode`), tree-shaken in release
-- `PerfMonitor` (`lib/kernel/utils/perf_monitor.dart`) -- frame timing via `SchedulerBinding.addTimingsCallback`
+## Logging
+
+**Framework:** `logger` package with custom `PrefixPrinter`
+
+**Module Loggers:**
+```dart
+log          // Global logger (no prefix)
+logEngine    // Engine module: [engine] prefix
+logBridge    // Bridge module: [bridge] prefix
+logServices  // Services module: [services] prefix
+logUi        // UI module: [ui] prefix
+```
+
+**Patterns:**
+```dart
+// Debug logging
+logEngine.d('[FvpEngine] open: $path');
+
+// Error logging with stack trace
+logBridge.e('[DisplayConfig._detectReleaseRate] $e\n$st');
+
+// Warning logging (release mode only)
+logServices.w('[PlaybackController] retry failed');
+```
+
+**Configuration:**
+- Debug mode: Console output with colors, all levels
+- Release mode: File output to `%APPDATA%\SimplePlayer\logs\`, warning+ only
+- Log rotation: 2 MB per file, keep 5 archives
 
 ## Comments
 
 **When to Comment:**
-- Every public class, enum, mixin, and non-trivial function gets a `///` doc comment
-- Chinese comments are acceptable (existing codebase convention)
-- Inline comments for non-obvious logic: explain *why*, not *what*
-- Section dividers: `// --- Section Name ---`
+- Class doc comments: Every public class and mixin
+- Method doc comments: Non-trivial public methods
+- Inline comments: Magic numbers, algorithms, side effects
+- TODO/FIXME: Include brief explanation
 
+**Language:** Chinese comments are OK (existing codebase convention)
+
+**Examples:**
 ```dart
-/// 播放控制器 — 播放器全部运行时能力的统一入口
+/// Refresh-rate-aware D3D11 sync mode policy.
 ///
-/// 组合 PlaybackNavigator / FileOperations / StateMonitor 三个子模块，
-/// UI 层只与本类交互。
-class PlaybackController { ... }
-```
+/// Detects the primary display's refresh rate and derives the optimal
+/// `d3d11.sync.cpu` value for the D3D11 rendering backend.
+class DisplayConfig {
+  DisplayConfig._();
 
-**Design Decision Tags:**
-- `D-03`, `D-08`, `D-13`, `D-14`, `D-15` -- reference design decision documents
-- Example: `// D-13: opacity < 0.01 skips BackdropFilter`
+  /// 内部实例 — 持有缓存状态，消除 static mutable state
+  static final DisplayConfig _instance = DisplayConfig._();
+
+  // 安全降级 — 未检测时假设 60Hz，选择同步模式（最安全）
+  int _cachedHz = 60;
+}
+```
 
 ## Function Design
 
-**Size:** Functions < 50 lines (20 for pure logic, 50 for UI builders). Split large functions.
+**Size:** <50 lines preferred, <20 for pure logic
 
-**Parameters:**
-- Use `required` for mandatory constructor params
-- Named parameters for optional/configurable params
-- `VoidCallback` for no-arg event handlers
-
+**Parameters:** Use named parameters for optional arguments:
 ```dart
-const PlayerActions({
-  this.onPrevious,
-  this.onNext,
-  this.onToggleFullscreen,
-  this.isVideo = false,
-});
+void configureMedia({
+  int durationMs = 60000,
+  List<AudioTrackInfo>? audioTracks,
+  List<SubtitleTrackInfo>? subtitleTracks,
+}) { ... }
 ```
 
-**Return Values:**
-- `Future<bool>` for operations with success/fail outcome
-- `String?` for validation (null = valid, string = error message)
-- `List<T>` for queries (empty list on error, never null)
+**Return Values:** Explicit return types required (strict mode)
 
 ## Module Design
 
-**Exports:**
-- Barrel files for public API surfaces
-- `show` clauses to limit re-exports: `export 'glass_container.dart' show GlassContainer, GlassButton, GlassTier;`
-
-**Singleton Pattern:**
-- Private constructor + static `_instance` + static methods
-- `@visibleForTesting` `reset()` for test isolation
-
+**Exports:** Use `export` for barrel files:
 ```dart
-class PlaylistStore {
-  static PlaylistStore _instance = PlaylistStore();
-  PlaylistStore({String? storagePath}) : _storagePath = storagePath;
-
-  static void save(Playlist playlist) => _instance._saveImpl(playlist);
-
-  @visibleForTesting
-  static void reset({PlaylistStore? newInstance}) { ... }
-}
+// engine_state.dart
+export 'media_error_type.dart';
+export 'models/media_info.dart';
+export 'media_state.dart';
 ```
 
-**Mixin Composition:**
-- `EngineState` mixin defines interface
-- Capability mixins: `TrackControl`, `VideoEffects`, `RendererConfig` (marker mixins)
-- `FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig`
-- `FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig`
+**Barrel Files:** Used for feature modules (e.g., `engine_state.dart` exports all engine types)
 
-## Immutability
+## Design System Enforcement
 
-**Data Classes:**
-- `copyWith()` pattern for immutable updates
-- `==` and `hashCode` overrides
-- `toJson()` / `fromJson()` for serialization
-
+**All visual values via `Tokens.*`:**
 ```dart
-class PlaylistItem {
-  PlaylistItem copyWith({int? timestamp, int? positionMs, int? durationMs}) {
-    return PlaylistItem(path: path, timestamp: timestamp ?? this.timestamp, ...);
-  }
-}
+// CORRECT
+color: Tokens.controlBarBg,
+borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+
+// WRONG — hardcoded values
+color: Color(0xFF0C0F18),
+borderRadius: BorderRadius.circular(16),
 ```
 
-**Nullable `copyWith` Fields:**
-- Use `_sentinel` pattern to distinguish "not provided" from "explicitly set to null"
-
+**Glass-morphism pattern:**
 ```dart
-class AppSettings {
-  static const _sentinel = Object();
-  AppSettings copyWith({Object? windowX = _sentinel, ...}) {
-    return AppSettings(windowX: windowX == _sentinel ? this.windowX : windowX as double?, ...);
-  }
-}
-```
-
-## Design System
-
-**File:** `lib/ui/theme/tokens.dart` -- `Tokens` class with static const fields
-
-**Usage:**
-- All colors via `Tokens.bgDeep`, `Tokens.accent`, `Tokens.textPrimary`, etc.
-- All spacing via `Tokens.spXs` (4), `Tokens.spSm` (8), `Tokens.spMd` (12), `Tokens.spLg` (16), `Tokens.spXl` (24)
-- All radius via `Tokens.radiusSm` (8), `Tokens.radiusMd` (14), `Tokens.radiusLg` (22), `Tokens.radiusXl` (32)
-- All fonts via `Tokens.fontFamily`, `Tokens.fontBody` (14), `Tokens.fontCaption` (12)
-- All animation durations via `Tokens.durationFast` (80), `Tokens.durationNormal` (150), `Tokens.durationFade` (300)
-- Glass blur via `Tokens.glassBlurThin` (4), `Tokens.glassBlur` (10), `Tokens.glassBlurThick` (12)
-
-**Glassmorphism Pattern:**
-```dart
-GlassContainer(
-  tier: GlassTier.normal,
-  opacity: opacityNotifier,
-  blurEnabled: true,
-  backgroundColor: Tokens.bgGlass,
-  child: ...,
+BackdropFilter(
+  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+  child: Container(
+    decoration: BoxDecoration(
+      color: Tokens.bgGlass,
+      border: Border.all(color: Tokens.borderHighlight),
+    ),
+  ),
 )
 ```
 
-## Async Patterns
+## State Management
+
+**Pattern:** ValueNotifier + ValueListenableBuilder
+
+```dart
+// Engine state
+final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
+final ValueNotifier<int> position = ValueNotifier(0);
+
+// Widget rebuild
+ValueListenableBuilder<int>(
+  valueListenable: engine.position,
+  builder: (context, value, child) {
+    return Text(formatMs(value));
+  },
+)
+```
 
 **Rules:**
-- Always `await` Futures or explicitly call `unawaited()` for fire-and-forget
-- Never mark a function `async` if it never `await`s anything
-- Check `context.mounted` before using `BuildContext` after any `await`
-- Debounce for I/O: `PlaylistStore` uses 300ms debounce timer
-- Atomic writes: write `.tmp` then `rename()` for crash safety
+- No Provider/Riverpod/Bloc — use ValueNotifier only
+- Expose state as `ValueNotifier<T>` fields
+- Widgets rebuild via `ValueListenableBuilder`
 
-## FFI / Platform Bridge
+## Async Best Practices
 
-**MethodChannel:** `com.simple_player/window` for Win32 bridge
-**File:** `lib/kernel/bridge/` -- platform-specific implementations
-**Pattern:** Always free FFI memory in `finally` blocks; document memory ownership
+```dart
+// Always await or explicitly mark fire-and-forget
+unawaited(EnginePrewarm.prewarm(...));
+
+// Check context.mounted after await
+await someAsyncOperation();
+if (!context.mounted) return;
+
+// Use Future.wait for concurrent operations
+final results = await Future.wait([op1(), op2()]);
+```
 
 ---
 
-*Convention analysis: 2026-07-03*
+*Convention analysis: 2026-07-12*
