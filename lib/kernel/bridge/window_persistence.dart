@@ -48,12 +48,6 @@ class WindowPersistence {
     });
   }
 
-  /// 保存全屏状态（立即，无防抖）。
-  // 全屏切换是离散事件，不需要防抖
-  Future<void> saveIsFullscreen(bool value) {
-    return _enqueue(() => SettingsStore.saveIsFullscreen(value));
-  }
-
   /// 写入锁：排队执行，上一个未完成时暂存最新闭包。
   // "latest wins" 策略 — 窗口几何是 last-write-wins 场景，
   // 拖拽期间的中间位置不值得持久化，只保存最终位置。

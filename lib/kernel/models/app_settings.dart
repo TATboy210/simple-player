@@ -44,9 +44,6 @@ class AppSettings {
   /// Whether the window stays above other windows.
   final bool isAlwaysOnTop;
 
-  /// Whether the window is in fullscreen mode.
-  final bool isFullscreen;
-
   /// Subtitle font size in logical pixels.
   // 17.0: 标准可读字号，1080p 下等效约 17px，参考系统默认字体大小
   final double subtitleFontSize;
@@ -99,7 +96,6 @@ class AppSettings {
     required this.playMode,
     required this.isMuted,
     this.isAlwaysOnTop = false,
-    this.isFullscreen = false,
     this.subtitleFontSize = 17.0,
     this.subtitleColorIndex = 0,
     this.subtitleBottomOffset = 80.0,
@@ -127,7 +123,6 @@ class AppSettings {
     int? playMode,
     bool? isMuted,
     bool? isAlwaysOnTop,
-    bool? isFullscreen,
     double? subtitleFontSize,
     int? subtitleColorIndex,
     double? subtitleBottomOffset,
@@ -153,7 +148,6 @@ class AppSettings {
       playMode: playMode ?? this.playMode,
       isMuted: isMuted ?? this.isMuted,
       isAlwaysOnTop: isAlwaysOnTop ?? this.isAlwaysOnTop,
-      isFullscreen: isFullscreen ?? this.isFullscreen,
       subtitleFontSize: subtitleFontSize ?? this.subtitleFontSize,
       subtitleColorIndex: subtitleColorIndex ?? this.subtitleColorIndex,
       subtitleBottomOffset:
@@ -186,7 +180,6 @@ class AppSettings {
           playMode == other.playMode &&
           isMuted == other.isMuted &&
           isAlwaysOnTop == other.isAlwaysOnTop &&
-          isFullscreen == other.isFullscreen &&
           subtitleFontSize == other.subtitleFontSize &&
           subtitleColorIndex == other.subtitleColorIndex &&
           subtitleBottomOffset == other.subtitleBottomOffset &&
@@ -213,7 +206,6 @@ class AppSettings {
     playMode,
     isMuted,
     isAlwaysOnTop,
-    isFullscreen,
     subtitleFontSize,
     subtitleColorIndex,
     subtitleBottomOffset,
