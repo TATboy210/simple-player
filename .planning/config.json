@@ -1,9 +1,9 @@
 {
-  "mode": "yolo",
+  "mode": "standard",
   "granularity": "standard",
   "parallelization": true,
   "commit_docs": true,
-  "model_profile": "adaptive",
+  "model_profile": "balanced",
   "workflow": {
     "research": true,
     "plan_check": true,
@@ -29,105 +29,5 @@
         "fallback": "- No known high-risk rollout dependencies."
       }
     ]
-  },
-  "capabilities": {
-    "flutter_quality": {
-      "enabled": true,
-      "description": "Flutter/Dart quality pipeline — architecture pre-review, integration validation, code review, performance, security",
-      "hooks": {
-        "plan:post": {
-          "kind": "step",
-          "ref": { "agent": "flutter-architecture" },
-          "blocking": false,
-          "onError": "skip",
-          "output": "ARCH-REVIEW.md"
-        },
-        "execute:wave:post": {
-          "kind": "gate",
-          "check": { "agentVerdict": "flutter-integration-validator" },
-          "blocking": true,
-          "onError": "fail",
-          "params": { "depth": "quick" },
-          "output": "VALIDATION.md"
-        },
-        "execute:post": [
-          {
-            "kind": "step",
-            "ref": { "agent": "flutter-code-reviewer" },
-            "blocking": false,
-            "onError": "skip"
-          },
-          {
-            "kind": "step",
-            "ref": { "agent": "flutter-performance" },
-            "blocking": false,
-            "onError": "skip"
-          },
-          {
-            "kind": "step",
-            "ref": { "agent": "flutter-security" },
-            "blocking": false,
-            "onError": "skip"
-          },
-          {
-            "kind": "step",
-            "ref": { "agent": "dart-correctness" },
-            "blocking": false,
-            "onError": "skip"
-          },
-          {
-            "kind": "step",
-            "ref": { "agent": "dart-performance" },
-            "blocking": false,
-            "onError": "skip"
-          },
-          {
-            "kind": "step",
-            "ref": { "agent": "dart-security" },
-            "blocking": false,
-            "onError": "skip"
-          }
-        ],
-        "verify:pre": {
-          "kind": "gate",
-          "check": { "agentVerdict": "flutter-integration-validator" },
-          "blocking": true,
-          "onError": "fail",
-          "params": { "depth": "deep" },
-          "output": "FINAL-VALIDATION.md"
-        }
-      }
-    },
-    "dart_agents": {
-      "enabled": true,
-      "description": "Dart language-level quality agents — correctness, testing, architecture, performance, security",
-      "agents": {
-        "dart-testing": {
-          "model": "sonnet",
-          "triggers": ["execute:post"],
-          "focus": "test coverage, test quality, TDD compliance"
-        },
-        "dart-architecture": {
-          "model": "sonnet",
-          "triggers": ["plan:post"],
-          "focus": "sealed types, freezed, enums, package layering"
-        },
-        "dart-correctness": {
-          "model": "sonnet",
-          "triggers": ["execute:wave:post", "execute:post"],
-          "focus": "null safety, async patterns, type safety"
-        },
-        "dart-performance": {
-          "model": "sonnet",
-          "triggers": ["execute:post"],
-          "focus": "allocations, async patterns, collections"
-        },
-        "dart-security": {
-          "model": "sonnet",
-          "triggers": ["execute:post"],
-          "focus": "input handling, parsing, regex, deserialization"
-        }
-      }
-    }
   }
 }
