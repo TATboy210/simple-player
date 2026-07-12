@@ -63,23 +63,23 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SUI-01 | — | Pending |
-| SUI-02 | — | Pending |
-| SUI-03 | — | Pending |
-| FULL-01 | — | Pending |
-| FULL-02 | — | Pending |
-| FULL-03 | — | Pending |
-| IEX-01 | — | Pending |
-| IEX-02 | — | Pending |
-| IEX-03 | — | Pending |
-| DEV-01 | — | Pending |
-| DEV-02 | — | Pending |
-| DEV-03 | — | Pending |
+| SUI-01 | Phase 2 | Pending |
+| SUI-02 | Phase 3 | Pending |
+| SUI-03 | Phase 5 | Pending |
+| FULL-01 | Phase 1 | Pending |
+| FULL-02 | Phase 1 | Pending |
+| FULL-03 | Phase 1 | Pending |
+| IEX-01 | Phase 4 | Pending |
+| IEX-02 | Phase 4 | Pending |
+| IEX-03 | Phase 4 | Pending |
+| DEV-01 | Phase 6 | Pending |
+| DEV-02 | Phase 6 | Pending |
+| DEV-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-12*
