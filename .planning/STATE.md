@@ -1,59 +1,37 @@
----
-gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: fullscreen-simplification
-status: Research complete, roadmap created — ready for Phase 8
-stopped_at: Phase 8 context gathered
-last_updated: "2026-07-12T09:43:55.969Z"
-progress:
-  total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
----
+# Project State: Simple Player — 设置面板 & 全屏重构
 
-# Project State: Player Fullscreen v3 Simplification
+**Last updated:** 2026-07-12
+**Current phase:** Not started
 
-## Current Phase
+## Project Reference
 
-**Phase 8:** 删除不必要的抽象层 — PLANNED
+See: .planning/PROJECT.md (updated 2026-07-12)
 
-## Core Value
-
-全屏 = 视频占满屏幕 + 控制栏正常工作。从 3,248 行简化到 ~800 行。
+**Core value:** 设置面板和全屏功能的代码质量与用户体验同步提升
+**Current focus:** Ready to start Phase 1
 
 ## Progress
 
-### v1 Milestone (Complete)
+| Phase | Status | Started | Completed |
+|-------|--------|---------|-----------|
+| Phase 1: 全屏代码简化 | Pending | — | — |
+| Phase 2: 设置面板视觉升级 | Pending | — | — |
+| Phase 3: Reset to Defaults | Pending | — | — |
+| Phase 4: 设置导入导出 | Pending | — | — |
+| Phase 5: 全屏交互规范化 | Pending | — | — |
+| Phase 6: 开发工作流增强 | Pending | — | — |
 
-- ✓ Phase 1-4: 架构建立（Adapter、CommandQueue、状态机）
-- **v1 Total: 13/13 plans, SHIPPED 2026-07-10**
+## Active Blockers
 
-### v2 Milestone (Complete)
+None
 
-- ✓ Phase 5: 性能优化（FFI 路径、HWND 缓存、零闪烁）
-- **v2 Total: 4/4 plans, SHIPPED 2026-07-11**
+## Decisions Log
 
-### v3 Milestone (In Progress)
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-07-12 | 保持 7 tab，不合并 | 用户明确选择 |
+| 2026-07-12 | 数据层重构 defer 到 v2 | v1 聚焦 UI + 全屏简化 |
+| 2026-07-12 | 评估 flutter_fullscreen | 用户要求检查是否可用 |
 
-- [ ] Phase 8: 删除抽象层（757 行源码 + 2,000 行测试）
-- [ ] Phase 9: 合并与精简（WindowService 直调 Driver）
-- [ ] Phase 10: 平台整合（plugin_platform_interface + FFI + 原生代码）
-- **v3 Total: 0/8 requirements, 0/7 plans**
-
-## Key Decisions
-
-| Date | Decision | Outcome |
-|------|----------|---------|
-| 2026-07-09 | FullscreenAdapter 独立 | ✓ v1 实施，v3 删除 |
-| 2026-07-09 | per-window 命令队列 | ✓ v1 实施，v3 删除 |
-| 2026-07-11 | 借鉴 plugin_platform_interface | — Pending Phase 10 |
-| 2026-07-11 | 保留 Win32 FFI 核心 | ✓ 已确认 |
-| 2026-07-11 | x86/ARM 不需要分支 | ✓ 已确认 |
-
-## Session
-
-**Last session:** 2026-07-12T09:43:55.945Z
-**Stopped at:** Phase 8 context gathered
-**Resume file:** .planning/phase-8/08-CONTEXT.md
+---
+*Created: 2026-07-12*
