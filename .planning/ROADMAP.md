@@ -50,6 +50,12 @@ Plans:
 **Goal:** 毛玻璃风格现代化，更新圆角、间距、动画、交互反馈
 
 **Requirements:** SUI-01
+**Plans:** 2 plans
+
+Plans:
+
+- [ ] 02-01-PLAN.md — Panel shell upgrade: radius 22px, sidebar 88px, nav hover/selection, tab slide, bottom button feedback (SUI-01)
+- [ ] 02-02-PLAN.md — Content section stagger animations for all 7 tabs (SUI-01)
 
 **Success Criteria:**
 
