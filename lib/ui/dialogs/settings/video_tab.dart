@@ -8,6 +8,7 @@ import '../../../features/player/models/video_processing_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/animated_section_list.dart';
 import '../../shared/section_header.dart';
 import '../../shared/settings_card.dart'; // keep for SettingSwitchRow export
 
@@ -39,8 +40,7 @@ class VideoTab extends StatelessWidget {
     final service = videoProcessing!;
     return ValueListenableBuilder<VideoProcessingState>(
       valueListenable: service.state,
-      builder: (_, s, _) => ListView(
-        padding: EdgeInsets.zero,
+      builder: (_, s, _) => AnimatedSectionList(
         children: [
           // 色彩校正 — GlassContainer + SectionHeader 替代 SettingsCard
           GlassContainer(

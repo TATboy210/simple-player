@@ -4,6 +4,7 @@ import '../../../kernel/engine/engine_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/animated_section_list.dart';
 import '../../shared/section_header.dart';
 import '../../shared/settings_card.dart'; // SettingRow export
 
@@ -28,8 +29,7 @@ class AudioTab extends StatelessWidget {
         ),
       );
     }
-    return ListView(
-      padding: EdgeInsets.zero,
+    return AnimatedSectionList(
       children: [
         // 音轨选择 — 毛玻璃卡片
         GlassContainer(

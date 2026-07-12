@@ -5,6 +5,7 @@ import '../../../kernel/persistence/settings_store.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/animated_section_list.dart';
 import '../../shared/section_header.dart';
 import '../../shared/settings_card.dart'; // keep for SettingActionRow export
 
@@ -98,7 +99,7 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
     final l10n = AppLocalizations.of(context);
     final defs = _shortcutDefs(l10n);
 
-    return Column(
+    return AnimatedSectionList(
       children: [
         // 快捷键列表
         Expanded(
