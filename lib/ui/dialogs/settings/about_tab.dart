@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/animated_section_list.dart';
 import '../../shared/section_header.dart';
 import '../../shared/settings_card.dart'; // keep for SettingRow export
 
@@ -13,8 +14,7 @@ class AboutTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return ListView(
-      padding: EdgeInsets.zero,
+    return AnimatedSectionList(
       children: [
         // 应用名称 + 版本 — GlassContainer + SectionHeader 替代 SettingsCard
         GlassContainer(

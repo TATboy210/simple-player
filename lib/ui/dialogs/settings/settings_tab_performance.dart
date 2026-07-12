@@ -5,6 +5,7 @@ import '../../../kernel/persistence/settings_store.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/animated_section_list.dart';
 import '../../shared/section_header.dart';
 import '../../shared/settings_card.dart'; // SettingSwitchRow export
 
@@ -63,8 +64,7 @@ class _PerformanceTabState extends State<PerformanceTab> {
       return const Center(child: CircularProgressIndicator());
     }
     final l10n = AppLocalizations.of(context);
-    return ListView(
-      padding: EdgeInsets.zero,
+    return AnimatedSectionList(
       children: [
         // D3D11 渲染 — 毛玻璃卡片
         GlassContainer(

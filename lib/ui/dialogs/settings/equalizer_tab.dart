@@ -4,6 +4,7 @@ import '../../../kernel/engine/engine_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/animated_section_list.dart';
 import '../../shared/section_header.dart';
 import '../../shared/settings_card.dart'; // SettingRow export
 
@@ -61,8 +62,7 @@ class _EqualizerTabState extends State<EqualizerTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return ListView(
-      padding: EdgeInsets.zero,
+    return AnimatedSectionList(
       children: [
         // 均衡器预设 — 毛玻璃卡片
         GlassContainer(
