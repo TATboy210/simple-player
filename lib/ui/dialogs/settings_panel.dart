@@ -43,6 +43,7 @@ class SettingsPanel extends StatefulWidget {
 
 class _SettingsPanelState extends State<SettingsPanel> {
   int _selectedIndex = 0;
+  int _previousIndex = 0;
   final ValueNotifier<Offset> _offset = ValueNotifier(Offset.zero);
 
   // ── GeneralTab 延迟应用的 pending 值 ──
@@ -205,8 +206,10 @@ class _SettingsPanelState extends State<SettingsPanel> {
                             _Sidebar(
                               selectedIndex: _selectedIndex,
                               l10n: l10n,
-                              onSelect: (i) =>
-                                  setState(() => _selectedIndex = i),
+                              onSelect: (i) => setState(() {
+                                _previousIndex = _selectedIndex;
+                                _selectedIndex = i;
+                              }),
                             ),
                             const VerticalDivider(
                               width: 1,
@@ -217,8 +220,33 @@ class _SettingsPanelState extends State<SettingsPanel> {
                                 padding: const EdgeInsets.all(Tokens.spMd),
                                 child: AnimatedSwitcher(
                                   duration: const Duration(
-                                    milliseconds: Tokens.durationFast,
+                                    milliseconds: Tokens.durationSlide,
                                   ),
+                                  // 滑动方向：前进(→)从右侧滑入，后退(←)从左侧滑入
+                                  transitionBuilder: (child, animation) {
+                                    final isForward =
+                                        _selectedIndex >= _previousIndex;
+                                    final offsetTween = Tween<Offset>(
+                                      begin: Offset(
+                                        isForward ? 0.3 : -0.3,
+                                        0,
+                                      ),
+                                      end: Offset.zero,
+                                    );
+                                    return FadeTransition(
+                                      opacity: animation,
+                                      child: SlideTransition(
+                                        position: animation.drive(
+                                          offsetTween.chain(
+                                            CurveTween(
+                                              curve: Curves.easeOutCubic,
+                                            ),
+                                          ),
+                                        ),
+                                        child: child,
+                                      ),
+                                    );
+                                  },
                                   child: _buildTab(_selectedIndex),
                                 ),
                               ),
@@ -292,7 +320,13 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
 // ── 底部按钮 ──
 
-class _BottomButton extends StatelessWidget {
+/// 底部操作按钮 — hover 缩放 + press 缩放 + primary 蓝色辉光
+///
+/// 交互反馈模式与 GlassButton 一致：
+/// - hover → scale 1.02（Tokens.hoverScale）
+/// - press → scale 0.98（Tokens.pressScale）
+/// - primary 按钮额外添加 accent BoxShadow 辉光
+class _BottomButton extends StatefulWidget {
   final String label;
   final bool primary;
   final VoidCallback onTap;
@@ -304,32 +338,105 @@ class _BottomButton extends StatelessWidget {
   });
 
   @override
+  State<_BottomButton> createState() => _BottomButtonState();
+}
+
+class _BottomButtonState extends State<_BottomButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleController;
+  late final Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationFast),
+      lowerBound: Tokens.pressScale,
+      upperBound: Tokens.hoverScale,
+      value: 1.0,
+    );
+    _scaleAnim = _scaleController;
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _onHoverChanged(bool hovering) {
+    _scaleController.animateTo(hovering ? Tokens.hoverScale : 1.0);
+  }
+
+  void _onTapDown(TapDownDetails _) {
+    _scaleController.value = Tokens.pressScale;
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    _scaleController.animateTo(1.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Tokens.radiusSm),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Tokens.spMd,
-          vertical: Tokens.spXs,
+    // primary 按钮带 accent 蓝色辉光
+    final boxShadow = widget.primary
+        ? [
+            BoxShadow(
+              color: Tokens.accent.withValues(alpha: 0.3),
+              blurRadius: 8,
+              spreadRadius: -2,
+            ),
+          ]
+        : null;
+
+    final content = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Tokens.spMd,
+        vertical: Tokens.spXs,
+      ),
+      decoration: BoxDecoration(
+        color: widget.primary ? Tokens.accent : Colors.transparent,
+        border: Border.all(
+          color:
+              widget.primary ? Tokens.accent : Tokens.borderHighlight,
+          width: 1,
         ),
-        decoration: BoxDecoration(
-          color: primary ? Tokens.accent : Colors.transparent,
-          border: Border.all(
-            color: primary ? Tokens.accent : Tokens.borderHighlight,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: primary ? Colors.white : Tokens.textSecondary,
-            fontSize: Tokens.fontCaption,
-            fontWeight: primary ? Tokens.weightMedium : Tokens.weightRegular,
-          ),
+        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+        boxShadow: boxShadow,
+      ),
+      child: Text(
+        widget.label,
+        style: TextStyle(
+          color: widget.primary ? Colors.white : Tokens.textSecondary,
+          fontSize: Tokens.fontCaption,
+          fontWeight:
+              widget.primary ? Tokens.weightMedium : Tokens.weightRegular,
         ),
       ),
+    );
+
+    final button = Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(Tokens.radiusSm),
+      child: InkWell(
+        onTap: widget.onTap,
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: () => _scaleController.animateTo(1.0),
+        hoverColor: Tokens.bgHover,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+        splashFactory: NoSplash.splashFactory,
+        child: content,
+      ),
+    );
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => _onHoverChanged(true),
+      onExit: (_) => _onHoverChanged(false),
+      child: ScaleTransition(scale: _scaleAnim, child: button),
     );
   }
 }
