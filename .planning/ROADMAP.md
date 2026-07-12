@@ -8,7 +8,7 @@
 
 | # | Phase | Goal | Requirements | Est. Time |
 |---|-------|------|--------------|-----------|
-| 1 | 全屏代码简化 | 减少层数、建立单一数据源、评估 flutter_fullscreen | FULL-01, FULL-02, FULL-03 | ~3h |
+| 1 | 全屏代码简化 | 2/0 | Complete    | 2026-07-12 |
 | 2 | 设置面板视觉升级 | 毛玻璃风格现代化，圆角/间距/动画/交互反馈 | SUI-01 | ~3h |
 | 3 | Reset to Defaults | 每个 tab 独立重置按钮，确认提示 | SUI-02 | ~2h |
 | 4 | 设置导入导出 | JSON 导出/导入，格式校验，确认提示 | IEX-01, IEX-02, IEX-03 | ~2h |
@@ -23,11 +23,19 @@
 ## Phase Details
 
 ### Phase 1: 全屏代码简化
+
 **Goal:** 减少全屏代码层数，建立 WindowService 为单一数据源，评估是否引入 flutter_fullscreen 包
 
 **Requirements:** FULL-01, FULL-02, FULL-03
+**Plans:** 2/0 plans complete
+
+Plans:
+
+- [x] 01-01-PLAN.md — Delete dead driver layer + inline platform detection + FullscreenResult sealed class (FULL-01, FULL-02)
+- [x] 01-02-PLAN.md — Consolidate fullscreen state + simplify timers and confirmation chain (FULL-03)
 
 **Success Criteria:**
+
 1. FullscreenDriver/WindowService/SettingsStore 间接层减少 1 层以上
 2. flutter_fullscreen 评估文档完成，明确结论
 3. SettingsStore 不再有 saveIsFullscreen/isFullscreen（UI 层直接调用 WindowService）
@@ -38,11 +46,13 @@
 ---
 
 ### Phase 2: 设置面板视觉升级
+
 **Goal:** 毛玻璃风格现代化，更新圆角、间距、动画、交互反馈
 
 **Requirements:** SUI-01
 
 **Success Criteria:**
+
 1. 圆角/间距与 Tokens.* 一致
 2. tab 切换有过渡动画
 3. 交互反馈与播放器控制栏风格一致
@@ -53,11 +63,13 @@
 ---
 
 ### Phase 3: Reset to Defaults
+
 **Goal:** 每个 tab 独立重置按钮
 
 **Requirements:** SUI-02
 
 **Success Criteria:**
+
 1. 每个 tab 右上角有重置按钮
 2. 点击后显示确认提示
 3. 确认后仅重置该 tab 设置项
@@ -68,11 +80,13 @@
 ---
 
 ### Phase 4: 设置导入导出
+
 **Goal:** JSON 导出/导入设置
 
 **Requirements:** IEX-01, IEX-02, IEX-03
 
 **Success Criteria:**
+
 1. 导出按钮 → 选择保存位置 → .json 文件
 2. 导入按钮 → 选择 .json 文件
 3. 导入前确认对话框
@@ -84,11 +98,13 @@
 ---
 
 ### Phase 5: 全屏与设置面板交互规范化
+
 **Goal:** 进入/退出全屏时设置面板行为正确
 
 **Requirements:** SUI-03
 
 **Success Criteria:**
+
 1. 进入全屏时面板不遮挡视频
 2. 退出全屏时面板状态保持
 3. 全屏下打开/关闭面板正常
@@ -99,11 +115,13 @@
 ---
 
 ### Phase 6: 开发工作流增强
+
 **Goal:** Context7 文档查询、codegraph 源码参考、Quality Pipeline 评估
 
 **Requirements:** DEV-01, DEV-02, DEV-03
 
 **Success Criteria:**
+
 1. Context7 MCP 查询 Flutter API 文档可用
 2. codegraph 分析 Flutter SDK 源码可用
 3. Quality Pipeline 评估文档完成

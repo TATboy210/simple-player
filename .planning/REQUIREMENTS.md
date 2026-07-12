@@ -13,9 +13,9 @@
 
 ### Fullscreen — 全屏代码简化
 
-- [ ] **FULL-01**: 全屏代码层数减少 — 合并分散逻辑，降低 FullscreenDriver/WindowService/SettingsStore 之间的间接层
-- [ ] **FULL-02**: 评估 flutter_fullscreen 包适用性 — 对比现有 Win32 FFI 实现，决定是否引入或保持自研
-- [ ] **FULL-03**: 全屏状态单一数据源 — WindowService 作为唯一 owner，移除 SettingsStore 中的全屏相关状态
+- [x] **FULL-01**: 全屏代码层数减少 — 合并分散逻辑，降低 FullscreenDriver/WindowService/SettingsStore 之间的间接层
+- [x] **FULL-02**: 评估 flutter_fullscreen 包适用性 — 对比现有 Win32 FFI 实现，决定是否引入或保持自研
+- [x] **FULL-03**: 全屏状态单一数据源 — WindowService 作为唯一 owner，移除 SettingsStore 中的全屏相关状态
 
 ### Import/Export — 设置导入导出
 
@@ -66,9 +66,9 @@
 | SUI-01 | Phase 2 | Pending |
 | SUI-02 | Phase 3 | Pending |
 | SUI-03 | Phase 5 | Pending |
-| FULL-01 | Phase 1 | Pending |
-| FULL-02 | Phase 1 | Pending |
-| FULL-03 | Phase 1 | Pending |
+| FULL-01 | Phase 1 | Complete |
+| FULL-02 | Phase 1 | Complete |
+| FULL-03 | Phase 1 | Complete |
 | IEX-01 | Phase 4 | Pending |
 | IEX-02 | Phase 4 | Pending |
 | IEX-03 | Phase 4 | Pending |
@@ -77,6 +77,7 @@
 | DEV-03 | Phase 6 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 12 total
 - Mapped to phases: 12
 - Unmapped: 0 ✓
