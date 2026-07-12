@@ -23,7 +23,7 @@ class SettingsNavItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(Tokens.radiusSm),
       child: Container(
-        width: 64,
+        width: 80,
         padding: const EdgeInsets.symmetric(vertical: Tokens.spSm),
         decoration: BoxDecoration(
           color: selected ? Tokens.bgHover : Colors.transparent,

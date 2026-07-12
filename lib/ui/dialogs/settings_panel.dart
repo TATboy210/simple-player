@@ -144,7 +144,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
             child: Padding(
               padding: const EdgeInsets.only(left: 80, top: 48),
               child: GlassContainer(
-                borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+                borderRadius: BorderRadius.circular(Tokens.radiusLg),
                 child: SizedBox(
                   width: 600,
                   height: 480,
@@ -350,7 +350,7 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 72,
+      width: 88,
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: Tokens.spSm),
         children: [
