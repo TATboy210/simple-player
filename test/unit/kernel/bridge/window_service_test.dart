@@ -133,6 +133,34 @@ void main() {
       service.dispose();
     });
   });
+
+  // ─── isFullscreen derivation from mode (Task 2) ───
+
+  group('isFullscreen derives from mode', () {
+    test('isFullscreen returns false when mode is windowed', () {
+      final service = WindowService();
+      expect(service.isFullscreen, isFalse);
+      expect(service.state.mode.value, WindowMode.windowed);
+      service.dispose();
+    });
+
+    test('isFullscreen returns true when mode is fullscreen', () {
+      final service = WindowService();
+      service.state.mode.value = WindowMode.fullscreen;
+      expect(service.isFullscreen, isTrue);
+      service.dispose();
+    });
+
+    test('isFullscreen tracks mode changes', () {
+      final service = WindowService();
+      expect(service.isFullscreen, isFalse);
+      service.state.mode.value = WindowMode.fullscreen;
+      expect(service.isFullscreen, isTrue);
+      service.state.mode.value = WindowMode.windowed;
+      expect(service.isFullscreen, isFalse);
+      service.dispose();
+    });
+  });
 }
 
 /// 测试用假驱动 — 支持 fast-path 标志和异常模拟。
