@@ -9,7 +9,7 @@
 | # | Phase | Goal | Requirements | Est. Time |
 |---|-------|------|--------------|-----------|
 | 1 | 全屏代码简化 | 2/0 | Complete    | 2026-07-12 |
-| 2 | 设置面板视觉升级 | 毛玻璃风格现代化，圆角/间距/动画/交互反馈 | SUI-01 | ~3h |
+| 2 | 设置面板视觉升级 | 2/2 | Complete   | 2026-07-12 |
 | 3 | Reset to Defaults | 每个 tab 独立重置按钮，确认提示 | SUI-02 | ~2h |
 | 4 | 设置导入导出 | JSON 导出/导入，格式校验，确认提示 | IEX-01, IEX-02, IEX-03 | ~2h |
 | 5 | 全屏与设置面板交互规范化 | 进入/退出全屏时设置面板行为正确 | SUI-03 | ~1.5h |
@@ -50,12 +50,12 @@ Plans:
 **Goal:** 毛玻璃风格现代化，更新圆角、间距、动画、交互反馈
 
 **Requirements:** SUI-01
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 
-- [ ] 02-01-PLAN.md — Panel shell upgrade: radius 22px, sidebar 88px, nav hover/selection, tab slide, bottom button feedback (SUI-01)
-- [ ] 02-02-PLAN.md — Content section stagger animations for all 7 tabs (SUI-01)
+- [x] 02-01-PLAN.md — Panel shell upgrade: radius 22px, sidebar 88px, nav hover/selection, tab slide, bottom button feedback (SUI-01)
+- [x] 02-02-PLAN.md — Content section stagger animations for all 7 tabs (SUI-01)
 
 **Success Criteria:**
 
