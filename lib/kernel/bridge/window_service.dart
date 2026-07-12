@@ -72,18 +72,19 @@ class WindowService with WindowListener implements WindowBridge {
   bool _isProgrammaticResize = false;
   bool _skipNextResize = false;
 
-  static const int _durationWindowResize = 100;
-  static const int _durationResizeEnd = 500;
+  /// resize 防抖延迟 — 500ms 内无新 resize 事件才更新 windowSize。
+  static const int _resizeDebounceMs = 500;
 
-  Timer? _resizeDebounce;
-  Timer? _resizeEndTimer;
+  Timer? _resizeTimer;
 
-  final ValueNotifier<bool> _isFullscreen = ValueNotifier(false);
-  ValueNotifier<bool> get isFullscreen => _isFullscreen;
+  /// 当前是否全屏 — 从 mode 派生，单一数据源。
+  @override
+  bool get isFullscreen => _state.mode.value.isFullscreen;
 
   final Map<int, _RestoreSnapshot> _restoreSnapshots = {};
-  final Map<int, _PendingConfirmation> _confirmByWindowId = {};
-  int _nextRequestId = 0;
+
+  /// 单一确认 Completer — 替代 _confirmByWindowId map + 20x 轮询。
+  Completer<bool>? _confirmationCompleter;
 
   @override
   ValueNotifier<WindowMode> get mode => _state.mode;
@@ -138,20 +139,14 @@ class WindowService with WindowListener implements WindowBridge {
     windowManager.addListener(this);
   }
 
+  /// 原生全屏状态变更回调 — 完成确认 Completer 或更新 mode。
   void _onNativeFullScreenChanged(int windowId, bool isFullscreen) {
     if (_disposed) return;
-    final pending = _confirmByWindowId[windowId];
-    if (pending != null) {
-      if (pending.expectedFullscreen == isFullscreen &&
-          pending.requestId == _nextRequestId - 1) {
-        _confirmByWindowId.remove(windowId);
-        if (!pending.completer.isCompleted) {
-          pending.completer.complete(true);
-        }
-      }
+    final completer = _confirmationCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(true);
       return;
     }
-    _isFullscreen.value = isFullscreen;
     _updateOnUIThread(() {
       final target = isFullscreen ? WindowMode.fullscreen : WindowMode.windowed;
       if (_state.mode.value != target) {
@@ -174,15 +169,25 @@ class WindowService with WindowListener implements WindowBridge {
     }
   }
 
-  void _startResizeEndTimer() {
-    _resizeEndTimer?.cancel();
+  /// 单一 resize 定时器 — 合并 isResizing 标记和 windowSize 更新。
+  void _startResizeTimer() {
+    _resizeTimer?.cancel();
     _updateOnUIThread(() => _state.isResizing.value = true);
-    _resizeEndTimer = Timer(
-      const Duration(milliseconds: _durationResizeEnd),
+    _resizeTimer = Timer(
+      const Duration(milliseconds: _resizeDebounceMs),
       () {
-        if (!_disposed) {
-          _updateOnUIThread(() => _state.isResizing.value = false);
-        }
+        if (_disposed) return;
+        windowManager.getSize().then((size) {
+          if (!_disposed && size != _state.windowSize.value) {
+            _updateOnUIThread(() {
+              _state.windowSize.value = Size(
+                math.max(size.width, 854),
+                math.max(size.height, 513),
+              );
+              _state.isResizing.value = false;
+            });
+          }
+        });
       },
     );
   }
@@ -191,7 +196,7 @@ class WindowService with WindowListener implements WindowBridge {
   void onWindowMaximize() {
     if (_disposed) return;
     logBridge.d('onWindowMaximize()');
-    _startResizeEndTimer();
+    _startResizeTimer();
     _updateOnUIThread(() {
       if (_state.mode.value != WindowMode.maximized) {
         _state.mode.value = WindowMode.maximized;
@@ -203,7 +208,7 @@ class WindowService with WindowListener implements WindowBridge {
   void onWindowUnmaximize() {
     if (_disposed) return;
     logBridge.d('onWindowUnmaximize()');
-    _startResizeEndTimer();
+    _startResizeTimer();
     _updateOnUIThread(() {
       if (_state.mode.value == WindowMode.maximized) {
         _state.mode.value = WindowMode.windowed;
@@ -216,31 +221,13 @@ class WindowService with WindowListener implements WindowBridge {
     if (_disposed) return;
     if (_skipNextResize) { _skipNextResize = false; return; }
     if (_isProgrammaticResize) { _isProgrammaticResize = false; return; }
-    _startResizeEndTimer();
-    _resizeDebounce?.cancel();
-    _resizeDebounce = Timer(
-      const Duration(milliseconds: _durationWindowResize),
-      () {
-        if (_disposed) return;
-        windowManager.getSize().then((size) {
-          if (!_disposed && size != _state.windowSize.value) {
-            _updateOnUIThread(() {
-              _state.windowSize.value = Size(
-                math.max(size.width, 854),
-                math.max(size.height, 513),
-              );
-            });
-          }
-        });
-      },
-    );
+    _startResizeTimer();
   }
 
   @override
   void onWindowClose() {
     logBridge.i('onWindowClose() - saving geometry');
-    _resizeDebounce?.cancel();
-    _resizeEndTimer?.cancel();
+    _resizeTimer?.cancel();
     _saveGeometry().whenComplete(() {
       dispose();
       windowManager.destroy();
@@ -305,7 +292,7 @@ class WindowService with WindowListener implements WindowBridge {
   Future<FullscreenResult> _handleEnter(int windowId) async {
     final driver = _fullscreenDriver;
     if (driver == null) return const FullscreenFailure();
-    if (!_isFullscreen.value) { await _captureRestoreSnapshot(windowId); }
+    if (_state.mode.value != WindowMode.fullscreen) { await _captureRestoreSnapshot(windowId); }
     try {
       if (await windowManager.isMinimized()) {
         await windowManager.restore();
@@ -313,14 +300,11 @@ class WindowService with WindowListener implements WindowBridge {
       }
       if (driver.supportsFastPath) {
         await driver.enterFullscreenFast(displayId: 0);
-        _isFullscreen.value = true;
         return const FullscreenSuccess();
       }
-      _registerConfirmation(windowId, true);
       await driver.enterFullscreen(displayId: 0);
-      final confirmed = await _waitForConfirmation(windowId, true);
+      final confirmed = await _waitForConfirmation(true);
       if (confirmed) {
-        _isFullscreen.value = true;
         return const FullscreenSuccess();
       } else {
         await _applyDesync();
@@ -328,7 +312,6 @@ class WindowService with WindowListener implements WindowBridge {
       }
     } on Exception catch (e) {
       debugPrint('[WindowService] fullscreen enter failed: $e');
-      _isFullscreen.value = false;
       return const FullscreenFailure();
     }
   }
@@ -341,15 +324,12 @@ class WindowService with WindowListener implements WindowBridge {
       if (driver.supportsFastPath) {
         await driver.leaveFullscreenFast();
         await _restoreFromSnapshot(windowId);
-        _isFullscreen.value = false;
         return const FullscreenSuccess();
       }
-      _registerConfirmation(windowId, false);
       await driver.leaveFullscreen();
-      final confirmed = await _waitForConfirmation(windowId, false);
+      final confirmed = await _waitForConfirmation(false);
       if (confirmed) {
         await _restoreFromSnapshot(windowId);
-        _isFullscreen.value = false;
         return const FullscreenSuccess();
       } else {
         await _applyDesync();
@@ -366,7 +346,6 @@ class WindowService with WindowListener implements WindowBridge {
     if (driver == null) return;
     final actual = await driver.queryFullscreen();
     debugPrint('[WindowService] desync detected, correcting to $actual');
-    _isFullscreen.value = actual;
     _updateOnUIThread(() {
       _state.mode.value = actual ? WindowMode.fullscreen : WindowMode.windowed;
     });
@@ -404,38 +383,23 @@ class WindowService with WindowListener implements WindowBridge {
     }
   }
 
-  Future<bool> _waitForConfirmation(int windowId, bool expectedFullscreen) async {
+  /// 等待全屏确认 — 原生回调优先，超时后单次查询兜底。
+  Future<bool> _waitForConfirmation(bool expectedFullscreen) async {
     final driver = _fullscreenDriver;
     if (driver == null) return false;
-    final pending = _confirmByWindowId[windowId];
-    if (pending == null || pending.expectedFullscreen != expectedFullscreen) {
-      _registerConfirmation(windowId, expectedFullscreen);
-    }
+    _confirmationCompleter = Completer<bool>();
     try {
-      final waiter = _confirmByWindowId[windowId];
-      if (waiter == null) return false;
-      final confirmed = await waiter.completer.future.timeout(
+      final confirmed = await _confirmationCompleter!.future.timeout(
         const Duration(milliseconds: 500),
         onTimeout: () => false,
       );
       if (confirmed) return true;
     } finally {
-      _confirmByWindowId.remove(windowId);
+      _confirmationCompleter = null;
     }
-    for (int i = 0; i < 20; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      final actual = await driver.queryFullscreen();
-      if (actual == expectedFullscreen) return true;
-    }
-    return false;
-  }
-
-  void _registerConfirmation(int windowId, bool expectedFullscreen) {
-    _confirmByWindowId[windowId] = _PendingConfirmation(
-      expectedFullscreen: expectedFullscreen,
-      completer: Completer<bool>(),
-      requestId: _nextRequestId++,
-    );
+    // 超时后单次查询 — 替代 20x 轮询
+    final actual = await driver.queryFullscreen();
+    return actual == expectedFullscreen;
   }
 
   Future<void> _saveGeometry() async {
@@ -456,31 +420,18 @@ class WindowService with WindowListener implements WindowBridge {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _resizeDebounce?.cancel();
-    _resizeEndTimer?.cancel();
+    _resizeTimer?.cancel();
     _fullscreenDriver?.onNativeStateChanged = null;
     _fullscreenDriver?.dispose();
-    _isFullscreen.dispose();
     _restoreSnapshots.clear();
-    for (final pending in _confirmByWindowId.values) {
-      if (!pending.completer.isCompleted) { pending.completer.complete(false); }
+    if (_confirmationCompleter != null && !_confirmationCompleter!.isCompleted) {
+      _confirmationCompleter!.complete(false);
     }
-    _confirmByWindowId.clear();
+    _confirmationCompleter = null;
     _state.dispose();
     _persistence.dispose();
     windowManager.removeListener(this);
   }
-}
-
-final class _PendingConfirmation {
-  const _PendingConfirmation({
-    required this.expectedFullscreen,
-    required this.completer,
-    required this.requestId,
-  });
-  final bool expectedFullscreen;
-  final Completer<bool> completer;
-  final int requestId;
 }
 
 final class _RestoreSnapshot {

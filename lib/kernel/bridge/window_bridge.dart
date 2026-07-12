@@ -9,11 +9,14 @@ import 'window_mode.dart';
 /// - [WindowService] — Win32 真实实现
 /// - 测试中的 FakeWindowService — 无平台依赖的测试替身
 abstract class WindowBridge {
-  // ─── 4 个状态 ───
+  // ─── 5 个状态 ───
   ValueNotifier<WindowMode> get mode;
   ValueNotifier<Size> get windowSize;
   ValueNotifier<bool> get isResizing;
   ValueNotifier<bool> get isAlwaysOnTop;
+
+  /// 当前是否全屏 — 从 [mode] 派生，单一数据源。
+  bool get isFullscreen;
 
   // ─── 7 个命令 ───
   // Importers: WindowService, player_screen.dart, test fakes
