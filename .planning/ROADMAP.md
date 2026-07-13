@@ -142,6 +142,12 @@ Plans:
 **Goal:** Context7 文档查询、codegraph 源码参考、Quality Pipeline 评估
 
 **Requirements:** DEV-01, DEV-02, DEV-03
+**Plans:** 2 plans
+
+Plans:
+
+- [ ] 06-01-PLAN.md — Context7 library ID mapping + codegraph upgrade/MCP config + CLAUDE.md tool guides (DEV-01, DEV-02)
+- [ ] 06-02-PLAN.md — Quality Pipeline evaluation document: test coverage + performance benchmarks (DEV-03)
 
 **Success Criteria:**
 
