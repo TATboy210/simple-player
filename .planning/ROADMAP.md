@@ -12,7 +12,7 @@
 | 2 | 设置面板视觉升级 | 2/2 | Complete    | 2026-07-12 |
 | 3 | Reset to Defaults | 1/1 | Complete    | 2026-07-13 |
 | 4 | 设置导入导出 | 2/2 | Complete   | 2026-07-13 |
-| 5 | 全屏与设置面板交互规范化 | 进入/退出全屏时设置面板行为正确 | SUI-03 | ~1.5h |
+| 5 | 全屏与设置面板交互规范化 | 1/1 | Complete    | 2026-07-13 |
 | 6 | 开发工作流增强 | Context7、codegraph、Quality Pipeline 评估 | DEV-01, DEV-02, DEV-03 | ~2h |
 
 **Total estimated:** ~13.5h
@@ -120,6 +120,11 @@ Plans:
 **Goal:** 进入/退出全屏时设置面板行为正确
 
 **Requirements:** SUI-03
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 05-01-PLAN.md — Fullscreen-aware settings panel positioning with AnimatedAlign, ESC interception, drag control (SUI-03)
 
 **Success Criteria:**
 
