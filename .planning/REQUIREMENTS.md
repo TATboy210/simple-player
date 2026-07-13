@@ -8,7 +8,7 @@
 ### Settings UI — 设置面板视觉与交互升级
 
 - [x] **SUI-01**: 设置面板整体视觉现代化 — 圆角、间距、动画、交互反馈保持毛玻璃风格但更新细节
-- [ ] **SUI-02**: 每个 tab 有独立的 Reset to defaults 按钮 — 用户可单独重置某个 tab 的所有设置项为默认值
+- [x] **SUI-02**: 每个 tab 有独立的 Reset to defaults 按钮 — 用户可单独重置某个 tab 的所有设置项为默认值
 - [ ] **SUI-03**: 设置面板在全屏进入/退出时行为规范化 — 不遮挡、不错位、状态同步
 
 ### Fullscreen — 全屏代码简化
@@ -64,7 +64,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SUI-01 | Phase 2 | Complete |
-| SUI-02 | Phase 3 | Pending |
+| SUI-02 | Phase 3 | Complete |
 | SUI-03 | Phase 5 | Pending |
 | FULL-01 | Phase 1 | Complete |
 | FULL-02 | Phase 1 | Complete |
