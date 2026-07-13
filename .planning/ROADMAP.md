@@ -1,176 +1,121 @@
-# Roadmap: Simple Player — 设置面板 & 全屏重构
+# Roadmap: 沉浸式全屏重构
 
-**Created:** 2026-07-12
+**Created:** 2026-07-13
 **Mode:** standard
-**Granularity:** standard (5-8 phases)
+**Granularity:** standard (4 phases)
 
 ## Overview
 
 | # | Phase | Goal | Requirements | Est. Time |
 |---|-------|------|--------------|-----------|
-| 1 | 全屏代码简化 | 2/0 | Complete    | 2026-07-12 |
-| 2 | 设置面板视觉升级 | 2/2 | Complete    | 2026-07-12 |
-| 3 | Reset to Defaults | 1/1 | Complete    | 2026-07-13 |
-| 4 | 设置导入导出 | 2/2 | Complete   | 2026-07-13 |
-| 5 | 全屏与设置面板交互规范化 | 1/1 | Complete    | 2026-07-13 |
-| 6 | 开发工作流增强 | Context7、codegraph、Quality Pipeline 评估 | DEV-01, DEV-02, DEV-03 | ~2h |
+| 1 | 旧架构移除 | 删除 FullscreenDriver、平台驱动、Win32 FFI、旧测试 | ARCH-REM-01~04 | 2h |
+| 2 | WindowService 简化 | 移除确认链，直接调用 fullscreen_window 包 | WIN-SVC-01~03 | 1.5h |
+| 3 | 沉浸式全屏 UI | 标题栏隐藏、控制栏自动隐藏、ESC 退出 | IMM-UI-01~03 | 1.5h |
+| 4 | 测试更新 | 更新 WindowService 和 UI 测试 | TEST-UPD-01~02 | 1h |
 
-**Total estimated:** ~13.5h
-**Total requirements mapped:** 12/12 ✓
+**Total estimated:** ~6h
+**Total requirements mapped:** 12/12
 
 ---
 
 ## Phase Details
 
-### Phase 1: 全屏代码简化
+### Phase 1: 旧架构移除
 
-**Goal:** 减少全屏代码层数，建立 WindowService 为单一数据源，评估是否引入 flutter_fullscreen 包
+**Goal:** 完全移除现有的多层全屏架构
 
-**Requirements:** FULL-01, FULL-02, FULL-03
-**Plans:** 2/0 plans complete
+**Requirements:** ARCH-REM-01~04
+**Plans:** 0/2 plans complete
 
 Plans:
+**Wave 1**
 
-- [x] 01-01-PLAN.md — Delete dead driver layer + inline platform detection + FullscreenResult sealed class (FULL-01, FULL-02)
-- [x] 01-02-PLAN.md — Consolidate fullscreen state + simplify timers and confirmation chain (FULL-03)
+- [ ] 01-01-PLAN.md — 删除 FullscreenDriver 抽象层和平台驱动 (ARCH-REM-01, ARCH-REM-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 01-02-PLAN.md — 删除 Win32 FFI 绑定和旧测试文件 (ARCH-REM-03, ARCH-REM-04)
 
 **Success Criteria:**
 
-1. FullscreenDriver/WindowService/SettingsStore 间接层减少 1 层以上
-2. flutter_fullscreen 评估文档完成，明确结论
-3. SettingsStore 不再有 saveIsFullscreen/isFullscreen（UI 层直接调用 WindowService）
-4. 全屏进入/退出功能正常，无回归
-
-**Pitfalls:** Fullscreen dual-source truth — 先建立单一 owner；Win32 FFI 资源泄漏 — try/finally
+1. fullscreen_driver.dart、fullscreen_capability.dart 已删除
+2. platform/ 目录下所有驱动文件已删除
+3. win32_fullscreen_ffi.dart 已删除
+4. 旧测试文件已删除
+5. `flutter analyze` 无错误
 
 ---
 
-### Phase 2: 设置面板视觉升级
+### Phase 2: WindowService 简化
 
-**Goal:** 毛玻璃风格现代化，更新圆角、间距、动画、交互反馈
+**Goal:** 简化 WindowService，直接调用 fullscreen_window 包
 
-**Requirements:** SUI-01
-**Plans:** 2/2 plans complete
+**Requirements:** WIN-SVC-01~03
+**Plans:** 0/1 plans complete
 
 Plans:
 
-- [x] 02-01-PLAN.md — Panel shell upgrade: radius 22px, sidebar 88px, nav hover/selection, tab slide, bottom button feedback (SUI-01)
-- [x] 02-02-PLAN.md — Content section stagger animations for all 7 tabs (SUI-01)
+- [ ] 02-01-PLAN.md — 移除确认链，添加 fullscreen_window 包调用和流监听
 
 **Success Criteria:**
 
-1. 圆角/间距与 Tokens.* 一致
-2. tab 切换有过渡动画
-3. 交互反馈与播放器控制栏风格一致
-4. 毛玻璃效果正常
+1. 确认链相关方法和字段已移除
+2. setMode 直接调用 FullScreenWindow.setFullScreen()
+3. 订阅 onFullScreenChanged 流
+4. `flutter analyze` 无错误
 
 **Dependencies:** Phase 1
 
 ---
 
-### Phase 3: Reset to Defaults
+### Phase 3: 沉浸式全屏 UI
 
-**Goal:** 每个 tab 独立重置按钮，确认提示，仅重置当前 tab 设置
+**Goal:** 沉浸式全屏体验
 
-**Requirements:** SUI-02
-**Plans:** 1/1 plans complete
+**Requirements:** IMM-UI-01~03
+**Plans:** 0/1 plans complete
 
 Plans:
 
-- [x] 03-01-PLAN.md — Per-tab reset buttons, glass confirmation dialog, reset logic for 5 tabs (SUI-02)
+- [ ] 03-01-PLAN.md — 标题栏隐藏、控制栏自动隐藏、ESC 退出
 
 **Success Criteria:**
 
-1. 5 个 tab（General/EQ/Video/Shortcuts/Performance）底部有重置按钮
-2. 点击后显示毛玻璃风格确认对话框
-3. 确认后仅重置该 tab 设置项为默认值
-4. 重置后 UI 立即刷新
-5. About 和 Audio tab 无重置按钮
+1. 全屏时标题栏隐藏
+2. 控制栏自动隐藏+鼠标唤醒
+3. ESC 退出全屏
+4. 过渡动画平滑
 
 **Dependencies:** Phase 2
 
 ---
 
-### Phase 4: 设置导入导出
+### Phase 4: 测试更新
 
-**Goal:** JSON 导出/导入设置
+**Goal:** 更新测试以匹配新架构
 
-**Requirements:** IEX-01, IEX-02, IEX-03
-**Plans:** 2/2 plans complete
-
-Plans:
-
-- [x] 04-01-PLAN.md — ExportData model + SettingsStore export/import methods with validation (IEX-01, IEX-02)
-- [x] 04-02-PLAN.md — Import/Export buttons in bottom bar + import confirmation dialog + OSD feedback (IEX-01, IEX-02, IEX-03)
-
-**Success Criteria:**
-
-1. 导出按钮 → 选择保存位置 → .json 文件
-2. 导入按钮 → 选择 .json 文件
-3. 导入前确认对话框
-4. JSON 包含版本号
-5. 格式校验失败显示错误
-
-**Dependencies:** 无（可独立开发）
-
----
-
-### Phase 5: 全屏与设置面板交互规范化
-
-**Goal:** 进入/退出全屏时设置面板行为正确
-
-**Requirements:** SUI-03
-**Plans:** 1/1 plans complete
+**Requirements:** TEST-UPD-01~02
+**Plans:** 0/1 plans complete
 
 Plans:
 
-- [x] 05-01-PLAN.md — Fullscreen-aware settings panel positioning with AnimatedAlign, ESC interception, drag control (SUI-03)
+- [ ] 04-01-PLAN.md — 更新 WindowService 和 UI 测试
 
 **Success Criteria:**
 
-1. 进入全屏时面板不遮挡视频
-2. 退出全屏时面板状态保持
-3. 全屏下打开/关闭面板正常
-4. 面板位置自适应
+1. WindowService 测试覆盖新逻辑
+2. UI 测试覆盖全屏行为
+3. 所有测试通过
 
-**Dependencies:** Phase 1
-
----
-
-### Phase 6: 开发工作流增强
-
-**Goal:** Context7 文档查询、codegraph 源码参考、Quality Pipeline 评估
-
-**Requirements:** DEV-01, DEV-02, DEV-03
-**Plans:** 2 plans
-
-Plans:
-
-- [x] 06-01-PLAN.md — Context7 library ID mapping + codegraph upgrade/MCP config + CLAUDE.md tool guides (DEV-01, DEV-02)
-- [x] 06-02-PLAN.md — Quality Pipeline evaluation document: test coverage + performance benchmarks (DEV-03)
-
-**Success Criteria:**
-
-1. Context7 MCP 查询 Flutter API 文档可用
-2. codegraph 分析 Flutter SDK 源码可用
-3. Quality Pipeline 评估文档完成
-
-**Dependencies:** 无（可独立开发）
+**Dependencies:** Phase 3
 
 ---
 
 ## Phase Dependency Graph
 
 ```
-Phase 1 (全屏简化) ──→ Phase 2 (视觉升级) ──→ Phase 3 (Reset)
-       │
-       └──→ Phase 5 (全屏交互)
-
-Phase 4 (导入导出) — 独立
-Phase 6 (工作流) — 独立
+Phase 1 → Phase 2 → Phase 3 → Phase 4
 ```
 
-**Parallelizable:** Phase 4 和 Phase 6 可与任何 phase 并行
-
 ---
-*Roadmap created: 2026-07-12*
+*Created: 2026-07-13*
