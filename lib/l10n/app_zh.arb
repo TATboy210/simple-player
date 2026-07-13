@@ -169,5 +169,10 @@
   "decoderSettings": "解码器",
   "hardwareDecoding": "硬件解码",
   "hardwareDecodingDesc": "使用 GPU 进行视频解码。如出现画面异常请关闭。",
-  "performanceHint": "更改在下次打开文件时生效。"
+  "performanceHint": "更改在下次打开文件时生效。",
+
+  "resetToDefaults": "恢复默认",
+  "resetConfirmTitle": "重置{tabName}设置？",
+  "resetConfirmMessage": "以下设置将恢复为默认值：",
+  "confirmReset": "确认重置"
 }

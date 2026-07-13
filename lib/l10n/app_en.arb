@@ -342,5 +342,17 @@
   "hardwareDecodingDesc": "Use GPU for video decoding. Disable if experiencing artifacts.",
   "@hardwareDecodingDesc": { "description": "Description for hardware decoding toggle" },
   "performanceHint": "Changes take effect on next file open.",
-  "@performanceHint": { "description": "Hint that performance changes require reopening file" }
+  "@performanceHint": { "description": "Hint that performance changes require reopening file" },
+
+  "resetToDefaults": "Restore Defaults",
+  "@resetToDefaults": { "description": "Button to reset current tab settings to defaults" },
+  "resetConfirmTitle": "Reset {tabName} Settings?",
+  "@resetConfirmTitle": {
+    "description": "Confirmation dialog title for resetting tab settings",
+    "placeholders": { "tabName": { "type": "String" } }
+  },
+  "resetConfirmMessage": "The following settings will be restored to defaults:",
+  "@resetConfirmMessage": { "description": "Confirmation dialog message listing settings to reset" },
+  "confirmReset": "Reset",
+  "@confirmReset": { "description": "Confirm button in reset dialog" }
 }

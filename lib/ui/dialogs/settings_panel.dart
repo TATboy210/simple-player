@@ -56,6 +56,14 @@ class _SettingsPanelState extends State<SettingsPanel> {
   Map<String, String> _originalShortcuts = {};
   bool _depsInitialized = false;
 
+  // ── 重置计数器 — 用于 ValueKey 强制 tab 重建 ──
+  int _eqResetCounter = 0;
+  int _shortcutsResetCounter = 0;
+  int _perfResetCounter = 0;
+
+  /// 可重置的 tab 索引集合（跳过 Audio=2, About=5）
+  static const _resettableTabIndices = {0, 1, 3, 4, 6};
+
   @override
   void initState() {
     super.initState();
@@ -121,6 +129,115 @@ class _SettingsPanelState extends State<SettingsPanel> {
     // 更新原始值以便后续取消时以当前值为基准
     _originalLocale = _pendingLocale;
     _originalThemeIndex = _pendingThemeIndex;
+  }
+
+  // ── 重置功能 ──
+
+  /// 显示毛玻璃风格的重置确认对话框
+  ///
+  /// 返回 true 表示用户确认重置，false 表示取消。
+  Future<bool> _showResetConfirmDialog(
+    String title,
+    List<String> items,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: GlassTier.normal.blurFilter,
+        child: AlertDialog(
+          backgroundColor: Tokens.bgGlass,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Tokens.radiusLg),
+            side: const BorderSide(color: Tokens.borderHighlight),
+          ),
+          title: Text(title, style: const TextStyle(color: Tokens.textPrimary)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: items
+                .map(
+                  (item) => Text(
+                    '• $item',
+                    style: const TextStyle(color: Tokens.textSecondary),
+                  ),
+                )
+                .toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: Tokens.danger),
+              child: Text(l10n.confirmReset),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result ?? false;
+  }
+
+  /// 执行指定 tab 的重置逻辑
+  ///
+  /// General(0): 延迟应用 locale/theme 默认值
+  /// Equalizer(1): 清除 EQ 滤镜
+  /// Video(3): 重置所有视频处理状态
+  /// Shortcuts(4): 清除自定义快捷键绑定
+  /// Performance(6): 持久化默认性能设置
+  void _resetTab(int index) {
+    switch (index) {
+      case 0:
+        // General: 延迟应用 — 设置 pending 值为默认值，不直接调用 Service
+        setState(() {
+          _pendingLocale = 'zh';
+          _pendingThemeIndex = 0;
+        });
+      case 1:
+        // Equalizer: 清除 EQ 滤镜，tab 通过 Key 变化重建 _selectedIndex=0
+        widget.engine.setEqualizer('');
+        setState(() => _eqResetCounter++);
+      case 3:
+        // Video: service.resetAll() 重置状态并自动持久化
+        widget.videoProcessing?.resetAll();
+      case 4:
+        // Shortcuts: 清除自定义绑定 + 持久化空 map
+        widget.onShortcutsChanged?.call({});
+        SettingsStore.saveShortcuts({});
+        setState(() => _shortcutsResetCounter++);
+      case 6:
+        // Performance: 持久化默认值（true/true），tab 通过 Key 变化重建
+        SettingsStore.saveD3d11SyncEnabled(true);
+        SettingsStore.saveHardwareDecoding(true);
+        setState(() => _perfResetCounter++);
+    }
+  }
+
+  /// 返回指定 tab 重置时将影响的设置项名称列表（用于确认对话框展示）
+  List<String> _tabResetItems(int index) {
+    return switch (index) {
+      0 => ['语言', '主题'],
+      1 => ['均衡器预设'],
+      3 => ['亮度', '对比度', '饱和度', '色调', '旋转', '宽高比', '去隔行'],
+      4 => ['自定义快捷键绑定'],
+      6 => ['D3D11 CPU 同步', '硬件解码'],
+      _ => [],
+    };
+  }
+
+  /// 返回指定 tab 的显示名称（用于确认对话框标题）
+  String _tabName(int index, AppLocalizations l10n) {
+    return switch (index) {
+      0 => l10n.generalTab,
+      1 => l10n.equalizer,
+      3 => l10n.videoTab,
+      4 => l10n.shortcutsTab,
+      6 => l10n.performanceTab,
+      _ => '',
+    };
   }
 
   @override
@@ -268,6 +385,17 @@ class _SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
+  /// tab 调用此方法请求重置 — 显示确认对话框，确认后执行重置
+  Future<void> _onTabResetRequested(int index) async {
+    final l10n = AppLocalizations.of(context);
+    final title = l10n.resetConfirmTitle(_tabName(index, l10n));
+    final items = _tabResetItems(index);
+    final confirmed = await _showResetConfirmDialog(title, items);
+    if (confirmed && mounted) {
+      _resetTab(index);
+    }
+  }
+
   Widget _buildTab(int index) {
     return switch (index) {
       0 => GeneralTab(
@@ -276,19 +404,30 @@ class _SettingsPanelState extends State<SettingsPanel> {
         currentThemeIndex: _pendingThemeIndex,
         onLocaleChanged: (code) => setState(() => _pendingLocale = code),
         onThemeChanged: (idx) => setState(() => _pendingThemeIndex = idx),
+        onReset: () => _onTabResetRequested(0),
       ),
-      1 => EqualizerTab(key: const ValueKey(1), engine: widget.engine),
+      1 => EqualizerTab(
+        key: ValueKey('eq-$_eqResetCounter'),
+        engine: widget.engine,
+        onReset: () => _onTabResetRequested(1),
+      ),
       2 => AudioTab(key: const ValueKey(2), engine: widget.engine),
       3 => VideoTab(
         key: const ValueKey(3),
         videoProcessing: widget.videoProcessing,
+        onReset: () => _onTabResetRequested(3),
       ),
       4 => ShortcutsTab(
-        key: const ValueKey(4),
+        key: ValueKey('sc-$_shortcutsResetCounter'),
         onShortcutsChanged: widget.onShortcutsChanged,
+        onReset: () => _onTabResetRequested(4),
       ),
       5 => const AboutTab(key: ValueKey(5)),
-      6 => PerformanceTab(key: const ValueKey(6), engine: widget.engine),
+      6 => PerformanceTab(
+        key: ValueKey('perf-$_perfResetCounter'),
+        engine: widget.engine,
+        onReset: () => _onTabResetRequested(6),
+      ),
       _ => GeneralTab(
         key: const ValueKey(0),
         currentLocale: _pendingLocale,
@@ -305,8 +444,20 @@ class _SettingsPanelState extends State<SettingsPanel> {
       ),
       color: Tokens.bgGlass,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // 重置按钮 — 仅在可重置的 tab 显示
+          if (_resettableTabIndices.contains(_selectedIndex))
+            TextButton(
+              onPressed: () => _onTabResetRequested(_selectedIndex),
+              child: Text(
+                l10n.resetToDefaults,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
+                ),
+              ),
+            ),
+          const Spacer(),
           _BottomButton(label: l10n.ok, primary: true, onTap: _ok),
           const SizedBox(width: Tokens.spSm),
           _BottomButton(label: l10n.cancel, onTap: _cancel),
