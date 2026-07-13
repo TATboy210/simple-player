@@ -24,7 +24,8 @@ import '../../shared/settings_card.dart'; // keep for SettingSwitchRow export
 /// Rotation is limited to hardware steps: 0°, 90°, 180°, 270°.
 class VideoTab extends StatelessWidget {
   final VideoProcessingService? videoProcessing;
-  const VideoTab({super.key, this.videoProcessing});
+  final VoidCallback? onReset;
+  const VideoTab({super.key, this.videoProcessing, this.onReset});
 
   @override
   Widget build(BuildContext context) {
@@ -134,29 +135,18 @@ class VideoTab extends StatelessWidget {
               ],
             ),
           ),
-          // 重置
+          // 重置按钮 — 底部左侧（通过确认对话框）
           Align(
-            alignment: Alignment.centerRight,
+            alignment: Alignment.centerLeft,
             child: Padding(
-              padding: const EdgeInsets.only(bottom: Tokens.spMd),
-              child: InkWell(
-                onTap: service.resetAll,
-                borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Tokens.spMd,
-                    vertical: Tokens.spXs,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Tokens.borderHighlight, width: 1),
-                    borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                  ),
-                  child: Text(
-                    l10n.resetAll,
-                    style: const TextStyle(
-                      color: Tokens.accent,
-                      fontSize: Tokens.fontCaption,
-                    ),
+              padding: const EdgeInsets.only(top: Tokens.spSm),
+              child: TextButton(
+                onPressed: onReset,
+                child: Text(
+                  l10n.resetToDefaults,
+                  style: const TextStyle(
+                    color: Tokens.textSecondary,
+                    fontSize: Tokens.fontCaption,
                   ),
                 ),
               ),

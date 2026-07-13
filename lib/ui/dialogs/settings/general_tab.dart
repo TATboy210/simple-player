@@ -16,6 +16,7 @@ class GeneralTab extends StatelessWidget {
   final int currentThemeIndex;
   final ValueChanged<String>? onLocaleChanged;
   final ValueChanged<int>? onThemeChanged;
+  final VoidCallback? onReset;
 
   const GeneralTab({
     super.key,
@@ -23,6 +24,7 @@ class GeneralTab extends StatelessWidget {
     required this.currentThemeIndex,
     this.onLocaleChanged,
     this.onThemeChanged,
+    this.onReset,
   });
 
   @override
@@ -64,6 +66,23 @@ class GeneralTab extends StatelessWidget {
                 onChanged: onThemeChanged,
               ),
             ],
+          ),
+        ),
+        // 重置按钮 — 底部左侧
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(top: Tokens.spSm),
+            child: TextButton(
+              onPressed: onReset,
+              child: Text(
+                l10n.resetToDefaults,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
+                ),
+              ),
+            ),
           ),
         ),
       ],
