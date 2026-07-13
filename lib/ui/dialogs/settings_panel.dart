@@ -2,7 +2,10 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../kernel/bridge/window_bridge.dart';
+import '../../kernel/bridge/window_mode.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/locale_service.dart';
@@ -34,10 +37,12 @@ class SettingsPanel extends StatefulWidget {
   final EngineState engine;
   final VideoProcessingService? videoProcessing;
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
+  final WindowBridge windowService;
 
   const SettingsPanel({
     super.key,
     required this.engine,
+    required this.windowService,
     this.videoProcessing,
     this.onShortcutsChanged,
   });
@@ -73,6 +78,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
   void initState() {
     super.initState();
     _loadOriginalShortcuts();
+    // 监听全屏模式变化 — 进入/退出全屏时重置拖拽偏移 (D-09)
+    widget.windowService.mode.addListener(_onModeChanged);
   }
 
   @override
@@ -96,8 +103,26 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   @override
   void dispose() {
+    widget.windowService.mode.removeListener(_onModeChanged);
     _offset.dispose();
     super.dispose();
+  }
+
+  /// 全屏模式变化时重置拖拽偏移 — 面板居中后偏移量无意义 (D-09)
+  void _onModeChanged() {
+    _offset.value = Offset.zero;
+  }
+
+  /// ESC 按键拦截 — 在全屏模式下关闭面板而非退出全屏 (D-04, D-12)
+  ///
+  /// 返回 [KeyEventResult.handled] 阻止事件传播到外层 KeyboardHandler。
+  KeyEventResult _handleEscape(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   /// 应用语言和主题变更（在对话框关闭后调用，避免 MaterialApp 重建丢失对话框状态）
@@ -452,78 +477,102 @@ class _SettingsPanelState extends State<SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Stack(
-      children: [
-        // 半透明背景遮罩 — 点击关闭
-        Positioned.fill(
-          child: GestureDetector(
-            onTap: _cancel,
-            child: Container(color: Colors.black54),
-          ),
-        ),
-        // 可拖拽面板 — ValueListenableBuilder 隔离拖拽 rebuild
-        ValueListenableBuilder<Offset>(
-          valueListenable: _offset,
-          builder: (context, offset, panel) =>
-              Transform.translate(offset: offset, child: panel),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 80, top: 48),
-              child: GlassContainer(
-                borderRadius: BorderRadius.circular(Tokens.radiusLg),
-                child: SizedBox(
-                  width: 600,
-                  height: 480,
-                  child: Column(
-                    children: [
-                      // 标题栏 — 拖拽区域
-                      GestureDetector(
-                        onPanStart: (_) {},
-                        onPanUpdate: (d) {
-                          _offset.value += d.delta;
-                        },
-                        child: Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Tokens.spMd,
-                          ),
-                          color: Tokens.bgGlass,
-                          child: Row(
+    // PopScope 阻止 Navigator.maybePop — ESC 由 _handleEscape 统一处理 (D-04)
+    return PopScope(
+      canPop: false,
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: _handleEscape,
+        child: Stack(
+          children: [
+            // 半透明背景遮罩 — 点击关闭 (D-07: Colors.black54 不变)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _cancel,
+                child: Container(color: Colors.black54),
+              ),
+            ),
+            // 全屏感知定位 — AnimatedAlign 在全屏时居中，窗口模式时左上角 (D-01, D-03, D-05, D-06, D-08)
+            ValueListenableBuilder<WindowMode>(
+              valueListenable: widget.windowService.mode,
+              builder: (context, mode, _) {
+                final isFullscreen = mode.isFullscreen;
+                return AnimatedAlign(
+                  alignment: isFullscreen
+                      ? Alignment.center
+                      : Alignment.topLeft,
+                  duration: const Duration(
+                    milliseconds: Tokens.durationSlide,
+                  ),
+                  curve: Curves.easeOutCubic,
+                  child: Padding(
+                    padding: isFullscreen
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.only(left: 80, top: 48),
+                    // 拖拽偏移 — 在 AnimatedAlign 内部，偏移相对于对齐位置 (D-09)
+                    child: ValueListenableBuilder<Offset>(
+                      valueListenable: _offset,
+                      builder: (context, offset, panel) =>
+                          Transform.translate(offset: offset, child: panel),
+                      child: GlassContainer(
+                        borderRadius: BorderRadius.circular(Tokens.radiusLg),
+                        child: SizedBox(
+                          width: 600,
+                          height: 480,
+                          child: Column(
                             children: [
-                              Text(
-                                l10n.settings,
-                                style: const TextStyle(
-                                  color: Tokens.textPrimary,
-                                  fontSize: Tokens.fontBody,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const Spacer(),
-                              const Icon(
-                                Icons.drag_indicator,
-                                size: 16,
-                                color: Tokens.textTertiary,
-                              ),
-                              const SizedBox(width: Tokens.spSm),
-                              InkWell(
-                                onTap: _cancel,
-                                borderRadius: BorderRadius.circular(
-                                  Tokens.radiusBtn,
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(4),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 18,
-                                    color: Tokens.textTertiary,
+                              // 标题栏 — 全屏时禁用拖拽 (D-06, D-11)
+                              GestureDetector(
+                                onPanStart: isFullscreen ? null : (_) {},
+                                onPanUpdate: isFullscreen
+                                    ? null
+                                    : (d) {
+                                        _offset.value += d.delta;
+                                      },
+                                child: Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: Tokens.spMd,
+                                  ),
+                                  color: Tokens.bgGlass,
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        l10n.settings,
+                                        style: const TextStyle(
+                                          color: Tokens.textPrimary,
+                                          fontSize: Tokens.fontBody,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      // 拖拽指示器 — 全屏时隐藏 (D-11)
+                                      if (!isFullscreen) ...[
+                                        const Icon(
+                                          Icons.drag_indicator,
+                                          size: 16,
+                                          color: Tokens.textTertiary,
+                                        ),
+                                        const SizedBox(width: Tokens.spSm),
+                                      ],
+                                      InkWell(
+                                        onTap: _cancel,
+                                        borderRadius: BorderRadius.circular(
+                                          Tokens.radiusBtn,
+                                        ),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4),
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 18,
+                                            color: Tokens.textTertiary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
                       const Divider(height: 1, color: Tokens.borderHighlight),
                       // 内容区：侧边栏 + 内容
                       Expanded(
@@ -589,9 +638,13 @@ class _SettingsPanelState extends State<SettingsPanel> {
               ),
             ),
           ),
-        ),
+        ); // AnimatedAlign
+        }, // builder
+      ), // ValueListenableBuilder<WindowMode>
       ],
-    );
+      ), // Stack
+      ), // Focus
+    ); // PopScope
   }
 
   /// tab 调用此方法请求重置 — 显示确认对话框，确认后执行重置
