@@ -96,6 +96,12 @@ Plans:
 **Goal:** JSON 导出/导入设置
 
 **Requirements:** IEX-01, IEX-02, IEX-03
+**Plans:** 2 plans
+
+Plans:
+
+- [ ] 04-01-PLAN.md — ExportData model + SettingsStore export/import methods with validation (IEX-01, IEX-02)
+- [ ] 04-02-PLAN.md — Import/Export buttons in bottom bar + import confirmation dialog + OSD feedback (IEX-01, IEX-02, IEX-03)
 
 **Success Criteria:**
 
