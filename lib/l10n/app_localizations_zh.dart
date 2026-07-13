@@ -467,4 +467,57 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get performanceHint => '更改在下次打开文件时生效。';
+
+  @override
+  String get resetToDefaults => '恢复默认';
+
+  @override
+  String resetConfirmTitle(String tabName) {
+    return '重置$tabName设置？';
+  }
+
+  @override
+  String get resetConfirmMessage => '以下设置将恢复为默认值：';
+
+  @override
+  String get confirmReset => '确认重置';
+
+  @override
+  String get exportSettings => '导出';
+
+  @override
+  String get importSettings => '导入';
+
+  @override
+  String get importConfirmTitle => '导入设置？';
+
+  @override
+  String get importConfirmMessage => '以下设置将被覆盖：';
+
+  @override
+  String get importConfirmCategories => '播放、视频效果、字幕、窗口、快捷键、主题、语言';
+
+  @override
+  String get importSuccess => '设置已导入';
+
+  @override
+  String importError(String error) {
+    return '导入失败：$error';
+  }
+
+  @override
+  String get exportError => '导出失败';
+
+  @override
+  String get exportSuccess => '设置已导出';
+
+  @override
+  String importParseError(String error) {
+    return '无效 JSON：$error';
+  }
+
+  @override
+  String importFileReadError(String error) {
+    return '无法读取文件：$error';
+  }
 }

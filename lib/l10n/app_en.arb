@@ -354,5 +354,37 @@
   "resetConfirmMessage": "The following settings will be restored to defaults:",
   "@resetConfirmMessage": { "description": "Confirmation dialog message listing settings to reset" },
   "confirmReset": "Reset",
-  "@confirmReset": { "description": "Confirm button in reset dialog" }
+  "@confirmReset": { "description": "Confirm button in reset dialog" },
+
+  "exportSettings": "Export",
+  "@exportSettings": { "description": "Button to export settings to JSON file" },
+  "importSettings": "Import",
+  "@importSettings": { "description": "Button to import settings from JSON file" },
+  "importConfirmTitle": "Import Settings?",
+  "@importConfirmTitle": { "description": "Title of import confirmation dialog" },
+  "importConfirmMessage": "The following settings will be overwritten:",
+  "@importConfirmMessage": { "description": "Message in import confirmation dialog" },
+  "importConfirmCategories": "Playback, Video, Subtitle, Window, Shortcuts, Theme, Language",
+  "@importConfirmCategories": { "description": "Categories that will be overwritten on import" },
+  "importSuccess": "Settings imported",
+  "@importSuccess": { "description": "OSD message after successful import" },
+  "importError": "Import failed: {error}",
+  "@importError": {
+    "description": "Error message when import fails",
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "exportError": "Export failed",
+  "@exportError": { "description": "Generic error message when export fails" },
+  "exportSuccess": "Settings exported",
+  "@exportSuccess": { "description": "OSD message after successful export" },
+  "importParseError": "Invalid JSON: {error}",
+  "@importParseError": {
+    "description": "Error when imported file contains invalid JSON",
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "importFileReadError": "Cannot read file: {error}",
+  "@importFileReadError": {
+    "description": "Error when imported file cannot be read from disk",
+    "placeholders": { "error": { "type": "String" } }
+  }
 }

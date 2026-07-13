@@ -469,4 +469,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get performanceHint => 'Changes take effect on next file open.';
+
+  @override
+  String get resetToDefaults => 'Restore Defaults';
+
+  @override
+  String resetConfirmTitle(String tabName) {
+    return 'Reset $tabName Settings?';
+  }
+
+  @override
+  String get resetConfirmMessage =>
+      'The following settings will be restored to defaults:';
+
+  @override
+  String get confirmReset => 'Reset';
+
+  @override
+  String get exportSettings => 'Export';
+
+  @override
+  String get importSettings => 'Import';
+
+  @override
+  String get importConfirmTitle => 'Import Settings?';
+
+  @override
+  String get importConfirmMessage =>
+      'The following settings will be overwritten:';
+
+  @override
+  String get importConfirmCategories =>
+      'Playback, Video, Subtitle, Window, Shortcuts, Theme, Language';
+
+  @override
+  String get importSuccess => 'Settings imported';
+
+  @override
+  String importError(String error) {
+    return 'Import failed: $error';
+  }
+
+  @override
+  String get exportError => 'Export failed';
+
+  @override
+  String get exportSuccess => 'Settings exported';
+
+  @override
+  String importParseError(String error) {
+    return 'Invalid JSON: $error';
+  }
+
+  @override
+  String importFileReadError(String error) {
+    return 'Cannot read file: $error';
+  }
 }

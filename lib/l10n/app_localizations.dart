@@ -985,6 +985,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Changes take effect on next file open.'**
   String get performanceHint;
+
+  /// Button to reset current tab settings to defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Defaults'**
+  String get resetToDefaults;
+
+  /// Confirmation dialog title for resetting tab settings
+  ///
+  /// In en, this message translates to:
+  /// **'Reset {tabName} Settings?'**
+  String resetConfirmTitle(String tabName);
+
+  /// Confirmation dialog message listing settings to reset
+  ///
+  /// In en, this message translates to:
+  /// **'The following settings will be restored to defaults:'**
+  String get resetConfirmMessage;
+
+  /// Confirm button in reset dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get confirmReset;
+
+  /// Button to export settings to JSON file
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get exportSettings;
+
+  /// Button to import settings from JSON file
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importSettings;
+
+  /// Title of import confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Import Settings?'**
+  String get importConfirmTitle;
+
+  /// Message in import confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'The following settings will be overwritten:'**
+  String get importConfirmMessage;
+
+  /// Categories that will be overwritten on import
+  ///
+  /// In en, this message translates to:
+  /// **'Playback, Video, Subtitle, Window, Shortcuts, Theme, Language'**
+  String get importConfirmCategories;
+
+  /// OSD message after successful import
+  ///
+  /// In en, this message translates to:
+  /// **'Settings imported'**
+  String get importSuccess;
+
+  /// Error message when import fails
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed: {error}'**
+  String importError(String error);
+
+  /// Generic error message when export fails
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get exportError;
+
+  /// OSD message after successful export
+  ///
+  /// In en, this message translates to:
+  /// **'Settings exported'**
+  String get exportSuccess;
+
+  /// Error when imported file contains invalid JSON
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid JSON: {error}'**
+  String importParseError(String error);
+
+  /// Error when imported file cannot be read from disk
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot read file: {error}'**
+  String importFileReadError(String error);
 }
 
 class _AppLocalizationsDelegate
