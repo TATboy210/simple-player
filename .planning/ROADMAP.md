@@ -10,7 +10,7 @@
 |---|-------|------|--------------|-----------|
 | 1 | 全屏代码简化 | 2/0 | Complete    | 2026-07-12 |
 | 2 | 设置面板视觉升级 | 2/2 | Complete    | 2026-07-12 |
-| 3 | Reset to Defaults | 每个 tab 独立重置按钮，确认提示 | SUI-02 | ~2h |
+| 3 | Reset to Defaults | 1/1 | Complete   | 2026-07-13 |
 | 4 | 设置导入导出 | JSON 导出/导入，格式校验，确认提示 | IEX-01, IEX-02, IEX-03 | ~2h |
 | 5 | 全屏与设置面板交互规范化 | 进入/退出全屏时设置面板行为正确 | SUI-03 | ~1.5h |
 | 6 | 开发工作流增强 | Context7、codegraph、Quality Pipeline 评估 | DEV-01, DEV-02, DEV-03 | ~2h |
@@ -70,16 +70,22 @@ Plans:
 
 ### Phase 3: Reset to Defaults
 
-**Goal:** 每个 tab 独立重置按钮
+**Goal:** 每个 tab 独立重置按钮，确认提示，仅重置当前 tab 设置
 
 **Requirements:** SUI-02
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 03-01-PLAN.md — Per-tab reset buttons, glass confirmation dialog, reset logic for 5 tabs (SUI-02)
 
 **Success Criteria:**
 
-1. 每个 tab 右上角有重置按钮
-2. 点击后显示确认提示
-3. 确认后仅重置该 tab 设置项
+1. 5 个 tab（General/EQ/Video/Shortcuts/Performance）底部有重置按钮
+2. 点击后显示毛玻璃风格确认对话框
+3. 确认后仅重置该 tab 设置项为默认值
 4. 重置后 UI 立即刷新
+5. About 和 Audio tab 无重置按钮
 
 **Dependencies:** Phase 2
 
