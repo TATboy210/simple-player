@@ -83,8 +83,6 @@ class WindowsFullscreenDriver implements FullscreenDriver {
   @override
   bool get supportsFastPath => true;
 
-  @override
-  bool get supportsBatchSnapshot => true;
   int _cachedHwnd = 0;
 
   // ─── 回调桥接 ───
@@ -386,109 +384,6 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     _cachedHwnd = 0;
   }
 
-  @override
-  Future<Offset> getPosition() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0) return Offset.zero;
-    final placement = _api.getWindowPlacement(hwnd);
-    if (placement == null) return Offset.zero;
-    try {
-      final dpr = _getDevicePixelRatio();
-      return Offset(
-        placement.ref.rcNormalPosition.left / dpr,
-        placement.ref.rcNormalPosition.top / dpr,
-      );
-    } finally {
-      calloc.free(placement);
-    }
-  }
-
-  @override
-  Future<Size> getSize() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0) return Size.zero;
-    final placement = _api.getWindowPlacement(hwnd);
-    if (placement == null) return Size.zero;
-    try {
-      final dpr = _getDevicePixelRatio();
-      final rc = placement.ref.rcNormalPosition;
-      return Size(
-        (rc.right - rc.left) / dpr,
-        (rc.bottom - rc.top) / dpr,
-      );
-    } finally {
-      calloc.free(placement);
-    }
-  }
-
-  @override
-  Future<void> setBounds(Offset? position, Size? size) async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0) return;
-
-    final dpr = _getDevicePixelRatio();
-    int x = 0;
-    int y = 0;
-    int cx = 0;
-    int cy = 0;
-    int flags = swpFramechanged;
-
-    if (position != null) {
-      x = (position.dx * dpr).round();
-      y = (position.dy * dpr).round();
-    } else {
-      flags |= swpNomove;
-    }
-
-    if (size != null) {
-      cx = (size.width * dpr).round();
-      cy = (size.height * dpr).round();
-    } else {
-      flags |= swpNosize;
-    }
-
-    _api.setWindowPos(hwnd, 0, x, y, cx, cy, flags);
-  }
-
-  @override
-  Future<void> maximize() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd != 0) {
-      _api.maximizeWindow(hwnd);
-    }
-  }
-
-  @override
-  Future<void> restore() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd != 0) {
-      _api.restoreWindow(hwnd);
-    }
-  }
-
-  @override
-  Future<void> focus() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd != 0 && _api.isWindowVisible(hwnd)) {
-      _api.setForegroundWindow(hwnd);
-      _api.setFocus(hwnd);
-    }
-  }
-
-  @override
-  Future<bool> isMaximized() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0) return false;
-    return _api.isZoomed(hwnd);
-  }
-
-  @override
-  Future<bool> isMinimized() async {
-    final hwnd = _api.getFlutterHwnd();
-    if (hwnd == 0) return false;
-    return _api.isIconic(hwnd);
-  }
-
   // ─── 能力查询 ───
 
   /// 返回 Windows 平台全屏能力。
@@ -507,39 +402,6 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     );
   }
 
-  // ─── T4: 批量快照 ───
-
-  /// 批量捕获窗口快照 — 2 次 FFI (vs 默认 3 次 async)。
-  ///
-  /// 使用 [_getHwnd] 缓存避免 FindWindowW 重复调用。
-  /// isZoomed(hwnd) + getWindowPlacement(hwnd) 合并为一次批量操作。
-  @override
-  Future<({bool isMaximized, Offset position, Size size})> captureSnapshot() async {
-    final hwnd = _getHwnd();
-    if (hwnd == 0) {
-      return (isMaximized: false, position: Offset.zero, size: Size.zero);
-    }
-
-    final maximized = _api.isZoomed(hwnd); // 1 FFI
-    final placement = _api.getWindowPlacement(hwnd); // 1 FFI
-
-    Offset position = Offset.zero;
-    Size size = Size.zero;
-
-    if (placement != null) {
-      try {
-        final dpr = _getDevicePixelRatio();
-        final rc = placement.ref.rcNormalPosition;
-        position = Offset(rc.left / dpr, rc.top / dpr);
-        size = Size((rc.right - rc.left) / dpr, (rc.bottom - rc.top) / dpr);
-      } finally {
-        calloc.free(placement);
-      }
-    }
-
-    return (isMaximized: maximized, position: position, size: size);
-  }
-
   // ─── 内部辅助 ───
 
   /// 释放保存的窗口位置指针。
@@ -548,15 +410,6 @@ class WindowsFullscreenDriver implements FullscreenDriver {
     if (p != null) {
       calloc.free(p);
       _savedPlacement = null;
-    }
-  }
-
-  /// 获取 devicePixelRatio。
-  double _getDevicePixelRatio() {
-    try {
-      return PlatformDispatcher.instance.views.first.devicePixelRatio;
-    } catch (_) {
-      return 1.0;
     }
   }
 
@@ -603,6 +456,4 @@ class Win32FullscreenApiWrapper {
       Win32FullscreenApi.getWindowPlacement(hwnd);
   bool setWindowPlacement(int hwnd, Pointer<WindowPlacement> placement) =>
       Win32FullscreenApi.setWindowPlacement(hwnd, placement);
-  bool maximizeWindow(int hwnd) => Win32FullscreenApi.maximizeWindow(hwnd);
-  bool restoreWindow(int hwnd) => Win32FullscreenApi.restoreWindow(hwnd);
 }

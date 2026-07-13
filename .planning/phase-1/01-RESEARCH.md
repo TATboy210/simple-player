@@ -521,22 +521,16 @@ Future<void> setMode(WindowMode target) async {
 |---|-------|---------|---------------|
 | — | No assumptions | — | — |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `_isFullscreen` be removed in favor of deriving from `mode.value.isFullscreen`?**
-   - What we know: Both `_isFullscreen` and `_state.mode` exist and can desync
-   - What's unclear: Whether all consumers use `_isFullscreen` directly or go through `mode`
-   - Recommendation: Remove `_isFullscreen`, add `isFullscreen` getter to WindowService that returns `mode.value.isFullscreen`. This eliminates dual state source.
+1. **Should `_isFullscreen` be removed in favor of deriving from `mode.value.isFullscreen`?** (RESOLVED: 2026-07-12)
+   - RESOLVED: Remove `_isFullscreen`, add `bool get isFullscreen => mode.value.isFullscreen` getter. Plan 01-02 T2 Step 1.
 
-2. **How to handle `AppSettings.isFullscreen` field after removing persistence?**
-   - What we know: `AppSettings.isFullscreen` exists but is never populated from SharedPreferences
-   - What's unclear: Whether any code reads `AppSettings.isFullscreen`
-   - Recommendation: Remove the field from `AppSettings` if no code reads it. Keep if needed for settings export (Phase 4).
+2. **How to handle `AppSettings.isFullscreen` field after removing persistence?** (RESOLVED: 2026-07-12)
+   - RESOLVED: Remove `AppSettings.isFullscreen` entirely — dead code. Plan 01-02 T1 Step 3.
 
-3. **Should `WindowPersistence.saveIsFullscreen` be kept for D-09 (WindowService manages persistence)?**
-   - What we know: Current `saveIsFullscreen` calls `SettingsStore.saveIsFullscreen` (dead code)
-   - What's unclear: Whether D-09 intends a different persistence mechanism
-   - Recommendation: Keep `WindowPersistence` but change `saveIsFullscreen` to use a WindowService-owned persistence key, not SettingsStore.
+3. **Should `WindowPersistence.saveIsFullscreen` be kept for D-09?** (RESOLVED: 2026-07-12)
+   - RESOLVED: Remove `saveIsFullscreen` — dead code path. Plan 01-02 T1 Step 2.
 
 ## Metadata
 
