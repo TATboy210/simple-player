@@ -1,11 +1,16 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/locale_service.dart';
 import '../../kernel/services/theme_service.dart';
+import '../../kernel/utils/log.dart';
 import '../../features/player/services/video_processing_service.dart';
 import '../shared/glass_container.dart';
+import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import 'settings/_settings_nav_item.dart';
@@ -129,6 +134,210 @@ class _SettingsPanelState extends State<SettingsPanel> {
     // 更新原始值以便后续取消时以当前值为基准
     _originalLocale = _pendingLocale;
     _originalThemeIndex = _pendingThemeIndex;
+  }
+
+  // ── Import / Export ──
+
+  /// 导出所有设置为 JSON 文件 (D-05, D-13)
+  ///
+  /// 流程：file_picker 保存对话框 → SettingsStore.exportSettings → 写入文件
+  /// 默认文件名含日期 `settings_YYYY-MM-DD.json`
+  Future<void> _exportSettings() async {
+    final l10n = AppLocalizations.of(context);
+    // 生成带日期的默认文件名
+    final now = DateTime.now();
+    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final defaultFileName = 'settings_$dateStr.json';
+
+    final result = await FilePicker.saveFile(
+      dialogTitle: l10n.exportSettings,
+      fileName: defaultFileName,
+      allowedExtensions: ['json'],
+      type: FileType.custom,
+    );
+    // 用户取消选择
+    if (result == null) return;
+
+    try {
+      final json = await SettingsStore.exportSettings();
+      await File(result).writeAsString(json);
+      // 导出成功 — OSD 提示
+      if (mounted) {
+        OsdService.I.show(l10n.exportSuccess);
+      }
+    } on FileSystemException catch (e) {
+      // 磁盘满、权限不足等 I/O 错误 (D-13)
+      log.e('Export failed: $e');
+      if (mounted) {
+        OsdService.I.show(l10n.exportError);
+      }
+    } on FormatException catch (e) {
+      // JSON 序列化错误 (D-13)
+      log.e('Export failed: $e');
+      if (mounted) {
+        OsdService.I.show(l10n.exportError);
+      }
+    }
+  }
+
+  /// 从 JSON 文件导入设置 (D-06, D-07, D-12, D-14, D-15)
+  ///
+  /// 流程：file_picker 打开对话框 → 读取文件 → SettingsStore.importSettings
+  ///       → 成功则显示确认对话框，失败则显示错误对话框
+  Future<void> _importSettings() async {
+    final l10n = AppLocalizations.of(context);
+
+    final result = await FilePicker.pickFiles(
+      dialogTitle: l10n.importSettings,
+      allowedExtensions: ['json'],
+      type: FileType.custom,
+    );
+    // 用户取消选择
+    if (result == null || result.files.isEmpty) return;
+
+    // 读取文件内容
+    final String json;
+    try {
+      json = await File(result.files.first.path!).readAsString();
+    } on FileSystemException catch (e) {
+      // 文件读取失败 (D-12)
+      log.e('Import file read failed: $e');
+      if (mounted) {
+        _showImportErrorDialog(l10n.importFileReadError(e.message));
+      }
+      return;
+    }
+
+    // 解析并验证 JSON
+    final importResult = await SettingsStore.importSettings(json);
+
+    if (!mounted) return;
+
+    switch (importResult) {
+      case ImportFailure(:final error):
+        // 解析/验证失败 — 显示详细错误 (D-12)
+        _showImportErrorDialog(l10n.importParseError(error));
+      case ImportSuccess():
+        // 解析成功 — 显示确认对话框 (D-09, D-10, D-11)
+        _showImportConfirmDialog(importResult);
+    }
+  }
+
+  /// 导入失败错误对话框 — 毛玻璃风格，显示详细错误信息 (D-12)
+  void _showImportErrorDialog(String errorMessage) {
+    final l10n = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: GlassTier.normal.blurFilter,
+        child: AlertDialog(
+          backgroundColor: Tokens.bgGlass,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Tokens.radiusLg),
+            side: const BorderSide(color: Tokens.borderHighlight),
+          ),
+          title: Text(l10n.importError(''), style: const TextStyle(color: Tokens.textPrimary)),
+          content: Text(
+            errorMessage,
+            style: const TextStyle(color: Tokens.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.ok),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 导入确认对话框 — 毛玻璃风格，显示将被覆盖的设置类别 (D-09, D-10, D-11)
+  ///
+  /// 确认后调用 [_onImportConfirmed] 立即应用所有设置。
+  void _showImportConfirmDialog(ImportSuccess result) {
+    final l10n = AppLocalizations.of(context);
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: GlassTier.normal.blurFilter,
+        child: AlertDialog(
+          backgroundColor: Tokens.bgGlass,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Tokens.radiusLg),
+            side: const BorderSide(color: Tokens.borderHighlight),
+          ),
+          title: Text(
+            l10n.importConfirmTitle,
+            style: const TextStyle(color: Tokens.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.importConfirmMessage,
+                style: const TextStyle(color: Tokens.textSecondary),
+              ),
+              const SizedBox(height: Tokens.spSm),
+              Text(
+                l10n.importConfirmCategories,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(
+                backgroundColor: Tokens.accent,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.confirmReset),
+            ),
+          ],
+        ),
+      ),
+    ).then((confirmed) {
+      // 用户确认导入 — 立即应用所有设置 (D-14)
+      if (confirmed == true && mounted) {
+        _onImportConfirmed(result);
+      }
+    });
+  }
+
+  /// 导入确认后 — 立即应用设置，更新面板状态，保持面板打开 (D-14, D-15)
+  ///
+  /// - 通过 SettingsStore 持久化所有设置
+  /// - 通过 LocaleService/ThemeService 立即更新 UI
+  /// - 更新 _pendingLocale/_pendingThemeIndex 使面板反映新值
+  /// - 不调用 Navigator.pop — 面板保持打开 (D-15)
+  Future<void> _onImportConfirmed(ImportSuccess result) async {
+    final l10n = AppLocalizations.of(context);
+    // 持久化所有设置到 SharedPreferences
+    await SettingsStore.applyImportedSettings(result);
+
+    // 立即更新 locale/theme 服务 — UI 实时响应 (D-14)
+    LocaleService.I.setLocale(result.locale);
+    ThemeService.I.setTheme(result.themeIndex);
+
+    // 更新面板内部 pending 值 — 使 GeneralTab 显示新导入的 locale/theme
+    setState(() {
+      _pendingLocale = result.locale;
+      _pendingThemeIndex = result.themeIndex;
+    });
+
+    // OSD 成功提示
+    if (mounted) {
+      OsdService.I.show(l10n.importSuccess);
+    }
   }
 
   // ── 重置功能 ──
@@ -458,6 +667,20 @@ class _SettingsPanelState extends State<SettingsPanel> {
               ),
             ),
           const Spacer(),
+          // Import/Export 按钮组
+          _BottomButton(label: l10n.importSettings, onTap: _importSettings),
+          const SizedBox(width: Tokens.spSm),
+          _BottomButton(label: l10n.exportSettings, onTap: _exportSettings),
+          // 竖线分隔符 — 区分 Import/Export 和 OK/Cancel/Apply
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
+            child: Container(
+              width: 1,
+              height: 20,
+              color: Tokens.borderHighlight,
+            ),
+          ),
+          // OK/Cancel/Apply 按钮组
           _BottomButton(label: l10n.ok, primary: true, onTap: _ok),
           const SizedBox(width: Tokens.spSm),
           _BottomButton(label: l10n.cancel, onTap: _cancel),

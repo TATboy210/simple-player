@@ -174,5 +174,17 @@
   "resetToDefaults": "恢复默认",
   "resetConfirmTitle": "重置{tabName}设置？",
   "resetConfirmMessage": "以下设置将恢复为默认值：",
-  "confirmReset": "确认重置"
+  "confirmReset": "确认重置",
+
+  "exportSettings": "导出",
+  "importSettings": "导入",
+  "importConfirmTitle": "导入设置？",
+  "importConfirmMessage": "以下设置将被覆盖：",
+  "importConfirmCategories": "播放、视频效果、字幕、窗口、快捷键、主题、语言",
+  "importSuccess": "设置已导入",
+  "importError": "导入失败：{error}",
+  "exportError": "导出失败",
+  "exportSuccess": "设置已导出",
+  "importParseError": "无效 JSON：{error}",
+  "importFileReadError": "无法读取文件：{error}"
 }
