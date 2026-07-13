@@ -1,5 +1,4 @@
 ﻿import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -11,10 +10,6 @@ import '../persistence/settings_store.dart';
 import '../utils/log.dart';
 import '../utils/screen_utils.dart';
 import 'display_enumerator.dart';
-import 'fullscreen_driver.dart';
-import 'platform/linux_fullscreen_driver.dart';
-import 'platform/macos_fullscreen_driver.dart';
-import 'platform/windows_fullscreen_driver.dart';
 import 'win32/win32_display_enumerator.dart';
 import 'window_bridge.dart';
 import 'window_mode.dart';
@@ -25,48 +20,14 @@ import 'window_state.dart';
 class WindowService with WindowListener implements WindowBridge {
   /// 创建 WindowService。
   ///
-  /// [driver] 可选注入全屏驱动（测试用），默认通过 [_createDriver] 自动创建。
   /// [displayEnumerator] 可选注入显示器枚举器，默认使用 Win32DisplayAdapter。
   WindowService({
     DisplayEnumerator? displayEnumerator,
-    FullscreenDriver? driver,
-  }) : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter(),
-       _fullscreenDriver = driver ?? _createDriver() {
-    _fullscreenDriver?.onNativeStateChanged = _onNativeFullScreenChanged;
-  }
-
-  /// 根据当前平台创建合适的 FullscreenDriver。
-  ///
-  /// - Windows: WindowsFullscreenDriver (Win32 FFI)，HWND 无效时返回 null
-  /// - macOS: MacosFullscreenDriver (fullscreen_window 插件)
-  /// - Linux: LinuxFullscreenDriver (fullscreen_window 插件)
-  /// - 其他: 返回 null（不支持全屏）
-  static FullscreenDriver? _createDriver() {
-    if (Platform.isWindows) {
-      try {
-        final driver = WindowsFullscreenDriver();
-        final api = driver.apiForTesting;
-        final hwnd = api.getFlutterHwnd();
-        if (hwnd == 0 || !api.isWindow(hwnd)) {
-          debugPrint('[WindowService] HWND invalid ($hwnd), no fullscreen');
-          return null;
-        }
-        return driver;
-      } on Exception catch (e) {
-        debugPrint('[WindowService] WindowsFullscreenDriver init failed: $e');
-        return null;
-      }
-    }
-    if (Platform.isMacOS) return MacosFullscreenDriver();
-    if (Platform.isLinux) return LinuxFullscreenDriver();
-    debugPrint('[WindowService] unsupported platform, no fullscreen');
-    return null;
-  }
+  }) : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
 
   final WindowState _state = WindowState();
   final WindowPersistence _persistence = WindowPersistence();
   final DisplayEnumerator _displayEnumerator;
-  final FullscreenDriver? _fullscreenDriver;
 
   bool _disposed = false;
   bool _isProgrammaticResize = false;
@@ -80,11 +41,6 @@ class WindowService with WindowListener implements WindowBridge {
   /// 当前是否全屏 — 从 mode 派生，单一数据源。
   @override
   bool get isFullscreen => _state.mode.value.isFullscreen;
-
-  final Map<int, _RestoreSnapshot> _restoreSnapshots = {};
-
-  /// 单一确认 Completer — 替代 _confirmByWindowId map + 20x 轮询。
-  Completer<bool>? _confirmationCompleter;
 
   @override
   ValueNotifier<WindowMode> get mode => _state.mode;
@@ -137,22 +93,6 @@ class WindowService with WindowListener implements WindowBridge {
       }),
     );
     windowManager.addListener(this);
-  }
-
-  /// 原生全屏状态变更回调 — 完成确认 Completer 或更新 mode。
-  void _onNativeFullScreenChanged(int windowId, bool isFullscreen) {
-    if (_disposed) return;
-    final completer = _confirmationCompleter;
-    if (completer != null && !completer.isCompleted) {
-      completer.complete(true);
-      return;
-    }
-    _updateOnUIThread(() {
-      final target = isFullscreen ? WindowMode.fullscreen : WindowMode.windowed;
-      if (_state.mode.value != target) {
-        _state.mode.value = target;
-      }
-    });
   }
 
   void _updateOnUIThread(VoidCallback update) {
@@ -240,14 +180,7 @@ class WindowService with WindowListener implements WindowBridge {
     logBridge.i('setMode($target) <- ${_state.mode.value}');
     switch (target) {
       case WindowMode.windowed:
-        if (_state.mode.value == WindowMode.fullscreen &&
-            _fullscreenDriver != null) {
-          _state.mode.value = WindowMode.windowed;
-          final result = await _handleLeave(0);
-          if (result is FullscreenFailure) {
-            _state.mode.value = WindowMode.fullscreen;
-          }
-        } else if (_state.mode.value == WindowMode.maximized) {
+        if (_state.mode.value == WindowMode.maximized) {
           await windowManager.unmaximize();
         }
       case WindowMode.maximized:
@@ -255,13 +188,8 @@ class WindowService with WindowListener implements WindowBridge {
       case WindowMode.minimized:
         await windowManager.minimize();
       case WindowMode.fullscreen:
-        if (_fullscreenDriver != null) {
-          _state.mode.value = WindowMode.fullscreen;
-          final result = await _handleEnter(0);
-          if (result is FullscreenFailure) {
-            _state.mode.value = WindowMode.windowed;
-          }
-        }
+        // TODO: Phase 2 — wire to fullscreen_window package
+        break;
     }
   }
 
@@ -284,124 +212,6 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   Future<void> startDragging() => windowManager.startDragging();
 
-  // ─── Fullscreen enter/leave (merged from DesktopFullscreenAdapter) ───
-
-  /// 进入全屏 — 返回 [FullscreenResult] 表示操作结果。
-  ///
-  /// 快速路径 (supportsFastPath) 直接操作，否则通过三级确认链等待原生回调。
-  Future<FullscreenResult> _handleEnter(int windowId) async {
-    final driver = _fullscreenDriver;
-    if (driver == null) return const FullscreenFailure();
-    if (_state.mode.value != WindowMode.fullscreen) { await _captureRestoreSnapshot(windowId); }
-    try {
-      if (await windowManager.isMinimized()) {
-        await windowManager.restore();
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
-      if (driver.supportsFastPath) {
-        await driver.enterFullscreenFast(displayId: 0);
-        return const FullscreenSuccess();
-      }
-      await driver.enterFullscreen(displayId: 0);
-      final confirmed = await _waitForConfirmation(true);
-      if (confirmed) {
-        return const FullscreenSuccess();
-      } else {
-        await _applyDesync();
-        return const FullscreenFailure();
-      }
-    } on Exception catch (e) {
-      debugPrint('[WindowService] fullscreen enter failed: $e');
-      return const FullscreenFailure();
-    }
-  }
-
-  /// 退出全屏 — 返回 [FullscreenResult] 表示操作结果。
-  Future<FullscreenResult> _handleLeave(int windowId) async {
-    final driver = _fullscreenDriver;
-    if (driver == null) return const FullscreenFailure();
-    try {
-      if (driver.supportsFastPath) {
-        await driver.leaveFullscreenFast();
-        await _restoreFromSnapshot(windowId);
-        return const FullscreenSuccess();
-      }
-      await driver.leaveFullscreen();
-      final confirmed = await _waitForConfirmation(false);
-      if (confirmed) {
-        await _restoreFromSnapshot(windowId);
-        return const FullscreenSuccess();
-      } else {
-        await _applyDesync();
-        return const FullscreenFailure();
-      }
-    } on Exception catch (e) {
-      debugPrint('[WindowService] fullscreen leave failed: $e');
-      return const FullscreenFailure();
-    }
-  }
-
-  Future<void> _applyDesync() async {
-    final driver = _fullscreenDriver;
-    if (driver == null) return;
-    final actual = await driver.queryFullscreen();
-    debugPrint('[WindowService] desync detected, correcting to $actual');
-    _updateOnUIThread(() {
-      _state.mode.value = actual ? WindowMode.fullscreen : WindowMode.windowed;
-    });
-  }
-
-  Future<void> _captureRestoreSnapshot(int windowId) async {
-    try {
-      final position = await windowManager.getPosition();
-      final size = await windowManager.getSize();
-      final maximized = await windowManager.isMaximized();
-      _restoreSnapshots[windowId] = _RestoreSnapshot(
-        position: position, size: size, isMaximized: maximized,
-      );
-    } on Exception catch (e) {
-      debugPrint('[WindowService] captureRestoreSnapshot failed: $e');
-    }
-  }
-
-  Future<void> _restoreFromSnapshot(int windowId) async {
-    final snapshot = _restoreSnapshots.remove(windowId);
-    if (snapshot == null) return;
-    if (snapshot.isMaximized) {
-      await windowManager.maximize();
-      return;
-    }
-    if (snapshot.position != Offset.zero || snapshot.size != Size.zero) {
-      try {
-        await windowManager.setBounds(
-          null, position: snapshot.position, size: snapshot.size,
-        );
-      } on Exception catch (_) {
-        await windowManager.setBounds(null, size: snapshot.size);
-        await windowManager.center();
-      }
-    }
-  }
-
-  /// 等待全屏确认 — 原生回调优先，超时后单次查询兜底。
-  Future<bool> _waitForConfirmation(bool expectedFullscreen) async {
-    final driver = _fullscreenDriver;
-    if (driver == null) return false;
-    _confirmationCompleter = Completer<bool>();
-    try {
-      final confirmed = await _confirmationCompleter!.future.timeout(
-        const Duration(milliseconds: 500),
-        onTimeout: () => false,
-      );
-      if (confirmed) return true;
-    } finally {
-      _confirmationCompleter = null;
-    }
-    // 超时后单次查询 — 替代 20x 轮询
-    final actual = await driver.queryFullscreen();
-    return actual == expectedFullscreen;
-  }
-
   Future<void> _saveGeometry() async {
     try {
       final pos = await windowManager.getPosition();
@@ -421,26 +231,8 @@ class WindowService with WindowListener implements WindowBridge {
     if (_disposed) return;
     _disposed = true;
     _resizeTimer?.cancel();
-    _fullscreenDriver?.onNativeStateChanged = null;
-    _fullscreenDriver?.dispose();
-    _restoreSnapshots.clear();
-    if (_confirmationCompleter != null && !_confirmationCompleter!.isCompleted) {
-      _confirmationCompleter!.complete(false);
-    }
-    _confirmationCompleter = null;
     _state.dispose();
     _persistence.dispose();
     windowManager.removeListener(this);
   }
-}
-
-final class _RestoreSnapshot {
-  const _RestoreSnapshot({
-    required this.position,
-    required this.size,
-    this.isMaximized = false,
-  });
-  final Offset position;
-  final Size size;
-  final bool isMaximized;
 }
