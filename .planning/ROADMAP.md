@@ -8,7 +8,7 @@
 
 | # | Phase | Goal | Requirements | Est. Time |
 |---|-------|------|--------------|-----------|
-| 1 | 旧架构移除 | 删除 FullscreenDriver、平台驱动、Win32 FFI、旧测试 | ARCH-REM-01~04 | 2h |
+| 1 | 旧架构移除 | 2/2 | Complete   | 2026-07-13 |
 | 2 | WindowService 简化 | 移除确认链，直接调用 fullscreen_window 包 | WIN-SVC-01~03 | 1.5h |
 | 3 | 沉浸式全屏 UI | 标题栏隐藏、控制栏自动隐藏、ESC 退出 | IMM-UI-01~03 | 1.5h |
 | 4 | 测试更新 | 更新 WindowService 和 UI 测试 | TEST-UPD-01~02 | 1h |
@@ -25,16 +25,16 @@
 **Goal:** 完全移除现有的多层全屏架构
 
 **Requirements:** ARCH-REM-01~04
-**Plans:** 0/2 plans complete
+**Plans:** 2/2 plans complete
 
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — 删除 FullscreenDriver 抽象层和平台驱动 (ARCH-REM-01, ARCH-REM-02)
+- [x] 01-01-PLAN.md — 删除 FullscreenDriver 抽象层和平台驱动 (ARCH-REM-01, ARCH-REM-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — 删除 Win32 FFI 绑定和旧测试文件 (ARCH-REM-03, ARCH-REM-04)
+- [x] 01-02-PLAN.md — 删除 Win32 FFI 绑定和旧测试文件 (ARCH-REM-03, ARCH-REM-04)
 
 **Success Criteria:**
 
