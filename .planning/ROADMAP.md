@@ -10,7 +10,7 @@
 |---|-------|------|--------------|-----------|
 | 1 | 全屏代码简化 | 2/0 | Complete    | 2026-07-12 |
 | 2 | 设置面板视觉升级 | 2/2 | Complete    | 2026-07-12 |
-| 3 | Reset to Defaults | 1/1 | Complete   | 2026-07-13 |
+| 3 | Reset to Defaults | 1/1 | Complete    | 2026-07-13 |
 | 4 | 设置导入导出 | JSON 导出/导入，格式校验，确认提示 | IEX-01, IEX-02, IEX-03 | ~2h |
 | 5 | 全屏与设置面板交互规范化 | 进入/退出全屏时设置面板行为正确 | SUI-03 | ~1.5h |
 | 6 | 开发工作流增强 | Context7、codegraph、Quality Pipeline 评估 | DEV-01, DEV-02, DEV-03 | ~2h |
