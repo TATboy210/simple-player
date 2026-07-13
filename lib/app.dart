@@ -75,6 +75,7 @@ class _AppState extends State<App> {
       builder: (dialogCtx) => SettingsPanel(
         engine: engine,
         videoProcessing: videoProcessing,
+        windowService: widget.windowService,
       ),
     );
   }
