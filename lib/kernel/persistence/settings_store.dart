@@ -4,9 +4,42 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_settings.dart';
+import '../models/export_data.dart';
 export '../models/app_settings.dart';
 import '../utils/log.dart';
 import 'settings_validator.dart';
+
+/// 导入结果 — sealed class 支持穷尽模式匹配。
+///
+/// ```dart
+/// switch (result) {
+///   case ImportSuccess(:final settings, :final locale) => // 应用设置
+///   case ImportFailure(:final error) => // 显示错误
+/// }
+/// ```
+sealed class ImportResult {
+  const ImportResult();
+}
+
+/// 导入成功 — 携带解析后的设置和补充值。
+final class ImportSuccess extends ImportResult {
+  final AppSettings settings;
+  final String locale;
+  final int themeIndex;
+  final Map<String, String> shortcuts;
+  const ImportSuccess({
+    required this.settings,
+    required this.locale,
+    required this.themeIndex,
+    required this.shortcuts,
+  });
+}
+
+/// 导入失败 — 携带人类可读的错误描述。
+final class ImportFailure extends ImportResult {
+  final String error;
+  const ImportFailure(this.error);
+}
 
 /// 应用设置持久化 (shared_preferences)
 ///
@@ -443,4 +476,154 @@ class SettingsStore {
       await p.remove(_keyWindowY);
     }
   });
+
+  // ─── 设置导入/导出 ───
+
+  /// 导出所有设置为 JSON 字符串。
+  ///
+  /// 读取当前 AppSettings + locale + themeIndex + shortcuts，
+  /// 构建 [ExportData] 并序列化为 JSON。
+  /// 失败时抛出异常 — 由调用方处理 UI 错误提示 (D-13)。
+  static Future<String> exportSettings() async {
+    final settings = await load();
+    final locale = await loadLocale();
+    final themeIndex = await loadThemeIndex();
+    final shortcuts = await loadShortcuts();
+    // playbackSpeed 由 loadPlaybackSpeed() 单独加载，需要覆盖 load() 的默认值
+    final playbackSpeed = await loadPlaybackSpeed();
+    final mergedSettings = settings.copyWith(playbackSpeed: playbackSpeed);
+
+    final exportData = ExportData.fromSettings(
+      settings: mergedSettings,
+      locale: locale,
+      themeIndex: themeIndex,
+      shortcuts: shortcuts,
+    );
+
+    return jsonEncode(exportData.toMap());
+  }
+
+  /// 从 JSON 字符串导入设置。
+  ///
+  /// 解析 JSON，提取 'settings' key，逐字段验证。
+  /// 返回 [ImportSuccess]（携带验证后的设置）或 [ImportFailure]（携带错误描述）。
+  ///
+  /// 宽松策略 (D-07)：忽略未知字段，缺失字段用 AppSettings 默认值填充。
+  static Future<ImportResult> importSettings(String jsonString) async {
+    // Step 1: 解析 JSON — 无法解析则返回失败
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(jsonString) as Map<String, dynamic>;
+    } on FormatException catch (e) {
+      return ImportFailure('Invalid JSON: ${e.message}');
+    }
+
+    // Step 2: 提取 settings key — 缺失或类型错误则返回失败
+    final rawSettings = data['settings'];
+    if (rawSettings == null || rawSettings is! Map) {
+      return const ImportFailure('Missing settings data');
+    }
+    final map = rawSettings as Map<String, dynamic>;
+
+    // Step 3: 逐字段解析 + 验证 — 缺失字段用默认值，未知字段忽略
+    final settings = AppSettings(
+      volume: SettingsValidator.volume(
+        (map['volume'] as num?)?.toDouble() ?? 1.0,
+      ),
+      lastFile: map['lastFile'] as String? ?? '',
+      windowWidth: SettingsValidator.sanitizeDimension(
+        (map['windowWidth'] as num?)?.toDouble() ?? SettingsValidator.windowWidthDefault,
+        SettingsValidator.windowWidthDefault,
+        SettingsValidator.windowWidthMin,
+        SettingsValidator.windowWidthMax,
+      ),
+      windowHeight: SettingsValidator.sanitizeDimension(
+        (map['windowHeight'] as num?)?.toDouble() ?? SettingsValidator.windowHeightDefault,
+        SettingsValidator.windowHeightDefault,
+        SettingsValidator.windowHeightMin,
+        SettingsValidator.windowHeightMax,
+      ),
+      windowX: map['windowX'] != null
+          ? SettingsValidator.sanitizeCoordinate(
+              (map['windowX'] as num).toDouble(), 0)
+          : null,
+      windowY: map['windowY'] != null
+          ? SettingsValidator.sanitizeCoordinate(
+              (map['windowY'] as num).toDouble(), 0)
+          : null,
+      isMaximized: map['isMaximized'] as bool? ?? false,
+      playMode: SettingsValidator.playMode(
+        map['playMode'] as int? ?? 0,
+      ),
+      isMuted: map['isMuted'] as bool? ?? false,
+      isAlwaysOnTop: map['isAlwaysOnTop'] as bool? ?? false,
+      subtitleFontSize: SettingsValidator.subtitleFontSize(
+        (map['subtitleFontSize'] as num?)?.toDouble() ?? SettingsValidator.subtitleFontSizeDefault,
+      ),
+      subtitleColorIndex: SettingsValidator.subtitleColorIndex(
+        map['subtitleColorIndex'] as int? ?? 0,
+      ),
+      subtitleBottomOffset: SettingsValidator.subtitleOffset(
+        (map['subtitleBottomOffset'] as num?)?.toDouble() ?? SettingsValidator.subtitleOffsetDefault,
+      ),
+      videoBrightness: SettingsValidator.videoEffect(
+        (map['videoBrightness'] as num?)?.toDouble() ?? 0.0,
+      ),
+      videoContrast: SettingsValidator.videoEffect(
+        (map['videoContrast'] as num?)?.toDouble() ?? 0.0,
+      ),
+      videoSaturation: SettingsValidator.videoEffect(
+        (map['videoSaturation'] as num?)?.toDouble() ?? 0.0,
+      ),
+      videoHue: SettingsValidator.videoEffect(
+        (map['videoHue'] as num?)?.toDouble() ?? 0.0,
+      ),
+      videoRotation: SettingsValidator.sanitizeRotation(
+        map['videoRotation'] as int? ?? 0,
+      ),
+      videoAspectRatioIndex: SettingsValidator.videoAspectRatioIndex(
+        map['videoAspectRatioIndex'] as int? ?? 0,
+      ),
+      videoDeinterlace: map['videoDeinterlace'] as bool? ?? false,
+      playbackSpeed: SettingsValidator.playbackSpeed(
+        (map['playbackSpeed'] as num?)?.toDouble() ?? SettingsValidator.playbackSpeedDefault,
+      ),
+      d3d11Sync: map['d3d11Sync'] as bool? ?? true,
+      hardwareDecoding: map['hardwareDecoding'] as bool? ?? true,
+    );
+
+    // locale/themeIndex/shortcuts 验证
+    final locale = map['locale'] as String? ?? SettingsValidator.defaultLocale;
+    final themeIndex = SettingsValidator.themeIndex(
+      map['themeIndex'] as int? ?? 0,
+    );
+    final rawShortcuts = map['shortcuts'];
+    final shortcuts = rawShortcuts is Map
+        ? rawShortcuts.map((k, v) => MapEntry(k as String, v as String))
+        : <String, String>{};
+
+    return ImportSuccess(
+      settings: settings,
+      locale: locale,
+      themeIndex: themeIndex,
+      shortcuts: shortcuts,
+    );
+  }
+
+  /// 持久化导入的设置到 SharedPreferences。
+  ///
+  /// 参数类型为 [ImportSuccess]（非 [ImportResult]）— 调用方必须先模式匹配。
+  /// 导入后立即生效，不等 OK/Cancel (D-14)。
+  static Future<void> applyImportedSettings(ImportSuccess result) async {
+    try {
+      await saveAll(result.settings);
+      // playbackSpeed 由 savePlaybackSpeed() 单独持久化（saveAll 不包含此字段）
+      await savePlaybackSpeed(result.settings.playbackSpeed);
+      await saveLocale(result.locale);
+      await saveThemeIndex(result.themeIndex);
+      await saveShortcuts(result.shortcuts);
+    } on Exception catch (e) {
+      log.e('SettingsStore.applyImportedSettings failed: $e');
+    }
+  }
 }
