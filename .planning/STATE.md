@@ -2,29 +2,29 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: 沉浸式全屏重构
-current_phase: 01
-status: executing
-last_updated: "2026-07-13T14:45:36.791Z"
+current_phase: 02
+status: ready
+last_updated: "2026-07-13T16:30:00.000Z"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 1
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 3
+  percent: 29
 stopped_at: null
 ---
 
 # Project State: 沉浸式全屏重构
 
 **Last updated:** 2026-07-13
-**Current phase:** 01
-**Status:** Executing Phase 01
+**Current phase:** 02
+**Status:** Phase 01 Complete — Ready for Phase 2
 
 ## Progress
 
 | Phase | Status | Started | Completed |
 |-------|--------|---------|-----------|
-| Phase 1: 旧架构移除 | Pending | — | — |
+| Phase 1: 旧架构移除 | Complete | 2026-07-13 | 2026-07-13 |
 | Phase 2: WindowService 简化 | Pending | — | — |
 | Phase 3: 沉浸式全屏 UI | Pending | — | — |
 | Phase 4: 测试更新 | Pending | — | — |
