@@ -117,6 +117,36 @@ lib/
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`
 - Chinese comments are OK (existing codebase convention)
 
+## Context7 Documentation Lookup
+
+Use Context7 MCP to query Flutter API docs. Always use `resolve-library-id` first to get the exact library ID.
+
+### Library ID Mapping
+
+| Library | Context7 ID | Snippets | Use For |
+|---------|-------------|----------|---------|
+| Flutter API | `/websites/api_flutter_dev` | 30,590 | Widget API, class reference, method signatures |
+| Flutter Guide | `/websites/flutter_dev` | 10,777 | How-to guides, concepts, tutorials |
+| fvp | `/wang-bin/fvp` | 105 | Video player plugin API (MDK/FFmpeg) |
+| shared_preferences | `/websites/pub_dev_packages_shared_preferences` | 370 | Key-value storage API |
+| window_manager | `/leanflutter/window_manager` | 126 | Window control (frameless, fullscreen, etc.) |
+
+### Usage Rules
+
+- **On-demand only:** Only query when user explicitly asks or API behavior is unclear — do not query proactively
+- **Specific queries:** Use specific queries like `AnimatedSlide transition usage` not broad searches like `Flutter animation`
+- **Chinese docs:** Available via `/websites/flutter_cn` (4,266 snippets) for Chinese queries
+
+### Example (two-step pattern)
+
+```
+# Step 1: Resolve library ID
+mcp__context7__resolve-library-id(query="AnimatedSlide widget", libraryName="Flutter")
+
+# Step 2: Query docs with specific question
+mcp__context7__query-docs(libraryId="/websites/api_flutter_dev", query="How to use AnimatedSlide widget with offset")
+```
+
 ## Comment Policy (MANDATORY — write comments WHILE coding)
 
 **编写新功能的同时必须为重要代码添加注释，不要事后补。**
