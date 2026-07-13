@@ -314,17 +314,15 @@ Widget _buildResetButton(AppLocalizations l10n) {
 | A1 | AppSettings constructor default for volume is 1.0 (not 50) | Default Values | Volume slider range is 0-100 in UI but 0.0-1.0 in AppSettings. Context says "volume=50" but constructor shows 1.0. Need to verify actual default. |
 | A2 | EqualizerTab preset index 0 = flat/disabled (empty string filter) | EQ Reset | Verified in code: _presetValues[0] = '' (disabled). LOW risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Volume default value discrepancy**
+1. **Volume default value discrepancy** ✅ RESOLVED
    - What we know: AppSettings constructor has `volume: 1.0` (0.0-1.0 range), but UI slider shows 0-100 range. Context says "volume=50".
-   - What's unclear: Is the default volume 1.0 (100%) or 0.5 (50%)?
-   - Recommendation: Use AppSettings constructor default (1.0 = 100% volume). The "volume=50" in context may refer to the UI display value (50% = 0.5 in internal range). Verify with actual slider implementation.
+   - Resolution: Use AppSettings constructor default (1.0 = 100% volume). The plan uses `_resetTab()` which calls `AppSettings()` constructor defaults directly. Volume slider internally maps 0.0-1.0 to 0-100 display.
 
-2. **Reset button visibility during loading**
+2. **Reset button visibility during loading** ✅ RESOLVED
    - What we know: PerformanceTab loads settings asynchronously.
-   - What's unclear: Should reset button be disabled/hidden while loading?
-   - Recommendation: Disable reset button while `_loading == true` in PerformanceTab.
+   - Resolution: Plan disables reset button while `_loading == true` in PerformanceTab (Task 1 acceptance criteria).
 
 ## Environment Availability
 

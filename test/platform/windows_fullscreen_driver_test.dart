@@ -759,46 +759,7 @@ void main() {
       });
     });
 
-    // ─── window management ───
-
-    group('window management', () {
-      test('isMaximized delegates to IsZoomed', () async {
-        api.zoomed = true;
-        final result = await driver.isMaximized();
-        expect(result, isTrue);
-        expect(api.calls.any((c) => c.startsWith('isZoomed')), isTrue);
-      });
-
-      test('isMinimized delegates to IsIconic', () async {
-        api.iconic = true;
-        final result = await driver.isMinimized();
-        expect(result, isTrue);
-        expect(api.calls.any((c) => c.startsWith('isIconic')), isTrue);
-      });
-
-      test('maximize calls maximizeWindow', () async {
-        await driver.maximize();
-        expect(api.calls.any((c) => c.startsWith('maximizeWindow')), isTrue);
-      });
-
-      test('restore calls restoreWindow', () async {
-        await driver.restore();
-        expect(api.calls.any((c) => c.startsWith('restoreWindow')), isTrue);
-      });
-
-      test('focus calls setForegroundWindow when visible', () async {
-        api.visible = true;
-        await driver.focus();
-        expect(
-            api.calls.any((c) => c.startsWith('setForegroundWindow')), isTrue);
-      });
-
-      test('focus skips setForegroundWindow when not visible', () async {
-        api.visible = false;
-        await driver.focus();
-        expect(
-            api.calls.any((c) => c.startsWith('setForegroundWindow')), isFalse);
-      });
-    });
+    // ─── window management (v3: removed from Driver, now in WindowService) ───
+    // isMaximized/isMinimized/maximize/restore/focus 已移至 WindowService 直接调用 windowManager
   });
 }

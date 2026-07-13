@@ -146,8 +146,8 @@ Plans:
 
 Plans:
 
-- [ ] 06-01-PLAN.md — Context7 library ID mapping + codegraph upgrade/MCP config + CLAUDE.md tool guides (DEV-01, DEV-02)
-- [ ] 06-02-PLAN.md — Quality Pipeline evaluation document: test coverage + performance benchmarks (DEV-03)
+- [x] 06-01-PLAN.md — Context7 library ID mapping + codegraph upgrade/MCP config + CLAUDE.md tool guides (DEV-01, DEV-02)
+- [x] 06-02-PLAN.md — Quality Pipeline evaluation document: test coverage + performance benchmarks (DEV-03)
 
 **Success Criteria:**
 
