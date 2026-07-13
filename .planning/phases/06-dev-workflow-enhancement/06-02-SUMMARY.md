@@ -76,4 +76,8 @@ None — this is a documentation-only plan with no code output.
 |------|------|-------------|
 | (none) | — | Documentation only, no security surface |
 
-## Self-Check: PENDING
+## Self-Check: PASSED
+
+- [x] QUALITY-PIPELINE.md exists at `.planning/phases/06-dev-workflow-enhancement/QUALITY-PIPELINE.md`
+- [x] Commit c9d50ff exists in git log
+- [x] Commit 1ce7de8 exists in git log
