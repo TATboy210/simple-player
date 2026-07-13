@@ -2,162 +2,137 @@
 phase: 01-fullscreen-simplification
 plan: 02
 subsystem: bridge
-tags: [fullscreen, driver-removal, architecture-cleanup]
+tags: [fullscreen, ffi-deletion, test-cleanup, driver-removal]
 
-requires: [01-01]
+requires:
+  - 01-01
 provides:
   - "Win32 FFI fullscreen bindings deleted"
-  - "All old fullscreen driver test files deleted"
-  - "Zero references to deleted fullscreen types in codebase"
-affects: [01-fullscreen-simplification]
+  - "All 3 platform driver test files deleted"
+  - "Regression and unit tests updated — zero code references to deleted types"
+affects: [02-window-service-simplification, 04-testing]
 
 tech-stack:
   added: []
-  patterns: [abstraction-layer-removal]
+  patterns: [test-stub-with-todo]
 
 key-files:
   created: []
-  modified: []
+  modified:
+    - test/regression/smoke_suite_test.dart
+    - test/regression/high_risk_suite_test.dart
+    - test/unit/kernel/bridge/window_service_test.dart
 
 key-decisions:
-  - "Adapted file deletion targets to worktree's actual file structure (plan expected different names)"
-  - "WindowService test already clean — no modifications needed"
-  - "Deleted 5 source + 4 test files to remove entire old fullscreen abstraction layer"
+  - "Commented out all fullscreen-dependent tests with Phase 4 TODO markers"
+  - "Kept non-fullscreen WindowService tests intact (composition, callbacks, dispose, isFullscreen)"
+  - "Removed unused imports from regression test files to avoid warnings"
 
-patterns-established: []
+patterns-established:
+  - "TODO-marker pattern for deferred test rewrites"
 
 requirements-completed: [ARCH-REM-03, ARCH-REM-04]
 
 coverage:
   - id: D1
-    description: "Win32 FFI fullscreen bindings fully removed from codebase"
+    description: "Win32 FFI fullscreen file deleted (509 lines)"
     requirement: ARCH-REM-03
     verification:
       - kind: other
-        ref: "grep -r 'FullscreenController|PlatformFullscreen|FullscreenSnapshot' lib/ returns 0 matches"
+        ref: "bash: test -f lib/kernel/bridge/win32/win32_fullscreen_ffi.dart returns false"
         status: pass
     human_judgment: false
   - id: D2
-    description: "All old fullscreen driver test files deleted"
+    description: "3 platform driver test files deleted (1289 lines)"
+    requirement: ARCH-REM-03
+    verification:
+      - kind: other
+        ref: "bash: test -f for each of 3 files returns false"
+        status: pass
+    human_judgment: false
+  - id: D3
+    description: "Regression and unit tests updated — zero code references to FullscreenDriver/FullscreenCapability/FullscreenResult"
     requirement: ARCH-REM-04
     verification:
       - kind: other
-        ref: "grep -r 'FullscreenController|PlatformFullscreen|FullscreenSnapshot' test/ returns 0 matches"
+        ref: "flutter analyze on all 3 test files — No issues found"
         status: pass
     human_judgment: false
 
-duration: 5min
+duration: 6min
 completed: 2026-07-13
 status: complete
 ---
 
-# Phase 1 Plan 02: Delete Win32 FFI and Old Fullscreen Test Files Summary
+# Phase 01 Plan 02: Delete Win32 FFI and Driver Tests Summary
 
-**Deleted all old fullscreen source files (FullscreenController, PlatformFullscreen interface, 3 platform implementations) and their associated test files, leaving zero references to deleted types**
+**Deleted Win32 FFI fullscreen bindings (509 lines) and all 3 platform driver test files (1289 lines), updated regression/unit tests to remove all code references to deleted FullscreenDriver types**
 
 ## Performance
 
-- **Duration:** 5 min
-- **Started:** 2026-07-13T15:15:16Z
-- **Completed:** 2026-07-13T15:20:00Z
+- **Duration:** 6 min
+- **Started:** 2026-07-13T15:42:04Z
+- **Completed:** 2026-07-13T15:47:48Z
 - **Tasks:** 2
-- **Files modified:** 9 (5 source + 4 test deleted)
+- **Files modified:** 7 (4 deleted, 3 updated)
 
 ## Accomplishments
-- Removed entire old fullscreen abstraction layer: FullscreenController (mutex-guarded toggle with rollback), PlatformFullscreen abstract interface with FullscreenSnapshot, and Win32/macOS/Linux platform implementations
-- Removed all 4 associated test files: fullscreen_controller_test, linux_platform_fullscreen_test, macos_platform_fullscreen_test, platform_fullscreen_contract_test
-- Verified WindowService and window_service_test.dart have zero references to deleted types
-- Zero references to deleted types remain in lib/ and test/
+- Deleted 1798 lines across 4 files (1 source + 3 tests)
+- All regression tests compile cleanly without deleted type references
+- Non-fullscreen WindowService tests preserved intact (11 tests across 4 groups)
+- Zero code references to FullscreenDriver, FullscreenCapability, or FullscreenResult in test/
 
 ## Task Commits
 
-1. **Task 1: Delete old fullscreen source files** - `341f5c6` (refactor)
-2. **Task 2: Delete old fullscreen test files** - `a672369` (test)
+Each task was committed atomically:
+
+1. **Task 1: Delete Win32 FFI file and driver test files** - `f17ea28` (refactor)
+2. **Task 2: Update regression and unit tests to remove FullscreenDriver references** - `8fee3ae` (refactor)
 
 ## Files Created/Modified
-
-### Deleted (source):
-- `lib/kernel/bridge/fullscreen_controller.dart` - FullscreenController with mutex toggle and rollback
-- `lib/kernel/bridge/platform_fullscreen.dart` - PlatformFullscreen abstract interface + FullscreenSnapshot
-- `lib/kernel/bridge/win32/win32_platform_fullscreen.dart` - Win32 FFI fullscreen implementation
-- `lib/kernel/bridge/linux/linux_platform_fullscreen.dart` - Linux FFI/MethodChannel fullscreen implementation
-- `lib/kernel/bridge/macos/macos_platform_fullscreen.dart` - macOS MethodChannel fullscreen implementation
-
-### Deleted (tests):
-- `test/unit/bridge/fullscreen_controller_test.dart`
-- `test/unit/bridge/linux_platform_fullscreen_test.dart`
-- `test/unit/bridge/macos_platform_fullscreen_test.dart`
-- `test/unit/bridge/platform_fullscreen_contract_test.dart`
-
-### Verified clean:
-- `lib/kernel/bridge/window_service.dart` - Already uses windowManager.setFullScreen directly, no driver references
-- `test/unit/kernel/bridge/window_service_test.dart` - No fullscreen references
+- `lib/kernel/bridge/win32/win32_fullscreen_ffi.dart` - DELETED: Win32 FFI bindings (509 lines, Win32FullscreenApi class + 20 Win32 API wrappers)
+- `test/platform/windows_fullscreen_driver_test.dart` - DELETED: WindowsFullscreenDriver tests (763 lines)
+- `test/platform/linux_fullscreen_driver_test.dart` - DELETED: LinuxFullscreenDriver tests (274 lines)
+- `test/platform/macos_fullscreen_driver_test.dart` - DELETED: MacosFullscreenDriver tests (252 lines)
+- `test/regression/smoke_suite_test.dart` - MODIFIED: removed FullscreenDriver mock, all 8 scenarios marked Phase 4 TODO
+- `test/regression/high_risk_suite_test.dart` - MODIFIED: removed FullscreenDriver mock, all scenarios marked Phase 4 TODO
+- `test/unit/kernel/bridge/window_service_test.dart` - MODIFIED: removed _FakeFullscreenDriver, FullscreenResult tests, confirmation chain tests; kept 11 non-fullscreen tests
 
 ## Decisions Made
-- Adapted file deletion targets to worktree's actual file structure (plan referenced main repo names)
-- WindowService and its test required no modifications — worktree version was already simplified
-- Deleted test files alongside source to prevent compilation failures
+- Commented out all fullscreen-dependent tests rather than attempting partial rewrites (Phase 4 scope)
+- Removed unused imports from regression test files to pass flutter analyze cleanly
+- Preserved non-fullscreen WindowService tests (composition, callbacks, dispose safety, isFullscreen derivation)
 
 ## Deviations from Plan
 
 ### Auto-fixed Issues
 
-**1. [Rule 3 - Blocking] Adapted file targets to worktree structure**
-- **Found during:** Task 1 (Delete driver source files)
-- **Issue:** Plan referenced files from main repo (win32_fullscreen_ffi.dart, test/platform/*.dart) but worktree had different names (win32_platform_fullscreen.dart, test/unit/bridge/*.dart)
-- **Fix:** Deleted equivalent files in worktree's actual structure
-- **Files modified:** 5 source + 4 test files (different paths than plan)
-- **Verification:** grep confirms zero references remain
-- **Committed in:** 341f5c6, a672369
-
-**2. [Rule 3 - Blocking] WindowService test already clean**
-- **Found during:** Task 2 (Update regression and unit tests)
-- **Issue:** Plan expected to update window_service_test.dart to remove FullscreenDriver references, but worktree version had no such references
-- **Fix:** No modifications needed — test was already clean
-- **Files modified:** None
-- **Verification:** grep confirms no fullscreen references
-- **Committed in:** N/A (no changes needed)
-
-**3. [Rule 3 - Blocking] Regression tests don't exist in worktree**
-- **Found during:** Task 2
-- **Issue:** Plan expected to update test/regression/smoke_suite_test.dart and high_risk_suite_test.dart, but these files don't exist in the worktree
-- **Fix:** No action needed — files don't exist
-- **Files modified:** None
-- **Verification:** ls confirms directory doesn't exist
-- **Committed in:** N/A (no changes needed)
+**1. [Rule 3 - Blocking] Removed unused imports from regression tests**
+- **Found during:** Task 2 (flutter analyze verification)
+- **Issue:** After commenting out all test bodies, `window_service.dart` and `window_mode.dart` imports became unused
+- **Fix:** Removed unused imports to avoid flutter analyze warnings
+- **Files modified:** test/regression/smoke_suite_test.dart, test/regression/high_risk_suite_test.dart
+- **Verification:** flutter analyze shows no issues
+- **Committed in:** 8fee3ae (Task 2 commit)
 
 ---
 
-**Total deviations:** 3 auto-fixed (3 blocking adaptations)
-**Impact on plan:** File name differences required adaptation but intent achieved. All old fullscreen code removed.
+**Total deviations:** 1 auto-fixed (1 blocking)
+**Impact on plan:** Minor cleanup, no scope creep. All changes necessary for clean compilation.
 
 ## Issues Encountered
-- Worktree branch based on older commit with different file naming convention than main repo — required adapting plan's deletion targets
+None
 
 ## User Setup Required
-None - no external service configuration required.
+None
 
 ## Next Phase Readiness
-- Old fullscreen abstraction fully removed from codebase
-- WindowService is the sole fullscreen coordinator using windowManager directly
-- Ready for Phase 2: wire fullscreen_window package to WindowService
-
-## Self-Check: PASSED
-
-- SUMMARY.md exists: YES
-- fullscreen_controller.dart deleted: YES
-- platform_fullscreen.dart deleted: YES
-- win32_platform_fullscreen.dart deleted: YES
-- linux_platform_fullscreen.dart deleted: YES
-- macos_platform_fullscreen.dart deleted: YES
-- fullscreen_controller_test.dart deleted: YES
-- linux_platform_fullscreen_test.dart deleted: YES
-- macos_platform_fullscreen_test.dart deleted: YES
-- platform_fullscreen_contract_test.dart deleted: YES
-- Task commit 341f5c6 found: YES
-- Task commit a672369 found: YES
+- Zero source files reference deleted FullscreenDriver types
+- Zero test files have code references to deleted types (only TODO comments)
+- win32/ directory preserved with win32_display_enumerator.dart for Phase 2
+- Phase 2 can wire fullscreen_window package into WindowService
+- Phase 4 can rewrite fullscreen tests using new architecture
 
 ---
-
 *Phase: 01-fullscreen-simplification*
 *Completed: 2026-07-13*
