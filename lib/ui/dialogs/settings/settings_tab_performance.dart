@@ -18,7 +18,8 @@ import '../../shared/settings_card.dart'; // SettingSwitchRow export
 /// - Hardware decoding: 硬件解码（D3D11/NVDEC）降低 CPU 使用率，但可能有兼容性/驱动问题
 class PerformanceTab extends StatefulWidget {
   final EngineState engine;
-  const PerformanceTab({super.key, required this.engine});
+  final VoidCallback? onReset;
+  const PerformanceTab({super.key, required this.engine, this.onReset});
 
   @override
   State<PerformanceTab> createState() => _PerformanceTabState();
@@ -112,6 +113,23 @@ class _PerformanceTabState extends State<PerformanceTab> {
             style: const TextStyle(
               color: Tokens.textTertiary,
               fontSize: Tokens.fontOverline,
+            ),
+          ),
+        ),
+        // 重置按钮 — 底部左侧，加载期间禁用
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(top: Tokens.spSm),
+            child: TextButton(
+              onPressed: _loading ? null : widget.onReset,
+              child: Text(
+                l10n.resetToDefaults,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
+                ),
+              ),
             ),
           ),
         ),

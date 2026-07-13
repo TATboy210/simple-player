@@ -14,8 +14,9 @@ import '../../shared/settings_card.dart'; // keep for SettingActionRow export
 /// [onShortcutsChanged] 在每次绑定变更时回调，由 SettingsPanel 负责持久化。
 class ShortcutsTab extends StatefulWidget {
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
+  final VoidCallback? onReset;
 
-  const ShortcutsTab({super.key, this.onShortcutsChanged});
+  const ShortcutsTab({super.key, this.onShortcutsChanged, this.onReset});
 
   @override
   State<ShortcutsTab> createState() => _ShortcutsTabState();
@@ -89,11 +90,6 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
     widget.onShortcutsChanged?.call(Map.unmodifiable(_customBindings));
   }
 
-  void _resetAll() {
-    setState(() => _customBindings = {});
-    widget.onShortcutsChanged?.call({});
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -135,29 +131,18 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
             ),
           ),
         ),
-        // 重置按钮
+        // 重置按钮 — 底部左侧（通过确认对话框）
         Align(
-          alignment: Alignment.centerRight,
+          alignment: Alignment.centerLeft,
           child: Padding(
             padding: const EdgeInsets.only(top: Tokens.spSm),
-            child: InkWell(
-              onTap: _resetAll,
-              borderRadius: BorderRadius.circular(Tokens.radiusSm),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Tokens.spMd,
-                  vertical: Tokens.spXs,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Tokens.borderHighlight, width: 1),
-                  borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                ),
-                child: Text(
-                  l10n.resetShortcuts,
-                  style: const TextStyle(
-                    color: Tokens.textSecondary,
-                    fontSize: Tokens.fontCaption,
-                  ),
+            child: TextButton(
+              onPressed: widget.onReset,
+              child: Text(
+                l10n.resetToDefaults,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
                 ),
               ),
             ),

@@ -28,7 +28,8 @@ import '../../shared/settings_card.dart'; // SettingRow export
 ///    MDK reinitializes the audio filter graph on each call
 class EqualizerTab extends StatefulWidget {
   final EngineState engine;
-  const EqualizerTab({super.key, required this.engine});
+  final VoidCallback? onReset;
+  const EqualizerTab({super.key, required this.engine, this.onReset});
 
   @override
   State<EqualizerTab> createState() => _EqualizerTabState();
@@ -93,6 +94,23 @@ class _EqualizerTabState extends State<EqualizerTab> {
                   },
                 ),
             ],
+          ),
+        ),
+        // 重置按钮 — 底部左侧
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(top: Tokens.spSm),
+            child: TextButton(
+              onPressed: widget.onReset,
+              child: Text(
+                l10n.resetToDefaults,
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: Tokens.fontCaption,
+                ),
+              ),
+            ),
           ),
         ),
       ],
