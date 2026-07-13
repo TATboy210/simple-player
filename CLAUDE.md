@@ -147,6 +147,36 @@ mcp__context7__resolve-library-id(query="AnimatedSlide widget", libraryName="Flu
 mcp__context7__query-docs(libraryId="/websites/api_flutter_dev", query="How to use AnimatedSlide widget with offset")
 ```
 
+## codegraph Source Analysis
+
+codegraph provides tree-sitter-based code intelligence via MCP. Use for call graph, impact analysis, and source navigation.
+
+### Common Commands
+
+| Command | Purpose |
+|---------|---------|
+| `codegraph query "SymbolName"` | Search for a symbol |
+| `codegraph explore "ClassName.method"` | Source + call paths |
+| `codegraph callers "Method"` | Find all callers |
+| `codegraph impact "ClassName"` | Refactoring impact analysis |
+| `codegraph sync` | Incremental index update after code changes |
+| `codegraph status` | Check index health |
+
+### Notes
+
+- codegraph is configured as MCP server in `.mcp.json` -- tools available in all Claude sessions
+- Indexes both project (`D:/simple_player_flutter`) and Flutter SDK (`D:/flutter/packages/flutter/lib`)
+
+## Quality Pipeline Reference
+
+Quality assessment covers test coverage and performance benchmarks. See `.planning/QUALITY-PIPELINE.md` for full evaluation.
+
+### Current Capabilities
+
+- **Static analysis:** `flutter analyze` with strict-casts/strict-inference/strict-raw-types (complete)
+- **Test coverage:** `flutter test --coverage`
+- **Performance monitoring:** `PerfMonitor` (frame timing, jank detection), `MemoryMonitor` (RSS tracking), `EngineMetrics` (engine counters)
+
 ## Comment Policy (MANDATORY — write comments WHILE coding)
 
 **编写新功能的同时必须为重要代码添加注释，不要事后补。**
