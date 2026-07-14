@@ -8,7 +8,7 @@ import '../shared/merged_listenable.dart';
 /// 时间显示 (当前 / 总时长)
 class TimeRangeDisplay extends StatefulWidget {
   /// Engine state providing [position] and [duration] ValueNotifiers.
-  final EngineState engine;
+  final EngineStateView engine;
 
   const TimeRangeDisplay({super.key, required this.engine});
 

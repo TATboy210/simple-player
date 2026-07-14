@@ -12,7 +12,7 @@ import '../shared/osd_overlay.dart';
 
 /// 音量按钮（单击静音）
 class VolumeButton extends StatefulWidget {
-  final EngineState engine;
+  final MediaEngine engine;
 
   const VolumeButton({super.key, required this.engine});
 
@@ -113,7 +113,7 @@ class VolumeSlider extends StatefulWidget {
     overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
   );
 
-  final EngineState engine;
+  final MediaEngine engine;
 
   const VolumeSlider({super.key, required this.engine});
 

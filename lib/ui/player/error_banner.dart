@@ -6,14 +6,17 @@ import '../../l10n/app_localizations.dart';
 import '../shared/value_listenable_builder2.dart';
 
 /// 错误横幅 — 显示可操作的错误信息
+///
+/// 通过 [PlayerError] sealed class 的穷举模式匹配，
+/// 根据错误子类型显示不同的操作按钮（重新打开 / 选择其他文件 / 重试）。
 class ErrorBanner extends StatelessWidget {
-  /// Engine state providing [state], [errorMessage], and [errorType].
-  final EngineState engine;
+  /// 引擎只读状态视图 — 提供 [state] 和 [lastError]
+  final EngineStateView engine;
 
-  /// Called when the user taps the action button for file/codec errors.
+  /// 文件/编解码错误时的"打开文件"回调
   final VoidCallback? onOpenFile;
 
-  /// Called when the user taps the action button for playback/network errors.
+  /// 播放/网络错误时的"重试"回调
   final VoidCallback? onRetry;
 
   const ErrorBanner({
@@ -25,28 +28,27 @@ class ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder2<MediaState, String?>(
+    return ValueListenableBuilder2<MediaState, PlayerError?>(
       first: engine.state,
-      second: engine.errorMessage,
-      builder: (context, state, msg, _) {
-        if (state != MediaState.error || msg == null) {
+      second: engine.lastError,
+      builder: (context, state, error, _) {
+        if (state != MediaState.error || error == null) {
           return const SizedBox.shrink();
         }
 
         final l10n = AppLocalizations.of(context);
 
+        // PlayerError sealed class 穷举匹配 — 根据子类型决定操作按钮
         VoidCallback? callback;
         String actionLabel;
-        switch (engine.errorType) {
-          case MediaErrorType.file:
+        switch (error) {
+          case FileError():
             callback = onOpenFile;
             actionLabel = l10n.reopen;
-          case MediaErrorType.codec:
+          case CodecError():
             callback = onOpenFile;
             actionLabel = l10n.selectOtherFile;
-          case MediaErrorType.playback:
-          case MediaErrorType.network:
-          case MediaErrorType.unknown:
+          case PlaybackError() || NetworkError() || UnknownError():
             callback = onRetry;
             actionLabel = l10n.retry;
         }
@@ -67,7 +69,7 @@ class ErrorBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  msg,
+                  error.message,
                   style: const TextStyle(
                     color: Tokens.textPrimary,
                     fontSize: Tokens.fontCaption,

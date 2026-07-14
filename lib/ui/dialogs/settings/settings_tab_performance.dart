@@ -11,13 +11,13 @@ import '../../shared/settings_card.dart'; // SettingSwitchRow export
 
 /// Performance settings tab — D3D11 sync toggle and hardware decoding switch.
 ///
-/// Controls engine parameters through [EngineState] interface (no direct FvpEngine
+/// Controls engine parameters through [MediaEngine] interface (no direct FvpEngine
 /// dependency). Settings are persisted via [SettingsStore] and survive app restarts.
 ///
 /// - D3D11 sync (`sync.cpu`): 强制 CPU 同步，避免 D3D11 异步拷贝导致撕裂，性能换稳定性
 /// - Hardware decoding: 硬件解码（D3D11/NVDEC）降低 CPU 使用率，但可能有兼容性/驱动问题
 class PerformanceTab extends StatefulWidget {
-  final EngineState engine;
+  final MediaEngine engine;
   final VoidCallback? onReset;
   const PerformanceTab({super.key, required this.engine, this.onReset});
 
@@ -138,12 +138,12 @@ class _PerformanceTabState extends State<PerformanceTab> {
   }
 }
 
-/// D3D11 同步开关 — 桥接 EngineState.setD3d11SyncEnabled 到 `ValueNotifier<bool>`
+/// D3D11 同步开关 — 桥接 MediaEngine.setD3d11SyncEnabled 到 `ValueNotifier<bool>`
 ///
 /// 默认开启（同步模式），关闭后切换到异步模式（低延迟，可能撕裂）。
 /// 切换时通过 SettingsStore 持久化，重启后保持用户选择。
 class _D3d11SyncNotifier extends ValueNotifier<bool> {
-  final EngineState _engine;
+  final MediaEngine _engine;
 
   _D3d11SyncNotifier(this._engine, {required bool initialValue})
     : super(initialValue);
@@ -156,12 +156,12 @@ class _D3d11SyncNotifier extends ValueNotifier<bool> {
   }
 }
 
-/// 硬件解码开关 — 桥接 EngineState.setHardwareDecoding 到 `ValueNotifier<bool>`
+/// 硬件解码开关 — 桥接 MediaEngine.setHardwareDecoding 到 `ValueNotifier<bool>`
 ///
 /// 默认开启（硬件解码优先），关闭后回退到软件解码。
 /// 切换时通过 SettingsStore 持久化，重启后保持用户选择。
 class _HardwareDecodingNotifier extends ValueNotifier<bool> {
-  final EngineState _engine;
+  final MediaEngine _engine;
 
   _HardwareDecodingNotifier(this._engine, {required bool initialValue})
     : super(initialValue);

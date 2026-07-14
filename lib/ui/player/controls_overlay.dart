@@ -36,7 +36,7 @@ import 'player_actions.dart';
 /// ControlBar 按钮通过子 GestureDetector 优先赢得手势竞技场，不触发隐藏。
 class ControlsOverlay extends StatefulWidget {
   static const _clickDelayMs = 250; // 等待可能的双击
-  final EngineState engine;
+  final MediaEngine engine;
   final PlayerActions actions;
 
   /// 空状态存在时，控制栏不拦截 hit test（让下层 EmptyState 按钮可点击）

@@ -12,7 +12,7 @@ import 'package:simple_player_flutter/kernel/models/player_error.dart';
 /// Implements (not with) the 6 new ISP interfaces:
 /// [EngineStateView], [PlaybackControl], [TrackControl],
 /// [SubtitleConfig], [VideoEffectControl], [RendererConfig].
-class FakeEngine implements EngineStateView, PlaybackControl, TrackControl, SubtitleConfig, VideoEffectControl, RendererControl {
+class FakeEngine implements MediaEngine {
   bool _disposed = false;
 
   // ─── ValueNotifier fields (defaults match FvpEngine) ───

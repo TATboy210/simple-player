@@ -49,7 +49,7 @@ class SmartDragToResizeArea extends StatelessWidget {
 /// 宽屏（≥600dp）: Row 布局，面板在右侧
 /// 窄屏（<600dp）: 面板叠加为 overlay
 class PlayerScreen extends StatefulWidget {
-  final EngineState engine;
+  final MediaEngine engine;
   final PlaybackController controller;
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
@@ -348,7 +348,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ],
   );
 
-  void _seek(EngineState engine, int deltaMs) {
+  void _seek(MediaEngine engine, int deltaMs) {
     final target = engine.position.value + deltaMs;
     engine.seekTo(target.clamp(0, engine.duration.value));
   }

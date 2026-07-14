@@ -135,15 +135,15 @@ class AutoHideController {
       }
       return;
     }
-    if (s == MediaState.loading || s == MediaState.playing) {
+    if (s == MediaState.opening || s == MediaState.playing) {
       show();
       // 无论当前是否可见，始终重置隐藏定时器
       scheduleHide();
       return;
     }
+    // completed/error/paused 状态下永久显示控制栏，不自动隐藏
     final alwaysShow =
         s == MediaState.paused ||
-        s == MediaState.stopped ||
         s == MediaState.completed ||
         s == MediaState.error;
     if (alwaysShow && !visible.value) {

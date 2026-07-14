@@ -16,7 +16,7 @@ import 'volume_controls.dart';
 
 /// 左侧按钮组：播放模式 + 音量 + 倍速
 class LeftButtonGroup extends StatelessWidget {
-  final EngineState engine;
+  final MediaEngine engine;
   final PlayerActions actions;
 
   const LeftButtonGroup({super.key, required this.engine, required this.actions});
