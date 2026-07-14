@@ -1,7 +1,7 @@
 import 'dart:io' show File;
 
 import 'package:fvp/mdk.dart' as mdk;
-import 'media_error_type.dart';
+import '../models/player_error.dart';
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
@@ -45,7 +45,9 @@ class MediaOpener {
     // ─── 路径验证 ───
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
-      return const OpenError(MediaErrorType.file, '文件路径为空');
+      return const OpenError(
+        FileError(FileErrorCode.pathEmpty, '文件路径为空'),
+      );
     }
 
     // 非 URL 路径检查文件是否存在
@@ -54,12 +56,11 @@ class MediaOpener {
         final file = File(trimmed);
         if (!await file.exists()) {
           return OpenError(
-            MediaErrorType.file,
-            '文件不存在: ${PathUtils.basename(trimmed)}',
+            FileError(FileErrorCode.fileNotFound, '文件不存在: ${PathUtils.basename(trimmed)}'),
           );
         }
       } on Exception catch (e) {
-        return OpenError(MediaErrorType.file, '路径无效: $e');
+        return OpenError(FileError(FileErrorCode.fileNotFound, '路径无效: $e'));
       }
     }
 
@@ -78,15 +79,15 @@ class MediaOpener {
     );
     if (prepareResult < 0) {
       final isTimeout = prepareResult == -99;
-      final errorType = isTimeout
-          ? (PathValidator.isUrl(trimmed)
-                ? MediaErrorType.network
-                : MediaErrorType.file)
-          : MediaErrorType.codec;
-      final message = isTimeout
-          ? '打开超时: ${PathUtils.basename(trimmed)}'
-          : '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)';
-      return OpenError(errorType, message);
+      final PlayerError error;
+      if (isTimeout) {
+        error = PathValidator.isUrl(trimmed)
+            ? NetworkError(NetworkErrorCode.timeout, '打开超时: ${PathUtils.basename(trimmed)}')
+            : FileError(FileErrorCode.fileNotFound, '打开超时: ${PathUtils.basename(trimmed)}');
+      } else {
+        error = CodecError(CodecErrorCode.decodeFailed, '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)');
+      }
+      return OpenError(error);
     }
 
     // ─── Metadata 解析 ───
@@ -130,7 +131,7 @@ class MediaOpener {
       final message = textureResult == -99
           ? '纹理创建超时: ${PathUtils.basename(trimmed)}'
           : '纹理创建失败: ${PathUtils.basename(trimmed)}';
-      return OpenError(MediaErrorType.codec, message);
+      return OpenError(PlaybackError(PlaybackErrorCode.textureFailed, message));
     }
 
     return OpenSuccess(mediaInfo);

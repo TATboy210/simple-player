@@ -5,7 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   file_selector_windows
-  fullscreen_window
   fvp
   hotkey_manager_windows
   screen_retriever_windows

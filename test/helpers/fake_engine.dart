@@ -2,12 +2,17 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
-/// Hand-written Fake implementing EngineState for testing.
+/// Hand-written Fake implementing all 6 ISP interfaces for testing.
 ///
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
-class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
+///
+/// Implements (not with) the 6 new ISP interfaces:
+/// [EngineStateView], [PlaybackControl], [TrackControl],
+/// [SubtitleConfig], [VideoEffectControl], [RendererConfig].
+class FakeEngine implements EngineStateView, PlaybackControl, TrackControl, SubtitleConfig, VideoEffectControl, RendererControl {
   bool _disposed = false;
 
   // ─── ValueNotifier fields (defaults match FvpEngine) ───
@@ -44,14 +49,16 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   @override
   final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
 
+  /// 最近一次错误 — 替代旧的 errorMessage + errorType
   @override
-  final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
-
-  @override
-  MediaErrorType errorType = MediaErrorType.unknown;
+  final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
 
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
+
+  /// 是否正在 seek — transient 标志，独立于主状态枚举
+  @override
+  final ValueNotifier<bool> isSeeking = ValueNotifier<bool>(false);
 
   // ─── Internal state ───
 
@@ -59,6 +66,9 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
 
   @override
   MediaInfo get mediaInfo => _mediaInfo;
+
+  @override
+  int get subtitleDelay => _subtitleDelayMs;
 
   // ─── Call tracking for test introspection ───
 
@@ -82,6 +92,7 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   int setVolumeCallCount = 0;
   double? lastSetVolumeValue;
   int _subtitleDelayMs = 0;
+
   // ─── Playback control ───
 
   @override
@@ -89,7 +100,7 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     if (_disposed) return;
     openCallCount++;
     openPaths.add(path);
-    state.value = MediaState.loading;
+    state.value = MediaState.opening;
     // Minimal async yield to allow test pump
     await Future<void>.value();
     if (_disposed) return;
@@ -99,14 +110,14 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       final msg = failNextOpenWith!;
       failNextOpenWith = null; // one-shot
       state.value = MediaState.error;
-      errorMessage.value = msg;
+      lastError.value = UnknownError(msg);
       return;
     }
 
     // Pre-configured _mediaInfo is used (caller sets it before open)
     duration.value = _mediaInfo.duration;
     position.value = 0;
-    errorMessage.value = null;
+    lastError.value = null;
     // Do NOT set state to idle — caller (play) sets it to playing
     // This matches FvpEngine behavior: open() does not set idle
   }
@@ -128,7 +139,7 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   @override
   void stop() {
     if (_disposed) return;
-    state.value = MediaState.stopped;
+    state.value = MediaState.idle;
     position.value = 0;
     stopCallCount++;
   }
@@ -169,7 +180,6 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       pause();
     } else if (state.value == MediaState.idle ||
         state.value == MediaState.paused ||
-        state.value == MediaState.stopped ||
         state.value == MediaState.completed) {
       play();
     }
@@ -244,9 +254,6 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     setSubtitleDelayCallCount++;
     _subtitleDelayMs = milliseconds;
   }
-
-  @override
-  int get subtitleDelay => _subtitleDelayMs;
 
   // ─── Equalizer ───
 
@@ -336,8 +343,9 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     subtitleText.dispose();
     buffered.dispose();
     aspectRatio.dispose();
-    errorMessage.dispose();
+    lastError.dispose();
     playbackSpeed.dispose();
+    isSeeking.dispose();
   }
 
   // ─── Test helper methods ───
@@ -360,7 +368,7 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   /// Simulate an error state.
   void simulateError(String message) {
     state.value = MediaState.error;
-    errorMessage.value = message;
+    lastError.value = UnknownError(message);
   }
 
   /// Simulate playback completed.
@@ -368,11 +376,8 @@ class FakeEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     state.value = MediaState.completed;
   }
 
-  /// Simulate buffering state.
+  /// Simulate buffering state — only sets transient flag, does not change main state.
   void simulateBuffering(bool buffering) {
     isBuffering.value = buffering;
-    if (buffering) {
-      state.value = MediaState.buffering;
-    }
   }
 }
