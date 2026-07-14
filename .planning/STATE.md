@@ -1,42 +1,94 @@
 ---
-gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: 沉浸式全屏重构
-current_phase: 02
-status: ready
-last_updated: "2026-07-13T16:30:00.000Z"
+gsd_state_version: '1.0'
+milestone: v2.1
+milestone_name: 播放内核重构强化
+status: planning
+last_updated: "2026-07-14"
+last_activity: 2026-07-14
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 7
-  completed_plans: 3
-  percent: 29
-stopped_at: null
+  completed_phases: 0
+  total_plans: 8
+  completed_plans: 0
+  percent: 0
 ---
 
-# Project State: 沉浸式全屏重构
+# Project State: 播放内核重构强化
 
-**Last updated:** 2026-07-13
-**Current phase:** 02
-**Status:** Phase 01 Complete — Ready for Phase 2
+## Project Reference
 
-## Progress
+See: .planning/PROJECT.md (updated 2026-07-14)
 
-| Phase | Status | Started | Completed |
-|-------|--------|---------|-----------|
-| Phase 1: 旧架构移除 | Complete | 2026-07-13 | 2026-07-13 |
-| Phase 2: WindowService 简化 | Pending | — | — |
-| Phase 3: 沉浸式全屏 UI | Pending | — | — |
-| Phase 4: 测试更新 | Pending | — | — |
+**Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入
+**Current focus:** Phase 9 — 接口分解 + 状态模型统一
 
-## Decisions Log
+## Current Position
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-07-13 | 使用 fullscreen_window 包 | 简化架构，减少维护成本 |
-| 2026-07-13 | 移除 Win32 FFI 绑定 | 包已处理平台差异 |
-| 2026-07-13 | 移除确认链机制 | 包提供原生回调流 |
-| 2026-07-13 | 保持 WindowMode 枚举 | UI 层依赖，改动成本低 |
+Phase: 9 of 12 (接口分解 + 状态模型统一)
+Plan: 0 of 2 in current phase
+Status: Ready to plan
+Last activity: 2026-07-14 — Roadmap created for v2.1 milestone
 
----
-*Created: 2026-07-13*
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: —
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 9. 接口分解 | 0/2 | — | — |
+| 10. 状态机 | 0/2 | — | — |
+| 11. 防御增强 | 0/2 | — | — |
+| 12. 轨道统一 | 0/2 | — | — |
+
+**Recent Trend:**
+- Last 5 plans: —
+- Trend: —
+
+*Updated after each plan completion*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- [v2.1]: 保持 fvp 引擎 + ValueNotifier，纯架构重构
+- [v2.1]: 接口分解采用 ISP 模式（EngineStateView + PlaybackControl + 4 能力接口）
+- [v2.1]: 状态机采用 switch expression 穷举 9 状态 ~40 条边
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- 状态机转换矩阵遗漏风险 — 9 状态 ~40 条边需要穷举验证
+- mdk 回调线程安全时序窗口 — generation 计数器方案待验证
+- Service 层迁移后 import 路径变更影响范围待评估
+
+## Deferred Items
+
+Items acknowledged and carried forward:
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| Future | D1: 引擎能力查询接口 | Deferred | v2.1 |
+| Future | D2: 播放列表序列化解耦 | Deferred | v2.1 |
+| Future | D5: NetworkConfigurator 自适应策略 | Deferred | v2.1 |
+| Future | D6: EngineEventLog 结构化导出 | Deferred | v2.1 |
+| Future | T4: PositionPoller 策略模式 | Deferred | v2.1 |
+| Future | T6: 结构化 EngineMetrics | Deferred | v2.1 |
+
+## Session Continuity
+
+Last session: 2026-07-14
+Stopped at: Roadmap created, ready to plan Phase 9
+Resume file: None

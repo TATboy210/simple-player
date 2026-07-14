@@ -48,21 +48,21 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENG-01 | — | Pending |
-| ENG-02 | — | Pending |
-| ENG-03 | — | Pending |
-| ENG-04 | — | Pending |
-| SVC-01 | — | Pending |
-| SVC-02 | — | Pending |
-| SVC-03 | — | Pending |
-| TRK-01 | — | Pending |
-| TRK-02 | — | Pending |
+| ENG-01 | Phase 9 | Pending |
+| ENG-02 | Phase 10 | Pending |
+| ENG-03 | Phase 9 | Pending |
+| ENG-04 | Phase 11 | Pending |
+| SVC-01 | Phase 9 | Pending |
+| SVC-02 | Phase 10 | Pending |
+| SVC-03 | Phase 11 | Pending |
+| TRK-01 | Phase 12 | Pending |
+| TRK-02 | Phase 12 | Pending |
 
 **Coverage:**
 - v2.1 requirements: 9 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 9
+- Mapped to phases: 9
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-14*
-*Last updated: 2026-07-14 after research synthesis*
+*Last updated: 2026-07-14 — roadmap traceability applied*
