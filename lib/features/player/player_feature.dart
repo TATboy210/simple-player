@@ -30,8 +30,8 @@ import '../../ui/shared/play_mode_utils.dart';
 import '../../ui/shared/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
 import '../../kernel/engine/engine_state.dart';
-import 'services/video_processing_service.dart';
-import 'player_services.dart';
+import '../../kernel/services/video_processing_service.dart';
+import '../../kernel/player_services.dart';
 
 /// 播放器功能组件 — UI 状态管理 + PlayerScreen 组合
 ///
@@ -54,7 +54,7 @@ class PlayerFeature extends StatefulWidget {
   /// 打开设置面板的回调 — 需要 MaterialApp 级 BuildContext 和引擎/视频处理服务引用
   final void Function(
     BuildContext context,
-    EngineState engine,
+    EngineStateView engine,
     VideoProcessingService videoProcessing,
   )
   onSettings;

@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
-import '../../kernel/engine/engine_state.dart';
+import 'engine_state.dart';
 
 import '../services/path_validator.dart';
 import '../utils/path_utils.dart';
@@ -12,7 +12,6 @@ import 'engine_event_log.dart';
 import 'engine_metrics.dart';
 import 'fvp_callback_handler.dart';
 import 'media_opener.dart';
-import 'open_result.dart';
 import 'player_proxy.dart';
 import 'position_poller.dart';
 import '../utils/log.dart';
@@ -41,7 +40,7 @@ import 'mdk_player_proxy.dart';
 ///
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
 ///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
-class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
+class FvpEngine implements MediaEngine {
   /// 工厂构造函数 — 保证所有依赖在构造时注入，消除 late 初始化风险
   ///
   /// 对比旧实现（lazy getter + late fields）:
@@ -174,11 +173,10 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
 
   @override
-  final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
+  final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
 
-  MediaErrorType _errorType = MediaErrorType.unknown;
   @override
-  MediaErrorType get errorType => _errorType;
+  final ValueNotifier<bool> isSeeking = ValueNotifier<bool>(false);
 
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(
@@ -223,8 +221,7 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       action();
     } on Exception catch (e) {
       log.e('FvpEngine.$name error: $e');
-      _errorType = MediaErrorType.playback;
-      errorMessage.value = '$name 失败: $e';
+      lastError.value = PlaybackError(PlaybackErrorCode.playFailed, '$name 失败: $e', e);
       eventLog.add('error', {'action': name, 'error': e.toString()});
     }
   }
@@ -242,15 +239,14 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
       _safeSetState(MediaState.error, 'open');
-      _errorType = MediaErrorType.file;
-      errorMessage.value = '文件路径为空';
+      lastError.value = const FileError(FileErrorCode.pathEmpty, '文件路径为空');
       metrics.recordOpen(success: false);
       eventLog.add('open', {'path': path, 'error': 'empty path'});
       return;
     }
 
     _isOpening = true;
-    _safeSetState(MediaState.loading, 'open');
+    _safeSetState(MediaState.opening, 'open');
     _currentPath = trimmed;
     eventLog.add('open', {'path': PathUtils.basename(trimmed)});
 
@@ -270,17 +266,16 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
           }
           position.value = 0;
           _safeSetState(MediaState.idle, 'open');
-          _errorType = MediaErrorType.unknown;
-          errorMessage.value = null;
+          lastError.value = null;
           metrics.recordOpen(success: true);
           logEngine.i(
             'open() success — ${PathUtils.basename(trimmed)} '
             '${video?.width}x${video?.height} '
             '${mediaInfo.duration}ms',
           );
-        case OpenError(:final type, :final message):
+        case OpenError(:final error):
           // 错误恢复：codec 错误且非 URL 时尝试软解降级
-          if (type == MediaErrorType.codec && !PathValidator.isUrl(trimmed)) {
+          if (error is CodecError && !PathValidator.isUrl(trimmed)) {
             logEngine.i('open() codec error — retrying with software decode');
             eventLog.add('fallback', {
               'reason': 'codec error',
@@ -292,19 +287,17 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
             return;
           }
           _safeSetState(MediaState.error, 'open');
-          _errorType = type;
-          errorMessage.value = message;
+          lastError.value = error;
           metrics.recordOpen(success: false);
           logEngine.e(
-            'open() error — ${PathUtils.basename(trimmed)}: $message',
+            'open() error — ${PathUtils.basename(trimmed)}: ${error.message}',
           );
       }
     } on Exception catch (e) {
       _safeSetState(MediaState.error, 'open');
-      _errorType = PathValidator.isUrl(trimmed)
-          ? MediaErrorType.network
-          : MediaErrorType.playback;
-      errorMessage.value = '无法打开: ${PathUtils.basename(path)}\n$e';
+      lastError.value = PathValidator.isUrl(trimmed)
+          ? NetworkError(NetworkErrorCode.timeout, '无法打开: ${PathUtils.basename(path)}', e)
+          : PlaybackError(PlaybackErrorCode.playFailed, '无法打开: ${PathUtils.basename(path)}', e);
       metrics.recordOpen(success: false);
       eventLog.add('error', {'action': 'open', 'error': e.toString()});
     } finally {
@@ -331,8 +324,7 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       logEngine.d('play() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e) {
       _safeSetState(MediaState.error, 'play');
-      _errorType = MediaErrorType.playback;
-      errorMessage.value = '播放失败: $e';
+      lastError.value = PlaybackError(PlaybackErrorCode.playFailed, '播放失败: $e', e);
       logEngine.e('play() error: $e');
       debugPrint('❌ play() failed: $e');
     }
@@ -357,7 +349,7 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     if (_disposed) return;
     try {
       _player.state = mdk.PlaybackState.stopped;
-      _safeSetState(MediaState.stopped, 'stop');
+      _safeSetState(MediaState.idle, 'stop');
       position.value = 0;
       _positionPoller.stop();
       eventLog.add('stop');
@@ -372,11 +364,11 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     if (_disposed) return;
     if (state.value == MediaState.idle || duration.value <= 0) return;
     // 跳过自转换 — 已经在 seek 中
-    if (state.value == MediaState.seeking) return;
+    if (isSeeking.value) return;
     final clamped = milliseconds.clamp(0, duration.value);
     final wasPlaying = _player.state == mdk.PlaybackState.playing;
     _positionPoller.seeking = true;
-    _safeSetState(MediaState.seeking, 'seekTo');
+    isSeeking.value = true;
 
     final seekStopwatch = Stopwatch()..start();
     try {
@@ -386,23 +378,21 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       eventLog.add('seek', {'position': clamped});
     } on Exception catch (e) {
       if (_disposed) return;
-      _errorType = MediaErrorType.playback;
-      errorMessage.value = '跳转失败: $e';
+      lastError.value = PlaybackError(PlaybackErrorCode.seekFailed, '跳转失败: $e', e);
       position.value = _player.position;
       eventLog.add('error', {'action': 'seek', 'error': e.toString()});
     } finally {
       seekStopwatch.stop();
       metrics.recordSeek(seekStopwatch.elapsed);
       _positionPoller.seeking = false;
+      isSeeking.value = false;
     }
     if (_disposed) return;
-    if (state.value == MediaState.seeking ||
-        state.value == MediaState.buffering) {
-      _safeSetState(
-        wasPlaying ? MediaState.playing : MediaState.paused,
-        'seekTo.restore',
-      );
-    }
+    // seek 完成后恢复到 seek 前的状态
+    _safeSetState(
+      wasPlaying ? MediaState.playing : MediaState.paused,
+      'seekTo.restore',
+    );
   }
 
   @override
@@ -425,7 +415,6 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     if (state.value == MediaState.playing) {
       pause();
     } else if (state.value == MediaState.paused ||
-        state.value == MediaState.stopped ||
         state.value == MediaState.idle ||
         state.value == MediaState.completed) {
       play();
@@ -603,10 +592,11 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
         'volume': volume,
         'isMuted': isMuted,
         'isBuffering': isBuffering,
+        'isSeeking': isSeeking,
         'subtitleText': subtitleText,
         'buffered': buffered,
         'aspectRatio': aspectRatio,
-        'errorMessage': errorMessage,
+        'lastError': lastError,
         'playbackSpeed': playbackSpeed,
       };
       for (final entry in notifiers.entries) {
@@ -630,10 +620,11 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
     volume.dispose();
     isMuted.dispose();
     isBuffering.dispose();
+    isSeeking.dispose();
     subtitleText.dispose();
     buffered.dispose();
     aspectRatio.dispose();
-    errorMessage.dispose();
+    lastError.dispose();
     playbackSpeed.dispose();
 
     eventLog.add('dispose');

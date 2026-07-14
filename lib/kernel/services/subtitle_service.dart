@@ -3,16 +3,16 @@
 /// 本文件实现 [SubtitleService] 负责扫描媒体文件目录，
 /// 通过文件名相似性匹配外挂字幕文件（SRT/ASS/SSA/SUB/VTT/IDX/SUP）。
 ///
-/// 架构位置：PlaybackNavigator → **SubtitleService** → EngineState.setExternalSubtitle()
+/// 架构位置：PlaybackNavigator → **SubtitleService** → MediaEngine.setExternalSubtitle()
 /// 匹配算法：提取媒体文件基名（不含扩展名），查找同目录下同名或 "基名.语言.扩展名" 格式的字幕文件
 /// 异步/同步变体：async 用于非热路径，sync 用于 playIndex 热路径
 library;
 
 import 'dart:io';
 
-import '../../../kernel/engine/engine_state.dart';
-import '../../../kernel/utils/path_utils.dart';
-import '../../../kernel/utils/log.dart';
+import '../engine/engine_state.dart';
+import '../utils/path_utils.dart';
+import '../utils/log.dart';
 
 /// 字幕服务 — 外挂字幕自动检测与管理
 ///
@@ -24,7 +24,7 @@ import '../../../kernel/utils/log.dart';
 ///
 /// 支持的字幕格式：SRT / ASS / SSA / SUB / VTT / IDX / SUP
 class SubtitleService {
-  final EngineState _engine;
+  final MediaEngine _engine;
 
   SubtitleService(this._engine);
 

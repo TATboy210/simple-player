@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../kernel/models/aspect_ratio_mode.dart';
-import '../../../features/player/services/video_processing_service.dart';
+import '../../../kernel/services/video_processing_service.dart';
 import '../../../features/player/models/video_processing_state.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';

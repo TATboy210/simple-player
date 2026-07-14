@@ -3,16 +3,16 @@
 /// 本文件实现 [PlaybackNavigator] 负责曲目索引跳转、上一首/下一首导航，
 /// 以及关键的 openGeneration 并发守卫机制。
 ///
-/// 架构位置：PlaybackController → **PlaybackNavigator** → EngineState.open()
+/// 架构位置：PlaybackController → **PlaybackNavigator** → MediaEngine.open()
 /// 并发模型：openGeneration 计数器丢弃过期的异步 open() 请求
 library;
 
 import 'dart:async';
 
-import '../../../kernel/engine/engine_state.dart';
-import '../../../kernel/utils/log.dart';
-import '../../../kernel/utils/path_utils.dart';
-import '../../../kernel/services/path_validator.dart';
+import '../engine/engine_state.dart';
+import '../utils/log.dart';
+import '../utils/path_utils.dart';
+import '../services/path_validator.dart';
 import 'playback_controller.dart';
 
 /// 播放导航 — 索引跳转、上一首/下一首、并发 open() 守卫
@@ -63,7 +63,7 @@ class PlaybackNavigator {
       // generation 不匹配说明用户已切歌，丢弃本次结果
       if (gen != _openGeneration) return;
       if (_controller.engine.state.value == MediaState.error) {
-        throw Exception(_controller.engine.errorMessage.value ?? '打开失败');
+        throw Exception(_controller.engine.lastError.value?.message ?? '打开失败');
       }
 
       // FEAT-01: Resume from saved position (> 1s threshold)
