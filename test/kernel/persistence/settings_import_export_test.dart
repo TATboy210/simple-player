@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:simple_player_flutter/kernel/models/app_settings.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_validator.dart';
 
@@ -50,7 +49,7 @@ void main() {
       expect(map['appVersion'], '1.0.0-rc.1');
       expect(map['platform'], isA<String>());
       expect(map['settingsCount'], isA<int>());
-      expect(map['settings'], isA<Map>());
+      expect(map['settings'], isA<Map<String, dynamic>>());
     });
 
     test('includes all AppSettings fields plus locale/themeIndex/shortcuts', () async {
@@ -85,7 +84,7 @@ void main() {
       // 额外字段
       expect(s['locale'], 'en');
       expect(s['themeIndex'], 2);
-      expect(s['shortcuts'], isA<Map>());
+      expect(s['shortcuts'], isA<Map<String, dynamic>>());
     });
 
     test('settingsCount matches actual settings map length', () async {
@@ -341,8 +340,8 @@ void main() {
     });
 
     test('persists all settings to SharedPreferences', () async {
-      final success = ImportSuccess(
-        settings: const AppSettings(
+      final success = const ImportSuccess(
+        settings: AppSettings(
           volume: 0.9,
           lastFile: 'imported.mp4',
           windowWidth: 1600,

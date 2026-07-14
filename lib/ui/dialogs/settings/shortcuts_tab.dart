@@ -95,11 +95,12 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
     final l10n = AppLocalizations.of(context);
     final defs = _shortcutDefs(l10n);
 
+    // AnimatedSectionList 内部返回 Column，自身处理布局
+    // 不使用 Expanded — Scaffold.body 不是 Flex 容器
     return AnimatedSectionList(
       children: [
         // 快捷键列表
-        Expanded(
-          child: KeyboardListener(
+        KeyboardListener(
             focusNode: _keyListenerFocus,
             autofocus: _recordingAction != null,
             onKeyEvent: _onKeyPressed,
@@ -130,9 +131,8 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
               ),
             ),
           ),
-        ),
-        // 重置按钮 — 底部左侧（通过确认对话框）
-        Align(
+          // 重置按钮 — 底部左侧（通过确认对话框）
+          Align(
           alignment: Alignment.centerLeft,
           child: Padding(
             padding: const EdgeInsets.only(top: Tokens.spSm),

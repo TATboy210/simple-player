@@ -4,7 +4,7 @@ import 'package:simple_player_flutter/kernel/models/export_data.dart';
 
 void main() {
   /// 创建测试用 AppSettings 实例（所有字段填充值便于验证序列化完整性）
-  AppSettings _testSettings() => const AppSettings(
+  AppSettings testSettings() => const AppSettings(
     volume: 0.75,
     lastFile: 'test.mp4',
     windowWidth: 1920,
@@ -32,7 +32,7 @@ void main() {
 
   group('ExportData', () {
     test('toMap() returns correct structure with all metadata fields', () {
-      final data = ExportData(
+      final data = const ExportData(
         settingsVersion: 1,
         exportedAt: '2026-07-13T10:00:00.000Z',
         appVersion: '1.0.0-rc.1',
@@ -51,7 +51,7 @@ void main() {
     });
 
     test('fromSettings() correctly maps all AppSettings fields', () {
-      final settings = _testSettings();
+      final settings = testSettings();
       final data = ExportData.fromSettings(
         settings: settings,
         locale: 'en',
@@ -92,7 +92,7 @@ void main() {
 
     test('fromSettings() sets metadata correctly', () {
       final data = ExportData.fromSettings(
-        settings: _testSettings(),
+        settings: testSettings(),
         locale: 'zh',
         themeIndex: 0,
         shortcuts: {},
@@ -108,7 +108,7 @@ void main() {
 
     test('settingsCount matches number of keys in settings map', () {
       final data = ExportData.fromSettings(
-        settings: _testSettings(),
+        settings: testSettings(),
         locale: 'zh',
         themeIndex: 0,
         shortcuts: {'a': 'b'},
