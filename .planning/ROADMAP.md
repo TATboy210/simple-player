@@ -40,11 +40,11 @@ Phase numbering: 1-8.
   2. 错误处理使用 exhaustive pattern matching — switch on PlayerError 不会有 missing case
   3. PlaybackController 从 features/player/services/ 迁移到 kernel/services/ — import 路径全部更新
   4. `flutter analyze` 无错误，现有测试全部通过
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 09-01-PLAN.md — ISP interface creation + PlayerError sealed class + MediaState split + FakeEngine update
+- [ ] 09-02-PLAN.md — Service migration to kernel/ + FvpEngine rewrite + UI consumer updates + test rewrites
 
 ### Phase 10: 状态机提取 + 引擎瘦身
 **Goal**: 状态转换由独立状态机强制守卫，FvpEngine 职责精简到 <350 行
@@ -107,7 +107,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. 接口分解 + 状态模型统一 | v2.1 | 0/2 | Not started | - |
+| 9. 接口分解 + 状态模型统一 | v2.1 | 0/2 | Planning complete | - |
 | 10. 状态机提取 + 引擎瘦身 | v2.1 | 0/2 | Not started | - |
 | 11. 引擎解耦 + 防御增强 | v2.1 | 0/2 | Not started | - |
 | 12. 轨道管理统一 | v2.1 | 0/2 | Not started | - |
