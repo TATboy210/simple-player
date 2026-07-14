@@ -563,7 +563,7 @@ class FvpEngine implements MediaEngine {
   @override
   void setVideoEffect(VideoEffectType effect, double value) {
     _guardedAction('setVideoEffect', () {
-      _videoEffectController.setEffect(effect, value);
+      _videoEffectController.setVideoEffect(effect, value);
     });
   }
 
@@ -593,7 +593,7 @@ class FvpEngine implements MediaEngine {
   @override
   void setD3d11SyncEnabled(bool enabled) {
     _guardedAction('setD3d11SyncEnabled', () {
-      _d3d11Configurator.setSyncEnabled(enabled);
+      _d3d11Configurator.setD3d11SyncEnabled(enabled);
     });
   }
 

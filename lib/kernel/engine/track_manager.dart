@@ -2,6 +2,7 @@ import 'package:fvp/mdk.dart' as mdk;
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
+import 'track_control.dart';
 
 import '../utils/log.dart';
 
@@ -15,7 +16,7 @@ import '../utils/log.dart';
 ///   - Query available audio/subtitle tracks
 ///   - Switch active audio/subtitle track by index
 ///   - Toggle subtitle on/off
-class TrackManager {
+class TrackManager implements TrackControl {
   final mdk.Player _player;
   MediaInfo _mediaInfo = const MediaInfo();
 
@@ -30,6 +31,7 @@ class TrackManager {
   }
 
   /// Returns the list of available audio tracks for the current media.
+  @override
   List<AudioTrackInfo> getAudioTracks() => _mediaInfo.audioTracks;
 
   /// Switches to the audio track at [trackIndex].
@@ -37,6 +39,7 @@ class TrackManager {
   /// Index must be in range [0, trackCount). Out-of-range indices are
   /// silently ignored — MDK crashes on invalid track index, so we
   /// defensively check bounds first.
+  @override
   void switchAudioTrack(int trackIndex) {
     final tracks = _mediaInfo.audioTracks;
     if (tracks.isEmpty || trackIndex < 0 || trackIndex >= tracks.length) return;
@@ -48,6 +51,7 @@ class TrackManager {
   }
 
   /// Returns the currently active audio track indices.
+  @override
   List<int> get activeAudioTracks => _player.activeAudioTracks;
 
   /// Returns the list of available subtitle tracks for the current media.

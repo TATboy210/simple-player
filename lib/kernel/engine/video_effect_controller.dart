@@ -15,7 +15,7 @@ class VideoEffectController {
 
   /// Sets a video effect (brightness, contrast, hue, saturation).
   /// Value is clamped to [-1.0, 1.0].
-  void setEffect(VideoEffectType effect, double value) {
+  void setVideoEffect(VideoEffectType effect, double value) {
     final clamped = value.clamp(-1.0, 1.0);
     final mdkEffect = switch (effect) {
       VideoEffectType.brightness => mdk.VideoEffect.brightness,

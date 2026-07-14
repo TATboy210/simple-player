@@ -9,8 +9,8 @@ void main() {
       expect(VideoEffectController, isA<Type>());
     });
 
-    test('setEffect method is part of public API', () {
-      // Verify setEffect accepts VideoEffectType and double
+    test('setVideoEffect method is part of public API', () {
+      // Verify setVideoEffect accepts VideoEffectType and double
       expect(VideoEffectController, isA<Type>());
     });
 

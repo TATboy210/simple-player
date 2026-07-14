@@ -1,16 +1,19 @@
 import 'package:flutter/foundation.dart';
 
 import 'player_proxy.dart';
+import 'volume_control.dart';
 
 /// Manages volume and mute state for a player.
 ///
 /// Synchronizes player volume/mute with Flutter ValueNotifiers.
 /// Handles auto-mute when volume reaches zero.
-class VolumeController {
+class VolumeController implements VolumeControl {
   VolumeController(this._player, {required this.volume, required this.isMuted});
 
   final PlayerProxy _player;
+  @override
   final ValueNotifier<double> volume;
+  @override
   final ValueNotifier<bool> isMuted;
 
   /// Sets volume [value] (clamped to 0.0–1.0).
@@ -19,6 +22,7 @@ class VolumeController {
   /// human perception is logarithmic, but MDK handles the curve internally).
   ///
   /// Auto-mutes at zero, auto-unmutes when raised from zero.
+  @override
   void setVolume(double value) {
     final clamped = value.clamp(0.0, 1.0);
     _player.volume = clamped;
@@ -35,6 +39,7 @@ class VolumeController {
   }
 
   /// Sets mute state directly.
+  @override
   void setMute(bool mute) {
     _player.mute = mute;
     isMuted.value = mute;
