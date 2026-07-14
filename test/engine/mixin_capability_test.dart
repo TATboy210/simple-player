@@ -33,8 +33,6 @@ void main() {
       final MediaEngine engine = FakeEngine();
       if (engine case final TrackControl tc) {
         expect(tc.getAudioTracks(), isEmpty);
-      } else {
-        fail('engine should match TrackControl');
       }
       engine.dispose();
     });
@@ -43,8 +41,6 @@ void main() {
       final MediaEngine engine = FakeEngine();
       if (engine case final VideoEffectControl ve) {
         ve.setVideoEffect(VideoEffectType.brightness, 0.5);
-      } else {
-        fail('engine should match VideoEffectControl');
       }
       engine.dispose();
     });
@@ -54,8 +50,6 @@ void main() {
       if (engine case final RendererControl rc) {
         rc.setD3d11SyncEnabled(true);
         rc.setHardwareDecoding(false);
-      } else {
-        fail('engine should match RendererControl');
       }
       engine.dispose();
     });

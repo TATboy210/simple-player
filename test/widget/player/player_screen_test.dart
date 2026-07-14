@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,7 +83,7 @@ void main() {
       // Act: 模拟 _seek(engine, -5000) → 2000 - 5000 = -3000 → clamp → 0
       // PlayerScreen._seek 是 private，通过 engine 直接验证 clamp 逻辑
       final target = (engine.position.value - 5000).clamp(0, engine.duration.value);
-      engine.seekTo(target);
+      unawaited(engine.seekTo(target));
 
       // Assert: seekTo 被 clamp 到 0
       expect(engine.lastSeekToMs, 0);
@@ -99,7 +101,7 @@ void main() {
 
       // Act: 模拟 _seek(engine, 5000) → 58000 + 5000 = 63000 → clamp → 60000
       final target = (engine.position.value + 5000).clamp(0, engine.duration.value);
-      engine.seekTo(target);
+      unawaited(engine.seekTo(target));
 
       // Assert: seekTo 被 clamp 到 duration
       expect(engine.lastSeekToMs, 60000);
@@ -251,7 +253,7 @@ void main() {
 
     testWidgets('fullscreen mode renders MouseRegion', (tester) async {
       // 设置窗口为全屏模式
-      windowService.setMode(WindowMode.fullscreen);
+      unawaited(windowService.setMode(WindowMode.fullscreen));
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 

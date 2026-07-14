@@ -22,7 +22,7 @@ void main() {
   group('GeneralTab', () {
     testWidgets('renders with GlassContainer', (tester) async {
       await tester.pumpWidget(_wrapWithL10n(
-        GeneralTab(
+        const GeneralTab(
           currentLocale: 'zh',
           currentThemeIndex: 0,
         ),
@@ -34,7 +34,7 @@ void main() {
 
     testWidgets('renders language section header with icon', (tester) async {
       await tester.pumpWidget(_wrapWithL10n(
-        GeneralTab(
+        const GeneralTab(
           currentLocale: 'zh',
           currentThemeIndex: 0,
         ),
@@ -52,7 +52,7 @@ void main() {
 
     testWidgets('renders theme section header with icon', (tester) async {
       await tester.pumpWidget(_wrapWithL10n(
-        GeneralTab(
+        const GeneralTab(
           currentLocale: 'zh',
           currentThemeIndex: 0,
         ),
