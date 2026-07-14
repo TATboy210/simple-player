@@ -22,10 +22,15 @@ class EngineStateMachine {
   EngineStateMachine({this.onPlay, this.onPause});
 
   /// 播放回调（idle/paused/completed → toggle）
-  final VoidCallback? onPlay;
+  ///
+  /// 可在构造后设置，用于解决 FvpEngine 的循环依赖
+  ///（状态机先创建，engine.play/pause 后注入）
+  VoidCallback? onPlay;
 
   /// 暂停回调（playing → toggle）
-  final VoidCallback? onPause;
+  ///
+  /// 可在构造后设置，用于解决 FvpEngine 的循环依赖
+  VoidCallback? onPause;
 
   /// 主播放状态 — 正交 6 值枚举
   final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
@@ -61,7 +66,9 @@ class EngineStateMachine {
   static bool _canTransitionTo(MediaState current, MediaState next) {
     return switch (current) {
       MediaState.idle =>
-        next == MediaState.opening || next == MediaState.error,
+        next == MediaState.opening ||
+            next == MediaState.playing ||
+            next == MediaState.error,
       MediaState.opening =>
         next == MediaState.idle ||
             next == MediaState.playing ||

@@ -26,6 +26,7 @@ import 'mdk_player_proxy.dart';
 ///
 /// 封装 fvp/MDK 播放器，暴露 Flutter 友好的 ValueNotifier 接口。
 /// 由 6 个 helper 组合而成:
+///   - EngineStateMachine: 独立状态机，管理 state/isSeeking/isBuffering
 ///   - FvpCallbackHandler: mdk 回调注册、状态映射、主线程调度
 ///   - PositionPoller: 自适应间隔轮询播放位置
 ///   - TrackManager: 音频/字幕轨道选择与切换
@@ -35,19 +36,11 @@ import 'mdk_player_proxy.dart';
 ///
 /// 架构说明:
 ///   - 使用工厂构造函数保证所有 helper 在构造时就有值，消除 late 初始化风险
-///   - 状态转换受 switch expression 穷举守卫保护，防止非法跳转
+///   - 状态转换通过 EngineStateMachine.transitionTo 守卫
 ///   - 内置 EngineMetrics 性能计数器和 EngineEventLog 事件日志
-///
-/// fvp 底层使用 FFmpeg + Windows D3D11 渲染
-///   ARM/x86 均通过 FFmpeg 软解或硬件加速支持
-class FvpEngine implements MediaEngine {
+///   - Helper 通过接口 getter 暴露（trackControl, volumeControl 等）
+class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 工厂构造函数 — 保证所有依赖在构造时注入，消除 late 初始化风险
-  ///
-  /// 对比旧实现（lazy getter + late fields）:
-  ///   - 旧: _player 是 lazy getter，helper 的 late 字段在 _createPlayer() 中初始化
-  ///         如果任何代码路径在 _player 被触碰前访问 helper → LateInitializationError
-  ///   - 新: 所有 helper 在工厂构造函数中创建，通过私有命名构造函数注入
-  ///         编译期保证不可能出现未初始化访问
   factory FvpEngine() {
     final player = mdk.Player();
     final proxy = MdkPlayerProxy(player);
@@ -55,20 +48,27 @@ class FvpEngine implements MediaEngine {
     final mediaOpener = MediaOpener(player, trackManager);
     final videoEffectController = VideoEffectController(player);
 
+    // 创建状态机 — onPlay/onPause 在 engine 创建后注入（避免循环依赖）
+    final stateMachine = EngineStateMachine();
+
     // 创建引擎实例 — 所有字段在构造时赋值
     final engine = FvpEngine._(
       player,
       trackManager,
       mediaOpener,
       videoEffectController,
+      stateMachine,
       proxy,
     );
 
-    // 初始化依赖引擎状态的 helper（需要引用 engine 的 ValueNotifier）
+    // 注入状态机回调（engine 已创建，可安全引用 engine.play/pause）
+    stateMachine.onPlay = engine.play;
+    stateMachine.onPause = engine.pause;
+
+    // 初始化依赖引擎状态的 helper
     engine._callbackHandler = FvpCallbackHandler(
       player,
-      state: engine.state,
-      isBuffering: engine.isBuffering,
+      stateMachine: stateMachine,
       onStopPositionPolling: () => engine._positionPoller.stop(),
     );
     engine._positionPoller = PositionPoller(
@@ -96,14 +96,12 @@ class FvpEngine implements MediaEngine {
   }
 
   /// 私有命名构造函数 — 核心字段在此赋值，编译期保证完整初始化
-  ///
-  /// 部分 helper（callbackHandler/positionPoller/volumeController）需要引用
-  /// engine 的 ValueNotifier，因此在工厂构造函数中延迟创建。
   FvpEngine._(
     this._player,
     this._trackManager,
     this._mediaOpener,
     this._videoEffectController,
+    this._stateMachine,
     PlayerProxy proxy,
   ) : _subtitleConfigurator = SubtitleConfigurator(proxy),
       _d3d11Configurator = D3D11Configurator(proxy);
@@ -116,14 +114,15 @@ class FvpEngine implements MediaEngine {
   final VideoEffectController _videoEffectController;
   final SubtitleConfigurator _subtitleConfigurator;
   final D3D11Configurator _d3d11Configurator;
+  final EngineStateMachine _stateMachine;
 
-  /// 回调处理器 — 在工厂构造函数中创建（依赖 engine 的 ValueNotifier）
+  /// 回调处理器 — 在工厂构造函数中创建
   late FvpCallbackHandler _callbackHandler;
 
-  /// 位置轮询器 — 在工厂构造函数中创建（依赖 engine 的 ValueNotifier）
+  /// 位置轮询器 — 在工厂构造函数中创建
   late PositionPoller _positionPoller;
 
-  /// 音量控制器 — 在工厂构造函数中创建（依赖 engine 的 ValueNotifier）
+  /// 音量控制器 — 在工厂构造函数中创建
   late VolumeController _volumeController;
 
   bool _disposed = false;
@@ -141,10 +140,9 @@ class FvpEngine implements MediaEngine {
   @override
   final ValueNotifier<int?> textureId = ValueNotifier<int?>(null);
 
+  /// 主播放状态 — 委托给 EngineStateMachine 管理
   @override
-  final ValueNotifier<MediaState> state = ValueNotifier<MediaState>(
-    MediaState.idle,
-  );
+  ValueNotifier<MediaState> get state => _stateMachine.state;
 
   @override
   final ValueNotifier<int> position = ValueNotifier<int>(0);
@@ -160,8 +158,9 @@ class FvpEngine implements MediaEngine {
   @override
   final ValueNotifier<bool> isMuted = ValueNotifier<bool>(false);
 
+  /// 是否正在缓冲 — 委托给 EngineStateMachine 管理
   @override
-  final ValueNotifier<bool> isBuffering = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isBuffering => _stateMachine.isBuffering;
 
   @override
   final ValueNotifier<String> subtitleText = ValueNotifier<String>('');
@@ -175,8 +174,9 @@ class FvpEngine implements MediaEngine {
   @override
   final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
 
+  /// 是否正在 seek — 委托给 EngineStateMachine 管理
   @override
-  final ValueNotifier<bool> isSeeking = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isSeeking => _stateMachine.isSeeking;
 
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(
@@ -195,55 +195,24 @@ class FvpEngine implements MediaEngine {
     textureId.value = _player.textureId.value;
   }
 
-  // ─── 状态转换辅助 ───
+  // ─── 接口 getter (per D-07) ───
 
-  /// 安全地设置播放状态 — 检查转换合法性，debug 模式下打印非法跳转警告
-  ///
-  /// 使用 switch expression 穷举守卫防止非法状态跳转。
-  /// debug 模式下非法转换会被打印但仍然执行（保证不崩溃）；
-  /// release 模式下非法转换被静默忽略。
-  ///
-  /// 注意: 此方法将在 Plan 10-02 中迁移为使用 EngineStateMachine.transitionTo。
-  void _safeSetState(MediaState next, String caller) {
-    final current = state.value;
-    if (!_canTransitionTo(current, next)) {
-      assert(() {
-        debugPrint('⚠️ FvpEngine.$caller: illegal transition $current → $next');
-        return true;
-      }());
-      if (!kDebugMode) return;
-    }
-    state.value = next;
-  }
+  /// 音轨控制 — 委托给 TrackManager
+  TrackControl get trackControl => _trackManager;
 
-  /// switch expression 穷举合法转换 — 与 EngineStateMachine 逻辑一致
-  ///
-  /// Plan 10-02 将删除此方法，改用 EngineStateMachine.transitionTo。
-  static bool _canTransitionTo(MediaState current, MediaState next) {
-    return switch (current) {
-      MediaState.idle =>
-        next == MediaState.opening || next == MediaState.error,
-      MediaState.opening =>
-        next == MediaState.idle ||
-            next == MediaState.playing ||
-            next == MediaState.error,
-      MediaState.playing =>
-        next == MediaState.paused ||
-            next == MediaState.completed ||
-            next == MediaState.error ||
-            next == MediaState.idle,
-      MediaState.paused =>
-        next == MediaState.playing ||
-            next == MediaState.error ||
-            next == MediaState.idle,
-      MediaState.completed =>
-        next == MediaState.opening ||
-            next == MediaState.error ||
-            next == MediaState.idle,
-      MediaState.error =>
-        next == MediaState.opening || next == MediaState.idle,
-    };
-  }
+  /// 字幕配置 — FvpEngine 自身实现 SubtitleConfig
+  SubtitleConfig get subtitleConfig => this;
+
+  /// 视频效果控制 — FvpEngine 自身实现 VideoEffectControl
+  VideoEffectControl get videoEffectControl => this;
+
+  /// 渲染器配置 — 委托给 D3D11Configurator
+  RendererControl get rendererControl => _d3d11Configurator;
+
+  /// 音量控制 — 委托给 VolumeController
+  VolumeControl get volumeControl => _volumeController;
+
+  // ─── 通用守卫 ───
 
   /// 通用守卫：disposed 检查 + try-catch + log + 事件记录
   void _guardedAction(String name, void Function() action) {
@@ -269,7 +238,7 @@ class FvpEngine implements MediaEngine {
 
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
-      _safeSetState(MediaState.error, 'open');
+      _stateMachine.transitionTo(MediaState.error, 'open');
       lastError.value = const FileError(FileErrorCode.pathEmpty, '文件路径为空');
       metrics.recordOpen(success: false);
       eventLog.add('open', {'path': path, 'error': 'empty path'});
@@ -277,7 +246,7 @@ class FvpEngine implements MediaEngine {
     }
 
     _isOpening = true;
-    _safeSetState(MediaState.opening, 'open');
+    _stateMachine.transitionTo(MediaState.opening, 'open');
     _currentPath = trimmed;
     eventLog.add('open', {'path': PathUtils.basename(trimmed)});
 
@@ -285,7 +254,6 @@ class FvpEngine implements MediaEngine {
       final result = await _mediaOpener.open(trimmed);
       if (_disposed) return;
 
-      // 诊断日志: 记录 open 结果
       debugPrint('🔍 open() result: ${result.runtimeType} for ${PathUtils.basename(trimmed)}');
 
       switch (result) {
@@ -296,7 +264,7 @@ class FvpEngine implements MediaEngine {
             aspectRatio.value = (video.width * video.par) / video.height;
           }
           position.value = 0;
-          _safeSetState(MediaState.idle, 'open');
+          _stateMachine.transitionTo(MediaState.idle, 'open');
           lastError.value = null;
           metrics.recordOpen(success: true);
           logEngine.i(
@@ -305,7 +273,6 @@ class FvpEngine implements MediaEngine {
             '${mediaInfo.duration}ms',
           );
         case OpenError(:final error):
-          // 错误恢复：codec 错误且非 URL 时尝试软解降级
           if (error is CodecError && !PathValidator.isUrl(trimmed)) {
             logEngine.i('open() codec error — retrying with software decode');
             eventLog.add('fallback', {
@@ -317,7 +284,7 @@ class FvpEngine implements MediaEngine {
             await open(trimmed);
             return;
           }
-          _safeSetState(MediaState.error, 'open');
+          _stateMachine.transitionTo(MediaState.error, 'open');
           lastError.value = error;
           metrics.recordOpen(success: false);
           logEngine.e(
@@ -325,7 +292,7 @@ class FvpEngine implements MediaEngine {
           );
       }
     } on Exception catch (e) {
-      _safeSetState(MediaState.error, 'open');
+      _stateMachine.transitionTo(MediaState.error, 'open');
       lastError.value = PathValidator.isUrl(trimmed)
           ? NetworkError(NetworkErrorCode.timeout, '无法打开: ${PathUtils.basename(path)}', e)
           : PlaybackError(PlaybackErrorCode.playFailed, '无法打开: ${PathUtils.basename(path)}', e);
@@ -340,7 +307,6 @@ class FvpEngine implements MediaEngine {
   @override
   void play() {
     if (_disposed) return;
-    // 跳过自转换 — 已经在播放中
     if (state.value == MediaState.playing) return;
     try {
       debugPrint(
@@ -349,12 +315,12 @@ class FvpEngine implements MediaEngine {
         'path=${PathUtils.basename(_currentPath)}',
       );
       _player.state = mdk.PlaybackState.playing;
-      _safeSetState(MediaState.playing, 'play');
+      _stateMachine.transitionTo(MediaState.playing, 'play');
       _positionPoller.startSilent();
       eventLog.add('play', {'path': PathUtils.basename(_currentPath)});
       logEngine.d('play() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e) {
-      _safeSetState(MediaState.error, 'play');
+      _stateMachine.transitionTo(MediaState.error, 'play');
       lastError.value = PlaybackError(PlaybackErrorCode.playFailed, '播放失败: $e', e);
       logEngine.e('play() error: $e');
       debugPrint('❌ play() failed: $e');
@@ -366,7 +332,7 @@ class FvpEngine implements MediaEngine {
     if (_disposed) return;
     try {
       _player.state = mdk.PlaybackState.paused;
-      _safeSetState(MediaState.paused, 'pause');
+      _stateMachine.transitionTo(MediaState.paused, 'pause');
       _positionPoller.stop();
       eventLog.add('pause');
       logEngine.d('pause() — ${PathUtils.basename(_currentPath)}');
@@ -380,7 +346,7 @@ class FvpEngine implements MediaEngine {
     if (_disposed) return;
     try {
       _player.state = mdk.PlaybackState.stopped;
-      _safeSetState(MediaState.idle, 'stop');
+      _stateMachine.transitionTo(MediaState.idle, 'stop');
       position.value = 0;
       _positionPoller.stop();
       eventLog.add('stop');
@@ -394,7 +360,6 @@ class FvpEngine implements MediaEngine {
   Future<void> seekTo(int milliseconds) async {
     if (_disposed) return;
     if (state.value == MediaState.idle || duration.value <= 0) return;
-    // 跳过自转换 — 已经在 seek 中
     if (isSeeking.value) return;
     final clamped = milliseconds.clamp(0, duration.value);
     final wasPlaying = _player.state == mdk.PlaybackState.playing;
@@ -419,37 +384,16 @@ class FvpEngine implements MediaEngine {
       isSeeking.value = false;
     }
     if (_disposed) return;
-    // seek 完成后恢复到 seek 前的状态
-    _safeSetState(
+    _stateMachine.transitionTo(
       wasPlaying ? MediaState.playing : MediaState.paused,
       'seekTo.restore',
     );
   }
 
   @override
-  void setVolume(double value) {
-    _guardedAction('setVolume', () {
-      _volumeController.setVolume(value);
-    });
-  }
-
-  @override
-  void setMute(bool mute) {
-    _guardedAction('setMute', () {
-      _volumeController.setMute(mute);
-    });
-  }
-
-  @override
   void togglePlayPause() {
     if (_disposed) return;
-    if (state.value == MediaState.playing) {
-      pause();
-    } else if (state.value == MediaState.paused ||
-        state.value == MediaState.idle ||
-        state.value == MediaState.completed) {
-      play();
-    }
+    _stateMachine.togglePlayPause();
   }
 
   @override
@@ -461,7 +405,6 @@ class FvpEngine implements MediaEngine {
       );
       _player.playbackRate = clamped;
       playbackSpeed.value = clamped;
-      // 自适应轮询间隔：倍速播放时调整轮询频率
       _positionPoller.setPlaybackRate(clamped);
       eventLog.add('speed', {'rate': clamped});
     });
@@ -494,7 +437,7 @@ class FvpEngine implements MediaEngine {
     });
   }
 
-  // ─── 音轨/字幕 (delegated to TrackManager) ───
+  // ─── TrackControl 实现 (delegated to TrackManager) ───
 
   @override
   List<AudioTrackInfo> getAudioTracks() => _trackManager.getAudioTracks();
@@ -508,6 +451,8 @@ class FvpEngine implements MediaEngine {
   @override
   List<int> get activeAudioTracks =>
       _disposed ? [] : _trackManager.activeAudioTracks;
+
+  // ─── SubtitleConfig 实现 (FvpEngine 直接实现，部分委托 TrackManager) ───
 
   @override
   List<SubtitleTrackInfo> getSubtitleTracks() =>
@@ -525,16 +470,12 @@ class FvpEngine implements MediaEngine {
     _trackManager.toggleSubtitle();
   }
 
-  // ─── 外挂字幕 ───
-
   @override
   void setExternalSubtitle(String path) {
     _guardedAction('setExternalSubtitle', () {
       _subtitleConfigurator.setExternalSubtitle(path);
     });
   }
-
-  // ─── 字幕时间偏移 ───
 
   @override
   void setSubtitleDelay(int milliseconds) {
@@ -549,8 +490,6 @@ class FvpEngine implements MediaEngine {
     return _subtitleConfigurator.getSubtitleDelay();
   }
 
-  // ─── 均衡器 ───
-
   @override
   void setEqualizer(String afFilter) {
     _guardedAction('setEqualizer', () {
@@ -558,7 +497,7 @@ class FvpEngine implements MediaEngine {
     });
   }
 
-  // ─── 视频处理 (delegated to VideoEffectController) ───
+  // ─── VideoEffectControl 实现 (FvpEngine 直接实现，委托 VideoEffectController) ───
 
   @override
   void setVideoEffect(VideoEffectType effect, double value) {
@@ -588,7 +527,23 @@ class FvpEngine implements MediaEngine {
     });
   }
 
-  // ─── D3D11 性能参数 ───
+  // ─── VolumeControl 实现 (delegated to VolumeController) ───
+
+  @override
+  void setVolume(double value) {
+    _guardedAction('setVolume', () {
+      _volumeController.setVolume(value);
+    });
+  }
+
+  @override
+  void setMute(bool mute) {
+    _guardedAction('setMute', () {
+      _volumeController.setMute(mute);
+    });
+  }
+
+  // ─── RendererControl 实现 (delegated to D3D11Configurator) ───
 
   @override
   void setD3d11SyncEnabled(bool enabled) {
@@ -606,24 +561,17 @@ class FvpEngine implements MediaEngine {
 
   // ─── 生命周期 ───
 
-  /// 释放所有资源
-  ///
-  /// debug 模式下检查 ValueNotifier 是否有残留 listeners（内存泄漏检测）。
   @override
   void dispose() {
     _disposed = true;
 
-    // debug 模式：检查 listener 泄漏
     assert(() {
       final notifiers = {
         'textureId': textureId,
-        'state': state,
         'position': position,
         'duration': duration,
         'volume': volume,
         'isMuted': isMuted,
-        'isBuffering': isBuffering,
-        'isSeeking': isSeeking,
         'subtitleText': subtitleText,
         'buffered': buffered,
         'aspectRatio': aspectRatio,
@@ -643,15 +591,13 @@ class FvpEngine implements MediaEngine {
     _callbackHandler.dispose();
     _player.textureId.removeListener(_onTextureIdChanged);
     _player.dispose();
+    _stateMachine.dispose();
 
     textureId.dispose();
-    state.dispose();
     position.dispose();
     duration.dispose();
     volume.dispose();
     isMuted.dispose();
-    isBuffering.dispose();
-    isSeeking.dispose();
     subtitleText.dispose();
     buffered.dispose();
     aspectRatio.dispose();

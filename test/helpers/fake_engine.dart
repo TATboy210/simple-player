@@ -2,28 +2,32 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
-/// Hand-written Fake implementing all 6 ISP interfaces for testing.
+/// Hand-written Fake implementing all ISP interfaces for testing.
 ///
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
 ///
-/// Implements (not with) the 6 new ISP interfaces:
-/// [EngineStateView], [PlaybackControl], [TrackControl],
-/// [SubtitleConfig], [VideoEffectControl], [RendererConfig].
-class FakeEngine implements MediaEngine {
+/// Uses EngineStateMachine for state management (matching FvpEngine).
+class FakeEngine implements MediaEngine, SubtitleConfig {
   bool _disposed = false;
 
-  // ─── ValueNotifier fields (defaults match FvpEngine) ───
+  /// 状态机 — 管理 state/isSeeking/isBuffering
+  ///
+  /// onPlay/onPause 在构造时注入，使 togglePlayPause 可以正常工作
+  late final EngineStateMachine stateMachine = EngineStateMachine(
+    onPlay: play,
+    onPause: pause,
+  );
+
+  // ─── ValueNotifier fields (delegated to stateMachine where applicable) ───
 
   @override
   final ValueNotifier<int?> textureId = ValueNotifier<int?>(null);
 
+  /// 主播放状态 — 委托给 stateMachine
   @override
-  final ValueNotifier<MediaState> state = ValueNotifier<MediaState>(
-    MediaState.idle,
-  );
+  ValueNotifier<MediaState> get state => stateMachine.state;
 
   @override
   final ValueNotifier<int> position = ValueNotifier<int>(0);
@@ -37,8 +41,9 @@ class FakeEngine implements MediaEngine {
   @override
   final ValueNotifier<bool> isMuted = ValueNotifier<bool>(false);
 
+  /// 是否正在缓冲 — 委托给 stateMachine
   @override
-  final ValueNotifier<bool> isBuffering = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isBuffering => stateMachine.isBuffering;
 
   @override
   final ValueNotifier<String> subtitleText = ValueNotifier<String>('');
@@ -49,16 +54,15 @@ class FakeEngine implements MediaEngine {
   @override
   final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
 
-  /// 最近一次错误 — 替代旧的 errorMessage + errorType
   @override
   final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
 
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
 
-  /// 是否正在 seek — transient 标志，独立于主状态枚举
+  /// 是否正在 seek — 委托给 stateMachine
   @override
-  final ValueNotifier<bool> isSeeking = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isSeeking => stateMachine.isSeeking;
 
   // ─── Internal state ───
 
@@ -88,10 +92,21 @@ class FakeEngine implements MediaEngine {
   int setExternalSubtitleCallCount = 0;
   String? lastExternalSubtitlePath;
   int setSubtitleDelayCallCount = 0;
-  /// setVolume 调用追踪（用于节流测试）
   int setVolumeCallCount = 0;
   double? lastSetVolumeValue;
   int _subtitleDelayMs = 0;
+
+  // ─── Interface getters (matching FvpEngine pattern) ───
+
+  TrackControl get trackControl => this;
+
+  SubtitleConfig get subtitleConfig => this;
+
+  VideoEffectControl get videoEffectControl => this;
+
+  RendererControl get rendererControl => this;
+
+  VolumeControl get volumeControl => this;
 
   // ─── Playback control ───
 
@@ -100,46 +115,43 @@ class FakeEngine implements MediaEngine {
     if (_disposed) return;
     openCallCount++;
     openPaths.add(path);
-    state.value = MediaState.opening;
-    // Minimal async yield to allow test pump
+    stateMachine.transitionTo(MediaState.opening, 'fake.open');
     await Future<void>.value();
     if (_disposed) return;
 
-    // Simulate open failure if configured
     if (failNextOpenWith != null) {
       final msg = failNextOpenWith!;
-      failNextOpenWith = null; // one-shot
-      state.value = MediaState.error;
+      failNextOpenWith = null;
+      stateMachine.transitionTo(MediaState.error, 'fake.open.error');
       lastError.value = UnknownError(msg);
       return;
     }
 
-    // Pre-configured _mediaInfo is used (caller sets it before open)
     duration.value = _mediaInfo.duration;
     position.value = 0;
     lastError.value = null;
-    // Do NOT set state to idle — caller (play) sets it to playing
-    // This matches FvpEngine behavior: open() does not set idle
+    // open 成功后回到 idle — 匹配 FvpEngine.open() 行为
+    stateMachine.transitionTo(MediaState.idle, 'fake.open.success');
   }
 
   @override
   void play() {
     if (_disposed) return;
-    state.value = MediaState.playing;
+    stateMachine.transitionTo(MediaState.playing, 'fake.play');
     playCallCount++;
   }
 
   @override
   void pause() {
     if (_disposed) return;
-    state.value = MediaState.paused;
+    stateMachine.transitionTo(MediaState.paused, 'fake.pause');
     pauseCallCount++;
   }
 
   @override
   void stop() {
     if (_disposed) return;
-    state.value = MediaState.idle;
+    stateMachine.transitionTo(MediaState.idle, 'fake.stop');
     position.value = 0;
     stopCallCount++;
   }
@@ -176,13 +188,7 @@ class FakeEngine implements MediaEngine {
   @override
   void togglePlayPause() {
     if (_disposed) return;
-    if (state.value == MediaState.playing) {
-      pause();
-    } else if (state.value == MediaState.idle ||
-        state.value == MediaState.paused ||
-        state.value == MediaState.completed) {
-      play();
-    }
+    stateMachine.togglePlayPause();
   }
 
   @override
@@ -209,7 +215,7 @@ class FakeEngine implements MediaEngine {
     // no-op in fake
   }
 
-  // ─── Audio tracks ───
+  // ─── Audio tracks (TrackControl) ───
 
   @override
   List<AudioTrackInfo> getAudioTracks() => _mediaInfo.audioTracks;
@@ -222,7 +228,7 @@ class FakeEngine implements MediaEngine {
   @override
   List<int> get activeAudioTracks => [];
 
-  // ─── Subtitles ───
+  // ─── Subtitles (SubtitleConfig) ───
 
   @override
   List<SubtitleTrackInfo> getSubtitleTracks() => _mediaInfo.subtitleTracks;
@@ -262,7 +268,7 @@ class FakeEngine implements MediaEngine {
     // no-op in fake
   }
 
-  // ─── Video Processing ───
+  // ─── Video Processing (VideoEffectControl) ───
 
   int setVideoEffectCallCount = 0;
   VideoEffectType? lastVideoEffectType;
@@ -306,7 +312,7 @@ class FakeEngine implements MediaEngine {
     lastDeinterlaceValue = enable;
   }
 
-  // ─── D3D11 Performance ───
+  // ─── D3D11 Performance (RendererControl) ───
 
   int setD3d11SyncEnabledCallCount = 0;
   bool? lastD3d11SyncEnabled;
@@ -333,26 +339,22 @@ class FakeEngine implements MediaEngine {
   @override
   void dispose() {
     _disposed = true;
+    stateMachine.dispose();
     textureId.dispose();
-    state.dispose();
     position.dispose();
     duration.dispose();
     volume.dispose();
     isMuted.dispose();
-    isBuffering.dispose();
     subtitleText.dispose();
     buffered.dispose();
     aspectRatio.dispose();
     lastError.dispose();
     playbackSpeed.dispose();
-    isSeeking.dispose();
   }
 
   // ─── Test helper methods ───
 
   /// Pre-configure what open() will expose.
-  ///
-  /// Call before open() to set duration, audio tracks, subtitle tracks.
   void configureMedia({
     int durationMs = 60000,
     List<AudioTrackInfo>? audioTracks,
@@ -367,13 +369,13 @@ class FakeEngine implements MediaEngine {
 
   /// Simulate an error state.
   void simulateError(String message) {
-    state.value = MediaState.error;
+    stateMachine.transitionTo(MediaState.error, 'fake.simulateError');
     lastError.value = UnknownError(message);
   }
 
   /// Simulate playback completed.
   void simulateCompleted() {
-    state.value = MediaState.completed;
+    stateMachine.transitionTo(MediaState.completed, 'fake.simulateCompleted');
   }
 
   /// Simulate buffering state — only sets transient flag, does not change main state.

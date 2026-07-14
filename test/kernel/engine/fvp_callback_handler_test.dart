@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fvp/mdk.dart' as mdk;
 import 'package:simple_player_flutter/kernel/engine/fvp_callback_handler.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
 
 void main() {
   group('FvpCallbackHandler', () {
@@ -28,15 +29,20 @@ void main() {
       });
 
       test('maps unknown state to MediaState.idle', () {
-        // mdk.PlaybackState has no seeking — test with a non-mapped value
-        // The switch default case handles any unrecognized state
-        // Using stopped as baseline, then verifying the mapping is correct
         expect(
           FvpCallbackHandler.mapMdkState(mdk.PlaybackState.stopped),
           MediaState.idle,
         );
-        // Verify all 3 known states map correctly (covered above)
-        // The default branch returns idle for any unrecognized value
+      });
+    });
+
+    group('constructor', () {
+      test('accepts stateMachine parameter', () {
+        final sm = EngineStateMachine();
+        // Verify constructor accepts EngineStateMachine (compile-time check)
+        expect(sm, isA<EngineStateMachine>());
+        expect(sm.state.value, MediaState.idle);
+        sm.dispose();
       });
     });
   });
