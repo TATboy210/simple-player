@@ -1,39 +1,39 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.1
-milestone_name: 播放内核重构强化
-current_phase: 9
-current_phase_name: 接口分解 + 状态模型统一
-status: paused
-stopped_at: Plan 09-02 complete, ready for summary + commit (2026-07-14)
-last_updated: "2026-07-14T16:30:00.000Z"
+milestone_name: 播放内核重构强化 (expanded)
+current_phase: 0
+current_phase_name: Defining requirements
+status: planning
+stopped_at: Milestone expanded, requirements defined, roadmap pending (2026-07-14)
+last_updated: "2026-07-14T18:00:00.000Z"
 last_activity: 2026-07-14
-last_activity_desc: Plan 09-02 complete — 22 test files fixed, 1058 tests passing
+last_activity_desc: Milestone expanded with Widget↔Kernel optimization goals, 22 requirements defined
 progress:
-  total_phases: 4
+  total_phases: 0
   completed_phases: 0
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# Project State: 播放内核重构强化
+# Project State: 播放内核重构强化 (expanded)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-07-14)
 
-**Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入
-**Current focus:** Phase 9 — 接口分解 + 状态模型统一
+**Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
+**Current focus:** v2.1 expanded — 内核重构 + Widget↔Kernel 对接优化
 
 ## Current Position
 
-Phase: 9 of 12 (接口分解 + 状态模型统一)
-Plan: 09-02 of 2 (completed)
-Status: Paused — Task 7/7 complete, summary pending
-Last activity: 2026-07-14 — 22 test files fixed, 1058 tests passing
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-14 — Milestone expanded with 16 new requirements
 
-Progress: [██████████] 100% (Plan 09-02 done)
+Progress: [░░░░░░░░░░] 0% (roadmap pending)
 
 ## Performance Metrics
 

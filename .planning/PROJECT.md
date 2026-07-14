@@ -2,11 +2,11 @@
 
 ## What This Is
 
-对 Simple Player Flutter 桌面播放器的核心内核进行全面重构强化。覆盖从播放引擎抽象（MediaEngine/FvpEngine）到服务编排层（PlaybackController/Playlist/TrackManager）的完整内核栈，目标是提升代码质量、修复稳定性问题、为后续功能（ABR、多实例、插件化等）打下架构基础。
+对 Simple Player Flutter 桌面播放器的核心内核进行全面重构强化。覆盖从播放引擎抽象（MediaEngine/FvpEngine）到服务编排层（PlaybackController/Playlist/TrackManager）的完整内核栈，目标是提升代码质量、修复稳定性问题、为后续功能（ABR、多实例、插件化等）打下架构基础。**v2.1 扩展：** 同时优化 Widget 层与内核层的对接方式，统一 API、提升可测试性、优化状态通知、清晰化数据流。
 
 ## Core Value
 
-播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。
+播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。**Widget↔Kernel 边界清晰、API 统一、可测试。**
 
 ## Requirements
 
@@ -25,6 +25,10 @@
 - [ ] 播放控制服务重构 — PlaybackController 编排逻辑、Playlist 管理、PlayMode 实现
 - [ ] 轨道管理重构 — Audio/Subtitle track 选择、切换、延迟同步
 - [ ] 状态模型重构 — MediaState 状态模型、状态变更通知、状态一致性保证
+- [ ] Widget API 统一 — PlayerScreen/ControlBar/VolumeControls 等 widget 对内核的调用方式标准化
+- [ ] 状态通知优化 — ValueNotifier 粒度、更新频率、rebuild 范围优化
+- [ ] 可测试性提升 — Widget 层 mock 内核更容易，测试复杂度降低
+- [ ] 数据流清晰化 — Widget↔Kernel 数据流单向、可预测
 
 ### Out of Scope
 
