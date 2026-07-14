@@ -181,10 +181,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
               onSubtitleDelayForward: () {
                 final delay = widget.engine.subtitleDelay;
                 widget.engine.setSubtitleDelay(delay + 500);
+                // 录制字幕延迟偏好 — 跨会话恢复
+                widget.controller.trackPreferenceService
+                    ?.recordSubtitleDelay(delay + 500);
               },
               onSubtitleDelayBackward: () {
                 final delay = widget.engine.subtitleDelay;
                 widget.engine.setSubtitleDelay(delay - 500);
+                widget.controller.trackPreferenceService
+                    ?.recordSubtitleDelay(delay - 500);
               },
               onMediaPlayPause: () => widget.engine.togglePlayPause(),
               onMediaNext: () => widget.controller.playNext(),

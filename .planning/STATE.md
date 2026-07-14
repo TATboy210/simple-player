@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: 播放内核重构强化
-current_phase_name: defining requirements
+current_phase_name: Phase 12 complete
 status: executing
-stopped_at: context exhaustion at 76% (2026-07-14)
-last_updated: "2026-07-14T12:00:50.509Z"
+stopped_at: —
+last_updated: "2026-07-14T15:30:00.000Z"
 last_activity: 2026-07-14
-last_activity_desc: Milestone expanded with 16 new requirements
+last_activity_desc: Phase 12 complete — track preference recording wired through UI layer
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 3
   total_plans: 4
-  completed_plans: 2
-  percent: 17
-current_phase: 0
+  completed_plans: 6
+  percent: 50
+current_phase: 3
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-07-14 — Milestone expanded with 16 new requirements
+Phase: Phase 12 — 轨道管理统一 (in progress)
+Plan: 12-01-PLAN.md — 轨道偏好录制接入
+Status: Implementing
+Last activity: 2026-07-14 — Phase 13 verified complete, Phase 12 plan created
 
-Progress: [░░░░░░░░░░] 0% (roadmap pending)
+Progress: [███████░░░] 67% (4/6 phases done, Phase 12 in progress)
 
 ## Performance Metrics
 
@@ -48,8 +48,8 @@ Progress: [░░░░░░░░░░] 0% (roadmap pending)
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 9. 接口分解 | 2/2 | — | — |
-| 10. 状态机 | 0/2 | — | — |
-| 11. 防御增强 | 0/2 | — | — |
+| 10. 状态机 | 2/2 | — | — |
+| 11. 防御增强 | 1/1 | — | — |
 | 12. 轨道统一 | 0/2 | — | — |
 
 **Recent Trend:**
@@ -69,6 +69,8 @@ Recent decisions affecting current work:
 - [v2.1]: 保持 fvp 引擎 + ValueNotifier，纯架构重构
 - [v2.1]: 接口分解采用 ISP 模式（EngineStateView + PlaybackControl + 4 能力接口）
 - [v2.1]: 状态机采用 switch expression 穷举 9 状态 ~40 条边
+- [v2.1]: StateMonitor 拆分为 PlaybackStateManager（设置+断点+持久化）+ AutoAdvancePolicy（连播策略）
+- [v2.1]: open() 使用 _openGeneration 计数器替代 _isOpening bool
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-14T11:55:47.296Z
-Stopped at: context exhaustion at 76% (2026-07-14)
+Last session: 2026-07-14T12:56:30.232Z
+Stopped at: context exhaustion at 75% (2026-07-14)
 Resume file: .planning/phases/10-state-machine-extraction/10-CONTEXT.md

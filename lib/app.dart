@@ -66,8 +66,9 @@ class _AppState extends State<App> {
   void _showSettingsPanel(
     BuildContext context,
     MediaEngine engine,
-    VideoProcessingService? videoProcessing,
-  ) {
+    VideoProcessingService? videoProcessing, {
+    ValueChanged<int>? onAudioTrackChanged,
+  }) {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -76,6 +77,7 @@ class _AppState extends State<App> {
         engine: engine,
         videoProcessing: videoProcessing,
         windowService: widget.windowService,
+        onAudioTrackChanged: onAudioTrackChanged,
       ),
     );
   }
@@ -166,8 +168,9 @@ class _AppState extends State<App> {
           home: DeferredPlayerFeature(
             coordinator: widget.coordinator,
             windowService: widget.windowService,
-            onSettings: (ctx, engine, videoProcessing) =>
-                _showSettingsPanel(ctx, engine, videoProcessing),
+            onSettings: (ctx, engine, videoProcessing, {onAudioTrackChanged}) =>
+                _showSettingsPanel(ctx, engine, videoProcessing,
+                    onAudioTrackChanged: onAudioTrackChanged),
             onSettingsSecondary: _showSettingsQuickMenu,
           ),
         ),

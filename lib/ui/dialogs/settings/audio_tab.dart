@@ -15,7 +15,10 @@ import '../../shared/settings_card.dart'; // SettingRow export
 /// Tapping a track calls [MediaEngine.switchAudioTrack] and closes the dialog.
 class AudioTab extends StatelessWidget {
   final MediaEngine engine;
-  const AudioTab({super.key, required this.engine});
+
+  /// 音轨切换后录制偏好 — 由上层传入，避免 UI 直接依赖 kernel 服务
+  final ValueChanged<int>? onAudioTrackChanged;
+  const AudioTab({super.key, required this.engine, this.onAudioTrackChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +53,7 @@ class AudioTab extends StatelessWidget {
                   l10n: l10n,
                   onTap: () {
                     engine.switchAudioTrack(i);
+                    onAudioTrackChanged?.call(i);
                     Navigator.of(context).pop();
                   },
                 ),

@@ -55,8 +55,9 @@ class PlayerFeature extends StatefulWidget {
   final void Function(
     BuildContext context,
     MediaEngine engine,
-    VideoProcessingService videoProcessing,
-  )
+    VideoProcessingService videoProcessing, {
+    ValueChanged<int>? onAudioTrackChanged,
+  })
   onSettings;
 
   /// 右键快捷菜单回调 — 需要触发位置的 BuildContext 和 TapUpDetails 坐标
@@ -254,6 +255,8 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         context,
         _services.engine,
         _services.videoProcessing,
+        onAudioTrackChanged:
+            _services.controller.trackPreferenceService?.recordAudioTrack,
       ),
       onSettingsSecondary: widget.onSettingsSecondary,
       onFilesDropped: _onFilesDropped,
