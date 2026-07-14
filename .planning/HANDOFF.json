@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-14T00:00:00+08:00",
+  "phase": "09",
+  "phase_name": "interface-decomposition",
+  "phase_dir": ".planning/phases/09-interface-decomposition",
+  "plan": 2,
+  "task": 1,
+  "total_tasks": 6,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Add canTransitionTo extension + update barrel export",
+      "status": "done",
+      "commit": "uncommitted"
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 2,
+      "name": "Rewrite FvpEngine to implement 6 ISP interfaces",
+      "status": "not_started"
+    },
+    {
+      "id": 3,
+      "name": "Update MediaOpener and FvpCallbackHandler",
+      "status": "not_started"
+    },
+    {
+      "id": 4,
+      "name": "Migrate service files to kernel/services/ + update PlaybackController",
+      "status": "not_started"
+    },
+    {
+      "id": 5,
+      "name": "Update all UI consumers (ErrorBanner + type annotations + imports)",
+      "status": "not_started"
+    },
+    {
+      "id": 6,
+      "name": "Update test files for new types",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {
+      "decision": "Add MediaStateTransition extension with canTransitionTo() to media_state.dart",
+      "rationale": "FvpEngine._safeSetState() depends on this method; the new 6-value enum needs its own transition matrix",
+      "phase": "09"
+    },
+    {
+      "decision": "Re-export player_error.dart and open_result.dart from engine_state.dart barrel",
+      "rationale": "EngineStateView.lastError uses PlayerError type; consumers need it in scope through the barrel import",
+      "phase": "09"
+    }
+  ],
+  "uncommitted_files": [
+    "lib/kernel/engine/media_state.dart",
+    "lib/kernel/engine/engine_state.dart"
+  ],
+  "next_action": "Rewrite FvpEngine: change class declaration from 'with EngineState, TrackControl, VideoEffects, RendererConfig' to 'implements EngineStateView, PlaybackControl, TrackControl, SubtitleConfig, VideoEffectControl, RendererControl'. Replace errorMessage/errorType with lastError/isSeeking. Update all MediaState references and error handling.",
+  "context_notes": "Plan 09-02 consumer migration is in progress. Plan 01 completed all new ISP interfaces. The codebase is currently broken because the barrel export was replaced but consumers still reference old types (EngineState mixin, MediaErrorType, MediaState.loading/stopped/seeking/buffering). All source files have been read and analyzed. The migration order is: foundation → engine → services → UI → tests."
+}

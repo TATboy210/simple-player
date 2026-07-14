@@ -1,13 +1,19 @@
-/// 播放器状态枚举
+/// 播放器主状态枚举 — 正交 6 值
 ///
-/// 状态机: idle -> loading -> playing ⇄ paused -> stopped -> completed -> error
-/// seeking 和 buffering 是 transient 状态，与 playing/paused 并行。
+/// 状态模型：idle → opening → playing ⇄ paused → completed → error
+///
+/// 旧版本的 seeking/buffering 已移至独立的 `ValueNotifier<bool>`
+/// （EngineStateView.isSeeking / EngineStateView.isBuffering），
+/// 避免主状态枚举的组合爆炸。
+///
+/// 旧版本的 loading 重命名为 opening 以保持一致性。
+/// 旧版本的 stopped 已移除 — stop() 将状态重置为 idle。
 enum MediaState {
   /// 初始状态，未加载任何媒体
   idle,
 
-  /// 正在加载媒体
-  loading,
+  /// 正在加载/打开媒体
+  opening,
 
   /// 正在播放
   playing,
@@ -15,82 +21,48 @@ enum MediaState {
   /// 已暂停
   paused,
 
-  /// 已停止（手动停止或播放结束后重置）
-  stopped,
-
   /// 播放完成（自然播放到末尾）
   completed,
 
   /// 发生错误
   error,
-
-  /// 正在 seek（transient 状态）
-  seeking,
-
-  /// 正在缓冲（transient 状态，网络流或 seek 后）
-  buffering,
 }
 
-/// 状态转换守卫 — 定义合法的 MediaState 转换
+/// 状态转换合法性守卫
 ///
-/// 防御非法跳转（如 idle → completed），debug 模式下打印警告。
-/// 转换矩阵基于播放器实际行为：
-///   - idle: 初始状态，只能进入 loading 或 error
-///   - loading: 加载中，可进入 playing/paused/error
-///   - playing: 播放中，可暂停/停止/完成/seek/缓冲/出错
-///   - paused: 已暂停，可恢复播放/停止/seek
-///   - stopped: 已停止，只能重新加载或回到 idle
-///   - completed: 播放完成，可重新加载/回到 idle/重播
-///   - error: 出错，只能回到 idle 或重新加载
-///   - seeking/buffering: transient 状态，恢复到 playing/paused 或出错
+/// 正交 6 值模型的合法转换：
+/// - idle → opening, error
+/// - opening → idle, playing, error
+/// - playing → paused, completed, error, idle
+/// - paused → playing, error, idle
+/// - completed → opening, error, idle
+/// - error → opening, idle
+///
+/// debug 模式下非法转换触发 assert 警告（不崩溃）；
+/// release 模式下非法转换被静默忽略。
 extension MediaStateTransition on MediaState {
-  /// 当前状态是否可以转换到 [next] 状态
-  bool canTransitionTo(MediaState next) => switch (this) {
-    MediaState.idle => const {
-      MediaState.loading,
-      MediaState.error,
-    }.contains(next),
-    MediaState.loading => const {
-      MediaState.playing,
-      MediaState.paused,
-      MediaState.idle,
-      MediaState.error,
-    }.contains(next),
-    MediaState.playing => const {
-      MediaState.paused,
-      MediaState.stopped,
-      MediaState.completed,
-      MediaState.error,
-      MediaState.seeking,
-      MediaState.buffering,
-    }.contains(next),
-    MediaState.paused => const {
-      MediaState.playing,
-      MediaState.stopped,
-      MediaState.seeking,
-    }.contains(next),
-    MediaState.stopped => const {
-      MediaState.loading,
-      MediaState.idle,
-    }.contains(next),
-    MediaState.completed => const {
-      MediaState.loading,
-      MediaState.idle,
-      MediaState.playing,
-    }.contains(next),
-    MediaState.error => const {
-      MediaState.idle,
-      MediaState.loading,
-    }.contains(next),
-    MediaState.seeking => const {
-      MediaState.playing,
-      MediaState.paused,
-      MediaState.error,
-    }.contains(next),
-    MediaState.buffering => const {
-      MediaState.playing,
-      MediaState.paused,
-      MediaState.error,
-    }.contains(next),
-  };
+  bool canTransitionTo(MediaState next) {
+    return switch (this) {
+      MediaState.idle => next == MediaState.opening || next == MediaState.error,
+      MediaState.opening =>
+        next == MediaState.idle ||
+            next == MediaState.playing ||
+            next == MediaState.error,
+      MediaState.playing =>
+        next == MediaState.paused ||
+            next == MediaState.completed ||
+            next == MediaState.error ||
+            next == MediaState.idle,
+      MediaState.paused =>
+        next == MediaState.playing ||
+            next == MediaState.error ||
+            next == MediaState.idle,
+      MediaState.completed =>
+        next == MediaState.opening ||
+            next == MediaState.error ||
+            next == MediaState.idle,
+      MediaState.error =>
+        next == MediaState.opening || next == MediaState.idle,
+    };
+  }
 }
