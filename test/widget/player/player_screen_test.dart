@@ -330,6 +330,7 @@ void main() {
       await tester.pump();
 
       // Act: 切换到 playing 状态
+      await engine.open('test.mp4');
       engine.play();
       await tester.pump();
 
@@ -452,11 +453,15 @@ void main() {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
+      // 先 open 使状态进入 opening（idle→playing 被状态机拒绝，必须经 opening）
+      await engine.open('test.mp4');
+      await tester.pump();
+
       // Act: 按空格 → KeyboardHandler → engine.togglePlayPause()
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
 
-      // Assert: togglePlayPause 被调用 → idle 时应变为 playing
+      // Assert: togglePlayPause 被调用 → opening 时应变为 playing
       expect(engine.state.value, MediaState.playing);
     });
 

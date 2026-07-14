@@ -69,9 +69,10 @@ void main() {
       engine.dispose();
     });
 
-    test('play() sets state to playing', () {
+    test('play() sets state to playing', () async {
       final engine = FakeEngine();
-      engine.play();
+      await engine.open('test.mp4'); // idle → opening → idle (open completes)
+      engine.play(); // idle → playing
       expect(engine.state.value, MediaState.playing);
       engine.dispose();
     });
@@ -185,8 +186,9 @@ void main() {
       engine.dispose();
     });
 
-    test('pause sets state and tracks call', () {
+    test('pause sets state and tracks call', () async {
       final engine = FakeEngine();
+      await engine.open('test.mp4');
       engine.play();
       engine.pause();
       expect(engine.state.value, MediaState.paused);
@@ -334,9 +336,11 @@ void main() {
       engine.dispose();
     });
 
-    test('simulateCompleted sets completed state', () {
+    test('simulateCompleted sets completed state', () async {
       final engine = FakeEngine();
-      engine.simulateCompleted();
+      await engine.open('test.mp4');
+      engine.play(); // opening → playing
+      engine.simulateCompleted(); // playing → completed
       expect(engine.state.value, MediaState.completed);
       engine.dispose();
     });

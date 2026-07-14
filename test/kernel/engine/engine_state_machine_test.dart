@@ -138,9 +138,9 @@ void main() {
     });
 
     group('transitionTo — illegal transitions', () {
-      test('idle → playing returns false and state unchanged', () {
-        expect(machine.transitionTo(MediaState.playing, 'test'), false);
-        expect(machine.state.value, MediaState.idle);
+      test('idle → playing returns true (play after open)', () {
+        expect(machine.transitionTo(MediaState.playing, 'test'), true);
+        expect(machine.state.value, MediaState.playing);
       });
 
       test('idle → paused returns false', () {
