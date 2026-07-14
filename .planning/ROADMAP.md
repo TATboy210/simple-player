@@ -45,11 +45,22 @@ Phase numbering: 1-8.
 **Goal**: 状态转换由独立状态机强制守卫，FvpEngine 职责精简到 <350 行
 **Depends on**: Phase 9
 **Requirements**: ENG-02, SVC-02
+**Plans**: 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 10-01-PLAN.md — EngineStateMachine + PlaybackSkipMixin (TDD, Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 10-02-PLAN.md — FvpEngine 瘦身: 集成状态机 + 接口 getter + 删除 delegation (Wave 2)
+
 **Success Criteria**:
 
 1. 非法状态转换（如 Playing → Playing）在 debug 和 release 模式下均被拦截
 2. FvpEngine 从 641 行减至 <350 行
-3. switch expression 穷举 9 状态 ~40 条边
+3. switch expression 穷举 6 状态 + 2 bool 标志
 4. `flutter analyze` 无错误，现有测试全部通过
 
 ### Phase 11: 引擎解耦 + 防御增强
@@ -120,7 +131,7 @@ Phase 9 ✅ (接口分解 + 状态模型统一)
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 9. 接口分解 + 状态模型统一 | v2.1 | 2/2 | ✅ Done | 2026-07-14 |
-| 10. 状态机提取 + 引擎瘦身 | v2.1 | 0/TBD | Not started | - |
+| 10. 状态机提取 + 引擎瘦身 | v2.1 | 0/2 | Planning done | - |
 | 11. 引擎解耦 + 防御增强 | v2.1 | 0/TBD | Not started | - |
 | 12. 轨道管理统一 | v2.1 | 0/TBD | Not started | - |
 | 13. Widget API 统一 + 状态通知优化 | v2.1 | 0/TBD | Not started | - |
