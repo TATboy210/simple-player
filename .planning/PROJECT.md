@@ -1,85 +1,78 @@
-# Simple Player — 设置面板 & 全屏重构
+# Simple Player — 播放内核重构强化
 
 ## What This Is
 
-对 Simple Player Flutter 桌面播放器的设置功能和全屏功能进行全面重构。包括设置面板 UI/UX 升级、数据层重构、全屏代码简化与解耦，以及开发工作流增强（Flutter SDK 文档/源码集成、质量管线探索）。
+对 Simple Player Flutter 桌面播放器的核心内核进行全面重构强化。覆盖从播放引擎抽象（MediaEngine/FvpEngine）到服务编排层（PlaybackController/Playlist/TrackManager）的完整内核栈，目标是提升代码质量、修复稳定性问题、为后续功能（ABR、多实例、插件化等）打下架构基础。
 
 ## Core Value
 
-设置面板和全屏功能的代码质量与用户体验同步提升 — 重构后代码更简洁可维护，UI 更现代化，两个功能模块彻底解耦。
+播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。
 
 ## Requirements
 
 ### Validated
 
-- ✓ 播放器核心功能（播放/暂停/seek/音量/播放模式）— 现有
-- ✓ 7-tab 设置面板（General/EQ/Audio/Video/Shortcuts/About/Performance）— 现有
-- ✓ 全屏功能（Win32 FFI、快捷键、状态管理）— 现有
-- ✓ 毛玻璃设计语言（GlassContainer、Tokens.*）— 现有
+- ✓ 播放核心功能（播放/暂停/seek/音量/播放模式）— 现有
+- ✓ fvp (MDK/FFmpeg) 播放引擎集成 — 现有
+- ✓ ValueNotifier + ValueListenableBuilder 状态管理 — 现有
 - ✓ 键盘快捷键系统（20+ 快捷键）— 现有
+- ✓ 毛玻璃设计语言（GlassContainer、Tokens.*）— 现有
+- ✓ 沉浸式全屏功能 — v2.0 已完成
 
 ### Active
 
-- [ ] 设置面板视觉升级 — 保持毛玻璃风格但更新细节（圆角、间距、动画、交互反馈）
-- [ ] 7 个 tab 内部重做 — 每个 tab 的布局、交互、样式全面升级
-- [ ] settings_store 数据层重构 — 存储、持久化、验证逻辑清理
-- [ ] 全屏代码简化 — 减少层数、合并分散逻辑、降低复杂度
-- [ ] 全屏与设置面板解耦 — 代码层面、状态层面、展示层面全部解耦
-- [ ] 全屏状态转换处理 — 进入/退出全屏时设置面板行为规范化
-- [ ] Flutter SDK 文档查询集成 — Context7 接入，开发时快速查 API
-- [ ] Flutter SDK 源码参考能力 — 需要时能分析 SDK 源码解决问题
-- [ ] Flutter Quality Pipeline 理解与评估 — 理解设计，决定集成方式
+- [ ] 播放引擎抽象重构 — MediaEngine/FvpEngine 接口设计、状态机、错误恢复、生命周期管理
+- [ ] 播放控制服务重构 — PlaybackController 编排逻辑、Playlist 管理、PlayMode 实现
+- [ ] 轨道管理重构 — Audio/Subtitle track 选择、切换、延迟同步
+- [ ] 状态模型重构 — MediaState 状态模型、状态变更通知、状态一致性保证
 
 ### Out of Scope
 
-- 新增设置项 — 现有设置项够用，只改 UI 和代码结构
-- 播放器核心功能改动 — 播放引擎、播放列表等不动
-- 跨平台全屏统一 — 本次只简化代码，不做平台行为统一
-- 移动端适配 — 桌面端专属
+- 底层引擎更换 — 继续使用 fvp (MDK/FFmpeg)
+- UI 层改动 — 本次专注内核，不改播放器界面
+- 状态管理模式更换 — 继续使用 ValueNotifier + ValueListenableBuilder
+- 新增播放功能 — 本次只重构现有功能的内核实现
 
 ## Context
 
 **技术环境：**
 - Flutter 桌面播放器，Windows 为主平台
 - fvp (MDK/FFmpeg) 作为播放引擎
-- Win32 FFI 用于窗口控制和全屏
 - ValueNotifier + ValueListenableBuilder 状态管理
 - 毛玻璃设计语言（GlassContainer + Tokens.*）
 
-**当前设置面板结构：**
-- `lib/ui/dialogs/settings_panel.dart` (403行) — 主面板，侧边栏导航
-- `lib/kernel/persistence/settings_store.dart` (450行) — 设置存储
-- `lib/kernel/persistence/settings_validator.dart` (105行) — 设置验证
-- `lib/ui/dialogs/settings/` — 7 个 tab 文件
-- `lib/ui/shared/settings_card.dart` (154行) — 设置卡片组件
-
-**当前全屏实现：**
-- `lib/kernel/bridge/fullscreen_driver.dart` — 全屏驱动抽象
-- `lib/kernel/bridge/desktop_fullscreen_driver.dart` — 桌面全屏实现
-- `lib/kernel/bridge/platform/` — 平台特定全屏实现
-- `lib/kernel/bridge/window_service.dart` — 窗口服务
+**当前内核结构：**
+- `lib/kernel/engine/media_engine.dart` — 抽象引擎接口
+- `lib/kernel/engine/fvp_engine.dart` — fvp 具体实现
+- `lib/kernel/engine/position_poller.dart` — Timer-based 位置更新
+- `lib/kernel/engine/track_manager.dart` — 音频/字幕轨道管理
+- `lib/kernel/services/playback_controller.dart` — 播放编排器
+- `lib/kernel/services/playback_navigator.dart` — 曲目推进逻辑
+- `lib/kernel/playlist/playlist.dart` — 播放列表模型
+- `lib/kernel/models/media_state.dart` — 播放状态枚举
 
 **已知问题：**
-- 全屏代码层数多、逻辑分散
-- 全屏与设置面板在代码/状态/展示三个层面耦合
-- 设置面板视觉风格需要现代化
-- settings_store 450 行需要重构
+- 引擎抽象层职责不够清晰，状态管理分散
+- PlaybackController 过于庞大，职责混合
+- 错误恢复机制不完善，边界情况处理差
+- 状态变更通知缺乏一致性保证
+- 为后续功能扩展（ABR、多实例等）缺乏架构准备
 
 ## Constraints
 
-- **设计语言**: 保持毛玻璃风格，不换设计系统
-- **Tab 结构**: 保持 7 个 tab 划分，只重做内部
-- **设置项**: 不增不减，只改 UI 和代码结构
+- **引擎绑定**: 继续使用 fvp (MDK/FFmpeg)，不更换底层
+- **状态管理**: 继续使用 ValueNotifier + ValueListenableBuilder，不引入新状态管理框架
+- **UI 不动**: 本次重构不涉及播放器界面改动
 - **平台**: 以 Windows 为主，macOS/Linux 次要
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 保持毛玻璃但升级 | 延续品牌一致性，现代化细节 | — Pending |
-| 7 tab 保持不变 | 划分合理，问题在内部实现 | — Pending |
-| 全屏与设置彻底解耦 | 降低复杂度，独立演进 | — Pending |
-| Quality Pipeline 先理解再集成 | 避免盲目引入复杂度 | — Pending |
+| 保持 fvp 引擎 | MDK/FFmpeg 能力足够，更换成本高 | — Pending |
+| ValueNotifier 不变 | 项目已有成熟模式，引入新框架增加复杂度 | — Pending |
+| 内核与 UI 解耦重构 | 允许独立演进，降低回归风险 | — Pending |
+| 为 ABR/多实例做架构准备 | 不实现但确保接口可扩展 | — Pending |
 
 ## Evolution
 
@@ -99,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-12 after initialization*
+*Last updated: 2026-07-14 after v2.1 milestone initialization*

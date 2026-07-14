@@ -258,6 +258,9 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       final result = await _mediaOpener.open(trimmed);
       if (_disposed) return;
 
+      // 诊断日志: 记录 open 结果
+      debugPrint('🔍 open() result: ${result.runtimeType} for ${PathUtils.basename(trimmed)}');
+
       switch (result) {
         case OpenSuccess(:final mediaInfo):
           duration.value = mediaInfo.duration;
@@ -313,7 +316,14 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   @override
   void play() {
     if (_disposed) return;
+    // 跳过自转换 — 已经在播放中
+    if (state.value == MediaState.playing) return;
     try {
+      debugPrint(
+        '🔍 play() — state=${state.value}, '
+        'textureId=${textureId.value}, '
+        'path=${PathUtils.basename(_currentPath)}',
+      );
       _player.state = mdk.PlaybackState.playing;
       _safeSetState(MediaState.playing, 'play');
       _positionPoller.startSilent();
@@ -324,6 +334,7 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
       _errorType = MediaErrorType.playback;
       errorMessage.value = '播放失败: $e';
       logEngine.e('play() error: $e');
+      debugPrint('❌ play() failed: $e');
     }
   }
 
@@ -360,6 +371,8 @@ class FvpEngine with EngineState, TrackControl, VideoEffects, RendererConfig {
   Future<void> seekTo(int milliseconds) async {
     if (_disposed) return;
     if (state.value == MediaState.idle || duration.value <= 0) return;
+    // 跳过自转换 — 已经在 seek 中
+    if (state.value == MediaState.seeking) return;
     final clamped = milliseconds.clamp(0, duration.value);
     final wasPlaying = _player.state == mdk.PlaybackState.playing;
     _positionPoller.seeking = true;

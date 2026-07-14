@@ -28,8 +28,7 @@ dependencies:
   xdg_directories: any
   animations: any
   cross_file: any
-  fullscreen_window:
-    path: packages/fullscreen_window
+  
 
 dev_dependencies:
   flutter_test:

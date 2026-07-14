@@ -41,6 +41,8 @@ class FvpCallbackHandler {
       final mapped = mapMdkState(event.newValue);
       _scheduleOnMain(() {
         if (_disposed) return;
+        // 防御：opening 阶段不更新状态 — 这是旧视频的回调
+        if (state.value == MediaState.opening) return;
         if (state.value != mapped) state.value = mapped;
       });
     });
@@ -52,23 +54,17 @@ class FvpCallbackHandler {
         if (_disposed) return;
 
         if (newValue.test(mdk.MediaStatus.buffering)) {
+          // 正交模型：buffering 是独立标志，不影响主状态枚举
           if (!isBuffering.value) isBuffering.value = true;
-          if (state.value != MediaState.buffering) {
-            state.value = MediaState.buffering;
-          }
         } else {
           if (isBuffering.value) isBuffering.value = false;
-          // 缓冲结束时恢复到正确的播放状态 — 检查 _player.state 而非
-          // 无条件设为 playing，因为用户可能在缓冲期间暂停了播放
-          if (state.value == MediaState.buffering) {
-            state.value = _player.state == mdk.PlaybackState.playing
-                ? MediaState.playing
-                : MediaState.paused;
-          }
         }
 
         if (newValue.test(mdk.MediaStatus.end)) {
-          if (state.value != MediaState.completed) {
+          // 防御：只在实际播放中才设 completed — 避免旧视频 end 事件干扰新视频
+          // 正交模型：completed 只从 playing/paused 转换（seeking/buffering 是独立标志）
+          final current = state.value;
+          if (current == MediaState.playing || current == MediaState.paused) {
             state.value = MediaState.completed;
           }
           onStopPositionPolling();
@@ -98,9 +94,12 @@ class FvpCallbackHandler {
   /// static 保证无副作用、可独立测试。
   /// mdk 只有 3 种状态（stopped/playing/paused），
   /// loading/buffering/completed 等由 onMediaStatus 单独处理。
+  /// 纯函数映射：mdk.PlaybackState → MediaState
+  ///
+  /// stopped → idle（正交模型中 stopped 已移除，stop() 重置为 idle）
   static MediaState mapMdkState(mdk.PlaybackState mdkState) {
     return switch (mdkState) {
-      mdk.PlaybackState.stopped => MediaState.stopped,
+      mdk.PlaybackState.stopped => MediaState.idle,
       mdk.PlaybackState.playing => MediaState.playing,
       mdk.PlaybackState.paused => MediaState.paused,
       _ => MediaState.idle,

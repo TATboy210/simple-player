@@ -1,33 +1,40 @@
-import 'media_error_type.dart';
-import 'models/media_info.dart';
+import 'package:simple_player_flutter/kernel/models/player_error.dart';
+import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 
-/// Result of opening a media file — sealed for exhaustive pattern matching.
+/// 打开媒体文件的结果 — sealed for exhaustive pattern matching.
 ///
-/// Dart 3 sealed class ensures all cases are handled in switch expressions:
+/// Dart 3 sealed class 确保 switch 表达式穷举所有情况：
 /// ```dart
 /// switch (result) {
-///   case OpenSuccess(:final mediaInfo) => // use mediaInfo
-///   case OpenError(:final type, :final message) => // show error
+///   case OpenSuccess(:final mediaInfo) => // 使用 mediaInfo
+///   case OpenError(:final error) => // 通过 error 的 sealed 子类型匹配
+///     switch (error) {
+///       case FileError(:final code) => // 文件错误
+///       case CodecError(:final code) => // 编解码错误
+///       case PlaybackError(:final code) => // 播放错误
+///       case NetworkError(:final code) => // 网络错误
+///       case UnknownError(:final message) => // 未知错误
+///     }
 /// }
 /// ```
 sealed class OpenResult {
   const OpenResult();
 }
 
-/// Opening succeeded — carries parsed media metadata.
+/// 打开成功 — 携带解析后的媒体元信息。
 final class OpenSuccess extends OpenResult {
-  /// Parsed media info (codec, resolution, duration, tracks).
+  /// 解析后的媒体信息（编解码、分辨率、时长、轨道）。
   final MediaInfo mediaInfo;
   const OpenSuccess(this.mediaInfo);
 }
 
-/// Opening failed — carries error category and human-readable message.
+/// 打开失败 — 携带结构化错误信息。
 final class OpenError extends OpenResult {
-  /// Error category (fileNotFound, unsupportedFormat, etc.) for programmatic handling.
-  final MediaErrorType type;
+  /// 结构化错误 — 支持穷举模式匹配。
+  final PlayerError error;
 
-  /// Human-readable error description for UI display.
-  final String message;
+  const OpenError(this.error);
 
-  const OpenError(this.type, this.message);
+  /// 便捷访问错误消息
+  String get message => error.message;
 }
