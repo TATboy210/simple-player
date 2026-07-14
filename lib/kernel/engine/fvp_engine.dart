@@ -35,7 +35,7 @@ import 'mdk_player_proxy.dart';
 ///
 /// 架构说明:
 ///   - 使用工厂构造函数保证所有 helper 在构造时就有值，消除 late 初始化风险
-///   - 状态转换受 MediaStateTransition 守卫保护，防止非法跳转
+///   - 状态转换受 switch expression 穷举守卫保护，防止非法跳转
 ///   - 内置 EngineMetrics 性能计数器和 EngineEventLog 事件日志
 ///
 /// fvp 底层使用 FFmpeg + Windows D3D11 渲染
@@ -199,12 +199,14 @@ class FvpEngine implements MediaEngine {
 
   /// 安全地设置播放状态 — 检查转换合法性，debug 模式下打印非法跳转警告
   ///
-  /// 使用 MediaStateTransition 守卫防止非法状态跳转。
+  /// 使用 switch expression 穷举守卫防止非法状态跳转。
   /// debug 模式下非法转换会被打印但仍然执行（保证不崩溃）；
   /// release 模式下非法转换被静默忽略。
+  ///
+  /// 注意: 此方法将在 Plan 10-02 中迁移为使用 EngineStateMachine.transitionTo。
   void _safeSetState(MediaState next, String caller) {
     final current = state.value;
-    if (!current.canTransitionTo(next)) {
+    if (!_canTransitionTo(current, next)) {
       assert(() {
         debugPrint('⚠️ FvpEngine.$caller: illegal transition $current → $next');
         return true;
@@ -212,6 +214,35 @@ class FvpEngine implements MediaEngine {
       if (!kDebugMode) return;
     }
     state.value = next;
+  }
+
+  /// switch expression 穷举合法转换 — 与 EngineStateMachine 逻辑一致
+  ///
+  /// Plan 10-02 将删除此方法，改用 EngineStateMachine.transitionTo。
+  static bool _canTransitionTo(MediaState current, MediaState next) {
+    return switch (current) {
+      MediaState.idle =>
+        next == MediaState.opening || next == MediaState.error,
+      MediaState.opening =>
+        next == MediaState.idle ||
+            next == MediaState.playing ||
+            next == MediaState.error,
+      MediaState.playing =>
+        next == MediaState.paused ||
+            next == MediaState.completed ||
+            next == MediaState.error ||
+            next == MediaState.idle,
+      MediaState.paused =>
+        next == MediaState.playing ||
+            next == MediaState.error ||
+            next == MediaState.idle,
+      MediaState.completed =>
+        next == MediaState.opening ||
+            next == MediaState.error ||
+            next == MediaState.idle,
+      MediaState.error =>
+        next == MediaState.opening || next == MediaState.idle,
+    };
   }
 
   /// 通用守卫：disposed 检查 + try-catch + log + 事件记录

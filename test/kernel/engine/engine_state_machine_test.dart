@@ -1,6 +1,3 @@
-/// EngineStateMachine 单元测试
-///
-/// 覆盖 SVC-02 需求: 独立状态机的转换守卫、togglePlayPause、标志位管理。
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
