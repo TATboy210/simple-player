@@ -43,8 +43,9 @@ class DeferredPlayerFeature extends StatefulWidget {
   final void Function(
     BuildContext context,
     MediaEngine engine,
-    VideoProcessingService? videoProcessing,
-  )
+    VideoProcessingService? videoProcessing, {
+    ValueChanged<int>? onAudioTrackChanged,
+  })
   onSettings;
 
   /// 右键快捷菜单回调（需要触发位置的 BuildContext 和 TapUpDetails）

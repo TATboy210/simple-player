@@ -39,12 +39,16 @@ class SettingsPanel extends StatefulWidget {
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
   final WindowBridge windowService;
 
+  /// 音轨切换后录制偏好 — 穿透到 AudioTab
+  final ValueChanged<int>? onAudioTrackChanged;
+
   const SettingsPanel({
     super.key,
     required this.engine,
     required this.windowService,
     this.videoProcessing,
     this.onShortcutsChanged,
+    this.onAudioTrackChanged,
   });
 
   @override
@@ -673,7 +677,11 @@ class _SettingsPanelState extends State<SettingsPanel> {
         engine: widget.engine,
         onReset: () => _onTabResetRequested(1),
       ),
-      2 => AudioTab(key: const ValueKey(2), engine: widget.engine),
+      2 => AudioTab(
+        key: const ValueKey(2),
+        engine: widget.engine,
+        onAudioTrackChanged: widget.onAudioTrackChanged,
+      ),
       3 => VideoTab(
         key: const ValueKey(3),
         videoProcessing: widget.videoProcessing,
