@@ -7,7 +7,7 @@ import '../../kernel/bridge/window_mode.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
-import '../../features/player/services/playback_controller.dart';
+import '../../kernel/services/playback_controller.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../playlist/playlist_panel.dart';

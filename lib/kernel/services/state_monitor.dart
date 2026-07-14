@@ -5,19 +5,19 @@
 /// 2. 监听引擎状态变化，驱动断点保存和自动连播
 /// 3. 销毁时异步保存所有运行时状态
 ///
-/// 架构位置：PlaybackController → **StateMonitor** → EngineState.state (ValueNotifier)
+/// 架构位置：PlaybackController → **StateMonitor** → MediaEngine.state (ValueNotifier)
 /// 设计模式：Observer（观察者模式）— 监听 MediaState 变化触发行为
 /// 与 AutoAdvancePolicy 的关系：StateMonitor 是早期实现，包含断点保存+设置恢复+自动连播。
 /// AutoAdvancePolicy 是重构后的独立策略类，专注于自动连播逻辑。
 library;
 
-import '../../../kernel/engine/engine_state.dart';
+import '../engine/engine_state.dart';
 import 'dart:async';
 
-import '../../../kernel/utils/log.dart';
-import '../../../kernel/models/play_mode.dart';
-import '../../../kernel/persistence/playlist_store.dart';
-import '../../../kernel/persistence/settings_store.dart';
+import '../utils/log.dart';
+import '../models/play_mode.dart';
+import '../persistence/playlist_store.dart';
+import '../persistence/settings_store.dart';
 import 'playback_controller.dart';
 
 /// 状态监控服务 — 监听引擎状态变化并执行副作用

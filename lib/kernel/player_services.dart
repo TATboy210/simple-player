@@ -14,19 +14,19 @@
 library;
 
 import 'package:flutter/foundation.dart';
-import '../../kernel/engine/engine_state.dart';
+import 'engine/engine_state.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/engine/fvp_engine.dart';
-import '../../kernel/persistence/settings_store.dart';
-import '../../kernel/playlist/playlist.dart';
+import 'bridge/window_bridge.dart';
+import 'engine/fvp_engine.dart';
+import 'persistence/settings_store.dart';
+import 'playlist/playlist.dart';
 import 'services/playback_controller.dart';
 import 'services/video_processing_service.dart';
 
 /// 播放器服务容器 — 创建并管理所有播放服务的生命周期
 ///
 /// [PlayerServices] 是播放器核心服务的 DI 容器，持有以下服务实例：
-/// - [EngineState] (engine) — 视频渲染引擎
+/// - [MediaEngine] (engine) — 视频渲染引擎
 /// - [Playlist] (playlist) — 播放列表管理
 /// - [PlaybackController] (controller) — 播放控制编排器
 /// - [VideoProcessingService] (videoProcessing) — 视频处理（亮度/对比度/旋转等）
@@ -52,7 +52,7 @@ class PlayerServices {
   }
 
   /// 视频渲染引擎实例
-  late final EngineState engine;
+  late final MediaEngine engine;
 
   /// 播放列表管理器
   late final Playlist playlist;

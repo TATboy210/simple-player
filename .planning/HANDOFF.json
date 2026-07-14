@@ -1,12 +1,12 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-14T00:00:00+08:00",
+  "timestamp": "2026-07-14T12:00:00+08:00",
   "phase": "09",
   "phase_name": "interface-decomposition",
   "phase_dir": ".planning/phases/09-interface-decomposition",
   "plan": 2,
-  "task": 1,
-  "total_tasks": 6,
+  "task": 4,
+  "total_tasks": 7,
   "status": "paused",
   "completed_tasks": [
     {
@@ -14,32 +14,40 @@
       "name": "Add canTransitionTo extension + update barrel export",
       "status": "done",
       "commit": "uncommitted"
+    },
+    {
+      "id": 2,
+      "name": "Update FvpCallbackHandler and MediaOpener to new types",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 3,
+      "name": "Rewrite FvpEngine to implement MediaEngine interface",
+      "status": "done",
+      "commit": "uncommitted"
+    },
+    {
+      "id": 4,
+      "name": "Migrate service files to kernel/services/ + create MediaEngine interface",
+      "status": "done",
+      "commit": "uncommitted"
     }
   ],
   "remaining_tasks": [
     {
-      "id": 2,
-      "name": "Rewrite FvpEngine to implement 6 ISP interfaces",
-      "status": "not_started"
-    },
-    {
-      "id": 3,
-      "name": "Update MediaOpener and FvpCallbackHandler",
-      "status": "not_started"
-    },
-    {
-      "id": 4,
-      "name": "Migrate service files to kernel/services/ + update PlaybackController",
-      "status": "not_started"
-    },
-    {
       "id": 5,
-      "name": "Update all UI consumers (ErrorBanner + type annotations + imports)",
+      "name": "Update all UI consumers (ErrorBanner + auto_hide_controller + type annotations + imports)",
       "status": "not_started"
     },
     {
       "id": 6,
       "name": "Update test files for new types",
+      "status": "not_started"
+    },
+    {
+      "id": 7,
+      "name": "flutter analyze + flutter test verification",
       "status": "not_started"
     }
   ],
@@ -48,20 +56,32 @@
   "human_actions_pending": [],
   "decisions": [
     {
-      "decision": "Add MediaStateTransition extension with canTransitionTo() to media_state.dart",
-      "rationale": "FvpEngine._safeSetState() depends on this method; the new 6-value enum needs its own transition matrix",
+      "decision": "Create MediaEngine abstract class combining all 6 ISP interfaces",
+      "rationale": "Service layer needs both state and control methods; avoids depending on concrete FvpEngine",
       "phase": "09"
     },
     {
-      "decision": "Re-export player_error.dart and open_result.dart from engine_state.dart barrel",
-      "rationale": "EngineStateView.lastError uses PlayerError type; consumers need it in scope through the barrel import",
+      "decision": "FvpEngine implements MediaEngine (not 6 individual interfaces)",
+      "rationale": "Cleaner declaration, single point of truth for interface contract",
       "phase": "09"
     }
   ],
   "uncommitted_files": [
     "lib/kernel/engine/media_state.dart",
-    "lib/kernel/engine/engine_state.dart"
+    "lib/kernel/engine/engine_state.dart",
+    "lib/kernel/engine/fvp_engine.dart",
+    "lib/kernel/engine/media_engine.dart",
+    "lib/kernel/engine/fvp_callback_handler.dart",
+    "lib/kernel/engine/media_opener.dart",
+    "lib/kernel/services/playback_controller.dart",
+    "lib/kernel/services/playback_navigator.dart",
+    "lib/kernel/services/file_operations.dart",
+    "lib/kernel/services/state_monitor.dart",
+    "lib/kernel/services/subtitle_service.dart",
+    "lib/kernel/services/video_processing_service.dart",
+    "lib/kernel/services/breakpoint_saver.dart",
+    "lib/kernel/player_services.dart"
   ],
-  "next_action": "Rewrite FvpEngine: change class declaration from 'with EngineState, TrackControl, VideoEffects, RendererConfig' to 'implements EngineStateView, PlaybackControl, TrackControl, SubtitleConfig, VideoEffectControl, RendererControl'. Replace errorMessage/errorType with lastError/isSeeking. Update all MediaState references and error handling.",
-  "context_notes": "Plan 09-02 consumer migration is in progress. Plan 01 completed all new ISP interfaces. The codebase is currently broken because the barrel export was replaced but consumers still reference old types (EngineState mixin, MediaErrorType, MediaState.loading/stopped/seeking/buffering). All source files have been read and analyzed. The migration order is: foundation → engine → services → UI → tests."
+  "next_action": "Task 5: Update UI consumers — ErrorBanner (errorMessage/errorType/MediaErrorType → lastError/PlayerError), auto_hide_controller (MediaState.loading → opening, .stopped → .idle)",
+  "context_notes": "Kernel layer fully migrated and compiles clean. MediaEngine abstract class created. Old files deleted. Remaining: UI consumers (Task 5), tests (Task 6), verification (Task 7)."
 }

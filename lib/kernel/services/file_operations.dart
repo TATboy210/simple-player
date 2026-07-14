@@ -10,8 +10,8 @@ library;
 
 import 'package:flutter/foundation.dart';
 
-import '../../../kernel/services/path_validator.dart';
-import '../../../kernel/utils/log.dart';
+import '../services/path_validator.dart';
+import '../utils/log.dart';
 import 'playback_controller.dart';
 
 /// 文件操作服务 — 文件打开和批量添加

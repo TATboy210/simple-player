@@ -11,7 +11,7 @@ import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/locale_service.dart';
 import '../../kernel/services/theme_service.dart';
 import '../../kernel/utils/log.dart';
-import '../../features/player/services/video_processing_service.dart';
+import '../../kernel/services/video_processing_service.dart';
 import '../shared/glass_container.dart';
 import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';

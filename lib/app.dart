@@ -7,7 +7,7 @@ import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
 import 'features/player/deferred_player_feature.dart';
-import 'features/player/services/video_processing_service.dart';
+import 'kernel/services/video_processing_service.dart';
 import 'ui/dialogs/settings_panel.dart';
 import 'ui/shared/progress_splash_screen.dart';
 import 'l10n/app_localizations.dart';
@@ -65,7 +65,7 @@ class _AppState extends State<App> {
 
   void _showSettingsPanel(
     BuildContext context,
-    EngineState engine,
+    EngineStateView engine,
     VideoProcessingService? videoProcessing,
   ) {
     showDialog<void>(

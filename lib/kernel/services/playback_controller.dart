@@ -4,18 +4,18 @@
 /// 组合 [PlaybackNavigator] / [FileOperations] / [StateMonitor] 三个子模块，
 /// UI 层只与本类交互，不直接访问子模块。
 ///
-/// 架构位置：PlayerViewModel → **PlaybackController** → PlaybackNavigator / FileOperations / StateMonitor → EngineState
+/// 架构位置：PlayerViewModel → **PlaybackController** → PlaybackNavigator / FileOperations / StateMonitor → MediaEngine
 /// 设计模式：Facade（门面模式）— 简化 UI 层对多个子模块的调用路径
 library;
 
 import 'package:flutter/foundation.dart';
 
-import '../../../kernel/engine/engine_state.dart';
-import '../../../kernel/models/play_mode.dart';
-import '../../../kernel/persistence/playlist_store.dart';
-import '../../../kernel/persistence/settings_store.dart';
-import '../../../kernel/playlist/playlist.dart';
-import '../../../kernel/utils/debug_probe.dart';
+import '../engine/engine_state.dart';
+import '../models/play_mode.dart';
+import '../persistence/playlist_store.dart';
+import '../persistence/settings_store.dart';
+import '../playlist/playlist.dart';
+import '../utils/debug_probe.dart';
 import 'file_operations.dart';
 import 'playback_navigator.dart';
 import 'state_monitor.dart';
@@ -50,7 +50,7 @@ class PlaybackController {
   }
 
   /// 视频渲染引擎实例
-  final EngineState engine;
+  final MediaEngine engine;
 
   /// 播放列表管理器 — 包含当前播放索引、播放模式、历史记录
   final Playlist playlist;

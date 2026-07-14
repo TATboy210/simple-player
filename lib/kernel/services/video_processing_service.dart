@@ -3,7 +3,7 @@
 /// 本文件实现 [VideoProcessingService] 管理视频处理状态（亮度/对比度/饱和度/
 /// 色调/去隔行/旋转/宽高比），使用 copyWith 模式生成不可变状态。
 ///
-/// 架构位置：PlaybackController → **VideoProcessingService** → EngineState（setVideoEffect）
+/// 架构位置：PlaybackController → **VideoProcessingService** → MediaEngine（setVideoEffect）
 /// 设计模式：
 /// - Immutable State：copyWith 生成新状态，不修改原对象
 /// - Diff-based Sync：只将变化的属性推送到引擎，避免冗余调用
@@ -14,10 +14,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../kernel/engine/engine_state.dart';
-import '../../../kernel/models/aspect_ratio_mode.dart';
-import '../../../kernel/persistence/settings_store.dart';
-import '../models/video_processing_state.dart';
+import '../engine/engine_state.dart';
+import '../models/aspect_ratio_mode.dart';
+import '../persistence/settings_store.dart';
+import '../../features/player/models/video_processing_state.dart';
 
 /// 视频处理服务 — 单个 ValueNotifier 持有完整不可变状态
 ///
@@ -35,7 +35,7 @@ class VideoProcessingService {
     state.addListener(_schedulePersist);
   }
 
-  final EngineState _engine;
+  final MediaEngine _engine;
   bool _disposed = false;
   Timer? _persistDebounce;
 
@@ -89,7 +89,7 @@ class VideoProcessingService {
 
   // ── 内部方法 ──
 
-  /// 状态变化 → diff-based 委托给 EngineState（只同步变化的属性）
+  /// 状态变化 → diff-based 委托给 MediaEngine（只同步变化的属性）
   ///
   /// 通过比较前后状态的差异（_diff），只将变化的属性推送到引擎，
   /// 避免每次状态变化都推送所有 7 个属性（减少冗余引擎调用）。

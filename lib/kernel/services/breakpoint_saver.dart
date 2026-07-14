@@ -3,14 +3,14 @@
 /// 本文件实现 [BreakpointSaver] 负责在引擎暂停或销毁时保存当前播放位置，
 /// 确保应用重启后能从上次播放位置继续播放。
 ///
-/// 架构位置：PlaybackController → **BreakpointSaver** → EngineState.state + PlaylistStore
+/// 架构位置：PlaybackController → **BreakpointSaver** → MediaEngine.state + PlaylistStore
 /// 设计模式：Observer（观察者模式）— 监听 MediaState.paused 触发保存
 /// 保存时机：暂停时（实时保存）+ dispose 时（兜底保存）
 library;
 
-import '../../../kernel/engine/engine_state.dart';
-import '../../../kernel/persistence/playlist_store.dart';
-import '../../../kernel/playlist/playlist.dart';
+import '../engine/engine_state.dart';
+import '../persistence/playlist_store.dart';
+import '../playlist/playlist.dart';
 
 /// 断点保存策略 — 引擎暂停或销毁时保存当前播放位置
 ///
@@ -26,7 +26,7 @@ class BreakpointSaver {
   });
 
   /// 视频渲染引擎 — 监听 state 和 position ValueNotifier
-  final EngineState engine;
+  final MediaEngine engine;
 
   /// 播放列表 — 更新当前位置信息并触发持久化
   final Playlist playlist;

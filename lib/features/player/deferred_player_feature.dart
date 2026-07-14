@@ -21,7 +21,7 @@ import '../../kernel/utils/log.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
 import 'player_feature.dart' deferred as player_feature;
-import 'services/video_processing_service.dart';
+import '../../kernel/services/video_processing_service.dart';
 
 /// 延迟加载的播放器功能组件 — deferred import 包装器
 ///
@@ -30,7 +30,7 @@ import 'services/video_processing_service.dart';
 /// [StartupCoordinator]，加载完成后重建并渲染 [PlayerFeature]。
 ///
 /// 错误处理策略：加载失败时显示本地化的错误文本，不会导致 App 崩溃。
-/// 回调参数使用抽象类型 [EngineState]，避免对具体引擎实现的依赖。
+/// 回调参数使用抽象类型 [EngineStateView]，避免对具体引擎实现的依赖。
 class DeferredPlayerFeature extends StatefulWidget {
   /// 启动协调器，用于上报各阶段加载进度
   final StartupCoordinator coordinator;
@@ -42,7 +42,7 @@ class DeferredPlayerFeature extends StatefulWidget {
   /// 打开设置面板的回调（需要 MaterialApp 级 BuildContext）
   final void Function(
     BuildContext context,
-    EngineState engine,
+    EngineStateView engine,
     VideoProcessingService? videoProcessing,
   )
   onSettings;
