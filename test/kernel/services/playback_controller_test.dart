@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
+import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';

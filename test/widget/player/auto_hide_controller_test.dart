@@ -206,12 +206,12 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
-    test('stopped shows without scheduling hide', () {
-      engineState.value = MediaState.idle;
+    test('idle shows without scheduling hide', () {
+      engineState.value = MediaState.playing;
       final c = createController();
       c.init();
 
-      engineState.value = MediaState.stopped;
+      engineState.value = MediaState.idle;
       c.onEngineStateChanged();
 
       expect(c.visible.value, isTrue);
@@ -460,13 +460,13 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
-    test('loading when hidden shows and schedules hide', () {
+    test('opening when hidden shows and schedules hide', () {
       engineState.value = MediaState.idle;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.loading;
+      engineState.value = MediaState.opening;
       c.onEngineStateChanged();
 
       expect(c.visible.value, isTrue);
@@ -484,13 +484,13 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
-    test('stopped when hidden shows and cancels timer', () {
-      engineState.value = MediaState.idle;
+    test('idle when hidden shows and cancels timer', () {
+      engineState.value = MediaState.playing;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.stopped;
+      engineState.value = MediaState.idle;
       c.onEngineStateChanged();
 
       expect(c.visible.value, isTrue);

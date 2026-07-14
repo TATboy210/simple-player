@@ -39,7 +39,7 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsNothing);
     });
 
-    testWidgets('shows nothing when errorMessage is null', (tester) async {
+    testWidgets('shows nothing when lastError is null', (tester) async {
       engine.state.value = MediaState.error;
       await tester.pumpWidget(buildSubject());
       expect(find.byIcon(Icons.error_outline), findsNothing);
@@ -55,8 +55,8 @@ void main() {
 
     testWidgets('shows action button for file error', (tester) async {
       var opened = false;
-      engine.errorType = MediaErrorType.file;
-      engine.simulateError('Cannot open');
+      engine.state.value = MediaState.error;
+      engine.lastError.value = const FileError(FileErrorCode.fileNotFound, 'Cannot open');
       await tester.pumpWidget(buildSubject(onOpenFile: () => opened = true));
 
       final button = find.byType(TextButton);
@@ -67,8 +67,8 @@ void main() {
 
     testWidgets('shows retry button for playback error', (tester) async {
       var retried = false;
-      engine.errorType = MediaErrorType.playback;
-      engine.simulateError('Playback failed');
+      engine.state.value = MediaState.error;
+      engine.lastError.value = const PlaybackError(PlaybackErrorCode.playFailed, 'Playback failed');
       await tester.pumpWidget(buildSubject(onRetry: () => retried = true));
 
       final button = find.byType(TextButton);
@@ -78,8 +78,8 @@ void main() {
     });
 
     testWidgets('hides button when no callback provided', (tester) async {
-      engine.errorType = MediaErrorType.unknown;
-      engine.simulateError('Unknown error');
+      engine.state.value = MediaState.error;
+      engine.lastError.value = const UnknownError('Unknown error');
       await tester.pumpWidget(buildSubject());
 
       expect(find.byType(TextButton), findsNothing);
@@ -87,8 +87,8 @@ void main() {
 
     testWidgets('shows codec error with selectOtherFile action', (tester) async {
       var opened = false;
-      engine.errorType = MediaErrorType.codec;
-      engine.simulateError('Unsupported codec');
+      engine.state.value = MediaState.error;
+      engine.lastError.value = const CodecError(CodecErrorCode.unsupportedFormat, 'Unsupported codec');
       await tester.pumpWidget(buildSubject(onOpenFile: () => opened = true));
 
       expect(find.text('Unsupported codec'), findsOneWidget);

@@ -11,26 +11,26 @@ void main() {
       engine.dispose();
     });
 
-    test('FakeEngine is VideoEffects', () {
+    test('FakeEngine is VideoEffectControl', () {
       final engine = FakeEngine();
-      expect(engine, isA<VideoEffects>());
+      expect(engine, isA<VideoEffectControl>());
       engine.dispose();
     });
 
-    test('FakeEngine is RendererConfig', () {
+    test('FakeEngine is RendererControl', () {
       final engine = FakeEngine();
-      expect(engine, isA<RendererConfig>());
+      expect(engine, isA<RendererControl>());
       engine.dispose();
     });
 
-    test('FakeEngine is EngineState', () {
+    test('FakeEngine is MediaEngine', () {
       final engine = FakeEngine();
-      expect(engine, isA<EngineState>());
+      expect(engine, isA<MediaEngine>());
       engine.dispose();
     });
 
     test('Dart 3 pattern matching: case TrackControl', () {
-      final EngineState engine = FakeEngine();
+      final MediaEngine engine = FakeEngine();
       if (engine case final TrackControl tc) {
         expect(tc.getAudioTracks(), isEmpty);
       } else {
@@ -39,23 +39,23 @@ void main() {
       engine.dispose();
     });
 
-    test('Dart 3 pattern matching: case VideoEffects', () {
-      final EngineState engine = FakeEngine();
-      if (engine case final VideoEffects ve) {
+    test('Dart 3 pattern matching: case VideoEffectControl', () {
+      final MediaEngine engine = FakeEngine();
+      if (engine case final VideoEffectControl ve) {
         ve.setVideoEffect(VideoEffectType.brightness, 0.5);
       } else {
-        fail('engine should match VideoEffects');
+        fail('engine should match VideoEffectControl');
       }
       engine.dispose();
     });
 
-    test('Dart 3 pattern matching: case RendererConfig', () {
-      final EngineState engine = FakeEngine();
-      if (engine case final RendererConfig rc) {
+    test('Dart 3 pattern matching: case RendererControl', () {
+      final MediaEngine engine = FakeEngine();
+      if (engine case final RendererControl rc) {
         rc.setD3d11SyncEnabled(true);
         rc.setHardwareDecoding(false);
       } else {
-        fail('engine should match RendererConfig');
+        fail('engine should match RendererControl');
       }
       engine.dispose();
     });
@@ -93,7 +93,7 @@ void main() {
       expect(engine.subtitleText, isA<ValueNotifier<String>>());
       expect(engine.buffered, isA<ValueNotifier<int>>());
       expect(engine.aspectRatio, isA<ValueNotifier<double>>());
-      expect(engine.errorMessage, isA<ValueNotifier<String?>>());
+      expect(engine.lastError, isA<ValueNotifier<PlayerError?>>());
       expect(engine.playbackSpeed, isA<ValueNotifier<double>>());
       engine.dispose();
     });
@@ -198,7 +198,7 @@ void main() {
       final engine = FakeEngine();
       engine.position.value = 30000;
       engine.stop();
-      expect(engine.state.value, MediaState.stopped);
+      expect(engine.state.value, MediaState.idle);
       expect(engine.position.value, 0);
       expect(engine.stopCallCount, 1);
       engine.dispose();
@@ -330,7 +330,7 @@ void main() {
       final engine = FakeEngine();
       engine.simulateError('test error');
       expect(engine.state.value, MediaState.error);
-      expect(engine.errorMessage.value, 'test error');
+      expect(engine.lastError.value?.message, 'test error');
       engine.dispose();
     });
 
@@ -341,11 +341,10 @@ void main() {
       engine.dispose();
     });
 
-    test('simulateBuffering sets buffering state', () {
+    test('simulateBuffering sets buffering flag', () {
       final engine = FakeEngine();
       engine.simulateBuffering(true);
       expect(engine.isBuffering.value, isTrue);
-      expect(engine.state.value, MediaState.buffering);
 
       engine.simulateBuffering(false);
       expect(engine.isBuffering.value, isFalse);
@@ -365,7 +364,7 @@ void main() {
       engine.failNextOpenWith = 'simulated failure';
       await engine.open('bad.mp4');
       expect(engine.state.value, MediaState.error);
-      expect(engine.errorMessage.value, 'simulated failure');
+      expect(engine.lastError.value?.message, 'simulated failure');
       engine.dispose();
     });
 

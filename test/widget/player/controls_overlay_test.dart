@@ -19,7 +19,7 @@ void main() {
   });
 
   Widget buildSubject({
-    EngineState? eng,
+    MediaEngine? eng,
     PlayerActions? actions,
     bool isFullscreen = false,
     bool emptyStatePresent = false,

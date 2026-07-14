@@ -1,25 +1,55 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-14T15:00:00+08:00",
+  "timestamp": "2026-07-14T16:30:00+08:00",
   "phase": "09",
   "phase_name": "interface-decomposition",
   "phase_dir": ".planning/phases/09-interface-decomposition",
   "plan": 2,
-  "task": 5,
+  "task": 7,
   "total_tasks": 7,
-  "status": "paused",
+  "status": "completed",
   "completed_tasks": [
     {"id": 1, "name": "Add canTransitionTo extension + update barrel export", "status": "done", "commit": "da7cb2f"},
     {"id": 2, "name": "Update FvpCallbackHandler and MediaOpener to new types", "status": "done", "commit": "a4f122c"},
     {"id": 3, "name": "Rewrite FvpEngine to implement MediaEngine interface", "status": "done", "commit": "d8573f6"},
     {"id": 4, "name": "Migrate service files to kernel/services/ + create MediaEngine interface", "status": "done", "commit": "d8573f6"},
-    {"id": 5, "name": "Update all UI consumers (ErrorBanner + auto_hide_controller + type annotations + imports)", "status": "done", "commit": "426f753"}
+    {"id": 5, "name": "Update all UI consumers (ErrorBanner + auto_hide_controller + type annotations + imports)", "status": "done", "commit": "426f753"},
+    {"id": 6, "name": "Update test files for new types", "status": "done", "commit": "pending"},
+    {"id": 7, "name": "flutter analyze + flutter test verification", "status": "done", "commit": "pending"}
   ],
-  "remaining_tasks": [
-    {"id": 6, "name": "Update test files for new types", "status": "not_started"},
-    {"id": 7, "name": "flutter analyze + flutter test verification", "status": "not_started"}
-  ],
+  "remaining_tasks": [],
   "blockers": [],
-  "next_action": "Task 6: Update test files — mixin_capability_test.dart (old types), subtitle_service_test.dart (old import path), player_error_test.dart (PlayerErrorCode), error_banner_test.dart (MediaErrorType), widget tests (already fixed via FakeEngine). 158 test errors to fix.",
-  "context_notes": "lib/ 0 errors. All UI consumers migrated: EngineState→MediaEngine (commands) or EngineStateView (read-only). ErrorBanner uses PlayerError sealed class. AutoHideController fixed (loading→opening, stopped removed). FakeEngine implements MediaEngine. Test errors: old type names (VideoEffects/RendererConfig/EngineState), old MediaState values (stopped/buffering/loading), old import paths, old error types (MediaErrorType/errorMessage/errorType/PlayerErrorCode)."
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "FakeWindowService needs isFullscreen getter", "rationale": "WindowBridge interface requires it, was missing from test fake", "phase": "9"},
+    {"decision": "Widget test engine param type is MediaEngine (not EngineStateView)", "rationale": "Widget constructors accept MediaEngine for both state reading and commands", "phase": "9"},
+    {"decision": "4 pre-existing shortcuts_tab_test failures ignored", "rationale": "Unrelated to interface decomposition, existed before this phase", "phase": "9"}
+  ],
+  "uncommitted_files": [
+    "test/engine/mixin_capability_test.dart",
+    "test/features/player/services/subtitle_service_test.dart",
+    "test/helpers/fake_window_service.dart",
+    "test/helpers/integration_helpers.dart",
+    "test/kernel/engine/fvp_callback_handler_test.dart",
+    "test/kernel/engine/media_opener_test.dart",
+    "test/kernel/models/player_error_test.dart",
+    "test/kernel/services/external_subtitle_test.dart",
+    "test/kernel/services/file_operations_test.dart",
+    "test/kernel/services/playback_controller_test.dart",
+    "test/kernel/services/playback_navigator_test.dart",
+    "test/kernel/services/state_monitor_test.dart",
+    "test/kernel/services/video_processing_service_test.dart",
+    "test/widget/player/auto_hide_controller_test.dart",
+    "test/widget/player/control_bar_startup_test.dart",
+    "test/widget/player/control_bar_test.dart",
+    "test/widget/player/controls_overlay_test.dart",
+    "test/widget/player/error_banner_test.dart",
+    "test/widget/player/player_screen_test.dart",
+    "test/widget/player/video_surface_test.dart",
+    "test/widget/player/volume_controls_test.dart",
+    "test/widget/shared/aurora_background_test.dart"
+  ],
+  "next_action": "Write 09-02-SUMMARY.md, commit all test fixes, then advance to Phase 10",
+  "context_notes": "Plan 09-02 all 7 tasks complete. 22 test files fixed (import paths, type renames, enum values, error model, interface gaps). flutter analyze: 0 errors. flutter test: 1058 pass, 4 fail (pre-existing shortcuts_tab_test). Need to write SUMMARY.md and commit, then Phase 10 (state machine extraction)."
 }

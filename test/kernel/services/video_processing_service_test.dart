@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/models/aspect_ratio_mode.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
-import 'package:simple_player_flutter/features/player/services/video_processing_service.dart';
+import 'package:simple_player_flutter/kernel/services/video_processing_service.dart';
 import '../../helpers/fake_engine.dart';
 
 void main() {
