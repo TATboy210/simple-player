@@ -65,7 +65,7 @@ class _AppState extends State<App> {
 
   void _showSettingsPanel(
     BuildContext context,
-    EngineStateView engine,
+    MediaEngine engine,
     VideoProcessingService? videoProcessing,
   ) {
     showDialog<void>(

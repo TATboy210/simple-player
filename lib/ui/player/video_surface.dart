@@ -8,7 +8,7 @@ import '../../kernel/engine/engine_state.dart';
 /// 此组件仅负责渲染纹理 + 滚轮音量调节。
 /// Listener 提升到 AnimatedBuilder 外层，避免每次纹理重建时重建回调。
 class VideoSurface extends StatelessWidget {
-  final EngineState engine;
+  final EngineStateView engine;
 
   const VideoSurface({super.key, required this.engine});
 

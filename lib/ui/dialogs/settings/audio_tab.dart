@@ -10,11 +10,11 @@ import '../../shared/settings_card.dart'; // SettingRow export
 
 /// Audio track selection tab — lists available audio tracks and allows switching.
 ///
-/// Queries [EngineState.getAudioTracks] for the current file's audio streams.
+/// Queries [MediaEngine.getAudioTracks] for the current file's audio streams.
 /// Each track shows codec, channel count, and language when available.
-/// Tapping a track calls [EngineState.switchAudioTrack] and closes the dialog.
+/// Tapping a track calls [MediaEngine.switchAudioTrack] and closes the dialog.
 class AudioTab extends StatelessWidget {
-  final EngineState engine;
+  final MediaEngine engine;
   const AudioTab({super.key, required this.engine});
 
   @override

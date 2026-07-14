@@ -34,7 +34,7 @@ import 'settings/settings_tab_performance.dart';
 /// losing dialog state). GeneralTab receives pending values; ShortcutsTab notifies via
 /// callback, restoring originals on cancel.
 class SettingsPanel extends StatefulWidget {
-  final EngineState engine;
+  final MediaEngine engine;
   final VideoProcessingService? videoProcessing;
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
   final WindowBridge windowService;

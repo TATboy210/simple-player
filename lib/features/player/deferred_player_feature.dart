@@ -42,7 +42,7 @@ class DeferredPlayerFeature extends StatefulWidget {
   /// 打开设置面板的回调（需要 MaterialApp 级 BuildContext）
   final void Function(
     BuildContext context,
-    EngineStateView engine,
+    MediaEngine engine,
     VideoProcessingService? videoProcessing,
   )
   onSettings;

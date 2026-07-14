@@ -11,7 +11,7 @@ import '../../shared/settings_card.dart'; // SettingRow export
 /// Equalizer settings tab — provides audio frequency presets via FFmpeg filters.
 ///
 /// Applies audio filters through MDK's `af` property via
-/// [EngineState.setEqualizer]. The underlying FFmpeg filter chain format is:
+/// [MediaEngine.setEqualizer]. The underlying FFmpeg filter chain format is:
 /// `filter_name=param1=value1,param2=value2` — multiple filters separated by
 /// commas are applied sequentially (e.g., `bass=g=8,treble=g=6`).
 ///
@@ -27,7 +27,7 @@ import '../../shared/settings_card.dart'; // SettingRow export
 /// 3. The filter chain hot-swaps in real time — no need to re-open the file;
 ///    MDK reinitializes the audio filter graph on each call
 class EqualizerTab extends StatefulWidget {
-  final EngineState engine;
+  final MediaEngine engine;
   final VoidCallback? onReset;
   const EqualizerTab({super.key, required this.engine, this.onReset});
 
@@ -36,7 +36,7 @@ class EqualizerTab extends StatefulWidget {
 }
 
 class _EqualizerTabState extends State<EqualizerTab> {
-  // FFmpeg 滤镜字符串 — 通过 EngineState.setProperty('af', ...) 设置到 MDK 引擎
+  // FFmpeg 滤镜字符串 — 通过 MediaEngine.setProperty('af', ...) 设置到 MDK 引擎
   // 增益单位 dB（分贝）：正数增强、负数衰减。建议范围 -20dB ~ +20dB，过高可能导致削波失真
   // 滤镜链热切换：MDK 实时重新初始化音频滤镜图，不需要重新打开文件
   static const _presetValues = [

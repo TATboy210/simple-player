@@ -20,7 +20,7 @@ class _HoverState {
 /// 支持：拖拽 seek（节流+阈值）、悬停展开动画、Tooltip 淡入淡出、
 /// 滚轮 seek、悬停 thumb、禁用状态、缓冲指示器
 class ProgressBar extends StatefulWidget {
-  final EngineState engine;
+  final MediaEngine engine;
 
   /// Window resize signal — when true, skip internal bar rebuild to save CPU.
   final ValueListenable<bool>? resizing;
@@ -66,7 +66,7 @@ class _ProgressBarState extends State<ProgressBar>
 
   bool get _disabled => widget.engine.duration.value <= 0;
 
-  EngineState get engine => widget.engine;
+  MediaEngine get engine => widget.engine;
 
   @override
   void initState() {

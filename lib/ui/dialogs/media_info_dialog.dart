@@ -11,7 +11,7 @@ import '../shared/app_dialog.dart';
 ///
 /// Shows file path, video properties (resolution, codec, pixel aspect ratio),
 /// duration, audio tracks (codec, channels, language), and subtitle tracks.
-/// Data comes from [EngineState.mediaInfo] which is populated by MDK after file open.
+/// Data comes from [EngineStateView.mediaInfo] which is populated by MDK after file open.
 ///
 /// Each field:
 /// - codec: 编解码器名称（如 H.264, HEVC, VP9）
@@ -39,7 +39,7 @@ class MediaInfoDialog extends StatelessWidget {
   static Future<void> showForEngine(
     BuildContext context, {
     required String path,
-    required EngineState engine,
+    required MediaEngine engine,
   }) {
     return show(context, path: path, info: engine.mediaInfo);
   }

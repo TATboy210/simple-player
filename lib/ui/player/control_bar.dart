@@ -78,7 +78,7 @@ class ControlBar extends StatelessWidget {
     end: _decorationPlaying,
   );
 
-  final EngineState engine;
+  final MediaEngine engine;
   final PlayerActions actions;
   final bool enableBlur;
   final bool isIdle;

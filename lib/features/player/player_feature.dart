@@ -54,7 +54,7 @@ class PlayerFeature extends StatefulWidget {
   /// 打开设置面板的回调 — 需要 MaterialApp 级 BuildContext 和引擎/视频处理服务引用
   final void Function(
     BuildContext context,
-    EngineStateView engine,
+    MediaEngine engine,
     VideoProcessingService videoProcessing,
   )
   onSettings;
