@@ -412,22 +412,16 @@ class EngineStateMachine {
 | A2 | PlaybackSkipMixin 可以在 mixin 中调用 seekTo/position/duration | Pattern 3 | mixin 可能无法访问这些方法，需要改为独立类 |
 | A3 | MediaEngine 接口需要添加 VolumeControl | Architecture | 可能改为单独 getter 而非修改 MediaEngine |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **PlaybackControl 接口是否保留 togglePlayPause/skipForward/skipBack/setRange 的方法签名？**
-   - What we know: 这些方法将移至状态机和 mixin
-   - What's unclear: PlaybackControl 接口是否保留签名（mixin 提供实现）还是删除签名
-   - Recommendation: 保留签名，mixin 提供 default 实现。这样调用者代码不需要改。
+   - RESOLVED: 保留签名。Plan 10-01 Task 1 将 togglePlayPause 移至 EngineStateMachine (per D-09)，skipForward/skipBack 通过 PlaybackSkipMixin 提供 default 实现 (per D-10)。setRange 保留在 FvpEngine 中 (per D-10 decision)。调用者通过 PlaybackControl 接口访问，代码无需改。
 
 2. **VolumeControl 接口是否加入 MediaEngine 组合接口？**
-   - What we know: D-11 说 VolumeController 实现 VolumeControl 接口或通过 getter 暴露
-   - What's unclear: 是否修改 MediaEngine 接口
-   - Recommendation: 添加 `VolumeControl get volumeControl` getter 到 MediaEngine，保持一致性。
+   - RESOLVED: 是。Plan 10-02 Task 1 添加 `VolumeControl get volumeControl` getter 到 MediaEngine 组合接口 (per D-11)，保持与 TrackControl/SubtitleConfig/VideoEffectControl/RendererControl 一致的 getter 暴露模式。
 
 3. **setRange 的归属？**
-   - What we know: D-10 说移至 PlaybackControl mixin，但 setRange 需要访问 _player
-   - What's unclear: mixin 无法直接访问 _player
-   - Recommendation: setRange 保留在 FvpEngine（需要 player.setRange），或移到独立 helper。
+   - RESOLVED: setRange 保留在 FvpEngine。需要 _player.setRange + _guardedAction，mixin 无法访问这些依赖。PlaybackSkipMixin 只提供 skipForward/skipBack 的 default 实现 (per D-10 decision in Plan 10-01 Task 2)。
 
 ## Environment Availability
 
