@@ -1,87 +1,68 @@
-# Requirements: Simple Player — 设置面板 & 全屏重构
+# Requirements — 播放内核重构强化 (v2.1)
 
-**Defined:** 2026-07-12
-**Core Value:** 设置面板和全屏功能的代码质量与用户体验同步提升 — 重构后代码更简洁可维护，UI 更现代化，两个功能模块彻底解耦。
+**Defined:** 2026-07-14
+**Core Value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。
 
-## v1 Requirements
+## v2.1 Requirements
 
-### Settings UI — 设置面板视觉与交互升级
+### 引擎层重构
 
-- [x] **SUI-01**: 设置面板整体视觉现代化 — 圆角、间距、动画、交互反馈保持毛玻璃风格但更新细节
-- [x] **SUI-02**: 每个 tab 有独立的 Reset to defaults 按钮 — 用户可单独重置某个 tab 的所有设置项为默认值
-- [ ] **SUI-03**: 设置面板在全屏进入/退出时行为规范化 — 不遮挡、不错位、状态同步
+- [ ] **ENG-01**: EngineState 接口重构 — 将 mixin 拆分为 abstract interface class：EngineStateView（只读状态）+ PlaybackControl（操作命令）+ 4 个能力接口（TrackControl/SubtitleConfig/VideoEffectControl/RendererControl），组合为 FullEngine 接口
+- [ ] **ENG-02**: FvpEngine 分解 — 从 641 行优化至 <350 行，深化 helper 组合模式，提取状态转换守卫到独立类
+- [ ] **ENG-03**: 统一错误模型 — 用 sealed class PlayerError 替代 MediaErrorType + PlayerErrorCode 双体系，支持 exhaustive pattern matching
+- [ ] **ENG-04**: open() 防御增强 — 引入 generation 计数器 + CancelableOperation，防止过期回调干扰新视频，统一 openGeneration + _isOpening 双守卫
 
-### Fullscreen — 全屏代码简化
+### 服务层重构
 
-- [x] **FULL-01**: 全屏代码层数减少 — 合并分散逻辑，降低 FullscreenDriver/WindowService/SettingsStore 之间的间接层
-- [x] **FULL-02**: 评估 flutter_fullscreen 包适用性 — 对比现有 Win32 FFI 实现，决定是否引入或保持自研
-- [x] **FULL-03**: 全屏状态单一数据源 — WindowService 作为唯一 owner，移除 SettingsStore 中的全屏相关状态
+- [ ] **SVC-01**: PlaybackController 迁移 — 从 features/player/services/ 迁移到 kernel/services/，修正架构边界
+- [ ] **SVC-02**: 引擎生命周期状态机 — 独立 EngineStateMachine 类，用 switch expression 穷举 9 状态 ~40 条边的转换矩阵，release 模式强制守卫
+- [ ] **SVC-03**: StateMonitor 职责拆分 — 拆分为 PlaybackStateManager（设置恢复 + 断点保存）+ AutoAdvancePolicy（自动连播逻辑）
 
-### Import/Export — 设置导入导出
+### 轨道管理重构
 
-- [ ] **IEX-01**: 用户可以将所有设置导出为 JSON 文件 — 包含全部 SettingsStore 数据
-- [ ] **IEX-02**: 用户可以从 JSON 文件导入设置 — 覆盖当前配置，导入前需校验格式
-- [ ] **IEX-03**: 导入前显示确认提示 — 告知用户将覆盖哪些设置
+- [ ] **TRK-01**: 轨道管理统一接口 — 合并 TrackManager + SubtitleConfigurator + VideoEffectController 为统一的 MediaControl 接口
+- [ ] **TRK-02**: 轨道偏好记忆 — 记住用户最后选择的音频/字幕轨道，下次打开文件时自动应用
 
-### Dev Workflow — 开发工作流增强
+## Future Requirements
 
-- [ ] **DEV-01**: Flutter SDK 文档查询集成 — 通过 Context7 MCP 在开发时快速查询 Flutter API 文档
-- [ ] **DEV-02**: Flutter SDK 源码参考能力 — 通过 codegraph 分析 SDK 源码解决疑难问题
-- [ ] **DEV-03**: Flutter Quality Pipeline 评估 — 理解其设计，输出集成方案建议（评估文档，不集成代码）
-
-## v2 Requirements
-
-### Settings UI (deferred)
-
-- **SUI-V2-01**: 7 tab 内部布局全面重做 — 每个 tab 的布局、交互、样式升级（deferred: 本次只做视觉层）
-- **SUI-V2-02**: Settings search/filter — 在 7 个 tab 中快速定位设置项
-- **SUI-V2-03**: 快捷键冲突检测 — 检测重复键绑定，显示警告
-
-### Data Layer (deferred)
-
-- **DATA-V2-01**: AppSettings god-object 拆分 — 26 字段拆为 PlaybackConfig/WindowConfig/SubtitleConfig/VideoConfig/EngineConfig
-- **DATA-V2-02**: SettingsStore 拆分 — 25+ 静态方法拆为 domain-specific stores
-- **DATA-V2-03**: Settings migration key — 加 settingsVersion key，安全迁移
-
-### Fullscreen (deferred)
-
-- **FULL-V2-01**: 全屏与设置面板彻底解耦 — 代码/状态/展示三层面全部解耦
+- D1: 引擎能力查询接口 — 查询引擎支持的功能（硬件解码、字幕渲染等）
+- D2: 播放列表序列化解耦 — 版本化 JSON 格式，支持迁移
+- D5: NetworkConfigurator 自适应策略 — 网络流缓冲参数动态调整
+- D6: EngineEventLog 结构化导出 — JSON 格式导出事件日志
+- T4: PositionPoller 策略模式 — 可配置的轮询间隔策略
+- T6: 结构化 EngineMetrics — ValueNotifier 暴露指标，便于 UI 展示
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 新增设置项 | 现有设置项够用，只改 UI 和代码结构 |
-| 播放器核心功能改动 | 播放引擎、播放列表等不动 |
-| 跨平台全屏统一 | 本次只简化代码，不做平台行为统一 |
-| 移动端适配 | 桌面端专属 |
-| Live preview | 需要非模态对话框重设计，高工作量 |
-| Settings presets | 依赖 import/export，属于 v2+ |
-| Per-file settings | 复杂持久化层，不在本次范围 |
+| 底层引擎更换 | 继续使用 fvp (MDK/FFmpeg)，更换成本高且无必要 |
+| UI 层改动 | 本次专注内核，不改播放器界面 |
+| 状态管理模式更换 | 继续使用 ValueNotifier + ValueListenableBuilder，项目已有成熟模式 |
+| 多实例播放 | 不在本次范围内，需验证 fvp 多实例能力 |
+| ABR 自适应码率 | 架构准备但不实现，属于长期计划 |
+| 滤镜编辑器 | 不在本次范围内 |
+| 云同步 | 不在本次范围内 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SUI-01 | Phase 2 | Complete |
-| SUI-02 | Phase 3 | Complete |
-| SUI-03 | Phase 5 | Pending |
-| FULL-01 | Phase 1 | Complete |
-| FULL-02 | Phase 1 | Complete |
-| FULL-03 | Phase 1 | Complete |
-| IEX-01 | Phase 4 | Pending |
-| IEX-02 | Phase 4 | Pending |
-| IEX-03 | Phase 4 | Pending |
-| DEV-01 | Phase 6 | Pending |
-| DEV-02 | Phase 6 | Pending |
-| DEV-03 | Phase 6 | Pending |
+| ENG-01 | — | Pending |
+| ENG-02 | — | Pending |
+| ENG-03 | — | Pending |
+| ENG-04 | — | Pending |
+| SVC-01 | — | Pending |
+| SVC-02 | — | Pending |
+| SVC-03 | — | Pending |
+| TRK-01 | — | Pending |
+| TRK-02 | — | Pending |
 
 **Coverage:**
-
-- v1 requirements: 12 total
-- Mapped to phases: 12
-- Unmapped: 0 ✓
+- v2.1 requirements: 9 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 9
 
 ---
-*Requirements defined: 2026-07-12*
-*Last updated: 2026-07-12 after initial definition*
+*Requirements defined: 2026-07-14*
+*Last updated: 2026-07-14 after research synthesis*
