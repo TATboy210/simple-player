@@ -69,6 +69,9 @@ class FakeWindowService implements WindowBridge {
     startDraggingCallCount++;
   }
 
+  @override
+  bool get isFullscreen => mode.value == WindowMode.fullscreen;
+
   void showAfterFirstFrame() {}
 
   @override

@@ -2,59 +2,68 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
 void main() {
-  group('PlayerErrorCode', () {
-    test('enum has all expected values', () {
-      expect(PlayerErrorCode.values.length, 11);
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.pathEmpty));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.fileNotFound));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.pathTraversal));
-      expect(
-        PlayerErrorCode.values,
-        contains(PlayerErrorCode.unsupportedFormat),
-      );
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.openTimeout));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.decodeFailed));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.textureFailed));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.networkTimeout));
-      expect(
-        PlayerErrorCode.values,
-        contains(PlayerErrorCode.codecUnsupported),
-      );
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.fileCorruption));
-      expect(PlayerErrorCode.values, contains(PlayerErrorCode.unknown));
-    });
-  });
-
-  group('PlayerError', () {
-    test('toString includes code and message', () {
-      const error = PlayerError(PlayerErrorCode.fileNotFound, '文件不存在');
-      expect(error.toString(), 'PlayerError(fileNotFound): 文件不存在');
+  group('PlayerError sealed class', () {
+    test('FileError carries code and message', () {
+      const error = FileError(FileErrorCode.fileNotFound, '文件不存在');
+      expect(error.code, FileErrorCode.fileNotFound);
+      expect(error.message, '文件不存在');
+      expect(error.toString(), 'FileError(fileNotFound): 文件不存在');
     });
 
-    test('equality based on code and message', () {
-      const a = PlayerError(PlayerErrorCode.openTimeout, '超时');
-      const b = PlayerError(PlayerErrorCode.openTimeout, '超时');
-      const c = PlayerError(PlayerErrorCode.decodeFailed, '超时');
-      expect(a, equals(b));
-      expect(a, isNot(equals(c)));
+    test('CodecError carries code and message', () {
+      const error = CodecError(CodecErrorCode.unsupportedFormat, '无法解码');
+      expect(error.code, CodecErrorCode.unsupportedFormat);
+      expect(error.message, '无法解码');
     });
 
-    test('hashCode consistent with equality', () {
-      const a = PlayerError(PlayerErrorCode.openTimeout, '超时');
-      const b = PlayerError(PlayerErrorCode.openTimeout, '超时');
-      expect(a.hashCode, equals(b.hashCode));
+    test('PlaybackError carries code and message', () {
+      const error = PlaybackError(PlaybackErrorCode.playFailed, '播放失败');
+      expect(error.code, PlaybackErrorCode.playFailed);
+      expect(error.message, '播放失败');
+    });
+
+    test('NetworkError carries code and message', () {
+      const error = NetworkError(NetworkErrorCode.timeout, '网络超时');
+      expect(error.code, NetworkErrorCode.timeout);
+      expect(error.message, '网络超时');
+    });
+
+    test('UnknownError carries message', () {
+      const error = UnknownError('未知错误');
+      expect(error.message, '未知错误');
     });
 
     test('cause is optional', () {
-      const withoutCause = PlayerError(PlayerErrorCode.unknown, 'err');
+      const withoutCause = FileError(FileErrorCode.pathEmpty, 'err');
       expect(withoutCause.cause, isNull);
 
-      final withCause = PlayerError(
-        PlayerErrorCode.decodeFailed,
-        'err',
-        Exception('bad'),
-      );
+      final withCause = FileError(FileErrorCode.pathEmpty, 'err', Exception('bad'));
       expect(withCause.cause, isA<Exception>());
+    });
+
+    test('exhaustive pattern matching works', () {
+      const errors = <PlayerError>[
+        FileError(FileErrorCode.pathEmpty, 'e'),
+        CodecError(CodecErrorCode.decodeFailed, 'e'),
+        PlaybackError(PlaybackErrorCode.seekFailed, 'e'),
+        NetworkError(NetworkErrorCode.connectionLost, 'e'),
+        UnknownError('e'),
+      ];
+
+      for (final error in errors) {
+        switch (error) {
+          case FileError():
+            expect(error, isA<FileError>());
+          case CodecError():
+            expect(error, isA<CodecError>());
+          case PlaybackError():
+            expect(error, isA<PlaybackError>());
+          case NetworkError():
+            expect(error, isA<NetworkError>());
+          case UnknownError():
+            expect(error, isA<UnknownError>());
+        }
+      }
     });
   });
 }

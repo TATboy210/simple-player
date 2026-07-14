@@ -6,10 +6,10 @@ import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 void main() {
   group('FvpCallbackHandler', () {
     group('mapMdkState (static)', () {
-      test('maps stopped to MediaState.stopped', () {
+      test('maps stopped to MediaState.idle', () {
         expect(
           FvpCallbackHandler.mapMdkState(mdk.PlaybackState.stopped),
-          MediaState.stopped,
+          MediaState.idle,
         );
       });
 
@@ -33,7 +33,7 @@ void main() {
         // Using stopped as baseline, then verifying the mapping is correct
         expect(
           FvpCallbackHandler.mapMdkState(mdk.PlaybackState.stopped),
-          MediaState.stopped,
+          MediaState.idle,
         );
         // Verify all 3 known states map correctly (covered above)
         // The default branch returns idle for any unrecognized value

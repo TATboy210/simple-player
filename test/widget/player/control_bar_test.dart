@@ -24,7 +24,7 @@ void main() {
   });
 
   Widget buildSubject({
-    EngineState? eng,
+    MediaEngine? eng,
     PlayerActions? actions,
   }) {
     return MaterialApp(

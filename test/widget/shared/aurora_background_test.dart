@@ -50,11 +50,11 @@ void main() {
       engineState.dispose();
     });
 
-    testWidgets('handles engine idle→buffering→idle cycle', (tester) async {
+    testWidgets('handles engine idle→opening→idle cycle', (tester) async {
       final engineState = ValueNotifier(MediaState.idle);
       await tester.pumpWidget(_buildSubject(engineState: engineState));
 
-      engineState.value = MediaState.buffering;
+      engineState.value = MediaState.opening;
       await tester.pump();
       engineState.value = MediaState.idle;
       await tester.pump();

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:simple_player_flutter/features/player/services/playback_controller.dart';
+import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 
 import 'fake_engine.dart';

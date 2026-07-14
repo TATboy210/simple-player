@@ -16,7 +16,7 @@ void main() {
     engine.dispose();
   });
 
-  Widget buildSubject({EngineState? eng}) {
+  Widget buildSubject({MediaEngine? eng}) {
     return MaterialApp(
       home: Scaffold(body: VideoSurface(engine: eng ?? engine)),
     );

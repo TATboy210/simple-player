@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/engine/open_result.dart';
 
 void main() {
   group('OpenResult', () {
@@ -29,25 +28,25 @@ void main() {
       expect(result.mediaInfo.subtitleTracks.length, 1);
     });
 
-    test('OpenError carries type and message', () {
-      const result = OpenError(MediaErrorType.file, '文件不存在');
+    test('OpenError carries PlayerError', () {
+      const result = OpenError(FileError(FileErrorCode.fileNotFound, '文件不存在'));
 
       expect(result, isA<OpenResult>());
-      expect(result.type, MediaErrorType.file);
-      expect(result.message, '文件不存在');
+      expect(result.error, isA<FileError>());
+      expect(result.error.message, '文件不存在');
     });
 
     test('sealed class pattern matching works', () {
       final success = const OpenSuccess(MediaInfo(duration: 1000));
-      const error = OpenError(MediaErrorType.codec, '无法解码');
+      const error = OpenError(CodecError(CodecErrorCode.unsupportedFormat, '无法解码'));
 
       String describe(OpenResult r) => switch (r) {
         OpenSuccess(:final mediaInfo) => 'ok:${mediaInfo.duration}',
-        OpenError(:final type, :final message) => 'err:$type:$message',
+        OpenError(:final error) => 'err:${error.runtimeType}:${error.message}',
       };
 
       expect(describe(success), 'ok:1000');
-      expect(describe(error), 'err:MediaErrorType.codec:无法解码');
+      expect(describe(error), 'err:CodecError:无法解码');
     });
 
     test('OpenSuccess with minimal MediaInfo', () {
@@ -58,14 +57,16 @@ void main() {
       expect(result.mediaInfo.subtitleTracks, isEmpty);
     });
 
-    test('OpenError with network type', () {
-      const result = OpenError(MediaErrorType.network, '连接超时');
-      expect(result.type, MediaErrorType.network);
+    test('OpenError with network error', () {
+      const result = OpenError(NetworkError(NetworkErrorCode.timeout, '连接超时'));
+      expect(result.error, isA<NetworkError>());
+      expect(result.message, '连接超时');
     });
 
-    test('OpenError with playback type', () {
-      const result = OpenError(MediaErrorType.playback, '播放失败');
-      expect(result.type, MediaErrorType.playback);
+    test('OpenError with playback error', () {
+      const result = OpenError(PlaybackError(PlaybackErrorCode.playFailed, '播放失败'));
+      expect(result.error, isA<PlaybackError>());
+      expect(result.message, '播放失败');
     });
   });
 }
