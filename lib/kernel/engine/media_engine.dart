@@ -4,6 +4,7 @@ import 'track_control.dart';
 import 'subtitle_config.dart';
 import 'video_effect_control.dart';
 import 'renderer_control.dart';
+import 'volume_control.dart';
 
 /// 播放引擎组合接口 — 服务层统一依赖类型
 ///
@@ -26,4 +27,5 @@ abstract class MediaEngine
         TrackControl,
         SubtitleConfig,
         VideoEffectControl,
-        RendererControl {}
+        RendererControl,
+        VolumeControl {}

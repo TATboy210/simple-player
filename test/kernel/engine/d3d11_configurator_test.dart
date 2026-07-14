@@ -109,12 +109,12 @@ void main() {
 
     group('setSyncEnabled', () {
       test('sets d3d11.sync.cpu to 1 when enabled', () {
-        configurator.setSyncEnabled(true);
+        configurator.setD3d11SyncEnabled(true);
         expect(player.properties['d3d11.sync.cpu'], '1');
       });
 
       test('sets d3d11.sync.cpu to 0 when disabled', () {
-        configurator.setSyncEnabled(false);
+        configurator.setD3d11SyncEnabled(false);
         expect(player.properties['d3d11.sync.cpu'], '0');
       });
     });

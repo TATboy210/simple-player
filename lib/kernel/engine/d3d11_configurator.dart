@@ -1,6 +1,7 @@
 import '../bridge/display_config.dart';
 import '../utils/log.dart';
 import 'player_proxy.dart';
+import 'renderer_control.dart';
 
 /// Encapsulates D3D11 rendering configuration for a player.
 ///
@@ -10,7 +11,7 @@ import 'player_proxy.dart';
 /// All properties use the mpv property system exposed through fvp/MDK —
 /// `setProperty(key, value)` maps directly to mpv's `mp_set_property_string`.
 /// See https://mpv.io/manual/stable/ for property semantics.
-class D3D11Configurator {
+class D3D11Configurator implements RendererControl {
   D3D11Configurator(this._player);
 
   final PlayerProxy _player;
@@ -49,7 +50,8 @@ class D3D11Configurator {
   /// Enables/disables D3D11 CPU sync.
   /// - `true`: synchronous (safe default, higher latency)
   /// - `false`: asynchronous (low latency)
-  void setSyncEnabled(bool enabled) {
+  @override
+  void setD3d11SyncEnabled(bool enabled) {
     _player.setProperty('d3d11.sync.cpu', enabled ? '1' : '0');
     log.d('D3D11Configurator: d3d11.sync.cpu = ${enabled ? 1 : 0}');
   }
@@ -57,6 +59,7 @@ class D3D11Configurator {
   /// Switches between hardware and software decoding.
   /// - `true`: hardware decoders (D3D11, NVDEC) with FFmpeg fallback
   /// - `false`: FFmpeg software decoding only
+  @override
   void setHardwareDecoding(bool enabled) {
     _player.setProperty(
       'video.decoders',
