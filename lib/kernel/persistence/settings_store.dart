@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_settings.dart';
 import '../models/export_data.dart';
+import '../models/track_preferences.dart';
 export '../models/app_settings.dart';
 import '../utils/log.dart';
 import 'settings_validator.dart';
@@ -114,6 +115,9 @@ class SettingsStore {
   static const _keyLocale = 'locale';
   static const _keyThemeIndex = 'themeIndex';
   static const _keyShortcuts = 'shortcuts';
+  static const _keyAudioTrackIndex = 'audioTrackIndex';
+  static const _keySubtitleTrackIndex = 'subtitleTrackIndex';
+  static const _keySubtitleDelay = 'subtitleDelay';
 
   static Future<AppSettings> load() async => (_instance ?? SettingsStore._(null))._loadImpl();
 
@@ -476,6 +480,44 @@ class SettingsStore {
       await p.remove(_keyWindowY);
     }
   });
+
+  // ─── 轨道偏好持久化 ───
+
+  /// 加载轨道偏好，默认空偏好（使用 demuxer 默认值）
+  static Future<TrackPreferences> loadTrackPreferences() async =>
+      (_instance ?? SettingsStore._(null))._loadTrackPreferencesImpl();
+
+  Future<TrackPreferences> _loadTrackPreferencesImpl() async {
+    try {
+      final prefs = await _getPrefs();
+      return TrackPreferences(
+        audioTrackIndex: prefs.getInt(_keyAudioTrackIndex),
+        subtitleTrackIndex: prefs.getInt(_keySubtitleTrackIndex),
+        subtitleDelay: prefs.getInt(_keySubtitleDelay) ?? 0,
+      );
+    } on Exception catch (e) {
+      log.e('SettingsStore.loadTrackPreferences failed: $e');
+      return TrackPreferences.empty;
+    }
+  }
+
+  /// 保存轨道偏好
+  static Future<void> saveTrackPreferences(TrackPreferences prefs) => _save(
+    'saveTrackPreferences',
+    (p) async {
+      if (prefs.audioTrackIndex != null) {
+        await p.setInt(_keyAudioTrackIndex, prefs.audioTrackIndex!);
+      } else {
+        await p.remove(_keyAudioTrackIndex);
+      }
+      if (prefs.subtitleTrackIndex != null) {
+        await p.setInt(_keySubtitleTrackIndex, prefs.subtitleTrackIndex!);
+      } else {
+        await p.remove(_keySubtitleTrackIndex);
+      }
+      await p.setInt(_keySubtitleDelay, prefs.subtitleDelay);
+    },
+  );
 
   // ─── 设置导入/导出 ───
 

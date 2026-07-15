@@ -1,12 +1,14 @@
 /// Services 层播放控制模块 — 门面模式统一入口
 ///
 /// 本文件实现 [PlaybackController] 作为播放器运行时能力的统一门面，
-/// 组合 [PlaybackNavigator] / [FileOperations] / [StateMonitor] 三个子模块，
+/// 组合 [PlaybackNavigator] / [FileOperations] / [PlaybackStateManager] / [AutoAdvancePolicy] 四个子模块，
 /// UI 层只与本类交互，不直接访问子模块。
 ///
-/// 架构位置：PlayerViewModel → **PlaybackController** → PlaybackNavigator / FileOperations / StateMonitor → MediaEngine
+/// 架构位置：PlayerViewModel → **PlaybackController** → PlaybackNavigator / FileOperations / PlaybackStateManager / AutoAdvancePolicy → MediaEngine
 /// 设计模式：Facade（门面模式）— 简化 UI 层对多个子模块的调用路径
 library;
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
@@ -16,24 +18,28 @@ import '../persistence/playlist_store.dart';
 import '../persistence/settings_store.dart';
 import '../playlist/playlist.dart';
 import '../utils/debug_probe.dart';
+import '../utils/log.dart';
+import 'auto_advance_policy.dart';
 import 'file_operations.dart';
 import 'playback_navigator.dart';
-import 'state_monitor.dart';
+import 'playback_state_manager.dart';
 import 'subtitle_service.dart';
+import 'track_preference_service.dart';
 
 /// 播放控制器 — 播放器全部运行时能力的统一门面入口
 ///
-/// 组合 [PlaybackNavigator] / [FileOperations] / [StateMonitor] 三个子模块，
+/// 组合 [PlaybackNavigator] / [FileOperations] / [PlaybackStateManager] / [AutoAdvancePolicy] 四个子模块，
 /// UI 层只与本类交互。所有子模块通过 [PlaybackContract] 接口访问共享依赖。
 ///
 /// 职责划分：
 /// - 播放导航：委托 [PlaybackNavigator]（playIndex / playNext / playPrevious）
 /// - 文件操作：委托 [FileOperations]（openAndPlay / addFiles）
-/// - 状态监控：委托 [StateMonitor]（初始化 / 状态监听 / 销毁保存）
+/// - 状态管理：委托 [PlaybackStateManager]（设置恢复 / 断点保存 / 销毁持久化）
+/// - 自动连播：委托 [AutoAdvancePolicy]（completed → loopSingle / next）
 /// - 播放列表 CRUD：直接管理 removeAt / reorder / clearPlaylist / togglePlayMode
 ///
 /// 生命周期：init() → 使用 → dispose()
-/// init() 内部调用 StateMonitor.init()，触发设置恢复和状态监听注册。
+/// init() 内部调用 stateManager.init() + autoAdvance.init()。
 class PlaybackController {
   PlaybackController({
     required this.engine,
@@ -41,12 +47,15 @@ class PlaybackController {
     required VoidCallback onNeedRebuild,
     void Function(Object error)? onError,
     SubtitleService? subtitleService,
+    TrackPreferenceService? trackPreferenceService,
   }) : _onNeedRebuild = onNeedRebuild,
        _onError = onError,
-       _subtitleService = subtitleService {
+       _subtitleService = subtitleService,
+       _trackPreferenceService = trackPreferenceService {
     navigator = PlaybackNavigator(this);
     fileOps = FileOperations(this);
-    monitor = StateMonitor(this);
+    stateManager = PlaybackStateManager(this);
+    autoAdvance = AutoAdvancePolicy(this);
   }
 
   /// 视频渲染引擎实例
@@ -64,14 +73,20 @@ class PlaybackController {
   /// 字幕服务 — 可选依赖，null 表示无外挂字幕支持
   final SubtitleService? _subtitleService;
 
+  /// 轨道偏好服务 — 可选依赖，null 表示不持久化轨道偏好
+  final TrackPreferenceService? _trackPreferenceService;
+
   /// 播放导航子模块 — 索引跳转和并发 open() 守卫
   late final PlaybackNavigator navigator;
 
   /// 文件操作子模块 — 文件打开和批量添加
   late final FileOperations fileOps;
 
-  /// 状态监控子模块 — 断点保存、设置恢复、自动连播
-  late final StateMonitor monitor;
+  /// 状态管理子模块 — 设置恢复、断点保存、销毁持久化
+  late final PlaybackStateManager stateManager;
+
+  /// 自动连播策略 — completed → loopSingle / next
+  late final AutoAdvancePolicy autoAdvance;
 
   /// 调试探针 — 记录播放控制操作的耗时和事件（编译时开关 kDebugMode）
   final DebugProbe probe = DebugProbeRegistry.register('playback');
@@ -87,6 +102,9 @@ class PlaybackController {
 
   /// 获取字幕服务（可能为 null）
   SubtitleService? get subtitleService => _subtitleService;
+
+  /// 获取轨道偏好服务（可能为 null）
+  TrackPreferenceService? get trackPreferenceService => _trackPreferenceService;
 
   /// 保存播放列表 — 异步写入，跨模块共享
   void savePlaylist() {
@@ -114,7 +132,7 @@ class PlaybackController {
   /// 最近一次路径校验错误（null 表示无错误）— 委托 [FileOperations.validationError]
   ValueNotifier<String?> get validationError => fileOps.validationError;
 
-  // ── 播放列表 CRUD（从 StateMonitor 提取）──
+  // ── 播放列表 CRUD ──
 
   /// 移除播放列表中指定索引
   ///
@@ -161,16 +179,26 @@ class PlaybackController {
 
   // ── 生命周期 ──
 
-  /// 初始化播放控制器 — 内部委托 StateMonitor 完成设置恢复和状态监听注册
+  /// 初始化播放控制器 — 内部委托 stateManager + autoAdvance 完成初始化
   ///
   /// [settings] 可选：调用方已加载时传入，避免重复 IO。
   /// 使用 DebugProbe 包裹以记录初始化耗时。
-  Future<void> init({AppSettings? settings}) =>
-      probe.measureAsync('init', () => monitor.init(settings: settings));
+  Future<void> init({AppSettings? settings}) => probe.measureAsync('init', () async {
+    await stateManager.init(settings: settings);
+    await autoAdvance.init();
+    await _trackPreferenceService?.load();
+  });
 
-  /// 释放资源 — 按序释放 StateMonitor / currentFileName / validationError
+  /// 释放资源 — 按序释放 autoAdvance / stateManager / currentFileName / validationError
   void dispose() {
-    monitor.dispose();
+    autoAdvance.dispose();
+    stateManager.dispose();
+    // fire-and-forget 保存轨道偏好
+    unawaited(
+      _trackPreferenceService?.save().catchError(
+        (Object e) => log.e('TrackPreferenceService.save failed: $e'),
+      ),
+    );
     currentFileName.dispose();
     fileOps.validationError.dispose();
   }

@@ -30,23 +30,7 @@ void main() {
     engine.dispose();
   });
 
-  /// Helper: register auto-advance listener
-  void registerAutoAdvance() {
-    engine.state.addListener(() {
-      final state = engine.state.value;
-      if (state != MediaState.completed) return;
-      if (playlist.mode == PlayMode.loopSingle) {
-        final idx = playlist.currentIndex;
-        if (idx >= 0) {
-          controller.playIndex(idx).catchError((e) {});
-        }
-      } else {
-        controller.playNext().catchError((e) {});
-      }
-    });
-  }
-
-  group('StateMonitor', () {
+  group('PlaybackStateManager', () {
     group('removeAt', () {
       test('stops engine when removing currently-playing item', () async {
         engine.configureMedia(durationMs: 60000);
@@ -97,32 +81,6 @@ void main() {
       });
     });
 
-    group('auto-advance', () {
-      test('loopSingle replays same index', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.mode = PlayMode.loopSingle;
-        registerAutoAdvance();
-        await controller.playIndex(0);
-        engine.simulateCompleted();
-        await Future(() {});
-        expect(playlist.currentIndex, 0);
-      });
-
-      test('loopAll wraps around at end', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.mode = PlayMode.loopAll;
-        registerAutoAdvance();
-        await controller.playIndex(1);
-        engine.simulateCompleted();
-        await Future(() {});
-        expect(playlist.currentIndex, 0);
-      });
-    });
-
     group('pause breakpoint', () {
       test('saves position on pause state', () async {
         await controller.init(); // registers state listener
@@ -138,7 +96,7 @@ void main() {
       });
     });
 
-    group('StateMonitor.init', () {
+    group('init', () {
       test('init with preloaded settings sets volume and mute', () async {
         const settings = AppSettings(
           volume: 0.7,
@@ -166,70 +124,6 @@ void main() {
         // Second init should be a no-op
         await controller.init(settings: settings);
         expect(engine.volume.value, closeTo(0.5, 0.01));
-      });
-    });
-
-    group('StateMonitor auto-advance via init', () {
-      test('completed + loopSingle replays via StateMonitor listener',
-          () async {
-        const settings = AppSettings(
-          volume: 1.0,
-          lastFile: '',
-          windowWidth: 1280,
-          windowHeight: 720,
-          playMode: 0,
-          isMuted: false,
-        );
-        await controller.init(settings: settings);
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.mode = PlayMode.loopSingle;
-        await controller.playIndex(0);
-        // Trigger completed state — StateMonitor._onStateChanged should replay
-        engine.simulateCompleted();
-        await Future(() {});
-        expect(playlist.currentIndex, 0);
-      });
-
-      test('completed + loopAll advances via StateMonitor listener', () async {
-        const settings = AppSettings(
-          volume: 1.0,
-          lastFile: '',
-          windowWidth: 1280,
-          windowHeight: 720,
-          playMode: 0,
-          isMuted: false,
-        );
-        await controller.init(settings: settings);
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.mode = PlayMode.loopAll;
-        await controller.playIndex(0);
-        engine.simulateCompleted();
-        await Future(() {});
-        expect(playlist.currentIndex, 1);
-      });
-
-      test('completed + loopAll wraps around via StateMonitor', () async {
-        const settings = AppSettings(
-          volume: 1.0,
-          lastFile: '',
-          windowWidth: 1280,
-          windowHeight: 720,
-          playMode: 0,
-          isMuted: false,
-        );
-        await controller.init(settings: settings);
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.mode = PlayMode.loopAll;
-        await controller.playIndex(1); // play last item
-        engine.simulateCompleted();
-        await Future(() {});
-        expect(playlist.currentIndex, 0); // wraps to first
       });
     });
   });
