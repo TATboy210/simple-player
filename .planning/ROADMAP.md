@@ -30,7 +30,7 @@ Phase numbering: 1-8.
 - [x] **Phase 11: 引擎解耦 + 防御增强** — open() generation 计数器，StateMonitor → PlaybackStateManager + AutoAdvancePolicy (completed 2026-07-14)
 - [ ] **Phase 12: 轨道管理统一** — 合并轨道管理接口，实现轨道偏好记忆
 - [x] **Phase 13: Widget API 统一 + 状态通知优化** — 已在 Phase 9-11 实施中自然完成 (verified 2026-07-14)
-- [ ] **Phase 14: 可测试性提升 + 数据流清晰化** — Widget 测试 mock 简化，数据流单向可预测
+- [ ] **Phase 14: 可测试性提升 + 数据流清晰化** — Widget 测试 mock 简化，数据流单向可预测 (2 plans)
 
 ## Phase Details
 
@@ -108,6 +108,17 @@ Plans:
 **Goal**: Widget 测试可通过 FakeEngine 完整 mock，数据流单向可预测
 **Depends on**: Phase 13
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, FLOW-01, FLOW-02, FLOW-03
+**Plans**: 2/2 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 14-01-PLAN.md — Fix 4 pre-existing test failures + 17 analysis warnings → clean baseline
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [x] 14-02-PLAN.md — Widget interaction tests + error propagation integration test
+
 **Success Criteria**:
 
 1. Widget 测试可通过 FakeEngine + FakeWindowService 完整 mock 内核行为
@@ -138,7 +149,7 @@ Phase 9 ✅ (接口分解 + 状态模型统一)
 | 11. 引擎解耦 + 防御增强 | v2.1 | 1/1 | ✅ Done | 2026-07-14 |
 | 12. 轨道管理统一 | v2.1 | 0/TBD | Not started | - |
 | 13. Widget API 统一 + 状态通知优化 | v2.1 | — | ✅ Done | 2026-07-14 |
-| 14. 可测试性提升 + 数据流清晰化 | v2.1 | 0/TBD | Not started | - |
+| 14. 可测试性提升 + 数据流清晰化 | v2.1 | 2/2 | In Progress|  |
 
 ---
 *Created: 2026-07-14*

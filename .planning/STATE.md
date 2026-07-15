@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.1
-milestone_name: 播放内核重构强化
-current_phase_name: Phase 12 complete
+milestone_name: 播放内核重构强化 (expanded — In Progress)
+current_phase: 14
+current_phase_name: testability-data-flow
 status: executing
 stopped_at: —
-last_updated: "2026-07-14T15:30:00.000Z"
-last_activity: 2026-07-14
-last_activity_desc: Phase 12 complete — track preference recording wired through UI layer
+last_updated: "2026-07-15T06:23:17.159Z"
+last_activity: 2026-07-15
+last_activity_desc: Phase 14 execution started
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 4
+  completed_phases: 2
+  total_plans: 9
   completed_plans: 6
-  percent: 50
-current_phase: 3
+  percent: 33
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -24,14 +24,14 @@ current_phase: 3
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** v2.1 expanded — 内核重构 + Widget↔Kernel 对接优化
+**Current focus:** Phase 14 — testability-data-flow
 
 ## Current Position
 
-Phase: Phase 12 — 轨道管理统一 (in progress)
-Plan: 12-01-PLAN.md — 轨道偏好录制接入
-Status: Implementing
-Last activity: 2026-07-14 — Phase 13 verified complete, Phase 12 plan created
+Phase: 14 (testability-data-flow) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 14
+Last activity: 2026-07-15 — Phase 14 execution started
 
 Progress: [███████░░░] 67% (4/6 phases done, Phase 12 in progress)
 
