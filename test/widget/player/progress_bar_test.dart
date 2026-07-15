@@ -719,5 +719,69 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
       resizing.dispose();
     });
+
+    // ── Wave 2: proportional seek + value sync tests ──
+
+    testWidgets('tap at center seeks to ~50% of duration', (tester) async {
+      // 验证点击进度条中心 → seekTo 接近 duration 的 50%
+      engine.duration.value = 20000;
+      await tester.pumpWidget(buildSubject());
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+
+      // 点击中心位置
+      await tester.tapAt(rect.center);
+      await tester.pump();
+
+      expect(engine.seekToCallCount, 1);
+      // seekTo 应在 duration 50% 附近（容差 ±10%）
+      expect(engine.lastSeekToMs, greaterThan(8000));
+      expect(engine.lastSeekToMs, lessThan(12000));
+    });
+
+    testWidgets('tap at 25% position seeks to ~25% of duration', (
+      tester,
+    ) async {
+      // 验证点击进度条 25% 位置 → seekTo 接近 duration 的 25%
+      engine.duration.value = 40000;
+      await tester.pumpWidget(buildSubject());
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+      final tapX = rect.left + rect.width * 0.25;
+
+      await tester.tapAt(Offset(tapX, rect.center.dy));
+      await tester.pump();
+
+      expect(engine.seekToCallCount, 1);
+      // seekTo 应在 duration 25% 附近（容差 ±10%）
+      expect(engine.lastSeekToMs, greaterThan(6000));
+      expect(engine.lastSeekToMs, lessThan(14000));
+    });
+
+    testWidgets('multiple taps update seek position correctly', (tester) async {
+      // 验证多次点击 → 每次 seekTo 正确更新
+      engine.duration.value = 10000;
+      await tester.pumpWidget(buildSubject());
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+
+      // 第一次点击：左侧
+      await tester.tapAt(rect.centerLeft + const Offset(50, 0));
+      await tester.pump();
+
+      final firstSeek = engine.lastSeekToMs;
+      expect(engine.seekToCallCount, 1);
+
+      // 第二次点击：右侧
+      await tester.tapAt(rect.centerRight - const Offset(50, 0));
+      await tester.pump();
+
+      expect(engine.seekToCallCount, 2);
+      // 第二次 seek 应比第一次更远
+      expect(engine.lastSeekToMs, greaterThan(firstSeek!));
+    });
   });
 }

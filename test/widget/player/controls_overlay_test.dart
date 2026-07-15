@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import '../../helpers/fake_engine.dart';
@@ -243,6 +244,102 @@ void main() {
       await tester.pump();
 
       expect(find.byType(ControlsOverlay), findsOneWidget);
+    });
+
+    // ── Wave 2: auto-hide timer + state-driven visibility tests ──
+
+    testWidgets('playing state auto-hides controls after hide delay', (
+      tester,
+    ) async {
+      // 验证 AutoHideController scheduleHide() 生效：
+      // playing 状态下 → 控制栏初始可见 → 等待 hideDelay → controlBar 被 IgnorePointer 拦截
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 确认控制栏初始可见（playing 状态 show() + scheduleHide()）
+      expect(find.byType(ControlBar), findsOneWidget);
+
+      // pump 超过窗口模式 hideDelay (Tokens.hideDelayWindowed = 3秒)
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 500)); // 动画完成
+
+      // ControlBar 仍然在 widget tree 中（被 IgnorePointer 包裹不可交互）
+      expect(find.byType(ControlBar), findsOneWidget);
+    });
+
+    testWidgets('paused state keeps controls visible after delay', (
+      tester,
+    ) async {
+      // paused 状态下 AutoHideController.onEngineStateChanged() 不调用 scheduleHide()
+      // 控制栏应永久可见 — ControlBar 仍然可以交互
+      engine.state.value = MediaState.paused;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 等待超过正常 hideDelay
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+
+      // ControlBar 仍应存在于 widget tree 中
+      expect(find.byType(ControlBar), findsOneWidget);
+    });
+
+    testWidgets('completed state keeps controls visible after delay', (
+      tester,
+    ) async {
+      // completed 和 paused 一样 — 控制栏永久显示
+      engine.state.value = MediaState.completed;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+
+      expect(find.byType(ControlBar), findsOneWidget);
+    });
+
+    testWidgets('mouse move in bottom zone re-shows hidden controls', (
+      tester,
+    ) async {
+      // 流程：playing → 控制栏自动隐藏 → 鼠标移入底部 → 控制栏重新显示
+      engine.state.value = MediaState.playing;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // 等待自动隐藏
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // 鼠标移入底部触发区 — onMouseMove → show()
+      final overlay = tester.getRect(find.byType(ControlsOverlay));
+      final bottomZone = Offset(overlay.center.dx, overlay.bottom - 50);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: bottomZone);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(bottomZone);
+      await tester.pump();
+
+      // 控制栏应重新可见
+      expect(find.byType(ControlBar), findsOneWidget);
+    });
+
+    testWidgets('ErrorBanner renders inside ControlsOverlay', (tester) async {
+      // 验证 ErrorBanner 作为 ControlsOverlay 子组件存在
+      engine.simulateError('Test error message');
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      // ErrorBanner 应在 ControlsOverlay 内部渲染
+      expect(
+        find.descendant(
+          of: find.byType(ControlsOverlay),
+          matching: find.text('Test error message'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 

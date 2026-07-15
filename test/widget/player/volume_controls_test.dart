@@ -271,5 +271,69 @@ void main() {
       expect(engine.volume.value, closeTo(0.7, 0.01));
       OsdService.I.hide();
     });
+
+    // ── Wave 2: interaction-level tests ──
+
+    testWidgets('mute toggle sets engine.isMuted and volume', (tester) async {
+      // 验证 VolumeButton._toggleMute 正确调用 engine.setMute + engine.setVolume
+      engine.volume.value = 0.5;
+      engine.isMuted.value = false;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeButton(engine: engine)),
+      );
+      await tester.pump();
+
+      // Act: tap mute button
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump();
+
+      // Assert: muted + volume set to 0
+      expect(engine.isMuted.value, isTrue);
+      expect(engine.volume.value, 0.0);
+      OsdService.I.hide();
+    });
+
+    testWidgets('unmute restores saved volume via setVolume', (tester) async {
+      // 验证静音→取消静音 的完整 round-trip
+      engine.volume.value = 0.6;
+      engine.isMuted.value = false;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeButton(engine: engine)),
+      );
+      await tester.pump();
+
+      // Mute: saves 0.6, sets volume=0
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump();
+      expect(engine.isMuted.value, isTrue);
+
+      // Unmute: restores 0.6
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump();
+      expect(engine.isMuted.value, isFalse);
+      expect(engine.volume.value, closeTo(0.6, 0.01));
+      OsdService.I.hide();
+    });
+
+    testWidgets('slider value syncs with external engine.volume change', (
+      tester,
+    ) async {
+      // 验证 VolumeSlider 的 ValueListenableBuilder 响应 engine.volume 变更
+      engine.volume.value = 0.3;
+      await tester.pumpWidget(
+        buildSubject(child: VolumeSlider(engine: engine)),
+      );
+      await tester.pump();
+
+      var slider = tester.widget<Slider>(find.byType(Slider));
+      expect(slider.value, 0.3);
+
+      // 模拟外部变更（如键盘快捷键触发）
+      engine.volume.value = 0.9;
+      await tester.pump();
+
+      slider = tester.widget<Slider>(find.byType(Slider));
+      expect(slider.value, 0.9);
+    });
   });
 }
