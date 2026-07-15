@@ -66,6 +66,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     stateMachine.onPause = engine.pause;
 
     // 初始化依赖引擎状态的 helper
+    engine._subtitleConfigurator = SubtitleConfigurator(proxy, trackManager);
     engine._callbackHandler = FvpCallbackHandler(
       player,
       stateMachine: stateMachine,
@@ -103,8 +104,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     this._videoEffectController,
     this._stateMachine,
     PlayerProxy proxy,
-  ) : _subtitleConfigurator = SubtitleConfigurator(proxy),
-      _d3d11Configurator = D3D11Configurator(proxy);
+  ) : _d3d11Configurator = D3D11Configurator(proxy);
 
   // ─── 核心依赖 ───
 
@@ -112,7 +112,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   final TrackManager _trackManager;
   final MediaOpener _mediaOpener;
   final VideoEffectController _videoEffectController;
-  final SubtitleConfigurator _subtitleConfigurator;
+  late final SubtitleConfigurator _subtitleConfigurator;
   final D3D11Configurator _d3d11Configurator;
   final EngineStateMachine _stateMachine;
 
@@ -186,7 +186,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   // ─── 内部状态 ───
 
   String _currentPath = '';
-  bool _isOpening = false;
+
+  /// open() 递增计数器 — 快速切歌时丢弃过期的异步结果
+  ///
+  /// 每次 open() 递增，async 操作完成后检查 generation 是否仍匹配。
+  /// 不匹配说明用户已发起新 open()，旧结果应被丢弃。
+  int _openGeneration = 0;
 
   @override
   MediaInfo get mediaInfo => _trackManager.mediaInfo;
@@ -200,11 +205,11 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 音轨控制 — 委托给 TrackManager
   TrackControl get trackControl => _trackManager;
 
-  /// 字幕配置 — FvpEngine 自身实现 SubtitleConfig
-  SubtitleConfig get subtitleConfig => this;
+  /// 字幕配置 — 委托给 SubtitleConfigurator
+  SubtitleConfig get subtitleConfig => _subtitleConfigurator;
 
-  /// 视频效果控制 — FvpEngine 自身实现 VideoEffectControl
-  VideoEffectControl get videoEffectControl => this;
+  /// 视频效果控制 — 委托给 VideoEffectController
+  VideoEffectControl get videoEffectControl => _videoEffectController;
 
   /// 渲染器配置 — 委托给 D3D11Configurator
   RendererControl get rendererControl => _d3d11Configurator;
@@ -231,10 +236,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   @override
   Future<void> open(String path) async {
     if (_disposed) return;
-    if (_isOpening) {
-      log.w('FvpEngine.open() blocked — already opening');
-      return;
-    }
 
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
@@ -245,14 +246,16 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       return;
     }
 
-    _isOpening = true;
+    // 递增 generation — 后续 await 返回后检查是否仍为最新请求
+    final gen = ++_openGeneration;
     _stateMachine.transitionTo(MediaState.opening, 'open');
     _currentPath = trimmed;
     eventLog.add('open', {'path': PathUtils.basename(trimmed)});
 
     try {
       final result = await _mediaOpener.open(trimmed);
-      if (_disposed) return;
+      // generation 不匹配或已 dispose → 用户已切歌，丢弃本次结果
+      if (_disposed || gen != _openGeneration) return;
 
       debugPrint('🔍 open() result: ${result.runtimeType} for ${PathUtils.basename(trimmed)}');
 
@@ -280,7 +283,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
               'action': 'switch to software decode',
             });
             _d3d11Configurator.setHardwareDecoding(false);
-            _isOpening = false;
+            // open() 内部递增 generation，无需手动重置
             await open(trimmed);
             return;
           }
@@ -292,6 +295,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
           );
       }
     } on Exception catch (e) {
+      if (_disposed || gen != _openGeneration) return;
       _stateMachine.transitionTo(MediaState.error, 'open');
       lastError.value = PathValidator.isUrl(trimmed)
           ? NetworkError(NetworkErrorCode.timeout, '无法打开: ${PathUtils.basename(path)}', e)
@@ -299,8 +303,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       metrics.recordOpen(success: false);
       eventLog.add('error', {'action': 'open', 'error': e.toString()});
     } finally {
-      isBuffering.value = false;
-      _isOpening = false;
+      // 只有当前 generation 才清理 buffering 状态
+      if (gen == _openGeneration) {
+        isBuffering.value = false;
+      }
     }
   }
 
@@ -469,6 +475,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     _trackManager.toggleSubtitle();
   }
+
+  @override
+  List<int> get activeSubtitleTracks =>
+      _disposed ? [] : _trackManager.activeSubtitleTracks;
 
   @override
   void setExternalSubtitle(String path) {

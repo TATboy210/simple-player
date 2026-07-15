@@ -3,6 +3,7 @@ import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
 import 'track_control.dart';
+import 'subtitle_track_source.dart';
 
 import '../utils/log.dart';
 
@@ -16,7 +17,7 @@ import '../utils/log.dart';
 ///   - Query available audio/subtitle tracks
 ///   - Switch active audio/subtitle track by index
 ///   - Toggle subtitle on/off
-class TrackManager implements TrackControl {
+class TrackManager implements TrackControl, SubtitleTrackSource {
   final mdk.Player _player;
   MediaInfo _mediaInfo = const MediaInfo();
 
@@ -54,7 +55,11 @@ class TrackManager implements TrackControl {
   @override
   List<int> get activeAudioTracks => _player.activeAudioTracks;
 
+  @override
+  List<int> get activeSubtitleTracks => _player.activeSubtitleTracks;
+
   /// Returns the list of available subtitle tracks for the current media.
+  @override
   List<SubtitleTrackInfo> getSubtitleTracks() => _mediaInfo.subtitleTracks;
 
   /// Switches to the subtitle track at [trackIndex].
@@ -62,6 +67,7 @@ class TrackManager implements TrackControl {
   /// Pass -1 (or any negative value) to disable subtitle output.
   /// Under the hood, passing empty list `[]` disables subtitle — this is
   /// MDK's convention, not a special "track -1".
+  @override
   void switchSubtitleTrack(int trackIndex) {
     try {
       if (trackIndex < 0) {
@@ -79,6 +85,7 @@ class TrackManager implements TrackControl {
   /// Cycles between "first subtitle track" and "no subtitle" (not all tracks).
   /// Most content has one subtitle track, so cycling through all tracks
   /// would add unnecessary complexity for minimal benefit.
+  @override
   void toggleSubtitle() {
     final tracks = _player.activeSubtitleTracks;
     if (tracks.isEmpty) {

@@ -66,6 +66,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   // ─── Internal state ───
 
+  /// open() generation 计数器 — 匹配 FvpEngine 的防御模式
+  int _openGeneration = 0;
+
   MediaInfo _mediaInfo = const MediaInfo();
 
   @override
@@ -115,9 +118,11 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     openCallCount++;
     openPaths.add(path);
+    final gen = ++_openGeneration;
     stateMachine.transitionTo(MediaState.opening, 'fake.open');
     await Future<void>.value();
-    if (_disposed) return;
+    // generation 不匹配或已 dispose → 丢弃结果
+    if (_disposed || gen != _openGeneration) return;
 
     if (failNextOpenWith != null) {
       final msg = failNextOpenWith!;
@@ -242,6 +247,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   void toggleSubtitle() {
     // no-op in fake
   }
+
+  @override
+  List<int> get activeSubtitleTracks => [];
 
   // ─── External subtitle ───
 
