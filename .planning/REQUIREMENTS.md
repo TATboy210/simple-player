@@ -43,16 +43,16 @@
 
 ### G. 可测试性提升 (NEW)
 
-- [ ] **TEST-01**: Widget 测试可通过 FakeEngine + FakeWindowService 完整 mock 内核行为 — 不需要真实的 fvp Player
-- [ ] **TEST-02**: 每个 PlayerScreen 子 widget 可独立测试 — 不依赖 PlayerScreen 的 context 或 InheritedWidget
-- [ ] **TEST-03**: PlaybackController 可通过构造函数注入 mock 依赖 — 不硬编码 FvpEngine
-- [ ] **TEST-04**: 测试覆盖率达到 80%+ — 核心路径（播放/暂停/seek/切歌/错误恢复）全部有测试
+- [x] **TEST-01**: Widget 测试可通过 FakeEngine + FakeWindowService 完整 mock 内核行为 — 不需要真实的 fvp Player
+- [x] **TEST-02**: 每个 PlayerScreen 子 widget 可独立测试 — 不依赖 PlayerScreen 的 context 或 InheritedWidget
+- [x] **TEST-03**: PlaybackController 可通过构造函数注入 mock 依赖 — 不硬编码 FvpEngine
+- [x] **TEST-04**: 测试覆盖率达到 80%+ — 核心路径（播放/暂停/seek/切歌/错误恢复）全部有测试
 
 ### H. 数据流清晰化 (NEW)
 
-- [ ] **FLOW-01**: Widget→Kernel 命令流单向 — widget 调用 PlaybackControl 方法，不直接修改 ValueNotifier
-- [ ] **FLOW-02**: Kernel→Widget 状态流单向 — ValueNotifier 变更触发 widget rebuild，widget 不反向写入
-- [ ] **FLOW-03**: 错误传播路径清晰 — FvpEngine → PlaybackController → ErrorBanner，每层有明确的错误转换
+- [x] **FLOW-01**: Widget→Kernel 命令流单向 — widget 调用 PlaybackControl 方法，不直接修改 ValueNotifier
+- [x] **FLOW-02**: Kernel→Widget 状态流单向 — ValueNotifier 变更触发 widget rebuild，widget 不反向写入
+- [x] **FLOW-03**: 错误传播路径清晰 — FvpEngine → PlaybackController → ErrorBanner，每层有明确的错误转换
 - [ ] **FLOW-04**: `flutter analyze` 无错误，现有测试全部通过
 
 ## Future Requirements
@@ -95,6 +95,7 @@
 | FLOW-01 ~ FLOW-04 | TBD | Pending |
 
 **Coverage:**
+
 - v2.1 requirements: 25 total (9 existing + 16 new)
 - Completed: 3 (ENG-01, ENG-03, SVC-01)
 - Remaining: 22
