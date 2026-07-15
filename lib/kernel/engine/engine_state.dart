@@ -9,6 +9,7 @@ export 'subtitle_config.dart';
 export 'video_effect_control.dart';
 export 'renderer_control.dart';
 export 'volume_control.dart';
+export 'subtitle_track_source.dart';
 export 'media_engine.dart';
 export 'media_state.dart';
 export 'models/media_info.dart';

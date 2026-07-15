@@ -1,4 +1,5 @@
 import 'package:fvp/mdk.dart' as mdk;
+import 'video_effect_control.dart';
 import 'video_effect_type.dart';
 
 import '../utils/log.dart';
@@ -6,15 +7,17 @@ import '../utils/log.dart';
 /// Encapsulates video effect operations: brightness, contrast, hue,
 /// saturation, rotation, aspect ratio, and deinterlace.
 ///
-/// Extracted from FvpEngine to isolate video processing concerns.
+/// Implements [VideoEffectControl] interface — extracted from FvpEngine
+/// to isolate video processing concerns.
 /// Uses mdk.Player directly for all video property manipulation.
-class VideoEffectController {
+class VideoEffectController implements VideoEffectControl {
   VideoEffectController(this._player);
 
   final mdk.Player _player;
 
   /// Sets a video effect (brightness, contrast, hue, saturation).
   /// Value is clamped to [-1.0, 1.0].
+  @override
   void setVideoEffect(VideoEffectType effect, double value) {
     final clamped = value.clamp(-1.0, 1.0);
     final mdkEffect = switch (effect) {
@@ -37,6 +40,7 @@ class VideoEffectController {
       validRotationDegrees.contains(degree);
 
   /// Rotates video by [degree] (must be 0, 90, 180, or 270).
+  @override
   void rotate(int degree) {
     if (!isValidRotation(degree)) {
       log.w('VideoEffectController.rotate invalid: $degree, expected 0/90/180/270');
@@ -46,6 +50,7 @@ class VideoEffectController {
   }
 
   /// Sets video aspect ratio (e.g., 16/9 = 1.778).
+  @override
   void setAspectRatio(double ratio) {
     _player.setAspectRatio(ratio);
   }
@@ -55,6 +60,7 @@ class VideoEffectController {
   /// `yadif` = Yet Another DeInterlacing Filter (FFmpeg).
   /// - `mode=send_frame`: outputs one frame per input (vs `send_field` for half)
   /// - `deint=all`: deinterlaces both fields (vs `interlaced` for interlaced-only)
+  @override
   void setDeinterlace(bool enable) {
     _player.setProperty(
       'video.avfilter',

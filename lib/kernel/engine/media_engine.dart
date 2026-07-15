@@ -8,7 +8,7 @@ import 'volume_control.dart';
 
 /// 播放引擎组合接口 — 服务层统一依赖类型
 ///
-/// 将 6 个 ISP 接口聚合为单一类型，服务层（PlaybackController、StateMonitor 等）
+/// 将 6 个 ISP 接口聚合为单一类型，服务层（PlaybackController、PlaybackStateManager、AutoAdvancePolicy 等）
 /// 通过此接口同时访问状态和控制方法，无需依赖具体实现类。
 ///
 /// 架构位置：

@@ -84,6 +84,9 @@ class PlaybackNavigator {
         ),
       );
 
+      // FEAT-04: Restore track preferences (audio/subtitle track, subtitle delay)
+      _controller.trackPreferenceService?.restoreAfterOpen(_controller.engine.mediaInfo);
+
       _controller.engine.play();
     } on Exception catch (e) {
       log.e('PlaybackNavigator.playIndex($index) failed: $e');
