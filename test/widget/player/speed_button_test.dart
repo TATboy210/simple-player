@@ -292,5 +292,42 @@ void main() {
       expect(engine.playbackSpeed.value, 1.5);
       OsdService.I.hide();
     });
+
+    // ── Wave 2: reactive label sync + call tracking tests ──
+
+    testWidgets('speed label updates reactively on external speed change', (
+      tester,
+    ) async {
+      // 验证 ValueListenableBuilder<double> 正确响应 engine.playbackSpeed 变更
+      engine.playbackSpeed.value = 1.0;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      expect(find.text('1x'), findsOneWidget);
+
+      // 模拟外部倍速变更（如键盘快捷键）
+      engine.playbackSpeed.value = 2.0;
+      await tester.pump();
+
+      expect(find.text('2x'), findsOneWidget);
+      expect(find.text('1x'), findsNothing);
+    });
+
+    testWidgets('left arrow tap snaps non-standard speed to correct gear', (
+      tester,
+    ) async {
+      // 验证非标准值 + 左箭头 → snap 到正确的较低挡位
+      // _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
+      // 1.1 → indexWhere >= 1.1 → idx=3 (1.25), left → prev=2 (1.0)
+      engine.playbackSpeed.value = 1.1;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pump();
+
+      expect(engine.playbackSpeed.value, 1.0);
+      OsdService.I.hide();
+    });
   });
 }
