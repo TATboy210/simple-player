@@ -176,7 +176,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
               onPrevious: () => widget.controller.playPrevious(),
               onNext: () => widget.controller.playNext(),
               onOpenFile: widget.onOpenFile,
-              onToggleSubtitle: widget.engine.toggleSubtitle,
+              onToggleSubtitle: () {
+                widget.engine.toggleSubtitle();
+                // 录制字幕开关偏好 — S 键切换后记录新状态（-1=关闭, 0+=轨道索引）
+                final active = widget.engine.activeSubtitleTracks;
+                final newIndex = active.isEmpty ? -1 : active.first;
+                widget.controller.trackPreferenceService
+                    ?.recordSubtitleTrack(newIndex);
+              },
               onShowHelp: () => _showShortcutsHelp(context),
               onSubtitleDelayForward: () {
                 final delay = widget.engine.subtitleDelay;

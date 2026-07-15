@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.dart';
 import 'package:simple_player_flutter/kernel/engine/subtitle_configurator.dart';
 import 'package:simple_player_flutter/kernel/engine/player_proxy.dart';
+import 'package:simple_player_flutter/kernel/engine/subtitle_track_source.dart';
 
 /// Fake player that implements PlayerProxy for testing.
 /// Records all calls for verification.
@@ -30,6 +32,21 @@ class FakePlayer implements PlayerProxy {
   Map<String, String> get properties => Map.unmodifiable(_properties);
 }
 
+/// Fake SubtitleTrackSource for testing SubtitleConfigurator's track delegation.
+class FakeSubtitleTrackSource implements SubtitleTrackSource {
+  @override
+  List<SubtitleTrackInfo> getSubtitleTracks() => [];
+
+  @override
+  void switchSubtitleTrack(int trackId) {}
+
+  @override
+  void toggleSubtitle() {}
+
+  @override
+  List<int> get activeSubtitleTracks => [];
+}
+
 void main() {
   group('SubtitleConfigurator', () {
     late FakePlayer player;
@@ -37,7 +54,7 @@ void main() {
 
     setUp(() {
       player = FakePlayer();
-      configurator = SubtitleConfigurator(player);
+      configurator = SubtitleConfigurator(player, FakeSubtitleTrackSource());
     });
 
     group('setExternalSubtitle', () {
