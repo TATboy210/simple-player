@@ -5,10 +5,10 @@ milestone_name: 播放内核重构强化 (expanded — In Progress)
 current_phase: 12
 current_phase_name: 轨道管理统一
 status: planning
-stopped_at: context exhaustion at 75% (2026-07-15)
-last_updated: "2026-07-15T07:20:36.875Z"
+stopped_at: Phase 11 verification complete (2026-07-15)
+last_updated: "2026-07-15T12:00:00.000Z"
 last_activity: 2026-07-15
-last_activity_desc: Phase 14 complete, transitioned to Phase 12
+last_activity_desc: Phase 11 verified — StateMonitor split + generation guard confirmed
 progress:
   total_phases: 6
   completed_phases: 4
