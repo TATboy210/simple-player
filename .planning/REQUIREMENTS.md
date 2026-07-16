@@ -107,12 +107,61 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(由 roadmapper 回填)_ | | |
+| BASE-01 | Phase 15 | Pending |
+| BASE-02 | Phase 15 | Pending |
+| BASE-03 | Phase 15 | Pending |
+| BASE-04 | Phase 15 | Pending |
+| ADAPT-01 | Phase 16 | Pending |
+| ADAPT-02 | Phase 16 | Pending |
+| ADAPT-03 | Phase 16 | Pending |
+| ADAPT-04 | Phase 16 | Pending |
+| ADAPT-05 | Phase 16 | Pending |
+| LOG-01 | Phase 17 | Pending |
+| LOG-02 | Phase 17 | Pending |
+| LOG-03 | Phase 17 | Pending |
+| LOG-04 | Phase 17 | Pending |
+| LOG-05 | Phase 17 | Pending |
+| ERR-01 | Phase 18 | Pending |
+| ERR-02 | Phase 18 | Pending |
+| ERR-03 | Phase 18 | Pending |
+| ERR-04 | Phase 18 | Pending |
+| ERR-05 | Phase 18 | Pending |
+| MEM-01 | Phase 19 | Pending |
+| MEM-02 | Phase 19 | Pending |
+| MEM-03 | Phase 19 | Pending |
+| MEM-04 | Phase 19 | Pending |
+| MEM-05 | Phase 19 | Pending |
+| STATE-01 | Phase 20 | Pending |
+| STATE-02 | Phase 20 | Pending |
+| STATE-03 | Phase 20 | Pending |
+| STATE-04 | Phase 20 | Pending |
+| STATE-05 | Phase 20 | Pending |
+| STATE-06 | Phase 20 | Pending |
+| STATE-07 | Phase 20 | Pending |
+| VERIFY-01 | Phase 21 | Pending |
+| VERIFY-02 | Phase 21 | Pending |
+| VERIFY-03 | Phase 21 | Pending |
+| VERIFY-04 | Phase 21 | Pending |
+| VERIFY-05 | Phase 21 | Pending |
+| VERIFY-06 | Phase 21 | Pending |
+| DOC-01 | Phase 22 | Pending |
+| DOC-02 | Phase 22 | Pending |
+| DOC-03 | Phase 22 | Pending |
 
 **Coverage:**
 - v1 requirements: 40 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 40 ⚠️ (pending roadmap)
+- Mapped to phases: 40 ✓
+- Unmapped: 0 ✓
+
+**Phase 映射概览**（按代码接地 8 阶段构建顺序）：
+- Phase 15 契约固化与基线盘点 ← BASE (4)
+- Phase 16 兼容适配层骨架 + DiagnosticsBundle ← ADAPT (5)
+- Phase 17 零依赖 KernelLogger 门面 ← LOG (5)
+- Phase 18 Sealed 错误模型稳化 ← ERR (5)
+- Phase 19 MemoryMonitor 一等化 ← MEM (5)
+- Phase 20 状态与生命周期重写 ← STATE (7)
+- Phase 21 测试与迁移验证 + 适配层收拢 ← VERIFY (6)
+- Phase 22 双语 API 文档注释标准 ← DOC (3)
 
 ---
 *Requirements defined: 2026-07-16*
