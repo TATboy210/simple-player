@@ -179,3 +179,7 @@ None - no external service configuration required.
 ---
 *Phase: 15-contract-freeze-baseline-audit*
 *Completed: 2026-07-17*
+
+## Self-Check: PASSED
+
+All created files verified present on disk (tool/audit/inventory.sh, tool/audit/contract_completeness.sh, tool/audit/README.md, 15-BASELINE-AUDIT.json, 15-BASELINE-AUDIT.md, 15-01-SUMMARY.md, PROJECT.md, and all 7 .planning/codebase/*.md files). All recorded commit hashes (d72e0d4, 97818f4, 54804f1, 0a69242) confirmed present in git log.
