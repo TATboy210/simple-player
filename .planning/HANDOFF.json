@@ -1,52 +1,66 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-16T14:53:19.237Z",
+  "timestamp": "2026-07-16T19:53:35.009Z",
   "phase": "15",
   "phase_name": "契约固化与基线盘点",
   "phase_dir": ".planning/phases/15-contract-freeze-baseline-audit",
-  "workflow": "discuss-phase",
-  "workflow_mode": "default",
-  "plan": null,
-  "task": 3,
-  "total_tasks": 4,
-  "task_label": "discuss-area-3 (契约测试策略) 完成; discuss-area-4 (盘点工件+陈旧maps) 未开始",
-  "status": "paused",
+  "plan": 0,
+  "task": 0,
+  "total_tasks": 3,
+  "plan_count": 3,
+  "status": "ready_to_execute",
+  "phase_lifecycle_stage": "plan-phase-COMPLETE-ready-to-execute",
+  "workflow_position": "plan-phase COMPLETE (§0-§13e done, §13d committed 2937238); §15 auto-advance NOT triggered (context 76%)",
   "completed_tasks": [
-    {"id": 1, "name": "discuss-area-1 契约文档落点 (BASE-01)", "status": "done", "decisions": "D1-D4", "note": "契约权威在接口 /// 双语注释; 扩展 DOC-01 标签集 +requires/ensures/modifies/states/throws; 12 只读 getter 按组共享轻量契约; 实现薄仅记副作用"},
-    {"id": 2, "name": "discuss-area-2 9v6裁决+生命周期态 (BASE-03 + 约束#2)", "status": "done", "decisions": "D5-D12", "note": "独立 LifecyclePhase 枚举正交 6 态; 冻结高层转换语义完整表留 P20; states 标签每方法列入态/出态; dispose 任意态可达+终态; disposed 后安全默认+no-op; error 陷阱态仅显式可出; disposing 同步瞬态不可见; recover 仅 error 可调"},
-    {"id": 3, "name": "discuss-area-3 契约测试策略 (BASE-04)", "status": "done", "decisions": "D13-D20", "note": "本会话完成. 对真实 FvpEngine 跑+参数化 accepts MediaEngine (P21 复用); 按 ISP 接口分组; 首版覆盖 states+throws 优先; baseline 捕获现有行为 lifecycle 留 P20; 真实坏文件 fixture 注入错误; known gap 落 CONTEXT.md decisions/deferred; 行为断言+派生交叉校验 D7; 时序/竞态留 P20 STATE-05/07"}
+    {"id": 1, "name": "init.plan-phase 15 + closed-phase gate + prerequisites", "status": "done"},
+    {"id": 2, "name": "Verify prerequisites (CONTEXT/RESEARCH/VALIDATION exist, UI gate frontend=false, drift gate non-blocking)", "status": "done"},
+    {"id": 3, "name": "Spawn gsd-pattern-mapper (15-PATTERNS.md) + §7.95 edge-probe ($COVERAGE 4/4 unresolved->flagged) + §8 gsd-planner (3 plans: 15-01 BASE-02, 15-02 BASE-01+03, 15-03 BASE-04)", "status": "done", "note": "planner 越界 commit 43e874d 已在 §13d soft-reset 折叠"},
+    {"id": 4, "name": "Spawn gsd-plan-checker iter1 -> BLOCKER(load→play gate skippable) + WARNING(audit non-deterministic) -> revise -> iter2 PASSED", "status": "done"},
+    {"id": 5, "name": "§13 requirements gate 4/4 + §13a decision gate 23/23 + §13b state.planned-phase + §13c roadmap.annotate-dependencies + §13e gap-analysis clean", "status": "done", "verified_independently_this_session": "grep 复验: requirements union BASE-01..04; D1..D23 across 3 plans missing=empty; CONTEXT.md <decisions> block present with all 23"},
+    {"id": 6, "name": "§13d commit plans — DONE", "status": "done", "commit": "2937238", "note": "soft-reset 43e874d~1→ca67a93 (folded planner 43e874d + wip 1efca91), precise add 6 工件, single docs(15) commit; in-flight 文件 staged 集验证 CLEAN"},
+    {"id": 7, "name": "§14 present final status", "status": "done", "note": "呈现 PHASE 15 PLANNED banner + wave table; auto_advance 未触发"},
+    {"id": 8, "name": "§15 auto-advance check", "status": "skipped", "note": "context 76% 不足执行链; auto_advance=true 但本会话不触发, 留新窗口 /gsd-execute-phase 15"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "discuss-area-4 盘点工件+陈旧maps (BASE-02)", "status": "not_started", "sub_decisions": [
-      "121 logger / MemoryMonitor.start/snapshot 2 处 / openGeneration 引用 盘点产物形态 (独立 AUDIT.md vs 嵌入 CONTEXT.md vs grep 脚本)",
-      "codebase maps 是 v2.1 重构前 (2026-07-12) 陈旧快照 (描述 EngineState god-mixin + features/player/services/) — 刷新对 LIVE code 重新生成, 还是标注其陈旧性保留作历史参考"
-    ]},
-    {"id": 5, "name": "write_context", "status": "not_started", "note": "写 15-CONTEXT.md + 15-DISCUSSION-LOG.md (读 templates/context.md + templates/discussion-log.md); canonical_refs MANDATORY 完整相对路径; spec_loaded=false 无 spec_lock; 含 20 决策 + deferred + code_context"},
-    {"id": 6, "name": "git_commit", "status": "not_started", "note": "gsd_run query commit 'docs(15): capture phase context' --files CONTEXT.md DISCUSSION-LOG.md; 并 rm -f 15-DISCUSS-CHECKPOINT.json"},
-    {"id": 7, "name": "update_state", "status": "not_started", "note": "gsd_run query state.record-session --stopped-at 'Phase 15 context gathered' --resume-file CONTEXT.md; commit STATE.md"},
-    {"id": 8, "name": "auto_advance", "status": "not_started", "note": "auto_advance=true 已开 → 读 modes/chain.md → 自动跳 /gsd-plan-phase 15"}
+    {"id": 1, "name": "执行 15-01 (Wave 1): BASE-02 审计脚本 inventory.sh + contract_completeness.sh + 7 陈旧 maps 水印 + PROJECT.md 9态修正", "status": "not_started"},
+    {"id": 2, "name": "执行 15-02 (Wave 1): BASE-01+03 7 接口文件 D2 契约标签 + fvp_engine 薄注释 + 15-CONTEXT.md P20 lifecycle-gap 清单", "status": "not_started"},
+    {"id": 3, "name": "执行 15-03 (Wave 2, depends_on 15-02): BASE-04 7 契约测试组 + 真实 FvpEngine 挂载点 + 5 fixtures + open→idle→play 回归闸门", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "上下文窗口耗尽 (非技术阻塞): 区域3 完成时 79%, 剩余 21% 不足跑完区域4 + 写 CONTEXT.md/DISCUSSION-LOG.md + 提交", "type": "technical", "workaround": "checkpoint 已保存 20 决策 (D1-D20), 下会话 Resume 零损失从 areas_pending[0]=盘点工件+陈旧maps 继续"}
+    {"description": "glm-5.2 分类器间歇宕机 (项目 STATE.md recurring blocker) — 本会话 §13d 两次重试阻塞, 第三次恢复; execute-phase git commit / fixture 生成 / flutter test 可能再遇", "type": "external", "workaround": "提交重试; read-only 操作不受影响; 若持续宕机留工作树未提交由下会话处理"},
+    {"description": "上下文 76% — §15 auto-advance 故意未触发, execute-phase 须新窗口跑 (3 计划含真实 fixture 生成/flutter test/契约标签/7 接口 doc-comment 编辑)", "type": "context", "workaround": "/clear → /gsd-execute-phase 15 (新上下文窗口)"}
   ],
   "async_jobs": [],
   "human_actions_pending": [],
-  "decisions_count": 20,
-  "decisions_summary": {
-    "D1-D4": "契约文档落点 (BASE-01): 接口 /// 双语注释权威非独立 CONTRACT.md; 扩展标签集 requires/ensures/modifies/states/throws; 12 只读 getter 按组共享轻量契约; 实现薄仅记副作用",
-    "D5-D12": "9v6裁决+生命周期态 (BASE-03 + 约束#2): 独立 LifecyclePhase 枚举正交 6 态; 冻结高层转换语义完整表留 P20; states 每方法列入态/出态; dispose 任意态可达+终态+double-dispose 幂等; disposed 后安全默认+no-op; error 陷阱态仅 recover()/open() 可出; disposing 同步瞬态不可见; recover 仅 error 可调 transitions to {idle,opening}",
-    "D13-D20": "契约测试策略 (BASE-04): 对真实 FvpEngine 跑+参数化 accepts MediaEngine (P21 复用); 按 ISP 接口分组; 首版 states+throws 优先; baseline 捕获现有行为 lifecycle 留 P20; 真实坏文件 fixture 注入错误; known gap 落 CONTEXT.md; 行为断言+派生交叉校验 D7; 时序/竞态留 P20 STATE-05/07"
+  "decisions": [
+    {"decision": "Phase 15 规划 3 计划按 BASE 需求切分: 15-01(BASE-02)/15-02(BASE-01+03)/15-03(BASE-04 Wave2依赖15-02) — Wave1 两计划零文件重叠可并行", "rationale": "需求驱动边界; 审计/契约冻结/契约测试三件职责正交", "phase": "15"},
+    {"decision": "load→play 回归断言纳入 must_haves.truths + 15-03 happy-path 结构回归闸门 (tiny_valid.mp4 真实 fixture, EXECUTION 验收非 skippable)", "rationale": "用户正经历'加载但不能播放'回归 (.planning/debug/ 两 stub status:investigating + 未提交 media_opener/main); 契约测试作结构闸门冻结该交接语义为可测边界", "phase": "15"},
+    {"decision": "§13d soft-reset 43e874d~1 重做单次 docs(15) 提交 (折叠 planner 越界 commit + wip 1efca91)", "rationale": "planner 子代理自行 commit 越界 + 标错 fix + 漏 15-02 致历史错位; --soft 保留工作树内容只重塑历史 (严禁 --hard)", "phase": "15"},
+    {"decision": "7 个 ISP 契约测试组 (非 D14 的 6 个): 补 VolumeControl 第7组", "rationale": "15-PATTERNS.md 发现 media_engine.dart implements 7 接口含 VolumeControl (RESEARCH Pitfall 4)", "phase": "15"},
+    {"decision": "契约测试断言 state/value(lastError.value + state==error) 非 throwsA", "rationale": "FvpEngine 错误路径设 lastError.value + 状态转换而非抛异常 (PATTERNS behavioral-assertion, D19)", "phase": "15"},
+    {"decision": "§13a 决策闸门: 本会话独立 grep 复验 23/23 通过 (CONTEXT.md 确含 <decisions> 块, 上轮 handoff 称'格式非<decisions>'的备注系陈旧误述)", "rationale": "gate 实质=每 trackable decision 被某 plan 引用; 内容满足则通过, 无论 markdown vs XML 格式", "phase": "15"}
+  ],
+  "uncommitted_files": {
+    "plan_phase_handoff_this_session": [
+      ".planning/HANDOFF.json (M 本 handoff 写入, 将随 pause commit 含入)",
+      ".planning/phases/15-contract-freeze-baseline-audit/.continue-here.md (M 本 handoff 更新, 将随 pause commit 含入)",
+      ".planning/STATE.md (M §13b state.planned-phase 写入, 未随 §13d 提交——含 planning→Ready-to-execute 更新; 是否纳入 pause commit 待定)"
+    ],
+    "in_flight_files_NOT_ours_EXCLUDE_from_pause_commit": [
+      ".planning/debug/ (?? 两份诊断 stub, in-flight debug 调查'加载但不能播放')",
+      "lib/kernel/engine/media_opener.dart (M, in-flight debug)",
+      "lib/main.dart (M, in-flight debug)",
+      "lib/ui/player/player_screen.dart (M, in-flight UI debug)",
+      "lib/ui/player/video_surface.dart (M, in-flight UI debug)",
+      "lib/ui/player/playback_status_overlay.dart (?? in-flight UI debug)",
+      "test/widget/player/playback_status_overlay_test.dart (?? in-flight UI debug)",
+      "lib/l10n/app_en.arb, app_zh.arb, app_localizations.dart, app_localizations_en.dart, app_localizations_zh.dart (M, in-flight l10n)"
+    ],
+    "resume_artifacts_optional_cleanup": [
+      ".planning/phases/15-contract-freeze-baseline-audit/15-PLAN-PHASE-CHECKPOINT.md (?? pre-planner resume 指南, execute-phase 成功后可删)",
+      ".planning/HANDOFF.json (本文件, execute-phase 成功后可删作一次性工件)"
+    ]
   },
-  "deferred": [
-    "recover() 目标态 idle vs opening — Phase 20 STATE-04 定 (D6 已限定 {idle, opening})",
-    "lifecycle 完整转换表 — Phase 20 STATE-04 实现时定并回写契约",
-    "PROJECT.md '9 态~40 边' 陈旧描述修正为 '6 态正交 + LifecyclePhase' — Phase 15 产物派生任务",
-    "lifecycle 新语义 (D5-D12) 对 NewFvpEngine 的须补清单 — Phase 20 (D16/D18)"
-  ],
-  "uncommitted_files": [
-    ".planning/STATE.md (M, 含第七次恢复记录, 非本会话改动, 随 commit 一并落盘)",
-    ".planning/phases/15-contract-freeze-baseline-audit/15-DISCUSS-CHECKPOINT.json (M, 区域3 D13-D20 本会话改动)"
-  ],
-  "next_action": "新会话执行 /gsd-discuss-phase 15. check_existing 步骤检测 15-DISCUSS-CHECKPOINT.json (3/4 areas, 20 决策) 并提供 Resume → 选恢复讨论 → 从 areas_pending[0]=盘点工件+陈旧maps (BASE-02) 继续 default 模式讨论 (每区 4 单问题轮次 → Next area 检查) → 区域4 完成 → write_context 写 15-CONTEXT.md+15-DISCUSSION-LOG.md → git_commit (rm checkpoint) → update_state → auto_advance 跳 /gsd-plan-phase 15",
-  "context_notes": "discuss-phase 默认模式工作流第 8 次会话续作. 本次从 checkpoint (2/4, 12 决策) resume, 完成区域3 契约测试策略 (D13-D20, 8 决策), 区域4 未开始因上下文 79% 耗尽. 决策链高度内聚: D13→D14→D15→D16→D17→D18→D19→D20 互相引用 (D17↔D13, D19↔D7, D20↔STATE-05/07, D16↔D6). 关键边界由 D16+D20 锁定: Phase 15 闸门=静态行为契约 baseline 捕获, lifecycle 新语义与时序/竞态留 P20. codebase maps 是 v2.1 前 (2026-07-12) 陈旧快照, Phase 15 基线盘点必须对 LIVE code 做. 里程碑级 .planning/.continue-here.md (8 blocking constraints) 不可覆盖."
+  "next_action": "新上下文窗口: /clear → /gsd-execute-phase 15。execute-phase 会从 STATE.md (status Ready-to-execute, plan_count 3) 续。执行前复核 3 计划 do_not_touch 边界 (15-03 files_modified 仅限 test/contracts/* + test/fixtures/* + lib/kernel/engine/* doc-comment edits; 不得碰 in-flight 的 media_opener/main/player_screen/video_surface/playback_status_overlay/l10n)",
+  "context_notes": "Phase 15 plan-phase 实质 100% 完成 (§0-§13e 全过, §13d 已提交 2937238, §14 已呈现), 仅 §15 auto-advance 因上下文 76% 故意未触发。两个覆盖闸门本会话独立 grep 复验通过 (requirements 4/4, decisions 23/23)。关键非显而易见判断: load→play 回归断言已正确纳入 15-03 结构闸门 (checker iter2 验证 EXECUTION 非 skippable); in-flight 调试文件是用户并行工作 §13d 已显式排除绝不污染 Phase 提交。"
 }
