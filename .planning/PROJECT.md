@@ -33,7 +33,7 @@ Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的内核重�
 - ✓ 毛玻璃设计语言（GlassContainer、Tokens.*）— 现有
 - ✓ 沉浸式全屏功能 — v2.0 已完成
 - ✓ 引擎接口分解（ISP：EngineStateView + PlaybackControl + 能力接口）— v2.1 (09)
-- ✓ 状态机穷举（9 状态 ~40 边）— v2.1 (10)
+- ✓ 状态机穷举（6 态正交 MediaState（idle/opening/playing/paused/completed/error）+ isSeeking/isBuffering 独立标志；v3.0 补充正交 LifecyclePhase{alive,disposing,disposed}，见 Phase 15 契约冻结 D5-D12）— v2.1 (10)
 - ✓ `StateMonitor` 拆分为 `PlaybackStateManager` + `AutoAdvancePolicy` — v2.1
 - ✓ `openGeneration` 守卫替代 `_isOpening` bool — v2.1
 - ✓ `MemoryMonitor` / `EngineMetrics` / `EngineEventLog` 初版 — v2.1 (11/14)
