@@ -220,6 +220,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   // ─── 通用守卫 ───
 
   /// 通用守卫：disposed 检查 + try-catch + log + 事件记录
+  ///
+  /// 实现特有：异常被吸收为 lastError=PlaybackError（无论具体操作语义），
+  /// 不重新 throw；state 不受影响 — 供大多数无状态迁移的 setter 方法复用
+  /// （D19 行为断言模式的通用实现载体，接口层契约见各方法自身 throws: 标签）。
   void _guardedAction(String name, void Function() action) {
     if (_disposed) return;
     try {
@@ -233,6 +237,11 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 播放控制 ───
 
+  /// 实现特有：成功后 state→idle（非 playing），调用方须显式 play()；
+  /// generation 守卫丢弃过期异步结果；codec 错误自动降级软解重试一次
+  /// （见下方 CodecError 分支）；从 playing/paused/completed 源态调用时，
+  /// 内部无条件先转 opening，若与 _canTransitionTo 表冲突则静默失败但
+  /// 方法主体仍继续（契约层已在 PlaybackControl.open 标注此已知落差）。
   @override
   Future<void> open(String path) async {
     if (_disposed) return;
@@ -276,6 +285,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
             '${mediaInfo.duration}ms',
           );
         case OpenError(:final error):
+          // 实现特有：软解降级重试仅一次 —— 递归调用 open() 会再次递增
+          // generation，不会无限重试（第二次若仍失败会走下方 else 分支
+          // 直接 state→error，不会再次判定 CodecError 分支）；本地文件
+          // 专属（网络 URL 排除在外，因网络编解码问题多与硬解无关）。
           if (error is CodecError && !PathValidator.isUrl(trimmed)) {
             logEngine.i('open() codec error — retrying with software decode');
             eventLog.add('fallback', {
@@ -571,6 +584,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 生命周期 ───
 
+  /// 实现特有：当前 baseline 用 `_disposed` bool 守卫，尚无 LifecyclePhase
+  /// 枚举（Phase 20 补，见 15-CONTEXT.md P20 清单）；double-dispose 由
+  /// `_disposed` 幂等吸收（第二次调用仍会重复执行 dispose 全部 ValueNotifier，
+  /// 但 `_disposed=true` 已生效，故各 setter/控制方法在此之后均为 no-op）。
   @override
   void dispose() {
     _disposed = true;
