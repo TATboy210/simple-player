@@ -1,3 +1,5 @@
+> ⚠️ **v2.1 前快照（2026-07-12）** — 此文档描述 v2.1 重构前结构，Phase 15+ 一律对 LIVE code + codegraph 核对，勿信本快照具体路径/类名。保留作演进历史。
+
 # Testing Patterns
 
 **Analysis Date:** 2026-07-12
