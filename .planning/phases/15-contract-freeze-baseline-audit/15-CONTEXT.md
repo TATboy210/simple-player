@@ -132,6 +132,41 @@ None of the deferred items block Phase 15. 所有延后项均有明确归属阶�
 
 ---
 
+## P20 Lifecycle-Gap 清单（D18）
+
+Phase 15-02 执行时冻结的 9-vs-6 态裁决与 Phase 20 待补生命周期清单，记录于此供 Phase 20 gsd-planner/gsd-executor 直接消费。
+
+**冻结裁决：** 冻结基线 = 6 态正交 MediaState + 正交 LifecyclePhase；9 态模型（PROJECT.md 陈旧）已退休（promote 非 add-alongside）。
+
+**6 态正交 MediaState**（`engine_state_machine.dart` 现状，已冻结）：
+- `idle` / `opening` / `playing` / `paused` / `completed` / `error`
+- 转换表（`_canTransitionTo`）：
+  - `idle → {opening, playing, error}`
+  - `opening → {idle, playing, error}`
+  - `playing → {paused, completed, error, idle}`
+  - `paused → {playing, error, idle}`
+  - `completed → {opening, error, idle}`
+  - `error → {opening, idle}`（recover() 唯一出口，D6/D12 已限定，Phase 20 不可关闭此边）
+
+**正交 LifecyclePhase（D5，尚未实现，Phase 20 待补）：**
+- 目标形状：`LifecyclePhase { alive, disposing, disposed }`，与 6 态 MediaState 正交（D5）
+- 当前基线现状：`FvpEngine` 仅用 `bool _disposed` 标志守卫（无枚举），`dispose()` 首行设 `_disposed = true`；`disposing` 中间态在当前实现中不可观察（同步完成，符合 D11 冻结的"disposing 对调用者不可见"语义，尽管尚未有显式枚举值）
+- Phase 20 待补：
+  1. 引入 `LifecyclePhase` 枚举替换 `bool _disposed`
+  2. 完整转换表（`alive→disposing→disposed`，D6 留待 P20 定并回写契约）
+  3. `recover()` 目标态在 `{idle, opening}` 集合内选定最终态（D6/D12 已限定集合）
+  4. `dispose()` 契约的 double-dispose 幂等验证需覆盖枚举实现后的行为（D8 冻结的"double-dispose 幂等 no-op"语义不变，仅实现载体升级）
+  5. disposed 后 mutating 方法从当前"静默 no-op"升级为 `Result.err` + KernelLogger 警告（D9 已冻结此升级路径）
+  6. `recover()` 他态调用被拒的行为从当前实现（如有）升级为 `Result.err`（D12 已冻结此升级路径）
+
+**本计划（15-02）执行时观察到的契约-实现落差**（非本计划修复范围，供 Phase 20/22 参考）：
+- `open()` 从 `playing`/`paused` 源态调用时，`_canTransitionTo` 表未收录 `→opening` 边，`transitionTo` 静默失败但 `open()` 方法主体仍继续执行（详见 `playback_control.dart` open() 的 `states:` 标签注）
+- `play()` 从 `completed` 源态调用时，`_canTransitionTo` 表未收录 `→playing` 边，同上静默失败模式（详见 `playback_control.dart` play() 的 `states:` 标签注）
+- `VideoEffectControl.setAspectRatio()` 不写回 `EngineStateView.aspectRatio` ValueNotifier — 该 notifier 仅由 `open()` 成功时自动计算写入，调用方手动设置的宽高比对状态视图不可见（详见 `video_effect_control.dart` 的 `modifies:` 标签注）
+
+---
+
 *Phase: 15-contract-freeze-baseline-audit*
 *Context gathered: 2026-07-16*
 *Decisions captured: 23 (D1-D23) across 4 gray areas, resumed from checkpoint (20 decisions) + completed area 4 (3 decisions)*
+*P20 Lifecycle-Gap 清单 appended: 15-02 execution (D18)*
