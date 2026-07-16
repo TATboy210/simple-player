@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-16T14:18:57Z",
+  "phase": "15",
+  "phase_name": "契约固化与基线盘点",
+  "phase_dir": ".planning/phases/15-contract-freeze-baseline-audit",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "workflow": "gsd-discuss-phase",
+  "completed_areas": [
+    "契约文档落点",
+    "9v6裁决+生命周期态"
+  ],
+  "remaining_areas": [
+    "契约测试策略",
+    "盘点工件+陈旧maps"
+  ],
+  "areas_total": 4,
+  "areas_done": 2,
+  "decisions_captured": 12,
+  "completed_tasks": [
+    {"id": "区域1", "name": "契约文档落点 (BASE-01)", "status": "done", "decisions": ["D1 接口///双语注释权威,不设独立CONTRACT.md", "D2 扩展DOC-01标签+requires/ensures/modifies", "D3 12只读getter按组共享轻量契约", "D4 仅接口契约权威,FvpEngine///薄记实现特有副作用"]},
+    {"id": "区域2", "name": "9v6裁决+生命周期态 (BASE-03+#2)", "status": "done", "decisions": ["D5 独立LifecyclePhase{alive,disposing,disposed}与6态正交", "D6 冻结高层转换语义,完整转换表留P20", "D7 states:每方法列入态/出态(故意交叉校验)", "D8 dispose任意态可达+终态不可逆+double-dispose幂等no-op", "D9 disposed后getter安全默认永不throw,mutating no-op(P20升Result.err)", "D10 error陷阱态仅recover()/open()可出", "D11 disposing不可见(同步瞬态)对外实质二稳态", "D12 recover仅error可调,transitions to{idle,opening}(目标P20定)"]}
+  ],
+  "remaining_tasks": [
+    {"id": "区域3", "name": "契约测试策略 (BASE-04)", "status": "not_started", "gray_questions": ["复用FakeEngine vs 新harness", "按方法 vs 按接口组织", "参数化供Phase21对NewFvpEngine复用"]},
+    {"id": "区域4", "name": "盘点工件+陈旧maps (BASE-02)", "status": "not_started", "gray_questions": ["121 logger/MemoryMonitor 2处/openGeneration 盘点产物形态", "codebase maps v2.1前陈旧快照:刷新还是标注"]},
+    {"id": "write_context", "name": "写 CONTEXT.md + DISCUSSION-LOG.md", "status": "not_started"},
+    {"id": "git_commit", "name": "git_commit CONTEXT+LOG并rm checkpoint", "status": "not_started"},
+    {"id": "update_state", "name": "update_state (STATE.md)", "status": "not_started"},
+    {"id": "auto_advance", "name": "auto_advance → /gsd-plan-phase 15 (auto_advance已开)", "status": "not_started"}
+  ],
+  "deferred": [
+    "recover() 目标态 idle vs opening — Phase 20 STATE-04 定 (D6 已限定 {idle, opening})",
+    "lifecycle 完整转换表 — Phase 20 STATE-04 实现时定并回写契约",
+    "PROJECT.md '9 态~40 边' 陈旧描述修正为 '6 态正交 + LifecyclePhase' — Phase 15 产物派生任务"
+  ],
+  "blockers": [
+    {"description": "上下文窗口在 discuss-phase 区域2完成后耗尽至96%,剩余4%不足跑完区域3+4讨论+写CONTEXT/DISCUSSION-LOG+git_commit+update_state。非技术阻塞,是会话长度限制。", "type": "technical", "workaround": "本会话已写checkpoint保存12项决策;下会话/gsd-discuss-phase 15 的check_existing会检测checkpoint并提供Resume,从areas_pending[0]=契约测试策略零损失继续"}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "契约落点=接口///双语注释,不设独立CONTRACT.md", "rationale": "随接口冻结而冻结,零漂移SSOT,BASE-04测试编码同一契约作闸门,与#8一致", "phase": "15"},
+    {"decision": "扩展DOC-01标签+requires/ensures/modifies;states=转换;throws=错误", "rationale": "BASE-01第4要素'被改ValueNotifier'无自然归处,显式标签可grep,P22 lint可校验modifies存在", "phase": "15"},
+    {"decision": "12只读getter按组共享轻量契约", "rationale": "只读getter共享不变量类,逐个写完整契约为#8过度工程化", "phase": "15"},
+    {"decision": "仅接口契约权威;FvpEngine///薄记实现特有副作用", "rationale": "契约在接口是Strangler Fig闸门要求,NewFvpEngine须继承同一契约", "phase": "15"},
+    {"decision": "独立LifecyclePhase{alive,disposing,disposed}与6态MediaState正交", "rationale": "播放语义与资源语义正交分离,避免UI监听MediaState受dispose干扰,保持6态纯净", "phase": "15"},
+    {"decision": "冻结高层转换语义,完整转换表留Phase20", "rationale": "防分叉(满足#2)且尊重P15/P20边界(P15冻结契约,P20设计转换表)", "phase": "15"},
+    {"decision": "states:每方法列入态/出态,与转换表重复为故意交叉校验", "rationale": "契约自包含BASE-04测试可直接镜像断言,两视图分叉即bug应捕获", "phase": "15"},
+    {"decision": "dispose任意态可达+终态不可逆+double-dispose幂等no-op", "rationale": "双重dispose安全最自然实现,调用者无需编排stop→dispose,适配层无条件转发", "phase": "15"},
+    {"decision": "disposed后getter安全默认永不throw,mutating no-op(P20升Result.err)", "rationale": "use-after-dispose常见bug,安全默认把已销毁变可观察稳态", "phase": "15"},
+    {"decision": "error陷阱态:仅显式recover()/open()可出,不自动恢复", "rationale": "可预测可测,与STATE-07竞态测试一致,适配层透传error无需预测自动恢复时序", "phase": "15"},
+    {"decision": "disposing不可见(同步瞬态),对外实质二稳态{alive,disposed}", "rationale": "契约最简,调用者无中间态处理,异步dispose复杂度外溢", "phase": "15"},
+    {"decision": "recover仅error可调,他态no-op,transitions to{idle,opening}(P20定)", "rationale": "error专属出口与D10陷阱态协同,recover专管复位/open专管换媒体", "phase": "15"}
+  ],
+  "uncommitted_files": [
+    ".planning/STATE.md (M, 上会话遗留未提交更新)",
+    ".planning/phases/15-contract-freeze-baseline-audit/15-DISCUSS-CHECKPOINT.json (M, 区域1+2共12决策)"
+  ],
+  "next_action": "新会话执行 /gsd-discuss-phase 15 → check_existing 检测 15-DISCUSS-CHECKPOINT.json → 选'恢复讨论' → 从 areas_pending[0]=契约测试策略 开始默认模式讨论(每区4单问题轮次→Next area检查) → 跑完区域3+4 → write_context 写 CONTEXT.md+DISCUSSION-LOG.md → git_commit 提交并 rm checkpoint → update_state → auto_advance → /gsd-plan-phase 15",
+  "context_notes": "discuss-phase 默认模式工作流。区域1契约落点4问+区域2生命周期态8问(初轮4+追问轮4)均完成。区域2用户选了'继续追问'跑了第二轮。承袭v2.1锁定决策(6态正交/ISP分解/PlayerError sealed/EngineStateMachine/FvpEngine<350行/双语注释)全部保留在checkpoint。codebase maps是v2.1前陈旧快照,Phase15基线盘点必须对LIVE code做。里程碑级.continue-here.md(14723字节,8项blocking constraints)不可覆盖,phase级建独立文件。"
+}
