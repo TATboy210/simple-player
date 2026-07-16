@@ -1,27 +1,23 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-16T09:35:00.000Z",
+  "timestamp": "2026-07-16T11:44:52.357Z",
   "phase": null,
   "phase_name": "里程碑定义 v3.0 — 内核重写（兼容式替换与诊断内核）",
   "phase_dir": null,
   "plan": null,
-  "task": 3,
+  "task": 4,
   "total_tasks": 4,
   "status": "paused",
   "completed_tasks": [
     {"id": 1, "name": "澄清内核迁移范围", "status": "done"},
     {"id": 2, "name": "确定内核 logger 依赖策略（零依赖 KernelLogger 门面）", "status": "done"},
-    {"id": 3, "name": "里程碑 v3.0 定义：版本/范围/研究/需求", "status": "in_progress", "progress": "PROJECT.md✅ STATE.md(SDK重置)✅ research(STACK/FEATURES/ARCHITECTURE/PITFALLS/SUMMARY,已提交)✅ REQUIREMENTS.md(40 REQ-ID)✅。待：归档旧phases+提交、roadmap"},
+    {"id": 3, "name": "里程碑 v3.0 定义：版本/范围/研究/需求 + 归档旧 phases + 提交", "status": "done", "progress": "PROJECT.md✅ STATE.md(v3.0 frontmatter)✅ research(已提交 e4816d4/8de03d4/60fe9a6/3fbf21d)✅ REQUIREMENTS.md(40 REQ-ID)✅ v2.1收尾提交(76918ab feat/fd789eb test/94bf39b docs)✅ 归档旧phases到milestones/v3.0-phases(git rename 100%)✅ 提交ec1e530 docs:start milestone v3.0✅ 工作树干净。里程碑定义4/4完成。", "commit": "ec1e530"},
     {"id": 4, "name": "创建路线图 ROADMAP.md（gsd-roadmapper）", "status": "not_started"}
   ],
   "remaining_tasks": [
-    {"id": "3a", "name": "运行 phases.clear 归档旧 phases(09/10/11/12/14) + git add .planning/milestones/ .planning/phases/ + 提交 docs:start milestone v3.0", "status": "not_started"},
-    {"id": "3b", "name": "提交 PROJECT.md/STATE.md/REQUIREMENTS.md（若未在归档提交中一起）", "status": "not_started"},
-    {"id": "4", "name": "启动 gsd-roadmapper 生成 ROADMAP.md（8阶段，Phase 15 续编号）+ 回填 REQUIREMENTS Traceability + 呈批批准 + 提交", "status": "not_started"}
+    {"id": 4, "name": "启动 gsd-roadmapper 生成 ROADMAP.md（8阶段，Phase 15 续编号）+ 回填 REQUIREMENTS Traceability + 呈批批准 + 提交", "status": "not_started"}
   ],
-  "blockers": [
-    {"description": "本会话 Bash 分类器(glm-5.2)宕机，无法运行 gsd-tools 命令(phases.clear/commit) 与 git。子代理能提交（已提交 research 4+1 文件，commits e4816d4/8de03d4/60fe9a6/3fbf21d 等）说明分类器可能间歇恢复或子代理走不同路径。", "type": "external", "workaround": "下次会话 Bash 恢复后先重试 gsd_run query phases.clear --confirm；若仍宕机，把 git 操作委托给 Agent 子代理（已验证可行）。"}
-  ],
+  "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
@@ -43,24 +39,7 @@
     {"name": "debugPrint 发布不剥离", "constraint": "debugPrint 在 release 仍在二进制中执行(throttled print)。零依赖门面须用 kDebugMode 门控,warn/error 走 dart:developer.log。", "severity": "blocking", "mitigation": "Phase 3(LOG-03) + Phase 7(VERIFY-06 --release 冒烟闸门)。"},
     {"name": "过度工程化是项目宿敌", "constraint": "项目记忆:此前重构产'27文件3500行''19变量管1 bool''双数据源'。兼容替换易诱发永久 god-adapter 层。", "severity": "blocking", "mitigation": "Phase 2(ADAPT-05)尺寸预算:适配层+门面+sealed错误+tracker 合计<旧FvpEngine;适配层除KernelMode+generation计数器外无状态;Phase2 须召 senior-architect/red-team 挑战范围蔓延。"}
   ],
-  "uncommitted_files": [
-    ".planning/PROJECT.md",
-    ".planning/STATE.md",
-    ".planning/REQUIREMENTS.md",
-    ".planning/.continue-here.md",
-    ".planning/HANDOFF.json",
-    "lib/kernel/models/track_preferences.dart",
-    "lib/kernel/services/track_preference_service.dart",
-    "test/features/player/models/",
-    "test/kernel/bridge/window_mode_test.dart",
-    "test/kernel/engine/engine_event_log_test.dart",
-    "test/kernel/engine/engine_metrics_test.dart",
-    "test/kernel/models/app_settings_test.dart",
-    "test/kernel/models/track_preferences_test.dart",
-    "test/kernel/models/validation_error_test.dart",
-    "test/kernel/services/track_preference_service_test.dart",
-    "test/kernel/utils/memory_monitor_test.dart"
-  ],
-  "next_action": "运行 /gsd-resume-work。v2.1收尾已提交(76918ab/fd789eb/94bf39b)。Bash恢复后:node /c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs phases list确认范围(09/10/11/12/14);node .../gsd-tools.cjs phases clear --confirm归档到.planning/milestones/(移动非删除);git add -A .planning/ && git commit -m 'docs: start milestone v3.0';然后启动/gsd-roadmapper生成8阶段ROADMAP.md(Phase 15起续编号)+回填REQUIREMENTS Traceability+呈批批准+提交。gsd-tools正确语法:phases clear(子命令list/clear)非旧记query phases.clear。若Bash仍宕机,把归档+提交委托给Agent子代理(已验证可行,但本次Agent亦被同一分类器阻塞)。",
-  "context_notes": "用户通过 /gsd-new-milestone 推翻 v2.1 增量式计划,以兼容式替换重写内核。已确认 v3.0 + 7 项范围。4 个研究员(gsd-project-researcher)+1 综合器(gsd-research-synthesizer)并行完成研究并各自提交。研究校正:KernelLogger 是替换迁移非新建(package:logger 已是现有依赖);sealed PlayerError 已存在须稳化;openGeneration 与状态机分离须统一;9态vs6态须 Phase1 核对;EngineStateMachine 静默忽略非法转换是反模式须替换;适配层须先于状态重写存在(否则成禁断 big-bang swap)。里程碑定义 3/4 完成,待归档+提交+路线图。GSD STATE.md frontmatter 已是 v3.0(planning),机器读取源正确。"
+  "uncommitted_files": [],
+  "next_action": "运行 /gsd-resume-work。里程碑 v3.0 定义 4/4 完成,工作树干净(commit ec1e530)。下一步:启动 /gsd-roadmapper 生成 8 阶段 ROADMAP.md(Phase 15 起续编号),须遵守 .continue-here.md BLOCKING CONSTRAINTS 的 8 项 + 构建顺序 P1 契约冻结→P2 适配层→P3 KernelLogger→P4 错误模型→P5 MemoryMonitor→P6 状态重写→P7 验证收拢→P8 双语文档。roadmapper 须回填 REQUIREMENTS.md 的 40 REQ-ID Traceability,路线图呈批批准后提交。批准后进入 Phase 15 规划(/gsd-discuss-phase 15 或 /gsd-plan-phase 15)。注:glm-5.2 Bash 分类器间歇宕机,若再宕机 roadmapper 可委托 Agent 子代理或等恢复。",
+  "context_notes": "用户通过 /gsd-new-milestone 推翻 v2.1 增量式计划,以兼容式替换重写内核。4 研究员+1 综合器并行完成研究并各自提交。研究校正 8 项关键事实(logger 替换迁移/sealed PlayerError 已存在/openGeneration 分离/9vs6 态矛盾/EngineStateMachine 静默忽略/MemoryMonitor 2 静态调用/ValueNotifier 转发/debugPrint 不剥离)固化为 blocking_constraints。本会话从 HANDOFF 恢复,趁 Bash 分类器恢复窗口完成:v2.1 收尾 3 提交(76918ab/fd789eb/94bf39b)+旧 phases 归档到 milestones/v3.0-phases(git rename 100%,移动非删除)+提交 ec1e530 docs:start milestone v3.0。里程碑定义 4/4 完成,工作树干净,待启动 gsd-roadmapper。gsd-tools 正确语法:phases clear(子命令 list/clear)非旧记 query phases.clear。本会话教训:同一文件多 Edit 不可并行(竞态覆盖),须串行或用 Write 整体替换。"
 }
