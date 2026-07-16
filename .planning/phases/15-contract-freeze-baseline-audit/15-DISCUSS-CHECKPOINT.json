@@ -1,0 +1,132 @@
+{
+  "schema_version": "1.0",
+  "workflow": "discuss-phase",
+  "phase_number": "15",
+  "phase_name": "契约固化与基线盘点",
+  "phase_dir": ".planning/phases/15-contract-freeze-baseline-audit",
+  "padded_phase": "15",
+  "slug": "contract-freeze-baseline-audit",
+  "milestone": "v3.0",
+  "mode": "default",
+  "flags": [],
+  "config_flags": {
+    "research_before_questions": false,
+    "thinking_partner": false,
+    "text_mode": false,
+    "auto_advance": true,
+    "auto_chain_active": false
+  },
+  "created": "2026-07-16T13:25:00Z",
+  "areas_total": 4,
+  "areas_completed": [],
+  "areas_pending": [
+    "契约文档落点",
+    "9v6裁决+生命周期态",
+    "契约测试策略",
+    "盘点工件+陈旧maps"
+  ],
+  "areas_selected": [
+    "契约文档落点",
+    "9v6裁决+生命周期态",
+    "契约测试策略",
+    "盘点工件+陈旧maps"
+  ],
+  "decisions": {},
+  "deferred": [],
+  "discussion_log": [
+    {
+      "turn": 0,
+      "type": "git-finalize-clarify",
+      "question": "上一会话计划的 v3.0 路线图收尾提交从未真正执行——HEAD 仍是 5387c8a wip，HANDOFF.json 仍在，STATE.md 有未提交的第六次恢复记录。如何处理？",
+      "options": ["amend 5387c8a（推荐）", "新建独立提交", "暂不处理 git"],
+      "selection": "amend 5387c8a（推荐）",
+      "notes": "已执行：git rm HANDOFF.json + add STATE.md + commit --amend。新 HEAD=3ecf382 docs: roadmap v3.0 — 8 phases (15-22) compatible-replacement kernel rewrite。工作树干净。HANDOFF.json 已删除。"
+    },
+    {
+      "turn": 0,
+      "type": "gray-area-selection",
+      "question": "Phase 15 要讨论哪些灰色决策区？（多选，已由 v2.1 锁定的不再问）",
+      "options": [
+        "契约文档落点 — BASE-01 行为契约写在哪：接口 /// 双语文档 vs 独立 CONTRACT.md/规约文档",
+        "9v6裁决+生命周期态 — BASE-03 + 阻塞约束#2：6 态已锁，但 PROJECT.md 仍写 9 态（陈旧）；disposed/disposing/error-恢复 态加枚举还是独立标志；只列还是连转换语义冻结",
+        "契约测试策略 — BASE-04：复用 FakeEngine vs 新 harness；按方法 vs 按接口；是否参数化供 Phase 21 对 NewFvpEngine 复用",
+        "盘点工件+陈旧maps — BASE-02：121 logger/MemoryMonitor 2 处/openGeneration 盘点产物形态；codebase maps 是 v2.1 前陈旧快照，刷新还是标注"
+      ],
+      "selection": "契约文档落点, 9v6裁决+生命周期态, 契约测试策略, 盘点工件+陈旧maps",
+      "notes": "用户选全部 4 区。下一会话从这些区的单问题轮次开始（默认模式每区 4 问）。"
+    }
+  ],
+  "prior_decisions": {
+    "source": "v2.1 CONTEXT (09/10) + PROJECT.md + REQUIREMENTS.md + ROADMAP.md + .continue-here.md",
+    "locked_from_v21": [
+      "6 态正交 MediaState (idle/opening/playing/paused/completed/error) + isSeeking/isBuffering 独立 bool 标志（09 D-16 / 10 D-01）——9 态~40 边已废",
+      "ISP 接口分解：EngineStateView(12 只读 getter) + PlaybackControl + TrackControl/SubtitleConfig/VideoEffectControl/RendererControl（09 D-01..D-06）",
+      "PlayerError sealed (FileError/CodecError/PlaybackError/NetworkError/UnknownError + 细分码) + ValueNotifier<PlayerError?> lastError（09 D-07..D-10）",
+      "EngineStateMachine 独立类、transitionTo(MediaState, caller)→bool、非法转换 debug-assert/release-静默（10 D-02..D-05）——静默忽略即阻塞约束#4 反模式，Phase 20 换 Result.err",
+      "FvpEngine <350 行、helper 实现接口、engine 暴露接口 getter（10 D-06..D-08）",
+      "双语注释结构：/// 中文意图行 + 空行 + /// 英文契约块 (DOC-01, Phase 15 起约定)"
+    ],
+    "project_constraints": [
+      "零新增第三方运行时依赖 (dart:* stdlib + package:flutter/foundation.dart only)",
+      "继续 fvp (MDK/FFmpeg) 不换底层",
+      "ValueNotifier + ValueListenableBuilder 不变",
+      "UI 不动 (v3.0 专注内核，UI→Kernel 契约冻结不变)",
+      "禁止一次性全量替换内核 (兼容式逐步迁移, Strangler Fig + Anti-Corruption Layer)",
+      "双语 API 注释标准 (中文意图 + 英文契约)"
+    ]
+  },
+  "codebase_context": {
+    "maps_read": ["ARCHITECTURE.md", "CONCERNS.md", "TESTING.md"],
+    "critical_finding": "codebase maps 是 2026-07-12 快照，描述 v2.1 重构前结构 (EngineState god-mixin + features/player/services/)。但 09/10-CONTEXT 与 CLAUDE.md 显示 v2.1 已完成：接口拆 abstract class、服务迁 kernel/services/、状态机已提取。Phase 15 基线盘点必须对 LIVE code 做，不能信这些 maps。CONCERNS.md 列的旧路径 (player_feature.dart 283行双职责、features/services/) 多已重构。",
+    "testing_patterns": "Flutter Test + 手写 Fakes (无 mockito/mocktail)。FakeEngine implements EngineState + call tracking (openCallCount/playCallCount/failNextOpenWith)。createTestController() wire FakeEngine。test/helpers/。80% 覆盖率门槛。",
+    "reusable_assets": [
+      "lib/kernel/engine/open_result.dart — sealed class 模式 (复用于 PlayerError)",
+      "lib/kernel/engine/media_state.dart — MediaStateTransition switch expression (可迁移到 EngineStateMachine)",
+      "FakeEngine (test/helpers/fake_engine.dart) — call tracking + controllable failure (可作契约测试起点)"
+    ],
+    "integration_points": [
+      "app.dart 组合根 (Phase 16 KernelAdapter 在 FvpEngine 原位装配)",
+      "lib/features/player/player_feature.dart — PlayerServices 创建点",
+      "lib/ui/player/player_screen.dart — 通过 EngineStateView 读状态"
+    ]
+  },
+  "canonical_refs_seed": [
+    ".planning/ROADMAP.md — Phase 15 goal/success criteria/blocking constraint #2",
+    ".planning/REQUIREMENTS.md — BASE-01..04 定义",
+    ".planning/PROJECT.md — Current Milestone v3.0, Constraints, Key Decisions (但含陈旧'9 态~40 边'需修正)",
+    ".planning/.continue-here.md — 8 项 blocking constraints (Phase 15+ 复核)",
+    ".planning/milestones/v3.0-phases/09-interface-decomposition/09-CONTEXT.md — D-01..D-19 (接口分解 + MediaState 正交拆分)",
+    ".planning/milestones/v3.0-phases/10-state-machine-extraction/10-CONTEXT.md — D-01..D-12 (状态机提取, 6 态锁定)",
+    ".planning/codebase/TESTING.md — FakeEngine/手写 fake 模式 (契约测试参考)",
+    ".planning/codebase/CONCERNS.md — (陈旧 v2.1 前快照, 谨慎)"
+  ],
+  "blocking_antipatterns": {
+    "milestone_level_file": ".planning/.continue-here.md",
+    "phase15_relevant": [
+      {
+        "pattern": "一次性 big-bang 替换内核",
+        "severity": "blocking",
+        "three_answers": {
+          "what": "适配层 seam 不存在就重写状态机/引擎，使引擎替换退化为一次性全量 swap，回归风险不可控",
+          "manifested": "兼容式重写若无冻结契约先导，适配层只能基于 signature 级猜测实现，无法按能力逐个翻转，被迫 big-bang cutover — v3.0 Out of Scope 明令禁止",
+          "structural_mechanism": "构建顺序硬约束 P15 契约冻结→P16 适配层→P17+...：Phase 15 先产出 frozen audited behavioral spec + 接口级契约测试 (BASE-01/04)，使 P16 适配层实现冻结契约而非猜测，P20 按 DelegationPolicy 逐能力翻转每次跑契约测试。Phase 15 契约测试即此闸门具体执行机制"
+        }
+      }
+    ],
+    "owned_by_other_phases": [
+      "静默失败 → P20 (STATE-03 换 Result.err + KernelLogger 警告)",
+      "跨提交拆分单例 → P19 (MEM-04 原子提交)",
+      "ValueNotifier 重新包装 → P16 (ADAPT-03 转发同一 notifier 实例)",
+      "永久 god-adapter → P16 (ADAPT-05 尺寸预算 + red-team)"
+    ]
+  },
+  "git_state": {
+    "head": "3ecf382 docs: roadmap v3.0 — 8 phases (15-22) compatible-replacement kernel rewrite",
+    "branch": "feat/v1.8-stability-polish-plan-02-02",
+    "ahead": 379,
+    "working_tree": "clean except phase-15 dir + this checkpoint (uncommitted)",
+    "handoff_json": "DELETED (folded into 3ecf382 amend)",
+    "note": "git 收尾提交已在本会话完成。discuss-phase 末尾 git_commit 步骤会另起提交 CONTEXT.md + DISCUSSION-LOG.md。"
+  },
+  "resume_instruction": "下次 /gsd-discuss-phase 15：check_existing 会检测本 checkpoint 并提供 Resume。Resume 后从 areas_pending[0]=契约文档落点 开始默认模式讨论（每区 4 单问题轮次 → Next area 检查）。4 区全完成后写 CONTEXT.md + DISCUSSION-LOG.md + git_commit + update_state。"
+}

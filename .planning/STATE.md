@@ -2,12 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
+current_phase: 15
 current_phase_name: "Phase 15: 契约固化与基线盘点"
 status: planning
-stopped_at: roadmap approved, proceeding to /gsd-discuss-phase 15 (2026-07-16)
-last_updated: "2026-07-16T12:49:28.000Z"
+stopped_at: Phase 15 discuss-phase checkpoint written — git 收尾提交 3ecf382 已完成, 4 灰色区已选待讨论 (2026-07-16)
+last_updated: "2026-07-16T13:32:00.000Z"
 last_activity: 2026-07-16
-last_activity_desc: v3.0 roadmap approved (8 phases 15-22); Phase 15 discussion next
+last_activity_desc: "git 收尾提交 3ecf382 完成 (amend 5387c8a→docs: + 删 HANDOFF.json); /gsd-discuss-phase 15 起步加载先验上下文, 4 灰色区已选, checkpoint 写入待续"
 progress:
   total_phases: 8
   completed_phases: 0
@@ -95,8 +96,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-16T12:49:28.000Z
-Stopped at: v3.0 roadmap approved; proceeding to /gsd-discuss-phase 15
+Last session: 2026-07-16T13:25:17.797Z
+Stopped at: context exhaustion at 75% (2026-07-16)
 Resume file: (none — Phase 15 未规划，下一步 /gsd-discuss-phase 15)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -139,3 +140,16 @@ Resume file: (none — Phase 15 未规划，下一步 /gsd-discuss-phase 15)
 - **收尾提交（amend 5387c8a）**：因 5387c8a 未 push（`@{u}..HEAD` 含之，分支 ahead 379），amend 安全。操作：(1) `git rm .planning/HANDOFF.json` 删一次性工件；(2) 更新本 STATE.md 会话连续性；(3) `git commit --amend -m "docs: roadmap v3.0 — 8 phases (15-22) compatible-replacement kernel rewrite"`，把 wip commit message 修正为 docs: 并纳入 HANDOFF.json 删除 + STATE.md 更新，单 commit 收尾。
 - **保留未动**：`.planning/.continue-here.md`（v3.0 的 8 项 blocking constraints 集中参考，Phase 15+ 仍须复核）+ 根目录 `./.continue-here.md`（v1.0/v1.6 全屏迁移时代遗留噪声，待用户决定是否清理）均未删——用户仅授权删 HANDOFF.json。
 - **下一步**：`/clear` → `/gsd-discuss-phase 15`（新上下文窗口，读 Phase 15 RESEARCH/CONTEXT）。
+
+### 2026-07-16 第七次（/gsd-discuss-phase 15 起步 — git 收尾提交执行 + 上下文加载 + checkpoint）
+
+- **恢复源**：第六次恢复记录 + `.planning/.continue-here.md`（8 项 blocking constraints）。git 现状核对发现：上一会话计划的 v3.0 路线图收尾提交**从未执行**——HEAD 仍是 `5387c8a wip: ...paused`，HANDOFF.json 仍在，STATE.md 含未提交的"第六次恢复"记录。
+- **用户决策（AskUserQuestion）**：选择 **amend 5387c8a**（推荐项）处理悬挂的收尾提交。
+- **git 收尾提交已执行**：`git rm .planning/HANDOFF.json` + `git add .planning/STATE.md` + `git commit --amend -m "docs: roadmap v3.0 — 8 phases (15-22) compatible-replacement kernel rewrite"`。新 HEAD = **`3ecf382`**（docs:，5 files changed，含 HANDOFF.json delete mode）。工作树干净。分支 ahead 379 未 push（amend 安全可逆，reflog 可回退）。HANDOFF.json 已从磁盘删除闭环。
+- **discuss-phase 15 起步完成**：`init.phase-op 15`（phase_found=true, phase_name="契约固化与基线盘点", has_context=false）；无 phase 级 `.continue-here.md`，里程碑级 5 个 blocking 反模式已核查——Phase 15 直接相关仅"一次性 big-bang 替换内核"，三问已答（契约测试即其结构闸门）；其余 4 个由各自归属阶段拥有。无 SPEC.md（spec_loaded=false）。无既有 context/checkpoint/plans（全新阶段）。无 todo 匹配。discuss:pre hooks 空。
+- **先验上下文已加载**：PROJECT.md（v3.0 milestones + 陈旧"9 态~40 边"待修正）、REQUIREMENTS.md（BASE-01..04 + Traceability 40/40）、ROADMAP.md Phase 15 detail（goal/success criteria/blocking constraint #2）、.continue-here.md（8 constraints）、v2.1 归档 09-CONTEXT（接口分解 D-01..D-19）/10-CONTEXT（状态机 D-01..D-12）、codebase maps ARCHITECTURE/CONCERNS/TESTING（**关键发现：maps 是 2026-07-12 v2.1 重构前陈旧快照，Phase 15 基线盘点必须对 LIVE code 做**）。
+- **承袭 v2.1 已锁决策（不再问）**：6 态正交 MediaState + isSeeking/isBuffering（9 态已废）、ISP 接口分解（EngineStateView+PlaybackControl+4 能力接口）、PlayerError sealed、EngineStateMachine.transitionTo→bool（静默忽略即 #4 反模式 Phase 20 修）、FvpEngine <350 行、双语注释结构。
+- **灰色区选择（AskUserQuestion multiSelect）**：用户选**全部 4 区**——①契约文档落点（BASE-01：接口 /// 双语文档 vs 独立 CONTRACT.md）②9v6 裁决+生命周期态（BASE-03+#2：6 态已锁但 PROJECT.md 仍写 9 态陈旧；disposed/disposing/error-恢复 态加枚举还是独立标志；只列还是连转换语义冻结）③契约测试策略（BASE-04：复用 FakeEngine vs 新 harness；按方法 vs 按接口；是否参数化供 Phase 21 对 NewFvpEngine 复用）④盘点工件+陈旧 maps（BASE-02：121 logger/MemoryMonitor 2 处/openGeneration 盘点产物形态；maps 刷新还是标注）。
+- **上下文耗尽收尾（75% 警告）**：discuss-phase 是交互式多轮工作流，剩余 25% 不足跑完 4 区讨论 + 写 CONTEXT.md/DISCUSSION-LOG.md + 提交。改为**创建 phase 15 目录 + 写 checkpoint** 收尾——`mkdir .planning/phases/15-contract-freeze-baseline-audit`，写 `15-DISCUSS-CHECKPOINT.json`（含全部已加载先验上下文 + 4 已选灰色区 + 承袭决策 + codebase 上下文 + canonical refs seed + blocking 反模式三答 + git 状态）。
+- **未提交**：phase-15 目录 + checkpoint + STATE.md 本次更新。建议提交 message：`docs(15): discuss-phase checkpoint — git 收尾完成, 4 灰色区已选`（或下次 `/gsd-discuss-phase 15` Resume 后由其 git_commit 步骤连同 CONTEXT.md 一起提交）。
+- **下一步（新上下文窗口）**：`/clear` → `/gsd-discuss-phase 15`。`check_existing` 会检测 `15-DISCUSS-CHECKPOINT.json` 并提供 Resume → 从 `areas_pending[0]=契约文档落点` 开始默认模式讨论（每区 4 单问题轮次 → Next area 检查）→ 4 区全完成写 CONTEXT.md + DISCUSSION-LOG.md → git_commit（会 `rm` checkpoint）→ update_state → 可选 `/gsd-plan-phase 15`（auto_advance 已开）。
