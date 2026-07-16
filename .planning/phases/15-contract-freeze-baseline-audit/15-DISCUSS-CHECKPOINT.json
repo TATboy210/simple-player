@@ -18,9 +18,8 @@
   },
   "created": "2026-07-16T13:25:00Z",
   "areas_total": 4,
-  "areas_completed": ["契约文档落点", "9v6裁决+生命周期态"],
+  "areas_completed": ["契约文档落点", "9v6裁决+生命周期态", "契约测试策略"],
   "areas_pending": [
-    "契约测试策略",
     "盘点工件+陈旧maps"
   ],
   "areas_selected": [
@@ -101,6 +100,54 @@
       "rationale": "recover() 作为 error 专属出口与 D10 陷阱态协同（error 仅有 recover()/open() 两出口，recover 专管复位/重试，open 专管换媒体）；专一化=可测；任意态可调会与 stop() 重叠语义模糊",
       "base_ref": "STATE-04, BASE-03",
       "turn": 12
+    },
+    "契约测试执行对象": {
+      "decision": "对真实 FvpEngine 跑契约测试（验证旧实现符合冻结契约，满足 sc4）；测试参数化 accepts MediaEngine 供 Phase 21 对 NewFvpEngine 复用（VERIFY-01 闸门前提）；FakeEngine 保留 widget 测试用，不扩展为契约驱动",
+      "rationale": "契约测试作为迁移闸门须验证'实现符合冻结契约'；FakeEngine 行为是测试自定义的，测 fake = 测 mock，闸门弱；对真实行为跑才有闸门意义；参数化使 P21 同一套测试对 NewFvpEngine 跑即 VERIFY-01",
+      "base_ref": "BASE-04, VERIFY-01",
+      "turn": 13
+    },
+    "契约测试组织": {
+      "decision": "按 ISP 接口分组：EngineStateView/PlaybackControl/TrackControl/SubtitleConfig/VideoEffectControl/RendererControl 各一组测试；与 D3 组契约同构；每组测试可独立审查（BASE-01 sc1）；迁移时按接口逐个验证",
+      "rationale": "契约结构在哪组就测哪组；按方法分组与 D3 组契约脱节且 getter 单方法测试会与组契约重复；按契约要素分组跨方法难一眼审查单方法契约完整性",
+      "base_ref": "BASE-01, BASE-04",
+      "turn": 14
+    },
+    "契约测试覆盖深度": {
+      "decision": "首版覆盖优先 states: 入/出态断言 + throws: 错误情形（最高回归风险）；ensures/modifies 后置条件次轮补；与 D7 states: 标签镜像交叉校验；先立闸门骨架供 P20 capability 翻转时捕获回归",
+      "rationale": "states+throws 覆盖最高回归风险先立骨架；全要素每方法工作量大且 modifies 须 D2 标签先落地才能断言；先 states 镜像跑通再扩首版闸门偏窄",
+      "base_ref": "BASE-04",
+      "turn": 15
+    },
+    "契约测试覆盖范围": {
+      "decision": "Phase 15 契约测试 = baseline 捕获 FvpEngine 当前行为（6 态转换 + 现有错误情形 + 现有 dispose），满足 sc4'通过旧引擎'；D5-D12 lifecycle 新语义记为 P20 NewFvpEngine 须补清单（BASE-03 sc3'须补生命周期态已列出'），Phase 15 不强测；与 D6'完整转换表留 P20'边界一致",
+      "rationale": "lifecycle 新语义旧 FvpEngine 可能不符合（LifecyclePhase 是 v3.0 新增）；断言目标行为会让 FvpEngine fail 违反 sc4 且每次翻转一直红致闸门失效；baseline 捕获现有行为 + lifecycle 留 P20 清单尊重 P15/P20 边界",
+      "base_ref": "BASE-04, BASE-03, 约束#2",
+      "turn": 16
+    },
+    "契约测试错误注入": {
+      "decision": "错误注入 = 真实坏文件 fixture（test/fixtures/ 放损坏/不存在/不支持编码视频），真实触发 FvpEngine 错误路径；与 D13'真实 FvpEngine'一致、闸门强；需维护 fixture 集（坏文件、空文件、非视频文件、损坏 header）",
+      "rationale": "真实坏文件最真实触发 FvpEngine 错误路径且与 D13 一致；FakeEngine 仅注入错误则 throws 闸门弱（测 mock）；混合两套注入机制须维护",
+      "base_ref": "BASE-04",
+      "turn": 17
+    },
+    "known gap 清单落点": {
+      "decision": "lifecycle 新语义 known gap 作为 P20 衍生项记在 CONTEXT.md decisions/deferred（或专门 lifecycle-gap 子节）；D5-D12 决策已在 decisions；SSOT，下游 gsd-planner 直接读 CONTEXT.md，无额外文件",
+      "rationale": "CONTEXT.md SSOT 下游直接读；契约 /// 就地标注分散难汇总审查且 P22 lint 须额外校验 TODO 闭环；独立 KNOWN-GAPS.md 与 CONTEXT.md 双源可能漂移",
+      "base_ref": "BASE-03, BASE-04",
+      "turn": 18
+    },
+    "契约测试断言形式": {
+      "decision": "断言 = 行为断言（expect 方法调用后状态/错误）+ 从 states: 标签/转换表派生参数化测试覆盖每条边；三视图（契约标签→转换表→测试）分叉即 bug 捕获，与 D7 交叉校验机制化",
+      "rationale": "行为断言+派生交叉使三视图分叉可捕获与 D7 机制化；仅直接断言行为与转换表/标签是两套表达交叉校验靠人工分叉风险高；转换表镜像生成纯副本无独立断言同源错误传播",
+      "base_ref": "BASE-04",
+      "turn": 19
+    },
+    "契约测试时序边界": {
+      "decision": "Phase 15 契约测试只测静态行为契约（前置/后置/状态/错误）；时序/竞态（generation 守卫、open→seek→open、mdk 回调封送）留 P20 STATE-05/07；时序依赖 P20 OpenGenerationTracker，旧 FvpEngine 无此守卫测无意义",
+      "rationale": "Phase 15 闸门=行为正确性；STATE-05/07 是 P20 REQ 依赖 NewFvpEngine OpenGenerationTracker（P20 才有）；对旧 FvpEngine 跑竞态测试无对应实现测不动；含基础时序对真实 FvpEngine mdk 回调时序敏感 flaky 风险高",
+      "base_ref": "BASE-04, STATE-05, STATE-07",
+      "turn": 20
     }
   },
   "deferred": [
@@ -237,6 +284,78 @@
       "options": ["仅 error 可调 (推荐)", "任意态可调 no-op", "Claude 决定"],
       "selection": "仅 error 可调 (推荐)",
       "notes": "error 专属出口；transitions to {idle, opening}(P20 定)；他态 no-op"
+    },
+    {
+      "turn": 13,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "BASE-04 契约测试要对谁跑？契约测试作为迁移闸门，需验证'实现符合冻结契约'——执行对象决定闸门强度与 Phase 21 复用性。",
+      "options": ["真实 FvpEngine（推荐）", "FakeEngine 扩展", "两者混合"],
+      "selection": "真实 FvpEngine（推荐）",
+      "notes": "对真实 FvpEngine 跑验证旧实现符合冻结契约；参数化 accepts MediaEngine 供 P21 对 NewFvpEngine 复用即 VERIFY-01；FakeEngine 保留 widget 测试"
+    },
+    {
+      "turn": 14,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "契约测试如何组织？D3 已定 12 只读 getter 按组共享契约，测试组织应与契约结构同构以利独立审查。",
+      "options": ["按 ISP 接口分组（推荐）", "按方法分组", "按契约要素分组"],
+      "selection": "按 ISP 接口分组（推荐）",
+      "notes": "按 ISP 接口分组与 D3 组契约同构；每组测试可独立审查；迁移时按接口逐个验证"
+    },
+    {
+      "turn": 15,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "契约测试的覆盖深度？工作量和闸门强度的权衡——首版覆盖哪些契约要素。",
+      "options": ["优先 states+throws（推荐）", "全契约要素每方法", "先 states 镜像跑通再扩"],
+      "selection": "优先 states+throws（推荐）",
+      "notes": "先覆盖最高回归风险 states 入/出态 + throws 错误情形；ensures/modifies 次轮补；与 D7 states: 标签镜像交叉校验"
+    },
+    {
+      "turn": 16,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "Phase 15 契约测试覆盖范围？sc4 要求'通过旧引擎'，但 D5-D12 lifecycle 新语义旧 FvpEngine 可能不符合（LifecyclePhase 是 v3.0 新增）。",
+      "options": ["baseline 捕获现有行为（推荐）", "目标契约 forward-looking", "baseline + lifecycle 分层"],
+      "selection": "baseline 捕获现有行为（推荐）",
+      "notes": "baseline 捕获 FvpEngine 现有行为满足 sc4；lifecycle 新语义记 P20 NewFvpEngine 须补清单；与 D6 完整转换表留 P20 边界一致"
+    },
+    {
+      "turn": 17,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "D15 定了测 throws: 错误情形，但真实 FvpEngine 如何触发错误路径？错误注入方式决定 throws 测试可行性。",
+      "options": ["真实坏文件 fixture（推荐）", "FakeEngine 仅注入错误", "混合：真实主+fake 补"],
+      "selection": "真实坏文件 fixture（推荐）",
+      "notes": "test/fixtures/ 真实坏文件触发 FvpEngine 错误路径；与 D13 一致闸门强；维护 fixture 集（坏/空/非视频/损坏 header）"
+    },
+    {
+      "turn": 18,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "D16 说 lifecycle 新语义记为 P20 须补清单。这个清单落点在哪？下游 gsd-planner/gsd-executor 须能找到。",
+      "options": ["CONTEXT.md decisions/deferred（推荐）", "契约 /// 就地标注", "独立 KNOWN-GAPS.md"],
+      "selection": "CONTEXT.md decisions/deferred（推荐）",
+      "notes": "lifecycle gap 作为 P20 衍生项记 CONTEXT.md；SSOT 下游直接读；无额外文件"
+    },
+    {
+      "turn": 19,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "D7 定了 states: 标签与转换表'故意交叉校验'。契约测试是第三视图——断言形式如何与 D7 交叉校验协同？",
+      "options": ["行为断言+派生交叉（推荐）", "仅直接断言行为", "转换表镜像生成"],
+      "selection": "行为断言+派生交叉（推荐）",
+      "notes": "行为断言 expect + 从 states: 标签/转换表派生参数化测试覆盖每条边；三视图分叉即 bug 捕获与 D7 机制化"
+    },
+    {
+      "turn": 20,
+      "type": "area-discuss",
+      "area": "契约测试策略",
+      "question": "Phase 15 契约测试是否含时序/竞态断言？STATE-05/07 是 P20 REQ，依赖 P20 的 OpenGenerationTracker。",
+      "options": ["不含，留 P20（推荐）", "含基础时序", "含完整竞态"],
+      "selection": "不含，留 P20（推荐）",
+      "notes": "Phase 15 只测静态行为契约；时序/竞态留 P20 STATE-05/07；依赖 P20 OpenGenerationTracker 旧 FvpEngine 无此守卫测无意义"
     }
   ],
   "prior_decisions": {
@@ -307,9 +426,9 @@
     "head": "ba6221b docs(15): discuss-phase checkpoint — git 收尾完成, 4 灰色区已选待讨论",
     "branch": "feat/v1.8-stability-polish-plan-02-02",
     "ahead": 379,
-    "working_tree": "phase-15 checkpoint modified (区域1+2 完成, 12 决策捕获), uncommitted; discuss-phase 末尾 git_commit 将提交 CONTEXT.md + DISCUSSION-LOG.md 并 rm 本 checkpoint",
+    "working_tree": "phase-15 checkpoint modified (区域1+2+3 完成, 20 决策捕获), uncommitted; discuss-phase 末尾 git_commit 将提交 CONTEXT.md + DISCUSSION-LOG.md 并 rm 本 checkpoint",
     "handoff_json": "DELETED (folded into 3ecf382 amend)",
-    "note": "git 收尾提交 3ecf382 已完成；checkpoint 已在 ba6221b 提交。本次 Resume 后修改 checkpoint（12 决策）。discuss-phase 末尾 git_commit 步骤提交 CONTEXT.md + DISCUSSION-LOG.md 并 rm 本 checkpoint。"
+    "note": "git 收尾提交 3ecf382 已完成；checkpoint 首版在 ba6221b 提交，后在 c0b5468 wip 提交（区域1+2 12 决策）。本次 Resume 后修改 checkpoint（区域3 新增 D13-D20，共 20 决策）。discuss-phase 末尾 git_commit 步骤提交 CONTEXT.md + DISCUSSION-LOG.md 并 rm 本 checkpoint。"
   },
-  "resume_instruction": "区域 1（契约文档落点, D1-D4）+ 区域 2（9v6裁决+生命周期态, D5-D12）已完成，共 12 项决策捕获。下次 /gsd-discuss-phase 15 Resume 后从 areas_pending[0]=契约测试策略 继续默认模式讨论。4 区全完成后写 CONTEXT.md + DISCUSSION-LOG.md + git_commit（rm checkpoint）+ update_state。"
+  "resume_instruction": "区域 1（契约文档落点, D1-D4）+ 区域 2（9v6裁决+生命周期态, D5-D12）+ 区域 3（契约测试策略, D13-D20）已完成，共 20 项决策捕获。下次 /gsd-discuss-phase 15 Resume 后从 areas_pending[0]=盘点工件+陈旧maps 继续 default 模式讨论（BASE-02: 121 logger/MemoryMonitor 2 处/openGeneration 盘点产物形态；codebase maps 是 v2.1 前(2026-07-12)陈旧快照，刷新还是标注）。区域4 完成后 write_context 写 CONTEXT.md+DISCUSSION-LOG.md → git_commit(rm checkpoint)→ update_state → auto_advance 跳 /gsd-plan-phase 15。"
 }
