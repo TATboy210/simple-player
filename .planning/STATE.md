@@ -5,8 +5,8 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 15
 current_phase_name: "Phase 15: 契约固化与基线盘点"
 status: planning
-stopped_at: context exhaustion at 79% (2026-07-16)
-last_updated: "2026-07-16T14:48:29.901Z"
+stopped_at: context exhaustion at 75% (2026-07-16)
+last_updated: "2026-07-16T16:25:37.563Z"
 last_activity: 2026-07-16
 last_activity_desc: "v3.0 ROADMAP.md approved (commit 5387c8a amended to docs:), Phase 15 discussion next"
 progress:
@@ -96,8 +96,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-16T14:48:29.882Z
-Stopped at: context exhaustion at 79% (2026-07-16)
+Last session: 2026-07-16T16:25:37.523Z
+Stopped at: context exhaustion at 75% (2026-07-16)
 Resume file: (none — Phase 15 未规划，下一步 /gsd-discuss-phase 15)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
