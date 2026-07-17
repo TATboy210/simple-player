@@ -142,6 +142,15 @@ Resume file: .planning/phases/16-diagnosticsbundle/16-CONTEXT.md
 - **保留未动**：`.planning/.continue-here.md`（v3.0 的 8 项 blocking constraints 集中参考，Phase 15+ 仍须复核）+ 根目录 `./.continue-here.md`（v1.0/v1.6 全屏迁移时代遗留噪声，待用户决定是否清理）均未删——用户仅授权删 HANDOFF.json。
 - **下一步**：`/clear` → `/gsd-discuss-phase 15`（新上下文窗口，读 Phase 15 RESEARCH/CONTEXT）。
 
+### 2026-07-17 Phase 16 planning 暂停（上下文预算 72%，checkpoint 已落盘）
+
+- **恢复源**：`.planning/phases/16-diagnosticsbundle/16-PLAN-CHECKPOINT.json`（本次新建，plan-phase 桥接工件，非 GSD 自动消费；安全删除时机 = PLAN.md 提交后）。
+- **已完成的规划前置**：(1) `gsd-tools.cjs` 定位 `/c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs`；(2) `init.plan-phase 16` 全字段已解析（phase_found=true, phase_req_ids=ADAPT-01..05, has_context=true, has_research=false, has_plans=false, phase_status=Pending, planner=opus/checker=sonnet/researcher=sonnet, auto_advance=true, context_window=200000）；(3) `phase.mvp-mode 16` = false（标准水平分层）；(4) plan:pre hooks 已渲染并逐能力判定：research=ACTIVE、pattern-mapper=ACTIVE(Step 7.8)、security=ACTIVE(须 `<threat_model>`)、intel=ACTIVE(Step 7.9)、ai-integration=SKIP(无 AI 关键词)、ui=SKIP(纯内核 seam 无 frontend)；(5) research hook 的 `fragment.inline` 提示模板 + 9 个字段替换值已固化进 checkpoint；(6) Step 5.1 用户选 "Research first (Recommended)"。
+- **未完成（下个窗口做）**：未 spawn 任何子代理。下个窗口 `/clear` → `/gsd-plan-phase 16 --research`：跳过 Step 5.1 交互门 → spawn gsd-phase-researcher(sonnet, 写 RESEARCH.md，含 D6 调用点普查 + Validation Architecture 喂 Nyquist D8) → Step 5.5 派生 VALIDATION.md → Step 5.55 security 门禁 → Step 7.8 pattern-mapper → Step 7.9 intel API-SURFACE → Step 8 planner(opus, 写 *-PLAN.md，须含 `<threat_model>` + D27 wc 预算明细 + D24/D25 测试构成 + D21 类级迁移清单三项 + D22 grep 闸门) → Step 10 checker(sonnet) → Step 12 修订循环(max 3) → Step 13 需求覆盖门(ADAPT-01..05) + 13a 决策覆盖门(D1-D27) + 13b STATE + 13c ROADMAP 注释 + 13d 提交 → Step 13e gap 分析 → Step 15 auto_advance=true 链到 execute-phase 16。
+- **auto_advance 警告**：规划通过后工作流会自动 spawn execute-phase 16（STATE 第七次恢复已确认 auto_advance 是用户有意开启）。但当前工作树有 12 个脏文件（lib/kernel/engine/media_opener.dart、lib/main.dart、lib/ui/player/*、lib/l10n/*、未追踪 playback_status_overlay.dart + 测试 + .planning/debug/）是上一会话 playback_status_overlay debug 残留，**与 Phase 16 无关**。execute-phase 会新建 lib/kernel/adapter + lib/kernel/diagnostics 触碰 lib/kernel/。建议在 auto-advance 触发前先提交/暂存这些无关脏改动，或在新窗口首步先处理。P16 规划本身只写 .planning/ 不碰 lib/，规划阶段安全。
+- **open research questions 已固化**：checkpoint `open_research_questions_for_researcher` 列 7 条（D6 调用点普查、Nyquist D8 验证架构、FvpEngine 636 行基线核实、MediaEngine 7 接口成员枚举、EngineStateView notifier 字段枚举、现有 3 诊断组件形状、cast audit 复核）。
+- **下一步**：`/clear` → `/gsd-plan-phase 16 --research`（带 --research flag 跳过已答的研究交互门，直接 spawn researcher）。
+
 ### 2026-07-16 第七次（/gsd-discuss-phase 15 起步 — git 收尾提交执行 + 上下文加载 + checkpoint）
 
 - **恢复源**：第六次恢复记录 + `.planning/.continue-here.md`（8 项 blocking constraints）。git 现状核对发现：上一会话计划的 v3.0 路线图收尾提交**从未执行**——HEAD 仍是 `5387c8a wip: ...paused`，HANDOFF.json 仍在，STATE.md 含未提交的"第六次恢复"记录。
