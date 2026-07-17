@@ -8,7 +8,27 @@
   },
   "command_invoked": "/gsd-plan-phase 16",
   "flags_passed": [],
-  "step_reached": "5.5 (Research + Validation landed; planner/checker/pattern-mapper/API-SURFACE/gates NOT yet run)",
+  "step_reached": "13e/15 — Planning COMPLETE (5 PLANs committed dd58ec7, checker PASS, coverage gates PASS). Awaiting Step 15 dirty-tree decision before auto-advance to execute-phase 16.",
+  "planning_complete": {
+    "commit": "dd58ec7 docs(16): 5 PLANs PASS checker + coverage gates — planning complete",
+    "plans_committed": ["16-01-PLAN.md", "16-02-PLAN.md", "16-03-PLAN.md", "16-04-PLAN.md", "16-05-PLAN.md"],
+    "checker_verdict": "PASS (after revision loop round 1 — BLOCKER was adapter _openGeneration counter violating D20/D22, fixed by removing counter + pure-forward open())",
+    "coverage_gates": {"step_13_adapt": "PASS (ADAPT-01..05 all covered)", "step_13a_decisions": "PASS (D1-D27 all cited, 27/27)"},
+    "non_blocking_cleaned": ["16-05 red_team #3 rationale synced to D20", "VALIDATION.md line 52/73 synced (removed deleted open_generation test ref)"],
+    "step_15_dirty_tree_decision_pending": {
+      "reason": "auto_advance=true will spawn execute-phase 16 after Step 15, but 12 unrelated lib/ dirty files + 3 Phase 15 residue files would pollute execute working tree. User must decide commit/stash/interrupt BEFORE auto-advance fires.",
+      "dirty_files_unrelated": ["lib/kernel/engine/media_opener.dart", "lib/main.dart", "lib/ui/player/player_screen.dart", "lib/ui/player/video_surface.dart", "lib/ui/player/playback_status_overlay.dart (untracked)", "test/widget/player/playback_status_overlay_test.dart (untracked)", "lib/l10n/app_en.arb", "lib/l10n/app_zh.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_zh.dart", ".planning/debug/ (untracked)"],
+      "phase15_residue": ["15-BASELINE-AUDIT.json", "15-BASELINE-AUDIT.md", "15-EXECUTE-CHECKPOINT.md"],
+      "options": ["commit the unrelated debug residue separately (recommended — keeps execute tree clean)", "stash them", "interrupt auto-advance and let user handle later"],
+      "note": "P16 execute will create lib/kernel/adapter/ + lib/kernel/diagnostics/ — must start from clean lib/ tree"
+    },
+    "gap_analysis_step_13e": {
+      "open_questions_for_p20": ["VolumeControl single-route via DelegationPolicy.volume vs ambiguous dual-field (D14/researcher OQ1 — planner decided single-route)", "migrated: same FvpEngine instance as legacy: (D13 — same instance, avoids double resource)"],
+      "deferred_to_p20": ["openGeneration counter migration STATE-02 (D21 class-level checklist)", "DiagnosticsBundle activation D3 (P20 NewFvpEngine consumes)", "DelegationPolicy field flip D14 (P20 per-capability)", "player_services.dart:55 late final engine → rebuildable (D15)"],
+      "validation_md_desync_resolved": true,
+      "checkpoint_safe_to_delete": "After Step 15 decision + auto-advance fires (or user interrupts) — planning is committed, checkpoint no longer needed"
+    }
+  },
   "init_json": {
     "researcher_model": "sonnet",
     "planner_model": "opus",
