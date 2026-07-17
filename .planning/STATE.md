@@ -5,8 +5,8 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 16
 current_phase_name: 兼容适配层骨架 + DiagnosticsBundle
 status: planning
-stopped_at: Phase 16 context gathered
-last_updated: "2026-07-17T14:36:11.731Z"
+stopped_at: context exhaustion at 77% (2026-07-17)
+last_updated: "2026-07-17T16:00:45.903Z"
 last_activity: 2026-07-17
 last_activity_desc: Phase 15 complete, transitioned to Phase 16
 progress:
@@ -97,8 +97,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-17T14:36:11.715Z
-Stopped at: Phase 16 context gathered
+Last session: 2026-07-17T16:00:45.888Z
+Stopped at: context exhaustion at 77% (2026-07-17)
 Resume file: .planning/phases/16-diagnosticsbundle/16-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -163,3 +163,30 @@ Resume file: .planning/phases/16-diagnosticsbundle/16-CONTEXT.md
 - **上下文耗尽收尾（75% 警告）**：discuss-phase 是交互式多轮工作流，剩余 25% 不足跑完 4 区讨论 + 写 CONTEXT.md/DISCUSSION-LOG.md + 提交。改为**创建 phase 15 目录 + 写 checkpoint** 收尾——`mkdir .planning/phases/15-contract-freeze-baseline-audit`，写 `15-DISCUSS-CHECKPOINT.json`（含全部已加载先验上下文 + 4 已选灰色区 + 承袭决策 + codebase 上下文 + canonical refs seed + blocking 反模式三答 + git 状态）。
 - **未提交**：phase-15 目录 + checkpoint + STATE.md 本次更新。建议提交 message：`docs(15): discuss-phase checkpoint — git 收尾完成, 4 灰色区已选`（或下次 `/gsd-discuss-phase 15` Resume 后由其 git_commit 步骤连同 CONTEXT.md 一起提交）。
 - **下一步（新上下文窗口）**：`/clear` → `/gsd-discuss-phase 15`。`check_existing` 会检测 `15-DISCUSS-CHECKPOINT.json` 并提供 Resume → 从 `areas_pending[0]=契约文档落点` 开始默认模式讨论（每区 4 单问题轮次 → Next area 检查）→ 4 区全完成写 CONTEXT.md + DISCUSSION-LOG.md → git_commit（会 `rm` checkpoint）→ update_state → 可选 `/gsd-plan-phase 15`（auto_advance 已开）。
+
+### 2026-07-17 第八次恢复（/gsd-resume-work → 确认直接规划 Phase 16）
+
+- **恢复源**：`.planning/phases/16-diagnosticsbundle/16-PLAN-CHECKPOINT.json`（plan-phase 桥接工件，Step 5 暂停）。`.planning/HANDOFF.json` 已陈旧（2026-07-16 Phase 15 plan-phase 产物，被 `dc93d20` 执行超越），不予采信。
+- **状态核对**：Phase 15 已完整闭环（3 PLAN+SUMMARY+VERIFICATION.md+BASELINE-AUDIT，commit `dc93d20` PASSED 4/4）；Phase 16 规划 Step 5 暂停（gsd-phase-researcher 未 spawn）。git HEAD = `6b9c381`。工作树 12 个 lib/ debug 残留 + 3 个 Phase 15 零星残留，均与 Phase 16 无关。
+- **用户决策**：经 AskUserQuestion，选择**直接规划 Phase 16**（推荐项）——规划阶段只写 `.planning/`，对 lib/ 脏文件免疫；lib/ 残留留到规划通过后、auto-advance→execute 触发前再处理。
+- **下一步**：`/gsd-plan-phase 16 --research`（`--research` flag 跳过已答的 Step 5.1 交互门，直接 spawn gsd-phase-researcher）。
+
+### 2026-07-17 第九次（/gsd-plan-phase 16 --research — 只跑研究，落盘后检查点停）
+
+- **恢复源**：`16-PLAN-CHECKPOINT.json`（第八次恢复已核对，本次直接消费）+ 第八次 STATE 记录。git HEAD = `6b9c381`，工作树 12 个 lib/ debug 残留（与 P16 无关）。
+- **上下文预算现实**：本窗口启动时已 66%（剩 34%），不足以跑完 Research→Plan→Verify→Step13 门禁→auto-advance→execute-phase 全链。经 AskUserQuestion，用户选 **"只跑研究，落盘后检查点停 (推荐)"** —— 单窗口产出一个持久工件（RESEARCH.md），下一窗口复用继续。
+- **本窗口已完成**：
+  1. **Step 5 — spawn gsd-phase-researcher (sonnet)**：用 checkpoint 固化的 `fragment.inline` 模板 + 9 字段替换 + 7 条 open research questions 注入。researcher 写 `16-RESEARCH.md`（含 `## Validation Architecture` 段）并以**隔离提交** `e99ead2` 落盘（仅 RESEARCH.md，未碰 12 个无关脏文件）。返回 `## RESEARCH COMPLETE`，confidence HIGH，111K subagent tokens。
+  2. **Step 5.5 — 派生 16-VALIDATION.md**：从 RESEARCH 的 `## Validation Architecture`（481-515 行）派生 Nyquist Dimension 8 种子，填 frontmatter（phase=16, slug=diagnosticsbundle, status=draft, nyquist_compliant=false, created=2026-07-17）+ Flutter 适配 body（Test Infrastructure / Phase Requirements→Test Map ADAPT-01..05 / Wave 0 / Manual-Only / Security Domain）。GateGuard 事实闸已过。提交 `0eae691`（仅 VALIDATION.md，隔离）。
+- **researcher 关键发现（喂给下窗口 planner）**：
+  - **D6 解决 + stale figure 纠正**：活码 log 调用点实为 **84**（非 ROADMAP/REQUIREMENTS 写的 121）—— 48 `.e` / 7 `.w` / 12 `.i` / 17 `.d` / 0 `.t` / 0 `.f`，二次确认（Phase 15 baseline JSON + 本会话独立 grep）。planner 须用 84。
+  - `.e()` 仅 3 处用命名参，两种 shape（`error:`+`stackTrace:` 或仅 `stackTrace:`）→ `KernelLogger.error()` 须接受 `{Object? error, StackTrace? stackTrace}` 均可选命名参；`fatal()` 零活点，签名按对称性 `[ASSUMED]` 外推。
+  - **ADAPT-05 基线精确**：`wc -l lib/kernel/engine/fvp_engine.dart` = **636**（非估计）。
+  - **7 接口 MediaEngine 面枚举完成**：EngineStateView 15 / PlaybackControl 12 / TrackControl 3 / SubtitleConfig 8 / VideoEffectControl 4 / RendererControl 2 / VolumeControl 4 成员；**发现未文档化重叠**：`PlaybackControl.setVolume/setMute` + `EngineStateView.volume/isMuted` 与 `VolumeControl` 成员签名同型 → 一个 Dart override 满足多接口。记为 Pitfall 2 / Open Question 1，推荐经 `VolumeControl` 的 policy 字段单路由（planner 须显式决策 + 代码注释）。
+  - **契约测试复用机制已存在且可用**：Phase 15 的 7 个 `run*ContractTests` + `contract_test_runner.dart` 聚合器专为对 `KernelAdapter` 重挂而设计（换 factory 即可），挂点 `test/engine/fvp_engine_contract_test.dart` 已确认。
+  - **cast audit 再确认**：`as FvpEngine` 0 hits + 5 个便捷 getter（trackControl/videoEffectControl/rendererControl/volumeControl/subtitleConfig）0 用量 —— drop-in 透明性证据齐。
+  - **Open Questions（喂 planner）**：(1) setVolume/setMute/volume/isMuted 经 `DelegationPolicy.volume` 单路由 vs 模糊双字段治理（推荐单路由）；(2) `migrated:` 与 `legacy:` 是否同一 FvpEngine 实例（推荐同实例，避免资源重复问题，D19 允许二者）。
+- **git 状态**：HEAD `0eae691`，其上 `e99ead2`（research）。两个 P16 提交均隔离（仅 .planning/）。12 个 lib/ debug 残留 + Phase 15 零星残留 + STATE.md(M) 仍未动 —— auto-advance→execute 触发前须处理（见下）。
+- **未提交**：本 STATE.md 更新（下一步将随 checkpoint 一起提交）。
+- **下一步（新上下文窗口）**：`/clear` → `/gsd-plan-phase 16`（**不带 --research**，因 has_research=true 会自动复用 RESEARCH.md，走 Step 5.1 "Use existing, skip to step 6"）。续跑：Step 5.55 security threat-model 门禁（planner 须发 `<threat_model>`，低风险）→ Step 7.8 spawn gsd-pattern-mapper（写 PATTERNS.md）→ Step 7.9 regenerate API-SURFACE.md → Step 8 spawn gsd-planner opus（写 *-PLAN.md，须含 D27 wc 预算明细 / D24 测试构成 / D21 类级迁移清单 / D22 grep 闸门 / D6 84-调用点签名 / VolumeControl 单路由决策）→ Step 10 checker(sonnet) → Step 12 修订循环(max 3) → Step 13 需求覆盖门(ADAPT-01..05) + 13a 决策覆盖门(D1-D27) + 13b STATE + 13c ROADMAP 注释 + 13d 提交 → 13e gap 分析 → Step 15 auto_advance=true 链 execute-phase 16。
+- **auto-advance 警告（重申）**：规划通过后工作流自动 spawn execute-phase 16（会动 lib/kernel/adapter + lib/kernel/diagnostics 新目录）。触发前务必先提交/暂存 12 个无关 lib/ debug 脏文件，否则 execute 阶段工作树混乱。P16 规划本身只写 .planning/，安全。
