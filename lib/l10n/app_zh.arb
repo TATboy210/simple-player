@@ -186,5 +186,7 @@
   "exportError": "导出失败",
   "exportSuccess": "设置已导出",
   "importParseError": "无效 JSON：{error}",
-  "importFileReadError": "无法读取文件：{error}"
+  "importFileReadError": "无法读取文件：{error}",
+  "openingMedia": "正在打开媒体",
+  "bufferingMedia": "正在缓冲媒体"
 }

@@ -134,6 +134,18 @@ class MediaOpener {
       return OpenError(PlaybackError(PlaybackErrorCode.textureFailed, message));
     }
 
+    // updateTexture() 返回码 >=0 但 textureId 仍为 null — D3D11 纹理创建静默失败
+    // (常见根因: fvp.registerWith() 未在 main() 中调用，MDK key/硬件解码器未注册)。
+    // 必须显式转为 textureFailed，否则上层 (PlaybackNavigator) 会在无纹理时调用 play()。
+    if (_player.textureId.value == null) {
+      return OpenError(
+        PlaybackError(
+          PlaybackErrorCode.textureFailed,
+          '纹理创建失败(空 textureId): ${PathUtils.basename(trimmed)}',
+        ),
+      );
+    }
+
     return OpenSuccess(mediaInfo);
   }
 

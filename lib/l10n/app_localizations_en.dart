@@ -525,4 +525,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String importFileReadError(String error) {
     return 'Cannot read file: $error';
   }
+
+  @override
+  String get openingMedia => 'Opening media';
+
+  @override
+  String get bufferingMedia => 'Buffering media';
 }

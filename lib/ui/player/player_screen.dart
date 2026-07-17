@@ -17,6 +17,7 @@ import '../window/custom_title_bar.dart';
 import 'drop_handler.dart';
 import 'keyboard_handler.dart';
 import 'player_actions.dart';
+import 'playback_status_overlay.dart';
 import 'video_surface.dart';
 
 /// 包装 DragToResizeArea，增加 enabled 属性
@@ -97,8 +98,10 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   /// (visible, mounted) — 合并为单一 notifier 消除嵌套 VLB
-  final ValueNotifier<(bool, bool)> _playlistState =
-      ValueNotifier((false, false));
+  final ValueNotifier<(bool, bool)> _playlistState = ValueNotifier((
+    false,
+    false,
+  ));
 
   /// B: 视频加载后锁定窗口比例 — OS 级约束，拖边框自动保持比例
   // 窗口自由缩放 — 不锁定宽高比，VideoSurface 用 FittedBox(contain) 自适应
@@ -181,22 +184,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 // 录制字幕开关偏好 — S 键切换后记录新状态（-1=关闭, 0+=轨道索引）
                 final active = widget.engine.activeSubtitleTracks;
                 final newIndex = active.isEmpty ? -1 : active.first;
-                widget.controller.trackPreferenceService
-                    ?.recordSubtitleTrack(newIndex);
+                widget.controller.trackPreferenceService?.recordSubtitleTrack(
+                  newIndex,
+                );
               },
               onShowHelp: () => _showShortcutsHelp(context),
               onSubtitleDelayForward: () {
                 final delay = widget.engine.subtitleDelay;
                 widget.engine.setSubtitleDelay(delay + 500);
                 // 录制字幕延迟偏好 — 跨会话恢复
-                widget.controller.trackPreferenceService
-                    ?.recordSubtitleDelay(delay + 500);
+                widget.controller.trackPreferenceService?.recordSubtitleDelay(
+                  delay + 500,
+                );
               },
               onSubtitleDelayBackward: () {
                 final delay = widget.engine.subtitleDelay;
                 widget.engine.setSubtitleDelay(delay - 500);
-                widget.controller.trackPreferenceService
-                    ?.recordSubtitleDelay(delay - 500);
+                widget.controller.trackPreferenceService?.recordSubtitleDelay(
+                  delay - 500,
+                );
               },
               onMediaPlayPause: () => widget.engine.togglePlayPause(),
               onMediaNext: () => widget.controller.playNext(),
@@ -225,7 +231,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             valueListenable: _playlistState,
                             builder: (context, state, videoContent) {
                               final (playlistVisible, playlistMounted) = state;
-                              final useRow = w >= Tokens.breakpointWide && playlistMounted;
+                              final useRow =
+                                  w >= Tokens.breakpointWide && playlistMounted;
 
                               final playlistPanel = PlaylistPanel(
                                 playlist: widget.playlist,
@@ -250,7 +257,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 // 宽屏: Row 布局，视频左、播放列表右
                                 return Row(
                                   children: [
-                                    Expanded(child: RepaintBoundary(child: videoContent!)),
+                                    Expanded(
+                                      child: RepaintBoundary(
+                                        child: videoContent!,
+                                      ),
+                                    ),
                                     RepaintBoundary(
                                       child: IgnorePointer(
                                         ignoring: !playlistVisible,
@@ -275,7 +286,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ],
                               );
                             },
-                            child: _buildVideoContent(isVideo, modeIcon, modeLabel, isFullscreen),
+                            child: _buildVideoContent(
+                              isVideo,
+                              modeIcon,
+                              modeLabel,
+                              isFullscreen,
+                            ),
                           );
                         },
                       ),
@@ -289,7 +305,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             // 全屏时 enabled=false，通过 IgnorePointer 禁用拖拽但不改变类型
             // 这样 canUpdate 始终返回 true，Element 复用，Texture 子树不被销毁
             return MouseRegion(
-              cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
+              cursor: isFullscreen
+                  ? SystemMouseCursors.basic
+                  : MouseCursor.defer,
               child: SmartDragToResizeArea(
                 enabled: !isFullscreen,
                 child: keyboardHandler,
@@ -310,12 +328,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     children: [
       Expanded(
         child: DropHandler(
-            onFilesDropped: widget.onFilesDropped ?? (_) {},
-            onHoverChanged: widget.onDragHoverChanged,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
+          onFilesDropped: widget.onFilesDropped ?? (_) {},
+          onHoverChanged: widget.onDragHoverChanged,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
               VideoSurface(engine: widget.engine),
+              PlaybackStatusOverlay(engine: widget.engine),
               if (widget.emptyState != null)
                 ValueListenableBuilder<MediaState>(
                   valueListenable: widget.engine.state,
@@ -335,8 +354,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   onSettings: widget.onSettings,
                   onSettingsSecondary: widget.onSettingsSecondary,
                   onOpenFile: widget.onOpenFile,
-                  onToggleFullscreen: () =>
-                      widget.windowService.setMode(isFullscreen ? WindowMode.windowed : WindowMode.fullscreen),
+                  onToggleFullscreen: () => widget.windowService.setMode(
+                    isFullscreen ? WindowMode.windowed : WindowMode.fullscreen,
+                  ),
                   onTogglePlayMode: widget.onTogglePlayMode,
                   onOpenSubtitle: _openSubtitle,
                   onFilesDropped: widget.onFilesDropped,
@@ -366,7 +386,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   static void _showShortcutsHelp(BuildContext context) {
-    showDialog<void>(context: context, builder: (_) => const _ShortcutsHelpDialog());
+    showDialog<void>(
+      context: context,
+      builder: (_) => const _ShortcutsHelpDialog(),
+    );
   }
 }
 

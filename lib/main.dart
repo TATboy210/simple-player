@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:fvp/fvp.dart' as fvp;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
@@ -12,6 +13,11 @@ import 'kernel/utils/memory_monitor.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 自定义 mdk.Player 的 updateTexture() 同样经由 fvp 平台通道创建 Flutter Texture。
+  // 必须早于 EnginePrewarm 和播放器服务构造，避免首个播放器拿到未注册的平台实现。
+  fvp.registerWith();
+
   await initLog();
   MemoryMonitor.start();
 

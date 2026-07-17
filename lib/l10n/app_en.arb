@@ -386,5 +386,13 @@
   "@importFileReadError": {
     "description": "Error when imported file cannot be read from disk",
     "placeholders": { "error": { "type": "String" } }
+  },
+  "openingMedia": "Opening media",
+  "@openingMedia": {
+    "description": "Accessibility status while media is opening"
+  },
+  "bufferingMedia": "Buffering media",
+  "@bufferingMedia": {
+    "description": "Accessibility status while media data is buffering"
   }
 }
