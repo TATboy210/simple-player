@@ -1075,6 +1075,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cannot read file: {error}'**
   String importFileReadError(String error);
+
+  /// Accessibility status while media is opening
+  ///
+  /// In en, this message translates to:
+  /// **'Opening media'**
+  String get openingMedia;
+
+  /// Accessibility status while media data is buffering
+  ///
+  /// In en, this message translates to:
+  /// **'Buffering media'**
+  String get bufferingMedia;
 }
 
 class _AppLocalizationsDelegate

@@ -520,4 +520,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String importFileReadError(String error) {
     return '无法读取文件：$error';
   }
+
+  @override
+  String get openingMedia => '正在打开媒体';
+
+  @override
+  String get bufferingMedia => '正在缓冲媒体';
 }
