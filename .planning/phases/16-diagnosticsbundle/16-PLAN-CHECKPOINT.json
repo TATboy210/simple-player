@@ -167,5 +167,20 @@
     "command": "/gsd-plan-phase 16  (NO --research — has_research=true auto-uses RESEARCH.md, Step 5.1 Use existing → skip to step 6)",
     "remaining_steps": "5.55 security gate → 7.8 pattern-mapper → 7.9 API-SURFACE → 8 planner(opus, write *-PLAN.md) → 10 checker(sonnet) → 12 revision(max 3) → 13 req gate + 13a decision gate + 13b STATE + 13c ROADMAP + 13d commit → 13e gaps → 15 auto_advance→execute-phase 16",
     "auto_advance_warning": "before execute fires, commit/stash 12 unrelated lib/ dirty files"
+  },
+  "resume_session_2026_07_18": {
+    "status_at_pause": "Research + Validation + CONTEXT all landed (commits e99ead2, 0eae691); planner NOT yet spawned. Next concrete action: Step 8 spawn gsd-planner(opus, write *-PLAN.md).",
+    "user_decision_this_session": "Chose 'pause, resume in fresh session' over spawning planner now — context was at 34% remaining, insufficient for the full planner->checker->revision(max 3)->gates->commit->auto-advance-execute chain without overflow risk.",
+    "verified_this_session": [
+      "gsd-tools.cjs confirmed available at /c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs (commit + coverage gates operational)",
+      "dirty working tree unchanged: 12 files (playback_status_overlay debug residue + 3 Phase 15 audit doc tweaks), ALL unrelated to Phase 16",
+      "16-VALIDATION.md frontmatter: status=draft, nyquist_compliant=false (EXPECTED — validate-phase sets nyquist_compliant=true later, not plan-phase)",
+      "No *-PLAN.md, *-SPEC.md, *-PATTERNS.md, *-UI-SPEC.md on disk yet — planner spawn is genuinely the next step"
+    ],
+    "resume_command": "/clear then /gsd-plan-phase 16   (has_research=true auto-skips Step 5.1 'use existing' -> straight to Step 5.55 security gate -> 7.8 pattern-mapper -> 7.9 API-SURFACE -> 8 planner)",
+    "critical_before_spawn": "DECIDE dirty-tree handling BEFORE planning passes Step 13d commit. auto_advance=true (user-intentional, STATE.md) will auto-spawn execute-phase after plans pass, which writes lib/kernel/adapter + lib/kernel/diagnostics. Options: (a) git stash the 12 unrelated files now so execute faces a clean tree; (b) interrupt at the 'AUTO-ADVANCING TO EXECUTE' banner and handle dirty tree manually; (c) commit the unrelated files on a separate branch first. Do NOT let auto-advance fire into a dirty lib/kernel tree.",
+    "open_questions_for_planner_unchanged_from_checkpoint": true,
+    "checkpoint_safe_to_delete_after": "PLAN.md committed + STATE.md shows phase 16 'Ready to execute'",
+    "update_2026_07_18_10th": "Pattern-mapper DONE (16-PATTERNS.md 28227 bytes, 14 files mapped; commit will batch with PLAN.md at Step 13d). Key analogs: KernelAdapter↔fvp_engine+media_engine 7-iface composite; KernelLogger↔utils/log.dart (84-call-site sig: error({Object? error,StackTrace? stackTrace})); DiagnosticsBundle↔player_services.dart DI idiom; contract tests↔fvp_engine_contract_test+contract_test_runner factory-swap; same() identity↔engine_state_view 13 ValueNotifier fields. CORRECTIONS to prior checkpoint: intel DISABLED (not ACTIVE) — `intel api-surface` returns {disabled:true}, Step 7.9 SKIPPED, no API-SURFACE.md, planner omits API Surface hint. D19 single-file adapter (kernel_adapter.dart containing KernelAdapter+DelegationPolicy+KernelMode) is AUTHORITATIVE over RESEARCH's 3-file suggestion — pattern-mapper flagged conflict, planner must follow D19. agent-skills gsd-planner returns empty (no extra skills injected; planner uses built-in agent def). Next concrete action: Step 8 spawn gsd-planner(opus). Resume: /clear then /gsd-plan-phase 16 (has_research=true auto-skips Step 5.1; patterns_path now non-null auto-skips Step 7.8 spawn; intel disabled auto-skips 7.9; straight to Step 8 planner). Planner must include all items in existing next_session_resume_instructions.what_will_happen + resume_session_2026_07_18.remaining_steps PLUS: D19 single-file, VolumeControl single-route via DelegationPolicy.volume, 84-call-site KernelLogger sig, migrated:==legacy: same FvpEngine instance."
   }
 }

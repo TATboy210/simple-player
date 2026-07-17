@@ -49,7 +49,7 @@ created: 2026-07-17
 | ADAPT-02 | `DiagnosticsBundle.noop()` constructs without error; all 4 slots callable as no-ops | unit | `flutter test test/diagnostics/diagnostics_bundle_test.dart` | ❌ Wave 0 — new file |
 | ADAPT-02 | `KernelLogger.error()`/`fatal()` accept both named-param shapes found in the live census (both-named, stackTrace-only, neither) | unit | `flutter test test/diagnostics/kernel_logger_test.dart` | ❌ Wave 0 — new file |
 | ADAPT-03 | Every `EngineStateView` `ValueNotifier` returned by `KernelAdapter` is `same()` as the wrapped legacy engine's notifier | unit (identity, D25) | `flutter test test/adapter/kernel_adapter_identity_test.dart` | ❌ Wave 0 — new file |
-| ADAPT-04 | Adapter's own `openGeneration` counter increments once per `open()` call; no `_openGeneration` identifier appears inside `lib/kernel/adapter/` | unit + static grep gate (D22) | `flutter test test/adapter/kernel_adapter_open_generation_test.dart` then `grep -rL '_openGeneration' lib/kernel/adapter/*.dart \| wc -l` (expect 0 matches) | ❌ Wave 0 — new test file + new grep-gate audit step |
+| ADAPT-04 | P16 adapter has NO `_openGeneration` field (D20); single arbiter via KernelMode + D22 grep gate at 0 hits; counter migration is a P20 placeholder (D21) | static grep gate (D22, no Dart test — adapter is transparent per D20/#8 KISS) | `grep -rn '_openGeneration' lib/kernel/adapter/` (expect 0 hits) + `grep -rn 'openGeneration' lib/kernel/adapter/` (expect class-level `///` doc-comment only) | ❌ Wave 0 — gate is a shell grep, not a `flutter test` target (test file removed per D20; ADAPT-04 covered by 16-01 KernelMode arbiter + 16-05 GATE 1) |
 | ADAPT-05 | `wc -l` across the 6 new files (`lib/kernel/adapter/*.dart` + `lib/kernel/diagnostics/*.dart`) sums to < 636 (old `FvpEngine` baseline) | static size gate (shell, no Dart test — D27) | `wc -l lib/kernel/adapter/*.dart lib/kernel/diagnostics/*.dart \| tail -1` (verify total < 636) | ❌ Wave 0 — gate is a shell one-liner, not a `flutter test` target |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
@@ -70,7 +70,7 @@ Test stubs and audit scripts that MUST exist before Wave 1 implementation tasks 
 
 - [ ] `test/adapter/kernel_adapter_contract_test.dart` — mounts the existing 7 `run*ContractTests` functions against `KernelAdapter(legacy: FvpEngine(), ...)`; covers ADAPT-01
 - [ ] `test/adapter/kernel_adapter_identity_test.dart` — 13 `same()` assertions (one per `EngineStateView` notifier field); covers ADAPT-03/D25
-- [ ] `test/adapter/kernel_adapter_open_generation_test.dart` — covers ADAPT-04's counter-increment behavior
+- [ ] (No `kernel_adapter_open_generation_test.dart` — removed per D20: P16 adapter is transparent, no counter to test; #8 KISS forbids testing a no-op. ADAPT-04 covered by 16-01 KernelMode arbiter + 16-05 GATE 1 D22 grep gate)
 - [ ] `test/diagnostics/diagnostics_bundle_test.dart` — covers ADAPT-02's noop-construction and cascading-dispose behavior
 - [ ] `test/diagnostics/kernel_logger_test.dart` — covers D6's signature acceptance for all 3 live call shapes (both-named, stackTrace-only, neither)
 - [ ] Static grep-gate script (D22) — `tool/audit/` shell script or CI step verifying 0 `_openGeneration` matches in `lib/kernel/adapter/`; follows the existing `tool/audit/inventory.sh` pattern (Phase 15 precedent)
