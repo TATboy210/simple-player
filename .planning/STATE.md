@@ -5,10 +5,10 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 16
 current_phase_name: 兼容适配层骨架 + DiagnosticsBundle
 status: planned
-stopped_at: Phase 16 planning complete — 5 PLANs PASS checker + coverage gates (2026-07-18), awaiting execution
-last_updated: "2026-07-18T01:45:00.000Z"
+stopped_at: Phase 16 planning complete + dirty-tree isolated (bf12821 Phase15 residue + b28c37f playback_status_overlay debug, 2026-07-18), awaiting execute-phase 16 in fresh window
+last_updated: "2026-07-18T01:59:00.000Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 16 planning complete (5 PLANs, checker PASS, coverage gates PASS)
+last_activity_desc: Phase 16 planning complete (5 PLANs, checker PASS, coverage gates PASS) + Step 15 dirty-tree isolated to 2 commits (bf12821 + b28c37f), working tree clean
 progress:
   total_phases: 8
   completed_phases: 0
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 Phase: 16 — 兼容适配层骨架 + DiagnosticsBundle
 Plan: 5 PLANs created (16-01..05), checker PASS, coverage gates PASS
-Status: Planning complete — awaiting execution
-Last activity: 2026-07-18 — Phase 16 planning complete (5 PLANs, checker PASS, ADAPT-01..05 + D1-D27 coverage PASS)
+Status: Planning complete + dirty-tree isolated — awaiting execute-phase 16 in fresh window
+Last activity: 2026-07-18 — Phase 16 planning complete (5 PLANs, checker PASS, ADAPT-01..05 + D1-D27 coverage PASS) + Step 15 dirty-tree isolated (bf12821 Phase15 residue + b28c37f playback_status_overlay debug), working tree clean
 
 ## Performance Metrics
 
