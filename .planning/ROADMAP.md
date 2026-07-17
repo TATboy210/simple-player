@@ -40,7 +40,7 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 - Integer phases (15, 16, ...): Planned v3.0 milestone work (continuing from v2.1 Phase 14)
 - Decimal phases (15.1, 15.2): Urgent insertions (marked with INSERTED), created via `/gsd-phase --insert`
 
-- [ ] **Phase 15: 契约固化与基线盘点** - 冻结 MediaEngine 行为契约规约，盘点静态调用点，核对 9 态 vs 6 态差异，编写接口级契约测试作为迁移闸门
+- [x] **Phase 15: 契约固化与基线盘点** - 冻结 MediaEngine 行为契约规约，盘点静态调用点，核对 9 态 vs 6 态差异，编写接口级契约测试作为迁移闸门 (completed 2026-07-17)
 - [ ] **Phase 16: 兼容适配层骨架 + DiagnosticsBundle** - KernelAdapter 100% 路由旧引擎零行为变更，DiagnosticsBundle 载体骨架，单一 KernelMode 仲裁者，尺寸预算受控
 - [ ] **Phase 17: 零依赖 KernelLogger 门面（替换迁移）** - dart:developer 门面 + kDebugMode 门控，121 调用点替换迁移保留 log*.w() 形状，CI grep 闸门内核永不 import package:logger
 - [ ] **Phase 18: Sealed 错误模型稳化** - 扩展现有 sealed PlayerError + ErrorContext + ErrorCode 注册表，引擎 catch 点结构化发射，UI 边界 ErrorView 翻译，跨 mdk 回调线程封送
@@ -211,7 +211,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. 契约固化与基线盘点 | v3.0 | 3/3 | In Progress|  |
+| 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
 | 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 0/TBD | Not started | - |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 0/TBD | Not started | - |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |

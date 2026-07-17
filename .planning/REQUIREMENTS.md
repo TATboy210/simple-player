@@ -10,10 +10,10 @@
 
 ### BASE — 契约固化与基线盘点（Phase 1）
 
-- [ ] **BASE-01**: 为每个 `MediaEngine`/`EngineStateView` 成员固化行为契约规约（前置条件、后置条件、允许的 `MediaState` 转换、错误情形、被修改的 `ValueNotifier`）
-- [ ] **BASE-02**: 产出静态调用点盘点：`package:logger` 用法（121 处/30 文件）、`MemoryMonitor.start/snapshot`（2 处）、`openGeneration` 引用
-- [ ] **BASE-03**: 核对 9 态（PROJECT.md）vs 6 态（`engine_state_machine.dart`）差异，决定冻结基线 + v3.0 须补的生命周期态（如 `disposed`/`disposing`/`error`-恢复）
-- [ ] **BASE-04**: 针对接口（非实现）编写契约测试，作为迁移闸门
+- [x] **BASE-01**: 为每个 `MediaEngine`/`EngineStateView` 成员固化行为契约规约（前置条件、后置条件、允许的 `MediaState` 转换、错误情形、被修改的 `ValueNotifier`）
+- [x] **BASE-02**: 产出静态调用点盘点：`package:logger` 用法（121 处/30 文件）、`MemoryMonitor.start/snapshot`（2 处）、`openGeneration` 引用
+- [x] **BASE-03**: 核对 9 态（PROJECT.md）vs 6 态（`engine_state_machine.dart`）差异，决定冻结基线 + v3.0 须补的生命周期态（如 `disposed`/`disposing`/`error`-恢复）
+- [x] **BASE-04**: 针对接口（非实现）编写契约测试，作为迁移闸门
 
 ### ADAPT — 兼容适配层骨架（Phase 2）
 
@@ -107,10 +107,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BASE-01 | Phase 15 | Pending |
-| BASE-02 | Phase 15 | Pending |
-| BASE-03 | Phase 15 | Pending |
-| BASE-04 | Phase 15 | Pending |
+| BASE-01 | Phase 15 | Complete |
+| BASE-02 | Phase 15 | Complete |
+| BASE-03 | Phase 15 | Complete |
+| BASE-04 | Phase 15 | Complete |
 | ADAPT-01 | Phase 16 | Pending |
 | ADAPT-02 | Phase 16 | Pending |
 | ADAPT-03 | Phase 16 | Pending |
@@ -149,11 +149,13 @@
 | DOC-03 | Phase 22 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 40 total
 - Mapped to phases: 40 ✓
 - Unmapped: 0 ✓
 
 **Phase 映射概览**（按代码接地 8 阶段构建顺序）：
+
 - Phase 15 契约固化与基线盘点 ← BASE (4)
 - Phase 16 兼容适配层骨架 + DiagnosticsBundle ← ADAPT (5)
 - Phase 17 零依赖 KernelLogger 门面 ← LOG (5)

@@ -59,3 +59,42 @@ These fixtures exist to capture `FvpEngine`'s **current** observable
 behavior for contract-freeze purposes (Phase 15). They intentionally do
 NOT probe timing/race conditions or new `LifecyclePhase` semantics — those
 are deferred to Phase 20/21.
+
+## Native-DLL provisioning for `flutter test` (follow-up, advisory)
+
+`flutter test test/engine/fvp_engine_contract_test.dart` (the T-15-07 gate
+reused by Phase 20/21) loads `fvp`'s native `mdk.dll` via
+`DynamicLibrary.open('mdk.dll')` — a bare filename resolved against the
+process search path. Under headless `flutter test` there is no Windows
+embedder, so the DLLs that a `flutter run -d windows` build drops next to
+the exe in `build/windows/x64/runner/Debug/` are NOT on that path. The
+result is an opaque `error code 126 — module could not be found` that is an
+environment-provisioning failure, NOT a contract-correctness signal (every
+test passes once the DLLs resolve).
+
+**Current manual procedure** (recorded here so the gate is reproducible;
+the contracts and tests themselves are correct — see
+`15-VERIFICATION.md` human_verification):
+
+```bash
+# Prerequisite: a prior `flutter run -d windows` (or `flutter build windows`)
+# must have populated build/windows/x64/runner/Debug/ with the 9 native DLLs:
+#   mdk.dll fvp.dll ffmpeg-9.dll libass.dll mdk-braw.dll mdk-nvjp2k.dll
+#   mdk-r3d.dll flutter_windows.dll + plugin DLLs
+cp build/windows/x64/runner/Debug/*.dll <repo-root>/
+flutter test test/engine/fvp_engine_contract_test.dart
+# → 57/57 pass (incl. T-15-07 open→idle→play against real tiny_valid.mp4)
+rm *.dll   # restore repo root to its clean (DLL-free) tracked state
+```
+
+PATH-injection (`export PATH=.../Debug:$PATH`) does NOT reliably work for
+bare-filename `LoadLibrary` under Windows `SafeDllSearchMode`; copying the
+DLLs into the repo root (= `flutter test`'s cwd) is the verified-reliable
+pattern.
+
+**Open follow-up for a later phase** (not a Phase 15 blocker — verdict
+PASSED 4/4): pick a permanent provisioning mechanism — (a) commit the DLLs
+as fixtures under `test/fixtures/native/`, (b) a `dart_test.yaml` pre-test
+hook / `tool/audit/ensure_test_dlls.sh` that copies from the build dir, or
+(c) accept the documented manual copy above as convention. Decide before
+Phase 20/21 depend on this gate.
