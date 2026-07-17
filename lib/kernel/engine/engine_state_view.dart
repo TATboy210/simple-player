@@ -12,6 +12,11 @@ import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 /// 与 [PlaybackControl] 分离：此接口仅暴露状态，不包含控制方法。
 /// 实现者通常是具体的引擎类（如 FvpEngine），消费者通过此接口
 /// 以只读方式访问播放状态。
+///
+/// requires: 无（所有 getter 幂等、无参数、永不 throw）
+/// ensures: 返回值反映最近一次内部状态更新；disposed 后返回安全默认值
+///   （state→idle, position/duration→0, isSeeking/isBuffering→false，见 D9）
+/// modifies: 无（本接口所有成员均为纯读取，无副作用）
 abstract class EngineStateView {
   /// 纹理 ID — 用于 Texture 渲染，null 表示尚未就绪
   ValueNotifier<int?> get textureId;
