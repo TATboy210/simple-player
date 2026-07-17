@@ -67,7 +67,7 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 
   - **#2 (9 态 vs 6 态矛盾)** — BASE-03 必须核对决定冻结基线 + v3.0 须补的 lifecycle 态（disposed/disposing/error-恢复），再固化 BCS；未核对会让适配层契约分叉。
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 Plans:
 **Wave 1**
 
@@ -76,7 +76,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 15-03-PLAN.md — BASE-04 7 组接口契约测试（参数化 accepts MediaEngine）+ 真实 FvpEngine 挂载点 + 坏文件 fixture + open→idle→play 回归闸门（Wave 2）
+- [x] 15-03-PLAN.md — BASE-04 7 组接口契约测试（参数化 accepts MediaEngine）+ 真实 FvpEngine 挂载点 + 坏文件 fixture + open→idle→play 回归闸门（Wave 2）
 
 ### Phase 16: 兼容适配层骨架 + DiagnosticsBundle
 
@@ -211,7 +211,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. 契约固化与基线盘点 | v3.0 | 2/3 | In Progress|  |
+| 15. 契约固化与基线盘点 | v3.0 | 3/3 | In Progress|  |
 | 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 0/TBD | Not started | - |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 0/TBD | Not started | - |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |
