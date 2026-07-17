@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-07-16T21:16:34Z",
+  "script_version": "1.0.0",
+  "targets": {
+    "package_logger_usage": {
+      "total_call_sites": 84,
+      "total_files": 28,
+      "breakdown": {
+        "log": 64,
+        "logEngine": 9,
+        "logBridge": 11,
+        "logServices": 0,
+        "logUi": 0
+      }
+    },
+    "memory_monitor_calls": {
+      "total_call_sites": 2,
+      "locations": [
+        "lib/kernel/utils/debug_exporter.dart:57",
+        "lib/main.dart:16"
+      ]
+    },
+    "open_generation_references": {
+      "total_files": 2,
+      "locations": [
+        "lib/kernel/engine/fvp_engine.dart",
+        "lib/kernel/services/playback_navigator.dart"
+      ]
+    }
+  }
+}
