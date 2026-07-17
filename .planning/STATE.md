@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
 current_phase: 15
-current_phase_name: "Phase 15: 契约固化与基线盘点"
-status: planning
-stopped_at: context exhaustion at 75% (2026-07-16)
-last_updated: "2026-07-16T17:42:05.824Z"
-last_activity: 2026-07-16
-last_activity_desc: "v3.0 ROADMAP.md approved (commit 5387c8a amended to docs:), Phase 15 discussion next"
+current_phase_name: contract-freeze-baseline-audit
+status: executing
+stopped_at: context exhaustion at 75% (2026-07-17)
+last_updated: "2026-07-17T07:26:31.571Z"
+last_activity: 2026-07-17
+last_activity_desc: Phase 15 execution resumed (wave continue)
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 1
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 2
   percent: 0
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 14 — testability-data-flow
+**Current focus:** Phase 15 — contract-freeze-baseline-audit
 
 ## Current Position
 
-Phase: 15 of 22 (Phase 15: 契约固化与基线盘点 — ready to plan)
-Plan: — (0/TBD in Phase 15)
-Status: Roadmap approved — awaiting Phase 15 discussion (CONTEXT.md missing)
-Last activity: 2026-07-16 — v3.0 ROADMAP.md approved (commit 5387c8a amended to docs:), Phase 15 discussion next
+Phase: 15 (contract-freeze-baseline-audit) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 15
+Last activity: 2026-07-17 — Phase 15 execution resumed (wave continue)
 
 ## Performance Metrics
 
@@ -96,8 +96,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-16T17:42:05.801Z
-Stopped at: context exhaustion at 75% (2026-07-16)
+Last session: 2026-07-17T06:47:31.217Z
+Stopped at: context exhaustion at 75% (2026-07-17)
 Resume file: (none — Phase 15 未规划，下一步 /gsd-discuss-phase 15)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
