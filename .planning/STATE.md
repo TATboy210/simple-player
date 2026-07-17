@@ -5,8 +5,8 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 16
 current_phase_name: 兼容适配层骨架 + DiagnosticsBundle
 status: planning
-stopped_at: context exhaustion at 81% (2026-07-17)
-last_updated: "2026-07-17T12:17:44.846Z"
+stopped_at: Phase 16 context gathered
+last_updated: "2026-07-17T14:36:11.731Z"
 last_activity: 2026-07-17
 last_activity_desc: Phase 15 complete, transitioned to Phase 16
 progress:
@@ -97,9 +97,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-17T11:22:59.235Z
-Stopped at: context exhaustion at 81% (2026-07-17)
-Resume file: (none — Phase 15 未规划，下一步 /gsd-discuss-phase 15)
+Last session: 2026-07-17T14:36:11.715Z
+Stopped at: Phase 16 context gathered
+Resume file: .planning/phases/16-diagnosticsbundle/16-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
