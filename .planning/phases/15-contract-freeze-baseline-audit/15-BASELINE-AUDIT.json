@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-16T21:16:34Z",
+  "generated_at": "2026-07-17T11:52:42Z",
   "script_version": "1.0.0",
   "targets": {
     "package_logger_usage": {
@@ -17,7 +17,7 @@
       "total_call_sites": 2,
       "locations": [
         "lib/kernel/utils/debug_exporter.dart:57",
-        "lib/main.dart:16"
+        "lib/main.dart:22"
       ]
     },
     "open_generation_references": {
