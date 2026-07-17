@@ -1,0 +1,2 @@
+This is a plain text file, not a video.
+Used to test FvpEngine.open() error handling for non-media files.
