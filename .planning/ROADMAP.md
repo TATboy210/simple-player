@@ -88,7 +88,7 @@ Plans:
   1. `KernelAdapter implements MediaEngine` 100% 路由到旧引擎，既有全测试套件保持绿色，UI 行为零可观测变化（cutover 未发生，仅 seam 就位）
   2. `DiagnosticsBundle` 载体（`KernelLogger` + `MemoryMonitor` + `EngineMetrics` + `EngineEventLog`）含 `noop` 默认，构造注入，`app.dart` 组合根在 `FvpEngine` 原位装配 `KernelAdapter(old, old, policyAllOld)`
   3. 适配层转发活动引擎持有的**同一 `ValueNotifier` 实例**（不重新包装），既有 `ValueListenableBuilder` 监听器不脱钩 — 可用同一 widget 测试对 adapter 验证 notifier 实例相等性
-  4. 单一 `KernelMode { legacy, migrated }` 仲裁者由适配层持有 + 统一 `openGeneration` 计数器由适配层持有，无双数据源（不存在两套 `MediaState`/`position`/`openGeneration` 流）
+  4. 单一 `KernelMode { legacy, migrated }` 仲裁者由适配层持有；`openGeneration` 统一计数器 P16 由旧引擎持有（适配层无 counter 字段，D20），P20 经 `OpenGenerationTracker` 迁入适配层/机器（STATE-02）；无双数据源（不存在两套 `MediaState`/`position`/`openGeneration` 流） — P16 经 D22 grep 闸门（`_openGeneration` 0 命中 `lib/kernel/adapter/`）验证
   5. 尺寸预算受控且已审计 — 适配层+门面+sealed 错误+tracker 合计 < 旧 `FvpEngine` 行数；适配层除 `KernelMode` + generation 计数器外无状态；已召 senior-architect / red-team 挑战范围蔓延并记录结论
 
 **Blocking Constraints honored**:
@@ -96,7 +96,13 @@ Plans:
   - **#6 (适配层转发 ValueNotifier 实例非重新包装)** — ADAPT-03 适配层返回活动引擎持有的同一 notifier 实例；重新包装会脱钩所有 ValueListenableBuilder 监听器 → cutover 时 UI 静默冻结。
   - **#8 (过度工程化是项目宿敌)** — ADAPT-05 尺寸预算：适配层+门面+sealed 错误+tracker 合计 < 旧 FvpEngine；适配层除 KernelMode + generation 计数器外无状态；Phase 2 须召 senior-architect/red-team 挑战范围蔓延。
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+- [ ] 16-01-PLAN.md — KernelAdapter seam (single file per D19): 7-interface ternary dispatch, pure-forward open() (no counter, D20), DelegationPolicy + KernelMode, identity-preserving notifier forwarding, D21 class-level P20 migration checklist [wave 2]
+- [ ] 16-02-PLAN.md — DiagnosticsBundle + 5 diagnostics files: KernelLogger + 3 slots + bundle, all noop, const .noop() factory, cascading dispose [wave 1]
+- [ ] 16-03-PLAN.md — PlayerServices wiring: composition-root swap FvpEngine → KernelAdapter(old, old, policyAllOld, noop bundle) [wave 3]
+- [ ] 16-04-PLAN.md — Test suite (D24 three layers): contract mount (factory swap) + same() identity (13 notifiers) + diagnostics units + full-suite regression; no adapter-layer openGeneration test (D20/#8 KISS) [wave 3]
+- [ ] 16-05-PLAN.md — Static gates: D22 grep (`_openGeneration` 0 hits in lib/kernel/adapter/, `openGeneration` class-level doc-only) + D27 wc (6 files < 636) in tool/audit/phase16_gates.sh [wave 3]
 
 ### Phase 17: 零依赖 KernelLogger 门面（替换迁移）
 
@@ -212,7 +218,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
-| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 0/TBD | Not started | - |
+| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 planned (awaiting execution) | Planning complete | - |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 0/TBD | Not started | - |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |
 | 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |

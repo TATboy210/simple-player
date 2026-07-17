@@ -4,11 +4,11 @@ milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
 current_phase: 16
 current_phase_name: 兼容适配层骨架 + DiagnosticsBundle
-status: planning
-stopped_at: context exhaustion at 77% (2026-07-17)
-last_updated: "2026-07-17T16:00:45.903Z"
-last_activity: 2026-07-17
-last_activity_desc: Phase 15 complete, transitioned to Phase 16
+status: planned
+stopped_at: Phase 16 planning complete — 5 PLANs PASS checker + coverage gates (2026-07-18), awaiting execution
+last_updated: "2026-07-18T01:45:00.000Z"
+last_activity: 2026-07-18
+last_activity_desc: Phase 16 planning complete (5 PLANs, checker PASS, coverage gates PASS)
 progress:
   total_phases: 8
   completed_phases: 0
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 15 — contract-freeze-baseline-audit
+**Current focus:** Phase 16 — 兼容适配层骨架 + DiagnosticsBundle (planning complete, awaiting execution)
 
 ## Current Position
 
 Phase: 16 — 兼容适配层骨架 + DiagnosticsBundle
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-17 — Phase 15 complete, transitioned to Phase 16
+Plan: 5 PLANs created (16-01..05), checker PASS, coverage gates PASS
+Status: Planning complete — awaiting execution
+Last activity: 2026-07-18 — Phase 16 planning complete (5 PLANs, checker PASS, ADAPT-01..05 + D1-D27 coverage PASS)
 
 ## Performance Metrics
 
@@ -97,8 +97,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-17T16:00:45.888Z
-Stopped at: context exhaustion at 77% (2026-07-17)
+Last session: 2026-07-17T16:34:55.316Z
+Stopped at: context exhaustion at 80% (2026-07-17)
 Resume file: .planning/phases/16-diagnosticsbundle/16-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
