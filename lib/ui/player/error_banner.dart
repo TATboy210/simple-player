@@ -48,6 +48,15 @@ class ErrorBanner extends StatelessWidget {
           case CodecError():
             callback = onOpenFile;
             actionLabel = l10n.selectOtherFile;
+          // textureFailed 多为 GPU/驱动/4K 资源问题，盲目重试易触发资源竞争再超时
+          // （实测：首次 4K open 成功但黑屏，用户再点 → 第二次 open 在首次纹理
+          // 资源未释放时 5s 超时）。引导"选择其他文件"跳出死循环。
+          // 注：controls_overlay 接线里 onRetry 与 onOpenFile 同源，此处仅修正
+          // 误导性文案（"重试"→"选择其他文件"），行为零变化。
+          case PlaybackError(:final code)
+              when code == PlaybackErrorCode.textureFailed:
+            callback = onOpenFile;
+            actionLabel = l10n.selectOtherFile;
           case PlaybackError() || NetworkError() || UnknownError():
             callback = onRetry;
             actionLabel = l10n.retry;
