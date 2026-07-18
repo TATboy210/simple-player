@@ -21,7 +21,7 @@
 - [x] **ADAPT-02**: `DiagnosticsBundle` 载体（`KernelLogger` + `MemoryMonitor` + `EngineMetrics` + `EngineEventLog`），含 `noop` 默认，构造注入
 - [x] **ADAPT-03**: 适配层转发活动引擎的 `ValueNotifier` **实例**（不重新包装），`ValueListenableBuilder` 监听器不脱钩
 - [x] **ADAPT-04**: 单一 `KernelMode { legacy, migrated }` 仲裁者 + 由适配层持有的统一 `openGeneration` 计数器，无双数据源
-- [ ] **ADAPT-05**: 尺寸预算受控 — 适配层+门面+sealed 错误+tracker 合计 < 旧 `FvpEngine`；适配层除 `KernelMode`+generation 计数器外无状态
+- [x] **ADAPT-05**: 尺寸预算受控 — 适配层+门面+sealed 错误+tracker 合计 < 旧 `FvpEngine`；适配层除 `KernelMode`+generation 计数器外无状态
 
 ### LOG — 零依赖 KernelLogger 门面（Phase 3）
 
@@ -115,7 +115,7 @@
 | ADAPT-02 | Phase 16 | Complete |
 | ADAPT-03 | Phase 16 | Complete |
 | ADAPT-04 | Phase 16 | Complete |
-| ADAPT-05 | Phase 16 | Pending |
+| ADAPT-05 | Phase 16 | Complete |
 | LOG-01 | Phase 17 | Pending |
 | LOG-02 | Phase 17 | Pending |
 | LOG-03 | Phase 17 | Pending |
