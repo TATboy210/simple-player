@@ -41,7 +41,7 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 - Decimal phases (15.1, 15.2): Urgent insertions (marked with INSERTED), created via `/gsd-phase --insert`
 
 - [x] **Phase 15: 契约固化与基线盘点** - 冻结 MediaEngine 行为契约规约，盘点静态调用点，核对 9 态 vs 6 态差异，编写接口级契约测试作为迁移闸门 (completed 2026-07-17)
-- [ ] **Phase 16: 兼容适配层骨架 + DiagnosticsBundle** - KernelAdapter 100% 路由旧引擎零行为变更，DiagnosticsBundle 载体骨架，单一 KernelMode 仲裁者，尺寸预算受控
+- [x] **Phase 16: 兼容适配层骨架 + DiagnosticsBundle** - KernelAdapter 100% 路由旧引擎零行为变更，DiagnosticsBundle 载体骨架，单一 KernelMode 仲裁者，尺寸预算受控 (completed 2026-07-18)
 - [ ] **Phase 17: 零依赖 KernelLogger 门面（替换迁移）** - dart:developer 门面 + kDebugMode 门控，121 调用点替换迁移保留 log*.w() 形状，CI grep 闸门内核永不 import package:logger
 - [ ] **Phase 18: Sealed 错误模型稳化** - 扩展现有 sealed PlayerError + ErrorContext + ErrorCode 注册表，引擎 catch 点结构化发射，UI 边界 ErrorView 翻译，跨 mdk 回调线程封送
 - [ ] **Phase 19: MemoryMonitor 一等化** - 实例化构造注入 RssProvider+Clock，start/stop/dispose 生命周期，单例→实例一个原子提交，纳入 DiagnosticsBundle，对播放业务零干扰
@@ -96,13 +96,13 @@ Plans:
   - **#6 (适配层转发 ValueNotifier 实例非重新包装)** — ADAPT-03 适配层返回活动引擎持有的同一 notifier 实例；重新包装会脱钩所有 ValueListenableBuilder 监听器 → cutover 时 UI 静默冻结。
   - **#8 (过度工程化是项目宿敌)** — ADAPT-05 尺寸预算：适配层+门面+sealed 错误+tracker 合计 < 旧 FvpEngine；适配层除 KernelMode + generation 计数器外无状态；Phase 2 须召 senior-architect/red-team 挑战范围蔓延。
 
-**Plans**: 3/5 plans executed
+**Plans**: 5/5 plans executed
 
 - [x] 16-01-PLAN.md — KernelAdapter seam (single file per D19): 7-interface ternary dispatch, pure-forward open() (no counter, D20), DelegationPolicy + KernelMode, identity-preserving notifier forwarding, D21 class-level P20 migration checklist [wave 2]
 - [x] 16-02-PLAN.md — DiagnosticsBundle + 5 diagnostics files: KernelLogger + 3 slots + bundle, all noop, const .noop() factory, cascading dispose [wave 1]
-- [ ] 16-03-PLAN.md — PlayerServices wiring: composition-root swap FvpEngine → KernelAdapter(old, old, policyAllOld, noop bundle) [wave 3]
+- [x] 16-03-PLAN.md — PlayerServices wiring: composition-root swap FvpEngine → KernelAdapter(old, old, policyAllOld, noop bundle) [wave 3]
 - [x] 16-04-PLAN.md — Test suite (D24 three layers): contract mount (factory swap) + same() identity (13 notifiers) + diagnostics units + full-suite regression; no adapter-layer openGeneration test (D20/#8 KISS) [wave 3]
-- [ ] 16-05-PLAN.md — Static gates: D22 grep (`_openGeneration` 0 hits in lib/kernel/adapter/, `openGeneration` class-level doc-only) + D27 wc (6 files < 636) in tool/audit/phase16_gates.sh [wave 3]
+- [x] 16-05-PLAN.md — Static gates: D22 grep (`_openGeneration` 0 hits in lib/kernel/adapter/, `openGeneration` class-level doc-only) + D27 wc (6 files < 636) in tool/audit/phase16_gates.sh [wave 3]
 
 ### Phase 17: 零依赖 KernelLogger 门面（替换迁移）
 
@@ -218,7 +218,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
-| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 3/5 | In Progress|  |
+| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete    | 2026-07-18 |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 0/TBD | Not started | - |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |
 | 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |

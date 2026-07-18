@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
-current_phase: 16
-current_phase_name: 兼容适配层骨架 + DiagnosticsBundle
-status: planned
+current_phase: 17
+current_phase_name: 零依赖 KernelLogger 门面（替换迁移）
+status: planning
 stopped_at: Completed 16-04-PLAN.md
-last_updated: "2026-07-18T10:20:46.867Z"
+last_updated: "2026-07-18T11:30:44.543Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 16 planning complete (5 PLANs, checker PASS, ADAPT-01..05 + D1-D27 coverage PASS) + Step 15 dirty-tree isolated (bf12821 Phase15 residue + b28c37f playback_status_overlay debug), working tree clean
+last_activity_desc: Phase 16 complete, transitioned to Phase 17
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 9
-  completed_plans: 6
-  percent: 0
+  completed_plans: 8
+  percent: 13
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 16 — 兼容适配层骨架 + DiagnosticsBundle
-Plan: 5 PLANs created (16-01..05), checker PASS, coverage gates PASS
-Status: Planning complete + dirty-tree isolated — awaiting execute-phase 16 in fresh window
-Last activity: 2026-07-18 — Phase 16 planning complete (5 PLANs, checker PASS, ADAPT-01..05 + D1-D27 coverage PASS) + Step 15 dirty-tree isolated (bf12821 Phase15 residue + b28c37f playback_status_overlay debug), working tree clean
+Phase: 17 — 零依赖 KernelLogger 门面（替换迁移）
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-18 — Phase 16 complete, transitioned to Phase 17
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 5
+- Total plans completed: 10
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -51,6 +51,7 @@ Last activity: 2026-07-18 — Phase 16 planning complete (5 PLANs, checker PASS,
 | 12. 轨道统一 | 0/2 | — | — |
 | 14 | 2 | - | - |
 | 15 | 3 | - | - |
+| 16 | 5 | - | - |
 
 **Recent Trend:**
 
