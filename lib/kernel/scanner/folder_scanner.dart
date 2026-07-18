@@ -46,27 +46,32 @@ class FolderScanner {
   };
 
   /// Scan [directory] for video files. Returns empty list on error.
-  static List<VideoFile> scan(String directory) {
+  ///
+  /// 异步遍历目录（dir.list() + await for），避免 listSync 阻塞 UI isolate。
+  /// 同步语义保留：非递归、扩展名大小写不敏感、按文件名升序排序。
+  static Future<List<VideoFile>> scan(String directory) async {
     try {
       final dir = Directory(directory);
-      if (!dir.existsSync()) return [];
+      // exists() 异步让出事件循环（vs existsSync 阻塞），大目录扫描不卡 UI
+      if (!await dir.exists()) return [];
 
-      return dir
-          .listSync()
-          .whereType<File>()
-          .where((f) {
-            final ext = p.extension(f.path).toLowerCase();
-            return _extensions.contains(ext);
-          })
-          .map(
-            (f) => VideoFile(
-              path: f.path,
-              name: p.basename(f.path),
-              folderPath: directory,
-            ),
-          )
-          .toList()
-        ..sort((a, b) => a.name.compareTo(b.name));
+      final results = <VideoFile>[];
+      // await for 逐项流式处理：每个 entity 让出事件循环，UI 可穿插响应
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final ext = p.extension(entity.path).toLowerCase();
+        if (!_extensions.contains(ext)) continue;
+        results.add(
+          VideoFile(
+            path: entity.path,
+            name: p.basename(entity.path),
+            folderPath: directory,
+          ),
+        );
+      }
+      // 流结束后统一排序，保持原同步版的稳定升序语义
+      results.sort((a, b) => a.name.compareTo(b.name));
+      return results;
     } on Exception catch (e) {
       debugPrint('[FolderScanner] Failed to scan "$directory": $e');
       return [];

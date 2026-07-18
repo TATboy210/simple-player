@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/playlist_item.dart';
@@ -145,7 +147,8 @@ class _FolderGroupWidget extends StatelessWidget {
         // 路径标签
         _FolderPathLabel(
           folderPath: group.folderPath,
-          onScan: () => _scanFolder(context),
+          // _scanFolder 已 async；unawaited 标注 fire-and-forget，不阻塞菜单回调
+          onScan: () => unawaited(_scanFolder(context)),
           onOpen: () => _openFolder(),
         ),
         // 水平缩略图列表
@@ -193,8 +196,9 @@ class _FolderGroupWidget extends StatelessWidget {
     PathUtils.openFileLocation(group.folderPath);
   }
 
-  void _scanFolder(BuildContext context) {
-    final scanned = FolderScanner.scan(group.folderPath);
+  Future<void> _scanFolder(BuildContext context) async {
+    // FolderScanner.scan 已异步化：避免扫描大文件夹时阻塞 UI
+    final scanned = await FolderScanner.scan(group.folderPath);
     if (scanned.isNotEmpty) {
       onFolderScanned?.call(
         group.folderPath,
@@ -233,7 +237,9 @@ class _FolderPathLabel extends StatelessWidget {
             Flexible(
               child: Tooltip(
                 message: folderPath,
-                waitDuration: const Duration(milliseconds: Tokens.tooltipDelayLong),
+                waitDuration: const Duration(
+                  milliseconds: Tokens.tooltipDelayLong,
+                ),
                 child: Text(
                   _truncateMiddle(folderPath, 36),
                   maxLines: 1,

@@ -39,9 +39,13 @@ class ThumbnailService {
       _instance._getThumbnailImpl(filePath);
 
   Future<ImageProvider?> _getThumbnailImpl(String filePath) async {
-    if (_cache.containsKey(filePath)) {
-      _touchImpl(filePath);
-      return _cache[filePath];
+    // 命中路径优化：remove 返回非 null 即命中，reinsert 实现 LRU touch。
+    // 原路径 containsKey + _touchImpl(remove+reinsert) + _cache[read] = 4 次 map；
+    // 优化后 remove + reinsert = 2 次，且 remove 的返回值直接复用，省去再读。
+    final cached = _cache.remove(filePath);
+    if (cached != null) {
+      _cache[filePath] = cached; // reinsert → 移到末尾（最近访问）
+      return cached;
     }
 
     final provider = await _providerImpl.getThumbnail(filePath);
