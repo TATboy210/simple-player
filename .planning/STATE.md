@@ -5,15 +5,15 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 16
 current_phase_name: 兼容适配层骨架 + DiagnosticsBundle
 status: planned
-stopped_at: Phase 16 planning complete + dirty-tree isolated (bf12821 Phase15 residue + b28c37f playback_status_overlay debug, 2026-07-18), awaiting execute-phase 16 in fresh window
-last_updated: "2026-07-18T01:59:00.000Z"
+stopped_at: Completed 16-04-PLAN.md
+last_updated: "2026-07-18T10:20:46.867Z"
 last_activity: 2026-07-18
-last_activity_desc: Phase 16 planning complete (5 PLANs, checker PASS, coverage gates PASS) + Step 15 dirty-tree isolated to 2 commits (bf12821 + b28c37f), working tree clean
+last_activity_desc: Phase 16 planning complete (5 PLANs, checker PASS, ADAPT-01..05 + D1-D27 coverage PASS) + Step 15 dirty-tree isolated (bf12821 Phase15 residue + b28c37f playback_status_overlay debug), working tree clean
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 4
-  completed_plans: 3
+  total_plans: 9
+  completed_plans: 6
   percent: 0
 ---
 
@@ -58,6 +58,11 @@ Last activity: 2026-07-18 — Phase 16 planning complete (5 PLANs, checker PASS,
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 16-diagnosticsbundle P04 | 45min | 4 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -71,6 +76,7 @@ Recent decisions affecting current work:
 - [v2.1]: 状态机采用 switch expression 穷举 9 状态 ~40 条边
 - [v2.1]: StateMonitor 拆分为 PlaybackStateManager（设置+断点+持久化）+ AutoAdvancePolicy（连播策略）
 - [v2.1]: open() 使用 _openGeneration 计数器替代 _isOpening bool
+- [Phase ?]: No adapter-layer openGeneration test created; texture-channel mock copied verbatim; native DLLs copied for local test env per Phase 15 precedent
 
 ### Pending Todos
 
@@ -97,9 +103,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-17T16:34:55.316Z
-Stopped at: context exhaustion at 80% (2026-07-17)
-Resume file: .planning/phases/16-diagnosticsbundle/16-CONTEXT.md
+Last session: 2026-07-18T10:20:46.845Z
+Stopped at: Completed 16-04-PLAN.md
+Resume file: None
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 

@@ -96,12 +96,12 @@ Plans:
   - **#6 (适配层转发 ValueNotifier 实例非重新包装)** — ADAPT-03 适配层返回活动引擎持有的同一 notifier 实例；重新包装会脱钩所有 ValueListenableBuilder 监听器 → cutover 时 UI 静默冻结。
   - **#8 (过度工程化是项目宿敌)** — ADAPT-05 尺寸预算：适配层+门面+sealed 错误+tracker 合计 < 旧 FvpEngine；适配层除 KernelMode + generation 计数器外无状态；Phase 2 须召 senior-architect/red-team 挑战范围蔓延。
 
-**Plans**: 5 plans
+**Plans**: 3/5 plans executed
 
-- [ ] 16-01-PLAN.md — KernelAdapter seam (single file per D19): 7-interface ternary dispatch, pure-forward open() (no counter, D20), DelegationPolicy + KernelMode, identity-preserving notifier forwarding, D21 class-level P20 migration checklist [wave 2]
-- [ ] 16-02-PLAN.md — DiagnosticsBundle + 5 diagnostics files: KernelLogger + 3 slots + bundle, all noop, const .noop() factory, cascading dispose [wave 1]
+- [x] 16-01-PLAN.md — KernelAdapter seam (single file per D19): 7-interface ternary dispatch, pure-forward open() (no counter, D20), DelegationPolicy + KernelMode, identity-preserving notifier forwarding, D21 class-level P20 migration checklist [wave 2]
+- [x] 16-02-PLAN.md — DiagnosticsBundle + 5 diagnostics files: KernelLogger + 3 slots + bundle, all noop, const .noop() factory, cascading dispose [wave 1]
 - [ ] 16-03-PLAN.md — PlayerServices wiring: composition-root swap FvpEngine → KernelAdapter(old, old, policyAllOld, noop bundle) [wave 3]
-- [ ] 16-04-PLAN.md — Test suite (D24 three layers): contract mount (factory swap) + same() identity (13 notifiers) + diagnostics units + full-suite regression; no adapter-layer openGeneration test (D20/#8 KISS) [wave 3]
+- [x] 16-04-PLAN.md — Test suite (D24 three layers): contract mount (factory swap) + same() identity (13 notifiers) + diagnostics units + full-suite regression; no adapter-layer openGeneration test (D20/#8 KISS) [wave 3]
 - [ ] 16-05-PLAN.md — Static gates: D22 grep (`_openGeneration` 0 hits in lib/kernel/adapter/, `openGeneration` class-level doc-only) + D27 wc (6 files < 636) in tool/audit/phase16_gates.sh [wave 3]
 
 ### Phase 17: 零依赖 KernelLogger 门面（替换迁移）
@@ -218,7 +218,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
-| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 planned (awaiting execution) | Planning complete | - |
+| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 3/5 | In Progress|  |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 0/TBD | Not started | - |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |
 | 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |
