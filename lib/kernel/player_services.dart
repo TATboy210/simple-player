@@ -16,6 +16,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'engine/engine_state.dart';
 
+import 'adapter/kernel_adapter.dart';
 import 'bridge/window_bridge.dart';
 import 'engine/fvp_engine.dart';
 import 'persistence/settings_store.dart';
@@ -84,7 +85,17 @@ class PlayerServices {
   ///
   /// 每个服务的创建都依赖前一个服务的结果，因此必须顺序执行。
   Future<void> init() async {
-    engine = FvpEngine();
+    // Strangler Fig seam (Phase 16, ADAPT-01/02): 用 KernelAdapter 包裹同一个
+    // FvpEngine 实例，legacy/migrated 均指向它 (D13/D19 — NewFvpEngine 尚不存在，
+    // 零额外原生资源)。policy 全量路由到 legacy，行为与直接使用 FvpEngine 完全
+    // 一致；bundle 使用构造函数默认的 noop (D10/D12)。Phase 20 将把 migrated
+    // 换成 NewFvpEngine 并翻转 policy，此处即为切换点。
+    final fvp = FvpEngine();
+    engine = KernelAdapter(
+      legacy: fvp,
+      migrated: fvp,
+      policy: const DelegationPolicy.all(KernelMode.legacy),
+    );
     playlist = Playlist();
     controller = PlaybackController(
       engine: engine,
