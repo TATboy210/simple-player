@@ -1,5 +1,13 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:simple_player_flutter/kernel/diagnostics/diagnostics_bundle.dart';
 import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
+import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/engine/models/audio_track_info.dart';
+import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
+import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.dart';
+import 'package:simple_player_flutter/kernel/engine/video_effect_type.dart';
+import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
 /// 单一仲裁枚举 — 标识某能力路由到旧引擎还是新引擎 (D14/ADAPT-04).
 ///
@@ -9,14 +17,12 @@ enum KernelMode { legacy, migrated }
 
 /// 委托策略 — 7 个 final KernelMode 字段, 一一对应 MediaEngine 的 7 个 ISP 子接口 (D14).
 ///
-/// Immutable per-capability routing policy. All 7 fields are `final` (D15):
-/// cutover rebuilds the adapter rather than flipping in place — this is the
-/// structural protection for Blocking Constraint #6 (identity-preserving
-/// ValueNotifier forwarding; a mid-flight policy flip would detach UI
-/// listeners). `stateView` is a plain field with no extra pin/factory
-/// constraint (D18): the final+recreate guarantee already bounds its mutation,
-/// and an additional pin would be redundant over-engineering that also
-/// blocks Phase 20's partial cutover.
+/// Immutable per-capability routing policy. All 7 fields `final` (D15):
+/// cutover rebuilds the adapter rather than flipping in place — structural
+/// protection for Blocking Constraint #6 (identity-preserving ValueNotifier
+/// forwarding; a mid-flight flip would detach UI listeners). `stateView` is a
+/// plain field with no extra pin (D18): final+recreate already bounds mutation;
+/// an extra pin would block Phase 20 partial cutover.
 final class DelegationPolicy {
   const DelegationPolicy({
     required this.stateView,
@@ -30,37 +36,34 @@ final class DelegationPolicy {
 
   /// 全部 7 能力路由到同一 KernelMode — Phase 16 仅使用
   /// `DelegationPolicy.all(KernelMode.legacy)` (D14).
-  ///
-  /// All 7 capabilities routed to the same [KernelMode]. Phase 16 uses
-  /// `DelegationPolicy.all(KernelMode.legacy)` exclusively (D14).
   const DelegationPolicy.all(KernelMode mode)
-      : stateView = mode,
-        playback = mode,
-        track = mode,
-        subtitle = mode,
-        videoEffect = mode,
-        renderer = mode,
-        volume = mode;
+    : stateView = mode,
+      playback = mode,
+      track = mode,
+      subtitle = mode,
+      videoEffect = mode,
+      renderer = mode,
+      volume = mode;
 
-  /// EngineStateView 子接口路由 (只读状态视图, 11 ValueNotifier + mediaInfo).
+  /// EngineStateView 路由 (只读状态视图: 11 ValueNotifier + mediaInfo).
   final KernelMode stateView;
 
-  /// PlaybackControl 子接口路由 (open/play/pause/seek 等控制方法).
+  /// PlaybackControl 路由 (open/play/pause/seek 等控制方法).
   final KernelMode playback;
 
-  /// TrackControl 子接口路由 (音轨查询/切换).
+  /// TrackControl 路由 (音轨查询/切换).
   final KernelMode track;
 
-  /// SubtitleConfig 子接口路由 (字幕轨道/延迟/均衡器).
+  /// SubtitleConfig 路由 (字幕轨道/延迟/均衡器).
   final KernelMode subtitle;
 
-  /// VideoEffectControl 子接口路由 (亮度/旋转/宽高比/反交错).
+  /// VideoEffectControl 路由 (亮度/旋转/宽高比/反交错).
   final KernelMode videoEffect;
 
-  /// RendererControl 子接口路由 (D3D11 同步/硬解).
+  /// RendererControl 路由 (D3D11 同步/硬解).
   final KernelMode renderer;
 
-  /// VolumeControl 子接口路由 (音量/静音 — 单一路由, 见 KernelAdapter).
+  /// VolumeControl 路由 (音量/静音 — 单一路由, 见 KernelAdapter).
   final KernelMode volume;
 }
 
@@ -68,21 +71,15 @@ final class DelegationPolicy {
 ///
 /// `KernelAdapter implements MediaEngine` 并将 7 个 ISP 子接口的约 44 个成员
 /// 按 [_policy] 逐能力转发到 [_legacy] 或 [_migrated] 引擎. 组成:
-///   - [_legacy]:    当前 FvpEngine (Phase 16 权威)
-///   - [_migrated]:   未来 NewFvpEngine (Phase 20 切换目标)
-///   - [_policy]:     DelegationPolicy — 逐能力路由仲裁
-///   - [_bundle]:      DiagnosticsBundle — Phase 16 全 noop (D2/D3)
+///   - [_legacy]:   当前 FvpEngine (Phase 16 权威)
+///   - [_migrated]:  未来 NewFvpEngine (Phase 20 切换目标)
+///   - [_policy]:    DelegationPolicy — 逐能力路由仲裁
+///   - [_bundle]:     DiagnosticsBundle — Phase 16 全 noop (D2/D3)
 ///
-/// Phase 16 立场: 刻意死路由 — `DelegationPolicy.all(KernelMode.legacy)`
-/// 将 100% 路由到 [_legacy], 行为与直接使用 FvpEngine 完全一致. 适配器
-/// 不持有任何可变状态 (D17): 无计数器, 无迁移标志, 无缓存 — engine/policy/
-/// bundle 均为注入依赖.
-///
-/// Strangler Fig seam — a transient routing layer, NOT a permanent
-/// architectural layer. `KernelAdapter` implements `MediaEngine` and forwards
-/// every one of the ~44 members across the 7 ISP sub-interfaces to a wrapped
-/// `legacy` or `migrated` engine, selected per-capability by [_policy]. The
-/// seam is collapsed/deleted in Phase 21 (see ROADMAP Phase 21 SC4/D16).
+/// Phase 16 立场: 刻意死路由 — `DelegationPolicy.all(KernelMode.legacy)` 将
+/// 100% 路由到 [_legacy], 行为与直接使用 FvpEngine 完全一致. 适配器不持有
+/// 任何可变状态 (D17): 无计数器, 无迁移标志, 无缓存 — engine/policy/bundle
+/// 均为注入依赖. The seam is collapsed/deleted in Phase 21 (SC4/D16).
 ///
 /// P20 migration checklist (forward-looking, NOT implemented in Phase 16):
 ///   - openGeneration unified counter migrates from legacy into adapter/tracker (STATE-02, D23a)
@@ -90,19 +87,16 @@ final class DelegationPolicy {
 ///   - DelegationPolicy field flip: all-legacy -> per-capability migrated (D14/STATE-06, D23c)
 class KernelAdapter implements MediaEngine {
   /// 构造函数 — 旧/新引擎 + 委托策略 + 诊断 bundle (默认 noop, D12).
-  ///
   /// Engine/policy/bundle are injected dependencies (not mutable state, D17).
-  /// `bundle` defaults to `const DiagnosticsBundle.noop()` so Phase 16
-  /// callers can omit it (D12 constructor signature).
   KernelAdapter({
     required MediaEngine legacy,
     required MediaEngine migrated,
     required DelegationPolicy policy,
     DiagnosticsBundle bundle = const DiagnosticsBundle.noop(),
-  })  : _legacy = legacy,
-        _migrated = migrated,
-        _policy = policy,
-        _bundle = bundle;
+  }) : _legacy = legacy,
+       _migrated = migrated,
+       _policy = policy,
+       _bundle = bundle;
 
   final MediaEngine _legacy;
   final MediaEngine _migrated;
@@ -111,14 +105,253 @@ class KernelAdapter implements MediaEngine {
 
   /// 释放活动引擎并级联释放 bundle (D10). 路由由 _policy.stateView 决定,
   /// 无额外内部条件分支 (Phase 15 D8 — 无 _isMigrating 等内部标志分支).
-  ///
-  /// dispose forwards to the active engine (selected by [_policy].stateView)
-  /// AND cascades to [_bundle].dispose() (D10). One policy-based dispatch,
-  /// no further internal branching (Phase 15 D8).
   @override
   void dispose() {
     (_policy.stateView == KernelMode.legacy ? _legacy : _migrated).dispose();
     _bundle.dispose();
   }
-}
 
+  // ===== EngineStateView (11 ValueNotifier + mediaInfo via _policy.stateView) =====
+  //
+  // Identity-preserving forwarding (ADAPT-03 / Blocking Constraint #6): every
+  // notifier getter returns the wrapped engine's OWN ValueNotifier instance —
+  // never a fresh notifier wrapping `x.value`, which would detach all
+  // ValueListenableBuilder listeners and freeze UI on cutover (D25 same() test,
+  // Plan 16-04).
+
+  @override
+  ValueNotifier<int?> get textureId => _policy.stateView == KernelMode.legacy
+      ? _legacy.textureId
+      : _migrated.textureId;
+
+  @override
+  ValueNotifier<MediaState> get state =>
+      _policy.stateView == KernelMode.legacy ? _legacy.state : _migrated.state;
+
+  @override
+  ValueNotifier<int> get position => _policy.stateView == KernelMode.legacy
+      ? _legacy.position
+      : _migrated.position;
+
+  @override
+  ValueNotifier<int> get duration => _policy.stateView == KernelMode.legacy
+      ? _legacy.duration
+      : _migrated.duration;
+
+  @override
+  ValueNotifier<bool> get isBuffering => _policy.stateView == KernelMode.legacy
+      ? _legacy.isBuffering
+      : _migrated.isBuffering;
+
+  @override
+  ValueNotifier<bool> get isSeeking => _policy.stateView == KernelMode.legacy
+      ? _legacy.isSeeking
+      : _migrated.isSeeking;
+
+  @override
+  ValueNotifier<String> get subtitleText =>
+      _policy.stateView == KernelMode.legacy
+      ? _legacy.subtitleText
+      : _migrated.subtitleText;
+
+  @override
+  ValueNotifier<int> get buffered => _policy.stateView == KernelMode.legacy
+      ? _legacy.buffered
+      : _migrated.buffered;
+
+  @override
+  ValueNotifier<double> get aspectRatio =>
+      _policy.stateView == KernelMode.legacy
+      ? _legacy.aspectRatio
+      : _migrated.aspectRatio;
+
+  @override
+  ValueNotifier<PlayerError?> get lastError =>
+      _policy.stateView == KernelMode.legacy
+      ? _legacy.lastError
+      : _migrated.lastError;
+
+  @override
+  ValueNotifier<double> get playbackSpeed =>
+      _policy.stateView == KernelMode.legacy
+      ? _legacy.playbackSpeed
+      : _migrated.playbackSpeed;
+
+  @override
+  MediaInfo get mediaInfo => _policy.stateView == KernelMode.legacy
+      ? _legacy.mediaInfo
+      : _migrated.mediaInfo;
+
+  // ===== VolumeControl (4 members via _policy.volume — single route) =====
+  //
+  // Single-route rationale (RESEARCH Pitfall 2 / Assumption A2):
+  // PlaybackControl.setVolume/setMute and EngineStateView.volume/isMuted have
+  // identical signatures to VolumeControl's 4 members. Dart interface
+  // composition means ONE override satisfies all three parent-interface
+  // declarations simultaneously; a second branch keyed on _policy.playback or
+  // _policy.stateView would be unreachable dead code — route via _policy.volume.
+
+  @override
+  ValueNotifier<double> get volume =>
+      _policy.volume == KernelMode.legacy ? _legacy.volume : _migrated.volume;
+
+  @override
+  ValueNotifier<bool> get isMuted =>
+      _policy.volume == KernelMode.legacy ? _legacy.isMuted : _migrated.isMuted;
+
+  @override
+  void setVolume(double value) => _policy.volume == KernelMode.legacy
+      ? _legacy.setVolume(value)
+      : _migrated.setVolume(value);
+
+  @override
+  void setMute(bool mute) => _policy.volume == KernelMode.legacy
+      ? _legacy.setMute(mute)
+      : _migrated.setMute(mute);
+
+  // ===== PlaybackControl (10 methods via _policy.playback — excludes setVolume/setMute) =====
+
+  /// 纯转发 — openGeneration 守卫驻留于旧引擎 (fvp_engine.dart:259/267/311/320),
+  /// P16 适配器透明无计数器 (D20); 计数器迁移为 P20 任务 (见类级 D21 检查清单).
+  @override
+  Future<void> open(String path) => _policy.playback == KernelMode.legacy
+      ? _legacy.open(path)
+      : _migrated.open(path);
+
+  @override
+  void play() =>
+      _policy.playback == KernelMode.legacy ? _legacy.play() : _migrated.play();
+
+  @override
+  void pause() => _policy.playback == KernelMode.legacy
+      ? _legacy.pause()
+      : _migrated.pause();
+
+  @override
+  void stop() =>
+      _policy.playback == KernelMode.legacy ? _legacy.stop() : _migrated.stop();
+
+  @override
+  void togglePlayPause() => _policy.playback == KernelMode.legacy
+      ? _legacy.togglePlayPause()
+      : _migrated.togglePlayPause();
+
+  @override
+  Future<void> seekTo(int ms) => _policy.playback == KernelMode.legacy
+      ? _legacy.seekTo(ms)
+      : _migrated.seekTo(ms);
+
+  @override
+  void setPlaybackRate(double rate) => _policy.playback == KernelMode.legacy
+      ? _legacy.setPlaybackRate(rate)
+      : _migrated.setPlaybackRate(rate);
+
+  @override
+  void setRange({required int from, int to = -1}) =>
+      _policy.playback == KernelMode.legacy
+      ? _legacy.setRange(from: from, to: to)
+      : _migrated.setRange(from: from, to: to);
+
+  @override
+  void skipForward([int ms = 10000]) => _policy.playback == KernelMode.legacy
+      ? _legacy.skipForward(ms)
+      : _migrated.skipForward(ms);
+
+  @override
+  void skipBack([int ms = 10000]) => _policy.playback == KernelMode.legacy
+      ? _legacy.skipBack(ms)
+      : _migrated.skipBack(ms);
+
+  // ===== TrackControl (3 members via _policy.track) =====
+  @override
+  List<AudioTrackInfo> getAudioTracks() => _policy.track == KernelMode.legacy
+      ? _legacy.getAudioTracks()
+      : _migrated.getAudioTracks();
+
+  @override
+  void switchAudioTrack(int trackId) => _policy.track == KernelMode.legacy
+      ? _legacy.switchAudioTrack(trackId)
+      : _migrated.switchAudioTrack(trackId);
+
+  @override
+  List<int> get activeAudioTracks => _policy.track == KernelMode.legacy
+      ? _legacy.activeAudioTracks
+      : _migrated.activeAudioTracks;
+
+  // ===== SubtitleConfig (8 members via _policy.subtitle) =====
+  @override
+  List<SubtitleTrackInfo> getSubtitleTracks() =>
+      _policy.subtitle == KernelMode.legacy
+      ? _legacy.getSubtitleTracks()
+      : _migrated.getSubtitleTracks();
+
+  @override
+  void switchSubtitleTrack(int trackId) => _policy.subtitle == KernelMode.legacy
+      ? _legacy.switchSubtitleTrack(trackId)
+      : _migrated.switchSubtitleTrack(trackId);
+
+  @override
+  void toggleSubtitle() => _policy.subtitle == KernelMode.legacy
+      ? _legacy.toggleSubtitle()
+      : _migrated.toggleSubtitle();
+
+  @override
+  void setExternalSubtitle(String path) => _policy.subtitle == KernelMode.legacy
+      ? _legacy.setExternalSubtitle(path)
+      : _migrated.setExternalSubtitle(path);
+
+  @override
+  void setSubtitleDelay(int delay) => _policy.subtitle == KernelMode.legacy
+      ? _legacy.setSubtitleDelay(delay)
+      : _migrated.setSubtitleDelay(delay);
+
+  @override
+  void setEqualizer(String preset) => _policy.subtitle == KernelMode.legacy
+      ? _legacy.setEqualizer(preset)
+      : _migrated.setEqualizer(preset);
+
+  @override
+  int get subtitleDelay => _policy.subtitle == KernelMode.legacy
+      ? _legacy.subtitleDelay
+      : _migrated.subtitleDelay;
+
+  @override
+  List<int> get activeSubtitleTracks => _policy.subtitle == KernelMode.legacy
+      ? _legacy.activeSubtitleTracks
+      : _migrated.activeSubtitleTracks;
+
+  // ===== VideoEffectControl (4 members via _policy.videoEffect) =====
+  @override
+  void setVideoEffect(VideoEffectType effectType, double value) =>
+      _policy.videoEffect == KernelMode.legacy
+      ? _legacy.setVideoEffect(effectType, value)
+      : _migrated.setVideoEffect(effectType, value);
+
+  @override
+  void rotate(int degrees) => _policy.videoEffect == KernelMode.legacy
+      ? _legacy.rotate(degrees)
+      : _migrated.rotate(degrees);
+
+  @override
+  void setAspectRatio(double ratio) => _policy.videoEffect == KernelMode.legacy
+      ? _legacy.setAspectRatio(ratio)
+      : _migrated.setAspectRatio(ratio);
+
+  @override
+  void setDeinterlace(bool enable) => _policy.videoEffect == KernelMode.legacy
+      ? _legacy.setDeinterlace(enable)
+      : _migrated.setDeinterlace(enable);
+
+  // ===== RendererControl (2 members via _policy.renderer) =====
+  @override
+  void setD3d11SyncEnabled(bool enabled) =>
+      _policy.renderer == KernelMode.legacy
+      ? _legacy.setD3d11SyncEnabled(enabled)
+      : _migrated.setD3d11SyncEnabled(enabled);
+
+  @override
+  void setHardwareDecoding(bool enabled) =>
+      _policy.renderer == KernelMode.legacy
+      ? _legacy.setHardwareDecoding(enabled)
+      : _migrated.setHardwareDecoding(enabled);
+}
