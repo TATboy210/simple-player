@@ -5,8 +5,8 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 17
 current_phase_name: 零依赖 KernelLogger 门面（替换迁移）
 status: planning
-stopped_at: Completed 16-04-PLAN.md
-last_updated: "2026-07-18T11:30:44.543Z"
+stopped_at: context exhaustion at 83% (2026-07-18)
+last_updated: "2026-07-18T13:16:04.147Z"
 last_activity: 2026-07-18
 last_activity_desc: Phase 16 complete, transitioned to Phase 17
 progress:
@@ -104,8 +104,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-18T10:20:46.845Z
-Stopped at: Completed 16-04-PLAN.md
+Last session: 2026-07-18T13:16:04.132Z
+Stopped at: context exhaustion at 83% (2026-07-18)
 Resume file: None
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
