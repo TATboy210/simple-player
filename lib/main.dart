@@ -9,7 +9,6 @@ import 'kernel/engine/engine_prewarm.dart';
 import 'kernel/persistence/settings_store.dart';
 import 'kernel/startup/startup_coordinator.dart';
 import 'kernel/utils/log.dart';
-import 'kernel/utils/memory_monitor.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +18,6 @@ Future<void> main() async {
   fvp.registerWith();
 
   await initLog();
-  MemoryMonitor.start();
 
   // SettingsStore 预热 — 在 WindowService.init() 回调前缓存 prefs
   final prefs = await SharedPreferences.getInstance();

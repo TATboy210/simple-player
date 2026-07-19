@@ -6,9 +6,9 @@ import 'package:path_provider/path_provider.dart';
 
 import 'debug_probe.dart';
 import '../diagnostics/kernel_logger.dart';
-import 'memory_monitor.dart';
+import '../diagnostics/memory_monitor.dart';
 
-final log = KernelLogger.I;
+final log = KernelLoggerImpl.I;
 
 /// 统一调试数据导出 — 一键收集所有诊断信息。
 ///
@@ -56,7 +56,7 @@ class DebugExporter {
   }
 
   static Map<String, Object>? _memorySnapshot() {
-    final snap = MemoryMonitor.snapshot();
+    final snap = MemoryMonitor.I.snapshot();
     return snap?.toJson();
   }
 
