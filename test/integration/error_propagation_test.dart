@@ -98,7 +98,7 @@ void main() {
       // 验证 FileError → onOpenFile 回调
       var openFileCalled = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const FileError(
+      engine.lastError.value = FileError(
         FileErrorCode.fileNotFound,
         'File missing',
       );
@@ -120,7 +120,7 @@ void main() {
       // 验证 PlaybackError → onRetry 回调
       var retryCalled = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const PlaybackError(
+      engine.lastError.value = PlaybackError(
         PlaybackErrorCode.playFailed,
         'Play failed',
       );
@@ -141,7 +141,7 @@ void main() {
       // 验证 CodecError → onOpenFile 回调（选择其他文件）
       var openFileCalled = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const CodecError(
+      engine.lastError.value = CodecError(
         CodecErrorCode.unsupportedFormat,
         'Unsupported format',
       );
@@ -162,7 +162,7 @@ void main() {
       // 验证 NetworkError → onRetry 回调
       var retryCalled = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const NetworkError(
+      engine.lastError.value = NetworkError(
         NetworkErrorCode.timeout,
         'Connection timeout',
       );

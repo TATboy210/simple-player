@@ -188,5 +188,19 @@
   "importParseError": "无效 JSON：{error}",
   "importFileReadError": "无法读取文件：{error}",
   "openingMedia": "正在打开媒体",
-  "bufferingMedia": "正在缓冲媒体"
+  "bufferingMedia": "正在缓冲媒体",
+
+  "errorFilePathEmpty": "文件路径为空",
+  "errorFileNotFound": "文件不存在",
+  "errorFilepathTraversal": "文件路径无效",
+  "errorCodecUnsupportedFormat": "不支持的媒体格式",
+  "errorCodecDecodeFailed": "无法解码媒体",
+  "errorCodecCodecUnsupported": "编解码器不支持",
+  "errorPlaybackPlayFailed": "播放失败",
+  "errorPlaybackSeekFailed": "跳转失败",
+  "errorPlaybackTextureFailed": "视频渲染失败",
+  "errorPlaybackOpenTimeout": "打开超时",
+  "errorNetworkTimeout": "网络超时",
+  "errorNetworkConnectionLost": "连接中断",
+  "errorUnknown": "发生未知错误"
 }

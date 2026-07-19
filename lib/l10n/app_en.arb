@@ -394,5 +394,32 @@
   "bufferingMedia": "Buffering media",
   "@bufferingMedia": {
     "description": "Accessibility status while media data is buffering"
-  }
+  },
+
+  "errorFilePathEmpty": "File path is empty",
+  "@errorFilePathEmpty": { "description": "Error message when file path is empty" },
+  "errorFileNotFound": "File not found",
+  "@errorFileNotFound": { "description": "Error message when file does not exist" },
+  "errorFilepathTraversal": "Invalid file path",
+  "@errorFilepathTraversal": { "description": "Error message for path traversal attempt (security — no details)" },
+  "errorCodecUnsupportedFormat": "Unsupported media format",
+  "@errorCodecUnsupportedFormat": { "description": "Error message for unsupported media format" },
+  "errorCodecDecodeFailed": "Failed to decode media",
+  "@errorCodecDecodeFailed": { "description": "Error message when media decoding fails" },
+  "errorCodecCodecUnsupported": "Codec not supported",
+  "@errorCodecCodecUnsupported": { "description": "Error message when codec is not supported" },
+  "errorPlaybackPlayFailed": "Playback failed",
+  "@errorPlaybackPlayFailed": { "description": "Error message when playback fails" },
+  "errorPlaybackSeekFailed": "Seek failed",
+  "@errorPlaybackSeekFailed": { "description": "Error message when seeking fails" },
+  "errorPlaybackTextureFailed": "Video rendering failed",
+  "@errorPlaybackTextureFailed": { "description": "Error message when video texture creation fails" },
+  "errorPlaybackOpenTimeout": "Open timed out",
+  "@errorPlaybackOpenTimeout": { "description": "Error message when opening media times out" },
+  "errorNetworkTimeout": "Network timeout",
+  "@errorNetworkTimeout": { "description": "Error message for network timeout" },
+  "errorNetworkConnectionLost": "Connection lost",
+  "@errorNetworkConnectionLost": { "description": "Error message when network connection is lost" },
+  "errorUnknown": "An unexpected error occurred",
+  "@errorUnknown": { "description": "Error message for unknown/unclassified errors" }
 }
