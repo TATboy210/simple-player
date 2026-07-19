@@ -208,7 +208,17 @@ Plans:
   - **#3 (openGeneration 与状态机分离)** — `openGeneration` 在 `fvp_engine.dart:194`，与 `engine_state_machine.dart` 分离；两者是同一正确性属性（"仅最新 open 的结果生效"）的两半。STATE-02 须用 `OpenGenerationTracker` 统一，守卫移入机器，`transitionTo` 原子拒绝过时 generation。
   - **#4 (EngineStateMachine 静默忽略非法转换)** — `engine_state_machine.dart:52-58` 用 assert-only 静默忽略非法转换（release 无效），是项目记忆里的"静默失败"反模式。STATE-03 替换为 `Result.err` + `KernelLogger` 警告。
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 20-01-PLAN.md — State machine rewrite: LifecyclePhase + TransitionResult + OpenGenerationTracker + recover() + double-dispose (STATE-02, STATE-03, STATE-04)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 20-02-PLAN.md — FvpEngine DiagnosticsBundle injection + lifecycle integration + per-method DelegationPolicy + PlayerServices wiring (STATE-01, STATE-02, STATE-04, STATE-06)
+- [ ] 20-03-PLAN.md — FvpCallbackHandler scheduleMicrotask marshalling + race condition tests (STATE-05, STATE-07)
 
 ### Phase 21: 测试与迁移验证 + 适配层收拢
 
@@ -254,7 +264,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | Complete    | 2026-07-20 |
 | 18. Sealed 错误模型稳化 | v3.0 | 3/3 | Complete    | 2026-07-20 |
 | 19. MemoryMonitor 一等化 | v3.0 | 2/2 | Complete    | 2026-07-20 |
-| 20. 状态与生命周期重写 | v3.0 | 0/TBD | Not started | - |
+| 20. 状态与生命周期重写 | v3.0 | 0/3 | Planning | - |
 | 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 0/TBD | Not started | - |
 | 22. 双语 API 文档注释标准 | v3.0 | 0/TBD | Not started | - |
 
