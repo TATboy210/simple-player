@@ -459,17 +459,15 @@ final bundle = DiagnosticsBundle(
 | A2 | `DebugExporter` can accept `MemoryMonitor` instance as parameter (no circular dependency) | Pitfall 2 | Low — DebugExporter is a static utility, parameter change is safe |
 | A3 | `MemoryMonitorSlot.start({Duration? interval})` can be made idempotent without breaking existing `NullMemoryMonitorSlot` consumers | Pitfall 1 | Low — NullMemoryMonitorSlot is no-op, real impl can be idempotent |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **DebugExporter migration strategy**
+1. **DebugExporter migration strategy** — RESOLVED: Plan 02 uses static `MemoryMonitor.I` accessor (follows Phase 17 KernelLoggerImpl.I pattern for consistency; threading instance through keyboard_handler → DebugExporter callback chain adds unnecessary coupling vs a single static accessor).
    - What we know: `DebugExporter._memorySnapshot()` calls `MemoryMonitor.snapshot()` statically. `DebugExporter` is called from `keyboard_handler.dart:199`.
-   - What's unclear: Whether to (a) add `MemoryMonitor` param to `DebugExporter.exportAll()`, or (b) keep a static reference for backward compat.
-   - Recommendation: Option (a) — add parameter. `keyboard_handler` has access to the app's services via callback chain. Cleaner than static bridge.
+   - Decision: Static `I` accessor on the new `MemoryMonitor` class, matching `KernelLoggerImpl.I` pattern.
 
-2. **MemoryMonitorSlot.start() interface alignment with D5 constructor-start**
+2. **MemoryMonitorSlot.start() interface alignment with D5 constructor-start** — RESOLVED: Make `start()` idempotent on the concrete class (no-op if already running). Don't modify the Phase 16 frozen abstract interface.
    - What we know: `MemoryMonitorSlot` has `start({Duration? interval})`. D5 says constructor auto-starts.
-   - What's unclear: Whether to modify the slot interface or make `start()` idempotent.
-   - Recommendation: Make `start()` idempotent on the concrete class (no-op if already running). Don't modify the abstract interface — it's Phase 16 frozen contract.
+   - Decision: Constructor starts Timer; `start()` is idempotent (checks `_isActive` flag). Abstract interface unchanged.
 
 ## Environment Availability
 
