@@ -5,10 +5,10 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 20
 current_phase_name: 状态与生命周期重写
 status: planning
-stopped_at: Phase 20 context gathered
+stopped_at: Phase 20 plans created (3 plans)
 last_updated: "2026-07-19T22:42:34.229Z"
 last_activity: 2026-07-20
-last_activity_desc: Phase 19 complete, transitioned to Phase 20
+last_activity_desc: Phase 20 plans created (3 plans, 2 waves)
 progress:
   total_phases: 8
   completed_phases: 4
