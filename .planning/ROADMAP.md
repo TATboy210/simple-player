@@ -42,7 +42,7 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 
 - [x] **Phase 15: 契约固化与基线盘点** - 冻结 MediaEngine 行为契约规约，盘点静态调用点，核对 9 态 vs 6 态差异，编写接口级契约测试作为迁移闸门 (completed 2026-07-17)
 - [x] **Phase 16: 兼容适配层骨架 + DiagnosticsBundle** - KernelAdapter 100% 路由旧引擎零行为变更，DiagnosticsBundle 载体骨架，单一 KernelMode 仲裁者，尺寸预算受控 (completed 2026-07-18)
-- [ ] **Phase 17: 零依赖 KernelLogger 门面（替换迁移）** - dart:developer 门面 + kDebugMode 门控，121 调用点替换迁移保留 log*.w() 形状，CI grep 闸门内核永不 import package:logger
+- [x] **Phase 17: 零依赖 KernelLogger 门面（替换迁移）** - dart:developer 门面 + kDebugMode 门控，121 调用点替换迁移保留 log*.w() 形状，CI grep 闸门内核永不 import package:logger (completed 2026-07-20)
 - [ ] **Phase 18: Sealed 错误模型稳化** - 扩展现有 sealed PlayerError + ErrorContext + ErrorCode 注册表，引擎 catch 点结构化发射，UI 边界 ErrorView 翻译，跨 mdk 回调线程封送
 - [ ] **Phase 19: MemoryMonitor 一等化** - 实例化构造注入 RssProvider+Clock，start/stop/dispose 生命周期，单例→实例一个原子提交，纳入 DiagnosticsBundle，对播放业务零干扰
 - [ ] **Phase 20: 状态与生命周期重写** - NewFvpEngine 实现 MediaEngine，OpenGenerationTracker 统一守卫移入机器，Result.err 替换静默 assert 忽略，lifecycle 态加固，mdk 回调主线程封送，竞态测试
@@ -242,7 +242,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 |-------|-----------|----------------|--------|-----------|
 | 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
 | 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete    | 2026-07-18 |
-| 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | In Progress|  |
+| 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | Complete    | 2026-07-20 |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/3 | Planning | - |
 | 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |
 | 20. 状态与生命周期重写 | v3.0 | 0/TBD | Not started | - |
