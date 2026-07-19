@@ -4,15 +4,15 @@ milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
 current_phase: 20
 current_phase_name: 状态与生命周期重写
-status: planning
-stopped_at: Phase 20 plans created (3 plans)
-last_updated: "2026-07-19T22:42:34.229Z"
+status: executing
+stopped_at: context exhaustion at 75% (2026-07-19)
+last_updated: "2026-07-19T23:29:36.857Z"
 last_activity: 2026-07-20
-last_activity_desc: Phase 20 plans created (3 plans, 2 waves)
+last_activity_desc: Phase 19 complete, transitioned to Phase 20
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 17
+  total_plans: 20
   completed_plans: 16
   percent: 50
 ---
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 Phase: 20 — 状态与生命周期重写
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Last activity: 2026-07-20 — Phase 19 complete, transitioned to Phase 20
 
 ## Performance Metrics
@@ -107,8 +107,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-19T22:42:34.212Z
-Stopped at: Phase 20 context gathered
+Last session: 2026-07-19T23:29:36.811Z
+Stopped at: context exhaustion at 75% (2026-07-19)
 Resume file: .planning/phases/20-state-lifecycle/20-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
