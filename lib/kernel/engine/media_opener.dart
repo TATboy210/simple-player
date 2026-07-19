@@ -45,8 +45,13 @@ class MediaOpener {
     // ─── 路径验证 ───
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
-      return const OpenError(
-        FileError(FileErrorCode.pathEmpty, '文件路径为空'),
+      return OpenError(
+        FileError(
+          FileErrorCode.pathEmpty,
+          '文件路径为空',
+          null,
+          ErrorContext(action: 'open', path: trimmed, module: 'MediaOpener'),
+        ),
       );
     }
 
@@ -56,11 +61,23 @@ class MediaOpener {
         final file = File(trimmed);
         if (!await file.exists()) {
           return OpenError(
-            FileError(FileErrorCode.fileNotFound, '文件不存在: ${PathUtils.basename(trimmed)}'),
+            FileError(
+              FileErrorCode.fileNotFound,
+              '文件不存在: ${PathUtils.basename(trimmed)}',
+              null,
+              ErrorContext(action: 'open', path: trimmed, module: 'MediaOpener'),
+            ),
           );
         }
       } on Exception catch (e) {
-        return OpenError(FileError(FileErrorCode.fileNotFound, '路径无效: $e'));
+        return OpenError(
+          FileError(
+            FileErrorCode.fileNotFound,
+            '路径无效: $e',
+            e,
+            ErrorContext(action: 'open', path: trimmed, module: 'MediaOpener'),
+          ),
+        );
       }
     }
 
@@ -79,13 +96,14 @@ class MediaOpener {
     );
     if (prepareResult < 0) {
       final isTimeout = prepareResult == -99;
+      final ctx = ErrorContext(action: 'prepare', path: trimmed, module: 'MediaOpener');
       final PlayerError error;
       if (isTimeout) {
         error = PathValidator.isUrl(trimmed)
-            ? NetworkError(NetworkErrorCode.timeout, '打开超时: ${PathUtils.basename(trimmed)}')
-            : FileError(FileErrorCode.fileNotFound, '打开超时: ${PathUtils.basename(trimmed)}');
+            ? NetworkError(NetworkErrorCode.timeout, '打开超时: ${PathUtils.basename(trimmed)}', null, ctx)
+            : FileError(FileErrorCode.fileNotFound, '打开超时: ${PathUtils.basename(trimmed)}', null, ctx);
       } else {
-        error = CodecError(CodecErrorCode.decodeFailed, '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)');
+        error = CodecError(CodecErrorCode.decodeFailed, '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)', null, ctx);
       }
       return OpenError(error);
     }
@@ -131,7 +149,14 @@ class MediaOpener {
       final message = textureResult == -99
           ? '纹理创建超时: ${PathUtils.basename(trimmed)}'
           : '纹理创建失败: ${PathUtils.basename(trimmed)}';
-      return OpenError(PlaybackError(PlaybackErrorCode.textureFailed, message));
+      return OpenError(
+        PlaybackError(
+          PlaybackErrorCode.textureFailed,
+          message,
+          null,
+          ErrorContext(action: 'texture', path: trimmed, module: 'MediaOpener'),
+        ),
+      );
     }
 
     // updateTexture() 返回码 >=0 但 textureId 仍为 null — D3D11 纹理创建静默失败
@@ -142,6 +167,8 @@ class MediaOpener {
         PlaybackError(
           PlaybackErrorCode.textureFailed,
           '纹理创建失败(空 textureId): ${PathUtils.basename(trimmed)}',
+          null,
+          ErrorContext(action: 'texture', path: trimmed, module: 'MediaOpener'),
         ),
       );
     }
