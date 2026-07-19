@@ -1087,6 +1087,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Buffering media'**
   String get bufferingMedia;
+
+  /// Error message when file path is empty
+  ///
+  /// In en, this message translates to:
+  /// **'File path is empty'**
+  String get errorFilePathEmpty;
+
+  /// Error message when file does not exist
+  ///
+  /// In en, this message translates to:
+  /// **'File not found'**
+  String get errorFileNotFound;
+
+  /// Error message for path traversal attempt (security — no details)
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid file path'**
+  String get errorFilepathTraversal;
+
+  /// Error message for unsupported media format
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported media format'**
+  String get errorCodecUnsupportedFormat;
+
+  /// Error message when media decoding fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to decode media'**
+  String get errorCodecDecodeFailed;
+
+  /// Error message when codec is not supported
+  ///
+  /// In en, this message translates to:
+  /// **'Codec not supported'**
+  String get errorCodecCodecUnsupported;
+
+  /// Error message when playback fails
+  ///
+  /// In en, this message translates to:
+  /// **'Playback failed'**
+  String get errorPlaybackPlayFailed;
+
+  /// Error message when seeking fails
+  ///
+  /// In en, this message translates to:
+  /// **'Seek failed'**
+  String get errorPlaybackSeekFailed;
+
+  /// Error message when video texture creation fails
+  ///
+  /// In en, this message translates to:
+  /// **'Video rendering failed'**
+  String get errorPlaybackTextureFailed;
+
+  /// Error message when opening media times out
+  ///
+  /// In en, this message translates to:
+  /// **'Open timed out'**
+  String get errorPlaybackOpenTimeout;
+
+  /// Error message for network timeout
+  ///
+  /// In en, this message translates to:
+  /// **'Network timeout'**
+  String get errorNetworkTimeout;
+
+  /// Error message when network connection is lost
+  ///
+  /// In en, this message translates to:
+  /// **'Connection lost'**
+  String get errorNetworkConnectionLost;
+
+  /// Error message for unknown/unclassified errors
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected error occurred'**
+  String get errorUnknown;
 }
 
 class _AppLocalizationsDelegate

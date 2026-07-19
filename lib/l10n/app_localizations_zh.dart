@@ -526,4 +526,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bufferingMedia => '正在缓冲媒体';
+
+  @override
+  String get errorFilePathEmpty => '文件路径为空';
+
+  @override
+  String get errorFileNotFound => '文件不存在';
+
+  @override
+  String get errorFilepathTraversal => '文件路径无效';
+
+  @override
+  String get errorCodecUnsupportedFormat => '不支持的媒体格式';
+
+  @override
+  String get errorCodecDecodeFailed => '无法解码媒体';
+
+  @override
+  String get errorCodecCodecUnsupported => '编解码器不支持';
+
+  @override
+  String get errorPlaybackPlayFailed => '播放失败';
+
+  @override
+  String get errorPlaybackSeekFailed => '跳转失败';
+
+  @override
+  String get errorPlaybackTextureFailed => '视频渲染失败';
+
+  @override
+  String get errorPlaybackOpenTimeout => '打开超时';
+
+  @override
+  String get errorNetworkTimeout => '网络超时';
+
+  @override
+  String get errorNetworkConnectionLost => '连接中断';
+
+  @override
+  String get errorUnknown => '发生未知错误';
 }
