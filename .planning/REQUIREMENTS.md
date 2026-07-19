@@ -41,11 +41,11 @@
 
 ### MEM — MemoryMonitor 一等化（Phase 5）
 
-- [ ] **MEM-01**: 实例化（非静态单例），构造注入 `RssProvider`（默认 `ProcessInfo`）+ `Clock`；阈值/间隔/历史上限可配置
-- [ ] **MEM-02**: `start`/`stop`/`dispose` 生命周期；可关闭（`NoopMemoryMonitor`/`disabled` 工厂）；对播放业务状态零干扰（永不调用 `PlaybackController`、永不改 `MediaState`）
-- [ ] **MEM-03**: 保留 `ValueNotifier<MemorySnapshot?>` + `snapshot()`/`exportJson()`；移至 `diagnostics/`，数据类拆至 `memory_snapshot.dart`
-- [ ] **MEM-04**: 单例→实例迁移在**一个原子提交**内完成（瞬态静态桥 shim + 重写 2 处调用 + 删除 shim），永不跨提交拆分
-- [ ] **MEM-05**: `MemoryMonitor` 实例纳入 `DiagnosticsBundle`；与 `KernelLogger` 集成（替换直接 `debugPrint`）
+- [x] **MEM-01**: 实例化（非静态单例），构造注入 `RssProvider`（默认 `ProcessInfo`）+ `Clock`；阈值/间隔/历史上限可配置
+- [x] **MEM-02**: `start`/`stop`/`dispose` 生命周期；可关闭（`NoopMemoryMonitor`/`disabled` 工厂）；对播放业务状态零干扰（永不调用 `PlaybackController`、永不改 `MediaState`）
+- [x] **MEM-03**: 保留 `ValueNotifier<MemorySnapshot?>` + `snapshot()`/`exportJson()`；移至 `diagnostics/`，数据类拆至 `memory_snapshot.dart`
+- [x] **MEM-04**: 单例→实例迁移在**一个原子提交**内完成（瞬态静态桥 shim + 重写 2 处调用 + 删除 shim），永不跨提交拆分
+- [x] **MEM-05**: `MemoryMonitor` 实例纳入 `DiagnosticsBundle`；与 `KernelLogger` 集成（替换直接 `debugPrint`）
 
 ### STATE — 状态与生命周期重写（Phase 6）
 
@@ -126,11 +126,11 @@
 | ERR-03 | Phase 18 | Complete |
 | ERR-04 | Phase 18 | Complete |
 | ERR-05 | Phase 18 | Complete |
-| MEM-01 | Phase 19 | Pending |
-| MEM-02 | Phase 19 | Pending |
-| MEM-03 | Phase 19 | Pending |
-| MEM-04 | Phase 19 | Pending |
-| MEM-05 | Phase 19 | Pending |
+| MEM-01 | Phase 19 | Complete |
+| MEM-02 | Phase 19 | Complete |
+| MEM-03 | Phase 19 | Complete |
+| MEM-04 | Phase 19 | Complete |
+| MEM-05 | Phase 19 | Complete |
 | STATE-01 | Phase 20 | Pending |
 | STATE-02 | Phase 20 | Pending |
 | STATE-03 | Phase 20 | Pending |

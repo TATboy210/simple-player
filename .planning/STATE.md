@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
-current_phase: 19
-current_phase_name: MemoryMonitor 一等化
-status: executing
+current_phase: 20
+current_phase_name: 状态与生命周期重写
+status: planning
 stopped_at: Phase 19 context gathered
-last_updated: "2026-07-19T21:09:28.741Z"
+last_updated: "2026-07-19T21:55:28.547Z"
 last_activity: 2026-07-20
-last_activity_desc: Phase 19 execution started
+last_activity_desc: Phase 19 complete, transitioned to Phase 20
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 14
-  percent: 38
+  completed_plans: 16
+  percent: 50
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 19 (MemoryMonitor 一等化) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 19
-Last activity: 2026-07-20 — Phase 19 execution started
+Phase: 20 — 状态与生命周期重写
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-20 — Phase 19 complete, transitioned to Phase 20
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 16
+- Total plans completed: 18
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -54,6 +54,7 @@ Last activity: 2026-07-20 — Phase 19 execution started
 | 16 | 5 | - | - |
 | 17 | 3 | - | - |
 | 18 | 3 | - | - |
+| 19 | 2 | - | - |
 
 **Recent Trend:**
 
