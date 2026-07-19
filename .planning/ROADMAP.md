@@ -179,7 +179,16 @@ Plans:
 
   - **#5 (MemoryMonitor 单例→实例原子提交)** — 项目记忆 R2-5：删 `_instance` 但留静态方法致构建失败。MemoryMonitor 仅 2 静态调用（`main.dart:16`, `debug_exporter.dart:57`）。MEM-04 在一个原子提交内：瞬态静态桥 shim + 重写 2 调用 + 删 shim，**永不跨提交拆分**。
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 19-01-PLAN.md — Abstraction layer: RssProvider + Clock + data class extraction + instance-based MemoryMonitor implementation [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 19-02-PLAN.md — Atomic singleton→instance migration + DiagnosticsBundle wiring + KernelLogger integration [wave 2]
 
 ### Phase 20: 状态与生命周期重写
 
@@ -244,7 +253,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete    | 2026-07-18 |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | Complete    | 2026-07-20 |
 | 18. Sealed 错误模型稳化 | v3.0 | 3/3 | Complete    | 2026-07-20 |
-| 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |
+| 19. MemoryMonitor 一等化 | v3.0 | 0/2 | Not started | - |
 | 20. 状态与生命周期重写 | v3.0 | 0/TBD | Not started | - |
 | 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 0/TBD | Not started | - |
 | 22. 双语 API 文档注释标准 | v3.0 | 0/TBD | Not started | - |
