@@ -11,8 +11,10 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../services/path_validator.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
+
+final log = KernelLogger.I;
 
 /// 文件操作服务 — 文件打开和批量添加
 ///

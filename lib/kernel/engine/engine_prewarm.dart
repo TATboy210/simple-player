@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
 
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// 引擎预热 — 在应用启动时提前初始化 MDK/FFmpeg 渲染上下文
 ///

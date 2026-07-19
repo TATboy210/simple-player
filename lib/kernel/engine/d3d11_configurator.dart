@@ -1,5 +1,7 @@
 import '../bridge/display_config.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 import 'player_proxy.dart';
 import 'renderer_control.dart';
 

@@ -1,7 +1,10 @@
 import 'dart:ui';
 
 import '../bridge/display_enumerator.dart';
-import 'log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
+final logBridge = KernelLogger.I;
 
 /// 屏幕几何工具 — 窗口位置校正。
 ///

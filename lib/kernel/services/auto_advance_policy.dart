@@ -12,8 +12,10 @@ import 'dart:async';
 
 import '../engine/engine_state.dart';
 import '../models/play_mode.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
+
+final log = KernelLogger.I;
 
 /// 自动连播策略 — 监听 [MediaState.completed] 并驱动播放器前进
 ///

@@ -18,13 +18,15 @@ import '../persistence/playlist_store.dart';
 import '../persistence/settings_store.dart';
 import '../playlist/playlist.dart';
 import '../utils/debug_probe.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'auto_advance_policy.dart';
 import 'file_operations.dart';
 import 'playback_navigator.dart';
 import 'playback_state_manager.dart';
 import 'subtitle_service.dart';
 import 'track_preference_service.dart';
+
+final log = KernelLogger.I;
 
 /// 播放控制器 — 播放器全部运行时能力的统一门面入口
 ///
