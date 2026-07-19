@@ -122,7 +122,12 @@ Plans:
   - **#1 (logger 决策语义校正)** — 零依赖 = 内核解耦对 `package:logger` 的依赖（保留 `log*.w()` 调用形状的替换迁移），非"app 无 logger 包"。`log.dart` 已 import package:logger + path_provider，121 调用点/30 文件。LOG-04（保留调用形状）+ LOG-01（内核永不 import package:logger，CI grep 闸门）为硬要求；勿把 KernelLogger 当全新门面从零写。
   - **#7 (debugPrint 发布不剥离)** — debugPrint 在 release 仍在二进制中执行（throttled print）。零依赖门面须用 `kDebugMode` 门控，warn/error 走 `dart:developer.log`。LOG-03 + Phase 21 VERIFY-06（--release 冒烟闸门）。
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — KernelLogger concrete implementation (LogLevel + LogSink + 3 sinks + KernelLoggerImpl) + PlayerServices wiring [wave 1]
+- [ ] 17-02-PLAN.md — Batch-migrate 22 kernel files (78 call sites, import+declaration only) + CI grep gate script [wave 2]
+- [ ] 17-03-PLAN.md — Extended behavioral tests for all sink types + full verification (gate + analyze + test suite) [wave 3]
 
 ### Phase 18: Sealed 错误模型稳化
 
@@ -219,7 +224,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 |-------|-----------|----------------|--------|-----------|
 | 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
 | 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete    | 2026-07-18 |
-| 17. 零依赖 KernelLogger 门面 | v3.0 | 0/TBD | Not started | - |
+| 17. 零依赖 KernelLogger 门面 | v3.0 | 0/3 | Planning complete | - |
 | 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |
 | 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |
 | 20. 状态与生命周期重写 | v3.0 | 0/TBD | Not started | - |
