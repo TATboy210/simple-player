@@ -112,21 +112,29 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. `lib/kernel/diagnostics/` 内零依赖 `KernelLogger` 门面存在，以 `dart:developer` + 受控 `debugPrint` 实现；CI grep 闸门验证 `lib/kernel/**` 永不 import `package:logger`/`path_provider`
-  2. 121 处调用点完成替换迁移，`log*.w(...)`/`log.i(...)` 调用形状保留 — 30 文件仅改 import/声明即迁移，无 121 处逐点改写
+  2. 78 处内核调用点完成替换迁移（24 文件），`log*.w(...)`/`log.i(...)` 调用形状保留 — 仅改 import/声明即迁移，无逐点改写（注：121 为 Phase 15 全码基线含 app 级，内核范围 78）
   3. 发布门控生效 — `kDebugMode` 编译时剥离 `DebugPrintSink`，warn/error 走 `dart:developer.log`；release 构建产出零 `debugPrint`/debug/info 行（可由 `--release` 冒烟验证）
   4. 日志级别（trace/debug/info/warn/error/fatal）+ 结构化 `Map` 上下文 + 文件路径脱敏 + 稳定调用点 API 可用，app 级 `log.dart` 作为 `LogSink` 在 `app.dart` 注册（接线在内核之外）
   5. 可插拔 `LogSink`（`DevToolsSink`/`DebugPrintSink`/`NullSink`）可用，release 默认 `NullSink`，debug 默认 `DevToolsSink`
 
 **Blocking Constraints honored**:
 
-  - **#1 (logger 决策语义校正)** — 零依赖 = 内核解耦对 `package:logger` 的依赖（保留 `log*.w()` 调用形状的替换迁移），非"app 无 logger 包"。`log.dart` 已 import package:logger + path_provider，121 调用点/30 文件。LOG-04（保留调用形状）+ LOG-01（内核永不 import package:logger，CI grep 闸门）为硬要求；勿把 KernelLogger 当全新门面从零写。
+  - **#1 (logger 决策语义校正)** — 零依赖 = 内核解耦对 `package:logger` 的依赖（保留 `log*.w()` 调用形状的替换迁移），非"app 无 logger 包"。`log.dart` 已 import package:logger + path_provider，78 内核调用点/24 文件（Phase 16 researcher 实测）。LOG-04（保留调用形状）+ LOG-01（内核永不 import package:logger，CI grep 闸门）为硬要求；勿把 KernelLogger 当全新门面从零写。
   - **#7 (debugPrint 发布不剥离)** — debugPrint 在 release 仍在二进制中执行（throttled print）。零依赖门面须用 `kDebugMode` 门控，warn/error 走 `dart:developer.log`。LOG-03 + Phase 21 VERIFY-06（--release 冒烟闸门）。
 
 **Plans**: 3 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 17-01-PLAN.md — KernelLogger concrete implementation (LogLevel + LogSink + 3 sinks + KernelLoggerImpl) + PlayerServices wiring [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 17-02-PLAN.md — Batch-migrate 22 kernel files (78 call sites, import+declaration only) + CI grep gate script [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 17-03-PLAN.md — Extended behavioral tests for all sink types + full verification (gate + analyze + test suite) [wave 3]
 
 ### Phase 18: Sealed 错误模型稳化
