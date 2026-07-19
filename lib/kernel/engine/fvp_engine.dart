@@ -74,6 +74,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       player,
       stateMachine: stateMachine,
       onStopPositionPolling: () => engine._positionPoller.stop(),
+      lastErrorNotifier: engine.lastError,
     );
     engine._positionPoller = PositionPoller(
       player,
@@ -231,9 +232,16 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     try {
       action();
-    } on Exception catch (e) {
-      log.e('FvpEngine.$name error: $e');
-      lastError.value = PlaybackError(PlaybackErrorCode.playFailed, '$name 失败: $e', e);
+    } on Exception catch (e, st) {
+      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        '$name 失败: $e',
+        e,
+        ErrorContext(action: name, module: 'FvpEngine'),
+      );
+      lastError.value = error;
+      log.e('FvpEngine.$name error', context: error.context?.toMap(), error: e, stackTrace: st);
       eventLog.add('error', {'action': name, 'error': e.toString()});
     }
   }
@@ -252,7 +260,14 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
       _stateMachine.transitionTo(MediaState.error, 'open');
-      lastError.value = FileError(FileErrorCode.pathEmpty, '文件路径为空');
+      final error = FileError(
+        FileErrorCode.pathEmpty,
+        '文件路径为空',
+        null,
+        ErrorContext(action: 'open', path: trimmed, module: 'FvpEngine'),
+      );
+      lastError.value = error;
+      log.e('open() empty path', context: error.context?.toMap());
       metrics.recordOpen(success: false);
       eventLog.add('open', {'path': path, 'error': 'empty path'});
       return;
@@ -304,18 +319,44 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
             return;
           }
           _stateMachine.transitionTo(MediaState.error, 'open');
+          // 丰富 ErrorContext — MediaOpener 构造的 error 可能没有 generation/module
+          error.context ??= ErrorContext(
+            action: 'open',
+            generation: gen,
+            path: trimmed,
+            module: 'MediaOpener',
+          );
           lastError.value = error;
           metrics.recordOpen(success: false);
           logEngine.e(
-            'open() error — ${PathUtils.basename(trimmed)}: ${error.message}',
+            'open() error — ${PathUtils.basename(trimmed)}',
+            context: error.context?.toMap(),
           );
       }
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       if (_disposed || gen != _openGeneration) return;
       _stateMachine.transitionTo(MediaState.error, 'open');
-      lastError.value = PathValidator.isUrl(trimmed)
-          ? NetworkError(NetworkErrorCode.timeout, '无法打开: ${PathUtils.basename(path)}', e)
-          : PlaybackError(PlaybackErrorCode.playFailed, '无法打开: ${PathUtils.basename(path)}', e);
+      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
+      final error = PathValidator.isUrl(trimmed)
+          ? NetworkError(
+              NetworkErrorCode.timeout,
+              '无法打开: ${PathUtils.basename(path)}',
+              e,
+              ErrorContext(action: 'open', generation: gen, path: trimmed, module: 'FvpEngine'),
+            )
+          : PlaybackError(
+              PlaybackErrorCode.playFailed,
+              '无法打开: ${PathUtils.basename(path)}',
+              e,
+              ErrorContext(action: 'open', generation: gen, path: trimmed, module: 'FvpEngine'),
+            );
+      lastError.value = error;
+      log.e(
+        'open() error — ${PathUtils.basename(trimmed)}',
+        context: error.context?.toMap(),
+        error: e,
+        stackTrace: st,
+      );
       metrics.recordOpen(success: false);
       eventLog.add('error', {'action': 'open', 'error': e.toString()});
     } finally {
@@ -341,10 +382,17 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       _positionPoller.startSilent();
       eventLog.add('play', {'path': PathUtils.basename(_currentPath)});
       logEngine.d('play() — ${PathUtils.basename(_currentPath)}');
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       _stateMachine.transitionTo(MediaState.error, 'play');
-      lastError.value = PlaybackError(PlaybackErrorCode.playFailed, '播放失败: $e', e);
-      logEngine.e('play() error: $e');
+      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        '播放失败: $e',
+        e,
+        ErrorContext(action: 'play', module: 'FvpEngine'),
+      );
+      lastError.value = error;
+      logEngine.e('play() error', context: error.context?.toMap(), error: e, stackTrace: st);
       debugPrint('❌ play() failed: $e');
     }
   }
@@ -358,8 +406,16 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       _positionPoller.stop();
       eventLog.add('pause');
       logEngine.d('pause() — ${PathUtils.basename(_currentPath)}');
-    } on Exception catch (e) {
-      logEngine.e('pause() error: $e');
+    } on Exception catch (e, st) {
+      // 三步模式：pause 错误也应上报 UI
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        '暂停失败: $e',
+        e,
+        ErrorContext(action: 'pause', module: 'FvpEngine'),
+      );
+      lastError.value = error;
+      logEngine.e('pause() error', context: error.context?.toMap(), error: e, stackTrace: st);
     }
   }
 
@@ -373,8 +429,16 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       _positionPoller.stop();
       eventLog.add('stop');
       logEngine.d('stop() — ${PathUtils.basename(_currentPath)}');
-    } on Exception catch (e) {
-      logEngine.e('stop() error: $e');
+    } on Exception catch (e, st) {
+      // 三步模式：stop 错误也应上报 UI
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        '停止失败: $e',
+        e,
+        ErrorContext(action: 'stop', module: 'FvpEngine'),
+      );
+      lastError.value = error;
+      logEngine.e('stop() error', context: error.context?.toMap(), error: e, stackTrace: st);
     }
   }
 
@@ -394,9 +458,17 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       if (_disposed) return;
       position.value = clamped;
       eventLog.add('seek', {'position': clamped});
-    } on Exception catch (e) {
+    } on Exception catch (e, st) {
       if (_disposed) return;
-      lastError.value = PlaybackError(PlaybackErrorCode.seekFailed, '跳转失败: $e', e);
+      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
+      final error = PlaybackError(
+        PlaybackErrorCode.seekFailed,
+        '跳转失败: $e',
+        e,
+        ErrorContext(action: 'seek', module: 'FvpEngine'),
+      );
+      lastError.value = error;
+      log.e('seekTo() error', context: error.context?.toMap(), error: e, stackTrace: st);
       position.value = _player.position;
       eventLog.add('error', {'action': 'seek', 'error': e.toString()});
     } finally {
