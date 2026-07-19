@@ -47,7 +47,7 @@ class PlaybackController {
     required this.engine,
     required this.playlist,
     required VoidCallback onNeedRebuild,
-    void Function(Object error)? onError,
+    void Function(PlayerError error)? onError,
     SubtitleService? subtitleService,
     TrackPreferenceService? trackPreferenceService,
   }) : _onNeedRebuild = onNeedRebuild,
@@ -70,7 +70,7 @@ class PlaybackController {
   final VoidCallback _onNeedRebuild;
 
   /// 错误回调 — 子模块捕获异常时调用（null 表示忽略错误）
-  final void Function(Object error)? _onError;
+  final void Function(PlayerError error)? _onError;
 
   /// 字幕服务 — 可选依赖，null 表示无外挂字幕支持
   final SubtitleService? _subtitleService;
@@ -99,8 +99,8 @@ class PlaybackController {
   /// 通知 UI 层播放列表已变更
   void onNeedRebuild() => _onNeedRebuild();
 
-  /// 错误回调（子模块通过 `_rt.onError?.call(e)` 调用）
-  void Function(Object error)? get onError => _onError;
+  /// 错误回调（子模块通过 `_controller.onError?.call(error)` 调用）
+  void Function(PlayerError error)? get onError => _onError;
 
   /// 获取字幕服务（可能为 null）
   SubtitleService? get subtitleService => _subtitleService;
