@@ -1,8 +1,10 @@
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'models/subtitle_track_info.dart';
 import 'player_proxy.dart';
 import 'subtitle_config.dart';
 import 'subtitle_track_source.dart';
+
+final log = KernelLogger.I;
 
 /// Encapsulates subtitle and audio filter configuration for a player.
 ///

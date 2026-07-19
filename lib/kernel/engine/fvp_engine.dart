@@ -14,13 +14,16 @@ import 'fvp_callback_handler.dart';
 import 'media_opener.dart';
 import 'player_proxy.dart';
 import 'position_poller.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'track_manager.dart';
 import 'video_effect_controller.dart';
 import 'volume_controller.dart';
 import 'subtitle_configurator.dart';
 import 'd3d11_configurator.dart';
 import 'mdk_player_proxy.dart';
+
+final log = KernelLogger.I;
+final logEngine = KernelLogger.I;
 
 /// fvp/MDK 引擎实现
 ///

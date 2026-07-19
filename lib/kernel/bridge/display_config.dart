@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
+final logBridge = KernelLogger.I;
 
 /// Refresh-rate-aware D3D11 sync mode policy.
 ///

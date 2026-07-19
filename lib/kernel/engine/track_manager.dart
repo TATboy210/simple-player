@@ -5,7 +5,9 @@ import 'models/subtitle_track_info.dart';
 import 'track_control.dart';
 import 'subtitle_track_source.dart';
 
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// Manages audio and subtitle track selection for a media player.
 ///

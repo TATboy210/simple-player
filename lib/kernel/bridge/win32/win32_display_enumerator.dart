@@ -13,8 +13,11 @@ import 'dart:ui';
 
 import 'package:ffi/ffi.dart';
 
-import '../../utils/log.dart';
+import '../../diagnostics/kernel_logger.dart';
 import '../display_enumerator.dart';
+
+final log = KernelLogger.I;
+final logBridge = KernelLogger.I;
 
 // ─── Win32 结构体 ───
 

@@ -8,7 +8,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../playlist/playlist.dart';
 import '../utils/debug_probe.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// 播放列表 JSON 持久化
 ///

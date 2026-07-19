@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:fvp/mdk.dart' as mdk;
 
 import '../services/path_validator.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// 位置轮询器 — 自适应间隔轮询播放位置
 ///
