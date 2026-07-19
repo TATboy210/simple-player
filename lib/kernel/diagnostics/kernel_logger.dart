@@ -342,7 +342,7 @@ final class KernelLoggerImpl extends KernelLogger {
   /// - release: `NullSink()`
   static void init() {
     final LogSink sink = kDebugMode
-        ? CompositeSink([DebugPrintSink(), DevToolsSink()])
+        ? CompositeSink([const DebugPrintSink(), const DevToolsSink()])
         : const NullSink();
     _instance = KernelLoggerImpl(sink);
   }
