@@ -14,6 +14,11 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import 'diagnostics/diagnostics_bundle.dart';
+import 'diagnostics/event_log_slot.dart';
+import 'diagnostics/kernel_logger.dart';
+import 'diagnostics/memory_monitor_slot.dart';
+import 'diagnostics/metrics_slot.dart';
 import 'engine/engine_state.dart';
 
 import 'adapter/kernel_adapter.dart';
@@ -85,16 +90,29 @@ class PlayerServices {
   ///
   /// 每个服务的创建都依赖前一个服务的结果，因此必须顺序执行。
   Future<void> init() async {
+    // Phase 17: 初始化 KernelLogger 静态实例 — 必须在 FvpEngine 创建之前,
+    // 确保所有内核代码从启动第一刻起就能通过 KernelLoggerImpl.I 输出日志。
+    // kDebugMode 门控: debug 模式 CompositeSink([DebugPrintSink, DevToolsSink]),
+    // release 模式 NullSink (零输出, 可 tree-shake)。
+    KernelLoggerImpl.init();
+
     // Strangler Fig seam (Phase 16, ADAPT-01/02): 用 KernelAdapter 包裹同一个
     // FvpEngine 实例，legacy/migrated 均指向它 (D13/D19 — NewFvpEngine 尚不存在，
     // 零额外原生资源)。policy 全量路由到 legacy，行为与直接使用 FvpEngine 完全
-    // 一致；bundle 使用构造函数默认的 noop (D10/D12)。Phase 20 将把 migrated
-    // 换成 NewFvpEngine 并翻转 policy，此处即为切换点。
+    // 一致；bundle 传递真实 KernelLogger，其余 3 插槽 noop (P19/P20 激活)。
+    // Phase 20 将把 migrated 换成 NewFvpEngine 并翻转 policy，此处即为切换点。
     final fvp = FvpEngine();
+    final bundle = DiagnosticsBundle(
+      logger: KernelLoggerImpl.I,
+      memoryMonitor: const NullMemoryMonitorSlot(),
+      metrics: const NullMetricsSlot(),
+      eventLog: const NullEventLogSlot(),
+    );
     engine = KernelAdapter(
       legacy: fvp,
       migrated: fvp,
       policy: const DelegationPolicy.all(KernelMode.legacy),
+      bundle: bundle,
     );
     playlist = Playlist();
     controller = PlaybackController(
