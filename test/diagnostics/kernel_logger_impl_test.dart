@@ -3,7 +3,6 @@
 /// KernelLoggerImpl with static I accessor, and redactPath helper.
 library;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
