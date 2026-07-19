@@ -59,7 +59,9 @@ class AutoAdvancePolicy {
       await _controller.navigator.playIndex(index);
     } on Exception catch (e, st) {
       log.e('AutoAdvancePolicy loopSingle replay failed: $e', stackTrace: st);
-      _controller.onError?.call(e);
+      _controller.onError?.call(
+        PlaybackError(PlaybackErrorCode.playFailed, 'AutoAdvancePolicy loopSingle replay failed: $e', e),
+      );
     }
   }
 
@@ -69,7 +71,9 @@ class AutoAdvancePolicy {
       await _controller.navigator.playNext();
     } on Exception catch (e, st) {
       log.e('AutoAdvancePolicy auto-advance failed: $e', stackTrace: st);
-      _controller.onError?.call(e);
+      _controller.onError?.call(
+        PlaybackError(PlaybackErrorCode.playFailed, 'AutoAdvancePolicy auto-advance failed: $e', e),
+      );
     }
   }
 
