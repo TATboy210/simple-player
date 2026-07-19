@@ -47,14 +47,15 @@ abstract interface class LogSink {
 }
 
 // ---------------------------------------------------------------------------
-// _redactPath — strips directory prefixes from file paths (D17)
+// redactPath — strips directory prefixes from file paths (D17)
 // ---------------------------------------------------------------------------
 
 /// 路径脱敏 — 将完整文件路径缩短为文件名:行号 (D17).
 ///
 /// Strips directory prefixes from `.dart:line` paths in log messages.
 /// Example: `lib/kernel/engine/fvp_engine.dart:259` → `fvp_engine.dart:259`
-String _redactPath(String msg) {
+/// Public for direct testing; also used internally by DevToolsSink/DebugPrintSink.
+String redactPath(String msg) {
   return msg.replaceAllMapped(
     RegExp(r'[\w/\\]+[/\\]([\w]+\.dart:\d+)'),
     (m) => m.group(1)!,
@@ -69,8 +70,10 @@ String _redactPath(String msg) {
 ///
 /// Logs via `dart:developer.log` with `name: 'Kernel'`. DevTools receives
 /// structured entries; context map is not passed (DevTools has its own view).
-/// Message paths are redacted via [_redactPath] before output.
+/// Message paths are redacted via [redactPath] before output.
 final class DevToolsSink implements LogSink {
+  /// const 构造 — 无状态, 支持编译时常量 (D15).
+  const DevToolsSink();
   /// LogLevel → dart:developer severity 映射 (D15).
   static int _toSeverity(LogLevel level) => switch (level) {
     LogLevel.trace => 300,
@@ -86,7 +89,7 @@ final class DevToolsSink implements LogSink {
     developer.log(
       name: 'Kernel',
       level: _toSeverity(level),
-      _redactPath(msg),
+      redactPath(msg),
       time: DateTime.now(),
     );
   }
@@ -99,12 +102,14 @@ final class DevToolsSink implements LogSink {
 /// debugPrint 输出 — 带级别前缀和可选 context 后缀 (D12/D16).
 ///
 /// Outputs via `debugPrint` with `LEVEL: message {context}` format.
-/// Message paths are redacted via [_redactPath] before output.
+/// Message paths are redacted via [redactPath] before output.
 /// Only active in debug mode (kDebugMode gate at composition root).
 final class DebugPrintSink implements LogSink {
+  /// const 构造 — 无状态, 支持编译时常量 (D16).
+  const DebugPrintSink();
   @override
   void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
-    final redacted = _redactPath(msg);
+    final redacted = redactPath(msg);
     final contextStr = context != null && context.isNotEmpty
         ? ' $context'
         : '';
