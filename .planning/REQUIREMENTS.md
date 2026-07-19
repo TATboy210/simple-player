@@ -33,11 +33,11 @@
 
 ### ERR — Sealed 错误模型稳化（Phase 4）
 
-- [ ] **ERR-01**: 扩展现有 sealed `PlayerError`（`ErrorContext`：action/generation/path/timestamp/module + `ErrorCode` 注册表）；保留 `ValueNotifier<PlayerError?>` 契约
-- [ ] **ERR-02**: 可恢复 vs 致命分裂根植于层级顶端；无静默吞错（类型化 `on` 子句，永不捕获 `Error` 子类）
-- [ ] **ERR-03**: 引擎 catch 点构造带上下文的 `PlayerError`、赋值 `lastError`、经 `bundle.logger.e` 发射；`PlaybackController._onError` 取 `PlayerError`
-- [ ] **ERR-04**: UI 边界 `ErrorView` 翻译（字符串码 + 本地化消息 + 严重级）；sealed `KernelError` 永不以原始 sealed 对象暴露给 UI
-- [ ] **ERR-05**: 错误跨 mdk 回调线程封送（主线程重建，回调栈作为字段携带）
+- [x] **ERR-01**: 扩展现有 sealed `PlayerError`（`ErrorContext`：action/generation/path/timestamp/module + `ErrorCode` 注册表）；保留 `ValueNotifier<PlayerError?>` 契约
+- [x] **ERR-02**: 可恢复 vs 致命分裂根植于层级顶端；无静默吞错（类型化 `on` 子句，永不捕获 `Error` 子类）
+- [x] **ERR-03**: 引擎 catch 点构造带上下文的 `PlayerError`、赋值 `lastError`、经 `bundle.logger.e` 发射；`PlaybackController._onError` 取 `PlayerError`
+- [x] **ERR-04**: UI 边界 `ErrorView` 翻译（字符串码 + 本地化消息 + 严重级）；sealed `KernelError` 永不以原始 sealed 对象暴露给 UI
+- [x] **ERR-05**: 错误跨 mdk 回调线程封送（主线程重建，回调栈作为字段携带）
 
 ### MEM — MemoryMonitor 一等化（Phase 5）
 
@@ -121,11 +121,11 @@
 | LOG-03 | Phase 17 | Complete |
 | LOG-04 | Phase 17 | Complete |
 | LOG-05 | Phase 17 | Complete |
-| ERR-01 | Phase 18 | Pending |
-| ERR-02 | Phase 18 | Pending |
-| ERR-03 | Phase 18 | Pending |
-| ERR-04 | Phase 18 | Pending |
-| ERR-05 | Phase 18 | Pending |
+| ERR-01 | Phase 18 | Complete |
+| ERR-02 | Phase 18 | Complete |
+| ERR-03 | Phase 18 | Complete |
+| ERR-04 | Phase 18 | Complete |
+| ERR-05 | Phase 18 | Complete |
 | MEM-01 | Phase 19 | Pending |
 | MEM-02 | Phase 19 | Pending |
 | MEM-03 | Phase 19 | Pending |
