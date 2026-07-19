@@ -1,6 +1,6 @@
 /// Behavioral tests for Phase 17 concrete KernelLogger implementation:
 /// LogLevel, LogSink, DevToolsSink, DebugPrintSink, NullSink, CompositeSink,
-/// KernelLoggerImpl with static I accessor, and _redactPath helper.
+/// KernelLoggerImpl with static I accessor, and redactPath helper.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -91,13 +91,13 @@ void main() {
     });
   });
 
-  group('_redactPath (via DevToolsSink/DebugPrintSink output)', () {
-    // _redactPath is file-private, so we test its effect through the sinks.
-    // The sinks apply _redactPath to the message before output.
+  group('redactPath (via DevToolsSink/DebugPrintSink output)', () {
+    // redactPath is a public function; these tests verify the regex pattern
+    // used internally by the sinks for path stripping.
     // We verify via SpySink wrapped in CompositeSink to capture the msg.
 
     test('redacts directory prefixes from .dart file paths', () {
-      // We need to test _redactPath indirectly. Use a custom approach:
+      // We test the regex pattern that redactPath uses internally:
       // Since DevToolsSink/DebugPrintSink apply redaction internally,
       // we verify the redaction logic is correct by testing the pattern.
       // The actual redaction is: 'lib/kernel/engine/fvp_engine.dart:259' → 'fvp_engine.dart:259'
