@@ -29,7 +29,7 @@ final class FakeClock implements Clock {
   DateTime _now;
 
   /// 设置当前时间 (测试用)。
-  set now(DateTime t) => _now = t;
+  set currentTime(DateTime t) => _now = t;
 
   @override
   DateTime now() => _now;
