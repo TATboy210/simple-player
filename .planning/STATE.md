@@ -5,8 +5,8 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 20
 current_phase_name: 状态与生命周期重写
 status: planning
-stopped_at: Phase 19 context gathered
-last_updated: "2026-07-19T21:55:28.547Z"
+stopped_at: Phase 20 context gathered
+last_updated: "2026-07-19T22:42:34.229Z"
 last_activity: 2026-07-20
 last_activity_desc: Phase 19 complete, transitioned to Phase 20
 progress:
@@ -107,9 +107,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-19T20:27:57.455Z
-Stopped at: Phase 19 context gathered
-Resume file: .planning/phases/19-memorymonitor/19-CONTEXT.md
+Last session: 2026-07-19T22:42:34.212Z
+Stopped at: Phase 20 context gathered
+Resume file: .planning/phases/20-state-lifecycle/20-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
