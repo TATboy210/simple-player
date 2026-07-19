@@ -2,7 +2,9 @@ import 'dart:io' show Process;
 
 import 'package:flutter/foundation.dart';
 
-import 'log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// 路径工具函数
 ///

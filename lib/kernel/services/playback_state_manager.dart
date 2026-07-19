@@ -14,8 +14,10 @@ import 'dart:async';
 import '../engine/engine_state.dart';
 import '../persistence/playlist_store.dart';
 import '../persistence/settings_store.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
+
+final log = KernelLogger.I;
 
 /// 播放状态管理器 — 设置恢复 + 断点保存 + 销毁持久化
 ///

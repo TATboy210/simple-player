@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 
-import '../utils/log.dart';
-
+import '../diagnostics/kernel_logger.dart';
 import 'startup_state.dart';
+
+final log = KernelLogger.I;
 
 export 'startup_state.dart';
 

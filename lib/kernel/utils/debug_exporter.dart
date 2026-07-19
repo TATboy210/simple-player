@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'debug_probe.dart';
-import 'log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'memory_monitor.dart';
+
+final log = KernelLogger.I;
 
 /// 统一调试数据导出 — 一键收集所有诊断信息。
 ///
