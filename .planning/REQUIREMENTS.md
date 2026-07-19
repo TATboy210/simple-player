@@ -25,11 +25,11 @@
 
 ### LOG — 零依赖 KernelLogger 门面（Phase 3）
 
-- [ ] **LOG-01**: `lib/kernel/diagnostics/` 内零依赖 `KernelLogger` 门面（`dart:developer` + 受控 `debugPrint`）；内核永不导入 `package:logger`（CI grep 闸门）
-- [ ] **LOG-02**: 日志级别（trace/debug/info/warn/error/fatal）、结构化 `Map` 上下文、稳定调用点 API、文件路径脱敏
-- [ ] **LOG-03**: 发布门控 `kDebugMode`；warn/error 走 `dart:developer.log`；release 构建产出零 `debugPrint`/debug/info 行
-- [ ] **LOG-04**: 121 处调用点的替换迁移保留 `log*.w(...)` 调用形状（30 文件仅改 import/声明即迁移）
-- [ ] **LOG-05**: 可插拔 `LogSink`（`DevToolsSink`/`DebugPrintSink`/`NullSink`）；app 级 `log.dart` 作为 sink 注册（接线在内核之外）
+- [x] **LOG-01**: `lib/kernel/diagnostics/` 内零依赖 `KernelLogger` 门面（`dart:developer` + 受控 `debugPrint`）；内核永不导入 `package:logger`（CI grep 闸门）
+- [x] **LOG-02**: 日志级别（trace/debug/info/warn/error/fatal）、结构化 `Map` 上下文、稳定调用点 API、文件路径脱敏
+- [x] **LOG-03**: 发布门控 `kDebugMode`；warn/error 走 `dart:developer.log`；release 构建产出零 `debugPrint`/debug/info 行
+- [x] **LOG-04**: 121 处调用点的替换迁移保留 `log*.w(...)` 调用形状（30 文件仅改 import/声明即迁移）
+- [x] **LOG-05**: 可插拔 `LogSink`（`DevToolsSink`/`DebugPrintSink`/`NullSink`）；app 级 `log.dart` 作为 sink 注册（接线在内核之外）
 
 ### ERR — Sealed 错误模型稳化（Phase 4）
 
@@ -116,11 +116,11 @@
 | ADAPT-03 | Phase 16 | Complete |
 | ADAPT-04 | Phase 16 | Complete |
 | ADAPT-05 | Phase 16 | Complete |
-| LOG-01 | Phase 17 | Pending |
-| LOG-02 | Phase 17 | Pending |
-| LOG-03 | Phase 17 | Pending |
-| LOG-04 | Phase 17 | Pending |
-| LOG-05 | Phase 17 | Pending |
+| LOG-01 | Phase 17 | Complete |
+| LOG-02 | Phase 17 | Complete |
+| LOG-03 | Phase 17 | Complete |
+| LOG-04 | Phase 17 | Complete |
+| LOG-05 | Phase 17 | Complete |
 | ERR-01 | Phase 18 | Pending |
 | ERR-02 | Phase 18 | Pending |
 | ERR-03 | Phase 18 | Pending |
