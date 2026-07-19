@@ -12,7 +12,9 @@ import 'dart:io';
 
 import '../engine/engine_state.dart';
 import '../utils/path_utils.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// 字幕服务 — 外挂字幕自动检测与管理
 ///

@@ -7,7 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../persistence/settings_store.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import '../utils/screen_utils.dart';
 import 'display_enumerator.dart';
 import 'win32/win32_display_enumerator.dart';
@@ -15,6 +15,9 @@ import 'window_bridge.dart';
 import 'window_mode.dart';
 import 'window_persistence.dart';
 import 'window_state.dart';
+
+final log = KernelLogger.I;
+final logBridge = KernelLogger.I;
 
 /// Window management service - thin coordinator combining responsibility components.
 class WindowService with WindowListener implements WindowBridge {

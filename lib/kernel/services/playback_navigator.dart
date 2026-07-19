@@ -10,10 +10,12 @@ library;
 import 'dart:async';
 
 import '../engine/engine_state.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import '../utils/path_utils.dart';
 import '../services/path_validator.dart';
 import 'playback_controller.dart';
+
+final log = KernelLogger.I;
 
 /// 播放导航 — 索引跳转、上一首/下一首、并发 open() 守卫
 ///

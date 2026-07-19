@@ -2,7 +2,9 @@ import 'package:fvp/mdk.dart' as mdk;
 import 'video_effect_control.dart';
 import 'video_effect_type.dart';
 
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
+
+final log = KernelLogger.I;
 
 /// Encapsulates video effect operations: brightness, contrast, hue,
 /// saturation, rotation, aspect ratio, and deinterlace.

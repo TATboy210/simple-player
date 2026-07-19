@@ -7,8 +7,10 @@ import '../models/app_settings.dart';
 import '../models/export_data.dart';
 import '../models/track_preferences.dart';
 export '../models/app_settings.dart';
-import '../utils/log.dart';
+import '../diagnostics/kernel_logger.dart';
 import 'settings_validator.dart';
+
+final log = KernelLogger.I;
 
 /// 导入结果 — sealed class 支持穷尽模式匹配。
 ///
