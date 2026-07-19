@@ -252,7 +252,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
       _stateMachine.transitionTo(MediaState.error, 'open');
-      lastError.value = const FileError(FileErrorCode.pathEmpty, '文件路径为空');
+      lastError.value = FileError(FileErrorCode.pathEmpty, '文件路径为空');
       metrics.recordOpen(success: false);
       eventLog.add('open', {'path': path, 'error': 'empty path'});
       return;

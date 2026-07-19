@@ -531,4 +531,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bufferingMedia => 'Buffering media';
+
+  @override
+  String get errorFilePathEmpty => 'File path is empty';
+
+  @override
+  String get errorFileNotFound => 'File not found';
+
+  @override
+  String get errorFilepathTraversal => 'Invalid file path';
+
+  @override
+  String get errorCodecUnsupportedFormat => 'Unsupported media format';
+
+  @override
+  String get errorCodecDecodeFailed => 'Failed to decode media';
+
+  @override
+  String get errorCodecCodecUnsupported => 'Codec not supported';
+
+  @override
+  String get errorPlaybackPlayFailed => 'Playback failed';
+
+  @override
+  String get errorPlaybackSeekFailed => 'Seek failed';
+
+  @override
+  String get errorPlaybackTextureFailed => 'Video rendering failed';
+
+  @override
+  String get errorPlaybackOpenTimeout => 'Open timed out';
+
+  @override
+  String get errorNetworkTimeout => 'Network timeout';
+
+  @override
+  String get errorNetworkConnectionLost => 'Connection lost';
+
+  @override
+  String get errorUnknown => 'An unexpected error occurred';
 }
