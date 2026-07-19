@@ -53,7 +53,7 @@ void main() {
     testWidgets('shows action button for file error', (tester) async {
       var opened = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const FileError(
+      engine.lastError.value = FileError(
         FileErrorCode.fileNotFound,
         'Cannot open',
       );
@@ -68,7 +68,7 @@ void main() {
     testWidgets('shows retry button for playback error', (tester) async {
       var retried = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const PlaybackError(
+      engine.lastError.value = PlaybackError(
         PlaybackErrorCode.playFailed,
         'Playback failed',
       );
@@ -82,7 +82,7 @@ void main() {
 
     testWidgets('hides button when no callback provided', (tester) async {
       engine.state.value = MediaState.error;
-      engine.lastError.value = const UnknownError('Unknown error');
+      engine.lastError.value = UnknownError('Unknown error');
       await tester.pumpWidget(buildSubject());
 
       expect(find.byType(TextButton), findsNothing);
@@ -93,7 +93,7 @@ void main() {
     ) async {
       var opened = false;
       engine.state.value = MediaState.error;
-      engine.lastError.value = const CodecError(
+      engine.lastError.value = CodecError(
         CodecErrorCode.unsupportedFormat,
         'Unsupported codec',
       );
@@ -118,7 +118,7 @@ void main() {
         var opened = false;
         var retried = false;
         engine.state.value = MediaState.error;
-        engine.lastError.value = const PlaybackError(
+        engine.lastError.value = PlaybackError(
           PlaybackErrorCode.textureFailed,
           '纹理创建超时',
         );
