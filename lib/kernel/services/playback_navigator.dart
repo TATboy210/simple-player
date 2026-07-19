@@ -56,7 +56,7 @@ class PlaybackNavigator {
     final validationError = PathValidator.validate(current.path);
     if (validationError != null) {
       log.w('playIndex: rejected unsafe path: $validationError');
-      _controller.onError?.call(Exception(validationError));
+      _controller.onError?.call(FileError(FileErrorCode.pathTraversal, validationError));
       return;
     }
 
@@ -96,7 +96,9 @@ class PlaybackNavigator {
       if (gen == _openGeneration) {
         _controller.playlist.currentIndex = oldIndex;
       }
-      _controller.onError?.call(e);
+      _controller.onError?.call(
+        PlaybackError(PlaybackErrorCode.playFailed, 'PlaybackNavigator.playIndex($index) failed: $e', e),
+      );
       return;
     }
     _controller.onNeedRebuild();
