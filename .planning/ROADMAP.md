@@ -150,7 +150,17 @@ Plans:
   4. UI 边界 `ErrorView` 翻译生效（字符串码 + 本地化消息 + 严重级），sealed `KernelError` 永不以原始 sealed 对象暴露给 UI
   5. 错误跨 mdk 回调线程封送 — 主线程重建 `PlayerError`，回调栈作为 `callbackStackTrace` 字段携带
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 18-01-PLAN.md — Model layer: ErrorContext + isFatal + l10nKey + recoverable enums + ARB keys + model tests [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 18-02-PLAN.md — Engine catch points → three-step pattern + PlaybackController signature + callback marshalling [wave 2]
+- [ ] 18-03-PLAN.md — ErrorBanner l10nKey translation + widget tests [wave 2]
 
 ### Phase 19: MemoryMonitor 一等化
 
@@ -233,7 +243,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
 | 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete    | 2026-07-18 |
 | 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | In Progress|  |
-| 18. Sealed 错误模型稳化 | v3.0 | 0/TBD | Not started | - |
+| 18. Sealed 错误模型稳化 | v3.0 | 0/3 | Planning | - |
 | 19. MemoryMonitor 一等化 | v3.0 | 0/TBD | Not started | - |
 | 20. 状态与生命周期重写 | v3.0 | 0/TBD | Not started | - |
 | 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 0/TBD | Not started | - |

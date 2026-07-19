@@ -5,14 +5,14 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 17
 current_phase_name: kernellogger
 status: executing
-stopped_at: Phase 18 context gathered
-last_updated: "2026-07-19T15:25:04.601Z"
+stopped_at: context exhaustion at 77% (2026-07-19)
+last_updated: "2026-07-19T16:35:50.125Z"
 last_activity: 2026-07-19
 last_activity_desc: Phase 17 execution started
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 12
+  total_plans: 15
   completed_plans: 11
   percent: 25
 ---
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 Phase: 17 (kernellogger) — EXECUTING
 Plan: 1 of 3
-Status: Executing Phase 17
+Status: Ready to execute
 Last activity: 2026-07-19 — Phase 17 execution started
 
 ## Performance Metrics
@@ -104,8 +104,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-19T15:25:04.582Z
-Stopped at: Phase 18 context gathered
+Last session: 2026-07-19T16:19:47.467Z
+Stopped at: context exhaustion at 77% (2026-07-19)
 Resume file: .planning/phases/18-sealed/18-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
