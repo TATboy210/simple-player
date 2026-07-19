@@ -42,38 +42,50 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsNothing);
     });
 
-    testWidgets('displays error message when in error state', (tester) async {
-      engine.simulateError('File not found');
+    // ERR-04: ErrorBanner uses l10nKey → AppLocalizations for display text.
+    // simulateError() creates UnknownError → l10nKey 'error.unknown' →
+    // English ARB value: 'An unexpected error occurred'
+    testWidgets('displays localized error message when in error state', (
+      tester,
+    ) async {
+      engine.simulateError('raw message ignored by l10nKey');
       await tester.pumpWidget(buildSubject());
 
-      expect(find.text('File not found'), findsOneWidget);
+      // l10nKey 'error.unknown' → ARB English value
+      expect(find.text('An unexpected error occurred'), findsOneWidget);
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
+    // ERR-04: FileError → l10nKey 'error.file.fileNotFound' → ARB 'File not found'
     testWidgets('shows action button for file error', (tester) async {
       var opened = false;
       engine.state.value = MediaState.error;
       engine.lastError.value = FileError(
         FileErrorCode.fileNotFound,
-        'Cannot open',
+        'raw message ignored',
       );
       await tester.pumpWidget(buildSubject(onOpenFile: () => opened = true));
 
+      // Localized message visible
+      expect(find.text('File not found'), findsOneWidget);
       final button = find.byType(TextButton);
       expect(button, findsOneWidget);
       await tester.tap(button);
       expect(opened, isTrue);
     });
 
+    // ERR-04: PlaybackError → l10nKey 'error.playback.playFailed' → ARB 'Playback failed'
     testWidgets('shows retry button for playback error', (tester) async {
       var retried = false;
       engine.state.value = MediaState.error;
       engine.lastError.value = PlaybackError(
         PlaybackErrorCode.playFailed,
-        'Playback failed',
+        'raw message ignored',
       );
       await tester.pumpWidget(buildSubject(onRetry: () => retried = true));
 
+      // Localized message visible
+      expect(find.text('Playback failed'), findsOneWidget);
       final button = find.byType(TextButton);
       expect(button, findsOneWidget);
       await tester.tap(button);
@@ -82,12 +94,13 @@ void main() {
 
     testWidgets('hides button when no callback provided', (tester) async {
       engine.state.value = MediaState.error;
-      engine.lastError.value = UnknownError('Unknown error');
+      engine.lastError.value = UnknownError('raw message');
       await tester.pumpWidget(buildSubject());
 
       expect(find.byType(TextButton), findsNothing);
     });
 
+    // ERR-04: CodecError → l10nKey 'error.codec.unsupportedFormat' → ARB 'Unsupported media format'
     testWidgets('shows codec error with selectOtherFile action', (
       tester,
     ) async {
@@ -95,11 +108,12 @@ void main() {
       engine.state.value = MediaState.error;
       engine.lastError.value = CodecError(
         CodecErrorCode.unsupportedFormat,
-        'Unsupported codec',
+        'raw message ignored',
       );
       await tester.pumpWidget(buildSubject(onOpenFile: () => opened = true));
 
-      expect(find.text('Unsupported codec'), findsOneWidget);
+      // Localized message visible
+      expect(find.text('Unsupported media format'), findsOneWidget);
       final button = find.byType(TextButton);
       expect(button, findsOneWidget);
       await tester.tap(button);
@@ -120,7 +134,7 @@ void main() {
         engine.state.value = MediaState.error;
         engine.lastError.value = PlaybackError(
           PlaybackErrorCode.textureFailed,
-          '纹理创建超时',
+          'raw message ignored',
         );
         await tester.pumpWidget(
           buildSubject(
@@ -129,8 +143,8 @@ void main() {
           ),
         );
 
-        // Arrange 后：错误 message 可见
-        expect(find.text('纹理创建超时'), findsOneWidget);
+        // ERR-04: l10nKey 'error.playback.textureFailed' → ARB 'Video rendering failed'
+        expect(find.text('Video rendering failed'), findsOneWidget);
         final button = find.byType(TextButton);
         expect(button, findsOneWidget);
 
@@ -144,5 +158,111 @@ void main() {
         expect(retried, isFalse);
       },
     );
+
+    // ERR-04: 每个错误子类型都显示正确的本地化消息
+    group('l10nKey translation — each error type', () {
+      testWidgets('FileError.pathEmpty shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = FileError(
+          FileErrorCode.pathEmpty,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('File path is empty'), findsOneWidget);
+      });
+
+      testWidgets('FileError.pathTraversal shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = FileError(
+          FileErrorCode.pathTraversal,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Invalid file path'), findsOneWidget);
+      });
+
+      testWidgets('CodecError.decodeFailed shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = CodecError(
+          CodecErrorCode.decodeFailed,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Failed to decode media'), findsOneWidget);
+      });
+
+      testWidgets('CodecError.codecUnsupported shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = CodecError(
+          CodecErrorCode.codecUnsupported,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Codec not supported'), findsOneWidget);
+      });
+
+      testWidgets('PlaybackError.seekFailed shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = PlaybackError(
+          PlaybackErrorCode.seekFailed,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Seek failed'), findsOneWidget);
+      });
+
+      testWidgets('PlaybackError.openTimeout shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = PlaybackError(
+          PlaybackErrorCode.openTimeout,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Open timed out'), findsOneWidget);
+      });
+
+      testWidgets('NetworkError.timeout shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = NetworkError(
+          NetworkErrorCode.timeout,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Network timeout'), findsOneWidget);
+      });
+
+      testWidgets('NetworkError.connectionLost shows localized message', (
+        tester,
+      ) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = NetworkError(
+          NetworkErrorCode.connectionLost,
+          'raw',
+        );
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('Connection lost'), findsOneWidget);
+      });
+
+      testWidgets('UnknownError shows localized message', (tester) async {
+        engine.state.value = MediaState.error;
+        engine.lastError.value = UnknownError('raw');
+        await tester.pumpWidget(buildSubject());
+        expect(find.text('An unexpected error occurred'), findsOneWidget);
+      });
+    });
   });
 }

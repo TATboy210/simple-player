@@ -37,6 +37,8 @@ class ErrorBanner extends StatelessWidget {
         }
 
         final l10n = AppLocalizations.of(context);
+        // l10nKey 翻译 — 解耦 sealed 内部与 UI 显示文本 (D7)
+        final displayMessage = _resolveMessage(l10n, error);
 
         // PlayerError sealed class 穷举匹配 — 根据子类型决定操作按钮
         VoidCallback? callback;
@@ -78,7 +80,7 @@ class ErrorBanner extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  error.message,
+                  displayMessage,
                   style: const TextStyle(
                     color: Tokens.textPrimary,
                     fontSize: Tokens.fontCaption,
@@ -114,5 +116,28 @@ class ErrorBanner extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// l10nKey → AppLocalizations 查找，未知键 fallback 到原始 error.message (D7)
+  ///
+  /// Uses switch expression for compile-time exhaustive checking when new error
+  /// codes are added. The `_` default case provides graceful fallback.
+  String _resolveMessage(AppLocalizations l10n, PlayerError error) {
+    return switch (error.l10nKey) {
+      'error.file.pathEmpty' => l10n.errorFilePathEmpty,
+      'error.file.fileNotFound' => l10n.errorFileNotFound,
+      'error.file.pathTraversal' => l10n.errorFilepathTraversal,
+      'error.codec.unsupportedFormat' => l10n.errorCodecUnsupportedFormat,
+      'error.codec.decodeFailed' => l10n.errorCodecDecodeFailed,
+      'error.codec.codecUnsupported' => l10n.errorCodecCodecUnsupported,
+      'error.playback.playFailed' => l10n.errorPlaybackPlayFailed,
+      'error.playback.seekFailed' => l10n.errorPlaybackSeekFailed,
+      'error.playback.textureFailed' => l10n.errorPlaybackTextureFailed,
+      'error.playback.openTimeout' => l10n.errorPlaybackOpenTimeout,
+      'error.network.timeout' => l10n.errorNetworkTimeout,
+      'error.network.connectionLost' => l10n.errorNetworkConnectionLost,
+      'error.unknown' => l10n.errorUnknown,
+      _ => error.message, // fallback: 未知 l10nKey 用原始消息
+    };
   }
 }
