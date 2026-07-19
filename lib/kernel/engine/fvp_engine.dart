@@ -74,6 +74,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       player,
       stateMachine: stateMachine,
       onStopPositionPolling: () => engine._positionPoller.stop(),
+      lastErrorNotifier: engine.lastError,
     );
     engine._positionPoller = PositionPoller(
       player,
