@@ -3,6 +3,7 @@
 /// Extracted data classes from the legacy singleton MemoryMonitor.
 /// [MetricSample] and [MemorySnapshot] are pure data carriers with toJson()
 /// serialization, shared by both old and new MemoryMonitor implementations.
+library;
 
 /// 单次内存采样 — RSS 字节数 + 时间戳。
 ///

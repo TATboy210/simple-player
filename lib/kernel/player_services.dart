@@ -14,11 +14,13 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import 'diagnostics/clock.dart';
 import 'diagnostics/diagnostics_bundle.dart';
 import 'diagnostics/event_log_slot.dart';
 import 'diagnostics/kernel_logger.dart';
-import 'diagnostics/memory_monitor_slot.dart';
+import 'diagnostics/memory_monitor.dart';
 import 'diagnostics/metrics_slot.dart';
+import 'diagnostics/rss_provider.dart';
 import 'engine/engine_state.dart';
 
 import 'adapter/kernel_adapter.dart';
@@ -96,15 +98,24 @@ class PlayerServices {
     // release 模式 NullSink (零输出, 可 tree-shake)。
     KernelLoggerImpl.init();
 
+    // Phase 19: 创建实例化 MemoryMonitor 并设置静态 I 访问器,
+    // 使 DebugExporter 等遗留调用点可通过 MemoryMonitor.I.snapshot() 访问。
+    final memoryMonitor = MemoryMonitor(
+      rssProvider: const ProcessInfoRssProvider(),
+      clock: const SystemClock(),
+      logger: KernelLoggerImpl.I,
+    );
+    MemoryMonitor.init(memoryMonitor);
+
     // Strangler Fig seam (Phase 16, ADAPT-01/02): 用 KernelAdapter 包裹同一个
     // FvpEngine 实例，legacy/migrated 均指向它 (D13/D19 — NewFvpEngine 尚不存在，
     // 零额外原生资源)。policy 全量路由到 legacy，行为与直接使用 FvpEngine 完全
-    // 一致；bundle 传递真实 KernelLogger，其余 3 插槽 noop (P19/P20 激活)。
+    // 一致；bundle 传递真实 KernelLogger + 真实 MemoryMonitor，其余 2 插槽 noop (P20 激活)。
     // Phase 20 将把 migrated 换成 NewFvpEngine 并翻转 policy，此处即为切换点。
     final fvp = FvpEngine();
     final bundle = DiagnosticsBundle(
       logger: KernelLoggerImpl.I,
-      memoryMonitor: const NullMemoryMonitorSlot(),
+      memoryMonitor: memoryMonitor,
       metrics: const NullMetricsSlot(),
       eventLog: const NullEventLogSlot(),
     );

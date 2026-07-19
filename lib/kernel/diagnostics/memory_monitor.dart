@@ -38,6 +38,38 @@ import 'rss_provider.dart';
 /// monitor.dispose();
 /// ```
 final class MemoryMonitor implements MemoryMonitorSlot {
+  // ─── 静态单例 (KernelLoggerImpl.I 模式, Phase 17 风格) ───
+
+  /// 静态实例 — 由 [init] 在 PlayerServices.init() 中设置。
+  static MemoryMonitor? _instance;
+
+  /// 全局访问器 — 调用前必须先调用 [init]。
+  ///
+  /// Throws [StateError] if [init] has not been called.
+  static MemoryMonitor get I {
+    final inst = _instance;
+    if (inst == null) {
+      throw StateError(
+        'MemoryMonitor.I accessed before init(). '
+        'Call MemoryMonitor.init() in PlayerServices.init().',
+      );
+    }
+    return inst;
+  }
+
+  /// 组合根 — 在 PlayerServices.init() 中调用, 设置静态 [I] 访问器。
+  static void init(MemoryMonitor monitor) {
+    _instance = monitor;
+  }
+
+  /// 测试重置 — 清除静态实例, 隔离测试间状态。
+  @visibleForTesting
+  static void resetForTesting() {
+    _instance = null;
+  }
+
+  // ─── 实例构造 ───
+
   /// 构造 — 必填 [rssProvider] + [clock], 可选配置参数和回调。
   ///
   /// 自动启动定时器 (D5): 构造函数体内调用 [_startImpl]。
