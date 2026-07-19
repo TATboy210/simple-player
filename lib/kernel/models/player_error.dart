@@ -25,6 +25,12 @@ sealed class PlayerError {
   /// construct errors without context continue to work.
   ErrorContext? get context;
 
+  /// 可变 context setter — 支持 FvpEngine 对 MediaOpener 错误的上下文丰富
+  ///
+  /// Used when engine enriches errors from lower layers (e.g., MediaOpener)
+  /// with additional context like generation number.
+  set context(ErrorContext? value);
+
   /// 是否为致命错误（不可恢复）
   ///
   /// Delegates to `!code.recoverable` for subclasses with code enums.
@@ -99,7 +105,7 @@ final class FileError extends PlayerError {
   final Object? cause;
 
   @override
-  final ErrorContext? context;
+  ErrorContext? context;
 
   FileError(this.code, this.message, [this.cause, this.context]);
 
@@ -143,7 +149,7 @@ final class CodecError extends PlayerError {
   final Object? cause;
 
   @override
-  final ErrorContext? context;
+  ErrorContext? context;
 
   CodecError(this.code, this.message, [this.cause, this.context]);
 
@@ -187,7 +193,7 @@ final class PlaybackError extends PlayerError {
   final Object? cause;
 
   @override
-  final ErrorContext? context;
+  ErrorContext? context;
 
   PlaybackError(this.code, this.message, [this.cause, this.context]);
 
@@ -234,7 +240,7 @@ final class NetworkError extends PlayerError {
   final Object? cause;
 
   @override
-  final ErrorContext? context;
+  ErrorContext? context;
 
   NetworkError(this.code, this.message, [this.cause, this.context]);
 
@@ -272,7 +278,7 @@ final class UnknownError extends PlayerError {
   final Object? cause;
 
   @override
-  final ErrorContext? context;
+  ErrorContext? context;
 
   UnknownError(this.message, [this.cause, this.context]);
 
