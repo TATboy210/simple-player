@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'startup_state.dart';
 
-final log = KernelLogger.I;
-
 export 'startup_state.dart';
+
+final log = KernelLogger.I;
 
 /// 启动协调器 — 跟踪各阶段进度并广播状态
 ///

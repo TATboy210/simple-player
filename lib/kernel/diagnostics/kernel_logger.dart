@@ -182,6 +182,12 @@ abstract class KernelLogger {
   /// const 构造 — 支持子类 const 构造.
   const KernelLogger();
 
+  /// 静态访问器 — 委托给 [KernelLoggerImpl.I] (Phase 17-02 迁移调用点统一入口).
+  ///
+  /// Forwarding getter so that 24 migrated kernel files can use
+  /// `KernelLogger.I` without importing the concrete implementation.
+  static KernelLoggerImpl get I => KernelLoggerImpl.I;
+
   /// 最低优先级追踪日志 (trace-level, 当前无存量调用点)
   void trace(String message, {Map<String, Object?>? context});
 
