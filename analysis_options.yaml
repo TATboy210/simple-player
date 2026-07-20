@@ -10,6 +10,11 @@ analyzer:
     missing_return: error
     dead_code: warning
 
+# Phase 21 D14: lib/kernel/ 禁止 debugPrint — 内核必须用 KernelLogger
+# Flutter analyzer 不支持目录级 lint override，使用 CI grep 闸门兜底:
+#   grep -rn 'debugPrint(' lib/kernel/ | grep -v kernel_logger.dart | grep -v '//'
+# 构建产物检查由 Plan 04 phase21_release_gate.sh 交付
+
 linter:
   rules:
     prefer_const_constructors: true
