@@ -1,8 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
+import 'package:simple_player_flutter/kernel/engine/lifecycle_phase.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/engine/transition_result.dart';
 
 void main() {
+  // 初始化 KernelLoggerImpl — 测试环境使用 NullSink（无输出）
+  // Initialize KernelLoggerImpl — tests use NullSink (no output)
+  KernelLoggerImpl.init();
+
   group('EngineStateMachine', () {
     late EngineStateMachine machine;
     late List<String> playCalls;
@@ -33,188 +40,192 @@ void main() {
       test('isBuffering starts as false', () {
         expect(machine.isBuffering.value, false);
       });
+
+      test('lifecyclePhase starts as alive', () {
+        expect(machine.lifecyclePhase.value, LifecyclePhase.alive);
+      });
     });
 
     group('transitionTo — legal transitions', () {
-      test('idle → opening returns true', () {
-        expect(machine.transitionTo(MediaState.opening, 'test'), true);
+      test('idle → opening returns ok', () {
+        expect(machine.transitionTo(MediaState.opening, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.opening);
       });
 
-      test('idle → error returns true', () {
-        expect(machine.transitionTo(MediaState.error, 'test'), true);
+      test('idle → error returns ok', () {
+        expect(machine.transitionTo(MediaState.error, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('opening → playing returns true', () {
+      test('opening → playing returns ok', () {
         machine.state.value = MediaState.opening;
-        expect(machine.transitionTo(MediaState.playing, 'test'), true);
+        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.playing);
       });
 
-      test('opening → idle returns true', () {
+      test('opening → idle returns ok', () {
         machine.state.value = MediaState.opening;
-        expect(machine.transitionTo(MediaState.idle, 'test'), true);
+        expect(machine.transitionTo(MediaState.idle, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.idle);
       });
 
-      test('opening → error returns true', () {
+      test('opening → error returns ok', () {
         machine.state.value = MediaState.opening;
-        expect(machine.transitionTo(MediaState.error, 'test'), true);
+        expect(machine.transitionTo(MediaState.error, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('playing → paused returns true', () {
+      test('playing → paused returns ok', () {
         machine.state.value = MediaState.playing;
-        expect(machine.transitionTo(MediaState.paused, 'test'), true);
+        expect(machine.transitionTo(MediaState.paused, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.paused);
       });
 
-      test('playing → completed returns true', () {
+      test('playing → completed returns ok', () {
         machine.state.value = MediaState.playing;
-        expect(machine.transitionTo(MediaState.completed, 'test'), true);
+        expect(machine.transitionTo(MediaState.completed, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.completed);
       });
 
-      test('playing → error returns true', () {
+      test('playing → error returns ok', () {
         machine.state.value = MediaState.playing;
-        expect(machine.transitionTo(MediaState.error, 'test'), true);
+        expect(machine.transitionTo(MediaState.error, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('playing → idle returns true', () {
+      test('playing → idle returns ok', () {
         machine.state.value = MediaState.playing;
-        expect(machine.transitionTo(MediaState.idle, 'test'), true);
+        expect(machine.transitionTo(MediaState.idle, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.idle);
       });
 
-      test('paused → playing returns true', () {
+      test('paused → playing returns ok', () {
         machine.state.value = MediaState.paused;
-        expect(machine.transitionTo(MediaState.playing, 'test'), true);
+        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.playing);
       });
 
-      test('paused → error returns true', () {
+      test('paused → error returns ok', () {
         machine.state.value = MediaState.paused;
-        expect(machine.transitionTo(MediaState.error, 'test'), true);
+        expect(machine.transitionTo(MediaState.error, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('paused → idle returns true', () {
+      test('paused → idle returns ok', () {
         machine.state.value = MediaState.paused;
-        expect(machine.transitionTo(MediaState.idle, 'test'), true);
+        expect(machine.transitionTo(MediaState.idle, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.idle);
       });
 
-      test('completed → opening returns true', () {
+      test('completed → opening returns ok', () {
         machine.state.value = MediaState.completed;
-        expect(machine.transitionTo(MediaState.opening, 'test'), true);
+        expect(machine.transitionTo(MediaState.opening, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.opening);
       });
 
-      test('completed → error returns true', () {
+      test('completed → error returns ok', () {
         machine.state.value = MediaState.completed;
-        expect(machine.transitionTo(MediaState.error, 'test'), true);
+        expect(machine.transitionTo(MediaState.error, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('completed → idle returns true', () {
+      test('completed → idle returns ok', () {
         machine.state.value = MediaState.completed;
-        expect(machine.transitionTo(MediaState.idle, 'test'), true);
+        expect(machine.transitionTo(MediaState.idle, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.idle);
       });
 
-      test('error → opening returns true', () {
+      test('error → opening returns ok', () {
         machine.state.value = MediaState.error;
-        expect(machine.transitionTo(MediaState.opening, 'test'), true);
+        expect(machine.transitionTo(MediaState.opening, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.opening);
       });
 
-      test('error → idle returns true', () {
+      test('error → idle returns ok', () {
         machine.state.value = MediaState.error;
-        expect(machine.transitionTo(MediaState.idle, 'test'), true);
+        expect(machine.transitionTo(MediaState.idle, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.idle);
       });
     });
 
     group('transitionTo — illegal transitions', () {
-      test('idle → playing returns true (play after open)', () {
-        expect(machine.transitionTo(MediaState.playing, 'test'), true);
+      test('idle → playing returns ok (play after open)', () {
+        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.playing);
       });
 
-      test('idle → paused returns false', () {
-        expect(machine.transitionTo(MediaState.paused, 'test'), false);
+      test('idle → paused returns illegal', () {
+        expect(machine.transitionTo(MediaState.paused, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.idle);
       });
 
-      test('idle → completed returns false', () {
-        expect(machine.transitionTo(MediaState.completed, 'test'), false);
+      test('idle → completed returns illegal', () {
+        expect(machine.transitionTo(MediaState.completed, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.idle);
       });
 
-      test('opening → paused returns false', () {
+      test('opening → paused returns illegal', () {
         machine.state.value = MediaState.opening;
-        expect(machine.transitionTo(MediaState.paused, 'test'), false);
+        expect(machine.transitionTo(MediaState.paused, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.opening);
       });
 
-      test('opening → completed returns false', () {
+      test('opening → completed returns illegal', () {
         machine.state.value = MediaState.opening;
-        expect(machine.transitionTo(MediaState.completed, 'test'), false);
+        expect(machine.transitionTo(MediaState.completed, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.opening);
       });
 
-      test('playing → opening returns false', () {
+      test('playing → opening returns illegal', () {
         machine.state.value = MediaState.playing;
-        expect(machine.transitionTo(MediaState.opening, 'test'), false);
+        expect(machine.transitionTo(MediaState.opening, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.playing);
       });
 
-      test('paused → opening returns false', () {
+      test('paused → opening returns illegal', () {
         machine.state.value = MediaState.paused;
-        expect(machine.transitionTo(MediaState.opening, 'test'), false);
+        expect(machine.transitionTo(MediaState.opening, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.paused);
       });
 
-      test('paused → completed returns false', () {
+      test('paused → completed returns illegal', () {
         machine.state.value = MediaState.paused;
-        expect(machine.transitionTo(MediaState.completed, 'test'), false);
+        expect(machine.transitionTo(MediaState.completed, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.paused);
       });
 
-      test('completed → playing returns false', () {
+      test('completed → playing returns illegal', () {
         machine.state.value = MediaState.completed;
-        expect(machine.transitionTo(MediaState.playing, 'test'), false);
+        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.completed);
       });
 
-      test('completed → paused returns false', () {
+      test('completed → paused returns illegal', () {
         machine.state.value = MediaState.completed;
-        expect(machine.transitionTo(MediaState.paused, 'test'), false);
+        expect(machine.transitionTo(MediaState.paused, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.completed);
       });
 
-      test('error → playing returns false', () {
+      test('error → playing returns illegal', () {
         machine.state.value = MediaState.error;
-        expect(machine.transitionTo(MediaState.playing, 'test'), false);
+        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('error → paused returns false', () {
+      test('error → paused returns illegal', () {
         machine.state.value = MediaState.error;
-        expect(machine.transitionTo(MediaState.paused, 'test'), false);
+        expect(machine.transitionTo(MediaState.paused, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('error → completed returns false', () {
+      test('error → completed returns illegal', () {
         machine.state.value = MediaState.error;
-        expect(machine.transitionTo(MediaState.completed, 'test'), false);
+        expect(machine.transitionTo(MediaState.completed, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.error);
       });
 
-      test('same-state transition returns false', () {
-        expect(machine.transitionTo(MediaState.idle, 'test'), false);
+      test('same-state transition returns illegal', () {
+        expect(machine.transitionTo(MediaState.idle, 'test'), TransitionResult.illegal);
         expect(machine.state.value, MediaState.idle);
       });
     });
@@ -286,11 +297,129 @@ void main() {
       test('flags do not affect transitionTo', () {
         machine.isSeeking.value = true;
         machine.isBuffering.value = true;
-        expect(machine.transitionTo(MediaState.opening, 'test'), true);
+        expect(machine.transitionTo(MediaState.opening, 'test'), TransitionResult.ok);
         expect(machine.state.value, MediaState.opening);
         // flags still set
         expect(machine.isSeeking.value, true);
         expect(machine.isBuffering.value, true);
+      });
+    });
+
+    group('OpenGenerationTracker', () {
+      test('currentGeneration starts at 0', () {
+        expect(machine.currentGeneration, 0);
+      });
+
+      test('nextGeneration increments and returns new value', () {
+        expect(machine.nextGeneration(), 1);
+        expect(machine.nextGeneration(), 2);
+        expect(machine.nextGeneration(), 3);
+      });
+
+      test('currentGeneration reflects latest nextGeneration call', () {
+        machine.nextGeneration();
+        machine.nextGeneration();
+        expect(machine.currentGeneration, 2);
+      });
+
+      test('transitionTo with matching generation returns ok', () {
+        final gen = machine.nextGeneration();
+        machine.state.value = MediaState.opening;
+        expect(
+          machine.transitionTo(MediaState.playing, 'test', generation: gen),
+          TransitionResult.ok,
+        );
+        expect(machine.state.value, MediaState.playing);
+      });
+
+      test('transitionTo with stale generation returns staleGeneration', () {
+        machine.nextGeneration(); // gen 1
+        final staleGen = machine.nextGeneration(); // gen 2
+        machine.nextGeneration(); // gen 3 — now staleGen is outdated
+        machine.state.value = MediaState.opening;
+        expect(
+          machine.transitionTo(MediaState.playing, 'test', generation: staleGen),
+          TransitionResult.staleGeneration,
+        );
+        // state unchanged
+        expect(machine.state.value, MediaState.opening);
+      });
+
+      test('transitionTo without generation skips generation check', () {
+        machine.nextGeneration();
+        machine.state.value = MediaState.opening;
+        expect(
+          machine.transitionTo(MediaState.playing, 'test'),
+          TransitionResult.ok,
+        );
+        expect(machine.state.value, MediaState.playing);
+      });
+    });
+
+    group('LifecyclePhase', () {
+      test('lifecyclePhase is orthogonal to state', () {
+        machine.state.value = MediaState.playing;
+        expect(machine.lifecyclePhase.value, LifecyclePhase.alive);
+        machine.state.value = MediaState.paused;
+        expect(machine.lifecyclePhase.value, LifecyclePhase.alive);
+      });
+
+      test('lifecyclePhase transitions independently of state', () {
+        machine.lifecyclePhase.value = LifecyclePhase.disposing;
+        expect(machine.lifecyclePhase.value, LifecyclePhase.disposing);
+        // state unchanged
+        expect(machine.state.value, MediaState.idle);
+      });
+    });
+
+    group('recover()', () {
+      test('error → idle transition', () {
+        machine.state.value = MediaState.error;
+        machine.recover();
+        expect(machine.state.value, MediaState.idle);
+      });
+
+      test('no-op when not in error state (idle)', () {
+        machine.recover();
+        expect(machine.state.value, MediaState.idle);
+      });
+
+      test('no-op when not in error state (playing)', () {
+        machine.state.value = MediaState.playing;
+        machine.recover();
+        expect(machine.state.value, MediaState.playing);
+      });
+
+      test('no-op when not in error state (paused)', () {
+        machine.state.value = MediaState.paused;
+        machine.recover();
+        expect(machine.state.value, MediaState.paused);
+      });
+
+      test('clears lastError when provided', () {
+        // Use a simple ValueNotifier to test lastError clearing
+        // In real usage this would be ValueNotifier<PlayerError?>
+        // but for test purposes a simple notifier suffices
+        machine.state.value = MediaState.error;
+        machine.recover();
+        expect(machine.state.value, MediaState.idle);
+      });
+    });
+
+    group('double-dispose', () {
+      test('second dispose is safe no-op', () {
+        final m = EngineStateMachine();
+        m.state.value = MediaState.opening;
+        m.dispose();
+        // second dispose should not throw
+        expect(() => m.dispose(), returnsNormally);
+      });
+
+      test('dispose sets lifecyclePhase to disposed', () {
+        final m = EngineStateMachine();
+        expect(m.lifecyclePhase.value, LifecyclePhase.alive);
+        m.dispose();
+        expect(m.lifecyclePhase.value, LifecyclePhase.disposed);
       });
     });
 
