@@ -1,9 +1,9 @@
 import '../bridge/display_config.dart';
 import '../diagnostics/kernel_logger.dart';
-
-final log = KernelLogger.I;
 import 'player_proxy.dart';
 import 'renderer_control.dart';
+
+final log = KernelLogger.I;
 
 /// Encapsulates D3D11 rendering configuration for a player.
 ///
