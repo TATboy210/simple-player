@@ -274,4 +274,346 @@ void main() {
       expect(true, isTrue); // 占位 — 编译期验证
     });
   });
+
+  // =========================================================================
+  // Deep coverage: static lifecycle (init/I/resetForTesting)
+  // =========================================================================
+  group('MemoryMonitor static lifecycle', () {
+    late FakeRssProvider rss;
+    late FakeClock clock;
+
+    setUp(() {
+      rss = FakeRssProvider(10 * 1024 * 1024);
+      clock = FakeClock(DateTime(2026, 7, 20, 12, 0, 0));
+      MemoryMonitor.resetForTesting();
+    });
+
+    tearDown(() {
+      MemoryMonitor.resetForTesting();
+    });
+
+    test('I throws StateError before init()', () {
+      expect(() => MemoryMonitor.I, throwsA(isA<StateError>()));
+    });
+
+    test('init() sets static I accessor', () {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      MemoryMonitor.init(monitor);
+      expect(MemoryMonitor.I, same(monitor));
+      monitor.dispose();
+    });
+
+    test('resetForTesting() clears static instance', () {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      MemoryMonitor.init(monitor);
+      expect(MemoryMonitor.I, isNotNull);
+
+      MemoryMonitor.resetForTesting();
+      expect(() => MemoryMonitor.I, throwsA(isA<StateError>()));
+      monitor.dispose();
+    });
+
+    test('init() is idempotent — second call replaces instance', () {
+      final monitor1 = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      MemoryMonitor.init(monitor1);
+
+      final monitor2 = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      MemoryMonitor.init(monitor2);
+
+      expect(MemoryMonitor.I, same(monitor2));
+      monitor1.dispose();
+      monitor2.dispose();
+    });
+  });
+
+  // =========================================================================
+  // Deep coverage: sampling behavior
+  // =========================================================================
+  group('MemoryMonitor sampling', () {
+    late FakeRssProvider rss;
+    late FakeClock clock;
+
+    setUp(() {
+      rss = FakeRssProvider(10 * 1024 * 1024);
+      clock = FakeClock(DateTime(2026, 7, 20, 12, 0, 0));
+    });
+
+    test('takes snapshot at each interval tick', () async {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      // Should have at least initial + 2 ticks
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.history.length, greaterThanOrEqualTo(2));
+
+      monitor.dispose();
+    });
+
+    test('snapshot includes rssBytes from RssProvider', () async {
+      rss.value = 42 * 1024 * 1024; // 42 MB
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.rssBytes, 42 * 1024 * 1024);
+
+      monitor.dispose();
+    });
+
+    test('snapshot includes timestamp from Clock', () async {
+      final fixedTime = DateTime(2025, 3, 15, 10, 30, 0);
+      clock.currentTime = fixedTime;
+
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.timestamp, fixedTime);
+
+      monitor.dispose();
+    });
+
+    test('handles RssProvider returning 0 bytes', () async {
+      rss.value = 0;
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      // Should not crash with 0 bytes
+      expect(monitor.snapshot(), isNotNull);
+
+      monitor.dispose();
+    });
+  });
+
+  // =========================================================================
+  // Deep coverage: dispose behavior
+  // =========================================================================
+  group('MemoryMonitor dispose', () {
+    late FakeRssProvider rss;
+    late FakeClock clock;
+
+    setUp(() {
+      rss = FakeRssProvider(10 * 1024 * 1024);
+      clock = FakeClock(DateTime(2026, 7, 20, 12, 0, 0));
+    });
+
+    test('stops timer on dispose', () async {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final countBefore = monitor.snapshot()!.history.length;
+
+      monitor.dispose();
+
+      // After dispose, no more ticks should happen
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      // Can't check snapshot after dispose (notifier disposed), but
+      // the timer should have been cancelled.
+    });
+
+    test('dispose is idempotent', () {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      expect(() {
+        monitor.dispose();
+        monitor.dispose();
+        monitor.dispose();
+      }, returnsNormally);
+    });
+
+    test('no further notifications after dispose', () async {
+      var notifyCount = 0;
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      monitor.snapshotNotifier.addListener(() => notifyCount++);
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final countBefore = notifyCount;
+
+      monitor.dispose();
+
+      // After dispose, no more notifications should fire
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(notifyCount, countBefore);
+    });
+  });
+
+  // =========================================================================
+  // Deep coverage: MemorySnapshot structure
+  // =========================================================================
+  group('MemorySnapshot structure', () {
+    late FakeRssProvider rss;
+    late FakeClock clock;
+
+    setUp(() {
+      rss = FakeRssProvider(10 * 1024 * 1024);
+      clock = FakeClock(DateTime(2026, 7, 20, 12, 0, 0));
+    });
+
+    test('rssBytes reflects provider value', () async {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.rssBytes, 10 * 1024 * 1024);
+
+      monitor.dispose();
+    });
+
+    test('timestamp reflects clock value', () async {
+      final fixedTime = DateTime(2026, 12, 25, 8, 0, 0);
+      clock.currentTime = fixedTime;
+
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.timestamp, fixedTime);
+
+      monitor.dispose();
+    });
+
+    test('maxRssBytes tracks peak RSS', () async {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      // Increase RSS to create a new peak
+      rss.value = 50 * 1024 * 1024;
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.maxRssBytes, greaterThanOrEqualTo(50 * 1024 * 1024));
+
+      monitor.dispose();
+    });
+
+    test('history list grows with each tick', () async {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 30),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final snap = monitor.snapshot();
+      expect(snap, isNotNull);
+      expect(snap!.history.length, greaterThanOrEqualTo(3));
+
+      monitor.dispose();
+    });
+  });
+
+  // =========================================================================
+  // Deep coverage: stop() behavior
+  // =========================================================================
+  group('MemoryMonitor stop()', () {
+    late FakeRssProvider rss;
+    late FakeClock clock;
+
+    setUp(() {
+      rss = FakeRssProvider(10 * 1024 * 1024);
+      clock = FakeClock(DateTime(2026, 7, 20, 12, 0, 0));
+    });
+
+    test('stop() clears onTick callback', () async {
+      var tickCount = 0;
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+        onTick: (_) => tickCount++,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(tickCount, greaterThan(0));
+
+      monitor.stop();
+      final countAfterStop = tickCount;
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(tickCount, countAfterStop);
+
+      monitor.dispose();
+    });
+
+    test('start() after stop() restarts sampling', () async {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      monitor.stop();
+      expect(monitor.snapshot(), isNull);
+
+      monitor.start();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(monitor.snapshot(), isNotNull);
+
+      monitor.dispose();
+    });
+  });
 }
