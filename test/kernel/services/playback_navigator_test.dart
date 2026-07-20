@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
@@ -6,6 +7,11 @@ import '../../helpers/fake_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
 
   late FakeEngine engine;
   late Playlist playlist;
@@ -128,6 +134,58 @@ void main() {
         await controller.playIndex(0);
         await controller.playPrevious();
         expect(playlist.currentIndex, 1);
+      });
+
+      test('playNext at end in loopAll wraps to first', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.add('C:/c.mp4');
+        playlist.mode = PlayMode.loopAll;
+        await controller.playIndex(2); // last item
+        await controller.playNext();
+        expect(playlist.currentIndex, 0);
+      });
+
+      test('playNext in loopSingle replays same index', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopSingle;
+        await controller.playIndex(0);
+        await controller.playNext();
+        expect(playlist.currentIndex, 0);
+      });
+
+      test('playPrevious in loopSingle replays same index', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.mode = PlayMode.loopSingle;
+        await controller.playIndex(1);
+        await controller.playPrevious();
+        expect(playlist.currentIndex, 1);
+      });
+
+      test('playNext at end in shuffle mode advances to different index', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.add('C:/c.mp4');
+        playlist.mode = PlayMode.shuffle;
+        await controller.playIndex(0);
+        await controller.playNext();
+        // shuffle picks a random different index
+        expect(playlist.currentIndex, isNot(0));
+        expect(playlist.currentIndex, inInclusiveRange(0, 2));
+      });
+    });
+
+    group('path validation edge cases', () {
+      test('rejects path with null bytes', () async {
+        playlist.add('C:/test\x00evil.mp4');
+        await controller.playIndex(0);
+        expect(errors, isNotEmpty);
       });
     });
   });
