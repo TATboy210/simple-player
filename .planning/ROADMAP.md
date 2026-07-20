@@ -237,7 +237,23 @@ Plans:
 
   - **#7 的 release 闸门部分** — VERIFY-06 发布构建 CI 闸门：`--release` 冒烟测试产出零 `debugPrint`/debug/info 行（与 Phase 17 LOG-03 的 `kDebugMode` 门控配套验证）。
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+**Wave 1** (parallel)
+
+- [ ] 21-01-PLAN.md — VERIFY-01: 契约测试挂载点验证 FvpEngine 契约（7 组 run*ContractTests 全 PASS）
+- [ ] 21-02-PLAN.md — VERIFY-02: 参数化双轨回归套件（RegressionFixture + DiffReport + 全方法覆盖 + fakeAsync）
+- [ ] 21-05-PLAN.md — VERIFY-03: codegraph 依赖图分析 + 迁移顺序文档（叶子→编排器→状态管理→UI 绑定）
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 21-03-PLAN.md — VERIFY-05/VERIFY-06: 修复 analyze errors + 清理 lib/kernel/ debugPrint + lint rule 防新增
+
+**Wave 3** *(blocked on Wave 2, parallel)*
+
+- [ ] 21-04-PLAN.md — VERIFY-04/VERIFY-06: 适配层闸门脚本 + 回退脚本/文档 + release 冒烟脚本 + 删 adapter 测试
+- [ ] 21-06-PLAN.md — VERIFY-05/VERIFY-06: 最终验证（release 冒烟 + 契约 + 双轨回归 + 覆盖率 + analyze）
 
 ### Phase 22: 双语 API 文档注释标准
 
@@ -265,7 +281,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | 18. Sealed 错误模型稳化 | v3.0 | 3/3 | Complete    | 2026-07-20 |
 | 19. MemoryMonitor 一等化 | v3.0 | 2/2 | Complete    | 2026-07-20 |
 | 20. 状态与生命周期重写 | v3.0 | 0/3 | Planning | - |
-| 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 0/TBD | Not started | - |
+| 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 0/6 | Planning | - |
 | 22. 双语 API 文档注释标准 | v3.0 | 0/TBD | Not started | - |
 
 ## Build Order Rationale
