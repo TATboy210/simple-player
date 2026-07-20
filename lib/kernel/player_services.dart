@@ -120,10 +120,41 @@ class PlayerServices {
       eventLog: const NullEventLogSlot(),
     );
     final fvp = FvpEngine(bundle: bundle);
+    // Phase 21-07: DelegationPolicy 全量翻转到 migrated — 激活 Phase 20 迁移。
+    // 7 个 capability 字段全部路由到 KernelMode.migrated;
+    // migratedMethods 包含全部 26 个 MediaEngine 方法 (PlaybackControl 10 +
+    // TrackControl 2 + SubtitleConfig 6 + VideoEffectControl 4 +
+    // RendererControl 2 + VolumeControl 2), 与 dual_track_regression_test
+    // 的 _allMediaEngineMethods 集合一致。
+    // 回退: 改回 DelegationPolicy.all(KernelMode.legacy) 或运行 rollback.sh。
     engine = KernelAdapter(
       legacy: fvp,
       migrated: fvp,
-      policy: const DelegationPolicy.all(KernelMode.legacy),
+      policy: const DelegationPolicy(
+        stateView: KernelMode.migrated,
+        playback: KernelMode.migrated,
+        track: KernelMode.migrated,
+        subtitle: KernelMode.migrated,
+        videoEffect: KernelMode.migrated,
+        renderer: KernelMode.migrated,
+        volume: KernelMode.migrated,
+        migratedMethods: {
+          // PlaybackControl (10 methods)
+          'open', 'play', 'pause', 'stop', 'togglePlayPause',
+          'seekTo', 'setPlaybackRate', 'setRange', 'skipForward', 'skipBack',
+          // TrackControl (2 methods)
+          'getAudioTracks', 'switchAudioTrack',
+          // SubtitleConfig (6 methods)
+          'getSubtitleTracks', 'switchSubtitleTrack', 'toggleSubtitle',
+          'setExternalSubtitle', 'setSubtitleDelay', 'setEqualizer',
+          // VideoEffectControl (4 methods)
+          'setVideoEffect', 'rotate', 'setAspectRatio', 'setDeinterlace',
+          // RendererControl (2 methods)
+          'setD3d11SyncEnabled', 'setHardwareDecoding',
+          // VolumeControl (2 methods)
+          'setVolume', 'setMute',
+        },
+      ),
       bundle: bundle,
     );
     playlist = Playlist();
