@@ -94,6 +94,43 @@ void main() {
         service.recordSubtitleDelay(1000);
         expect(service.current.subtitleDelay, 1000);
       });
+
+      test('multiple records accumulate correctly', () {
+        service.recordAudioTrack(1);
+        service.recordSubtitleTrack(2);
+        service.recordSubtitleDelay(500);
+        expect(service.current.audioTrackIndex, 1);
+        expect(service.current.subtitleTrackIndex, 2);
+        expect(service.current.subtitleDelay, 500);
+      });
+    });
+
+    group('restoreAfterOpen edge cases', () {
+      test('restore with empty mediaInfo does nothing', () {
+        service.recordAudioTrack(0);
+        service.recordSubtitleTrack(0);
+        // Empty mediaInfo — no tracks available
+        const emptyInfo = MediaInfo();
+        expect(() => service.restoreAfterOpen(emptyInfo), returnsNormally);
+      });
+
+      test('restore with null audio index does nothing', () {
+        // Default state has null audioTrackIndex
+        engine.configureMedia(
+          audioTracks: [const AudioTrackInfo(index: 0, language: 'en')],
+        );
+        expect(() => service.restoreAfterOpen(engine.mediaInfo), returnsNormally);
+      });
+
+      test('restore with null subtitle index does nothing', () {
+        // Default state has null subtitleTrackIndex
+        engine.configureMedia(
+          subtitleTracks: [
+            const SubtitleTrackInfo(index: 0, language: 'en', title: 'English'),
+          ],
+        );
+        expect(() => service.restoreAfterOpen(engine.mediaInfo), returnsNormally);
+      });
     });
   });
 }
