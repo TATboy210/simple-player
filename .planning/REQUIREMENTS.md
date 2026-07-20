@@ -49,13 +49,13 @@
 
 ### STATE — 状态与生命周期重写（Phase 6）
 
-- [ ] **STATE-01**: `new_fvp_engine.dart` 实现 `MediaEngine`，依赖 `DiagnosticsBundle`，发射 `PlayerError`+上下文
-- [ ] **STATE-02**: `openGeneration` 经 `OpenGenerationTracker` 与状态机统一（守卫移入机器，`transitionTo` 原子拒绝过时 generation 的转换）
-- [ ] **STATE-03**: `EngineStateMachine` 静默 assert-only 忽略替换为 `Result.err` + `KernelLogger` 警告；穷举 `switch`（无 `default`）
-- [ ] **STATE-04**: 生命周期加固 — `disposed`/`disposing`/`error`-恢复态、显式 `recover()`、双重 dispose 安全
-- [ ] **STATE-05**: mdk 回调封送至主 isolate；监听器触发的 open 延迟至 `scheduleMicrotask`
-- [ ] **STATE-06**: `DelegationPolicy` 按能力逐个翻转到新引擎；每次翻转后 Phase 1 契约测试通过
-- [ ] **STATE-07**: 竞态测试（open→seek→open 快速连发）断言最终状态仅匹配最后一次 open
+- [x] **STATE-01**: `fvp_engine.dart`（就地修改 per D1）实现 `MediaEngine`，依赖 `DiagnosticsBundle`，发射 `PlayerError`+上下文
+- [x] **STATE-02**: `openGeneration` 经 `OpenGenerationTracker` 与状态机统一（守卫移入机器，`transitionTo` 原子拒绝过时 generation 的转换）
+- [x] **STATE-03**: `EngineStateMachine` 静默 assert-only 忽略替换为 `Result.err` + `KernelLogger` 警告；穷举 `switch`（无 `default`）
+- [x] **STATE-04**: 生命周期加固 — `disposed`/`disposing`/`error`-恢复态、显式 `recover()`、双重 dispose 安全
+- [x] **STATE-05**: mdk 回调封送至主 isolate；监听器触发的 open 延迟至 `scheduleMicrotask`
+- [x] **STATE-06**: `DelegationPolicy` 按能力逐个翻转到新引擎；每次翻转后 Phase 1 契约测试通过（基础设施就位，实际翻转 deferred → Phase 21）
+- [x] **STATE-07**: 竞态测试（open→seek→open 快速连发）断言最终状态仅匹配最后一次 open
 
 ### VERIFY — 测试与迁移验证 + 适配层收拢（Phase 7）
 
@@ -131,13 +131,13 @@
 | MEM-03 | Phase 19 | Complete |
 | MEM-04 | Phase 19 | Complete |
 | MEM-05 | Phase 19 | Complete |
-| STATE-01 | Phase 20 | Pending |
-| STATE-02 | Phase 20 | Pending |
-| STATE-03 | Phase 20 | Pending |
-| STATE-04 | Phase 20 | Pending |
-| STATE-05 | Phase 20 | Pending |
-| STATE-06 | Phase 20 | Pending |
-| STATE-07 | Phase 20 | Pending |
+| STATE-01 | Phase 20 | Complete |
+| STATE-02 | Phase 20 | Complete |
+| STATE-03 | Phase 20 | Complete |
+| STATE-04 | Phase 20 | Complete |
+| STATE-05 | Phase 20 | Complete |
+| STATE-06 | Phase 20 | Complete (infra built, flips deferred → Phase 21) |
+| STATE-07 | Phase 20 | Complete |
 | VERIFY-01 | Phase 21 | Pending |
 | VERIFY-02 | Phase 21 | Pending |
 | VERIFY-03 | Phase 21 | Pending |

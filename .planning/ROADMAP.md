@@ -45,7 +45,7 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 - [x] **Phase 17: 零依赖 KernelLogger 门面（替换迁移）** - dart:developer 门面 + kDebugMode 门控，121 调用点替换迁移保留 log*.w() 形状，CI grep 闸门内核永不 import package:logger (completed 2026-07-20)
 - [x] **Phase 18: Sealed 错误模型稳化** - 扩展现有 sealed PlayerError + ErrorContext + ErrorCode 注册表，引擎 catch 点结构化发射，UI 边界 ErrorView 翻译，跨 mdk 回调线程封送 (completed 2026-07-20)
 - [x] **Phase 19: MemoryMonitor 一等化** - 实例化构造注入 RssProvider+Clock，start/stop/dispose 生命周期，单例→实例一个原子提交，纳入 DiagnosticsBundle，对播放业务零干扰 (completed 2026-07-20)
-- [ ] **Phase 20: 状态与生命周期重写** - NewFvpEngine 实现 MediaEngine，OpenGenerationTracker 统一守卫移入机器，Result.err 替换静默 assert 忽略，lifecycle 态加固，mdk 回调主线程封送，竞态测试
+- [x] **Phase 20: 状态与生命周期重写** - NewFvpEngine 实现 MediaEngine，OpenGenerationTracker 统一守卫移入机器，Result.err 替换静默 assert 忽略，lifecycle 态加固，mdk 回调主线程封送，竞态测试 (completed 2026-07-20)
 - [ ] **Phase 21: 测试与迁移验证 + 适配层收拢** - 契约测试对 NewFvpEngine 通过，双轨回归套件差异为零，codegraph 推导迁移顺序，适配层删除闸门清单，--release 冒烟闸门，flutter analyze 严格干净 + 覆盖率≥80%
 - [ ] **Phase 22: 双语 API 文档注释标准** - Phase 1 即约定结构（中文意图行 + 英文契约块），扫尾 lib/kernel/** v3.0 修改的公开符号，lint 校验双语注释 + KernelError 子类错误码
 
@@ -213,12 +213,12 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 20-01-PLAN.md — State machine rewrite: LifecyclePhase + TransitionResult + OpenGenerationTracker + recover() + double-dispose (STATE-02, STATE-03, STATE-04)
+- [x] 20-01-PLAN.md — State machine rewrite: LifecyclePhase + TransitionResult + OpenGenerationTracker + recover() + double-dispose (STATE-02, STATE-03, STATE-04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 20-02-PLAN.md — FvpEngine DiagnosticsBundle injection + lifecycle integration + per-method DelegationPolicy + PlayerServices wiring (STATE-01, STATE-02, STATE-04, STATE-06)
-- [ ] 20-03-PLAN.md — FvpCallbackHandler scheduleMicrotask marshalling + race condition tests (STATE-05, STATE-07)
+- [x] 20-02-PLAN.md — FvpEngine DiagnosticsBundle injection + lifecycle integration + per-method DelegationPolicy + PlayerServices wiring (STATE-01, STATE-02, STATE-04, STATE-06)
+- [x] 20-03-PLAN.md — FvpCallbackHandler scheduleMicrotask marshalling + race condition tests (STATE-05, STATE-07)
 
 ### Phase 21: 测试与迁移验证 + 适配层收拢
 
