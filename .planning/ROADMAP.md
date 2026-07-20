@@ -237,7 +237,7 @@ Plans:
 
   - **#7 的 release 闸门部分** — VERIFY-06 发布构建 CI 闸门：`--release` 冒烟测试产出零 `debugPrint`/debug/info 行（与 Phase 17 LOG-03 的 `kDebugMode` 门控配套验证）。
 
-**Plans**: 9/9 plans executed
+**Plans**: 11 plans executed
 
 Plans:
 **Wave 1** (parallel)
@@ -263,6 +263,11 @@ Plans:
 **Wave 5 — Coverage Gap Closure** *(blocked on Wave 4)*
 
 - [x] 21-09-PLAN.md — VERIFY-05: kernel/ 覆盖率提升 Wave 5（纯 Dart 模块扩展 + mdk.dll 瓶颈量化，目标 ≥70%）
+
+**Wave 6 — Final Gap Closure** *(parallel, blocked on Wave 5)*
+
+- [ ] 21-10-PLAN.md — VERIFY-05: mdk.Player DI 注入 + 覆盖率实测（playerFactory + FakeMdkPlayer + FvpEngine open 测试）
+- [ ] 21-11-PLAN.md — VERIFY-01/VERIFY-02: SDK bug 修复 + 契约测试/双轨回归运行验证
 
 ### Phase 22: 双语 API 文档注释标准
 
