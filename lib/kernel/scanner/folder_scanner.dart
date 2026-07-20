@@ -1,6 +1,7 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+
+import '../diagnostics/kernel_logger.dart';
 
 /// Represents a video file discovered in a directory scan.
 class VideoFile {
@@ -73,7 +74,7 @@ class FolderScanner {
       results.sort((a, b) => a.name.compareTo(b.name));
       return results;
     } on Exception catch (e) {
-      debugPrint('[FolderScanner] Failed to scan "$directory": $e');
+      KernelLoggerImpl.I.e('FolderScanner: failed to scan', error: e);
       return [];
     }
   }

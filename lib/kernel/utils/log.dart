@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart' hide PrefixPrinter;
 import 'package:path_provider/path_provider.dart';
 
+import '../diagnostics/kernel_logger.dart';
+
 /// Kernel-wide logger. Uses PrettyPrinter with minimal method count
 /// for compact desktop output. Only logs in debug mode (default filter).
 ///
@@ -208,7 +210,7 @@ Future<void> initLog() async {
       output: output,
     );
   } on Exception catch (e) {
-    debugPrint('[Log] file logging init failed: $e');
+    KernelLoggerImpl.I.e('file logging init failed', error: e);
   }
 }
 
