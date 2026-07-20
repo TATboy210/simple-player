@@ -237,7 +237,7 @@ Plans:
 
   - **#7 的 release 闸门部分** — VERIFY-06 发布构建 CI 闸门：`--release` 冒烟测试产出零 `debugPrint`/debug/info 行（与 Phase 17 LOG-03 的 `kDebugMode` 门控配套验证）。
 
-**Plans**: 8/8 plans executed
+**Plans**: 9/9 plans executed
 
 Plans:
 **Wave 1** (parallel)
@@ -259,6 +259,10 @@ Plans:
 
 - [x] 21-07-PLAN.md — VERIFY-04: DelegationPolicy 翻转为 all-migrated（BLOCKER 1 修复：GATE 1 从 FAIL 变 PASS）
 - [x] 21-08-PLAN.md — VERIFY-05: kernel/ 覆盖率提升（BLOCKER 2 修复：KernelAdapter + DelegationPolicy 单元测试）
+
+**Wave 5 — Coverage Gap Closure** *(blocked on Wave 4)*
+
+- [x] 21-09-PLAN.md — VERIFY-05: kernel/ 覆盖率提升 Wave 5（纯 Dart 模块扩展 + mdk.dll 瓶颈量化，目标 ≥70%）
 
 ### Phase 22: 双语 API 文档注释标准
 
@@ -286,7 +290,7 @@ Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 �
 | 18. Sealed 错误模型稳化 | v3.0 | 3/3 | Complete    | 2026-07-20 |
 | 19. MemoryMonitor 一等化 | v3.0 | 2/2 | Complete    | 2026-07-20 |
 | 20. 状态与生命周期重写 | v3.0 | 0/3 | Planning | - |
-| 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 8/8 | In Progress|  |
+| 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 9/9 | In Progress|  |
 | 22. 双语 API 文档注释标准 | v3.0 | 0/TBD | Not started | - |
 
 ## Build Order Rationale
