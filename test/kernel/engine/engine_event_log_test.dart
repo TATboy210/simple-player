@@ -178,5 +178,59 @@ void main() {
         expect(log.capacity, 100);
       });
     });
+
+    group('custom capacity', () {
+      test('accepts custom capacity', () {
+        final customLog = EngineEventLog(capacity: 5);
+        expect(customLog.capacity, 5);
+      });
+
+      test('custom capacity limits entries', () {
+        final customLog = EngineEventLog(capacity: 3);
+        customLog.add('a');
+        customLog.add('b');
+        customLog.add('c');
+        customLog.add('d'); // overwrites 'a'
+        expect(customLog.length, 3);
+        expect(customLog.entries.first.type, 'b');
+      });
+    });
+
+    group('add with data', () {
+      test('data is preserved in entries', () {
+        log.add('seek', {'position': 5000, 'duration': 10000});
+        final entry = log.entries.first;
+        expect(entry.data, {'position': 5000, 'duration': 10000});
+      });
+
+      test('data is included in toJson', () {
+        log.add('error', {'message': 'codec not found'});
+        final json = log.toJson();
+        expect(json.first['data'], {'message': 'codec not found'});
+      });
+    });
+
+    group('clear idempotency', () {
+      test('clear on empty log is no-op', () {
+        log.clear();
+        expect(log.isEmpty, isTrue);
+        log.clear();
+        expect(log.isEmpty, isTrue);
+      });
+    });
+
+    group('isFull', () {
+      test('isFull is false when not at capacity', () {
+        log.add('test');
+        expect(log.isFull, isFalse);
+      });
+
+      test('isFull is true at capacity', () {
+        final smallLog = EngineEventLog(capacity: 2);
+        smallLog.add('a');
+        smallLog.add('b');
+        expect(smallLog.isFull, isTrue);
+      });
+    });
   });
 }

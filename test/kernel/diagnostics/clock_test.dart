@@ -47,6 +47,27 @@ void main() {
       clock.currentTime = newTime;
       expect(clock.now(), newTime);
     });
+
+    test('time does not advance automatically', () {
+      final clock = FakeClock(DateTime(2026, 1, 1));
+      final t1 = clock.now();
+      final t2 = clock.now();
+      expect(t1, equals(t2));
+    });
+
+    test('multiple setter calls work', () {
+      final clock = FakeClock();
+      clock.currentTime = DateTime(2025, 1, 1);
+      expect(clock.now().year, 2025);
+      clock.currentTime = DateTime(2030, 6, 15);
+      expect(clock.now().year, 2030);
+      expect(clock.now().month, 6);
+    });
+
+    test('implements Clock interface', () {
+      final clock = FakeClock();
+      expect(clock, isA<Clock>());
+    });
   });
 
   group('ProcessInfoRssProvider', () {
