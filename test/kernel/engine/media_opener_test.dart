@@ -29,7 +29,7 @@ void main() {
     });
 
     test('OpenError carries PlayerError', () {
-      const result = OpenError(FileError(FileErrorCode.fileNotFound, '文件不存在'));
+      final result = OpenError(FileError(FileErrorCode.fileNotFound, '文件不存在'));
 
       expect(result, isA<OpenResult>());
       expect(result.error, isA<FileError>());
@@ -38,7 +38,7 @@ void main() {
 
     test('sealed class pattern matching works', () {
       final success = const OpenSuccess(MediaInfo(duration: 1000));
-      const error = OpenError(CodecError(CodecErrorCode.unsupportedFormat, '无法解码'));
+      final error = OpenError(CodecError(CodecErrorCode.unsupportedFormat, '无法解码'));
 
       String describe(OpenResult r) => switch (r) {
         OpenSuccess(:final mediaInfo) => 'ok:${mediaInfo.duration}',
@@ -58,13 +58,13 @@ void main() {
     });
 
     test('OpenError with network error', () {
-      const result = OpenError(NetworkError(NetworkErrorCode.timeout, '连接超时'));
+      final result = OpenError(NetworkError(NetworkErrorCode.timeout, '连接超时'));
       expect(result.error, isA<NetworkError>());
       expect(result.message, '连接超时');
     });
 
     test('OpenError with playback error', () {
-      const result = OpenError(PlaybackError(PlaybackErrorCode.playFailed, '播放失败'));
+      final result = OpenError(PlaybackError(PlaybackErrorCode.playFailed, '播放失败'));
       expect(result.error, isA<PlaybackError>());
       expect(result.message, '播放失败');
     });

@@ -17,7 +17,7 @@ import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/engine/engine_state.dart';
-import '../../kernel/utils/log.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
 import 'player_feature.dart' deferred as player_feature;
@@ -103,7 +103,7 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
       );
       if (mounted) setState(() => _loaded = true);
     } catch (e, stackTrace) {
-      log.e(
+      KernelLogger.I.e(
         '[DeferredPlayerFeature] loadLibrary failed: $e',
         error: e,
         stackTrace: stackTrace,

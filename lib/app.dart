@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'ui/theme/tokens.dart';
 import 'kernel/bridge/window_bridge.dart';
 import 'kernel/engine/engine_state.dart';
-import 'kernel/utils/log.dart';
+import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
@@ -51,7 +51,7 @@ class _AppState extends State<App> {
     try {
       await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
     } on Exception catch (e) {
-      log.w('[App] settings load failed (continuing): $e');
+      KernelLogger.I.w('[App] settings load failed (continuing): $e');
     }
     widget.coordinator.report(StartupPhase.settings, 1.0, 'Preferences loaded');
     if (mounted) setState(() => _ready = true);

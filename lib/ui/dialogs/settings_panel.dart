@@ -10,7 +10,7 @@ import '../../kernel/engine/engine_state.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/locale_service.dart';
 import '../../kernel/services/theme_service.dart';
-import '../../kernel/utils/log.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/services/video_processing_service.dart';
 import '../shared/glass_container.dart';
 import '../shared/osd_overlay.dart';
@@ -196,13 +196,13 @@ class _SettingsPanelState extends State<SettingsPanel> {
       }
     } on FileSystemException catch (e) {
       // 磁盘满、权限不足等 I/O 错误 (D-13)
-      log.e('Export failed: $e');
+      KernelLogger.I.e('Export failed: $e');
       if (mounted) {
         OsdService.I.show(l10n.exportError);
       }
     } on FormatException catch (e) {
       // JSON 序列化错误 (D-13)
-      log.e('Export failed: $e');
+      KernelLogger.I.e('Export failed: $e');
       if (mounted) {
         OsdService.I.show(l10n.exportError);
       }
@@ -230,7 +230,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
       json = await File(result.files.first.path!).readAsString();
     } on FileSystemException catch (e) {
       // 文件读取失败 (D-12)
-      log.e('Import file read failed: $e');
+      KernelLogger.I.e('Import file read failed: $e');
       if (mounted) {
         _showImportErrorDialog(l10n.importFileReadError(e.message));
       }
