@@ -210,6 +210,12 @@ None — no external service configuration required.
 - Coverage gap analysis needed for remaining ~385 lines to reach 80%
 - FakeMdkPlayer can be extended with more configurable behavior for edge case testing
 
+## Self-Check: PASSED
+
+- All 13 created/modified files verified on disk
+- All 3 commits (3c027cd, dc84fe8, c3ea4dc) verified in git history
+- No missing files or commits
+
 ---
 *Phase: 21-verify-migration-adapter-convergence*
 *Completed: 2026-07-20*
