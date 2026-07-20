@@ -113,5 +113,26 @@ void main() {
       coordinator.markReady();
       expect(coordinator.state.value.phase, StartupPhase.ready);
     });
+
+    test('report to ready phase directly', () {
+      coordinator.report(StartupPhase.ready, 1.0, 'Done');
+      expect(coordinator.state.value.phase, StartupPhase.ready);
+      expect(coordinator.state.value.progress, 1.0);
+    });
+
+    test('multiple phases reported sequentially', () {
+      for (final phase in StartupPhase.values) {
+        if (phase == StartupPhase.ready) continue;
+        coordinator.report(phase, 0.5, '${phase.name} half');
+        expect(coordinator.state.value.phase, phase);
+      }
+    });
+
+    test('phase timestamp is recorded on first report only', () {
+      coordinator.report(StartupPhase.infrastructure, 0.3, 'First');
+      // Second report in same phase — should not change timestamp
+      coordinator.report(StartupPhase.infrastructure, 0.7, 'Second');
+      expect(coordinator.state.value.progress, 0.7);
+    });
   });
 }
