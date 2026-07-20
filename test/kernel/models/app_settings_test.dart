@@ -2,6 +2,7 @@
 ///
 /// Covers: defaults, copyWith (including sentinel pattern for nullable
 /// windowX/windowY), equality, hashCode.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/app_settings.dart';
 
@@ -201,6 +202,7 @@ void main() {
 
       test('not equal to non-AppSettings', () {
         final a = _fullSettings();
+        // ignore: unrelated_type_equality_checks
         expect(a == 'not settings', isFalse);
       });
     });

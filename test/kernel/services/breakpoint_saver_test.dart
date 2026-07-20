@@ -3,6 +3,7 @@
 /// Tests the observer pattern: listens to MediaState.paused and saves
 /// playback position to Playlist via PlaylistStore. Also tests the
 /// dispose() fallback save logic.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';

@@ -1,6 +1,7 @@
 /// VideoProcessingState 单元测试
 ///
 /// 覆盖：默认值、copyWith、相等性、hashCode、VideoProcessingPatch
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/features/player/models/video_processing_state.dart';
 import 'package:simple_player_flutter/kernel/models/aspect_ratio_mode.dart';

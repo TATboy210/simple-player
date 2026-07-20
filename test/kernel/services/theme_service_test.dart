@@ -2,6 +2,7 @@
 ///
 /// Tests the singleton theme service: accent colors, theme index management,
 /// currentAccent/currentTheme accessors, setTheme clamping, and dispose.
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';

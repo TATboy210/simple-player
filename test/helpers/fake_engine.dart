@@ -16,6 +16,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   /// 状态机 — 管理 state/isSeeking/isBuffering
   ///
   /// onPlay/onPause 在构造时注入，使 togglePlayPause 可以正常工作
+  @override
   late final EngineStateMachine stateMachine = EngineStateMachine(
     onPlay: play,
     onPause: pause,

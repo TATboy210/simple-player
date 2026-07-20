@@ -4,6 +4,7 @@
 /// field immutability, and const constructibility.
 ///
 /// Pure Dart tests — no mdk.dll or FakeEngine dependency needed.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/adapter/kernel_adapter.dart';
 

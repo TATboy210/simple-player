@@ -30,6 +30,7 @@ dependencies:
   cross_file: any
   
 
+  intl: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

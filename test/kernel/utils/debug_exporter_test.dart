@@ -2,6 +2,7 @@
 ///
 /// Tests the exportAll() JSON serialization and structure.
 /// saveToFile() is skipped because it depends on path_provider (platform plugin).
+library;
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -68,7 +69,7 @@ void main() {
       test('probes is a Map', () {
         final json = DebugExporter.exportAll();
         final map = jsonDecode(json) as Map<String, dynamic>;
-        expect(map['probes'], isA<Map>());
+        expect(map['probes'], isA<Map<dynamic, dynamic>>());
       });
 
       test('memory is a Map when MemoryMonitor has data', () {
@@ -76,7 +77,7 @@ void main() {
         final map = jsonDecode(json) as Map<String, dynamic>;
         // MemoryMonitor was initialized with FakeRssProvider(1MB),
         // so snapshot() should return non-null after first tick
-        expect(map['memory'], isA<Map>());
+        expect(map['memory'], isA<Map<dynamic, dynamic>>());
       });
     });
 

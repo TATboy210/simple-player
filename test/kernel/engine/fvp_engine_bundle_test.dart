@@ -8,7 +8,6 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/diagnostics/diagnostics_bundle.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/engine/lifecycle_phase.dart';

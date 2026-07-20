@@ -271,7 +271,7 @@ Plans:
 
 **Wave 7 — Coverage Deep Dive** *(blocked on Wave 6)*
 
-- [ ] 21-12-PLAN.md — VERIFY-05: kernel/ 覆盖率深度提升（Tier 1 大文件深度测试 + Tier 2 薄测试扩展，目标 ≥80%）
+- [x] 21-12-PLAN.md — VERIFY-05: kernel/ 覆盖率深度提升（Tier 1 大文件深度测试 + Tier 2 薄测试扩展，目标 ≥80%）
 
 ### Phase 22: 双语 API 文档注释标准
 

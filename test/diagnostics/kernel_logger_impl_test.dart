@@ -64,7 +64,7 @@ void main() {
     test('formats message with level prefix', () {
       // DebugPrintSink calls debugPrint internally; we can't easily intercept
       // debugPrint in a test, but we can verify it doesn't throw.
-      final sink = DebugPrintSink();
+      final sink = const DebugPrintSink();
       expect(
         () => sink.log(LogLevel.info, 'hello world'),
         returnsNormally,
@@ -72,7 +72,7 @@ void main() {
     });
 
     test('appends context map to message', () {
-      final sink = DebugPrintSink();
+      final sink = const DebugPrintSink();
       expect(
         () => sink.log(LogLevel.debug, 'msg', context: {'key': 42}),
         returnsNormally,
@@ -82,7 +82,7 @@ void main() {
 
   group('DevToolsSink', () {
     test('log() returns normally without throwing', () {
-      final sink = DevToolsSink();
+      final sink = const DevToolsSink();
       expect(
         () => sink.log(LogLevel.error, 'some error'),
         returnsNormally,

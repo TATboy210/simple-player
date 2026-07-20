@@ -1,4 +1,11 @@
-include: package:flutter_lints/flutter.yaml
+# Subpackage analysis options — kept minimal since dependencies
+# are resolved separately from the root project.
+analyzer:
+  errors:
+    missing_required_param: error
+    missing_return: error
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+linter:
+  rules:
+    prefer_const_constructors: true
+    avoid_print: true

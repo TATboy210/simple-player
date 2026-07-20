@@ -2,6 +2,7 @@
 ///
 /// Tests Clock, RssProvider, NullMetricsSlot, and NullEventLogSlot
 /// — the foundational diagnostics primitives.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/rss_provider.dart';
