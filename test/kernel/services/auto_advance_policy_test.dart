@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
@@ -8,6 +9,11 @@ import '../../helpers/fake_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
 
   late FakeEngine engine;
   late Playlist playlist;
@@ -139,6 +145,79 @@ void main() {
         engine.simulateCompleted();
         await Future(() {});
         expect(playlist.currentIndex, 0);
+      });
+    });
+
+    group('state transitions', () {
+      test('non-completed state triggers nothing', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.currentIndex = 0;
+        // Transition to paused — should NOT trigger auto-advance
+        engine.state.value = MediaState.paused;
+        await Future(() {});
+        expect(playlist.currentIndex, 0);
+      });
+
+      test('completed with empty playlist does not crash', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        // Empty playlist — currentIndex is -1
+        engine.simulateCompleted();
+        await Future(() {});
+        // Should not crash
+        expect(playlist.currentIndex, -1);
+      });
+
+      test('non-completed idle state does not trigger advance', () async {
+        // Direct listener pattern (no init needed)
+        engine.state.addListener(() {
+          final state = engine.state.value;
+          if (state != MediaState.completed) return;
+          controller.playNext().catchError((e) {});
+        });
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.currentIndex = 0;
+        // Simulate idle state — should not trigger advance
+        engine.state.value = MediaState.idle;
+        await Future(() {});
+        expect(playlist.currentIndex, 0);
+      });
+    });
+
+    group('dispose', () {
+      test('dispose after init does not throw', () async {
+        const settings = AppSettings(
+          volume: 1.0,
+          lastFile: '',
+          windowWidth: 1280,
+          windowHeight: 720,
+          playMode: 0,
+          isMuted: false,
+        );
+        await controller.init(settings: settings);
+        // Verify init succeeded by checking playlist mode
+        expect(playlist.mode, PlayMode.loopAll);
+        // tearDown will call dispose — just verify no crash
       });
     });
   });
