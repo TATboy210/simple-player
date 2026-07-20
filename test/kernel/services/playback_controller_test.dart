@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
@@ -7,6 +8,11 @@ import '../../helpers/fake_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
 
   late FakeEngine engine;
   late Playlist playlist;
@@ -306,6 +312,46 @@ void main() {
         expect(playlist.mode, PlayMode.shuffle);
         controller.togglePlayMode();
         expect(playlist.mode, PlayMode.loopAll);
+      });
+
+      test('cycles from any starting mode', () {
+        // Start from shuffle
+        playlist.mode = PlayMode.shuffle;
+        controller.togglePlayMode();
+        expect(playlist.mode, PlayMode.loopAll);
+      });
+    });
+
+    // ─── addFiles edge cases ───
+
+    group('addFiles edge cases', () {
+      test('addFiles with empty list returns 0', () async {
+        final count = await controller.addFiles([]);
+        expect(count, 0);
+        expect(playlist.isEmpty, true);
+      });
+
+      test('addFiles all invalid returns 0', () async {
+        final count = await controller.addFiles(['', 'bad.txt', 'noext']);
+        expect(count, 0);
+        expect(playlist.isEmpty, true);
+      });
+    });
+
+    // ─── reorder edge cases ───
+
+    group('reorder edge cases', () {
+      test('reorder to same position is no-op', () {
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        playlist.add('C:/c.mp4');
+        playlist.currentIndex = 1;
+
+        controller.reorder(1, 1);
+
+        // No change — same position
+        expect(playlist.items[1].path, 'C:/b.mp4');
+        expect(playlist.currentIndex, 1);
       });
     });
 

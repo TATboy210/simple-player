@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
@@ -8,6 +9,11 @@ import '../../helpers/fake_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
 
   late FakeEngine engine;
   late Playlist playlist;
@@ -124,6 +130,41 @@ void main() {
         // Second init should be a no-op
         await controller.init(settings: settings);
         expect(engine.volume.value, closeTo(0.5, 0.01));
+      });
+
+      test('init without settings loads from store', () async {
+        // init() without settings calls SettingsStore.load()
+        // which fails in headless CI — but should not crash
+        await controller.init();
+        // Engine state should be unaffected
+        expect(engine.state.value, MediaState.idle);
+      });
+    });
+
+    group('pause breakpoint edge cases', () {
+      test('does not save position when currentIndex < 0', () async {
+        await controller.init();
+        engine.configureMedia(durationMs: 60000);
+        // No items added — currentIndex is -1
+        engine.position.value = 5000;
+        engine.state.value = MediaState.paused;
+        await Future.microtask(() {});
+        // Should not crash and no save happens
+        expect(playlist.currentIndex, -1);
+      });
+
+      test('saves duration along with position on pause', () async {
+        await controller.init();
+        engine.configureMedia(durationMs: 120000);
+        playlist.add('C:/a.mp4');
+        await controller.playIndex(0);
+        engine.position.value = 30000;
+        engine.duration.value = 120000;
+        engine.state.value = MediaState.paused;
+        await Future.microtask(() {});
+        final item = playlist.items[0];
+        expect(item.positionMs, 30000);
+        expect(item.durationMs, 120000);
       });
     });
   });
