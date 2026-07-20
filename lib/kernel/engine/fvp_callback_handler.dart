@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:fvp/mdk.dart' as mdk;
 import '../models/player_error.dart';
 import 'engine_state_machine.dart';
@@ -17,6 +16,9 @@ import 'media_state.dart';
 /// Main-thread scheduling is required because ValueNotifier updates trigger
 /// Flutter widget rebuilds — these MUST happen on the main isolate to avoid
 /// race conditions with the rendering pipeline.
+///
+/// 所有回调统一通过 `scheduleMicrotask` 封送到主 isolate (D12/D13)，
+/// 替代旧版 SchedulerBinding.addPostFrameCallback，消除帧阶段复杂性。
 ///
 /// The static [mapMdkState] function is pure and independently testable.
 class FvpCallbackHandler {
@@ -120,13 +122,15 @@ class FvpCallbackHandler {
     _statusSubscription?.cancel();
   }
 
-  /// Schedules [action] on the main thread during the frame callback phase.
+  /// 封送 [action] 到主 isolate — 通过 scheduleMicrotask 统一延迟 (D12/D13)
   ///
-  /// Uses SchedulerBinding.addPostFrameCallback to ensure ValueNotifier
-  /// updates happen between frames, preventing mid-frame rebuilds that
-  /// could cause visual glitches or assertion failures.
+  /// Marshals [action] to the main isolate via scheduleMicrotask (D12/D13).
+  /// 统一使用 scheduleMicrotask 替代 SchedulerBinding.addPostFrameCallback，
+  /// 消除帧阶段复杂性，与 Phase 18 D9 错误封送模式一致。
+  ///
+  /// scheduleMicrotask 开销极低，所有回调统一延迟不影响性能。
   void _scheduleOnMain(VoidCallback action) {
-    SchedulerBinding.instance.addPostFrameCallback((_) => action());
+    scheduleMicrotask(action);
   }
 
   /// 纯函数映射：mdk.PlaybackState → MediaState
