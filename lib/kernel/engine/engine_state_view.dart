@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
 import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 
@@ -59,6 +60,11 @@ abstract class EngineStateView {
 
   /// 媒体元信息（编解码、分辨率、轨道列表）
   MediaInfo get mediaInfo;
+
+  /// 状态机访问器 — PlaybackNavigator 通过此访问 generation 计数器 (Phase 20 D5)
+  ///
+  /// State machine accessor — PlaybackNavigator accesses generation counter via this.
+  EngineStateMachine get stateMachine;
 
   /// 释放所有 ValueNotifier 资源
   void dispose();
