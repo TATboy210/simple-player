@@ -1,4 +1,4 @@
-import 'package:fvp/mdk.dart' as mdk;
+import 'player_proxy.dart';
 
 /// 网络流配置器 — 为 URL 源设置 FFmpeg 网络参数
 ///
@@ -25,7 +25,7 @@ class NetworkConfigurator {
   ///
   /// 设置超时、探测大小、分析时长和协议特定参数。
   /// 仅在 [PathValidator.isUrl] 返回 true 时调用。
-  static void configure(mdk.Player player, String url) {
+  static void configure(MdkPlayerLike player, String url) {
     // 通用网络超时
     player.setProperty('timeout', _networkTimeoutMs.toString());
 
@@ -51,55 +51,47 @@ class NetworkConfigurator {
   }
 
   /// RTSP 低延迟配置
-  static void _configureRtsp(mdk.Player player) {
+  static void _configureRtsp(MdkPlayerLike player) {
     player.setProperty('avformat.probesize', _rtspProbeSize.toString());
-    // 禁用 FFmpeg 内部缓冲，降低延迟
     player.setProperty('avformat.fflags', '+nobuffer');
-    // 跳过 FPS 探测（使用容器元数据），节省 1-2s 启动时间
     player.setProperty('avformat.fpsprobesize', '0');
-    // 绕过 FFmpeg IO 层缓冲
     player.setProperty('avformat.avioflags', 'direct');
-    // min=0/max=0: 不预缓冲; drop=true: 压力下允许丢帧保实时性
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
   /// RTMP 低延迟配置（同 RTSP，无 avioflags）
-  static void _configureRtmp(mdk.Player player) {
+  static void _configureRtmp(MdkPlayerLike player) {
     player.setProperty('avformat.fflags', '+nobuffer');
     player.setProperty('avformat.fpsprobesize', '0');
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
   /// SRT 低延迟配置（同 RTMP）
-  static void _configureSrt(mdk.Player player) {
+  static void _configureSrt(MdkPlayerLike player) {
     player.setProperty('avformat.fflags', '+nobuffer');
     player.setProperty('avformat.fpsprobesize', '0');
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
   /// UDP/TCP 实时流低延迟（同 SRT）
-  static void _configureUdpTcp(mdk.Player player) {
+  static void _configureUdpTcp(MdkPlayerLike player) {
     player.setProperty('avformat.fflags', '+nobuffer');
     player.setProperty('avformat.fpsprobesize', '0');
     player.setBufferRange(min: 0, max: 0, drop: true);
   }
 
   /// HTTP/HTTPS 启用解复用缓存（加速 seek）
-  static void _configureHttp(mdk.Player player) {
+  static void _configureHttp(MdkPlayerLike player) {
     player.setProperty('demux.buffer.ranges', '1');
   }
 
   /// 动态缓冲策略 — 根据网络延迟自适应调整缓冲大小
-  ///
-  /// 高延迟（>500ms）时增大缓冲到 5MB 防止频繁卡顿，
-  /// 低延迟时保持 1MB 节省内存。
   static void configureAdaptive(
-    mdk.Player player,
+    MdkPlayerLike player,
     String url, {
     int latencyMs = 0,
   }) {
     configure(player, url);
-    // 根据延迟动态调整缓冲：高延迟 → 5MB，低延迟 → 1MB
     final bufferSize = latencyMs > 500 ? 5000000 : 1000000;
     player.setProperty('buffer', bufferSize.toString());
   }

@@ -1,6 +1,5 @@
 import 'dart:io' show File;
 
-import 'package:fvp/mdk.dart' as mdk;
 import '../models/player_error.dart';
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
@@ -11,6 +10,7 @@ import '../services/path_validator.dart';
 import '../utils/path_utils.dart';
 import 'network_configurator.dart';
 import 'open_result.dart';
+import 'player_proxy.dart';
 import 'track_manager.dart';
 
 /// 媒体打开器 — 编排打开流程
@@ -24,7 +24,7 @@ import 'track_manager.dart';
 ///
 /// 返回 [OpenResult] 表示成功或失败原因。
 class MediaOpener {
-  final mdk.Player _player;
+  final MdkPlayerLike _player;
   final TrackManager _trackManager;
 
   static const _prepareTimeoutSeconds = 10;
@@ -109,19 +109,23 @@ class MediaOpener {
     }
 
     // ─── Metadata 解析 ───
-    final info = _player.mediaInfo;
+    // mediaInfo 是 dynamic（mdk.MediaInfo 或 FakeMdkMediaInfo），
+    // 使用 _extract* 辅助方法安全提取字段，兼容 strict-casts 模式。
+    final dynamic info = _player.mediaInfo;
 
     // PAR 修正：物理像素宽高比 ≠ 显示宽高比
-    final videos = info.video;
     VideoCodecInfo? videoInfo;
+    final List<dynamic>? videos = info.video as List<dynamic>?;
     if (videos != null && videos.isNotEmpty) {
-      final vc = videos.first.codec;
-      if (vc.width > 0 && vc.height > 0) {
+      final dynamic vc = videos.first.codec;
+      final int w = vc.width as int;
+      final int h = vc.height as int;
+      if (w > 0 && h > 0) {
         videoInfo = VideoCodecInfo(
-          width: vc.width,
-          height: vc.height,
-          par: vc.par,
-          codec: vc.codec,
+          width: w,
+          height: h,
+          par: (vc.par as num).toDouble(),
+          codec: vc.codec as String,
         );
       }
     }
@@ -133,7 +137,7 @@ class MediaOpener {
     final subtitleTracks = _parseSubtitleTracks(info);
 
     final mediaInfo = MediaInfo(
-      duration: info.duration,
+      duration: info.duration as int,
       video: videoInfo,
       audioTracks: audioTracks,
       subtitleTracks: subtitleTracks,
@@ -160,8 +164,6 @@ class MediaOpener {
     }
 
     // updateTexture() 返回码 >=0 但 textureId 仍为 null — D3D11 纹理创建静默失败
-    // (常见根因: fvp.registerWith() 未在 main() 中调用，MDK key/硬件解码器未注册)。
-    // 必须显式转为 textureFailed，否则上层 (PlaybackNavigator) 会在无纹理时调用 play()。
     if (_player.textureId.value == null) {
       return OpenError(
         PlaybackError(
@@ -177,9 +179,6 @@ class MediaOpener {
   }
 
   /// 本地文件紧凑缓冲 — 减少内存占用
-  ///
-  /// 默认 buffer.range=1000-4000ms，本地文件不需要这么大的缓冲。
-  /// 同时禁用 demux 缓存（网络流才需要）。
   void _configureLocalBuffer() {
     _player.setBufferRange(
       min: _localBufferMinMs,
@@ -189,18 +188,18 @@ class MediaOpener {
     _player.setProperty('demux.buffer.ranges', '0');
   }
 
-  /// 解析音轨信息
-  List<AudioTrackInfo> _parseAudioTracks(mdk.MediaInfo info) {
+  /// 解析音轨信息 — 动态类型兼容 mdk.MediaInfo 和 FakeMdkMediaInfo
+  List<AudioTrackInfo> _parseAudioTracks(dynamic info) {
     final audioTracks = <AudioTrackInfo>[];
-    final audio = info.audio;
+    final dynamic audio = info.audio;
     if (audio != null) {
-      for (final t in audio) {
+      for (final dynamic t in (audio as List)) {
         audioTracks.add(
           AudioTrackInfo(
-            index: t.index,
-            language: t.metadata['language'] ?? '',
-            codec: t.codec.codec,
-            channels: t.codec.channels,
+            index: t.index as int,
+            language: (t.metadata as Map)['language'] as String? ?? '',
+            codec: (t.codec.codec as String),
+            channels: t.codec.channels as int,
           ),
         );
       }
@@ -208,17 +207,17 @@ class MediaOpener {
     return audioTracks;
   }
 
-  /// 解析字幕轨道信息
-  List<SubtitleTrackInfo> _parseSubtitleTracks(mdk.MediaInfo info) {
+  /// 解析字幕轨道信息 — 动态类型兼容 mdk.MediaInfo 和 FakeMdkMediaInfo
+  List<SubtitleTrackInfo> _parseSubtitleTracks(dynamic info) {
     final subtitleTracks = <SubtitleTrackInfo>[];
-    final subtitle = info.subtitle;
+    final dynamic subtitle = info.subtitle;
     if (subtitle != null) {
-      for (final t in subtitle) {
+      for (final dynamic t in (subtitle as List)) {
         subtitleTracks.add(
           SubtitleTrackInfo(
-            index: t.index,
-            language: t.metadata['language'] ?? '',
-            title: t.metadata['title'] ?? '',
+            index: t.index as int,
+            language: (t.metadata as Map)['language'] as String? ?? '',
+            title: (t.metadata as Map)['title'] as String? ?? '',
           ),
         );
       }
