@@ -237,7 +237,7 @@ Plans:
 
   - **#7 的 release 闸门部分** — VERIFY-06 发布构建 CI 闸门：`--release` 冒烟测试产出零 `debugPrint`/debug/info 行（与 Phase 17 LOG-03 的 `kDebugMode` 门控配套验证）。
 
-**Plans**: 6 plans
+**Plans**: 8 plans
 
 Plans:
 **Wave 1** (parallel)
@@ -254,6 +254,11 @@ Plans:
 
 - [ ] 21-04-PLAN.md — VERIFY-04/VERIFY-06: 适配层闸门脚本 + 回退脚本/文档 + release 冒烟脚本 + 删 adapter 测试
 - [ ] 21-06-PLAN.md — VERIFY-05/VERIFY-06: 最终验证（release 冒烟 + 契约 + 双轨回归 + 覆盖率 + analyze）
+
+**Wave 4 — Gap Closure** *(parallel, blocked on Wave 3 verification)*
+
+- [ ] 21-07-PLAN.md — VERIFY-04: DelegationPolicy 翻转为 all-migrated（BLOCKER 1 修复：GATE 1 从 FAIL 变 PASS）
+- [ ] 21-08-PLAN.md — VERIFY-05: kernel/ 覆盖率提升（BLOCKER 2 修复：KernelAdapter + DelegationPolicy 单元测试）
 
 ### Phase 22: 双语 API 文档注释标准
 
