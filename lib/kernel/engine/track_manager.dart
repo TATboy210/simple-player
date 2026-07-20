@@ -1,7 +1,7 @@
-import 'package:fvp/mdk.dart' as mdk;
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
+import 'player_proxy.dart';
 import 'track_control.dart';
 import 'subtitle_track_source.dart';
 
@@ -20,7 +20,7 @@ final log = KernelLogger.I;
 ///   - Switch active audio/subtitle track by index
 ///   - Toggle subtitle on/off
 class TrackManager implements TrackControl, SubtitleTrackSource {
-  final mdk.Player _player;
+  final MdkPlayerLike _player;
   MediaInfo _mediaInfo = const MediaInfo();
 
   TrackManager(this._player);

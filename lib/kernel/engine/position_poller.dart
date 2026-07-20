@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:fvp/mdk.dart' as mdk;
 
+import 'player_proxy.dart';
 import '../services/path_validator.dart';
 import '../diagnostics/kernel_logger.dart';
 
@@ -33,7 +33,7 @@ class PositionPoller {
   /// 静默模式延迟（无交互后多久切换到静默间隔）
   static const _silentDelay = Duration(seconds: 3);
 
-  final mdk.Player _player;
+  final MdkPlayerLike _player;
   final ValueNotifier<int> position;
   final ValueNotifier<int> buffered;
   final String Function() currentPathGetter;
@@ -56,12 +56,10 @@ class PositionPoller {
   set seeking(bool value) {
     _seeking = value;
     if (value) {
-      // seek 开始：取消活跃定时器和静默定时器
       _activeTimer?.cancel();
       _activeTimer = null;
       _cancelSilentTimer();
     } else {
-      // seek 完成：切换到快速轮询，重置静默延迟
       setActive();
       _scheduleSilentTransition();
     }
@@ -93,8 +91,6 @@ class PositionPoller {
   }
 
   /// 设置拖拽模式 — 拖拽进度条时降到 16ms（60fps 跟手）
-  ///
-  /// 拖拽结束后恢复稳态间隔（250ms）。
   static const _dragPollMs = 16;
 
   void setDragMode(bool isDragging) {
@@ -102,11 +98,7 @@ class PositionPoller {
   }
 
   /// 根据播放速率调整轮询间隔
-  ///
-  /// 倍速播放时按比例缩短间隔（2x → 间隔减半），
-  /// 确保高速播放时进度条更新仍然平滑。
   void setPlaybackRate(double rate) {
-    // 基础间隔 250ms，倍速时按比例缩短，最低 50ms
     final adjusted = (_normalPollMs / rate).round().clamp(50, _silentPollMs);
     _updateInterval(adjusted);
   }
@@ -140,7 +132,7 @@ class PositionPoller {
     _silentTimer = null;
   }
 
-  /// 更新轮询间隔（仅当间隔变化时重建定时器，避免不必要开销）
+  /// 更新轮询间隔（仅当间隔变化时重建定时器）
   void _updateInterval(int ms) {
     if (_currentIntervalMs == ms) return;
     _currentIntervalMs = ms;
@@ -149,7 +141,7 @@ class PositionPoller {
       Duration(milliseconds: ms),
       (_) => _poll(),
     );
-    _poll(); // 立即轮询一次，避免间隔切换时的空白
+    _poll();
   }
 
   /// 轮询播放位置

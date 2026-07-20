@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:fvp/mdk.dart' as mdk;
 import 'engine_state.dart';
 
 import '../services/path_validator.dart';
@@ -28,7 +27,7 @@ import 'mdk_player_proxy.dart';
 /// 封装 fvp/MDK 播放器，暴露 Flutter 友好的 ValueNotifier 接口。
 /// 由 6 个 helper 组合而成:
 ///   - EngineStateMachine: 独立状态机，管理 state/isSeeking/isBuffering
-///   - FvpCallbackHandler: mdk 回调注册、状态映射、主线程调度
+///   - FvpCallbackHandler: 回调注册、状态映射、主线程调度
 ///   - PositionPoller: 自适应间隔轮询播放位置
 ///   - TrackManager: 音频/字幕轨道选择与切换
 ///   - VolumeController: 音量/静音控制
@@ -40,13 +39,18 @@ import 'mdk_player_proxy.dart';
 ///   - 状态转换通过 EngineStateMachine.transitionTo 守卫
 ///   - 内置 EngineMetrics 性能计数器和 EngineEventLog 事件日志
 ///   - Helper 通过接口 getter 暴露（trackControl, volumeControl 等）
+///   - [playerFactory] 支持依赖注入 — 测试时注入 FakeMdkPlayer 消除 mdk.dll 依赖
 class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 工厂构造函数 — 保证所有依赖在构造时注入，消除 late 初始化风险
   ///
   /// [bundle] 诊断能力载体（Phase 20 D2 依赖注入），默认 noop。
-  factory FvpEngine({DiagnosticsBundle bundle = const DiagnosticsBundle.noop()}) {
-    final player = mdk.Player();
-    final proxy = MdkPlayerProxy(player);
+  /// [playerFactory] mdk.Player 工厂 — 默认创建真实 mdk.Player（通过 MdkPlayerProxy）；
+  ///   测试时注入 FakeMdkPlayer 工厂以消除 mdk.dll FFI 依赖。
+  factory FvpEngine({
+    DiagnosticsBundle bundle = const DiagnosticsBundle.noop(),
+    MdkPlayerLike Function()? playerFactory,
+  }) {
+    final player = playerFactory?.call() ?? MdkPlayerProxy.create();
     final trackManager = TrackManager(player);
     final mediaOpener = MediaOpener(player, trackManager);
     final videoEffectController = VideoEffectController(player);
@@ -61,7 +65,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       mediaOpener,
       videoEffectController,
       stateMachine,
-      proxy,
+      player,
       bundle,
     );
 
@@ -70,7 +74,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     stateMachine.onPause = engine.pause;
 
     // 初始化依赖引擎状态的 helper
-    engine._subtitleConfigurator = SubtitleConfigurator(proxy, trackManager);
+    engine._subtitleConfigurator = SubtitleConfigurator(player, trackManager);
     engine._callbackHandler = FvpCallbackHandler(
       player,
       stateMachine: stateMachine,
@@ -84,13 +88,16 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       currentPathGetter: () => engine._currentPath,
     );
     engine._volumeController = VolumeController(
-      proxy,
+      player,
       volume: engine.volume,
       isMuted: engine.isMuted,
     );
 
-    // 注册纹理 ID 监听
-    player.textureId.addListener(engine._onTextureIdChanged);
+    // 注册纹理 ID 监听 — textureId 是 ValueNotifier<int?>，支持 removeListener
+    final tid = player.textureId;
+    if (tid is ValueNotifier<int?>) {
+      tid.addListener(engine._onTextureIdChanged);
+    }
 
     // 初始化回调处理器
     engine._callbackHandler.init();
@@ -114,7 +121,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 核心依赖 ───
 
-  final mdk.Player _player;
+  final MdkPlayerLike _player;
   final TrackManager _trackManager;
   final MediaOpener _mediaOpener;
   final VideoEffectController _videoEffectController;
@@ -202,60 +209,42 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   // ─── 生命周期 (Phase 20 D6/D7) ───
 
   /// 引擎生命周期阶段 — 委托给 EngineStateMachine (D6 正交生命周期)
-  ///
-  /// Engine lifecycle phase — delegated to EngineStateMachine.
-  /// 与 MediaState 正交共存：state 表示播放行为，lifecyclePhase 表示引擎存活阶段。
   ValueNotifier<LifecyclePhase> get lifecyclePhase => _stateMachine.lifecyclePhase;
 
   /// 状态机访问器 — PlaybackNavigator 通过此访问 generation 计数器 (D5 单一真相源)
-  ///
-  /// State machine accessor — PlaybackNavigator accesses generation counter via this.
   @override
   EngineStateMachine get stateMachine => _stateMachine;
 
   /// 从 error 状态恢复到 idle — 委托给 EngineStateMachine (D7)
-  ///
-  /// Recover from error state to idle — delegated to EngineStateMachine.
-  /// 仅在 state == MediaState.error 时生效，其他状态为 no-op。
   void recover() {
     if (_disposed) return;
     _stateMachine.recover(lastError: lastError);
   }
 
   void _onTextureIdChanged() {
-    textureId.value = _player.textureId.value;
+    final tid = _player.textureId;
+    // textureId 是 ValueNotifier<int?> (MdkPlayerProxy) 或 ValueNotifier<int?> (FakeMdkPlayer)
+    if (tid is ValueNotifier<int?>) {
+      textureId.value = tid.value;
+    }
   }
 
   // ─── 接口 getter (per D-07) ───
 
-  /// 音轨控制 — 委托给 TrackManager
   TrackControl get trackControl => _trackManager;
-
-  /// 字幕配置 — 委托给 SubtitleConfigurator
   SubtitleConfig get subtitleConfig => _subtitleConfigurator;
-
-  /// 视频效果控制 — 委托给 VideoEffectController
   VideoEffectControl get videoEffectControl => _videoEffectController;
-
-  /// 渲染器配置 — 委托给 D3D11Configurator
   RendererControl get rendererControl => _d3d11Configurator;
-
-  /// 音量控制 — 委托给 VolumeController
   VolumeControl get volumeControl => _volumeController;
 
   // ─── 通用守卫 ───
 
   /// 通用守卫：disposed 检查 + try-catch + log + 事件记录
-  ///
-  /// 实现特有：异常被吸收为 lastError=PlaybackError（无论具体操作语义），
-  /// 不重新 throw；state 不受影响 — 供大多数无状态迁移的 setter 方法复用
-  /// （D19 行为断言模式的通用实现载体，接口层契约见各方法自身 throws: 标签）。
   void _guardedAction(String name, void Function() action) {
     if (_disposed) return;
     try {
       action();
     } on Exception catch (e, st) {
-      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
       final error = PlaybackError(
         PlaybackErrorCode.playFailed,
         '$name 失败: $e',
@@ -270,11 +259,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 播放控制 ───
 
-  /// 实现特有：成功后 state→idle（非 playing），调用方须显式 play()；
-  /// generation 守卫丢弃过期异步结果；codec 错误自动降级软解重试一次
-  /// （见下方 CodecError 分支）；从 playing/paused/completed 源态调用时，
-  /// 内部无条件先转 opening，若与 _canTransitionTo 表冲突则静默失败但
-  /// 方法主体仍继续（契约层已在 PlaybackControl.open 标注此已知落差）。
   @override
   Future<void> open(String path) async {
     if (_disposed) return;
@@ -295,7 +279,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       return;
     }
 
-    // 递增 generation — 后续 await 返回后检查是否仍为最新请求 (Phase 20 D5 单一真相源)
     final gen = _stateMachine.nextGeneration();
     _stateMachine.transitionTo(MediaState.opening, 'open');
     _currentPath = trimmed;
@@ -303,7 +286,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
     try {
       final result = await _mediaOpener.open(trimmed);
-      // generation 不匹配或已 dispose → 用户已切歌，丢弃本次结果
       if (_disposed || gen != _stateMachine.currentGeneration) return;
 
       _bundle.logger.d('open result: ${result.runtimeType}', context: {'file': PathUtils.basename(trimmed)});
@@ -325,10 +307,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
             '${mediaInfo.duration}ms',
           );
         case OpenError(:final error):
-          // 实现特有：软解降级重试仅一次 —— 递归调用 open() 会再次递增
-          // generation，不会无限重试（第二次若仍失败会走下方 else 分支
-          // 直接 state→error，不会再次判定 CodecError 分支）；本地文件
-          // 专属（网络 URL 排除在外，因网络编解码问题多与硬解无关）。
           if (error is CodecError && !PathValidator.isUrl(trimmed)) {
             _bundle.logger.i('open() codec error — retrying with software decode');
             eventLog.add('fallback', {
@@ -336,12 +314,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
               'action': 'switch to software decode',
             });
             _d3d11Configurator.setHardwareDecoding(false);
-            // open() 内部递增 generation，无需手动重置
             await open(trimmed);
             return;
           }
           _stateMachine.transitionTo(MediaState.error, 'open');
-          // 丰富 ErrorContext — MediaOpener 构造的 error 可能没有 generation/module
           error.context ??= ErrorContext(
             action: 'open',
             generation: gen,
@@ -358,7 +334,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     } on Exception catch (e, st) {
       if (_disposed || gen != _stateMachine.currentGeneration) return;
       _stateMachine.transitionTo(MediaState.error, 'open');
-      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
       final error = PathValidator.isUrl(trimmed)
           ? NetworkError(
               NetworkErrorCode.timeout,
@@ -382,7 +357,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       metrics.recordOpen(success: false);
       eventLog.add('error', {'action': 'open', 'error': e.toString()});
     } finally {
-      // 只有当前 generation 才清理 buffering 状态
       if (gen == _stateMachine.currentGeneration) {
         isBuffering.value = false;
       }
@@ -399,14 +373,13 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         'textureId=${textureId.value}, '
         'path=${PathUtils.basename(_currentPath)}',
       );
-      _player.state = mdk.PlaybackState.playing;
+      _player.state = MdkPlaybackState.playing;
       _stateMachine.transitionTo(MediaState.playing, 'play');
       _positionPoller.startSilent();
       eventLog.add('play', {'path': PathUtils.basename(_currentPath)});
       _bundle.logger.d('play() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e, st) {
       _stateMachine.transitionTo(MediaState.error, 'play');
-      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
       final error = PlaybackError(
         PlaybackErrorCode.playFailed,
         '播放失败: $e',
@@ -415,7 +388,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       );
       lastError.value = error;
       _bundle.logger.e('play() error', context: error.context?.toMap(), error: e, stackTrace: st);
-      // Error already logged via _bundle.logger.e above
     }
   }
 
@@ -423,13 +395,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   void pause() {
     if (_disposed) return;
     try {
-      _player.state = mdk.PlaybackState.paused;
+      _player.state = MdkPlaybackState.paused;
       _stateMachine.transitionTo(MediaState.paused, 'pause');
       _positionPoller.stop();
       eventLog.add('pause');
       _bundle.logger.d('pause() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e, st) {
-      // 三步模式：pause 错误也应上报 UI
       final error = PlaybackError(
         PlaybackErrorCode.playFailed,
         '暂停失败: $e',
@@ -445,14 +416,13 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   void stop() {
     if (_disposed) return;
     try {
-      _player.state = mdk.PlaybackState.stopped;
+      _player.state = MdkPlaybackState.stopped;
       _stateMachine.transitionTo(MediaState.idle, 'stop');
       position.value = 0;
       _positionPoller.stop();
       eventLog.add('stop');
       _bundle.logger.d('stop() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e, st) {
-      // 三步模式：stop 错误也应上报 UI
       final error = PlaybackError(
         PlaybackErrorCode.playFailed,
         '停止失败: $e',
@@ -470,7 +440,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     if (state.value == MediaState.idle || duration.value <= 0) return;
     if (isSeeking.value) return;
     final clamped = milliseconds.clamp(0, duration.value);
-    final wasPlaying = _player.state == mdk.PlaybackState.playing;
+    final wasPlaying = _player.state == MdkPlaybackState.playing;
     _positionPoller.seeking = true;
     isSeeking.value = true;
 
@@ -482,7 +452,6 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       eventLog.add('seek', {'position': clamped});
     } on Exception catch (e, st) {
       if (_disposed) return;
-      // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
       final error = PlaybackError(
         PlaybackErrorCode.seekFailed,
         '跳转失败: $e',
@@ -553,7 +522,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
-  // ─── TrackControl 实现 (delegated to TrackManager) ───
+  // ─── TrackControl 实现 ───
 
   @override
   List<AudioTrackInfo> getAudioTracks() => _trackManager.getAudioTracks();
@@ -568,7 +537,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   List<int> get activeAudioTracks =>
       _disposed ? [] : _trackManager.activeAudioTracks;
 
-  // ─── SubtitleConfig 实现 (FvpEngine 直接实现，部分委托 TrackManager) ───
+  // ─── SubtitleConfig 实现 ───
 
   @override
   List<SubtitleTrackInfo> getSubtitleTracks() =>
@@ -617,7 +586,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
-  // ─── VideoEffectControl 实现 (FvpEngine 直接实现，委托 VideoEffectController) ───
+  // ─── VideoEffectControl 实现 ───
 
   @override
   void setVideoEffect(VideoEffectType effect, double value) {
@@ -647,7 +616,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
-  // ─── VolumeControl 实现 (delegated to VolumeController) ───
+  // ─── VolumeControl 实现 ───
 
   @override
   void setVolume(double value) {
@@ -663,7 +632,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
-  // ─── RendererControl 实现 (delegated to D3D11Configurator) ───
+  // ─── RendererControl 实现 ───
 
   @override
   void setD3d11SyncEnabled(bool enabled) {
@@ -681,13 +650,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 生命周期 ───
 
-  /// 实现特有：当前 baseline 用 `_disposed` bool 守卫，尚无 LifecyclePhase
-  /// 枚举（Phase 20 补，见 15-CONTEXT.md P20 清单）；double-dispose 由
-  /// `_disposed` 幂等吸收（第二次调用仍会重复执行 dispose 全部 ValueNotifier，
-  /// 但 `_disposed=true` 已生效，故各 setter/控制方法在此之后均为 no-op）。
   @override
   void dispose() {
-    if (_disposed) return; // Phase 20 D8: double-dispose safety
+    if (_disposed) return;
     _disposed = true;
 
     assert(() {
@@ -714,7 +679,11 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
     _positionPoller.dispose();
     _callbackHandler.dispose();
-    _player.textureId.removeListener(_onTextureIdChanged);
+    // 移除纹理 ID 监听
+    final tid = _player.textureId;
+    if (tid is ValueNotifier<int?>) {
+      tid.removeListener(_onTextureIdChanged);
+    }
     _player.dispose();
     _stateMachine.dispose();
 
