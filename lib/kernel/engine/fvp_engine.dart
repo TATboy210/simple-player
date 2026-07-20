@@ -306,7 +306,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       // generation 不匹配或已 dispose → 用户已切歌，丢弃本次结果
       if (_disposed || gen != _stateMachine.currentGeneration) return;
 
-      debugPrint('🔍 open() result: ${result.runtimeType} for ${PathUtils.basename(trimmed)}');
+      _bundle.logger.d('open result: ${result.runtimeType}', context: {'file': PathUtils.basename(trimmed)});
 
       switch (result) {
         case OpenSuccess(:final mediaInfo):
@@ -394,8 +394,8 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     if (state.value == MediaState.playing) return;
     try {
-      debugPrint(
-        '🔍 play() — state=${state.value}, '
+      _bundle.logger.d(
+        'play() — state=${state.value}, '
         'textureId=${textureId.value}, '
         'path=${PathUtils.basename(_currentPath)}',
       );
@@ -415,7 +415,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       );
       lastError.value = error;
       _bundle.logger.e('play() error', context: error.context?.toMap(), error: e, stackTrace: st);
-      debugPrint('❌ play() failed: $e');
+      // Error already logged via _bundle.logger.e above
     }
   }
 
@@ -706,7 +706,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       for (final entry in notifiers.entries) {
         // ignore: invalid_use_of_protected_member
         if (entry.value.hasListeners) {
-          debugPrint('⚠️ FvpEngine.dispose: ${entry.key} still has listeners');
+          _bundle.logger.w('FvpEngine.dispose: ${entry.key} still has listeners');
         }
       }
       return true;

@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
+
+import '../diagnostics/kernel_logger.dart';
 
 /// 全局热键服务 — 窗口失焦时仍可响应媒体键
 ///
@@ -24,7 +25,7 @@ class GlobalHotkeyService {
     try {
       await hotKeyManager.unregisterAll();
     } on Exception catch (e) {
-      debugPrint('GlobalHotkeyService: unregisterAll failed: $e');
+      KernelLoggerImpl.I.e('GlobalHotkeyService: unregisterAll failed', error: e);
     }
 
     final hotkeys = [
@@ -65,11 +66,11 @@ class GlobalHotkeyService {
         );
         registered++;
       } on Exception catch (e) {
-        debugPrint('GlobalHotkeyService: $name registration failed: $e');
+        KernelLoggerImpl.I.e('GlobalHotkeyService: $name registration failed', error: e);
       }
     }
 
-    debugPrint('GlobalHotkeyService: registered $registered/3 media hotkeys');
+    KernelLoggerImpl.I.i('GlobalHotkeyService: registered $registered/3 media hotkeys');
   }
 
   /// 绑定播放控制回调 — 引擎/控制器就绪后调用
@@ -81,12 +82,12 @@ class GlobalHotkeyService {
     _onPlayPause = onPlayPause;
     _onNext = onNext;
     _onPrevious = onPrevious;
-    debugPrint('GlobalHotkeyService: callbacks bound');
+    KernelLoggerImpl.I.d('GlobalHotkeyService: callbacks bound');
   }
 
   /// 注销全部全局热键
   Future<void> unregisterAll() async {
     await hotKeyManager.unregisterAll();
-    debugPrint('GlobalHotkeyService: unregistered all');
+    KernelLoggerImpl.I.d('GlobalHotkeyService: unregistered all');
   }
 }

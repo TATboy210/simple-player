@@ -22,7 +22,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/path_validator.dart';
-import '../../kernel/utils/log.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
@@ -132,7 +132,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       );
       _customBindings = await SettingsStore.loadShortcuts();
     } catch (e, stackTrace) {
-      log.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
+      KernelLogger.I.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _error = true;
@@ -141,7 +141,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       }
       return;
     }
-    log.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
+    KernelLogger.I.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
     widget.coordinator.markReady();
     if (mounted) setState(() => _ready = true);
   }
