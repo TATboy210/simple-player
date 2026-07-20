@@ -341,6 +341,68 @@ void main() {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Error propagation
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('KernelAdapter error propagation', () {
+    test('open error propagates from legacy engine', () async {
+      legacyEngine.failNextOpenWith = 'decode error';
+      final adapter = KernelAdapter(
+        legacy: legacyEngine,
+        migrated: migratedEngine,
+        policy: const DelegationPolicy.all(KernelMode.legacy),
+      );
+
+      await adapter.open('test.mp4');
+      // FakeEngine sets error state on failure
+      expect(legacyEngine.openCallCount, 1);
+    });
+
+    test('open error propagates from migrated engine via migratedMethods', () async {
+      migratedEngine.failNextOpenWith = 'decode error';
+      final adapter = KernelAdapter(
+        legacy: legacyEngine,
+        migrated: migratedEngine,
+        policy: const DelegationPolicy.all(KernelMode.legacy).copyWith(
+          migratedMethods: {'open'},
+        ),
+      );
+
+      await adapter.open('test.mp4');
+      // open is in migratedMethods, so migrated engine receives the call
+      expect(migratedEngine.openCallCount, 1);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // mediaInfo routing
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('KernelAdapter mediaInfo routing', () {
+    test('mediaInfo routes via stateView policy (legacy)', () {
+      legacyEngine.configureMedia(durationMs: 60000);
+      final adapter = KernelAdapter(
+        legacy: legacyEngine,
+        migrated: migratedEngine,
+        policy: const DelegationPolicy.all(KernelMode.legacy),
+      );
+
+      expect(adapter.mediaInfo.duration, 60000);
+    });
+
+    test('mediaInfo routes via stateView policy (migrated)', () {
+      migratedEngine.configureMedia(durationMs: 120000);
+      final adapter = KernelAdapter(
+        legacy: legacyEngine,
+        migrated: migratedEngine,
+        policy: const DelegationPolicy.all(KernelMode.migrated),
+      );
+
+      expect(adapter.mediaInfo.duration, 120000);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Per-capability field routing (delegationPolicy fields)
   // ═══════════════════════════════════════════════════════════════════════════
 
