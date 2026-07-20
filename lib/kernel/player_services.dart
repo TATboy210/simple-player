@@ -112,13 +112,14 @@ class PlayerServices {
     // 零额外原生资源)。policy 全量路由到 legacy，行为与直接使用 FvpEngine 完全
     // 一致；bundle 传递真实 KernelLogger + 真实 MemoryMonitor，其余 2 插槽 noop (P20 激活)。
     // Phase 20 将把 migrated 换成 NewFvpEngine 并翻转 policy，此处即为切换点。
-    final fvp = FvpEngine();
+    // Phase 20 D2: 创建 bundle 在 FvpEngine 之前，注入到引擎构造函数
     final bundle = DiagnosticsBundle(
       logger: KernelLoggerImpl.I,
       memoryMonitor: memoryMonitor,
       metrics: const NullMetricsSlot(),
       eventLog: const NullEventLogSlot(),
     );
+    final fvp = FvpEngine(bundle: bundle);
     engine = KernelAdapter(
       legacy: fvp,
       migrated: fvp,
