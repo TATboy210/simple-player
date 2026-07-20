@@ -5,14 +5,14 @@ milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 �
 current_phase: 20
 current_phase_name: 测试与迁移验证 + 适配层收拢
 status: ready
-stopped_at: Phase 21 context gathered
-last_updated: "2026-07-20T02:16:58.440Z"
+stopped_at: context exhaustion at 75% (2026-07-20)
+last_updated: "2026-07-20T03:35:10.455Z"
 last_activity: 2026-07-20
 last_activity_desc: Phase 19 complete, transitioned to Phase 20
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 20
+  total_plans: 26
   completed_plans: 19
   percent: 63
 ---
@@ -107,8 +107,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-20T02:16:58.424Z
-Stopped at: Phase 21 context gathered
+Last session: 2026-07-20T03:35:10.396Z
+Stopped at: context exhaustion at 75% (2026-07-20)
 Resume file: .planning/phases/21-verify-migration-adapter-convergence/21-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
