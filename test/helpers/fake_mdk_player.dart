@@ -89,7 +89,8 @@ class FakeMdkPlayer implements MdkPlayerLike {
   Future<int> updateTexture() async {
     updateTextureCallCount++;
     if (updateTextureResult >= 0) {
-      textureIdNotifier.value = textureIdValue ?? 1;
+      // textureIdValue 为 null 时保持 notifier 为 null（模拟纹理创建失败场景）
+      textureIdNotifier.value = textureIdValue;
     }
     return updateTextureResult;
   }
