@@ -140,6 +140,14 @@ None - no external service configuration required.
 - Race condition tests validate generation guard correctness — foundation for future engine integration tests
 - All D12/D13/D14 coverage verified
 
+## Self-Check: PASSED
+
+- [x] `lib/kernel/engine/fvp_callback_handler.dart` — FOUND
+- [x] `test/kernel/engine/race_condition_test.dart` — FOUND
+- [x] `.planning/phases/20-state-lifecycle/20-03-SUMMARY.md` — FOUND
+- [x] Commit `f1d35ad` — FOUND
+- [x] Commit `28d08e5` — FOUND
+
 ---
 *Phase: 20-state-lifecycle*
 *Completed: 2026-07-20*
