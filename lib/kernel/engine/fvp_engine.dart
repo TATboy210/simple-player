@@ -14,16 +14,14 @@ import 'fvp_callback_handler.dart';
 import 'media_opener.dart';
 import 'player_proxy.dart';
 import 'position_poller.dart';
-import '../diagnostics/kernel_logger.dart';
+import '../diagnostics/diagnostics_bundle.dart';
+import 'lifecycle_phase.dart';
 import 'track_manager.dart';
 import 'video_effect_controller.dart';
 import 'volume_controller.dart';
 import 'subtitle_configurator.dart';
 import 'd3d11_configurator.dart';
 import 'mdk_player_proxy.dart';
-
-final log = KernelLogger.I;
-final logEngine = KernelLogger.I;
 
 /// fvp/MDK 引擎实现
 ///
@@ -44,7 +42,9 @@ final logEngine = KernelLogger.I;
 ///   - Helper 通过接口 getter 暴露（trackControl, volumeControl 等）
 class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 工厂构造函数 — 保证所有依赖在构造时注入，消除 late 初始化风险
-  factory FvpEngine() {
+  ///
+  /// [bundle] 诊断能力载体（Phase 20 D2 依赖注入），默认 noop。
+  factory FvpEngine({DiagnosticsBundle bundle = const DiagnosticsBundle.noop()}) {
     final player = mdk.Player();
     final proxy = MdkPlayerProxy(player);
     final trackManager = TrackManager(player);
@@ -62,6 +62,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       videoEffectController,
       stateMachine,
       proxy,
+      bundle,
     );
 
     // 注入状态机回调（engine 已创建，可安全引用 engine.play/pause）
@@ -108,6 +109,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     this._videoEffectController,
     this._stateMachine,
     PlayerProxy proxy,
+    this._bundle,
   ) : _d3d11Configurator = D3D11Configurator(proxy);
 
   // ─── 核心依赖 ───
@@ -119,6 +121,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   late final SubtitleConfigurator _subtitleConfigurator;
   final D3D11Configurator _d3d11Configurator;
   final EngineStateMachine _stateMachine;
+
+  /// 诊断能力载体 — Phase 20 D2 依赖注入 (logger/metrics/eventLog/memoryMonitor)
+  final DiagnosticsBundle _bundle;
 
   /// 回调处理器 — 在工厂构造函数中创建
   late FvpCallbackHandler _callbackHandler;
@@ -191,14 +196,31 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   String _currentPath = '';
 
-  /// open() 递增计数器 — 快速切歌时丢弃过期的异步结果
-  ///
-  /// 每次 open() 递增，async 操作完成后检查 generation 是否仍匹配。
-  /// 不匹配说明用户已发起新 open()，旧结果应被丢弃。
-  int _openGeneration = 0;
-
   @override
   MediaInfo get mediaInfo => _trackManager.mediaInfo;
+
+  // ─── 生命周期 (Phase 20 D6/D7) ───
+
+  /// 引擎生命周期阶段 — 委托给 EngineStateMachine (D6 正交生命周期)
+  ///
+  /// Engine lifecycle phase — delegated to EngineStateMachine.
+  /// 与 MediaState 正交共存：state 表示播放行为，lifecyclePhase 表示引擎存活阶段。
+  ValueNotifier<LifecyclePhase> get lifecyclePhase => _stateMachine.lifecyclePhase;
+
+  /// 状态机访问器 — PlaybackNavigator 通过此访问 generation 计数器 (D5 单一真相源)
+  ///
+  /// State machine accessor — PlaybackNavigator accesses generation counter via this.
+  @override
+  EngineStateMachine get stateMachine => _stateMachine;
+
+  /// 从 error 状态恢复到 idle — 委托给 EngineStateMachine (D7)
+  ///
+  /// Recover from error state to idle — delegated to EngineStateMachine.
+  /// 仅在 state == MediaState.error 时生效，其他状态为 no-op。
+  void recover() {
+    if (_disposed) return;
+    _stateMachine.recover(lastError: lastError);
+  }
 
   void _onTextureIdChanged() {
     textureId.value = _player.textureId.value;
@@ -241,7 +263,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: name, module: 'FvpEngine'),
       );
       lastError.value = error;
-      log.e('FvpEngine.$name error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e('FvpEngine.$name error', context: error.context?.toMap(), error: e, stackTrace: st);
       eventLog.add('error', {'action': name, 'error': e.toString()});
     }
   }
@@ -267,14 +289,14 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'open', path: trimmed, module: 'FvpEngine'),
       );
       lastError.value = error;
-      log.e('open() empty path', context: error.context?.toMap());
+      _bundle.logger.e('open() empty path', context: error.context?.toMap());
       metrics.recordOpen(success: false);
       eventLog.add('open', {'path': path, 'error': 'empty path'});
       return;
     }
 
-    // 递增 generation — 后续 await 返回后检查是否仍为最新请求
-    final gen = ++_openGeneration;
+    // 递增 generation — 后续 await 返回后检查是否仍为最新请求 (Phase 20 D5 单一真相源)
+    final gen = _stateMachine.nextGeneration();
     _stateMachine.transitionTo(MediaState.opening, 'open');
     _currentPath = trimmed;
     eventLog.add('open', {'path': PathUtils.basename(trimmed)});
@@ -282,7 +304,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     try {
       final result = await _mediaOpener.open(trimmed);
       // generation 不匹配或已 dispose → 用户已切歌，丢弃本次结果
-      if (_disposed || gen != _openGeneration) return;
+      if (_disposed || gen != _stateMachine.currentGeneration) return;
 
       debugPrint('🔍 open() result: ${result.runtimeType} for ${PathUtils.basename(trimmed)}');
 
@@ -297,7 +319,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
           _stateMachine.transitionTo(MediaState.idle, 'open');
           lastError.value = null;
           metrics.recordOpen(success: true);
-          logEngine.i(
+          _bundle.logger.i(
             'open() success — ${PathUtils.basename(trimmed)} '
             '${video?.width}x${video?.height} '
             '${mediaInfo.duration}ms',
@@ -308,7 +330,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
           // 直接 state→error，不会再次判定 CodecError 分支）；本地文件
           // 专属（网络 URL 排除在外，因网络编解码问题多与硬解无关）。
           if (error is CodecError && !PathValidator.isUrl(trimmed)) {
-            logEngine.i('open() codec error — retrying with software decode');
+            _bundle.logger.i('open() codec error — retrying with software decode');
             eventLog.add('fallback', {
               'reason': 'codec error',
               'action': 'switch to software decode',
@@ -328,13 +350,13 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
           );
           lastError.value = error;
           metrics.recordOpen(success: false);
-          logEngine.e(
+          _bundle.logger.e(
             'open() error — ${PathUtils.basename(trimmed)}',
             context: error.context?.toMap(),
           );
       }
     } on Exception catch (e, st) {
-      if (_disposed || gen != _openGeneration) return;
+      if (_disposed || gen != _stateMachine.currentGeneration) return;
       _stateMachine.transitionTo(MediaState.error, 'open');
       // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
       final error = PathValidator.isUrl(trimmed)
@@ -351,7 +373,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
               ErrorContext(action: 'open', generation: gen, path: trimmed, module: 'FvpEngine'),
             );
       lastError.value = error;
-      log.e(
+      _bundle.logger.e(
         'open() error — ${PathUtils.basename(trimmed)}',
         context: error.context?.toMap(),
         error: e,
@@ -361,7 +383,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       eventLog.add('error', {'action': 'open', 'error': e.toString()});
     } finally {
       // 只有当前 generation 才清理 buffering 状态
-      if (gen == _openGeneration) {
+      if (gen == _stateMachine.currentGeneration) {
         isBuffering.value = false;
       }
     }
@@ -381,7 +403,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       _stateMachine.transitionTo(MediaState.playing, 'play');
       _positionPoller.startSilent();
       eventLog.add('play', {'path': PathUtils.basename(_currentPath)});
-      logEngine.d('play() — ${PathUtils.basename(_currentPath)}');
+      _bundle.logger.d('play() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e, st) {
       _stateMachine.transitionTo(MediaState.error, 'play');
       // 三步模式：构造 PlayerError + ErrorContext → 赋值 lastError → log.e
@@ -392,7 +414,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'play', module: 'FvpEngine'),
       );
       lastError.value = error;
-      logEngine.e('play() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e('play() error', context: error.context?.toMap(), error: e, stackTrace: st);
       debugPrint('❌ play() failed: $e');
     }
   }
@@ -405,7 +427,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       _stateMachine.transitionTo(MediaState.paused, 'pause');
       _positionPoller.stop();
       eventLog.add('pause');
-      logEngine.d('pause() — ${PathUtils.basename(_currentPath)}');
+      _bundle.logger.d('pause() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e, st) {
       // 三步模式：pause 错误也应上报 UI
       final error = PlaybackError(
@@ -415,7 +437,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'pause', module: 'FvpEngine'),
       );
       lastError.value = error;
-      logEngine.e('pause() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e('pause() error', context: error.context?.toMap(), error: e, stackTrace: st);
     }
   }
 
@@ -428,7 +450,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       position.value = 0;
       _positionPoller.stop();
       eventLog.add('stop');
-      logEngine.d('stop() — ${PathUtils.basename(_currentPath)}');
+      _bundle.logger.d('stop() — ${PathUtils.basename(_currentPath)}');
     } on Exception catch (e, st) {
       // 三步模式：stop 错误也应上报 UI
       final error = PlaybackError(
@@ -438,7 +460,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'stop', module: 'FvpEngine'),
       );
       lastError.value = error;
-      logEngine.e('stop() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e('stop() error', context: error.context?.toMap(), error: e, stackTrace: st);
     }
   }
 
@@ -468,7 +490,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'seek', module: 'FvpEngine'),
       );
       lastError.value = error;
-      log.e('seekTo() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e('seekTo() error', context: error.context?.toMap(), error: e, stackTrace: st);
       position.value = _player.position;
       eventLog.add('error', {'action': 'seek', 'error': e.toString()});
     } finally {
@@ -665,6 +687,7 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 但 `_disposed=true` 已生效，故各 setter/控制方法在此之后均为 no-op）。
   @override
   void dispose() {
+    if (_disposed) return; // Phase 20 D8: double-dispose safety
     _disposed = true;
 
     assert(() {
