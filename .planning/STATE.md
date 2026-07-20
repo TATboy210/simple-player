@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
-current_phase: 20
-current_phase_name: 测试与迁移验证 + 适配层收拢
-status: ready
-stopped_at: context exhaustion at 75% (2026-07-20)
-last_updated: "2026-07-20T03:35:10.455Z"
+current_phase: 21
+current_phase_name: verify-migration-adapter-convergence
+status: executing
+stopped_at: context exhaustion at 76% (2026-07-20)
+last_updated: "2026-07-20T06:22:45.519Z"
 last_activity: 2026-07-20
-last_activity_desc: Phase 19 complete, transitioned to Phase 20
+last_activity_desc: Phase 21 execution started
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 26
-  completed_plans: 19
+  total_plans: 28
+  completed_plans: 25
   percent: 63
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 19 — MemoryMonitor 一等化
+**Current focus:** Phase 21 — verify-migration-adapter-convergence
 
 ## Current Position
 
-Phase: 20 — 状态与生命周期重写
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-20 — Phase 19 complete, transitioned to Phase 20
+Phase: 21 (verify-migration-adapter-convergence) — EXECUTING
+Plan: 1 of 8
+Status: Executing Phase 21
+Last activity: 2026-07-20 — Phase 21 execution started
 
 ## Performance Metrics
 
@@ -107,8 +107,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-20T03:35:10.396Z
-Stopped at: context exhaustion at 75% (2026-07-20)
+Last session: 2026-07-20T05:31:10.159Z
+Stopped at: context exhaustion at 76% (2026-07-20)
 Resume file: .planning/phases/21-verify-migration-adapter-convergence/21-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
