@@ -1,3 +1,6 @@
+// ignore_for_file: uri_does_not_exist, undefined_identifier, creation_with_non_type
+// desktop_multi_window is an optional dependency for multi-window support;
+// when analyzing from root project it may not be resolved.
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:fullscreen_window/fullscreen_window.dart';

@@ -2,6 +2,7 @@
 ///
 /// Covers: event construction, toJson, toString, ring buffer add/entries/clear,
 /// wraparound behavior, capacity edge cases.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_event_log.dart';
 

@@ -2,7 +2,7 @@
 ///
 /// Tests the debounce + write lock pattern for window geometry saves.
 /// Uses fakeAsync to control Timer behavior.
-import 'dart:async';
+library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_persistence.dart';

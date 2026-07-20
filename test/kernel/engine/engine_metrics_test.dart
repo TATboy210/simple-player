@@ -2,6 +2,7 @@
 ///
 /// Covers: counters, computed properties (averageSeekTime, openSuccessRate),
 /// record methods, reset, toJson.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_metrics.dart';
 

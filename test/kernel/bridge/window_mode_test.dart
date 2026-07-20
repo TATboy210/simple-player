@@ -1,6 +1,7 @@
 /// Unit tests for [WindowMode] enum.
 ///
 /// Covers: convenience getters (isWindowed, isMaximized, isFullscreen, isMinimized).
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
 

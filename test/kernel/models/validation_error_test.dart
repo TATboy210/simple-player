@@ -1,6 +1,7 @@
 /// Unit tests for [ValidationError] and [ValidationErrorType].
 ///
 /// Covers: enum values, constructor, toString, equality, hashCode.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/validation_error.dart';
 
@@ -75,6 +76,7 @@ void main() {
 
       test('not equal to non-ValidationError', () {
         const a = ValidationError(ValidationErrorType.empty, 'msg');
+        // ignore: unrelated_type_equality_checks
         expect(a == 'not an error', isFalse);
       });
     });

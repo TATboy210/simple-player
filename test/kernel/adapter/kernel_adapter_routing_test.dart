@@ -5,6 +5,7 @@
 /// dispose behavior, and DiagnosticsBundle forwarding.
 ///
 /// All tests use pure Dart FakeEngine — no mdk.dll dependency.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/adapter/kernel_adapter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/diagnostics_bundle.dart';
