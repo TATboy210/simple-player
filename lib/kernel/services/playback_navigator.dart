@@ -10,12 +10,12 @@ library;
 import 'dart:async';
 
 import '../engine/engine_state.dart';
-import '../diagnostics/kernel_logger.dart';
+import '../diagnostics/kernel_logger.dart' show KernelLoggerImpl;
 import '../utils/path_utils.dart';
 import '../services/path_validator.dart';
 import 'playback_controller.dart';
 
-final log = KernelLogger.I;
+final log = KernelLoggerImpl.I;
 
 /// 播放导航 — 索引跳转、上一首/下一首、并发 open() 守卫
 ///
@@ -31,11 +31,10 @@ class PlaybackNavigator {
   PlaybackNavigator(this._controller);
   final PlaybackController _controller;
 
-  /// 并发 open() 守卫：快速切换歌曲时，丢弃过期的异步请求
-  int _openGeneration = 0;
-
-  /// 当前 generation 值，供 UI 层检查异步回调是否过期
-  int get currentGeneration => _openGeneration;
+  /// 当前 generation 值 — 委托给 EngineStateMachine (Phase 20 D5 单一真相源)
+  ///
+  /// PlaybackNavigator 不再持有独立 _openGeneration，直接使用 stateMachine 的嵌入计数器。
+  int get currentGeneration => _controller.engine.stateMachine.currentGeneration;
 
   /// 播放指定索引 — 完整的打开流程
   ///
@@ -46,7 +45,7 @@ class PlaybackNavigator {
   /// 确保快速切歌时只有最后一次 open() 生效。
   Future<void> playIndex(int index) async {
     if (index < 0 || index >= _controller.playlist.length) return;
-    final gen = ++_openGeneration;
+    final gen = _controller.engine.stateMachine.nextGeneration();
     final oldIndex = _controller.playlist.currentIndex;
     _controller.playlist.currentIndex = index;
     final current = _controller.playlist.current;
@@ -63,7 +62,7 @@ class PlaybackNavigator {
     try {
       await _controller.engine.open(current.path);
       // generation 不匹配说明用户已切歌，丢弃本次结果
-      if (gen != _openGeneration) return;
+      if (gen != _controller.engine.stateMachine.currentGeneration) return;
       if (_controller.engine.state.value == MediaState.error) {
         throw Exception(_controller.engine.lastError.value?.message ?? '打开失败');
       }
@@ -93,7 +92,7 @@ class PlaybackNavigator {
     } on Exception catch (e) {
       log.e('PlaybackNavigator.playIndex($index) failed: $e');
       // 只在 generation 仍匹配时恢复原索引，避免干扰后续切歌
-      if (gen == _openGeneration) {
+      if (gen == _controller.engine.stateMachine.currentGeneration) {
         _controller.playlist.currentIndex = oldIndex;
       }
       _controller.onError?.call(

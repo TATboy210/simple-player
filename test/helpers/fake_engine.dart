@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/engine/lifecycle_phase.dart';
 
 /// Hand-written Fake implementing all ISP interfaces for testing.
 ///
@@ -66,8 +67,10 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   // ─── Internal state ───
 
-  /// open() generation 计数器 — 匹配 FvpEngine 的防御模式
-  int _openGeneration = 0;
+  /// open() generation 计数器 — 委托给 stateMachine (Phase 20 D5 单一真相源)
+  ///
+  /// FakeEngine 不再持有独立 _openGeneration，直接使用 stateMachine 的嵌入计数器。
+  /// 与 FvpEngine 保持一致的 generation 守卫语义。
 
   MediaInfo _mediaInfo = const MediaInfo();
 
@@ -113,16 +116,24 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   // ─── Playback control ───
 
+  /// 生命周期阶段 — 委托给 stateMachine (Phase 20 D6 正交生命周期)
+  ValueNotifier<LifecyclePhase> get lifecyclePhase => stateMachine.lifecyclePhase;
+
+  /// 从 error 状态恢复 — 委托给 stateMachine (Phase 20 D7)
+  void recover() {
+    stateMachine.recover(lastError: lastError);
+  }
+
   @override
   Future<void> open(String path) async {
     if (_disposed) return;
     openCallCount++;
     openPaths.add(path);
-    final gen = ++_openGeneration;
+    final gen = stateMachine.nextGeneration();
     stateMachine.transitionTo(MediaState.opening, 'fake.open');
     await Future<void>.value();
     // generation 不匹配或已 dispose → 丢弃结果
-    if (_disposed || gen != _openGeneration) return;
+    if (_disposed || gen != stateMachine.currentGeneration) return;
 
     if (failNextOpenWith != null) {
       final msg = failNextOpenWith!;
@@ -346,6 +357,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   @override
   void dispose() {
+    if (_disposed) return; // Phase 20 D8: double-dispose safety
     _disposed = true;
     stateMachine.dispose();
     textureId.dispose();
