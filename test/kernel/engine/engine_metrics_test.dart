@@ -168,6 +168,51 @@ void main() {
         expect(json['openFailures'], 0);
         expect(json['openSuccessRate'], '0.0');
       });
+
+      test('openSuccessRate as percentage string', () {
+        metrics.recordOpen(success: true);
+        metrics.recordOpen(success: true);
+        metrics.recordOpen(success: false);
+        final json = metrics.toJson();
+        // 2/3 = 66.7%
+        expect(json['openSuccessRate'], '66.7');
+      });
+    });
+
+    group('reset is idempotent', () {
+      test('double reset does not throw', () {
+        metrics.recordFrameDrop(5);
+        metrics.reset();
+        metrics.reset();
+        expect(metrics.framesDropped, 0);
+      });
+
+      test('reset then record works', () {
+        metrics.recordFrameDrop(10);
+        metrics.reset();
+        metrics.recordFrameDrop(3);
+        expect(metrics.framesDropped, 3);
+      });
+    });
+
+    group('edge cases', () {
+      test('recordFrameDrop with 0 count', () {
+        metrics.recordFrameDrop(0);
+        expect(metrics.framesDropped, 0);
+      });
+
+      test('openSuccessRate with many attempts', () {
+        for (var i = 0; i < 100; i++) {
+          metrics.recordOpen(success: true);
+        }
+        expect(metrics.openSuccessRate, 1.0);
+      });
+
+      test('averageSeekTime with large values', () {
+        metrics.recordSeek(const Duration(seconds: 10));
+        metrics.recordSeek(const Duration(seconds: 20));
+        expect(metrics.averageSeekTime, const Duration(seconds: 15));
+      });
     });
   });
 }
