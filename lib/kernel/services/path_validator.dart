@@ -1,13 +1,19 @@
-/// 路径安全校验工具
+/// 路径安全校验工具 — 统一入口
 ///
-/// 统一的文件路径校验：扩展名白名单、路径遍历检测。
-/// 所有文件打开入口（FilePicker、拖放、历史记录）必须通过此工具校验。
+/// Centralised file-path validation: extension whitelist, path-traversal
+/// detection, and URL scheme filtering.
+///
+/// Invariants:
+/// - All file-open entry points (FilePicker, drag-and-drop, history replay)
+///   must pass through [validate] before reaching the engine.
+/// - Extension lists are lowercase, without leading dots.
 class PathValidator {
   PathValidator._();
 
   /// FilePicker 使用的扩展名列表（不含点号，小写）
   ///
-  /// 与 [allowedExtensions] 保持同步，供 FilePicker 和 UI 层引用。
+  /// A const list of lowercase extensions (no leading dot) accepted by
+  /// the file picker. Must stay in sync with [allowedExtensions].
   static const supportedExtensions = [
     'mp4',
     'mkv',
@@ -38,6 +44,9 @@ class PathValidator {
   ];
 
   /// 允许的媒体文件扩展名白名单（小写，从 supportedExtensions 派生）
+  ///
+  /// Derived from [supportedExtensions]. Used by [isAllowedMedia] for
+  /// O(1) membership checks.
   static final allowedExtensions = supportedExtensions.toSet();
 
   /// URL 协议白名单 — MDK/FFmpeg 原生支持
@@ -51,10 +60,16 @@ class PathValidator {
     'tcp://',
   };
 
-  /// 检查是否为 URL
+  /// 检查路径是否为支持的流媒体 URL
+  ///
+  /// Returns `true` if [path] starts with a recognised streaming protocol
+  /// (http, https, rtmp, rtsp, srt, udp, tcp).
   static bool isUrl(String path) => _urlSchemes.any((s) => path.startsWith(s));
 
   /// 检查扩展名是否为允许的媒体类型
+  ///
+  /// Returns `true` if [path] is a URL (trusted upstream) or its lowercase
+  /// extension is in [allowedExtensions].
   static bool isAllowedMedia(String path) {
     if (isUrl(path)) return true; // URL 信任上游
     final dotIndex = path.lastIndexOf('.');
@@ -65,8 +80,10 @@ class PathValidator {
 
   /// 检查路径是否包含路径遍历攻击特征
   ///
-  /// 只检测 `../` 和 `..\` 模式，不检测裸 `..`（避免误杀合法文件名
-  /// 如 `song (live..remix).flac`）。
+  /// Returns `true` if [path] contains null bytes, `../` / `..\` sequences,
+  /// UNC network paths (`\\`), or home-directory expansion (`~`).
+  /// Does NOT flag bare `..` to avoid false positives on filenames
+  /// like `song (live..remix).flac`.
   static bool isPathTraversal(String path) {
     if (path.contains('\x00')) return true; // null byte 注入
     if (path.contains('../') || path.contains('..\\')) return true; // 路径遍历
@@ -88,7 +105,11 @@ class PathValidator {
 
   /// 完整校验：扩展名 + 路径遍历
   ///
-  /// 返回 null = 合法，返回 String = 错误消息
+  /// Runs the full validation pipeline: empty check, URL scheme validation
+  /// (HTTP/HTTPS require a valid authority), control-character scan,
+  /// path-traversal detection, and extension whitelist.
+  ///
+  /// Returns `null` when [path] is valid, or a human-readable error string.
   static String? validate(String path) {
     final trimmed = path.trim();
     if (trimmed.isEmpty) return '路径为空';
@@ -111,6 +132,9 @@ class PathValidator {
   }
 
   /// 批量校验，返回通过校验的路径列表
+  ///
+  /// Filters [paths] through [validate], keeping only entries that
+  /// return `null` (valid). Preserves original order.
   static List<String> filterValid(List<String> paths) {
     return paths.where((p) => validate(p) == null).toList();
   }

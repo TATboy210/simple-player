@@ -1,30 +1,41 @@
 /// 播放器主状态枚举 — 正交 6 值
 ///
-/// 状态模型：idle → opening → playing ⇄ paused → completed → error
+/// Playback state enum — 6 orthogonal values.
 ///
-/// 旧版本的 seeking/buffering 已移至独立的 `ValueNotifier<bool>`
-/// （EngineStateView.isSeeking / EngineStateView.isBuffering），
-/// 避免主状态枚举的组合爆炸。
+/// State model: `idle → opening → playing ⇄ paused → completed → error`.
 ///
-/// 旧版本的 loading 重命名为 opening 以保持一致性。
-/// 旧版本的 stopped 已移除 — stop() 将状态重置为 idle。
+/// `seeking`/`buffering` are tracked by separate `ValueNotifier<bool>`
+/// ([EngineStateView.isSeeking] / [EngineStateView.isBuffering])
+/// to avoid combinatorial explosion of the main state enum.
 enum MediaState {
-  /// 初始状态，未加载任何媒体
+  /// 初始状态，未加载任何媒体.
+  ///
+  /// Initial state; no media loaded.
   idle,
 
-  /// 正在加载/打开媒体
+  /// 正在加载/打开媒体.
+  ///
+  /// Loading/opening media.
   opening,
 
-  /// 正在播放
+  /// 正在播放.
+  ///
+  /// Actively playing.
   playing,
 
-  /// 已暂停
+  /// 已暂停.
+  ///
+  /// Paused.
   paused,
 
-  /// 播放完成（自然播放到末尾）
+  /// 播放完成（自然播放到末尾）.
+  ///
+  /// Playback completed (reached end of media naturally).
   completed,
 
-  /// 发生错误
+  /// 发生错误.
+  ///
+  /// An error occurred.
   error,
 }
 

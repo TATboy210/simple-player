@@ -1,4 +1,10 @@
-/// 视频编解码信息
+/// 视频编解码信息。
+///
+/// Video codec metadata extracted from the media engine after opening a file.
+///
+/// - `width` / `height`: Native frame dimensions in pixels.
+/// - `par`: Pixel aspect ratio (1.0 = square pixels).
+/// - `codec`: Codec identifier string (e.g. "h264", "hevc").
 class VideoCodecInfo {
   final int width;
   final int height;

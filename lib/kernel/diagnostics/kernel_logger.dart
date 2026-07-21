@@ -29,7 +29,37 @@ import 'package:flutter/foundation.dart';
 /// 日志严重级别枚举 — 6 级, 与 KernelLogger 的 6 个方法一一对应 (D14).
 ///
 /// Log severity levels. Six values matching KernelLogger methods 1:1.
-enum LogLevel { trace, debug, info, warn, error, fatal }
+enum LogLevel {
+  /// 最低级别 — 细粒度跟踪, 当前无存量调用点.
+  ///
+  /// Finest-grained tracing. No existing call sites.
+  trace,
+
+  /// 调试级别 — 开发期诊断信息.
+  ///
+  /// Debug-level diagnostics for development.
+  debug,
+
+  /// 信息级别 — 正常运行时事件.
+  ///
+  /// Informational events during normal operation.
+  info,
+
+  /// 警告级别 — 可恢复异常或降级.
+  ///
+  /// Recoverable anomalies or degraded conditions.
+  warn,
+
+  /// 错误级别 — 操作失败但进程可继续.
+  ///
+  /// Operation failure; process may continue.
+  error,
+
+  /// 致命级别 — 不可恢复错误, 进程即将终止.
+  ///
+  /// Unrecoverable error; process is about to terminate.
+  fatal,
+}
 
 // ---------------------------------------------------------------------------
 // LogSink — single-method output interface (D4)
@@ -145,6 +175,8 @@ final class NullSink implements LogSink {
 /// `CompositeSink([DebugPrintSink(), DevToolsSink()])` for dual output.
 final class CompositeSink implements LogSink {
   /// 构造 — 接受一组 sink 实例.
+  ///
+  /// Constructor. Accepts a list of [LogSink] instances for fan-out.
   CompositeSink(this._sinks);
 
   final List<LogSink> _sinks;
@@ -188,16 +220,24 @@ abstract class KernelLogger {
   /// `KernelLogger.I` without importing the concrete implementation.
   static KernelLoggerImpl get I => KernelLoggerImpl.I;
 
-  /// 最低优先级追踪日志 (trace-level, 当前无存量调用点)
+  /// 最低优先级追踪日志 (trace-level, 当前无存量调用点).
+  ///
+  /// Trace-level log. No existing call sites.
   void trace(String message, {Map<String, Object?>? context});
 
-  /// 调试日志 (debug-level)
+  /// 调试日志 (debug-level).
+  ///
+  /// Debug-level log.
   void debug(String message, {Map<String, Object?>? context});
 
-  /// 信息日志 (info-level)
+  /// 信息日志 (info-level).
+  ///
+  /// Info-level log.
   void info(String message, {Map<String, Object?>? context});
 
-  /// 警告日志 (warn-level)
+  /// 警告日志 (warn-level).
+  ///
+  /// Warn-level log.
   void warn(String message, {Map<String, Object?>? context});
 
   /// 错误日志 (error-level) — 84 处存量调用点中有 3 处携带 error/stackTrace 命名参数
@@ -221,23 +261,33 @@ abstract class KernelLogger {
 
   // ---- Shortcut methods (D11) — delegate to full methods ----
 
-  /// trace 快捷方式 (D11)
+  /// trace 快捷方式 (D11).
+  ///
+  /// Shortcut for [trace].
   void t(String m, {Map<String, Object?>? context}) =>
       trace(m, context: context);
 
-  /// debug 快捷方式 (D11)
+  /// debug 快捷方式 (D11).
+  ///
+  /// Shortcut for [debug].
   void d(String m, {Map<String, Object?>? context}) =>
       debug(m, context: context);
 
-  /// info 快捷方式 (D11)
+  /// info 快捷方式 (D11).
+  ///
+  /// Shortcut for [info].
   void i(String m, {Map<String, Object?>? context}) =>
       info(m, context: context);
 
-  /// warn 快捷方式 (D11)
+  /// warn 快捷方式 (D11).
+  ///
+  /// Shortcut for [warn].
   void w(String m, {Map<String, Object?>? context}) =>
       warn(m, context: context);
 
-  /// error 快捷方式 (D11)
+  /// error 快捷方式 (D11).
+  ///
+  /// Shortcut for [error].
   void e(
     String m, {
     Map<String, Object?>? context,
@@ -248,7 +298,9 @@ abstract class KernelLogger {
     this.error(m, context: context, error: error, stackTrace: stackTrace);
   }
 
-  /// fatal 快捷方式 (D11)
+  /// fatal 快捷方式 (D11).
+  ///
+  /// Shortcut for [fatal].
   void f(
     String m, {
     Map<String, Object?>? context,

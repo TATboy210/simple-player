@@ -11,7 +11,10 @@ import 'metrics_slot.dart';
 /// `final class` (not just `class`) supports [dispose] semantics and blocks
 /// accidental inheritance (D1).
 final class DiagnosticsBundle {
-  /// 主构造函数 — 4 个插槽均为必填命名参数, 供真实实现注入。
+  /// 主构造函数 — 4 个插槽均为必填命名参数, 供真实实现注入
+  ///
+  /// Main constructor — all 4 slots are required named parameters.
+  /// Real implementations are injected at composition root (PlayerServices).
   const DiagnosticsBundle({
     required this.logger,
     required this.memoryMonitor,
@@ -30,16 +33,24 @@ final class DiagnosticsBundle {
         metrics = const NullMetricsSlot(),
         eventLog = const NullEventLogSlot();
 
-  /// 日志插槽
+  /// 日志插槽 — 结构化内核日志输出 (trace→fatal 6 级)
+  ///
+  /// Logging slot — structured kernel log output (6 levels: trace→fatal).
   final KernelLogger logger;
 
-  /// 内存监控插槽
+  /// 内存监控插槽 — RSS 采样与阈值告警
+  ///
+  /// Memory monitoring slot — RSS sampling and threshold alerting.
   final MemoryMonitorSlot memoryMonitor;
 
-  /// 指标插槽
+  /// 指标插槽 — 播放/seek/帧丢/解码错误计数
+  ///
+  /// Metrics slot — counters for open/seek/frame-drop/decode-error events.
   final MetricsSlot metrics;
 
-  /// 事件日志插槽
+  /// 事件日志插槽 — 时序事件环形缓冲
+  ///
+  /// Event log slot — time-ordered event ring buffer.
   final EventLogSlot eventLog;
 
   /// 级联释放 — 镜像 PlayerServices.dispose() 的级联模式 (D10, player_services.dart:99-109)。

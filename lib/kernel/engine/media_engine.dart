@@ -6,21 +6,24 @@ import 'video_effect_control.dart';
 import 'renderer_control.dart';
 import 'volume_control.dart';
 
-/// 播放引擎组合接口 — 服务层统一依赖类型
+/// 播放引擎组合接口 — 服务层统一依赖类型.
 ///
-/// 将 EngineStateView 只读状态视图与 6 个控制类 ISP 接口（共 7 个 implements）聚合为单一类型，
-/// 服务层（PlaybackController、PlaybackStateManager、AutoAdvancePolicy 等）
-/// 通过此接口同时访问状态和控制方法，无需依赖具体实现类。
+/// Composite engine interface — unified dependency type for service layer.
 ///
-/// 架构位置：
-///   - UI 层 → EngineStateView（只读状态）
-///   - 服务层 → MediaEngine（状态 + 控制）
-///   - FvpEngine implements MediaEngine（具体实现）
+/// Aggregates [EngineStateView] (read-only state) with 6 control ISP
+/// interfaces (7 `implements` total) into a single type. Service layer
+/// (PlaybackController, PlaybackStateManager, AutoAdvancePolicy, etc.)
+/// accesses both state and control through this interface without
+/// depending on concrete [FvpEngine].
 ///
-/// 设计说明：
-///   旧 EngineState mixin 混合了状态和控制方法。ISP 拆分后，
-///   服务层需要同时访问两者。此接口作为组合类型，避免服务层
-///   依赖具体 FvpEngine 实现。
+/// Architecture:
+///   - UI layer → EngineStateView (read-only state)
+///   - Service layer → MediaEngine (state + control)
+///   - FvpEngine implements MediaEngine (concrete implementation)
+///
+/// Design rationale: the legacy EngineState mixin mixed state and control
+/// methods. After ISP decomposition, the service layer needs both — this
+/// composite type bridges the gap without coupling to FvpEngine.
 abstract class MediaEngine
     implements
         EngineStateView,

@@ -1,22 +1,16 @@
-/// 播放器服务容器 — 依赖注入与生命周期管理.
+/// 模块级概览：播放器服务容器 — 依赖注入与生命周期管理
 ///
-/// Player service container — dependency injection and lifecycle management.
+/// 本文件实现了播放器的服务容器模式，负责：
+/// 1. 创建并持有所有播放服务实例（Engine、Playlist、PlaybackController、VideoProcessingService）
+/// 2. 提供 init/dispose 生命周期管理
 ///
-/// Implements the service container pattern:
-/// 1. Creates and owns all playback service instances (Engine, Playlist,
-///    PlaybackController, VideoProcessingService).
-/// 2. Provides init/dispose lifecycle management.
+/// 设计原则：
+/// - 单一职责：只负责服务的创建、初始化和销毁，不涉及 UI 状态
+/// - 依赖注入：所有服务通过构造函数或 init() 注入，便于测试时替换
+/// - 生命周期一致：dispose 顺序与 init 相反（playlistGeneration → window → videoProcessing → controller → engine）
 ///
-/// Design principles:
-/// - Single responsibility: only creates, initializes, and destroys services;
-///   no UI state involvement.
-/// - Dependency injection: all services injected via constructor or [init],
-///   replaceable in tests.
-/// - Reverse-order disposal: dispose order is the reverse of init
-///   (playlistGeneration → window → videoProcessing → controller → engine).
-///
-/// Architecture: PlayerFeature/PlayerViewModel → **PlayerServices** → concrete services.
-/// Dependency chain: PlayerServices → FvpEngine → fvp/MDK native library.
+/// 架构位置：PlayerFeature/PlayerViewModel → **PlayerServices** → 各具体服务
+/// 依赖链：PlayerServices → FvpEngine → fvp/MDK 原生库
 library;
 
 import 'package:flutter/foundation.dart';
@@ -37,24 +31,24 @@ import 'playlist/playlist.dart';
 import 'services/playback_controller.dart';
 import 'services/video_processing_service.dart';
 
-/// 播放器服务容器 — 创建并管理所有播放服务的生命周期.
+/// 播放器服务容器 — 创建并管理所有播放服务的生命周期
 ///
-/// DI container for core playback services. Holds:
-/// - [engine] — media rendering engine ([MediaEngine])
-/// - [playlist] — playlist management ([Playlist])
-/// - [controller] — playback orchestrator ([PlaybackController])
-/// - [videoProcessing] — video effects ([VideoProcessingService])
-/// - [windowService] — Win32 window bridge ([WindowBridge])
+/// [PlayerServices] 是播放器核心服务的 DI 容器，持有以下服务实例：
+/// - [MediaEngine] (engine) — 视频渲染引擎
+/// - [Playlist] (playlist) — 播放列表管理
+/// - [PlaybackController] (controller) — 播放控制编排器
+/// - [VideoProcessingService] (videoProcessing) — 视频处理（亮度/对比度/旋转等）
+/// - [WindowBridge] (windowService) — Win32 窗口桥接
 ///
-/// No UI state, no BuildContext — independently unit-testable.
+/// 不涉及 UI 状态，不涉及 BuildContext — 可独立于 Widget 树进行单元测试。
 class PlayerServices {
   PlayerServices({required this.windowService});
 
-  /// 异步创建并初始化 PlayerServices 实例.
+  /// 异步创建并初始化 PlayerServices 实例
   ///
-  /// Async factory — creates and fully initializes a [PlayerServices] instance.
-  /// Static factory pattern because Dart constructors cannot be async;
-  /// [init] involves `SettingsStore.load()` (async I/O).
+  /// 使用静态工厂方法而非构造函数，因为 init() 包含异步操作
+  /// （SettingsStore.load()），Dart 构造函数不支持 async。
+  /// 创建流程：构造 → init() → 返回已初始化的实例。
   static Future<PlayerServices> create({
     required WindowBridge windowService,
   }) async {
@@ -65,48 +59,38 @@ class PlayerServices {
     return services;
   }
 
-  /// 视频渲染引擎实例.
-  ///
-  /// Media rendering engine (fvp/MDK wrapper).
+  /// 视频渲染引擎实例
   late final MediaEngine engine;
 
-  /// 播放列表管理器.
-  ///
-  /// Playlist model — play mode logic, item management.
+  /// 播放列表管理器
   late final Playlist playlist;
 
-  /// 播放控制编排器 — 编排 engine + playlist 的交互.
-  ///
-  /// Playback orchestrator — coordinates engine and playlist interactions.
+  /// 播放控制编排器 — 编排 engine + playlist 的交互
   late final PlaybackController controller;
 
-  /// 视频处理服务 — 亮度/对比度/饱和度/色调/旋转/宽高比/去隔行.
-  ///
-  /// Video processing — brightness, contrast, saturation, hue, rotation,
-  /// aspect ratio, deinterlace.
+  /// 视频处理服务 — 亮度/对比度/饱和度/色调/旋转/宽高比/去隔行
   late final VideoProcessingService videoProcessing;
 
-  /// Win32 窗口桥接服务.
-  ///
-  /// Win32 window bridge service.
+  /// Win32 窗口桥接服务
   final WindowBridge windowService;
 
-  /// 播放列表版本号 — 每次播放列表变化时递增，触发 UI 重建.
+  /// 播放列表版本号 — 每次播放列表变化时递增，触发 UI 重建
   ///
-  /// Playlist generation counter — incremented on each playlist change
-  /// to trigger UI rebuilds. Uses `ValueNotifier<int>` (not
-  /// `ValueNotifier<Playlist>`) as a lightweight change signal;
-  /// UI reads `playlist.items` directly for current data.
+  /// 使用 `ValueNotifier<int>` 而非 `ValueNotifier<Playlist>`，
+  /// 因为只需通知"列表已变化"，UI 通过 playlist.items 获取最新数据。
+  /// 这是一个轻量级的变更通知机制，避免不必要的深拷贝。
   final ValueNotifier<int> playlistGeneration = ValueNotifier(0);
 
-  /// 初始化所有播放服务.
+  /// 初始化所有播放服务
   ///
-  /// Initialization order (sequential — each step depends on the previous):
-  /// 1. KernelLogger + MemoryMonitor (diagnostics, must precede FvpEngine)
-  /// 2. DiagnosticsBundle + FvpEngine + KernelAdapter (engine)
-  /// 3. Playlist + PlaybackController (orchestration)
-  /// 4. SettingsStore.load() → controller.init(settings)
-  /// 5. VideoProcessingService (video effects)
+  /// 初始化顺序：
+  /// 1. 创建引擎（FvpEngine）
+  /// 2. 创建播放列表
+  /// 3. 创建 PlaybackController 并注入 engine + playlist
+  /// 4. 从 SettingsStore 加载设置并传递给 controller
+  /// 5. 创建 VideoProcessingService 并注入 engine + settings
+  ///
+  /// 每个服务的创建都依赖前一个服务的结果，因此必须顺序执行。
   Future<void> init() async {
     // Phase 17: 初始化 KernelLogger 静态实例 — 必须在 FvpEngine 创建之前,
     // 确保所有内核代码从启动第一刻起就能通过 KernelLoggerImpl.I 输出日志。
@@ -184,12 +168,10 @@ class PlayerServices {
     videoProcessing = VideoProcessingService(engine, initialSettings: settings);
   }
 
-  /// 释放所有服务资源.
+  /// 释放所有服务资源
   ///
-  /// Disposes all services in reverse init order
-  /// (playlistGeneration → window → videoProcessing → controller → engine),
-  /// ensuring dependents are released before their dependencies.
-  /// Each dispose is idempotent (safe to call multiple times).
+  /// 释放顺序与 init() 相反（playlistGeneration → window → videoProcessing → controller → engine），
+  /// 确保被依赖的服务后释放。每个 dispose() 都是幂等的（多次调用安全）。
   void dispose() {
     playlistGeneration.dispose();
     windowService.dispose();

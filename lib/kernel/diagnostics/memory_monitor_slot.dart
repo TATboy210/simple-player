@@ -7,16 +7,24 @@
 /// and the loose `Object?` return keeps Phase 19 free to change the concrete
 /// snapshot shape without breaking this interface.
 abstract class MemoryMonitorSlot {
-  /// 开始周期性采样 (interval 为 null 时使用实现方默认间隔)
+  /// 开始周期性采样 (interval 为 null 时使用实现方默认间隔).
+  ///
+  /// Starts periodic sampling. Uses implementation default interval when null.
   void start({Duration? interval});
 
-  /// 停止采样
+  /// 停止采样.
+  ///
+  /// Stops sampling.
   void stop();
 
-  /// 返回当前快照 — 返回类型故意宽松 (Object?), 不耦合具体 MemorySnapshot 形状 (D10)
+  /// 返回当前快照 — 返回类型故意宽松 (Object?), 不耦合具体 MemorySnapshot 形状 (D10).
+  ///
+  /// Returns current snapshot. Deliberately loose return type (D10).
   Object? snapshot();
 
-  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用)
+  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用).
+  ///
+  /// Disposes resources. Called cascaded from DiagnosticsBundle.dispose().
   void dispose();
 }
 

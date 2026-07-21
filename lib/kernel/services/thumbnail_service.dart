@@ -6,10 +6,15 @@ import 'macos_thumbnail_provider.dart';
 import 'noop_thumbnail_provider.dart';
 import 'thumbnail_provider.dart';
 
-/// 平台感知的缩略图服务门面。
+/// 平台感知的缩略图服务门面
 ///
-/// 根据 [defaultTargetPlatform] 惰性选择平台实现，
-/// 统一管理 LRU 内存缓存。消费者无需感知底层平台差异。
+/// Facade that lazily selects a platform-specific [ThumbnailProvider] based
+/// on [defaultTargetPlatform] and manages an LRU in-memory cache.
+///
+/// Invariants:
+/// - Cache capacity is bounded at [_maxCacheSize] (200 entries).
+/// - All public methods are static — consumers call [ThumbnailService.xxx] directly.
+/// - Thread-safety is not guaranteed; called from the UI isolate only.
 class ThumbnailService {
   ThumbnailService._();
 
@@ -34,7 +39,13 @@ class ThumbnailService {
     return _impl!;
   }
 
-  /// 获取文件的系统缩略图，带 LRU 内存缓存。
+  /// 获取文件的系统缩略图，带 LRU 内存缓存
+  ///
+  /// Returns a cached [ImageProvider] or fetches a new one from the
+  /// platform [ThumbnailProvider].
+  ///
+  /// - [filePath] must be an absolute local file path.
+  /// - Returns `null` when the platform cannot generate a thumbnail.
   static Future<ImageProvider?> getThumbnail(String filePath) =>
       _instance._getThumbnailImpl(filePath);
 
@@ -56,28 +67,43 @@ class ThumbnailService {
     return provider;
   }
 
-  /// 移除单个缓存条目。
+  /// 移除单个缓存条目
+  ///
+  /// Removes [filePath] from the LRU cache. No-op if not present.
   static void evict(String filePath) => _instance._cache.remove(filePath);
 
-  /// 清空全部缓存。
+  /// 清空全部缓存
+  ///
+  /// Drops all cached thumbnails. Useful when the playlist is replaced.
   static void clearCache() => _instance._cache.clear();
 
-  /// 重置全部状态（仅供测试使用）。
+  /// 重置全部状态（仅供测试使用）
+  ///
+  /// Clears cache and resets the platform provider so it will be
+  /// re-selected on the next access.
   @visibleForTesting
   static void reset() {
     _instance._impl = null;
     _instance._cache.clear();
   }
 
-  /// 手动触发 LRU 触摸（仅供测试使用）。
+  /// 手动触发 LRU 触摸（仅供测试使用）
+  ///
+  /// Moves [filePath] to the most-recently-used position without
+  /// fetching a new thumbnail. No-op if not cached.
   @visibleForTesting
   static void touch(String filePath) => _instance._touchImpl(filePath);
 
-  /// 缓存条目数量（仅供测试使用）。
+  /// 缓存条目数量（仅供测试使用）
+  ///
+  /// Returns the current number of cached entries (0 .. [_maxCacheSize]).
   @visibleForTesting
   static int get cacheLength => _instance._cache.length;
 
-  /// 缓存键的迭代顺序（仅供测试使用，oldest-first）。
+  /// 缓存键的迭代顺序（仅供测试使用，oldest-first）
+  ///
+  /// Returns cache keys in insertion order (oldest first). Useful for
+  /// verifying LRU eviction behavior in tests.
   @visibleForTesting
   static Iterable<String> get cacheKeys => _instance._cache.keys;
 

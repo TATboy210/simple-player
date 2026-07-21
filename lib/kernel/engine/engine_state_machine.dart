@@ -26,24 +26,32 @@ import 'transition_result.dart';
 ///
 /// [recover] 从 error 状态恢复到 idle，清理 lastError。
 class EngineStateMachine {
-  /// 创建状态机
+  /// 创建状态机 — 回调可选, 支持构造后注入以解耦循环依赖
   ///
-  /// [onPlay] 播放回调 — idle/paused/completed 状态 toggle 时调用
-  /// [onPause] 暂停回调 — playing 状态 toggle 时调用
+  /// Creates state machine. Callbacks are optional and can be set after
+  /// construction to break circular dependency with FvpEngine.
+  ///
+  /// [onPlay] invoked when toggle is requested from idle/paused/completed.
+  /// [onPause] invoked when toggle is requested from playing.
   EngineStateMachine({this.onPlay, this.onPause});
 
-  /// 播放回调（idle/paused/completed → toggle）
+  /// 播放回调 — idle/paused/completed 态 toggle 时调用
   ///
-  /// 可在构造后设置，用于解决 FvpEngine 的循环依赖
-  ///（状态机先创建，engine.play/pause 后注入）
+  /// Play callback — invoked when toggle is requested from idle/paused/completed.
+  /// Set after construction to break circular dependency (state machine created
+  /// before engine.play/pause is available).
   VoidCallback? onPlay;
 
-  /// 暂停回调（playing → toggle）
+  /// 暂停回调 — playing 态 toggle 时调用
   ///
-  /// 可在构造后设置，用于解决 FvpEngine 的循环依赖
+  /// Pause callback — invoked when toggle is requested from playing state.
+  /// Set after construction to break circular dependency.
   VoidCallback? onPause;
 
-  /// 主播放状态 — 正交 6 值枚举
+  /// 主播放状态 — 正交 6 值枚举 (idle/opening/playing/paused/completed/error)
+  ///
+  /// Primary playback state — orthogonal 6-value enum.
+  /// Transitions validated by [transitionTo] via switch expression.
   final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
 
   /// 引擎生命周期阶段 — 正交于 state 的独立维度
@@ -53,10 +61,16 @@ class EngineStateMachine {
   final ValueNotifier<LifecyclePhase> lifecyclePhase =
       ValueNotifier(LifecyclePhase.alive);
 
-  /// 是否正在 seek — 独立于主状态
+  /// 是否正在 seek — 独立于主状态, 可与任何 MediaState 共存
+  ///
+  /// Whether a seek operation is in progress — independent of primary state.
+  /// Can coexist with any [MediaState] value.
   final ValueNotifier<bool> isSeeking = ValueNotifier(false);
 
-  /// 是否正在缓冲 — 独立于主状态
+  /// 是否正在缓冲 — 独立于主状态, 可与任何 MediaState 共存
+  ///
+  /// Whether buffering is in progress — independent of primary state.
+  /// Can coexist with any [MediaState] value.
   final ValueNotifier<bool> isBuffering = ValueNotifier(false);
 
   // ---- OpenGenerationTracker（嵌入状态机，单一真相源）----
@@ -144,12 +158,13 @@ class EngineStateMachine {
     };
   }
 
-  /// 切换播放/暂停 — 通过回调注入，不持有引擎引用
+  /// 切换播放/暂停 — 通过回调注入, 不持有引擎引用, 避免循环依赖
   ///
-  /// 状态 → 回调映射:
-  /// - playing → [onPause]
-  /// - idle/paused/completed → [onPlay]
-  /// - opening/error → 无操作（不可 toggle）
+  /// Toggle play/pause via injected callbacks. Does not hold engine reference.
+  /// State-to-callback mapping:
+  /// - playing → calls [onPause]
+  /// - idle/paused/completed → calls [onPlay]
+  /// - opening/error → no-op (not toggleable)
   void togglePlayPause() {
     final current = state.value;
     if (current == MediaState.playing) {

@@ -1,12 +1,15 @@
 import 'player_proxy.dart';
 
-/// 网络流配置器 — 为 URL 源设置 FFmpeg 网络参数
+/// 网络流配置器 — 为 URL 源设置 FFmpeg 网络参数（超时、探测、协议低延迟）
 ///
 /// 职责:
 ///   - 通用网络超时、探测大小、分析时长
 ///   - 协议特定低延迟配置 (RTSP/RTMP/SRT/UDP/TCP/HTTP)
 ///
-/// 仅对 http/https/rtmp/rtsp 等 URL 生效，本地文件不调用。
+/// Contract:
+/// - Only effective for URL sources (http/https/rtmp/rtsp/srt/udp/tcp); local files MUST NOT call.
+/// - All `setProperty` calls are delegated to [MdkPlayerLike]; this class holds no mutable state.
+/// - Protocol detection is prefix-based (`url.startsWith`); callers MUST pass a valid URL.
 class NetworkConfigurator {
   // ─── 常量 ───
 
@@ -21,10 +24,13 @@ class NetworkConfigurator {
 
   const NetworkConfigurator._();
 
-  /// 为 URL 源配置 FFmpeg 网络参数
+  /// 为 URL 源配置 FFmpeg 网络参数（超时、探测大小、分析时长、协议特定参数）
   ///
-  /// 设置超时、探测大小、分析时长和协议特定参数。
-  /// 仅在 [PathValidator.isUrl] 返回 true 时调用。
+  /// Contract:
+  /// - [player] MUST be a valid, open-capable player instance.
+  /// - [url] MUST be a non-empty URL string; protocol is detected by prefix match.
+  /// - Side effect: mutates player properties via `setProperty` / `setBufferRange`.
+  /// - No-op safety: if [url] matches no known protocol prefix, only generic settings are applied.
   static void configure(MdkPlayerLike player, String url) {
     // 通用网络超时
     player.setProperty('timeout', _networkTimeoutMs.toString());
@@ -86,6 +92,11 @@ class NetworkConfigurator {
   }
 
   /// 动态缓冲策略 — 根据网络延迟自适应调整缓冲大小
+  ///
+  /// Contract:
+  /// - Delegates to [configure] first, then applies adaptive buffer sizing.
+  /// - [latencyMs] > 500 → buffer 5 MB (high-latency tolerance); otherwise 1 MB (low-latency fast-start).
+  /// - Side effect: overwrites `'buffer'` property set by [configure] if protocol also sets it.
   static void configureAdaptive(
     MdkPlayerLike player,
     String url, {

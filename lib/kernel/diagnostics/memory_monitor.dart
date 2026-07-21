@@ -91,28 +91,44 @@ final class MemoryMonitor implements MemoryMonitorSlot {
     _startImpl();
   }
 
-  /// RSS 读取抽象 (可注入)。
+  /// RSS 读取抽象 (可注入).
+  ///
+  /// RSS provider abstraction (injectable).
   final RssProvider rssProvider;
 
-  /// 时钟抽象 (可注入)。
+  /// 时钟抽象 (可注入).
+  ///
+  /// Clock abstraction (injectable).
   final Clock clock;
 
-  /// RSS 增长阈值 (字节) — 超过此值触发 warn 日志。
+  /// RSS 增长阈值 (字节) — 超过此值触发 warn 日志.
+  ///
+  /// RSS growth threshold in bytes — triggers warn log when exceeded.
   final int thresholdBytes;
 
-  /// 环形缓冲历史上限。
+  /// 环形缓冲历史上限.
+  ///
+  /// Ring buffer history cap.
   final int maxHistory;
 
-  /// 采样间隔。
+  /// 采样间隔.
+  ///
+  /// Sampling interval.
   final Duration interval;
 
-  /// 日志门面 (可选)。
+  /// 日志门面 (可选).
+  ///
+  /// Logger facade (optional).
   final KernelLogger? _logger;
 
-  /// 每次 tick 回调 (可选)。
+  /// 每次 tick 回调 (可选).
+  ///
+  /// Per-tick callback (optional).
   void Function(MemorySnapshot snapshot)? onTick;
 
-  /// 当前快照 — 外部可通过 ValueListenableBuilder 监听。
+  /// 当前快照 — 外部可通过 ValueListenableBuilder 监听.
+  ///
+  /// Current snapshot — external listeners via ValueListenableBuilder.
   final ValueNotifier<MemorySnapshot?> snapshotNotifier =
       ValueNotifier<MemorySnapshot?>(null);
 

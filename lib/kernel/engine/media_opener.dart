@@ -13,16 +13,18 @@ import 'open_result.dart';
 import 'player_proxy.dart';
 import 'track_manager.dart';
 
-/// 媒体打开器 — 编排打开流程
+/// 媒体打开器 — 编排打开流程.
 ///
-/// 职责:
-///   - 路径验证（空路径、文件存在性）
-///   - 网络配置委托
-///   - MDK prepare + 超时
-///   - metadata 解析（视频/音频/字幕轨）
-///   - D3D11 纹理创建
+/// Media opener — orchestrates the open flow.
 ///
-/// 返回 [OpenResult] 表示成功或失败原因。
+/// Responsibilities:
+///   - Path validation (empty path, file existence).
+///   - Network configuration delegation.
+///   - MDK prepare + timeout.
+///   - Metadata parsing (video/audio/subtitle tracks).
+///   - D3D11 texture creation.
+///
+/// Returns [OpenResult] — success or typed error reason.
 class MediaOpener {
   final MdkPlayerLike _player;
   final TrackManager _trackManager;
@@ -36,11 +38,11 @@ class MediaOpener {
 
   MediaOpener(this._player, this._trackManager);
 
-  /// 打开媒体文件或 URL
+  /// 打开媒体文件或 URL.
   ///
-  /// 调用方需在返回后检查 [OpenResult] 类型:
-  /// - [OpenSuccess]: 打开成功，可开始播放
-  /// - [OpenError]: 打开失败，包含错误类型和消息
+  /// Opens a media file or URL. Caller checks [OpenResult] type:
+  /// - [OpenSuccess]: ready to play.
+  /// - [OpenError]: contains typed error and message.
   Future<OpenResult> open(String path) async {
     // ─── 路径验证 ───
     final trimmed = path.trim();

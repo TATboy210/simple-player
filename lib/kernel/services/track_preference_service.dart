@@ -1,11 +1,13 @@
-/// 轨道偏好管理 — 加载、保存、恢复用户选择的音频/字幕轨道
+/// 轨道偏好管理 — 加载、保存、恢复用户选择的音频/字幕轨道.
 ///
-/// 本文件实现 [TrackPreferenceService] 作为轨道偏好的持久化管理者：
-/// 1. 初始化时从 [SettingsStore] 加载轨道偏好
-/// 2. open() 成功后自动恢复用户的音频/字幕轨道选择
-/// 3. 销毁时异步保存当前轨道偏好到 [SettingsStore]
+/// Track preference management — loads, saves, restores user audio/subtitle selections.
 ///
-/// 架构位置：PlaybackController → **TrackPreferenceService** → MediaEngine (TrackControl + SubtitleConfig)
+/// [TrackPreferenceService] persists track preferences:
+/// 1. Loads from [SettingsStore] on init.
+/// 2. Restores audio/subtitle track after successful open().
+/// 3. Saves current preferences to [SettingsStore] on dispose.
+///
+/// Architecture: PlaybackController → **TrackPreferenceService** → MediaEngine (TrackControl + SubtitleConfig).
 library;
 
 import '../engine/engine_state.dart';
@@ -15,17 +17,24 @@ import '../diagnostics/kernel_logger.dart';
 
 final log = KernelLogger.I;
 
-/// 轨道偏好服务 — 加载、保存、恢复用户选择的音频/字幕轨道和字幕延迟
+/// 轨道偏好服务 — 加载、保存、恢复用户选择的音频/字幕轨道和字幕延迟.
+///
+/// Track preference service — loads, saves, restores audio/subtitle track
+/// selections and subtitle delay.
 class TrackPreferenceService {
   TrackPreferenceService(this._engine);
 
   final MediaEngine _engine;
   TrackPreferences _current = TrackPreferences.empty;
 
-  /// 当前偏好（只读，供测试断言）
+  /// 当前偏好（只读，供测试断言）.
+  ///
+  /// Current preferences (read-only, for test assertions).
   TrackPreferences get current => _current;
 
-  /// 从 [SettingsStore] 加载轨道偏好
+  /// 从 [SettingsStore] 加载轨道偏好.
+  ///
+  /// Loads track preferences from [SettingsStore].
   Future<void> load() async {
     try {
       _current = await SettingsStore.loadTrackPreferences();
@@ -35,9 +44,10 @@ class TrackPreferenceService {
     }
   }
 
-  /// 在 open() 成功后恢复轨道偏好
+  /// 在 open() 成功后恢复轨道偏好.
   ///
-  /// 边界处理：偏好索引超出当前文件轨道数 → 静默忽略
+  /// Restores track preferences after successful open().
+  /// Out-of-range preference indices are silently ignored.
   void restoreAfterOpen(MediaInfo mediaInfo) {
     // 恢复音频轨道
     if (_current.audioTrackIndex != null) {
@@ -63,22 +73,30 @@ class TrackPreferenceService {
     }
   }
 
-  /// 记录用户当前的音频轨道选择
+  /// 记录用户当前的音频轨道选择.
+  ///
+  /// Records user's current audio track selection.
   void recordAudioTrack(int index) {
     _current = _current.copyWith(audioTrackIndex: index);
   }
 
-  /// 记录用户当前的字幕轨道选择（-1 表示关闭字幕）
+  /// 记录用户当前的字幕轨道选择（-1 表示关闭字幕）.
+  ///
+  /// Records user's current subtitle track selection (-1 = disabled).
   void recordSubtitleTrack(int index) {
     _current = _current.copyWith(subtitleTrackIndex: index);
   }
 
-  /// 记录用户当前的字幕延迟
+  /// 记录用户当前的字幕延迟.
+  ///
+  /// Records user's current subtitle delay.
   void recordSubtitleDelay(int delay) {
     _current = _current.copyWith(subtitleDelay: delay);
   }
 
-  /// 持久化当前偏好到 [SettingsStore]
+  /// 持久化当前偏好到 [SettingsStore].
+  ///
+  /// Saves current preferences to [SettingsStore].
   Future<void> save() async {
     try {
       await SettingsStore.saveTrackPreferences(_current);
