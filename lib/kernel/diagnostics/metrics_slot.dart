@@ -6,28 +6,44 @@
 /// implementation-private in the real class, D10). [toJson] uses a loose
 /// value type rather than the concrete `Map<String, Object>`.
 abstract class MetricsSlot {
-  /// 记录一次打开操作 (成功/失败)
+  /// 记录一次打开操作 (成功/失败).
+  ///
+  /// Records an open attempt. [success] indicates outcome.
   void recordOpen({required bool success});
 
-  /// 记录一次 seek 操作耗时
+  /// 记录一次 seek 操作耗时.
+  ///
+  /// Records a seek operation's elapsed time.
   void recordSeek(Duration elapsed);
 
-  /// 记录丢帧事件 (默认计数 1)
+  /// 记录丢帧事件 (默认计数 1).
+  ///
+  /// Records dropped frames (default count: 1).
   void recordFrameDrop([int count = 1]);
 
-  /// 记录解码错误
+  /// 记录解码错误.
+  ///
+  /// Records a decode error.
   void recordDecodeError();
 
-  /// 记录缓冲区欠载
+  /// 记录缓冲区欠载.
+  ///
+  /// Records a buffer underrun.
   void recordBufferUnderrun();
 
-  /// 重置所有计数器
+  /// 重置所有计数器.
+  ///
+  /// Resets all counters.
   void reset();
 
-  /// 导出为 JSON — 值类型故意宽松 (Object?), 不耦合具体计数器形状 (D10)
+  /// 导出为 JSON — 值类型故意宽松 (Object?), 不耦合具体计数器形状 (D10).
+  ///
+  /// Exports as JSON. Deliberately loose value type (D10).
   Map<String, Object?> toJson();
 
-  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用)
+  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用).
+  ///
+  /// Disposes resources. Called cascaded from DiagnosticsBundle.dispose().
   void dispose();
 }
 

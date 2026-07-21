@@ -1,4 +1,11 @@
-/// 音频轨道信息
+/// 音频轨道信息。
+///
+/// Metadata for a single audio track within a media file.
+///
+/// - `index`: Engine-level track index (used by [MediaEngine] to select tracks).
+/// - `language`: ISO 639 language code (e.g. "en", "zh"), empty if unknown.
+/// - `codec`: Audio codec identifier (e.g. "aac", "opus").
+/// - `channels`: Channel count (0 if unknown).
 class AudioTrackInfo {
   final int index;
   final String language;

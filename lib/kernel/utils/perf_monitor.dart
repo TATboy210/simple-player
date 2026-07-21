@@ -5,10 +5,17 @@ import 'package:flutter/scheduler.dart';
 
 /// 性能监控工具 — 记录 build/raster 耗时
 ///
-/// 使用固定容量环形缓冲区（_maxFrames=300），避免无界列表内存泄漏。
-/// 每 100 帧输出一次统计，不主动清空缓冲区（环形覆盖最旧数据）。
+/// Tracks frame build and raster durations via [SchedulerBinding.addTimingsCallback].
+///
+/// Invariants:
+/// - Uses a fixed-capacity ring buffer ([_maxFrames] = 300) to bound memory.
+/// - Logs aggregate statistics every 100 frames.
+/// - Frames exceeding 16 ms (60 fps budget) are logged as slow frames.
 class PerfMonitor {
   static final PerfMonitor _instance = PerfMonitor._();
+  /// 全局单例入口
+  ///
+  /// Returns the singleton [PerfMonitor] instance shared across the app.
   static PerfMonitor get instance => _instance;
 
   PerfMonitor._();
@@ -23,6 +30,9 @@ class PerfMonitor {
   int _totalFrames = 0;
 
   /// 启用性能监控
+  ///
+  /// Registers a timings callback with [SchedulerBinding]. Safe to call
+  /// multiple times — subsequent calls are no-ops if already enabled.
   void enable() {
     if (_enabled) return;
     _enabled = true;
@@ -33,6 +43,8 @@ class PerfMonitor {
   }
 
   /// 禁用性能监控
+  ///
+  /// Unregisters the timings callback. Safe to call when already disabled.
   void disable() {
     _enabled = false;
     SchedulerBinding.instance.removeTimingsCallback(_onTimingsCallback);
@@ -108,7 +120,10 @@ class PerfMonitor {
     );
   }
 
-  /// 重置全部状态（仅供测试使用）。
+  /// 重置全部状态（仅供测试使用）
+  ///
+  /// Clears all ring-buffer data, disables monitoring, and resets counters
+  /// to initial state.
   @visibleForTesting
   void reset() {
     _enabled = false;
@@ -121,6 +136,10 @@ class PerfMonitor {
   }
 
   /// 导出统计为 JSON
+  ///
+  /// Returns a map with keys `frameCount`, `build` ({`avgMs`, `maxMs}`),
+  /// and `raster` ({`avgMs`, `maxMs}`). Returns an empty map when no
+  /// frames have been recorded.
   Map<String, dynamic> exportStats() {
     final result = <String, dynamic>{};
 

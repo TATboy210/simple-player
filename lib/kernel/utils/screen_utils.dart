@@ -9,10 +9,18 @@ final logBridge = KernelLogger.I;
 /// 屏幕几何工具 — 窗口位置校正。
 ///
 /// 支持多显示器：窗口保留在上次所在的显示器上。
+///
+/// Contract:
+/// - Pure static utility class — no I/O, no state mutation.
+/// - All methods return a valid [Offset] where the window remains visible.
+/// - Falls back gracefully when display data is unavailable.
 class ScreenUtils {
   ScreenUtils._();
 
   /// 窗口边缘最小可见像素数。
+  ///
+  /// Used by [_clampToArea] to detect off-screen windows.
+  /// Invariant: `minVisible > 0`.
   static const double minVisible = 100.0;
 
   /// 将窗口位置限制在最近的显示器可见范围内。
@@ -21,6 +29,10 @@ class ScreenUtils {
   /// 2. 若找到，钳制到该显示器的 workArea
   /// 3. 若未找到（显示器断开），找最近的显示器
   /// 4. 若无显示器数据，回退到 [clampToPrimaryDisplay]
+  ///
+  /// [displays] must not be mutated during this call.
+  /// Returns a valid [Offset] where at least [minVisible] pixels
+  /// of the window remain visible on the target display.
   static Offset clampToNearestMonitor({
     required List<DisplayInfo> displays,
     required double x,
@@ -53,6 +65,8 @@ class ScreenUtils {
   ///
   /// 副显示器上的窗口会被拉回主显示器。
   /// 请改用 [clampToNearestMonitor]。
+  ///
+  /// Returns original [Offset] unchanged if platform query fails.
   @Deprecated('Use clampToNearestMonitor for multi-monitor support')
   static Offset clampToPrimaryDisplay({
     required double x,
@@ -81,6 +95,10 @@ class ScreenUtils {
   // ─── 内部方法 ───
 
   /// 找到包含指定点的显示器，未找到返回 null。
+  ///
+  /// - `displays`: list of available displays.
+  /// - `px`/`py`: point coordinates to test.
+  /// - Returns: the [DisplayInfo] whose workArea contains the point, or `null`.
   static DisplayInfo? _findContainingDisplay(
     List<DisplayInfo> displays,
     double px,
@@ -95,6 +113,10 @@ class ScreenUtils {
   }
 
   /// 找到离指定点最近的显示器（按中心距离）。
+  ///
+  /// - `displays`: list of available displays (must be non-empty).
+  /// - `px`/`py`: reference point coordinates.
+  /// - Returns: the [DisplayInfo] with the closest center to the point.
   static DisplayInfo _findNearestDisplay(
     List<DisplayInfo> displays,
     double px,
@@ -119,6 +141,12 @@ class ScreenUtils {
   ///
   /// 若窗口完全超出可见区域（四边均小于 [minVisible]），则居中放置。
   /// 否则返回原始位置不变。
+  ///
+  /// - `area`: target display work area rectangle.
+  /// - `x`/`y`: current window position.
+  /// - `width`/`height`: window dimensions.
+  /// - Returns: clamped [Offset] where at least [minVisible] pixels are visible,
+  ///   or centered in [area] if the window is fully off-screen.
   static Offset _clampToArea({
     required Rect area,
     required double x,

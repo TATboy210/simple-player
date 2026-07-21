@@ -3,24 +3,27 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 
 import '../diagnostics/kernel_logger.dart';
 
-/// 全局热键服务 — 窗口失焦时仍可响应媒体键
+/// 全局热键服务 — 窗口失焦时仍可响应媒体键.
 ///
-/// 注册 3 个系统级热键：
-/// - MediaPlayPause → 播放/暂停
-/// - MediaTrackNext → 下一首
-/// - MediaTrackPrevious → 上一首
+/// Global hotkey service — responds to media keys even when window is unfocused.
 ///
-/// 与 KeyboardHandler 互补：后者处理窗口内快捷键，
-/// 本服务处理窗口外（系统级）媒体键。
+/// Registers 3 system-level hotkeys:
+/// - MediaPlayPause → play/pause
+/// - MediaTrackNext → next track
+/// - MediaTrackPrevious → previous track
+///
+/// Complements KeyboardHandler: latter handles window-internal shortcuts;
+/// this service handles system-level media keys (window-external).
 class GlobalHotkeyService {
   VoidCallback? _onPlayPause;
   VoidCallback? _onNext;
   VoidCallback? _onPrevious;
 
-  /// 注册全部全局热键（回调可为 null，后续通过 [bind] 绑定）
+  /// 注册全部全局热键（回调可为 null，后续通过 [bind] 绑定）.
   ///
-  /// 每个热键单独 try-catch：单个注册失败不影响其他。
-  /// 失败静默降级（窗口内快捷键仍可用）。
+  /// Registers all global hotkeys. Callbacks may be null (bind later via [bind]).
+  /// Each hotkey is individually try-caught — single failure doesn't block others.
+  /// Silent degradation on failure (window-internal shortcuts still work).
   Future<void> registerAll() async {
     try {
       await hotKeyManager.unregisterAll();
@@ -73,7 +76,9 @@ class GlobalHotkeyService {
     KernelLoggerImpl.I.i('GlobalHotkeyService: registered $registered/3 media hotkeys');
   }
 
-  /// 绑定播放控制回调 — 引擎/控制器就绪后调用
+  /// 绑定播放控制回调 — 引擎/控制器就绪后调用.
+  ///
+  /// Binds playback control callbacks — called after engine/controller ready.
   void bind({
     required VoidCallback onPlayPause,
     required VoidCallback onNext,
@@ -85,7 +90,9 @@ class GlobalHotkeyService {
     KernelLoggerImpl.I.d('GlobalHotkeyService: callbacks bound');
   }
 
-  /// 注销全部全局热键
+  /// 注销全部全局热键.
+  ///
+  /// Unregisters all global hotkeys.
   Future<void> unregisterAll() async {
     await hotKeyManager.unregisterAll();
     KernelLoggerImpl.I.d('GlobalHotkeyService: unregistered all');

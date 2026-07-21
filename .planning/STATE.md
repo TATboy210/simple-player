@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
-current_phase: 21
-current_phase_name: verify-migration-adapter-convergence
+current_phase: 22
+current_phase_name: bilingual-api-docs
 status: executing
-stopped_at: context exhaustion at 76% (2026-07-20)
-last_updated: "2026-07-21T00:30:00.000Z"
+stopped_at: Phase 22 bilingual-api-docs COMPLETE (2026-07-21)
+last_updated: "2026-07-21T15:20:00.000Z"
 last_activity: 2026-07-21
-last_activity_desc: Phase 21 all 12 plans complete, ready for verification
+last_activity_desc: "Phase 22 COMPLETE — 55 kernel files bilingual (中 intent + 英 contract). flutter analyze clean. Pending: commit."
 progress:
   total_phases: 8
   completed_phases: 5

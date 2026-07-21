@@ -1,26 +1,32 @@
-/// 播放器结构化错误 — sealed class 层级
+/// 播放器结构化错误 — sealed class 层级, 支持穷举模式匹配
 ///
-/// 替代旧的 flat enum + class 组合，支持穷举模式匹配。
+/// Structured player error — sealed class hierarchy with exhaustive pattern matching.
 /// 每个子类型携带自己的子枚举 code，兼顾类型安全和细粒度错误码。
+/// Each subtype carries its own code enum for type-safe, fine-grained error codes.
 ///
 /// ```dart
 /// switch (error) {
-///   case FileError(:final code) => // 处理文件错误
-///   case CodecError(:final code) => // 处理解码错误
-///   case PlaybackError(:final code) => // 处理播放错误
-///   case NetworkError(:final code) => // 处理网络错误
-///   case UnknownError(:final message) => // 处理未知错误
+///   case FileError(:final code) => // handle file error
+///   case CodecError(:final code) => // handle codec error
+///   case PlaybackError(:final code) => // handle playback error
+///   case NetworkError(:final code) => // handle network error
+///   case UnknownError(:final message) => // handle unknown error
 /// }
 /// ```
 sealed class PlayerError {
-  /// 人类可读的错误消息
+  /// 人类可读的错误消息 — 用于日志和调试
+  ///
+  /// Human-readable error message — used for logging and debugging.
   String get message;
 
-  /// 原始异常（可选）
+  /// 原始异常（可选）— 保留原始异常链用于调试
+  ///
+  /// Original exception (optional) — preserves exception chain for debugging.
   Object? get cause;
 
-  /// 错误结构化上下文 — 携带错误发生时的环境信息 (D1)
+  /// 错误结构化上下文 — 携带错误发生时的环境信息 (D1), 可选以保持向后兼容
   ///
+  /// Structured error context — carries environment info at error site.
   /// Optional for backward compatibility — existing catch sites that
   /// construct errors without context continue to work.
   ErrorContext? get context;
@@ -46,28 +52,40 @@ sealed class PlayerError {
   PlayerError();
 }
 
-/// 错误结构化上下文 — 携带错误发生时的环境信息 (D1)
+/// 错误结构化上下文 — 携带错误发生时的环境信息, 用于日志关联和诊断 (D1)
 ///
-/// Carries structured context at error construction site.
+/// Structured error context — carries environment info at error construction site.
 /// Fields are optional except timestamp (always set at construction).
 /// Serialized via [toMap] for KernelLogger integration.
 class ErrorContext {
-  /// 操作名称 (e.g., 'open', 'play', 'seek')
+  /// 操作名称 (e.g., 'open', 'play', 'seek') — 用于日志关联
+  ///
+  /// Action name — used for log correlation and error categorization.
   final String? action;
 
   /// open() 递增计数器 — 关联到具体哪次 open 请求
+  ///
+  /// Open request generation counter — correlates error to specific open() call.
   final int? generation;
 
-  /// 文件路径或 URL
+  /// 文件路径或 URL — 脱敏后用于日志
+  ///
+  /// File path or URL — redacted before logging.
   final String? path;
 
-  /// 错误发生时间 (D3: default DateTime.now(), injectable for tests)
+  /// 错误发生时间 — 默认 DateTime.now(), 测试可注入 (D3)
+  ///
+  /// Error timestamp — defaults to DateTime.now(), injectable for testing.
   final DateTime timestamp;
 
-  /// 模块名称 (e.g., 'FvpEngine', 'MediaOpener')
+  /// 模块名称 (e.g., 'FvpEngine', 'MediaOpener') — 标识错误来源
+  ///
+  /// Module name — identifies error source for diagnostics.
   final String? module;
 
   /// mdk 回调线程栈 — 仅跨线程封送时填充 (D11)
+  ///
+  /// mdk callback thread stack trace — populated only during cross-thread marshalling.
   final StackTrace? callbackStackTrace;
 
   ErrorContext({
@@ -93,7 +111,9 @@ class ErrorContext {
 
 // ── 文件错误 ──
 
-/// 文件相关错误（路径、存在性、安全性）
+/// 文件相关错误（路径、存在性、安全性）— 携带 FileErrorCode 子枚举
+///
+/// File-related errors (path, existence, security) — carries [FileErrorCode] sub-enum.
 final class FileError extends PlayerError {
   /// 错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
   final FileErrorCode code;
@@ -120,24 +140,37 @@ final class FileError extends PlayerError {
 }
 
 /// 文件错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
+///
+/// File error code registry — append-only, existing codes never renamed/deleted.
 enum FileErrorCode {
   /// 路径为空 — 可恢复
+  ///
+  /// Path is empty — recoverable.
   pathEmpty(recoverable: true),
 
   /// 文件不存在 — 可恢复
+  ///
+  /// File not found — recoverable.
   fileNotFound(recoverable: true),
 
   /// 路径遍历攻击（../、null byte、UNC）— 致命
+  ///
+  /// Path traversal attack (../, null byte, UNC) — fatal.
   pathTraversal(recoverable: false);
 
-  /// Whether this error code is recoverable (non-fatal)
+  /// 是否可恢复（非致命）— recoverable 错误可被 UI 展示后继续使用
+  ///
+  /// Whether this error code is recoverable (non-fatal).
+  /// Recoverable errors can be displayed and the player remains usable.
   final bool recoverable;
   const FileErrorCode({required this.recoverable});
 }
 
 // ── 编解码错误 ──
 
-/// 编解码/格式相关错误
+/// 编解码/格式相关错误 — 携带 CodecErrorCode 子枚举
+///
+/// Codec/format-related errors — carries [CodecErrorCode] sub-enum.
 final class CodecError extends PlayerError {
   /// 错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
   final CodecErrorCode code;
@@ -164,24 +197,36 @@ final class CodecError extends PlayerError {
 }
 
 /// 编解码错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
+///
+/// Codec error code registry — append-only, existing codes never renamed/deleted.
 enum CodecErrorCode {
   /// 不支持的媒体格式 — 可恢复
+  ///
+  /// Unsupported media format — recoverable.
   unsupportedFormat(recoverable: true),
 
   /// 解码失败 — 可恢复
+  ///
+  /// Decode failed — recoverable.
   decodeFailed(recoverable: true),
 
   /// 编解码器不支持 — 可恢复
+  ///
+  /// Codec unsupported — recoverable.
   codecUnsupported(recoverable: true);
 
-  /// Whether this error code is recoverable (non-fatal)
+  /// 是否可恢复（非致命）
+  ///
+  /// Whether this error code is recoverable (non-fatal).
   final bool recoverable;
   const CodecErrorCode({required this.recoverable});
 }
 
 // ── 播放错误 ──
 
-/// 播放控制相关错误
+/// 播放控制相关错误 — 携带 PlaybackErrorCode 子枚举
+///
+/// Playback control errors — carries [PlaybackErrorCode] sub-enum.
 final class PlaybackError extends PlayerError {
   /// 错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
   final PlaybackErrorCode code;
@@ -208,27 +253,41 @@ final class PlaybackError extends PlayerError {
 }
 
 /// 播放错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
+///
+/// Playback error code registry — append-only, existing codes never renamed/deleted.
 enum PlaybackErrorCode {
   /// 播放失败 — 可恢复
+  ///
+  /// Playback failed — recoverable.
   playFailed(recoverable: true),
 
   /// 跳转失败 — 可恢复
+  ///
+  /// Seek failed — recoverable.
   seekFailed(recoverable: true),
 
-  /// 纹理创建失败 — 致命
+  /// 纹理创建失败 — 致命 (GPU 资源不可用)
+  ///
+  /// Texture creation failed — fatal (GPU resource unavailable).
   textureFailed(recoverable: false),
 
   /// 打开超时 — 可恢复
+  ///
+  /// Open timeout — recoverable.
   openTimeout(recoverable: true);
 
-  /// Whether this error code is recoverable (non-fatal)
+  /// 是否可恢复（非致命）
+  ///
+  /// Whether this error code is recoverable (non-fatal).
   final bool recoverable;
   const PlaybackErrorCode({required this.recoverable});
 }
 
 // ── 网络错误 ──
 
-/// 网络相关错误
+/// 网络相关错误 — 携带 NetworkErrorCode 子枚举
+///
+/// Network-related errors — carries [NetworkErrorCode] sub-enum.
 final class NetworkError extends PlayerError {
   /// 错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
   final NetworkErrorCode code;
@@ -255,21 +314,31 @@ final class NetworkError extends PlayerError {
 }
 
 /// 网络错误码注册表 — append-only, 现有码永不重命名/删除 (D6)
+///
+/// Network error code registry — append-only, existing codes never renamed/deleted.
 enum NetworkErrorCode {
   /// 网络超时 — 可恢复
+  ///
+  /// Network timeout — recoverable.
   timeout(recoverable: true),
 
   /// 连接丢失 — 可恢复
+  ///
+  /// Connection lost — recoverable.
   connectionLost(recoverable: true);
 
-  /// Whether this error code is recoverable (non-fatal)
+  /// 是否可恢复（非致命）
+  ///
+  /// Whether this error code is recoverable (non-fatal).
   final bool recoverable;
   const NetworkErrorCode({required this.recoverable});
 }
 
 // ── 未知错误 ──
 
-/// 未分类错误 — 始终可恢复 (research Open Q4)
+/// 未分类错误 — 始终可恢复, 未分类不代表致命 (research Open Q4)
+///
+/// Uncategorized error — always recoverable. Being uncategorized does not imply fatal.
 final class UnknownError extends PlayerError {
   @override
   final String message;

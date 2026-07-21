@@ -4,7 +4,14 @@ import 'package:simple_player_flutter/kernel/engine/models/audio_track_info.dart
 import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.dart';
 import 'package:simple_player_flutter/kernel/engine/models/video_codec_info.dart';
 
-/// 媒体文件信息（打开后可用）
+/// 媒体文件信息（打开后可用）。
+///
+/// Aggregated metadata for an opened media file.
+///
+/// - `duration`: Total duration in milliseconds.
+/// - `video`: Video codec info, `null` for audio-only files.
+/// - `audioTracks`: Available audio tracks.
+/// - `subtitleTracks`: Available subtitle tracks.
 class MediaInfo {
   final int duration; // 毫秒
   final VideoCodecInfo? video;

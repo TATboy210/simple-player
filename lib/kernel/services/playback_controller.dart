@@ -60,10 +60,14 @@ class PlaybackController {
     autoAdvance = AutoAdvancePolicy(this);
   }
 
-  /// 视频渲染引擎实例
+  /// 视频渲染引擎实例.
+  ///
+  /// Media engine instance.
   final MediaEngine engine;
 
-  /// 播放列表管理器 — 包含当前播放索引、播放模式、历史记录
+  /// 播放列表管理器 — 包含当前播放索引、播放模式、历史记录.
+  ///
+  /// Playlist manager — holds current index, play mode, and history.
   final Playlist playlist;
 
   /// UI 重建回调 — 子模块播放列表变更时调用
@@ -78,37 +82,59 @@ class PlaybackController {
   /// 轨道偏好服务 — 可选依赖，null 表示不持久化轨道偏好
   final TrackPreferenceService? _trackPreferenceService;
 
-  /// 播放导航子模块 — 索引跳转和并发 open() 守卫
+  /// 播放导航子模块 — 索引跳转和并发 open() 守卫.
+  ///
+  /// Playback navigation sub-module — index jumping and concurrent open() guard.
   late final PlaybackNavigator navigator;
 
-  /// 文件操作子模块 — 文件打开和批量添加
+  /// 文件操作子模块 — 文件打开和批量添加.
+  ///
+  /// File operations sub-module — open and batch-add files.
   late final FileOperations fileOps;
 
-  /// 状态管理子模块 — 设置恢复、断点保存、销毁持久化
+  /// 状态管理子模块 — 设置恢复、断点保存、销毁持久化.
+  ///
+  /// State management sub-module — settings restore, breakpoint save, dispose persistence.
   late final PlaybackStateManager stateManager;
 
-  /// 自动连播策略 — completed → loopSingle / next
+  /// 自动连播策略 — completed → loopSingle / next.
+  ///
+  /// Auto-advance policy — completed → loopSingle / next.
   late final AutoAdvancePolicy autoAdvance;
 
-  /// 调试探针 — 记录播放控制操作的耗时和事件（编译时开关 kDebugMode）
+  /// 调试探针 — 记录播放控制操作的耗时和事件（编译时开关 kDebugMode）.
+  ///
+  /// Debug probe — records timing and events (compile-time kDebugMode gate).
   final DebugProbe probe = DebugProbeRegistry.register('playback');
 
-  /// 当前播放文件名（仅文件名，不含路径）— UI 层显示标题栏文件名
+  /// 当前播放文件名（仅文件名，不含路径）— UI 层显示标题栏文件名.
+  ///
+  /// Current playback file name (basename only) — displayed in title bar.
   final ValueNotifier<String> currentFileName = ValueNotifier('');
 
-  /// 通知 UI 层播放列表已变更
+  /// 通知 UI 层播放列表已变更.
+  ///
+  /// Notifies UI layer that the playlist has changed.
   void onNeedRebuild() => _onNeedRebuild();
 
-  /// 错误回调（子模块通过 `_controller.onError?.call(error)` 调用）
+  /// 错误回调（子模块通过 `_controller.onError?.call(error)` 调用）.
+  ///
+  /// Error callback invoked by sub-modules.
   void Function(PlayerError error)? get onError => _onError;
 
-  /// 获取字幕服务（可能为 null）
+  /// 获取字幕服务（可能为 null）.
+  ///
+  /// Returns the subtitle service, or null if not configured.
   SubtitleService? get subtitleService => _subtitleService;
 
-  /// 获取轨道偏好服务（可能为 null）
+  /// 获取轨道偏好服务（可能为 null）.
+  ///
+  /// Returns the track preference service, or null if not configured.
   TrackPreferenceService? get trackPreferenceService => _trackPreferenceService;
 
-  /// 保存播放列表 — 异步写入，跨模块共享
+  /// 保存播放列表 — 异步写入，跨模块共享.
+  ///
+  /// Persists playlist to storage. Shared across sub-modules.
   void savePlaylist() {
     PlaylistStore.save(playlist);
   }
@@ -116,30 +142,43 @@ class PlaybackController {
   // ── 转发 — UI 层的统一入口 ──
   // 所有播放/文件操作委托给对应子模块，UI 层无需关心具体实现。
 
-  /// 播放指定索引 — 委托 [PlaybackNavigator.playIndex]
+  /// 播放指定索引 — 委托 [PlaybackNavigator.playIndex].
+  ///
+  /// Plays the track at [i]. Delegates to [PlaybackNavigator.playIndex].
   Future<void> playIndex(int i) => navigator.playIndex(i);
 
-  /// 播放下一首 — 委托 [PlaybackNavigator.playNext]
+  /// 播放下一首 — 委托 [PlaybackNavigator.playNext].
+  ///
+  /// Plays the next track. Delegates to [PlaybackNavigator.playNext].
   Future<void> playNext() => navigator.playNext();
 
-  /// 播放上一首 — 委托 [PlaybackNavigator.playPrevious]
+  /// 播放上一首 — 委托 [PlaybackNavigator.playPrevious].
+  ///
+  /// Plays the previous track. Delegates to [PlaybackNavigator.playPrevious].
   Future<void> playPrevious() => navigator.playPrevious();
 
-  /// 打开并播放文件 — 委托 [FileOperations.openAndPlay]
+  /// 打开并播放文件 — 委托 [FileOperations.openAndPlay].
+  ///
+  /// Opens and plays a file. Delegates to [FileOperations.openAndPlay].
   Future<bool> openAndPlay(String p) => fileOps.openAndPlay(p);
 
-  /// 批量添加文件 — 委托 [FileOperations.addFiles]
+  /// 批量添加文件 — 委托 [FileOperations.addFiles].
+  ///
+  /// Batch-adds files. Delegates to [FileOperations.addFiles].
   Future<int> addFiles(List<String> p) => fileOps.addFiles(p);
 
-  /// 最近一次路径校验错误（null 表示无错误）— 委托 [FileOperations.validationError]
+  /// 最近一次路径校验错误（null 表示无错误）— 委托 [FileOperations.validationError].
+  ///
+  /// Most recent path validation error (null = none). Delegates to [FileOperations.validationError].
   ValueNotifier<String?> get validationError => fileOps.validationError;
 
   // ── 播放列表 CRUD ──
 
-  /// 移除播放列表中指定索引
+  /// 移除播放列表中指定索引.
   ///
-  /// 如果移除的是当前播放项，自动停止引擎并尝试播放下一项。
-  /// 移除后通知 UI 重建并持久化播放列表。
+  /// Removes the playlist entry at [index]. If it is the currently playing
+  /// track, stops the engine and attempts to play the next item.
+  /// Notifies UI rebuild and persists playlist after removal.
   Future<void> removeAt(int index) async {
     final wasCurrent = playlist.currentIndex == index;
     playlist.removeAt(index);
@@ -154,14 +193,18 @@ class PlaybackController {
     savePlaylist();
   }
 
-  /// 拖拽排序 — 交换播放列表中两个位置的项
+  /// 拖拽排序 — 交换播放列表中两个位置的项.
+  ///
+  /// Drag-reorder — swaps two playlist entries.
   void reorder(int oldIndex, int newIndex) {
     playlist.reorder(oldIndex, newIndex);
     _onNeedRebuild();
     savePlaylist();
   }
 
-  /// 清空播放列表 — 停止引擎，重置文件名，通知 UI 重建
+  /// 清空播放列表 — 停止引擎，重置文件名，通知 UI 重建.
+  ///
+  /// Clears playlist — stops engine, resets filename, notifies UI.
   void clearPlaylist() {
     engine.stop();
     playlist.clear();
@@ -170,7 +213,9 @@ class PlaybackController {
     savePlaylist();
   }
 
-  /// 切换播放模式 — 在 LoopAll / LoopSingle / Shuffle 之间循环切换
+  /// 切换播放模式 — 在 LoopAll / LoopSingle / Shuffle 之间循环切换.
+  ///
+  /// Cycles play mode through LoopAll → LoopSingle → Shuffle.
   void togglePlayMode() {
     // 循环取模：index + 1 后对 PlayMode 枚举长度取模，实现循环切换
     final next = (playlist.mode.index + 1) % PlayMode.values.length;
@@ -191,7 +236,9 @@ class PlaybackController {
     await _trackPreferenceService?.load();
   });
 
-  /// 释放资源 — 按序释放 autoAdvance / stateManager / currentFileName / validationError
+  /// 释放资源 — 按序释放 autoAdvance / stateManager / currentFileName / validationError.
+  ///
+  /// Disposes resources in order: autoAdvance, stateManager, trackPreference, currentFileName, validationError.
   void dispose() {
     autoAdvance.dispose();
     stateManager.dispose();

@@ -146,54 +146,94 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   // ─── 可观测性 ───
 
   /// 引擎健康指标 — 计数器在 open/play/seek/error 路径自动更新
+  ///
+  /// Engine health counters, auto-updated on open/play/seek/error paths.
   final metrics = EngineMetrics();
 
   /// 引擎事件日志 — 最近 100 条操作记录（环形缓冲，不持久化）
+  ///
+  /// Ring buffer of the most recent 100 engine events (not persisted).
   final eventLog = EngineEventLog();
 
   // ─── ValueNotifier 实现 ───
 
+  /// GPU 纹理 ID — 由 fvp 插件注册，null 表示尚未就绪
+  ///
+  /// GPU texture ID registered by the fvp plugin; `null` until ready.
   @override
   final ValueNotifier<int?> textureId = ValueNotifier<int?>(null);
 
   /// 主播放状态 — 委托给 EngineStateMachine 管理
+  ///
+  /// Primary playback state notifier, delegated to [EngineStateMachine].
   @override
   ValueNotifier<MediaState> get state => _stateMachine.state;
 
+  /// 当前播放位置（毫秒）
+  ///
+  /// Current playback position in milliseconds.
   @override
   final ValueNotifier<int> position = ValueNotifier<int>(0);
 
+  /// 媒体总时长（毫秒）
+  ///
+  /// Total media duration in milliseconds.
   @override
   final ValueNotifier<int> duration = ValueNotifier<int>(0);
 
+  /// 音量（0.0–1.0）
+  ///
+  /// Volume level in the range 0.0 (silent) to 1.0 (max).
   @override
   final ValueNotifier<double> volume = ValueNotifier<double>(
     EngineConstants.defaultVolume,
   );
 
+  /// 是否静音
+  ///
+  /// Whether audio output is muted.
   @override
   final ValueNotifier<bool> isMuted = ValueNotifier<bool>(false);
 
   /// 是否正在缓冲 — 委托给 EngineStateMachine 管理
+  ///
+  /// Whether the engine is buffering data, delegated to [EngineStateMachine].
   @override
   ValueNotifier<bool> get isBuffering => _stateMachine.isBuffering;
 
+  /// 当前字幕文本
+  ///
+  /// Current subtitle text for the active frame.
   @override
   final ValueNotifier<String> subtitleText = ValueNotifier<String>('');
 
+  /// 已缓冲的字节数
+  ///
+  /// Number of bytes currently buffered ahead of playback position.
   @override
   final ValueNotifier<int> buffered = ValueNotifier<int>(0);
 
+  /// 视频宽高比
+  ///
+  /// Current video aspect ratio (width / height, accounting for PAR).
   @override
   final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
 
+  /// 最近一次错误（null 表示无错误）
+  ///
+  /// Most recent [PlayerError], or `null` if no error occurred.
   @override
   final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
 
   /// 是否正在 seek — 委托给 EngineStateMachine 管理
+  ///
+  /// Whether a seek operation is in progress, delegated to [EngineStateMachine].
   @override
   ValueNotifier<bool> get isSeeking => _stateMachine.isSeeking;
 
+  /// 播放速率（1.0 = 正常速度）
+  ///
+  /// Playback speed multiplier (1.0 = normal speed).
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(
     EngineConstants.defaultPlaybackRate,
@@ -203,19 +243,28 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   String _currentPath = '';
 
+  /// 当前媒体元数据（编解码器、分辨率、时长等）
+  ///
+  /// Current media metadata (codec, resolution, duration, etc.).
   @override
   MediaInfo get mediaInfo => _trackManager.mediaInfo;
 
   // ─── 生命周期 (Phase 20 D6/D7) ───
 
   /// 引擎生命周期阶段 — 委托给 EngineStateMachine (D6 正交生命周期)
+  ///
+  /// Engine lifecycle phase notifier, delegated to [EngineStateMachine].
   ValueNotifier<LifecyclePhase> get lifecyclePhase => _stateMachine.lifecyclePhase;
 
   /// 状态机访问器 — PlaybackNavigator 通过此访问 generation 计数器 (D5 单一真相源)
+  ///
+  /// State machine accessor; [PlaybackNavigator] reads the generation counter here.
   @override
   EngineStateMachine get stateMachine => _stateMachine;
 
   /// 从 error 状态恢复到 idle — 委托给 EngineStateMachine (D7)
+  ///
+  /// Recovers from error state back to idle. Delegates to [EngineStateMachine].
   void recover() {
     if (_disposed) return;
     _stateMachine.recover(lastError: lastError);
@@ -231,10 +280,29 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 接口 getter (per D-07) ───
 
+  /// 音频/字幕轨道管理
+  ///
+  /// Audio/subtitle track selection and switching.
   TrackControl get trackControl => _trackManager;
+
+  /// 字幕配置（外挂字幕、延迟、均衡器）
+  ///
+  /// Subtitle configuration (external subs, delay, equalizer).
   SubtitleConfig get subtitleConfig => _subtitleConfigurator;
+
+  /// 视频效果控制（色彩、旋转、宽高比、反交错）
+  ///
+  /// Video effect controls (color, rotation, aspect ratio, deinterlace).
   VideoEffectControl get videoEffectControl => _videoEffectController;
+
+  /// D3D11 渲染管线配置
+  ///
+  /// D3D11 render pipeline configuration.
   RendererControl get rendererControl => _d3d11Configurator;
+
+  /// 音量/静音控制
+  ///
+  /// Volume and mute control.
   VolumeControl get volumeControl => _volumeController;
 
   // ─── 通用守卫 ───
@@ -259,6 +327,11 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 播放控制 ───
 
+  /// 打开媒体文件或 URL
+  ///
+  /// Opens the media file at [path] (local path or URL).
+  /// Transitions through `opening → idle` on success or `opening → error` on failure.
+  /// Codec errors on local files trigger an automatic software-decode retry.
   @override
   Future<void> open(String path) async {
     if (_disposed) return;
@@ -363,6 +436,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     }
   }
 
+  /// 开始播放
+  ///
+  /// Starts playback. No-op if already playing or disposed.
   @override
   void play() {
     if (_disposed) return;
@@ -391,6 +467,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     }
   }
 
+  /// 暂停播放
+  ///
+  /// Pauses playback. No-op if disposed.
   @override
   void pause() {
     if (_disposed) return;
@@ -412,6 +491,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     }
   }
 
+  /// 停止播放并重置位置
+  ///
+  /// Stops playback and resets position to 0. No-op if disposed.
   @override
   void stop() {
     if (_disposed) return;
@@ -434,6 +516,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     }
   }
 
+  /// 跳转到指定位置
+  ///
+  /// Seeks to [milliseconds] (clamped to 0..duration).
+  /// No-op if idle, duration unknown, or already seeking.
   @override
   Future<void> seekTo(int milliseconds) async {
     if (_disposed) return;
@@ -475,12 +561,18 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     );
   }
 
+  /// 切换播放/暂停
+  ///
+  /// Toggles between playing and paused states. No-op if disposed.
   @override
   void togglePlayPause() {
     if (_disposed) return;
     _stateMachine.togglePlayPause();
   }
 
+  /// 设置播放速率
+  ///
+  /// Sets playback speed to [rate] (clamped to min/max constants).
   @override
   void setPlaybackRate(double rate) {
     _guardedAction('setPlaybackRate', () {
@@ -495,16 +587,26 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 快进（默认 10 秒）
+  ///
+  /// Skips forward by [ms] milliseconds (default 10s). Clamped to duration.
   @override
   void skipForward([int ms = EngineConstants.defaultSkipMs]) {
     seekTo((position.value + ms).clamp(0, duration.value));
   }
 
+  /// 快退（默认 10 秒）
+  ///
+  /// Skips backward by [ms] milliseconds (default 10s). Clamped to 0.
   @override
   void skipBack([int ms = EngineConstants.defaultSkipMs]) {
     seekTo((position.value - ms).clamp(0, duration.value));
   }
 
+  /// 设置播放范围（循环区间）
+  ///
+  /// Sets the playback range. [from] and [to] are in milliseconds;
+  /// `to = -1` means end of media. Values are clamped to [0, duration].
   @override
   void setRange({required int from, int to = -1}) {
     _guardedAction('setRange', () {
@@ -524,41 +626,65 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── TrackControl 实现 ───
 
+  /// 获取可用音频轨道列表
+  ///
+  /// Returns available audio tracks.
   @override
   List<AudioTrackInfo> getAudioTracks() => _trackManager.getAudioTracks();
 
+  /// 切换到指定音频轨道
+  ///
+  /// Switches to the audio track at [trackIndex]. No-op if disposed.
   @override
   void switchAudioTrack(int trackIndex) {
     if (_disposed) return;
     _trackManager.switchAudioTrack(trackIndex);
   }
 
+  /// 当前激活的音频轨道索引列表
+  ///
+  /// Indices of currently active audio tracks; empty if disposed.
   @override
   List<int> get activeAudioTracks =>
       _disposed ? [] : _trackManager.activeAudioTracks;
 
   // ─── SubtitleConfig 实现 ───
 
+  /// 获取可用字幕轨道列表
+  ///
+  /// Returns available subtitle tracks.
   @override
   List<SubtitleTrackInfo> getSubtitleTracks() =>
       _trackManager.getSubtitleTracks();
 
+  /// 切换到指定字幕轨道
+  ///
+  /// Switches to the subtitle track at [trackIndex]. No-op if disposed.
   @override
   void switchSubtitleTrack(int trackIndex) {
     if (_disposed) return;
     _trackManager.switchSubtitleTrack(trackIndex);
   }
 
+  /// 切换字幕开/关
+  ///
+  /// Toggles subtitle display on/off. No-op if disposed.
   @override
   void toggleSubtitle() {
     if (_disposed) return;
     _trackManager.toggleSubtitle();
   }
 
+  /// 当前激活的字幕轨道索引列表
+  ///
+  /// Indices of currently active subtitle tracks; empty if disposed.
   @override
   List<int> get activeSubtitleTracks =>
       _disposed ? [] : _trackManager.activeSubtitleTracks;
 
+  /// 加载外挂字幕文件
+  ///
+  /// Loads an external subtitle file from [path].
   @override
   void setExternalSubtitle(String path) {
     _guardedAction('setExternalSubtitle', () {
@@ -566,6 +692,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 设置字幕延迟（毫秒，正=延后，负=提前）
+  ///
+  /// Sets subtitle delay in ms (positive = delay, negative = advance).
   @override
   void setSubtitleDelay(int milliseconds) {
     _guardedAction('setSubtitleDelay', () {
@@ -573,12 +702,18 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 当前字幕延迟（毫秒）
+  ///
+  /// Current subtitle delay in milliseconds; 0 if disposed.
   @override
   int get subtitleDelay {
     if (_disposed) return 0;
     return _subtitleConfigurator.getSubtitleDelay();
   }
 
+  /// 设置音频均衡器滤镜
+  ///
+  /// Applies an audio filter string (MDK `af` syntax).
   @override
   void setEqualizer(String afFilter) {
     _guardedAction('setEqualizer', () {
@@ -588,6 +723,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── VideoEffectControl 实现 ───
 
+  /// 设置视频效果参数
+  ///
+  /// Applies [value] for the given [effect] type (brightness, contrast, etc.).
   @override
   void setVideoEffect(VideoEffectType effect, double value) {
     _guardedAction('setVideoEffect', () {
@@ -595,6 +733,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 旋转视频画面（度数）
+  ///
+  /// Rotates the video by [degree] degrees.
   @override
   void rotate(int degree) {
     _guardedAction('rotate', () {
@@ -602,6 +743,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 设置显示宽高比
+  ///
+  /// Sets the display aspect ratio to [ratio].
   @override
   void setAspectRatio(double ratio) {
     _guardedAction('setAspectRatio', () {
@@ -609,6 +753,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 开/关反交错
+  ///
+  /// Enables or disables deinterlacing.
   @override
   void setDeinterlace(bool enable) {
     _guardedAction('setDeinterlace', () {
@@ -618,6 +765,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── VolumeControl 实现 ───
 
+  /// 设置音量（0.0–1.0）
+  ///
+  /// Sets volume to [value] (clamped to 0.0–1.0).
   @override
   void setVolume(double value) {
     _guardedAction('setVolume', () {
@@ -625,6 +775,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 设置静音
+  ///
+  /// Mutes or unmutes audio based on [mute].
   @override
   void setMute(bool mute) {
     _guardedAction('setMute', () {
@@ -634,6 +787,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── RendererControl 实现 ───
 
+  /// 开/关 D3D11 CPU 同步
+  ///
+  /// Enables or disables D3D11 CPU sync (sync.cpu parameter).
   @override
   void setD3d11SyncEnabled(bool enabled) {
     _guardedAction('setD3d11SyncEnabled', () {
@@ -641,6 +797,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
     });
   }
 
+  /// 开/关硬件解码
+  ///
+  /// Enables or disables hardware-accelerated decoding.
   @override
   void setHardwareDecoding(bool enabled) {
     _guardedAction('setHardwareDecoding', () {
@@ -650,6 +809,10 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   // ─── 生命周期 ───
 
+  /// 释放所有资源
+  ///
+  /// Disposes all notifiers, helpers, and the underlying player.
+  /// Double-dispose safe (no-op on second call).
   @override
   void dispose() {
     if (_disposed) return;

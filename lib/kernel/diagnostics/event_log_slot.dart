@@ -5,19 +5,29 @@
 /// concrete `EngineEvent` type to `Map<String, Object?>` (D10) so Phase 19
 /// can change the concrete event shape without breaking this interface.
 abstract class EventLogSlot {
-  /// 追加一条事件记录 (type 为事件类型, data 为可选附加数据)
+  /// 追加一条事件记录 (type 为事件类型, data 为可选附加数据).
+  ///
+  /// Appends an event record. [type] is the event type; [data] is optional.
   void add(String type, [Map<String, Object?>? data]);
 
-  /// 当前所有事件条目 — 松散类型, 未耦合具体 EngineEvent (D10)
+  /// 当前所有事件条目 — 松散类型, 未耦合具体 EngineEvent (D10).
+  ///
+  /// All event entries. Loose type — not coupled to concrete EngineEvent (D10).
   List<Map<String, Object?>> get entries;
 
-  /// 清空所有事件条目
+  /// 清空所有事件条目.
+  ///
+  /// Clears all event entries.
   void clear();
 
-  /// 导出为 JSON 列表
+  /// 导出为 JSON 列表.
+  ///
+  /// Exports entries as a JSON-compatible list.
   List<Map<String, Object?>> toJson();
 
-  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用)
+  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用).
+  ///
+  /// Disposes resources. Called cascaded from DiagnosticsBundle.dispose().
   void dispose();
 }
 

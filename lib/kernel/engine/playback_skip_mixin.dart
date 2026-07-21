@@ -3,23 +3,28 @@ import 'package:flutter/foundation.dart';
 import 'engine_constants.dart';
 import 'playback_control.dart';
 
-/// 便捷跳转 mixin — 提供 skipForward/skipBack 默认实现
+/// 便捷跳转 mixin — 提供 skipForward/skipBack 默认实现.
 ///
-/// 混入 [PlaybackControl] 的实现类即可获得跳转能力，
-/// 无需重复编写 clamp 逻辑。
+/// Skip mixin — provides default [skipForward]/[skipBack] implementations.
 ///
-/// 依赖（需由混入类提供）:
-/// - [position] 当前播放位置（毫秒）
-/// - [duration] 媒体总时长（毫秒）
-/// - [seekTo] 跳转到指定位置
+/// Mix into any [PlaybackControl] implementor to gain skip capability
+/// without repeating clamp logic.
 ///
-/// 注意: setRange 保留在 FvpEngine 中，因为它需要
-/// _player.setRange + _guardedAction，mixin 无法访问这些依赖。
+/// Dependencies (must be provided by the mixing class):
+/// - [position] — current playback position (ms)
+/// - [duration] — total media duration (ms)
+/// - [seekTo] — seek to specified position
+///
+/// Note: [setRange] stays in FvpEngine (needs _player.setRange + _guardedAction).
 mixin PlaybackSkipMixin implements PlaybackControl {
-  /// 当前播放位置（毫秒） — 由混入类提供
+  /// 当前播放位置（毫秒） — 由混入类提供.
+  ///
+  /// Current playback position (ms) — provided by mixing class.
   ValueNotifier<int> get position;
 
-  /// 媒体总时长（毫秒） — 由混入类提供
+  /// 媒体总时长（毫秒） — 由混入类提供.
+  ///
+  /// Total media duration (ms) — provided by mixing class.
   ValueNotifier<int> get duration;
 
   @override

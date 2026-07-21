@@ -1,8 +1,13 @@
 /// 引擎事件 — 结构化日志记录
 ///
-/// 每次引擎操作（open/play/seek/error）生成一个事件，
-/// 保留最近 100 条，不持久化，仅用于调试和性能分析。
+/// A structured event emitted by the engine on each operation
+/// (open / play / pause / seek / error). Retains the most recent
+/// 100 entries; not persisted — for debugging and perf analysis only.
 class EngineEvent {
+  /// 创建引擎事件
+  ///
+  /// Creates an engine event with the given [type], [timestamp], and
+  /// optional [data] payload.
   const EngineEvent({
     required this.type,
     required this.timestamp,
@@ -10,14 +15,23 @@ class EngineEvent {
   });
 
   /// 事件类型（如 'open', 'play', 'pause', 'seek', 'error'）
+  ///
+  /// Event type identifier, e.g. `'open'`, `'play'`, `'seek'`, `'error'`.
   final String type;
 
   /// 事件发生时间
+  ///
+  /// Wall-clock timestamp when the event occurred.
   final DateTime timestamp;
 
   /// 附加数据（可选，如 seek 目标位置、错误消息）
+  ///
+  /// Optional payload map (e.g. seek target position, error message).
   final Map<String, Object?>? data;
 
+  /// 导出为 JSON Map
+  ///
+  /// Returns a JSON-serialisable representation of this event.
   Map<String, Object?> toJson() => {
     'type': type,
     'timestamp': timestamp.toIso8601String(),
@@ -30,13 +44,18 @@ class EngineEvent {
 
 /// 引擎事件环形缓冲 — 固定容量，超出覆盖最旧条目
 ///
-/// 设计为轻量级：无锁、无持久化、固定内存占用。
-/// 容量 100 条 ≈ 正常播放 2-3 分钟的操作量。
+/// Fixed-capacity ring buffer for engine events.
+/// Lightweight: no locks, no persistence, constant memory footprint.
+/// Default capacity 100 ≈ 2–3 minutes of normal playback operations.
 class EngineEventLog {
   /// 默认环形缓冲容量
+  ///
+  /// Default ring buffer capacity (100 entries).
   static const defaultCapacity = 100;
 
   /// 缓冲容量
+  ///
+  /// Maximum number of events retained before oldest are overwritten.
   final int capacity;
 
   /// 底层存储
@@ -52,17 +71,26 @@ class EngineEventLog {
       : _buffer = List<EngineEvent?>.filled(defaultCapacity, null);
 
   /// 当前条目数
+  ///
+  /// Number of events currently in the buffer (never exceeds [capacity]).
   int get length => _count;
 
   /// 是否为空
+  ///
+  /// Whether the buffer contains zero events.
   bool get isEmpty => _count == 0;
 
   /// 是否已满（新条目将覆盖最旧）
+  ///
+  /// Whether the buffer has reached [capacity]; next [add] overwrites the oldest.
   bool get isFull => _count == capacity;
 
   /// 添加事件
   ///
-  /// 当缓冲已满时，覆盖最旧的条目（环形写入）。
+  /// Appends an event to the ring buffer.
+  /// When full, overwrites the oldest entry (circular write).
+  /// - [type]: event identifier (e.g. `'open'`, `'seek'`).
+  /// - [data]: optional payload map.
   void add(String type, [Map<String, Object?>? data]) {
     final event = EngineEvent(
       type: type,
@@ -75,6 +103,9 @@ class EngineEventLog {
   }
 
   /// 获取所有条目（按时间从旧到新排列）
+  ///
+  /// Returns all events ordered oldest-first.
+  /// The list is unmodifiable.
   List<EngineEvent> get entries {
     if (_count == 0) return const [];
     if (_count < capacity) {
@@ -89,6 +120,8 @@ class EngineEventLog {
   }
 
   /// 清空所有条目
+  ///
+  /// Removes all events and resets the write pointer.
   void clear() {
     for (var i = 0; i < capacity; i++) {
       _buffer[i] = null;
@@ -98,6 +131,8 @@ class EngineEventLog {
   }
 
   /// 导出为 JSON 列表（供调试导出）
+  ///
+  /// Returns all events as a JSON-serialisable list (oldest first).
   List<Map<String, Object?>> toJson() =>
       entries.map((e) => e.toJson()).toList();
 }

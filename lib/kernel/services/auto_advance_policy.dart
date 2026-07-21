@@ -1,11 +1,13 @@
-/// 自动连播策略 — 监听引擎完成状态并决定下一首播放逻辑
+/// 自动连播策略 — 监听引擎完成状态并决定下一首播放逻辑.
 ///
-/// 本文件实现 [AutoAdvancePolicy] 作为播放完成后的连播决策器：
-/// - 单曲循环 (loopSingle) → 重播当前索引
-/// - 其他模式 (loopAll / shuffle) → 自动播放下一首
+/// Auto-advance policy — listens for engine completion and decides next track.
 ///
-/// 架构位置：PlaybackController → **AutoAdvancePolicy** → MediaEngine.state (ValueNotifier)
-/// 设计模式：Strategy（策略模式）— 封装连播决策，可独立替换或扩展
+/// [AutoAdvancePolicy] decides what happens after playback completes:
+/// - loopSingle → replay current index
+/// - loopAll / shuffle → auto-play next track
+///
+/// Architecture: PlaybackController → **AutoAdvancePolicy** → MediaEngine.state (ValueNotifier).
+/// Pattern: Strategy — encapsulates advance decision, independently replaceable.
 library;
 
 import 'dart:async';
@@ -17,31 +19,33 @@ import 'playback_controller.dart';
 
 final log = KernelLogger.I;
 
-/// 自动连播策略 — 监听 [MediaState.completed] 并驱动播放器前进
+/// 自动连播策略 — 监听 [MediaState.completed] 并驱动播放器前进.
 ///
-/// 职责单一：只关心「播放完成后做什么」，不涉及设置恢复或断点保存。
-/// 通过 [PlaybackController] 的回调访问播放列表和导航器，保持松耦合。
+/// Listens for [MediaState.completed] and drives playback forward.
+/// Single responsibility: only handles "what to do after playback ends";
+/// no settings restore or breakpoint save. Accesses playlist and navigator
+/// via [PlaybackController] callbacks for loose coupling.
 class AutoAdvancePolicy {
   AutoAdvancePolicy(this._controller);
   final PlaybackController _controller;
 
   bool _initialized = false;
 
-  /// 初始化：注册引擎状态监听
+  /// 初始化：注册引擎状态监听.
   ///
-  /// 幂等操作：多次调用只注册一次（_initialized 守卫）。
+  /// Registers engine state listener. Idempotent (guarded by [_initialized]).
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
     _controller.engine.state.addListener(_onStateChanged);
   }
 
-  /// 引擎状态变化回调 — 仅处理 [MediaState.completed]
+  /// 引擎状态变化回调 — 仅处理 [MediaState.completed].
   ///
-  /// 状态机：
-  /// - completed + loopSingle → 重播当前索引
-  /// - completed + 其他模式 → 自动播放下一首
-  /// - 其他状态 → 忽略
+  /// Engine state callback — handles [MediaState.completed] only.
+  /// - completed + loopSingle → replay current index
+  /// - completed + other modes → auto-play next
+  /// - other states → ignored
   void _onStateChanged() {
     if (_controller.engine.state.value != MediaState.completed) return;
 
@@ -53,7 +57,9 @@ class AutoAdvancePolicy {
     }
   }
 
-  /// 单曲循环：重新播放指定索引
+  /// 单曲循环：重新播放指定索引.
+  ///
+  /// Loop-single: replays the specified index.
   Future<void> _replayIndex(int index) async {
     try {
       await _controller.navigator.playIndex(index);
@@ -65,7 +71,9 @@ class AutoAdvancePolicy {
     }
   }
 
-  /// 自动连播：播放下一首
+  /// 自动连播：播放下一首.
+  ///
+  /// Auto-advance: plays the next track.
   Future<void> _autoAdvance() async {
     try {
       await _controller.navigator.playNext();
@@ -77,7 +85,9 @@ class AutoAdvancePolicy {
     }
   }
 
-  /// 释放资源 — 注销引擎状态监听
+  /// 释放资源 — 注销引擎状态监听.
+  ///
+  /// Disposes resources — unregisters engine state listener.
   void dispose() {
     _controller.engine.state.removeListener(_onStateChanged);
   }

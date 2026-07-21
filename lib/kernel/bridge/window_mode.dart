@@ -1,4 +1,11 @@
 /// 窗口模式枚举 — 替代散装 bool (isFullscreen/isMaximized)。
+///
+/// Window presentation modes, replacing scattered boolean flags.
+///
+/// - `windowed`: Normal resizable window.
+/// - `maximized`: OS-level maximized state.
+/// - `fullscreen`: Borderless full-screen (covers taskbar).
+/// - `minimized`: Minimized to taskbar.
 enum WindowMode {
   /// 普通窗口。
   windowed,

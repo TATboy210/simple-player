@@ -1,12 +1,14 @@
-/// 播放状态管理 — 设置恢复、断点保存、运行时状态持久化
+/// 播放状态管理 — 设置恢复、断点保存、运行时状态持久化.
 ///
-/// 本文件实现 [PlaybackStateManager] 作为播放器状态的持久化管理者：
-/// 1. 初始化时从 SettingsStore 恢复音量/静音设置
-/// 2. 监听引擎暂停状态，保存当前播放位置（断点续播）
-/// 3. 销毁时异步保存所有运行时状态（音量、静音、播放模式、播放列表）
+/// Playback state management — settings restore, breakpoint save, runtime persistence.
 ///
-/// 架构位置：PlaybackController → **PlaybackStateManager** → MediaEngine.state (ValueNotifier)
-/// 设计模式：Observer（观察者模式）— 监听 MediaState 变化触发持久化行为
+/// [PlaybackStateManager] persists playback state:
+/// 1. Restores volume/mute from SettingsStore on init.
+/// 2. Listens for engine pause → saves current position (resume playback).
+/// 3. On dispose → async-saves all runtime state (volume, mute, play mode, playlist).
+///
+/// Architecture: PlaybackController → **PlaybackStateManager** → MediaEngine.state (ValueNotifier).
+/// Pattern: Observer — listens to MediaState changes to trigger persistence.
 library;
 
 import 'dart:async';
@@ -19,20 +21,21 @@ import 'playback_controller.dart';
 
 final log = KernelLogger.I;
 
-/// 播放状态管理器 — 设置恢复 + 断点保存 + 销毁持久化
+/// 播放状态管理器 — 设置恢复 + 断点保存 + 销毁持久化.
 ///
-/// 职责：管理播放器的持久化状态，不涉及自动连播逻辑。
-/// 自动连播由 [AutoAdvancePolicy] 独立处理。
+/// Manages persisted playback state — no auto-advance logic.
+/// Auto-advance is handled independently by [AutoAdvancePolicy].
 class PlaybackStateManager {
   PlaybackStateManager(this._controller);
   final PlaybackController _controller;
 
   bool _initialized = false;
 
-  /// 初始化：恢复设置 + 注册引擎状态监听
+  /// 初始化：恢复设置 + 注册引擎状态监听.
   ///
-  /// [settings] 可选 — 调用方已加载时传入，避免重复 IO。
-  /// 幂等操作：多次调用只执行一次（_initialized 守卫）。
+  /// Restores settings and registers engine state listener.
+  /// [settings] — optional, avoids redundant I/O when caller already loaded.
+  /// Idempotent: guarded by [_initialized].
   Future<void> init({AppSettings? settings}) async {
     if (_initialized) return;
     _initialized = true;
@@ -50,10 +53,11 @@ class PlaybackStateManager {
     }
   }
 
-  /// 加载播放列表仅用于历史迁移副作用，结果不恢复
+  /// 加载播放列表仅用于历史迁移副作用，结果不恢复.
   ///
-  /// 使用 loadInBackground() 将文件 I/O + JSON 解析移至独立 Isolate，
-  /// 不阻塞主 UI 线程。迁移逻辑仍在主 Isolate 回调中执行。
+  /// Loads playlist solely for history migration side-effect; result is discarded.
+  /// Uses [PlaylistStore.loadInBackground] to offload file I/O + JSON parsing
+  /// to a separate Isolate, avoiding main UI thread blocking.
   Future<void> _loadPlaylistForMigration() async {
     try {
       await PlaylistStore.loadInBackground();
@@ -62,11 +66,11 @@ class PlaybackStateManager {
     }
   }
 
-  /// 引擎状态变化回调 — 仅处理 [MediaState.paused] 的断点保存
+  /// 引擎状态变化回调 — 仅处理 [MediaState.paused] 的断点保存.
   ///
-  /// 状态机：
-  /// - paused → 保存当前播放位置到播放列表（断点续播）
-  /// - 其他状态 → 忽略（自动连播由 AutoAdvancePolicy 处理）
+  /// Engine state change callback — breakpoint save on [MediaState.paused] only.
+  /// - paused → saves current position to playlist (resume playback)
+  /// - other states → ignored (auto-advance handled by AutoAdvancePolicy)
   void _onStateChanged() {
     final state = _controller.engine.state.value;
     if (state != MediaState.paused) return;
@@ -82,12 +86,11 @@ class PlaybackStateManager {
     }
   }
 
-  /// 释放资源 — 注销监听器，异步保存所有运行时状态
+  /// 释放资源 — 注销监听器，异步保存所有运行时状态.
   ///
-  /// 保存内容：
-  /// - 当前播放位置（仅在有有效播放进度时保存）
-  /// - 音量、静音状态、播放模式（fire-and-forget，不阻塞销毁流程）
-  /// - 播放列表到持久化存储
+  /// Disposes resources — unregisters listener, async-saves all runtime state.
+  /// Saved: current position (only if progress > 0), volume, mute, play mode.
+  /// All saves are fire-and-forget (errors logged, don't block disposal).
   void dispose() {
     _controller.engine.state.removeListener(_onStateChanged);
     final idx = _controller.playlist.currentIndex;
