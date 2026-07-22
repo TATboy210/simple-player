@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
-current_phase: 22
+milestone: v4.0
+milestone_name: 设置面板框架重构 (Phases 23-27 — Not Started)
+current_phase: 21
 current_phase_name: bilingual-api-docs
 status: executing
-stopped_at: Phase 22 bilingual-api-docs COMPLETE (2026-07-21)
-last_updated: "2026-07-21T15:20:00.000Z"
-last_activity: 2026-07-21
-last_activity_desc: "Phase 22 COMPLETE — 55 kernel files bilingual (中 intent + 英 contract). flutter analyze clean. Pending: commit."
+stopped_at: context exhaustion at 76% (2026-07-22)
+last_updated: "2026-07-22T15:03:55.081Z"
+last_activity: 2026-07-20
+last_activity_desc: Phase 21 execution started
 progress:
-  total_phases: 8
-  completed_phases: 5
-  total_plans: 32
-  completed_plans: 30
-  percent: 63
+  total_phases: 13
+  completed_phases: 6
+  total_plans: 33
+  completed_plans: 31
+  percent: 46
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -107,8 +107,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-20T16:21:56.095Z
-Stopped at: context exhaustion at 76% (2026-07-20)
+Last session: 2026-07-22T15:03:55.009Z
+Stopped at: context exhaustion at 76% (2026-07-22)
 Resume file: .planning/phases/21-verify-migration-adapter-convergence/21-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
