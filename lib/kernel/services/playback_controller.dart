@@ -28,6 +28,23 @@ import 'track_preference_service.dart';
 
 final log = KernelLogger.I;
 
+/// 设置面板暂停契约 — Phase 23 D-03 服务边界的窄接口。
+///
+/// [SettingsPanelController] 仅经此契约与播放服务交互，不直碰 [MediaEngine]，
+/// 避免与 `openGeneration` 打开守卫产生竞态。单元测试可用手写
+/// `FakePlaybackController implements SettingsPanelPlayback` 替身，
+/// 无需真实 [MediaEngine]（规避 mdk.dll headless FFI 依赖）。
+abstract interface class SettingsPanelPlayback {
+  /// 当前是否正在播放 — 从引擎状态派生（非独立 notifier）.
+  bool get isPlaying;
+
+  /// 暂停播放.
+  void pause();
+
+  /// 恢复播放.
+  void play();
+}
+
 /// 播放控制器 — 播放器全部运行时能力的统一门面入口
 ///
 /// 组合 [PlaybackNavigator] / [FileOperations] / [PlaybackStateManager] / [AutoAdvancePolicy] 四个子模块，
@@ -39,10 +56,12 @@ final log = KernelLogger.I;
 /// - 状态管理：委托 [PlaybackStateManager]（设置恢复 / 断点保存 / 销毁持久化）
 /// - 自动连播：委托 [AutoAdvancePolicy]（completed → loopSingle / next）
 /// - 播放列表 CRUD：直接管理 removeAt / reorder / clearPlaylist / togglePlayMode
+/// - 设置面板暂停契约：实现 [SettingsPanelPlayback]（Phase 23 D-03），
+///   为 [SettingsPanelController] 提供窄化的 pause/play/isPlaying 服务边界。
 ///
 /// 生命周期：init() → 使用 → dispose()
 /// init() 内部调用 stateManager.init() + autoAdvance.init()。
-class PlaybackController {
+class PlaybackController implements SettingsPanelPlayback {
   PlaybackController({
     required this.engine,
     required this.playlist,
@@ -171,6 +190,29 @@ class PlaybackController {
   ///
   /// Most recent path validation error (null = none). Delegates to [FileOperations.validationError].
   ValueNotifier<String?> get validationError => fileOps.validationError;
+
+  // ── SettingsPanelPlayback 契约实现（Phase 23 D-03） ──
+  // SettingsPanelController 经此三成员协调暂停/恢复，不直碰 MediaEngine。
+
+  /// 暂停播放 — 委托 MediaEngine.pause()（D-03 SettingsPanelController 暂停入口）.
+  ///
+  /// Pauses playback. Delegates directly to [MediaEngine.pause] — thin
+  /// forwarder, does not interact with the `openGeneration` open guard.
+  @override
+  void pause() => engine.pause();
+
+  /// 恢复播放 — 委托 MediaEngine.play()（D-03 close() 恢复入口）.
+  ///
+  /// Resumes playback. Delegates directly to [MediaEngine.play].
+  @override
+  void play() => engine.play();
+
+  /// 是否正在播放 — 从 state notifier 派生（D-03 wasPlaying 快照）.
+  ///
+  /// Whether playback is currently active, derived from the engine's
+  /// [MediaState] notifier rather than a separate boolean flag.
+  @override
+  bool get isPlaying => engine.state.value == MediaState.playing;
 
   // ── 播放列表 CRUD ──
 
