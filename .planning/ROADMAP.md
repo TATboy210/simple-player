@@ -27,11 +27,18 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 
 </details>
 
-### 🚧 v3.0 内核重写（兼容式替换与诊断内核）(Phases 15-22 — In Progress)
+<details>
+<summary>✅ v3.0 内核重写（兼容式替换与诊断内核）(Phases 15-22) - SHIPPED 2026-07-20</summary>
 
-**Milestone Goal:** 以兼容式替换重写播放内核，`MemoryMonitor` + 零依赖 `KernelLogger` 一等化，保持 UI→Kernel 契约不变，通过适配层逐步迁移以降低回归风险。禁止一次性全量替换。
+兼容式替换 + 诊断内核一等化（KernelLogger/MemoryMonitor/sealed 错误）+ 双语文档。
 
-**Target features (7):** 内核基线学习与契约固化 · 兼容适配层 · 状态与生命周期重写 · 错误模型与统一 KernelLogger · MemoryMonitor 一等化 · 测试与迁移验证 · 双语 API 文档注释标准。
+</details>
+
+### 🚧 v4.0 设置面板框架重构 (Phases 23-27 — Not Started)
+
+**Milestone Goal:** 重建设置面板框架骨架，支持 D-pad/手柄/键鼠三模态交互，毛玻璃设计语言一致，先框架后功能。
+
+**Target features (5):** Overlay Shell & State Model · Sidebar Navigation · Tab Content Framework · Gamepad & Keyboard Navigation · Responsive Scaling.
 
 ## Phases
 
@@ -46,8 +53,8 @@ Fullscreen cleanup, WindowService simplification, immersive UI, test updates. Ph
 - [x] **Phase 18: Sealed 错误模型稳化** - 扩展现有 sealed PlayerError + ErrorContext + ErrorCode 注册表，引擎 catch 点结构化发射，UI 边界 ErrorView 翻译，跨 mdk 回调线程封送 (completed 2026-07-20)
 - [x] **Phase 19: MemoryMonitor 一等化** - 实例化构造注入 RssProvider+Clock，start/stop/dispose 生命周期，单例→实例一个原子提交，纳入 DiagnosticsBundle，对播放业务零干扰 (completed 2026-07-20)
 - [x] **Phase 20: 状态与生命周期重写** - NewFvpEngine 实现 MediaEngine，OpenGenerationTracker 统一守卫移入机器，Result.err 替换静默 assert 忽略，lifecycle 态加固，mdk 回调主线程封送，竞态测试 (completed 2026-07-20)
-- [ ] **Phase 21: 测试与迁移验证 + 适配层收拢** - 契约测试对 NewFvpEngine 通过，双轨回归套件差异为零，codegraph 推导迁移顺序，适配层删除闸门清单，--release 冒烟闸门，flutter analyze 严格干净 + 覆盖率≥80%
-- [ ] **Phase 22: 双语 API 文档注释标准** - Phase 1 即约定结构（中文意图行 + 英文契约块），扫尾 lib/kernel/** v3.0 修改的公开符号，lint 校验双语注释 + KernelError 子类错误码
+- [x] **Phase 21: 测试与迁移验证 + 适配层收拢** - 契约测试对 NewFvpEngine 通过，双轨回归套件差异为零，codegraph 推导迁移顺序，适配层删除闸门清单，--release 冒烟闸门，flutter analyze 严格干净 + 覆盖率≥80% (completed 2026-07-21)
+- [x] **Phase 22: 双语 API 文档注释标准** - Phase 1 即约定结构（中文意图行 + 英文契约块），扫尾 lib/kernel/** v3.0 修改的公开符号，lint 校验双语注释 + KernelError 子类错误码 (completed 2026-07-21)
 
 ## Phase Details
 
@@ -286,35 +293,126 @@ Plans:
 
 **Plans**: TBD
 
+### Phase 23: Overlay Shell & State Model
+
+**Goal**: 绘制设置面板的覆盖层壳（毛玻璃 + 遮罩 + 标题栏），建立状态模型和控制器，实现打开/关闭/暂停/恢复的完整生命周期
+**Depends on**: Nothing (first phase of v4.0)
+**Requirements**: PANEL-01, PANEL-02, PANEL-03, PANEL-04, PANEL-05, PANEL-06, PANEL-07
+**Success Criteria** (what must be TRUE):
+
+  1. `SettingsPanelState` 含 3 个 ValueNotifier（isOpen/selectedTab/dragOffset），无其他状态管理框架
+  2. `SettingsPanelController.open()` 暂停视频并记录 wasPlaying，`close()` 恢复先前状态
+  3. 毛玻璃覆盖层居中显示，BackdropFilter + bgGlass + borderHighlight 匹配控制栏设计语言
+  4. 标题栏可拖拽，拖拽范围限制在播放器窗口内
+  5. 点击遮罩 / ESC / B 键均可关闭面板
+  6. 面板基础尺寸 500×400，不超过窗口 80%
+  7. 打开/关闭动画（Scale + Fade）流畅无卡顿
+
+**Plans**: 2 plans
+Plans:
+
+**Wave 0**
+
+- [ ] 23-01-PLAN.md — Track AppleCurves, add playback facade controls, and establish testable settings state/controller lifecycle
+
+**Wave 1** *(blocked on Wave 0)*
+
+- [ ] 23-02-PLAN.md — Mount and cut over the in-tree glass overlay shell with interaction-safety, drag, keyboard, and responsive-bound tests
+
+### Phase 24: Sidebar Navigation
+
+**Goal**: 建立固定 200px 侧边栏导航系统，支持点击和手柄 LB/RB 切换 tab，FadeTransition 动画过渡
+**Depends on**: Phase 23
+**Requirements**: SIDEBAR-01, SIDEBAR-02, SIDEBAR-03, SIDEBAR-04
+**Success Criteria** (what must be TRUE):
+
+  1. 侧边栏固定 200px 宽，每个 tab 项含 Material Icons + 文字标签
+  2. 7 个 tab 完整渲染（General/EQ/Audio/Video/Shortcuts/About/Performance）
+  3. 选中态：accent 色背景 + 白色文字，未选中态：透明背景 + 次要文字色
+  4. Tab 切换时内容区 FadeTransition 200ms 淡入淡出
+  5. LB/RB 键循环切换 tab（← 减，→ 增，首尾循环）
+
+**Plans**: TBD (via `/gsd-plan-phase`)
+
+### Phase 25: Tab Content Framework
+
+**Goal**: 建立 tab 内容框架和通用设置项组件，实现 OK/Cancel/Apply 延迟应用模式
+**Depends on**: Phase 24
+**Requirements**: TABS-01, TABS-02, TABS-03, TABS-04
+**Success Criteria** (what must be TRUE):
+
+  1. 每个 tab 页独立 StatelessWidget，渲染 SettingRow 骨架列表（占位内容）
+  2. SettingRow 支持 Switch/Slider/SpinControl/Dropdown 四种控件类型
+  3. 内联描述文本在标签下方（灰色小字），不单独占行
+  4. OK/Cancel/Apply 按钮栏固定在面板底部
+  5. 延迟应用：更改存入 pending 状态，OK/Apply 提交，Cancel 恢复原始值
+
+**Plans**: TBD (via `/gsd-plan-phase`)
+
+### Phase 26: Gamepad & Keyboard Navigation
+
+**Goal**: 实现 D-pad/手柄三模态导航，FocusTraversalGroup 分区管理，SpinControl 手柄友好组件
+**Depends on**: Phase 25
+**Requirements**: NAV-01, NAV-02, NAV-03, NAV-04, NAV-05, NAV-06
+**Success Criteria** (what must be TRUE):
+
+  1. 面板整体和侧边栏/内容区各包裹 FocusTraversalGroup
+  2. 每个 SettingRow 有 FocusableActionDetector，焦点态高亮边框，hover 态背景变化
+  3. SpinControl 组件：左右方向键循环选项值，显示当前值 + 箭头指示器
+  4. D-pad ←→ 在 Switch/Slider/SpinControl 上调整值（Slider 步进 5%）
+  5. A 键触发确认（Switch 切换、SpinControl 选择、Button 点击）
+  6. B 键关闭面板（与 ESC 等效），焦点在控件上时先退回侧边栏
+
+**Plans**: TBD (via `/gsd-plan-phase`)
+
+### Phase 27: Responsive Scaling & Polish
+
+**Goal**: 实现面板响应式缩放（全屏/小窗口适配），完善动画动效，集成测试覆盖关键路径
+**Depends on**: Phase 26
+**Requirements**: SCALE-01, SCALE-02, SCALE-03
+**Success Criteria** (what must be TRUE):
+
+  1. MediaQuery.size 检测窗口尺寸，面板按比例缩放
+  2. 全屏模式：600×480（5:4 比例），侧边栏 200px
+  3. 小窗口（<800px 宽）：400×320，侧边栏 160px
+  4. 打开/关闭动画 Scale + Fade 流畅（60fps）
+  5. 关键路径集成测试：打开/关闭/切换 tab/拖拽/键盘导航
+
+**Plans**: TBD (via `/gsd-plan-phase`)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 (decimal insertions e.g. 15.1 via `/gsd-phase --insert`)
+Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete    | 2026-07-17 |
-| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete    | 2026-07-18 |
-| 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | Complete    | 2026-07-20 |
-| 18. Sealed 错误模型稳化 | v3.0 | 3/3 | Complete    | 2026-07-20 |
-| 19. MemoryMonitor 一等化 | v3.0 | 2/2 | Complete    | 2026-07-20 |
-| 20. 状态与生命周期重写 | v3.0 | 0/3 | Planning | - |
-| 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 12/12 | In Progress|  |
-| 22. 双语 API 文档注释标准 | v3.0 | 0/TBD | Not started | - |
+| 15. 契约固化与基线盘点 | v3.0 | 3/3 | Complete | 2026-07-17 |
+| 16. 兼容适配层骨架 + DiagnosticsBundle | v3.0 | 5/5 | Complete | 2026-07-18 |
+| 17. 零依赖 KernelLogger 门面 | v3.0 | 3/3 | Complete | 2026-07-20 |
+| 18. Sealed 错误模型稳化 | v3.0 | 3/3 | Complete | 2026-07-20 |
+| 19. MemoryMonitor 一等化 | v3.0 | 2/2 | Complete | 2026-07-20 |
+| 20. 状态与生命周期重写 | v3.0 | 3/3 | Complete | 2026-07-20 |
+| 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 12/12 | Complete | 2026-07-21 |
+| 22. 双语 API 文档注释标准 | v3.0 | 3/3 | Complete | 2026-07-21 |
+| 23. Overlay Shell & State Model | v4.0 | 0/2 | Planned | - |
+| 24. Sidebar Navigation | v4.0 | 0/TBD | Not started | - |
+| 25. Tab Content Framework | v4.0 | 0/TBD | Not started | - |
+| 26. Gamepad & Keyboard Navigation | v4.0 | 0/TBD | Not started | - |
+| 27. Responsive Scaling & Polish | v4.0 | 0/TBD | Not started | - |
 
 ## Build Order Rationale
 
-构建顺序由代码接地研究固化（ARCHITECTURE + PITFALLS 研究员读 live files 得出，覆盖 STACK + FEATURES 研究员的 web-blocked 较弱排序）：
+**v3.0（已完成）：**
 
-- **契约冻结先于一切（P15→P16+）**：适配层实现 frozen 契约；不冻结则 contract drift 破坏迁移闸门。冻结也是唯一能廉价核对 9 态 vs 6 态差异的阶段。
-- **适配层先于状态重写（P16 before P20）**：新引擎只因适配层路由才有地方住；无适配层则替换引擎成禁断 big-bang swap。适配层必须先于状态重写存在。
-- **logger 先于 error model（P17→P18）**：error model 通过 logger 发射结构化日志，必须共享词汇。
-- **Bundle 先于 A/B/C（P16→P17/18/19）**：三个诊断能力都需要 DiagnosticsBundle 载体。
-- **状态重写在能力中最后（P20 after P17/18/19）**：消耗 logger/error/memory/adapter，提前做会重写两遍。
-- **验证收拢在 cutover 后（P21 after P20）**：验证只在 cutover 完成后有意义；collapse 是 gated delete。
-- **双语文档与 17-20 并行（P22 扫尾）**：结构 Phase 15 即约定，最后扫尾保证无遗漏。
+- 契约冻结 → 适配层 → 诊断(logger→error→memory) → 状态重写 → 验证收拢 → 双语文档
+
+**v4.0：**
+
+- **壳先于内容（P23→P25）**：覆盖层壳 + 状态模型是所有后续组件的容器
+- **侧边栏先于 tab 内容（P24→P25）**：tab 切换是内容渲染的前提
+- **内容框架先于手柄导航（P25→P26）**：FocusTraversalGroup 需要已存在的 SettingRow 组件树
+- **缩放在最后（P27）**：响应式缩放依赖完整的面板结构
 
 ---
-*Roadmap created: 2026-07-16 — v3.0 kernel rewrite (compatible replacement + diagnostic kernel), 8 phases continuing from Phase 15*
-*Build order source: .planning/research/SUMMARY.md "Implications for Roadmap" (code-grounded)*
-*Blocking constraints: .planning/.continue-here.md (8 items, honored as per-phase hard requirements)*
+*Roadmap updated: 2026-07-21 — v4.0 settings panel framework refactoring, 5 phases continuing from Phase 23*
