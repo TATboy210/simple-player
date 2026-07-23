@@ -336,6 +336,7 @@ Plans:
 
 **Plans**: 2 plans
 Plans:
+
 - [ ] 24-01-PLAN.md — 水平 tab bar + IndexedStack + FadeTransition + click switching (Wave 1)
 - [ ] 24-02-PLAN.md — 键盘 ← → + 手柄 LB/RB tab 切换 + 跨平台 gamepad 支持 (Wave 2)
 
@@ -352,10 +353,15 @@ Plans:
   4. OK/Cancel/Apply 按钮栏固定在面板底部
   5. 延迟应用：更改存入 pending 状态，OK/Apply 提交，Cancel 恢复原始值
 
-**Plans**: 2 plans
+**Plans**: 2/2 plans executed
 Plans:
-- [ ] 25-01-PLAN.md — PendingSettingsState + SettingsButton + OK/Cancel/Apply button bar (Wave 1)
-- [ ] 25-02-PLAN.md — 7 skeleton tab pages in tabs/ + shell content wiring (Wave 2)
+**Wave 1**
+
+- [x] 25-01-PLAN.md — PendingSettingsState + SettingsButton + OK/Cancel/Apply button bar (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 25-02-PLAN.md — 7 skeleton tab pages in tabs/ + shell content wiring (Wave 2)
 
 ### Phase 26: Gamepad & Keyboard Navigation
 
@@ -405,7 +411,7 @@ Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 | 22. 双语 API 文档注释标准 | v3.0 | 1/1 | Complete    | 2026-07-23 |
 | 23. Overlay Shell & State Model | v4.0 | 2/2 | Complete    | 2026-07-23 |
 | 24. Sidebar Navigation | v4.0 | 0/2 | Planning complete | - |
-| 25. Tab Content Framework | v4.0 | 0/TBD | Not started | - |
+| 25. Tab Content Framework | v4.0 | 2/2 | In Progress|  |
 | 26. Gamepad & Keyboard Navigation | v4.0 | 0/TBD | Not started | - |
 | 27. Responsive Scaling & Polish | v4.0 | 0/TBD | Not started | - |
 

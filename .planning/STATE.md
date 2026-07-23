@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: 设置面板框架重构 (Phases 23-27 — Not Started)
-current_phase: 24
-current_phase_name: Sidebar Navigation
-status: planning
-stopped_at: Phase 24 context gathered
-last_updated: "2026-07-23T13:13:12.019Z"
-last_activity: 2026-07-23
-last_activity_desc: Phase 23 complete, transitioned to Phase 24
+current_phase: 25
+current_phase_name: Tab Content Migration
+status: execution_complete
+stopped_at: "Phase 25 execution complete — pending verification"
+last_updated: "2026-07-24T02:15:00.000Z"
+last_activity: 2026-07-24
+last_activity_desc: Phase 25 complete (deferred apply + 7 skeleton tabs + IndexedStack, 68 tests, 2/2 plans)
 progress:
   total_phases: 13
-  completed_phases: 8
-  total_plans: 35
-  completed_plans: 34
-  percent: 62
+  completed_phases: 9
+  total_plans: 37
+  completed_plans: 38
+  percent: 73
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 24 — Sidebar Navigation
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-23 — Phase 23 complete, transitioned to Phase 24
+Phase: 25 — Tab Content Migration
+Plans: Next phase
+Status: Ready to execute
+Last activity: 2026-07-23 — Phase 24 complete (horizontal tab bar + IndexedStack + keyboard/gamepad, 44 tests, 2/2 plans)
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Last activity: 2026-07-23 — Phase 23 complete, transitioned to Phase 24
 | 19 | 2 | - | - |
 | 22 | 1 | - | - |
 | 23 | 2 | - | - |
+| 24 | 2 | - | - |
 
 **Recent Trend:**
 
@@ -109,8 +110,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-23T13:13:11.994Z
-Stopped at: Phase 24 context gathered
+Last session: 2026-07-23T16:50:09.736Z
+Stopped at: context exhaustion at 75% (2026-07-23)
 Resume file: .planning/phases/24-sidebar-navigation/24-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
