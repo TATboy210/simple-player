@@ -352,7 +352,10 @@ Plans:
   4. OK/Cancel/Apply 按钮栏固定在面板底部
   5. 延迟应用：更改存入 pending 状态，OK/Apply 提交，Cancel 恢复原始值
 
-**Plans**: TBD (via `/gsd-plan-phase`)
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md — PendingSettingsState + SettingsButton + OK/Cancel/Apply button bar (Wave 1)
+- [ ] 25-02-PLAN.md — 7 skeleton tab pages in tabs/ + shell content wiring (Wave 2)
 
 ### Phase 26: Gamepad & Keyboard Navigation
 
