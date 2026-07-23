@@ -8,6 +8,7 @@
 import 'dart:ui';
 
 import '../../../kernel/services/playback_controller.dart';
+import 'pending_settings.dart';
 import 'settings_panel_state.dart';
 
 /// 设置面板控制器 — 持有 [SettingsPanelState]，实现 open/close/toggle
@@ -24,21 +25,43 @@ class SettingsPanelController {
   /// 面板状态模型（PANEL-01）.
   final SettingsPanelState state = SettingsPanelState();
 
+  /// 延迟应用状态（TABS-04）— 持有用户待提交的修改.
+  final PendingSettingsState pending = PendingSettingsState();
+
   /// 打开面板前的播放状态快照 — 仅当为 true 时 close() 才恢复播放.
   bool _wasPlaying = false;
 
+  /// Tab 总数 — 用于 nextTab/prevTab 首尾循环的模数.
+  static const int tabCount = 7;
+
   /// 打开面板 — 已打开时 no-op（幂等）。
   ///
-  /// 顺序：先读取 [SettingsPanelPlayback.isPlaying] 快照，再调用
-  /// [SettingsPanelPlayback.pause]（仅当快照为 true），最后翻转 [state.isOpen]。
+  /// 顺序：先重置 selectedTab 为 0（D-03），再读取播放快照，
+  /// 暂停播放（仅当快照为 true），最后翻转 [state.isOpen]。
   /// 快照必须先于 pause() 读取，因为 pause() 会改变引擎状态。
   void open() {
     if (state.isOpen.value) return;
+    // D-03: 每次打开重置到 General tab（index 0）
+    state.selectedTab.value = 0;
     _wasPlaying = _playback.isPlaying;
     if (_wasPlaying) {
       _playback.pause();
     }
+    // 注册已知设置项的原始值（TABS-04）— 后续 tab 内容替换时扩展
+    pending.register('locale', 'zh');
+    pending.register('themeIndex', 0);
     state.isOpen.value = true;
+  }
+
+  /// 切换到下一个 tab（首尾循环：6→0）。
+  void nextTab() {
+    state.selectedTab.value = (state.selectedTab.value + 1) % tabCount;
+  }
+
+  /// 切换到上一个 tab（首尾循环：0→6）。
+  void prevTab() {
+    state.selectedTab.value =
+        (state.selectedTab.value - 1 + tabCount) % tabCount;
   }
 
   /// 关闭面板 — 已关闭时 no-op（幂等）。
@@ -52,6 +75,8 @@ class SettingsPanelController {
       _playback.play();
     }
     state.dragOffset.value = Offset.zero;
+    // 释放延迟应用状态 — 下次 open() 重新注册（TABS-04）
+    pending.dispose();
   }
 
   /// 切换面板开关状态 — 等价于 open()/close() 二选一。
@@ -63,6 +88,15 @@ class SettingsPanelController {
     }
   }
 
+  /// 提交所有待修改值（TABS-04）— 返回变更 map.
+  Map<String, dynamic> commitPending() => pending.commit();
+
+  /// 回滚所有修改（TABS-04）— 返回原始值 map.
+  Map<String, dynamic> cancelPending() => pending.cancel();
+
   /// 释放面板状态资源.
-  void dispose() => state.dispose();
+  void dispose() {
+    pending.dispose();
+    state.dispose();
+  }
 }
