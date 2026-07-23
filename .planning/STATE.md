@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: 设置面板框架重构 (Phases 23-27 — Not Started)
-current_phase: 23
-current_phase_name: Overlay Shell & State Model
+current_phase: 24
+current_phase_name: Sidebar Navigation
 status: planning
 stopped_at: context exhaustion at 88% (2026-07-23)
-last_updated: "2026-07-23T11:37:58.124Z"
+last_updated: "2026-07-23T12:28:54.291Z"
 last_activity: 2026-07-23
-last_activity_desc: Phase 22 complete, transitioned to Phase 23
+last_activity_desc: Phase 23 complete, transitioned to Phase 24
 progress:
   total_phases: 13
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 35
-  completed_plans: 33
-  percent: 54
+  completed_plans: 34
+  percent: 62
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 23 — Overlay Shell & State Model
+Phase: 24 — Sidebar Navigation
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-23 — Phase 22 complete, transitioned to Phase 23
+Last activity: 2026-07-23 — Phase 23 complete, transitioned to Phase 24
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 19
+- Total plans completed: 21
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -56,6 +56,7 @@ Last activity: 2026-07-23 — Phase 22 complete, transitioned to Phase 23
 | 18 | 3 | - | - |
 | 19 | 2 | - | - |
 | 22 | 1 | - | - |
+| 23 | 2 | - | - |
 
 **Recent Trend:**
 
