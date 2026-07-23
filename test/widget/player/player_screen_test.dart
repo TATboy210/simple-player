@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
 import 'package:simple_player_flutter/ui/player/player_screen.dart';
 import 'package:simple_player_flutter/ui/player/drop_handler.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
@@ -44,6 +45,7 @@ void main() {
       playlist: playlist,
       onNeedRebuild: () {},
     );
+    final settingsPanelController = SettingsPanelController(controller);
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -55,6 +57,7 @@ void main() {
           playlist: playlist,
           playlistGeneration: playlistGeneration,
           windowService: windowService,
+          settingsPanelController: settingsPanelController,
         ),
       ),
     );
@@ -174,6 +177,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               onTogglePlaylist: () => toggled = true,
             ),
           ),
@@ -208,6 +212,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               onOpenFile: () => opened = true,
             ),
           ),
@@ -240,6 +245,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               onFilesDropped: dropped.add,
             ),
           ),
@@ -295,6 +301,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               emptyState: const Center(child: Text('No media loaded')),
             ),
           ),
@@ -324,6 +331,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               emptyState: const Center(child: Text('No media loaded')),
             ),
           ),
@@ -489,6 +497,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               onDragHoverChanged: hoverStates.add,
             ),
           ),
@@ -561,6 +570,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
               onTogglePlaylist: () => toggled = true,
             ),
           ),
@@ -598,6 +608,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
             ),
           ),
         ),
@@ -637,6 +648,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
             ),
           ),
         ),
@@ -676,6 +688,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
             ),
           ),
         ),
@@ -723,6 +736,7 @@ void main() {
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               windowService: windowService,
+              settingsPanelController: SettingsPanelController(controller),
             ),
           ),
         ),
