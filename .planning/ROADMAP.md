@@ -291,7 +291,9 @@ Plans:
   2. `lib/kernel/**` 中 v3.0 修改的每个公开符号同时含中文意图 + 英文契约（lint/grep 校验通过）
   3. 每个 `KernelError` 子类附错误码 + 英文契约；既有中文-only 注释仅对重写触及的符号迁移（避免 scope creep）
 
-**Plans**: TBD
+**Plans**: 1/1 plans executed
+
+- [x] 22-01-PLAN.md
 
 ### Phase 23: Overlay Shell & State Model
 
@@ -394,7 +396,7 @@ Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 | 19. MemoryMonitor 一等化 | v3.0 | 2/2 | Complete | 2026-07-20 |
 | 20. 状态与生命周期重写 | v3.0 | 3/3 | Complete | 2026-07-20 |
 | 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 12/12 | Complete | 2026-07-21 |
-| 22. 双语 API 文档注释标准 | v3.0 | 3/3 | Complete | 2026-07-21 |
+| 22. 双语 API 文档注释标准 | v3.0 | 1/1 | Complete    | 2026-07-23 |
 | 23. Overlay Shell & State Model | v4.0 | 0/2 | Planned | - |
 | 24. Sidebar Navigation | v4.0 | 0/TBD | Not started | - |
 | 25. Tab Content Framework | v4.0 | 0/TBD | Not started | - |
