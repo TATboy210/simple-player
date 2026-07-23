@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'ui/theme/tokens.dart';
 import 'kernel/bridge/window_bridge.dart';
-import 'kernel/engine/engine_state.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/services/locale_service.dart';
 import 'kernel/services/theme_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
 import 'features/player/deferred_player_feature.dart';
-import 'kernel/services/video_processing_service.dart';
-import 'ui/dialogs/settings_panel.dart';
 import 'ui/shared/progress_splash_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -61,25 +58,6 @@ class _AppState extends State<App> {
   void dispose() {
     widget.windowService.dispose();
     super.dispose();
-  }
-
-  void _showSettingsPanel(
-    BuildContext context,
-    MediaEngine engine,
-    VideoProcessingService? videoProcessing, {
-    ValueChanged<int>? onAudioTrackChanged,
-  }) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.transparent,
-      builder: (dialogCtx) => SettingsPanel(
-        engine: engine,
-        videoProcessing: videoProcessing,
-        windowService: widget.windowService,
-        onAudioTrackChanged: onAudioTrackChanged,
-      ),
-    );
   }
 
   void _showSettingsQuickMenu(BuildContext barCtx, TapUpDetails tap) {
@@ -168,9 +146,6 @@ class _AppState extends State<App> {
           home: DeferredPlayerFeature(
             coordinator: widget.coordinator,
             windowService: widget.windowService,
-            onSettings: (ctx, engine, videoProcessing, {onAudioTrackChanged}) =>
-                _showSettingsPanel(ctx, engine, videoProcessing,
-                    onAudioTrackChanged: onAudioTrackChanged),
             onSettingsSecondary: _showSettingsQuickMenu,
           ),
         ),

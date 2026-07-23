@@ -10,6 +10,8 @@ import '../../kernel/playlist/playlist.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../dialogs/settings/settings_overlay_shell.dart';
+import '../dialogs/settings/settings_panel_controller.dart';
 import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
 import 'controls_overlay.dart';
@@ -56,7 +58,7 @@ class PlayerScreen extends StatefulWidget {
   final ValueNotifier<int> playlistGeneration;
   final Map<String, String> customBindings;
   final VoidCallback? onTogglePlaylist;
-  final VoidCallback? onSettings;
+  final SettingsPanelController settingsPanelController;
   final void Function(BuildContext context, TapUpDetails details)?
   onSettingsSecondary;
   final VoidCallback? onOpenFile;
@@ -78,9 +80,9 @@ class PlayerScreen extends StatefulWidget {
     required this.playlist,
     required this.playlistGeneration,
     required this.windowService,
+    required this.settingsPanelController,
     this.customBindings = const {},
     this.onTogglePlaylist,
-    this.onSettings,
     this.onSettingsSecondary,
     this.onOpenFile,
     this.onTogglePlayMode,
@@ -224,7 +226,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   children: [
                     CustomTitleBar(windowService: widget.windowService),
                     Expanded(
-                      child: LayoutBuilder(
+                      child: Stack(
+                        children: [
+                          LayoutBuilder(
                         builder: (context, constraints) {
                           final w = constraints.maxWidth;
                           return ValueListenableBuilder<(bool, bool)>(
@@ -294,6 +298,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             ),
                           );
                         },
+                          ),
+                          // 设置覆盖层壳 — 在内容区 Stack 顶层，CustomTitleBar 之下（D-05）
+                          SettingsOverlayShell(
+                            controller: widget.settingsPanelController,
+                            resizing: widget.windowService.isResizing,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -351,7 +362,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   onPrevious: () => widget.controller.playPrevious(),
                   onNext: () => widget.controller.playNext(),
                   onTogglePlaylist: _togglePlaylist,
-                  onSettings: widget.onSettings,
+                  onSettings: widget.settingsPanelController.open,
                   onSettingsSecondary: widget.onSettingsSecondary,
                   onOpenFile: widget.onOpenFile,
                   onToggleFullscreen: () => widget.windowService.setMode(

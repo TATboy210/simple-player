@@ -24,13 +24,12 @@ import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/path_validator.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
+import '../../ui/dialogs/settings/settings_panel_controller.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
 import '../../ui/shared/play_mode_utils.dart';
 import '../../ui/shared/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
-import '../../kernel/engine/engine_state.dart';
-import '../../kernel/services/video_processing_service.dart';
 import '../../kernel/player_services.dart';
 
 /// 播放器功能组件 — UI 状态管理 + PlayerScreen 组合
@@ -50,16 +49,6 @@ class PlayerFeature extends StatefulWidget {
   /// Win32 窗口桥接服务，用于全屏/窗口控制等原生操作
   final WindowBridge windowService;
 
-
-  /// 打开设置面板的回调 — 需要 MaterialApp 级 BuildContext 和引擎/视频处理服务引用
-  final void Function(
-    BuildContext context,
-    MediaEngine engine,
-    VideoProcessingService videoProcessing, {
-    ValueChanged<int>? onAudioTrackChanged,
-  })
-  onSettings;
-
   /// 右键快捷菜单回调 — 需要触发位置的 BuildContext 和 TapUpDetails 坐标
   final void Function(BuildContext barCtx, TapUpDetails details)
   onSettingsSecondary;
@@ -68,7 +57,6 @@ class PlayerFeature extends StatefulWidget {
     super.key,
     required this.coordinator,
     required this.windowService,
-    required this.onSettings,
     required this.onSettingsSecondary,
   });
 
@@ -79,6 +67,9 @@ class PlayerFeature extends StatefulWidget {
 class _PlayerFeatureState extends State<PlayerFeature> {
   /// 服务容器，持有 engine/playlist/controller/videoProcessing 等所有播放服务
   late final PlayerServices _services;
+
+  /// 设置面板控制器 — 由组合根构造，传入 PlayerScreen 挂载覆盖层壳（D-02）
+  late final SettingsPanelController _settingsPanelController;
 
   /// 初始化是否完成（控制 build 渲染：未就绪时显示空 widget）
   bool _ready = false;
@@ -131,6 +122,8 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         'Loading settings...',
       );
       _customBindings = await SettingsStore.loadShortcuts();
+      // 构造设置面板控制器 — PlaybackController 实现 SettingsPanelPlayback 接口（D-03）
+      _settingsPanelController = SettingsPanelController(_services.controller);
     } catch (e, stackTrace) {
       KernelLogger.I.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
       if (mounted) {
@@ -186,6 +179,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
   @override
   void dispose() {
+    _settingsPanelController.dispose();
     _services.dispose();
     super.dispose();
   }
@@ -249,15 +243,9 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       customBindings: _customBindings,
       playlistGeneration: _services.playlistGeneration,
       windowService: _services.windowService,
+      settingsPanelController: _settingsPanelController,
       onOpenFile: _openFile,
       onTogglePlayMode: _onTogglePlayMode,
-      onSettings: () => widget.onSettings(
-        context,
-        _services.engine,
-        _services.videoProcessing,
-        onAudioTrackChanged:
-            _services.controller.trackPreferenceService?.recordAudioTrack,
-      ),
       onSettingsSecondary: widget.onSettingsSecondary,
       onFilesDropped: _onFilesDropped,
       onDragHoverChanged: (hovering) {

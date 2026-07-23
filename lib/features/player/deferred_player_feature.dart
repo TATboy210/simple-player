@@ -16,12 +16,10 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/engine/engine_state.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
 import 'player_feature.dart' deferred as player_feature;
-import '../../kernel/services/video_processing_service.dart';
 
 /// 延迟加载的播放器功能组件 — deferred import 包装器
 ///
@@ -38,16 +36,6 @@ class DeferredPlayerFeature extends StatefulWidget {
   /// 窗口桥接服务，传递给 PlayerFeature 用于 Win32 窗口控制
   final WindowBridge windowService;
 
-
-  /// 打开设置面板的回调（需要 MaterialApp 级 BuildContext）
-  final void Function(
-    BuildContext context,
-    MediaEngine engine,
-    VideoProcessingService? videoProcessing, {
-    ValueChanged<int>? onAudioTrackChanged,
-  })
-  onSettings;
-
   /// 右键快捷菜单回调（需要触发位置的 BuildContext 和 TapUpDetails）
   final void Function(BuildContext barCtx, TapUpDetails details)
   onSettingsSecondary;
@@ -56,7 +44,6 @@ class DeferredPlayerFeature extends StatefulWidget {
     super.key,
     required this.coordinator,
     required this.windowService,
-    required this.onSettings,
     required this.onSettingsSecondary,
   });
 
@@ -128,7 +115,6 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
     return player_feature.PlayerFeature(
       coordinator: widget.coordinator,
       windowService: widget.windowService,
-      onSettings: widget.onSettings,
       onSettingsSecondary: widget.onSettingsSecondary,
     );
   }
