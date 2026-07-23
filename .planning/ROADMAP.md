@@ -323,18 +323,21 @@ Plans:
 
 ### Phase 24: Sidebar Navigation
 
-**Goal**: 建立固定 200px 侧边栏导航系统，支持点击和手柄 LB/RB 切换 tab，FadeTransition 动画过渡
+**Goal**: 在 Phase 23 壳内建立水平 tab bar 导航系统（Top/Middle/Bottom 三段式布局），支持点击/键盘方向键/手柄 LB/RB 切换 7 个 tab，IndexedStack + FadeTransition 200ms 动画过渡
 **Depends on**: Phase 23
 **Requirements**: SIDEBAR-01, SIDEBAR-02, SIDEBAR-03, SIDEBAR-04
 **Success Criteria** (what must be TRUE):
 
-  1. 侧边栏固定 200px 宽，每个 tab 项含 Material Icons + 文字标签
+  1. 水平 tab bar 固定 40px 高，7 个等宽 tab 项含 Material Icons + 文字标签（用户决定：Top/Middle/Bottom 三段式替代原 200px 垂直侧边栏）
   2. 7 个 tab 完整渲染（General/EQ/Audio/Video/Shortcuts/About/Performance）
   3. 选中态：accent 色背景 + 白色文字，未选中态：透明背景 + 次要文字色
-  4. Tab 切换时内容区 FadeTransition 200ms 淡入淡出
-  5. LB/RB 键循环切换 tab（← 减，→ 增，首尾循环）
+  4. Tab 切换时内容区 TweenAnimationBuilder 200ms 淡入淡出，IndexedStack 保持所有 tab 存活
+  5. ← → 方向键 + LB/RB 手柄键循环切换 tab（首尾循环），面板 Focus subtree 消费不冒泡
 
-**Plans**: TBD (via `/gsd-plan-phase`)
+**Plans**: 2 plans
+Plans:
+- [ ] 24-01-PLAN.md — 水平 tab bar + IndexedStack + FadeTransition + click switching (Wave 1)
+- [ ] 24-02-PLAN.md — 键盘 ← → + 手柄 LB/RB tab 切换 + 跨平台 gamepad 支持 (Wave 2)
 
 ### Phase 25: Tab Content Framework
 
@@ -398,7 +401,7 @@ Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 | 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 12/12 | Complete | 2026-07-21 |
 | 22. 双语 API 文档注释标准 | v3.0 | 1/1 | Complete    | 2026-07-23 |
 | 23. Overlay Shell & State Model | v4.0 | 2/2 | Complete    | 2026-07-23 |
-| 24. Sidebar Navigation | v4.0 | 0/TBD | Not started | - |
+| 24. Sidebar Navigation | v4.0 | 0/2 | Planning complete | - |
 | 25. Tab Content Framework | v4.0 | 0/TBD | Not started | - |
 | 26. Gamepad & Keyboard Navigation | v4.0 | 0/TBD | Not started | - |
 | 27. Responsive Scaling & Polish | v4.0 | 0/TBD | Not started | - |
