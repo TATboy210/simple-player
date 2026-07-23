@@ -22,7 +22,8 @@ class PerformanceTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSectionList(
+    return SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 性能监控 — 毛玻璃卡片
         GlassContainer(
@@ -88,6 +89,7 @@ class PerformanceTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

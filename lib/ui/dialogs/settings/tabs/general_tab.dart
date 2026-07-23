@@ -22,7 +22,8 @@ class GeneralTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSectionList(
+    return SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 语言选择 — 毛玻璃卡片
         GlassContainer(
@@ -82,6 +83,7 @@ class GeneralTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

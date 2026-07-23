@@ -22,7 +22,8 @@ class AudioTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSectionList(
+    return SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 音频输出 — 毛玻璃卡片
         GlassContainer(
@@ -123,6 +124,7 @@ class AudioTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

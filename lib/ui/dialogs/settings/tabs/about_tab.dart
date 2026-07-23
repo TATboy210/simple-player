@@ -22,7 +22,8 @@ class AboutTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AnimatedSectionList(
+    return const SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 版本信息 — 毛玻璃卡片
         GlassContainer(
@@ -84,6 +85,7 @@ class AboutTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }
