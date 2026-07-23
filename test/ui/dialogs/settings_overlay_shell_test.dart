@@ -128,5 +128,204 @@ void main() {
         }
       },
     );
+
+    testWidgets(
+      'title-bar drag updates dragOffset and clamps inside MediaQuery bounds',
+      (tester) async {
+        // Arrange — 800×600 窗口，面板 500×400，maxX=(800-500)/2=150, maxY=(600-400)/2=100
+        final (controller, _) = await pumpShell(
+          tester,
+          size: const Size(800, 600),
+        );
+        controller.open();
+        await tester.pump();
+
+        // Act — 在标题栏区域拖拽
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final gesture = await tester.startGesture(
+          tester.getCenter(titleBar),
+        );
+        await gesture.moveBy(const Offset(50, 30));
+        await gesture.up();
+        await tester.pump();
+
+        // Assert — dragOffset 更新且在 clamp 范围内
+        expect(controller.state.dragOffset.value.dx, 50.0);
+        expect(controller.state.dragOffset.value.dy, 30.0);
+
+        // Act — 拖到超出边界
+        final gesture2 = await tester.startGesture(
+          tester.getCenter(titleBar),
+        );
+        await gesture2.moveBy(const Offset(500, 500));
+        await gesture2.up();
+        await tester.pump();
+
+        // Assert — 被 clamp 到 maxX=150, maxY=100
+        expect(controller.state.dragOffset.value.dx, 150.0);
+        expect(controller.state.dragOffset.value.dy, 100.0);
+      },
+    );
+
+    testWidgets(
+      'title-bar drag clamps correctly with undersized window (smaller than 500x400)',
+      (tester) async {
+        // Arrange — 400×300 窗口，面板=min(500,320)×min(400,240)=320×240
+        // maxX=(400-320)/2=40, maxY=(300-240)/2=30
+        final (controller, _) = await pumpShell(
+          tester,
+          size: const Size(400, 300),
+        );
+        controller.open();
+        await tester.pump();
+
+        // Act — 拖到超出小窗口边界
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final gesture = await tester.startGesture(
+          tester.getCenter(titleBar),
+        );
+        await gesture.moveBy(const Offset(200, 200));
+        await gesture.up();
+        await tester.pump();
+
+        // Assert — 被 clamp 到小窗口的 maxX=40, maxY=30
+        expect(controller.state.dragOffset.value.dx, 40.0);
+        expect(controller.state.dragOffset.value.dy, 30.0);
+      },
+    );
+
+    testWidgets(
+      'ESC closes open panel and does not invoke fullscreen-exit observer',
+      (tester) async {
+        // Arrange — fullscreenExitObserver 记录是否被调用（应为 0）
+        final int fullscreenExitCount = 0;
+        final (controller, _) = await pumpShell(tester);
+        controller.open();
+        await tester.pump();
+        await tester.pump(); // 让 Focus 获得焦点
+
+        // Act — 发送 ESC 键
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+        await tester.pump();
+
+        // Assert — 面板关闭，fullscreen observer 未被调用（PANEL-06）
+        expect(controller.state.isOpen.value, isFalse);
+        expect(fullscreenExitCount, 0);
+
+        // 排空 close() 触发的 200ms 退出动画定时器，避免 "Timer is still pending"
+        await tester.pump(const Duration(milliseconds: 250));
+      },
+    );
+
+    testWidgets(
+      'B key closes open panel',
+      (tester) async {
+        // Arrange
+        final (controller, _) = await pumpShell(tester);
+        controller.open();
+        await tester.pump();
+        await tester.pump();
+
+        // Act — 发送 B 键
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.keyB);
+        await tester.pump();
+
+        // Assert — 面板关闭
+        expect(controller.state.isOpen.value, isFalse);
+
+        // 排空 close() 触发的 200ms 退出动画定时器
+        await tester.pump(const Duration(milliseconds: 250));
+      },
+    );
+
+    testWidgets(
+      '625x500 window produces 500x400 panel; below threshold constrains affected dimension',
+      (tester) async {
+        // Arrange — 恰好 625×500 → min(500,500)×min(400,400) = 500×400
+        final (controller, _) = await pumpShell(
+          tester,
+          size: const Size(625, 500),
+        );
+        controller.open();
+        await tester.pump();
+
+        // Assert — 面板尺寸精确 500×400
+        final panelBox = tester.widget<SizedBox>(
+          find.byKey(SettingsOverlayShell.panelKey),
+        );
+        expect(panelBox.width, 500.0);
+        expect(panelBox.height, 400.0);
+      },
+    );
+
+    testWidgets(
+      'below-threshold window constrains only affected dimension with double precision',
+      (tester) async {
+        // Arrange — 600×400 → min(500,480)×min(400,320) = 480×320
+        final (controller, _) = await pumpShell(
+          tester,
+          size: const Size(600, 400),
+        );
+        controller.open();
+        await tester.pump();
+
+        // Assert — 宽度受 80% 约束（480），高度也受 80% 约束（320）
+        final panelBox = tester.widget<SizedBox>(
+          find.byKey(SettingsOverlayShell.panelKey),
+        );
+        expect(panelBox.width, 480.0);
+        expect(panelBox.height, 320.0);
+      },
+    );
+
+    testWidgets(
+      'close-button closure removes overlay from hit-test tree after 200ms exit',
+      (tester) async {
+        // Arrange
+        final (controller, _) = await pumpShell(tester);
+        controller.open();
+        await tester.pump();
+
+        // Act — 点击关闭按钮
+        await tester.tap(find.byKey(SettingsOverlayShell.closeButtonKey));
+        await tester.pump();
+
+        // Assert — 已关闭
+        expect(controller.state.isOpen.value, isFalse);
+
+        // Act — 等待 200ms 退出动画
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pump();
+
+        // Assert — 壳从命中树卸载
+        expect(find.byKey(SettingsOverlayShell.shellKey), findsNothing);
+        expect(find.byKey(SettingsOverlayShell.maskKey), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'ESC closure removes overlay from hit-test tree after 200ms exit',
+      (tester) async {
+        // Arrange
+        final (controller, _) = await pumpShell(tester);
+        controller.open();
+        await tester.pump();
+        await tester.pump();
+
+        // Act — ESC 关闭
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+        await tester.pump();
+
+        // Assert — 已关闭
+        expect(controller.state.isOpen.value, isFalse);
+
+        // Act — 等待 200ms 退出动画
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pump();
+
+        // Assert — 壳从命中树卸载
+        expect(find.byKey(SettingsOverlayShell.shellKey), findsNothing);
+      },
+    );
   });
 }

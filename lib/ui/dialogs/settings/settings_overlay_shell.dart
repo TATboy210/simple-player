@@ -11,6 +11,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../shared/apple_curves.dart';
 import '../../shared/glass_container.dart';
@@ -136,19 +137,27 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
                   ),
                 ),
               ),
-              // 居中面板 — Scale + Fade（PANEL-05）。
-              Center(
-                child: AnimatedScale(
-                  scale: open ? 1.0 : 0.9,
-                  duration: SettingsOverlayShell.animationDuration,
-                  curve: curve,
-                  child: AnimatedOpacity(
-                    opacity: open ? 1.0 : 0.0,
-                    duration: SettingsOverlayShell.animationDuration,
-                    curve: curve,
-                    child: _buildPanel(),
-                  ),
-                ),
+              // 居中面板 — Scale + Fade + 拖拽位移（PANEL-05 / D-09）。
+              ValueListenableBuilder<Offset>(
+                valueListenable: _controller.state.dragOffset,
+                builder: (context, dragOffset, _) {
+                  return Center(
+                    child: Transform.translate(
+                      offset: dragOffset,
+                      child: AnimatedScale(
+                        scale: open ? 1.0 : 0.9,
+                        duration: SettingsOverlayShell.animationDuration,
+                        curve: curve,
+                        child: AnimatedOpacity(
+                          opacity: open ? 1.0 : 0.0,
+                          duration: SettingsOverlayShell.animationDuration,
+                          curve: curve,
+                          child: _buildPanel(context),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -157,60 +166,126 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     );
   }
 
-  /// 面板 — GlassContainer(GlassTier.normal) + 标题栏；拦截自身区域点击，
-  /// 防止落在面板空白处的点击穿透到遮罩误关面板。
-  Widget _buildPanel() {
-    return GestureDetector(
-      // opaque：面板空白区（无子命中目标处）也拦截，不穿透到下层遮罩。
-      behavior: HitTestBehavior.opaque,
-      onTap: () {},
-      child: GlassContainer(
-        tier: GlassTier.normal,
-        borderRadius: BorderRadius.circular(Tokens.radiusLg),
-        resizing: widget.resizing,
-        child: SizedBox(
-          key: SettingsOverlayShell.panelKey,
-          width: SettingsOverlayShell.basePanelWidth,
-          height: SettingsOverlayShell.basePanelHeight,
-          child: Column(
-            children: [
-              _buildTitleBar(),
-              // Phase 25 挂入 tab 内容；壳阶段仅占位撑开面板。
-              const Expanded(child: SizedBox.shrink()),
-            ],
+  /// 计算面板尺寸 — min(500, 窗口宽×0.8) × min(400, 窗口高×0.8)（PANEL-07）。
+  ///
+  /// 保持 double 精度，不做 ceil/floor/truncation。
+  static Size _panelSize(Size mediaSize) => Size(
+    _clampDimension(mediaSize.width, SettingsOverlayShell.basePanelWidth),
+    _clampDimension(mediaSize.height, SettingsOverlayShell.basePanelHeight),
+  );
+
+  /// 单轴尺寸约束 — 80% 窗口或基准值取较小者。
+  static double _clampDimension(double mediaExtent, double base) =>
+      base < mediaExtent * 0.8 ? base : mediaExtent * 0.8;
+
+  /// 面板 — GlassContainer(GlassTier.normal) + 标题栏 + Focus 键盘处理。
+  ///
+  /// 包裹 FocusTraversalGroup + autofocus Focus 实现 D-10 自管键盘作用域：
+  /// ESC/B 关面板且不冒泡到 KeyboardHandler（PANEL-06）。
+  ///
+  /// 注意：面板本身不设 GestureDetector(onTap) 拦截，由标题栏和内容区
+  /// 各自的 GestureDetector 负责命中隔离，避免父级 opaque 拦截标题栏拖拽手势。
+  Widget _buildPanel(BuildContext context) {
+    final mediaSize = MediaQuery.sizeOf(context);
+    final panelSize = _panelSize(mediaSize);
+
+    return FocusTraversalGroup(
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: _handleKeyEvent,
+        child: GlassContainer(
+          tier: GlassTier.normal,
+          borderRadius: BorderRadius.circular(Tokens.radiusLg),
+          resizing: widget.resizing,
+          child: SizedBox(
+            key: SettingsOverlayShell.panelKey,
+            width: panelSize.width,
+            height: panelSize.height,
+            child: Column(
+              children: [
+                _buildTitleBar(mediaSize, panelSize),
+                // 内容区空白 — 拦截点击，不穿透到遮罩层误关面板。
+                // 标题栏拖拽由 _buildTitleBar 自己的 GestureDetector 处理。
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {},
+                    child: const SizedBox.shrink(),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+
+  /// 键盘事件处理 — ESC/B 关面板，消费事件不冒泡（D-10 / PANEL-06）。
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
+      _controller.close();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   /// 标题栏 — 左侧 "设置" 文字 + 右侧关闭按钮（PANEL-04）。
-  Widget _buildTitleBar() {
-    return Container(
+  ///
+  /// 标题栏区域支持拖拽（D-09）：onPanUpdate 更新 dragOffset，
+  /// clamp 到 MediaQuery 窗口边界减去面板尺寸的一半。
+  Widget _buildTitleBar(Size mediaSize, Size panelSize) {
+    return GestureDetector(
       key: SettingsOverlayShell.titleBarKey,
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
-      color: Tokens.bgGlass,
-      child: Row(
-        children: [
-          const Text(
-            '设置',
-            style: TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontBody,
-              fontWeight: Tokens.weightSemiBold,
+      behavior: HitTestBehavior.translucent,
+      onPanUpdate: (details) => _onDragUpdate(details, mediaSize, panelSize),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
+        color: Tokens.bgGlass,
+        child: Row(
+          children: [
+            const Text(
+              '设置',
+              style: TextStyle(
+                color: Tokens.textPrimary,
+                fontSize: Tokens.fontBody,
+                fontWeight: Tokens.weightSemiBold,
+              ),
             ),
-          ),
-          const Spacer(),
-          GlassButton.iconOnly(
-            key: SettingsOverlayShell.closeButtonKey,
-            icon: Icons.close,
-            tooltip: '关闭',
-            iconSize: Tokens.iconMd,
-            onPressed: _controller.close,
-          ),
-        ],
+            const Spacer(),
+            GlassButton.iconOnly(
+              key: SettingsOverlayShell.closeButtonKey,
+              icon: Icons.close,
+              tooltip: '关闭',
+              iconSize: Tokens.iconMd,
+              onPressed: _controller.close,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  /// 拖拽更新 — clamp dragOffset 到窗口边界（D-09 / T-23-03）。
+  ///
+  /// maxX/maxY = (窗口尺寸 - 面板尺寸) / 2，保证面板不拖出播放器窗口。
+  void _onDragUpdate(
+    DragUpdateDetails details,
+    Size mediaSize,
+    Size panelSize,
+  ) {
+    final current = _controller.state.dragOffset.value;
+    final next = current + details.delta;
+    // 面板居中时 dragOffset=0，最大偏移 = (窗口-面板)/2
+    final maxX = (mediaSize.width - panelSize.width) / 2;
+    final maxY = (mediaSize.height - panelSize.height) / 2;
+    _controller.state.dragOffset.value = Offset(
+      next.dx.clamp(-maxX, maxX),
+      next.dy.clamp(-maxY, maxY),
     );
   }
 }
