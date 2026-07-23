@@ -15,7 +15,9 @@ import 'package:flutter/services.dart';
 
 import '../../shared/apple_curves.dart';
 import '../../shared/glass_container.dart';
+import '../../shared/settings_button.dart';
 import '../../theme/tokens.dart';
+import '_settings_nav_item.dart';
 import 'settings_panel_controller.dart';
 
 /// 设置覆盖层壳 — 毛玻璃 + 遮罩 + 标题栏的模态骨架（壳先于内容，tab 内容属 Phase 25）。
@@ -54,14 +56,17 @@ class SettingsOverlayShell extends StatefulWidget {
   /// 面板 sizing box key（测试断言精确尺寸用）.
   static const Key panelKey = ValueKey('settings-overlay-panel');
 
+  /// 底部按钮栏 key（测试定位用）.
+  static const Key buttonBarKey = ValueKey('settings-overlay-button-bar');
+
   /// 开/关动画时长 — 200ms，与 P24 侧边栏 FadeTransition 节奏一致（D-07）.
   static const Duration animationDuration = Duration(milliseconds: 200);
 
-  /// 面板基础宽度 — PANEL-07：min(500, 窗口宽 × 0.8).
-  static const double basePanelWidth = 500.0;
+  /// 面板宽度比例 — 50% 窗口宽度（clamp 上限 80%）.
+  static const double panelWidthRatio = 0.5;
 
-  /// 面板基础高度 — PANEL-07：min(400, 窗口高 × 0.8).
-  static const double basePanelHeight = 400.0;
+  /// 面板高度比例 — 50% 窗口高度（clamp 上限 80%）.
+  static const double panelHeightRatio = 0.5;
 
   @override
   State<SettingsOverlayShell> createState() => _SettingsOverlayShellState();
@@ -72,6 +77,28 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   bool _mountedForExit = false;
 
   SettingsPanelController get _controller => widget.controller;
+
+  /// 7 个 tab 的图标（对应 General/EQ/Audio/Video/Shortcuts/About/Performance）。
+  static const _tabIcons = [
+    Icons.tune,
+    Icons.equalizer,
+    Icons.headphones,
+    Icons.videocam,
+    Icons.keyboard,
+    Icons.info_outline,
+    Icons.speed,
+  ];
+
+  /// 7 个 tab 的标签文字（Phase 25 可升级为 l10n）。
+  static const _tabLabels = [
+    '通用',
+    '均衡器',
+    '音频',
+    '视频',
+    '快捷键',
+    '关于',
+    '性能',
+  ];
 
   @override
   void initState() {
@@ -166,25 +193,22 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     );
   }
 
-  /// 计算面板尺寸 — min(500, 窗口宽×0.8) × min(400, 窗口高×0.8)（PANEL-07）。
+  /// 计算面板尺寸 — 50% 窗口宽高，clamp 上限 80%（PANEL-07）。
   ///
   /// 保持 double 精度，不做 ceil/floor/truncation。
   static Size _panelSize(Size mediaSize) => Size(
-    _clampDimension(mediaSize.width, SettingsOverlayShell.basePanelWidth),
-    _clampDimension(mediaSize.height, SettingsOverlayShell.basePanelHeight),
+    _clampDimension(mediaSize.width, SettingsOverlayShell.panelWidthRatio),
+    _clampDimension(mediaSize.height, SettingsOverlayShell.panelHeightRatio),
   );
 
-  /// 单轴尺寸约束 — 80% 窗口或基准值取较小者。
-  static double _clampDimension(double mediaExtent, double base) =>
-      base < mediaExtent * 0.8 ? base : mediaExtent * 0.8;
+  /// 单轴尺寸约束 — ratio × 窗口尺寸，clamp 到 80% 上限。
+  static double _clampDimension(double mediaExtent, double ratio) =>
+      (mediaExtent * ratio).clamp(0, mediaExtent * 0.8);
 
-  /// 面板 — GlassContainer(GlassTier.normal) + 标题栏 + Focus 键盘处理。
+  /// 面板 — GlassContainer(GlassTier.normal) + 标题栏 + tab bar + 内容区 + Focus 键盘处理。
   ///
-  /// 包裹 FocusTraversalGroup + autofocus Focus 实现 D-10 自管键盘作用域：
-  /// ESC/B 关面板且不冒泡到 KeyboardHandler（PANEL-06）。
-  ///
-  /// 注意：面板本身不设 GestureDetector(onTap) 拦截，由标题栏和内容区
-  /// 各自的 GestureDetector 负责命中隔离，避免父级 opaque 拦截标题栏拖拽手势。
+  /// 三段式布局（D-07）：标题栏 → 水平 tab bar（40px, bgPanel）→ 内容区（毛玻璃, 16dp padding）。
+  /// 包裹 FocusTraversalGroup + autofocus Focus 实现 D-10 自管键盘作用域。
   Widget _buildPanel(BuildContext context) {
     final mediaSize = MediaQuery.sizeOf(context);
     final panelSize = _panelSize(mediaSize);
@@ -204,15 +228,9 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
             child: Column(
               children: [
                 _buildTitleBar(mediaSize, panelSize),
-                // 内容区空白 — 拦截点击，不穿透到遮罩层误关面板。
-                // 标题栏拖拽由 _buildTitleBar 自己的 GestureDetector 处理。
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {},
-                    child: const SizedBox.shrink(),
-                  ),
-                ),
+                _buildTabBar(),
+                Expanded(child: _buildContent()),
+                _buildButtonBar(),
               ],
             ),
           ),
@@ -221,17 +239,169 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     );
   }
 
+  /// 水平 tab bar — 64px 高，bgGlass 半透明背板与标题栏统一（D-07/D-08）。
+  ///
+  /// 7 个等宽 [SettingsNavItem] 横排，selectedTab 驱动高亮。
+  Widget _buildTabBar() {
+    return ValueListenableBuilder<int>(
+      valueListenable: _controller.state.selectedTab,
+      builder: (context, selectedIndex, _) {
+        return Container(
+          height: 64,
+          color: Tokens.bgGlass,
+          child: Row(
+            children: List.generate(_tabIcons.length, (i) {
+              return Expanded(
+                child: SettingsNavItem(
+                  icon: _tabIcons[i],
+                  label: _tabLabels[i],
+                  selected: selectedIndex == i,
+                  onTap: () => _controller.state.selectedTab.value = i,
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
 
-  /// 键盘事件处理 — ESC/B 关面板，消费事件不冒泡（D-10 / PANEL-06）。
+  /// 内容区 — bgPanel 背板 + IndexedStack 保持 7 个 tab 存活 + TweenAnimationBuilder 淡入淡出（D-01/D-02）。
+  ///
+  /// 每个 tab 包裹 `TweenAnimationBuilder<double>`，selectedTab 变化时自动
+  /// 触发 200ms opacity 过渡。内容区四周 16dp padding（D-10）。
+  Widget _buildContent() {
+    return ValueListenableBuilder<int>(
+      valueListenable: _controller.state.selectedTab,
+      builder: (context, selectedIndex, _) {
+        return ColoredBox(
+          color: Tokens.bgPanel,
+          child: Padding(
+            padding: const EdgeInsets.all(Tokens.spMd),
+            child: IndexedStack(
+              index: selectedIndex,
+              children: List.generate(_tabLabels.length, (i) {
+                return TweenAnimationBuilder<double>(
+                  // 目标 opacity：选中 1.0，未选中 0.0
+                  tween: Tween<double>(end: i == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) {
+                    return Opacity(opacity: opacity, child: child);
+                  },
+                  // 占位内容 — Phase 25 替换为真实 tab 内容
+                  child: Center(
+                    child: Text(
+                      _tabLabels[i],
+                      style: const TextStyle(
+                        color: Tokens.textSecondary,
+                        fontSize: Tokens.fontBody,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
+  /// 底部按钮栏 — Cancel / Apply / OK，始终可见（TABS-03/TABS-04）。
+  ///
+  /// OK：提交待修改值 + 关闭面板；Apply：仅提交不关闭；Cancel：回滚 + 关闭。
+  Widget _buildButtonBar() {
+    return Container(
+      key: SettingsOverlayShell.buttonBarKey,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Tokens.spMd,
+        vertical: Tokens.spSm,
+      ),
+      color: Tokens.bgGlass,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          SettingsButton(
+            label: '取消',
+            onTap: () {
+              _controller.cancelPending();
+              _controller.close();
+            },
+          ),
+          const SizedBox(width: Tokens.spSm),
+          SettingsButton(
+            label: '应用',
+            onTap: () {
+              _controller.commitPending();
+            },
+          ),
+          const SizedBox(width: Tokens.spSm),
+          SettingsButton(
+            label: '确定',
+            primary: true,
+            onTap: () {
+              _controller.commitPending();
+              _controller.close();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 键盘/手柄事件处理 — ESC/B 关面板，← → 切换 tab，LB/RB 循环 tab（D-04/D-05/D-06）。
+  ///
+  /// 面板打开时事件由 Focus subtree 消费（返回 handled），不冒泡到
+  /// KeyboardHandler（避免触发 seek ±5s）。
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.escape ||
-        event.logicalKey == LogicalKeyboardKey.keyB) {
+
+    final key = event.logicalKey;
+
+    // ESC/B — 关面板（PANEL-06）
+    if (key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.keyB) {
       _controller.close();
       return KeyEventResult.handled;
     }
+
+    // Arrow Left — 切换到上一个 tab（D-04）
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _controller.prevTab();
+      return KeyEventResult.handled;
+    }
+
+    // Arrow Right — 切换到下一个 tab（D-04）
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _controller.nextTab();
+      return KeyEventResult.handled;
+    }
+
+    // Gamepad Left Shoulder — 切换到上一个 tab（D-05）
+    if (_isLeftShoulder(key)) {
+      _controller.prevTab();
+      return KeyEventResult.handled;
+    }
+
+    // Gamepad Right Shoulder — 切换到下一个 tab（D-05）
+    if (_isRightShoulder(key)) {
+      _controller.nextTab();
+      return KeyEventResult.handled;
+    }
+
     return KeyEventResult.ignored;
   }
+
+  /// 左肩键检测 — Windows 映射 gameButton13，跨平台也检查 gameButtonLeft1。
+  static bool _isLeftShoulder(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.gameButton13 ||
+      key == LogicalKeyboardKey.gameButtonLeft1;
+
+  /// 右肩键检测 — Windows 映射 gameButton12，跨平台也检查 gameButtonRight1。
+  static bool _isRightShoulder(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.gameButton12 ||
+      key == LogicalKeyboardKey.gameButtonRight1;
 
   /// 标题栏 — 左侧 "设置" 文字 + 右侧关闭按钮（PANEL-04）。
   ///
