@@ -310,16 +310,16 @@ Plans:
   6. 面板基础尺寸 500×400，不超过窗口 80%
   7. 打开/关闭动画（Scale + Fade）流畅无卡顿
 
-**Plans**: 2 plans
+**Plans**: 2/2 plans executed
 Plans:
 
 **Wave 0**
 
-- [ ] 23-01-PLAN.md — Track AppleCurves, add playback facade controls, and establish testable settings state/controller lifecycle
+- [x] 23-01-PLAN.md — Track AppleCurves, add playback facade controls, and establish testable settings state/controller lifecycle
 
 **Wave 1** *(blocked on Wave 0)*
 
-- [ ] 23-02-PLAN.md — Mount and cut over the in-tree glass overlay shell with interaction-safety, drag, keyboard, and responsive-bound tests
+- [x] 23-02-PLAN.md — Mount and cut over the in-tree glass overlay shell with interaction-safety, drag, keyboard, and responsive-bound tests
 
 ### Phase 24: Sidebar Navigation
 
@@ -397,7 +397,7 @@ Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 | 20. 状态与生命周期重写 | v3.0 | 3/3 | Complete | 2026-07-20 |
 | 21. 测试与迁移验证 + 适配层收拢 | v3.0 | 12/12 | Complete | 2026-07-21 |
 | 22. 双语 API 文档注释标准 | v3.0 | 1/1 | Complete    | 2026-07-23 |
-| 23. Overlay Shell & State Model | v4.0 | 0/2 | Planned | - |
+| 23. Overlay Shell & State Model | v4.0 | 2/2 | Complete    | 2026-07-23 |
 | 24. Sidebar Navigation | v4.0 | 0/TBD | Not started | - |
 | 25. Tab Content Framework | v4.0 | 0/TBD | Not started | - |
 | 26. Gamepad & Keyboard Navigation | v4.0 | 0/TBD | Not started | - |
