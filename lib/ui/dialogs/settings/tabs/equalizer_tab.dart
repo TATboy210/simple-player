@@ -22,7 +22,8 @@ class EqualizerTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSectionList(
+    return SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 均衡器开关 + 频段滑块 — 毛玻璃卡片
         GlassContainer(
@@ -73,6 +74,7 @@ class EqualizerTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

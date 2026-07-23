@@ -24,7 +24,8 @@ class ShortcutsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AnimatedSectionList(
+    return const SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 快捷键列表 — 毛玻璃卡片
         GlassContainer(
@@ -56,6 +57,7 @@ class ShortcutsTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }

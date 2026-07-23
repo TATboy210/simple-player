@@ -19,6 +19,13 @@ import '../../shared/settings_button.dart';
 import '../../theme/tokens.dart';
 import '_settings_nav_item.dart';
 import 'settings_panel_controller.dart';
+import 'tabs/about_tab.dart';
+import 'tabs/audio_tab.dart';
+import 'tabs/equalizer_tab.dart';
+import 'tabs/general_tab.dart';
+import 'tabs/performance_tab.dart';
+import 'tabs/shortcuts_tab.dart';
+import 'tabs/video_tab.dart';
 
 /// 设置覆盖层壳 — 毛玻璃 + 遮罩 + 标题栏的模态骨架（壳先于内容，tab 内容属 Phase 25）。
 ///
@@ -270,6 +277,9 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   ///
   /// 每个 tab 包裹 `TweenAnimationBuilder<double>`，selectedTab 变化时自动
   /// 触发 200ms opacity 过渡。内容区四周 16dp padding（D-10）。
+  ///
+  /// 7 个 tab 显式列出（非 List.generate），每个 tab 类型不同：
+  /// GeneralTab / EqualizerTab / AudioTab / VideoTab / ShortcutsTab / AboutTab / PerformanceTab。
   Widget _buildContent() {
     return ValueListenableBuilder<int>(
       valueListenable: _controller.state.selectedTab,
@@ -280,26 +290,64 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
             padding: const EdgeInsets.all(Tokens.spMd),
             child: IndexedStack(
               index: selectedIndex,
-              children: List.generate(_tabLabels.length, (i) {
-                return TweenAnimationBuilder<double>(
-                  // 目标 opacity：选中 1.0，未选中 0.0
-                  tween: Tween<double>(end: i == selectedIndex ? 1.0 : 0.0),
+              children: [
+                // Tab 0: 通用
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 0 == selectedIndex ? 1.0 : 0.0),
                   duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) {
-                    return Opacity(opacity: opacity, child: child);
-                  },
-                  // 占位内容 — Phase 25 替换为真实 tab 内容
-                  child: Center(
-                    child: Text(
-                      _tabLabels[i],
-                      style: const TextStyle(
-                        color: Tokens.textSecondary,
-                        fontSize: Tokens.fontBody,
-                      ),
-                    ),
-                  ),
-                );
-              }),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: GeneralTab(pending: _controller.pending),
+                ),
+                // Tab 1: 均衡器
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 1 == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: EqualizerTab(pending: _controller.pending),
+                ),
+                // Tab 2: 音频
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 2 == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: AudioTab(pending: _controller.pending),
+                ),
+                // Tab 3: 视频
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 3 == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: VideoTab(pending: _controller.pending),
+                ),
+                // Tab 4: 快捷键
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 4 == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: ShortcutsTab(pending: _controller.pending),
+                ),
+                // Tab 5: 关于
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 5 == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: AboutTab(pending: _controller.pending),
+                ),
+                // Tab 6: 性能
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: 6 == selectedIndex ? 1.0 : 0.0),
+                  duration: const Duration(milliseconds: 200),
+                  builder: (context, opacity, child) =>
+                      Opacity(opacity: opacity, child: child),
+                  child: PerformanceTab(pending: _controller.pending),
+                ),
+              ],
             ),
           ),
         );

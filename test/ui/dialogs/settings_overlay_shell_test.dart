@@ -105,10 +105,14 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
 
         // Assert — GlassContainer 走 GlassTier.normal，内含 BackdropFilter（PANEL-03）
-        final glass = tester.widget<GlassContainer>(
-          find.byType(GlassContainer),
+        // 找到包含 panelKey 的 GlassContainer（壳级别，非 tab 内部的 GlassContainer）
+        final shellGlass = tester.widget<GlassContainer>(
+          find.ancestor(
+            of: find.byKey(SettingsOverlayShell.panelKey),
+            matching: find.byType(GlassContainer),
+          ),
         );
-        expect(glass.tier, GlassTier.normal);
+        expect(shellGlass.tier, GlassTier.normal);
         expect(find.byType(BackdropFilter), findsWidgets);
 
         // Assert — 动画终点 scale==1.0 / opacity==1.0，时长 200ms，
@@ -437,10 +441,15 @@ void main() {
         await tester.pump();
 
         // Assert — IndexedStack 的 index 等于 selectedTab
-        final indexedStack = tester.widget<IndexedStack>(
+        // 壳内有多个 IndexedStack（tab 内容可能也包含），取第一个（壳级别）
+        final allStacks = tester.widgetList<IndexedStack>(
           find.byType(IndexedStack),
         );
-        expect(indexedStack.index, 2);
+        // Shell's IndexedStack has 7 children (one per tab)
+        final shellStack = allStacks.firstWhere(
+          (s) => s.children.length == 7,
+        );
+        expect(shellStack.index, 2);
       },
     );
 

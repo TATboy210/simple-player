@@ -22,7 +22,8 @@ class VideoTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSectionList(
+    return SingleChildScrollView(
+      child: AnimatedSectionList(
       children: [
         // 解码器选择 — 毛玻璃卡片
         GlassContainer(
@@ -122,6 +123,7 @@ class VideoTab extends StatelessWidget {
           ),
         ),
       ],
+    ),
     );
   }
 }
