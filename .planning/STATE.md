@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: 设置面板框架重构 (Phases 23-27 — Not Started)
-current_phase: 21
-current_phase_name: bilingual-api-docs
-status: executing
-stopped_at: context exhaustion at 76% (2026-07-22)
-last_updated: "2026-07-22T15:03:55.081Z"
-last_activity: 2026-07-20
-last_activity_desc: Phase 21 execution started
+current_phase: 23
+current_phase_name: Overlay Shell & State Model
+status: planning
+stopped_at: context exhaustion at 88% (2026-07-23)
+last_updated: "2026-07-23T11:37:58.124Z"
+last_activity: 2026-07-23
+last_activity_desc: Phase 22 complete, transitioned to Phase 23
 progress:
   total_phases: 13
-  completed_phases: 6
-  total_plans: 33
-  completed_plans: 31
-  percent: 46
+  completed_phases: 7
+  total_plans: 35
+  completed_plans: 33
+  percent: 54
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -24,20 +24,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 21 — verify-migration-adapter-convergence
+**Current focus:** Phase 22 — bilingual-api-docs
 
 ## Current Position
 
-Phase: 21 (verify-migration-adapter-convergence) — EXECUTING
-Plan: 1 of 8
-Status: Ready to execute
-Last activity: 2026-07-20 — Phase 21 execution started
+Phase: 23 — Overlay Shell & State Model
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-23 — Phase 22 complete, transitioned to Phase 23
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 18
+- Total plans completed: 19
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -55,6 +55,7 @@ Last activity: 2026-07-20 — Phase 21 execution started
 | 17 | 3 | - | - |
 | 18 | 3 | - | - |
 | 19 | 2 | - | - |
+| 22 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -107,8 +108,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-22T15:03:55.009Z
-Stopped at: context exhaustion at 76% (2026-07-22)
+Last session: 2026-07-23T07:35:27.545Z
+Stopped at: context exhaustion at 88% (2026-07-23)
 Resume file: .planning/phases/21-verify-migration-adapter-convergence/21-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
