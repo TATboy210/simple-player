@@ -411,7 +411,7 @@ Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 | 22. 双语 API 文档注释标准 | v3.0 | 1/1 | Complete    | 2026-07-23 |
 | 23. Overlay Shell & State Model | v4.0 | 2/2 | Complete    | 2026-07-23 |
 | 24. Sidebar Navigation | v4.0 | 0/2 | Planning complete | - |
-| 25. Tab Content Framework | v4.0 | 2/2 | In Progress|  |
+| 25. Tab Content Framework | v4.0 | 2/2 | Complete    | 2026-07-24 |
 | 26. Gamepad & Keyboard Navigation | v4.0 | 0/TBD | Not started | - |
 | 27. Responsive Scaling & Polish | v4.0 | 0/TBD | Not started | - |
 
