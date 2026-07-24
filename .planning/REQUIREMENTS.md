@@ -176,13 +176,13 @@
 
 ### PANEL — Overlay Shell & State Model（Phase 23）
 
-- [ ] **PANEL-01**: `SettingsPanelState` 状态模型 — `ValueNotifier<bool> isOpen`、`ValueNotifier<int> selectedTab`、`ValueNotifier<Offset> dragOffset`；视频暂停/恢复由 `PlaybackController` 协调
-- [ ] **PANEL-02**: `SettingsPanelController` — `open()`/`close()`/`toggle()` 方法，打开时暂停视频并记录先前播放状态（`wasPlaying`），关闭时恢复到先前状态
-- [ ] **PANEL-03**: 毛玻璃覆盖层壳 — `BackdropFilter(sigmaX/Y)` + `bgGlass` + `borderHighlight`，居中定位（`Alignment.center`），拖拽约束在播放器窗口内
-- [ ] **PANEL-04**: 标题栏 — 左侧 "设置" 文字 + 右侧 × 关闭按钮（`GlassIconButton`），拖拽区域仅标题栏
-- [ ] **PANEL-05**: 遮罩层 — 半透明遮罩覆盖整个播放器，点击遮罩关闭面板，`AnimatedOpacity` + `AnimatedScale` 开关动效
-- [ ] **PANEL-06**: 键盘关闭 — `ESC` 和 `B` 键关闭面板（`FocusTraversalGroup` 内 `LogicalKeySet` 处理）
-- [ ] **PANEL-07**: 面板尺寸 — 500×400 基础尺寸，全屏时按窗口比例缩放（`MediaQuery.size` 计算），最大不超过窗口 80%
+- [x] **PANEL-01**: `SettingsPanelState` 状态模型 — `ValueNotifier<bool> isOpen`、`ValueNotifier<int> selectedTab`、`ValueNotifier<Offset> dragOffset`；视频暂停/恢复由 `PlaybackController` 协调
+- [x] **PANEL-02**: `SettingsPanelController` — `open()`/`close()`/`toggle()` 方法，打开时暂停视频并记录先前播放状态（`wasPlaying`），关闭时恢复到先前状态
+- [x] **PANEL-03**: 毛玻璃覆盖层壳 — `BackdropFilter(sigmaX/Y)` + `bgGlass` + `borderHighlight`，居中定位（`Alignment.center`），拖拽约束在播放器窗口内
+- [x] **PANEL-04**: 标题栏 — 左侧 "设置" 文字 + 右侧 × 关闭按钮（`GlassIconButton`），拖拽区域仅标题栏
+- [x] **PANEL-05**: 遮罩层 — 半透明遮罩覆盖整个播放器，点击遮罩关闭面板，`AnimatedOpacity` + `AnimatedScale` 开关动效
+- [x] **PANEL-06**: 键盘关闭 — `ESC` 和 `B` 键关闭面板（`FocusTraversalGroup` 内 `LogicalKeySet` 处理）
+- [x] **PANEL-07**: 面板尺寸 — 500×400 基础尺寸，全屏时按窗口比例缩放（`MediaQuery.size` 计算），最大不超过窗口 80%
 
 ### SIDEBAR — Sidebar Navigation（Phase 24）
 
@@ -193,10 +193,10 @@
 
 ### TABS — Tab Content Framework（Phase 25）
 
-- [ ] **TABS-01**: 7 个 tab 页壳 — 每个 tab 为独立 `StatelessWidget`，接收当前 tab 索引，渲染 `SettingRow` 骨架列表（占位内容）
-- [ ] **TABS-02**: `SettingRow` 组件 — 标签 + 控件布局，支持 `Switch`/`Slider`/`SpinControl`/`Dropdown` 控件类型，内联描述文本（标签下方灰色小字）
-- [ ] **TABS-03**: OK/Cancel/Apply 按钮栏 — 底部固定，OK 应用所有待定更改并关闭，Cancel 丢弃并关闭，Apply 应用但不关闭
-- [ ] **TABS-04**: 延迟应用模式 — locale/theme/shortcuts 更改存入 `_pending*` 状态，仅 OK/Apply 时提交，Cancel 恢复原始值
+- [x] **TABS-01**: 7 个 tab 页壳 — 每个 tab 为独立 `StatelessWidget`，接收当前 tab 索引，渲染 `SettingRow` 骨架列表（占位内容）
+- [x] **TABS-02**: `SettingRow` 组件 — 标签 + 控件布局，支持 `Switch`/`Slider`/`SpinControl`/`Dropdown` 控件类型，内联描述文本（标签下方灰色小字）
+- [x] **TABS-03**: OK/Cancel/Apply 按钮栏 — 底部固定，OK 应用所有待定更改并关闭，Cancel 丢弃并关闭，Apply 应用但不关闭
+- [x] **TABS-04**: 延迟应用模式 — locale/theme/shortcuts 更改存入 `_pending*` 状态，仅 OK/Apply 时提交，Cancel 恢复原始值
 
 ### NAV — Gamepad & Keyboard Navigation（Phase 26）
 
