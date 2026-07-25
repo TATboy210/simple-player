@@ -4,17 +4,17 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 28
 current_phase_name: settings-shell-split-legacy-deletion
-status: executing
-stopped_at: context exhaustion at 87% (2026-07-25)
-last_updated: "2026-07-25T16:05:56.001Z"
-last_activity: 2026-07-25
-last_activity_desc: Phase 28 execution started
+status: phase_complete
+stopped_at: Phase 28 complete (2026-07-26), ready for Phase 29 planning
+last_updated: "2026-07-26T00:00:00.000Z"
+last_activity: 2026-07-26
+last_activity_desc: Phase 28 complete (3/3 tasks + SUMMARY, interactive inline mode)
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 14
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 28 — settings-shell-split-legacy-deletion
+**Current focus:** Phase 29 — auto-pause-detector (next, ready to plan); Phase 28 complete
 
 ## Current Position
 
-Phase: 28 (settings-shell-split-legacy-deletion) — EXECUTING
-Plan: 1 of 1
-Status: Executing Phase 28
-Last activity: 2026-07-25 — Phase 28 execution started
+Phase: 28 (settings-shell-split-legacy-deletion) — COMPLETE
+Plan: 1 of 1 (complete)
+Status: Phase 28 complete, ready for Phase 29 planning
+Last activity: 2026-07-26 — Phase 28 complete (interactive inline mode)
 
 ## Performance Metrics
 
@@ -111,8 +111,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-25T16:05:55.968Z
-Stopped at: context exhaustion at 87% (2026-07-25)
+Last session: 2026-07-25T16:35:46.762Z
+Stopped at: context exhaustion at 94% (2026-07-25)
 Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -258,6 +258,21 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **slim spawn 子代理风险不变**：subagent 有效窗口 ~60K（2nd attempt 实测 52K=89%），slim 注入 ~50K 仅余 ~9K 给 3 tasks，仍可能 halt。
 - **checkpoint 更新**：28-EXECUTE-CHECKPOINT.md frontmatter `attempts: 3`、`created: 2026-07-26`、halt_reason 改为 orchestrator-budget；append 3rd-halt 节 + 下窗口建议（slim spawn 或 `--interactive`，推荐 `--interactive` 因 3 次 halt 后最可恢复；lean orchestrator tip：下窗口只读 checkpoint+plan+execute-phase.md，跳过重读 STATE.md 全历史省 ~10K）。
 - **下一步（新窗口）**：`/clear` → `/gsd-execute-phase 28`（fresh 200K）。读 checkpoint 应用 lean 加载（跳过 STATE 全历史）→ 选 slim spawn 或 `--interactive`（后者主会话 inline 跑 3 tasks，无子代理注入开销，fresh 窗口预算够 Task 1+2+3 + post-merge gate）。
+
+### 2026-07-26 Phase 28 complete (interactive inline mode, 3/3 tasks + SUMMARY)
+
+- **执行模式**：`/gsd-execute-phase 28 --interactive inline`（主会话直接跑，避开 3 次 subagent spawn halt）。3 次 fresh 子代理注入耗尽后用户切 inline 模式，单窗口 200K 主会话跑完 Task 1+2+3 + SUMMARY + 全套件验证。
+- **3 个原子 commit + 1 docs commit**：
+  - `e2d7f3f` refactor(28-01): extract SettingsTabStrip (91 行) — tracer tdd
+  - `1592386` refactor(28-02): extract SettingsTabContent (121 行) + SettingsPanelKeyBindings (82 行) — tdd
+  - `364676f` refactor(28-03): delete legacy settings_panel.dart (945 行) + refresh 3 stale comments
+  - `650acd3` docs(28): record Phase 28 SUMMARY
+- **验收数据**：shell 467→331 行 (<500 ✓); 4 个提取文件全 <300 行 (tab_strip 91 / tab_content 121 / panel_key_bindings 82); pubspec.yaml 未变; grep gate `SettingsPanel(` 零外部调用; 7-child IndexedStack 显式结构保持; FocusTraversalGroup ≥4 不变; 状态归属不变 (SettingsPanelController.state.selectedTab 唯一拥有者)。
+- **测试结果**：dialogs 子集 128/132 (4 预存在失败 stash 鉴别非回归: settings_nav_item_test 2 个 = Phase 25 SettingsNavItem; settings_tab_content_test DropdownButton 2 个 = GeneralTab headless); 全套件 2361 通过 + 26 跳过 + 68 失败 (4 dialogs 预存在 + 64 engine/kernel mdk.dll FFI 预存在, Phase 28 不触及这些模块, 按模块边界判断)。
+- **关键工程教训**：(1) 提取时 import 完整性 — panel_key_bindings.dart 需 material.dart (FocusNode/KeyEventResult via widgets) + services.dart (LogicalKeyboardKey/KeyEvent/KeyDownEvent), widgets.dart 用 `show` 限定 re-export 子集不能依赖传递性; (2) Tracer TDD 鉴别 — stash + 跑 HEAD 基线把"测试全绿"(不可达, 预存在失败)转化为"提取零回归"(可达, 对比基线); (3) 按模块边界快速判断预存在失败 — Phase 28 只改 lib/ui/dialogs/settings/, 全套件 68 失败中 64 在 engine/kernel, 物理上无法触及。
+- **预存在技术债登记**（非 Phase 28）: settings_nav_item_test 2 个 (Phase 25 SettingsNavItem), settings_tab_content_test DropdownButton 2 个 (GeneralTab headless), fvp_engine_contract_test ~57 个 mdk.dll FFI 加载失败 (headless 环境, 见 memory reference_mdk_dll_headless_test_failures.md)。
+- **STATE.md 外科手术更新**: frontmatter status executing→phase_complete, completed_phases 0→1, completed_plans 0→1, percent 0→14; Current Position EXECUTING→COMPLETE; 追加本条历史。历史 Session Continuity 全保留。
+- **下一步**: Phase 28 结构债务清零, 可启动 v4.5 设置面板重设计下一 phase。Phase 29 = auto-pause-detector (PAUSE, 4 reqs), 标准模式 (无需 research-phase, ROADMAP 仅 32/33 须 research)。`/clear` → `/gsd-plan-phase 29`。ROADMAP phases 28-34, 构建顺序 28→29→30→31→32→33→34, Phase 28 已完成 1/7。
 
 ## Operator Next Steps
 
