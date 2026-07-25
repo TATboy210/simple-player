@@ -18,6 +18,7 @@ import '../../shared/glass_container.dart';
 import '../../shared/settings_button.dart';
 import '../../theme/tokens.dart';
 import '_settings_nav_item.dart';
+import 'tab_strip.dart';
 import 'settings_panel_controller.dart';
 import 'tabs/about_tab.dart';
 import 'tabs/audio_tab.dart';
@@ -81,28 +82,6 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   bool _mountedForExit = false;
 
   SettingsPanelController get _controller => widget.controller;
-
-  /// 7 个 tab 的图标（对应 General/EQ/Audio/Video/Shortcuts/About/Performance）。
-  static const _tabIcons = [
-    Icons.tune,
-    Icons.equalizer,
-    Icons.headphones,
-    Icons.videocam,
-    Icons.keyboard,
-    Icons.info_outline,
-    Icons.speed,
-  ];
-
-  /// 7 个 tab 的标签文字（Phase 25 可升级为 l10n）。
-  static const _tabLabels = [
-    '通用',
-    '均衡器',
-    '音频',
-    '视频',
-    '快捷键',
-    '关于',
-    '性能',
-  ];
 
   @override
   void initState() {
@@ -234,7 +213,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
               child: Column(
                 children: [
                   _buildTitleBar(mediaSize, Size(width, height)),
-                  _buildTabBar(isCompact: isCompact),
+                  SettingsTabStrip(
+                    selectedTab: _controller.state.selectedTab,
+                    onSelect: (i) => _controller.state.selectedTab.value = i,
+                    isCompact: isCompact,
+                  ),
                   Expanded(child: _buildContent()),
                   _buildButtonBar(),
                 ],
@@ -243,39 +226,6 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
           ),
         ),
       ),
-    );
-  }
-
-  /// 水平 tab bar — 64px/48px 高，bgGlass 半透明背板与标题栏统一（D-07/D-08）。
-  ///
-  /// 7 个等宽 [SettingsNavItem] 横排，selectedTab 驱动高亮。
-  /// [isCompact] 控制 tab 高度、字体大小和间距（D-01/D-02/D-03）。
-  Widget _buildTabBar({required bool isCompact}) {
-    final fontSize = isCompact ? Tokens.tabBarFontCompact : Tokens.tabBarFontNormal;
-    final spacing = isCompact ? Tokens.tabBarSpacingCompact : Tokens.tabBarSpacingNormal;
-
-    return ValueListenableBuilder<int>(
-      valueListenable: _controller.state.selectedTab,
-      builder: (context, selectedIndex, _) {
-        return Container(
-          height: isCompact ? 56 : 64,
-          color: Tokens.bgGlass,
-          child: Row(
-            children: List.generate(_tabIcons.length, (i) {
-              return Expanded(
-                child: SettingsNavItem(
-                  icon: _tabIcons[i],
-                  label: _tabLabels[i],
-                  selected: selectedIndex == i,
-                  onTap: () => _controller.state.selectedTab.value = i,
-                  fontSize: fontSize,
-                  spacing: spacing,
-                ),
-              );
-            }),
-          ),
-        );
-      },
     );
   }
 
