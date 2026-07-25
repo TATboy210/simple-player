@@ -9,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/_settings_nav_item.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
-import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import 'settings_panel_controller_test.dart' show FakePlaybackController;
@@ -214,7 +213,7 @@ void main() {
 
   group('Drag Bounds', () {
     testWidgets('drag title bar -> panel moves within bounds', (tester) async {
-      // Arrange — 1200×800 窗口 → 面板 600×750, maxX=(1200-600)/2=300, maxY=max(0,(800-750)/2)=25
+      // Arrange — 1200×800 窗口 → 面板 600×480, maxX=(1200-600)/2=300, maxY=(800-480)/2=160
       final (controller, _) = await pumpShell(
         tester,
         size: const Size(1200, 800),
@@ -229,13 +228,13 @@ void main() {
       await gesture.up();
       await tester.pump();
 
-      // Assert — dx=100（在 maxX=300 内），dy=20（在 maxY=25 内）
+      // Assert — dx=100（在 maxX=300 内），dy=20（在 maxY=160 内）
       expect(controller.state.dragOffset.value.dx, 100.0);
       expect(controller.state.dragOffset.value.dy, 20.0);
     });
 
     testWidgets('drag beyond bounds is clamped', (tester) async {
-      // Arrange — 1200×800 窗口 → maxX=300, maxY=25
+      // Arrange — 1200×800 窗口 → 面板 600×480, maxX=300, maxY=160
       final (controller, _) = await pumpShell(
         tester,
         size: const Size(1200, 800),
@@ -246,13 +245,13 @@ void main() {
       // Act — 拖到超出边界
       final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
       final gesture = await tester.startGesture(tester.getCenter(titleBar));
-      await gesture.moveBy(const Offset(500, 100));
+      await gesture.moveBy(const Offset(500, 200));
       await gesture.up();
       await tester.pump();
 
-      // Assert — 被 clamp 到 maxX=300, maxY=25
+      // Assert — 被 clamp 到 maxX=300, maxY=160
       expect(controller.state.dragOffset.value.dx, 300.0);
-      expect(controller.state.dragOffset.value.dy, 25.0);
+      expect(controller.state.dragOffset.value.dy, 160.0);
     });
   });
 
@@ -346,6 +345,156 @@ void main() {
 
       // Assert — GlassContainer 的 BackdropFilter 存在
       expect(find.byType(BackdropFilter), findsWidgets);
+    });
+  });
+
+  // ── SCALE Success Criteria (Phase 27 ROADMAP) ──
+  //
+  // 验证 ROADMAP Phase 27 的 5 条 Success Criteria 全部由自动化测试覆盖。
+
+  group('SCALE Success Criteria', () {
+    // SC-1: MediaQuery.size 检测窗口尺寸，面板按比例缩放
+    testWidgets('SC-1: MediaQuery.size drives panel sizing at 3 window sizes', (tester) async {
+      // 测试 3 个窗口尺寸，确认面板宽度随窗口变化
+
+      // 1920×1080 → width=1536, clamp to 600
+      final (ctrl1, _) = await pumpShell(tester, size: const Size(1920, 1080));
+      ctrl1.open();
+      await tester.pump();
+      var panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
+      expect(panel.width, 600.0);
+      ctrl1.close();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      // 800×600 → width=640, clamp to 600
+      final (ctrl2, _) = await pumpShell(tester, size: const Size(800, 600));
+      ctrl2.open();
+      await tester.pump();
+      panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
+      expect(panel.width, 600.0);
+      ctrl2.close();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      // 500×400 → width=400
+      final (ctrl3, _) = await pumpShell(tester, size: const Size(500, 400));
+      ctrl3.open();
+      await tester.pump();
+      panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
+      expect(panel.width, 400.0);
+    });
+
+    // SC-2: 全屏模式面板600×480
+    testWidgets('SC-2: fullscreen mode panel is 600×480', (tester) async {
+      // Arrange — 1920×1080 模拟全屏
+      final (controller, _) = await pumpShell(tester, size: const Size(1920, 1080));
+      controller.open();
+      await tester.pump();
+
+      // Assert — 面板精确 600×480
+      final panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
+      expect(panel.width, 600.0);
+      expect(panel.height, 480.0);
+
+      // Assert — tab bar 为 normal 模式（fontSize 14.0）
+      final navItems = tester.widgetList<SettingsNavItem>(find.byType(SettingsNavItem));
+      for (final item in navItems) {
+        expect(item.fontSize, Tokens.tabBarFontNormal);
+      }
+    });
+
+    // SC-3: 小窗口（<800px）面板400×320
+    testWidgets('SC-3: small window <800px panel is 400×320', (tester) async {
+      // Arrange — 500×400 窗口（<800px → compact 模式, 500*0.8=400 → clamp 下限命中）
+      final (controller, _) = await pumpShell(tester, size: const Size(500, 400));
+      controller.open();
+      await tester.pump();
+
+      // Assert — 面板精确 400×320（width=500*0.8=400, height=400*0.8=320）
+      final panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
+      expect(panel.width, 400.0);
+      expect(panel.height, 320.0);
+
+      // Assert — tab bar 为 compact 模式（fontSize 12.0）
+      final navItems = tester.widgetList<SettingsNavItem>(find.byType(SettingsNavItem));
+      for (final item in navItems) {
+        expect(item.fontSize, Tokens.tabBarFontCompact);
+      }
+    });
+
+    // SC-4: 打开/关闭动画 Scale + Fade 流畅（200ms 无异常）
+    testWidgets('SC-4: open/close animation completes in 200ms without error', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester, size: const Size(800, 600));
+
+      // Act — 打开面板
+      controller.open();
+      await tester.pump();
+
+      // Assert — AnimatedOpacity 和 AnimatedScale 存在，duration=200ms
+      final scaleWidget = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+      expect(scaleWidget.duration, const Duration(milliseconds: 200));
+      expect(scaleWidget.scale, 1.0);
+
+      // 推进 12 帧（200ms @60fps）— 无异常
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 16, microseconds: 667));
+      }
+
+      // Act — 关闭面板
+      controller.close();
+      await tester.pump();
+
+      // 推进关闭动画 — 无异常
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 16, microseconds: 667));
+      }
+
+      // Assert — 关闭后 isOpen 为 false
+      expect(controller.state.isOpen.value, isFalse);
+
+      // 等待退出动画完成
+      await tester.pump(const Duration(milliseconds: 250));
+    });
+
+    // SC-5: 关键路径 — open/close/tab switch/drag/keyboard
+    testWidgets('SC-5: all key paths work (open/close/tab/drag/keyboard)', (tester) async {
+      final (controller, _) = await pumpShell(tester, size: const Size(1200, 800));
+
+      // Path 1: Open
+      controller.open();
+      await tester.pump();
+      expect(controller.state.isOpen.value, isTrue);
+      expect(find.byKey(SettingsOverlayShell.shellKey), findsOneWidget);
+
+      // Path 2: Switch tab
+      final navItems = find.byType(SettingsNavItem);
+      await tester.tap(navItems.at(2)); // 音频
+      await tester.pump();
+      expect(controller.state.selectedTab.value, 2);
+
+      // Path 3: Drag title bar
+      final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+      final gesture = await tester.startGesture(tester.getCenter(titleBar));
+      await gesture.moveBy(const Offset(50, 30));
+      await gesture.up();
+      await tester.pump();
+      expect(controller.state.dragOffset.value.dx, 50.0);
+
+      // Path 4: Keyboard — arrow right switches tab
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(controller.state.selectedTab.value, 3);
+
+      // Path 5: Close via ESC
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(controller.state.isOpen.value, isFalse);
+
+      // 等待退出动画
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.byKey(SettingsOverlayShell.shellKey), findsNothing);
     });
   });
 }
