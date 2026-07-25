@@ -11,22 +11,15 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../shared/apple_curves.dart';
 import '../../shared/glass_container.dart';
 import '../../shared/settings_button.dart';
 import '../../theme/tokens.dart';
-import '_settings_nav_item.dart';
-import 'tab_strip.dart';
+import 'panel_key_bindings.dart';
 import 'settings_panel_controller.dart';
-import 'tabs/about_tab.dart';
-import 'tabs/audio_tab.dart';
-import 'tabs/equalizer_tab.dart';
-import 'tabs/general_tab.dart';
-import 'tabs/performance_tab.dart';
-import 'tabs/shortcuts_tab.dart';
-import 'tabs/video_tab.dart';
+import 'tab_content.dart';
+import 'tab_strip.dart';
 
 /// 设置覆盖层壳 — 毛玻璃 + 遮罩 + 标题栏的模态骨架（壳先于内容，tab 内容属 Phase 25）。
 ///
@@ -196,12 +189,14 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     final width = _panelWidth(mediaSize.width);
     final height = _panelHeight(width);
     final isCompact = mediaSize.width < Tokens.breakpointResponsive;
+    // 无状态键盘路由 helper — root Focus 的 onKeyEvent 委托给它 (REFAC-01)。
+    final keyBindings = SettingsPanelKeyBindings(_controller);
 
     return RepaintBoundary(
       child: FocusTraversalGroup(
         child: Focus(
           autofocus: true,
-          onKeyEvent: _handleKeyEvent,
+          onKeyEvent: keyBindings.handle,
           child: GlassContainer(
             tier: GlassTier.normal,
             borderRadius: BorderRadius.circular(Tokens.radiusLg),
@@ -218,7 +213,12 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
                     onSelect: (i) => _controller.state.selectedTab.value = i,
                     isCompact: isCompact,
                   ),
-                  Expanded(child: _buildContent()),
+                  Expanded(
+                    child: SettingsTabContent(
+                      selectedTab: _controller.state.selectedTab,
+                      pending: _controller.pending,
+                    ),
+                  ),
                   _buildButtonBar(),
                 ],
               ),
@@ -228,89 +228,6 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       ),
     );
   }
-
-  /// 内容区 — bgPanel 背板 + IndexedStack 保持 7 个 tab 存活 + TweenAnimationBuilder 淡入淡出（D-01/D-02）。
-  ///
-  /// 每个 tab 包裹 `TweenAnimationBuilder<double>`，selectedTab 变化时自动
-  /// 触发 200ms opacity 过渡。内容区四周 16dp padding（D-10）。
-  ///
-  /// 7 个 tab 显式列出（非 List.generate），每个 tab 类型不同：
-  /// GeneralTab / EqualizerTab / AudioTab / VideoTab / ShortcutsTab / AboutTab / PerformanceTab。
-  Widget _buildContent() {
-    return ValueListenableBuilder<int>(
-      valueListenable: _controller.state.selectedTab,
-      builder: (context, selectedIndex, _) {
-        return ColoredBox(
-          color: Tokens.bgPanel,
-          child: Padding(
-            padding: const EdgeInsets.all(Tokens.spMd),
-            child: IndexedStack(
-              index: selectedIndex,
-              children: [
-                // Tab 0: 通用
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 0 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: GeneralTab(pending: _controller.pending),
-                ),
-                // Tab 1: 均衡器
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 1 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: EqualizerTab(pending: _controller.pending),
-                ),
-                // Tab 2: 音频
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 2 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: AudioTab(pending: _controller.pending),
-                ),
-                // Tab 3: 视频
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 3 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: VideoTab(pending: _controller.pending),
-                ),
-                // Tab 4: 快捷键
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 4 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: ShortcutsTab(pending: _controller.pending),
-                ),
-                // Tab 5: 关于
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 5 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: AboutTab(pending: _controller.pending),
-                ),
-                // Tab 6: 性能
-                TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: 6 == selectedIndex ? 1.0 : 0.0),
-                  duration: const Duration(milliseconds: 200),
-                  builder: (context, opacity, child) =>
-                      Opacity(opacity: opacity, child: child),
-                  child: PerformanceTab(pending: _controller.pending),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
 
   /// 底部按钮栏 — Cancel / Apply / OK，始终可见（TABS-03/TABS-04）。
   ///
@@ -353,59 +270,6 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       ),
     );
   }
-
-  /// 键盘/手柄事件处理 — ESC/B 关面板，← → 切换 tab，LB/RB 循环 tab（D-04/D-05/D-06）。
-  ///
-  /// 面板打开时事件由 Focus subtree 消费（返回 handled），不冒泡到
-  /// KeyboardHandler（避免触发 seek ±5s）。
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    final key = event.logicalKey;
-
-    // ESC/B — 关面板（PANEL-06）
-    if (key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.keyB) {
-      _controller.close();
-      return KeyEventResult.handled;
-    }
-
-    // Arrow Left — 切换到上一个 tab（D-04）
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _controller.prevTab();
-      return KeyEventResult.handled;
-    }
-
-    // Arrow Right — 切换到下一个 tab（D-04）
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _controller.nextTab();
-      return KeyEventResult.handled;
-    }
-
-    // Gamepad Left Shoulder — 切换到上一个 tab（D-05）
-    if (_isLeftShoulder(key)) {
-      _controller.prevTab();
-      return KeyEventResult.handled;
-    }
-
-    // Gamepad Right Shoulder — 切换到下一个 tab（D-05）
-    if (_isRightShoulder(key)) {
-      _controller.nextTab();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
-  }
-
-  /// 左肩键检测 — Windows 映射 gameButton13，跨平台也检查 gameButtonLeft1。
-  static bool _isLeftShoulder(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.gameButton13 ||
-      key == LogicalKeyboardKey.gameButtonLeft1;
-
-  /// 右肩键检测 — Windows 映射 gameButton12，跨平台也检查 gameButtonRight1。
-  static bool _isRightShoulder(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.gameButton12 ||
-      key == LogicalKeyboardKey.gameButtonRight1;
 
   /// 标题栏 — 左侧 "设置" 文字 + 右侧关闭按钮（PANEL-04）。
   ///
