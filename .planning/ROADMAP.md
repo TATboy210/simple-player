@@ -39,7 +39,9 @@
   2. Legacy `settings_panel.dart` deleted; `grep -r "SettingsPanel(" lib/ test/` returns zero production callers (legacy-only tests migrated to the `settings/` framework path)
   3. Full test suite green (`flutter test`); no new dependencies added to pubspec
 **Blocking Constraints honored**: 设计北极星 (refactor preserves control-bar alignment target, no visual drift); file size cap (CLAUDE.md <500 lines convention, kernel <350); zero new dependencies; ValueNotifier unchanged
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 28-01-PLAN.md — Extract the settings shell collaborators and remove the legacy sidebar panel with full regression coverage
 **UI hint**: yes
 
 ### Phase 29: Auto-Pause Always
