@@ -2,12 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
-current_phase_name: defining requirements
+current_phase: 28
+current_phase_name: settings-shell-split-legacy-deletion
 status: executing
-stopped_at: context exhaustion at 75% (2026-07-25)
-last_updated: "2026-07-25T15:21:42.236Z"
+stopped_at: context exhaustion at 87% (2026-07-25)
+last_updated: "2026-07-25T16:05:56.001Z"
 last_activity: 2026-07-25
-last_activity_desc: Milestone v4.5 started
+last_activity_desc: Phase 28 execution started
 progress:
   total_phases: 7
   completed_phases: 0
@@ -23,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 27 — Responsive Scaling & Polish
+**Current focus:** Phase 28 — settings-shell-split-legacy-deletion
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-07-25 — Milestone v4.5 started
+Phase: 28 (settings-shell-split-legacy-deletion) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 28
+Last activity: 2026-07-25 — Phase 28 execution started
 
 ## Performance Metrics
 
@@ -110,8 +111,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-25T15:21:42.204Z
-Stopped at: context exhaustion at 75% (2026-07-25)
+Last session: 2026-07-25T16:05:55.968Z
+Stopped at: context exhaustion at 87% (2026-07-25)
 Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -239,6 +240,24 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **worktree 决策（下个会话执行时）**：单 plan 单 wave 无并行收益，worktree 隔离只增 `.git/config.lock` 风险。建议 **sequential 模式**（`USE_WORKTREES_FOR_PLAN=false`，不传 `isolation="worktree"`）——功能等价、更简单、避开 glm-5.2 间歇宕机期 worktree 清理复杂度。
 - **上下文 68% 暂停决策**：系统警告 32% 剩余不宜启动复杂工作。STATE 历史第 228 行用户已评估"29% 不足以 spawn execute-phase 28（动 lib/, 长寿命 subagent）"——本次仅 +3%。沿用 Phase 15/16 验证模式：**checkpoint-then-resume**。不对称风险：现在 spawn 最佳情况勉强够，最坏情况测试失败/verifier 发现 gap 时无恢复预算，中途 checkpoint 状态更差；现在 checkpoint 无下行风险。
 - **下一步（新上下文窗口）**：`/clear` → `/gsd-execute-phase 28`。init 已验证可秒级复跑；orchestrator 从 fresh 200K 开始 → spawn gsd-executor (sonnet, sequential mode) 读 28-01-PLAN.md + 6 源文件 + 6 测试文件（fresh 200K 上下文）→ 执行 3 tasks 原子提交 → 跑 `flutter test`（`D:/flutter/bin/flutter`，不在 PATH，用全路径）→ 写 28-01-SUMMARY.md → orchestrator spot-check + post-merge gate + tracking update → spawn gsd-verifier (sonnet) → phase completion。
+
+### 2026-07-26 Phase 28 execute spawn halt（fresh 子代理注入耗尽，零改动）
+
+- **spawn gsd-executor (sonnet, sequential) 安全 halt，零改动**：HEAD 仍 `eee0aac`，工作树仅 `M .planning/STATE.md`（state.begin-phase 改）。executor 报告加载 PLAN+STATE 后 89%，`subagent_tokens=52453`(52K) vs 89% 表明 fresh 子代理窗口远小于 200K（~60K）。注入开销：execute-plan.md(~25K)+CLAUDE.md(~15K)+STATE.md(244 行全历史)+模板+system prompt。**系统性 GSD 子代理注入问题，非 Phase 28 特有**。
+- **checkpoint 文件**：`.planning/phases/28-settings-shell-split-legacy-deletion/28-EXECUTE-CHECKPOINT.md`（精简 spawn 策略 + `--interactive` fallback 详节）。
+- **用户决策**：精简 spawn 模式（省 STATE/PROJECT/config/checkpoints/tdd 注入，只留 PLAN+CLAUDE+execute-plan+summary）。风险：若子代理窗口确实 ~60K，精简后注入仍可能 80%+ halt。
+- **Fallback**：若精简 spawn 再 halt → `/gsd-execute-phase 28 --interactive`（主会话 200K 窗口 inline 跑 3 tasks，每 task checkpoint，避开子代理注入开销）。
+- **下一步**：`/clear` → `/gsd-execute-phase 28`（orchestrator 读 checkpoint 应用精简 spawn 策略；若再 halt 呈 `--interactive` fallback）。
+
+### 2026-07-26 Phase 28 execute 3rd halt（orchestrator 预算 67%，零 spawn）
+
+- **恢复源**：28-EXECUTE-CHECKPOINT.md + 28-01-PLAN.md + init.execute-phase 28（秒级复跑，字段已验证）。
+- **状态核对**：HEAD `eee0aac`，工作树 `M .planning/STATE.md` + 未追踪 checkpoint，分支 `feat/v1.8-stability-polish-plan-02-02`，零代码改动。
+- **halt 原因（与 2nd attempt 不同）**：orchestrator 上下文在加载 execute-phase.md(1676 行) + STATE.md(250 行历史) + plan(200 行) + CLAUDE.md + 系统 prompt + agent registry 后已耗 67%。剩余 33% 不足以跑完 post-spawn 全流程（executor dispatch + return + spot-check + post-merge `flutter test` gate + verifier spawn + phase completion + STATE/ROADMAP 写入）。
+- **用户决策（AskUserQuestion）**：选 **"Checkpoint, fresh window"**（最安全路径），不 spawn、不 inline，记录状态后 `/clear` 新窗口重试。
+- **slim spawn 子代理风险不变**：subagent 有效窗口 ~60K（2nd attempt 实测 52K=89%），slim 注入 ~50K 仅余 ~9K 给 3 tasks，仍可能 halt。
+- **checkpoint 更新**：28-EXECUTE-CHECKPOINT.md frontmatter `attempts: 3`、`created: 2026-07-26`、halt_reason 改为 orchestrator-budget；append 3rd-halt 节 + 下窗口建议（slim spawn 或 `--interactive`，推荐 `--interactive` 因 3 次 halt 后最可恢复；lean orchestrator tip：下窗口只读 checkpoint+plan+execute-phase.md，跳过重读 STATE.md 全历史省 ~10K）。
+- **下一步（新窗口）**：`/clear` → `/gsd-execute-phase 28`（fresh 200K）。读 checkpoint 应用 lean 加载（跳过 STATE 全历史）→ 选 slim spawn 或 `--interactive`（后者主会话 inline 跑 3 tasks，无子代理注入开销，fresh 窗口预算够 Task 1+2+3 + post-merge gate）。
 
 ## Operator Next Steps
 
