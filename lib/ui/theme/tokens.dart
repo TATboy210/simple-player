@@ -236,6 +236,8 @@ class Tokens {
   static const double panelMaxWidth = 600.0;
   /// 面板宽度占窗口宽度比例
   static const double panelWidthRatio = 0.8;
+  /// 面板高度占面板宽度比例（全屏 600×480, 小窗口 400×320）
+  static const double panelHeightRatio = 0.8;
   /// normal 模式 tab 字体大小
   static const double tabBarFontNormal = 14.0;
   /// compact 模式 tab 字体大小
