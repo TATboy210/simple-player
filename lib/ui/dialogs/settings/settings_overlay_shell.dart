@@ -204,8 +204,8 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
         Tokens.panelMaxWidth,
       );
 
-  /// 面板高度 — 宽度 × 5:4 比例（D-04）。
-  static double _panelHeight(double width) => width * 5.0 / 4.0;
+  /// 面板高度 — 宽度 × 0.8 比例，全屏 600×480，小窗口 400×320（D-04 / SC-2/SC-3）。
+  static double _panelHeight(double width) => width * Tokens.panelHeightRatio;
 
   /// 面板 — RepaintBoundary + GlassContainer + 标题栏 + tab bar + 内容区 + Focus 键盘处理。
   ///
