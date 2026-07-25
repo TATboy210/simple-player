@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: 设置面板框架重构 (Phases 23-27 — Not Started)
-current_phase: 27
-current_phase_name: Responsive Scaling & Polish
-status: executing
+status: Awaiting next milestone
 stopped_at: context exhaustion at 75% (2026-07-25)
-last_updated: "2026-07-25T08:43:10.702Z"
+last_updated: "2026-07-25T09:41:45.714Z"
 last_activity: 2026-07-25
-last_activity_desc: Phase 27 execution started
+last_activity_desc: Milestone v4.0 completed and archived
 progress:
   total_phases: 14
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 45
-  completed_plans: 41
-  percent: 79
+  completed_plans: 42
+  percent: 86
+current_phase: 27
+current_phase_name: Responsive Scaling & Polish
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 27 (Responsive Scaling & Polish) — EXECUTING
-Plans: Next phase
-Status: Executing Phase 27
-Last activity: 2026-07-25 — Phase 27 execution started
+Phase: Milestone v4.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-25 — Milestone v4.0 completed and archived
 
 ## Performance Metrics
 
@@ -204,3 +204,7 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **未提交**：本 STATE.md 更新（下一步将随 checkpoint 一起提交）。
 - **下一步（新上下文窗口）**：`/clear` → `/gsd-plan-phase 16`（**不带 --research**，因 has_research=true 会自动复用 RESEARCH.md，走 Step 5.1 "Use existing, skip to step 6"）。续跑：Step 5.55 security threat-model 门禁（planner 须发 `<threat_model>`，低风险）→ Step 7.8 spawn gsd-pattern-mapper（写 PATTERNS.md）→ Step 7.9 regenerate API-SURFACE.md → Step 8 spawn gsd-planner opus（写 *-PLAN.md，须含 D27 wc 预算明细 / D24 测试构成 / D21 类级迁移清单 / D22 grep 闸门 / D6 84-调用点签名 / VolumeControl 单路由决策）→ Step 10 checker(sonnet) → Step 12 修订循环(max 3) → Step 13 需求覆盖门(ADAPT-01..05) + 13a 决策覆盖门(D1-D27) + 13b STATE + 13c ROADMAP 注释 + 13d 提交 → 13e gap 分析 → Step 15 auto_advance=true 链 execute-phase 16。
 - **auto-advance 警告（重申）**：规划通过后工作流自动 spawn execute-phase 16（会动 lib/kernel/adapter + lib/kernel/diagnostics 新目录）。触发前务必先提交/暂存 12 个无关 lib/ debug 脏文件，否则 execute 阶段工作树混乱。P16 规划本身只写 .planning/，安全。
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

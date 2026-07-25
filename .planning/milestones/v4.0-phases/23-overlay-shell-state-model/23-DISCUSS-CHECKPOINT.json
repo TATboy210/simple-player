@@ -1,0 +1,54 @@
+{
+  "phase": "23",
+  "phase_name": "Overlay Shell & State Model",
+  "mode": "default",
+  "created": "2026-07-22 (discuss-phase, interrupted)",
+  "areas_selected": [
+    "状态/控制器落点",
+    "覆盖层挂载方式",
+    "开/关动画实现",
+    "拖拽与键盘关闭复用"
+  ],
+  "areas_completed": ["状态/控制器落点"],
+  "areas_pending": ["覆盖层挂载方式", "开/关动画实现", "拖拽与键盘关闭复用"],
+  "decisions": {
+    "状态/控制器落点": {
+      "文件落点": "就地拆 lib/ui/dialogs/settings_panel.dart，提取 SettingsPanelState + SettingsPanelController 到已存在的 lib/ui/dialogs/settings/ 子目录（与 7 个 tab 文件同住），渐进 Strangler 重构，不新建并列目录，不动 lib/kernel/",
+      "依赖注入": "构造注入 SettingsPanelController(playbackController)，组合根（app.dart / PlayerServices）装配，不用 DI 框架/服务定位/BuildContext",
+      "暂停契约": "open() 调 PlaybackController.pause()（经编排器，不直碰 MediaEngine，避免与 openGeneration 守卫竞态）；wasPlaying = MediaEngine.isPlaying notifier 快照；打开前已暂停则 wasPlaying=false，close() 不恢复播放。close() 仅在 wasPlaying=true 时恢复",
+      "范围边界澄清": "Phase 23 的 SettingsPanelState 仅持 3 个 notifier（isOpen/selectedTab/dragOffset per PANEL-01）；现有 _pendingLocale/_pendingThemeIndex/_originalShortcuts 延迟应用状态暂留 widget 本地，Phase 25（TABS-04）再迁移"
+    }
+  },
+  "prior_decisions_carried_forward": [
+    "居中覆盖层（非独立窗口），不可拖出播放器窗口 — PROJECT.md",
+    "ValueNotifier 状态管理不变，恰好 3 notifier（isOpen/selectedTab/dragOffset）— PANEL-01",
+    "毛玻璃 BackdropFilter + bgGlass + borderHighlight 匹配控制栏 — PANEL-03",
+    "标题栏：左'设置'文字 + 右 × 关闭（GlassIconButton），仅标题栏可拖拽 — PANEL-04",
+    "遮罩：点击关闭 + AnimatedOpacity + AnimatedScale — PANEL-05",
+    "ESC + B 关闭；面板基础 500×400 且 ≤窗口80% — PANEL-06/PANEL-07",
+    "按钮不要动画效果，保留 InkWell hover/press 反馈 — 用户历史反馈",
+    "locale/theme 延迟应用到关闭后 — 用户历史反馈（具体延迟应用属 Phase 25）",
+    "状态模型必须转发现有 notifier 实例，不可重新包装 — 承袭 v3.0 ADAPT-03 阻塞约束"
+  ],
+  "codebase_context": {
+    "settings_panel_current": "lib/ui/dialogs/settings_panel.dart = 945 行（PROJECT.md 记的 ~500 已过时），tab 已拆到 lib/ui/dialogs/settings/ 7 文件 + _settings_nav_item.dart",
+    "overlay_shell_analog": "lib/ui/playlist/playlist_panel.dart (357 行，浮动毛玻璃窗+动画+拖拽) — 最强 overlay-shell 类比",
+    "titlebar_drag_analog": "lib/ui/window/custom_title_bar.dart — 标题栏拖拽类比",
+    "glass_reusable": "lib/ui/shared/glass_container.dart (383 行) — PANEL-03 复用资产",
+    "new_untracked": "lib/ui/shared/apple_curves.dart (未跟踪) — 可能影响动画曲线选择",
+    "other_overlays": "controls_overlay.dart(301), osd_overlay.dart, error_banner.dart, app_dialog.dart — 现有 overlay 模式参考"
+  },
+  "canonical_refs_seed": [
+    ".planning/PROJECT.md (v4.0 milestone + Key Decisions)",
+    ".planning/REQUIREMENTS.md (PANEL-01..07)",
+    ".planning/ROADMAP.md (Phase 23 goal + success criteria)",
+    "CLAUDE.md (Design System / Coding Conventions / Dart rules)"
+  ],
+  "blocking_antipatterns": {
+    "milestone_level": "5 blocking rows in .planning/.continue-here.md but ALL are v3.0 kernel constraints; only 'ValueNotifier 重新包装' adjacent to Phase 23 (state model must forward notifier instances, not rewrap) — carried as prior decision",
+    "phase_level": "none (no phase-23 .continue-here.md)"
+  },
+  "spec_loaded": false,
+  "git_state": "branch feat/v1.8-stability-polish-plan-02-02; phase_dir newly created this session; CONTEXT.md not yet written",
+  "resume_instruction": "Resume discuss-phase 23: load this checkpoint, skip areas_completed, continue default-mode discussion from areas_pending[0]=覆盖层挂载方式. After all 4 areas done, write 23-CONTEXT.md + 23-DISCUSSION-LOG.md, git commit, update STATE.md, delete this checkpoint."
+}
