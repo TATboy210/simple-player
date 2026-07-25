@@ -1,0 +1,206 @@
+{
+  "_meta": {
+    "kind": "plan-phase-checkpoint",
+    "purpose": "Bridge artifact for resuming /gsd-plan-phase 16 in a fresh context window. Not auto-consumed by the workflow (unlike discuss-phase DISCUSS-CHECKPOINT.json) — kept as single-source-of-truth for humans / next session. Safe to delete after PLAN.md is committed.",
+    "created_utc": "2026-07-17T-planning-paused",
+    "reason": "Context budget 72% / 28% remaining — insufficient to run research→plan→verify subagent fleet without overflow risk. User chose to pause before spawning.",
+    "researcher_returned": "2026-07-17T-window-9th"
+  },
+  "command_invoked": "/gsd-plan-phase 16",
+  "flags_passed": [],
+  "step_reached": "13e/15 — Planning COMPLETE (5 PLANs committed dd58ec7, checker PASS, coverage gates PASS). Awaiting Step 15 dirty-tree decision before auto-advance to execute-phase 16.",
+  "planning_complete": {
+    "commit": "dd58ec7 docs(16): 5 PLANs PASS checker + coverage gates — planning complete",
+    "plans_committed": ["16-01-PLAN.md", "16-02-PLAN.md", "16-03-PLAN.md", "16-04-PLAN.md", "16-05-PLAN.md"],
+    "checker_verdict": "PASS (after revision loop round 1 — BLOCKER was adapter _openGeneration counter violating D20/D22, fixed by removing counter + pure-forward open())",
+    "coverage_gates": {"step_13_adapt": "PASS (ADAPT-01..05 all covered)", "step_13a_decisions": "PASS (D1-D27 all cited, 27/27)"},
+    "non_blocking_cleaned": ["16-05 red_team #3 rationale synced to D20", "VALIDATION.md line 52/73 synced (removed deleted open_generation test ref)"],
+    "step_15_dirty_tree_decision_pending": {
+      "reason": "auto_advance=true will spawn execute-phase 16 after Step 15, but 12 unrelated lib/ dirty files + 3 Phase 15 residue files would pollute execute working tree. User must decide commit/stash/interrupt BEFORE auto-advance fires.",
+      "dirty_files_unrelated": ["lib/kernel/engine/media_opener.dart", "lib/main.dart", "lib/ui/player/player_screen.dart", "lib/ui/player/video_surface.dart", "lib/ui/player/playback_status_overlay.dart (untracked)", "test/widget/player/playback_status_overlay_test.dart (untracked)", "lib/l10n/app_en.arb", "lib/l10n/app_zh.arb", "lib/l10n/app_localizations.dart", "lib/l10n/app_localizations_en.dart", "lib/l10n/app_localizations_zh.dart", ".planning/debug/ (untracked)"],
+      "phase15_residue": ["15-BASELINE-AUDIT.json", "15-BASELINE-AUDIT.md", "15-EXECUTE-CHECKPOINT.md"],
+      "options": ["commit the unrelated debug residue separately (recommended — keeps execute tree clean)", "stash them", "interrupt auto-advance and let user handle later"],
+      "note": "P16 execute will create lib/kernel/adapter/ + lib/kernel/diagnostics/ — must start from clean lib/ tree"
+    },
+    "gap_analysis_step_13e": {
+      "open_questions_for_p20": ["VolumeControl single-route via DelegationPolicy.volume vs ambiguous dual-field (D14/researcher OQ1 — planner decided single-route)", "migrated: same FvpEngine instance as legacy: (D13 — same instance, avoids double resource)"],
+      "deferred_to_p20": ["openGeneration counter migration STATE-02 (D21 class-level checklist)", "DiagnosticsBundle activation D3 (P20 NewFvpEngine consumes)", "DelegationPolicy field flip D14 (P20 per-capability)", "player_services.dart:55 late final engine → rebuildable (D15)"],
+      "validation_md_desync_resolved": true,
+      "checkpoint_safe_to_delete": "After Step 15 decision + auto-advance fires (or user interrupts) — planning is committed, checkpoint no longer needed"
+    }
+  },
+  "init_json": {
+    "researcher_model": "sonnet",
+    "planner_model": "opus",
+    "checker_model": "sonnet",
+    "tdd_mode": false,
+    "granularity": "standard",
+    "research_enabled": true,
+    "plan_checker_enabled": true,
+    "nyquist_validation_enabled": true,
+    "commit_docs": true,
+    "text_mode": false,
+    "auto_advance": true,
+    "auto_chain_active": false,
+    "mode": "standard",
+    "phase_found": true,
+    "phase_dir": ".planning/phases/16-diagnosticsbundle",
+    "expected_phase_dir": null,
+    "phase_number": "16",
+    "phase_name": "diagnosticsbundle",
+    "phase_slug": "diagnosticsbundle",
+    "padded_phase": "16",
+    "phase_req_ids": "ADAPT-01, ADAPT-02, ADAPT-03, ADAPT-04, ADAPT-05",
+    "phase_status": "Pending",
+    "has_research": false,
+    "has_context": true,
+    "has_reviews": false,
+    "has_plans": false,
+    "plan_count": 0,
+    "planning_exists": true,
+    "roadmap_exists": true,
+    "state_path": ".planning/STATE.md",
+    "roadmap_path": ".planning/ROADMAP.md",
+    "requirements_path": ".planning/REQUIREMENTS.md",
+    "patterns_path": null,
+    "context_path": ".planning/phases/16-diagnosticsbundle/16-CONTEXT.md",
+    "project_root": "D:\\simple_player_flutter",
+    "agents_installed": true,
+    "missing_agents": [],
+    "agents_dir": "C:\\Users\\35490\\.claude\\agents",
+    "agent_runtime": "claude",
+    "project_title": "Simple Player — 播放内核重写（兼容式替换与诊断内核）"
+  },
+  "resolved_runtime": {
+    "gsd_tools_path": "/c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs",
+    "invocation_shim": "_GSD_SHIM_NAME=gsd-tools.cjs; GSD_TOOLS=/c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs; gsd_run() { node \"$GSD_TOOLS\" \"$@\"; }",
+    "context_window": 200000,
+    "cross_phase_enrichment_active": false,
+    "mvp_mode": {
+      "active": false,
+      "source": "none"
+    },
+    "walking_skeleton": false,
+    "tdd_mode": false,
+    "chunked_mode": "not-checked-but-defaults-false"
+  },
+  "step5_user_decision": "Research first (Recommended) — user chose to research before planning. NOT yet acted upon (paused before spawn).",
+  "plan_pre_hooks_resolved": {
+    "ai_integration": "SKIP — Phase 16 goal has no AI keywords (agent/llm/rag/...); ai-integration capability inactive for this phase.",
+    "research": "ACTIVE — ref.agent=gsd-phase-researcher; produces RESEARCH.md; consumes CONTEXT.md. fragment.inline template captured below.",
+    "ui": "SKIP — Phase 16 is pure kernel seam (no frontend indicators); ui-plan-gate Branch 2 (frontend=false) skips silently. No UI-SPEC needed.",
+    "pattern_mapper": "ACTIVE at Step 7.8 — ref.agent=gsd-pattern-mapper; produces PATTERNS.md. Runs AFTER research_path is known. Will skip if no CONTEXT/RESEARCH exist (both exist here, so it WILL run).",
+    "security": "ACTIVE contribution hook at Step 5.55/8 — security_asvs_level default 1, security_block_on default 'high'. Planner MUST emit a <threat_model> block per PLAN.md. Phase 16 surface is low-risk (pure delegation seam, noop diagnostics) but gate is unconditional.",
+    "intel": "ACTIVE at Step 7.9 — regenerates .planning/intel/API-SURFACE.md, passed to planner as HINT ONLY (may be incomplete).",
+    "drift_precheck": "NOT CHECKED — workflow.plan_drift_precheck gate presence not verified; non-blocking anyway.",
+    "gap_analysis_post": "Step 13e — workflow.post_planning_gaps default true; advisory, non-blocking."
+  },
+  "research_hook_fragment_inline": "<objective>\nResearch how to implement Phase {phase_number}: {phase_name}\nAnswer: \"What do I need to know to PLAN this phase well?\"\n</objective>\n\n<files_to_read>\n- {context_path} (USER DECISIONS from /gsd:discuss-phase)\n- {requirements_path} (Project requirements)\n- {state_path} (Project decisions and history)\n</files_to_read>\n\n${AGENT_SKILLS_RESEARCHER}\n\n<additional_context>\n**Phase description:** {phase_description}\n**Phase requirement IDs (MUST address):** {phase_req_ids}\n\n**Project instructions:** Read ./CLAUDE.md or ./.claude/CLAUDE.md if either exists; follow project-specific guidelines.\n**Project skills:** Check .claude/skills/ or .agents/skills/ directory (if either exists). Read SKILL.md files and account for project skill patterns.\n</additional_context>\n\n<output>\nWrite to: {phase_dir}/{phase_num}-RESEARCH.md\n</output>\n",
+  "research_hook_field_substitutions": {
+    "phase_number": "16",
+    "phase_name": "diagnosticsbundle",
+    "phase_description": "建立 Strangler Fig 接缝 — KernelAdapter 100% 路由到旧引擎且零行为变更（全测试绿），DiagnosticsBundle 载体骨架就位，让后续每个诊断能力与新引擎都有地方住、有路由可用。详见 .planning/phases/16-diagnosticsbundle/16-CONTEXT.md <domain> 节 + ROADMAP.md §Phase 16。",
+    "phase_req_ids": "ADAPT-01, ADAPT-02, ADAPT-03, ADAPT-04, ADAPT-05",
+    "context_path": ".planning/phases/16-diagnosticsbundle/16-CONTEXT.md",
+    "requirements_path": ".planning/REQUIREMENTS.md",
+    "state_path": ".planning/STATE.md",
+    "phase_dir": ".planning/phases/16-diagnosticsbundle",
+    "phase_num": "16"
+  },
+  "phase_roadmap_section": {
+    "title": "### Phase 16: 兼容适配层骨架 + DiagnosticsBundle",
+    "goal": "建立 Strangler Fig 接缝 — KernelAdapter 100% 路由到旧引擎且零行为变更（全测试绿），DiagnosticsBundle 载体骨架就位，让后续每个诊断能力与新引擎都有地方住、有路由可用",
+    "depends_on": "Phase 15",
+    "requirements": "ADAPT-01, ADAPT-02, ADAPT-03, ADAPT-04, ADAPT-05",
+    "success_criteria_count": 5,
+    "blocking_constraints_honored": [
+      "#6 适配层转发 ValueNotifier 实例非重新包装",
+      "#8 过度工程化是项目宿敌 (尺寸预算 + 须召 senior-architect/red-team)"
+    ],
+    "plans": "TBD"
+  },
+  "open_research_questions_for_researcher": [
+    "D6 (UNLOCKED, real work): Census the ~121 log*.e/log*.w/log*.i call sites to decide whether KernelLogger.error/fatal signatures must extend with {Object? error, StackTrace? stackTrace}. P16 must statically verify every existing call shape is expressible by the new signature — do NOT defer to P17 mid-migration. Determine if a two-method signature (error+fatal both taking {error, stackTrace}) is needed based on the actual call-site shapes (log*.e(msg, err, st) forms).",
+    "Nyquist Dimension 8 (Validation Architecture): Produce the validation architecture section in RESEARCH.md so a VALIDATION.md can be derived — covering D22 grep gate (dual openGeneration data source = 0 hits in adapter), D27 wc gate (adapter+diagnostics 6 files < 636 lines baseline), D24 three-layer test composition (existing suite green + P15 contract tests re-run on adapter + notifier identity widget test), D25 same() identity test (all EngineStateView notifiers expect(adapter.X, same(legacy.X))).",
+    "Size budget baseline confirmation: wc -l lib/kernel/engine/fvp_engine.dart = 636 (CONTEXT.md D27 states this; researcher should verify the live line count and snapshot it for the plan).",
+    "MediaEngine 7-interface surface enumeration: confirm the exact member set of EngineStateView + PlaybackControl + TrackControl + SubtitleConfig + VideoEffectControl + RendererControl + VolumeControl so the adapter delegation surface and DelegationPolicy 7 fields are exhaustive (D14).",
+    "EngineStateView ValueNotifier field enumeration: list every ValueNotifier field for the D25 same() identity test to cover (state/position/duration/isSeeking/isBuffering/aspectRatio/lastError + any others).",
+    "Existing diagnostics components shape (for D9 minimal abstract interfaces): inspect lib/kernel/utils/memory_monitor.dart (193 lines), lib/kernel/engine/engine_event_log.dart (103 lines), lib/kernel/engine/engine_metrics.dart (91 lines) — their public method sets inform the minimal MemoryMonitorSlot/MetricsSlot/EventLogSlot abstract interfaces + noop impls. Naming must avoid collision with existing class names.",
+    "Cast audit re-verification: confirm 0 `as FvpEngine` strong-casts in live lib/ code and 0 usages of FvpEngine convenience getters (trackControl/videoEffectControl/rendererControl/volumeControl/subtitleConfig) in lib/ — the drop-in transparency evidence."
+  ],
+  "closed_phase_gate_step1_5": "phase_status=Pending (not Complete) → gate passes, no --force needed.",
+  "reviews_prereq_step2_5": "No --reviews flag → skip.",
+  "prd_express_step3_5": "No --prd flag → skip.",
+  "adr_ingest_step3_6": "No --ingest flag → skip.",
+  "context_load_step4": "context_path non-null → CONTEXT.md EXISTS and will be used (has_context=true). No discuss-phase needed.",
+  "ai_spec_step4_5": "No AI-SPEC for Phase 16 (non-AI phase).",
+  "ui_gate_step5_6": "No frontend indicators → Branch 2 skip (no UI-SPEC block).",
+  "next_session_resume_instructions": {
+    "step_1_command": "/clear",
+    "step_2_command": "/gsd-plan-phase 16 --research",
+    "why_research_flag": "Bypasses Step 5.1 interactive research-decision prompt since user already chose 'Research first'. Without --research, Step 5.1 will ask again (harmless, just re-confirm). With --research, goes straight to spawning gsd-phase-researcher.",
+    "what_will_happen": "Step 5 → spawn gsd-phase-researcher (writes RESEARCH.md) → Step 5.5 derive VALIDATION.md from RESEARCH ## Validation Architecture → Step 5.55 security threat-model gate (planner emits <threat_model>) → Step 7.8 spawn gsd-pattern-mapper (writes PATTERNS.md) → Step 7.9 regenerate API-SURFACE.md → Step 8 spawn gsd-planner opus (writes *-PLAN.md) → Step 10 spawn gsd-plan-checker sonnet → Step 12 revision loop (max 3) → Step 13 requirements coverage gate + Step 13a decision coverage gate + Step 13b STATE.md update + Step 13c ROADMAP annotate + Step 13d commit → Step 13e gap analysis → Step 14/15 auto_advance=true will then chain to /gsd-execute-phase 16 --auto --no-transition.",
+    "auto_advance_warning": "auto_advance=true is user-intentional (STATE.md 7th-recovery note confirms). After planning passes, the workflow WILL auto-spawn execute-phase. If the working tree is still dirty (unrelated lib/ debug changes), consider committing/stashing those BEFORE the auto-advance fires, or interrupt at the 'AUTO-ADVANCING TO EXECUTE' banner. execute-phase touches lib/kernel/ — a clean tree avoids merge confusion.",
+    "dirty_working_tree_at_pause": [
+      "M lib/kernel/engine/media_opener.dart",
+      "M lib/l10n/app_en.arb",
+      "M lib/l10n/app_localizations.dart",
+      "M lib/l10n/app_localizations_en.dart",
+      "M lib/l10n/app_localizations_zh.dart",
+      "M lib/l10n/app_zh.arb",
+      "M lib/main.dart",
+      "M lib/ui/player/player_screen.dart",
+      "M lib/ui/player/video_surface.dart",
+      "?? .planning/debug/",
+      "?? lib/ui/player/playback_status_overlay.dart",
+      "?? test/widget/player/playback_status_overlay_test.dart"
+    ],
+    "dirty_tree_note": "These are debug-session residue from a prior session (playback_status_overlay work), UNRELATED to Phase 16. P16 only writes .planning/phases/16-*/*-PLAN.md + .planning/STATE.md + .planning/ROADMAP.md — does not touch lib/kernel/. But auto_advance→execute-phase WILL touch lib/kernel/adapter + lib/kernel/diagnostics (new dirs). Clean tree recommended before execute."
+  },
+  "checkpoint_files_on_disk_at_pause": [
+    ".planning/phases/16-diagnosticsbundle/16-CONTEXT.md (29804 bytes, 27 locked decisions D1-D27)",
+    ".planning/phases/16-diagnosticsbundle/16-DISCUSSION-LOG.md (16183 bytes)",
+    ".planning/phases/16-diagnosticsbundle/16-PLAN-CHECKPOINT.json (this file)"
+  ],
+  "research_landed": {
+    "commit": "e99ead2",
+    "file": "16-RESEARCH.md",
+    "complete_marker": "## RESEARCH COMPLETE",
+    "confidence": "HIGH",
+    "stale_figure_correction": "log call sites 84 not 121",
+    "size_baseline_exact": 636,
+    "volumecontrol_overlap_pitfall": true,
+    "cast_audit_zero_hits": true
+  },
+  "validation_landed": {
+    "commit": "0eae691",
+    "file": "16-VALIDATION.md",
+    "seeded_from": "RESEARCH.md ## Validation Architecture (lines 481-515)",
+    "status": "draft",
+    "nyquist_compliant": false
+  },
+  "open_questions_for_planner": [
+    "VolumeControl member overlap: route setVolume/setMute/volume/isMuted via DelegationPolicy.volume single-field (recommended) vs ambiguous dual-field",
+    "migrated: vs legacy: same FvpEngine instance (recommended, avoids resource duplication) vs second instance — D19 permits either"
+  ],
+  "next_session_resume": {
+    "command": "/gsd-plan-phase 16  (NO --research — has_research=true auto-uses RESEARCH.md, Step 5.1 Use existing → skip to step 6)",
+    "remaining_steps": "5.55 security gate → 7.8 pattern-mapper → 7.9 API-SURFACE → 8 planner(opus, write *-PLAN.md) → 10 checker(sonnet) → 12 revision(max 3) → 13 req gate + 13a decision gate + 13b STATE + 13c ROADMAP + 13d commit → 13e gaps → 15 auto_advance→execute-phase 16",
+    "auto_advance_warning": "before execute fires, commit/stash 12 unrelated lib/ dirty files"
+  },
+  "resume_session_2026_07_18": {
+    "status_at_pause": "Research + Validation + CONTEXT all landed (commits e99ead2, 0eae691); planner NOT yet spawned. Next concrete action: Step 8 spawn gsd-planner(opus, write *-PLAN.md).",
+    "user_decision_this_session": "Chose 'pause, resume in fresh session' over spawning planner now — context was at 34% remaining, insufficient for the full planner->checker->revision(max 3)->gates->commit->auto-advance-execute chain without overflow risk.",
+    "verified_this_session": [
+      "gsd-tools.cjs confirmed available at /c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs (commit + coverage gates operational)",
+      "dirty working tree unchanged: 12 files (playback_status_overlay debug residue + 3 Phase 15 audit doc tweaks), ALL unrelated to Phase 16",
+      "16-VALIDATION.md frontmatter: status=draft, nyquist_compliant=false (EXPECTED — validate-phase sets nyquist_compliant=true later, not plan-phase)",
+      "No *-PLAN.md, *-SPEC.md, *-PATTERNS.md, *-UI-SPEC.md on disk yet — planner spawn is genuinely the next step"
+    ],
+    "resume_command": "/clear then /gsd-plan-phase 16   (has_research=true auto-skips Step 5.1 'use existing' -> straight to Step 5.55 security gate -> 7.8 pattern-mapper -> 7.9 API-SURFACE -> 8 planner)",
+    "critical_before_spawn": "DECIDE dirty-tree handling BEFORE planning passes Step 13d commit. auto_advance=true (user-intentional, STATE.md) will auto-spawn execute-phase after plans pass, which writes lib/kernel/adapter + lib/kernel/diagnostics. Options: (a) git stash the 12 unrelated files now so execute faces a clean tree; (b) interrupt at the 'AUTO-ADVANCING TO EXECUTE' banner and handle dirty tree manually; (c) commit the unrelated files on a separate branch first. Do NOT let auto-advance fire into a dirty lib/kernel tree.",
+    "open_questions_for_planner_unchanged_from_checkpoint": true,
+    "checkpoint_safe_to_delete_after": "PLAN.md committed + STATE.md shows phase 16 'Ready to execute'",
+    "update_2026_07_18_10th": "Pattern-mapper DONE (16-PATTERNS.md 28227 bytes, 14 files mapped; commit will batch with PLAN.md at Step 13d). Key analogs: KernelAdapter↔fvp_engine+media_engine 7-iface composite; KernelLogger↔utils/log.dart (84-call-site sig: error({Object? error,StackTrace? stackTrace})); DiagnosticsBundle↔player_services.dart DI idiom; contract tests↔fvp_engine_contract_test+contract_test_runner factory-swap; same() identity↔engine_state_view 13 ValueNotifier fields. CORRECTIONS to prior checkpoint: intel DISABLED (not ACTIVE) — `intel api-surface` returns {disabled:true}, Step 7.9 SKIPPED, no API-SURFACE.md, planner omits API Surface hint. D19 single-file adapter (kernel_adapter.dart containing KernelAdapter+DelegationPolicy+KernelMode) is AUTHORITATIVE over RESEARCH's 3-file suggestion — pattern-mapper flagged conflict, planner must follow D19. agent-skills gsd-planner returns empty (no extra skills injected; planner uses built-in agent def). Next concrete action: Step 8 spawn gsd-planner(opus). Resume: /clear then /gsd-plan-phase 16 (has_research=true auto-skips Step 5.1; patterns_path now non-null auto-skips Step 7.8 spawn; intel disabled auto-skips 7.9; straight to Step 8 planner). Planner must include all items in existing next_session_resume_instructions.what_will_happen + resume_session_2026_07_18.remaining_steps PLUS: D19 single-file, VolumeControl single-route via DelegationPolicy.volume, 84-call-site KernelLogger sig, migrated:==legacy: same FvpEngine instance."
+  }
+}

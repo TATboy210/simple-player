@@ -1,5 +1,6 @@
 ---
-status: investigating
+status: deferred
+deferred_reason: "v4.0 milestone close — debug session deferred to future milestone. Root cause not yet determined."
 trigger: "只读诊断 Flutter 项目 D:\\simple_player_flutter：用户反馈“播放器播放不了视频，加载视频播放不了”。请追踪 main/app → FvpEngine/MediaEngine → PlaybackController → video surface 的初始化与 open/play 调用链，寻找明显逻辑缺陷、状态守卫、错误吞没、fvp API误用，并给出文件行号与最可能根因。不要修改文件。"
 created: 2026-07-17T00:00:00+08:00
 updated: 2026-07-17T00:00:00+08:00

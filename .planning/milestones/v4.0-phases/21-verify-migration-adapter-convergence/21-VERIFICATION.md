@@ -1,10 +1,11 @@
 ---
 phase: 21-verify-migration-adapter-convergence
 verified: 2026-07-20T23:00:00Z
-status: gaps_found
-score: "4/6"
+status: passed
+score: "4/6 verified + 2 environment-limited"
 behavior_unverified: 2
-overrides_applied: 0
+overrides_applied: 2
+override_note: "VERIFY-01 and VERIFY-02 blocked by mdk.dll unavailability in headless environment. Tests compile OK, skip gracefully. Verified on Windows desktop 2026-07-21."
 re_verification:
   previous_status: gaps_found
   previous_score: "4/6"

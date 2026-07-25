@@ -1,5 +1,6 @@
 ---
-status: investigating
+status: deferred
+deferred_reason: "v4.0 milestone close — debug session deferred to future milestone. Root cause not yet determined."
 trigger: "只读检查 D:\\simple_player_flutter 最近 git 历史中所有涉及 fvp_engine.dart/media_opener.dart/player_services.dart/playback_navigator.dart 的提交。定位造成用户“加载视频但无法播放”的最可能回归（若有），含提交哈希、差异机制、修复建议。不要修改。"
 created: 2026-07-17T00:30:00+08:00
 updated: 2026-07-17T00:30:00+08:00
