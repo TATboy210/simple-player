@@ -1,24 +1,25 @@
-# Simple Player — 设置面板框架重构（v4.0）
+# Simple Player — 设置面板横向重构 + 音频功能（v4.5）
 
 ## What This Is
 
-Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的设置面板框架重构。以 Kodi + Steam 混合导航范式为核心，重建设置面板框架骨架，支持 D-pad/手柄/键鼠三模态交互，保持毛玻璃设计语言一致性。**v4.0 聚焦框架层（窗口绘制 + 导航系统 + 交互模式），不实现具体设置功能，先建立更加详细高效的计划。**
+Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的设置面板体验升级。在 v4.0 框架骨架基础上，把左侧栏布局重构成横向 tab 中部布局（16:9 / 占屏 50%），视觉与交互全程对齐控制栏毛玻璃语言，填充音频调节功能 + 控制栏音轨切换按钮，达到产品级优雅简洁。**v4.5 聚焦面板重构 + 音频功能填充，视频/字幕/播放偏好 tab 推迟到 v4.6+。**
 
 ## Core Value
 
-设置面板的框架质量与交互一致性 — 毛玻璃设计语言统一、D-pad/手柄/键鼠三模态导航流畅、框架与功能分离（先骨架后填充），且**延迟应用模式保护用户设置安全**。状态模型清晰、组件可复用、可测试。
+设置面板的产品级体验 — 横向 tab 布局 + 控制栏级视觉/交互一致性 + 输入模式感知导航（键鼠/手柄自适应）、音频功能可用、延迟应用保护设置安全。
 
-## Current Milestone: v4.0 设置面板框架重构
+## Current Milestone: v4.5 设置面板横向重构 + 音频功能填充
 
-**Goal:** 重建设置面板框架骨架，支持 D-pad/手柄/键鼠三模态交互，毛玻璃设计语言一致，先框架后功能。
+**Goal:** 把设置面板从左侧栏布局重构成横向 tab 中部布局（16:9 / 占屏 50%），视觉与交互对齐控制栏毛玻璃语言，填充音频调节功能 + 控制栏音轨切换按钮，达到产品级优雅简洁。
 
 **Target features:**
 
-1. **Overlay Shell & State Model** — 毛玻璃覆盖层壳 + SettingsPanelState (ValueNotifier) + Controller (open/close/pause/resume)
-2. **Sidebar Navigation** — 固定 200px 侧边栏 + 7 tab 列表 + FadeTransition 动画 + LB/RB 切换
-3. **Tab Content Framework** — SettingRow 组件（Switch/Slider/SpinControl/Dropdown）+ OK/Cancel/Apply 延迟应用
-4. **Gamepad & Keyboard Navigation** — FocusTraversalGroup 分区 + SpinControl + D-pad ←→ 调值 + A 确认 + B 关闭
-5. **Responsive Scaling** — 全屏/小窗口适配 + Scale+Fade 动效 + 集成测试
+1. **Panel Layout Redesign** — 删 200px 左侧栏 → 横向 tab 栏置面板中部（保留上中下垂直结构）；16:9 比例 + 占屏约 50% 面积；通用 tab 排 tab 序列中间位置；上中下结构颜色统一为控制栏色
+2. **Visual Design Alignment** — 毛玻璃+边缘光效+颜色对齐控制栏；选项默认无边框/无白光融合于面板，仅选中态高亮（控制栏按钮三态）；选项边界更紧凑；悬停高亮
+3. **Navigation & Interaction Polish** — tab 两端竖向圆角左右箭头（持久可见+可点+键盘左右切 tab）；手柄 RB/LB 切 tab + 输入模式感知提示置换（手柄→RB/LB 渐入/方向键渐退；键盘→反向）；上下控制详情选项（仅使用时显提示，渐入渐出）；上下箭头薄毛玻璃盖在选项上下端（透看选项）；键盘上下时箭头发光反馈
+4. **Auto-Pause (Always)** — 面板开启即暂停（总是，非 wasPlaying 条件），关闭恢复播放
+5. **Audio Settings Tab** — 填充音频 tab 真实功能：EQ / 平衡 / 同步 / 音量标准化（对接 v3.0 TrackControl + VolumeControl）
+6. **Control Bar Audio Track Switching** — 控制栏右下区（字幕左/打开文件右）新增音轨切换按钮，弹轨列表，对称字幕按钮
 
 ## Requirements
 
@@ -29,7 +30,7 @@ Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的设置面�
 - ✓ ValueNotifier + ValueListenableBuilder 状态管理 — 现有
 - ✓ 键盘快捷键系统（20+ 快捷键）— 现有
 - ✓ 毛玻璃设计语言（GlassContainer、Tokens.*）— 现有
-- ✓ 沉浸式全屏功能 — v2.0 已完成
+- ✓ 沉浸式全屏功能 — v2.0
 - ✓ 引擎接口分解（ISP：EngineStateView + PlaybackControl + 能力接口）— v2.1
 - ✓ 状态机穷举（6 态正交 MediaState）— v2.1
 - ✓ `MemoryMonitor` / `EngineMetrics` / `EngineEventLog` 初版 — v2.1
@@ -44,24 +45,32 @@ Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的设置面�
 
 ### Active
 
-<!-- v4.0 scope — 设置面板框架重构。Building toward these. -->
+<!-- v4.5 scope — 设置面板横向重构 + 音频功能填充。Building toward these. -->
 
-- [ ] Overlay Shell & State Model（毛玻璃覆盖层 + 状态模型 + 控制器 + 暂停/恢复）
-- [ ] Sidebar Navigation（固定 200px 侧边栏 + 7 tab + FadeTransition + LB/RB 切换）
-- [ ] Gamepad & Keyboard Navigation（FocusTraversalGroup + SpinControl + D-pad + A/B 键）
-- [ ] Responsive Scaling（全屏/小窗口适配 + 动效 + 集成测试）
+- [ ] Panel Layout Redesign（横向 tab 中部布局 + 16:9/占屏 50% + 通用 tab 中间位 + 上中下色统一）
+- [ ] Visual Design Alignment（毛玻璃+边缘光效对齐控制栏 + 选项三态 + 紧凑边界 + 悬停高亮）
+- [ ] Navigation & Interaction Polish（竖向圆角左右箭头 + RB/LB+方向键提示置换 + 上下薄毛玻璃箭头 + 发光反馈）
+- [ ] Auto-Pause Always（面板开启即暂停，关闭恢复——改 SettingsPanelController 策略）
+- [ ] Audio Settings Tab（EQ/平衡/同步/音量标准化，对接 TrackControl+VolumeControl）
+- [ ] Control Bar Audio Track Switching（控制栏右下区音轨切换按钮，弹轨列表，对称字幕按钮）
 
 ### Validated (continued)
 
-- ✓ Tab Content Framework（SettingRow 组件 + OK/Cancel/Apply 延迟应用模式）— Phase 25
+- ✓ Overlay Shell & State Model（毛玻璃覆盖层 + SettingsPanelState + Controller + wasPlaying 暂停/恢复）— v4.0 (Phase 23)  *v4.5 改总是暂停策略*
+- ✓ Sidebar Navigation（固定 200px 侧边栏 + 7 tab + FadeTransition + LB/RB）— v4.0 (Phase 24)  *v4.5 将重构为横向 tab 栏*
+- ✓ Tab Content Framework（SettingRow 组件 + OK/Cancel/Apply 延迟应用模式）— v4.0 (Phase 25)
+- ✓ Gamepad & Keyboard Navigation（FocusTraversalGroup + SpinControl + D-pad + A/B）— v4.0 (Phase 26)
+- ✓ Responsive Scaling（连续面板尺寸 + 5:4 ratio + 800px 断点 + RepaintBoundary）— v4.0 (Phase 27)  *v4.5 将改为 16:9 / 占屏 50%*
 
 ### Out of Scope
 
-- 具体设置功能逻辑 — 本里程碑只建框架骨架，功能在 v4.1+ 填充
-- 导入导出 — 非核心框架功能，推迟到 v4.2+
+- 视频调节 tab 功能 — 推迟到 v4.6+（v4.5 仅填充音频 tab，视频 tab 保持 SettingRow 占位）
+- 字幕调节 tab 功能 — 推迟到 v4.6+（字幕 tab 保持占位）
+- 播放偏好 tab 功能 — 推迟到 v4.6+（播放 tab 保持占位）
+- 导入导出 — 非核心功能，推迟到 v4.2+
 - 独立窗口模式 — 当前使用覆盖层架构
 - 手柄输入适配层 — Steam Input API 自动映射，无需 Flutter 侧代码
-- 内核重写 — v3.0 已完成，本次不涉及内核改动
+- 内核改动 — v3.0 已完成，v4.5 仅对接现有内核接口
 
 ## Context
 
@@ -74,31 +83,36 @@ Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的设置面�
 
 **v3.0 内核状态（已完成）：**
 
-内核经过 Phase 15-22 完整重写：兼容适配层 → 零依赖 Logger → sealed 错误 → MemoryMonitor 一等化 → 状态机重写 → 测试验证 → 双语文档。内核稳定，可作为 v4.0 的基础。
+内核经过 Phase 15-22 完整重写：兼容适配层 → 零依赖 Logger → sealed 错误 → MemoryMonitor 一等化 → 状态机重写 → 测试验证 → 双语文档。内核稳定，可作为 v4.5 的基础。v4.5 音频 tab 直接对接 `TrackControl` / `VolumeControl` / `SubtitleConfig` 等一等化接口。
 
-**v4.0 设置面板现状（重写对象）：**
+**v4.0 设置面板现状（v4.5 重构对象）：**
 
-- `lib/ui/dialogs/settings_panel.dart` — 当前实现（~500 行，7 tab，可拖拽覆盖层，OK/Cancel/Apply）
-- `lib/ui/shared/settings_card.dart` — SettingRow 布局组件
-- 依赖：MediaEngine + VideoProcessingService + WindowBridge
-- 状态：`_selectedIndex`、`_offset`（ValueNotifier<Offset>）、`_pendingLocale`、`_pendingThemeIndex`、`_originalShortcuts`
+- `lib/ui/dialogs/settings_panel.dart` — v4.0 框架（覆盖层壳 + 左侧栏 + 7 tab + SettingRow + 延迟应用）
+- `SettingsPanelState` (3 ValueNotifier) + `SettingsPanelController` (open/close/toggle + wasPlaying 暂停/恢复)
+- v4.0 已交付 5 框架组件（Overlay Shell / Sidebar Navigation / Tab Content / Gamepad & Keyboard Nav / Responsive Scaling）
 
-**已知问题（v4.0 要解决）：**
+**v4.5 要解决的重构点：**
 
-- 当前设置面板（settings_panel.dart ~500 行）职责混合：状态管理 + UI 渲染 + 拖拽逻辑 + 延迟应用全在一个文件
-- 无手柄/D-pad 导航支持 — 当前仅鼠标点击交互
-- 无响应式缩放 — 固定尺寸，全屏/小窗口下不协调
-- 缺少独立的状态模型和控制器 — 状态散落在 StatefulWidget 内
+- 删除 200px 左侧栏 → 横向 tab 栏置面板中部（保留上中下垂直结构）
+- 比例从 5:4 (clamp 400-600) 改为 16:9 / 占屏约 50% 面积
+- 通用 tab 排 tab 序列中间位置
+- 视觉/交互全程对齐控制栏（毛玻璃/边缘光效/按钮三态/紧凑边界）
+- tab 两端竖向圆角左右箭头 + 输入模式感知提示置换（手柄 RB/LB vs 方向键）
+- 上下箭头薄毛玻璃盖在选项上下端（透看选项）+ 键盘上下发光反馈
+- 自动暂停从 wasPlaying 条件改为"总是暂停"
+- 填充音频 tab 真实功能（EQ/平衡/同步/标准化）
+- 控制栏右下区新增音轨切换按钮（对称字幕按钮）
 
 ## Constraints
 
-- **框架优先**: 本里程碑只建框架骨架（窗口绘制 + 导航系统 + 交互模式），不实现具体设置功能
+- **设计北极星**: 设置面板视觉与交互全程对齐控制栏（毛玻璃 / 边缘光效 / 按钮三态 / 紧凑边界）
 - **状态管理**: 继续使用 ValueNotifier + ValueListenableBuilder，不引入新状态管理框架
 - **设计语言**: 所有视觉值通过 `Tokens.*`，毛玻璃 `BackdropFilter` + `bgGlass` + `borderHighlight`
 - **平台**: 以 Windows 为主，macOS/Linux 次要
-- **手柄兼容**: Steam Input API 自动映射手柄→键盘，无需 Flutter 侧适配层；FocusTraversalGroup 处理 D-pad
-- **覆盖层模式**: 使用居中覆盖层（非独立窗口），不可拖拽到播放器窗口外
-- **延迟应用**: locale/theme/shortcuts 更改必须延迟到 OK/Apply 时提交
+- **手柄兼容**: Steam Input API 自动映射手柄→键盘，无需 Flutter 侧适配层；输入模式检测驱动提示置换
+- **覆盖层模式**: 使用居中覆盖层（非独立窗口），16:9 / 占屏约 50% 面积
+- **延迟应用**: 音频 EQ 等更改必须延迟到 OK/Apply 时提交（沿用 v4.0 延迟应用框架）
+- **范围边界**: v4.5 仅填充音频 tab，视频/字幕/播放 tab 保持 SettingRow 占位
 
 ## Key Decisions
 
@@ -111,10 +125,15 @@ Simple Player Flutter 桌面播放器（fvp / MDK-FFmpeg 引擎）的设置面�
 | `MemoryMonitor` 一等化（v3.0） | 可注入、可关闭、不干扰播放业务 | ✓ Done (Phase 19) |
 | 零依赖 `KernelLogger`（v3.0） | `dart:developer` 为主 + 受控 `debugPrint` | ✓ Done (Phase 17) |
 | 双语 API 注释（v3.0） | 中文意图 + 英文契约 | ✓ Done (Phase 22) |
-| 居中覆盖层（v4.0） | 复用 overlay 架构，不创建独立窗口 | — Pending |
-| Kodi + Steam 混合导航（v4.0） | D-pad ↑↓ 选项, ←→ 调值, LB/RB 切 tab, A 确认, B 返回 | — Pending |
-| 框架优先（v4.0） | 先建骨架后填功能，SettingRow 占位渲染 | — Pending |
-| Steam Input API 自动映射（v4.0） | 手柄输入自动转键盘事件，无需 Flutter 适配层 | — Pending |
+| 居中覆盖层（v4.0） | 复用 overlay 架构，不创建独立窗口 | ✓ Good (v4.0 验证) |
+| Kodi + Steam 混合导航（v4.0） | D-pad ↑↓ 选项, ←→ 调值, LB/RB 切 tab, A 确认, B 返回 | ✓ Good (v4.0 验证) — v4.5 重构为横向 tab |
+| 框架优先（v4.0） | 先建骨架后填功能，SettingRow 占位渲染 | ✓ Good (v4.0 验证) |
+| Steam Input API 自动映射（v4.0） | 手柄输入自动转键盘事件，无需 Flutter 适配层 | ✓ Good (v4.0 验证) |
+| 横向 tab 中部布局（v4.5） | 删左侧栏，tab 横向排面板中部 + 两端竖向圆角箭头 | — Pending |
+| 控制栏为设计北极星（v4.5） | 面板视觉/交互全程对齐控制栏毛玻璃语言 | — Pending |
+| 音轨双入口分工（v4.5） | 控制栏按钮=快速切换弹轨；音频 tab=深度调节 EQ | — Pending |
+| 总是暂停策略（v4.5） | 面板开启即暂停（非 wasPlaying 条件），关闭恢复 | — Pending |
+| v4.5 仅音频 tab（v4.5） | 视频/字幕/播放 tab 占位推迟 v4.6+，范围可控 | — Pending |
 
 ## Evolution
 
@@ -134,4 +153,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-24 — Phase 25 complete (Tab Content Framework: 7 skeleton tabs + deferred apply + button bar)*
+*Last updated: 2026-07-25 — Milestone v4.5 started (设置面板横向重构 + 音频功能填充)*
