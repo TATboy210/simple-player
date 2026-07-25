@@ -11,7 +11,8 @@ import '../../shared/settings_card.dart'; // keep for SettingActionRow export
 
 /// 快捷键自定义 tab — 显示/录制/重置快捷键绑定
 ///
-/// [onShortcutsChanged] 在每次绑定变更时回调，由 SettingsPanel 负责持久化。
+/// [onShortcutsChanged] 在每次绑定变更时回调，由 SettingsPanelController
+/// 负责持久化（通过 PendingSettingsState 延迟应用）。
 class ShortcutsTab extends StatefulWidget {
   final ValueChanged<Map<String, String>>? onShortcutsChanged;
   final VoidCallback? onReset;
