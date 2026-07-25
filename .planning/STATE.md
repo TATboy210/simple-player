@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充
 status: planning
-last_updated: "2026-07-25T12:11:48.643Z"
+last_updated: "2026-07-25T14:00:31.000Z"
 last_activity: 2026-07-25
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -130,14 +130,14 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 
 - 恢复源：`.planning/HANDOFF.json`（task 4/4 paused）+ `.planning/.continue-here.md`（8 项 blocking constraints）一致，无漂移。
 - **状态核对**：工作树干净；最新 commit `6a15cd5` "wip: milestone v3.0 paused at 4/4 (definition complete, awaiting roadmapper)"（比 HANDOFF 记录的 `ec1e530` 更新，已超越移交快照）。
-- **关键判断**：现有 `.planning/ROADMAP.md` 是 **v2.1 残留**（标题 "v2.1 expanded"、Phase 9-14、Jul 14），v3.0 路线图尚未生成 → STATE frontmatter `total_phases: 0` 印证。下一步确认为 `/gsd-roadmapper` 重写，而非 `/gsd-plan-phase`。
+- **关键判断**：现有 `.planning/ROADMAP.md` 是 **v2.1 拋留**（标题 "v2.1 expanded"、Phase 9-14、Jul 14），v3.0 路线图尚未生成 → STATE frontmatter `total_phases: 0` 印证。下一步确认为 `/gsd-roadmapper` 重写，而非 `/gsd-plan-phase`。
 - **噪声文件**：根目录 `./.continue-here.md` 是 2026-07-10 v1.0/v1.6 全屏迁移时代遗留，与 v3.0 无关（未清理，待用户决定）。
 - **下一步**：启动 `/gsd-roadmapper` 生成 8 阶段 ROADMAP.md（Phase 15 起续编号），须遵守 8 项 blocking constraints + 构建顺序 P1 契约冻结→P2 适配层→P3 KernelLogger→P4 错误模型→P5 MemoryMonitor→P6 状态重写→P7 验证收拢→P8 双语文档；回填 REQUIREMENTS.md 40 REQ-ID Traceability；呈批批准后提交。
 
 ### 2026-07-16 第五次（路线图生成 — Agent 分类器宕机，主会话直产）
 
 - **阻塞绕行**：`/gsd-roadmapper` 无独立 skill 入口（是 agent，由 `/gsd-new-milestone` 编排）；用 Agent 工具 spawn `gsd-roadmapper` 时 glm-5.2 分类器宕机（HANDOFF 预警的间歇宕机）。read-only 与 Write/Edit 不受影响 → 在主会话直接产出 roadmapper 三件套（上下文已持 PROJECT/REQUIREMENTS/SUMMARY/.continue-here/config 全部输入）。
-- **产出**：(1) `ROADMAP.md` 覆盖 v2.1 残留，8 phases（Phase 15-22 续编号），每 phase 含 Goal/Depends on/Requirements/Success Criteria/**Blocking Constraints honored**/Plans TBD + Progress Table + Build Order Rationale；(2) `STATE.md` 外科手术更新（frontmatter total_phases 0→8、current_phase_name→Phase 15、Current Position→15 of 22 ready to plan），历史 Session Continuity 全保留；(3) `REQUIREMENTS.md` Traceability 回填 40 行映射表，Coverage 40/40 归零。
+- **产出**：(1) `ROADMAP.md` 覆盖 v2.1 拋留，8 phases（Phase 15-22 续编号），每 phase 含 Goal/Depends on/Requirements/Success Criteria/**Blocking Constraints honored**/Plans TBD + Progress Table + Build Order Rationale；(2) `STATE.md` 外科手术更新（frontmatter total_phases 0→8、current_phase_name→Phase 15、Current Position→15 of 22 ready to plan），历史 Session Continuity 全保留；(3) `REQUIREMENTS.md` Traceability 回填 40 行映射表，Coverage 40/40 归零。
 - **关键决策固化为各 phase 硬要求**：8 项 blocking constraints 已分别写入对应 phase（#2→P15, #6+#8→P16, #1+#7→P17, #5→P19, #3+#4→P20, #7 release→P21）。构建顺序严格遵守 P15→P16→P17→P18→P19→P20→P21→P22，Depends on 体现依赖链。
 - **granularity 张力**：config.json `standard`（默认 4-6 phases），但 8 phases 是需求驱动自然边界，ROADMAP.md Overview 已注明未压缩（压缩会破坏诊断能力依赖链）。
 - **未提交**：三件套待用户呈批批准后提交（建议 commit message: `docs: roadmap v3.0 — 8 phases (15-22) compatible-replacement kernel rewrite`）。未删除 HANDOFF.json（待路线图批准提交后作为一次性工件闭环删除）。
@@ -157,7 +157,7 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **恢复源**：`.planning/phases/16-diagnosticsbundle/16-PLAN-CHECKPOINT.json`（本次新建，plan-phase 桥接工件，非 GSD 自动消费；安全删除时机 = PLAN.md 提交后）。
 - **已完成的规划前置**：(1) `gsd-tools.cjs` 定位 `/c/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs`；(2) `init.plan-phase 16` 全字段已解析（phase_found=true, phase_req_ids=ADAPT-01..05, has_context=true, has_research=false, has_plans=false, phase_status=Pending, planner=opus/checker=sonnet/researcher=sonnet, auto_advance=true, context_window=200000）；(3) `phase.mvp-mode 16` = false（标准水平分层）；(4) plan:pre hooks 已渲染并逐能力判定：research=ACTIVE、pattern-mapper=ACTIVE(Step 7.8)、security=ACTIVE(须 `<threat_model>`)、intel=ACTIVE(Step 7.9)、ai-integration=SKIP(无 AI 关键词)、ui=SKIP(纯内核 seam 无 frontend)；(5) research hook 的 `fragment.inline` 提示模板 + 9 个字段替换值已固化进 checkpoint；(6) Step 5.1 用户选 "Research first (Recommended)"。
 - **未完成（下个窗口做）**：未 spawn 任何子代理。下个窗口 `/clear` → `/gsd-plan-phase 16 --research`：跳过 Step 5.1 交互门 → spawn gsd-phase-researcher(sonnet, 写 RESEARCH.md，含 D6 调用点普查 + Validation Architecture 喂 Nyquist D8) → Step 5.5 派生 VALIDATION.md → Step 5.55 security 门禁 → Step 7.8 pattern-mapper → Step 7.9 intel API-SURFACE → Step 8 planner(opus, 写 *-PLAN.md，须含 `<threat_model>` + D27 wc 预算明细 + D24/D25 测试构成 + D21 类级迁移清单三项 + D22 grep 闸门) → Step 10 checker(sonnet) → Step 12 修订循环(max 3) → Step 13 需求覆盖门(ADAPT-01..05) + 13a 决策覆盖门(D1-D27) + 13b STATE + 13c ROADMAP 注释 + 13d 提交 → Step 13e gap 分析 → Step 15 auto_advance=true 链到 execute-phase 16。
-- **auto_advance 警告**：规划通过后工作流会自动 spawn execute-phase 16（STATE 第七次恢复已确认 auto_advance 是用户有意开启）。但当前工作树有 12 个脏文件（lib/kernel/engine/media_opener.dart、lib/main.dart、lib/ui/player/*、lib/l10n/*、未追踪 playback_status_overlay.dart + 测试 + .planning/debug/）是上一会话 playback_status_overlay debug 残留，**与 Phase 16 无关**。execute-phase 会新建 lib/kernel/adapter + lib/kernel/diagnostics 触碰 lib/kernel/。建议在 auto-advance 触发前先提交/暂存这些无关脏改动，或在新窗口首步先处理。P16 规划本身只写 .planning/ 不碰 lib/，规划阶段安全。
+- **auto_advance 警告**：规划通过后工作流会自动 spawn execute-phase 16（STATE 第七次恢复已确认 auto_advance 是用户有意开启）。但当前工作树有 12 个脏文件（lib/kernel/engine/media_opener.dart、lib/main.dart、lib/ui/player/*、lib/l10n/*、未追踪 playback_status_overlay.dart + 测试 + .planning/debug/）是上一会话 playback_status_overlay debug 拋留，**与 Phase 16 无关**。execute-phase 会新建 lib/kernel/adapter + lib/kernel/diagnostics 触碰 lib/kernel/。建议在 auto-advance 触发前先提交/暂存这些无关脏改动，或在新窗口首步先处理。P16 规划本身只写 .planning/ 不碰 lib/，规划阶段安全。
 - **open research questions 已固化**：checkpoint `open_research_questions_for_researcher` 列 7 条（D6 调用点普查、Nyquist D8 验证架构、FvpEngine 636 行基线核实、MediaEngine 7 接口成员枚举、EngineStateView notifier 字段枚举、现有 3 诊断组件形状、cast audit 复核）。
 - **下一步**：`/clear` → `/gsd-plan-phase 16 --research`（带 --research flag 跳过已答的研究交互门，直接 spawn researcher）。
 
@@ -177,13 +177,13 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 ### 2026-07-17 第八次恢复（/gsd-resume-work → 确认直接规划 Phase 16）
 
 - **恢复源**：`.planning/phases/16-diagnosticsbundle/16-PLAN-CHECKPOINT.json`（plan-phase 桥接工件，Step 5 暂停）。`.planning/HANDOFF.json` 已陈旧（2026-07-16 Phase 15 plan-phase 产物，被 `dc93d20` 执行超越），不予采信。
-- **状态核对**：Phase 15 已完整闭环（3 PLAN+SUMMARY+VERIFICATION.md+BASELINE-AUDIT，commit `dc93d20` PASSED 4/4）；Phase 16 规划 Step 5 暂停（gsd-phase-researcher 未 spawn）。git HEAD = `6b9c381`。工作树 12 个 lib/ debug 残留 + 3 个 Phase 15 零星残留，均与 Phase 16 无关。
-- **用户决策**：经 AskUserQuestion，选择**直接规划 Phase 16**（推荐项）——规划阶段只写 `.planning/`，对 lib/ 脏文件免疫；lib/ 残留留到规划通过后、auto-advance→execute 触发前再处理。
+- **状态核对**：Phase 15 已完整闭环（3 PLAN+SUMMARY+VERIFICATION.md+BASELINE-AUDIT，commit `dc93d20` PASSED 4/4）；Phase 16 规划 Step 5 暂停（gsd-phase-researcher 未 spawn）。git HEAD = `6b9c381`。工作树 12 个 lib/ debug 拋留 + 3 个 Phase 15 零星残留，均与 Phase 16 无关。
+- **用户决策**：经 AskUserQuestion，选择**直接规划 Phase 16**（推荐项）——规划阶段只写 `.planning/`，对 lib/ 脏文件免疫；lib/ 拋留留到规划通过后、auto-advance→execute 触发前再处理。
 - **下一步**：`/gsd-plan-phase 16 --research`（`--research` flag 跳过已答的 Step 5.1 交互门，直接 spawn gsd-phase-researcher）。
 
 ### 2026-07-17 第九次（/gsd-plan-phase 16 --research — 只跑研究，落盘后检查点停）
 
-- **恢复源**：`16-PLAN-CHECKPOINT.json`（第八次恢复已核对，本次直接消费）+ 第八次 STATE 记录。git HEAD = `6b9c381`，工作树 12 个 lib/ debug 残留（与 P16 无关）。
+- **恢复源**：`16-PLAN-CHECKPOINT.json`（第八次恢复已核对，本次直接消费）+ 第八次 STATE 记录。git HEAD = `6b9c381`，工作树 12 个 lib/ debug 拋留（与 P16 无关）。
 - **上下文预算现实**：本窗口启动时已 66%（剩 34%），不足以跑完 Research→Plan→Verify→Step13 门禁→auto-advance→execute-phase 全链。经 AskUserQuestion，用户选 **"只跑研究，落盘后检查点停 (推荐)"** —— 单窗口产出一个持久工件（RESEARCH.md），下一窗口复用继续。
 - **本窗口已完成**：
   1. **Step 5 — spawn gsd-phase-researcher (sonnet)**：用 checkpoint 固化的 `fragment.inline` 模板 + 9 字段替换 + 7 条 open research questions 注入。researcher 写 `16-RESEARCH.md`（含 `## Validation Architecture` 段）并以**隔离提交** `e99ead2` 落盘（仅 RESEARCH.md，未碰 12 个无关脏文件）。返回 `## RESEARCH COMPLETE`，confidence HIGH，111K subagent tokens。
@@ -196,10 +196,24 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
   - **契约测试复用机制已存在且可用**：Phase 15 的 7 个 `run*ContractTests` + `contract_test_runner.dart` 聚合器专为对 `KernelAdapter` 重挂而设计（换 factory 即可），挂点 `test/engine/fvp_engine_contract_test.dart` 已确认。
   - **cast audit 再确认**：`as FvpEngine` 0 hits + 5 个便捷 getter（trackControl/videoEffectControl/rendererControl/volumeControl/subtitleConfig）0 用量 —— drop-in 透明性证据齐。
   - **Open Questions（喂 planner）**：(1) setVolume/setMute/volume/isMuted 经 `DelegationPolicy.volume` 单路由 vs 模糊双字段治理（推荐单路由）；(2) `migrated:` 与 `legacy:` 是否同一 FvpEngine 实例（推荐同实例，避免资源重复问题，D19 允许二者）。
-- **git 状态**：HEAD `0eae691`，其上 `e99ead2`（research）。两个 P16 提交均隔离（仅 .planning/）。12 个 lib/ debug 残留 + Phase 15 零星残留 + STATE.md(M) 仍未动 —— auto-advance→execute 触发前须处理（见下）。
+- **git 状态**：HEAD `0eae691`，其上 `e99ead2`（research）。两个 P16 提交均隔离（仅 .planning/）。12 个 lib/ debug 拋留 + Phase 15 零星残留 + STATE.md(M) 仍未动 —— auto-advance→execute 触发前须处理（见下）。
 - **未提交**：本 STATE.md 更新（下一步将随 checkpoint 一起提交）。
 - **下一步（新上下文窗口）**：`/clear` → `/gsd-plan-phase 16`（**不带 --research**，因 has_research=true 会自动复用 RESEARCH.md，走 Step 5.1 "Use existing, skip to step 6"）。续跑：Step 5.55 security threat-model 门禁（planner 须发 `<threat_model>`，低风险）→ Step 7.8 spawn gsd-pattern-mapper（写 PATTERNS.md）→ Step 7.9 regenerate API-SURFACE.md → Step 8 spawn gsd-planner opus（写 *-PLAN.md，须含 D27 wc 预算明细 / D24 测试构成 / D21 类级迁移清单 / D22 grep 闸门 / D6 84-调用点签名 / VolumeControl 单路由决策）→ Step 10 checker(sonnet) → Step 12 修订循环(max 3) → Step 13 需求覆盖门(ADAPT-01..05) + 13a 决策覆盖门(D1-D27) + 13b STATE + 13c ROADMAP 注释 + 13d 提交 → 13e gap 分析 → Step 15 auto_advance=true 链 execute-phase 16。
 - **auto-advance 警告（重申）**：规划通过后工作流自动 spawn execute-phase 16（会动 lib/kernel/adapter + lib/kernel/diagnostics 新目录）。触发前务必先提交/暂存 12 个无关 lib/ debug 脏文件，否则 execute 阶段工作树混乱。P16 规划本身只写 .planning/，安全。
+
+### 2026-07-25 Step 10 ROADMAP
+
+- **产出**：`ROADMAP.md` 创建（覆盖 v4.0 拋留）— 7 phases（Phase 28-34 续 v4.0 Phase 27 编号），每 phase 含 Goal / Depends on / Requirements / Success Criteria (2-5 observable) / **Blocking Constraints honored** / Plans TBD + Phase Progress Table + Build Order Rationale + Research Flags + Risk Profile + Traceability 表。
+- **Coverage**：35/35 v1 requirements mapped，0 orphaned，0 duplicated。Phase 分布 28(REFAC)=2 / 29(PAUSE)=4 / 30(LAYOUT)=5 / 31(VISUAL)=5 / 32(NAV)=7 / 33(AUDIO)=7 / 34(CTRLBAR)=5。Traceability 与 REQUIREMENTS.md Step 9 预填一致，roadmapper 复核确认无分歧。
+- **3 项 PRODUCT 决策固化进 phase 硬要求**：① 前置重构纳入 v4.5（REFAC-01/02 → Phase 28，Pitfalls shell-split 硬规则）；② 音频 EQ 纯延迟应用（AUDIO-06 → Phase 33 Success Criterion #3，无 live preview，无引擎快照管理）；③ 面板 16:9 主约束 + 50% 面积次约束（LAYOUT-02 → Phase 30 Success Criterion #1，`width = min(0.5 × screenW, screenH × 16/9)` clamp `[400, 960]`）。
+- **构建顺序**：28→29→30→31→32→33→34。Rationale 4 条写入 ROADMAP：split-before-features (Pitfalls 硬规则) + auto-pause-early (Features MVP order + 解锁安全迭代) + layout→visual→navigation (Features 依赖图) + audio-last (33/34 独立于 layout/nav，可并行，config parallelization=true)。
+- **Research Flags**：Phase 32 须 `--research-phase 32`（InputModeDetector 是 v4.5 唯一新基础设施，验证 Steam Input 事件签名可分性）；Phase 33 须 `--research-phase 33`（验证 MDK `af` 滤镜 pan/adelay/dynaudnorm 在链接 FFmpeg build 中编译可用）；Phase 34 light research（字幕按钮 primitive 确认 showMenu vs OverlayEntry，可能可跳过）。28/29/30/31 标准模式跳过 research-phase。
+- **Risk Profile**：LOW(28,29) → LOW-MEDIUM(30,34) → MEDIUM(31,33) → MEDIUM-HIGH(32, 最高)。最高风险 Phase 32（唯一新基础设施 + Steam Input 边缘案例 + focus-tree 拆分风险），所有风险在 SUMMARY Pitfalls 1-12 有具体缓解。
+- **granularity 张力**：config.json `standard`（默认 4-6 phases），但 7 phases 是需求驱动自然边界（每 phase 交付恰好一个 PROJECT.md target feature 或前置重构/安全修复），ROADMAP Overview 已注明未压缩（压缩会混合不相关 feature 跨独立交付边界，同 v3.0 8-phase 先例）。
+- **STATE.md 外科手术更新**：frontmatter `total_phases: 0→7`、`last_updated` 刷新；`total_plans`/`completed_phases`/`completed_plans`/`percent` 保持 0（plans 未定义）；历史 Session Continuity（v2.1/v3.0/v4.0 记录）全保留，仅追加本条。
+- **UI hint**：7 个 phase 全部含 `**UI hint**: yes`（全部涉及 settings panel / control bar / widget / 视觉/交互）。
+- **未提交**：ROADMAP.md + STATE.md(M) + REQUIREMENTS.md（Traceability 已在 Step 9 预填，无需改动）待 orchestrator 呈批批准后提交。建议 commit message: `docs: roadmap v4.5 — 7 phases (28-34) settings panel redesign + audio backfill`。
+- **下一步**：呈批 → 批准后提交 → `/clear` → `/gsd-plan-phase 28`（Phase 28 规划，新上下文窗口，纯 refactor 无需 research-phase）。
 
 ## Operator Next Steps
 
