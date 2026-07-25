@@ -392,7 +392,16 @@ Plans:
   4. 打开/关闭动画 Scale + Fade 流畅（60fps）
   5. 关键路径集成测试：打开/关闭/切换 tab/拖拽/键盘导航
 
-**Plans**: TBD (via `/gsd-plan-phase`)
+**Plans**: 2 plans
+Plans:
+
+**Wave 1**
+
+- [ ] 27-01-PLAN.md — Responsive tokens + panel continuous scaling + RepaintBoundary + tab bar compact mode + tests (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 27-02-PLAN.md — Compact mode verification + SC1-5 success criteria integration tests + full regression (Wave 2)
 
 ## Progress
 
@@ -413,7 +422,7 @@ Phases execute in numeric order: 15 → ... → 22 → 23 → ... → 27
 | 24. Sidebar Navigation | v4.0 | 0/2 | Planning complete | - |
 | 25. Tab Content Framework | v4.0 | 2/2 | Complete    | 2026-07-24 |
 | 26. Gamepad & Keyboard Navigation | v4.0 | 0/TBD | Not started | - |
-| 27. Responsive Scaling & Polish | v4.0 | 0/TBD | Not started | - |
+| 27. Responsive Scaling & Polish | v4.0 | 0/2 | Planning complete | - |
 
 ## Build Order Rationale
 
