@@ -4,8 +4,8 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase_name: defining requirements
 status: executing
-stopped_at: context exhaustion at 79% (2026-07-25)
-last_updated: "2026-07-25T15:04:02.639Z"
+stopped_at: context exhaustion at 75% (2026-07-25)
+last_updated: "2026-07-25T15:21:42.236Z"
 last_activity: 2026-07-25
 last_activity_desc: Milestone v4.5 started
 progress:
@@ -110,8 +110,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-25T14:27:07.848Z
-Stopped at: context exhaustion at 79% (2026-07-25)
+Last session: 2026-07-25T15:21:42.204Z
+Stopped at: context exhaustion at 75% (2026-07-25)
 Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -227,6 +227,18 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **跳过的 plan:pre 门控**: pattern-mapper (has_context=false AND has_research=false), intel API-SURFACE (纯重构 planner 直读源文件), specless probe (EDGE_ABSENT, ROADMAP 3 成功标准派生 must_haves), research (纯重构标准模式)。
 - **上下文 71% 暂停**: 用户选 checkpoint-then-resume (Phase 15/16 验证模式)。auto_advance=true 但 29% 剩余不足以 spawn execute-phase 28 (动 lib/, 长寿命 subagent)。
 - **下一步**: `/clear` → `/gsd-execute-phase 28` (新上下文窗口)。execute-phase 会读 28-01-PLAN.md + STATE.md, 创建 lib/ui/dialogs/settings/tab_strip.dart + tab_content.dart + panel_key_bindings.dart, 删除 lib/ui/dialogs/settings_panel.dart, 跑 flutter test 验证零行为改变。
+
+### 2026-07-25 Phase 28 execute-phase 预 spawn 暂停（上下文 68%，未 spawn executor）
+
+- **恢复源**：28-01-PLAN.md + STATE.md（本条）+ init.execute-phase 28 已跑（全部字段已验证，下个会话可秒级复跑）。
+- **状态核对**：工作树干净（`git status --porcelain` 空），分支 `feat/v1.8-stability-polish-plan-02-02`，HEAD `7a0b1b2`（与规划 checkpoint 一致）。
+- **init.execute-phase 28 验证结果**：`phase_found=true`, `phase_dir=D:/simple_player_flutter/.planning/phases/28-settings-shell-split-legacy-deletion`, `plan_count=1`, `incomplete_count=1` (28-01-PLAN.md), `executor_model=sonnet`, `verifier_model=sonnet`, `parallelization=true`, `branching_strategy=none`（留当前分支）, `context_window=200000`, `agents_installed=true`, `missing_agents=[]`, `agent_runtime=claude`, `phase_req_ids=REFAC-01, REFAC-02`, `requirements_path=.planning/REQUIREMENTS.md`。28-01 frontmatter: `autonomous=true`, `wave=1`, `depends_on=[]`, 8 files_modified。
+- **阻塞反模式检查（check_blocking_antipatterns 步）**：Phase 28 目录无 `.continue-here.md`（只有 28-01-PLAN.md）；`.planning/.continue-here.md` 的 8 项 blocking constraints 全是 v3.0 内核重写相关（logger/状态机/适配层/MemoryMonitor，归属 Phase 15-22），**不适用于** v4.5 Phase 28 设置面板重构。无 blocking 反模式，继续。
+- **interactive mode 检查**：用户调用 `/gsd-execute-phase 28` 无 `--interactive` flag → 走标准 subagent 模式（Claude Code + Agent 工具可用 → 必须 spawn gsd-executor，inline 未授权）。
+- **执行计划摘要**：单 plan 单 wave，3 tasks tracer-first。Task 1 (`type="tracer"`, tdd=true) 提取 `tab_strip.dart` 端到端证明 tab 选择链路 → Task 2 (auto, tdd=true) 提取 `tab_content.dart`+`panel_key_bindings.dart` → Task 3 (auto) 删 `settings_panel.dart` (945行) + 更新 stale comments + grep gate。每文件 <300 行，shell <500 行，pubspec 不变，`flutter test` 全绿。
+- **worktree 决策（下个会话执行时）**：单 plan 单 wave 无并行收益，worktree 隔离只增 `.git/config.lock` 风险。建议 **sequential 模式**（`USE_WORKTREES_FOR_PLAN=false`，不传 `isolation="worktree"`）——功能等价、更简单、避开 glm-5.2 间歇宕机期 worktree 清理复杂度。
+- **上下文 68% 暂停决策**：系统警告 32% 剩余不宜启动复杂工作。STATE 历史第 228 行用户已评估"29% 不足以 spawn execute-phase 28（动 lib/, 长寿命 subagent）"——本次仅 +3%。沿用 Phase 15/16 验证模式：**checkpoint-then-resume**。不对称风险：现在 spawn 最佳情况勉强够，最坏情况测试失败/verifier 发现 gap 时无恢复预算，中途 checkpoint 状态更差；现在 checkpoint 无下行风险。
+- **下一步（新上下文窗口）**：`/clear` → `/gsd-execute-phase 28`。init 已验证可秒级复跑；orchestrator 从 fresh 200K 开始 → spawn gsd-executor (sonnet, sequential mode) 读 28-01-PLAN.md + 6 源文件 + 6 测试文件（fresh 200K 上下文）→ 执行 3 tasks 原子提交 → 跑 `flutter test`（`D:/flutter/bin/flutter`，不在 PATH，用全路径）→ 写 28-01-SUMMARY.md → orchestrator spot-check + post-merge gate + tracking update → spawn gsd-verifier (sonnet) → phase completion。
 
 ## Operator Next Steps
 
