@@ -69,11 +69,8 @@ class SettingsOverlayShell extends StatefulWidget {
   /// 开/关动画时长 — 200ms，与 P24 侧边栏 FadeTransition 节奏一致（D-07）.
   static const Duration animationDuration = Duration(milliseconds: 200);
 
-  /// 面板宽度比例 — 50% 窗口宽度（clamp 上限 80%）.
-  static const double panelWidthRatio = 0.5;
-
-  /// 面板高度比例 — 50% 窗口高度（clamp 上限 80%）.
-  static const double panelHeightRatio = 0.5;
+  /// 面板宽度比例 — 由 Tokens.panelWidthRatio 驱动.
+  static const double panelWidthRatio = Tokens.panelWidthRatio;
 
   @override
   State<SettingsOverlayShell> createState() => _SettingsOverlayShellState();
@@ -200,45 +197,48 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     );
   }
 
-  /// 计算面板尺寸 — 50% 窗口宽高，clamp 上限 80%（PANEL-07）。
-  ///
-  /// 保持 double 精度，不做 ceil/floor/truncation。
-  static Size _panelSize(Size mediaSize) => Size(
-    _clampDimension(mediaSize.width, SettingsOverlayShell.panelWidthRatio),
-    _clampDimension(mediaSize.height, SettingsOverlayShell.panelHeightRatio),
-  );
+  /// 面板宽度 — windowWidth × 0.8，clamp 到 [400, 600]（D-04/D-05）。
+  static double _panelWidth(double windowWidth) =>
+      (windowWidth * Tokens.panelWidthRatio).clamp(
+        Tokens.panelMinWidth,
+        Tokens.panelMaxWidth,
+      );
 
-  /// 单轴尺寸约束 — ratio × 窗口尺寸，clamp 到 80% 上限。
-  static double _clampDimension(double mediaExtent, double ratio) =>
-      (mediaExtent * ratio).clamp(0, mediaExtent * 0.8);
+  /// 面板高度 — 宽度 × 5:4 比例（D-04）。
+  static double _panelHeight(double width) => width * 5.0 / 4.0;
 
-  /// 面板 — GlassContainer(GlassTier.normal) + 标题栏 + tab bar + 内容区 + Focus 键盘处理。
+  /// 面板 — RepaintBoundary + GlassContainer + 标题栏 + tab bar + 内容区 + Focus 键盘处理。
   ///
   /// 三段式布局（D-07）：标题栏 → 水平 tab bar（40px, bgPanel）→ 内容区（毛玻璃, 16dp padding）。
+  /// RepaintBoundary 隔离面板重绘，防止 PlayerScreen 联动刷新（D-07）。
   /// 包裹 FocusTraversalGroup + autofocus Focus 实现 D-10 自管键盘作用域。
   Widget _buildPanel(BuildContext context) {
     final mediaSize = MediaQuery.sizeOf(context);
-    final panelSize = _panelSize(mediaSize);
+    final width = _panelWidth(mediaSize.width);
+    final height = _panelHeight(width);
+    final isCompact = mediaSize.width < Tokens.breakpointResponsive;
 
-    return FocusTraversalGroup(
-      child: Focus(
-        autofocus: true,
-        onKeyEvent: _handleKeyEvent,
-        child: GlassContainer(
-          tier: GlassTier.normal,
-          borderRadius: BorderRadius.circular(Tokens.radiusLg),
-          resizing: widget.resizing,
-          child: SizedBox(
-            key: SettingsOverlayShell.panelKey,
-            width: panelSize.width,
-            height: panelSize.height,
-            child: Column(
-              children: [
-                _buildTitleBar(mediaSize, panelSize),
-                _buildTabBar(),
-                Expanded(child: _buildContent()),
-                _buildButtonBar(),
-              ],
+    return RepaintBoundary(
+      child: FocusTraversalGroup(
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: _handleKeyEvent,
+          child: GlassContainer(
+            tier: GlassTier.normal,
+            borderRadius: BorderRadius.circular(Tokens.radiusLg),
+            resizing: widget.resizing,
+            child: SizedBox(
+              key: SettingsOverlayShell.panelKey,
+              width: width,
+              height: height,
+              child: Column(
+                children: [
+                  _buildTitleBar(mediaSize, Size(width, height)),
+                  _buildTabBar(isCompact: isCompact),
+                  Expanded(child: _buildContent()),
+                  _buildButtonBar(),
+                ],
+              ),
             ),
           ),
         ),
@@ -246,15 +246,19 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     );
   }
 
-  /// 水平 tab bar — 64px 高，bgGlass 半透明背板与标题栏统一（D-07/D-08）。
+  /// 水平 tab bar — 64px/48px 高，bgGlass 半透明背板与标题栏统一（D-07/D-08）。
   ///
   /// 7 个等宽 [SettingsNavItem] 横排，selectedTab 驱动高亮。
-  Widget _buildTabBar() {
+  /// [isCompact] 控制 tab 高度、字体大小和间距（D-01/D-02/D-03）。
+  Widget _buildTabBar({required bool isCompact}) {
+    final fontSize = isCompact ? Tokens.tabBarFontCompact : Tokens.tabBarFontNormal;
+    final spacing = isCompact ? Tokens.tabBarSpacingCompact : Tokens.tabBarSpacingNormal;
+
     return ValueListenableBuilder<int>(
       valueListenable: _controller.state.selectedTab,
       builder: (context, selectedIndex, _) {
         return Container(
-          height: 64,
+          height: isCompact ? 56 : 64,
           color: Tokens.bgGlass,
           child: Row(
             children: List.generate(_tabIcons.length, (i) {
@@ -264,6 +268,8 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
                   label: _tabLabels[i],
                   selected: selectedIndex == i,
                   onTap: () => _controller.state.selectedTab.value = i,
+                  fontSize: fontSize,
+                  spacing: spacing,
                 ),
               );
             }),
@@ -491,6 +497,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   /// 拖拽更新 — clamp dragOffset 到窗口边界（D-09 / T-23-03）。
   ///
   /// maxX/maxY = (窗口尺寸 - 面板尺寸) / 2，保证面板不拖出播放器窗口。
+  /// 当面板大于窗口时（maxX/maxY < 0），禁用拖拽（clamp 到 0）。
   void _onDragUpdate(
     DragUpdateDetails details,
     Size mediaSize,
@@ -499,8 +506,9 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     final current = _controller.state.dragOffset.value;
     final next = current + details.delta;
     // 面板居中时 dragOffset=0，最大偏移 = (窗口-面板)/2
-    final maxX = (mediaSize.width - panelSize.width) / 2;
-    final maxY = (mediaSize.height - panelSize.height) / 2;
+    // 负值表示面板大于窗口，此时 clamp 到 0 禁止拖拽
+    final maxX = ((mediaSize.width - panelSize.width) / 2).clamp(0.0, double.infinity);
+    final maxY = ((mediaSize.height - panelSize.height) / 2).clamp(0.0, double.infinity);
     _controller.state.dragOffset.value = Offset(
       next.dx.clamp(-maxX, maxX),
       next.dy.clamp(-maxY, maxY),

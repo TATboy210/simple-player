@@ -13,6 +13,10 @@ class SettingsNavItem extends StatefulWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  /// 响应式字体大小 — normal 模式 14px, compact 模式 12px
+  final double fontSize;
+  /// 响应式水平间距 — normal 模式 16px, compact 模式 8px
+  final double spacing;
 
   const SettingsNavItem({
     super.key,
@@ -20,6 +24,8 @@ class SettingsNavItem extends StatefulWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.fontSize = Tokens.fontOverline,
+    this.spacing = Tokens.spSm,
   });
 
   @override
@@ -54,7 +60,10 @@ class _SettingsNavItemState extends State<SettingsNavItem> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: Tokens.durationFast),
           width: 80,
-          padding: const EdgeInsets.symmetric(vertical: Tokens.spSm),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.spacing,
+            vertical: Tokens.spSm,
+          ),
           decoration: BoxDecoration(
             color: bgColor,
             border: Border(
@@ -81,7 +90,7 @@ class _SettingsNavItemState extends State<SettingsNavItem> {
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: Tokens.durationFast),
                 style: TextStyle(
-                  fontSize: Tokens.fontOverline,
+                  fontSize: widget.fontSize,
                   color: fgColor,
                   fontWeight: widget.selected
                       ? Tokens.weightMedium
