@@ -10,7 +10,7 @@ export '../models/app_settings.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'settings_validator.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 导入结果 — sealed class 支持穷尽模式匹配。
 ///
@@ -176,7 +176,7 @@ class SettingsStore {
         hardwareDecoding: prefs.getBool(_keyHardwareDecoding) ?? true,
       );
     } on Exception catch (e) {
-      log.e('SettingsStore.load failed: $e');
+      _log.e('SettingsStore.load failed: $e');
       return const AppSettings(
         volume: 1.0,
         lastFile: '',
@@ -210,7 +210,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       await op(prefs);
     } on Exception catch (e) {
-      log.e('SettingsStore.$method failed: $e');
+      _log.e('SettingsStore.$method failed: $e');
     }
   }
 
@@ -271,7 +271,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return prefs.getString(_keyLocale) ?? SettingsValidator.defaultLocale;
     } on Exception catch (e) {
-      log.e('SettingsStore.loadLocale failed: $e');
+      _log.e('SettingsStore.loadLocale failed: $e');
       return 'zh';
     }
   }
@@ -288,7 +288,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return SettingsValidator.themeIndex(prefs.getInt(_keyThemeIndex) ?? 0);
     } on Exception catch (e) {
-      log.e('SettingsStore.loadThemeIndex failed: $e');
+      _log.e('SettingsStore.loadThemeIndex failed: $e');
       return 0;
     }
   }
@@ -310,7 +310,7 @@ class SettingsStore {
       final decoded = jsonDecode(json) as Map<String, dynamic>;
       return decoded.map((k, v) => MapEntry(k, v as String));
     } on Exception catch (e) {
-      log.e('SettingsStore.loadShortcuts failed: $e');
+      _log.e('SettingsStore.loadShortcuts failed: $e');
       return {};
     }
   }
@@ -403,7 +403,7 @@ class SettingsStore {
         prefs.getDouble(_keyPlaybackSpeed) ?? SettingsValidator.playbackSpeedDefault,
       );
     } on Exception catch (e) {
-      log.e('SettingsStore.loadPlaybackSpeed failed: $e');
+      _log.e('SettingsStore.loadPlaybackSpeed failed: $e');
       return SettingsValidator.playbackSpeedDefault;
     }
   }
@@ -416,7 +416,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return prefs.getBool(_keyD3d11Sync) ?? true;
     } on Exception catch (e) {
-      log.e('SettingsStore.loadD3d11SyncEnabled failed: $e');
+      _log.e('SettingsStore.loadD3d11SyncEnabled failed: $e');
       return true;
     }
   }
@@ -429,7 +429,7 @@ class SettingsStore {
       final prefs = await _getPrefs();
       return prefs.getBool(_keyHardwareDecoding) ?? true;
     } on Exception catch (e) {
-      log.e('SettingsStore.loadHardwareDecoding failed: $e');
+      _log.e('SettingsStore.loadHardwareDecoding failed: $e');
       return true;
     }
   }
@@ -498,7 +498,7 @@ class SettingsStore {
         subtitleDelay: prefs.getInt(_keySubtitleDelay) ?? 0,
       );
     } on Exception catch (e) {
-      log.e('SettingsStore.loadTrackPreferences failed: $e');
+      _log.e('SettingsStore.loadTrackPreferences failed: $e');
       return TrackPreferences.empty;
     }
   }
@@ -667,7 +667,7 @@ class SettingsStore {
       await saveThemeIndex(result.themeIndex);
       await saveShortcuts(result.shortcuts);
     } on Exception catch (e) {
-      log.e('SettingsStore.applyImportedSettings failed: $e');
+      _log.e('SettingsStore.applyImportedSettings failed: $e');
     }
   }
 }

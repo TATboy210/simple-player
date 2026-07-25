@@ -1,10 +1,8 @@
 import 'dart:ui';
 
-import '../bridge/display_enumerator.dart';
-import '../diagnostics/kernel_logger.dart';
+import 'package:flutter/foundation.dart';
 
-final log = KernelLogger.I;
-final logBridge = KernelLogger.I;
+import '../bridge/display_enumerator.dart';
 
 /// 屏幕几何工具 — 窗口位置校正。
 ///
@@ -87,7 +85,7 @@ class ScreenUtils {
         height: height,
       );
     } catch (e, st) {
-      logBridge.e('[ScreenUtils.clampToPrimaryDisplay] $e\n$st');
+      debugPrint('[ScreenUtils.clampToPrimaryDisplay] $e\n$st');
     }
     return Offset(x, y);
   }

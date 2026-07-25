@@ -26,7 +26,7 @@ import 'playback_state_manager.dart';
 import 'subtitle_service.dart';
 import 'track_preference_service.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 设置面板暂停契约 — Phase 23 D-03 服务边界的窄接口。
 ///
@@ -287,7 +287,7 @@ class PlaybackController implements SettingsPanelPlayback {
     // fire-and-forget 保存轨道偏好
     unawaited(
       _trackPreferenceService?.save().catchError(
-        (Object e) => log.e('TrackPreferenceService.save failed: $e'),
+        (Object e) => _log.e('TrackPreferenceService.save failed: $e'),
       ),
     );
     currentFileName.dispose();

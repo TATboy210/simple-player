@@ -4,6 +4,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/diagnostics_bundle.dart
 import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
 import 'package:simple_player_flutter/kernel/engine/media_engine.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/engine/open_result.dart';
 import 'package:simple_player_flutter/kernel/engine/models/audio_track_info.dart';
 import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.dart';
@@ -309,9 +310,9 @@ class KernelAdapter implements MediaEngine {
 
   /// 打开媒体文件 — per-method 路由 via [_targetFor].
   ///
-  /// Opens a media file. Per-method routing via [_targetFor].
+  /// Opens a media file and forwards its explicit result through [_targetFor].
   @override
-  Future<void> open(String path) => _targetFor('open').open(path);
+  Future<OpenResult> open(String path) => _targetFor('open').open(path);
 
   /// 开始播放 — per-method 路由 via [_targetFor].
   ///
@@ -347,7 +348,8 @@ class KernelAdapter implements MediaEngine {
   ///
   /// Sets playback speed multiplier. Per-method routing via [_targetFor].
   @override
-  void setPlaybackRate(double rate) => _targetFor('setPlaybackRate').setPlaybackRate(rate);
+  void setPlaybackRate(double rate) =>
+      _targetFor('setPlaybackRate').setPlaybackRate(rate);
 
   /// 设置播放范围 — per-method 路由 via [_targetFor].
   ///
@@ -360,7 +362,8 @@ class KernelAdapter implements MediaEngine {
   ///
   /// Skips forward (default 10 seconds). Per-method routing via [_targetFor].
   @override
-  void skipForward([int ms = 10000]) => _targetFor('skipForward').skipForward(ms);
+  void skipForward([int ms = 10000]) =>
+      _targetFor('skipForward').skipForward(ms);
 
   /// 快退 (默认 10 秒) — per-method 路由 via [_targetFor].
   ///
@@ -374,13 +377,15 @@ class KernelAdapter implements MediaEngine {
   ///
   /// Returns available audio tracks. Per-method routing via [_targetFor].
   @override
-  List<AudioTrackInfo> getAudioTracks() => _targetFor('getAudioTracks').getAudioTracks();
+  List<AudioTrackInfo> getAudioTracks() =>
+      _targetFor('getAudioTracks').getAudioTracks();
 
   /// 切换音轨 — per-method 路由 via [_targetFor].
   ///
   /// Switches audio track. Per-method routing via [_targetFor].
   @override
-  void switchAudioTrack(int trackId) => _targetFor('switchAudioTrack').switchAudioTrack(trackId);
+  void switchAudioTrack(int trackId) =>
+      _targetFor('switchAudioTrack').switchAudioTrack(trackId);
 
   /// 活跃音轨 ID 列表 — 路由由 [_policy.track] 决定.
   ///
@@ -396,13 +401,15 @@ class KernelAdapter implements MediaEngine {
   ///
   /// Returns available subtitle tracks. Per-method routing via [_targetFor].
   @override
-  List<SubtitleTrackInfo> getSubtitleTracks() => _targetFor('getSubtitleTracks').getSubtitleTracks();
+  List<SubtitleTrackInfo> getSubtitleTracks() =>
+      _targetFor('getSubtitleTracks').getSubtitleTracks();
 
   /// 切换字幕轨道 — per-method 路由 via [_targetFor].
   ///
   /// Switches subtitle track. Per-method routing via [_targetFor].
   @override
-  void switchSubtitleTrack(int trackId) => _targetFor('switchSubtitleTrack').switchSubtitleTrack(trackId);
+  void switchSubtitleTrack(int trackId) =>
+      _targetFor('switchSubtitleTrack').switchSubtitleTrack(trackId);
 
   /// 切换字幕开关 — per-method 路由 via [_targetFor].
   ///
@@ -414,19 +421,22 @@ class KernelAdapter implements MediaEngine {
   ///
   /// Loads an external subtitle file. Per-method routing via [_targetFor].
   @override
-  void setExternalSubtitle(String path) => _targetFor('setExternalSubtitle').setExternalSubtitle(path);
+  void setExternalSubtitle(String path) =>
+      _targetFor('setExternalSubtitle').setExternalSubtitle(path);
 
   /// 设置字幕延迟 (毫秒) — per-method 路由 via [_targetFor].
   ///
   /// Sets subtitle delay in milliseconds. Per-method routing via [_targetFor].
   @override
-  void setSubtitleDelay(int delay) => _targetFor('setSubtitleDelay').setSubtitleDelay(delay);
+  void setSubtitleDelay(int delay) =>
+      _targetFor('setSubtitleDelay').setSubtitleDelay(delay);
 
   /// 设置均衡器预设 — per-method 路由 via [_targetFor].
   ///
   /// Sets equalizer preset. Per-method routing via [_targetFor].
   @override
-  void setEqualizer(String preset) => _targetFor('setEqualizer').setEqualizer(preset);
+  void setEqualizer(String preset) =>
+      _targetFor('setEqualizer').setEqualizer(preset);
 
   /// 字幕延迟 (毫秒) — 路由由 [_policy.subtitle] 决定.
   ///
@@ -463,13 +473,15 @@ class KernelAdapter implements MediaEngine {
   ///
   /// Sets video aspect ratio. Per-method routing via [_targetFor].
   @override
-  void setAspectRatio(double ratio) => _targetFor('setAspectRatio').setAspectRatio(ratio);
+  void setAspectRatio(double ratio) =>
+      _targetFor('setAspectRatio').setAspectRatio(ratio);
 
   /// 启用/禁用反交错 — per-method 路由 via [_targetFor].
   ///
   /// Enables/disables deinterlacing. Per-method routing via [_targetFor].
   @override
-  void setDeinterlace(bool enable) => _targetFor('setDeinterlace').setDeinterlace(enable);
+  void setDeinterlace(bool enable) =>
+      _targetFor('setDeinterlace').setDeinterlace(enable);
 
   // ===== RendererControl (2 members via _targetFor per-method routing, Phase 20 D9) =====
 

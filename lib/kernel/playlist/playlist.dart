@@ -5,7 +5,7 @@ import '../models/playlist_item.dart';
 import '../models/play_mode.dart';
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 播放列表管理 — 状态机.
 ///
@@ -271,8 +271,9 @@ class Playlist {
   factory Playlist.fromJson(Map<String, dynamic> json) {
     final playlist = Playlist();
 
-    // 播放模式（防御: 越界回退 loopAll）
-    final modeIndex = (json['mode'] as num?)?.toInt() ?? 0;
+    // 播放模式（防御: 越界回退 loopAll，类型安全转换）
+    final rawMode = json['mode'];
+    final modeIndex = (rawMode is num) ? rawMode.toInt() : 0;
     playlist._mode = (modeIndex >= 0 && modeIndex < PlayMode.values.length)
         ? PlayMode.values[modeIndex]
         : PlayMode.loopAll;
@@ -285,12 +286,13 @@ class Playlist {
           PlaylistItem.fromJson(item as Map<String, dynamic>),
         );
       } on Exception catch (e) {
-        log.w('Playlist.fromJson: skipping corrupted item: $e');
+        _log.w('Playlist.fromJson: skipping corrupted item: $e');
       }
     }
 
-    // 当前索引（防御: clamp 到有效范围）
-    playlist._currentIndex = (json['currentIndex'] as num?)?.toInt() ?? -1;
+    // 当前索引（防御: clamp 到有效范围，类型安全转换）
+    final rawIndex = json['currentIndex'];
+    playlist._currentIndex = (rawIndex is num) ? rawIndex.toInt() : -1;
     if (playlist._items.isEmpty) {
       playlist._currentIndex = -1;
     } else {

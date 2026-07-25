@@ -6,7 +6,7 @@ import 'player_proxy.dart';
 import '../services/path_validator.dart';
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 位置轮询器 — 自适应间隔轮询播放位置.
 ///
@@ -175,7 +175,7 @@ class PositionPoller {
         if (buffered.value != newBuf) buffered.value = newBuf;
       }
     } on Exception catch (e) {
-      log.e('PositionPoller._poll error: $e');
+      _log.e('PositionPoller._poll error: $e');
     }
   }
 }

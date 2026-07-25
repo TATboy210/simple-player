@@ -38,15 +38,26 @@ void main() {
 
     test('sealed class pattern matching works', () {
       final success = const OpenSuccess(MediaInfo(duration: 1000));
-      final error = OpenError(CodecError(CodecErrorCode.unsupportedFormat, '无法解码'));
+      final error = OpenError(
+        CodecError(CodecErrorCode.unsupportedFormat, '无法解码'),
+      );
+      const superseded = OpenSuperseded();
 
       String describe(OpenResult r) => switch (r) {
         OpenSuccess(:final mediaInfo) => 'ok:${mediaInfo.duration}',
         OpenError(:final error) => 'err:${error.runtimeType}:${error.message}',
+        OpenSuperseded() => 'superseded',
       };
 
       expect(describe(success), 'ok:1000');
       expect(describe(error), 'err:CodecError:无法解码');
+      expect(describe(superseded), 'superseded');
+    });
+
+    test('OpenSuperseded represents a request replaced by a newer request', () {
+      const result = OpenSuperseded();
+
+      expect(result, isA<OpenResult>());
     });
 
     test('OpenSuccess with minimal MediaInfo', () {
@@ -64,7 +75,9 @@ void main() {
     });
 
     test('OpenError with playback error', () {
-      final result = OpenError(PlaybackError(PlaybackErrorCode.playFailed, '播放失败'));
+      final result = OpenError(
+        PlaybackError(PlaybackErrorCode.playFailed, '播放失败'),
+      );
       expect(result.error, isA<PlaybackError>());
       expect(result.message, '播放失败');
     });

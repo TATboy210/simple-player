@@ -54,19 +54,20 @@ void main() {
         expect(playlist.currentIndex, oldIndex);
       });
 
-      test('generation guard: only last request wins', () async {
+      test('only latest open result commits playback side effects', () async {
         engine.configureMedia(durationMs: 60000);
         playlist.add('C:/a.mp4');
         playlist.add('C:/b.mp4');
         playlist.add('C:/c.mp4');
-        final f1 = controller.playIndex(0);
-        final f2 = controller.playIndex(1);
-        final f3 = controller.playIndex(2);
-        await f1;
-        await f2;
-        await f3;
+
+        final first = controller.playIndex(0);
+        final second = controller.playIndex(1);
+        final latest = controller.playIndex(2);
+        await Future.wait<void>([first, second, latest]);
+
         expect(playlist.currentIndex, 2);
-        expect(controller.navigator.currentGeneration, 3);
+        expect(engine.playCallCount, 1);
+        expect(controller.currentFileName.value, 'c.mp4');
       });
 
       test('reports error via onError callback on failure', () async {
@@ -167,18 +168,21 @@ void main() {
         expect(playlist.currentIndex, 1);
       });
 
-      test('playNext at end in shuffle mode advances to different index', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        playlist.add('C:/c.mp4');
-        playlist.mode = PlayMode.shuffle;
-        await controller.playIndex(0);
-        await controller.playNext();
-        // shuffle picks a random different index
-        expect(playlist.currentIndex, isNot(0));
-        expect(playlist.currentIndex, inInclusiveRange(0, 2));
-      });
+      test(
+        'playNext at end in shuffle mode advances to different index',
+        () async {
+          engine.configureMedia(durationMs: 60000);
+          playlist.add('C:/a.mp4');
+          playlist.add('C:/b.mp4');
+          playlist.add('C:/c.mp4');
+          playlist.mode = PlayMode.shuffle;
+          await controller.playIndex(0);
+          await controller.playNext();
+          // shuffle picks a random different index
+          expect(playlist.currentIndex, isNot(0));
+          expect(playlist.currentIndex, inInclusiveRange(0, 2));
+        },
+      );
     });
 
     group('path validation edge cases', () {

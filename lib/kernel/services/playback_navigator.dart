@@ -9,99 +9,112 @@ library;
 
 import 'dart:async';
 
-import '../engine/engine_state.dart';
 import '../diagnostics/kernel_logger.dart' show KernelLoggerImpl;
+import '../engine/open_result.dart';
+import '../models/player_error.dart';
 import '../utils/path_utils.dart';
 import '../services/path_validator.dart';
 import 'playback_controller.dart';
 
-final log = KernelLoggerImpl.I;
+late final _log = KernelLoggerImpl.I;
 
-/// 播放导航 — 索引跳转、上一首/下一首、并发 open() 守卫
+/// 播放导航 — 索引跳转、上一首/下一首与打开结果提交。
 ///
 /// 职责：
-/// - [playIndex] — 播放指定索引（核心方法，包含完整的打开流程）
-/// - [playNext] / [playPrevious] — 委托 playlist 的 peekNext/peekPrevious
-/// - openGeneration 守卫 — 快速切换曲目时丢弃过期的异步请求
+/// - [playIndex] — 播放指定索引，并只在 [OpenSuccess] 后提交副作用。
+/// - [playNext] / [playPrevious] — 委托 playlist 的 peekNext/peekPrevious。
 ///
-/// openGeneration 模式：用户快速切歌时，多个异步 open() 调用重叠。
-/// 每次调用 playIndex 递增 generation，异步完成后检查 generation 是否仍匹配。
-/// 若不匹配，说明用户已切歌，直接 return 丢弃旧请求。
+/// 并发安全由引擎的 [OpenResult] 契约表达：较新的打开请求会使旧请求返回
+/// [OpenSuperseded]，导航器因此无需读取或预测引擎内部 generation。
 class PlaybackNavigator {
   PlaybackNavigator(this._controller);
   final PlaybackController _controller;
 
-  /// 当前 generation 值 — 委托给 EngineStateMachine (Phase 20 D5 单一真相源)
+  /// 播放指定索引。
   ///
-  /// PlaybackNavigator 不再持有独立 _openGeneration，直接使用 stateMachine 的嵌入计数器。
-  int get currentGeneration => _controller.engine.stateMachine.currentGeneration;
-
-  /// 播放指定索引 — 完整的打开流程
-  ///
-  /// 流程：校验索引 → 递增 generation → 路径安全检查 → 打开引擎 →
-  /// 恢复断点位置 → 检测字幕 → 播放 → 更新文件名和历史
-  ///
-  /// 并发安全：通过 generation 计数器丢弃过期的异步结果，
-  /// 确保快速切歌时只有最后一次 open() 生效。
+  /// 正常打开失败以 [OpenError] 返回并恢复原索引；[OpenSuperseded] 是并发
+  /// 正常结局，不报告错误且不提交任何属于旧请求的播放、历史或持久化副作用。
   Future<void> playIndex(int index) async {
     if (index < 0 || index >= _controller.playlist.length) return;
-    final gen = _controller.engine.stateMachine.nextGeneration();
+
     final oldIndex = _controller.playlist.currentIndex;
     _controller.playlist.currentIndex = index;
     final current = _controller.playlist.current;
     if (current == null) return;
 
-    // 安全：验证路径防止播放列表注入的路径遍历
+    // 安全：验证路径防止播放列表注入的路径遍历。
     final validationError = PathValidator.validate(current.path);
     if (validationError != null) {
-      log.w('playIndex: rejected unsafe path: $validationError');
-      _controller.onError?.call(FileError(FileErrorCode.pathTraversal, validationError));
+      _log.w('playIndex: rejected unsafe path: $validationError');
+      _controller.onError?.call(
+        FileError(FileErrorCode.pathTraversal, validationError),
+      );
       return;
     }
 
+    final result = await _controller.engine.open(current.path);
+    switch (result) {
+      case OpenSuccess():
+        await _commitOpenSuccess(
+          index,
+          oldIndex,
+          current.path,
+          current.positionMs,
+        );
+      case OpenError(:final error):
+        _controller.playlist.currentIndex = oldIndex;
+        _controller.onError?.call(error);
+      case OpenSuperseded():
+        // 旧请求不能覆盖新请求已选择的播放列表项或 UI 状态。
+        return;
+    }
+  }
+
+  /// 提交成功打开后的播放相关副作用。
+  ///
+  /// 断点恢复包含异步边界；恢复结束后重新确认目标仍被选中，避免旧请求
+  /// 对已切换的媒体调用 play()、写入历史或覆盖标题。
+  Future<void> _commitOpenSuccess(
+    int index,
+    int oldIndex,
+    String path,
+    int? savedPositionMs,
+  ) async {
     try {
-      await _controller.engine.open(current.path);
-      // generation 不匹配说明用户已切歌，丢弃本次结果
-      if (gen != _controller.engine.stateMachine.currentGeneration) return;
-      if (_controller.engine.state.value == MediaState.error) {
-        throw Exception(_controller.engine.lastError.value?.message ?? '打开失败');
+      if (savedPositionMs != null && savedPositionMs > 1000) {
+        // 小于一秒的退出位置通常只是开头噪声，不应触发恢复跳转。
+        await _controller.engine.seekTo(savedPositionMs);
       }
-
-      // FEAT-01: Resume from saved position (> 1s threshold)
-      // 只恢复 > 1s 的断点 — < 1s 通常是噪声（如退出时刚好暂停在开头）
-      final savedMs = current.positionMs;
-      if (savedMs != null && savedMs > 1000) {
-        await _controller.engine.seekTo(savedMs);
-      }
-
-      // FEAT-03: Auto-detect external subtitles
-      // fire-and-forget：字幕检测失败不影响播放
-      final subtitlePath = current.path;
-      unawaited(
-        _controller.subtitleService?.detectAndLoad(subtitlePath).catchError(
-          (Object e) {
-            log.d('Subtitle detection failed: $e');
-          },
+    } on Exception catch (error) {
+      if (!_isSelectedTarget(index, path)) return;
+      _log.e('PlaybackNavigator.playIndex($index) seek failed: $error');
+      _controller.playlist.currentIndex = oldIndex;
+      _controller.onError?.call(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'PlaybackNavigator.playIndex($index) seek failed: $error',
+          error,
         ),
       );
-
-      // FEAT-04: Restore track preferences (audio/subtitle track, subtitle delay)
-      _controller.trackPreferenceService?.restoreAfterOpen(_controller.engine.mediaInfo);
-
-      _controller.engine.play();
-    } on Exception catch (e) {
-      log.e('PlaybackNavigator.playIndex($index) failed: $e');
-      // 只在 generation 仍匹配时恢复原索引，避免干扰后续切歌
-      if (gen == _controller.engine.stateMachine.currentGeneration) {
-        _controller.playlist.currentIndex = oldIndex;
-      }
-      _controller.onError?.call(
-        PlaybackError(PlaybackErrorCode.playFailed, 'PlaybackNavigator.playIndex($index) failed: $e', e),
-      );
       return;
     }
+
+    if (!_isSelectedTarget(index, path)) return;
+
+    // 字幕检测不影响主播放链路，失败仅记录诊断信息。
+    unawaited(
+      _controller.subtitleService?.detectAndLoad(path).catchError((
+        Object error,
+      ) {
+        _log.d('Subtitle detection failed: $error');
+      }),
+    );
+    _controller.trackPreferenceService?.restoreAfterOpen(
+      _controller.engine.mediaInfo,
+    );
+    _controller.engine.play();
     _controller.onNeedRebuild();
-    _controller.currentFileName.value = PathUtils.basename(current.path);
+    _controller.currentFileName.value = PathUtils.basename(path);
     _controller.playlist.updateHistory(
       index,
       positionMs: _controller.engine.position.value,
@@ -109,6 +122,11 @@ class PlaybackNavigator {
     );
     _controller.savePlaylist();
   }
+
+  /// 检查异步恢复期间是否已选择了另一首曲目。
+  bool _isSelectedTarget(int index, String path) =>
+      _controller.playlist.currentIndex == index &&
+      _controller.playlist.current?.path == path;
 
   /// 播放下一首 — 委托 playlist.peekNext() 获取下一个索引
   Future<void> playNext() async {

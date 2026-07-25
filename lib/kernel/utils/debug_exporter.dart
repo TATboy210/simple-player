@@ -8,7 +8,7 @@ import 'debug_probe.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../diagnostics/memory_monitor.dart';
 
-final log = KernelLoggerImpl.I;
+late final _log = KernelLoggerImpl.I;
 
 /// 统一调试数据导出 — 一键收集所有诊断信息。
 ///
@@ -47,10 +47,10 @@ class DebugExporter {
           .replaceAll('T', '_');
       final file = File('${dir.path}/debug_$timestamp.json');
       await file.writeAsString(exportAll(), flush: true);
-      log.i('[DebugExporter] saved to ${file.path}');
+      _log.i('[DebugExporter] saved to ${file.path}');
       return file.path;
     } on Exception catch (e) {
-      log.e('[DebugExporter] saveToFile failed: $e');
+      _log.e('[DebugExporter] saveToFile failed: $e');
       return null;
     }
   }

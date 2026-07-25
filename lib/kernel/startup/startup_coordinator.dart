@@ -5,7 +5,7 @@ import 'startup_state.dart';
 
 export 'startup_state.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 启动协调器 — 跟踪各阶段进度并广播状态
 ///
@@ -75,23 +75,23 @@ class StartupCoordinator {
 
   /// 输出逐阶段结构化耗时日志
   void _logTimeline() {
-    log.i('━━━ Startup Timeline ━━━');
+    _log.i('━━━ Startup Timeline ━━━');
     for (final phase in StartupPhase.values) {
       if (phase == StartupPhase.ready) continue;
       final duration = _phaseDurations[phase];
       if (duration != null) {
         final ms = duration.inMicroseconds / 1000; // μs → ms 转换
-        log.i('  ✓ ${phase.name.padRight(16)} ${ms.toStringAsFixed(1)}ms');
+        _log.i('  ✓ ${phase.name.padRight(16)} ${ms.toStringAsFixed(1)}ms');
       } else if (_phaseTimestamps.containsKey(phase)) {
-        log.i('  ○ ${phase.name.padRight(16)} (no duration)');
+        _log.i('  ○ ${phase.name.padRight(16)} (no duration)');
       } else {
-        log.i('  ○ ${phase.name.padRight(16)} (skipped)');
+        _log.i('  ○ ${phase.name.padRight(16)} (skipped)');
       }
     }
     final total = _stopwatch.elapsed;
-    log.i('  ────────────────────────');
-    log.i('  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms'); // μs → ms 转换
-    log.i('━━━━━━━━━━━━━━━━━━━━━━━━');
+    _log.i('  ────────────────────────');
+    _log.i('  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms'); // μs → ms 转换
+    _log.i('━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   /// Releases all resources. Call during app shutdown.

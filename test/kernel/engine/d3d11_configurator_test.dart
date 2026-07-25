@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/d3d11_configurator.dart';
 import 'package:simple_player_flutter/kernel/bridge/display_config.dart';
 import 'package:simple_player_flutter/kernel/engine/player_proxy.dart';
@@ -35,6 +36,14 @@ class FakePlayer implements PlayerProxy {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  // D3D11Configurator 内部使用 KernelLogger — 必须初始化
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
+
   group('D3D11Configurator', () {
     late FakePlayer player;
     late D3D11Configurator configurator;

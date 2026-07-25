@@ -1,7 +1,7 @@
-// GeneralTab — 通用设置 tab（骨架）— Phase 25 框架占位，后续阶段填充真实功能。
+// GeneralTab — 通用设置 tab — 语言切换 + 外观设置。
 //
-// 语言切换 + 外观设置，用户交互通过 pending.update() 存储，
-// 不直接调用 service 方法。
+// 语言切换使用 SpinControl（Steam 水平选择器），外观使用 Switch。
+// 用户交互通过 pending.update() 存储，不直接调用 service 方法。
 
 import 'package:flutter/material.dart';
 
@@ -12,7 +12,26 @@ import '../../../shared/section_header.dart';
 import '../../../shared/settings_card.dart';
 import '../pending_settings.dart';
 
-/// 通用设置 tab（骨架）— Phase 25 框架占位，后续阶段填充真实功能。
+/// 语言选项列表 — 与 PendingSettingsState 键 'locale' 对应
+const _localeOptions = ['zh', 'en'];
+
+/// locale 值到显示文本的映射（D-09）
+String _formatLocale(String value) {
+  return switch (value) {
+    'zh' => '中文',
+    'en' => 'English',
+    _ => value,
+  };
+}
+
+/// locale 值到选项索引的转换 — 未知值回退到 0（中文）
+int _localeToIndex(String? locale) {
+  if (locale == null) return 0;
+  final idx = _localeOptions.indexOf(locale);
+  return idx >= 0 ? idx : 0;
+}
+
+/// 通用设置 tab — 语言 SpinControl + 深色模式 Switch。
 ///
 /// 接收 [PendingSettingsState] 引用，用户交互通过 pending.update() 存储，
 /// 不直接调用 service 方法。
@@ -25,7 +44,7 @@ class GeneralTab extends StatelessWidget {
     return SingleChildScrollView(
       child: AnimatedSectionList(
       children: [
-        // 语言选择 — 毛玻璃卡片
+        // 语言选择 — 毛玻璃卡片 + SpinControl（D-08/D-09/D-10）
         GlassContainer(
           padding: const EdgeInsets.symmetric(
             horizontal: Tokens.spLg,
@@ -36,25 +55,17 @@ class GeneralTab extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SectionHeader(title: '语言', icon: Icons.language),
-              SettingRow(
+              SettingSpinRow(
+                icon: Icons.language,
                 title: '界面语言',
                 description: '选择界面显示语言',
-                control: DropdownButton<String>(
-                  value: pending.current('locale') as String? ?? 'zh',
-                  dropdownColor: Tokens.bgElevated,
-                  style: const TextStyle(
-                    color: Tokens.textPrimary,
-                    fontSize: Tokens.fontBody,
-                  ),
-                  underline: const SizedBox.shrink(),
-                  items: const [
-                    DropdownMenuItem(value: 'zh', child: Text('中文')),
-                    DropdownMenuItem(value: 'en', child: Text('English')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) pending.update('locale', v);
-                  },
+                options: _localeOptions,
+                currentIndex: _localeToIndex(
+                  pending.current('locale') as String?,
                 ),
+                onChanged: (i) =>
+                    pending.update('locale', _localeOptions[i]),
+                formatValue: _formatLocale,
               ),
             ],
           ),

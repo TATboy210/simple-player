@@ -1,3 +1,5 @@
+import '../utils/path_utils.dart';
+
 /// 播放器结构化错误 — sealed class 层级, 支持穷举模式匹配
 ///
 /// Structured player error — sealed class hierarchy with exhaustive pattern matching.
@@ -98,10 +100,12 @@ class ErrorContext {
   }) : timestamp = timestamp ?? DateTime.now();
 
   /// 序列化为 Map — 传给 KernelLogger.error(context:) 参数
+  ///
+  /// 路径脱敏：只保留文件名，防止泄露用户目录结构
   Map<String, Object?> toMap() => {
     if (action != null) 'action': action,
     if (generation != null) 'generation': generation,
-    if (path != null) 'path': path,
+    if (path != null) 'path': PathUtils.basename(path!),
     'timestamp': timestamp.toIso8601String(),
     if (module != null) 'module': module,
     if (callbackStackTrace != null)

@@ -1,8 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/utils/path_utils.dart';
 
 void main() {
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
   group('PathUtils.basename', () {
     test('Windows path with backslashes', () {
       expect(PathUtils.basename(r'C:\Videos\movie.mkv'), 'movie.mkv');

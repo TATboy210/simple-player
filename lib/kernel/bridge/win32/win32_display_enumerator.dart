@@ -16,7 +16,7 @@ import 'package:ffi/ffi.dart';
 import '../../diagnostics/kernel_logger.dart';
 import '../display_enumerator.dart';
 
-final log = KernelLogger.I;
+/// 日志门面 — Win32 显示枚举器共用。
 final logBridge = KernelLogger.I;
 
 // ─── Win32 结构体 ───

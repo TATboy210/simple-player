@@ -1,7 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/display_config.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  // DisplayConfig 顶层 log 变量访问 KernelLogger — 必须初始化
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
   group('DisplayConfig.syncModeForHz', () {
     tearDown(() => DisplayConfig.reset());
 

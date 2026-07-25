@@ -15,6 +15,7 @@ import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 ///       case NetworkError(:final code) => // 网络错误
 ///       case UnknownError(:final message) => // 未知错误
 ///     }
+///   case OpenSuperseded() => // 请求已被后续打开操作取代，不提交副作用
 /// }
 /// ```
 sealed class OpenResult {
@@ -37,4 +38,12 @@ final class OpenError extends OpenResult {
 
   /// 便捷访问错误消息
   String get message => error.message;
+}
+
+/// 打开请求已被较新的请求或引擎释放取代。
+///
+/// 调用方收到此结果后不得播放、回滚播放列表、报告错误或持久化历史，
+/// 因为这些副作用可能覆盖当前请求已经提交的状态。
+final class OpenSuperseded extends OpenResult {
+  const OpenSuperseded();
 }

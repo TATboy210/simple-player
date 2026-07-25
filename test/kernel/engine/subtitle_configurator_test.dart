@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.dart';
 import 'package:simple_player_flutter/kernel/engine/subtitle_configurator.dart';
 import 'package:simple_player_flutter/kernel/engine/player_proxy.dart';
@@ -48,6 +49,10 @@ class FakeSubtitleTrackSource implements SubtitleTrackSource {
 }
 
 void main() {
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
   group('SubtitleConfigurator', () {
     late FakePlayer player;
     late SubtitleConfigurator configurator;

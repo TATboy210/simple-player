@@ -2,7 +2,10 @@
 ///
 /// 测试 open/play/pause/seek/dispose 主路径，验证 playerFactory 注入机制。
 /// 所有测试在 headless CI 中运行，不依赖 FFI/DLL。
-import 'package:flutter/foundation.dart';
+library;
+
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
@@ -31,7 +34,12 @@ void main() {
         duration: 60000,
         video: [
           FakeVideoTrack(
-            codec: FakeCodecInfo(width: 1920, height: 1080, par: 1.0, codec: 'h264'),
+            codec: FakeCodecInfo(
+              width: 1920,
+              height: 1080,
+              par: 1.0,
+              codec: 'h264',
+            ),
           ),
         ],
         audio: [
@@ -71,6 +79,29 @@ void main() {
         await engine.open('https://example.com/video.mp4');
         expect(fake.prepareCallCount, 1);
       });
+
+      test(
+        'stops the previous native session before opening new media',
+        () async {
+          // Arrange: 首次 open 成功后状态会回到 idle，但原生 Player 仍持有媒体管线。
+          await engine.open('https://example.com/first.mp4');
+          fake.operationLog.clear();
+
+          // Act
+          await engine.open('https://example.com/second.mp4');
+
+          // Assert: 新媒体写入前必须显式停止旧原生会话。
+          expect(
+            fake.operationLog,
+            containsAllInOrder(<String>[
+              'state:MdkPlaybackState.stopped',
+              'media:https://example.com/second.mp4',
+              'prepare:https://example.com/second.mp4',
+              'updateTexture:https://example.com/second.mp4',
+            ]),
+          );
+        },
+      );
 
       test('transitions state to opening then idle on success', () async {
         final states = <MediaState>[];
@@ -113,8 +144,9 @@ void main() {
       test('handles prepare failure with error state', () async {
         fake.prepareResult = -1;
 
-        await engine.open('https://example.com/bad.mp4');
+        final result = await engine.open('https://example.com/bad.mp4');
 
+        expect(result, isA<OpenError>());
         expect(engine.state.value, MediaState.error);
         expect(engine.lastError.value, isNotNull);
       });
@@ -281,13 +313,75 @@ void main() {
         // 立即发起第二次 open（无延迟）
         fake.prepareDelay = Duration.zero;
         fake.prepareResult = 1;
-        await engine.open('https://example.com/second.mp4');
+        final latestResult = await engine.open(
+          'https://example.com/second.mp4',
+        );
+        final staleResult = await firstOpen;
 
-        await firstOpen;
-
-        // 第二次 open 的结果应该生效
+        // 旧请求是正常并发结局；只有最新请求可提交打开结果。
+        expect(staleResult, isA<OpenSuperseded>());
+        expect(latestResult, isA<OpenSuccess>());
         expect(engine.state.value, MediaState.idle);
       });
+
+      test('queues a newer open until the active prepare completes', () async {
+        final firstPrepare = Completer<int>();
+        fake.nextPrepareCompleter = firstPrepare;
+
+        final firstOpen = engine.open('https://example.com/first.mp4');
+        await Future<void>.delayed(Duration.zero);
+        expect(fake.prepareCallCount, 1);
+
+        final secondOpen = engine.open('https://example.com/second.mp4');
+        await Future<void>.delayed(Duration.zero);
+
+        try {
+          // 同一 MdkPlayer 不支持重叠 prepare；新请求必须先等待前一段原生调用结束。
+          expect(fake.prepareCallCount, 1);
+        } finally {
+          firstPrepare.complete(1);
+          final results = await Future.wait<OpenResult>([
+            firstOpen,
+            secondOpen,
+          ]);
+          expect(results.first, isA<OpenSuperseded>());
+          expect(results.last, isA<OpenSuccess>());
+        }
+      });
+
+      test(
+        'skips stale native tail work after its prepare completes',
+        () async {
+          final firstPrepare = Completer<int>();
+          fake.nextPrepareCompleter = firstPrepare;
+
+          final firstOpen = engine.open('https://example.com/first.mp4');
+          await Future<void>.delayed(Duration.zero);
+          final secondOpen = engine.open('https://example.com/second.mp4');
+
+          firstPrepare.complete(1);
+          final results = await Future.wait<OpenResult>([
+            firstOpen,
+            secondOpen,
+          ]);
+          expect(results.first, isA<OpenSuperseded>());
+          expect(results.last, isA<OpenSuccess>());
+
+          // 第一请求在 prepare 返回前已过期，不能再创建或覆盖共享纹理。
+          expect(fake.prepareCallCount, 2);
+          expect(fake.updateTextureCallCount, 1);
+          expect(
+            fake.operationLog,
+            containsAllInOrder(<String>[
+              'media:https://example.com/first.mp4',
+              'prepare:https://example.com/first.mp4',
+              'media:https://example.com/second.mp4',
+              'prepare:https://example.com/second.mp4',
+              'updateTexture:https://example.com/second.mp4',
+            ]),
+          );
+        },
+      );
     });
   });
 }

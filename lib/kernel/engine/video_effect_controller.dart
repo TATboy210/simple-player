@@ -5,7 +5,7 @@ import 'video_effect_type.dart';
 
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// Encapsulates video effect operations: brightness, contrast, hue,
 /// saturation, rotation, aspect ratio, and deinterlace.
@@ -45,15 +45,21 @@ class VideoEffectController implements VideoEffectControl {
   @override
   void rotate(int degree) {
     if (!isValidRotation(degree)) {
-      log.w('VideoEffectController.rotate invalid: $degree, expected 0/90/180/270');
+      _log.w('VideoEffectController.rotate invalid: $degree, expected 0/90/180/270');
       return;
     }
     _player.rotate(degree);
   }
 
   /// Sets video aspect ratio (e.g., 16/9 = 1.778).
+  ///
+  /// 防御：拒绝 0/负数/NaN/Infinity，防止原生层除零或渲染损坏
   @override
   void setAspectRatio(double ratio) {
+    if (ratio <= 0 || ratio.isNaN || ratio.isInfinite) {
+      _log.w('setAspectRatio: rejected invalid ratio ($ratio)');
+      return;
+    }
     _player.setAspectRatio(ratio);
   }
 

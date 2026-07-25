@@ -128,18 +128,18 @@ void main() {
         expect(engine.openCallCount, 0);
       });
 
-      test('generation guard discards stale request', () async {
+      test('latest open result determines the selected track', () async {
         engine.configureMedia(durationMs: 60000);
         playlist.add('C:/a.mp4');
         playlist.add('C:/b.mp4');
-        // Start two playIndex calls concurrently
-        final f1 = controller.playIndex(0);
-        final f2 = controller.playIndex(1);
-        await f1;
-        await f2;
-        // Last request wins
+
+        final first = controller.playIndex(0);
+        final latest = controller.playIndex(1);
+        await Future.wait<void>([first, latest]);
+
         expect(playlist.currentIndex, 1);
-        expect(controller.navigator.currentGeneration, 2);
+        expect(engine.playCallCount, 1);
+        expect(controller.currentFileName.value, 'b.mp4');
       });
     });
 

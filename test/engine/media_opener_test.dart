@@ -2,10 +2,13 @@
 ///
 /// 测试 open 流程：路径验证、prepare、metadata 解析、纹理创建。
 /// 所有测试在 headless CI 中运行，不依赖 FFI/DLL。
+library;
+
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/media_opener.dart';
-import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 import 'package:simple_player_flutter/kernel/engine/open_result.dart';
 import 'package:simple_player_flutter/kernel/engine/track_manager.dart';
 
@@ -34,7 +37,12 @@ void main() {
         duration: 120000,
         video: [
           FakeVideoTrack(
-            codec: FakeCodecInfo(width: 3840, height: 2160, par: 1.0, codec: 'hevc'),
+            codec: FakeCodecInfo(
+              width: 3840,
+              height: 2160,
+              par: 1.0,
+              codec: 'hevc',
+            ),
           ),
         ],
         audio: [
@@ -50,8 +58,14 @@ void main() {
           ),
         ],
         subtitle: [
-          FakeSubtitleTrack(index: 0, metadata: {'language': 'chi', 'title': '中文'}),
-          FakeSubtitleTrack(index: 1, metadata: {'language': 'eng', 'title': 'English'}),
+          FakeSubtitleTrack(
+            index: 0,
+            metadata: {'language': 'chi', 'title': '中文'},
+          ),
+          FakeSubtitleTrack(
+            index: 1,
+            metadata: {'language': 'eng', 'title': 'English'},
+          ),
         ],
       );
     });
@@ -75,6 +89,35 @@ void main() {
         final error = (result as OpenError).error;
         expect(error.message, contains('文件不存在'));
       });
+
+      test(
+        'does not touch the player when local validation becomes stale',
+        () async {
+          final fileExists = Completer<bool>();
+          var canContinue = true;
+          final guardedOpener = MediaOpener(
+            player,
+            trackManager,
+            fileExists: (_) => fileExists.future,
+          );
+
+          final opening = guardedOpener.open(
+            'C:\\media\\first.mp4',
+            canContinue: () => canContinue,
+          );
+          await Future<void>.delayed(Duration.zero);
+
+          // 模拟后续 open 在文件系统查询完成前取得最新 generation。
+          canContinue = false;
+          fileExists.complete(true);
+
+          expect(await opening, isA<OpenSuperseded>());
+          // FakeMdkPlayer 以空字符串表示尚未设置 media。
+          expect(player.mediaPath, isEmpty);
+          expect(player.prepareCallCount, 0);
+          expect(player.updateTextureCallCount, 0);
+        },
+      );
     });
 
     group('open - prepare', () {
@@ -95,12 +138,18 @@ void main() {
         expect(result, isA<OpenError>());
       });
 
-      test('returns error on prepare timeout', () async {
-        // 模拟超时：prepare 永不完成
-        player.prepareDelay = const Duration(seconds: 15);
-        final result = await opener.open('https://example.com/video.mp4');
+      test('waits for the native prepare future to settle', () async {
+        final prepareCompleter = Completer<int>();
+        player.nextPrepareCompleter = prepareCompleter;
+
+        final opening = opener.open('https://example.com/video.mp4');
+        await Future<void>.delayed(Duration.zero);
+        expect(player.prepareCallCount, 1);
+
+        prepareCompleter.complete(-1);
+        final result = await opening;
         expect(result, isA<OpenError>());
-      }, timeout: const Timeout(Duration(seconds: 20)));
+      });
     });
 
     group('open - metadata parsing', () {
@@ -177,15 +226,18 @@ void main() {
         expect(error.message, contains('纹理创建失败'));
       });
 
-      test('returns error when textureId is null after updateTexture', () async {
-        player.updateTextureResult = 1;
-        player.textureIdValue = null;
-        // textureIdNotifier 默认为 null
-        final result = await opener.open('https://example.com/video.mp4');
-        expect(result, isA<OpenError>());
-        final error = (result as OpenError).error;
-        expect(error.message, contains('纹理创建失败'));
-      });
+      test(
+        'returns error when textureId is null after updateTexture',
+        () async {
+          player.updateTextureResult = 1;
+          player.textureIdValue = null;
+          // textureIdNotifier 默认为 null
+          final result = await opener.open('https://example.com/video.mp4');
+          expect(result, isA<OpenError>());
+          final error = (result as OpenError).error;
+          expect(error.message, contains('纹理创建失败'));
+        },
+      );
 
       test('returns success with valid textureId', () async {
         player.textureIdValue = 42;
