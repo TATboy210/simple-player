@@ -9,8 +9,9 @@ import '../../shared/section_header.dart';
 
 /// 通用设置 tab — 语言切换 + 主题选择
 ///
-/// 接收当前选中的 locale/themeIndex（由 SettingsPanel 管理的 pending 值），
-/// 不直接修改 App 状态。用户点击时通过回调通知 SettingsPanel 更新 pending 值。
+/// 接收当前选中的 locale/themeIndex（由 SettingsPanelController.pending 管理
+/// 的 pending 值），不直接修改 App 状态。用户点击时通过回调通知 controller
+/// 更新 pending 值（延迟应用，OK/Apply 时统一 commit）。
 class GeneralTab extends StatelessWidget {
   final String currentLocale;
   final int currentThemeIndex;

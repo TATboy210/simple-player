@@ -1,6 +1,8 @@
 // SettingsButton — 设置面板底部操作按钮（TABS-03）。
 //
-// 从旧 settings_panel.dart _BottomButton 提取的公共组件。
+// 从原 settings_panel.dart _BottomButton 提取的公共组件（Phase 23 拆分；
+// Phase 28 已删除 legacy settings_panel.dart，本组件现由 SettingsOverlayShell
+// 的 _buildButtonBar 直接使用）。
 // 毛玻璃风格：bgGlass 背景 + borderHighlight 边框 + hover/press 缩放反馈。
 // primary 模式使用 accent 背景 + 白色文字。
 
