@@ -138,7 +138,8 @@ void main() {
     testWidgets(
       'title-bar drag updates dragOffset and clamps inside MediaQuery bounds',
       (tester) async {
-        // Arrange — 800×600 窗口，面板 400×300（50%），maxX=(800-400)/2=200, maxY=(600-300)/2=150
+        // Arrange — 800×600 窗口，面板 600×750（80% clamp 到 600，5:4 ratio）
+        // maxX=(800-600)/2=100, maxY=max(0,(600-750)/2)=0（面板高于窗口，垂直拖拽禁用）
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(800, 600),
@@ -155,9 +156,9 @@ void main() {
         await gesture.up();
         await tester.pump();
 
-        // Assert — dragOffset 更新且在 clamp 范围内
+        // Assert — dx=50（在 maxX=100 内），dy=0（maxY=0，垂直拖拽被禁用）
         expect(controller.state.dragOffset.value.dx, 50.0);
-        expect(controller.state.dragOffset.value.dy, 30.0);
+        expect(controller.state.dragOffset.value.dy, 0.0);
 
         // Act — 拖到超出边界
         final gesture2 = await tester.startGesture(
@@ -167,17 +168,17 @@ void main() {
         await gesture2.up();
         await tester.pump();
 
-        // Assert — 被 clamp 到 maxX=200, maxY=150
-        expect(controller.state.dragOffset.value.dx, 200.0);
-        expect(controller.state.dragOffset.value.dy, 150.0);
+        // Assert — 被 clamp 到 maxX=100, maxY=0
+        expect(controller.state.dragOffset.value.dx, 100.0);
+        expect(controller.state.dragOffset.value.dy, 0.0);
       },
     );
 
     testWidgets(
       'title-bar drag clamps correctly with undersized window (smaller than 500x400)',
       (tester) async {
-        // Arrange — 480×360 窗口，面板=240×180（50%）
-        // maxX=(480-240)/2=120, maxY=(360-180)/2=90
+        // Arrange — 480×360 窗口，面板=400×500（clamp 到 minWidth，5:4 ratio）
+        // maxX=max(0,(480-400)/2)=40, maxY=max(0,(360-500)/2)=0
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(480, 360),
@@ -194,9 +195,9 @@ void main() {
         await gesture.up();
         await tester.pump();
 
-        // Assert — 被 clamp 到小窗口的 maxX=120, maxY=90
-        expect(controller.state.dragOffset.value.dx, 120.0);
-        expect(controller.state.dragOffset.value.dy, 90.0);
+        // Assert — 被 clamp 到小窗口的 maxX=40, maxY=0
+        expect(controller.state.dragOffset.value.dx, 40.0);
+        expect(controller.state.dragOffset.value.dy, 0.0);
       },
     );
 
@@ -245,9 +246,9 @@ void main() {
     );
 
     testWidgets(
-      '625x500 window produces 312.5x250 panel (50% ratio)',
+      '625x500 window produces 500x625 panel (80% clamped to 500, 5:4 ratio)',
       (tester) async {
-        // Arrange — 625×500 → 312.5×250（50% 窗口尺寸）
+        // Arrange — 625×500 → width=625*0.8=500, height=500*5/4=625
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(625, 500),
@@ -255,19 +256,19 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板尺寸精确 312.5×250
+        // Assert — 面板尺寸精确 500×625
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 312.5);
-        expect(panelBox.height, 250.0);
+        expect(panelBox.width, 500.0);
+        expect(panelBox.height, 625.0);
       },
     );
 
     testWidgets(
-      'below-threshold window produces 50% panel with double precision',
+      'below-threshold window produces 480x600 panel (80% ratio, 5:4 height)',
       (tester) async {
-        // Arrange — 600×400 → 300×200（50% 窗口尺寸）
+        // Arrange — 600×400 → width=600*0.8=480, height=480*5/4=600
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(600, 400),
@@ -275,12 +276,12 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 宽度 300，高度 200
+        // Assert — 宽度 480，高度 600
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 300.0);
-        expect(panelBox.height, 200.0);
+        expect(panelBox.width, 480.0);
+        expect(panelBox.height, 600.0);
       },
     );
 
