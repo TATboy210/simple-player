@@ -4,7 +4,7 @@ import 'player_proxy.dart';
 import 'subtitle_config.dart';
 import 'subtitle_track_source.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// Encapsulates subtitle and audio filter configuration for a player.
 ///
@@ -63,7 +63,7 @@ class SubtitleConfigurator implements SubtitleConfig {
     try {
       return int.parse(_player.getProperty('subtitle.delay') ?? '0');
     } on Exception catch (e) {
-      log.d('SubtitleConfigurator.getSubtitleDelay parse error: $e');
+      _log.d('SubtitleConfigurator.getSubtitleDelay parse error: $e');
       return 0;
     }
   }

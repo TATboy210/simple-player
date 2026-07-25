@@ -102,7 +102,8 @@ void main() {
 
       expect(map['action'], 'open');
       expect(map['generation'], 5);
-      expect(map['path'], '/video/test.mp4');
+      // 路径脱敏：toMap() 只保留文件名
+      expect(map['path'], 'test.mp4');
       expect(map['timestamp'], '2026-01-15T10:30:00.000');
       expect(map['module'], 'FvpEngine');
       expect(map.containsKey('callbackStackTrace'), isFalse);

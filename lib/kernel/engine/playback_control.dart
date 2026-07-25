@@ -1,3 +1,5 @@
+import 'open_result.dart';
+
 /// 播放控制接口 — 核心播放操作（含打开、播放、暂停、停止、跳转、音量、倍速等控制方法）
 ///
 /// 与 [EngineStateView] 分离：此接口仅暴露控制方法，不包含状态。
@@ -12,15 +14,15 @@ abstract class PlaybackControl {
   /// 打开媒体文件
   ///
   /// requires: state ∈ {idle, opening, playing, paused, completed, error}
-  /// ensures: 成功时 state == idle 且 duration/aspectRatio 更新、lastError == null；
-  ///   调用者须随后 play() 才进入 playing（open→idle→play() 交接边界，见 D-handoff）
-  /// states: transitions to {opening, idle, error}
-  ///   （注：从 playing/paused 源态调用时，_canTransitionTo 表未收录 →opening 边，
-  ///   transitionTo 静默失败但 open() 主体仍继续执行 — 已知契约-实现落差，非本计划修复范围）
+  /// ensures: 仅最新打开请求可操作共享播放器并发布结果；成功时 state == idle、
+  ///   duration/aspectRatio 更新且 lastError == null；调用者须随后 play() 才进入 playing。
+  /// states: 旧播放会话在新请求获得播放器独占权后收敛为 idle，再进入
+  ///   opening；完成后转换为 idle 或 error。被取代的请求不发布任何状态。
   /// modifies: [state], [position], [duration], [aspectRatio], [lastError], [isBuffering]
-  /// throws: 不抛异常 — 错误经 lastError 赋 FileError(pathEmpty)/CodecError/PlaybackError/NetworkError
-  ///   并 state→error 表达（D19 行为断言，非 throwsA）
-  Future<void> open(String path);
+  /// returns: [OpenSuccess] 用于提交后续播放副作用；[OpenError] 携带结构化失败；
+  ///   [OpenSuperseded] 表示请求被新请求或释放操作取代，调用方不得提交副作用。
+  /// throws: 正常失败不会抛异常，且仍同步经 lastError + state→error 供 UI 持续观察。
+  Future<OpenResult> open(String path);
 
   /// 开始播放
   ///

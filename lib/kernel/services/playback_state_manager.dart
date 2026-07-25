@@ -19,7 +19,7 @@ import '../persistence/settings_store.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 播放状态管理器 — 设置恢复 + 断点保存 + 销毁持久化.
 ///
@@ -49,7 +49,7 @@ class PlaybackStateManager {
       _controller.engine.setVolume(s.volume);
       _controller.engine.setMute(s.isMuted);
     } on Exception catch (e) {
-      log.e('PlaybackStateManager.init load settings failed: $e');
+      _log.e('PlaybackStateManager.init load settings failed: $e');
     }
   }
 
@@ -62,7 +62,7 @@ class PlaybackStateManager {
     try {
       await PlaylistStore.loadInBackground();
     } on Exception catch (e) {
-      log.e('PlaylistStore.load migration failed: $e');
+      _log.e('PlaylistStore.load migration failed: $e');
     }
   }
 
@@ -107,21 +107,21 @@ class PlaybackStateManager {
     unawaited(
       SettingsStore.saveVolume(
         _controller.engine.volume.value,
-      ).catchError((Object e) => log.e('SettingsStore.saveVolume failed: $e')),
+      ).catchError((Object e) => _log.e('SettingsStore.saveVolume failed: $e')),
     );
     unawaited(
       SettingsStore.saveIsMuted(
         _controller.engine.isMuted.value,
-      ).catchError((Object e) => log.e('SettingsStore.saveIsMuted failed: $e')),
+      ).catchError((Object e) => _log.e('SettingsStore.saveIsMuted failed: $e')),
     );
     unawaited(
       SettingsStore.savePlayMode(
         _controller.playlist.mode.index,
-      ).catchError((Object e) => log.e('SettingsStore.savePlayMode failed: $e')),
+      ).catchError((Object e) => _log.e('SettingsStore.savePlayMode failed: $e')),
     );
     unawaited(
       PlaylistStore.dispose().catchError((Object e) {
-        log.e('PlaylistStore.dispose failed: $e');
+        _log.e('PlaylistStore.dispose failed: $e');
       }),
     );
   }

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 路径工具函数
 ///
@@ -85,7 +85,7 @@ class PathUtils {
       case TargetPlatform.macOS:
         run('open', [dir]);
       default:
-        log.w('openFileLocation: unsupported platform');
+        _log.w('openFileLocation: unsupported platform');
     }
   }
 }

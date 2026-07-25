@@ -112,7 +112,8 @@ void main() {
 
       expect(map['action'], 'open');
       expect(map['generation'], 3);
-      expect(map['path'], 'C:/video.mp4');
+      // 路径脱敏：toMap() 只保留文件名，不泄露完整路径
+      expect(map['path'], 'video.mp4');
       expect(map['module'], 'FvpEngine');
       expect(map['timestamp'], isA<String>());
       // callbackStackTrace is null → not in map

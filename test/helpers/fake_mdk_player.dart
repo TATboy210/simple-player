@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:simple_player_flutter/kernel/engine/player_proxy.dart';
 
+// ignore_for_file: unused_field
+// Fake 对象实现接口字段，测试中通过 setter 验证调用，无需读取
+
 /// 纯 Dart mdk.Player 测试替身 — 实现 [MdkPlayerLike] 接口
 ///
 /// 不 import fvp/mdk.dart，不依赖 FFI/DLL，可在 headless CI 中运行。
@@ -23,6 +26,14 @@ class FakeMdkPlayer implements MdkPlayerLike {
 
   /// prepare() 延迟 — 模拟异步加载
   Duration prepareDelay = Duration.zero;
+
+  /// 下一次 prepare() 的受控完成器 — 用于验证并发 open 不会重叠。
+  ///
+  /// 被 prepare() 读取后立即清空，使后续请求回到常规可配置行为。
+  Completer<int>? nextPrepareCompleter;
+
+  /// 调用轨迹 — 用于断言媒体切换期间的原生调用顺序。
+  final List<String> operationLog = <String>[];
 
   /// updateTexture() 返回值 — >=0 成功, <0 失败
   int updateTextureResult = 1;
@@ -71,11 +82,18 @@ class FakeMdkPlayer implements MdkPlayerLike {
   @override
   set media(String path) {
     mediaPath = path;
+    operationLog.add('media:$path');
   }
 
   @override
   Future<int> prepare() async {
     prepareCallCount++;
+    operationLog.add('prepare:$mediaPath');
+    final completer = nextPrepareCompleter;
+    nextPrepareCompleter = null;
+    if (completer != null) {
+      return completer.future;
+    }
     if (prepareDelay != Duration.zero) {
       await Future<void>.delayed(prepareDelay);
     }
@@ -88,6 +106,7 @@ class FakeMdkPlayer implements MdkPlayerLike {
   @override
   Future<int> updateTexture() async {
     updateTextureCallCount++;
+    operationLog.add('updateTexture:$mediaPath');
     if (updateTextureResult >= 0) {
       // textureIdValue 为 null 时保持 notifier 为 null（模拟纹理创建失败场景）
       textureIdNotifier.value = textureIdValue;
@@ -124,7 +143,10 @@ class FakeMdkPlayer implements MdkPlayerLike {
   // ─── MdkPlayerLike: Playback state ───
 
   @override
-  set state(dynamic value) => _state = value;
+  set state(dynamic value) {
+    _state = value;
+    operationLog.add('state:$value');
+  }
 
   @override
   dynamic get state => _state;
@@ -152,7 +174,10 @@ class FakeMdkPlayer implements MdkPlayerLike {
   int buffered() => bufferedValue;
 
   @override
-  Future<void> seek({required int position, void Function(bool)? callback}) async {
+  Future<void> seek({
+    required int position,
+    void Function(bool)? callback,
+  }) async {
     seekCallCount++;
     lastSeekPosition = position;
     if (seekDelay != Duration.zero) {
@@ -189,7 +214,11 @@ class FakeMdkPlayer implements MdkPlayerLike {
   bool bufferDrop = false;
 
   @override
-  void setBufferRange({required int min, required int max, required bool drop}) {
+  void setBufferRange({
+    required int min,
+    required int max,
+    required bool drop,
+  }) {
     bufferMin = min;
     bufferMax = max;
     bufferDrop = drop;
@@ -309,10 +338,7 @@ class FakeSubtitleTrack {
   final int index;
   final Map<String, String> metadata;
 
-  FakeSubtitleTrack({
-    this.index = 0,
-    this.metadata = const {},
-  });
+  FakeSubtitleTrack({this.index = 0, this.metadata = const {}});
 }
 
 /// 模拟 mdk 状态变化事件 — 匹配 FvpCallbackHandler.mapMdkState 的访问模式

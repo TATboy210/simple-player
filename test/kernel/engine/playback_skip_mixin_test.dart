@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/open_result.dart';
 import 'package:simple_player_flutter/kernel/engine/playback_skip_mixin.dart';
 
 /// 测试用引擎 — 混入 PlaybackSkipMixin 验证行为
@@ -21,7 +22,7 @@ class _TestEngine with PlaybackSkipMixin {
 
   // PlaybackControl 其他方法 — stub 实现
   @override
-  Future<void> open(String path) async {}
+  Future<OpenResult> open(String path) async => const OpenSuperseded();
   @override
   void play() {}
   @override

@@ -7,7 +7,7 @@ import 'subtitle_track_source.dart';
 
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// Manages audio and subtitle track selection for a media player.
 ///
@@ -49,7 +49,7 @@ class TrackManager implements TrackControl, SubtitleTrackSource {
     try {
       _player.activeAudioTracks = [trackIndex];
     } on Exception catch (e) {
-      log.e('TrackManager.switchAudioTrack error: $e');
+      _log.e('TrackManager.switchAudioTrack error: $e');
     }
   }
 
@@ -78,7 +78,7 @@ class TrackManager implements TrackControl, SubtitleTrackSource {
         _player.activeSubtitleTracks = [trackIndex];
       }
     } on Exception catch (e) {
-      log.e('TrackManager.switchSubtitleTrack error: $e');
+      _log.e('TrackManager.switchSubtitleTrack error: $e');
     }
   }
 

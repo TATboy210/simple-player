@@ -3,7 +3,7 @@ import '../diagnostics/kernel_logger.dart';
 import 'player_proxy.dart';
 import 'renderer_control.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// Encapsulates D3D11 rendering configuration for a player.
 ///
@@ -46,7 +46,7 @@ class D3D11Configurator implements RendererControl {
     _player.setProperty('videoout.buffer_frames', _maxBufferFrames);
     // 强制从关键帧开始解码，避免 seek 后出现绿帧/花屏
     _player.setProperty('reader.starts_with_key', '1');
-    log.d('D3D11Configurator: defaults applied');
+    _log.d('D3D11Configurator: defaults applied');
   }
 
   /// Enables/disables D3D11 CPU sync.
@@ -55,7 +55,7 @@ class D3D11Configurator implements RendererControl {
   @override
   void setD3d11SyncEnabled(bool enabled) {
     _player.setProperty('d3d11.sync.cpu', enabled ? '1' : '0');
-    log.d('D3D11Configurator: d3d11.sync.cpu = ${enabled ? 1 : 0}');
+    _log.d('D3D11Configurator: d3d11.sync.cpu = ${enabled ? 1 : 0}');
   }
 
   /// Switches between hardware and software decoding.
@@ -67,7 +67,7 @@ class D3D11Configurator implements RendererControl {
       'video.decoders',
       enabled ? defaultVideoDecoders : 'FFmpeg',
     );
-    log.d(
+    _log.d(
       'D3D11Configurator: video.decoders = ${enabled ? defaultVideoDecoders : "FFmpeg"}',
     );
   }

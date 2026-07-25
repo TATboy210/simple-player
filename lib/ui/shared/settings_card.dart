@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'focusable_setting_row.dart';
+import 'spin_control.dart';
 
 export 'setting_action_row.dart';
 export 'setting_slider_row.dart';
+export 'spin_control.dart';
 
 /// 设置行 — 统一的 label + control 布局，带 hover/press 交互反馈
 ///
@@ -39,7 +42,11 @@ class _SettingRowState extends State<SettingRow> {
   Widget build(BuildContext context) {
     final isActive = _hovered || _pressed;
 
-    return MouseRegion(
+    // FocusableSettingRow 提供键盘焦点边框（D-11），enabled 由 onTap 驱动：
+    // 有 onTap → 可聚焦（交互行），无 onTap → 不可聚焦（仅展示行）
+    return FocusableSettingRow(
+      enabled: widget.onTap != null,
+      child: MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() {
         _hovered = false;
@@ -106,6 +113,7 @@ class _SettingRowState extends State<SettingRow> {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -149,6 +157,70 @@ class SettingSwitchRow extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Spin 设置行 — label + SpinControl 水平选择器，包裹 SettingRow
+///
+/// 用于枚举选项的水平切换（如语言、渲染器等）。
+///
+/// ```dart
+/// SettingSpinRow(
+///   icon: Icons.language,
+///   title: '界面语言',
+///   description: '选择界面显示语言',
+///   options: ['zh', 'en'],
+///   currentIndex: 0,
+///   onChanged: (i) => pending.update('locale', ['zh', 'en'][i]),
+///   formatValue: (v) => v == 'zh' ? '中文' : 'English',
+/// )
+/// ```
+class SettingSpinRow extends StatelessWidget {
+  /// 行图标（可选）
+  final IconData? icon;
+
+  /// 行标题
+  final String title;
+
+  /// 行描述（可选）
+  final String? description;
+
+  /// 可选值列表
+  final List<String> options;
+
+  /// 当前选中索引
+  final int currentIndex;
+
+  /// 选择变更回调
+  final ValueChanged<int> onChanged;
+
+  /// 自定义值格式化器（可选）
+  final String Function(String)? formatValue;
+
+  const SettingSpinRow({
+    super.key,
+    this.icon,
+    required this.title,
+    this.description,
+    required this.options,
+    required this.currentIndex,
+    required this.onChanged,
+    this.formatValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingRow(
+      icon: icon,
+      title: title,
+      description: description,
+      control: SpinControl(
+        options: options,
+        currentIndex: currentIndex,
+        onChanged: onChanged,
+        formatValue: formatValue,
+      ),
     );
   }
 }

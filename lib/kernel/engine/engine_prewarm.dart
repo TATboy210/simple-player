@@ -3,7 +3,7 @@ import 'package:fvp/mdk.dart' as mdk;
 
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 引擎预热 — 在应用启动时提前初始化 MDK/FFmpeg 渲染上下文
 ///
@@ -66,7 +66,7 @@ class EnginePrewarm {
       onProgress?.call(1.0, 'Prewarm complete');
     } on Exception catch (e) {
       _prewarmed = false;
-      log.d('EnginePrewarm failed: $e');
+      _log.d('EnginePrewarm failed: $e');
     }
   }
 

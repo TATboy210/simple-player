@@ -92,11 +92,15 @@ class PlaylistItem {
         'PlaylistItem.path must be String, got ${path.runtimeType}',
       );
     }
+    // 类型安全转换：使用 is num 检查避免 TypeError
+    final rawTimestamp = json['timestamp'];
+    final rawPosition = json['positionMs'];
+    final rawDuration = json['durationMs'];
     return PlaylistItem(
       path: path,
-      timestamp: (json['timestamp'] as num?)?.toInt(),
-      positionMs: (json['positionMs'] as num?)?.toInt(),
-      durationMs: (json['durationMs'] as num?)?.toInt(),
+      timestamp: (rawTimestamp is num) ? rawTimestamp.toInt() : null,
+      positionMs: (rawPosition is num) ? rawPosition.toInt() : null,
+      durationMs: (rawDuration is num) ? rawDuration.toInt() : null,
     );
   }
 

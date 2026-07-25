@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/services/subtitle_service.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
@@ -11,6 +12,10 @@ import '../../helpers/fake_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
 
   late FakeEngine engine;
   late Playlist playlist;

@@ -40,6 +40,27 @@ import 'mdk_player_proxy.dart';
 ///   - 内置 EngineMetrics 性能计数器和 EngineEventLog 事件日志
 ///   - Helper 通过接口 getter 暴露（trackControl, volumeControl 等）
 ///   - [playerFactory] 支持依赖注入 — 测试时注入 FakeMdkPlayer 消除 mdk.dll 依赖
+/// Tracks uncancellable MDK operations for one queued open transaction.
+///
+/// The public result may timeout, but the next transaction must not mutate the
+/// shared player until every native Future registered here has settled.
+final class _NativeOpenDrain {
+  Future<void> _tail = Future<void>.value();
+
+  /// Adds a native operation without allowing its failure to poison the queue.
+  void track(Future<Object?> work) {
+    _tail = _tail.then<void>(
+      (_) => work.then<void>(
+        (_) {},
+        onError: (Object _, StackTrace _) {},
+      ),
+    );
+  }
+
+  /// Resolves after all registered native operations have completed.
+  Future<void> waitForSettlement() => _tail;
+}
+
 class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 工厂构造函数 — 保证所有依赖在构造时注入，消除 late 初始化风险
   ///
@@ -143,6 +164,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
 
   bool _disposed = false;
 
+  /// 共享 MDK Player 的原生 open 调用尾部。
+  ///
+  /// 每个请求在入口处保留一个独立的队列位置；前一段 native 调用结束后，
+  /// 当前任务会再次检查 generation，避免过期请求触碰共享 Player。
+  Future<void> _nativeOpenTail = Future<void>.value();
+
   // ─── 可观测性 ───
 
   /// 引擎健康指标 — 计数器在 open/play/seek/error 路径自动更新
@@ -223,7 +250,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   ///
   /// Most recent [PlayerError], or `null` if no error occurred.
   @override
-  final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
+  final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(
+    null,
+  );
 
   /// 是否正在 seek — 委托给 EngineStateMachine 管理
   ///
@@ -254,7 +283,8 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   /// 引擎生命周期阶段 — 委托给 EngineStateMachine (D6 正交生命周期)
   ///
   /// Engine lifecycle phase notifier, delegated to [EngineStateMachine].
-  ValueNotifier<LifecyclePhase> get lifecyclePhase => _stateMachine.lifecyclePhase;
+  ValueNotifier<LifecyclePhase> get lifecyclePhase =>
+      _stateMachine.lifecyclePhase;
 
   /// 状态机访问器 — PlaybackNavigator 通过此访问 generation 计数器 (D5 单一真相源)
   ///
@@ -320,21 +350,25 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: name, module: 'FvpEngine'),
       );
       lastError.value = error;
-      _bundle.logger.e('FvpEngine.$name error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e(
+        'FvpEngine.$name error',
+        context: error.context?.toMap(),
+        error: e,
+        stackTrace: st,
+      );
       eventLog.add('error', {'action': name, 'error': e.toString()});
     }
   }
 
   // ─── 播放控制 ───
 
-  /// 打开媒体文件或 URL
+  /// 打开媒体文件或 URL，并显式返回本次请求的最终结果。
   ///
-  /// Opens the media file at [path] (local path or URL).
-  /// Transitions through `opening → idle` on success or `opening → error` on failure.
-  /// Codec errors on local files trigger an automatic software-decode retry.
+  /// 每个请求在入口处获得 generation 并占用 native 队列位置。轮到执行时会
+  /// 再次验证 generation，因此被更新请求取代的任务不会触碰共享 MDK Player。
   @override
-  Future<void> open(String path) async {
-    if (_disposed) return;
+  Future<OpenResult> open(String path) async {
+    if (_disposed) return const OpenSuperseded();
 
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
@@ -349,91 +383,222 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       _bundle.logger.e('open() empty path', context: error.context?.toMap());
       metrics.recordOpen(success: false);
       eventLog.add('open', {'path': path, 'error': 'empty path'});
-      return;
+      return OpenError(error);
     }
 
-    final gen = _stateMachine.nextGeneration();
-    _stateMachine.transitionTo(MediaState.opening, 'open');
-    _currentPath = trimmed;
-    eventLog.add('open', {'path': PathUtils.basename(trimmed)});
+    final generation = _stateMachine.nextGeneration();
+    return _enqueueNativeOpen(trimmed, generation);
+  }
+
+  /// 将一次媒体打开管道排到共享 MDK Player 的前一段原生调用之后。
+  ///
+  /// 每个队列任务的错误都会被独立消费来推进队列，防止单次失败永久阻塞后续请求。
+  Future<OpenResult> _enqueueNativeOpen(String path, int generation) {
+    final previousOpen = _nativeOpenTail;
+    final nativeDrain = _NativeOpenDrain();
+    final queuedOpen = previousOpen.then(
+      (_) => _openCurrentGeneration(path, generation, nativeDrain),
+    );
+    // 调用方可在 timeout 后先拿到 OpenError；队列仍须等待原始 MDK Future。
+    _nativeOpenTail = queuedOpen
+        .then<void>((_) => nativeDrain.waitForSettlement())
+        .catchError((Object _) => nativeDrain.waitForSettlement());
+    return queuedOpen;
+  }
+
+  /// 在独占共享 MDK Player 时执行一次完整的打开流程。
+  ///
+  /// 本方法绝不递归调用公共 [open]：本地 codec 错误最多在同一队列位置内
+  /// 切换一次软件解码后重试，避免当前任务等待排在自身后方的请求。
+  Future<OpenResult> _openCurrentGeneration(
+    String path,
+    int generation,
+    _NativeOpenDrain nativeDrain,
+  ) async {
+    if (!_isCurrentGeneration(generation)) return const OpenSuperseded();
+
+    _beginOpen(path, generation);
+    var hasRetriedSoftwareDecode = false;
 
     try {
-      final result = await _mediaOpener.open(trimmed);
-      if (_disposed || gen != _stateMachine.currentGeneration) return;
+      while (_isCurrentGeneration(generation)) {
+        final result = await _mediaOpener.open(
+          path,
+          canContinue: () => _isCurrentGeneration(generation),
+          onNativeWorkStarted: nativeDrain.track,
+        );
+        if (!_isCurrentGeneration(generation)) return const OpenSuperseded();
 
-      _bundle.logger.d('open result: ${result.runtimeType}', context: {'file': PathUtils.basename(trimmed)});
+        _bundle.logger.d(
+          'open result: ${result.runtimeType}',
+          context: {'file': PathUtils.basename(path)},
+        );
 
-      switch (result) {
-        case OpenSuccess(:final mediaInfo):
-          duration.value = mediaInfo.duration;
-          final video = mediaInfo.video;
-          if (video != null && video.width > 0 && video.height > 0) {
-            aspectRatio.value = (video.width * video.par) / video.height;
-          }
-          position.value = 0;
-          _stateMachine.transitionTo(MediaState.idle, 'open');
-          lastError.value = null;
-          metrics.recordOpen(success: true);
-          _bundle.logger.i(
-            'open() success — ${PathUtils.basename(trimmed)} '
-            '${video?.width}x${video?.height} '
-            '${mediaInfo.duration}ms',
-          );
-        case OpenError(:final error):
-          if (error is CodecError && !PathValidator.isUrl(trimmed)) {
-            _bundle.logger.i('open() codec error — retrying with software decode');
-            eventLog.add('fallback', {
-              'reason': 'codec error',
-              'action': 'switch to software decode',
-            });
-            _d3d11Configurator.setHardwareDecoding(false);
-            await open(trimmed);
-            return;
-          }
-          _stateMachine.transitionTo(MediaState.error, 'open');
-          error.context ??= ErrorContext(
-            action: 'open',
-            generation: gen,
-            path: trimmed,
-            module: 'MediaOpener',
-          );
-          lastError.value = error;
-          metrics.recordOpen(success: false);
-          _bundle.logger.e(
-            'open() error — ${PathUtils.basename(trimmed)}',
-            context: error.context?.toMap(),
-          );
+        switch (result) {
+          case OpenSuccess(:final mediaInfo):
+            _publishOpenSuccess(path, generation, mediaInfo);
+            return OpenSuccess(mediaInfo);
+          case OpenError(:final error):
+            if (error is CodecError &&
+                !PathValidator.isUrl(path) &&
+                !hasRetriedSoftwareDecode) {
+              // 仅重试一次，防止持续 codec 错误使调用栈或 native 队列无限增长。
+              hasRetriedSoftwareDecode = true;
+              _bundle.logger.i(
+                'open() codec error — retrying with software decode',
+              );
+              eventLog.add('fallback', {
+                'reason': 'codec error',
+                'action': 'switch to software decode',
+              });
+              _d3d11Configurator.setHardwareDecoding(false);
+              continue;
+            }
+            _publishOpenError(path, generation, error);
+            return OpenError(error);
+          case OpenSuperseded():
+            return const OpenSuperseded();
+        }
       }
-    } on Exception catch (e, st) {
-      if (_disposed || gen != _stateMachine.currentGeneration) return;
-      _stateMachine.transitionTo(MediaState.error, 'open');
-      final error = PathValidator.isUrl(trimmed)
-          ? NetworkError(
-              NetworkErrorCode.timeout,
-              '无法打开: ${PathUtils.basename(path)}',
-              e,
-              ErrorContext(action: 'open', generation: gen, path: trimmed, module: 'FvpEngine'),
-            )
-          : PlaybackError(
-              PlaybackErrorCode.playFailed,
-              '无法打开: ${PathUtils.basename(path)}',
-              e,
-              ErrorContext(action: 'open', generation: gen, path: trimmed, module: 'FvpEngine'),
-            );
-      lastError.value = error;
-      _bundle.logger.e(
-        'open() error — ${PathUtils.basename(trimmed)}',
-        context: error.context?.toMap(),
-        error: e,
-        stackTrace: st,
+      return const OpenSuperseded();
+    } on Exception catch (error, stackTrace) {
+      if (!_isCurrentGeneration(generation)) return const OpenSuperseded();
+      final playerError = _publishOpenException(
+        path,
+        generation,
+        error,
+        stackTrace,
       );
-      metrics.recordOpen(success: false);
-      eventLog.add('error', {'action': 'open', 'error': e.toString()});
+      return OpenError(playerError);
     } finally {
-      if (gen == _stateMachine.currentGeneration) {
+      if (_isCurrentGeneration(generation)) {
         isBuffering.value = false;
       }
     }
+  }
+
+  /// Returns whether this queued task may still publish state or use the player.
+  bool _isCurrentGeneration(int generation) =>
+      !_disposed && generation == _stateMachine.currentGeneration;
+
+  /// Stops and resets the prior native session before opening new media.
+  ///
+  /// An idle Dart state can still retain a prepared MDK pipeline, so every
+  /// queued request sends `stopped` before assigning a new media source.
+  void _beginOpen(String path, int generation) {
+    _player.state = MdkPlaybackState.stopped;
+    _positionPoller.stop();
+    position.value = 0;
+
+    // `opening` can belong to a superseded request. Converge every non-idle
+    // public state first so the state machine permits the next opening phase.
+    if (state.value != MediaState.idle) {
+      _stateMachine.transitionTo(
+        MediaState.idle,
+        'open.reset',
+        generation: generation,
+      );
+    }
+    _stateMachine.transitionTo(
+      MediaState.opening,
+      'open',
+      generation: generation,
+    );
+    _currentPath = path;
+    eventLog.add('open.stopPrevious', {
+      'path': PathUtils.basename(path),
+      'generation': generation,
+    });
+  }
+
+  /// Publishes the observable state for a successfully opened current generation.
+  void _publishOpenSuccess(String path, int generation, MediaInfo mediaInfo) {
+    if (!_isCurrentGeneration(generation)) return;
+
+    duration.value = mediaInfo.duration;
+    final video = mediaInfo.video;
+    if (video != null && video.width > 0 && video.height > 0) {
+      aspectRatio.value = (video.width * video.par) / video.height;
+    }
+    position.value = 0;
+    _stateMachine.transitionTo(MediaState.idle, 'open', generation: generation);
+    lastError.value = null;
+    metrics.recordOpen(success: true);
+    _bundle.logger.i(
+      'open() success — ${PathUtils.basename(path)} '
+      '${video?.width}x${video?.height} '
+      '${mediaInfo.duration}ms',
+    );
+  }
+
+  /// Publishes a typed opening failure for the still-current generation.
+  void _publishOpenError(String path, int generation, PlayerError error) {
+    if (!_isCurrentGeneration(generation)) return;
+
+    _stateMachine.transitionTo(
+      MediaState.error,
+      'open',
+      generation: generation,
+    );
+    error.context ??= ErrorContext(
+      action: 'open',
+      generation: generation,
+      path: path,
+      module: 'MediaOpener',
+    );
+    lastError.value = error;
+    metrics.recordOpen(success: false);
+    _bundle.logger.e(
+      'open() error — ${PathUtils.basename(path)}',
+      context: error.context?.toMap(),
+    );
+  }
+
+  /// Converts unexpected opening exceptions to a user-visible typed error.
+  PlayerError _publishOpenException(
+    String path,
+    int generation,
+    Exception exception,
+    StackTrace stackTrace,
+  ) {
+    _stateMachine.transitionTo(
+      MediaState.error,
+      'open',
+      generation: generation,
+    );
+    final error = PathValidator.isUrl(path)
+        ? NetworkError(
+            NetworkErrorCode.timeout,
+            '无法打开: ${PathUtils.basename(path)}',
+            exception,
+            ErrorContext(
+              action: 'open',
+              generation: generation,
+              path: path,
+              module: 'FvpEngine',
+            ),
+          )
+        : PlaybackError(
+            PlaybackErrorCode.playFailed,
+            '无法打开: ${PathUtils.basename(path)}',
+            exception,
+            ErrorContext(
+              action: 'open',
+              generation: generation,
+              path: path,
+              module: 'FvpEngine',
+            ),
+          );
+    lastError.value = error;
+    _bundle.logger.e(
+      'open() error — ${PathUtils.basename(path)}',
+      context: error.context?.toMap(),
+      error: exception,
+      stackTrace: stackTrace,
+    );
+    metrics.recordOpen(success: false);
+    eventLog.add('error', {'action': 'open', 'error': exception.toString()});
+    return error;
   }
 
   /// 开始播放
@@ -463,7 +628,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'play', module: 'FvpEngine'),
       );
       lastError.value = error;
-      _bundle.logger.e('play() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e(
+        'play() error',
+        context: error.context?.toMap(),
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
@@ -487,7 +657,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'pause', module: 'FvpEngine'),
       );
       lastError.value = error;
-      _bundle.logger.e('pause() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e(
+        'pause() error',
+        context: error.context?.toMap(),
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
@@ -512,7 +687,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'stop', module: 'FvpEngine'),
       );
       lastError.value = error;
-      _bundle.logger.e('stop() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e(
+        'stop() error',
+        context: error.context?.toMap(),
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
@@ -545,7 +725,12 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
         ErrorContext(action: 'seek', module: 'FvpEngine'),
       );
       lastError.value = error;
-      _bundle.logger.e('seekTo() error', context: error.context?.toMap(), error: e, stackTrace: st);
+      _bundle.logger.e(
+        'seekTo() error',
+        context: error.context?.toMap(),
+        error: e,
+        stackTrace: st,
+      );
       position.value = _player.position;
       eventLog.add('error', {'action': 'seek', 'error': e.toString()});
     } finally {
@@ -688,6 +873,11 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   @override
   void setExternalSubtitle(String path) {
     _guardedAction('setExternalSubtitle', () {
+      // 防御纵深：验证路径安全性，防止路径遍历攻击
+      if (PathValidator.isPathTraversal(path)) {
+        debugPrint('[FvpEngine] setExternalSubtitle: rejected unsafe path');
+        return;
+      }
       _subtitleConfigurator.setExternalSubtitle(path);
     });
   }
@@ -817,6 +1007,8 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    // 使尚未开始的队列任务失效；已经进入原生调用的 Future 无法由 Dart 取消。
+    _stateMachine.nextGeneration();
 
     assert(() {
       final notifiers = {
@@ -834,7 +1026,9 @@ class FvpEngine implements MediaEngine, SubtitleConfig {
       for (final entry in notifiers.entries) {
         // ignore: invalid_use_of_protected_member
         if (entry.value.hasListeners) {
-          _bundle.logger.w('FvpEngine.dispose: ${entry.key} still has listeners');
+          _bundle.logger.w(
+            'FvpEngine.dispose: ${entry.key} still has listeners',
+          );
         }
       }
       return true;

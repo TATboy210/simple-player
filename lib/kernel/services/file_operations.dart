@@ -14,7 +14,7 @@ import '../services/path_validator.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 文件操作服务 — 文件打开和批量添加
 ///
@@ -84,7 +84,7 @@ class FileOperations {
       try {
         await _controller.navigator.playIndex(0);
       } on Exception catch (e) {
-        log.e('addFiles: playIndex(0) failed: $e');
+        _log.e('addFiles: playIndex(0) failed: $e');
         validationError.value = e.toString();
       }
     } else if (addedCount > 0) {

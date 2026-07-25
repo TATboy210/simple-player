@@ -14,7 +14,7 @@ import '../engine/engine_state.dart';
 import '../utils/path_utils.dart';
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+late final _log = KernelLogger.I;
 
 /// 字幕服务 — 外挂字幕自动检测与管理
 ///
@@ -59,7 +59,7 @@ class SubtitleService {
         }
       }
     } on Exception catch (e) {
-      log.d('SubtitleService.detectAndLoad error: $e');
+      _log.d('SubtitleService.detectAndLoad error: $e');
     }
   }
 
@@ -82,7 +82,7 @@ class SubtitleService {
         }
       }
     } on Exception catch (e) {
-      log.d('SubtitleService.detectAndLoadSync error: $e');
+      _log.d('SubtitleService.detectAndLoadSync error: $e');
     }
   }
 

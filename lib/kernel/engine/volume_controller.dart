@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 
+import '../diagnostics/kernel_logger.dart';
 import 'player_proxy.dart';
 import 'volume_control.dart';
+
+late final _log = KernelLogger.I;
 
 /// Manages volume and mute state for a player.
 ///
@@ -24,6 +27,11 @@ class VolumeController implements VolumeControl {
   /// Auto-mutes at zero, auto-unmutes when raised from zero.
   @override
   void setVolume(double value) {
+    // 防御：拒绝 NaN/Infinity，防止传播到原生层
+    if (value.isNaN || value.isInfinite) {
+      _log.w('setVolume: rejected invalid value ($value)');
+      return;
+    }
     final clamped = value.clamp(0.0, 1.0);
     _player.volume = clamped;
     volume.value = clamped;

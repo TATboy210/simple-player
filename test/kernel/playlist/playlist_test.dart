@@ -1,9 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 
 void main() {
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
   group('Playlist', () {
     late Playlist playlist;
 

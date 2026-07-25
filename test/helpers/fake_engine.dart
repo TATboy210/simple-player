@@ -57,7 +57,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
 
   @override
-  final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(null);
+  final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(
+    null,
+  );
 
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
@@ -92,6 +94,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   /// When set, the next open() will simulate an error after loading.
   String? failNextOpenWith;
 
+  /// When true, seekTo() throws an Exception to simulate seek failure.
+  bool seekToShouldThrow = false;
+
   // ─── Call tracking for new Phase 3 methods ───
 
   int seekToCallCount = 0;
@@ -118,7 +123,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   // ─── Playback control ───
 
   /// 生命周期阶段 — 委托给 stateMachine (Phase 20 D6 正交生命周期)
-  ValueNotifier<LifecyclePhase> get lifecyclePhase => stateMachine.lifecyclePhase;
+  ValueNotifier<LifecyclePhase> get lifecyclePhase =>
+      stateMachine.lifecyclePhase;
 
   /// 从 error 状态恢复 — 委托给 stateMachine (Phase 20 D7)
   void recover() {
@@ -126,22 +132,25 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   }
 
   @override
-  Future<void> open(String path) async {
-    if (_disposed) return;
+  Future<OpenResult> open(String path) async {
+    if (_disposed) return const OpenSuperseded();
     openCallCount++;
     openPaths.add(path);
     final gen = stateMachine.nextGeneration();
     stateMachine.transitionTo(MediaState.opening, 'fake.open');
     await Future<void>.value();
-    // generation 不匹配或已 dispose → 丢弃结果
-    if (_disposed || gen != stateMachine.currentGeneration) return;
+    // generation 不匹配或已 dispose 时，调用方不得提交过期请求的副作用。
+    if (_disposed || gen != stateMachine.currentGeneration) {
+      return const OpenSuperseded();
+    }
 
-    if (failNextOpenWith != null) {
-      final msg = failNextOpenWith!;
+    final failureMessage = failNextOpenWith;
+    if (failureMessage != null) {
       failNextOpenWith = null;
+      final error = UnknownError(failureMessage);
       stateMachine.transitionTo(MediaState.error, 'fake.open.error');
-      lastError.value = UnknownError(msg);
-      return;
+      lastError.value = error;
+      return OpenError(error);
     }
 
     duration.value = _mediaInfo.duration;
@@ -149,6 +158,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     lastError.value = null;
     // open 成功后回到 idle — 匹配 FvpEngine.open() 行为
     stateMachine.transitionTo(MediaState.idle, 'fake.open.success');
+    return OpenSuccess(_mediaInfo);
   }
 
   @override
@@ -178,6 +188,10 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     seekToCallCount++;
     lastSeekToMs = milliseconds;
+    if (seekToShouldThrow) {
+      seekToShouldThrow = false; // one-shot
+      throw Exception('simulated seek failure');
+    }
     final clamped = milliseconds.clamp(0, duration.value);
     position.value = clamped;
   }

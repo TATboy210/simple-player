@@ -1,7 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/startup/startup_coordinator.dart';
 
 void main() {
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
   group('StartupCoordinator', () {
     late StartupCoordinator coordinator;
 

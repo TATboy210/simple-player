@@ -16,7 +16,7 @@ import 'window_mode.dart';
 import 'window_persistence.dart';
 import 'window_state.dart';
 
-final log = KernelLogger.I;
+/// 日志门面 — WindowService 共用。
 final logBridge = KernelLogger.I;
 
 /// Window management service - thin coordinator combining responsibility components.

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:logger/logger.dart' hide PrefixPrinter, JsonPrinter;
+import 'package:logger/logger.dart' hide PrefixPrinter;
 import 'package:simple_player_flutter/kernel/utils/log.dart';
 
 void main() {

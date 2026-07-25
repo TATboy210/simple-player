@@ -1,12 +1,17 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/persistence/playlist_store.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() {
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
 
   late Directory tempDir;
 

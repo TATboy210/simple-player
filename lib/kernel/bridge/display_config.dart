@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
 
-final log = KernelLogger.I;
+/// 日志门面 — DisplayConfig 和 Bridge 层共用。
 final logBridge = KernelLogger.I;
 
 /// Refresh-rate-aware D3D11 sync mode policy.

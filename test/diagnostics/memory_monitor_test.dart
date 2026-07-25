@@ -440,7 +440,6 @@ void main() {
       );
 
       await Future<void>.delayed(const Duration(milliseconds: 80));
-      final countBefore = monitor.snapshot()!.history.length;
 
       monitor.dispose();
 

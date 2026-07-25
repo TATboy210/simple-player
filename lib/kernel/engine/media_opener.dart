@@ -28,22 +28,48 @@ import 'track_manager.dart';
 class MediaOpener {
   final MdkPlayerLike _player;
   final TrackManager _trackManager;
-
-  static const _prepareTimeoutSeconds = 10;
-  static const _textureTimeoutSeconds = 5;
+  final Future<bool> Function(File file) _fileExists;
 
   // 本地文件缓冲参数 — 紧凑配置，减少内存占用
   static const _localBufferMinMs = 500; // 默认 1000
   static const _localBufferMaxMs = 2000; // 默认 4000
 
-  MediaOpener(this._player, this._trackManager);
+  // 防止 MDK 原生调用挂起后永久阻塞后续媒体打开请求。
+  static const _prepareTimeout = Duration(seconds: 10);
+  static const _textureTimeout = Duration(seconds: 5);
+  static const _timeoutResult = -99;
+
+  /// Creates a one-shot native open pipeline.
+  ///
+  /// [fileExists] is injectable so lifecycle tests can pause local path
+  /// validation without relying on a real filesystem or wall-clock delays.
+  MediaOpener(
+    this._player,
+    this._trackManager, {
+    Future<bool> Function(File file)? fileExists,
+  }) : _fileExists = fileExists ?? _defaultFileExists;
+
+  /// Uses the platform filesystem for production local-path validation.
+  static Future<bool> _defaultFileExists(File file) => file.exists();
 
   /// 打开媒体文件或 URL.
+  ///
+  /// [canContinue] 会在 native await 后确认调用者仍拥有共享 Player；返回
+  /// `false` 时立即结束，避免已过期的请求继续更新轨道或创建纹理。
   ///
   /// Opens a media file or URL. Caller checks [OpenResult] type:
   /// - [OpenSuccess]: ready to play.
   /// - [OpenError]: contains typed error and message.
-  Future<OpenResult> open(String path) async {
+  /// - [OpenSuperseded]: a newer request replaced this one; do not commit side effects.
+  ///
+  /// [onNativeWorkStarted] receives each uncancellable MDK Future before its
+  /// caller-facing timeout is applied. The engine uses it to keep the shared
+  /// native queue blocked until the underlying operation has actually settled.
+  Future<OpenResult> open(
+    String path, {
+    bool Function()? canContinue,
+    void Function(Future<Object?> work)? onNativeWorkStarted,
+  }) async {
     // ─── 路径验证 ───
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
@@ -57,17 +83,33 @@ class MediaOpener {
       );
     }
 
+    // 防御纵深：验证路径安全性（即使上游已验证）
+    if (!PathValidator.isUrl(trimmed) && PathValidator.isPathTraversal(trimmed)) {
+      return OpenError(
+        FileError(
+          FileErrorCode.pathTraversal,
+          '路径不安全: ${PathUtils.basename(trimmed)}',
+          null,
+          ErrorContext(action: 'open', path: trimmed, module: 'MediaOpener'),
+        ),
+      );
+    }
+
     // 非 URL 路径检查文件是否存在
     if (!PathValidator.isUrl(trimmed)) {
       try {
         final file = File(trimmed);
-        if (!await file.exists()) {
+        if (!await _fileExists(file)) {
           return OpenError(
             FileError(
               FileErrorCode.fileNotFound,
               '文件不存在: ${PathUtils.basename(trimmed)}',
               null,
-              ErrorContext(action: 'open', path: trimmed, module: 'MediaOpener'),
+              ErrorContext(
+                action: 'open',
+                path: trimmed,
+                module: 'MediaOpener',
+              ),
             ),
           );
         }
@@ -83,6 +125,9 @@ class MediaOpener {
       }
     }
 
+    // 文件系统查询也是异步边界；过期请求不可重新进入共享 Player。
+    if (canContinue?.call() == false) return const OpenSuperseded();
+
     // ─── Prepare ───
     _player.media = trimmed;
 
@@ -92,21 +137,48 @@ class MediaOpener {
       _configureLocalBuffer();
     }
 
-    final prepareResult = await _player.prepare().timeout(
-      const Duration(seconds: _prepareTimeoutSeconds),
-      onTimeout: () => -99,
+    // timeout 只能结束调用方等待，不能取消 MDK；将原始 Future 交给引擎 drain。
+    final prepareWork = _player.prepare();
+    onNativeWorkStarted?.call(prepareWork);
+    final prepareResult = await prepareWork.timeout(
+      _prepareTimeout,
+      onTimeout: () => _timeoutResult,
     );
+    if (canContinue?.call() == false) return const OpenSuperseded();
     if (prepareResult < 0) {
-      final isTimeout = prepareResult == -99;
-      final ctx = ErrorContext(action: 'prepare', path: trimmed, module: 'MediaOpener');
-      final PlayerError error;
-      if (isTimeout) {
-        error = PathValidator.isUrl(trimmed)
-            ? NetworkError(NetworkErrorCode.timeout, '打开超时: ${PathUtils.basename(trimmed)}', null, ctx)
-            : FileError(FileErrorCode.fileNotFound, '打开超时: ${PathUtils.basename(trimmed)}', null, ctx);
-      } else {
-        error = CodecError(CodecErrorCode.decodeFailed, '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)', null, ctx);
-      }
+      final isTimeout = prepareResult == _timeoutResult;
+      final error = isTimeout
+          ? PathValidator.isUrl(trimmed)
+                ? NetworkError(
+                    NetworkErrorCode.timeout,
+                    '打开超时: ${PathUtils.basename(trimmed)}',
+                    null,
+                    ErrorContext(
+                      action: 'prepare',
+                      path: trimmed,
+                      module: 'MediaOpener',
+                    ),
+                  )
+                : PlaybackError(
+                    PlaybackErrorCode.playFailed,
+                    '打开超时: ${PathUtils.basename(trimmed)}',
+                    null,
+                    ErrorContext(
+                      action: 'prepare',
+                      path: trimmed,
+                      module: 'MediaOpener',
+                    ),
+                  )
+          : CodecError(
+              CodecErrorCode.decodeFailed,
+              '无法解码: ${PathUtils.basename(trimmed)} (code: $prepareResult)',
+              null,
+              ErrorContext(
+                action: 'prepare',
+                path: trimmed,
+                module: 'MediaOpener',
+              ),
+            );
       return OpenError(error);
     }
 
@@ -147,12 +219,17 @@ class MediaOpener {
     _trackManager.updateMediaInfo(mediaInfo);
 
     // ─── 纹理创建 ───
-    final textureResult = await _player.updateTexture().timeout(
-      const Duration(seconds: _textureTimeoutSeconds),
-      onTimeout: () => -99,
+    // D3D11 纹理调用也必须有安全阀；原始 Future 仍由引擎队列 drain。
+    final textureWork = _player.updateTexture();
+    onNativeWorkStarted?.call(textureWork);
+    final textureResult = await textureWork.timeout(
+      _textureTimeout,
+      onTimeout: () => _timeoutResult,
     );
+    if (canContinue?.call() == false) return const OpenSuperseded();
     if (textureResult < 0) {
-      final message = textureResult == -99
+      final isTimeout = textureResult == _timeoutResult;
+      final message = isTimeout
           ? '纹理创建超时: ${PathUtils.basename(trimmed)}'
           : '纹理创建失败: ${PathUtils.basename(trimmed)}';
       return OpenError(
