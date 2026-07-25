@@ -218,6 +218,16 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **未提交**：ROADMAP.md + STATE.md(M) + REQUIREMENTS.md（Traceability 已在 Step 9 预填，无需改动）待 orchestrator 呈批批准后提交。建议 commit message: `docs: roadmap v4.5 — 7 phases (28-34) settings panel redesign + audio backfill`。
 - **下一步**：呈批 → 批准后提交 → `/clear` → `/gsd-plan-phase 28`（Phase 28 规划，新上下文窗口，纯 refactor 无需 research-phase）。
 
+### 2026-07-25 Phase 28 planning complete (paused for execute, context 71%)
+
+- **规划完整闭环**：planner(opus) `## PLANNING COMPLETE` → checker(sonnet) `## VERIFICATION PASSED` 14/14 → 3 gates (需求门 REFAC-01/02 ✓, 决策门 N/A 无 CONTEXT.md, STATE.md planned-phase ✓)。Step 12 revision loop 跳过 (checker PASSED)。
+- **commit `3f99f6e`** (`docs(28): create phase plan`): 28-01-PLAN.md (203 行, new) + STATE.md + ROADMAP.md。工作树干净。amend 自 planner 的 `e8f5139` (未 push, amend 安全)。
+- **28-01-PLAN.md 结构**: 1 plan / 1 wave / 3 tasks / 8 files, tracer-first (Task 1 `type="tracer"` extract tab_strip.dart 端到端 → Task 2 extract tab_content+panel_key_bindings → Task 3 delete settings_panel + migrate callers + grep gate)。每 task 有 read_first + acceptance_criteria + concrete action (无 fenced code)。
+- **checker live verification**: `grep -rn "SettingsPanel(" lib/ test/` 只返回 legacy class declaration (无外部生产调用者, Task 3 删除安全); 6 test files 存在; settings_overlay_shell.dart=517 行, settings_panel.dart=945 行。
+- **跳过的 plan:pre 门控**: pattern-mapper (has_context=false AND has_research=false), intel API-SURFACE (纯重构 planner 直读源文件), specless probe (EDGE_ABSENT, ROADMAP 3 成功标准派生 must_haves), research (纯重构标准模式)。
+- **上下文 71% 暂停**: 用户选 checkpoint-then-resume (Phase 15/16 验证模式)。auto_advance=true 但 29% 剩余不足以 spawn execute-phase 28 (动 lib/, 长寿命 subagent)。
+- **下一步**: `/clear` → `/gsd-execute-phase 28` (新上下文窗口)。execute-phase 会读 28-01-PLAN.md + STATE.md, 创建 lib/ui/dialogs/settings/tab_strip.dart + tab_content.dart + panel_key_bindings.dart, 删除 lib/ui/dialogs/settings_panel.dart, 跑 flutter test 验证零行为改变。
+
 ## Operator Next Steps
 
 - Start the next milestone with /gsd-new-milestone
