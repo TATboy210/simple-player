@@ -14,9 +14,9 @@ plan_count: 4
 
 | Plan ID | Objective | Wave | Depends On | Requirements | Type |
 |---------|-----------|------|------------|--------------|------|
-| 30-01 | Deliver the production tracer: render the strict 16:9 settings overlay using the locked min/clamp formula, open on General at index 3 in the locked seven-tab sequence, and prove one real work-area-clamped drag path through the existing `DisplayEnumerator` seam. | 1 | — | LAYOUT-01, LAYOUT-02, LAYOUT-03, LAYOUT-05 | tracer |
-| 30-02 | Expand and harden the multi-monitor behavior with drag-session window-position caching, per-frame work-area bounds, null/FFI fallback to the existing symmetric clamp, and resize re-clamping. | 2 | 30-01 | LAYOUT-03 | expansion |
-| 30-03 | Create the Phase 30 structural color route by making the title bar, tab strip, content, and button bar consume the single `Tokens.panelSectionBg = Tokens.bgGlass` alias, without taking Phase 31 chrome work. | 2 | 30-01 | LAYOUT-04 | expansion |
+| 30-01 | Deliver the production tracer: render the strict 16:9 settings overlay using the locked min/clamp formula, open on General at index 3 in the locked seven-tab sequence, and prove one real work-area-clamped drag path through the existing `DisplayEnumerator` seam. | 1 | — | LAYOUT-01, LAYOUT-02, LAYOUT-03, LAYOUT-04 | tracer |
+| 30-02 | Expand and harden the multi-monitor behavior with drag-session window-position caching, per-frame work-area bounds, null/FFI fallback to the existing symmetric clamp, and resize re-clamping. | 2 | 30-01 | LAYOUT-04 | expansion |
+| 30-03 | Create the Phase 30 structural color route by making the title bar, tab strip, content, and button bar consume the single `Tokens.panelSectionBg = Tokens.bgGlass` alias, without taking Phase 31 chrome work. | 2 | 30-01 | LAYOUT-05 | expansion |
 | 30-04 | Re-baseline the complete widget-test contract for 16:9 geometry, General-default tab ordering, work-area/fallback/resize clamp behavior, and all-four-section token unification. | 3 | 30-02, 30-03 | LAYOUT-01, LAYOUT-02, LAYOUT-03, LAYOUT-04, LAYOUT-05 | expansion |
 
 ## Notes
