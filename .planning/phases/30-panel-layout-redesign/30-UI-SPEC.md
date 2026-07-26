@@ -220,25 +220,34 @@ constraint: workArea edges ∓ panel half-size
 
 ## UI Considerations
 
-> State coverage for this layout refactor. Probe (Step 9.5) may replace rows on re-run.
+> State coverage for this layout refactor. Resolved via `ui-consideration-probe.cjs` (Step 9.5) + researcher-authored interaction states. Idempotent — rows are REPLACED on a probe re-run.
 
-Applicable state considerations resolved: 5 covered, 2 backstop, 0 unresolved
+Applicable state considerations resolved: **10 covered, 4 backstop, 0 unresolved, 18 dismissed (N/A for static settings tabs), 1 unclassified (manual-review)**.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| empty | settings panel | ✅ covered | Panel closed = overlay subtree not built; tabs always populated — no empty-data state exists |
-| drag-clamped | title bar drag (multi-monitor) | ✅ covered | Real-time workArea clamp per drag frame (D-03); conversion formula locked in Clamp Contract; fake-DisplayEnumerator widget test (Wave 0) |
-| drag-fallback | headless / null DisplayInfo | ✅ covered | Null resolver → existing symmetric MediaQuery clamp; keeps 10 existing test files constructible with zero ctor changes |
-| resize | window resize while panel open | ✅ covered | D-05 `didChangeDependencies` post-frame re-clamp of illegal `dragOffset`; Wave 0 test pumps size A → smaller size B and asserts re-clamp |
-| tab-select on open | controller reset | ✅ covered | `open()` resets `selectedTab` to `SettingsPanelController.defaultTabIndex` (3 = General); re-baselined shell tests assert 3 |
-| overflow | tab strip at `panelMinWidth` 400 | 🧪 backstop | 7 `Expanded` slots × inner 80px `SettingsNavItem` at 400px width — pre-existing since Phase 27 (min width unchanged); compact mode (font 12 / spacing 8) active below `breakpointResponsive`; visual check only, not regressed by this phase |
-| long-text | tab labels (Chinese, 2-3 chars) | 🧪 backstop | 14px normal / 12px compact labels in ~57-80px slots; no truncation path; visual check only |
+| empty | settings panel (E1/E2/E5/E6) | ✅ covered | Panel closed = overlay subtree not built; tabs always populated — no empty-data state exists |
+| populated | tab strip / nav / content (E2/E5/E6) | ✅ covered | Normal happy-path: 7 static tabs with fixed content; implicit in `IndexedStack` 7-child explicit structure |
+| drag-clamped | title bar drag multi-monitor (E3) | ✅ covered | Real-time workArea clamp per drag frame (D-03); conversion formula locked in Clamp Contract; fake-`DisplayEnumerator` widget test (Wave 0) |
+| drag-fallback | headless / null DisplayInfo (E3) | ✅ covered | Null resolver → existing symmetric `MediaQuery` clamp; keeps 10 existing test files constructible with zero ctor changes |
+| resize | window resize while panel open (E6) | ✅ covered | D-05 `didChangeDependencies` post-frame re-clamp of illegal `dragOffset`; Wave 0 test pumps size A → smaller size B and asserts re-clamp |
+| tab-select on open | controller reset (E6) | ✅ covered | `open()` resets `selectedTab` to `SettingsPanelController.defaultTabIndex` (3 = General); re-baselined shell tests assert 3 |
+| overflow | tab strip at `panelMinWidth` 400 (E2/E5) | 🧪 backstop | 7 `Expanded` slots × inner 80px `SettingsNavItem` at 400px width — pre-existing since Phase 27 (min width unchanged); compact mode (font 12 / spacing 8) active below `breakpointResponsive`; visual check only, not regressed by this phase |
+| long-text | tab labels Chinese 2-3 chars (E2/E5) | 🧪 backstop | 14px normal / 12px compact labels in ~57-80px slots; no truncation path; visual check only |
+| overflow | title bar / button bar / tab content (E3/E4/E6) | ✗ dismissed | Fixed-height/short-string containers (「设置」 title 2 chars, 3 fixed CTAs 2 chars each, tab content scrollable) — no overflow path; N/A |
+| long-text | title bar / button bar / tab content (E3/E4/E6) | ✗ dismissed | 「设置」 2 chars, 取消/应用/确定 2 chars each; tab content scrollable by default Flutter pattern — no truncation surface; N/A |
+| loading | tab strip / nav / content (E2/E5/E6) | ✗ dismissed | Settings tabs are static content (no async load, no skeleton/spinner state); N/A |
+| error | tab content (E2/E5/E6) | ✗ dismissed | Error state is FFI work-area query failure → `## Copywriting Contract` covers (silent-to-user fallback to symmetric clamp + `debugPrint`); not a tab-content data state |
+| partial | tab strip / nav / content (E2/E5/E6) | ✗ dismissed | Tabs fully populated (no partial-data state); N/A |
+| zero-one-many | tab strip / nav / content (E2/E5/E6) | ✗ dismissed | Fixed 7 tabs (no variable count, no singular/plural copy); N/A |
+| unclassified | settings panel overlay (E1) | ⚠ manual-review | Probe classifier tripped no data-state cue (overlay is a container, not a data element); interaction states covered above; no shape-rooted state gap identified — planner treats as no-action |
 
 <!-- Status vocabulary (locked by probe-core projectTruths):
-     ✅ covered   → a plain truth string lifted into must_haves.truths
-     🧪 backstop  → a flat scalar { statement, verification: backstop }; at verify time, no explicit
-                    evidence → insufficient_spec → human_needed (never a silent pass, #1154)
-     ⚠ unresolved → an explicit planner assumption (surfaced, never silently dropped)
+     ✅ covered    → a plain truth string lifted into must_haves.truths
+     🧪 backstop   → a flat scalar { statement, verification: backstop }; at verify time, no explicit
+                     evidence → insufficient_spec → human_needed (never a silent pass, #1154)
+     ✗ dismissed   → N/A for this surface (reason required, never silent); planner skips at verify
+     ⚠ unresolved  → an explicit planner assumption (surfaced, never silently dropped)
      Rows are REPLACED (not appended) on a probe re-run — idempotent. -->
 
 ---
