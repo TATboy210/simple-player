@@ -1,66 +1,50 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-16T19:53:35.009Z",
-  "phase": "15",
-  "phase_name": "契约固化与基线盘点",
-  "phase_dir": ".planning/phases/15-contract-freeze-baseline-audit",
-  "plan": 0,
-  "task": 0,
-  "total_tasks": 3,
-  "plan_count": 3,
-  "status": "ready_to_execute",
-  "phase_lifecycle_stage": "plan-phase-COMPLETE-ready-to-execute",
-  "workflow_position": "plan-phase COMPLETE (§0-§13e done, §13d committed 2937238); §15 auto-advance NOT triggered (context 76%)",
+  "timestamp": "2026-07-26T11:23:04.329Z",
+  "phase": "30",
+  "phase_name": "panel-layout-redesign",
+  "phase_dir": "D:/simple_player_flutter/.planning/phases/30-panel-layout-redesign",
+  "plan": null,
+  "task": null,
+  "total_tasks": 0,
+  "status": "paused",
+  "mode": "research-only (--research-phase 30)",
+  "workflow_position": "plan-phase §5.1 Spawn gsd-phase-researcher — BLOCKED (classifier down + context 75%); checkpoint written, prep 100% done",
   "completed_tasks": [
-    {"id": 1, "name": "init.plan-phase 15 + closed-phase gate + prerequisites", "status": "done"},
-    {"id": 2, "name": "Verify prerequisites (CONTEXT/RESEARCH/VALIDATION exist, UI gate frontend=false, drift gate non-blocking)", "status": "done"},
-    {"id": 3, "name": "Spawn gsd-pattern-mapper (15-PATTERNS.md) + §7.95 edge-probe ($COVERAGE 4/4 unresolved->flagged) + §8 gsd-planner (3 plans: 15-01 BASE-02, 15-02 BASE-01+03, 15-03 BASE-04)", "status": "done", "note": "planner 越界 commit 43e874d 已在 §13d soft-reset 折叠"},
-    {"id": 4, "name": "Spawn gsd-plan-checker iter1 -> BLOCKER(load→play gate skippable) + WARNING(audit non-deterministic) -> revise -> iter2 PASSED", "status": "done"},
-    {"id": 5, "name": "§13 requirements gate 4/4 + §13a decision gate 23/23 + §13b state.planned-phase + §13c roadmap.annotate-dependencies + §13e gap-analysis clean", "status": "done", "verified_independently_this_session": "grep 复验: requirements union BASE-01..04; D1..D23 across 3 plans missing=empty; CONTEXT.md <decisions> block present with all 23"},
-    {"id": 6, "name": "§13d commit plans — DONE", "status": "done", "commit": "2937238", "note": "soft-reset 43e874d~1→ca67a93 (folded planner 43e874d + wip 1efca91), precise add 6 工件, single docs(15) commit; in-flight 文件 staged 集验证 CLEAN"},
-    {"id": 7, "name": "§14 present final status", "status": "done", "note": "呈现 PHASE 15 PLANNED banner + wave table; auto_advance 未触发"},
-    {"id": 8, "name": "§15 auto-advance check", "status": "skipped", "note": "context 76% 不足执行链; auto_advance=true 但本会话不触发, 留新窗口 /gsd-execute-phase 15"}
+    {"id": 1, "name": "query init.plan-phase 30", "status": "done", "notes": "researcher_model=sonnet, commit_docs=true, nyquist_validation_enabled=true, has_research=false, has_context=true, phase_req_ids=LAYOUT-01..05, context_window=200000"},
+    {"id": 2, "name": "loop render-hooks plan:pre --raw (research hook fragment.inline captured)", "status": "done"},
+    {"id": 3, "name": "Read ROADMAP Phase 30 section (L62-74) + 30-CONTEXT.md (8 CF + D-01..06 locked)", "status": "done"},
+    {"id": 4, "name": "Confirm context_window=200000 <500k → no cross-phase enrichment; agent-skills gsd-phase-researcher query empty", "status": "done"},
+    {"id": 5, "name": "Write 30-RESEARCH-CHECKPOINT.md with filled researcher prompt", "status": "done", "commit": "uncommitted"}
   ],
   "remaining_tasks": [
-    {"id": 1, "name": "执行 15-01 (Wave 1): BASE-02 审计脚本 inventory.sh + contract_completeness.sh + 7 陈旧 maps 水印 + PROJECT.md 9态修正", "status": "not_started"},
-    {"id": 2, "name": "执行 15-02 (Wave 1): BASE-01+03 7 接口文件 D2 契约标签 + fvp_engine 薄注释 + 15-CONTEXT.md P20 lifecycle-gap 清单", "status": "not_started"},
-    {"id": 3, "name": "执行 15-03 (Wave 2, depends_on 15-02): BASE-04 7 契约测试组 + 真实 FvpEngine 挂载点 + 5 fixtures + open→idle→play 回归闸门", "status": "not_started"}
+    {"id": 6, "name": "Spawn gsd-phase-researcher (model=sonnet, synchronous) with verbatim prompt from 30-RESEARCH-CHECKPOINT.md", "status": "not_started", "blocked_by": "classifier-down + context-critical"}
   ],
   "blockers": [
-    {"description": "glm-5.2 分类器间歇宕机 (项目 STATE.md recurring blocker) — 本会话 §13d 两次重试阻塞, 第三次恢复; execute-phase git commit / fixture 生成 / flutter test 可能再遇", "type": "external", "workaround": "提交重试; read-only 操作不受影响; 若持续宕机留工作树未提交由下会话处理"},
-    {"description": "上下文 76% — §15 auto-advance 故意未触发, execute-phase 须新窗口跑 (3 计划含真实 fixture 生成/flutter test/契约标签/7 接口 doc-comment 编辑)", "type": "context", "workaround": "/clear → /gsd-execute-phase 15 (新上下文窗口)"}
+    {"description": "auto-mode safety classifier (kimi-k3) temporarily unavailable — Agent spawn cannot be safety-checked", "type": "external", "workaround": "transient — retry after brief wait, or /clear and resume from 30-RESEARCH-CHECKPOINT.md"},
+    {"description": "context window at 75% (critical, 25% remaining) — spawn + return risk overflow", "type": "context", "workaround": "/clear then resume; 30-RESEARCH-CHECKPOINT.md already written with full verbatim prompt"}
   ],
   "async_jobs": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "/clear then open .planning/phases/30-panel-layout-redesign/30-RESEARCH-CHECKPOINT.md and follow its Resume action (spawn gsd-phase-researcher)", "context": "researcher spawn blocked by classifier + context budget; checkpoint has verbatim prompt + commit + early-exit instructions", "blocking": true}
+  ],
   "decisions": [
-    {"decision": "Phase 15 规划 3 计划按 BASE 需求切分: 15-01(BASE-02)/15-02(BASE-01+03)/15-03(BASE-04 Wave2依赖15-02) — Wave1 两计划零文件重叠可并行", "rationale": "需求驱动边界; 审计/契约冻结/契约测试三件职责正交", "phase": "15"},
-    {"decision": "load→play 回归断言纳入 must_haves.truths + 15-03 happy-path 结构回归闸门 (tiny_valid.mp4 真实 fixture, EXECUTION 验收非 skippable)", "rationale": "用户正经历'加载但不能播放'回归 (.planning/debug/ 两 stub status:investigating + 未提交 media_opener/main); 契约测试作结构闸门冻结该交接语义为可测边界", "phase": "15"},
-    {"decision": "§13d soft-reset 43e874d~1 重做单次 docs(15) 提交 (折叠 planner 越界 commit + wip 1efca91)", "rationale": "planner 子代理自行 commit 越界 + 标错 fix + 漏 15-02 致历史错位; --soft 保留工作树内容只重塑历史 (严禁 --hard)", "phase": "15"},
-    {"decision": "7 个 ISP 契约测试组 (非 D14 的 6 个): 补 VolumeControl 第7组", "rationale": "15-PATTERNS.md 发现 media_engine.dart implements 7 接口含 VolumeControl (RESEARCH Pitfall 4)", "phase": "15"},
-    {"decision": "契约测试断言 state/value(lastError.value + state==error) 非 throwsA", "rationale": "FvpEngine 错误路径设 lastError.value + 状态转换而非抛异常 (PATTERNS behavioral-assertion, D19)", "phase": "15"},
-    {"decision": "§13a 决策闸门: 本会话独立 grep 复验 23/23 通过 (CONTEXT.md 确含 <decisions> 块, 上轮 handoff 称'格式非<decisions>'的备注系陈旧误述)", "rationale": "gate 实质=每 trackable decision 被某 plan 引用; 内容满足则通过, 无论 markdown vs XML 格式", "phase": "15"}
+    {"decision": "research-only mode (--research-phase 30): produce RESEARCH.md only, skip planner/checker/verifier per §5.0/§5.1 early-exit contract", "rationale": "user invoked /gsd-plan-phase 30 --research-phase 30", "phase": "30"},
+    {"decision": "wrote 30-RESEARCH-CHECKPOINT.md with filled researcher prompt instead of forcing spawn at 68%+ context", "rationale": "feedback_gsd_context_budget_pause pattern — 60%+ context + spawn blocked → checkpoint + pause, not forced spawn", "phase": "30"}
   ],
   "uncommitted_files": {
-    "plan_phase_handoff_this_session": [
-      ".planning/HANDOFF.json (M 本 handoff 写入, 将随 pause commit 含入)",
-      ".planning/phases/15-contract-freeze-baseline-audit/.continue-here.md (M 本 handoff 更新, 将随 pause commit 含入)",
-      ".planning/STATE.md (M §13b state.planned-phase 写入, 未随 §13d 提交——含 planning→Ready-to-execute 更新; 是否纳入 pause commit 待定)"
+    "this_session": [
+      ".planning/HANDOFF.json (M — this handoff write, will be in pause commit)",
+      ".planning/phases/30-panel-layout-redesign/30-RESEARCH-CHECKPOINT.md (?? new, this session)",
+      ".planning/phases/30-panel-layout-redesign/.continue-here.md (?? new, this pause)"
     ],
-    "in_flight_files_NOT_ours_EXCLUDE_from_pause_commit": [
-      ".planning/debug/ (?? 两份诊断 stub, in-flight debug 调查'加载但不能播放')",
-      "lib/kernel/engine/media_opener.dart (M, in-flight debug)",
-      "lib/main.dart (M, in-flight debug)",
-      "lib/ui/player/player_screen.dart (M, in-flight UI debug)",
-      "lib/ui/player/video_surface.dart (M, in-flight UI debug)",
-      "lib/ui/player/playback_status_overlay.dart (?? in-flight UI debug)",
-      "test/widget/player/playback_status_overlay_test.dart (?? in-flight UI debug)",
-      "lib/l10n/app_en.arb, app_zh.arb, app_localizations.dart, app_localizations_en.dart, app_localizations_zh.dart (M, in-flight l10n)"
-    ],
-    "resume_artifacts_optional_cleanup": [
-      ".planning/phases/15-contract-freeze-baseline-audit/15-PLAN-PHASE-CHECKPOINT.md (?? pre-planner resume 指南, execute-phase 成功后可删)",
-      ".planning/HANDOFF.json (本文件, execute-phase 成功后可删作一次性工件)"
+    "pre_existing_untracked_NOT_ours_EXCLUDE_from_pause_commit": [
+      ".planning/STATE.md (M pre-existing from prior phase-29 work — NOT touched this session)",
+      ".planning/phases/30-panel-layout-redesign/30-DISCUSS-CHECKPOINT.json (?? pre-existing)",
+      ".planning/phases/30-panel-layout-redesign/30-PLAN-CHECKPOINT.md (?? pre-existing)",
+      ".planning/phases/29-auto-pause-always/29-EXECUTE-CHECKPOINT.md (?? pre-existing)"
     ]
   },
-  "next_action": "新上下文窗口: /clear → /gsd-execute-phase 15。execute-phase 会从 STATE.md (status Ready-to-execute, plan_count 3) 续。执行前复核 3 计划 do_not_touch 边界 (15-03 files_modified 仅限 test/contracts/* + test/fixtures/* + lib/kernel/engine/* doc-comment edits; 不得碰 in-flight 的 media_opener/main/player_screen/video_surface/playback_status_overlay/l10n)",
-  "context_notes": "Phase 15 plan-phase 实质 100% 完成 (§0-§13e 全过, §13d 已提交 2937238, §14 已呈现), 仅 §15 auto-advance 因上下文 76% 故意未触发。两个覆盖闸门本会话独立 grep 复验通过 (requirements 4/4, decisions 23/23)。关键非显而易见判断: load→play 回归断言已正确纳入 15-03 结构闸门 (checker iter2 验证 EXECUTION 非 skippable); in-flight 调试文件是用户并行工作 §13d 已显式排除绝不污染 Phase 提交。"
+  "next_action": "After /clear: open .planning/phases/30-panel-layout-redesign/30-RESEARCH-CHECKPOINT.md, follow its Resume action — spawn gsd-phase-researcher (subagent_type=gsd-phase-researcher, model=sonnet, run_in_background=false) with the verbatim prompt in that file. On ## RESEARCH COMPLETE: verify 30-RESEARCH.md exists, commit if commit_docs=true via: node \"C:/Users/35490/.claude/gsd-core/bin/gsd-tools.cjs\" query commit \"docs(30): create phase research\" --files \"D:/simple_player_flutter/.planning/phases/30-panel-layout-redesign/30-RESEARCH.md\", print §5.1 research-only early-exit summary, exit. Do NOT continue to planner/checker/verifier — RESEARCH_ONLY=true skips them all.",
+  "context_notes": "research-only mode; all prep done (INIT JSON, research hook fragment filled, ROADMAP Phase 30 + CONTEXT.md read, context_window=200k <500k so no cross-phase enrichment); 8 CF (CF-01 size formula, CF-02 aspect ratio, CF-03 overlay mode, CF-04 display_enumerator FFI, CF-05 General tab index 3, CF-06 tokens only, CF-07 vertical structure unify, CF-08 always-pause live) + D-01..06 LOCKED in CONTEXT.md — researcher must NOT re-litigate; nyquist_validation_enabled=true so RESEARCH.md MUST include ## Validation Architecture section for planner-time §5.5; Phase 30 flagged in ROADMAP L170 as 'standard patterns' but user explicitly triggered research — researcher focuses on: sizing seam actual code (settings_overlay_shell.dart:172-179 verify real lines + current formula), display_enumerator FFI existing interface (display_enumerator.dart + win32_display_enumerator.dart + screen_utils.dart + window_service.dart), tab reorder seam (tab_strip.dart:36 + tab_content.dart IndexedStack child order), SC#5 test re-baseline targets (settings_responsive_integration_test.dart + settings_tab_content_test.dart), Tokens promotion for [400,960] clamp bounds, Phase 30/31 boundary (D-02 structural color unify only, keep bgGlass), reversibility (D-04 costly — undo needs SC#5 re-baseline back to Phase 27 formula). Headless flutter test mdk.dll FFI caveat: ~57 pre-existing failures NOT regressions (reference_mdk_dll_headless_test_failures memory)."
 }
