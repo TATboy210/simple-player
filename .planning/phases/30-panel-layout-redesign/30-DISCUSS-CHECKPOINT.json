@@ -1,0 +1,125 @@
+{
+  "phase": "30",
+  "phase_name": "panel-layout-redesign",
+  "phase_slug": "panel-layout-redesign",
+  "padded_phase": "30",
+  "phase_dir": "D:/simple_player_flutter/.planning/phases/30-panel-layout-redesign",
+  "timestamp": "2026-07-26T18:30:00+08:00",
+  "halt_reason": "context_budget_66pct — discuss-phase 是多轮交互工作流,剩余 34% 不足以跑完 4 gray area × 多轮提问 + 写 CONTEXT.md/DISCUSSION-LOG.md + 2 commit + state update。用户选 Checkpoint 暂停(遵循 Phase 15 discuss 先例 STATE:177 + memory feedback_gsd_context_budget_pause)",
+  "spec_loaded": false,
+  "blocking_antipatterns": "none — phase 30 dir 无 .continue-here.md;里程碑级 .continue-here.md 8 constraints 全是 v3.0 内核(Phase 15-22)相关,不适用 v4.5 Phase 30",
+  "areas_completed": [],
+  "areas_remaining": [
+    "A. Tab 序列重排 (General 移到第 4 位后其余 6 tab 顺序)",
+    "B. LAYOUT-05 vs VISUAL-01 边界 (Phase 30 结构颜色统一做到什么程度)",
+    "C. 多显示器钳制 UX (实时钳制 vs drop snap-back + resize 时是否重钳制)",
+    "D. height 推导 + 响应式断点 (height=width×9/16? 保留 800px 断点 vs 16:9+clamp 自适应)"
+  ],
+  "decisions": {},
+  "carried_forward_locked": {
+    "note": "以下决策已被 ROADMAP/REQUIREMENTS/PROJECT 固化到 Success Criteria 级别 — 下个窗口不得重新提问(universal-anti-patterns 规则 11:不重议已锁决策)。直接写入 CONTEXT.md <decisions>/<constraints>。",
+    "size_formula": "width = min(0.5 × screenW, screenH × 16/9) clamped to [400, 960] (LAYOUT-02, PRODUCT 固化)",
+    "aspect_ratio": "16:9 主约束 + 50% 面积次约束 (LAYOUT-01/02)",
+    "overlay_mode": "居中覆盖层 Stack sibling,非独立窗口(PROJECT Constraint;Out of Scope 明确排除独立窗口模式)",
+    "multi_monitor_clamp": "display_enumerator work-area FFI 钳制,非 MediaQuery(no new deps;Blocking Constraint honored;memory project_multi_monitor_ffi 有 EnumDisplayMonitors 回调+RECT→Rect+clamp 算法详尽记录)",
+    "general_tab_middle": "General tab 移到 7-tab sequence 第 4 位(index 3,3+1+3 对称),非 first/last (LAYOUT-03, ROADMAP SC#2)",
+    "tokens_only": "所有视觉值通过 Tokens.*,无硬编码尺寸(PROJECT Constraint;LAYOUT-05 隐含)",
+    "vertical_structure_color_unify": "上中下垂直结构颜色统一为控制栏色(LAYOUT-05,与 VISUAL-01 协同 — 但协同边界本身就是 gray area B)",
+    "always_pause": "Phase 29 已完成 — 面板开启即暂停 + MediaState _preOpenState 快照 + 4 子竞态测试。Phase 30 可安全迭代(PAUSE-01..04 Complete)",
+    "phase_28_seam": "Phase 28 已 split shell:tab_strip.dart(91行)+tab_content.dart(121行)+panel_key_bindings.dart(82行);shell settings_overlay_shell.dart 331行;legacy settings_panel.dart 已删。sizing seam 在 settings_overlay_shell.dart:172-179"
+  },
+  "gray_areas_detail": {
+    "A_tab_sequence_reorder": {
+      "why": "General 移到第 4 位后,其余 6 个 tab 的顺序是 UX 愿景决策,ROADMAP 只锁'中间位'不锁其余顺序",
+      "current_order_from_tab_strip_line36": "General / EQ / Audio / Video / Shortcuts / About / Performance (General 在第 1 位)",
+      "target_general_position": "index 3 (第 4 位,7-tab 中间)",
+      "options_to_present": [
+        "保持其余 6 tab 相对顺序,只把 General 插到第 4 位 → [EQ, Audio, Video, General, Shortcuts, About, Performance]",
+        "按功能分组重排 → [About, EQ, Audio, General, Video, Shortcuts, Performance] 或其他分组",
+        "频率/重要性排序(用户最常用居中)",
+        "让 Claude 按现有相对顺序推荐(默认选项 1)"
+      ],
+      "code_context": "lib/ui/dialogs/settings/tab_strip.dart:36 注释 '7 个 tab 图标(对应 General/EQ/Audio/Video/Shortcuts/About/Performance)'",
+      "downstream_note": "planner 需知道最终 7-tab 顺序数组以改 tab_strip.dart tab 列表 + IndexedStack 顺序(tab_content.dart)"
+    },
+    "B_layout05_vs_visual01_boundary": {
+      "why": "LAYOUT-05 说'上中下色统一为控制栏色(与 VISUAL-01 协同)',但 VISUAL-01(Phase 31)才做 chrome 对齐控制栏(bgGlass→controlBarBg 等)。Phase 30 做到什么程度决定两 phase 分工,避免重复或冲突",
+      "options_to_present": [
+        "占位统一:Phase 30 保持现有 bgGlass,只统一'上下中都用同一 token'(结构层),Phase 31 才切 controlBarBg (推荐 — 严格 phase 边界)",
+        "Phase 30 已切 controlBarBg:Phase 30 直接用 controlBarBg/controlBarBorderWhite,Phase 31 只做 edge-glow/three-state/density (有 scope overlap 风险)",
+        "Phase 30 完全不动颜色,只改尺寸/比例/tab 位,颜色全留 Phase 31 (最保守,LAYOUT-05 推迟到 Phase 31)",
+        "让 Claude 按'占位统一'推荐(选项 1)"
+      ],
+      "code_context": "tokens.dart:12 bgGlass / :57 controlBarBg / :59 controlBarBorderWhite / :31 glowOuterRing / :69 controlBarBgIdle;Phase 31 VISUAL-01 明确 bgGlass→controlBarBg+controlBarBorderWhite+glowOuterRing(4-shadow decoration from ControlBar._decorationPlaying)",
+      "downstream_note": "决定 Phase 30 是否触碰 tokens 切换;影响 settings_overlay_shell.dart 上中下 decoration 代码"
+    },
+    "C_multimonitor_clamp_ux": {
+      "why": "FFI 用 display_enumerator 已锁,但拖拽 UX 细节未定:实时 vs snap-back + resize 行为",
+      "options_to_present": [
+        "实时钳制:拖拽中面板边缘不能超出当前 monitor work-area(更直觉,但每帧查 work-area)",
+        "松手 snap-back:拖拽可超出,松手时若超出则 snap 回 work-area 内(更省 perf)",
+        "混合:拖拽实时钳制 + 窗口 resize 时重新钳制(面板跟随窗口 resize 保持合法位置)",
+        "让 Claude 推荐(选项 1 实时钳制,与现有 fullscreen snap 一致)"
+      ],
+      "code_context": "lib/kernel/bridge/display_enumerator.dart + win32/win32_display_enumerator.dart + screen_utils.dart + window_service.dart 已存在 work-area FFI;memory project_multi_monitor_ffi + project_v17_wave3_progress 记录 EnumDisplayMonitors 回调+RECT→Rect+clamp 算法",
+      "downstream_note": "planner 需决定钳制时机(drag 全程 vs drop 时) + resize 监听;影响 settings_overlay_shell.dart 拖拽/resize handler"
+    },
+    "D_height_derivation_responsive_breakpoint": {
+      "why": "LAYOUT-02 公式只给 width,height 推导未显式;Phase 27 有 800px 断点,16:9+clamp 下是否保留断点未定",
+      "options_to_present": [
+        "height = width × 9/16(16:9 严格,公式隐含);废弃 800px 断点,16:9+clamp[400,960] 已自适应(推荐 — 公式自洽)",
+        "height = width × 9/16 + 保留 800px 断点(小窗口特殊处理)",
+        "height 也按 50% 面积反推(非纯 16:9,但 50% 面积约束更强)",
+        "让 Claude 推荐(选项 1 纯 16:9,公式自洽)"
+      ],
+      "code_context": "settings_overlay_shell.dart:179 当前 'height = width × 0.8 比例,全屏 600×480,小窗口 400×320';Phase 27 ResponsiveScaling(STATE 记录 5:4 ratio + 800px 断点 + RepaintBoundary)是 Phase 30 要改的对象",
+      "downstream_note": "planner 需决定 height 公式 + 是否保留/废弃 800px 断点 + RepaintBoundary 去留;影响 settings_overlay_shell.dart:172-179 尺寸计算 + settings_responsive_integration_test.dart(SC#5 re-baseline)"
+    }
+  },
+  "codebase_context": {
+    "settings_dir_post_phase28": "lib/ui/dialogs/settings/ — 15 files, 2272 lines total. Key: tab_strip.dart(91), tab_content.dart(121), panel_key_bindings.dart(82), settings_overlay_shell.dart(331), settings_panel_controller.dart(116), settings_panel_state.dart(36), general_tab.dart(241), video_tab.dart(344), shortcuts_tab.dart(238), audio_tab.dart(100), equalizer_tab.dart(119), about_tab.dart(105), _settings_nav_item.dart(107), settings_tab_performance.dart(175), pending_settings.dart(66). Plus tabs/ subdir.",
+    "size_seam": "settings_overlay_shell.dart:172 '面板宽度 — windowWidth × 0.8,clamp [400,600](D-04/D-05)';:179 '面板高度 — 宽度 × 0.8 比例,全屏 600×480,小窗口 400×320(D-04/SC-2/SC-3)' — 这就是要改成 16:9 公式的位置",
+    "tab_order_seam": "tab_strip.dart:36 注释 '7 个 tab 图标(对应 General/EQ/Audio/Video/Shortcuts/About/Performance)' — General 当前第 1 位,LAYOUT-03 要移到第 4 位",
+    "multi_monitor_ffi": "lib/kernel/bridge/display_enumerator.dart + win32/win32_display_enumerator.dart + screen_utils.dart + window_service.dart — work-area FFI 已存在,no new deps",
+    "tokens_for_layout05": "lib/ui/theme/tokens.dart:12 bgGlass(0x8C0C0F18) / :31 glowOuterRing(0x0A5082FF) / :57 controlBarBg(0x990E111E) / :59 controlBarBorderWhite(0x0A6496FF) / :69 controlBarBgIdle(0x660E111E) / :87 borderHighlight(0x33FFFFFF) — LAYOUT-05/VISUAL-01 协同所需 token 齐备",
+    "reusable_patterns": "ValueNotifier + ValueListenableBuilder(状态管理不变);GlassContainer 毛玻璃模式;ControlBar._decorationPlaying 4-shadow decoration(Phase 31 VISUAL-01 复用);IndexedStack 7-child 显式结构(Phase 28 验证保持);FocusTraversalGroup ≥4(Phase 28 验证不变)",
+    "test_seam": "settings_tab_content_test.dart + settings_responsive_integration_test.dart(SC#5 re-baseline 目标);dialogs 子集 128/132(4 预存在失败:settings_nav_item_test 2 个 Phase 25 + settings_tab_content_test DropdownButton 2 个 GeneralTab headless)"
+  },
+  "canonical_refs_seed": {
+    "note": "MANDATORY in CONTEXT.md per success_criteria. 下个窗口 analyze_phase 要补全(从 ROADMAP 'Canonical refs:' 行展开 + 用户讨论中提及的 doc)。当前 seed:",
+    "refs": [
+      ".planning/ROADMAP.md (Phase 30 detail, LAYOUT-01..05 Success Criteria, Blocking Constraints honored)",
+      ".planning/REQUIREMENTS.md (LAYOUT-01..05 原子需求 + Traceability Phase 30)",
+      ".planning/PROJECT.md (v4.5 Key Decisions: 横向 tab 中部布局 / 控制栏设计北极星 / overlay 模式 / 总是暂停)",
+      ".planning/STATE.md (Phase 28/29 complete 记录, sizing seam 位置)",
+      "lib/ui/dialogs/settings/settings_overlay_shell.dart (sizing seam :172-179, 上中下结构)",
+      "lib/ui/dialogs/settings/tab_strip.dart (tab 顺序 :36, Phase 30 改 General 位)",
+      "lib/kernel/bridge/display_enumerator.dart (多显示器 work-area FFI)",
+      "lib/ui/theme/tokens.dart (controlBar/bgGlass/glow token, LAYOUT-05/VISUAL-01)",
+      "lib/ui/player/control_bar.dart (ControlBar._decorationPlaying 4-shadow, Phase 31 VISUAL-01 复用源 — 下个窗口确认路径)"
+    ]
+  },
+  "deferred_ideas": [],
+  "todo_matches": "0 matches — cross_reference_todos 跳过(todo.match-phase 30 返回空)",
+  "spike_sketch": "none — 无 spike-findings/sketch-findings skill,无 raw spikes/sketches MANIFEST",
+  "discuss_pre_hooks": "empty — activeHooks=[] (loop render-hooks discuss:pre --raw)",
+  "git_state_at_checkpoint": {
+    "branch": "feat/v1.8-stability-polish-plan-02-02",
+    "head_before_checkpoint": "2f1c4cc (docs(29-01): create phase verification)",
+    "worktree_dirty": "M .planning/STATE.md + 未追踪 .planning/phases/29-auto-pause-always/29-EXECUTE-CHECKPOINT.md + 未追踪 .planning/phases/30-panel-layout-redesign/ (本 checkpoint 将创建于此)",
+    "note": "29-EXECUTE-CHECKPOINT.md 是 Phase 29 execute 的桥接工件,与 Phase 30 discuss 无关,不动"
+  },
+  "resume_instructions": {
+    "step_1": "/clear 新上下文窗口",
+    "step_2": "/gsd-discuss-phase 30 — check_existing 步骤检测本 checkpoint → AskUserQuestion(Resume / Start fresh)→ 选 Resume",
+    "step_3": "parse checkpoint: areas_completed=[] 全空, decisions={} 全空 → 4 个 gray area 全在 areas_remaining",
+    "step_4": "present_gray_areas: 用 gray_areas_detail 的 4 区 + carried_forward_locked 的承袭决策标注('已在 ROADMAP/REQUIREMENTS 固化,不再问')。无需重跑 analyze_phase(本 checkpoint 已含 codebase_context + canonical_refs seed)",
+    "step_5": "discuss_areas: 读 workflows/discuss-phase/modes/default.md(默认模式 4 单问题轮次/区)。按 A→B→C→D 顺序讨论。每区完成写 checkpoint 更新(areas_completed += 该区, decisions[区]=问答记录)",
+    "step_6": "4 区全完成 → write_context: 读 templates/context.md, 写 30-CONTEXT.md(含 spec_lock?否 spec_loaded=false / domain / carried_forward decisions / 4 gray area decisions / canonical_refs / code_context / deferred)",
+    "step_7": "git_commit: 读 templates/discussion-log.md, 写 30-DISCUSSION-LOG.md, rm checkpoint, commit 'docs(30): capture phase context'",
+    "step_8": "update_state: gsd_run query state.record-session + commit 'docs(state): record phase 30 context session'",
+    "step_9": "auto_advance: 无 flag(--chain/--auto 未设)→ route to confirm_creation → 呈批下一步 /gsd-plan-phase 30",
+    "lean_loading_tip": "下个窗口为省 context: init.phase-op 30 秒级复跑;跳过重读 STATE.md 全历史(只读 frontmatter 省 ~10K,本 checkpoint 已含全部需要的 prior context);scout_codebase 可跳过(本 checkpoint codebase_context 已含集成点);直接 check_existing → present_gray_areas"
+  },
+  "next_command": "/clear → /gsd-discuss-phase 30 (Resume from checkpoint, 4 gray areas A-D pending)"
+}

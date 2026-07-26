@@ -4,11 +4,11 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 30
 current_phase_name: panel-layout-redesign
-status: in_progress
-stopped_at: Phase 30 research-only complete (RESEARCH.md committed a813590); ready for planner (2026-07-26)
-last_updated: "2026-07-26"
-last_activity: 2026-07-26
-last_activity_desc: Phase 30 research-only complete — RESEARCH.md committed (a813590), HANDOFF闭环删除
+status: planned
+stopped_at: context exhaustion at 76% (2026-07-26) — resumed + plan set complete 2026-07-27
+last_updated: "2026-07-27T00:20:00.000Z"
+last_activity: 2026-07-27
+last_activity_desc: Phase 30 plan set complete (4 PLAN.md committed, §10 gsd-plan-checker PASS)
 progress:
   total_phases: 7
   completed_phases: 2
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 30 (panel-layout-redesign) — IN PROGRESS (research-only mode, --research-phase 30)
-Plan: 0 of 1 (research complete; planner not yet spawned — RESEARCH_ONLY early-exit)
-Status: Research-only complete, ready for /gsd-plan-phase 30 (planner will consume 30-RESEARCH.md)
-Last activity: 2026-07-26 — Phase 30 research-only complete (RESEARCH.md a813590, HANDOFF闭环)
+Phase: 30 (panel-layout-redesign) — PLANNED (plan set complete, ready for execute-phase)
+Plan: 0 of 4 (plan set committed: 30-01 tracer + 30-02/03/04 expansion; §10 gsd-plan-checker PASS)
+Status: Plan set complete + checker PASS, ready for /gsd-execute-phase 30
+Last activity: 2026-07-27 — Phase 30 plan set complete (4 plans, checker PASS)
 
 ## Performance Metrics
 
@@ -111,9 +111,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-26T11:20:07.967Z
-Stopped at: context exhaustion at 75% (2026-07-26)
-Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
+Last session: 2026-07-26T14:55:05.810Z
+Stopped at: context exhaustion at 76% (2026-07-26)
+Resume file: .planning/phases/30-panel-layout-redesign/30-UI-SPEC.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
@@ -283,6 +283,20 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **HANDOFF 闭环**: `git rm .planning/HANDOFF.json` + `git rm .planning/phases/30-panel-layout-redesign/.continue-here.md` (两一次性工件, 恢复成功后删除 per workflow)。`30-RESEARCH-CHECKPOINT.md` 保留 (含 verbatim prompt + resume 史, 规划通过后安全删除)。
 - **§5.1 research-only early-exit**: RESEARCH_ONLY=true → 不 spawn planner/checker/verifier。下一步 = `/clear` → `/gsd-plan-phase 30` (has_research=true → 走 §5.1 "Use existing, skip to step 6", 直接 spawn planner opus 消费 30-RESEARCH.md + 30-CONTEXT.md 写 30-01-PLAN.md)。
 - **未提交**: 本次 STATE.md frontmatter+body 更新 + HANDOFF/.continue-here 删除, 随本条 commit 闭环。3 个非本会话 untracked checkpoint (30-DISCUSS-CHECKPOINT.json / 30-PLAN-CHECKPOINT.md / 29-EXECUTE-CHECKPOINT.md) 仍 ?? 未动 per HANDOFF exclude 规则。
+
+### 2026-07-26 Phase 30 UI-phase checkpoint（Step 1-4 done, spawn deferred @ 65%）
+
+- **恢复源**: fresh `/clear` → `/gsd-ui-phase 30` skill 调用。本会话不是恢复旧 checkpoint, 是 fresh 窗口启动 ui-phase 工作流。
+- **本会话已完成 (Step 1-4)**:
+  1. **Step 1 Initialize**: `gsd-tools query init.plan-phase 30` 全字段已解析 — phase_found=true, phase_dir=`D:/simple_player_flutter/.planning/phases/30-panel-layout-redesign`, padded_phase="30", phase_req_ids=LAYOUT-01..05, phase_status=Pending, has_context=true, has_research=true, has_plans=false, commit_docs=true, text_mode=false, auto_advance=true, researcher_model=sonnet/planner_model=opus/checker_model=sonnet, agents_installed=true/missing_agents=[], agent_runtime=claude, project_title="Simple Player — 设置面板横向重构 + 音频功能 (v4.5)"。`config-get workflow.ui_phase`=true (ENABLED)。
+  2. **Step 2 Validate**: `roadmap.get-phase 30` found=true, 5 success criteria + blocking constraints honored section 确认 (overlay mode / Windows primary / 现有 FFI 无新 deps / Tokens.* 无 hardcoded)。
+  3. **Step 3 Prereqs**: has_context=true (30-CONTEXT.md 143 行, 8 CF + 6 D pre-locked); has_research=true (30-RESEARCH.md 442 行, HIGH confidence, 4 seams verified, 3 drifts corrected); sketch findings=none; response_language 未设 (subagent prompts English, user-facing 简体中文 per CLAUDE.md)。
+  4. **Step 4 Existing UI-SPEC**: Glob `*CHECKPOINT*` 返回 DISCUSS/RESEARCH/PLAN 三个, 无 `*-UI-SPEC.md` → AskUserQuestion (update/view/skip) 不适用, 直接进 Step 5。
+- **halt 原因 (context budget 65%)**: memory `feedback_gsd_context_budget_pause` (2026-07-26, today) 硬约束 "60%+ 窗口启动 spawn 会 halt mid-spawn, 先写 checkpoint 暂停而非强行 spawn"。ui-phase 要 spawn **两个**子代理 (researcher + checker) + revision loop (max 2) + UI-consideration probe (node + AskUserQuestion multi-round) + commit + state, 35% 不足以跑完全链。不对称风险 (STATE.md L241 已验证): spawn 最佳情况勉强够, 最坏 researcher 返回后无预算处理 checker/revision/probe → 中途 halt 状态更差; checkpoint 无下行风险。
+- **checkpoint 工件**: `.planning/phases/30-panel-layout-redesign/30-UI-CHECKPOINT.md` (frontmatter attempts=1/created=2026-07-26/halt_reason=context_budget_65pct/step_at_halt=between Step 4 and Step 5)。含: init 验证 verbatim 表 (fresh 窗口不必重跑) + 5 success criteria + 8 CF/6 D pre-locked 清单 (researcher MUST NOT re-ask) + **预构造 researcher prompt 模板** (含 files_to_read 5 条 + locked_decisions 块 + design_focus 6 项: Tokens/tab-sequence/multi-monitor-clamp/vertical-unify/copywriting/state-coverage) + spawn 策略 (gsd-ui-researcher/sonnet/sync/run_in_background=false, 参考 a813590 成功模式) + fresh 窗口 lean 复用指令 (跳过 STATE 全历史省 ~10K) + 上下文预算守卫 (fresh 200K 估算: 32% baseline + 26% spawn chain = 58%, 42% margin) + interactive-inline fallback (Phase 28 先例) + 3 个 open assumptions (A1/A2/A3) 留给 researcher。
+- **未提交**: 本次 STATE.md frontmatter+body 更新 + 30-UI-CHECKPOINT.md (new untracked)。建议 commit message: `docs(30): UI-phase checkpoint — Step 1-4 done, spawn deferred @ 65%`。
+- **下一步 (新上下文窗口)**: `/clear` → `/gsd-ui-phase 30`。fresh 窗口读 30-UI-CHECKPOINT.md (lean, 跳过 STATE 全历史) + 30-CONTEXT.md + 30-RESEARCH.md → 跳 Step 4 AskUserQuestion → spawn gsd-ui-researcher (sonnet, sync, 用预构造 prompt 模板填 `${AGENT_SKILLS_UI}`) → 写 30-UI-SPEC.md → spawn gsd-ui-checker (sonnet, 6 维度) → revision loop (if ISSUES, max 2) → Step 9.5 UI-consideration probe (resolve ui-consideration-probe.cjs + ELEMENTS_JSON + AskUserQuestion resolution) → Step 10 READY banner → Step 11 commit docs(30): UI design contract → Step 12 state.record-session → 删 30-UI-CHECKPOINT.md (一次性工件闭环) → 下一步 `/gsd-plan-phase 30` (has_research=true 走 §5.1 "Use existing, skip to step 6", planner 消费 30-RESEARCH.md + 30-CONTEXT.md + 30-UI-SPEC.md 写 30-01-PLAN.md)。
+- **若 researcher spawn halt 备选**: fresh 子代理窗口 ~60K (STATE.md L246 实测), 若注入后 halt, fall back `--interactive inline` 模式 (Phase 28 先例 STATE.md L262-275, 主会话直接写 30-UI-SPEC.md 用 template + RESEARCH + CONTEXT 作输入, 无子代理)。但 Phase 30 phase-researcher a813590 已证明 fresh 窗口 spawn 可行, 首选 spawn。
 
 ## Operator Next Steps
 
