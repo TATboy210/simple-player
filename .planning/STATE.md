@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
-current_phase: 29
-current_phase_name: auto-pause-always
-status: phase_complete
-stopped_at: Phase 29 complete (2026-07-26)
-last_updated: "2026-07-26T09:00:00.000Z"
+current_phase: 30
+current_phase_name: panel-layout-redesign
+status: in_progress
+stopped_at: Phase 30 research-only complete (RESEARCH.md committed a813590); ready for planner (2026-07-26)
+last_updated: "2026-07-26"
 last_activity: 2026-07-26
-last_activity_desc: Phase 29 complete (interactive inline mode, 4/4 tasks + SUMMARY)
+last_activity_desc: Phase 30 research-only complete — RESEARCH.md committed (a813590), HANDOFF闭环删除
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 2
+  total_plans: 3
   completed_plans: 2
   percent: 29
 ---
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 29 (auto-pause-always) — COMPLETE
-Plan: 1 of 1 (complete)
-Status: Phase complete, ready to plan Phase 30
-Last activity: 2026-07-26 — Phase 29 complete (interactive inline mode, 4/4 tasks + SUMMARY)
+Phase: 30 (panel-layout-redesign) — IN PROGRESS (research-only mode, --research-phase 30)
+Plan: 0 of 1 (research complete; planner not yet spawned — RESEARCH_ONLY early-exit)
+Status: Research-only complete, ready for /gsd-plan-phase 30 (planner will consume 30-RESEARCH.md)
+Last activity: 2026-07-26 — Phase 30 research-only complete (RESEARCH.md a813590, HANDOFF闭环)
 
 ## Performance Metrics
 
@@ -111,8 +111,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-26T05:28:33.498Z
-Stopped at: context exhaustion at 76% (2026-07-26)
+Last session: 2026-07-26T11:20:07.967Z
+Stopped at: context exhaustion at 75% (2026-07-26)
 Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -273,6 +273,16 @@ Resume file: .planning/phases/27-responsive-scaling-polish/27-CONTEXT.md
 - **预存在技术债登记**（非 Phase 28）: settings_nav_item_test 2 个 (Phase 25 SettingsNavItem), settings_tab_content_test DropdownButton 2 个 (GeneralTab headless), fvp_engine_contract_test ~57 个 mdk.dll FFI 加载失败 (headless 环境, 见 memory reference_mdk_dll_headless_test_failures.md)。
 - **STATE.md 外科手术更新**: frontmatter status executing→phase_complete, completed_phases 0→1, completed_plans 0→1, percent 0→14; Current Position EXECUTING→COMPLETE; 追加本条历史。历史 Session Continuity 全保留。
 - **下一步**: Phase 28 结构债务清零, 可启动 v4.5 设置面板重设计下一 phase。Phase 29 = auto-pause-detector (PAUSE, 4 reqs), 标准模式 (无需 research-phase, ROADMAP 仅 32/33 须 research)。`/clear` → `/gsd-plan-phase 29`。ROADMAP phases 28-34, 构建顺序 28→29→30→31→32→33→34, Phase 28 已完成 1/7。
+
+### 2026-07-26 Phase 30 research-only resume (spawn 成功, RESEARCH.md a813590, HANDOFF闭环)
+
+- **恢复源**: `.planning/HANDOFF.json` (一次性工件, 2026-07-26T11:23:04Z) + `.planning/phases/30-panel-layout-redesign/.continue-here.md` + `30-RESEARCH-CHECKPOINT.md` (verbatim researcher prompt)。
+- **blocker 校验**: HANDOFF 记录两 blocker — ① classifier kimi-k3 down (外部间歇) ② context 75% critical。本次 fresh 窗口 (context 已清) spawn gsd-phase-researcher (sonnet, 同步, run_in_background=false) 成功，classifier 已恢复。
+- **researcher 产出**: `30-RESEARCH.md` (441 行, HIGH confidence) 已自提交 `a813590` (commit_docs=true 指示)。researcher 校正 CONTEXT.md 3 处漂移 (sizing seam 行号 172-180 非 172-179; "800px breakpoint" 仅驱动 tab-compact 非 sizing → Assumption A2; `SettingsPanelController.open()` 重置 selectedTab=0 的 D-01 ripple → Pitfall 1) + 识别 multi-monitor clamp 设计缺口 (无同步窗口位置源, 推荐 Option A drag-start 缓存) + test re-baseline 风险升级 (3 文件 14 断言 + 2 文件 ~8 tab-index 断言, 非 CONTEXT 点的 2 文件)。
+- **3 Open Questions 留给 planner**: A1 open() 重置→index 3 (保"开在 General"); A2 D-04 "删 breakpoint"=sizing-only, 保留 tab-compact; A3 窗口位置源 Option A (drag-session 缓存) vs B (WindowService notifier), A 推荐。
+- **HANDOFF 闭环**: `git rm .planning/HANDOFF.json` + `git rm .planning/phases/30-panel-layout-redesign/.continue-here.md` (两一次性工件, 恢复成功后删除 per workflow)。`30-RESEARCH-CHECKPOINT.md` 保留 (含 verbatim prompt + resume 史, 规划通过后安全删除)。
+- **§5.1 research-only early-exit**: RESEARCH_ONLY=true → 不 spawn planner/checker/verifier。下一步 = `/clear` → `/gsd-plan-phase 30` (has_research=true → 走 §5.1 "Use existing, skip to step 6", 直接 spawn planner opus 消费 30-RESEARCH.md + 30-CONTEXT.md 写 30-01-PLAN.md)。
+- **未提交**: 本次 STATE.md frontmatter+body 更新 + HANDOFF/.continue-here 删除, 随本条 commit 闭环。3 个非本会话 untracked checkpoint (30-DISCUSS-CHECKPOINT.json / 30-PLAN-CHECKPOINT.md / 29-EXECUTE-CHECKPOINT.md) 仍 ?? 未动 per HANDOFF exclude 规则。
 
 ## Operator Next Steps
 
