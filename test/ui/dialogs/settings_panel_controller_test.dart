@@ -52,7 +52,7 @@ void main() {
       controller.dispose();
     });
 
-    test('open() while paused never calls pause() and never resumes on close()', () {
+    test('open() while paused still pauses once (always-pause policy) and never resumes on close()', () {
       // Arrange
       final fake = FakePlaybackController(initiallyPlaying: false);
       final controller = SettingsPanelController(fake);
@@ -61,8 +61,9 @@ void main() {
       controller.open();
       controller.close();
 
-      // Assert
-      expect(fake.pauseCallCount, 0);
+      // Assert — PAUSE-01: open() always pauses regardless of pre-open state;
+      // non-playing snapshot means close() never resumes.
+      expect(fake.pauseCallCount, 1);
       expect(fake.playCallCount, 0);
 
       controller.dispose();

@@ -40,8 +40,9 @@ class SettingsPanelController {
   /// 打开面板 — 已打开时 no-op（幂等）。
   ///
   /// 顺序：先重置 selectedTab 为 0（D-03），再快照播放状态（[MediaState]），
-  /// 暂停播放（仅当快照为 [MediaState.playing]），最后翻转 [state.isOpen]。
-  /// 快照必须先于 pause() 读取，因为 pause() 会改变引擎状态。
+  /// 无条件暂停播放（PAUSE-01 安全策略），最后翻转 [state.isOpen]。
+  /// 快照必须先于 pause() 读取，因为 pause() 会改变引擎状态；无条件 pause
+  /// 确保面板打开期间播放始终暂停，无论快照为何种状态.
   void open() {
     if (state.isOpen.value) return;
     // D-03: 每次打开重置到 General tab（index 0）
@@ -49,9 +50,9 @@ class SettingsPanelController {
     // PAUSE-02: 经窄接缝 isPlaying 投影为 MediaState 快照——playing 可恢复，
     // 其余状态统一记为 paused（非 playing 的安全代表），close() 只认 playing.
     _preOpenState = _playback.isPlaying ? MediaState.playing : MediaState.paused;
-    if (_preOpenState == MediaState.playing) {
-      _playback.pause();
-    }
+    // PAUSE-01: 无条件暂停——面板打开期间播放始终暂停，避免设置面板后续
+    // 阶段在 opening/completed/manual-pause 状态期间产生播放竞态.
+    _playback.pause();
     // 注册已知设置项的原始值（TABS-04）— 后续 tab 内容替换时扩展
     pending.register('locale', 'zh');
     pending.register('themeIndex', 0);
