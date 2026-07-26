@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
-current_phase: 28
-current_phase_name: settings-shell-split-legacy-deletion
-status: executing
-stopped_at: context exhaustion at 76% (2026-07-26)
-last_updated: "2026-07-26T06:07:19.981Z"
+current_phase: 29
+current_phase_name: auto-pause-always
+status: phase_complete
+stopped_at: Phase 29 complete (2026-07-26)
+last_updated: "2026-07-26T09:00:00.000Z"
 last_activity: 2026-07-26
-last_activity_desc: Phase 28 complete (interactive inline mode)
+last_activity_desc: Phase 29 complete (interactive inline mode, 4/4 tasks + SUMMARY)
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 2
-  completed_plans: 1
-  percent: 14
+  completed_plans: 2
+  percent: 29
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 28 (settings-shell-split-legacy-deletion) — COMPLETE
+Phase: 29 (auto-pause-always) — COMPLETE
 Plan: 1 of 1 (complete)
-Status: Ready to execute
-Last activity: 2026-07-26 — Phase 28 complete (interactive inline mode)
+Status: Phase complete, ready to plan Phase 30
+Last activity: 2026-07-26 — Phase 29 complete (interactive inline mode, 4/4 tasks + SUMMARY)
 
 ## Performance Metrics
 

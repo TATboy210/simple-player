@@ -15,10 +15,10 @@
 
 ### PAUSE — 自动暂停（总是）（Phase 29）
 
-- [ ] **PAUSE-01**: 面板开启即暂停（总是，非 `wasPlaying` 条件）— `open()` 无条件调 `pause()`
-- [ ] **PAUSE-02**: `bool _wasPlaying` 拓宽为 `MediaState _preOpenState` 快照（覆盖 loading/buffering/ended/manual-pause 四子竞态）
-- [ ] **PAUSE-03**: `close()` 仅当 `_preOpenState == MediaState.playing` 才恢复播放；loading/buffering/ended/manual-pause 显式 NO-RESUME
-- [ ] **PAUSE-04**: Widget 测试覆盖四子竞态 — load→loading→open→close→断言 `play()` 未调用；EOF→open→close→断言；manual-pause→open→close→断言未恢复
+- [x] **PAUSE-01**: 面板开启即暂停（总是，非 `wasPlaying` 条件）— `open()` 无条件调 `pause()`
+- [x] **PAUSE-02**: `bool _wasPlaying` 拓宽为 `MediaState _preOpenState` 快照（覆盖 loading/buffering/ended/manual-pause 四子竞态）
+- [x] **PAUSE-03**: `close()` 仅当 `_preOpenState == MediaState.playing` 才恢复播放；loading/buffering/ended/manual-pause 显式 NO-RESUME
+- [x] **PAUSE-04**: Widget 测试覆盖四子竞态 — load→loading→open→close→断言 `play()` 未调用；EOF→open→close→断言；manual-pause→open→close→断言未恢复
 
 ### LAYOUT — 面板布局重构（Phase 30）
 
@@ -98,10 +98,10 @@
 |-------------|-------|--------|
 | REFAC-01 | Phase 28 | Pending |
 | REFAC-02 | Phase 28 | Pending |
-| PAUSE-01 | Phase 29 | Pending |
-| PAUSE-02 | Phase 29 | Pending |
-| PAUSE-03 | Phase 29 | Pending |
-| PAUSE-04 | Phase 29 | Pending |
+| PAUSE-01 | Phase 29 | Complete |
+| PAUSE-02 | Phase 29 | Complete |
+| PAUSE-03 | Phase 29 | Complete |
+| PAUSE-04 | Phase 29 | Complete |
 | LAYOUT-01 | Phase 30 | Pending |
 | LAYOUT-02 | Phase 30 | Pending |
 | LAYOUT-03 | Phase 30 | Pending |
