@@ -21,7 +21,7 @@
 ## Phases
 
 - [ ] **Phase 28: Settings Shell Split + Legacy Deletion** - Prerequisite refactor: split 517-line shell into 3 files + delete legacy 88px-sidebar panel
-- [ ] **Phase 29: Auto-Pause Always** - Panel-open always pauses (wasPlaying guard dropped); MediaState snapshot for safe resume
+- [x] **Phase 29: Auto-Pause Always** - Panel-open always pauses (wasPlaying guard dropped); MediaState snapshot for safe resume
 - [ ] **Phase 30: Panel Layout Redesign** - 16:9 / 50%-area overlay + General tab middle + multi-monitor clamp
 - [ ] **Phase 31: Visual Design Alignment** - Panel chrome + option rows aligned to control-bar glass / edge-glow / three-state
 - [ ] **Phase 32: Navigation & Interaction Polish** - End-cap arrows + InputModeDetector + hint substitution + raw LB/RB binding deletion
@@ -56,7 +56,7 @@ Plans:
 **Blocking Constraints honored**: zero kernel interface expansion (seam unchanged); deferred-apply seam preserved; Windows primary platform; ValueNotifier unchanged
 **Plans**: 1 plan
 Plans:
-- [ ] 29-01-PLAN.md — Make settings-panel auto-pause unconditional and protect resume with a MediaState snapshot
+- [x] 29-01-PLAN.md — Make settings-panel auto-pause unconditional and protect resume with a MediaState snapshot
 **UI hint**: yes
 
 ### Phase 30: Panel Layout Redesign
@@ -194,10 +194,10 @@ Every v1 requirement mapped to exactly one phase. No orphans, no duplicates.
 |-------------|-------|--------|
 | REFAC-01 | Phase 28 | Pending |
 | REFAC-02 | Phase 28 | Pending |
-| PAUSE-01 | Phase 29 | Pending |
-| PAUSE-02 | Phase 29 | Pending |
-| PAUSE-03 | Phase 29 | Pending |
-| PAUSE-04 | Phase 29 | Pending |
+| PAUSE-01 | Phase 29 | Complete |
+| PAUSE-02 | Phase 29 | Complete |
+| PAUSE-03 | Phase 29 | Complete |
+| PAUSE-04 | Phase 29 | Complete |
 | LAYOUT-01 | Phase 30 | Pending |
 | LAYOUT-02 | Phase 30 | Pending |
 | LAYOUT-03 | Phase 30 | Pending |
