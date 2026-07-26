@@ -54,7 +54,9 @@ Plans:
   3. Four sub-race widget tests pass: loading→open→close→assert `play()` NOT called; EOF→open→close→assert NO-RESUME; manual-pause→open→close→assert NO-RESUME; playing→open→close→assert resume (PAUSE-04)
   4. `SettingsPanelPlayback` seam interface unchanged — zero kernel interface expansion, no new `MediaEngine` direct dependency
 **Blocking Constraints honored**: zero kernel interface expansion (seam unchanged); deferred-apply seam preserved; Windows primary platform; ValueNotifier unchanged
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 29-01-PLAN.md — Make settings-panel auto-pause unconditional and protect resume with a MediaState snapshot
 **UI hint**: yes
 
 ### Phase 30: Panel Layout Redesign
