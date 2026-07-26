@@ -7,6 +7,7 @@
 
 import 'dart:ui';
 
+import '../../../kernel/engine/media_state.dart';
 import '../../../kernel/services/playback_controller.dart';
 import 'pending_settings.dart';
 import 'settings_panel_state.dart';
@@ -14,8 +15,9 @@ import 'settings_panel_state.dart';
 /// 设置面板控制器 — 持有 [SettingsPanelState]，实现 open/close/toggle
 /// 生命周期，并在打开前后经 [SettingsPanelPlayback] 协调播放暂停/恢复。
 ///
-/// 打开前快照 `wasPlaying`（在暂停之前读取，保证同步 open() 调用内
-/// 无并发交叠语义），仅当快照为 true 时才在 close() 时恢复播放。
+/// 打开前快照 [_preOpenState]（[MediaState] 语义，在暂停之前读取，保证
+/// 同步 open() 调用内无并发交叠语义），仅当快照为 [MediaState.playing]
+/// 时才在 close() 时恢复播放。
 class SettingsPanelController {
   SettingsPanelController(this._playback);
 
@@ -28,23 +30,26 @@ class SettingsPanelController {
   /// 延迟应用状态（TABS-04）— 持有用户待提交的修改.
   final PendingSettingsState pending = PendingSettingsState();
 
-  /// 打开面板前的播放状态快照 — 仅当为 true 时 close() 才恢复播放.
-  bool _wasPlaying = false;
+  /// 打开面板前的播放状态快照 — 仅当为 [MediaState.playing] 时 close()
+  /// 才恢复播放；其余状态（idle/opening/paused/completed/error）一律不恢复.
+  MediaState _preOpenState = MediaState.idle;
 
   /// Tab 总数 — 用于 nextTab/prevTab 首尾循环的模数.
   static const int tabCount = 7;
 
   /// 打开面板 — 已打开时 no-op（幂等）。
   ///
-  /// 顺序：先重置 selectedTab 为 0（D-03），再读取播放快照，
-  /// 暂停播放（仅当快照为 true），最后翻转 [state.isOpen]。
+  /// 顺序：先重置 selectedTab 为 0（D-03），再快照播放状态（[MediaState]），
+  /// 暂停播放（仅当快照为 [MediaState.playing]），最后翻转 [state.isOpen]。
   /// 快照必须先于 pause() 读取，因为 pause() 会改变引擎状态。
   void open() {
     if (state.isOpen.value) return;
     // D-03: 每次打开重置到 General tab（index 0）
     state.selectedTab.value = 0;
-    _wasPlaying = _playback.isPlaying;
-    if (_wasPlaying) {
+    // PAUSE-02: 经窄接缝 isPlaying 投影为 MediaState 快照——playing 可恢复，
+    // 其余状态统一记为 paused（非 playing 的安全代表），close() 只认 playing.
+    _preOpenState = _playback.isPlaying ? MediaState.playing : MediaState.paused;
+    if (_preOpenState == MediaState.playing) {
       _playback.pause();
     }
     // 注册已知设置项的原始值（TABS-04）— 后续 tab 内容替换时扩展
@@ -66,12 +71,13 @@ class SettingsPanelController {
 
   /// 关闭面板 — 已关闭时 no-op（幂等）。
   ///
-  /// 仅当 [_wasPlaying] 为 true 时才调用 [SettingsPanelPlayback.play] 恢复播放，
-  /// 并将 [state.dragOffset] 重置为 [Offset.zero]（面板下次打开时居中）。
+  /// 仅当打开前快照为 [MediaState.playing] 时才调用
+  /// [SettingsPanelPlayback.play] 恢复播放，并将 [state.dragOffset] 重置为
+  /// [Offset.zero]（面板下次打开时居中）。
   void close() {
     if (!state.isOpen.value) return;
     state.isOpen.value = false;
-    if (_wasPlaying) {
+    if (_preOpenState == MediaState.playing) {
       _playback.play();
     }
     state.dragOffset.value = Offset.zero;
