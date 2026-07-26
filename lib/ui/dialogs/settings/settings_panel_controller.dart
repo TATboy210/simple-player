@@ -72,13 +72,20 @@ class SettingsPanelController {
 
   /// 关闭面板 — 已关闭时 no-op（幂等）。
   ///
-  /// 仅当打开前快照为 [MediaState.playing] 时才调用
-  /// [SettingsPanelPlayback.play] 恢复播放，并将 [state.dragOffset] 重置为
-  /// [Offset.zero]（面板下次打开时居中）。
+  /// PAUSE-03 安全恢复规则：仅当打开前快照为 [MediaState.playing] 时才调用
+  /// [SettingsPanelPlayback.play] 恢复播放。非 playing 快照（idle/opening/
+  /// paused/completed/error，以及由独立 ValueNotifier 跟踪的 buffering/seeking）
+  /// 一律不恢复——这些状态代表媒体不可恢复或不应自动续播，避免设置面板在
+  /// 加载、完成、手动暂停期间产生播放竞态。
+  ///
+  /// 无论是否恢复，都将 [state.dragOffset] 重置为 [Offset.zero]（面板下次
+  /// 打开时居中），并释放延迟应用状态（TABS-04）。
   void close() {
     if (!state.isOpen.value) return;
     state.isOpen.value = false;
-    if (_preOpenState == MediaState.playing) {
+    // PAUSE-03: 仅 playing 快照可恢复；opening/completed/manual-pause 等不恢复.
+    final shouldResume = _preOpenState == MediaState.playing;
+    if (shouldResume) {
       _playback.play();
     }
     state.dragOffset.value = Offset.zero;
