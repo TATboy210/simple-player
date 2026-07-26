@@ -54,9 +54,9 @@ created: 2026-07-26
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 30-01-01 | 01 | 1 | LAYOUT-01 | — | N/A | widget | `flutter test test/widgets/panel_size_test.dart` | ❌ W0 | ⬜ pending |
 | 30-01-02 | 01 | 1 | LAYOUT-02 | — | N/A | widget | `flutter test test/widgets/panel_size_test.dart` | ❌ W0 | ⬜ pending |
-| 30-01-03 | 01 | 1 | LAYOUT-03 | — | N/A | widget | `flutter test test/widgets/multi_monitor_clamp_test.dart` | ❌ W0 | ⬜ pending |
-| 30-01-04 | 01 | 1 | LAYOUT-04 | — | N/A | widget | `flutter test test/widgets/panel_color_test.dart` | ❌ W0 | ⬜ pending |
-| 30-01-05 | 01 | 1 | LAYOUT-05 | — | N/A | widget | `flutter test test/widgets/tab_strip_order_test.dart` | ✅ existing | ⬜ pending |
+| 30-01-03 | 01 | 1 | LAYOUT-04 | — | N/A | widget | `flutter test test/widgets/multi_monitor_clamp_test.dart` | ❌ W0 | ⬜ pending |
+| 30-01-04 | 01 | 1 | LAYOUT-05 | — | N/A | widget | `flutter test test/widgets/panel_color_test.dart` | ❌ W0 | ⬜ pending |
+| 30-01-05 | 01 | 1 | LAYOUT-03 | — | N/A | widget | `flutter test test/widgets/tab_strip_order_test.dart` | ✅ existing | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -65,8 +65,8 @@ created: 2026-07-26
 ## Wave 0 Requirements
 
 - [ ] Re-baseline `test/widgets/panel_size_test.dart` assertions to `width = min(0.5 × screenW, screenH × 16/9)` clamped to `[400, 960]` (LAYOUT-01, LAYOUT-02)
-- [ ] Add multi-monitor clamp widget test covering `display_enumerator` work-area clamp (LAYOUT-03)
-- [ ] Existing tab-strip order tests stay green after General-tab middle reorder (LAYOUT-05)
+- [ ] Add multi-monitor clamp widget test covering `display_enumerator` work-area clamp (LAYOUT-04)
+- [ ] Existing tab-strip order tests stay green after General-tab middle reorder (LAYOUT-03)
 
 *If none: "Existing infrastructure covers all phase requirements." — here, existing size/tab-strip tests need re-baselining, so Wave 0 listed.*
 
@@ -76,7 +76,7 @@ created: 2026-07-26
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Multi-monitor drag never lands on non-primary bezel gap | LAYOUT-03 | Requires real multi-monitor hardware; FFI clamp logic is unit-tested, but visual bezel-gap confirmation needs a physical dual-display rig | Drag settings overlay across monitor boundary on dual-display setup; confirm panel clamps to primary work-area, never straddles the bezel |
+| Multi-monitor drag never lands on non-primary bezel gap | LAYOUT-04 | Requires real multi-monitor hardware; FFI clamp logic is unit-tested, but visual bezel-gap confirmation needs a physical dual-display rig | Drag settings overlay across monitor boundary on dual-display setup; confirm panel clamps to primary work-area, never straddles the bezel |
 
 ---
 
