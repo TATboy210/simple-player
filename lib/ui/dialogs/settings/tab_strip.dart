@@ -33,23 +33,24 @@ class SettingsTabStrip extends StatelessWidget {
   /// 响应式 compact/normal 模式标志 — 控制 tab 高度、字体大小、间距。
   final bool isCompact;
 
-  /// 7 个 tab 图标（对应 General/EQ/Audio/Video/Shortcuts/About/Performance）。
+  /// 7 个 tab 图标（D-01 顺序：EQ/Audio/Video/General/Shortcuts/About/Performance，
+  /// General 位于 index 3 中间位）。
   static const _tabIcons = [
-    Icons.tune,
     Icons.equalizer,
     Icons.headphones,
     Icons.videocam,
+    Icons.tune,
     Icons.keyboard,
     Icons.info_outline,
     Icons.speed,
   ];
 
-  /// 7 个 tab 标签文字（Phase 25 可升级为 l10n）。
+  /// 7 个 tab 标签文字（D-01 顺序，General 居中；Phase 25 可升级为 l10n）。
   static const _tabLabels = [
-    '通用',
     '均衡器',
     '音频',
     '视频',
+    '通用',
     '快捷键',
     '关于',
     '性能',

@@ -55,37 +55,37 @@ class SettingsTabContent extends StatelessWidget {
             child: IndexedStack(
               index: selectedIndex,
               children: [
-                // Tab 0: 通用
+                // Tab 0: 均衡器 (D-01 顺序：EQ/Audio/Video/General/...)
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(end: 0 == selectedIndex ? 1.0 : 0.0),
                   duration: const Duration(milliseconds: 200),
                   builder: (context, opacity, child) =>
                       Opacity(opacity: opacity, child: child),
-                  child: GeneralTab(pending: pending),
+                  child: EqualizerTab(pending: pending),
                 ),
-                // Tab 1: 均衡器
+                // Tab 1: 音频
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(end: 1 == selectedIndex ? 1.0 : 0.0),
                   duration: const Duration(milliseconds: 200),
                   builder: (context, opacity, child) =>
                       Opacity(opacity: opacity, child: child),
-                  child: EqualizerTab(pending: pending),
+                  child: AudioTab(pending: pending),
                 ),
-                // Tab 2: 音频
+                // Tab 2: 视频
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(end: 2 == selectedIndex ? 1.0 : 0.0),
                   duration: const Duration(milliseconds: 200),
                   builder: (context, opacity, child) =>
                       Opacity(opacity: opacity, child: child),
-                  child: AudioTab(pending: pending),
+                  child: VideoTab(pending: pending),
                 ),
-                // Tab 3: 视频
+                // Tab 3: 通用 (D-01：General 居中默认，defaultTabIndex=3)
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(end: 3 == selectedIndex ? 1.0 : 0.0),
                   duration: const Duration(milliseconds: 200),
                   builder: (context, opacity, child) =>
                       Opacity(opacity: opacity, child: child),
-                  child: VideoTab(pending: pending),
+                  child: GeneralTab(pending: pending),
                 ),
                 // Tab 4: 快捷键
                 TweenAnimationBuilder<double>(

@@ -74,8 +74,14 @@ class _SettingsNavItemState extends State<SettingsNavItem> {
             ),
             borderRadius: BorderRadius.circular(Tokens.radiusSm),
           ),
+          // D-04 fallback：窄面板（400px 面板下每 tab 内容宽 ~23px）时，
+          // "均衡器"等 3 字 label 自然宽度 ~42px 会触发 RenderFlex overflow。
+          // 用 stretch + FittedBox(scaleDown) 让 label 自适应缩放到可用宽度，
+          // 宽面板下 Text 自然宽 < 约束，scaleDown 不触发，保持原 fontSize 不变。
+          // 不改 sizing 公式 / breakpointResponsive 语义 / compact 逻辑（D-04 边界）。
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: Tokens.durationFast),
@@ -87,16 +93,20 @@ class _SettingsNavItemState extends State<SettingsNavItem> {
                 ),
               ),
               const SizedBox(height: 2),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: Tokens.durationFast),
-                style: TextStyle(
-                  fontSize: widget.fontSize,
-                  color: fgColor,
-                  fontWeight: widget.selected
-                      ? Tokens.weightMedium
-                      : Tokens.weightRegular,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: Tokens.durationFast),
+                  style: TextStyle(
+                    fontSize: widget.fontSize,
+                    color: fgColor,
+                    fontWeight: widget.selected
+                        ? Tokens.weightMedium
+                        : Tokens.weightRegular,
+                  ),
+                  child: Text(widget.label),
                 ),
-                child: Text(widget.label),
               ),
             ],
           ),

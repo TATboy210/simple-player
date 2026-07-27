@@ -227,17 +227,18 @@ class Tokens {
   static const double breakpointUltraCompact = 360;
   static const double breakpointWide = 1200;
 
-  // ── 响应式设置面板 ──
+  // ── 响应式设置面板（D-04：严格 16:9 几何）──
   /// 设置面板 tab bar 切换 normal/compact 的窗口宽度断点（>=800 normal, <800 compact）
+  /// 注意：仅驱动 tab-compact 呈现，不参与 sizing 公式（D-04：sizing 无断点分支）
   static const double breakpointResponsive = 800.0;
   /// 面板最小宽度（clamp 下限）
   static const double panelMinWidth = 400.0;
-  /// 面板最大宽度（clamp 上限）
-  static const double panelMaxWidth = 600.0;
-  /// 面板宽度占窗口宽度比例
-  static const double panelWidthRatio = 0.8;
-  /// 面板高度占面板宽度比例（全屏 600×480, 小窗口 400×320）
-  static const double panelHeightRatio = 0.8;
+  /// 面板最大宽度（clamp 上限，D-04：16:9 几何上限 960）
+  static const double panelMaxWidth = 960.0;
+  /// 面板宽度占窗口宽度比例（D-04：0.5，width=min(0.5×W, H×16/9)）
+  static const double panelWidthRatio = 0.5;
+  /// 面板宽高比（D-04：16:9，height = width / panelAspectRatio）
+  static const double panelAspectRatio = 16.0 / 9.0;
   /// normal 模式 tab 字体大小
   static const double tabBarFontNormal = 14.0;
   /// compact 模式 tab 字体大小

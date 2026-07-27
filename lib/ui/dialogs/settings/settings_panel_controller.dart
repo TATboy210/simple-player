@@ -37,6 +37,10 @@ class SettingsPanelController {
   /// Tab 总数 — 用于 nextTab/prevTab 首尾循环的模数.
   static const int tabCount = 7;
 
+  /// 默认 tab 索引 — General 在七 tab 序列 [EQ, Audio, Video, General, Shortcuts,
+  /// About, Performance] 中位于 index 3（D-01：General 为中间/默认打开项）.
+  static const int defaultTabIndex = 3;
+
   /// 打开面板 — 已打开时 no-op（幂等）。
   ///
   /// 顺序：先重置 selectedTab 为 0（D-03），再快照播放状态（[MediaState]），
@@ -45,8 +49,8 @@ class SettingsPanelController {
   /// 确保面板打开期间播放始终暂停，无论快照为何种状态.
   void open() {
     if (state.isOpen.value) return;
-    // D-03: 每次打开重置到 General tab（index 0）
-    state.selectedTab.value = 0;
+    // D-01: 每次打开重置到 General tab（index 3，七 tab 序列中间）
+    state.selectedTab.value = defaultTabIndex;
     // PAUSE-02: 经窄接缝 isPlaying 投影为 MediaState 快照——playing 可恢复，
     // 其余状态统一记为 paused（非 playing 的安全代表），close() 只认 playing.
     _preOpenState = _playback.isPlaying ? MediaState.playing : MediaState.paused;
