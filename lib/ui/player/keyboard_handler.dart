@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -181,13 +182,47 @@ class KeyboardHandler extends StatelessWidget {
       return KeyEventResult.handled;
     }
 
-    // 调试快捷键: F12 导出性能统计（仅 debug 模式）
-    if (kDebugMode && key == LogicalKeyboardKey.f12) {
-      final stats = PerfMonitor.instance.exportStats();
-      developer.log(
-        'Performance Stats:\n${const JsonEncoder.withIndent('  ').convert(stats)}',
-        name: 'Perf',
-      );
+    // 性能基线导出: F12 启用 PerfMonitor（幂等）并导出统计到 JSON
+    // profile + debug 模式均可用 — Plan 31 baseline protocol 依赖此入口
+    // （RESEARCH §2：profile mode 每帧采样 + A/B exportStats 基线对比）
+    if ((kDebugMode || kProfileMode) && key == LogicalKeyboardKey.f12) {
+      final monitor = PerfMonitor.instance;
+      // 幂等启用：已注册 timings callback 时为 no-op（perf_monitor.dart L36-43）
+      monitor.enable();
+      final stats = monitor.exportStats();
+      final frameCount = stats['frameCount'];
+      // 首次按下：callback 刚注册，尚无采样帧 → 提示操作后再导出
+      if (frameCount == null || frameCount == 0) {
+        developer.log(
+          'PerfMonitor enabled. Operate the app (drag/scroll), then press '
+          'F12 again to export the baseline JSON.',
+          name: 'Perf',
+        );
+      } else {
+        final json = const JsonEncoder.withIndent('  ').convert(stats);
+        // 写入项目根基线路径（CWD 相对；flutter run 通常以项目根为 CWD）
+        const basePath =
+            '.planning/phases/31-visual-design-alignment/perf-baseline-pre.json';
+        try {
+          final file = File(basePath);
+          if (!file.parent.existsSync()) {
+            file.parent.createSync(recursive: true);
+          }
+          // 同步写入 — 一次性小 JSON（<2KB），阻塞可忽略
+          file.writeAsStringSync(json, flush: true);
+          developer.log(
+            'Perf baseline exported ($frameCount frames) to:\n'
+            '${file.absolute.path}\n$json',
+            name: 'Perf',
+          );
+        } on Exception catch (e) {
+          // 文件 IO 失败不阻塞键处理 — 仍打印统计供手动复制
+          developer.log(
+            'Perf baseline export failed: $e\nStats:\n$json',
+            name: 'Perf',
+          );
+        }
+      }
       return KeyEventResult.handled;
     }
 
