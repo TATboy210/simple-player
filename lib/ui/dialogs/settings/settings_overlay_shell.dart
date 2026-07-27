@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 
 import '../../../kernel/bridge/display_enumerator.dart';
 import '../../shared/apple_curves.dart';
+import '../../shared/control_bar_decoration.dart';
 import '../../shared/glass_container.dart';
 import '../../shared/settings_button.dart';
 import '../../theme/tokens.dart';
@@ -344,6 +345,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   ///
   /// 标题栏区域支持拖拽（D-09）：onPanStart 异步缓存窗口屏幕坐标（D-03），
   /// onPanUpdate 更新 dragOffset 并 clamp 到显示器 workArea（D-03）。
+  ///
+  /// Phase 31 D-11：chrome 装饰切换为共享 [ControlBarDecoration.playing]
+  /// （4-shadow + controlBarBg + controlBarBorderWhite 边框 + glowOuterRing），
+  /// 仅顶部圆角（radiusLg）——与 GlassContainer 外轮廓对齐，段间零圆角防
+  /// 阴影接缝（31-RESEARCH Pitfall 1 的 corner-only 缓解）。
   Widget _buildTitleBar(Size mediaSize, Size panelSize) {
     return GestureDetector(
       key: SettingsOverlayShell.titleBarKey,
@@ -353,7 +359,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       child: Container(
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
-        color: Tokens.panelSectionBg,
+        decoration: ControlBarDecoration.playing(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(Tokens.radiusLg),
+          ),
+        ),
         child: Row(
           children: [
             const Text(

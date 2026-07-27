@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/control_bar_decoration.dart';
 import '../shared/edge_glow.dart';
 import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
@@ -17,62 +18,17 @@ import 'time_range_display.dart';
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
 
-  /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框（D-01: static final 缓存）
-  static final _decorationPlaying = BoxDecoration(
-    color: Tokens.controlBarBg,
-    borderRadius: ControlBar._borderRadius,
-    border: Border.all(color: Tokens.controlBarBorderWhite, width: 1),
-    boxShadow: const [
-      // CSS: inset 0 1px 0 rgba(255,255,255,0.04) — 顶部内高光
-      BoxShadow(
-        color: Tokens.controlBarBorderWhite,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, -1),
-      ),
-      // CSS: inset 0 -1px 0 rgba(0,0,0,0.1) — 底部内阴影
-      BoxShadow(
-        color: Tokens.controlBarShadowBlack,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, 1),
-      ),
-      // CSS: 0 8px 32px rgba(0,0,0,0.25) — 外层投影
-      BoxShadow(
-        color: Tokens.controlBarOuterShadow,
-        blurRadius: 32,
-        offset: Offset(0, 8),
-      ),
-      // CSS: 0 0 0 1px rgba(80,130,255,0.04) — 蓝色外环
-      BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
-    ],
-  );
+  /// 播放状态装饰 — 深色毛玻璃 + 蓝色微光边框（Phase 31 D-01: 提取至共享
+  /// [ControlBarDecoration]，本类 static final 缓存 no-arg 实例保持热路径零重建）
+  static final _decorationPlaying = ControlBarDecoration.playing();
 
-  /// 空状态装饰 — 2% 淡蓝描边（idle，比 playing 淡，per D-18）+ 补齐 4 个 BoxShadow（D-01/D-04）
-  static final _decorationIdle = BoxDecoration(
-    color: Tokens.controlBarBg,
-    borderRadius: ControlBar._borderRadius,
-    border: Border.all(color: Tokens.controlBarBorderIdle, width: 1),
-    boxShadow: const [
-      BoxShadow(
-        color: Tokens.controlBarBorderIdle,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, -1),
-      ),
-      BoxShadow(
-        color: Tokens.controlBarShadowBlack,
-        blurRadius: 0,
-        spreadRadius: 0,
-        offset: Offset(0, 1),
-      ),
-      // 补齐 4 个 BoxShadow，让 DecorationTween 插值更平滑（D-04）
-      BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
-      BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0),
-    ],
-  );
+  /// 空状态装饰 — 2% 淡蓝描边（idle，比 playing 淡）+ 4 个 BoxShadow
+  /// （Phase 31 D-03: idle 随 playing 一并提取至共享，保持 shared/local 不混用）
+  static final _decorationIdle = ControlBarDecoration.idle();
 
-  /// DecorationTween — playing/idle 状态插值（D-01/D-02）
+  /// DecorationTween — playing/idle 状态插值（Phase 31 D-03: tween 保留本地，
+  /// 仅 begin/end 源装饰改为共享工厂；DecorationTween 按 index lerp shadow 列表，
+  /// idle 的 4-shadow padding 由 ControlBarDecoration.idle 保证）
   static final _decorationTween = DecorationTween(
     begin: _decorationIdle,
     end: _decorationPlaying,
