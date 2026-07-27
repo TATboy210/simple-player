@@ -22,7 +22,7 @@
 
 - [ ] **Phase 28: Settings Shell Split + Legacy Deletion** - Prerequisite refactor: split 517-line shell into 3 files + delete legacy 88px-sidebar panel
 - [x] **Phase 29: Auto-Pause Always** - Panel-open always pauses (wasPlaying guard dropped); MediaState snapshot for safe resume
-- [ ] **Phase 30: Panel Layout Redesign** - 16:9 / 50%-area overlay + General tab middle + multi-monitor clamp
+- [x] **Phase 30: Panel Layout Redesign** - 16:9 / 50%-area overlay + General tab middle + multi-monitor clamp
 - [ ] **Phase 31: Visual Design Alignment** - Panel chrome + option rows aligned to control-bar glass / edge-glow / three-state
 - [ ] **Phase 32: Navigation & Interaction Polish** - End-cap arrows + InputModeDetector + hint substitution + raw LB/RB binding deletion
 - [ ] **Phase 33: Audio Settings Tab** - EQ / balance / sync / normalization via single af string, pure deferred-apply
@@ -198,11 +198,11 @@ Every v1 requirement mapped to exactly one phase. No orphans, no duplicates.
 | PAUSE-02 | Phase 29 | Complete |
 | PAUSE-03 | Phase 29 | Complete |
 | PAUSE-04 | Phase 29 | Complete |
-| LAYOUT-01 | Phase 30 | Pending |
-| LAYOUT-02 | Phase 30 | Pending |
-| LAYOUT-03 | Phase 30 | Pending |
-| LAYOUT-04 | Phase 30 | Pending |
-| LAYOUT-05 | Phase 30 | Pending |
+| LAYOUT-01 | Phase 30 | Complete |
+| LAYOUT-02 | Phase 30 | Complete |
+| LAYOUT-03 | Phase 30 | Complete |
+| LAYOUT-04 | Phase 30 | Complete |
+| LAYOUT-05 | Phase 30 | Complete |
 | VISUAL-01 | Phase 31 | Pending |
 | VISUAL-02 | Phase 31 | Pending |
 | VISUAL-03 | Phase 31 | Pending |
