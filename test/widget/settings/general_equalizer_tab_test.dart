@@ -1,150 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/l10n/app_localizations.dart';
-import 'package:simple_player_flutter/ui/dialogs/settings/general_tab.dart';
-import 'package:simple_player_flutter/ui/dialogs/settings/equalizer_tab.dart';
-import 'package:simple_player_flutter/ui/shared/glass_container.dart';
-import 'package:simple_player_flutter/ui/shared/section_header.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/pending_settings.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/tabs/equalizer_tab.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/tabs/general_tab.dart';
+import 'package:simple_player_flutter/ui/shared/focusable_setting_row.dart';
 import 'package:simple_player_flutter/ui/shared/settings_card.dart';
-
-import '../../helpers/fake_engine.dart';
-
-/// 带 AppLocalizations 的 MaterialApp 包装器
-MaterialApp _wrapWithL10n(Widget child) {
-  return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: child),
-  );
-}
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 void main() {
-  group('GeneralTab', () {
-    testWidgets('renders with GlassContainer', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        const GeneralTab(
-          currentLocale: 'zh',
-          currentThemeIndex: 0,
-        ),
-      ));
+  group('settings tab SettingRow consumers', () {
+    testWidgets('GeneralTab keeps each row on one non-InkWell focus route', (
+      tester,
+    ) async {
+      // Arrange & Act
+      await tester.pumpWidget(
+        _wrap(GeneralTab(pending: PendingSettingsState())),
+      );
 
-      // 应使用 GlassContainer（SettingsCard 已移除）
-      expect(find.byType(GlassContainer), findsWidgets);
+      // Assert — interactive controls keep their own semantics while InkWell
+      // cannot introduce a second tab stop around the row.
+      expect(find.byType(SettingRow), findsNWidgets(2));
+      expect(find.byType(FocusableSettingRow), findsNWidgets(2));
+      _expectRowsUseLockedDensity(tester);
     });
 
-    testWidgets('renders language section header with icon', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        const GeneralTab(
-          currentLocale: 'zh',
-          currentThemeIndex: 0,
-        ),
-      ));
+    testWidgets('EqualizerTab keeps its setting row geometry and focus route', (
+      tester,
+    ) async {
+      // Arrange & Act
+      await tester.pumpWidget(
+        _wrap(EqualizerTab(pending: PendingSettingsState())),
+      );
 
-      // 语言 SectionHeader 应带 Icons.language
-      final sectionHeaders = tester.widgetList<SectionHeader>(
-        find.byType(SectionHeader),
-      );
-      final langHeader = sectionHeaders.firstWhere(
-        (h) => h.icon == Icons.language,
-      );
-      expect(langHeader, isNotNull);
+      // Assert
+      expect(find.byType(SettingRow), findsOneWidget);
+      expect(find.byType(FocusableSettingRow), findsOneWidget);
+      _expectRowsUseLockedDensity(tester);
     });
 
-    testWidgets('renders theme section header with icon', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        const GeneralTab(
-          currentLocale: 'zh',
-          currentThemeIndex: 0,
-        ),
-      ));
+    testWidgets(
+      'focused text value keeps the accent route without geometry shift',
+      (tester) async {
+        // Arrange
+        final focusNode = FocusNode();
+        addTearDown(focusNode.dispose);
+        await tester.pumpWidget(
+          _wrap(
+            SettingRow(
+              focusNode: focusNode,
+              title: 'Representative value',
+              control: const Text('Enabled'),
+              onTap: () {},
+            ),
+          ),
+        );
+        final beforeFocusHeight = tester
+            .getSize(find.byType(SettingRow))
+            .height;
 
-      // 主题 SectionHeader 应带 Icons.palette
-      final sectionHeaders = tester.widgetList<SectionHeader>(
-        find.byType(SectionHeader),
-      );
-      final themeHeader = sectionHeaders.firstWhere(
-        (h) => h.icon == Icons.palette,
-      );
-      expect(themeHeader, isNotNull);
-    });
+        // Act
+        focusNode.requestFocus();
+        await tester.pump();
 
-    testWidgets('language chips trigger onLocaleChanged callback',
-        (tester) async {
-      String? changedLocale;
-      await tester.pumpWidget(_wrapWithL10n(
-        GeneralTab(
-          currentLocale: 'zh',
-          currentThemeIndex: 0,
-          onLocaleChanged: (loc) => changedLocale = loc,
-        ),
-      ));
-
-      // 点击 English chip
-      await tester.tap(find.text('English'));
-      await tester.pump();
-      expect(changedLocale, 'en');
-    });
+        // Assert
+        final value = tester.widget<Text>(find.text('Enabled'));
+        expect(value.style?.color, Tokens.accent);
+        expect(
+          tester.getSize(find.byType(SettingRow)).height,
+          beforeFocusHeight,
+        );
+        expect(beforeFocusHeight, 40);
+      },
+    );
   });
+}
 
-  group('EqualizerTab', () {
-    late FakeEngine engine;
+/// Provides Material inherited widgets required by settings controls and ink.
+Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
-    setUp(() {
-      engine = FakeEngine();
-    });
-
-    tearDown(() {
-      engine.dispose();
-    });
-
-    testWidgets('renders with GlassContainer', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        EqualizerTab(engine: engine),
-      ));
-
-      // 应使用 GlassContainer（SettingsCard 已移除）
-      expect(find.byType(GlassContainer), findsOneWidget);
-    });
-
-    testWidgets('renders equalizer section header', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        EqualizerTab(engine: engine),
-      ));
-
-      final sectionHeaders = tester.widgetList<SectionHeader>(
-        find.byType(SectionHeader),
-      );
-      final eqHeader = sectionHeaders.firstWhere(
-        (h) => h.icon == Icons.equalizer,
-      );
-      expect(eqHeader, isNotNull);
-    });
-
-    testWidgets('preserves SettingRow for each preset', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        EqualizerTab(engine: engine),
-      ));
-
-      // 应有 5 个 SettingRow（5 个均衡器预设）
-      expect(find.byType(SettingRow), findsNWidgets(5));
-    });
-
-    testWidgets('preset selection calls engine.setEqualizer', (tester) async {
-      await tester.pumpWidget(_wrapWithL10n(
-        EqualizerTab(engine: engine),
-      ));
-
-      // 点击第二个预设（Bass Boost）
-      await tester.tap(find.byType(SettingRow).at(1));
-      await tester.pump();
-
-      // FakeEngine.setEqualizer 是 no-op，但选中状态应更新
-      // 验证第二个 radio button 变为 checked
-      final icons = tester.widgetList<Icon>(find.byType(Icon));
-      final checkedIcons = icons.where(
-        (icon) => icon.icon == Icons.radio_button_checked,
-      );
-      expect(checkedIcons.length, 1);
-    });
-  });
+/// Verifies focus borders remain paint-only while all consumer rows stay compact.
+void _expectRowsUseLockedDensity(WidgetTester tester) {
+  for (final row in tester.widgetList<SettingRow>(find.byType(SettingRow))) {
+    final rowFinder = find.byWidget(row);
+    final wrapperFinder = find.descendant(
+      of: rowFinder,
+      matching: find.byType(FocusableSettingRow),
+    );
+    expect(tester.getSize(wrapperFinder).height, 40);
+  }
 }
