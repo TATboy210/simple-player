@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/_settings_nav_item.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
@@ -28,7 +29,9 @@ void main() {
     bool initiallyPlaying = true,
     Widget Function(Widget shell)? decorate,
   }) async {
-    final fake = FakePlaybackController(initiallyPlaying: initiallyPlaying);
+    final fake = FakePlaybackController(
+      initialState: initiallyPlaying ? MediaState.playing : MediaState.idle,
+    );
     final controller = SettingsPanelController(fake);
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox());
@@ -138,8 +141,8 @@ void main() {
     testWidgets(
       'title-bar drag updates dragOffset and clamps inside MediaQuery bounds',
       (tester) async {
-        // Arrange — 800×600 窗口，面板 600×480（80% clamp 到 600，height=width*0.8）
-        // maxX=(800-600)/2=100, maxY=max(0,(600-480)/2)=60
+        // Arrange — 800×600 窗口，面板 400×225（D-04：width=min(0.5×800, 600×16/9)=400，
+        // height=400×9/16=225）；maxX=(800-400)/2=200, maxY=(600-225)/2=187.5
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(800, 600),
@@ -156,7 +159,7 @@ void main() {
         await gesture.up();
         await tester.pump();
 
-        // Assert — dx=50（在 maxX=100 内），dy=30（在 maxY=60 内）
+        // Assert — dx=50（在 maxX=200 内），dy=30（在 maxY=187.5 内）
         expect(controller.state.dragOffset.value.dx, 50.0);
         expect(controller.state.dragOffset.value.dy, 30.0);
 
@@ -168,17 +171,18 @@ void main() {
         await gesture2.up();
         await tester.pump();
 
-        // Assert — 被 clamp 到 maxX=100, maxY=60
-        expect(controller.state.dragOffset.value.dx, 100.0);
-        expect(controller.state.dragOffset.value.dy, 60.0);
+        // Assert — 被 clamp 到 maxX=200, maxY=187.5
+        expect(controller.state.dragOffset.value.dx, 200.0);
+        expect(controller.state.dragOffset.value.dy, 187.5);
       },
     );
 
     testWidgets(
       'title-bar drag clamps correctly with undersized window (smaller than 500x400)',
       (tester) async {
-        // Arrange — 480×360 窗口，面板=400×320（clamp 到 minWidth，height=width*0.8）
-        // maxX=max(0,(480-400)/2)=40, maxY=max(0,(360-320)/2)=20
+        // Arrange — 480×360 窗口，面板 400×225（D-04：width=min(0.5×480, 360×16/9)=240，
+        // clamp 到 minWidth=400；height=400×9/16=225）
+        // maxX=max(0,(480-400)/2)=40, maxY=max(0,(360-225)/2)=67.5
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(480, 360),
@@ -195,9 +199,9 @@ void main() {
         await gesture.up();
         await tester.pump();
 
-        // Assert — 被 clamp 到小窗口的 maxX=40, maxY=20
+        // Assert — 被 clamp 到小窗口的 maxX=40, maxY=67.5
         expect(controller.state.dragOffset.value.dx, 40.0);
-        expect(controller.state.dragOffset.value.dy, 20.0);
+        expect(controller.state.dragOffset.value.dy, 67.5);
       },
     );
 
@@ -246,9 +250,10 @@ void main() {
     );
 
     testWidgets(
-      '625x500 window produces 500x400 panel (80% clamped to 500, height=width*0.8)',
+      '625x500 window produces 400x225 panel (D-04: min(0.5W, H*16/9) clamped to 400, height=W*9/16)',
       (tester) async {
-        // Arrange — 625×500 → width=625*0.8=500, height=500*0.8=400
+        // Arrange — 625×500 → width=min(0.5×625=312.5, 500×16/9≈888.9)=312.5,
+        // clamp 到 minWidth=400；height=400×9/16=225
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(625, 500),
@@ -256,19 +261,20 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板尺寸精确 500×400
+        // Assert — 面板尺寸精确 400×225（D-04 严格 16:9）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 500.0);
-        expect(panelBox.height, 400.0);
+        expect(panelBox.width, 400.0);
+        expect(panelBox.height, 225.0);
       },
     );
 
     testWidgets(
-      'below-threshold window produces 480x384 panel (80% ratio, height=width*0.8)',
+      'below-threshold window produces 400x225 panel (D-04: min(0.5W, H*16/9) clamps to minWidth)',
       (tester) async {
-        // Arrange — 600×400 → width=600*0.8=480, height=480*0.8=384
+        // Arrange — 600×400 → width=min(0.5×600=300, 400×16/9≈711.1)=300,
+        // clamp 到 minWidth=400；height=400×9/16=225
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(600, 400),
@@ -276,12 +282,12 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 宽度 480，高度 384
+        // Assert — 宽度 400（clamp 下限），高度 225（16:9）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 480.0);
-        expect(panelBox.height, 384.0);
+        expect(panelBox.width, 400.0);
+        expect(panelBox.height, 225.0);
       },
     );
 
@@ -351,15 +357,15 @@ void main() {
     );
 
     testWidgets(
-      'default selected tab is index 0 (通用) on open',
+      'default selected tab is index 3 (通用) on open',
       (tester) async {
         // Arrange & Act
         final (controller, _) = await pumpShell(tester);
         controller.open();
         await tester.pump();
 
-        // Assert — selectedTab 为 0
-        expect(controller.state.selectedTab.value, 0);
+        // Assert — selectedTab 为 3（D-01：General 在七 tab 序列 index 3 默认打开）
+        expect(controller.state.selectedTab.value, 3);
 
         // Assert — 通用 文字可见（tab bar + 内容区各一处）
         expect(find.text('通用'), findsWidgets);
@@ -374,9 +380,9 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 7 个标签全部可见
+        // Assert — 7 个标签全部可见（D-01 顺序：EQ/Audio/Video/General/Shortcuts/About/Performance）
         const labels = [
-          '通用', '均衡器', '音频', '视频', '快捷键', '关于', '性能',
+          '均衡器', '音频', '视频', '通用', '快捷键', '关于', '性能',
         ];
         for (final label in labels) {
           expect(find.text(label), findsWidgets); // 至少在 tab bar 和内容区各一处
@@ -423,8 +429,8 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — selectedTab 重置为 0（D-03）
-        expect(controller.state.selectedTab.value, 0);
+        // Assert — selectedTab 重置为 3（D-01：General 默认 index 3）
+        expect(controller.state.selectedTab.value, 3);
       },
     );
 
@@ -520,31 +526,31 @@ void main() {
         await tester.pump();
         await tester.pump(); // Focus 获得焦点
 
-        // Act
+        // Act — default tab 3（D-01），按右 → tab 4
         await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
         await tester.pump();
 
         // Assert
-        expect(controller.state.selectedTab.value, 1);
+        expect(controller.state.selectedTab.value, 4);
       },
     );
 
     testWidgets(
-      'Arrow Left switches to previous tab (wrapping 0→6)',
+      'Arrow Left switches to previous tab (default 3, left → 2)',
       (tester) async {
-        // Arrange
+        // Arrange — default tab 3（D-01）
         final (controller, _) = await pumpShell(tester);
         controller.open();
         await tester.pump();
         await tester.pump();
-        expect(controller.state.selectedTab.value, 0);
+        expect(controller.state.selectedTab.value, 3);
 
-        // Act — 从 tab 0 按左键，应循环到 tab 6
+        // Act — 从 tab 3 按左键 → tab 2
         await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
         await tester.pump();
 
         // Assert
-        expect(controller.state.selectedTab.value, 6);
+        expect(controller.state.selectedTab.value, 2);
       },
     );
 
@@ -581,7 +587,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        // Act — 按 3 次右键
+        // Act — 按 3 次右键（default tab 3，3 次后 → tab 6）
         await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
         await tester.pump();
         await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
@@ -589,15 +595,15 @@ void main() {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
         await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 3);
+        // Assert — default 3 + 3 次右键 = tab 6
+        expect(controller.state.selectedTab.value, 6);
       },
     );
 
     testWidgets(
       'gamepad Right Shoulder (gameButton12) switches to next tab',
       (tester) async {
-        // Arrange
+        // Arrange — default tab 3（D-01）
         final (controller, _) = await pumpShell(tester);
         controller.open();
         await tester.pump();
@@ -607,8 +613,8 @@ void main() {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButton12);
         await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 1);
+        // Assert — 3 + 1 = tab 4
+        expect(controller.state.selectedTab.value, 4);
       },
     );
 
@@ -638,7 +644,7 @@ void main() {
     testWidgets(
       'gamepad gameButtonRight1 also works (cross-platform)',
       (tester) async {
-        // Arrange
+        // Arrange — default tab 3（D-01）
         final (controller, _) = await pumpShell(tester);
         controller.open();
         await tester.pump();
@@ -648,8 +654,8 @@ void main() {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonRight1);
         await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 1);
+        // Assert — 3 + 1 = tab 4
+        expect(controller.state.selectedTab.value, 4);
       },
     );
 
@@ -707,8 +713,8 @@ void main() {
         await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
         await tester.pump();
 
-        // Assert — selectedTab 不变
-        expect(controller.state.selectedTab.value, 0);
+        // Assert — selectedTab 不变（default 3，D-01）
+        expect(controller.state.selectedTab.value, 3);
       },
     );
 
