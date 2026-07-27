@@ -4,16 +4,16 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 31
 current_phase_name: visual-design-alignment
-status: ready-to-execute
-stopped_at: planning complete — 3 plans, 3 waves, checker iter 2 passed (2026-07-27)
-last_updated: "2026-07-27T13:55:48.676Z"
+status: executing
+stopped_at: Completed 31-02-PLAN.md
+last_updated: "2026-07-27T17:28:10.183Z"
 last_activity: 2026-07-27
-last_activity_desc: plan-phase complete — 3 plans (31-01/02/03), 3 waves, 0 blockers, GlassButton deferred to Phase 32 (Option C), decision coverage 12/12, requirements 5/5
+last_activity_desc: resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 6
+  total_plans: 10
+  completed_plans: 8
   percent: 29
 ---
 
@@ -71,6 +71,7 @@ Last activity: 2026-07-27 — resume-work → user chose resume Phase 31 discuss
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 16-diagnosticsbundle P04 | 45min | 4 tasks | 4 files |
+| Phase 31 P02 | 34 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [v2.1]: StateMonitor 拆分为 PlaybackStateManager（设置+断点+持久化）+ AutoAdvancePolicy（连播策略）
 - [v2.1]: open() 使用 _openGeneration 计数器替代 _isOpening bool
 - [Phase ?]: No adapter-layer openGeneration test created; texture-channel mock copied verbatim; native DLLs copied for local test env per Phase 15 precedent
+- [Phase ?]: FocusableSettingRow remains the sole keyboard focus owner; embedded InkWell is pointer-only.
+- [Phase ?]: focusedBuilder delivers focus state to active values without Focus.of polling.
 
 ### Pending Todos
 
@@ -111,9 +114,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-27T13:55:48.649Z
-Stopped at: context exhaustion at 79% (2026-07-27)
-Resume file: .planning/phases/31-visual-design-alignment/31-UI-SPEC.md
+Last session: 2026-07-27T17:28:10.156Z
+Stopped at: Completed 31-02-PLAN.md
+Resume file: None
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 

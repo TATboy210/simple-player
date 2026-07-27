@@ -105,11 +105,11 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 31-01-PLAN.md — Extract the shared control-bar decoration and route all three panel chrome sections through it
+- [x] 31-01-PLAN.md — Extract the shared control-bar decoration and route all three panel chrome sections through it
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 31-02-PLAN.md — Implement compact three-state SettingRow and GlassButton interaction with single-owner focus behavior
+- [x] 31-02-PLAN.md — Implement compact three-state SettingRow and GlassButton interaction with single-owner focus behavior
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
