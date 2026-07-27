@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:simple_player_flutter/kernel/bridge/win32/win32_display_enumerator.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/bridge/window_mode.dart';
@@ -300,9 +301,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         },
                           ),
                           // 设置覆盖层壳 — 在内容区 Stack 顶层，CustomTitleBar 之下（D-05）
+                          // Plan 30-02：注入 Win32DisplayAdapter + windowManager.getPosition
+                          // tear-off，使 drag session 缓存真实窗口屏幕坐标做 workArea clamp
+                          //（D-03）；FFI 异常 / null display 走对称 MediaQuery fallback（D-03）.
                           SettingsOverlayShell(
                             controller: widget.settingsPanelController,
                             resizing: widget.windowService.isResizing,
+                            displayEnumerator: Win32DisplayAdapter(),
+                            windowPositionReader: windowManager.getPosition,
                           ),
                         ],
                       ),
