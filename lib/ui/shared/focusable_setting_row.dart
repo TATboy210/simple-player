@@ -62,9 +62,14 @@ class _FocusableSettingRowState extends State<FocusableSettingRow> {
   Widget build(BuildContext context) {
     final child = _buildChild(context);
 
-    // D-15: 禁用行不接收焦点，也不让嵌入 InkWell 接收指针事件。
+    // D-15: Disabled rows neither receive focus nor pointer events. Keep the
+    // permanent border slot so display-only rows preserve the 40px row geometry.
     if (!widget.enabled) {
-      return ExcludeFocus(child: IgnorePointer(child: child));
+      return ExcludeFocus(
+        child: IgnorePointer(
+          child: _buildDecoratedChild(child, Colors.transparent),
+        ),
+      );
     }
 
     return FocusableActionDetector(
@@ -76,17 +81,22 @@ class _FocusableSettingRowState extends State<FocusableSettingRow> {
       // are disabled by the current platform highlight mode.
       onFocusChange: _handleFocusHighlight,
       // Hover 由 SettingRow 的 InkWell 单一拥有，避免多个背景来源闪烁。
-      child: Container(
-        decoration: BoxDecoration(
-          // Container 始终保留边框槽位，焦点切换不会改变行的外部几何。
-          border: Border.all(
-            color: _focused ? Tokens.controlBarBorderWhite : Colors.transparent,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        ),
-        child: child,
+      child: _buildDecoratedChild(
+        child,
+        _focused ? Tokens.controlBarBorderWhite : Colors.transparent,
       ),
+    );
+  }
+
+  /// Paints the permanent focused-border slot without allowing decoration to shift layout.
+  Widget _buildDecoratedChild(Widget child, Color borderColor) {
+    return Container(
+      decoration: BoxDecoration(
+        // Container 始终保留边框槽位，焦点切换不会改变行的外部几何。
+        border: Border.all(color: borderColor, width: 1),
+        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+      ),
+      child: child,
     );
   }
 
