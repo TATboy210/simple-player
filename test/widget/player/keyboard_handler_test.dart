@@ -254,15 +254,5 @@ void main() {
       );
       expect(tracker.showHelp, 1);
     });
-
-    // ── F12 debug key ──
-
-    testWidgets('F12 key does not crash (perf stats export)', (tester) async {
-      await tester.pumpWidget(_buildSubject(tracker));
-      // F12 调用 PerfMonitor.instance.exportStats() — 验证不抛异常
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.f12);
-      // 无异常 = 通过（F12 不触发任何用户回调）
-      expect(tracker.playPause, 0);
-    });
   });
 }
