@@ -21,6 +21,9 @@ class SettingRow extends StatefulWidget {
   final Widget control;
   final VoidCallback? onTap;
 
+  /// 可选的行焦点节点；外层应用可用它控制键盘遍历的当前行。
+  final FocusNode? focusNode;
+
   const SettingRow({
     super.key,
     this.icon,
@@ -28,6 +31,7 @@ class SettingRow extends StatefulWidget {
     this.description,
     required this.control,
     this.onTap,
+    this.focusNode,
   });
 
   @override
@@ -35,50 +39,39 @@ class SettingRow extends StatefulWidget {
 }
 
 class _SettingRowState extends State<SettingRow> {
-  bool _hovered = false;
-  bool _pressed = false;
-
   @override
   Widget build(BuildContext context) {
-    final isActive = _hovered || _pressed;
-
-    // FocusableSettingRow 提供键盘焦点边框（D-11），enabled 由 onTap 驱动：
-    // 有 onTap → 可聚焦（交互行），无 onTap → 不可聚焦（仅展示行）
+    // FocusableSettingRow is the single keyboard stop; InkWell only owns pointer feedback.
     return FocusableSettingRow(
       enabled: widget.onTap != null,
-      child: MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() {
-        _hovered = false;
-        _pressed = false;
-      }),
-      child: GestureDetector(
-        onTapDown: widget.onTap != null
-            ? (_) => setState(() => _pressed = true)
-            : null,
-        onTapUp: widget.onTap != null
-            ? (_) => setState(() => _pressed = false)
-            : null,
-        onTapCancel: () => setState(() => _pressed = false),
+      focusNode: widget.focusNode,
+      focusedBuilder: (context, focused) => _buildInteractiveRow(focused),
+    );
+  }
+
+  /// Builds the transparent Material surface required for InkWell's visible ink effects.
+  Widget _buildInteractiveRow(bool focused) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: Tokens.durationFast),
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: Tokens.spSm),
-          decoration: BoxDecoration(
-            color: isActive ? Tokens.bgHover : Colors.transparent,
-            borderRadius: BorderRadius.circular(Tokens.radiusSm),
-          ),
-          child: Transform.scale(
-            scale: _pressed ? Tokens.pressScale : 1.0,
+        canRequestFocus: false,
+        autofocus: false,
+        hoverColor: Tokens.bgHover,
+        // Accent light remains visible against the dark glass during pointer press.
+        splashColor: Tokens.accentLight,
+        highlightColor: Tokens.bgHover,
+        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+        child: SizedBox(
+          // The focus wrapper paints a persistent 1px border on both edges.
+          // Keep its outer hit target at the locked 40 logical pixels.
+          height: 38,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Tokens.spXs),
             child: Row(
               children: [
-                if (widget.icon != null) ...[
-                  Icon(
-                    widget.icon,
-                    size: Tokens.iconSm,
-                    color: Tokens.textSecondary,
-                  ),
+                if (widget.icon case final icon?) ...[
+                  Icon(icon, size: Tokens.iconSm, color: Tokens.textSecondary),
                   const SizedBox(width: Tokens.spSm),
                 ],
                 Expanded(
@@ -95,9 +88,9 @@ class _SettingRowState extends State<SettingRow> {
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (widget.description != null)
+                      if (widget.description case final description?)
                         Text(
-                          widget.description!,
+                          description,
                           style: const TextStyle(
                             color: Tokens.textTertiary,
                             fontSize: Tokens.fontOverline,
@@ -107,14 +100,32 @@ class _SettingRowState extends State<SettingRow> {
                     ],
                   ),
                 ),
-                widget.control,
+                _buildControl(focused),
               ],
             ),
           ),
         ),
       ),
-      ),
     );
+  }
+
+  /// Applies the locked accent route to text controls while this row owns focus.
+  Widget _buildControl(bool focused) {
+    final control = widget.control;
+    if (control is Text) {
+      final style = control.style ?? const TextStyle();
+      return Text(
+        control.data ?? '',
+        key: control.key,
+        style: style.copyWith(
+          color: focused
+              ? Tokens.accent
+              : (style.color ?? Tokens.textSecondary),
+        ),
+        overflow: control.overflow,
+      );
+    }
+    return control;
   }
 }
 
