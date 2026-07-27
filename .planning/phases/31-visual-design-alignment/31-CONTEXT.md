@@ -72,7 +72,7 @@ These decisions are already固化 in ROADMAP.md §31 SC#1-5 + Phase 30 CONTEXT.m
 
 - **panelSectionBg alias fate** (30-UI-SPEC L56 `panelSectionBg=bgGlass`): Under D-11 layered decision, chrome switches to `ControlBarDecoration` (does not use `panelSectionBg` alias); content may keep `panelSectionBg` alias (→bgGlass, content single-route) or switch to direct `bgGlass`. Recommendation: **keep `panelSectionBg` alias for content** — preserves 30-UI-SPEC's single-swap-route semantics for content; future content color change touches one alias site. Planner has flexibility to decide final form (alias vs direct) since both satisfy CF-06.
 - **Chrome decoration method**: `ControlBarDecoration.playing` (4-shadow) for chrome three sections — panel chrome恒用 playing 装饰 (visual alignment, not state alignment; panel is not "playing" but visual language consistent). `idle` method exists for control_bar local use (D-03). Planner confirms.
-- **D-07 a11y mitigation**: If accent #2C58F4 insufficient contrast for color-weak users, plan-phase may deepen accent or apply SemiBold weight to active value text. Planner decides based on contrast audit.
+- **a11y mitigation** (D-07, discretionary): If accent #2C58F4 insufficient contrast for color-weak users, plan-phase may deepen accent or apply SemiBold weight to active value text. Planner decides based on contrast audit.
 
 </decisions>
 

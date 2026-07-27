@@ -4,11 +4,11 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 31
 current_phase_name: visual-design-alignment
-status: discuss-paused
-stopped_at: Phase 31 context gathered
-last_updated: "2026-07-27T11:23:17.275Z"
+status: ready-to-execute
+stopped_at: planning complete — 3 plans, 3 waves, checker iter 2 passed (2026-07-27)
+last_updated: "2026-07-27T13:55:48.676Z"
 last_activity: 2026-07-27
-last_activity_desc: resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
+last_activity_desc: plan-phase complete — 3 plans (31-01/02/03), 3 waves, 0 blockers, GlassButton deferred to Phase 32 (Option C), decision coverage 12/12, requirements 5/5
 progress:
   total_phases: 7
   completed_phases: 2
@@ -111,9 +111,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-27T11:23:17.253Z
-Stopped at: Phase 31 context gathered
-Resume file: .planning/phases/31-visual-design-alignment/31-CONTEXT.md
+Last session: 2026-07-27T13:55:48.649Z
+Stopped at: context exhaustion at 79% (2026-07-27)
+Resume file: .planning/phases/31-visual-design-alignment/31-UI-SPEC.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
