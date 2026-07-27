@@ -1023,43 +1023,82 @@ void main() {
     );
   });
 
-  // ── Structural color route (Plan 30-03: LAYOUT-05 / D-02) ──
+  // ── Structural color route (Plan 30-03: LAYOUT-05 / D-02；31-01 D-11 re-baseline) ──
   group('settings overlay structural color route (30-03)', () {
     testWidgets(
-      'title bar, tab strip, content, and button bar resolve background from Tokens.panelSectionBg',
+      'chrome sections use ControlBarDecoration.playing decoration, content stays Tokens.panelSectionBg',
       (tester) async {
         // Arrange — open shell 让四段都挂载
         final (controller, _) = await pumpShell(tester);
         controller.open();
         await tester.pump();
 
-        // Assert — 标题栏 Container color 走 panelSectionBg（color-route 非 ARGB 字面值，
-        // 方便 Phase 31 单点改 alias，D-02）
+        // Phase 31 D-11：chrome 三段从 color-route 切换为共享
+        // ControlBarDecoration.playing 装饰（BoxDecoration: controlBarBg +
+        // 1px controlBarBorderWhite + 4-shadow 末位 glowOuterRing）；
+        // content 保持 panelSectionBg 薄玻璃。局部断言函数与
+        // panel_color_test.dart 的 expectChromeDecoration 同构。
+        void expectChromeDecoration(Container container, String sectionName) {
+          final decoration = container.decoration;
+          if (decoration is! BoxDecoration) {
+            fail(
+              '$sectionName: expected BoxDecoration, '
+              'got ${decoration.runtimeType}',
+            );
+          }
+          expect(
+            decoration.color,
+            Tokens.controlBarBg,
+            reason: '$sectionName color',
+          );
+          final border = decoration.border;
+          if (border is! Border) {
+            fail('$sectionName: expected Border, got ${border.runtimeType}');
+          }
+          expect(border.top.width, 1, reason: '$sectionName border width');
+          expect(
+            border.top.color,
+            Tokens.controlBarBorderWhite,
+            reason: '$sectionName border color',
+          );
+          expect(
+            decoration.boxShadow?.length,
+            4,
+            reason: '$sectionName shadow count',
+          );
+          expect(
+            decoration.boxShadow?[3].color,
+            Tokens.glowOuterRing,
+            reason: '$sectionName shadow[3] glowOuterRing',
+          );
+        }
+
+        // Assert — 标题栏 Container 走 ControlBarDecoration.playing
         final titleBarContainer = tester.widgetList<Container>(
           find.descendant(
             of: find.byKey(SettingsOverlayShell.titleBarKey),
             matching: find.byType(Container),
           ),
         ).first;
-        expect(titleBarContainer.color, Tokens.panelSectionBg);
+        expectChromeDecoration(titleBarContainer, 'title bar');
 
-        // Assert — 按钮栏 Container color 走 panelSectionBg（buttonBarKey 唯一定位）
+        // Assert — 按钮栏 Container 走 ControlBarDecoration.playing
         final buttonBarContainer = tester.widget<Container>(
           find.byKey(SettingsOverlayShell.buttonBarKey),
         );
-        expect(buttonBarContainer.color, Tokens.panelSectionBg);
+        expectChromeDecoration(buttonBarContainer, 'button bar');
 
-        // Assert — tab 条 Container color 走 panelSectionBg（SettingsTabStrip 子树首个 Container）
+        // Assert — tab 条 Container 走 ControlBarDecoration.playing
         final tabStripContainer = tester.widgetList<Container>(
           find.descendant(
             of: find.byType(SettingsTabStrip),
             matching: find.byType(Container),
           ),
         ).first;
-        expect(tabStripContainer.color, Tokens.panelSectionBg);
+        expectChromeDecoration(tabStripContainer, 'tab strip');
 
-        // Assert — 内容区 ColoredBox color 走 panelSectionBg（SettingsTabContent 子树首个
-        // ColoredBox；原 bgPanel distinct route 已统一到 panelSectionBg，D-02）
+        // Assert — 内容区 ColoredBox color 保持 panelSectionBg（D-11 content
+        // 单路由；SettingsTabContent 子树首个 ColoredBox）
         final contentColoredBox = tester.widgetList<ColoredBox>(
           find.descendant(
             of: find.byType(SettingsTabContent),

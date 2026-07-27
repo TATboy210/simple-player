@@ -7,6 +7,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../shared/control_bar_decoration.dart';
 import '../../theme/tokens.dart';
 import '_settings_nav_item.dart';
 
@@ -70,7 +71,12 @@ class SettingsTabStrip extends StatelessWidget {
       builder: (context, selectedIndex, _) {
         return Container(
           height: isCompact ? 56 : 64,
-          color: Tokens.panelSectionBg,
+          // Phase 31 D-11：chrome 装饰切换为共享 ControlBarDecoration.playing，
+          // BorderRadius.zero — tab 条夹于标题栏与内容区之间，段间零圆角防
+          // 阴影接缝（31-RESEARCH Pitfall 1 的 corner-only 缓解）。
+          decoration: ControlBarDecoration.playing(
+            borderRadius: BorderRadius.zero,
+          ),
           child: Row(
             children: List.generate(_tabIcons.length, (i) {
               return Expanded(

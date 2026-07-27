@@ -302,6 +302,10 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   /// 底部按钮栏 — Cancel / Apply / OK，始终可见（TABS-03/TABS-04）。
   ///
   /// OK：提交待修改值 + 关闭面板；Apply：仅提交不关闭；Cancel：回滚 + 关闭。
+  ///
+  /// Phase 31 D-11：chrome 装饰切换为共享 [ControlBarDecoration.playing]，
+  /// 仅底部圆角（radiusLg）——与 GlassContainer 外轮廓对齐，段间零圆角
+  /// 防阴影接缝（31-RESEARCH Pitfall 1 的 corner-only 缓解）。
   Widget _buildButtonBar() {
     return Container(
       key: SettingsOverlayShell.buttonBarKey,
@@ -309,7 +313,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
         horizontal: Tokens.spMd,
         vertical: Tokens.spSm,
       ),
-      color: Tokens.panelSectionBg,
+      decoration: ControlBarDecoration.playing(
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(Tokens.radiusLg),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
