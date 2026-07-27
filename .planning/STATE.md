@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
-current_phase: 30
-current_phase_name: panel-layout-redesign
-status: complete
-stopped_at: ""
-last_updated: "2026-07-27T08:12:52.000Z"
+current_phase: 31
+current_phase_name: visual-design-alignment
+status: discuss-paused
+stopped_at: Phase 31 context gathered
+last_updated: "2026-07-27T11:23:17.275Z"
 last_activity: 2026-07-27
-last_activity_desc: Phase 30 complete (4 plans executed + verifier PASS, 113/113 tests)
+last_activity_desc: resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 2
+  completed_plans: 6
   percent: 29
 ---
 
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 ## Current Position
 
-Phase: 30 (panel-layout-redesign) — PLANNED (plan set complete, ready for execute-phase)
-Plan: 0 of 4 (plan set committed: 30-01 tracer + 30-02/03/04 expansion; §10 gsd-plan-checker PASS)
-Status: Plan set complete + checker PASS, ready for /gsd-execute-phase 30
-Last activity: 2026-07-27 — Phase 30 plan set complete (4 plans, checker PASS)
+Phase: 31 (visual-design-alignment) — DISCUSS-PAUSED (pre-gray-area, 4/10 sub-tasks)
+Plan: 0 of ? (discuss-phase in progress, no PLAN yet; prerequisites: discuss → ui-phase → plan)
+Status: discuss-phase paused pre-gray-area at 77% ctx (2026-07-27), HANDOFF.json recorded
+Last activity: 2026-07-27 — resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
 
 ## Performance Metrics
 
@@ -111,9 +111,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-27T03:56:50.063Z
-Stopped at: context exhaustion at 78% (2026-07-27)
-Resume file: .planning/phases/30-panel-layout-redesign/30-UI-SPEC.md
+Last session: 2026-07-27T11:23:17.253Z
+Stopped at: Phase 31 context gathered
+Resume file: .planning/phases/31-visual-design-alignment/31-CONTEXT.md
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
@@ -297,6 +297,15 @@ Resume file: .planning/phases/30-panel-layout-redesign/30-UI-SPEC.md
 - **未提交**: 本次 STATE.md frontmatter+body 更新 + 30-UI-CHECKPOINT.md (new untracked)。建议 commit message: `docs(30): UI-phase checkpoint — Step 1-4 done, spawn deferred @ 65%`。
 - **下一步 (新上下文窗口)**: `/clear` → `/gsd-ui-phase 30`。fresh 窗口读 30-UI-CHECKPOINT.md (lean, 跳过 STATE 全历史) + 30-CONTEXT.md + 30-RESEARCH.md → 跳 Step 4 AskUserQuestion → spawn gsd-ui-researcher (sonnet, sync, 用预构造 prompt 模板填 `${AGENT_SKILLS_UI}`) → 写 30-UI-SPEC.md → spawn gsd-ui-checker (sonnet, 6 维度) → revision loop (if ISSUES, max 2) → Step 9.5 UI-consideration probe (resolve ui-consideration-probe.cjs + ELEMENTS_JSON + AskUserQuestion resolution) → Step 10 READY banner → Step 11 commit docs(30): UI design contract → Step 12 state.record-session → 删 30-UI-CHECKPOINT.md (一次性工件闭环) → 下一步 `/gsd-plan-phase 30` (has_research=true 走 §5.1 "Use existing, skip to step 6", planner 消费 30-RESEARCH.md + 30-CONTEXT.md + 30-UI-SPEC.md 写 30-01-PLAN.md)。
 - **若 researcher spawn halt 备选**: fresh 子代理窗口 ~60K (STATE.md L246 实测), 若注入后 halt, fall back `--interactive inline` 模式 (Phase 28 先例 STATE.md L262-275, 主会话直接写 30-UI-SPEC.md 用 template + RESEARCH + CONTEXT 作输入, 无子代理)。但 Phase 30 phase-researcher a813590 已证明 fresh 窗口 spawn 可行, 首选 spawn。
+
+### 2026-07-27 第十次恢复（/gsd-resume-work → 用户选恢复 Phase 31 discuss）
+
+- **恢复源**：`.planning/HANDOFF.json`（2026-07-27T08:49:25Z，phase 31 discuss pre-gray-area，4/10 done）+ `.planning/phases/31-visual-design-alignment/.continue-here.md`（phase-level checkpoint）。无 interrupted agent、无 async-job、无 PLAN-without-SUMMARY。
+- **三个状态偏差已核对**：(1) STATE.md frontmatter 滞后（本条已修正：phase 30→31、status complete→discuss-paused、completed_phases 2→3、percent 29→43）；(2) `29-EXECUTE-CHECKPOINT.md`（untracked）过时残留——记录 execute 3 次 halt/zero edit，但 git full-history 显示 Phase 29 在那之后成功闭环（plan `d8aeb585` → Task1-4 `39bb649f`/`4cc4eb28`/`7524d221`/`8e88577b` → summary `ed6828bd` → complete `a63650a6` → verification `2f1c4ccb`，29-01 PLAN+SUMMARY+VERIFICATION 三件齐），checkpoint 是过时快照可删；(3) 工作树脏 43 files（23 lib/kernel + tests + pubspec，净 -670 行）跨会话累积，与 Phase 31 discuss（只写 .planning/）物理隔离当前安全，但 `/gsd-ui-phase 31` 的 ui-researcher 读 lib/ui/player/ 源码（player_screen.dart 脏、control_bar.dart 干净）触发前应处理。
+- **用户决策**（AskUserQuestion）：选 **"恢复 Phase 31 discuss (推荐)"** —— 从 HANDOFF.json 恢复 gray-area discussion（remaining tasks 5-10：scout_codebase → analyze_phase → present_gray_areas → discuss_areas → write_context → git_commit）。
+- **未提交**：本次 STATE.md frontmatter + Current Position + 本条 Session Continuity。43 个无关脏 lib/kernel 文件不动。不单独提交 STATE.md——/clear → `/gsd-discuss-phase 31` 的 git_commit 步骤（commit "docs(31): capture phase context"）会带上 STATE.md 改动闭环。HANDOFF.json 由 discuss-phase 成功恢复后自动闭环删除。
+- **下一步（新上下文窗口）**：`/clear` → `/gsd-discuss-phase 31`。fresh 200K 窗口，check_existing 检测 HANDOFF.json 提供 Resume → 从 `remaining_tasks[5]=scout_codebase` 续跑。预读 `lib/ui/player/control_bar.dart`（`_decorationPlaying` 4-shadow 实现）+ `30-UI-SPEC.md`（视觉参数直接来源）+ `30-CONTEXT.md`（D-02 deferred chrome boundary）。预期 4 gray areas：① 共享 decoration token 命名 ② 三态按钮 Tokens.* 颜色值 ③ density 像素值 ④ 透看选项 border policy。
+- **上下文预算守卫**：memory `feedback_gsd_context_budget_pause`（2026-07-26）硬约束 60%+ 启动交互式多轮工作流会 halt。discuss-phase = 4 区 × 4 轮 AskUserQuestion + 写 CONTEXT.md/DISCUSSION-LOG.md + commit + state。本 resume 窗口已耗 66%，不建议本窗口续跑 → /clear 后 fresh 跑。
 
 ## Operator Next Steps
 
