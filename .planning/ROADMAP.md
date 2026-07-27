@@ -84,7 +84,11 @@ Plans:
   4. Thin-glass "透看选项" translucency faked with `Container(color: Tokens.bgGlass)` — ZERO additional `BackdropFilter` layers stacked on the panel (Pitfall 3 mitigation)
   5. BackdropFilter stacking perf: panel keeps ONE `BackdropFilter` + `RepaintBoundary`; no jank during drag/scroll (manual profile-mode check on Windows)
 **Blocking Constraints honored**: 设计北极星 (control-bar alignment is the north star); Tokens.* design system (no hardcoded colors); BackdropFilter stacking mitigation (Pitfall 3); file size cap (shared token reduces decoration duplication)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — Extract the shared control-bar decoration and route all three panel chrome sections through it
+- [ ] 31-02-PLAN.md — Implement compact three-state SettingRow and GlassButton interaction with single-owner focus behavior
+- [ ] 31-03-PLAN.md — Run regression evidence and obtain Windows profile/visual confirmation
 **UI hint**: yes
 
 ### Phase 32: Navigation & Interaction Polish
