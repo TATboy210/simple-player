@@ -107,11 +107,11 @@
 | LAYOUT-03 | Phase 30 | Pending |
 | LAYOUT-04 | Phase 30 | Pending |
 | LAYOUT-05 | Phase 30 | Pending |
-| VISUAL-01 | Phase 31 | Pending |
-| VISUAL-02 | Phase 31 | Pending |
-| VISUAL-03 | Phase 31 | Pending |
-| VISUAL-04 | Phase 31 | Pending |
-| VISUAL-05 | Phase 31 | Pending |
+| VISUAL-01 | Phase 31 | Satisfied |
+| VISUAL-02 | Phase 31 | Satisfied (by-design exempt) |
+| VISUAL-03 | Phase 31 | Satisfied |
+| VISUAL-04 | Phase 31 | Satisfied (code; human_review pending) |
+| VISUAL-05 | Phase 31 | Satisfied (code; human_review pending) |
 | NAV-01 | Phase 32 | Pending |
 | NAV-02 | Phase 32 | Pending |
 | NAV-03 | Phase 32 | Pending |

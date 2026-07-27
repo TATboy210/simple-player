@@ -4,8 +4,8 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 31
 current_phase_name: visual-design-alignment
-status: executing
-stopped_at: Completed 31-02-PLAN.md
+status: complete
+stopped_at: Phase 31 complete (passed-with-note; VISUAL-02 by-design exempt, VISUAL-04/05 human_review pending; 2026-07-28)
 last_updated: "2026-07-27T17:28:10.183Z"
 last_activity: 2026-07-27
 last_activity_desc: resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
