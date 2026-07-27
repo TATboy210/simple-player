@@ -6,43 +6,55 @@ import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 void main() {
   group('SettingRow three-state contract', () {
-    testWidgets('is transparent and borderless before hover or focus',
-        (tester) async {
+    testWidgets('is transparent and borderless before hover or focus', (
+      tester,
+    ) async {
       // Arrange & Act
       await _pumpSettingRow(tester);
 
       // Assert
       final decoration = _rowDecoration(tester);
-      expect(decoration.color, Colors.transparent);
-      expect(decoration.border, isNull);
-    });
-
-    testWidgets('uses hover fill and focused one-pixel border without height shift',
-        (tester) async {
-      // Arrange
-      final focusNode = FocusNode();
-      addTearDown(focusNode.dispose);
-      await _pumpSettingRow(tester, focusNode: focusNode);
-      final beforeFocusHeight = tester.getSize(find.byType(SettingRow)).height;
-
-      // Act & Assert — hover is owned by the InkWell interaction surface.
-      final inkWell = tester.widget<InkWell>(find.byType(InkWell));
-      expect(inkWell.hoverColor, Tokens.bgHover);
-
-      // Act
-      focusNode.requestFocus();
-      await tester.pump();
-
-      // Assert
-      final decoration = _rowDecoration(tester);
+      expect(decoration.color, isNull);
       final border = decoration.border! as Border;
-      expect(border.top.color, Tokens.controlBarBorderWhite);
+      expect(border.top.color, Colors.transparent);
       expect(border.top.width, 1);
-      expect(tester.getSize(find.byType(SettingRow)).height, beforeFocusHeight);
-      expect(beforeFocusHeight, 40);
     });
 
-    testWidgets('delivers focus state to the active value builder', (tester) async {
+    testWidgets(
+      'uses hover fill and focused one-pixel border without height shift',
+      (tester) async {
+        // Arrange
+        final focusNode = FocusNode();
+        addTearDown(focusNode.dispose);
+        await _pumpSettingRow(tester, focusNode: focusNode);
+        final beforeFocusHeight = tester
+            .getSize(find.byType(SettingRow))
+            .height;
+
+        // Act & Assert — hover is owned by the InkWell interaction surface.
+        final inkWell = tester.widget<InkWell>(find.byType(InkWell));
+        expect(inkWell.hoverColor, Tokens.bgHover);
+
+        // Act
+        focusNode.requestFocus();
+        await tester.pump();
+
+        // Assert
+        final decoration = _rowDecoration(tester);
+        final border = decoration.border! as Border;
+        expect(border.top.color, Tokens.controlBarBorderWhite);
+        expect(border.top.width, 1);
+        expect(
+          tester.getSize(find.byType(SettingRow)).height,
+          beforeFocusHeight,
+        );
+        expect(beforeFocusHeight, 40);
+      },
+    );
+
+    testWidgets('delivers focus state to the active value builder', (
+      tester,
+    ) async {
       // Arrange
       final focusNode = FocusNode();
       addTearDown(focusNode.dispose);
@@ -71,14 +83,12 @@ void main() {
       expect(text.style?.color, Tokens.accent);
     });
 
-    testWidgets('uses a non-focusable InkWell for ripple tap feedback',
-        (tester) async {
+    testWidgets('uses a non-focusable InkWell for ripple tap feedback', (
+      tester,
+    ) async {
       // Arrange
       var tapCount = 0;
-      await _pumpSettingRow(
-        tester,
-        onTap: () => tapCount += 1,
-      );
+      await _pumpSettingRow(tester, onTap: () => tapCount += 1);
 
       // Act
       await tester.tap(find.byType(InkWell));
@@ -91,22 +101,40 @@ void main() {
       expect(inkWell.autofocus, isFalse);
       expect(inkWell.splashColor, Tokens.accentLight);
       expect(tapCount, 1);
-      expect(find.byType(Transform), findsNothing);
-    });
-
-    testWidgets('uses the locked 40-pixel density and spXs horizontal padding',
-        (tester) async {
-      // Arrange & Act
-      await _pumpSettingRow(tester);
-
-      // Assert
-      expect(tester.getSize(find.byType(SettingRow)).height, 40);
-      final padding = tester.widget<Padding>(find.byType(Padding).first);
       expect(
-        padding.padding,
-        const EdgeInsets.symmetric(horizontal: Tokens.spXs),
+        find.descendant(
+          of: find.byType(SettingRow),
+          matching: find.byType(Transform),
+        ),
+        findsNothing,
       );
     });
+
+    testWidgets(
+      'uses the locked 40-pixel density and spXs horizontal padding',
+      (tester) async {
+        // Arrange & Act
+        await _pumpSettingRow(tester);
+
+        // Assert
+        expect(tester.getSize(find.byType(SettingRow)).height, 40);
+        final padding = tester.widget<Padding>(
+          find.descendant(
+            of: find.byType(SettingRow),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Padding &&
+                  widget.padding ==
+                      const EdgeInsets.symmetric(horizontal: Tokens.spXs),
+            ),
+          ),
+        );
+        expect(
+          padding.padding,
+          const EdgeInsets.symmetric(horizontal: Tokens.spXs),
+        );
+      },
+    );
   });
 }
 
@@ -119,13 +147,11 @@ Future<void> _pumpSettingRow(
   return tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: FocusableSettingRow(
+        body: SettingRow(
           focusNode: focusNode,
-          child: SettingRow(
-            title: 'Playback speed',
-            control: const Text('1.0x'),
-            onTap: onTap ?? () {},
-          ),
+          title: 'Playback speed',
+          control: const Text('1.0x'),
+          onTap: onTap ?? () {},
         ),
       ),
     ),
