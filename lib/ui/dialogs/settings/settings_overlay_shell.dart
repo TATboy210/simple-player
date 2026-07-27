@@ -308,7 +308,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
         horizontal: Tokens.spMd,
         vertical: Tokens.spSm,
       ),
-      color: Tokens.bgGlass,
+      color: Tokens.panelSectionBg,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -353,7 +353,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       child: Container(
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
-        color: Tokens.bgGlass,
+        color: Tokens.panelSectionBg,
         child: Row(
           children: [
             const Text(

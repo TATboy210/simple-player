@@ -248,6 +248,11 @@ class Tokens {
   /// compact 模式 tab 内容间距
   static const double tabBarSpacingCompact = 8.0;
 
+  // ── 响应式设置面板结构色路由（D-02 / LAYOUT-05）──
+  /// 设置面板四段（标题栏 / tab 条 / 内容区 / 按钮栏）结构背景统一路由。
+  /// Phase 30 保留 bgGlass 值；Phase 31 chrome 对齐时单点改此别名即可，不动四消费者。
+  static const Color panelSectionBg = bgGlass;
+
   // ── 跳秒 ──
   static const int skipSecondsShort = 10;
   static const int skipSecondsLong = 30;

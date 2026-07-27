@@ -70,7 +70,7 @@ class SettingsTabStrip extends StatelessWidget {
       builder: (context, selectedIndex, _) {
         return Container(
           height: isCompact ? 56 : 64,
-          color: Tokens.bgGlass,
+          color: Tokens.panelSectionBg,
           child: Row(
             children: List.generate(_tabIcons.length, (i) {
               return Expanded(
