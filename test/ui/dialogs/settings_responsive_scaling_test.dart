@@ -1,7 +1,7 @@
 // SettingsOverlayShell 响应式缩放测试 — 覆盖 SCALE-01/02/03。
 //
-// 验证面板连续缩放（clamp 400-600）、5:4 高宽比、800px 断点 tab bar
-// normal/compact 切换、RepaintBoundary 隔离。
+// 验证面板严格 16:9 几何（D-04: width=min(0.5×W, H×16/9).clamp(400,960)，
+// height=width×9/16）、800px 断点 tab bar normal/compact 切换、RepaintBoundary 隔离。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,9 +42,10 @@ void main() {
 
   group('Responsive Scaling', () {
     testWidgets(
-      'panelWidth scales continuously and clamps to 600 at large window',
+      'panelWidth clamps to 960 at large window (D-04: min(960,1920)=960)',
       (tester) async {
-        // Arrange — 1920×1080 窗口 → width = 1920 * 0.8 = 1536, clamp to 600
+        // Arrange — 1920×1080 → width=min(0.5×1920=960, 1080×16/9=1920)=960,
+        // clamp(400,960)=960（D-04 上限命中，非旧 0.8 ratio）
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(1920, 1080),
@@ -52,18 +53,19 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板宽度 = 600（被 maxWidth 钳制）
+        // Assert — 面板宽度 = 960（D-04 maxWidth 上限）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 600.0);
+        expect(panelBox.width, 960.0);
       },
     );
 
     testWidgets(
-      'panelWidth clamps to 400 at small window',
+      'panelWidth clamps to 400 at small window (D-04: min(250,711.11)=250→clamp 400)',
       (tester) async {
-        // Arrange — 500×400 窗口 → width = 500 * 0.8 = 400, 在 [400,600] 内
+        // Arrange — 500×400 → width=min(0.5×500=250, 400×16/9≈711.11)=250,
+        // clamp(400,960)=400（D-04 下限命中，非旧 0.8×500=400）
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(500, 400),
@@ -71,7 +73,7 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板宽度 = 400
+        // Assert — 面板宽度 = 400（D-04 minWidth 下限命中）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
@@ -80,9 +82,10 @@ void main() {
     );
 
     testWidgets(
-      'panelWidth scales at mid-range window (800px)',
+      'panelWidth produces 400 at 800×600 (D-04: min(400,1066.67)=400)',
       (tester) async {
-        // Arrange — 800×600 窗口 → width = 800 * 0.8 = 640, clamp to 600
+        // Arrange — 800×600 → width=min(0.5×800=400, 600×16/9≈1066.67)=400,
+        // clamp(400,960)=400（D-04 下限命中，非旧 0.8×800=640 clamp 600）
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(800, 600),
@@ -90,18 +93,18 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板宽度 = 600（640 超过 max，被钳制）
+        // Assert — 面板宽度 = 400（D-04 min 选 0.5×W，命中下限）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 600.0);
+        expect(panelBox.width, 400.0);
       },
     );
 
     testWidgets(
-      'panelHeight follows width * 0.8 ratio (fullscreen 600×480)',
+      'panelHeight follows width × 9/16 (fullscreen 960×540, D-04 strict 16:9)',
       (tester) async {
-        // Arrange — 1920×1080 窗口 → width = 1920 * 0.8 = 1536, clamp to 600, height = 600 * 0.8 = 480
+        // Arrange — 1920×1080 → width=960, height=960×9/16=540（D-04 严格 16:9）
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(1920, 1080),
@@ -109,19 +112,20 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板尺寸 = 600×480（SC-2）
+        // Assert — 面板尺寸 = 960×540（D-04 严格 16:9，非旧 600×480）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
-        expect(panelBox.width, 600.0);
-        expect(panelBox.height, 480.0);
+        expect(panelBox.width, 960.0);
+        expect(panelBox.height, closeTo(540.0, 0.01));
       },
     );
 
     testWidgets(
-      'panelHeight follows width * 0.8 ratio at min width (compact 400×320)',
+      'panelHeight follows width × 9/16 at min width (400×225, D-04 strict 16:9)',
       (tester) async {
-        // Arrange — 500×400 窗口 → width = 400, height = 400 * 0.8 = 320
+        // Arrange — 500×400 → width=min(250, 711.11)=250, clamp(400,960)=400,
+        // height=400×9/16=225（D-04 下限命中后保持 16:9）
         final (controller, _) = await pumpShell(
           tester,
           size: const Size(500, 400),
@@ -129,12 +133,12 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Assert — 面板尺寸 = 400×320（SC-3）
+        // Assert — 面板尺寸 = 400×225（D-04 严格 16:9，非旧 400×320）
         final panelBox = tester.widget<SizedBox>(
           find.byKey(SettingsOverlayShell.panelKey),
         );
         expect(panelBox.width, 400.0);
-        expect(panelBox.height, 320.0);
+        expect(panelBox.height, closeTo(225.0, 0.01));
       },
     );
 

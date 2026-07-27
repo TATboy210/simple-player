@@ -213,7 +213,8 @@ void main() {
 
   group('Drag Bounds', () {
     testWidgets('drag title bar -> panel moves within bounds', (tester) async {
-      // Arrange — 1200×800 窗口 → 面板 600×480, maxX=(1200-600)/2=300, maxY=(800-480)/2=160
+      // Arrange — 1200×800 窗口 → D-04 面板 600×337.5（width=min(600,1422.22)=600,
+      // height=600×9/16=337.5），maxX=(1200-600)/2=300, maxY=(800-337.5)/2=231.25
       final (controller, _) = await pumpShell(
         tester,
         size: const Size(1200, 800),
@@ -228,13 +229,13 @@ void main() {
       await gesture.up();
       await tester.pump();
 
-      // Assert — dx=100（在 maxX=300 内），dy=20（在 maxY=160 内）
+      // Assert — dx=100（在 maxX=300 内），dy=20（在 maxY=231.25 内，D-04 16:9 边界）
       expect(controller.state.dragOffset.value.dx, 100.0);
       expect(controller.state.dragOffset.value.dy, 20.0);
     });
 
     testWidgets('drag beyond bounds is clamped', (tester) async {
-      // Arrange — 1200×800 窗口 → 面板 600×480, maxX=300, maxY=160
+      // Arrange — 1200×800 窗口 → D-04 面板 600×337.5, maxX=300, maxY=231.25
       final (controller, _) = await pumpShell(
         tester,
         size: const Size(1200, 800),
@@ -242,16 +243,16 @@ void main() {
       controller.open();
       await tester.pump();
 
-      // Act — 拖到超出边界
+      // Act — 拖到超出边界（dx=500 超 maxX=300；dy=200 < maxY=231.25 仍在界内）
       final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
       final gesture = await tester.startGesture(tester.getCenter(titleBar));
       await gesture.moveBy(const Offset(500, 200));
       await gesture.up();
       await tester.pump();
 
-      // Assert — 被 clamp 到 maxX=300, maxY=160
+      // Assert — dx 被 clamp 到 maxX=300；dy=200 < maxY=231.25 未触发 clamp（D-04 16:9）
       expect(controller.state.dragOffset.value.dx, 300.0);
-      expect(controller.state.dragOffset.value.dy, 160.0);
+      expect(controller.state.dragOffset.value.dy, 200.0);
     });
   });
 
@@ -307,18 +308,18 @@ void main() {
     });
 
     testWidgets('RB (gameButton12) cycles tabs', (tester) async {
-      // Arrange
+      // Arrange — D-01 defaultTabIndex=3 (General 居中默认)
       final (controller, _) = await pumpShell(tester);
       controller.open();
       await tester.pump();
       await tester.pump();
 
-      // Act — 按右肩键
+      // Act — 按右肩键（next tab）
       await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButton12);
       await tester.pump();
 
-      // Assert — 切到 tab 1
-      expect(controller.state.selectedTab.value, 1);
+      // Assert — D-01 从 default tab 3 → tab 4 (Shortcuts，非旧 default 0→1)
+      expect(controller.state.selectedTab.value, 4);
     });
   });
 
@@ -355,29 +356,29 @@ void main() {
   group('SCALE Success Criteria', () {
     // SC-1: MediaQuery.size 检测窗口尺寸，面板按比例缩放
     testWidgets('SC-1: MediaQuery.size drives panel sizing at 3 window sizes', (tester) async {
-      // 测试 3 个窗口尺寸，确认面板宽度随窗口变化
+      // 测试 3 个窗口尺寸，确认面板宽度随窗口变化（D-04: width=min(0.5×W,H×16/9).clamp(400,960)）
 
-      // 1920×1080 → width=1536, clamp to 600
+      // 1920×1080 → width=min(960,1920)=960, clamp(400,960)=960
       final (ctrl1, _) = await pumpShell(tester, size: const Size(1920, 1080));
       ctrl1.open();
       await tester.pump();
       var panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
-      expect(panel.width, 600.0);
+      expect(panel.width, 960.0);
       ctrl1.close();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
-      // 800×600 → width=640, clamp to 600
+      // 800×600 → width=min(400,1066.67)=400, clamp(400,960)=400（下限命中）
       final (ctrl2, _) = await pumpShell(tester, size: const Size(800, 600));
       ctrl2.open();
       await tester.pump();
       panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
-      expect(panel.width, 600.0);
+      expect(panel.width, 400.0);
       ctrl2.close();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
-      // 500×400 → width=400
+      // 500×400 → width=min(250,711.11)=250, clamp(400,960)=400（下限命中）
       final (ctrl3, _) = await pumpShell(tester, size: const Size(500, 400));
       ctrl3.open();
       await tester.pump();
@@ -385,17 +386,17 @@ void main() {
       expect(panel.width, 400.0);
     });
 
-    // SC-2: 全屏模式面板600×480
-    testWidgets('SC-2: fullscreen mode panel is 600×480', (tester) async {
+    // SC-2: 全屏模式面板 960×540（D-04 严格 16:9）
+    testWidgets('SC-2: fullscreen mode panel is 960×540 (D-04 strict 16:9)', (tester) async {
       // Arrange — 1920×1080 模拟全屏
       final (controller, _) = await pumpShell(tester, size: const Size(1920, 1080));
       controller.open();
       await tester.pump();
 
-      // Assert — 面板精确 600×480
+      // Assert — D-04 面板精确 960×540（width=960, height=960×9/16=540）
       final panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
-      expect(panel.width, 600.0);
-      expect(panel.height, 480.0);
+      expect(panel.width, 960.0);
+      expect(panel.height, closeTo(540.0, 0.01));
 
       // Assert — tab bar 为 normal 模式（fontSize 14.0）
       final navItems = tester.widgetList<SettingsNavItem>(find.byType(SettingsNavItem));
@@ -404,17 +405,17 @@ void main() {
       }
     });
 
-    // SC-3: 小窗口（<800px）面板400×320
-    testWidgets('SC-3: small window <800px panel is 400×320', (tester) async {
-      // Arrange — 500×400 窗口（<800px → compact 模式, 500*0.8=400 → clamp 下限命中）
+    // SC-3: 小窗口（<800px）面板 400×225（D-04 严格 16:9）
+    testWidgets('SC-3: small window <800px panel is 400×225 (D-04 strict 16:9)', (tester) async {
+      // Arrange — 500×400 窗口（<800px → compact 模式；D-04 width=min(250,711.11)=250→clamp 400）
       final (controller, _) = await pumpShell(tester, size: const Size(500, 400));
       controller.open();
       await tester.pump();
 
-      // Assert — 面板精确 400×320（width=500*0.8=400, height=400*0.8=320）
+      // Assert — D-04 面板精确 400×225（width=400 下限, height=400×9/16=225）
       final panel = tester.widget<SizedBox>(find.byKey(SettingsOverlayShell.panelKey));
       expect(panel.width, 400.0);
-      expect(panel.height, 320.0);
+      expect(panel.height, closeTo(225.0, 0.01));
 
       // Assert — tab bar 为 compact 模式（fontSize 12.0）
       final navItems = tester.widgetList<SettingsNavItem>(find.byType(SettingsNavItem));
