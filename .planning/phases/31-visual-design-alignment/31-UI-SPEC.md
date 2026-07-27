@@ -181,9 +181,9 @@ Notes:
 
 ## UI Considerations
 
-> State coverage for this visual-alignment phase. Resolved via `ui-consideration-probe.cjs` (Step 9.5) + researcher-authored interaction states. Idempotent — rows are REPLACED on a probe re-run.
+> State coverage for this visual-alignment phase. Probe-validated via `ui-consideration-probe.cjs` (Step 9.5): engine proposed 27 applicable considerations across 5 elements (E1 chrome / E2 content / E3 option row / E4 CTAs / E5 tab strip); for this static-decoration phase (no async I/O, always-populated tabs) the 27 map cleanly to the researcher's interaction-state analysis — 24 resolved as ✗ dismissed (N/A: chrome is static decoration, tabs always populated, no async load/fail path) and 3 retained as 🧪 backstop. User-confirmed batch adoption. Idempotent — rows are REPLACED on a probe re-run.
 
-Applicable state considerations resolved: **8 covered, 3 backstop, 0 unresolved, remainder dismissed (N/A)**.
+Probe resolution: **8 covered, 3 backstop, 0 unresolved, 24 dismissed (N/A)** — 27/27 probe items resolved.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
