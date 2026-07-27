@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/bridge/display_enumerator.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/_settings_nav_item.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
@@ -28,6 +29,8 @@ void main() {
     Size size = const Size(800, 600),
     bool initiallyPlaying = true,
     Widget Function(Widget shell)? decorate,
+    DisplayEnumerator? displayEnumerator,
+    Future<Offset> Function()? windowPositionReader,
   }) async {
     final fake = FakePlaybackController(
       initialState: initiallyPlaying ? MediaState.playing : MediaState.idle,
@@ -37,7 +40,11 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       controller.dispose();
     });
-    Widget shell = SettingsOverlayShell(controller: controller);
+    Widget shell = SettingsOverlayShell(
+      controller: controller,
+      displayEnumerator: displayEnumerator,
+      windowPositionReader: windowPositionReader,
+    );
     if (decorate != null) shell = decorate(shell);
     await tester.pumpWidget(
       MediaQuery(
@@ -829,4 +836,222 @@ void main() {
       },
     );
   });
+
+  // ── Multi-monitor drag clamp, fallback, resize (Plan 30-02: D-03/D-05/D-06) ──
+  group('settings overlay multi-monitor (30-02)', () {
+    /// 1200×800 窗口 → 面板 600×337.5（D-04：width=min(600,1422.22)=600，
+    /// height=600×9/16=337.5），baseLeft=300，baseTop=231.25。
+    /// fake workArea LTRB(100,200,1100,700)（1000×500 ≥ 600×337.5）；
+    /// fake windowOrigin=(50,50)。
+    /// 屏幕坐标 panel left=50+300+dx → dx∈[-250,150]；top=50+231.25+dy →
+    /// dy∈[-81.25,81.25]。对称 clamp dx 上限 300 / dy 上限 231.25（可区分）。
+    const windowSize = Size(1200, 800);
+    const fakeWorkArea = Rect.fromLTRB(100, 200, 1100, 700);
+    const fakeWindowOrigin = Offset(50, 50);
+
+    testWidgets(
+      'work area with cached window position clamps drag to screen-coordinate bounds (D-03)',
+      (tester) async {
+        // Arrange — 注入 fake display + windowPositionReader
+        final fake = FakeDisplayEnumerator(workArea: fakeWorkArea);
+        final (controller, _) = await pumpShell(
+          tester,
+          size: windowSize,
+          displayEnumerator: fake,
+          windowPositionReader: () async => fakeWindowOrigin,
+        );
+        controller.open();
+        await tester.pump();
+
+        // Act — drag session: onPanStart 异步缓存 origin，moveBy dy=+500
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final g1 = await tester.startGesture(tester.getCenter(titleBar));
+        await tester.pump(); // 让 Future.value resolve → _cachedWindowOrigin 设
+        await g1.moveBy(const Offset(0, 500));
+        await tester.pump();
+        await g1.up();
+        await tester.pump();
+
+        // Assert — 屏幕坐标 clamp: dy=81.25（对称会到 231.25）
+        expect(controller.state.dragOffset.value.dy, closeTo(81.25, 0.01));
+
+        // Act — 重置后测 dx 方向
+        controller.state.dragOffset.value = Offset.zero;
+        await tester.pump();
+        final g2 = await tester.startGesture(tester.getCenter(titleBar));
+        await tester.pump();
+        await g2.moveBy(const Offset(500, 0));
+        await tester.pump();
+        await g2.up();
+        await tester.pump();
+
+        // Assert — dx=150（对称会到 300）
+        expect(controller.state.dragOffset.value.dx, closeTo(150.0, 0.01));
+      },
+    );
+
+    testWidgets(
+      'null display result preserves symmetric clamp (D-03 fallback)',
+      (tester) async {
+        // Arrange — fake getCurrentDisplay 返回 null（无显示器信息）
+        final fake = FakeDisplayEnumerator(workArea: null);
+        final (controller, _) = await pumpShell(
+          tester,
+          size: windowSize,
+          displayEnumerator: fake,
+          windowPositionReader: () async => fakeWindowOrigin,
+        );
+        controller.open();
+        await tester.pump();
+
+        // Act
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final g = await tester.startGesture(tester.getCenter(titleBar));
+        await tester.pump();
+        await g.moveBy(const Offset(0, 500));
+        await tester.pump();
+        await g.up();
+        await tester.pump();
+
+        // Assert — null display → 对称 clamp: dy=231.25
+        expect(controller.state.dragOffset.value.dy, closeTo(231.25, 0.01));
+      },
+    );
+
+    testWidgets(
+      'display-query exception preserves symmetric clamp without crashing (D-03 fallback)',
+      (tester) async {
+        // Arrange — fake getCurrentDisplay 抛 StateError（验证 shell 层 try/catch）
+        final fake = FakeDisplayEnumerator(throwOnGetCurrent: true);
+        final (controller, _) = await pumpShell(
+          tester,
+          size: windowSize,
+          displayEnumerator: fake,
+          windowPositionReader: () async => fakeWindowOrigin,
+        );
+        controller.open();
+        await tester.pump();
+
+        // Act — drag；shell try/catch + debugPrint + 对称 fallback，不崩溃
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final g = await tester.startGesture(tester.getCenter(titleBar));
+        await tester.pump();
+        await g.moveBy(const Offset(0, 500));
+        await tester.pump();
+        await g.up();
+        await tester.pump();
+
+        // Assert — 无崩溃，dy=231.25（对称 fallback）
+        expect(controller.state.dragOffset.value.dy, closeTo(231.25, 0.01));
+      },
+    );
+
+    testWidgets(
+      'resize re-clamps displaced offset after post-frame reconciliation (D-05)',
+      (tester) async {
+        // Arrange — 1200×800，无 displayEnumerator（对称 clamp），maxY=231.25
+        final (controller, _) = await pumpShell(tester, size: windowSize);
+        controller.open();
+        await tester.pump();
+
+        // Act — drag dy=+500 → 对称 clamp 231.25（在更小尺寸下将非法）
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final g = await tester.startGesture(tester.getCenter(titleBar));
+        await g.moveBy(const Offset(0, 500));
+        await g.up();
+        await tester.pump();
+        expect(controller.state.dragOffset.value.dy, closeTo(231.25, 0.01));
+
+        // Act — pump 更小窗口 800×600，面板 400×225，对称 maxY=187.5
+        // didChangeDependencies → post-frame callback → re-clamp 231.25→187.5
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(size: Size(800, 600)),
+            child: MaterialApp(
+              home: Scaffold(
+                body: Stack(
+                  fit: StackFit.expand,
+                  children: [SettingsOverlayShell(controller: controller)],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump(); // 排 post-frame callback
+        await tester.pump(); // 执行 callback → re-clamp
+
+        // Assert — dy 从 231.25 re-clamp 到 187.5
+        expect(controller.state.dragOffset.value.dy, closeTo(187.5, 0.01));
+      },
+    );
+
+    testWidgets(
+      'panel retains RepaintBoundary ancestor after clamp paths run (D-06)',
+      (tester) async {
+        // Arrange
+        final fake = FakeDisplayEnumerator(workArea: fakeWorkArea);
+        final (controller, _) = await pumpShell(
+          tester,
+          size: windowSize,
+          displayEnumerator: fake,
+          windowPositionReader: () async => fakeWindowOrigin,
+        );
+        controller.open();
+        await tester.pump();
+
+        // Act — 触发 work-area clamp 路径（origin 已缓存）
+        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+        final g = await tester.startGesture(tester.getCenter(titleBar));
+        await tester.pump();
+        await g.moveBy(const Offset(500, 500));
+        await tester.pump();
+        await g.up();
+        await tester.pump();
+
+        // Assert — RepaintBoundary 仍是 panel 的祖先（D-06 保留）
+        expect(
+          find.ancestor(
+            of: find.byKey(SettingsOverlayShell.panelKey),
+            matching: find.byType(RepaintBoundary),
+          ),
+          findsWidgets,
+        );
+      },
+    );
+  });
+}
+
+/// 手写 DisplayEnumerator 替身 — 可配 workArea 或抛异常（Plan 30-02 D-03 fallback 测试）。
+///
+/// 复用 test/widgets/multi_monitor_clamp_test.dart 的 fake 模式，但在本文件内
+/// 自定义以支持 [throwOnGetCurrent]（验证 shell 层 try/catch + 对称 fallback）。
+/// 用 local 变量提升非 null（避免 `!`，CLAUDE.md 严格类型安全）。
+class FakeDisplayEnumerator implements DisplayEnumerator {
+  FakeDisplayEnumerator({this.workArea, this.throwOnGetCurrent = false});
+
+  /// 当前显示器可用区域（null 模拟"无显示器信息"）.
+  final Rect? workArea;
+
+  /// true 时 getCurrentDisplay 抛 StateError（验证异常 fallback 路径）.
+  final bool throwOnGetCurrent;
+
+  @override
+  List<DisplayInfo> enumerateDisplays() {
+    final area = workArea;
+    if (area == null) return const [];
+    return [DisplayInfo(bounds: area, workArea: area, isPrimary: true)];
+  }
+
+  @override
+  DisplayInfo? getDisplayForWindow(int hwnd) => getCurrentDisplay();
+
+  @override
+  DisplayInfo? getCurrentDisplay() {
+    if (throwOnGetCurrent) {
+      throw StateError('fake display query failure');
+    }
+    final area = workArea;
+    if (area == null) return null;
+    return DisplayInfo(bounds: area, workArea: area, isPrimary: true);
+  }
 }
