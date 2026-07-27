@@ -14,7 +14,10 @@ import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
 import 'package:simple_player_flutter/ui/shared/apple_curves.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/tab_content.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/tab_strip.dart';
 import 'package:simple_player_flutter/ui/shared/settings_button.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import 'settings_panel_controller_test.dart' show FakePlaybackController;
 
@@ -1016,6 +1019,54 @@ void main() {
           ),
           findsWidgets,
         );
+      },
+    );
+  });
+
+  // ── Structural color route (Plan 30-03: LAYOUT-05 / D-02) ──
+  group('settings overlay structural color route (30-03)', () {
+    testWidgets(
+      'title bar, tab strip, content, and button bar resolve background from Tokens.panelSectionBg',
+      (tester) async {
+        // Arrange — open shell 让四段都挂载
+        final (controller, _) = await pumpShell(tester);
+        controller.open();
+        await tester.pump();
+
+        // Assert — 标题栏 Container color 走 panelSectionBg（color-route 非 ARGB 字面值，
+        // 方便 Phase 31 单点改 alias，D-02）
+        final titleBarContainer = tester.widgetList<Container>(
+          find.descendant(
+            of: find.byKey(SettingsOverlayShell.titleBarKey),
+            matching: find.byType(Container),
+          ),
+        ).first;
+        expect(titleBarContainer.color, Tokens.panelSectionBg);
+
+        // Assert — 按钮栏 Container color 走 panelSectionBg（buttonBarKey 唯一定位）
+        final buttonBarContainer = tester.widget<Container>(
+          find.byKey(SettingsOverlayShell.buttonBarKey),
+        );
+        expect(buttonBarContainer.color, Tokens.panelSectionBg);
+
+        // Assert — tab 条 Container color 走 panelSectionBg（SettingsTabStrip 子树首个 Container）
+        final tabStripContainer = tester.widgetList<Container>(
+          find.descendant(
+            of: find.byType(SettingsTabStrip),
+            matching: find.byType(Container),
+          ),
+        ).first;
+        expect(tabStripContainer.color, Tokens.panelSectionBg);
+
+        // Assert — 内容区 ColoredBox color 走 panelSectionBg（SettingsTabContent 子树首个
+        // ColoredBox；原 bgPanel distinct route 已统一到 panelSectionBg，D-02）
+        final contentColoredBox = tester.widgetList<ColoredBox>(
+          find.descendant(
+            of: find.byType(SettingsTabContent),
+            matching: find.byType(ColoredBox),
+          ),
+        ).first;
+        expect(contentColoredBox.color, Tokens.panelSectionBg);
       },
     );
   });
