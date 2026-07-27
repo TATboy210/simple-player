@@ -1,0 +1,11 @@
+{
+  "frameCount": 300,
+  "build": {
+    "avgMs": 0.20459,
+    "maxMs": 2.765
+  },
+  "raster": {
+    "avgMs": 1.4004400000000001,
+    "maxMs": 5.402
+  }
+}

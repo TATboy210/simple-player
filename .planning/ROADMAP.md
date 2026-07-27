@@ -24,7 +24,7 @@
 - [ ] **Phase 28: Settings Shell Split + Legacy Deletion** - Prerequisite refactor: split 517-line shell into 3 files + delete legacy 88px-sidebar panel
 - [x] **Phase 29: Auto-Pause Always** - Panel-open always pauses (wasPlaying guard dropped); MediaState snapshot for safe resume
 - [x] **Phase 30: Panel Layout Redesign** - 16:9 / 50%-area overlay + General tab middle + multi-monitor clamp
-- [ ] **Phase 31: Visual Design Alignment** - Panel chrome + option rows aligned to control-bar glass / edge-glow / three-state
+- [x] **Phase 31: Visual Design Alignment** - Panel chrome + option rows aligned to control-bar glass / edge-glow / three-state
 - [ ] **Phase 32: Navigation & Interaction Polish** - End-cap arrows + InputModeDetector + hint substitution + raw LB/RB binding deletion
 - [ ] **Phase 33: Audio Settings Tab** - EQ / balance / sync / normalization via single af string, pure deferred-apply
 - [ ] **Phase 34: Control Bar Audio Track Switching** - Headphones button + track popup menu symmetric to subtitle button
@@ -113,7 +113,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 31-03-PLAN.md — Run regression evidence and obtain Windows profile/visual confirmation
+- [x] 31-03-PLAN.md — Run regression evidence and obtain Windows profile/visual confirmation (user-approved checkpoint 2026-07-28)
 
 **Cross-cutting constraints:**
 
@@ -186,7 +186,7 @@ Plans:
 | 28 | Settings Shell Split + Legacy Deletion | Not started | 0/TBD | 2 |
 | 29 | Auto-Pause Always | Not started | 0/TBD | 4 |
 | 30 | Panel Layout Redesign | Not started | 0/TBD | 5 |
-| 31 | Visual Design Alignment | Not started | 0/TBD | 5 |
+| 31 | Visual Design Alignment | Complete (passed-with-note) | 3/3 | 5 |
 | 32 | Navigation & Interaction Polish | Not started | 0/TBD | 7 |
 | 33 | Audio Settings Tab | Not started | 0/TBD | 7 |
 | 34 | Control Bar Audio Track Switching | Not started | 0/TBD | 5 |
@@ -253,11 +253,11 @@ Every v1 requirement mapped to exactly one phase. No orphans, no duplicates.
 | LAYOUT-03 | Phase 30 | Complete |
 | LAYOUT-04 | Phase 30 | Complete |
 | LAYOUT-05 | Phase 30 | Complete |
-| VISUAL-01 | Phase 31 | Pending |
-| VISUAL-02 | Phase 31 | Pending |
-| VISUAL-03 | Phase 31 | Pending |
-| VISUAL-04 | Phase 31 | Pending |
-| VISUAL-05 | Phase 31 | Pending |
+| VISUAL-01 | Phase 31 | Satisfied |
+| VISUAL-02 | Phase 31 | Satisfied (by-design exempt) |
+| VISUAL-03 | Phase 31 | Satisfied |
+| VISUAL-04 | Phase 31 | Satisfied (code; human_review pending) |
+| VISUAL-05 | Phase 31 | Satisfied (code; human_review pending) |
 | NAV-01 | Phase 32 | Pending |
 | NAV-02 | Phase 32 | Pending |
 | NAV-03 | Phase 32 | Pending |
