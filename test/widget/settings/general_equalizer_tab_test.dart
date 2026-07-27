@@ -4,11 +4,46 @@ import 'package:simple_player_flutter/ui/dialogs/settings/pending_settings.dart'
 import 'package:simple_player_flutter/ui/dialogs/settings/tabs/equalizer_tab.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/tabs/general_tab.dart';
 import 'package:simple_player_flutter/ui/shared/focusable_setting_row.dart';
+import 'package:simple_player_flutter/ui/shared/glass_container.dart';
+import 'package:simple_player_flutter/ui/shared/section_header.dart';
 import 'package:simple_player_flutter/ui/shared/settings_card.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 void main() {
   group('settings tab SettingRow consumers', () {
+    testWidgets('GeneralTab renders its glass sections and headers', (
+      tester,
+    ) async {
+      // Arrange & Act
+      await tester.pumpWidget(
+        _wrap(GeneralTab(pending: PendingSettingsState())),
+      );
+
+      // Assert
+      expect(find.byType(GlassContainer), findsNWidgets(2));
+      final headers = tester.widgetList<SectionHeader>(
+        find.byType(SectionHeader),
+      );
+      expect(
+        headers.map((header) => header.icon),
+        containsAll(<IconData>[Icons.language, Icons.dark_mode]),
+      );
+    });
+
+    testWidgets('EqualizerTab renders its glass section and header', (
+      tester,
+    ) async {
+      // Arrange & Act
+      await tester.pumpWidget(
+        _wrap(EqualizerTab(pending: PendingSettingsState())),
+      );
+
+      // Assert
+      expect(find.byType(GlassContainer), findsOneWidget);
+      final header = tester.widget<SectionHeader>(find.byType(SectionHeader));
+      expect(header.icon, Icons.equalizer);
+    });
+
     testWidgets('GeneralTab keeps each row on one non-InkWell focus route', (
       tester,
     ) async {
