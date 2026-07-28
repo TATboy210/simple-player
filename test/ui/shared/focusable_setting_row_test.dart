@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/focusable_setting_row.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 void main() {
   /// 构建最小化测试壳 — MaterialApp 包裹 FocusableSettingRow。
@@ -49,12 +50,11 @@ void main() {
       addTearDown(focusNode.dispose);
 
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: Scaffold(
-            body: Focus(
-              child: FocusableSettingRow(
-                child: Text('Focusable'),
-              ),
+            body: FocusableSettingRow(
+              focusNode: focusNode,
+              child: const Text('Focusable'),
             ),
           ),
         ),
@@ -64,9 +64,18 @@ void main() {
       focusNode.requestFocus();
       await tester.pump();
 
-      // Assert — FocusableSettingRow 的 Container 应存在
-      // （焦点边框在 FocusableActionDetector 的 onShowFocusHighlight 回调中设置）
-      expect(find.text('Focusable'), findsOneWidget);
+      // Assert — 焦点边框即时更新为设计令牌色。
+      final decoration = tester.widget<Container>(
+        find.descendant(
+          of: find.byType(FocusableSettingRow),
+          matching: find.byType(Container),
+        ),
+      ).decoration;
+      expect(decoration, isA<BoxDecoration>());
+      final boxDecoration = decoration! as BoxDecoration;
+      expect(boxDecoration.border, isA<Border>());
+      final border = boxDecoration.border! as Border;
+      expect(border.top.color, Tokens.controlBarBorderWhite);
     });
 
     testWidgets('disabled widget is not focusable (D-15)', (tester) async {
@@ -142,6 +151,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: FocusableSettingRow(
+              focusNode: focusNode,
               onFocusChange: (focused) => focusChanges.add(focused),
               child: const Text('Callback Test'),
             ),
@@ -149,12 +159,12 @@ void main() {
         ),
       );
 
-      // Act — 通过 FocusableActionDetector 的焦点变化触发回调
-      // （直接请求焦点到 FocusableSettingRow 的 FocusNode）
+      // Act — 直接请求 FocusableSettingRow 的焦点节点。
+      focusNode.requestFocus();
       await tester.pump();
 
-      // Assert — 回调列表存在（可能为空，取决于焦点是否实际变化）
-      expect(focusChanges, isA<List<bool>>());
+      // Assert — 回调记录实际的未聚焦到聚焦状态转换。
+      expect(focusChanges, contains(true));
     });
 
     testWidgets('focusKey is passed to FocusableActionDetector',
