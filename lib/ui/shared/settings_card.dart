@@ -21,6 +21,12 @@ class SettingRow extends StatefulWidget {
   final Widget control;
   final VoidCallback? onTap;
 
+  /// 是否允许行及其嵌入控件接收焦点和指针事件。
+  ///
+  /// 行级 [onTap] 为空时，嵌入的 Switch 或 SpinControl 仍可独立交互；
+  /// 仅纯展示行需要显式设为 false。
+  final bool focusable;
+
   /// 可选的行焦点节点；外层应用可用它控制键盘遍历的当前行。
   final FocusNode? focusNode;
 
@@ -31,6 +37,7 @@ class SettingRow extends StatefulWidget {
     this.description,
     required this.control,
     this.onTap,
+    this.focusable = true,
     this.focusNode,
   });
 
@@ -41,9 +48,10 @@ class SettingRow extends StatefulWidget {
 class _SettingRowState extends State<SettingRow> {
   @override
   Widget build(BuildContext context) {
-    // FocusableSettingRow is the single keyboard stop; InkWell only owns pointer feedback.
+    // FocusableSettingRow is the single keyboard stop; row-level tapping and
+    // embedded-control interaction are independent.
     return FocusableSettingRow(
-      enabled: widget.onTap != null,
+      enabled: widget.focusable,
       focusNode: widget.focusNode,
       focusedBuilder: (context, focused) => _buildInteractiveRow(focused),
     );
