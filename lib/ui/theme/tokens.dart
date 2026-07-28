@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 class Tokens {
   Tokens._();
 
-  static const bgDeep = Color(0xFF060810);      // 最深背景 - 加深
-  static const bgBase = Color(0xFF0C0F18);      // 加深
-  static const bgPanel = Color(0xFF111520);     // 加深
-  static const bgElevated = Color(0xFF161A28);  // 加深
-  static const bgHover = Color(0xFF283045);     // hover 高亮 — 比 bgElevated 明显更亮
-  static const bgGlass = Color(0x8C0C0F18);    // 加深
+  static const bgDeep = Color(0xFF060810); // 最深背景 - 加深
+  static const bgBase = Color(0xFF0C0F18); // 加深
+  static const bgPanel = Color(0xFF111520); // 加深
+  static const bgElevated = Color(0xFF161A28); // 加深
+  static const bgHover = Color(0xFF283045); // hover 高亮 — 比 bgElevated 明显更亮
+  static const bgGlass = Color(0x8C0C0F18); // 加深
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
@@ -18,9 +18,9 @@ class Tokens {
   static const danger = Color.fromARGB(255, 250, 55, 55);
 
   // ── 边缘微光 ──
-  static const glowCore = Color(0xE6A0BEFF);     // rgba(160,190,255,0.9)
-  static const glowMid = Color(0x40648CFF);       // rgba(100,140,255,0.25)
-  static const glowEdge = Color(0x265078FF);      // rgba(80,120,255,0.15)
+  static const glowCore = Color(0xE6A0BEFF); // rgba(160,190,255,0.9)
+  static const glowMid = Color(0x40648CFF); // rgba(100,140,255,0.25)
+  static const glowEdge = Color(0x265078FF); // rgba(80,120,255,0.15)
   static const glowEdgeStrong = Color(0x596496FF); // rgba(100,150,255,0.35)
 
   // ── 边缘微光 — gradient 变体 box-shadow ──
@@ -48,27 +48,36 @@ class Tokens {
   static const auroraBlue1 = Color(0x1A4A8EFF);
   static const auroraBlue2 = Color(0x144A8EFF);
   static const auroraBlue3 = Color(0x0F4A8EFF);
+
   /// 噪点叠加色 — 低 alpha 白色，模拟胶片颗粒
   static const noiseOverlay = Color(0x0AFFFFFF);
+
   /// 紫色透射光斑 — 中心光效默认色
   static const glowPurple = Color(0x1AA855F7);
 
   // ── 控制栏装饰 ──
   static const controlBarBg = Color(0x990E111E);
+
   /// 10% 淡蓝辉光描边（playing 状态，替代白色微光 D-15/D-16）
   static const controlBarBorderWhite = Color(0x0A6496FF);
+
   /// 2% 淡蓝描边（idle 状态，比 playing 的 10% 更淡，per D-18）
   static const controlBarBorderIdle = Color(0x056496FF);
   static const controlBarShadowBlack = Color(0x1A000000);
   static const controlBarOuterShadow = Color(0x40000000);
+
   /// idle 状态下中心控件文字色 — 淡化版 textPrimary
   static const controlBarTextPrimaryIdle = Color(0x73FFFFFF);
+
   /// idle 状态下次要文字色
   static const controlBarTextSecondaryIdle = Color(0x38FFFFFF);
+
   /// idle 状态下控制栏背景
   static const controlBarBgIdle = Color(0x660E111E);
+
   /// idle 状态下玻璃边框
   static const glassBorderIdle = Color(0x0A6482FF);
+
   /// idle 状态下图标色
   static const controlBarIconIdle = Color(0x73FFFFFF);
 
@@ -88,8 +97,8 @@ class Tokens {
   static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 字体 ──
-  static const fontFamily = 'SF Pro Display';    // 主字体（Windows 回退 Segoe UI）
-  static const fontFamilyMono = 'SF Mono';       // 等宽字体
+  static const fontFamily = 'SF Pro Display'; // 主字体（Windows 回退 Segoe UI）
+  static const fontFamilyMono = 'SF Mono'; // 等宽字体
   static const fontTitle = 18.0;
   static const fontBody = 14.0;
   static const fontCaption = 12.0;
@@ -116,12 +125,12 @@ class Tokens {
   static const spLg = 16.0;
   static const spXl = 24.0;
 
-  static const radiusSm = 8.0;       // 按钮、speed 标签
-  static const radiusMd = 14.0;      // 色板方块、透射卡片图标
-  static const radiusLg = 22.0;      // 卡片、控制栏、hover 区域
-  static const radiusXl = 32.0;      // 外框容器
+  static const radiusSm = 8.0; // 按钮、speed 标签
+  static const radiusMd = 14.0; // 色板方块、透射卡片图标
+  static const radiusLg = 22.0; // 卡片、控制栏、hover 区域
+  static const radiusXl = 32.0; // 外框容器
   static const radiusBtn = 4.0;
-  static const radiusLarge = 12.0;   // 保留兼容
+  static const radiusLarge = 12.0; // 保留兼容
   static const radiusPopup = 8.0;
 
   // ── 毛玻璃 ──
@@ -160,7 +169,7 @@ class Tokens {
 
   // ── 控制栏 ──
   static const controlBarHeight = 110.0;
-  static const controlBarRadius = 22.0;   // 修正为 22px（与设计稿一致）
+  static const controlBarRadius = 22.0; // 修正为 22px（与设计稿一致）
   static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;
   static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
@@ -168,6 +177,7 @@ class Tokens {
   // ── 缩略图 ──
   /// 缩略图播放中叠加层 — 半透明黑色标识当前播放项
   static const thumbnailOverlay = Color(0x66000000);
+
   /// 缩略图迷你进度条背景轨道
   static const progressBarBg = Color(0x33FFFFFF);
 
@@ -181,6 +191,7 @@ class Tokens {
   static const progressBuffer = Color(0x44FFFFFF);
   static const Color progressThumb = Color(0xFFFFFFFF);
   static const int progressSeekThrottleMs = 150;
+
   /// 渐变条高度
   static const double gradientStripHeight = 3.0;
   static const int progressExpandDurationMs = 200;
@@ -200,6 +211,7 @@ class Tokens {
   static const double osdIconSize = 22;
   static const int osdFadeDurationMs = 200;
   static const int osdDefaultHoldMs = 1200;
+
   /// OSD 迷你进度条背景轨道色
   static const Color osdTrackColor = Color(0x33FFFFFF);
 
@@ -227,24 +239,55 @@ class Tokens {
   static const double breakpointUltraCompact = 360;
   static const double breakpointWide = 1200;
 
+  // ── 设置面板 chrome ──
+  /// 设置面板的半透明背景遮罩。
+  static const Color settingsOverlayMask = Colors.black54;
+
+  /// 设置面板标题栏高度。
+  static const double settingsTitleBarHeight = 44.0;
+
+  /// 紧凑布局的设置 tab 条高度。
+  static const double tabStripHeightCompact = 56.0;
+
+  /// 常规布局的设置 tab 条高度。
+  static const double tabStripHeightNormal = 64.0;
+
+  // ── 控制栏局部布局 ──
+  /// 控制栏内容与底部边缘之间的留白。
+  static const double controlBarContentBottomPadding = 6.0;
+
+  /// 控制栏顶部装饰渐变条的高度。
+  static const double controlBarGradientHeight = 1.0;
+
+  /// 控制栏按钮行的水平留白。
+  static const double controlBarButtonRowPadding = 4.0;
+
   // ── 响应式设置面板（D-04：严格 16:9 几何）──
   /// 设置面板 tab bar 切换 normal/compact 的窗口宽度断点（>=800 normal, <800 compact）
   /// 注意：仅驱动 tab-compact 呈现，不参与 sizing 公式（D-04：sizing 无断点分支）
   static const double breakpointResponsive = 800.0;
+
   /// 面板最小宽度（clamp 下限）
   static const double panelMinWidth = 400.0;
+
   /// 面板最大宽度（clamp 上限，D-04：16:9 几何上限 960）
   static const double panelMaxWidth = 960.0;
+
   /// 面板宽度占窗口宽度比例（D-04：0.5，width=min(0.5×W, H×16/9)）
   static const double panelWidthRatio = 0.5;
+
   /// 面板宽高比（D-04：16:9，height = width / panelAspectRatio）
   static const double panelAspectRatio = 16.0 / 9.0;
+
   /// normal 模式 tab 字体大小
   static const double tabBarFontNormal = 14.0;
+
   /// compact 模式 tab 字体大小
   static const double tabBarFontCompact = 12.0;
+
   /// normal 模式 tab 内容间距
   static const double tabBarSpacingNormal = 16.0;
+
   /// compact 模式 tab 内容间距
   static const double tabBarSpacingCompact = 8.0;
 
@@ -266,6 +309,7 @@ class Tokens {
 
   // ── 音量/倍速控件 ──
   static const double volumeSliderWidth = 100;
+
   /// VolumeSlider 拖拽节流间隔（≤10 次/秒）
   static const int volumeThrottleMs = 100;
   static const double speedButtonWidth = 72;
