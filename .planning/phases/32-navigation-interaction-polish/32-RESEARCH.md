@@ -319,22 +319,25 @@ The detector must ignore non-mouse pointer kinds; `onPointerHover` is the primar
 | A4 | Five-second detection should use a cancellable timer and be active only while the settings panel is open. | Standard Stack / Pattern 2 | Lifecycle/timer leaks or detector behavior outside panel scope. |
 | A5 | Fixed end caps plus nested expanded tab row preserve compact layout. | Pitfall 4 | Compact labels could overflow without measurement. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What exact KeyEvent signature does the target Steam Input profile emit on Windows?**
    - What we know: Direct Flutter gamepad logical/physical keys have distinct constants, but Flutter exposes no origin metadata once an external layer emits a keyboard arrow; Windows/non-Android raw conversion defaults device type to keyboard. [CITED: D:/flutter/packages/flutter/lib/src/services/keyboard_key.g.dart#L790-L795] [CITED: D:/flutter/packages/flutter/lib/src/services/keyboard_key.g.dart#L2519-L2534] [CITED: D:/flutter/packages/flutter/lib/src/services/hardware_keyboard.dart#L1217-L1242]
    - What is unclear: Whether the installed Steam profile injects plain keyboard events or presents direct gamepad events for LB/RB.
    - Recommendation: Add a debug-only/manual Windows test matrix logging `logicalKey`, `physicalKey`, `deviceType`, and `synthesized` for native arrows, Steam LB/RB, and a direct controller; do not alter production routing based on an unverified signature. [ASSUMED]
+   - **RESOLVED:** Production routing is source-agnostic (heuristic, not key-routing — D-01); the exact Steam Input hardware signature is validation-only and is covered by the Plan 03 blocking checkpoint (human-verify dual-mode + profile raster A/B). The hardware checkpoint boundary is preserved — production does not depend on a specific hardware signature.
 
 2. **Which UI owns the manual input-mode toggle?**
    - What we know: NAV-02 locks a toggle fallback but does not name its placement. [CITED: D:/simple_player_flutter/.planning/REQUIREMENTS.md#L41-L44]
    - What is unclear: Whether it belongs in the shortcuts tab, panel title bar, or another settings control.
    - Recommendation: Planner should add a compact control in the Shortcuts tab, because that tab already owns key-capture UI through `KeyboardListener`. [CITED: D:/simple_player_flutter/lib/ui/dialogs/settings/shortcuts_tab.dart#L104-L107] [ASSUMED]
+   - **RESOLVED:** The manual input-mode toggle is placed in the Shortcuts tab as a pointer-only control (GestureDetector/InkWell with an independent FocusNode), cycling keyboard → gamepad → auto, calling InputModeDetector.instance.toggle(mode) (Plan 32-02 Task 2, D-09 — does not compete with KeyboardListener autofocus which is true only during recording).
 
 3. **Which option-list widget receives NAV-05/06 overlays first?**
    - What we know: `SettingsTabContent` is a colored `IndexedStack` container and has no generic scroll/list overlay seam. [CITED: D:/simple_player_flutter/lib/ui/dialogs/settings/tab_content.dart#L47-L120]
    - What is unclear: Which shipped tab/list has the intended top/bottom option-list navigation model.
    - Recommendation: Scope the new overlay to the specific scrollable settings list selected by the planner; do not overlay all seven IndexedStack children speculatively. [ASSUMED]
+   - **RESOLVED:** GeneralTab (index 3 in the IndexedStack — the default tab, D-01 middle position) is selected as the target option list. It contains a SingleChildScrollView wrapping an AnimatedSectionList with discrete GlassContainer sections (language SpinControl and appearance switches), forming a natural option list for up/down navigation with clear top and bottom boundaries (Plan 32-03 Task 1). Scope is limited to this one shipped list per the approved approach — no speculative overlay of all seven IndexedStack children.
 
 ## Environment Availability
 
