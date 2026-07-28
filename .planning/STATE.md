@@ -4,15 +4,15 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 32
 current_phase_name: navigation-interaction-polish
-status: research-complete-paused-for-plan
-stopped_at: research complete, awaiting /gsd-plan-phase 32 (2026-07-28)
-last_updated: "2026-07-28T10:51:14.652Z"
-last_activity: 2026-07-28
-last_activity_desc: /gsd-plan-phase 32 --research-phase 32 → researcher COMPLETE commit 645904ab (MEDIUM; Steam Input separability byte-identical→mouse-idle heuristic + toggle), awaiting /gsd-plan-phase 32
+status: phase-32-planned-ready-to-execute
+stopped_at: Phase 32 plan-checker iter8 PASSED (0 blockers + 1 §12-exempt VALIDATION.md warning resolved); ready for /gsd-execute-phase 32 (2026-07-29)
+last_updated: "2026-07-29T17:00:00.000Z"
+last_activity: 2026-07-29
+last_activity_desc: "Phase 32 plan-checker iter8 PASSED (0 blockers); 3 plans + 32-VALIDATION.md verified — ready for /gsd-execute-phase 32"
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 10
+  total_plans: 14
   completed_plans: 9
   percent: 43
 ---
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 32 — navigation-interaction-polish (research complete commit 645904ab, awaiting /gsd-plan-phase 32); Phases 28-31 complete
+**Current focus:** Phase 32 — navigation-interaction-polish (plan-checker iter8 PASSED commit 7e04121, ready for /gsd-execute-phase 32); Phases 28-31 complete
 
 ## Current Position
 
-Phase: 32 (navigation-interaction-polish) — RESEARCH COMPLETE (32-RESEARCH.md written, commit 645904ab, MEDIUM confidence)
-Plan: 0 of ? (research done; prerequisites: plan → execute → validate)
-Status: research-complete-paused-for-plan (2026-07-28); HANDOFF.json + .continue-here.md closed-loop deleted this commit
-Last activity: 2026-07-28 — /gsd-plan-phase 32 --research-phase 32 → researcher COMPLETE (Steam Input separability: byte-identical→mouse-idle heuristic)
+Phase: 32 (navigation-interaction-polish) — PLAN VERIFIED (32-01/02/03-PLAN.md + 32-VALIDATION.md written, plan-checker iter8 PASSED 0 blockers)
+Plan: 3/3 verified (32-01, 32-02, 32-03); prerequisites: execute → validate
+Status: planned-ready-to-execute (2026-07-29); plan-checker iter8 PASSED, 32-VALIDATION.md created
+Last activity: 2026-07-29 — Phase 32 plan-checker iter8 PASSED (0 blockers); 3 plans + VALIDATION.md ready for /gsd-execute-phase 32
 
 ## Performance Metrics
 
@@ -114,9 +114,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-28T10:51:14.627Z
-Stopped at: context exhaustion at 79% (2026-07-28)
-Resume file: None
+Last session: 2026-07-29T17:00:00.000Z
+Stopped at: Phase 32 plan-checker iter8 PASSED — post-PASS partial (STATE/ROADMAP edited, 4 checkpoints + commit pending in fresh window) (2026-07-29)
+Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commit, then /gsd-execute-phase 32)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
