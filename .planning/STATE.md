@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
-current_phase: 31
-current_phase_name: visual-design-alignment
-status: complete
-stopped_at: context exhaustion at 82% (2026-07-28)
-last_updated: "2026-07-28T08:08:52.205Z"
-last_activity: 2026-07-27
-last_activity_desc: resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
+current_phase: 32
+current_phase_name: navigation-interaction-polish
+status: research-complete-paused-for-plan
+stopped_at: research complete, awaiting /gsd-plan-phase 32 (2026-07-28)
+last_updated: "2026-07-28T10:51:14.652Z"
+last_activity: 2026-07-28
+last_activity_desc: /gsd-plan-phase 32 --research-phase 32 → researcher COMPLETE commit 645904ab (MEDIUM; Steam Input separability byte-identical→mouse-idle heuristic + toggle), awaiting /gsd-plan-phase 32
 progress:
   total_phases: 7
   completed_phases: 3
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 29 — auto-pause-detector (next, ready to plan); Phase 28 complete
+**Current focus:** Phase 32 — navigation-interaction-polish (research complete commit 645904ab, awaiting /gsd-plan-phase 32); Phases 28-31 complete
 
 ## Current Position
 
-Phase: 31 (visual-design-alignment) — DISCUSS-PAUSED (pre-gray-area, 4/10 sub-tasks)
-Plan: 0 of ? (discuss-phase in progress, no PLAN yet; prerequisites: discuss → ui-phase → plan)
-Status: discuss-phase paused pre-gray-area at 77% ctx (2026-07-27), HANDOFF.json recorded
-Last activity: 2026-07-27 — resume-work → user chose resume Phase 31 discuss (Phase 29 confirmed complete via git history, checkpoint stale)
+Phase: 32 (navigation-interaction-polish) — RESEARCH COMPLETE (32-RESEARCH.md written, commit 645904ab, MEDIUM confidence)
+Plan: 0 of ? (research done; prerequisites: plan → execute → validate)
+Status: research-complete-paused-for-plan (2026-07-28); HANDOFF.json + .continue-here.md closed-loop deleted this commit
+Last activity: 2026-07-28 — /gsd-plan-phase 32 --research-phase 32 → researcher COMPLETE (Steam Input separability: byte-identical→mouse-idle heuristic)
 
 ## Performance Metrics
 
@@ -114,8 +114,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-28T08:08:52.183Z
-Stopped at: context exhaustion at 82% (2026-07-28)
+Last session: 2026-07-28T10:51:14.627Z
+Stopped at: context exhaustion at 79% (2026-07-28)
 Resume file: None
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -309,6 +309,32 @@ Resume file: None
 - **未提交**：本次 STATE.md frontmatter + Current Position + 本条 Session Continuity。43 个无关脏 lib/kernel 文件不动。不单独提交 STATE.md——/clear → `/gsd-discuss-phase 31` 的 git_commit 步骤（commit "docs(31): capture phase context"）会带上 STATE.md 改动闭环。HANDOFF.json 由 discuss-phase 成功恢复后自动闭环删除。
 - **下一步（新上下文窗口）**：`/clear` → `/gsd-discuss-phase 31`。fresh 200K 窗口，check_existing 检测 HANDOFF.json 提供 Resume → 从 `remaining_tasks[5]=scout_codebase` 续跑。预读 `lib/ui/player/control_bar.dart`（`_decorationPlaying` 4-shadow 实现）+ `30-UI-SPEC.md`（视觉参数直接来源）+ `30-CONTEXT.md`（D-02 deferred chrome boundary）。预期 4 gray areas：① 共享 decoration token 命名 ② 三态按钮 Tokens.* 颜色值 ③ density 像素值 ④ 透看选项 border policy。
 - **上下文预算守卫**：memory `feedback_gsd_context_budget_pause`（2026-07-26）硬约束 60%+ 启动交互式多轮工作流会 halt。discuss-phase = 4 区 × 4 轮 AskUserQuestion + 写 CONTEXT.md/DISCUSSION-LOG.md + commit + state。本 resume 窗口已耗 66%，不建议本窗口续跑 → /clear 后 fresh 跑。
+
+### 2026-07-28 第十一次恢复（/gsd-resume-work → 用户选启动 Phase 32 research）
+
+- **恢复源**：`.planning/HANDOFF.json`（2026-07-28T08:22:49Z，phase 32 paused-pre-research，0/7 tasks）+ `.planning/.continue-here.md`（phase 32 level checkpoint，同时间戳，内容一致）。无 interrupted agent、无 async-job、无 PLAN-without-SUMMARY（Phase 32 目录尚未创建，pre-research 阶段）。
+- **三方状态核对一致**：(1) git HEAD `54b348f7 wip: phase-32 paused at pre-research`（工作树干净，HANDOFF 记录的 `uncommitted_files: [.planning/STATE.md]` 已被该 commit 提交闭环）；(2) Phase 31 闭环确认 — `55f90724` verification passed-with-note + `ae8145b4` phase complete + `64fd9f91`/`2737d537`/`d2496aaf` SettingRow three-state plan；(3) Phase 32 目录 `.planning/phases/32-navigation-interaction-polish/` **不存在**（pre-research，research 会创建）。
+- **两个 .continue-here 区分**：`.planning/.continue-here.md` = Phase 32 有效 checkpoint（paused-pre-research，7 项 NAV 需求 + 2 blocking constraints）；`./.continue-here.md`（根目录）= 2026-07-10 v1.6 时代遗留噪声（HEAD `b8d431b3`，待清理，非当前 phase）。
+- **STATE.md 滞后修正**：frontmatter `current_phase 31→32`、`status complete→paused-pre-research`、`completed_phases 3→4`、`percent 43→57`、`last_activity 2026-07-27→2026-07-28`；Current Position + Project Reference Current focus 同步到 Phase 32。历史 Session Continuity 全保留。
+- **用户决策**（AskUserQuestion）：选 **"启动 Phase 32 research (推荐)"** —— 按 HANDOFF.next_action + ROADMAP L145/L210 硬性要求，spawn gsd-phase-researcher 验证 Steam Input 事件签名可分性（核心 blocker）+ InputModeDetector heuristic 信号可靠性 + gameButton 绑定影响面，产出 32-RESEARCH.md。
+- **未提交**：本次 STATE.md frontmatter + Current Position + Project Reference + 本条 Session Continuity。不单独提交——fresh 窗口 `/gsd-plan-phase 32 --research-phase 32` 的 git_commit 步骤会带上 STATE.md 改动闭环（第十次恢复先例 STATE L309）。HANDOFF.json + `.planning/.continue-here.md` 由 research 成功恢复后闭环删除（一次性工件）。
+- **强耦合约束（blocking，research 喂给 planner）**：NAV-04（删 `gameButtonLeft1/Right1` 绑定）与 NAV-07（单一根 `Focus(onKeyEvent:_handleKeyEvent)`）**必须同批落地**于同一 plan —— 否则 ←/→ 逃逸到 `KeyboardHandler` 触发 seek ±5s 回归。
+- **下一步（新上下文窗口）**：`/clear` → `/gsd-plan-phase 32 --research-phase 32`（fresh 200K 窗口，spawn gsd-phase-researcher/sonnet，参考 Phase 30 researcher `a813590` 成功模式）。researcher 核心必答：Flutter `Focus.onKeyEvent` / `HardwareKeyboard` 能否区分 Steam Input 映射的 LB/RB vs 原生 ←/→（若 byte-identical，heuristic 须依赖 absence-of-mouse-move + arrow-key-presence）。读 `lib/ui/player/keyboard_handler.dart` + Steam Input docs + cross-reference `project_steam_steamos_plan` memory。产出 32-RESEARCH.md → 派生 32-VALIDATION.md → 后续 plan→execute→validate。
+- **上下文预算守卫**：memory `feedback_gsd_context_budget_pause`（2026-07-26）硬约束 60%+ 窗口启动 spawn 会 halt mid-spawn。本 resume 窗口已读 STATE.md(316 行)+PROJECT.md+HANDOFF+.continue-here+ROADMAP sections，不建议本窗口 spawn researcher → /clear 后 fresh 跑。
+- **附带清理候选（非阻塞，HANDOFF 记录）**：删 `lib/kernel/player_services.dart.bak`；同步 CLAUDE.md 架构树（漏记 `lib/features/`、`kernel/adapter|diagnostics|startup`、`ui/window/`(含迁出的 `custom_title_bar.dart`)、`ui/dialogs/settings/*`；Design System 节 tokens 路径应为 `lib/ui/theme/` 非 `kernel/ui/theme/`）。
+- **交接 plan 文件**（上次会话产出，researcher 可参考但非执行 plan）：`C:/Users/35490/.claude/plans/32-snappy-lantern.md`（7 项需求、research 必答问题、关键文件路径、6 条验收标准）。
+
+### 2026-07-28 Phase 32 research-only complete (RESEARCH.md 645904ab, MEDIUM confidence)
+
+- **恢复源**：`32-RESEARCH-CHECKPOINT.md`（lean load: init 已查 + VERBATIM prompt + post-spawn procedure 已固化）+ HANDOFF.json + .continue-here.md（phase 32 paused-pre-research 快照）。
+- **本会话**：fresh 200K → spawn gsd-phase-researcher (sonnet, sync, VERBATIM prompt) → `## RESEARCH COMPLETE` MEDIUM（265K tokens, 80 tool_uses, ~13.4 min）。隔离自提交 `645904ab`（仅 32-RESEARCH.md）。
+- **核心 blocker 解决**：Steam Input 事件签名可分性 — 直接 gamepad key events 有 distinct Flutter key constants，但 Steam Input 映射注入的 normal keyboard ←/→ 失去 controller provenance → InputModeDetector heuristic MUST 用 mouse-idle + arrow-key-presence + manual toggle fallback（非 key event 本身路由）。
+- **3 项假设校正（喂 planner）**：① `gameButtonLeft1/Right1` 实际在 `lib/ui/dialogs/settings/panel_key_bindings.dart`（**非** `keyboard_handler.dart`）→ NAV-04 位置纠正；② mouse detection 主信号 `Listener.onPointerHover`（`onPointerMove` 仅 pointer-down）；③ panel 已有 `GlassContainer` blur，NAV-05 MUST color-only Container 无嵌套 BackdropFilter。
+- **NAV-04/NAV-07 强耦合确认**：settings-root `Focus` 须对所有方向键返回 `handled` 防止 player seek/volume 泄漏 — 同 plan 原子落地。
+- **3 Open Questions 留 planner**：① Windows 上目标 Steam Input LB/RB profile 的实际 Flutter event fields（manual capture）；② manual toggle user-facing 位置；③ 第一个 NAV-05/06 overlay 的 option-list tab。
+- **Validation Architecture 已写**：32-RESEARCH.md L353 → 下次 `/gsd-plan-phase 32` 派生 32-VALIDATION.md。
+- **一次性工件闭环**：`git rm HANDOFF.json` + `git rm .continue-here.md`（research 成功恢复后闭环）。`32-RESEARCH-CHECKPOINT.md` 保留（规划通过后删，Phase 30 先例）。
+- **下一步**：`/clear` → `/gsd-plan-phase 32`（不带 --research，has_research=true 走 §5.1 "Use existing" 直接 spawn planner opus 消费 32-RESEARCH.md 写 32-0X-PLAN.md）。
 
 ## Operator Next Steps
 
