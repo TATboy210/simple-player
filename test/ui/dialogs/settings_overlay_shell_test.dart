@@ -401,20 +401,20 @@ void main() {
     );
 
     testWidgets(
-      'clicking tab index 3 (视频) switches selectedTab to 3',
+      'clicking tab index 2 (视频) switches selectedTab to 2',
       (tester) async {
         // Arrange
         final (controller, _) = await pumpShell(tester);
         controller.open();
         await tester.pump();
 
-        // Act — 点击第 4 个 tab（index 3 = 视频）
+        // Act — 点击第 3 个 tab（index 2 = 视频），非默认 General tab。
         final navItems = find.byType(SettingsNavItem);
-        await tester.tap(navItems.at(3));
+        await tester.tap(navItems.at(2));
         await tester.pump();
 
-        // Assert — selectedTab 更新为 3
-        expect(controller.state.selectedTab.value, 3);
+        // Assert — selectedTab 从默认 3 更新为 2。
+        expect(controller.state.selectedTab.value, 2);
       },
     );
 
