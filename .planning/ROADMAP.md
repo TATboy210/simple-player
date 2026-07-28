@@ -142,7 +142,13 @@ Plans:
   6. Top/bottom thin-glass arrows over option list use `Container(color: Tokens.bgGlass)` (no second blur); keyboard ↑/↓ triggers arrow glow feedback
 
 **Blocking Constraints honored**: Steam Input API auto-maps (no Flutter adapter layer — heuristic + toggle only, not FFI); 设计北极星 (arrows match control-bar glass); Tokens.*; BackdropFilter stacking mitigation (Pitfalls 3 + 5); focus-tree single root (Pitfall 1)
-**Plans**: TBD — needs `--research-phase 32` (InputModeDetector is the only new v4.5 infrastructure; verify Steam Input event signatures for heuristic distinguishability)
+**Plans**: 3 plans
+Plans:
+
+- [ ] 32-01-PLAN.md — InputModeDetector singleton + delete raw gameButton LB/RB bindings + single-root Focus arrow containment (NAV-02/04/07 atomic, Wave 1)
+- [ ] 32-02-PLAN.md — End-cap tab arrows + input-mode-aware hint substitution via AnimatedSwitcher (NAV-01/03, Wave 2)
+- [ ] 32-03-PLAN.md — Top/bottom thin-glass option-list arrows with keyboard glow feedback (NAV-05/06, Wave 3)
+
 **UI hint**: yes
 
 ### Phase 33: Audio Settings Tab
@@ -187,7 +193,7 @@ Plans:
 | 29 | Auto-Pause Always | Not started | 0/TBD | 4 |
 | 30 | Panel Layout Redesign | Not started | 0/TBD | 5 |
 | 31 | Visual Design Alignment | Complete (passed-with-note) | 3/3 | 5 |
-| 32 | Navigation & Interaction Polish | Not started | 0/TBD | 7 |
+| 32 | Navigation & Interaction Polish | Planned (iter8 PASSED) | 3/3 | 7 |
 | 33 | Audio Settings Tab | Not started | 0/TBD | 7 |
 | 34 | Control Bar Audio Track Switching | Not started | 0/TBD | 5 |
 
