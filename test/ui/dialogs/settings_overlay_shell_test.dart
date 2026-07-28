@@ -63,24 +63,23 @@ void main() {
   }
 
   group('SettingsOverlayShell', () {
-    testWidgets(
-      'open renders glass shell with 设置 title and close button',
-      (tester) async {
-        // Arrange — 初始关闭：无任何壳命中目标
-        final (controller, fake) = await pumpShell(tester);
-        expect(find.byKey(SettingsOverlayShell.maskKey), findsNothing);
+    testWidgets('open renders glass shell with 设置 title and close button', (
+      tester,
+    ) async {
+      // Arrange — 初始关闭：无任何壳命中目标
+      final (controller, fake) = await pumpShell(tester);
+      expect(find.byKey(SettingsOverlayShell.maskKey), findsNothing);
 
-        // Act
-        controller.open();
-        await tester.pump();
+      // Act
+      controller.open();
+      await tester.pump();
 
-        // Assert — 壳可见，标题为 设置，含关闭按钮；打开时暂停了正在播放的 fake
-        expect(find.byKey(SettingsOverlayShell.shellKey), findsOneWidget);
-        expect(find.text('设置'), findsOneWidget);
-        expect(find.byKey(SettingsOverlayShell.closeButtonKey), findsOneWidget);
-        expect(fake.pauseCallCount, 1);
-      },
-    );
+      // Assert — 壳可见，标题为 设置，含关闭按钮；打开时暂停了正在播放的 fake
+      expect(find.byKey(SettingsOverlayShell.shellKey), findsOneWidget);
+      expect(find.text('设置'), findsOneWidget);
+      expect(find.byKey(SettingsOverlayShell.closeButtonKey), findsOneWidget);
+      expect(fake.pauseCallCount, 1);
+    });
 
     testWidgets(
       'mask tap closes shell, removes hit target, resumes playing fake',
@@ -130,9 +129,7 @@ void main() {
 
         // Assert — 动画终点 scale==1.0 / opacity==1.0，时长 200ms，
         // 开启曲线为 AppleCurves.fullscreenEnter（PANEL-05 / D-07 / D-08）
-        final scale = tester.widget<AnimatedScale>(
-          find.byType(AnimatedScale),
-        );
+        final scale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
         expect(scale.scale, 1.0);
         expect(scale.duration, const Duration(milliseconds: 200));
         expect(scale.curve, AppleCurves.fullscreenEnter);
@@ -162,9 +159,7 @@ void main() {
 
         // Act — 在标题栏区域拖拽
         final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture = await tester.startGesture(tester.getCenter(titleBar));
         await gesture.moveBy(const Offset(50, 30));
         await gesture.up();
         await tester.pump();
@@ -174,9 +169,7 @@ void main() {
         expect(controller.state.dragOffset.value.dy, 30.0);
 
         // Act — 拖到超出边界
-        final gesture2 = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture2 = await tester.startGesture(tester.getCenter(titleBar));
         await gesture2.moveBy(const Offset(500, 500));
         await gesture2.up();
         await tester.pump();
@@ -202,9 +195,7 @@ void main() {
 
         // Act — 拖到超出小窗口边界
         final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture = await tester.startGesture(tester.getCenter(titleBar));
         await gesture.moveBy(const Offset(200, 200));
         await gesture.up();
         await tester.pump();
@@ -238,26 +229,23 @@ void main() {
       },
     );
 
-    testWidgets(
-      'B key closes open panel',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('B key closes open panel', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act — 发送 B 键
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.keyB);
-        await tester.pump();
+      // Act — 发送 B 键
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyB);
+      await tester.pump();
 
-        // Assert — 面板关闭
-        expect(controller.state.isOpen.value, isFalse);
+      // Assert — 面板关闭
+      expect(controller.state.isOpen.value, isFalse);
 
-        // 排空 close() 触发的 200ms 退出动画定时器
-        await tester.pump(const Duration(milliseconds: 250));
-      },
-    );
+      // 排空 close() 触发的 200ms 退出动画定时器
+      await tester.pump(const Duration(milliseconds: 250));
+    });
 
     testWidgets(
       '625x500 window produces 400x225 panel (D-04: min(0.5W, H*16/9) clamped to 400, height=W*9/16)',
@@ -353,70 +341,60 @@ void main() {
 
     // ── Tab Navigation (SIDEBAR-01/02/03) ──
 
-    testWidgets(
-      'open shell renders 7 SettingsNavItem tab items',
-      (tester) async {
-        // Arrange & Act
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('open shell renders 7 SettingsNavItem tab items', (
+      tester,
+    ) async {
+      // Arrange & Act
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Assert — 7 个 SettingsNavItem 存在
-        expect(find.byType(SettingsNavItem), findsNWidgets(7));
-      },
-    );
+      // Assert — 7 个 SettingsNavItem 存在
+      expect(find.byType(SettingsNavItem), findsNWidgets(7));
+    });
 
-    testWidgets(
-      'default selected tab is index 3 (通用) on open',
-      (tester) async {
-        // Arrange & Act
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('default selected tab is index 3 (通用) on open', (tester) async {
+      // Arrange & Act
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Assert — selectedTab 为 3（D-01：General 在七 tab 序列 index 3 默认打开）
-        expect(controller.state.selectedTab.value, 3);
+      // Assert — selectedTab 为 3（D-01：General 在七 tab 序列 index 3 默认打开）
+      expect(controller.state.selectedTab.value, 3);
 
-        // Assert — 通用 文字可见（tab bar + 内容区各一处）
-        expect(find.text('通用'), findsWidgets);
-      },
-    );
+      // Assert — 通用 文字可见（tab bar + 内容区各一处）
+      expect(find.text('通用'), findsWidgets);
+    });
 
-    testWidgets(
-      'all 7 tab labels are visible in the tab bar',
-      (tester) async {
-        // Arrange & Act
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('all 7 tab labels are visible in the tab bar', (tester) async {
+      // Arrange & Act
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Assert — 7 个标签全部可见（D-01 顺序：EQ/Audio/Video/General/Shortcuts/About/Performance）
-        const labels = [
-          '均衡器', '音频', '视频', '通用', '快捷键', '关于', '性能',
-        ];
-        for (final label in labels) {
-          expect(find.text(label), findsWidgets); // 至少在 tab bar 和内容区各一处
-        }
-      },
-    );
+      // Assert — 7 个标签全部可见（D-01 顺序：EQ/Audio/Video/General/Shortcuts/About/Performance）
+      const labels = ['均衡器', '音频', '视频', '通用', '快捷键', '关于', '性能'];
+      for (final label in labels) {
+        expect(find.text(label), findsWidgets); // 至少在 tab bar 和内容区各一处
+      }
+    });
 
-    testWidgets(
-      'clicking tab index 2 (视频) switches selectedTab to 2',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('clicking tab index 2 (视频) switches selectedTab to 2', (
+      tester,
+    ) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act — 点击第 3 个 tab（index 2 = 视频），非默认 General tab。
-        final navItems = find.byType(SettingsNavItem);
-        await tester.tap(navItems.at(2));
-        await tester.pump();
+      // Act — 点击第 3 个 tab（index 2 = 视频），非默认 General tab。
+      final navItems = find.byType(SettingsNavItem);
+      await tester.tap(navItems.at(2));
+      await tester.pump();
 
-        // Assert — selectedTab 从默认 3 更新为 2。
-        expect(controller.state.selectedTab.value, 2);
-      },
-    );
+      // Assert — selectedTab 从默认 3 更新为 2。
+      expect(controller.state.selectedTab.value, 2);
+    });
 
     testWidgets(
       'opening panel resets selectedTab to 0 even if previously on another tab',
@@ -444,31 +422,26 @@ void main() {
       },
     );
 
-    testWidgets(
-      'IndexedStack index matches selectedTab value',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('IndexedStack index matches selectedTab value', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act — 切换到 tab 2
-        final navItems = find.byType(SettingsNavItem);
-        await tester.tap(navItems.at(2));
-        await tester.pump();
+      // Act — 切换到 tab 2
+      final navItems = find.byType(SettingsNavItem);
+      await tester.tap(navItems.at(2));
+      await tester.pump();
 
-        // Assert — IndexedStack 的 index 等于 selectedTab
-        // 壳内有多个 IndexedStack（tab 内容可能也包含），取第一个（壳级别）
-        final allStacks = tester.widgetList<IndexedStack>(
-          find.byType(IndexedStack),
-        );
-        // Shell's IndexedStack has 7 children (one per tab)
-        final shellStack = allStacks.firstWhere(
-          (s) => s.children.length == 7,
-        );
-        expect(shellStack.index, 2);
-      },
-    );
+      // Assert — IndexedStack 的 index 等于 selectedTab
+      // 壳内有多个 IndexedStack（tab 内容可能也包含），取第一个（壳级别）
+      final allStacks = tester.widgetList<IndexedStack>(
+        find.byType(IndexedStack),
+      );
+      // Shell's IndexedStack has 7 children (one per tab)
+      final shellStack = allStacks.firstWhere((s) => s.children.length == 7);
+      expect(shellStack.index, 2);
+    });
 
     testWidgets(
       'TweenAnimationBuilder wraps IndexedStack children for fade animation',
@@ -479,10 +452,7 @@ void main() {
         await tester.pump();
 
         // Assert — TweenAnimationBuilder 存在（IndexedStack 至少构建当前可见 tab 的）
-        expect(
-          find.byType(TweenAnimationBuilder<double>),
-          findsWidgets,
-        );
+        expect(find.byType(TweenAnimationBuilder<double>), findsWidgets);
       },
     );
 
@@ -506,127 +476,117 @@ void main() {
       },
     );
 
-    testWidgets(
-      'content area has Padding(spMd) around IndexedStack',
-      (tester) async {
-        // Arrange & Act
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('content area has Padding(spMd) around IndexedStack', (
+      tester,
+    ) async {
+      // Arrange & Act
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Assert — Padding 是 IndexedStack 的父级，padding 值为 spMd (12)
-        final padding = tester.widget<Padding>(
-          find.ancestor(
-            of: find.byType(IndexedStack),
-            matching: find.byType(Padding),
-          ).first,
-        );
-        expect(padding.padding, const EdgeInsets.all(12)); // Tokens.spMd = 12
-      },
-    );
+      // Assert — Padding 是 IndexedStack 的父级，padding 值为 spMd (12)
+      final padding = tester.widget<Padding>(
+        find
+            .ancestor(
+              of: find.byType(IndexedStack),
+              matching: find.byType(Padding),
+            )
+            .first,
+      );
+      expect(padding.padding, const EdgeInsets.all(12)); // Tokens.spMd = 12
+    });
 
     // ── Keyboard & Gamepad Tab Switching (SIDEBAR-04) ──
 
-    testWidgets(
-      'Arrow Right switches to next tab',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump(); // Focus 获得焦点
+    testWidgets('Arrow Right switches to next tab', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump(); // Focus 获得焦点
 
-        // Act — default tab 3（D-01），按右 → tab 4
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
+      // Act — default tab 3（D-01），按右 → tab 4
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 4);
-      },
-    );
+      // Assert
+      expect(controller.state.selectedTab.value, 4);
+    });
 
-    testWidgets(
-      'Arrow Left switches to previous tab (default 3, left → 2)',
-      (tester) async {
-        // Arrange — default tab 3（D-01）
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
-        expect(controller.state.selectedTab.value, 3);
+    testWidgets('Arrow Left switches to previous tab (default 3, left → 2)', (
+      tester,
+    ) async {
+      // Arrange — default tab 3（D-01）
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
+      expect(controller.state.selectedTab.value, 3);
 
-        // Act — 从 tab 3 按左键 → tab 2
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
-        await tester.pump();
+      // Act — 从 tab 3 按左键 → tab 2
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 2);
-      },
-    );
+      // Assert
+      expect(controller.state.selectedTab.value, 2);
+    });
 
-    testWidgets(
-      'Arrow Right wraps around (6→0)',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('Arrow Right wraps around (6→0)', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act — 切换到 tab 6
-        final navItems = find.byType(SettingsNavItem);
-        await tester.tap(navItems.at(6));
-        await tester.pump();
-        expect(controller.state.selectedTab.value, 6);
+      // Act — 切换到 tab 6
+      final navItems = find.byType(SettingsNavItem);
+      await tester.tap(navItems.at(6));
+      await tester.pump();
+      expect(controller.state.selectedTab.value, 6);
 
-        // Act — 按右键，应循环到 tab 0
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
+      // Act — 按右键，应循环到 tab 0
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 0);
-      },
-    );
+      // Assert
+      expect(controller.state.selectedTab.value, 0);
+    });
 
-    testWidgets(
-      'multiple arrow presses cycle through tabs',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('multiple arrow presses cycle through tabs', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act — 按 3 次右键（default tab 3，3 次后 → tab 6）
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
+      // Act — 按 3 次右键（default tab 3，3 次后 → tab 6）
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
 
-        // Assert — default 3 + 3 次右键 = tab 6
-        expect(controller.state.selectedTab.value, 6);
-      },
-    );
+      // Assert — default 3 + 3 次右键 = tab 6
+      expect(controller.state.selectedTab.value, 6);
+    });
 
-    testWidgets(
-      'gamepad Right Shoulder (gameButton12) switches to next tab',
-      (tester) async {
-        // Arrange — default tab 3（D-01）
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('gamepad Right Shoulder (gameButton12) switches to next tab', (
+      tester,
+    ) async {
+      // Arrange — default tab 3（D-01）
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButton12);
-        await tester.pump();
+      // Act
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButton12);
+      await tester.pump();
 
-        // Assert — 3 + 1 = tab 4
-        expect(controller.state.selectedTab.value, 4);
-      },
-    );
+      // Assert — 3 + 1 = tab 4
+      expect(controller.state.selectedTab.value, 4);
+    });
 
     testWidgets(
       'gamepad Left Shoulder (gameButton13) switches to previous tab',
@@ -651,105 +611,96 @@ void main() {
       },
     );
 
-    testWidgets(
-      'gamepad gameButtonRight1 also works (cross-platform)',
-      (tester) async {
-        // Arrange — default tab 3（D-01）
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('gamepad gameButtonRight1 also works (cross-platform)', (
+      tester,
+    ) async {
+      // Arrange — default tab 3（D-01）
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonRight1);
-        await tester.pump();
+      // Act
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonRight1);
+      await tester.pump();
 
-        // Assert — 3 + 1 = tab 4
-        expect(controller.state.selectedTab.value, 4);
-      },
-    );
+      // Assert — 3 + 1 = tab 4
+      expect(controller.state.selectedTab.value, 4);
+    });
 
-    testWidgets(
-      'gamepad gameButtonLeft1 also works (cross-platform)',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('gamepad gameButtonLeft1 also works (cross-platform)', (
+      tester,
+    ) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act — 切换到 tab 2
-        final navItems = find.byType(SettingsNavItem);
-        await tester.tap(navItems.at(2));
-        await tester.pump();
+      // Act — 切换到 tab 2
+      final navItems = find.byType(SettingsNavItem);
+      await tester.tap(navItems.at(2));
+      await tester.pump();
 
-        // Act — 按左肩键（跨平台）
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonLeft1);
-        await tester.pump();
+      // Act — 按左肩键（跨平台）
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonLeft1);
+      await tester.pump();
 
-        // Assert
-        expect(controller.state.selectedTab.value, 1);
-      },
-    );
+      // Assert
+      expect(controller.state.selectedTab.value, 1);
+    });
 
-    testWidgets(
-      'arrow key does NOT close panel',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('arrow key does NOT close panel', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
+      // Act
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
 
-        // Assert — 面板仍然打开
-        expect(controller.state.isOpen.value, isTrue);
-      },
-    );
+      // Assert — 面板仍然打开
+      expect(controller.state.isOpen.value, isTrue);
+    });
 
-    testWidgets(
-      'KeyUp events are ignored (no tab switch on release)',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('KeyUp events are ignored (no tab switch on release)', (
+      tester,
+    ) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act — 发送 KeyUp（非 KeyDown）
-        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
+      // Act — 发送 KeyUp（非 KeyDown）
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
 
-        // Assert — selectedTab 不变（default 3，D-01）
-        expect(controller.state.selectedTab.value, 3);
-      },
-    );
+      // Assert — selectedTab 不变（default 3，D-01）
+      expect(controller.state.selectedTab.value, 3);
+    });
 
-    testWidgets(
-      'ESC/B still closes panel after tab switching',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
-        await tester.pump();
+    testWidgets('ESC/B still closes panel after tab switching', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
+      await tester.pump();
 
-        // Act — 先切 tab，再按 ESC
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
-        await tester.pump();
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
-        await tester.pump();
+      // Act — 先切 tab，再按 ESC
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
 
-        // Assert — 面板关闭
-        expect(controller.state.isOpen.value, isFalse);
+      // Assert — 面板关闭
+      expect(controller.state.isOpen.value, isFalse);
 
-        // 排空退出动画
-        await tester.pump(const Duration(milliseconds: 250));
-      },
-    );
+      // 排空退出动画
+      await tester.pump(const Duration(milliseconds: 250));
+    });
 
     // ── Button Bar (TABS-03/TABS-04) ──
 
@@ -769,75 +720,67 @@ void main() {
       },
     );
 
-    testWidgets(
-      'button bar is not rendered when panel is closed',
-      (tester) async {
-        // Arrange
-        await pumpShell(tester);
-        // never opened
+    testWidgets('button bar is not rendered when panel is closed', (
+      tester,
+    ) async {
+      // Arrange
+      await pumpShell(tester);
+      // never opened
 
-        // Assert — 关闭状态无按钮栏
-        expect(find.byType(SettingsButton), findsNothing);
-        expect(find.byKey(SettingsOverlayShell.buttonBarKey), findsNothing);
-      },
-    );
+      // Assert — 关闭状态无按钮栏
+      expect(find.byType(SettingsButton), findsNothing);
+      expect(find.byKey(SettingsOverlayShell.buttonBarKey), findsNothing);
+    });
 
-    testWidgets(
-      'OK button calls commitPending and close',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('OK button calls commitPending and close', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act — 点击确定
-        await tester.tap(find.text('确定'));
-        await tester.pump();
+      // Act — 点击确定
+      await tester.tap(find.text('确定'));
+      await tester.pump();
 
-        // Assert — 面板关闭
-        expect(controller.state.isOpen.value, isFalse);
+      // Assert — 面板关闭
+      expect(controller.state.isOpen.value, isFalse);
 
-        // 排空 close() 触发的 200ms 退出动画定时器
-        await tester.pump(const Duration(milliseconds: 250));
-      },
-    );
+      // 排空 close() 触发的 200ms 退出动画定时器
+      await tester.pump(const Duration(milliseconds: 250));
+    });
 
-    testWidgets(
-      'Apply button calls commitPending but does NOT close',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('Apply button calls commitPending but does NOT close', (
+      tester,
+    ) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act — 点击应用
-        await tester.tap(find.text('应用'));
-        await tester.pump();
+      // Act — 点击应用
+      await tester.tap(find.text('应用'));
+      await tester.pump();
 
-        // Assert — 面板仍然打开
-        expect(controller.state.isOpen.value, isTrue);
-      },
-    );
+      // Assert — 面板仍然打开
+      expect(controller.state.isOpen.value, isTrue);
+    });
 
-    testWidgets(
-      'Cancel button calls cancelPending and close',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('Cancel button calls cancelPending and close', (tester) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act — 点击取消
-        await tester.tap(find.text('取消'));
-        await tester.pump();
+      // Act — 点击取消
+      await tester.tap(find.text('取消'));
+      await tester.pump();
 
-        // Assert — 面板关闭
-        expect(controller.state.isOpen.value, isFalse);
+      // Assert — 面板关闭
+      expect(controller.state.isOpen.value, isFalse);
 
-        // 排空 close() 触发的 200ms 退出动画定时器
-        await tester.pump(const Duration(milliseconds: 250));
-      },
-    );
+      // 排空 close() 触发的 200ms 退出动画定时器
+      await tester.pump(const Duration(milliseconds: 250));
+    });
   });
 
   // ── Multi-monitor drag clamp, fallback, resize (Plan 30-02: D-03/D-05/D-06) ──
@@ -924,7 +867,7 @@ void main() {
     testWidgets(
       'display-query exception preserves symmetric clamp without crashing (D-03 fallback)',
       (tester) async {
-        // Arrange — fake getCurrentDisplay 抛 StateError（验证 shell 层 try/catch）
+        // Arrange — fake getCurrentDisplay 抛可恢复 Exception（验证 shell fallback）。
         final fake = FakeDisplayEnumerator(throwOnGetCurrent: true);
         final (controller, _) = await pumpShell(
           tester,
@@ -1074,12 +1017,14 @@ void main() {
         }
 
         // Assert — 标题栏 Container 走 ControlBarDecoration.playing
-        final titleBarContainer = tester.widgetList<Container>(
-          find.descendant(
-            of: find.byKey(SettingsOverlayShell.titleBarKey),
-            matching: find.byType(Container),
-          ),
-        ).first;
+        final titleBarContainer = tester
+            .widgetList<Container>(
+              find.descendant(
+                of: find.byKey(SettingsOverlayShell.titleBarKey),
+                matching: find.byType(Container),
+              ),
+            )
+            .first;
         expectChromeDecoration(titleBarContainer, 'title bar');
 
         // Assert — 按钮栏 Container 走 ControlBarDecoration.playing
@@ -1089,22 +1034,26 @@ void main() {
         expectChromeDecoration(buttonBarContainer, 'button bar');
 
         // Assert — tab 条 Container 走 ControlBarDecoration.playing
-        final tabStripContainer = tester.widgetList<Container>(
-          find.descendant(
-            of: find.byType(SettingsTabStrip),
-            matching: find.byType(Container),
-          ),
-        ).first;
+        final tabStripContainer = tester
+            .widgetList<Container>(
+              find.descendant(
+                of: find.byType(SettingsTabStrip),
+                matching: find.byType(Container),
+              ),
+            )
+            .first;
         expectChromeDecoration(tabStripContainer, 'tab strip');
 
         // Assert — 内容区 ColoredBox color 保持 panelSectionBg（D-11 content
         // 单路由；SettingsTabContent 子树首个 ColoredBox）
-        final contentColoredBox = tester.widgetList<ColoredBox>(
-          find.descendant(
-            of: find.byType(SettingsTabContent),
-            matching: find.byType(ColoredBox),
-          ),
-        ).first;
+        final contentColoredBox = tester
+            .widgetList<ColoredBox>(
+              find.descendant(
+                of: find.byType(SettingsTabContent),
+                matching: find.byType(ColoredBox),
+              ),
+            )
+            .first;
         expect(contentColoredBox.color, Tokens.panelSectionBg);
       },
     );
@@ -1122,7 +1071,7 @@ class FakeDisplayEnumerator implements DisplayEnumerator {
   /// 当前显示器可用区域（null 模拟"无显示器信息"）.
   final Rect? workArea;
 
-  /// true 时 getCurrentDisplay 抛 StateError（验证异常 fallback 路径）.
+  /// true 时 getCurrentDisplay 抛 Exception（验证可恢复异常 fallback 路径）.
   final bool throwOnGetCurrent;
 
   @override
@@ -1138,7 +1087,7 @@ class FakeDisplayEnumerator implements DisplayEnumerator {
   @override
   DisplayInfo? getCurrentDisplay() {
     if (throwOnGetCurrent) {
-      throw StateError('fake display query failure');
+      throw Exception('fake display query failure');
     }
     final area = workArea;
     if (area == null) return null;

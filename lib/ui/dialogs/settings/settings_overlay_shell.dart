@@ -14,6 +14,8 @@
 // MediaQuery fallback + debugPrint；resize 时 didChangeDependencies 排 post-frame
 // re-clamp。保留 RepaintBoundary（D-06）。
 
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -404,18 +406,23 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       _cachedWindowOrigin = null;
       return;
     }
-    // 异步缓存：失败时 debugPrint + 置 null（fallback 路径处理）
-    reader()
-        .then((origin) {
-          if (mounted) _cachedWindowOrigin = origin;
-        })
-        .catchError((Object error, StackTrace stack) {
-          debugPrint(
-            '[SettingsOverlayShell] windowPositionReader failed: '
-            '$error\n$stack',
-          );
-          if (mounted) _cachedWindowOrigin = null;
-        });
+    // Fire-and-forget is intentional: a drag may begin before the platform
+    // reader resolves, so clamp logic must retain its synchronous fallback.
+    unawaited(_cacheWindowOrigin(reader));
+  }
+
+  /// Caches the window origin while allowing programming errors to surface.
+  Future<void> _cacheWindowOrigin(Future<Offset> Function() reader) async {
+    try {
+      final origin = await reader();
+      if (mounted) _cachedWindowOrigin = origin;
+    } on Exception catch (error, stackTrace) {
+      debugPrint(
+        '[SettingsOverlayShell] windowPositionReader failed: '
+        '$error\n$stackTrace',
+      );
+      if (mounted) _cachedWindowOrigin = null;
+    }
   }
 
   /// 拖拽更新 — clamp dragOffset 到显示边界（D-03 / D-09 / T-23-03）。
@@ -452,9 +459,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     final DisplayInfo? info;
     try {
       info = widget.displayEnumerator?.getCurrentDisplay();
-    } catch (e, st) {
-      // 注入的 enumerator 实现可能抛异常 — 不让它崩溃手势，debugPrint + 对称 fallback
-      debugPrint('[SettingsOverlayShell] getCurrentDisplay failed: $e\n$st');
+    } on Exception catch (error, stackTrace) {
+      // 注入的 enumerator 可能有可恢复平台失败，退回对称 clamp 并记录诊断。
+      debugPrint(
+        '[SettingsOverlayShell] getCurrentDisplay failed: $error\n$stackTrace',
+      );
       return _symmetricClamp(next, mediaSize, panelSize);
     }
     if (info != null) {
