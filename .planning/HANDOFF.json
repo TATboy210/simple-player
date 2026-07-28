@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-28T14:24:09Z",
+  "phase": "32",
+  "phase_name": "navigation-interaction-polish",
+  "phase_dir": ".planning/phases/32-navigation-interaction-polish",
+  "plan": 0,
+  "task": 0,
+  "total_tasks": 7,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "iter1", "name": "plan revision iter 1", "status": "done", "commit": "85e6696"},
+    {"id": "iter2", "name": "plan revision iter 2", "status": "done", "commit": "3689329"},
+    {"id": "iter3", "name": "plan revision iter 3 (two-stage gate — REJECTED by checker)", "status": "done", "commit": "d2c58ad"},
+    {"id": "iter4", "name": "plan revision iter 4 (structural fix — baseline trust root + grep pathspec)", "status": "done", "commit": "5671e95"}
+  ],
+  "remaining_tasks": [
+    {"id": "checker-reverify", "name": "spawn gsd-plan-checker (sonnet) with verbatim prompt to confirm PASSED", "status": "not_started"},
+    {"id": "post-pass", "name": "post-PASS: VALIDATION.md + STATE/ROADMAP + cleanup 3 checkpoints + commit", "status": "not_started", "blocked_by": "checker-reverify PASSED or user Proceed-anyway"}
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "iter3 two-stage dynamic-solidification gate REJECTED", "rationale": "baseline generated in Wave 3 after Phase 32 code exists = materially invalid; residual_note cannot save a gutted trust root", "phase": "32"},
+    {"decision": "iter4 structural fix: baseline GENERATION in 32-01 Task 0 (pre-tracer, clean Phase 31 tree), 32-03 only CONSUMES", "rationale": "clean-baseline property guaranteed by execution ORDER not git stash; separates trust-root generation from consumption", "phase": "32"},
+    {"decision": "STATE.md left stale this session, correction deferred to post-PASS", "rationale": "checkpoint is authoritative current-state source; avoid context-budget risk of STATE body surgery at 75%", "phase": "32"}
+  ],
+  "uncommitted_files": [".planning/STATE.md (stale research-only-window frontmatter, uncommitted)"],
+  "next_action": "/clear → read .planning/phases/32-navigation-interaction-polish/32-CHECKER-CHECKPOINT.md → spawn gsd-plan-checker (sonnet, sync, run_in_background=false) with VERBATIM prompt from checkpoint '## VERBATIM constructed checker prompt' section → PASSED runs post-PASS / ISSUES uses AskUserQuestion (iter5/proceed/abandon)",
+  "context_notes": "iter4 planner complete + verified (5671e95); both BLOCKERs structurally fixed (32-01 Task0 baseline-gen + 32-01 Task2 canonical grep pathspec + 32-03 consumption-only 6-step gate); checker re-verify NOT spawned — halted at 75% per memory feedback_gsd_context_budget_pause. 32-CHECKER-CHECKPOINT.md is the PRIMARY handoff (contains verbatim prompt + Fresh-window procedure)."
+}
