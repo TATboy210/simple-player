@@ -137,11 +137,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       final width = _panelWidth(mediaSize);
       final height = _panelHeight(width);
       final current = _controller.state.dragOffset.value;
-      final clamped = _clampDragOffset(
-        current,
-        mediaSize,
-        Size(width, height),
-      );
+      final clamped = _clampDragOffset(current, mediaSize, Size(width, height));
       // 只在 resize 让 offset 非法时写入（D-05）
       if (clamped != current) {
         _controller.state.dragOffset.value = clamped;
@@ -191,7 +187,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
             key: SettingsOverlayShell.shellKey,
             children: [
               // 遮罩层 — 全播放器，点击关闭（PANEL-05）。
-              // Tokens 无专用遮罩角色值，沿用旧面板 Colors.black54 遮罩语义。
+              // 遮罩语义通过 Tokens 集中管理，保证 chrome 可统一调校。
               Positioned.fill(
                 child: AnimatedOpacity(
                   opacity: open ? 1.0 : 0.0,
@@ -201,7 +197,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
                     key: SettingsOverlayShell.maskKey,
                     behavior: HitTestBehavior.opaque,
                     onTap: _controller.close,
-                    child: const ColoredBox(color: Colors.black54),
+                    child: const ColoredBox(color: Tokens.settingsOverlayMask),
                   ),
                 ),
               ),
@@ -365,7 +361,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       onPanStart: (_) => _onDragStart(),
       onPanUpdate: (details) => _onDragUpdate(details, mediaSize, panelSize),
       child: Container(
-        height: 44,
+        height: Tokens.settingsTitleBarHeight,
         padding: const EdgeInsets.symmetric(horizontal: Tokens.spMd),
         decoration: ControlBarDecoration.playing(
           borderRadius: const BorderRadius.vertical(
@@ -409,13 +405,17 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       return;
     }
     // 异步缓存：失败时 debugPrint + 置 null（fallback 路径处理）
-    reader().then((origin) {
-      if (mounted) _cachedWindowOrigin = origin;
-    }).catchError((Object error, StackTrace stack) {
-      debugPrint('[SettingsOverlayShell] windowPositionReader failed: '
-          '$error\n$stack');
-      if (mounted) _cachedWindowOrigin = null;
-    });
+    reader()
+        .then((origin) {
+          if (mounted) _cachedWindowOrigin = origin;
+        })
+        .catchError((Object error, StackTrace stack) {
+          debugPrint(
+            '[SettingsOverlayShell] windowPositionReader failed: '
+            '$error\n$stack',
+          );
+          if (mounted) _cachedWindowOrigin = null;
+        });
   }
 
   /// 拖拽更新 — clamp dragOffset 到显示边界（D-03 / D-09 / T-23-03）。
@@ -488,10 +488,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
       0.0,
       double.infinity,
     );
-    return Offset(
-      next.dx.clamp(-maxX, maxX),
-      next.dy.clamp(-maxY, maxY),
-    );
+    return Offset(next.dx.clamp(-maxX, maxX), next.dy.clamp(-maxY, maxY));
   }
 
   /// 用 [DisplayInfo.workArea] clamp dragOffset（D-03 tracer 路径）。

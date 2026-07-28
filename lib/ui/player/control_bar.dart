@@ -85,7 +85,7 @@ class ControlBar extends StatelessWidget {
           padding: const EdgeInsets.only(
             left: Tokens.spSm,
             right: Tokens.spSm,
-            bottom: 6,
+            bottom: Tokens.controlBarContentBottomPadding,
           ),
           child: Stack(
             children: [
@@ -94,7 +94,7 @@ class ControlBar extends StatelessWidget {
                 top: 0,
                 left: 0,
                 right: 0,
-                height: 1,
+                height: Tokens.controlBarGradientHeight,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -196,7 +196,9 @@ class ControlBar extends StatelessWidget {
     String nextTooltip,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Tokens.controlBarButtonRowPadding,
+      ),
       child: Row(
         children: [
           LeftButtonGroup(engine: engine, actions: actions),

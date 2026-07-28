@@ -47,15 +47,7 @@ class SettingsTabStrip extends StatelessWidget {
   ];
 
   /// 7 个 tab 标签文字（D-01 顺序，General 居中；Phase 25 可升级为 l10n）。
-  static const _tabLabels = [
-    '均衡器',
-    '音频',
-    '视频',
-    '通用',
-    '快捷键',
-    '关于',
-    '性能',
-  ];
+  static const _tabLabels = ['均衡器', '音频', '视频', '通用', '快捷键', '关于', '性能'];
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +62,9 @@ class SettingsTabStrip extends StatelessWidget {
       valueListenable: selectedTab,
       builder: (context, selectedIndex, _) {
         return Container(
-          height: isCompact ? 56 : 64,
+          height: isCompact
+              ? Tokens.tabStripHeightCompact
+              : Tokens.tabStripHeightNormal,
           // Phase 31 D-11：chrome 装饰切换为共享 ControlBarDecoration.playing，
           // BorderRadius.zero — tab 条夹于标题栏与内容区之间，段间零圆角防
           // 阴影接缝（31-RESEARCH Pitfall 1 的 corner-only 缓解）。
