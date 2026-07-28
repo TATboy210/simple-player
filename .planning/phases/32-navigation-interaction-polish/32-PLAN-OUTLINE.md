@@ -1,0 +1,100 @@
+# Phase 32: Navigation & Interaction Polish — Plan Outline
+
+**Phase:** 32-navigation-interaction-polish
+**Plans:** 3 (tracer-first, 3 waves)
+**Approved approach:** `C:/Users/35490/.claude/plans/32-iridescent-hopper.md`
+
+## Wave / Plan Map
+
+| Wave | Plan | Type | Autonomous | Depends On | Requirements | Coverage |
+|------|------|------|------------|------------|--------------|----------|
+| 1 | 32-01 | execute (tracer-first, TDD) | true | — | NAV-02, NAV-04, NAV-07 | InputModeDetector core + atomic arrow containment + binding deletion |
+| 2 | 32-02 | execute (TDD) | true | 32-01 | NAV-01, NAV-03 | Tab end-cap arrows + hint substitution + mouse/toggle wiring |
+| 3 | 32-03 | execute (TDD + checkpoint) | false | 32-01, 32-02 | NAV-05, NAV-06 | Option-list overlay + glow + regression/perf gate |
+
+## NAV-01..07 → Plan Coverage Matrix
+
+| Req ID | Plan | Task(s) | Verification |
+|--------|------|---------|---------------|
+| NAV-01 | 32-02 | Task 1 (tab_arrow_button.dart), Task 2 (tab_strip.dart row) | settings_tab_strip_test.dart: end-cap geometry, click invokes prevTab/nextTab, compact no overflow |
+| NAV-02 | 32-01 | Task 1 (InputModeDetector singleton + heuristic + toggle), Task 2 (recordArrowKey wiring) | input_mode_detector_test.dart: hover→keyboard, idle 5s+arrow→gamepad, toggle override, auto re-enables, dispose cancels timer |
+| NAV-03 | 32-02 | Task 1 (input_mode_hint.dart), Task 2 (shell mount) | input_mode_hint_test.dart: keyed child swap, fade config, gamepad/keyboard text |
+| NAV-04 | 32-01 | Task 2 (delete gameButtonLeft1/Right1 + grep gate) | git grep zero in lib/; shell_test gameButton tests deleted/replaced |
+| NAV-05 | 32-03 | Task 1 (option_list_navigation_overlay.dart) | option_list_navigation_overlay_test.dart: 0 BackdropFilter in overlay subtree |
+| NAV-06 | 32-03 | Task 1 (glow subscription) | option_list_navigation_overlay_test.dart: up/down glow state correct |
+| NAV-07 | 32-01 | Task 2 (all arrows handled + outer KeyboardHandler spy) | shell_test: spy zero-call on arrows when panel open |
+
+## Dependency Graph
+
+```
+32-01 (Wave 1) ──────┬──> 32-02 (Wave 2) ──┐
+                     │                       │
+                     └──> 32-03 (Wave 3) <───┘
+```
+
+- **32-01** has no dependencies — Phase 31 provides ControlBarDecoration + single-blur baseline.
+- **32-02** depends on 32-01 — InputModeDetector singleton must exist for hint + mouse wiring.
+- **32-03** depends on 32-01 (glow notifier from root router) + 32-02 (tab strip + shell modifications for overlay mount point).
+
+## Locked Design Decisions (from approved approach — planner does not re-derive)
+
+| ID | Decision | Source |
+|----|----------|--------|
+| D-01 | Heuristic NOT key routing — do not branch on physicalKey/HardwareKeyboard/deviceType for gamepad; Steam-mapped arrows are source-indistinguishable | 32-RESEARCH Pattern 1 |
+| D-02 | onPointerHover is the primary mouse signal (not onPointerMove alone); filter PointerDeviceKind.mouse; onPointerMove supplements drag movement | 32-RESEARCH Pattern 2 |
+| D-03 | Preference vs effective mode split — public InputMode { keyboard, gamepad, auto } + private derived keyboard/gamepad; auto does not directly drive hint text | 32-RESEARCH Pitfall 3 |
+| D-04 | Single blur owner — panel GlassContainer owns the BackdropFilter; arrows/overlays use Container(color: Tokens.bgGlass); reuse ControlBarDecoration (no blur) | 32-RESEARCH Pattern 4 |
+| D-05 | Keep gameButton12/gameButton13 direct gamepad routing (not NAV-04 deletion target); ASSUMED, verify with Windows controller in Plan 03 checkpoint | 32-RESEARCH Binding Impact Surface |
+| D-06 | Zero new deps, zero Steamworks FFI, zero kernel change; ValueNotifier unchanged; debugPrint not print; Tokens.* no hardcoded values | Approved approach |
+| D-07 | NAV-04 + NAV-07 same plan same commit — atomicity hard constraint (delete + contain or neither) | Approved approach |
+| D-08 | No new FocusTraversalGroup — settings_focus_navigation_test asserts >= 4; new widgets mount inside existing root FocusTraversalGroup > Focus subtree | Approved approach |
+| D-09 | Shortcuts tab focus preemption — KeyboardListener autofocus only during recording; toggle control is pointer-only or holds independent FocusNode | Approved approach |
+
+## Wave 0 Test Gaps (from 32-RESEARCH.md L389-396 Validation Architecture)
+
+| # | Test File | Status | Plan |
+|---|-----------|--------|------|
+| 1 | test/kernel/services/input_mode_detector_test.dart | NEW (fakeAsync) | 32-01 |
+| 2 | test/ui/dialogs/settings_tab_strip_test.dart | NEW | 32-02 |
+| 3 | test/ui/dialogs/input_mode_hint_test.dart | NEW | 32-02 |
+| 4 | test/ui/dialogs/option_list_navigation_overlay_test.dart | NEW | 32-03 |
+| 5 | test/ui/dialogs/settings_overlay_shell_test.dart | MODIFY (delete L614-651 gameButton tests, add spy + grep assertion) | 32-01 |
+| 6 | test/ui/dialogs/settings_focus_navigation_test.dart | REPAIR (L20 stale fake: initiallyPlaying → initialState) | 32-01 |
+
+## Manual-Only Validation (cannot be automated in headless tests)
+
+| Scenario | Plan | Checkpoint |
+|----------|------|------------|
+| Native keyboard left/right vs Steam Input LB/RB on Windows (logicalKey/physicalKey/deviceType log, tab-index exactly ±1 per press, hint mode correct, toggle fallback effective) | 32-03 | Task 2 (blocking human-verify) |
+| Profile-mode raster A/B (no new blur layer, raster avg increase ≤ 1ms, drag/scroll no jank) | 32-03 | Task 2 (blocking human-verify) |
+
+## Pre-existing Test Baseline (out of scope, from Phase 31 VERIFICATION.md L28-34)
+
+- ~57 mdk.dll FFI headless test failures (memory: reference_mdk_dll_headless_test_failures.md)
+- settings_focus_navigation_test.dart compile error (stale fake — repaired in 32-01 Task 2)
+- 4 Phase 25 settings-dialog headless failures
+- 114 kernel bridge/stash analyze diagnostics
+- Phase 32 module boundary target: 0 new failures, 0 new diagnostics
+
+## Multi-Source Coverage Audit
+
+| Source | Item | Plan | Status |
+|--------|------|------|--------|
+| GOAL | End-cap arrows + input-mode-aware hint + option-list glow | 32-01/02/03 | COVERED |
+| REQ | NAV-01 end-cap tab arrows | 32-02 | COVERED |
+| REQ | NAV-02 InputModeDetector singleton | 32-01 | COVERED |
+| REQ | NAV-03 hint substitution AnimatedSwitcher | 32-02 | COVERED |
+| REQ | NAV-04 delete gameButtonLeft1/Right1 | 32-01 | COVERED |
+| REQ | NAV-05 thin-glass option-list arrows | 32-03 | COVERED |
+| REQ | NAV-06 up/down glow feedback | 32-03 | COVERED |
+| REQ | NAV-07 root Focus handles all arrows | 32-01 | COVERED |
+| RESEARCH | Pattern 1 (treat Steam arrows as ordinary) | 32-01 | CITED D-01 |
+| RESEARCH | Pattern 2 (mouse-idle heuristic + override) | 32-01/02 | CITED D-02 |
+| RESEARCH | Pattern 3 (end-cap row composition) | 32-02 | CITED |
+| RESEARCH | Pattern 4 (single blur owner) | 32-03 | CITED D-04 |
+| RESEARCH | Pitfall 1 (arrow leak to seek) | 32-01 | MITIGATED |
+| RESEARCH | Pitfall 2 (incorrect mouse signal) | 32-02 | MITIGATED |
+| RESEARCH | Pitfall 3 (ambiguous auto state) | 32-01 | MITIGATED D-03 |
+| RESEARCH | Pitfall 4 (tab overflow) | 32-02 | MITIGATED |
+| RESEARCH | Pitfall 5 (nested blur) | 32-03 | MITIGATED D-04 |
+| CONTEXT | D-01..D-09 locked decisions | All plans | CITED |
