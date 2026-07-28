@@ -136,6 +136,54 @@ void main() {
       },
     );
   });
+
+  group('embedded setting controls', () {
+    testWidgets('SettingSwitchRow toggles its notifier', (tester) async {
+      // Arrange
+      final notifier = ValueNotifier(false);
+      addTearDown(notifier.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SettingSwitchRow(title: 'Deinterlace', notifier: notifier),
+          ),
+        ),
+      );
+
+      // Act
+      await tester.tap(find.byType(Switch));
+      await tester.pump();
+
+      // Assert
+      expect(notifier.value, isTrue);
+    });
+
+    testWidgets('SettingSpinRow invokes callback from its right arrow', (
+      tester,
+    ) async {
+      // Arrange
+      int? selectedIndex;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SettingSpinRow(
+              title: 'Language',
+              options: const ['zh', 'en'],
+              currentIndex: 0,
+              onChanged: (index) => selectedIndex = index,
+            ),
+          ),
+        ),
+      );
+
+      // Act
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+
+      // Assert
+      expect(selectedIndex, 1);
+    });
+  });
 }
 
 /// Pumps an interactive row inside a single focus owner for state assertions.
