@@ -316,4 +316,13 @@ class Tokens {
   static const double speedButtonHeight = 36;
   static const double speedSegmentWidth = 36;
   static const double speedArrowWidth = 18;
+
+  // ── Phase 32 输入模式检测 (NAV-02/NAV-06) ──
+  /// InputModeDetector 启发式空闲阈值（秒）—— 鼠标空闲超过此值且出现方向键时
+  /// 推断为 gamepad (D-06：无硬编码，InputModeDetector 生产默认读此令牌)。
+  static const int inputModeIdleTimeoutSec = 5;
+
+  /// 方向辉光显示窗口（毫秒）—— setArrowGlow 后到此时长自动回 null (NAV-06)，
+  /// 复用 osdDefaultHoldMs=1200 的瞬态显示先例。
+  static const int arrowGlowDuration = 1200;
 }
