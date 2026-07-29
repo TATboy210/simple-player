@@ -4,15 +4,15 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 32
 current_phase_name: navigation-interaction-polish
-status: phase-32-planned-ready-to-execute
-stopped_at: Phase 32 plan-checker iter8 PASSED (0 blockers + 1 §12-exempt VALIDATION.md warning resolved); ready for /gsd-execute-phase 32 (2026-07-29)
-last_updated: "2026-07-29T17:00:00.000Z"
+status: phase-32-wave-1-complete
+stopped_at: wave-1-complete (2026-07-29)
+last_updated: "2026-07-29T14:23:11Z"
 last_activity: 2026-07-29
-last_activity_desc: "Phase 32 plan-checker iter8 PASSED (0 blockers); 3 plans + 32-VALIDATION.md verified — ready for /gsd-execute-phase 32"
+last_activity_desc: Phase 32 Wave 1 (32-01) complete — InputModeDetector + NAV-04/07 containment (4 commits: 3716104d + 631f26c + e38175f + 0d692ab); Wave 2/3 not started, phase verification skipped (partial-wave)
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 14
+  total_plans: 13
   completed_plans: 9
   percent: 43
 ---
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-07-14)
 
 Phase: 32 (navigation-interaction-polish) — PLAN VERIFIED (32-01/02/03-PLAN.md + 32-VALIDATION.md written, plan-checker iter8 PASSED 0 blockers)
 Plan: 3/3 verified (32-01, 32-02, 32-03); prerequisites: execute → validate
-Status: planned-ready-to-execute (2026-07-29); plan-checker iter8 PASSED, 32-VALIDATION.md created
-Last activity: 2026-07-29 — Phase 32 plan-checker iter8 PASSED (0 blockers); 3 plans + VALIDATION.md ready for /gsd-execute-phase 32
+Status: wave-1-complete (2026-07-29); 32-01 executed (4 commits), Wave 2/3 not started — partial-wave, phase verification skipped
+Last activity: 2026-07-29 — Phase 32 Wave 1 (32-01) complete: InputModeDetector + NAV-04/07 containment (4 commits 3716104d + 631f26c + e38175f + 0d692ab); next: /gsd-execute-phase 32 --wave 2
 
 ## Performance Metrics
 
@@ -114,8 +114,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-29T17:00:00.000Z
-Stopped at: Phase 32 plan-checker iter8 PASSED — post-PASS partial (STATE/ROADMAP edited, 4 checkpoints + commit pending in fresh window) (2026-07-29)
+Last session: 2026-07-29T11:32:02.648Z
+Stopped at: context exhaustion at 95% (2026-07-29)
 Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commit, then /gsd-execute-phase 32)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
