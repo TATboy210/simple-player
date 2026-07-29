@@ -165,7 +165,13 @@ Plans:
   5. Video / subtitle / playback tabs remain `SettingRow` placeholders (scope boundary honored — v4.5 audio tab only)
 
 **Blocking Constraints honored**: zero kernel interface expansion (reuse `setEqualizer` af entry; `AudioConfig` ISP deferred to v4.6+); deferred-apply non-negotiable (AUDIO-06 pure, no live preview); scope boundary (audio tab only); ValueNotifier unchanged; zero new dependencies
-**Plans**: TBD — needs `--research-phase 33` (verify MDK `af` filter support for `pan` / `adelay` / `dynaudnorm` in the linked FFmpeg build — not just FFmpeg upstream)
+**Plans**: 3 plans
+Plans:
+
+- [ ] 33-01-PLAN.md — Deliver the deferred EQ preset tracer through the existing equalizer entry and persisted audio settings (Wave 1)
+- [ ] 33-02-PLAN.md — Add deferred balance and audio-sync controls with pan and adelay chain composition (Wave 2)
+- [ ] 33-03-PLAN.md — Add normalization and complete deferred-commit regression coverage (Wave 3)
+
 **UI hint**: yes
 
 ### Phase 34: Control Bar Audio Track Switching
