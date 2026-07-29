@@ -97,6 +97,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   /// 退出动画挂载标志 — isOpen 翻 false 后保持 200ms，让关闭动画播完再卸载命中目标。
   bool _mountedForExit = false;
 
+  /// 面板根 Focus 节点 — open 时显式 requestFocus 夺回焦点，避免外层
+  /// KeyboardHandler(autofocus:true) 持焦使方向键冒泡到 seek/volume（NAV-07）。
+  /// 与 [PlaylistPanel] 同模式：autofocus:false + 显式 requestFocus/unfocus。
+  final FocusNode _panelFocusNode = FocusNode();
+
   /// drag session 缓存的窗口屏幕坐标原点（D-03）— onPanStart 异步 resolve 后填入，
   /// onPanUpdate 用它把面板偏移转换到屏幕坐标做 workArea clamp。null 表示本帧尚未
   /// resolve 或 reader 缺失，退回 workArea 直接作原点的 tracer 路径。
@@ -114,6 +119,10 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     // 初始即打开的场景（测试先 open 再 pump）直接置为已挂载。
     _mountedForExit = _controller.state.isOpen.value;
     _controller.state.isOpen.addListener(_onIsOpenChanged);
+    // 初始即打开时排 post-frame requestFocus 面板根 — autofocus 抢不过外层
+    // KeyboardHandler(autofocus:true) 已持焦，须显式夺回（NAV-07 遏制前提：
+    // 焦点在面板根，方向键才到 panel_key_bindings.handle 而非冒泡到 seek/volume）。
+    if (_mountedForExit) _requestPanelFocus();
   }
 
   @override
@@ -150,21 +159,40 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   @override
   void dispose() {
     _controller.state.isOpen.removeListener(_onIsOpenChanged);
+    _panelFocusNode.dispose();
     super.dispose();
   }
 
-  /// 监听 isOpen：打开时立即挂载；关闭时延迟一个动画周期再卸载。
+  /// 监听 isOpen：打开时立即挂载并夺回焦点；关闭时归还焦点并延迟一个动画周期再卸载。
   void _onIsOpenChanged() {
     final open = _controller.state.isOpen.value;
     if (open) {
       if (!_mountedForExit) setState(() => _mountedForExit = true);
+      // 显式 requestFocus 面板根 — 夺回外层 KeyboardHandler(autofocus:true) 持有
+      // 的焦点，使方向键到 panel_key_bindings.handle（NAV-07 遏制）而非冒泡到
+      // 外层 seek/volume 回调。post-frame 等 Focus 节点 mount 后再请求。
+      _requestPanelFocus();
       return;
     }
-    // 关闭：延迟 200ms（与关闭动画同长）卸载；期间 IgnorePointer 已屏蔽命中。
-    // 若 200ms 内重新打开（isOpen 回 true）则保持挂载，避免闪烁。
+    // 关闭：归还焦点给底层 KeyboardHandler，再延迟 200ms（与关闭动画同长）卸载；
+    // 期间 IgnorePointer 已屏蔽命中。若 200ms 内重新打开（isOpen 回 true）则
+    // 保持挂载，避免闪烁。
+    _panelFocusNode.unfocus();
     Future.delayed(SettingsOverlayShell.animationDuration, () {
       if (mounted && !_controller.state.isOpen.value && _mountedForExit) {
         setState(() => _mountedForExit = false);
+      }
+    });
+  }
+
+  /// 排 post-frame callback 请求面板根焦点 — 等 Focus 节点 mount 后再
+  /// requestFocus，否则 FocusNode 尚未 attach 到 tree，请求无效。
+  /// guarded against disposal：mounted + isOpen 双检查。与
+  /// [PlaylistPanel._requestFocus] 同模式（D-10 焦点作用域自管）。
+  void _requestPanelFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controller.state.isOpen.value) {
+        _panelFocusNode.requestFocus();
       }
     });
   }
@@ -251,7 +279,9 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
   ///
   /// 三段式布局（D-07）：标题栏 → 水平 tab bar（40px, bgPanel）→ 内容区（毛玻璃, 16dp padding）。
   /// RepaintBoundary 隔离面板重绘，防止 PlayerScreen 联动刷新（D-07 / D-06）。
-  /// 包裹 FocusTraversalGroup + autofocus Focus 实现 D-10 自管键盘作用域。
+  /// 包裹 FocusTraversalGroup + 显式 requestFocus Focus（_panelFocusNode）实现
+  /// D-10 自管键盘作用域 — open 时夺回外层 KeyboardHandler(autofocus:true) 持有的
+  /// 焦点，使方向键到 panel_key_bindings.handle 而非冒泡到 seek/volume（NAV-07）。
   Widget _buildPanel(BuildContext context) {
     final mediaSize = MediaQuery.sizeOf(context);
     final width = _panelWidth(mediaSize);
@@ -263,7 +293,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     return RepaintBoundary(
       child: FocusTraversalGroup(
         child: Focus(
-          autofocus: true,
+          // autofocus:false + 显式 requestFocus（_onIsOpenChanged 排 post-frame）
+          // —— 避免与外层 KeyboardHandler(autofocus:true) 竞争时抢焦失败，使 open
+          // 后方向键冒泡到外层 seek/volume（NAV-07）。与 PlaylistPanel 同模式。
+          focusNode: _panelFocusNode,
+          autofocus: false,
           onKeyEvent: keyBindings.handle,
           child: GlassContainer(
             tier: GlassTier.normal,
