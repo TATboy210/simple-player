@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../shared/control_bar_decoration.dart';
 import '../../theme/tokens.dart';
 import '_settings_nav_item.dart';
+import 'tab_arrow_button.dart';
 
 /// 设置面板水平 tab 栏 — 7 个 [SettingsNavItem] 横排，[selectedTab] 驱动高亮。
 ///
@@ -23,6 +24,8 @@ class SettingsTabStrip extends StatelessWidget {
     required this.selectedTab,
     required this.onSelect,
     required this.isCompact,
+    required this.onPrevTab,
+    required this.onNextTab,
   });
 
   /// 当前选中 tab 索引 — 由 SettingsPanelController.state.selectedTab 拥有。
@@ -33,6 +36,12 @@ class SettingsTabStrip extends StatelessWidget {
 
   /// 响应式 compact/normal 模式标志 — 控制 tab 高度、字体大小、间距。
   final bool isCompact;
+
+  /// 左端帽点击回调 — 接 controller.prevTab (NAV-01)，与键盘左方向键同路径。
+  final VoidCallback onPrevTab;
+
+  /// 右端帽点击回调 — 接 controller.nextTab (NAV-01)，与键盘右方向键同路径。
+  final VoidCallback onNextTab;
 
   /// 7 个 tab 图标（D-01 顺序：EQ/Audio/Video/General/Shortcuts/About/Performance，
   /// General 位于 index 3 中间位）。
@@ -72,18 +81,37 @@ class SettingsTabStrip extends StatelessWidget {
             borderRadius: BorderRadius.zero,
           ),
           child: Row(
-            children: List.generate(_tabIcons.length, (i) {
-              return Expanded(
-                child: SettingsNavItem(
-                  icon: _tabIcons[i],
-                  label: _tabLabels[i],
-                  selected: selectedIndex == i,
-                  onTap: () => onSelect(i),
-                  fontSize: fontSize,
-                  spacing: spacing,
+            children: [
+              // 端帽箭头 (NAV-01) — 持久挂于 tab 行两端，接 controller prev/next，
+              // 与键盘方向键走同一 controller 路径（T-32-05：无第二个 tab 选择状态）。
+              TabArrowButton(
+                isLeft: true,
+                onTap: onPrevTab,
+                isCompact: isCompact,
+              ),
+              // 7 个 tab 共享剩余宽度 —— 嵌套 Expanded(Row) 防端帽固定宽致溢出 (Pitfall 4)。
+              Expanded(
+                child: Row(
+                  children: List.generate(_tabIcons.length, (i) {
+                    return Expanded(
+                      child: SettingsNavItem(
+                        icon: _tabIcons[i],
+                        label: _tabLabels[i],
+                        selected: selectedIndex == i,
+                        onTap: () => onSelect(i),
+                        fontSize: fontSize,
+                        spacing: spacing,
+                      ),
+                    );
+                  }),
                 ),
-              );
-            }),
+              ),
+              TabArrowButton(
+                isLeft: false,
+                onTap: onNextTab,
+                isCompact: isCompact,
+              ),
+            ],
           ),
         );
       },
