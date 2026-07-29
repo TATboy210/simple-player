@@ -10,6 +10,7 @@ import '../../../shared/animated_section_list.dart';
 import '../../../shared/glass_container.dart';
 import '../../../shared/section_header.dart';
 import '../../../shared/settings_card.dart';
+import '../option_list_navigation_overlay.dart';
 import '../pending_settings.dart';
 
 /// 语言选项列表 — 与 PendingSettingsState 键 'locale' 对应
@@ -41,60 +42,63 @@ class GeneralTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: AnimatedSectionList(
-      children: [
-        // 语言选择 — 毛玻璃卡片 + SpinControl（D-08/D-09/D-10）
-        GlassContainer(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Tokens.spLg,
-            vertical: Tokens.spMd,
-          ),
-          margin: const EdgeInsets.only(bottom: Tokens.spMd),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SectionHeader(title: '语言', icon: Icons.language),
-              SettingSpinRow(
-                icon: Icons.language,
-                title: '界面语言',
-                description: '选择界面显示语言',
-                options: _localeOptions,
-                currentIndex: _localeToIndex(
-                  pending.current('locale') as String?,
-                ),
-                onChanged: (i) =>
-                    pending.update('locale', _localeOptions[i]),
-                formatValue: _formatLocale,
+    return OptionListNavigationOverlay(
+      // The overlay owns the Stack; GeneralTab supplies only its scrollable list.
+      child: SingleChildScrollView(
+        child: AnimatedSectionList(
+          children: [
+            // 语言选择 — 毛玻璃卡片 + SpinControl（D-08/D-09/D-10）
+            GlassContainer(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Tokens.spLg,
+                vertical: Tokens.spMd,
               ),
-            ],
-          ),
-        ),
-        // 外观设置 — 毛玻璃卡片
-        GlassContainer(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Tokens.spLg,
-            vertical: Tokens.spMd,
-          ),
-          margin: const EdgeInsets.only(bottom: Tokens.spMd),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SectionHeader(title: '外观', icon: Icons.dark_mode),
-              SettingRow(
-                title: '深色模式',
-                description: '启用深色主题（当前仅深色主题可用）',
-                control: Switch(
-                  value: pending.current('darkMode') as bool? ?? true,
-                  onChanged: (v) => pending.update('darkMode', v),
-                  activeThumbColor: Tokens.accent,
-                ),
+              margin: const EdgeInsets.only(bottom: Tokens.spMd),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionHeader(title: '语言', icon: Icons.language),
+                  SettingSpinRow(
+                    icon: Icons.language,
+                    title: '界面语言',
+                    description: '选择界面显示语言',
+                    options: _localeOptions,
+                    currentIndex: _localeToIndex(
+                      pending.current('locale') as String?,
+                    ),
+                    onChanged: (i) =>
+                        pending.update('locale', _localeOptions[i]),
+                    formatValue: _formatLocale,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            // 外观设置 — 毛玻璃卡片
+            GlassContainer(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Tokens.spLg,
+                vertical: Tokens.spMd,
+              ),
+              margin: const EdgeInsets.only(bottom: Tokens.spMd),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionHeader(title: '外观', icon: Icons.dark_mode),
+                  SettingRow(
+                    title: '深色模式',
+                    description: '启用深色主题（当前仅深色主题可用）',
+                    control: Switch(
+                      value: pending.current('darkMode') as bool? ?? true,
+                      onChanged: (v) => pending.update('darkMode', v),
+                      activeThumbColor: Tokens.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
+      ),
     );
   }
 }
