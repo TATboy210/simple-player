@@ -1,0 +1,69 @@
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract dispose (modifies: 无 during normal reads) dispose completes without error
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) aspectRatio is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) buffered is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) duration is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) isBuffering is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) isMuted is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) isSeeking is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) lastError is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) mediaInfo is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) playbackSpeed is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) position is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) state is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) subtitleText is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) textureId is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract getters — callable before open() (requires: 无) volume is accessible and returnsNormally
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract initial values — before any open() duration starts at 0
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract initial values — before any open() isBuffering starts false
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract initial values — before any open() isSeeking starts false
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract initial values — before any open() lastError starts null
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract initial values — before any open() position starts at 0
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: EngineStateView contract initial values — before any open() state starts as idle
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract open() open to play handoff — real fixture opens then plays
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract open() throws: contract — corrupted_header.mp4-shaped nonexistent path sets FileError + state=error (CodecError-retry-recursion avoided, see deviation note above)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract open() throws: contract — empty (whitespace-only) path also errors
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract open() throws: contract — empty path sets FileError + state=error
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract pause() pause() after play() transitions to paused
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract play() play() is idempotent when already playing (no-op re-entry)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract play() play() on idle after successful open() transitions to playing
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract seekTo() / skipForward() / skipBack() seekTo before any open() (duration==0) is a safe no-op
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract seekTo() / skipForward() / skipBack() skipForward / skipBack return normally before open()
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract setPlaybackRate() setPlaybackRate clamps into [0.25, 4.0]
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract setRange() setRange returns normally (modifies: 无 ValueNotifier)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract setVolume() / setMute() setMute sets isMuted directly without volume side-effect
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract setVolume() / setMute() setVolume clamps into [0.0, 1.0]
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract setVolume() / setMute() setVolume to 0 auto-mutes (modifies: isMuted conditionally)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract stop() stop() transitions to idle and resets position
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: PlaybackControl contract togglePlayPause() toggles playing -> paused -> playing
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: RendererControl contract setD3d11SyncEnabled() returns normally for both enable states (modifies: 无 ValueNotifier)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: RendererControl contract setHardwareDecoding() returns normally for both enable states (modifies: 无 ValueNotifier)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract activeSubtitleTracks returns [0] before any open() (MDK default active-index, not [] — documented interface/implementation gap, out of Phase 15 fix scope)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract getSubtitleTracks() returns an empty list before any open() (ensures: 快照, no media yet)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract setEqualizer() is a safe no-op call (modifies: 无 ValueNotifier — delegates to underlying engine)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract setExternalSubtitle() is a safe no-op call (modifies: 无 ValueNotifier — delegates to underlying engine)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract setSubtitleDelay() / subtitleDelay setSubtitleDelay updates subtitleDelay getter (ensures: subtitleDelay == delay)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract switchSubtitleTrack() is a safe no-op before any open() (requires: 无 — TrackManager handles bounds)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: SubtitleConfig contract toggleSubtitle() is a safe no-op before any open() (modifies: activeSubtitleTracks)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: TrackControl contract activeAudioTracks returns [0] before any open() (MDK default active-index, not [] — documented interface/implementation gap, out of Phase 15 fix scope)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: TrackControl contract getAudioTracks() returns an empty list before any open() (ensures: 快照, no media yet)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: TrackControl contract switchAudioTrack() is a safe no-op before any open() (requires: 无 — TrackManager handles bounds)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VideoEffectControl contract rotate() returns normally for a valid rotation degree (modifies: 无 ValueNotifier)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VideoEffectControl contract setAspectRatio() returns normally without writing back to EngineStateView.aspectRatio (documented contract-implementation gap, out of Phase 15 fix scope)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VideoEffectControl contract setDeinterlace() returns normally for both enable states (modifies: 无 ValueNotifier)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VideoEffectControl contract setVideoEffect() returns normally for a valid effect type + value (modifies: 无 ValueNotifier)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VolumeControl contract setMute() sets isMuted directly without a volume side-effect (modifies: [isMuted])
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VolumeControl contract setVolume() clamps into [0.0, 1.0] (ensures: volume == clamp(value, 0.0, 1.0))
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VolumeControl contract setVolume() crossing to 0 auto-mutes; raising above 0 auto-unmutes (modifies: [volume], [isMuted] — conditional on 0 boundary)
+D:/simple_player_flutter/test/engine/fvp_engine_contract_test.dart: VolumeControl contract volume / isMuted getters reflect the most recent setVolume/setMute write (ensures: 纯读取)
+D:/simple_player_flutter/test/engine/mixin_capability_test.dart: EngineState playback behavior stop resets position and tracks call
+D:/simple_player_flutter/test/integration/error_propagation_test.dart: Error propagation: engine → ErrorBanner engine error triggers ErrorBanner display
+D:/simple_player_flutter/test/integration/error_propagation_test.dart: Error propagation: engine → ErrorBanner error dismiss clears engine.lastError
+D:/simple_player_flutter/test/integration/error_propagation_test.dart: Error propagation: engine → ErrorBanner error → recovery → new playback clears error
+D:/simple_player_flutter/test/integration/error_propagation_test.dart: Unidirectional data flow verification Kernel→Widget: engine state changes drive widget rebuilds
+D:/simple_player_flutter/test/kernel/engine/fvp_engine_open_test.dart: FvpEngine.open() generation guard rapid open() — only last request wins
+D:/simple_player_flutter/test/ui/dialogs/settings_nav_item_test.dart: SettingsNavItem layout is horizontal Row (not vertical Column)
+D:/simple_player_flutter/test/ui/dialogs/settings_nav_item_test.dart: SettingsNavItem selected=false shows transparent indicator, selected=true shows accent
+D:/simple_player_flutter/test/ui/dialogs/settings_spin_control_integration_test.dart: SpinControl integration in GeneralTab SettingSpinRow wraps SpinControl inside SettingRow
+D:/simple_player_flutter/test/widget/player/controls_overlay_test.dart: ControlsOverlay ErrorBanner renders inside ControlsOverlay
+D:/simple_player_flutter/test/widget/settings/about_tab_test.dart: AboutTab licenses row uses InkWell for tap
+loading D:/simple_player_flutter/test/ui/dialogs/settings_focus_navigation_test.dart
