@@ -4,17 +4,17 @@ milestone: v4.5
 milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
 current_phase: 32
 current_phase_name: navigation-interaction-polish
-status: phase-32-wave-1-complete
-stopped_at: wave-1-complete (2026-07-29)
-last_updated: "2026-07-29T14:23:11Z"
-last_activity: 2026-07-29
-last_activity_desc: Phase 32 Wave 1 (32-01) complete — InputModeDetector + NAV-04/07 containment (4 commits: 3716104d + 631f26c + e38175f + 0d692ab); Wave 2/3 not started, phase verification skipped (partial-wave)
+status: phase_complete
+stopped_at: all 3 plans complete, awaiting verification (2026-07-30)
+last_updated: "2026-07-30T01:30:00.000Z"
+last_activity: 2026-07-30
+last_activity_desc: Phase 32 complete (32-03-SUMMARY.md written; gamepad deferred to 32-04)
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
-  completed_plans: 9
-  percent: 43
+  completed_plans: 11
+  percent: 57
 ---
 
 # Project State: 播放内核重构强化 (expanded)
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-14)
 
 **Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** Phase 32 — navigation-interaction-polish (plan-checker iter8 PASSED commit 7e04121, ready for /gsd-execute-phase 32); Phases 28-31 complete
+**Current focus:** Phase 32 — navigation-interaction-polish
 
 ## Current Position
 
-Phase: 32 (navigation-interaction-polish) — PLAN VERIFIED (32-01/02/03-PLAN.md + 32-VALIDATION.md written, plan-checker iter8 PASSED 0 blockers)
-Plan: 3/3 verified (32-01, 32-02, 32-03); prerequisites: execute → validate
-Status: wave-1-complete (2026-07-29); 32-01 executed (4 commits), Wave 2/3 not started — partial-wave, phase verification skipped
-Last activity: 2026-07-29 — Phase 32 Wave 1 (32-01) complete: InputModeDetector + NAV-04/07 containment (4 commits 3716104d + 631f26c + e38175f + 0d692ab); next: /gsd-execute-phase 32 --wave 2
+Phase: 32 (navigation-interaction-polish) — COMPLETE
+Plan: 3 of 3 (all complete)
+Status: Phase 32 complete — awaiting gsd-verifier, then 32-04 gap-closure plan (XInput bridge)
+Last activity: 2026-07-30 — 32-03-SUMMARY.md written, diagnostic finding recorded
 
 ## Performance Metrics
 
@@ -114,8 +114,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-29T11:32:02.648Z
-Stopped at: context exhaustion at 95% (2026-07-29)
+Last session: 2026-07-29T15:50:29.385Z
+Stopped at: context exhaustion at 89% (2026-07-29)
 Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commit, then /gsd-execute-phase 32)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -335,6 +335,15 @@ Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commi
 - **Validation Architecture 已写**：32-RESEARCH.md L353 → 下次 `/gsd-plan-phase 32` 派生 32-VALIDATION.md。
 - **一次性工件闭环**：`git rm HANDOFF.json` + `git rm .continue-here.md`（research 成功恢复后闭环）。`32-RESEARCH-CHECKPOINT.md` 保留（规划通过后删，Phase 30 先例）。
 - **下一步**：`/clear` → `/gsd-plan-phase 32`（不带 --research，has_research=true 走 §5.1 "Use existing" 直接 spawn planner opus 消费 32-RESEARCH.md 写 32-0X-PLAN.md）。
+
+### 2026-07-30 Phase 32 wrap-up complete (32-03-SUMMARY.md + STATE update; awaiting verifier)
+
+- **恢复源**：`.planning/HANDOFF.json`（2026-07-29T17:20:13Z，paused-task2-resolved-with-deferral，task 2/2）+ `.planning/phases/32-navigation-interaction-polish/.continue-here.md`（phase-level checkpoint，同时间戳）。无 interrupted agent、无 async-job、无 PLAN-without-SUMMARY（除 32-03-PLAN.md 本身）。
+- **本会话**：fresh 窗口 → 写 `32-03-SUMMARY.md`（lead with Diagnostic finding: Xbox LB/RB 不到达 `Focus.onKeyEvent` on Windows desktop; 32-01 `gameButton12/13` premise falsified; deferred to 32-04 XInput bridge）→ Task 1 summary（`52764c33`, 6/6 tests, gate PASS, BP3 extraction override）→ Task 2 checkpoint resolution（keyboard verified, gamepad deferred per Step 5, diagnostic NOTE `cac31475`）→ Rule 1 deviations（gamepad deferral plan-sanctioned; BP3 extraction override; ShortcutsTab overflow fix）→ 更新 STATE.md frontmatter（status executing→phase_complete, completed_phases 3→4, completed_plans 10→11, percent 43→57, last_activity 2026-07-29→2026-07-30）+ Current Position（EXECUTING→COMPLETE, Plan 1 of 3→3 of 3）。
+- **32-03-SUMMARY.md 结构**：Diagnostic finding（最重要输出，falsified 32-01 premise）→ Task 1（overlay + mount + gate）→ Task 2（checkpoint resolved with deferral）→ Artifacts（2 commits: `52764c33` + `cac31475`）→ must_haves truths 7/7 → Rule 1 deviations（4 项）→ Handoff to verifier（all 3 waves complete, 9 commits total）。
+- **一次性工件待闭环**：`HANDOFF.json` + `.planning/.continue-here.md`（phase 32 level）— verifier 成功运行后删除。`32-RESEARCH-CHECKPOINT.md` 保留（规划通过后删，Phase 30/32 先例）。
+- **下一步**：(1) 提交 `32-03-SUMMARY.md` + `STATE.md`（建议 commit message: `docs(32): record Phase 32 Wave 3 SUMMARY`）；(2) 删 `HANDOFF.json` + `.planning/.continue-here.md`（一次性工件闭环）；(3) run `gsd-verifier` for Phase 32（会 flag gamepad gap → 32-04 gap-closure plan: XInput bridge）；(4) `/clear` → 下一会话处理 32-04（或 verifier 后 auto-advance 到 Phase 33）。
+- **上下文预算守卫**：本窗口已耗 ~70%。提交 + 删 HANDOFF/.continue-here + 呈批 verifier 可本窗口做；spawn gsd-verifier (sonnet) 建议 fresh 窗口（参考 Phase 31 verifier 模式）。
 
 ## Operator Next Steps
 
