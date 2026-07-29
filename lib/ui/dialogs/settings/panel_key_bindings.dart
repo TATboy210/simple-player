@@ -83,6 +83,12 @@ class SettingsPanelKeyBindings {
       return KeyEventResult.handled;
     }
 
+    // NOTE (32-03 诊断, 2026-07-29)：Windows 桌面 profile 实测证明 Xbox 手柄
+    // LB/RB（及 A/B/X/Y 等面键）不会作为 KeyEvent 到达本 Focus 处理器——
+    // 仅 D-pad 被重映射层翻译成键盘箭头才到达。即下方 gameButton12/13 比较
+    // 在 Windows 桌面从不命中（死路由）。真肩键支持需经 XInput 桥接
+    // （window_bridge MethodChannel + GamepadService），延后到 32-04。
+    // 32-01 当初"gameButton13/12 = Windows 直接映射肩键"的前提已被实测证伪。
     // Gamepad Left Shoulder — 切换到上一个 tab（D-05，仅 gameButton13）
     if (_isLeftShoulder(key)) {
       controller.prevTab();
