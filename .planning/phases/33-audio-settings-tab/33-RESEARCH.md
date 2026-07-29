@@ -600,22 +600,24 @@ static Future<void> saveAudioNormalization(bool enabled) async { ... }
 | A5 | `pan` filter's pipe (`|`) syntax does not conflict with MDK's property parsing | MDK/FFmpeg Syntax | Pan filter string gets mangled; need to test actual behavior |
 | A6 | `SettingsPanelController` can be extended with an audio commit callback without breaking existing tests | Commit Flow | Existing settings tests need updates; additional coordination |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Filter availability in fvp's FFmpeg build**
-   - What we know: `bass`, `treble`, `equalizer` are proven working (existing EQ tab). `pan`, `adelay`, `dynaudnorm` are standard FFmpeg filters but haven't been tested with fvp's specific build.
-   - What's unclear: Whether fvp 0.37.2's bundled FFmpeg includes all these filters.
-   - Recommendation: Write a quick smoke test that calls `setEqualizer` with each filter individually. Run on target Windows machine. If a filter fails, omit it gracefully.
+### Q1: Filter availability in fvp's FFmpeg build ✅ RESOLVED
+- **What:** Whether `pan`, `adelay`, `dynaudnorm` are compiled into fvp 0.37.2's bundled FFmpeg.
+- **Decision:** Wave 0 (Plan 33-01 Task 1) runs individual smoke checks on target Windows before combined-chain use. Each filter whose `setEqualizer` call throws is marked unavailable.
+- **Fallback policy:** An unavailable segment is omitted from the composed af chain + emits `debugPrint` warning. The UI retains its control value and persistence remains intact. If ANY of the three filters is unavailable AND no equivalent supported route exists, Phase 33 cannot be declared complete until an acceptable substitute is identified and tested. This makes filter support a delivery gate, not silent degradation.
+- **Verification:** Runtime smoke test in `test/ui/dialogs/settings/audio_filter_runtime_smoke_test.dart`.
 
-2. **Commit flow integration**
-   - What we know: `commitPending()` returns changes map but the button bar doesn't use the return value.
-   - What's unclear: How to cleanly wire the audio commit (compose af string → setEqualizer → persist) into the existing button bar flow without breaking locale/theme commit logic.
-   - Recommendation: Use the `AudioCommitCallback` pattern (Option A above). Register in composition root. This keeps audio commit isolated from other settings.
+### Q2: Commit flow integration method ✅ RESOLVED
+- **What:** How to wire the audio commit handler into the existing button bar without breaking locale/theme logic.
+- **Decision:** Adopt Option A — inject a typed `AudioCommitCallback?` into `SettingsPanelController`. `PlayerFeature` registers the callback at the manual composition root (app.dart / PlayerServices). On `commitPending()`, the controller builds an `AudioSettings` snapshot from committed-or-current values and invokes the callback exactly once per Apply/OK.
+- **Scope boundary:** Only `settings_panel_controller.dart` and `player_feature.dart` receive new seams; `SubtitleConfigurator`, `MediaEngine`, and `SubtitleConfig` remain untouched.
+- **Verification:** Plan 33-01 Task 2 acceptance criteria.
 
-3. **Old `EqualizerTab` (live-apply) vs new audio tab (deferred-apply)**
-   - What we know: The old `EqualizerTab` at `lib/ui/dialogs/settings/equalizer_tab.dart` calls `engine.setEqualizer()` directly on preset tap. There are TWO `equalizer_tab.dart` files — one at the root settings dir (old, live-apply) and one in `tabs/` (skeleton).
-   - What's unclear: Which `EqualizerTab` is actually rendered in `tab_content.dart`.
-   - Recommendation: `tab_content.dart` imports from `tabs/equalizer_tab.dart` (the skeleton). The old one at the root level is likely dead code from before the v4.0 settings refactor. Phase 33 replaces the skeleton at `tabs/equalizer_tab.dart` with the new combined audio tab.
+### Q3: Which EqualizerTab is rendered ✅ RESOLVED
+- **What:** Two `equalizer_tab.dart` files exist — one at project-root settings dir (old live-apply), one in `tabs/` (Phase 32 skeleton).
+- **Decision:** `tab_content.dart` imports from `tabs/equalizer_tab.dart`. Phase 33 replaces THAT file with the combined AudioTab (EQ presets replacing the skeleton). The legacy root-level file is dead code and is not touched.
+- **Verification:** Plan 33-01 Task 2 acceptance criteria: "root-level legacy equalizer tab remains untouched."
 
 ## Security Domain
 
