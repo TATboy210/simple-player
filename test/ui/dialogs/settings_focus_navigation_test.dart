@@ -6,6 +6,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/services/input_mode_detector.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
 
@@ -17,9 +19,13 @@ void main() {
     WidgetTester tester, {
     Size size = const Size(800, 600),
   }) async {
-    final fake = FakePlaybackController(initiallyPlaying: true);
+    final fake = FakePlaybackController(initialState: MediaState.playing);
     final controller = SettingsPanelController(fake);
     addTearDown(() async {
+      // 清理 InputModeDetector 进程级单例的 pending FakeTimer（recordArrowKey 的
+      // 5s gamepad 检测 + setArrowGlow 的 reset 计时器），避免 fakeAsync 泄漏
+      // 触发 !timersPending 断言（panel_key_bindings.handle 间接调用单例）。
+      InputModeDetector.instance.onPanelClosed();
       await tester.pumpWidget(const SizedBox());
       controller.dispose();
     });
@@ -68,8 +74,13 @@ void main() {
       // Assert — 面板仍然打开
       expect(controller.state.isOpen.value, isTrue);
 
-      // 排空定时器
+      // 排空定时器 + 取消 InputModeDetector 单例的 pending FakeTimer。
+      // arrowUp/Down 经 panel_key_bindings.handle 调 recordArrowKey（5s 检测
+      // Timer）+ setArrowGlow（reset Timer）。flutter_test 的 timersPending
+      // 检查（_verifyInvariants）在 addTearDown 之前运行，addTearDown 的
+      // onPanelClosed 来不及取消，故须在 body 末尾主动调。
       await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('ArrowLeft/ArrowRight still switch tabs when no control focused',
@@ -84,8 +95,8 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
 
-      // Assert — selectedTab 更新为 1
-      expect(controller.state.selectedTab.value, 1);
+      // Assert — selectedTab 更新为 4（open→General(3)，Right→nextTab→(3+1)%7=4）
+      expect(controller.state.selectedTab.value, 4);
 
       // Act — 按 Left 切换回
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
@@ -94,6 +105,13 @@ void main() {
       // Assert — selectedTab 回到 0（或循环到 6）
       // 由于焦点可能在侧边栏，Left 应切换 tab
       expect(controller.state.selectedTab.value, isNot(1));
+
+      // 排空 + 取消 InputModeDetector 单例的 pending FakeTimer（arrowLeft/Right
+      // 经 recordArrowKey 启动 5s 检测 Timer）。timersPending 检查
+      // （_verifyInvariants）在 addTearDown 之前运行，addTearDown 的
+      // onPanelClosed 来不及取消，故须在 body 末尾主动调。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('B key closes panel when focus is on sidebar', (tester) async {
@@ -159,15 +177,15 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButton12);
       await tester.pump();
 
-      // Assert
-      expect(controller.state.selectedTab.value, 1);
+      // Assert — open→3，RB(next)→(3+1)%7=4
+      expect(controller.state.selectedTab.value, 4);
 
       // Act — LB 切换到上一个 tab
       await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButton13);
       await tester.pump();
 
-      // Assert
-      expect(controller.state.selectedTab.value, 0);
+      // Assert — LB(prev)→(4-1+7)%7=3
+      expect(controller.state.selectedTab.value, 3);
     });
 
     testWidgets('FocusTraversalGroup hierarchy exists in panel',
@@ -222,19 +240,28 @@ void main() {
       await tester.pump();
 
       // Act — 先切 tab，再按 Up/Down，再切 tab
+      // open() 重置到 General(3)；Right→nextTab→4；Up 仅 setArrowGlow 不切 tab；
+      // 再 Right→(4+1)%7=5。
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
-      expect(controller.state.selectedTab.value, 1);
+      expect(controller.state.selectedTab.value, 4);
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
       await tester.pump();
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
-      expect(controller.state.selectedTab.value, 2);
+      expect(controller.state.selectedTab.value, 5);
 
       // Assert — 面板仍然打开
       expect(controller.state.isOpen.value, isTrue);
+
+      // 排空 + 取消 InputModeDetector 单例的 pending FakeTimer（arrowRight +
+      // arrowUp 经 recordArrowKey 启动 5s 检测 Timer；arrowUp 还启动 glow
+      // reset Timer）。timersPending 检查（_verifyInvariants）在 addTearDown
+      // 之前运行，addTearDown 的 onPanelClosed 来不及取消，故须 body 末尾主动调。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
   });
 }

@@ -4,14 +4,18 @@
 // 替代真实 PlaybackController，不依赖 MediaEngine / mdk.dll，
 // 规避 headless FFI 加载失败风险（CLAUDE.md "Fakes over mocks"）。
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/display_enumerator.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/services/input_mode_detector.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/_settings_nav_item.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
+import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
 import 'package:simple_player_flutter/ui/shared/apple_curves.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/tab_content.dart';
@@ -40,6 +44,10 @@ void main() {
     );
     final controller = SettingsPanelController(fake);
     addTearDown(() async {
+      // 清理 InputModeDetector 进程级单例的 pending FakeTimer（recordArrowKey 的
+      // 5s gamepad 检测 + setArrowGlow 的 reset 计时器），避免 fakeAsync 泄漏
+      // 触发 !timersPending 断言（panel_key_bindings.handle 间接调用单例）。
+      InputModeDetector.instance.onPanelClosed();
       await tester.pumpWidget(const SizedBox());
       controller.dispose();
     });
@@ -511,6 +519,12 @@ void main() {
 
       // Assert
       expect(controller.state.selectedTab.value, 4);
+
+      // 取消 InputModeDetector 单例的 pending FakeTimer（arrow 键经
+      // recordArrowKey 启动 5s 检测 Timer）。timersPending 检查
+      // （_verifyInvariants）在 addTearDown 之前运行，须 body 内取消。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('Arrow Left switches to previous tab (default 3, left → 2)', (
@@ -529,6 +543,12 @@ void main() {
 
       // Assert
       expect(controller.state.selectedTab.value, 2);
+
+      // 取消 InputModeDetector 单例的 pending FakeTimer（arrowLeft 经
+      // recordArrowKey 启动 5s 检测 Timer）。timersPending 检查
+      // （_verifyInvariants）在 addTearDown 之前运行，须 body 内取消。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('Arrow Right wraps around (6→0)', (tester) async {
@@ -550,6 +570,12 @@ void main() {
 
       // Assert
       expect(controller.state.selectedTab.value, 0);
+
+      // 取消 InputModeDetector 单例的 pending FakeTimer（arrowRight 经
+      // recordArrowKey 启动 5s 检测 Timer）。timersPending 检查
+      // （_verifyInvariants）在 addTearDown 之前运行，须 body 内取消。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('multiple arrow presses cycle through tabs', (tester) async {
@@ -569,6 +595,13 @@ void main() {
 
       // Assert — default 3 + 3 次右键 = tab 6
       expect(controller.state.selectedTab.value, 6);
+
+      // 取消 InputModeDetector 单例的 pending FakeTimer（3 次 arrowRight 经
+      // recordArrowKey 启动 5s 检测 Timer，每次刷新不堆叠但仍 pending）。
+      // timersPending 检查（_verifyInvariants）在 addTearDown 之前运行，须 body
+      // 内取消。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('gamepad Right Shoulder (gameButton12) switches to next tab', (
@@ -611,44 +644,81 @@ void main() {
       },
     );
 
-    testWidgets('gamepad gameButtonRight1 also works (cross-platform)', (
-      tester,
-    ) async {
-      // Arrange — default tab 3（D-01）
-      final (controller, _) = await pumpShell(tester);
-      controller.open();
-      await tester.pump();
-      await tester.pump();
-
-      // Act
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonRight1);
-      await tester.pump();
-
-      // Assert — 3 + 1 = tab 4
-      expect(controller.state.selectedTab.value, 4);
+    test('NAV-04: lib/ source has no gameButtonLeft1/Right1 code refs', () async {
+      // git grep -hE 输出匹配 content 行（无文件名行号）。
+      // 注释行（// 或 ///）允许文档引用已删除符号；代码行禁止 —— NAV-04
+      // 防止代码重新引入跨平台肩键别名比较（panel_key_bindings 仅留 gameButton12/13）。
+      final result = await Process.run(
+        'git',
+        const ['grep', '-hE', 'gameButtonLeft1|gameButtonRight1', '--', 'lib/'],
+      );
+      final stdout = result.stdout.toString();
+      final codeLines = stdout
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty && !l.trimLeft().startsWith('//'));
+      expect(
+        codeLines,
+        isEmpty,
+        reason: 'lib/ 代码不得引用 gameButtonLeft1/gameButtonRight1（NAV-04）；'
+            '注释文档引用允许。匹配行：\n$stdout',
+      );
     });
 
-    testWidgets('gamepad gameButtonLeft1 also works (cross-platform)', (
-      tester,
-    ) async {
-      // Arrange
-      final (controller, _) = await pumpShell(tester);
-      controller.open();
-      await tester.pump();
-      await tester.pump();
+    testWidgets(
+      'NAV-07: arrows contained in panel do not bubble to outer KeyboardHandler',
+      (tester) async {
+        // Arrange — 外层 KeyboardHandler spy 计数四向回调；若面板根 Focus 未遏制
+        // 方向键，事件冒泡到外层 KeyboardHandler 触发 seek/volume 回调。
+        var seekBackwardCount = 0;
+        var seekForwardCount = 0;
+        var volumeUpCount = 0;
+        var volumeDownCount = 0;
+        final (controller, _) = await pumpShell(
+          tester,
+          decorate: (shell) => KeyboardHandler(
+            onSeekBackward: () => seekBackwardCount++,
+            onSeekForward: () => seekForwardCount++,
+            onVolumeUp: () => volumeUpCount++,
+            onVolumeDown: () => volumeDownCount++,
+            child: shell,
+          ),
+        );
+        controller.open();
+        await tester.pump();
+        await tester.pump();
+        // pump×2 让 _onIsOpenChanged 排的 post-frame requestFocus 执行并稳定 ——
+        // 第一 pump 触发 isOpen listener → _requestPanelFocus 排 post-frame；
+        // 第二 pump 执行 post-frame callback 调 _panelFocusNode.requestFocus() 夺回
+        // 外层 KeyboardHandler(autofocus:true) 持有的焦点。此后方向键到面板根
+        // panel_key_bindings.handle（返回 handled 遏制）而非冒泡到外层 seek/volume。
+        // 方案 A 生产修复（fix(32-01)）：settings_overlay_shell open 时显式
+        // requestFocus 面板根 FocusNode，对标 PlaylistPanel 模式。
 
-      // Act — 切换到 tab 2
-      final navItems = find.byType(SettingsNavItem);
-      await tester.tap(navItems.at(2));
-      await tester.pump();
 
-      // Act — 按左肩键（跨平台）
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.gameButtonLeft1);
-      await tester.pump();
+        // Act — 发四个方向键，每个后 pump 让事件分发
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pump();
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump();
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pump();
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pump();
 
-      // Assert
-      expect(controller.state.selectedTab.value, 1);
-    });
+        // Assert — 四向回调零调用（NAV-07 遏制：面板根 handle 返回 handled 阻止冒泡）
+        expect(seekBackwardCount, 0);
+        expect(seekForwardCount, 0);
+        expect(volumeUpCount, 0);
+        expect(volumeDownCount, 0);
+
+        // 排空定时器 + 取消 InputModeDetector 单例的 pending FakeTimer（4 方向
+        // 键经 recordArrowKey 启动 5s 检测 Timer；arrowUp/Down 还启动 glow reset
+        // Timer）。timersPending 检查（_verifyInvariants）在 addTearDown 之前运行，
+        // addTearDown 的 onPanelClosed 来不及取消，故须 body 末尾主动调。
+        await tester.pump(const Duration(milliseconds: 250));
+        InputModeDetector.instance.onPanelClosed();
+      },
+    );
 
     testWidgets('arrow key does NOT close panel', (tester) async {
       // Arrange
@@ -663,6 +733,12 @@ void main() {
 
       // Assert — 面板仍然打开
       expect(controller.state.isOpen.value, isTrue);
+
+      // 取消 InputModeDetector 单例的 pending FakeTimer（arrowRight 经
+      // recordArrowKey 启动 5s 检测 Timer）。timersPending 检查
+      // （_verifyInvariants）在 addTearDown 之前运行，须 body 内取消。
+      await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     testWidgets('KeyUp events are ignored (no tab switch on release)', (
@@ -698,8 +774,11 @@ void main() {
       // Assert — 面板关闭
       expect(controller.state.isOpen.value, isFalse);
 
-      // 排空退出动画
+      // 排空退出动画 + 取消前置 arrowRight 启动的 InputModeDetector 5s 检测
+      // Timer（ESC 本身不启动 Timer，但前置的 Right 启动了）。timersPending
+      // 检查（_verifyInvariants）在 addTearDown 之前运行，须 body 内取消。
       await tester.pump(const Duration(milliseconds: 250));
+      InputModeDetector.instance.onPanelClosed();
     });
 
     // ── Button Bar (TABS-03/TABS-04) ──
