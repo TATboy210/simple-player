@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../kernel/persistence/settings_store.dart';
+import '../../../kernel/services/input_mode_detector.dart';
 import '../../theme/tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/glass_container.dart';
@@ -115,6 +116,11 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SectionHeader(title: l10n.shortcutsTab, icon: Icons.keyboard),
+                  // 输入模式切换 (NAV-02) — pointer-only chip，不抢 KeyboardListener 焦点 (D-09)。
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: Tokens.spSm),
+                    child: _InputModeToggle(),
+                  ),
                   for (final def in defs)
                     SettingActionRow(
                       label: def.label,
@@ -152,6 +158,74 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
       ],
     );
   }
+}
+
+// ── 输入模式切换 chip (NAV-02) ──
+
+/// 输入模式切换 chip —— pointer-only，不抢 KeyboardListener 焦点 (D-09)。
+///
+/// 显示当前 [InputModeDetector.preference] (keyboard/gamepad/auto)，点击循环
+/// 切换。用 [GestureDetector] 而非 [InkWell] —— 纯指针交互无 focus 语义，
+/// 保证快捷键录制时 [KeyboardListener] 独占键盘焦点 (D-09)。
+class _InputModeToggle extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<InputMode>(
+      valueListenable: InputModeDetector.instance.preference,
+      builder: (context, mode, _) {
+        final (label, icon) = _modeDisplay(mode);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () =>
+              InputModeDetector.instance.toggle(_nextMode(mode)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.spMd,
+              vertical: Tokens.spXs,
+            ),
+            decoration: BoxDecoration(
+              color: Tokens.bgGlass,
+              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+              border: Border.all(color: Tokens.borderHighlight),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: Tokens.fontCaption,
+                  color: Tokens.textSecondary,
+                ),
+                const SizedBox(width: Tokens.spXs),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Tokens.textSecondary,
+                    fontSize: Tokens.fontCaption,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 当前偏好 → (显示文本, 图标)。
+  (String, IconData) _modeDisplay(InputMode mode) => switch (mode) {
+        InputMode.keyboard => ('Keyboard', Icons.keyboard),
+        InputMode.gamepad => ('Gamepad', Icons.gamepad),
+        InputMode.auto => ('Auto', Icons.autorenew),
+      };
+
+  /// 循环顺序：keyboard → gamepad → auto → keyboard。
+  /// 基于 preference 三态（含 auto），非 effectiveMode。
+  InputMode _nextMode(InputMode current) => switch (current) {
+        InputMode.keyboard => InputMode.gamepad,
+        InputMode.gamepad => InputMode.auto,
+        InputMode.auto => InputMode.keyboard,
+      };
 }
 
 // ── 数据模型 ──

@@ -20,11 +20,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../kernel/bridge/display_enumerator.dart';
+import '../../../kernel/services/input_mode_detector.dart';
 import '../../shared/apple_curves.dart';
 import '../../shared/control_bar_decoration.dart';
 import '../../shared/glass_container.dart';
 import '../../shared/settings_button.dart';
 import '../../theme/tokens.dart';
+import 'input_mode_hint.dart';
 import 'panel_key_bindings.dart';
 import 'settings_panel_controller.dart';
 import 'tab_content.dart';
@@ -177,6 +179,11 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
     // 关闭：归还焦点给底层 KeyboardHandler，再延迟 200ms（与关闭动画同长）卸载；
     // 期间 IgnorePointer 已屏蔽命中。若 200ms 内重新打开（isOpen 回 true）则
     // 保持挂载，避免闪烁。
+    // T-32-10P: 关闭即取消 InputModeDetector 待触发的 5s gamepad 检测计时器并
+    // 重置 arrowGlow —— 防箭头在关闭前一刻按下、计时器在关闭后触发把
+    // effectiveMode 翻成 gamepad（关闭态不应再翻转）。单例不 dispose，跨
+    // open/close 存活；仅取消其待触发计时器（checker warning 1）。
+    InputModeDetector.instance.onPanelClosed();
     _panelFocusNode.unfocus();
     Future.delayed(SettingsOverlayShell.animationDuration, () {
       if (mounted && !_controller.state.isOpen.value && _mountedForExit) {
@@ -292,7 +299,16 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
 
     return RepaintBoundary(
       child: FocusTraversalGroup(
-        child: Focus(
+        child: Listener(
+          // D-02/NAV-02: 鼠标活动信号源 —— translucent 命中让指针事件穿透到下层
+          // Focus 的键盘路由，同时把 hover/move 喂给 InputModeDetector（仅 mouse
+          // kind；recordPointerActivity 内部过滤非鼠标）。Listener 位于
+          // FocusTraversalGroup 内、Focus 外，捕获面板表面鼠标移动驱动
+          // keyboard/gamepad 启发式；不阻碍键盘事件冒泡（onKeyEvent 仍由 Focus）。
+          behavior: HitTestBehavior.translucent,
+          onPointerHover: InputModeDetector.instance.recordPointerActivity,
+          onPointerMove: InputModeDetector.instance.recordPointerActivity,
+          child: Focus(
           // autofocus:false + 显式 requestFocus（_onIsOpenChanged 排 post-frame）
           // —— 避免与外层 KeyboardHandler(autofocus:true) 竞争时抢焦失败，使 open
           // 后方向键冒泡到外层 seek/volume（NAV-07）。与 PlaylistPanel 同模式。
@@ -313,6 +329,10 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
                   SettingsTabStrip(
                     selectedTab: _controller.state.selectedTab,
                     onSelect: (i) => _controller.state.selectedTab.value = i,
+                    // 端帽箭头接 controller prev/next —— 与键盘方向键同路径
+                    //（NAV-01/T-32-05：无第二个 tab 选择状态）。
+                    onPrevTab: _controller.prevTab,
+                    onNextTab: _controller.nextTab,
                     isCompact: isCompact,
                   ),
                   Expanded(
@@ -326,6 +346,7 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -415,6 +436,12 @@ class _SettingsOverlayShellState extends State<SettingsOverlayShell> {
               ),
             ),
             const Spacer(),
+            // NAV-03: 有效输入模式提示 —— 监听 InputModeDetector.effectiveMode
+            // 交叉淡入键盘↔手柄标签。置于关闭按钮左侧作紧凑指示器
+            //（D-03：effectiveMode 永不为 auto，hint 仅分支 keyboard/gamepad）。
+            InputModeHint(
+              effectiveMode: InputModeDetector.instance.effectiveMode,
+            ),
             GlassButton.iconOnly(
               key: SettingsOverlayShell.closeButtonKey,
               icon: Icons.close,
