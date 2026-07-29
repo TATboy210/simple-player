@@ -99,10 +99,13 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
 
     // AnimatedSectionList 内部返回 Column，自身处理布局
     // 不使用 Expanded — Scaffold.body 不是 Flex 容器
-    return AnimatedSectionList(
-      children: [
-        // 快捷键列表
-        KeyboardListener(
+    // The new mode-toggle row extends this discrete option list beyond the
+    // fixed test viewport, so retain every shortcut by making the tab scroll.
+    return SingleChildScrollView(
+      child: AnimatedSectionList(
+        children: [
+          // 快捷键列表
+          KeyboardListener(
             focusNode: _keyListenerFocus,
             autofocus: _recordingAction != null,
             onKeyEvent: _onKeyPressed,
@@ -140,22 +143,23 @@ class _ShortcutsTabState extends State<ShortcutsTab> {
           ),
           // 重置按钮 — 底部左侧（通过确认对话框）
           Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.only(top: Tokens.spSm),
-            child: TextButton(
-              onPressed: widget.onReset,
-              child: Text(
-                l10n.resetToDefaults,
-                style: const TextStyle(
-                  color: Tokens.textSecondary,
-                  fontSize: Tokens.fontCaption,
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(top: Tokens.spSm),
+              child: TextButton(
+                onPressed: widget.onReset,
+                child: Text(
+                  l10n.resetToDefaults,
+                  style: const TextStyle(
+                    color: Tokens.textSecondary,
+                    fontSize: Tokens.fontCaption,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -176,8 +180,7 @@ class _InputModeToggle extends StatelessWidget {
         final (label, icon) = _modeDisplay(mode);
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () =>
-              InputModeDetector.instance.toggle(_nextMode(mode)),
+          onTap: () => InputModeDetector.instance.toggle(_nextMode(mode)),
           child: Container(
             padding: const EdgeInsets.symmetric(
               horizontal: Tokens.spMd,
@@ -214,18 +217,18 @@ class _InputModeToggle extends StatelessWidget {
 
   /// 当前偏好 → (显示文本, 图标)。
   (String, IconData) _modeDisplay(InputMode mode) => switch (mode) {
-        InputMode.keyboard => ('Keyboard', Icons.keyboard),
-        InputMode.gamepad => ('Gamepad', Icons.gamepad),
-        InputMode.auto => ('Auto', Icons.autorenew),
-      };
+    InputMode.keyboard => ('Keyboard', Icons.keyboard),
+    InputMode.gamepad => ('Gamepad', Icons.gamepad),
+    InputMode.auto => ('Auto', Icons.autorenew),
+  };
 
   /// 循环顺序：keyboard → gamepad → auto → keyboard。
   /// 基于 preference 三态（含 auto），非 effectiveMode。
   InputMode _nextMode(InputMode current) => switch (current) {
-        InputMode.keyboard => InputMode.gamepad,
-        InputMode.gamepad => InputMode.auto,
-        InputMode.auto => InputMode.keyboard,
-      };
+    InputMode.keyboard => InputMode.gamepad,
+    InputMode.gamepad => InputMode.auto,
+    InputMode.auto => InputMode.keyboard,
+  };
 }
 
 // ── 数据模型 ──
