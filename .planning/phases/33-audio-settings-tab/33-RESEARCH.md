@@ -605,7 +605,7 @@ static Future<void> saveAudioNormalization(bool enabled) async { ... }
 ### Q1: Filter availability in fvp's FFmpeg build ✅ RESOLVED
 - **What:** Whether `pan`, `adelay`, `dynaudnorm` are compiled into fvp 0.37.2's bundled FFmpeg.
 - **Decision:** Wave 0 (Plan 33-01 Task 1) runs individual smoke checks on target Windows before combined-chain use. Each filter whose `setEqualizer` call throws is marked unavailable.
-- **Fallback policy:** An unavailable segment is omitted from the composed af chain + emits `debugPrint` warning. The UI retains its control value and persistence remains intact. If ANY of the three filters is unavailable AND no equivalent supported route exists, Phase 33 cannot be declared complete until an acceptable substitute is identified and tested. This makes filter support a delivery gate, not silent degradation.
+- **Fallback policy:** An unavailable segment is omitted from the composed af chain + emits `debugPrint` warning. However, because AUDIO-02/03/04 require real functional filters, if ANY of pan, adelay, or dynaudnorm is unavailable on target runtime, Phase 33 MUST NOT be declared complete until an equivalent supported route is identified, implemented, and tested. Partial feature omission is not an acceptable final state. This makes filter support a strict delivery gate.
 - **Verification:** Runtime smoke test in `test/ui/dialogs/settings/audio_filter_runtime_smoke_test.dart`.
 
 ### Q2: Commit flow integration method ✅ RESOLVED
