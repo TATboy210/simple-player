@@ -325,4 +325,17 @@ class Tokens {
   /// 方向辉光显示窗口（毫秒）—— setArrowGlow 后到此时长自动回 null (NAV-06)，
   /// 复用 osdDefaultHoldMs=1200 的瞬态显示先例。
   static const int arrowGlowDuration = 1200;
+
+  // ── Phase 32 端帽箭头 + 输入提示 (NAV-01/NAV-03) ──
+  /// 端帽箭头圆角 —— 复用 [radiusBtn] 按钮尺度（GlassButton 先例），端帽为
+  /// 按钮级可交互元素，4px 圆角在零圆角 tab 条内作微妙区分 (NAV-01)。
+  static const double tabArrowRadius = radiusBtn;
+
+  /// 端帽箭头固定宽 —— 匹配 GlassButton.iconOnly 的 36px 点击靶，留给 7 个
+  /// Expanded tab 足够空间（面板最小宽 400 - 2×36 = 328px / 7 ≈ 47px/项）。
+  static const double tabArrowWidth = 36.0;
+
+  /// 输入提示淡入淡出时长（毫秒）—— AnimatedSwitcher 交叉淡入键盘↔手柄标签，
+  /// 复用 [durationSlide] 的瞬态切换先例 (NAV-03)。
+  static const int hintFadeDuration = durationSlide;
 }
