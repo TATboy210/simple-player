@@ -38,10 +38,14 @@ void main() {
         _wrap(EqualizerTab(pending: PendingSettingsState())),
       );
 
-      // Assert
-      expect(find.byType(GlassContainer), findsOneWidget);
-      final header = tester.widget<SectionHeader>(find.byType(SectionHeader));
-      expect(header.icon, Icons.equalizer);
+      // Assert — Phase 33 重写：EqualizerTab 现有 3 个 GlassContainer 区段
+      //（EQ 预设 / 空间与同步 / 音量标准化），3 个 SectionHeader。
+      // EQ 预设区 header 仍用 Icons.equalizer（另两区为 tune / graphic_eq）。
+      expect(find.byType(GlassContainer), findsNWidgets(3));
+      final headers = tester.widgetList<SectionHeader>(
+        find.byType(SectionHeader),
+      );
+      expect(headers.map((h) => h.icon), contains(Icons.equalizer));
     });
 
     testWidgets('GeneralTab keeps each row on one non-InkWell focus route', (
@@ -67,9 +71,11 @@ void main() {
         _wrap(EqualizerTab(pending: PendingSettingsState())),
       );
 
-      // Assert
-      expect(find.byType(SettingRow), findsOneWidget);
-      expect(find.byType(FocusableSettingRow), findsOneWidget);
+      // Assert — Phase 33 重写：5 个 EQ 预设行 + 1 个标准化行 = 6 SettingRow，
+      // 每个内含 1 个 FocusableSettingRow（_PendingSliderRow 不用 SettingRow）。
+      // 锁定 40px 行高契约仍对全部 6 行生效。
+      expect(find.byType(SettingRow), findsNWidgets(6));
+      expect(find.byType(FocusableSettingRow), findsNWidgets(6));
       _expectRowsUseLockedDensity(tester);
     });
 
