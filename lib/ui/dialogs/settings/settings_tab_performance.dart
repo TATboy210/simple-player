@@ -11,7 +11,7 @@ import '../../shared/settings_card.dart'; // SettingSwitchRow export
 
 /// Performance settings tab — D3D11 sync toggle and hardware decoding switch.
 ///
-/// Controls engine parameters through [MediaEngine] interface (no direct FvpEngine
+/// Controls engine parameters through [MediaEngine] interface (no direct MediaKitEngine
 /// dependency). Settings are persisted via [SettingsStore] and survive app restarts.
 ///
 /// - D3D11 sync (`sync.cpu`): 强制 CPU 同步，避免 D3D11 异步拷贝导致撕裂，性能换稳定性

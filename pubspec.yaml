@@ -11,7 +11,12 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  fvp: ^0.37.2
+  # media_kit 引擎 + 桌面控件 + Windows 原生库 (libmpv 二进制) — 唯一后端.
+  # MediaKitEngine implements MediaEngine; Player.stream 事件流根治轮询滞后,
+  # MaterialDesktopVideoControls 成熟 seekbar. fvp/MDK 已移除.
+  media_kit: ^1.1.1
+  media_kit_video: ^1.1.1
+  media_kit_libs_windows_video: ^1.0.7
   path_provider: ^2.1.5
   file_picker: ^11.0.2
   shared_preferences: ^2.5.5

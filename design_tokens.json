@@ -294,9 +294,9 @@
   },
 
   "skip": {
-    "_section": "跳秒",
-    "skipSecondsShort": { "value": 10, "unit": "秒" },
-    "skipSecondsLong":  { "value": 30, "unit": "秒" }
+    "_section": "跳秒（毫秒，匹配引擎 PlaybackControl ms 契约）",
+    "skipShortMs": { "value": 10000, "unit": "ms" },
+    "skipLongMs":  { "value": 30000, "unit": "ms" }
   },
 
   "material": {

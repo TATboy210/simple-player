@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// 音量控制接口
 ///
 /// 音量设置（0.0~1.0）和静音切换。
-/// VolumeController 实现此接口，FvpEngine 通过 volumeControl getter 暴露。
+/// 具体引擎类实现此接口（MediaKitEngine 经 MediaEngine 暴露 volumeControl getter）。
 abstract class VolumeControl {
   /// 设置音量（0.0 ~ 1.0）
   ///

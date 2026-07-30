@@ -9,7 +9,7 @@ import 'package:simple_player_flutter/kernel/engine/lifecycle_phase.dart';
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
 ///
-/// Uses EngineStateMachine for state management (matching FvpEngine).
+/// Uses EngineStateMachine for state management (matching MediaKitEngine).
 class FakeEngine implements MediaEngine, SubtitleConfig {
   bool _disposed = false;
 
@@ -73,7 +73,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   /// open() generation 计数器 — 委托给 stateMachine (Phase 20 D5 单一真相源)
   ///
   /// FakeEngine 不再持有独立 _openGeneration，直接使用 stateMachine 的嵌入计数器。
-  /// 与 FvpEngine 保持一致的 generation 守卫语义。
+  /// 与 MediaKitEngine 保持一致的 generation 守卫语义。
 
   MediaInfo _mediaInfo = const MediaInfo();
 
@@ -89,6 +89,17 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   int playCallCount = 0;
   int pauseCallCount = 0;
   int stopCallCount = 0;
+
+  /// Exposes every play/pause intent, including states where the state machine
+  /// cannot transition, so UI interaction tests can assert the tap was routed.
+  int togglePlayPauseCallCount = 0;
+
+  /// Records explicit skip requests independently from the resulting seek.
+  /// This preserves the requested duration even when seek clamping applies.
+  int skipBackCallCount = 0;
+  int skipForwardCallCount = 0;
+  int? lastSkipBackMs;
+  int? lastSkipForwardMs;
   final List<String> openPaths = [];
 
   /// When set, the next open() will simulate an error after loading.
@@ -108,7 +119,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   double? lastSetVolumeValue;
   int _subtitleDelayMs = 0;
 
-  // ─── Interface getters (matching FvpEngine pattern) ───
+  // ─── Interface getters (matching MediaKitEngine pattern) ───
 
   TrackControl get trackControl => this;
 
@@ -156,7 +167,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     duration.value = _mediaInfo.duration;
     position.value = 0;
     lastError.value = null;
-    // open 成功后回到 idle — 匹配 FvpEngine.open() 行为
+    // open 成功后回到 idle — 匹配 MediaKitEngine.open() 行为
     stateMachine.transitionTo(MediaState.idle, 'fake.open.success');
     return OpenSuccess(_mediaInfo);
   }
@@ -219,6 +230,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   void togglePlayPause() {
     if (_disposed) return;
+    togglePlayPauseCallCount++;
     stateMachine.togglePlayPause();
   }
 
@@ -231,11 +243,17 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   @override
   void skipForward([int ms = 10000]) {
+    if (_disposed) return;
+    skipForwardCallCount++;
+    lastSkipForwardMs = ms;
     seekTo((position.value + ms).clamp(0, duration.value));
   }
 
   @override
   void skipBack([int ms = 10000]) {
+    if (_disposed) return;
+    skipBackCallCount++;
+    lastSkipBackMs = ms;
     seekTo((position.value - ms).clamp(0, duration.value));
   }
 

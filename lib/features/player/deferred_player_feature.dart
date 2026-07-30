@@ -3,8 +3,8 @@
 /// 本文件实现了 Dart 的 `deferred as` 延迟加载模式，将 PlayerFeature
 /// 模块推迟到首次 build 时异步加载。这样做的原因是：
 ///
-/// 1. 避免在 App 启动时 eager 导入 FvpEngine、Playlist 等重型类型，
-///    这些类型依赖 fvp/MDK 原生库，延迟加载可以缩短首屏渲染时间。
+/// 1. 避免在 App 启动时 eager 导入 MediaKitEngine、Playlist 等重型类型，
+///    这些类型依赖 libmpv 原生库，延迟加载可以缩短首屏渲染时间。
 /// 2. 加载失败时可以独立显示错误状态，不影响 App 其他部分的运行。
 /// 3. StartupCoordinator 在加载各阶段上报进度，Splash 由 App 层驱动。
 ///

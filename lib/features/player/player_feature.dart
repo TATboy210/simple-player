@@ -13,7 +13,7 @@
 /// - 本文件同时承担 View 和部分 ViewModel 职责（历史遗留，后续重构目标）
 ///
 /// 架构位置：App → DeferredPlayerFeature → **PlayerFeature** → PlayerScreen
-/// 依赖链：PlayerFeature → PlayerServices → PlaybackController → FvpEngine
+/// 依赖链：PlayerFeature → PlayerServices → PlaybackController → MediaKitEngine
 library;
 
 import 'dart:async' show unawaited;
@@ -293,6 +293,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
     return PlayerScreen(
       engine: engine,
+      mediaKitController: _services.mediaKitVideoController,
       controller: controller,
       playlist: playlist,
       customBindings: _customBindings,

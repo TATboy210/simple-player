@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
 
@@ -193,6 +194,21 @@ class GlassButton extends StatefulWidget {
   final Color? color;
   final Widget? child;
 
+  /// 可选的键盘焦点节点；省略时按钮会拥有一个生命周期内稳定的内部节点。
+  final FocusNode? focusNode;
+
+  /// 是否在挂载后自动请求键盘焦点。
+  final bool autofocus;
+
+  /// 屏幕阅读器使用的明确按钮名称；未提供时回退至 tooltip 或 label。
+  final String? semanticsLabel;
+
+  /// 可选的切换状态，例如播放/暂停按钮当前是否处于播放状态。
+  final bool? semanticsToggled;
+
+  /// 焦点状态变化回调，供组合控件同步局部视觉状态。
+  final ValueChanged<bool>? onFocusChange;
+
   const GlassButton({
     super.key,
     required this.icon,
@@ -205,6 +221,11 @@ class GlassButton extends StatefulWidget {
     this.iconSize = Tokens.iconLg,
     this.color,
     this.child,
+    this.focusNode,
+    this.autofocus = false,
+    this.semanticsLabel,
+    this.semanticsToggled,
+    this.onFocusChange,
   });
 
   /// 便捷构造：icon-only 模式（轻量，无 BackdropFilter）
@@ -219,6 +240,11 @@ class GlassButton extends StatefulWidget {
     this.iconSize = Tokens.iconLg,
     this.color,
     this.child,
+    this.focusNode,
+    this.autofocus = false,
+    this.semanticsLabel,
+    this.semanticsToggled,
+    this.onFocusChange,
   }) : label = null;
 
   bool get _isIconOnly => label == null;
@@ -231,6 +257,19 @@ class _GlassButtonState extends State<GlassButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _scaleController;
   late final Animation<double> _scaleAnim;
+  late final FocusNode _internalFocusNode;
+  bool _focused = false;
+
+  /// 外部节点由调用方管理；未提供时按钮持有并释放内部节点。
+  FocusNode get _effectiveFocusNode => widget.focusNode ?? _internalFocusNode;
+
+  /// 有效可用性 — 同时要求 [Widget.enabled] 且 [GlassButton.onPressed] 非 null。
+  ///
+  /// P0 修复:原仅判 `widget.enabled`(默认 true),onPressed=null 时按钮仍显示
+  /// click cursor / hover / 缩放,但 InkWell.onTap=null(点不动)—— 视觉可用与
+  /// 命中可用语义错位。统一用 `_effectiveEnabled` 驱动 onTap / MouseCursor /
+  /// hoverColor / 缩放反馈,使"看起来可用 ⇔ 真的可点"。
+  bool get _effectiveEnabled => widget.enabled && widget.onPressed != null;
 
   @override
   void initState() {
@@ -243,47 +282,112 @@ class _GlassButtonState extends State<GlassButton>
       value: 1.0,
     );
     _scaleAnim = _scaleController;
+    _internalFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
+    _internalFocusNode.dispose();
     _scaleController.dispose();
     super.dispose();
   }
 
   void _onHoverChanged(bool hovering) {
-    if (!widget.enabled) return;
+    if (!_effectiveEnabled) return;
     _scaleController.animateTo(hovering ? Tokens.hoverScale : 1.0);
   }
 
   void _onTapDown(TapDownDetails _) {
-    if (!widget.enabled) return;
+    if (!_effectiveEnabled) return;
     _scaleController.value = Tokens.pressScale;
   }
 
   void _onTapUp(TapUpDetails _) {
-    if (!widget.enabled) return;
+    if (!_effectiveEnabled) return;
     _scaleController.animateTo(1.0);
   }
 
   void _onTapCancel() {
-    if (!widget.enabled) return;
+    if (!_effectiveEnabled) return;
     _scaleController.animateTo(1.0);
+  }
+
+  /// 同步焦点高亮，且把状态通知给需要组合视觉的调用方。
+  void _handleFocusChanged(bool focused) {
+    if (_focused == focused) return;
+    setState(() => _focused = focused);
+    widget.onFocusChange?.call(focused);
+  }
+
+  /// 提供可遍历焦点、键盘激活和单一语义节点，不改变被包装控件的几何。
+  Widget _buildInteractive(Widget child) {
+    final semanticLabel =
+        widget.semanticsLabel ?? widget.tooltip ?? widget.label;
+    // 边框绘制在既有边界内；透明时仍占用同一绘制槽位，焦点切换不改变布局。
+    final decoratedChild = DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: _focused ? Tokens.controlBarBorderWhite : Colors.transparent,
+          width: 1,
+        ),
+        borderRadius: widget._isIconOnly
+            ? GlassButton._radiusBtn
+            : GlassButton._radiusIcon,
+      ),
+      child: child,
+    );
+    final semantics = Semantics(
+      container: true,
+      excludeSemantics: true,
+      label: semanticLabel,
+      button: true,
+      enabled: _effectiveEnabled,
+      toggled: widget.semanticsToggled,
+      onTap: _effectiveEnabled ? widget.onPressed : null,
+      child: decoratedChild,
+    );
+
+    if (!_effectiveEnabled) {
+      return ExcludeFocus(child: IgnorePointer(child: semantics));
+    }
+
+    return FocusableActionDetector(
+      focusNode: _effectiveFocusNode,
+      autofocus: widget.autofocus,
+      onFocusChange: _handleFocusChanged,
+      onShowFocusHighlight: _handleFocusChanged,
+      // 将快捷键绑定在拥有焦点的探测器上，确保事件在到达全局播放器
+      // 快捷键之前被转换为本地 ActivateIntent 并消费。
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onPressed?.call();
+            return null;
+          },
+        ),
+      },
+      child: semantics,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget._isIconOnly) {
-      return _buildIconOnly();
-    }
-    return _buildLabel();
+    final button = widget._isIconOnly ? _buildIconOnly() : _buildLabel();
+    return _buildInteractive(button);
   }
 
   /// icon-only 轻量路径：SizedBox + Material + InkWell，无 BackdropFilter
   Widget _buildIconOnly() {
-    final effectiveColor = widget.color ??
+    final effectiveColor =
+        widget.color ??
         (widget.isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
-    final content = widget.child ??
+    final content =
+        widget.child ??
         Icon(widget.icon, size: widget.iconSize, color: effectiveColor);
 
     final button = Tooltip(
@@ -296,13 +400,12 @@ class _GlassButtonState extends State<GlassButton>
           color: Colors.transparent,
           borderRadius: GlassButton._radiusBtn,
           child: InkWell(
-            onTap: widget.enabled ? widget.onPressed : null,
+            onTap: _effectiveEnabled ? widget.onPressed : null,
             onSecondaryTapUp: widget.onSecondaryTapUp,
             onTapDown: _onTapDown,
             onTapUp: _onTapUp,
             onTapCancel: _onTapCancel,
-            hoverColor:
-                widget.enabled ? Tokens.bgHover : Colors.transparent,
+            hoverColor: _effectiveEnabled ? Tokens.bgHover : Colors.transparent,
             highlightColor: Colors.transparent,
             borderRadius: GlassButton._radiusBtn,
             splashFactory: NoSplash.splashFactory,
@@ -313,7 +416,7 @@ class _GlassButtonState extends State<GlassButton>
     );
 
     return MouseRegion(
-      cursor: widget.enabled
+      cursor: _effectiveEnabled
           ? SystemMouseCursors.click
           : SystemMouseCursors.basic,
       onEnter: (_) => _onHoverChanged(true),
@@ -324,7 +427,8 @@ class _GlassButtonState extends State<GlassButton>
 
   /// label 路径：GlassContainer + Material + InkWell，带模糊背景
   Widget _buildLabel() {
-    final effectiveColor = widget.color ??
+    final effectiveColor =
+        widget.color ??
         (widget.isPrimary ? Tokens.textPrimary : Tokens.textSecondary);
 
     final content = GlassContainer(
@@ -353,13 +457,12 @@ class _GlassButtonState extends State<GlassButton>
       color: Colors.transparent,
       borderRadius: GlassButton._radiusIcon,
       child: InkWell(
-        onTap: widget.enabled ? widget.onPressed : null,
+        onTap: _effectiveEnabled ? widget.onPressed : null,
         onSecondaryTapUp: widget.onSecondaryTapUp,
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
-        hoverColor:
-            widget.enabled ? Tokens.bgHover : Colors.transparent,
+        hoverColor: _effectiveEnabled ? Tokens.bgHover : Colors.transparent,
         highlightColor: Colors.transparent,
         borderRadius: GlassButton._radiusIcon,
         splashFactory: NoSplash.splashFactory,
@@ -372,7 +475,7 @@ class _GlassButtonState extends State<GlassButton>
     );
 
     return MouseRegion(
-      cursor: widget.enabled
+      cursor: _effectiveEnabled
           ? SystemMouseCursors.click
           : SystemMouseCursors.basic,
       onEnter: (_) => _onHoverChanged(true),

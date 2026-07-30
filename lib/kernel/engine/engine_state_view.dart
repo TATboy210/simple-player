@@ -11,7 +11,7 @@ import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 /// [ValueListenableBuilder] 监听变化，不直接修改状态。
 ///
 /// 与 [PlaybackControl] 分离：此接口仅暴露状态，不包含控制方法。
-/// 实现者通常是具体的引擎类（如 FvpEngine），消费者通过此接口
+/// 实现者是具体的引擎类（MediaKitEngine），消费者通过此接口
 /// 以只读方式访问播放状态。
 ///
 /// requires: 无（所有 getter 幂等、无参数、永不 throw）

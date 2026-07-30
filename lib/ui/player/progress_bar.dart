@@ -248,12 +248,16 @@ class _ProgressBarState extends State<ProgressBar>
                     children: [
                       _buildBarLayers(),
                       // 悬停/拖拽时间提示
-                      ValueListenableBuilder<_HoverState>(
-                        valueListenable: _hoverNotifier,
-                        builder: (_, hover, _) {
-                          final isDragging = _dragNotifier.value != null;
+                      // tooltip 指向 _barListenable(已含 _dragNotifier+_hoverNotifier),
+                      // 拖动时跟随手指更新文字/位置(VLC TimeTooltip / mpv tooltipF 本地计算)
+                      AnimatedBuilder(
+                        animation: _barListenable,
+                        builder: (_, _) {
+                          final drag = _dragNotifier.value;
+                          final hover = _hoverNotifier.value;
+                          final isDragging = drag != null;
                           final fraction = isDragging
-                              ? _dragNotifier.value!
+                              ? drag
                               : hover.hovering
                               ? hover.x
                               : null;

@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:simple_player_flutter/kernel/bridge/win32/win32_display_enumerator.dart';
 
@@ -15,13 +16,9 @@ import '../dialogs/settings/settings_overlay_shell.dart';
 import '../dialogs/settings/settings_panel_controller.dart';
 import '../playlist/playlist_panel.dart';
 import '../shared/play_mode_utils.dart';
-import 'controls_overlay.dart';
 import '../window/custom_title_bar.dart';
 import 'drop_handler.dart';
 import 'keyboard_handler.dart';
-import 'player_actions.dart';
-import 'playback_status_overlay.dart';
-import 'video_surface.dart';
 
 /// 包装 DragToResizeArea，增加 enabled 属性
 ///
@@ -54,6 +51,10 @@ class SmartDragToResizeArea extends StatelessWidget {
 /// 窄屏（<600dp）: 面板叠加为 overlay
 class PlayerScreen extends StatefulWidget {
   final MediaEngine engine;
+
+  /// media_kit VideoController — UI 用 [Video] widget. 透传自 PlayerServices.
+  /// media_kit 是唯一后端 (fvp/VideoSurface 回退路径已移除).
+  final VideoController mediaKitController;
   final PlaybackController controller;
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
@@ -77,6 +78,7 @@ class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
     super.key,
     required this.engine,
+    required this.mediaKitController,
     required this.controller,
     required this.playlist,
     required this.playlistGeneration,
@@ -100,6 +102,11 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
+  /// media_kit Video 的 state key — 供 F 键全屏回调调无参
+  /// [VideoState.toggleFullscreen] (绕过 context 陷阱: 顶层 toggleFullscreen
+  /// 需 Video 子树 context, 而 KeyboardHandler 在 Video 外层). 阶段 4 全屏走 media_kit 自带.
+  final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
+
   /// (visible, mounted) — 合并为单一 notifier 消除嵌套 VLB
   final ValueNotifier<(bool, bool)> _playlistState = ValueNotifier((
     false,
@@ -210,12 +217,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
               onMediaPlayPause: () => widget.engine.togglePlayPause(),
               onMediaNext: () => widget.controller.playNext(),
               onMediaPrevious: () => widget.controller.playPrevious(),
-              // BUG-01 修正: F 键快捷键接线 — 切换全屏/窗口
-              onToggleFullscreen: () {
-                widget.windowService.setMode(
-                  isFullscreen ? WindowMode.windowed : WindowMode.fullscreen,
-                );
-              },
+              // F 键全屏 — 走 media_kit 自带 overlay 全屏 (VideoState 无参
+              // toggleFullscreen, 绕过 context 陷阱). 与默认
+              // MaterialDesktopFullscreenButton 行为一致. 阶段 4: 放弃 Win32
+              // driver 接线, 全屏用 media_kit 自带 (用户决策).
+              // fvp 回退路径无 Video widget, currentState 为 null → noop (安全).
+              onToggleFullscreen: () =>
+                  _videoKey.currentState?.toggleFullscreen(),
               onExitFullscreen: () {
                 if (isFullscreen) {
                   widget.windowService.setMode(WindowMode.windowed);
@@ -230,75 +238,77 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       child: Stack(
                         children: [
                           LayoutBuilder(
-                        builder: (context, constraints) {
-                          final w = constraints.maxWidth;
-                          return ValueListenableBuilder<(bool, bool)>(
-                            valueListenable: _playlistState,
-                            builder: (context, state, videoContent) {
-                              final (playlistVisible, playlistMounted) = state;
-                              final useRow =
-                                  w >= Tokens.breakpointWide && playlistMounted;
+                            builder: (context, constraints) {
+                              final w = constraints.maxWidth;
+                              return ValueListenableBuilder<(bool, bool)>(
+                                valueListenable: _playlistState,
+                                builder: (context, state, videoContent) {
+                                  final (playlistVisible, playlistMounted) =
+                                      state;
+                                  final useRow =
+                                      w >= Tokens.breakpointWide &&
+                                      playlistMounted;
 
-                              final playlistPanel = PlaylistPanel(
-                                playlist: widget.playlist,
-                                visible: playlistVisible,
-                                onClose: _closePlaylist,
-                                onSelectIndex: (i) {
-                                  widget.controller.playIndex(i);
-                                  _closePlaylist();
+                                  final playlistPanel = PlaylistPanel(
+                                    playlist: widget.playlist,
+                                    visible: playlistVisible,
+                                    onClose: _closePlaylist,
+                                    onSelectIndex: (i) {
+                                      widget.controller.playIndex(i);
+                                      _closePlaylist();
+                                    },
+                                    onRemoveIndex: (i) {
+                                      widget.playlist.removeAt(i);
+                                      widget.playlistGeneration.value++;
+                                    },
+                                    onShowProperties: widget.onShowProperties,
+                                    onFolderScanned: widget.onFolderScanned,
+                                    onClearHistory: widget.onClearHistory,
+                                    resizing: widget.windowService.isResizing,
+                                    availableWidth: w,
+                                  );
+
+                                  if (useRow) {
+                                    // 宽屏: Row 布局，视频左、播放列表右
+                                    return Row(
+                                      children: [
+                                        Expanded(
+                                          child: RepaintBoundary(
+                                            child: videoContent!,
+                                          ),
+                                        ),
+                                        RepaintBoundary(
+                                          child: IgnorePointer(
+                                            ignoring: !playlistVisible,
+                                            child: playlistPanel,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }
+
+                                  // 窄屏: Stack overlay
+                                  return Stack(
+                                    children: [
+                                      RepaintBoundary(child: videoContent!),
+                                      if (playlistMounted)
+                                        RepaintBoundary(
+                                          child: IgnorePointer(
+                                            ignoring: !playlistVisible,
+                                            child: playlistPanel,
+                                          ),
+                                        ),
+                                    ],
+                                  );
                                 },
-                                onRemoveIndex: (i) {
-                                  widget.playlist.removeAt(i);
-                                  widget.playlistGeneration.value++;
-                                },
-                                onShowProperties: widget.onShowProperties,
-                                onFolderScanned: widget.onFolderScanned,
-                                onClearHistory: widget.onClearHistory,
-                                resizing: widget.windowService.isResizing,
-                                availableWidth: w,
-                              );
-
-                              if (useRow) {
-                                // 宽屏: Row 布局，视频左、播放列表右
-                                return Row(
-                                  children: [
-                                    Expanded(
-                                      child: RepaintBoundary(
-                                        child: videoContent!,
-                                      ),
-                                    ),
-                                    RepaintBoundary(
-                                      child: IgnorePointer(
-                                        ignoring: !playlistVisible,
-                                        child: playlistPanel,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }
-
-                              // 窄屏: Stack overlay
-                              return Stack(
-                                children: [
-                                  RepaintBoundary(child: videoContent!),
-                                  if (playlistMounted)
-                                    RepaintBoundary(
-                                      child: IgnorePointer(
-                                        ignoring: !playlistVisible,
-                                        child: playlistPanel,
-                                      ),
-                                    ),
-                                ],
+                                child: _buildVideoContent(
+                                  isVideo,
+                                  modeIcon,
+                                  modeLabel,
+                                  isFullscreen,
+                                ),
                               );
                             },
-                            child: _buildVideoContent(
-                              isVideo,
-                              modeIcon,
-                              modeLabel,
-                              isFullscreen,
-                            ),
-                          );
-                        },
                           ),
                           // 设置覆盖层壳 — 在内容区 Stack 顶层，CustomTitleBar 之下（D-05）
                           // Plan 30-02：注入 Win32DisplayAdapter + windowManager.getPosition
@@ -350,8 +360,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              VideoSurface(engine: widget.engine),
-              PlaybackStatusOverlay(engine: widget.engine),
+              // media_kit 是唯一后端: Video + MaterialDesktopVideoControls.
+              // 默认快捷键全禁用 (默认 ←→±2s / Space / ↑↓ / F / Esc / 媒体键),
+              // 全交项目 [KeyboardHandler]: 保留 ±5s 语义、避免双触发、经 engine
+              // 走 generation guard (切歌时取消残留 seek). 焦点冒泡保证可行 —
+              // Video 内部 Focus 抢到 primaryFocus 时, 空 bindings 的
+              // CallbackShortcuts 返回 ignored, 事件冒泡到外层 KeyboardHandler.
+              MaterialDesktopVideoControlsTheme(
+                normal: MaterialDesktopVideoControlsThemeData(
+                  keyboardShortcuts: const <ShortcutActivator, VoidCallback>{},
+                  bottomButtonBar: _buildMediaKitBottomBar(),
+                ),
+                fullscreen: MaterialDesktopVideoControlsThemeData(
+                  keyboardShortcuts: const <ShortcutActivator, VoidCallback>{},
+                  bottomButtonBar: _buildMediaKitBottomBar(),
+                ),
+                child: Video(
+                  key: _videoKey,
+                  controller: widget.mediaKitController,
+                  controls: MaterialDesktopVideoControls,
+                ),
+              ),
               if (widget.emptyState != null)
                 ValueListenableBuilder<MediaState>(
                   valueListenable: widget.engine.state,
@@ -360,42 +389,54 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       : const SizedBox.shrink(),
                   child: Positioned.fill(child: widget.emptyState!),
                 ),
-              // T5: 直接使用外层 AnimatedBuilder 传入的 isFullscreen，
-              // 移除内层 AnimatedBuilder 消除同一 notifier 的冗余 markNeedsBuild。
-              ControlsOverlay(
-                engine: widget.engine,
-                actions: PlayerActions(
-                  onPrevious: () => widget.controller.playPrevious(),
-                  onNext: () => widget.controller.playNext(),
-                  onTogglePlaylist: _togglePlaylist,
-                  onSettings: widget.settingsPanelController.open,
-                  onSettingsSecondary: widget.onSettingsSecondary,
-                  onOpenFile: widget.onOpenFile,
-                  onToggleFullscreen: () => widget.windowService.setMode(
-                    isFullscreen ? WindowMode.windowed : WindowMode.fullscreen,
-                  ),
-                  onTogglePlayMode: widget.onTogglePlayMode,
-                  onOpenSubtitle: _openSubtitle,
-                  onFilesDropped: widget.onFilesDropped,
-                  onDragHoverChanged: widget.onDragHoverChanged,
-                  onFolderScanned: widget.onFolderScanned,
-                  onClearHistory: widget.onClearHistory,
-                  onShowProperties: widget.onShowProperties,
-                  playModeIcon: modeIcon,
-                  playModeLabel: modeLabel,
-                  isVideo: isVideo,
-                ),
-                emptyStatePresent: widget.emptyState != null,
-                isFullscreen: isFullscreen,
-                resizing: widget.windowService.isResizing,
-                title: widget.playlist.current?.name,
-              ),
+              // ControlsOverlay (fvp 玻璃控件) 已随 fvp 移除 —
+              // media_kit 用 MaterialDesktopVideoControls, 入口在 bottomButtonBar.
             ],
           ),
         ),
       ),
     ],
   );
+
+  /// media_kit 路径 bottomButtonBar — 自定义入口替代原 ControlsOverlay right_button_group.
+  ///
+  /// 上/下一首接项目 [PlaybackController] (编排 playlist); media_kit 默认
+  /// SkipPrevious/SkipNext 因 player.playlist 为空而自动隐藏, 故用
+  /// [MaterialDesktopCustomButton] 显式接线. 打开文件/播放列表/设置入口重建
+  /// (阶段 2 移除 ControlsOverlay 后这些入口暂失, 此处恢复).
+  List<Widget> _buildMediaKitBottomBar() => [
+    MaterialDesktopCustomButton(
+      icon: const Icon(Icons.skip_previous),
+      onPressed: () => widget.controller.playPrevious(),
+    ),
+    const MaterialDesktopPlayOrPauseButton(),
+    MaterialDesktopCustomButton(
+      icon: const Icon(Icons.skip_next),
+      onPressed: () => widget.controller.playNext(),
+    ),
+    const MaterialDesktopVolumeButton(),
+    const MaterialDesktopPositionIndicator(),
+    const Spacer(),
+    MaterialDesktopCustomButton(
+      icon: const Icon(Icons.folder_open),
+      onPressed: () => widget.onOpenFile?.call(),
+    ),
+    // 打开外部字幕文件 (srt/ass/ssa/sub/vtt) — 接 _openSubtitle.
+    // media_kit 迁移删 ControlsOverlay 后入口遗留, 此处重建 (阶段 4 漏).
+    MaterialDesktopCustomButton(
+      icon: const Icon(Icons.subtitles),
+      onPressed: _openSubtitle,
+    ),
+    MaterialDesktopCustomButton(
+      icon: const Icon(Icons.playlist_play),
+      onPressed: _togglePlaylist,
+    ),
+    MaterialDesktopCustomButton(
+      icon: const Icon(Icons.settings),
+      onPressed: widget.settingsPanelController.open,
+    ),
+    const MaterialDesktopFullscreenButton(),
+  ];
 
   void _seek(MediaEngine engine, int deltaMs) {
     final target = engine.position.value + deltaMs;

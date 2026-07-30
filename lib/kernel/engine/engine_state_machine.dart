@@ -29,7 +29,7 @@ class EngineStateMachine {
   /// 创建状态机 — 回调可选, 支持构造后注入以解耦循环依赖
   ///
   /// Creates state machine. Callbacks are optional and can be set after
-  /// construction to break circular dependency with FvpEngine.
+  /// construction to break circular dependency with MediaKitEngine.
   ///
   /// [onPlay] invoked when toggle is requested from idle/paused/completed.
   /// [onPause] invoked when toggle is requested from playing.
@@ -149,8 +149,12 @@ class EngineStateMachine {
         next == MediaState.playing ||
             next == MediaState.error ||
             next == MediaState.idle,
+      // completed→playing:补齐矩阵边,允许 completed 态按 play 重新播放。
+      // 原 matrix 未收录此边,导致 togglePlayPause 在 completed 态调 onPlay→play()
+      // 时 transitionTo(playing) 静默失败(known 契约-实现落差),违反"按钮永可点"。
       MediaState.completed =>
         next == MediaState.opening ||
+            next == MediaState.playing ||
             next == MediaState.error ||
             next == MediaState.idle,
       MediaState.error =>
