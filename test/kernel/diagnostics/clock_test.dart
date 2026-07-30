@@ -1,13 +1,10 @@
-/// Diagnostics small modules unit tests — pure Dart, no mdk.dll dependency.
+/// Diagnostics small modules unit tests — pure Dart, no native dependency.
 ///
-/// Tests Clock, RssProvider, NullMetricsSlot, and NullEventLogSlot
-/// — the foundational diagnostics primitives.
+/// Tests Clock and RssProvider — the foundational diagnostics primitives.
 library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/rss_provider.dart';
-import 'package:simple_player_flutter/kernel/diagnostics/metrics_slot.dart';
-import 'package:simple_player_flutter/kernel/diagnostics/event_log_slot.dart';
 
 void main() {
   group('SystemClock', () {
@@ -98,78 +95,6 @@ void main() {
       final provider = FakeRssProvider();
       provider.value = 2048;
       expect(provider.currentRss, 2048);
-    });
-  });
-
-  group('NullMetricsSlot', () {
-    test('recordOpen does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.recordOpen(success: true), returnsNormally);
-      expect(() => slot.recordOpen(success: false), returnsNormally);
-    });
-
-    test('recordSeek does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.recordSeek(const Duration(milliseconds: 100)), returnsNormally);
-    });
-
-    test('recordFrameDrop does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.recordFrameDrop(), returnsNormally);
-      expect(() => slot.recordFrameDrop(5), returnsNormally);
-    });
-
-    test('recordDecodeError does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.recordDecodeError(), returnsNormally);
-    });
-
-    test('recordBufferUnderrun does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.recordBufferUnderrun(), returnsNormally);
-    });
-
-    test('reset does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.reset(), returnsNormally);
-    });
-
-    test('toJson returns empty map', () {
-      const slot = NullMetricsSlot();
-      expect(slot.toJson(), isEmpty);
-    });
-
-    test('dispose does not throw', () {
-      const slot = NullMetricsSlot();
-      expect(() => slot.dispose(), returnsNormally);
-    });
-  });
-
-  group('NullEventLogSlot', () {
-    test('add does not throw', () {
-      const slot = NullEventLogSlot();
-      expect(() => slot.add('test'), returnsNormally);
-      expect(() => slot.add('test', {'key': 'value'}), returnsNormally);
-    });
-
-    test('entries returns empty list', () {
-      const slot = NullEventLogSlot();
-      expect(slot.entries, isEmpty);
-    });
-
-    test('clear does not throw', () {
-      const slot = NullEventLogSlot();
-      expect(() => slot.clear(), returnsNormally);
-    });
-
-    test('toJson returns empty list', () {
-      const slot = NullEventLogSlot();
-      expect(slot.toJson(), isEmpty);
-    });
-
-    test('dispose does not throw', () {
-      const slot = NullEventLogSlot();
-      expect(() => slot.dispose(), returnsNormally);
     });
   });
 }

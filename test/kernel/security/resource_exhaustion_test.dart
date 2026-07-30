@@ -8,7 +8,7 @@
 ///   2. File handle exhaustion — rapid open/close cycles
 ///   3. Callback accumulation — ValueNotifier listener flood
 ///   4. Path validation performance — malicious path flood (no ReDoS)
-///   5. Queue exhaustion — EngineEventLog ring buffer, generation superseding
+///   5. Queue exhaustion — generation superseding, playlist bounds
 ///
 /// Uses FakeEngine + Playlist directly — no mdk.dll FFI, headless CI safe.
 library;
@@ -16,7 +16,6 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
-import 'package:simple_player_flutter/kernel/engine/engine_event_log.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
@@ -85,55 +84,6 @@ void main() {
       expect(engine.duration.value, 5000);
 
       engine.dispose();
-    });
-
-    test('EngineEventLog ring buffer caps at capacity', () {
-      final log = EngineEventLog(capacity: 100);
-
-      // 写入 10,000 条 — 验证 buffer 不超过 capacity
-      for (var i = 0; i < 10000; i++) {
-        log.add('test', {'index': i});
-      }
-
-      expect(log.length, 100);
-      expect(log.isFull, isTrue);
-
-      // 最旧条目已被覆盖 — 第一条应该是 index 9900
-      final entries = log.entries;
-      expect(entries.length, 100);
-      expect(entries.first.data?['index'], 9900);
-      expect(entries.last.data?['index'], 9999);
-    });
-
-    test('EngineEventLog with default capacity handles overflow', () {
-      final log = EngineEventLog(); // capacity = 100
-
-      for (var i = 0; i < 5000; i++) {
-        log.add('overflow');
-      }
-
-      expect(log.length, EngineEventLog.defaultCapacity);
-      expect(log.isFull, isTrue);
-    });
-
-    test('EngineEventLog.clear frees buffer for reuse', () {
-      final log = EngineEventLog(capacity: 50);
-
-      for (var i = 0; i < 200; i++) {
-        log.add('fill');
-      }
-      expect(log.length, 50);
-
-      log.clear();
-      expect(log.length, 0);
-      expect(log.isEmpty, isTrue);
-      expect(log.isFull, isFalse);
-
-      // 重新填充 — 正常工作
-      for (var i = 0; i < 50; i++) {
-        log.add('refill');
-      }
-      expect(log.length, 50);
     });
   });
 
@@ -254,22 +204,6 @@ void main() {
       expect(positionChanges, 200);
 
       engine.dispose();
-    });
-
-    test('EngineEventLog.add under listener flood — no slowdown', () {
-      final log = EngineEventLog(capacity: 100);
-      final stopwatch = Stopwatch()..start();
-
-      // 10,000 次 add — 验证 O(1) 环形缓冲性能
-      for (var i = 0; i < 10000; i++) {
-        log.add('stress', {'i': i});
-      }
-
-      stopwatch.stop();
-
-      expect(log.length, 100);
-      // 10k 次 add 应在 100ms 内完成（保守阈值）
-      expect(stopwatch.elapsedMilliseconds, lessThan(100));
     });
   });
 
@@ -413,34 +347,6 @@ void main() {
   // ────────────────────────────────────────────────────────────────────────────
 
   group('Queue exhaustion', () {
-    test('EngineEventLog overwrites oldest when full', () {
-      final log = EngineEventLog(capacity: 10);
-
-      // 填满 → 继续写 → 验证环形覆盖
-      for (var i = 0; i < 25; i++) {
-        log.add('event', {'seq': i});
-      }
-
-      expect(log.length, 10);
-      expect(log.isFull, isTrue);
-
-      final entries = log.entries;
-      // 最旧: seq=15, 最新: seq=24
-      expect(entries.first.data?['seq'], 15);
-      expect(entries.last.data?['seq'], 24);
-    });
-
-    test('EngineEventLog toJson respects capacity', () {
-      final log = EngineEventLog(capacity: 5);
-
-      for (var i = 0; i < 100; i++) {
-        log.add('event');
-      }
-
-      final json = log.toJson();
-      expect(json.length, 5);
-    });
-
     test('FakeEngine generation guard — superseded operations discarded',
         () async {
       final engine = FakeEngine();
