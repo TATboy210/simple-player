@@ -43,6 +43,12 @@ class SettingsValidator {
   static const double playbackSpeedMax = 4.0;
   static const double playbackSpeedDefault = 1.0;
 
+  // ── 音频设置边界（Phase 33）──
+  static const int audioEqPresetMax = 4;
+  static const double audioBalanceMin = -1.0;
+  static const double audioBalanceMax = 1.0;
+  static const int audioSyncMsMax = 10000;
+
   // ── 主题索引边界 ──
   static const int themeIndexMax = 2;
 
@@ -153,4 +159,25 @@ class SettingsValidator {
   /// - [v] is clamped to `[0, AspectRatioMode.values.length - 1]`.
   static int videoAspectRatioIndex(int v) =>
       v.clamp(0, AspectRatioMode.values.length - 1);
+
+  // ── Phase 33 音频偏好验证器 ──
+
+  /// EQ 预设索引 [0, audioEqPresetMax]
+  ///
+  /// Contract:
+  /// - [v] is clamped to `[0, audioEqPresetMax]`（5 个预设）。
+  static int audioEqPreset(int v) => v.clamp(0, audioEqPresetMax);
+
+  /// 立体声平衡 [audioBalanceMin, audioBalanceMax]
+  ///
+  /// Contract:
+  /// - [v] is clamped to `[audioBalanceMin, audioBalanceMax]`（-1.0..1.0）。
+  static double audioBalance(double v) =>
+      v.clamp(audioBalanceMin, audioBalanceMax);
+
+  /// 音频延迟毫秒 [0, audioSyncMsMax]
+  ///
+  /// Contract:
+  /// - [v] is clamped to `[0, audioSyncMsMax]`（0..10000，仅延迟）。
+  static int audioSyncMs(int v) => v.clamp(0, audioSyncMsMax);
 }

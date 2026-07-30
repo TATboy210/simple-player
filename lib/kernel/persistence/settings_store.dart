@@ -121,6 +121,12 @@ class SettingsStore {
   static const _keySubtitleTrackIndex = 'subtitleTrackIndex';
   static const _keySubtitleDelay = 'subtitleDelay';
 
+  // ─── Phase 33 音频偏好键 ───
+  static const _keyAudioEqPreset = 'audioEqPreset';
+  static const _keyAudioBalance = 'audioBalance';
+  static const _keyAudioSyncMs = 'audioSyncMs';
+  static const _keyAudioNormalization = 'audioNormalization';
+
   static Future<AppSettings> load() async => (_instance ?? SettingsStore._(null))._loadImpl();
 
   Future<AppSettings> _loadImpl() async {
@@ -407,6 +413,90 @@ class SettingsStore {
       return SettingsValidator.playbackSpeedDefault;
     }
   }
+
+  // ─── Phase 33 音频偏好持久化 ───
+
+  /// 加载 EQ 预设索引，默认 0（关闭）— clamp 到 0..4。
+  static Future<int> loadAudioEqPreset() async =>
+      (_instance ?? SettingsStore._(null))._loadAudioEqPresetImpl();
+
+  Future<int> _loadAudioEqPresetImpl() async {
+    try {
+      final prefs = await _getPrefs();
+      return SettingsValidator.audioEqPreset(prefs.getInt(_keyAudioEqPreset) ?? 0);
+    } on Exception catch (e) {
+      _log.e('SettingsStore.loadAudioEqPreset failed: $e');
+      return 0;
+    }
+  }
+
+  /// 保存 EQ 预设索引（clamp 到 0..4）。
+  static Future<void> saveAudioEqPreset(int value) => _save(
+    'saveAudioEqPreset',
+    (p) => p.setInt(_keyAudioEqPreset, SettingsValidator.audioEqPreset(value)),
+  );
+
+  /// 加载立体声平衡，默认 0.0（居中）— clamp 到 -1.0..1.0。
+  static Future<double> loadAudioBalance() async =>
+      (_instance ?? SettingsStore._(null))._loadAudioBalanceImpl();
+
+  Future<double> _loadAudioBalanceImpl() async {
+    try {
+      final prefs = await _getPrefs();
+      return SettingsValidator.audioBalance(
+        prefs.getDouble(_keyAudioBalance) ?? 0.0,
+      );
+    } on Exception catch (e) {
+      _log.e('SettingsStore.loadAudioBalance failed: $e');
+      return 0.0;
+    }
+  }
+
+  /// 保存立体声平衡（clamp 到 -1.0..1.0）。
+  static Future<void> saveAudioBalance(double value) => _save(
+    'saveAudioBalance',
+    (p) => p.setDouble(_keyAudioBalance, SettingsValidator.audioBalance(value)),
+  );
+
+  /// 加载音频延迟毫秒，默认 0 — clamp 到 0..10000（仅延迟）。
+  static Future<int> loadAudioSyncMs() async =>
+      (_instance ?? SettingsStore._(null))._loadAudioSyncMsImpl();
+
+  Future<int> _loadAudioSyncMsImpl() async {
+    try {
+      final prefs = await _getPrefs();
+      return SettingsValidator.audioSyncMs(prefs.getInt(_keyAudioSyncMs) ?? 0);
+    } on Exception catch (e) {
+      _log.e('SettingsStore.loadAudioSyncMs failed: $e');
+      return 0;
+    }
+  }
+
+  /// 保存音频延迟毫秒（clamp 到 0..10000）。
+  static Future<void> saveAudioSyncMs(int value) => _save(
+    'saveAudioSyncMs',
+    (p) => p.setInt(_keyAudioSyncMs, SettingsValidator.audioSyncMs(value)),
+  );
+
+  /// 加载音量归一化开关，默认 false。
+  static Future<bool> loadAudioNormalization() async =>
+      (_instance ?? SettingsStore._(null))._loadAudioNormalizationImpl();
+
+  Future<bool> _loadAudioNormalizationImpl() async {
+    try {
+      final prefs = await _getPrefs();
+      return prefs.getBool(_keyAudioNormalization) ?? false;
+    } on Exception catch (e) {
+      _log.e('SettingsStore.loadAudioNormalization failed: $e');
+      return false;
+    }
+  }
+
+  /// 保存音量归一化开关。
+  static Future<void> saveAudioNormalization(bool value) => _save(
+    'saveAudioNormalization',
+    (p) => p.setBool(_keyAudioNormalization, value),
+  );
 
   /// 加载 D3D11 同步设置，默认 true（同步模式）
   static Future<bool> loadD3d11SyncEnabled() async => (_instance ?? SettingsStore._(null))._loadD3d11SyncEnabledImpl();

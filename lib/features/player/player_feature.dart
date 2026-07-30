@@ -16,6 +16,8 @@
 /// 依赖链：PlayerFeature → PlayerServices → PlaybackController → FvpEngine
 library;
 
+import 'dart:async' show unawaited;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -24,6 +26,7 @@ import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/services/path_validator.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
+import '../../ui/dialogs/settings/audio_filter_compositor.dart';
 import '../../ui/dialogs/settings/settings_panel_controller.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
@@ -122,8 +125,19 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         'Loading settings...',
       );
       _customBindings = await SettingsStore.loadShortcuts();
-      // 构造设置面板控制器 — PlaybackController 实现 SettingsPanelPlayback 接口（D-03）
-      _settingsPanelController = SettingsPanelController(_services.controller);
+      // Phase 33: 加载 4 个音频偏好原始值（AUDIO-07）作为面板音频 tab 基准快照
+      final audioDefaults = AudioSettings(
+        eqPresetIndex: await SettingsStore.loadAudioEqPreset(),
+        balance: await SettingsStore.loadAudioBalance(),
+        syncMs: await SettingsStore.loadAudioSyncMs(),
+        normalization: await SettingsStore.loadAudioNormalization(),
+      );
+      // 构造设置面板控制器 — 注入音频基准 + 提交回调（Q2 Option A）
+      _settingsPanelController = SettingsPanelController(
+        _services.controller,
+        audioDefaults: audioDefaults,
+        onAudioCommit: _applyAudioSettings,
+      );
     } catch (e, stackTrace) {
       KernelLogger.I.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
       if (mounted) {
@@ -175,6 +189,47 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       playModeLabel(_services.playlist.mode, l10n),
       icon: playModeIcon(_services.playlist.mode),
     );
+  }
+
+  /// 音频滤镜运行时可用性——默认全支持；目标 Windows smoke 检查建立真实值（Q1）。
+  /// 由 PlayerFeature 组合根拥有，注入到 af 串组合。
+  final AudioFilterAvailability _audioAvailability =
+      AudioFilterAvailability.allSupported;
+
+  /// Phase 33 音频提交回调——SettingsPanelController 在 Apply/OK 时调用一次。
+  ///
+  /// 组合 af 串（经 [AudioFilterCompositor]，接受可用性结果）→ 调现有
+  /// `setEqualizer(String)` 引擎入口一次（AUDIO-05）→ fire-and-forget 顺序
+  /// 持久化 4 个原始值（AUDIO-07）。engine.setEqualizer 已被 _guardedAction
+  /// 守卫（内部 try-catch+log），此处不再包裹；save 的可恢复异常在
+  /// [_saveAudioSettings] 内记录，绝不静默吞掉。
+  void _applyAudioSettings(AudioSettings settings) {
+    final af = _buildAfString(settings, _audioAvailability);
+    _services.engine.setEqualizer(af);
+    unawaited(_saveAudioSettings(settings));
+  }
+
+  /// 组合 af 串——委托确定性 [AudioFilterCompositor.compose]，注入运行时可用性。
+  String _buildAfString(
+    AudioSettings settings,
+    AudioFilterAvailability availability,
+  ) =>
+      AudioFilterCompositor.compose(settings, availability);
+
+  /// 顺序持久化 4 个音频原始值（RC-4 一致性：顺序写，避免部分成功）。
+  Future<void> _saveAudioSettings(AudioSettings settings) async {
+    try {
+      await SettingsStore.saveAudioEqPreset(settings.eqPresetIndex);
+      await SettingsStore.saveAudioBalance(settings.balance);
+      await SettingsStore.saveAudioSyncMs(settings.syncMs);
+      await SettingsStore.saveAudioNormalization(settings.normalization);
+    } on Exception catch (e, stackTrace) {
+      KernelLogger.I.e(
+        '[PlayerFeature] saveAudioSettings failed: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override
