@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/_settings_nav_item.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/tabs/equalizer_tab.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/tabs/general_tab.dart';
 import 'package:simple_player_flutter/ui/shared/animated_section_list.dart';
 import 'package:simple_player_flutter/ui/shared/settings_card.dart';
@@ -74,16 +75,15 @@ void main() {
         controller.open();
         await tester.pump();
 
-        // Act — 切换到均衡器 tab
+        // Act — 切换到均衡器 tab（index 0）
         final navItems = find.byType(SettingsNavItem);
         await tester.tap(navItems.at(0));
         await tester.pump();
 
-        // Assert — 均衡器 tab 内容可见
-        expect(find.text('启用均衡器'), findsOneWidget);
-        expect(find.text('60Hz'), findsOneWidget);
-        expect(find.text('1kHz'), findsOneWidget);
-        expect(find.text('14kHz'), findsOneWidget);
+        // Assert — Phase 33 EqualizerTab：均衡器预设 section + 预设标签可见
+        //（33-01 重写：5 预设选择器替换旧 60Hz/1kHz/14kHz 频段骨架）
+        expect(find.text('均衡器预设'), findsOneWidget);
+        expect(find.text('摇滚'), findsOneWidget);
       },
     );
 
@@ -220,7 +220,7 @@ void main() {
     );
 
     testWidgets(
-      'EqualizerTab contains Slider controls for frequency bands',
+      'EqualizerTab contains Slider controls for balance and sync',
       (tester) async {
         // Arrange
         final (controller, _) = await pumpShell(tester);
@@ -232,8 +232,16 @@ void main() {
         await tester.tap(navItems.at(0));
         await tester.pump();
 
-        // Assert — Slider controls exist (3 frequency bands)
-        expect(find.byType(Slider), findsNWidgets(3));
+        // Assert — Phase 33：balance + 音频延迟 两个 Slider。descendant 限定到
+        // EqualizerTab，避免 AudioTab 音量 Slider 串扰（find 默认 skipOffstage，
+        // 非选中 tab 的 widget 不计入，但 descendant 限定更明确意图）。
+        expect(
+          find.descendant(
+            of: find.byType(EqualizerTab),
+            matching: find.byType(Slider),
+          ),
+          findsNWidgets(2),
+        );
       },
     );
 

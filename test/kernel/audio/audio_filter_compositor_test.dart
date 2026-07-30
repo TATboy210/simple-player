@@ -150,6 +150,26 @@ void main() {
         );
       },
     );
+
+    test(
+      'canonical complete chain: rock + balance 0.3 + sync 200 + normalization',
+      () {
+        // Phase 33-03 代表性全链样本（AUDIO-05）：摇滚预设 3 + balance 0.3
+        // (leftGain=0.70, rightGain=clamp(1.3)=1.00) + sync 200 + 标准化开启。
+        // 顺序固定 EQ → pan → adelay → dynaudnorm，逗号连接。
+        const settings = AudioSettings(
+          eqPresetIndex: 3,
+          balance: 0.3,
+          syncMs: 200,
+          normalization: true,
+        );
+        expect(
+          AudioFilterCompositor.compose(settings, all),
+          'bass=g=8,treble=g=6,pan=stereo|c0=0.70*c0|c1=1.00*c1,'
+          'adelay=200|200,dynaudnorm=f=500:g=15:p=0.95',
+        );
+      },
+    );
   });
 
   group('AudioFilterCompositor.compose — unavailable filters omitted', () {

@@ -13,6 +13,7 @@ import 'package:simple_player_flutter/kernel/bridge/display_enumerator.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/kernel/services/input_mode_detector.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/_settings_nav_item.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/audio_filter_compositor.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_overlay_shell.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
@@ -38,11 +39,15 @@ void main() {
     Widget Function(Widget shell)? decorate,
     DisplayEnumerator? displayEnumerator,
     Future<Offset> Function()? windowPositionReader,
+    AudioCommitCallback? onAudioCommit,
   }) async {
     final fake = FakePlaybackController(
       initialState: initiallyPlaying ? MediaState.playing : MediaState.idle,
     );
-    final controller = SettingsPanelController(fake);
+    final controller = SettingsPanelController(
+      fake,
+      onAudioCommit: onAudioCommit,
+    );
     addTearDown(() async {
       // 清理 InputModeDetector 进程级单例的 pending FakeTimer（recordArrowKey 的
       // 5s gamepad 检测 + setArrowGlow 的 reset 计时器），避免 fakeAsync 泄漏
@@ -1137,6 +1142,102 @@ void main() {
       },
     );
   });
+
+  // ── Audio commit integration (Phase 33-03: AUDIO-05/06) ──
+  // 验证 Apply/OK 一次提交、Cancel 零提交；UI 交互不触达引擎（延迟应用）。
+  group('audio commit integration (33-03)', () {
+    testWidgets(
+      'Apply commits all 4 staged audio values once and keeps shell open',
+      (tester) async {
+        final commit = _AudioCommitSpy();
+        final (controller, _) = await pumpShell(
+          tester,
+          onAudioCommit: commit.call,
+        );
+        controller.open();
+        await tester.pump();
+
+        // 暂存 4 个音频原始值（非默认）——Apply 前零提交
+        controller.pending.update('eqPresetIndex', 3);
+        controller.pending.update('balance', 0.3);
+        controller.pending.update('syncMs', 200);
+        controller.pending.update('normalization', true);
+        await tester.pump();
+        expect(commit.callCount, 0);
+
+        await tester.tap(find.text('应用'));
+        await tester.pump();
+
+        // 一次提交，快照含全部 4 个原始值，shell 不关闭
+        expect(commit.callCount, 1);
+        expect(commit.last!.eqPresetIndex, 3);
+        expect(commit.last!.balance, 0.3);
+        expect(commit.last!.syncMs, 200);
+        expect(commit.last!.normalization, isTrue);
+        expect(controller.state.isOpen.value, isTrue);
+      },
+    );
+
+    testWidgets('OK commits once and closes shell', (tester) async {
+      final commit = _AudioCommitSpy();
+      final (controller, _) = await pumpShell(
+        tester,
+        onAudioCommit: commit.call,
+      );
+      controller.open();
+      await tester.pump();
+      controller.pending.update('normalization', true);
+      await tester.pump();
+
+      await tester.tap(find.text('确定'));
+      await tester.pump();
+
+      expect(commit.callCount, 1);
+      expect(controller.state.isOpen.value, isFalse);
+      // 排空 close() 触发的 200ms 退出动画定时器
+      await tester.pump(const Duration(milliseconds: 250));
+    });
+
+    testWidgets(
+      'Cancel invokes zero commit calls and closes shell',
+      (tester) async {
+        final commit = _AudioCommitSpy();
+        final (controller, _) = await pumpShell(
+          tester,
+          onAudioCommit: commit.call,
+        );
+        controller.open();
+        await tester.pump();
+        controller.pending.update('eqPresetIndex', 3);
+        controller.pending.update('balance', 0.3);
+        controller.pending.update('syncMs', 200);
+        controller.pending.update('normalization', true);
+        await tester.pump();
+
+        await tester.tap(find.text('取消'));
+        await tester.pump();
+
+        // Cancel 走 cancelPending()，不经 commitPending()——零提交
+        expect(commit.callCount, 0);
+        expect(controller.state.isOpen.value, isFalse);
+        await tester.pump(const Duration(milliseconds: 250));
+      },
+    );
+  });
+}
+
+/// 手写音频提交回调替身 — 记录调用次数与最后一次 AudioSettings 快照。
+///
+/// 镜像 audio_tab_test.dart 的 _FakeAudioCommit，验证 Apply/OK 一次提交、
+/// Cancel 零提交（AUDIO-06：UI 交互不触达引擎，仅 Apply/OK 入口提交）。
+class _AudioCommitSpy {
+  int callCount = 0;
+  AudioSettings? last;
+
+  void call(AudioSettings settings) {
+    callCount++;
+    last = settings;
+  }
 }
 
 /// 手写 DisplayEnumerator 替身 — 可配 workArea 或抛异常（Plan 30-02 D-03 fallback 测试）。

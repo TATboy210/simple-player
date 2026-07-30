@@ -69,6 +69,16 @@ class _EqualizerTabState extends State<EqualizerTab> {
     return 0;
   }
 
+  /// 当前音量标准化开关——从 pending 投影；非 bool 回退 false（关闭）。
+  ///
+  /// Phase 33 Wave 3（AUDIO-04）：normalization 经 dynaudnorm 段应用，
+  /// false 时组合器省略该段（见 AudioFilterCompositor._appendDynaudnorm）。
+  bool get _currentNormalization {
+    final v = widget.pending.current('normalization');
+    if (v is bool) return v;
+    return false;
+  }
+
   /// 选择预设——写入 pending 并触发本 widget 重建。
   ///
   /// pending 是纯数据容器（非 Listenable），故需手动 setState 刷新 radio 显示；
@@ -90,11 +100,23 @@ class _EqualizerTabState extends State<EqualizerTab> {
     setState(() {});
   }
 
+  /// 音量标准化开关变更——只写 pending 并重建（AUDIO-06 延迟应用）。
+  ///
+  /// 不触达 commit 回调 / engine；Apply/OK 时由 commitPending 构造快照交回调。
+  void _onNormalizationChanged(bool value) {
+    widget.pending.update('normalization', value);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: AnimatedSectionList(
-        children: [_buildEqSection(), _buildSpatialSyncSection()],
+        children: [
+          _buildEqSection(),
+          _buildSpatialSyncSection(),
+          _buildNormalizationSection(),
+        ],
       ),
     );
   }
@@ -162,6 +184,36 @@ class _EqualizerTabState extends State<EqualizerTab> {
             // 显示为整毫秒；正值=音频延后（FFmpeg adelay 无法提前音频）
             formatValue: (v) => '${v.round()}ms',
             onChanged: _onSyncChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 音量标准化区——dynaudnorm 开关（Phase 33 Wave 3，AUDIO-04）。
+  ///
+  /// 独立 GlassContainer 区段：标准化是动态范围处理，与"空间与同步"概念
+  /// 分离。Switch 仅写 pending('normalization')，Apply/OK 才进 af 链。
+  Widget _buildNormalizationSection() {
+    return GlassContainer(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Tokens.spLg,
+        vertical: Tokens.spMd,
+      ),
+      margin: const EdgeInsets.only(top: Tokens.spMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: '音量标准化', icon: Icons.graphic_eq),
+          SettingRow(
+            title: '音量标准化',
+            description: '动态范围归一化，平滑音量波动',
+            control: Switch(
+              key: const ValueKey('audio-normalization-switch'),
+              value: _currentNormalization,
+              onChanged: _onNormalizationChanged,
+              activeThumbColor: Tokens.accent,
+            ),
           ),
         ],
       ),
