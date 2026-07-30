@@ -158,5 +158,8 @@ class PlayerServices {
     videoProcessing.dispose();
     controller.dispose();
     engine.dispose();
+    // 释放 MemoryMonitor 静态实例 — cancel 其 Timer.periodic(30s),
+    // 防止引擎 dispose 后定时器继续运行泄漏 (对称 init 中的 MemoryMonitor.init)。
+    MemoryMonitor.disposeStatic();
   }
 }

@@ -22,27 +22,8 @@ abstract class MemoryMonitorSlot {
   /// Returns current snapshot. Deliberately loose return type (D10).
   Object? snapshot();
 
-  /// 释放资源 (由 DiagnosticsBundle.dispose() 级联调用).
+  /// 释放资源.
   ///
-  /// Disposes resources. Called cascaded from DiagnosticsBundle.dispose().
+  /// Disposes resources.
   void dispose();
-}
-
-/// 空实现 MemoryMonitorSlot — Phase 16 默认值, 所有方法空操作。
-///
-/// Null-object implementation: every method no-ops, [snapshot] returns null.
-final class NullMemoryMonitorSlot implements MemoryMonitorSlot {
-  const NullMemoryMonitorSlot();
-
-  @override
-  void start({Duration? interval}) {}
-
-  @override
-  void stop() {}
-
-  @override
-  Object? snapshot() => null;
-
-  @override
-  void dispose() {}
 }

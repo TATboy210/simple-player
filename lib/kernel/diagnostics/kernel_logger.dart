@@ -73,7 +73,16 @@ abstract interface class LogSink {
   /// 输出一条日志到目标 (D4).
   ///
   /// [level] severity, [msg] redacted message, [context] optional structured data.
-  void log(LogLevel level, String msg, {Map<String, Object?>? context});
+  /// [error]/[stackTrace] 可选 — 由 error/fatal 级别透传, 供支持结构化错误的
+  /// sink (如 DevToolsSink) 使用。P1 bugfix: 此前接口不接这两个参数, 导致
+  /// KernelLoggerImpl.error/fatal 丢弃调用方传入的 error/stackTrace。
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -115,12 +124,20 @@ final class DevToolsSink implements LogSink {
   };
 
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     developer.log(
       name: 'Kernel',
       level: _toSeverity(level),
       redactPath(msg),
       time: DateTime.now(),
+      error: error,
+      stackTrace: stackTrace,
     );
   }
 }
@@ -138,12 +155,21 @@ final class DebugPrintSink implements LogSink {
   /// const 构造 — 无状态, 支持编译时常量 (D16).
   const DebugPrintSink();
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     final redacted = redactPath(msg);
     final contextStr = context != null && context.isNotEmpty
         ? ' $context'
         : '';
-    debugPrint('${level.name.toUpperCase()}: $redacted$contextStr');
+    // error/stackTrace 拼入输出 — debugPrint 无结构化错误通道, 仅文本展示。
+    final errorStr = error != null ? ' error=$error' : '';
+    final stackStr = stackTrace != null ? '\n$stackTrace' : '';
+    debugPrint('${level.name.toUpperCase()}: $redacted$contextStr$errorStr$stackStr');
   }
 }
 
@@ -160,7 +186,13 @@ final class NullSink implements LogSink {
   const NullSink();
 
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     // Intentional no-op: release builds produce zero output.
   }
 }
@@ -182,9 +214,21 @@ final class CompositeSink implements LogSink {
   final List<LogSink> _sinks;
 
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     for (final sink in _sinks) {
-      sink.log(level, msg, context: context);
+      sink.log(
+        level,
+        msg,
+        context: context,
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 }
@@ -313,47 +357,6 @@ abstract class KernelLogger {
 }
 
 // ---------------------------------------------------------------------------
-// NullKernelLogger — Phase 16 no-op implementation (D2/D3)
-// ---------------------------------------------------------------------------
-
-/// 空实现 KernelLogger — Phase 16 默认值, 所有方法体为空 (D2/D3 故意死代码).
-///
-/// Null-object [KernelLogger] implementation — every method is a no-op.
-/// This is the Phase 16 default; Phase 17 supplies a real sink-backed
-/// implementation behind this same interface.
-final class NullKernelLogger extends KernelLogger {
-  const NullKernelLogger();
-
-  @override
-  void trace(String message, {Map<String, Object?>? context}) {}
-
-  @override
-  void debug(String message, {Map<String, Object?>? context}) {}
-
-  @override
-  void info(String message, {Map<String, Object?>? context}) {}
-
-  @override
-  void warn(String message, {Map<String, Object?>? context}) {}
-
-  @override
-  void error(
-    String message, {
-    Map<String, Object?>? context,
-    Object? error,
-    StackTrace? stackTrace,
-  }) {}
-
-  @override
-  void fatal(
-    String message, {
-    Map<String, Object?>? context,
-    Object? error,
-    StackTrace? stackTrace,
-  }) {}
-}
-
-// ---------------------------------------------------------------------------
 // KernelLoggerImpl — concrete KernelLogger with static I accessor (Phase 17)
 // ---------------------------------------------------------------------------
 
@@ -443,7 +446,13 @@ final class KernelLoggerImpl extends KernelLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    _sink.log(LogLevel.error, message, context: context);
+    _sink.log(
+      LogLevel.error,
+      message,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   @override
@@ -453,6 +462,12 @@ final class KernelLoggerImpl extends KernelLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    _sink.log(LogLevel.fatal, message, context: context);
+    _sink.log(
+      LogLevel.fatal,
+      message,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }

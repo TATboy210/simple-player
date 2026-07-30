@@ -11,7 +11,13 @@ class SpySink implements LogSink {
   final List<(LogLevel, String, Map<String, Object?>?)> calls = [];
 
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     calls.add((level, msg, context));
   }
 }
@@ -212,25 +218,6 @@ void main() {
       for (final call in spy.calls) {
         expect(call.$3, {'k': 'v'});
       }
-    });
-  });
-
-  group('NullKernelLogger with context param', () {
-    const logger = NullKernelLogger();
-
-    test('all 6 methods accept optional context param', () {
-      expect(() => logger.trace('t', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.debug('d', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.info('i', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.warn('w', context: {'k': 'v'}), returnsNormally);
-      expect(
-        () => logger.error('e', context: {'k': 'v'}, error: Exception('x')),
-        returnsNormally,
-      );
-      expect(
-        () => logger.fatal('f', context: {'k': 'v'}, error: Exception('x')),
-        returnsNormally,
-      );
     });
   });
 
@@ -511,57 +498,6 @@ void main() {
   });
 
   // =========================================================================
-  // Deep coverage: NullKernelLogger shortcut methods
-  // =========================================================================
-  group('NullKernelLogger shortcut methods', () {
-    const logger = NullKernelLogger();
-
-    test('t() delegates to trace (no-op)', () {
-      expect(() => logger.t('t'), returnsNormally);
-    });
-
-    test('d() delegates to debug (no-op)', () {
-      expect(() => logger.d('d'), returnsNormally);
-    });
-
-    test('i() delegates to info (no-op)', () {
-      expect(() => logger.i('i'), returnsNormally);
-    });
-
-    test('w() delegates to warn (no-op)', () {
-      expect(() => logger.w('w'), returnsNormally);
-    });
-
-    test('e() delegates to error (no-op)', () {
-      expect(() => logger.e('e'), returnsNormally);
-    });
-
-    test('f() delegates to fatal (no-op)', () {
-      expect(() => logger.f('f'), returnsNormally);
-    });
-
-    test('all shortcuts accept context parameter', () {
-      expect(() => logger.t('t', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.d('d', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.i('i', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.w('w', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.e('e', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.f('f', context: {'k': 'v'}), returnsNormally);
-    });
-
-    test('e() and f() accept error and stackTrace params', () {
-      expect(
-        () => logger.e('e', error: Exception('x'), stackTrace: StackTrace.current),
-        returnsNormally,
-      );
-      expect(
-        () => logger.f('f', error: Exception('x'), stackTrace: StackTrace.current),
-        returnsNormally,
-      );
-    });
-  });
-
-  // =========================================================================
   // Deep coverage: KernelLoggerImpl with custom sinks
   // =========================================================================
   group('KernelLoggerImpl with custom sinks', () {
@@ -679,7 +615,13 @@ void main() {
 /// Test helper: a sink that throws on every log() call.
 class _ThrowingSink implements LogSink {
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     throw Exception('sink failure');
   }
 }

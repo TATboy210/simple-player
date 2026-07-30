@@ -96,7 +96,7 @@ void main() {
         generation: 5,
         path: '/video/test.mp4',
         timestamp: DateTime(2026, 1, 15, 10, 30),
-        module: 'FvpEngine',
+        module: 'MediaKitEngine',
       );
       final map = ctx.toMap();
 
@@ -105,7 +105,7 @@ void main() {
       // 路径脱敏：toMap() 只保留文件名
       expect(map['path'], 'test.mp4');
       expect(map['timestamp'], '2026-01-15T10:30:00.000');
-      expect(map['module'], 'FvpEngine');
+      expect(map['module'], 'MediaKitEngine');
       expect(map.containsKey('callbackStackTrace'), isFalse);
     });
 
@@ -266,12 +266,12 @@ void main() {
     });
 
     test('errors with context carry it', () {
-      final ctx = ErrorContext(action: 'open', module: 'FvpEngine');
+      final ctx = ErrorContext(action: 'open', module: 'MediaKitEngine');
       final error = FileError(FileErrorCode.fileNotFound, 'not found', null, ctx);
 
       expect(error.context, isNotNull);
       expect(error.context?.action, 'open');
-      expect(error.context?.module, 'FvpEngine');
+      expect(error.context?.module, 'MediaKitEngine');
     });
   });
 

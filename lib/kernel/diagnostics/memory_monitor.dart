@@ -68,6 +68,16 @@ final class MemoryMonitor implements MemoryMonitorSlot {
     _instance = null;
   }
 
+  /// 静态清理 — 释放静态实例并 dispose 其资源。
+  ///
+  /// 由 PlayerServices.dispose() 在应用退出时调用, 对称 [init]。
+  /// 防止 MemoryMonitor 的 Timer.periodic (30s) 在引擎 dispose 后继续
+  /// 运行导致泄漏。幂等: _instance 为 null 时为 no-op。
+  static void disposeStatic() {
+    _instance?.dispose();
+    _instance = null;
+  }
+
   // ─── 实例构造 ───
 
   /// 构造 — 必填 [rssProvider] + [clock], 可选配置参数和回调。

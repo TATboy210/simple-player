@@ -1,9 +1,6 @@
 /// Behavioral tests for Phase 17 KernelLogger: LogLevel, LogSink, all sink
 /// types (DevToolsSink, DebugPrintSink, NullSink, CompositeSink),
 /// KernelLoggerImpl lifecycle, and path redaction (D17).
-///
-/// Extends the Phase 16 signature-acceptance tests (NullKernelLogger) with
-/// behavioral coverage for the concrete implementation.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -14,88 +11,18 @@ class SpySink implements LogSink {
   final List<(LogLevel, String, Map<String, Object?>?)> calls = [];
 
   @override
-  void log(LogLevel level, String msg, {Map<String, Object?>? context}) {
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     calls.add((level, msg, context));
   }
 }
 
 void main() {
-  // =========================================================================
-  // Group 0: NullKernelLogger signature tests (from Phase 16, preserved)
-  // =========================================================================
-  group('NullKernelLogger', () {
-    const logger = NullKernelLogger();
-
-    test('trace/debug/info/warn each accept a single positional String', () {
-      expect(() => logger.trace('trace message'), returnsNormally);
-      expect(() => logger.debug('debug message'), returnsNormally);
-      expect(() => logger.info('info message'), returnsNormally);
-      expect(() => logger.warn('warn message'), returnsNormally);
-    });
-
-    test('error() accepts shape (a): both error: and stackTrace: named', () {
-      // Live shape: 2 of 84 call sites pass both named params together.
-      expect(
-        () => logger.error(
-          'error message',
-          error: Exception('boom'),
-          stackTrace: StackTrace.current,
-        ),
-        returnsNormally,
-      );
-    });
-
-    test('error() accepts shape (b): stackTrace: only', () {
-      // Live shape: 2 of 84 call sites pass stackTrace: with no error:.
-      expect(
-        () => logger.error('error message', stackTrace: StackTrace.current),
-        returnsNormally,
-      );
-    });
-
-    test('error() accepts shape (c): neither named param', () {
-      // Live shape: the remaining call sites pass only the message.
-      expect(() => logger.error('error message'), returnsNormally);
-    });
-
-    test('fatal() accepts shape (a): both error: and stackTrace: named', () {
-      expect(
-        () => logger.fatal(
-          'fatal message',
-          error: Exception('boom'),
-          stackTrace: StackTrace.current,
-        ),
-        returnsNormally,
-      );
-    });
-
-    test('fatal() accepts shape (b): stackTrace: only', () {
-      expect(
-        () => logger.fatal('fatal message', stackTrace: StackTrace.current),
-        returnsNormally,
-      );
-    });
-
-    test('fatal() accepts shape (c): neither named param', () {
-      expect(() => logger.fatal('fatal message'), returnsNormally);
-    });
-
-    test('all 6 methods accept optional context param', () {
-      expect(() => logger.trace('t', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.debug('d', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.info('i', context: {'k': 'v'}), returnsNormally);
-      expect(() => logger.warn('w', context: {'k': 'v'}), returnsNormally);
-      expect(
-        () => logger.error('e', context: {'k': 'v'}, error: Exception('x')),
-        returnsNormally,
-      );
-      expect(
-        () => logger.fatal('f', context: {'k': 'v'}, error: Exception('x')),
-        returnsNormally,
-      );
-    });
-  });
-
   // =========================================================================
   // Group 1: LogLevel enum
   // =========================================================================
