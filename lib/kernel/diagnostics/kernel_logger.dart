@@ -5,8 +5,10 @@
 /// three sink implementations (DevToolsSink/DebugPrintSink/NullSink)
 /// + CompositeSink, and KernelLoggerImpl with static `I` accessor.
 ///
-/// 层级映射表 (D8, locked) — Phase 17 迁移时按此表逐行替换调用点:
-/// Level-mapping table (D8) for Phase 17's migration (table lookup, not logic):
+/// 层级映射表 (D8, locked) — Phase 17 迁移已完成 (24 个 kernel 文件已迁移),
+/// 此表为迁移期工作清单, 保留作历史参考:
+/// Level-mapping table (D8) — Phase 17 migration complete (24 kernel files migrated).
+/// Retained as historical reference:
 ///
 /// | 现有调用前缀 (existing prefix) | KernelLogger 方法 | 现存调用点数 |
 /// |---|---|---|
@@ -243,8 +245,10 @@ final class CompositeSink implements LogSink {
 /// provides kDebugMode-gated sinks. Shortcut methods (t/d/i/w/e/f)
 /// delegate to full methods for ergonomic call sites.
 ///
-/// 层级映射表 (D8, locked) — Phase 17 迁移时按此表逐行替换调用点:
-/// Level-mapping table (D8) for Phase 17's migration (table lookup, not logic):
+/// 层级映射表 (D8, locked) — Phase 17 迁移已完成 (24 个 kernel 文件已迁移),
+/// 此表为迁移期工作清单, 保留作历史参考:
+/// Level-mapping table (D8) — Phase 17 migration complete (24 kernel files migrated).
+/// Retained as historical reference:
 ///
 /// | 现有调用前缀 (existing prefix) | KernelLogger 方法 | 现存调用点数 |
 /// |---|---|---|
