@@ -1,6 +1,6 @@
 # Simple Player Flutter
 
-Flutter desktop media player powered by fvp (MDK/FFmpeg).
+Flutter desktop media player powered by media_kit (libmpv).
 
 ## Build & Run
 
@@ -15,16 +15,18 @@ flutter test
 
 ```
 lib/
-├── main.dart                    # Entry point (fvp init, window setup)
+├── main.dart                    # Entry point (media_kit init, window setup)
 ├── app.dart                     # MaterialApp shell, service wiring
 ├── kernel/                      # Core logic (no UI)
-│   ├── engine/                  # fvp/MDK engine wrapper
-│   │   ├── media_engine.dart       # Abstract engine interface
-│   │   ├── fvp_engine.dart         # Concrete fvp implementation
-│   │   ├── position_poller.dart    # Timer-based position updates
-│   │   └── track_manager.dart      # Audio/subtitle track management
+│   ├── engine/                  # media_kit (libmpv) engine — ISP facets
+│   │   ├── media_engine.dart       # Composite interface (7 ISP facets)
+│   │   ├── media_kit_engine.dart   # Concrete media_kit implementation
+│   │   ├── engine_state_machine.dart # State machine + generation guard
+│   │   ├── playback_control.dart   # ISP: open/play/pause/seek
+│   │   ├── track_control.dart      # ISP: audio track query/switch
+│   │   └── subtitle_config.dart    # ISP: subtitle track query/switch
 │   ├── bridge/
-│   │   └── window_bridge.dart      # Win32 window control (MethodChannel)
+│   │   └── window_bridge.dart      # Window control abstraction (FFI-backed)
 │   ├── models/                  # Data classes
 │   │   ├── playlist_item.dart      # PlaylistItem (path, timestamp, position)
 │   │   ├── media_state.dart        # Playback state enum
@@ -72,7 +74,7 @@ lib/
 │   ├── widgets/
 │   │   └── osd_overlay.dart        # Floating OSD pill
 │   └── dialogs/
-│       ├── settings_dialog.dart    # Settings (EQ, video, tracks)
+│       ├── settings/               # Settings overlay (EQ/video/audio/general tabs)
 │       └── media_info_dialog.dart  # File properties dialog
 └── l10n/                        # Localization (ARB + generated)
 ```
@@ -95,9 +97,8 @@ lib/
 | N | Previous track |
 | P | Next track |
 | O | Open file |
-| A | Cycle aspect ratio |
 | S | Toggle subtitle |
-| [ / ] | Subtitle delay ±500ms |
+| [ / ] | Subtitle delay ±500ms (stub — media_kit 不支持) |
 | F1 / ? | Show shortcuts help |
 | ESC | Exit fullscreen / Close playlist |
 | Media keys | Play/Pause, Next, Previous |
@@ -105,7 +106,7 @@ lib/
 ## Design System
 
 - Single theme: Midnight (compile-time const)
-- Design tokens in `kernel/ui/theme/tokens.dart` — `Tokens.*` static constants
+- Design tokens in `ui/theme/tokens.dart` — `Tokens.*` static constants
 - Glass-morphism: `BackdropFilter` + `bgGlass` + `borderHighlight`
 - All colors/fonts/spacing via `Tokens.*` (no hardcoded values)
 
@@ -127,7 +128,6 @@ Use Context7 MCP to query Flutter API docs. Always use `resolve-library-id` firs
 |---------|-------------|----------|---------|
 | Flutter API | `/websites/api_flutter_dev` | 30,590 | Widget API, class reference, method signatures |
 | Flutter Guide | `/websites/flutter_dev` | 10,777 | How-to guides, concepts, tutorials |
-| fvp | `/wang-bin/fvp` | 105 | Video player plugin API (MDK/FFmpeg) |
 | shared_preferences | `/websites/pub_dev_packages_shared_preferences` | 370 | Key-value storage API |
 | window_manager | `/leanflutter/window_manager` | 126 | Window control (frameless, fullscreen, etc.) |
 
@@ -244,7 +244,7 @@ final class Err<T> extends Result<T> {
 - **Copy strings that cross thread boundaries** — `const char*` from Dart may be freed after call
 - **Use persistent handles for async Dart callbacks** — regular handles become invalid across threads
 - **Document memory ownership** — who allocates, who frees
-- **MethodChannel naming**: `com.simple_player/window` for Win32 bridge
+- **Win32 桥接**: 走 `dart:ffi` (`lib/kernel/bridge/win32/`), 非 MethodChannel — 旧 `com.simple_player/window` channel 已弃用
 
 ### Testing
 
