@@ -26,8 +26,8 @@
 - [x] **Phase 30: Panel Layout Redesign** - 16:9 / 50%-area overlay + General tab middle + multi-monitor clamp
 - [x] **Phase 31: Visual Design Alignment** - Panel chrome + option rows aligned to control-bar glass / edge-glow / three-state
 - [ ] **Phase 32: Navigation & Interaction Polish** - End-cap arrows + InputModeDetector + hint substitution + raw LB/RB binding deletion
-- [ ] **Phase 33: Audio Settings Tab** - EQ / balance / sync / normalization via single af string, pure deferred-apply
-- [ ] **Phase 34: Control Bar Audio Track Switching** - Headphones button + track popup menu symmetric to subtitle button
+- [~] **Phase 33: Audio Settings Tab** - DEFERRED (af route unverified at runtime; code kept, see `33-DEFERRED.md`) — EQ / balance / sync / normalization via single af string, pure deferred-apply
+- [-] **Phase 34: Control Bar Audio Track Switching** - SKIPPED (v4.5 wrap decision 2026-07-30) — Headphones button + track popup menu symmetric to subtitle button
 
 ## Phase Details
 
@@ -200,8 +200,8 @@ Plans:
 | 30 | Panel Layout Redesign | Not started | 0/TBD | 5 |
 | 31 | Visual Design Alignment | Complete (passed-with-note) | 3/3 | 5 |
 | 32 | Navigation & Interaction Polish | Planned (iter8 PASSED) | 3/3 | 7 |
-| 33 | Audio Settings Tab | Not started | 0/TBD | 7 |
-| 34 | Control Bar Audio Track Switching | Not started | 0/TBD | 5 |
+| 33 | Audio Settings Tab | Deferred (af route unverified) | 3/3 (code kept) | 7 |
+| 34 | Control Bar Audio Track Switching | Skipped (v4.5 wrap) | 0/TBD | 5 |
 
 ## Build Order Rationale
 
@@ -338,7 +338,7 @@ Overlay Shell & State Model (Phase 23) + Sidebar Navigation (Phase 24) + Tab Con
 </details>
 
 <details>
-<summary>🚧 v4.5 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
+<summary>📦 v4.5 设置面板横向重构 + 音频功能填充 (Phases 28-34) - WRAPPED (P33 deferred, P34 skipped, 2026-07-30)</summary>
 
 7 phases: Shell Split (28) + Auto-Pause Always (29) + Panel Layout Redesign (30) + Visual Design Alignment (31) + Navigation & Interaction Polish (32) + Audio Settings Tab (33) + Control Bar Audio Track Switching (34)。本路线图。
 

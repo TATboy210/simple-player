@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.5
-milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - IN PROGRESS</summary>
+milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - WRAPPED (P33 deferred, P34 skipped)
 current_phase: 33
 current_phase_name: audio-settings-tab
-status: executing
-stopped_at: context exhaustion at 75% (2026-07-30)
-last_updated: "2026-07-30T02:17:51.732Z"
+status: milestone_wrapped
+stopped_at: v4.5 wrapped — P33 deferred (af route unverified at runtime), P34 skipped (2026-07-30)
+last_updated: "2026-07-30T03:13:31.496Z"
 last_activity: 2026-07-30
-last_activity_desc: Phase 33 execution started
+last_activity_desc: v4.5 wrap-up — P33 deferred, P34 skipped
 progress:
   total_phases: 7
   completed_phases: 4
@@ -114,7 +114,7 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-30T02:17:51.705Z
+Last session: 2026-07-30T03:13:31.457Z
 Stopped at: context exhaustion at 75% (2026-07-30)
 Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commit, then /gsd-execute-phase 32)
 
@@ -344,6 +344,17 @@ Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commi
 - **一次性工件待闭环**：`HANDOFF.json` + `.planning/.continue-here.md`（phase 32 level）— verifier 成功运行后删除。`32-RESEARCH-CHECKPOINT.md` 保留（规划通过后删，Phase 30/32 先例）。
 - **下一步**：(1) 提交 `32-03-SUMMARY.md` + `STATE.md`（建议 commit message: `docs(32): record Phase 32 Wave 3 SUMMARY`）；(2) 删 `HANDOFF.json` + `.planning/.continue-here.md`（一次性工件闭环）；(3) run `gsd-verifier` for Phase 32（会 flag gamepad gap → 32-04 gap-closure plan: XInput bridge）；(4) `/clear` → 下一会话处理 32-04（或 verifier 后 auto-advance 到 Phase 33）。
 - **上下文预算守卫**：本窗口已耗 ~70%。提交 + 删 HANDOFF/.continue-here + 呈批 verifier 可本窗口做；spawn gsd-verifier (sonnet) 建议 fresh 窗口（参考 Phase 31 verifier 模式）。
+
+### 2026-07-30 v4.5 wrap-up (P33 deferred, P34 skipped)
+
+- **触发**：Phase 33 运行时门——用户在 target Windows 真机应用音频滤镜（pan/adelay/dynaudnorm，含 EQ）后判定「完全无法使用」，听感完全无效。
+- **根因（强嫌疑，未验证）**：`setProperty('af', afFilter)` 路由在 fvp 0.37.2 上未接线到音频滤镜管线。RESEARCH 的"af already works"从未经听感验证（`_guardedAction` 吞异常致 probe 不权威）。视频滤镜用 `video.avfilter`（MDK 原生命名），按对称性音频应为 `audio.avfilter` 而非 `af`（mpv 别名）——RESEARCH L183 锁定 `af` 建立在未验证假设上。源注释 `subtitle_configurator.dart:71-77` 自相矛盾（lavfi 包装 vs 裸逗号语法）。详见 `33-DEFERRED.md`。
+- **用户决策（AskUserQuestion）**：选「保留代码 + deferred 收尾」——不试 `audio.avfilter`（30 秒验证），直接止损。撤回此前锁定的"不允许部分遗漏"硬约束（用户主动撤回）。Phase 34 skipped。v4.5 收尾。
+- **保留产物**：P33 三 plan 代码 + 121/121 聚焦测试 + 3 SUMMARY + `33-DEFERRED.md` 根因记录全部保留。未来重启 = 改 1 行属性名 `af`→`audio.avfilter` + 真机听感，见 33-DEFERRED.md「How to resume」。
+- **未做**：未 spawn verifier（P33 不完成）；未改 lib/ 代码（保留）；未回滚 P33 提交。
+- **ROADMAP 校准**：P33 标 deferred、P34 标 skipped、v4.5 milestone 行 IN PROGRESS→WRAPPED。ROADMAP Progress 表 P28-32 仍滞后（标 "Not started" 但实际完成），非本次范围，留作技术债。
+- **提交**：`docs(33): defer audio tab — af route unverified; skip P34; wrap v4.5`（含 33-DEFERRED.md + STATE.md + ROADMAP.md + 删 33-EXECUTE-CHECKPOINT.md）。
+- **下一步**：v4.5 收尾完成。用户可选 `/gsd-new-milestone` 启动下一里程碑，或在未来重启 P33（1 行属性名改动可能救活）。
 
 ## Operator Next Steps
 
