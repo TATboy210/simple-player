@@ -277,5 +277,34 @@ void main() {
         pending.dispose();
       },
     );
+
+    // —— Phase 33 Wave 3：normalization 开关（AUDIO-04/06）——
+
+    testWidgets('normalization toggle updates pending normalization key', (
+      tester,
+    ) async {
+      final pending = PendingSettingsState();
+      pending.register('eqPresetIndex', 0);
+      pending.register('balance', 0.0);
+      pending.register('syncMs', 0);
+      pending.register('normalization', false);
+
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: EqualizerTab(pending: pending))),
+      );
+
+      final sw = find.byKey(const ValueKey('audio-normalization-switch'));
+      expect(sw, findsOneWidget);
+
+      // 初始关闭
+      expect(pending.current('normalization'), isFalse);
+
+      // 切换开关 → pending normalization 置 true（不触达 commit 回调）
+      await tester.tap(sw);
+      await tester.pump();
+      expect(pending.current('normalization'), isTrue);
+
+      pending.dispose();
+    });
   });
 }
