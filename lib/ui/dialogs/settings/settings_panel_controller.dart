@@ -9,6 +9,7 @@ import 'dart:ui';
 
 import '../../../kernel/engine/media_state.dart';
 import '../../../kernel/services/playback_controller.dart';
+import 'audio_filter_compositor.dart';
 import 'pending_settings.dart';
 import 'settings_panel_state.dart';
 
@@ -19,10 +20,23 @@ import 'settings_panel_state.dart';
 /// 同步 open() 调用内无并发交叠语义），仅当快照为 [MediaState.playing]
 /// 时才在 close() 时恢复播放。
 class SettingsPanelController {
-  SettingsPanelController(this._playback);
+  SettingsPanelController(
+    this._playback, {
+    AudioSettings audioDefaults = const AudioSettings(),
+    AudioCommitCallback? onAudioCommit,
+  })  : _audioDefaults = audioDefaults,
+        _audioCommitCallback = onAudioCommit;
 
   /// 播放服务边界 — 仅暴露 pause()/play()/isPlaying（D-03）.
   final SettingsPanelPlayback _playback;
+
+  /// 音频偏好基准快照——open() 注册 4 个原始键的基准值（Phase 33, AUDIO-07）。
+  /// 由 PlayerFeature 组合根从 SettingsStore 加载后经构造注入。
+  final AudioSettings _audioDefaults;
+
+  /// 音频提交回调——commitPending() 构造 [AudioSettings] 快照后调用一次
+  /// （Q2 Option A）。PlayerFeature 组合根实现：组合 af 串 → setEqualizer → 持久化。
+  final AudioCommitCallback? _audioCommitCallback;
 
   /// 面板状态模型（PANEL-01）.
   final SettingsPanelState state = SettingsPanelState();
@@ -60,6 +74,11 @@ class SettingsPanelController {
     // 注册已知设置项的原始值（TABS-04）— 后续 tab 内容替换时扩展
     pending.register('locale', 'zh');
     pending.register('themeIndex', 0);
+    // Phase 33: 注册 4 个音频原始键——基准值来自 PlayerFeature 注入的持久化默认
+    pending.register('eqPresetIndex', _audioDefaults.eqPresetIndex);
+    pending.register('balance', _audioDefaults.balance);
+    pending.register('syncMs', _audioDefaults.syncMs);
+    pending.register('normalization', _audioDefaults.normalization);
     state.isOpen.value = true;
   }
 
@@ -107,7 +126,21 @@ class SettingsPanelController {
   }
 
   /// 提交所有待修改值（TABS-04）— 返回变更 map.
-  Map<String, dynamic> commitPending() => pending.commit();
+  ///
+  /// Phase 33: 提交后从已提交值构造 [AudioSettings] 快照，调用音频提交回调
+  /// 一次（Q2 Option A）。current() 在 commit() 后返回 _originals（已更新为
+  /// 已提交值），即"已提交或当前值"。Cancel 走 cancelPending()，不经此路径，
+  /// 故回调零调用（AUDIO-06）。
+  Map<String, dynamic> commitPending() {
+    final changes = pending.commit();
+    _audioCommitCallback?.call(AudioSettings(
+      eqPresetIndex: pending.current('eqPresetIndex') as int? ?? 0,
+      balance: pending.current('balance') as double? ?? 0.0,
+      syncMs: pending.current('syncMs') as int? ?? 0,
+      normalization: pending.current('normalization') as bool? ?? false,
+    ));
+    return changes;
+  }
 
   /// 回滚所有修改（TABS-04）— 返回原始值 map.
   Map<String, dynamic> cancelPending() => pending.cancel();
