@@ -42,4 +42,21 @@
 - Continuous panel sizing (clamp 400-600, 5:4 ratio), 800px breakpoint tab bar adaptation, and RepaintBoundary isolation for 60fps animation
 - Panel height aligned to ROADMAP SC (600×480 / 400×320), all 5 success criteria verified by automated tests, full 111-test regression green
 
+## v4.5 设置面板横向重构 + 音频功能填充 (Shipped: 2026-07-30)
+
+**Phases completed:** 5/7 (28-32 done; 33 deferred; 34 skipped)
+
+**Key accomplishments:**
+
+- Phase 28: settings shell split — 517-line shell 拆为 3 个聚焦文件 + 删除 legacy 88px sidebar panel(在任何 feature 落地前完成,避免中期重构死锁)
+- Phase 29: auto-pause-detector — settings 打开时总是暂停(always-pause 策略)
+- Phase 30: panel layout redesign — 16:9 主约束 + 50% 面积次约束,连续 sizing clamp 400-600,800px tab bar 适配
+- Phase 31: visual design alignment — 毛玻璃语言对齐控制栏
+- Phase 32: navigation & interaction polish — InputModeDetector(v4.5 唯一新基础设施)+ L/R tab 箭头 + 输入模式感知 hint
+- Phase 33 (DEFERRED): audio EQ tab — MDK `af` 滤镜路线未验证(pan/adelay/dynaudnorm 在链接 FFmpeg build 中可用性未确认);代码保留,1 行属性名改动可能救活
+- Phase 34 (SKIPPED): control bar audio track switching — 耳机按钮 + track popup,推迟到 v4.6+
+- Wrap 决策:用户撤回"不允许部分遗漏"硬约束;af 验证止损(未试 30 秒验证)
+- Wrap commit:`d4ec8b57 docs(33): defer audio tab — af route unverified; skip P34; wrap v4.5`
+- 技术债:ROADMAP Progress 表 P28-32 标 "Not started" 但实际完成,留作后续校准
+
 ---
