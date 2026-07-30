@@ -691,7 +691,7 @@ void main() {
       final m = EngineStateMachine();
       final gen = m.nextGeneration();
 
-      // Simulate what FvpEngine.dispose does: bump generation.
+      // Simulate engine dispose: bump generation.
       m.nextGeneration();
 
       // gen is now stale.

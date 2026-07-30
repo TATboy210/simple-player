@@ -16,22 +16,19 @@
 ///   (playlistGeneration → window → videoProcessing → controller → engine).
 ///
 /// Architecture: PlayerFeature/PlayerViewModel → **PlayerServices** → concrete services.
-/// Dependency chain: PlayerServices → FvpEngine → fvp/MDK native library.
+/// Dependency chain: PlayerServices → MediaKitEngine → media_kit/libmpv native.
 library;
 
 import 'package:flutter/foundation.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'diagnostics/clock.dart';
-import 'diagnostics/diagnostics_bundle.dart';
-import 'diagnostics/event_log_slot.dart';
 import 'diagnostics/kernel_logger.dart';
 import 'diagnostics/memory_monitor.dart';
-import 'diagnostics/metrics_slot.dart';
 import 'diagnostics/rss_provider.dart';
-import 'engine/engine_state.dart';
 
-import 'adapter/kernel_adapter.dart';
 import 'bridge/window_bridge.dart';
-import 'engine/fvp_engine.dart';
+import 'engine/media_engine.dart';
+import 'engine/media_kit_engine.dart';
 import 'persistence/settings_store.dart';
 import 'playlist/playlist.dart';
 import 'services/playback_controller.dart';
@@ -58,16 +55,14 @@ class PlayerServices {
   static Future<PlayerServices> create({
     required WindowBridge windowService,
   }) async {
-    final services = PlayerServices(
-      windowService: windowService,
-    );
+    final services = PlayerServices(windowService: windowService);
     await services.init();
     return services;
   }
 
   /// 视频渲染引擎实例.
   ///
-  /// Media rendering engine (fvp/MDK wrapper).
+  /// Media rendering engine (media_kit/libmpv wrapper).
   late final MediaEngine engine;
 
   /// 播放列表管理器.
@@ -91,6 +86,15 @@ class PlayerServices {
   /// Win32 window bridge service.
   final WindowBridge windowService;
 
+  /// media_kit [VideoController] — 供 UI [Video] widget 使用.
+  ///
+  /// 透传自 [_mediaKitEngine]. media_kit 是唯一后端 (fvp/MDK 已移除).
+  VideoController get mediaKitVideoController =>
+      _mediaKitEngine.videoController;
+
+  /// media_kit 引擎实例 — 持有以透传 [mediaKitVideoController].
+  late final MediaKitEngine _mediaKitEngine;
+
   /// 播放列表版本号 — 每次播放列表变化时递增，触发 UI 重建.
   ///
   /// Playlist generation counter — incremented on each playlist change
@@ -102,13 +106,13 @@ class PlayerServices {
   /// 初始化所有播放服务.
   ///
   /// Initialization order (sequential — each step depends on the previous):
-  /// 1. KernelLogger + MemoryMonitor (diagnostics, must precede FvpEngine)
-  /// 2. DiagnosticsBundle + FvpEngine + KernelAdapter (engine)
+  /// 1. KernelLogger + MemoryMonitor (diagnostics)
+  /// 2. MediaKitEngine (engine)
   /// 3. Playlist + PlaybackController (orchestration)
   /// 4. SettingsStore.load() → controller.init(settings)
   /// 5. VideoProcessingService (video effects)
   Future<void> init() async {
-    // Phase 17: 初始化 KernelLogger 静态实例 — 必须在 FvpEngine 创建之前,
+    // Phase 17: 初始化 KernelLogger 静态实例 — 必须在引擎创建之前,
     // 确保所有内核代码从启动第一刻起就能通过 KernelLoggerImpl.I 输出日志。
     // kDebugMode 门控: debug 模式 CompositeSink([DebugPrintSink, DevToolsSink]),
     // release 模式 NullSink (零输出, 可 tree-shake)。
@@ -123,56 +127,14 @@ class PlayerServices {
     );
     MemoryMonitor.init(memoryMonitor);
 
-    // Strangler Fig seam (Phase 16, ADAPT-01/02): 用 KernelAdapter 包裹同一个
-    // FvpEngine 实例，legacy/migrated 均指向它 (D13/D19 — NewFvpEngine 尚不存在，
-    // 零额外原生资源)。policy 全量路由到 legacy，行为与直接使用 FvpEngine 完全
-    // 一致；bundle 传递真实 KernelLogger + 真实 MemoryMonitor，其余 2 插槽 noop (P20 激活)。
-    // Phase 20 将把 migrated 换成 NewFvpEngine 并翻转 policy，此处即为切换点。
-    // Phase 20 D2: 创建 bundle 在 FvpEngine 之前，注入到引擎构造函数
-    final bundle = DiagnosticsBundle(
-      logger: KernelLoggerImpl.I,
-      memoryMonitor: memoryMonitor,
-      metrics: const NullMetricsSlot(),
-      eventLog: const NullEventLogSlot(),
-    );
-    final fvp = FvpEngine(bundle: bundle);
-    // Phase 21-07: DelegationPolicy 全量翻转到 migrated — 激活 Phase 20 迁移。
-    // 7 个 capability 字段全部路由到 KernelMode.migrated;
-    // migratedMethods 包含全部 26 个 MediaEngine 方法 (PlaybackControl 10 +
-    // TrackControl 2 + SubtitleConfig 6 + VideoEffectControl 4 +
-    // RendererControl 2 + VolumeControl 2), 与 dual_track_regression_test
-    // 的 _allMediaEngineMethods 集合一致。
-    // 回退: 改回 DelegationPolicy.all(KernelMode.legacy) 或运行 rollback.sh。
-    engine = KernelAdapter(
-      legacy: fvp,
-      migrated: fvp,
-      policy: const DelegationPolicy(
-        stateView: KernelMode.migrated,
-        playback: KernelMode.migrated,
-        track: KernelMode.migrated,
-        subtitle: KernelMode.migrated,
-        videoEffect: KernelMode.migrated,
-        renderer: KernelMode.migrated,
-        volume: KernelMode.migrated,
-        migratedMethods: {
-          // PlaybackControl (10 methods)
-          'open', 'play', 'pause', 'stop', 'togglePlayPause',
-          'seekTo', 'setPlaybackRate', 'setRange', 'skipForward', 'skipBack',
-          // TrackControl (2 methods)
-          'getAudioTracks', 'switchAudioTrack',
-          // SubtitleConfig (6 methods)
-          'getSubtitleTracks', 'switchSubtitleTrack', 'toggleSubtitle',
-          'setExternalSubtitle', 'setSubtitleDelay', 'setEqualizer',
-          // VideoEffectControl (4 methods)
-          'setVideoEffect', 'rotate', 'setAspectRatio', 'setDeinterlace',
-          // RendererControl (2 methods)
-          'setD3d11SyncEnabled', 'setHardwareDecoding',
-          // VolumeControl (2 methods)
-          'setVolume', 'setMute',
-        },
-      ),
-      bundle: bundle,
-    );
+    // media_kit 是唯一后端 (fvp/MDK + KernelAdapter 临时层已移除).
+    // 直接实例化 MediaKitEngine; engine 字段类型 MediaEngine,
+    // MediaKitEngine implements MediaEngine, 45 消费方零改动.
+    // diagnostics 经静态访问器 (KernelLoggerImpl.I / MemoryMonitor.I) 读取,
+    // 无需 bundle 注入 (MediaKitEngine 构造函数不接 bundle).
+    _mediaKitEngine = MediaKitEngine();
+    engine = _mediaKitEngine;
+
     playlist = Playlist();
     controller = PlaybackController(
       engine: engine,

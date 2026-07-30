@@ -14,8 +14,6 @@ import 'playback_control.dart';
 /// - [position] — current playback position (ms)
 /// - [duration] — total media duration (ms)
 /// - [seekTo] — seek to specified position
-///
-/// Note: [setRange] stays in FvpEngine (needs _player.setRange + _guardedAction).
 mixin PlaybackSkipMixin implements PlaybackControl {
   /// 当前播放位置（毫秒） — 由混入类提供.
   ///

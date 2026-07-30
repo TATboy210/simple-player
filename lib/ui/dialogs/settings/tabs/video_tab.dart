@@ -10,6 +10,7 @@ import '../../../shared/animated_section_list.dart';
 import '../../../shared/glass_container.dart';
 import '../../../shared/section_header.dart';
 import '../../../shared/settings_card.dart';
+import '../../../shared/unsupported_backend_notice.dart';
 import '../pending_settings.dart';
 
 /// 视频设置 tab（骨架）— Phase 25 框架占位，后续阶段填充真实功能。
@@ -25,6 +26,9 @@ class VideoTab extends StatelessWidget {
     return SingleChildScrollView(
       child: AnimatedSectionList(
       children: [
+        // media_kit 后端: 视频效果/去隔行/色彩校正为 stub, 调整仅保存不生效
+        // (fvp 回退时横幅自动隐藏). 解码器选择 media_kit 走 hwdec 配置, 后续补.
+        const UnsupportedBackendNotice(feature: '视频效果'),
         // 解码器选择 — 毛玻璃卡片
         GlassContainer(
           padding: const EdgeInsets.symmetric(

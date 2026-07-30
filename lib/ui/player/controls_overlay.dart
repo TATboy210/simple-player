@@ -241,58 +241,68 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             ),
           ),
         ),
-        // 下层控制栏区域 — 始终可交互，不受 emptyState 影响
-        ValueListenableBuilder<bool>(
-          valueListenable: _autoHide.visible,
-          builder: (_, isVisible, child) =>
-              IgnorePointer(ignoring: !isVisible, child: child),
-          child: RepaintBoundary(
-            child: Stack(
-              children: [
-                Positioned(
-                  bottom:
-                      Tokens.controlBarMarginBottom +
-                      Tokens.controlBarHeight +
-                      12,
-                  left: Tokens.controlBarMarginH,
-                  right: Tokens.controlBarMarginH,
-                  child: OsdOverlay(resizing: widget.resizing),
-                ),
-                Positioned(
+        // 下层控制栏区域 — OSD / ControlBar / ErrorBanner 各自独立 Positioned，
+        // 不再用单一 IgnorePointer 包裹整层（原方案在 visible=false 时连累
+        // ErrorBanner 不可点 —— P3 根因）。
+        RepaintBoundary(
+          child: Stack(
+            children: [
+              // OSD — 独立,不受控制栏可见性影响
+              Positioned(
+                bottom:
+                    Tokens.controlBarMarginBottom +
+                    Tokens.controlBarHeight +
+                    12,
+                left: Tokens.controlBarMarginH,
+                right: Tokens.controlBarMarginH,
+                child: OsdOverlay(resizing: widget.resizing),
+              ),
+              // ControlBar — visible=false 时 Visibility 从 hit-test 树移除,
+              // 避免透明 ControlBar 抢点击;FadeTransition 仅驱动淡入/淡出动画。
+              // visible 在 fade-out dismissed 后才变 false,故淡出动画完整播放后再移除。
+              ValueListenableBuilder<bool>(
+                valueListenable: _autoHide.visible,
+                builder: (_, isVisible, _) => Positioned(
                   left: Tokens.controlBarMarginH,
                   right: Tokens.controlBarMarginH,
                   bottom: Tokens.controlBarMarginBottom,
-                  child: FadeTransition(
-                    opacity: _autoHide.opacity,
-                    child: ControlBar(
-                      engine: widget.engine,
-                      actions: widget.actions,
-                      isIdle: isIdle,
-                      title: widget.title,
-                      opacity: _resizeOpacity,
-                      enableBlur: _autoHide.visible.value,
-                      decoration: _animController,
-                      resizing: widget.resizing,
+                  child: Visibility(
+                    visible: isVisible,
+                    maintainState: true,
+                    maintainAnimation: true,
+                    child: FadeTransition(
+                      opacity: _autoHide.opacity,
+                      child: ControlBar(
+                        engine: widget.engine,
+                        actions: widget.actions,
+                        isIdle: isIdle,
+                        title: widget.title,
+                        opacity: _resizeOpacity,
+                        enableBlur: isVisible,
+                        decoration: _animController,
+                        resizing: widget.resizing,
+                      ),
                     ),
                   ),
                 ),
-                Positioned(
-                  left: Tokens.controlBarMarginH + 16,
-                  right: Tokens.controlBarMarginH + 16,
-                  bottom:
-                      Tokens.controlBarMarginBottom +
-                      Tokens.controlBarHeight +
-                      8,
-                  child: RepaintBoundary(
-                    child: ErrorBanner(
-                      engine: widget.engine,
-                      onOpenFile: widget.actions.onOpenFile,
-                      onRetry: widget.actions.onOpenFile,
-                    ),
+              ),
+              // ErrorBanner — 独立可见且始终可点,不被控制栏可见性连累(P3 修复)
+              Positioned(
+                left: Tokens.controlBarMarginH + 16,
+                right: Tokens.controlBarMarginH + 16,
+                bottom:
+                    Tokens.controlBarMarginBottom +
+                    Tokens.controlBarHeight +
+                    8,
+                child: RepaintBoundary(
+                  child: ErrorBanner(
+                    engine: widget.engine,
+                    onOpenFile: widget.actions.onOpenFile,
+                    onRetry: widget.actions.onOpenFile,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],

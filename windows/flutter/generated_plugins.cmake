@@ -5,9 +5,11 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   file_selector_windows
-  fvp
   hotkey_manager_windows
+  media_kit_libs_windows_video
+  media_kit_video
   screen_retriever_windows
+  volume_controller
   window_manager
 )
 

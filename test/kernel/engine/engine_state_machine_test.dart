@@ -194,10 +194,13 @@ void main() {
         expect(machine.state.value, MediaState.paused);
       });
 
-      test('completed → playing returns illegal', () {
+      // P1 修复:completed→playing 现已 legal —— 播放结束态按 play 应能重播,
+      // 而非 no-op(六按钮"有时不起作用"根因之一)。此边从 illegal 集移出,
+      // 故断言改为 ok + state 推进到 playing。
+      test('completed → playing is legal (replay from end)', () {
         machine.state.value = MediaState.completed;
-        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.illegal);
-        expect(machine.state.value, MediaState.completed);
+        expect(machine.transitionTo(MediaState.playing, 'test'), TransitionResult.ok);
+        expect(machine.state.value, MediaState.playing);
       });
 
       test('completed → paused returns illegal', () {

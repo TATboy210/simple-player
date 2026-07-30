@@ -3,7 +3,7 @@ import 'open_result.dart';
 /// 播放控制接口 — 核心播放操作（含打开、播放、暂停、停止、跳转、音量、倍速等控制方法）
 ///
 /// 与 [EngineStateView] 分离：此接口仅暴露控制方法，不包含状态。
-/// 实现者通常是具体的引擎类（如 FvpEngine），消费者通过此接口控制播放行为。
+/// 实现者是具体的引擎类（MediaKitEngine），消费者通过此接口控制播放行为。
 ///
 /// Contract:
 /// - Implementations MUST update [state] via the declared transitions on each method.

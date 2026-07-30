@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/glass_widgets.dart';
 
@@ -14,6 +15,9 @@ void main() {
     void Function(TapUpDetails)? onSecondaryTapUp,
     double iconSize = 20.0,
     Color? color,
+    FocusNode? focusNode,
+    String? semanticsLabel,
+    bool? semanticsToggled,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -29,6 +33,9 @@ void main() {
                   onSecondaryTapUp: onSecondaryTapUp,
                   iconSize: iconSize,
                   color: color,
+                  focusNode: focusNode,
+                  semanticsLabel: semanticsLabel,
+                  semanticsToggled: semanticsToggled,
                 )
               : GlassButton.iconOnly(
                   icon: icon,
@@ -39,6 +46,9 @@ void main() {
                   onSecondaryTapUp: onSecondaryTapUp,
                   iconSize: iconSize,
                   color: color,
+                  focusNode: focusNode,
+                  semanticsLabel: semanticsLabel,
+                  semanticsToggled: semanticsToggled,
                 ),
         ),
       ),
@@ -101,6 +111,134 @@ void main() {
         buttons: kSecondaryButton,
       );
       expect(receivedDetails, isNotNull);
+    });
+  });
+
+  group('GlassButton keyboard and semantics contract', () {
+    testWidgets('Space activates the focused button once', (tester) async {
+      var activationCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          focusNode: focusNode,
+          onPressed: () => activationCount++,
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+
+      expect(activationCount, 1);
+    });
+
+    testWidgets('Enter activates the focused button once', (tester) async {
+      var activationCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          focusNode: focusNode,
+          onPressed: () => activationCount++,
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+
+      expect(activationCount, 1);
+    });
+
+    testWidgets('activator keys do not bubble past the focused button', (
+      tester,
+    ) async {
+      var activationCount = 0;
+      var ancestorKeyDownCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Focus(
+              onKeyEvent: (_, event) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.space ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
+                  ancestorKeyDownCount++;
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: Center(
+                child: GlassButton.iconOnly(
+                  icon: Icons.play_arrow,
+                  focusNode: focusNode,
+                  onPressed: () => activationCount++,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+
+      expect(activationCount, 2);
+      expect(ancestorKeyDownCount, 0);
+    });
+
+    testWidgets('exposes its explicit semantic label and toggled state', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.pause,
+          semanticsLabel: 'Pause',
+          semanticsToggled: true,
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Pause')),
+        matchesSemantics(
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasToggledState: true,
+          isToggled: true,
+          hasTapAction: true,
+        ),
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('focus feedback preserves the icon hit-test geometry', (
+      tester,
+    ) async {
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(icon: Icons.play_arrow, focusNode: focusNode),
+      );
+      final rectBeforeFocus = tester.getRect(find.byIcon(Icons.play_arrow));
+
+      focusNode.requestFocus();
+      await tester.pump();
+
+      expect(tester.getRect(find.byIcon(Icons.play_arrow)), rectBeforeFocus);
     });
   });
 

@@ -296,9 +296,12 @@ class Tokens {
   /// Phase 30 保留 bgGlass 值；Phase 31 chrome 对齐时单点改此别名即可，不动四消费者。
   static const Color panelSectionBg = bgGlass;
 
-  // ── 跳秒 ──
-  static const int skipSecondsShort = 10;
-  static const int skipSecondsLong = 30;
+  // ── 跳秒（毫秒）──
+  // P0' 修复:原 skipSecondsShort/Long(秒命名 + 值 10/30)误传引擎 ms 接口,
+  // 实际只跳 10ms/30ms。改名 skipShortMs/skipLongMs + 值改 10000/30000,
+  // 与 EngineConstants.defaultSkipMs 的毫秒语义对齐,消除 UI/引擎单位错配。
+  static const int skipShortMs = 10000;
+  static const int skipLongMs = 30000;
 
   // ── 字体补充 ──
   static const double fontSizeSmall = 9.0;

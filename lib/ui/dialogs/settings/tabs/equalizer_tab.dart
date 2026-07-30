@@ -20,6 +20,7 @@ import '../../../shared/animated_section_list.dart';
 import '../../../shared/glass_container.dart';
 import '../../../shared/section_header.dart';
 import '../../../shared/settings_card.dart';
+import '../../../shared/unsupported_backend_notice.dart';
 import '../pending_settings.dart';
 
 /// 音频设置首 tab（Phase 33）。
@@ -113,6 +114,9 @@ class _EqualizerTabState extends State<EqualizerTab> {
     return SingleChildScrollView(
       child: AnimatedSectionList(
         children: [
+          // media_kit 后端: setEqualizer 为 stub, EQ/balance/音频延迟/标准化
+          // 调整仅保存偏好不生效 (fvp 回退时横幅自动隐藏).
+          const UnsupportedBackendNotice(feature: '均衡器与音频滤镜'),
           _buildEqSection(),
           _buildSpatialSyncSection(),
           _buildNormalizationSection(),

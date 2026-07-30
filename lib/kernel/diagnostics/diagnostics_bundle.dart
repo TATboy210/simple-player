@@ -7,7 +7,7 @@ import 'metrics_slot.dart';
 ///
 /// Construction-injected carrier that gives future phases a home to attach
 /// real diagnostics capabilities. This is deliberate dead code in Phase 16
-/// (D2/D3) — no consumer reads the bundle until Phase 20's `NewFvpEngine`.
+/// (D2/D3) — no consumer reads the bundle (deliberate dead code).
 /// `final class` (not just `class`) supports [dispose] semantics and blocks
 /// accidental inheritance (D1).
 final class DiagnosticsBundle {

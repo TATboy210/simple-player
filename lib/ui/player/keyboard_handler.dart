@@ -155,6 +155,14 @@ class KeyboardHandler extends StatelessWidget {
       onExitFullscreen?.call();
       return KeyEventResult.handled;
     }
+    // F 键切换全屏 — media_kit 路径: player_screen 的 onToggleFullscreen 调
+    // VideoState.toggleFullscreen (media_kit 自带 overlay 全屏). fvp 回退路径
+    // 接 windowService.setMode (fullscreen case 仍 TODO, 暂无效).
+    // TODO: 补 shortcutDefinitions + l10n.shortcutFullscreen 以在帮助面板显示.
+    if (_keyMatches(key, 'toggleFullscreen', LogicalKeyboardKey.keyF)) {
+      onToggleFullscreen?.call();
+      return KeyEventResult.handled;
+    }
     if (_keyMatches(key, 'help', LogicalKeyboardKey.f1) ||
         (key == LogicalKeyboardKey.slash && event.character == '?')) {
       onShowHelp?.call();
