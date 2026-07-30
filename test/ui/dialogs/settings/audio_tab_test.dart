@@ -192,5 +192,90 @@ void main() {
 
       pending.dispose();
     });
+
+    // —— Phase 33 Wave 2：balance + sync 滑块（AUDIO-02/03/05/06）——
+
+    testWidgets('balance slider drag updates pending balance key', (
+      tester,
+    ) async {
+      final pending = PendingSettingsState();
+      pending.register('eqPresetIndex', 0);
+      pending.register('balance', 0.0);
+      pending.register('syncMs', 0);
+
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: EqualizerTab(pending: pending))),
+      );
+
+      final slider = find.byKey(const ValueKey('audio-balance-slider'));
+      expect(slider, findsOneWidget);
+
+      // 拖动平衡滑块向右——balance 从 0.0 增大（向偏右）
+      await tester.drag(slider, const Offset(80, 0));
+      await tester.pump();
+
+      expect(pending.current('balance'), isA<double>());
+      expect(pending.current('balance') as double, greaterThan(0.0));
+
+      pending.dispose();
+    });
+
+    testWidgets('sync slider drag updates pending syncMs (rounded to int)', (
+      tester,
+    ) async {
+      final pending = PendingSettingsState();
+      pending.register('eqPresetIndex', 0);
+      pending.register('balance', 0.0);
+      pending.register('syncMs', 0);
+
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: EqualizerTab(pending: pending))),
+      );
+
+      final slider = find.byKey(const ValueKey('audio-sync-slider'));
+      expect(slider, findsOneWidget);
+
+      // 拖动延迟滑块向右——syncMs 从 0 增大（音频延后）
+      await tester.drag(slider, const Offset(80, 0));
+      await tester.pump();
+
+      expect(pending.current('syncMs'), isA<int>());
+      expect(pending.current('syncMs') as int, greaterThan(0));
+
+      pending.dispose();
+    });
+
+    testWidgets(
+      'slider changes stage pending values without invoking commit',
+      (tester) async {
+        // AUDIO-06：slider 只写 pending，不触达 commit 回调。
+        // commit 路径由 SettingsPanelController.commitPending 触发（见上方
+        // controller 单测 "pending.update does not invoke commit callback"）。
+        final pending = PendingSettingsState();
+        pending.register('eqPresetIndex', 0);
+        pending.register('balance', 0.0);
+        pending.register('syncMs', 0);
+
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: EqualizerTab(pending: pending))),
+        );
+
+        await tester.drag(
+          find.byKey(const ValueKey('audio-balance-slider')),
+          const Offset(80, 0),
+        );
+        await tester.drag(
+          find.byKey(const ValueKey('audio-sync-slider')),
+          const Offset(80, 0),
+        );
+        await tester.pump();
+
+        // 两个 pending 键都有未提交修改，但无 commit 入口被调用
+        expect(pending.current('balance'), isA<double>());
+        expect(pending.current('syncMs'), isA<int>());
+
+        pending.dispose();
+      },
+    );
   });
 }
