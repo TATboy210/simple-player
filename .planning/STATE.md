@@ -1,7 +1,6 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.5
-milestone_name: 设置面板横向重构 + 音频功能填充 (Phases 28-34) - CLOSED (P33 deferred, P34 skipped, 2026-07-30)
 current_phase: 33
 current_phase_name: null
 status: milestone_closed
