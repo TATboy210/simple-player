@@ -2,7 +2,6 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/engine/lifecycle_phase.dart';
 
 /// Hand-written Fake implementing all ISP interfaces for testing.
 ///
@@ -132,15 +131,6 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   VolumeControl get volumeControl => this;
 
   // ─── Playback control ───
-
-  /// 生命周期阶段 — 委托给 stateMachine (Phase 20 D6 正交生命周期)
-  ValueNotifier<LifecyclePhase> get lifecyclePhase =>
-      stateMachine.lifecyclePhase;
-
-  /// 从 error 状态恢复 — 委托给 stateMachine (Phase 20 D7)
-  void recover() {
-    stateMachine.recover(lastError: lastError);
-  }
 
   @override
   Future<OpenResult> open(String path) async {
