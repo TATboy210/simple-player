@@ -29,8 +29,6 @@ abstract class PlaybackControl {
   /// requires: state ∈ {idle, paused, completed}
   /// ensures: state == playing
   /// states: transitions to {playing, error}
-  ///   （注：从 completed 源态调用时，_canTransitionTo 表未收录 →playing 边，
-  ///   transitionTo 静默失败，state 保持 completed — 已知契约-实现落差，非本计划修复范围）
   /// modifies: [state]
   /// throws: 经 lastError=PlaybackError + state→error 表达
   void play();
@@ -56,8 +54,7 @@ abstract class PlaybackControl {
   /// requires: 无（任意可达态均可调用；opening/error 态为 no-op）
   /// ensures: state == playing → 转 paused；state ∈ {idle, paused, completed} → 转 playing；
   ///   state ∈ {opening, error} → 保持不变（no-op）
-  /// states: transitions to {playing, paused}（continues 同 [play]/[pause] 契约，
-  ///   含 completed→playing 的已知契约-实现落差，见 [play]）
+  /// states: transitions to {playing, paused}（continues 同 [play]/[pause] 契约）
   /// modifies: [state]
   void togglePlayPause();
 

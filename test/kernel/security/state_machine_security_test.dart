@@ -1,17 +1,16 @@
-/// State machine security tests — validates illegal transitions, state
-/// corruption detection, callback safety, and numeric invariants.
-///
-/// These tests exercise the EngineStateMachine and FakeEngine under adversarial
-/// conditions: rapid-fire transitions, disposed-state access, stale callbacks,
-/// and boundary violations on position/volume.
+// State machine security tests — validates state corruption detection,
+// callback safety, generation guard, and numeric invariants.
+//
+// 状态机瘦身后(向后兼容方案):
+// - transitionTo 不再校验合法性矩阵 → 删除 illegal transitions 组.
+// - 删除 lifecyclePhase / recover() → 删除相关用例.
+// - 保留: generation 守卫、dispose 安全、FakeEngine 不变量、回调安全.
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
-import 'package:simple_player_flutter/kernel/engine/lifecycle_phase.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/kernel/engine/open_result.dart';
-import 'package:simple_player_flutter/kernel/engine/transition_result.dart';
 
 import '../../helpers/fake_engine.dart';
 
@@ -20,198 +19,14 @@ void main() {
   KernelLoggerImpl.init();
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 1. Illegal state transitions — must return TransitionResult.illegal
-  //    and never crash or corrupt state.
-  // ─────────────────────────────────────────────────────────────────────────
-  group('Illegal state transitions', () {
-    late EngineStateMachine machine;
-
-    setUp(() {
-      machine = EngineStateMachine();
-    });
-
-    tearDown(() {
-      machine.dispose();
-    });
-
-    test('idle -> paused returns illegal (no media loaded)', () {
-      expect(
-        machine.transitionTo(MediaState.paused, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.idle);
-    });
-
-    test('idle -> completed returns illegal (cannot complete without playing)',
-        () {
-      expect(
-        machine.transitionTo(MediaState.completed, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.idle);
-    });
-
-    test('opening -> paused returns illegal (cannot pause mid-load)', () {
-      machine.state.value = MediaState.opening;
-      expect(
-        machine.transitionTo(MediaState.paused, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.opening);
-    });
-
-    test('opening -> completed returns illegal (cannot complete mid-load)', () {
-      machine.state.value = MediaState.opening;
-      expect(
-        machine.transitionTo(MediaState.completed, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.opening);
-    });
-
-    test('error -> playing returns illegal (must recover first)', () {
-      machine.state.value = MediaState.error;
-      expect(
-        machine.transitionTo(MediaState.playing, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.error);
-    });
-
-    test('error -> paused returns illegal (must recover first)', () {
-      machine.state.value = MediaState.error;
-      expect(
-        machine.transitionTo(MediaState.paused, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.error);
-    });
-
-    test('error -> completed returns illegal (must recover first)', () {
-      machine.state.value = MediaState.error;
-      expect(
-        machine.transitionTo(MediaState.completed, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.error);
-    });
-
-    test('completed -> playing returns illegal (must re-open)', () {
-      machine.state.value = MediaState.completed;
-      expect(
-        machine.transitionTo(MediaState.playing, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.completed);
-    });
-
-    test('completed -> paused returns illegal (must re-open)', () {
-      machine.state.value = MediaState.completed;
-      expect(
-        machine.transitionTo(MediaState.paused, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.completed);
-    });
-
-    test('playing -> opening returns illegal (must stop first)', () {
-      machine.state.value = MediaState.playing;
-      expect(
-        machine.transitionTo(MediaState.opening, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.playing);
-    });
-
-    test('paused -> opening returns illegal (must stop first)', () {
-      machine.state.value = MediaState.paused;
-      expect(
-        machine.transitionTo(MediaState.opening, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.paused);
-    });
-
-    test('self-transition (idle -> idle) returns illegal', () {
-      expect(
-        machine.transitionTo(MediaState.idle, 'security-test'),
-        TransitionResult.illegal,
-      );
-    });
-
-    test('self-transition (playing -> playing) returns illegal', () {
-      machine.state.value = MediaState.playing;
-      expect(
-        machine.transitionTo(MediaState.playing, 'security-test'),
-        TransitionResult.illegal,
-      );
-    });
-
-    test('self-transition (error -> error) returns illegal', () {
-      machine.state.value = MediaState.error;
-      expect(
-        machine.transitionTo(MediaState.error, 'security-test'),
-        TransitionResult.illegal,
-      );
-    });
-
-    test('rapid opening -> opening is rejected (self-transition)', () {
-      machine.state.value = MediaState.opening;
-      expect(
-        machine.transitionTo(MediaState.opening, 'security-test'),
-        TransitionResult.illegal,
-      );
-      expect(machine.state.value, MediaState.opening);
-    });
-
-    test(
-        'every illegal transition leaves state unchanged '
-        '(exhaustive — all 36 - 18 legal = 18 illegal pairs)', () {
-      // Build all (from, to) pairs and filter out legal ones.
-      final allStates = MediaState.values;
-      for (final from in allStates) {
-        for (final to in allStates) {
-          machine.state.value = from;
-          final result = machine.transitionTo(to, 'exhaustive');
-          if (from == to) {
-            // Self-transitions are always illegal.
-            expect(result, TransitionResult.illegal,
-                reason: '$from -> $to should be illegal (self-transition)');
-            expect(machine.state.value, from,
-                reason: '$from -> $to should not change state');
-          }
-          // For non-self pairs, the legal ones are verified by the existing
-          // engine_state_machine_test.dart; we just verify no crash here.
-        }
-      }
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 1b. disposed -> any transition must not crash
+  // 1. Post-dispose safety — double-dispose and post-dispose no-ops.
   // ─────────────────────────────────────────────────────────────────────────
   group('Post-dispose safety', () {
-    test('transitionTo after dispose does not throw', () {
-      final m = EngineStateMachine();
-      m.dispose();
-
-      // After dispose, state.value access throws because ValueNotifier is
-      // disposed. The state machine itself should not crash on double-dispose.
-      expect(() => m.dispose(), returnsNormally);
-    });
-
     test('double dispose is safe no-op', () {
       final m = EngineStateMachine();
       m.state.value = MediaState.playing;
       m.dispose();
       expect(() => m.dispose(), returnsNormally);
-    });
-
-    test('lifecyclePhase is disposed after dispose', () {
-      final m = EngineStateMachine();
-      expect(m.lifecyclePhase.value, LifecyclePhase.alive);
-      m.dispose();
-      expect(m.lifecyclePhase.value, LifecyclePhase.disposed);
     });
 
     test('FakeEngine operations after dispose are no-ops', () {
@@ -236,7 +51,7 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 2. State corruption detection
+  // 2. State corruption detection — failed open + supersede do not corrupt.
   // ─────────────────────────────────────────────────────────────────────────
   group('State corruption detection', () {
     late FakeEngine engine;
@@ -257,56 +72,6 @@ void main() {
       expect(result, isA<OpenError>());
       expect(engine.state.value, MediaState.error);
       // State is NOT stuck in `opening` — it correctly transitioned to `error`.
-    });
-
-    test('after failed open, engine can recover and open again', () async {
-      engine.configureMedia(durationMs: 5000);
-
-      // First open fails.
-      engine.failNextOpenWith = 'bad file';
-      await engine.open('/bad.mp4');
-      expect(engine.state.value, MediaState.error);
-
-      // Recover to idle.
-      engine.recover();
-      expect(engine.state.value, MediaState.idle);
-      expect(engine.lastError.value, isNull);
-
-      // Second open succeeds.
-      final result = await engine.open('/good.mp4');
-      expect(result, isA<OpenSuccess>());
-      expect(engine.state.value, MediaState.idle);
-    });
-
-    test('after error, recover returns to idle and clears lastError', () {
-      engine.simulateError('disk failure');
-      expect(engine.state.value, MediaState.error);
-      expect(engine.lastError.value, isNotNull);
-
-      engine.recover();
-      expect(engine.state.value, MediaState.idle);
-      expect(engine.lastError.value, isNull);
-    });
-
-    test('recover is no-op when not in error state', () {
-      // idle
-      engine.recover();
-      expect(engine.state.value, MediaState.idle);
-
-      // playing
-      engine.play();
-      engine.recover();
-      expect(engine.state.value, MediaState.playing);
-
-      // paused
-      engine.pause();
-      engine.recover();
-      expect(engine.state.value, MediaState.paused);
-    });
-
-    test('after dispose, FakeEngine state machine lifecycle is disposed', () {
-      engine.dispose();
-      expect(engine.lifecyclePhase.value, LifecyclePhase.disposed);
     });
 
     test('rapid open + supersede does not corrupt state', () async {
@@ -349,9 +114,7 @@ void main() {
       expect(callCount, 1);
 
       notifier.dispose();
-
-      // After dispose, adding a listener throws — but existing listeners
-      // are removed. Verify no crash.
+      // After dispose, existing listeners are removed — verify no crash.
       expect(callCount, 1);
     });
 
@@ -361,7 +124,7 @@ void main() {
 
       m.state.addListener(() => observed.add(m.state.value));
 
-      // Walk through a valid path: idle -> opening -> playing -> paused
+      // Walk through a valid path: idle -> opening -> playing -> paused.
       m.transitionTo(MediaState.opening, 'test');
       m.transitionTo(MediaState.playing, 'test');
       m.transitionTo(MediaState.paused, 'test');
@@ -371,22 +134,6 @@ void main() {
         MediaState.playing,
         MediaState.paused,
       ]);
-
-      m.dispose();
-    });
-
-    test('illegal transition does NOT fire state listener', () {
-      final m = EngineStateMachine();
-      var fireCount = 0;
-      m.state.addListener(() => fireCount++);
-
-      // Illegal: idle -> paused
-      m.transitionTo(MediaState.paused, 'test');
-      expect(fireCount, 0, reason: 'Illegal transition must not fire listener');
-
-      // Legal: idle -> opening
-      m.transitionTo(MediaState.opening, 'test');
-      expect(fireCount, 1);
 
       m.dispose();
     });
@@ -402,15 +149,9 @@ void main() {
       m.state.value = MediaState.opening;
       fireCount = 0; // reset after direct assignment
 
-      final result = m.transitionTo(
-        MediaState.playing,
-        'test',
-        generation: gen1,
-      );
+      m.transitionTo(MediaState.playing, 'test', generation: gen1);
 
-      expect(result, TransitionResult.staleGeneration);
-      expect(fireCount, 0,
-          reason: 'Stale generation must not fire listener');
+      expect(fireCount, 0, reason: 'Stale generation must not fire listener');
       expect(m.state.value, MediaState.opening);
 
       m.dispose();
@@ -424,24 +165,24 @@ void main() {
         onPause: () => pauseCalls.add('pause'),
       );
 
-      // idle -> play callback
+      // idle -> play callback.
       m.togglePlayPause();
       expect(playCalls.length, 1);
       expect(pauseCalls.length, 0);
 
-      // playing -> pause callback
+      // playing -> pause callback.
       m.state.value = MediaState.playing;
       m.togglePlayPause();
       expect(playCalls.length, 1);
       expect(pauseCalls.length, 1);
 
-      // opening -> no callback
+      // opening -> no callback.
       m.state.value = MediaState.opening;
       m.togglePlayPause();
       expect(playCalls.length, 1);
       expect(pauseCalls.length, 1);
 
-      // error -> no callback
+      // error -> no callback.
       m.state.value = MediaState.error;
       m.togglePlayPause();
       expect(playCalls.length, 1);
@@ -452,7 +193,8 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 4. Invariant checks — position, volume, mute consistency
+  // 4. Invariant checks — position, volume, mute consistency.
+  //    (与状态机瘦身无关 — 验证 FakeEngine clamp 逻辑.)
   // ─────────────────────────────────────────────────────────────────────────
   group('Invariant checks', () {
     late FakeEngine engine;
@@ -633,7 +375,7 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 5. Generation guard — stale callback protection
+  // 5. Generation guard — stale callback protection.
   // ─────────────────────────────────────────────────────────────────────────
   group('Generation guard — stale callback protection', () {
     test('stale generation rejects transition and preserves state', () {
@@ -643,13 +385,9 @@ void main() {
       m.nextGeneration(); // 2 — gen1 is now stale
 
       m.state.value = MediaState.opening;
-      final result = m.transitionTo(
-        MediaState.playing,
-        'test',
-        generation: gen1,
-      );
+      m.transitionTo(MediaState.playing, 'test', generation: gen1);
 
-      expect(result, TransitionResult.staleGeneration);
+      // Stale 被拒绝,state 不变.
       expect(m.state.value, MediaState.opening);
 
       m.dispose();
@@ -660,13 +398,8 @@ void main() {
       final gen = m.nextGeneration();
 
       m.state.value = MediaState.opening;
-      final result = m.transitionTo(
-        MediaState.playing,
-        'test',
-        generation: gen,
-      );
+      m.transitionTo(MediaState.playing, 'test', generation: gen);
 
-      expect(result, TransitionResult.ok);
       expect(m.state.value, MediaState.playing);
 
       m.dispose();
@@ -679,114 +412,26 @@ void main() {
 
       m.state.value = MediaState.opening;
       // No generation param — should succeed regardless of generation mismatch.
-      final result = m.transitionTo(MediaState.playing, 'test');
+      m.transitionTo(MediaState.playing, 'test');
 
-      expect(result, TransitionResult.ok);
       expect(m.state.value, MediaState.playing);
 
       m.dispose();
     });
 
-    test('dispose increments generation (invalidates queued tasks)', () {
+    test('stale generation after dispose-time bump is rejected', () {
       final m = EngineStateMachine();
       final gen = m.nextGeneration();
 
-      // Simulate engine dispose: bump generation.
+      // Simulate engine dispose: bump generation, gen is now stale.
       m.nextGeneration();
 
-      // gen is now stale.
       m.state.value = MediaState.opening;
-      final result = m.transitionTo(
-        MediaState.playing,
-        'test',
-        generation: gen,
-      );
+      m.transitionTo(MediaState.playing, 'test', generation: gen);
 
-      expect(result, TransitionResult.staleGeneration);
+      expect(m.state.value, MediaState.opening);
 
       m.dispose();
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 6. EngineStateMachine._canTransitionTo exhaustive coverage
-  //    Verifies the switch expression covers all 36 (6x6) state pairs.
-  // ─────────────────────────────────────────────────────────────────────────
-  group('Exhaustive transition matrix', () {
-    /// All legal transitions extracted from the switch expression in
-    /// EngineStateMachine._canTransitionTo.
-    const legalTransitions = <(MediaState, MediaState)>{
-      // idle ->
-      (MediaState.idle, MediaState.opening),
-      (MediaState.idle, MediaState.playing),
-      (MediaState.idle, MediaState.error),
-      // opening ->
-      (MediaState.opening, MediaState.idle),
-      (MediaState.opening, MediaState.playing),
-      (MediaState.opening, MediaState.error),
-      // playing ->
-      (MediaState.playing, MediaState.paused),
-      (MediaState.playing, MediaState.completed),
-      (MediaState.playing, MediaState.error),
-      (MediaState.playing, MediaState.idle),
-      // paused ->
-      (MediaState.paused, MediaState.playing),
-      (MediaState.paused, MediaState.error),
-      (MediaState.paused, MediaState.idle),
-      // completed ->
-      (MediaState.completed, MediaState.opening),
-      (MediaState.completed, MediaState.error),
-      (MediaState.completed, MediaState.idle),
-      // error ->
-      (MediaState.error, MediaState.opening),
-      (MediaState.error, MediaState.idle),
-    };
-
-    test('all legal transitions return ok', () {
-      final m = EngineStateMachine();
-      for (final (from, to) in legalTransitions) {
-        m.state.value = from;
-        final result = m.transitionTo(to, 'matrix-test');
-        expect(result, TransitionResult.ok,
-            reason: 'Legal transition $from -> $to should return ok');
-      }
-      m.dispose();
-    });
-
-    test('all illegal transitions return illegal (except self-transitions)',
-        () {
-      final m = EngineStateMachine();
-      for (final from in MediaState.values) {
-        for (final to in MediaState.values) {
-          if (from == to) continue; // self-transition tested separately
-          if (legalTransitions.contains((from, to))) continue;
-
-          m.state.value = from;
-          final result = m.transitionTo(to, 'matrix-test');
-          expect(result, TransitionResult.illegal,
-              reason: 'Illegal transition $from -> $to should return illegal');
-          expect(m.state.value, from,
-              reason: 'Illegal $from -> $to must not change state');
-        }
-      }
-      m.dispose();
-    });
-
-    test('self-transitions always return illegal', () {
-      final m = EngineStateMachine();
-      for (final state in MediaState.values) {
-        m.state.value = state;
-        final result = m.transitionTo(state, 'self-test');
-        expect(result, TransitionResult.illegal,
-            reason: 'Self-transition $state -> $state should be illegal');
-      }
-      m.dispose();
-    });
-
-    test('legal transition count matches switch expression (18 pairs)', () {
-      // 6 states * 3 avg exits ≈ 18 legal transitions.
-      // This test guards against accidentally adding/removing transitions.
-      expect(legalTransitions.length, 18);
     });
   });
 }

@@ -1,30 +1,26 @@
 import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart' show KernelLoggerImpl;
-import 'lifecycle_phase.dart';
 import 'media_state.dart';
-import 'transition_result.dart';
 
-/// 独立状态机 — 管理播放器主状态 + 生命周期 + generation 守卫
+/// 独立状态机 — 管理播放器主状态 + generation 守卫
 ///
-/// Standalone state machine — manages playback state + lifecycle + generation guard.
+/// Standalone state machine — manages playback state + generation guard.
 ///
-/// 拥有 4 个 ValueNotifier + 1 个 generation 计数器：
-/// Owns 4 ValueNotifiers + 1 generation counter:
+/// 拥有 3 个 ValueNotifier + 1 个 generation 计数器：
+/// Owns 3 ValueNotifiers + 1 generation counter:
 /// - [state] 主播放状态（6 值正交枚举）
-/// - [lifecyclePhase] 引擎生命周期（正交于 state）
 /// - [isSeeking] 是否正在 seek
 /// - [isBuffering] 是否正在缓冲
 /// - `_openGeneration` open 请求计数器（嵌入状态机，单一真相源）
 ///
-/// [transitionTo] 用 switch expression 穷举合法转换路径，
-/// 编译期保证新增状态时所有路径都被更新。
-/// 返回 [TransitionResult] 替代旧版 bool，非法转换通过 KernelLogger.warn 记录。
+/// [transitionTo] 是带 generation 检查的 setter — 不做合法性矩阵校验。
+/// 转换合法性由调用方（引擎本地 guard）负责，这些 guard 同时控制是否调
+/// 底层 player，顺带挡住非法转换，无需状态机再校验一遍。generation 过期时
+/// 拒绝写入并经 KernelLogger.warn 记录，防止 stale 回调污染状态。
 ///
 /// [togglePlayPause] 通过 [onPlay]/[onPause] 回调注入解耦，
 /// 不持有引擎引用，避免循环依赖。
-///
-/// [recover] 从 error 状态恢复到 idle，清理 lastError。
 class EngineStateMachine {
   /// 创建状态机 — 回调可选, 支持构造后注入以解耦循环依赖
   ///
@@ -51,15 +47,8 @@ class EngineStateMachine {
   /// 主播放状态 — 正交 6 值枚举 (idle/opening/playing/paused/completed/error)
   ///
   /// Primary playback state — orthogonal 6-value enum.
-  /// Transitions validated by [transitionTo] via switch expression.
+  /// Written by [transitionTo]; legality enforced by callers' local guards.
   final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
-
-  /// 引擎生命周期阶段 — 正交于 state 的独立维度
-  ///
-  /// Engine lifecycle phase — orthogonal dimension independent of state.
-  /// 与 MediaState 正交共存：state 表示播放行为，lifecyclePhase 表示引擎存活阶段。
-  final ValueNotifier<LifecyclePhase> lifecyclePhase =
-      ValueNotifier(LifecyclePhase.alive);
 
   /// 是否正在 seek — 独立于主状态, 可与任何 MediaState 共存
   ///
@@ -92,74 +81,34 @@ class EngineStateMachine {
   /// Current generation value — read-only query.
   int get currentGeneration => _openGeneration;
 
-  // ---- transitionTo（返回 TransitionResult，KernelLogger.warn 记录非法转换）----
-
-  /// 尝试转换到目标状态
+  /// 判断给定 generation 是否为当前代 — generation 逻辑内聚于状态机
   ///
-  /// Returns [TransitionResult] indicating outcome:
-  /// - [TransitionResult.ok] 转换成功，状态已更新
-  /// - [TransitionResult.illegal] 非法转换（违反状态矩阵），已通过 KernelLogger.warn 记录
-  /// - [TransitionResult.staleGeneration] generation 过期（open 请求已被新请求取代）
-  TransitionResult transitionTo(
-    MediaState next,
-    String caller, {
-    int? generation,
-  }) {
-    final current = state.value;
+  /// Whether [gen] matches the current open generation.
+  /// Migrated from MediaKitEngine so generation logic lives entirely in the
+  /// state machine; callers consume, not implement.
+  bool isCurrent(int gen) => gen == _openGeneration;
 
-    // 检查 generation（如果提供）
-    // Check generation if provided
+  // ---- transitionTo（带 generation 检查的 setter）----
+
+  /// 写入目标状态 — 带 generation 守卫的 setter
+  ///
+  /// Writes [next] as the new playback state. Does NOT validate legality —
+  /// callers' local guards own that responsibility (and also decide whether
+  /// to invoke the underlying player). The state machine only guards against
+  /// stale callbacks via [generation].
+  ///
+  /// [generation] 提供时，若与当前代不匹配视为 stale 回调，拒绝写入并经
+  /// KernelLogger.warn 记录（[caller] 标注来源，便于定位 stale 调用点）。
+  /// [generation] 为 null 时直接写入（调用方已用本地 guard 把关）。
+  void transitionTo(MediaState next, String caller, {int? generation}) {
     if (generation != null && generation != _openGeneration) {
       KernelLoggerImpl.I.warn(
         'EngineStateMachine.$caller: stale generation '
         '(provided=$generation, current=$_openGeneration)',
       );
-      return TransitionResult.staleGeneration;
-    }
-
-    if (!_canTransitionTo(current, next)) {
-      // 所有构建模式下通过 KernelLogger.warn 记录（非 assert-only debugPrint）
-      // Logged via KernelLogger.warn in all build modes (not assert-only debugPrint)
-      KernelLoggerImpl.I.warn(
-        'EngineStateMachine.$caller: illegal transition $current → $next',
-      );
-      return TransitionResult.illegal;
+      return;
     }
     state.value = next;
-    return TransitionResult.ok;
-  }
-
-  /// switch expression 穷举 — 编译期保证所有 case 覆盖
-  static bool _canTransitionTo(MediaState current, MediaState next) {
-    return switch (current) {
-      MediaState.idle =>
-        next == MediaState.opening ||
-            next == MediaState.playing ||
-            next == MediaState.error,
-      MediaState.opening =>
-        next == MediaState.idle ||
-            next == MediaState.playing ||
-            next == MediaState.error,
-      MediaState.playing =>
-        next == MediaState.paused ||
-            next == MediaState.completed ||
-            next == MediaState.error ||
-            next == MediaState.idle,
-      MediaState.paused =>
-        next == MediaState.playing ||
-            next == MediaState.error ||
-            next == MediaState.idle,
-      // completed→playing:补齐矩阵边,允许 completed 态按 play 重新播放。
-      // 原 matrix 未收录此边,导致 togglePlayPause 在 completed 态调 onPlay→play()
-      // 时 transitionTo(playing) 静默失败(known 契约-实现落差),违反"按钮永可点"。
-      MediaState.completed =>
-        next == MediaState.opening ||
-            next == MediaState.playing ||
-            next == MediaState.error ||
-            next == MediaState.idle,
-      MediaState.error =>
-        next == MediaState.opening || next == MediaState.idle,
-    };
   }
 
   /// 切换播放/暂停 — 通过回调注入, 不持有引擎引用, 避免循环依赖
@@ -181,21 +130,6 @@ class EngineStateMachine {
     // opening/error — no-op
   }
 
-  /// 从 error 状态恢复到 idle — 显式方法调用
-  ///
-  /// Recover from error state to idle — explicit method call.
-  /// 仅在 state == MediaState.error 时生效，其他状态为 no-op。
-  /// Only effective when state == MediaState.error, no-op otherwise.
-  ///
-  /// [lastError] 可选的错误通知器，恢复时同步清理。
-  /// Optional error notifier — cleared on recovery.
-  void recover({ValueNotifier<Object?>? lastError}) {
-    if (state.value == MediaState.error) {
-      state.value = MediaState.idle;
-      lastError?.value = null;
-    }
-  }
-
   /// 释放所有 ValueNotifier 资源 — 双重调用安全
   ///
   /// Release all ValueNotifier resources — safe to call twice.
@@ -204,9 +138,7 @@ class EngineStateMachine {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    lifecyclePhase.value = LifecyclePhase.disposed;
     state.dispose();
-    lifecyclePhase.dispose();
     isSeeking.dispose();
     isBuffering.dispose();
   }
