@@ -1,13 +1,14 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.5
+milestone_name: milestone
 current_phase: 33
 current_phase_name: null
 status: milestone_closed
-stopped_at: context exhaustion at 83% (2026-07-30)
-last_updated: "2026-07-30T11:58:58.179Z"
+stopped_at: context exhaustion at 75% (2026-08-01)
+last_updated: "2026-08-01T06:54:35.915Z"
 last_activity: 2026-07-30
-last_activity_desc: v4.5 milestone closed (P33 deferred, P34 skipped, 2026-07-30)
+last_activity_desc: v4.5 wrap-up
 progress:
   total_phases: 7
   completed_phases: 5
@@ -113,8 +114,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-07-30T11:58:58.131Z
-Stopped at: context exhaustion at 83% (2026-07-30)
+Last session: 2026-08-01T06:54:35.842Z
+Stopped at: context exhaustion at 75% (2026-08-01)
 Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commit, then /gsd-execute-phase 32)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
@@ -355,6 +356,28 @@ Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commi
 - **提交**：`docs(33): defer audio tab — af route unverified; skip P34; wrap v4.5`（含 33-DEFERRED.md + STATE.md + ROADMAP.md + 删 33-EXECUTE-CHECKPOINT.md）。
 - **下一步**：v4.5 收尾完成。用户可选 `/gsd-new-milestone` 启动下一里程碑，或在未来重启 P33（1 行属性名改动可能救活）。
 
+### 2026-07-31 C 增强后两个 bug 诊断(需求1全屏控制栏 + 需求5打开文件)— 未实施,待下窗口
+
+**背景**:C 增强计划(media-kit-wise-river.md,控制栏 auto-hide 对齐 media_kit)代码+测试已完成。用户报两个新 bug,AskUserQuestion 确认:需求1现象="切换瞬间立即消失",本次范围="仅先修两个 bug(1,5)"。
+
+**需求1:全屏切换控制栏立即消失**
+
+- 根因(确定):`window_service.dart:193-195` `setMode(WindowMode.fullscreen)` 是 TODO 空实现。全屏走 `videoKey.toggleFullscreen()`(player_keyboard_actions:64,media_kit→fullscreen_window cpp→`SC_MAXIMIZE`)→ `onWindowMaximize:144` 设 mode=maximized(非 fullscreen)→ `isFullscreen` 永远 false → `ControlsOverlay.didUpdateWidget` isFullscreen 分支不触发 → `_isFullscreenTransition` 永不置 true → `_onResizeChanged:169` `reverse()` 淡出。C 增强把 fade 400→150ms 让淡出变"瞬间消失"。
+- 连累(系统性):① C 增强全屏隐藏鼠标/字幕上移失效(isFullscreen=false);② ESC 退全屏 `if(isFullscreen)`(player_keyboard_actions:66)失效;③ 窗口/全屏 auto-hide 延迟统一(isFullscreen=false 永走 windowed 延迟)。
+- 治本深坑:fullscreen_window cpp 用 `SC_MAXIMIZE`→`onWindowMaximize` 覆盖 mode=maximized。即使 setMode 设 mode=fullscreen 也会被立即覆盖。必须加 `_fullscreenIntent` 守卫。
+- 方案A(推荐):① `window_service.setMode(fullscreen)` 调 `FullScreenWindowPlatform.instance.setFullScreen(true)`+`_fullscreenIntent=true`+`mode=fullscreen`;② `onWindowMaximize` 检查 `_fullscreenIntent` 跳过 mode=maximized;③ `onToggleFullscreen`(player_keyboard_actions:64 + player_screen _buildPlayerActions:372)改走 `windowService.setMode(isFullscreen?windowed:fullscreen)`,弃 `videoKey.toggleFullscreen`;④ `onExitFullscreen` 保留(isFullscreen 修正后生效)。
+- 方案B(替代):弃 fullscreen_window,改用 `windowManager.setFullScreen`(window_manager 自带),onWindowMaximize 不冲突。但需验证 window_manager setFullScreen 与现有 fullscreen_window 不冲突(media_kit 是否还调)。
+- 用户可先手动验证根因:全屏后按 ESC — 若 ESC 也退不出全屏,印证 `isFullscreen=false`(mode 不同步)。
+
+**需求5:停止后打开文件无反应**
+
+- 链路:`_openFile`(player_feature:162)→`controller.openAndPlay`→`fileOps.openAndPlay`(file_operations:36)→`PathValidator.validate`+`navigator.playIndex(idx)`→`engine.open`(idle→opening→idle,契约允许 idle)+`play()`。代码链路无 idle 阻塞。
+- 根因(待确认):疑 FilePicker 不弹(与需求6 file picker 多开同源)非状态机阻塞。
+- 需手动复现:点打开文件按钮(EmptyState 中间 或 ControlBar 右下)观察 picker 是否弹出。①不弹→需求6同源(FilePicker guard/聚焦);②弹但选文件不播→查 PlaybackNavigator.playIndex + engine.open generation 守卫。
+
+**未实施原因**:context ~72% + 两 bug 需 GUI 手动验证(无头测不出全屏/FilePicker)+ 需求1治本涉及 4-5 文件 + SC_MAXIMIZE 深坑 + 核心交互风险。半成品(全屏坏)比不修更糟。记录根因+方案,下窗口实施+手动验证。memory `project-bug-fullscreen-mode-desync`。
+
 ## Operator Next Steps
 
+- 下一窗口:实施需求1治本方案 A(window_service.setMode 实现 + _fullscreenIntent 守卫 + onToggleFullscreen 改走 windowService)+ 需求5手动复现定位。需 Windows GUI 手动验证。
 - Start the next milestone with /gsd-new-milestone

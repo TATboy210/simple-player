@@ -40,7 +40,7 @@ class AboutTab extends StatelessWidget {
               SettingRow(
                 title: l10n.techStack,
                 control: const Text(
-                  'Flutter + fvp',
+                  'Flutter + media_kit',
                   style: TextStyle(
                     color: Tokens.textSecondary,
                     fontSize: Tokens.fontCaption,

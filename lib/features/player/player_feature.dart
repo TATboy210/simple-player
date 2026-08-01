@@ -159,17 +159,27 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// allowedExtensions 覆盖视频格式（mp4/mkv/avi/mov 等）和音频格式
   /// （mp3/flac/wav/aac 等），确保用户只能选择播放器支持的文件类型。
   /// 选中的文件逐个通过 PlaybackController.openAndPlay() 打开播放。
+  /// File picker 重入守卫 — 防重复点击多次弹出 FilePicker (需求6 最小修改).
+  /// 聚焦 (SetForegroundWindow) + 提示音 (MessageBeep) 代价大, 暂未做.
+  bool _isPicking = false;
+
   Future<void> _openFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: PathValidator.supportedExtensions,
-    );
-    if (result != null && result.files.isNotEmpty) {
-      for (final file in result.files) {
-        if (file.path != null) {
-          await _services.controller.openAndPlay(file.path!);
+    if (_isPicking) return;
+    _isPicking = true;
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: PathValidator.supportedExtensions,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        for (final file in result.files) {
+          if (file.path != null) {
+            await _services.controller.openAndPlay(file.path!);
+          }
         }
       }
+    } finally {
+      _isPicking = false;
     }
   }
 

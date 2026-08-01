@@ -15,7 +15,7 @@ import '../models/track_preferences.dart';
 import '../persistence/settings_store.dart';
 import '../diagnostics/kernel_logger.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 轨道偏好服务 — 加载、保存、恢复用户选择的音频/字幕轨道和字幕延迟.
 ///

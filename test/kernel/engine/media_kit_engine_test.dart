@@ -59,14 +59,36 @@ void main() {
         audio: [
           AudioTrack.auto(),
           AudioTrack.no(),
-          AudioTrack('1', 'English', 'en', codec: 'aac', channelscount: 2),
-          AudioTrack('2', 'Chinese', 'zh', codec: 'opus', channelscount: 6),
+          const AudioTrack(
+            '1',
+            'English',
+            'en',
+            codec: 'aac',
+            channelscount: 2,
+          ),
+          const AudioTrack(
+            '2',
+            'Chinese',
+            'zh',
+            codec: 'opus',
+            channelscount: 6,
+          ),
         ],
       );
       final result = MediaKitEngine.audioTracksFromMediaKit(tracks);
       expect(result, [
-        AudioTrackInfo(index: 0, language: 'en', codec: 'aac', channels: 2),
-        AudioTrackInfo(index: 1, language: 'zh', codec: 'opus', channels: 6),
+        const AudioTrackInfo(
+          index: 0,
+          language: 'en',
+          codec: 'aac',
+          channels: 2,
+        ),
+        const AudioTrackInfo(
+          index: 1,
+          language: 'zh',
+          codec: 'opus',
+          channels: 6,
+        ),
       ]);
     });
 
@@ -76,12 +98,10 @@ void main() {
     });
 
     test('language/codec/channels null 时填默认空值', () {
-      final tracks = Tracks(
-        audio: [AudioTrack('1', null, null)],
-      );
+      final tracks = const Tracks(audio: [AudioTrack('1', null, null)]);
       final result = MediaKitEngine.audioTracksFromMediaKit(tracks);
       expect(result, [
-        AudioTrackInfo(index: 0, language: '', codec: '', channels: 0),
+        const AudioTrackInfo(index: 0, language: '', codec: '', channels: 0),
       ]);
     });
   });
@@ -96,14 +116,14 @@ void main() {
         subtitle: [
           SubtitleTrack.auto(),
           SubtitleTrack.no(),
-          SubtitleTrack('1', 'Forced', 'en'),
-          SubtitleTrack('2', 'SDH', 'zh'),
+          const SubtitleTrack('1', 'Forced', 'en'),
+          const SubtitleTrack('2', 'SDH', 'zh'),
         ],
       );
       final result = MediaKitEngine.subtitleTracksFromMediaKit(tracks);
       expect(result, [
-        SubtitleTrackInfo(index: 0, language: 'en', title: 'Forced'),
-        SubtitleTrackInfo(index: 1, language: 'zh', title: 'SDH'),
+        const SubtitleTrackInfo(index: 0, language: 'en', title: 'Forced'),
+        const SubtitleTrackInfo(index: 1, language: 'zh', title: 'SDH'),
       ]);
     });
 

@@ -28,7 +28,6 @@ dependencies:
   json_annotation: ^4.12.0
   ffi: ^2.1.0
   window_manager: ^0.5.2
-  hotkey_manager: ^0.2.3
   file_selector: any
   xdg_directories: any
   animations: any

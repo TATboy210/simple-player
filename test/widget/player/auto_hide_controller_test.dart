@@ -357,8 +357,8 @@ void main() {
       c.onMouseEnter(); // hovering = true
       c.scheduleHide();
 
-      // Advance past 5s hide delay — hover guard blocks hide
-      await tester.pump(const Duration(seconds: 6));
+      // Advance past 3s hide delay — hover guard blocks hide
+      await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
 
       expect(c.visible.value, isTrue);
@@ -412,9 +412,9 @@ void main() {
   group('AutoHideController — scheduleHide timer fires hide', () {
     testWidgets('timer callback hides when not hovering', (tester) async {
       // Use a widget test so AnimationController/Ticker works properly.
-      // scheduleHide creates Timer(5s) in windowed mode.
-      // After pump(Duration(seconds: 6)), the timer fires and calls hide().
-      // hide() reverses the animation (300ms). pumpAndSettle() completes it.
+      // scheduleHide creates Timer(3s) in windowed mode (Tokens.hideDelayWindowed).
+      // After pump(Duration(seconds: 4)), the timer fires and calls hide().
+      // hide() reverses the animation (150ms). pumpAndSettle() completes it.
       // _onAnimStatus(dismissed) → visible = false.
       engineState.value = MediaState.playing;
       await tester.pumpWidget(
@@ -427,19 +427,18 @@ void main() {
       );
       await tester.pump();
 
-      final state = tester
-          .state<_TestAutoHideWrapperState>(
-            find.byType(_TestAutoHideWrapper),
-          );
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
       final c = state.controller;
 
       // Start auto-hide timer via scheduleHide
       c.scheduleHide();
 
-      // Advance past the 5s windowed hide delay
-      await tester.pump(const Duration(seconds: 6));
+      // Advance past the 3s windowed hide delay
+      await tester.pump(const Duration(seconds: 4));
       // Timer fired → hide() → _animController.reverse()
-      // Now let the reverse animation (300ms) complete
+      // Now let the reverse animation (150ms) complete
       await tester.pumpAndSettle();
 
       // _onAnimStatus(dismissed) should have fired → visible = false
@@ -460,7 +459,8 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
-    test('opening when hidden shows and schedules hide', () {
+    test('opening when hidden shows without scheduling hide', () {
+      // opening 永显策略:show() + cancel timer(不 scheduleHide)
       engineState.value = MediaState.idle;
       final c = createController();
       c.init();
@@ -518,6 +518,96 @@ void main() {
       c.onEngineStateChanged();
 
       expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController.onEngineStateChanged() — opening persistence', () {
+    testWidgets('opening keeps controls visible past hide delay', (
+      tester,
+    ) async {
+      // opening 永显:进入 opening 后 timer 被 cancel,pump 超过 hide delay 仍可见
+      engineState.value = MediaState.idle;
+      await tester.pumpWidget(
+        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+      );
+      await tester.pump();
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final c = state.controller;
+      c.visible.value = false;
+
+      engineState.value = MediaState.opening;
+      c.onEngineStateChanged();
+
+      // pump 超过 hide delay(3s)— opening 永显,timer 被 cancel,不隐藏
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      expect(c.visible.value, isTrue);
+    });
+  });
+
+  group('AutoHideController.onSeekStart/onSeekEnd', () {
+    testWidgets('onSeekStart shows and freezes hide timer', (tester) async {
+      // seek 拖动保护:onSeekStart 显示控件 + cancel timer,pump 超过 delay 仍可见
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+      );
+      await tester.pump();
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final c = state.controller;
+
+      // 先隐藏控件
+      c.hide();
+      await tester.pumpAndSettle();
+      expect(c.visible.value, isFalse);
+
+      // onSeekStart — 显示 + cancel hide timer
+      c.onSeekStart();
+      expect(c.visible.value, isTrue);
+
+      // pump 超过 hide delay — timer 被 cancel,seek 期间不隐藏
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(c.visible.value, isTrue);
+    });
+
+    testWidgets('onSeekEnd restarts hide timer', (tester) async {
+      // onSeekEnd 重启计时:pump 超过 delay 后控件隐藏
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+      );
+      await tester.pump();
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final c = state.controller;
+
+      c.onSeekStart(); // cancel timer
+      c.onSeekEnd(); // 重启 timer(3s)
+
+      await tester.pump(const Duration(seconds: 4)); // past 3s
+      await tester.pumpAndSettle();
+
+      expect(c.visible.value, isFalse); // timer fires → hide
+    });
+
+    test('onSeekStart/onSeekEnd are no-op when idle', () {
+      engineState.value = MediaState.idle;
+      final c = createController();
+      c.init();
+      c.visible.value = false;
+
+      c.onSeekStart();
+      expect(c.visible.value, isFalse); // idle 跳过
+
+      c.onSeekEnd();
+      expect(c.visible.value, isFalse); // idle 跳过
     });
   });
 }

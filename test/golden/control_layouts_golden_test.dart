@@ -116,7 +116,6 @@ void main() {
     testWidgets('half progress', (tester) async {
       engine.configureMedia(durationMs: 60000);
       engine.position.value = 30000;
-      engine.buffered.value = 45000;
 
       await tester.pumpWidget(
         buildControlSubject(

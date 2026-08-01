@@ -130,14 +130,6 @@ void main() {
       expect(engine.lastSeekToMs, greaterThanOrEqualTo(9500));
     });
 
-    testWidgets('renders with buffered content', (tester) async {
-      engine.duration.value = 10000;
-      engine.position.value = 3000;
-      engine.buffered.value = 6000;
-      await tester.pumpWidget(buildSubject());
-      expect(find.byType(CustomPaint), findsWidgets);
-    });
-
     testWidgets('Semantics slider is present', (tester) async {
       engine.duration.value = 10000;
       engine.position.value = 5000;
@@ -783,5 +775,87 @@ void main() {
       // 第二次 seek 应比第一次更远
       expect(engine.lastSeekToMs, greaterThan(firstSeek!));
     });
+
+    // ── 穿外套后续: 进度条与 media_kit 对接修复 (修 A/B/D) 回归测试 ──
+    // 修 C (dragEnd 延迟清 _dragNotifier 防回跳) 不在此覆盖:
+    //   FakeEngine.seekTo 同步写 position, 不模拟 media_kit 旧 stream 回拨,
+    //   "松手回跳" 场景需手动 run 验证 (见 plan quizzical-wobbling-kettle 手动清单).
+
+    testWidgets(
+      'tap seeks immediately when duration arrives after build (修 A)',
+      (tester) async {
+        // 修 A: build 时 duration=0 (stream 未到), 回调体内 return 但回调非 null.
+        // duration 延迟到达后只触发子 AnimatedBuilder, 不重建顶层 GestureDetector.
+        await tester.pumpWidget(buildSubject());
+        await tester.pump();
+
+        // duration stream 延迟到达 — 模拟 media_kit 加载后 duration 才就绪
+        engine.duration.value = 10000;
+        await tester.pump();
+
+        // 点击立即 seek — 无需控制栏 hide/show 触发重建 (用户痛点)
+        final bar = find.byType(ProgressBar);
+        await tester.tapAt(tester.getRect(bar).center);
+        await tester.pump();
+
+        expect(engine.seekToCallCount, greaterThanOrEqualTo(1));
+      },
+    );
+
+    testWidgets(
+      'drag seeks during drag, not only on release (修 B)',
+      (tester) async {
+        // 修 B: leading throttle — dragUpdate 期间 seek (timer 未活跃才触发),
+        // 非松手才跳. dragFrom 触发 start→update→end, 断言 seek >= 2
+        // (dragUpdate leading seek 1 + dragEnd flush seek 1).
+        // 修 B 前 debounce 致 dragUpdate 不 seek, 仅 dragEnd 1 次 → count=1.
+        engine.duration.value = 10000;
+        await tester.pumpWidget(buildSubject());
+        await tester.pump();
+
+        final bar = find.byType(ProgressBar);
+        final rect = tester.getRect(bar);
+        final start = rect.centerLeft + const Offset(50, 0);
+        final end = rect.centerRight - const Offset(50, 0);
+
+        await tester.dragFrom(start, end - start);
+        await tester.pump();
+
+        expect(engine.seekToCallCount, greaterThanOrEqualTo(2));
+      },
+    );
+
+    testWidgets(
+      'hover tooltip renders without extra postFrame pump (修 D)',
+      (tester) async {
+        // 修 D: onHover 直接更新 _hoverNotifier, 去掉 postFrameCallback +
+        // _hoverScheduled. 连续 hover move 每次都更新 (不丢更新), tooltip 即时跟随.
+        engine.duration.value = 60000;
+        await tester.pumpWidget(buildSubject());
+        await tester.pump();
+
+        final bar = find.byType(ProgressBar);
+        final rect = tester.getRect(bar);
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(
+          location: rect.centerLeft + const Offset(10, 0),
+        );
+        await tester.pump();
+
+        // 连续 hover move — 修 D 前 _hoverScheduled=true 期间会丢中途更新
+        for (var i = 0; i < 4; i++) {
+          await gesture.moveBy(const Offset(30, 0));
+          await tester.pump();
+        }
+        await tester.pump();
+
+        // tooltip 渲染: hover fraction 非 null → Positioned tooltip 存在
+        expect(find.byType(Positioned), findsWidgets);
+        expect(find.byType(ProgressBar), findsOneWidget);
+      },
+    );
   });
 }

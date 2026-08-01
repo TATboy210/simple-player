@@ -26,7 +26,7 @@ import 'playback_state_manager.dart';
 import 'subtitle_service.dart';
 import 'track_preference_service.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 设置面板暂停契约 — Phase 23 D-03 服务边界的窄接口。
 ///
@@ -272,11 +272,12 @@ class PlaybackController implements SettingsPanelPlayback {
   ///
   /// [settings] 可选：调用方已加载时传入，避免重复 IO。
   /// 使用 DebugProbe 包裹以记录初始化耗时。
-  Future<void> init({AppSettings? settings}) => probe.measureAsync('init', () async {
-    await stateManager.init(settings: settings);
-    await autoAdvance.init();
-    await _trackPreferenceService?.load();
-  });
+  Future<void> init({AppSettings? settings}) =>
+      probe.measureAsync('init', () async {
+        await stateManager.init(settings: settings);
+        await autoAdvance.init();
+        await _trackPreferenceService?.load();
+      });
 
   /// 释放资源 — 按序释放 autoAdvance / stateManager / currentFileName / validationError.
   ///

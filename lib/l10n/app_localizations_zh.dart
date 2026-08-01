@@ -415,7 +415,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get licenses => '开源许可';
 
   @override
-  String get copyright => '基于 Flutter + fvp (MDK/FFmpeg) 构建';
+  String get copyright => '基于 Flutter + media_kit (libmpv) 构建';
 
   @override
   String get resetShortcuts => '恢复默认';

@@ -147,7 +147,7 @@
   "version": "版本",
   "techStack": "技术栈",
   "licenses": "开源许可",
-  "copyright": "基于 Flutter + fvp (MDK/FFmpeg) 构建",
+  "copyright": "基于 Flutter + media_kit (libmpv) 构建",
 
   "resetShortcuts": "恢复默认",
   "pressKeyToBind": "请按下新按键...",

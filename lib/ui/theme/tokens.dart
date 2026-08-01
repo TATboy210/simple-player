@@ -142,12 +142,16 @@ class Tokens {
   static const durationFast = 80;
   static const durationNormal = 150;
   static const durationFade = 400;
+  // auto-hide 控件淡入淡出专用 — 对齐 media_kit 原生 150ms(独立于
+  // durationFade=400,后者驱动 center_controls 中心播放/暂停图标,隔离影响)
+  static const durationControlsFade = 150;
   static const durationSlide = 300;
   static const durationDebounce = 500;
   static const durationWindowResize = 100;
 
   // ── 自动隐藏 ──
-  static const hideDelayWindowed = 5;
+  // 窗口/全屏统一 3s — 对齐 media_kit 原生隐藏延迟(原 windowed=5s 偏长)
+  static const hideDelayWindowed = 3;
   static const hideDelayFullscreen = 3;
 
   /// 鼠标距底部多少 px 内触发控制栏显示
@@ -188,16 +192,22 @@ class Tokens {
   static const progressBarThicknessDrag = 5.0;
   static const progressThumbRadius = 7.0;
   static const progressPlayed = Color(0xFFFFFFFF); // 白色（与设计稿一致）
-  static const progressBuffer = Color(0x44FFFFFF);
   static const Color progressThumb = Color(0xFFFFFFFF);
   static const int progressSeekThrottleMs = 150;
+
+  /// 修 C (事件驱动 v2): position 到达 seek 目标的容差 — 容差内视为 seek 完成, 清 drag.
+  /// 比 v1 固定 300ms 定时器更贴近 media_kit_control_bar 原生内部协调, 网络流/慢 seek 不回跳.
+  static const int progressSeekArriveToleranceMs = 500;
+
+  /// 修 C (事件驱动 v2): seek 超时兜底 — position 一直未到达 (seek 失败/极慢) 时强制清 drag,
+  /// 避免进度条永久卡在 drag 位置. 兜底大于典型 seek 完成时间.
+  static const int progressSeekHoldTimeoutMs = 2000;
 
   /// 渐变条高度
   static const double gradientStripHeight = 3.0;
   static const int progressExpandDurationMs = 200;
   static const double progressDragThreshold = 5.0;
   static const double progressDisabledBgAlpha = 0.3;
-  static const double progressDisabledBufferAlpha = 0.2;
   static const double progressDisabledPlayedAlpha = 0.3;
 
   // ── 缩放 ──

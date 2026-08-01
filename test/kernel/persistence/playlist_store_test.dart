@@ -18,7 +18,7 @@ void main() {
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('playlist_store_test_');
     // R2-5: 使用 create() 注入临时目录，无需 mock platform channel
-    PlaylistStore.reset(newInstance: PlaylistStore.create(storagePath: tempDir.path));
+    PlaylistStore.reset(newInstance: PlaylistStore(storagePath: tempDir.path));
   });
 
   tearDown(() async {
@@ -253,7 +253,7 @@ void main() {
 
     test('_flush retries on write failure', () async {
       // R2-5: 使用 create() 注入无效路径，无需 mock platform channel
-      PlaylistStore.reset(newInstance: PlaylistStore.create(storagePath: '/nonexistent_dir_xyz'));
+      PlaylistStore.reset(newInstance: PlaylistStore(storagePath: '/nonexistent_dir_xyz'));
 
       final playlist = Playlist();
       playlist.add('/retry_test.mp4');
@@ -262,7 +262,7 @@ void main() {
       await PlaylistStore.dispose();
 
       // Restore valid instance for tearDown
-      PlaylistStore.reset(newInstance: PlaylistStore.create(storagePath: tempDir.path));
+      PlaylistStore.reset(newInstance: PlaylistStore(storagePath: tempDir.path));
     });
   });
 }

@@ -36,9 +36,7 @@ void main() {
     WidgetTester tester, {
     DisplayEnumerator? displayEnumerator,
   }) async {
-    final fake = FakePlaybackController(
-      initialState: MediaState.playing,
-    );
+    final fake = FakePlaybackController(initialState: MediaState.playing);
     final controller = SettingsPanelController(fake);
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox());
@@ -80,9 +78,7 @@ void main() {
 
         // Act — 从标题栏向下拖 500px（超 workArea 底部）
         final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture = await tester.startGesture(tester.getCenter(titleBar));
         await gesture.moveBy(const Offset(0, 500));
         await gesture.up();
         await tester.pump();
@@ -93,27 +89,24 @@ void main() {
       },
     );
 
-    testWidgets(
-      'no injection falls back to symmetric clamp at dy=231.25',
-      (tester) async {
-        // Arrange — 无 DisplayEnumerator 注入（生产默认 null，30-02 才注入 Win32）
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('no injection falls back to symmetric clamp at dy=231.25', (
+      tester,
+    ) async {
+      // Arrange — 无 DisplayEnumerator 注入（生产默认 null，30-02 才注入 Win32）
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act
-        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
-        await gesture.moveBy(const Offset(0, 500));
-        await gesture.up();
-        await tester.pump();
+      // Act
+      final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+      final gesture = await tester.startGesture(tester.getCenter(titleBar));
+      await gesture.moveBy(const Offset(0, 500));
+      await gesture.up();
+      await tester.pump();
 
-        // Assert — 对称 clamp：dy 停在 (800-337.5)/2=231.25
-        expect(controller.state.dragOffset.value.dy, closeTo(231.25, 0.01));
-      },
-    );
+      // Assert — 对称 clamp：dy 停在 (800-337.5)/2=231.25
+      expect(controller.state.dragOffset.value.dy, closeTo(231.25, 0.01));
+    });
 
     testWidgets(
       'workArea injection clamps drag right at dx=200 (not symmetric 300)',
@@ -129,9 +122,7 @@ void main() {
 
         // Act — 向右拖 500px（超 workArea 右边界）
         final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture = await tester.startGesture(tester.getCenter(titleBar));
         await gesture.moveBy(const Offset(500, 0));
         await gesture.up();
         await tester.pump();
@@ -142,33 +133,30 @@ void main() {
       },
     );
 
-    testWidgets(
-      'no injection falls back to symmetric clamp at dx=300',
-      (tester) async {
-        // Arrange
-        final (controller, _) = await pumpShell(tester);
-        controller.open();
-        await tester.pump();
+    testWidgets('no injection falls back to symmetric clamp at dx=300', (
+      tester,
+    ) async {
+      // Arrange
+      final (controller, _) = await pumpShell(tester);
+      controller.open();
+      await tester.pump();
 
-        // Act
-        final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
-        await gesture.moveBy(const Offset(500, 0));
-        await gesture.up();
-        await tester.pump();
+      // Act
+      final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
+      final gesture = await tester.startGesture(tester.getCenter(titleBar));
+      await gesture.moveBy(const Offset(500, 0));
+      await gesture.up();
+      await tester.pump();
 
-        // Assert — 对称 clamp：dx 停在 (1200-600)/2=300
-        expect(controller.state.dragOffset.value.dx, closeTo(300.0, 0.01));
-      },
-    );
+      // Assert — 对称 clamp：dx 停在 (1200-600)/2=300
+      expect(controller.state.dragOffset.value.dx, closeTo(300.0, 0.01));
+    });
 
     testWidgets(
       'falls back to symmetric clamp when workArea smaller than panel',
       (tester) async {
         // Arrange — workArea 500×300 < panelSize 600×337.5 → 触发 fallback
-        final smallWorkArea = Rect.fromLTRB(0, 0, 500, 300);
+        final smallWorkArea = const Rect.fromLTRB(0, 0, 500, 300);
         final fake = FakeDisplayEnumerator(workArea: smallWorkArea);
         final (controller, _) = await pumpShell(
           tester,
@@ -179,9 +167,7 @@ void main() {
 
         // Act
         final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture = await tester.startGesture(tester.getCenter(titleBar));
         await gesture.moveBy(const Offset(0, 500));
         await gesture.up();
         await tester.pump();
@@ -205,9 +191,7 @@ void main() {
 
         // Act
         final titleBar = find.byKey(SettingsOverlayShell.titleBarKey);
-        final gesture = await tester.startGesture(
-          tester.getCenter(titleBar),
-        );
+        final gesture = await tester.startGesture(tester.getCenter(titleBar));
         await gesture.moveBy(const Offset(0, 500));
         await gesture.up();
         await tester.pump();
@@ -234,11 +218,7 @@ class FakeDisplayEnumerator implements DisplayEnumerator {
   List<DisplayInfo> enumerateDisplays() {
     if (workArea == null) return const [];
     return [
-      DisplayInfo(
-        bounds: workArea!,
-        workArea: workArea!,
-        isPrimary: true,
-      ),
+      DisplayInfo(bounds: workArea!, workArea: workArea!, isPrimary: true),
     ];
   }
 
@@ -248,10 +228,6 @@ class FakeDisplayEnumerator implements DisplayEnumerator {
   @override
   DisplayInfo? getCurrentDisplay() {
     if (workArea == null) return null;
-    return DisplayInfo(
-      bounds: workArea!,
-      workArea: workArea!,
-      isPrimary: true,
-    );
+    return DisplayInfo(bounds: workArea!, workArea: workArea!, isPrimary: true);
   }
 }

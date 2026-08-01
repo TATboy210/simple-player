@@ -10,13 +10,16 @@ import '../../kernel/engine/engine_state.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../kernel/services/playback_controller.dart';
-import '../theme/tokens.dart';
+import '../../l10n/app_localizations.dart';
 import '../dialogs/settings/settings_overlay_shell.dart';
 import '../dialogs/settings/settings_panel_controller.dart';
 import '../playlist/playlist_panel.dart';
+import '../shared/play_mode_utils.dart';
+import '../theme/tokens.dart';
 import '../window/custom_title_bar.dart';
+import 'controls_overlay.dart';
 import 'drop_handler.dart';
-import 'media_kit_control_bar.dart';
+import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
 import 'smart_drag_to_resize_area.dart';
 
@@ -76,9 +79,8 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  /// media_kit Video 的 state key — 供 F 键全屏回调调无参
-  /// [VideoState.toggleFullscreen] (绕过 context 陷阱: 顶层 toggleFullscreen
-  /// 需 Video 子树 context, 而 KeyboardHandler 在 Video 外层).
+  /// media_kit Video 的 state key — 供 setSubtitleViewPadding 调用
+  /// (控件可见性联动字幕上移). 不再用于全屏切换 (改走 WindowService.setMode).
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
 
   /// (visible, mounted) — 合并为单一 notifier 消除嵌套 VLB.
@@ -86,6 +88,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     false,
     false,
   ));
+
+  /// 控件可见性 — 从 ControlsOverlay 单向同步,驱动全屏鼠标隐藏 + 字幕上移.
+  final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
 
   void _togglePlaylist() {
     final (visible, mounted) = _playlistState.value;
@@ -115,7 +120,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _controlsVisible.addListener(_onControlsVisibleChanged);
+    // Video 挂载后初始上移字幕(控件初始可见). post-frame 确保 _videoKey 已挂载.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _onControlsVisibleChanged(),
+    );
+  }
+
+  /// 控件可见性变化 — 联动字幕上移(控件可见时上移避免被 ControlBar 遮挡,
+  /// 隐藏时还原 base). 对齐 media_kit 原生 material_desktop shift/unshift 逻辑.
+  void _onControlsVisibleChanged() {
+    final videoState = _videoKey.currentState;
+    if (videoState == null) return;
+    final base = videoState.widget.subtitleViewConfiguration.padding;
+    if (_controlsVisible.value) {
+      videoState.setSubtitleViewPadding(
+        base +
+            const EdgeInsets.only(
+              bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
+            ),
+      );
+    } else {
+      videoState.setSubtitleViewPadding(base);
+    }
+  }
+
+  @override
   void dispose() {
+    _controlsVisible.removeListener(_onControlsVisibleChanged);
+    _controlsVisible.dispose();
     _playlistState.dispose();
     super.dispose();
   }
@@ -200,7 +235,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ],
                             );
                           },
-                          child: _buildVideoContent(),
+                          child: _buildVideoContent(
+                            context,
+                            isFullscreen: isFullscreen,
+                          ),
                         );
                       },
                     ),
@@ -236,21 +274,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
         // T1: 始终返回 SmartDragToResizeArea — 保持 Widget 类型一致.
         // 全屏时 enabled=false (IgnorePointer 禁用拖拽但不改类型),
         // canUpdate 始终 true, Element 复用, Texture 子树不被销毁.
-        return MouseRegion(
-          cursor: isFullscreen
-              ? SystemMouseCursors.basic
-              : MouseCursor.defer,
-          child: SmartDragToResizeArea(
-            enabled: !isFullscreen,
-            child: keyboardHandler,
-          ),
+        return ValueListenableBuilder<bool>(
+          valueListenable: _controlsVisible,
+          builder: (_, controlsVisible, _) {
+            // 全屏 + 控件隐藏 → 隐藏鼠标(沉浸);否则全屏 basic / 窗口 defer
+            final cursor = (isFullscreen && !controlsVisible)
+                ? SystemMouseCursors.none
+                : (isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer);
+            return MouseRegion(
+              cursor: cursor,
+              child: SmartDragToResizeArea(
+                enabled: !isFullscreen,
+                child: keyboardHandler,
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  /// 视频内容区 — DropHandler 包裹 media_kit 控件 + 空状态层.
-  Widget _buildVideoContent() => Row(
+  /// 视频内容区 — DropHandler 包裹 media_kit 纯渲染 + 空状态层 + 自定义控制外套.
+  ///
+  /// 三层 Stack: 底层 [Video](`NoVideoControls` 纯渲染, 身体不动) →
+  /// 中层 emptyState(idle 时显示, 在 ControlsOverlay 之下供手势透传) →
+  /// 顶层 [ControlsOverlay](自定义玻璃外套: ControlBar + AutoHideController +
+  /// OSD + ErrorBanner + 手势). media_kit 引擎(VideoController/videoKey/全屏)不变.
+  Widget _buildVideoContent(
+    BuildContext context, {
+    required bool isFullscreen,
+  }) => Row(
     children: [
       Expanded(
         child: DropHandler(
@@ -259,16 +312,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              MediaKitControlBar(
+              // 底层: media_kit 纯渲染 — 脱掉控件外套 (NoVideoControls),
+              // VideoState 仍创建, toggleFullscreen 仍可用 (身体不动).
+              Video(
+                key: _videoKey,
                 controller: widget.mediaKitController,
-                videoKey: _videoKey,
-                onPrevious: () => widget.controller.playPrevious(),
-                onNext: () => widget.controller.playNext(),
-                onOpenFile: widget.onOpenFile,
-                onOpenSubtitle: _openSubtitle,
-                onTogglePlaylist: _togglePlaylist,
-                onOpenSettings: widget.settingsPanelController.open,
+                controls: (_) => const SizedBox.shrink(),
               ),
+              // 中层: emptyState (idle 时显示). 置于 ControlsOverlay 之下,
+              // 让 ControlsOverlay.emptyStatePresent 的手势透传命中 emptyState 按钮.
               if (widget.emptyState != null)
                 ValueListenableBuilder<MediaState>(
                   valueListenable: widget.engine.state,
@@ -277,10 +329,65 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       : const SizedBox.shrink(),
                   child: Positioned.fill(child: widget.emptyState!),
                 ),
+              // 顶层: 自定义玻璃外套. 借 playlistGeneration 间接刷新
+              // playModeIcon (Playlist.mode 非 ValueNotifier, 见 _buildPlayerActions).
+              ValueListenableBuilder<int>(
+                valueListenable: widget.playlistGeneration,
+                builder: (ctx, _, _) => ControlsOverlay(
+                  engine: widget.engine,
+                  actions: _buildPlayerActions(ctx),
+                  isFullscreen: isFullscreen,
+                  resizing: widget.windowService.isResizing,
+                  emptyStatePresent: widget.emptyState != null,
+                  visibleSink: _controlsVisible,
+                  // 视频名 — 从 playlist 当前项 basename 取 (恢复 14b68165^ 接线,
+                  // CB-04 隐藏 title row 时移除). 借 playlistGeneration VLB 刷新
+                  // (切歌 onNeedRebuild→generation++).
+                  title: widget.playlist.current?.name,
+                ),
+              ),
             ],
           ),
         ),
       ),
     ],
   );
+
+  /// 构造播放器回调集合 — 从 PlayerScreen 现有回调填充 [PlayerActions].
+  ///
+  /// `playModeIcon`/`playModeLabel` 从 `widget.playlist.mode` 经 PlayModeUtils
+  /// 计算. `Playlist.mode` 是普通 getter (非 ValueNotifier), 借外层
+  /// `playlistGeneration` ValueListenableBuilder 间接驱动刷新 — 若播放模式
+  /// 切换未触发 generation++, 图标不实时更新 (已知限制, 不阻塞主目标).
+  /// `onToggleFullscreen` 走 `WindowService.setMode` (统一全屏通道, 同步 mode).
+  PlayerActions _buildPlayerActions(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final mode = widget.playlist.mode;
+    return PlayerActions(
+      onPrevious: () => widget.controller.playPrevious(),
+      onNext: () => widget.controller.playNext(),
+      onOpenFile: widget.onOpenFile,
+      onOpenSubtitle: _openSubtitle,
+      onTogglePlaylist: _togglePlaylist,
+      onSettings: widget.settingsPanelController.open,
+      onSettingsSecondary: widget.onSettingsSecondary,
+      onTogglePlayMode: widget.onTogglePlayMode,
+      // 方案 B: setMode 设 intent+mode (守卫同步 mode), videoKey.toggleFullscreen
+      // 走 media_kit 原生全屏. 闭包内现读 mode.value 避免陈旧捕获 (此 builder 在
+      // playlistGeneration VLB 内, 拿不到外层 AnimatedBuilder 的 isFullscreen).
+      onToggleFullscreen: () {
+        final m = widget.windowService.mode.value;
+        final entering = m != WindowMode.fullscreen;
+        widget.windowService.setMode(
+          entering ? WindowMode.fullscreen : WindowMode.windowed,
+        );
+        _videoKey.currentState?.toggleFullscreen();
+      },
+      onFilesDropped: widget.onFilesDropped,
+      onShowProperties: widget.onShowProperties,
+      playModeIcon: playModeIcon(mode),
+      playModeLabel: playModeLabel(mode, l10n),
+      isVideo: true,
+    );
+  }
 }

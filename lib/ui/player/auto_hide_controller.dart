@@ -20,11 +20,15 @@ class AutoHideController {
        _popupCloseNotifier = popupCloseNotifier {
     _animController = AnimationController(
       vsync: vsync,
-      duration: const Duration(milliseconds: Tokens.durationFade),
+      // 对齐 media_kit 原生 150ms 控件淡入淡出(原 durationFade=400ms 偏慢)
+      duration: const Duration(milliseconds: Tokens.durationControlsFade),
       value: 1,
     );
     // D-02: easeInOut 对称曲线 — 出现和消失速度一致
-    _opacity = CurvedAnimation(parent: _animController, curve: Curves.easeInOut);
+    _opacity = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeInOut,
+    );
     // fade-out 完成后立即关闭 hit test，避免透明 overlay 拦截点击
     _animController.addStatusListener(_onAnimStatus);
   }
@@ -125,6 +129,12 @@ class AutoHideController {
   }
 
   /// 引擎状态变化处理
+  ///
+  /// 状态策略(对齐 media_kit 原生 + 增强):
+  /// - idle: 永显(空状态共存)
+  /// - opening: 永显直到 playing(打开文件不过早隐藏控件)
+  /// - playing: show + scheduleHide(唯一自动隐藏状态)
+  /// - paused/completed/error: 永显(用户需操作)
   void onEngineStateChanged() {
     final s = _engineState.value;
     if (s == MediaState.idle) {
@@ -135,21 +145,34 @@ class AutoHideController {
       }
       return;
     }
-    if (s == MediaState.opening || s == MediaState.playing) {
+    // 仅 playing 自动隐藏 — opening/paused/completed/error 永显
+    if (s == MediaState.playing) {
       show();
       // 无论当前是否可见，始终重置隐藏定时器
       scheduleHide();
       return;
     }
-    // completed/error/paused 状态下永久显示控制栏，不自动隐藏
-    final alwaysShow =
-        s == MediaState.paused ||
-        s == MediaState.completed ||
-        s == MediaState.error;
-    if (alwaysShow && !visible.value) {
+    // opening/paused/completed/error:永显
+    if (!visible.value) {
       show();
-      _hideTimer?.cancel();
     }
+    _hideTimer?.cancel();
+  }
+
+  /// 用户开始拖动进度条 — 显示控件并冻结隐藏计时(seek 期间不隐藏).
+  ///
+  /// 对齐 media_kit 原生 onSeekStart:取消隐藏定时器,避免拖动中控件消失.
+  /// idle 状态无进度条交互,跳过.
+  void onSeekStart() {
+    if (_engineState.value == MediaState.idle) return;
+    show();
+    _hideTimer?.cancel();
+  }
+
+  /// 用户结束拖动进度条 — 重启隐藏计时.
+  void onSeekEnd() {
+    if (_engineState.value == MediaState.idle) return;
+    scheduleHide();
   }
 
   /// 初始状态：idle 时永久显示，否则启动自动隐藏

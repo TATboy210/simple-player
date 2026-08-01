@@ -34,7 +34,7 @@ void main() {
       await tester.pumpWidget(buildTestWidget(const AboutTab()));
 
       expect(find.text('0.0.1'), findsOneWidget);
-      expect(find.text('Flutter + fvp'), findsOneWidget);
+      expect(find.text('Flutter + media_kit'), findsOneWidget);
     });
 
     testWidgets('licenses row uses InkWell for tap', (tester) async {

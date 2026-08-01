@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/services/input_mode_detector.dart';
@@ -124,11 +122,11 @@ void main() {
   );
 }
 
-Widget _wrapOverlay() => MaterialApp(
+Widget _wrapOverlay() => const MaterialApp(
   home: Scaffold(
     body: OptionListNavigationOverlay(
       child: SingleChildScrollView(
-        child: const Column(
+        child: Column(
           children: [
             SizedBox(height: Tokens.spXl),
             SizedBox(height: Tokens.spXl),
