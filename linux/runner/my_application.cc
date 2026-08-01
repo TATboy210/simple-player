@@ -18,6 +18,30 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 // ─── MethodChannel: com.simple_player/window ───
 
 static FlMethodChannel* window_channel = nullptr;
+static FlMethodChannel* file_picker_attention_channel = nullptr;
+
+static void file_picker_attention_method_handler(
+    FlMethodChannel* channel, FlMethodCall* method_call, gpointer user_data) {
+  g_autoptr(FlMethodResponse) response = nullptr;
+  const gchar* method = fl_method_call_get_name(method_call);
+  if (strcmp(method, "focusExistingPicker") != 0) {
+    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+    fl_method_call_respond(method_call, response, nullptr);
+    return;
+  }
+
+  GtkApplication* app = GTK_APPLICATION(user_data);
+  GtkWindow* window = gtk_application_get_active_window(app);
+  // Portal/Wayland pickers are external processes and cannot be focused safely.
+  // Ring GTK's system bell instead of falsely bringing the player to front.
+  if (window != nullptr) {
+    gtk_widget_error_bell(GTK_WIDGET(window));
+  }
+
+  g_autoptr(FlValue) result = fl_value_new_bool(window != nullptr);
+  response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+  fl_method_call_respond(method_call, response, nullptr);
+}
 
 static void window_method_handler(FlMethodChannel* channel,
                                    FlMethodCall* method_call,
@@ -49,6 +73,13 @@ static void register_window_channel(GtkApplication* app, FlView* view) {
       "com.simple_player/window", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
       window_channel, window_method_handler, app, nullptr);
+
+  file_picker_attention_channel = fl_method_channel_new(
+      fl_engine_get_binary_message_engine(fl_view_get_engine(view)),
+      "com.simple_player/file_picker_attention", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      file_picker_attention_channel, file_picker_attention_method_handler, app,
+      nullptr);
 }
 
 // ─── Flutter lifecycle ───

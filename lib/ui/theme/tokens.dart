@@ -121,6 +121,9 @@ class Tokens {
 
   static const spXs = 4.0;
   static const spSm = 8.0;
+
+  /// 进度条与右侧时间读数的固定间距，保留 seek 热区的视觉边界。
+  static const controlBarTimeGap = spSm;
   static const spMd = 12.0;
   static const spLg = 16.0;
   static const spXl = 24.0;

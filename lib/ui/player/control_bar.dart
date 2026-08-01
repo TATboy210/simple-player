@@ -3,17 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
-import '../../l10n/app_localizations.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/edge_glow.dart';
 import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
-import 'center_controls.dart';
-import 'left_button_group.dart';
+import 'control_bar_layout.dart';
 import 'player_actions.dart';
-import 'progress_bar.dart';
-import 'right_button_group.dart';
-import 'time_range_display.dart';
 
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
@@ -56,6 +51,10 @@ class ControlBar extends StatelessWidget {
   final VoidCallback? onSeekStart;
   final VoidCallback? onSeekEnd;
 
+  /// 非 seek 子控件的交互边界，透传至 Overlay 统一管理自动隐藏。
+  final VoidCallback? onInteractionStart;
+  final VoidCallback? onInteractionEnd;
+
   const ControlBar({
     super.key,
     required this.engine,
@@ -68,14 +67,12 @@ class ControlBar extends StatelessWidget {
     this.resizing,
     this.onSeekStart,
     this.onSeekEnd,
+    this.onInteractionStart,
+    this.onInteractionEnd,
   });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final prevTooltip = l10n.previousTrack;
-    final nextTooltip = l10n.nextTrack;
-
     // decoration 非空时用 DecorationTween 插值，否则直接使用 playing 装饰
     final effectiveDecoration = decoration != null
         ? _decorationTween.evaluate(decoration!)
@@ -94,73 +91,16 @@ class ControlBar extends StatelessWidget {
             right: Tokens.spSm,
             bottom: Tokens.controlBarContentBottomPadding,
           ),
-          child: Stack(
-            children: [
-              // CSS .player-controls::before — 顶部渐变光线
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: Tokens.controlBarGradientHeight,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Tokens.glowTransparent,
-                        Tokens.glowAccent,
-                        Tokens.glowTransparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // 3 行等分布局：标题+时间 / 进度条 / 按钮行
-              Column(
-                children: [
-                  // Row 1 (Top): 标题 | 时间显示
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title ?? '',
-                            style: const TextStyle(
-                              color: Tokens.textPrimary,
-                              fontSize: Tokens.fontBody,
-                              fontWeight: Tokens.weightMedium,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        TimeRangeDisplay(engine: engine),
-                      ],
-                    ),
-                  ),
-                  // Row 2 (Middle): ProgressBar
-                  Expanded(
-                    child: Center(
-                      child: ProgressBar(
-                        engine: engine,
-                        resizing: resizing,
-                        onSeekStart: onSeekStart,
-                        onSeekEnd: onSeekEnd,
-                      ),
-                    ),
-                  ),
-                  // Row 3 (Bottom): 左组 | Spacer | 中心组 | Spacer | 右组
-                  Expanded(
-                    child: _buildButtonRow(
-                      context,
-                      l10n,
-                      prevTooltip,
-                      nextTooltip,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          child: ControlBarLayout(
+            engine: engine,
+            actions: actions,
+            isIdle: isIdle,
+            title: title,
+            resizing: resizing,
+            onSeekStart: onSeekStart,
+            onSeekEnd: onSeekEnd,
+            onInteractionStart: onInteractionStart,
+            onInteractionEnd: onInteractionEnd,
           ),
         ),
       ),
@@ -196,37 +136,5 @@ class ControlBar extends StatelessWidget {
     }
 
     return withBlur(blurContent);
-  }
-
-  /// 按钮行：左组 | Spacer | 中心组 | Spacer | 右组
-  ///
-  /// 三段等 flex Spacer 将播放按钮群精确置于 Row 50% 位置。
-  Widget _buildButtonRow(
-    BuildContext context,
-    AppLocalizations l10n,
-    String prevTooltip,
-    String nextTooltip,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Tokens.controlBarButtonRowPadding,
-      ),
-      child: Row(
-        children: [
-          LeftButtonGroup(engine: engine, actions: actions),
-          const Spacer(),
-          CenterGroup(
-            engine: engine,
-            isIdle: isIdle,
-            prevTooltip: prevTooltip,
-            nextTooltip: nextTooltip,
-            onPrevious: actions.onPrevious,
-            onNext: actions.onNext,
-          ),
-          const Spacer(),
-          RightButtonGroup(actions: actions),
-        ],
-      ),
-    );
   }
 }

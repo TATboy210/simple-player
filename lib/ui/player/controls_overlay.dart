@@ -290,6 +290,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         // seek 钩子 — 拖动进度条期间冻结 auto-hide
                         onSeekStart: _autoHide.onSeekStart,
                         onSeekEnd: _autoHide.onSeekEnd,
+                        // 音量等非 seek 子控件复用同一交互会话，避免各自维护 Timer。
+                        onInteractionStart: _autoHide.onInteractionStart,
+                        onInteractionEnd: _autoHide.onInteractionEnd,
                       ),
                     ),
                   ),

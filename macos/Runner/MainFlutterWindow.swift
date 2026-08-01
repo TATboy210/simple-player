@@ -11,6 +11,7 @@ import FlutterMacOS
 /// NSCondition 防止重入，2 秒超时防止永久挂起。
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var fullscreenChannel: FlutterMethodChannel?
+  private var filePickerAttentionChannel: FlutterMethodChannel?
   private let fullscreenCondition = NSCondition()
   private var isTogglingFullScreen = false
 
@@ -48,6 +49,33 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+
+    filePickerAttentionChannel = FlutterMethodChannel(
+      name: "com.simple_player/file_picker_attention",
+      binaryMessenger: messenger
+    )
+    filePickerAttentionChannel?.setMethodCallHandler { [weak self] (call, result) in
+      guard let self = self else {
+        result(FlutterError(
+          code: "DISPOSED",
+          message: "Window was disposed",
+          details: nil
+        ))
+        return
+      }
+      guard call.method == "focusExistingPicker" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+
+      // file_picker attaches NSOpenPanel as a sheet, so no extra panel is created.
+      let found = self.attachedSheet is NSOpenPanel
+      if let panel = self.attachedSheet as? NSOpenPanel {
+        panel.makeKeyAndOrderFront(nil)
+      }
+      NSBeep()
+      result(["found": found])
     }
 
     self.center()

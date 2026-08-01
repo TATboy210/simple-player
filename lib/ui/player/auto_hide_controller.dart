@@ -41,6 +41,12 @@ class AutoHideController {
 
   bool _hovering = false;
   bool _resizing = false;
+
+  /// 正在进行的子控件交互数量。
+  ///
+  /// 进度条、音量滑块和 popup 可能重叠；使用计数而不是单个 bool，确保任一
+  /// 交互仍活跃时不会过早恢复自动隐藏。
+  int _activeInteractionCount = 0;
   Timer? _hideTimer;
   DateTime _lastHoverTime = DateTime.fromMillisecondsSinceEpoch(0);
   static const _hoverThrottle = Duration(milliseconds: 100);
@@ -87,11 +93,19 @@ class AutoHideController {
     }
   }
 
-  /// 取消旧 Timer 再设新的，避免多次鼠标移动导致 Timer 堆积
+  /// 取消旧 Timer 再设新的，避免多次鼠标移动导致 Timer 堆积。
+  ///
+  /// 只有 playing 状态、未 resize 且没有活跃子控件交互时才允许自动隐藏；所有
+  /// 调用方均经过此处，避免窗口状态变化绕开交互会话保护。
   void scheduleHide() {
     _hideTimer?.cancel();
+    if (_engineState.value != MediaState.playing ||
+        _resizing ||
+        _activeInteractionCount > 0) {
+      return;
+    }
     _hideTimer = Timer(_hideDelay, () {
-      if (!_hovering) hide();
+      if (!_hovering && _activeInteractionCount == 0) hide();
     });
   }
 
@@ -138,6 +152,8 @@ class AutoHideController {
   void onEngineStateChanged() {
     final s = _engineState.value;
     if (s == MediaState.idle) {
+      // 新媒体打开会中断旧手势序列，清除计数避免下一次播放永久不自动隐藏。
+      _activeInteractionCount = 0;
       _hideTimer?.cancel();
       if (!visible.value) {
         visible.value = true;
@@ -159,21 +175,34 @@ class AutoHideController {
     _hideTimer?.cancel();
   }
 
-  /// 用户开始拖动进度条 — 显示控件并冻结隐藏计时(seek 期间不隐藏).
+  /// 开始一个子控件交互会话，并冻结 playing 状态的自动隐藏。
   ///
-  /// 对齐 media_kit 原生 onSeekStart:取消隐藏定时器,避免拖动中控件消失.
-  /// idle 状态无进度条交互,跳过.
-  void onSeekStart() {
+  /// UI 子组件只报告交互边界，不自行维护隐藏 Timer，避免拖拽、悬停和 popup
+  /// 的异步结束顺序造成控制栏提前消失。idle 没有可自动隐藏的控件，保持 no-op。
+  void onInteractionStart() {
     if (_engineState.value == MediaState.idle) return;
+    _activeInteractionCount++;
     show();
     _hideTimer?.cancel();
   }
 
-  /// 用户结束拖动进度条 — 重启隐藏计时.
-  void onSeekEnd() {
-    if (_engineState.value == MediaState.idle) return;
-    scheduleHide();
+  /// 结束一个子控件交互会话；最后一个会话结束后恢复既有隐藏策略。
+  void onInteractionEnd() {
+    if (_engineState.value == MediaState.idle || _activeInteractionCount == 0) {
+      return;
+    }
+    _activeInteractionCount--;
+    if (_activeInteractionCount == 0 && !_resizing) scheduleHide();
   }
+
+  /// 用户开始拖动进度条 — 显示控件并冻结隐藏计时(seek 期间不隐藏).
+  ///
+  /// 对齐 media_kit 原生 onSeekStart，并复用统一交互会话以保证其他子控件
+  /// 同时交互时也不会提前恢复自动隐藏。
+  void onSeekStart() => onInteractionStart();
+
+  /// 用户结束拖动进度条 — 在最后一个活跃交互结束后重启隐藏计时。
+  void onSeekEnd() => onInteractionEnd();
 
   /// 初始状态：idle 时永久显示，否则启动自动隐藏
   void init() {

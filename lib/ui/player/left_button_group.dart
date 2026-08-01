@@ -19,7 +19,17 @@ class LeftButtonGroup extends StatelessWidget {
   final MediaEngine engine;
   final PlayerActions actions;
 
-  const LeftButtonGroup({super.key, required this.engine, required this.actions});
+  /// 子控件交互边界透传给 Overlay，统一冻结或恢复自动隐藏策略。
+  final VoidCallback? onInteractionStart;
+  final VoidCallback? onInteractionEnd;
+
+  const LeftButtonGroup({
+    super.key,
+    required this.engine,
+    required this.actions,
+    this.onInteractionStart,
+    this.onInteractionEnd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +44,11 @@ class LeftButtonGroup extends StatelessWidget {
         ),
         const SizedBox(width: Tokens.spXs),
         VolumeButton(engine: engine),
-        VolumeSlider(engine: engine),
+        VolumeSlider(
+          engine: engine,
+          onInteractionStart: onInteractionStart,
+          onInteractionEnd: onInteractionEnd,
+        ),
         const SizedBox(width: Tokens.spXs),
         SpeedButton(engine: engine),
       ],
