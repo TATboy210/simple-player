@@ -548,6 +548,63 @@ void main() {
     });
   });
 
+  group('AutoHideController interaction sessions', () {
+    testWidgets('keeps controls visible while a child interaction is active', (
+      tester,
+    ) async {
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+      );
+      await tester.pump();
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final controller = state.controller;
+
+      // A child control owns the interaction period, so its hover or drag
+      // cannot be interrupted by the playing-state hide timer.
+      controller.onInteractionStart();
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      expect(controller.visible.value, isTrue);
+    });
+
+    testWidgets('restarts auto-hide after the last child interaction ends', (
+      tester,
+    ) async {
+      engineState.value = MediaState.playing;
+      await tester.pumpWidget(
+        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+      );
+      await tester.pump();
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final controller = state.controller;
+
+      controller.onInteractionStart();
+      controller.onInteractionEnd();
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      expect(controller.visible.value, isFalse);
+    });
+
+    test('interaction methods are no-ops when idle', () {
+      engineState.value = MediaState.idle;
+      final controller = createController();
+      controller.init();
+      controller.visible.value = false;
+
+      controller.onInteractionStart();
+      controller.onInteractionEnd();
+
+      expect(controller.visible.value, isFalse);
+    });
+  });
+
   group('AutoHideController.onSeekStart/onSeekEnd', () {
     testWidgets('onSeekStart shows and freezes hide timer', (tester) async {
       // seek 拖动保护:onSeekStart 显示控件 + cancel timer,pump 超过 delay 仍可见

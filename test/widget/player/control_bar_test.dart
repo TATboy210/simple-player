@@ -26,6 +26,7 @@ void main() {
   Widget buildSubject({
     MediaEngine? eng,
     PlayerActions? actions,
+    String? title,
   }) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -37,6 +38,7 @@ void main() {
           child: ControlBar(
             engine: eng ?? engine,
             actions: actions ?? const PlayerActions(),
+            title: title,
           ),
         ),
       ),
@@ -63,6 +65,22 @@ void main() {
       await tester.pump();
 
       expect(find.byType(ProgressBar), findsOneWidget);
+    });
+
+    testWidgets('places the time range to the right of the progress bar', (
+      tester,
+    ) async {
+      // Arrange: 长标题确保 Row 1 不会为时间读数预留空间。
+      await tester.pumpWidget(buildSubject(title: 'A very long media title'));
+      await tester.pump();
+
+      // Act: 取得两个时间导航元素的屏幕几何位置。
+      final progressRect = tester.getRect(find.byType(ProgressBar));
+      final timeRect = tester.getRect(find.byType(TimeRangeDisplay));
+
+      // Assert: 第二行的时间读数固定在 seek 区域右侧且垂直对齐。
+      expect(progressRect.right, lessThanOrEqualTo(timeRect.left));
+      expect(progressRect.center.dy, closeTo(timeRect.center.dy, 0.1));
     });
 
     testWidgets('renders play mode button', (tester) async {
@@ -112,6 +130,7 @@ void main() {
 
       expect(find.byType(VolumeButton), findsOneWidget);
       expect(find.byType(VolumeSlider), findsOneWidget);
+      expect(tester.getSize(find.byType(ProgressBar)).width, greaterThan(0));
     });
 
     testWidgets('shows folder_open button when onOpenFile is provided', (
@@ -277,9 +296,7 @@ void main() {
       );
     }
 
-    testWidgets('narrow width still shows full layout', (
-      tester,
-    ) async {
+    testWidgets('narrow width still shows full layout', (tester) async {
       // CB-04: ultra-compact breakpoint removed — always show full layout
       // Use 600px to avoid Row overflow (desktop player minimum practical width)
       await tester.pumpWidget(buildWithWidth(600));
@@ -297,9 +314,7 @@ void main() {
       expect(find.byType(VolumeSlider), findsOneWidget);
     });
 
-    testWidgets('medium width shows full layout', (
-      tester,
-    ) async {
+    testWidgets('medium width shows full layout', (tester) async {
       // CB-04: compact breakpoint removed — always show full layout
       await tester.pumpWidget(buildWithWidth(700));
       await tester.pump();
@@ -344,10 +359,7 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 200,
-              child: ControlBar(
-                engine: engine,
-                opacity: opacityController,
-              ),
+              child: ControlBar(engine: engine, opacity: opacityController),
             ),
           ),
         ),

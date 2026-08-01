@@ -115,7 +115,18 @@ class VolumeSlider extends StatefulWidget {
 
   final MediaEngine engine;
 
-  const VolumeSlider({super.key, required this.engine});
+  /// 子控件交互开始时通知上层冻结自动隐藏。
+  final VoidCallback? onInteractionStart;
+
+  /// 子控件交互结束时通知上层恢复既有自动隐藏策略。
+  final VoidCallback? onInteractionEnd;
+
+  const VolumeSlider({
+    super.key,
+    required this.engine,
+    this.onInteractionStart,
+    this.onInteractionEnd,
+  });
 
   @override
   State<VolumeSlider> createState() => _VolumeSliderState();
@@ -181,8 +192,12 @@ class _VolumeSliderState extends State<VolumeSlider> {
             data: VolumeSlider._sliderTheme,
             child: Slider(
               value: volume,
+              onChangeStart: (_) => widget.onInteractionStart?.call(),
               onChanged: _onChanged,
-              onChangeEnd: _onChangedEnd,
+              onChangeEnd: (value) {
+                _onChangedEnd(value);
+                widget.onInteractionEnd?.call();
+              },
               activeColor: Tokens.accent,
               inactiveColor: Tokens.bgHover,
             ),

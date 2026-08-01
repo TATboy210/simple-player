@@ -159,6 +159,35 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
     });
 
+    testWidgets('drag reports the interaction session boundaries', (
+      tester,
+    ) async {
+      var started = 0;
+      var ended = 0;
+      engine.volume.value = 0.5;
+      await tester.pumpWidget(
+        buildSubject(
+          child: VolumeSlider(
+            engine: engine,
+            onInteractionStart: () => started++,
+            onInteractionEnd: () => ended++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final slider = find.byType(Slider);
+      final center = tester.getRect(slider).center;
+      final gesture = await tester.startGesture(center);
+      await gesture.moveBy(const Offset(20, 0));
+      await gesture.up();
+      await tester.pump();
+
+      expect(started, 1);
+      expect(ended, 1);
+      OsdService.I.hide();
+    });
+
     testWidgets('scroll wheel up increases volume', (tester) async {
       engine.volume.value = 0.5;
       await tester.pumpWidget(

@@ -18,12 +18,10 @@ library;
 
 import 'dart:async' show unawaited;
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/persistence/settings_store.dart';
-import '../../kernel/services/path_validator.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../ui/dialogs/settings/audio_filter_compositor.dart';
@@ -34,6 +32,8 @@ import '../../ui/shared/play_mode_utils.dart';
 import '../../ui/shared/osd_overlay.dart';
 import '../../l10n/app_localizations.dart';
 import '../../kernel/player_services.dart';
+import 'file_picker_adapters.dart';
+import 'file_picker_coordinator.dart';
 
 /// 播放器功能组件 — UI 状态管理 + PlayerScreen 组合
 ///
@@ -71,6 +71,9 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 服务容器，持有 engine/playlist/controller/videoProcessing 等所有播放服务
   late final PlayerServices _services;
 
+  /// 单开系统文件选择器会话及其 attention 协调器。
+  late final FilePickerCoordinator _filePickerCoordinator;
+
   /// 设置面板控制器 — 由组合根构造，传入 PlayerScreen 挂载覆盖层壳（D-02）
   late final SettingsPanelController _settingsPanelController;
 
@@ -93,8 +96,13 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   void initState() {
     super.initState();
     // 创建服务容器（同步构造），然后异步初始化
-    _services = PlayerServices(
-      windowService: widget.windowService,
+    _services = PlayerServices(windowService: widget.windowService);
+    _filePickerCoordinator = FilePickerCoordinator(
+      picker: const FilePickerMediaGateway(),
+      attention: const MethodChannelFilePickerAttention(),
+      openAndPlay: (path) async {
+        await _services.controller.openAndPlay(path);
+      },
     );
     _init();
   }
@@ -139,7 +147,11 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         onAudioCommit: _applyAudioSettings,
       );
     } catch (e, stackTrace) {
-      KernelLogger.I.e('[PlayerFeature] init failed: $e', error: e, stackTrace: stackTrace);
+      KernelLogger.I.e(
+        '[PlayerFeature] init failed: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       if (mounted) {
         setState(() {
           _error = true;
@@ -148,40 +160,18 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       }
       return;
     }
-    KernelLogger.I.d('[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms');
+    KernelLogger.I.d(
+      '[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms',
+    );
     widget.coordinator.markReady();
     if (mounted) setState(() => _ready = true);
   }
 
-  /// 打开文件选择器并播放选中的文件
+  /// 打开媒体文件选择器，或在选择器已显示时请求其获得 attention。
   ///
-  /// 使用 FilePicker 以 custom 模式打开系统文件选择器，
-  /// allowedExtensions 覆盖视频格式（mp4/mkv/avi/mov 等）和音频格式
-  /// （mp3/flac/wav/aac 等），确保用户只能选择播放器支持的文件类型。
-  /// 选中的文件逐个通过 PlaybackController.openAndPlay() 打开播放。
-  /// File picker 重入守卫 — 防重复点击多次弹出 FilePicker (需求6 最小修改).
-  /// 聚焦 (SetForegroundWindow) + 提示音 (MessageBeep) 代价大, 暂未做.
-  bool _isPicking = false;
-
-  Future<void> _openFile() async {
-    if (_isPicking) return;
-    _isPicking = true;
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: PathValidator.supportedExtensions,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        for (final file in result.files) {
-          if (file.path != null) {
-            await _services.controller.openAndPlay(file.path!);
-          }
-        }
-      }
-    } finally {
-      _isPicking = false;
-    }
-  }
+  /// 选择、路径过滤与顺序播放由 [FilePickerCoordinator] 统一处理，确保按钮和
+  /// 快捷键触发同一单开会话语义。
+  Future<void> _openFile() => _filePickerCoordinator.open();
 
   /// 处理文件拖放事件 — 将拖入的文件路径添加到播放列表
   void _onFilesDropped(List<String> paths) {
@@ -223,8 +213,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   String _buildAfString(
     AudioSettings settings,
     AudioFilterAvailability availability,
-  ) =>
-      AudioFilterCompositor.compose(settings, availability);
+  ) => AudioFilterCompositor.compose(settings, availability);
 
   /// 顺序持久化 4 个音频原始值（RC-4 一致性：顺序写，避免部分成功）。
   Future<void> _saveAudioSettings(AudioSettings settings) async {
@@ -244,6 +233,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
   @override
   void dispose() {
+    _filePickerCoordinator.dispose();
     _settingsPanelController.dispose();
     _services.dispose();
     super.dispose();
