@@ -5,7 +5,7 @@ import '../models/playlist_item.dart';
 import '../models/play_mode.dart';
 import '../diagnostics/kernel_logger.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 播放列表管理 — 状态机.
 ///

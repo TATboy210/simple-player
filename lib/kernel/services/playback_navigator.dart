@@ -16,7 +16,7 @@ import '../utils/path_utils.dart';
 import '../services/path_validator.dart';
 import 'playback_controller.dart';
 
-late final _log = KernelLoggerImpl.I;
+final _log = KernelLoggerImpl.I;
 
 /// 播放导航 — 索引跳转、上一首/下一首与打开结果提交。
 ///

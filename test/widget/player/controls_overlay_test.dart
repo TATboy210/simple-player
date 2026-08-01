@@ -70,8 +70,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       await tester.tapAt(center);
       await tester.pump();
-      // Pump past the click timer (250ms) to let it resolve
-      await tester.pump(const Duration(milliseconds: 300));
+      // Pump past the click timer (400ms) to let it resolve
+      await tester.pump(const Duration(milliseconds: 450));
 
       expect(toggled, isTrue);
     });
@@ -85,7 +85,7 @@ void main() {
       await tester.tapAt(center);
       await tester.pump();
 
-      // After 250ms delay + animation
+      // After 400ms click delay + 150ms fade
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
     });
@@ -166,10 +166,7 @@ void main() {
 
       final overlay = tester.getRect(find.byType(ControlsOverlay));
       // 底部区域中心点：距底部约 75px（在 150px 触发区内）
-      final bottomZoneCenter = Offset(
-        overlay.center.dx,
-        overlay.bottom - 75,
-      );
+      final bottomZoneCenter = Offset(overlay.center.dx, overlay.bottom - 75);
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: bottomZoneCenter);
@@ -207,7 +204,7 @@ void main() {
     });
 
     testWidgets('single tap immediately hides controls (D-04)', (tester) async {
-      // D-04: 第一次点击应立即隐藏，不等 250ms 延迟
+      // D-04: 第一次点击应立即隐藏，不等 400ms 延迟
       engine.state.value = MediaState.playing;
       await tester.pumpWidget(buildSubject());
       await tester.pump();
@@ -217,7 +214,7 @@ void main() {
       await tester.pump();
 
       // 立即 pump 一次（无延迟）— hide() 应已调用
-      // 动画需要 400ms 完成，但 hide() 调用是即时的
+      // 动画需要 150ms 完成，但 hide() 调用是即时的
       // pump 一小段时间后动画应已开始 reverse
       await tester.pump(const Duration(milliseconds: 100));
 
@@ -264,8 +261,9 @@ void main() {
       await tester.pump(const Duration(seconds: 4));
       await tester.pump(const Duration(milliseconds: 500)); // 动画完成
 
-      // ControlBar 仍然在 widget tree 中（被 IgnorePointer 包裹不可交互）
-      expect(find.byType(ControlBar), findsOneWidget);
+      // auto-hide 触发:visible=false → Visibility offstage,但 maintainState
+      // 保留 ControlBar 在 tree(skipOffstage:false 确认仍挂载,可恢复显示)
+      expect(find.byType(ControlBar, skipOffstage: false), findsOneWidget);
     });
 
     testWidgets('paused state keeps controls visible after delay', (
@@ -327,20 +325,92 @@ void main() {
     });
 
     testWidgets('ErrorBanner renders inside ControlsOverlay', (tester) async {
-      // 验证 ErrorBanner 作为 ControlsOverlay 子组件存在
+      // 验证 ErrorBanner 作为 ControlsOverlay 子组件存在.
+      // D7: simulateError → UnknownError → l10nKey 'error.unknown' → ARB 英文值
+      // 'An unexpected error occurred'(原始 message 被 l10nKey 查找忽略,
+      // 详见 error_banner_test.dart 同款断言 + error_banner.dart _resolveMessage)
       engine.simulateError('Test error message');
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
-      // ErrorBanner 应在 ControlsOverlay 内部渲染
+      // ErrorBanner 在 ControlsOverlay 内部渲染,显示本地化文案(非原始 message)
       expect(
         find.descendant(
           of: find.byType(ControlsOverlay),
-          matching: find.text('Test error message'),
+          matching: find.text('An unexpected error occurred'),
         ),
         findsOneWidget,
       );
     });
+
+    testWidgets('visibleSink syncs with auto-hide visibility', (tester) async {
+      // visibleSink 单向同步 _autoHide.visible → sink(防回环)
+      engine.state.value = MediaState.playing;
+      final sink = ValueNotifier<bool>(true);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ControlsOverlay(engine: engine, visibleSink: sink),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(sink.value, isTrue); // 初始可见
+
+      // 单击触发隐藏 → fade(150ms) → visible=false → sink 同步 false
+      final center = tester.getCenter(find.byType(ControlsOverlay));
+      await tester.tapAt(center);
+      await tester.pump();
+      // >400ms click timer + 150ms fade
+      await tester.pump(const Duration(milliseconds: 450));
+      await tester.pumpAndSettle();
+
+      expect(sink.value, isFalse);
+      sink.dispose();
+    });
+
+    testWidgets(
+      'mouse resting over ControlBar keeps controls visible (regression)',
+      (tester) async {
+        // 回归:整区 MouseRegion 覆盖 ControlBar — 鼠标停在 ControlBar 上不触发
+        // onExit,_hovering 保持 true,timer 到期不 hide。旧代码(MouseRegion 不覆盖
+        // ControlBar)会 onExit → 3s 后控件消失。
+        engine.state.value = MediaState.playing;
+        final sink = ValueNotifier<bool>(true);
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ControlsOverlay(engine: engine, visibleSink: sink),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final overlay = tester.getRect(find.byType(ControlsOverlay));
+        // ControlBar 区域内(距底部 30px — 在 150px 触发区内,整区 MouseRegion 覆盖)
+        final controlBarPoint = Offset(overlay.center.dx, overlay.bottom - 30);
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(location: controlBarPoint);
+        addTearDown(gesture.removePointer);
+        await gesture.moveTo(controlBarPoint);
+        await tester.pump();
+
+        // 停留超过 hide delay(3s)— _hovering=true,timer 不 hide
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+
+        expect(sink.value, isTrue); // 控件仍可见
+        sink.dispose();
+      },
+    );
   });
 
   group('ControlsOverlay resize flow', () {

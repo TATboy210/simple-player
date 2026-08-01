@@ -14,7 +14,7 @@ import '../services/path_validator.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 文件操作服务 — 文件打开和批量添加
 ///

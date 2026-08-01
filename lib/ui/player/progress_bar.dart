@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
@@ -16,16 +15,28 @@ class _HoverState {
   final double x;
 }
 
-/// 进度条 — 已播放/已缓冲/未播放三层圆角矩形
+/// 进度条 — 已播放/未播放两层圆角矩形。
 /// 支持：拖拽 seek（节流+阈值）、悬停展开动画、Tooltip 淡入淡出、
-/// 滚轮 seek、悬停 thumb、禁用状态、缓冲指示器
+/// 滚轮 seek、悬停 thumb 与禁用状态。
 class ProgressBar extends StatefulWidget {
   final MediaEngine engine;
 
   /// Window resize signal — when true, skip internal bar rebuild to save CPU.
   final ValueListenable<bool>? resizing;
 
-  const ProgressBar({super.key, required this.engine, this.resizing});
+  /// 用户开始拖动进度条回调 — 通知 AutoHideController 冻结隐藏计时
+  final VoidCallback? onSeekStart;
+
+  /// 用户结束拖动进度条回调 — 通知 AutoHideController 重启隐藏计时
+  final VoidCallback? onSeekEnd;
+
+  const ProgressBar({
+    super.key,
+    required this.engine,
+    this.resizing,
+    this.onSeekStart,
+    this.onSeekEnd,
+  });
 
   @override
   State<ProgressBar> createState() => _ProgressBarState();
@@ -41,7 +52,12 @@ class _ProgressBarState extends State<ProgressBar>
 
   late Listenable _barListenable;
   Timer? _seekThrottle;
-  bool _hoverScheduled = false;
+  // 修 C (事件驱动 v2): dragEnd 后监听 position 到达目标才清 drag, 替代 v1 固定
+  // 300ms 定时器. 比 media_kit_control_bar 原生内部协调更贴近 — 不依赖固定
+  // 延迟, 网络流/慢 seek 下不回跳. 加超时兜底防 seek 失败永久卡住.
+  VoidCallback? _seekHoldListener;
+  int? _seekTargetMs;
+  Timer? _seekHoldTimer; // 超时兜底: position 未到达时强制清
 
   // Tooltip 淡入淡出动画
   late final AnimationController _tooltipFadeController;
@@ -96,7 +112,6 @@ class _ProgressBarState extends State<ProgressBar>
     final listenables = <Listenable>[
       engine.position,
       engine.duration,
-      engine.buffered,
       _dragNotifier,
       _hoverNotifier,
     ];
@@ -117,6 +132,7 @@ class _ProgressBarState extends State<ProgressBar>
   @override
   void dispose() {
     _seekThrottle?.cancel();
+    _cancelSeekHoldListeners();
     _dragNotifier.dispose();
     _hoverNotifier.dispose();
     _expandController.dispose();
@@ -134,6 +150,54 @@ class _ProgressBarState extends State<ProgressBar>
       _expandController.reverse();
       _tooltipFadeController.reverse();
     }
+  }
+
+  /// 修 C (事件驱动 v2): dragEnd 后启动 seek hold — 监听 [engine.position]
+  /// 到达 [targetMs] 容差内才清 [_dragNotifier], 遮住旧 stream 回拨防回跳.
+  /// 加超时兜底: seek 失败/极慢时强制清, 避免进度条永久卡在 drag 位置.
+  void _beginSeekHold(int targetMs) {
+    _cancelSeekHoldListeners();
+    _seekTargetMs = targetMs;
+    _seekHoldListener = () {
+      if (!mounted || _seekTargetMs == null) return;
+      final pos = widget.engine.position.value;
+      if ((pos - _seekTargetMs!).abs() <=
+          Tokens.progressSeekArriveToleranceMs) {
+        _finishSeekHold();
+      }
+    };
+    // 先建超时 timer, 再 addListener + 立即检查 — 若立即检查触发 _finishSeekHold,
+    // _cancelSeekHoldListeners 会 cancel 此 timer; 顺序反了 (timer 在 call 之后建)
+    // 会留下无人取消的 pending timer, 触发 flutter_test 的 !timersPending 断言.
+    _seekHoldTimer = Timer(
+      const Duration(milliseconds: Tokens.progressSeekHoldTimeoutMs),
+      _finishSeekHold,
+    );
+    widget.engine.position.addListener(_seekHoldListener!);
+    // 立即检查一次: FakeEngine/同步 seek 可能已让 position 到达目标,
+    // addListener 只对未来变化触发, 不立即检查会卡到超时 (测试/同步路径).
+    _seekHoldListener!.call();
+  }
+
+  /// 清理 seek hold 的监听 + 超时 timer, 不动 [_dragNotifier].
+  /// 用于 dragStart (新 drag 覆盖前) / dispose 取消未完成 hold.
+  void _cancelSeekHoldListeners() {
+    _seekHoldTimer?.cancel();
+    _seekHoldTimer = null;
+    final listener = _seekHoldListener;
+    if (listener != null) {
+      widget.engine.position.removeListener(listener);
+      _seekHoldListener = null;
+    }
+    _seekTargetMs = null;
+  }
+
+  /// seek hold 正常完成: position 已到达目标 (或超时兜底) — 清监听 + 清 drag.
+  void _finishSeekHold() {
+    if (!mounted) return;
+    _cancelSeekHoldListeners();
+    _dragNotifier.value = null;
+    _updateTooltipVisibility();
   }
 
   @override
@@ -160,16 +224,12 @@ class _ProgressBarState extends State<ProgressBar>
           },
           onHover: (details) {
             if (_disabled) return;
-            if (_hoverScheduled) return;
-            _hoverScheduled = true;
-            SchedulerBinding.instance.addPostFrameCallback((_) {
-              _hoverScheduled = false;
-              if (!mounted) return;
-              _hoverNotifier.value = _HoverState(
-                true,
-                (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
-              );
-            });
+            // 修 D: 直接更新 — hover 事件系统已节流,无需 postFrame 防抖
+            // (原 postFrame+_hoverScheduled 引入一帧延迟+漏更新,致 tooltip 不跟手)
+            _hoverNotifier.value = _HoverState(
+              true,
+              (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
+            );
           },
           child: Semantics(
             label: AppLocalizations.of(context).progressBar,
@@ -177,67 +237,77 @@ class _ProgressBarState extends State<ProgressBar>
             slider: true,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onHorizontalDragStart: _disabled
-                  ? null
-                  : (details) {
-                      _dragStartX = details.localPosition.dx;
-                      _updateTooltipVisibility();
-                    },
-              onHorizontalDragUpdate: _disabled
-                  ? null
-                  : (details) {
-                      final dx = details.localPosition.dx;
-                      // 拖拽阈值：防止误触
-                      if (_dragNotifier.value == null) {
-                        final start = _dragStartX;
-                        if (start != null &&
-                            (dx - start).abs() <
-                                Tokens.progressDragThreshold) {
-                          return;
-                        }
-                        _dragStartX = null;
-                      }
-                      _dragNotifier.value = (dx / barWidth).clamp(0.0, 1.0);
-                      _seekThrottle?.cancel();
-                      _seekThrottle = Timer(
-                        const Duration(
-                          milliseconds: Tokens.progressSeekThrottleMs,
-                        ),
-                        () {
-                          if (_dragNotifier.value != null &&
-                              widget.engine.duration.value > 0) {
-                            widget.engine.seekTo(_dragPositionMs);
-                          }
-                        },
-                      );
-                    },
-              onHorizontalDragEnd: _disabled
-                  ? null
-                  : (_) {
-                      _dragStartX = null;
-                      _seekThrottle?.cancel();
-                      if (_dragNotifier.value == null) return;
-                      if (widget.engine.duration.value <= 0) {
-                        _dragNotifier.value = null;
-                        _updateTooltipVisibility();
-                        return;
-                      }
-                      widget.engine.seekTo(_dragPositionMs);
-                      _dragNotifier.value = null;
-                      // 恢复悬停状态（鼠标仍在 bar 上）
-                      _hoverNotifier.value = _HoverState(true, _hoverX);
-                      _updateTooltipVisibility();
-                    },
-              onTapDown: _disabled
-                  ? null
-                  : (details) {
-                      if (widget.engine.duration.value <= 0) return;
-                      final fraction = (details.localPosition.dx / barWidth)
-                          .clamp(0.0, 1.0);
-                      final ms = (fraction * widget.engine.duration.value)
-                          .round();
-                      widget.engine.seekTo(ms);
-                    },
+              // 修 A: 回调始终非 null,体内判断 duration — 避免 _disabled 顶层 build 快照陈旧
+              // (duration stream 到达后只触发子 AnimatedBuilder,不触发顶层 build,致回调永久 null)
+              onHorizontalDragStart: (details) {
+                if (widget.engine.duration.value <= 0) return;
+                // 新 drag 开始 — 取消上次 dragEnd 未完成的 seek hold,
+                // 防旧 listener 在新 drag 期间触发 _finishSeekHold 清掉新 drag 状态.
+                _cancelSeekHoldListeners();
+                // 通知 auto-hide 冻结隐藏计时(seek 期间控件不消失)
+                widget.onSeekStart?.call();
+                _dragStartX = details.localPosition.dx;
+                _updateTooltipVisibility();
+              },
+              onHorizontalDragUpdate: (details) {
+                if (widget.engine.duration.value <= 0) return;
+                final dx = details.localPosition.dx;
+                // 拖拽阈值：防止误触
+                if (_dragNotifier.value == null) {
+                  final start = _dragStartX;
+                  if (start != null &&
+                      (dx - start).abs() < Tokens.progressDragThreshold) {
+                    return;
+                  }
+                  _dragStartX = null;
+                }
+                _dragNotifier.value = (dx / barWidth).clamp(0.0, 1.0);
+                // 修 B: leading throttle — timer 未活跃才 seek+启动,活跃期跳过
+                // (原 cancel+重建 debounce 致拖动中永不 seek,松手才跳)
+                if (!(_seekThrottle?.isActive ?? false)) {
+                  widget.engine.seekTo(_dragPositionMs);
+                  _seekThrottle = Timer(
+                    const Duration(milliseconds: Tokens.progressSeekThrottleMs),
+                    () {},
+                  );
+                }
+              },
+              onHorizontalDragEnd: (_) {
+                _dragStartX = null;
+                _seekThrottle?.cancel();
+                // 配对 onSeekStart — 重启隐藏计时(即使未真正拖动也保持 start/end 配对,
+                // 避免 onSeekStart cancel 了 timer 却无 onSeekEnd 重启导致控件永显)
+                if (widget.engine.duration.value > 0) {
+                  widget.onSeekEnd?.call();
+                }
+                if (_dragNotifier.value == null) return;
+                if (widget.engine.duration.value <= 0) {
+                  _dragNotifier.value = null;
+                  _updateTooltipVisibility();
+                  return;
+                }
+                widget.engine.seekTo(_dragPositionMs);
+                // 修 C (事件驱动 v2): 不立即清 drag — 监听 position 到达目标容差内
+                // 才清, 遮住旧 stream 回拨防回跳. 比 v1 固定 300ms 更贴近原生内部
+                // 协调, 网络流/慢 seek 下不回跳. 超时兜底防 seek 失败永久卡住.
+                _beginSeekHold(_dragPositionMs);
+                // 恢复悬停状态（鼠标仍在 bar 上）
+                _hoverNotifier.value = _HoverState(true, _hoverX);
+                _updateTooltipVisibility();
+              },
+              onTapDown: (details) {
+                if (widget.engine.duration.value <= 0) return;
+                // 瞬时 seek — 配对 start+end(等同 show + scheduleHide:
+                // 闪现控件,3s 后隐藏)
+                widget.onSeekStart?.call();
+                final fraction = (details.localPosition.dx / barWidth).clamp(
+                  0.0,
+                  1.0,
+                );
+                final ms = (fraction * widget.engine.duration.value).round();
+                widget.engine.seekTo(ms);
+                widget.onSeekEnd?.call();
+              },
               child: SizedBox(
                 height: Tokens.progressBarHeight,
                 child: AnimatedBuilder(
@@ -295,15 +365,11 @@ class _ProgressBarState extends State<ProgressBar>
           if (resizing != null && resizing.value) {
             return _cachedCustomPaint ?? const SizedBox.shrink();
           }
-          final dur = engine.duration.value;
-          final buf = engine.buffered.value;
           final playedFrac = _effectiveFraction;
-          final bufFrac = dur > 0 ? (buf / dur).clamp(0.0, 1.0) : 0.0;
           final child = CustomPaint(
             size: Size.infinite,
             painter: _BarPainter(
               playedFraction: playedFrac,
-              bufferedFraction: bufFrac,
               dragging: _dragNotifier.value != null,
               barHeight: _barHeightAnimation.value,
               hoverFraction: _hoverNotifier.value.hovering ? _hoverX : null,
@@ -330,34 +396,33 @@ class _ProgressBarState extends State<ProgressBar>
       child: FadeTransition(
         opacity: _tooltipOpacity,
         child: Container(
-            width: tooltipWidth,
-            padding: const EdgeInsets.symmetric(
-              horizontal: Tokens.spXs,
-              vertical: 2,
-            ),
-            decoration: BoxDecoration(
-              color: Tokens.bgGlass,
-              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-              border: Border.all(color: Tokens.borderHighlight, width: 0.5),
-            ),
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Tokens.textPrimary,
-                fontSize: Tokens.fontOverline,
-                fontFeatures: [Tokens.tabularFigures],
-              ),
+          width: tooltipWidth,
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spXs,
+            vertical: 2,
+          ),
+          decoration: BoxDecoration(
+            color: Tokens.bgGlass,
+            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            border: Border.all(color: Tokens.borderHighlight, width: 0.5),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontOverline,
+              fontFeatures: [Tokens.tabularFigures],
             ),
           ),
         ),
+      ),
     );
   }
 }
 
 class _BarPainter extends CustomPainter {
   final double playedFraction;
-  final double bufferedFraction;
   final bool dragging;
   final double barHeight;
   final double? hoverFraction;
@@ -365,7 +430,6 @@ class _BarPainter extends CustomPainter {
 
   _BarPainter({
     required this.playedFraction,
-    required this.bufferedFraction,
     required this.dragging,
     required this.barHeight,
     this.hoverFraction,
@@ -375,11 +439,6 @@ class _BarPainter extends CustomPainter {
   static final _bgPaint = Paint()..color = Tokens.bgHover;
   static final _bgDisabledPaint = Paint()
     ..color = Tokens.bgHover.withValues(alpha: Tokens.progressDisabledBgAlpha);
-  static final _bufPaint = Paint()..color = Tokens.progressBuffer;
-  static final _bufDisabledPaint = Paint()
-    ..color = Tokens.progressBuffer.withValues(
-      alpha: Tokens.progressDisabledBufferAlpha,
-    );
   static final _playedPaint = Paint()..color = Tokens.progressPlayed;
   static final _playedDisabledPaint = Paint()
     ..color = Tokens.progressPlayed.withValues(
@@ -396,7 +455,6 @@ class _BarPainter extends CustomPainter {
     final top = (size.height - barHeight) / 2;
 
     final bg = disabled ? _bgDisabledPaint : _bgPaint;
-    final buf = disabled ? _bufDisabledPaint : _bufPaint;
     final played = disabled ? _playedDisabledPaint : _playedPaint;
 
     const radius = Radius.circular(Tokens.progressBarRadius);
@@ -408,14 +466,6 @@ class _BarPainter extends CustomPainter {
         radius,
       ),
       bg,
-    );
-    // 缓冲层（圆角）
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, top, size.width * bufferedFraction, barHeight),
-        radius,
-      ),
-      buf,
     );
     // 已播放层（圆角）
     canvas.drawRRect(
@@ -445,7 +495,6 @@ class _BarPainter extends CustomPainter {
   @override
   bool shouldRepaint(_BarPainter old) =>
       old.playedFraction != playedFraction ||
-      old.bufferedFraction != bufferedFraction ||
       old.dragging != dragging ||
       old.barHeight != barHeight ||
       old.hoverFraction != hoverFraction ||

@@ -1,12 +1,12 @@
-/// Fuzz tests for kernel API input validation.
-///
-/// Tests malicious/malformed inputs across four attack surfaces:
-///   1. Path traversal attacks (PathValidator + Playlist + PlaybackNavigator)
-///   2. Index manipulation (Playlist)
-///   3. Volume/value boundary attacks (FakeEngine clamping)
-///   4. String injection (PathValidator + PathUtils)
-///
-/// Uses FakeEngine + Playlist directly to avoid mdk.dll FFI dependency.
+// Fuzz tests for kernel API input validation.
+//
+// Tests malicious/malformed inputs across four attack surfaces:
+//   1. Path traversal attacks (PathValidator + Playlist + PlaybackNavigator)
+//   2. Index manipulation (Playlist)
+//   3. Volume/value boundary attacks (FakeEngine clamping)
+//   4. String injection (PathValidator + PathUtils)
+//
+// Uses FakeEngine + Playlist directly to avoid mdk.dll FFI dependency.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
@@ -100,10 +100,13 @@ void main() {
       ];
 
       for (final path in maliciousPaths) {
-        test('rejects: ${path.length > 60 ? "${path.substring(0, 60)}..." : path}', () {
-          final error = PathValidator.validate(path);
-          expect(error, isNotNull, reason: 'Expected rejection for: $path');
-        });
+        test(
+          'rejects: ${path.length > 60 ? "${path.substring(0, 60)}..." : path}',
+          () {
+            final error = PathValidator.validate(path);
+            expect(error, isNotNull, reason: 'Expected rejection for: $path');
+          },
+        );
       }
     });
 
@@ -116,7 +119,10 @@ void main() {
       test('dot-dot-slash traversal', () {
         expect(PathValidator.isPathTraversal('../etc/passwd'), isTrue);
         expect(PathValidator.isPathTraversal('..\\etc\\passwd'), isTrue);
-        expect(PathValidator.isPathTraversal('dir/../../../etc/passwd'), isTrue);
+        expect(
+          PathValidator.isPathTraversal('dir/../../../etc/passwd'),
+          isTrue,
+        );
       });
 
       test('UNC network paths', () {
@@ -132,7 +138,10 @@ void main() {
       // Bare ".." without separator should NOT be flagged (filenames like
       // "song (live..remix).flac" are legitimate).
       test('bare ".." is NOT traversal (false positive avoidance)', () {
-        expect(PathValidator.isPathTraversal('song (live..remix).flac'), isFalse);
+        expect(
+          PathValidator.isPathTraversal('song (live..remix).flac'),
+          isFalse,
+        );
         expect(PathValidator.isPathTraversal('..my_file.mp4'), isFalse);
       });
     });
@@ -152,12 +161,15 @@ void main() {
         final valid = PathValidator.filterValid(mixed);
         // 4 valid: 3 clean paths + 1 XSS filename with valid extension
         expect(valid, hasLength(4));
-        expect(valid, containsAll([
-          r'C:\Videos\movie.mp4',
-          r'D:\Music\song.mp3',
-          'C:/test.avi',
-          '<script>.mp4', // passes — PathValidator is not XSS filter
-        ]));
+        expect(
+          valid,
+          containsAll([
+            r'C:\Videos\movie.mp4',
+            r'D:\Music\song.mp3',
+            'C:/test.avi',
+            '<script>.mp4', // passes — PathValidator is not XSS filter
+          ]),
+        );
       });
     });
 
@@ -166,8 +178,14 @@ void main() {
         // PathValidator checks path safety (traversal, null bytes, UNC),
         // not HTML safety. UI layer must escape before rendering.
         expect(PathValidator.validate('<script>alert(1)</script>.mp4'), isNull);
-        expect(PathValidator.validate('"><img onerror=alert(1) src=x>.mp4'), isNull);
-        expect(PathValidator.validate("'; DROP TABLE playlist; --.mp4"), isNull);
+        expect(
+          PathValidator.validate('"><img onerror=alert(1) src=x>.mp4'),
+          isNull,
+        );
+        expect(
+          PathValidator.validate("'; DROP TABLE playlist; --.mp4"),
+          isNull,
+        );
       });
 
       test('long paths are accepted (OS enforces MAX_PATH)', () {
@@ -180,7 +198,10 @@ void main() {
       test('percent-encoded dot-dot-slash passes', () {
         // PathValidator does not URL-decode before checking.
         // MDK/FFmpeg would handle or reject these at the protocol layer.
-        expect(PathValidator.validate('%2e%2e%2f%2e%2e%2fetc%2fpasswd.mp4'), isNull);
+        expect(
+          PathValidator.validate('%2e%2e%2f%2e%2e%2fetc%2fpasswd.mp4'),
+          isNull,
+        );
         expect(PathValidator.validate('..%2f..%2fetc%2fpasswd.mp4'), isNull);
         expect(PathValidator.validate('..%5c..%5cetc%5cpasswd.mp4'), isNull);
       });
@@ -694,16 +715,19 @@ void main() {
         "1' OR '1'='1",
         "'; DELETE FROM history WHERE 1=1; --",
         "admin'--",
-        "1; UPDATE settings SET volume=100; --",
+        '1; UPDATE settings SET volume=100; --',
         "' UNION SELECT * FROM secrets --",
       ];
 
       for (final payload in sqlPayloads) {
-        test('PathValidator rejects SQL injection: ${payload.substring(0, payload.length.clamp(0, 40))}...', () {
-          final error = PathValidator.validate(payload);
-          // These should be rejected either as empty extension or path issues
-          expect(error, isNotNull);
-        });
+        test(
+          'PathValidator rejects SQL injection: ${payload.substring(0, payload.length.clamp(0, 40))}...',
+          () {
+            final error = PathValidator.validate(payload);
+            // These should be rejected either as empty extension or path issues
+            expect(error, isNotNull);
+          },
+        );
       }
 
       test('SQL injection in playlist JSON does not corrupt state', () {
@@ -733,11 +757,14 @@ void main() {
       ];
 
       for (final payload in commandPayloads) {
-        test('PathValidator rejects command injection: ${payload.substring(0, payload.length.clamp(0, 40))}', () {
-          final error = PathValidator.validate(payload);
-          // Rejected due to invalid extension (characters after .mp4 are part of ext)
-          expect(error, isNotNull);
-        });
+        test(
+          'PathValidator rejects command injection: ${payload.substring(0, payload.length.clamp(0, 40))}',
+          () {
+            final error = PathValidator.validate(payload);
+            // Rejected due to invalid extension (characters after .mp4 are part of ext)
+            expect(error, isNotNull);
+          },
+        );
       }
 
       test('backtick injection passes if extension is valid (known gap)', () {
@@ -757,11 +784,14 @@ void main() {
       ];
 
       for (final payload in formatPayloads) {
-        test('PathUtils.basename handles format string: ${payload.substring(0, payload.length.clamp(0, 30))}', () {
-          // PathUtils.basename is pure string manipulation — must not crash
-          final result = PathUtils.basename(payload);
-          expect(result, isA<String>());
-        });
+        test(
+          'PathUtils.basename handles format string: ${payload.substring(0, payload.length.clamp(0, 30))}',
+          () {
+            // PathUtils.basename is pure string manipulation — must not crash
+            final result = PathUtils.basename(payload);
+            expect(result, isA<String>());
+          },
+        );
       }
     });
 
@@ -838,10 +868,7 @@ void main() {
     });
 
     test('throws FormatException for non-string path', () {
-      expect(
-        () => PlaylistItem.fromJson({'path': 123}),
-        throwsFormatException,
-      );
+      expect(() => PlaylistItem.fromJson({'path': 123}), throwsFormatException);
     });
 
     test('throws FormatException for null path', () {
@@ -899,9 +926,7 @@ void main() {
 
     test('preserves malicious path strings in PlaylistItem', () {
       // PlaylistItem stores paths as-is; PathValidator is the guard
-      final item = PlaylistItem.fromJson({
-        'path': '../../../etc/passwd',
-      });
+      final item = PlaylistItem.fromJson({'path': '../../../etc/passwd'});
       expect(item.path, '../../../etc/passwd');
       expect(item.name, 'passwd'); // basename extraction
     });
@@ -979,7 +1004,10 @@ void main() {
     });
 
     test('data: URI is rejected', () {
-      expect(PathValidator.validate('data:text/html,<script>alert(1)</script>'), isNotNull);
+      expect(
+        PathValidator.validate('data:text/html,<script>alert(1)</script>'),
+        isNotNull,
+      );
     });
 
     test('file: scheme is rejected', () {
@@ -1021,11 +1049,14 @@ void main() {
       expect(p.currentIndex, 0); // auto-set to 0 on first add
     });
 
-    test('addAll with duplicate paths adds all (no dedup at Playlist level)', () {
-      final p = Playlist();
-      p.addAll(['C:/a.mp4', 'C:/a.mp4', 'C:/a.mp4']);
-      expect(p.length, 3); // Playlist does not dedup; FileOperations does
-    });
+    test(
+      'addAll with duplicate paths adds all (no dedup at Playlist level)',
+      () {
+        final p = Playlist();
+        p.addAll(['C:/a.mp4', 'C:/a.mp4', 'C:/a.mp4']);
+        expect(p.length, 3); // Playlist does not dedup; FileOperations does
+      },
+    );
   });
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -1081,11 +1112,7 @@ void main() {
       final p = Playlist();
       p.add('C:/a.mp4');
       p.mergeHistory({
-        'C:/a.mp4': {
-          'timestamp': -1,
-          'positionMs': -1000,
-          'durationMs': -5000,
-        },
+        'C:/a.mp4': {'timestamp': -1, 'positionMs': -1000, 'durationMs': -5000},
       });
       // Negative values are stored as-is (no validation at Playlist level)
       expect(p.items[0].timestamp, -1);

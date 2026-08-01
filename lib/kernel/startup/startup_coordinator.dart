@@ -5,7 +5,7 @@ import 'startup_state.dart';
 
 export 'startup_state.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 启动协调器 — 跟踪各阶段进度并广播状态
 ///
@@ -90,7 +90,9 @@ class StartupCoordinator {
     }
     final total = _stopwatch.elapsed;
     _log.i('  ────────────────────────');
-    _log.i('  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms'); // μs → ms 转换
+    _log.i(
+      '  Total: ${(total.inMicroseconds / 1000).toStringAsFixed(1)}ms',
+    ); // μs → ms 转换
     _log.i('━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 

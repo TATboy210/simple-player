@@ -8,7 +8,7 @@ import 'debug_probe.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../diagnostics/memory_monitor.dart';
 
-late final _log = KernelLoggerImpl.I;
+final _log = KernelLoggerImpl.I;
 
 /// 统一调试数据导出 — 一键收集所有诊断信息。
 ///

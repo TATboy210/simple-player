@@ -20,7 +20,7 @@ import 'player_actions.dart';
 ///
 /// - controls_overlay: child 缓存 Stack（静态子树）
 /// - control_bar: AnimatedBuilder + opacity child（D-13 模式）
-/// - progress_bar: MergedListenable（position+duration+buffered+drag），
+/// - progress_bar: MergedListenable（position+duration+drag），
 ///   hover tooltip 无法缓存（依赖 hover 状态）
 /// - volume_controls: ValueListenableBuilder2 双 notifier，Slider 依赖 volume
 /// - speed_button: 箭头为 StatelessWidget 局部变量引用（不重建），中间段依赖 speed
@@ -35,7 +35,8 @@ import 'player_actions.dart';
 /// 手势统一处理：单击空白区域隐藏控制栏，双击切换全屏。
 /// ControlBar 按钮通过子 GestureDetector 优先赢得手势竞技场，不触发隐藏。
 class ControlsOverlay extends StatefulWidget {
-  static const _clickDelayMs = 250; // 等待可能的双击
+  // 对齐 media_kit 原生 onTapUp 400ms 双击窗口(原 250ms 偏短)
+  static const _clickDelayMs = 400; // 等待可能的双击
   final MediaEngine engine;
   final PlayerActions actions;
 
@@ -51,6 +52,10 @@ class ControlsOverlay extends StatefulWidget {
   /// 视频标题（传递给 ControlBar Row 1 左侧）
   final String? title;
 
+  /// 控件可见性同步 sink — 单向(_autoHide.visible → sink),供 PlayerScreen
+  /// 联动全屏鼠标隐藏 + 字幕上移. sink 不回写,防回环.
+  final ValueNotifier<bool>? visibleSink;
+
   const ControlsOverlay({
     super.key,
     required this.engine,
@@ -59,6 +64,7 @@ class ControlsOverlay extends StatefulWidget {
     this.isFullscreen = false,
     this.resizing,
     this.title,
+    this.visibleSink,
   });
 
   @override
@@ -88,6 +94,12 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   /// 闪烁消失。此标记在 isFullscreen 变化时设置，在 resize 结束时清除。
   bool _isFullscreenTransition = false;
 
+  /// 同步 _autoHide.visible 到外部 sink — 单向(_autoHide.visible → sink),防回环.
+  /// 供 PlayerScreen 联动全屏鼠标隐藏 + 字幕上移.
+  void _syncVisible() {
+    widget.visibleSink?.value = _autoHide.visible.value;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +127,10 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     widget.resizing?.addListener(_onResizeChanged);
     // CB-06: 防御性同步 — widget 创建时 resizing 可能已为 true
     if (widget.resizing?.value == true) _onResizeChanged();
+
+    // 同步控件可见性到外部 sink(全屏鼠标隐藏 + 字幕上移联动)
+    _autoHide.visible.addListener(_syncVisible);
+    _syncVisible(); // 立即同步初始状态
   }
 
   // TODO: 消费 Tokens.tapJitterThreshold — 当前使用 GestureDetector.onTap，
@@ -193,12 +209,17 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       widget.resizing?.addListener(_onResizeChanged);
       _onResizeChanged();
     }
+    // visibleSink 变化 — 立即同步一次到新 sink(listener 仍在 _autoHide.visible 上)
+    if (oldWidget.visibleSink != widget.visibleSink) {
+      _syncVisible();
+    }
   }
 
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
     widget.resizing?.removeListener(_onResizeChanged);
+    _autoHide.visible.removeListener(_syncVisible);
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
     _animController.dispose();
@@ -213,8 +234,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     final gestureActive = !(widget.emptyStatePresent && isIdle);
     return Stack(
       children: [
-        // 上层手势区域 — 点击隐藏控制栏、双击全屏
-        // idle + emptyState 时 IgnorePointer 让下方 EmptyState 接收点击
+        // 底层:单击/双击手势区 — 仅覆盖 ControlBar 上方空白(不覆盖 ControlBar,
+        // 按钮可点). idle+emptyState 时 IgnorePointer 让下方 EmptyState 收点击.
         Positioned.fill(
           bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
           child: GestureDetector(
@@ -222,22 +243,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
             onTap: gestureActive ? _handleTap : null,
             child: IgnorePointer(
               ignoring: widget.emptyStatePresent && isIdle,
-              child: MouseRegion(
-                opaque: false,
-                hitTestBehavior: HitTestBehavior.translucent,
-                onHover: (event) {
-                  // D-03: 仅底部区域触发 — 鼠标在距底部 150px 内才显示控制栏
-                  final size = context.size;
-                  if (size == null) return;
-                  final mouseFromBottom = size.height - event.localPosition.dy;
-                  if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
-                    _autoHide.onMouseMove();
-                  }
-                },
-                onEnter: (_) => _autoHide.onMouseEnter(),
-                onExit: (_) => _autoHide.onMouseExit(),
-                child: const SizedBox.expand(),
-              ),
+              child: const SizedBox.expand(),
             ),
           ),
         ),
@@ -281,6 +287,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         enableBlur: isVisible,
                         decoration: _animController,
                         resizing: widget.resizing,
+                        // seek 钩子 — 拖动进度条期间冻结 auto-hide
+                        onSeekStart: _autoHide.onSeekStart,
+                        onSeekEnd: _autoHide.onSeekEnd,
                       ),
                     ),
                   ),
@@ -291,9 +300,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                 left: Tokens.controlBarMarginH + 16,
                 right: Tokens.controlBarMarginH + 16,
                 bottom:
-                    Tokens.controlBarMarginBottom +
-                    Tokens.controlBarHeight +
-                    8,
+                    Tokens.controlBarMarginBottom + Tokens.controlBarHeight + 8,
                 child: RepaintBoundary(
                   child: ErrorBanner(
                     engine: widget.engine,
@@ -303,6 +310,29 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                 ),
               ),
             ],
+          ),
+        ),
+        // 顶层:整区 MouseRegion — opaque=false 不阻止 ControlBar 收 tap/hover,
+        // 但跟踪鼠标进出整个 Video. 修复"鼠标从空白移到 ControlBar 触发 onExit
+        // → 3s 后控件消失"的现有 bug:整区覆盖 ControlBar,移入不 onExit,
+        // _hovering 保持 true, timer 到期 if(!_hovering) hide() 不执行.
+        // onHover 仍仅底部 150px 唤起(保留用户"底部触发"意图); onEnter/onExit 整区.
+        Positioned.fill(
+          child: MouseRegion(
+            opaque: false,
+            hitTestBehavior: HitTestBehavior.translucent,
+            onHover: (event) {
+              // D-03: 仅底部区域触发 — 鼠标在距底部 150px 内才唤起控制栏
+              final size = context.size;
+              if (size == null) return;
+              final mouseFromBottom = size.height - event.localPosition.dy;
+              if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
+                _autoHide.onMouseMove();
+              }
+            },
+            onEnter: (_) => _autoHide.onMouseEnter(),
+            onExit: (_) => _autoHide.onMouseExit(),
+            child: const SizedBox.expand(),
           ),
         ),
       ],

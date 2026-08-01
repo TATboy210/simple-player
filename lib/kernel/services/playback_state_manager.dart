@@ -19,7 +19,7 @@ import '../persistence/settings_store.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 播放状态管理器 — 设置恢复 + 断点保存 + 销毁持久化.
 ///
@@ -110,14 +110,14 @@ class PlaybackStateManager {
       ).catchError((Object e) => _log.e('SettingsStore.saveVolume failed: $e')),
     );
     unawaited(
-      SettingsStore.saveIsMuted(
-        _controller.engine.isMuted.value,
-      ).catchError((Object e) => _log.e('SettingsStore.saveIsMuted failed: $e')),
+      SettingsStore.saveIsMuted(_controller.engine.isMuted.value).catchError(
+        (Object e) => _log.e('SettingsStore.saveIsMuted failed: $e'),
+      ),
     );
     unawaited(
-      SettingsStore.savePlayMode(
-        _controller.playlist.mode.index,
-      ).catchError((Object e) => _log.e('SettingsStore.savePlayMode failed: $e')),
+      SettingsStore.savePlayMode(_controller.playlist.mode.index).catchError(
+        (Object e) => _log.e('SettingsStore.savePlayMode failed: $e'),
+      ),
     );
     unawaited(
       PlaylistStore.dispose().catchError((Object e) {

@@ -51,6 +51,11 @@ class ControlBar extends StatelessWidget {
   /// 窗口 resize 信号 — 透传给 ProgressBar 跳过内部 bar 重建（CB-06）
   final ValueListenable<bool>? resizing;
 
+  /// 进度条 seek 开始/结束回调 — 透传给 ProgressBar,通知 AutoHideController
+  /// 在 seek 期间冻结/重启隐藏计时
+  final VoidCallback? onSeekStart;
+  final VoidCallback? onSeekEnd;
+
   const ControlBar({
     super.key,
     required this.engine,
@@ -61,6 +66,8 @@ class ControlBar extends StatelessWidget {
     this.opacity,
     this.decoration,
     this.resizing,
+    this.onSeekStart,
+    this.onSeekEnd,
   });
 
   @override
@@ -134,7 +141,12 @@ class ControlBar extends StatelessWidget {
                   // Row 2 (Middle): ProgressBar
                   Expanded(
                     child: Center(
-                      child: ProgressBar(engine: engine, resizing: resizing),
+                      child: ProgressBar(
+                        engine: engine,
+                        resizing: resizing,
+                        onSeekStart: onSeekStart,
+                        onSeekEnd: onSeekEnd,
+                      ),
                     ),
                   ),
                   // Row 3 (Bottom): 左组 | Spacer | 中心组 | Spacer | 右组

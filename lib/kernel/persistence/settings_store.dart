@@ -10,7 +10,7 @@ export '../models/app_settings.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'settings_validator.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 导入结果 — sealed class 支持穷尽模式匹配。
 ///
@@ -127,53 +127,74 @@ class SettingsStore {
   static const _keyAudioSyncMs = 'audioSyncMs';
   static const _keyAudioNormalization = 'audioNormalization';
 
-  static Future<AppSettings> load() async => (_instance ?? SettingsStore._(null))._loadImpl();
+  static Future<AppSettings> load() async =>
+      (_instance ?? SettingsStore._(null))._loadImpl();
 
   Future<AppSettings> _loadImpl() async {
     try {
       final prefs = await _getPrefs();
-      
+
       return AppSettings(
         volume: SettingsValidator.volume(prefs.getDouble(_keyVolume) ?? 1.0),
         lastFile: prefs.getString(_keyLastFile) ?? '',
         // RC-3: 验证窗口尺寸 — 防止 NaN/损坏数据导致启动失败
         windowWidth: SettingsValidator.sanitizeDimension(
-          prefs.getDouble(_keyWindowWidth) ?? SettingsValidator.windowWidthDefault,
+          prefs.getDouble(_keyWindowWidth) ??
+              SettingsValidator.windowWidthDefault,
           SettingsValidator.windowWidthDefault,
           SettingsValidator.windowWidthMin,
           SettingsValidator.windowWidthMax,
         ),
         windowHeight: SettingsValidator.sanitizeDimension(
-          prefs.getDouble(_keyWindowHeight) ?? SettingsValidator.windowHeightDefault,
+          prefs.getDouble(_keyWindowHeight) ??
+              SettingsValidator.windowHeightDefault,
           SettingsValidator.windowHeightDefault,
           SettingsValidator.windowHeightMin,
           SettingsValidator.windowHeightMax,
         ),
         windowX: prefs.getDouble(_keyWindowX) != null
-            ? SettingsValidator.sanitizeCoordinate(prefs.getDouble(_keyWindowX)!, 0)
+            ? SettingsValidator.sanitizeCoordinate(
+                prefs.getDouble(_keyWindowX)!,
+                0,
+              )
             : null,
         windowY: prefs.getDouble(_keyWindowY) != null
-            ? SettingsValidator.sanitizeCoordinate(prefs.getDouble(_keyWindowY)!, 0)
+            ? SettingsValidator.sanitizeCoordinate(
+                prefs.getDouble(_keyWindowY)!,
+                0,
+              )
             : null,
         isMaximized: prefs.getBool(_keyIsMaximized) ?? false,
         playMode: SettingsValidator.playMode(prefs.getInt(_keyPlayMode) ?? 0),
         isMuted: prefs.getBool(_keyIsMuted) ?? false,
         isAlwaysOnTop: prefs.getBool(_keyIsAlwaysOnTop) ?? false,
         subtitleFontSize: SettingsValidator.subtitleFontSize(
-          prefs.getDouble(_keySubtitleFontSize) ?? SettingsValidator.subtitleFontSizeDefault,
+          prefs.getDouble(_keySubtitleFontSize) ??
+              SettingsValidator.subtitleFontSizeDefault,
         ),
         subtitleColorIndex: SettingsValidator.subtitleColorIndex(
           prefs.getInt(_keySubtitleColorIndex) ?? 0,
         ),
         subtitleBottomOffset: SettingsValidator.subtitleOffset(
-          prefs.getDouble(_keySubtitleBottomOffset) ?? SettingsValidator.subtitleOffsetDefault,
+          prefs.getDouble(_keySubtitleBottomOffset) ??
+              SettingsValidator.subtitleOffsetDefault,
         ),
         // 视频处理 — 防篡改：clamp 到有效范围，解析失败用默认值
-        videoBrightness: SettingsValidator.videoEffect(prefs.getDouble(_keyVideoBrightness) ?? 0.0),
-        videoContrast: SettingsValidator.videoEffect(prefs.getDouble(_keyVideoContrast) ?? 0.0),
-        videoSaturation: SettingsValidator.videoEffect(prefs.getDouble(_keyVideoSaturation) ?? 0.0),
-        videoHue: SettingsValidator.videoEffect(prefs.getDouble(_keyVideoHue) ?? 0.0),
-        videoRotation: SettingsValidator.sanitizeRotation(prefs.getInt(_keyVideoRotation) ?? 0),
+        videoBrightness: SettingsValidator.videoEffect(
+          prefs.getDouble(_keyVideoBrightness) ?? 0.0,
+        ),
+        videoContrast: SettingsValidator.videoEffect(
+          prefs.getDouble(_keyVideoContrast) ?? 0.0,
+        ),
+        videoSaturation: SettingsValidator.videoEffect(
+          prefs.getDouble(_keyVideoSaturation) ?? 0.0,
+        ),
+        videoHue: SettingsValidator.videoEffect(
+          prefs.getDouble(_keyVideoHue) ?? 0.0,
+        ),
+        videoRotation: SettingsValidator.sanitizeRotation(
+          prefs.getInt(_keyVideoRotation) ?? 0,
+        ),
         videoAspectRatioIndex: SettingsValidator.videoAspectRatioIndex(
           prefs.getInt(_keyVideoAspectRatio) ?? 0,
         ),
@@ -245,9 +266,18 @@ class SettingsStore {
     required double y,
     required bool isMaximized,
   }) => _save('saveWindowGeometry', (p) async {
-    
-    final safeWidth = SettingsValidator.sanitizeDimension(width, SettingsValidator.windowWidthDefault, SettingsValidator.windowWidthMin, SettingsValidator.windowWidthMax);
-    final safeHeight = SettingsValidator.sanitizeDimension(height, SettingsValidator.windowHeightDefault, SettingsValidator.windowHeightMin, SettingsValidator.windowHeightMax);
+    final safeWidth = SettingsValidator.sanitizeDimension(
+      width,
+      SettingsValidator.windowWidthDefault,
+      SettingsValidator.windowWidthMin,
+      SettingsValidator.windowWidthMax,
+    );
+    final safeHeight = SettingsValidator.sanitizeDimension(
+      height,
+      SettingsValidator.windowHeightDefault,
+      SettingsValidator.windowHeightMin,
+      SettingsValidator.windowHeightMax,
+    );
     final safeX = SettingsValidator.sanitizeCoordinate(x, 0);
     final safeY = SettingsValidator.sanitizeCoordinate(y, 0);
     // RC-4: 顺序写入 — 避免 Future.wait 部分成功导致数据不一致
@@ -270,7 +300,8 @@ class SettingsStore {
       _save('saveIsAlwaysOnTop', (p) => p.setBool(_keyIsAlwaysOnTop, value));
 
   /// 加载语言偏好，默认 'zh'（中文）
-  static Future<String> loadLocale() async => (_instance ?? SettingsStore._(null))._loadLocaleImpl();
+  static Future<String> loadLocale() async =>
+      (_instance ?? SettingsStore._(null))._loadLocaleImpl();
 
   Future<String> _loadLocaleImpl() async {
     try {
@@ -287,7 +318,8 @@ class SettingsStore {
       _save('saveLocale', (p) => p.setString(_keyLocale, localeCode));
 
   /// 加载主题索引，默认 0（Midnight）
-  static Future<int> loadThemeIndex() async => (_instance ?? SettingsStore._(null))._loadThemeIndexImpl();
+  static Future<int> loadThemeIndex() async =>
+      (_instance ?? SettingsStore._(null))._loadThemeIndexImpl();
 
   Future<int> _loadThemeIndexImpl() async {
     try {
@@ -306,7 +338,8 @@ class SettingsStore {
   );
 
   /// 加载自定义快捷键映射 (action → LogicalKeyboardKey.keyName)
-  static Future<Map<String, String>> loadShortcuts() async => (_instance ?? SettingsStore._(null))._loadShortcutsImpl();
+  static Future<Map<String, String>> loadShortcuts() async =>
+      (_instance ?? SettingsStore._(null))._loadShortcutsImpl();
 
   Future<Map<String, String>> _loadShortcutsImpl() async {
     try {
@@ -329,24 +362,34 @@ class SettingsStore {
 
   static Future<void> saveSubtitleFontSize(double value) => _save(
     'saveSubtitleFontSize',
-    (p) => p.setDouble(_keySubtitleFontSize, SettingsValidator.subtitleFontSize(value)),
+    (p) => p.setDouble(
+      _keySubtitleFontSize,
+      SettingsValidator.subtitleFontSize(value),
+    ),
   );
 
   static Future<void> saveSubtitleColorIndex(int index) => _save(
     'saveSubtitleColorIndex',
-    (p) => p.setInt(_keySubtitleColorIndex, SettingsValidator.subtitleColorIndex(index)),
+    (p) => p.setInt(
+      _keySubtitleColorIndex,
+      SettingsValidator.subtitleColorIndex(index),
+    ),
   );
 
   static Future<void> saveSubtitleBottomOffset(double value) => _save(
     'saveSubtitleBottomOffset',
-    (p) => p.setDouble(_keySubtitleBottomOffset, SettingsValidator.subtitleOffset(value)),
+    (p) => p.setDouble(
+      _keySubtitleBottomOffset,
+      SettingsValidator.subtitleOffset(value),
+    ),
   );
 
   // ─── 视频处理持久化 ───
 
   static Future<void> saveVideoBrightness(double value) => _save(
     'saveVideoBrightness',
-    (p) => p.setDouble(_keyVideoBrightness, SettingsValidator.videoEffect(value)),
+    (p) =>
+        p.setDouble(_keyVideoBrightness, SettingsValidator.videoEffect(value)),
   );
 
   static Future<void> saveVideoContrast(double value) => _save(
@@ -356,7 +399,8 @@ class SettingsStore {
 
   static Future<void> saveVideoSaturation(double value) => _save(
     'saveVideoSaturation',
-    (p) => p.setDouble(_keyVideoSaturation, SettingsValidator.videoEffect(value)),
+    (p) =>
+        p.setDouble(_keyVideoSaturation, SettingsValidator.videoEffect(value)),
   );
 
   static Future<void> saveVideoHue(double value) => _save(
@@ -366,7 +410,8 @@ class SettingsStore {
 
   static Future<void> saveVideoRotation(int degree) => _save(
     'saveVideoRotation',
-    (p) => p.setInt(_keyVideoRotation, SettingsValidator.sanitizeRotation(degree)),
+    (p) =>
+        p.setInt(_keyVideoRotation, SettingsValidator.sanitizeRotation(degree)),
   );
 
   static Future<void> saveVideoAspectRatioIndex(int index) => _save(
@@ -396,7 +441,8 @@ class SettingsStore {
 
   static Future<void> savePlaybackSpeed(double value) => _save(
     'savePlaybackSpeed',
-    (p) => p.setDouble(_keyPlaybackSpeed, SettingsValidator.playbackSpeed(value)),
+    (p) =>
+        p.setDouble(_keyPlaybackSpeed, SettingsValidator.playbackSpeed(value)),
   );
 
   static Future<double> loadPlaybackSpeed() async =>
@@ -406,7 +452,8 @@ class SettingsStore {
     try {
       final prefs = await _getPrefs();
       return SettingsValidator.playbackSpeed(
-        prefs.getDouble(_keyPlaybackSpeed) ?? SettingsValidator.playbackSpeedDefault,
+        prefs.getDouble(_keyPlaybackSpeed) ??
+            SettingsValidator.playbackSpeedDefault,
       );
     } on Exception catch (e) {
       _log.e('SettingsStore.loadPlaybackSpeed failed: $e');
@@ -423,7 +470,9 @@ class SettingsStore {
   Future<int> _loadAudioEqPresetImpl() async {
     try {
       final prefs = await _getPrefs();
-      return SettingsValidator.audioEqPreset(prefs.getInt(_keyAudioEqPreset) ?? 0);
+      return SettingsValidator.audioEqPreset(
+        prefs.getInt(_keyAudioEqPreset) ?? 0,
+      );
     } on Exception catch (e) {
       _log.e('SettingsStore.loadAudioEqPreset failed: $e');
       return 0;
@@ -499,7 +548,8 @@ class SettingsStore {
   );
 
   /// 加载 D3D11 同步设置，默认 true（同步模式）
-  static Future<bool> loadD3d11SyncEnabled() async => (_instance ?? SettingsStore._(null))._loadD3d11SyncEnabledImpl();
+  static Future<bool> loadD3d11SyncEnabled() async =>
+      (_instance ?? SettingsStore._(null))._loadD3d11SyncEnabledImpl();
 
   Future<bool> _loadD3d11SyncEnabledImpl() async {
     try {
@@ -512,7 +562,8 @@ class SettingsStore {
   }
 
   /// 加载硬件解码设置，默认 true（硬件解码优先）
-  static Future<bool> loadHardwareDecoding() async => (_instance ?? SettingsStore._(null))._loadHardwareDecodingImpl();
+  static Future<bool> loadHardwareDecoding() async =>
+      (_instance ?? SettingsStore._(null))._loadHardwareDecodingImpl();
 
   Future<bool> _loadHardwareDecodingImpl() async {
     try {
@@ -530,44 +581,83 @@ class SettingsStore {
   /// RC-4: 顺序写入。
   /// RC-8: windowX/windowY 为 null 时显式清除旧键。
   static Future<void> saveAll(AppSettings s) => _save('saveAll', (p) async {
-    
     await p.setDouble(_keyVolume, SettingsValidator.volume(s.volume));
     await p.setString(_keyLastFile, s.lastFile);
     // RC-3: 验证窗口尺寸
     await p.setDouble(
       _keyWindowWidth,
-      SettingsValidator.sanitizeDimension(s.windowWidth, SettingsValidator.windowWidthDefault, SettingsValidator.windowWidthMin, SettingsValidator.windowWidthMax),
+      SettingsValidator.sanitizeDimension(
+        s.windowWidth,
+        SettingsValidator.windowWidthDefault,
+        SettingsValidator.windowWidthMin,
+        SettingsValidator.windowWidthMax,
+      ),
     );
     await p.setDouble(
       _keyWindowHeight,
-      SettingsValidator.sanitizeDimension(s.windowHeight, SettingsValidator.windowHeightDefault, SettingsValidator.windowHeightMin, SettingsValidator.windowHeightMax),
+      SettingsValidator.sanitizeDimension(
+        s.windowHeight,
+        SettingsValidator.windowHeightDefault,
+        SettingsValidator.windowHeightMin,
+        SettingsValidator.windowHeightMax,
+      ),
     );
     await p.setInt(_keyPlayMode, SettingsValidator.playMode(s.playMode));
     await p.setBool(_keyIsMuted, s.isMuted);
-    await p.setDouble(_keySubtitleFontSize, SettingsValidator.subtitleFontSize(s.subtitleFontSize));
-    await p.setInt(_keySubtitleColorIndex, SettingsValidator.subtitleColorIndex(s.subtitleColorIndex));
-    await p.setDouble(_keySubtitleBottomOffset, SettingsValidator.subtitleOffset(s.subtitleBottomOffset));
+    await p.setDouble(
+      _keySubtitleFontSize,
+      SettingsValidator.subtitleFontSize(s.subtitleFontSize),
+    );
+    await p.setInt(
+      _keySubtitleColorIndex,
+      SettingsValidator.subtitleColorIndex(s.subtitleColorIndex),
+    );
+    await p.setDouble(
+      _keySubtitleBottomOffset,
+      SettingsValidator.subtitleOffset(s.subtitleBottomOffset),
+    );
     await p.setBool(_keyIsMaximized, s.isMaximized);
     await p.setBool(_keyIsAlwaysOnTop, s.isAlwaysOnTop);
     // 视频处理
-    await p.setDouble(_keyVideoBrightness, SettingsValidator.videoEffect(s.videoBrightness));
-    await p.setDouble(_keyVideoContrast, SettingsValidator.videoEffect(s.videoContrast));
-    await p.setDouble(_keyVideoSaturation, SettingsValidator.videoEffect(s.videoSaturation));
+    await p.setDouble(
+      _keyVideoBrightness,
+      SettingsValidator.videoEffect(s.videoBrightness),
+    );
+    await p.setDouble(
+      _keyVideoContrast,
+      SettingsValidator.videoEffect(s.videoContrast),
+    );
+    await p.setDouble(
+      _keyVideoSaturation,
+      SettingsValidator.videoEffect(s.videoSaturation),
+    );
     await p.setDouble(_keyVideoHue, SettingsValidator.videoEffect(s.videoHue));
-    await p.setInt(_keyVideoRotation, SettingsValidator.sanitizeRotation(s.videoRotation));
-    await p.setInt(_keyVideoAspectRatio, SettingsValidator.videoAspectRatioIndex(s.videoAspectRatioIndex));
+    await p.setInt(
+      _keyVideoRotation,
+      SettingsValidator.sanitizeRotation(s.videoRotation),
+    );
+    await p.setInt(
+      _keyVideoAspectRatio,
+      SettingsValidator.videoAspectRatioIndex(s.videoAspectRatioIndex),
+    );
     await p.setBool(_keyVideoDeinterlace, s.videoDeinterlace);
     // 性能设置
     await p.setBool(_keyD3d11Sync, s.d3d11Sync);
     await p.setBool(_keyHardwareDecoding, s.hardwareDecoding);
     // RC-8: null 时显式清除旧键，防止残留值导致下次启动位置错误
     if (s.windowX != null) {
-      await p.setDouble(_keyWindowX, SettingsValidator.sanitizeCoordinate(s.windowX!, 0));
+      await p.setDouble(
+        _keyWindowX,
+        SettingsValidator.sanitizeCoordinate(s.windowX!, 0),
+      );
     } else {
       await p.remove(_keyWindowX);
     }
     if (s.windowY != null) {
-      await p.setDouble(_keyWindowY, SettingsValidator.sanitizeCoordinate(s.windowY!, 0));
+      await p.setDouble(
+        _keyWindowY,
+        SettingsValidator.sanitizeCoordinate(s.windowY!, 0),
+      );
     } else {
       await p.remove(_keyWindowY);
     }
@@ -594,22 +684,20 @@ class SettingsStore {
   }
 
   /// 保存轨道偏好
-  static Future<void> saveTrackPreferences(TrackPreferences prefs) => _save(
-    'saveTrackPreferences',
-    (p) async {
-      if (prefs.audioTrackIndex != null) {
-        await p.setInt(_keyAudioTrackIndex, prefs.audioTrackIndex!);
-      } else {
-        await p.remove(_keyAudioTrackIndex);
-      }
-      if (prefs.subtitleTrackIndex != null) {
-        await p.setInt(_keySubtitleTrackIndex, prefs.subtitleTrackIndex!);
-      } else {
-        await p.remove(_keySubtitleTrackIndex);
-      }
-      await p.setInt(_keySubtitleDelay, prefs.subtitleDelay);
-    },
-  );
+  static Future<void> saveTrackPreferences(TrackPreferences prefs) =>
+      _save('saveTrackPreferences', (p) async {
+        if (prefs.audioTrackIndex != null) {
+          await p.setInt(_keyAudioTrackIndex, prefs.audioTrackIndex!);
+        } else {
+          await p.remove(_keyAudioTrackIndex);
+        }
+        if (prefs.subtitleTrackIndex != null) {
+          await p.setInt(_keySubtitleTrackIndex, prefs.subtitleTrackIndex!);
+        } else {
+          await p.remove(_keySubtitleTrackIndex);
+        }
+        await p.setInt(_keySubtitleDelay, prefs.subtitleDelay);
+      });
 
   // ─── 设置导入/导出 ───
 
@@ -666,39 +754,45 @@ class SettingsStore {
       ),
       lastFile: map['lastFile'] as String? ?? '',
       windowWidth: SettingsValidator.sanitizeDimension(
-        (map['windowWidth'] as num?)?.toDouble() ?? SettingsValidator.windowWidthDefault,
+        (map['windowWidth'] as num?)?.toDouble() ??
+            SettingsValidator.windowWidthDefault,
         SettingsValidator.windowWidthDefault,
         SettingsValidator.windowWidthMin,
         SettingsValidator.windowWidthMax,
       ),
       windowHeight: SettingsValidator.sanitizeDimension(
-        (map['windowHeight'] as num?)?.toDouble() ?? SettingsValidator.windowHeightDefault,
+        (map['windowHeight'] as num?)?.toDouble() ??
+            SettingsValidator.windowHeightDefault,
         SettingsValidator.windowHeightDefault,
         SettingsValidator.windowHeightMin,
         SettingsValidator.windowHeightMax,
       ),
       windowX: map['windowX'] != null
           ? SettingsValidator.sanitizeCoordinate(
-              (map['windowX'] as num).toDouble(), 0)
+              (map['windowX'] as num).toDouble(),
+              0,
+            )
           : null,
       windowY: map['windowY'] != null
           ? SettingsValidator.sanitizeCoordinate(
-              (map['windowY'] as num).toDouble(), 0)
+              (map['windowY'] as num).toDouble(),
+              0,
+            )
           : null,
       isMaximized: map['isMaximized'] as bool? ?? false,
-      playMode: SettingsValidator.playMode(
-        map['playMode'] as int? ?? 0,
-      ),
+      playMode: SettingsValidator.playMode(map['playMode'] as int? ?? 0),
       isMuted: map['isMuted'] as bool? ?? false,
       isAlwaysOnTop: map['isAlwaysOnTop'] as bool? ?? false,
       subtitleFontSize: SettingsValidator.subtitleFontSize(
-        (map['subtitleFontSize'] as num?)?.toDouble() ?? SettingsValidator.subtitleFontSizeDefault,
+        (map['subtitleFontSize'] as num?)?.toDouble() ??
+            SettingsValidator.subtitleFontSizeDefault,
       ),
       subtitleColorIndex: SettingsValidator.subtitleColorIndex(
         map['subtitleColorIndex'] as int? ?? 0,
       ),
       subtitleBottomOffset: SettingsValidator.subtitleOffset(
-        (map['subtitleBottomOffset'] as num?)?.toDouble() ?? SettingsValidator.subtitleOffsetDefault,
+        (map['subtitleBottomOffset'] as num?)?.toDouble() ??
+            SettingsValidator.subtitleOffsetDefault,
       ),
       videoBrightness: SettingsValidator.videoEffect(
         (map['videoBrightness'] as num?)?.toDouble() ?? 0.0,
@@ -720,7 +814,8 @@ class SettingsStore {
       ),
       videoDeinterlace: map['videoDeinterlace'] as bool? ?? false,
       playbackSpeed: SettingsValidator.playbackSpeed(
-        (map['playbackSpeed'] as num?)?.toDouble() ?? SettingsValidator.playbackSpeedDefault,
+        (map['playbackSpeed'] as num?)?.toDouble() ??
+            SettingsValidator.playbackSpeedDefault,
       ),
       d3d11Sync: map['d3d11Sync'] as bool? ?? true,
       hardwareDecoding: map['hardwareDecoding'] as bool? ?? true,

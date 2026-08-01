@@ -10,7 +10,7 @@ import '../playlist/playlist.dart';
 import '../utils/debug_probe.dart';
 import '../diagnostics/kernel_logger.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 播放列表 JSON 持久化
 ///
@@ -45,12 +45,6 @@ class PlaylistStore {
   /// store.save(playlist);
   /// ```
   PlaylistStore({String? storagePath}) : _storagePath = storagePath;
-
-  /// 创建独立实例 — 与默认构造函数等价，保留向后兼容
-  @Deprecated('Use PlaylistStore(storagePath: ...) directly')
-  factory PlaylistStore.create({required String storagePath}) {
-    return PlaylistStore(storagePath: storagePath);
-  }
 
   Timer? _debounce;
 
@@ -153,8 +147,10 @@ class PlaylistStore {
   /// 文件读取和 JSON 解析在独立 Isolate 中执行，
   /// 迁移逻辑在主 Isolate 回调中执行（低频一次性操作）。
   /// Isolate 失败时自动回退到 [load]。
-  static Future<Playlist?> loadInBackground() =>
-      probe.measureAsync('loadInBackground', () => _instance._loadInBackgroundImpl());
+  static Future<Playlist?> loadInBackground() => probe.measureAsync(
+    'loadInBackground',
+    () => _instance._loadInBackgroundImpl(),
+  );
 
   Future<Playlist?> _loadInBackgroundImpl() async {
     try {

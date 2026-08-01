@@ -110,13 +110,11 @@
     },
     "colors": {
       "progressPlayed":  { "value": "0xFFFFFFFF", "desc": "已播放部分颜色" },
-      "progressBuffer":  { "value": "0x44FFFFFF", "alpha": "27%", "desc": "已缓冲部分颜色" },
       "progressThumb":   { "value": "0xFFFFFFFF", "desc": "拖拽圆点颜色" },
       "progressBarBg":   { "value": "0x44000000", "alpha": "27%", "desc": "进度条底色" }
     },
     "disabled": {
       "progressDisabledBgAlpha":     { "value": 0.3, "desc": "禁用时背景透明度" },
-      "progressDisabledBufferAlpha": { "value": 0.2, "desc": "禁用时缓冲透明度" },
       "progressDisabledPlayedAlpha": { "value": 0.3, "desc": "禁用时已播放透明度" }
     },
     "interaction": {

@@ -10,9 +10,9 @@ import 'shortcuts_help_dialog.dart';
 
 /// 构造播放器键盘处理器 — 绑定 20+ 快捷键到 engine/controller.
 ///
-/// F 键全屏走 media_kit 自带 [VideoState.toggleFullscreen] (无参, 绕过
-/// context 陷阱: [KeyboardHandler] 在 [Video] 外层, 顶层 toggleFullscreen
-/// 需 Video 子树 context). 无 Video widget 时 currentState 为 null → noop (安全).
+/// F 键全屏: setMode 设 intent+mode + videoKey.toggleFullscreen 实际全屏 (方案 B).
+/// 单用 toggleFullscreen: SC_MAXIMIZE→onWindowMaximize 覆盖 mode=maximized;
+/// 单用 setMode 直调 fullscreen_window: GUI 失效 (方案 A 弃). 两者配合 + 守卫.
 ///
 /// [isFullscreen] 由调用方 (AnimatedBuilder 内) 每次重建时传入,
 /// 保证 onExitFullscreen 闭包捕获的是最新全屏状态.
@@ -61,10 +61,21 @@ KeyboardHandler buildPlayerKeyboardActions({
     onMediaPlayPause: () => engine.togglePlayPause(),
     onMediaNext: () => controller.playNext(),
     onMediaPrevious: () => controller.playPrevious(),
-    onToggleFullscreen: () => videoKey.currentState?.toggleFullscreen(),
+    // 方案 B: setMode 设 intent+mode (守卫 onWindowMaximize 同步 mode=fullscreen),
+    // videoKey.toggleFullscreen 走 media_kit 原生全屏 (已验证可用).
+    // 单用 toggleFullscreen: SC_MAXIMIZE→onWindowMaximize 覆盖 mode=maximized;
+    // 单用 setMode 直调 fullscreen_window: GUI 失效 (方案 A 弃). 两者配合 + 守卫.
+    onToggleFullscreen: () {
+      final entering = !isFullscreen;
+      windowService.setMode(
+        entering ? WindowMode.fullscreen : WindowMode.windowed,
+      );
+      videoKey.currentState?.toggleFullscreen();
+    },
     onExitFullscreen: () {
       if (isFullscreen) {
         windowService.setMode(WindowMode.windowed);
+        videoKey.currentState?.toggleFullscreen();
       }
     },
     child: child,

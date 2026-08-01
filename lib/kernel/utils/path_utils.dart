@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 路径工具函数
 ///

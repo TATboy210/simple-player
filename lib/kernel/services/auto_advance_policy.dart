@@ -17,7 +17,7 @@ import '../models/play_mode.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'playback_controller.dart';
 
-late final _log = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// 自动连播策略 — 监听 [MediaState.completed] 并驱动播放器前进.
 ///
@@ -66,7 +66,11 @@ class AutoAdvancePolicy {
     } on Exception catch (e, st) {
       _log.e('AutoAdvancePolicy loopSingle replay failed: $e', stackTrace: st);
       _controller.onError?.call(
-        PlaybackError(PlaybackErrorCode.playFailed, 'AutoAdvancePolicy loopSingle replay failed: $e', e),
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'AutoAdvancePolicy loopSingle replay failed: $e',
+          e,
+        ),
       );
     }
   }
@@ -80,7 +84,11 @@ class AutoAdvancePolicy {
     } on Exception catch (e, st) {
       _log.e('AutoAdvancePolicy auto-advance failed: $e', stackTrace: st);
       _controller.onError?.call(
-        PlaybackError(PlaybackErrorCode.playFailed, 'AutoAdvancePolicy auto-advance failed: $e', e),
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'AutoAdvancePolicy auto-advance failed: $e',
+          e,
+        ),
       );
     }
   }

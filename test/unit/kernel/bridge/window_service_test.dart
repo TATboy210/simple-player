@@ -305,4 +305,62 @@ void main() {
       service.dispose();
     });
   });
+
+  // =========================================================================
+  // 全屏 mode 同步 — _fullscreenIntent 守卫 (需求1 治本方案 A)
+  // =========================================================================
+  group('fullscreen mode sync (_fullscreenIntent guard)', () {
+    // 方案 B: setMode(fullscreen/windowed) 只设 intent+mode, 不调平台接口
+    // (实际全屏由 media_kit VideoState.toggleFullscreen 完成). 守卫测试验证 mode 同步.
+
+    test('setMode(fullscreen) sets mode + intent', () async {
+      final service = WindowService();
+      await service.setMode(WindowMode.fullscreen);
+      expect(service.state.mode.value, WindowMode.fullscreen);
+      expect(service.isFullscreen, isTrue);
+      service.dispose();
+    });
+
+    test('onWindowMaximize during fullscreen intent keeps mode fullscreen', () async {
+      // SC_MAXIMIZE 噪音不应覆盖 mode — _fullscreenIntent 守卫
+      final service = WindowService();
+      await service.setMode(WindowMode.fullscreen);
+      service.onWindowMaximize();
+      expect(service.state.mode.value, WindowMode.fullscreen);
+      service.dispose();
+    });
+
+    test('onWindowUnmaximize during fullscreen intent is no-op', () async {
+      final service = WindowService();
+      await service.setMode(WindowMode.fullscreen);
+      service.onWindowUnmaximize();
+      expect(service.state.mode.value, WindowMode.fullscreen);
+      service.dispose();
+    });
+
+    test('setMode(windowed) from fullscreen clears intent + sets windowed', () async {
+      final service = WindowService();
+      await service.setMode(WindowMode.fullscreen);
+      await service.setMode(WindowMode.windowed);
+      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.isFullscreen, isFalse);
+      service.dispose();
+    });
+
+    test('onWindowMaximize without intent sets maximized (regression)', () {
+      // 守卫不影响正常最大化路径
+      final service = WindowService();
+      service.onWindowMaximize();
+      expect(service.state.mode.value, WindowMode.maximized);
+      service.dispose();
+    });
+
+    test('setMode(fullscreen) no-op when already fullscreen', () async {
+      final service = WindowService();
+      await service.setMode(WindowMode.fullscreen);
+      await service.setMode(WindowMode.fullscreen); // 同值, 早退
+      expect(service.state.mode.value, WindowMode.fullscreen);
+      service.dispose();
+    });
+  });
 }

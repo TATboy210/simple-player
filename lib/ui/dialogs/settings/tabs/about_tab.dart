@@ -49,9 +49,9 @@ class AboutTab extends StatelessWidget {
               ),
               SettingRow(
                 title: '引擎',
-                description: 'fvp (MDK/FFmpeg)',
+                description: 'media_kit (libmpv)',
                 control: Text(
-                  'MDK 0.1.x',
+                  'libmpv',
                   style: TextStyle(
                     color: Tokens.textSecondary,
                     fontSize: Tokens.fontCaption,

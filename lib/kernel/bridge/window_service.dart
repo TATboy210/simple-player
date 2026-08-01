@@ -36,6 +36,11 @@ class WindowService with WindowListener implements WindowBridge {
   bool _isProgrammaticResize = false;
   bool _skipNextResize = false;
 
+  /// 全屏意图标记 — setMode(fullscreen) 置 true, setMode(windowed 从 fullscreen) 置 false.
+  /// fullscreen_window cpp 用 SC_MAXIMIZE 实现全屏铺满, 会触发 onWindowMaximize;
+  /// 此标记守卫 onWindowMaximize/onWindowUnmaximize, 防止 mode 被覆盖成 maximized.
+  bool _fullscreenIntent = false;
+
   /// resize 防抖延迟 — 500ms 内无新 resize 事件才更新 windowSize。
   static const int _resizeDebounceMs = 500;
 
@@ -138,10 +143,15 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowMaximize() {
     if (_disposed) return;
-    logBridge.d('onWindowMaximize()');
+    logBridge.d('onWindowMaximize() fullscreenIntent=$_fullscreenIntent');
     _startResizeTimer();
     _updateOnUIThread(() {
-      if (_state.mode.value != WindowMode.maximized) {
+      if (_fullscreenIntent) {
+        // 全屏切换的 SC_MAXIMIZE — 保持 fullscreen, 不被 maximized 覆盖.
+        if (_state.mode.value != WindowMode.fullscreen) {
+          _state.mode.value = WindowMode.fullscreen;
+        }
+      } else if (_state.mode.value != WindowMode.maximized) {
         _state.mode.value = WindowMode.maximized;
       }
     });
@@ -150,7 +160,10 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowUnmaximize() {
     if (_disposed) return;
-    logBridge.d('onWindowUnmaximize()');
+    logBridge.d('onWindowUnmaximize() fullscreenIntent=$_fullscreenIntent');
+    // 全屏期间忽略 unmaximize 噪音 (退出全屏的 SC_RESTORE 可能触发).
+    // 退出全屏由 setMode(windowed) 显式设 mode, 不依赖此回调.
+    if (_fullscreenIntent) return;
     _startResizeTimer();
     _updateOnUIThread(() {
       if (_state.mode.value == WindowMode.maximized) {
@@ -181,9 +194,16 @@ class WindowService with WindowListener implements WindowBridge {
   Future<void> setMode(WindowMode target) async {
     if (_disposed || target == _state.mode.value) return;
     logBridge.i('setMode($target) <- ${_state.mode.value}');
+    final prev = _state.mode.value;
     switch (target) {
       case WindowMode.windowed:
-        if (_state.mode.value == WindowMode.maximized) {
+        if (prev == WindowMode.fullscreen) {
+          // 方案 B: 实际退出全屏由 UI 层调 media_kit VideoState.toggleFullscreen.
+          // 只清 intent + 设 mode=windowed. 不用 windowManager.unmaximize:
+          // 全屏非真最大化, unmaximize 无效.
+          _fullscreenIntent = false;
+          _state.mode.value = WindowMode.windowed;
+        } else if (prev == WindowMode.maximized) {
           await windowManager.unmaximize();
         }
       case WindowMode.maximized:
@@ -191,8 +211,13 @@ class WindowService with WindowListener implements WindowBridge {
       case WindowMode.minimized:
         await windowManager.minimize();
       case WindowMode.fullscreen:
-        // TODO: Phase 2 — wire to fullscreen_window package
-        break;
+        // 方案 B: 实际全屏由 UI 层调 media_kit VideoState.toggleFullscreen
+        // (已验证可用). 此处只设 intent + mode — onWindowMaximize 守卫保持
+        // mode=fullscreen, 不被 SC_MAXIMIZE 覆盖成 maximized.
+        // 弃方案 A 直调 FullScreenWindowPlatform: path 依赖覆盖 + 绕过 media_kit
+        // 初始化路径, 致 GUI 全屏失效.
+        _fullscreenIntent = true;
+        _state.mode.value = WindowMode.fullscreen;
     }
   }
 

@@ -302,7 +302,7 @@
   "@techStack": { "description": "Label for technology stack" },
   "licenses": "Licenses",
   "@licenses": { "description": "Button to show open source licenses" },
-  "copyright": "Built with Flutter + fvp (MDK/FFmpeg)",
+  "copyright": "Built with Flutter + media_kit (libmpv)",
   "@copyright": { "description": "Copyright/technology description" },
 
   "resetShortcuts": "Reset to Default",

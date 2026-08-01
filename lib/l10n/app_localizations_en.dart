@@ -415,7 +415,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get licenses => 'Licenses';
 
   @override
-  String get copyright => 'Built with Flutter + fvp (MDK/FFmpeg)';
+  String get copyright => 'Built with Flutter + media_kit (libmpv)';
 
   @override
   String get resetShortcuts => 'Reset to Default';

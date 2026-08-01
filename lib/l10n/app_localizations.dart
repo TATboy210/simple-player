@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// Copyright/technology description
   ///
   /// In en, this message translates to:
-  /// **'Built with Flutter + fvp (MDK/FFmpeg)'**
+  /// **'Built with Flutter + media_kit (libmpv)'**
   String get copyright;
 
   /// Button to reset all keyboard shortcuts to defaults
