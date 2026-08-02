@@ -128,10 +128,18 @@ class PlaybackNavigator {
       _controller.playlist.currentIndex == index &&
       _controller.playlist.current?.path == path;
 
-  /// 播放下一首 — 委托 playlist.peekNext() 获取下一个索引
+  /// 播放下一首；无可播放后继项时安全卸载已完成的媒体。
+  ///
+  /// loopAll、loopSingle 与 shuffle 的回绕/重播仍由 [Playlist.peekNext] 决定；
+  /// 只有它明确返回 `-1` 时才进入空置收尾。
   Future<void> playNext() async {
     final next = _controller.playlist.peekNext();
-    if (next >= 0) await playIndex(next);
+    if (next >= 0) {
+      await playIndex(next);
+      return;
+    }
+
+    await _controller.stopCurrentMedia();
   }
 
   /// 播放上一首 — 委托 playlist.peekPrevious() 获取上一个索引

@@ -169,22 +169,30 @@ void main() {
         expect(playlist.currentIndex, 0);
       });
 
-      test('completed with empty playlist does not crash', () async {
-        const settings = AppSettings(
-          volume: 1.0,
-          lastFile: '',
-          windowWidth: 1280,
-          windowHeight: 720,
-          playMode: 0,
-          isMuted: false,
-        );
-        await controller.init(settings: settings);
-        // Empty playlist — currentIndex is -1
-        engine.simulateCompleted();
-        await Future(() {});
-        // Should not crash
-        expect(playlist.currentIndex, -1);
-      });
+      test(
+        'completed without a playable successor unloads the media',
+        () async {
+          const settings = AppSettings(
+            volume: 1.0,
+            lastFile: '',
+            windowWidth: 1280,
+            windowHeight: 720,
+            playMode: 0,
+            isMuted: false,
+          );
+          await controller.init(settings: settings);
+          engine.configureMedia(durationMs: 60000);
+          // 模拟外部列表变更后，完成事件仍来自已加载的旧媒体。
+          await engine.open('C:/orphan.mp4');
+          controller.currentFileName.value = 'orphan.mp4';
+          engine.simulateCompleted();
+          await Future<void>(() {});
+
+          expect(engine.stopCallCount, 1);
+          expect(engine.hasMedia, isFalse);
+          expect(controller.currentFileName.value, isEmpty);
+        },
+      );
 
       test('non-completed idle state does not trigger advance', () async {
         // Direct listener pattern (no init needed)

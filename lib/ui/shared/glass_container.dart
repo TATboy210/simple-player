@@ -409,6 +409,9 @@ class _GlassButtonState extends State<GlassButton>
             highlightColor: Colors.transparent,
             borderRadius: GlassButton._radiusBtn,
             splashFactory: NoSplash.splashFactory,
+            // 键盘焦点与激活由外层 FocusableActionDetector 唯一处理，避免
+            // 同一视觉按钮的 InkWell 再占用一个 Tab 停靠点。
+            canRequestFocus: false,
             child: Center(child: content),
           ),
         ),
@@ -466,6 +469,9 @@ class _GlassButtonState extends State<GlassButton>
         highlightColor: Colors.transparent,
         borderRadius: GlassButton._radiusIcon,
         splashFactory: NoSplash.splashFactory,
+        // 键盘焦点与激活由外层 FocusableActionDetector 唯一处理，避免
+        // 同一视觉按钮的 InkWell 再占用一个 Tab 停靠点。
+        canRequestFocus: false,
         child: Tooltip(
           message: widget.tooltip ?? widget.label ?? '',
           waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),

@@ -47,9 +47,9 @@ class PlayPauseButton extends StatelessWidget {
 
 /// 中央控制组（上一首/后退/播放暂停/前进/下一首/停止）
 ///
-/// 按钮永可点契约:六个按钮的命令直接绑定引擎方法,不以 [isIdle] 置 null。
-/// 引擎层 guard 下沉保证幂等 —— idle 态 seekTo/stop no-op、opening/error 态
-/// toggle no-op,重复命令不产生不一致(见 [MediaKitEngine.play/pause/stop/seekTo])。
+/// 按钮永可点契约:六个按钮不以 [isIdle] 置 null。
+/// 后退、播放和前进直接绑定引擎幂等命令；停止优先走 [onStop]，使
+/// [PlaybackController.stopCurrentMedia] 在项目层统一完成标题与空置态收尾。
 /// [isIdle] 仅用于 [dimmed] 视觉淡化(保留)。
 ///
 /// 上一首/下一首按回调存在性禁用:[onPrevious]/[onNext] == null 时
@@ -62,6 +62,9 @@ class CenterGroup extends StatelessWidget {
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
 
+  /// 停止并卸载当前媒体的项目层收尾入口。
+  final VoidCallback? onStop;
+
   const CenterGroup({
     super.key,
     required this.engine,
@@ -70,6 +73,7 @@ class CenterGroup extends StatelessWidget {
     required this.nextTooltip,
     this.onPrevious,
     this.onNext,
+    this.onStop,
   });
 
   @override
@@ -151,7 +155,8 @@ class CenterGroup extends StatelessWidget {
             child: GlassButton.iconOnly(
               icon: Icons.stop,
               color: dimmed,
-              onPressed: engine.stop,
+              // 生产路径传入控制器收尾回调；fallback 保持独立控件的兼容性。
+              onPressed: onStop ?? engine.stop,
               tooltip: l10n.stop,
               semanticsLabel: l10n.stop,
             ),

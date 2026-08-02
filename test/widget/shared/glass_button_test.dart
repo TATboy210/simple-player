@@ -242,6 +242,51 @@ void main() {
     });
   });
 
+  group('GlassButton focus traversal contract', () {
+    testWidgets('each visual button occupies one Tab stop', (tester) async {
+      var firstActivationCount = 0;
+      var secondActivationCount = 0;
+      final scopeNode = FocusScopeNode();
+      addTearDown(scopeNode.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FocusScope(
+              node: scopeNode,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GlassButton.iconOnly(
+                    icon: Icons.skip_previous,
+                    onPressed: () => firstActivationCount++,
+                  ),
+                  GlassButton.iconOnly(
+                    icon: Icons.replay_10,
+                    onPressed: () => secondActivationCount++,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // FocusableActionDetector is the only keyboard-focus owner per button.
+      scopeNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      expect(firstActivationCount, 1);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      expect(secondActivationCount, 1);
+    });
+  });
+
   group('GlassButton label mode', () {
     testWidgets('renders Icon and Text', (tester) async {
       await tester.pumpWidget(

@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/shared/glass_widgets.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
@@ -48,6 +49,7 @@ void main() {
   CenterGroup buildCenterGroup({
     VoidCallback? onPrevious,
     VoidCallback? onNext,
+    VoidCallback? onStop,
   }) {
     return CenterGroup(
       engine: engine,
@@ -56,6 +58,7 @@ void main() {
       nextTooltip: 'Next',
       onPrevious: onPrevious ?? () {},
       onNext: onNext ?? () {},
+      onStop: onStop ?? engine.stop,
     );
   }
 
@@ -124,6 +127,52 @@ void main() {
       // Assert
       expect(engine.togglePlayPauseCallCount, 1);
     });
+
+    testWidgets('stop routes tap through the supplied controller callback', (
+      tester,
+    ) async {
+      var stopCount = 0;
+      await tester.pumpWidget(
+        buildSubject(child: buildCenterGroup(onStop: () => stopCount++)),
+      );
+
+      // Act
+      await tester.tap(find.byIcon(Icons.stop));
+      await tester.pump();
+
+      // Assert
+      expect(stopCount, 1);
+      expect(engine.stopCallCount, 0);
+    });
+
+    testWidgets('replay 10 requests a 10-second backward skip in milliseconds', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildSubject(child: buildCenterGroup()));
+
+      // Act
+      await tester.tap(find.byIcon(Icons.replay_10));
+      await tester.pump();
+
+      // Assert: prevent passing the displayed seconds value (10) as milliseconds.
+      expect(engine.skipBackCallCount, 1);
+      expect(engine.lastSkipBackMs, Tokens.skipShortMs);
+    });
+
+    testWidgets(
+      'forward 30 requests a 30-second forward skip in milliseconds',
+      (tester) async {
+        await tester.pumpWidget(buildSubject(child: buildCenterGroup()));
+
+        // Act
+        await tester.tap(find.byIcon(Icons.forward_30));
+        await tester.pump();
+
+        // Assert: keep the 30-second UI action aligned with the engine ms API.
+        expect(engine.skipForwardCallCount, 1);
+        expect(engine.lastSkipForwardMs, Tokens.skipLongMs);
+      },
+    );
 
     testWidgets('seeking CenterGroup accepts a second replay command', (
       tester,
@@ -283,6 +332,8 @@ void main() {
       tester,
     ) async {
       var ancestorSpaceCount = 0;
+      final scopeNode = FocusScopeNode();
+      addTearDown(scopeNode.dispose);
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -297,17 +348,21 @@ void main() {
                 }
                 return KeyEventResult.ignored;
               },
-              child: Center(child: buildCenterGroup()),
+              child: FocusScope(
+                node: scopeNode,
+                child: Center(child: buildCenterGroup()),
+              ),
             ),
           ),
         ),
       );
       await tester.pump();
 
-      // 两次 Tab 分别进入 Previous 与 Rewind，避免依赖内部 detector 枚举顺序。
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      // 从明确的外层焦点域进入组：两次 Tab 分别到达 Previous 与 Rewind。
+      scopeNode.requestFocus();
       await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pump();

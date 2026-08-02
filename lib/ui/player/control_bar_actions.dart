@@ -48,6 +48,7 @@ class ControlBarActions extends StatelessWidget {
             nextTooltip: l10n.nextTrack,
             onPrevious: actions.onPrevious,
             onNext: actions.onNext,
+            onStop: actions.onStop,
           ),
           const Spacer(),
           RightButtonGroup(actions: actions),

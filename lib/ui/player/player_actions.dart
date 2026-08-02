@@ -12,6 +12,9 @@ class PlayerActions {
   /// P 键或控制栏"下一曲"按钮。
   final VoidCallback? onNext;
 
+  /// 停止并卸载当前媒体；由控制器统一收尾标题和空置态。
+  final VoidCallback? onStop;
+
   /// 播放列表面板切换按钮。
   final VoidCallback? onTogglePlaylist;
 
@@ -62,6 +65,7 @@ class PlayerActions {
   const PlayerActions({
     this.onPrevious,
     this.onNext,
+    this.onStop,
     this.onTogglePlaylist,
     this.onSettings,
     this.onSettingsSecondary,
