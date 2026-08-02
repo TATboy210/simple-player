@@ -65,8 +65,9 @@ class MediaKitEngine implements MediaEngine {
   final ValueNotifier<String> _subtitleText = ValueNotifier<String>('');
   final ValueNotifier<int> _buffered = ValueNotifier<int>(0);
   final ValueNotifier<double> _aspectRatio = ValueNotifier<double>(0.0);
-  final ValueNotifier<PlayerError?> _lastError =
-      ValueNotifier<PlayerError?>(null);
+  final ValueNotifier<PlayerError?> _lastError = ValueNotifier<PlayerError?>(
+    null,
+  );
   final ValueNotifier<double> _playbackSpeed = ValueNotifier<double>(1.0);
 
   // ---- stream 缓存 (tracks/track 异步到达, 供 getter 查询) ----
@@ -75,6 +76,7 @@ class MediaKitEngine implements MediaEngine {
   int? _videoWidth;
   int? _videoHeight;
   MediaInfo _mediaInfo = const MediaInfo();
+  bool _hasMedia = false;
 
   // 静音前音量快照 — unmute 时恢复. media_kit 无独立 mute API, 借 setVolume(0).
   double _preMuteVolume = 1.0;
@@ -137,6 +139,9 @@ class MediaKitEngine implements MediaEngine {
   MediaInfo get mediaInfo => _mediaInfo;
 
   @override
+  bool get hasMedia => _hasMedia;
+
+  @override
   EngineStateMachine get stateMachine => _stateMachine;
 
   /// media_kit [VideoController] — 供 UI 层的 [Video] widget 使用.
@@ -171,11 +176,7 @@ class MediaKitEngine implements MediaEngine {
     // 切歌时若从 playing 直转 opening 会被状态矩阵拒, 依赖后续 stream 修正
     // (切歌不频繁, 单次 warn 可接受).
     final gen = _stateMachine.nextGeneration();
-    _stateMachine.transitionTo(
-      MediaState.opening,
-      'open',
-      generation: gen,
-    );
+    _stateMachine.transitionTo(MediaState.opening, 'open', generation: gen);
     _stateMachine.isBuffering.value = true;
 
     try {
@@ -186,6 +187,7 @@ class MediaKitEngine implements MediaEngine {
 
       // 成功: 回 idle (契约: 成功后 state==idle, 调用方随后 play()).
       // duration/tracks 由 stream 异步到达, _mediaInfo 随之重建.
+      _hasMedia = true;
       _stateMachine.transitionTo(MediaState.idle, 'open', generation: gen);
       return OpenSuccess(_mediaInfo);
     } on Exception catch (error, stackTrace) {
@@ -202,11 +204,7 @@ class MediaKitEngine implements MediaEngine {
         ),
       );
       _lastError.value = playerError;
-      _stateMachine.transitionTo(
-        MediaState.error,
-        'open',
-        generation: gen,
-      );
+      _stateMachine.transitionTo(MediaState.error, 'open', generation: gen);
       return OpenError(playerError);
     } finally {
       if (_isCurrentGeneration(gen)) _stateMachine.isBuffering.value = false;
@@ -237,12 +235,47 @@ class MediaKitEngine implements MediaEngine {
   }
 
   @override
-  void stop() {
+  Future<void> stop() async {
     if (_disposed) return;
-    unawaited(_player.stop());
-    _position.value = 0;
+
+    // 使等待中的 open 失效；后续新 open/stop 也会使本次异步 stop 过期。
+    final generation = _stateMachine.nextGeneration();
+    _completing = false;
+    try {
+      await _player.stop();
+    } on Exception catch (error, stackTrace) {
+      // 新会话已取得生命周期所有权时，旧 stop 不得覆盖其状态或错误信息。
+      if (!_isCurrentGeneration(generation)) return;
+      // stop 失败时不伪造“媒体已清空”的应用状态，避免用户继续操作残留媒体。
+      final playerError = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        '停止播放失败: $error',
+        error,
+        ErrorContext(
+          action: 'stop',
+          generation: generation,
+          module: 'MediaKitEngine',
+          callbackStackTrace: stackTrace,
+        ),
+      );
+      _lastError.value = playerError;
+      _stateMachine.transitionTo(
+        MediaState.error,
+        'stop',
+        generation: generation,
+      );
+      return;
+    }
+
+    // 旧 stop 的完成不能清空新 open 已经发布的媒体派生状态。
+    if (!_isCurrentGeneration(generation)) return;
+    _clearLoadedMediaState();
     if (_stateMachine.state.value != MediaState.idle) {
-      _stateMachine.transitionTo(MediaState.idle, 'stop');
+      _stateMachine.transitionTo(
+        MediaState.idle,
+        'stop',
+        generation: generation,
+      );
     }
   }
 
@@ -317,8 +350,7 @@ class MediaKitEngine implements MediaEngine {
   void setRange({required int from, int to = -1}) => _unsupported('setRange');
 
   @override
-  void skipForward([int ms = 10000]) =>
-      unawaited(seekTo(_position.value + ms));
+  void skipForward([int ms = 10000]) => unawaited(seekTo(_position.value + ms));
 
   @override
   void skipBack([int ms = 10000]) => unawaited(seekTo(_position.value - ms));
@@ -420,12 +452,10 @@ class MediaKitEngine implements MediaEngine {
   // ============================================================
 
   @override
-  void setD3d11SyncEnabled(bool enabled) =>
-      _unsupported('setD3d11SyncEnabled');
+  void setD3d11SyncEnabled(bool enabled) => _unsupported('setD3d11SyncEnabled');
 
   @override
-  void setHardwareDecoding(bool enabled) =>
-      _unsupported('setHardwareDecoding');
+  void setHardwareDecoding(bool enabled) => _unsupported('setHardwareDecoding');
 
   // ============================================================
   // dispose
@@ -460,55 +490,79 @@ class MediaKitEngine implements MediaEngine {
 
   void _subscribeStreams() {
     // position — 事件流根治轮询滞后 (换后端的核心收益).
-    _subs.add(_player.stream.position.listen((d) {
-      _position.value = d.inMilliseconds;
-    }));
-    _subs.add(_player.stream.duration.listen((d) {
-      _duration.value = d.inMilliseconds;
-      _rebuildMediaInfo();
-    }));
+    _subs.add(
+      _player.stream.position.listen((d) {
+        _position.value = d.inMilliseconds;
+      }),
+    );
+    _subs.add(
+      _player.stream.duration.listen((d) {
+        _duration.value = d.inMilliseconds;
+        _rebuildMediaInfo();
+      }),
+    );
     // media_kit volume 0~100 → 项目 0.0~1.0.
     // 仅同步数值, 不联动 isMuted (静音由 setMute 显式管).
-    _subs.add(_player.stream.volume.listen((v) {
-      _volume.value = (v / 100).clamp(0.0, 1.0);
-    }));
-    _subs.add(_player.stream.rate.listen((r) {
-      _playbackSpeed.value = r;
-    }));
-    _subs.add(_player.stream.buffering.listen((b) {
-      _stateMachine.isBuffering.value = b;
-    }));
-    _subs.add(_player.stream.buffer.listen((d) {
-      _buffered.value = d.inMilliseconds;
-    }));
+    _subs.add(
+      _player.stream.volume.listen((v) {
+        _volume.value = (v / 100).clamp(0.0, 1.0);
+      }),
+    );
+    _subs.add(
+      _player.stream.rate.listen((r) {
+        _playbackSpeed.value = r;
+      }),
+    );
+    _subs.add(
+      _player.stream.buffering.listen((b) {
+        _stateMachine.isBuffering.value = b;
+      }),
+    );
+    _subs.add(
+      _player.stream.buffer.listen((d) {
+        _buffered.value = d.inMilliseconds;
+      }),
+    );
     _subs.add(_player.stream.playing.listen(_onPlaying));
     _subs.add(_player.stream.completed.listen(_onCompleted));
-    _subs.add(_player.stream.tracks.listen((t) {
-      _tracks = t;
-      _rebuildMediaInfo();
-    }));
-    _subs.add(_player.stream.track.listen((t) {
-      _track = t;
-    }));
+    _subs.add(
+      _player.stream.tracks.listen((t) {
+        _tracks = t;
+        _rebuildMediaInfo();
+      }),
+    );
+    _subs.add(
+      _player.stream.track.listen((t) {
+        _track = t;
+      }),
+    );
     // 用 width/height 流算 aspectRatio, 避开 VideoParams 字段名版本差异.
-    _subs.add(_player.stream.width.listen((w) {
-      _videoWidth = w;
-      _updateAspectRatio();
-    }));
-    _subs.add(_player.stream.height.listen((h) {
-      _videoHeight = h;
-      _updateAspectRatio();
-    }));
-    _subs.add(_player.stream.subtitle.listen((lines) {
-      _subtitleText.value = lines.join('\n');
-    }));
-    _subs.add(_player.stream.error.listen((msg) {
-      _lastError.value = UnknownError(
-        msg,
-        null,
-        ErrorContext(action: 'stream', module: 'MediaKitEngine'),
-      );
-    }));
+    _subs.add(
+      _player.stream.width.listen((w) {
+        _videoWidth = w;
+        _updateAspectRatio();
+      }),
+    );
+    _subs.add(
+      _player.stream.height.listen((h) {
+        _videoHeight = h;
+        _updateAspectRatio();
+      }),
+    );
+    _subs.add(
+      _player.stream.subtitle.listen((lines) {
+        _subtitleText.value = lines.join('\n');
+      }),
+    );
+    _subs.add(
+      _player.stream.error.listen((msg) {
+        _lastError.value = UnknownError(
+          msg,
+          null,
+          ErrorContext(action: 'stream', module: 'MediaKitEngine'),
+        );
+      }),
+    );
   }
 
   /// playing 事件驱动 playing/paused 转换. 完成引起的 playing(false) 由
@@ -544,6 +598,23 @@ class MediaKitEngine implements MediaEngine {
     }
   }
 
+  /// 清空已卸载媒体留下的派生状态，防止空置 UI 渲染旧文件信息。
+  void _clearLoadedMediaState() {
+    _hasMedia = false;
+    _position.value = 0;
+    _duration.value = 0;
+    _buffered.value = 0;
+    _aspectRatio.value = 0;
+    _subtitleText.value = '';
+    _tracks = null;
+    _track = null;
+    _videoWidth = null;
+    _videoHeight = null;
+    _mediaInfo = const MediaInfo();
+    _stateMachine.isSeeking.value = false;
+    _stateMachine.isBuffering.value = false;
+  }
+
   /// 重建 _mediaInfo — duration/tracks 任一到达后调用, 保持两者同步.
   void _rebuildMediaInfo() {
     _mediaInfo = MediaInfo(
@@ -557,8 +628,7 @@ class MediaKitEngine implements MediaEngine {
   // 内部工具
   // ============================================================
 
-  bool _isCurrentGeneration(int gen) =>
-      gen == _stateMachine.currentGeneration;
+  bool _isCurrentGeneration(int gen) => gen == _stateMachine.currentGeneration;
 
   /// 过滤掉 media_kit 的 auto/no 占位轨, 只留真实轨道.
   List<AudioTrack> _realAudioTracks() {

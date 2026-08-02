@@ -1,4 +1,6 @@
 // ignore_for_file: overridden_fields — intentional: each engine needs independent ValueNotifier instances
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
@@ -74,10 +76,15 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   /// FakeEngine 不再持有独立 _openGeneration，直接使用 stateMachine 的嵌入计数器。
   /// 与 MediaKitEngine 保持一致的 generation 守卫语义。
 
+  MediaInfo _configuredMediaInfo = const MediaInfo();
   MediaInfo _mediaInfo = const MediaInfo();
+  bool _hasMedia = false;
 
   @override
   MediaInfo get mediaInfo => _mediaInfo;
+
+  @override
+  bool get hasMedia => _hasMedia;
 
   @override
   int get subtitleDelay => _subtitleDelayMs;
@@ -103,6 +110,21 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   /// When set, the next open() will simulate an error after loading.
   String? failNextOpenWith;
+
+  /// When set, the next stop() keeps the loaded media and reports an error.
+  ///
+  /// This mirrors [MediaKitEngine.stop]'s recoverable failure behavior so
+  /// controller tests can verify that the visible title is not cleared early.
+  String? failNextStopWith;
+
+  /// When non-null, open waits for the test to release this deterministic gate.
+  Completer<void>? openGate;
+
+  /// When non-null, stop waits for the test to release this deterministic gate.
+  ///
+  /// This makes it possible to assert that a stale stop cannot overwrite a
+  /// newer open request after its asynchronous backend operation completes.
+  Completer<void>? stopGate;
 
   /// When true, seekTo() throws an Exception to simulate seek failure.
   bool seekToShouldThrow = false;
@@ -139,7 +161,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     openPaths.add(path);
     final gen = stateMachine.nextGeneration();
     stateMachine.transitionTo(MediaState.opening, 'fake.open');
-    await Future<void>.value();
+    await (openGate?.future ?? Future<void>.value());
     // generation 不匹配或已 dispose 时，调用方不得提交过期请求的副作用。
     if (_disposed || gen != stateMachine.currentGeneration) {
       return const OpenSuperseded();
@@ -154,6 +176,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
       return OpenError(error);
     }
 
+    _mediaInfo = _configuredMediaInfo;
+    _hasMedia = true;
     duration.value = _mediaInfo.duration;
     position.value = 0;
     lastError.value = null;
@@ -177,11 +201,43 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   }
 
   @override
-  void stop() {
+  Future<void> stop() async {
     if (_disposed) return;
-    stateMachine.transitionTo(MediaState.idle, 'fake.stop');
-    position.value = 0;
+    // 使正在等待的 open 失效，并让本次 stop 可辨识为过期操作。
+    final generation = stateMachine.nextGeneration();
+    final failureMessage = failNextStopWith;
     stopCallCount++;
+    await (stopGate?.future ?? Future<void>.value());
+    // 新 open/stop 已取得生命周期所有权时，旧 stop 不得发布任何状态。
+    if (_disposed || !stateMachine.isCurrent(generation)) return;
+
+    if (failureMessage != null) {
+      failNextStopWith = null;
+      // 停止失败时保留加载媒体，避免测试替身伪造安全的空置状态。
+      lastError.value = UnknownError(failureMessage);
+      stateMachine.transitionTo(
+        MediaState.error,
+        'fake.stop.error',
+        generation: generation,
+      );
+      return;
+    }
+
+    _hasMedia = false;
+    _mediaInfo = const MediaInfo();
+    position.value = 0;
+    duration.value = 0;
+    buffered.value = 0;
+    aspectRatio.value = 0;
+    subtitleText.value = '';
+    lastError.value = null;
+    stateMachine.isSeeking.value = false;
+    stateMachine.isBuffering.value = false;
+    stateMachine.transitionTo(
+      MediaState.idle,
+      'fake.stop',
+      generation: generation,
+    );
   }
 
   @override
@@ -403,7 +459,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     List<AudioTrackInfo>? audioTracks,
     List<SubtitleTrackInfo>? subtitleTracks,
   }) {
-    _mediaInfo = MediaInfo(
+    _configuredMediaInfo = MediaInfo(
       duration: durationMs,
       audioTracks: audioTracks ?? const [],
       subtitleTracks: subtitleTracks ?? const [],

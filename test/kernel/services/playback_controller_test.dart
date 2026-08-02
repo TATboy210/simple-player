@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
@@ -248,19 +250,131 @@ void main() {
         expect(playlist.isEmpty, true);
         expect(engine.stopCallCount, greaterThanOrEqualTo(1));
       });
+
+      test(
+        'keeps current item and does not play next when stop fails',
+        () async {
+          engine.configureMedia(durationMs: 60000);
+          playlist.add('C:/a.mp4');
+          playlist.add('C:/b.mp4');
+          await controller.playIndex(0);
+          final titleBeforeStop = controller.currentFileName.value;
+          final openCallsBeforeStop = engine.openCallCount;
+          engine.failNextStopWith = 'backend unavailable';
+
+          await controller.removeAt(0);
+
+          expect(engine.hasMedia, true);
+          expect(engine.state.value, MediaState.error);
+          expect(playlist.length, 2);
+          expect(playlist.current?.path, 'C:/a.mp4');
+          expect(controller.currentFileName.value, titleBeforeStop);
+          expect(engine.openCallCount, openCallsBeforeStop);
+        },
+      );
     });
 
-    // ─── clearPlaylist ───
+    // ─── stopCurrentMedia / clearPlaylist ───
+
+    group('stopCurrentMedia', () {
+      test(
+        'unloads media, clears the active title, and keeps the playlist',
+        () async {
+          engine.configureMedia(durationMs: 60000);
+          playlist.add('C:/a.mp4');
+          await controller.playIndex(0);
+          engine.buffered.value = 4000;
+          engine.aspectRatio.value = 16 / 9;
+          engine.subtitleText.value = 'stale subtitle';
+
+          await controller.stopCurrentMedia();
+
+          expect(engine.hasMedia, false);
+          expect(engine.state.value, MediaState.idle);
+          expect(engine.position.value, 0);
+          expect(engine.duration.value, 0);
+          expect(engine.buffered.value, 0);
+          expect(engine.aspectRatio.value, 0);
+          expect(engine.subtitleText.value, '');
+          expect(engine.mediaInfo, const MediaInfo());
+          expect(controller.currentFileName.value, '');
+          expect(playlist.length, 1);
+          expect(playlist.currentIndex, 0);
+          expect(rebuildCount, greaterThan(0));
+        },
+      );
+
+      test('keeps the active title when stop fails', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        await controller.playIndex(0);
+        final titleBeforeStop = controller.currentFileName.value;
+        final mediaInfoBeforeStop = engine.mediaInfo;
+        engine.failNextStopWith = 'backend unavailable';
+
+        await controller.stopCurrentMedia();
+
+        expect(engine.hasMedia, true);
+        expect(engine.mediaInfo, mediaInfoBeforeStop);
+        expect(engine.state.value, MediaState.error);
+        expect(engine.lastError.value, isNotNull);
+        expect(controller.currentFileName.value, titleBeforeStop);
+      });
+
+      test('does not let an older stop clear a newer open request', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        await controller.playIndex(0);
+        final stopGate = Completer<void>();
+        final openGate = Completer<void>();
+        engine.stopGate = stopGate;
+        engine.openGate = openGate;
+
+        final stopping = controller.stopCurrentMedia();
+        final opening = controller.playIndex(1);
+        await Future<void>.value();
+
+        expect(engine.state.value, MediaState.opening);
+        stopGate.complete();
+        await stopping;
+        expect(engine.state.value, MediaState.opening);
+
+        openGate.complete();
+        await opening;
+
+        expect(engine.hasMedia, true);
+        expect(engine.state.value, MediaState.playing);
+        expect(controller.currentFileName.value, 'b.mp4');
+      });
+    });
 
     group('clearPlaylist', () {
       test('stops engine and clears playlist', () async {
         engine.configureMedia(durationMs: 60000);
         playlist.add('C:/a.mp4');
         await controller.playIndex(0);
-        controller.clearPlaylist();
+        await controller.clearPlaylist();
         expect(engine.stopCallCount, greaterThanOrEqualTo(1));
         expect(playlist.isEmpty, true);
         expect(controller.currentFileName.value, '');
+      });
+
+      test('keeps playlist and title when stop fails', () async {
+        engine.configureMedia(durationMs: 60000);
+        playlist.add('C:/a.mp4');
+        playlist.add('C:/b.mp4');
+        await controller.playIndex(0);
+        final titleBeforeStop = controller.currentFileName.value;
+        engine.failNextStopWith = 'backend unavailable';
+
+        await controller.clearPlaylist();
+
+        expect(engine.hasMedia, true);
+        expect(engine.state.value, MediaState.error);
+        expect(playlist.length, 2);
+        expect(playlist.current?.path, 'C:/a.mp4');
+        expect(controller.currentFileName.value, titleBeforeStop);
       });
     });
 

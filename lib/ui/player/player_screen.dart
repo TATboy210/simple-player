@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -109,6 +111,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
+  /// 通过播放控制器删除条目，确保当前媒体先完成安全停止。
+  ///
+  /// 面板不能直接修改 [Playlist]，否则会绕过 stop 失败保护和活动标题收尾。
+  Future<void> _removePlaylistItem(int index) async {
+    await widget.controller.removeAt(index);
+    if (!mounted) return;
+    widget.playlistGeneration.value++;
+  }
+
   Future<void> _openSubtitle() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
@@ -191,9 +202,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 widget.controller.playIndex(i);
                                 _closePlaylist();
                               },
-                              onRemoveIndex: (i) {
-                                widget.playlist.removeAt(i);
-                                widget.playlistGeneration.value++;
+                              onRemoveIndex: (index) {
+                                unawaited(_removePlaylistItem(index));
                               },
                               onShowProperties: widget.onShowProperties,
                               onFolderScanned: widget.onFolderScanned,

@@ -65,7 +65,7 @@ void main() {
         playlist.add('C:/a.mp4');
         await controller.playIndex(0);
         expect(controller.currentFileName.value, isNotEmpty);
-        controller.clearPlaylist();
+        await controller.clearPlaylist();
         expect(controller.currentFileName.value, '');
       });
 
@@ -74,7 +74,7 @@ void main() {
         playlist.add('C:/a.mp4');
         await controller.playIndex(0);
         rebuildCount = 0;
-        controller.clearPlaylist();
+        await controller.clearPlaylist();
         expect(rebuildCount, greaterThanOrEqualTo(1));
       });
     });

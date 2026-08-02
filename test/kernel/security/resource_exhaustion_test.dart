@@ -99,7 +99,7 @@ void main() {
       for (var i = 0; i < 10000; i++) {
         await engine.open('C:\\media\\rapid_$i.mp4');
         // 模拟 close: stop 重置状态（FakeEngine 没有 close，stop 最接近）
-        engine.stop();
+        await engine.stop();
       }
 
       // 所有 open 都成功，引擎状态干净
@@ -128,7 +128,7 @@ void main() {
       expect(result, isA<OpenSuperseded>());
     });
 
-    test('Double dispose — idempotent, no crash', () {
+    test('Double dispose — idempotent, no crash', () async {
       final engine = FakeEngine();
 
       engine.dispose();
@@ -137,7 +137,7 @@ void main() {
       // dispose 后操作安全 no-op
       engine.play();
       engine.pause();
-      engine.stop();
+      await engine.stop();
       expect(engine.state.value, MediaState.idle);
     });
   });
@@ -176,10 +176,7 @@ void main() {
 
       // dispose 后修改 value — Dart 的 ValueNotifier 在 dispose 后
       // 设置 value 会抛 FlutterError（"used after being disposed"）
-      expect(
-        () => notifier.value = 1,
-        throwsFlutterError,
-      );
+      expect(() => notifier.value = 1, throwsFlutterError);
     });
 
     test('FakeEngine ValueNotifiers survive listener flood', () {
@@ -347,31 +344,33 @@ void main() {
   // ────────────────────────────────────────────────────────────────────────────
 
   group('Queue exhaustion', () {
-    test('FakeEngine generation guard — superseded operations discarded',
-        () async {
-      final engine = FakeEngine();
-      engine.configureMedia(durationMs: 1000);
+    test(
+      'FakeEngine generation guard — superseded operations discarded',
+      () async {
+        final engine = FakeEngine();
+        engine.configureMedia(durationMs: 1000);
 
-      // 快速连续 open — 旧 generation 被丢弃
-      final futures = <Future<OpenResult>>[];
-      for (var i = 0; i < 100; i++) {
-        futures.add(engine.open('C:\\media\\gen_$i.mp4'));
-        // 短暂 yield 让 generation 推进
-        await Future<void>.value();
-      }
+        // 快速连续 open — 旧 generation 被丢弃
+        final futures = <Future<OpenResult>>[];
+        for (var i = 0; i < 100; i++) {
+          futures.add(engine.open('C:\\media\\gen_$i.mp4'));
+          // 短暂 yield 让 generation 推进
+          await Future<void>.value();
+        }
 
-      final results = await Future.wait(futures);
+        final results = await Future.wait(futures);
 
-      // 大部分旧请求被 superseded，只有最后一个成功
-      final superseded = results.whereType<OpenSuperseded>().length;
-      final success = results.whereType<OpenSuccess>().length;
+        // 大部分旧请求被 superseded，只有最后一个成功
+        final superseded = results.whereType<OpenSuperseded>().length;
+        final success = results.whereType<OpenSuccess>().length;
 
-      // 至少有一个成功（最后一次 open），其余被 superseded
-      expect(success, greaterThanOrEqualTo(1));
-      expect(superseded + success, 100);
+        // 至少有一个成功（最后一次 open），其余被 superseded
+        expect(success, greaterThanOrEqualTo(1));
+        expect(superseded + success, 100);
 
-      engine.dispose();
-    });
+        engine.dispose();
+      },
+    );
 
     test('Playlist operations on empty playlist — no crash', () {
       final playlist = Playlist();

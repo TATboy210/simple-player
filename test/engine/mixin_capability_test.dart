@@ -190,10 +190,10 @@ void main() {
       engine.dispose();
     });
 
-    test('stop resets position and tracks call', () {
+    test('stop resets position and tracks call', () async {
       final engine = FakeEngine();
       engine.position.value = 30000;
-      engine.stop();
+      await engine.stop();
       expect(engine.state.value, MediaState.idle);
       expect(engine.position.value, 0);
       expect(engine.stopCallCount, 1);
@@ -202,24 +202,32 @@ void main() {
   });
 
   group('TrackControl behavior', () {
-    test('getAudioTracks returns configured tracks', () {
+    test('getAudioTracks returns tracks from the opened media', () async {
       final engine = FakeEngine();
       engine.configureMedia(
         audioTracks: [const AudioTrackInfo(index: 0, language: 'en')],
       );
+
+      // 与真实引擎一致：轨道只会在媒体成功打开后对外可见。
+      await engine.open('test.mp4');
+
       final tracks = engine.getAudioTracks();
       expect(tracks, hasLength(1));
       expect(tracks.first.language, 'en');
       engine.dispose();
     });
 
-    test('getSubtitleTracks returns configured tracks', () {
+    test('getSubtitleTracks returns tracks from the opened media', () async {
       final engine = FakeEngine();
       engine.configureMedia(
         subtitleTracks: [
           const SubtitleTrackInfo(index: 0, language: 'zh', title: 'Chinese'),
         ],
       );
+
+      // 与真实引擎一致：轨道只会在媒体成功打开后对外可见。
+      await engine.open('test.mp4');
+
       final tracks = engine.getSubtitleTracks();
       expect(tracks, hasLength(1));
       expect(tracks.first.title, 'Chinese');
@@ -366,13 +374,13 @@ void main() {
       engine.dispose();
     });
 
-    test('methods are no-op after dispose', () {
+    test('methods are no-op after dispose', () async {
       final engine = FakeEngine();
       engine.dispose();
       // Should not throw
       engine.play();
       engine.pause();
-      engine.stop();
+      await engine.stop();
       engine.setVolume(0.5);
       engine.setMute(true);
       engine.togglePlayPause();
