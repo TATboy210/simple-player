@@ -41,13 +41,23 @@ abstract class PlaybackControl {
   /// modifies: [state]
   void pause();
 
-  /// 停止播放并重置位置
+  /// 停止播放并卸载当前媒体。
   ///
-  /// requires: 无（任意可达态均可调用）
-  /// ensures: state == idle 且 position == 0
-  /// states: transitions to {idle}
-  /// modifies: [state], [position]
-  void stop();
+  /// requires: 无（任意可达态均可调用）。
+  /// ensures: 当前媒体已停止、[hasMedia] 为 `false`、state == idle，且所有媒体派生
+  /// 状态（position、duration、buffered、aspectRatio、mediaInfo）均已重置。
+  /// states: transitions to {idle}。
+  /// modifies: [state]、媒体派生状态和 [hasMedia]。
+  ///
+  /// 返回的 Future 在播放器完成停止操作后完成；调用方需要在空置界面切换前等待它，
+  /// 避免新打开请求与旧媒体状态清理交叠。该操作不 dispose 可复用的播放器实例；
+  /// 系统级播放器资源仅在 [dispose] 时释放。
+  Future<void> stop();
+
+  /// 当前播放器是否仍加载媒体。
+  ///
+  /// 该只读状态用于让上层验证“停止”确实完成了卸载，而非只重置播放位置。
+  bool get hasMedia;
 
   /// 切换播放/暂停状态
   ///

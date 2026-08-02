@@ -219,13 +219,18 @@ class PlaybackController implements SettingsPanelPlayback {
   /// 移除播放列表中指定索引.
   ///
   /// Removes the playlist entry at [index]. If it is the currently playing
-  /// track, stops the engine and attempts to play the next item.
-  /// Notifies UI rebuild and persists playlist after removal.
+  /// track, stops the engine before removing it and attempts to play the next.
+  /// A failed stop leaves the entry intact, preserving recovery context.
   Future<void> removeAt(int index) async {
     final wasCurrent = playlist.currentIndex == index;
+    if (wasCurrent) {
+      await engine.stop();
+      if (engine.hasMedia) return;
+      currentFileName.value = '';
+    }
+
     playlist.removeAt(index);
     if (wasCurrent) {
-      engine.stop();
       final next = playlist.peekNext();
       if (next >= 0) {
         await navigator.playIndex(next);
@@ -244,13 +249,25 @@ class PlaybackController implements SettingsPanelPlayback {
     savePlaylist();
   }
 
-  /// 清空播放列表 — 停止引擎，重置文件名，通知 UI 重建.
+  /// 停止并卸载当前媒体，但保留播放列表供用户再次选择。
   ///
-  /// Clears playlist — stops engine, resets filename, notifies UI.
-  void clearPlaylist() {
-    engine.stop();
-    playlist.clear();
+  /// 只有引擎确认媒体已卸载时才清空活动标题；停止失败会保留标题和列表，
+  /// 使 UI 与仍可恢复的底层媒体状态保持一致。
+  Future<void> stopCurrentMedia() async {
+    await engine.stop();
+    if (engine.hasMedia) return;
     currentFileName.value = '';
+    _onNeedRebuild();
+  }
+
+  /// 清空播放列表 — 仅在当前媒体已成功停止后执行。
+  ///
+  /// Stops the engine before clearing the playlist. A failed stop preserves the
+  /// list so the visible entry remains consistent with the loaded media.
+  Future<void> clearPlaylist() async {
+    await stopCurrentMedia();
+    if (engine.hasMedia) return;
+    playlist.clear();
     _onNeedRebuild();
     savePlaylist();
   }
