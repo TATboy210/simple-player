@@ -24,6 +24,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
@@ -52,7 +53,9 @@ class _RebuildCounterState extends State<_RebuildCounter> {
 }
 
 Widget _buildControlBar(
-  FakeEngine engine, {
+  FakeEngine engine,
+  Playlist playlist,
+  ValueNotifier<int> playlistGeneration, {
   bool enableBlur = true,
   bool isIdle = false,
 }) {
@@ -65,6 +68,8 @@ Widget _buildControlBar(
         height: 200,
         child: ControlBar(
           engine: engine,
+          playlist: playlist,
+          playlistGeneration: playlistGeneration,
           actions: const PlayerActions(
             onOpenFile: _noop,
             onSettings: _noop,
@@ -78,13 +83,23 @@ Widget _buildControlBar(
   );
 }
 
-Widget _buildControlsOverlay(FakeEngine engine) {
+Widget _buildControlsOverlay(
+  FakeEngine engine,
+  Playlist playlist,
+  ValueNotifier<int> playlistGeneration,
+  ValueNotifier<String> currentFileName,
+  ValueNotifier<bool> openFileEnabled,
+) {
   return MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: ControlsOverlay(
         engine: engine,
+        currentFileName: currentFileName,
+        playlist: playlist,
+        playlistGeneration: playlistGeneration,
+        openFileEnabled: openFileEnabled,
         actions: const PlayerActions(onToggleFullscreen: _noop),
       ),
     ),
@@ -92,6 +107,27 @@ Widget _buildControlsOverlay(FakeEngine engine) {
 }
 
 void main() {
+  // 渐进路径:ControlBar/ControlsOverlay 需 playlist + generation(overlay 还需
+  // currentFileName/openFileEnabled)。两个 group 共享,main 顶层 setUp/tearDown
+  // 各跑一次,group 内 setUp 只管 engine。
+  late Playlist playlist;
+  late ValueNotifier<int> playlistGeneration;
+  late ValueNotifier<String> currentFileName;
+  late ValueNotifier<bool> openFileEnabled;
+
+  setUp(() {
+    playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
+    currentFileName = ValueNotifier<String>('');
+    openFileEnabled = ValueNotifier<bool>(true);
+  });
+
+  tearDown(() {
+    playlistGeneration.dispose();
+    currentFileName.dispose();
+    openFileEnabled.dispose();
+  });
+
   group('ControlBar rebuild profiling', () {
     late FakeEngine engine;
 
@@ -110,7 +146,10 @@ void main() {
       (tester) async {
         final rebuildCount = ValueNotifier<int>(0);
         await tester.pumpWidget(
-          _RebuildCounter(count: rebuildCount, child: _buildControlBar(engine)),
+          _RebuildCounter(
+            count: rebuildCount,
+            child: _buildControlBar(engine, playlist, playlistGeneration),
+          ),
         );
         await tester.pump();
         final initialCount = rebuildCount.value;
@@ -143,7 +182,12 @@ void main() {
       await tester.pumpWidget(
         _RebuildCounter(
           count: blurCount,
-          child: _buildControlBar(engine, enableBlur: true),
+          child: _buildControlBar(
+            engine,
+            playlist,
+            playlistGeneration,
+            enableBlur: true,
+          ),
         ),
       );
       await tester.pump();
@@ -160,7 +204,12 @@ void main() {
       await tester.pumpWidget(
         _RebuildCounter(
           count: noBlurCount,
-          child: _buildControlBar(engine, enableBlur: false),
+          child: _buildControlBar(
+            engine,
+            playlist,
+            playlistGeneration,
+            enableBlur: false,
+          ),
         ),
       );
       await tester.pump();
@@ -184,7 +233,10 @@ void main() {
     ) async {
       final rebuildCount = ValueNotifier<int>(0);
       await tester.pumpWidget(
-        _RebuildCounter(count: rebuildCount, child: _buildControlBar(engine)),
+        _RebuildCounter(
+          count: rebuildCount,
+          child: _buildControlBar(engine, playlist, playlistGeneration),
+        ),
       );
       await tester.pump();
       final initialCount = rebuildCount.value;
@@ -210,7 +262,14 @@ void main() {
     testWidgets('Phase 2 verification — enableBlur=false skips BackdropFilter', (
       tester,
     ) async {
-      await tester.pumpWidget(_buildControlBar(engine, enableBlur: false));
+      await tester.pumpWidget(
+        _buildControlBar(
+          engine,
+          playlist,
+          playlistGeneration,
+          enableBlur: false,
+        ),
+      );
       await tester.pump();
 
       // When enableBlur=false, ControlBar returns RepaintBoundary(child: content)
@@ -228,7 +287,14 @@ void main() {
     testWidgets(
       'Phase 2 verification — enableBlur=true includes BackdropFilter',
       (tester) async {
-        await tester.pumpWidget(_buildControlBar(engine, enableBlur: true));
+        await tester.pumpWidget(
+          _buildControlBar(
+            engine,
+            playlist,
+            playlistGeneration,
+            enableBlur: true,
+          ),
+        );
         await tester.pump();
 
         // When enableBlur=true and WindowInteractionState is idle,
@@ -247,7 +313,14 @@ void main() {
     testWidgets('Phase 2 verification — RepaintBoundary wraps content', (
       tester,
     ) async {
-      await tester.pumpWidget(_buildControlBar(engine, enableBlur: false));
+      await tester.pumpWidget(
+        _buildControlBar(
+          engine,
+          playlist,
+          playlistGeneration,
+          enableBlur: false,
+        ),
+      );
       await tester.pump();
 
       // ControlBar wraps content in RepaintBoundary in both paths.
@@ -282,7 +355,13 @@ void main() {
         await tester.pumpWidget(
           _RebuildCounter(
             count: rebuildCount,
-            child: _buildControlsOverlay(engine),
+            child: _buildControlsOverlay(
+              engine,
+              playlist,
+              playlistGeneration,
+              currentFileName,
+              openFileEnabled,
+            ),
           ),
         );
         await tester.pump();
@@ -324,7 +403,15 @@ void main() {
       // The outer ValueListenableBuilder<bool> on _autoHide.visible
       // caches the Stack as `child`. Verify the Stack doesn't rebuild
       // when visibility toggles.
-      await tester.pumpWidget(_buildControlsOverlay(engine));
+      await tester.pumpWidget(
+        _buildControlsOverlay(
+          engine,
+          playlist,
+          playlistGeneration,
+          currentFileName,
+          openFileEnabled,
+        ),
+      );
       await tester.pump();
 
       // Verify at least one Stack exists (cached child inside VLB).

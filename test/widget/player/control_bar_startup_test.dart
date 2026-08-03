@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
@@ -10,19 +11,32 @@ import '../../helpers/fake_engine.dart';
 /// 验证控制栏在启动时（emptyState + idle）的可见性和交互性
 void main() {
   late FakeEngine engine;
+  // 渐进路径:ControlsOverlay 需 currentFileName/playlist/playlistGeneration/
+  // openFileEnabled 自驱动 builder;emptyStatePresent 标志位升级为 emptyState Widget?。
+  late Playlist playlist;
+  late ValueNotifier<int> playlistGeneration;
+  late ValueNotifier<String> currentFileName;
+  late ValueNotifier<bool> openFileEnabled;
 
   setUp(() {
     engine = FakeEngine();
+    playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
+    currentFileName = ValueNotifier<String>('');
+    openFileEnabled = ValueNotifier<bool>(true);
   });
 
   tearDown(() {
     engine.dispose();
+    playlistGeneration.dispose();
+    currentFileName.dispose();
+    openFileEnabled.dispose();
   });
 
   Widget buildSubject({
     MediaEngine? eng,
     PlayerActions? actions,
-    bool emptyStatePresent = false,
+    Widget? emptyState,
   }) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -33,13 +47,18 @@ void main() {
           height: 600,
           child: ControlsOverlay(
             engine: eng ?? engine,
-            actions: actions ??
+            currentFileName: currentFileName,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
+            openFileEnabled: openFileEnabled,
+            actions:
+                actions ??
                 PlayerActions(
                   onOpenFile: () {},
                   onSettings: () {},
                   onToggleFullscreen: () {},
                 ),
-            emptyStatePresent: emptyStatePresent,
+            emptyState: emptyState,
           ),
         ),
       ),
@@ -65,10 +84,9 @@ void main() {
       }
     });
 
-    testWidgets('visible at startup (idle + emptyStatePresent)',
-        (tester) async {
+    testWidgets('visible at startup (idle + emptyState)', (tester) async {
       engine.state.value = MediaState.idle;
-      await tester.pumpWidget(buildSubject(emptyStatePresent: true));
+      await tester.pumpWidget(buildSubject(emptyState: const SizedBox()));
       await tester.pump();
 
       expect(find.byType(ControlBar), findsOneWidget);
@@ -83,8 +101,9 @@ void main() {
       }
     });
 
-    testWidgets('buttons interactive at startup (idle + emptyState)',
-        (tester) async {
+    testWidgets('buttons interactive at startup (idle + emptyState)', (
+      tester,
+    ) async {
       // Note: ControlBar no longer uses IgnorePointer for emptyState + idle.
       // Buttons remain interactive to allow user actions from any state.
       var fileOpened = false;
@@ -92,14 +111,16 @@ void main() {
       var fullscreenToggled = false;
 
       engine.state.value = MediaState.idle;
-      await tester.pumpWidget(buildSubject(
-        emptyStatePresent: true,
-        actions: PlayerActions(
-          onOpenFile: () => fileOpened = true,
-          onSettings: () => settingsOpened = true,
-          onToggleFullscreen: () => fullscreenToggled = true,
+      await tester.pumpWidget(
+        buildSubject(
+          emptyState: const SizedBox(),
+          actions: PlayerActions(
+            onOpenFile: () => fileOpened = true,
+            onSettings: () => settingsOpened = true,
+            onToggleFullscreen: () => fullscreenToggled = true,
+          ),
         ),
-      ));
+      );
       await tester.pump();
 
       // 打开文件按钮 — 现在可交互
@@ -107,8 +128,11 @@ void main() {
       if (openFileBtn.evaluate().isNotEmpty) {
         await tester.tap(openFileBtn);
         await tester.pump();
-        expect(fileOpened, isTrue,
-            reason: 'Button should be interactive even when emptyState + idle');
+        expect(
+          fileOpened,
+          isTrue,
+          reason: 'Button should be interactive even when emptyState + idle',
+        );
       }
 
       // 设置按钮 — 同理
@@ -116,8 +140,11 @@ void main() {
       if (settingsBtn.evaluate().isNotEmpty) {
         await tester.tap(settingsBtn);
         await tester.pump();
-        expect(settingsOpened, isTrue,
-            reason: 'Button should be interactive even when emptyState + idle');
+        expect(
+          settingsOpened,
+          isTrue,
+          reason: 'Button should be interactive even when emptyState + idle',
+        );
       }
 
       // 全屏按钮 — 同理
@@ -125,26 +152,32 @@ void main() {
       if (fsBtn.evaluate().isNotEmpty) {
         await tester.tap(fsBtn);
         await tester.pump();
-        expect(fullscreenToggled, isTrue,
-            reason: 'Button should be interactive even when emptyState + idle');
+        expect(
+          fullscreenToggled,
+          isTrue,
+          reason: 'Button should be interactive even when emptyState + idle',
+        );
       }
     });
 
-    testWidgets('buttons interactive when playing (no emptyState)',
-        (tester) async {
+    testWidgets('buttons interactive when playing (no emptyState)', (
+      tester,
+    ) async {
       // 对照组：非 idle 状态下按钮应可交互
       var fileOpened = false;
       var settingsOpened = false;
       var fullscreenToggled = false;
 
       engine.state.value = MediaState.playing;
-      await tester.pumpWidget(buildSubject(
-        actions: PlayerActions(
-          onOpenFile: () => fileOpened = true,
-          onSettings: () => settingsOpened = true,
-          onToggleFullscreen: () => fullscreenToggled = true,
+      await tester.pumpWidget(
+        buildSubject(
+          actions: PlayerActions(
+            onOpenFile: () => fileOpened = true,
+            onSettings: () => settingsOpened = true,
+            onToggleFullscreen: () => fullscreenToggled = true,
+          ),
         ),
-      ));
+      );
       await tester.pump();
 
       // 打开文件按钮 — 播放中可交互
@@ -152,8 +185,11 @@ void main() {
       if (openFileBtn.evaluate().isNotEmpty) {
         await tester.tap(openFileBtn);
         await tester.pump();
-        expect(fileOpened, isTrue,
-            reason: 'Button should be tappable when playing');
+        expect(
+          fileOpened,
+          isTrue,
+          reason: 'Button should be tappable when playing',
+        );
       }
 
       // 设置按钮
@@ -161,8 +197,11 @@ void main() {
       if (settingsBtn.evaluate().isNotEmpty) {
         await tester.tap(settingsBtn);
         await tester.pump();
-        expect(settingsOpened, isTrue,
-            reason: 'Button should be tappable when playing');
+        expect(
+          settingsOpened,
+          isTrue,
+          reason: 'Button should be tappable when playing',
+        );
       }
 
       // 全屏按钮
@@ -170,22 +209,30 @@ void main() {
       if (fsBtn.evaluate().isNotEmpty) {
         await tester.tap(fsBtn);
         await tester.pump();
-        expect(fullscreenToggled, isTrue,
-            reason: 'Button should be tappable when playing');
+        expect(
+          fullscreenToggled,
+          isTrue,
+          reason: 'Button should be tappable when playing',
+        );
       }
     });
 
     testWidgets('FadeTransition opacity is 1.0 at startup', (tester) async {
       engine.state.value = MediaState.idle;
-      await tester.pumpWidget(buildSubject(emptyStatePresent: true));
+      await tester.pumpWidget(buildSubject(emptyState: const SizedBox()));
       await tester.pump();
 
       final fades = tester.widgetList(find.byType(FadeTransition));
       expect(fades, isNotEmpty);
 
-      final hasVisible = fades.any((w) => (w as FadeTransition).opacity.value > 0.99);
-      expect(hasVisible, isTrue,
-          reason: 'FadeTransition should have opacity ~1.0 at startup');
+      final hasVisible = fades.any(
+        (w) => (w as FadeTransition).opacity.value > 0.99,
+      );
+      expect(
+        hasVisible,
+        isTrue,
+        reason: 'FadeTransition should have opacity ~1.0 at startup',
+      );
     });
   });
 }
