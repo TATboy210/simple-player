@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
@@ -10,20 +11,33 @@ import '../../helpers/fake_engine.dart';
 
 void main() {
   late FakeEngine engine;
+  // 渐进路径:ControlsOverlay 需 currentFileName/playlist/playlistGeneration/
+  // openFileEnabled 自驱动 builder — 测试共享实例,tearDown 释放。
+  late Playlist playlist;
+  late ValueNotifier<int> playlistGeneration;
+  late ValueNotifier<String> currentFileName;
+  late ValueNotifier<bool> openFileEnabled;
 
   setUp(() {
     engine = FakeEngine();
+    playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
+    currentFileName = ValueNotifier<String>('');
+    openFileEnabled = ValueNotifier<bool>(true);
   });
 
   tearDown(() {
     engine.dispose();
+    playlistGeneration.dispose();
+    currentFileName.dispose();
+    openFileEnabled.dispose();
   });
 
   Widget buildSubject({
     MediaEngine? eng,
     PlayerActions? actions,
     bool isFullscreen = false,
-    bool emptyStatePresent = false,
+    Widget? emptyState,
   }) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -32,8 +46,12 @@ void main() {
         body: ControlsOverlay(
           engine: eng ?? engine,
           actions: actions ?? const PlayerActions(),
+          currentFileName: currentFileName,
+          playlist: playlist,
+          playlistGeneration: playlistGeneration,
+          openFileEnabled: openFileEnabled,
+          emptyState: emptyState,
           isFullscreen: isFullscreen,
-          emptyStatePresent: emptyStatePresent,
         ),
       ),
     );
@@ -101,9 +119,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets('emptyStatePresent + idle disables gesture', (tester) async {
+    testWidgets('emptyState + idle disables gesture', (tester) async {
+      // 渐进路径:emptyStatePresent 标志位升级为 emptyState Widget? —
+      // idle && !hasMedia 时内化渲染(FakeEngine 默认 hasMedia=false)。
       engine.state.value = MediaState.idle;
-      await tester.pumpWidget(buildSubject(emptyStatePresent: true));
+      await tester.pumpWidget(buildSubject(emptyState: const SizedBox()));
       await tester.pump();
 
       // Should render without error
@@ -352,7 +372,14 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ControlsOverlay(engine: engine, visibleSink: sink),
+            body: ControlsOverlay(
+              engine: engine,
+              currentFileName: currentFileName,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              openFileEnabled: openFileEnabled,
+              visibleSink: sink,
+            ),
           ),
         ),
       );
@@ -385,7 +412,14 @@ void main() {
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
-              body: ControlsOverlay(engine: engine, visibleSink: sink),
+              body: ControlsOverlay(
+                engine: engine,
+                currentFileName: currentFileName,
+                playlist: playlist,
+                playlistGeneration: playlistGeneration,
+                openFileEnabled: openFileEnabled,
+                visibleSink: sink,
+              ),
             ),
           ),
         );
@@ -423,7 +457,14 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ControlsOverlay(engine: engine, resizing: resizing),
+            body: ControlsOverlay(
+              engine: engine,
+              currentFileName: currentFileName,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              openFileEnabled: openFileEnabled,
+              resizing: resizing,
+            ),
           ),
         ),
       );
@@ -446,7 +487,14 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ControlsOverlay(engine: engine, resizing: resizing),
+            body: ControlsOverlay(
+              engine: engine,
+              currentFileName: currentFileName,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              openFileEnabled: openFileEnabled,
+              resizing: resizing,
+            ),
           ),
         ),
       );
@@ -476,7 +524,14 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: ControlsOverlay(engine: engine, resizing: resizing),
+            body: ControlsOverlay(
+              engine: engine,
+              currentFileName: currentFileName,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              openFileEnabled: openFileEnabled,
+              resizing: resizing,
+            ),
           ),
         ),
       );

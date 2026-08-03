@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
@@ -14,13 +15,20 @@ void _noop() {}
 
 void main() {
   late FakeEngine engine;
+  // 渐进路径:ControlBar 需 playlist + playlistGeneration(required) —
+  // playMode 下沉到 LeftButtonGroup 内部读 playlist.mode,generation 驱动重建。
+  late Playlist playlist;
+  late ValueNotifier<int> playlistGeneration;
 
   setUp(() {
     engine = FakeEngine();
+    playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
   });
 
   tearDown(() {
     engine.dispose();
+    playlistGeneration.dispose();
   });
 
   Widget buildSubject({
@@ -38,6 +46,8 @@ void main() {
           child: ControlBar(
             engine: eng ?? engine,
             actions: actions ?? const PlayerActions(),
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
             title: title,
           ),
         ),
@@ -120,7 +130,11 @@ void main() {
               body: SizedBox(
                 width: 600,
                 height: 200,
-                child: ControlBar(engine: engine),
+                child: ControlBar(
+                  engine: engine,
+                  playlist: playlist,
+                  playlistGeneration: playlistGeneration,
+                ),
               ),
             ),
           ),
@@ -205,7 +219,12 @@ void main() {
           body: SizedBox(
             width: 800,
             height: 200,
-            child: ControlBar(engine: engine, isIdle: isIdle),
+            child: ControlBar(
+              engine: engine,
+              playlist: playlist,
+              playlistGeneration: playlistGeneration,
+              isIdle: isIdle,
+            ),
           ),
         ),
       );
@@ -263,6 +282,8 @@ void main() {
               height: 200,
               child: ControlBar(
                 engine: engine,
+                playlist: playlist,
+                playlistGeneration: playlistGeneration,
                 isIdle: false,
                 decoration: controller,
               ),
@@ -289,7 +310,11 @@ void main() {
             body: SizedBox(
               width: width,
               height: 200,
-              child: ControlBar(engine: engine),
+              child: ControlBar(
+                engine: engine,
+                playlist: playlist,
+                playlistGeneration: playlistGeneration,
+              ),
             ),
           ),
         ),
@@ -359,7 +384,12 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 200,
-              child: ControlBar(engine: engine, opacity: opacityController),
+              child: ControlBar(
+                engine: engine,
+                playlist: playlist,
+                playlistGeneration: playlistGeneration,
+                opacity: opacityController,
+              ),
             ),
           ),
         ),
