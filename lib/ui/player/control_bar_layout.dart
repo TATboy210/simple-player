@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
 import 'control_bar_actions.dart';
 import 'control_bar_timeline.dart';
@@ -15,6 +16,8 @@ import 'player_actions.dart';
 class ControlBarLayout extends StatelessWidget {
   final MediaEngine engine;
   final PlayerActions actions;
+  final Playlist playlist;
+  final ValueListenable<int> playlistGeneration;
   final bool isIdle;
   final String? title;
   final ValueListenable<bool>? resizing;
@@ -27,6 +30,8 @@ class ControlBarLayout extends StatelessWidget {
     super.key,
     required this.engine,
     required this.actions,
+    required this.playlist,
+    required this.playlistGeneration,
     required this.isIdle,
     this.title,
     this.resizing,
@@ -74,6 +79,8 @@ class ControlBarLayout extends StatelessWidget {
               child: ControlBarActions(
                 engine: engine,
                 actions: actions,
+                playlist: playlist,
+                playlistGeneration: playlistGeneration,
                 isIdle: isIdle,
                 onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,

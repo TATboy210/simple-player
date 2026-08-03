@@ -12,11 +12,9 @@ import '../../kernel/engine/engine_state.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../kernel/services/playback_controller.dart';
-import '../../l10n/app_localizations.dart';
 import '../dialogs/settings/settings_overlay_shell.dart';
 import '../dialogs/settings/settings_panel_controller.dart';
 import '../playlist/playlist_panel.dart';
-import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import '../window/custom_title_bar.dart';
 import 'controls_overlay.dart';
@@ -29,6 +27,11 @@ import 'smart_drag_to_resize_area.dart';
 ///
 /// 宽屏 (≥breakpointWide): Row 布局, 播放列表在右侧.
 /// 窄屏: 播放列表叠加为 overlay.
+///
+/// 控制栏住进 media_kit `Video.controls` builder (渐进路径·核心闭环):
+/// 全屏 route 复制 builder 时自动携带 ControlsOverlay, 解决全屏控制栏消失.
+/// 数据源/控制出口暂留 engine (不切 player.stream), 避免破坏 ProgressBar
+/// 「修 C 事件驱动 v2」精密逻辑.
 class PlayerScreen extends StatefulWidget {
   final MediaEngine engine;
 
@@ -100,12 +103,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
   ));
 
   /// 控件可见性 — 从 ControlsOverlay 单向同步,驱动全屏鼠标隐藏 + 字幕上移.
+  ///
+  /// 双实例竞争警告:窗口态与全屏态两个 ControlsOverlay 实例都写此 sink.
+  /// 当前阶段暂留(值跳变但不崩溃),拆解留待下一步(对齐 plan 阶段 2).
   final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
 
   /// 空置页刚出现时暂时隔离所有“打开文件”入口，等待旧媒体纹理完全退场。
   static const _openFileDelay = Duration(seconds: 2);
   Timer? _openFileDelayTimer;
-  bool _isOpenFileEnabled = false;
+
+  /// 打开文件入口可用性 — ValueNotifier 驱动 ControlsOverlay 内的空状态页
+  /// IgnorePointer（builder 化后需自驱动，不再靠本层 setState 重建）。
+  final ValueNotifier<bool> _isOpenFileEnabled = ValueNotifier(false);
+
+  /// 稳定化的播放器回调集合 — initState 构造一次，供 ControlsOverlay 闭包捕获。
+  /// builder 化后 actions 不能每次 build 重建（Video.controls builder 不在
+  /// build 上下文），playModeIcon/Label 已下沉到 LeftButtonGroup 内部计算。
+  late final PlayerActions _actions;
 
   bool get _isEmptyState =>
       widget.engine.state.value == MediaState.idle && !widget.engine.hasMedia;
@@ -149,6 +163,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // 稳定化 actions — initState 构造一次,纯播放/项目回调闭包现读 widget 字段
+    // 避免陈旧捕获. playModeIcon/Label 已下沉, 不需 l10n/context.
+    _actions = PlayerActions(
+      onPrevious: () => widget.controller.playPrevious(),
+      onNext: () => widget.controller.playNext(),
+      // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
+      onStop: () => unawaited(widget.controller.stopCurrentMedia()),
+      // 控制栏与快捷键共用空置态的资源释放隔离窗口。
+      onOpenFile: _openFileWhenReady,
+      onOpenSubtitle: _openSubtitle,
+      onTogglePlaylist: _togglePlaylist,
+      onSettings: widget.settingsPanelController.open,
+      onSettingsSecondary: widget.onSettingsSecondary,
+      onTogglePlayMode: widget.onTogglePlayMode,
+      // setMode 设 intent+mode (守卫同步 mode), videoKey.toggleFullscreen
+      // 走 media_kit 原生全屏. 闭包内现读 mode.value 避免陈旧捕获.
+      onToggleFullscreen: () {
+        final m = widget.windowService.mode.value;
+        final entering = m != WindowMode.fullscreen;
+        widget.windowService.setMode(
+          entering ? WindowMode.fullscreen : WindowMode.windowed,
+        );
+        _videoKey.currentState?.toggleFullscreen();
+      },
+      onFilesDropped: widget.onFilesDropped,
+      onShowProperties: widget.onShowProperties,
+      isVideo: true,
+    );
     _controlsVisible.addListener(_onControlsVisibleChanged);
     widget.engine.state.addListener(_syncOpenFileAvailability);
     // Stop 成功会清空活动标题；它也是 hasMedia 从 true 变 false 后的可靠 UI 通知。
@@ -164,27 +206,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _syncOpenFileAvailability() {
     _openFileDelayTimer?.cancel();
     if (widget.engine.state.value != MediaState.idle) {
-      _setOpenFileEnabled(true);
+      _isOpenFileEnabled.value = true;
       return;
     }
 
-    _setOpenFileEnabled(false);
+    _isOpenFileEnabled.value = false;
     if (!_isEmptyState) return;
     _openFileDelayTimer = Timer(_openFileDelay, () {
       if (!mounted || !_isEmptyState) return;
-      _setOpenFileEnabled(true);
+      _isOpenFileEnabled.value = true;
     });
-  }
-
-  /// 避免在 notifier 监听回调中对已相同的值重复触发构建。
-  void _setOpenFileEnabled(bool enabled) {
-    if (_isOpenFileEnabled == enabled) return;
-    setState(() => _isOpenFileEnabled = enabled);
   }
 
   /// 将所有项目层打开入口收敛到空置态稳定窗口之后。
   void _openFileWhenReady() {
-    if (!_isOpenFileEnabled) return;
+    if (!_isOpenFileEnabled.value) return;
     widget.onOpenFile?.call();
   }
 
@@ -213,6 +249,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     widget.engine.state.removeListener(_syncOpenFileAvailability);
     _controlsVisible.removeListener(_onControlsVisibleChanged);
     _controlsVisible.dispose();
+    _isOpenFileEnabled.dispose();
     _playlistState.dispose();
     super.dispose();
   }
@@ -296,10 +333,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ],
                             );
                           },
-                          child: _buildVideoContent(
-                            context,
-                            isFullscreen: isFullscreen,
-                          ),
+                          child: _buildVideoContent(context),
                         );
                       },
                     ),
@@ -356,16 +390,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// 视频内容区 — DropHandler 包裹 media_kit 纯渲染 + 空状态层 + 自定义控制外套.
+  /// 视频内容区 — DropHandler 包裹 media_kit [Video] (controls 住进 builder).
   ///
-  /// 三层 Stack: 底层 [Video](`NoVideoControls` 纯渲染, 身体不动) →
-  /// 中层 emptyState(idle 时显示, 在 ControlsOverlay 之下供手势透传) →
-  /// 顶层 [ControlsOverlay](自定义玻璃外套: ControlBar + AutoHideController +
-  /// OSD + ErrorBanner + 手势). media_kit 引擎(VideoController/videoKey/全屏)不变.
-  Widget _buildVideoContent(
-    BuildContext context, {
-    required bool isFullscreen,
-  }) => Row(
+  /// 渐进路径核心:ControlsOverlay + emptyState 都住进 Video.controls builder,
+  /// media_kit 全屏 route 复制 builder 时自动携带控制栏(解决全屏控制栏消失).
+  /// engine/VideoController/videoKey/全屏机制不变,数据源暂留 engine.
+  Widget _buildVideoContent(BuildContext context) => Row(
     children: [
       Expanded(
         child: DropHandler(
@@ -374,52 +404,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // 底层: 生产路径保持 media_kit 纯渲染；测试可注入无原生依赖 surface。
+              // Video.controls builder 内含 ControlsOverlay + emptyState,
+              // 全屏 route 复制 builder 时自动携带. 生产路径 media_kit 纯渲染；
+              // 测试可注入无原生依赖 surface (videoSurfaceBuilder).
               _buildVideoSurface(),
-              // 中层: 仅在引擎确认媒体已卸载后显示空置页。idle 可能是 stop
-              // 尚未结束的中间状态，此时不能提前接收打开文件的交互。
-              if (widget.emptyState != null)
-                ValueListenableBuilder<MediaState>(
-                  valueListenable: widget.engine.state,
-                  builder: (_, state, child) =>
-                      state == MediaState.idle && !widget.engine.hasMedia
-                      ? child!
-                      : const SizedBox.shrink(),
-                  child: Positioned.fill(
-                    // 父级 gate 同步覆盖快捷键和控制栏，空置页本身保留淡入动画。
-                    child: IgnorePointer(
-                      ignoring: !_isOpenFileEnabled,
-                      child: widget.emptyState!,
-                    ),
-                  ),
-                ),
-              // 顶层: 统一监听状态、播放列表刷新和活动标题；三个来源共同决定
-              // 控制栏内容，避免停止后播放列表保留项导致标题残留。
-              ListenableBuilder(
-                listenable: Listenable.merge([
-                  widget.engine.state,
-                  widget.playlistGeneration,
-                  widget.controller.currentFileName,
-                ]),
-                builder: (ctx, _) {
-                  final isEmptyState =
-                      widget.engine.state.value == MediaState.idle &&
-                      !widget.engine.hasMedia;
-                  final currentFileName =
-                      widget.controller.currentFileName.value;
-                  return ControlsOverlay(
-                    engine: widget.engine,
-                    actions: _buildPlayerActions(ctx),
-                    isFullscreen: isFullscreen,
-                    resizing: widget.windowService.isResizing,
-                    // 必须与中层空置页使用同一判定，才能正确透传命中。
-                    emptyStatePresent:
-                        widget.emptyState != null && isEmptyState,
-                    visibleSink: _controlsVisible,
-                    title: currentFileName.isEmpty ? null : currentFileName,
-                  );
-                },
-              ),
             ],
           ),
         ),
@@ -428,6 +416,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   );
 
   /// 构建视频渲染面；默认实现保持原有 media_kit [Video] 生命周期不变。
+  ///
+  /// controls 传 [_buildControls] builder — media_kit 全屏 route 会复制此 builder
+  /// (fullscreen.dart:63), 使全屏态自动获得同一份 ControlsOverlay.
   Widget _buildVideoSurface() {
     final testSurface = widget.videoSurfaceBuilder;
     if (testSurface != null) return testSurface(_videoKey);
@@ -437,48 +428,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Video(
       key: _videoKey,
       controller: controller,
-      controls: (_) => const SizedBox.shrink(),
+      controls: _buildControls,
     );
   }
 
-  /// 构造播放器回调集合 — 从 PlayerScreen 现有回调填充 [PlayerActions].
+  /// Video.controls builder — 符合 `Widget Function(VideoState)` 签名.
   ///
-  /// `playModeIcon`/`playModeLabel` 从 `widget.playlist.mode` 经 PlayModeUtils
-  /// 计算. `Playlist.mode` 是普通 getter (非 ValueNotifier), 借外层
-  /// `playlistGeneration` ValueListenableBuilder 间接驱动刷新 — 若播放模式
-  /// 切换未触发 generation++, 图标不实时更新 (已知限制, 不阻塞主目标).
-  /// `onToggleFullscreen` 走 `WindowService.setMode` (统一全屏通道, 同步 mode).
-  PlayerActions _buildPlayerActions(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final mode = widget.playlist.mode;
-    return PlayerActions(
-      onPrevious: () => widget.controller.playPrevious(),
-      onNext: () => widget.controller.playNext(),
-      // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
-      onStop: () => unawaited(widget.controller.stopCurrentMedia()),
-      // 控制栏与快捷键共用空置态的资源释放隔离窗口。
-      onOpenFile: _openFileWhenReady,
-      onOpenSubtitle: _openSubtitle,
-      onTogglePlaylist: _togglePlaylist,
-      onSettings: widget.settingsPanelController.open,
-      onSettingsSecondary: widget.onSettingsSecondary,
-      onTogglePlayMode: widget.onTogglePlayMode,
-      // 方案 B: setMode 设 intent+mode (守卫同步 mode), videoKey.toggleFullscreen
-      // 走 media_kit 原生全屏. 闭包内现读 mode.value 避免陈旧捕获 (此 builder 在
-      // playlistGeneration VLB 内, 拿不到外层 AnimatedBuilder 的 isFullscreen).
-      onToggleFullscreen: () {
-        final m = widget.windowService.mode.value;
-        final entering = m != WindowMode.fullscreen;
-        widget.windowService.setMode(
-          entering ? WindowMode.fullscreen : WindowMode.windowed,
-        );
-        _videoKey.currentState?.toggleFullscreen();
-      },
-      onFilesDropped: widget.onFilesDropped,
-      onShowProperties: widget.onShowProperties,
-      playModeIcon: playModeIcon(mode),
-      playModeLabel: playModeLabel(mode, l10n),
-      isVideo: true,
+  /// 闭包捕获稳定对象(engine/_actions/playlist/currentFileName 等),在 Video
+  /// 渲染时(含全屏 route)调用. isFullscreen 从 VideoState 现取,不陈旧
+  /// (窗口态/全屏态是不同 Video 实例,各自 builder 拿到正确值).
+  Widget _buildControls(VideoState state) {
+    return ControlsOverlay(
+      engine: widget.engine,
+      actions: _actions,
+      currentFileName: widget.controller.currentFileName,
+      playlist: widget.playlist,
+      playlistGeneration: widget.playlistGeneration,
+      openFileEnabled: _isOpenFileEnabled,
+      emptyState: widget.emptyState,
+      isFullscreen: state.isFullscreen(),
+      resizing: widget.windowService.isResizing,
+      visibleSink: _controlsVisible,
     );
   }
 }
