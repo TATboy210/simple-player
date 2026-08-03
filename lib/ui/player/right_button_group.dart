@@ -14,11 +14,24 @@ import 'player_actions.dart';
 class RightButtonGroup extends StatelessWidget {
   final PlayerActions actions;
 
-  const RightButtonGroup({super.key, required this.actions});
+  /// 全屏切换回调 — 优先于 actions.onToggleFullscreen.
+  ///
+  /// ControlsOverlay 传 _toggleFullscreen(同时做 setMode + 本实例 videoState
+  /// route 切换); 若未传则回退 actions.onToggleFullscreen(仅 setMode, 兼容旧调用).
+  final VoidCallback? onToggleFullscreen;
+
+  const RightButtonGroup({
+    super.key,
+    required this.actions,
+    this.onToggleFullscreen,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 全屏按钮 — 优先显式 onToggleFullscreen(ControlsOverlay._toggleFullscreen,
+    // 同时 setMode 同步 + 本实例 videoState route 切换); 回退 actions.onToggleFullscreen.
+    final fullscreenCb = onToggleFullscreen ?? actions.onToggleFullscreen;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -49,10 +62,10 @@ class RightButtonGroup extends StatelessWidget {
                 : null,
             tooltip: l10n.settings,
           ),
-        if (actions.onToggleFullscreen != null)
+        if (fullscreenCb != null)
           GlassButton.iconOnly(
             icon: Icons.fullscreen,
-            onPressed: actions.onToggleFullscreen,
+            onPressed: fullscreenCb,
             tooltip: l10n.shortcutFullscreen,
           ),
       ],
