@@ -58,6 +58,10 @@ class ControlBar extends StatelessWidget {
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
 
+  /// 全屏切换回调 — 透传给 ControlBarLayout → ControlBarActions → RightButtonGroup.
+  /// ControlsOverlay 传 _toggleFullscreen(setMode + 本实例 videoState route 切换).
+  final VoidCallback? onToggleFullscreen;
+
   const ControlBar({
     super.key,
     required this.engine,
@@ -72,6 +76,7 @@ class ControlBar extends StatelessWidget {
     this.resizing,
     this.onSeekStart,
     this.onSeekEnd,
+    this.onToggleFullscreen,
     this.onInteractionStart,
     this.onInteractionEnd,
   });
@@ -106,6 +111,7 @@ class ControlBar extends StatelessWidget {
             resizing: resizing,
             onSeekStart: onSeekStart,
             onSeekEnd: onSeekEnd,
+            onToggleFullscreen: onToggleFullscreen,
             onInteractionStart: onInteractionStart,
             onInteractionEnd: onInteractionEnd,
           ),

@@ -26,6 +26,9 @@ class ControlBarLayout extends StatelessWidget {
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
 
+  /// 全屏切换回调 — 透传给 ControlBarActions → RightButtonGroup.
+  final VoidCallback? onToggleFullscreen;
+
   const ControlBarLayout({
     super.key,
     required this.engine,
@@ -37,6 +40,7 @@ class ControlBarLayout extends StatelessWidget {
     this.resizing,
     this.onSeekStart,
     this.onSeekEnd,
+    this.onToggleFullscreen,
     this.onInteractionStart,
     this.onInteractionEnd,
   });
@@ -82,6 +86,7 @@ class ControlBarLayout extends StatelessWidget {
                 playlist: playlist,
                 playlistGeneration: playlistGeneration,
                 isIdle: isIdle,
+                onToggleFullscreen: onToggleFullscreen,
                 onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,
               ),

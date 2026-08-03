@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/playlist/playlist.dart';
@@ -66,6 +67,16 @@ class ControlsOverlay extends StatefulWidget {
   /// 全屏状态 — 传递给 AutoHideController 控制隐藏延迟
   final bool isFullscreen;
 
+  /// 本实例的 media_kit [VideoState] — 用于走原生全屏 route 切换.
+  ///
+  /// 症状④根因:`actions.onToggleFullscreen` 闭包在 PlayerScreen initState
+  /// 构造, 拿不到全屏态 VideoState(另一实例), 只能用窗口态 `_videoKey` →
+  /// `isFullscreen()` 永远 false → 退出全屏反而再 enter → route 冲突 →
+  /// 渲染出错. 改为每实例用自己的 [videoState]: 窗口态 `isFullscreen()=false`
+  /// →enter, 全屏态 `=true`→exit, 自动正确分支.
+  /// 见 memory [[project_fullscreen_minimal_fix]] 症状④.
+  final VideoState? videoState;
+
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter
   final ValueListenable<bool>? resizing;
 
@@ -83,6 +94,7 @@ class ControlsOverlay extends StatefulWidget {
     this.actions = const PlayerActions(),
     this.emptyState,
     this.isFullscreen = false,
+    this.videoState,
     this.resizing,
     this.visibleSink,
   });
@@ -118,6 +130,18 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   /// 供 PlayerScreen 联动全屏鼠标隐藏 + 字幕上移.
   void _syncVisible() {
     widget.visibleSink?.value = _autoHide.visible.value;
+  }
+
+  /// 切换全屏 — 双击与全屏按钮共用入口.
+  ///
+  /// 两步:① `actions.onToggleFullscreen` 同步 WindowService mode(守卫 + 鼠标
+  /// 隐藏联动);② `videoState.toggleFullscreen()` 走 media_kit 原生 route
+  /// (push/pop PageRouteBuilder). 关键:用**本实例**的 [widget.videoState] 而非
+  /// PlayerScreen 的窗口态 `_videoKey` — 窗口态 isFullscreen()=false→enter,
+  /// 全屏态 isFullscreen()=true→exit, 自动正确分支(修复症状④退出渲染出错).
+  void _toggleFullscreen() {
+    widget.actions.onToggleFullscreen?.call();
+    widget.videoState?.toggleFullscreen();
   }
 
   @override
@@ -159,7 +183,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     if (_clickTimer?.isActive ?? false) {
       // 第二次点击在延迟内 → 双击，切换全屏
       _clickTimer?.cancel();
-      widget.actions.onToggleFullscreen?.call();
+      _toggleFullscreen();
     } else {
       // D-04: 第一次点击 → 立即隐藏（不等 250ms 延迟）
       if (widget.engine.state.value != MediaState.idle) {
@@ -339,6 +363,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                             enableBlur: isVisible,
                             decoration: _animController,
                             resizing: widget.resizing,
+                            // 全屏切换 — 传 _toggleFullscreen 而非 actions.onToggleFullscreen:
+                            // 需同时做 setMode 同步 + 本实例 videoState route 切换.
+                            onToggleFullscreen: _toggleFullscreen,
                             // seek 钩子 — 拖动进度条期间冻结 auto-hide
                             onSeekStart: _autoHide.onSeekStart,
                             onSeekEnd: _autoHide.onSeekEnd,

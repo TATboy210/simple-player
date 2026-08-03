@@ -10,9 +10,9 @@ import 'shortcuts_help_dialog.dart';
 
 /// 构造播放器键盘处理器 — 绑定 20+ 快捷键到 engine/controller.
 ///
-/// F 键全屏: setMode 设 intent+mode + videoKey.toggleFullscreen 实际全屏 (方案 B).
-/// 单用 toggleFullscreen: SC_MAXIMIZE→onWindowMaximize 覆盖 mode=maximized;
-/// 单用 setMode 直调 fullscreen_window: GUI 失效 (方案 A 弃). 两者配合 + 守卫.
+/// F 键全屏: setMode 设 intent+mode + media_kit route 切换 (方案 B, 修症状④).
+/// enter 用 videoKey.enterFullscreen; exit 直接 pop root navigator 全屏 route
+/// (窗口态 key 的 exitFullscreen 受 isFullscreen 守卫失效, 见 onToggleFullscreen 注释).
 ///
 /// [isFullscreen] 由调用方 (AnimatedBuilder 内) 每次重建时传入,
 /// 保证 onExitFullscreen 闭包捕获的是最新全屏状态.
@@ -62,20 +62,29 @@ KeyboardHandler buildPlayerKeyboardActions({
     onMediaNext: () => controller.playNext(),
     onMediaPrevious: () => controller.playPrevious(),
     // 方案 B: setMode 设 intent+mode (守卫 onWindowMaximize 同步 mode=fullscreen),
-    // videoKey.toggleFullscreen 走 media_kit 原生全屏 (已验证可用).
-    // 单用 toggleFullscreen: SC_MAXIMIZE→onWindowMaximize 覆盖 mode=maximized;
-    // 单用 setMode 直调 fullscreen_window: GUI 失效 (方案 A 弃). 两者配合 + 守卫.
+    // route 切换走 media_kit 原生全屏. 修症状④: 窗口态 videoKey 的
+    // toggleFullscreen/exitFullscreen 受 isFullscreen(context) 守卫 — 退出时
+    // (全屏 route 在 root navigator, 窗口态 context 查不到
+    // FullscreenInheritedWidget) 守卫 false → 不 pop → 退出反而 enter → 渲染出错.
+    // 改为: enter 用 enterFullscreen(窗口态 isFullscreen()=false→push, 正确);
+    //       exit 直接 pop root navigator 栈顶全屏 route(绕过守卫).
     onToggleFullscreen: () {
       final entering = !isFullscreen;
       windowService.setMode(
         entering ? WindowMode.fullscreen : WindowMode.windowed,
       );
-      videoKey.currentState?.toggleFullscreen();
+      if (entering) {
+        videoKey.currentState?.enterFullscreen();
+      } else {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.maybePop();
+      }
     },
     onExitFullscreen: () {
       if (isFullscreen) {
         windowService.setMode(WindowMode.windowed);
-        videoKey.currentState?.toggleFullscreen();
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.maybePop();
       }
     },
     child: child,

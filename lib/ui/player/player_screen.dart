@@ -177,15 +177,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onSettings: widget.settingsPanelController.open,
       onSettingsSecondary: widget.onSettingsSecondary,
       onTogglePlayMode: widget.onTogglePlayMode,
-      // setMode 设 intent+mode (守卫同步 mode), videoKey.toggleFullscreen
-      // 走 media_kit 原生全屏. 闭包内现读 mode.value 避免陈旧捕获.
+      // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
+      // 切换改由 ControlsOverlay._toggleFullscreen 用各实例自己的 videoState 完成
+      // (修复症状④: 窗口态 _videoKey isFullscreen() 永远 false → 退出反而 enter).
+      // 闭包内现读 mode.value 避免陈旧捕获.
       onToggleFullscreen: () {
         final m = widget.windowService.mode.value;
         final entering = m != WindowMode.fullscreen;
         widget.windowService.setMode(
           entering ? WindowMode.fullscreen : WindowMode.windowed,
         );
-        _videoKey.currentState?.toggleFullscreen();
       },
       onFilesDropped: widget.onFilesDropped,
       onShowProperties: widget.onShowProperties,
@@ -447,6 +448,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       openFileEnabled: _isOpenFileEnabled,
       emptyState: widget.emptyState,
       isFullscreen: state.isFullscreen(),
+      // 传本实例 VideoState — _toggleFullscreen 用它做 route 切换(每实例自动
+      // enter/exit, 修复症状④). 窗口态/全屏态是不同 Video 实例, 各自传各自的 state.
+      videoState: state,
       resizing: widget.windowService.isResizing,
       visibleSink: _controlsVisible,
     );
