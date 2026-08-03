@@ -3,8 +3,14 @@ import '../../kernel/models/playlist_item.dart';
 
 /// 播放器回调集合 — 替代 PlayerScreen/ControlsOverlay/ControlBar 的散落回调参数
 ///
-/// PlayerScreen 在 build() 中构造，沿链路传递给 ControlsOverlay → ControlBar。
-/// engine 等状态对象不包含在内（它们是 required 独立参数）。
+/// PlayerScreen 在 initState 中构造一次（稳定化），沿链路传递给
+/// ControlsOverlay → ControlBar。engine 等状态对象不包含在内（它们是
+/// required 独立参数）。
+///
+/// 稳定化原因：ControlsOverlay 住进 media_kit `Video.controls` builder 后，
+/// builder 在 Video 渲染时调用，不在 PlayerScreen build 上下文 — 故 actions
+/// 必须是稳定引用，不能每次 build 重建。playModeIcon/Label 已下沉到
+/// LeftButtonGroup 内部用 playlist.mode + playlistGeneration 计算。
 class PlayerActions {
   /// N 键或控制栏"上一曲"按钮。
   final VoidCallback? onPrevious;
@@ -53,12 +59,6 @@ class PlayerActions {
   /// 显示文件属性对话框。
   final void Function(String path)? onShowProperties;
 
-  /// 播放模式图标（如 repeat/shuffle）
-  final IconData? playModeIcon;
-
-  /// 播放模式名称（如"顺序播放"、"列表循环"）
-  final String? playModeLabel;
-
   /// 是否为视频媒体（影响 prev/next 按钮的 tooltip）
   final bool isVideo;
 
@@ -78,8 +78,6 @@ class PlayerActions {
     this.onFolderScanned,
     this.onClearHistory,
     this.onShowProperties,
-    this.playModeIcon,
-    this.playModeLabel,
     this.isVideo = false,
   });
 }

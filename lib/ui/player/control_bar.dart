@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/edge_glow.dart';
@@ -31,6 +32,8 @@ class ControlBar extends StatelessWidget {
 
   final MediaEngine engine;
   final PlayerActions actions;
+  final Playlist playlist;
+  final ValueListenable<int> playlistGeneration;
   final bool enableBlur;
   final bool isIdle;
 
@@ -59,6 +62,8 @@ class ControlBar extends StatelessWidget {
     super.key,
     required this.engine,
     this.actions = const PlayerActions(),
+    required this.playlist,
+    required this.playlistGeneration,
     this.enableBlur = true,
     this.isIdle = false,
     this.title,
@@ -94,6 +99,8 @@ class ControlBar extends StatelessWidget {
           child: ControlBarLayout(
             engine: engine,
             actions: actions,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
             isIdle: isIdle,
             title: title,
             resizing: resizing,

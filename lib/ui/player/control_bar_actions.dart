@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/playlist/playlist.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme/tokens.dart';
 import 'center_controls.dart';
@@ -12,6 +14,8 @@ import 'right_button_group.dart';
 class ControlBarActions extends StatelessWidget {
   final MediaEngine engine;
   final PlayerActions actions;
+  final Playlist playlist;
+  final ValueListenable<int> playlistGeneration;
   final bool isIdle;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
@@ -20,6 +24,8 @@ class ControlBarActions extends StatelessWidget {
     super.key,
     required this.engine,
     required this.actions,
+    required this.playlist,
+    required this.playlistGeneration,
     required this.isIdle,
     this.onInteractionStart,
     this.onInteractionEnd,
@@ -36,7 +42,9 @@ class ControlBarActions extends StatelessWidget {
         children: [
           LeftButtonGroup(
             engine: engine,
-            actions: actions,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
+            onTogglePlayMode: actions.onTogglePlayMode,
             onInteractionStart: onInteractionStart,
             onInteractionEnd: onInteractionEnd,
           ),
