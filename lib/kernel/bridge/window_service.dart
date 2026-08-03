@@ -72,6 +72,13 @@ class WindowService with WindowListener implements WindowBridge {
     );
     unawaited(
       windowManager.waitUntilReadyToShow(options, () async {
+        // 切换为 frameless:消除 hidden titleBarStyle 在 WM_NCCALCSIZE 留下的
+        // 8px 调整边框(白边根因)。必须在此 callback 内调用——waitUntilReadyToShow
+        // 已先执行 setTitleBarStyle(hidden) 把 is_frameless_ 重置为 false,此处
+        // setAsFrameless 把它设回 true,使 WM_NCCALCSIZE 走 frameless 分支直接
+        // return 0(非最大化不留 8px)。代价:失去系统级 resize hit-test,
+        // 由 SmartDragToResizeArea 在 Flutter 层兜底。
+        await windowManager.setAsFrameless();
         final settings = await SettingsStore.load();
         if (settings.windowX != null && settings.windowY != null) {
           final displays = _displayEnumerator.enumerateDisplays();
