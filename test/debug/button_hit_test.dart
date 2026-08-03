@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
@@ -15,6 +16,12 @@ import '../helpers/fake_engine.dart';
 
 void main() {
   late FakeEngine engine;
+  // 渐进路径:ControlsOverlay/ControlBar 需 currentFileName/playlist/
+  // playlistGeneration/openFileEnabled 自驱动 builder — 测试共享,tearDown 释放。
+  late Playlist playlist;
+  late ValueNotifier<int> playlistGeneration;
+  late ValueNotifier<String> currentFileName;
+  late ValueNotifier<bool> openFileEnabled;
 
   setUp(() {
     // 匹配生产环境:app 启动时调 KernelLoggerImpl.init()。测试中 transitionTo
@@ -24,10 +31,17 @@ void main() {
     engine.state.value = MediaState.playing;
     engine.duration.value = 60000;
     engine.position.value = 10000;
+    playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
+    currentFileName = ValueNotifier<String>('');
+    openFileEnabled = ValueNotifier<bool>(true);
   });
 
   tearDown(() {
     engine.dispose();
+    playlistGeneration.dispose();
+    currentFileName.dispose();
+    openFileEnabled.dispose();
   });
 
   Widget buildFullOverlay({PlayerActions? actions}) {
@@ -40,6 +54,10 @@ void main() {
           height: 600,
           child: ControlsOverlay(
             engine: engine,
+            currentFileName: currentFileName,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
+            openFileEnabled: openFileEnabled,
             actions:
                 actions ??
                 const PlayerActions(onPrevious: _noop, onNext: _noop),
@@ -59,6 +77,8 @@ void main() {
           height: 200,
           child: ControlBar(
             engine: engine,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
             isIdle: isIdle,
             actions:
                 actions ??

@@ -22,23 +22,35 @@ Widget _wrapWithApp(Widget child, {double width = 800, double height = 600}) {
 void main() {
   late FakeEngine engine;
   late Playlist playlist;
+  // 渐进路径:ControlBar 需 playlistGeneration(required) —
+  // playMode 下沉到 LeftButtonGroup 内部读 playlist.mode,generation 驱动重建。
+  late ValueNotifier<int> playlistGeneration;
 
   setUp(() {
     engine = FakeEngine();
     playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
   });
 
   tearDown(() {
     engine.dispose();
+    playlistGeneration.dispose();
   });
 
   group('ControlBar button groups', () {
     testWidgets('wide layout shows all three groups', (tester) async {
-      await tester.pumpWidget(_wrapWithApp(
-        ControlBar(engine: engine, actions: const PlayerActions()),
-        width: 800,
-        height: 200,
-      ));
+      await tester.pumpWidget(
+        _wrapWithApp(
+          ControlBar(
+            engine: engine,
+            actions: const PlayerActions(),
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
+          ),
+          width: 800,
+          height: 200,
+        ),
+      );
       await tester.pump();
 
       // CenterGroup always visible
@@ -50,18 +62,20 @@ void main() {
 
   group('PlaylistPanel responsive sizing', () {
     testWidgets('renders with normal dimensions', (tester) async {
-      await tester.pumpWidget(_wrapWithApp(
-        PlaylistPanel(
-          playlist: playlist,
-          visible: true,
-          onClose: () {},
-          onSelectIndex: (_) {},
-          onRemoveIndex: (_) {},
-          availableWidth: 800,
+      await tester.pumpWidget(
+        _wrapWithApp(
+          PlaylistPanel(
+            playlist: playlist,
+            visible: true,
+            onClose: () {},
+            onSelectIndex: (_) {},
+            onRemoveIndex: (_) {},
+            availableWidth: 800,
+          ),
+          width: 800,
+          height: 600,
         ),
-        width: 800,
-        height: 600,
-      ));
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -80,10 +94,14 @@ void main() {
     });
 
     test('narrow playlist dimensions are smaller than normal', () {
-      expect(Tokens.playlistPanelWidthNarrow,
-          lessThan(Tokens.playlistPanelWidth));
-      expect(Tokens.playlistPanelHeightNarrow,
-          lessThan(Tokens.playlistPanelHeight));
+      expect(
+        Tokens.playlistPanelWidthNarrow,
+        lessThan(Tokens.playlistPanelWidth),
+      );
+      expect(
+        Tokens.playlistPanelHeightNarrow,
+        lessThan(Tokens.playlistPanelHeight),
+      );
     });
 
     test('compactBreakpoint unchanged at 500', () {

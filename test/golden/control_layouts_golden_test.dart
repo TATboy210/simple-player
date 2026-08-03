@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
@@ -13,13 +14,19 @@ void main() {
   setUp(() => enableTolerantGoldens());
 
   late FakeEngine engine;
+  // 渐进路径:ControlBar 需 playlist + playlistGeneration(required)。
+  late Playlist playlist;
+  late ValueNotifier<int> playlistGeneration;
 
   setUp(() {
     engine = FakeEngine();
+    playlist = Playlist();
+    playlistGeneration = ValueNotifier<int>(0);
   });
 
   tearDown(() {
     engine.dispose();
+    playlistGeneration.dispose();
   });
 
   Widget buildControlSubject({
@@ -33,11 +40,7 @@ void main() {
       home: Scaffold(
         backgroundColor: const Color(0xFF1A1A2E),
         body: Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: child,
-          ),
+          child: SizedBox(width: width, height: height, child: child),
         ),
       ),
     );
@@ -49,6 +52,8 @@ void main() {
         buildControlSubject(
           child: ControlBar(
             engine: engine,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
             isIdle: true,
             enableBlur: false,
           ),
@@ -69,6 +74,8 @@ void main() {
         buildControlSubject(
           child: ControlBar(
             engine: engine,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
             enableBlur: false,
           ),
         ),
@@ -88,6 +95,8 @@ void main() {
         buildControlSubject(
           child: ControlBar(
             engine: engine,
+            playlist: playlist,
+            playlistGeneration: playlistGeneration,
             enableBlur: false,
           ),
         ),
@@ -102,10 +111,7 @@ void main() {
   group('ProgressBar golden', () {
     testWidgets('empty (no duration)', (tester) async {
       await tester.pumpWidget(
-        buildControlSubject(
-          height: 60,
-          child: ProgressBar(engine: engine),
-        ),
+        buildControlSubject(height: 60, child: ProgressBar(engine: engine)),
       );
       await expectLater(
         find.byType(ProgressBar),
@@ -118,10 +124,7 @@ void main() {
       engine.position.value = 30000;
 
       await tester.pumpWidget(
-        buildControlSubject(
-          height: 60,
-          child: ProgressBar(engine: engine),
-        ),
+        buildControlSubject(height: 60, child: ProgressBar(engine: engine)),
       );
       await expectLater(
         find.byType(ProgressBar),
