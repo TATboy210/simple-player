@@ -323,6 +323,14 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 是另一实例,padding 调错对象 → 字幕被控制栏遮挡/控件隐藏字幕不动。本控件每实例
   /// 监听自己 _autoHide.visible,调 `widget.state`(本实例)→ 双实例各自正确。
   void _syncSubtitlePadding() {
+    // 阶段3:退出全屏 route pop(Duration.zero) 后,全屏 VideoState deactivate/dispose。
+    // post-frame callback(line 413) 或 _autoHide.visible listener 可能在本控件
+    // 失效后触发本方法,调用已 deactivate 的 widget.state.setSubtitleViewPadding
+    // 会更新 media_kit _videoViewParametersNotifier → 触发全屏 Video rebuild →
+    // 查已 deactivate 的 InheritedWidget ancestor → "deactivated widget's
+    // ancestor" 断言(framework.dart:6417)。mounted 挡本控件 dispose 后;
+    // widget.state.mounted 挡全屏 VideoState dispose 后。
+    if (!mounted || !widget.state.mounted) return;
     final videoState = widget.state;
     final base = videoState.widget.subtitleViewConfiguration.padding;
     if (_autoHide.visible.value) {
@@ -486,6 +494,22 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       widget.resizing?.addListener(_onResizeChanged);
       _onResizeChanged();
     }
+  }
+
+  @override
+  void deactivate() {
+    // 阶段3:deactivate 即断开外部 listener — 退出全屏 route pop(Duration.zero)
+    // 后全屏 VideoState 即将 deactivate,但 _autoHide 的 _hideTimer/_animController
+    // 在 deactivate→dispose 之间仍可能触发 visible 变化(playing 态 Timer / stream
+    // isPlaying 推送 / resize 信号),经 _autoHide.visible listener 触发
+    // _syncSubtitlePadding 调已 deactivate 的 widget.state.setSubtitleViewPadding
+    // → media_kit 查 deactivated ancestor 断言。dispose 太晚(Timer/动画仍跑),
+    // 须在此断开。dispose 内 removeListener 幂等保留(remove 已移除的 listener 是
+    // no-op)。注:本控件由 controls builder 构建,不 reparent,无需 activate 重 add。
+    widget.engine.state.removeListener(_onEngineStateChanged);
+    widget.resizing?.removeListener(_onResizeChanged);
+    _autoHide.visible.removeListener(_syncSubtitlePadding);
+    super.deactivate();
   }
 
   @override
