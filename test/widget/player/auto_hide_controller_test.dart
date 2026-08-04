@@ -335,8 +335,12 @@ void main() {
     });
   });
 
-  group('AutoHideController — hover guard blocks scheduleHide', () {
-    testWidgets('scheduleHide timer blocked by hovering guard', (tester) async {
+  group('AutoHideController — hovering does not block hide', () {
+    testWidgets('scheduleHide timer hides even when hovering (静止 3s 隐藏)', (
+      tester,
+    ) async {
+      // 阶段3问题3:对齐 media_kit 原生 — 鼠标在 Video 内静止 3s 也隐藏,
+      // 不因 hovering 阻止。仅 _activeInteractionCount 保护交互期间不隐藏。
       isPlaying.value = true;
       await tester.pumpWidget(
         MaterialApp(
@@ -357,11 +361,11 @@ void main() {
       c.onMouseEnter(); // hovering = true
       c.scheduleHide();
 
-      // Advance past 3s hide delay — hover guard blocks hide
+      // Advance past 3s hide delay — 静止 3s 隐藏(不再被 hovering 阻止)
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
 
-      expect(c.visible.value, isTrue);
+      expect(c.visible.value, isFalse);
     });
   });
 
