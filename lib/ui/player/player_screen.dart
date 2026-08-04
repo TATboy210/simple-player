@@ -102,12 +102,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     false,
   ));
 
-  /// 控件可见性 — 从 ControlsOverlay 单向同步,驱动全屏鼠标隐藏 + 字幕上移.
-  ///
-  /// 双实例竞争警告:窗口态与全屏态两个 ControlsOverlay 实例都写此 sink.
-  /// 当前阶段暂留(值跳变但不崩溃),拆解留待下一步(对齐 plan 阶段 2).
-  final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
-
   /// 空置页刚出现时暂时隔离所有“打开文件”入口，等待旧媒体纹理完全退场。
   static const _openFileDelay = Duration(seconds: 2);
   Timer? _openFileDelayTimer;
@@ -192,15 +186,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onShowProperties: widget.onShowProperties,
       isVideo: true,
     );
-    _controlsVisible.addListener(_onControlsVisibleChanged);
     widget.engine.state.addListener(_syncOpenFileAvailability);
     // Stop 成功会清空活动标题；它也是 hasMedia 从 true 变 false 后的可靠 UI 通知。
     widget.controller.currentFileName.addListener(_syncOpenFileAvailability);
     _syncOpenFileAvailability();
-    // Video 挂载后初始上移字幕(控件初始可见). post-frame 确保 _videoKey 已挂载.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _onControlsVisibleChanged(),
-    );
+    // 阶段2:字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱
+    // (每实例调自己 VideoState),不再需本层 _onControlsVisibleChanged 联动.
   }
 
   /// idle 既可能表示尚未加载，也可能表示 stop 正在卸载；两种情况都先隔离打开入口。
@@ -225,31 +216,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     widget.onOpenFile?.call();
   }
 
-  /// 控件可见性变化 — 联动字幕上移(控件可见时上移避免被 ControlBar 遮挡,
-  /// 隐藏时还原 base). 对齐 media_kit 原生 material_desktop shift/unshift 逻辑.
-  void _onControlsVisibleChanged() {
-    final videoState = _videoKey.currentState;
-    if (videoState == null) return;
-    final base = videoState.widget.subtitleViewConfiguration.padding;
-    if (_controlsVisible.value) {
-      videoState.setSubtitleViewPadding(
-        base +
-            const EdgeInsets.only(
-              bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
-            ),
-      );
-    } else {
-      videoState.setSubtitleViewPadding(base);
-    }
-  }
-
   @override
   void dispose() {
     _openFileDelayTimer?.cancel();
     widget.controller.currentFileName.removeListener(_syncOpenFileAvailability);
     widget.engine.state.removeListener(_syncOpenFileAvailability);
-    _controlsVisible.removeListener(_onControlsVisibleChanged);
-    _controlsVisible.dispose();
     _isOpenFileEnabled.dispose();
     _playlistState.dispose();
     super.dispose();
@@ -371,21 +342,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
         // T1: 始终返回 SmartDragToResizeArea — 保持 Widget 类型一致.
         // 全屏时 enabled=false (IgnorePointer 禁用拖拽但不改类型),
         // canUpdate 始终 true, Element 复用, Texture 子树不被销毁.
-        return ValueListenableBuilder<bool>(
-          valueListenable: _controlsVisible,
-          builder: (_, controlsVisible, _) {
-            // 全屏 + 控件隐藏 → 隐藏鼠标(沉浸);否则全屏 basic / 窗口 defer
-            final cursor = (isFullscreen && !controlsVisible)
-                ? SystemMouseCursors.none
-                : (isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer);
-            return MouseRegion(
-              cursor: cursor,
-              child: SmartDragToResizeArea(
-                enabled: !isFullscreen,
-                child: keyboardHandler,
-              ),
-            );
-          },
+        // 阶段2:全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动
+        // (controls MouseRegion cursor)。本层仅窗口态 defer / 全屏 basic。
+        return MouseRegion(
+          cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
+          child: SmartDragToResizeArea(
+            enabled: !isFullscreen,
+            child: keyboardHandler,
+          ),
         );
       },
     );
@@ -452,7 +416,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       openFileEnabled: _isOpenFileEnabled,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,
-      visibleSink: _controlsVisible,
     );
   }
 }

@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+// services: KeyDownEvent / LogicalKeyboardKey / KeyEventResult / FocusNode
+// (material.dart 不完整导出 services 的键盘事件类型)
+import 'package:flutter/services.dart';
 // hide Playlist: media_kit 也导出 Playlist 类,与项目 kernel/playlist/playlist.dart
 // 的 Playlist 同名冲突。hide 掉 media_kit 的 Playlist,保留 Player(路径B 数据源)。
 import 'package:media_kit/media_kit.dart' hide Playlist;
@@ -180,7 +183,6 @@ Widget playerVideoControls(
   required ValueListenable<bool> openFileEnabled,
   Widget? emptyState,
   ValueListenable<bool>? resizing,
-  ValueNotifier<bool>? visibleSink,
 }) {
   return PlayerVideoControls(
     state: state,
@@ -192,7 +194,6 @@ Widget playerVideoControls(
     openFileEnabled: openFileEnabled,
     emptyState: emptyState,
     resizing: resizing,
-    visibleSink: visibleSink,
   );
 }
 
@@ -206,11 +207,20 @@ Widget playerVideoControls(
 /// - skipBack/skipForward: 走 engine(项目语义糖,内部 seekTo→player.seek 一致)
 /// - isFullscreen: 从 [VideoState.isFullscreen] 现取(每实例独立,修复"图标不动态")
 ///
-/// 阶段1 暂保留 [ControlsOverlay](其测试 + 跨层 visibleSink)。阶段2 删旧 +
-/// AutoHide 改 isPlaying + 键盘住进 controls + 删 visibleSink 跨层。
+/// 阶段2 适配 route 约束(修实机 3 bug):
+/// - **AutoHide 改 isPlaying**:[PlayerControlsState.isPlaying] 驱动,非 playing 永显
+/// - **删 visibleSink 跨层**:字幕 padding 由本控件监听 [_autoHide.visible] 调
+///   `widget.state.setSubtitleViewPadding`(每实例调自己 VideoState,修"自动隐藏
+///   失效"根因 — 旧路径 PlayerScreen 用窗口态 _videoKey,全屏 route 调错对象)
+/// - **键盘住进 controls**:[Focus] + autofocus + onKeyEvent 最小集(ESC/F/Space/
+///   方向键),全屏 route 复制 builder 时自动携带(修"退出 deactivated" — 旧路径
+///   KeyboardHandler 在 builder 外不进 route)
+/// - **MouseRegion cursor**:全屏 + 控件隐藏 → none(沉浸),替代旧 PlayerScreen
+///   _controlsVisible 跨层驱动
 class PlayerVideoControls extends StatefulWidget {
   /// 本实例 media_kit [VideoState] — 数据源(`.widget.controller.player`)
-  /// + 全屏 route 切换(`toggleFullscreen`)双用途。
+  /// + 全屏 route 切换(`toggleFullscreen`/`exitFullscreen`)+ 字幕 padding
+  /// (`setSubtitleViewPadding`)三用途。
   final VideoState state;
 
   final MediaEngine engine;
@@ -234,9 +244,6 @@ class PlayerVideoControls extends StatefulWidget {
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter。
   final ValueListenable<bool>? resizing;
 
-  /// 控件可见性同步 sink — 阶段2 删除(改为 controls 内 AutoHide.visible 自驱)。
-  final ValueNotifier<bool>? visibleSink;
-
   const PlayerVideoControls({
     super.key,
     required this.state,
@@ -248,7 +255,6 @@ class PlayerVideoControls extends StatefulWidget {
     required this.openFileEnabled,
     this.emptyState,
     this.resizing,
-    this.visibleSink,
   });
 
   @override
@@ -272,6 +278,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
 
+  /// 阶段2:键盘 Focus — controls 自带 FocusNode + autofocus,全屏 route 复制
+  /// builder 时自动携带。项目 `Video` 未传 focusNode(player_screen.dart:429-433),
+  /// 全屏 route focusNode=null → 不自带 Focus 键盘事件收不到(见计划风险处理2)。
+  late final FocusNode _focusNode = FocusNode();
+
   /// 派生 isFullscreen — 同步 widget.state.isFullscreen(),供全屏按钮图标动态切换。
   late final ValueNotifier<bool> _isFullscreenNotifier;
 
@@ -290,14 +301,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
   /// 对齐 media_kit 原生 onTapUp 400ms 双击窗口(同 [ControlsOverlay._clickDelayMs])。
   /// 本类自带副本 — _clickDelayMs 在 ControlsOverlay 是 private,跨文件不可访问;
-  /// 阶段2 删 ControlsOverlay 后此常量成为唯一来源。
+  /// 阶段3 删 ControlsOverlay 后此常量成为唯一来源。
   static const _clickDelayMs = 400;
-
-  /// 同步 _autoHide.visible 到外部 sink — 单向(_autoHide.visible → sink),防回环.
-  /// 阶段2 删除:改为 controls 内 AutoHide.visible 自驱鼠标隐藏 + 字幕 padding。
-  void _syncVisible() {
-    widget.visibleSink?.value = _autoHide.visible.value;
-  }
 
   /// 切换全屏 — 双击与全屏按钮共用入口.
   ///
@@ -311,18 +316,78 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.state.toggleFullscreen();
   }
 
+  /// 阶段2:字幕 padding 自驱 — 监听 [_autoHide.visible] 调本实例 VideoState.
+  ///
+  /// 修"自动隐藏失效"根因:旧路径 PlayerScreen._onControlsVisibleChanged 用窗口态
+  /// `_videoKey.currentState` 调 setSubtitleViewPadding,全屏 route 时全屏 VideoState
+  /// 是另一实例,padding 调错对象 → 字幕被控制栏遮挡/控件隐藏字幕不动。本控件每实例
+  /// 监听自己 _autoHide.visible,调 `widget.state`(本实例)→ 双实例各自正确。
+  void _syncSubtitlePadding() {
+    final videoState = widget.state;
+    final base = videoState.widget.subtitleViewConfiguration.padding;
+    if (_autoHide.visible.value) {
+      videoState.setSubtitleViewPadding(
+        base +
+            const EdgeInsets.only(
+              bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
+            ),
+      );
+    } else {
+      videoState.setSubtitleViewPadding(base);
+    }
+  }
+
+  /// 阶段2:键盘事件处理 — controls 内 Focus 最小集.
+  ///
+  /// 全屏 route 复制 builder 时自动携带(KeyboardHandler 在 builder 外不进 route)。
+  /// 最小集:ESC(退出全屏)/F(切换全屏)/Space(播放暂停)/←→(seek ±5s)。
+  /// 其余键(N/P/O/S/M/[]/F1/媒体键)return ignored 冒泡给窗口态 KeyboardHandler
+  /// (全屏 route 缺这些键 — 已知限制,计划 line 85 认可)。
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
+      // ESC:仅全屏态退出(窗口态 ESC 冒泡给 KeyboardHandler 关播放列表/设置)
+      if (widget.state.isFullscreen()) {
+        widget.actions.onToggleFullscreen?.call();
+        widget.state.exitFullscreen();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.keyF) {
+      _toggleFullscreen();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.space) {
+      _controlsState.playOrPause();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      widget.engine.skipBack();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      widget.engine.skipForward();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   void initState() {
     super.initState();
     _isFullscreenNotifier = ValueNotifier<bool>(widget.state.isFullscreen());
+    // 阶段2:_controlsState.init() 前置 — isPlaying 有真值后再构造 _autoHide
+    // (AutoHide 监听 _controlsState.isPlaying,init() 读初值)。
+    _controlsState.init(); // 订阅 player.stream + 初始快照
     _autoHide = AutoHideController(
       vsync: this,
-      // 阶段1:AutoHide 仍用 engine.state(阶段2 改 isPlaying)。
-      engineState: widget.engine.state,
+      // 阶段2:AutoHide 用 _controlsState.isPlaying(player.stream 驱动)。
+      isPlaying: _controlsState.isPlaying,
       isFullscreen: widget.state.isFullscreen(),
       popupCloseNotifier: _popupCloseNotifier,
     );
-    _controlsState.init(); // 订阅 player.stream + 初始快照
     widget.engine.state.addListener(_onEngineStateChanged);
     _autoHide.init();
 
@@ -342,9 +407,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // CB-06: 防御性同步 — widget 创建时 resizing 可能已为 true
     if (widget.resizing?.value == true) _onResizeChanged();
 
-    // 同步控件可见性到外部 sink(全屏鼠标隐藏 + 字幕上移联动)
-    _autoHide.visible.addListener(_syncVisible);
-    _syncVisible(); // 立即同步初始状态
+    // 阶段2:字幕 padding 自驱(每实例调自己 VideoState)。post-frame 确保
+    // widget.state 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
+    _autoHide.visible.addListener(_syncSubtitlePadding);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncSubtitlePadding());
   }
 
   void _handleTap() {
@@ -391,7 +457,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   void _onEngineStateChanged() {
     // resize 期间忽略 engine 状态变化,避免 controller 竞争(Pitfall 2)
     if (_isResizing) return;
-    _autoHide.onEngineStateChanged();
+    // 阶段2:AutoHide 自动监听 _controlsState.isPlaying(player.stream 驱动),
+    // 不需手动调 _autoHide.onEngineStateChanged()。本回调仅驱动 decoration 切换。
 
     // engine 状态变化驱动 decoration 切换:idle→reverse(淡出),playing→forward(淡入)
     final isIdle = widget.engine.state.value == MediaState.idle;
@@ -419,18 +486,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       widget.resizing?.addListener(_onResizeChanged);
       _onResizeChanged();
     }
-    // visibleSink 变化 — 立即同步一次到新 sink(listener 仍在 _autoHide.visible 上)
-    if (oldWidget.visibleSink != widget.visibleSink) {
-      _syncVisible();
-    }
   }
 
   @override
   void dispose() {
     widget.engine.state.removeListener(_onEngineStateChanged);
     widget.resizing?.removeListener(_onResizeChanged);
-    _autoHide.visible.removeListener(_syncVisible);
+    _autoHide.visible.removeListener(_syncSubtitlePadding);
     _clickTimer?.cancel();
+    _focusNode.dispose();
     _popupCloseNotifier.dispose();
     _isFullscreenNotifier.dispose();
     _animController.dispose();
@@ -453,160 +517,173 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
   @override
   Widget build(BuildContext context) {
-    // 自驱动:builder 化后不依赖外层 ListenableBuilder,本控件自行监听
-    // engine.state(算 isIdle + AutoHide decoration) + currentFileName(算 title)。
-    // 注:position/isPlaying 等播放态走 _controlsState 的 ValueNotifier,ControlBar
-    // 子组件各自 ValueListenableBuilder 监听,不触发本 ListenableBuilder 重建。
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        widget.engine.state,
-        widget.currentFileName,
-      ]),
-      builder: (context, _) {
-        final isIdle = widget.engine.state.value == MediaState.idle;
-        // emptyStatePresent 等价判定:idle && !hasMedia(hasMedia 依赖 currentFileName)
-        final emptyActive =
-            widget.emptyState != null && isIdle && !widget.engine.hasMedia;
-        final fileName = widget.currentFileName.value;
-        final title = fileName.isEmpty ? null : fileName;
-        // idle + emptyState 时只对上方空白区域禁用手势,ControlBar 始终可交互
-        final gestureActive = !emptyActive;
-        // 路径B:vm 从 PlayerControlsState(player.stream)派生,非 engine。
-        // isPlaying/position/duration/volume/rate 走 stream;isMuted 复用 engine;
-        // 回调:onSeek/onPlayPause/onSetRate 直写 player(经 _controlsState),
-        // onSetVolume/onToggleMute 走 engine(保 _preMuteVolume),
-        // onSeekBack/onSeekForward 走 engine(语义糖,内部 seekTo→player.seek 一致)。
-        final vm = ControlBarViewModel(
-          isPlaying: _controlsState.isPlaying,
-          position: _controlsState.positionMs,
-          duration: _controlsState.durationMs,
-          volume: _controlsState.volume01,
-          isMuted: _controlsState.isMuted,
-          rate: _controlsState.rate,
-          isFullscreen: _isFullscreenNotifier,
-          onSeek: _controlsState.seek,
-          onPlayPause: _controlsState.playOrPause,
-          onSeekBack: widget.engine.skipBack,
-          onSeekForward: widget.engine.skipForward,
-          onToggleMute: _controlsState.toggleMute,
-          onSetVolume: _controlsState.setVolume,
-          onSetRate: _controlsState.setRate,
-        );
-        return Stack(
-          children: [
-            // 最底层:空状态页(空状态时显示,在 ControlBar 之下)。
-            if (widget.emptyState != null)
-              Positioned.fill(child: _buildEmptyState(emptyActive)),
-            // 手势区:单击/双击 — 仅覆盖 ControlBar 上方空白(不覆盖 ControlBar,
-            // 按钮可点)。emptyActive 时 IgnorePointer 让下方空状态页收点击。
-            Positioned.fill(
-              bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: gestureActive ? _handleTap : null,
-                child: IgnorePointer(
-                  ignoring: emptyActive,
-                  child: const SizedBox.expand(),
+    // 阶段2:Focus 包裹整个 controls — autofocus 让 controls 挂载即获焦,
+    // onKeyEvent 处理最小集(ESC/F/Space/方向键),其余冒泡窗口态 KeyboardHandler。
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: ListenableBuilder(
+        listenable: Listenable.merge([
+          widget.engine.state,
+          widget.currentFileName,
+        ]),
+        builder: (context, _) {
+          final isIdle = widget.engine.state.value == MediaState.idle;
+          // emptyStatePresent 等价判定:idle && !hasMedia(hasMedia 依赖 currentFileName)
+          final emptyActive =
+              widget.emptyState != null && isIdle && !widget.engine.hasMedia;
+          final fileName = widget.currentFileName.value;
+          final title = fileName.isEmpty ? null : fileName;
+          // idle + emptyState 时只对上方空白区域禁用手势,ControlBar 始终可交互
+          final gestureActive = !emptyActive;
+          // 路径B:vm 从 PlayerControlsState(player.stream)派生,非 engine。
+          // isPlaying/position/duration/volume/rate 走 stream;isMuted 复用 engine;
+          // 回调:onSeek/onPlayPause/onSetRate 直写 player(经 _controlsState),
+          // onSetVolume/onToggleMute 走 engine(保 _preMuteVolume),
+          // onSeekBack/onSeekForward 走 engine(语义糖,内部 seekTo→player.seek 一致)。
+          final vm = ControlBarViewModel(
+            isPlaying: _controlsState.isPlaying,
+            position: _controlsState.positionMs,
+            duration: _controlsState.durationMs,
+            volume: _controlsState.volume01,
+            isMuted: _controlsState.isMuted,
+            rate: _controlsState.rate,
+            isFullscreen: _isFullscreenNotifier,
+            onSeek: _controlsState.seek,
+            onPlayPause: _controlsState.playOrPause,
+            onSeekBack: widget.engine.skipBack,
+            onSeekForward: widget.engine.skipForward,
+            onToggleMute: _controlsState.toggleMute,
+            onSetVolume: _controlsState.setVolume,
+            onSetRate: _controlsState.setRate,
+          );
+          return Stack(
+            children: [
+              // 最底层:空状态页(空状态时显示,在 ControlBar 之下)。
+              if (widget.emptyState != null)
+                Positioned.fill(child: _buildEmptyState(emptyActive)),
+              // 手势区:单击/双击 — 仅覆盖 ControlBar 上方空白(不覆盖 ControlBar,
+              // 按钮可点)。emptyActive 时 IgnorePointer 让下方空状态页收点击。
+              Positioned.fill(
+                bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: gestureActive ? _handleTap : null,
+                  child: IgnorePointer(
+                    ignoring: emptyActive,
+                    child: const SizedBox.expand(),
+                  ),
                 ),
               ),
-            ),
-            // 下层控制栏区域 — OSD / ControlBar / ErrorBanner 各自独立 Positioned,
-            // 不再用单一 IgnorePointer 包裹整层(原方案在 visible=false 时连累
-            // ErrorBanner 不可点 —— P3 根因)。
-            RepaintBoundary(
-              child: Stack(
-                children: [
-                  // OSD — 独立,不受控制栏可见性影响
-                  Positioned(
-                    bottom:
-                        Tokens.controlBarMarginBottom +
-                        Tokens.controlBarHeight +
-                        12,
-                    left: Tokens.controlBarMarginH,
-                    right: Tokens.controlBarMarginH,
-                    child: OsdOverlay(resizing: widget.resizing),
-                  ),
-                  // ControlBar — visible=false 时 Visibility 从 hit-test 树移除,
-                  // 避免透明 ControlBar 抢点击;FadeTransition 仅驱动淡入/淡出动画。
-                  ValueListenableBuilder<bool>(
-                    valueListenable: _autoHide.visible,
-                    builder: (_, isVisible, _) => Positioned(
+              // 下层控制栏区域 — OSD / ControlBar / ErrorBanner 各自独立 Positioned,
+              // 不再用单一 IgnorePointer 包裹整层(原方案在 visible=false 时连累
+              // ErrorBanner 不可点 —— P3 根因)。
+              RepaintBoundary(
+                child: Stack(
+                  children: [
+                    // OSD — 独立,不受控制栏可见性影响
+                    Positioned(
+                      bottom:
+                          Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight +
+                          12,
                       left: Tokens.controlBarMarginH,
                       right: Tokens.controlBarMarginH,
-                      bottom: Tokens.controlBarMarginBottom,
-                      child: Visibility(
-                        visible: isVisible,
-                        maintainState: true,
-                        maintainAnimation: true,
-                        child: FadeTransition(
-                          opacity: _autoHide.opacity,
-                          child: ControlBar(
-                            vm: vm,
-                            actions: widget.actions,
-                            playlist: widget.playlist,
-                            playlistGeneration: widget.playlistGeneration,
-                            isIdle: isIdle,
-                            title: title,
-                            opacity: _resizeOpacity,
-                            enableBlur: isVisible,
-                            decoration: _animController,
-                            resizing: widget.resizing,
-                            // 全屏切换 — 传 _toggleFullscreen 而非 actions.onToggleFullscreen:
-                            // 需同时做 setMode 同步 + 本实例 state route 切换。
-                            onToggleFullscreen: _toggleFullscreen,
-                            // seek 钩子 — 拖动进度条期间冻结 auto-hide
-                            onSeekStart: _autoHide.onSeekStart,
-                            onSeekEnd: _autoHide.onSeekEnd,
-                            // 音量等非 seek 子控件复用同一交互会话,避免各自维护 Timer。
-                            onInteractionStart: _autoHide.onInteractionStart,
-                            onInteractionEnd: _autoHide.onInteractionEnd,
+                      child: OsdOverlay(resizing: widget.resizing),
+                    ),
+                    // ControlBar — visible=false 时 Visibility 从 hit-test 树移除,
+                    // 避免透明 ControlBar 抢点击;FadeTransition 仅驱动淡入/淡出动画。
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _autoHide.visible,
+                      builder: (_, isVisible, _) => Positioned(
+                        left: Tokens.controlBarMarginH,
+                        right: Tokens.controlBarMarginH,
+                        bottom: Tokens.controlBarMarginBottom,
+                        child: Visibility(
+                          visible: isVisible,
+                          maintainState: true,
+                          maintainAnimation: true,
+                          child: FadeTransition(
+                            opacity: _autoHide.opacity,
+                            child: ControlBar(
+                              vm: vm,
+                              actions: widget.actions,
+                              playlist: widget.playlist,
+                              playlistGeneration: widget.playlistGeneration,
+                              isIdle: isIdle,
+                              title: title,
+                              opacity: _resizeOpacity,
+                              enableBlur: isVisible,
+                              decoration: _animController,
+                              resizing: widget.resizing,
+                              // 全屏切换 — 传 _toggleFullscreen 而非 actions.onToggleFullscreen:
+                              // 需同时做 setMode 同步 + 本实例 state route 切换。
+                              onToggleFullscreen: _toggleFullscreen,
+                              // seek 钩子 — 拖动进度条期间冻结 auto-hide
+                              onSeekStart: _autoHide.onSeekStart,
+                              onSeekEnd: _autoHide.onSeekEnd,
+                              // 音量等非 seek 子控件复用同一交互会话,避免各自维护 Timer。
+                              onInteractionStart: _autoHide.onInteractionStart,
+                              onInteractionEnd: _autoHide.onInteractionEnd,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  // ErrorBanner — 独立可见且始终可点,不被控制栏可见性连累(P3 修复)
-                  Positioned(
-                    left: Tokens.controlBarMarginH + 16,
-                    right: Tokens.controlBarMarginH + 16,
-                    bottom:
-                        Tokens.controlBarMarginBottom + Tokens.controlBarHeight + 8,
-                    child: RepaintBoundary(
-                      child: ErrorBanner(
-                        engine: widget.engine,
-                        onOpenFile: widget.actions.onOpenFile,
-                        onRetry: widget.actions.onOpenFile,
+                    // ErrorBanner — 独立可见且始终可点,不被控制栏可见性连累(P3 修复)
+                    Positioned(
+                      left: Tokens.controlBarMarginH + 16,
+                      right: Tokens.controlBarMarginH + 16,
+                      bottom:
+                          Tokens.controlBarMarginBottom + Tokens.controlBarHeight + 8,
+                      child: RepaintBoundary(
+                        child: ErrorBanner(
+                          engine: widget.engine,
+                          onOpenFile: widget.actions.onOpenFile,
+                          onRetry: widget.actions.onOpenFile,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              // 顶层:整区 MouseRegion — opaque=false 不阻止 ControlBar 收 tap/hover,
+              // 但跟踪鼠标进出整个 Video。修复"鼠标从空白移到 ControlBar 触发 onExit
+              // → 3s 后控件消失":整区覆盖 ControlBar,移入不 onExit,_hovering 保持 true。
+              // onHover 仍仅底部 150px 唤起(保留用户"底部触发"意图);onEnter/onExit 整区。
+              //
+              // 阶段2:cursor 由本控件 _autoHide.visible 驱动(替代旧 PlayerScreen
+              // _controlsVisible 跨层) — 全屏 + 控件隐藏 → none(沉浸鼠标)。
+              Positioned.fill(
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _autoHide.visible,
+                  builder: (_, isVisible, _) => MouseRegion(
+                    opaque: false,
+                    hitTestBehavior: HitTestBehavior.translucent,
+                    // 全屏 + 控件隐藏 → 隐藏鼠标(沉浸);否则 defer(窗口态/控件可见)
+                    cursor: widget.state.isFullscreen() && !isVisible
+                        ? SystemMouseCursors.none
+                        : MouseCursor.defer,
+                    onHover: (event) {
+                      // D-03: 仅底部区域触发 — 鼠标在距底部 150px 内才唤起控制栏
+                      final size = context.size;
+                      if (size == null) return;
+                      final mouseFromBottom = size.height - event.localPosition.dy;
+                      if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
+                        _autoHide.onMouseMove();
+                      }
+                    },
+                    onEnter: (_) => _autoHide.onMouseEnter(),
+                    onExit: (_) => _autoHide.onMouseExit(),
+                    child: const SizedBox.expand(),
                   ),
-                ],
+                ),
               ),
-            ),
-            // 顶层:整区 MouseRegion — opaque=false 不阻止 ControlBar 收 tap/hover,
-            // 但跟踪鼠标进出整个 Video。修复"鼠标从空白移到 ControlBar 触发 onExit
-            // → 3s 后控件消失":整区覆盖 ControlBar,移入不 onExit,_hovering 保持 true。
-            // onHover 仍仅底部 150px 唤起(保留用户"底部触发"意图);onEnter/onExit 整区。
-            Positioned.fill(
-              child: MouseRegion(
-                opaque: false,
-                hitTestBehavior: HitTestBehavior.translucent,
-                onHover: (event) {
-                  // D-03: 仅底部区域触发 — 鼠标在距底部 150px 内才唤起控制栏
-                  final size = context.size;
-                  if (size == null) return;
-                  final mouseFromBottom = size.height - event.localPosition.dy;
-                  if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
-                    _autoHide.onMouseMove();
-                  }
-                },
-                onEnter: (_) => _autoHide.onMouseEnter(),
-                onExit: (_) => _autoHide.onMouseExit(),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 }

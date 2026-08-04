@@ -161,7 +161,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     _isFullscreenNotifier = ValueNotifier<bool>(widget.isFullscreen);
     _autoHide = AutoHideController(
       vsync: this,
-      engineState: widget.engine.state,
+      // 阶段2:AutoHide 改用 isPlaying(派生自 engine.state==playing)。
+      // AutoHide 内部 addListener 自动响应,_isPlayingNotifier 更新即触发。
+      isPlaying: _isPlayingNotifier,
       isFullscreen: widget.isFullscreen,
       popupCloseNotifier: _popupCloseNotifier,
     );
@@ -243,7 +245,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
         widget.engine.state.value == MediaState.playing;
     // resize 期间忽略 engine 状态变化，避免 controller 竞争（Pitfall 2）
     if (_isResizing) return;
-    _autoHide.onEngineStateChanged();
+    // 阶段2:删 _autoHide.onEngineStateChanged() — AutoHide 自动监听
+    // _isPlayingNotifier(上方 line 242-243 更新时触发 _onPlayingChanged)。
 
     // engine 状态变化驱动 decoration 切换：idle→reverse（淡出），playing→forward（淡入）
     final isIdle = widget.engine.state.value == MediaState.idle;

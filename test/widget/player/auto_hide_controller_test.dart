@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/ui/player/auto_hide_controller.dart';
 
 /// TestTickerProvider — provides a Ticker for AutoHideController in tests.
@@ -13,15 +12,19 @@ class _TestTickerProvider extends TickerProvider {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late _TestTickerProvider vsync;
-  late ValueNotifier<MediaState> engineState;
+  // 路径B阶段2:AutoHide 归约为 isPlaying bool(非 playing 永显,
+  // 仅 playing 自动隐藏)。false = idle/opening/paused/completed/error,
+  // true = playing。AutoHide 构造时 addListener,值变化自动触发
+  // _onPlayingChanged — 测试只需改 isPlaying.value,无需手动调用。
+  late ValueNotifier<bool> isPlaying;
 
   setUp(() {
     vsync = _TestTickerProvider();
-    engineState = ValueNotifier(MediaState.idle);
+    isPlaying = ValueNotifier(false); // 默认非 playing(idle 语义)
   });
 
   tearDown(() {
-    engineState.dispose();
+    isPlaying.dispose();
   });
 
   AutoHideController createController({
@@ -30,7 +33,7 @@ void main() {
   }) {
     final controller = AutoHideController(
       vsync: vsync,
-      engineState: engineState,
+      isPlaying: isPlaying,
       isFullscreen: isFullscreen,
       popupCloseNotifier: popupCloseNotifier,
     );
@@ -40,7 +43,7 @@ void main() {
 
   group('AutoHideController.init()', () {
     test('idle state shows permanently without timer', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = false;
       final c = createController();
       c.init();
 
@@ -48,7 +51,7 @@ void main() {
     });
 
     test('non-idle state starts auto-hide timer', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
@@ -77,8 +80,8 @@ void main() {
   });
 
   group('AutoHideController.hide()', () {
-    test('does not hide when engine is idle', () {
-      engineState.value = MediaState.idle;
+    test('does not hide when not playing', () {
+      isPlaying.value = false;
       final c = createController();
       c.init();
 
@@ -88,19 +91,20 @@ void main() {
     });
 
     test('does not hide when hovering', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.onMouseEnter();
 
       c.hide();
 
+      // hide() 启动 reverse 动画,但同步测试动画未完成,visible 仍 true
       expect(c.visible.value, isTrue);
     });
 
     test('increments popupCloseNotifier when hiding', () {
       final notifier = ValueNotifier<int>(0);
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController(popupCloseNotifier: notifier);
       c.init();
 
@@ -112,8 +116,8 @@ void main() {
   });
 
   group('AutoHideController.onMouseMove()', () {
-    test('no-op when engine is idle', () {
-      engineState.value = MediaState.idle;
+    test('no-op when not playing', () {
+      isPlaying.value = false;
       final c = createController();
       c.init();
       c.visible.value = false;
@@ -123,8 +127,8 @@ void main() {
       expect(c.visible.value, isFalse);
     });
 
-    test('shows and schedules hide when not idle', () {
-      engineState.value = MediaState.playing;
+    test('shows and schedules hide when playing', () {
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
@@ -137,7 +141,7 @@ void main() {
 
   group('AutoHideController.onMouseEnter()', () {
     test('sets hovering and shows', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
@@ -149,8 +153,8 @@ void main() {
   });
 
   group('AutoHideController.onMouseExit()', () {
-    test('clears hovering and schedules hide when not idle', () {
-      engineState.value = MediaState.playing;
+    test('clears hovering and schedules hide when playing', () {
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.onMouseEnter();
@@ -160,8 +164,8 @@ void main() {
       expect(c.isHovering, isFalse);
     });
 
-    test('does not schedule hide when idle', () {
-      engineState.value = MediaState.idle;
+    test('does not schedule hide when not playing', () {
+      isPlaying.value = false;
       final c = createController();
       c.init();
 
@@ -171,59 +175,55 @@ void main() {
     });
   });
 
-  group('AutoHideController.onEngineStateChanged()', () {
-    test('idle shows permanently and cancels timer', () {
-      engineState.value = MediaState.playing;
+  group('AutoHideController isPlaying transitions', () {
+    test('non-playing shows permanently and cancels timer', () {
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.idle;
-      c.onEngineStateChanged();
+      isPlaying.value = false; // true→false 触发 _onPlayingChanged → 永显
 
       expect(c.visible.value, isTrue);
     });
 
     test('playing shows and schedules hide', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = false;
       final c = createController();
       c.init();
 
-      engineState.value = MediaState.playing;
-      c.onEngineStateChanged();
+      isPlaying.value = true; // false→true 触发 show + scheduleHide
 
       expect(c.visible.value, isTrue);
     });
 
     test('paused shows without scheduling hide', () {
-      engineState.value = MediaState.idle;
+      // 归约:paused = 非 playing = false,永显不调度
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
-      engineState.value = MediaState.paused;
-      c.onEngineStateChanged();
+      isPlaying.value = false; // true→false 触发永显
 
       expect(c.visible.value, isTrue);
     });
 
     test('idle shows without scheduling hide', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
-      engineState.value = MediaState.idle;
-      c.onEngineStateChanged();
+      isPlaying.value = false;
 
       expect(c.visible.value, isTrue);
     });
 
     test('error shows without scheduling hide', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
-      engineState.value = MediaState.error;
-      c.onEngineStateChanged();
+      isPlaying.value = false;
 
       expect(c.visible.value, isTrue);
     });
@@ -231,7 +231,7 @@ void main() {
 
   group('AutoHideController.isFullscreen setter', () {
     test('changing isFullscreen triggers scheduleHide', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController(isFullscreen: false);
       c.init();
 
@@ -253,7 +253,7 @@ void main() {
 
   group('AutoHideController.scheduleHide()', () {
     test('cancels previous timer on repeated calls', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
@@ -268,7 +268,7 @@ void main() {
 
   group('AutoHideController.resizing', () {
     test('resizing=true cancels hide timer', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.scheduleHide();
@@ -280,7 +280,7 @@ void main() {
     });
 
     test('resizing=false schedules hide', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.resizing = true;
@@ -294,7 +294,7 @@ void main() {
 
   group('AutoHideController.onMouseMove() throttle', () {
     test('second call within throttle window is no-op', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
@@ -308,7 +308,7 @@ void main() {
 
   group('AutoHideController.onMouseMove() — resize freeze', () {
     test('onMouseMove is no-op when resizing=true', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.resizing = true;
@@ -321,7 +321,7 @@ void main() {
     });
 
     test('onMouseMove resumes after resizing=false', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.resizing = true;
@@ -337,11 +337,11 @@ void main() {
 
   group('AutoHideController — hover guard blocks scheduleHide', () {
     testWidgets('scheduleHide timer blocked by hovering guard', (tester) async {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       await tester.pumpWidget(
         MaterialApp(
           home: _TestAutoHideWrapper(
-            engineState: engineState,
+            isPlaying: isPlaying,
             isFullscreen: false,
           ),
         ),
@@ -367,7 +367,7 @@ void main() {
 
   group('AutoHideController.onMouseMove() — throttle boundary', () {
     test('onMouseMove passes after 100ms throttle window', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
 
@@ -382,7 +382,7 @@ void main() {
 
   group('AutoHideController — fullscreen hide delay', () {
     test('fullscreen hide delay is shorter than windowed', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final windowed = createController(isFullscreen: false);
       windowed.init();
       final fullscreen = createController(isFullscreen: true);
@@ -395,7 +395,7 @@ void main() {
 
   group('AutoHideController — animation dismissed', () {
     test('hide triggers reverse animation then sets visible false', () async {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.onMouseEnter(); // hovering = true
@@ -411,16 +411,15 @@ void main() {
 
   group('AutoHideController — scheduleHide timer fires hide', () {
     testWidgets('timer callback hides when not hovering', (tester) async {
-      // Use a widget test so AnimationController/Ticker works properly.
       // scheduleHide creates Timer(3s) in windowed mode (Tokens.hideDelayWindowed).
       // After pump(Duration(seconds: 4)), the timer fires and calls hide().
       // hide() reverses the animation (150ms). pumpAndSettle() completes it.
       // _onAnimStatus(dismissed) → visible = false.
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       await tester.pumpWidget(
         MaterialApp(
           home: _TestAutoHideWrapper(
-            engineState: engineState,
+            isPlaying: isPlaying,
             isFullscreen: false,
           ),
         ),
@@ -446,89 +445,84 @@ void main() {
     });
   });
 
-  group('AutoHideController.onEngineStateChanged() — hidden transitions', () {
+  group('AutoHideController isPlaying transitions — hidden', () {
     test('playing when hidden shows and schedules hide', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = false;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.playing;
-      c.onEngineStateChanged();
+      isPlaying.value = true; // false→true 触发 show + scheduleHide
 
       expect(c.visible.value, isTrue);
     });
 
-    test('opening when hidden shows without scheduling hide', () {
-      // opening 永显策略:show() + cancel timer(不 scheduleHide)
-      engineState.value = MediaState.idle;
+    test('non-playing when hidden shows without scheduling hide', () {
+      // 非 playing 永显策略:show() + cancel timer(不 scheduleHide)
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.opening;
-      c.onEngineStateChanged();
+      isPlaying.value = false; // true→false 触发永显
 
       expect(c.visible.value, isTrue);
     });
 
     test('paused when hidden shows and cancels timer', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.paused;
-      c.onEngineStateChanged();
+      isPlaying.value = false;
 
       expect(c.visible.value, isTrue);
     });
 
     test('idle when hidden shows and cancels timer', () {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.idle;
-      c.onEngineStateChanged();
+      isPlaying.value = false;
 
       expect(c.visible.value, isTrue);
     });
 
     test('completed when hidden shows and cancels timer', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.completed;
-      c.onEngineStateChanged();
+      isPlaying.value = false;
 
       expect(c.visible.value, isTrue);
     });
 
     test('error when hidden shows and cancels timer', () {
-      engineState.value = MediaState.idle;
+      isPlaying.value = true;
       final c = createController();
       c.init();
       c.visible.value = false;
 
-      engineState.value = MediaState.error;
-      c.onEngineStateChanged();
+      isPlaying.value = false;
 
       expect(c.visible.value, isTrue);
     });
   });
 
-  group('AutoHideController.onEngineStateChanged() — opening persistence', () {
-    testWidgets('opening keeps controls visible past hide delay', (
+  group('AutoHideController isPlaying transitions — 非 playing persistence', () {
+    testWidgets('non-playing keeps controls visible past hide delay', (
       tester,
     ) async {
-      // opening 永显:进入 opening 后 timer 被 cancel,pump 超过 hide delay 仍可见
-      engineState.value = MediaState.idle;
+      // 非 playing 永显:进入非 playing 后 timer 被 cancel,
+      // pump 超过 hide delay 仍可见
+      isPlaying.value = true;
       await tester.pumpWidget(
-        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+        MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
       );
       await tester.pump();
       final state = tester.state<_TestAutoHideWrapperState>(
@@ -537,10 +531,9 @@ void main() {
       final c = state.controller;
       c.visible.value = false;
 
-      engineState.value = MediaState.opening;
-      c.onEngineStateChanged();
+      isPlaying.value = false; // true→false 触发永显 + cancel timer
 
-      // pump 超过 hide delay(3s)— opening 永显,timer 被 cancel,不隐藏
+      // pump 超过 hide delay(3s)— 非 playing 永显,timer 被 cancel,不隐藏
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
 
@@ -552,9 +545,9 @@ void main() {
     testWidgets('keeps controls visible while a child interaction is active', (
       tester,
     ) async {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       await tester.pumpWidget(
-        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+        MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
       );
       await tester.pump();
       final state = tester.state<_TestAutoHideWrapperState>(
@@ -574,9 +567,9 @@ void main() {
     testWidgets('restarts auto-hide after the last child interaction ends', (
       tester,
     ) async {
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       await tester.pumpWidget(
-        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+        MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
       );
       await tester.pump();
       final state = tester.state<_TestAutoHideWrapperState>(
@@ -592,8 +585,8 @@ void main() {
       expect(controller.visible.value, isFalse);
     });
 
-    test('interaction methods are no-ops when idle', () {
-      engineState.value = MediaState.idle;
+    test('interaction methods are no-ops when not playing', () {
+      isPlaying.value = false;
       final controller = createController();
       controller.init();
       controller.visible.value = false;
@@ -607,10 +600,11 @@ void main() {
 
   group('AutoHideController.onSeekStart/onSeekEnd', () {
     testWidgets('onSeekStart shows and freezes hide timer', (tester) async {
-      // seek 拖动保护:onSeekStart 显示控件 + cancel timer,pump 超过 delay 仍可见
-      engineState.value = MediaState.playing;
+      // seek 拖动保护:onSeekStart 显示控件 + cancel timer,
+      // pump 超过 delay 仍可见
+      isPlaying.value = true;
       await tester.pumpWidget(
-        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+        MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
       );
       await tester.pump();
       final state = tester.state<_TestAutoHideWrapperState>(
@@ -635,9 +629,9 @@ void main() {
 
     testWidgets('onSeekEnd restarts hide timer', (tester) async {
       // onSeekEnd 重启计时:pump 超过 delay 后控件隐藏
-      engineState.value = MediaState.playing;
+      isPlaying.value = true;
       await tester.pumpWidget(
-        MaterialApp(home: _TestAutoHideWrapper(engineState: engineState)),
+        MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
       );
       await tester.pump();
       final state = tester.state<_TestAutoHideWrapperState>(
@@ -654,17 +648,17 @@ void main() {
       expect(c.visible.value, isFalse); // timer fires → hide
     });
 
-    test('onSeekStart/onSeekEnd are no-op when idle', () {
-      engineState.value = MediaState.idle;
+    test('onSeekStart/onSeekEnd are no-op when not playing', () {
+      isPlaying.value = false;
       final c = createController();
       c.init();
       c.visible.value = false;
 
       c.onSeekStart();
-      expect(c.visible.value, isFalse); // idle 跳过
+      expect(c.visible.value, isFalse); // 非 playing 跳过
 
       c.onSeekEnd();
-      expect(c.visible.value, isFalse); // idle 跳过
+      expect(c.visible.value, isFalse); // 非 playing 跳过
     });
   });
 }
@@ -672,10 +666,10 @@ void main() {
 /// Wrapper widget that provides a real TickerProvider for AutoHideController.
 /// Used in widget tests where AnimationController + pump() is needed.
 class _TestAutoHideWrapper extends StatefulWidget {
-  final ValueNotifier<MediaState> engineState;
+  final ValueNotifier<bool> isPlaying;
   final bool isFullscreen;
   const _TestAutoHideWrapper({
-    required this.engineState,
+    required this.isPlaying,
     this.isFullscreen = false,
   });
   @override
@@ -691,7 +685,7 @@ class _TestAutoHideWrapperState extends State<_TestAutoHideWrapper>
     super.initState();
     controller = AutoHideController(
       vsync: this,
-      engineState: widget.engineState,
+      isPlaying: widget.isPlaying,
       isFullscreen: widget.isFullscreen,
     );
     controller.init();
