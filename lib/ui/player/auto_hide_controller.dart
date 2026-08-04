@@ -114,7 +114,12 @@ class AutoHideController {
       return;
     }
     _hideTimer = Timer(_hideDelay, () {
-      if (!_hovering && _activeInteractionCount == 0) hide();
+      // 阶段3问题3修复:去掉 !_hovering 检查 — 对齐 media_kit 原生「静止 3s 隐藏」。
+      // MouseRegion 整区覆盖(含 ControlBar),鼠标在 Video 内 _hovering 恒 true,
+      // 原 !_hovering 检查致静止永不隐藏。整区 MouseRegion 下 onExit 不会误触
+      // (ControlsOverlay 时期该检查防的「移到 ControlBar 误 onExit」已不成立)。
+      // _activeInteractionCount 仍保护拖拽进度条/滑块交互期间不隐藏。
+      if (_activeInteractionCount == 0) hide();
     });
   }
 
