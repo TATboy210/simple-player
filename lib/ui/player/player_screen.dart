@@ -17,7 +17,7 @@ import '../dialogs/settings/settings_panel_controller.dart';
 import '../playlist/playlist_panel.dart';
 import '../theme/tokens.dart';
 import '../window/custom_title_bar.dart';
-import 'controls_overlay.dart';
+import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
@@ -439,7 +439,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 渲染时(含全屏 route)调用. isFullscreen 从 VideoState 现取,不陈旧
   /// (窗口态/全屏态是不同 Video 实例,各自 builder 拿到正确值).
   Widget _buildControls(VideoState state) {
-    return ControlsOverlay(
+    // 路径B:返回 playerVideoControls(直连 player.stream),非 ControlsOverlay.
+    // isFullscreen/videoState 不再显式传 — PlayerVideoControls 内部从 state
+    // 现取(每实例独立,修复"图标不动态"). 闭包捕获的其余稳定对象不变.
+    return playerVideoControls(
+      state,
       engine: widget.engine,
       actions: _actions,
       currentFileName: widget.controller.currentFileName,
@@ -447,10 +451,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       playlistGeneration: widget.playlistGeneration,
       openFileEnabled: _isOpenFileEnabled,
       emptyState: widget.emptyState,
-      isFullscreen: state.isFullscreen(),
-      // 传本实例 VideoState — _toggleFullscreen 用它做 route 切换(每实例自动
-      // enter/exit, 修复症状④). 窗口态/全屏态是不同 Video 实例, 各自传各自的 state.
-      videoState: state,
       resizing: widget.windowService.isResizing,
       visibleSink: _controlsVisible,
     );
