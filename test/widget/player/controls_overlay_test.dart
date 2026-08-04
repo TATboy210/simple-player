@@ -400,11 +400,12 @@ void main() {
     });
 
     testWidgets(
-      'mouse resting over ControlBar keeps controls visible (regression)',
+      'hides controls after delay even when resting over ControlBar (问题3: 静止3s隐藏)',
       (tester) async {
-        // 回归:整区 MouseRegion 覆盖 ControlBar — 鼠标停在 ControlBar 上不触发
-        // onExit,_hovering 保持 true,timer 到期不 hide。旧代码(MouseRegion 不覆盖
-        // ControlBar)会 onExit → 3s 后控件消失。
+        // 问题3修复:scheduleHide 去 !_hovering 检查 — 整区 MouseRegion 覆盖
+        // ControlBar,_hovering 恒 true,但 timer 到期仍 hide(对齐 media_kit 原生
+        // 「静止3s隐藏」)。旧测试(742cd41 前)期望「静止保持可见」是问题3错误
+        // 行为,已废弃。详见 auto_hide_controller_test hovering does not block hide。
         engine.state.value = MediaState.playing;
         final sink = ValueNotifier<bool>(true);
         await tester.pumpWidget(
@@ -437,11 +438,11 @@ void main() {
         await gesture.moveTo(controlBarPoint);
         await tester.pump();
 
-        // 停留超过 hide delay(3s)— _hovering=true,timer 不 hide
+        // 停留超过 hide delay(3s)— 问题3修复:timer 到期 hide(不再被 _hovering 阻止)
         await tester.pump(const Duration(seconds: 4));
         await tester.pumpAndSettle();
 
-        expect(sink.value, isTrue); // 控件仍可见
+        expect(sink.value, isFalse); // 问题3: 静止3s隐藏
         sink.dispose();
       },
     );
