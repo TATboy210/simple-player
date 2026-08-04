@@ -31,7 +31,7 @@ void main() {
     testWidgets('shows volume_off icon when muted', (tester) async {
       engine.isMuted.value = true;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -42,7 +42,7 @@ void main() {
       engine.volume.value = 0;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -53,7 +53,7 @@ void main() {
       engine.volume.value = 0.3;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -64,7 +64,7 @@ void main() {
       engine.volume.value = 0.8;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -75,7 +75,7 @@ void main() {
       engine.volume.value = 0.8;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -91,7 +91,7 @@ void main() {
       engine.volume.value = 0.0;
       engine.isMuted.value = true;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -110,7 +110,7 @@ void main() {
     testWidgets('slider reflects engine volume', (tester) async {
       engine.volume.value = 0.5;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -120,7 +120,7 @@ void main() {
 
     testWidgets('slider updates when engine volume changes', (tester) async {
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -134,7 +134,7 @@ void main() {
     testWidgets('dragging slider calls engine.setVolume', (tester) async {
       engine.volume.value = 0.5;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -168,7 +168,8 @@ void main() {
       await tester.pumpWidget(
         buildSubject(
           child: VolumeSlider(
-            engine: engine,
+            volume: engine.volume,
+            onSetVolume: engine.setVolume,
             onInteractionStart: () => started++,
             onInteractionEnd: () => ended++,
           ),
@@ -191,7 +192,7 @@ void main() {
     testWidgets('scroll wheel up increases volume', (tester) async {
       engine.volume.value = 0.5;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -213,7 +214,7 @@ void main() {
     testWidgets('scroll wheel down decreases volume', (tester) async {
       engine.volume.value = 0.5;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -237,7 +238,7 @@ void main() {
     testWidgets('scroll wheel up at max volume (1.0) clamps', (tester) async {
       engine.volume.value = 1.0;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -259,7 +260,7 @@ void main() {
     testWidgets('scroll wheel down at min volume (0.0) clamps', (tester) async {
       engine.volume.value = 0.0;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -283,7 +284,7 @@ void main() {
       engine.volume.value = 0.7;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -308,7 +309,7 @@ void main() {
       engine.volume.value = 0.5;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -327,7 +328,7 @@ void main() {
       engine.volume.value = 0.6;
       engine.isMuted.value = false;
       await tester.pumpWidget(
-        buildSubject(child: VolumeButton(engine: engine)),
+        buildSubject(child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 
@@ -350,7 +351,7 @@ void main() {
       // 验证 VolumeSlider 的 ValueListenableBuilder 响应 engine.volume 变更
       engine.volume.value = 0.3;
       await tester.pumpWidget(
-        buildSubject(child: VolumeSlider(engine: engine)),
+        buildSubject(child: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
       );
       await tester.pump();
 

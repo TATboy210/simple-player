@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -18,8 +17,18 @@ class _HoverState {
 /// 进度条 — 已播放/未播放两层圆角矩形。
 /// 支持：拖拽 seek（节流+阈值）、悬停展开动画、Tooltip 淡入淡出、
 /// 滚轮 seek、悬停 thumb 与禁用状态。
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [position]/[duration]
+/// ValueListenable + [onSeek] 回调,seek-hold 逻辑不变(只换 position 来源)。
 class ProgressBar extends StatefulWidget {
-  final MediaEngine engine;
+  /// 当前位置(ms)— seek-hold 监听它到达目标容差。
+  final ValueListenable<int> position;
+
+  /// 总时长(ms)— <=0 视为禁用态。
+  final ValueListenable<int> duration;
+
+  /// seek 回调(ms)— 拖拽/点击/瞬时 seek 统一出口。
+  final void Function(int ms) onSeek;
 
   /// Window resize signal — when true, skip internal bar rebuild to save CPU.
   final ValueListenable<bool>? resizing;
@@ -32,7 +41,9 @@ class ProgressBar extends StatefulWidget {
 
   const ProgressBar({
     super.key,
-    required this.engine,
+    required this.position,
+    required this.duration,
+    required this.onSeek,
     this.resizing,
     this.onSeekStart,
     this.onSeekEnd,
@@ -70,19 +81,17 @@ class _ProgressBarState extends State<ProgressBar>
   double get _hoverX => _hoverNotifier.value.x;
 
   double get _effectiveFraction {
-    final dur = widget.engine.duration.value;
+    final dur = widget.duration.value;
     if (dur <= 0) return 0;
     final drag = _dragNotifier.value;
     if (drag != null) return drag;
-    return (widget.engine.position.value / dur).clamp(0.0, 1.0);
+    return (widget.position.value / dur).clamp(0.0, 1.0);
   }
 
   int get _dragPositionMs =>
-      ((_dragNotifier.value ?? 0) * widget.engine.duration.value).round();
+      ((_dragNotifier.value ?? 0) * widget.duration.value).round();
 
-  bool get _disabled => widget.engine.duration.value <= 0;
-
-  MediaEngine get engine => widget.engine;
+  bool get _disabled => widget.duration.value <= 0;
 
   @override
   void initState() {
@@ -110,8 +119,8 @@ class _ProgressBarState extends State<ProgressBar>
 
   Listenable _buildBarListenable() {
     final listenables = <Listenable>[
-      engine.position,
-      engine.duration,
+      widget.position,
+      widget.duration,
       _dragNotifier,
       _hoverNotifier,
     ];
@@ -123,7 +132,8 @@ class _ProgressBarState extends State<ProgressBar>
   @override
   void didUpdateWidget(ProgressBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.engine != widget.engine ||
+    if (oldWidget.position != widget.position ||
+        oldWidget.duration != widget.duration ||
         oldWidget.resizing != widget.resizing) {
       _barListenable = _buildBarListenable();
     }
@@ -152,7 +162,7 @@ class _ProgressBarState extends State<ProgressBar>
     }
   }
 
-  /// 修 C (事件驱动 v2): dragEnd 后启动 seek hold — 监听 [engine.position]
+  /// 修 C (事件驱动 v2): dragEnd 后启动 seek hold — 监听 [widget.position]
   /// 到达 [targetMs] 容差内才清 [_dragNotifier], 遮住旧 stream 回拨防回跳.
   /// 加超时兜底: seek 失败/极慢时强制清, 避免进度条永久卡在 drag 位置.
   void _beginSeekHold(int targetMs) {
@@ -160,7 +170,7 @@ class _ProgressBarState extends State<ProgressBar>
     _seekTargetMs = targetMs;
     _seekHoldListener = () {
       if (!mounted || _seekTargetMs == null) return;
-      final pos = widget.engine.position.value;
+      final pos = widget.position.value;
       if ((pos - _seekTargetMs!).abs() <=
           Tokens.progressSeekArriveToleranceMs) {
         _finishSeekHold();
@@ -173,7 +183,7 @@ class _ProgressBarState extends State<ProgressBar>
       const Duration(milliseconds: Tokens.progressSeekHoldTimeoutMs),
       _finishSeekHold,
     );
-    widget.engine.position.addListener(_seekHoldListener!);
+    widget.position.addListener(_seekHoldListener!);
     // 立即检查一次: FakeEngine/同步 seek 可能已让 position 到达目标,
     // addListener 只对未来变化触发, 不立即检查会卡到超时 (测试/同步路径).
     _seekHoldListener!.call();
@@ -186,7 +196,7 @@ class _ProgressBarState extends State<ProgressBar>
     _seekHoldTimer = null;
     final listener = _seekHoldListener;
     if (listener != null) {
-      widget.engine.position.removeListener(listener);
+      widget.position.removeListener(listener);
       _seekHoldListener = null;
     }
     _seekTargetMs = null;
@@ -240,7 +250,7 @@ class _ProgressBarState extends State<ProgressBar>
               // 修 A: 回调始终非 null,体内判断 duration — 避免 _disabled 顶层 build 快照陈旧
               // (duration stream 到达后只触发子 AnimatedBuilder,不触发顶层 build,致回调永久 null)
               onHorizontalDragStart: (details) {
-                if (widget.engine.duration.value <= 0) return;
+                if (widget.duration.value <= 0) return;
                 // 新 drag 开始 — 取消上次 dragEnd 未完成的 seek hold,
                 // 防旧 listener 在新 drag 期间触发 _finishSeekHold 清掉新 drag 状态.
                 _cancelSeekHoldListeners();
@@ -250,7 +260,7 @@ class _ProgressBarState extends State<ProgressBar>
                 _updateTooltipVisibility();
               },
               onHorizontalDragUpdate: (details) {
-                if (widget.engine.duration.value <= 0) return;
+                if (widget.duration.value <= 0) return;
                 final dx = details.localPosition.dx;
                 // 拖拽阈值：防止误触
                 if (_dragNotifier.value == null) {
@@ -265,7 +275,7 @@ class _ProgressBarState extends State<ProgressBar>
                 // 修 B: leading throttle — timer 未活跃才 seek+启动,活跃期跳过
                 // (原 cancel+重建 debounce 致拖动中永不 seek,松手才跳)
                 if (!(_seekThrottle?.isActive ?? false)) {
-                  widget.engine.seekTo(_dragPositionMs);
+                  widget.onSeek(_dragPositionMs);
                   _seekThrottle = Timer(
                     const Duration(milliseconds: Tokens.progressSeekThrottleMs),
                     () {},
@@ -277,16 +287,16 @@ class _ProgressBarState extends State<ProgressBar>
                 _seekThrottle?.cancel();
                 // 配对 onSeekStart — 重启隐藏计时(即使未真正拖动也保持 start/end 配对,
                 // 避免 onSeekStart cancel 了 timer 却无 onSeekEnd 重启导致控件永显)
-                if (widget.engine.duration.value > 0) {
+                if (widget.duration.value > 0) {
                   widget.onSeekEnd?.call();
                 }
                 if (_dragNotifier.value == null) return;
-                if (widget.engine.duration.value <= 0) {
+                if (widget.duration.value <= 0) {
                   _dragNotifier.value = null;
                   _updateTooltipVisibility();
                   return;
                 }
-                widget.engine.seekTo(_dragPositionMs);
+                widget.onSeek(_dragPositionMs);
                 // 修 C (事件驱动 v2): 不立即清 drag — 监听 position 到达目标容差内
                 // 才清, 遮住旧 stream 回拨防回跳. 比 v1 固定 300ms 更贴近原生内部
                 // 协调, 网络流/慢 seek 下不回跳. 超时兜底防 seek 失败永久卡住.
@@ -296,7 +306,7 @@ class _ProgressBarState extends State<ProgressBar>
                 _updateTooltipVisibility();
               },
               onTapDown: (details) {
-                if (widget.engine.duration.value <= 0) return;
+                if (widget.duration.value <= 0) return;
                 // 瞬时 seek — 配对 start+end(等同 show + scheduleHide:
                 // 闪现控件,3s 后隐藏)
                 widget.onSeekStart?.call();
@@ -304,8 +314,8 @@ class _ProgressBarState extends State<ProgressBar>
                   0.0,
                   1.0,
                 );
-                final ms = (fraction * widget.engine.duration.value).round();
-                widget.engine.seekTo(ms);
+                final ms = (fraction * widget.duration.value).round();
+                widget.onSeek(ms);
                 widget.onSeekEnd?.call();
               },
               child: SizedBox(
@@ -337,7 +347,7 @@ class _ProgressBarState extends State<ProgressBar>
                           return _buildTooltip(
                             fraction: fraction,
                             text: formatMs(
-                              (fraction * engine.duration.value).round(),
+                              (fraction * widget.duration.value).round(),
                             ),
                           );
                         },

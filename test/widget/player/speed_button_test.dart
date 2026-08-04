@@ -24,7 +24,7 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SpeedButton(engine: engine),
+          body: SpeedButton(rate: engine.playbackSpeed, onSetRate: engine.setPlaybackRate),
         ),
       );
     }

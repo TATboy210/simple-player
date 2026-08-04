@@ -65,9 +65,27 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
 
+  /// 派生 isPlaying(监听 state==playing) — 路径B Commit1:
+  /// CenterGroup/PlayPauseButton 新签名需 `ValueListenable<bool>` isPlaying,
+  /// FakeEngine 原无此字段,加派生 notifier 供测试构造(同 controls_overlay 模式).
+  /// late final + 构造函数 eager 初始化:避免 dispose 时未初始化访问崩溃.
+  late final ValueNotifier<bool> isPlayingNotifier;
+
   /// 是否正在 seek — 委托给 stateMachine
   @override
   ValueNotifier<bool> get isSeeking => stateMachine.isSeeking;
+
+  /// 路径B Commit1:构造函数 eager 初始化 isPlayingNotifier + 监听 state.
+  /// 访问 state 触发 stateMachine 惰性初始化(与 open/stop 等方法一致).
+  FakeEngine() {
+    isPlayingNotifier = ValueNotifier<bool>(state.value == MediaState.playing);
+    state.addListener(_onStateChanged);
+  }
+
+  /// state 变化时同步派生 isPlayingNotifier(playing→true,其他→false).
+  void _onStateChanged() {
+    isPlayingNotifier.value = state.value == MediaState.playing;
+  }
 
   // ─── Internal state ───
 
@@ -438,6 +456,11 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   void dispose() {
     if (_disposed) return; // Phase 20 D8: double-dispose safety
     _disposed = true;
+    // isPlayingNotifier 监听 state(stateMachine.state)— 必须在
+    // stateMachine.dispose()(释放 state)之前 removeListener + dispose,
+    // 否则访问已释放的 state 抛 StateError.
+    state.removeListener(_onStateChanged);
+    isPlayingNotifier.dispose();
     stateMachine.dispose();
     textureId.dispose();
     position.dispose();

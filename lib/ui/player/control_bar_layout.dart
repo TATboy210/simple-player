@@ -1,20 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
 import 'control_bar_actions.dart';
 import 'control_bar_timeline.dart';
 import 'control_bar_title.dart';
+import 'control_bar_view_model.dart';
 import 'player_actions.dart';
 
 /// 控制栏的三行内容布局。
 ///
 /// 将标题、时间导航和动作区的布局从视觉外壳中分离，使装饰或模糊效果变化时
 /// 不会混入业务控件的组合职责。
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [ControlBarViewModel]。
 class ControlBarLayout extends StatelessWidget {
-  final MediaEngine engine;
+  final ControlBarViewModel vm;
   final PlayerActions actions;
   final Playlist playlist;
   final ValueListenable<int> playlistGeneration;
@@ -31,7 +33,7 @@ class ControlBarLayout extends StatelessWidget {
 
   const ControlBarLayout({
     super.key,
-    required this.engine,
+    required this.vm,
     required this.actions,
     required this.playlist,
     required this.playlistGeneration,
@@ -73,7 +75,7 @@ class ControlBarLayout extends StatelessWidget {
             Expanded(child: ControlBarTitle(title: title)),
             Expanded(
               child: ControlBarTimeline(
-                engine: engine,
+                vm: vm,
                 resizing: resizing,
                 onSeekStart: onSeekStart,
                 onSeekEnd: onSeekEnd,
@@ -81,7 +83,7 @@ class ControlBarLayout extends StatelessWidget {
             ),
             Expanded(
               child: ControlBarActions(
-                engine: engine,
+                vm: vm,
                 actions: actions,
                 playlist: playlist,
                 playlistGeneration: playlistGeneration,

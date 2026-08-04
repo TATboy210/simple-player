@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
+import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
@@ -25,24 +26,46 @@ void main() {
   // 渐进路径:ControlBar 需 playlistGeneration(required) —
   // playMode 下沉到 LeftButtonGroup 内部读 playlist.mode,generation 驱动重建。
   late ValueNotifier<int> playlistGeneration;
+  // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
+  late ValueNotifier<bool> isFullscreen;
 
   setUp(() {
     engine = FakeEngine();
     playlist = Playlist();
     playlistGeneration = ValueNotifier<int>(0);
+    isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
     engine.dispose();
     playlistGeneration.dispose();
+    isFullscreen.dispose();
   });
+
+  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
+        isPlaying: e.isPlayingNotifier,
+        position: e.position,
+        duration: e.duration,
+        volume: e.volume,
+        isMuted: e.isMuted,
+        rate: e.playbackSpeed,
+        isFullscreen: isFullscreen,
+        onSeek: e.seekTo,
+        onPlayPause: e.togglePlayPause,
+        onSeekBack: e.skipBack,
+        onSeekForward: e.skipForward,
+        onToggleMute: () => e.setMute(!e.isMuted.value),
+        onSetVolume: e.setVolume,
+        onSetRate: e.setPlaybackRate,
+      );
 
   group('ControlBar button groups', () {
     testWidgets('wide layout shows all three groups', (tester) async {
       await tester.pumpWidget(
         _wrapWithApp(
           ControlBar(
-            engine: engine,
+            vm: buildVm(engine),
             actions: const PlayerActions(),
             playlist: playlist,
             playlistGeneration: playlistGeneration,

@@ -6,15 +6,18 @@ class TimePair {
   final int a, b;
 }
 
-/// 合并两个 `ValueNotifier<int>` 为一个 `ValueNotifier<TimePair>`
+/// 合并两个 `ValueListenable<int>` 为一个 `ValueNotifier<TimePair>`
+///
+/// 输入只需 ValueListenable(读 value + listen) — 路径B Commit1 修正:
+/// 原 ValueNotifier 约束过严,vm 字段用 ValueListenable 抽象后暴露此 ISP 缺陷。
 class MergedListenable extends ValueNotifier<TimePair> {
   MergedListenable(this._a, this._b) : super(TimePair(_a.value, _b.value)) {
     _a.addListener(_sync);
     _b.addListener(_sync);
   }
 
-  final ValueNotifier<int> _a;
-  final ValueNotifier<int> _b;
+  final ValueListenable<int> _a;
+  final ValueListenable<int> _b;
 
   void _sync() => value = TimePair(_a.value, _b.value);
 

@@ -10,6 +10,7 @@ import '../theme/tokens.dart';
 import '../shared/osd_overlay.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
+import 'control_bar_view_model.dart';
 import 'error_banner.dart';
 import 'player_actions.dart';
 
@@ -110,6 +111,13 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   final _popupCloseNotifier = ValueNotifier<int>(0);
   Timer? _clickTimer;
 
+  /// 派生 isPlaying(`ValueNotifier<bool>`) — 从 engine.state==playing 计算,
+  /// 供 ControlBarViewModel 驱动播放/暂停图标(路径B Commit1:数据源仍 engine)。
+  late final ValueNotifier<bool> _isPlayingNotifier;
+
+  /// 派生 isFullscreen — 同步 widget.isFullscreen,供全屏按钮图标动态切换。
+  late final ValueNotifier<bool> _isFullscreenNotifier;
+
   /// 共享 AnimationController — 驱动 resize 淡出/淡入和 decoration 状态切换
   /// 150ms，初始 value=1.0（不 resize 时完全可见）
   late final AnimationController _animController;
@@ -147,6 +155,10 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   @override
   void initState() {
     super.initState();
+    _isPlayingNotifier = ValueNotifier<bool>(
+      widget.engine.state.value == MediaState.playing,
+    );
+    _isFullscreenNotifier = ValueNotifier<bool>(widget.isFullscreen);
     _autoHide = AutoHideController(
       vsync: this,
       engineState: widget.engine.state,
@@ -226,6 +238,9 @@ class _ControlsOverlayState extends State<ControlsOverlay>
   }
 
   void _onEngineStateChanged() {
+    // isPlaying 派生更新(无竞争风险,resize 期间也更新 — playing 图标必须即时)
+    _isPlayingNotifier.value =
+        widget.engine.state.value == MediaState.playing;
     // resize 期间忽略 engine 状态变化，避免 controller 竞争（Pitfall 2）
     if (_isResizing) return;
     _autoHide.onEngineStateChanged();
@@ -244,6 +259,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isFullscreen != widget.isFullscreen) {
       _autoHide.isFullscreen = widget.isFullscreen;
+      // 同步派生 isFullscreen → 全屏按钮图标切换
+      _isFullscreenNotifier.value = widget.isFullscreen;
       // T3: 标记全屏切换过渡 — 下次 isResizing=true 时跳过 reverse()
       _isFullscreenTransition = true;
     }
@@ -266,6 +283,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
     _autoHide.visible.removeListener(_syncVisible);
     _clickTimer?.cancel();
     _popupCloseNotifier.dispose();
+    _isPlayingNotifier.dispose();
+    _isFullscreenNotifier.dispose();
     _animController.dispose();
     _autoHide.dispose();
     super.dispose();
@@ -302,6 +321,25 @@ class _ControlsOverlayState extends State<ControlsOverlay>
         final title = fileName.isEmpty ? null : fileName;
         // idle + emptyState 时只对上方空白区域禁用手势，ControlBar 始终可交互
         final gestureActive = !emptyActive;
+        // 路径B Commit1:从 engine 派生 ControlBarViewModel(数据源仍 engine,
+        // 行为不变). Commit2 将切到 PlayerControlsState(player.stream).
+        final vm = ControlBarViewModel(
+          isPlaying: _isPlayingNotifier,
+          position: widget.engine.position,
+          duration: widget.engine.duration,
+          volume: widget.engine.volume,
+          isMuted: widget.engine.isMuted,
+          rate: widget.engine.playbackSpeed,
+          isFullscreen: _isFullscreenNotifier,
+          onSeek: widget.engine.seekTo,
+          onPlayPause: widget.engine.togglePlayPause,
+          onSeekBack: widget.engine.skipBack,
+          onSeekForward: widget.engine.skipForward,
+          onToggleMute: () =>
+              widget.engine.setMute(!widget.engine.isMuted.value),
+          onSetVolume: widget.engine.setVolume,
+          onSetRate: widget.engine.setPlaybackRate,
+        );
         return Stack(
           children: [
             // 最底层:空状态页(空状态时显示,在 ControlBar 之下).
@@ -353,7 +391,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
                         child: FadeTransition(
                           opacity: _autoHide.opacity,
                           child: ControlBar(
-                            engine: widget.engine,
+                            vm: vm,
                             actions: widget.actions,
                             playlist: widget.playlist,
                             playlistGeneration: widget.playlistGeneration,

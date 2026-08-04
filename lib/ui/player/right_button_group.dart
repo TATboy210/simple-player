@@ -4,6 +4,7 @@
 /// 包含打开文件、打开字幕、播放列表、设置、全屏切换五个功能按钮。
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -11,6 +12,9 @@ import '../shared/glass_widgets.dart';
 import 'player_actions.dart';
 
 /// 右侧按钮组：文件、字幕、播放列表、设置
+///
+/// 路径B Commit1:加 [isFullscreen] ValueListenable 驱动全屏按钮图标
+/// (fullscreen ↔ fullscreen_exit),原恒定 Icons.fullscreen 改为动态。
 class RightButtonGroup extends StatelessWidget {
   final PlayerActions actions;
 
@@ -20,10 +24,15 @@ class RightButtonGroup extends StatelessWidget {
   /// route 切换); 若未传则回退 actions.onToggleFullscreen(仅 setMode, 兼容旧调用).
   final VoidCallback? onToggleFullscreen;
 
+  /// 全屏状态 — 驱动全屏按钮图标(enter ↔ exit)。
+  /// null 时 fallback 恒定 enter 图标(兼容未接入场景,生产路径总传非 null)。
+  final ValueListenable<bool>? isFullscreen;
+
   const RightButtonGroup({
     super.key,
     required this.actions,
     this.onToggleFullscreen,
+    this.isFullscreen,
   });
 
   @override
@@ -32,6 +41,8 @@ class RightButtonGroup extends StatelessWidget {
     // 全屏按钮 — 优先显式 onToggleFullscreen(ControlsOverlay._toggleFullscreen,
     // 同时 setMode 同步 + 本实例 videoState route 切换); 回退 actions.onToggleFullscreen.
     final fullscreenCb = onToggleFullscreen ?? actions.onToggleFullscreen;
+    // 局部变量促 flow promotion(避免 isFullscreen! bang)。
+    final fsListenable = isFullscreen;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -63,11 +74,22 @@ class RightButtonGroup extends StatelessWidget {
             tooltip: l10n.settings,
           ),
         if (fullscreenCb != null)
-          GlassButton.iconOnly(
-            icon: Icons.fullscreen,
-            onPressed: fullscreenCb,
-            tooltip: l10n.shortcutFullscreen,
-          ),
+          // isFullscreen 驱动图标:全屏时 exit 图标,非全屏时 enter 图标.
+          // null 时 fallback 恒定 enter 图标(兼容未接入场景).
+          fsListenable != null
+              ? ValueListenableBuilder<bool>(
+                  valueListenable: fsListenable,
+                  builder: (_, fs, _) => GlassButton.iconOnly(
+                    icon: fs ? Icons.fullscreen_exit : Icons.fullscreen,
+                    onPressed: fullscreenCb,
+                    tooltip: l10n.shortcutFullscreen,
+                  ),
+                )
+              : GlassButton.iconOnly(
+                  icon: Icons.fullscreen,
+                  onPressed: fullscreenCb,
+                  tooltip: l10n.shortcutFullscreen,
+                ),
       ],
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../theme/tokens.dart';
 import '../shared/control_bar_decoration.dart';
@@ -9,6 +8,7 @@ import '../shared/edge_glow.dart';
 import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
 import 'control_bar_layout.dart';
+import 'control_bar_view_model.dart';
 import 'player_actions.dart';
 
 class ControlBar extends StatelessWidget {
@@ -30,7 +30,8 @@ class ControlBar extends StatelessWidget {
     end: _decorationPlaying,
   );
 
-  final MediaEngine engine;
+  /// 控制栏数据视图模型 — 路径B Commit1:从 engine 解耦的数据源 + 回调。
+  final ControlBarViewModel vm;
   final PlayerActions actions;
   final Playlist playlist;
   final ValueListenable<int> playlistGeneration;
@@ -64,7 +65,7 @@ class ControlBar extends StatelessWidget {
 
   const ControlBar({
     super.key,
-    required this.engine,
+    required this.vm,
     this.actions = const PlayerActions(),
     required this.playlist,
     required this.playlistGeneration,
@@ -102,7 +103,7 @@ class ControlBar extends StatelessWidget {
             bottom: Tokens.controlBarContentBottomPadding,
           ),
           child: ControlBarLayout(
-            engine: engine,
+            vm: vm,
             actions: actions,
             playlist: playlist,
             playlistGeneration: playlistGeneration,

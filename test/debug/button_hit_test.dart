@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
+import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import '../helpers/fake_engine.dart';
@@ -22,6 +23,9 @@ void main() {
   late ValueNotifier<int> playlistGeneration;
   late ValueNotifier<String> currentFileName;
   late ValueNotifier<bool> openFileEnabled;
+  // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
+  // isFullscreen 共享 notifier(hit 测试不需全屏交互),setUp/tearDown 管理生命周期.
+  late ValueNotifier<bool> isFullscreen;
 
   setUp(() {
     // 匹配生产环境:app 启动时调 KernelLoggerImpl.init()。测试中 transitionTo
@@ -35,6 +39,7 @@ void main() {
     playlistGeneration = ValueNotifier<int>(0);
     currentFileName = ValueNotifier<String>('');
     openFileEnabled = ValueNotifier<bool>(true);
+    isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
@@ -42,7 +47,26 @@ void main() {
     playlistGeneration.dispose();
     currentFileName.dispose();
     openFileEnabled.dispose();
+    isFullscreen.dispose();
   });
+
+  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
+        isPlaying: e.isPlayingNotifier,
+        position: e.position,
+        duration: e.duration,
+        volume: e.volume,
+        isMuted: e.isMuted,
+        rate: e.playbackSpeed,
+        isFullscreen: isFullscreen,
+        onSeek: e.seekTo,
+        onPlayPause: e.togglePlayPause,
+        onSeekBack: e.skipBack,
+        onSeekForward: e.skipForward,
+        onToggleMute: () => e.setMute(!e.isMuted.value),
+        onSetVolume: e.setVolume,
+        onSetRate: e.setPlaybackRate,
+      );
 
   Widget buildFullOverlay({PlayerActions? actions}) {
     return MaterialApp(
@@ -76,13 +100,20 @@ void main() {
           width: 800,
           height: 200,
           child: ControlBar(
-            engine: engine,
+            vm: buildVm(engine),
             playlist: playlist,
             playlistGeneration: playlistGeneration,
             isIdle: isIdle,
+            // onStop 显式传 engine.stop — 新签名 CenterGroup 移除 engine.stop
+            // fallback(actions.onStop null 时禁用)。显式传保 stop 按钮可点,
+            // 等价旧签名 fallback 行为(idle 态 stop 路由到 engine).
             actions:
                 actions ??
-                const PlayerActions(onPrevious: _noop, onNext: _noop),
+                PlayerActions(
+                  onPrevious: _noop,
+                  onNext: _noop,
+                  onStop: engine.stop,
+                ),
           ),
         ),
       ),

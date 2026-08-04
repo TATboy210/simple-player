@@ -1,18 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme/tokens.dart';
 import 'center_controls.dart';
+import 'control_bar_view_model.dart';
 import 'left_button_group.dart';
 import 'player_actions.dart';
 import 'right_button_group.dart';
 
 /// 控制栏动作行：左侧设置、中部播放和右侧文件动作各自保持既有可访问性契约。
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [ControlBarViewModel]。
 class ControlBarActions extends StatelessWidget {
-  final MediaEngine engine;
+  final ControlBarViewModel vm;
   final PlayerActions actions;
   final Playlist playlist;
   final ValueListenable<int> playlistGeneration;
@@ -25,7 +27,7 @@ class ControlBarActions extends StatelessWidget {
 
   const ControlBarActions({
     super.key,
-    required this.engine,
+    required this.vm,
     required this.actions,
     required this.playlist,
     required this.playlistGeneration,
@@ -45,7 +47,12 @@ class ControlBarActions extends StatelessWidget {
       child: Row(
         children: [
           LeftButtonGroup(
-            engine: engine,
+            volume: vm.volume,
+            isMuted: vm.isMuted,
+            rate: vm.rate,
+            onToggleMute: vm.onToggleMute,
+            onSetVolume: vm.onSetVolume,
+            onSetRate: vm.onSetRate,
             playlist: playlist,
             playlistGeneration: playlistGeneration,
             onTogglePlayMode: actions.onTogglePlayMode,
@@ -54,7 +61,10 @@ class ControlBarActions extends StatelessWidget {
           ),
           const Spacer(),
           CenterGroup(
-            engine: engine,
+            isPlaying: vm.isPlaying,
+            onPlayPause: vm.onPlayPause,
+            onSeekBack: vm.onSeekBack,
+            onSeekForward: vm.onSeekForward,
             isIdle: isIdle,
             prevTooltip: l10n.previousTrack,
             nextTooltip: l10n.nextTrack,
@@ -66,6 +76,7 @@ class ControlBarActions extends StatelessWidget {
           RightButtonGroup(
             actions: actions,
             onToggleFullscreen: onToggleFullscreen,
+            isFullscreen: vm.isFullscreen,
           ),
         ],
       ),
