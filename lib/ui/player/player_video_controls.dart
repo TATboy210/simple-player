@@ -299,6 +299,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 全屏切换过渡标记 — 跳过 isResizing 触发的控制栏淡出,避免全屏切换闪烁消失。
   bool _isFullscreenTransition = false;
 
+  /// 阶段3 bug1:deactivate 标记 — 挡 LayoutBuilder 在 inactive element 上触发
+  /// 的 didUpdateWidget/build 查 isFullscreen(查 ancestor 会断言)。
+  /// deactivate() 即置 true(element 仍 mounted 但 inactive,State.mounted 无效)。
+  bool _isDeactivating = false;
+
   /// 对齐 media_kit 原生 onTapUp 400ms 双击窗口(同 [ControlsOverlay._clickDelayMs])。
   /// 本类自带副本 — _clickDelayMs 在 ControlsOverlay 是 private,跨文件不可访问;
   /// 阶段3 删 ControlsOverlay 后此常量成为唯一来源。
@@ -480,13 +485,37 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   @override
   void didUpdateWidget(covariant PlayerVideoControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // VideoState 每次 builder 调用可能新实例 — 现取 isFullscreen 同步图标 + AutoHide。
-    // 全屏态切换时 _isFullscreenNotifier 变化驱动 RightButtonGroup fullscreen_exit 图标。
-    final fs = widget.state.isFullscreen();
-    if (_isFullscreenNotifier.value != fs) {
-      _isFullscreenNotifier.value = fs;
-      _autoHide.isFullscreen = fs;
-      _isFullscreenTransition = true; // 标记过渡,下次 isResizing=true 跳过 reverse()
+    // 阶段3 bug1 真正根因(实机 stack trace #6 line 502 定位,前三次修复无效):
+    // 退出全屏 route pop(Duration.zero) 过程中,全屏 VideoState 的 element 进入
+    // inactive lifecycle(deactivate 已调,dispose 未调)。全屏 Video 内部的
+    // LayoutBuilder 在 pop 时序的 layout 阶段触发 _rebuildWithConstraints
+    // (layout 阶段不检查子 element active 状态),rebuild 传播到本控件
+    // didUpdateWidget,此时 widget.state.isFullscreen() → VideoState.isFullscreen
+    // → FullscreenInheritedWidget.maybeOf → dependOnInheritedWidgetOfExactType
+    // 在 inactive element 上查 ancestor → framework.dart:5082 断言。
+    //
+    // 为什么前三次修复无效(关键教训):
+    // ①0ff3859 deactivate() 移除 listener — 挡不住本崩点。didUpdateWidget 由
+    //   LayoutBuilder rebuild 触发(非 notifier listener),deactivate 移除的
+    //   engine.state/resizing/_autoHide.visible listener 与此路径无关。
+    // ②mounted guard 无效 — State.mounted = (_element != null),_element 只在
+    //   unmount() 置 null,deactivate 不动 → deactivate 后 mounted 仍 true →
+    //   guard 通过 → 崩。mounted 与 active 不同步。
+    // ③Element.active — 非 public getter(dart analyze undefined),不可用。
+    //
+    // 真正修复:_isDeactivating flag。deactivate() 即置 true(stack trace 证明
+    // didUpdateWidget 在 deactivate 之后触发,此时 element inactive),didUpdateWidget
+    // /build 检查 flag 跳过 isFullscreen 查询。本控件不 reparent,无需 activate 重置。
+    // resizing 监听迁移不跳过(漏移除 oldWidget.resizing 会泄漏)。
+    if (!_isDeactivating) {
+      // VideoState 每次 builder 调用可能新实例 — 现取 isFullscreen 同步图标 + AutoHide。
+      // 全屏态切换时 _isFullscreenNotifier 变化驱动 RightButtonGroup fullscreen_exit 图标。
+      final fs = widget.state.isFullscreen();
+      if (_isFullscreenNotifier.value != fs) {
+        _isFullscreenNotifier.value = fs;
+        _autoHide.isFullscreen = fs;
+        _isFullscreenTransition = true; // 标记过渡,下次 isResizing=true 跳过 reverse()
+      }
     }
     // resizing 监听迁移 — 旧值移除,新值添加(CB-06: 同步当前值)
     if (oldWidget.resizing != widget.resizing) {
@@ -498,6 +527,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
   @override
   void deactivate() {
+    _isDeactivating = true; // 阶段3 bug1:标记 inactive,挡后续 didUpdateWidget/build 查 ancestor
     // 阶段3:deactivate 即断开外部 listener — 退出全屏 route pop(Duration.zero)
     // 后全屏 VideoState 即将 deactivate,但 _autoHide 的 _hideTimer/_animController
     // 在 deactivate→dispose 之间仍可能触发 visible 变化(playing 态 Timer / stream
@@ -686,7 +716,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                     opaque: false,
                     hitTestBehavior: HitTestBehavior.translucent,
                     // 全屏 + 控件隐藏 → 隐藏鼠标(沉浸);否则 defer(窗口态/控件可见)
-                    cursor: widget.state.isFullscreen() && !isVisible
+                    // 阶段3:_isDeactivating flag 挡 widget.state deactivate 时序
+                    // (mounted 无效、Element.active 非 public;详见 didUpdateWidget 注释)。
+                    // build 同 didUpdateWidget 可能在 LayoutBuilder layout 阶段被触发。
+                    cursor: !_isDeactivating &&
+                            widget.state.isFullscreen() &&
+                            !isVisible
                         ? SystemMouseCursors.none
                         : MouseCursor.defer,
                     onHover: (event) {
