@@ -25,7 +25,7 @@ void main() {
           body: SizedBox(
             width: width,
             height: 48,
-            child: ProgressBar(engine: engine),
+            child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo),
           ),
         ),
       );
@@ -499,7 +499,7 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(engine: engine, resizing: resizing),
+              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing),
             ),
           ),
         ),
@@ -523,7 +523,7 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(engine: engine, resizing: resizing),
+              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing),
             ),
           ),
         ),
@@ -648,7 +648,7 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(engine: engine, resizing: resizing1),
+              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing1),
             ),
           ),
         ),
@@ -664,7 +664,7 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(engine: engine, resizing: resizing2),
+              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing2),
             ),
           ),
         ),
@@ -689,7 +689,7 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(engine: engine, resizing: resizing),
+              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing),
             ),
           ),
         ),

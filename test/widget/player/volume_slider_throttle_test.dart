@@ -21,7 +21,7 @@ void main() {
   Widget buildSubject() => MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: VolumeSlider(engine: engine)),
+    home: Scaffold(body: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
   );
 
   group('VolumeSlider throttle', () {

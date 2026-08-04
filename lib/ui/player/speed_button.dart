@@ -1,7 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/osd_overlay.dart';
@@ -12,27 +12,35 @@ import '../shared/osd_overlay.dart';
 /// - 点击箭头切换挡位
 /// - 双击数字重置 1.0
 /// - 滚轮切换挡位
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [rate] ValueListenable
+/// + [onSetRate] 回调。
 class SpeedButton extends StatelessWidget {
-  final MediaEngine engine;
+  final ValueListenable<double> rate;
+  final void Function(double) onSetRate;
 
   static const _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
   static const _normal = 1.0;
 
-  const SpeedButton({super.key, required this.engine});
+  const SpeedButton({
+    super.key,
+    required this.rate,
+    required this.onSetRate,
+  });
 
   void _shift(int direction) {
-    final current = engine.playbackSpeed.value;
+    final current = rate.value;
     // 找到第一个 >= 当前值的挡位（非标准值自动 snap 到最近的较高挡位）
     var idx = _gears.indexWhere((g) => g >= current);
     if (idx < 0) idx = _gears.length - 1; // 超出最大挡位，锁定最后一档
     final next = (idx + direction).clamp(0, _gears.length - 1);
     final v = _gears[next];
-    engine.setPlaybackRate(v);
+    onSetRate(v);
     OsdService.I.show('${v.toStringAsFixed(v == v.roundToDouble() ? 0 : 2)}x');
   }
 
   void _reset() {
-    engine.setPlaybackRate(_normal);
+    onSetRate(_normal);
     OsdService.I.show('1x');
   }
 
@@ -64,7 +72,7 @@ class SpeedButton extends StatelessWidget {
           }
         },
         child: ValueListenableBuilder<double>(
-          valueListenable: engine.playbackSpeed,
+          valueListenable: rate,
           builder: (_, speed, _) {
             final label = speed == speed.roundToDouble()
                 ? speed.toStringAsFixed(0)

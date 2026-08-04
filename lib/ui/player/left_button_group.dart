@@ -7,7 +7,6 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../../kernel/playlist/playlist.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
@@ -22,8 +21,17 @@ import 'volume_controls.dart';
 /// PlayerActions 传入；ControlsOverlay 住进 Video.controls builder 后 actions
 /// 必须稳定化，故 mode 图标/标签改为本组件内部用 [playlist.mode] +
 /// [playlistGeneration] 计算（generation 变化驱动重建读最新 mode）。
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 volume/isMuted/rate
+/// ValueListenable + onToggleMute/onSetVolume/onSetRate 回调,透传给
+/// VolumeButton/VolumeSlider/SpeedButton。
 class LeftButtonGroup extends StatelessWidget {
-  final MediaEngine engine;
+  final ValueListenable<double> volume;
+  final ValueListenable<bool> isMuted;
+  final ValueListenable<double> rate;
+  final VoidCallback onToggleMute;
+  final void Function(double) onSetVolume;
+  final void Function(double) onSetRate;
   final Playlist playlist;
 
   /// 播放模式切换的间接驱动源 — 切换 mode 时 generation++ 触发本组重建。
@@ -38,7 +46,12 @@ class LeftButtonGroup extends StatelessWidget {
 
   const LeftButtonGroup({
     super.key,
-    required this.engine,
+    required this.volume,
+    required this.isMuted,
+    required this.rate,
+    required this.onToggleMute,
+    required this.onSetVolume,
+    required this.onSetRate,
     required this.playlist,
     required this.playlistGeneration,
     this.onTogglePlayMode,
@@ -67,14 +80,20 @@ class LeftButtonGroup extends StatelessWidget {
           },
         ),
         const SizedBox(width: Tokens.spXs),
-        VolumeButton(engine: engine),
+        VolumeButton(
+          volume: volume,
+          isMuted: isMuted,
+          onToggleMute: onToggleMute,
+          onSetVolume: onSetVolume,
+        ),
         VolumeSlider(
-          engine: engine,
+          volume: volume,
+          onSetVolume: onSetVolume,
           onInteractionStart: onInteractionStart,
           onInteractionEnd: onInteractionEnd,
         ),
         const SizedBox(width: Tokens.spXs),
-        SpeedButton(engine: engine),
+        SpeedButton(rate: rate, onSetRate: onSetRate),
       ],
     );
   }

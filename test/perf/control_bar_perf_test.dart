@@ -27,6 +27,7 @@ import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
+import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import '../helpers/fake_engine.dart';
@@ -52,6 +53,28 @@ class _RebuildCounterState extends State<_RebuildCounter> {
   }
 }
 
+/// 路径B Commit1:perf 测试共享的全屏 notifier — 恒 false(perf 不验证全屏交互).
+/// 文件级 final:perf test 是 dev tooling,notifier 极轻量,进程结束自然回收.
+final ValueNotifier<bool> _isFullscreen = ValueNotifier<bool>(false);
+
+/// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+ControlBarViewModel _buildVm(FakeEngine e) => ControlBarViewModel(
+      isPlaying: e.isPlayingNotifier,
+      position: e.position,
+      duration: e.duration,
+      volume: e.volume,
+      isMuted: e.isMuted,
+      rate: e.playbackSpeed,
+      isFullscreen: _isFullscreen,
+      onSeek: e.seekTo,
+      onPlayPause: e.togglePlayPause,
+      onSeekBack: e.skipBack,
+      onSeekForward: e.skipForward,
+      onToggleMute: () => e.setMute(!e.isMuted.value),
+      onSetVolume: e.setVolume,
+      onSetRate: e.setPlaybackRate,
+    );
+
 Widget _buildControlBar(
   FakeEngine engine,
   Playlist playlist,
@@ -67,7 +90,7 @@ Widget _buildControlBar(
         width: 800,
         height: 200,
         child: ControlBar(
-          engine: engine,
+          vm: _buildVm(engine),
           playlist: playlist,
           playlistGeneration: playlistGeneration,
           actions: const PlayerActions(

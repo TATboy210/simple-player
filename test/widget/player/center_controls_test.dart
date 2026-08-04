@@ -52,7 +52,10 @@ void main() {
     VoidCallback? onStop,
   }) {
     return CenterGroup(
-      engine: engine,
+      isPlaying: engine.isPlayingNotifier,
+      onPlayPause: engine.togglePlayPause,
+      onSeekBack: engine.skipBack,
+      onSeekForward: engine.skipForward,
       isIdle: engine.state.value == MediaState.idle,
       prevTooltip: 'Previous',
       nextTooltip: 'Next',
@@ -98,7 +101,7 @@ void main() {
       // RED: PlayPauseButton currently sets onPressed to null when isIdle is true.
       engine.state.value = MediaState.idle;
       await tester.pumpWidget(
-        buildSubject(child: PlayPauseButton(engine: engine, isIdle: true)),
+        buildSubject(child: PlayPauseButton(isPlaying: engine.isPlayingNotifier, onPlayPause: engine.togglePlayPause, isIdle: true)),
       );
       await tester.pump();
 
@@ -116,7 +119,7 @@ void main() {
       // RED: opening is treated as idle by ControlBar and currently disables play.
       engine.state.value = MediaState.opening;
       await tester.pumpWidget(
-        buildSubject(child: PlayPauseButton(engine: engine, isIdle: true)),
+        buildSubject(child: PlayPauseButton(isPlaying: engine.isPlayingNotifier, onPlayPause: engine.togglePlayPause, isIdle: true)),
       );
       await tester.pump();
 
@@ -249,10 +252,14 @@ void main() {
           buildSubject(
             focusScopeNode: scopeNode,
             child: CenterGroup(
-              engine: engine,
+              isPlaying: engine.isPlayingNotifier,
+              onPlayPause: engine.togglePlayPause,
+              onSeekBack: engine.skipBack,
+              onSeekForward: engine.skipForward,
               isIdle: false,
               prevTooltip: 'Previous',
               nextTooltip: 'Next',
+              onStop: engine.stop,
             ),
           ),
         );

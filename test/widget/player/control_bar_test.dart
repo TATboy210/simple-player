@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
+import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
@@ -19,20 +19,43 @@ void main() {
   // playMode 下沉到 LeftButtonGroup 内部读 playlist.mode,generation 驱动重建。
   late Playlist playlist;
   late ValueNotifier<int> playlistGeneration;
+  // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
+  // isFullscreen 用共享 notifier(测试不需全屏),避免每次 buildVm 创建泄漏.
+  late ValueNotifier<bool> isFullscreen;
+
+  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
+        isPlaying: e.isPlayingNotifier,
+        position: e.position,
+        duration: e.duration,
+        volume: e.volume,
+        isMuted: e.isMuted,
+        rate: e.playbackSpeed,
+        isFullscreen: isFullscreen,
+        onSeek: e.seekTo,
+        onPlayPause: e.togglePlayPause,
+        onSeekBack: e.skipBack,
+        onSeekForward: e.skipForward,
+        onToggleMute: () => e.setMute(!e.isMuted.value),
+        onSetVolume: e.setVolume,
+        onSetRate: e.setPlaybackRate,
+      );
 
   setUp(() {
     engine = FakeEngine();
     playlist = Playlist();
     playlistGeneration = ValueNotifier<int>(0);
+    isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
     engine.dispose();
     playlistGeneration.dispose();
+    isFullscreen.dispose();
   });
 
   Widget buildSubject({
-    MediaEngine? eng,
+    FakeEngine? eng,
     PlayerActions? actions,
     String? title,
   }) {
@@ -44,7 +67,7 @@ void main() {
           width: 800,
           height: 200,
           child: ControlBar(
-            engine: eng ?? engine,
+            vm: buildVm(eng ?? engine),
             actions: actions ?? const PlayerActions(),
             playlist: playlist,
             playlistGeneration: playlistGeneration,
@@ -131,7 +154,7 @@ void main() {
                 width: 600,
                 height: 200,
                 child: ControlBar(
-                  engine: engine,
+                  vm: buildVm(engine),
                   playlist: playlist,
                   playlistGeneration: playlistGeneration,
                 ),
@@ -220,7 +243,7 @@ void main() {
             width: 800,
             height: 200,
             child: ControlBar(
-              engine: engine,
+              vm: buildVm(engine),
               playlist: playlist,
               playlistGeneration: playlistGeneration,
               isIdle: isIdle,
@@ -281,7 +304,7 @@ void main() {
               width: 800,
               height: 200,
               child: ControlBar(
-                engine: engine,
+                vm: buildVm(engine),
                 playlist: playlist,
                 playlistGeneration: playlistGeneration,
                 isIdle: false,
@@ -311,7 +334,7 @@ void main() {
               width: width,
               height: 200,
               child: ControlBar(
-                engine: engine,
+                vm: buildVm(engine),
                 playlist: playlist,
                 playlistGeneration: playlistGeneration,
               ),
@@ -385,7 +408,7 @@ void main() {
               width: 800,
               height: 200,
               child: ControlBar(
-                engine: engine,
+                vm: buildVm(engine),
                 playlist: playlist,
                 playlistGeneration: playlistGeneration,
                 opacity: opacityController,

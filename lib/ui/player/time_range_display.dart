@@ -1,16 +1,26 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../shared/merged_listenable.dart';
 
 /// 时间显示 (当前 / 总时长)
+///
+/// 路径B Commit1:数据源从 [EngineStateView] 解耦为 [position]/[duration]
+/// ValueListenable。
 class TimeRangeDisplay extends StatefulWidget {
-  /// Engine state providing [position] and [duration] ValueNotifiers.
-  final EngineStateView engine;
+  /// 当前位置(ms)。
+  final ValueListenable<int> position;
 
-  const TimeRangeDisplay({super.key, required this.engine});
+  /// 总时长(ms)。
+  final ValueListenable<int> duration;
+
+  const TimeRangeDisplay({
+    super.key,
+    required this.position,
+    required this.duration,
+  });
 
   @override
   State<TimeRangeDisplay> createState() => _TimeRangeDisplayState();
@@ -24,7 +34,7 @@ class _TimeRangeDisplayState extends State<TimeRangeDisplay> {
   @override
   void initState() {
     super.initState();
-    _merged = MergedListenable(widget.engine.position, widget.engine.duration);
+    _merged = MergedListenable(widget.position, widget.duration);
   }
 
   @override

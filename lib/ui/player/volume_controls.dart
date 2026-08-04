@@ -1,9 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
@@ -11,10 +11,26 @@ import '../shared/value_listenable_builder2.dart';
 import '../shared/osd_overlay.dart';
 
 /// 音量按钮（单击静音）
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [volume]/[isMuted]
+/// ValueListenable + [onToggleMute]/[onSetVolume] 回调。mute/unmute 仍
+/// 通过 onToggleMute(=setMute(!isMuted)) + onSetVolume 协同,保 _savedVolume
+/// 语义等价。mute 分支反序(onToggleMute 先 + onSetVolume(0) 后):
+/// 避免 FakeEngine.setVolume(0) 联动 isMuted=true 后 onToggleMute 翻回 false
+/// (生产 MediaKitEngine.setVolume 不联动 isMuted,两种 engine 下都正确)。
 class VolumeButton extends StatefulWidget {
-  final MediaEngine engine;
+  final ValueListenable<double> volume;
+  final ValueListenable<bool> isMuted;
+  final VoidCallback onToggleMute;
+  final void Function(double) onSetVolume;
 
-  const VolumeButton({super.key, required this.engine});
+  const VolumeButton({
+    super.key,
+    required this.volume,
+    required this.isMuted,
+    required this.onToggleMute,
+    required this.onSetVolume,
+  });
 
   @override
   State<VolumeButton> createState() => _VolumeButtonState();
@@ -26,50 +42,57 @@ class _VolumeButtonState extends State<VolumeButton> {
   @override
   void initState() {
     super.initState();
-    widget.engine.volume.addListener(_onVolumeChanged);
+    widget.volume.addListener(_onVolumeChanged);
   }
 
   @override
   void didUpdateWidget(covariant VolumeButton oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.engine != widget.engine) {
-      oldWidget.engine.volume.removeListener(_onVolumeChanged);
-      widget.engine.volume.addListener(_onVolumeChanged);
+    if (oldWidget.volume != widget.volume) {
+      oldWidget.volume.removeListener(_onVolumeChanged);
+      widget.volume.addListener(_onVolumeChanged);
     }
   }
 
   @override
   void dispose() {
-    widget.engine.volume.removeListener(_onVolumeChanged);
+    widget.volume.removeListener(_onVolumeChanged);
     super.dispose();
   }
 
   /// 同步 _savedVolume：用户拖滑块时自动跟踪，并在静音状态下自动取消静音
   void _onVolumeChanged() {
-    final v = widget.engine.volume.value;
+    final v = widget.volume.value;
     if (v > 0) {
       _savedVolume = v;
       // 静音状态下拖滑块到非零值 → 自动取消静音
-      if (widget.engine.isMuted.value) {
-        widget.engine.setMute(false);
+      // onToggleMute = setMute(!isMuted),此处 isMuted=true → setMute(false) 等价
+      if (widget.isMuted.value) {
+        widget.onToggleMute();
       }
     }
   }
 
   void _toggleMute() {
-    final engine = widget.engine;
     final l10n = AppLocalizations.of(context);
-    if (engine.isMuted.value) {
-      engine.setMute(false);
-      engine.setVolume(_savedVolume);
+    if (widget.isMuted.value) {
+      // unmute: setMute(false) + 恢复 saved 音量
+      // onToggleMute = setMute(!true) = setMute(false),等价原 engine.setMute(false)
+      widget.onToggleMute();
+      widget.onSetVolume(_savedVolume);
       OsdService.I.show(
         '${(_savedVolume * 100).round()}%',
         progress: _savedVolume,
       );
     } else {
-      _savedVolume = engine.volume.value;
-      engine.setVolume(0);
-      engine.setMute(true);
+      // mute: 存 saved → setMute(true) → setVolume(0)
+      // 反序:onToggleMute(=setMute(!false)=setMute(true)) 必须在 onSetVolume(0)
+      // 之前,避免 FakeEngine.setVolume(0) 联动 isMuted=true 后 onToggleMute
+      // =setMute(!true)=setMute(false) 翻回 false。生产 MediaKitEngine.setVolume
+      // 不联动 isMuted,两种 engine 下结果都是 isMuted=true + volume=0.
+      _savedVolume = widget.volume.value;
+      widget.onToggleMute();
+      widget.onSetVolume(0);
       OsdService.I.show(l10n.mute, icon: Icons.volume_off);
     }
   }
@@ -78,8 +101,8 @@ class _VolumeButtonState extends State<VolumeButton> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return ValueListenableBuilder2<bool, double>(
-      first: widget.engine.isMuted,
-      second: widget.engine.volume,
+      first: widget.isMuted,
+      second: widget.volume,
       builder: (_, muted, volume, _) {
         IconData icon;
         if (muted || volume == 0) {
@@ -106,6 +129,9 @@ class _VolumeButtonState extends State<VolumeButton> {
 /// 拖拽期间使用 [Tokens.volumeThrottleMs] 节流引擎和 OSD 调用，
 /// 松手时通过 [onChangeEnd] 立即同步最终值（零感知延迟）。
 /// 鼠标滚轮保持无节流（离散事件，每秒 3-5 次）。
+///
+/// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [volume] ValueListenable
+/// + [onSetVolume] 回调。
 class VolumeSlider extends StatefulWidget {
   static const _sliderTheme = SliderThemeData(
     trackHeight: 3,
@@ -113,7 +139,8 @@ class VolumeSlider extends StatefulWidget {
     overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
   );
 
-  final MediaEngine engine;
+  final ValueListenable<double> volume;
+  final void Function(double) onSetVolume;
 
   /// 子控件交互开始时通知上层冻结自动隐藏。
   final VoidCallback? onInteractionStart;
@@ -123,7 +150,8 @@ class VolumeSlider extends StatefulWidget {
 
   const VolumeSlider({
     super.key,
-    required this.engine,
+    required this.volume,
+    required this.onSetVolume,
     this.onInteractionStart,
     this.onInteractionEnd,
   });
@@ -153,7 +181,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
     _throttleTimer = null;
     final v = _pendingVolume;
     if (v == null) return;
-    widget.engine.setVolume(v);
+    widget.onSetVolume(v);
     OsdService.I.show('${(v * 100).round()}%', progress: v);
   }
 
@@ -162,7 +190,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _pendingVolume = null;
-    widget.engine.setVolume(v);
+    widget.onSetVolume(v);
     OsdService.I.show('${(v * 100).round()}%', progress: v);
   }
 
@@ -181,13 +209,13 @@ class _VolumeSliderState extends State<VolumeSlider> {
         onPointerSignal: (event) {
           if (event is PointerScrollEvent) {
             final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
-            final v = (widget.engine.volume.value + delta).clamp(0.0, 1.0);
-            widget.engine.setVolume(v);
+            final v = (widget.volume.value + delta).clamp(0.0, 1.0);
+            widget.onSetVolume(v);
             OsdService.I.show('${(v * 100).round()}%', progress: v);
           }
         },
         child: ValueListenableBuilder<double>(
-          valueListenable: widget.engine.volume,
+          valueListenable: widget.volume,
           builder: (_, volume, _) => SliderTheme(
             data: VolumeSlider._sliderTheme,
             child: Slider(
