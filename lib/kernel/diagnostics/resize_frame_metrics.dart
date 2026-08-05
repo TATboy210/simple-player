@@ -4,7 +4,11 @@
 /// - 上升沿 (false→true) 注册 [SchedulerBinding.addTimingsCallback],
 ///   累积 resize 期间每帧的 build/raster 时序;
 /// - 下降沿 (true→false) 移除回调并输出摘要
-///   (build/raster 的 avg/max + 60fps/30fps 丢帧计数).
+///   (build/raster/totalSpan 的 avg/max + 60fps/30fps 丢帧计数).
+///
+/// totalSpan = build + raster + 流水线等待. avg/max 揭示是否存在流水线
+/// 气泡: build/raster 健康但 totalSpan 大 → 帧在等资源 (如视频纹理上传),
+/// 卡顿在 FrameTiming 测不到的管线外.
 ///
 /// 仅 debug 模式生效: [kDebugMode] 门控 — release 构造不注册 listener,
 /// 零开销. 生命周期跟随 [WindowService], 由其构造/dispose.
@@ -110,11 +114,16 @@ final class ResizeFrameMetrics {
       ..sort();
     final rasters =
         _samples.map((t) => t.rasterDuration.inMicroseconds).toList()..sort();
+    // totalSpan 含流水线等待 — avg/max 与 build/raster 对比可揭示管线外延迟.
+    final spans =
+        _samples.map((t) => t.totalSpan.inMicroseconds).toList()..sort();
 
     final buildAvgUs = _avg(builds);
     final buildMaxUs = builds.last;
     final rasterAvgUs = _avg(rasters);
     final rasterMaxUs = rasters.last;
+    final spanAvgUs = _avg(spans);
+    final spanMaxUs = spans.last;
 
     final jank60 = _samples.where((t) => t.totalSpan > _frameBudget60).length;
     final jank30 = _samples.where((t) => t.totalSpan > _frameBudget30).length;
@@ -123,6 +132,7 @@ final class ResizeFrameMetrics {
       '[ResizeFrameMetrics] session: ${_samples.length} frames | '
       'build ${_ms(buildAvgUs)}/${_ms(buildMaxUs)}ms (avg/max) | '
       'raster ${_ms(rasterAvgUs)}/${_ms(rasterMaxUs)}ms (avg/max) | '
+      'total ${_ms(spanAvgUs)}/${_ms(spanMaxUs)}ms (avg/max) | '
       'jank $jank60@60fps $jank30@30fps',
     );
   }
