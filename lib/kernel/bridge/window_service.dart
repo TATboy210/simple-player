@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../persistence/settings_store.dart';
 import '../diagnostics/kernel_logger.dart';
+import '../diagnostics/resize_frame_metrics.dart';
 import '../utils/screen_utils.dart';
 import 'display_enumerator.dart';
 import 'win32/win32_display_enumerator.dart';
@@ -24,13 +25,15 @@ class WindowService with WindowListener implements WindowBridge {
   /// 创建 WindowService。
   ///
   /// [displayEnumerator] 可选注入显示器枚举器，默认使用 Win32DisplayAdapter。
-  WindowService({
-    DisplayEnumerator? displayEnumerator,
-  }) : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
+  WindowService({DisplayEnumerator? displayEnumerator})
+    : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
 
   final WindowState _state = WindowState();
   final WindowPersistence _persistence = WindowPersistence();
   final DisplayEnumerator _displayEnumerator;
+  // nullable: 构造时无法引用 _state (Dart 初始化列表禁实例成员),
+  // 改在 init() 创建. dispose 用 ?., init 未调即 dispose 时安全跳过.
+  ResizeFrameMetrics? _resizeMetrics;
 
   bool _disposed = false;
   bool _isProgrammaticResize = false;
@@ -108,6 +111,9 @@ class WindowService with WindowListener implements WindowBridge {
       }),
     );
     windowManager.addListener(this);
+    // 构造时无法引用 _state (Dart 初始化列表禁实例成员), 故延后到 init.
+    // 此时 binding 已就绪, isResizing 监听器开始接管后续 resize 会话切片.
+    _resizeMetrics = ResizeFrameMetrics(isResizing: _state.isResizing);
   }
 
   void _updateOnUIThread(VoidCallback update) {
@@ -128,28 +134,25 @@ class WindowService with WindowListener implements WindowBridge {
   void _startResizeTimer() {
     _resizeTimer?.cancel();
     _updateOnUIThread(() => _state.isResizing.value = true);
-    _resizeTimer = Timer(
-      const Duration(milliseconds: _resizeDebounceMs),
-      () {
+    _resizeTimer = Timer(const Duration(milliseconds: _resizeDebounceMs), () {
+      if (_disposed) return;
+      windowManager.getSize().then((size) {
         if (_disposed) return;
-        windowManager.getSize().then((size) {
-          if (_disposed) return;
-          _updateOnUIThread(() {
-            // 无论尺寸是否净变化,resize 已停止 — 必须落 isResizing=false.
-            // 旧逻辑把 isResizing=false 包在 if(size!=windowSize) 内,致
-            // "拖大又拖回原尺寸"等净变化为零场景 isResizing 卡 true,
-            // 控制栏永不恢复、BackdropFilter 永久跳过 (方向2 状态边界 bug).
-            if (size != _state.windowSize.value) {
-              _state.windowSize.value = Size(
-                math.max(size.width, 854),
-                math.max(size.height, 513),
-              );
-            }
-            _state.isResizing.value = false;
-          });
+        _updateOnUIThread(() {
+          // 无论尺寸是否净变化,resize 已停止 — 必须落 isResizing=false.
+          // 旧逻辑把 isResizing=false 包在 if(size!=windowSize) 内,致
+          // "拖大又拖回原尺寸"等净变化为零场景 isResizing 卡 true,
+          // 控制栏永不恢复、BackdropFilter 永久跳过 (方向2 状态边界 bug).
+          if (size != _state.windowSize.value) {
+            _state.windowSize.value = Size(
+              math.max(size.width, 854),
+              math.max(size.height, 513),
+            );
+          }
+          _state.isResizing.value = false;
         });
-      },
-    );
+      });
+    });
   }
 
   @override
@@ -187,8 +190,14 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowResize() {
     if (_disposed) return;
-    if (_skipNextResize) { _skipNextResize = false; return; }
-    if (_isProgrammaticResize) { _isProgrammaticResize = false; return; }
+    if (_skipNextResize) {
+      _skipNextResize = false;
+      return;
+    }
+    if (_isProgrammaticResize) {
+      _isProgrammaticResize = false;
+      return;
+    }
     _startResizeTimer();
   }
 
@@ -257,8 +266,10 @@ class WindowService with WindowListener implements WindowBridge {
       final pos = await windowManager.getPosition();
       final size = await windowManager.getSize();
       _persistence.saveWindowGeometry(
-        x: pos.dx, y: pos.dy,
-        width: size.width, height: size.height,
+        x: pos.dx,
+        y: pos.dy,
+        width: size.width,
+        height: size.height,
         isMaximized: _state.mode.value.isMaximized,
       );
     } catch (e, st) {
@@ -270,6 +281,10 @@ class WindowService with WindowListener implements WindowBridge {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    // _resizeMetrics 监听 _state.isResizing — 必须先于 _state.dispose(),
+    // 否则 removeListener 触发 "used after being disposed". nullable: init
+    // 未调时为 null (如纯单元测试), ? 安全跳过.
+    _resizeMetrics?.dispose();
     _resizeTimer?.cancel();
     _state.dispose();
     _persistence.dispose();
