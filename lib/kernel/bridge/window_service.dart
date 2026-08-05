@@ -133,15 +133,20 @@ class WindowService with WindowListener implements WindowBridge {
       () {
         if (_disposed) return;
         windowManager.getSize().then((size) {
-          if (!_disposed && size != _state.windowSize.value) {
-            _updateOnUIThread(() {
+          if (_disposed) return;
+          _updateOnUIThread(() {
+            // 无论尺寸是否净变化,resize 已停止 — 必须落 isResizing=false.
+            // 旧逻辑把 isResizing=false 包在 if(size!=windowSize) 内,致
+            // "拖大又拖回原尺寸"等净变化为零场景 isResizing 卡 true,
+            // 控制栏永不恢复、BackdropFilter 永久跳过 (方向2 状态边界 bug).
+            if (size != _state.windowSize.value) {
               _state.windowSize.value = Size(
                 math.max(size.width, 854),
                 math.max(size.height, 513),
               );
-              _state.isResizing.value = false;
-            });
-          }
+            }
+            _state.isResizing.value = false;
+          });
         });
       },
     );

@@ -1,4 +1,5 @@
-import 'package:flutter/widgets.dart';
+import 'package:fake_async/fake_async.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_service.dart';
@@ -6,7 +7,10 @@ import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
 void main() {
   setUpAll(() {
-    WidgetsFlutterBinding.ensureInitialized();
+    // 用 TestWidgetsFlutterBinding (非 WidgetsFlutterBinding) — 其
+    // defaultBinaryMessenger 是 TestDefaultBinaryMessenger, 支持 mock
+    // MethodChannel (resize 测试需 mock window_manager.getSize).
+    TestWidgetsFlutterBinding.ensureInitialized();
     // WindowService callback methods use KernelLogger.I — must init first
     KernelLoggerImpl.resetForTesting();
     KernelLoggerImpl.init();
@@ -361,6 +365,109 @@ void main() {
       await service.setMode(WindowMode.fullscreen); // 同值, 早退
       expect(service.state.mode.value, WindowMode.fullscreen);
       service.dispose();
+    });
+  });
+
+  // =========================================================================
+  // resize debounce + isResizing 恢复 (方向2 — isResizing 卡 true bug 回归)
+  // =========================================================================
+  group('resize debounce + isResizing recovery', () {
+    // window_manager 包用 MethodChannel('window_manager'), getSize 走
+    // 'getWindowSize' method 返回 [width, height]. mock 之以便 fakeAsync
+    // 推进 500ms timer 后验证回调逻辑 (无需真实窗口/ensureInitialized).
+    const wmChannel = MethodChannel('window_manager');
+    Size? mockSize;
+
+    /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding,
+    /// 其 defaultBinaryMessenger 静态类型即 TestDefaultBinaryMessenger
+    /// (无需 is 提升或 as cast).
+    TestDefaultBinaryMessenger messenger() =>
+        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
+
+    setUp(() {
+      mockSize = null;
+      messenger().setMockMethodCallHandler(wmChannel, (call) async {
+        // window_manager 0.5.2: getSize() 内部调 getBounds() (非 getWindowSize
+        // method — 该 method 从不被调用, 勿 mock). getBounds 期望返回 Map 字段
+        // x/y/width/height (非 left/top — 否则 Rect.fromLTWH 读 null →
+        // type 'Null' is not subtype of double). 局部提升消除 bang.
+        final sz = mockSize;
+        if (sz == null) return null;
+        if (call.method == 'getBounds') {
+          return {
+            'x': 0.0,
+            'y': 0.0,
+            'width': sz.width,
+            'height': sz.height,
+          };
+        }
+        return null;
+      });
+    });
+
+    tearDown(() {
+      messenger().setMockMethodCallHandler(wmChannel, null);
+    });
+
+    test('onWindowResize sets isResizing true immediately', () {
+      final service = WindowService();
+      expect(service.state.isResizing.value, isFalse);
+      service.onWindowResize();
+      expect(service.state.isResizing.value, isTrue);
+      service.dispose();
+    });
+
+    test('isResizing recovers false after debounce when size changed', () {
+      fakeAsync((async) {
+        mockSize = const Size(1920, 1080);
+        final service = WindowService();
+        service.onWindowResize();
+        expect(service.state.isResizing.value, isTrue);
+
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+
+        expect(service.state.isResizing.value, isFalse);
+        expect(service.state.windowSize.value, const Size(1920, 1080));
+        service.dispose();
+      });
+    });
+
+    test('isResizing recovers false even when size unchanged (regression)', () {
+      // 旧 bug: isResizing=false 包在 if(size!=windowSize) 内, size 净变化
+      // 为零时不落 false → 控制栏永不恢复. 默认 windowSize=1280x752, mock
+      // getSize 返回同值 → 触发 bug 场景. 修复后无论 size 是否变化都落 false.
+      fakeAsync((async) {
+        mockSize = const Size(1280, 752);
+        final service = WindowService();
+        service.onWindowResize();
+        expect(service.state.isResizing.value, isTrue);
+
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+
+        expect(service.state.isResizing.value, isFalse);
+        service.dispose();
+      });
+    });
+
+    test('repeated onWindowResize resets debounce timer', () {
+      fakeAsync((async) {
+        mockSize = const Size(1920, 1080);
+        final service = WindowService();
+        service.onWindowResize();
+        async.elapse(const Duration(milliseconds: 400));
+        expect(service.state.isResizing.value, isTrue);
+
+        service.onWindowResize(); // 重置 500ms timer
+        async.elapse(const Duration(milliseconds: 400));
+        expect(service.state.isResizing.value, isTrue);
+
+        async.elapse(const Duration(milliseconds: 100));
+        async.flushMicrotasks();
+        expect(service.state.isResizing.value, isFalse);
+        service.dispose();
+      });
     });
   });
 }
