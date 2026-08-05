@@ -240,7 +240,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
           backgroundColor: Tokens.bgBase,
           body: Column(
             children: [
-              CustomTitleBar(windowService: widget.windowService),
+              // RepaintBoundary: resize 期间根 layout 变, 标题栏内容静态
+              // (标题+4按钮, mode/isAlwaysOnTop 不变则不重建), layer 复用
+              // 跳过 repaint — 与 videoContent/PlaylistPanel/SettingsShell
+              // 的隔离模式一致.
+              RepaintBoundary(child: CustomTitleBar(windowService: widget.windowService)),
               Expanded(
                 child: Stack(
                   children: [
