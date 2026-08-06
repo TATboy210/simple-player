@@ -68,9 +68,11 @@ class RightButtonGroup extends StatelessWidget {
           GlassButton.iconOnly(
             icon: Icons.settings,
             onPressed: actions.onSettings,
-            onSecondaryTapUp: actions.onSettingsSecondary != null
-                ? (d) => actions.onSettingsSecondary!(context, d)
-                : null,
+            // switch 表达式消除字段 `!` (onSettingsSecondary 不提升)
+            onSecondaryTapUp: switch (actions.onSettingsSecondary) {
+              final cb? => (d) => cb(context, d),
+              null => null,
+            },
             tooltip: l10n.settings,
           ),
         if (fullscreenCb != null)

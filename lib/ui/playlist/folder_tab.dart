@@ -53,15 +53,18 @@ class _FolderTabState extends State<FolderTab> {
   Map<String, int>? _cachedPathIndexMap;
 
   List<_FolderGroup> _getGroups() {
-    if (_cachedGroups != null && identical(_cachedItems, widget.items)) {
-      return _cachedGroups!;
+    // local 捕获消除字段 `!` (字段不提升, 即便刚赋值)
+    final cached = _cachedGroups;
+    if (cached != null && identical(_cachedItems, widget.items)) {
+      return cached;
     }
     _cachedItems = widget.items;
-    _cachedGroups = _groupByFolder(widget.items);
+    final groups = _groupByFolder(widget.items);
+    _cachedGroups = groups;
     _cachedPathIndexMap = {
       for (var i = 0; i < widget.items.length; i++) widget.items[i].path: i,
     };
-    return _cachedGroups!;
+    return groups;
   }
 
   @override
@@ -79,7 +82,8 @@ class _FolderTabState extends State<FolderTab> {
     }
 
     final groups = _getGroups();
-    final pathIndexMap = _cachedPathIndexMap!;
+    // _getGroups() 后必非空, ?? const {} 防御兜底消除字段 `!`
+    final pathIndexMap = _cachedPathIndexMap ?? const <String, int>{};
 
     return ListView.builder(
       scrollDirection: Axis.vertical,
@@ -196,7 +200,7 @@ class _FolderGroupWidget extends StatelessWidget {
     PathUtils.openFileLocation(group.folderPath);
   }
 
-  Future<void> _scanFolder(BuildContext context) async {
+  Future<void> _scanFolder(BuildContext _) async {
     // FolderScanner.scan 已异步化：避免扫描大文件夹时阻塞 UI
     final scanned = await FolderScanner.scan(group.folderPath);
     if (scanned.isNotEmpty) {
@@ -223,7 +227,7 @@ class _FolderPathLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onSecondaryTap: () => _showPathMenu(context),
+      onSecondaryTap: () => unawaited(_showPathMenu(context)),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Tokens.spMd,
@@ -264,7 +268,7 @@ class _FolderPathLabel extends StatelessWidget {
     return '${path.substring(0, keep)}...${path.substring(path.length - keep)}';
   }
 
-  void _showPathMenu(BuildContext context) {
+  Future<void> _showPathMenu(BuildContext context) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final button = context.findRenderObject() as RenderBox;
     final position = RelativeRect.fromRect(
@@ -280,7 +284,7 @@ class _FolderPathLabel extends StatelessWidget {
 
     final l10n = AppLocalizations.of(context);
 
-    showMenu<String>(
+    final value = await showMenu<String>(
       context: context,
       position: position,
       color: Tokens.bgElevated,
@@ -297,16 +301,15 @@ class _FolderPathLabel extends StatelessWidget {
           child: ContextMenuRow(Icons.refresh, l10n.scanFolder),
         ),
       ],
-    ).then((value) {
-      if (value == null) return;
-      switch (value) {
-        case 'open':
-          onOpen();
-          break;
-        case 'scan':
-          onScan();
-          break;
-      }
-    });
+    );
+    if (value == null) return;
+    switch (value) {
+      case 'open':
+        onOpen();
+        break;
+      case 'scan':
+        onScan();
+        break;
+    }
   }
 }

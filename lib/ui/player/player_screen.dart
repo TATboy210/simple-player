@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/kernel/bridge/win32/win32_display_enumerat
 
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/bridge/window_mode.dart';
+import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/playlist/playlist.dart';
@@ -110,6 +111,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// IgnorePointer（builder 化后需自驱动，不再靠本层 setState 重建）。
   final ValueNotifier<bool> _isOpenFileEnabled = ValueNotifier(false);
 
+  /// 拖窗纹理重建诊断探针 — 并联 ResizeFrameMetrics, 区分 native 纹理重建(甲)
+  /// vs 纯合成缩放(乙). 仅 debug 生效; controller 为 null (测试注入 surface) 时跳过.
+  VideoTextureResizeProbe? _textureProbe;
+
+  /// resize 期间锁定的 useRow — 避免跨 breakpointWide 时 Row↔Stack 翻转
+  /// 触发 Element 重新挂载 (build 54ms 尖峰, RepaintBoundary 不挡 mount)。
+  /// null=未锁定; resize 开始由 listener 置 null, 首次 build 计算并锁定。
+  bool? _lockedUseRow;
+  bool _resizeLayoutLockActive = false;
+
   /// 稳定化的播放器回调集合 — initState 构造一次，供 ControlsOverlay 闭包捕获。
   /// builder 化后 actions 不能每次 build 重建（Video.controls builder 不在
   /// build 上下文），playModeIcon/Label 已下沉到 LeftButtonGroup 内部计算。
@@ -149,8 +160,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       type: FileType.custom,
       allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
     );
-    if (result != null && result.files.single.path != null) {
-      widget.engine.setExternalSubtitle(result.files.single.path!);
+    // local 捕获 path 消除字段链 `!` (result.files.single.path 不提升)
+    if (result != null) {
+      final path = result.files.single.path;
+      if (path != null) {
+        widget.engine.setExternalSubtitle(path);
+      }
     }
   }
 
@@ -166,7 +181,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onStop: () => unawaited(widget.controller.stopCurrentMedia()),
       // 控制栏与快捷键共用空置态的资源释放隔离窗口。
       onOpenFile: _openFileWhenReady,
-      onOpenSubtitle: _openSubtitle,
+      onOpenSubtitle: () => unawaited(_openSubtitle()),
       onTogglePlaylist: _togglePlaylist,
       onSettings: widget.settingsPanelController.open,
       onSettingsSecondary: widget.onSettingsSecondary,
@@ -190,8 +205,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Stop 成功会清空活动标题；它也是 hasMedia 从 true 变 false 后的可靠 UI 通知。
     widget.controller.currentFileName.addListener(_syncOpenFileAvailability);
     _syncOpenFileAvailability();
+    // resize 边沿锁定 useRow — 防跨 breakpointWide 翻转 (build 54ms 尖峰)。
+    widget.windowService.isResizing.addListener(_onResizeForLayoutLock);
     // 阶段2:字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱
     // (每实例调自己 VideoState),不再需本层 _onControlsVisibleChanged 联动.
+    // 拖窗纹理重建诊断 — 并联 ResizeFrameMetrics, 区分 resize 延迟根因
+    // (native 纹理重建 vs 纯合成缩放). 仅 debug 生效; controller 为 null
+    // (测试注入 videoSurfaceBuilder) 时跳过, 不阻塞测试.
+    final controller = widget.mediaKitController;
+    if (controller != null) {
+      _textureProbe = VideoTextureResizeProbe(
+        isResizing: widget.windowService.isResizing,
+        rect: controller.rect,
+        textureId: controller.id,
+      );
+    }
   }
 
   /// idle 既可能表示尚未加载，也可能表示 stop 正在卸载；两种情况都先隔离打开入口。
@@ -216,11 +244,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
     widget.onOpenFile?.call();
   }
 
+  /// resize 边沿 — 锁定/释放 useRow, 防跨 breakpointWide 翻转 (build 54ms 尖峰)。
+  ///
+  /// resize 开始: 标记 active, _lockedUseRow 置 null (待首次 LayoutBuilder.build
+  ///   计算 — 此处无 constraints, 无法取宽度)。
+  /// resize 结束: 清除锁定 + setState 刷新 — LayoutBuilder 此刻可能不重建
+  ///   (窗口已稳定无 constraints 变化), 须主动触发用真实宽度重判 useRow。
+  void _onResizeForLayoutLock() {
+    if (widget.windowService.isResizing.value) {
+      _resizeLayoutLockActive = true;
+      _lockedUseRow = null;
+    } else if (_resizeLayoutLockActive) {
+      _resizeLayoutLockActive = false;
+      _lockedUseRow = null;
+      if (mounted) setState(() {});
+    }
+  }
+
   @override
   void dispose() {
     _openFileDelayTimer?.cancel();
+    // 探针先于其余 listener 移除 — 它监听 windowService.isResizing 与
+    // controller.rect/id, 须在二者 dispose 前解除绑定 (此处二者生命周期更长,
+    // 但保持 dispose 顺序一致性).
+    _textureProbe?.dispose();
     widget.controller.currentFileName.removeListener(_syncOpenFileAvailability);
     widget.engine.state.removeListener(_syncOpenFileAvailability);
+    widget.windowService.isResizing.removeListener(_onResizeForLayoutLock);
     _isOpenFileEnabled.dispose();
     _playlistState.dispose();
     super.dispose();
@@ -228,6 +278,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 缓存视频子树 — LayoutBuilder 无 child 参数,constraints 变化时 builder 每帧执行;
+    // 提到 build() 顶层后,LayoutBuilder.builder 闭包捕获此变量复用同一 Video 实例,
+    // 不再每帧 new Video → controls → PlayerVideoControls → 整 Stack 重建。
+    // 拖窗时 State.build() 不调(isResizing 不传顶层),此变量不重建;
+    // widget 真正变化时(PlayerFeature rebuild)build() 自然重调,cachedVideoContent 自然重建。
+    final cachedVideoContent = _buildVideoContent(context);
     return AnimatedBuilder(
       animation: widget.windowService.mode,
       builder: (context, _) {
@@ -254,9 +310,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         return ValueListenableBuilder<(bool, bool)>(
                           valueListenable: _playlistState,
                           builder: (context, state, videoContent) {
+                            // videoContent 是 VLB child 参数 (Widget?), 由
+                            // cachedVideoContent 传入必非空; early check 提升
+                            // 为非空消除 `!` (P0 缓存逻辑不变)
+                            if (videoContent == null) {
+                              return const SizedBox.shrink();
+                            }
                             final (playlistVisible, playlistMounted) = state;
-                            final useRow =
+                            final realUseRow =
                                 w >= Tokens.breakpointWide && playlistMounted;
+                            // resize 期间锁定 useRow — 首次 build 计算, 之后复用,
+                            // 防跨 breakpointWide 时 Row↔Stack 翻转触发 Element
+                            // 重新挂载 (build 54ms 尖峰, RepaintBoundary 不挡 mount)。
+                            final useRow = _resizeLayoutLockActive
+                                ? (_lockedUseRow ??= realUseRow)
+                                : realUseRow;
 
                             final playlistPanel = PlaylistPanel(
                               playlist: widget.playlist,
@@ -282,7 +350,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 children: [
                                   Expanded(
                                     child: RepaintBoundary(
-                                      child: videoContent!,
+                                      child: videoContent,
                                     ),
                                   ),
                                   RepaintBoundary(
@@ -298,7 +366,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             // 窄屏: Stack overlay.
                             return Stack(
                               children: [
-                                RepaintBoundary(child: videoContent!),
+                                RepaintBoundary(child: videoContent),
                                 if (playlistMounted)
                                   RepaintBoundary(
                                     child: IgnorePointer(
@@ -309,7 +377,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ],
                             );
                           },
-                          child: _buildVideoContent(context),
+                          child: cachedVideoContent,
                         );
                       },
                     ),
@@ -330,6 +398,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         );
 
+        // resize 期间排除整个 Scaffold 语义树 — AXTree "will not be in the tree"
+        // 是 Flutter engine accessibility_bridge 语义更新竞争 (已知 bug, 9+ GH issues)。
+        // 根因: resize 时 widget 重建 + media_kit D3D11 纹理重建触发
+        // markNeedsSemanticsUpdate, engine 语义树父子关系断裂 → 刷屏。
+        // 上一轮 ExcludeSemantics 只包 Video, 但错误源 (node 18) 在 Video 之外
+        // (标题栏/播放列表/设置壳 resize 重建) → 扩大到整个 Scaffold。
+        // ExcludeSemantics(excluding: resizing) 让子树不参与语义 → 不传播更新 →
+        // engine AXTree 不刷新 → 消噪。仅 resize 时排除 (isResizing 驱动),
+        // 静止时保留无障碍语义。VLB child 缓存 scaffold, isResizing 仅开始/结束
+        // 各变化 1 次 (非每帧重建)。gesture/focus/hit-test 走独立通道不受影响。
+        // 代价: resize 期间控制栏/标题栏按钮 tooltip/label 暂不可读 (拖窗时无意义)。
+        // 边界点 (isResizing 翻转) 可能各残留 1 次语义树重建 — 持续刷消除。
+        final scaffoldSemanticsGuard = ValueListenableBuilder<bool>(
+          valueListenable: widget.windowService.isResizing,
+          builder: (_, resizing, child) => ExcludeSemantics(
+            excluding: resizing,
+            // child 由 VLB child 参数传入 (scaffold, 必非空); `??` 兜底消除 `!`
+            child: child ?? const SizedBox.shrink(),
+          ),
+          child: scaffold,
+        );
+
         final keyboardHandler = buildPlayerKeyboardActions(
           engine: widget.engine,
           controller: widget.controller,
@@ -340,7 +430,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           context: context,
           // O 键与空置页按钮共享同一稳定窗口，不能绕过媒体释放延迟。
           onOpenFile: _openFileWhenReady,
-          child: scaffold,
+          child: scaffoldSemanticsGuard,
         );
 
         // T1: 始终返回 SmartDragToResizeArea — 保持 Widget 类型一致.
@@ -364,7 +454,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 渐进路径核心:ControlsOverlay + emptyState 都住进 Video.controls builder,
   /// media_kit 全屏 route 复制 builder 时自动携带控制栏(解决全屏控制栏消失).
   /// engine/VideoController/videoKey/全屏机制不变,数据源暂留 engine.
-  Widget _buildVideoContent(BuildContext context) => Row(
+  // context 参数保留以维持签名一致性 (Video.controls builder 契约),
+  // 但 _buildVideoContent 提到 build() 顶层后不再使用 — 命名 _ 豁免 DCM avoid-unused-parameters.
+  Widget _buildVideoContent(BuildContext _) => Row(
     children: [
       Expanded(
         child: DropHandler(
@@ -394,10 +486,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     final controller = widget.mediaKitController;
     if (controller == null) return const SizedBox.expand();
-    return Video(
-      key: _videoKey,
-      controller: controller,
-      controls: _buildControls,
+    // ExcludeSemantics: media_kit Video 拖窗时 D3D11 纹理重建触发 markNeedsSemanticsUpdate,
+    // engine AXTree 更新 race 致 "will not be in the tree" 刷屏 (Flutter engine 已知 bug,
+    // 零功能影响)。排除 Video 子树 semantics → texture 重建不再触发 semantics 更新 → 消噪。
+    // 代价: Video.controls 内控制栏 tooltip/label 一并排除 (视频播放器无障碍优先级低)。
+    // gesture/focus/hit-test 不受影响 (走独立通道,非 semantics),按钮仍可点可聚焦。
+    return ExcludeSemantics(
+      child: ValueListenableBuilder<bool>(
+        valueListenable: widget.windowService.isResizing,
+        builder: (_, resizing, _) => Video(
+          key: _videoKey,
+          controller: controller,
+          controls: _buildControls,
+          // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
+          // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
+          // 变化, Element 复用不重新挂载。静止用 low 保画质。isResizing 仅开始/结束各变 1 次。
+          filterQuality:
+              resizing ? FilterQuality.none : FilterQuality.low,
+        ),
+      ),
     );
   }
 

@@ -73,47 +73,63 @@ class WindowService with WindowListener implements WindowBridge {
       windowButtonVisibility: false,
       minimumSize: Size(854, 513),
     );
+    // waitUntilReadyToShow 期望同步 VoidCallback; 提取 _initWindow() async 方法,
+    // 回调内 unawaited 触发 (DCM avoid-passing-async-when-sync-expected).
+    // 纯 async 形态重组, 信号源逻辑(frameless/isResizing)一字未改.
     unawaited(
-      windowManager.waitUntilReadyToShow(options, () async {
-        // 切换为 frameless:消除 hidden titleBarStyle 在 WM_NCCALCSIZE 留下的
-        // 8px 调整边框(白边根因)。必须在此 callback 内调用——waitUntilReadyToShow
-        // 已先执行 setTitleBarStyle(hidden) 把 is_frameless_ 重置为 false,此处
-        // setAsFrameless 把它设回 true,使 WM_NCCALCSIZE 走 frameless 分支直接
-        // return 0(非最大化不留 8px)。代价:失去系统级 resize hit-test,
-        // 由 SmartDragToResizeArea 在 Flutter 层兜底。
-        await windowManager.setAsFrameless();
-        final settings = await SettingsStore.load();
-        if (settings.windowX != null && settings.windowY != null) {
-          final displays = _displayEnumerator.enumerateDisplays();
-          final clamped = ScreenUtils.clampToNearestMonitor(
-            displays: displays,
-            x: settings.windowX!,
-            y: settings.windowY!,
-            width: settings.windowWidth,
-            height: settings.windowHeight,
-          );
-          await windowManager.setBounds(
-            null,
-            position: clamped,
-            size: Size(settings.windowWidth, settings.windowHeight),
-          );
-        } else {
-          await windowManager.setBounds(
-            null,
-            size: Size(settings.windowWidth, settings.windowHeight),
-          );
-          await windowManager.center();
-        }
-        _skipNextResize = true;
-        await windowManager.show();
-        await windowManager.focus();
-        if (settings.isMaximized) await windowManager.maximize();
-      }),
+      windowManager.waitUntilReadyToShow(
+        options,
+        () => unawaited(_initWindow()),
+      ),
     );
     windowManager.addListener(this);
     // 构造时无法引用 _state (Dart 初始化列表禁实例成员), 故延后到 init.
     // 此时 binding 已就绪, isResizing 监听器开始接管后续 resize 会话切片.
     _resizeMetrics = ResizeFrameMetrics(isResizing: _state.isResizing);
+  }
+
+  /// 窗口初始化 — 在 waitUntilReadyToShow 回调内 fire-and-forget 触发。
+  ///
+  /// 提取为 async 方法以满足回调期望同步 VoidCallback 的契约
+  /// (DCM avoid-passing-async-when-sync-expected)。纯 async 形态重组,
+  /// 信号源逻辑(frameless 设置 / isResizing)一字未改。
+  Future<void> _initWindow() async {
+    // 切换为 frameless:消除 hidden titleBarStyle 在 WM_NCCALCSIZE 留下的
+    // 8px 调整边框(白边根因)。必须在此 callback 内调用——waitUntilReadyToShow
+    // 已先执行 setTitleBarStyle(hidden) 把 is_frameless_ 重置为 false,此处
+    // setAsFrameless 把它设回 true,使 WM_NCCALCSIZE 走 frameless 分支直接
+    // return 0(非最大化不留 8px)。代价:失去系统级 resize hit-test,
+    // 由 SmartDragToResizeArea 在 Flutter 层兜底。
+    await windowManager.setAsFrameless();
+    final settings = await SettingsStore.load();
+    // 字段不提升, 用 local 捕获消除 `!` (纯 null 安全, 不动信号源逻辑)
+    final wx = settings.windowX;
+    final wy = settings.windowY;
+    if (wx != null && wy != null) {
+      final displays = _displayEnumerator.enumerateDisplays();
+      final clamped = ScreenUtils.clampToNearestMonitor(
+        displays: displays,
+        x: wx,
+        y: wy,
+        width: settings.windowWidth,
+        height: settings.windowHeight,
+      );
+      await windowManager.setBounds(
+        null,
+        position: clamped,
+        size: Size(settings.windowWidth, settings.windowHeight),
+      );
+    } else {
+      await windowManager.setBounds(
+        null,
+        size: Size(settings.windowWidth, settings.windowHeight),
+      );
+      await windowManager.center();
+    }
+    _skipNextResize = true;
+    await windowManager.show();
+    await windowManager.focus();
+    if (settings.isMaximized) await windowManager.maximize();
   }
 
   void _updateOnUIThread(VoidCallback update) {
@@ -133,25 +149,42 @@ class WindowService with WindowListener implements WindowBridge {
   /// 单一 resize 定时器 — 合并 isResizing 标记和 windowSize 更新。
   void _startResizeTimer() {
     _resizeTimer?.cancel();
-    _updateOnUIThread(() => _state.isResizing.value = true);
-    _resizeTimer = Timer(const Duration(milliseconds: _resizeDebounceMs), () {
-      if (_disposed) return;
-      windowManager.getSize().then((size) {
-        if (_disposed) return;
-        _updateOnUIThread(() {
-          // 无论尺寸是否净变化,resize 已停止 — 必须落 isResizing=false.
-          // 旧逻辑把 isResizing=false 包在 if(size!=windowSize) 内,致
-          // "拖大又拖回原尺寸"等净变化为零场景 isResizing 卡 true,
-          // 控制栏永不恢复、BackdropFilter 永久跳过 (方向2 状态边界 bug).
-          if (size != _state.windowSize.value) {
-            _state.windowSize.value = Size(
-              math.max(size.width, 854),
-              math.max(size.height, 513),
-            );
-          }
-          _state.isResizing.value = false;
-        });
-      });
+    // 红线放宽: isResizing=true 同步翻转, 不走 _updateOnUIThread 推迟.
+    // 原推迟致会话起手 1-2 帧 isResizing 仍 false → ExcludeSemantics/
+    // BackdropFilter 未及时生效 → 边沿尖峰 (实测 build max 58ms, avg 2-3ms).
+    // 同步安全: 消费者全是 VLB(setState→markNeedsBuild 仅标记 dirty, 不同步
+    // layout) + 诊断器(无 layout) + AutoHideController(Timer) → 无重入断言.
+    // 边界: 仅放宽 isResizing=true; windowSize(防抖 500ms)/isResizing=false/
+    // mode 翻转仍走 _updateOnUIThread (重操作推迟仍合理, 不动).
+    _state.isResizing.value = true;
+    // Timer callback 期望同步; .then 链改 await 需 async 宿主,
+    // 提取 _onResizeDebounce() (DCM prefer-async-await).
+    _resizeTimer = Timer(
+      const Duration(milliseconds: _resizeDebounceMs),
+      () => unawaited(_onResizeDebounce()),
+    );
+  }
+
+  /// resize 防抖结束处理 — 落定窗口尺寸 + isResizing=false。
+  ///
+  /// 提取为 async 方法以用 await 替代 .then 链 (DCM prefer-async-await)。
+  /// 信号源逻辑(isResizing 落地时机)一字未改。
+  Future<void> _onResizeDebounce() async {
+    if (_disposed) return;
+    final size = await windowManager.getSize();
+    if (_disposed) return;
+    _updateOnUIThread(() {
+      // 无论尺寸是否净变化,resize 已停止 — 必须落 isResizing=false.
+      // 旧逻辑把 isResizing=false 包在 if(size!=windowSize) 内,致
+      // "拖大又拖回原尺寸"等净变化为零场景 isResizing 卡 true,
+      // 控制栏永不恢复、BackdropFilter 永久跳过 (方向2 状态边界 bug).
+      if (size != _state.windowSize.value) {
+        _state.windowSize.value = Size(
+          math.max(size.width, 854),
+          math.max(size.height, 513),
+        );
+      }
+      _state.isResizing.value = false;
     });
   }
 

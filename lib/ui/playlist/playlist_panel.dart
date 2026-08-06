@@ -63,6 +63,12 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   final _focusNode = FocusNode();
   final _selectedTab = ValueNotifier<int>(0); // 0=文件夹, 1=历史
 
+  /// resize 期间缓存的上一帧 build 结果 — 跳过 _buildPanel/缩略图列表
+  /// 每帧重建 (build 长尾主因)。借鉴 OsdOverlay 模式 (osd_overlay.dart:74-99)。
+  /// 代价: resize 期间 playlist 内容/动画冻结, 可接受 (拖窗时不操作 playlist);
+  /// 结束后随父 rebuild 自然刷新 (resizing→false 时 build 重建)。
+  Widget? _cachedChild;
+
   @override
   void initState() {
     super.initState();
@@ -129,7 +135,13 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    // resize 期间返回缓存 — 跳过 _buildPanel/缩略图列表每帧重建 (build 长尾主因)。
+    // 代价: resize 期间 playlist 内容/动画冻结, 可接受 (拖窗时不操作 playlist)。
+    final r = widget.resizing;
+    if (r != null && r.value) {
+      return _cachedChild ?? const SizedBox.shrink();
+    }
+    final child = Stack(
       children: [
         // 全屏透明层 — 点击外部关闭
         Positioned.fill(
@@ -156,6 +168,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         ),
       ],
     );
+    _cachedChild = child;
+    return child;
   }
 
   Widget _buildPanel(double width, double height) {
@@ -180,23 +194,25 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               // 背景层：毛玻璃模糊（缓存固定 filter，opacity 淡入避免帧分配）
               // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
               Positioned.fill(
-                child: widget.resizing != null
-                    ? AnimatedBuilder(
-                        animation: widget.resizing!,
-                        builder: (_, _) {
-                          final resizing = widget.resizing;
-                          if (resizing != null && resizing.value) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                Tokens.radiusLarge,
-                              ),
-                              child: Container(color: Tokens.bgGlass),
-                            );
-                          }
-                          return _buildBackdrop();
-                        },
-                      )
-                    : _buildBackdrop(),
+                // switch 表达式消除 widget.resizing! (字段不提升);
+                // builder 内直接用 r (非空), 不再需二次 null 捕获
+                child: switch (widget.resizing) {
+                  final r? => AnimatedBuilder(
+                      animation: r,
+                      builder: (_, _) {
+                        if (r.value) {
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              Tokens.radiusLarge,
+                            ),
+                            child: Container(color: Tokens.bgGlass),
+                          );
+                        }
+                        return _buildBackdrop();
+                      },
+                    ),
+                  null => _buildBackdrop(),
+                },
               ),
               // 内容层：滚动不触发 BackdropFilter 重绘
               RepaintBoundary(

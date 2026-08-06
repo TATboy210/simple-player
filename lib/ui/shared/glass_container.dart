@@ -109,25 +109,27 @@ class GlassContainer extends StatelessWidget {
     // margin 在最外层，确保不被 BackdropFilter 裁剪
     Widget result;
 
+    // local 捕获 resizing/margin 字段消除 `!` (字段不提升); child `??` 兜底
+    final r = resizing;
+    final m = margin;
     // 降级模式：跳过 BackdropFilter，仅渲染半透明背景（D-14）
     if (!blurEnabled) {
       result = ClipRRect(
         borderRadius: rRect,
         child: RepaintBoundary(child: content),
       );
-    } else if (resizing != null) {
+    } else if (r != null) {
       // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
-      final resizingNotifier = resizing!;
       result = AnimatedBuilder(
-        animation: resizingNotifier,
+        animation: r,
         builder: (_, child) {
-          if (resizingNotifier.value) {
+          if (r.value) {
             return ClipRRect(
               borderRadius: rRect,
               child: RepaintBoundary(child: child),
             );
           }
-          return _buildBlurContent(rRect, child!);
+          return _buildBlurContent(rRect, child ?? const SizedBox.shrink());
         },
         child: content,
       );
@@ -136,8 +138,8 @@ class GlassContainer extends StatelessWidget {
     }
 
     // margin 包裹在最外层，确保毛玻璃裁剪不影响间距
-    if (margin != null) {
-      return Padding(padding: margin!, child: result);
+    if (m != null) {
+      return Padding(padding: m, child: result);
     }
     return result;
   }
@@ -153,7 +155,9 @@ class GlassContainer extends StatelessWidget {
       return AnimatedBuilder(
         animation: opacityNotifier,
         builder: (_, child) {
-          if (opacityNotifier.value < 0.01) return child!;
+          if (opacityNotifier.value < 0.01) {
+            return child ?? const SizedBox.shrink();
+          }
           return ClipRRect(
             borderRadius: rRect,
             child: BackdropFilter(filter: blurFilter, child: child),

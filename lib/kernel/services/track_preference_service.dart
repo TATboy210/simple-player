@@ -49,17 +49,15 @@ class TrackPreferenceService {
   /// Restores track preferences after successful open().
   /// Out-of-range preference indices are silently ignored.
   void restoreAfterOpen(MediaInfo mediaInfo) {
-    // 恢复音频轨道
-    if (_current.audioTrackIndex != null) {
-      final idx = _current.audioTrackIndex!;
+    // 恢复音频轨道 — if-case 绑定非 null idx, 消除字段 `!`
+    if (_current.audioTrackIndex case final idx?) {
       if (idx >= 0 && idx < mediaInfo.audioTracks.length) {
         _engine.switchAudioTrack(idx);
       }
     }
 
-    // 恢复字幕轨道
-    if (_current.subtitleTrackIndex != null) {
-      final idx = _current.subtitleTrackIndex!;
+    // 恢复字幕轨道 — if-case 绑定非 null idx, 消除字段 `!`
+    if (_current.subtitleTrackIndex case final idx?) {
       if (idx == -1) {
         _engine.switchSubtitleTrack(-1);
       } else if (idx >= 0 && idx < mediaInfo.subtitleTracks.length) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
@@ -192,11 +193,7 @@ class KeyboardHandler extends StatelessWidget {
         key == LogicalKeyboardKey.keyD &&
         HardwareKeyboard.instance.isControlPressed &&
         HardwareKeyboard.instance.isShiftPressed) {
-      DebugExporter.saveToFile().then((path) {
-        if (path != null) {
-          developer.log('Debug data saved to: $path', name: 'Debug');
-        }
-      });
+      unawaited(_exportDebugData());
       return KeyEventResult.handled;
     }
 
@@ -215,5 +212,15 @@ class KeyboardHandler extends StatelessWidget {
     }
 
     return KeyEventResult.ignored;
+  }
+
+  /// 导出调试数据到文件 (Ctrl+Shift+D)。
+  ///
+  /// 提取为 async 方法以用 await 替代 .then 链 (DCM prefer-async-await)。
+  Future<void> _exportDebugData() async {
+    final path = await DebugExporter.saveToFile();
+    if (path != null) {
+      developer.log('Debug data saved to: $path', name: 'Debug');
+    }
   }
 }

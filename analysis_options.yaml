@@ -28,3 +28,85 @@ linter:
     cancel_subscriptions: true
     close_sinks: true
     unawaited_futures: true
+dcm:
+  rules:
+    # === 已有规则 ===
+    - avoid-dynamic
+    - avoid-unused-parameters
+    - prefer-conditional-expressions
+    # === Bug 检测 — 纯 bug, 零风格噪音, 只报真 bug ===
+    - avoid-self-assignment
+    - avoid-self-compare
+    - avoid-constant-conditions
+    - avoid-contradictory-expressions
+    - avoid-duplicate-collection-elements
+    - avoid-empty-spread
+    - avoid-recursive-calls
+    - avoid-global-state
+    - avoid-assignments-as-conditions
+    # === 资源/内存泄漏 — 播放器控制器/Stream 订阅/Texture 生命周期, 泄漏即 bug ===
+    - dispose-fields
+    - avoid-unassigned-stream-subscriptions
+    - avoid-unremovable-callbacks-in-listeners
+    - always-remove-listener
+    - avoid-undisposed-instances
+    # === Null/Async 安全 — 强化 CLAUDE.md 禁 ! / late / async 规范 ===
+    - avoid-non-null-assertion
+    - avoid-nullable-tostring
+    - avoid-redundant-async
+    - prefer-async-await
+    - avoid-passing-async-when-sync-expected
+    - require-atomic-async-updates
+    # === Widget 设计/性能 ===
+    - avoid-unnecessary-stateful-widgets
+    - avoid-empty-setstate
+    - avoid-unnecessary-setstate
+    - prefer-single-setstate
+    - avoid-shrink-wrap-in-lists
+    - prefer-dedicated-media-query-methods
+    - prefer-spacing
+    - prefer-const-border-radius
+    - avoid-unnecessary-type-assertions
+    - avoid-unnecessary-type-casts
+    - avoid-unrelated-type-assertions
+    - avoid-unrelated-type-casts
+    - avoid-unnecessary-nullable-return-type
+    - avoid-redundant-async
+    - avoid-passing-async-when-sync-expected
+    - avoid-incomplete-copy-with
+    - avoid-self-assignment
+    - avoid-self-compare
+    - no-equal-then-else
+    - no-boolean-literal-compare
+    - no-empty-block
+    - prefer-moving-to-variable
+    - prefer-declaring-const-constructor
+    - prefer-trailing-comma
+    - newline-before-return
+    - avoid-collapsible-if
+    - avoid-redundant-else
+    - avoid-nested-conditional-expressions
+    - always-remove-listener
+    - dispose-class-fields
+    - proper-super-calls
+    - avoid-unnecessary-setstate
+    - prefer-single-setstate
+    - avoid-border-all
+    - prefer-void-callback
+    - prefer-widget-private-members
+    - prefer-text-rich
+    - prefer-match-file-name
+    - arguments-ordering
+    - avoid-unnecessary-rebuilds
+    - avoid-large-widget
+    - prefer-value-listenable-builder
+    - avoid-missing-returns
+    - avoid-unused-code
+    - avoid-unnecessary-overrides
+  metrics:
+    cyclomatic-complexity: 15
+    maximum-nesting-level: 6
+    number-of-parameters: 8
+    number-of-methods: 20
+    widgets-nesting-level: 8
+    number-of-used-widgets: 30

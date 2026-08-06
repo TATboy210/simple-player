@@ -85,9 +85,11 @@ class ControlBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // decoration 非空时用 DecorationTween 插值，否则直接使用 playing 装饰
-    final effectiveDecoration = decoration != null
-        ? _decorationTween.evaluate(decoration!)
-        : _decorationPlaying;
+    // switch 表达式消除字段 `!`
+    final effectiveDecoration = switch (decoration) {
+      final d? => _decorationTween.evaluate(d),
+      null => _decorationPlaying,
+    };
 
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
@@ -142,8 +144,12 @@ class ControlBar extends StatelessWidget {
       return AnimatedBuilder(
         animation: op,
         builder: (_, child) {
-          if (op.value < 0.01) return child!;
-          return withBlur(child!);
+          // child 由 AnimatedBuilder child 参数传入 (blurContent, 必非空);
+          // local 捕获提升消除 `!`, null 时 fallback blurContent (防御, 不触发)
+          final c = child;
+          if (c == null) return withBlur(blurContent);
+          if (op.value < 0.01) return c;
+          return withBlur(c);
         },
         child: blurContent,
       );

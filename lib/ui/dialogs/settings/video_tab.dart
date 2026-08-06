@@ -30,7 +30,9 @@ class VideoTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    if (videoProcessing == null) {
+    // local 捕获消除字段 `!` (检查后提升)
+    final service = videoProcessing;
+    if (service == null) {
       return Center(
         child: Text(
           l10n.videoProcessingUnavailable,
@@ -38,7 +40,6 @@ class VideoTab extends StatelessWidget {
         ),
       );
     }
-    final service = videoProcessing!;
     return ValueListenableBuilder<VideoProcessingState>(
       valueListenable: service.state,
       builder: (_, s, _) => AnimatedSectionList(

@@ -44,7 +44,8 @@ class SectionHeader extends StatelessWidget {
           if (description != null) ...[
             const SizedBox(width: Tokens.spSm),
             Text(
-              description!,
+              // ?? '' 防御消除 `!` (description 已 null 检查, 字段不提升)
+              description ?? '',
               style: const TextStyle(
                 color: Tokens.textTertiary,
                 fontSize: Tokens.fontOverline,
