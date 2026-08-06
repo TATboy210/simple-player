@@ -6,14 +6,13 @@ import 'player_video_controls.dart';
 
 /// 生产环境 [PlayerPort] — 包装 media_kit 真实 [Player]。
 ///
-/// 路径B:控制栏直连 `player.stream`/`player.state`,绕过 [MediaEngine] 中间层。
-/// 仅纯播放控制(playOrPause/seek/setRate)直写 player;volume/mute 写走
-/// [MediaEngine](保 `_preMuteVolume` 语义),故本端口不暴露 setVolume。
+/// 控制栏展示状态直连 `player.stream`/`player.state`，基础播放命令由项目
+/// `PlaybackController` 门面负责。本端口仅保留进度条 seek-hold 与倍速所需的
+/// 直接 Player 操作；volume/mute 仍由 [MediaEngine] 维护项目语义。
 ///
-/// stream + state 字段名完全镜像(见 media_kit `PlayerStream`/`PlayerState`
-/// 源码,1.2.6),1:1 转发零转换。[Player] 的 playOrPause/seek/setRate 返回
-/// `Future<void>`,适配器 void 语义用 [unawaited] fire-and-forget(对齐
-/// `MediaKitEngine` 的 `unawaited(_player.play())` 模式)。
+/// stream + state 字段名完全镜像 media_kit 1.2.6 的 `PlayerStream` 与
+/// `PlayerState`。`seek`/`setRate` 返回 `Future<void>`，适配器用 [unawaited]
+/// 明确表达 fire-and-forget。
 ///
 /// 本类无单元测试 — 构造需真实 [Player](FFI mdk.dll),headless 环境无法构造
 /// (见 memory [[reference_mdk_dll_headless_test_failures]])。核心逻辑测试覆盖
@@ -56,10 +55,7 @@ class MediaKitPlayerPort implements PlayerPort {
   @override
   double get rateNow => _player.state.rate;
 
-  // ─── 纯播放控制(直写 player,Future<void> → unawaited)───
-  @override
-  void playOrPause() => unawaited(_player.playOrPause());
-
+  // ─── 精细交互控制(直写 player,Future<void> → unawaited)───
   @override
   void seek(Duration position) => unawaited(_player.seek(position));
 

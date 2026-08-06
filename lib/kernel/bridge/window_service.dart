@@ -40,7 +40,7 @@ class WindowService with WindowListener implements WindowBridge {
   bool _skipNextResize = false;
 
   /// 全屏意图标记 — setMode(fullscreen) 置 true, setMode(windowed 从 fullscreen) 置 false.
-  /// fullscreen_window cpp 用 SC_MAXIMIZE 实现全屏铺满, 会触发 onWindowMaximize;
+  /// 系统全屏铺满走 SC_MAXIMIZE(最大化), 会触发 onWindowMaximize;
   /// 此标记守卫 onWindowMaximize/onWindowUnmaximize, 防止 mode 被覆盖成 maximized.
   bool _fullscreenIntent = false;
 
@@ -268,8 +268,7 @@ class WindowService with WindowListener implements WindowBridge {
         // 方案 B: 实际全屏由 UI 层调 media_kit VideoState.toggleFullscreen
         // (已验证可用). 此处只设 intent + mode — onWindowMaximize 守卫保持
         // mode=fullscreen, 不被 SC_MAXIMIZE 覆盖成 maximized.
-        // 弃方案 A 直调 FullScreenWindowPlatform: path 依赖覆盖 + 绕过 media_kit
-        // 初始化路径, 致 GUI 全屏失效.
+        // 不得绕过 media_kit 初始化路径直调系统全屏 (旧方案致 GUI 全屏失效).
         _fullscreenIntent = true;
         _state.mode.value = WindowMode.fullscreen;
     }

@@ -5,7 +5,7 @@
 /// v3 简化: DesktopFullscreenAdapter 已合并入 WindowService。
 ///
 /// Phase 1 移除: FullscreenDriver 抽象层已删除，WindowService 不再接受 driver 参数。
-/// 全屏测试待 Phase 4 使用 fullscreen_window 包重写。
+/// 全屏现走 media_kit VideoState.toggleFullscreen (方案 B), 无独立全屏依赖。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,9 +16,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Smoke Suite — 8 Mandatory Scenarios', () {
-    // TODO: Phase 4 — rewrite fullscreen tests using fullscreen_window package
-    // All 8 scenarios (FS-REG-001 ~ FS-REG-008) depend on FullscreenDriver mock
-    // which was deleted in Phase 1. WindowService no longer accepts driver parameter.
-    // Fullscreen case in setMode is stubbed until Phase 2 wires fullscreen_window.
+    // TODO: 全屏回归场景 (FS-REG-001 ~ FS-REG-008) 依赖已删除的 FullscreenDriver,
+    // 现全屏走 media_kit VideoState.toggleFullscreen — 待用 media_kit 集成测试重写.
   });
 }

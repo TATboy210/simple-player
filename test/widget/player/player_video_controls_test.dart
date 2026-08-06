@@ -1,14 +1,21 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
+import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
+import '../../helpers/fake_video_controls.dart';
 
-/// 路径B 阶段1 核心闭环测试 — [PlayerControlsState] 订阅 [PlayerPort] stream
-/// 转写为 ValueNotifier + 纯播放控制直写 port + volume/mute 写走 engine。
+/// 控制栏状态桥测试 — [PlayerControlsState] 订阅 [PlayerPort] stream 转写为
+/// ValueNotifier；seek/倍速保留直达 port，音量/静音写走 engine。
 ///
-/// 8 个测试覆盖: init 快照 / playOrPause / seek 乐观更新 / setVolume 走 engine /
-/// setRate / stream.playing 推送 / stream.position 推送 / stream.volume 转 0-1。
+/// 基础播放命令已统一由 PlayerActions → PlaybackController 负责，因此此处只锁定
+/// media_kit Player stream 仍是播放图标和进度显示的数据源。
 void main() {
   late FakeEngine engine;
   late FakePlayerControls port;
@@ -34,13 +41,7 @@ void main() {
     expect(state.volume01.value, 1.0);
   });
 
-  // 2. playOrPause 直写 port(路径B 跳过 engine 中间层)
-  test('playOrPause 直写 port(路径B)', () {
-    state.playOrPause();
-    expect(port.playOrPauseCallCount, 1);
-  });
-
-  // 3. seek 乐观更新 positionMs 再调 port.seek — 让 seek-hold 立即到达容差
+  // 2. seek 乐观更新 positionMs 再调 port.seek — 让 seek-hold 立即到达容差
   test('seek 乐观更新 positionMs 再调 port.seek', () {
     state.durationMs.value = 60000;
     state.seek(5000);
@@ -81,5 +82,194 @@ void main() {
     port.emitVolume(75.0);
     await Future<void>.delayed(Duration.zero);
     expect(state.volume01.value, closeTo(0.75, 1e-9));
+  });
+
+  group('PlayerVideoControls 生产装配', () {
+    late FakeEngine widgetEngine;
+    late FakeVideoControlsPort video;
+    late ValueNotifier<String> currentFileName;
+    late ValueNotifier<int> playlistGeneration;
+    late ValueNotifier<bool> openFileEnabled;
+
+    setUp(() {
+      widgetEngine = FakeEngine();
+      video = FakeVideoControlsPort();
+      currentFileName = ValueNotifier<String>('movie.mp4');
+      playlistGeneration = ValueNotifier<int>(0);
+      openFileEnabled = ValueNotifier<bool>(true);
+    });
+
+    tearDown(() {
+      currentFileName.dispose();
+      playlistGeneration.dispose();
+      openFileEnabled.dispose();
+      video.dispose();
+      widgetEngine.dispose();
+    });
+
+    Future<void> pumpControls(
+      WidgetTester tester, {
+      required PlayerActions actions,
+      FakeVideoControlsPort? controlsPort,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 1280,
+              height: 720,
+              child: PlayerVideoControls(
+                video: controlsPort ?? video,
+                engine: widgetEngine,
+                actions: actions,
+                currentFileName: currentFileName,
+                playlist: Playlist(),
+                playlistGeneration: playlistGeneration,
+                openFileEnabled: openFileEnabled,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('六个基础按钮只命中 PlayerActions', (tester) async {
+      var playPauseCount = 0;
+      var previousCount = 0;
+      var nextCount = 0;
+      var stopCount = 0;
+      final seekBackValues = <int>[];
+      final seekForwardValues = <int>[];
+      final actions = PlayerActions(
+        onPlayPause: () => playPauseCount++,
+        onSeekBack: seekBackValues.add,
+        onSeekForward: seekForwardValues.add,
+        onPrevious: () => previousCount++,
+        onNext: () => nextCount++,
+        onStop: () => stopCount++,
+      );
+
+      await pumpControls(tester, actions: actions);
+
+      await tester.tap(find.byIcon(Icons.skip_previous));
+      await tester.tap(find.byIcon(Icons.replay_10));
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.tap(find.byIcon(Icons.forward_30));
+      await tester.tap(find.byIcon(Icons.skip_next));
+      await tester.tap(find.byIcon(Icons.stop));
+      await tester.pump();
+
+      expect(previousCount, 1);
+      expect(seekBackValues, [Tokens.skipShortMs]);
+      expect(playPauseCount, 1);
+      expect(seekForwardValues, [Tokens.skipLongMs]);
+      expect(nextCount, 1);
+      expect(stopCount, 1);
+      expect(widgetEngine.togglePlayPauseCallCount, 0);
+      expect(widgetEngine.skipBackCallCount, 0);
+      expect(widgetEngine.skipForwardCallCount, 0);
+    });
+
+    testWidgets('Space Left Right 与按钮复用同一动作入口', (tester) async {
+      var playPauseCount = 0;
+      final seekBackValues = <int>[];
+      final seekForwardValues = <int>[];
+      final actions = PlayerActions(
+        onPlayPause: () => playPauseCount++,
+        onSeekBack: seekBackValues.add,
+        onSeekForward: seekForwardValues.add,
+      );
+
+      await pumpControls(tester, actions: actions);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+
+      expect(playPauseCount, 1);
+      expect(seekBackValues, [Tokens.skipShortMs]);
+      expect(seekForwardValues, [Tokens.skipLongMs]);
+      expect(widgetEngine.togglePlayPauseCallCount, 0);
+      expect(widgetEngine.skipBackCallCount, 0);
+      expect(widgetEngine.skipForwardCallCount, 0);
+    });
+
+    testWidgets('F 使用当前 route 端口切换 media_kit 全屏', (tester) async {
+      var fullscreenSyncCount = 0;
+      final actions = PlayerActions(
+        onToggleFullscreen: () => fullscreenSyncCount++,
+      );
+
+      await pumpControls(tester, actions: actions);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+
+      expect(fullscreenSyncCount, 1);
+      expect(video.toggleFullscreenCallCount, 1);
+      expect(video.exitFullscreenCallCount, 0);
+    });
+
+    testWidgets('ESC 只退出当前 fullscreen route 端口', (tester) async {
+      video.isFullscreen = true;
+      var fullscreenSyncCount = 0;
+      final actions = PlayerActions(
+        onToggleFullscreen: () => fullscreenSyncCount++,
+      );
+
+      await pumpControls(tester, actions: actions);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+
+      expect(fullscreenSyncCount, 1);
+      expect(video.exitFullscreenCallCount, 1);
+      expect(video.toggleFullscreenCallCount, 0);
+    });
+
+    testWidgets('窗口态 ESC 不触发全屏 route 操作', (tester) async {
+      var fullscreenSyncCount = 0;
+      final actions = PlayerActions(
+        onToggleFullscreen: () => fullscreenSyncCount++,
+      );
+
+      await pumpControls(tester, actions: actions);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+
+      expect(fullscreenSyncCount, 0);
+      expect(video.exitFullscreenCallCount, 0);
+      expect(video.toggleFullscreenCallCount, 0);
+    });
+
+    testWidgets('playing stream 驱动自动隐藏且暂停后恢复常显', (tester) async {
+      final playingPort = FakePlayerControls(isPlayingNow: true);
+      final playingVideo = FakeVideoControlsPort(player: playingPort);
+      addTearDown(playingVideo.dispose);
+
+      await pumpControls(
+        tester,
+        controlsPort: playingVideo,
+        actions: const PlayerActions(),
+      );
+
+      Visibility controlsVisibility() => tester.widget<Visibility>(
+        find.byKey(const Key('player-controls-visibility')),
+      );
+
+      expect(controlsVisibility().visible, isTrue);
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+      expect(controlsVisibility().visible, isFalse);
+
+      playingPort.emitPlaying(false);
+      await tester.pump();
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+      expect(controlsVisibility().visible, isTrue);
+
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed + 1));
+      expect(controlsVisibility().visible, isTrue);
+    });
   });
 }

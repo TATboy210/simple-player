@@ -11,6 +11,7 @@ import 'package:simple_player_flutter/ui/player/player_screen.dart';
 import 'package:simple_player_flutter/ui/shared/empty_state.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/fake_video_controls.dart';
 import '../../helpers/fake_window_service.dart';
 
 void main() {
@@ -27,6 +28,7 @@ void main() {
       );
       final settingsPanelController = SettingsPanelController(controller);
       final windowService = FakeWindowService();
+      final videoControls = FakeVideoControlsPort();
       final stopGate = Completer<void>();
       var openFileCount = 0;
 
@@ -35,6 +37,7 @@ void main() {
         controller.dispose();
         playlistGeneration.dispose();
         windowService.dispose();
+        videoControls.dispose();
         engine.dispose();
       });
 
@@ -58,6 +61,7 @@ void main() {
             onOpenFile: () => openFileCount++,
             emptyState: EmptyState(onOpenFile: () => openFileCount++),
             videoSurfaceBuilder: (_) => const SizedBox.expand(),
+            testVideoControls: videoControls,
           ),
         ),
       );
