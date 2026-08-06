@@ -45,6 +45,12 @@ class PlayerScreen extends StatefulWidget {
   /// 可替换的视频渲染面；默认路径仍使用 media_kit [Video]，不改变其生命周期。
   final Widget Function(GlobalKey<VideoState> videoKey)? videoSurfaceBuilder;
 
+  /// 测试渲染面配套的 controls 端口；仅在 [videoSurfaceBuilder] 注入时使用。
+  ///
+  /// 生产路径必须由 `Video.controls` 提供当前 route 的 [VideoState]，因此禁止单独
+  /// 注入本端口，避免绕过 media_kit 默认 fullscreen route。
+  final VideoControlsPort? testVideoControls;
+
   final PlaybackController controller;
   final Playlist playlist;
   final ValueNotifier<int> playlistGeneration;
@@ -70,6 +76,7 @@ class PlayerScreen extends StatefulWidget {
     required this.engine,
     this.mediaKitController,
     this.videoSurfaceBuilder,
+    this.testVideoControls,
     required this.controller,
     required this.playlist,
     required this.playlistGeneration,
@@ -86,7 +93,8 @@ class PlayerScreen extends StatefulWidget {
     this.onFolderScanned,
     this.onClearHistory,
     this.onShowProperties,
-  }) : assert(mediaKitController != null || videoSurfaceBuilder != null);
+  }) : assert(mediaKitController != null || videoSurfaceBuilder != null),
+       assert(testVideoControls == null || videoSurfaceBuilder != null);
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -175,6 +183,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // 稳定化 actions — initState 构造一次,纯播放/项目回调闭包现读 widget 字段
     // 避免陈旧捕获. playModeIcon/Label 已下沉, 不需 l10n/context.
     _actions = PlayerActions(
+      onPlayPause: widget.controller.togglePlayPause,
+      onSeekBack: widget.controller.skipBack,
+      onSeekForward: widget.controller.skipForward,
       onPrevious: () => widget.controller.playPrevious(),
       onNext: () => widget.controller.playNext(),
       // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
@@ -300,7 +311,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
               // (标题+4按钮, mode/isAlwaysOnTop 不变则不重建), layer 复用
               // 跳过 repaint — 与 videoContent/PlaylistPanel/SettingsShell
               // 的隔离模式一致.
-              RepaintBoundary(child: CustomTitleBar(windowService: widget.windowService)),
+              RepaintBoundary(
+                child: CustomTitleBar(windowService: widget.windowService),
+              ),
               Expanded(
                 child: Stack(
                   children: [
@@ -349,9 +362,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               return Row(
                                 children: [
                                   Expanded(
-                                    child: RepaintBoundary(
-                                      child: videoContent,
-                                    ),
+                                    child: RepaintBoundary(child: videoContent),
                                   ),
                                   RepaintBoundary(
                                     child: IgnorePointer(
@@ -423,6 +434,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         final keyboardHandler = buildPlayerKeyboardActions(
           engine: widget.engine,
           controller: widget.controller,
+          actions: _actions,
           windowService: widget.windowService,
           customBindings: widget.customBindings,
           videoKey: _videoKey,
@@ -482,7 +494,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// (fullscreen.dart:63), 使全屏态自动获得同一份 ControlsOverlay.
   Widget _buildVideoSurface() {
     final testSurface = widget.videoSurfaceBuilder;
-    if (testSurface != null) return testSurface(_videoKey);
+    if (testSurface != null) {
+      final surface = testSurface(_videoKey);
+      final testVideo = widget.testVideoControls;
+      if (testVideo == null) return surface;
+
+      // 测试模式叠加真实 controls widget，但端口由纯 Dart fake 提供，既覆盖
+      // PlayerScreen 装配，又不初始化 MDK/libmpv。生产路径不会进入该分支。
+      return Stack(
+        fit: StackFit.expand,
+        children: [surface, _buildTestControls(testVideo)],
+      );
+    }
 
     final controller = widget.mediaKitController;
     if (controller == null) return const SizedBox.expand();
@@ -501,10 +524,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
           // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
           // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
           // 变化, Element 复用不重新挂载。静止用 low 保画质。isResizing 仅开始/结束各变 1 次。
-          filterQuality:
-              resizing ? FilterQuality.none : FilterQuality.low,
+          filterQuality: resizing ? FilterQuality.none : FilterQuality.low,
         ),
       ),
+    );
+  }
+
+  /// 测试 surface 使用的 controls 装配；生产仍只走 [_buildControls]。
+  Widget _buildTestControls(VideoControlsPort video) {
+    return PlayerVideoControls(
+      video: video,
+      engine: widget.engine,
+      actions: _actions,
+      currentFileName: widget.controller.currentFileName,
+      playlist: widget.playlist,
+      playlistGeneration: widget.playlistGeneration,
+      openFileEnabled: _isOpenFileEnabled,
+      emptyState: widget.emptyState,
+      resizing: widget.windowService.isResizing,
     );
   }
 

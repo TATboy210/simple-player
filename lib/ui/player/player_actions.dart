@@ -12,6 +12,15 @@ import '../../kernel/models/playlist_item.dart';
 /// 必须是稳定引用，不能每次 build 重建。playModeIcon/Label 已下沉到
 /// LeftButtonGroup 内部用 playlist.mode + playlistGeneration 计算。
 class PlayerActions {
+  /// 播放/暂停切换；统一进入项目播放控制门面。
+  final VoidCallback? onPlayPause;
+
+  /// 快退指定毫秒数。
+  final void Function(int milliseconds)? onSeekBack;
+
+  /// 快进指定毫秒数。
+  final void Function(int milliseconds)? onSeekForward;
+
   /// N 键或控制栏"上一曲"按钮。
   final VoidCallback? onPrevious;
 
@@ -63,6 +72,9 @@ class PlayerActions {
   final bool isVideo;
 
   const PlayerActions({
+    this.onPlayPause,
+    this.onSeekBack,
+    this.onSeekForward,
     this.onPrevious,
     this.onNext,
     this.onStop,

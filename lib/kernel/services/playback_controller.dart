@@ -176,6 +176,17 @@ class PlaybackController implements SettingsPanelPlayback {
   /// Plays the previous track. Delegates to [PlaybackNavigator.playPrevious].
   Future<void> playPrevious() => navigator.playPrevious();
 
+  /// 切换播放/暂停 — 委托 [MediaEngine.togglePlayPause].
+  ///
+  /// 控制栏统一经过本门面进入引擎状态机，避免绕过 opening/error 等状态守卫。
+  void togglePlayPause() => engine.togglePlayPause();
+
+  /// 快退指定毫秒数 — 委托 [MediaEngine.skipBack].
+  void skipBack([int ms = 10000]) => engine.skipBack(ms);
+
+  /// 快进指定毫秒数 — 委托 [MediaEngine.skipForward].
+  void skipForward([int ms = 10000]) => engine.skipForward(ms);
+
   /// 打开并播放文件 — 委托 [FileOperations.openAndPlay].
   ///
   /// Opens and plays a file. Delegates to [FileOperations.openAndPlay].

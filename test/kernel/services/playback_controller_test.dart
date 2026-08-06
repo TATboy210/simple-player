@@ -65,6 +65,28 @@ void main() {
   }
 
   group('PlaybackController', () {
+    group('基础播放控制门面', () {
+      test('togglePlayPause delegates to the media engine', () {
+        controller.togglePlayPause();
+
+        expect(engine.togglePlayPauseCallCount, 1);
+      });
+
+      test('skipBack delegates the requested milliseconds', () {
+        controller.skipBack(10000);
+
+        expect(engine.skipBackCallCount, 1);
+        expect(engine.lastSkipBackMs, 10000);
+      });
+
+      test('skipForward delegates the requested milliseconds', () {
+        controller.skipForward(30000);
+
+        expect(engine.skipForwardCallCount, 1);
+        expect(engine.lastSkipForwardMs, 30000);
+      });
+    });
+
     // ─── openAndPlay ───
 
     group('openAndPlay', () {

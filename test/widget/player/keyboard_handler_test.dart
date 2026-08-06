@@ -100,10 +100,10 @@ void main() {
       expect(tracker.volumeUp, 0);
     });
 
-    testWidgets('F key does not toggle fullscreen', (tester) async {
+    testWidgets('F key triggers fullscreen toggle', (tester) async {
       await tester.pumpWidget(_buildSubject(tracker));
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF);
-      expect(tracker.toggleFullscreen, 0);
+      expect(tracker.toggleFullscreen, 1);
     });
 
     testWidgets('M key toggles mute', (tester) async {

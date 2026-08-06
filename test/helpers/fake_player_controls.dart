@@ -4,10 +4,8 @@ import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 
 /// 路径B 测试 fake — 实现 [PlayerPort] 用纯 Dart [StreamController.broadcast]。
 ///
-/// 模拟 media_kit [Player] 的 stream + state 快照 + 控制调用计数,无 FFI 依赖
-/// (headless 测试环境 mdk.dll 加载失败,见 memory
-/// [[reference_mdk_dll_headless_test_failures]])。照 [FakeEngine] 模式:
-/// stream + 调用计数 + emit* helper。
+/// 模拟 media_kit [Player] 的 stream + state 快照 + 精细交互调用计数，无 FFI
+/// 依赖。基础播放命令已收口到 PlaybackController，不属于本 fake 的职责。
 class FakePlayerControls implements PlayerPort {
   FakePlayerControls({
     this.isPlayingNow = false,
@@ -21,8 +19,7 @@ class FakePlayerControls implements PlayerPort {
   // ─── 8 个 broadcast stream(模拟 player.stream.*)───
   final StreamController<bool> _playing = StreamController<bool>.broadcast();
   final StreamController<bool> _buffering = StreamController<bool>.broadcast();
-  final StreamController<bool> _completed =
-      StreamController<bool>.broadcast();
+  final StreamController<bool> _completed = StreamController<bool>.broadcast();
   final StreamController<Duration> _position =
       StreamController<Duration>.broadcast();
   final StreamController<Duration> _duration =
@@ -63,15 +60,11 @@ class FakePlayerControls implements PlayerPort {
   @override
   double rateNow;
 
-  // ─── 控制调用计数 ───
-  int playOrPauseCallCount = 0;
+  // ─── 精细交互调用计数 ───
   int seekCallCount = 0;
   int setRateCallCount = 0;
   Duration? lastSeekPosition;
   double? lastRate;
-
-  @override
-  void playOrPause() => playOrPauseCallCount++;
 
   @override
   void seek(Duration position) {

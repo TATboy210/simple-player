@@ -23,15 +23,11 @@ import 'player_actions.dart';
 import 'player_units.dart';
 
 /// media_kit [Player] 的可测试端口 — 抽象出 [PlayerControlsState] 所需的
-/// stream + 快照 + 纯播放控制。
+/// stream、快照与精细交互控制。
 ///
-/// 路径B:控制栏直连 `player.stream`,但 [Player] 是 media_kit 具体类,headless
-/// 测试环境无法构造(FFI mdk.dll 加载失败,见 memory
-/// [[reference_mdk_dll_headless_test_failures]])。本接口用 Dart 标准类型暴露
-/// 所需能力,生产用 `MediaKitPlayerPort` 包装真实 [Player],测试用 Fake。
-///
-/// 纯播放控制(playOrPause/seek/setRate)直写 player(路径B核心);volume/mute
-/// 写走 [MediaEngine](保 `_preMuteVolume` 语义),不在此接口。
+/// 控制栏展示状态直连 `player.stream`，避免引擎镜像状态带来的帧间延迟；基础
+/// 播放命令则经 [PlayerActions] 统一进入项目播放控制门面。本端口只保留
+/// 进度条 seek-hold 与倍速所需的直接 Player 操作。
 abstract interface class PlayerPort {
   /// 播放状态流
   Stream<bool> get playing;
@@ -55,10 +51,67 @@ abstract interface class PlayerPort {
   double get volumeNow; // 0-100
   double get rateNow;
 
-  /// 纯播放控制 — 直写 player(路径B)
-  void playOrPause();
+  /// 进度条与倍速的精细交互仍直达 player。
   void seek(Duration position);
   void setRate(double rate);
+}
+
+/// 当前 media_kit `Video.controls` 实例的可测试端口。
+///
+/// 生产实现始终包装当前 route 的 [VideoState]，确保全屏切换与字幕 padding 不会
+/// 错发到窗口态的旧实例；测试实现可使用纯 Dart [PlayerPort]，避免加载 libmpv。
+abstract interface class VideoControlsPort {
+  /// 当前视频实例共享的播放器状态与精细交互端口。
+  PlayerPort get player;
+
+  /// 当前 controls 是否位于 media_kit fullscreen route。
+  bool get isFullscreen;
+
+  /// 包装的 VideoState 是否仍可安全接收字幕 padding 更新。
+  bool get isMounted;
+
+  /// 当前字幕配置的基础 padding。
+  EdgeInsets get subtitlePadding;
+
+  /// 使用当前 VideoState 切换 media_kit 原生全屏 route。
+  void toggleFullscreen();
+
+  /// 使用当前 VideoState 退出 media_kit 原生全屏 route。
+  void exitFullscreen();
+
+  /// 更新当前 VideoState 的字幕安全区。
+  void setSubtitleViewPadding(EdgeInsets padding);
+}
+
+/// 将 media_kit [VideoState] 适配为 [VideoControlsPort]。
+final class MediaKitVideoControlsPort implements VideoControlsPort {
+  MediaKitVideoControlsPort(this._state)
+    : player = MediaKitPlayerPort(_state.widget.controller.player);
+
+  final VideoState _state;
+
+  @override
+  final PlayerPort player;
+
+  @override
+  bool get isFullscreen => _state.isFullscreen();
+
+  @override
+  bool get isMounted => _state.mounted;
+
+  @override
+  EdgeInsets get subtitlePadding =>
+      _state.widget.subtitleViewConfiguration.padding;
+
+  @override
+  void toggleFullscreen() => _state.toggleFullscreen();
+
+  @override
+  void exitFullscreen() => _state.exitFullscreen();
+
+  @override
+  void setSubtitleViewPadding(EdgeInsets padding) =>
+      _state.setSubtitleViewPadding(padding);
 }
 
 /// 路径B 控制栏的状态容器 — 订阅 [PlayerPort] stream 转写为 [ValueNotifier]。
@@ -122,9 +175,6 @@ class PlayerControlsState {
     _rateSub = _port.rate.listen((v) => rate.value = v);
   }
 
-  /// 播放/暂停 — 直写 player(路径B,跳过 engine 中间层)
-  void playOrPause() => _port.playOrPause();
-
   /// seek(int ms)— 乐观更新 positionMs 再 player.seek.
   ///
   /// 关键:乐观更新让 ProgressBar seek-hold 立即到达容差触发 _finishSeekHold,
@@ -185,7 +235,7 @@ Widget playerVideoControls(
   ValueListenable<bool>? resizing,
 }) {
   return PlayerVideoControls(
-    state: state,
+    video: MediaKitVideoControlsPort(state),
     engine: engine,
     actions: actions,
     playlist: playlist,
@@ -202,15 +252,15 @@ Widget playerVideoControls(
 /// 与 [ControlsOverlay] 同构 Stack(空状态→RepaintBoundary[OsdOverlay+ControlBar
 /// +ErrorBanner]→MouseRegion 唤起),差异仅在数据源/控制出口:
 /// - 播放/位置/时长/倍速/音量(读): [PlayerControlsState] 订阅 `player.stream`
-/// - 播放/seek/倍速(写): 直写 `player`(经 [PlayerPort]),跳过 [MediaEngine]
+/// - 播放/暂停、快退、快进(写): 经 [PlayerActions] 进入 PlaybackController 门面
+/// - 进度条 seek/倍速(写): 经 [PlayerPort] 直写 `player`，保留低延迟精细交互
 /// - 音量/静音(写): 走 [MediaEngine](保 `_preMuteVolume` 语义)
-/// - skipBack/skipForward: 走 engine(项目语义糖,内部 seekTo→player.seek 一致)
 /// - isFullscreen: 从 [VideoState.isFullscreen] 现取(每实例独立,修复"图标不动态")
 ///
 /// 阶段2 适配 route 约束(修实机 3 bug):
 /// - **AutoHide 改 isPlaying**:[PlayerControlsState.isPlaying] 驱动,非 playing 永显
 /// - **删 visibleSink 跨层**:字幕 padding 由本控件监听 [_autoHide.visible] 调
-///   `widget.state.setSubtitleViewPadding`(每实例调自己 VideoState,修"自动隐藏
+///   `widget.video.setSubtitleViewPadding`(每实例调自己 VideoState,修"自动隐藏
 ///   失效"根因 — 旧路径 PlayerScreen 用窗口态 _videoKey,全屏 route 调错对象)
 /// - **键盘住进 controls**:[Focus] + autofocus + onKeyEvent 最小集(ESC/F/Space/
 ///   方向键),全屏 route 复制 builder 时自动携带(修"退出 deactivated" — 旧路径
@@ -218,10 +268,9 @@ Widget playerVideoControls(
 /// - **MouseRegion cursor**:全屏 + 控件隐藏 → none(沉浸),替代旧 PlayerScreen
 ///   _controlsVisible 跨层驱动
 class PlayerVideoControls extends StatefulWidget {
-  /// 本实例 media_kit [VideoState] — 数据源(`.widget.controller.player`)
-  /// + 全屏 route 切换(`toggleFullscreen`/`exitFullscreen`)+ 字幕 padding
-  /// (`setSubtitleViewPadding`)三用途。
-  final VideoState state;
+  /// 当前 route 的视频控制端口；生产环境由 [MediaKitVideoControlsPort] 包装
+  /// media_kit [VideoState]，测试可注入不加载原生库的 fake。
+  final VideoControlsPort video;
 
   final MediaEngine engine;
   final PlayerActions actions;
@@ -246,7 +295,7 @@ class PlayerVideoControls extends StatefulWidget {
 
   const PlayerVideoControls({
     super.key,
-    required this.state,
+    required this.video,
     required this.engine,
     required this.actions,
     required this.currentFileName,
@@ -263,13 +312,10 @@ class PlayerVideoControls extends StatefulWidget {
 
 class _PlayerVideoControlsState extends State<PlayerVideoControls>
     with TickerProviderStateMixin {
-  /// 路径B 核心:从本实例 VideoState 取 Player,经 [MediaKitPlayerPort] 订阅 stream。
-  /// 全屏 route 复用同 Player,stream 推送至该实例 [PlayerControlsState](每实例独立,
-  /// 修复"图标不动态"——旧路径 engine 是单例,全屏 route 的控制栏图标不随 player 状态变)。
-  late final Player _player = widget.state.widget.controller.player;
-  late final MediaKitPlayerPort _port = MediaKitPlayerPort(_player);
+  /// 路径B 核心:从当前 route 的视频端口订阅 Player stream。全屏 route 复用
+  /// 同一个 Player，但每个 controls 实例独立维护展示状态与生命周期。
   late final PlayerControlsState _controlsState = PlayerControlsState(
-    _port,
+    widget.video.player,
     engine: widget.engine,
   );
 
@@ -283,7 +329,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 全屏 route focusNode=null → 不自带 Focus 键盘事件收不到(见计划风险处理2)。
   late final FocusNode _focusNode = FocusNode();
 
-  /// 派生 isFullscreen — 同步 widget.state.isFullscreen(),供全屏按钮图标动态切换。
+  /// 派生 isFullscreen — 同步 widget.video.isFullscreen,供全屏按钮图标动态切换。
   late final ValueNotifier<bool> _isFullscreenNotifier;
 
   /// 共享 AnimationController — 驱动 resize 淡出/淡入和 decoration 状态切换
@@ -313,12 +359,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   ///
   /// 两步:① `actions.onToggleFullscreen` 同步 WindowService mode(守卫 + 鼠标
   /// 隐藏联动);② `state.toggleFullscreen()` 走 media_kit 原生 route
-  /// (push/pop PageRouteBuilder)。用**本实例** [widget.state] — 窗口态
+  /// (push/pop PageRouteBuilder)。用**本实例** [widget.video] — 窗口态
   /// isFullscreen()=false→enter, 全屏态 =true→exit, 自动正确分支
   /// (修复症状④退出渲染出错,见 memory [[project_fullscreen_minimal_fix]])。
   void _toggleFullscreen() {
     widget.actions.onToggleFullscreen?.call();
-    widget.state.toggleFullscreen();
+    widget.video.toggleFullscreen();
   }
 
   /// 阶段2:字幕 padding 自驱 — 监听 [_autoHide.visible] 调本实例 VideoState.
@@ -326,18 +372,18 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 修"自动隐藏失效"根因:旧路径 PlayerScreen._onControlsVisibleChanged 用窗口态
   /// `_videoKey.currentState` 调 setSubtitleViewPadding,全屏 route 时全屏 VideoState
   /// 是另一实例,padding 调错对象 → 字幕被控制栏遮挡/控件隐藏字幕不动。本控件每实例
-  /// 监听自己 _autoHide.visible,调 `widget.state`(本实例)→ 双实例各自正确。
+  /// 监听自己 _autoHide.visible,调 `widget.video`(本实例)→ 双实例各自正确。
   void _syncSubtitlePadding() {
     // 阶段3:退出全屏 route pop(Duration.zero) 后,全屏 VideoState deactivate/dispose。
     // post-frame callback(line 413) 或 _autoHide.visible listener 可能在本控件
-    // 失效后触发本方法,调用已 deactivate 的 widget.state.setSubtitleViewPadding
+    // 失效后触发本方法,调用已 deactivate 的 widget.video.setSubtitleViewPadding
     // 会更新 media_kit _videoViewParametersNotifier → 触发全屏 Video rebuild →
     // 查已 deactivate 的 InheritedWidget ancestor → "deactivated widget's
     // ancestor" 断言(framework.dart:6417)。mounted 挡本控件 dispose 后;
-    // widget.state.mounted 挡全屏 VideoState dispose 后。
-    if (!mounted || !widget.state.mounted) return;
-    final videoState = widget.state;
-    final base = videoState.widget.subtitleViewConfiguration.padding;
+    // widget.video.isMounted 挡全屏 VideoState dispose 后。
+    if (!mounted || !widget.video.isMounted) return;
+    final videoState = widget.video;
+    final base = videoState.subtitlePadding;
     if (_autoHide.visible.value) {
       videoState.setSubtitleViewPadding(
         base +
@@ -361,9 +407,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
       // ESC:仅全屏态退出(窗口态 ESC 冒泡给 KeyboardHandler 关播放列表/设置)
-      if (widget.state.isFullscreen()) {
+      if (widget.video.isFullscreen) {
         widget.actions.onToggleFullscreen?.call();
-        widget.state.exitFullscreen();
+        widget.video.exitFullscreen();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -373,15 +419,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.space) {
-      _controlsState.playOrPause();
+      widget.actions.onPlayPause?.call();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      widget.engine.skipBack();
+      widget.actions.onSeekBack?.call(Tokens.skipShortMs);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      widget.engine.skipForward();
+      widget.actions.onSeekForward?.call(Tokens.skipLongMs);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -390,7 +436,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   @override
   void initState() {
     super.initState();
-    _isFullscreenNotifier = ValueNotifier<bool>(widget.state.isFullscreen());
+    _isFullscreenNotifier = ValueNotifier<bool>(widget.video.isFullscreen);
     // 阶段2:_controlsState.init() 前置 — isPlaying 有真值后再构造 _autoHide
     // (AutoHide 监听 _controlsState.isPlaying,init() 读初值)。
     _controlsState.init(); // 订阅 player.stream + 初始快照
@@ -398,7 +444,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       vsync: this,
       // 阶段2:AutoHide 用 _controlsState.isPlaying(player.stream 驱动)。
       isPlaying: _controlsState.isPlaying,
-      isFullscreen: widget.state.isFullscreen(),
+      isFullscreen: widget.video.isFullscreen,
       popupCloseNotifier: _popupCloseNotifier,
     );
     widget.engine.state.addListener(_onEngineStateChanged);
@@ -421,7 +467,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     if (widget.resizing?.value == true) _onResizeChanged();
 
     // 阶段2:字幕 padding 自驱(每实例调自己 VideoState)。post-frame 确保
-    // widget.state 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
+    // widget.video 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
     _autoHide.visible.addListener(_syncSubtitlePadding);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncSubtitlePadding());
   }
@@ -437,10 +483,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         _autoHide.hide();
       }
       // Timer 仅用于双击检测窗口(超时自动失效,空回调)
-      _clickTimer = Timer(
-        const Duration(milliseconds: _clickDelayMs),
-        () {},
-      );
+      _clickTimer = Timer(const Duration(milliseconds: _clickDelayMs), () {});
     }
   }
 
@@ -490,7 +533,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // inactive lifecycle(deactivate 已调,dispose 未调)。全屏 Video 内部的
     // LayoutBuilder 在 pop 时序的 layout 阶段触发 _rebuildWithConstraints
     // (layout 阶段不检查子 element active 状态),rebuild 传播到本控件
-    // didUpdateWidget,此时 widget.state.isFullscreen() → VideoState.isFullscreen
+    // didUpdateWidget,此时 widget.video.isFullscreen → VideoState.isFullscreen
     // → FullscreenInheritedWidget.maybeOf → dependOnInheritedWidgetOfExactType
     // 在 inactive element 上查 ancestor → framework.dart:5082 断言。
     //
@@ -510,7 +553,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     if (!_isDeactivating) {
       // VideoState 每次 builder 调用可能新实例 — 现取 isFullscreen 同步图标 + AutoHide。
       // 全屏态切换时 _isFullscreenNotifier 变化驱动 RightButtonGroup fullscreen_exit 图标。
-      final fs = widget.state.isFullscreen();
+      final fs = widget.video.isFullscreen;
       if (_isFullscreenNotifier.value != fs) {
         _isFullscreenNotifier.value = fs;
         _autoHide.isFullscreen = fs;
@@ -527,12 +570,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
   @override
   void deactivate() {
-    _isDeactivating = true; // 阶段3 bug1:标记 inactive,挡后续 didUpdateWidget/build 查 ancestor
+    _isDeactivating =
+        true; // 阶段3 bug1:标记 inactive,挡后续 didUpdateWidget/build 查 ancestor
     // 阶段3:deactivate 即断开外部 listener — 退出全屏 route pop(Duration.zero)
     // 后全屏 VideoState 即将 deactivate,但 _autoHide 的 _hideTimer/_animController
     // 在 deactivate→dispose 之间仍可能触发 visible 变化(playing 态 Timer / stream
     // isPlaying 推送 / resize 信号),经 _autoHide.visible listener 触发
-    // _syncSubtitlePadding 调已 deactivate 的 widget.state.setSubtitleViewPadding
+    // _syncSubtitlePadding 调已 deactivate 的 widget.video.setSubtitleViewPadding
     // → media_kit 查 deactivated ancestor 断言。dispose 太晚(Timer/动画仍跑),
     // 须在此断开。dispose 内 removeListener 幂等保留(remove 已移除的 listener 是
     // no-op)。注:本控件由 controls builder 构建,不 reparent,无需 activate 重 add。
@@ -592,11 +636,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
           final title = fileName.isEmpty ? null : fileName;
           // idle + emptyState 时只对上方空白区域禁用手势,ControlBar 始终可交互
           final gestureActive = !emptyActive;
-          // 路径B:vm 从 PlayerControlsState(player.stream)派生,非 engine。
-          // isPlaying/position/duration/volume/rate 走 stream;isMuted 复用 engine;
-          // 回调:onSeek/onPlayPause/onSetRate 直写 player(经 _controlsState),
-          // onSetVolume/onToggleMute 走 engine(保 _preMuteVolume),
-          // onSeekBack/onSeekForward 走 engine(语义糖,内部 seekTo→player.seek 一致)。
+          // 路径B:展示数据从 PlayerControlsState(player.stream)派生；基础播放
+          // 命令经稳定 PlayerActions 进入 PlaybackController，seek-hold/倍速仍保留
+          // 直达 player 的精细交互路径，音量/静音继续走 engine。
+          final onPlayPause = widget.actions.onPlayPause;
+          final onSeekBack = widget.actions.onSeekBack;
+          final onSeekForward = widget.actions.onSeekForward;
           final vm = ControlBarViewModel(
             isPlaying: _controlsState.isPlaying,
             position: _controlsState.positionMs,
@@ -606,9 +651,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
             rate: _controlsState.rate,
             isFullscreen: _isFullscreenNotifier,
             onSeek: _controlsState.seek,
-            onPlayPause: _controlsState.playOrPause,
-            onSeekBack: widget.engine.skipBack,
-            onSeekForward: widget.engine.skipForward,
+            onPlayPause: onPlayPause ?? () {},
+            onSeekBack: onSeekBack ?? (_) {},
+            onSeekForward: onSeekForward ?? (_) {},
             onToggleMute: _controlsState.toggleMute,
             onSetVolume: _controlsState.setVolume,
             onSetRate: _controlsState.setRate,
@@ -656,6 +701,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                         right: Tokens.controlBarMarginH,
                         bottom: Tokens.controlBarMarginBottom,
                         child: Visibility(
+                          key: const Key('player-controls-visibility'),
                           visible: isVisible,
                           maintainState: true,
                           maintainAnimation: true,
@@ -691,7 +737,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                       left: Tokens.controlBarMarginH + 16,
                       right: Tokens.controlBarMarginH + 16,
                       bottom:
-                          Tokens.controlBarMarginBottom + Tokens.controlBarHeight + 8,
+                          Tokens.controlBarMarginBottom +
+                          Tokens.controlBarHeight +
+                          8,
                       child: RepaintBoundary(
                         child: ErrorBanner(
                           engine: widget.engine,
@@ -717,11 +765,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                     opaque: false,
                     hitTestBehavior: HitTestBehavior.translucent,
                     // 全屏 + 控件隐藏 → 隐藏鼠标(沉浸);否则 defer(窗口态/控件可见)
-                    // 阶段3:_isDeactivating flag 挡 widget.state deactivate 时序
+                    // 阶段3:_isDeactivating flag 挡 widget.video deactivate 时序
                     // (mounted 无效、Element.active 非 public;详见 didUpdateWidget 注释)。
                     // build 同 didUpdateWidget 可能在 LayoutBuilder layout 阶段被触发。
-                    cursor: !_isDeactivating &&
-                            widget.state.isFullscreen() &&
+                    cursor:
+                        !_isDeactivating &&
+                            widget.video.isFullscreen &&
                             !isVisible
                         ? SystemMouseCursors.none
                         : MouseCursor.defer,
@@ -729,7 +778,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                       // D-03: 仅底部区域触发 — 鼠标在距底部 150px 内才唤起控制栏
                       final size = context.size;
                       if (size == null) return;
-                      final mouseFromBottom = size.height - event.localPosition.dy;
+                      final mouseFromBottom =
+                          size.height - event.localPosition.dy;
                       if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
                         _autoHide.onMouseMove();
                       }
