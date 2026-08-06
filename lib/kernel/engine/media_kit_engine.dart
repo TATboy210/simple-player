@@ -88,6 +88,7 @@ class MediaKitEngine implements MediaEngine {
   // 已告警的 stub 方法集合 — 每个 stub 只 debugPrint 一次, 避免刷屏.
   final Set<String> _warnedUnsupported = <String>{};
 
+  // 异构 stream 订阅容器: T 逆变无法用 Object 统一, dynamic 绕过 invariant 限制
   final List<StreamSubscription<dynamic>> _subs =
       <StreamSubscription<dynamic>>[];
   bool _disposed = false;

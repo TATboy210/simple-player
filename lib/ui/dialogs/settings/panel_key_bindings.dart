@@ -43,7 +43,7 @@ class SettingsPanelKeyBindings {
   /// KeyboardHandler（避免触发 seek ±5s / 音量 ±5%，NAV-07 遏制）。
   /// 四个方向键（上下左右）全部调用 [InputModeDetector.instance.recordArrowKey]，
   /// 上下箭头额外调用 [InputModeDetector.instance.setArrowGlow]。
-  KeyEventResult handle(FocusNode node, KeyEvent event) {
+  KeyEventResult handle(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final key = event.logicalKey;

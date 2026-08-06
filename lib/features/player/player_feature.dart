@@ -300,7 +300,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       playlistGeneration: _services.playlistGeneration,
       windowService: _services.windowService,
       settingsPanelController: _settingsPanelController,
-      onOpenFile: _openFile,
+      onOpenFile: () => unawaited(_openFile()),
       onTogglePlayMode: _onTogglePlayMode,
       onSettingsSecondary: widget.onSettingsSecondary,
       onFilesDropped: _onFilesDropped,
@@ -321,7 +321,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
         _services.playlistGeneration.value++;
       },
       emptyState: EmptyState(
-        onOpenFile: _openFile,
+        onOpenFile: () => unawaited(_openFile()),
         isDragHovering: _isDragHovering,
         engineState: engine.state,
       ),

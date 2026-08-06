@@ -75,7 +75,12 @@ class PlaylistStore {
   void _saveImpl(Playlist playlist) {
     _pendingJson = jsonEncode(playlist.toJson());
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: _debounceMs), _flushImpl);
+    // Timer callback 期望同步 VoidCallback; _flushImpl 返回 Future,
+    // 用 unawaited 显式标记 fire-and-forget (原 .then 链亦是如此)
+    _debounce = Timer(
+      const Duration(milliseconds: _debounceMs),
+      () => unawaited(_flushImpl()),
+    );
   }
 
   /// C3: 原子写入 + 指数退避重试 — 写 .tmp 后 rename，失败最多重试 3 次

@@ -35,11 +35,13 @@ class _HistoryTabState extends State<HistoryTab> {
   List<PlaylistItem>? _cachedItems;
 
   List<MapEntry<int, PlaylistItem>> _getHistoryItems() {
-    if (_cachedHistoryItems != null && identical(_cachedItems, widget.items)) {
-      return _cachedHistoryItems!;
+    // local 捕获消除字段 `!` (字段不提升, 即便刚赋值)
+    final cached = _cachedHistoryItems;
+    if (cached != null && identical(_cachedItems, widget.items)) {
+      return cached;
     }
     _cachedItems = widget.items;
-    _cachedHistoryItems =
+    final items =
         widget.items
             .asMap()
             .entries
@@ -49,7 +51,8 @@ class _HistoryTabState extends State<HistoryTab> {
             (a, b) =>
                 (b.value.timestamp ?? 0).compareTo(a.value.timestamp ?? 0),
           );
-    return _cachedHistoryItems!;
+    _cachedHistoryItems = items;
+    return items;
   }
 
   @override
@@ -154,10 +157,12 @@ class _HistoryTileWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (timestamp == null || timestamp == 0) return child;
+    // local 捕获 timestamp 消除字段 `!` (字段不提升)
+    final ts = timestamp;
+    if (ts == null || ts == 0) return child;
 
     final l10n = AppLocalizations.of(context);
-    final relativeTime = _formatRelativeTime(timestamp!, l10n);
+    final relativeTime = _formatRelativeTime(ts, l10n);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

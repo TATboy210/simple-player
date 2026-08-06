@@ -96,8 +96,10 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   }
 
   void _disposeBlobImages() {
-    if (_blobImages != null) {
-      for (final img in _blobImages!) {
+    // local 捕获消除字段 `!` (字段不提升)
+    final blobs = _blobImages;
+    if (blobs != null) {
+      for (final img in blobs) {
         img.dispose();
       }
       _blobImages = null;
@@ -329,9 +331,12 @@ class _AuroraPainter extends CustomPainter {
   /// 轻量噪点层 — 防止色带，增加质感
   ///
   /// 噪点 Picture 由 State 层缓存，seed 每 2 秒变化一次时才重新录制。
-  void _drawNoiseOverlay(Canvas canvas, Size size) {
-    if (cachedNoise == null) return;
-    canvas.drawPicture(cachedNoise!);
+  // size 参数由 paint() 透传, 但本方法只用 canvas + cachedNoise — 命名 _ 豁免 DCM.
+  void _drawNoiseOverlay(Canvas canvas, Size _) {
+    // local 捕获 cachedNoise 消除字段 `!` (字段不提升)
+    final noise = cachedNoise;
+    if (noise == null) return;
+    canvas.drawPicture(noise);
   }
 
   @override

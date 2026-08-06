@@ -301,7 +301,8 @@ class _ControlsOverlayState extends State<ControlsOverlay>
       valueListenable: widget.openFileEnabled,
       builder: (_, enabled, _) => IgnorePointer(
         ignoring: !enabled,
-        child: widget.emptyState!,
+        // emptyState 契约非空, `?? SizedBox.shrink()` 防御性兜底消除 `!`
+        child: widget.emptyState ?? const SizedBox.shrink(),
       ),
     );
   }
@@ -334,7 +335,7 @@ class _ControlsOverlayState extends State<ControlsOverlay>
           isMuted: widget.engine.isMuted,
           rate: widget.engine.playbackSpeed,
           isFullscreen: _isFullscreenNotifier,
-          onSeek: widget.engine.seekTo,
+          onSeek: (ms) => unawaited(widget.engine.seekTo(ms)),
           onPlayPause: widget.engine.togglePlayPause,
           onSeekBack: widget.engine.skipBack,
           onSeekForward: widget.engine.skipForward,

@@ -168,14 +168,20 @@ class _ProgressBarState extends State<ProgressBar>
   void _beginSeekHold(int targetMs) {
     _cancelSeekHoldListeners();
     _seekTargetMs = targetMs;
-    _seekHoldListener = () {
-      if (!mounted || _seekTargetMs == null) return;
+    // 局部函数声明 (非闭包变量赋值, 避免 prefer_function_declarations_over_variables);
+    // 复用函数名消除 addListener/call 的 `!`; 内 _seekTargetMs local 捕获消除 `!`
+    void listener() {
+      if (!mounted) return;
+      final target = _seekTargetMs;
+      if (target == null) return;
       final pos = widget.position.value;
-      if ((pos - _seekTargetMs!).abs() <=
+      if ((pos - target).abs() <=
           Tokens.progressSeekArriveToleranceMs) {
         _finishSeekHold();
       }
-    };
+    }
+
+    _seekHoldListener = listener;
     // 先建超时 timer, 再 addListener + 立即检查 — 若立即检查触发 _finishSeekHold,
     // _cancelSeekHoldListeners 会 cancel 此 timer; 顺序反了 (timer 在 call 之后建)
     // 会留下无人取消的 pending timer, 触发 flutter_test 的 !timersPending 断言.
@@ -183,10 +189,10 @@ class _ProgressBarState extends State<ProgressBar>
       const Duration(milliseconds: Tokens.progressSeekHoldTimeoutMs),
       _finishSeekHold,
     );
-    widget.position.addListener(_seekHoldListener!);
+    widget.position.addListener(listener);
     // 立即检查一次: FakeEngine/同步 seek 可能已让 position 到达目标,
     // addListener 只对未来变化触发, 不立即检查会卡到超时 (测试/同步路径).
-    _seekHoldListener!.call();
+    listener.call();
   }
 
   /// 清理 seek hold 的监听 + 超时 timer, 不动 [_dragNotifier].

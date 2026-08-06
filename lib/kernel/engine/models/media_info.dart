@@ -25,7 +25,11 @@ class MediaInfo {
     this.subtitleTracks = const [],
   });
 
-  bool get hasVideo => video != null && video!.width > 0;
+  // video 是可空字段, 字段不提升; 用 local 捕获后提升消除 `!`
+  bool get hasVideo {
+    final v = video;
+    return v != null && v.width > 0;
+  }
   bool get hasAudio => audioTracks.isNotEmpty;
   bool get hasSubtitles => subtitleTracks.isNotEmpty;
 

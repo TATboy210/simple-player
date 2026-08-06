@@ -105,7 +105,7 @@ class ErrorContext {
   Map<String, Object?> toMap() => {
     if (action != null) 'action': action,
     if (generation != null) 'generation': generation,
-    if (path != null) 'path': PathUtils.basename(path!),
+    if (path case final p?) 'path': PathUtils.basename(p),
     'timestamp': timestamp.toIso8601String(),
     if (module != null) 'module': module,
     if (callbackStackTrace != null)

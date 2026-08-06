@@ -99,7 +99,8 @@ abstract interface class LogSink {
 String redactPath(String msg) {
   return msg.replaceAllMapped(
     RegExp(r'[\w/\\]+[/\\]([\w]+\.dart:\d+)'),
-    (m) => m.group(1)!,
+    // group(1) 类型为 String?, 整体匹配时捕获组必非空, `?? ''` 兜底防御
+    (m) => m.group(1) ?? '',
   );
 }
 

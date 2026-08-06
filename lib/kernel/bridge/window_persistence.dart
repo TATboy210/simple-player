@@ -63,8 +63,9 @@ class WindowPersistence {
       await _inFlight;
     } finally {
       _inFlight = null;
-      if (_pendingAction != null) {
-        final next = _pendingAction!;
+      // 实例字段不享受 null 类型提升, 用 local 捕获后提升, 消除 `!`
+      final next = _pendingAction;
+      if (next != null) {
         _pendingAction = null;
         await _enqueue(next); // 递归执行最新 pending
       }

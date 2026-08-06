@@ -137,7 +137,8 @@ class _OsdBubble extends StatelessWidget {
         ),
         if (message.progress != null) ...[
           const SizedBox(height: 8),
-          _MiniProgressBar(value: message.progress!),
+          // ?? 0 防御消除 `!` (progress 已 null 检查, 属性不提升)
+          _MiniProgressBar(value: message.progress ?? 0),
         ],
       ],
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/playlist_item.dart';
@@ -39,14 +41,16 @@ class ThumbnailTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // local 捕获 durationMs 消除字段 `!` (复合条件后字段不提升)
+    final durationMs = item.durationMs;
     final hasBreakpoint =
         (item.positionMs ?? 0) > 0 &&
-        item.durationMs != null &&
-        item.durationMs! > 0;
+        durationMs != null &&
+        durationMs > 0;
 
     return GestureDetector(
       onTap: onPlay,
-      onSecondaryTap: () => _showContextMenu(context),
+      onSecondaryTap: () => unawaited(_showContextMenu(context)),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: SizedBox(
@@ -97,7 +101,8 @@ class ThumbnailTile extends StatelessWidget {
                 left: 0,
                 right: 0,
                 child: _BreakpointBar(
-                  progress: item.positionMs! / item.durationMs!,
+                  // hasBreakpoint 守卫保证非空且 durationMs>0; ?? 防御消除字段 `!`
+                  progress: (item.positionMs ?? 0) / (item.durationMs ?? 1),
                 ),
               ),
           ],
@@ -126,7 +131,7 @@ class ThumbnailTile extends StatelessWidget {
     );
   }
 
-  void _showContextMenu(BuildContext context) {
+  Future<void> _showContextMenu(BuildContext context) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final button = context.findRenderObject() as RenderBox;
     final position = RelativeRect.fromRect(
@@ -143,7 +148,7 @@ class ThumbnailTile extends StatelessWidget {
     final hasBreakpoint = (item.positionMs ?? 0) > 0;
     final l10n = AppLocalizations.of(context);
 
-    showMenu<String>(
+    final value = await showMenu<String>(
       context: context,
       position: position,
       color: Tokens.bgElevated,
@@ -176,26 +181,25 @@ class ThumbnailTile extends StatelessWidget {
             child: ContextMenuRow(Icons.info_outline, l10n.properties),
           ),
       ],
-    ).then((value) {
-      if (value == null || !context.mounted) return;
-      switch (value) {
-        case 'play':
-          onPlay();
-          break;
-        case 'resume':
-          onResume?.call();
-          break;
-        case 'openFolder':
-          PathUtils.openFileLocation(item.path);
-          break;
-        case 'remove':
-          onRemove?.call();
-          break;
-        case 'properties':
-          onShowProperties?.call(item.path);
-          break;
-      }
-    });
+    );
+    if (value == null || !context.mounted) return;
+    switch (value) {
+      case 'play':
+        onPlay();
+        break;
+      case 'resume':
+        onResume?.call();
+        break;
+      case 'openFolder':
+        PathUtils.openFileLocation(item.path);
+        break;
+      case 'remove':
+        onRemove?.call();
+        break;
+      case 'properties':
+        onShowProperties?.call(item.path);
+        break;
+    }
   }
 }
 
@@ -266,9 +270,11 @@ class _ThumbnailImageState extends State<_ThumbnailImage> {
         ),
       );
     }
-    if (_thumbnail != null) {
+    // local 捕获 _thumbnail 消除字段 `!` (字段不提升)
+    final thumb = _thumbnail;
+    if (thumb != null) {
       return Image(
-        image: _thumbnail!,
+        image: thumb,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _buildPlaceholder(),
       );

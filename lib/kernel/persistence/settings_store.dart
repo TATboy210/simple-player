@@ -127,7 +127,7 @@ class SettingsStore {
   static const _keyAudioSyncMs = 'audioSyncMs';
   static const _keyAudioNormalization = 'audioNormalization';
 
-  static Future<AppSettings> load() async =>
+  static Future<AppSettings> load() =>
       (_instance ?? SettingsStore._(null))._loadImpl();
 
   Future<AppSettings> _loadImpl() async {
@@ -152,18 +152,15 @@ class SettingsStore {
           SettingsValidator.windowHeightMin,
           SettingsValidator.windowHeightMax,
         ),
-        windowX: prefs.getDouble(_keyWindowX) != null
-            ? SettingsValidator.sanitizeCoordinate(
-                prefs.getDouble(_keyWindowX)!,
-                0,
-              )
-            : null,
-        windowY: prefs.getDouble(_keyWindowY) != null
-            ? SettingsValidator.sanitizeCoordinate(
-                prefs.getDouble(_keyWindowY)!,
-                0,
-              )
-            : null,
+        // switch 表达式消除 `!` + 避免 getDouble 重复调用 (原判空+取值两次)
+        windowX: switch (prefs.getDouble(_keyWindowX)) {
+          final x? => SettingsValidator.sanitizeCoordinate(x, 0),
+          null => null,
+        },
+        windowY: switch (prefs.getDouble(_keyWindowY)) {
+          final y? => SettingsValidator.sanitizeCoordinate(y, 0),
+          null => null,
+        },
         isMaximized: prefs.getBool(_keyIsMaximized) ?? false,
         playMode: SettingsValidator.playMode(prefs.getInt(_keyPlayMode) ?? 0),
         isMuted: prefs.getBool(_keyIsMuted) ?? false,
@@ -245,7 +242,7 @@ class SettingsStore {
   static Future<void> _save(
     String method,
     Future<void> Function(SharedPreferences prefs) op,
-  ) async => (_instance ?? SettingsStore._(null))._saveImpl(method, op);
+  ) => (_instance ?? SettingsStore._(null))._saveImpl(method, op);
 
   static Future<void> saveVolume(double value) => _save(
     'saveVolume',
@@ -300,7 +297,7 @@ class SettingsStore {
       _save('saveIsAlwaysOnTop', (p) => p.setBool(_keyIsAlwaysOnTop, value));
 
   /// 加载语言偏好，默认 'zh'（中文）
-  static Future<String> loadLocale() async =>
+  static Future<String> loadLocale() =>
       (_instance ?? SettingsStore._(null))._loadLocaleImpl();
 
   Future<String> _loadLocaleImpl() async {
@@ -318,7 +315,7 @@ class SettingsStore {
       _save('saveLocale', (p) => p.setString(_keyLocale, localeCode));
 
   /// 加载主题索引，默认 0（Midnight）
-  static Future<int> loadThemeIndex() async =>
+  static Future<int> loadThemeIndex() =>
       (_instance ?? SettingsStore._(null))._loadThemeIndexImpl();
 
   Future<int> _loadThemeIndexImpl() async {
@@ -338,7 +335,7 @@ class SettingsStore {
   );
 
   /// 加载自定义快捷键映射 (action → LogicalKeyboardKey.keyName)
-  static Future<Map<String, String>> loadShortcuts() async =>
+  static Future<Map<String, String>> loadShortcuts() =>
       (_instance ?? SettingsStore._(null))._loadShortcutsImpl();
 
   Future<Map<String, String>> _loadShortcutsImpl() async {
@@ -445,7 +442,7 @@ class SettingsStore {
         p.setDouble(_keyPlaybackSpeed, SettingsValidator.playbackSpeed(value)),
   );
 
-  static Future<double> loadPlaybackSpeed() async =>
+  static Future<double> loadPlaybackSpeed() =>
       (_instance ?? SettingsStore._(null))._loadPlaybackSpeedImpl();
 
   Future<double> _loadPlaybackSpeedImpl() async {
@@ -464,7 +461,7 @@ class SettingsStore {
   // ─── Phase 33 音频偏好持久化 ───
 
   /// 加载 EQ 预设索引，默认 0（关闭）— clamp 到 0..4。
-  static Future<int> loadAudioEqPreset() async =>
+  static Future<int> loadAudioEqPreset() =>
       (_instance ?? SettingsStore._(null))._loadAudioEqPresetImpl();
 
   Future<int> _loadAudioEqPresetImpl() async {
@@ -486,7 +483,7 @@ class SettingsStore {
   );
 
   /// 加载立体声平衡，默认 0.0（居中）— clamp 到 -1.0..1.0。
-  static Future<double> loadAudioBalance() async =>
+  static Future<double> loadAudioBalance() =>
       (_instance ?? SettingsStore._(null))._loadAudioBalanceImpl();
 
   Future<double> _loadAudioBalanceImpl() async {
@@ -508,7 +505,7 @@ class SettingsStore {
   );
 
   /// 加载音频延迟毫秒，默认 0 — clamp 到 0..10000（仅延迟）。
-  static Future<int> loadAudioSyncMs() async =>
+  static Future<int> loadAudioSyncMs() =>
       (_instance ?? SettingsStore._(null))._loadAudioSyncMsImpl();
 
   Future<int> _loadAudioSyncMsImpl() async {
@@ -528,7 +525,7 @@ class SettingsStore {
   );
 
   /// 加载音量归一化开关，默认 false。
-  static Future<bool> loadAudioNormalization() async =>
+  static Future<bool> loadAudioNormalization() =>
       (_instance ?? SettingsStore._(null))._loadAudioNormalizationImpl();
 
   Future<bool> _loadAudioNormalizationImpl() async {
@@ -548,7 +545,7 @@ class SettingsStore {
   );
 
   /// 加载 D3D11 同步设置，默认 true（同步模式）
-  static Future<bool> loadD3d11SyncEnabled() async =>
+  static Future<bool> loadD3d11SyncEnabled() =>
       (_instance ?? SettingsStore._(null))._loadD3d11SyncEnabledImpl();
 
   Future<bool> _loadD3d11SyncEnabledImpl() async {
@@ -562,7 +559,7 @@ class SettingsStore {
   }
 
   /// 加载硬件解码设置，默认 true（硬件解码优先）
-  static Future<bool> loadHardwareDecoding() async =>
+  static Future<bool> loadHardwareDecoding() =>
       (_instance ?? SettingsStore._(null))._loadHardwareDecodingImpl();
 
   Future<bool> _loadHardwareDecodingImpl() async {
@@ -645,18 +642,19 @@ class SettingsStore {
     await p.setBool(_keyD3d11Sync, s.d3d11Sync);
     await p.setBool(_keyHardwareDecoding, s.hardwareDecoding);
     // RC-8: null 时显式清除旧键，防止残留值导致下次启动位置错误
-    if (s.windowX != null) {
+    // if-case 绑定非 null local, 消除字段 `!`
+    if (s.windowX case final x?) {
       await p.setDouble(
         _keyWindowX,
-        SettingsValidator.sanitizeCoordinate(s.windowX!, 0),
+        SettingsValidator.sanitizeCoordinate(x, 0),
       );
     } else {
       await p.remove(_keyWindowX);
     }
-    if (s.windowY != null) {
+    if (s.windowY case final y?) {
       await p.setDouble(
         _keyWindowY,
-        SettingsValidator.sanitizeCoordinate(s.windowY!, 0),
+        SettingsValidator.sanitizeCoordinate(y, 0),
       );
     } else {
       await p.remove(_keyWindowY);
@@ -666,7 +664,7 @@ class SettingsStore {
   // ─── 轨道偏好持久化 ───
 
   /// 加载轨道偏好，默认空偏好（使用 demuxer 默认值）
-  static Future<TrackPreferences> loadTrackPreferences() async =>
+  static Future<TrackPreferences> loadTrackPreferences() =>
       (_instance ?? SettingsStore._(null))._loadTrackPreferencesImpl();
 
   Future<TrackPreferences> _loadTrackPreferencesImpl() async {
@@ -686,13 +684,14 @@ class SettingsStore {
   /// 保存轨道偏好
   static Future<void> saveTrackPreferences(TrackPreferences prefs) =>
       _save('saveTrackPreferences', (p) async {
-        if (prefs.audioTrackIndex != null) {
-          await p.setInt(_keyAudioTrackIndex, prefs.audioTrackIndex!);
+        // if-case 绑定非 null local, 消除字段 `!`
+        if (prefs.audioTrackIndex case final idx?) {
+          await p.setInt(_keyAudioTrackIndex, idx);
         } else {
           await p.remove(_keyAudioTrackIndex);
         }
-        if (prefs.subtitleTrackIndex != null) {
-          await p.setInt(_keySubtitleTrackIndex, prefs.subtitleTrackIndex!);
+        if (prefs.subtitleTrackIndex case final idx?) {
+          await p.setInt(_keySubtitleTrackIndex, idx);
         } else {
           await p.remove(_keySubtitleTrackIndex);
         }

@@ -564,7 +564,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       valueListenable: widget.openFileEnabled,
       builder: (_, enabled, _) => IgnorePointer(
         ignoring: !enabled,
-        child: widget.emptyState!,
+        // emptyState 契约非空, `?? SizedBox.shrink()` 防御性兜底消除 `!`
+        child: widget.emptyState ?? const SizedBox.shrink(),
       ),
     );
   }

@@ -29,14 +29,17 @@ class ThumbnailService {
   final _cache = <String, ImageProvider>{};
 
   ThumbnailProvider get _providerImpl {
-    if (_impl != null) return _impl!;
-    _impl = switch (defaultTargetPlatform) {
+    // 字段不提升, 用 local 捕获消除 `!` (existing 命中 / created 新建各一)
+    final existing = _impl;
+    if (existing != null) return existing;
+    final created = switch (defaultTargetPlatform) {
       TargetPlatform.windows => const NoopThumbnailProvider(),
       TargetPlatform.linux => const LinuxThumbnailProvider(),
       TargetPlatform.macOS => const MacosThumbnailProvider(),
       _ => const NoopThumbnailProvider(),
     };
-    return _impl!;
+    _impl = created;
+    return created;
   }
 
   /// 获取文件的系统缩略图，带 LRU 内存缓存

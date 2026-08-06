@@ -69,7 +69,10 @@ class _AppState extends State<App> {
       (c) => c == currentAccent,
     );
 
-    final overlay = Overlay.of(barCtx).context.findRenderObject()! as RenderBox;
+    // findRenderObject() 返回 RenderObject?; 用 is 检查替代 `!`+`as`,
+    // 类型提升后 overlay 为 RenderBox (无 `!`/`as`, 符合 strict-raw-types)
+    final overlay = Overlay.of(barCtx).context.findRenderObject();
+    if (overlay is! RenderBox) return;
     final pos = overlay.globalToLocal(tap.globalPosition);
 
     showMenu(
@@ -141,7 +144,7 @@ class _AppState extends State<App> {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-          debugShowCheckedModeBanner: false,
+          debugShowCheckedModeBanner: true,
           theme: ThemeService.I.currentTheme,
           home: DeferredPlayerFeature(
             coordinator: widget.coordinator,
@@ -174,9 +177,7 @@ class _QuickMenuItem extends PopupMenuItem<void> {
              Text(
                label,
                style: TextStyle(
-                 color: selected
-                     ? Tokens.menuAccent
-                     : Tokens.menuTextNormal,
+                 color: selected ? Tokens.menuAccent : Tokens.menuTextNormal,
                  fontSize: 13,
                ),
              ),
