@@ -262,7 +262,23 @@ class _GlassButtonState extends State<GlassButton>
   late final AnimationController _scaleController;
   late final Animation<double> _scaleAnim;
   late final FocusNode _internalFocusNode;
+  // 惰性缓存动作，避免生命周期恢复时读取未初始化字段，也避免每次 build
+  // 重复分配 CallbackAction 和闭包。
+  CallbackAction<ActivateIntent>? _activateAction;
   bool _focused = false;
+
+  CallbackAction<ActivateIntent> get _effectiveActivateAction =>
+      _activateAction ??= CallbackAction<ActivateIntent>(
+        onInvoke: (_) {
+          widget.onPressed?.call();
+          return null;
+        },
+      );
+
+  static const _shortcuts = <ShortcutActivator, Intent>{
+    SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+    SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+  };
 
   /// 外部节点由调用方管理；未提供时按钮持有并释放内部节点。
   FocusNode get _effectiveFocusNode => widget.focusNode ?? _internalFocusNode;
@@ -363,17 +379,9 @@ class _GlassButtonState extends State<GlassButton>
       onShowFocusHighlight: _handleFocusChanged,
       // 将快捷键绑定在拥有焦点的探测器上，确保事件在到达全局播放器
       // 快捷键之前被转换为本地 ActivateIntent 并消费。
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
-        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-      },
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(
-          onInvoke: (_) {
-            widget.onPressed?.call();
-            return null;
-          },
-        ),
+      shortcuts: _shortcuts,
+      actions: <Type, Action<Intent>>{
+        ActivateIntent: _effectiveActivateAction,
       },
       child: semantics,
     );

@@ -12,6 +12,7 @@ void main() {
     bool isPrimary = false,
     bool enabled = true,
     VoidCallback? onPressed,
+    bool allowNullOnPressed = false,
     void Function(TapUpDetails)? onSecondaryTapUp,
     double iconSize = 20.0,
     Color? color,
@@ -29,7 +30,7 @@ void main() {
                   tooltip: tooltip,
                   isPrimary: isPrimary,
                   enabled: enabled,
-                  onPressed: onPressed ?? () {},
+                  onPressed: allowNullOnPressed ? onPressed : (onPressed ?? () {}),
                   onSecondaryTapUp: onSecondaryTapUp,
                   iconSize: iconSize,
                   color: color,
@@ -42,7 +43,7 @@ void main() {
                   tooltip: tooltip,
                   isPrimary: isPrimary,
                   enabled: enabled,
-                  onPressed: onPressed ?? () {},
+                  onPressed: allowNullOnPressed ? onPressed : (onPressed ?? () {}),
                   onSecondaryTapUp: onSecondaryTapUp,
                   iconSize: iconSize,
                   color: color,
@@ -153,6 +154,97 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
 
       expect(activationCount, 1);
+    });
+
+    testWidgets('uses the latest onPressed callback after rebuild', (tester) async {
+      var firstActivationCount = 0;
+      var secondActivationCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          focusNode: focusNode,
+          onPressed: () => firstActivationCount++,
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          focusNode: focusNode,
+          onPressed: () => secondActivationCount++,
+        ),
+      );
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+
+      expect(firstActivationCount, 1);
+      expect(secondActivationCount, 1);
+    });
+
+    testWidgets('enabled to disabled rebuild ignores keyboard activation', (
+      tester,
+    ) async {
+      var activationCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          focusNode: focusNode,
+          onPressed: () => activationCount++,
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      expect(activationCount, 1);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          enabled: false,
+          focusNode: focusNode,
+          onPressed: () => activationCount++,
+        ),
+      );
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+
+      expect(activationCount, 1);
+    });
+
+    testWidgets('null onPressed exposes a disabled semantic button', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.play_arrow,
+          allowNullOnPressed: true,
+          semanticsLabel: 'Unavailable',
+          onPressed: null,
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Unavailable')),
+        matchesSemantics(
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: false,
+          hasTapAction: false,
+        ),
+      );
+      semantics.dispose();
     });
 
     testWidgets('activator keys do not bubble past the focused button', (
