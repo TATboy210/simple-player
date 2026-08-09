@@ -86,14 +86,18 @@ void main() {
       opacity.dispose();
     });
 
-    testWidgets('resizing=true skips BackdropFilter', (tester) async {
+    testWidgets('resizing=true keeps BackdropFilter mounted but disabled', (
+      tester,
+    ) async {
       final resizing = ValueNotifier<bool>(true);
+      addTearDown(resizing.dispose);
       await tester.pumpWidget(buildSubject(resizing: resizing));
       await tester.pump();
-      // resizing=true → ClipRRect + RepaintBoundary, no BackdropFilter
-      expect(find.byType(BackdropFilter), findsNothing);
+
+      final filter = find.byType(BackdropFilter);
+      expect(filter, findsOneWidget);
+      expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
       expect(find.text('test'), findsOneWidget);
-      resizing.dispose();
     });
 
     testWidgets('resizing=false renders BackdropFilter', (tester) async {
@@ -105,25 +109,68 @@ void main() {
       resizing.dispose();
     });
 
-    testWidgets('resizing transition rebuilds correctly', (tester) async {
-      final resizing = ValueNotifier<bool>(false);
-      await tester.pumpWidget(buildSubject(resizing: resizing));
+    testWidgets(
+      'resizing transition toggles filter without replacing elements',
+      (tester) async {
+        final resizing = ValueNotifier<bool>(false);
+        addTearDown(resizing.dispose);
+        await tester.pumpWidget(buildSubject(resizing: resizing));
+        await tester.pump();
+
+        final filter = find.byType(BackdropFilter);
+        final content = find.text('test');
+        final filterElement = tester.element(filter);
+        final contentElement = tester.element(content);
+        expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
+
+        resizing.value = true;
+        await tester.pump();
+        expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
+        expect(tester.element(filter), same(filterElement));
+        expect(tester.element(content), same(contentElement));
+
+        resizing.value = false;
+        await tester.pump();
+        expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
+        expect(tester.element(filter), same(filterElement));
+        expect(tester.element(content), same(contentElement));
+      },
+    );
+
+    testWidgets('replacing resizing notifier detaches the old source', (
+      tester,
+    ) async {
+      final oldResizing = ValueNotifier(false);
+      final replacement = ValueNotifier(false);
+      addTearDown(oldResizing.dispose);
+      addTearDown(replacement.dispose);
+
+      await tester.pumpWidget(buildSubject(resizing: oldResizing));
       await tester.pump();
 
-      // Start without resize → BackdropFilter present
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      final filter = find.byType(BackdropFilter);
+      final content = find.text('test');
+      final filterElement = tester.element(filter);
+      final contentElement = tester.element(content);
+      expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
 
-      // Simulate resize start → skip BackdropFilter
-      resizing.value = true;
+      await tester.pumpWidget(buildSubject(resizing: replacement));
       await tester.pump();
-      expect(find.byType(BackdropFilter), findsNothing);
-      expect(find.text('test'), findsOneWidget);
+      expect(tester.binding.hasScheduledFrame, isFalse);
 
-      // Resize end → restore BackdropFilter
-      resizing.value = false;
+      oldResizing.value = true;
+      expect(tester.binding.hasScheduledFrame, isFalse);
       await tester.pump();
-      expect(find.byType(BackdropFilter), findsOneWidget);
-      resizing.dispose();
+      expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
+      expect(tester.element(filter), same(filterElement));
+      expect(tester.element(content), same(contentElement));
+
+      replacement.value = true;
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
+      expect(tester.element(filter), same(filterElement));
+      expect(tester.element(content), same(contentElement));
     });
 
     testWidgets('backgroundColor defaults to Tokens.bgGlass', (tester) async {

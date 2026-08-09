@@ -3,7 +3,7 @@
 /// Player service container — dependency injection and lifecycle management.
 ///
 /// Implements the service container pattern:
-/// 1. Creates and owns all playback service instances (Engine, Playlist,
+/// 1. Creates and owns all playback service instances (Engine,
 ///    PlaybackController, VideoProcessingService).
 /// 2. Provides init/dispose lifecycle management.
 ///
@@ -13,13 +13,14 @@
 /// - Dependency injection: all services injected via constructor or [init],
 ///   replaceable in tests.
 /// - Reverse-order disposal: dispose order is the reverse of init
-///   (playlistGeneration → window → videoProcessing → controller → engine).
+///   (window → videoProcessing → controller → engine).
 ///
 /// Architecture: PlayerFeature/PlayerViewModel → **PlayerServices** → concrete services.
 /// Dependency chain: PlayerServices → MediaKitEngine → media_kit/libmpv native.
+///
+/// v1.8:移除 Playlist/playlistGeneration(单文件播放器,无队列)。
 library;
 
-import 'package:flutter/foundation.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'diagnostics/clock.dart';
 import 'diagnostics/kernel_logger.dart';
@@ -30,7 +31,6 @@ import 'bridge/window_bridge.dart';
 import 'engine/media_engine.dart';
 import 'engine/media_kit_engine.dart';
 import 'persistence/settings_store.dart';
-import 'playlist/playlist.dart';
 import 'services/playback_controller.dart';
 import 'services/video_processing_service.dart';
 
@@ -38,7 +38,6 @@ import 'services/video_processing_service.dart';
 ///
 /// DI container for core playback services. Holds:
 /// - [engine] — media rendering engine ([MediaEngine])
-/// - [playlist] — playlist management ([Playlist])
 /// - [controller] — playback orchestrator ([PlaybackController])
 /// - [videoProcessing] — video effects ([VideoProcessingService])
 /// - [windowService] — Win32 window bridge ([WindowBridge])
@@ -65,14 +64,9 @@ class PlayerServices {
   /// Media rendering engine (media_kit/libmpv wrapper).
   late final MediaEngine engine;
 
-  /// 播放列表管理器.
+  /// 播放控制编排器 — 单文件播放器门面.
   ///
-  /// Playlist model — play mode logic, item management.
-  late final Playlist playlist;
-
-  /// 播放控制编排器 — 编排 engine + playlist 的交互.
-  ///
-  /// Playback orchestrator — coordinates engine and playlist interactions.
+  /// Playback orchestrator — single-file player facade.
   late final PlaybackController controller;
 
   /// 视频处理服务 — 亮度/对比度/饱和度/色调/旋转/宽高比/去隔行.
@@ -95,24 +89,16 @@ class PlayerServices {
   /// media_kit 引擎实例 — 持有以透传 [mediaKitVideoController].
   late final MediaKitEngine _mediaKitEngine;
 
-  /// 播放列表版本号 — 每次播放列表变化时递增，触发 UI 重建.
-  ///
-  /// Playlist generation counter — incremented on each playlist change
-  /// to trigger UI rebuilds. Uses `ValueNotifier<int>` (not
-  /// `ValueNotifier<Playlist>`) as a lightweight change signal;
-  /// UI reads `playlist.items` directly for current data.
-  final ValueNotifier<int> playlistGeneration = ValueNotifier(0);
-
   /// 初始化所有播放服务.
   ///
   /// Initialization order (sequential — each step depends on the previous):
   /// 1. KernelLogger + MemoryMonitor (diagnostics)
   /// 2. MediaKitEngine (engine)
-  /// 3. Playlist + PlaybackController (orchestration)
+  /// 3. PlaybackController (orchestration)
   /// 4. SettingsStore.load() → controller.init(settings)
   /// 5. VideoProcessingService (video effects)
   Future<void> init() async {
-    // Phase 17: 初始化 KernelLogger 静态实例 — 必须在引擎创建之前,
+    // Phase 17: 初始化 KernelLogger 静态实例 — 必须在引擎创建以前,
     // 确保所有内核代码从启动第一刻起就能通过 KernelLoggerImpl.I 输出日志。
     // kDebugMode 门控: debug 模式 CompositeSink([DebugPrintSink, DevToolsSink]),
     // release 模式 NullSink (零输出, 可 tree-shake)。
@@ -135,12 +121,8 @@ class PlayerServices {
     _mediaKitEngine = MediaKitEngine();
     engine = _mediaKitEngine;
 
-    playlist = Playlist();
-    controller = PlaybackController(
-      engine: engine,
-      playlist: playlist,
-      onNeedRebuild: () => playlistGeneration.value++,
-    );
+    // v1.8:PlaybackController 不再接 playlist/onNeedRebuild(单文件播放器).
+    controller = PlaybackController(engine: engine);
     final settings = await SettingsStore.load();
     await controller.init(settings: settings);
     videoProcessing = VideoProcessingService(engine, initialSettings: settings);
@@ -149,11 +131,10 @@ class PlayerServices {
   /// 释放所有服务资源.
   ///
   /// Disposes all services in reverse init order
-  /// (playlistGeneration → window → videoProcessing → controller → engine),
+  /// (window → videoProcessing → controller → engine),
   /// ensuring dependents are released before their dependencies.
   /// Each dispose is idempotent (safe to call multiple times).
   void dispose() {
-    playlistGeneration.dispose();
     windowService.dispose();
     videoProcessing.dispose();
     controller.dispose();

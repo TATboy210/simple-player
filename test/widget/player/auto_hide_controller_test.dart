@@ -150,6 +150,32 @@ void main() {
       expect(c.isHovering, isTrue);
       expect(c.visible.value, isTrue);
     });
+
+    testWidgets('records hover but keeps hidden controls hidden during resize', (
+      tester,
+    ) async {
+      isPlaying.value = true;
+      await tester.pumpWidget(
+        MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
+      );
+      await tester.pump();
+      final state = tester.state<_TestAutoHideWrapperState>(
+        find.byType(_TestAutoHideWrapper),
+      );
+      final controller = state.controller;
+
+      controller.hide();
+      await tester.pumpAndSettle();
+      expect(controller.visible.value, isFalse);
+
+      controller.resizing = true;
+      controller.onMouseEnter();
+
+      // Resize only freezes visual auto-hide behavior. Keep the actual pointer
+      // state so a later exit remains accurate, without resurfacing controls.
+      expect(controller.isHovering, isTrue);
+      expect(controller.visible.value, isFalse);
+    });
   });
 
   group('AutoHideController.onMouseExit()', () {
@@ -279,6 +305,25 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
+    test(
+      'resizing=true prevents a stale hide callback from starting fade-out',
+      () {
+        isPlaying.value = true;
+        final popupCloseNotifier = ValueNotifier<int>(0);
+        addTearDown(popupCloseNotifier.dispose);
+        final c = createController(popupCloseNotifier: popupCloseNotifier);
+        c.init();
+        c.resizing = true;
+
+        // Model a timer callback that was already queued when resize began. The
+        // final hide gate, rather than Timer.cancel timing, owns this invariant.
+        c.hide();
+
+        expect(popupCloseNotifier.value, 0);
+        expect(c.visible.value, isTrue);
+      },
+    );
+
     test('resizing=false schedules hide', () {
       isPlaying.value = true;
       final c = createController();
@@ -344,10 +389,7 @@ void main() {
       isPlaying.value = true;
       await tester.pumpWidget(
         MaterialApp(
-          home: _TestAutoHideWrapper(
-            isPlaying: isPlaying,
-            isFullscreen: false,
-          ),
+          home: _TestAutoHideWrapper(isPlaying: isPlaying, isFullscreen: false),
         ),
       );
       await tester.pump();
@@ -422,10 +464,7 @@ void main() {
       isPlaying.value = true;
       await tester.pumpWidget(
         MaterialApp(
-          home: _TestAutoHideWrapper(
-            isPlaying: isPlaying,
-            isFullscreen: false,
-          ),
+          home: _TestAutoHideWrapper(isPlaying: isPlaying, isFullscreen: false),
         ),
       );
       await tester.pump();

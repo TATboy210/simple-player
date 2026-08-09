@@ -23,53 +23,43 @@ Widget _wrapWithApp(Widget child, {double width = 800, double height = 600}) {
 void main() {
   late FakeEngine engine;
   late Playlist playlist;
-  // 渐进路径:ControlBar 需 playlistGeneration(required) —
-  // playMode 下沉到 LeftButtonGroup 内部读 playlist.mode,generation 驱动重建。
-  late ValueNotifier<int> playlistGeneration;
   // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
   late ValueNotifier<bool> isFullscreen;
 
   setUp(() {
     engine = FakeEngine();
     playlist = Playlist();
-    playlistGeneration = ValueNotifier<int>(0);
     isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
     engine.dispose();
-    playlistGeneration.dispose();
     isFullscreen.dispose();
   });
 
-  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  /// 从 FakeEngine 派生 ControlBarViewModel，供响应式布局测试使用。
   ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
-        isPlaying: e.isPlayingNotifier,
-        position: e.position,
-        duration: e.duration,
-        volume: e.volume,
-        isMuted: e.isMuted,
-        rate: e.playbackSpeed,
-        isFullscreen: isFullscreen,
-        onSeek: e.seekTo,
-        onPlayPause: e.togglePlayPause,
-        onSeekBack: e.skipBack,
-        onSeekForward: e.skipForward,
-        onToggleMute: () => e.setMute(!e.isMuted.value),
-        onSetVolume: e.setVolume,
-        onSetRate: e.setPlaybackRate,
-      );
+    isPlaying: e.isPlayingNotifier,
+    position: e.position,
+    duration: e.duration,
+    volume: e.volume,
+    isMuted: e.isMuted,
+    rate: e.playbackSpeed,
+    isFullscreen: isFullscreen,
+    onSeek: e.seekTo,
+    onPlayPause: e.togglePlayPause,
+    onSeekBack: e.skipBack,
+    onSeekForward: e.skipForward,
+    onToggleMute: () => e.setMute(!e.isMuted.value),
+    onSetVolume: e.setVolume,
+    onSetRate: e.setPlaybackRate,
+  );
 
   group('ControlBar button groups', () {
     testWidgets('wide layout shows all three groups', (tester) async {
       await tester.pumpWidget(
         _wrapWithApp(
-          ControlBar(
-            vm: buildVm(engine),
-            actions: const PlayerActions(),
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
-          ),
+          ControlBar(vm: buildVm(engine), actions: const PlayerActions()),
           width: 800,
           height: 200,
         ),
@@ -78,8 +68,41 @@ void main() {
 
       // CenterGroup always visible
       expect(find.byType(CenterGroup), findsOneWidget);
-      // Play mode button (left group) visible
-      expect(find.byIcon(Icons.repeat), findsOneWidget);
+      // 单文件播放器不再展示播放模式或队列入口。
+      expect(find.byIcon(Icons.repeat), findsNothing);
+      expect(find.byIcon(Icons.queue_music), findsNothing);
+    });
+
+    testWidgets('keeps the blur element attached when opacity reaches zero', (
+      tester,
+    ) async {
+      final opacity = AnimationController(vsync: tester, value: 1);
+      addTearDown(opacity.dispose);
+
+      await tester.pumpWidget(
+        _wrapWithApp(
+          ControlBar(
+            vm: buildVm(engine),
+            actions: const PlayerActions(),
+            opacity: opacity,
+          ),
+          width: 800,
+          height: 200,
+        ),
+      );
+      await tester.pump();
+
+      final initialBlurElement = tester.element(find.byType(BackdropFilter));
+
+      // resize 淡出只应停用滤镜，不能替换语义内容的中间祖先拓扑。
+      opacity.value = 0;
+      await tester.pump();
+
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(
+        tester.element(find.byType(BackdropFilter)),
+        same(initialBlurElement),
+      );
     });
   });
 

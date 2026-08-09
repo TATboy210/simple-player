@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
@@ -88,20 +89,17 @@ void main() {
     late FakeEngine widgetEngine;
     late FakeVideoControlsPort video;
     late ValueNotifier<String> currentFileName;
-    late ValueNotifier<int> playlistGeneration;
     late ValueNotifier<bool> openFileEnabled;
 
     setUp(() {
       widgetEngine = FakeEngine();
       video = FakeVideoControlsPort();
       currentFileName = ValueNotifier<String>('movie.mp4');
-      playlistGeneration = ValueNotifier<int>(0);
       openFileEnabled = ValueNotifier<bool>(true);
     });
 
     tearDown(() {
       currentFileName.dispose();
-      playlistGeneration.dispose();
       openFileEnabled.dispose();
       video.dispose();
       widgetEngine.dispose();
@@ -111,6 +109,7 @@ void main() {
       WidgetTester tester, {
       required PlayerActions actions,
       FakeVideoControlsPort? controlsPort,
+      ValueListenable<bool>? resizing,
     }) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -125,9 +124,8 @@ void main() {
                 engine: widgetEngine,
                 actions: actions,
                 currentFileName: currentFileName,
-                playlist: Playlist(),
-                playlistGeneration: playlistGeneration,
                 openFileEnabled: openFileEnabled,
+                resizing: resizing,
               ),
             ),
           ),
@@ -136,10 +134,40 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('六个基础按钮只命中 PlayerActions', (tester) async {
+    testWidgets('替换 currentFileName 后只响应新 notifier', (tester) async {
+      final oldFileName = currentFileName;
+      await pumpControls(tester, actions: const PlayerActions());
+      expect(find.text('movie.mp4'), findsOneWidget);
+
+      final replacement = ValueNotifier<String>('replacement.mp4');
+      currentFileName = replacement;
+      await pumpControls(tester, actions: const PlayerActions());
+      expect(find.text('replacement.mp4'), findsOneWidget);
+      expect(find.text('movie.mp4'), findsNothing);
+
+      // 旧源已从合并监听器解绑；更新它不应安排新帧，而不是仅仅保持当前标题。
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      oldFileName.value = 'stale.mp4';
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      await tester.pump();
+      expect(find.text('replacement.mp4'), findsOneWidget);
+      expect(find.text('stale.mp4'), findsNothing);
+
+      // 新源仍然有效，后续更新必须安排新帧并驱动标题更新。
+      replacement.value = 'latest.mp4';
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+      expect(find.text('latest.mp4'), findsOneWidget);
+
+      // 先卸载仍订阅 replacement 的控件树，再释放 notifier，避免
+      // ListenableBuilder 在 dispose 时从已释放源移除监听器。
+      await tester.pumpWidget(const SizedBox.shrink());
+      replacement.dispose();
+      currentFileName = oldFileName;
+    });
+
+    testWidgets('四个基础按钮只命中 PlayerActions', (tester) async {
       var playPauseCount = 0;
-      var previousCount = 0;
-      var nextCount = 0;
       var stopCount = 0;
       final seekBackValues = <int>[];
       final seekForwardValues = <int>[];
@@ -147,26 +175,20 @@ void main() {
         onPlayPause: () => playPauseCount++,
         onSeekBack: seekBackValues.add,
         onSeekForward: seekForwardValues.add,
-        onPrevious: () => previousCount++,
-        onNext: () => nextCount++,
         onStop: () => stopCount++,
       );
 
       await pumpControls(tester, actions: actions);
 
-      await tester.tap(find.byIcon(Icons.skip_previous));
       await tester.tap(find.byIcon(Icons.replay_10));
       await tester.tap(find.byIcon(Icons.play_arrow));
       await tester.tap(find.byIcon(Icons.forward_30));
-      await tester.tap(find.byIcon(Icons.skip_next));
       await tester.tap(find.byIcon(Icons.stop));
       await tester.pump();
 
-      expect(previousCount, 1);
       expect(seekBackValues, [Tokens.skipShortMs]);
       expect(playPauseCount, 1);
       expect(seekForwardValues, [Tokens.skipLongMs]);
-      expect(nextCount, 1);
       expect(stopCount, 1);
       expect(widgetEngine.togglePlayPauseCallCount, 0);
       expect(widgetEngine.skipBackCallCount, 0);
@@ -237,6 +259,193 @@ void main() {
       expect(fullscreenSyncCount, 0);
       expect(video.exitFullscreenCallCount, 0);
       expect(video.toggleFullscreenCallCount, 0);
+    });
+
+    testWidgets('auto-hide 后 resize 保持控件隐藏且不暴露活跃语义', (tester) async {
+      final semanticsHandle = tester.ensureSemantics();
+      final resizing = ValueNotifier<bool>(false);
+      final playingPort = FakePlayerControls(isPlayingNow: true);
+      final playingVideo = FakeVideoControlsPort(player: playingPort);
+      addTearDown(resizing.dispose);
+      addTearDown(playingVideo.dispose);
+
+      try {
+        await pumpControls(
+          tester,
+          controlsPort: playingVideo,
+          resizing: resizing,
+          actions: const PlayerActions(),
+        );
+
+        final visibilityFinder = find.byKey(
+          const Key('player-controls-visibility'),
+        );
+        final initialVisibilityElement = tester.element(visibilityFinder);
+
+        // 先完成 playing 状态的自动隐藏，建立 resize 开始前的真实 UI 状态。
+        await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+        await tester.pump(
+          const Duration(milliseconds: Tokens.durationControlsFade + 1),
+        );
+        expect(tester.widget<Visibility>(visibilityFinder).visible, isFalse);
+        expect(find.bySemanticsLabel('Play'), findsNothing);
+
+        // resize 只能冻结隐藏策略和改变绘制状态，不能重挂载控制栏可见性节点，
+        // 也不能让视觉上隐藏的按钮重新进入活跃 semantics 遍历。
+        resizing.value = true;
+        await tester.pump();
+        await tester.pump(
+          const Duration(milliseconds: Tokens.durationControlsFade + 1),
+        );
+        expect(tester.widget<Visibility>(visibilityFinder).visible, isFalse);
+        expect(
+          tester.element(visibilityFinder),
+          same(initialVisibilityElement),
+        );
+        expect(find.bySemanticsLabel('Play'), findsNothing);
+
+        resizing.value = false;
+        await tester.pump();
+        expect(tester.widget<Visibility>(visibilityFinder).visible, isFalse);
+        expect(
+          tester.element(visibilityFinder),
+          same(initialVisibilityElement),
+        );
+        expect(find.bySemanticsLabel('Play'), findsNothing);
+      } finally {
+        semanticsHandle.dispose();
+      }
+    });
+
+    testWidgets('暂停发生在自动淡出中仍恢复控制栏与 backdrop filter', (tester) async {
+      final playingPort = FakePlayerControls(isPlayingNow: true);
+      final playingVideo = FakeVideoControlsPort(player: playingPort);
+      addTearDown(playingVideo.dispose);
+
+      await pumpControls(
+        tester,
+        controlsPort: playingVideo,
+        actions: const PlayerActions(),
+      );
+
+      final visibilityFinder = find.byKey(
+        const Key('player-controls-visibility'),
+      );
+      final backdropFinder = find.byType(BackdropFilter, skipOffstage: false);
+      expect(backdropFinder, findsOneWidget);
+      final initialElement = tester.element(backdropFinder);
+
+      // 先让 hide timer 到期；timer 回调只启动 reverse，再推进半个淡出
+      // 周期以确认暂停发生在动画中段，而不是动画完成后。
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade ~/ 2),
+      );
+      expect(tester.widget<Visibility>(visibilityFinder).visible, isTrue);
+      // opacity 仍高于 0.01 阈值，中段淡出不会提前关闭背景采样。
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+      // 暂停必须反转尚未结束的 reverse animation，不能让其随后进入
+      // dismissed 并隐藏控件。
+      playingPort.emitPlaying(false);
+      await tester.pump();
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+
+      expect(tester.widget<Visibility>(visibilityFinder).visible, isTrue);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+      expect(tester.element(backdropFinder), same(initialElement));
+    });
+
+    testWidgets('auto-hide 淡出停用保留的控制栏 backdrop filter', (tester) async {
+      final playingPort = FakePlayerControls(isPlayingNow: true);
+      final playingVideo = FakeVideoControlsPort(player: playingPort);
+      addTearDown(playingVideo.dispose);
+
+      await pumpControls(
+        tester,
+        controlsPort: playingVideo,
+        actions: const PlayerActions(),
+      );
+
+      // 控制栏淡出期间必须及早停止背景采样，但不能替换 Windows AX
+      // 依赖的滤镜祖先链。
+      final backdropFinder = find.byType(BackdropFilter, skipOffstage: false);
+      expect(backdropFinder, findsOneWidget);
+      final initialElement = tester.element(backdropFinder);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+
+      expect(backdropFinder, findsOneWidget);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      expect(tester.element(backdropFinder), same(initialElement));
+
+      // FakePlayerControls 的 broadcast stream 异步投递；第一帧先让
+      // PlayerControlsState → AutoHideController.show() 进入可见态。此时淡入
+      // 动画尚未跨过 ControlBar 的 0.01 blur 阈值，滤镜必须仍保持关闭。
+      playingPort.emitPlaying(false);
+      await tester.pump();
+
+      final visibilityFinder = find.byKey(
+        const Key('player-controls-visibility'),
+      );
+      expect(tester.widget<Visibility>(visibilityFinder).visible, isTrue);
+      expect(backdropFinder, findsOneWidget);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      expect(tester.element(backdropFinder), same(initialElement));
+
+      // 先消费 forward() 调度的首个零 elapsed ticker frame；否则下一次带时长的
+      // pump 可能只用于建立动画起点，尚未推进 opacity。
+      await tester.pump();
+
+      // 推进 show() 的淡入动画；opacity 跨过阈值后才恢复实时背景采样。
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+
+      expect(backdropFinder, findsOneWidget);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+      expect(tester.element(backdropFinder), same(initialElement));
+    });
+
+    testWidgets('resize 立即停用并在 non-idle 状态恢复控制栏 backdrop filter', (
+      tester,
+    ) async {
+      final resizing = ValueNotifier<bool>(false);
+      addTearDown(resizing.dispose);
+      // 使用非 idle 的 engine，锁定正常媒体态完成 resize 后恢复 blur 的契约。
+      widgetEngine.play();
+
+      await pumpControls(
+        tester,
+        resizing: resizing,
+        actions: const PlayerActions(),
+      );
+
+      final controlBarFinder = find.byType(ControlBar);
+      final backdropFinder = find.descendant(
+        of: controlBarFinder,
+        matching: find.byType(BackdropFilter),
+      );
+      expect(backdropFinder, findsOneWidget);
+      final initialElement = tester.element(backdropFinder);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+      // resize 上升沿必须直接停用实时背景采样，不能等待 decoration 的淡出动画。
+      resizing.value = true;
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      expect(tester.element(backdropFinder), same(initialElement));
+
+      resizing.value = false;
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+      expect(tester.element(backdropFinder), same(initialElement));
     });
 
     testWidgets('playing stream 驱动自动隐藏且暂停后恢复常显', (tester) async {

@@ -18,8 +18,6 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('↑ / ↓', l10n.shortcutVolume),
   ('ESC', l10n.shortcutExitFullscreen),
   ('M', l10n.shortcutMute),
-  ('N', l10n.shortcutNext),
-  ('P', l10n.shortcutPrevious),
   ('O', l10n.shortcutOpenFile),
   ('S', l10n.shortcutSubtitle),
   ('] / [', l10n.shortcutSubtitleDelay),
@@ -30,10 +28,8 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
 /// 键盘快捷键包装器 — 支持自定义绑定
 ///
 /// Space → 播放/暂停 | ← → 后退/前进 5s | ↑ ↓ → 音量 ±5%
-/// M → 静音 | N/P → 上/下一首
-/// O → 打开文件 | S → 字幕开关 | ESC → 退出全屏
-/// ]/[ → 字幕延迟 ± | F1 → 帮助
-/// MediaPlayPause/MediaTrackNext/MediaTrackPrevious → 媒体键
+/// M → 静音 | O → 打开文件 | S → 字幕开关 | ESC → 退出全屏
+/// ]/[ → 字幕延迟 ± | F1 → 帮助 | MediaPlayPause → 媒体播放键
 ///
 /// [customBindings] 覆盖默认按键映射 (action → LogicalKeyboardKey.keyName)
 class KeyboardHandler extends StatelessWidget {
@@ -46,8 +42,6 @@ class KeyboardHandler extends StatelessWidget {
   final VoidCallback? onVolumeDown;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onToggleMute;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
   final VoidCallback? onOpenFile;
   final VoidCallback? onToggleSubtitle;
   final VoidCallback? onExitFullscreen;
@@ -55,8 +49,6 @@ class KeyboardHandler extends StatelessWidget {
   final VoidCallback? onSubtitleDelayForward;
   final VoidCallback? onSubtitleDelayBackward;
   final VoidCallback? onMediaPlayPause;
-  final VoidCallback? onMediaNext;
-  final VoidCallback? onMediaPrevious;
   const KeyboardHandler({
     super.key,
     required this.child,
@@ -68,8 +60,6 @@ class KeyboardHandler extends StatelessWidget {
     this.onVolumeDown,
     this.onToggleFullscreen,
     this.onToggleMute,
-    this.onPrevious,
-    this.onNext,
     this.onOpenFile,
     this.onToggleSubtitle,
     this.onExitFullscreen,
@@ -77,8 +67,6 @@ class KeyboardHandler extends StatelessWidget {
     this.onSubtitleDelayForward,
     this.onSubtitleDelayBackward,
     this.onMediaPlayPause,
-    this.onMediaNext,
-    this.onMediaPrevious,
   });
 
   @override
@@ -136,14 +124,6 @@ class KeyboardHandler extends StatelessWidget {
       onToggleMute?.call();
       return KeyEventResult.handled;
     }
-    if (_keyMatches(key, 'next', LogicalKeyboardKey.keyN)) {
-      onNext?.call();
-      return KeyEventResult.handled;
-    }
-    if (_keyMatches(key, 'previous', LogicalKeyboardKey.keyP)) {
-      onPrevious?.call();
-      return KeyEventResult.handled;
-    }
     if (_keyMatches(key, 'openFile', LogicalKeyboardKey.keyO)) {
       onOpenFile?.call();
       return KeyEventResult.handled;
@@ -197,17 +177,9 @@ class KeyboardHandler extends StatelessWidget {
       return KeyEventResult.handled;
     }
 
-    // FEAT-06: Media keys (always hardcoded, not customizable)
+    // 系统媒体播放键固定映射，不受自定义快捷键配置影响。
     if (key == LogicalKeyboardKey.mediaPlayPause) {
       onMediaPlayPause?.call();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.mediaTrackNext) {
-      onMediaNext?.call();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.mediaTrackPrevious) {
-      onMediaPrevious?.call();
       return KeyEventResult.handled;
     }
 

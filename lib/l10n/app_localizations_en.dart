@@ -72,7 +72,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutHelp => 'Show Help';
 
   @override
-  String get shortcutMediaKeys => 'Play/Pause/Prev/Next';
+  String get shortcutMediaKeys => 'Play/Pause';
 
   @override
   String get settings => 'Settings';

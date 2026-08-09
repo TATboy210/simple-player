@@ -72,7 +72,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutHelp => '显示帮助';
 
   @override
-  String get shortcutMediaKeys => '播放/暂停/上一首/下一首';
+  String get shortcutMediaKeys => '播放/暂停';
 
   @override
   String get settings => '设置';

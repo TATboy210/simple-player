@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_banner.dart';
 
@@ -24,10 +23,7 @@ void main() {
   });
 
   /// 构建 ErrorBanner 测试壳 — 带 MaterialApp + l10n
-  Widget buildErrorBanner({
-    VoidCallback? onOpenFile,
-    VoidCallback? onRetry,
-  }) {
+  Widget buildErrorBanner({VoidCallback? onOpenFile, VoidCallback? onRetry}) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -55,7 +51,7 @@ void main() {
       await tester.pump();
 
       // 4. ErrorBanner 应显示错误消息
-      expect(find.text('File not found'), findsOneWidget);
+      expect(find.text('An unexpected error occurred'), findsOneWidget);
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
@@ -64,7 +60,7 @@ void main() {
       engine.simulateError('Test error');
       await tester.pumpWidget(buildErrorBanner());
       await tester.pump();
-      expect(find.text('Test error'), findsOneWidget);
+      expect(find.text('An unexpected error occurred'), findsOneWidget);
 
       // 2. 模拟 dismiss 操作 — 通过设置 state 回到 idle + lastError = null
       engine.state.value = MediaState.idle;
@@ -76,22 +72,22 @@ void main() {
       expect(engine.lastError.value, isNull);
     });
 
-    testWidgets('error → recovery → new playback clears error', (
-      tester,
-    ) async {
+    testWidgets('error → recovery → new playback clears error', (tester) async {
       // 1. 触发错误
       engine.simulateError('Codec error');
       await tester.pumpWidget(buildErrorBanner());
       await tester.pump();
-      expect(find.text('Codec error'), findsOneWidget);
+      expect(find.text('An unexpected error occurred'), findsOneWidget);
 
       // 2. 恢复: open 新文件 → lastError 清除
       engine.configureMedia(durationMs: 30000);
       await engine.open('new_video.mp4');
 
-      // 3. ErrorBanner 应隐藏
+      // 3. ErrorBanner 应在引擎恢复后移除。
+      await tester.pump();
       expect(engine.lastError.value, isNull);
       expect(engine.state.value, MediaState.idle);
+      expect(find.byIcon(Icons.error_outline), findsNothing);
     });
 
     testWidgets('FileError shows openFile action button', (tester) async {
@@ -181,29 +177,32 @@ void main() {
   });
 
   group('Unidirectional data flow verification', () {
-    testWidgets('Widget→Kernel: tap triggers engine method, no reverse callback',
-        (tester) async {
-      // 验证 Widget 层调用 Kernel 层是单向的:
-      // Widget 调用 engine.play() → engine 状态变更
-      // engine 不引用任何 widget/callback
-      engine.configureMedia(durationMs: 60000);
-      await engine.open('test.mp4');
+    testWidgets(
+      'Widget→Kernel: tap triggers engine method, no reverse callback',
+      (tester) async {
+        // 验证 Widget 层调用 Kernel 层是单向的:
+        // Widget 调用 engine.play() → engine 状态变更
+        // engine 不引用任何 widget/callback
+        engine.configureMedia(durationMs: 60000);
+        await engine.open('test.mp4');
 
-      // Widget 层操作 → Kernel 方法调用
-      engine.play();
-      expect(engine.playCallCount, 1);
-      expect(engine.state.value, MediaState.playing);
+        // Widget 层操作 → Kernel 方法调用
+        engine.play();
+        expect(engine.playCallCount, 1);
+        expect(engine.state.value, MediaState.playing);
 
-      engine.pause();
-      expect(engine.pauseCallCount, 1);
-      expect(engine.state.value, MediaState.paused);
+        engine.pause();
+        expect(engine.pauseCallCount, 1);
+        expect(engine.state.value, MediaState.paused);
 
-      // 验证 engine 没有反向回调到 widget
-      // FakeEngine 不包含任何 widget 引用 — 通过类型系统保证
-    });
+        // 验证 engine 没有反向回调到 widget
+        // FakeEngine 不包含任何 widget 引用 — 通过类型系统保证
+      },
+    );
 
-    testWidgets('Kernel→Widget: engine state changes drive widget rebuilds',
-        (tester) async {
+    testWidgets('Kernel→Widget: engine state changes drive widget rebuilds', (
+      tester,
+    ) async {
       // 验证 Kernel → Widget 数据流:
       // engine.state (ValueNotifier) → ValueListenableBuilder → widget rebuild
       await tester.pumpWidget(buildErrorBanner());
@@ -216,7 +215,7 @@ void main() {
       engine.simulateError('State change drives rebuild');
       await tester.pump();
 
-      expect(find.text('State change drives rebuild'), findsOneWidget);
+      expect(find.text('An unexpected error occurred'), findsOneWidget);
 
       // Kernel 状态恢复 → Widget 重建
       engine.state.value = MediaState.idle;
@@ -248,19 +247,17 @@ void main() {
       expect(engine.isMuted.value, isTrue);
     });
 
-    test('PlaybackController uses constructor injection — no service locator',
-        () {
-      // 验证 PlaybackController 通过构造函数注入依赖
-      // 无 GetIt/service locator/全局状态
-      final controller = PlaybackController(
-        engine: engine,
-        playlist: Playlist(),
-        onNeedRebuild: () {},
-      );
+    test(
+      'PlaybackController uses constructor injection — no service locator',
+      () {
+        // 验证 PlaybackController 通过构造函数注入依赖
+        // 无 GetIt/service locator/全局状态
+        final controller = PlaybackController(engine: engine);
 
-      // engine 是通过构造函数注入的 — 可替换为 FakeEngine
-      expect(controller.engine, same(engine));
-      expect(controller.playlist, isA<Playlist>());
-    });
+        // engine 是通过构造函数注入的 — 可替换为 FakeEngine。
+        expect(controller.engine, same(engine));
+        controller.dispose();
+      },
+    );
   });
 }

@@ -20,15 +20,12 @@
 /// - GlassIconButton 使用 Material+InkWell，无 BackdropFilter（无双层模糊）
 library;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
-import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import '../helpers/fake_engine.dart';
 
@@ -57,28 +54,26 @@ class _RebuildCounterState extends State<_RebuildCounter> {
 /// 文件级 final:perf test 是 dev tooling,notifier 极轻量,进程结束自然回收.
 final ValueNotifier<bool> _isFullscreen = ValueNotifier<bool>(false);
 
-/// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+/// 从 FakeEngine 派生 ControlBarViewModel，供性能测试使用。
 ControlBarViewModel _buildVm(FakeEngine e) => ControlBarViewModel(
-      isPlaying: e.isPlayingNotifier,
-      position: e.position,
-      duration: e.duration,
-      volume: e.volume,
-      isMuted: e.isMuted,
-      rate: e.playbackSpeed,
-      isFullscreen: _isFullscreen,
-      onSeek: e.seekTo,
-      onPlayPause: e.togglePlayPause,
-      onSeekBack: e.skipBack,
-      onSeekForward: e.skipForward,
-      onToggleMute: () => e.setMute(!e.isMuted.value),
-      onSetVolume: e.setVolume,
-      onSetRate: e.setPlaybackRate,
-    );
+  isPlaying: e.isPlayingNotifier,
+  position: e.position,
+  duration: e.duration,
+  volume: e.volume,
+  isMuted: e.isMuted,
+  rate: e.playbackSpeed,
+  isFullscreen: _isFullscreen,
+  onSeek: e.seekTo,
+  onPlayPause: e.togglePlayPause,
+  onSeekBack: e.skipBack,
+  onSeekForward: e.skipForward,
+  onToggleMute: () => e.setMute(!e.isMuted.value),
+  onSetVolume: e.setVolume,
+  onSetRate: e.setPlaybackRate,
+);
 
 Widget _buildControlBar(
-  FakeEngine engine,
-  Playlist playlist,
-  ValueNotifier<int> playlistGeneration, {
+  FakeEngine engine, {
   bool enableBlur = true,
   bool isIdle = false,
 }) {
@@ -91,8 +86,6 @@ Widget _buildControlBar(
         height: 200,
         child: ControlBar(
           vm: _buildVm(engine),
-          playlist: playlist,
-          playlistGeneration: playlistGeneration,
           actions: const PlayerActions(
             onOpenFile: _noop,
             onSettings: _noop,
@@ -106,51 +99,7 @@ Widget _buildControlBar(
   );
 }
 
-Widget _buildControlsOverlay(
-  FakeEngine engine,
-  Playlist playlist,
-  ValueNotifier<int> playlistGeneration,
-  ValueNotifier<String> currentFileName,
-  ValueNotifier<bool> openFileEnabled,
-) {
-  return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(
-      body: ControlsOverlay(
-        engine: engine,
-        currentFileName: currentFileName,
-        playlist: playlist,
-        playlistGeneration: playlistGeneration,
-        openFileEnabled: openFileEnabled,
-        actions: const PlayerActions(onToggleFullscreen: _noop),
-      ),
-    ),
-  );
-}
-
 void main() {
-  // 渐进路径:ControlBar/ControlsOverlay 需 playlist + generation(overlay 还需
-  // currentFileName/openFileEnabled)。两个 group 共享,main 顶层 setUp/tearDown
-  // 各跑一次,group 内 setUp 只管 engine。
-  late Playlist playlist;
-  late ValueNotifier<int> playlistGeneration;
-  late ValueNotifier<String> currentFileName;
-  late ValueNotifier<bool> openFileEnabled;
-
-  setUp(() {
-    playlist = Playlist();
-    playlistGeneration = ValueNotifier<int>(0);
-    currentFileName = ValueNotifier<String>('');
-    openFileEnabled = ValueNotifier<bool>(true);
-  });
-
-  tearDown(() {
-    playlistGeneration.dispose();
-    currentFileName.dispose();
-    openFileEnabled.dispose();
-  });
-
   group('ControlBar rebuild profiling', () {
     late FakeEngine engine;
 
@@ -169,10 +118,7 @@ void main() {
       (tester) async {
         final rebuildCount = ValueNotifier<int>(0);
         await tester.pumpWidget(
-          _RebuildCounter(
-            count: rebuildCount,
-            child: _buildControlBar(engine, playlist, playlistGeneration),
-          ),
+          _RebuildCounter(count: rebuildCount, child: _buildControlBar(engine)),
         );
         await tester.pump();
         final initialCount = rebuildCount.value;
@@ -205,12 +151,7 @@ void main() {
       await tester.pumpWidget(
         _RebuildCounter(
           count: blurCount,
-          child: _buildControlBar(
-            engine,
-            playlist,
-            playlistGeneration,
-            enableBlur: true,
-          ),
+          child: _buildControlBar(engine, enableBlur: true),
         ),
       );
       await tester.pump();
@@ -227,12 +168,7 @@ void main() {
       await tester.pumpWidget(
         _RebuildCounter(
           count: noBlurCount,
-          child: _buildControlBar(
-            engine,
-            playlist,
-            playlistGeneration,
-            enableBlur: false,
-          ),
+          child: _buildControlBar(engine, enableBlur: false),
         ),
       );
       await tester.pump();
@@ -256,10 +192,7 @@ void main() {
     ) async {
       final rebuildCount = ValueNotifier<int>(0);
       await tester.pumpWidget(
-        _RebuildCounter(
-          count: rebuildCount,
-          child: _buildControlBar(engine, playlist, playlistGeneration),
-        ),
+        _RebuildCounter(count: rebuildCount, child: _buildControlBar(engine)),
       );
       await tester.pump();
       final initialCount = rebuildCount.value;
@@ -285,14 +218,7 @@ void main() {
     testWidgets('Phase 2 verification — enableBlur=false skips BackdropFilter', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        _buildControlBar(
-          engine,
-          playlist,
-          playlistGeneration,
-          enableBlur: false,
-        ),
-      );
+      await tester.pumpWidget(_buildControlBar(engine, enableBlur: false));
       await tester.pump();
 
       // When enableBlur=false, ControlBar returns RepaintBoundary(child: content)
@@ -310,14 +236,7 @@ void main() {
     testWidgets(
       'Phase 2 verification — enableBlur=true includes BackdropFilter',
       (tester) async {
-        await tester.pumpWidget(
-          _buildControlBar(
-            engine,
-            playlist,
-            playlistGeneration,
-            enableBlur: true,
-          ),
-        );
+        await tester.pumpWidget(_buildControlBar(engine, enableBlur: true));
         await tester.pump();
 
         // When enableBlur=true and WindowInteractionState is idle,
@@ -336,14 +255,7 @@ void main() {
     testWidgets('Phase 2 verification — RepaintBoundary wraps content', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        _buildControlBar(
-          engine,
-          playlist,
-          playlistGeneration,
-          enableBlur: false,
-        ),
-      );
+      await tester.pumpWidget(_buildControlBar(engine, enableBlur: false));
       await tester.pump();
 
       // ControlBar wraps content in RepaintBoundary in both paths.
@@ -358,88 +270,4 @@ void main() {
     });
   });
 
-  group('ControlsOverlay rebuild profiling', () {
-    late FakeEngine engine;
-
-    setUp(() {
-      engine = FakeEngine();
-      engine.configureMedia(durationMs: 120000);
-      engine.state.value = MediaState.playing;
-    });
-
-    tearDown(() {
-      engine.dispose();
-    });
-
-    testWidgets(
-      'rebuild count during mouse movement — AutoHideController throttle',
-      (tester) async {
-        final rebuildCount = ValueNotifier<int>(0);
-        await tester.pumpWidget(
-          _RebuildCounter(
-            count: rebuildCount,
-            child: _buildControlsOverlay(
-              engine,
-              playlist,
-              playlistGeneration,
-              currentFileName,
-              openFileEnabled,
-            ),
-          ),
-        );
-        await tester.pump();
-        final initialCount = rebuildCount.value;
-
-        // Simulate rapid mouse movement — AutoHideController has 100ms throttle
-        final gesture = await tester.createGesture(
-          kind: PointerDeviceKind.mouse,
-        );
-        await gesture.addPointer(
-          location: tester.getCenter(find.byType(ControlsOverlay)),
-        );
-        addTearDown(gesture.removePointer);
-
-        // Move mouse 20 times in quick succession
-        final center = tester.getCenter(find.byType(ControlsOverlay));
-        for (var i = 0; i < 20; i++) {
-          await gesture.moveTo(center + Offset(i.toDouble() * 5, 0));
-          await tester.pump(const Duration(milliseconds: 16));
-        }
-
-        final totalRebuilds = rebuildCount.value - initialCount;
-        // AutoHideController throttles at 100ms, so 20 moves at 16ms intervals
-        // should result in ~3-4 effective updates (not 20).
-        // Parent rebuild count depends on how many times _autoHide.visible changes.
-        expect(
-          totalRebuilds,
-          lessThanOrEqualTo(10),
-          reason:
-              'ControlsOverlay parent rebuilt $totalRebuilds times during '
-              '20 rapid mouse moves (expected <= 10 due to 100ms throttle)',
-        );
-      },
-    );
-
-    testWidgets('ControlsOverlay child caching — Stack is static subtree', (
-      tester,
-    ) async {
-      // The outer ValueListenableBuilder<bool> on _autoHide.visible
-      // caches the Stack as `child`. Verify the Stack doesn't rebuild
-      // when visibility toggles.
-      await tester.pumpWidget(
-        _buildControlsOverlay(
-          engine,
-          playlist,
-          playlistGeneration,
-          currentFileName,
-          openFileEnabled,
-        ),
-      );
-      await tester.pump();
-
-      // Verify at least one Stack exists (cached child inside VLB).
-      // Multiple Stacks are expected from MaterialApp/Scaffold/ControlsOverlay.
-      expect(find.byType(Stack), findsAtLeastNWidgets(1));
-    });
-  });
 }

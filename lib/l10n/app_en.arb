@@ -45,8 +45,8 @@
   "@shortcutSubtitleDelay": { "description": "Keyboard shortcut description for bracket keys" },
   "shortcutHelp": "Show Help",
   "@shortcutHelp": { "description": "Keyboard shortcut description for F1 key" },
-  "shortcutMediaKeys": "Play/Pause/Prev/Next",
-  "@shortcutMediaKeys": { "description": "Keyboard shortcut description for media keys" },
+  "shortcutMediaKeys": "Play/Pause",
+  "@shortcutMediaKeys": { "description": "Keyboard shortcut description for the media play/pause key" },
 
   "settings": "Settings",
   "@settings": { "description": "Settings dialog title and tooltip" },

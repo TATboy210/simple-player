@@ -119,18 +119,19 @@ class GlassContainer extends StatelessWidget {
         child: RepaintBoundary(child: content),
       );
     } else if (r != null) {
-      // resize 期间跳过 BackdropFilter — 避免 GPU readback 卡顿
+      // resize 期间仅停用滤镜采样，保留固定祖先链，避免后代内容因切换
+      // ClipRRect/BackdropFilter 分支而卸载，导致焦点和 semantics 状态重建。
+      final blurFilter = tier.blurFilter;
       result = AnimatedBuilder(
         animation: r,
-        builder: (_, child) {
-          if (r.value) {
-            return ClipRRect(
-              borderRadius: rRect,
-              child: RepaintBoundary(child: child),
-            );
-          }
-          return _buildBlurContent(rRect, child ?? const SizedBox.shrink());
-        },
+        builder: (_, child) => ClipRRect(
+          borderRadius: rRect,
+          child: BackdropFilter(
+            filter: blurFilter,
+            enabled: !r.value,
+            child: RepaintBoundary(child: child),
+          ),
+        ),
         child: content,
       );
     } else {
@@ -380,9 +381,7 @@ class _GlassButtonState extends State<GlassButton>
       // 将快捷键绑定在拥有焦点的探测器上，确保事件在到达全局播放器
       // 快捷键之前被转换为本地 ActivateIntent 并消费。
       shortcuts: _shortcuts,
-      actions: <Type, Action<Intent>>{
-        ActivateIntent: _effectiveActivateAction,
-      },
+      actions: <Type, Action<Intent>>{ActivateIntent: _effectiveActivateAction},
       child: semantics,
     );
   }

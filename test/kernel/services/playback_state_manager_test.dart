@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
-import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
-import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/models/play_mode.dart';
+import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
+import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
+
 import '../../helpers/fake_engine.dart';
 
 void main() {
@@ -16,19 +16,13 @@ void main() {
   });
 
   late FakeEngine engine;
-  late Playlist playlist;
   late PlaybackController controller;
-  int rebuildCount = 0;
 
   setUp(() {
+    // 为 SettingsStore 提供平台无关的内存后端，避免测试依赖宿主插件。
+    SharedPreferences.setMockInitialValues({});
     engine = FakeEngine();
-    playlist = Playlist();
-    rebuildCount = 0;
-    controller = PlaybackController(
-      engine: engine,
-      playlist: playlist,
-      onNeedRebuild: () => rebuildCount++,
-    );
+    controller = PlaybackController(engine: engine);
   });
 
   tearDown(() {
@@ -37,71 +31,6 @@ void main() {
   });
 
   group('PlaybackStateManager', () {
-    group('removeAt', () {
-      test('stops engine when removing currently-playing item', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        await controller.playIndex(0);
-        await controller.removeAt(0);
-        expect(engine.stopCallCount, greaterThanOrEqualTo(1));
-        expect(playlist.length, 1);
-      });
-
-      test('does not stop engine when removing non-current item', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        playlist.add('C:/b.mp4');
-        await controller.playIndex(1);
-        final stopsBefore = engine.stopCallCount;
-        await controller.removeAt(0);
-        expect(engine.stopCallCount, stopsBefore);
-      });
-    });
-
-    group('clearPlaylist', () {
-      test('resets currentFileName to empty', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        await controller.playIndex(0);
-        expect(controller.currentFileName.value, isNotEmpty);
-        await controller.clearPlaylist();
-        expect(controller.currentFileName.value, '');
-      });
-
-      test('triggers onNeedRebuild', () async {
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        await controller.playIndex(0);
-        rebuildCount = 0;
-        await controller.clearPlaylist();
-        expect(rebuildCount, greaterThanOrEqualTo(1));
-      });
-    });
-
-    group('togglePlayMode', () {
-      test('persists mode change', () {
-        expect(playlist.mode, PlayMode.loopAll);
-        controller.togglePlayMode();
-        expect(playlist.mode, PlayMode.loopSingle);
-      });
-    });
-
-    group('pause breakpoint', () {
-      test('saves position on pause state', () async {
-        await controller.init(); // registers state listener
-        engine.configureMedia(durationMs: 60000);
-        playlist.add('C:/a.mp4');
-        await controller.playIndex(0);
-        engine.position.value = 5000;
-        engine.state.value = MediaState.paused;
-        // allow synchronous listeners and microtasks to run
-        await Future.microtask(() {});
-        final item = playlist.items[0];
-        expect(item.positionMs, 5000);
-      });
-    });
-
     group('init', () {
       test('init with preloaded settings sets volume and mute', () async {
         const settings = AppSettings(
@@ -112,7 +41,9 @@ void main() {
           playMode: 0,
           isMuted: true,
         );
+
         await controller.init(settings: settings);
+
         expect(engine.volume.value, closeTo(0.7, 0.01));
         expect(engine.isMuted.value, isTrue);
       });
@@ -126,45 +57,19 @@ void main() {
           playMode: 0,
           isMuted: false,
         );
+
         await controller.init(settings: settings);
-        // Second init should be a no-op
+        // 第二次初始化不应覆盖已恢复的单文件播放设置。
         await controller.init(settings: settings);
+
         expect(engine.volume.value, closeTo(0.5, 0.01));
       });
 
-      test('init without settings loads from store', () async {
-        // init() without settings calls SettingsStore.load()
-        // which fails in headless CI — but should not crash
+      test('init without settings leaves engine in idle state', () async {
+        // SettingsStore 在测试环境可能无法访问平台存储；初始化必须保持安全。
         await controller.init();
-        // Engine state should be unaffected
+
         expect(engine.state.value, MediaState.idle);
-      });
-    });
-
-    group('pause breakpoint edge cases', () {
-      test('does not save position when currentIndex < 0', () async {
-        await controller.init();
-        engine.configureMedia(durationMs: 60000);
-        // No items added — currentIndex is -1
-        engine.position.value = 5000;
-        engine.state.value = MediaState.paused;
-        await Future.microtask(() {});
-        // Should not crash and no save happens
-        expect(playlist.currentIndex, -1);
-      });
-
-      test('saves duration along with position on pause', () async {
-        await controller.init();
-        engine.configureMedia(durationMs: 120000);
-        playlist.add('C:/a.mp4');
-        await controller.playIndex(0);
-        engine.position.value = 30000;
-        engine.duration.value = 120000;
-        engine.state.value = MediaState.paused;
-        await Future.microtask(() {});
-        final item = playlist.items[0];
-        expect(item.positionMs, 30000);
-        expect(item.durationMs, 120000);
       });
     });
   });

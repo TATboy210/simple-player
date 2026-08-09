@@ -4,7 +4,7 @@ import '../../kernel/engine/engine_state.dart';
 
 /// 视频纹理渲染 — 根据引擎 textureId 和 aspectRatio 显示视频
 ///
-/// 手势由 ControlsOverlay 统一处理（tap 隐藏 / double-tap 全屏）。
+/// 手势由 PlayerVideoControls 统一处理（tap 隐藏 / double-tap 全屏）。
 /// 此组件仅负责渲染纹理 + 滚轮音量调节。
 /// Listener 提升到 AnimatedBuilder 外层，避免每次纹理重建时重建回调。
 class VideoSurface extends StatelessWidget {

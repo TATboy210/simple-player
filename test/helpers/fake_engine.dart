@@ -67,7 +67,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   /// 派生 isPlaying(监听 state==playing) — 路径B Commit1:
   /// CenterGroup/PlayPauseButton 新签名需 `ValueListenable<bool>` isPlaying,
-  /// FakeEngine 原无此字段,加派生 notifier 供测试构造(同 controls_overlay 模式).
+  /// FakeEngine 原无此字段,加派生 notifier 供测试构造（供 ControlBar 测试构造）.
   /// late final + 构造函数 eager 初始化:避免 dispose 时未初始化访问崩溃.
   late final ValueNotifier<bool> isPlayingNotifier;
 

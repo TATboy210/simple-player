@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 
 import 'window_mode.dart';
 
@@ -28,6 +29,11 @@ abstract class WindowBridge {
   ///
   /// Contract: `true` between drag-start and drag-end; useful for suppressing layout thrashing.
   ValueNotifier<bool> get isResizing;
+
+  /// 当前连续 resize 会话的单调标识；0 表示尚未发生用户 resize。
+  ///
+  /// Contract: read-only diagnostic correlation source; it must not drive UI layout.
+  ValueListenable<int> get resizeSessionId;
 
   /// 窗口是否置顶
   ///

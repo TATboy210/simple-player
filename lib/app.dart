@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'ui/theme/tokens.dart';
 import 'kernel/bridge/window_bridge.dart';
@@ -20,10 +21,18 @@ class App extends StatefulWidget {
   final StartupCoordinator coordinator;
   final WindowBridge windowService;
 
+  /// 可选的设置初始化入口；测试可注入可控 Future，生产环境仍加载真实偏好。
+  final Future<void> Function()? initializeSettings;
+
+  /// 可选的 ready 页面构建器；测试可避开 media_kit 原生模块初始化。
+  final WidgetBuilder? readyHomeBuilder;
+
   const App({
     super.key,
     required this.coordinator,
     required this.windowService,
+    this.initializeSettings,
+    this.readyHomeBuilder,
   });
 
   @override
@@ -31,7 +40,7 @@ class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> {
-  bool _ready = false;
+  final ValueNotifier<bool> _settingsReady = ValueNotifier<bool>(false);
 
   @override
   void initState() {
@@ -46,16 +55,22 @@ class _AppState extends State<App> {
       'Loading preferences...',
     );
     try {
-      await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
+      final initializeSettings = widget.initializeSettings;
+      if (initializeSettings != null) {
+        await initializeSettings();
+      } else {
+        await Future.wait([LocaleService.I.init(), ThemeService.I.init()]);
+      }
     } on Exception catch (e) {
       KernelLogger.I.w('[App] settings load failed (continuing): $e');
     }
     widget.coordinator.report(StartupPhase.settings, 1.0, 'Preferences loaded');
-    if (mounted) setState(() => _ready = true);
+    if (mounted) _settingsReady.value = true;
   }
 
   @override
   void dispose() {
+    _settingsReady.dispose();
     widget.windowService.dispose();
     super.dispose();
   }
@@ -123,38 +138,70 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) {
-      return MaterialApp(
-        theme: ThemeService.I.currentTheme,
-        home: ValueListenableBuilder<StartupState>(
-          valueListenable: widget.coordinator.state,
-          builder: (context, startupState, _) =>
-              ProgressSplashScreen(state: startupState),
-        ),
-      );
-    }
-
-    return AnimatedTheme(
-      data: ThemeService.I.currentTheme,
-      duration: const Duration(milliseconds: 250),
-      child: ValueListenableBuilder<Locale>(
-        valueListenable: LocaleService.I.locale,
-        builder: (context, locale, _) => MaterialApp(
-          locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-          debugShowCheckedModeBanner: true,
-          theme: ThemeService.I.currentTheme,
-          home: DeferredPlayerFeature(
-            coordinator: widget.coordinator,
-            windowService: widget.windowService,
-            onSettingsSecondary: _showSettingsQuickMenu,
+    return ValueListenableBuilder<int>(
+      valueListenable: ThemeService.I.themeIndex,
+      builder: (context, _, _) {
+        final theme = ThemeService.I.currentTheme;
+        return AnimatedTheme(
+          data: theme,
+          duration: const Duration(milliseconds: 250),
+          child: ValueListenableBuilder<Locale>(
+            valueListenable: LocaleService.I.locale,
+            builder: (context, locale, _) => MaterialApp(
+              locale: locale,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              onGenerateTitle: (context) =>
+                  AppLocalizations.of(context).appTitle,
+              debugShowCheckedModeBanner: true,
+              theme: theme,
+              home: _StartupHome(
+                settingsReady: _settingsReady,
+                coordinator: widget.coordinator,
+                readyHomeBuilder: widget.readyHomeBuilder ?? _buildPlayerHome,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
+  Widget _buildPlayerHome(BuildContext context) => DeferredPlayerFeature(
+    coordinator: widget.coordinator,
+    windowService: widget.windowService,
+    onSettingsSecondary: _showSettingsQuickMenu,
+  );
+}
+
+/// Navigator 的固定初始页面，只在页面内部切换启动画面与播放器。
+///
+/// 该边界保持根 MaterialApp、Navigator 与 Overlay 的 Element identity，避免
+/// settings 初始化完成时整棵 accessibility 根树被卸载并重新创建。
+class _StartupHome extends StatelessWidget {
+  const _StartupHome({
+    required this.settingsReady,
+    required this.coordinator,
+    required this.readyHomeBuilder,
+  });
+
+  final ValueListenable<bool> settingsReady;
+  final StartupCoordinator coordinator;
+  final WidgetBuilder readyHomeBuilder;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: settingsReady,
+    builder: (context, isReady, _) {
+      if (isReady) return readyHomeBuilder(context);
+
+      return ValueListenableBuilder<StartupState>(
+        valueListenable: coordinator.state,
+        builder: (context, startupState, _) =>
+            ProgressSplashScreen(state: startupState),
+      );
+    },
+  );
 }
 
 // ── 快捷菜单项 — 选中态 + 点击回调 ──

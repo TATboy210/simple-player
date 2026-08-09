@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
@@ -15,42 +14,35 @@ void _noop() {}
 
 void main() {
   late FakeEngine engine;
-  // 渐进路径:ControlBar 需 playlist + playlistGeneration(required) —
-  // playMode 下沉到 LeftButtonGroup 内部读 playlist.mode,generation 驱动重建。
-  late Playlist playlist;
-  late ValueNotifier<int> playlistGeneration;
   // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
   // isFullscreen 用共享 notifier(测试不需全屏),避免每次 buildVm 创建泄漏.
   late ValueNotifier<bool> isFullscreen;
 
-  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  /// 从 FakeEngine 派生 ControlBarViewModel，供 ControlBar 测试使用。
   ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
-        isPlaying: e.isPlayingNotifier,
-        position: e.position,
-        duration: e.duration,
-        volume: e.volume,
-        isMuted: e.isMuted,
-        rate: e.playbackSpeed,
-        isFullscreen: isFullscreen,
-        onSeek: e.seekTo,
-        onPlayPause: e.togglePlayPause,
-        onSeekBack: e.skipBack,
-        onSeekForward: e.skipForward,
-        onToggleMute: () => e.setMute(!e.isMuted.value),
-        onSetVolume: e.setVolume,
-        onSetRate: e.setPlaybackRate,
-      );
+    isPlaying: e.isPlayingNotifier,
+    position: e.position,
+    duration: e.duration,
+    volume: e.volume,
+    isMuted: e.isMuted,
+    rate: e.playbackSpeed,
+    isFullscreen: isFullscreen,
+    onSeek: e.seekTo,
+    onPlayPause: e.togglePlayPause,
+    onSeekBack: e.skipBack,
+    onSeekForward: e.skipForward,
+    onToggleMute: () => e.setMute(!e.isMuted.value),
+    onSetVolume: e.setVolume,
+    onSetRate: e.setPlaybackRate,
+  );
 
   setUp(() {
     engine = FakeEngine();
-    playlist = Playlist();
-    playlistGeneration = ValueNotifier<int>(0);
     isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
     engine.dispose();
-    playlistGeneration.dispose();
     isFullscreen.dispose();
   });
 
@@ -69,8 +61,6 @@ void main() {
           child: ControlBar(
             vm: buildVm(eng ?? engine),
             actions: actions ?? const PlayerActions(),
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
             title: title,
           ),
         ),
@@ -116,13 +106,6 @@ void main() {
       expect(progressRect.center.dy, closeTo(timeRect.center.dy, 0.1));
     });
 
-    testWidgets('renders play mode button', (tester) async {
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
-
-      expect(find.byIcon(Icons.repeat), findsOneWidget);
-    });
-
     testWidgets('renders CenterGroup', (tester) async {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
@@ -153,11 +136,7 @@ void main() {
               body: SizedBox(
                 width: 600,
                 height: 200,
-                child: ControlBar(
-                  vm: buildVm(engine),
-                  playlist: playlist,
-                  playlistGeneration: playlistGeneration,
-                ),
+                child: ControlBar(vm: buildVm(engine)),
               ),
             ),
           ),
@@ -212,17 +191,6 @@ void main() {
       expect(find.byIcon(Icons.subtitles), findsOneWidget);
     });
 
-    testWidgets('shows queue_music when onTogglePlaylist is provided', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        buildSubject(actions: const PlayerActions(onTogglePlaylist: _noop)),
-      );
-      await tester.pump();
-
-      expect(find.byIcon(Icons.queue_music), findsOneWidget);
-    });
-
     testWidgets('shows settings when onSettings is provided', (tester) async {
       await tester.pumpWidget(
         buildSubject(actions: const PlayerActions(onSettings: _noop)),
@@ -242,12 +210,7 @@ void main() {
           body: SizedBox(
             width: 800,
             height: 200,
-            child: ControlBar(
-              vm: buildVm(engine),
-              playlist: playlist,
-              playlistGeneration: playlistGeneration,
-              isIdle: isIdle,
-            ),
+            child: ControlBar(vm: buildVm(engine), isIdle: isIdle),
           ),
         ),
       );
@@ -305,8 +268,6 @@ void main() {
               height: 200,
               child: ControlBar(
                 vm: buildVm(engine),
-                playlist: playlist,
-                playlistGeneration: playlistGeneration,
                 isIdle: false,
                 decoration: controller,
               ),
@@ -333,11 +294,7 @@ void main() {
             body: SizedBox(
               width: width,
               height: 200,
-              child: ControlBar(
-                vm: buildVm(engine),
-                playlist: playlist,
-                playlistGeneration: playlistGeneration,
-              ),
+              child: ControlBar(vm: buildVm(engine)),
             ),
           ),
         ),
@@ -350,9 +307,10 @@ void main() {
       await tester.pumpWidget(buildWithWidth(600));
       await tester.pump();
 
-      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+      expect(find.byIcon(Icons.replay_10), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow), findsOneWidget);
-      expect(find.byIcon(Icons.skip_next), findsOneWidget);
+      expect(find.byIcon(Icons.forward_30), findsOneWidget);
+      expect(find.byIcon(Icons.stop), findsOneWidget);
 
       // Full CenterGroup (replay_10 + forward_30 always visible)
       expect(find.byType(CenterGroup), findsOneWidget);
@@ -385,19 +343,73 @@ void main() {
       expect(find.byType(VolumeButton), findsOneWidget);
       expect(find.byType(VolumeSlider), findsOneWidget);
 
-      // play mode button (left group)
-      expect(find.byIcon(Icons.repeat), findsOneWidget);
+      // 单文件播放器不再展示播放模式或队列入口。
+      expect(find.byIcon(Icons.repeat), findsNothing);
+      expect(find.byIcon(Icons.queue_music), findsNothing);
     });
 
-    testWidgets('_buildBlur skips BackdropFilter when opacity < 0.01', (
+    testWidgets(
+      '_buildBlur toggles filter for resize without replacing its element',
+      (tester) async {
+        final opacityController = AnimationController(vsync: tester, value: 1);
+        final resizing = ValueNotifier(false);
+        addTearDown(opacityController.dispose);
+        addTearDown(resizing.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 200,
+                child: ControlBar(
+                  vm: buildVm(engine),
+                  opacity: opacityController,
+                  resizing: resizing,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final backdropFinder = find.byType(BackdropFilter);
+        expect(backdropFinder, findsOneWidget);
+        final initialElement = tester.element(backdropFinder);
+        expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+        // resize 起始边沿应立即停用实时视频背景采样，而不是等待淡出结束。
+        resizing.value = true;
+        await tester.pump();
+        expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+        expect(
+          identical(tester.element(backdropFinder), initialElement),
+          isTrue,
+          reason: 'resize 期间只能切换滤镜状态，不能替换其 Element',
+        );
+
+        resizing.value = false;
+        await tester.pump();
+        expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+        // 非 resize 状态下仍保留原有淡出尾部优化。
+        opacityController.value = 0;
+        await tester.pump();
+        expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      },
+    );
+
+    testWidgets('replacing resizing notifier detaches the old source', (
       tester,
     ) async {
-      // Create an opacity animation that is near-zero
-      final opacityController = AnimationController(
-        vsync: tester,
-        value: 0.005, // < 0.01 threshold
-      );
+      final opacityController = AnimationController(vsync: tester, value: 1);
+      final oldResizing = ValueNotifier(false);
+      final replacement = ValueNotifier(false);
       addTearDown(opacityController.dispose);
+      addTearDown(oldResizing.dispose);
+      addTearDown(replacement.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -409,9 +421,8 @@ void main() {
               height: 200,
               child: ControlBar(
                 vm: buildVm(engine),
-                playlist: playlist,
-                playlistGeneration: playlistGeneration,
                 opacity: opacityController,
+                resizing: oldResizing,
               ),
             ),
           ),
@@ -419,10 +430,42 @@ void main() {
       );
       await tester.pump();
 
-      // When opacity < 0.01, BackdropFilter is skipped (GPU optimization)
-      // ControlBar still renders but without blur
-      expect(find.byType(ControlBar), findsOneWidget);
-      expect(find.byType(BackdropFilter), findsNothing);
+      final backdropFinder = find.byType(BackdropFilter);
+      final initialElement = tester.element(backdropFinder);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+      // 父级改用 replacement 后，旧源应已从合并监听器解绑。
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 200,
+              child: ControlBar(
+                vm: buildVm(engine),
+                opacity: opacityController,
+                resizing: replacement,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      oldResizing.value = true;
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+      expect(tester.element(backdropFinder), same(initialElement));
+
+      replacement.value = true;
+      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      expect(tester.element(backdropFinder), same(initialElement));
     });
   });
 }

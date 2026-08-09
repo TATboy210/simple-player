@@ -23,7 +23,7 @@
   "shortcutSubtitle": "字幕开关",
   "shortcutSubtitleDelay": "字幕延迟 +/- 500ms",
   "shortcutHelp": "显示帮助",
-  "shortcutMediaKeys": "播放/暂停/上一首/下一首",
+  "shortcutMediaKeys": "播放/暂停",
 
   "settings": "设置",
   "generalTab": "通用",

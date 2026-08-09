@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
@@ -16,43 +15,38 @@ void main() {
 
   late FakeEngine engine;
   // 渐进路径:ControlBar 需 playlist + playlistGeneration(required)。
-  late Playlist playlist;
-  late ValueNotifier<int> playlistGeneration;
   // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
   // isFullscreen 共享 notifier(golden 测试无全屏交互),setUp/tearDown 管理.
   late ValueNotifier<bool> isFullscreen;
 
   setUp(() {
     engine = FakeEngine();
-    playlist = Playlist();
-    playlistGeneration = ValueNotifier<int>(0);
     isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
     engine.dispose();
-    playlistGeneration.dispose();
     isFullscreen.dispose();
   });
 
-  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  /// 从 FakeEngine 派生 ControlBarViewModel，供布局测试使用。
   /// golden 渲染输出不变(纯签名改造),无需 --update-goldens.
   ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
-        isPlaying: e.isPlayingNotifier,
-        position: e.position,
-        duration: e.duration,
-        volume: e.volume,
-        isMuted: e.isMuted,
-        rate: e.playbackSpeed,
-        isFullscreen: isFullscreen,
-        onSeek: e.seekTo,
-        onPlayPause: e.togglePlayPause,
-        onSeekBack: e.skipBack,
-        onSeekForward: e.skipForward,
-        onToggleMute: () => e.setMute(!e.isMuted.value),
-        onSetVolume: e.setVolume,
-        onSetRate: e.setPlaybackRate,
-      );
+    isPlaying: e.isPlayingNotifier,
+    position: e.position,
+    duration: e.duration,
+    volume: e.volume,
+    isMuted: e.isMuted,
+    rate: e.playbackSpeed,
+    isFullscreen: isFullscreen,
+    onSeek: e.seekTo,
+    onPlayPause: e.togglePlayPause,
+    onSeekBack: e.skipBack,
+    onSeekForward: e.skipForward,
+    onToggleMute: () => e.setMute(!e.isMuted.value),
+    onSetVolume: e.setVolume,
+    onSetRate: e.setPlaybackRate,
+  );
 
   Widget buildControlSubject({
     required Widget child,
@@ -77,8 +71,6 @@ void main() {
         buildControlSubject(
           child: ControlBar(
             vm: buildVm(engine),
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
             isIdle: true,
             enableBlur: false,
           ),
@@ -97,12 +89,7 @@ void main() {
 
       await tester.pumpWidget(
         buildControlSubject(
-          child: ControlBar(
-            vm: buildVm(engine),
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
-            enableBlur: false,
-          ),
+          child: ControlBar(vm: buildVm(engine), enableBlur: false),
         ),
       );
       await expectLater(
@@ -118,12 +105,7 @@ void main() {
 
       await tester.pumpWidget(
         buildControlSubject(
-          child: ControlBar(
-            vm: buildVm(engine),
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
-            enableBlur: false,
-          ),
+          child: ControlBar(vm: buildVm(engine), enableBlur: false),
         ),
       );
       await expectLater(
@@ -136,7 +118,14 @@ void main() {
   group('ProgressBar golden', () {
     testWidgets('empty (no duration)', (tester) async {
       await tester.pumpWidget(
-        buildControlSubject(height: 60, child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo)),
+        buildControlSubject(
+          height: 60,
+          child: ProgressBar(
+            position: engine.position,
+            duration: engine.duration,
+            onSeek: engine.seekTo,
+          ),
+        ),
       );
       await expectLater(
         find.byType(ProgressBar),
@@ -149,7 +138,14 @@ void main() {
       engine.position.value = 30000;
 
       await tester.pumpWidget(
-        buildControlSubject(height: 60, child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo)),
+        buildControlSubject(
+          height: 60,
+          child: ProgressBar(
+            position: engine.position,
+            duration: engine.duration,
+            onSeek: engine.seekTo,
+          ),
+        ),
       );
       await expectLater(
         find.byType(ProgressBar),
@@ -168,7 +164,12 @@ void main() {
         buildControlSubject(
           width: 200,
           height: 60,
-          child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume),
+          child: VolumeButton(
+            volume: engine.volume,
+            isMuted: engine.isMuted,
+            onToggleMute: () => engine.setMute(!engine.isMuted.value),
+            onSetVolume: engine.setVolume,
+          ),
         ),
       );
       await expectLater(
@@ -185,7 +186,12 @@ void main() {
         buildControlSubject(
           width: 200,
           height: 60,
-          child: VolumeButton(volume: engine.volume, isMuted: engine.isMuted, onToggleMute: () => engine.setMute(!engine.isMuted.value), onSetVolume: engine.setVolume),
+          child: VolumeButton(
+            volume: engine.volume,
+            isMuted: engine.isMuted,
+            onToggleMute: () => engine.setMute(!engine.isMuted.value),
+            onSetVolume: engine.setVolume,
+          ),
         ),
       );
       await expectLater(

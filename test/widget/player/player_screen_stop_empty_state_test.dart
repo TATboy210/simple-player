@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_controller.dart';
@@ -19,13 +18,7 @@ void main() {
     'shows the empty state only after stop unloads media and then enables open',
     (tester) async {
       final engine = FakeEngine()..configureMedia();
-      final playlist = Playlist()..add('C:/video.mp4');
-      final playlistGeneration = ValueNotifier(0);
-      final controller = PlaybackController(
-        engine: engine,
-        playlist: playlist,
-        onNeedRebuild: () {},
-      );
+      final controller = PlaybackController(engine: engine);
       final settingsPanelController = SettingsPanelController(controller);
       final windowService = FakeWindowService();
       final videoControls = FakeVideoControlsPort();
@@ -35,7 +28,6 @@ void main() {
       addTearDown(() {
         settingsPanelController.dispose();
         controller.dispose();
-        playlistGeneration.dispose();
         windowService.dispose();
         videoControls.dispose();
         engine.dispose();
@@ -54,8 +46,6 @@ void main() {
             engine: engine,
             mediaKitController: null,
             controller: controller,
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
             windowService: windowService,
             settingsPanelController: settingsPanelController,
             onOpenFile: () => openFileCount++,

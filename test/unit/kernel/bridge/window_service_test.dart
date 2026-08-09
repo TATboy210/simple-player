@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +56,6 @@ void main() {
       expect(service.state.mode.value, WindowMode.windowed);
       service.dispose();
     });
-
   });
 
   group('dispose safety', () {
@@ -325,14 +326,17 @@ void main() {
       service.dispose();
     });
 
-    test('onWindowMaximize during fullscreen intent keeps mode fullscreen', () async {
-      // SC_MAXIMIZE 噪音不应覆盖 mode — _fullscreenIntent 守卫
-      final service = WindowService();
-      await service.setMode(WindowMode.fullscreen);
-      service.onWindowMaximize();
-      expect(service.state.mode.value, WindowMode.fullscreen);
-      service.dispose();
-    });
+    test(
+      'onWindowMaximize during fullscreen intent keeps mode fullscreen',
+      () async {
+        // SC_MAXIMIZE 噪音不应覆盖 mode — _fullscreenIntent 守卫
+        final service = WindowService();
+        await service.setMode(WindowMode.fullscreen);
+        service.onWindowMaximize();
+        expect(service.state.mode.value, WindowMode.fullscreen);
+        service.dispose();
+      },
+    );
 
     test('onWindowUnmaximize during fullscreen intent is no-op', () async {
       final service = WindowService();
@@ -342,14 +346,17 @@ void main() {
       service.dispose();
     });
 
-    test('setMode(windowed) from fullscreen clears intent + sets windowed', () async {
-      final service = WindowService();
-      await service.setMode(WindowMode.fullscreen);
-      await service.setMode(WindowMode.windowed);
-      expect(service.state.mode.value, WindowMode.windowed);
-      expect(service.isFullscreen, isFalse);
-      service.dispose();
-    });
+    test(
+      'setMode(windowed) from fullscreen clears intent + sets windowed',
+      () async {
+        final service = WindowService();
+        await service.setMode(WindowMode.fullscreen);
+        await service.setMode(WindowMode.windowed);
+        expect(service.state.mode.value, WindowMode.windowed);
+        expect(service.isFullscreen, isFalse);
+        service.dispose();
+      },
+    );
 
     test('onWindowMaximize without intent sets maximized (regression)', () {
       // 守卫不影响正常最大化路径
@@ -372,11 +379,14 @@ void main() {
   // resize debounce + isResizing 恢复 (方向2 — isResizing 卡 true bug 回归)
   // =========================================================================
   group('resize debounce + isResizing recovery', () {
-    // window_manager 包用 MethodChannel('window_manager'), getSize 走
-    // 'getWindowSize' method 返回 [width, height]. mock 之以便 fakeAsync
-    // 推进 500ms timer 后验证回调逻辑 (无需真实窗口/ensureInitialized).
+    // window_manager 包用 MethodChannel('window_manager')，getSize() 内部走
+    // getBounds 并返回 x/y/width/height。mock 之以便 fakeAsync 推进 500ms
+    // timer 后验证回调逻辑（无需真实窗口）。
     const wmChannel = MethodChannel('window_manager');
     Size? mockSize;
+    var shouldFailBounds = false;
+    final pendingBounds = <Completer<Map<String, double>>>[];
+    var deferBounds = false;
 
     /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding,
     /// 其 defaultBinaryMessenger 静态类型即 TestDefaultBinaryMessenger
@@ -386,22 +396,24 @@ void main() {
 
     setUp(() {
       mockSize = null;
+      shouldFailBounds = false;
+      deferBounds = false;
+      pendingBounds.clear();
       messenger().setMockMethodCallHandler(wmChannel, (call) async {
         // window_manager 0.5.2: getSize() 内部调 getBounds() (非 getWindowSize
         // method — 该 method 从不被调用, 勿 mock). getBounds 期望返回 Map 字段
         // x/y/width/height (非 left/top — 否则 Rect.fromLTWH 读 null →
         // type 'Null' is not subtype of double). 局部提升消除 bang.
+        if (call.method != 'getBounds') return null;
+        if (shouldFailBounds) throw Exception('getBounds failed');
+        if (deferBounds) {
+          final result = Completer<Map<String, double>>();
+          pendingBounds.add(result);
+          return result.future;
+        }
         final sz = mockSize;
         if (sz == null) return null;
-        if (call.method == 'getBounds') {
-          return {
-            'x': 0.0,
-            'y': 0.0,
-            'width': sz.width,
-            'height': sz.height,
-          };
-        }
-        return null;
+        return {'x': 0.0, 'y': 0.0, 'width': sz.width, 'height': sz.height};
       });
     });
 
@@ -415,6 +427,33 @@ void main() {
       service.onWindowResize();
       expect(service.state.isResizing.value, isTrue);
       service.dispose();
+    });
+
+    test('resize session ID 在上升沿先发布、活跃期不重复递增', () {
+      fakeAsync((async) {
+        mockSize = const Size(1280, 752);
+        final service = WindowService();
+        final sessionIdsSeenAtStart = <int>[];
+        service.isResizing.addListener(() {
+          if (service.isResizing.value) {
+            sessionIdsSeenAtStart.add(service.resizeSessionId.value);
+          }
+        });
+
+        service.onWindowResize();
+        service.onWindowResize();
+        expect(service.resizeSessionId.value, 1);
+        expect(sessionIdsSeenAtStart, [1]);
+
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+        expect(service.isResizing.value, isFalse);
+
+        service.onWindowResize();
+        expect(service.resizeSessionId.value, 2);
+        expect(sessionIdsSeenAtStart, [1, 2]);
+        service.dispose();
+      });
     });
 
     test('isResizing recovers false after debounce when size changed', () {
@@ -467,6 +506,87 @@ void main() {
         async.flushMicrotasks();
         expect(service.state.isResizing.value, isFalse);
         service.dispose();
+      });
+    });
+
+    test(
+      'stale getSize completion cannot overwrite a newer resize session',
+      () {
+        fakeAsync((async) {
+          deferBounds = true;
+          final service = WindowService();
+
+          service.onWindowResize();
+          async.elapse(const Duration(milliseconds: 500));
+          async.flushMicrotasks();
+          expect(pendingBounds, hasLength(1));
+
+          service.onWindowResize();
+          async.elapse(const Duration(milliseconds: 500));
+          async.flushMicrotasks();
+          expect(pendingBounds, hasLength(2));
+
+          pendingBounds[1].complete({
+            'x': 0.0,
+            'y': 0.0,
+            'width': 1920.0,
+            'height': 1080.0,
+          });
+          async.flushMicrotasks();
+          expect(service.state.windowSize.value, const Size(1920, 1080));
+          expect(service.state.isResizing.value, isFalse);
+
+          pendingBounds.first.complete({
+            'x': 0.0,
+            'y': 0.0,
+            'width': 1600.0,
+            'height': 900.0,
+          });
+          async.flushMicrotasks();
+          expect(service.state.windowSize.value, const Size(1920, 1080));
+          expect(service.state.isResizing.value, isFalse);
+          service.dispose();
+        });
+      },
+    );
+
+    test('getSize failure still ends the current resize session', () {
+      fakeAsync((async) {
+        shouldFailBounds = true;
+        final service = WindowService();
+        final initialSize = service.state.windowSize.value;
+
+        service.onWindowResize();
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+
+        expect(service.state.isResizing.value, isFalse);
+        expect(service.state.windowSize.value, initialSize);
+        service.dispose();
+      });
+    });
+
+    test('pending getSize completion is ignored after dispose', () {
+      fakeAsync((async) {
+        deferBounds = true;
+        final service = WindowService();
+        final initialSize = service.state.windowSize.value;
+
+        service.onWindowResize();
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+        expect(pendingBounds, hasLength(1));
+
+        service.dispose();
+        pendingBounds.single.complete({
+          'x': 0.0,
+          'y': 0.0,
+          'width': 1920.0,
+          'height': 1080.0,
+        });
+        async.flushMicrotasks();
+
+        expect(service.state.windowSize.value, initialSize);
       });
     });
   });

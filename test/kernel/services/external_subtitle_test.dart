@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -6,173 +7,172 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/services/subtitle_service.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 
 import '../../helpers/fake_engine.dart';
 
+/// 在真实目录扫描结束时发出信号，避免测试依赖固定延迟等待后台字幕任务。
+class _CompletingSubtitleService extends SubtitleService {
+  _CompletingSubtitleService(super.engine);
+
+  final Completer<void> _completed = Completer<void>();
+
+  Future<void> get completed => _completed.future;
+
+  @override
+  Future<void> detectAndLoad(String mediaPath) async {
+    await super.detectAndLoad(mediaPath);
+    if (!_completed.isCompleted) _completed.complete();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() {
     KernelLoggerImpl.resetForTesting();
     KernelLoggerImpl.init();
   });
 
   late FakeEngine engine;
-  late Playlist playlist;
   late PlaybackController controller;
+  late _CompletingSubtitleService subtitleService;
   late Directory tempDir;
 
   setUp(() {
-    // Mock platform channels to prevent MissingPluginException
+    // State manager disposal persists settings; provide the platform seam here
+    // so these filesystem-focused tests remain independent of host plugins.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('plugins.flutter.io/path_provider'),
-      (MethodCall methodCall) async {
-        if (methodCall.method == 'getApplicationSupportDirectory') {
-          return Directory.systemTemp.createTempSync('app_support').path;
-        }
-        return null;
-      },
-    );
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (MethodCall methodCall) async {
+            if (methodCall.method == 'getApplicationSupportDirectory') {
+              return Directory.systemTemp.createTempSync('app_support').path;
+            }
+            return null;
+          },
+        );
     SharedPreferences.setMockInitialValues({});
 
-    engine = FakeEngine();
-    playlist = Playlist();
+    engine = FakeEngine()..configureMedia(durationMs: 60000);
+    subtitleService = _CompletingSubtitleService(engine);
     controller = PlaybackController(
       engine: engine,
-      playlist: playlist,
-      onNeedRebuild: () {},
       onError: (_) {},
-      subtitleService: SubtitleService(engine),
+      subtitleService: subtitleService,
     );
     tempDir = Directory.systemTemp.createTempSync('subtitle_test_');
   });
 
   tearDown(() {
-    // 清除 mock
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('plugins.flutter.io/path_provider'),
-      null,
-    );
-    // PlaylistStore.dispose() uses path_provider which isn't available in tests
-    try {
-      controller.dispose();
-    } on Exception {
-      // ignore path_provider MissingPluginException
-    }
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          null,
+        );
+    controller.dispose();
     engine.dispose();
-    try {
-      tempDir.deleteSync(recursive: true);
-    } on Exception {
-      // ignore cleanup failures
-    }
+    tempDir.deleteSync(recursive: true);
   });
 
-  /// Helper: create a file in tempDir with given name and optional content.
+  /// Creates a fixture file inside the temporary media directory.
   File createFile(String name, [String content = '']) {
     final file = File('${tempDir.path}/$name');
     file.writeAsStringSync(content);
     return file;
   }
 
+  /// Opens [mediaPath] through the public controller boundary and waits until
+  /// its intentionally detached subtitle scan completes.
+  Future<void> openAndWaitForSubtitleScan(String mediaPath) async {
+    expect(await controller.openAndPlay(mediaPath), isTrue);
+    await subtitleService.completed;
+  }
+
   group('External subtitle auto-detection', () {
     test('detects .srt file with matching base name', () async {
-      createFile('video.mp4');
+      final media = createFile('video.mp4');
       createFile('video.srt');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/video.mp4');
-      await controller.playIndex(0);
-      // Wait for fire-and-forget detectAndLoad to complete
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('video.srt'));
     });
 
     test('detects .ass file with matching base name', () async {
-      createFile('movie.mp4');
+      final media = createFile('movie.mp4');
       createFile('movie.ass');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/movie.mp4');
-      await controller.playIndex(0);
-      // Wait for fire-and-forget detectAndLoad to complete
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('movie.ass'));
     });
 
     test('detects .ssa file with matching base name', () async {
-      createFile('film.mkv');
+      final media = createFile('film.mkv');
       createFile('film.ssa');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/film.mkv');
-      await controller.playIndex(0);
-      // Wait for fire-and-forget detectAndLoad to complete
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('film.ssa'));
     });
 
     test('detects .vtt file with matching base name', () async {
-      createFile('clip.mp4');
+      final media = createFile('clip.mp4');
       createFile('clip.vtt');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/clip.mp4');
-      await controller.playIndex(0);
-      // Wait for fire-and-forget detectAndLoad to complete
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('clip.vtt'));
     });
 
-    test('detects subtitle with language tag (movie.en.srt)', () async {
-      createFile('movie.mp4');
+    test('detects subtitle with language tag', () async {
+      final media = createFile('movie.mp4');
       createFile('movie.en.srt');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/movie.mp4');
-      await controller.playIndex(0);
-      // Wait for fire-and-forget detectAndLoad to complete
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 1);
       expect(engine.lastExternalSubtitlePath, contains('movie.en.srt'));
     });
 
     test('ignores subtitle files with different base name', () async {
-      createFile('video.mp4');
+      final media = createFile('video.mp4');
       createFile('other.srt');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/video.mp4');
-      await controller.playIndex(0);
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 0);
     });
 
     test('ignores non-subtitle extensions', () async {
-      createFile('video.mp4');
+      final media = createFile('video.mp4');
       createFile('video.txt');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/video.mp4');
-      await controller.playIndex(0);
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 0);
     });
 
-    test('handles missing directory gracefully (no crash)', () async {
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('Z:/nonexistent/path/video.mp4');
-      // Should not throw
-      await controller.playIndex(0);
+    test('handles missing directory without blocking playback', () async {
+      const missingMediaPath = 'Z:/nonexistent/path/video.mp4';
+
+      await openAndWaitForSubtitleScan(missingMediaPath);
+
       expect(engine.setExternalSubtitleCallCount, 0);
+      expect(engine.playCallCount, 1);
     });
 
     test('loads only the first matching subtitle', () async {
-      createFile('video.mp4');
+      final media = createFile('video.mp4');
       createFile('video.srt');
       createFile('video.ass');
-      engine.configureMedia(durationMs: 60000);
-      playlist.add('${tempDir.path}/video.mp4');
-      await controller.playIndex(0);
-      // Wait for fire-and-forget detectAndLoad to complete
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      // Should load exactly one subtitle (first match found)
+
+      await openAndWaitForSubtitleScan(media.path);
+
       expect(engine.setExternalSubtitleCallCount, 1);
     });
   });

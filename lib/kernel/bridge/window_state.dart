@@ -28,6 +28,9 @@ final class WindowState {
 
   // ─── 交互状态 ───
 
+  /// 当前连续用户 resize 会话的单调标识；0 表示尚未开始。
+  final ValueNotifier<int> resizeSessionId = ValueNotifier(0);
+
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
@@ -41,6 +44,7 @@ final class WindowState {
     _disposed = true;
     mode.dispose();
     _windowSize.dispose();
+    resizeSessionId.dispose();
     isResizing.dispose();
     isAlwaysOnTop.dispose();
   }
