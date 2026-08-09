@@ -1,7 +1,7 @@
-// SettingsNavItem widget 测试 — 覆盖 SIDEBAR-02（水平布局、hover、selected 状态）。
+// SettingsNavItem widget 测试 — 覆盖 SIDEBAR-02（纵向布局、hover、selected 状态）。
 //
-// 验证重构后的水平 Row 布局（icon + label 横排）、hover 背景、
-// selected 底部指示器、onTap 回调。
+// 验证当前纵向 Column 布局（icon + label 纵排）、hover 背景、
+// selected 左侧指示器、onTap 回调。
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -40,43 +40,60 @@ void main() {
       expect(find.text('General'), findsOneWidget);
     });
 
-    testWidgets('layout is horizontal Row (not vertical Column)', (tester) async {
-      // Arrange & Act
-      await pumpNavItem(tester, selected: false);
+    testWidgets(
+      'layout is vertical Column (icon over label, not horizontal Row)',
+      (tester) async {
+        // Arrange & Act
+        await pumpNavItem(tester, selected: false);
 
-      // Assert — SettingsNavItem 内部的 Row 存在（icon + label 横排）
-      final row = tester.widget<Row>(
-        find.descendant(
-          of: find.byType(SettingsNavItem),
-          matching: find.byType(Row),
-        ),
-      );
-      expect(row.mainAxisAlignment, MainAxisAlignment.center);
-    });
+        // Assert — SettingsNavItem 内部使用 Column（icon 上、label 下纵排），
+        // mainAxisSize=min + crossAxisAlignment=stretch 以撑满 tab 宽度
+        final column = tester.widget<Column>(
+          find.descendant(
+            of: find.byType(SettingsNavItem),
+            matching: find.byType(Column),
+          ),
+        );
+        expect(column.mainAxisSize, MainAxisSize.min);
+        expect(column.crossAxisAlignment, CrossAxisAlignment.stretch);
 
-    testWidgets('selected=false shows transparent indicator, selected=true shows accent', (tester) async {
-      // Arrange — 未选中态
-      await pumpNavItem(tester, selected: false);
+        // 不存在 Row 横排布局（旧水平契约已废弃）
+        expect(
+          find.descendant(
+            of: find.byType(SettingsNavItem),
+            matching: find.byType(Row),
+          ),
+          findsNothing,
+        );
+      },
+    );
 
-      // Assert — AnimatedContainer 的 border bottom 应为 transparent
-      final container1 = tester.widget<AnimatedContainer>(
-        find.byType(AnimatedContainer),
-      );
-      final decoration1 = container1.decoration! as BoxDecoration;
-      final border1 = decoration1.border as Border?;
-      expect(border1?.bottom.color, Colors.transparent);
+    testWidgets(
+      'selected=false shows transparent left indicator, selected=true shows accent',
+      (tester) async {
+        // Arrange — 未选中态
+        await pumpNavItem(tester, selected: false);
 
-      // Act — 切换到选中态
-      await pumpNavItem(tester, selected: true);
+        // Assert — AnimatedContainer 的左侧 border 应为 transparent
+        final container1 = tester.widget<AnimatedContainer>(
+          find.byType(AnimatedContainer),
+        );
+        final decoration1 = container1.decoration! as BoxDecoration;
+        final border1 = decoration1.border as Border;
+        expect(border1.left.color, Colors.transparent);
 
-      // Assert — border bottom 应为 accent
-      final container2 = tester.widget<AnimatedContainer>(
-        find.byType(AnimatedContainer),
-      );
-      final decoration2 = container2.decoration! as BoxDecoration;
-      final border2 = decoration2.border as Border?;
-      expect(border2?.bottom.color, Tokens.accent);
-    });
+        // Act — 切换到选中态
+        await pumpNavItem(tester, selected: true);
+
+        // Assert — 左侧 border 应为 accent
+        final container2 = tester.widget<AnimatedContainer>(
+          find.byType(AnimatedContainer),
+        );
+        final decoration2 = container2.decoration! as BoxDecoration;
+        final border2 = decoration2.border as Border;
+        expect(border2.left.color, Tokens.accent);
+      },
+    );
 
     testWidgets('onTap callback fires when tapped', (tester) async {
       // Arrange
@@ -95,9 +112,7 @@ void main() {
       await pumpNavItem(tester, selected: false);
 
       // Act — hover 进入
-      final gesture = await tester.createGesture(
-        kind: PointerDeviceKind.mouse,
-      );
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer();
       await gesture.moveTo(tester.getCenter(find.byType(SettingsNavItem)));
       await tester.pump();

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -49,6 +50,12 @@ class WindowService with WindowListener implements WindowBridge {
 
   Timer? _resizeTimer;
 
+  /// 递增式会话标记，令已开始的旧 debounce 异步读取失效。
+  ///
+  /// 取消 Timer 无法中断已进入 `getSize()` 的 Future；完成后必须确认其
+  /// 仍属于当前 resize 会话，才可写入窗口状态或关闭降级渲染模式。
+  int _resizeGeneration = 0;
+
   /// 当前是否全屏 — 从 mode 派生，单一数据源。
   @override
   bool get isFullscreen => _state.mode.value.isFullscreen;
@@ -59,6 +66,8 @@ class WindowService with WindowListener implements WindowBridge {
   ValueNotifier<Size> get windowSize => _state.windowSize;
   @override
   ValueNotifier<bool> get isResizing => _state.isResizing;
+  @override
+  ValueListenable<int> get resizeSessionId => _state.resizeSessionId;
   @override
   ValueNotifier<bool> get isAlwaysOnTop => _state.isAlwaysOnTop;
 
@@ -85,7 +94,10 @@ class WindowService with WindowListener implements WindowBridge {
     windowManager.addListener(this);
     // 构造时无法引用 _state (Dart 初始化列表禁实例成员), 故延后到 init.
     // 此时 binding 已就绪, isResizing 监听器开始接管后续 resize 会话切片.
-    _resizeMetrics = ResizeFrameMetrics(isResizing: _state.isResizing);
+    _resizeMetrics = ResizeFrameMetrics(
+      isResizing: _state.isResizing,
+      resizeSessionId: _state.resizeSessionId,
+    );
   }
 
   /// 窗口初始化 — 在 waitUntilReadyToShow 回调内 fire-and-forget 触发。
@@ -149,6 +161,9 @@ class WindowService with WindowListener implements WindowBridge {
   /// 单一 resize 定时器 — 合并 isResizing 标记和 windowSize 更新。
   void _startResizeTimer() {
     _resizeTimer?.cancel();
+    // 新事件使已在 await getSize() 的旧 debounce 结果过期，避免它提前
+    // 结束当前会话并恢复 blur/filter quality 等高成本渲染路径。
+    final generation = ++_resizeGeneration;
     // 红线放宽: isResizing=true 同步翻转, 不走 _updateOnUIThread 推迟.
     // 原推迟致会话起手 1-2 帧 isResizing 仍 false → ExcludeSemantics/
     // BackdropFilter 未及时生效 → 边沿尖峰 (实测 build max 58ms, avg 2-3ms).
@@ -156,37 +171,56 @@ class WindowService with WindowListener implements WindowBridge {
     // layout) + 诊断器(无 layout) + AutoHideController(Timer) → 无重入断言.
     // 边界: 仅放宽 isResizing=true; windowSize(防抖 500ms)/isResizing=false/
     // mode 翻转仍走 _updateOnUIThread (重操作推迟仍合理, 不动).
+    // listener 同步通知；先分配新会话 ID，保证 diagnostics 在收到 true 时
+    // 立即关联到正确会话。活跃会话中的事件只续期 debounce/generation。
+    if (!_state.isResizing.value) {
+      _state.resizeSessionId.value++;
+    }
     _state.isResizing.value = true;
     // Timer callback 期望同步; .then 链改 await 需 async 宿主,
     // 提取 _onResizeDebounce() (DCM prefer-async-await).
     _resizeTimer = Timer(
       const Duration(milliseconds: _resizeDebounceMs),
-      () => unawaited(_onResizeDebounce()),
+      () => unawaited(_onResizeDebounce(generation)),
     );
   }
 
   /// resize 防抖结束处理 — 落定窗口尺寸 + isResizing=false。
   ///
-  /// 提取为 async 方法以用 await 替代 .then 链 (DCM prefer-async-await)。
-  /// 信号源逻辑(isResizing 落地时机)一字未改。
-  Future<void> _onResizeDebounce() async {
-    if (_disposed) return;
-    final size = await windowManager.getSize();
-    if (_disposed) return;
+  /// [generation] 防止无法取消的旧 `getSize()` 异步完成覆盖新拖拽会话。
+  Future<void> _onResizeDebounce(int generation) async {
+    if (!_isCurrentResizeGeneration(generation)) return;
+
+    Size? size;
+    try {
+      size = await windowManager.getSize();
+    } on Exception catch (error, stackTrace) {
+      // 平台查询失败也必须结束当前会话，否则控件和渲染降级会永久滞留。
+      logBridge.e('[WindowService._onResizeDebounce] $error\n$stackTrace');
+    }
+
+    if (!_isCurrentResizeGeneration(generation)) return;
     _updateOnUIThread(() {
+      // post-frame 前可能已有新 resize；旧 callback 不得关闭新会话。
+      if (!_isCurrentResizeGeneration(generation)) return;
+      final settledSize = size;
       // 无论尺寸是否净变化,resize 已停止 — 必须落 isResizing=false.
       // 旧逻辑把 isResizing=false 包在 if(size!=windowSize) 内,致
       // "拖大又拖回原尺寸"等净变化为零场景 isResizing 卡 true,
       // 控制栏永不恢复、BackdropFilter 永久跳过 (方向2 状态边界 bug).
-      if (size != _state.windowSize.value) {
+      if (settledSize != null && settledSize != _state.windowSize.value) {
         _state.windowSize.value = Size(
-          math.max(size.width, 854),
-          math.max(size.height, 513),
+          math.max(settledSize.width, 854),
+          math.max(settledSize.height, 513),
         );
       }
       _state.isResizing.value = false;
     });
   }
+
+  /// 判断异步 resize 结果是否仍可触碰当前窗口状态。
+  bool _isCurrentResizeGeneration(int generation) =>
+      !_disposed && generation == _resizeGeneration;
 
   @override
   void onWindowMaximize() {

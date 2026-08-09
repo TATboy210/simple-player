@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
 
 /// 回调计数器 — 追踪 KeyboardHandler 各回调触发次数
@@ -12,8 +13,6 @@ class _CallbackTracker {
   int volumeDown = 0;
   int toggleFullscreen = 0;
   int toggleMute = 0;
-  int previous = 0;
-  int next = 0;
   int openFile = 0;
   int toggleSubtitle = 0;
   int exitFullscreen = 0;
@@ -21,41 +20,37 @@ class _CallbackTracker {
   int subtitleDelayForward = 0;
   int subtitleDelayBackward = 0;
   int mediaPlayPause = 0;
-  int mediaNext = 0;
-  int mediaPrevious = 0;
 }
 
 /// 构建测试用 KeyboardHandler wrapper
 ///
 /// Focus 节点通过 tester.binding.focusManager 获取，
 /// autofocus=true 确保按键事件能被接收。
-Widget _buildSubject(_CallbackTracker t, {Map<String, String> bindings = const {}}) =>
-    MaterialApp(
-      home: Scaffold(
-        body: KeyboardHandler(
-          customBindings: bindings,
-          onPlayPause: () => t.playPause++,
-          onSeekBackward: () => t.seekBackward++,
-          onSeekForward: () => t.seekForward++,
-          onVolumeUp: () => t.volumeUp++,
-          onVolumeDown: () => t.volumeDown++,
-          onToggleFullscreen: () => t.toggleFullscreen++,
-          onToggleMute: () => t.toggleMute++,
-          onPrevious: () => t.previous++,
-          onNext: () => t.next++,
-          onOpenFile: () => t.openFile++,
-          onToggleSubtitle: () => t.toggleSubtitle++,
-          onExitFullscreen: () => t.exitFullscreen++,
-          onShowHelp: () => t.showHelp++,
-          onSubtitleDelayForward: () => t.subtitleDelayForward++,
-          onSubtitleDelayBackward: () => t.subtitleDelayBackward++,
-          onMediaPlayPause: () => t.mediaPlayPause++,
-          onMediaNext: () => t.mediaNext++,
-          onMediaPrevious: () => t.mediaPrevious++,
-          child: const SizedBox.expand(),
-        ),
-      ),
-    );
+Widget _buildSubject(
+  _CallbackTracker t, {
+  Map<String, String> bindings = const {},
+}) => MaterialApp(
+  home: Scaffold(
+    body: KeyboardHandler(
+      customBindings: bindings,
+      onPlayPause: () => t.playPause++,
+      onSeekBackward: () => t.seekBackward++,
+      onSeekForward: () => t.seekForward++,
+      onVolumeUp: () => t.volumeUp++,
+      onVolumeDown: () => t.volumeDown++,
+      onToggleFullscreen: () => t.toggleFullscreen++,
+      onToggleMute: () => t.toggleMute++,
+      onOpenFile: () => t.openFile++,
+      onToggleSubtitle: () => t.toggleSubtitle++,
+      onExitFullscreen: () => t.exitFullscreen++,
+      onShowHelp: () => t.showHelp++,
+      onSubtitleDelayForward: () => t.subtitleDelayForward++,
+      onSubtitleDelayBackward: () => t.subtitleDelayBackward++,
+      onMediaPlayPause: () => t.mediaPlayPause++,
+      child: const SizedBox.expand(),
+    ),
+  ),
+);
 
 void main() {
   late _CallbackTracker tracker;
@@ -112,18 +107,21 @@ void main() {
       expect(tracker.toggleMute, 1);
     });
 
-    testWidgets('N key goes to next track', (tester) async {
+    testWidgets('N/P keys remain unhandled in single-file mode', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildSubject(tracker));
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyN);
-      expect(tracker.next, 1);
-      expect(tracker.previous, 0);
-    });
 
-    testWidgets('P key goes to previous track', (tester) async {
-      await tester.pumpWidget(_buildSubject(tracker));
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyP);
-      expect(tracker.previous, 1);
-      expect(tracker.next, 0);
+      // 单文件播放器不拥有队列导航，事件必须继续向焦点树上层传播。
+      final nextHandled = await tester.sendKeyDownEvent(
+        LogicalKeyboardKey.keyN,
+      );
+      final previousHandled = await tester.sendKeyDownEvent(
+        LogicalKeyboardKey.keyP,
+      );
+
+      expect(nextHandled, isFalse);
+      expect(previousHandled, isFalse);
     });
 
     testWidgets('O key opens file picker', (tester) async {
@@ -144,14 +142,49 @@ void main() {
       expect(tracker.exitFullscreen, 1);
     });
 
-    testWidgets('media keys trigger callbacks', (tester) async {
+    testWidgets('media play/pause triggers its callback', (tester) async {
       await tester.pumpWidget(_buildSubject(tracker));
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.mediaPlayPause);
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.mediaTrackNext);
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.mediaTrackPrevious);
+
+      final handled = await tester.sendKeyDownEvent(
+        LogicalKeyboardKey.mediaPlayPause,
+      );
+
+      expect(handled, isTrue);
       expect(tracker.mediaPlayPause, 1);
-      expect(tracker.mediaNext, 1);
-      expect(tracker.mediaPrevious, 1);
+    });
+
+    testWidgets('media track keys remain unhandled in single-file mode', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+
+      // 系统媒体上一首/下一首同样属于队列语义，不能被单文件播放器截获。
+      final nextHandled = await tester.sendKeyDownEvent(
+        LogicalKeyboardKey.mediaTrackNext,
+      );
+      final previousHandled = await tester.sendKeyDownEvent(
+        LogicalKeyboardKey.mediaTrackPrevious,
+      );
+
+      expect(nextHandled, isFalse);
+      expect(previousHandled, isFalse);
+    });
+  });
+
+  group('KeyboardHandler shortcut definitions', () {
+    test('single-file mode omits queue navigation shortcuts', () {
+      final l10n = lookupAppLocalizations(const Locale('zh'));
+
+      final definitions = shortcutDefinitions(l10n);
+      final keyLabels = definitions.map(((String, String) item) => item.$1);
+      final descriptions = definitions.map(((String, String) item) => item.$2);
+
+      expect(keyLabels, isNot(contains('N')));
+      expect(keyLabels, isNot(contains('P')));
+      expect(descriptions, isNot(contains(l10n.shortcutNext)));
+      expect(descriptions, isNot(contains(l10n.shortcutPrevious)));
+      expect(l10n.shortcutMediaKeys, isNot(contains(l10n.shortcutNext)));
+      expect(l10n.shortcutMediaKeys, isNot(contains(l10n.shortcutPrevious)));
     });
   });
 
@@ -163,8 +196,6 @@ void main() {
       expect(tracker.playPause, 0);
       expect(tracker.toggleFullscreen, 0);
       expect(tracker.toggleMute, 0);
-      expect(tracker.next, 0);
-      expect(tracker.previous, 0);
     });
 
     testWidgets('KeyUpEvent is ignored (only KeyDown handled)', (tester) async {
@@ -196,11 +227,7 @@ void main() {
       // 所有回调为 null — 按键不应抛异常
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: KeyboardHandler(
-              child: SizedBox.expand(),
-            ),
-          ),
+          home: Scaffold(body: KeyboardHandler(child: SizedBox.expand())),
         ),
       );
       // 发送多个不同按键 — 全部应安全忽略
@@ -215,9 +242,7 @@ void main() {
 
     testWidgets('customBindings overrides default key mapping', (tester) async {
       // 将 playPause 绑定到 KeyA 而非 Space
-      final bindings = {
-        'playPause': LogicalKeyboardKey.keyA.keyId.toString(),
-      };
+      final bindings = {'playPause': LogicalKeyboardKey.keyA.keyId.toString()};
       await tester.pumpWidget(_buildSubject(tracker, bindings: bindings));
 
       // KeyA 应触发 playPause（自定义绑定）
@@ -229,12 +254,11 @@ void main() {
       expect(tracker.playPause, 1); // 仍然1，未增加
     });
 
-    testWidgets('customBindings partial — unmatched actions use default keys',
-        (tester) async {
+    testWidgets('customBindings partial — unmatched actions use default keys', (
+      tester,
+    ) async {
       // 只覆盖 playPause，其他动作保留默认按键
-      final bindings = {
-        'playPause': LogicalKeyboardKey.keyA.keyId.toString(),
-      };
+      final bindings = {'playPause': LogicalKeyboardKey.keyA.keyId.toString()};
       await tester.pumpWidget(_buildSubject(tracker, bindings: bindings));
 
       // seekForward 仍绑定默认的 ArrowRight
@@ -248,10 +272,7 @@ void main() {
       await tester.pumpWidget(_buildSubject(tracker));
       // line 166: (key == LogicalKeyboardKey.slash && event.character == '?')
       // sendKeyDownEvent 默认 character=null，需要手动构造带 character 的事件
-      await tester.sendKeyEvent(
-        LogicalKeyboardKey.slash,
-        character: '?',
-      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.slash, character: '?');
       expect(tracker.showHelp, 1);
     });
   });

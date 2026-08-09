@@ -40,22 +40,41 @@ class _HoverGlowState extends State<HoverGlow>
     return MouseRegion(
       onEnter: (_) => _controller.forward(),
       onExit: (_) => _controller.reverse(),
-      child: AnimatedBuilder(
-        animation: _opacity,
-        builder: (_, child) => DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Tokens.glowEdge.withValues(
-                alpha: Tokens.glowEdge.a * _opacity.value,
-              ),
-              width: 1,
-            ),
-            borderRadius: BorderRadius.circular(Tokens.radiusSm),
-          ),
-          child: child,
+      child: CustomPaint(
+        // 动画只改变边框绘制，不再每帧重建 DecoratedBox/BoxDecoration。
+        painter: _HoverGlowPainter(
+          repaint: _opacity,
+          opacity: () => _opacity.value,
         ),
         child: widget.child,
       ),
     );
   }
+}
+
+/// 绘制悬停边框的画笔。
+///
+/// [repaint] 让动画帧直接进入 paint 阶段，保持子树 Widget identity 不变。
+class _HoverGlowPainter extends CustomPainter {
+  _HoverGlowPainter({required this.repaint, required this.opacity})
+    : super(repaint: repaint);
+
+  final Listenable repaint;
+  final double Function() opacity;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final borderRadius = BorderRadius.circular(Tokens.radiusSm);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Tokens.glowEdge.withValues(
+        alpha: Tokens.glowEdge.a * opacity(),
+      );
+    canvas.drawRRect(borderRadius.toRRect(Offset.zero & size), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HoverGlowPainter oldDelegate) =>
+      oldDelegate.repaint != repaint || oldDelegate.opacity != opacity;
 }

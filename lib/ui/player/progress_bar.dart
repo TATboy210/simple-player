@@ -61,7 +61,12 @@ class _ProgressBarState extends State<ProgressBar>
   bool _reducedMotion = false;
   double? _dragStartX;
 
+  /// Tooltip 只关心位置、时长、悬停和拖拽，不关心窗口 resize。
   late Listenable _barListenable;
+
+  /// 条形绘制额外关心高度动画和 resize，用一个 builder 合并处理，
+  /// 避免“高度 AnimatedBuilder → 内层 bar AnimatedBuilder”的嵌套重建。
+  late Listenable _barPaintListenable;
   Timer? _seekThrottle;
   // 修 C (事件驱动 v2): dragEnd 后监听 position 到达目标才清 drag, 替代 v1 固定
   // 300ms 定时器. 比 media_kit_control_bar 原生内部协调更贴近 — 不依赖固定
@@ -115,15 +120,21 @@ class _ProgressBarState extends State<ProgressBar>
     _tooltipOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _tooltipFadeController, curve: Curves.easeOut),
     );
+    _barPaintListenable = _buildBarPaintListenable();
   }
 
   Listenable _buildBarListenable() {
-    final listenables = <Listenable>[
+    return Listenable.merge([
       widget.position,
       widget.duration,
       _dragNotifier,
       _hoverNotifier,
-    ];
+    ]);
+  }
+
+  /// 合并条形绘制的所有高频状态，避免高度动画和条形状态各自重建一层。
+  Listenable _buildBarPaintListenable() {
+    final listenables = <Listenable>[_barListenable, _barHeightAnimation];
     final resizing = widget.resizing;
     if (resizing != null) listenables.add(resizing);
     return Listenable.merge(listenables);
@@ -136,6 +147,7 @@ class _ProgressBarState extends State<ProgressBar>
         oldWidget.duration != widget.duration ||
         oldWidget.resizing != widget.resizing) {
       _barListenable = _buildBarListenable();
+      _barPaintListenable = _buildBarPaintListenable();
     }
   }
 
@@ -175,8 +187,7 @@ class _ProgressBarState extends State<ProgressBar>
       final target = _seekTargetMs;
       if (target == null) return;
       final pos = widget.position.value;
-      if ((pos - target).abs() <=
-          Tokens.progressSeekArriveToleranceMs) {
+      if ((pos - target).abs() <= Tokens.progressSeekArriveToleranceMs) {
         _finishSeekHold();
       }
     }
@@ -326,40 +337,39 @@ class _ProgressBarState extends State<ProgressBar>
               },
               child: SizedBox(
                 height: Tokens.progressBarHeight,
-                child: AnimatedBuilder(
-                  animation: _barHeightAnimation,
-                  builder: (_, _) => Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.center,
-                    children: [
-                      _buildBarLayers(),
-                      // 悬停/拖拽时间提示
-                      // tooltip 指向 _barListenable(已含 _dragNotifier+_hoverNotifier),
-                      // 拖动时跟随手指更新文字/位置(VLC TimeTooltip / mpv tooltipF 本地计算)
-                      AnimatedBuilder(
-                        animation: _barListenable,
-                        builder: (_, _) {
-                          final drag = _dragNotifier.value;
-                          final hover = _hoverNotifier.value;
-                          final isDragging = drag != null;
-                          final fraction = isDragging
-                              ? drag
-                              : hover.hovering
-                              ? hover.x
-                              : null;
-                          if (fraction == null || _disabled) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildTooltip(
-                            fraction: fraction,
-                            text: formatMs(
-                              (fraction * widget.duration.value).round(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    // 合并高度动画与条形状态监听；避免高度 builder
+                    // 每帧重新创建一个内层 AnimatedBuilder。
+                    _buildBarLayers(),
+                    // 悬停/拖拽时间提示
+                    // tooltip 指向 _barListenable(已含 _dragNotifier+_hoverNotifier),
+                    // 拖动时跟随手指更新文字/位置(VLC TimeTooltip / mpv tooltipF 本地计算)
+                    AnimatedBuilder(
+                      animation: _barListenable,
+                      builder: (_, _) {
+                        final drag = _dragNotifier.value;
+                        final hover = _hoverNotifier.value;
+                        final isDragging = drag != null;
+                        final fraction = isDragging
+                            ? drag
+                            : hover.hovering
+                            ? hover.x
+                            : null;
+                        if (fraction == null || _disabled) {
+                          return const SizedBox.shrink();
+                        }
+                        return _buildTooltip(
+                          fraction: fraction,
+                          text: formatMs(
+                            (fraction * widget.duration.value).round(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -375,11 +385,14 @@ class _ProgressBarState extends State<ProgressBar>
   Widget _buildBarLayers() {
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: _barListenable,
+        animation: _barPaintListenable,
         builder: (_, _) {
           final resizing = widget.resizing;
-          if (resizing != null && resizing.value) {
-            return _cachedCustomPaint ?? const SizedBox.shrink();
+          // 缓存只用于加速 resize，不能在缓存尚未建立时用空组件替代进度条。
+          // 首次进入 resize 直接绘制当前状态，后续帧再复用已缓存的 CustomPaint。
+          final cached = _cachedCustomPaint;
+          if (resizing != null && resizing.value && cached != null) {
+            return cached;
           }
           final playedFrac = _effectiveFraction;
           final child = CustomPaint(

@@ -68,8 +68,19 @@ void main() {
 
     test('log() returns normally', () {
       const sink = DebugPrintSink();
+      expect(() => sink.log(LogLevel.warn, 'hello'), returnsNormally);
+    });
+
+    test('cyclic structured context stays inside the diagnostic path', () {
+      final context = <String, Object?>{};
+      context['self'] = context;
+
       expect(
-        () => sink.log(LogLevel.warn, 'hello'),
+        () => const DebugPrintSink().log(
+          LogLevel.debug,
+          'cycle',
+          context: context,
+        ),
         returnsNormally,
       );
     });
@@ -84,12 +95,105 @@ void main() {
       expect(true, isTrue);
     });
 
-    test('log() returns normally', () {
+    test('log() with structured context returns normally', () {
       const sink = DevToolsSink();
       expect(
-        () => sink.log(LogLevel.error, 'test error'),
+        () => sink.log(
+          LogLevel.error,
+          'test error',
+          context: {'sampleCount': 12, 'totalP99Us': 42000},
+        ),
         returnsNormally,
       );
+    });
+  });
+
+  group('serializeLogContext', () {
+    test('recursively sorts map keys while preserving list order and null', () {
+      final context = <String, Object?>{
+        'z': 1,
+        'nested': <String, Object?>{'b': 2, 'a': 1},
+        'list': <Object?>[3, null, 1],
+        'a': true,
+      };
+
+      expect(
+        serializeLogContext(context),
+        '{"a":true,"list":[3,null,1],"nested":{"a":1,"b":2},"z":1}',
+      );
+    });
+
+    test(
+      'normalizes DateTime Set and non-finite doubles deterministically',
+      () {
+        final context = <String, Object?>{
+          'set': <Object?>{'b', 'a'},
+          'when': DateTime.utc(2026, 8, 7, 12, 30),
+          'nan': double.nan,
+          'positiveInfinity': double.infinity,
+          'negativeInfinity': double.negativeInfinity,
+        };
+
+        expect(
+          serializeLogContext(context),
+          '{"nan":"NaN","negativeInfinity":"-Infinity",'
+          '"positiveInfinity":"Infinity","set":["a","b"],'
+          '"when":"2026-08-07T12:30:00.000Z"}',
+        );
+      },
+    );
+
+    test('replaces cyclic references without throwing', () {
+      final context = <String, Object?>{};
+      context['self'] = context;
+
+      expect(serializeLogContext(context), '{"self":"<cycle>"}');
+    });
+  });
+
+  group('default sink strategy', () {
+    test('debug fans out to debug and DevTools sinks', () {
+      final debugSink = SpySink();
+      final devToolsSink = SpySink();
+      final sink = createDefaultLogSink(
+        KernelBuildMode.debug,
+        debugSink: debugSink,
+        devToolsSink: devToolsSink,
+      );
+
+      sink.log(LogLevel.info, 'resize', context: {'count': 1});
+
+      expect(debugSink.calls, hasLength(1));
+      expect(devToolsSink.calls, hasLength(1));
+    });
+
+    test('profile writes only to DevTools sink', () {
+      final debugSink = SpySink();
+      final devToolsSink = SpySink();
+      final sink = createDefaultLogSink(
+        KernelBuildMode.profile,
+        debugSink: debugSink,
+        devToolsSink: devToolsSink,
+      );
+
+      sink.log(LogLevel.info, 'resize');
+
+      expect(debugSink.calls, isEmpty);
+      expect(devToolsSink.calls, hasLength(1));
+    });
+
+    test('release produces no output', () {
+      final debugSink = SpySink();
+      final devToolsSink = SpySink();
+      final sink = createDefaultLogSink(
+        KernelBuildMode.release,
+        debugSink: debugSink,
+        devToolsSink: devToolsSink,
+      );
+
+      expect(() => sink.log(LogLevel.info, 'resize'), returnsNormally);
+      expect(debugSink.calls, isEmpty);
+      expect(devToolsSink.calls, isEmpty);
     });
   });
 
@@ -115,10 +219,7 @@ void main() {
 
     test('with empty list returns normally', () {
       final composite = CompositeSink([]);
-      expect(
-        () => composite.log(LogLevel.info, 'empty'),
-        returnsNormally,
-      );
+      expect(() => composite.log(LogLevel.info, 'empty'), returnsNormally);
     });
   });
 
@@ -171,7 +272,11 @@ void main() {
       final spy = SpySink();
       final logger = KernelLoggerImpl(spy);
 
-      logger.error('err', error: Exception('boom'), stackTrace: StackTrace.current);
+      logger.error(
+        'err',
+        error: Exception('boom'),
+        stackTrace: StackTrace.current,
+      );
       logger.fatal('fat', error: Exception('die'));
 
       expect(spy.calls, hasLength(2));

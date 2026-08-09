@@ -18,10 +18,11 @@ class SmartDragToResizeArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 始终用 DragToResizeArea 保持 Widget 类型一致;
-    // enabled=false 时套 IgnorePointer 禁用拖拽但不改类型 (canUpdate 仍 true).
-    final dragArea = DragToResizeArea(child: child);
-    if (enabled) return dragArea;
-    return IgnorePointer(child: dragArea);
+    // 常驻两层祖先，只更新 ignoring 属性；全屏切换因此可沿原 Element 链
+    // 更新配置，而不会因插入或移除 IgnorePointer 扰动 Texture 子树身份。
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: DragToResizeArea(child: child),
+    );
   }
 }

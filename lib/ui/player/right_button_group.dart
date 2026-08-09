@@ -1,7 +1,7 @@
-/// 右侧按钮组模块 — 文件、字幕、播放列表、设置
+/// 右侧按钮组模块 — 文件、字幕、设置与全屏
 ///
 /// 从 ControlBar 中提取的独立 Widget，负责控制栏底部行右侧按钮群。
-/// 包含打开文件、打开字幕、播放列表、设置、全屏切换五个功能按钮。
+/// 单文件播放器不再展示播放列表入口。
 library;
 
 import 'package:flutter/foundation.dart';
@@ -11,7 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import 'player_actions.dart';
 
-/// 右侧按钮组：文件、字幕、播放列表、设置
+/// 右侧按钮组：文件、字幕、设置与全屏。
 ///
 /// 路径B Commit1:加 [isFullscreen] ValueListenable 驱动全屏按钮图标
 /// (fullscreen ↔ fullscreen_exit),原恒定 Icons.fullscreen 改为动态。
@@ -20,8 +20,7 @@ class RightButtonGroup extends StatelessWidget {
 
   /// 全屏切换回调 — 优先于 actions.onToggleFullscreen.
   ///
-  /// ControlsOverlay 传 _toggleFullscreen(同时做 setMode + 本实例 videoState
-  /// route 切换); 若未传则回退 actions.onToggleFullscreen(仅 setMode, 兼容旧调用).
+  /// 当前 controls route 传入的全屏回调；未传入时回退到 actions 回调。
   final VoidCallback? onToggleFullscreen;
 
   /// 全屏状态 — 驱动全屏按钮图标(enter ↔ exit)。
@@ -38,8 +37,7 @@ class RightButtonGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // 全屏按钮 — 优先显式 onToggleFullscreen(ControlsOverlay._toggleFullscreen,
-    // 同时 setMode 同步 + 本实例 videoState route 切换); 回退 actions.onToggleFullscreen.
+    // 全屏按钮优先使用当前 controls route 的显式回调，回退到 actions 回调。
     final fullscreenCb = onToggleFullscreen ?? actions.onToggleFullscreen;
     // 局部变量促 flow promotion(避免 isFullscreen! bang)。
     final fsListenable = isFullscreen;
@@ -57,12 +55,6 @@ class RightButtonGroup extends StatelessWidget {
             icon: Icons.subtitles,
             onPressed: actions.onOpenSubtitle,
             tooltip: l10n.openSubtitle,
-          ),
-        if (actions.onTogglePlaylist != null)
-          GlassButton.iconOnly(
-            icon: Icons.queue_music,
-            onPressed: actions.onTogglePlaylist,
-            tooltip: l10n.playlist,
           ),
         if (actions.onSettings != null)
           GlassButton.iconOnly(

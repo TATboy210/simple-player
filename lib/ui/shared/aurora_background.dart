@@ -59,12 +59,28 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   // 缓存 layout 尺寸，避免每帧触发 LayoutBuilder
   Size _layoutSize = Size.zero;
 
+  /// 复用 painter — initState 创建一次。LayoutBuilder 重建时若每次 new
+  /// _AuroraPainter，CustomPainter 构造会向 _repaint addListener，而旧
+  /// painter 不会被 dispose（RenderCustomPaint 只解绑自身 markNeedsPaint
+  /// 监听），导致 _repaint 上监听器累积。painter 通过闭包实时读取 State
+  /// 字段，值变化时无需重建 painter。
+  late final _AuroraPainter _painter;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_onTick);
     _ticker.start();
+    // painter 仅创建一次：闭包捕获 this 实时读取 _time/_blobImages/
+    // _cachedNoisePicture，因此值变化无需重建 painter。复用避免 _repaint
+    // 监听器累积（详见字段注释）。
+    _painter = _AuroraPainter(
+      repaint: _repaint,
+      time: () => _time,
+      blobImages: () => _blobImages,
+      cachedNoise: () => _cachedNoisePicture,
+    );
     _generateBlobImages();
     widget.engineState?.addListener(_onEngineStateChanged);
   }
@@ -133,9 +149,13 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 
   void _onTick(Duration elapsed) {
     _time = elapsed.inMicroseconds / 1e6;
-    // 降级到 ~15fps — 光团移动极慢 (freq ~0.03)，60fps 与 15fps 肉眼无区别
+    // 降级到 ~10fps — 光团移动极慢 (freq ~0.03)，低频刷新可减少背景栅格化开销。
     final ms = elapsed.inMilliseconds;
-    if (ms - _lastRepaintMs >= 66) {
+    if (ms - _lastRepaintMs >= 100) {
+      // Keep the painter's cached noise in sync before issuing its repaint.
+      // The painter reads the latest fields through callbacks, so no widget
+      // rebuild is needed for a ticker-driven frame.
+      _regenerateNoiseCache(_layoutSize);
       _repaint.markDirty();
       _lastRepaintMs = ms;
     }
@@ -192,7 +212,10 @@ class _AuroraBackgroundState extends State<AuroraBackground>
     srcImage.dispose();
 
     if (mounted) {
-      setState(() => _blobImages = images);
+      _blobImages = images;
+      // The painter reads the current image cache through its callback, so
+      // notify only the render object instead of rebuilding this widget.
+      _repaint.markDirty();
     } else {
       for (final img in images) {
         img.dispose();
@@ -231,19 +254,10 @@ class _AuroraBackgroundState extends State<AuroraBackground>
       child: RepaintBoundary(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // LayoutBuilder 只在窗口尺寸变化时触发（极低频）
+            // LayoutBuilder 只在窗口尺寸变化时触发（极低频）。
             _layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
             _regenerateNoiseCache(_layoutSize);
-            return AnimatedBuilder(
-              animation: _repaint,
-              builder: (context, _) => CustomPaint(
-                painter: _AuroraPainter(
-                  time: _time,
-                  blobImages: _blobImages,
-                  cachedNoise: _cachedNoisePicture,
-                ),
-              ),
-            );
+            return CustomPaint(painter: _painter);
           },
         ),
       ),
@@ -252,9 +266,12 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 }
 
 class _AuroraPainter extends CustomPainter {
-  final double time;
-  final List<ui.Image>? blobImages;
-  final ui.Picture? cachedNoise;
+  /// Ticker-driven repaint signal. It repaints this render object without
+  /// rebuilding the widget subtree.
+  final Listenable repaint;
+  final double Function() time;
+  final List<ui.Image>? Function() blobImages;
+  final ui.Picture? Function() cachedNoise;
 
   // Lissajous 参数 — 质数比避免同步
   static const _lissajous = [
@@ -278,10 +295,11 @@ class _AuroraPainter extends CustomPainter {
   static const _breathPhases = [0.0, pi / 3, 2 * pi / 3];
 
   _AuroraPainter({
+    required this.repaint,
     required this.time,
     required this.blobImages,
-    this.cachedNoise,
-  });
+    required this.cachedNoise,
+  }) : super(repaint: repaint);
 
   // 静态 Paint 缓存 — 避免每帧分配（PERF-07）
   static final _bgPaint = Paint()..color = Tokens.bgBase;
@@ -292,15 +310,16 @@ class _AuroraPainter extends CustomPainter {
     // Layer 0: 深色底
     canvas.drawRect(Offset.zero & size, _bgPaint);
 
-    final images = blobImages;
+    final currentTime = time();
+    final images = blobImages();
     if (images == null || images.length < 3) return;
 
     for (var i = 0; i < 3; i++) {
       final params = _lissajous[i];
 
       // Lissajous 坐标（归一化 -1 ~ 1）
-      final lx = sin(time * params.freqX + params.phaseX);
-      final ly = cos(time * params.freqY + params.phaseY);
+      final lx = sin(currentTime * params.freqX + params.phaseX);
+      final ly = cos(currentTime * params.freqY + params.phaseY);
 
       // 映射到屏幕坐标（中心 + 偏移）
       final cx = size.width * 0.5 + lx * size.width * 0.25;
@@ -309,7 +328,9 @@ class _AuroraPainter extends CustomPainter {
       // 呼吸缩放
       final breathScale =
           0.8 +
-          0.4 * (0.5 + 0.5 * sin(time * _breathFreqs[i] + _breathPhases[i]));
+          0.4 *
+              (0.5 +
+                  0.5 * sin(currentTime * _breathFreqs[i] + _breathPhases[i]));
 
       // 光团大小
       final blobW = size.width * 0.6 * breathScale;
@@ -320,7 +341,11 @@ class _AuroraPainter extends CustomPainter {
       canvas.save();
       canvas.translate(cx, cy);
       canvas.scale(blobW / img.width, blobH / img.height);
-      canvas.drawImage(img, Offset(-img.width / 2, -img.height / 2), _compositePaint);
+      canvas.drawImage(
+        img,
+        Offset(-img.width / 2, -img.height / 2),
+        _compositePaint,
+      );
       canvas.restore();
     }
 
@@ -333,16 +358,17 @@ class _AuroraPainter extends CustomPainter {
   /// 噪点 Picture 由 State 层缓存，seed 每 2 秒变化一次时才重新录制。
   // size 参数由 paint() 透传, 但本方法只用 canvas + cachedNoise — 命名 _ 豁免 DCM.
   void _drawNoiseOverlay(Canvas canvas, Size _) {
-    // local 捕获 cachedNoise 消除字段 `!` (字段不提升)
-    final noise = cachedNoise;
+    final noise = cachedNoise();
     if (noise == null) return;
     canvas.drawPicture(noise);
   }
 
   @override
-  bool shouldRepaint(covariant _AuroraPainter oldDelegate) {
-    return oldDelegate.time != time || oldDelegate.blobImages != blobImages;
-  }
+  bool shouldRepaint(covariant _AuroraPainter oldDelegate) =>
+      oldDelegate.repaint != repaint ||
+      oldDelegate.time != time ||
+      oldDelegate.blobImages != blobImages ||
+      oldDelegate.cachedNoise != cachedNoise;
 }
 
 class _LissajousParams {

@@ -1,27 +1,28 @@
-/// Services 层播放控制模块 — 门面模式统一入口
+/// Services 层播放控制模块 — 单文件播放器门面
 ///
-/// 本文件实现 [PlaybackController] 作为播放器运行时能力的统一门面，
-/// 组合 [PlaybackNavigator] / [FileOperations] / [PlaybackStateManager] / [AutoAdvancePolicy] 四个子模块，
-/// UI 层只与本类交互，不直接访问子模块。
+/// 本文件实现 [PlaybackController] 作为单文件播放器运行时能力的统一入口，
+/// UI 层只与本类交互。
 ///
-/// 架构位置：PlayerViewModel → **PlaybackController** → PlaybackNavigator / FileOperations / PlaybackStateManager / AutoAdvancePolicy → MediaEngine
-/// 设计模式：Facade（门面模式）— 简化 UI 层对多个子模块的调用路径
+/// 架构位置：PlayerViewModel → **PlaybackController** → MediaEngine
+/// 设计模式：Facade（门面模式）— 简化 UI 层对播放能力的调用路径
+///
+/// v1.8 重写：移除播放队列/历史/断点/播放模式，回归单文件播放。
+/// - 打开：[openAndPlay] 内联路径校验 + engine.open + OpenResult 分发
+/// - 播完：engine completed 不主动处理（播完停止，符合产品决策）
+/// - 状态：volume/mute 恢复与保存委托 [PlaybackStateManager]
+/// - 当前媒体：[currentPath] / [currentFileName] ValueNotifier 驱动 UI
 library;
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../engine/engine_state.dart';
-import '../models/play_mode.dart';
-import '../persistence/playlist_store.dart';
-import '../persistence/settings_store.dart';
-import '../playlist/playlist.dart';
-import '../utils/debug_probe.dart';
 import '../diagnostics/kernel_logger.dart';
-import 'auto_advance_policy.dart';
-import 'file_operations.dart';
-import 'playback_navigator.dart';
+import '../engine/engine_state.dart';
+import '../persistence/settings_store.dart';
+import '../utils/debug_probe.dart';
+import '../utils/path_utils.dart';
+import 'path_validator.dart';
 import 'playback_state_manager.dart';
 import 'subtitle_service.dart';
 import 'track_preference_service.dart';
@@ -31,7 +32,7 @@ final _log = KernelLogger.I;
 /// 设置面板暂停契约 — Phase 23 D-03 服务边界的窄接口。
 ///
 /// [SettingsPanelController] 仅经此契约与播放服务交互，不直碰 [MediaEngine]，
-/// 避免与 `openGeneration` 打开守卫产生竞态。单元测试可用手写
+/// 避免与打开流程产生竞态。单元测试可用手写
 /// `FakePlaybackController implements SettingsPanelPlayback` 替身，
 /// 无需真实 [MediaEngine]（规避 mdk.dll headless FFI 依赖）。
 abstract interface class SettingsPanelPlayback {
@@ -45,38 +46,26 @@ abstract interface class SettingsPanelPlayback {
   void play();
 }
 
-/// 播放控制器 — 播放器全部运行时能力的统一门面入口
-///
-/// 组合 [PlaybackNavigator] / [FileOperations] / [PlaybackStateManager] / [AutoAdvancePolicy] 四个子模块，
-/// UI 层只与本类交互。所有子模块通过 [PlaybackContract] 接口访问共享依赖。
+/// 播放控制器 — 单文件播放器运行时能力的统一门面入口
 ///
 /// 职责划分：
-/// - 播放导航：委托 [PlaybackNavigator]（playIndex / playNext / playPrevious）
-/// - 文件操作：委托 [FileOperations]（openAndPlay / addFiles）
-/// - 状态管理：委托 [PlaybackStateManager]（设置恢复 / 断点保存 / 销毁持久化）
-/// - 自动连播：委托 [AutoAdvancePolicy]（completed → loopSingle / next）
-/// - 播放列表 CRUD：直接管理 removeAt / reorder / clearPlaylist / togglePlayMode
-/// - 设置面板暂停契约：实现 [SettingsPanelPlayback]（Phase 23 D-03），
-///   为 [SettingsPanelController] 提供窄化的 pause/play/isPlaying 服务边界。
+/// - 打开并播放：[openAndPlay]（路径校验 → engine.open → OpenResult 分发）
+/// - 停止卸载：[stopCurrentMedia]
+/// - 设置面板暂停契约：实现 [SettingsPanelPlayback]（Phase 23 D-03）
+/// - 状态持久化：委托 [PlaybackStateManager]（volume/mute 恢复与保存）
 ///
 /// 生命周期：init() → 使用 → dispose()
-/// init() 内部调用 stateManager.init() + autoAdvance.init()。
+/// init() 内部调用 stateManager.init() 恢复音量/静音设置。
 class PlaybackController implements SettingsPanelPlayback {
   PlaybackController({
     required this.engine,
-    required this.playlist,
-    required VoidCallback onNeedRebuild,
     void Function(PlayerError error)? onError,
     SubtitleService? subtitleService,
     TrackPreferenceService? trackPreferenceService,
-  }) : _onNeedRebuild = onNeedRebuild,
-       _onError = onError,
+  }) : _onError = onError,
        _subtitleService = subtitleService,
        _trackPreferenceService = trackPreferenceService {
-    navigator = PlaybackNavigator(this);
-    fileOps = FileOperations(this);
     stateManager = PlaybackStateManager(this);
-    autoAdvance = AutoAdvancePolicy(this);
   }
 
   /// 视频渲染引擎实例.
@@ -84,15 +73,7 @@ class PlaybackController implements SettingsPanelPlayback {
   /// Media engine instance.
   final MediaEngine engine;
 
-  /// 播放列表管理器 — 包含当前播放索引、播放模式、历史记录.
-  ///
-  /// Playlist manager — holds current index, play mode, and history.
-  final Playlist playlist;
-
-  /// UI 重建回调 — 子模块播放列表变更时调用
-  final VoidCallback _onNeedRebuild;
-
-  /// 错误回调 — 子模块捕获异常时调用（null 表示忽略错误）
+  /// 错误回调 — 捕获异常时调用（null 表示忽略错误）
   final void Function(PlayerError error)? _onError;
 
   /// 字幕服务 — 可选依赖，null 表示无外挂字幕支持
@@ -101,25 +82,10 @@ class PlaybackController implements SettingsPanelPlayback {
   /// 轨道偏好服务 — 可选依赖，null 表示不持久化轨道偏好
   final TrackPreferenceService? _trackPreferenceService;
 
-  /// 播放导航子模块 — 索引跳转和并发 open() 守卫.
+  /// 状态管理子模块 — volume/mute 恢复与销毁保存.
   ///
-  /// Playback navigation sub-module — index jumping and concurrent open() guard.
-  late final PlaybackNavigator navigator;
-
-  /// 文件操作子模块 — 文件打开和批量添加.
-  ///
-  /// File operations sub-module — open and batch-add files.
-  late final FileOperations fileOps;
-
-  /// 状态管理子模块 — 设置恢复、断点保存、销毁持久化.
-  ///
-  /// State management sub-module — settings restore, breakpoint save, dispose persistence.
+  /// State management sub-module — settings restore and dispose persistence.
   late final PlaybackStateManager stateManager;
-
-  /// 自动连播策略 — completed → loopSingle / next.
-  ///
-  /// Auto-advance policy — completed → loopSingle / next.
-  late final AutoAdvancePolicy autoAdvance;
 
   /// 调试探针 — 记录播放控制操作的耗时和事件（编译时开关 kDebugMode）.
   ///
@@ -131,10 +97,14 @@ class PlaybackController implements SettingsPanelPlayback {
   /// Current playback file name (basename only) — displayed in title bar.
   final ValueNotifier<String> currentFileName = ValueNotifier('');
 
-  /// 通知 UI 层播放列表已变更.
+  /// 当前播放文件绝对路径（null 表示无媒体加载）.
   ///
-  /// Notifies UI layer that the playlist has changed.
-  void onNeedRebuild() => _onNeedRebuild();
+  /// 替代原 `playlist.current` 的「当前媒体引用」职责；
+  /// 队列/历史/断点/播放模式职责已在 v1.8 移除。
+  final ValueNotifier<String?> currentPath = ValueNotifier<String?>(null);
+
+  /// 最近一次路径校验错误（null 表示无错误）— UI 层显示用.
+  final ValueNotifier<String?> validationError = ValueNotifier<String?>(null);
 
   /// 错误回调（子模块通过 `_controller.onError?.call(error)` 调用）.
   ///
@@ -151,64 +121,13 @@ class PlaybackController implements SettingsPanelPlayback {
   /// Returns the track preference service, or null if not configured.
   TrackPreferenceService? get trackPreferenceService => _trackPreferenceService;
 
-  /// 保存播放列表 — 异步写入，跨模块共享.
-  ///
-  /// Persists playlist to storage. Shared across sub-modules.
-  void savePlaylist() {
-    PlaylistStore.save(playlist);
-  }
-
-  // ── 转发 — UI 层的统一入口 ──
-  // 所有播放/文件操作委托给对应子模块，UI 层无需关心具体实现。
-
-  /// 播放指定索引 — 委托 [PlaybackNavigator.playIndex].
-  ///
-  /// Plays the track at [i]. Delegates to [PlaybackNavigator.playIndex].
-  Future<void> playIndex(int i) => navigator.playIndex(i);
-
-  /// 播放下一首 — 委托 [PlaybackNavigator.playNext].
-  ///
-  /// Plays the next track. Delegates to [PlaybackNavigator.playNext].
-  Future<void> playNext() => navigator.playNext();
-
-  /// 播放上一首 — 委托 [PlaybackNavigator.playPrevious].
-  ///
-  /// Plays the previous track. Delegates to [PlaybackNavigator.playPrevious].
-  Future<void> playPrevious() => navigator.playPrevious();
-
-  /// 切换播放/暂停 — 委托 [MediaEngine.togglePlayPause].
-  ///
-  /// 控制栏统一经过本门面进入引擎状态机，避免绕过 opening/error 等状态守卫。
-  void togglePlayPause() => engine.togglePlayPause();
-
-  /// 快退指定毫秒数 — 委托 [MediaEngine.skipBack].
-  void skipBack([int ms = 10000]) => engine.skipBack(ms);
-
-  /// 快进指定毫秒数 — 委托 [MediaEngine.skipForward].
-  void skipForward([int ms = 10000]) => engine.skipForward(ms);
-
-  /// 打开并播放文件 — 委托 [FileOperations.openAndPlay].
-  ///
-  /// Opens and plays a file. Delegates to [FileOperations.openAndPlay].
-  Future<bool> openAndPlay(String p) => fileOps.openAndPlay(p);
-
-  /// 批量添加文件 — 委托 [FileOperations.addFiles].
-  ///
-  /// Batch-adds files. Delegates to [FileOperations.addFiles].
-  Future<int> addFiles(List<String> p) => fileOps.addFiles(p);
-
-  /// 最近一次路径校验错误（null 表示无错误）— 委托 [FileOperations.validationError].
-  ///
-  /// Most recent path validation error (null = none). Delegates to [FileOperations.validationError].
-  ValueNotifier<String?> get validationError => fileOps.validationError;
-
   // ── SettingsPanelPlayback 契约实现（Phase 23 D-03） ──
   // SettingsPanelController 经此三成员协调暂停/恢复，不直碰 MediaEngine。
 
   /// 暂停播放 — 委托 MediaEngine.pause()（D-03 SettingsPanelController 暂停入口）.
   ///
   /// Pauses playback. Delegates directly to [MediaEngine.pause] — thin
-  /// forwarder, does not interact with the `openGeneration` open guard.
+  /// forwarder, does not interact with the open flow.
   @override
   void pause() => engine.pause();
 
@@ -225,93 +144,90 @@ class PlaybackController implements SettingsPanelPlayback {
   @override
   bool get isPlaying => engine.state.value == MediaState.playing;
 
-  // ── 播放列表 CRUD ──
-
-  /// 移除播放列表中指定索引.
+  /// 切换播放与暂停状态。
   ///
-  /// Removes the playlist entry at [index]. If it is the currently playing
-  /// track, stops the engine before removing it and attempts to play the next.
-  /// A failed stop leaves the entry intact, preserving recovery context.
-  Future<void> removeAt(int index) async {
-    final wasCurrent = playlist.currentIndex == index;
-    if (wasCurrent) {
-      await engine.stop();
-      if (engine.hasMedia) return;
-      currentFileName.value = '';
-    }
+  /// 状态合法性与不可切换状态的 no-op 行为由 [MediaEngine] 统一处理。
+  void togglePlayPause() => engine.togglePlayPause();
 
-    playlist.removeAt(index);
-    if (wasCurrent) {
-      final next = playlist.peekNext();
-      if (next >= 0) {
-        await navigator.playIndex(next);
-      }
+  /// 将当前位置向后跳转 [ms] 毫秒。
+  ///
+  /// 位置边界由 [MediaEngine] clamp，默认快退 10 秒。
+  void skipBack([int ms = 10000]) => engine.skipBack(ms);
+
+  /// 将当前位置向前跳转 [ms] 毫秒。
+  ///
+  /// 位置边界由 [MediaEngine] clamp，默认快进 10 秒。
+  void skipForward([int ms = 10000]) => engine.skipForward(ms);
+
+  // ── 单文件播放 ──
+
+  /// 打开并播放单个文件 — 完整打开流程（路径校验 → engine.open → 副作用提交）.
+  ///
+  /// 并发安全由引擎 [OpenResult] 契约表达：较新的打开请求使旧请求返回
+  /// [OpenSuperseded]，本方法据此跳过旧请求的副作用（字幕检测 / 标题更新等），
+  /// 无需自维护 generation 计数器。
+  ///
+  /// 返回 true 表示成功打开并开始播放；
+  /// false 表示校验失败 / 打开错误 / 被更新请求淘汰。
+  Future<bool> openAndPlay(String path) async {
+    final validationMsg = PathValidator.validate(path);
+    if (validationMsg != null) {
+      validationError.value = validationMsg;
+      onError?.call(FileError(FileErrorCode.pathTraversal, validationMsg));
+      return false;
     }
-    _onNeedRebuild();
-    savePlaylist();
+    validationError.value = null;
+
+    final result = await engine.open(path);
+    switch (result) {
+      case OpenSuccess():
+        // 字幕检测不影响主播放链路，失败仅记录诊断信息。
+        unawaited(
+          subtitleService?.detectAndLoad(path).catchError((Object error) {
+            _log.d('Subtitle detection failed: $error');
+          }),
+        );
+        trackPreferenceService?.restoreAfterOpen(engine.mediaInfo);
+        engine.play();
+        currentFileName.value = PathUtils.basename(path);
+        currentPath.value = path;
+        return true;
+      case OpenError(:final error):
+        onError?.call(error);
+        return false;
+      case OpenSuperseded():
+        // 旧请求被新请求淘汰，不提交任何属于旧请求的副作用。
+        return false;
+    }
   }
 
-  /// 拖拽排序 — 交换播放列表中两个位置的项.
+  /// 停止并卸载当前媒体。
   ///
-  /// Drag-reorder — swaps two playlist entries.
-  void reorder(int oldIndex, int newIndex) {
-    playlist.reorder(oldIndex, newIndex);
-    _onNeedRebuild();
-    savePlaylist();
-  }
-
-  /// 停止并卸载当前媒体，但保留播放列表供用户再次选择。
-  ///
-  /// 只有引擎确认媒体已卸载时才清空活动标题；停止失败会保留标题和列表，
+  /// 只有引擎确认媒体已卸载时才清空活动标题与路径；停止失败会保留标题，
   /// 使 UI 与仍可恢复的底层媒体状态保持一致。
   Future<void> stopCurrentMedia() async {
     await engine.stop();
     if (engine.hasMedia) return;
     currentFileName.value = '';
-    _onNeedRebuild();
-  }
-
-  /// 清空播放列表 — 仅在当前媒体已成功停止后执行。
-  ///
-  /// Stops the engine before clearing the playlist. A failed stop preserves the
-  /// list so the visible entry remains consistent with the loaded media.
-  Future<void> clearPlaylist() async {
-    await stopCurrentMedia();
-    if (engine.hasMedia) return;
-    playlist.clear();
-    _onNeedRebuild();
-    savePlaylist();
-  }
-
-  /// 切换播放模式 — 在 LoopAll / LoopSingle / Shuffle 之间循环切换.
-  ///
-  /// Cycles play mode through LoopAll → LoopSingle → Shuffle.
-  void togglePlayMode() {
-    // 循环取模：index + 1 后对 PlayMode 枚举长度取模，实现循环切换
-    final next = (playlist.mode.index + 1) % PlayMode.values.length;
-    playlist.mode = PlayMode.values[next];
-    _onNeedRebuild();
-    SettingsStore.savePlayMode(playlist.mode.index);
+    currentPath.value = null;
   }
 
   // ── 生命周期 ──
 
-  /// 初始化播放控制器 — 内部委托 stateManager + autoAdvance 完成初始化
+  /// 初始化播放控制器 — 委托 stateManager 恢复 volume/mute.
   ///
   /// [settings] 可选：调用方已加载时传入，避免重复 IO。
   /// 使用 DebugProbe 包裹以记录初始化耗时。
   Future<void> init({AppSettings? settings}) =>
       probe.measureAsync('init', () async {
         await stateManager.init(settings: settings);
-        await autoAdvance.init();
         await _trackPreferenceService?.load();
       });
 
-  /// 释放资源 — 按序释放 autoAdvance / stateManager / currentFileName / validationError.
+  /// 释放资源 — 按序释放 stateManager / trackPreference / notifiers.
   ///
-  /// Disposes resources in order: autoAdvance, stateManager, trackPreference, currentFileName, validationError.
+  /// Disposes resources in order: stateManager, trackPreference, notifiers.
   void dispose() {
-    autoAdvance.dispose();
     stateManager.dispose();
     // fire-and-forget 保存轨道偏好
     unawaited(
@@ -320,6 +236,7 @@ class PlaybackController implements SettingsPanelPlayback {
       ),
     );
     currentFileName.dispose();
-    fileOps.validationError.dispose();
+    currentPath.dispose();
+    validationError.dispose();
   }
 }

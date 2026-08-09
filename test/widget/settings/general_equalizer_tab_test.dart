@@ -38,14 +38,19 @@ void main() {
         _wrap(EqualizerTab(pending: PendingSettingsState())),
       );
 
-      // Assert — Phase 33 重写：EqualizerTab 现有 3 个 GlassContainer 区段
-      //（EQ 预设 / 空间与同步 / 音量标准化），3 个 SectionHeader。
-      // EQ 预设区 header 仍用 Icons.equalizer（另两区为 tune / graphic_eq）。
-      expect(find.byType(GlassContainer), findsNWidgets(3));
-      final headers = tester.widgetList<SectionHeader>(
-        find.byType(SectionHeader),
+      // Assert — 三个设置区都应保留真实的 SectionHeader 与 GlassContainer。
+      // 不锁定页面内 GlassContainer 总数，避免布局包装层变化破坏行为测试。
+      final headerFinder = find.byType(SectionHeader);
+      final headers = tester.widgetList<SectionHeader>(headerFinder);
+      expect(
+        headers.map((h) => h.icon),
+        containsAll(<IconData>[Icons.equalizer, Icons.tune, Icons.graphic_eq]),
       );
-      expect(headers.map((h) => h.icon), contains(Icons.equalizer));
+      expect(headerFinder, findsNWidgets(3));
+      expect(
+        find.ancestor(of: headerFinder, matching: find.byType(GlassContainer)),
+        findsNWidgets(3),
+      );
     });
 
     testWidgets('GeneralTab keeps each row on one non-InkWell focus route', (

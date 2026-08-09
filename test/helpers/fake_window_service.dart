@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
 import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
@@ -27,6 +27,8 @@ class FakeWindowService implements WindowBridge {
   final ValueNotifier<Size> windowSize = ValueNotifier(const Size(1280, 720));
   @override
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
+  @override
+  final ValueNotifier<int> resizeSessionId = ValueNotifier(0);
   @override
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
@@ -79,6 +81,7 @@ class FakeWindowService implements WindowBridge {
     mode.dispose();
     windowSize.dispose();
     isResizing.dispose();
+    resizeSessionId.dispose();
     isAlwaysOnTop.dispose();
   }
 }

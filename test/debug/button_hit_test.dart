@@ -1,4 +1,4 @@
-/// R1 调试测试 — 验证按钮在 ControlsOverlay 内是否可点击
+/// R1 调试测试 — 验证控制栏按钮是否可点击
 ///
 /// 运行: flutter test test/debug/button_hit_test.dart
 library;
@@ -6,9 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
-import 'package:simple_player_flutter/ui/player/controls_overlay.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
@@ -17,12 +15,6 @@ import '../helpers/fake_engine.dart';
 
 void main() {
   late FakeEngine engine;
-  // 渐进路径:ControlsOverlay/ControlBar 需 currentFileName/playlist/
-  // playlistGeneration/openFileEnabled 自驱动 builder — 测试共享,tearDown 释放。
-  late Playlist playlist;
-  late ValueNotifier<int> playlistGeneration;
-  late ValueNotifier<String> currentFileName;
-  late ValueNotifier<bool> openFileEnabled;
   // 路径B Commit1:ControlBar 新签名需 ControlBarViewModel(从 engine 派生).
   // isFullscreen 共享 notifier(hit 测试不需全屏交互),setUp/tearDown 管理生命周期.
   late ValueNotifier<bool> isFullscreen;
@@ -35,61 +27,31 @@ void main() {
     engine.state.value = MediaState.playing;
     engine.duration.value = 60000;
     engine.position.value = 10000;
-    playlist = Playlist();
-    playlistGeneration = ValueNotifier<int>(0);
-    currentFileName = ValueNotifier<String>('');
-    openFileEnabled = ValueNotifier<bool>(true);
     isFullscreen = ValueNotifier<bool>(false);
   });
 
   tearDown(() {
     engine.dispose();
-    playlistGeneration.dispose();
-    currentFileName.dispose();
-    openFileEnabled.dispose();
     isFullscreen.dispose();
   });
 
-  /// 从 FakeEngine 派生 ControlBarViewModel — 数据源仍 engine(同 controls_overlay).
+  /// 从 FakeEngine 派生 ControlBarViewModel，供当前 ControlBar 测试使用。
   ControlBarViewModel buildVm(FakeEngine e) => ControlBarViewModel(
-        isPlaying: e.isPlayingNotifier,
-        position: e.position,
-        duration: e.duration,
-        volume: e.volume,
-        isMuted: e.isMuted,
-        rate: e.playbackSpeed,
-        isFullscreen: isFullscreen,
-        onSeek: e.seekTo,
-        onPlayPause: e.togglePlayPause,
-        onSeekBack: e.skipBack,
-        onSeekForward: e.skipForward,
-        onToggleMute: () => e.setMute(!e.isMuted.value),
-        onSetVolume: e.setVolume,
-        onSetRate: e.setPlaybackRate,
-      );
-
-  Widget buildFullOverlay({PlayerActions? actions}) {
-    return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: SizedBox(
-          width: 800,
-          height: 600,
-          child: ControlsOverlay(
-            engine: engine,
-            currentFileName: currentFileName,
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
-            openFileEnabled: openFileEnabled,
-            actions:
-                actions ??
-                const PlayerActions(onPrevious: _noop, onNext: _noop),
-          ),
-        ),
-      ),
-    );
-  }
+    isPlaying: e.isPlayingNotifier,
+    position: e.position,
+    duration: e.duration,
+    volume: e.volume,
+    isMuted: e.isMuted,
+    rate: e.playbackSpeed,
+    isFullscreen: isFullscreen,
+    onSeek: e.seekTo,
+    onPlayPause: e.togglePlayPause,
+    onSeekBack: e.skipBack,
+    onSeekForward: e.skipForward,
+    onToggleMute: () => e.setMute(!e.isMuted.value),
+    onSetVolume: e.setVolume,
+    onSetRate: e.setPlaybackRate,
+  );
 
   Widget buildControlBarOnly({PlayerActions? actions, bool isIdle = false}) {
     return MaterialApp(
@@ -101,19 +63,11 @@ void main() {
           height: 200,
           child: ControlBar(
             vm: buildVm(engine),
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
             isIdle: isIdle,
             // onStop 显式传 engine.stop — 新签名 CenterGroup 移除 engine.stop
             // fallback(actions.onStop null 时禁用)。显式传保 stop 按钮可点,
             // 等价旧签名 fallback 行为(idle 态 stop 路由到 engine).
-            actions:
-                actions ??
-                PlayerActions(
-                  onPrevious: _noop,
-                  onNext: _noop,
-                  onStop: engine.stop,
-                ),
+            actions: actions ?? PlayerActions(onStop: engine.stop),
           ),
         ),
       ),
@@ -136,95 +90,6 @@ void main() {
         MediaState.paused,
         reason: 'togglePlayPause should change state to paused',
       );
-    });
-
-    testWidgets('ControlsOverlay — play/pause button tappable', (tester) async {
-      await tester.pumpWidget(buildFullOverlay());
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final playButton = find.byIcon(Icons.pause);
-      expect(
-        playButton,
-        findsOneWidget,
-        reason: 'Should find pause icon inside ControlsOverlay',
-      );
-
-      await tester.tap(playButton);
-      await tester.pump();
-
-      expect(
-        engine.state.value,
-        MediaState.paused,
-        reason: 'togglePlayPause should work through ControlsOverlay',
-      );
-    });
-
-    testWidgets('ControlsOverlay — previous button tappable', (tester) async {
-      var prevCalled = false;
-      await tester.pumpWidget(
-        buildFullOverlay(
-          actions: PlayerActions(
-            onPrevious: () => prevCalled = true,
-            onNext: _noop,
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final prevButton = find.byIcon(Icons.skip_previous);
-      expect(prevButton, findsOneWidget);
-
-      await tester.tap(prevButton);
-      await tester.pump();
-
-      expect(prevCalled, isTrue, reason: 'onPrevious should be called');
-    });
-
-    testWidgets('ControlsOverlay — next button tappable', (tester) async {
-      var nextCalled = false;
-      await tester.pumpWidget(
-        buildFullOverlay(
-          actions: PlayerActions(
-            onPrevious: _noop,
-            onNext: () => nextCalled = true,
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final nextButton = find.byIcon(Icons.skip_next);
-      expect(nextButton, findsOneWidget);
-
-      await tester.tap(nextButton);
-      await tester.pump();
-
-      expect(nextCalled, isTrue, reason: 'onNext should be called');
-    });
-
-    testWidgets('ControlsOverlay — fullscreen button tappable', (tester) async {
-      var fsCalled = false;
-      await tester.pumpWidget(
-        buildFullOverlay(
-          actions: PlayerActions(
-            onPrevious: _noop,
-            onNext: _noop,
-            onToggleFullscreen: () => fsCalled = true,
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      final fsButton = find.byIcon(Icons.fullscreen);
-      expect(fsButton, findsOneWidget);
-
-      await tester.tap(fsButton);
-      await tester.pump();
-
-      expect(fsCalled, isTrue, reason: 'onToggleFullscreen should be called');
     });
 
     testWidgets('idle state routes stop and play taps to the engine', (
@@ -304,26 +169,5 @@ void main() {
       expect(engine.skipForwardCallCount, 2);
     });
 
-    testWidgets('hidden controls remove center buttons from hit-test', (
-      tester,
-    ) async {
-      // 契约:控制栏隐藏(visible=false,完全透明)后,ControlBar 从 hit-test 树
-      // 移除,tap 穿透到上层手势区/视频区,不触发不可见按钮(避免误触)。
-      // ErrorBanner 独立可见且不受 ControlBar 可见性连累(另测)。
-      await tester.pumpWidget(buildFullOverlay());
-      await tester.pump();
-
-      // Act: playing controls hide after the windowed five-second delay.
-      await tester.pump(const Duration(seconds: 6));
-      await tester.pump(const Duration(milliseconds: 500));
-
-      // Assert: 隐藏态(visible=false)ControlBar 被 Visibility+Offstage 移出可见树,
-      // find.byIcon 默认 skipOffstage=true 故找不到 stop —— 契约:隐藏态按钮不可见,
-      // 不会因透明叠加层抢点击而误触发(原 P3:IgnorePointer 连累整层的问题已修复)。
-      expect(find.byIcon(Icons.stop), findsNothing);
-      expect(engine.stopCallCount, 0);
-    });
   });
 }
-
-void _noop() {}

@@ -224,10 +224,10 @@ abstract class AppLocalizations {
   /// **'Show Help'**
   String get shortcutHelp;
 
-  /// Keyboard shortcut description for media keys
+  /// Keyboard shortcut description for the media play/pause key
   ///
   /// In en, this message translates to:
-  /// **'Play/Pause/Prev/Next'**
+  /// **'Play/Pause'**
   String get shortcutMediaKeys;
 
   /// Settings dialog title and tooltip

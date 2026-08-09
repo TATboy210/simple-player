@@ -1,8 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../kernel/playlist/playlist.dart';
-import '../../l10n/app_localizations.dart';
 import '../theme/tokens.dart';
 import 'center_controls.dart';
 import 'control_bar_view_model.dart';
@@ -16,8 +13,6 @@ import 'right_button_group.dart';
 class ControlBarActions extends StatelessWidget {
   final ControlBarViewModel vm;
   final PlayerActions actions;
-  final Playlist playlist;
-  final ValueListenable<int> playlistGeneration;
   final bool isIdle;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
@@ -29,8 +24,6 @@ class ControlBarActions extends StatelessWidget {
     super.key,
     required this.vm,
     required this.actions,
-    required this.playlist,
-    required this.playlistGeneration,
     required this.isIdle,
     this.onToggleFullscreen,
     this.onInteractionStart,
@@ -39,7 +32,6 @@ class ControlBarActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: Tokens.controlBarButtonRowPadding,
@@ -53,9 +45,6 @@ class ControlBarActions extends StatelessWidget {
             onToggleMute: vm.onToggleMute,
             onSetVolume: vm.onSetVolume,
             onSetRate: vm.onSetRate,
-            playlist: playlist,
-            playlistGeneration: playlistGeneration,
-            onTogglePlayMode: actions.onTogglePlayMode,
             onInteractionStart: onInteractionStart,
             onInteractionEnd: onInteractionEnd,
           ),
@@ -66,10 +55,6 @@ class ControlBarActions extends StatelessWidget {
             onSeekBack: vm.onSeekBack,
             onSeekForward: vm.onSeekForward,
             isIdle: isIdle,
-            prevTooltip: l10n.previousTrack,
-            nextTooltip: l10n.nextTrack,
-            onPrevious: actions.onPrevious,
-            onNext: actions.onNext,
             onStop: actions.onStop,
           ),
           const Spacer(),

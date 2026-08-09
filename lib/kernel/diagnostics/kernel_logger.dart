@@ -20,6 +20,8 @@
 /// | `log*.f(...)` | [fatal] | 0  |
 library;
 
+import 'dart:collection';
+import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
@@ -87,6 +89,31 @@ abstract interface class LogSink {
   });
 }
 
+enum KernelBuildMode {
+  /// 开发构建，同时输出到 debugPrint 与 DevTools。
+  debug,
+
+  /// 性能构建，仅输出到 DevTools，避免终端日志干扰采样。
+  profile,
+
+  /// 发布构建，不产生诊断输出。
+  release,
+}
+
+/// 根据构建模式创建默认日志输出策略。
+///
+/// sink 参数可注入以通过行为验证路由；生产环境使用默认实现。Release 始终
+/// 返回 [NullSink]，从而不注册任何实际输出目标。
+LogSink createDefaultLogSink(
+  KernelBuildMode mode, {
+  LogSink debugSink = const DebugPrintSink(),
+  LogSink devToolsSink = const DevToolsSink(),
+}) => switch (mode) {
+  KernelBuildMode.debug => CompositeSink([debugSink, devToolsSink]),
+  KernelBuildMode.profile => devToolsSink,
+  KernelBuildMode.release => const NullSink(),
+};
+
 // ---------------------------------------------------------------------------
 // redactPath — strips directory prefixes from file paths (D17)
 // ---------------------------------------------------------------------------
@@ -104,24 +131,89 @@ String redactPath(String msg) {
   );
 }
 
+/// 将日志 context 转为键顺序稳定、始终可编码的 JSON。
+///
+/// Map 递归按键排序，List 保序，Set 按规范化后的值排序；非有限浮点数与
+/// 循环引用使用固定字符串表示，使 Profile 诊断不会因辅助数据异常而中断。
+String serializeLogContext(Map<String, Object?> context) {
+  final activeContainers = HashSet<Object>.identity();
+  final normalized = _normalizeLogValue(context, activeContainers);
+  return jsonEncode(normalized);
+}
+
+Object? _normalizeLogValue(Object? value, Set<Object> activeContainers) {
+  if (value == null || value is bool || value is String || value is int) {
+    return value;
+  }
+  if (value is double) {
+    if (value.isNaN) return 'NaN';
+    if (value == double.infinity) return 'Infinity';
+    if (value == double.negativeInfinity) return '-Infinity';
+    return value;
+  }
+  if (value is DateTime) return value.toUtc().toIso8601String();
+
+  if (value is Map<Object?, Object?>) {
+    if (!activeContainers.add(value)) return '<cycle>';
+    try {
+      final entries = value.entries.toList()
+        ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
+      return <String, Object?>{
+        for (final entry in entries)
+          entry.key.toString(): _normalizeLogValue(
+            entry.value,
+            activeContainers,
+          ),
+      };
+    } finally {
+      activeContainers.remove(value);
+    }
+  }
+  if (value is List<Object?>) {
+    if (!activeContainers.add(value)) return '<cycle>';
+    try {
+      return [
+        for (final item in value) _normalizeLogValue(item, activeContainers),
+      ];
+    } finally {
+      activeContainers.remove(value);
+    }
+  }
+  if (value is Set<Object?>) {
+    if (!activeContainers.add(value)) return '<cycle>';
+    try {
+      final normalized = [
+        for (final item in value) _normalizeLogValue(item, activeContainers),
+      ];
+      normalized.sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+      return normalized;
+    } finally {
+      activeContainers.remove(value);
+    }
+  }
+
+  // 未知对象不调用用户可覆写的 toString()；诊断辅助路径不能执行不可控代码。
+  return '<object:${value.runtimeType}>';
+}
+
 // ---------------------------------------------------------------------------
 // DevToolsSink — dart:developer.log with name='Kernel' (D15)
 // ---------------------------------------------------------------------------
 
 /// DevTools 输出 — 通过 dart:developer.log 发送结构化日志 (D15).
 ///
-/// Logs via `dart:developer.log` with `name: 'Kernel'`. DevTools receives
-/// structured entries; context map is not passed (DevTools has its own view).
-/// Message paths are redacted via [redactPath] before output.
+/// context 以稳定 JSON 后缀写入 message，Profile 控制台与 DevTools 都能直接
+/// 收集 machine-readable resize 指标；路径仍通过 [redactPath] 脱敏。
 final class DevToolsSink implements LogSink {
   /// const 构造 — 无状态, 支持编译时常量 (D15).
   const DevToolsSink();
+
   /// LogLevel → dart:developer severity 映射 (D15).
   static int _toSeverity(LogLevel level) => switch (level) {
     LogLevel.trace => 300,
     LogLevel.debug => 500,
-    LogLevel.info  => 800,
-    LogLevel.warn  => 900,
+    LogLevel.info => 800,
+    LogLevel.warn => 900,
     LogLevel.error => 1000,
     LogLevel.fatal => 1200,
   };
@@ -134,10 +226,14 @@ final class DevToolsSink implements LogSink {
     Object? error,
     StackTrace? stackTrace,
   }) {
+    final redacted = redactPath(msg);
+    final contextSuffix = context != null && context.isNotEmpty
+        ? ' ${serializeLogContext(context)}'
+        : '';
     developer.log(
+      '$redacted$contextSuffix',
       name: 'Kernel',
       level: _toSeverity(level),
-      redactPath(msg),
       time: DateTime.now(),
       error: error,
       stackTrace: stackTrace,
@@ -167,12 +263,14 @@ final class DebugPrintSink implements LogSink {
   }) {
     final redacted = redactPath(msg);
     final contextStr = context != null && context.isNotEmpty
-        ? ' $context'
+        ? ' ${serializeLogContext(context)}'
         : '';
     // error/stackTrace 拼入输出 — debugPrint 无结构化错误通道, 仅文本展示。
     final errorStr = error != null ? ' error=$error' : '';
     final stackStr = stackTrace != null ? '\n$stackTrace' : '';
-    debugPrint('${level.name.toUpperCase()}: $redacted$contextStr$errorStr$stackStr');
+    debugPrint(
+      '${level.name.toUpperCase()}: $redacted$contextStr$errorStr$stackStr',
+    );
   }
 }
 
@@ -365,11 +463,12 @@ abstract class KernelLogger {
 // KernelLoggerImpl — concrete KernelLogger with static I accessor (Phase 17)
 // ---------------------------------------------------------------------------
 
-/// 具体 KernelLogger 实现 — 静态 I 访问器 + kDebugMode 门控 sink (Phase 17).
+/// 具体 KernelLogger 实现 — 静态 I 访问器 + 构建模式门控 sink (Phase 17).
 ///
 /// Concrete [KernelLogger] backed by a [LogSink]. Composition root
-/// ([init]) selects sink based on [kDebugMode]:
+/// ([init]) selects sink based on Flutter's compile-time build mode:
 /// - debug: `CompositeSink([DebugPrintSink(), DevToolsSink()])`
+/// - profile: `DevToolsSink()`，保留低噪声性能诊断
 /// - release: `NullSink()` (zero output, tree-shakeable)
 ///
 /// Usage:
@@ -400,17 +499,17 @@ final class KernelLoggerImpl extends KernelLogger {
     return inst;
   }
 
-  /// 组合根 — 创建 kDebugMode 门控的 sink 并初始化静态实例 (D13).
+  /// 组合根 — 根据 Flutter 构建模式初始化默认 sink。
   ///
-  /// Composition root. Must be called once at app startup, before any
-  /// kernel code accesses [I]. Creates:
-  /// - debug: `CompositeSink([DebugPrintSink(), DevToolsSink()])`
-  /// - release: `NullSink()`
+  /// Debug 双路输出，Profile 仅写 DevTools，Release 使用 [NullSink]。必须在
+  /// kernel 代码访问 [I] 之前调用。
   static void init() {
-    final LogSink sink = kDebugMode
-        ? CompositeSink([const DebugPrintSink(), const DevToolsSink()])
-        : const NullSink();
-    _instance = KernelLoggerImpl(sink);
+    final mode = kDebugMode
+        ? KernelBuildMode.debug
+        : kProfileMode
+        ? KernelBuildMode.profile
+        : KernelBuildMode.release;
+    _instance = KernelLoggerImpl(createDefaultLogSink(mode));
   }
 
   /// 测试辅助 — 重置静态实例, 便于测试间隔离.

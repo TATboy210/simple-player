@@ -159,46 +159,100 @@ class _EdgeGlowState extends State<EdgeGlow>
     final pulseController = _pulseController;
     if (pulseController == null) return widget.child;
 
-    return AnimatedBuilder(
-      animation: pulseController,
-      builder: (context, child) {
-        final t = pulseController.value;
-        // 正弦曲线：0 → 1 → 0
-        final pulse = math.sin(t * math.pi);
-        final intensity = widget.glowIntensity ?? 1.0;
-
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
-            boxShadow: [
-              // 内层高光（脉冲）
-              BoxShadow(
-                color: Tokens.glowHighlightWhite.withValues(alpha: (0.03 + 0.05 * pulse) * intensity),
-                blurRadius: 0,
-                spreadRadius: 0,
-                offset: const Offset(0, 1),
-              ),
-              // 中层扩散（脉冲）
-              BoxShadow(
-                color: Tokens.glowMidBlue.withValues(alpha: (0.03 + 0.05 * pulse) * intensity),
-                blurRadius: 20 + 10 * pulse,
-                spreadRadius: 0,
-              ),
-              // 外层环境（仅脉冲高峰出现）
-              if (pulse > 0.5)
-                BoxShadow(
-                  color: Tokens.glowAmbientBlue.withValues(alpha: 0.04 * (pulse - 0.5) * 2 * intensity),
-                  blurRadius: 60,
-                  spreadRadius: 0,
-                ),
-            ],
-          ),
-          child: child,
-        );
-      },
+    return CustomPaint(
+      // 脉冲只改变辉光绘制参数，避免每帧创建 Container、Decoration 和阴影列表。
+      painter: _PulseGlowPainter(
+        repaint: pulseController,
+        pulse: () => pulseController.value,
+        intensity: () => widget.glowIntensity ?? 1.0,
+        borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+      ),
       child: widget.child,
     );
   }
+}
+
+/// 脉冲辉光画笔。
+///
+/// 动画帧通过 [CustomPainter.repaint] 直接进入 paint 阶段，子树只在参数
+/// 或内容变化时重建；绘制顺序与原 BoxShadow 列表保持一致。
+class _PulseGlowPainter extends CustomPainter {
+  _PulseGlowPainter({
+    required this.repaint,
+    required this.pulse,
+    required this.intensity,
+    required this.borderRadius,
+  }) : super(repaint: repaint);
+
+  final Listenable repaint;
+  final double Function() pulse;
+  final double Function() intensity;
+  final BorderRadius borderRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final t = pulse();
+    final value = math.sin(t * math.pi);
+    final factor = intensity();
+    final rect = Offset.zero & size;
+    final rrect = borderRadius.toRRect(rect);
+
+    // 先绘制内层高光，再绘制中层与外层扩散，保持原阴影的叠加顺序。
+    _drawGlow(
+      canvas,
+      rrect,
+      color: Tokens.glowHighlightWhite.withValues(
+        alpha: (0.03 + 0.05 * value) * factor,
+      ),
+      blurRadius: 0,
+      offset: const Offset(0, 1),
+    );
+    _drawGlow(
+      canvas,
+      rrect,
+      color: Tokens.glowMidBlue.withValues(
+        alpha: (0.03 + 0.05 * value) * factor,
+      ),
+      blurRadius: 20 + 10 * value,
+    );
+    if (value > 0.5) {
+      _drawGlow(
+        canvas,
+        rrect,
+        color: Tokens.glowAmbientBlue.withValues(
+          alpha: 0.04 * (value - 0.5) * 2 * factor,
+        ),
+        blurRadius: 60,
+      );
+    }
+  }
+
+  void _drawGlow(
+    Canvas canvas,
+    RRect rrect, {
+    required Color color,
+    required double blurRadius,
+    Offset offset = Offset.zero,
+  }) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..maskFilter = blurRadius == 0
+          ? null
+          : MaskFilter.blur(BlurStyle.normal, blurRadius);
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    canvas.drawRRect(rrect, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _PulseGlowPainter oldDelegate) =>
+      oldDelegate.repaint != repaint ||
+      oldDelegate.pulse != pulse ||
+      oldDelegate.intensity != intensity ||
+      oldDelegate.borderRadius != borderRadius;
 }
 
 /// 渐变描边画笔 — 模拟 mask-composite: exclude 效果

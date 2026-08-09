@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// 控制栏数据视图模型 — 解耦子组件与 [MediaEngine]。
 ///
-/// 路径B Commit1:数据源仍 engine(由 `ControlsOverlay` 从 engine 派生本 vm);
+/// 路径B Commit1:数据源仍由 engine 派生本 vm。
 /// Commit2 将由 `PlayerVideoControls` 从 `PlayerControlsState`(player.stream)
 /// 提供同结构 vm,子组件零改动切换数据源。
 ///

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/pending_settings.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/tabs/general_tab.dart';
-import 'package:simple_player_flutter/ui/shared/spin_control.dart';
+import 'package:simple_player_flutter/ui/shared/settings_card.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 void main() {
@@ -21,9 +21,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SingleChildScrollView(
-            child: GeneralTab(pending: pending),
-          ),
+          body: SingleChildScrollView(child: GeneralTab(pending: pending)),
         ),
       ),
     );
@@ -42,8 +40,9 @@ void main() {
       expect(find.text('中文'), findsOneWidget);
     });
 
-    testWidgets('SpinControl renders with correct boundary arrow colors',
-        (tester) async {
+    testWidgets('SpinControl renders with correct boundary arrow colors', (
+      tester,
+    ) async {
       // Arrange & Act — 默认 index=0（左边界）
       await pumpGeneralTab(tester);
 
@@ -54,18 +53,21 @@ void main() {
       expect(rightIcon.color, Tokens.textSecondary);
     });
 
-    testWidgets('SpinControl has formatValue that maps locale to display text',
-        (tester) async {
-      // Arrange & Act — 当前 locale='zh'，formatValue 应映射为 '中文'
-      await pumpGeneralTab(tester);
+    testWidgets(
+      'SpinControl has formatValue that maps locale to display text',
+      (tester) async {
+        // Arrange & Act — 当前 locale='zh'，formatValue 应映射为 '中文'
+        await pumpGeneralTab(tester);
 
-      // Assert — 显示 '中文' 而非 'zh'
-      expect(find.text('中文'), findsOneWidget);
-      expect(find.text('zh'), findsNothing);
-    });
+        // Assert — 显示 '中文' 而非 'zh'
+        expect(find.text('中文'), findsOneWidget);
+        expect(find.text('zh'), findsNothing);
+      },
+    );
 
-    testWidgets('GeneralTab contains language and dark mode settings',
-        (tester) async {
+    testWidgets('GeneralTab contains language and dark mode settings', (
+      tester,
+    ) async {
       // Arrange & Act
       await pumpGeneralTab(tester);
 
@@ -83,17 +85,37 @@ void main() {
       expect(find.byType(Switch), findsOneWidget);
     });
 
-    testWidgets('SettingSpinRow wraps SpinControl inside SettingRow',
-        (tester) async {
+    testWidgets('SettingSpinRow wraps SpinControl inside SettingRow', (
+      tester,
+    ) async {
       // Arrange & Act
       await pumpGeneralTab(tester);
 
-      // Assert — SpinControl 是 SettingRow 的 control 子 widget
-      final settingRow = find.ancestor(
+      // Assert — SettingSpinRow 是 GeneralTab 渲染的公开包装组件
+      expect(find.byType(SettingSpinRow), findsOneWidget);
+
+      // Assert — SpinControl 位于 SettingRow 内（真实组合关系，而非
+      // AnimatedContainer 这类实现细节）
+      final settingRowFinder = find.ancestor(
         of: find.byType(SpinControl),
-        matching: find.byType(AnimatedContainer), // SettingRow 内部的 AnimatedContainer
+        matching: find.byType(SettingRow),
       );
-      expect(settingRow, findsWidgets);
+      expect(settingRowFinder, findsOneWidget);
+
+      // Assert — SettingRow 的 control 槽位即 SpinControl（验证
+      // SettingSpinRow -> SettingRow(control: SpinControl) 接线契约）
+      final settingRow = tester.widget<SettingRow>(settingRowFinder);
+      expect(settingRow.control, isA<SpinControl>());
+
+      // Assert — SettingSpinRow 把 title/description/icon 透传给 SettingRow
+      expect(settingRow.title, '界面语言');
+      expect(settingRow.description, '选择界面显示语言');
+      expect(settingRow.icon, Icons.language);
+
+      // Assert — 内嵌 SpinControl 携带 locale 选项与当前索引
+      final spinControl = tester.widget<SpinControl>(find.byType(SpinControl));
+      expect(spinControl.options, ['zh', 'en']);
+      expect(spinControl.currentIndex, 0); // locale='zh' -> index 0
     });
   });
 }

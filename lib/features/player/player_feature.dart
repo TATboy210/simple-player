@@ -4,7 +4,7 @@
 /// 1. 持有 [PlayerServices] 实例（DI 容器），管理其生命周期
 /// 2. 管理 UI 状态：ready（初始化完成）、error（错误状态）、
 ///    dragHovering（拖拽悬停）、customBindings（自定义快捷键）
-/// 3. 提供业务回调：文件选择、拖放、播放模式切换
+/// 3. 提供业务回调：文件选择与单文件拖放
 /// 4. 组合 [PlayerScreen] —— 实际的播放器 UI
 ///
 /// 与 [PlayerViewModel] 的区别：
@@ -23,15 +23,13 @@ import 'package:flutter/material.dart';
 import '../../kernel/bridge/window_bridge.dart';
 import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
+import '../../kernel/player_services.dart';
 import '../../kernel/startup/startup_coordinator.dart';
+import '../../l10n/app_localizations.dart';
 import '../../ui/dialogs/settings/audio_filter_compositor.dart';
 import '../../ui/dialogs/settings/settings_panel_controller.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
-import '../../ui/shared/play_mode_utils.dart';
-import '../../ui/shared/osd_overlay.dart';
-import '../../l10n/app_localizations.dart';
-import '../../kernel/player_services.dart';
 import 'file_picker_adapters.dart';
 import 'file_picker_coordinator.dart';
 
@@ -40,7 +38,7 @@ import 'file_picker_coordinator.dart';
 /// 作为 MVVM 的 View 层，[PlayerFeature] 负责：
 /// - 创建并持有 [PlayerServices]（服务容器）
 /// - 管理 UI 级状态：初始化就绪、错误信息、拖拽悬停、自定义快捷键
-/// - 提供文件选择/拖放/播放模式切换等业务回调
+/// - 提供文件选择与单文件拖放回调
 /// - 在初始化完成后组合渲染 [PlayerScreen]
 ///
 /// 需要 MaterialApp 级 [BuildContext] 的回调（设置面板、右键菜单）
@@ -68,7 +66,7 @@ class PlayerFeature extends StatefulWidget {
 }
 
 class _PlayerFeatureState extends State<PlayerFeature> {
-  /// 服务容器，持有 engine/playlist/controller/videoProcessing 等所有播放服务
+  /// 服务容器，持有 engine/controller/videoProcessing 等播放服务
   late final PlayerServices _services;
 
   /// 单开系统文件选择器会话及其 attention 协调器。
@@ -111,7 +109,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   ///
   /// 初始化序列：
   /// 1. 上报 StartupPhase.playerInit 开始（进度 0.0）
-  /// 2. 调用 PlayerServices.init() — 创建引擎、播放列表、控制器、视频处理服务
+  /// 2. 调用 PlayerServices.init() — 初始化引擎、控制器与视频处理服务
   /// 3. 上报加载设置阶段（进度 0.7）
   /// 4. 从 SettingsStore 加载自定义快捷键绑定
   /// 5. 上报初始化完成，调用 coordinator.markReady()
@@ -173,22 +171,13 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 快捷键触发同一单开会话语义。
   Future<void> _openFile() => _filePickerCoordinator.open();
 
-  /// 处理文件拖放事件 — 将拖入的文件路径添加到播放列表
-  void _onFilesDropped(List<String> paths) {
-    _services.controller.addFiles(paths);
-  }
-
-  /// 切换播放模式（循环全部 → 单曲循环 → 随机）并通过 OSD 显示当前模式
+  /// 处理文件拖放事件，仅打开第一个路径。
   ///
-  /// 切换顺序由 PlaybackController.togglePlayMode() 内部的 PlayMode 枚举决定，
-  /// OSD 显示使用 playModeLabel/playModeUtils 提供的本地化标签和图标。
-  void _onTogglePlayMode() {
-    _services.controller.togglePlayMode();
-    final l10n = AppLocalizations.of(context);
-    OsdService.I.show(
-      playModeLabel(_services.playlist.mode, l10n),
-      icon: playModeIcon(_services.playlist.mode),
-    );
+  /// 拖放边界可能一次提供多个文件，但 v1.8 不再隐式建立播放队列；实际路径
+  /// 安全与媒体类型校验继续统一由 [PlaybackController.openAndPlay] 执行。
+  void _onFilesDropped(List<String> paths) {
+    if (paths.isEmpty) return;
+    unawaited(_services.controller.openAndPlay(paths.first));
   }
 
   /// 音频滤镜运行时可用性——默认全支持；目标 Windows smoke 检查建立真实值（Q1）。
@@ -269,56 +258,22 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     );
   }
 
-  /// 构建播放器主界面 — 将 PlayerServices 中的各项服务注入 PlayerScreen
-  ///
-  /// 服务注入关系：engine → 渲染、controller → 播放控制、playlist → 播放列表。
-  /// customBindings 从 SettingsStore 加载的自定义快捷键。
-  /// playlistGeneration 是一个 ValueNotifier，每次播放列表变化时递增，
-  /// 触发 PlayerScreen 通过 ValueListenableBuilder 重建。
-  ///
-  /// 注意：这里有一行 debugDumpApp() 调用，仅在 debug 模式下执行，
-  /// 用于首帧渲染后 dump widget 树结构，帮助调试布局问题。
+  /// 构建播放器主界面，将单文件播放服务注入 [PlayerScreen]。
   Widget _buildPlayerScreen() {
     final engine = _services.engine;
-    final controller = _services.controller;
-    final playlist = _services.playlist;
-
-    // DEBUG: 首帧渲染后 dump widget 树，帮助调试布局结构（仅 debug 模式生效）
-    assert(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        debugDumpApp();
-      });
-      return true;
-    }());
 
     return PlayerScreen(
       engine: engine,
       mediaKitController: _services.mediaKitVideoController,
-      controller: controller,
-      playlist: playlist,
+      controller: _services.controller,
       customBindings: _customBindings,
-      playlistGeneration: _services.playlistGeneration,
       windowService: _services.windowService,
       settingsPanelController: _settingsPanelController,
       onOpenFile: () => unawaited(_openFile()),
-      onTogglePlayMode: _onTogglePlayMode,
       onSettingsSecondary: widget.onSettingsSecondary,
       onFilesDropped: _onFilesDropped,
       onDragHoverChanged: (hovering) {
         setState(() => _isDragHovering = hovering);
-      },
-      onFolderScanned: (folderPath, scanned) {
-        playlist.addAll(scanned.map((i) => i.path).toList());
-        _services.playlistGeneration.value++;
-      },
-      onClearHistory: () {
-        final keptPaths = playlist.items
-            .where((i) => (i.timestamp ?? 0) == 0)
-            .map((i) => i.path)
-            .toList();
-        playlist.clear();
-        playlist.addAll(keptPaths);
-        _services.playlistGeneration.value++;
       },
       emptyState: EmptyState(
         onOpenFile: () => unawaited(_openFile()),

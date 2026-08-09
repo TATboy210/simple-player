@@ -12,9 +12,9 @@ import 'shortcuts_help_dialog.dart';
 
 /// 构造播放器键盘处理器 — 绑定 20+ 快捷键到项目动作与引擎能力。
 ///
-/// 播放/暂停、快退、快进、上一首和下一首统一复用稳定的 [actions]，确保
-/// 窗口态与 media_kit fullscreen route 内控制栏使用同一命令入口。音量、字幕等
-/// 非基础播放操作仍按原路径使用 [engine]，不改变现有交互语义。
+/// 播放/暂停、快退与快进统一复用稳定的 [actions]，确保窗口态与
+/// media_kit fullscreen route 内控制栏使用同一命令入口。音量、字幕等非基础播放操作
+/// 仍按原路径使用 [engine]，不改变现有交互语义。
 ///
 /// F 键全屏: setMode 设 intent+mode + media_kit route 切换 (方案 B, 修症状④).
 /// enter 用 videoKey.enterFullscreen; exit 直接 pop root navigator 全屏 route
@@ -43,8 +43,6 @@ KeyboardHandler buildPlayerKeyboardActions({
     onVolumeUp: () => engine.setVolume(engine.volume.value + 0.05),
     onVolumeDown: () => engine.setVolume(engine.volume.value - 0.05),
     onToggleMute: () => engine.setMute(!engine.isMuted.value),
-    onPrevious: actions.onPrevious,
-    onNext: actions.onNext,
     onOpenFile: onOpenFile,
     onToggleSubtitle: () {
       engine.toggleSubtitle();
@@ -66,8 +64,6 @@ KeyboardHandler buildPlayerKeyboardActions({
       controller.trackPreferenceService?.recordSubtitleDelay(delay - 500);
     },
     onMediaPlayPause: actions.onPlayPause,
-    onMediaNext: actions.onNext,
-    onMediaPrevious: actions.onPrevious,
     // 方案 B: setMode 设 intent+mode (守卫 onWindowMaximize 同步 mode=fullscreen),
     // route 切换走 media_kit 原生全屏. 修症状④: 窗口态 videoKey 的
     // toggleFullscreen/exitFullscreen 受 isFullscreen(context) 守卫 — 退出时

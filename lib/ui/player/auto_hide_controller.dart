@@ -6,7 +6,7 @@ import '../theme/tokens.dart';
 
 /// 自动隐藏控制器 — 管理控制栏可见性、淡入淡出动画、自动隐藏定时器、鼠标悬停节流
 ///
-/// 从 ControlsOverlay 提取，独立可测试。
+/// 控制栏自动隐藏逻辑，独立可测试。
 ///
 /// 路径B阶段2:仅接收 [ValueNotifier<bool>] `isPlaying` — 非 playing 永显,
 /// 仅 playing 自动隐藏。归约原 `MediaState` 多状态策略(opening/paused/completed
@@ -77,21 +77,26 @@ class AutoHideController {
       ? const Duration(seconds: Tokens.hideDelayFullscreen)
       : const Duration(seconds: Tokens.hideDelayWindowed);
 
-  /// 显示控制栏（带动画）
+  /// 显示控制栏（带动画）。
+  ///
+  /// 即使 [visible] 已为 true，也要调用 forward：自动淡出中的暂停事件必须
+  /// 反转尚未结束的 reverse animation，避免 dismissed 回调随后错误隐藏非播放控件。
   void show() {
     if (!visible.value) {
       visible.value = true;
-      _animController.forward();
     }
+    _animController.forward();
   }
 
-  /// 隐藏控制栏（带动画，非 playing 时不隐藏）
+  /// 隐藏控制栏（带动画，非 playing 或 resize 中不隐藏）
   ///
   /// 阶段2:归约自原 `if (engineState == idle) return` — 非 playing 永显,
   /// 单击非 playing 状态不再隐藏控件(与永显策略一致,消除原 paused 单击隐藏
   /// 的不一致)。
   void hide() {
-    if (!_isPlaying.value) return;
+    // 将 resize gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调即使
+    // 无法再被 cancel，也不能在会话内启动淡出动画。
+    if (!_isPlaying.value || _resizing) return;
     if (visible.value) {
       _popupCloseNotifier?.value++;
       _animController.reverse();
@@ -117,7 +122,7 @@ class AutoHideController {
       // 阶段3问题3修复:去掉 !_hovering 检查 — 对齐 media_kit 原生「静止 3s 隐藏」。
       // MouseRegion 整区覆盖(含 ControlBar),鼠标在 Video 内 _hovering 恒 true,
       // 原 !_hovering 检查致静止永不隐藏。整区 MouseRegion 下 onExit 不会误触
-      // (ControlsOverlay 时期该检查防的「移到 ControlBar 误 onExit」已不成立)。
+      // 控制栏由同一 MouseRegion 管理，因此进入子控件时不应重启退出计时。
       // _activeInteractionCount 仍保护拖拽进度条/滑块交互期间不隐藏。
       if (_activeInteractionCount == 0) hide();
     });
@@ -146,9 +151,13 @@ class AutoHideController {
     scheduleHide();
   }
 
-  /// 鼠标进入
+  /// 鼠标进入。
+  ///
+  /// Resize 期间仍记录实际 pointer 状态，但不改变 controls 可见性：窗口拖动时
+  /// 不应因迟到的 enter 事件重新显示已自动隐藏的 controls。
   void onMouseEnter() {
     _hovering = true;
+    if (_resizing) return;
     show();
     scheduleHide();
   }
@@ -175,12 +184,11 @@ class AutoHideController {
       scheduleHide();
       return;
     }
-    // 非 playing:清计数(中断旧手势序列)+ cancel + 永显
+    // 非 playing:清计数(中断旧手势序列)+ cancel + 永显。无条件调用 show()
+    // 以反转可能正在进行的自动淡出动画，避免 dismissed 回调随后隐藏控件。
     _activeInteractionCount = 0;
     _hideTimer?.cancel();
-    if (!visible.value) {
-      show();
-    }
+    show();
   }
 
   /// 开始一个子控件交互会话，并冻结 playing 状态的自动隐藏。

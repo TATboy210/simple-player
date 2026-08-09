@@ -22,8 +22,9 @@ void main() {
       expect(find.byType(GlassContainer), findsNWidgets(3));
     });
 
-    testWidgets('renders SectionHeader for info and copyright sections',
-        (tester) async {
+    testWidgets('renders SectionHeader for info and copyright sections', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildTestWidget(const AboutTab()));
 
       // 2 SectionHeaders: app info + copyright (licenses uses SettingRow)
@@ -37,11 +38,21 @@ void main() {
       expect(find.text('Flutter + media_kit'), findsOneWidget);
     });
 
-    testWidgets('licenses row uses InkWell for tap', (tester) async {
+    testWidgets('tapping licenses row opens the license page', (tester) async {
       await tester.pumpWidget(buildTestWidget(const AboutTab()));
 
-      // InkWell should exist for the licenses row
-      expect(find.byType(InkWell), findsOneWidget);
+      // SettingRow wraps every row in its own InkWell, so the global
+      // InkWell count is not a reliable signal. Locate the licenses row
+      // by its title text instead.
+      final licensesRow = find.text('Licenses');
+      expect(licensesRow, findsOneWidget);
+
+      await tester.tap(licensesRow);
+      await tester.pumpAndSettle();
+
+      // The outer InkWell's onTap calls showLicensePage, which pushes a
+      // LicensePage route onto the navigator.
+      expect(find.byType(LicensePage), findsOneWidget);
     });
 
     testWidgets('does not use SettingsActionCard', (tester) async {
