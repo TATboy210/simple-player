@@ -120,8 +120,8 @@ class PlayerControlsState {
   PlayerControlsState(this._port, {required MediaEngine engine})
     : _engine = engine;
 
-  final PlayerPort _port;
-  final MediaEngine _engine;
+  PlayerPort _port;
+  MediaEngine _engine;
 
   // ─── 播放状态 ───
   final ValueNotifier<bool> isPlaying = ValueNotifier<bool>(false);
@@ -152,6 +152,7 @@ class PlayerControlsState {
 
   /// 订阅 [PlayerPort] stream + 初始快照。必须在 widget initState 调用。
   void init() {
+    _cancelSubscriptions();
     // 初始快照 — 避免首帧空白(订阅前的旧值)
     isPlaying.value = _port.isPlayingNow;
     buffering.value = _port.isBufferingNow;
@@ -170,6 +171,32 @@ class PlayerControlsState {
       (v) => volume01.value = volumeFromMediaKit(v),
     );
     _rateSub = _port.rate.listen((v) => rate.value = v);
+  }
+
+  /// 迁移到新的视频端口和引擎，同时复用现有 notifier 保持下游 identity。
+  void updateSources(PlayerPort port, {required MediaEngine engine}) {
+    _port = port;
+    _engine = engine;
+    init();
+  }
+
+  void _cancelSubscriptions() {
+    _playingSub?.cancel();
+    _bufferingSub?.cancel();
+    _completedSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _bufferSub?.cancel();
+    _volumeSub?.cancel();
+    _rateSub?.cancel();
+    _playingSub = null;
+    _bufferingSub = null;
+    _completedSub = null;
+    _positionSub = null;
+    _durationSub = null;
+    _bufferSub = null;
+    _volumeSub = null;
+    _rateSub = null;
   }
 
   /// seek(int ms)— 乐观更新 positionMs 再 player.seek.
@@ -193,14 +220,7 @@ class PlayerControlsState {
 
   /// 取消订阅 + dispose 自建 notifiers(不 dispose engine.isMuted — engine 拥有)
   void dispose() {
-    _playingSub?.cancel();
-    _bufferingSub?.cancel();
-    _completedSub?.cancel();
-    _positionSub?.cancel();
-    _durationSub?.cancel();
-    _bufferSub?.cancel();
-    _volumeSub?.cancel();
-    _rateSub?.cancel();
+    _cancelSubscriptions();
     isPlaying.dispose();
     buffering.dispose();
     completed.dispose();
@@ -323,8 +343,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// resize 状态标记 — resize 期间忽略 engine 状态变化,避免 controller 竞争
   bool _isResizing = false;
 
-  /// 空状态和控制栏共享的媒体身份监听器；缓存它避免每次 build 重新订阅。
+  /// 空状态使用的媒体身份监听器；控制栏只接收其中的局部监听器。
   late Listenable _mediaIdentityListenable;
+
+  /// 将 idle 状态变化限制在中央控制组，同时保留装饰动画独立监听。
+  late final ValueNotifier<bool> _isIdleNotifier;
 
   /// 全屏切换过渡标记 — 跳过 isResizing 触发的控制栏淡出,避免全屏切换闪烁消失。
   bool _isFullscreenTransition = false;
@@ -333,6 +356,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 的 didUpdateWidget/build 查 isFullscreen(查 ancestor 会断言)。
   /// deactivate() 即置 true(element 仍 mounted 但 inactive,State.mounted 无效)。
   bool _isDeactivating = false;
+  bool _lifecycleListenersAttached = false;
+
+  /// 控件创建后读取一次的字幕基础 padding，避免 activate 重复叠加自身 inset。
+  EdgeInsets? _subtitleBasePadding;
+
+  /// 控制栏可见时为字幕预留的底部安全区。
+  static const _subtitleControlBarInset = EdgeInsets.only(
+    bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
+  );
 
   /// 对齐 media_kit 原生 onTapUp 400ms 双击窗口。
   static const _clickDelayMs = 400;
@@ -363,19 +395,17 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 查已 deactivate 的 InheritedWidget ancestor → "deactivated widget's
     // ancestor" 断言(framework.dart:6417)。mounted 挡本控件 dispose 后;
     // widget.video.isMounted 挡全屏 VideoState dispose 后。
-    if (!mounted || !widget.video.isMounted) return;
+    // _isDeactivating 覆盖 State 仍 mounted 但 Element 已 inactive 的窗口，
+    // 也能拦截不可取消的 post-frame callback。
+    if (_isDeactivating || !mounted || !widget.video.isMounted) return;
     final videoState = widget.video;
-    final base = videoState.subtitlePadding;
-    if (_autoHide.visible.value) {
-      videoState.setSubtitleViewPadding(
-        base +
-            const EdgeInsets.only(
-              bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
-            ),
-      );
-    } else {
-      videoState.setSubtitleViewPadding(base);
-    }
+    // 只在当前 source 首次同步时读取基础值；之后始终复用缓存，保证重复
+    // activate/reparent 不会把本控件已经添加的 inset 再次当作基础值。
+    final base = _subtitleBasePadding ??= videoState.subtitlePadding;
+    final padding = _autoHide.visible.value
+        ? base + _subtitleControlBarInset
+        : base;
+    videoState.setSubtitleViewPadding(padding);
   }
 
   /// 阶段2:键盘事件处理 — controls 内 Focus 最小集.
@@ -422,6 +452,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       widget.engine.state,
       widget.currentFileName,
     ]);
+    _isIdleNotifier = ValueNotifier<bool>(
+      widget.engine.state.value == MediaState.idle,
+    );
     _isFullscreenNotifier = ValueNotifier<bool>(widget.video.isFullscreen);
     // 阶段2:_controlsState.init() 前置 — isPlaying 有真值后再构造 _autoHide
     // (AutoHide 监听 _controlsState.isPlaying,init() 读初值)。
@@ -433,7 +466,6 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       isFullscreen: widget.video.isFullscreen,
       popupCloseNotifier: _popupCloseNotifier,
     );
-    widget.engine.state.addListener(_onEngineStateChanged);
     _autoHide.init();
 
     // 创建共享 AnimationController — 初始 value=1.0(不 resize 时完全可见)
@@ -444,13 +476,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     );
 
     // 监听 resize 信号变化
-    widget.resizing?.addListener(_onResizeChanged);
+    _attachLifecycleListeners();
     // CB-06: 防御性同步 — widget 创建时 resizing 可能已为 true
     if (widget.resizing?.value == true) _onResizeChanged();
 
     // 阶段2:字幕 padding 自驱(每实例调自己 VideoState)。post-frame 确保
     // widget.video 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
-    _autoHide.visible.addListener(_syncSubtitlePadding);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncSubtitlePadding());
   }
 
@@ -484,12 +515,30 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       _isResizing = false;
       _isFullscreenTransition = false; // 清除标记,恢复正常 resize 行为
       final isIdle = widget.engine.state.value == MediaState.idle;
+      // resize 期间状态变化被暂缓，结束时补同步中央按钮视觉状态。
+      _isIdleNotifier.value = isIdle;
       if (isIdle) {
         _animController.reverse(); // 恢复到 idle 装饰
       } else {
         _animController.forward(); // 恢复到 playing 装饰
       }
     }
+  }
+
+  void _attachLifecycleListeners() {
+    if (_lifecycleListenersAttached) return;
+    widget.engine.state.addListener(_onEngineStateChanged);
+    widget.resizing?.addListener(_onResizeChanged);
+    _autoHide.visible.addListener(_syncSubtitlePadding);
+    _lifecycleListenersAttached = true;
+  }
+
+  void _detachLifecycleListeners() {
+    if (!_lifecycleListenersAttached) return;
+    widget.engine.state.removeListener(_onEngineStateChanged);
+    widget.resizing?.removeListener(_onResizeChanged);
+    _autoHide.visible.removeListener(_syncSubtitlePadding);
+    _lifecycleListenersAttached = false;
   }
 
   void _onEngineStateChanged() {
@@ -500,6 +549,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
     // engine 状态变化驱动 decoration 切换:idle→reverse(淡出),playing→forward(淡入)
     final isIdle = widget.engine.state.value == MediaState.idle;
+    _isIdleNotifier.value = isIdle;
     if (isIdle) {
       _animController.reverse();
     } else {
@@ -542,6 +592,27 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         _isFullscreenTransition = true; // 标记过渡,下次 isResizing=true 跳过 reverse()
       }
     }
+    // 视频端口或引擎更换时迁移控制状态，避免新外壳继续驱动旧数据源。
+    final sourceChanged =
+        oldWidget.video != widget.video || oldWidget.engine != widget.engine;
+    if (sourceChanged) {
+      _controlsState.updateSources(widget.video.player, engine: widget.engine);
+      // 只有 VideoState 更换时基础 padding 才失效；仅替换 engine 时，
+      // 复用同一视频端口可避免把已加过的 control bar inset 再次当作基础值。
+      if (oldWidget.video != widget.video) _subtitleBasePadding = null;
+      // active replacement 不一定伴随可见性、resize 或 engine 状态变化，
+      // 因此必须立即把当前控制栏可见性同步到新的 VideoState；inactive 阶段
+      // 则延迟到 activate，避免访问已经脱离祖先树的 media_kit 状态。
+      if (!_isDeactivating) _syncSubtitlePadding();
+    }
+    // engine 更换时迁移状态监听，并同步局部 idle 信号，避免沿用旧引擎状态。
+    if (oldWidget.engine.state != widget.engine.state) {
+      oldWidget.engine.state.removeListener(_onEngineStateChanged);
+      if (_lifecycleListenersAttached) {
+        widget.engine.state.addListener(_onEngineStateChanged);
+      }
+      _isIdleNotifier.value = widget.engine.state.value == MediaState.idle;
+    }
     // 媒体身份源变化时更新缓存的合并监听器；避免 build 中反复创建新实例。
     if (oldWidget.engine.state != widget.engine.state ||
         oldWidget.currentFileName != widget.currentFileName) {
@@ -550,11 +621,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         widget.currentFileName,
       ]);
     }
-    // resizing 监听迁移 — 旧值移除,新值添加(CB-06: 同步当前值)
+    // resizing 监听迁移 — inactive 期间只更新 source，activate 再统一连接。
     if (oldWidget.resizing != widget.resizing) {
       oldWidget.resizing?.removeListener(_onResizeChanged);
-      widget.resizing?.addListener(_onResizeChanged);
-      _onResizeChanged();
+      if (_lifecycleListenersAttached) {
+        widget.resizing?.addListener(_onResizeChanged);
+        _onResizeChanged();
+      }
     }
   }
 
@@ -569,23 +642,30 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // _syncSubtitlePadding 调已 deactivate 的 widget.video.setSubtitleViewPadding
     // → media_kit 查 deactivated ancestor 断言。dispose 太晚(Timer/动画仍跑),
     // 须在此断开。dispose 内 removeListener 幂等保留(remove 已移除的 listener 是
-    // no-op)。注:本控件由 controls builder 构建,不 reparent,无需 activate 重 add。
-    widget.engine.state.removeListener(_onEngineStateChanged);
-    widget.resizing?.removeListener(_onResizeChanged);
-    _autoHide.visible.removeListener(_syncSubtitlePadding);
+    // no-op)。reparent 场景由 activate() 统一恢复，避免 inactive 期间重复注册。
+    _detachLifecycleListeners();
     super.deactivate();
   }
 
   @override
+  void activate() {
+    super.activate();
+    _isDeactivating = false;
+    _attachLifecycleListeners();
+    _onResizeChanged();
+    _isIdleNotifier.value = widget.engine.state.value == MediaState.idle;
+    _syncSubtitlePadding();
+  }
+
+  @override
   void dispose() {
-    widget.engine.state.removeListener(_onEngineStateChanged);
-    widget.resizing?.removeListener(_onResizeChanged);
-    _autoHide.visible.removeListener(_syncSubtitlePadding);
+    _detachLifecycleListeners();
     _clickTimer?.cancel();
     _focusNode.dispose();
     _popupCloseNotifier.dispose();
     _isFullscreenNotifier.dispose();
     _animController.dispose();
+    _isIdleNotifier.dispose();
     _autoHide.dispose();
     _controlsState.dispose(); // 取消 stream 订阅 + dispose notifiers
     super.dispose();
@@ -641,62 +721,55 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 文件名和 idle 状态只在控制栏需要时监听；控制栏之外的稳定 overlay
   /// 不会因标题或空状态变化而重新 build。
   Widget _buildControlBar() {
-    return ListenableBuilder(
-      listenable: _mediaIdentityListenable,
-      builder: (context, _) {
-        final isIdle = widget.engine.state.value == MediaState.idle;
-        final fileName = widget.currentFileName.value;
-        final title = fileName.isEmpty ? null : fileName;
-        final vm = ControlBarViewModel(
-          isPlaying: _controlsState.isPlaying,
-          position: _controlsState.positionMs,
-          duration: _controlsState.durationMs,
-          volume: _controlsState.volume01,
-          isMuted: _controlsState.isMuted,
-          rate: _controlsState.rate,
-          isFullscreen: _isFullscreenNotifier,
-          onSeek: _controlsState.seek,
-          onPlayPause: widget.actions.onPlayPause ?? () {},
-          onSeekBack: widget.actions.onSeekBack ?? (_) {},
-          onSeekForward: widget.actions.onSeekForward ?? (_) {},
-          onToggleMute: _controlsState.toggleMute,
-          onSetVolume: _controlsState.setVolume,
-          onSetRate: _controlsState.setRate,
-        );
-        return ValueListenableBuilder<bool>(
-          valueListenable: _autoHide.visible,
-          builder: (_, isVisible, _) => Positioned(
-            left: Tokens.controlBarMarginH,
-            right: Tokens.controlBarMarginH,
-            bottom: Tokens.controlBarMarginBottom,
-            child: Visibility(
-              key: const Key('player-controls-visibility'),
-              visible: isVisible,
-              maintainState: true,
-              maintainAnimation: true,
-              child: FadeTransition(
-                opacity: _autoHide.opacity,
-                child: ControlBar(
-                  vm: vm,
-                  actions: widget.actions,
-                  isIdle: isIdle,
-                  title: title,
-                  // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
-                  opacity: _autoHide.opacity,
-                  enableBlur: true,
-                  decoration: _animController,
-                  resizing: widget.resizing,
-                  onToggleFullscreen: _toggleFullscreen,
-                  onSeekStart: _autoHide.onSeekStart,
-                  onSeekEnd: _autoHide.onSeekEnd,
-                  onInteractionStart: _autoHide.onInteractionStart,
-                  onInteractionEnd: _autoHide.onInteractionEnd,
-                ),
-              ),
+    final vm = ControlBarViewModel(
+      isPlaying: _controlsState.isPlaying,
+      position: _controlsState.positionMs,
+      duration: _controlsState.durationMs,
+      volume: _controlsState.volume01,
+      isMuted: _controlsState.isMuted,
+      rate: _controlsState.rate,
+      isFullscreen: _isFullscreenNotifier,
+      onSeek: _controlsState.seek,
+      onPlayPause: widget.actions.onPlayPause ?? () {},
+      onSeekBack: widget.actions.onSeekBack ?? (_) {},
+      onSeekForward: widget.actions.onSeekForward ?? (_) {},
+      onToggleMute: _controlsState.toggleMute,
+      onSetVolume: _controlsState.setVolume,
+      onSetRate: _controlsState.setRate,
+    );
+    return ValueListenableBuilder<bool>(
+      valueListenable: _autoHide.visible,
+      builder: (_, isVisible, _) => Positioned(
+        left: Tokens.controlBarMarginH,
+        right: Tokens.controlBarMarginH,
+        bottom: Tokens.controlBarMarginBottom,
+        child: Visibility(
+          key: const Key('player-controls-visibility'),
+          visible: isVisible,
+          maintainState: true,
+          maintainAnimation: true,
+          child: FadeTransition(
+            opacity: _autoHide.opacity,
+            child: ControlBar(
+              vm: vm,
+              actions: widget.actions,
+              isIdle: _isIdleNotifier.value,
+              isIdleListenable: _isIdleNotifier,
+              titleListenable: widget.currentFileName,
+              // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
+              opacity: _autoHide.opacity,
+              enableBlur: true,
+              decoration: _animController,
+              resizing: widget.resizing,
+              onToggleFullscreen: _toggleFullscreen,
+              onSeekStart: _autoHide.onSeekStart,
+              onSeekEnd: _autoHide.onSeekEnd,
+              onInteractionStart: _autoHide.onInteractionStart,
+              onInteractionEnd: _autoHide.onInteractionEnd,
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 

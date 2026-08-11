@@ -18,7 +18,9 @@ class ControlBarLayout extends StatelessWidget {
   final ControlBarViewModel vm;
   final PlayerActions actions;
   final bool isIdle;
+  final ValueListenable<bool>? isIdleListenable;
   final String? title;
+  final ValueListenable<String>? titleListenable;
   final ValueListenable<bool>? resizing;
   final VoidCallback? onSeekStart;
   final VoidCallback? onSeekEnd;
@@ -33,7 +35,9 @@ class ControlBarLayout extends StatelessWidget {
     required this.vm,
     required this.actions,
     required this.isIdle,
+    this.isIdleListenable,
     this.title,
+    this.titleListenable,
     this.resizing,
     this.onSeekStart,
     this.onSeekEnd,
@@ -67,7 +71,12 @@ class ControlBarLayout extends StatelessWidget {
         // 3 行等分布局：标题 / 时间导航 / 按钮行。
         Column(
           children: [
-            Expanded(child: ControlBarTitle(title: title)),
+            Expanded(
+              child: ControlBarTitle(
+                title: title,
+                titleListenable: titleListenable,
+              ),
+            ),
             Expanded(
               child: ControlBarTimeline(
                 vm: vm,
@@ -81,6 +90,7 @@ class ControlBarLayout extends StatelessWidget {
                 vm: vm,
                 actions: actions,
                 isIdle: isIdle,
+                isIdleListenable: isIdleListenable,
                 onToggleFullscreen: onToggleFullscreen,
                 onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,

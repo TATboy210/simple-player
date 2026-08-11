@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
@@ -14,6 +15,7 @@ class ControlBarActions extends StatelessWidget {
   final ControlBarViewModel vm;
   final PlayerActions actions;
   final bool isIdle;
+  final ValueListenable<bool>? isIdleListenable;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
 
@@ -25,6 +27,7 @@ class ControlBarActions extends StatelessWidget {
     required this.vm,
     required this.actions,
     required this.isIdle,
+    this.isIdleListenable,
     this.onToggleFullscreen,
     this.onInteractionStart,
     this.onInteractionEnd,
@@ -55,6 +58,7 @@ class ControlBarActions extends StatelessWidget {
             onSeekBack: vm.onSeekBack,
             onSeekForward: vm.onSeekForward,
             isIdle: isIdle,
+            isIdleListenable: isIdleListenable,
             onStop: actions.onStop,
           ),
           const Spacer(),

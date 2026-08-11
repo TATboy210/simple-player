@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_banner.dart';
@@ -12,14 +15,26 @@ import '../helpers/fake_engine.dart';
 /// 路径: engine.lastError → ErrorBanner 显示 → dismiss → lastError 清除
 /// 数据流: Kernel(engine) → Widget(ErrorBanner) 单向，通过 ValueNotifier 驱动
 void main() {
+  // PlaybackController.dispose() 会异步保存设置；初始化 logger，避免保存失败时
+  // 测试 teardown 因日志单例未建立而产生测试完成后的未捕获异常。
+  setUpAll(() {
+    KernelLoggerImpl.init();
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  tearDownAll(KernelLoggerImpl.resetForTesting);
+
   late FakeEngine engine;
 
   setUp(() {
+    // 为 dispose() 提供内存版 SharedPreferences，避免 headless 测试触碰平台通道。
+    SharedPreferences.setMockInitialValues({});
     engine = FakeEngine();
   });
 
   tearDown(() {
     engine.dispose();
+    SettingsStore.resetPrewarm();
   });
 
   /// 构建 ErrorBanner 测试壳 — 带 MaterialApp + l10n

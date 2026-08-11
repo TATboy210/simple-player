@@ -34,9 +34,14 @@ class ControlBar extends StatelessWidget {
   final PlayerActions actions;
   final bool enableBlur;
   final bool isIdle;
+  final ValueListenable<bool>? isIdleListenable;
 
-  /// 视频标题（显示在 Row 1 左侧）
+  /// 视频标题（显示在 Row 1 左侧）。
+  ///
+  /// 直接传值用于独立使用的控制栏；播放器路径使用 [titleListenable]，
+  /// 将文件名更新限制在标题行。
   final String? title;
+  final ValueListenable<String>? titleListenable;
 
   /// 淡入淡出动画 — opacity=0 时停用 BackdropFilter，但保持祖先链挂载。
   final Animation<double>? opacity;
@@ -66,7 +71,9 @@ class ControlBar extends StatelessWidget {
     this.actions = const PlayerActions(),
     this.enableBlur = true,
     this.isIdle = false,
+    this.isIdleListenable,
     this.title,
+    this.titleListenable,
     this.opacity,
     this.decoration,
     this.resizing,
@@ -103,7 +110,9 @@ class ControlBar extends StatelessWidget {
             vm: vm,
             actions: actions,
             isIdle: isIdle,
+            isIdleListenable: isIdleListenable,
             title: title,
+            titleListenable: titleListenable,
             resizing: resizing,
             onSeekStart: onSeekStart,
             onSeekEnd: onSeekEnd,
