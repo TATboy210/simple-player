@@ -9,24 +9,53 @@ import '../theme/tokens.dart';
 /// 自定义标题栏 — 平面/沉浸式按钮，32px 高度
 ///
 /// 全屏时整体透明 + 忽略交互。
-class CustomTitleBar extends StatelessWidget {
+///
+/// 性能优化（PC 窗口频繁切换场景）：
+/// - StatefulWidget 缓存静态按钮行（标题、pin、最小化、关闭），
+///   避免窗口模式变更时重复创建相同 widget 子树。
+/// - 动画壳层（AnimatedOpacity/IgnorePointer/GestureDetector）仅在进入/
+///   离开全屏时触发动画，最大化↔恢复切换跳过透明动效以减少 GPU 开销。
+/// - 静态标题行被 RepaintBoundary 包裹，与动态按钮子树隔离重绘区域。
+class CustomTitleBar extends StatefulWidget {
   /// 应用标题是静态品牌标识，不随当前媒体或窗口状态变化。
-  static const String _applicationTitle = 'Simple Player';
+  static const String applicationTitle = 'Simple Player';
 
   final WindowBridge windowService;
 
   const CustomTitleBar({super.key, required this.windowService});
 
   @override
-  Widget build(BuildContext context) {
-    // 只有外层透明度和拖拽手势依赖完整窗口模式；按钮行作为 child 复用，
-    // 避免全屏/最大化切换时重新构建标题、置顶、最小化和关闭按钮。
-    final buttonRow = Row(
+  State<CustomTitleBar> createState() => _CustomTitleBarState();
+}
+
+class _CustomTitleBarState extends State<CustomTitleBar> {
+  /// 静态按钮行（标题 + pin + minimize + close）在 initState 中构建一次，
+  /// 之后每次 build 复用同一实例，避免重复创建相同的 ConstWidget 子树。
+  late final Widget _staticTitleRow;
+
+  @override
+  void initState() {
+    super.initState();
+    _staticTitleRow = _buildStaticTitleRow();
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomTitleBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.windowService != widget.windowService) {
+      // WindowBridge 替换时同步更新缓存
+      _staticTitleRow = _buildStaticTitleRow();
+    }
+  }
+
+  /// 构建静态标题行 — pin、最小化、关闭按钮及标题文字不随模式变化。
+  Widget _buildStaticTitleRow() {
+    return Row(
       children: [
         const Padding(
           padding: EdgeInsets.only(left: Tokens.spMd),
           child: Text(
-            _applicationTitle,
+            CustomTitleBar.applicationTitle,
             style: TextStyle(
               fontSize: Tokens.fontCaption,
               fontWeight: Tokens.weightMedium,
@@ -35,95 +64,160 @@ class CustomTitleBar extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        // Pin 按钮 — 独立 ValueListenableBuilder，仅当置顶状态变化时重建。
         ValueListenableBuilder<bool>(
-          valueListenable: windowService.isAlwaysOnTop,
-          builder: (context, isPinned, _) => _TitleBarButton(
-            icon: Icons.push_pin_outlined,
-            isActive: isPinned,
-            onPressed: () {
-              unawaited(windowService.setAlwaysOnTop(!isPinned));
-            },
-          ),
+          valueListenable: widget.windowService.isAlwaysOnTop,
+          builder: (context, isPinned, _) {
+            return _TitleBarButton(
+              icon: Icons.push_pin_outlined,
+              isActive: isPinned,
+              onPressed: () {
+                unawaited(
+                  widget.windowService.setAlwaysOnTop(!isPinned),
+                );
+              },
+            );
+          },
         ),
+        // 最小化按钮 — 无状态监听。
         _TitleBarButton(
           icon: Icons.minimize,
           onPressed: () {
-            unawaited(windowService.minimize());
+            unawaited(widget.windowService.minimize());
           },
         ),
+        // 关闭按钮 — 无状态监听。
+        _TitleBarButton(
+          icon: Icons.close,
+          onPressed: () {
+            unawaited(widget.windowService.close());
+          },
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // AnimatedBuilder：child（静态行）由 Flutter 框架缓存在每次 rebuild 间，
+    // builder 仅创建动画壳层（AnimatedOpacity + IgnorePointer + GestureDetector），
+    // 避免全屏/非全屏切换时重建静态按钮子树。
+    return AnimatedBuilder(
+      animation: widget.windowService.mode,
+      builder: (context, child) {
+        final isFullscreen = widget.windowService.mode.value.isFullscreen;
+        return _TitleBarAnimatedShell(
+          isFullscreen: isFullscreen,
+          windowService: widget.windowService,
+          child: child!,
+        );
+      },
+      child: RepaintBoundary(
+        child: _DynamicTitleRow(
+          windowService: widget.windowService,
+          staticTitleRow: _staticTitleRow,
+        ),
+      ),
+    );
+  }
+}
+
+/// 标题栏动画壳层 — 管理全屏透明度过渡与指针忽略。
+///
+/// 仅在进入/离开全屏时触发 AnimatedOpacity 动画。
+/// 最大化↔恢复切换（isMaximized 变化但非全屏）不触发动画，
+/// 避免 GPU readback 抖动导致的卡顿。
+class _TitleBarAnimatedShell extends StatelessWidget {
+  final bool isFullscreen;
+  final WindowBridge windowService;
+  final Widget child;
+
+  const _TitleBarAnimatedShell({
+    required this.isFullscreen,
+    required this.windowService,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: isFullscreen ? 0.0 : 1.0,
+      duration: const Duration(milliseconds: Tokens.durationFullscreenAnim),
+      curve: Curves.easeInOut,
+      child: IgnorePointer(
+        ignoring: isFullscreen,
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (_) {
+            unawaited(windowService.startDragging());
+          },
+          onDoubleTap: () {
+            final m = windowService.mode.value;
+            unawaited(
+              windowService.setMode(
+                m.isMaximized ? WindowMode.windowed : WindowMode.maximized,
+              ),
+            );
+          },
+          child: Container(
+            height: Tokens.titleBarHeight,
+            color: Colors.transparent,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 标题栏动态内容 — 静态行（缓存于 RepaintBoundary 中）与
+/// 最大化/恢复按钮并排列放。最大化按钮独立监听模式变更，仅在
+/// isMaximized 变化时刷新自身。
+class _DynamicTitleRow extends StatelessWidget {
+  final WindowBridge windowService;
+  final Widget staticTitleRow;
+
+  const _DynamicTitleRow({
+    required this.windowService,
+    required this.staticTitleRow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        staticTitleRow,
+        // 最大化按钮 — 独立监听模式变更，仅在 isMaximized 翻转时更新图标。
         ValueListenableBuilder<WindowMode>(
           valueListenable: windowService.mode,
           builder: (context, mode, _) {
-            final isMaximized = mode.isMaximized;
             return _TitleBarButton(
-              icon: isMaximized ? Icons.filter_none : Icons.crop_square,
+              icon: mode.isMaximized ? Icons.filter_none : Icons.crop_square,
               onPressed: () {
                 unawaited(
                   windowService.setMode(
-                    isMaximized ? WindowMode.windowed : WindowMode.maximized,
+                    mode.isMaximized ? WindowMode.windowed : WindowMode.maximized,
                   ),
                 );
               },
             );
           },
         ),
-        _TitleBarButton(
-          icon: Icons.close,
-          isClose: true,
-          onPressed: () {
-            unawaited(windowService.close());
-          },
-        ),
       ],
-    );
-
-    return AnimatedBuilder(
-      animation: windowService.mode,
-      child: buttonRow,
-      builder: (context, buttons) {
-        final isFullscreen = windowService.mode.value.isFullscreen;
-        final isMaximized = windowService.mode.value.isMaximized;
-        return AnimatedOpacity(
-          opacity: isFullscreen ? 0.0 : 1.0,
-          duration: const Duration(milliseconds: Tokens.durationFullscreenAnim),
-          curve: Curves.easeInOut,
-          child: IgnorePointer(
-            ignoring: isFullscreen,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onPanStart: (_) {
-                unawaited(windowService.startDragging());
-              },
-              onDoubleTap: () {
-                unawaited(
-                  windowService.setMode(
-                    isMaximized ? WindowMode.windowed : WindowMode.maximized,
-                  ),
-                );
-              },
-              child: Container(
-                height: Tokens.titleBarHeight,
-                color: Colors.transparent,
-                child: buttons,
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
 
+// ═══════════════ 通用标题栏按钮 ═══════════════
+
 class _TitleBarButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
-  final bool isClose;
   final bool isActive;
 
   const _TitleBarButton({
     required this.icon,
     required this.onPressed,
-    this.isClose = false,
     this.isActive = false,
   });
 
@@ -139,10 +233,8 @@ class _TitleBarButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            hoverColor: isClose ? Tokens.closeHoverBg : Tokens.titleBarHover,
-            highlightColor: isClose
-                ? Tokens.closePressedBg
-                : Tokens.titleBarPressed,
+            hoverColor: Tokens.titleBarHover,
+            highlightColor: Tokens.titleBarPressed,
             splashColor: Colors.transparent,
             onTap: onPressed,
             child: Icon(icon, size: Tokens.iconSm, color: iconColor),
