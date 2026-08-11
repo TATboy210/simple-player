@@ -144,9 +144,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       child: CustomTitleBar(windowService: widget.windowService),
     );
     _actions = PlayerActions(
-      onPlayPause: widget.controller.togglePlayPause,
-      onSeekBack: widget.controller.skipBack,
-      onSeekForward: widget.controller.skipForward,
+      // actions 保持同一实例以保护 Video subtree identity，但在调用时读取当前
+      // widget，避免 controller replacement 后继续把用户命令发送给旧数据源。
+      onPlayPause: () => widget.controller.togglePlayPause(),
+      onSeekBack: (milliseconds) => widget.controller.skipBack(milliseconds),
+      onSeekForward: (milliseconds) =>
+          widget.controller.skipForward(milliseconds),
       // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
       onStop: () => unawaited(widget.controller.stopCurrentMedia()),
       // 控制栏与快捷键共用空置态的资源释放隔离窗口。
@@ -154,8 +157,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onOpenSubtitle: () => unawaited(_openSubtitle()),
       // SettingsOverlayShell 当前禁用，主设置入口不触发不可见面板。
       onSettings: null,
-      // 保留宿主注入的二级设置菜单，不扩大本次禁用范围。
-      onSettingsSecondary: widget.onSettingsSecondary,
+      // 保留宿主注入的二级设置菜单，不扩大本次禁用范围。调用时读取
+      // widget，避免稳定 actions 在同 State replacement 后保留旧宿主回调。
+      onSettingsSecondary: (context, details) =>
+          widget.onSettingsSecondary?.call(context, details),
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
@@ -165,8 +170,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           entering ? WindowMode.fullscreen : WindowMode.windowed,
         );
       },
-      onFilesDropped: widget.onFilesDropped,
-      onDragHoverChanged: widget.onDragHoverChanged,
+      onFilesDropped: (paths) => widget.onFilesDropped?.call(paths),
+      onDragHoverChanged: (hovering) =>
+          widget.onDragHoverChanged?.call(hovering),
     );
     widget.engine.state.addListener(_syncOpenFileAvailability);
     // Stop 成功会清空活动标题；它也是 hasMedia 从 true 变 false 后的可靠 UI 通知。
@@ -222,6 +228,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _titleBar = RepaintBoundary(
         child: CustomTitleBar(windowService: widget.windowService),
       );
+    }
+
+    // PlayerScreen 自己持有的空置态 listener 也必须随 source 迁移；否则旧
+    // controller/engine 的延迟状态仍会改写新树的打开文件可用性。
+    if (oldWidget.engine != widget.engine ||
+        oldWidget.controller != widget.controller) {
+      oldWidget.engine.state.removeListener(_syncOpenFileAvailability);
+      oldWidget.controller.currentFileName.removeListener(
+        _syncOpenFileAvailability,
+      );
+      widget.engine.state.addListener(_syncOpenFileAvailability);
+      widget.controller.currentFileName.addListener(_syncOpenFileAvailability);
+      _syncOpenFileAvailability();
     }
 
     // probe 同时监听窗口 resize 与 controller 的 rect/id；任一来源替换时
