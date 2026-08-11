@@ -59,4 +59,17 @@
 - Wrap commit:`d4ec8b57 docs(33): defer audio tab — af route unverified; skip P34; wrap v4.5`
 - 技术债:ROADMAP Progress 表 P28-32 标 "Not started" 但实际完成,留作后续校准
 
+## v1.8 播放器 Widget 稳定性与 PC Resize 流畅度 (Started: 2026-08-11)
+
+**Phases planned:** 4 (35–38)
+
+**Goal:** 在不改变播放功能、视觉状态和交互契约的前提下，按组件确认/恢复当前 widget tree，并降低 PC 窗口频繁变换时的 rebuild、layout、raster 和纹理卡顿。
+
+**Key decisions:**
+
+- 保留 `Video.controls → PlayerVideoControls → ControlBar`，不恢复 `ControlsOverlay`。
+- 基于 Git 历史按文件/方法比较，不整体 checkout 或覆盖当前未提交工作树。
+- 采用中等颗粒度 4 阶段：基线恢复、rebuild 边界、渲染/resize、回归与 Windows 性能证据。
+- 验收同时包含自动化行为、Windows profile 帧耗时/jank 和内存稳定性。
+
 ---

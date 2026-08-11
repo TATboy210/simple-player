@@ -104,6 +104,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 状态继续由 PlayerVideoControls 订阅的 stream/listenable 驱动。
   late final PlayerActions _actions;
 
+  /// 缓存标题栏 widget，避免窗口模式或 resize 导致父级 build 时重新创建标题栏子树。
+  ///
+  /// 标题栏内部仍自行监听窗口状态；这里只固定外层 widget identity，缩小无关
+  /// 重建范围，不冻结全屏透明度、置顶图标和最大化图标等必要更新。
+  late Widget _titleBar;
+
   bool get _isEmptyState =>
       widget.engine.state.value == MediaState.idle && !widget.engine.hasMedia;
 
@@ -134,6 +140,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.initState();
     // 稳定化 actions — initState 构造一次,纯播放/项目回调闭包现读 widget 字段
     // 避免陈旧捕获. playModeIcon/Label 已下沉, 不需 l10n/context.
+    _titleBar = RepaintBoundary(
+      child: CustomTitleBar(windowService: widget.windowService),
+    );
     _actions = PlayerActions(
       onPlayPause: widget.controller.togglePlayPause,
       onSeekBack: widget.controller.skipBack,
@@ -168,6 +177,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // 拖窗纹理重建诊断 — 并联 ResizeFrameMetrics，分类只描述 Dart 侧
     // controller 信号。测试渲染面没有 controller 时仍创建 probe，以输出
     // probeUnavailable 摘要而非将观测源缺失误记成无信号变化。
+    _createTextureProbe();
+  }
+
+  /// 创建与当前窗口桥和视频控制器绑定的 resize 诊断探针。
+  void _createTextureProbe() {
     final controller = widget.mediaKitController;
     _textureProbe = VideoTextureResizeProbe(
       isResizing: widget.windowService.isResizing,
@@ -200,6 +214,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant PlayerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.windowService != widget.windowService) {
+      // WindowBridge 是标题栏和 resize probe 的外部依赖；替换时一起迁移，
+      // 避免稳定 widget identity 继续持有旧窗口服务的 notifier。
+      _titleBar = RepaintBoundary(
+        child: CustomTitleBar(windowService: widget.windowService),
+      );
+    }
+
+    // probe 同时监听窗口 resize 与 controller 的 rect/id；任一来源替换时
+    // 都必须解除旧监听，否则诊断会把新窗口会话与旧纹理状态混合。
+    if (oldWidget.windowService != widget.windowService ||
+        oldWidget.mediaKitController != widget.mediaKitController) {
+      _textureProbe?.dispose();
+      _createTextureProbe();
+    }
+  }
+
+  @override
   void dispose() {
     _openFileDelayTimer?.cancel();
     // 探针先于其余 listener 移除 — 它监听 windowService.isResizing 与
@@ -229,12 +263,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           backgroundColor: Tokens.bgBase,
           body: Column(
             children: [
-              // RepaintBoundary: resize 期间根 layout 变, 标题栏内容静态
-              // (标题+4按钮, mode/isAlwaysOnTop 不变则不重建), layer 复用
-              // 跳过 repaint — 与视频内容和设置覆盖层的隔离模式一致。
-              RepaintBoundary(
-                child: CustomTitleBar(windowService: widget.windowService),
-              ),
+              // 标题栏 widget identity 在 initState 固定；窗口模式变化只更新
+              // 标题栏内部真正依赖 mode 的局部节点，不重建整棵标题栏子树。
+              _titleBar,
               Expanded(
                 child: Stack(
                   children: [

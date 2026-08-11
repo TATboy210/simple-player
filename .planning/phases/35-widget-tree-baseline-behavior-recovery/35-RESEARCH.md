@@ -433,17 +433,17 @@ final newBridge = FakeWindowService();
 | A2 | headless 全套件约 57 项 `mdk.dll` 失败为既有问题。 | Headless FFI 注意事项 | 若未在干净基线复跑就豁免，可能掩盖真实回归。 |
 | A3 | 完整 `flutter test` 中的 FFI 失败应采用 stash/re-run 对比隔离。 | Headless FFI 注意事项 | 需要执行者按当日环境重新验证基线。 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **WindowBridge replacement 是只测 PlayerScreen 标题栏，还是连 `PlayerActions`/keyboard 闭包一起测？**
    - What we know: `_actions` 是 `initState` 一次构造，但其 fullscreen closure 每次调用读取 `widget.windowService`；标题栏有明确 cache replacement 代码。[VERIFIED: lib/ui/player/player_screen.dart:101-105, 143-170, 212-220]
    - What's unclear: 目前没有同一 State bridge replacement 的 widget test。
-   - Recommendation: 一个 PlayerScreen integration-style widget test 同时覆盖 title bar 点击和 F 键切换 mode，断言均只影响 replacement bridge。[ASSUMED]
+   - RESOLVED: 35-02 任务 1 在同一 PlayerScreen State 的 replacement 测试中同时覆盖标题栏交互、拖拽和 F 键；不另建隔离的 CustomTitleBar 测试。[PLAN: 35-02-PLAN.md 任务 1]
 
 2. **真实 media_kit fullscreen route 是否应纳入 Phase 35 自动化？**
    - What we know: fake-port tests 已验证 route-local 方法选择；真实 native surface 在 headless 环境不可靠。[VERIFIED: test/widget/player/player_video_controls_test.dart:885-926; lib/ui/player/player_screen.dart:28-42]
    - What's unclear: Windows GUI 可用性与 media_kit route 是否可在 CI 稳定驱动。
-   - Recommendation: Phase 35 锁 fake-port 合约，Phase 38 以 Windows 手测/profile 作为真实 route evidence。[ASSUMED]
+   - RESOLVED: Phase 35 只以 fake-port/injected-surface 自动化契约为门；真实 Windows fullscreen route 的手测/profile 明确留给 Phase 38，不纳入 headless gate。[PLAN: 35-01-PLAN.md 任务 2; ROADMAP.md Phase 38]
 
 ## Sources
 

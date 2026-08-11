@@ -54,6 +54,9 @@ class CenterGroup extends StatelessWidget {
   final void Function(int ms) onSeekForward;
   final bool isIdle;
 
+  /// 播放器路径使用此监听器，将 idle 变化限制在中央按钮组。
+  final ValueListenable<bool>? isIdleListenable;
+
   /// 停止并卸载当前媒体的项目层收尾入口。
   final VoidCallback? onStop;
 
@@ -64,7 +67,53 @@ class CenterGroup extends StatelessWidget {
     required this.onSeekBack,
     required this.onSeekForward,
     required this.isIdle,
+    this.isIdleListenable,
     this.onStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final listenable = isIdleListenable;
+    final content = _CenterGroupContent(
+      isPlaying: isPlaying,
+      onPlayPause: onPlayPause,
+      onSeekBack: onSeekBack,
+      onSeekForward: onSeekForward,
+      isIdle: isIdle,
+      onStop: onStop,
+    );
+    if (listenable == null) return content;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: listenable,
+      builder: (_, value, _) => _CenterGroupContent(
+        isPlaying: isPlaying,
+        onPlayPause: onPlayPause,
+        onSeekBack: onSeekBack,
+        onSeekForward: onSeekForward,
+        isIdle: value,
+        onStop: onStop,
+      ),
+    );
+  }
+}
+
+/// 中央控制组的局部内容，避免在 View 中使用构建辅助方法。
+class _CenterGroupContent extends StatelessWidget {
+  final ValueListenable<bool> isPlaying;
+  final VoidCallback onPlayPause;
+  final void Function(int ms) onSeekBack;
+  final void Function(int ms) onSeekForward;
+  final bool isIdle;
+  final VoidCallback? onStop;
+
+  const _CenterGroupContent({
+    required this.isPlaying,
+    required this.onPlayPause,
+    required this.onSeekBack,
+    required this.onSeekForward,
+    required this.isIdle,
+    required this.onStop,
   });
 
   @override

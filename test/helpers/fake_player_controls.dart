@@ -30,21 +30,69 @@ class FakePlayerControls implements PlayerPort {
   final StreamController<double> _rate = StreamController<double>.broadcast();
 
   @override
-  Stream<bool> get playing => _playing.stream;
+  Stream<bool> get playing {
+    streamListenAccessCount++;
+    return _playing.stream;
+  }
+
   @override
-  Stream<bool> get buffering => _buffering.stream;
+  Stream<bool> get buffering {
+    streamListenAccessCount++;
+    return _buffering.stream;
+  }
+
   @override
-  Stream<bool> get completed => _completed.stream;
+  Stream<bool> get completed {
+    streamListenAccessCount++;
+    return _completed.stream;
+  }
+
   @override
-  Stream<Duration> get position => _position.stream;
+  Stream<Duration> get position {
+    streamListenAccessCount++;
+    return _position.stream;
+  }
+
   @override
-  Stream<Duration> get duration => _duration.stream;
+  Stream<Duration> get duration {
+    streamListenAccessCount++;
+    return _duration.stream;
+  }
+
   @override
-  Stream<Duration> get buffer => _buffer.stream;
+  Stream<Duration> get buffer {
+    streamListenAccessCount++;
+    return _buffer.stream;
+  }
+
   @override
-  Stream<double> get volume => _volume.stream;
+  Stream<double> get volume {
+    streamListenAccessCount++;
+    return _volume.stream;
+  }
+
   @override
-  Stream<double> get rate => _rate.stream;
+  Stream<double> get rate {
+    streamListenAccessCount++;
+    return _rate.stream;
+  }
+
+  /// 记录 [PlayerControlsState] 对各 stream 建立监听的次数。
+  ///
+  /// 生命周期 reparent 不应重新初始化 controls state；因此该计数在多次
+  /// deactivate/activate 后应保持不变，source replacement 后新 port 应只增加一轮。
+  int streamListenAccessCount = 0;
+
+  /// 暴露订阅状态，验证 source replacement/dispose 是否真正解绑 stream。
+  bool get hasListeners =>
+      _playing.hasListener ||
+      _buffering.hasListener ||
+      _completed.hasListener ||
+      _position.hasListener ||
+      _duration.hasListener ||
+      _buffer.hasListener ||
+      _volume.hasListener ||
+      _rate.hasListener;
 
   // ─── 初始快照(非 final,测试可改)───
   @override

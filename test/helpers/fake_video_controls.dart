@@ -10,16 +10,27 @@ import 'fake_player_controls.dart';
 final class FakeVideoControlsPort implements VideoControlsPort {
   FakeVideoControlsPort({
     FakePlayerControls? player,
-    this.isFullscreen = false,
+    bool isFullscreen = false,
     this.isMounted = true,
     this.subtitlePadding = EdgeInsets.zero,
-  }) : player = player ?? FakePlayerControls();
+  }) : _isFullscreen = isFullscreen,
+       player = player ?? FakePlayerControls();
 
   @override
   final FakePlayerControls player;
 
+  bool _isFullscreen;
+
+  /// 记录 fullscreen 状态读取，便于验证 lifecycle guard 不查询 inactive VideoState。
+  int isFullscreenReadCount = 0;
+
   @override
-  bool isFullscreen;
+  bool get isFullscreen {
+    isFullscreenReadCount++;
+    return _isFullscreen;
+  }
+
+  set isFullscreen(bool value) => _isFullscreen = value;
 
   @override
   bool isMounted;
@@ -29,7 +40,9 @@ final class FakeVideoControlsPort implements VideoControlsPort {
 
   int toggleFullscreenCallCount = 0;
   int exitFullscreenCallCount = 0;
+  int subtitlePaddingCallCount = 0;
   EdgeInsets? lastSubtitlePadding;
+  final List<EdgeInsets> subtitlePaddingHistory = <EdgeInsets>[];
 
   @override
   void toggleFullscreen() {
@@ -43,7 +56,10 @@ final class FakeVideoControlsPort implements VideoControlsPort {
 
   @override
   void setSubtitleViewPadding(EdgeInsets padding) {
+    subtitlePaddingCallCount++;
     lastSubtitlePadding = padding;
+    subtitlePadding = padding;
+    subtitlePaddingHistory.add(padding);
   }
 
   /// 关闭 fake Player 的全部 broadcast stream。

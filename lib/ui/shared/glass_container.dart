@@ -266,7 +266,8 @@ class _GlassButtonState extends State<GlassButton>
   // 惰性缓存动作，避免生命周期恢复时读取未初始化字段，也避免每次 build
   // 重复分配 CallbackAction 和闭包。
   CallbackAction<ActivateIntent>? _activateAction;
-  bool _focused = false;
+  late final Map<Type, Action<Intent>> _actions;
+  late final ValueNotifier<bool> _focusedNotifier;
 
   CallbackAction<ActivateIntent> get _effectiveActivateAction =>
       _activateAction ??= CallbackAction<ActivateIntent>(
@@ -304,10 +305,15 @@ class _GlassButtonState extends State<GlassButton>
     );
     _scaleAnim = _scaleController;
     _internalFocusNode = FocusNode();
+    // 动作映射在状态生命周期内复用，避免按钮每次重建时重新分配。
+    _actions = <Type, Action<Intent>>{ActivateIntent: _effectiveActivateAction};
+    // 焦点边框使用独立监听器，避免焦点变化重建完整按钮内容。
+    _focusedNotifier = ValueNotifier<bool>(false);
   }
 
   @override
   void dispose() {
+    _focusedNotifier.dispose();
     _internalFocusNode.dispose();
     _scaleController.dispose();
     super.dispose();
@@ -335,8 +341,8 @@ class _GlassButtonState extends State<GlassButton>
 
   /// 同步焦点高亮，且把状态通知给需要组合视觉的调用方。
   void _handleFocusChanged(bool focused) {
-    if (_focused == focused) return;
-    setState(() => _focused = focused);
+    if (_focusedNotifier.value == focused) return;
+    _focusedNotifier.value = focused;
     widget.onFocusChange?.call(focused);
   }
 
@@ -344,17 +350,21 @@ class _GlassButtonState extends State<GlassButton>
   Widget _buildInteractive(Widget child) {
     final semanticLabel =
         widget.semanticsLabel ?? widget.tooltip ?? widget.label;
-    // 边框绘制在既有边界内；透明时仍占用同一绘制槽位，焦点切换不改变布局。
-    final decoratedChild = DecoratedBox(
-      position: DecorationPosition.foreground,
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: _focused ? Tokens.controlBarBorderWhite : Colors.transparent,
-          width: 1,
+    // 边框监听器只重建前景装饰，按钮内容、语义和命中区域保持不变。
+    final decoratedChild = ValueListenableBuilder<bool>(
+      valueListenable: _focusedNotifier,
+      builder: (context, focused, child) => DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: focused ? Tokens.controlBarBorderWhite : Colors.transparent,
+            width: 1,
+          ),
+          borderRadius: widget._isIconOnly
+              ? GlassButton._radiusBtn
+              : GlassButton._radiusIcon,
         ),
-        borderRadius: widget._isIconOnly
-            ? GlassButton._radiusBtn
-            : GlassButton._radiusIcon,
+        child: child,
       ),
       child: child,
     );
@@ -381,7 +391,7 @@ class _GlassButtonState extends State<GlassButton>
       // 将快捷键绑定在拥有焦点的探测器上，确保事件在到达全局播放器
       // 快捷键之前被转换为本地 ActivateIntent 并消费。
       shortcuts: _shortcuts,
-      actions: <Type, Action<Intent>>{ActivateIntent: _effectiveActivateAction},
+      actions: _actions,
       child: semantics,
     );
   }

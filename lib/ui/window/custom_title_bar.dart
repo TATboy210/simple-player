@@ -30,8 +30,8 @@ class CustomTitleBar extends StatefulWidget {
 
 class _CustomTitleBarState extends State<CustomTitleBar> {
   /// 静态按钮行（标题 + pin + minimize + close）在 initState 中构建一次，
-  /// 之后每次 build 复用同一实例，避免重复创建相同的 ConstWidget 子树。
-  late final Widget _staticTitleRow;
+  /// 之后每次 build 复用同一实例；WindowBridge 替换时重新绑定依赖。
+  late Widget _staticTitleRow;
 
   @override
   void initState() {
@@ -186,7 +186,10 @@ class _DynamicTitleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        staticTitleRow,
+        // 外层 Row 必须先分配有限宽度，内层静态标题行才能安全使用 Spacer。
+        // 测试装配和部分桌面窗口过渡路径可能提供可收缩约束，直接传递子树
+        // 会让内层 Row 收到无界宽度并触发 RenderFlex assertion。
+        Expanded(child: staticTitleRow),
         // 最大化按钮 — 独立监听模式变更，仅在 isMaximized 翻转时更新图标。
         ValueListenableBuilder<WindowMode>(
           valueListenable: windowService.mode,

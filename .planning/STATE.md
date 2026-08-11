@@ -1,37 +1,37 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.5
-milestone_name: milestone
-current_phase: 33
-current_phase_name: null
-status: milestone_closed
-stopped_at: context exhaustion at 97% (2026-08-09)
-last_updated: "2026-08-09T15:22:16.687Z"
-last_activity: 2026-07-30
-last_activity_desc: v4.5 wrap-up
+milestone: v1.8
+milestone_name: 播放器 Widget 稳定性与 PC Resize 流畅度
+current_phase: 35
+current_phase_name: Widget Tree Baseline & Behavior Recovery
+status: planned
+stopped_at: context exhaustion at 75% (2026-08-11)
+last_updated: "2026-08-11T10:49:01.461Z"
+last_activity: 2026-08-11
+last_activity_desc: v1.8 widget rebuild milestone defined
 progress:
-  total_phases: 7
-  completed_phases: 5
-  total_plans: 16
-  completed_plans: 15
-  percent: 71
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 3
+  percent: 25
 ---
 
-# Project State: 播放内核重构强化 (expanded)
+# Project State: 播放器 Widget 稳定性与 PC Resize 流畅度
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-14)
+See: .planning/PROJECT.md (updated 2026-08-11)
 
-**Core value:** 播放内核的健壮性与可扩展性 — 引擎抽象清晰、状态一致、错误恢复可靠、新功能易于接入。Widget↔Kernel 边界清晰、API 统一、可测试。
-**Current focus:** v4.5 milestone CLOSED — P33 deferred (af route unverified), P34 skipped (2026-07-30). Next: `/gsd-new-milestone` or resume P33 (1-line `af`→`audio.avfilter` fix + 真机听感).
+**Core value:** 保持播放器主要功能、视觉状态和交互契约不变，同时降低 PC 窗口频繁变换时的 widget rebuild、布局和渲染卡顿。
+**Current focus:** Phase 35 plans reviewed; next `/gsd-execute-phase 35`。
 
 ## Current Position
 
-Phase: 33 (audio-settings-tab) — CLOSED (deferred, af route unverified)
-Plan: 1 of 3 (deferred)
-Status: v4.5 milestone closed (P33 deferred, P34 skipped, 2026-07-30)
-Last activity: 2026-07-30 — v4.5 wrap-up
+Phase: 35 (Widget Tree Baseline & Behavior Recovery) — PLANNED
+Plan: 0 of 3
+Status: plans reviewed; ready to execute
+Last activity: 2026-08-11 — Phase 35 plan review revised dependency, validation, and FFI isolation gates
 
 ## Performance Metrics
 
@@ -91,13 +91,16 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Phase 35：完成基于本地 Git widget tree 的行为基线与高风险回归测试。
+- 检查未追踪截图用途；未经确认不删除、不提交。
+- 保持当前未提交源码增量，不执行整体 reset 或历史 tree 覆盖。
 
 ### Blockers/Concerns
 
-- 状态机转换矩阵遗漏风险 — 9 状态 ~40 条边需要穷举验证
-- mdk 回调线程安全时序窗口 — generation 计数器方案待验证
-- Service 层迁移后 import 路径变更影响范围待评估
+- 当前工作树包含播放器 widget、测试和 `.planning` 未提交改动，后续历史应用必须文件/方法级。
+- `GlassButton` action cache 是否会持有旧 callback，需要 Phase 35 定点验证。
+- `PlayerVideoControls.updateSources()`、reparent 和 subtitle padding 生命周期需要继续验证。
+- Windows profile 才能最终确认 BackdropFilter、texture resize 和窗口模式过渡的 raster 峰值。
 
 ## Deferred Items
 
@@ -114,9 +117,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-08-09T15:22:16.462Z
-Stopped at: context exhaustion at 97% (2026-08-09)
-Resume file: None (next action = finish post-PASS: cleanup 4 checkpoints + commit, then /gsd-execute-phase 32)
+Last session: 2026-08-11T10:49:01.413Z
+Stopped at: context exhaustion at 75% (2026-08-11)
+Resume file: None (next action = `/gsd-plan-phase 35`)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 

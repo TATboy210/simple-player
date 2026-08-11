@@ -30,7 +30,9 @@ void main() {
                   tooltip: tooltip,
                   isPrimary: isPrimary,
                   enabled: enabled,
-                  onPressed: allowNullOnPressed ? onPressed : (onPressed ?? () {}),
+                  onPressed: allowNullOnPressed
+                      ? onPressed
+                      : (onPressed ?? () {}),
                   onSecondaryTapUp: onSecondaryTapUp,
                   iconSize: iconSize,
                   color: color,
@@ -43,7 +45,9 @@ void main() {
                   tooltip: tooltip,
                   isPrimary: isPrimary,
                   enabled: enabled,
-                  onPressed: allowNullOnPressed ? onPressed : (onPressed ?? () {}),
+                  onPressed: allowNullOnPressed
+                      ? onPressed
+                      : (onPressed ?? () {}),
                   onSecondaryTapUp: onSecondaryTapUp,
                   iconSize: iconSize,
                   color: color,
@@ -93,7 +97,19 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.play_arrow));
+      // Disabled buttons deliberately ignore hit testing; assert the implementation
+      // contract before suppressing the expected test-framework miss warning.
+      final icon = find.byIcon(Icons.play_arrow);
+      final disabledHitBlocker = find.byWidgetPredicate(
+        (widget) => widget is IgnorePointer && widget.ignoring,
+      );
+      expect(
+        find.descendant(of: disabledHitBlocker, matching: icon),
+        findsOneWidget,
+      );
+      final inkWell = find.ancestor(of: icon, matching: find.byType(InkWell));
+      expect(tester.widget<InkWell>(inkWell).onTap, isNull);
+      await tester.tap(icon, warnIfMissed: false);
       expect(tapCount, 0);
     });
 
@@ -156,7 +172,9 @@ void main() {
       expect(activationCount, 1);
     });
 
-    testWidgets('uses the latest onPressed callback after rebuild', (tester) async {
+    testWidgets('uses the latest onPressed callback after rebuild', (
+      tester,
+    ) async {
       var firstActivationCount = 0;
       var secondActivationCount = 0;
       final focusNode = FocusNode();
@@ -417,8 +435,126 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.text('Open File'));
+      // Disabled buttons intentionally reject pointer hit tests.
+      await tester.tap(find.text('Open File'), warnIfMissed: false);
       expect(tapCount, 0);
+    });
+
+    testWidgets('uses the latest onPressed callback after rebuild', (
+      tester,
+    ) async {
+      var firstActivationCount = 0;
+      var secondActivationCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.folder_open,
+          label: 'Open File',
+          focusNode: focusNode,
+          onPressed: () => firstActivationCount++,
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.folder_open,
+          label: 'Open File',
+          focusNode: focusNode,
+          onPressed: () => secondActivationCount++,
+        ),
+      );
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+
+      expect(firstActivationCount, 1);
+      expect(secondActivationCount, 1);
+    });
+
+    testWidgets('disabled rebuild blocks tap and keyboard activation', (
+      tester,
+    ) async {
+      var activationCount = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.folder_open,
+          label: 'Open File',
+          focusNode: focusNode,
+          onPressed: () => activationCount++,
+        ),
+      );
+      focusNode.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+
+      await tester.pumpWidget(
+        buildSubject(
+          icon: Icons.folder_open,
+          label: 'Open File',
+          enabled: false,
+          focusNode: focusNode,
+          onPressed: () => activationCount++,
+        ),
+      );
+      await tester.pump();
+      // Disabled buttons intentionally reject pointer hit tests.
+      await tester.tap(find.text('Open File'), warnIfMissed: false);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+
+      expect(activationCount, 1);
+    });
+
+    testWidgets('null onPressed rebuild exposes disabled semantics', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      try {
+        await tester.pumpWidget(
+          buildSubject(
+            icon: Icons.folder_open,
+            label: 'Open File',
+            focusNode: focusNode,
+            semanticsLabel: 'Open file action',
+            onPressed: () {},
+          ),
+        );
+        focusNode.requestFocus();
+        await tester.pump();
+
+        await tester.pumpWidget(
+          buildSubject(
+            icon: Icons.folder_open,
+            label: 'Open File',
+            allowNullOnPressed: true,
+            focusNode: focusNode,
+            semanticsLabel: 'Open file action',
+            onPressed: null,
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('Open file action')),
+          matchesSemantics(
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: false,
+            hasTapAction: false,
+          ),
+        );
+      } finally {
+        semantics.dispose();
+      }
     });
   });
 }
