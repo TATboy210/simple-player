@@ -10,10 +10,7 @@ library;
 /// Single RSS sample with timestamp. Pure data, immutable.
 class MetricSample {
   /// 构造 — 必填 rssBytes 和 timestamp。
-  const MetricSample({
-    required this.rssBytes,
-    required this.timestamp,
-  });
+  const MetricSample({required this.rssBytes, required this.timestamp});
 
   /// 本次采样 RSS 字节数。
   final int rssBytes;
@@ -23,9 +20,9 @@ class MetricSample {
 
   /// 序列化为 JSON 兼容 Map。
   Map<String, Object> toJson() => {
-        'rssBytes': rssBytes,
-        'timestamp': timestamp.toIso8601String(),
-      };
+    'rssBytes': rssBytes,
+    'timestamp': timestamp.toIso8601String(),
+  };
 }
 
 /// 内存快照 — 当前值、峰值、增长量、采样历史、时间戳。
@@ -59,13 +56,13 @@ class MemorySnapshot {
 
   /// 序列化为 JSON 兼容 Map — 含计算字段 rssMB/maxRssMB/historyCount。
   Map<String, Object> toJson() => {
-        'rssBytes': rssBytes,
-        'maxRssBytes': maxRssBytes,
-        'deltaBytes': deltaBytes,
-        'rssMB': (rssBytes / (1024 * 1024)).toStringAsFixed(1),
-        'maxRssMB': (maxRssBytes / (1024 * 1024)).toStringAsFixed(1),
-        'historyCount': history.length,
-        'history': history.map((s) => s.toJson()).toList(),
-        'timestamp': timestamp.toIso8601String(),
-      };
+    'rssBytes': rssBytes,
+    'maxRssBytes': maxRssBytes,
+    'deltaBytes': deltaBytes,
+    'rssMB': (rssBytes / (1024 * 1024)).toStringAsFixed(1),
+    'maxRssMB': (maxRssBytes / (1024 * 1024)).toStringAsFixed(1),
+    'historyCount': history.length,
+    'history': history.map((s) => s.toJson()).toList(),
+    'timestamp': timestamp.toIso8601String(),
+  };
 }

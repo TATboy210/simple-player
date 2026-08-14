@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/app_dialog.dart';
+import '../shared/app_tooltip.dart';
 
 /// Media info dialog — displays technical metadata of the current media file.
 ///
@@ -198,7 +199,7 @@ class _CopyableRow extends StatelessWidget {
                   ),
                 );
               },
-              child: Tooltip(
+              child: AppTooltip(
                 message: l10n.doubleClickToCopy,
                 child: Text(
                   value,

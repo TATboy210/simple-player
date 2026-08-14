@@ -126,38 +126,37 @@ void main() {
     // 首次纹理资源未释放时 5s 超时 → textureFailed。盲目"重试"同一文件会
     // 触发资源竞争再超时，故引导"选择其他文件"跳出死循环。
     // 双重断言：①回调路由到 onOpenFile（非 onRetry）②文案"Select Other File"（非"Retry"）
-    testWidgets(
-      'routes textureFailed to onOpenFile with selectOtherFile label',
-      (tester) async {
-        var opened = false;
-        var retried = false;
-        engine.state.value = MediaState.error;
-        engine.lastError.value = PlaybackError(
-          PlaybackErrorCode.textureFailed,
-          'raw message ignored',
-        );
-        await tester.pumpWidget(
-          buildSubject(
-            onOpenFile: () => opened = true,
-            onRetry: () => retried = true,
-          ),
-        );
+    testWidgets('routes textureFailed to onOpenFile with selectOtherFile label', (
+      tester,
+    ) async {
+      var opened = false;
+      var retried = false;
+      engine.state.value = MediaState.error;
+      engine.lastError.value = PlaybackError(
+        PlaybackErrorCode.textureFailed,
+        'raw message ignored',
+      );
+      await tester.pumpWidget(
+        buildSubject(
+          onOpenFile: () => opened = true,
+          onRetry: () => retried = true,
+        ),
+      );
 
-        // ERR-04: l10nKey 'error.playback.textureFailed' → ARB 'Video rendering failed'
-        expect(find.text('Video rendering failed'), findsOneWidget);
-        final button = find.byType(TextButton);
-        expect(button, findsOneWidget);
+      // ERR-04: l10nKey 'error.playback.textureFailed' → ARB 'Video rendering failed'
+      expect(find.text('Video rendering failed'), findsOneWidget);
+      final button = find.byType(TextButton);
+      expect(button, findsOneWidget);
 
-        // Assert ②：按钮文案是"Select Other File"，不是"Retry"
-        expect(find.text('Select Other File'), findsOneWidget);
-        expect(find.text('Retry'), findsNothing);
+      // Assert ②：按钮文案是"Select Other File"，不是"Retry"
+      expect(find.text('Select Other File'), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
 
-        // Act：点击按钮 → Assert ①：路由到 onOpenFile，绝不触发 onRetry
-        await tester.tap(button);
-        expect(opened, isTrue);
-        expect(retried, isFalse);
-      },
-    );
+      // Act：点击按钮 → Assert ①：路由到 onOpenFile，绝不触发 onRetry
+      await tester.tap(button);
+      expect(opened, isTrue);
+      expect(retried, isFalse);
+    });
 
     // ERR-04: 每个错误子类型都显示正确的本地化消息
     group('l10nKey translation — each error type', () {
@@ -165,10 +164,7 @@ void main() {
         tester,
       ) async {
         engine.state.value = MediaState.error;
-        engine.lastError.value = FileError(
-          FileErrorCode.pathEmpty,
-          'raw',
-        );
+        engine.lastError.value = FileError(FileErrorCode.pathEmpty, 'raw');
         await tester.pumpWidget(buildSubject());
         expect(find.text('File path is empty'), findsOneWidget);
       });
@@ -177,10 +173,7 @@ void main() {
         tester,
       ) async {
         engine.state.value = MediaState.error;
-        engine.lastError.value = FileError(
-          FileErrorCode.pathTraversal,
-          'raw',
-        );
+        engine.lastError.value = FileError(FileErrorCode.pathTraversal, 'raw');
         await tester.pumpWidget(buildSubject());
         expect(find.text('Invalid file path'), findsOneWidget);
       });
@@ -189,10 +182,7 @@ void main() {
         tester,
       ) async {
         engine.state.value = MediaState.error;
-        engine.lastError.value = CodecError(
-          CodecErrorCode.decodeFailed,
-          'raw',
-        );
+        engine.lastError.value = CodecError(CodecErrorCode.decodeFailed, 'raw');
         await tester.pumpWidget(buildSubject());
         expect(find.text('Failed to decode media'), findsOneWidget);
       });
@@ -237,10 +227,7 @@ void main() {
         tester,
       ) async {
         engine.state.value = MediaState.error;
-        engine.lastError.value = NetworkError(
-          NetworkErrorCode.timeout,
-          'raw',
-        );
+        engine.lastError.value = NetworkError(NetworkErrorCode.timeout, 'raw');
         await tester.pumpWidget(buildSubject());
         expect(find.text('Network timeout'), findsOneWidget);
       });

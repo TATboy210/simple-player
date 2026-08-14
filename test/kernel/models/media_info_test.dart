@@ -60,11 +60,7 @@ void main() {
 
   group('SubtitleTrackInfo', () {
     test('toString includes index, language, title', () {
-      const track = SubtitleTrackInfo(
-        index: 0,
-        language: 'chi',
-        title: '简体中文',
-      );
+      const track = SubtitleTrackInfo(index: 0, language: 'chi', title: '简体中文');
       expect(track.toString(), 'SubtitleTrack(0, chi, 简体中文)');
     });
 

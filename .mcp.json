@@ -8,6 +8,17 @@
       "cwd": "D:\\simple_player_flutter",
       "env": { "PYTHONUTF8": "1" },
       "type": "stdio"
+    },
+    "marionette": {
+      "command": "dart",
+      "args": [
+        "pub",
+        "global",
+        "run",
+        "marionette_mcp"
+      ],
+      "cwd": "D:\\simple_player_flutter",
+      "type": "stdio"
     }
   }
 }

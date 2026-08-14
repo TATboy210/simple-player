@@ -66,11 +66,7 @@ void main() {
       // gen1 open → playing(第一个文件加载成功).
       final gen1 = machine.nextGeneration();
       machine.transitionTo(MediaState.opening, 'open1', generation: gen1);
-      machine.transitionTo(
-        MediaState.playing,
-        'gen1-loaded',
-        generation: gen1,
-      );
+      machine.transitionTo(MediaState.playing, 'gen1-loaded', generation: gen1);
       expect(machine.state.value, MediaState.playing);
 
       // 用户在 playing 中 seek — playing→playing 同值,setter 无条件写入
@@ -84,19 +80,11 @@ void main() {
       machine.transitionTo(MediaState.opening, 'open2', generation: gen2);
 
       // gen1 的 late 回调到达 — stale,拒绝.
-      machine.transitionTo(
-        MediaState.playing,
-        'gen1-late',
-        generation: gen1,
-      );
+      machine.transitionTo(MediaState.playing, 'gen1-late', generation: gen1);
       expect(machine.state.value, MediaState.opening);
 
       // gen2 完成加载 → playing.
-      machine.transitionTo(
-        MediaState.playing,
-        'gen2-loaded',
-        generation: gen2,
-      );
+      machine.transitionTo(MediaState.playing, 'gen2-loaded', generation: gen2);
       expect(machine.state.value, MediaState.playing);
 
       machine.dispose();
@@ -143,27 +131,15 @@ void main() {
 
       // gen2 的 opening 到达(带 generation)— setter 无条件写入 opening.
       // 旧设计会因 paused→opening 非法而拒绝;新设计由调用方 guard 负责.
-      machine.transitionTo(
-        MediaState.opening,
-        'open2',
-        generation: gen2,
-      );
+      machine.transitionTo(MediaState.opening, 'open2', generation: gen2);
       expect(machine.state.value, MediaState.opening);
 
       // gen2 完成.
-      machine.transitionTo(
-        MediaState.playing,
-        'play2',
-        generation: gen2,
-      );
+      machine.transitionTo(MediaState.playing, 'play2', generation: gen2);
       expect(machine.state.value, MediaState.playing);
 
       // gen1 的 late 回调被拒绝.
-      machine.transitionTo(
-        MediaState.playing,
-        'play1-late',
-        generation: gen1,
-      );
+      machine.transitionTo(MediaState.playing, 'play1-late', generation: gen1);
       // 最终状态来自 gen2,stale gen1 不影响.
       expect(machine.state.value, MediaState.playing);
 

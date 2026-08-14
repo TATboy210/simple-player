@@ -37,8 +37,11 @@ void main() {
       final withoutCause = FileError(FileErrorCode.pathEmpty, 'err');
       expect(withoutCause.cause, isNull);
 
-      final withCause =
-          FileError(FileErrorCode.pathEmpty, 'err', Exception('bad'));
+      final withCause = FileError(
+        FileErrorCode.pathEmpty,
+        'err',
+        Exception('bad'),
+      );
       expect(withCause.cause, isA<Exception>());
     });
 
@@ -151,7 +154,11 @@ void main() {
     test('CodecError: all codes are not fatal', () {
       for (final code in CodecErrorCode.values) {
         final error = CodecError(code, 'e');
-        expect(error.isFatal, isFalse, reason: '${code.name} should be fatal=false');
+        expect(
+          error.isFatal,
+          isFalse,
+          reason: '${code.name} should be fatal=false',
+        );
       }
     });
 
@@ -163,13 +170,20 @@ void main() {
     test('PlaybackError: other codes are not fatal', () {
       expect(PlaybackError(PlaybackErrorCode.playFailed, 'e').isFatal, isFalse);
       expect(PlaybackError(PlaybackErrorCode.seekFailed, 'e').isFatal, isFalse);
-      expect(PlaybackError(PlaybackErrorCode.openTimeout, 'e').isFatal, isFalse);
+      expect(
+        PlaybackError(PlaybackErrorCode.openTimeout, 'e').isFatal,
+        isFalse,
+      );
     });
 
     test('NetworkError: all codes are not fatal', () {
       for (final code in NetworkErrorCode.values) {
         final error = NetworkError(code, 'e');
-        expect(error.isFatal, isFalse, reason: '${code.name} should be fatal=false');
+        expect(
+          error.isFatal,
+          isFalse,
+          reason: '${code.name} should be fatal=false',
+        );
       }
     });
 
@@ -254,8 +268,10 @@ void main() {
       final codecError = CodecError(CodecErrorCode.decodeFailed, 'no context');
       expect(codecError.context, isNull);
 
-      final playbackError =
-          PlaybackError(PlaybackErrorCode.playFailed, 'no context');
+      final playbackError = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        'no context',
+      );
       expect(playbackError.context, isNull);
 
       final networkError = NetworkError(NetworkErrorCode.timeout, 'no context');
@@ -267,7 +283,12 @@ void main() {
 
     test('errors with context carry it', () {
       final ctx = ErrorContext(action: 'open', module: 'MediaKitEngine');
-      final error = FileError(FileErrorCode.fileNotFound, 'not found', null, ctx);
+      final error = FileError(
+        FileErrorCode.fileNotFound,
+        'not found',
+        null,
+        ctx,
+      );
 
       expect(error.context, isNotNull);
       expect(error.context?.action, 'open');

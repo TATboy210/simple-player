@@ -14,16 +14,23 @@ void main() {
       // glassBorderIdle 是 idle 状态的微妙边框
       final alpha = alphaOf(Tokens.glassBorderIdle);
       // 3% of 255 = 7.65
-      expect(alpha, greaterThanOrEqualTo(8),
-          reason: 'glassBorderIdle alpha=$alpha (${(alpha / 255 * 100).toStringAsFixed(1)}%) must be >= 3%');
+      expect(
+        alpha,
+        greaterThanOrEqualTo(8),
+        reason:
+            'glassBorderIdle alpha=$alpha (${(alpha / 255 * 100).toStringAsFixed(1)}%) must be >= 3%',
+      );
     });
 
     test('playing border alpha > idle border alpha', () {
       // controlBarBorderWhite (playing) 应比 controlBarBorderIdle (idle) 更明显
       final playing = alphaOf(Tokens.controlBarBorderWhite);
       final idle = alphaOf(Tokens.controlBarBorderIdle);
-      expect(playing, greaterThan(idle),
-          reason: 'playing=$playing > idle=$idle (fix visibility inversion)');
+      expect(
+        playing,
+        greaterThan(idle),
+        reason: 'playing=$playing > idle=$idle (fix visibility inversion)',
+      );
     });
 
     test('all controlBar border tokens alpha >= 2%', () {
@@ -35,8 +42,12 @@ void main() {
         'glassBorderIdle': alphaOf(Tokens.glassBorderIdle),
       };
       for (final entry in borders.entries) {
-        expect(entry.value, greaterThanOrEqualTo(5),
-            reason: '${entry.key} alpha=${entry.value} (${(entry.value / 255 * 100).toStringAsFixed(1)}%) must be >= 2%');
+        expect(
+          entry.value,
+          greaterThanOrEqualTo(5),
+          reason:
+              '${entry.key} alpha=${entry.value} (${(entry.value / 255 * 100).toStringAsFixed(1)}%) must be >= 2%',
+        );
       }
     });
   });

@@ -5,9 +5,11 @@ import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/center_controls.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
-import 'package:simple_player_flutter/ui/player/volume_controls.dart';
-import 'package:simple_player_flutter/ui/player/time_range_display.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
+import 'package:simple_player_flutter/ui/player/speed_button.dart';
+import 'package:simple_player_flutter/ui/player/volume_controls.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
+import 'package:simple_player_flutter/ui/player/time_range_display.dart';
 import '../../helpers/fake_engine.dart';
 
 void _noop() {}
@@ -50,13 +52,14 @@ void main() {
     FakeEngine? eng,
     PlayerActions? actions,
     String? title,
+    double width = 800,
   }) {
     return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SizedBox(
-          width: 800,
+          width: width,
           height: 200,
           child: ControlBar(
             vm: buildVm(eng ?? engine),
@@ -113,41 +116,79 @@ void main() {
       expect(find.byType(CenterGroup), findsOneWidget);
     });
 
-    testWidgets('shows secondary controls at width >= 500', (tester) async {
-      await tester.pumpWidget(buildSubject());
+    testWidgets('shows secondary controls at normal width', (tester) async {
+      // ControlBar 的水平内边距会使内部 LayoutBuilder 少于外部宽度；
+      // 使用 800px 确保测试覆盖 normal 模式的实际内容约束。
+      await tester.pumpWidget(buildSubject(width: 800));
       await tester.pump();
 
       expect(find.byType(VolumeButton), findsOneWidget);
       expect(find.byType(VolumeSlider), findsOneWidget);
     });
 
-    testWidgets('shows all controls at narrow width (no breakpoint gating)', (
-      tester,
-    ) async {
-      // CB-04: compact/ultra-compact breakpoints removed — always show full layout
-      // Desktop player typical width 800+, use 600 to avoid Row overflow
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: MediaQuery(
-            data: const MediaQueryData(size: Size(600, 600)),
-            child: Scaffold(
-              body: SizedBox(
-                width: 600,
-                height: 200,
-                child: ControlBar(vm: buildVm(engine)),
-              ),
-            ),
-          ),
-        ),
-      );
+    testWidgets('minimal width keeps core controls', (tester) async {
+      await tester.pumpWidget(buildSubject(width: 400));
       await tester.pump();
 
       expect(find.byType(VolumeButton), findsOneWidget);
-      expect(find.byType(VolumeSlider), findsOneWidget);
+      expect(find.byType(VolumeSlider), findsNothing);
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
       expect(tester.getSize(find.byType(ProgressBar)).width, greaterThan(0));
     });
+
+    testWidgets(
+      'switches layout mode at the content-width breakpoint without overflow',
+      (tester) async {
+        // ControlBar consumes 8px padding on each side, so 615px leaves the
+        // content below the 600px breakpoint and 616px reaches it exactly.
+        final reportedErrors = <FlutterErrorDetails>[];
+        final previousOnError = FlutterError.onError;
+        FlutterError.onError = reportedErrors.add;
+        addTearDown(() => FlutterError.onError = previousOnError);
+
+        const actions = PlayerActions(
+          onOpenFile: _noop,
+          onOpenSubtitle: _noop,
+          onToggleFullscreen: _noop,
+        );
+
+        // Minimal: primary playback, mute, timeline, and fullscreen remain;
+        // optional volume/rate/file actions must not consume the narrow row.
+        await tester.pumpWidget(buildSubject(width: 615, actions: actions));
+        await tester.pump();
+        expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+        expect(find.byType(VolumeButton), findsOneWidget);
+        expect(find.byType(VolumeSlider), findsNothing);
+        expect(find.byType(SpeedButton), findsNothing);
+        expect(find.byIcon(Icons.folder_open), findsNothing);
+        expect(find.byIcon(Icons.subtitles), findsNothing);
+        expect(find.byIcon(Icons.fullscreen), findsOneWidget);
+
+        final minimalProgressSize = tester.getSize(find.byType(ProgressBar));
+        expect(minimalProgressSize.width, greaterThan(0));
+        expect(minimalProgressSize.height, Tokens.progressBarHeight);
+
+        // Normal: all auxiliary actions return at the exact boundary.
+        await tester.pumpWidget(buildSubject(width: 616, actions: actions));
+        await tester.pump();
+        expect(find.byType(VolumeSlider), findsOneWidget);
+        expect(find.byType(SpeedButton), findsOneWidget);
+        expect(find.byIcon(Icons.folder_open), findsOneWidget);
+        expect(find.byIcon(Icons.subtitles), findsOneWidget);
+
+        final normalProgressSize = tester.getSize(find.byType(ProgressBar));
+        expect(normalProgressSize.width, greaterThan(0));
+        expect(normalProgressSize.height, Tokens.progressBarHeight);
+        expect(
+          reportedErrors.where(
+            (details) => details.exceptionAsString().contains('overflowed'),
+          ),
+          isEmpty,
+          reason:
+              'both layout modes must fit their control rows without a RenderFlex overflow',
+        );
+      },
+    );
 
     testWidgets('shows folder_open button when onOpenFile is provided', (
       tester,
@@ -189,15 +230,6 @@ void main() {
       await tester.pump();
 
       expect(find.byIcon(Icons.subtitles), findsOneWidget);
-    });
-
-    testWidgets('shows settings when onSettings is provided', (tester) async {
-      await tester.pumpWidget(
-        buildSubject(actions: const PlayerActions(onSettings: _noop)),
-      );
-      await tester.pump();
-
-      expect(find.byIcon(Icons.settings), findsOneWidget);
     });
   });
 
@@ -301,23 +333,18 @@ void main() {
       );
     }
 
-    testWidgets('narrow width still shows full layout', (tester) async {
-      // CB-04: ultra-compact breakpoint removed — always show full layout
-      // Use 600px to avoid Row overflow (desktop player minimum practical width)
-      await tester.pumpWidget(buildWithWidth(600));
+    testWidgets('minimal width keeps core transport controls', (tester) async {
+      await tester.pumpWidget(buildWithWidth(400));
       await tester.pump();
 
-      expect(find.byIcon(Icons.replay_10), findsOneWidget);
+      expect(find.byIcon(Icons.replay_10), findsNothing);
       expect(find.byIcon(Icons.play_arrow), findsOneWidget);
-      expect(find.byIcon(Icons.forward_30), findsOneWidget);
-      expect(find.byIcon(Icons.stop), findsOneWidget);
+      expect(find.byIcon(Icons.forward_30), findsNothing);
+      expect(find.byIcon(Icons.stop), findsNothing);
 
-      // Full CenterGroup (replay_10 + forward_30 always visible)
       expect(find.byType(CenterGroup), findsOneWidget);
-
-      // Volume always visible (no breakpoint gating)
       expect(find.byType(VolumeButton), findsOneWidget);
-      expect(find.byType(VolumeSlider), findsOneWidget);
+      expect(find.byType(VolumeSlider), findsNothing);
     });
 
     testWidgets('medium width shows full layout', (tester) async {

@@ -168,6 +168,5 @@ void main() {
       // Assert
       expect(engine.skipForwardCallCount, 2);
     });
-
   });
 }

@@ -31,7 +31,10 @@ final class WindowState {
   /// 当前连续用户 resize 会话的单调标识；0 表示尚未开始。
   final ValueNotifier<int> resizeSessionId = ValueNotifier(0);
 
+  /// 当前是否处于用户拖拽调整窗口大小的会话中。
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
+
+  /// 当前窗口是否保持置顶。
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
   // ─── Lifecycle ───

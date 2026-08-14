@@ -108,12 +108,14 @@ class DebugProbe {
   }
 
   void _addEvent(String label, Duration? elapsed, [Map<String, Object>? data]) {
-    _events.add(ProbeEvent(
-      label: label,
-      elapsed: elapsed,
-      data: data,
-      timestamp: DateTime.now(),
-    ));
+    _events.add(
+      ProbeEvent(
+        label: label,
+        elapsed: elapsed,
+        data: data,
+        timestamp: DateTime.now(),
+      ),
+    );
     // 限制历史长度
     if (_events.length > 1000) {
       _events.removeAt(0);

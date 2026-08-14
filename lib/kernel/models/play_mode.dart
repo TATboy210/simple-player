@@ -1,7 +1,7 @@
 /// 播放模式（从 Python Playlist 移植）
 ///
 /// Canonical location for PlayMode enum.
-/// Used by Playlist (core/playlist.dart) and SettingsStore (persistence/settings_store.dart).
+/// Used by Playlist (core/playlist.dart).
 enum PlayMode {
   /// 顺序播放（列表循环）.
   ///

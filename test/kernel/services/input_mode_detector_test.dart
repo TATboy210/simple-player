@@ -128,7 +128,9 @@ void main() {
         final d = _detector(async);
         d.toggle(InputMode.keyboard);
         d.recordArrowKey();
-        async.elapse(const Duration(seconds: 5)); // 计时器触发但 preference!=auto → 不翻 gamepad
+        async.elapse(
+          const Duration(seconds: 5),
+        ); // 计时器触发但 preference!=auto → 不翻 gamepad
         expect(d.effectiveMode.value, InputMode.keyboard);
         d.dispose();
       });
@@ -145,7 +147,9 @@ void main() {
         async.elapse(const Duration(seconds: 3)); // t=3s: 未到 5s
         expect(d.effectiveMode.value, InputMode.keyboard);
         d.recordArrowKey(); // t=3s: 取消 A，计时器 B 于 t=8s 触发（刷新窗口）
-        async.elapse(const Duration(seconds: 3)); // t=6s: B 未触发（若未刷新，A 应在 t=5s 已触发→gamepad）
+        async.elapse(
+          const Duration(seconds: 3),
+        ); // t=6s: B 未触发（若未刷新，A 应在 t=5s 已触发→gamepad）
         expect(d.effectiveMode.value, InputMode.keyboard);
         async.elapse(const Duration(seconds: 2)); // t=8s: B 触发 → gamepad
         expect(d.effectiveMode.value, InputMode.gamepad);
@@ -157,10 +161,16 @@ void main() {
     test('Test 10: two rapid setArrowGlow calls replace (no stacking)', () {
       fakeAsync((async) {
         final d = _detector(async);
-        d.setArrowGlow(ArrowDirection.up); // t=0: glow=up, reset1 于 t=100ms→null
+        d.setArrowGlow(
+          ArrowDirection.up,
+        ); // t=0: glow=up, reset1 于 t=100ms→null
         async.elapse(const Duration(milliseconds: 50)); // t=50ms
-        d.setArrowGlow(ArrowDirection.down); // t=50: 取消 reset1, glow=down, reset2 于 t=150ms→null
-        async.elapse(const Duration(milliseconds: 50)); // t=100: 若 reset1 未取消应→null；取消则仍 down
+        d.setArrowGlow(
+          ArrowDirection.down,
+        ); // t=50: 取消 reset1, glow=down, reset2 于 t=150ms→null
+        async.elapse(
+          const Duration(milliseconds: 50),
+        ); // t=100: 若 reset1 未取消应→null；取消则仍 down
         expect(d.arrowGlow.value, ArrowDirection.down); // 证明替换（非堆叠）
         async.elapse(const Duration(milliseconds: 50)); // t=150: reset2 触发→null
         expect(d.arrowGlow.value, null);
@@ -188,22 +198,28 @@ void main() {
         d.dispose(); // 取消 reset 计时器 + dispose arrowGlow
         // 若未取消，reset 触发时 setter on disposed → assert throw
         async.elapse(const Duration(milliseconds: 200));
-        expect(d.arrowGlow.value, ArrowDirection.up); // .value 读取 dispose 后安全，值不变
+        expect(
+          d.arrowGlow.value,
+          ArrowDirection.up,
+        ); // .value 读取 dispose 后安全，值不变
       });
     });
 
     // ── Test 13: panel-close cancels pending timer + resets glow (T-32-06) ──
-    test('Test 13: onPanelClosed cancels timer + resets glow (no late flip)', () {
-      fakeAsync((async) {
-        final d = _detector(async);
-        d.recordArrowKey(); // 启动 5s 计时器
-        d.onPanelClosed(); // 取消两计时器 + arrowGlow=null，但不 dispose
-        // 若未取消，5s 后计时器触发翻 effectiveMode→gamepad
-        async.elapse(const Duration(seconds: 10));
-        expect(d.effectiveMode.value, InputMode.keyboard); // 不翻转
-        expect(d.arrowGlow.value, null); // 已重置
-        d.dispose();
-      });
-    });
+    test(
+      'Test 13: onPanelClosed cancels timer + resets glow (no late flip)',
+      () {
+        fakeAsync((async) {
+          final d = _detector(async);
+          d.recordArrowKey(); // 启动 5s 计时器
+          d.onPanelClosed(); // 取消两计时器 + arrowGlow=null，但不 dispose
+          // 若未取消，5s 后计时器触发翻 effectiveMode→gamepad
+          async.elapse(const Duration(seconds: 10));
+          expect(d.effectiveMode.value, InputMode.keyboard); // 不翻转
+          expect(d.arrowGlow.value, null); // 已重置
+          d.dispose();
+        });
+      },
+    );
   });
 }

@@ -22,6 +22,7 @@ class LeftButtonGroup extends StatelessWidget {
   final VoidCallback onToggleMute;
   final void Function(double) onSetVolume;
   final void Function(double) onSetRate;
+  final bool showSecondaryActions;
 
   /// 子控件交互边界透传给 Overlay，统一冻结或恢复自动隐藏策略。
   final VoidCallback? onInteractionStart;
@@ -35,6 +36,7 @@ class LeftButtonGroup extends StatelessWidget {
     required this.onToggleMute,
     required this.onSetVolume,
     required this.onSetRate,
+    this.showSecondaryActions = true,
     this.onInteractionStart,
     this.onInteractionEnd,
   });
@@ -50,14 +52,15 @@ class LeftButtonGroup extends StatelessWidget {
           onToggleMute: onToggleMute,
           onSetVolume: onSetVolume,
         ),
-        VolumeSlider(
-          volume: volume,
-          onSetVolume: onSetVolume,
-          onInteractionStart: onInteractionStart,
-          onInteractionEnd: onInteractionEnd,
-        ),
-        const SizedBox(width: Tokens.spXs),
-        SpeedButton(rate: rate, onSetRate: onSetRate),
+        if (showSecondaryActions)
+          VolumeSlider(
+            volume: volume,
+            onSetVolume: onSetVolume,
+            onInteractionStart: onInteractionStart,
+            onInteractionEnd: onInteractionEnd,
+          ),
+        if (showSecondaryActions) const SizedBox(width: Tokens.spXs),
+        if (showSecondaryActions) SpeedButton(rate: rate, onSetRate: onSetRate),
       ],
     );
   }

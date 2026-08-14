@@ -9,6 +9,7 @@ import '../shared/glass_widgets.dart';
 import 'control_bar_layout.dart';
 import 'control_bar_view_model.dart';
 import 'player_actions.dart';
+import 'control_bar_layout_mode.dart';
 
 class ControlBar extends StatelessWidget {
   static final _borderRadius = BorderRadius.circular(Tokens.controlBarRadius);
@@ -96,30 +97,44 @@ class ControlBar extends StatelessWidget {
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
+      resizing: resizing,
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          height: Tokens.controlBarHeight,
-          decoration: effectiveDecoration,
-          padding: const EdgeInsets.only(
-            left: Tokens.spSm,
-            right: Tokens.spSm,
-            bottom: Tokens.controlBarContentBottomPadding,
-          ),
-          child: ControlBarLayout(
-            vm: vm,
-            actions: actions,
-            isIdle: isIdle,
-            isIdleListenable: isIdleListenable,
-            title: title,
-            titleListenable: titleListenable,
-            resizing: resizing,
-            onSeekStart: onSeekStart,
-            onSeekEnd: onSeekEnd,
-            onToggleFullscreen: onToggleFullscreen,
-            onInteractionStart: onInteractionStart,
-            onInteractionEnd: onInteractionEnd,
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Match the child LayoutBuilder's post-padding width so the shell
+            // height and its content always select the same responsive mode.
+            final contentWidth = constraints.maxWidth - (Tokens.spSm * 2);
+            final mode = ControlBarLayoutMode.fromWidth(contentWidth);
+            final height = switch (mode) {
+              ControlBarLayoutMode.normal => Tokens.controlBarHeight,
+              ControlBarLayoutMode.minimal => Tokens.controlBarHeightMinimal,
+            };
+            return Container(
+              height: height,
+              decoration: effectiveDecoration,
+              padding: const EdgeInsets.only(
+                left: Tokens.spSm,
+                right: Tokens.spSm,
+                bottom: Tokens.controlBarContentBottomPadding,
+              ),
+              child: ControlBarLayout(
+                vm: vm,
+                actions: actions,
+                mode: mode,
+                isIdle: isIdle,
+                isIdleListenable: isIdleListenable,
+                title: title,
+                titleListenable: titleListenable,
+                resizing: resizing,
+                onSeekStart: onSeekStart,
+                onSeekEnd: onSeekEnd,
+                onToggleFullscreen: onToggleFullscreen,
+                onInteractionStart: onInteractionStart,
+                onInteractionEnd: onInteractionEnd,
+              ),
+            );
+          },
         ),
       ),
     );

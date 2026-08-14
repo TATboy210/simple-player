@@ -5,6 +5,7 @@ import 'kernel/bridge/window_bridge.dart';
 import 'kernel/startup/startup_coordinator.dart';
 import 'features/player/deferred_player_feature.dart';
 import 'ui/shared/progress_splash_screen.dart';
+import 'ui/theme/tokens.dart';
 import 'l10n/app_localizations.dart';
 
 /// 应用壳 — MaterialApp、固定主题与本地化。
@@ -41,9 +42,11 @@ class _AppState extends State<App> {
     _init();
   }
 
-  Future<void> _init() async {
-    // 无用户设置需要加载；保留异步边界让启动壳与播放器模块时序一致。
-    if (mounted) _appReady.value = true;
+  Future<void> _init() {
+    if (mounted) {
+      _appReady.value = true;
+    }
+    return Future.value();
   }
 
   @override
@@ -66,8 +69,16 @@ class _AppState extends State<App> {
       supportedLocales: AppLocalizations.supportedLocales,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
-      theme: theme,
-      darkTheme: darkTheme,
+      theme: theme.copyWith(
+        tooltipTheme: const TooltipThemeData(
+          waitDuration: Duration(milliseconds: Tokens.tooltipDelayShort),
+        ),
+      ),
+      darkTheme: darkTheme.copyWith(
+        tooltipTheme: const TooltipThemeData(
+          waitDuration: Duration(milliseconds: Tokens.tooltipDelayShort),
+        ),
+      ),
       home: _StartupHome(
         appReady: _appReady,
         coordinator: widget.coordinator,

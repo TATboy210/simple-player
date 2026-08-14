@@ -19,7 +19,6 @@ import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
 import '../engine/engine_state.dart';
-import '../persistence/settings_store.dart';
 import '../utils/debug_probe.dart';
 import '../utils/path_utils.dart';
 import 'path_validator.dart';
@@ -51,11 +50,11 @@ abstract interface class SettingsPanelPlayback {
 /// 职责划分：
 /// - 打开并播放：[openAndPlay]（路径校验 → engine.open → OpenResult 分发）
 /// - 停止卸载：[stopCurrentMedia]
-/// - 设置面板暂停契约：实现 [SettingsPanelPlayback]（Phase 23 D-03）
-/// - 状态持久化：委托 [PlaybackStateManager]（volume/mute 恢复与保存）
+/// - 播放暂停契约：实现 [SettingsPanelPlayback]
+/// - 运行时生命周期：委托 [PlaybackStateManager]
 ///
 /// 生命周期：init() → 使用 → dispose()
-/// init() 内部调用 stateManager.init() 恢复音量/静音设置。
+/// init() 只初始化运行时状态管理器，不读取用户设置。
 class PlaybackController implements SettingsPanelPlayback {
   PlaybackController({
     required this.engine,
@@ -65,7 +64,7 @@ class PlaybackController implements SettingsPanelPlayback {
   }) : _onError = onError,
        _subtitleService = subtitleService,
        _trackPreferenceService = trackPreferenceService {
-    stateManager = PlaybackStateManager(this);
+    stateManager = const PlaybackStateManager();
   }
 
   /// 视频渲染引擎实例.
@@ -218,23 +217,13 @@ class PlaybackController implements SettingsPanelPlayback {
   ///
   /// [settings] 可选：调用方已加载时传入，避免重复 IO。
   /// 使用 DebugProbe 包裹以记录初始化耗时。
-  Future<void> init({AppSettings? settings}) =>
-      probe.measureAsync('init', () async {
-        await stateManager.init(settings: settings);
-        await _trackPreferenceService?.load();
-      });
+  Future<void> init() => probe.measureAsync('init', () async {
+    await stateManager.init();
+  });
 
-  /// 释放资源 — 按序释放 stateManager / trackPreference / notifiers.
-  ///
-  /// Disposes resources in order: stateManager, trackPreference, notifiers.
+  /// 释放运行时资源和状态通知器。
   void dispose() {
     stateManager.dispose();
-    // fire-and-forget 保存轨道偏好
-    unawaited(
-      _trackPreferenceService?.save().catchError(
-        (Object e) => _log.e('TrackPreferenceService.save failed: $e'),
-      ),
-    );
     currentFileName.dispose();
     currentPath.dispose();
     validationError.dispose();

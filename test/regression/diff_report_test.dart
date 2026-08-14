@@ -16,7 +16,10 @@ void main() {
         expected: 'MediaState.idle',
         actual: 'MediaState.playing',
       );
-      expect(entry.toString(), '[state] expected: MediaState.idle, actual: MediaState.playing');
+      expect(
+        entry.toString(),
+        '[state] expected: MediaState.idle, actual: MediaState.playing',
+      );
     });
 
     test('toString formats with context', () {
@@ -42,11 +45,9 @@ void main() {
 
     test('hasDiffs is true after adding entry', () {
       final report = DiffReport();
-      report.addEntry(const DiffEntry(
-        method: 'state',
-        expected: 'idle',
-        actual: 'playing',
-      ));
+      report.addEntry(
+        const DiffEntry(method: 'state', expected: 'idle', actual: 'playing'),
+      );
       expect(report.hasDiffs, isTrue);
       expect(report.diffCount, 1);
     });
@@ -58,16 +59,12 @@ void main() {
 
     test('toString returns formatted diffs', () {
       final report = DiffReport();
-      report.addEntry(const DiffEntry(
-        method: 'state',
-        expected: 'idle',
-        actual: 'playing',
-      ));
-      report.addEntry(const DiffEntry(
-        method: 'volume',
-        expected: '0.5',
-        actual: '0.8',
-      ));
+      report.addEntry(
+        const DiffEntry(method: 'state', expected: 'idle', actual: 'playing'),
+      );
+      report.addEntry(
+        const DiffEntry(method: 'volume', expected: '0.5', actual: '0.8'),
+      );
       final output = report.toString();
       expect(output, contains('2 difference(s)'));
       expect(output, contains('[state]'));

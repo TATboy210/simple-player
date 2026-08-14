@@ -88,9 +88,9 @@ class MediaKitEngine implements MediaEngine {
   // 已告警的 stub 方法集合 — 每个 stub 只 debugPrint 一次, 避免刷屏.
   final Set<String> _warnedUnsupported = <String>{};
 
-  // 异构 stream 订阅容器: T 逆变无法用 Object 统一, dynamic 绕过 invariant 限制
-  final List<StreamSubscription<dynamic>> _subs =
-      <StreamSubscription<dynamic>>[];
+  // 异构 stream 只保存取消回调，避免用 dynamic 统一不同的 stream 类型。
+  final List<Future<void> Function()> _subscriptionCancels =
+      <Future<void> Function()>[];
   bool _disposed = false;
 
   // ============================================================
@@ -466,10 +466,10 @@ class MediaKitEngine implements MediaEngine {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    for (final s in _subs) {
-      s.cancel();
+    for (final cancel in _subscriptionCancels) {
+      unawaited(_cancelSubscription(cancel));
     }
-    _subs.clear();
+    _subscriptionCancels.clear();
     _stateMachine.dispose();
     _position.dispose();
     _duration.dispose();
@@ -489,14 +489,29 @@ class MediaKitEngine implements MediaEngine {
   // stream → ValueNotifier 桥接
   // ============================================================
 
+  /// 注册带具体类型的订阅，同时让取消回调列表保持同质。
+  void _addSubscription<T>(StreamSubscription<T> subscription) {
+    _subscriptionCancels.add(subscription.cancel);
+  }
+
+  /// 取消订阅并隔离异步清理失败，避免 dispose 产生未处理异常。
+  Future<void> _cancelSubscription(Future<void> Function() cancel) async {
+    try {
+      await cancel();
+    } on Exception catch (error, stackTrace) {
+      debugPrint('Failed to cancel media stream subscription: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   void _subscribeStreams() {
     // position — 事件流根治轮询滞后 (换后端的核心收益).
-    _subs.add(
+    _addSubscription(
       _player.stream.position.listen((d) {
         _position.value = d.inMilliseconds;
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.duration.listen((d) {
         _duration.value = d.inMilliseconds;
         _rebuildMediaInfo();
@@ -504,58 +519,58 @@ class MediaKitEngine implements MediaEngine {
     );
     // media_kit volume 0~100 → 项目 0.0~1.0.
     // 仅同步数值, 不联动 isMuted (静音由 setMute 显式管).
-    _subs.add(
+    _addSubscription(
       _player.stream.volume.listen((v) {
         _volume.value = (v / 100).clamp(0.0, 1.0);
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.rate.listen((r) {
         _playbackSpeed.value = r;
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.buffering.listen((b) {
         _stateMachine.isBuffering.value = b;
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.buffer.listen((d) {
         _buffered.value = d.inMilliseconds;
       }),
     );
-    _subs.add(_player.stream.playing.listen(_onPlaying));
-    _subs.add(_player.stream.completed.listen(_onCompleted));
-    _subs.add(
+    _addSubscription(_player.stream.playing.listen(_onPlaying));
+    _addSubscription(_player.stream.completed.listen(_onCompleted));
+    _addSubscription(
       _player.stream.tracks.listen((t) {
         _tracks = t;
         _rebuildMediaInfo();
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.track.listen((t) {
         _track = t;
       }),
     );
     // 用 width/height 流算 aspectRatio, 避开 VideoParams 字段名版本差异.
-    _subs.add(
+    _addSubscription(
       _player.stream.width.listen((w) {
         _videoWidth = w;
         _updateAspectRatio();
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.height.listen((h) {
         _videoHeight = h;
         _updateAspectRatio();
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.subtitle.listen((lines) {
         _subtitleText.value = lines.join('\n');
       }),
     );
-    _subs.add(
+    _addSubscription(
       _player.stream.error.listen((msg) {
         _lastError.value = UnknownError(
           msg,

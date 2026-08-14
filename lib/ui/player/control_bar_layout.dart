@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import 'control_bar_actions.dart';
-import 'control_bar_timeline.dart';
 import 'control_bar_title.dart';
 import 'control_bar_view_model.dart';
+import 'control_bar_layout_mode.dart';
 import 'player_actions.dart';
 
-/// 控制栏的三行内容布局。
+/// 控制栏的响应式内容布局。
 ///
 /// 将标题、时间导航和动作区的布局从视觉外壳中分离，使装饰或模糊效果变化时
 /// 不会混入业务控件的组合职责。
@@ -17,6 +17,9 @@ import 'player_actions.dart';
 class ControlBarLayout extends StatelessWidget {
   final ControlBarViewModel vm;
   final PlayerActions actions;
+
+  /// Shared responsive mode selected from the post-padding content width.
+  final ControlBarLayoutMode mode;
   final bool isIdle;
   final ValueListenable<bool>? isIdleListenable;
   final String? title;
@@ -34,6 +37,7 @@ class ControlBarLayout extends StatelessWidget {
     super.key,
     required this.vm,
     required this.actions,
+    required this.mode,
     required this.isIdle,
     this.isIdleListenable,
     this.title,
@@ -47,7 +51,53 @@ class ControlBarLayout extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => _buildLayout(mode);
+
+  Widget _buildLayout(ControlBarLayoutMode mode) {
+    final title = ControlBarTitle(
+      title: this.title,
+      titleListenable: titleListenable,
+      minimal: mode.isMinimal,
+    );
+    final actions = ControlBarActions(
+      vm: vm,
+      actions: this.actions,
+      isIdle: isIdle,
+      mode: mode,
+      isIdleListenable: isIdleListenable,
+      onToggleFullscreen: onToggleFullscreen,
+      onInteractionStart: onInteractionStart,
+      onInteractionEnd: onInteractionEnd,
+    );
+
+    // 两档模式都保留 Expanded → SizedBox 的父级类型，避免切换宽度时替换
+    // 标题、时间轴和动作区的 Element；最小模式只改变稳定 SizedBox 的高度。
+    final titleHeight = mode.isMinimal
+        ? Tokens.controlBarTitleHeightMinimal
+        : null;
+    final actionsHeight = mode.isMinimal
+        ? Tokens.controlBarActionsHeightMinimal
+        : null;
+    final content = Column(
+      children: [
+        Flexible(
+          fit: mode.isMinimal ? FlexFit.loose : FlexFit.tight,
+          child: SizedBox(
+            height: titleHeight,
+            child: title,
+          ),
+        ),
+        const Flexible(fit: FlexFit.tight, child: SizedBox()),
+        Flexible(
+          fit: mode.isMinimal ? FlexFit.loose : FlexFit.tight,
+          child: SizedBox(
+            height: actionsHeight,
+            child: actions,
+          ),
+        ),
+      ],
+    );
+
     return Stack(
       children: [
         // CSS .player-controls::before — 顶部渐变光线。
@@ -68,36 +118,7 @@ class ControlBarLayout extends StatelessWidget {
             ),
           ),
         ),
-        // 3 行等分布局：标题 / 时间导航 / 按钮行。
-        Column(
-          children: [
-            Expanded(
-              child: ControlBarTitle(
-                title: title,
-                titleListenable: titleListenable,
-              ),
-            ),
-            Expanded(
-              child: ControlBarTimeline(
-                vm: vm,
-                resizing: resizing,
-                onSeekStart: onSeekStart,
-                onSeekEnd: onSeekEnd,
-              ),
-            ),
-            Expanded(
-              child: ControlBarActions(
-                vm: vm,
-                actions: actions,
-                isIdle: isIdle,
-                isIdleListenable: isIdleListenable,
-                onToggleFullscreen: onToggleFullscreen,
-                onInteractionStart: onInteractionStart,
-                onInteractionEnd: onInteractionEnd,
-              ),
-            ),
-          ],
-        ),
+        content,
       ],
     );
   }

@@ -55,7 +55,9 @@ void main() {
       expect(find.byType(DropHandler), findsOneWidget);
     });
 
-    testWidgets('without onHoverChanged shows overlay on hover', (tester) async {
+    testWidgets('without onHoverChanged shows overlay on hover', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -106,7 +108,10 @@ void main() {
       // 找到 DropTarget 并触发 onDragEntered 回调
       final dropTarget = tester.widget<DropTarget>(find.byType(DropTarget));
       dropTarget.onDragEntered?.call(
-        DropEventDetails(localPosition: Offset.zero, globalPosition: Offset.zero),
+        DropEventDetails(
+          localPosition: Offset.zero,
+          globalPosition: Offset.zero,
+        ),
       );
       await tester.pump();
 
@@ -114,8 +119,9 @@ void main() {
       expect(hoverStates, contains(true));
     });
 
-    testWidgets('DropTarget onDragExited clears hovering state',
-        (tester) async {
+    testWidgets('DropTarget onDragExited clears hovering state', (
+      tester,
+    ) async {
       final hoverStates = <bool>[];
       await tester.pumpWidget(
         MaterialApp(
@@ -144,37 +150,42 @@ void main() {
       expect(hoverStates, [true, false]);
     });
 
-    testWidgets('DropTarget onDragDone with empty list does not call onFilesDropped',
-        (tester) async {
-      final dropped = <List<String>>[];
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: DropHandler(
-              onFilesDropped: dropped.add,
-              child: const SizedBox.expand(),
+    testWidgets(
+      'DropTarget onDragDone with empty list does not call onFilesDropped',
+      (tester) async {
+        final dropped = <List<String>>[];
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: DropHandler(
+                onFilesDropped: dropped.add,
+                child: const SizedBox.expand(),
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      final dropTarget = tester.widget<DropTarget>(find.byType(DropTarget));
-      // 模拟拖入空文件列表
-      dropTarget.onDragDone?.call(const DropDoneDetails(
-        files: [],
-        localPosition: Offset.zero,
-        globalPosition: Offset.zero,
-      ));
-      await tester.pump();
+        final dropTarget = tester.widget<DropTarget>(find.byType(DropTarget));
+        // 模拟拖入空文件列表
+        dropTarget.onDragDone?.call(
+          const DropDoneDetails(
+            files: [],
+            localPosition: Offset.zero,
+            globalPosition: Offset.zero,
+          ),
+        );
+        await tester.pump();
 
-      // 空文件列表 → onFilesDropped 不应被调用
-      expect(dropped, isEmpty);
-    });
+        // 空文件列表 → onFilesDropped 不应被调用
+        expect(dropped, isEmpty);
+      },
+    );
 
     // ── Overlay rendering branch ──
 
-    testWidgets('overlay visible when _hovering=true and no onHoverChanged',
-        (tester) async {
+    testWidgets('overlay visible when _hovering=true and no onHoverChanged', (
+      tester,
+    ) async {
       // 覆盖 _hovering && widget.onHoverChanged == null 分支 (line 67)
       // overlay 内使用 AppLocalizations.of(context).dragHint，需要 l10n delegates
       await tester.pumpWidget(
@@ -194,7 +205,10 @@ void main() {
       // 触发 onDragEntered → _hovering = true
       final dropTarget = tester.widget<DropTarget>(find.byType(DropTarget));
       dropTarget.onDragEntered?.call(
-        DropEventDetails(localPosition: Offset.zero, globalPosition: Offset.zero),
+        DropEventDetails(
+          localPosition: Offset.zero,
+          globalPosition: Offset.zero,
+        ),
       );
       await tester.pump();
 
@@ -203,7 +217,9 @@ void main() {
       expect(find.byIcon(Icons.file_download_outlined), findsOneWidget);
     });
 
-    testWidgets('overlay hidden when onHoverChanged is provided', (tester) async {
+    testWidgets('overlay hidden when onHoverChanged is provided', (
+      tester,
+    ) async {
       // onHoverChanged 非空时，即使 _hovering=true 也不显示 overlay
       await tester.pumpWidget(
         MaterialApp(
@@ -219,7 +235,10 @@ void main() {
 
       final dropTarget = tester.widget<DropTarget>(find.byType(DropTarget));
       dropTarget.onDragEntered?.call(
-        DropEventDetails(localPosition: Offset.zero, globalPosition: Offset.zero),
+        DropEventDetails(
+          localPosition: Offset.zero,
+          globalPosition: Offset.zero,
+        ),
       );
       await tester.pump();
 

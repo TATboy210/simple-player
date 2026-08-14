@@ -1,6 +1,6 @@
-/// 轨道偏好 — 用户选择的音频/字幕轨道和字幕延迟
+/// 轨道偏好 — 当前播放会话中的音频/字幕轨道和字幕延迟。
 ///
-/// 持久化到 [SettingsStore]，在每次 open() 后由 [TrackPreferenceService] 自动恢复。
+/// 仅由 [TrackPreferenceService] 在媒体打开后恢复，不跨会话持久化。
 /// 索引-based（非语言匹配），跨文件可能不精确，但对大多数使用场景足够。
 ///
 /// 设计决策：
@@ -81,7 +81,8 @@ class TrackPreferences {
           subtitleDelay == other.subtitleDelay;
 
   @override
-  int get hashCode => Object.hash(audioTrackIndex, subtitleTrackIndex, subtitleDelay);
+  int get hashCode =>
+      Object.hash(audioTrackIndex, subtitleTrackIndex, subtitleDelay);
 
   @override
   String toString() =>

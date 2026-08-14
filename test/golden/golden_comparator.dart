@@ -59,14 +59,13 @@ class TolerantGoldenComparator extends LocalFileComparator {
     var mismatched = 0;
 
     for (var i = 0; i < totalPixels * 4; i += 4) {
-      final rDiff =
-          (actualData.getUint8(i) - expectedData.getUint8(i)).abs();
-      final gDiff =
-          (actualData.getUint8(i + 1) - expectedData.getUint8(i + 1)).abs();
-      final bDiff =
-          (actualData.getUint8(i + 2) - expectedData.getUint8(i + 2)).abs();
-      final aDiff =
-          (actualData.getUint8(i + 3) - expectedData.getUint8(i + 3)).abs();
+      final rDiff = (actualData.getUint8(i) - expectedData.getUint8(i)).abs();
+      final gDiff = (actualData.getUint8(i + 1) - expectedData.getUint8(i + 1))
+          .abs();
+      final bDiff = (actualData.getUint8(i + 2) - expectedData.getUint8(i + 2))
+          .abs();
+      final aDiff = (actualData.getUint8(i + 3) - expectedData.getUint8(i + 3))
+          .abs();
 
       if (rDiff > threshold ||
           gDiff > threshold ||
@@ -119,13 +118,7 @@ Widget wrapForGolden(Widget child) {
   return MaterialApp(
     home: Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
-      body: Center(
-        child: SizedBox(
-          width: 800,
-          height: 600,
-          child: child,
-        ),
-      ),
+      body: Center(child: SizedBox(width: 800, height: 600, child: child)),
     ),
   );
 }

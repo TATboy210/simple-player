@@ -23,18 +23,11 @@ import '../../ui/theme/tokens.dart';
 ///
 /// 注意：[InputModeDetector.effectiveMode] 永不取 [auto] —— auto 仅作 preference，
 /// 派生有效模式只有 keyboard / gamepad 两态 (D-03 split)。
-enum InputMode {
-  keyboard,
-  gamepad,
-  auto,
-}
+enum InputMode { keyboard, gamepad, auto }
 
 /// 方向键辉光方向 (NAV-06)，由上下箭头经 [InputModeDetector.setArrowGlow] 设置，
 /// 供 Plan 03 的 OptionListNavigationOverlay 消费。
-enum ArrowDirection {
-  up,
-  down,
-}
+enum ArrowDirection { up, down }
 
 /// 输入模式检测器 —— singleton，持有三个 [ValueNotifier]：[preference] /
 /// [effectiveMode] / [arrowGlow]。
@@ -54,9 +47,9 @@ class InputModeDetector {
     required Duration idleTimeout,
     required Duration glowResetDuration,
     required DateTime Function() clock,
-  })  : _idleTimeout = idleTimeout,
-        _glowResetDuration = glowResetDuration,
-        _clock = clock;
+  }) : _idleTimeout = idleTimeout,
+       _glowResetDuration = glowResetDuration,
+       _clock = clock;
 
   // ── singleton ──
   static InputModeDetector? _instance;
@@ -86,12 +79,11 @@ class InputModeDetector {
     required Duration idleTimeout,
     required Duration glowResetDuration,
     required DateTime Function() clock,
-  }) =>
-      InputModeDetector._(
-        idleTimeout: idleTimeout,
-        glowResetDuration: glowResetDuration,
-        clock: clock,
-      );
+  }) => InputModeDetector._(
+    idleTimeout: idleTimeout,
+    glowResetDuration: glowResetDuration,
+    clock: clock,
+  );
 
   // ── 注入配置 ──
   final Duration _idleTimeout;
@@ -101,12 +93,14 @@ class InputModeDetector {
   // ── 状态 ValueNotifiers ──
 
   /// 用户偏好 (D-03)。默认 [InputMode.auto] —— 启发式驱动。
-  final ValueNotifier<InputMode> preference =
-      ValueNotifier<InputMode>(InputMode.auto);
+  final ValueNotifier<InputMode> preference = ValueNotifier<InputMode>(
+    InputMode.auto,
+  );
 
   /// 派生有效模式 —— hints 读取此值，永不取 [InputMode.auto] (D-03 split)。
-  final ValueNotifier<InputMode> effectiveMode =
-      ValueNotifier<InputMode>(InputMode.keyboard);
+  final ValueNotifier<InputMode> effectiveMode = ValueNotifier<InputMode>(
+    InputMode.keyboard,
+  );
 
   /// 方向辉光 (NAV-06)，上下箭头经 [setArrowGlow] 设置，Plan 03 overlay 消费。
   /// 默认 null —— 无辉光。
@@ -149,8 +143,8 @@ class InputModeDetector {
     final lastMouse = _lastMouseActivity;
     // D-01: 用注入 clock 比较鼠标空闲，不查 key source。null = 从无鼠标活动
     // —— 视为始终空闲（倾向 gamepad 检测）。
-    final idle = lastMouse == null ||
-        _clock().difference(lastMouse) >= _idleTimeout;
+    final idle =
+        lastMouse == null || _clock().difference(lastMouse) >= _idleTimeout;
     if (!idle) return;
     if (preference.value != InputMode.auto) return; // D-03: 保留显式选择
     effectiveMode.value = InputMode.gamepad;

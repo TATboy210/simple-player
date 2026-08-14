@@ -41,36 +41,52 @@ void main() {
     test('textSecondary on bgDeep achieves >= 4.5:1 (WCAG AA)', () {
       final composite = _compositeOn(Tokens.textSecondary, Tokens.bgDeep);
       final ratio = _contrastRatio(composite, Tokens.bgDeep);
-      expect(ratio, greaterThanOrEqualTo(4.5),
-          reason: 'textSecondary contrast ${ratio.toStringAsFixed(2)}:1');
+      expect(
+        ratio,
+        greaterThanOrEqualTo(4.5),
+        reason: 'textSecondary contrast ${ratio.toStringAsFixed(2)}:1',
+      );
     });
 
     test('textSecondary on bgDeep achieves target 5.0:1+', () {
       final composite = _compositeOn(Tokens.textSecondary, Tokens.bgDeep);
       final ratio = _contrastRatio(composite, Tokens.bgDeep);
-      expect(ratio, greaterThanOrEqualTo(5.0),
-          reason: 'target contrast ${ratio.toStringAsFixed(2)}:1');
+      expect(
+        ratio,
+        greaterThanOrEqualTo(5.0),
+        reason: 'target contrast ${ratio.toStringAsFixed(2)}:1',
+      );
     });
   });
 
   group('WCAG contrast — idle text tokens', () {
     test('controlBarTextPrimaryIdle on bgDeep achieves >= 4.5:1', () {
-      final composite =
-          _compositeOn(Tokens.controlBarTextPrimaryIdle, Tokens.bgDeep);
+      final composite = _compositeOn(
+        Tokens.controlBarTextPrimaryIdle,
+        Tokens.bgDeep,
+      );
       final ratio = _contrastRatio(composite, Tokens.bgDeep);
-      expect(ratio, greaterThanOrEqualTo(4.5),
-          reason:
-              'controlBarTextPrimaryIdle contrast ${ratio.toStringAsFixed(2)}:1');
+      expect(
+        ratio,
+        greaterThanOrEqualTo(4.5),
+        reason:
+            'controlBarTextPrimaryIdle contrast ${ratio.toStringAsFixed(2)}:1',
+      );
     });
 
     test('controlBarTextSecondaryIdle on bgDeep — relaxed for idle state', () {
       // idle 次文本 (22% alpha) 允许更低对比度，但不应低于 2.4:1（可读性底线）
-      final composite =
-          _compositeOn(Tokens.controlBarTextSecondaryIdle, Tokens.bgDeep);
+      final composite = _compositeOn(
+        Tokens.controlBarTextSecondaryIdle,
+        Tokens.bgDeep,
+      );
       final ratio = _contrastRatio(composite, Tokens.bgDeep);
-      expect(ratio, greaterThanOrEqualTo(2.4),
-          reason:
-              'controlBarTextSecondaryIdle contrast ${ratio.toStringAsFixed(2)}:1');
+      expect(
+        ratio,
+        greaterThanOrEqualTo(2.4),
+        reason:
+            'controlBarTextSecondaryIdle contrast ${ratio.toStringAsFixed(2)}:1',
+      );
     });
   });
 
@@ -84,8 +100,10 @@ void main() {
     });
 
     test('controlBarBorderIdle is 40-60% of controlBarBorderWhite alpha', () {
-      final ratio =
-          alphaRatio(Tokens.controlBarBorderIdle, Tokens.controlBarBorderWhite);
+      final ratio = alphaRatio(
+        Tokens.controlBarBorderIdle,
+        Tokens.controlBarBorderWhite,
+      );
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });
@@ -98,15 +116,19 @@ void main() {
     });
 
     test('controlBarTextPrimaryIdle is 40-60% of textPrimary alpha', () {
-      final ratio =
-          alphaRatio(Tokens.controlBarTextPrimaryIdle, Tokens.textPrimary);
+      final ratio = alphaRatio(
+        Tokens.controlBarTextPrimaryIdle,
+        Tokens.textPrimary,
+      );
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });
 
     test('controlBarTextSecondaryIdle is 40-60% of textSecondary alpha', () {
-      final ratio =
-          alphaRatio(Tokens.controlBarTextSecondaryIdle, Tokens.textSecondary);
+      final ratio = alphaRatio(
+        Tokens.controlBarTextSecondaryIdle,
+        Tokens.textSecondary,
+      );
       expect(ratio, greaterThanOrEqualTo(0.4));
       expect(ratio, lessThanOrEqualTo(0.6));
     });

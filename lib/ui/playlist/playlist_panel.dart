@@ -63,12 +63,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   final _focusNode = FocusNode();
   final _selectedTab = ValueNotifier<int>(0); // 0=文件夹, 1=历史
 
-  /// resize 期间缓存的上一帧 build 结果 — 跳过 _buildPanel/缩略图列表
-  /// 每帧重建 (build 长尾主因)。借鉴 OsdOverlay 模式 (osd_overlay.dart:74-99)。
-  /// 代价: resize 期间 playlist 内容/动画冻结, 可接受 (拖窗时不操作 playlist);
-  /// 结束后随父 rebuild 自然刷新 (resizing→false 时 build 重建)。
-  Widget? _cachedChild;
-
   @override
   void initState() {
     super.initState();
@@ -135,41 +129,55 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   Widget build(BuildContext context) {
-    // resize 期间返回缓存 — 跳过 _buildPanel/缩略图列表每帧重建 (build 长尾主因)。
-    // 代价: resize 期间 playlist 内容/动画冻结, 可接受 (拖窗时不操作 playlist)。
-    final r = widget.resizing;
-    if (r != null && r.value) {
-      return _cachedChild ?? const SizedBox.shrink();
-    }
-    final child = Stack(
-      children: [
-        // 全屏透明层 — 点击外部关闭
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: widget.onClose,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        // 浮窗面板
-        Positioned(
-          right: Tokens.controlBarMarginH,
-          bottom:
-              Tokens.controlBarMarginBottom +
-              Tokens.controlBarHeight +
-              Tokens.spLg,
-          child: SlideTransition(
-            position: _slideAnim,
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: _buildPanel(_panelWidth, _panelHeight),
+    // resize 期间仍保留面板与外部关闭层；仅在下方跳过 BackdropFilter。
+    // 每次返回新的 Widget 配置，避免复用旧 Element 子树。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (widget.availableWidth ?? constraints.maxWidth).clamp(
+          0.0,
+          constraints.maxWidth,
+        );
+        final panelWidth = width < Tokens.breakpointResponsive
+            ? Tokens.playlistPanelWidthNarrow
+            : _panelWidth;
+        final boundedPanelWidth = panelWidth.clamp(0.0, width);
+        final panelHeight = _panelHeight.clamp(0.0, constraints.maxHeight);
+        final bottom =
+            (Tokens.controlBarMarginBottom +
+                    Tokens.controlBarHeightMinimal +
+                    Tokens.spLg)
+                .clamp(0.0, constraints.maxHeight - panelHeight);
+        final right = Tokens.controlBarMarginH.clamp(
+          0.0,
+          width - boundedPanelWidth,
+        );
+
+        return Stack(
+          children: [
+            // 全屏透明层 — 点击外部关闭
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: widget.onClose,
+                child: const SizedBox.expand(),
+              ),
             ),
-          ),
-        ),
-      ],
+            // 面板尺寸始终受窗口约束，避免窄窗口越界。
+            Positioned(
+              right: right,
+              bottom: bottom,
+              child: SlideTransition(
+                position: _slideAnim,
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: _buildPanel(boundedPanelWidth, panelHeight),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
-    _cachedChild = child;
-    return child;
   }
 
   Widget _buildPanel(double width, double height) {
@@ -187,6 +195,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: GestureDetector(
         onTap: () {}, // 拦截点击，不穿透到外部关闭层
         child: SizedBox(
+          key: const ValueKey('playlist-panel-surface'),
           width: width,
           height: height,
           child: Stack(
@@ -198,19 +207,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                 // builder 内直接用 r (非空), 不再需二次 null 捕获
                 child: switch (widget.resizing) {
                   final r? => AnimatedBuilder(
-                      animation: r,
-                      builder: (_, _) {
-                        if (r.value) {
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              Tokens.radiusLarge,
-                            ),
-                            child: Container(color: Tokens.bgGlass),
-                          );
-                        }
-                        return _buildBackdrop();
-                      },
-                    ),
+                    animation: r,
+                    builder: (_, _) {
+                      if (r.value) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            Tokens.radiusLarge,
+                          ),
+                          child: Container(color: Tokens.bgGlass),
+                        );
+                      }
+                      return _buildBackdrop();
+                    },
+                  ),
                   null => _buildBackdrop(),
                 },
               ),

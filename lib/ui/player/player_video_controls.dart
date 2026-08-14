@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 // services: KeyDownEvent / LogicalKeyboardKey / KeyEventResult / FocusNode
 // (material.dart 不完整导出 services 的键盘事件类型)
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -299,6 +300,10 @@ class PlayerVideoControls extends StatefulWidget {
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter。
   final ValueListenable<bool>? resizing;
 
+  /// 仅供 widget 测试观测外层 build 次数，不参与生产渲染逻辑。
+  @visibleForTesting
+  final VoidCallback? onBuild;
+
   const PlayerVideoControls({
     super.key,
     required this.video,
@@ -308,6 +313,7 @@ class PlayerVideoControls extends StatefulWidget {
     required this.openFileEnabled,
     this.emptyState,
     this.resizing,
+    this.onBuild,
   });
 
   @override
@@ -357,6 +363,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// deactivate() 即置 true(element 仍 mounted 但 inactive,State.mounted 无效)。
   bool _isDeactivating = false;
   bool _lifecycleListenersAttached = false;
+  bool _subtitleSyncScheduled = false;
 
   /// 控件创建后读取一次的字幕基础 padding，避免 activate 重复叠加自身 inset。
   EdgeInsets? _subtitleBasePadding;
@@ -365,6 +372,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   static const _subtitleControlBarInset = EdgeInsets.only(
     bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
   );
+
+  /// 复用控制栏的只读数据绑定，避免 auto-hide/父层 build 时重复创建。
+  ///
+  /// 该对象只持有 [_controlsState] 的 notifier 和稳定回调；播放器 source
+  /// 切换时 notifier identity 会被保留，因此无需随每次 stream 更新重建。
+  late ControlBarViewModel _controlBarViewModel;
 
   /// 对齐 media_kit 原生 onTapUp 400ms 双击窗口。
   static const _clickDelayMs = 400;
@@ -387,6 +400,22 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// `_videoKey.currentState` 调 setSubtitleViewPadding,全屏 route 时全屏 VideoState
   /// 是另一实例,padding 调错对象 → 字幕被控制栏遮挡/控件隐藏字幕不动。本控件每实例
   /// 监听自己 _autoHide.visible,调 `widget.video`(本实例)→ 双实例各自正确。
+  void _scheduleSubtitlePaddingSync() {
+    if (_subtitleSyncScheduled || _isDeactivating || !mounted) return;
+    // 空闲阶段没有正在进行的 widget build，可立即同步，保持 stream 事件的
+    // 即时性；build/update 通知期间则延迟到 frame 结束，避免触发 SubtitleView
+    // 的内部 setState() during build。
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      _syncSubtitlePadding();
+      return;
+    }
+    _subtitleSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subtitleSyncScheduled = false;
+      _syncSubtitlePadding();
+    });
+  }
+
   void _syncSubtitlePadding() {
     // 阶段3:退出全屏 route pop(Duration.zero) 后,全屏 VideoState deactivate/dispose。
     // post-frame callback(line 413) 或 _autoHide.visible listener 可能在本控件
@@ -459,6 +488,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 阶段2:_controlsState.init() 前置 — isPlaying 有真值后再构造 _autoHide
     // (AutoHide 监听 _controlsState.isPlaying,init() 读初值)。
     _controlsState.init(); // 订阅 player.stream + 初始快照
+    _controlBarViewModel = _createControlBarViewModel();
     _autoHide = AutoHideController(
       vsync: this,
       // 阶段2:AutoHide 用 _controlsState.isPlaying(player.stream 驱动)。
@@ -482,7 +512,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
     // 阶段2:字幕 padding 自驱(每实例调自己 VideoState)。post-frame 确保
     // widget.video 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncSubtitlePadding());
+    _scheduleSubtitlePaddingSync();
   }
 
   void _handleTap() {
@@ -529,7 +559,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     if (_lifecycleListenersAttached) return;
     widget.engine.state.addListener(_onEngineStateChanged);
     widget.resizing?.addListener(_onResizeChanged);
-    _autoHide.visible.addListener(_syncSubtitlePadding);
+    _autoHide.visible.addListener(_scheduleSubtitlePaddingSync);
     _lifecycleListenersAttached = true;
   }
 
@@ -537,7 +567,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     if (!_lifecycleListenersAttached) return;
     widget.engine.state.removeListener(_onEngineStateChanged);
     widget.resizing?.removeListener(_onResizeChanged);
-    _autoHide.visible.removeListener(_syncSubtitlePadding);
+    _autoHide.visible.removeListener(_scheduleSubtitlePaddingSync);
     _lifecycleListenersAttached = false;
   }
 
@@ -603,7 +633,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       // active replacement 不一定伴随可见性、resize 或 engine 状态变化，
       // 因此必须立即把当前控制栏可见性同步到新的 VideoState；inactive 阶段
       // 则延迟到 activate，避免访问已经脱离祖先树的 media_kit 状态。
-      if (!_isDeactivating) _syncSubtitlePadding();
+      if (!_isDeactivating) _scheduleSubtitlePaddingSync();
     }
     // engine 更换时迁移状态监听，并同步局部 idle 信号，避免沿用旧引擎状态。
     if (oldWidget.engine.state != widget.engine.state) {
@@ -628,6 +658,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         widget.resizing?.addListener(_onResizeChanged);
         _onResizeChanged();
       }
+    }
+    // actions 变化时仅刷新包含回调闭包的 ViewModel；播放状态 notifier 仍复用，
+    // 避免把一次宿主回调替换扩散成整套控制状态订阅重建。
+    if (oldWidget.actions != widget.actions) {
+      _controlBarViewModel = _createControlBarViewModel();
     }
   }
 
@@ -654,7 +689,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _attachLifecycleListeners();
     _onResizeChanged();
     _isIdleNotifier.value = widget.engine.state.value == MediaState.idle;
-    _syncSubtitlePadding();
+    _scheduleSubtitlePaddingSync();
   }
 
   @override
@@ -717,26 +752,28 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   }
 
   /// 构建控制栏及其展示数据。
+  /// 创建控制栏的只读数据绑定；调用方只在 source/actions 改变时调用。
+  ControlBarViewModel _createControlBarViewModel() => ControlBarViewModel(
+    isPlaying: _controlsState.isPlaying,
+    position: _controlsState.positionMs,
+    duration: _controlsState.durationMs,
+    volume: _controlsState.volume01,
+    isMuted: _controlsState.isMuted,
+    rate: _controlsState.rate,
+    isFullscreen: _isFullscreenNotifier,
+    onSeek: _controlsState.seek,
+    onPlayPause: widget.actions.onPlayPause ?? () {},
+    onSeekBack: widget.actions.onSeekBack ?? (_) {},
+    onSeekForward: widget.actions.onSeekForward ?? (_) {},
+    onToggleMute: _controlsState.toggleMute,
+    onSetVolume: _controlsState.setVolume,
+    onSetRate: _controlsState.setRate,
+  );
+
   ///
   /// 文件名和 idle 状态只在控制栏需要时监听；控制栏之外的稳定 overlay
   /// 不会因标题或空状态变化而重新 build。
   Widget _buildControlBar() {
-    final vm = ControlBarViewModel(
-      isPlaying: _controlsState.isPlaying,
-      position: _controlsState.positionMs,
-      duration: _controlsState.durationMs,
-      volume: _controlsState.volume01,
-      isMuted: _controlsState.isMuted,
-      rate: _controlsState.rate,
-      isFullscreen: _isFullscreenNotifier,
-      onSeek: _controlsState.seek,
-      onPlayPause: widget.actions.onPlayPause ?? () {},
-      onSeekBack: widget.actions.onSeekBack ?? (_) {},
-      onSeekForward: widget.actions.onSeekForward ?? (_) {},
-      onToggleMute: _controlsState.toggleMute,
-      onSetVolume: _controlsState.setVolume,
-      onSetRate: _controlsState.setRate,
-    );
     return ValueListenableBuilder<bool>(
       valueListenable: _autoHide.visible,
       builder: (_, isVisible, _) => Positioned(
@@ -751,7 +788,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
           child: FadeTransition(
             opacity: _autoHide.opacity,
             child: ControlBar(
-              vm: vm,
+              vm: _controlBarViewModel,
               actions: widget.actions,
               isIdle: _isIdleNotifier.value,
               isIdleListenable: _isIdleNotifier,
@@ -773,9 +810,20 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     );
   }
 
+  /// 返回当前 route 可安全读取的 fullscreen 状态。
+  ///
+  /// Flutter 在 `deactivate` 到 `dispose` 之间仍可能触发一次 build；此时
+  /// [VideoState] 的 inherited ancestor 已不可查询，必须先用生命周期标记短路。
+  bool _isFullscreenForCursor() {
+    if (_isDeactivating) return false;
+    return widget.video.isFullscreen;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Focus 保持在最外层；状态监听下沉到真正依赖它的局部区域。
+    // 仅测试观测外层 build；状态监听仍下沉到真正依赖它的局部区域。
+    widget.onBuild?.call();
+    final isFullscreenForCursor = _isFullscreenForCursor();
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
@@ -824,8 +872,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               builder: (_, isVisible, _) => MouseRegion(
                 opaque: false,
                 hitTestBehavior: HitTestBehavior.translucent,
-                cursor:
-                    !_isDeactivating && widget.video.isFullscreen && !isVisible
+                cursor: isFullscreenForCursor && !isVisible
                     ? SystemMouseCursors.none
                     : MouseCursor.defer,
                 onHover: (event) {

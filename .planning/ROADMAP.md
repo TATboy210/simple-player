@@ -12,7 +12,7 @@
 
 ## Phases
 
-- [ ] **Phase 35: Widget Tree Baseline & Behavior Recovery** — 比较本地历史 tree，确认当前主路径，定点恢复缺失行为并补高风险回归测试。
+- [x] **Phase 35: Widget Tree Baseline & Behavior Recovery** — 比较本地历史 tree，确认当前主路径，定点恢复缺失行为并补高风险回归测试。
 - [ ] **Phase 36: Medium-Grain Rebuild Boundary Refactor** — 拆分标题、idle、媒体状态、音量、进度和 resize 的监听边界，保持 widget identity 与 source 生命周期。
 - [ ] **Phase 37: Rendering, Glass & Resize Stability** — 优化 RepaintBoundary、BackdropFilter、painter、视频纹理和 PC resize 期间的布局/raster 行为。
 - [ ] **Phase 38: Regression & Windows Performance Evidence** — 完成自动化回归、analyze、review、profile 帧耗时/jank/内存证据和规划状态收尾。
@@ -48,7 +48,12 @@ Plans:
 3. PlayerScreen 标题栏、视频 surface 和 PlayerVideoControls 在 build/reparent/resize 后保持稳定。
 4. 相关函数和文件维持可维护的中等颗粒度。
 
-**Plans:** 预计 3 个 plan：ControlBar 局部 rebuild、PlayerScreen/video identity、listener/timer 生命周期。
+**Plans:** 3 个 plan：ControlBar 局部 rebuild、PlayerScreen/video identity、listener/timer 生命周期。
+
+Plans:
+- [ ] 36-01-PLAN.md — 以标题 tracer 开始，锁定 ControlBar 的 title/idle/playing/volume/progress 局部 rebuild
+- [ ] 36-02-PLAN.md — 验证 PlayerScreen 标题栏、视频 surface、controls identity 与 engine/controller replacement
+- [ ] 36-03-PLAN.md — 验证 ProgressBar source replacement、merged listener、timer 与 controls 生命周期对称性
 
 ### Phase 37: Rendering, Glass & Resize Stability
 

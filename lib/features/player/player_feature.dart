@@ -21,13 +21,10 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/persistence/settings_store.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/player_services.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
-import '../../ui/dialogs/settings/audio_filter_compositor.dart';
-import '../../ui/dialogs/settings/settings_panel_controller.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
 import 'file_picker_adapters.dart';
@@ -50,15 +47,10 @@ class PlayerFeature extends StatefulWidget {
   /// Win32 窗口桥接服务，用于全屏/窗口控制等原生操作
   final WindowBridge windowService;
 
-  /// 右键快捷菜单回调 — 需要触发位置的 BuildContext 和 TapUpDetails 坐标
-  final void Function(BuildContext barCtx, TapUpDetails details)
-  onSettingsSecondary;
-
   const PlayerFeature({
     super.key,
     required this.coordinator,
     required this.windowService,
-    required this.onSettingsSecondary,
   });
 
   @override
@@ -73,7 +65,6 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   late final FilePickerCoordinator _filePickerCoordinator;
 
   /// 设置面板控制器 — 由组合根构造，传入 PlayerScreen 挂载覆盖层壳（D-02）
-  late final SettingsPanelController _settingsPanelController;
 
   /// 初始化是否完成（控制 build 渲染：未就绪时显示空 widget）
   bool _ready = false;
@@ -87,8 +78,8 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 是否处于文件拖拽悬停状态（控制拖拽提示 UI 显示）
   bool _isDragHovering = false;
 
-  /// 从 SettingsStore 加载的自定义快捷键绑定（key: 快捷键名称, value: 按键组合）
-  Map<String, String> _customBindings = {};
+  /// 内置快捷键映射，移除用户设置后不再从磁盘读取。
+  static const Map<String, String> _customBindings = {};
 
   @override
   void initState() {
@@ -128,21 +119,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       widget.coordinator.report(
         StartupPhase.playerInit,
         0.7,
-        'Loading settings...',
-      );
-      _customBindings = await SettingsStore.loadShortcuts();
-      // Phase 33: 加载 4 个音频偏好原始值（AUDIO-07）作为面板音频 tab 基准快照
-      final audioDefaults = AudioSettings(
-        eqPresetIndex: await SettingsStore.loadAudioEqPreset(),
-        balance: await SettingsStore.loadAudioBalance(),
-        syncMs: await SettingsStore.loadAudioSyncMs(),
-        normalization: await SettingsStore.loadAudioNormalization(),
-      );
-      // 构造设置面板控制器 — 注入音频基准 + 提交回调（Q2 Option A）
-      _settingsPanelController = SettingsPanelController(
-        _services.controller,
-        audioDefaults: audioDefaults,
-        onAudioCommit: _applyAudioSettings,
+        'Applying built-in defaults...',
       );
     } catch (e, stackTrace) {
       KernelLogger.I.e(
@@ -182,8 +159,6 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
   /// 音频滤镜运行时可用性——默认全支持；目标 Windows smoke 检查建立真实值（Q1）。
   /// 由 PlayerFeature 组合根拥有，注入到 af 串组合。
-  final AudioFilterAvailability _audioAvailability =
-      AudioFilterAvailability.allSupported;
 
   /// Phase 33 音频提交回调——SettingsPanelController 在 Apply/OK 时调用一次。
   ///
@@ -192,38 +167,14 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 持久化 4 个原始值（AUDIO-07）。engine.setEqualizer 已被 _guardedAction
   /// 守卫（内部 try-catch+log），此处不再包裹；save 的可恢复异常在
   /// [_saveAudioSettings] 内记录，绝不静默吞掉。
-  void _applyAudioSettings(AudioSettings settings) {
-    final af = _buildAfString(settings, _audioAvailability);
-    _services.engine.setEqualizer(af);
-    unawaited(_saveAudioSettings(settings));
-  }
 
   /// 组合 af 串——委托确定性 [AudioFilterCompositor.compose]，注入运行时可用性。
-  String _buildAfString(
-    AudioSettings settings,
-    AudioFilterAvailability availability,
-  ) => AudioFilterCompositor.compose(settings, availability);
 
   /// 顺序持久化 4 个音频原始值（RC-4 一致性：顺序写，避免部分成功）。
-  Future<void> _saveAudioSettings(AudioSettings settings) async {
-    try {
-      await SettingsStore.saveAudioEqPreset(settings.eqPresetIndex);
-      await SettingsStore.saveAudioBalance(settings.balance);
-      await SettingsStore.saveAudioSyncMs(settings.syncMs);
-      await SettingsStore.saveAudioNormalization(settings.normalization);
-    } on Exception catch (e, stackTrace) {
-      KernelLogger.I.e(
-        '[PlayerFeature] saveAudioSettings failed: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
 
   @override
   void dispose() {
     _filePickerCoordinator.dispose();
-    _settingsPanelController.dispose();
     _services.dispose();
     super.dispose();
   }
@@ -268,9 +219,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       controller: _services.controller,
       customBindings: _customBindings,
       windowService: _services.windowService,
-      settingsPanelController: _settingsPanelController,
       onOpenFile: () => unawaited(_openFile()),
-      onSettingsSecondary: widget.onSettingsSecondary,
       onFilesDropped: _onFilesDropped,
       onDragHoverChanged: (hovering) {
         setState(() => _isDragHovering = hovering);

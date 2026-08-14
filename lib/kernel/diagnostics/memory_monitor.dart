@@ -260,10 +260,7 @@ final class MemoryMonitor implements MemoryMonitorSlot {
   ///
   /// Adds sample to ring buffer, trims to [maxHistory].
   void _recordSample(int rssBytes) {
-    _history.add(MetricSample(
-      rssBytes: rssBytes,
-      timestamp: clock.now(),
-    ));
+    _history.add(MetricSample(rssBytes: rssBytes, timestamp: clock.now()));
     // 环形缓冲: 超过上限移除最旧
     while (_history.length > maxHistory) {
       _history.removeAt(0);

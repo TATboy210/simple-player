@@ -3,6 +3,7 @@
 /// Ports tests from test/kernel/utils/memory_monitor_test.dart to use
 /// the new diagnostics/ import path.
 library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/memory_snapshot.dart';
 

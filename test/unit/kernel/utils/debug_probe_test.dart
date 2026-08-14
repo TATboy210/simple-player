@@ -96,10 +96,8 @@ void main() {
       final probe = DebugProbe('test');
       probe.record('a');
       expect(
-        () => probe.events.add(ProbeEvent(
-          label: 'b',
-          timestamp: DateTime.now(),
-        )),
+        () =>
+            probe.events.add(ProbeEvent(label: 'b', timestamp: DateTime.now())),
         throwsUnsupportedError,
       );
     });

@@ -211,11 +211,7 @@ void main() {
         final staleGen = machine.nextGeneration(); // gen 2
         machine.nextGeneration(); // gen 3 — staleGen outdated
         machine.state.value = MediaState.opening;
-        machine.transitionTo(
-          MediaState.playing,
-          'test',
-          generation: staleGen,
-        );
+        machine.transitionTo(MediaState.playing, 'test', generation: staleGen);
         // stale 被拒绝,state 不变.
         expect(machine.state.value, MediaState.opening);
       });

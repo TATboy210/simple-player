@@ -1,21 +1,12 @@
-/// 轨道偏好管理 — 加载、保存、恢复用户选择的音频/字幕轨道.
+/// 轨道运行时状态管理 — 记录并恢复当前会话中的音频/字幕选择。
 ///
-/// Track preference management — loads, saves, restores user audio/subtitle selections.
-///
-/// [TrackPreferenceService] persists track preferences:
-/// 1. Loads from [SettingsStore] on init.
-/// 2. Restores audio/subtitle track after successful open().
-/// 3. Saves current preferences to [SettingsStore] on dispose.
+/// 跨会话用户设置已移除；该服务只保留播放会话内的轨道状态。
 ///
 /// Architecture: PlaybackController → **TrackPreferenceService** → MediaEngine (TrackControl + SubtitleConfig).
 library;
 
 import '../engine/engine_state.dart';
 import '../models/track_preferences.dart';
-import '../persistence/settings_store.dart';
-import '../diagnostics/kernel_logger.dart';
-
-final _log = KernelLogger.I;
 
 /// 轨道偏好服务 — 加载、保存、恢复用户选择的音频/字幕轨道和字幕延迟.
 ///
@@ -31,18 +22,6 @@ class TrackPreferenceService {
   ///
   /// Current preferences (read-only, for test assertions).
   TrackPreferences get current => _current;
-
-  /// 从 [SettingsStore] 加载轨道偏好.
-  ///
-  /// Loads track preferences from [SettingsStore].
-  Future<void> load() async {
-    try {
-      _current = await SettingsStore.loadTrackPreferences();
-    } on Exception catch (e) {
-      _log.e('TrackPreferenceService.load failed: $e');
-      _current = TrackPreferences.empty;
-    }
-  }
 
   /// 在 open() 成功后恢复轨道偏好.
   ///
@@ -90,16 +69,5 @@ class TrackPreferenceService {
   /// Records user's current subtitle delay.
   void recordSubtitleDelay(int delay) {
     _current = _current.copyWith(subtitleDelay: delay);
-  }
-
-  /// 持久化当前偏好到 [SettingsStore].
-  ///
-  /// Saves current preferences to [SettingsStore].
-  Future<void> save() async {
-    try {
-      await SettingsStore.saveTrackPreferences(_current);
-    } on Exception catch (e) {
-      _log.e('TrackPreferenceService.save failed: $e');
-    }
   }
 }

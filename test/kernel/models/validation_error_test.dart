@@ -2,6 +2,7 @@
 ///
 /// Covers: enum values, constructor, toString, equality, hashCode.
 library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/validation_error.dart';
 

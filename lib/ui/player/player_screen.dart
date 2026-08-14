@@ -9,14 +9,12 @@ import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/services/subtitle_path_validator.dart';
-import '../dialogs/settings/settings_panel_controller.dart';
 import '../theme/tokens.dart';
 import '../window/custom_title_bar.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
-import 'smart_drag_to_resize_area.dart';
 
 /// 播放器主屏幕 — 组合窗口壳、视频 surface、键盘与控制层。
 ///
@@ -43,9 +41,6 @@ class PlayerScreen extends StatefulWidget {
   final PlaybackController controller;
   final WindowBridge windowService;
   final Map<String, String> customBindings;
-  final SettingsPanelController settingsPanelController;
-  final void Function(BuildContext context, TapUpDetails details)?
-  onSettingsSecondary;
   final VoidCallback? onOpenFile;
   final void Function(List<String> paths)? onFilesDropped;
 
@@ -66,9 +61,7 @@ class PlayerScreen extends StatefulWidget {
     this.testVideoControls,
     required this.controller,
     required this.windowService,
-    required this.settingsPanelController,
     this.customBindings = const {},
-    this.onSettingsSecondary,
     this.onOpenFile,
     this.onFilesDropped,
     this.onDragHoverChanged,
@@ -155,12 +148,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 控制栏与快捷键共用空置态的资源释放隔离窗口。
       onOpenFile: _openFileWhenReady,
       onOpenSubtitle: () => unawaited(_openSubtitle()),
-      // SettingsOverlayShell 当前禁用，主设置入口不触发不可见面板。
-      onSettings: null,
-      // 保留宿主注入的二级设置菜单，不扩大本次禁用范围。调用时读取
-      // widget，避免稳定 actions 在同 State replacement 后保留旧宿主回调。
-      onSettingsSecondary: (context, details) =>
-          widget.onSettingsSecondary?.call(context, details),
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
@@ -290,9 +277,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   children: [
                     // v1.8 单文件模式不再维护播放列表侧栏，视频 surface 始终占满内容区。
                     RepaintBoundary(child: cachedVideoContent),
-                    // 设置覆盖层暂时禁用；保留 SettingsPanelController 与 shell
-                    // 实现，后续恢复时只需重新挂载此入口，不影响其他播放路径。
-                    const SizedBox.shrink(),
                   ],
                 ),
               ),
@@ -314,17 +298,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: scaffold,
         );
 
-        // T1: 始终返回 SmartDragToResizeArea — 保持 Widget 类型一致.
-        // 全屏时 enabled=false (IgnorePointer 禁用拖拽但不改类型),
-        // canUpdate 始终 true, Element 复用, Texture 子树不被销毁.
-        // 阶段2:全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动
-        // (controls MouseRegion cursor)。本层仅窗口态 defer / 全屏 basic。
+        // 边缘缩放由 Windows 原生 WM_NCHITTEST 处理；Flutter 层只负责
+        // 标题栏/视频内容交互，避免手势层与原生窗口 resize loop 竞争。
+        // 全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动。
         return MouseRegion(
           cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
-          child: SmartDragToResizeArea(
-            enabled: !isFullscreen,
-            child: keyboardHandler,
-          ),
+          child: keyboardHandler,
         );
       },
     );

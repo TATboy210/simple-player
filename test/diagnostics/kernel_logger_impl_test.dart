@@ -40,10 +40,7 @@ void main() {
   group('NullSink', () {
     test('log() is a no-op (returns normally, does nothing)', () {
       const sink = NullSink();
-      expect(
-        () => sink.log(LogLevel.error, 'test msg'),
-        returnsNormally,
-      );
+      expect(() => sink.log(LogLevel.error, 'test msg'), returnsNormally);
     });
   });
 
@@ -71,10 +68,7 @@ void main() {
       // DebugPrintSink calls debugPrint internally; we can't easily intercept
       // debugPrint in a test, but we can verify it doesn't throw.
       final sink = const DebugPrintSink();
-      expect(
-        () => sink.log(LogLevel.info, 'hello world'),
-        returnsNormally,
-      );
+      expect(() => sink.log(LogLevel.info, 'hello world'), returnsNormally);
     });
 
     test('appends context map to message', () {
@@ -89,10 +83,7 @@ void main() {
   group('DevToolsSink', () {
     test('log() returns normally without throwing', () {
       final sink = const DevToolsSink();
-      expect(
-        () => sink.log(LogLevel.error, 'some error'),
-        returnsNormally,
-      );
+      expect(() => sink.log(LogLevel.error, 'some error'), returnsNormally);
     });
   });
 
@@ -136,10 +127,7 @@ void main() {
     test('I throws StateError before init() is called', () {
       // Reset static instance for test isolation
       KernelLoggerImpl.resetForTesting();
-      expect(
-        () => KernelLoggerImpl.I,
-        throwsA(isA<StateError>()),
-      );
+      expect(() => KernelLoggerImpl.I, throwsA(isA<StateError>()));
     });
 
     test('I returns same instance after init()', () {
@@ -323,7 +311,11 @@ void main() {
     test('with context map and error', () {
       final spy = SpySink();
       final logger = KernelLoggerImpl(spy);
-      logger.error('err', context: {'file': 'test.dart'}, error: Exception('x'));
+      logger.error(
+        'err',
+        context: {'file': 'test.dart'},
+        error: Exception('x'),
+      );
       expect(spy.calls[0].$3, {'file': 'test.dart'});
     });
   });
@@ -335,7 +327,11 @@ void main() {
     test('shape (a): both error and stackTrace', () {
       final spy = SpySink();
       final logger = KernelLoggerImpl(spy);
-      logger.fatal('fat', error: Exception('die'), stackTrace: StackTrace.current);
+      logger.fatal(
+        'fat',
+        error: Exception('die'),
+        stackTrace: StackTrace.current,
+      );
       expect(spy.calls, hasLength(1));
       expect(spy.calls[0].$1, LogLevel.fatal);
     });
@@ -370,10 +366,7 @@ void main() {
   group('CompositeSink deep coverage', () {
     test('empty sink list returns normally', () {
       final composite = CompositeSink([]);
-      expect(
-        () => composite.log(LogLevel.info, 'empty'),
-        returnsNormally,
-      );
+      expect(() => composite.log(LogLevel.info, 'empty'), returnsNormally);
     });
 
     test('forwards to three sinks', () {

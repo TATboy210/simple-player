@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'center_controls.dart';
 import 'control_bar_view_model.dart';
+import 'control_bar_layout_mode.dart';
 import 'left_button_group.dart';
 import 'player_actions.dart';
 import 'right_button_group.dart';
@@ -16,6 +17,7 @@ class ControlBarActions extends StatelessWidget {
   final PlayerActions actions;
   final bool isIdle;
   final ValueListenable<bool>? isIdleListenable;
+  final ControlBarLayoutMode mode;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
 
@@ -27,6 +29,7 @@ class ControlBarActions extends StatelessWidget {
     required this.vm,
     required this.actions,
     required this.isIdle,
+    this.mode = ControlBarLayoutMode.normal,
     this.isIdleListenable,
     this.onToggleFullscreen,
     this.onInteractionStart,
@@ -48,6 +51,7 @@ class ControlBarActions extends StatelessWidget {
             onToggleMute: vm.onToggleMute,
             onSetVolume: vm.onSetVolume,
             onSetRate: vm.onSetRate,
+            showSecondaryActions: mode.showsSecondaryActions,
             onInteractionStart: onInteractionStart,
             onInteractionEnd: onInteractionEnd,
           ),
@@ -57,6 +61,7 @@ class ControlBarActions extends StatelessWidget {
             onPlayPause: vm.onPlayPause,
             onSeekBack: vm.onSeekBack,
             onSeekForward: vm.onSeekForward,
+            showTransportActions: mode.showsTransportActions,
             isIdle: isIdle,
             isIdleListenable: isIdleListenable,
             onStop: actions.onStop,
@@ -65,6 +70,7 @@ class ControlBarActions extends StatelessWidget {
           RightButtonGroup(
             actions: actions,
             onToggleFullscreen: onToggleFullscreen,
+            showSecondaryActions: mode.showsSecondaryActions,
             isFullscreen: vm.isFullscreen,
           ),
         ],

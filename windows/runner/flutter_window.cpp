@@ -110,7 +110,13 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // Give Flutter, including plugins, an opportunity to handle window messages.
+  // Resize hit-testing must be resolved by the runner before Flutter/plugins;
+  // otherwise a plugin can consume WM_NCHITTEST and bypass the native resize loop.
+  if (message == WM_NCHITTEST) {
+    return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+  }
+
+  // Give Flutter, including plugins, an opportunity to handle other messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
         flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,

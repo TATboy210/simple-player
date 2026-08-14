@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
+import 'app_tooltip.dart';
 
 /// 毛玻璃模糊层级
 ///
@@ -155,15 +156,16 @@ class GlassContainer extends StatelessWidget {
     if (opacityNotifier != null) {
       return AnimatedBuilder(
         animation: opacityNotifier,
-        builder: (_, child) {
-          if (opacityNotifier.value < 0.01) {
-            return child ?? const SizedBox.shrink();
-          }
-          return ClipRRect(
-            borderRadius: rRect,
-            child: BackdropFilter(filter: blurFilter, child: child),
-          );
-        },
+        builder: (_, child) => ClipRRect(
+          borderRadius: rRect,
+          child: BackdropFilter(
+            filter: blurFilter,
+            // Keep the filter mounted so opacity changes do not replace the
+            // content element or reset interaction state.
+            enabled: opacityNotifier.value >= 0.01,
+            child: child,
+          ),
+        ),
         child: blurContent,
       );
     }
@@ -411,9 +413,8 @@ class _GlassButtonState extends State<GlassButton>
         widget.child ??
         Icon(widget.icon, size: widget.iconSize, color: effectiveColor);
 
-    final button = Tooltip(
-      message: widget.tooltip ?? '',
-      waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
+    final button = AppTooltip(
+      message: widget.tooltip,
       child: SizedBox(
         width: 36,
         height: 36,
@@ -493,9 +494,8 @@ class _GlassButtonState extends State<GlassButton>
         // 键盘焦点与激活由外层 FocusableActionDetector 唯一处理，避免
         // 同一视觉按钮的 InkWell 再占用一个 Tab 停靠点。
         canRequestFocus: false,
-        child: Tooltip(
-          message: widget.tooltip ?? widget.label ?? '',
-          waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
+        child: AppTooltip(
+          message: widget.tooltip ?? widget.label,
           child: content,
         ),
       ),

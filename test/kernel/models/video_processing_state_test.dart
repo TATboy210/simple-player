@@ -91,10 +91,7 @@ void main() {
     test('hasAny is true when any field is true', () {
       expect(const VideoProcessingPatch(brightness: true).hasAny, true);
       expect(const VideoProcessingPatch(rotation: true).hasAny, true);
-      expect(
-        const VideoProcessingPatch(aspectRatioMode: true).hasAny,
-        true,
-      );
+      expect(const VideoProcessingPatch(aspectRatioMode: true).hasAny, true);
     });
 
     test('isColorAdjustment true for brightness/contrast/saturation/hue', () {
@@ -110,10 +107,7 @@ void main() {
         const VideoProcessingPatch(saturation: true).isColorAdjustment,
         true,
       );
-      expect(
-        const VideoProcessingPatch(hue: true).isColorAdjustment,
-        true,
-      );
+      expect(const VideoProcessingPatch(hue: true).isColorAdjustment, true);
     });
 
     test('isColorAdjustment false for non-color fields', () {
@@ -122,8 +116,7 @@ void main() {
         false,
       );
       expect(
-        const VideoProcessingPatch(deinterlaceEnabled: true)
-            .isColorAdjustment,
+        const VideoProcessingPatch(deinterlaceEnabled: true).isColorAdjustment,
         false,
       );
       expect(

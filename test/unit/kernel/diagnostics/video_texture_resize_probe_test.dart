@@ -457,10 +457,14 @@ class _RecordingLogger extends KernelLogger {
   final List<_LogEntry> entries = [];
 
   @override
-  void trace(String message, {Map<String, Object?>? context}) {}
+  void trace(String message, {Map<String, Object?>? context}) {
+    // Trace output is intentionally ignored by this test logger.
+  }
 
   @override
-  void debug(String message, {Map<String, Object?>? context}) {}
+  void debug(String message, {Map<String, Object?>? context}) {
+    // Debug output is intentionally ignored by this test logger.
+  }
 
   @override
   void info(String message, {Map<String, Object?>? context}) {
@@ -468,7 +472,9 @@ class _RecordingLogger extends KernelLogger {
   }
 
   @override
-  void warn(String message, {Map<String, Object?>? context}) {}
+  void warn(String message, {Map<String, Object?>? context}) {
+    // Warning output is intentionally ignored by this test logger.
+  }
 
   @override
   void error(
@@ -476,7 +482,9 @@ class _RecordingLogger extends KernelLogger {
     Map<String, Object?>? context,
     Object? error,
     StackTrace? stackTrace,
-  }) {}
+  }) {
+    // Error output is intentionally ignored by this test logger.
+  }
 
   @override
   void fatal(
@@ -484,7 +492,9 @@ class _RecordingLogger extends KernelLogger {
     Map<String, Object?>? context,
     Object? error,
     StackTrace? stackTrace,
-  }) {}
+  }) {
+    // Fatal output is intentionally ignored by this test logger.
+  }
 }
 
 final class _ReentrantProbeLogger extends _RecordingLogger {
