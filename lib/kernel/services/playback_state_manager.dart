@@ -1,52 +1,19 @@
-/// 播放状态管理 — 恢复并持久化单文件播放器设置。
+/// 播放状态管理 — 维护单文件播放器的运行时生命周期状态。
 ///
-/// [PlaybackStateManager] 只管理跨会话有效的音量与静音设置；播放列表、
-/// 历史、断点和播放模式已不属于 v1.8 单文件播放器运行时。
+/// 用户设置已移除，因此该服务不执行跨会话读取或写入。
 library;
 
-import 'dart:async';
-
-import '../diagnostics/kernel_logger.dart';
-import '../persistence/settings_store.dart';
-import 'playback_controller.dart';
-
-final _log = KernelLogger.I;
-
-/// 单文件播放器状态管理器 — 设置恢复与销毁持久化。
+/// 单文件播放器状态管理器 — 运行时生命周期占位模块。
 class PlaybackStateManager {
-  PlaybackStateManager(this._controller);
+  const PlaybackStateManager();
 
-  final PlaybackController _controller;
-  bool _initialized = false;
-
-  /// 恢复音量与静音设置。
+  /// 标记运行时状态管理器已初始化。
   ///
-  /// [settings] 可由组合根传入以复用已完成的设置 I/O；重复调用不会再次应用。
-  Future<void> init({AppSettings? settings}) async {
-    if (_initialized) return;
-    _initialized = true;
+  /// 用户设置已移除，音量和静音由引擎默认值管理。
+  Future<void> init() async {}
 
-    try {
-      final resolvedSettings = settings ?? await SettingsStore.load();
-      _controller.engine.setVolume(resolvedSettings.volume);
-      _controller.engine.setMute(resolvedSettings.isMuted);
-    } on Exception catch (error) {
-      _log.e('PlaybackStateManager.init load settings failed: $error');
-    }
-  }
-
-  /// 异步保存音量与静音，不阻塞播放器销毁流程。
+  /// 释放运行时状态管理器。
   void dispose() {
-    // 设置写入与引擎资源释放互不依赖，因此显式采用 fire-and-forget。
-    unawaited(
-      SettingsStore.saveVolume(_controller.engine.volume.value).catchError(
-        (Object error) => _log.e('SettingsStore.saveVolume failed: $error'),
-      ),
-    );
-    unawaited(
-      SettingsStore.saveIsMuted(_controller.engine.isMuted.value).catchError(
-        (Object error) => _log.e('SettingsStore.saveIsMuted failed: $error'),
-      ),
-    );
+    // 无持久化副作用；引擎资源由 PlaybackController 统一释放。
   }
 }

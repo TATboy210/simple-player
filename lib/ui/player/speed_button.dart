@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../shared/app_tooltip.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/osd_overlay.dart';
@@ -22,11 +23,7 @@ class SpeedButton extends StatelessWidget {
   static const _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0];
   static const _normal = 1.0;
 
-  const SpeedButton({
-    super.key,
-    required this.rate,
-    required this.onSetRate,
-  });
+  const SpeedButton({super.key, required this.rate, required this.onSetRate});
 
   void _shift(int direction) {
     final current = rate.value;
@@ -129,9 +126,8 @@ class _Segment extends StatelessWidget {
             ),
           );
 
-    return Tooltip(
-      message: tooltip ?? '',
-      waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
+    return AppTooltip(
+      message: tooltip,
       child: GestureDetector(
         onDoubleTap: onDoubleTap,
         child: SizedBox(

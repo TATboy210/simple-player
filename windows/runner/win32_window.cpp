@@ -2,6 +2,9 @@
 
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <windowsx.h>
+
+#include <algorithm>
 
 #include "resource.h"
 
@@ -31,6 +34,46 @@ namespace
     DWORD corner = DWMWCP_ROUND;
     DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE,
                           &corner, sizeof(corner));
+  }
+
+  // Classify the physical-pixel border under the pointer so Windows can run
+  // its native resize loop for this frameless window.
+  LRESULT HitTestResizeBorder(HWND hwnd, LPARAM lparam)
+  {
+    // A non-resizable window must never expose HT* even if the pointer is on
+    // the physical border; this also protects against plugin style timing.
+    const LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+    if (IsZoomed(hwnd) || IsIconic(hwnd) ||
+        (style & WS_THICKFRAME) == 0) {
+      return HTCLIENT;
+    }
+
+    RECT window_rect{};
+    if (!GetWindowRect(hwnd, &window_rect)) {
+      return HTCLIENT;
+    }
+
+    const UINT dpi = GetDpiForWindow(hwnd);
+    const int dpi_scale = dpi == 0 ? USER_DEFAULT_SCREEN_DPI : dpi;
+    const int frame_x = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi_scale) +
+                        GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi_scale);
+    const int frame_y = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi_scale) +
+                        GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi_scale);
+    const POINT cursor = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+    const bool left = cursor.x < window_rect.left + frame_x;
+    const bool right = cursor.x >= window_rect.right - frame_x;
+    const bool top = cursor.y < window_rect.top + frame_y;
+    const bool bottom = cursor.y >= window_rect.bottom - frame_y;
+
+    if (left && top) return HTTOPLEFT;
+    if (right && top) return HTTOPRIGHT;
+    if (left && bottom) return HTBOTTOMLEFT;
+    if (right && bottom) return HTBOTTOMRIGHT;
+    if (top) return HTTOP;
+    if (bottom) return HTBOTTOM;
+    if (left) return HTLEFT;
+    if (right) return HTRIGHT;
+    return HTCLIENT;
   }
 
   constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
@@ -264,11 +307,15 @@ Win32Window::MessageHandler(HWND hwnd,
     return 0;
   }
 
+  case WM_NCHITTEST:
+    return HitTestResizeBorder(hwnd, lparam);
+
   case WM_NCCALCSIZE:
   {
     // Frameless window: fold non-client area to zero for ALL states
     // (windowed, maximized, fullscreen). Eliminates WS_THICKFRAME ~7px
-    // invisible borders. DragToResizeArea in Flutter handles edge resize.
+    // invisible borders. WM_NCHITTEST below restores native edge/corner
+    // resize hit-testing without reintroducing a visible non-client frame.
     // Note: maximized window covers taskbar — use rcWork in SetWindowPos
     // for correct maximize bounds (already handled in WindowService).
     if (wparam == TRUE)

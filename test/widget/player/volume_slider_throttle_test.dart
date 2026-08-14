@@ -21,7 +21,9 @@ void main() {
   Widget buildSubject() => MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume)),
+    home: Scaffold(
+      body: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume),
+    ),
   );
 
   group('VolumeSlider throttle', () {
@@ -56,9 +58,7 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
     });
 
-    testWidgets('onChangeEnd immediately flushes final value', (
-      tester,
-    ) async {
+    testWidgets('onChangeEnd immediately flushes final value', (tester) async {
       engine.volume.value = 0.5;
       await tester.pumpWidget(buildSubject());
       await tester.pump();

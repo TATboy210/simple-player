@@ -31,10 +31,6 @@ class _RecordingTrackPreferenceService extends TrackPreferenceService {
   void restoreAfterOpen(MediaInfo mediaInfo) {
     restoredMedia.add(mediaInfo);
   }
-
-  /// 测试替身不持久化偏好，避免销毁 controller 时触发平台插件 I/O。
-  @override
-  Future<void> save() => Future<void>.value();
 }
 
 void main() {

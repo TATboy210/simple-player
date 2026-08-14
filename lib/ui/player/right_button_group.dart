@@ -1,4 +1,4 @@
-/// 右侧按钮组模块 — 文件、字幕、设置与全屏
+/// 右侧按钮组模块 — 文件、字幕与全屏
 ///
 /// 从 ControlBar 中提取的独立 Widget，负责控制栏底部行右侧按钮群。
 /// 单文件播放器不再展示播放列表入口。
@@ -11,7 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import 'player_actions.dart';
 
-/// 右侧按钮组：文件、字幕、设置与全屏。
+/// 右侧按钮组：文件、字幕与全屏。
 ///
 /// 路径B Commit1:加 [isFullscreen] ValueListenable 驱动全屏按钮图标
 /// (fullscreen ↔ fullscreen_exit),原恒定 Icons.fullscreen 改为动态。
@@ -26,12 +26,14 @@ class RightButtonGroup extends StatelessWidget {
   /// 全屏状态 — 驱动全屏按钮图标(enter ↔ exit)。
   /// null 时 fallback 恒定 enter 图标(兼容未接入场景,生产路径总传非 null)。
   final ValueListenable<bool>? isFullscreen;
+  final bool showSecondaryActions;
 
   const RightButtonGroup({
     super.key,
     required this.actions,
     this.onToggleFullscreen,
     this.isFullscreen,
+    this.showSecondaryActions = true,
   });
 
   @override
@@ -44,28 +46,17 @@ class RightButtonGroup extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (actions.onOpenFile != null)
+        if (showSecondaryActions && actions.onOpenFile != null)
           GlassButton.iconOnly(
             icon: Icons.folder_open,
             onPressed: actions.onOpenFile,
             tooltip: l10n.openFileTooltip,
           ),
-        if (actions.onOpenSubtitle != null)
+        if (showSecondaryActions && actions.onOpenSubtitle != null)
           GlassButton.iconOnly(
             icon: Icons.subtitles,
             onPressed: actions.onOpenSubtitle,
             tooltip: l10n.openSubtitle,
-          ),
-        if (actions.onSettings != null)
-          GlassButton.iconOnly(
-            icon: Icons.settings,
-            onPressed: actions.onSettings,
-            // switch 表达式消除字段 `!` (onSettingsSecondary 不提升)
-            onSecondaryTapUp: switch (actions.onSettingsSecondary) {
-              final cb? => (d) => cb(context, d),
-              null => null,
-            },
-            tooltip: l10n.settings,
           ),
         if (fullscreenCb != null)
           // isFullscreen 驱动图标:全屏时 exit 图标,非全屏时 enter 图标.

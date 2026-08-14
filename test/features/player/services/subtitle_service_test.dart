@@ -39,7 +39,10 @@ void main() {
       await subFile.create();
 
       service.detectAndLoadSync(mediaFile.path);
-      expect(engine.lastSubtitle, subFile.path.replaceAll('/', Platform.pathSeparator));
+      expect(
+        engine.lastSubtitle,
+        subFile.path.replaceAll('/', Platform.pathSeparator),
+      );
     });
 
     test('detectAndLoadSync finds subtitle with language tag', () async {
@@ -49,7 +52,10 @@ void main() {
       await subFile.create();
 
       service.detectAndLoadSync(mediaFile.path);
-      expect(engine.lastSubtitle, subFile.path.replaceAll('/', Platform.pathSeparator));
+      expect(
+        engine.lastSubtitle,
+        subFile.path.replaceAll('/', Platform.pathSeparator),
+      );
     });
 
     test('detectAndLoadSync ignores non-subtitle extensions', () async {
@@ -91,7 +97,10 @@ void main() {
       await subFile.create();
 
       await service.detectAndLoad(mediaFile.path);
-      expect(engine.lastSubtitle, subFile.path.replaceAll('/', Platform.pathSeparator));
+      expect(
+        engine.lastSubtitle,
+        subFile.path.replaceAll('/', Platform.pathSeparator),
+      );
     });
 
     test('detectAndLoad finds subtitle with language tag async', () async {
@@ -144,7 +153,11 @@ void main() {
           final fakeEngine = _FakeEngine();
           final svc = SubtitleService(fakeEngine);
           await svc.detectAndLoad(mediaFile.path);
-          expect(fakeEngine.lastSubtitle, isNotNull, reason: 'Extension $ext should match');
+          expect(
+            fakeEngine.lastSubtitle,
+            isNotNull,
+            reason: 'Extension $ext should match',
+          );
         } finally {
           if (await subDir.exists()) await subDir.delete(recursive: true);
         }

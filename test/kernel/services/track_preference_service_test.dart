@@ -72,7 +72,9 @@ void main() {
 
       test('ignores subtitle track when index is out of range', () {
         engine.configureMedia(
-          subtitleTracks: [const SubtitleTrackInfo(index: 0, language: 'en', title: 'English')],
+          subtitleTracks: [
+            const SubtitleTrackInfo(index: 0, language: 'en', title: 'English'),
+          ],
         );
         service.recordSubtitleTrack(5);
         service.restoreAfterOpen(engine.mediaInfo);
@@ -119,7 +121,10 @@ void main() {
         engine.configureMedia(
           audioTracks: [const AudioTrackInfo(index: 0, language: 'en')],
         );
-        expect(() => service.restoreAfterOpen(engine.mediaInfo), returnsNormally);
+        expect(
+          () => service.restoreAfterOpen(engine.mediaInfo),
+          returnsNormally,
+        );
       });
 
       test('restore with null subtitle index does nothing', () {
@@ -129,7 +134,10 @@ void main() {
             const SubtitleTrackInfo(index: 0, language: 'en', title: 'English'),
           ],
         );
-        expect(() => service.restoreAfterOpen(engine.mediaInfo), returnsNormally);
+        expect(
+          () => service.restoreAfterOpen(engine.mediaInfo),
+          returnsNormally,
+        );
       });
     });
   });

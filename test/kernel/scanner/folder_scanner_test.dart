@@ -80,10 +80,7 @@ void main() {
 
       final result = await FolderScanner.scan(tempDir.path);
 
-      expect(
-        result.map((vf) => vf.name).toList(),
-        ['a.mp4', 'b.mp4', 'c.mp4'],
-      );
+      expect(result.map((vf) => vf.name).toList(), ['a.mp4', 'b.mp4', 'c.mp4']);
     });
 
     test('is non-recursive — ignores videos in subdirectories', () async {

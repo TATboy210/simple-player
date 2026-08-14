@@ -79,7 +79,7 @@ abstract interface class LogSink {
   /// [level] severity, [msg] redacted message, [context] optional structured data.
   /// [error]/[stackTrace] 可选 — 由 error/fatal 级别透传, 供支持结构化错误的
   /// sink (如 DevToolsSink) 使用。P1 bugfix: 此前接口不接这两个参数, 导致
-  /// KernelLoggerImpl.error/fatal 丢弃调用方传入的 error/stackTrace。
+  /// KernelLoggerImpl.error/fatal 丢弃调用方传入的 error/stackTrace.
   void log(
     LogLevel level,
     String msg, {
@@ -157,10 +157,13 @@ Object? _normalizeLogValue(Object? value, Set<Object> activeContainers) {
     if (!activeContainers.add(value)) return '<cycle>';
     try {
       final entries = value.entries.toList()
-        ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
+        ..sort(
+          (a, b) =>
+              (a.key?.toString() ?? '').compareTo(b.key?.toString() ?? ''),
+        );
       return <String, Object?>{
         for (final entry in entries)
-          entry.key.toString(): _normalizeLogValue(
+          (entry.key?.toString() ?? '<null>'): _normalizeLogValue(
             entry.value,
             activeContainers,
           ),
@@ -295,6 +298,7 @@ final class NullSink implements LogSink {
     StackTrace? stackTrace,
   }) {
     // Intentional no-op: release builds produce zero output.
+    return;
   }
 }
 
@@ -499,7 +503,7 @@ final class KernelLoggerImpl extends KernelLogger {
     return inst;
   }
 
-  /// 组合根 — 根据 Flutter 构建模式初始化默认 sink。
+  /// 组合根 — 根据 Flutter 构建模式初始化默认 sink.
   ///
   /// Debug 双路输出，Profile 仅写 DevTools，Release 使用 [NullSink]。必须在
   /// kernel 代码访问 [I] 之前调用。

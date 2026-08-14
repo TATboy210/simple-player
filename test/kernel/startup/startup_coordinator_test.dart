@@ -25,11 +25,7 @@ void main() {
     });
 
     test('report updates state with phase, progress, message', () {
-      coordinator.report(
-        StartupPhase.infrastructure,
-        0.5,
-        'Loading...',
-      );
+      coordinator.report(StartupPhase.infrastructure, 0.5, 'Loading...');
       expect(coordinator.state.value.phase, StartupPhase.infrastructure);
       expect(coordinator.state.value.progress, 0.5);
       expect(coordinator.state.value.message, 'Loading...');

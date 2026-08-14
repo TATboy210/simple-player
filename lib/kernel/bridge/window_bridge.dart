@@ -9,11 +9,14 @@ import 'window_mode.dart';
 /// 实现方：[WindowService]（Win32 真实实现）、FakeWindowService（测试替身）。
 ///
 /// Contract:
-/// - All state is exposed via [ValueNotifier] getters; widgets rebuild through `ValueListenableBuilder`.
-/// - Command methods return `Future<void>` and are safe to call concurrently; ordering is implementation-defined.
-/// - [dispose] MUST be called once when the bridge is no longer needed; calling commands after dispose is undefined.
+/// - State is exposed through notifier getters so widgets can use
+///   `ValueListenableBuilder` without depending on the platform implementation.
+/// - Commands return `Future<void>`; implementations may serialize platform
+///   operations when native completion order could otherwise reorder state.
+/// - The composition root owns the bridge lifecycle and calls [dispose] once
+///   after all consumers have stopped listening.
 abstract class WindowBridge {
-  // ─── 5 个状态 ───
+  // ─── 5 个 notifier 状态 + 1 个派生状态 ───
 
   /// 当前窗口模式（普通/最大化/全屏等）
   ///
@@ -37,7 +40,8 @@ abstract class WindowBridge {
 
   /// 窗口是否置顶
   ///
-  /// Contract: toggled via [setAlwaysOnTop]; persists across mode changes.
+  /// Contract: toggled via [setAlwaysOnTop]; implementations may persist the
+  /// choice across application restarts.
   ValueNotifier<bool> get isAlwaysOnTop;
 
   /// 当前是否全屏 — 从 [mode] 派生，单一数据源
@@ -47,25 +51,23 @@ abstract class WindowBridge {
 
   // ─── 7 个命令 ───
 
-  /// 初始化窗口（恢复持久化状态、注册平台回调）
+  /// 初始化窗口（应用固定默认状态并注册平台回调）
   ///
-  /// Contract: MUST be called once before any other command; calling twice is a no-op.
+  /// Contract: completes only after the platform window has restored its persisted
+  /// state and finished showing/focusing; concurrent calls share one operation.
   Future<void> init();
 
-  /// 切换窗口模式（普通/最大化/全屏等）
+  /// 切换窗口模式（普通/最大化/全屏等）。
   ///
-  /// Contract: [target] is applied atomically; notifies [mode], [windowSize], [isFullscreen] listeners.
+  /// Contract: [target] updates [mode] and therefore [isFullscreen]. Window
+  /// geometry is updated only when the platform reports a settled resize.
   Future<void> setMode(WindowMode target);
 
   /// 设置窗口置顶状态
   ///
-  /// Contract: [value] persisted across mode changes; notifies [isAlwaysOnTop] listener.
+  /// Contract: [value] applies immediately and notifies [isAlwaysOnTop] listeners;
+  /// implementations may persist it across application restarts.
   Future<void> setAlwaysOnTop(bool value);
-
-  /// 设置窗口宽高比（用于视频播放时锁定比例）
-  ///
-  /// Contract: [ratio] > 0; 0 or negative resets to free-resize. Delegates to platform `setAspectRatio`.
-  Future<void> setAspectRatio(double ratio);
 
   /// 最小化窗口
   ///
@@ -82,8 +84,9 @@ abstract class WindowBridge {
   /// Contract: delegates to platform drag; no-op if platform does not support programmatic drag.
   Future<void> startDragging();
 
-  /// 释放所有资源（取消回调、清理状态）
+  /// 释放所有资源（取消回调、清理状态）。
   ///
-  /// Contract: MUST be called exactly once; calling any command after dispose is undefined behavior.
+  /// Contract: the call is idempotent. Commands must not be issued after
+  /// disposal; the bridge ignores late platform callbacks safely.
   void dispose();
 }

@@ -38,4 +38,3 @@ enum MediaState {
   /// An error occurred.
   error,
 }
-

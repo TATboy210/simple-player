@@ -43,20 +43,18 @@ void main() {
     });
 
     testWidgets('pulse variant with glowIntensity renders', (tester) async {
-      await tester.pumpWidget(buildTestWidget(
-        variant: EdgeGlowVariant.pulse,
-        glowIntensity: 0.5,
-      ));
+      await tester.pumpWidget(
+        buildTestWidget(variant: EdgeGlowVariant.pulse, glowIntensity: 0.5),
+      );
       expect(find.byType(EdgeGlow), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(EdgeGlow), findsOneWidget);
     });
 
     testWidgets('omni variant with glowIntensity renders', (tester) async {
-      await tester.pumpWidget(buildTestWidget(
-        variant: EdgeGlowVariant.omni,
-        glowIntensity: 0.3,
-      ));
+      await tester.pumpWidget(
+        buildTestWidget(variant: EdgeGlowVariant.omni, glowIntensity: 0.3),
+      );
       expect(find.byType(EdgeGlow), findsOneWidget);
     });
 

@@ -25,7 +25,11 @@ void main() {
           body: SizedBox(
             width: width,
             height: 48,
-            child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo),
+            child: ProgressBar(
+              position: engine.position,
+              duration: engine.duration,
+              onSeek: engine.seekTo,
+            ),
           ),
         ),
       );
@@ -73,8 +77,9 @@ void main() {
       expect(engine.seekToCallCount, 0);
     });
 
-    testWidgets('drag updates position and triggers seek on end',
-        (tester) async {
+    testWidgets('drag updates position and triggers seek on end', (
+      tester,
+    ) async {
       engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
 
@@ -294,8 +299,9 @@ void main() {
       expect(engine.seekToCallCount, greaterThanOrEqualTo(1));
     });
 
-    testWidgets('drag end with zero duration resets drag state',
-        (tester) async {
+    testWidgets('drag end with zero duration resets drag state', (
+      tester,
+    ) async {
       engine.duration.value = 0;
       await tester.pumpWidget(buildSubject());
 
@@ -332,8 +338,9 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('_BarPainter shouldRepaint returns true on fraction change',
-        (tester) async {
+    testWidgets('_BarPainter shouldRepaint returns true on fraction change', (
+      tester,
+    ) async {
       engine.duration.value = 10000;
       engine.position.value = 0;
       await tester.pumpWidget(buildSubject());
@@ -345,8 +352,9 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
-    testWidgets('_BarPainter shouldRepaint returns true on drag state change',
-        (tester) async {
+    testWidgets('_BarPainter shouldRepaint returns true on drag state change', (
+      tester,
+    ) async {
       engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
 
@@ -362,8 +370,9 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
-    testWidgets('_buildTooltip positions correctly at left edge',
-        (tester) async {
+    testWidgets('_buildTooltip positions correctly at left edge', (
+      tester,
+    ) async {
       engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
 
@@ -380,8 +389,9 @@ void main() {
       expect(find.byType(ProgressBar), findsOneWidget);
     });
 
-    testWidgets('_buildTooltip positions correctly at right edge',
-        (tester) async {
+    testWidgets('_buildTooltip positions correctly at right edge', (
+      tester,
+    ) async {
       engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
 
@@ -398,8 +408,9 @@ void main() {
       expect(find.byType(ProgressBar), findsOneWidget);
     });
 
-    testWidgets('drag seekTo fires after drag ends with non-zero duration',
-        (tester) async {
+    testWidgets('drag seekTo fires after drag ends with non-zero duration', (
+      tester,
+    ) async {
       engine.duration.value = 10000;
       await tester.pumpWidget(buildSubject());
 
@@ -419,8 +430,9 @@ void main() {
       expect(engine.lastSeekToMs, lessThanOrEqualTo(10000));
     });
 
-    testWidgets('drag tooltip shows formatted time during drag',
-        (tester) async {
+    testWidgets('drag tooltip shows formatted time during drag', (
+      tester,
+    ) async {
       engine.duration.value = 60000; // 1 minute
       await tester.pumpWidget(buildSubject());
 
@@ -465,8 +477,9 @@ void main() {
       expect(find.byType(ProgressBar), findsOneWidget);
     });
 
-    testWidgets('hover with non-zero position shows formatted time',
-        (tester) async {
+    testWidgets('hover with non-zero position shows formatted time', (
+      tester,
+    ) async {
       engine.duration.value = 120000; // 2 minutes
       engine.position.value = 60000;
       await tester.pumpWidget(buildSubject());
@@ -499,7 +512,12 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing),
+              child: ProgressBar(
+                position: engine.position,
+                duration: engine.duration,
+                onSeek: engine.seekTo,
+                resizing: resizing,
+              ),
             ),
           ),
         ),
@@ -523,7 +541,12 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing),
+              child: ProgressBar(
+                position: engine.position,
+                duration: engine.duration,
+                onSeek: engine.seekTo,
+                resizing: resizing,
+              ),
             ),
           ),
         ),
@@ -648,7 +671,12 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing1),
+              child: ProgressBar(
+                position: engine.position,
+                duration: engine.duration,
+                onSeek: engine.seekTo,
+                resizing: resizing1,
+              ),
             ),
           ),
         ),
@@ -664,7 +692,12 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing2),
+              child: ProgressBar(
+                position: engine.position,
+                duration: engine.duration,
+                onSeek: engine.seekTo,
+                resizing: resizing2,
+              ),
             ),
           ),
         ),
@@ -689,7 +722,12 @@ void main() {
             body: SizedBox(
               width: 800,
               height: 48,
-              child: ProgressBar(position: engine.position, duration: engine.duration, onSeek: engine.seekTo, resizing: resizing),
+              child: ProgressBar(
+                position: engine.position,
+                duration: engine.duration,
+                onSeek: engine.seekTo,
+                resizing: resizing,
+              ),
             ),
           ),
         ),
@@ -802,60 +840,54 @@ void main() {
       },
     );
 
-    testWidgets(
-      'drag seeks during drag, not only on release (修 B)',
-      (tester) async {
-        // 修 B: leading throttle — dragUpdate 期间 seek (timer 未活跃才触发),
-        // 非松手才跳. dragFrom 触发 start→update→end, 断言 seek >= 2
-        // (dragUpdate leading seek 1 + dragEnd flush seek 1).
-        // 修 B 前 debounce 致 dragUpdate 不 seek, 仅 dragEnd 1 次 → count=1.
-        engine.duration.value = 10000;
-        await tester.pumpWidget(buildSubject());
+    testWidgets('drag seeks during drag, not only on release (修 B)', (
+      tester,
+    ) async {
+      // 修 B: leading throttle — dragUpdate 期间 seek (timer 未活跃才触发),
+      // 非松手才跳. dragFrom 触发 start→update→end, 断言 seek >= 2
+      // (dragUpdate leading seek 1 + dragEnd flush seek 1).
+      // 修 B 前 debounce 致 dragUpdate 不 seek, 仅 dragEnd 1 次 → count=1.
+      engine.duration.value = 10000;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+      final start = rect.centerLeft + const Offset(50, 0);
+      final end = rect.centerRight - const Offset(50, 0);
+
+      await tester.dragFrom(start, end - start);
+      await tester.pump();
+
+      expect(engine.seekToCallCount, greaterThanOrEqualTo(2));
+    });
+
+    testWidgets('hover tooltip renders without extra postFrame pump (修 D)', (
+      tester,
+    ) async {
+      // 修 D: onHover 直接更新 _hoverNotifier, 去掉 postFrameCallback +
+      // _hoverScheduled. 连续 hover move 每次都更新 (不丢更新), tooltip 即时跟随.
+      engine.duration.value = 60000;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
+
+      final bar = find.byType(ProgressBar);
+      final rect = tester.getRect(bar);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: rect.centerLeft + const Offset(10, 0));
+      await tester.pump();
+
+      // 连续 hover move — 修 D 前 _hoverScheduled=true 期间会丢中途更新
+      for (var i = 0; i < 4; i++) {
+        await gesture.moveBy(const Offset(30, 0));
         await tester.pump();
+      }
+      await tester.pump();
 
-        final bar = find.byType(ProgressBar);
-        final rect = tester.getRect(bar);
-        final start = rect.centerLeft + const Offset(50, 0);
-        final end = rect.centerRight - const Offset(50, 0);
-
-        await tester.dragFrom(start, end - start);
-        await tester.pump();
-
-        expect(engine.seekToCallCount, greaterThanOrEqualTo(2));
-      },
-    );
-
-    testWidgets(
-      'hover tooltip renders without extra postFrame pump (修 D)',
-      (tester) async {
-        // 修 D: onHover 直接更新 _hoverNotifier, 去掉 postFrameCallback +
-        // _hoverScheduled. 连续 hover move 每次都更新 (不丢更新), tooltip 即时跟随.
-        engine.duration.value = 60000;
-        await tester.pumpWidget(buildSubject());
-        await tester.pump();
-
-        final bar = find.byType(ProgressBar);
-        final rect = tester.getRect(bar);
-
-        final gesture = await tester.createGesture(
-          kind: PointerDeviceKind.mouse,
-        );
-        await gesture.addPointer(
-          location: rect.centerLeft + const Offset(10, 0),
-        );
-        await tester.pump();
-
-        // 连续 hover move — 修 D 前 _hoverScheduled=true 期间会丢中途更新
-        for (var i = 0; i < 4; i++) {
-          await gesture.moveBy(const Offset(30, 0));
-          await tester.pump();
-        }
-        await tester.pump();
-
-        // tooltip 渲染: hover fraction 非 null → Positioned tooltip 存在
-        expect(find.byType(Positioned), findsWidgets);
-        expect(find.byType(ProgressBar), findsOneWidget);
-      },
-    );
+      // tooltip 渲染: hover fraction 非 null → Positioned tooltip 存在
+      expect(find.byType(Positioned), findsWidgets);
+      expect(find.byType(ProgressBar), findsOneWidget);
+    });
   });
 }

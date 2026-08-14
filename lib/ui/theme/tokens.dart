@@ -176,6 +176,14 @@ class Tokens {
 
   // ── 控制栏 ──
   static const controlBarHeight = 110.0;
+
+  /// 控制栏在窄窗口中的高度；为标题、时间轴和核心动作保留独立命中区。
+  static const controlBarHeightMinimal = 100.0;
+  static const controlBarTitleHeightMinimal = 16.0;
+  static const controlBarActionsHeightMinimal = 44.0;
+
+  /// 低于该宽度仅保留核心播放控制，避免动作组发生横向溢出。
+  static const controlBarMinimalBreakpoint = 600.0;
   static const controlBarRadius = 22.0; // 修正为 22px（与设计稿一致）
   static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;

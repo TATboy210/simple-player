@@ -86,6 +86,35 @@ void main() {
       opacity.dispose();
     });
 
+    testWidgets(
+      'opacity changes skip the blur without replacing the content element',
+      (tester) async {
+        final opacity = ValueNotifier<double>(1.0);
+        addTearDown(opacity.dispose);
+        await tester.pumpWidget(buildSubject(opacity: opacity));
+        await tester.pump();
+
+        final content = find.text('test');
+        final initialContentElement = tester.element(content);
+        expect(find.byType(BackdropFilter), findsOneWidget);
+
+        // Fading a control out must not recreate its focusable/semantic content.
+        opacity.value = 0;
+        await tester.pump();
+
+        final filter = find.byType(BackdropFilter);
+        expect(filter, findsOneWidget);
+        expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
+        expect(tester.element(content), same(initialContentElement));
+
+        opacity.value = 1;
+        await tester.pump();
+
+        expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
+        expect(tester.element(content), same(initialContentElement));
+      },
+    );
+
     testWidgets('resizing=true keeps BackdropFilter mounted but disabled', (
       tester,
     ) async {
@@ -181,8 +210,11 @@ void main() {
           matching: find.byType(Container).first,
         ),
       );
-      final decoration = container.decoration! as BoxDecoration;
-      expect(decoration.color, Tokens.bgGlass);
+      final decoration = container.decoration;
+      expect(decoration, isA<BoxDecoration>());
+      if (decoration case final BoxDecoration boxDecoration) {
+        expect(boxDecoration.color, Tokens.bgGlass);
+      }
     });
 
     testWidgets('backgroundColor overrides default when provided', (
@@ -205,8 +237,11 @@ void main() {
           matching: find.byType(Container).first,
         ),
       );
-      final decoration = container.decoration! as BoxDecoration;
-      expect(decoration.color, customColor);
+      final decoration = container.decoration;
+      expect(decoration, isA<BoxDecoration>());
+      if (decoration case final BoxDecoration boxDecoration) {
+        expect(boxDecoration.color, customColor);
+      }
     });
   });
 

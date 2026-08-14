@@ -36,15 +36,10 @@ class DeferredPlayerFeature extends StatefulWidget {
   /// 窗口桥接服务，传递给 PlayerFeature 用于 Win32 窗口控制
   final WindowBridge windowService;
 
-  /// 右键快捷菜单回调（需要触发位置的 BuildContext 和 TapUpDetails）
-  final void Function(BuildContext barCtx, TapUpDetails details)
-  onSettingsSecondary;
-
   const DeferredPlayerFeature({
     super.key,
     required this.coordinator,
     required this.windowService,
-    required this.onSettingsSecondary,
   });
 
   @override
@@ -115,7 +110,6 @@ class _DeferredPlayerFeatureState extends State<DeferredPlayerFeature> {
     return player_feature.PlayerFeature(
       coordinator: widget.coordinator,
       windowService: widget.windowService,
-      onSettingsSecondary: widget.onSettingsSecondary,
     );
   }
 }

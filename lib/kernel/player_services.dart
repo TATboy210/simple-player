@@ -30,7 +30,6 @@ import 'diagnostics/rss_provider.dart';
 import 'bridge/window_bridge.dart';
 import 'engine/media_engine.dart';
 import 'engine/media_kit_engine.dart';
-import 'persistence/settings_store.dart';
 import 'services/playback_controller.dart';
 import 'services/video_processing_service.dart';
 
@@ -50,7 +49,7 @@ class PlayerServices {
   ///
   /// Async factory — creates and fully initializes a [PlayerServices] instance.
   /// Static factory pattern because Dart constructors cannot be async;
-  /// [init] involves `SettingsStore.load()` (async I/O).
+  /// [init] 只初始化运行时服务，不执行用户设置 I/O。
   static Future<PlayerServices> create({
     required WindowBridge windowService,
   }) async {
@@ -95,7 +94,7 @@ class PlayerServices {
   /// 1. KernelLogger + MemoryMonitor (diagnostics)
   /// 2. MediaKitEngine (engine)
   /// 3. PlaybackController (orchestration)
-  /// 4. SettingsStore.load() → controller.init(settings)
+  /// 4. controller.init() → 运行时默认状态
   /// 5. VideoProcessingService (video effects)
   Future<void> init() async {
     // Phase 17: 初始化 KernelLogger 静态实例 — 必须在引擎创建以前,
@@ -123,9 +122,8 @@ class PlayerServices {
 
     // v1.8:PlaybackController 不再接 playlist/onNeedRebuild(单文件播放器).
     controller = PlaybackController(engine: engine);
-    final settings = await SettingsStore.load();
-    await controller.init(settings: settings);
-    videoProcessing = VideoProcessingService(engine, initialSettings: settings);
+    await controller.init();
+    videoProcessing = VideoProcessingService(engine);
   }
 
   /// 释放所有服务资源.

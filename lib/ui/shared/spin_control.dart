@@ -171,17 +171,11 @@ class _SpinControlState extends State<SpinControl> {
     final offset = Tween<Offset>(
       begin: Offset(_slideDirection.toDouble(), 0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
 
     return SlideTransition(
       position: offset,
-      child: FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
+      child: FadeTransition(opacity: animation, child: child),
     );
   }
 

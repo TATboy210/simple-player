@@ -15,12 +15,16 @@ class ControlBarTimeline extends StatelessWidget {
   final VoidCallback? onSeekStart;
   final VoidCallback? onSeekEnd;
 
+  /// 最小模式收窄时间间距，为核心动作保留更多宽度。
+  final bool minimal;
+
   const ControlBarTimeline({
     super.key,
     required this.vm,
     this.resizing,
     this.onSeekStart,
     this.onSeekEnd,
+    this.minimal = false,
   });
 
   @override
@@ -37,7 +41,7 @@ class ControlBarTimeline extends StatelessWidget {
             onSeekEnd: onSeekEnd,
           ),
         ),
-        const SizedBox(width: Tokens.controlBarTimeGap),
+        SizedBox(width: minimal ? Tokens.spXs : Tokens.controlBarTimeGap),
         TimeRangeDisplay(position: vm.position, duration: vm.duration),
       ],
     );

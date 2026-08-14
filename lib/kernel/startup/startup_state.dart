@@ -5,10 +5,10 @@ enum StartupPhase {
   /// Flutter 绑定初始化
   binding,
 
-  /// 基础设施并行启动（Rust + SharedPreferences + WindowService）
+  /// 基础设施并行启动（Rust + WindowService）
   infrastructure,
 
-  /// 设置加载（locale/theme）
+  /// 播放器启动前的应用准备
   settings,
 
   /// 播放器模块延迟加载

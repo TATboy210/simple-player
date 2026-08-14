@@ -30,6 +30,7 @@ class MediaInfo {
     final v = video;
     return v != null && v.width > 0;
   }
+
   bool get hasAudio => audioTracks.isNotEmpty;
   bool get hasSubtitles => subtitleTracks.isNotEmpty;
 

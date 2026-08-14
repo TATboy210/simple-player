@@ -12,10 +12,7 @@ void main() {
 
     test('isReady is true only when phase is ready', () {
       expect(const StartupState().isReady, false);
-      expect(
-        const StartupState(phase: StartupPhase.ready).isReady,
-        true,
-      );
+      expect(const StartupState(phase: StartupPhase.ready).isReady, true);
       expect(
         const StartupState(phase: StartupPhase.infrastructure).isReady,
         false,

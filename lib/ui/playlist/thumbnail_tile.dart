@@ -7,6 +7,7 @@ import '../../kernel/services/thumbnail_service.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/app_tooltip.dart';
 import '../shared/context_menu_row.dart';
 
 /// 缩略图组件 — 16:9 圆角卡片，支持加载占位、播放高亮、断点进度
@@ -44,9 +45,7 @@ class ThumbnailTile extends StatelessWidget {
     // local 捕获 durationMs 消除字段 `!` (复合条件后字段不提升)
     final durationMs = item.durationMs;
     final hasBreakpoint =
-        (item.positionMs ?? 0) > 0 &&
-        durationMs != null &&
-        durationMs > 0;
+        (item.positionMs ?? 0) > 0 && durationMs != null && durationMs > 0;
 
     return GestureDetector(
       onTap: onPlay,
@@ -114,7 +113,7 @@ class ThumbnailTile extends StatelessWidget {
   Widget _buildNameLabel() {
     return SizedBox(
       height: _nameHeight - 4,
-      child: Tooltip(
+      child: AppTooltip(
         message: item.name,
         waitDuration: const Duration(milliseconds: Tokens.tooltipDelayLong),
         child: Text(

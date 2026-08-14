@@ -394,9 +394,13 @@ void main() {
       );
 
       // 排空本控件已知的动画帧，再记录旧 source 后续事件不可产生的副作用。
-      await tester.pump(const Duration(milliseconds: Tokens.durationControlsFade + 1));
-      final newPaddingBeforeOldEvents = replacementVideo.subtitlePaddingHistory.length;
-      final newFullscreenReadsBeforeOldEvents = replacementVideo.isFullscreenReadCount;
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+      final newPaddingBeforeOldEvents =
+          replacementVideo.subtitlePaddingHistory.length;
+      final newFullscreenReadsBeforeOldEvents =
+          replacementVideo.isFullscreenReadCount;
       final sliderValuesBeforeOldEvents = tester
           .widgetList<Slider>(find.byType(Slider))
           .map((slider) => slider.value)
@@ -418,8 +422,14 @@ void main() {
         sliderValuesBeforeOldEvents,
         reason: '旧 player position 事件不得驱动当前进度条。',
       );
-      expect(replacementVideo.subtitlePaddingHistory.length, newPaddingBeforeOldEvents);
-      expect(replacementVideo.isFullscreenReadCount, newFullscreenReadsBeforeOldEvents);
+      expect(
+        replacementVideo.subtitlePaddingHistory.length,
+        newPaddingBeforeOldEvents,
+      );
+      expect(
+        replacementVideo.isFullscreenReadCount,
+        newFullscreenReadsBeforeOldEvents,
+      );
       expect(video.player.hasListeners, isFalse);
 
       // 每一种新 source 仍驱动当前控件：标题、resize、player/engine 与 route port。
@@ -444,7 +454,9 @@ void main() {
       expect(replacementVideo.player.streamListenAccessCount, 8);
     });
 
-    testWidgets('subtitle padding 按 source base 恢复且 replacement 后隔离旧 route', (tester) async {
+    testWidgets('subtitle padding 按 source base 恢复且 replacement 后隔离旧 route', (
+      tester,
+    ) async {
       final firstBase = const EdgeInsets.only(left: 3, top: 4);
       final secondBase = const EdgeInsets.only(right: 5, bottom: 6);
       final firstVideo = FakeVideoControlsPort(
@@ -490,9 +502,11 @@ void main() {
       );
       await tester.pump();
 
-      final firstVisible = firstBase + const EdgeInsets.only(
-        bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
-      );
+      final firstVisible =
+          firstBase +
+          const EdgeInsets.only(
+            bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
+          );
       expect(firstVideo.lastSubtitlePadding, firstVisible);
 
       // 真实 auto-hide 写回 base；随后显示与两次 reparent 都只能加一次 inset。
@@ -511,14 +525,17 @@ void main() {
       expect(firstVideo.lastSubtitlePadding, firstVisible);
 
       // source replacement 在当前可见态立即使用第二个 source 自己的 base。
-      final firstHistoryAtReplacement = firstVideo.subtitlePaddingHistory.length;
+      final firstHistoryAtReplacement =
+          firstVideo.subtitlePaddingHistory.length;
       activeVideo = secondVideo;
       activeEngine = secondEngine;
       hostKey.currentState!.rebuildChild();
       await tester.pump();
-      final secondVisible = secondBase + const EdgeInsets.only(
-        bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
-      );
+      final secondVisible =
+          secondBase +
+          const EdgeInsets.only(
+            bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
+          );
       expect(secondVideo.lastSubtitlePadding, secondVisible);
 
       // 已替换的 route 不得再被 player、engine 或 resize 的旧事件写入。
@@ -526,7 +543,10 @@ void main() {
       widgetEngine.state.value = MediaState.playing;
       resizing.value = true;
       await tester.pump();
-      expect(firstVideo.subtitlePaddingHistory.length, firstHistoryAtReplacement);
+      expect(
+        firstVideo.subtitlePaddingHistory.length,
+        firstHistoryAtReplacement,
+      );
 
       // 当前 source 在 hide/re-show 中仍以自己的 base 计算，且不累加 inset。
       resizing.value = false;
@@ -552,7 +572,10 @@ void main() {
       currentFileName.value = 'after-dispose.mp4';
       await tester.pump();
       expect(secondVideo.subtitlePaddingHistory.length, secondHistoryAtDispose);
-      expect(firstVideo.subtitlePaddingHistory.length, firstHistoryAtReplacement);
+      expect(
+        firstVideo.subtitlePaddingHistory.length,
+        firstHistoryAtReplacement,
+      );
     });
 
     testWidgets('替换 PlayerVideoControls source 后只响应新 port 和 engine', (
@@ -627,9 +650,7 @@ void main() {
       expect(replacementVideo.isFullscreenReadCount, greaterThan(1));
     });
 
-    testWidgets('替换不同 video port 但共享 player 后立即同步字幕安全区', (
-      tester,
-    ) async {
+    testWidgets('替换不同 video port 但共享 player 后立即同步字幕安全区', (tester) async {
       final replacementVideo = FakeVideoControlsPort(
         player: video.player,
         subtitlePadding: const EdgeInsets.only(top: 4),
@@ -697,9 +718,7 @@ void main() {
       );
     });
 
-    testWidgets('仅替换 engine 且复用 video port 时字幕安全区不重复累加', (
-      tester,
-    ) async {
+    testWidgets('仅替换 engine 且复用 video port 时字幕安全区不重复累加', (tester) async {
       final replacementEngine = FakeEngine();
       addTearDown(replacementEngine.dispose);
       final controlsKey = GlobalKey();
@@ -762,9 +781,7 @@ void main() {
       expect(video.subtitlePaddingHistory.last, expectedPadding);
     });
 
-    testWidgets('多次 reparent 后生命周期 listener 不重复且卸载后失效', (
-      tester,
-    ) async {
+    testWidgets('多次 reparent 后生命周期 listener 不重复且卸载后失效', (tester) async {
       final resizing = ValueNotifier<bool>(false);
       final controlsKey = GlobalKey();
       final hostKey = GlobalKey<_ReparentHostState>();
@@ -879,7 +896,8 @@ void main() {
       expect(replacementVideo.player.streamListenAccessCount, 8);
       // FakeEngine 自身有内部状态派生 listener；旧/new source 的解绑由
       // stream 事件隔离和卸载后的无更新断言共同覆盖。
-      final paddingCallsBeforeDispose = replacementVideo.subtitlePaddingCallCount;
+      final paddingCallsBeforeDispose =
+          replacementVideo.subtitlePaddingCallCount;
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
 
@@ -898,9 +916,7 @@ void main() {
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
 
-    testWidgets('卸载 PlayerVideoControls 后解绑全部生命周期监听器', (
-      tester,
-    ) async {
+    testWidgets('卸载 PlayerVideoControls 后解绑全部生命周期监听器', (tester) async {
       final resizing = ValueNotifier<bool>(false);
       addTearDown(resizing.dispose);
 
@@ -927,9 +943,7 @@ void main() {
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
 
-    testWidgets('VideoState 未挂载时字幕同步被生命周期 guard 拦截', (
-      tester,
-    ) async {
+    testWidgets('VideoState 未挂载时字幕同步被生命周期 guard 拦截', (tester) async {
       await pumpControls(tester, actions: const PlayerActions());
       final paddingCallsBeforeUnmount = video.subtitlePaddingCallCount;
 
@@ -973,9 +987,7 @@ void main() {
       );
     });
 
-    testWidgets('单击后卸载 PlayerVideoControls 会取消双击检测 timer', (
-      tester,
-    ) async {
+    testWidgets('单击后卸载 PlayerVideoControls 会取消双击检测 timer', (tester) async {
       var toggleCount = 0;
       await pumpControls(
         tester,
@@ -992,9 +1004,7 @@ void main() {
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
 
-    testWidgets('deactivate 期间不读取 fullscreen，activate 后恢复读取', (
-      tester,
-    ) async {
+    testWidgets('deactivate 期间不读取 fullscreen，activate 后恢复读取', (tester) async {
       final controlsKey = GlobalKey();
       final hostKey = GlobalKey<_ReparentHostState>();
 
@@ -1112,6 +1122,48 @@ void main() {
       expect(widgetEngine.togglePlayPauseCallCount, 0);
       expect(widgetEngine.skipBackCallCount, 0);
       expect(widgetEngine.skipForwardCallCount, 0);
+    });
+
+    testWidgets('替换 PlayerActions 后 ControlBar 按钮只调用新回调', (tester) async {
+      var oldPlayPauseCount = 0;
+      final oldSeekBackValues = <int>[];
+      final oldSeekForwardValues = <int>[];
+      final oldActions = PlayerActions(
+        onPlayPause: () => oldPlayPauseCount++,
+        onSeekBack: oldSeekBackValues.add,
+        onSeekForward: oldSeekForwardValues.add,
+      );
+
+      await pumpControls(tester, actions: oldActions);
+      final originalState = tester.state(find.byType(PlayerVideoControls));
+
+      var newPlayPauseCount = 0;
+      final newSeekBackValues = <int>[];
+      final newSeekForwardValues = <int>[];
+      final newActions = PlayerActions(
+        onPlayPause: () => newPlayPauseCount++,
+        onSeekBack: newSeekBackValues.add,
+        onSeekForward: newSeekForwardValues.add,
+      );
+
+      // 同一 slot 更新 widget，确保测试覆盖 didUpdateWidget 而不是重新挂载 State。
+      await pumpControls(tester, actions: newActions);
+      expect(
+        tester.state(find.byType(PlayerVideoControls)),
+        same(originalState),
+      );
+
+      await tester.tap(find.byIcon(Icons.replay_10));
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.tap(find.byIcon(Icons.forward_30));
+      await tester.pump();
+
+      expect(oldPlayPauseCount, 0);
+      expect(oldSeekBackValues, isEmpty);
+      expect(oldSeekForwardValues, isEmpty);
+      expect(newPlayPauseCount, 1);
+      expect(newSeekBackValues, [Tokens.skipShortMs]);
+      expect(newSeekForwardValues, [Tokens.skipLongMs]);
     });
 
     testWidgets('F 使用当前 route 端口切换 media_kit 全屏', (tester) async {

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/glass_chip.dart';
 
+void _noop() {
+  // Intentionally empty callback for tests that do not verify taps.
+}
+
 void main() {
   group('GlassChip', () {
     Widget buildSubject({
@@ -14,7 +18,7 @@ void main() {
           body: GlassChip(
             label: label,
             selected: selected,
-            onTap: onTap ?? () {},
+            onTap: onTap ?? _noop,
           ),
         ),
       );
@@ -63,12 +67,12 @@ void main() {
 
     testWidgets('respects custom width and height', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
             body: GlassChip(
               label: '1.0x',
               selected: false,
-              onTap: () {},
+              onTap: _noop,
               width: 64,
               height: 40,
             ),

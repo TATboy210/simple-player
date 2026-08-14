@@ -41,10 +41,7 @@ class _AnimatedSectionListState extends State<AnimatedSectionList>
     final totalStagger = widget.staggerDelay * widget.children.length;
     final totalDuration = totalStagger + widget.animationDuration;
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: totalDuration,
-    );
+    _controller = AnimationController(vsync: this, duration: totalDuration);
     _controller.forward();
   }
 

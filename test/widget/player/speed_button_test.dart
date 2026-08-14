@@ -24,7 +24,10 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SpeedButton(rate: engine.playbackSpeed, onSetRate: engine.setPlaybackRate),
+          body: SpeedButton(
+            rate: engine.playbackSpeed,
+            onSetRate: engine.setPlaybackRate,
+          ),
         ),
       );
     }
@@ -198,8 +201,9 @@ void main() {
 
     // ── Arrow tap tests ──
 
-    testWidgets('left arrow tap decreases speed to previous gear',
-        (tester) async {
+    testWidgets('left arrow tap decreases speed to previous gear', (
+      tester,
+    ) async {
       engine.playbackSpeed.value = 1.0;
       await tester.pumpWidget(buildSubject());
       await tester.pump();
@@ -213,8 +217,7 @@ void main() {
       OsdService.I.hide();
     });
 
-    testWidgets('right arrow tap increases speed to next gear',
-        (tester) async {
+    testWidgets('right arrow tap increases speed to next gear', (tester) async {
       engine.playbackSpeed.value = 1.0;
       await tester.pumpWidget(buildSubject());
       await tester.pump();
@@ -277,21 +280,23 @@ void main() {
       OsdService.I.hide();
     });
 
-    testWidgets('non-standard speed snaps to nearest higher gear on arrow tap',
-        (tester) async {
-      // Set a non-standard speed (not in _gears list)
-      // _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
-      // 1.1 → indexWhere >= 1.1 → idx=3 (1.25), right → next=4 (1.5)
-      engine.playbackSpeed.value = 1.1;
-      await tester.pumpWidget(buildSubject());
-      await tester.pump();
+    testWidgets(
+      'non-standard speed snaps to nearest higher gear on arrow tap',
+      (tester) async {
+        // Set a non-standard speed (not in _gears list)
+        // _gears = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
+        // 1.1 → indexWhere >= 1.1 → idx=3 (1.25), right → next=4 (1.5)
+        engine.playbackSpeed.value = 1.1;
+        await tester.pumpWidget(buildSubject());
+        await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.chevron_right));
-      await tester.pump();
+        await tester.tap(find.byIcon(Icons.chevron_right));
+        await tester.pump();
 
-      expect(engine.playbackSpeed.value, 1.5);
-      OsdService.I.hide();
-    });
+        expect(engine.playbackSpeed.value, 1.5);
+        OsdService.I.hide();
+      },
+    );
 
     // ── Wave 2: reactive label sync + call tracking tests ──
 

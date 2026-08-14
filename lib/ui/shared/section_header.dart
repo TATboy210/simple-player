@@ -21,7 +21,12 @@ class SectionHeader extends StatelessWidget {
   /// 可选的图标（显示在标题左侧）
   final IconData? icon;
 
-  const SectionHeader({super.key, required this.title, this.description, this.icon});
+  const SectionHeader({
+    super.key,
+    required this.title,
+    this.description,
+    this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {

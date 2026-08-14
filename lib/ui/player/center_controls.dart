@@ -59,6 +59,7 @@ class CenterGroup extends StatelessWidget {
 
   /// 停止并卸载当前媒体的项目层收尾入口。
   final VoidCallback? onStop;
+  final bool showTransportActions;
 
   const CenterGroup({
     super.key,
@@ -69,6 +70,7 @@ class CenterGroup extends StatelessWidget {
     required this.isIdle,
     this.isIdleListenable,
     this.onStop,
+    this.showTransportActions = true,
   });
 
   @override
@@ -80,6 +82,7 @@ class CenterGroup extends StatelessWidget {
       onSeekBack: onSeekBack,
       onSeekForward: onSeekForward,
       isIdle: isIdle,
+      showTransportActions: showTransportActions,
       onStop: onStop,
     );
     if (listenable == null) return content;
@@ -92,6 +95,7 @@ class CenterGroup extends StatelessWidget {
         onSeekBack: onSeekBack,
         onSeekForward: onSeekForward,
         isIdle: value,
+        showTransportActions: showTransportActions,
         onStop: onStop,
       ),
     );
@@ -105,6 +109,7 @@ class _CenterGroupContent extends StatelessWidget {
   final void Function(int ms) onSeekBack;
   final void Function(int ms) onSeekForward;
   final bool isIdle;
+  final bool showTransportActions;
   final VoidCallback? onStop;
 
   const _CenterGroupContent({
@@ -113,6 +118,7 @@ class _CenterGroupContent extends StatelessWidget {
     required this.onSeekBack,
     required this.onSeekForward,
     required this.isIdle,
+    required this.showTransportActions,
     required this.onStop,
   });
 
@@ -129,16 +135,17 @@ class _CenterGroupContent extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FocusTraversalOrder(
-            order: const NumericFocusOrder(1),
-            child: GlassButton.iconOnly(
-              icon: Icons.replay_10,
-              color: dimmed,
-              onPressed: () => onSeekBack(Tokens.skipShortMs),
-              tooltip: l10n.rewind10,
-              semanticsLabel: l10n.rewind10,
+          if (showTransportActions)
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(1),
+              child: GlassButton.iconOnly(
+                icon: Icons.replay_10,
+                color: dimmed,
+                onPressed: () => onSeekBack(Tokens.skipShortMs),
+                tooltip: l10n.rewind10,
+                semanticsLabel: l10n.rewind10,
+              ),
             ),
-          ),
           const SizedBox(width: Tokens.spSm),
           FocusTraversalOrder(
             order: const NumericFocusOrder(2),
@@ -154,29 +161,31 @@ class _CenterGroupContent extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: Tokens.spSm),
-          FocusTraversalOrder(
-            order: const NumericFocusOrder(3),
-            child: GlassButton.iconOnly(
-              icon: Icons.forward_30,
-              color: dimmed,
-              onPressed: () => onSeekForward(Tokens.skipLongMs),
-              tooltip: l10n.forward30,
-              semanticsLabel: l10n.forward30,
+          if (showTransportActions) const SizedBox(width: Tokens.spSm),
+          if (showTransportActions)
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(3),
+              child: GlassButton.iconOnly(
+                icon: Icons.forward_30,
+                color: dimmed,
+                onPressed: () => onSeekForward(Tokens.skipLongMs),
+                tooltip: l10n.forward30,
+                semanticsLabel: l10n.forward30,
+              ),
             ),
-          ),
-          const SizedBox(width: Tokens.spXs),
-          FocusTraversalOrder(
-            order: const NumericFocusOrder(4),
-            child: GlassButton.iconOnly(
-              icon: Icons.stop,
-              color: dimmed,
-              onPressed: onStop,
-              enabled: onStop != null,
-              tooltip: l10n.stop,
-              semanticsLabel: l10n.stop,
+          if (showTransportActions) const SizedBox(width: Tokens.spXs),
+          if (showTransportActions)
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(4),
+              child: GlassButton.iconOnly(
+                icon: Icons.stop,
+                color: dimmed,
+                onPressed: onStop,
+                enabled: onStop != null,
+                tooltip: l10n.stop,
+                semanticsLabel: l10n.stop,
+              ),
             ),
-          ),
         ],
       ),
     );

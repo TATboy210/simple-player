@@ -3,6 +3,7 @@
 /// Tests the exportAll() JSON serialization and structure.
 /// saveToFile() is skipped because it depends on path_provider (platform plugin).
 library;
+
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -19,11 +20,13 @@ void main() {
     KernelLoggerImpl.resetForTesting();
     KernelLoggerImpl.init();
     MemoryMonitor.resetForTesting();
-    MemoryMonitor.init(MemoryMonitor(
-      rssProvider: FakeRssProvider(1024 * 1024), // 1 MB
-      clock: const SystemClock(),
-      logger: KernelLoggerImpl.I,
-    ));
+    MemoryMonitor.init(
+      MemoryMonitor(
+        rssProvider: FakeRssProvider(1024 * 1024), // 1 MB
+        clock: const SystemClock(),
+        logger: KernelLoggerImpl.I,
+      ),
+    );
   });
 
   tearDownAll(() {

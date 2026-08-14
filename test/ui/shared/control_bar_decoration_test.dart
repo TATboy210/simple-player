@@ -70,24 +70,29 @@ void main() {
   });
 
   group('ControlBarDecoration.idle (D-03, 源: _decorationIdle)', () {
-    test('boxShadow has exactly 4 entries (DecorationTween index-lerp 不断裂)',
-        () {
-      // Pitfall 4：idle 必须保留 2 个 transparent padding shadow，
-      // 否则 playing↔idle DecorationTween 按 index lerp 时数量不齐插值断裂。
-      expect(ControlBarDecoration.idle().boxShadow?.length, 4);
-    });
+    test(
+      'boxShadow has exactly 4 entries (DecorationTween index-lerp 不断裂)',
+      () {
+        // Pitfall 4：idle 必须保留 2 个 transparent padding shadow，
+        // 否则 playing↔idle DecorationTween 按 index lerp 时数量不齐插值断裂。
+        expect(ControlBarDecoration.idle().boxShadow?.length, 4);
+      },
+    );
 
-    test('color is Tokens.controlBarBg, border is 1px controlBarBorderIdle', () {
-      final decoration = ControlBarDecoration.idle();
-      expect(decoration.color, Tokens.controlBarBg);
-      final border = decoration.border;
-      if (border is Border) {
-        expect(border.top.width, 1);
-        expect(border.top.color, Tokens.controlBarBorderIdle);
-      } else {
-        fail('expected Border, got ${border.runtimeType}');
-      }
-    });
+    test(
+      'color is Tokens.controlBarBg, border is 1px controlBarBorderIdle',
+      () {
+        final decoration = ControlBarDecoration.idle();
+        expect(decoration.color, Tokens.controlBarBg);
+        final border = decoration.border;
+        if (border is Border) {
+          expect(border.top.width, 1);
+          expect(border.top.color, Tokens.controlBarBorderIdle);
+        } else {
+          fail('expected Border, got ${border.runtimeType}');
+        }
+      },
+    );
 
     test('default borderRadius is circular(Tokens.controlBarRadius)', () {
       expect(
@@ -98,13 +103,18 @@ void main() {
   });
 
   group('ControlBar 本地 tween 归属 (D-03)', () {
-    test('control_bar.dart still owns _decorationTween (tween stays local)', () {
-      // D-03：playing/idle 提取至共享，DecorationTween 保留在 control_bar.dart
-      // 本地。私有静态字段无法直接访问，用源码存在性断言锁定归属不被误迁。
-      final source = File('lib/ui/player/control_bar.dart').readAsStringSync();
-      expect(source, contains('_decorationTween'));
-      expect(source, contains('ControlBarDecoration.playing()'));
-      expect(source, contains('ControlBarDecoration.idle()'));
-    });
+    test(
+      'control_bar.dart still owns _decorationTween (tween stays local)',
+      () {
+        // D-03：playing/idle 提取至共享，DecorationTween 保留在 control_bar.dart
+        // 本地。私有静态字段无法直接访问，用源码存在性断言锁定归属不被误迁。
+        final source = File(
+          'lib/ui/player/control_bar.dart',
+        ).readAsStringSync();
+        expect(source, contains('_decorationTween'));
+        expect(source, contains('ControlBarDecoration.playing()'));
+        expect(source, contains('ControlBarDecoration.idle()'));
+      },
+    );
   });
 }

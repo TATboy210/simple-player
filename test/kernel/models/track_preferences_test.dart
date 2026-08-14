@@ -36,9 +36,21 @@ void main() {
     });
 
     test('equality works correctly', () {
-      const a = TrackPreferences(audioTrackIndex: 1, subtitleTrackIndex: 2, subtitleDelay: 300);
-      const b = TrackPreferences(audioTrackIndex: 1, subtitleTrackIndex: 2, subtitleDelay: 300);
-      const c = TrackPreferences(audioTrackIndex: 1, subtitleTrackIndex: 3, subtitleDelay: 300);
+      const a = TrackPreferences(
+        audioTrackIndex: 1,
+        subtitleTrackIndex: 2,
+        subtitleDelay: 300,
+      );
+      const b = TrackPreferences(
+        audioTrackIndex: 1,
+        subtitleTrackIndex: 2,
+        subtitleDelay: 300,
+      );
+      const c = TrackPreferences(
+        audioTrackIndex: 1,
+        subtitleTrackIndex: 3,
+        subtitleDelay: 300,
+      );
       expect(a, equals(b));
       expect(a, isNot(equals(c)));
     });

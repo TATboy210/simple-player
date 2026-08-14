@@ -60,7 +60,7 @@ class OsdService {
 /// - `IgnorePointer` 确保事件穿透到视频层
 /// - 只监听 message，visible 通过 message==null 判断
 /// - AnimatedOpacity 淡入/淡出，AnimatedSwitcher 文本交叉淡入
-/// - `resizing` 信号：resize 期间跳过 rebuild，返回缓存的上一帧
+/// - `resizing` 信号：resize 期间跳过 OSD 内容构建
 class OsdOverlay extends StatefulWidget {
   /// Window resize signal — when true, skip rebuild to save CPU.
   final ValueListenable<bool>? resizing;
@@ -72,31 +72,66 @@ class OsdOverlay extends StatefulWidget {
 }
 
 class _OsdOverlayState extends State<OsdOverlay> {
-  Widget? _cachedChild;
+  OsdMessage? _messageAtResizeStart;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.resizing?.addListener(_handleResizeChanged);
+    if (widget.resizing?.value ?? false) {
+      _messageAtResizeStart = OsdService.I.message.value;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant OsdOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resizing != widget.resizing) {
+      oldWidget.resizing?.removeListener(_handleResizeChanged);
+      widget.resizing?.addListener(_handleResizeChanged);
+      _messageAtResizeStart = (widget.resizing?.value ?? false)
+          ? OsdService.I.message.value
+          : null;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.resizing?.removeListener(_handleResizeChanged);
+    super.dispose();
+  }
+
+  void _handleResizeChanged() {
+    final resizing = widget.resizing?.value ?? false;
+    if (resizing) {
+      _messageAtResizeStart = OsdService.I.message.value;
+    } else {
+      _messageAtResizeStart = null;
+    }
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<OsdMessage?>(
       valueListenable: OsdService.I.message,
       builder: (_, msg, _) {
-        final resizing = widget.resizing;
-        if (resizing != null && resizing.value) {
-          return _cachedChild ?? const SizedBox.shrink();
-        }
-        final child = IgnorePointer(
+        final resizing = widget.resizing?.value ?? false;
+        final visibleMessage = resizing ? _messageAtResizeStart : msg;
+        return IgnorePointer(
           child: AnimatedOpacity(
-            opacity: msg != null ? 1.0 : 0.0,
+            opacity: visibleMessage != null ? 1.0 : 0.0,
             duration: _fadeDuration,
             curve: Curves.easeOut,
-            child: msg != null
+            child: visibleMessage != null
                 ? Center(
-                    child: RepaintBoundary(child: _OsdBubble(message: msg)),
+                    child: RepaintBoundary(
+                      child: _OsdBubble(message: visibleMessage),
+                    ),
                   )
                 : const SizedBox.shrink(),
           ),
         );
-        _cachedChild = child;
-        return child;
       },
     );
   }

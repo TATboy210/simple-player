@@ -8,9 +8,7 @@ void main() {
     testWidgets('renders title text correctly', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: SectionHeader(title: 'Test Title'),
-          ),
+          home: Scaffold(body: SectionHeader(title: 'Test Title')),
         ),
       );
 
@@ -21,10 +19,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: SectionHeader(
-              title: 'With Icon',
-              icon: Icons.language,
-            ),
+            body: SectionHeader(title: 'With Icon', icon: Icons.language),
           ),
         ),
       );
@@ -52,9 +47,7 @@ void main() {
     testWidgets('uses Tokens.textSecondary for title color', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: SectionHeader(title: 'Color Test'),
-          ),
+          home: Scaffold(body: SectionHeader(title: 'Color Test')),
         ),
       );
 
@@ -63,13 +56,10 @@ void main() {
       expect(style?.color, Tokens.textSecondary);
     });
 
-    testWidgets('uses Tokens.fontCaption for title font size',
-        (tester) async {
+    testWidgets('uses Tokens.fontCaption for title font size', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: SectionHeader(title: 'Font Test'),
-          ),
+          home: Scaffold(body: SectionHeader(title: 'Font Test')),
         ),
       );
 

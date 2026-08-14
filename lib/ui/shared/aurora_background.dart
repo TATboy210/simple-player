@@ -250,7 +250,10 @@ class _AuroraBackgroundState extends State<AuroraBackground>
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
+    // 组件可独立用于非 Stack 场景；让父组件决定定位，避免 ParentDataWidget 误用。
+    // SizedBox.expand 给 Stack 和普通父级都提供明确尺寸，避免 CustomPaint
+    // 在非定位 Stack 子级中按默认值收缩为零尺寸。
+    return SizedBox.expand(
       child: RepaintBoundary(
         child: LayoutBuilder(
           builder: (context, constraints) {

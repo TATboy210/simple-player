@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
@@ -28,6 +29,9 @@ class EdgeGlow extends StatefulWidget {
   final bool enabled;
   final double? glowIntensity;
 
+  /// Resize 期间跳过模糊阴影，避免与视频纹理合成争用 raster 线程。
+  final ValueListenable<bool>? resizing;
+
   const EdgeGlow({
     super.key,
     required this.child,
@@ -35,6 +39,7 @@ class EdgeGlow extends StatefulWidget {
     this.borderRadius,
     this.enabled = true,
     this.glowIntensity,
+    this.resizing,
   });
 
   @override
@@ -83,71 +88,104 @@ class _EdgeGlowState extends State<EdgeGlow>
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
 
-    return switch (widget.variant) {
-      EdgeGlowVariant.gradient => _buildGradientGlow(),
-      EdgeGlowVariant.omni => _buildOmniGlow(),
-      EdgeGlowVariant.pulse => _buildPulseGlow(),
-    };
+    final resizing = widget.resizing;
+    // ValueListenable 不会自动触发父组件重建；监听它可让 resize 降级阴影
+    // 在窗口状态变化的同一帧生效，而无需依赖无关的父级 build。
+    if (resizing != null) {
+      return AnimatedBuilder(
+        animation: resizing,
+        builder: (_, child) => _buildVariant(),
+      );
+    }
+    return _buildVariant();
   }
+
+  Widget _buildVariant() => switch (widget.variant) {
+    EdgeGlowVariant.gradient => _buildGradientGlow(),
+    EdgeGlowVariant.omni => _buildOmniGlow(),
+    EdgeGlowVariant.pulse => _buildPulseGlow(),
+  };
 
   /// 变体 A — 渐变描边（5 层 box-shadow）
   Widget _buildGradientGlow() {
     final intensity = widget.glowIntensity ?? 1.0;
+    final isResizing = widget.resizing?.value ?? false;
+    // Resize 时保留边框和子树 identity，只移除高成本的模糊阴影。
+    final shadows = isResizing
+        ? _buildResizeShadows(intensity)
+        : _buildGlowShadows(intensity);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
-        boxShadow: [
-          // 1. 顶部内高光
-          BoxShadow(
-            color: Tokens.glowHighlightWhite.withValues(alpha: Tokens.glowHighlightWhite.a * intensity),
-            blurRadius: 0,
-            spreadRadius: 0,
-            offset: const Offset(0, 1),
-          ),
-          // 2. 实线描边
-          BoxShadow(
-            color: Tokens.glowBorderBlue.withValues(alpha: Tokens.glowBorderBlue.a * intensity),
-            blurRadius: 0,
-            spreadRadius: 1,
-          ),
-          // 3. 中层扩散
-          BoxShadow(
-            color: Tokens.glowMidBlue.withValues(alpha: Tokens.glowMidBlue.a * intensity),
-            blurRadius: 20,
-            spreadRadius: 0,
-          ),
-          // 4. 外层环境
-          BoxShadow(
-            color: Tokens.glowAmbientBlue.withValues(alpha: Tokens.glowAmbientBlue.a * intensity),
-            blurRadius: 50,
-            spreadRadius: 0,
-          ),
-          // 5. 蓝色外环
-          BoxShadow(
-            color: Tokens.glowOuterRing.withValues(alpha: Tokens.glowOuterRing.a * intensity),
-            blurRadius: 1,
-            spreadRadius: 1,
-          ),
-        ],
+        borderRadius:
+            widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+        boxShadow: shadows,
       ),
       child: CustomPaint(
         painter: _GradientBorderPainter(
-          borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+          borderRadius:
+              widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
         ),
         child: widget.child,
       ),
     );
   }
 
+  List<BoxShadow> _buildGlowShadows(double intensity) => [
+    BoxShadow(
+      color: Tokens.glowHighlightWhite.withValues(
+        alpha: Tokens.glowHighlightWhite.a * intensity,
+      ),
+      offset: const Offset(0, 1),
+    ),
+    BoxShadow(
+      color: Tokens.glowBorderBlue.withValues(
+        alpha: Tokens.glowBorderBlue.a * intensity,
+      ),
+      spreadRadius: 1,
+    ),
+    BoxShadow(
+      color: Tokens.glowMidBlue.withValues(
+        alpha: Tokens.glowMidBlue.a * intensity,
+      ),
+      blurRadius: 20,
+    ),
+    BoxShadow(
+      color: Tokens.glowAmbientBlue.withValues(
+        alpha: Tokens.glowAmbientBlue.a * intensity,
+      ),
+      blurRadius: 50,
+    ),
+    BoxShadow(
+      color: Tokens.glowOuterRing.withValues(
+        alpha: Tokens.glowOuterRing.a * intensity,
+      ),
+      blurRadius: 1,
+      spreadRadius: 1,
+    ),
+  ];
+
+  /// Resize 时只保留无 blur 的边框，避免触发多层离屏模糊。
+  List<BoxShadow> _buildResizeShadows(double intensity) => [
+    BoxShadow(
+      color: Tokens.glowBorderBlue.withValues(
+        alpha: Tokens.glowBorderBlue.a * intensity,
+      ),
+      spreadRadius: 1,
+    ),
+  ];
+
   /// 变体 B — 全向柔光（conic-gradient）
   Widget _buildOmniGlow() {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+        borderRadius:
+            widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
       ),
       child: CustomPaint(
         painter: _OmniGlowPainter(
-          borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+          borderRadius:
+              widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+          isResizing: () => widget.resizing?.value ?? false,
         ),
         child: widget.child,
       ),
@@ -165,7 +203,9 @@ class _EdgeGlowState extends State<EdgeGlow>
         repaint: pulseController,
         pulse: () => pulseController.value,
         intensity: () => widget.glowIntensity ?? 1.0,
-        borderRadius: widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
+        isResizing: () => widget.resizing?.value ?? false,
+        borderRadius:
+            widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
       ),
       child: widget.child,
     );
@@ -181,12 +221,14 @@ class _PulseGlowPainter extends CustomPainter {
     required this.repaint,
     required this.pulse,
     required this.intensity,
+    required this.isResizing,
     required this.borderRadius,
   }) : super(repaint: repaint);
 
   final Listenable repaint;
   final double Function() pulse;
   final double Function() intensity;
+  final bool Function() isResizing;
   final BorderRadius borderRadius;
 
   @override
@@ -194,6 +236,7 @@ class _PulseGlowPainter extends CustomPainter {
     final t = pulse();
     final value = math.sin(t * math.pi);
     final factor = intensity();
+    final isResizingNow = isResizing();
     final rect = Offset.zero & size;
     final rrect = borderRadius.toRRect(rect);
 
@@ -213,9 +256,9 @@ class _PulseGlowPainter extends CustomPainter {
       color: Tokens.glowMidBlue.withValues(
         alpha: (0.03 + 0.05 * value) * factor,
       ),
-      blurRadius: 20 + 10 * value,
+      blurRadius: isResizingNow ? 0 : 20 + 10 * value,
     );
-    if (value > 0.5) {
+    if (!isResizingNow && value > 0.5) {
       _drawGlow(
         canvas,
         rrect,
@@ -252,6 +295,7 @@ class _PulseGlowPainter extends CustomPainter {
       oldDelegate.repaint != repaint ||
       oldDelegate.pulse != pulse ||
       oldDelegate.intensity != intensity ||
+      oldDelegate.isResizing != isResizing ||
       oldDelegate.borderRadius != borderRadius;
 }
 
@@ -293,20 +337,24 @@ class _GradientBorderPainter extends CustomPainter {
 /// 全向柔光画笔 — conic-gradient 模拟
 class _OmniGlowPainter extends CustomPainter {
   final BorderRadius borderRadius;
+  final bool Function() isResizing;
 
-  _OmniGlowPainter({required this.borderRadius});
+  _OmniGlowPainter({required this.borderRadius, required this.isResizing});
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final rrect = borderRadius.toRRect(rect);
     final center = rect.center;
+    final isResizingNow = isResizing();
 
-    // conic-gradient 效果 — 使用多个径向渐变模拟
+    // conic-gradient 效果 — 使用多个径向渐变模拟；resize 时移除 blur。
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..maskFilter = isResizingNow
+          ? null
+          : const MaskFilter.blur(BlurStyle.normal, 6);
 
     // 4 个方向的渐变
     final directions = [
@@ -325,7 +373,10 @@ class _OmniGlowPainter extends CustomPainter {
 
       paint.shader = LinearGradient(
         begin: Alignment.center,
-        end: Alignment(end.dx / size.width * 2 - 1, end.dy / size.height * 2 - 1),
+        end: Alignment(
+          end.dx / size.width * 2 - 1,
+          end.dy / size.height * 2 - 1,
+        ),
         colors: [color, Colors.transparent],
       ).createShader(rect);
 

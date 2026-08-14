@@ -106,7 +106,9 @@ void main() {
       expect(find.byType(Texture), findsOneWidget);
     });
 
-    testWidgets('16:9 ratio renders FittedBox with BoxFit.contain', (tester) async {
+    testWidgets('16:9 ratio renders FittedBox with BoxFit.contain', (
+      tester,
+    ) async {
       engine.textureId.value = 1;
       engine.aspectRatio.value = 16 / 9;
       await tester.pumpWidget(buildSubject());

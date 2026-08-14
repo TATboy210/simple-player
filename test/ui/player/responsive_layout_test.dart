@@ -8,6 +8,8 @@ import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
+import 'package:simple_player_flutter/ui/window/custom_title_bar.dart';
+import '../../helpers/fake_window_service.dart';
 import '../../helpers/fake_engine.dart';
 
 Widget _wrapWithApp(Widget child, {double width = 800, double height = 600}) {
@@ -128,6 +130,82 @@ void main() {
       // Panel uses standard dimensions
       expect(find.byType(PlaylistPanel), findsOneWidget);
     });
+
+    testWidgets('keeps the panel inside a narrow window after its animation', (
+      tester,
+    ) async {
+      const windowWidth = 300.0;
+      const windowHeight = 260.0;
+      await tester.pumpWidget(
+        _wrapWithApp(
+          PlaylistPanel(
+            playlist: playlist,
+            visible: true,
+            onClose: () {},
+            onSelectIndex: (_) {},
+            onRemoveIndex: (_) {},
+            availableWidth: windowWidth,
+          ),
+          width: windowWidth,
+          height: windowHeight,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final window = tester.getRect(find.byType(PlaylistPanel));
+      final panel = tester.getRect(
+        find.byKey(const ValueKey('playlist-panel-surface')),
+      );
+      expect(panel.left, greaterThanOrEqualTo(window.left));
+      expect(panel.right, lessThanOrEqualTo(window.right));
+      expect(panel.top, greaterThanOrEqualTo(window.top));
+      expect(panel.bottom, lessThanOrEqualTo(window.bottom));
+    });
+  });
+
+  group('CustomTitleBar responsive sizing', () {
+    late FakeWindowService windowService;
+
+    setUp(() {
+      windowService = FakeWindowService();
+    });
+
+    tearDown(() {
+      windowService.dispose();
+    });
+
+    testWidgets(
+      'keeps window controls visible without a flex overflow at 120px',
+      (tester) async {
+        final reportedErrors = <FlutterErrorDetails>[];
+        final previousOnError = FlutterError.onError;
+        FlutterError.onError = reportedErrors.add;
+        addTearDown(() => FlutterError.onError = previousOnError);
+
+        await tester.pumpWidget(
+          _wrapWithApp(
+            CustomTitleBar(windowService: windowService),
+            width: 120,
+            height: Tokens.titleBarHeight,
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('titlebar-minimize')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('titlebar-maximize-toggle')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('titlebar-close')), findsOneWidget);
+        FlutterError.onError = previousOnError;
+        expect(
+          reportedErrors.where(
+            (details) => details.exceptionAsString().contains('overflowed'),
+          ),
+          isEmpty,
+        );
+      },
+    );
   });
 
   group('Tokens responsive constants', () {

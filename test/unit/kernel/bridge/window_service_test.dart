@@ -21,22 +21,22 @@ void main() {
   group('WindowService composition', () {
     test('state.mode defaults to windowed', () {
       final service = WindowService();
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
     test('mode getter delegates to state.mode', () {
       final service = WindowService();
       expect(service.mode.value, WindowMode.windowed);
-      service.state.mode.value = WindowMode.maximized;
+      service.mode.value = WindowMode.maximized;
       expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
     test('state windowSize defaults to 1280x752', () {
       final service = WindowService();
-      expect(service.state.windowSize.value.width, 1280);
-      expect(service.state.windowSize.value.height, 752);
+      expect(service.windowSize.value.width, 1280);
+      expect(service.windowSize.value.height, 752);
       service.dispose();
     });
   });
@@ -45,15 +45,15 @@ void main() {
     test('onWindowMaximize sets mode to maximized', () {
       final service = WindowService();
       service.onWindowMaximize();
-      expect(service.state.mode.value, WindowMode.maximized);
+      expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
     test('onWindowUnmaximize sets mode to windowed', () {
       final service = WindowService();
-      service.state.mode.value = WindowMode.maximized;
+      service.mode.value = WindowMode.maximized;
       service.onWindowUnmaximize();
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
   });
@@ -87,13 +87,13 @@ void main() {
     test('isFullscreen returns false when mode is windowed', () {
       final service = WindowService();
       expect(service.isFullscreen, isFalse);
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
     test('isFullscreen returns true when mode is fullscreen', () {
       final service = WindowService();
-      service.state.mode.value = WindowMode.fullscreen;
+      service.mode.value = WindowMode.fullscreen;
       expect(service.isFullscreen, isTrue);
       service.dispose();
     });
@@ -101,9 +101,9 @@ void main() {
     test('isFullscreen tracks mode changes', () {
       final service = WindowService();
       expect(service.isFullscreen, isFalse);
-      service.state.mode.value = WindowMode.fullscreen;
+      service.mode.value = WindowMode.fullscreen;
       expect(service.isFullscreen, isTrue);
-      service.state.mode.value = WindowMode.windowed;
+      service.mode.value = WindowMode.windowed;
       expect(service.isFullscreen, isFalse);
       service.dispose();
     });
@@ -115,26 +115,26 @@ void main() {
   group('WindowState', () {
     test('windowSize defaults to 1280x752', () {
       final service = WindowService();
-      expect(service.state.windowSize.value.width, 1280);
-      expect(service.state.windowSize.value.height, 752);
+      expect(service.windowSize.value.width, 1280);
+      expect(service.windowSize.value.height, 752);
       service.dispose();
     });
 
     test('mode defaults to windowed', () {
       final service = WindowService();
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
     test('isResizing defaults to false', () {
       final service = WindowService();
-      expect(service.state.isResizing.value, isFalse);
+      expect(service.isResizing.value, isFalse);
       service.dispose();
     });
 
     test('isAlwaysOnTop defaults to false', () {
       final service = WindowService();
-      expect(service.state.isAlwaysOnTop.value, isFalse);
+      expect(service.isAlwaysOnTop.value, isFalse);
       service.dispose();
     });
   });
@@ -146,33 +146,33 @@ void main() {
     test('setting mode to same value does not fire extra notification', () {
       final service = WindowService();
       var count = 0;
-      service.state.mode.addListener(() => count++);
-      service.state.mode.value = WindowMode.maximized; // fires once
-      service.state.mode.value = WindowMode.maximized; // same value — no fire
+      service.mode.addListener(() => count++);
+      service.mode.value = WindowMode.maximized; // fires once
+      service.mode.value = WindowMode.maximized; // same value — no fire
       expect(count, 1);
       service.dispose();
     });
 
     test('windowed → maximized → windowed cycle', () {
       final service = WindowService();
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
 
-      service.state.mode.value = WindowMode.maximized;
-      expect(service.state.mode.value, WindowMode.maximized);
+      service.mode.value = WindowMode.maximized;
+      expect(service.mode.value, WindowMode.maximized);
       expect(service.isFullscreen, isFalse);
 
-      service.state.mode.value = WindowMode.windowed;
-      expect(service.state.mode.value, WindowMode.windowed);
+      service.mode.value = WindowMode.windowed;
+      expect(service.mode.value, WindowMode.windowed);
 
       service.dispose();
     });
 
     test('windowed → fullscreen → windowed cycle', () {
       final service = WindowService();
-      service.state.mode.value = WindowMode.fullscreen;
+      service.mode.value = WindowMode.fullscreen;
       expect(service.isFullscreen, isTrue);
 
-      service.state.mode.value = WindowMode.windowed;
+      service.mode.value = WindowMode.windowed;
       expect(service.isFullscreen, isFalse);
 
       service.dispose();
@@ -185,17 +185,17 @@ void main() {
   group('WindowListener callback deep', () {
     test('onWindowMaximize is idempotent when already maximized', () {
       final service = WindowService();
-      service.state.mode.value = WindowMode.maximized;
+      service.mode.value = WindowMode.maximized;
       service.onWindowMaximize();
-      expect(service.state.mode.value, WindowMode.maximized);
+      expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
     test('onWindowUnmaximize from non-maximized is no-op', () {
       final service = WindowService();
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
       service.onWindowUnmaximize();
-      expect(service.state.mode.value, WindowMode.windowed);
+      expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
@@ -230,8 +230,8 @@ void main() {
   // Deep coverage: WindowMode enum
   // =========================================================================
   group('WindowMode enum', () {
-    test('has 4 values', () {
-      expect(WindowMode.values, hasLength(4));
+    test('has 3 values', () {
+      expect(WindowMode.values, hasLength(3));
     });
 
     test('windowed isFullscreen is false', () {
@@ -246,10 +246,6 @@ void main() {
       expect(WindowMode.maximized.isMaximized, isTrue);
     });
 
-    test('minimized isMinimized is true', () {
-      expect(WindowMode.minimized.isMinimized, isTrue);
-    });
-
     test('windowed isWindowed is true', () {
       expect(WindowMode.windowed.isWindowed, isTrue);
     });
@@ -258,7 +254,6 @@ void main() {
       expect(WindowMode.windowed.name, 'windowed');
       expect(WindowMode.maximized.name, 'maximized');
       expect(WindowMode.fullscreen.name, 'fullscreen');
-      expect(WindowMode.minimized.name, 'minimized');
     });
   });
 
@@ -269,9 +264,9 @@ void main() {
     test('mode notifier fires listeners', () {
       final service = WindowService();
       var notified = false;
-      service.state.mode.addListener(() => notified = true);
+      service.mode.addListener(() => notified = true);
 
-      service.state.mode.value = WindowMode.maximized;
+      service.mode.value = WindowMode.maximized;
       expect(notified, isTrue);
 
       service.dispose();
@@ -280,9 +275,9 @@ void main() {
     test('windowSize notifier fires listeners', () {
       final service = WindowService();
       var notified = false;
-      service.state.windowSize.addListener(() => notified = true);
+      service.windowSize.addListener(() => notified = true);
 
-      service.state.windowSize.value = const Size(1920, 1080);
+      service.windowSize.value = const Size(1920, 1080);
       expect(notified, isTrue);
 
       service.dispose();
@@ -291,9 +286,9 @@ void main() {
     test('isResizing notifier fires listeners', () {
       final service = WindowService();
       var notified = false;
-      service.state.isResizing.addListener(() => notified = true);
+      service.isResizing.addListener(() => notified = true);
 
-      service.state.isResizing.value = true;
+      service.isResizing.value = true;
       expect(notified, isTrue);
 
       service.dispose();
@@ -302,9 +297,9 @@ void main() {
     test('isAlwaysOnTop notifier fires listeners', () {
       final service = WindowService();
       var notified = false;
-      service.state.isAlwaysOnTop.addListener(() => notified = true);
+      service.isAlwaysOnTop.addListener(() => notified = true);
 
-      service.state.isAlwaysOnTop.value = true;
+      service.isAlwaysOnTop.value = true;
       expect(notified, isTrue);
 
       service.dispose();
@@ -321,7 +316,7 @@ void main() {
     test('setMode(fullscreen) sets mode + intent', () async {
       final service = WindowService();
       await service.setMode(WindowMode.fullscreen);
-      expect(service.state.mode.value, WindowMode.fullscreen);
+      expect(service.mode.value, WindowMode.fullscreen);
       expect(service.isFullscreen, isTrue);
       service.dispose();
     });
@@ -333,7 +328,7 @@ void main() {
         final service = WindowService();
         await service.setMode(WindowMode.fullscreen);
         service.onWindowMaximize();
-        expect(service.state.mode.value, WindowMode.fullscreen);
+        expect(service.mode.value, WindowMode.fullscreen);
         service.dispose();
       },
     );
@@ -342,7 +337,7 @@ void main() {
       final service = WindowService();
       await service.setMode(WindowMode.fullscreen);
       service.onWindowUnmaximize();
-      expect(service.state.mode.value, WindowMode.fullscreen);
+      expect(service.mode.value, WindowMode.fullscreen);
       service.dispose();
     });
 
@@ -352,7 +347,7 @@ void main() {
         final service = WindowService();
         await service.setMode(WindowMode.fullscreen);
         await service.setMode(WindowMode.windowed);
-        expect(service.state.mode.value, WindowMode.windowed);
+        expect(service.mode.value, WindowMode.windowed);
         expect(service.isFullscreen, isFalse);
         service.dispose();
       },
@@ -362,7 +357,7 @@ void main() {
       // 守卫不影响正常最大化路径
       final service = WindowService();
       service.onWindowMaximize();
-      expect(service.state.mode.value, WindowMode.maximized);
+      expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
@@ -370,7 +365,7 @@ void main() {
       final service = WindowService();
       await service.setMode(WindowMode.fullscreen);
       await service.setMode(WindowMode.fullscreen); // 同值, 早退
-      expect(service.state.mode.value, WindowMode.fullscreen);
+      expect(service.mode.value, WindowMode.fullscreen);
       service.dispose();
     });
   });
@@ -423,9 +418,9 @@ void main() {
 
     test('onWindowResize sets isResizing true immediately', () {
       final service = WindowService();
-      expect(service.state.isResizing.value, isFalse);
+      expect(service.isResizing.value, isFalse);
       service.onWindowResize();
-      expect(service.state.isResizing.value, isTrue);
+      expect(service.isResizing.value, isTrue);
       service.dispose();
     });
 
@@ -461,13 +456,13 @@ void main() {
         mockSize = const Size(1920, 1080);
         final service = WindowService();
         service.onWindowResize();
-        expect(service.state.isResizing.value, isTrue);
+        expect(service.isResizing.value, isTrue);
 
         async.elapse(const Duration(milliseconds: 500));
         async.flushMicrotasks();
 
-        expect(service.state.isResizing.value, isFalse);
-        expect(service.state.windowSize.value, const Size(1920, 1080));
+        expect(service.isResizing.value, isFalse);
+        expect(service.windowSize.value, const Size(1920, 1080));
         service.dispose();
       });
     });
@@ -480,12 +475,12 @@ void main() {
         mockSize = const Size(1280, 752);
         final service = WindowService();
         service.onWindowResize();
-        expect(service.state.isResizing.value, isTrue);
+        expect(service.isResizing.value, isTrue);
 
         async.elapse(const Duration(milliseconds: 500));
         async.flushMicrotasks();
 
-        expect(service.state.isResizing.value, isFalse);
+        expect(service.isResizing.value, isFalse);
         service.dispose();
       });
     });
@@ -496,15 +491,15 @@ void main() {
         final service = WindowService();
         service.onWindowResize();
         async.elapse(const Duration(milliseconds: 400));
-        expect(service.state.isResizing.value, isTrue);
+        expect(service.isResizing.value, isTrue);
 
         service.onWindowResize(); // 重置 500ms timer
         async.elapse(const Duration(milliseconds: 400));
-        expect(service.state.isResizing.value, isTrue);
+        expect(service.isResizing.value, isTrue);
 
         async.elapse(const Duration(milliseconds: 100));
         async.flushMicrotasks();
-        expect(service.state.isResizing.value, isFalse);
+        expect(service.isResizing.value, isFalse);
         service.dispose();
       });
     });
@@ -533,8 +528,8 @@ void main() {
             'height': 1080.0,
           });
           async.flushMicrotasks();
-          expect(service.state.windowSize.value, const Size(1920, 1080));
-          expect(service.state.isResizing.value, isFalse);
+          expect(service.windowSize.value, const Size(1920, 1080));
+          expect(service.isResizing.value, isFalse);
 
           pendingBounds.first.complete({
             'x': 0.0,
@@ -543,8 +538,8 @@ void main() {
             'height': 900.0,
           });
           async.flushMicrotasks();
-          expect(service.state.windowSize.value, const Size(1920, 1080));
-          expect(service.state.isResizing.value, isFalse);
+          expect(service.windowSize.value, const Size(1920, 1080));
+          expect(service.isResizing.value, isFalse);
           service.dispose();
         });
       },
@@ -554,14 +549,14 @@ void main() {
       fakeAsync((async) {
         shouldFailBounds = true;
         final service = WindowService();
-        final initialSize = service.state.windowSize.value;
+        final initialSize = service.windowSize.value;
 
         service.onWindowResize();
         async.elapse(const Duration(milliseconds: 500));
         async.flushMicrotasks();
 
-        expect(service.state.isResizing.value, isFalse);
-        expect(service.state.windowSize.value, initialSize);
+        expect(service.isResizing.value, isFalse);
+        expect(service.windowSize.value, initialSize);
         service.dispose();
       });
     });
@@ -570,7 +565,7 @@ void main() {
       fakeAsync((async) {
         deferBounds = true;
         final service = WindowService();
-        final initialSize = service.state.windowSize.value;
+        final initialSize = service.windowSize.value;
 
         service.onWindowResize();
         async.elapse(const Duration(milliseconds: 500));
@@ -586,7 +581,7 @@ void main() {
         });
         async.flushMicrotasks();
 
-        expect(service.state.windowSize.value, initialSize);
+        expect(service.windowSize.value, initialSize);
       });
     });
   });

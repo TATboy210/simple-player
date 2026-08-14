@@ -7,15 +7,11 @@ import 'package:flutter/scheduler.dart';
 
 import 'package:window_manager/window_manager.dart';
 
-import '../persistence/settings_store.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../diagnostics/resize_frame_metrics.dart';
-import '../utils/screen_utils.dart';
-import 'display_enumerator.dart';
-import 'win32/win32_display_enumerator.dart';
+import '../persistence/window_persistence.dart';
 import 'window_bridge.dart';
 import 'window_mode.dart';
-import 'window_persistence.dart';
 import 'window_state.dart';
 
 /// 日志门面 — WindowService 共用。
@@ -25,19 +21,24 @@ final logBridge = KernelLogger.I;
 class WindowService with WindowListener implements WindowBridge {
   /// 创建 WindowService。
   ///
-  /// [displayEnumerator] 可选注入显示器枚举器，默认使用 Win32DisplayAdapter。
-  WindowService({DisplayEnumerator? displayEnumerator})
-    : _displayEnumerator = displayEnumerator ?? Win32DisplayAdapter();
+  /// 创建窗口服务。
+  WindowService({WindowPersistence? persistence})
+    : _persistence = persistence ?? WindowPersistence();
 
+  final WindowPersistence _persistence;
   final WindowState _state = WindowState();
-  final WindowPersistence _persistence = WindowPersistence();
-  final DisplayEnumerator _displayEnumerator;
   // nullable: 构造时无法引用 _state (Dart 初始化列表禁实例成员),
   // 改在 init() 创建. dispose 用 ?., init 未调即 dispose 时安全跳过.
   ResizeFrameMetrics? _resizeMetrics;
 
   bool _disposed = false;
+  bool _isClosing = false;
+  bool _initialized = false;
+  Future<void>? _initOperation;
   bool _isProgrammaticResize = false;
+  Future<void> _modeOperation = Future<void>.value();
+  int _modeGeneration = 0;
+  Future<void> _saveOperation = Future<void>.value();
   bool _skipNextResize = false;
 
   /// 全屏意图标记 — setMode(fullscreen) 置 true, setMode(windowed 从 fullscreen) 置 false.
@@ -71,33 +72,68 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   ValueNotifier<bool> get isAlwaysOnTop => _state.isAlwaysOnTop;
 
-  WindowState get state => _state;
-
   @override
-  Future<void> init() async {
-    await windowManager.ensureInitialized();
-    const options = WindowOptions(
-      backgroundColor: Colors.transparent,
-      titleBarStyle: TitleBarStyle.hidden,
-      windowButtonVisibility: false,
-      minimumSize: Size(854, 513),
-    );
-    // waitUntilReadyToShow 期望同步 VoidCallback; 提取 _initWindow() async 方法,
-    // 回调内 unawaited 触发 (DCM avoid-passing-async-when-sync-expected).
-    // 纯 async 形态重组, 信号源逻辑(frameless/isResizing)一字未改.
-    unawaited(
-      windowManager.waitUntilReadyToShow(
-        options,
-        () => unawaited(_initWindow()),
-      ),
-    );
-    windowManager.addListener(this);
-    // 构造时无法引用 _state (Dart 初始化列表禁实例成员), 故延后到 init.
-    // 此时 binding 已就绪, isResizing 监听器开始接管后续 resize 会话切片.
-    _resizeMetrics = ResizeFrameMetrics(
-      isResizing: _state.isResizing,
-      resizeSessionId: _state.resizeSessionId,
-    );
+  Future<void> init() {
+    if (_initialized) return Future<void>.value();
+    return _initOperation ??= _initOnce().catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      _initOperation = null;
+      logBridge.e('[WindowService.init] $error\n$stackTrace');
+      throw error;
+    });
+  }
+
+  Future<void> _initOnce() async {
+    var listenerAdded = false;
+    try {
+      await windowManager.ensureInitialized();
+      // 拦截原生关闭事件，确保异步窗口状态持久化完成后再销毁窗口。
+      await windowManager.setPreventClose(true);
+      const options = WindowOptions(
+        backgroundColor: Colors.transparent,
+        titleBarStyle: TitleBarStyle.hidden,
+        windowButtonVisibility: false,
+        minimumSize: Size(854, 513),
+      );
+      final ready = Completer<void>();
+      // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
+      // 传递给 init()，确保调用方等待到窗口真正 show/focus 完成。
+      await windowManager.waitUntilReadyToShow(options, () {
+        unawaited(
+          _runInitWindowSafely().then(ready.complete).catchError((
+            Object error,
+            StackTrace stackTrace,
+          ) {
+            if (!ready.isCompleted) ready.completeError(error, stackTrace);
+          }),
+        );
+      });
+      windowManager.addListener(this);
+      listenerAdded = true;
+      // 构造时无法引用 _state (Dart 初始化列表禁实例成员), 故延后到 init.
+      // 此时 binding 已就绪, isResizing 监听器开始接管后续 resize 会话切片.
+      _resizeMetrics = ResizeFrameMetrics(
+        isResizing: _state.isResizing,
+        resizeSessionId: _state.resizeSessionId,
+      );
+      await ready.future;
+      _initialized = true;
+    } catch (_) {
+      _cleanupFailedInit(listenerAdded: listenerAdded);
+      rethrow;
+    }
+  }
+
+  /// 清理初始化失败后已注册的资源，使后续重试不会叠加监听器。
+  void _cleanupFailedInit({required bool listenerAdded}) {
+    _resizeTimer?.cancel();
+    _resizeTimer = null;
+    _resizeMetrics?.dispose();
+    _resizeMetrics = null;
+    if (listenerAdded) windowManager.removeListener(this);
+    _initialized = false;
   }
 
   /// 窗口初始化 — 在 waitUntilReadyToShow 回调内 fire-and-forget 触发。
@@ -105,43 +141,53 @@ class WindowService with WindowListener implements WindowBridge {
   /// 提取为 async 方法以满足回调期望同步 VoidCallback 的契约
   /// (DCM avoid-passing-async-when-sync-expected)。纯 async 形态重组,
   /// 信号源逻辑(frameless 设置 / isResizing)一字未改。
+  Future<void> _runInitWindowSafely() async {
+    try {
+      await _initWindow();
+    } on Exception catch (error, stackTrace) {
+      logBridge.e('[WindowService._initWindow] $error\n$stackTrace');
+      rethrow;
+    }
+  }
+
   Future<void> _initWindow() async {
-    // 切换为 frameless:消除 hidden titleBarStyle 在 WM_NCCALCSIZE 留下的
-    // 8px 调整边框(白边根因)。必须在此 callback 内调用——waitUntilReadyToShow
-    // 已先执行 setTitleBarStyle(hidden) 把 is_frameless_ 重置为 false,此处
-    // setAsFrameless 把它设回 true,使 WM_NCCALCSIZE 走 frameless 分支直接
-    // return 0(非最大化不留 8px)。代价:失去系统级 resize hit-test,
-    // 由 SmartDragToResizeArea 在 Flutter 层兜底。
-    await windowManager.setAsFrameless();
-    final settings = await SettingsStore.load();
-    // 字段不提升, 用 local 捕获消除 `!` (纯 null 安全, 不动信号源逻辑)
-    final wx = settings.windowX;
-    final wy = settings.windowY;
-    if (wx != null && wy != null) {
-      final displays = _displayEnumerator.enumerateDisplays();
-      final clamped = ScreenUtils.clampToNearestMonitor(
-        displays: displays,
-        x: wx,
-        y: wy,
-        width: settings.windowWidth,
-        height: settings.windowHeight,
-      );
+    // 保持 hidden title bar 配置，不再切换 frameless 样式；Windows runner
+    // 通过 WM_NCHITTEST 返回原生 HT* 命中结果，继续交给系统 resize loop。
+    if (_disposed) return;
+    // Restore only validated geometry; corrupt preferences fall back to 1280×752.
+    final persisted = await _persistence.load();
+    if (_disposed) return;
+    if (persisted.position case final position?) {
       await windowManager.setBounds(
-        null,
-        position: clamped,
-        size: Size(settings.windowWidth, settings.windowHeight),
+        Rect.fromLTWH(
+          position.dx,
+          position.dy,
+          persisted.size.width,
+          persisted.size.height,
+        ),
       );
     } else {
-      await windowManager.setBounds(
-        null,
-        size: Size(settings.windowWidth, settings.windowHeight),
-      );
+      // 首次启动或位置损坏时仍应用已校验的尺寸，并交给平台居中，
+      // 避免依赖不可预测的默认窗口几何。
+      await windowManager.setSize(persisted.size);
       await windowManager.center();
     }
+    if (_disposed) return;
+    await windowManager.setAlwaysOnTop(persisted.alwaysOnTop);
+    if (_disposed) return;
+    _state.windowSize.value = persisted.size;
+    _state.isAlwaysOnTop.value = persisted.alwaysOnTop;
+    _state.mode.value = persisted.isMaximized
+        ? WindowMode.maximized
+        : WindowMode.windowed;
     _skipNextResize = true;
     await windowManager.show();
+    if (_disposed) return;
+    if (persisted.isMaximized) {
+      await windowManager.maximize();
+      if (_disposed) return;
+    }
     await windowManager.focus();
-    if (settings.isMaximized) await windowManager.maximize();
   }
 
   void _updateOnUIThread(VoidCallback update) {
@@ -215,6 +261,8 @@ class WindowService with WindowListener implements WindowBridge {
         );
       }
       _state.isResizing.value = false;
+      // Persist after the UI state is settled so the next launch uses this size.
+      unawaited(_saveWindowState(size: _state.windowSize.value));
     });
   }
 
@@ -270,77 +318,123 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   void onWindowClose() {
-    logBridge.i('onWindowClose() - saving geometry');
+    if (_disposed || _isClosing) return;
+    logBridge.i('onWindowClose()');
+    _isClosing = true;
     _resizeTimer?.cancel();
-    _saveGeometry().whenComplete(() {
-      dispose();
-      windowManager.destroy();
-    });
+    // Finish the preference write before destroying the native window.
+    unawaited(_persistThenDestroy());
   }
 
-  @override
-  Future<void> setMode(WindowMode target) async {
-    if (_disposed || target == _state.mode.value) return;
-    logBridge.i('setMode($target) <- ${_state.mode.value}');
-    final prev = _state.mode.value;
-    switch (target) {
-      case WindowMode.windowed:
-        if (prev == WindowMode.fullscreen) {
-          // 方案 B: 实际退出全屏由 UI 层调 media_kit VideoState.toggleFullscreen.
-          // 只清 intent + 设 mode=windowed. 不用 windowManager.unmaximize:
-          // 全屏非真最大化, unmaximize 无效.
-          _fullscreenIntent = false;
-          _state.mode.value = WindowMode.windowed;
-        } else if (prev == WindowMode.maximized) {
-          await windowManager.unmaximize();
-        }
-      case WindowMode.maximized:
-        await windowManager.maximize();
-      case WindowMode.minimized:
-        await windowManager.minimize();
-      case WindowMode.fullscreen:
-        // 方案 B: 实际全屏由 UI 层调 media_kit VideoState.toggleFullscreen
-        // (已验证可用). 此处只设 intent + mode — onWindowMaximize 守卫保持
-        // mode=fullscreen, 不被 SC_MAXIMIZE 覆盖成 maximized.
-        // 不得绕过 media_kit 初始化路径直调系统全屏 (旧方案致 GUI 全屏失效).
-        _fullscreenIntent = true;
-        _state.mode.value = WindowMode.fullscreen;
+  Future<void> _persistThenDestroy() async {
+    try {
+      await _saveWindowState();
+      await windowManager.destroy();
+    } finally {
+      dispose();
+    }
+  }
+
+  /// Saves the current settled geometry without letting persistence failures affect UI.
+  Future<void> _saveWindowState({Size? size}) {
+    final operation = _saveOperation.then(
+      (_) => _saveWindowStateSerialized(size: size),
+    );
+    _saveOperation = operation.catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      logBridge.w('[WindowService._saveWindowState] $error\n$stackTrace');
+    });
+    return operation;
+  }
+
+  Future<void> _saveWindowStateSerialized({Size? size}) async {
+    if (_disposed || _state.mode.value.isFullscreen) return;
+    try {
+      final position = await windowManager.getPosition();
+      if (_disposed) return;
+      await _persistence.save(
+        PersistedWindowState(
+          size: size ?? _state.windowSize.value,
+          position: position,
+          alwaysOnTop: _state.isAlwaysOnTop.value,
+          isMaximized: _state.mode.value == WindowMode.maximized,
+        ),
+      );
+    } on Exception catch (error, stackTrace) {
+      logBridge.w('[WindowService._saveWindowState] $error\n$stackTrace');
     }
   }
 
   @override
-  Future<void> setAspectRatio(double ratio) async {
-    await windowManager.setAspectRatio(ratio);
+  Future<void> setMode(WindowMode target) {
+    // 模式切换必须串行，避免快速切换时旧状态覆盖最新意图。
+    final operation = _modeOperation.then((_) => _setModeSerialized(target));
+    _modeOperation = operation.catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      logBridge.e('[WindowService.setMode] $error\n$stackTrace');
+    });
+    return operation;
+  }
+
+  Future<void> _setModeSerialized(WindowMode target) async {
+    if (_disposed || target == _state.mode.value) return;
+    final operationGeneration = ++_modeGeneration;
+    final previous = _state.mode.value;
+    logBridge.i('setMode($target) <- $previous');
+
+    switch (target) {
+      case WindowMode.windowed:
+        _fullscreenIntent = false;
+        _commitModeIfCurrent(operationGeneration, WindowMode.windowed);
+        if (previous == WindowMode.maximized) {
+          await windowManager.unmaximize();
+        }
+      case WindowMode.maximized:
+        _fullscreenIntent = false;
+        _commitModeIfCurrent(operationGeneration, WindowMode.maximized);
+        await windowManager.maximize();
+      case WindowMode.fullscreen:
+        // 实际全屏由 UI 层的 media_kit VideoState.toggleFullscreen 负责；
+        // 此处只同步语义状态，不修改 HWND 的原生 resize 能力。
+        _fullscreenIntent = true;
+        _commitModeIfCurrent(operationGeneration, WindowMode.fullscreen);
+    }
+  }
+
+  void _commitModeIfCurrent(int generation, WindowMode mode) {
+    if (_disposed || generation != _modeGeneration) return;
+    _state.mode.value = mode;
   }
 
   @override
   Future<void> setAlwaysOnTop(bool value) async {
+    if (_disposed) return;
     await windowManager.setAlwaysOnTop(value);
+    if (_disposed) return;
     _state.isAlwaysOnTop.value = value;
-    await SettingsStore.saveIsAlwaysOnTop(value);
+    await _saveWindowState();
   }
 
   @override
-  Future<void> minimize() => windowManager.minimize();
-  @override
-  Future<void> close() => windowManager.close();
-  @override
-  Future<void> startDragging() => windowManager.startDragging();
+  Future<void> minimize() async {
+    if (_disposed) return;
+    await windowManager.minimize();
+  }
 
-  Future<void> _saveGeometry() async {
-    try {
-      final pos = await windowManager.getPosition();
-      final size = await windowManager.getSize();
-      _persistence.saveWindowGeometry(
-        x: pos.dx,
-        y: pos.dy,
-        width: size.width,
-        height: size.height,
-        isMaximized: _state.mode.value.isMaximized,
-      );
-    } catch (e, st) {
-      logBridge.e('[WindowService._saveGeometry] $e\n$st');
-    }
+  @override
+  Future<void> close() async {
+    if (_disposed) return;
+    await windowManager.close();
+  }
+
+  @override
+  Future<void> startDragging() async {
+    if (_disposed) return;
+    await windowManager.startDragging();
   }
 
   @override
@@ -353,7 +447,6 @@ class WindowService with WindowListener implements WindowBridge {
     _resizeMetrics?.dispose();
     _resizeTimer?.cancel();
     _state.dispose();
-    _persistence.dispose();
     windowManager.removeListener(this);
   }
 }

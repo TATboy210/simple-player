@@ -7,6 +7,7 @@ import '../../kernel/scanner/folder_scanner.dart';
 import '../theme/tokens.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/app_tooltip.dart';
 import '../shared/context_menu_row.dart';
 import 'thumbnail_tile.dart';
 
@@ -239,7 +240,7 @@ class _FolderPathLabel extends StatelessWidget {
             const Icon(Icons.folder, size: 14, color: Tokens.textTertiary),
             const SizedBox(width: 4),
             Flexible(
-              child: Tooltip(
+              child: AppTooltip(
                 message: folderPath,
                 waitDuration: const Duration(
                   milliseconds: Tokens.tooltipDelayLong,

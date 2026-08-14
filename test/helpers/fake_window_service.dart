@@ -9,6 +9,8 @@ import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
 ///
 /// 提供调用计数用于测试断言。
 class FakeWindowService implements WindowBridge {
+  bool _disposed = false;
+
   // ─── Call tracking ───
 
   int modeCallCount = 0;
@@ -24,7 +26,8 @@ class FakeWindowService implements WindowBridge {
   @override
   final ValueNotifier<WindowMode> mode = ValueNotifier(WindowMode.windowed);
   @override
-  final ValueNotifier<Size> windowSize = ValueNotifier(const Size(1280, 720));
+  /// 与生产实现一致的默认外部窗口尺寸。
+  final ValueNotifier<Size> windowSize = ValueNotifier(const Size(1280, 752));
   @override
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
   @override
@@ -35,22 +38,21 @@ class FakeWindowService implements WindowBridge {
   // ─── WindowBridge implementation ───
 
   @override
-  Future<void> init() async {}
+  Future<void> init() async {
+    if (_disposed) return;
+  }
 
   @override
   Future<void> setMode(WindowMode target) async {
+    if (_disposed) return;
     modeCallCount++;
     lastModeValue = target;
     mode.value = target;
   }
 
-  // Importers: integration tests, widget tests
-  // Affected API: setAspectRatio — new WindowBridge method stub
-  @override
-  Future<void> setAspectRatio(double ratio) async {}
-
   @override
   Future<void> setAlwaysOnTop(bool value) async {
+    if (_disposed) return;
     alwaysOnTopCallCount++;
     lastAlwaysOnTopValue = value;
     isAlwaysOnTop.value = value;
@@ -58,16 +60,19 @@ class FakeWindowService implements WindowBridge {
 
   @override
   Future<void> minimize() async {
+    if (_disposed) return;
     minimizeCallCount++;
   }
 
   @override
   Future<void> close() async {
+    if (_disposed) return;
     closeCallCount++;
   }
 
   @override
   Future<void> startDragging() async {
+    if (_disposed) return;
     startDraggingCallCount++;
   }
 
@@ -78,6 +83,8 @@ class FakeWindowService implements WindowBridge {
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     mode.dispose();
     windowSize.dispose();
     isResizing.dispose();

@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: 播放器 Widget 稳定性与 PC Resize 流畅度
-current_phase: 35
-current_phase_name: Widget Tree Baseline & Behavior Recovery
-status: planned
-stopped_at: context exhaustion at 75% (2026-08-11)
-last_updated: "2026-08-11T10:49:01.461Z"
+current_phase: 36
+current_phase_name: medium-grain-rebuild-boundary-refactor
+status: executing
+stopped_at: context exhaustion at 82% (2026-08-14)
+last_updated: "2026-08-14T08:43:52.846Z"
 last_activity: 2026-08-11
 last_activity_desc: v1.8 widget rebuild milestone defined
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 25
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
+  percent: 50
 ---
 
 # Project State: 播放器 Widget 稳定性与 PC Resize 流畅度
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-11)
 
 **Core value:** 保持播放器主要功能、视觉状态和交互契约不变，同时降低 PC 窗口频繁变换时的 widget rebuild、布局和渲染卡顿。
-**Current focus:** Phase 35 plans reviewed; next `/gsd-execute-phase 35`。
+**Current focus:** Phase 36 — medium-grain-rebuild-boundary-refactor
 
 ## Current Position
 
-Phase: 35 (Widget Tree Baseline & Behavior Recovery) — PLANNED
-Plan: 0 of 3
-Status: plans reviewed; ready to execute
-Last activity: 2026-08-11 — Phase 35 plan review revised dependency, validation, and FFI isolation gates
+Phase: 36 (medium-grain-rebuild-boundary-refactor) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 36
+Last activity: 2026-08-11 — Phase 36 execution started
 
 ## Performance Metrics
 
@@ -117,9 +117,9 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-08-11T10:49:01.413Z
-Stopped at: context exhaustion at 75% (2026-08-11)
-Resume file: None (next action = `/gsd-plan-phase 35`)
+Last session: 2026-08-14T08:43:52.784Z
+Stopped at: context exhaustion at 82% (2026-08-14)
+Resume file: None (next action = `/gsd-execute-phase 36`)
 
 ### 2026-07-16 续会话（恢复 + logger 决策固化）
 
@@ -358,6 +358,13 @@ Resume file: None (next action = `/gsd-plan-phase 35`)
 - **ROADMAP 校准**：P33 标 deferred、P34 标 skipped、v4.5 milestone 行 IN PROGRESS→WRAPPED。ROADMAP Progress 表 P28-32 仍滞后（标 "Not started" 但实际完成），非本次范围，留作技术债。
 - **提交**：`docs(33): defer audio tab — af route unverified; skip P34; wrap v4.5`（含 33-DEFERRED.md + STATE.md + ROADMAP.md + 删 33-EXECUTE-CHECKPOINT.md）。
 - **下一步**：v4.5 收尾完成。用户可选 `/gsd-new-milestone` 启动下一里程碑，或在未来重启 P33（1 行属性名改动可能救活）。
+
+### 2026-08-11 Phase 36 planning complete
+
+- 生成并校验 3 个可执行计划：36-01 ControlBar 局部 rebuild tracer、36-02 PlayerScreen/video identity 与 source replacement、36-03 listener/timer 生命周期收口。
+- checker 修正 36-03 为 Wave 3 并依赖 36-01/36-02，避免并行修改同一 controls 生命周期文件；修正 `CenterGroup` 的实际源码路径。
+- 所有生产修复均受“测试先 RED，只有真实失败才修复”约束；保护当前未提交 `custom_title_bar.dart` 与未确认 PNG，不恢复 ControlsOverlay、不修改 media_kit。
+- 下一步：`/gsd-execute-phase 36`。
 
 ### 2026-07-31 C 增强后两个 bug 诊断(需求1全屏控制栏 + 需求5打开文件)— 未实施,待下窗口
 

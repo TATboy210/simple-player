@@ -80,8 +80,9 @@ void main() {
       expect(rightIcon.color, Tokens.textSecondary);
     });
 
-    testWidgets('right arrow gray at last index (boundary, D-03)',
-        (tester) async {
+    testWidgets('right arrow gray at last index (boundary, D-03)', (
+      tester,
+    ) async {
       // Arrange & Act — index=1（最后一个）右边界
       await pumpSpinControl(
         tester,
@@ -153,8 +154,7 @@ void main() {
       expect(callCount, 0);
     });
 
-    testWidgets('ArrowLeft key decrements when focused (D-10)',
-        (tester) async {
+    testWidgets('ArrowLeft key decrements when focused (D-10)', (tester) async {
       // Arrange
       int? capturedIndex;
       await pumpSpinControl(
@@ -183,8 +183,9 @@ void main() {
       expect(capturedIndex, 1);
     });
 
-    testWidgets('ArrowRight key increments when focused (D-10)',
-        (tester) async {
+    testWidgets('ArrowRight key increments when focused (D-10)', (
+      tester,
+    ) async {
       // Arrange
       int? capturedIndex;
       await pumpSpinControl(
