@@ -61,18 +61,24 @@ class PlayerServices {
   /// 视频渲染引擎实例.
   ///
   /// Media rendering engine (media_kit/libmpv wrapper).
-  late final MediaEngine engine;
+  MediaEngine? _engine;
+
+  MediaEngine get engine => _engine!;
 
   /// 播放控制编排器 — 单文件播放器门面.
   ///
   /// Playback orchestrator — single-file player facade.
-  late final PlaybackController controller;
+  PlaybackController? _controller;
+
+  PlaybackController get controller => _controller!;
 
   /// 视频处理服务 — 亮度/对比度/饱和度/色调/旋转/宽高比/去隔行.
   ///
   /// Video processing — brightness, contrast, saturation, hue, rotation,
   /// aspect ratio, deinterlace.
-  late final VideoProcessingService videoProcessing;
+  VideoProcessingService? _videoProcessing;
+
+  VideoProcessingService get videoProcessing => _videoProcessing!;
 
   /// Win32 窗口桥接服务.
   ///
@@ -83,10 +89,17 @@ class PlayerServices {
   ///
   /// 透传自 [_mediaKitEngine]. media_kit 是唯一后端 (fvp/MDK 已移除).
   VideoController get mediaKitVideoController =>
-      _mediaKitEngine.videoController;
+      _mediaKitEngine!.videoController;
 
   /// media_kit 引擎实例 — 持有以透传 [mediaKitVideoController].
-  late final MediaKitEngine _mediaKitEngine;
+  MediaKitEngine? _mediaKitEngine;
+
+  bool _initialized = false;
+  bool _disposed = false;
+  bool _engineCreated = false;
+  bool _controllerCreated = false;
+  bool _videoProcessingCreated = false;
+  Future<void>? _initOperation;
 
   /// 初始化所有播放服务.
   ///
@@ -96,34 +109,72 @@ class PlayerServices {
   /// 3. PlaybackController (orchestration)
   /// 4. controller.init() → 运行时默认状态
   /// 5. VideoProcessingService (video effects)
-  Future<void> init() async {
-    // Phase 17: 初始化 KernelLogger 静态实例 — 必须在引擎创建以前,
-    // 确保所有内核代码从启动第一刻起就能通过 KernelLoggerImpl.I 输出日志。
-    // kDebugMode 门控: debug 模式 CompositeSink([DebugPrintSink, DevToolsSink]),
-    // release 模式 NullSink (零输出, 可 tree-shake)。
-    KernelLoggerImpl.init();
+  Future<void> init() {
+    if (_disposed) return Future<void>.value();
+    if (_initialized) return Future<void>.value();
+    return _initOperation ??= _initOnce();
+  }
 
-    // Phase 19: 创建实例化 MemoryMonitor 并设置静态 I 访问器,
-    // 使 DebugExporter 等遗留调用点可通过 MemoryMonitor.I.snapshot() 访问。
-    final memoryMonitor = MemoryMonitor(
-      rssProvider: const ProcessInfoRssProvider(),
-      clock: const SystemClock(),
-      logger: KernelLoggerImpl.I,
-    );
-    MemoryMonitor.init(memoryMonitor);
+  Future<void> _initOnce() async {
+    try {
+      KernelLoggerImpl.init();
+      final memoryMonitor = MemoryMonitor(
+        rssProvider: const ProcessInfoRssProvider(),
+        clock: const SystemClock(),
+        logger: KernelLoggerImpl.I,
+      );
+      MemoryMonitor.init(memoryMonitor);
 
-    // media_kit 是唯一后端 (fvp/MDK + KernelAdapter 临时层已移除).
-    // 直接实例化 MediaKitEngine; engine 字段类型 MediaEngine,
-    // MediaKitEngine implements MediaEngine, 45 消费方零改动.
-    // diagnostics 经静态访问器 (KernelLoggerImpl.I / MemoryMonitor.I) 读取,
-    // 无需 bundle 注入 (MediaKitEngine 构造函数不接 bundle).
-    _mediaKitEngine = MediaKitEngine();
-    engine = _mediaKitEngine;
+      _throwIfDisposed();
+      _mediaKitEngine = MediaKitEngine();
+      _engine = _mediaKitEngine;
+      _engineCreated = true;
 
-    // v1.8:PlaybackController 不再接 playlist/onNeedRebuild(单文件播放器).
-    controller = PlaybackController(engine: engine);
-    await controller.init();
-    videoProcessing = VideoProcessingService(engine);
+      _throwIfDisposed();
+      _controller = PlaybackController(engine: engine);
+      _controllerCreated = true;
+      await controller.init();
+      if (_disposed) throw StateError('PlayerServices disposed during init');
+
+      _throwIfDisposed();
+      _videoProcessing = VideoProcessingService(engine);
+      _videoProcessingCreated = true;
+      _initialized = true;
+    } catch (_) {
+      // Cleanup must be best-effort: a failure in one disposer must not mask
+      // the initialization error or prevent dependent resources from closing.
+      _disposeCreatedResources();
+      _videoProcessing = null;
+      _controller = null;
+      _engine = null;
+      _mediaKitEngine = null;
+      rethrow;
+    } finally {
+      _initOperation = null;
+    }
+  }
+
+  void _throwIfDisposed() {
+    if (_disposed) throw StateError('PlayerServices disposed during init');
+  }
+
+  void _disposeCreatedResources() {
+    if (_videoProcessingCreated) _disposeSafely(_videoProcessing?.dispose);
+    if (_controllerCreated) _disposeSafely(_controller?.dispose);
+    if (_engineCreated) _disposeSafely(_engine?.dispose);
+    MemoryMonitor.disposeStatic();
+    _videoProcessingCreated = false;
+    _controllerCreated = false;
+    _engineCreated = false;
+  }
+
+  void _disposeSafely(void Function()? disposer) {
+    if (disposer == null) return;
+    try {
+      disposer();
+    } on Object catch (_) {
+      // Preserve the original init failure while continuing reverse cleanup.
+    }
   }
 
   /// 释放所有服务资源.
@@ -133,12 +184,17 @@ class PlayerServices {
   /// ensuring dependents are released before their dependencies.
   /// Each dispose is idempotent (safe to call multiple times).
   void dispose() {
-    windowService.dispose();
-    videoProcessing.dispose();
-    controller.dispose();
-    engine.dispose();
-    // 释放 MemoryMonitor 静态实例 — cancel 其 Timer.periodic(30s),
-    // 防止引擎 dispose 后定时器继续运行泄漏 (对称 init 中的 MemoryMonitor.init)。
-    MemoryMonitor.disposeStatic();
+    if (_disposed) return;
+    _disposed = true;
+    // The in-flight init observes this flag after each await and rolls back
+    // resources before publishing a ready service. dispose remains synchronous
+    // to preserve the existing composition-root contract.
+    // WindowBridge is borrowed from the composition root; PlayerServices must
+    // never dispose a dependency it did not create. If init is awaiting an
+    // async dependency, let its catch/finally path perform rollback so dispose
+    // cannot race the same resource teardown.
+    if (_initOperation == null) {
+      _disposeCreatedResources();
+    }
   }
 }

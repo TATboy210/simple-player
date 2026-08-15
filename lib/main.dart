@@ -5,7 +5,7 @@ import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'app.dart';
-import 'kernel/bridge/window_service.dart';
+import 'kernel/bridge/window_bridge.dart';
 import 'kernel/startup/startup_coordinator.dart';
 
 Future<void> main() async {
