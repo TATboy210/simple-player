@@ -2,7 +2,7 @@
 
 ## WindowBridge (abstract class)
 
-**File:** `lib/kernel/bridge/window_bridge.dart`
+**File:** `lib/kernel/window_manager_service/window_manager_service.dart`
 
 窗口管理抽象接口 — UI 层依赖此接口，不依赖具体实现。
 
@@ -28,7 +28,6 @@
 | `init` | `Future<void> init()` | 初始化窗口 |
 | `setMode` | `Future<void> setMode(WindowMode target)` | 设置窗口模式 |
 | `setAlwaysOnTop` | `Future<void> setAlwaysOnTop(bool value)` | 设置置顶 |
-| `setAspectRatio` | `Future<void> setAspectRatio(double ratio)` | 设置窗口宽高比 |
 | `minimize` | `Future<void> minimize()` | 最小化窗口 |
 | `close` | `Future<void> close()` | 关闭窗口 |
 | `startDragging` | `Future<void> startDragging()` | 开始窗口拖拽 |
@@ -54,11 +53,10 @@ windowService.isResizing.addListener(() {
 
 ## WindowMode (enum)
 
-**File:** `lib/kernel/bridge/window_mode.dart`
+**File:** `lib/kernel/window_manager_service/window_manager_service.dart`
 
 | Value | Getter | Description |
 |-------|--------|-------------|
 | `windowed` | `isWindowed` | 普通窗口 |
 | `maximized` | `isMaximized` | 最大化 |
 | `fullscreen` | `isFullscreen` | 无边框全屏 |
-| `minimized` | `isMinimized` | 最小化 |

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import '../../kernel/bridge/window_bridge.dart';
+import '../../kernel/window_manager_service/window_manager_service.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/services/playback_controller.dart';

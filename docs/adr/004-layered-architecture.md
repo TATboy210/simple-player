@@ -122,7 +122,7 @@ Adopt a **4-layer architecture** with MVVM-inspired service composition:
 - `lib/features/player/services/playback_controller.dart` — Facade pattern.
 - `lib/features/player/services/playback_contract.dart` — Dependency Inversion interface.
 - `lib/kernel/engine/media_engine.dart` — 7-ISP composite engine interface.
-- `lib/kernel/bridge/window_bridge.dart` — Abstract window management interface.
+- `lib/kernel/window_manager_service/window_manager_service.dart` — Abstract window management interface.
 - `lib/features/player/deferred_player_feature.dart` — Deferred loading.
 - `.planning/PROJECT.md` — "内核与 UI 解耦重构 — 允许独立演进，降低回归风险".
 - `.planning/research/ARCHITECTURE.md` — v3.0 compatible-replacement adapter architecture.

@@ -620,7 +620,7 @@ git push -u origin feat/my-feature
 |------|------|------|
 | `FvpEngine` | `kernel/engine/fvp_engine.dart` | fvp/MDK 引擎封装，6 个辅助组合 |
 | `PlaybackController` | `features/player/services/playback_controller.dart` | Facade：统一入口，组合 navigator + fileOps + monitor |
-| `WindowBridge` | `kernel/bridge/window_bridge.dart` | 窗口管理抽象接口（4 状态 + 7 命令） |
+| `WindowBridge` | `kernel/window_manager_service/window_manager_service.dart` | 窗口管理抽象接口（3 状态 + 7 命令） |
 | `Playlist` | `kernel/playlist/playlist.dart` | 状态机：有序项、当前索引、3 种播放模式 |
 | `PlayerScreen` | `ui/player/player_screen.dart` | 主播放器 UI：组合键盘 + 控制 + 视频 |
 | `Tokens` | `ui/theme/tokens.dart` | 编译时设计令牌：颜色、间距、圆角 |

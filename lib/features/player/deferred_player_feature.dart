@@ -15,7 +15,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/bridge/window_bridge.dart';
+import '../../kernel/window_manager_service/window_manager_service.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
