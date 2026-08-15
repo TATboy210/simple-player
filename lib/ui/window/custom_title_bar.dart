@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/bridge/window_mode.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/app_tooltip.dart';
 import '../theme/tokens.dart';

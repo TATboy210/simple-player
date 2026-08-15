@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_mode.dart';
+import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
 
 import '../helpers/fake_engine.dart';
 import '../helpers/integration_helpers.dart';

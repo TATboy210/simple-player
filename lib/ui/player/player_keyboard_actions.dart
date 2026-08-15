@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/bridge/window_bridge.dart';
-import '../../kernel/bridge/window_mode.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../theme/tokens.dart';

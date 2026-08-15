@@ -24,14 +24,18 @@ void main() {
     });
 
     group('dispose', () {
-      test('construction does not allocate playback resources', () {
-        final windowService = FakeWindowService();
-        final services = PlayerServices(windowService: windowService);
+      test(
+        'dispose before init is safe and does not dispose borrowed window',
+        () {
+          final windowService = FakeWindowService();
+          final services = PlayerServices(windowService: windowService);
 
-        // init() owns engine/controller creation; construction remains lightweight.
-        expect(services.windowService, same(windowService));
-        windowService.dispose();
-      });
+          // init() owns playback resources; the composition root owns the bridge.
+          expect(() => services.dispose(), returnsNormally);
+          expect(() => windowService.mode.value, returnsNormally);
+          windowService.dispose();
+        },
+      );
     });
   });
 }
