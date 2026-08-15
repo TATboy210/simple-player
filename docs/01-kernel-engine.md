@@ -211,7 +211,7 @@ static MediaState mapMdkState(mdk.PlaybackState mdkState) {
 
 ### 2.1 WindowBridge -- 窗口控制抽象
 
-**文件:** `lib/kernel/bridge/window_bridge.dart`
+**文件:** `lib/kernel/window_manager_service/window_manager_service.dart`
 
 **职责:** 解耦内核与窗口管理实现。内核通过此抽象接口控制窗口操作，不依赖任何 `window/` 包。
 

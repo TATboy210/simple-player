@@ -94,8 +94,8 @@ Key design rules:
 
 ## References
 
-- `lib/kernel/bridge/window_bridge.dart` — Abstract interface (5 states + 7 commands).
-- `lib/kernel/bridge/window_service.dart` — Concrete implementation (~451 lines, coordinates all window operations).
+- `lib/kernel/window_manager_service/window_manager_service.dart` — Abstract interface (5 states + 7 commands).
+- `lib/kernel/window_manager_service/window_manager_service.dart` — Concrete implementation (~451 lines, coordinates all window operations).
 - `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` — Win32 FFI fullscreen driver (~459 lines).
 - `lib/kernel/bridge/win32/win32_fullscreen_ffi.dart` — Raw Win32 FFI bindings (~509 lines).
 - `lib/kernel/bridge/win32/win32_display_enumerator.dart` — Multi-monitor enumeration FFI.

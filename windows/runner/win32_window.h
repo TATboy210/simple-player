@@ -97,6 +97,9 @@ class Win32Window {
 
   // window handle for hosted content.
   HWND child_content_ = nullptr;
+
+  // Prevents repeated subclass cleanup across WM_DESTROY, Create, and teardown.
+  bool destroy_notified_ = false;
 };
 
 #endif  // RUNNER_WIN32_WINDOW_H_

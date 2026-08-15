@@ -1,7 +1,7 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'kernel/bridge/window_bridge.dart';
+import 'kernel/window_manager_service/window_manager_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
 import 'features/player/deferred_player_feature.dart';
 import 'ui/shared/progress_splash_screen.dart';

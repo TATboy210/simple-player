@@ -242,7 +242,7 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   Future<void> init() {
-    if (_initialized) return Future<void>.value();
+    if (_disposed || _initialized) return Future<void>.value();
     return _initOperation ??= _initOnce().catchError((
       Object error,
       StackTrace stackTrace,
@@ -269,15 +269,9 @@ class WindowService with WindowListener implements WindowBridge {
       // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
       // 传递给 init()，确保调用方等待到窗口真正 show/focus 完成。
       await windowManager.waitUntilReadyToShow(options, () {
-        unawaited(
-          _runInitWindowSafely().then(ready.complete).catchError((
-            Object error,
-            StackTrace stackTrace,
-          ) {
-            if (!ready.isCompleted) ready.completeError(error, stackTrace);
-          }),
-        );
+        unawaited(_completeReadyAfterInit(ready));
       });
+      if (_disposed) return;
       windowManager.addListener(this);
       listenerAdded = true;
       // 构造时无法引用 _state (Dart 初始化列表禁实例成员), 故延后到 init.
@@ -287,10 +281,24 @@ class WindowService with WindowListener implements WindowBridge {
         resizeSessionId: _state.resizeSessionId,
       );
       await ready.future;
+      if (_disposed) return;
       _initialized = true;
-    } catch (_) {
+    } on Exception {
       _cleanupFailedInit(listenerAdded: listenerAdded);
       rethrow;
+    } on Error {
+      // 清理资源后继续抛出编程错误，避免把不可恢复错误伪装成初始化失败。
+      _cleanupFailedInit(listenerAdded: listenerAdded);
+      rethrow;
+    }
+  }
+
+  Future<void> _completeReadyAfterInit(Completer<void> ready) async {
+    try {
+      await _runInitWindowSafely();
+      if (!ready.isCompleted) ready.complete();
+    } on Object catch (error, stackTrace) {
+      if (!ready.isCompleted) ready.completeError(error, stackTrace);
     }
   }
 
@@ -367,8 +375,14 @@ class WindowService with WindowListener implements WindowBridge {
       } else {
         SchedulerBinding.instance.addPostFrameCallback((_) => update());
       }
-    } catch (_) {
+    } on Exception catch (error, stackTrace) {
+      // 调度器不可用时保留同步更新，并记录异常上下文便于诊断。
+      logBridge.w('[WindowService._updateOnUIThread] $error\n$stackTrace');
       update();
+    } on Error {
+      // 清理/测试阶段可能抛出 Error；保持原有兜底行为但继续传播不可恢复错误。
+      update();
+      rethrow;
     }
   }
 
@@ -490,6 +504,7 @@ class WindowService with WindowListener implements WindowBridge {
     logBridge.i('onWindowClose()');
     _isClosing = true;
     _resizeTimer?.cancel();
+    ++_resizeGeneration;
     // Finish the preference write before destroying the native window.
     unawaited(_closeWindowOperation());
   }
@@ -500,7 +515,16 @@ class WindowService with WindowListener implements WindowBridge {
 
   Future<void> _persistThenDestroy() async {
     try {
-      await _saveWindowState();
+      // 等待已发出的窗口命令完成，再读取最终置顶/模式状态。
+      await _modeOperation;
+      // 关闭可能发生在 resize 防抖完成前，优先读取 native 尺寸避免保存旧快照。
+      Size? closingSize;
+      try {
+        closingSize = await windowManager.getSize();
+      } on Exception catch (error, stackTrace) {
+        logBridge.w('[WindowService._persistThenDestroy] $error\n$stackTrace');
+      }
+      await _saveWindowState(size: closingSize);
       await windowManager.destroy();
     } finally {
       dispose();
@@ -553,6 +577,9 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   Future<void> _setModeSerialized(WindowMode target) async {
+    // 初始化恢复优先完成，避免用户命令被持久化快照覆盖。
+    final initOperation = _initOperation;
+    if (initOperation != null) await initOperation;
     if (_disposed || target == _state.mode.value) return;
     final operationGeneration = ++_modeGeneration;
     final previous = _state.mode.value;
@@ -583,8 +610,21 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   @override
-  Future<void> setAlwaysOnTop(bool value) async {
-    if (_disposed) return;
+  Future<void> setAlwaysOnTop(bool value) {
+    final operation = _modeOperation.then(
+      (_) => _setAlwaysOnTopSerialized(value),
+    );
+    _modeOperation = operation.catchError((
+      Object error,
+      StackTrace stackTrace,
+    ) {
+      logBridge.e('[WindowService.setAlwaysOnTop] $error\n$stackTrace');
+    });
+    return operation;
+  }
+
+  Future<void> _setAlwaysOnTopSerialized(bool value) async {
+    if (_disposed || value == _state.isAlwaysOnTop.value) return;
     await windowManager.setAlwaysOnTop(value);
     if (_disposed) return;
     _state.isAlwaysOnTop.value = value;

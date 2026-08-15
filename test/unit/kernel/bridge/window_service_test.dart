@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/bridge/window_bridge.dart';
+import 'package:simple_player_flutter/kernel/window_manager_service/window_manager_service.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
 void main() {

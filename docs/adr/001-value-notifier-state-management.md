@@ -66,7 +66,7 @@ Key design rules:
 
 - `lib/kernel/engine/engine_state.dart` — `EngineState` mixin with all `ValueNotifier` playback state fields.
 - `lib/kernel/engine/engine_state_view.dart` — Read-only state surface (~12 ValueNotifier getters).
-- `lib/kernel/bridge/window_bridge.dart` — Window state exposed as `ValueNotifier<WindowMode>`, `ValueNotifier<Size>`, etc.
+- `lib/kernel/window_manager_service/window_manager_service.dart` — Window state exposed as `ValueNotifier<WindowMode>`, `ValueNotifier<Size>`, etc.
 - `lib/ui/player/player_screen.dart` — Primary consumer, `ValueListenableBuilder` on multiple notifiers.
 - `lib/kernel/utils/mergable_listenable.dart` — Combines multiple notifiers for composite rebuild triggers.
 - `.planning/codebase/CONVENTIONS.md` — State management section documents the pattern.

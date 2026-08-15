@@ -25,8 +25,8 @@ lib/
 │   │   ├── playback_control.dart   # ISP: open/play/pause/seek
 │   │   ├── track_control.dart      # ISP: audio track query/switch
 │   │   └── subtitle_config.dart    # ISP: subtitle track query/switch
-│   ├── bridge/
-│   │   └── window_bridge.dart      # Window control abstraction (FFI-backed)
+│   ├── window_manager_service/    # Window control abstraction and implementation
+│   │   └── window_manager_service.dart
 │   ├── models/                  # Data classes
 │   │   ├── playlist_item.dart      # PlaylistItem (path, timestamp, position)
 │   │   ├── media_state.dart        # Playback state enum

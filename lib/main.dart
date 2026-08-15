@@ -5,7 +5,7 @@ import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'app.dart';
-import 'kernel/bridge/window_bridge.dart';
+import 'kernel/window_manager_service/window_manager_service.dart';
 import 'kernel/startup/startup_coordinator.dart';
 
 Future<void> main() async {
@@ -21,7 +21,6 @@ Future<void> main() async {
   // 必须早于 MediaKitEngine 构造 (PlayerServices.init 内). fvp/MDK 已移除.
   MediaKit.ensureInitialized();
 
-  // WindowService 内部通过 _createDriver() 自动创建平台全屏驱动
   final windowService = WindowService();
   await windowService.init();
 
