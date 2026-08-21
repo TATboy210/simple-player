@@ -25,8 +25,14 @@ lib/
 │   │   ├── playback_control.dart   # ISP: open/play/pause/seek
 │   │   ├── track_control.dart      # ISP: audio track query/switch
 │   │   └── subtitle_config.dart    # ISP: subtitle track query/switch
-│   ├── window_manager_service/    # Window control abstraction and implementation
-│   │   └── window_manager_service.dart
+│   ├── window_bridge/          # Window control abstraction and implementation
+│   │   ├── window_bridge.dart      # WindowBridge interface + WindowMode enum
+│   │   ├── window_manager_service.dart # WindowService impl + barrel export
+│   │   ├── window_service_state.dart  # Shared mutable state container
+│   │   ├── window_mode_coordinator.dart # Maximize/fullscreen mode transitions
+│   │   ├── window_resize_coordinator.dart # Resize debounce + persistence
+│   │   ├── window_persistence_coordinator.dart # Serialized geometry saves
+│   │   └── window_constants.dart   # Geometry constants (single source)
 │   ├── models/                  # Data classes
 │   │   ├── playlist_item.dart      # PlaylistItem (path, timestamp, position)
 │   │   ├── media_state.dart        # Playback state enum

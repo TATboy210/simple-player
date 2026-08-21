@@ -51,7 +51,6 @@ Key design rules:
 - **`WindowService`** coordinates: fullscreen enter/leave with confirmation chain (callback-first, polling fallback), resize debounce (500ms), geometry save/restore, always-on-top.
 - **Compile-time flag:** `USE_WINDOWS_NATIVE_FULLSCREEN` (via `--dart-define`) controls whether the Win32 FFI driver is used (`true`) or window_manager fallback (`false`, default).
 - **macOS/Linux:** Use `packages/fullscreen_window/` local fork (113-line C++ macOS, 182-line C Linux) via MethodChannel — no Win32 FFI on these platforms.
-- **`WindowState`** is an immutable state container with `copyWith` for all window state fields.
 - **Geometry persistence** via `WindowPersistence` backed by `shared_preferences`.
 
 ### Win32 FFI Safety Patterns
@@ -83,7 +82,6 @@ Key design rules:
 - `FakeWindowService` + `FakeFullscreenDriver` for unit tests.
 - 765-line test file for `WindowsFullscreenDriver` covering style bit logic, state transitions, and error recovery.
 - Confirmation chain with callback-first, polling-fallback pattern handles native callback timing variations.
-- `WindowState` immutable container + `copyWith` prevents inconsistent intermediate states.
 - Phase 1 simplified the architecture: deleted `DesktopFullscreenDriver` and `DesktopFullscreenDriverFactory` (4 layers to 3).
 
 ## Related Decisions
@@ -94,8 +92,8 @@ Key design rules:
 
 ## References
 
-- `lib/kernel/window_manager_service/window_manager_service.dart` — Abstract interface (5 states + 7 commands).
-- `lib/kernel/window_manager_service/window_manager_service.dart` — Concrete implementation (~451 lines, coordinates all window operations).
+- `lib/kernel/window_bridge/window_bridge.dart` — Abstract interface (states + commands).
+- `lib/kernel/window_bridge/window_manager_service.dart` — Concrete implementation (thin coordinator delegating to mode/resize/persistence sub-coordinators).
 - `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` — Win32 FFI fullscreen driver (~459 lines).
 - `lib/kernel/bridge/win32/win32_fullscreen_ffi.dart` — Raw Win32 FFI bindings (~509 lines).
 - `lib/kernel/bridge/win32/win32_display_enumerator.dart` — Multi-monitor enumeration FFI.

@@ -2,7 +2,7 @@
 
 ## WindowBridge (abstract class)
 
-**File:** `lib/kernel/window_manager_service/window_manager_service.dart`
+**File:** `lib/kernel/window_bridge/window_bridge.dart`
 
 窗口管理抽象接口 — UI 层依赖此接口，不依赖具体实现。
 
@@ -53,7 +53,7 @@ windowService.isResizing.addListener(() {
 
 ## WindowMode (enum)
 
-**File:** `lib/kernel/window_manager_service/window_manager_service.dart`
+**File:** `lib/kernel/window_bridge/window_bridge.dart`
 
 | Value | Getter | Description |
 |-------|--------|-------------|
