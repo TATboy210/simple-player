@@ -7,7 +7,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/startup/startup_coordinator.dart';
-import 'kernel/window_Bridge/window_manager_service.dart';
+import 'kernel/window_bridge/window_manager_service.dart';
 
 /// 应用组合根：初始化平台基础设施并将已准备的窗口服务注入 App。
 Future<void> main() async {
