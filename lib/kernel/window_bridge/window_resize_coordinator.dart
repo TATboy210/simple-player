@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:flutter/scheduler.dart';
-
 import '../diagnostics/kernel_logger.dart';
 import 'window_constants.dart';
 import 'window_service_state.dart';
+import 'window_ui_thread.dart';
 
 /// 将原生 resize 回调收敛为防抖后的窗口状态更新。
 final class WindowResizeCoordinator {
@@ -52,7 +51,7 @@ final class WindowResizeCoordinator {
       );
     }
     if (!_isCurrent(generation)) return;
-    _updateOnUIThread(() {
+    updateOnUIThread(() {
       if (!_isCurrent(generation)) return;
       if (size != null && size != _state.windowSize.value) {
         _state.windowSize.value = Size(
@@ -62,7 +61,9 @@ final class WindowResizeCoordinator {
       }
       _state.isResizing.value = false;
       unawaited(_persistSafely(_state.windowSize.value));
-    });
+    }, warn: (error, stackTrace) => _loggerOrFallback.w(
+      '[WindowResizeCoordinator._updateOnUIThread] $error\n$stackTrace',
+    ));
   }
 
   bool _isCurrent(int generation) => !_disposed && generation == _generation;
@@ -71,28 +72,13 @@ final class WindowResizeCoordinator {
     try {
       await _persistSize(size);
     } on Object catch (error, stackTrace) {
-      (_logger ?? KernelLogger.I).w(
+      _loggerOrFallback.w(
         '[WindowResizeCoordinator._persistSize] $error\n$stackTrace',
       );
     }
   }
 
-  void _updateOnUIThread(VoidCallback update) {
-    try {
-      final phase = SchedulerBinding.instance.schedulerPhase;
-      if (phase == SchedulerPhase.idle ||
-          phase == SchedulerPhase.postFrameCallbacks) {
-        update();
-      } else {
-        SchedulerBinding.instance.addPostFrameCallback((_) => update());
-      }
-    } on Exception catch (error, stackTrace) {
-      (_logger ?? KernelLogger.I).w(
-        '[WindowResizeCoordinator._updateOnUIThread] $error\n$stackTrace',
-      );
-      update();
-    }
-  }
+  KernelLogger get _loggerOrFallback => _logger ?? KernelLogger.I;
 
   /// 取消未完成的防抖任务并使异步回调失效。
   void dispose() {

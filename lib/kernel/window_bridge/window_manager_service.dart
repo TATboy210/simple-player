@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../diagnostics/kernel_logger.dart';
@@ -12,6 +11,7 @@ import 'window_mode_coordinator.dart';
 import 'window_persistence_coordinator.dart';
 import 'window_resize_coordinator.dart';
 import 'window_service_state.dart';
+import 'window_ui_thread.dart';
 
 export 'window_bridge.dart';
 export 'window_constants.dart';
@@ -19,6 +19,7 @@ export 'window_mode_coordinator.dart';
 export 'window_persistence_coordinator.dart';
 export 'window_resize_coordinator.dart';
 export 'window_service_state.dart';
+export 'window_ui_thread.dart';
 
 /// 日志门面 — WindowService 共用。
 final _log = KernelLogger.I;
@@ -198,23 +199,11 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   void _updateOnUIThread(VoidCallback update) {
-    try {
-      final phase = SchedulerBinding.instance.schedulerPhase;
-      if (phase == SchedulerPhase.idle ||
-          phase == SchedulerPhase.postFrameCallbacks) {
-        update();
-      } else {
-        SchedulerBinding.instance.addPostFrameCallback((_) => update());
-      }
-    } on Exception catch (error, stackTrace) {
-      // 调度器不可用时保留同步更新，并记录异常上下文便于诊断。
-      _log.w('[WindowService._updateOnUIThread] $error\n$stackTrace');
-      update();
-    } on Error {
-      // 清理/测试阶段可能抛出 Error；保持原有兜底行为但继续传播不可恢复错误。
-      update();
-      rethrow;
-    }
+    updateOnUIThread(
+      update,
+      warn: (error, stackTrace) =>
+          _log.w('[WindowService._updateOnUIThread] $error\n$stackTrace'),
+    );
   }
 
   void _ensureResizeCoordinator() {
