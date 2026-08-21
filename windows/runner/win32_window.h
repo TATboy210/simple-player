@@ -7,18 +7,19 @@
 #include <memory>
 #include <string>
 
-// A class abstraction for a high DPI-aware Win32 Window. Intended to be
-// inherited from by classes that wish to specialize with custom
-// rendering and input handling
-class Win32Window {
- public:
-  struct Point {
+// Win32 窗口基类 — 创建窗口壳 + 消息路由 + DPI 缩放
+class Win32Window
+{
+public:
+  struct Point
+  {
     unsigned int x;
     unsigned int y;
     Point(unsigned int x, unsigned int y) : x(x), y(y) {}
   };
 
-  struct Size {
+  struct Size
+  {
     unsigned int width;
     unsigned int height;
     Size(unsigned int width, unsigned int height)
@@ -28,78 +29,48 @@ class Win32Window {
   Win32Window();
   virtual ~Win32Window();
 
-  // Creates a win32 window with |title| that is positioned and sized using
-  // |origin| and |size|. New windows are created on the default monitor. Window
-  // sizes are specified to the OS in physical pixels, hence to ensure a
-  // consistent size this function will scale the inputted width and height as
-  // as appropriate for the default monitor. The window is invisible until
-  // |Show| is called. Returns true if the window was created successfully.
-  bool Create(const std::wstring& title, const Point& origin, const Size& size);
+  // 创建窗口（不可见，由 window_manager 控制显示）
+  bool Create(const std::wstring &title, const Point &origin, const Size &size);
 
-  // Show the current window. Returns true if the window was successfully shown.
-  bool Show();
-
-  // Release OS resources associated with window.
+  // 释放窗口资源
   void Destroy();
 
-  // Inserts |content| into the window tree.
+  // 嵌入 Flutter 视图
   void SetChildContent(HWND content);
 
-  // Returns the backing Window handle to enable clients to set icon and other
-  // window properties. Returns nullptr if the window has been destroyed.
+  // 获取窗口句柄
   HWND GetHandle();
 
-  // If true, closing this window will quit the application.
+  // 关闭窗口时是否退出应用
   void SetQuitOnClose(bool quit_on_close);
 
-  // Return a RECT representing the bounds of the current client area.
+  // 获取客户区矩形
   RECT GetClientArea();
 
- protected:
-  // Processes and route salient window messages for mouse handling,
-  // size change and DPI. Delegates handling of these to member overloads that
-  // inheriting classes can handle.
+protected:
+  // 消息处理（子类可重写）
   virtual LRESULT MessageHandler(HWND window,
                                  UINT const message,
                                  WPARAM const wparam,
                                  LPARAM const lparam) noexcept;
 
-  // Called when CreateAndShow is called, allowing subclass window-related
-  // setup. Subclasses should return false if setup fails.
   virtual bool OnCreate();
-
-  // Called when Destroy is called.
   virtual void OnDestroy();
 
- private:
+private:
   friend class WindowClassRegistrar;
 
-  // OS callback called by message pump. Handles the WM_NCCREATE message which
-  // is passed when the non-client area is being created and enables automatic
-  // non-client DPI scaling so that the non-client area automatically
-  // responds to changes in DPI. All other messages are handled by
-  // MessageHandler.
+  // Win32 消息回调
   static LRESULT CALLBACK WndProc(HWND const window,
                                   UINT const message,
                                   WPARAM const wparam,
                                   LPARAM const lparam) noexcept;
 
-  // Retrieves a class instance pointer for |window|
-  static Win32Window* GetThisFromHandle(HWND const window) noexcept;
-
-  // Update the window frame's theme to match the system theme.
-  static void UpdateTheme(HWND const window);
+  static Win32Window *GetThisFromHandle(HWND const window) noexcept;
 
   bool quit_on_close_ = false;
-
-  // window handle for top level window.
   HWND window_handle_ = nullptr;
-
-  // window handle for hosted content.
   HWND child_content_ = nullptr;
-
-  // Prevents repeated subclass cleanup across WM_DESTROY, Create, and teardown.
-  bool destroy_notified_ = false;
 };
 
-#endif  // RUNNER_WIN32_WINDOW_H_
+#endif // RUNNER_WIN32_WINDOW_H_
