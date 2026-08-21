@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../window_bridge/window_constants.dart';
+
 /// A validated window snapshot restored between application sessions.
 final class PersistedWindowState {
   /// Creates a window snapshot from the last settled desktop window state.
@@ -41,8 +43,6 @@ final class WindowPersistence {
   static const _alwaysOnTopKey = 'isAlwaysOnTop';
   static const _maximizedKey = 'isMaximized';
 
-  static const defaultSize = Size(1280, 752);
-  static const _minimumSize = Size(854, 513);
   static const _maximumDimension = 16384.0;
   static const _maximumCoordinate = 100000.0;
 
@@ -56,13 +56,13 @@ final class WindowPersistence {
         size: Size(
           _dimension(
             preferences.getDouble(_widthKey),
-            defaultSize.width,
-            _minimumSize.width,
+            defaultWindowSize.width,
+            minimumWindowSize.width,
           ),
           _dimension(
             preferences.getDouble(_heightKey),
-            defaultSize.height,
-            _minimumSize.height,
+            defaultWindowSize.height,
+            minimumWindowSize.height,
           ),
         ),
         position: _position(preferences),
@@ -71,7 +71,7 @@ final class WindowPersistence {
       );
     } on Exception {
       return const PersistedWindowState(
-        size: defaultSize,
+        size: defaultWindowSize,
         position: null,
         alwaysOnTop: false,
         isMaximized: false,
@@ -88,11 +88,11 @@ final class WindowPersistence {
       // Sequential writes avoid a partially reordered geometry snapshot.
       await preferences.setDouble(
         _widthKey,
-        _dimension(size.width, defaultSize.width, _minimumSize.width),
+        _dimension(size.width, defaultWindowSize.width, minimumWindowSize.width),
       );
       await preferences.setDouble(
         _heightKey,
-        _dimension(size.height, defaultSize.height, _minimumSize.height),
+        _dimension(size.height, defaultWindowSize.height, minimumWindowSize.height),
       );
       if (position == null) {
         await preferences.remove(_xKey);
