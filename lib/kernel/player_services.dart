@@ -27,7 +27,7 @@ import 'diagnostics/kernel_logger.dart';
 import 'diagnostics/memory_monitor.dart';
 import 'diagnostics/rss_provider.dart';
 
-import 'window_manager_service/window_manager_service.dart';
+import 'window_Bridge/window_manager_service.dart';
 import 'engine/media_engine.dart';
 import 'engine/media_kit_engine.dart';
 import 'services/playback_controller.dart';

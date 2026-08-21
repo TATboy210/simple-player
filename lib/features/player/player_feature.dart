@@ -20,7 +20,7 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 
-import '../../kernel/window_manager_service/window_manager_service.dart';
+import '../../kernel/window_Bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/player_services.dart';
 import '../../kernel/startup/startup_coordinator.dart';
