@@ -387,6 +387,22 @@ Resume file: None (next action = `/gsd-execute-phase 36`)
 
 **未实施原因**:context ~72% + 两 bug 需 GUI 手动验证(无头测不出全屏/FilePicker)+ 需求1治本涉及 4-5 文件 + SC_MAXIMIZE 深坑 + 核心交互风险。半成品(全屏坏)比不修更糟。记录根因+方案,下窗口实施+手动验证。memory `project-bug-fullscreen-mode-desync`。
 
+### 2026-08-22 window_bridge 桥接层重构完成（独立重构任务，非 GSD phase）
+
+- **范围**: 用户直接任务（非 GSD 工作流）— 在保留 `window_manager: ^0.5.2` 平台层前提下全面重构 `lib/kernel/window_Bridge/` → `lib/kernel/window_bridge/`，行为零改变。
+- **8 个 commit 全部落盘**（分支 feat/v1.8-stability-polish-plan-02-02）:
+  1. `52d5e3fb` 基线: window bridge 迁移（4 文件协调器架构替代已删 window_manager_service/ 670 行单文件）
+  2. `05cad89e` windows runner 加固（CMP0175 + 简化 Win32Window）
+  3. `e683ce85` misc（engine VideoCodecInfo / drop adaptive_theme / probe 扩展）
+  4. `e2822631` 结构规范化: window_Bridge→window_bridge（两步 git mv）+ window_service_state.dart 288 行拆为 state + 3 协调器，主文件 barrel export
+  5. `ec7711c1` 死代码: 删 WindowState 类 / syncFullscreenState 接口方法（协调器内部保留）/ FakeWindowService.showAfterFirstFrame / 薄重复测试×2; logBridge→_log
+  6. `7dd73c82` 常量统一: window_persistence.dart 改用 window_constants.dart 单一来源
+  7. `3480e29e` _updateOnUIThread 去重: 提取 window_ui_thread.dart 共享函数（warn 回调保留各日志前缀）
+  8. `243a3e4a` 文档同步: CLAUDE.md + docs/ 6 文件路径更新，删 ADR003 失实 WindowState 描述
+- **终验**: analyze 零问题；unit/kernel 118 测试全过；widget 全量 +408 -10 中 10 失败全部鉴别为预存（control_bar_rebuild_boundary_test 5 个基线对照同失败 + control_bar_test 4-5 个文件内共享状态污染，单独跑全过；两文件与 window 代码零 import 依赖）。
+- **预存技术债登记**: control_bar_test.dart 整文件运行时 4-5 测试失败/未完成（共享状态污染 + 1 个 10 分钟超时），单独运行全过——与 window_bridge 无关，归属 widget 测试隔离性问题。
+- **实机 smoke 待用户执行**: `flutter run -d windows` 验证 几何恢复/resize 防抖(500ms)/最大化/置顶/全屏进出(F/双击)/关闭落盘。
+
 ## Operator Next Steps
 
 - 下一窗口:实施需求1治本方案 A(window_service.setMode 实现 + _fullscreenIntent 守卫 + onToggleFullscreen 改走 windowService)+ 需求5手动复现定位。需 Windows GUI 手动验证。
