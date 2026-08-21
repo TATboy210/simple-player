@@ -4,7 +4,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/window_manager_service/window_manager_service.dart';
+import 'package:simple_player_flutter/kernel/window_Bridge/window_manager_service.dart';
 
 void main() {
   group('WindowMode', () {

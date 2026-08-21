@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import '../../kernel/window_manager_service/window_manager_service.dart';
+import '../../kernel/window_Bridge/window_manager_service.dart';
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../theme/tokens.dart';
@@ -72,9 +72,6 @@ KeyboardHandler buildPlayerKeyboardActions({
     //       exit 直接 pop root navigator 栈顶全屏 route(绕过守卫).
     onToggleFullscreen: () {
       final entering = !isFullscreen;
-      windowService.setMode(
-        entering ? WindowMode.fullscreen : WindowMode.windowed,
-      );
       if (entering) {
         videoKey.currentState?.enterFullscreen();
       } else {
@@ -84,7 +81,8 @@ KeyboardHandler buildPlayerKeyboardActions({
     },
     onExitFullscreen: () {
       if (isFullscreen) {
-        windowService.setMode(WindowMode.windowed);
+        // media_kit 的 Video.onExitFullscreen 统一同步窗口模式；这里仅负责
+        // 关闭 route，避免键盘路径与 route lifecycle callback 产生竞态。
         final nav = Navigator.of(context, rootNavigator: true);
         if (nav.canPop()) nav.maybePop();
       }
