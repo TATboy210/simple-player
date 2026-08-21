@@ -15,6 +15,7 @@ import '../models/player_error.dart';
 import 'models/audio_track_info.dart';
 import 'models/media_info.dart';
 import 'models/subtitle_track_info.dart';
+import 'models/video_codec_info.dart';
 
 /// media_kit (libmpv) 后端的 [MediaEngine] 实现 — 唯一后端.
 ///
@@ -631,10 +632,28 @@ class MediaKitEngine implements MediaEngine {
     _stateMachine.isBuffering.value = false;
   }
 
+  /// media_kit width/height 事件流 → [VideoCodecInfo].
+  ///
+  /// 仅当两者都已到达且为正值时才返回视频元数据；否则为 null，避免
+  /// 让纯音频/损坏文件被误识别成有效视频流。
+  @visibleForTesting
+  static VideoCodecInfo? videoInfoFromMediaKit({
+    int? width,
+    int? height,
+    double par = 1.0,
+    String codec = '',
+  }) {
+    if (width == null || height == null || width <= 0 || height <= 0) {
+      return null;
+    }
+    return VideoCodecInfo(width: width, height: height, par: par, codec: codec);
+  }
+
   /// 重建 _mediaInfo — duration/tracks 任一到达后调用, 保持两者同步.
   void _rebuildMediaInfo() {
     _mediaInfo = MediaInfo(
       duration: _duration.value,
+      video: videoInfoFromMediaKit(width: _videoWidth, height: _videoHeight),
       audioTracks: audioTracksFromMediaKit(_tracks),
       subtitleTracks: subtitleTracksFromMediaKit(_tracks),
     );

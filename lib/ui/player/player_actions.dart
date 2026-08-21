@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// 播放器稳定回调集合，沿 `Video.controls` 构建链共享。
-///
-/// 仅承载单文件播放器仍有效的基础传输、文件、字幕、全屏与拖放动作；
-/// 易变播放状态继续由独立的 listenable/stream 提供。
 class PlayerActions {
-  /// 播放/暂停切换；统一进入项目播放控制门面。
+  /// 播放/暂停切换。
   final VoidCallback? onPlayPause;
 
   /// 快退指定毫秒数。
@@ -14,8 +11,11 @@ class PlayerActions {
   /// 快进指定毫秒数。
   final void Function(int milliseconds)? onSeekForward;
 
-  /// 停止并卸载当前媒体；由控制器统一收尾标题和空置态。
+  /// 停止并卸载当前媒体。
   final VoidCallback? onStop;
+
+  /// media_kit 完成真实全屏切换后同步窗口语义状态。
+  final void Function(bool isFullscreen)? onFullscreenStateChanged;
 
   /// O 键或菜单“打开文件”。
   final VoidCallback? onOpenFile;
@@ -26,10 +26,10 @@ class PlayerActions {
   /// 字幕选择按钮。
   final VoidCallback? onOpenSubtitle;
 
-  /// 文件拖放完成回调（由 DropHandler 调用）。
+  /// 文件拖放完成回调。
   final void Function(List<String> paths)? onFilesDropped;
 
-  /// 拖拽悬停状态变化（用于联动子组件动效）。
+  /// 拖拽悬停状态变化。
   final void Function(bool hovering)? onDragHoverChanged;
 
   const PlayerActions({
@@ -37,6 +37,7 @@ class PlayerActions {
     this.onSeekBack,
     this.onSeekForward,
     this.onStop,
+    this.onFullscreenStateChanged,
     this.onOpenFile,
     this.onToggleFullscreen,
     this.onOpenSubtitle,

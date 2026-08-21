@@ -4,7 +4,7 @@
 /// 摘要。分类只陈述 Dart 侧可见信号，不据此推断 native 合成或纹理重建成本。
 library;
 
-import 'dart:ui' show Rect;
+import 'dart:ui' show Rect, Size;
 
 import 'package:flutter/foundation.dart' show ValueListenable, kReleaseMode;
 
@@ -22,6 +22,8 @@ final class VideoTextureResizeProbe {
     required ValueListenable<int> resizeSessionId,
     ValueListenable<Rect?>? rect,
     ValueListenable<int?>? textureId,
+    ValueListenable<Size?>? windowSize,
+    ValueListenable<double?>? devicePixelRatio,
     KernelLogger? logger,
     Duration Function()? monotonicNow,
     bool enabled = !kReleaseMode,
@@ -29,6 +31,8 @@ final class VideoTextureResizeProbe {
        _resizeSessionId = resizeSessionId,
        _rect = rect,
        _textureId = textureId,
+       _windowSize = windowSize,
+       _devicePixelRatio = devicePixelRatio,
        _logger = logger,
        _enabled = enabled,
        _stopwatch = monotonicNow == null ? (Stopwatch()..start()) : null,
@@ -39,7 +43,21 @@ final class VideoTextureResizeProbe {
     }
   }
 
-  /// 结构化日志固定字段；修改字段时测试会显式提示 schema 变化。
+  /// 首帧诊断日志的固定字段；修改字段时测试会显式提示 schema 变化。
+  static const Set<String> firstFrameContextKeys = {
+    'schemaVersion',
+    'sourceResolution',
+    'windowLogicalSize',
+    'windowPhysicalSize',
+    'devicePixelRatio',
+    'renderedRect',
+    'renderedPhysicalSize',
+    'textureId',
+    'firstFrameObserved',
+    'classification',
+  };
+
+  /// resize 诊断日志的固定字段；修改字段时测试会显式提示 schema 变化。
   static const Set<String> contextKeys = {
     'schemaVersion',
     'sessionId',
@@ -67,6 +85,8 @@ final class VideoTextureResizeProbe {
   final ValueListenable<int> _resizeSessionId;
   final ValueListenable<Rect?>? _rect;
   final ValueListenable<int?>? _textureId;
+  final ValueListenable<Size?>? _windowSize;
+  final ValueListenable<double?>? _devicePixelRatio;
   final KernelLogger? _logger;
   final bool _enabled;
   final Stopwatch? _stopwatch;
@@ -86,6 +106,45 @@ final class VideoTextureResizeProbe {
   int _textureIdChanges = 0;
   int _rectTrailOmitted = 0;
   int _textureIdTrailOmitted = 0;
+
+  /// 记录一次播放器启动后的首帧观测，并输出各层级可比对的尺寸。
+  ///
+  /// [sourceSize] 使用媒体元数据像素；窗口与渲染区域使用逻辑像素，再依据
+  /// [devicePixelRatio] 计算物理像素。该方法只记录 Flutter 帧边界已到达的观测，
+  /// 不声称已经读取 GPU 中的实际像素内容。
+  void recordFirstFrame({required bool observed, Size? sourceSize}) {
+    if (_disposed || !_enabled) return;
+
+    final windowSize = _windowSize?.value;
+    final dpr = _devicePixelRatio?.value;
+    final renderedRect = _rect?.value;
+    final validDpr = dpr != null && dpr.isFinite && dpr > 0 ? dpr : null;
+    final context = <String, Object?>{
+      'schemaVersion': 1,
+      'sourceResolution': _sizeToContext(sourceSize),
+      'windowLogicalSize': _sizeToContext(windowSize),
+      'windowPhysicalSize': _scaledSizeToContext(windowSize, validDpr),
+      'devicePixelRatio': validDpr,
+      'renderedRect': _rectToContext(renderedRect),
+      'renderedPhysicalSize': _scaledSizeToContext(
+        renderedRect?.size,
+        validDpr,
+      ),
+      'textureId': _textureId?.value,
+      'firstFrameObserved': observed,
+      'classification': _firstFrameClassification(
+        observed: observed,
+        sourceSize: sourceSize,
+        windowSize: windowSize,
+        dpr: validDpr,
+        renderedRect: renderedRect,
+      ),
+    };
+    (_logger ?? KernelLogger.I).info(
+      'video_texture_first_frame',
+      context: context,
+    );
+  }
 
   /// 同时持有两个 controller 信号时，探针才能形成可解释的分类。
   bool get _isProbeAvailable => _rect != null && _textureId != null;
@@ -211,6 +270,44 @@ final class VideoTextureResizeProbe {
     if (_textureIdChanges > 0) return 'texture-id-changed';
     if (_rectChanges > 0) return 'rect-only-changed';
     return 'no-dart-signal-change';
+  }
+
+  String _firstFrameClassification({
+    required bool observed,
+    required Size? sourceSize,
+    required Size? windowSize,
+    required double? dpr,
+    required Rect? renderedRect,
+  }) {
+    if (!observed) return 'flutter-frame-not-observed';
+    if (!_isValidSize(sourceSize)) {
+      return 'source-metadata-missing';
+    }
+    if (_textureId?.value == null) {
+      return 'texture-id-missing';
+    }
+    if (!_isValidSize(windowSize) || dpr == null) {
+      return 'window-metrics-missing';
+    }
+    if (renderedRect == null || !_isValidSize(renderedRect.size)) {
+      return 'rendered-rect-missing';
+    }
+    return 'first-frame-observed';
+  }
+
+  bool _isValidSize(Size? size) =>
+      size != null &&
+      size.width.isFinite &&
+      size.height.isFinite &&
+      size.width > 0 &&
+      size.height > 0;
+
+  Map<String, Object?>? _sizeToContext(Size? size) =>
+      size == null ? null : {'width': size.width, 'height': size.height};
+
+  Map<String, Object?>? _scaledSizeToContext(Size? size, double? dpr) {
+    if (!_isValidSize(size) || dpr == null) return null;
+    return _sizeToContext(Size(size!.width * dpr, size.height * dpr));
   }
 
   Map<String, Object?>? _rectToContext(Rect? rect) => rect == null

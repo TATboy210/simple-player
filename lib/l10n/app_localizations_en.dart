@@ -12,6 +12,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Simple Player';
 
   @override
+  String get windowInitializationFailed => 'Window initialization failed';
+
+  @override
   String get brandName => 'S I M P L E   P L A Y E R';
 
   @override

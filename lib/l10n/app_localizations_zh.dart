@@ -12,6 +12,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appTitle => 'Simple Player';
 
   @override
+  String get windowInitializationFailed => '窗口初始化失败';
+
+  @override
   String get brandName => 'S I M P L E   P L A Y E R';
 
   @override

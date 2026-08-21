@@ -377,6 +377,92 @@ void main() {
       textureId.dispose();
     });
 
+    test('首帧日志同时记录源、窗口和渲染区域的逻辑与物理分辨率', () {
+      final resizing = ValueNotifier<bool>(false);
+      final resizeSessionId = ValueNotifier<int>(1);
+      final rect = ValueNotifier<Rect?>(const Rect.fromLTWH(10, 20, 640, 360));
+      final textureId = ValueNotifier<int?>(9);
+      final windowSize = ValueNotifier<Size?>(const Size(1280, 720));
+      final dpr = ValueNotifier<double?>(1.5);
+      final logger = _RecordingLogger();
+      final probe = VideoTextureResizeProbe(
+        isResizing: resizing,
+        resizeSessionId: resizeSessionId,
+        rect: rect,
+        textureId: textureId,
+        windowSize: windowSize,
+        devicePixelRatio: dpr,
+        logger: logger,
+        enabled: true,
+      );
+
+      probe.recordFirstFrame(
+        observed: true,
+        sourceSize: const Size(1920, 1080),
+      );
+
+      final entry = logger.entries.single;
+      expect(entry.message, 'video_texture_first_frame');
+      expect(
+        entry.context?.keys.toSet(),
+        VideoTextureResizeProbe.firstFrameContextKeys,
+      );
+      expect(entry.context?['sourceResolution'], _sizeMap(1920, 1080));
+      expect(entry.context?['windowLogicalSize'], _sizeMap(1280, 720));
+      expect(entry.context?['windowPhysicalSize'], _sizeMap(1920, 1080));
+      expect(entry.context?['devicePixelRatio'], 1.5);
+      expect(entry.context?['renderedRect'], _rectMap(10, 20, 650, 380));
+      expect(entry.context?['renderedPhysicalSize'], _sizeMap(960, 540));
+      expect(entry.context?['textureId'], 9);
+      expect(entry.context?['firstFrameObserved'], isTrue);
+      expect(entry.context?['classification'], 'first-frame-observed');
+
+      probe.dispose();
+      resizing.dispose();
+      resizeSessionId.dispose();
+      rect.dispose();
+      textureId.dispose();
+      windowSize.dispose();
+      dpr.dispose();
+    });
+
+    test('首帧分类按可观测缺口指示问题来源', () {
+      final resizing = ValueNotifier<bool>(false);
+      final resizeSessionId = ValueNotifier<int>(1);
+      final textureId = ValueNotifier<int?>(null);
+      final windowSize = ValueNotifier<Size?>(const Size(1280, 720));
+      final dpr = ValueNotifier<double?>(1);
+      final logger = _RecordingLogger();
+      final probe = VideoTextureResizeProbe(
+        isResizing: resizing,
+        resizeSessionId: resizeSessionId,
+        textureId: textureId,
+        windowSize: windowSize,
+        devicePixelRatio: dpr,
+        logger: logger,
+        enabled: true,
+      );
+
+      probe.recordFirstFrame(observed: false, sourceSize: const Size(1, 1));
+      expect(
+        logger.entries.single.context?['classification'],
+        'flutter-frame-not-observed',
+      );
+
+      probe.recordFirstFrame(observed: true, sourceSize: null);
+      expect(
+        logger.entries[1].context?['classification'],
+        'source-metadata-missing',
+      );
+
+      probe.dispose();
+      resizing.dispose();
+      resizeSessionId.dispose();
+      textureId.dispose();
+      windowSize.dispose();
+      dpr.dispose();
+    });
+
     test('禁用与 dispose 后均不继续监听或输出', () {
       final resizing = ValueNotifier<bool>(false);
       final resizeSessionId = ValueNotifier<int>(1);
@@ -421,6 +507,11 @@ void main() {
     });
   });
 }
+
+Map<String, Object?> _sizeMap(double width, double height) => {
+  'width': width,
+  'height': height,
+};
 
 Map<String, Object?> _rectMap(
   double left,
