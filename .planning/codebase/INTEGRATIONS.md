@@ -1,129 +1,112 @@
-> ⚠️ **v2.1 前快照（2026-07-12）** — 此文档描述 v2.1 重构前结构，Phase 15+ 一律对 LIVE code + codegraph 核对，勿信本快照具体路径/类名。保留作演进历史。
-
 # External Integrations
 
-**Analysis Date:** 2026-07-12
+**Analysis Date:** 2026-08-21
 
 ## APIs & External Services
 
-**Media Playback (MDK/FFmpeg):**
-- fvp (MDK) - Primary media playback engine
-  - Dart API: `package:fvp/mdk.dart` (imported as `mdk`)
-  - Capabilities: local file playback, network streaming (HTTP/HTTPS, RTSP, RTMP, SRT, UDP, TCP)
-  - Hardware acceleration: D3D11 (Windows), NVDEC (NVIDIA GPU)
-  - No authentication required - direct library calls via FFI
+**Media Playback (libmpv via media_kit):**
+- libmpv (bundled by `media_kit_libs_windows_video` 1.0.11) — the sole native media backend; no remote API, runs in-process
+  - SDK/Client: `package:media_kit` 1.2.6 (`pubspec.yaml:17`)
+  - Bridge: `MediaKitEngine implements MediaEngine` in `lib/kernel/engine/media_kit_engine.dart:34`
+  - Event streams: `Player.stream.{position,duration,volume,rate,buffering,buffer,playing,completed,tracks,track,width,height,subtitle,error}` → project ValueNotifiers (`lib/kernel/engine/media_kit_engine.dart:508-583`)
+  - Auth: None (local in-process library)
 
-**Network Streaming Protocols:**
-- RTSP/RTMP/SRT/UDP/TCP - Low-latency live stream support via `NetworkConfigurator`
-  - Configured in `lib/kernel/engine/network_configurator.dart`
-  - Protocol-specific tuning: buffer ranges, probe sizes, analysis duration
-  - Adaptive buffering based on network latency
+**Streaming URL Schemes (passed to libmpv, not fetched by Dart):**
+- http://, https://, rtmp://, rtsp://, srt://, udp://, tcp:// — accepted by `PathValidator` and forwarded to `Player.open()` (`lib/kernel/services/path_validator.dart:53-61`, `lib/kernel/engine/media_kit_engine.dart:695-702`)
+- No Dart-side HTTP client is used for these; dio 5.11.0 is declared but unused in `lib/`
+
+**File Picker Attention (native platform channel):**
+- MethodChannel `com.simple_player/file_picker_attention` — requests focus on an already-shown native file dialog
+  - Client: `MethodChannelFilePickerAttention` in `lib/features/player/file_picker_adapters.dart:7-8,38-45`
+  - Method: `focusExistingPicker` (`lib/features/player/file_picker_adapters.dart:43`)
+  - Note: This is the **only** custom platform channel in the app; the legacy `com.simple_player/window` channel is deprecated and removed
 
 ## Data Storage
 
 **Databases:**
-- None detected (no SQLite, Hive, Isar, or other database packages)
-
-**Key-Value Persistence:**
-- shared_preferences ^2.5.5
-  - Used for: application settings, window geometry, locale, volume, playback preferences
-  - Implementation: `lib/kernel/persistence/settings_store.dart`
-  - Path: Platform-specific (Windows: `%APPDATA%\SimplePlayer\`)
+- None (no SQL/Drift/sqflite/isar). A `ruvector.db` file exists at repo root but is unrelated tooling data, not referenced by `lib/`.
 
 **File Storage:**
-- Playlist persistence: JSON files via path_provider (`lib/kernel/persistence/playlist_store.dart`)
-- Log files: `%APPDATA%\SimplePlayer\logs\` with 2 MB rotation (`lib/kernel/utils/log.dart`)
-- Font assets: `assets/fonts/NotoSansSC-*.ttf` (bundled, not downloaded)
+- Playlist JSON — `playlist.json` in `getApplicationSupportDirectory()`, atomic write via `.tmp` + rename, 300ms debounce, 3-retry exponential backoff (`lib/kernel/persistence/playlist_store.dart:23-123`)
+- History migration — legacy `history.json` merged into playlist on load, then deleted (`lib/kernel/persistence/playlist_store.dart:192-229`)
+- Debug export — `%APPDATA%/SimplePlayer/debug/debug_<timestamp>.json` (`lib/kernel/utils/debug_exporter.dart:37-49`)
+- Local filesystem only — no cloud/object storage integration
 
 **Caching:**
-- Thumbnail LRU cache: `lib/kernel/services/thumbnail_service.dart` (in-memory, per-session)
-- SharedPreferences prewarm cache: `lib/kernel/persistence/settings_store.dart`
+- In-memory LRU thumbnail cache — capacity 200 entries, LinkedHashMap with remove+reinsert touch (`lib/kernel/services/thumbnail_service.dart:18-125`)
+- Platform thumbnail caches read-only (Linux XDG `~/.cache/thumbnails/{size}/{md5(uri)}.png` via `lib/kernel/services/linux_thumbnail_provider.dart:20-39`; macOS + Windows currently no-op, `lib/kernel/services/macos_thumbnail_provider.dart`, `lib/kernel/services/noop_thumbnail_provider.dart`)
+
+**Preferences / Key-Value:**
+- `shared_preferences` 2.5.5 — window geometry only (width/height/x/y/alwaysOnTop/maximized); keys prefixed `window*` (`lib/kernel/persistence/window_persistence.dart:37-42`)
+- `flutter_secure_storage` 9.2.4 — declared in `pubspec.yaml:25` but **no direct usage in `lib/`**; reserved for future secret storage
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- None - This is a local desktop media player with no user accounts or authentication
+- None — the app is a local single-user desktop media player with no login, accounts, or identity provider
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None external - errors logged locally via `logger` package
+- None (no Sentry/Crashlytics/Bugsnag). Errors flow through `KernelLoggerImpl` and `debugPrint` only.
 
-**Logging:**
-- Framework: `logger` ^2.5.0 (`package:logger/logger.dart`)
-- Implementation: `lib/kernel/utils/log.dart`
-- Module-scoped loggers: `logEngine`, `logBridge` with PrefixPrinter
-- Output: Console (debug), file rotation (release) at `%APPDATA%\SimplePlayer\logs\`
-- Rotation: 2 MB max per file
+**Logs:**
+- Custom `KernelLogger` facade — 6 severity levels (trace/debug/info/warn/error/fatal), build-mode-gated sink selection (`lib/kernel/diagnostics/kernel_logger.dart:364-584`)
+  - Debug: `CompositeSink([DebugPrintSink, DevToolsSink])` → `debugPrint` + `dart:developer.log(name: 'Kernel')`
+  - Profile: `DevToolsSink` only
+  - Release: `NullSink` (tree-shakeable, zero output)
+  - Path redaction via `redactPath()` strips directory prefixes (`lib/kernel/diagnostics/kernel_logger.dart:126-132`)
+- No remote log aggregation; logs stay local (DevTools console / stdout)
 
-**Performance Monitoring:**
-- `lib/kernel/utils/perf_monitor.dart` - Frame timing, jank detection
-- `lib/kernel/utils/memory_monitor.dart` - Memory usage tracking
-- `lib/kernel/engine/engine_metrics.dart` - Engine-level performance counters
-- `lib/kernel/engine/engine_event_log.dart` - Structured event logging
+**Diagnostics (in-app):**
+- `MemoryMonitor` — periodic RSS sampling (default 30s, threshold 50MB growth), `ProcessInfo.currentRss` via `RssProvider` abstraction (`lib/kernel/diagnostics/memory_monitor.dart:40-275`, `lib/kernel/diagnostics/rss_provider.dart`)
+- `DebugProbe` / `DebugProbeRegistry` — timing probes for playback + playlistStore operations (`lib/kernel/utils/debug_probe.dart`)
+- `VideoTextureResizeProbe` — correlates `VideoController.rect`/`textureId` with resize sessions, Debug/Profile only (`lib/kernel/diagnostics/video_texture_resize_probe.dart:18-40`)
+- `StartupCoordinator` — per-phase stopwatch timing + structured timeline log (`lib/kernel/startup/startup_coordinator.dart:22-103`)
+- `DebugExporter.exportAll()` — collects memory + probe summary to JSON file (`lib/kernel/utils/debug_exporter.dart:24-49`)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Local desktop application (no cloud hosting)
+- Windows desktop MSIX package — `com.simpleplayer.app`, version `1.0.0.1`, `internetClient` capability (`pubspec.yaml:73-79`)
+- Local install only; no app store upload configured
 
 **CI Pipeline:**
-- None detected in repository
-
-**Packaging:**
-- Windows: MSIX via `msix` ^3.16.0 (`pubspec.yaml` msix_config section)
-  - Display name: "Simple Player"
-  - Identity: `com.simpleplayer.app`
-  - Capability: `internetClient`
-  - Logo: `windows/runner/resources/app_icon.ico`
-- macOS: Standard Xcode project (`macos/Runner.xcodeproj/`)
-- Linux: CMake build (`linux/CMakeLists.txt`)
+- None detected in repo (no `.github/workflows/` CI files found for build/test despite `.github/` directory existing). Quality gates run locally: `flutter analyze`, `flutter test --coverage`.
 
 ## Environment Configuration
 
 **Required env vars:**
-- None - application is fully self-contained
-
-**Compile-time configuration:**
-- `USE_WINDOWS_NATIVE_FULLSCREEN` (bool, `--dart-define`)
-  - Controls Windows fullscreen driver selection
-  - `true`: Win32 FFI driver (`lib/kernel/bridge/win32/win32_fullscreen_ffi.dart`)
-  - `false` (default): window_manager wrapper
-
-**Runtime configuration:**
-- All settings via SharedPreferences (`lib/kernel/persistence/settings_store.dart`)
-- Window geometry persistence (`lib/kernel/bridge/window_persistence.dart`)
+- `HOME` — required on Linux for XDG thumbnail cache path resolution (`lib/kernel/services/linux_thumbnail_provider.dart:22-23`); not required on Windows (primary target)
+- No other env vars consumed by `lib/` at runtime
 
 **Secrets location:**
-- None - no API keys, tokens, or secrets in the codebase
+- No secrets managed. `flutter_secure_storage` is declared but unused; no API keys, tokens, or credentials exist in the app (local-only media player, no remote auth).
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None
+- None (no HTTP server, no webhook endpoints)
 
 **Outgoing:**
-- None
+- None (no outbound HTTP calls from Dart; dio is declared but unused; streaming URLs are handed to libmpv which performs its own network I/O outside Dart's purview)
 
-## Platform Bridge (MethodChannel / FFI)
+## Native Platform Bridges
 
-**Win32 FFI (direct Win32 API calls):**
-- `lib/kernel/bridge/win32/win32_fullscreen_ffi.dart` - Fullscreen control (SetWindowPos, GetWindowLong, SetWindowLong, monitor enumeration)
-- `lib/kernel/bridge/win32/win32_display_enumerator.dart` - Multi-monitor enumeration (EnumDisplayMonitors, GetMonitorInfo)
-- `lib/kernel/bridge/display_config.dart` - Display configuration queries
+**window_manager (Windows primary):**
+- `WindowService implements WindowBridge` (`lib/kernel/window_Bridge/window_manager_service.dart:21`) wraps `window_manager` package
+- Capabilities: `setPreventClose(true)` to intercept native close (`lib/kernel/window_Bridge/window_manager_service.dart:93`), `WindowOptions` with hidden title bar + transparent background + minimum size 854×513 (`lib/kernel/window_Bridge/window_manager_service.dart:94-99`, `lib/kernel/window_Bridge/window_constants.dart:7`)
+- Listeners: `onWindowMaximize`/`onWindowUnmaximize`/`onWindowResize`/`onWindowClose` (`lib/kernel/window_Bridge/window_manager_service.dart:224-265`)
+- Fullscreen is **not** driven by window_manager; media_kit's fullscreen semantics are synced back via `syncFullscreenState(bool)` (`lib/kernel/window_Bridge/window_bridge.dart:49`, `lib/kernel/window_Bridge/window_manager_service.dart:289-294`)
 
-**MethodChannel (Flutter ↔ Native):**
-- `lib/kernel/bridge/window_bridge.dart` - Window management commands (not directly using MethodChannel, but through window_manager package)
-- `lib/kernel/bridge/platform/windows_fullscreen_driver.dart` - Windows fullscreen via window_manager
-- `lib/kernel/bridge/platform/linux_fullscreen_driver.dart` - Linux fullscreen via window_manager
-- `lib/kernel/bridge/platform/macos_fullscreen_driver.dart` - macOS fullscreen via window_manager
+**media_kit native (libmpv FFI):**
+- `MediaKit.ensureInitialized()` called at app startup (`lib/main.dart:20`) loads native libmpv
+- `Player` + `VideoController` created in `MediaKitEngine` constructor (`lib/kernel/engine/media_kit_engine.dart:40-53`)
+- No raw `dart:ffi`/`DynamicLibrary`/`lookupFunction` calls in `lib/` — all FFI is encapsulated inside the media_kit package
 
-**Native Runner Code:**
-- `windows/runner/main.cpp` - Win32 window creation and message loop
-- `windows/runner/win32_window.cpp` - Win32 window class implementation
-- `linux/runner/main.cc` - GTK application entry
-- `macos/Runner/AppDelegate.swift` - macOS application delegate
+**Marionette (debug-only):**
+- `MarionetteBinding.ensureInitialized()` replaces `WidgetsFlutterBinding` in `kDebugMode` (`lib/main.dart:14-18`) for VM-service-driven UI automation; MCP server `marionette` configured in `.mcp.json:12-22` runs `marionette_mcp` via `dart pub global run`
 
 ---
 
-*Integration audit: 2026-07-12*
+*Integration audit: 2026-08-21*

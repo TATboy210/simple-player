@@ -1,384 +1,258 @@
-> ⚠️ **v2.1 前快照（2026-07-12）** — 此文档描述 v2.1 重构前结构，Phase 15+ 一律对 LIVE code + codegraph 核对，勿信本快照具体路径/类名。保留作演进历史。
-
 # Codebase Structure
 
-**Analysis Date:** 2026-07-12
+**Analysis Date:** 2026-08-21
 
 ## Directory Layout
 
 ```
 simple_player_flutter/
-├── lib/
-│   ├── main.dart                          # App entry: bootstrap, prefs, window, engine prewarm
-│   ├── app.dart                           # MaterialApp shell: theme, locale, settings panel
-│   ├── features/
-│   │   └── player/                        # Player feature: DI container + business logic
-│   │       ├── deferred_player_feature.dart  # Lazy-load wrapper (deferred as)
-│   │       ├── player_feature.dart           # DI owner, UI state, PlayerScreen composition
-│   │       ├── player_services.dart          # DI container: engine + playlist + controller
-│   │       ├── models/
-│   │       │   └── video_processing_state.dart  # Immutable video processing state
-│   │       └── services/
-│   │           ├── playback_controller.dart     # Facade: unified entry to sub-modules
-│   │           ├── playback_contract.dart       # Abstract interface for sub-module DI
-│   │           ├── playback_navigator.dart      # Track navigation + openGeneration guard
-│   │           ├── file_operations.dart         # File open/add with path validation
-│   │           ├── state_monitor.dart           # Engine state observer: breakpoints, auto-advance
-│   │           ├── subtitle_service.dart        # External subtitle auto-detection
-│   │           ├── video_processing_service.dart # Diff-based engine sync + debounced persist
-│   │           └── breakpoint_saver.dart        # Breakpoint persistence helper
-│   ├── kernel/                            # Core logic: engine, bridge, models, persistence
-│   │   ├── engine/                        # fvp/MDK video engine wrapper
-│   │   │   ├── engine_state.dart              # Mixin: all ValueNotifier state + methods
-│   │   │   ├── fvp_engine.dart                # Concrete engine: 6 helper composition
-│   │   │   ├── media_state.dart               # MediaState enum + transition guard
-│   │   │   ├── media_error_type.dart          # Error classification enum
-│   │   │   ├── engine_constants.dart          # Default values, limits, thresholds
-│   │   │   ├── engine_metrics.dart            # Health counters (open/seek/error)
-│   │   │   ├── engine_event_log.dart          # Ring buffer: last 100 events
-│   │   │   ├── engine_prewarm.dart            # Startup: FFmpeg codec + D3D11 context
-│   │   │   ├── player_proxy.dart              # Abstract proxy for test injection
-│   │   │   ├── mdk_player_proxy.dart          # Concrete proxy wrapping mdk.Player
-│   │   │   ├── position_poller.dart           # Adaptive interval position polling
-│   │   │   ├── track_manager.dart             # Audio/subtitle track management
-│   │   │   ├── track_control.dart             # Track control mixin
-│   │   │   ├── volume_controller.dart         # Volume + mute control
-│   │   │   ├── video_effect_controller.dart   # Brightness/contrast/rotation
-│   │   │   ├── video_effect_type.dart         # Effect type enum
-│   │   │   ├── video_effects.dart             # Video effects mixin
-│   │   │   ├── subtitle_configurator.dart     # External subtitle + delay + equalizer
-│   │   │   ├── d3d11_configurator.dart        # D3D11 sync + hardware decode
-│   │   │   ├── renderer_config.dart           # Renderer configuration mixin
-│   │   │   ├── media_opener.dart              # Async open with error classification
-│   │   │   ├── open_result.dart               # OpenSuccess/OpenError sealed result
-│   │   │   ├── fvp_callback_handler.dart      # mdk callbacks → ValueNotifier bridge
-│   │   │   └── models/
-│   │   │       ├── media_info.dart            # Codec/resolution metadata
-│   │   │       ├── video_codec_info.dart      # Video codec details
-│   │   │       ├── audio_track_info.dart      # Audio track metadata
-│   │   │       └── subtitle_track_info.dart   # Subtitle track metadata
-│   │   ├── bridge/                        # Window management + fullscreen drivers
-│   │   │   ├── window_bridge.dart             # Abstract interface: 4 states + 7 commands
-│   │   │   ├── window_service.dart            # Concrete: WindowListener + FullscreenDriver
-│   │   │   ├── window_mode.dart               # WindowMode enum (windowed/maximized/fullscreen/minimized)
-│   │   │   ├── window_state.dart              # Immutable state container: mode, size, resizing
-│   │   │   ├── window_persistence.dart        # Window geometry save/load
-│   │   │   ├── fullscreen_driver.dart         # Abstract: enter/leave/query fullscreen
-│   │   │   ├── desktop_fullscreen_driver.dart # window_manager fallback driver
-│   │   │   ├── desktop_fullscreen_driver_factory.dart  # Factory: platform + compile flag
-│   │   │   ├── display_config.dart            # Display configuration data
-│   │   │   ├── display_enumerator.dart        # Abstract: enumerate displays
-│   │   │   ├── platform/
-│   │   │   │   ├── windows_fullscreen_driver.dart  # Win32 FFI driver
-│   │   │   │   ├── macos_fullscreen_driver.dart    # macOS fullscreen_window plugin
-│   │   │   │   └── linux_fullscreen_driver.dart    # Linux fullscreen_window plugin
-│   │   │   └── win32/
-│   │   │       ├── win32_fullscreen_ffi.dart       # Win32 FFI bindings (user32.dll)
-│   │   │       └── win32_display_enumerator.dart   # Win32 display enumeration
-│   │   ├── models/                        # Shared data models
-│   │   │   ├── playlist_item.dart             # PlaylistItem: immutable data class
-│   │   │   ├── play_mode.dart                 # PlayMode enum (loopAll/loopSingle/shuffle)
-│   │   │   ├── app_settings.dart              # AppSettings: all persisted preferences
-│   │   │   ├── aspect_ratio_mode.dart         # AspectRatioMode enum
-│   │   │   ├── fullscreen_capability.dart     # FullscreenCapability: platform capabilities
-│   │   │   ├── player_error.dart              # PlayerError types
-│   │   │   └── validation_error.dart          # ValidationError types
-│   │   ├── persistence/                   # Data persistence layer
-│   │   │   ├── settings_store.dart            # SharedPreferences with validation
-│   │   │   ├── settings_validator.dart        # Input sanitization rules
-│   │   │   └── playlist_store.dart            # JSON file persistence for playlist
-│   │   ├── playlist/                      # Playlist state machine
-│   │   │   └── playlist.dart                  # Playlist: items, index, modes, CQS navigation
-│   │   ├── scanner/                       # File system scanning
-│   │   │   └── folder_scanner.dart            # Directory video file scanner (14 formats)
-│   │   ├── services/                      # Cross-cutting kernel services
-│   │   │   ├── thumbnail_service.dart         # Platform-aware thumbnail facade (LRU cache)
-│   │   │   ├── thumbnail_provider.dart        # Abstract thumbnail provider
-│   │   │   ├── linux_thumbnail_provider.dart  # Linux thumbnail provider
-│   │   │   ├── macos_thumbnail_provider.dart  # macOS thumbnail provider
-│   │   │   ├── noop_thumbnail_provider.dart   # No-op for unsupported platforms
-│   │   │   ├── global_hotkey_service.dart     # Global hotkey registration
-│   │   │   ├── locale_service.dart            # Locale persistence + ValueNotifier
-│   │   │   ├── theme_service.dart             # Theme persistence + accent switching
-│   │   │   └── path_validator.dart            # Path traversal validation
-│   │   ├── startup/                       # App startup coordination
-│   │   │   ├── startup_coordinator.dart       # Phase-based progress tracker
-│   │   │   └── startup_state.dart             # StartupState: immutable value object
-│   │   └── utils/                         # Shared utilities
-│   │       ├── log.dart                       # Logging wrappers (log.i/d/w/e)
-│   │       ├── time_utils.dart                # formatMs() duration formatting
-│   │       ├── path_utils.dart                # Path validation + basename
-│   │       ├── screen_utils.dart              # Multi-monitor clamp utilities
-│   │       ├── debug_probe.dart               # Operation timing (DebugProbe)
-│   │       ├── debug_exporter.dart            # Debug data export
-│   │       ├── perf_monitor.dart              # Frame timing monitor
-│   │       └── memory_monitor.dart            # RSS memory tracking
-│   ├── ui/                                # All visual components
-│   │   ├── player/                        # Player screen components
-│   │   │   ├── player_screen.dart             # Main: Stack compositing + responsive layout
-│   │   │   ├── controls_overlay.dart          # Auto-hide layer: gestures, double-click
-│   │   │   ├── control_bar.dart               # Bottom glass bar: play/seek/volume/speed
-│   │   │   ├── progress_bar.dart              # Seekbar with thumbnail preview
-│   │   │   ├── volume_controls.dart           # Volume slider + mute toggle
-│   │   │   ├── speed_button.dart              # Playback speed selector
-│   │   │   ├── keyboard_handler.dart          # 20+ key Focus handler
-│   │   │   ├── video_surface.dart             # Texture renderer with aspect ratio
-│   │   │   ├── drop_handler.dart              # Drag-and-drop file handler
-│   │   │   ├── auto_hide_controller.dart      # Auto-hide timer + opacity
-│   │   │   ├── center_controls.dart           # Center play/pause button
-│   │   │   ├── left_button_group.dart         # Left side buttons (prev/play-mode)
-│   │   │   ├── right_button_group.dart        # Right side buttons (subtitle/fullscreen/settings)
-│   │   │   ├── player_actions.dart            # Action callbacks data class
-│   │   │   ├── error_banner.dart              # Error display banner
-│   │   │   └── time_range_display.dart        # Time display widget
-│   │   ├── playlist/                      # Floating playlist panel
-│   │   │   ├── playlist_panel.dart            # Floating window with tabs (folder/history)
-│   │   │   ├── folder_tab.dart                # Folder-grouped video thumbnails
-│   │   │   ├── history_tab.dart               # Timestamp-sorted play history
-│   │   │   └── thumbnail_tile.dart            # 16:9 thumbnail card
-│   │   ├── shared/                        # Reusable UI components
-│   │   │   ├── glass_container.dart           # Glassmorphism wrapper (3-tier blur)
-│   │   │   ├── glass_widgets.dart             # Additional glass components
-│   │   │   ├── glass_chip.dart                # Glass chip/badge component
-│   │   │   ├── aurora_background.dart         # Animated aurora breathing background
-│   │   │   ├── transmitted_light.dart         # Light transmission effect
-│   │   │   ├── hover_glow.dart                # Hover glow effect
-│   │   │   ├── edge_glow.dart                 # Edge glow effect
-│   │   │   ├── osd_overlay.dart               # OSD: global singleton + overlay widget
-│   │   │   ├── empty_state.dart               # Idle screen: aurora + branding + open button
-│   │   │   ├── splash_screen.dart             # Splash screen
-│   │   │   ├── progress_splash_screen.dart    # Startup progress splash
-│   │   │   ├── play_mode_utils.dart           # PlayMode → icon/label mapping
-│   │   │   ├── context_menu_row.dart          # Right-click menu row
-│   │   │   ├── section_header.dart            # Settings section header
-│   │   │   ├── setting_action_row.dart        # Settings action row
-│   │   │   ├── setting_slider_row.dart        # Settings slider row
-│   │   │   ├── settings_card.dart             # Settings card container
-│   │   │   ├── merged_listenable.dart         # Multi-notifier merger
-│   │   │   ├── value_listenable_builder2.dart # Dual-notifier builder
-│   │   │   └── app_dialog.dart                # Base dialog wrapper
-│   │   ├── widgets/                       # Specialized widgets
-│   │   │   └── osd_overlay.dart               # (see shared/ above)
-│   │   ├── dialogs/                       # Dialog components
-│   │   │   ├── media_info_dialog.dart         # File properties dialog
-│   │   │   ├── settings_panel.dart            # Settings side panel
-│   │   │   └── settings/                      # Settings tab components
-│   │   │       ├── general_tab.dart           # General settings tab
-│   │   │       ├── audio_tab.dart             # Audio settings tab
-│   │   │       ├── video_tab.dart             # Video settings tab
-│   │   │       ├── equalizer_tab.dart         # Equalizer settings tab
-│   │   │       ├── shortcuts_tab.dart         # Keyboard shortcuts tab
-│   │   │       ├── settings_tab_performance.dart  # Performance settings tab
-│   │   │       ├── about_tab.dart             # About tab
-│   │   │       └── _settings_nav_item.dart    # Navigation item component
-│   │   ├── theme/
-│   │   │   └── tokens.dart                   # Design tokens: colors, spacing, radii, durations
-│   │   └── window/
-│   │       └── custom_title_bar.dart          # Window title bar (glass, drag, controls)
-│   └── l10n/                              # Localization
-│       ├── app_localizations.dart             # Generated localizations
-│       ├── app_localizations_en.dart          # English translations
-│       └── app_localizations_zh.dart          # Chinese translations
-├── test/                                  # Test suite
-├── windows/                               # Windows platform code (Win32 runner)
-├── macos/                                 # macOS platform code
-├── linux/                                 # Linux platform code
-├── assets/                                # Static assets
-├── docs/                                  # Documentation
-├── packages/                              # Local packages
-├── integration_test/                      # Integration tests
-├── scripts/                               # Build/utility scripts
-├── patches/                               # Platform patches
-└── tool/                                  # Dev tooling
+├── lib/                          # Application source (Dart)
+│   ├── main.dart                 # Composition root — MediaKit/windowManager/KernelLogger init, runApp
+│   ├── app.dart                  # MaterialApp shell — theme, localization, splash→player home
+│   ├── features/                 # Feature modules (View layer of MVVM)
+│   │   └── player/               # Player feature module (deferred-loaded)
+│   ├── kernel/                   # Core logic — no UI, no Flutter widget imports (except ValueNotifier)
+│   │   ├── engine/               # Media engine abstraction + media_kit implementation
+│   │   ├── window_Bridge/        # Window management abstraction + coordinators
+│   │   ├── services/             # Service layer (orchestration, file ops, thumbnails)
+│   │   ├── diagnostics/          # Logging, memory monitoring, resize probes
+│   │   ├── persistence/          # SharedPreferences-backed storage
+│   │   ├── startup/              # StartupCoordinator + StartupState
+│   │   ├── models/               # Domain data classes (PlaylistItem, PlayMode, PlayerError, etc.)
+│   │   ├── playlist/             # Legacy playlist model (retained, not wired in v1.8)
+│   │   ├── scanner/              # Folder scanner (legacy, not wired in v1.8)
+│   │   ├── utils/                # Time/path utilities, debug probes
+│   │   └── player_services.dart  # DI container (PlayerServices)
+│   ├── ui/                       # Widget tree (Flutter UI)
+│   │   ├── player/               # Player screen + control bar + keyboard + OSD
+│   │   ├── playlist/             # Playlist panel (legacy, not wired in v1.8)
+│   │   ├── window/               # Custom window title bar
+│   │   ├── shared/               # Reusable glass widgets, empty state, splash
+│   │   ├── dialogs/              # Media info dialog (+ settings overlay legacy)
+│   │   ├── theme/                # Design tokens (Tokens.* const)
+│   │   └── widgets/              # Misc widgets (OSD overlay)
+│   └── l10n/                     # Localization (ARB + generated AppLocalizations)
+├── test/                         # Test suites (unit/widget/integration/golden/regression)
+│   ├── unit/                     # Pure unit tests (no Flutter bindings)
+│   ├── widget/                   # Widget tests (flutter_test)
+│   ├── integration/              # Integration tests (cross-component flows)
+│   ├── golden/                   # Golden image tests
+│   ├── kernel/                   # Kernel-layer tests (engine, services, security, startup)
+│   ├── features/                 # Feature-layer tests
+│   ├── diagnostics/              # Logger/memory tests
+│   ├── engine/                   # Engine mixin/capability tests
+│   ├── ui/                       # UI widget tests
+│   ├── debug/                    # Debug tooling tests
+│   ├── regression/               # Regression suites (smoke, high-risk)
+│   └── helpers/                  # Test doubles (fake_engine, fake_window_service, etc.)
+├── windows/                      # Windows native runner (CMakeLists, flutter_window, win32_window)
+├── assets/                       # Fonts (Noto Sans SC)
+├── .planning/                    # GSD planning documents + debug notes
+├── pubspec.yaml                  # Flutter/Dart dependencies
+├── analysis_options.yaml         # Strict analyzer config (strict-casts, strict-inference, strict-raw-types)
+└── CLAUDE.md                     # Project instructions for Claude
 ```
 
 ## Directory Purposes
 
-**`lib/features/player/`:**
-- Purpose: Player feature module -- DI container, business logic composition, sub-module services
-- Contains: PlayerServices (DI), PlaybackController (facade), PlaybackNavigator, FileOperations, StateMonitor, SubtitleService, VideoProcessingService, BreakpointSaver
-- Key files: `player_services.dart`, `player_feature.dart`, `services/playback_controller.dart`
+**`lib/features/`:**
+- Purpose: Feature modules grouped by domain — MVVM View layer
+- Contains: StatefulWidget views + coordinators + per-feature models
+- Key files: `lib/features/player/player_feature.dart`, `lib/features/player/deferred_player_feature.dart`, `lib/features/player/file_picker_coordinator.dart`
 
 **`lib/kernel/engine/`:**
-- Purpose: fvp/MDK video engine wrapper -- abstract interface + concrete implementation + helpers
-- Contains: EngineState mixin, FvpEngine, 8+ helper classes (PositionPoller, TrackManager, VolumeController, etc.), media models
-- Key files: `engine_state.dart`, `fvp_engine.dart`, `media_state.dart`
+- Purpose: Media playback abstraction (ISP-decomposed) + concrete media_kit implementation
+- Contains: 7 ISP interfaces, `MediaEngine` composite, `MediaKitEngine` impl, `EngineStateMachine`, `OpenResult` sealed class, `MediaInfo` models
+- Key files: `lib/kernel/engine/media_engine.dart`, `lib/kernel/engine/media_kit_engine.dart`, `lib/kernel/engine/engine_state_machine.dart`, `lib/kernel/engine/engine_state.dart` (barrel export)
 
-**`lib/kernel/bridge/`:**
-- Purpose: Window management and fullscreen abstraction -- abstract interfaces + concrete implementations per platform
-- Contains: WindowBridge, WindowService, FullscreenDriver, DesktopFullscreenDriverFactory, platform-specific drivers (Windows/macOS/Linux), Win32 FFI bindings
-- Key files: `window_bridge.dart`, `window_service.dart`, `fullscreen_driver.dart`, `desktop_fullscreen_driver_factory.dart`
-
-**`lib/kernel/models/`:**
-- Purpose: Shared immutable data models used across kernel and features layers
-- Contains: PlaylistItem, PlayMode, AppSettings, AspectRatioMode, FullscreenCapability, PlayerError, ValidationError
-- Key files: `playlist_item.dart`, `play_mode.dart`, `app_settings.dart`
-
-**`lib/kernel/persistence/`:**
-- Purpose: Data persistence -- SharedPreferences for settings, JSON files for playlist
-- Contains: SettingsStore (with validation), SettingsValidator, PlaylistStore
-- Key files: `settings_store.dart`, `playlist_store.dart`
+**`lib/kernel/window_Bridge/`:**
+- Purpose: Native window management abstraction (fullscreen/maximize/resize/persistence) decoupled from window_manager package
+- Contains: `WindowBridge` interface, `WindowService` impl, `WindowServiceState` mutable container, 3 sub-coordinators
+- Key files: `lib/kernel/window_Bridge/window_manager_service.dart`, `lib/kernel/window_Bridge/window_service_state.dart`, `lib/kernel/window_Bridge/window_bridge.dart`, `lib/kernel/window_Bridge/window_constants.dart`
 
 **`lib/kernel/services/`:**
-- Purpose: Cross-cutting kernel services -- thumbnail, locale, theme, hotkey, path validation
-- Contains: ThumbnailService (platform-aware with LRU cache), LocaleService, ThemeService, GlobalHotkeyService, PathValidator
-- Key files: `thumbnail_service.dart`, `locale_service.dart`, `theme_service.dart`
+- Purpose: Service layer — orchestration facade, file ops, thumbnails, subtitle, track prefs, validation
+- Contains: `PlaybackController` (facade), `PlaybackStateManager`, `SubtitleService`, `TrackPreferenceService`, `ThumbnailService`, `PathValidator`, `InputModeDetector`
+- Key files: `lib/kernel/services/playback_controller.dart`, `lib/kernel/services/playback_state_manager.dart`
+
+**`lib/kernel/diagnostics/`:**
+- Purpose: Cross-cutting diagnostics — logging, memory monitoring, resize frame metrics
+- Contains: `KernelLogger` facade + sinks (DevTools/DebugPrint/Null/Composite), `MemoryMonitor`, `ResizeFrameMetrics`, `VideoTextureResizeProbe`, `Clock`, `RssProvider`
+- Key files: `lib/kernel/diagnostics/kernel_logger.dart`, `lib/kernel/diagnostics/video_texture_resize_probe.dart`
+
+**`lib/kernel/persistence/`:**
+- Purpose: SharedPreferences-backed state persistence (window geometry)
+- Contains: `WindowPersistence`, `PersistedWindowState`, legacy `PlaylistStore`
+- Key files: `lib/kernel/persistence/window_persistence.dart`
 
 **`lib/kernel/startup/`:**
-- Purpose: App startup coordination -- phase tracking, progress reporting
-- Contains: StartupCoordinator (phase-based timeline), StartupState (immutable value object)
-- Key files: `startup_coordinator.dart`, `startup_state.dart`
+- Purpose: Startup phase tracking + progress reporting to UI splash
+- Contains: `StartupCoordinator`, `StartupState` (ValueNotifier), `StartupPhase` enum
+- Key files: `lib/kernel/startup/startup_coordinator.dart`, `lib/kernel/startup/startup_state.dart`
 
-**`lib/kernel/utils/`:**
-- Purpose: Shared utilities -- logging, time formatting, path operations, debug tools
-- Contains: log, time_utils, path_utils, screen_utils, debug_probe, debug_exporter, perf_monitor, memory_monitor
-- Key files: `log.dart`, `path_utils.dart`
+**`lib/kernel/models/`:**
+- Purpose: Domain data classes — pure Dart, no Flutter dependency
+- Contains: `PlaylistItem`, `PlayMode`, `PlayerError` (sealed), `MediaInfo`-adjacent types, `AspectRatioMode`, `TrackPreferences`, `ValidationError`
+- Key files: `lib/kernel/models/player_error.dart`, `lib/kernel/models/playlist_item.dart`
 
 **`lib/ui/player/`:**
-- Purpose: Player screen and all interactive overlay components
-- Contains: PlayerScreen (main composition), ControlsOverlay (auto-hide), ControlBar (bottom bar), ProgressBar, VolumeControls, SpeedButton, KeyboardHandler, VideoSurface, DropHandler, AutoHideController, center/left/right control groups
-- Key files: `player_screen.dart`, `controls_overlay.dart`, `control_bar.dart`
+- Purpose: Player screen widget tree — video surface, control bar, keyboard handler, OSD, drop handler
+- Contains: `PlayerScreen`, `PlayerVideoControls` (path B control layer), `ControlBar` + layout/actions/view-model, `KeyboardHandler`, `PlayerActions`, `PlayerKeyboardActions`, `ProgressBar`, `VolumeControls`, `SpeedButton`, `DropHandler`, `VideoSurface`, `AutoHideController`, `ErrorBanner`, `MediaKitPlayerPort`/`VideoControlsPort`
+- Key files: `lib/ui/player/player_screen.dart`, `lib/ui/player/player_video_controls.dart`, `lib/ui/player/control_bar.dart`, `lib/ui/player/control_bar_layout.dart`, `lib/ui/player/player_actions.dart`
 
 **`lib/ui/shared/`:**
-- Purpose: Reusable UI components used across player, playlist, and dialogs
-- Contains: GlassContainer (glassmorphism), AuroraBackground, OSD overlay, EmptyState, GlassButton, MergedListenable, ValueListenableBuilder2, play_mode_utils, settings row components
-- Key files: `glass_container.dart`, `osd_overlay.dart`, `empty_state.dart`
-
-**`lib/ui/playlist/`:**
-- Purpose: Floating playlist panel with folder and history tabs
-- Contains: PlaylistPanel, FolderTab, HistoryTab, ThumbnailTile
-- Key files: `playlist_panel.dart`
-
-**`lib/ui/dialogs/`:**
-- Purpose: Dialog components for settings and media info
-- Contains: SettingsPanel (side panel), MediaInfoDialog, settings tabs (General/Audio/Video/Equalizer/Shortcuts/Performance/About)
-- Key files: `settings_panel.dart`, `media_info_dialog.dart`
+- Purpose: Reusable widgets across features — glass-morphism, empty state, splash, section headers
+- Contains: `GlassContainer`, `EmptyState`, `ProgressSplashScreen`, `OsdOverlay`, `EdgeGlow`, `AuroraBackground`, `ControlBarDecoration`, `AppDialog`, `AppTooltip`, `MergedListenable`, `ValueListenableBuilder2`, `AnimatedSectionList`, `SpinControl`, `GlassChip`, `GlassWidgets`
+- Key files: `lib/ui/shared/glass_container.dart`, `lib/ui/shared/empty_state.dart`, `lib/ui/shared/progress_splash_screen.dart`
 
 **`lib/ui/theme/`:**
-- Purpose: Design system tokens -- all compile-time constants
-- Contains: Tokens (colors, spacing, radii, durations, font sizes, breakpoints)
-- Key files: `tokens.dart`
+- Purpose: Design system tokens — single compile-time const theme
+- Contains: `Tokens` class with static constants for colors, spacing, radius, durations, control bar dimensions
+- Key files: `lib/ui/theme/tokens.dart`
+
+**`lib/l10n/`:**
+- Purpose: Localization — ARB templates + generated Dart bindings
+- Contains: `app_en.arb`, `app_zh.arb` (source), `app_localizations.dart` + `_en.dart` + `_zh.dart` (generated)
+- Key files: `lib/l10n/app_zh.arb` (default locale source)
+
+**`test/helpers/`:**
+- Purpose: Test doubles — hand-written fakes (not mocks) for complex dependencies
+- Contains: `FakeEngine`, `FakePlayerControls`, `FakeVideoControls`, `FakeWindowService`, `IntegrationHelpers`
+- Key files: `test/helpers/fake_engine.dart`, `test/helpers/fake_window_service.dart`
 
 ## Key File Locations
 
 **Entry Points:**
-- `lib/main.dart`: App bootstrap (Flutter binding, prefs, window, engine prewarm, runApp)
-- `lib/app.dart`: MaterialApp shell (theme, locale, settings, quick menu)
+- `lib/main.dart`: Dart `main()` — composition root, platform init, runApp
+- `lib/app.dart`: `App` widget — MaterialApp shell, theme, splash→home
+- `lib/features/player/deferred_player_feature.dart`: Deferred module loader
+- `windows/runner/main.cpp`: Native Windows entry (C++)
 
 **Configuration:**
-- `lib/ui/theme/tokens.dart`: All design tokens (compile-time const)
-- `lib/kernel/engine/engine_constants.dart`: Engine defaults and limits
-- `lib/kernel/persistence/settings_validator.dart`: Input validation rules
-- `pubspec.yaml`: Dependencies and Flutter config
-- `analysis_options.yaml`: Dart analysis rules
-- `l10n.yaml`: Localization config
+- `pubspec.yaml`: Flutter/Dart dependencies, fonts, MSIX config
+- `analysis_options.yaml`: Strict analyzer (strict-casts, strict-inference, strict-raw-types)
+- `windows/CMakeLists.txt`: Windows native build config
 
 **Core Logic:**
-- `lib/kernel/engine/engine_state.dart`: Abstract engine interface (all ValueNotifier state)
-- `lib/kernel/engine/fvp_engine.dart`: Concrete engine implementation (6 helpers)
-- `lib/features/player/services/playback_controller.dart`: Playback orchestration facade
-- `lib/kernel/bridge/window_service.dart`: Window management coordinator
+- `lib/kernel/player_services.dart`: DI container (`PlayerServices`)
+- `lib/kernel/services/playback_controller.dart`: Playback facade
+- `lib/kernel/engine/media_kit_engine.dart`: Sole engine impl
+- `lib/kernel/engine/engine_state_machine.dart`: State + generation guard
+- `lib/kernel/window_Bridge/window_manager_service.dart`: Window service
+- `lib/kernel/window_Bridge/window_service_state.dart`: Window sub-coordinators
+
+**UI Composition:**
+- `lib/ui/player/player_screen.dart`: Main screen
+- `lib/ui/player/player_video_controls.dart`: Path B control layer
+- `lib/ui/player/player_actions.dart`: Stable callback bundle
+- `lib/ui/window/custom_title_bar.dart`: Frameless title bar
 
 **Testing:**
-- `test/`: Unit and widget tests
-- `integration_test/`: Integration tests
+- `test/kernel/player_services_test.dart`: DI container tests
+- `test/kernel/engine/media_kit_engine_test.dart`: Engine tests
+- `test/kernel/engine/engine_state_machine_test.dart`: State machine tests
+- `test/kernel/services/playback_controller_test.dart`: Facade tests
+- `test/helpers/fake_engine.dart`: Test double for MediaEngine
 
 ## Naming Conventions
 
 **Files:**
-- `snake_case.dart` for all Dart files
-- Feature files: `{feature_name}_feature.dart` (e.g., `player_feature.dart`)
-- Service files: `{service_name}_service.dart` (e.g., `thumbnail_service.dart`)
-- Model files: `{model_name}.dart` (e.g., `playlist_item.dart`)
-- Widget files: `{widget_name}.dart` matching the primary widget class name (e.g., `player_screen.dart`)
-- Abstract interfaces: no prefix, just the concept name (e.g., `window_bridge.dart`, `fullscreen_driver.dart`)
-- Platform drivers: `{platform}_{feature}_driver.dart` (e.g., `windows_fullscreen_driver.dart`)
+- `snake_case.dart` (Dart convention) — e.g., `playback_controller.dart`, `media_kit_engine.dart`, `window_manager_service.dart`
+- Interface files: bare concept name — `media_engine.dart`, `window_bridge.dart`, `playback_control.dart`
+- Implementation files: concrete name — `media_kit_engine.dart`, `window_manager_service.dart`
+- Test files: mirror source path under `test/` + `_test.dart` suffix — e.g., `test/kernel/services/playback_controller_test.dart`
+- Barrel files: aggregate concept — `engine_state.dart` re-exports all ISP interfaces
 
 **Directories:**
-- `snake_case` for all directories
-- Feature modules under `lib/features/{feature_name}/`
-- Platform-specific code under `{kernel/bridge/platform/}` or `{kernel/bridge/win32/}`
-- Settings tabs under `lib/ui/dialogs/settings/`
+- `snake_case` — `window_Bridge` is the sole exception (capital B, legacy naming retained during v1.8 refactor)
+- Feature/domain grouping: `kernel/engine/`, `kernel/services/`, `ui/player/` (not by type like `models/` or `widgets/` at top level)
+
+**Classes/Types:**
+- `PascalCase` — `PlayerServices`, `MediaKitEngine`, `PlaybackController`, `WindowService`
+- Interfaces: `MediaEngine`, `WindowBridge`, `PlaybackControl`, `EngineStateView` (no `I` prefix)
+- Sealed result types: `OpenResult` with subtypes `OpenSuccess`/`OpenError`/`OpenSuperseded`
+- ViewModels: `ControlBarViewModel`, `PlayerControlsState`
+- Coordinators: `WindowModeCoordinator`, `WindowResizeCoordinator`, `WindowPersistenceCoordinator`
+
+**Private members:** `_` prefix — `_player`, `_stateMachine`, `_controller`, `_disposed`
 
 ## Where to Add New Code
 
-**New Feature Module:**
-- Implementation: `lib/features/{feature_name}/`
-- Models: `lib/features/{feature_name}/models/`
-- Services: `lib/features/{feature_name}/services/`
-- Register in `PlayerServices` if player-related, or create standalone service
+**New Feature (with UI):**
+- Primary code: `lib/features/<feature>/` (new directory) or `lib/ui/<feature>/` (widget-only)
+- Feature entry: StatefulWidget in `lib/features/<feature>/<feature>_feature.dart`
+- Wire into `lib/app.dart` `_buildPlayerHome` or a new route
+- Tests: `test/features/<feature>/` + `test/widget/<feature>/`
 
-**New Engine Capability:**
-- Interface method: add to `lib/kernel/engine/engine_state.dart`
-- Implementation: add to `lib/kernel/engine/fvp_engine.dart` or create new helper in `lib/kernel/engine/`
-- Helper files: `lib/kernel/engine/{helper_name}.dart`
+**New Engine Control Facet (ISP):**
+- Interface: new file in `lib/kernel/engine/<facet>_control.dart` (e.g., `audio_filter_control.dart`)
+- Add to `MediaEngine implements` list in `lib/kernel/engine/media_engine.dart`
+- Implement in `MediaKitEngine` (`lib/kernel/engine/media_kit_engine.dart`)
+- Export via barrel `lib/kernel/engine/engine_state.dart`
+- Test: `test/kernel/engine/`
 
-**New Window/Fullscreen Feature:**
-- Abstract interface: `lib/kernel/bridge/fullscreen_driver.dart` or `lib/kernel/bridge/window_bridge.dart`
-- Platform implementation: `lib/kernel/bridge/platform/{platform}_{feature}.dart`
-- Win32 FFI: `lib/kernel/bridge/win32/win32_{feature}.dart`
+**New Service (orchestration):**
+- Implementation: `lib/kernel/services/<service_name>.dart`
+- Construct in `PlayerServices._initOnce()` (`lib/kernel/player_services.dart:118`) — add field, init step, dispose in reverse order
+- Inject into `PlaybackController` or `PlayerFeature` as needed
+- Test: `test/kernel/services/<service_name>_test.dart`
 
-**New UI Component:**
-- Player-related: `lib/ui/player/{component_name}.dart`
-- Shared/reusable: `lib/ui/shared/{component_name}.dart`
-- Dialog: `lib/ui/dialogs/{dialog_name}.dart`
-- Settings tab: `lib/ui/dialogs/settings/{tab_name}_tab.dart`
+**New Window Coordinator:**
+- Implementation: add coordinator class in `lib/kernel/window_Bridge/window_service_state.dart` (co-located with existing coordinators)
+- Wire in `WindowService` (`lib/kernel/window_Bridge/window_manager_service.dart`)
+- Test: `test/kernel/bridge/` or `test/unit/bridge/`
 
-**New Data Model:**
-- Shared model: `lib/kernel/models/{model_name}.dart`
-- Feature-specific model: `lib/features/{feature}/models/{model_name}.dart`
+**New UI Widget (player controls):**
+- Implementation: `lib/ui/player/<widget_name>.dart`
+- Compose in `PlayerVideoControls._buildControlBar()` or `_buildControls` builder
+- Use `Tokens.*` for all visual values — no hardcoded colors/spacing
+- Test: `test/widget/player/<widget_name>_test.dart`
 
-**New Utility:**
-- Kernel utility: `lib/kernel/utils/{utility_name}.dart`
-- UI utility: `lib/ui/shared/{utility_name}.dart`
+**New Reusable Widget:**
+- Implementation: `lib/ui/shared/<widget_name>.dart`
+- Test: `test/widget/shared/<widget_name>_test.dart`
 
-**New Test:**
-- Unit test: `test/{area}/{test_name}_test.dart`
-- Widget test: `test/widget/{test_name}_test.dart`
-- Regression test: `test/regression/{suite_name}_test.dart`
+**New Test Double:**
+- Fake: `test/helpers/fake_<name>.dart` (implement interface, hand-written)
+- Follow `FakeEngine` / `FakeWindowService` patterns (constructor-injectable, no native deps)
+
+**New Localization Key:**
+- Add to `lib/l10n/app_en.arb` and `lib/l10n/app_zh.arb`
+- Run `flutter gen-l10n` (or `flutter pub get` with `generate: true`)
+- Access via `AppLocalizations.of(context).<key>`
+
+**New Design Token:**
+- Add static const to `Tokens` class in `lib/ui/theme/tokens.dart`
+- Document purpose in doc comment
+- Never inline literal values in widgets
 
 ## Special Directories
 
-**`lib/l10n/`:**
-- Purpose: Auto-generated localization code from ARB files
-- Generated: Yes (by `gen_l10n`)
-- Committed: Yes (generated files checked in)
+**`windows/`:**
+- Purpose: Windows native runner (CMake build, win32 window, flutter_window)
+- Generated: Partially (runner scaffolded by Flutter, `CMakeLists.txt` hand-modified for WM_NCHITTEST)
+- Committed: Yes
 
-**`lib/kernel/engine/models/`:**
-- Purpose: Engine-specific data models (media info, track info, codec info)
+**`.planning/`:**
+- Purpose: GSD planning documents, phase plans, debug notes
+- Generated: No (authored by GSD commands + humans)
+- Committed: Mixed (codebase maps committed; debug notes `.planning/debug/` untracked)
+
+**`assets/fonts/`:**
+- Purpose: Noto Sans SC font family (Regular/Medium/SemiBold)
 - Generated: No
 - Committed: Yes
 
-**`lib/ui/dialogs/settings/`:**
-- Purpose: Individual settings tab components (General, Audio, Video, Equalizer, Shortcuts, Performance, About)
-- Generated: No
+**`test/golden/`:**
+- Purpose: Golden image reference files for visual regression
+- Generated: Yes (via `flutter test --update-goldens`)
 - Committed: Yes
 
-**`lib/kernel/bridge/win32/`:**
-- Purpose: Win32-specific FFI bindings and display enumeration
-- Generated: No (manual FFI bindings, not ffigen)
-- Committed: Yes
-
-**`lib/kernel/bridge/platform/`:**
-- Purpose: Platform-specific fullscreen driver implementations
-- Generated: No
-- Committed: Yes
-
-**`build/`:**
-- Purpose: Flutter build output
-- Generated: Yes
-- Committed: No
-
-**`windows/`, `macos/`, `linux/`:**
-- Purpose: Platform runner code (main entry points for each OS)
-- Generated: Partially (Flutter template) + manual modifications
-- Committed: Yes
-
-**`packages/`:**
-- Purpose: Local packages (if any)
-- Generated: No
+**`lib/l10n/` (generated files):**
+- Purpose: `app_localizations*.dart` are generated from ARB
+- Generated: Yes (by `flutter gen-l10n`)
 - Committed: Yes
 
 ---
 
-*Structure analysis: 2026-07-12*
+*Structure analysis: 2026-08-21*
