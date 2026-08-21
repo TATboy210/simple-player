@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/persistence/window_persistence.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_constants.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -16,7 +17,7 @@ void main() {
       () async {
         final state = await (await createStore()).load();
 
-        expect(state.size, WindowPersistence.defaultSize);
+        expect(state.size, defaultWindowSize);
         expect(state.position, isNull);
         expect(state.alwaysOnTop, isFalse);
         expect(state.isMaximized, isFalse);
@@ -52,7 +53,7 @@ void main() {
         });
         final state = await (await createStore()).load();
 
-        expect(state.size, WindowPersistence.defaultSize);
+        expect(state.size, defaultWindowSize);
         expect(state.position, isNull);
         expect(state.isMaximized, isFalse);
       },
