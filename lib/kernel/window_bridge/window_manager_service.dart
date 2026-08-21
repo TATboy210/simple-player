@@ -21,7 +21,7 @@ export 'window_resize_coordinator.dart';
 export 'window_service_state.dart';
 
 /// 日志门面 — WindowService 共用。
-final logBridge = KernelLogger.I;
+final _log = KernelLogger.I;
 
 /// Window management service - thin coordinator combining responsibility components.
 class WindowService with WindowListener implements WindowBridge {
@@ -40,7 +40,7 @@ class WindowService with WindowListener implements WindowBridge {
         persistence: _persistence,
         readPosition: windowManager.getPosition,
         log: (message, error, stackTrace) =>
-            logBridge.w('$message: $error\n$stackTrace'),
+            _log.w('$message: $error\n$stackTrace'),
       );
 
   bool _disposed = false;
@@ -55,7 +55,7 @@ class WindowService with WindowListener implements WindowBridge {
       final operation = _initOperation;
       if (operation != null) await operation;
     },
-    log: logBridge.i,
+    log: _log.i,
   );
   int _resizeSuppressionGeneration = 0;
   int _activeResizeSuppression = 0;
@@ -86,7 +86,7 @@ class WindowService with WindowListener implements WindowBridge {
       StackTrace stackTrace,
     ) {
       _initOperation = null;
-      logBridge.e('[WindowService.init] $error\n$stackTrace');
+      _log.e('[WindowService.init] $error\n$stackTrace');
       throw error;
     });
   }
@@ -152,7 +152,7 @@ class WindowService with WindowListener implements WindowBridge {
     try {
       await _initWindow();
     } on Exception catch (error, stackTrace) {
-      logBridge.e('[WindowService._initWindow] $error\n$stackTrace');
+      _log.e('[WindowService._initWindow] $error\n$stackTrace');
       rethrow;
     }
   }
@@ -208,7 +208,7 @@ class WindowService with WindowListener implements WindowBridge {
       }
     } on Exception catch (error, stackTrace) {
       // 调度器不可用时保留同步更新，并记录异常上下文便于诊断。
-      logBridge.w('[WindowService._updateOnUIThread] $error\n$stackTrace');
+      _log.w('[WindowService._updateOnUIThread] $error\n$stackTrace');
       update();
     } on Error {
       // 清理/测试阶段可能抛出 Error；保持原有兜底行为但继续传播不可恢复错误。
@@ -222,14 +222,14 @@ class WindowService with WindowListener implements WindowBridge {
       state: _state,
       readSize: windowManager.getSize,
       persistSize: (size) => _persistenceCoordinator.save(size: size),
-      logger: logBridge,
+      logger: _log,
     );
   }
 
   @override
   void onWindowMaximize() {
     if (_disposed) return;
-    logBridge.d('onWindowMaximize()');
+    _log.d('onWindowMaximize()');
     _ensureResizeCoordinator();
     _resizeCoordinator?.onResize();
     _updateOnUIThread(_modeCoordinator.onNativeMaximize);
@@ -238,7 +238,7 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowUnmaximize() {
     if (_disposed) return;
-    logBridge.d('onWindowUnmaximize()');
+    _log.d('onWindowUnmaximize()');
     if (_modeCoordinator.fullscreenIntent) return;
     _ensureResizeCoordinator();
     _resizeCoordinator?.onResize();
@@ -259,13 +259,13 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   void onWindowClose() {
     if (_disposed || _isClosing) return;
-    logBridge.i('onWindowClose()');
+    _log.i('onWindowClose()');
     _isClosing = true;
     _resizeCoordinator?.dispose();
     // Finish the preference write before destroying the native window.
     unawaited(
       _closeWindowOperation().catchError((Object error, StackTrace stackTrace) {
-        logBridge.e('[WindowService.onWindowClose] $error\n$stackTrace');
+        _log.e('[WindowService.onWindowClose] $error\n$stackTrace');
       }),
     );
   }
@@ -282,21 +282,13 @@ class WindowService with WindowListener implements WindowBridge {
       try {
         await windowManager.destroy();
       } on Object catch (error, stackTrace) {
-        logBridge.e(
+        _log.e(
           '[WindowService._persistThenDestroy] destroy failed: $error\n$stackTrace',
         );
       }
     } finally {
       dispose();
     }
-  }
-
-  /// 同步 media_kit 的实际全屏状态，不触发 window_manager 全屏操作。
-  @override
-  void syncFullscreenState(bool isFullscreen) {
-    if (_disposed) return;
-    _modeCoordinator.syncFullscreenState(isFullscreen);
-    if (!isFullscreen) unawaited(_saveWindowState());
   }
 
   /// Saves the current settled geometry without letting persistence failures affect UI.
