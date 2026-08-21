@@ -1,240 +1,170 @@
-> ⚠️ **v2.1 前快照（2026-07-12）** — 此文档描述 v2.1 重构前结构，Phase 15+ 一律对 LIVE code + codegraph 核对，勿信本快照具体路径/类名。保留作演进历史。
-
 # Coding Conventions
 
-**Analysis Date:** 2026-07-12
+**Analysis Date:** 2026-08-21
 
 ## Naming Patterns
 
 **Files:**
-- snake_case for all Dart files: `display_config.dart`, `engine_state.dart`
-- Test files use `_test.dart` suffix: `display_config_test.dart`, `control_bar_test.dart`
-- Feature directories use lowercase: `features/player/`, `kernel/engine/`
+- `snake_case.dart` for all Dart files (Dart convention enforced by tooling)
+- Feature-prefixed grouping: `player_screen.dart`, `player_keyboard_actions.dart`, `player_video_controls.dart` in `lib/ui/player/`
+- Test files mirror source path under `test/`: `lib/kernel/services/path_validator.dart` → `test/kernel/services/path_validator_test.dart`
+- Fakes prefixed with `fake_`: `test/helpers/fake_engine.dart`, `test/helpers/fake_window_service.dart`
+- Generated l10n files committed: `lib/l10n/app_localizations.dart`, `app_localizations_en.dart`, `app_localizations_zh.dart`
 
 **Functions:**
-- camelCase for all functions and methods: `getRefreshRate()`, `syncModeForHz()`
-- Private methods prefixed with underscore: `_initImpl()`, `_detectRefreshRate()`
-- Boolean getters use `is`/`has`/`can` prefix: `isPrimary`, `isBuffering`
+- `camelCase` for all functions and methods
+- Booleans prefixed `is`/`has`/`should`/`can`: `isPlaying`, `isBuffering`, `hasMedia`, `isFullscreen`
+- Private members prefixed `_`: `_disposed`, `_loadLibrary()`, `_onStateChanged()`
 
 **Variables:**
-- camelCase for instance variables: `_cachedHz`, `_initialized`
-- Private fields prefixed with underscore: `_displays`, `_inner`
-- Constants use `static const`: `static const bgDeep = Color(...)`
+- `camelCase` for locals and fields
+- `final` preferred for all locals (enforced by `prefer_final_locals` lint in `analysis_options.yaml`)
+- `SCREAMING_SNAKE_CASE` for top-level compile-time constants — NOT used; project uses `static const` class fields via `Tokens.*` instead
 
 **Types:**
-- PascalCase for classes and enums: `DisplayConfig`, `MediaState`, `PlayMode`
-- Enums use PascalCase values: `PlayMode.loopAll`, `MediaState.playing`
+- `PascalCase` for classes, enums, sealed classes, extensions
+- Enums carry semantic getters: `WindowMode.isFullscreen`, `MediaState` values
+- Sealed class hierarchies for closed result/error sets: `sealed class OpenResult` (`lib/kernel/engine/open_result.dart`), `sealed class PlayerError` (`lib/kernel/models/player_error.dart`)
+
+**Constants:**
+- Design tokens: `static const` fields on `Tokens` class (`lib/ui/theme/tokens.dart`) — e.g., `Tokens.bgGlass`, `Tokens.accent`, `Tokens.glassBlur`
+- Private static constants: `_urlSchemes`, `_maxCacheSize`, `_probesEnabled`
 
 ## Code Style
 
 **Formatting:**
-- Tool: `dart format` (standard Flutter formatter)
-- Line length: 80 characters (default)
-- Single quotes for strings: `'text'` not `"text"`
+- `dart format` (80-char line, default Flutter rules)
+- Trailing commas on multi-line argument/parameter lists (improves diff readability)
+- `prefer_single_quotes: true` enforced in `analysis_options.yaml`
 
 **Linting:**
-- Tool: `flutter_lints` with strict mode enabled
-- Key rules from `analysis_options.yaml`:
-  - `strict-casts: true` — no implicit downcasts
-  - `strict-inference: true` — explicit types required
-  - `strict-raw-types: true` — no raw generic types
-  - `prefer_const_constructors: true`
-  - `prefer_final_locals: true`
-  - `avoid_print: true` — use `debugPrint()` or logger
-  - `unawaited_futures: true` — explicit async handling
+- Base: `package:flutter_lints/flutter.yaml`
+- Strict mode enabled: `strict-casts`, `strict-inference`, `strict-raw-types` (`analysis_options.yaml`)
+- Key enabled rules: `prefer_const_constructors`, `prefer_final_locals`, `prefer_final_in_for_each`, `avoid_print`, `prefer_single_quotes`, `always_declare_return_types`, `avoid_void_async`, `cancel_subscriptions`, `close_sinks`, `unawaited_futures`
+- DCM (Dart Code Metrics) configured with 18 rules and metrics thresholds: cyclomatic-complexity 15, maximum-nesting-level 6, number-of-parameters 8, number-of-methods 20, widgets-nesting-level 8
+
+**Kernel logging ban:**
+- `lib/kernel/` must NOT use `debugPrint()` — enforced via CI grep gate (Flutter analyzer lacks directory-level lint overrides)
+- Kernel code must use `KernelLogger` instead (see Logging section)
 
 ## Import Organization
 
 **Order:**
-1. Dart SDK imports: `dart:async`, `dart:io`, `dart:ui`
-2. Flutter imports: `package:flutter/material.dart`, `package:flutter_test/flutter_test.dart`
-3. Third-party imports: `package:fvp/mdk.dart`, `package:logger/logger.dart`
-4. Project imports: `package:simple_player_flutter/...`
-5. Relative imports: `../../helpers/fake_engine.dart`
+1. `dart:` SDK imports
+2. External `package:` imports (flutter, media_kit, etc.)
+3. Internal `package:simple_player_flutter/` imports
+4. Relative imports within the same feature (`'./file.dart'`)
 
 **Path Aliases:**
-- No aliases — use full package paths: `package:simple_player_flutter/kernel/...`
-- Relative imports allowed within same feature/test directory
+- None — all imports use full `package:simple_player_flutter/...` paths or relative paths
+- Relative imports used within tightly-coupled files: `engine_state_machine.dart` imports `'media_state.dart'`, `'../diagnostics/kernel_logger.dart'`
+- Deferred imports for lazy loading: `import 'player_feature.dart' deferred as player_feature;` (`lib/features/player/deferred_player_feature.dart`)
+
+**Show/hide directives:**
+- Used to narrow scope: `import '../diagnostics/kernel_logger.dart' show KernelLoggerImpl;` (`lib/kernel/engine/engine_state_machine.dart`)
 
 ## Error Handling
 
 **Patterns:**
-```dart
-// Pattern 1: try-catch with logger
-try {
-  final display = PlatformDispatcher.instance.views.first;
-  return 60;
-} catch (e, st) {
-  logBridge.e('[DisplayConfig._detectRefreshRate] $e\n$st');
-  return 60; // safe default
-}
+- Sealed class hierarchies for structured, exhaustive error handling — `PlayerError` (`lib/kernel/models/player_error.dart`) with subtypes `FileError`, `CodecError`, `PlaybackError`, `NetworkError`, `UnknownError`, each carrying a typed code enum
+- Sealed `OpenResult` (`lib/kernel/engine/open_result.dart`): `OpenSuccess`, `OpenError`, `OpenSuperseded` — enables exhaustive `switch` pattern matching
+- Error codes are append-only registries: `FileErrorCode`, `CodecErrorCode`, etc. — existing codes never renamed/deleted (`lib/kernel/models/player_error.dart`)
+- Each error carries: `message` (human-readable), `cause` (original exception, optional), `context` (`ErrorContext?` with action/generation/path/timestamp/module), `isFatal`, `l10nKey` (for UI translation lookup)
+- `on Object catch (error, stackTrace)` at composition root (`lib/main.dart:35`) — catches everything at app entry, logs via `KernelLogger.I.e(...)`, records error string for UI display
+- Specify exception types in `on` clauses — never bare `catch (e)` (per CLAUDE.md rule)
+- Never catch `Error` subtypes — they indicate programming bugs
 
-// Pattern 2: Specific exception types
-on Exception catch (e) {
-  debugPrint('[Log] file logging init failed: $e');
-}
-
-// Pattern 3: Silent cleanup (only for non-critical operations)
-try {
-  _file.renameSync(archive.path);
-} on Exception {
-  // rename failed — continue with current file
-}
-```
-
-**Rules:**
-- Always catch specific exception types (not bare `catch (e)`)
-- Provide safe fallback values for non-critical operations
-- Log errors with context: `logBridge.e('[ClassName.method] $e')`
-- Never silently swallow errors in critical paths
+**Input validation:**
+- Centralized at system boundaries via `PathValidator` (`lib/kernel/services/path_validator.dart`): extension whitelist, path-traversal detection, URL scheme filtering
+- All file-open entry points (FilePicker, drag-and-drop, history replay) must pass through `PathValidator.validate()` before reaching the engine
+- Null byte injection, UNC paths, home expansion, control characters all rejected (fuzz-tested in `test/kernel/security/fuzz_input_test.dart`)
 
 ## Logging
 
-**Framework:** `logger` package with custom `PrefixPrinter`
+**Framework:** `KernelLogger` (custom, zero third-party dependencies)
 
-**Module Loggers:**
-```dart
-log          // Global logger (no prefix)
-logEngine    // Engine module: [engine] prefix
-logBridge    // Bridge module: [bridge] prefix
-logServices  // Services module: [services] prefix
-logUi        // UI module: [ui] prefix
-```
+**Architecture:**
+- Abstract `KernelLogger` base + concrete `KernelLoggerImpl` (`lib/kernel/diagnostics/kernel_logger.dart`)
+- 6 severity levels: `trace`, `debug`, `info`, `warn`, `error`, `fatal` — 1:1 method mapping
+- Shortcut methods: `.t()`, `.d()`, `.i()`, `.w()`, `.e()`, `.f()`
+- Static singleton accessor: `KernelLogger.I` (throws `StateError` if `init()` not called)
+- Build-mode-gated sinks via `createDefaultLogSink()`:
+  - debug → `CompositeSink([DebugPrintSink(), DevToolsSink()])`
+  - profile → `DevToolsSink()` (low-noise performance diagnostics)
+  - release → `NullSink()` (tree-shakeable, zero output)
 
 **Patterns:**
-```dart
-// Debug logging
-logEngine.d('[FvpEngine] open: $path');
-
-// Error logging with stack trace
-logBridge.e('[DisplayConfig._detectReleaseRate] $e\n$st');
-
-// Warning logging (release mode only)
-logServices.w('[PlaybackController] retry failed');
-```
-
-**Configuration:**
-- Debug mode: Console output with colors, all levels
-- Release mode: File output to `%APPDATA%\SimplePlayer\logs\`, warning+ only
-- Log rotation: 2 MB per file, keep 5 archives
+- Kernel modules obtain logger via `final _log = KernelLogger.I;` at file scope (`lib/kernel/services/playback_controller.dart:29`, `lib/kernel/utils/path_utils.dart:7`)
+- Call as `_log.info('message')`, `_log.error('message', error: e, stackTrace: st, context: {...})`
+- Structured context via `Map<String, Object?>` — serialized to stable-key JSON, cycle-safe (`serializeLogContext`)
+- Path redaction: `redactPath()` strips directory prefixes before logging (`lib/kernel/diagnostics/kernel_logger.dart:126`)
+- UI layer (outside `lib/kernel/`) may use `debugPrint()` — but kernel MUST use `KernelLogger`
+- Test setup: `KernelLoggerImpl.resetForTesting()` then `KernelLoggerImpl.init()` in `setUpAll`
 
 ## Comments
 
 **When to Comment:**
-- Class doc comments: Every public class and mixin
-- Method doc comments: Non-trivial public methods
-- Inline comments: Magic numbers, algorithms, side effects
-- TODO/FIXME: Include brief explanation
+- Every public class, mixin, and non-trivial function has a `///` doc comment (mandated by CLAUDE.md)
+- Doc comments are bilingual: Chinese first line, then English explanation — e.g., `/// 路径安全校验工具 — 统一入口` / `/// Centralised file-path validation: ...`
+- Inline comments for non-obvious logic — explain *why*, not *what*
+- Magic values documented: `Tokens.bgGlass = Color(0x8C0C0F18); // 加深`
+- Side effects documented: I/O operations, state mutations, external calls
+- TODOs include brief explanation: `// TODO: 全屏回归场景 ... 待用 media_kit 集成测试重写`
 
-**Language:** Chinese comments are OK (existing codebase convention)
-
-**Examples:**
-```dart
-/// Refresh-rate-aware D3D11 sync mode policy.
-///
-/// Detects the primary display's refresh rate and derives the optimal
-/// `d3d11.sync.cpu` value for the D3D11 rendering backend.
-class DisplayConfig {
-  DisplayConfig._();
-
-  /// 内部实例 — 持有缓存状态，消除 static mutable state
-  static final DisplayConfig _instance = DisplayConfig._();
-
-  // 安全降级 — 未检测时假设 60Hz，选择同步模式（最安全）
-  int _cachedHz = 60;
-}
-```
+**JSDoc/TSDoc:**
+- Dart `///` doc comments on all public APIs
+- Examples included in doc comments for pattern usage: `sealed class OpenResult` shows exhaustive `switch` example (`lib/kernel/engine/open_result.dart:5-19`)
+- Architecture position documented: `/// 架构位置：PlayerViewModel → PlaybackController → MediaEngine` (`lib/kernel/services/playback_controller.dart:7`)
 
 ## Function Design
 
-**Size:** <50 lines preferred, <20 for pure logic
+**Size:**
+- Functions < 50 lines (20 for pure logic, 50 for UI builders) per CLAUDE.md
+- Files < 500 lines — extract modules when approaching limit
 
-**Parameters:** Use named parameters for optional arguments:
-```dart
-void configureMedia({
-  int durationMs = 60000,
-  List<AudioTrackInfo>? audioTracks,
-  List<SubtitleTrackInfo>? subtitleTracks,
-}) { ... }
-```
+**Parameters:**
+- `required` for constructor params that must always be provided
+- Optional named params with nullable types or defaults
+- Callbacks typed as `VoidCallback?` or `void Function(T)?`
 
-**Return Values:** Explicit return types required (strict mode)
+**Return Values:**
+- Sealed `Result`-style types for fallible operations: `OpenResult` (`lib/kernel/engine/open_result.dart`)
+- `ValueNotifier<T>` for reactive state exposure (see State Management)
+- Immutable data classes with `copyWith()` for state mutations: `PlaylistItem.copyWith()` (`lib/kernel/models/playlist_item.dart:62`)
 
 ## Module Design
 
-**Exports:** Use `export` for barrel files:
-```dart
-// engine_state.dart
-export 'media_error_type.dart';
-export 'models/media_info.dart';
-export 'media_state.dart';
-```
+**Exports:**
+- No barrel files — direct imports to specific files
+- `show` directives to narrow scope where needed: `show KernelLoggerImpl`
+- `library;` directive used at file top for explicit library declaration (e.g., `kernel_logger.dart`, `playback_controller.dart`)
 
-**Barrel Files:** Used for feature modules (e.g., `engine_state.dart` exports all engine types)
+**ISP Decomposition:**
+- Engine interface split into 7 ISP facets: `EngineStateView` (read-only state), `PlaybackControl`, `TrackControl`, `SubtitleConfig`, `VideoEffectControl`, `RendererControl`, `VolumeControl` (`lib/kernel/engine/`)
+- Composite `MediaEngine` aggregates all facets for service-layer consumption (`lib/kernel/engine/media_engine.dart`)
+- UI layer depends on `EngineStateView` (read-only); service layer depends on `MediaEngine` (state + control)
 
-## Design System Enforcement
+**State Management:**
+- `ValueNotifier` + `ValueListenableBuilder` exclusively — no Provider/Riverpod/Bloc
+- `MediaEngine` exposes `ValueNotifier`s for all reactive state (position, volume, state, etc.)
+- `EngineStateMachine` owns 3 ValueNotifiers + generation counter (`lib/kernel/engine/engine_state_machine.dart`)
+- Widgets rebuild via `ValueListenableBuilder` wrappers
+- Generation guard pattern: `nextGeneration()` / `isCurrent(gen)` prevents stale async callbacks from polluting state
 
-**All visual values via `Tokens.*`:**
-```dart
-// CORRECT
-color: Tokens.controlBarBg,
-borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+**Immutability:**
+- `final` for all local variables (lint-enforced)
+- `const` constructors wherever all fields are `final`
+- `copyWith()` for state mutations in immutable classes
+- Avoid `!` bang operator — prefer `?.`, `??`, `if (x != null)`, or Dart 3 pattern matching
+- Avoid `late` — prefer nullable types or constructor initialization (exception: `late final` where init is guaranteed in constructor body, documented with comment)
+- Avoid `as` casts — use `switch`/`if (x is Type)` pattern matching
 
-// WRONG — hardcoded values
-color: Color(0xFF0C0F18),
-borderRadius: BorderRadius.circular(16),
-```
-
-**Glass-morphism pattern:**
-```dart
-BackdropFilter(
-  filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-  child: Container(
-    decoration: BoxDecoration(
-      color: Tokens.bgGlass,
-      border: Border.all(color: Tokens.borderHighlight),
-    ),
-  ),
-)
-```
-
-## State Management
-
-**Pattern:** ValueNotifier + ValueListenableBuilder
-
-```dart
-// Engine state
-final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
-final ValueNotifier<int> position = ValueNotifier(0);
-
-// Widget rebuild
-ValueListenableBuilder<int>(
-  valueListenable: engine.position,
-  builder: (context, value, child) {
-    return Text(formatMs(value));
-  },
-)
-```
-
-**Rules:**
-- No Provider/Riverpod/Bloc — use ValueNotifier only
-- Expose state as `ValueNotifier<T>` fields
-- Widgets rebuild via `ValueListenableBuilder`
-
-## Async Best Practices
-
-```dart
-// Always await or explicitly mark fire-and-forget
-unawaited(EnginePrewarm.prewarm(...));
-
-// Check context.mounted after await
-await someAsyncOperation();
-if (!context.mounted) return;
-
-// Use Future.wait for concurrent operations
-final results = await Future.wait([op1(), op2()]);
-```
+**Design System Enforcement:**
+- All visual values via `Tokens.*` (`lib/ui/theme/tokens.dart`) — no hardcoded colors, fonts, or spacing
+- Glass-morphism pattern: `BackdropFilter` + `Tokens.bgGlass` + `Tokens.glassBlur` via `GlassContainer` widget (`lib/ui/shared/glass_container.dart`)
+- Single theme: Midnight (compile-time const), `ThemeMode.dark` always (`lib/app.dart:60`)
+- `GlassTier` enum for blur levels (thin/normal/thick) with cached `ImageFilter` instances
 
 ---
 
-*Convention analysis: 2026-07-12*
+*Convention analysis: 2026-08-21*

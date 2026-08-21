@@ -1,54 +1,52 @@
-> ⚠️ **v2.1 前快照（2026-07-12）** — 此文档描述 v2.1 重构前结构，Phase 15+ 一律对 LIVE code + codegraph 核对，勿信本快照具体路径/类名。保留作演进历史。
-
-<!-- refreshed: 2026-07-12 -->
+<!-- refreshed: 2026-08-21 -->
 # Architecture
 
-**Analysis Date:** 2026-07-12
+**Analysis Date:** 2026-08-21
 
 ## System Overview
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Entry Points                                │
-│  `lib/main.dart`  →  `lib/app.dart`  →  `DeferredPlayerFeature`    │
-└──────────────┬──────────────────────────────┬───────────────────────┘
-               │                              │
-               ▼                              ▼
-┌──────────────────────────────┐  ┌──────────────────────────────────┐
-│       Kernel Layer           │  │        Features Layer            │
-│   `lib/kernel/`              │  │   `lib/features/player/`         │
-│                              │  │                                  │
-│  ┌─────────┐  ┌──────────┐  │  │  ┌──────────────────────┐        │
-│  │ Engine  │  │ Bridge   │  │  │  │  PlayerServices (DI) │        │
-│  │ (fvp)   │  │ (Win32)  │  │  │  └──────────┬───────────┘        │
-│  └────┬────┘  └────┬─────┘  │  │             │                    │
-│       │            │         │  │  ┌──────────▼───────────┐        │
-│  ┌────▼────┐  ┌────▼─────┐  │  │  │ PlaybackController   │        │
-│  │ Models  │  │ Persist  │  │  │  │ (Facade pattern)     │        │
-│  └─────────┘  └──────────┘  │  │  └──────────┬───────────┘        │
-│  ┌────────────────────────┐  │  │             │                    │
-│  │    Services / Utils    │  │  │  ┌──────────▼───────────┐        │
-│  └────────────────────────┘  │  │  │ Navigator / FileOps  │        │
-│                              │  │  │ / StateMonitor / Sub │        │
-└──────────────────────────────┘  │  └──────────────────────┘        │
-               │                  └──────────────────────────────────┘
-               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│                           UI Layer                                   │
-│                       `lib/ui/`                                      │
-│                                                                      │
-│  ┌──────────┐ ┌──────────┐ ┌────────────┐ ┌──────────┐ ┌─────────┐ │
-│  │  Player  │ │ Playlist │ │  Shared    │ │ Widgets  │ │ Dialogs │ │
-│  │  Screen  │ │  Panel   │ │  (Glass)   │ │  (OSD)   │ │(Settings)│ │
-│  └──────────┘ └──────────┘ └────────────┘ └──────────┘ └─────────┘ │
-│                     `lib/ui/theme/tokens.dart` (Design Tokens)       │
-└──────────────────────────────────────────────────────────────────────┘
-               │
-               ▼
+│                        Composition Root (main.dart)                    │
+│  MediaKit.ensureInitialized() · windowManager · StartupCoordinator    │
+│  `lib/main.dart` → `lib/app.dart`                                     │
+└───────────────────────────────┬────────────────────────────────────────┘
+                                │ constructs
+                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│                    Platform Layer (Native)                           │
-│  `windows/` (Win32 FFI)  │  `macos/`  │  `linux/`                   │
-│  user32.dll, D3D11        │  Swift/C++ │  GTK                         │
+│                         Feature / View Layer                          │
+│  App → DeferredPlayerFeature → PlayerFeature → PlayerScreen          │
+│  `lib/features/player/*` · `lib/ui/player/*` · `lib/ui/window/*`     │
+└───────────────────────────────┬────────────────────────────────────────┘
+                                │ owns + injects
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Service Container (PlayerServices)                  │
+│  DI container — creates engine, controller, videoProcessing         │
+│  `lib/kernel/player_services.dart`                                    │
+└───────┬───────────────────────┬───────────────────────┬────────────────┘
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌──────────────────┐ ┌─────────────────────┐ ┌──────────────────────────┐
+│ PlaybackController│ │  MediaKitEngine     │ │ VideoProcessingService  │
+│ (Facade)          │ │  (MediaEngine impl) │ │ (stubs — media_kit gaps) │
+│ `lib/kernel/      │ │ `lib/kernel/engine/ │ │ `lib/kernel/services/   │
+│  services/        │ │  media_kit_engine.  │ │  video_processing_      │
+│  playback_        │ │  dart`              │ │  service.dart`          │
+│  controller.dart` │ │                     │ │                          │
+└────────┬─────────┘ └──────────┬──────────┘ └──────────────────────────┘
+         │ delegates             │ wraps Player.stream → ValueNotifier
+         ▼                       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│              Window Bridge (WindowService → WindowBridge)             │
+│  WindowMode/Resize/Persistence coordinators — native window control  │
+│  `lib/kernel/window_Bridge/window_manager_service.dart`              │
+└───────────────────────────────┬────────────────────────────────────────┘
+                                │ wraps
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│      Platform Native (window_manager + media_kit libmpv FFI)          │
+│  Windows runner WM_NCHITTEST · libmpv native player                   │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,242 +54,218 @@
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| `main()` | Bootstrap: prefs, window, engine prewarm, run app | `lib/main.dart` |
-| `App` | MaterialApp shell, theme/locale, settings panel | `lib/app.dart` |
-| `DeferredPlayerFeature` | Lazy-load PlayerFeature via `deferred as` | `lib/features/player/deferred_player_feature.dart` |
-| `PlayerFeature` | DI container owner, UI state, PlayerScreen composition | `lib/features/player/player_feature.dart` |
-| `PlayerServices` | DI container: engine + playlist + controller + videoProcessing | `lib/features/player/player_services.dart` |
-| `PlaybackController` | Facade: orchestrates engine + playlist via sub-modules | `lib/features/player/services/playback_controller.dart` |
-| `PlaybackNavigator` | Track navigation with openGeneration concurrency guard | `lib/features/player/services/playback_navigator.dart` |
-| `FileOperations` | File open/add with path validation | `lib/features/player/services/file_operations.dart` |
-| `StateMonitor` | Engine state observer: breakpoint save, auto-advance, settings restore | `lib/features/player/services/state_monitor.dart` |
-| `SubtitleService` | External subtitle auto-detection and loading | `lib/features/player/services/subtitle_service.dart` |
-| `VideoProcessingService` | Immutable state + diff-based engine sync + debounced persistence | `lib/features/player/services/video_processing_service.dart` |
-| `EngineState` | Mixin: all ValueNotifier playback state + control methods | `lib/kernel/engine/engine_state.dart` |
-| `FvpEngine` | Concrete fvp/MDK engine: 6 helper composition | `lib/kernel/engine/fvp_engine.dart` |
-| `WindowBridge` | Abstract interface for window management (4 states + 7 commands) | `lib/kernel/bridge/window_bridge.dart` |
-| `WindowService` | Concrete WindowBridge: WindowListener + FullscreenDriver | `lib/kernel/bridge/window_service.dart` |
-| `FullscreenDriver` | Abstract interface: enter/leave/query fullscreen | `lib/kernel/bridge/fullscreen_driver.dart` |
-| `DesktopFullscreenDriverFactory` | Factory: platform detection + compile-time flag | `lib/kernel/bridge/desktop_fullscreen_driver_factory.dart` |
-| `WindowState` | Immutable state container: mode, size, resizing | `lib/kernel/bridge/window_state.dart` |
-| `Playlist` | State machine: ordered items, current index, 3 play modes | `lib/kernel/playlist/playlist.dart` |
-| `PlaylistItem` | Immutable data class: path, timestamp, position, duration | `lib/kernel/models/playlist_item.dart` |
-| `SettingsStore` | SharedPreferences persistence with validation | `lib/kernel/persistence/settings_store.dart` |
-| `PlaylistStore` | JSON file persistence for playlist | `lib/kernel/persistence/playlist_store.dart` |
-| `PlayerScreen` | Main player UI: composes keyboard + controls + video | `lib/ui/player/player_screen.dart` |
-| `ControlsOverlay` | Auto-hide layer: mouse/tap gestures, double-click fullscreen | `lib/ui/player/controls_overlay.dart` |
-| `ControlBar` | Bottom glass bar: play/pause, seek, volume, speed | `lib/ui/player/control_bar.dart` |
-| `VideoSurface` | Texture renderer with aspect ratio | `lib/ui/player/video_surface.dart` |
-| `GlassContainer` | Reusable glassmorphism wrapper (3-tier blur) | `lib/ui/shared/glass_container.dart` |
-| `Tokens` | Compile-time design tokens: colors, spacing, radii, durations | `lib/ui/theme/tokens.dart` |
-| `OsdService` | Global singleton OSD: show/hide with auto-dismiss timer | `lib/ui/shared/osd_overlay.dart` |
-| `ThumbnailService` | Platform-aware thumbnail facade with LRU cache | `lib/kernel/services/thumbnail_service.dart` |
-| `StartupCoordinator` | Startup progress tracker with phase-based timeline | `lib/kernel/startup/startup_coordinator.dart` |
+| `main.dart` | Composition root: init MediaKit, windowManager, KernelLogger; construct WindowService + StartupCoordinator; runApp | `lib/main.dart` |
+| `App` | MaterialApp shell: fixed dark theme, localization (zh default), splash → player home | `lib/app.dart` |
+| `DeferredPlayerFeature` | Dart `deferred as` wrapper: async-loads PlayerFeature module, reports load progress to StartupCoordinator | `lib/features/player/deferred_player_feature.dart` |
+| `PlayerFeature` | View layer: owns `PlayerServices` container, manages ready/error UI state, file picker + drop callbacks | `lib/features/player/player_feature.dart` |
+| `PlayerScreen` | Main screen: composites CustomTitleBar + video surface + controls inside `Video.controls` builder; keyboard actions | `lib/ui/player/player_screen.dart` |
+| `PlayerServices` | DI container: creates and disposes MediaKitEngine, PlaybackController, VideoProcessingService in init order | `lib/kernel/player_services.dart` |
+| `PlaybackController` | Facade over `MediaEngine`: openAndPlay (path validate → engine.open → OpenResult dispatch), stop, play/pause contract | `lib/kernel/services/playback_controller.dart` |
+| `MediaKitEngine` | Sole `MediaEngine` implementation: wraps media_kit Player, bridges `Player.stream.*` to ValueNotifiers, generation-guarded open | `lib/kernel/engine/media_kit_engine.dart` |
+| `EngineStateMachine` | Owns 3 ValueNotifiers (state/isSeeking/isBuffering) + generation counter; stale-callback guard via `transitionTo(..., generation:)` | `lib/kernel/engine/engine_state_machine.dart` |
+| `WindowService` | `WindowBridge` impl: thin coordinator delegating to WindowMode/Resize/Persistence sub-coordinators | `lib/kernel/window_Bridge/window_manager_service.dart` |
+| `PlayerVideoControls` | Control layer: subscribes to `Player.stream` via PlayerPort; AutoHide, subtitle padding sync, fullscreen toggle | `lib/ui/player/player_video_controls.dart` |
+| `StartupCoordinator` | Phase progress tracker: reports phases to ValueNotifier, logs timeline at markReady | `lib/kernel/startup/startup_coordinator.dart` |
+| `KernelLoggerImpl` | Build-mode-gated logging facade: debug → DebugPrint+DevTools, profile → DevTools, release → NullSink | `lib/kernel/diagnostics/kernel_logger.dart` |
 
 ## Pattern Overview
 
-**Overall:** Layered Architecture with MVVM-inspired service composition
+**Overall:** Layered MVVM with ISP-decomposed engine + Facade controller + DI container + deferred module loading.
 
 **Key Characteristics:**
-- **ValueNotifier-only state management** -- no Provider, Riverpod, or Bloc
-- **Deferred loading** for heavy modules (PlayerFeature via `deferred as`)
-- **Facade pattern** for PlaybackController (unified entry to sub-modules)
-- **Factory pattern** for platform-specific driver selection
-- **Observer pattern** for engine state monitoring
-- **Immutable state** with `copyWith` (VideoProcessingState, StartupState, PlaylistItem)
-- **Dependency Inversion** via `PlaybackContract` interface for sub-modules
+- **ValueNotifier + ValueListenableBuilder** state management throughout (no Provider/Riverpod/Bloc)
+- **ISP-decomposed engine interface**: `MediaEngine` is a composite of 7 `implements` (1 read-only view + 6 control facets)
+- **Facade pattern** at `PlaybackController` — UI talks only to the facade, never to `MediaEngine` directly for open/stop
+- **Deferred import** for PlayerFeature module to keep libmpv/MediaKitEngine types out of startup hot path
+- **Generation-guarded async** — stale open/stop callbacks rejected via embedded generation counter in state machine
+- **Coordinator sub-objects** for window service (mode/resize/persistence each serialized independently)
+- **Identity-preservation forwarding** — engine getters return the same notifier instances UI listens to (no wrapping)
 
 ## Layers
 
-**Entry Layer:**
-- Purpose: App bootstrap and MaterialApp shell
+**Composition Root (`lib/main.dart`, `lib/app.dart`):**
+- Purpose: bootstrap platform, construct singletons, wire App widget
 - Location: `lib/main.dart`, `lib/app.dart`
-- Contains: Flutter binding init, SharedPreferences prewarm, WindowService init, engine prewarm, theme/locale setup
-- Depends on: Kernel layer (WindowService, SettingsStore, StartupCoordinator)
-- Used by: Flutter framework
+- Contains: MediaKit.ensureInitialized, windowManager init, KernelLogger.init, StartupCoordinator
+- Depends on: WindowService, StartupCoordinator, App
+- Used by: Flutter runtime (entry point)
 
-**Features Layer:**
-- Purpose: Business logic composition and DI container
-- Location: `lib/features/player/`
-- Contains: PlayerServices (DI), PlaybackController (facade), PlaybackNavigator, FileOperations, StateMonitor, SubtitleService, VideoProcessingService
-- Depends on: Kernel layer (EngineState, Playlist, WindowBridge, SettingsStore)
-- Used by: UI layer (PlayerScreen)
+**Feature / View Layer (`lib/features/player/`, `lib/ui/`):**
+- Purpose: widget composition, UI state, user interaction callbacks
+- Location: `lib/features/player/player_feature.dart`, `lib/ui/player/player_screen.dart`, `lib/ui/player/player_video_controls.dart`, `lib/ui/window/custom_title_bar.dart`
+- Contains: StatefulWidget views, keyboard handler, control bar widget tree, OSD, dialogs
+- Depends on: PlayerServices (DI), PlaybackController (facade), WindowBridge, Tokens
+- Used by: App (MaterialApp home)
 
-**Kernel Layer:**
-- Purpose: Core logic, platform abstractions, data models, persistence
-- Location: `lib/kernel/`
-- Contains: Engine (fvp/MDK), Bridge (window/fullscreen), Models, Persistence, Playlist, Scanner, Services, Utils
-- Depends on: Platform native code (fvp, window_manager, Win32 FFI)
-- Used by: Features layer, UI layer
+**Service Layer (`lib/kernel/services/`, `lib/kernel/player_services.dart`):**
+- Purpose: orchestration, runtime state management, file operations
+- Location: `lib/kernel/services/playback_controller.dart`, `lib/kernel/player_services.dart`
+- Contains: PlaybackController facade, PlaybackStateManager, SubtitleService, TrackPreferenceService, ThumbnailService, PathValidator, InputModeDetector
+- Depends on: MediaEngine (interface), not concrete MediaKitEngine
+- Used by: PlayerFeature (constructs PlayerServices)
 
-**UI Layer:**
-- Purpose: All visual components and user interaction
-- Location: `lib/ui/`
-- Contains: Player screen, playlist panel, shared widgets (GlassContainer, OSD), design tokens, dialogs
-- Depends on: Features layer (for callbacks), Kernel layer (for EngineState direct read)
-- Used by: App layer
+**Engine Layer (`lib/kernel/engine/`):**
+- Purpose: media playback abstraction + concrete libmpv implementation
+- Location: `lib/kernel/engine/media_engine.dart`, `lib/kernel/engine/media_kit_engine.dart`, `lib/kernel/engine/engine_state_machine.dart`
+- Contains: 7 ISP interfaces, EngineStateMachine, OpenResult sealed class, MediaInfo models
+- Depends on: media_kit package (Player, VideoController), EngineStateMachine
+- Used by: PlayerServices (constructs), PlaybackController (delegates)
+
+**Window Bridge (`lib/kernel/window_Bridge/`):**
+- Purpose: native window abstraction (fullscreen/maximize/resize/persistence) decoupled from window_manager package
+- Location: `lib/kernel/window_Bridge/window_bridge.dart`, `lib/kernel/window_Bridge/window_manager_service.dart`, `lib/kernel/window_Bridge/window_service_state.dart`
+- Contains: WindowBridge interface, WindowService impl, WindowServiceState, 3 coordinators (Mode/Resize/Persistence)
+- Depends on: window_manager package, WindowPersistence (shared_preferences)
+- Used by: main.dart (constructs), PlayerFeature (injects), PlayerScreen (consumes mode/resize)
+
+**Diagnostics (`lib/kernel/diagnostics/`):**
+- Purpose: logging, memory monitoring, resize probes
+- Location: `lib/kernel/diagnostics/kernel_logger.dart`, `lib/kernel/diagnostics/memory_monitor.dart`, `lib/kernel/diagnostics/video_texture_resize_probe.dart`
+- Contains: KernelLogger facade + sinks, MemoryMonitor, ResizeFrameMetrics, VideoTextureResizeProbe
+- Depends on: dart:developer, flutter foundation
+- Used by: all layers (via `KernelLogger.I`)
+
+**Persistence (`lib/kernel/persistence/`):**
+- Purpose: SharedPreferences-backed storage for window geometry
+- Location: `lib/kernel/persistence/window_persistence.dart`, `lib/kernel/persistence/playlist_store.dart`
+- Contains: WindowPersistence, PersistedWindowState (validated snapshots)
+- Depends on: shared_preferences
+- Used by: WindowService (via WindowPersistenceCoordinator)
 
 ## Data Flow
 
-### Primary Playback Path
+### Primary Request Path: Open and Play a File
 
-1. User triggers play (file picker / drag-drop / playlist select) -- `lib/features/player/player_feature.dart:154`
-2. `PlaybackController.openAndPlay(path)` delegates to `FileOperations.openAndPlay()` -- `lib/features/player/services/playback_controller.dart:109`
-3. `PlaybackNavigator.playIndex(index)` validates path, increments generation, calls `engine.open(path)` -- `lib/features/player/services/playback_navigator.dart:46`
-4. `FvpEngine.open(path)` sets MediaState.loading, calls `MediaOpener.open()`, transitions to idle on success -- `lib/kernel/engine/fvp_engine.dart:235`
-5. `PlaybackNavigator` resumes breakpoint, detects subtitles, calls `engine.play()` -- `lib/features/player/services/playback_navigator.dart:75-87`
-6. `FvpEngine.play()` sets MDK player to playing, starts PositionPoller -- `lib/kernel/engine/fvp_engine.dart:314`
-7. UI rebuilds via `ValueListenableBuilder` on `engine.textureId`, `engine.state`, `engine.position` -- `lib/ui/player/player_screen.dart:146`
+1. User triggers open (button or `O` key) → `PlayerActions.onOpenFile` → `_openFileWhenReady` gate (`lib/ui/player/player_screen.dart:203`)
+2. `FilePickerCoordinator.open()` → `FilePickerMediaGateway` picks path → `_services.controller.openAndPlay(path)` (`lib/features/player/file_picker_coordinator.dart`)
+3. `PlaybackController.openAndPlay(path)` validates via `PathValidator.validate(path)` (`lib/kernel/services/playback_controller.dart:171`)
+4. `engine.open(path)` → `MediaKitEngine.open` increments generation, transitions to `opening`, awaits `_player.open(Media, play:false)` (`lib/kernel/engine/media_kit_engine.dart:161`)
+5. Returns `OpenResult` (sealed: `OpenSuccess` / `OpenError` / `OpenSuperseded`) — controller dispatches side effects only on `OpenSuccess` (`lib/kernel/services/playback_controller.dart:181`)
+6. On success: `engine.play()` transitions to `playing`, `currentFileName`/`currentPath` ValueNotifiers update → UI rebuilds via ValueListenableBuilder
 
-### Startup Path
+### Secondary Flow: Playback State via stream → ValueNotifier
 
-1. `main()` initializes bindings, logs, memory monitor, SharedPreferences -- `lib/main.dart:20-26`
-2. `DesktopFullscreenDriverFactory.create()` selects platform-specific driver -- `lib/kernel/bridge/desktop_fullscreen_driver_factory.dart:48`
-3. `WindowService.init()` ensures window manager, restores geometry, shows window -- `lib/kernel/bridge/window_service.dart:64`
-4. `EnginePrewarm.prewarm()` fire-and-forget: registers FFmpeg codecs, D3D11 context -- `lib/kernel/engine/engine_prewarm.dart`
-5. `App` loads locale/theme, shows `ProgressSplashScreen` -- `lib/app.dart:145-150`
-6. `DeferredPlayerFeature` lazy-loads `PlayerFeature` module -- `lib/features/player/deferred_player_feature.dart:89`
-7. `PlayerFeature._init()` creates `PlayerServices`, calls `init()` -- `lib/features/player/player_feature.dart:118`
-8. `PlayerServices.init()` creates FvpEngine, Playlist, PlaybackController, VideoProcessingService -- `lib/features/player/player_services.dart:86`
-9. `StartupCoordinator.markReady()` logs timeline, `PlayerScreen` renders -- `lib/kernel/startup/startup_coordinator.dart:64`
-
-### Fullscreen Toggle Path
-
-1. User presses F key or double-clicks -- `lib/ui/player/player_screen.dart:193`
-2. `KeyboardHandler.onToggleFullscreen` calls `windowService.setMode(WindowMode.fullscreen)` -- `lib/ui/player/player_screen.dart:194`
-3. `WindowService.setMode()` captures snapshot, calls `FullscreenDriver.enterFullscreen()` -- `lib/kernel/bridge/window_service.dart:232`
-4. `WindowsFullscreenDriver.enterFullscreenFast()` strips WS_THICKFRAME, caches HWND/monitor, calls SetWindowPos atomically -- `lib/kernel/bridge/platform/windows_fullscreen_driver.dart:194`
-5. `WindowService._onNativeFullScreenChanged()` updates `_isFullscreen` and `_state.mode` -- `lib/kernel/bridge/window_service.dart:105`
-6. `AnimatedBuilder` on `windowService.mode` in `PlayerScreen` rebuilds with `isFullscreen=true` -- `lib/ui/player/player_screen.dart:157`
-7. `ControlsOverlay` receives `isFullscreen`, `AutoHideController` adjusts delay -- `lib/ui/player/controls_overlay.dart:185`
+1. media_kit `Player.stream.position/duration/playing/buffering/...` emit events (`lib/kernel/engine/media_kit_engine.dart:508`)
+2. `MediaKitEngine._subscribeStreams()` listeners write to owned ValueNotifiers (position/duration/volume/isMuted/subtitleText/buffered/aspectRatio/lastError/playbackSpeed)
+3. State-only notifiers (`state`/`isSeeking`/`isBuffering`) are **forwarded** from `EngineStateMachine` (identity preserved — Blocking Constraint #6)
+4. UI `ValueListenableBuilder` widgets rebuild on notifier change
 
 **State Management:**
-- All reactive state exposed as `ValueNotifier<T>` instances
-- UI subscribes via `ValueListenableBuilder<T>` or `AnimatedBuilder`
-- `MergedListenable` combines multiple notifiers (e.g., position + duration + buffered)
-- `ValueListenableBuilder2` for dual-notifier scenarios
-- No global state container -- services hold their own notifiers
-- `ValueNotifier<int> playlistGeneration` as lightweight change signal (avoids deep copy)
+- Single source of truth per notifier; no duplicate state held elsewhere
+- `PlayerControlsState` (path B control bar) re-subscribes to `Player.stream` directly for low-latency seek/rate, NOT to engine notifiers — `lib/ui/player/player_video_controls.dart:155`
+- Volume/mute writes go through `MediaEngine` (preserves `_preMuteVolume` semantics) — `lib/ui/player/player_video_controls.dart:217`
+
+### Window Mode Flow
+
+1. UI calls `windowService.setMode(WindowMode.fullscreen)` or `syncFullscreenState(bool)` (`lib/ui/player/player_screen.dart:155`)
+2. `WindowModeCoordinator.setMode(target)` serializes via `_operation` chain, commits `_state.mode.value` (`lib/kernel/window_Bridge/window_service_state.dart:177`)
+3. Fullscreen: media_kit Video route push/pop handled by `PlayerVideoControls._toggleFullscreen` calling `widget.video.toggleFullscreen()` (VideoState) — `lib/ui/player/player_video_controls.dart:398`
+4. `WindowPersistenceCoordinator.save()` skips fullscreen snapshots, persists windowed/maximized geometry to SharedPreferences (`lib/kernel/window_Bridge/window_service_state.dart:272`)
 
 ## Key Abstractions
 
-**EngineState (mixin):**
-- Purpose: Abstract playback interface decoupled from fvp/MDK implementation
-- Examples: `lib/kernel/engine/engine_state.dart`, `lib/kernel/engine/fvp_engine.dart`
-- Pattern: Mixin with ValueNotifier fields + abstract method signatures
+**MediaEngine (ISP composite interface):**
+- Purpose: unified dependency type for service layer — aggregates 1 read-only + 6 control facets
+- Examples: `lib/kernel/engine/media_engine.dart`, 7 facet files in `lib/kernel/engine/`
+- Pattern: Interface Segregation Principle — `MediaEngine implements EngineStateView, PlaybackControl, TrackControl, SubtitleConfig, VideoEffectControl, RendererControl, VolumeControl`
 
-**WindowBridge (abstract class):**
-- Purpose: Abstract window management interface for testability
-- Examples: `lib/kernel/bridge/window_bridge.dart`, `lib/kernel/bridge/window_service.dart`
-- Pattern: Interface with 4 state notifiers + 7 command methods
+**WindowBridge (abstract interface):**
+- Purpose: window management abstraction hiding platform window library
+- Examples: `lib/kernel/window_Bridge/window_bridge.dart`
+- Pattern: Interface + concrete `WindowService implements WindowBridge with WindowListener`; coordinators decompose mode/resize/persistence
 
-**FullscreenDriver (abstract class):**
-- Purpose: Platform-specific fullscreen operations behind a common interface
-- Examples: `lib/kernel/bridge/fullscreen_driver.dart`, `lib/kernel/bridge/platform/windows_fullscreen_driver.dart`
-- Pattern: Abstract with optional fast-path methods and capability queries
+**OpenResult (sealed class):**
+- Purpose: typed open outcome — success/error/superseded; callers use exhaustive switch
+- Examples: `lib/kernel/engine/open_result.dart`
+- Pattern: Sealed result type (Dart 3) — controller dispatches side effects only on `OpenSuccess`
 
-**PlaybackContract (abstract interface):**
-- Purpose: Dependency Inversion for playback sub-modules
-- Examples: `lib/features/player/services/playback_contract.dart`
-- Pattern: Interface consumed by Navigator/FileOperations/StateMonitor, implemented by PlaybackController
+**PlayerActions (callback bundle):**
+- Purpose: stable, cached action closure set injected into controls builder
+- Examples: `lib/ui/player/player_actions.dart`
+- Pattern: Plain data class holding `VoidCallback`/typed callbacks; constructed once in `PlayerScreen.initState` to protect Video subtree identity
 
-**PlaybackController (facade):**
-- Purpose: Unified entry point combining navigator + fileOps + monitor sub-modules
-- Examples: `lib/features/player/services/playback_controller.dart`
-- Pattern: Facade + Composition (creates sub-modules in constructor, delegates all calls)
+**ControlBarViewModel (read-only data binding):**
+- Purpose: decouple ControlBar from MediaEngine — pass notifiers + callbacks, not engine
+- Examples: `lib/ui/player/control_bar_view_model.dart`
+- Pattern: Value-object holding `ValueListenable` references + callback closures
 
-**VideoProcessingState (immutable data):**
-- Purpose: Video processing settings with copyWith for immutable updates
-- Examples: `lib/features/player/models/video_processing_state.dart`
-- Pattern: Immutable value object with diff-based engine sync
-
-**StartupState (immutable data):**
-- Purpose: Startup progress tracking with phase enum
-- Examples: `lib/kernel/startup/startup_state.dart`
-- Pattern: @immutable class with copyWith + equality
+**PlayerPort / VideoControlsPort (test ports):**
+- Purpose: abstract media_kit `Player` and `VideoState` behind interfaces for headless widget tests
+- Examples: `lib/ui/player/media_kit_player_port.dart`, `lib/ui/player/player_video_controls.dart:29-82`
+- Pattern: Hexagonal port/adapter — `MediaKitVideoControlsPort` adapts `VideoState`; fakes inject in tests to avoid libmpv FFI
 
 ## Entry Points
 
-**main():**
-- Location: `lib/main.dart`
-- Triggers: App launch
-- Responsibilities: Flutter binding, log init, memory monitor, SharedPreferences prewarm, fullscreen driver factory, WindowService init, engine prewarm, runApp
+**`main()` (Dart entry):**
+- Location: `lib/main.dart:13`
+- Triggers: app launch
+- Responsibilities: ensureInitialized (MediaKit, windowManager, KernelLogger), construct WindowService + StartupCoordinator, runApp(App)
 
-**App (StatefulWidget):**
-- Location: `lib/app.dart`
-- Triggers: Created by main()
-- Responsibilities: MaterialApp shell, theme/locale init, settings panel dialog, quick menu
+**`App` widget:**
+- Location: `lib/app.dart:11`
+- Triggers: runApp
+- Responsibilities: MaterialApp shell, fixed dark theme, zh locale, splash → DeferredPlayerFeature
 
-**DeferredPlayerFeature (StatefulWidget):**
-- Location: `lib/features/player/deferred_player_feature.dart`
-- Triggers: Created by App.build()
-- Responsibilities: Lazy-load PlayerFeature module via deferred import
-
-**PlayerFeature (StatefulWidget):**
-- Location: `lib/features/player/player_feature.dart`
-- Triggers: Created by DeferredPlayerFeature after loadLibrary()
-- Responsibilities: Create PlayerServices, manage UI state (ready/error/drag), compose PlayerScreen
-
-**PlayerScreen (StatefulWidget):**
-- Location: `lib/ui/player/player_screen.dart`
-- Triggers: Created by PlayerFeature._buildPlayerScreen()
-- Responsibilities: Compose all UI: CustomTitleBar + VideoSurface + ControlsOverlay + PlaylistPanel + KeyboardHandler
+**`WindowService.onWindowClose()` (native callback):**
+- Location: `lib/kernel/window_Bridge/window_manager_service.dart:254`
+- Triggers: native window close button
+- Responsibilities: persist window state, then destroy native window
 
 ## Architectural Constraints
 
-- **Threading:** Single-threaded Dart UI isolate. All engine callbacks dispatched to main isolate via `SchedulerBinding.instance.addPostFrameCallback`. FFI calls (Win32) are synchronous on UI thread (fast path).
-- **Global state:** `OsdService.I` is a singleton (global OSD). `SettingsStore._instance` is a static prewarmed instance. `ThumbnailService._instance` is a static singleton with LRU cache. `StartupCoordinator` is instance-scoped but passed through widget tree.
-- **Deferred loading:** `PlayerFeature` uses `deferred as` to avoid eagerly importing fvp/MDK types. This means `PlayerFeature` cannot be referenced by type outside its module boundary.
-- **Platform branching:** `DesktopFullscreenDriverFactory` uses `Platform.isXXX` at runtime + `bool.fromEnvironment` at compile time for Windows driver selection. macOS/Linux always use their platform drivers.
-- **No DI framework:** All dependency injection is manual via constructor injection. `PlayerServices` acts as the composition root for player-related services.
-- **State machine guards:** `MediaStateTransition` extension enforces valid state transitions. Invalid transitions are logged in debug mode, silently ignored in release.
+- **Threading:** Single-threaded Dart event loop. All ValueNotifier updates from `Player.stream` listeners run on UI isolate. `WindowService._updateOnUIThread` schedules mutations via `SchedulerBinding` when not in idle/post-frame phase (`lib/kernel/window_Bridge/window_manager_service.dart:194`).
+- **Global state:** `KernelLoggerImpl._instance` (nullable singleton via `I` accessor, `lib/kernel/diagnostics/kernel_logger.dart:495`); `MemoryMonitor` static instance (`lib/kernel/diagnostics/memory_monitor.dart`); `windowManager` (package-level global).
+- **Circular imports:** `EngineStateMachine ↔ MediaKitEngine` circular dependency broken by injecting `onPlay`/`onPause` callbacks after construction (`lib/kernel/engine/engine_state_machine.dart:32`, `lib/kernel/engine/media_kit_engine.dart:50`).
+- **Identity preservation (Blocking Constraint #6):** UI ValueListenableBuilder listens to engine's own notifier instances. Wrapping in new notifiers breaks listener attach. `state`/`isSeeking`/`isBuffering` forward from `EngineStateMachine`; `textureId` forwards from `VideoController.id` (`lib/kernel/engine/media_kit_engine.dart:101-123`).
+- **Deferred loading:** `player_feature.dart` imported as `deferred as` — MediaKitEngine and heavy types excluded from startup module (`lib/features/player/deferred_player_feature.dart:22`).
+- **Borrowed dependency:** `PlayerServices` does NOT dispose `WindowBridge` (borrowed from composition root); only disposes services it created (`lib/kernel/player_services.dart:192`).
+- **media_kit immutability:** Never modify media_kit base capabilities. Playback issues handled in project wrapper/UI/tests only (per MEMORY: project_media_kit_immutable).
+- **Single-file player (v1.8):** No playlist queue/history/breakpoints/play-modes. `PlaybackController` is a single-file facade; `Playlist`/`PlayMode` legacy code retained but not wired (`lib/kernel/player_services.dart:21`).
 
 ## Anti-Patterns
 
-### Direct Engine Access from UI
+### Stale Async Callback Pollution
 
-**What happens:** Some UI widgets directly read `engine.position.value`, `engine.state.value`, etc.
-**Why it's wrong:** Creates implicit coupling between UI and engine internals.
-**Do this instead:** Pass `EngineState` through widget constructor parameters (already the pattern in PlayerScreen/ControlsOverlay/VideoSurface). Do not access engine via service locator.
+**What happens:** Open/seek/stop callbacks race — old open's completion overwrites newer open's state.
+**Why it's wrong:** User sees flicker/wrong file state; subtitle detection fires for abandoned file.
+**Do this instead:** `EngineStateMachine` embeds generation counter; `transitionTo(next, caller, generation:)` rejects stale writes with `KernelLogger.warn`. `open()` calls `nextGeneration()` and checks `_isCurrentGeneration(gen)` after each await (`lib/kernel/engine/media_kit_engine.dart:180`, `lib/kernel/engine/engine_state_machine.dart:103`).
 
-### Mutable Playlist State with External Modification
+### Cross-Layer State Duplication
 
-**What happens:** `PlaybackController` and `PlayerFeature` both call `playlist.addAll()`, `playlistGeneration.value++` directly.
-**Why it's wrong:** Split mutation responsibility makes it hard to track who changed what.
-**Do this instead:** Route all playlist mutations through `PlaybackController` methods. The `PlayerFeature._buildPlayerScreen` callbacks that mutate playlist should call controller methods instead.
+**What happens:** Mirroring engine state in a widget-local flag drifts from source of truth.
+**Why it's wrong:** Double-source bugs — `isPlaying` flag desyncs from `MediaState.playing`.
+**Do this instead:** `PlayerControlsState.isPlaying` derives from `Player.stream.playing` (subscription), `isMuted` reuses `engine.isMuted` directly (`lib/ui/player/player_video_controls.dart:142`). Never duplicate.
 
-### Late Field Initialization in FvpEngine
+### Subtitle Padding Directed at Wrong VideoState
 
-**What happens:** `_callbackHandler`, `_positionPoller`, `_volumeController` are `late` fields initialized in the factory constructor.
-**Why it's wrong:** If factory constructor throws between field assignment and helper initialization, these fields are uninitialized. Accessing them throws `LateInitializationError`.
-**Do this instead:** The factory constructor pattern (already used) is the mitigation. Document that these helpers must be initialized in the factory, not in the private constructor.
+**What happens:** Old path used window-level `_videoKey.currentState` to set subtitle padding — fullscreen route has a different VideoState instance.
+**Why it's wrong:** Padding applied to wrong instance; fullscreen subtitle obscured by control bar.
+**Do this instead:** Each `PlayerVideoControls` instance monitors its own `_autoHide.visible` and calls `widget.video.setSubtitleViewPadding` (its own VideoState) (`lib/ui/player/player_video_controls.dart:407-442`).
 
 ## Error Handling
 
-**Strategy:** Defensive catch + log + graceful degradation. Never crash the app.
+**Strategy:** Structured `PlayerError` sealed hierarchy surfaced via `lastError` ValueNotifier + `state → error`; never thrown to callers.
 
 **Patterns:**
-- `SettingsStore.load()` returns safe defaults on any exception (never throws to caller)
-- `FvpEngine._guardedAction()` wraps all engine operations with disposed check + try-catch + error type classification
-- `PlaybackNavigator.playIndex()` restores old playlist index on failure
-- `StateMonitor.dispose()` uses fire-and-forget `unawaited()` with `.catchError()` for save operations
-- `WindowService._handleEnter/Leave()` returns bool success, caller rolls back on failure
-- `DesktopFullscreenDriverFactory.createWindowsNative()` falls back to `DesktopFullscreenDriver` on HWND invalid or FFI exception
+- `OpenResult` sealed class: `OpenSuccess(MediaInfo)` / `OpenError(PlayerError)` / `OpenSuperseded()` — exhaustive switch dispatch (`lib/kernel/engine/open_result.dart`)
+- `PlayerError` sealed subtypes: `FileError(FileErrorCode)`, `PlaybackError(PlaybackErrorCode)`, `UnknownError` + `ErrorContext` (action/generation/path/module/stackTrace) (`lib/kernel/models/player_error.dart`)
+- Engine methods are safe to call from any reachable state — invalid transitions are no-ops, not exceptions (`lib/kernel/engine/playback_control.dart:12`)
+- `PlaybackController.openAndPlay` catches validation failure, surfaces via `onError` callback + `validationError` notifier (`lib/kernel/services/playback_controller.dart:175`)
+- `WindowService._persistThenDestroy` isolates destroy failures from persistence state (`lib/kernel/window_Bridge/window_manager_service.dart:271`)
+- Disposal is idempotent and best-effort: `_disposeSafely` swallows per-resource errors to avoid masking the original init failure (`lib/kernel/player_services.dart:171`)
 
 ## Cross-Cutting Concerns
 
-**Logging:** `lib/kernel/utils/log.dart` provides `log.i/d/w/e` wrappers around `debugPrint`. Engine-specific: `logEngine`. Bridge-specific: `logBridge`. All logging is debug-only in release builds.
+**Logging:** `KernelLogger.I` facade, build-mode-gated. Debug → DebugPrintSink + DevToolsSink (composite); Profile → DevToolsSink only; Release → NullSink (tree-shaken). Path redaction via `redactPath()`. `KernelLoggerImpl.init()` must be called before any kernel access (`lib/kernel/diagnostics/kernel_logger.dart:510`).
 
-**Validation:** `lib/kernel/services/path_validator.dart` validates file paths against traversal attacks. `lib/kernel/persistence/settings_validator.dart` sanitizes all persisted values (volume, dimensions, coordinates, enums) with clamp/default fallback.
+**Validation:** Boundary validation at system edges. `PathValidator.validate(path)` guards open flow against path traversal (`lib/kernel/services/path_validator.dart`). `SubtitlePathValidator.isLoadableLocalFile` re-validates file immediately before native load (TOCTOU defense) (`lib/ui/player/player_screen.dart:124`). `WindowPersistence` clamps dimensions to `[minimum, 16384]` and coordinates to `[-100000, 100000]` (`lib/kernel/persistence/window_persistence.dart:45`).
 
-**Authentication:** Not applicable (desktop media player, no user auth).
+**Authentication:** Not applicable (local desktop media player, no auth).
 
-**Theming:** Single "Midnight" theme defined in `lib/ui/theme/tokens.dart`. All visual values accessed via `Tokens.*` static constants. No runtime theme switching beyond accent color (3 options: Midnight/Ocean/Forest via `ThemeService`).
+**Localization:** ARB-based (`lib/l10n/app_en.arb`, `lib/l10n/app_zh.arb`) with generated `AppLocalizations`. Default locale `zh`; `onGenerateTitle` localizes app title. `App.materialLocalizationsDelegates` wired in `lib/app.dart:55`.
 
-**Localization:** ARB-based via `lib/l10n/`. Supported locales: `en`, `zh`. `LocaleService` persists preference. `AppLocalizations.of(context)` in all UI widgets.
-
-**Performance Monitoring:** `lib/kernel/utils/perf_monitor.dart` for frame timing. `lib/kernel/utils/memory_monitor.dart` for RSS tracking. `DebugProbe` for operation timing in `PlaybackController`. `EngineMetrics` for engine health counters. `EngineEventLog` for last 100 events ring buffer.
+**Design System:** Single compile-time const theme "Midnight". All visual values via `Tokens.*` static constants in `lib/ui/theme/tokens.dart`. Glass-morphism pattern: `BackdropFilter` + `bgGlass` + `borderHighlight` via `GlassContainer` (`lib/ui/shared/glass_container.dart`). No hardcoded colors/fonts/spacing.
 
 ---
 
-*Architecture analysis: 2026-07-12*
+*Architecture analysis: 2026-08-21*
