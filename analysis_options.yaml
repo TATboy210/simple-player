@@ -9,6 +9,14 @@ analyzer:
     missing_required_param: error
     missing_return: error
     dead_code: warning
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 # Phase 21 D14: lib/kernel/ 禁止 debugPrint — 内核必须用 KernelLogger
 # Flutter analyzer 不支持目录级 lint override，使用 CI grep 闸门兜底:

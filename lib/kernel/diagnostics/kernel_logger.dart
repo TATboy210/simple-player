@@ -508,6 +508,9 @@ final class KernelLoggerImpl extends KernelLogger {
   /// Debug 双路输出，Profile 仅写 DevTools，Release 使用 [NullSink]。必须在
   /// kernel 代码访问 [I] 之前调用。
   static void init() {
+    // 启动入口和播放器服务都可能调用初始化；复用实例可避免替换已被组件持有的 logger。
+    if (_instance != null) return;
+
     final mode = kDebugMode
         ? KernelBuildMode.debug
         : kProfileMode

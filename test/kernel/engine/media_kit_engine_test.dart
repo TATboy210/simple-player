@@ -4,6 +4,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:simple_player_flutter/kernel/engine/media_kit_engine.dart';
 import 'package:simple_player_flutter/kernel/engine/models/audio_track_info.dart';
 import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.dart';
+import 'package:simple_player_flutter/kernel/engine/models/video_codec_info.dart';
 
 /// MediaKitEngine 纯逻辑单测.
 ///
@@ -132,6 +133,40 @@ void main() {
         subtitle: [SubtitleTrack.auto(), SubtitleTrack.no()],
       );
       expect(MediaKitEngine.subtitleTracksFromMediaKit(tracks), isEmpty);
+    });
+  });
+
+  group('MediaKitEngine.videoInfoFromMediaKit', () {
+    test('有有效宽高时返回 VideoCodecInfo', () {
+      expect(
+        MediaKitEngine.videoInfoFromMediaKit(
+          width: 1920,
+          height: 1080,
+          codec: 'h264',
+          par: 1.0,
+        ),
+        const VideoCodecInfo(
+          width: 1920,
+          height: 1080,
+          codec: 'h264',
+          par: 1.0,
+        ),
+      );
+    });
+
+    test('宽高缺失或非正时返回 null', () {
+      expect(
+        MediaKitEngine.videoInfoFromMediaKit(width: 0, height: 1080),
+        isNull,
+      );
+      expect(
+        MediaKitEngine.videoInfoFromMediaKit(width: 1920, height: 0),
+        isNull,
+      );
+      expect(
+        MediaKitEngine.videoInfoFromMediaKit(width: null, height: 1080),
+        isNull,
+      );
     });
   });
 }

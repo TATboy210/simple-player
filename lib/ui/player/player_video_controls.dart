@@ -382,15 +382,19 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 对齐 media_kit 原生 onTapUp 400ms 双击窗口。
   static const _clickDelayMs = 400;
 
-  /// 切换全屏 — 双击与全屏按钮共用入口.
+  /// 切换全屏 — 双击与全屏按钮共用入口。
   ///
-  /// 两步:① `actions.onToggleFullscreen` 同步 WindowService mode(守卫 + 鼠标
-  /// 隐藏联动);② `state.toggleFullscreen()` 走 media_kit 原生 route
+  /// media_kit 执行真实 route 切换，宿主只接收结果同步窗口语义。
   /// (push/pop PageRouteBuilder)。用**本实例** [widget.video] — 窗口态
   /// isFullscreen()=false→enter, 全屏态 =true→exit, 自动正确分支
   /// (修复症状④退出渲染出错,见 memory [[project_fullscreen_minimal_fix]])。
   void _toggleFullscreen() {
+    if (!mounted || _isDeactivating || !widget.video.isMounted) return;
+    // media_kit 负责真实 route 切换，宿主只在根 Video 生命周期回调中同步状态。
     widget.actions.onToggleFullscreen?.call();
+    // The host callback may synchronously pop the fullscreen route, so re-check
+    // lifecycle before touching the route-local VideoState.
+    if (!mounted || _isDeactivating || !widget.video.isMounted) return;
     widget.video.toggleFullscreen();
   }
 
@@ -445,11 +449,18 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// (全屏 route 缺这些键 — 已知限制,计划 line 85 认可)。
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (_isDeactivating || !mounted || !widget.video.isMounted) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
       // ESC:仅全屏态退出(窗口态 ESC 冒泡给 KeyboardHandler 关播放列表/设置)
       if (widget.video.isFullscreen) {
         widget.actions.onToggleFullscreen?.call();
+        // Route callbacks may deactivate this VideoState synchronously.
+        if (!mounted || _isDeactivating || !widget.video.isMounted) {
+          return KeyEventResult.handled;
+        }
         widget.video.exitFullscreen();
         return KeyEventResult.handled;
       }

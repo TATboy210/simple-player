@@ -1,6 +1,7 @@
 {
   "@@locale": "zh",
   "appTitle": "Simple Player",
+  "windowInitializationFailed": "窗口初始化失败",
   "brandName": "S I M P L E   P L A Y E R",
   "emptyStateSubtitle": "沉浸视听体验",
   "openFile": "打开文件",

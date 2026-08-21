@@ -1,6 +1,7 @@
 {
   "@@locale": "en",
   "appTitle": "Simple Player",
+  "windowInitializationFailed": "Window initialization failed",
   "@appTitle": { "description": "Application title shown in title bar and taskbar" },
 
   "brandName": "S I M P L E   P L A Y E R",

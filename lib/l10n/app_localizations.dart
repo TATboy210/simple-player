@@ -104,6 +104,12 @@ abstract class AppLocalizations {
   /// **'Simple Player'**
   String get appTitle;
 
+  /// No description provided for @windowInitializationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Window initialization failed'**
+  String get windowInitializationFailed;
+
   /// Brand name displayed on empty state screen with wide letter spacing
   ///
   /// In en, this message translates to:
