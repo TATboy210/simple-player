@@ -50,12 +50,6 @@ class FakeWindowService implements WindowBridge {
   }
 
   @override
-  void syncFullscreenState(bool isFullscreen) {
-    if (_disposed) return;
-    mode.value = isFullscreen ? WindowMode.fullscreen : WindowMode.windowed;
-  }
-
-  @override
   Future<void> setAlwaysOnTop(bool value) async {
     if (_disposed) return;
     alwaysOnTopCallCount++;
@@ -83,8 +77,6 @@ class FakeWindowService implements WindowBridge {
 
   @override
   bool get isFullscreen => mode.value == WindowMode.fullscreen;
-
-  void showAfterFirstFrame() {}
 
   @override
   void dispose() {
