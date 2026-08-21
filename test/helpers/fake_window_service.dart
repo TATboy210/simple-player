@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:simple_player_flutter/kernel/window_Bridge/window_manager_service.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_manager_service.dart';
 
 /// 测试替身 — 实现 WindowBridge 接口，无 window_manager 依赖。
 ///

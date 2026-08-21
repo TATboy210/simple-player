@@ -8,10 +8,16 @@ import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
 import 'window_bridge.dart';
 import 'window_constants.dart';
+import 'window_mode_coordinator.dart';
+import 'window_persistence_coordinator.dart';
+import 'window_resize_coordinator.dart';
 import 'window_service_state.dart';
 
 export 'window_bridge.dart';
 export 'window_constants.dart';
+export 'window_mode_coordinator.dart';
+export 'window_persistence_coordinator.dart';
+export 'window_resize_coordinator.dart';
 export 'window_service_state.dart';
 
 /// 日志门面 — WindowService 共用。

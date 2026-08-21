@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'kernel/startup/startup_coordinator.dart';
-import 'kernel/window_Bridge/window_manager_service.dart';
+import 'kernel/window_bridge/window_manager_service.dart';
 import 'features/player/deferred_player_feature.dart';
 import 'ui/shared/progress_splash_screen.dart';
 import 'ui/theme/tokens.dart';
