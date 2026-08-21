@@ -10,6 +10,17 @@ set(BINARY_NAME "simple_player_flutter")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+# media_kit_libs_windows_video currently omits PRE_BUILD/PRE_LINK/POST_BUILD
+# on two add_custom_command() calls. Keep CMake's backward-compatible behavior
+# for that third-party subdirectory instead of turning its warning into an
+# error when newer CMake versions enforce CMP0175.
+if(POLICY CMP0175)
+  cmake_policy(SET CMP0175 OLD)
+endif()
+# Pass the compatibility default into plugin subdirectories that reset their
+# policy scope while configuring generated Flutter plugin targets.
+set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)
