@@ -17,11 +17,11 @@
    - 保留 `_modeOperation` 串行链，但记录前序操作错误并保持调用者 Future 的错误语义；避免后续操作被失败链永久阻塞。
    - 初始化 Future 增加失败日志和可重试语义；`waitUntilReadyToShow` 与 `_initWindow` 的 fire-and-forget 边界统一捕获 `Exception`。
 
-2. **完成 Windows 原生边缘命中**
-   - 在 `FlutterWindow::MessageHandler()` 中对 `WM_NCHITTEST` 明确走 `Win32Window::MessageHandler()`，确保 Flutter/plugin 不会抢先消费。
-   - 保留 `WM_NCCALCSIZE` 返回 0 的白边修复；由 `WM_NCHITTEST` 根据 DPI、窗口 rect 和 `WS_THICKFRAME` 返回四边/四角 `HT*`。
-   - 最大化、最小化、fullscreen intent 或 `setResizable(false)` 时返回 `HTCLIENT`，避免全屏/非可调整状态进入原生 resize loop。
-   - 删除确认未使用的 C++ include，并为 hit-test 辅助逻辑补充可测试的纯函数或 runner 集成测试 seam。
+2. **完成 Windows 原生边缘命中**（✅ 2026-08-22 落地：`win32_window.cpp` 的 `WM_NCHITTEST` 分支 + `HitTestWindowEdge` 纯函数）
+   - ~~在 `FlutterWindow::MessageHandler()` 中对 `WM_NCHITTEST` 明确走 `Win32Window::MessageHandler()`，确保 Flutter/plugin 不会抢先消费。~~ 实际消息流已满足：window_manager 插件仅在 `!is_resizable_` 时返回 `HTNOWHERE`，可调整时放行到 `Win32Window::MessageHandler`。
+   - 保留 `WM_NCCALCSIZE` 返回 0 的白边修复；由 `WM_NCHITTEST` 根据窗口 rect 返回四边/四角 `HT*`（统一 8 物理像素，与插件 hidden 样式保留的左/右/下边框一致，补齐其未覆盖的顶部）。
+   - 最大化（`IsZoomed`，全屏同）时 `break` 走 `DefWindowProc`，避免全屏/最大化状态进入原生 resize loop。
+   - hit-test 辅助逻辑为匿名 namespace 纯函数 `HitTestWindowEdge(RECT, POINT)`，无成员状态，可直接单测。
 
 3. **接通 resize 事件与渲染降级**
    - 依赖 `window_manager` 的 `onWindowResize` 作为唯一 Dart resize 信号源；不重新引入 Flutter 边缘手势。

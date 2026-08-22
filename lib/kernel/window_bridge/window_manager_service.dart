@@ -160,7 +160,8 @@ class WindowService with WindowListener implements WindowBridge {
 
   Future<void> _initWindow() async {
     // 保持 hidden title bar 配置，不再切换 frameless 样式；Windows runner
-    // 通过 WM_NCHITTEST 返回原生 HT* 命中结果，继续交给系统 resize loop。
+    // 在 WM_NCHITTEST 中统一四边 8px 判定区（含插件未覆盖的顶部），
+    // 命中 HT* 后交给系统原生 resize loop。
     if (_disposed) return;
     // Restore only validated geometry; corrupt preferences fall back to 1280×752.
     final persisted = await _persistence.load();
