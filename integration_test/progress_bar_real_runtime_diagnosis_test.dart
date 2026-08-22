@@ -28,6 +28,13 @@ final class _P39Trace {
     final detailText = detail == null ? '' : ' $detail';
     debugPrint('[P39] #$_sequence $layer $status$valueText$detailText');
   }
+
+  /// Emits the retained post-repair proof separately from the original trace.
+  void postRepair(String layer, String status, {int? value, String? detail}) {
+    final valueText = value == null ? '' : ' value=$value';
+    final detailText = detail == null ? '' : ' $detail';
+    debugPrint('[P39][post-repair] $layer $status$valueText$detailText');
+  }
 }
 
 /// Creates the intended direct handoff used to prove the downstream widgets.
@@ -262,15 +269,17 @@ void main() {
       );
       expect(rawPositionObserved, isTrue, reason: 'raw position stream did not emit');
 
+      final strictMode = Platform.environment['P39_POST_REPAIR'] == 'true';
       final boundary = switch ((portDurationMs > 0, state.durationMs.value > 0,
-          productionTimelinePresent)) {
-        (false, _, _) =>
+          productionTimelinePresent, strictMode)) {
+        (false, _, _, _) =>
           'lib/ui/player/media_kit_player_port.dart:MediaKitPlayerPort.duration',
-        (true, false, _) =>
+        (true, false, _, _) =>
           'lib/ui/player/player_video_controls.dart:PlayerControlsState.init',
-        (true, true, false) =>
+        (true, true, false, _) =>
           'lib/ui/player/control_bar_layout.dart:ControlBarLayout._buildLayout',
-        (true, true, true) =>
+        (true, true, true, true) => 'none-post-repair',
+        (true, true, true, false) =>
           'lib/ui/player/progress_bar.dart:_ProgressBarState.build',
       };
       trace.log('diagnosis.firstBrokenBoundary=$boundary', 'observed');
@@ -280,13 +289,57 @@ void main() {
         portPositionObserved ? 'observed' : 'missing-after-deadline',
       );
 
-      final strictMode = Platform.environment['P39_POST_REPAIR'] == 'true';
       if (strictMode) {
-        expect(
-          productionTimelinePresent,
-          isTrue,
-          reason: 'post-repair mode requires the production ControlBar timeline',
+        trace.postRepair('Post-repair verification', 'started');
+        trace.postRepair(
+          'raw.player.stream.duration',
+          rawDurationMs > 0 ? 'observed' : 'missing',
+          value: rawDurationMs,
         );
+        trace.postRepair(
+          'port.stream.duration',
+          portDurationMs > 0 ? 'observed' : 'missing',
+          value: portDurationMs,
+        );
+        trace.postRepair(
+          'state.durationMs',
+          state.durationMs.value > 0 ? 'observed' : 'missing',
+          value: state.durationMs.value,
+        );
+        trace.postRepair(
+          'widget.durationMs',
+          widgetDuration > 0 ? 'observed' : 'missing',
+          value: widgetDuration,
+        );
+        trace.postRepair(
+          'raw.player.stream.position',
+          rawPositionObserved ? 'observed' : 'missing',
+        );
+        trace.postRepair(
+          'port.stream.position',
+          portPositionObserved ? 'observed' : 'missing',
+        );
+        trace.postRepair(
+          'state.positionMs',
+          state.positionMs.value > 0 ? 'observed' : 'missing',
+          value: state.positionMs.value,
+        );
+        trace.postRepair(
+          'widget.positionMs',
+          widgetPosition > 0 ? 'observed' : 'missing',
+          value: widgetPosition,
+        );
+        expect(rawDurationMs, greaterThan(0));
+        expect(portDurationMs, greaterThan(0));
+        expect(state.durationMs.value, greaterThan(0));
+        expect(widgetDuration, greaterThan(0));
+        expect(productionTimelinePresent, isTrue);
+        expect(semantics.evaluate(), isNotEmpty);
+        expect(rawPositionObserved, isTrue);
+        expect(portPositionObserved, isTrue);
+        expect(state.positionMs.value, greaterThan(0));
+        expect(widgetPosition, greaterThan(0));
+        trace.postRepair('postRepair.positionAdvanced=true', 'observed');
       }
     } finally {
       for (final listener in diagnosticListeners) {
@@ -298,6 +351,9 @@ void main() {
       controlsState?.dispose();
       engine.dispose();
       await player.dispose();
+      if (Platform.environment['P39_POST_REPAIR'] == 'true') {
+        trace.postRepair('postRepair.playerDisposed=true', 'observed');
+      }
     }
   });
 }
