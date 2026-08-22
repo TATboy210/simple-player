@@ -1,6 +1,7 @@
 ﻿#include "win32_window.h"
 
 #include <flutter_windows.h>
+#include <windowsx.h>
 
 #include "resource.h"
 
@@ -31,6 +32,46 @@ namespace
       enable_non_client_dpi_scaling(hwnd);
     }
     FreeLibrary(user32_module);
+  }
+
+  // 统一的四边原生 resize 判定区宽度（物理像素）。
+  //
+  // window_manager hidden 样式在 WM_NCCALCSIZE 中为左/右/下各保留 8px
+  // 非客户区边框（DefWindowProc 据此命中 HTLEFT/HTRIGHT/HTBOTTOM），
+  // 但 Win11 上顶部不保留边框，导致自绘标题栏上缘无法缩放窗口。
+  // 这里按同样的 8px 补齐顶部，使四边判定区一致。不按 DPI 缩放——
+  // 插件保留的边框本身就是 8 物理像素。
+  constexpr int kResizeBorderWidth = 8;
+
+  // 根据屏幕坐标点相对窗口 rect 的位置计算 HT* 命中结果。
+  //
+  // 纯函数（无成员状态），便于独立测试；非边缘区域返回 HTCLIENT，
+  // 由调用方继续走 DefWindowProc（鼠标事件进入 Flutter 客户区）。
+  int HitTestWindowEdge(RECT window_rect, POINT pt)
+  {
+    const bool near_left = pt.x - window_rect.left < kResizeBorderWidth;
+    const bool near_top = pt.y - window_rect.top < kResizeBorderWidth;
+    const bool near_right = window_rect.right - pt.x <= kResizeBorderWidth;
+    const bool near_bottom = window_rect.bottom - pt.y <= kResizeBorderWidth;
+
+    // 角落优先：角落区同时命中两条边，返回双向 resize 结果
+    if (near_top && near_left)
+      return HTTOPLEFT;
+    if (near_top && near_right)
+      return HTTOPRIGHT;
+    if (near_bottom && near_left)
+      return HTBOTTOMLEFT;
+    if (near_bottom && near_right)
+      return HTBOTTOMRIGHT;
+    if (near_top)
+      return HTTOP;
+    if (near_bottom)
+      return HTBOTTOM;
+    if (near_left)
+      return HTLEFT;
+    if (near_right)
+      return HTRIGHT;
+    return HTCLIENT;
   }
 
 } // namespace
@@ -207,6 +248,26 @@ Win32Window::MessageHandler(HWND hwnd,
   // background flash while the fullscreen route changes window bounds.
   case WM_ERASEBKGND:
     return 1;
+
+  // 统一四边 resize 判定区。window_manager hidden 样式只在左/右/下保留
+  // 8px 非客户区边框（DefWindowProc 只对这些区域返回 HT*），顶部没有；
+  // 这里补齐顶部，使自绘标题栏上缘与左右下方一致支持原生 resize loop。
+  case WM_NCHITTEST:
+  {
+    // 最大化/全屏时不进入 resize：边缘“缩放”与 Snap/Aero 语义冲突，
+    // 且全屏视频时边缘误触发 resize 光标会破坏沉浸模式。
+    if (IsZoomed(hwnd))
+      break;
+    POINT pt{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+    RECT rect;
+    GetWindowRect(hwnd, &rect);
+    const int hit = HitTestWindowEdge(rect, pt);
+    if (hit != HTCLIENT)
+      return hit;
+    // 客户区命中交给 DefWindowProc：顶部 32px 标题栏的非边缘部分继续
+    // 由 Flutter 层 startDragging() 拖动移动窗口。
+    break;
+  }
   }
 
   return DefWindowProc(window_handle_, message, wparam, lparam);
