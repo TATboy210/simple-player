@@ -104,9 +104,9 @@ void main() {
       );
       await tester.pump();
 
-      // Painting keeps one old-source listener, but seek-hold must migrate its
-      // extra listener to the replacement rather than retaining both sources.
-      expect(oldPosition.listenerCount, 1);
+      // Replacing merged listeners must detach the old port entirely while
+      // the active source owns both painting and the seek-hold listener.
+      expect(oldPosition.listenerCount, 0);
       expect(newPosition.listenerCount, 2);
 
       // The stale source reaches the target first. It must not clear the current hold.
