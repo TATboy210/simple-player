@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import 'control_bar_actions.dart';
+import 'control_bar_timeline.dart';
 import 'control_bar_title.dart';
 import 'control_bar_view_model.dart';
 import 'control_bar_layout_mode.dart';
@@ -87,7 +88,18 @@ class ControlBarLayout extends StatelessWidget {
             child: title,
           ),
         ),
-        const Flexible(fit: FlexFit.tight, child: SizedBox()),
+        // Keep the timeline in the production content tree so the stable
+        // ViewModel listenables can drive the same ProgressBar instance.
+        Flexible(
+          fit: FlexFit.tight,
+          child: ControlBarTimeline(
+            vm: vm,
+            resizing: resizing,
+            onSeekStart: onSeekStart,
+            onSeekEnd: onSeekEnd,
+            minimal: mode.isMinimal,
+          ),
+        ),
         Flexible(
           fit: mode.isMinimal ? FlexFit.loose : FlexFit.tight,
           child: SizedBox(
