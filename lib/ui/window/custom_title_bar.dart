@@ -54,7 +54,11 @@ class _TitleBarContent extends StatelessWidget {
         final showPin = constraints.maxWidth >= Tokens.titleBarButtonWidth * 4;
         return Row(
           children: [
-            const Expanded(child: _TitleBarTitle()),
+            Expanded(
+              // 仅标题/空白 Expanded 区域响应 pan 拖动与双击最大化；
+              // 右侧按钮组独立持有点击，不进入拖拽手势竞争。
+              child: _TitleBarDragArea(windowService: windowService),
+            ),
             _TitleBarWindowControls(
               windowService: windowService,
               showPin: showPin,
@@ -80,6 +84,9 @@ class _TitleBarAnimatedShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 手势不放在整行壳层：translucent GestureDetector 会先于子树命中，
+    // 右侧按钮的点击会被 pan 竞争劫持。这里只负责全屏透明度/透传，
+    // 拖动与双击最大化由 [_TitleBarDragArea]（标题 Expanded 区域）持有。
     return _WindowServiceScope(
       service: windowService,
       child: AnimatedOpacity(
@@ -88,23 +95,7 @@ class _TitleBarAnimatedShell extends StatelessWidget {
         curve: Curves.easeInOut,
         child: IgnorePointer(
           ignoring: isFullscreen,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onPanStart: (_) => unawaited(windowService.startDragging()),
-            onDoubleTap: () {
-              final mode = windowService.mode.value;
-              unawaited(
-                windowService.setMode(
-                  mode.isMaximized ? WindowMode.windowed : WindowMode.maximized,
-                ),
-              );
-            },
-            child: Container(
-              height: Tokens.titleBarHeight,
-              color: Colors.transparent,
-              child: child,
-            ),
-          ),
+          child: SizedBox(height: Tokens.titleBarHeight, child: child),
         ),
       ),
     );
@@ -120,6 +111,35 @@ class _WindowServiceScope extends InheritedWidget {
   @override
   bool updateShouldNotify(_WindowServiceScope oldWidget) =>
       oldWidget.service != service;
+}
+
+/// 标题栏可拖区 — 标题与左侧空白，负责窗口移动与双击最大化。
+///
+/// 手势仅挂在此区域（非整行）：`onPanStart` 直接调
+/// `WindowBridge.startDragging()`（底层为 window_manager 的
+/// `startDragging`，Windows 上进入原生 SC_MOVE 拖动循环），
+/// 双击切换最大化/还原。命中行为用 `opaque`，避免与下层视频区竞争。
+class _TitleBarDragArea extends StatelessWidget {
+  final WindowBridge windowService;
+
+  const _TitleBarDragArea({required this.windowService});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (_) => unawaited(windowService.startDragging()),
+      onDoubleTap: () {
+        final mode = windowService.mode.value;
+        unawaited(
+          windowService.setMode(
+            mode.isMaximized ? WindowMode.windowed : WindowMode.maximized,
+          ),
+        );
+      },
+      child: const _TitleBarTitle(),
+    );
+  }
 }
 
 class _TitleBarTitle extends StatelessWidget {
