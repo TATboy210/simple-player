@@ -160,6 +160,35 @@ void main() {
 
     // ── Hover interaction tests ──
 
+    testWidgets('hover preview updates text and geometry across the bar', (
+      tester,
+    ) async {
+      engine.duration.value = 60000;
+      await tester.pumpWidget(buildSubject());
+      final rect = tester.getRect(find.byType(ProgressBar));
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+
+      final quarter = rect.centerLeft + Offset(rect.width * 0.25, 0);
+      await mouse.addPointer(location: quarter);
+      await mouse.moveBy(const Offset(1, 0));
+      await tester.pump();
+      final firstText = tester.widget<Text>(find.textContaining('0:').last).data;
+      final firstLeft = tester.widget<Positioned>(find.byType(Positioned).last).left;
+
+      await mouse.moveTo(Offset(rect.left + rect.width * 0.75, rect.center.dy));
+      await tester.pump();
+      final secondText = tester.widget<Text>(find.textContaining('0:').last).data;
+      final secondLeft = tester.widget<Positioned>(find.byType(Positioned).last).left;
+
+      expect(firstText, '00:15');
+      expect(secondText, '00:45');
+      expect(secondLeft, greaterThan(firstLeft ?? 0));
+
+      await mouse.moveTo(rect.topLeft - const Offset(20, 20));
+      await tester.pump();
+      expect(find.text('00:45'), findsNothing);
+    });
+
     testWidgets('hover shows tooltip with time', (tester) async {
       engine.duration.value = 60000;
       await tester.pumpWidget(buildSubject());
