@@ -1,55 +1,48 @@
-# Requirements: v1.8 播放器 Widget 稳定性与 PC Resize 流畅度
+# Requirements: v1.9 控制栏进度条修复与精简
 
-**Defined:** 2026-08-11
-**Core Value:** 保持播放器功能/交互不变，降低 PC 窗口频繁变换时的 widget rebuild、布局和渲染卡顿。
+**Defined:** 2026-08-22
+**Core Value:** 加载视频后进度条正常显示、可交互、悬停有时间预览，同时降低进度条/Tooltip 相关代码的监听与 rebuild 占用。
 
-## BASE — Widget Tree 基线与恢复（Phase 35）
+## PROG — 进度条三症状修复
 
-- [ ] **BASE-01**：从本地 Git 比较 `e0083842`、`f590cce2`、`6e0edbb8` 及父提交，形成按文件的 widget tree 基线；不整体覆盖当前工作树。
-- [ ] **BASE-02**：确认 `PlayerScreen → Video.controls → PlayerVideoControls → ControlBar` 主路径存在，旧 `ControlsOverlay` 和旧 fullscreen plugin 不重新接入。
-- [ ] **BASE-03**：播放/暂停、seek、音量、倍速、字幕、全屏、ESC、空状态、错误传播、拖放、键盘快捷键和窗口按钮的现有行为测试保持通过。
-- [ ] **BASE-04**：验证 `GlassButton` callback 在 widget 更新后仍指向最新回调；修复 action cache 旧闭包风险（若可复现）。
-- [ ] **BASE-05**：验证 PlayerVideoControls source replacement、reparent、activate/deactivate、dispose、subtitle padding 和旧 source 隔离。
+- [ ] **PROG-01**：加载视频后进度条正常显示，反映真实播放进度（duration/position 数据链修复）。
+- [ ] **PROG-02**：进度条可交互——点击/拖拽 seek 正常，拖拽期间 thumb 跟手且不回跳。
+- [ ] **PROG-03**：鼠标悬停进度条时时间预览气泡正常显示并跟随指针。
 
-## REBUILD — 中等颗粒度重建边界（Phase 36）
+## REFACTOR — 局部重构减占用
 
-- [ ] **REBUILD-01**：标题、idle、播放状态、音量、进度和 resize 状态分别在最小必要子树监听，不因单一状态变化重建整条 ControlBar。
-- [ ] **REBUILD-02**：保留并验证 `ControlBarTitle.titleListenable`、`CenterGroup.isIdleListenable` 等局部监听链，静态构造参数保持兼容。
-- [ ] **REBUILD-03**：PlayerScreen 标题栏和视频 surface 的 widget identity 在普通 build、窗口模式变化和 resize session 中保持稳定；WindowBridge 替换时绑定新 service。
-- [ ] **REBUILD-04**：所有新增监听、合并监听器和 timer 具备对称解绑/dispose 行为，不监听旧 notifier 或旧 player。
-- [ ] **REBUILD-05**：组件职责保持中等颗粒度；避免恢复旧大 overlay 或产生超过项目文件/函数大小约束的新单体。
+- [ ] **REFACTOR-01**：梳理 `PlayerControlsState → ControlBarViewModel → ProgressBar` 数据链，消除冗余监听/无效 rebuild，保持 v1.8 已建立的局部重建边界。
+- [ ] **REFACTOR-02**：Tooltip 双轨（AppTooltip 统一提示 + ProgressBar 自绘气泡）职责边界清晰，无重复实现。
 
-## RENDER — 渲染、玻璃与纹理 resize（Phase 37）
+## VERIFY — 验证
 
-- [ ] **RENDER-01**：CustomTitleBar 在有限、窄窗口和测试装配约束下无 RenderFlex assertion，按钮顺序、命中区域和拖拽行为不变。
-- [ ] **RENDER-02**：玻璃层、BackdropFilter、RepaintBoundary 和装饰绘制边界经过 profile 验证；不叠加无必要 blur/readback。
-- [ ] **RENDER-03**：视频 surface/texture 在连续 resize session 中不因无关 widget rebuild 被重新挂载；resize 期间控制栏可见性语义保持一致。
-- [ ] **RENDER-04**：进度条、背景 painter、控制栏动画等高频更新优先走 repaint/listenable 边界，避免重建不相关 tooltip、标题或按钮。
-- [ ] **RENDER-05**：Windows 频繁最大化、还原、拖拽和 resize 场景记录 frame timing、jank 峰值和纹理变化；不引入新的明显峰值。
+- [ ] **VERIFY-01**：`flutter analyze` 零 error；相关现有测试通过（headless mdk.dll 既有失败单独鉴别）。
+- [ ] **VERIFY-02**：实机验证三症状消失（用户手动 `flutter run -d windows` smoke）。
 
-## VERIFY — 回归与性能证据（Phase 38）
+## Constraints
 
-- [ ] **VERIFY-01**：`flutter analyze` 无问题，相关播放器 widget/integration 测试通过，`git diff --check` 通过。
-- [ ] **VERIFY-02**：关键播放流程和交互行为回归覆盖达到项目目标，headless `mdk.dll` 既有失败与本次回归明确区分。
-- [ ] **VERIFY-03**：Windows profile 证据包含 resize 帧耗时、jank 峰值、控制栏/视频 surface 稳定性和内存趋势。
-- [ ] **VERIFY-04**：flutter-code-reviewer、dart-testing、flutter-integration-validator 对最终改动检查无 Critical/High 问题。
-- [ ] **VERIFY-05**：未追踪截图用途已确认；未经明确授权不删除、不提交；`.planning/STATE.md` 与新里程碑状态同步。
+- **media_kit 不可修改（红线）**：所有修复/重构只允许动项目封装层（`media_kit_player_port.dart`、`PlayerControlsState`、`ProgressBar` 等项目文件）。诊断时必须考虑 media_kit 链路特性（`Video.controls` builder、`VideoState` 生命周期、`player.stream` 事件时序），但绝不修改 media_kit 包本身。
 
 ## Out of Scope
 
 | Feature | Reason |
 |---|---|
-| media_kit/libmpv 底层修改 | 本里程碑只调整项目封装、widget 和测试层 |
-| ControlsOverlay 恢复 | 已由 PlayerVideoControls 取代，会造成双控制树和状态竞争 |
-| 新状态管理框架 | 当前 ValueNotifier 架构足够且需降低迁移风险 |
-| 播放功能改版 | 目标是稳定性和流畅度，不改变用户操作契约 |
-| 未经确认的截图清理 | 文件用途尚未确认 |
+| media_kit/libmpv 包内任何修改 | 底线红线，只动项目封装层 |
+| ControlsOverlay 恢复 | 已被 PlayerVideoControls 取代，会造成双控制树和状态竞争 |
+| 全屏/标题栏/音量等其他控制栏问题 | 不在本里程碑范围，发现另开 |
 
 ## Traceability
 
-| Requirement group | Phase | Status |
-|---|---:|---|
-| BASE-01..05 | 35 | Pending |
-| REBUILD-01..05 | 36 | Pending |
-| RENDER-01..05 | 37 | Pending |
-| VERIFY-01..05 | 38 | Pending |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PROG-01 | 39 | Pending |
+| PROG-02 | 39 | Pending |
+| PROG-03 | 39 | Pending |
+| REFACTOR-01 | 40 | Pending |
+| REFACTOR-02 | 40 | Pending |
+| VERIFY-01 | 41 | Pending |
+| VERIFY-02 | 41 | Pending |
+
+---
+*Requirements defined: 2026-08-22*
+*Last updated: 2026-08-22 after milestone v1.9 definition*
