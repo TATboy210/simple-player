@@ -34,14 +34,16 @@ namespace
     FreeLibrary(user32_module);
   }
 
-  // 统一的四边原生 resize 判定区宽度（物理像素）。
+  // 四边原生 resize 判定区宽度（物理像素）。
   //
   // window_manager hidden 样式在 WM_NCCALCSIZE 中为左/右/下各保留 8px
   // 非客户区边框（DefWindowProc 据此命中 HTLEFT/HTRIGHT/HTBOTTOM），
   // 但 Win11 上顶部不保留边框，导致自绘标题栏上缘无法缩放窗口。
-  // 这里按同样的 8px 补齐顶部，使四边判定区一致。不按 DPI 缩放——
-  // 插件保留的边框本身就是 8 物理像素。
+  // 这里补齐顶部并加宽至 12px（8px 过窄、鼠标难以命中），其余三边维持
+  // 8px 与插件保留的边框一致。不按 DPI 缩放——插件保留的边框本身就是
+  // 8 物理像素。
   constexpr int kResizeBorderWidth = 8;
+  constexpr int kTopResizeBorderWidth = 12;
 
   // 根据屏幕坐标点相对窗口 rect 的位置计算 HT* 命中结果。
   //
@@ -50,7 +52,7 @@ namespace
   int HitTestWindowEdge(RECT window_rect, POINT pt)
   {
     const bool near_left = pt.x - window_rect.left < kResizeBorderWidth;
-    const bool near_top = pt.y - window_rect.top < kResizeBorderWidth;
+    const bool near_top = pt.y - window_rect.top < kTopResizeBorderWidth;
     const bool near_right = window_rect.right - pt.x <= kResizeBorderWidth;
     const bool near_bottom = window_rect.bottom - pt.y <= kResizeBorderWidth;
 
@@ -249,9 +251,10 @@ Win32Window::MessageHandler(HWND hwnd,
   case WM_ERASEBKGND:
     return 1;
 
-  // 统一四边 resize 判定区。window_manager hidden 样式只在左/右/下保留
+  // 补齐顶部 resize 判定区。window_manager hidden 样式只在左/右/下保留
   // 8px 非客户区边框（DefWindowProc 只对这些区域返回 HT*），顶部没有；
-  // 这里补齐顶部，使自绘标题栏上缘与左右下方一致支持原生 resize loop。
+  // 这里补上顶部（加宽至 12px 便于命中），使自绘标题栏上缘与左右下方
+  // 一样支持原生 resize loop。
   case WM_NCHITTEST:
   {
     // 最大化/全屏时不进入 resize：边缘“缩放”与 Snap/Aero 语义冲突，
