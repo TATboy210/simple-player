@@ -4,13 +4,17 @@
 
 Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放器。当前里程碑聚焦播放器 UI widget tree：在保持播放功能、视觉状态和交互契约不变的前提下，降低无效 rebuild、布局抖动和窗口频繁变换时的渲染卡顿。
 
-## Current Milestone
+## Current Milestone: v1.9 控制栏进度条修复与精简
 
-**名称：** v1.8 播放器 Widget 重构与 PC Resize 流畅度
+**Goal:** 修复加载视频后控制栏进度条不显示、无法交互、鼠标悬停无 Tooltip 的三症状，同时局部重构进度条/Tooltip 相关代码减少占用。
 
-**目标：** 先从本地 Git 历史确认最近完整 widget tree，按组件恢复缺失的功能/交互契约；随后以中等颗粒度拆分 rebuild、layout、paint 和 resize 边界，使 PC 窗口频繁最大化、还原、拖拽和尺寸变化时视频纹理、控制栏、标题栏及玻璃层保持稳定。
+**Target features:**
+- 加载视频后进度条正常显示并反映播放进度
+- 进度条可正常交互（拖拽/点击 seek）
+- 鼠标悬停进度条时 Tooltip（时间预览）正常显示
+- 进度条/Tooltip 相关代码局部重构，降低 rebuild/监听占用
 
-**恢复决策：** 不整体 checkout 历史 tree，不恢复已删除的 `ControlsOverlay`。`e0083842` 建立的 `Video.controls → PlayerVideoControls` 和 `f590cce2` 完成的直接控制栏架构继续保留；`6e0edbb8` 的标题栏优化继续保留。只在发现具体行为回归时按文件/方法应用历史实现。
+**Key context:** v1.8 的 Phase 36 plan 36-03（ProgressBar source replacement、merged listener、timer 生命周期）未完成即切出本里程碑，三症状疑似与其未验证的 listener/生命周期改动相关。验证方式为实机验证。v1.8 未完成的 Phase 37/38 归档至 milestones/。
 
 ## Core Value
 
@@ -56,4 +60,4 @@ Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放
 - v1.8 最近播放器稳定性提交：`e0083842` 统一 controls，`f590cce2` 稳定 resize/control rendering，`6e0edbb8` 优化 CustomTitleBar 窗口模式过渡。
 
 ---
-*Last updated: 2026-08-11 — v1.8 播放器 Widget 稳定性与 PC Resize 流畅度里程碑启动*
+*Last updated: 2026-08-22 — v1.9 控制栏进度条修复与精简里程碑启动*
