@@ -24,6 +24,7 @@
 **Requirements:** PROG-01, PROG-02, PROG-03
 
 **Success criteria:**
+
 1. 有证据（日志/单测/调试输出）指出 duration/position 链路断点的确切位置（port 订阅、updateSources 时序、或 widget 装配）。
 2. 加载视频后 `durationMs` 更新为真实时长，进度条显示且随播放推进。
 3. 点击/拖拽 seek 正常，拖拽 thumb 跟手不回跳（修 C 事件驱动 v2 行为保持）。
@@ -32,12 +33,16 @@
 
 **Plans:** 预计 2 个 plan：根因诊断取证；按根因实施修复+针对性单测。
 
+- [x] 39-01-PLAN.md
+- [ ] 39-02-PLAN.md
+
 ### Phase 40: 进度条数据链局部重构
 
 **Depends on:** Phase 39
 **Requirements:** REFACTOR-01, REFACTOR-02
 
 **Success criteria:**
+
 1. `PlayerControlsState → ControlBarViewModel → ProgressBar` 各层监听职责单一，无重复 merge/嵌套 AnimatedBuilder 链。
 2. 高频 position 更新只重建进度条局部子树，不触发控制栏无关子树（延续 REBUILD 边界）。
 3. Tooltip 双轨职责在代码注释与结构上清晰：AppTooltip 管静态动作提示，ProgressBar 自绘气泡管跟随指针的实时预览。
@@ -51,6 +56,7 @@
 **Requirements:** VERIFY-01, VERIFY-02
 
 **Success criteria:**
+
 1. `flutter analyze` 零 error；相关 widget/单测通过，headless mdk.dll 既有失败单独鉴别非本次回归。
 2. `git diff` 确认无 media_kit 包内改动。
 3. 用户实机 `flutter run -d windows` smoke：三症状消失，seek/悬停/进度推进正常。
