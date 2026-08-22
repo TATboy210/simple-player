@@ -92,3 +92,27 @@ Adjacent evidence is ordered: the intended widget receives duration and exposes 
 3. Keep `lib/ui/player/control_bar_timeline.dart:ControlBarTimeline.build` forwarding `vm.duration`, `vm.position`, and `vm.onSeek` directly to `ProgressBar`.
 4. With `P39_POST_REPAIR=true`, the retained Windows integration diagnostic must require `production.timeline.insertion observed`; it must still require a non-zero `raw.player.stream.duration`, log all layers, and fail on a non-unique boundary.
 5. Re-run `test/widget/player/progress_bar_data_chain_diagnosis_test.dart` so delayed arrival, source replacement, C seek-hold, and pointer-hit evidence remain protected.
+
+## Post-repair verification
+
+Command executed from the worktree root:
+
+```text
+P39_POST_REPAIR=true D:/flutter/bin/flutter test integration_test/progress_bar_real_runtime_diagnosis_test.dart -d windows --reporter expanded
+```
+
+The repaired production shell composes the timeline and preserves the raw-to-widget duration and position chain. This trace is intentionally separate from the pre-repair evidence above.
+
+```text
+[P39][post-repair] Post-repair verification started
+[P39][post-repair] raw.player.stream.duration observed value=10026
+[P39][post-repair] port.stream.duration observed value=10026
+[P39][post-repair] state.durationMs observed value=10026
+[P39][post-repair] widget.durationMs observed value=10026
+[P39][post-repair] raw.player.stream.position observed
+[P39][post-repair] port.stream.position observed
+[P39][post-repair] state.positionMs observed value=8681
+[P39][post-repair] widget.positionMs observed value=8452
+[P39][post-repair] postRepair.positionAdvanced=true observed
+[P39][post-repair] postRepair.playerDisposed=true observed
+```

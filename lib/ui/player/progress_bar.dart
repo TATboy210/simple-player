@@ -62,11 +62,11 @@ class _ProgressBarState extends State<ProgressBar>
   double? _dragStartX;
 
   /// Tooltip 只关心位置、时长、悬停和拖拽，不关心窗口 resize。
-  late Listenable _barListenable;
+  late _MergedListenable _barListenable;
 
   /// 条形绘制额外关心高度动画和 resize，用一个 builder 合并处理，
   /// 避免“高度 AnimatedBuilder → 内层 bar AnimatedBuilder”的嵌套重建。
-  late Listenable _barPaintListenable;
+  late _MergedListenable _barPaintListenable;
   Timer? _seekThrottle;
   // 修 C (事件驱动 v2): dragEnd 后监听 position 到达目标才清 drag, 替代 v1 固定
   // 300ms 定时器. 比 media_kit_control_bar 原生内部协调更贴近 — 不依赖固定
@@ -123,21 +123,28 @@ class _ProgressBarState extends State<ProgressBar>
     _barPaintListenable = _buildBarPaintListenable();
   }
 
-  Listenable _buildBarListenable() {
-    return Listenable.merge([
-      widget.position,
-      widget.duration,
-      _dragNotifier,
-      _hoverNotifier,
-    ]);
-  }
+  _MergedListenable _buildBarListenable() => _MergedListenable([
+    widget.position,
+    widget.duration,
+    _dragNotifier,
+    _hoverNotifier,
+  ]);
 
   /// 合并条形绘制的所有高频状态，避免高度动画和条形状态各自重建一层。
-  Listenable _buildBarPaintListenable() {
+  _MergedListenable _buildBarPaintListenable() {
     final listenables = <Listenable>[_barListenable, _barHeightAnimation];
     final resizing = widget.resizing;
     if (resizing != null) listenables.add(resizing);
-    return Listenable.merge(listenables);
+    return _MergedListenable(listenables);
+  }
+
+  /// Replaces merged listeners as one owned unit, avoiding old-source leaks
+  /// when a retained [ProgressBar] receives a replacement PlayerPort.
+  void _replaceBarListenables() {
+    _barPaintListenable.dispose();
+    _barListenable.dispose();
+    _barListenable = _buildBarListenable();
+    _barPaintListenable = _buildBarPaintListenable();
   }
 
   @override
@@ -146,8 +153,12 @@ class _ProgressBarState extends State<ProgressBar>
     if (oldWidget.position != widget.position ||
         oldWidget.duration != widget.duration ||
         oldWidget.resizing != widget.resizing) {
-      _barListenable = _buildBarListenable();
-      _barPaintListenable = _buildBarPaintListenable();
+      _replaceBarListenables();
+      if (oldWidget.position != widget.position && _seekHoldListener != null) {
+        final target = _seekTargetMs;
+        _cancelSeekHoldListeners(position: oldWidget.position);
+        if (target != null) _beginSeekHold(target);
+      }
     }
   }
 
@@ -155,6 +166,8 @@ class _ProgressBarState extends State<ProgressBar>
   void dispose() {
     _seekThrottle?.cancel();
     _cancelSeekHoldListeners();
+    _barPaintListenable.dispose();
+    _barListenable.dispose();
     _dragNotifier.dispose();
     _hoverNotifier.dispose();
     _expandController.dispose();
@@ -208,12 +221,14 @@ class _ProgressBarState extends State<ProgressBar>
 
   /// 清理 seek hold 的监听 + 超时 timer, 不动 [_dragNotifier].
   /// 用于 dragStart (新 drag 覆盖前) / dispose 取消未完成 hold.
-  void _cancelSeekHoldListeners() {
+  void _cancelSeekHoldListeners({ValueListenable<int>? position}) {
     _seekHoldTimer?.cancel();
     _seekHoldTimer = null;
     final listener = _seekHoldListener;
     if (listener != null) {
-      widget.position.removeListener(listener);
+      // During source replacement, widget.position already points at the new
+      // port; use the old source explicitly to detach the existing callback.
+      (position ?? widget.position).removeListener(listener);
       _seekHoldListener = null;
     }
     _seekTargetMs = null;
@@ -258,10 +273,16 @@ class _ProgressBarState extends State<ProgressBar>
               (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
             );
           },
-          child: Semantics(
-            label: AppLocalizations.of(context).progressBar,
-            value: '${(_effectiveFraction * 100).round()}%',
-            slider: true,
+          child: AnimatedBuilder(
+            // Semantics is outside the painter, so it must listen explicitly
+            // to expose stream-driven progress instead of retaining build-time 0%.
+            animation: _barListenable,
+            builder: (context, child) => Semantics(
+              label: AppLocalizations.of(context).progressBar,
+              value: '${(_effectiveFraction * 100).round()}%',
+              slider: true,
+              child: child,
+            ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               // 修 A: 回调始终非 null,体内判断 duration — 避免 _disabled 顶层 build 快照陈旧
@@ -447,6 +468,28 @@ class _ProgressBarState extends State<ProgressBar>
         ),
       ),
     );
+  }
+}
+
+/// Owns the forwarding registrations created for a group of listenables.
+///
+/// [Listenable.merge] has no disposal API, so a retained widget state must keep
+/// explicit callbacks and remove them when its PlayerPort sources are replaced.
+class _MergedListenable extends ChangeNotifier {
+  _MergedListenable(List<Listenable> sources) : _sources = List.of(sources) {
+    for (final source in _sources) {
+      source.addListener(notifyListeners);
+    }
+  }
+
+  final List<Listenable> _sources;
+
+  @override
+  void dispose() {
+    for (final source in _sources) {
+      source.removeListener(notifyListeners);
+    }
+    super.dispose();
   }
 }
 

@@ -90,11 +90,14 @@ void main() {
       player.emitDuration(const Duration(milliseconds: 60000));
       player.emitPosition(const Duration(milliseconds: 15000));
       await tester.pump();
+      // Broadcast stream delivery schedules state updates after the event loop.
+      await tester.pump();
 
-      // This is the tracer's first project-side break: PlayerVideoControls
-      // constructs ControlBar, but ControlBarLayout never inserts its timeline.
-      expect(find.byType(ControlBarTimeline), findsNothing);
-      expect(find.byType(ProgressBar), findsNothing);
+      // The production shell must compose the same timeline that the direct
+      // handoff uses; otherwise stream values cannot reach user interaction.
+      expect(find.byType(ControlBarTimeline), findsOneWidget);
+      expect(find.byType(ProgressBar), findsOneWidget);
+      expect(_progressSemantics(tester).properties.value, '25%');
     });
 
     testWidgets(
