@@ -258,10 +258,16 @@ class _ProgressBarState extends State<ProgressBar>
               (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
             );
           },
-          child: Semantics(
-            label: AppLocalizations.of(context).progressBar,
-            value: '${(_effectiveFraction * 100).round()}%',
-            slider: true,
+          child: AnimatedBuilder(
+            // Semantics is outside the painter, so it must listen explicitly
+            // to expose stream-driven progress instead of retaining build-time 0%.
+            animation: _barListenable,
+            builder: (context, child) => Semantics(
+              label: AppLocalizations.of(context).progressBar,
+              value: '${(_effectiveFraction * 100).round()}%',
+              slider: true,
+              child: child,
+            ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               // 修 A: 回调始终非 null,体内判断 duration — 避免 _disabled 顶层 build 快照陈旧
