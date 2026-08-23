@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
@@ -191,17 +192,21 @@ void main() {
     late FakeVideoControlsPort video;
     late ValueNotifier<String> currentFileName;
     late ValueNotifier<bool> openFileEnabled;
+    /// 窗口模式单一数据源 — 全屏按钮图标/auto-hide/ESC 的驱动源(C2)。
+    late ValueNotifier<WindowMode> windowMode;
 
     setUp(() {
       widgetEngine = FakeEngine();
       video = FakeVideoControlsPort();
       currentFileName = ValueNotifier<String>('movie.mp4');
       openFileEnabled = ValueNotifier<bool>(true);
+      windowMode = ValueNotifier<WindowMode>(WindowMode.windowed);
     });
 
     tearDown(() {
       currentFileName.dispose();
       openFileEnabled.dispose();
+      windowMode.dispose();
       video.dispose();
       widgetEngine.dispose();
     });
@@ -226,6 +231,7 @@ void main() {
                 actions: actions,
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
                 resizing: resizing,
               ),
             ),
@@ -257,6 +263,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
                 resizing: resizing,
               ),
             ),
@@ -298,15 +305,14 @@ void main() {
         ),
       );
 
-      // activate 后 fullscreen 查询也应恢复到当前 route 端口。
-      final fullscreenReadsAfterActivate = video.isFullscreenReadCount;
-      video.isFullscreen = true;
-      hostKey.currentState!.rebuildChild();
+      // activate 后 fullscreen 状态仍由 windowMode 驱动
+      // (C2:port isFullscreen 不再是 UI 数据源)。
+      windowMode.value = WindowMode.fullscreen;
       await tester.pump();
-      expect(
-        video.isFullscreenReadCount,
-        greaterThan(fullscreenReadsAfterActivate),
-      );
+      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
+      windowMode.value = WindowMode.windowed;
+      await tester.pump();
+      expect(find.byIcon(Icons.fullscreen), findsOneWidget);
 
       widgetEngine.play();
       await tester.pump();
@@ -362,6 +368,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: activeFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
                 resizing: activeResizing,
               ),
             ),
@@ -392,6 +399,10 @@ void main() {
           bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
         ),
       );
+      // C2:新 port 的 isFullscreen=true 不驱动图标 — 图标只由 windowMode
+      // (当前 windowed)驱动,验证旧数据源契约已移除。
+      expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
+      expect(find.byIcon(Icons.fullscreen), findsOneWidget);
 
       // 排空本控件已知的动画帧，再记录旧 source 后续事件不可产生的副作用。
       await tester.pump(
@@ -399,8 +410,6 @@ void main() {
       );
       final newPaddingBeforeOldEvents =
           replacementVideo.subtitlePaddingHistory.length;
-      final newFullscreenReadsBeforeOldEvents =
-          replacementVideo.isFullscreenReadCount;
       final sliderValuesBeforeOldEvents = tester
           .widgetList<Slider>(find.byType(Slider))
           .map((slider) => slider.value)
@@ -425,10 +434,6 @@ void main() {
       expect(
         replacementVideo.subtitlePaddingHistory.length,
         newPaddingBeforeOldEvents,
-      );
-      expect(
-        replacementVideo.isFullscreenReadCount,
-        newFullscreenReadsBeforeOldEvents,
       );
       expect(video.player.hasListeners, isFalse);
 
@@ -494,6 +499,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
                 resizing: resizing,
               ),
             ),
@@ -605,6 +611,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -628,6 +635,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -635,19 +643,24 @@ void main() {
       );
       await tester.pump();
 
-      // 旧 source 的事件不能再驱动控件；新 source 的 fullscreen 快照已在
-      // didUpdateWidget 中读取，且后续新 engine 状态变化仍可驱动外壳。
+      // 旧 source 的事件不能再驱动控件，且后续新 engine 状态变化仍可驱动外壳。
       video.player.emitPlaying(true);
       replacementEngine.state.value = MediaState.playing;
       await tester.pump();
-      expect(replacementVideo.isFullscreenReadCount, greaterThan(0));
+      // C2:新 port 的 isFullscreen=true 不再是图标数据源 — engine 状态变化
+      // 后图标仍由 windowMode(windowed)决定。
+      expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
 
       replacementVideo.player.emitPlaying(false);
       await tester.pump();
       replacementVideo.isFullscreen = false;
       currentFileName.value = 'replacement.mp4';
       await tester.pump();
-      expect(replacementVideo.isFullscreenReadCount, greaterThan(1));
+      expect(find.text('replacement.mp4'), findsOneWidget);
+      // mode → fullscreen:图标立即切换为退出图标(单一数据源直驱,无需重建)。
+      windowMode.value = WindowMode.fullscreen;
+      await tester.pump();
+      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
     });
 
     testWidgets('替换不同 video port 但共享 player 后立即同步字幕安全区', (tester) async {
@@ -676,6 +689,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -702,6 +716,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -739,6 +754,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -769,6 +785,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -803,6 +820,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
                 resizing: resizing,
               ),
             ),
@@ -875,6 +893,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
                 resizing: resizing,
               ),
             ),
@@ -972,6 +991,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -1004,7 +1024,9 @@ void main() {
       expect(tester.binding.hasScheduledFrame, isFalse);
     });
 
-    testWidgets('deactivate 期间不读取 fullscreen，activate 后恢复读取', (tester) async {
+    testWidgets('reparent(deactivate→activate)后 fullscreen 仍由 windowMode 驱动', (
+      tester,
+    ) async {
       final controlsKey = GlobalKey();
       final hostKey = GlobalKey<_ReparentHostState>();
 
@@ -1024,6 +1046,7 @@ void main() {
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
                 openFileEnabled: openFileEnabled,
+                windowMode: windowMode,
               ),
             ),
           ),
@@ -1031,13 +1054,16 @@ void main() {
       );
       await tester.pump();
 
-      final readsBeforeReparent = video.isFullscreenReadCount;
+      // 进入全屏后 reparent(deactivate→activate):activate 路径恢复 mode
+      // 监听,图标必须继续反映 mode 状态(C2 单一数据源)。
+      windowMode.value = WindowMode.fullscreen;
+      await tester.pump();
+      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
       hostKey.currentState!.moveChild();
       await tester.pump();
 
-      // reparent 完成后 State 必须仍然有效，且 activate 路径恢复 fullscreen 查询。
       expect(controlsKey.currentState, isNotNull);
-      expect(video.isFullscreenReadCount, greaterThan(readsBeforeReparent));
+      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
     });
 
     testWidgets('替换 currentFileName 后只响应新 notifier', (tester) async {
@@ -1181,7 +1207,8 @@ void main() {
     });
 
     testWidgets('ESC 只退出当前 fullscreen route 端口', (tester) async {
-      video.isFullscreen = true;
+      // C2:全屏判定来自 windowMode — 先置 fullscreen 再触发 ESC。
+      windowMode.value = WindowMode.fullscreen;
       var fullscreenSyncCount = 0;
       final actions = PlayerActions(
         onToggleFullscreen: () => fullscreenSyncCount++,
@@ -1193,6 +1220,26 @@ void main() {
       expect(fullscreenSyncCount, 1);
       expect(video.exitFullscreenCallCount, 1);
       expect(video.toggleFullscreenCallCount, 0);
+    });
+
+    testWidgets('全屏按钮图标跟随 windowMode(图标卡死回归)', (tester) async {
+      await pumpControls(tester, actions: const PlayerActions());
+      // 窗口态:enter 图标
+      expect(find.byIcon(Icons.fullscreen), findsOneWidget);
+      expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
+
+      // → fullscreen:立即切换为退出图标
+      windowMode.value = WindowMode.fullscreen;
+      await tester.pump();
+      expect(find.byIcon(Icons.fullscreen_exit), findsOneWidget);
+
+      // → windowed(模拟退出全屏):立即还原 enter 图标 — 不依赖 Video
+      // 重建时序(旧路径退出后 refreshView 空实现 + 参数相等抑制重建,
+      // 图标永不同步回,即用户报告的"按钮没有变回全屏按钮")。
+      windowMode.value = WindowMode.windowed;
+      await tester.pump();
+      expect(find.byIcon(Icons.fullscreen), findsOneWidget);
+      expect(find.byIcon(Icons.fullscreen_exit), findsNothing);
     });
 
     testWidgets('窗口态 ESC 不触发全屏 route 操作', (tester) async {

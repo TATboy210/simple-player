@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
@@ -14,12 +15,14 @@ void main() {
     final title = ValueNotifier<String>('first.mp4');
     final resizing = ValueNotifier<bool>(false);
     final openFileEnabled = ValueNotifier<bool>(true);
+    final windowMode = ValueNotifier<WindowMode>(WindowMode.windowed);
     var builds = 0;
 
     addTearDown(() {
       title.dispose();
       resizing.dispose();
       openFileEnabled.dispose();
+      windowMode.dispose();
       video.dispose();
       engine.dispose();
     });
@@ -35,6 +38,7 @@ void main() {
             actions: const PlayerActions(),
             currentFileName: title,
             openFileEnabled: openFileEnabled,
+            windowMode: windowMode,
             resizing: resizing,
             onBuild: () => builds += 1,
           ),

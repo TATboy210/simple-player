@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_timeline.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
@@ -18,6 +20,7 @@ Widget _controlsShell({
   required Key key,
   required FakeVideoControlsPort video,
   required FakeEngine engine,
+  required ValueListenable<WindowMode> windowMode,
 }) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
@@ -32,6 +35,7 @@ Widget _controlsShell({
         actions: const PlayerActions(),
         currentFileName: ValueNotifier<String>('diagnosis.mp4'),
         openFileEnabled: ValueNotifier<bool>(true),
+        windowMode: windowMode,
       ),
     ),
   ),
@@ -81,11 +85,18 @@ void main() {
       final engine = FakeEngine()..play();
       final player = FakePlayerControls(isPlayingNow: true);
       final video = FakeVideoControlsPort(player: player);
+      final windowMode = ValueNotifier<WindowMode>(WindowMode.windowed);
       addTearDown(engine.dispose);
       addTearDown(video.dispose);
+      addTearDown(windowMode.dispose);
 
       await tester.pumpWidget(
-        _controlsShell(key: GlobalKey(), video: video, engine: engine),
+        _controlsShell(
+          key: GlobalKey(),
+          video: video,
+          engine: engine,
+          windowMode: windowMode,
+        ),
       );
       player.emitDuration(const Duration(milliseconds: 60000));
       player.emitPosition(const Duration(milliseconds: 15000));
