@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/video_texture_resize_probe.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 
 void main() {
   group('VideoTextureResizeProbe', () {
@@ -48,6 +49,43 @@ void main() {
       resizeSessionId.dispose();
       rect.dispose();
       textureId.dispose();
+    });
+
+    test('会话按最近模式迁移方向分类为 fullscreen-enter/exit (C3 取证)', () {
+      // 时序: setMode 先于原生 resize 脉冲(会话内 mode 恒定),故探针
+      // 记录模式迁移方向而非会话跨越。
+      final resizing = ValueNotifier<bool>(false);
+      final resizeSessionId = ValueNotifier<int>(44);
+      final mode = ValueNotifier<WindowMode>(WindowMode.windowed);
+      final logger = _RecordingLogger();
+      final probe = VideoTextureResizeProbe(
+        isResizing: resizing,
+        resizeSessionId: resizeSessionId,
+        windowMode: mode,
+        logger: logger,
+        enabled: true,
+      );
+
+      // 进入全屏:mode 迁移 windowed → fullscreen,随后原生 resize 会话
+      mode.value = WindowMode.fullscreen;
+      resizing.value = true;
+      resizing.value = false;
+      expect(logger.entries.single.context?['sessionKind'], 'fullscreen-enter');
+      expect(logger.entries.single.context?['modeAtStart'], 'fullscreen');
+      expect(logger.entries.single.context?['modeAtEnd'], 'fullscreen');
+
+      // 退出全屏:mode 迁移 fullscreen → windowed,随后恢复 resize 会话
+      mode.value = WindowMode.windowed;
+      resizing.value = true;
+      resizing.value = false;
+      expect(logger.entries[1].context?['sessionKind'], 'fullscreen-exit');
+      expect(logger.entries[1].context?['modeAtStart'], 'windowed');
+      expect(logger.entries[1].context?['modeAtEnd'], 'windowed');
+
+      probe.dispose();
+      resizing.dispose();
+      resizeSessionId.dispose();
+      mode.dispose();
     });
 
     test('缺少 video controller 信号时输出完整的 probeUnavailable 摘要', () {

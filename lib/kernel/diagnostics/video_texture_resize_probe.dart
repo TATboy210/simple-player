@@ -8,6 +8,7 @@ import 'dart:ui' show Rect, Size;
 
 import 'package:flutter/foundation.dart' show ValueListenable, kReleaseMode;
 
+import '../window_bridge/window_bridge.dart';
 import 'kernel_logger.dart';
 
 /// 会话式视频纹理 resize 探针。
@@ -24,6 +25,7 @@ final class VideoTextureResizeProbe {
     ValueListenable<int?>? textureId,
     ValueListenable<Size?>? windowSize,
     ValueListenable<double?>? devicePixelRatio,
+    ValueListenable<WindowMode>? windowMode,
     KernelLogger? logger,
     Duration Function()? monotonicNow,
     bool enabled = !kReleaseMode,
@@ -33,6 +35,7 @@ final class VideoTextureResizeProbe {
        _textureId = textureId,
        _windowSize = windowSize,
        _devicePixelRatio = devicePixelRatio,
+       _windowMode = windowMode,
        _logger = logger,
        _enabled = enabled,
        _stopwatch = monotonicNow == null ? (Stopwatch()..start()) : null,
@@ -40,6 +43,8 @@ final class VideoTextureResizeProbe {
     if (_enabled) {
       _isResizing.addListener(_onResizingChanged);
       _onResizingChanged();
+      _mode = _windowMode?.value;
+      _windowMode?.addListener(_onModeChanged);
     }
   }
 
@@ -75,6 +80,10 @@ final class VideoTextureResizeProbe {
     'rectTrailOmitted',
     'textureIdTrail',
     'textureIdTrailOmitted',
+    // 全屏三症状取证:会话跨越的窗口模式 — sessionKind 由此区分
+    // fullscreen-enter/exit/resize,定位退出单帧异常时的 native 信号。
+    'modeAtStart',
+    'modeAtEnd',
   };
 
   static const int _trailHead = 8;
@@ -87,6 +96,12 @@ final class VideoTextureResizeProbe {
   final ValueListenable<int?>? _textureId;
   final ValueListenable<Size?>? _windowSize;
   final ValueListenable<double?>? _devicePixelRatio;
+  /// 窗口模式观察源 — 用于把 resize 会话分类为全屏进入/退出(取证用)。
+  final ValueListenable<WindowMode>? _windowMode;
+  /// 最近一次模式变化前后的值 — setMode 先于原生 resize 脉冲,会话内 mode
+  /// 恒定,故按会话前最近的模式迁移方向分类(enter/exit)。
+  WindowMode? _mode;
+  WindowMode? _modeBeforeLastChange;
   final KernelLogger? _logger;
   final bool _enabled;
   final Stopwatch? _stopwatch;
@@ -100,6 +115,8 @@ final class VideoTextureResizeProbe {
   Duration _sessionStart = Duration.zero;
   Rect? _rectAtStart;
   int? _textureIdAtStart;
+  /// 会话开始时的窗口模式 — 与会话结束时的 mode 组合出 sessionKind。
+  WindowMode? _modeAtStart;
   Rect? _previousRect;
   int? _previousTextureId;
   int _rectChanges = 0;
@@ -161,10 +178,17 @@ final class VideoTextureResizeProbe {
     if (_sessionActive) _endSession();
   }
 
+  void _onModeChanged() {
+    if (_disposed || !_enabled) return;
+    _modeBeforeLastChange = _mode;
+    _mode = _windowMode?.value;
+  }
+
   void _startSession() {
     _resetSessionState();
-    // 上升沿冻结关联 ID，避免下一会话开始后污染本会话的摘要归属。
+    // 上升沿冻结关联 ID 与窗口模式，避免下一会话开始后污染本会话的摘要归属。
     _sessionId = _resizeSessionId.value;
+    _modeAtStart = _windowMode?.value;
     _sessionStart = _now();
     _sessionActive = true;
 
@@ -236,10 +260,11 @@ final class VideoTextureResizeProbe {
     }
 
     _sessionActive = false;
+    final modeAtEnd = _windowMode?.value;
     final context = <String, Object?>{
       'schemaVersion': 1,
       'sessionId': _sessionId,
-      'sessionKind': 'drag+settle',
+      'sessionKind': _sessionKind(),
       'probeUnavailable': probeUnavailable,
       'classification': probeUnavailable ? null : _classification(),
       'durationUs': _elapsedUs(),
@@ -255,6 +280,8 @@ final class VideoTextureResizeProbe {
         _textureIdTrail,
       ),
       'textureIdTrailOmitted': _textureIdTrailOmitted,
+      'modeAtStart': _modeAtStart?.name,
+      'modeAtEnd': modeAtEnd?.name,
     };
 
     // 先关闭会话并清除旧采样，再调用可重入的外部 logger。否则日志 sink 若同步
@@ -270,6 +297,21 @@ final class VideoTextureResizeProbe {
     if (_textureIdChanges > 0) return 'texture-id-changed';
     if (_rectChanges > 0) return 'rect-only-changed';
     return 'no-dart-signal-change';
+  }
+
+  /// 按会话前最近的模式迁移方向分类:
+  /// - 最近迁移 → fullscreen:全屏进入(原生 resize 到显示器)
+  /// - 最近迁移 ← fullscreen:全屏退出(原生窗口恢复)
+  /// - 其余(含全屏中再 resize):drag+settle
+  /// setMode 先于原生 resize 脉冲发生,会话内 mode 恒定,故不能按会话
+  /// 跨越分类;未注入 windowMode 时退化为 'drag+settle'(既有行为)。
+  String _sessionKind() {
+    final from = _modeBeforeLastChange;
+    final to = _mode;
+    if (from == null || to == null) return 'drag+settle';
+    if (to == WindowMode.fullscreen) return 'fullscreen-enter';
+    if (from == WindowMode.fullscreen) return 'fullscreen-exit';
+    return 'drag+settle';
   }
 
   String _firstFrameClassification({
@@ -344,6 +386,7 @@ final class VideoTextureResizeProbe {
         _textureId?.removeListener(_onTextureIdChanged);
       }
       _isResizing.removeListener(_onResizingChanged);
+      _windowMode?.removeListener(_onModeChanged);
     }
     _sessionActive = false;
     _stopwatch?.stop();

@@ -173,6 +173,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// 创建与当前窗口桥和视频控制器绑定的 resize 诊断探针。
+  ///
+  /// windowMode 注入后,会话摘要按模式跨越分类(fullscreen-enter/exit/
+  /// resize/drag+settle) — 全屏退出单帧异常的取证维度(C3):退出会话若
+  /// 伴随 textureId 变化,指向 native 纹理重建;否则指向合成/布局侧。
   void _createTextureProbe() {
     final controller = widget.mediaKitController;
     _textureProbe = VideoTextureResizeProbe(
@@ -180,6 +184,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       resizeSessionId: widget.windowService.resizeSessionId,
       rect: controller?.rect,
       textureId: controller?.id,
+      windowMode: widget.windowService.mode,
     );
   }
 
