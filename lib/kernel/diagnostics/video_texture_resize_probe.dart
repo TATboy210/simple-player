@@ -98,10 +98,17 @@ final class VideoTextureResizeProbe {
   final ValueListenable<double?>? _devicePixelRatio;
   /// 窗口模式观察源 — 用于把 resize 会话分类为全屏进入/退出(取证用)。
   final ValueListenable<WindowMode>? _windowMode;
-  /// 最近一次模式变化前后的值 — setMode 先于原生 resize 脉冲,会话内 mode
-  /// 恒定,故按会话前最近的模式迁移方向分类(enter/exit)。
+  /// 当前窗口模式 — 用于检测全屏进入/退出迁移。
   WindowMode? _mode;
-  WindowMode? _modeBeforeLastChange;
+  /// 最近一次进入/离开全屏的单调时钟时刻 — 实机时序表明 mode 提交与原生
+  /// resize 会话先后不定(进入: 脉冲先于 setMode 提交),且"最大化→全屏→
+  /// 退出"路径退出会话内 mode 会经 windowed→maximized 再迁移,单靠迁移
+  /// 方向会误分类为 drag+settle,故按"会话起点前最近的全屏事件"补判。
+  Duration? _lastEnteredFullscreenAt;
+  Duration? _lastLeftFullscreenAt;
+
+  /// 全屏事件与会话起点的最大关联窗口 — 超过则视为无关的普通 resize。
+  static const _fullscreenEventWindow = Duration(seconds: 3);
   final KernelLogger? _logger;
   final bool _enabled;
   final Stopwatch? _stopwatch;
@@ -180,8 +187,14 @@ final class VideoTextureResizeProbe {
 
   void _onModeChanged() {
     if (_disposed || !_enabled) return;
-    _modeBeforeLastChange = _mode;
+    final previous = _mode;
     _mode = _windowMode?.value;
+    if (previous != WindowMode.fullscreen && _mode == WindowMode.fullscreen) {
+      _lastEnteredFullscreenAt = _now();
+    }
+    if (previous == WindowMode.fullscreen && _mode != WindowMode.fullscreen) {
+      _lastLeftFullscreenAt = _now();
+    }
   }
 
   void _startSession() {
@@ -299,18 +312,34 @@ final class VideoTextureResizeProbe {
     return 'no-dart-signal-change';
   }
 
-  /// 按会话前最近的模式迁移方向分类:
-  /// - 最近迁移 → fullscreen:全屏进入(原生 resize 到显示器)
-  /// - 最近迁移 ← fullscreen:全屏退出(原生窗口恢复)
-  /// - 其余(含全屏中再 resize):drag+settle
-  /// setMode 先于原生 resize 脉冲发生,会话内 mode 恒定,故不能按会话
-  /// 跨越分类;未注入 windowMode 时退化为 'drag+settle'(既有行为)。
+  /// 按会话起点前最近的全屏事件分类(实机时序:mode 提交与 resize 会话
+  /// 先后不定;退出会话内 mode 还可能经 windowed→maximized 再迁移):
+  /// - 会话起点=fullscreen 且终点=fullscreen:最近事件是"进入"→ fullscreen-enter
+  ///   (提交先于脉冲的进入),否则 fullscreen-resize(全屏中再 resize)
+  /// - 会话起点=fullscreen 且终点≠fullscreen:fullscreen-exit
+  /// - 会话终点=fullscreen:fullscreen-enter(脉冲先于提交的进入)
+  /// - 会话起点前 3s 内刚离开全屏:fullscreen-exit(含最大化进入的退出)
+  /// - 其余:drag+settle;未注入 windowMode 时退化为 'drag+settle'
   String _sessionKind() {
-    final from = _modeBeforeLastChange;
-    final to = _mode;
-    if (from == null || to == null) return 'drag+settle';
-    if (to == WindowMode.fullscreen) return 'fullscreen-enter';
-    if (from == WindowMode.fullscreen) return 'fullscreen-exit';
+    final start = _modeAtStart;
+    final end = _windowMode?.value;
+    if (start == null || end == null) return 'drag+settle';
+    if (start == WindowMode.fullscreen && end == WindowMode.fullscreen) {
+      final entered = _lastEnteredFullscreenAt;
+      final left = _lastLeftFullscreenAt;
+      if (entered != null &&
+          _sessionStart - entered < _fullscreenEventWindow &&
+          (left == null || entered > left)) {
+        return 'fullscreen-enter';
+      }
+      return 'fullscreen-resize';
+    }
+    if (start == WindowMode.fullscreen) return 'fullscreen-exit';
+    if (end == WindowMode.fullscreen) return 'fullscreen-enter';
+    final left = _lastLeftFullscreenAt;
+    if (left != null && _sessionStart - left < _fullscreenEventWindow) {
+      return 'fullscreen-exit';
+    }
     return 'drag+settle';
   }
 

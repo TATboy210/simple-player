@@ -51,9 +51,10 @@ void main() {
       textureId.dispose();
     });
 
-    test('会话按最近模式迁移方向分类为 fullscreen-enter/exit (C3 取证)', () {
-      // 时序: setMode 先于原生 resize 脉冲(会话内 mode 恒定),故探针
-      // 记录模式迁移方向而非会话跨越。
+    test('会话按会话起点前最近的全屏事件分类 (C3 取证)', () {
+      // 实机时序: mode 提交与原生 resize 会话先后不定(进入常为脉冲先于
+      // 提交),且"最大化→全屏→退出"路径退出会话内 mode 会经
+      // windowed→maximized 再迁移 — 单靠迁移方向会误分类,故按最近事件。
       final resizing = ValueNotifier<bool>(false);
       final resizeSessionId = ValueNotifier<int>(44);
       final mode = ValueNotifier<WindowMode>(WindowMode.windowed);
@@ -66,21 +67,43 @@ void main() {
         enabled: true,
       );
 
-      // 进入全屏:mode 迁移 windowed → fullscreen,随后原生 resize 会话
+      // 进入全屏:mode 提交先于 resize 会话
       mode.value = WindowMode.fullscreen;
       resizing.value = true;
       resizing.value = false;
-      expect(logger.entries.single.context?['sessionKind'], 'fullscreen-enter');
-      expect(logger.entries.single.context?['modeAtStart'], 'fullscreen');
-      expect(logger.entries.single.context?['modeAtEnd'], 'fullscreen');
+      expect(logger.entries[0].context?['sessionKind'], 'fullscreen-enter');
+      expect(logger.entries[0].context?['modeAtStart'], 'fullscreen');
+      expect(logger.entries[0].context?['modeAtEnd'], 'fullscreen');
 
-      // 退出全屏:mode 迁移 fullscreen → windowed,随后恢复 resize 会话
+      // 退出全屏(小窗进入):mode 迁移 fullscreen → windowed,随后恢复会话
       mode.value = WindowMode.windowed;
       resizing.value = true;
       resizing.value = false;
       expect(logger.entries[1].context?['sessionKind'], 'fullscreen-exit');
       expect(logger.entries[1].context?['modeAtStart'], 'windowed');
       expect(logger.entries[1].context?['modeAtEnd'], 'windowed');
+
+      // 实机"最大化→全屏→退出"路径: setMode(windowed) 先于恢复会话,
+      // 会话内插件重新最大化(windowed→maximized),分类仍须 fullscreen-exit。
+      mode.value = WindowMode.fullscreen;
+      resizing.value = true;
+      resizing.value = false;
+      expect(logger.entries[2].context?['sessionKind'], 'fullscreen-enter');
+      mode.value = WindowMode.windowed;
+      resizing.value = true;
+      mode.value = WindowMode.maximized; // 恢复过程中的重新最大化
+      resizing.value = false;
+      expect(logger.entries[3].context?['sessionKind'], 'fullscreen-exit');
+      expect(logger.entries[3].context?['modeAtEnd'], 'maximized');
+
+      // 3s 窗口外的全屏事件不关联:普通窗口 resize 仍为 drag+settle。
+      final clockProbe = _clockedProbe(resizing, resizeSessionId, mode);
+      clockProbe.advance(const Duration(seconds: 4));
+      resizing.value = true;
+      resizing.value = false;
+      expect(clockProbe.logger.entries.single.context?['sessionKind'],
+        'drag+settle');
+      clockProbe.dispose();
 
       probe.dispose();
       resizing.dispose();
@@ -640,4 +663,35 @@ final class _ReentrantProbeLogger extends _RecordingLogger {
     // 模拟同步日志 sink 在旧摘要写出期间立刻启动下一段 resize。
     onFirstEntry();
   }
+}
+
+/// 带可推进单调时钟的探针包装 — 用于验证全屏事件关联窗口的超时行为。
+final class _ClockedProbe {
+  _ClockedProbe(this._probe, this._clock, this.logger);
+
+  final VideoTextureResizeProbe _probe;
+  final _FakeMonotonicClock _clock;
+  final _RecordingLogger logger;
+
+  void advance(Duration delta) => _clock.advance(delta);
+
+  void dispose() => _probe.dispose();
+}
+
+_ClockedProbe _clockedProbe(
+  ValueNotifier<bool> resizing,
+  ValueNotifier<int> resizeSessionId,
+  ValueNotifier<WindowMode> mode,
+) {
+  final clock = _FakeMonotonicClock();
+  final logger = _RecordingLogger();
+  final probe = VideoTextureResizeProbe(
+    isResizing: resizing,
+    resizeSessionId: resizeSessionId,
+    windowMode: mode,
+    logger: logger,
+    monotonicNow: clock.now,
+    enabled: true,
+  );
+  return _ClockedProbe(probe, clock, logger);
 }
