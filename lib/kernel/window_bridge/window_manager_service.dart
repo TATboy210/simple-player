@@ -61,6 +61,13 @@ class WindowService with WindowListener implements WindowBridge {
   int _resizeSuppressionGeneration = 0;
   int _activeResizeSuppression = 0;
 
+  /// 关窗路径中单个平台命令的硬上限 — hide/persist/destroy 中任何一个
+  /// channel 调用卡住时，超时后继续推进，绝不让用户面对滞留窗口。
+  ///
+  /// 学自 BlueBubbles 的关窗策略:窗口先消失、清理放后台。本项目无系统
+  /// 托盘，窗口必须真正销毁，因此用 timeout 兜底替代其 exit(0) 硬杀。
+  static const _closeCommandTimeout = Duration(milliseconds: 800);
+
   /// resize 防抖延迟 — 500ms 内无新 resize 事件才更新 windowSize。
   Future<void>? _closeOperation;
 
@@ -265,19 +272,45 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   Future<void> _persistThenDestroy() async {
+    // 1) hide-first:窗口先视觉消失（BlueBubbles 模式），后续持久化与
+    //    销毁在"看不见"的状态下完成。hide 本身也可能卡 channel — 加
+    //    超时兜底，超时后继续走持久化。
+    await _runCloseCommand('hide', windowManager.hide);
+    // 2) 仅等待轻量的偏好设置写入（含超时兜底），确保下次启动仍能
+    //    恢复最后稳定的窗口几何。
+    await _runCloseCommand(
+      'persist',
+      () => _saveWindowState(size: _state.windowSize.value),
+    );
+    // 3) 销毁窗口。失败仅记录 — dispose() 仍会执行，服务进入终态。
     try {
-      // 关闭路径不再等待可能卡住的窗口命令或原生 getSize；仅等待轻量的
-      // 偏好设置写入，确保下次启动仍能恢复最后稳定的窗口几何。
-      await _saveWindowState(size: _state.windowSize.value);
-      try {
-        await windowManager.destroy();
-      } on Object catch (error, stackTrace) {
-        _log.e(
-          '[WindowService._persistThenDestroy] destroy failed: $error\n$stackTrace',
-        );
-      }
+      await _runCloseCommand('destroy', windowManager.destroy);
+    } on Object catch (error, stackTrace) {
+      _log.e(
+        '[WindowService._persistThenDestroy] destroy failed: $error\n$stackTrace',
+      );
     } finally {
       dispose();
+    }
+  }
+
+  /// 执行关窗路径中的单个平台命令，附带超时兜底。
+  ///
+  /// 超时不会取消底层调用（MethodChannel 无法真正取消），只是不再等待
+  /// 它完成 — 卡住的命令被记入日志后放任其自生自灭。
+  Future<void> _runCloseCommand(
+    String label,
+    Future<void> Function() command,
+  ) async {
+    try {
+      await command().timeout(_closeCommandTimeout);
+    } on TimeoutException {
+      _log.w(
+        '[WindowService.close] "$label" timed out after '
+        '$_closeCommandTimeout — continuing anyway',
+      );
+    } on Object catch (error, stackTrace) {
+      _log.e('[WindowService.close] "$label" failed: $error\n$stackTrace');
     }
   }
 
