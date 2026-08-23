@@ -237,8 +237,9 @@ Win32Window::MessageHandler(HWND hwnd,
     return 0;
   }
 
-  // Remove the native non-client frame in every mode, including the
-  // media_kit fullscreen route, so DWM cannot expose a light border gap.
+  // 纵深防御:正常情况下 window_manager 插件的 delegate 先于本 handler
+  // 处理 WM_NCCALCSIZE(见 flutter_window.cpp 顶部的 media_kit 全屏抢先分支
+  // 与插件 hidden 标题栏分支),本分支实际只在插件未接管时生效。
   case WM_NCCALCSIZE:
     if (wparam != FALSE)
       return 0;
