@@ -6,7 +6,7 @@ import '../../kernel/startup/startup_state.dart';
 /// 进度感知的启动 Splash
 ///
 /// 接收 [StartupState]，根据阶段显示：
-/// - 未开始：品牌名 + 不确定进度圈（与原 SplashScreen 一致）
+/// - 未开始：品牌名 + 不定进度圈（与原启动 splash 一致）
 /// - 进行中：品牌名 + 线性进度条 + 阶段消息
 /// - 完成后：由 AnimatedSwitcher 切换到主 UI
 class ProgressSplashScreen extends StatelessWidget {

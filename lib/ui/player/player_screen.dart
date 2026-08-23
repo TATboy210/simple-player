@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../kernel/window_bridge/window_manager_service.dart';
+import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/services/playback_controller.dart';
@@ -89,6 +90,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 拖窗纹理重建诊断探针 — 并联 ResizeFrameMetrics, 区分 native 纹理重建(甲)
   /// vs 纯合成缩放(乙). 仅 debug 生效; controller 为 null (测试注入 surface) 时跳过.
   VideoTextureResizeProbe? _textureProbe;
+
+  /// resize 帧时序采集器 — 并联 [_textureProbe] 的纹理信号,debug/profile 自启、
+  /// release 禁用。每次拖窗 drag+settle 会话输出 build/raster/totalSpan 的
+  /// P50/P95/P99 + 60/30fps jank 比例,作为代码侧可重复基线。
+  ResizeFrameMetrics? _resizeMetrics;
 
   /// 稳定化的播放器回调集合 — initState 构造一次，供 controls builder 捕获。
   ///
@@ -186,6 +192,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       textureId: controller?.id,
       windowMode: widget.windowService.mode,
     );
+    // 并联纹理探针:采集同一 resize 会话的 build/raster 帧时序(debug/profile)。
+    // 复用探针已绑定的 isResizing/resizeSessionId 信号源;dispose 在 dispose() 内。
+    _resizeMetrics?.dispose();
+    _resizeMetrics = ResizeFrameMetrics(
+      isResizing: widget.windowService.isResizing,
+      resizeSessionId: widget.windowService.resizeSessionId,
+    );
   }
 
   /// idle 既可能表示尚未加载，也可能表示 stop 正在卸载；两种情况都先隔离打开入口。
@@ -250,6 +263,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // controller.rect/id, 须在二者 dispose 前解除绑定 (此处二者生命周期更长,
     // 但保持 dispose 顺序一致性).
     _textureProbe?.dispose();
+    _resizeMetrics?.dispose();
     widget.controller.currentFileName.removeListener(_syncOpenFileAvailability);
     widget.engine.state.removeListener(_syncOpenFileAvailability);
     _isOpenFileEnabled.dispose();
