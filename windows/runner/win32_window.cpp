@@ -1,5 +1,6 @@
 ﻿#include "win32_window.h"
 
+#include <dwmapi.h>
 #include <flutter_windows.h>
 #include <windowsx.h>
 
@@ -167,6 +168,17 @@ bool Win32Window::Create(const std::wstring &title,
 
   if (!window)
     return false;
+
+  // 禁用 DWM 非客户区渲染, 消除 media_kit 原生全屏进出时的 Windows 风格
+  // 标题栏闪现: 退出全屏时 media_kit 先恢复 WS_OVERLAPPEDWINDOW(含
+  // WS_CAPTION)再 resize 回原几何, 两步之间的帧更新会让 DWM 在仍处显示器
+  // 尺寸的窗口顶部按新样式绘制一帧原生标题栏。禁用后 DWM 不再绘制任何
+  // 标题栏/边框过渡帧, 非客户区由 WM_NCPAINT 默认路径以窗口类背景刷
+  // (黑)绘制, 窗口态 8px resize 条外观保持黑色。窗口阴影与合成不受影响。
+  // SDK 枚举名为 DWMNCRENDERINGPOLICY(无 DWM_ 前缀 typedef)。
+  const DWMNCRENDERINGPOLICY ncrp = DWMNCRP_DISABLED;
+  ::DwmSetWindowAttribute(window, DWMWA_NCRENDERING_POLICY, &ncrp,
+                          sizeof(ncrp));
 
   return OnCreate();
 }
