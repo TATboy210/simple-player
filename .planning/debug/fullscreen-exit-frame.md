@@ -42,6 +42,13 @@ root_cause: (待实机证据)
 fix: (待选, 见下方候选)
 verification: 实机连续 5 次进出全屏, 退出瞬间无异常帧 + console 无断言。
 
+## 实机证据 (2026-08-23, 路径=最大化→全屏→退出)
+
+- fullscreen-enter 会话: classification=no-dart-signal-change, rect/textureId 零变化, 2732×1440(显示器), duration≈2.3s(进入期间多次 WM_SIZE 刷新 settle 计时器)。modeAtStart=windowed, modeAtEnd=fullscreen — **实机时序: 原生 resize 脉冲先于 setMode 提交**。
+- 退出: setMode(windowed) ← fullscreen → onWindowMaximize() → mode 回 maximized(最大化进入的退出正确恢复最大化)。退出会话: classification=no-dart-signal-change, 零变化。**两个方向 Dart 侧均无纹理/rect 重建** → 若仍有可见异常帧, 来源在 native 合成层(窗口恢复瞬间), 而非 Dart widget 重建/纹理重建。
+- console 另有 `[ERROR] accessibility_bridge.cc(114) Failed to update ui::AXTree, error: 557 ...` 多条 — 引擎无障碍桥在 fullscreen route push/pop 树变化时的同步失败, **不影响画面渲染**(仅 console 噪音); 待与用户确认"一帧画面出错"指可见黑帧/花屏还是该 console 报错。
+- 探针分类缺口(已修): 退出会话原被标 drag+settle(setMode(windowed) 先于会话, 随后 windowed→maximized 迁移覆盖) — 改为按"会话起点前最近的全屏事件"(3s 窗口)分类。
+
 ### 取证方法
 
 1. `flutter run -d windows`(debug, 探针默认启用; Release 不输出)。
