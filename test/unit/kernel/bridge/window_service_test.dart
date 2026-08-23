@@ -586,4 +586,82 @@ void main() {
       });
     });
   });
+
+  // =========================================================================
+  // 关窗路径 — hide-first 模式 (学自 BlueBubbles)
+  // =========================================================================
+  group('close path (hide-first)', () {
+    const wmChannel = MethodChannel('window_manager');
+
+    /// 取测试用 messenger — TestWidgetsFlutterBinding 提供可 mock 的
+    /// TestDefaultBinaryMessenger（无需 is 提升或 as cast）.
+    TestDefaultBinaryMessenger messenger() =>
+        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
+
+    test('onWindowClose hides the window before persisting and destroying', () {
+      fakeAsync((async) {
+        // 记录 window_manager channel 上每个被调用 method 的顺序。
+        final calls = <String>[];
+        Future<Object?> handler(MethodCall call) async {
+          calls.add(call.method);
+          if (call.method == 'getBounds') {
+            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
+          }
+          if (call.method == 'isPreventClose') return true;
+          return null;
+        }
+
+        messenger().setMockMethodCallHandler(wmChannel, handler);
+
+        final service = WindowService();
+        service.onWindowClose();
+
+        // 推进足够时间让 hide → persist(getBounds) → destroy 全部完成。
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        // hide 必须最先 — 用户点 X 后窗口立即消失（BlueBubbles 模式）。
+        expect(calls.first, 'hide');
+        // 持久化读取位置(getBounds)发生在 hide 之后、destroy 之前。
+        final persistIndex = calls.indexOf('getBounds');
+        final destroyIndex = calls.indexOf('destroy');
+        expect(persistIndex, greaterThan(calls.indexOf('hide')));
+        expect(destroyIndex, greaterThan(persistIndex));
+        // 服务进入终态。
+        expect(service.isResizing.value, isFalse);
+
+        messenger().setMockMethodCallHandler(wmChannel, null);
+      });
+    });
+
+    test('a stuck hide does not block persist or destroy (timeout guard)', () {
+      fakeAsync((async) {
+        final calls = <String>[];
+        // hide 永远不返回 — 模拟 channel 卡死。
+        final stuckHide = Completer<Object?>();
+        Future<Object?> handler(MethodCall call) async {
+          calls.add(call.method);
+          if (call.method == 'hide') return stuckHide.future;
+          if (call.method == 'getBounds') {
+            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
+          }
+          return null;
+        }
+
+        messenger().setMockMethodCallHandler(wmChannel, handler);
+
+        final service = WindowService();
+        service.onWindowClose();
+
+        // 800ms hide 超时 + persist + destroy — 5s 足够全部走完。
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        // hide 卡死但 destroy 依然被调用 — 超时兜底生效。
+        expect(calls, contains('destroy'));
+
+        messenger().setMockMethodCallHandler(wmChannel, null);
+      });
+    });
+  });
 }
