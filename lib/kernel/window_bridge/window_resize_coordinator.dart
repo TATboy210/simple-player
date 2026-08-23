@@ -42,6 +42,17 @@ final class WindowResizeCoordinator {
 
   Future<void> _settle(int generation) async {
     if (!_isCurrent(generation)) return;
+    // 全屏进入/退出触发的 resize 是过渡而非用户意图:跳过 windowSize 更新与
+    // 持久化,避免把显示器尺寸写进偏好导致下次启动恢复成巨窗。isResizing
+    // 仍须清除(filterQuality 降级依赖它恢复)。
+    if (_state.mode.value.isFullscreen) {
+      updateOnUIThread(() {
+        if (_isCurrent(generation)) _state.isResizing.value = false;
+      }, warn: (error, stackTrace) => _loggerOrFallback.w(
+        '[WindowResizeCoordinator._settle] $error\n$stackTrace',
+      ));
+      return;
+    }
     Size? size;
     try {
       size = await _readSize();

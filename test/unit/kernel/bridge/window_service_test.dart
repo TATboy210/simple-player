@@ -372,6 +372,56 @@ void main() {
   });
 
   // =========================================================================
+  // 全屏过渡 resize 的 windowSize 污染防护
+  // =========================================================================
+  // media_kit 原生全屏将窗口 resize 到显示器尺寸(进入/退出各一次), 触发的
+  // resize settle 若更新 windowSize, 显示器尺寸会经关闭路径持久化, 下次启动
+  // 恢复成巨窗。settle 在全屏模式期间只清 isResizing, 不更新 windowSize。
+  group('fullscreen transition resize settle guard', () {
+    const wmChannel = MethodChannel('window_manager');
+
+    /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding,
+    /// 其 defaultBinaryMessenger 静态类型即 TestDefaultBinaryMessenger.
+    TestDefaultBinaryMessenger messenger() =>
+        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
+
+    Size? mockSize;
+
+    setUp(() {
+      mockSize = null;
+      messenger().setMockMethodCallHandler(wmChannel, (call) async {
+        // window_manager 0.5.2: getSize() 内部走 getBounds, 返回 x/y/width/height.
+        if (call.method != 'getBounds') return null;
+        final sz = mockSize;
+        if (sz == null) return null;
+        return {'x': 0.0, 'y': 0.0, 'width': sz.width, 'height': sz.height};
+      });
+    });
+
+    tearDown(() {
+      messenger().setMockMethodCallHandler(wmChannel, null);
+    });
+
+    test('settle during fullscreen does not update windowSize', () {
+      // 全屏进入/退出的 resize 是过渡: settle 只清 isResizing, 不更新
+      // windowSize — 否则显示器尺寸会经关闭路径持久化, 下次启动巨窗。
+      fakeAsync((async) {
+        final service = WindowService();
+        service.mode.value = WindowMode.fullscreen;
+        mockSize = const Size(1920, 1080); // 模拟进入全屏后的显示器尺寸
+        service.onWindowResize();
+        expect(service.isResizing.value, isTrue);
+        async.elapse(const Duration(milliseconds: 600));
+        // isResizing 必须清除 (filterQuality 恢复依赖)
+        expect(service.isResizing.value, isFalse);
+        // windowSize 保持窗口态尺寸, 不被显示器尺寸污染
+        expect(service.windowSize.value, const Size(1280, 752));
+        service.dispose();
+      });
+    });
+  });
+
+  // =========================================================================
   // resize debounce + isResizing 恢复 (方向2 — isResizing 卡 true bug 回归)
   // =========================================================================
   group('resize debounce + isResizing recovery', () {
