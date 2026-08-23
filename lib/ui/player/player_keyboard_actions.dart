@@ -15,7 +15,8 @@ import 'shortcuts_help_dialog.dart';
 /// media_kit fullscreen route 内控制栏使用同一命令入口。音量、字幕等非基础播放操作
 /// 仍按原路径使用 [engine]，不改变现有交互语义。
 ///
-/// F 键全屏: setMode 设 intent+mode + media_kit route 切换 (方案 B, 修症状④).
+/// F 键全屏: 先 actions.onToggleFullscreen 同步 WindowMode(单一数据源,
+/// 修 F/ESC 退出后 mode 卡 fullscreen),再 media_kit route 切换(修症状④).
 /// enter 用 videoKey.enterFullscreen; exit 直接 pop root navigator 全屏 route
 /// (窗口态 key 的 exitFullscreen 受 isFullscreen 守卫失效, 见 onToggleFullscreen 注释).
 ///
@@ -71,6 +72,10 @@ KeyboardHandler buildPlayerKeyboardActions({
     // 改为: enter 用 enterFullscreen(窗口态 isFullscreen()=false→push, 正确);
     //       exit 直接 pop root navigator 栈顶全屏 route(绕过守卫).
     onToggleFullscreen: () {
+      // 先同步 WindowMode(图标/标题栏/cursor 单一数据源),再 route 切换 —
+      // 与 route 内按钮路径同序。旧路径只切 route 不同步 mode,F/ESC 退出
+      // 后 mode 卡 fullscreen,标题栏/cursor/按钮图标全部陈旧(C2 修复)。
+      actions.onToggleFullscreen?.call();
       final entering = !isFullscreen;
       if (entering) {
         videoKey.currentState?.enterFullscreen();
@@ -81,8 +86,9 @@ KeyboardHandler buildPlayerKeyboardActions({
     },
     onExitFullscreen: () {
       if (isFullscreen) {
-        // media_kit 的 Video.onExitFullscreen 统一同步窗口模式；这里仅负责
-        // 关闭 route，避免键盘路径与 route lifecycle callback 产生竞态。
+        // 先同步 mode 回 windowed,再关闭 route — route 内 PopScope 统一
+        // 触发 media_kit 原生全屏退出,此处不重复操作窗口几何。
+        actions.onToggleFullscreen?.call();
         final nav = Navigator.of(context, rootNavigator: true);
         if (nav.canPop()) nav.maybePop();
       }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
@@ -43,6 +44,7 @@ Widget _controlsApp({
   required FakeEngine engine,
   required ValueListenable<String> title,
   required ValueListenable<bool> resizing,
+  required ValueListenable<WindowMode> windowMode,
   GlobalKey<_ReparentHostState>? hostKey,
 }) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -60,6 +62,7 @@ Widget _controlsApp({
           actions: const PlayerActions(),
           currentFileName: title,
           openFileEnabled: ValueNotifier<bool>(true),
+          windowMode: windowMode,
           resizing: resizing,
         ),
       ),
@@ -79,6 +82,7 @@ void main() {
       final newTitle = ValueNotifier<String>('new.mp4');
       final oldResizing = ValueNotifier<bool>(false);
       final newResizing = ValueNotifier<bool>(false);
+      final windowMode = ValueNotifier<WindowMode>(WindowMode.windowed);
       final controlsKey = GlobalKey();
       final hostKey = GlobalKey<_ReparentHostState>();
 
@@ -90,6 +94,7 @@ void main() {
       addTearDown(newTitle.dispose);
       addTearDown(oldResizing.dispose);
       addTearDown(newResizing.dispose);
+      addTearDown(windowMode.dispose);
 
       await tester.pumpWidget(
         _controlsApp(
@@ -98,6 +103,7 @@ void main() {
           engine: oldEngine,
           title: oldTitle,
           resizing: oldResizing,
+          windowMode: windowMode,
           hostKey: hostKey,
         ),
       );
@@ -111,6 +117,7 @@ void main() {
           engine: newEngine,
           title: newTitle,
           resizing: newResizing,
+          windowMode: windowMode,
           hostKey: hostKey,
         ),
       );

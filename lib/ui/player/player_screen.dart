@@ -378,6 +378,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       actions: _actions,
       currentFileName: widget.controller.currentFileName,
       openFileEnabled: _isOpenFileEnabled,
+      windowMode: widget.windowService.mode,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,
     );
@@ -397,6 +398,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       actions: _actions,
       currentFileName: widget.controller.currentFileName,
       openFileEnabled: _isOpenFileEnabled,
+      windowMode: widget.windowService.mode,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,
     );

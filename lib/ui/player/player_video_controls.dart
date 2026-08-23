@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/window_bridge/window_bridge.dart';
 import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
 import 'auto_hide_controller.dart';
@@ -247,6 +248,7 @@ Widget playerVideoControls(
   required PlayerActions actions,
   required ValueListenable<String> currentFileName,
   required ValueListenable<bool> openFileEnabled,
+  required ValueListenable<WindowMode> windowMode,
   Widget? emptyState,
   ValueListenable<bool>? resizing,
 }) {
@@ -256,6 +258,7 @@ Widget playerVideoControls(
     actions: actions,
     currentFileName: currentFileName,
     openFileEnabled: openFileEnabled,
+    windowMode: windowMode,
     emptyState: emptyState,
     resizing: resizing,
   );
@@ -268,7 +271,11 @@ Widget playerVideoControls(
 /// - 播放/暂停、快退、快进(写): 经 [PlayerActions] 进入 PlaybackController 门面
 /// - 进度条 seek/倍速(写): 经 [PlayerPort] 直写 `player`，保留低延迟精细交互
 /// - 音量/静音(写): 走 [MediaEngine](保 `_preMuteVolume` 语义)
-/// - isFullscreen: 从 [VideoState.isFullscreen] 现取(每实例独立,修复"图标不动态")
+/// - isFullscreen: 由 [WindowMode] 单一数据源驱动(图标/auto-hide/cursor/
+///   ESC)。不再读 route 本地 [VideoState.isFullscreen] — media_kit 在全屏
+///   期间把窗口态 VideoState 的 context 换成 route context(窗口态实例读
+///   true),退出后 refreshView 为空实现且参数相等抑制重建,notifier 永不
+///   同步回 false(按钮图标卡死根因)。
 ///
 /// 阶段2 适配 route 约束(修实机 3 bug):
 /// - **AutoHide 改 isPlaying**:[PlayerControlsState.isPlaying] 驱动,非 playing 永显
@@ -297,6 +304,12 @@ class PlayerVideoControls extends StatefulWidget {
   /// 打开文件入口可用性 — 空置页刚出现时隔离打开入口,等待旧媒体纹理退场。
   final ValueListenable<bool> openFileEnabled;
 
+  /// 窗口模式单一数据源 — 驱动全屏按钮图标、auto-hide 延迟、cursor 与 ESC。
+  ///
+  /// 窗口态与全屏 route 的 controls 实例监听同一 mode,进出全屏时 setMode
+  /// 必然提交状态,图标/标题栏/cursor 同步还原,不依赖 Video 重建时序。
+  final ValueListenable<WindowMode> windowMode;
+
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter。
   final ValueListenable<bool>? resizing;
 
@@ -311,6 +324,7 @@ class PlayerVideoControls extends StatefulWidget {
     required this.actions,
     required this.currentFileName,
     required this.openFileEnabled,
+    required this.windowMode,
     this.emptyState,
     this.resizing,
     this.onBuild,
@@ -339,7 +353,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 全屏 route focusNode=null → 不自带 Focus 键盘事件收不到(见计划风险处理2)。
   late final FocusNode _focusNode = FocusNode();
 
-  /// 派生 isFullscreen — 同步 widget.video.isFullscreen,供全屏按钮图标动态切换。
+  /// 派生 isFullscreen — 由 widget.windowMode 驱动(单一数据源),供全屏按钮
+  /// 图标动态切换。mode 监听在 _attachLifecycleListeners 挂载。
   late final ValueNotifier<bool> _isFullscreenNotifier;
 
   /// 共享 AnimationController — 驱动 resize 淡出/淡入和 decoration 状态切换
@@ -356,6 +371,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   late final ValueNotifier<bool> _isIdleNotifier;
 
   /// 全屏切换过渡标记 — 跳过 isResizing 触发的控制栏淡出,避免全屏切换闪烁消失。
+  /// mode 进出全屏时置位,resize 平息后由 _onResizeChanged 清除。
   bool _isFullscreenTransition = false;
 
   /// 阶段3 bug1:deactivate 标记 — 挡 LayoutBuilder 在 inactive element 上触发
@@ -454,8 +470,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
-      // ESC:仅全屏态退出(窗口态 ESC 冒泡给 KeyboardHandler 关播放列表/设置)
-      if (widget.video.isFullscreen) {
+      // ESC:仅全屏态退出(窗口态 ESC 冒泡给 KeyboardHandler 关播放列表/设置)。
+      // 全屏判定用 mode 单一数据源 — 窗口态实例在全屏期间同样收到该键时
+      // (焦点回落边界)也能正确退出,不再依赖 route 本地 context 查询。
+      if (widget.windowMode.value.isFullscreen) {
         widget.actions.onToggleFullscreen?.call();
         // Route callbacks may deactivate this VideoState synchronously.
         if (!mounted || _isDeactivating || !widget.video.isMounted) {
@@ -495,7 +513,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _isIdleNotifier = ValueNotifier<bool>(
       widget.engine.state.value == MediaState.idle,
     );
-    _isFullscreenNotifier = ValueNotifier<bool>(widget.video.isFullscreen);
+    // 单一数据源:初始值与后续变化都来自 windowMode,不读 route 本地
+    // VideoState.isFullscreen(会被 media_kit context 交换污染)。
+    _isFullscreenNotifier = ValueNotifier<bool>(
+      widget.windowMode.value.isFullscreen,
+    );
     // 阶段2:_controlsState.init() 前置 — isPlaying 有真值后再构造 _autoHide
     // (AutoHide 监听 _controlsState.isPlaying,init() 读初值)。
     _controlsState.init(); // 订阅 player.stream + 初始快照
@@ -504,7 +526,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       vsync: this,
       // 阶段2:AutoHide 用 _controlsState.isPlaying(player.stream 驱动)。
       isPlaying: _controlsState.isPlaying,
-      isFullscreen: widget.video.isFullscreen,
+      // 隐藏延迟由 mode 决定(全屏 3s/窗口态 5s),与图标同源。
+      isFullscreen: _isFullscreenNotifier.value,
       popupCloseNotifier: _popupCloseNotifier,
     );
     _autoHide.init();
@@ -524,6 +547,22 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 阶段2:字幕 padding 自驱(每实例调自己 VideoState)。post-frame 确保
     // widget.video 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
     _scheduleSubtitlePaddingSync();
+  }
+
+  /// 由 [WindowMode] 同步全屏派生状态(图标/auto-hide/过渡标记)。
+  ///
+  /// 替代旧的 route 本地 VideoState.isFullscreen 现取:mode 由每条进出全屏
+  /// 路径的 setMode 提交,窗口态实例在全屏期间不会被 context 交换污染,
+  /// 退出后必然同步回 false(修按钮图标卡死)。
+  void _syncModeFullscreen() {
+    final fs = widget.windowMode.value.isFullscreen;
+    if (_isFullscreenNotifier.value != fs) {
+      _isFullscreenNotifier.value = fs;
+      _autoHide.isFullscreen = fs;
+      // 标记过渡,下次 isResizing=true 跳过 reverse() — 抑制切换期控制栏
+      // 闪烁,同时避免窗口恢复 resize 期间动画竞争(退出单帧异常的候选源)。
+      _isFullscreenTransition = true;
+    }
   }
 
   void _handleTap() {
@@ -569,6 +608,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   void _attachLifecycleListeners() {
     if (_lifecycleListenersAttached) return;
     widget.engine.state.addListener(_onEngineStateChanged);
+    widget.windowMode.addListener(_syncModeFullscreen);
     widget.resizing?.addListener(_onResizeChanged);
     _autoHide.visible.addListener(_scheduleSubtitlePaddingSync);
     _lifecycleListenersAttached = true;
@@ -577,6 +617,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   void _detachLifecycleListeners() {
     if (!_lifecycleListenersAttached) return;
     widget.engine.state.removeListener(_onEngineStateChanged);
+    widget.windowMode.removeListener(_syncModeFullscreen);
     widget.resizing?.removeListener(_onResizeChanged);
     _autoHide.visible.removeListener(_scheduleSubtitlePaddingSync);
     _lifecycleListenersAttached = false;
@@ -601,37 +642,21 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   @override
   void didUpdateWidget(covariant PlayerVideoControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 阶段3 bug1 真正根因(实机 stack trace #6 line 502 定位,前三次修复无效):
-    // 退出全屏 route pop(Duration.zero) 过程中,全屏 VideoState 的 element 进入
-    // inactive lifecycle(deactivate 已调,dispose 未调)。全屏 Video 内部的
-    // LayoutBuilder 在 pop 时序的 layout 阶段触发 _rebuildWithConstraints
-    // (layout 阶段不检查子 element active 状态),rebuild 传播到本控件
-    // didUpdateWidget,此时 widget.video.isFullscreen → VideoState.isFullscreen
-    // → FullscreenInheritedWidget.maybeOf → dependOnInheritedWidgetOfExactType
-    // 在 inactive element 上查 ancestor → framework.dart:5082 断言。
+    // 阶段3 bug1 历史教训(保留 _isDeactivating 守卫):route pop 期间
+    // element 处于 inactive(deactivate 已调、dispose 未调),此时
+    // mounted 仍 true 但 ancestor 查询会断言 — deactivate 置位、
+    // didUpdateWidget/build 检查 flag 跳过 port 状态读取。本控件不 reparent,
+    // 无需 activate 重置。
     //
-    // 为什么前三次修复无效(关键教训):
-    // ①0ff3859 deactivate() 移除 listener — 挡不住本崩点。didUpdateWidget 由
-    //   LayoutBuilder rebuild 触发(非 notifier listener),deactivate 移除的
-    //   engine.state/resizing/_autoHide.visible listener 与此路径无关。
-    // ②mounted guard 无效 — State.mounted = (_element != null),_element 只在
-    //   unmount() 置 null,deactivate 不动 → deactivate 后 mounted 仍 true →
-    //   guard 通过 → 崩。mounted 与 active 不同步。
-    // ③Element.active — 非 public getter(dart analyze undefined),不可用。
-    //
-    // 真正修复:_isDeactivating flag。deactivate() 即置 true(stack trace 证明
-    // didUpdateWidget 在 deactivate 之后触发,此时 element inactive),didUpdateWidget
-    // /build 检查 flag 跳过 isFullscreen 查询。本控件不 reparent,无需 activate 重置。
-    // resizing 监听迁移不跳过(漏移除 oldWidget.resizing 会泄漏)。
+    // 全屏状态改由 windowMode 单一数据源驱动(C2):不再在此读
+    // route 本地 VideoState.isFullscreen — media_kit 全屏期间把窗口态
+    // VideoState 的 context 换成 route context(窗口态实例读 true),退出
+    // 后 refreshView 为空实现且 VideoViewParameters 相等抑制重建,旧路径
+    // 图标永不同步回(false 卡死根因,见类注释)。mode 由每条进出全屏路径
+    // 的 setMode 提交,经 _syncModeFullscreen(亦由 windowMode 监听直驱)
+    // 同步图标 + AutoHide + 过渡标记。
     if (!_isDeactivating) {
-      // VideoState 每次 builder 调用可能新实例 — 现取 isFullscreen 同步图标 + AutoHide。
-      // 全屏态切换时 _isFullscreenNotifier 变化驱动 RightButtonGroup fullscreen_exit 图标。
-      final fs = widget.video.isFullscreen;
-      if (_isFullscreenNotifier.value != fs) {
-        _isFullscreenNotifier.value = fs;
-        _autoHide.isFullscreen = fs;
-        _isFullscreenTransition = true; // 标记过渡,下次 isResizing=true 跳过 reverse()
-      }
+      _syncModeFullscreen();
     }
     // 视频端口或引擎更换时迁移控制状态，避免新外壳继续驱动旧数据源。
     final sourceChanged =
@@ -661,6 +686,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         widget.engine.state,
         widget.currentFileName,
       ]);
+    }
+    // windowMode 监听迁移 — 窗口服务替换时须解除旧 notifier,否则旧服务的
+    // mode 状态继续驱动本控件;active 阶段立即按新源同步一次。
+    if (oldWidget.windowMode != widget.windowMode) {
+      oldWidget.windowMode.removeListener(_syncModeFullscreen);
+      if (_lifecycleListenersAttached) {
+        widget.windowMode.addListener(_syncModeFullscreen);
+      }
+      if (!_isDeactivating) _syncModeFullscreen();
     }
     // resizing 监听迁移 — inactive 期间只更新 source，activate 再统一连接。
     if (oldWidget.resizing != widget.resizing) {
@@ -821,13 +855,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     );
   }
 
-  /// 返回当前 route 可安全读取的 fullscreen 状态。
+  /// 返回当前可安全读取的 fullscreen 状态(cursor 判定用)。
   ///
-  /// Flutter 在 `deactivate` 到 `dispose` 之间仍可能触发一次 build；此时
-  /// [VideoState] 的 inherited ancestor 已不可查询，必须先用生命周期标记短路。
+  /// mode 是 ValueNotifier 读取,无 ancestor 查询,但 deactivate 窗口内仍先
+  /// 用生命周期标记短路,与 didUpdateWidget 的守卫语义保持一致。
   bool _isFullscreenForCursor() {
     if (_isDeactivating) return false;
-    return widget.video.isFullscreen;
+    return widget.windowMode.value.isFullscreen;
   }
 
   @override
