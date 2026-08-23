@@ -1,5 +1,5 @@
 ---
-status: investigating
+status: resolved
 trigger: "全屏退出瞬间一帧画面出错(用户报告, 判断与 widget tree 相关)。C1/C2 已修缝隙与图标卡死; 本文件为退出单帧异常的取证方案与候选修复, 待实机证据。"
 created: 2026-08-23
 updated: 2026-08-23
@@ -38,9 +38,14 @@ reproduction: 播放视频 → 进入全屏(小窗或最大化) → 退出全屏
 
 ## Resolution
 
-root_cause: (待实机证据)
-fix: (待选, 见下方候选)
-verification: 实机连续 5 次进出全屏, 退出瞬间无异常帧 + console 无断言。
+root_cause: 退出全屏时窗口原生恢复与窗口态 UI 过渡动画交叠(证据: 进出会话
+均 no-dart-signal-change, Dart 侧零纹理/rect 重建 → 排除纹理重建与布局
+重排, 指向过渡期 UI 动画竞争)。
+fix: 无额外代码 — C2(0286c22) 将 _isFullscreenTransition 改为由 WindowMode
+可靠置位后, 过渡期控制栏动画/重建竞争被抑制; C1(b291d7a) 保证全屏样式下
+客户区覆盖整窗。C1+C2 生效后实机不再复现。
+verification: 2026-08-23 实机连续 10+ 轮进出全屏(小窗+最大化路径,
+按钮/F/ESC 退出), 退出瞬间无异常帧, 用户确认 C3 通过。
 
 ## 实机证据 (2026-08-23, 路径=最大化→全屏→退出)
 
