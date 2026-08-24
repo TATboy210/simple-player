@@ -73,3 +73,6 @@ ruvector.db
 # Windows command artifacts
 nul
 
+# Windows icon backups (local-only, not version controlled)
+*.ico.bak
+
