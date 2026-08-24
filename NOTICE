@@ -1,0 +1,42 @@
+Simple Player — Third-Party Notices
+====================================
+
+This product includes software developed by third parties under their
+own licenses. The following components are distributed in binary form
+alongside this application and are licensed under the GNU Lesser General
+Public License v2.1 or later (LGPL-2.1-or-later).
+
+
+1. libmpv
+   Project:  https://github.com/mpv-player/mpv
+   License:  LGPL-2.1-or-later (libmpv client API / library form)
+   Source:   https://github.com/mpv-player/mpv
+
+2. FFmpeg
+   Project:  https://ffmpeg.org
+   License:  LGPL-2.1-or-later
+   Source:   https://ffmpeg.org/download.html
+
+These native binaries are bundled by the media_kit library packages:
+   https://github.com/media-kit/media-kit
+   https://github.com/media-kit/libmpv-win32-video-build
+
+
+LGPL Compliance
+---------------
+In accordance with the LGPL-2.1-or-later:
+
+  • The libraries are dynamically linked. Users may replace the bundled
+    libmpv shared library (e.g. libmpv-2.dll on Windows, libmpv.so on
+    Linux, libmpv.2.dylib on macOS) with a compatible modified version.
+
+  • Complete corresponding source code for libmpv and FFmpeg is available
+    from the upstream repositories listed above.
+
+  • The LGPL-2.1 license text is available at:
+    https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt
+
+
+All other third-party Dart/Flutter packages retain their respective
+licenses (typically MIT or BSD-3-Clause). See each package on pub.dev
+for details: https://pub.dev/packages/<package_name>
