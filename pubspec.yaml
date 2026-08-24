@@ -1,7 +1,7 @@
 name: simple_player_flutter
 description: "Simple Player - A dark-themed media player"
 publish_to: 'none'
-version: 1.0.0-rc.1
+version: 0.0.1
 
 environment:
   sdk: ^3.11.5
@@ -74,6 +74,6 @@ msix_config:
   display_name: Simple Player
   publisher_display_name: Simple Player
   identity_name: com.simpleplayer.app
-  msix_version: 1.0.0.1
+  msix_version: 0.0.1.0
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: internetClient

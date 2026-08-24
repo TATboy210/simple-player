@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Dart-3-0175C2?logo=dart&logoColor=white" alt="Dart 3" />
   <img src="https://img.shields.io/badge/engine-media__kit_(libmpv)-00B4D8" alt="media_kit" />
   <img src="https://img.shields.io/badge/platform-Windows_10%2F11-0078D6?logo=windows&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/version-1.0.0--rc.1-orange" alt="version" />
+  <img src="https://img.shields.io/badge/version-0.0.1-orange" alt="version" />
   <img src="https://img.shields.io/badge/license-Apache_2.0-blue.svg" alt="Apache 2.0" />
 </p>
 
