@@ -33,7 +33,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev
 
       # Quality Gate 1: Static analysis (fatal-infos = treat info-level as errors)
       - name: Analyze
