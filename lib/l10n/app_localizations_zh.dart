@@ -81,6 +81,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
+  String get settingsPlaceholder => '更多设置即将到来';
+
+  @override
   String get generalTab => '通用';
 
   @override

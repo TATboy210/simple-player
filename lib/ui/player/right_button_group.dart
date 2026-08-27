@@ -1,4 +1,4 @@
-/// 右侧按钮组模块 — 文件、字幕与全屏
+/// 右侧按钮组模块 — 文件、字幕、设置与全屏
 ///
 /// 从 ControlBar 中提取的独立 Widget，负责控制栏底部行右侧按钮群。
 /// 单文件播放器不再展示播放列表入口。
@@ -11,7 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import 'player_actions.dart';
 
-/// 右侧按钮组：文件、字幕与全屏。
+/// 右侧按钮组：文件、字幕、设置与全屏。
 ///
 /// 路径B Commit1:加 [isFullscreen] ValueListenable 驱动全屏按钮图标
 /// (fullscreen ↔ fullscreen_exit),原恒定 Icons.fullscreen 改为动态。
@@ -57,6 +57,13 @@ class RightButtonGroup extends StatelessWidget {
             icon: Icons.subtitles,
             onPressed: actions.onOpenSubtitle,
             tooltip: l10n.openSubtitle,
+          ),
+        // 设置入口位于字幕与全屏之间 — 打开设置窗口壳(仅 UI，无实际功能)。
+        if (showSecondaryActions && actions.onOpenSettings != null)
+          GlassButton.iconOnly(
+            icon: Icons.settings_outlined,
+            onPressed: actions.onOpenSettings,
+            tooltip: l10n.settings,
           ),
         if (fullscreenCb != null)
           // isFullscreen 驱动图标:全屏时 exit 图标,非全屏时 enter 图标.

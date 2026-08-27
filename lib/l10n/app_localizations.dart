@@ -242,6 +242,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// Placeholder message in the settings window shell before real settings are implemented
+  ///
+  /// In en, this message translates to:
+  /// **'More settings coming soon'**
+  String get settingsPlaceholder;
+
   /// General settings tab label
   ///
   /// In en, this message translates to:

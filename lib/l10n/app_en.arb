@@ -51,6 +51,10 @@
 
   "settings": "Settings",
   "@settings": { "description": "Settings dialog title and tooltip" },
+  "settingsPlaceholder": "More settings coming soon",
+  "@settingsPlaceholder": {
+    "description": "Placeholder message in the settings window shell before real settings are implemented"
+  },
   "generalTab": "General",
   "@generalTab": { "description": "General settings tab label" },
   "language": "Language",
