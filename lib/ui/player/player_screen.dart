@@ -144,14 +144,19 @@ class _PlayerScreenState extends State<PlayerScreen>
     _stopExitAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: Tokens.durationSlide),
+      // value 语义: 1 = 正常可见, 0 = 消散完成。初始必须为可见态 —
+      // Video.controls 的输出(控制栏/空置态)同属 Video 子树, 若初始为 0
+      // 整个内容区会被 opacity 隐藏(实机黑屏回归教训)。
+      value: 1,
     );
     _stopExitFade = CurvedAnimation(
       parent: _stopExitAnim,
-      curve: Curves.easeIn,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
     );
     _stopExitScale = Tween<double>(
-      begin: 1.0,
-      end: 0.97,
+      begin: 0.97,
+      end: 1.0,
     ).animate(_stopExitFade);
     _actions = PlayerActions(
       // actions 保持同一实例以保护 Video subtree identity，但在调用时读取当前
@@ -190,10 +195,13 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   /// 主动停止的过渡序列 — 消散（画面淡出+后缩 300ms）→ 卸载媒体 →
   /// 空置态接手（极光缓入 + 内容延迟显现）。重入期间忽略再次触发。
+  ///
+  /// reverse() 把可见度从 1 渐推到 0；卸载完成后 reset 回 1，与空置态
+  /// 出现在同一帧，避免恢复可见时闪现旧内容。
   Future<void> _stopWithTransition() async {
     if (_stopExitAnim.isAnimating) return;
     if (!widget.engine.hasMedia) return;
-    await _stopExitAnim.forward(from: 0);
+    await _stopExitAnim.reverse();
     await widget.controller.stopCurrentMedia();
     if (mounted) _stopExitAnim.reset();
   }
