@@ -9,7 +9,7 @@
 /// v1.8 重写：移除播放队列/历史/断点/播放模式，回归单文件播放。
 /// - 打开：[openAndPlay] 内联路径校验 + engine.open + OpenResult 分发
 /// - 播完：engine completed 不主动处理（播完停止，符合产品决策）
-/// - 状态：volume/mute 恢复与保存委托 [PlaybackStateManager]
+/// - 状态：音量/静音由引擎默认值管理（用户设置已移除）
 /// - 当前媒体：[currentPath] / [currentFileName] ValueNotifier 驱动 UI
 library;
 
@@ -22,7 +22,6 @@ import '../engine/engine_state.dart';
 import '../utils/debug_probe.dart';
 import '../utils/path_utils.dart';
 import 'path_validator.dart';
-import 'playback_state_manager.dart';
 import 'subtitle_service.dart';
 import 'track_preference_service.dart';
 
@@ -34,10 +33,8 @@ final _log = KernelLogger.I;
 /// - 打开并播放：[openAndPlay]（路径校验 → engine.open → OpenResult 分发）
 /// - 停止卸载：[stopCurrentMedia]
 /// - 播放/暂停：pause / play / isPlaying 薄委托（无打开流程交互）
-/// - 运行时生命周期：委托 [PlaybackStateManager]
 ///
-/// 生命周期：init() → 使用 → dispose()
-/// init() 只初始化运行时状态管理器，不读取用户设置。
+/// 生命周期：使用 → dispose()（无 init 副作用，用户设置已移除）
 class PlaybackController {
   PlaybackController({
     required this.engine,
@@ -46,9 +43,7 @@ class PlaybackController {
     TrackPreferenceService? trackPreferenceService,
   }) : _onError = onError,
        _subtitleService = subtitleService,
-       _trackPreferenceService = trackPreferenceService {
-    stateManager = const PlaybackStateManager();
-  }
+       _trackPreferenceService = trackPreferenceService;
 
   /// 视频渲染引擎实例.
   ///
@@ -63,11 +58,6 @@ class PlaybackController {
 
   /// 轨道偏好服务 — 可选依赖，null 表示不持久化轨道偏好
   final TrackPreferenceService? _trackPreferenceService;
-
-  /// 状态管理子模块 — volume/mute 恢复与销毁保存.
-  ///
-  /// State management sub-module — settings restore and dispose persistence.
-  late final PlaybackStateManager stateManager;
 
   /// 调试探针 — 记录播放控制操作的耗时和事件（编译时开关 kDebugMode）.
   ///
@@ -186,17 +176,8 @@ class PlaybackController {
 
   // ── 生命周期 ──
 
-  /// 初始化播放控制器 — 委托 stateManager 恢复 volume/mute.
-  ///
-  /// [settings] 可选：调用方已加载时传入，避免重复 IO。
-  /// 使用 DebugProbe 包裹以记录初始化耗时。
-  Future<void> init() => probe.measureAsync('init', () async {
-    await stateManager.init();
-  });
-
   /// 释放运行时资源和状态通知器。
   void dispose() {
-    stateManager.dispose();
     currentFileName.dispose();
     currentPath.dispose();
     validationError.dispose();

@@ -107,8 +107,7 @@ class PlayerServices {
   /// 1. KernelLogger + MemoryMonitor (diagnostics)
   /// 2. MediaKitEngine (engine)
   /// 3. PlaybackController (orchestration)
-  /// 4. controller.init() → 运行时默认状态
-  /// 5. VideoProcessingService (video effects)
+  /// 4. VideoProcessingService (video effects)
   Future<void> init() {
     if (_disposed) return Future<void>.value();
     if (_initialized) return Future<void>.value();
@@ -133,8 +132,6 @@ class PlayerServices {
       _throwIfDisposed();
       _controller = PlaybackController(engine: engine);
       _controllerCreated = true;
-      await controller.init();
-      if (_disposed) throw StateError('PlayerServices disposed during init');
 
       _throwIfDisposed();
       _videoProcessing = VideoProcessingService(engine);

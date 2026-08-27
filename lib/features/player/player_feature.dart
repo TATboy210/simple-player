@@ -100,8 +100,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   ///
   /// 初始化序列：
   /// 1. 调用 PlayerServices.init() — 初始化引擎、控制器与视频处理服务
-  /// 2. 从 SettingsStore 加载自定义快捷键绑定
-  /// 3. 打点 playerInit 并输出启动 Timeline 日志
+  /// 2. 打点 playerInit 并输出启动 Timeline 日志
   ///
   /// 错误处理：任何步骤失败都会捕获异常，设置 _error 状态显示错误 UI，
   /// 不会向上传播导致 App 崩溃。使用 Stopwatch 记录初始化耗时用于性能分析。
