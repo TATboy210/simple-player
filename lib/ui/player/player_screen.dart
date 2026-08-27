@@ -384,12 +384,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         key: _videoKey,
         controller: controller,
         controls: _buildControls,
-        // 方案 A：media_kit 的 native 全屏钩子置空 — utils.cc 的摘样式/
-        // 恢复"标准窗口假设"不再执行，窗口物理全屏由 WindowBridge 的
-        // enterNativeFullscreen/exitNativeFullscreen（FFI 快照精确还原）
-        // 唯一执行；media_kit 仅保留 Flutter route 层。
-        onEnterFullscreen: () async {},
-        onExitFullscreen: () async {},
         // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
         // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
         // 变化，Element 与语义子树均保持挂载；静止时恢复 low 画质。
