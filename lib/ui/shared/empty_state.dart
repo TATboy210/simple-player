@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../../kernel/engine/engine_state.dart';
 import 'package:flutter/material.dart';
 
@@ -38,13 +36,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
   late final AnimationController _dragAnim;
   late final CurvedAnimation _dragCurve;
 
-  /// 极光背景缓入 — 空置层挂载即启动（用户指定的"缓进显现"节奏）。
-  late final AnimationController _auroraFade;
-
-  /// 内容（品牌名+打开按钮）延迟显现 — 极光显现后停 1 秒再淡入。
-  late final AnimationController _contentReveal;
-  Timer? _contentRevealTimer;
-
   @override
   void initState() {
     super.initState();
@@ -58,21 +49,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       parent: _dragAnim,
       curve: Curves.easeOut,
       reverseCurve: Curves.easeIn,
-    );
-    _auroraFade = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: Tokens.emptyAuroraFadeDurationMs),
-    )..forward();
-    _contentReveal = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: Tokens.durationFade),
-    );
-    // 入场编排：极光缓入后，内容停 1 秒再显现（emptyContentRevealDelayMs）。
-    _contentRevealTimer = Timer(
-      const Duration(milliseconds: Tokens.emptyContentRevealDelayMs),
-      () {
-        if (mounted) _contentReveal.forward();
-      },
     );
     // AnimatedBuilder 驱动重建，addListener+setState 会导致整个 build() 每帧重建
     // （包括 AuroraBackground），AnimatedBuilder 只重建包裹的子树
@@ -96,9 +72,6 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _contentRevealTimer?.cancel();
-    _auroraFade.dispose();
-    _contentReveal.dispose();
     _dragCurve.dispose();
     _dragAnim.dispose();
     super.dispose();
@@ -119,69 +92,54 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
 
     return Stack(
       children: [
-        // Layer 0: 极光呼吸背景 — 缓进显现（FadeTransition 不重建子树）
-        FadeTransition(
-          opacity: _auroraFade,
-          child: AuroraBackground(engineState: widget.engineState),
-        ),
+        // Layer 0: 极光呼吸背景（不参与动画，不重建）
+        AuroraBackground(engineState: widget.engineState),
 
-        // Layer 1: 居中悬浮内容 — 停 1 秒后随 _contentReveal 淡入
+        // Layer 1: 居中悬浮内容 — AnimatedBuilder 只重建动画相关子树
         if (widget.onOpenFile != null)
-          FadeTransition(
-            opacity: _contentReveal,
-            child: AnimatedBuilder(
-              animation: _dragAnim,
-              builder: (context, _) {
-                return RepaintBoundary(
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildBranding(context),
-                        const SizedBox(height: Tokens.spXl),
-                        SizedBox(
-                          height: 56,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              FadeTransition(
-                                opacity: ReverseAnimation(_dragCurve),
-                                child: Transform.scale(
-                                  scale: 1.0 - 0.05 * _dragCurve.value,
-                                  child: openButton,
+          AnimatedBuilder(
+            animation: _dragAnim,
+            builder: (context, _) {
+              return RepaintBoundary(
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildBranding(context),
+                      const SizedBox(height: Tokens.spXl),
+                      SizedBox(
+                        height: 56,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            FadeTransition(
+                              opacity: ReverseAnimation(_dragCurve),
+                              child: Transform.scale(
+                                scale: 1.0 - 0.05 * _dragCurve.value,
+                                child: openButton,
+                              ),
+                            ),
+                            IgnorePointer(
+                              child: FadeTransition(
+                                opacity: _dragCurve,
+                                child: Transform.translate(
+                                  offset: Offset(0, 8 * (1 - _dragCurve.value)),
+                                  child: dragHint,
                                 ),
                               ),
-                              IgnorePointer(
-                                child: FadeTransition(
-                                  opacity: _dragCurve,
-                                  child: Transform.translate(
-                                    offset: Offset(
-                                      0,
-                                      8 * (1 - _dragCurve.value),
-                                    ),
-                                    child: dragHint,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           )
         else
-          FadeTransition(
-            opacity: _contentReveal,
-            child: Align(
-              alignment: Alignment.center,
-              child: _buildBranding(context),
-            ),
-          ),
+          Align(alignment: Alignment.center, child: _buildBranding(context)),
       ],
     );
   }

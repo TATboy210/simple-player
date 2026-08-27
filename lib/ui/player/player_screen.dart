@@ -75,20 +75,13 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen>
-    with SingleTickerProviderStateMixin {
+class _PlayerScreenState extends State<PlayerScreen> {
   /// media_kit Video 的 state key — 供 setSubtitleViewPadding 调用
   /// (控件可见性联动字幕上移). 不再用于全屏切换 (改走 WindowService.setMode).
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
 
-  /// 空置页刚出现时暂时隔离所有“打开文件”入口的倒计时机制已移除 —
-  /// 打开入口常驻可用（用户决策：去倒计时、按钮常驻）。
-
-  /// 主动停止的消散过渡动画 — 驱动视频面淡出+后缩（渐退后缩），完成后
-  /// 才执行真正的 stopCurrentMedia，衔接空置态的三段入场编排。
-  late final AnimationController _stopExitAnim;
-  late final CurvedAnimation _stopExitFade;
-  late final Animation<double> _stopExitScale;
+  /// 空置页刚出现时暂时隔离所有“打开文件”入口的倒计时机制已移除；
+  /// 停止即瞬间切换空置态（用户决策：三段过渡动画撤除）。
 
   /// 拖窗纹理重建诊断探针 — 并联 ResizeFrameMetrics, 区分 native 纹理重建(甲)
   /// vs 纯合成缩放(乙). 仅 debug 生效; controller 为 null (测试注入 surface) 时跳过.
@@ -141,23 +134,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     _titleBar = RepaintBoundary(
       child: CustomTitleBar(windowService: widget.windowService),
     );
-    _stopExitAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: Tokens.stopExitDurationMs),
-      // value 语义: 1 = 正常可见, 0 = 消散完成。初始必须为可见态 —
-      // Video.controls 的输出(控制栏/空置态)同属 Video 子树, 若初始为 0
-      // 整个内容区会被 opacity 隐藏(实机黑屏回归教训)。
-      value: 1,
-    );
-    _stopExitFade = CurvedAnimation(
-      parent: _stopExitAnim,
-      curve: Curves.easeOut,
-      reverseCurve: Curves.easeIn,
-    );
-    _stopExitScale = Tween<double>(
-      begin: 0.94,
-      end: 1.0,
-    ).animate(_stopExitFade);
     _actions = PlayerActions(
       // actions 保持同一实例以保护 Video subtree identity，但在调用时读取当前
       // widget，避免 controller replacement 后继续把用户命令发送给旧数据源。
@@ -165,9 +141,9 @@ class _PlayerScreenState extends State<PlayerScreen>
       onSeekBack: (milliseconds) => widget.controller.skipBack(milliseconds),
       onSeekForward: (milliseconds) =>
           widget.controller.skipForward(milliseconds),
-      // 主动停止 → 消散过渡（画面淡出+后缩）完成后再真正卸载媒体，
-      // 衔接空置态的三段入场（极光缓入 → 停 1 秒 → 内容显现）。
-      onStop: () => unawaited(_stopWithTransition()),
+      // 主动停止 → 瞬间卸载媒体并切换空置态（用户决策：无过渡动画）。
+      // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
+      onStop: () => unawaited(widget.controller.stopCurrentMedia()),
       onOpenFile: () => widget.onOpenFile?.call(),
       onOpenSubtitle: () => unawaited(_openSubtitle()),
       // 设置窗口壳 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
@@ -191,19 +167,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     // controller 信号。测试渲染面没有 controller 时仍创建 probe，以输出
     // probeUnavailable 摘要而非将观测源缺失误记成无信号变化。
     _createTextureProbe();
-  }
-
-  /// 主动停止的过渡序列 — 消散（画面淡出+后缩 300ms）→ 卸载媒体 →
-  /// 空置态接手（极光缓入 + 内容延迟显现）。重入期间忽略再次触发。
-  ///
-  /// reverse() 把可见度从 1 渐推到 0；卸载完成后 reset 回 1，与空置态
-  /// 出现在同一帧，避免恢复可见时闪现旧内容。
-  Future<void> _stopWithTransition() async {
-    if (_stopExitAnim.isAnimating) return;
-    if (!widget.engine.hasMedia) return;
-    await _stopExitAnim.reverse();
-    await widget.controller.stopCurrentMedia();
-    if (mounted) _stopExitAnim.reset();
   }
 
   /// 创建与当前窗口桥和视频控制器绑定的 resize 诊断探针。
@@ -259,8 +222,6 @@ class _PlayerScreenState extends State<PlayerScreen>
     // 但保持 dispose 顺序一致性).
     _textureProbe?.dispose();
     _resizeMetrics?.dispose();
-    _stopExitFade.dispose();
-    _stopExitAnim.dispose();
     super.dispose();
   }
 
@@ -371,22 +332,14 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (controller == null) return const SizedBox.expand();
     return ValueListenableBuilder<bool>(
       valueListenable: widget.windowService.isResizing,
-      builder: (_, resizing, _) => FadeTransition(
-        // 主动停止的消散过渡 — 淡出 + 0.97 后缩（渐退后缩），paint 阶段
-        // 变换不触发布局；完成后 stopCurrentMedia 卸载媒体衔接空置态。
-        opacity: _stopExitFade,
-        child: ScaleTransition(
-          scale: _stopExitScale,
-          child: Video(
-            key: _videoKey,
-            controller: controller,
-            controls: _buildControls,
-            // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
-            // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
-            // 变化，Element 与语义子树均保持挂载；静止时恢复 low 画质。
-            filterQuality: resizing ? FilterQuality.none : FilterQuality.low,
-          ),
-        ),
+      builder: (_, resizing, _) => Video(
+        key: _videoKey,
+        controller: controller,
+        controls: _buildControls,
+        // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
+        // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
+        // 变化，Element 与语义子树均保持挂载；静止时恢复 low 画质。
+        filterQuality: resizing ? FilterQuality.none : FilterQuality.low,
       ),
     );
   }
