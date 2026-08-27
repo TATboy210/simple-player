@@ -81,7 +81,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
-  String get settingsPlaceholder => '更多设置即将到来';
+  String get audioTab => '音频';
+
+  @override
+  String get specialThanks => '特别鸣谢';
+
+  @override
+  String get thanksPending => '名单正在准备中，敬请期待';
+
+  @override
+  String get lgplNotice =>
+      'mpv 与 FFmpeg 以 LGPL-2.1-or-later 动态链接 · 合规信息详见随附 NOTICE 文件';
 
   @override
   String get generalTab => '通用';

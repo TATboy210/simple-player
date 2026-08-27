@@ -51,9 +51,17 @@
 
   "settings": "Settings",
   "@settings": { "description": "Settings dialog title and tooltip" },
-  "settingsPlaceholder": "More settings coming soon",
-  "@settingsPlaceholder": {
-    "description": "Placeholder message in the settings window shell before real settings are implemented"
+  "audioTab": "Audio",
+  "@audioTab": { "description": "Audio settings section label (placeholder nav entry)" },
+  "specialThanks": "Special Thanks",
+  "@specialThanks": { "description": "Section title honoring supporters of the project" },
+  "thanksPending": "The list is being prepared — stay tuned",
+  "@thanksPending": {
+    "description": "Shown while the special-thanks list has no entries yet"
+  },
+  "lgplNotice": "mpv and FFmpeg are dynamically linked under LGPL-2.1-or-later — compliance details are in the bundled NOTICE file",
+  "@lgplNotice": {
+    "description": "LGPL attribution note displayed under the tech-stack list"
   },
   "generalTab": "General",
   "@generalTab": { "description": "General settings tab label" },

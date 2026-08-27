@@ -242,11 +242,29 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
-  /// Placeholder message in the settings window shell before real settings are implemented
+  /// Audio settings section label (placeholder nav entry)
   ///
   /// In en, this message translates to:
-  /// **'More settings coming soon'**
-  String get settingsPlaceholder;
+  /// **'Audio'**
+  String get audioTab;
+
+  /// Section title honoring supporters of the project
+  ///
+  /// In en, this message translates to:
+  /// **'Special Thanks'**
+  String get specialThanks;
+
+  /// Shown while the special-thanks list has no entries yet
+  ///
+  /// In en, this message translates to:
+  /// **'The list is being prepared — stay tuned'**
+  String get thanksPending;
+
+  /// LGPL attribution note displayed under the tech-stack list
+  ///
+  /// In en, this message translates to:
+  /// **'mpv and FFmpeg are dynamically linked under LGPL-2.1-or-later — compliance details are in the bundled NOTICE file'**
+  String get lgplNotice;
 
   /// General settings tab label
   ///
