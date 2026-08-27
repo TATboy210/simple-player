@@ -26,6 +26,9 @@ class PlayerActions {
   /// 字幕选择按钮。
   final VoidCallback? onOpenSubtitle;
 
+  /// 设置按钮 — 打开设置窗口（本轮仅 UI 壳，无实际功能）。
+  final VoidCallback? onOpenSettings;
+
   /// 文件拖放完成回调。
   final void Function(List<String> paths)? onFilesDropped;
 
@@ -41,6 +44,7 @@ class PlayerActions {
     this.onOpenFile,
     this.onToggleFullscreen,
     this.onOpenSubtitle,
+    this.onOpenSettings,
     this.onFilesDropped,
     this.onDragHoverChanged,
   });

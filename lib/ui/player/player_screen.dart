@@ -10,6 +10,7 @@ import '../../kernel/engine/engine_state.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/services/subtitle_path_validator.dart';
 import '../theme/tokens.dart';
+import '../dialogs/settings/settings_dialog.dart';
 import '../window/custom_title_bar.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
@@ -153,6 +154,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 控制栏与快捷键共用空置态的资源释放隔离窗口。
       onOpenFile: _openFileWhenReady,
       onOpenSubtitle: () => unawaited(_openSubtitle()),
+      // 设置窗口壳 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
+      onOpenSettings: () => unawaited(SettingsDialog.show(context)),
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {

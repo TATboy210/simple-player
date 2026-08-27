@@ -236,6 +236,10 @@ class Tokens {
   /// OSD 迷你进度条背景轨道色
   static const Color osdTrackColor = Color(0x33FFFFFF);
 
+  // ── 对话框 ──
+  /// 占位/空态对话框的居中大图标尺寸（如设置壳）
+  static const double dialogEmptyIconSize = 40;
+
   // ── 滑块 ──
   static const double sliderHeight = 42;
   static const double sliderLabelWidth = 64;

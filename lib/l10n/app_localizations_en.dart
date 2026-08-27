@@ -81,6 +81,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get settingsPlaceholder => 'More settings coming soon';
+
+  @override
   String get generalTab => 'General';
 
   @override
