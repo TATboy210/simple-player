@@ -30,6 +30,9 @@ class PathValidator {
     'ogv',
     'vob',
     'rmvb',
+    // SMPTE 377M 广播封装 — libmpv/FFmpeg 内建 mxf demuxer(OP1a/OP-Atom)，
+    // 内部 MPEG-2/H.264/ProRes/DNxHD 等常规编码可解；上限取决于具体编码。
+    'mxf',
     'mp3',
     'flac',
     'wav',

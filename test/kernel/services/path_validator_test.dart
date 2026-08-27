@@ -9,6 +9,7 @@ void main() {
         expect(PathValidator.isAllowedMedia('/video.mkv'), true);
         expect(PathValidator.isAllowedMedia('/video.avi'), true);
         expect(PathValidator.isAllowedMedia('/video.webm'), true);
+        expect(PathValidator.isAllowedMedia('/video.mxf'), true);
       });
 
       test('accepts audio extensions', () {
