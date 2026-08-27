@@ -1,5 +1,6 @@
 ﻿#include "win32_window.h"
 
+#include <dwmapi.h>
 #include <flutter_windows.h>
 #include <windowsx.h>
 
@@ -168,6 +169,14 @@ bool Win32Window::Create(const std::wstring &title,
   if (!window)
     return false;
 
+  // 全屏切换防闪烁: media_kit 全屏经 SetWindowLongPtr 摘 WS_OVERLAPPEDWINDOW
+  // 并 SWP_FRAMECHANGED, 该过程触发 DWM 按中间态样式重绘非客户区, 过渡帧
+  // 画出系统标题栏经典外观(实机报告的"老版窗口"闪烁)。禁用本窗口的 DWM
+  // 过渡动画 — attribute 独立于窗口样式重设, 一次设置持续生效。
+  const BOOL disable_transitions = TRUE;
+  DwmSetWindowAttribute(window, DWMWA_TRANSITIONS_FORCEDISABLED,
+                        &disable_transitions, sizeof(disable_transitions));
+
   return OnCreate();
 }
 
@@ -236,6 +245,15 @@ Win32Window::MessageHandler(HWND hwnd,
     }
     return 0;
   }
+
+  // Chromium 惯用法: 窗口激活态变化时令 DefWindowProc 跳过非客户区重绘
+  // (lParam=-1), 压制样式切换期的框架闪帧 — 与 DWM 过渡禁用配合。
+  case WM_NCACTIVATE:
+    if (wparam != FALSE)
+    {
+      return DefWindowProc(window_handle_, message, wparam, -1);
+    }
+    break;
 
   // 纵深防御:正常情况下 window_manager 插件的 delegate 先于本 handler
   // 处理 WM_NCCALCSIZE(见 flutter_window.cpp 顶部的 media_kit 全屏抢先分支
