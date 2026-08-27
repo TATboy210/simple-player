@@ -247,7 +247,6 @@ Widget playerVideoControls(
   required MediaEngine engine,
   required PlayerActions actions,
   required ValueListenable<String> currentFileName,
-  required ValueListenable<bool> openFileEnabled,
   required ValueListenable<WindowMode> windowMode,
   Widget? emptyState,
   ValueListenable<bool>? resizing,
@@ -257,7 +256,6 @@ Widget playerVideoControls(
     engine: engine,
     actions: actions,
     currentFileName: currentFileName,
-    openFileEnabled: openFileEnabled,
     windowMode: windowMode,
     emptyState: emptyState,
     resizing: resizing,
@@ -301,9 +299,6 @@ class PlayerVideoControls extends StatefulWidget {
   /// 空状态页 — 空状态(idle && !hasMedia)时在 Stack 最底层渲染。
   final Widget? emptyState;
 
-  /// 打开文件入口可用性 — 空置页刚出现时隔离打开入口,等待旧媒体纹理退场。
-  final ValueListenable<bool> openFileEnabled;
-
   /// 窗口模式单一数据源 — 驱动全屏按钮图标、auto-hide 延迟、cursor 与 ESC。
   ///
   /// 窗口态与全屏 route 的 controls 实例监听同一 mode,进出全屏时 setMode
@@ -323,7 +318,6 @@ class PlayerVideoControls extends StatefulWidget {
     required this.engine,
     required this.actions,
     required this.currentFileName,
-    required this.openFileEnabled,
     required this.windowMode,
     this.emptyState,
     this.resizing,
@@ -751,17 +745,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     super.dispose();
   }
 
-  /// 空状态页 — 仅 idle && !hasMedia 时渲染,IgnorePointer 透传让 ControlBar 可点。
+  /// 空状态页 — 仅 idle && !hasMedia 时渲染,直接可交互（打开入口常驻）。
   Widget _buildEmptyState(bool active) {
     if (!active) return const SizedBox.shrink();
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.openFileEnabled,
-      builder: (_, enabled, _) => IgnorePointer(
-        ignoring: !enabled,
-        // emptyState 契约非空, `?? SizedBox.shrink()` 防御性兜底消除 `!`
-        child: widget.emptyState ?? const SizedBox.shrink(),
-      ),
-    );
+    // emptyState 契约非空, `?? SizedBox.shrink()` 防御性兜底消除 `!`
+    return widget.emptyState ?? const SizedBox.shrink();
   }
 
   /// 根据播放状态构建空状态页和上方手势区。

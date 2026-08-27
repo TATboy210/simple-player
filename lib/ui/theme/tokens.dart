@@ -164,6 +164,10 @@ class Tokens {
   // ── 全屏动画 ──
   static const durationFullscreenAnim = 200;
 
+  /// 空置态内容（品牌名+打开文件按钮）在极光背景显现后的延迟时长 —
+  /// 用户指定的"停一秒再显 logo"入场节奏。
+  static const int emptyContentRevealDelayMs = 1000;
+
   // ── 标题栏 ──
   static const titleBarHeight = 32.0;
   static const titleBarButtonWidth = 36.0;
