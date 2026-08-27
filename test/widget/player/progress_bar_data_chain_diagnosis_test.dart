@@ -34,7 +34,6 @@ Widget _controlsShell({
         engine: engine,
         actions: const PlayerActions(),
         currentFileName: ValueNotifier<String>('diagnosis.mp4'),
-        openFileEnabled: ValueNotifier<bool>(true),
         windowMode: windowMode,
       ),
     ),

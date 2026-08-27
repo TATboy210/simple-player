@@ -35,14 +35,15 @@ class EmptyState extends StatefulWidget {
 }
 
 class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
-  /// 给媒体纹理释放和空置页面切换预留的稳定窗口。
-  static const _openButtonDelay = Duration(seconds: 2);
-
   late final AnimationController _dragAnim;
   late final CurvedAnimation _dragCurve;
-  late final AnimationController _openButtonAnim;
-  Timer? _openButtonDelayTimer;
-  bool _isOpenButtonEnabled = false;
+
+  /// 极光背景缓入 — 空置层挂载即启动（用户指定的"缓进显现"节奏）。
+  late final AnimationController _auroraFade;
+
+  /// 内容（品牌名+打开按钮）延迟显现 — 极光显现后停 1 秒再淡入。
+  late final AnimationController _contentReveal;
+  Timer? _contentRevealTimer;
 
   @override
   void initState() {
@@ -58,29 +59,27 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       curve: Curves.easeOut,
       reverseCurve: Curves.easeIn,
     );
-    _openButtonAnim = AnimationController(
+    _auroraFade = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationFade),
+    )..forward();
+    _contentReveal = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: Tokens.durationFade),
     );
-    _scheduleOpenButton();
+    // 入场编排：极光缓入后，内容停 1 秒再显现（emptyContentRevealDelayMs）。
+    _contentRevealTimer = Timer(
+      const Duration(milliseconds: Tokens.emptyContentRevealDelayMs),
+      () {
+        if (mounted) _contentReveal.forward();
+      },
+    );
     // AnimatedBuilder 驱动重建，addListener+setState 会导致整个 build() 每帧重建
     // （包括 AuroraBackground），AnimatedBuilder 只重建包裹的子树
 
     if (widget.isDragHovering) {
       _dragAnim.forward();
     }
-  }
-
-  /// 延迟启用打开按钮，避免空置层刚显示时接收上一媒体会话的残留手势。
-  void _scheduleOpenButton() {
-    _openButtonDelayTimer?.cancel();
-    if (widget.onOpenFile == null) return;
-
-    _openButtonDelayTimer = Timer(_openButtonDelay, () {
-      if (!mounted) return;
-      setState(() => _isOpenButtonEnabled = true);
-      _openButtonAnim.forward();
-    });
   }
 
   @override
@@ -93,17 +92,13 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
         _dragAnim.reverse();
       }
     }
-    if (widget.onOpenFile != oldWidget.onOpenFile) {
-      _isOpenButtonEnabled = false;
-      _openButtonAnim.value = 0;
-      _scheduleOpenButton();
-    }
   }
 
   @override
   void dispose() {
-    _openButtonDelayTimer?.cancel();
-    _openButtonAnim.dispose();
+    _contentRevealTimer?.cancel();
+    _auroraFade.dispose();
+    _contentReveal.dispose();
     _dragCurve.dispose();
     _dragAnim.dispose();
     super.dispose();
@@ -113,69 +108,80 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     // 静态子组件 — 只构建一次，跨动画帧复用
-    final openButton = FadeTransition(
-      opacity: _openButtonAnim,
-      child: GlassButton(
-        icon: Icons.folder_open,
-        label: l10n.openFile,
-        tooltip: l10n.openFileTooltip,
-        isPrimary: true,
-        // GlassButton 将 null callback 同步为不可点、不可聚焦和禁用语义。
-        onPressed: _isOpenButtonEnabled ? widget.onOpenFile : null,
-      ),
+    final openButton = GlassButton(
+      icon: Icons.folder_open,
+      label: l10n.openFile,
+      tooltip: l10n.openFileTooltip,
+      isPrimary: true,
+      onPressed: widget.onOpenFile,
     );
     final dragHint = _buildDragHint(context);
 
     return Stack(
       children: [
-        // Layer 0: 极光呼吸背景（不参与动画，不重建）
-        AuroraBackground(engineState: widget.engineState),
+        // Layer 0: 极光呼吸背景 — 缓进显现（FadeTransition 不重建子树）
+        FadeTransition(
+          opacity: _auroraFade,
+          child: AuroraBackground(engineState: widget.engineState),
+        ),
 
-        // Layer 1: 居中悬浮内容 — AnimatedBuilder 只重建动画相关子树
+        // Layer 1: 居中悬浮内容 — 停 1 秒后随 _contentReveal 淡入
         if (widget.onOpenFile != null)
-          AnimatedBuilder(
-            animation: _dragAnim,
-            builder: (context, _) {
-              return RepaintBoundary(
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildBranding(context),
-                      const SizedBox(height: Tokens.spXl),
-                      SizedBox(
-                        height: 56,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            FadeTransition(
-                              opacity: ReverseAnimation(_dragCurve),
-                              child: Transform.scale(
-                                scale: 1.0 - 0.05 * _dragCurve.value,
-                                child: openButton,
-                              ),
-                            ),
-                            IgnorePointer(
-                              child: FadeTransition(
-                                opacity: _dragCurve,
-                                child: Transform.translate(
-                                  offset: Offset(0, 8 * (1 - _dragCurve.value)),
-                                  child: dragHint,
+          FadeTransition(
+            opacity: _contentReveal,
+            child: AnimatedBuilder(
+              animation: _dragAnim,
+              builder: (context, _) {
+                return RepaintBoundary(
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildBranding(context),
+                        const SizedBox(height: Tokens.spXl),
+                        SizedBox(
+                          height: 56,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              FadeTransition(
+                                opacity: ReverseAnimation(_dragCurve),
+                                child: Transform.scale(
+                                  scale: 1.0 - 0.05 * _dragCurve.value,
+                                  child: openButton,
                                 ),
                               ),
-                            ),
-                          ],
+                              IgnorePointer(
+                                child: FadeTransition(
+                                  opacity: _dragCurve,
+                                  child: Transform.translate(
+                                    offset: Offset(
+                                      0,
+                                      8 * (1 - _dragCurve.value),
+                                    ),
+                                    child: dragHint,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           )
         else
-          Align(alignment: Alignment.center, child: _buildBranding(context)),
+          FadeTransition(
+            opacity: _contentReveal,
+            child: Align(
+              alignment: Alignment.center,
+              child: _buildBranding(context),
+            ),
+          ),
       ],
     );
   }

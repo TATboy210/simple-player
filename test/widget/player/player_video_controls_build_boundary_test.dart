@@ -14,14 +14,12 @@ void main() {
     final video = FakeVideoControlsPort();
     final title = ValueNotifier<String>('first.mp4');
     final resizing = ValueNotifier<bool>(false);
-    final openFileEnabled = ValueNotifier<bool>(true);
     final windowMode = ValueNotifier<WindowMode>(WindowMode.windowed);
     var builds = 0;
 
     addTearDown(() {
       title.dispose();
       resizing.dispose();
-      openFileEnabled.dispose();
       windowMode.dispose();
       video.dispose();
       engine.dispose();
@@ -37,7 +35,6 @@ void main() {
             engine: engine,
             actions: const PlayerActions(),
             currentFileName: title,
-            openFileEnabled: openFileEnabled,
             windowMode: windowMode,
             resizing: resizing,
             onBuild: () => builds += 1,

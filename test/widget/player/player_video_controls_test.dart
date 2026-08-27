@@ -191,7 +191,6 @@ void main() {
     late FakeEngine widgetEngine;
     late FakeVideoControlsPort video;
     late ValueNotifier<String> currentFileName;
-    late ValueNotifier<bool> openFileEnabled;
 
     /// 窗口模式单一数据源 — 全屏按钮图标/auto-hide/ESC 的驱动源(C2)。
     late ValueNotifier<WindowMode> windowMode;
@@ -200,13 +199,11 @@ void main() {
       widgetEngine = FakeEngine();
       video = FakeVideoControlsPort();
       currentFileName = ValueNotifier<String>('movie.mp4');
-      openFileEnabled = ValueNotifier<bool>(true);
       windowMode = ValueNotifier<WindowMode>(WindowMode.windowed);
     });
 
     tearDown(() {
       currentFileName.dispose();
-      openFileEnabled.dispose();
       windowMode.dispose();
       video.dispose();
       widgetEngine.dispose();
@@ -231,7 +228,6 @@ void main() {
                 engine: widgetEngine,
                 actions: actions,
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
                 resizing: resizing,
               ),
@@ -263,7 +259,6 @@ void main() {
                 engine: widgetEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
                 resizing: resizing,
               ),
@@ -369,7 +364,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: activeFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
                 resizing: activeResizing,
               ),
@@ -501,7 +495,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
                 resizing: resizing,
               ),
@@ -613,7 +606,6 @@ void main() {
                 engine: widgetEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -637,7 +629,6 @@ void main() {
                 engine: replacementEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -691,7 +682,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -718,7 +708,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -756,7 +745,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -787,7 +775,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -822,7 +809,6 @@ void main() {
                 engine: widgetEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
                 resizing: resizing,
               ),
@@ -895,7 +881,6 @@ void main() {
                 engine: activeEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
                 resizing: resizing,
               ),
@@ -993,7 +978,6 @@ void main() {
                 engine: widgetEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),
@@ -1048,7 +1032,6 @@ void main() {
                 engine: widgetEngine,
                 actions: const PlayerActions(),
                 currentFileName: currentFileName,
-                openFileEnabled: openFileEnabled,
                 windowMode: windowMode,
               ),
             ),

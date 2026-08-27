@@ -75,18 +75,20 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen>
+    with SingleTickerProviderStateMixin {
   /// media_kit Video 的 state key — 供 setSubtitleViewPadding 调用
   /// (控件可见性联动字幕上移). 不再用于全屏切换 (改走 WindowService.setMode).
   final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
 
-  /// 空置页刚出现时暂时隔离所有“打开文件”入口，等待旧媒体纹理完全退场。
-  static const _openFileDelay = Duration(seconds: 2);
-  Timer? _openFileDelayTimer;
+  /// 空置页刚出现时暂时隔离所有“打开文件”入口的倒计时机制已移除 —
+  /// 打开入口常驻可用（用户决策：去倒计时、按钮常驻）。
 
-  /// 打开文件入口可用性 — ValueNotifier 驱动 PlayerVideoControls 内的空状态页
-  /// IgnorePointer（builder 化后需自驱动，不再靠本层 setState 重建）。
-  final ValueNotifier<bool> _isOpenFileEnabled = ValueNotifier(false);
+  /// 主动停止的消散过渡动画 — 驱动视频面淡出+后缩（渐退后缩），完成后
+  /// 才执行真正的 stopCurrentMedia，衔接空置态的三段入场编排。
+  late final AnimationController _stopExitAnim;
+  late final CurvedAnimation _stopExitFade;
+  late final Animation<double> _stopExitScale;
 
   /// 拖窗纹理重建诊断探针 — 并联 ResizeFrameMetrics, 区分 native 纹理重建(甲)
   /// vs 纯合成缩放(乙). 仅 debug 生效; controller 为 null (测试注入 surface) 时跳过.
@@ -108,9 +110,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 标题栏内部仍自行监听窗口状态；这里只固定外层 widget identity，缩小无关
   /// 重建范围，不冻结全屏透明度、置顶图标和最大化图标等必要更新。
   late Widget _titleBar;
-
-  bool get _isEmptyState =>
-      widget.engine.state.value == MediaState.idle && !widget.engine.hasMedia;
 
   /// 打开系统字幕选择器并返回用户选择的本地路径。
   Future<String?> _pickSubtitlePath() async {
@@ -142,6 +141,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _titleBar = RepaintBoundary(
       child: CustomTitleBar(windowService: widget.windowService),
     );
+    _stopExitAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationSlide),
+    );
+    _stopExitFade = CurvedAnimation(
+      parent: _stopExitAnim,
+      curve: Curves.easeIn,
+    );
+    _stopExitScale = Tween<double>(
+      begin: 1.0,
+      end: 0.97,
+    ).animate(_stopExitFade);
     _actions = PlayerActions(
       // actions 保持同一实例以保护 Video subtree identity，但在调用时读取当前
       // widget，避免 controller replacement 后继续把用户命令发送给旧数据源。
@@ -149,10 +160,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onSeekBack: (milliseconds) => widget.controller.skipBack(milliseconds),
       onSeekForward: (milliseconds) =>
           widget.controller.skipForward(milliseconds),
-      // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
-      onStop: () => unawaited(widget.controller.stopCurrentMedia()),
-      // 控制栏与快捷键共用空置态的资源释放隔离窗口。
-      onOpenFile: _openFileWhenReady,
+      // 主动停止 → 消散过渡（画面淡出+后缩）完成后再真正卸载媒体，
+      // 衔接空置态的三段入场（极光缓入 → 停 1 秒 → 内容显现）。
+      onStop: () => unawaited(_stopWithTransition()),
+      onOpenFile: () => widget.onOpenFile?.call(),
       onOpenSubtitle: () => unawaited(_openSubtitle()),
       // 设置窗口壳 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
       onOpenSettings: () => unawaited(SettingsDialog.show(context)),
@@ -169,16 +180,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onDragHoverChanged: (hovering) =>
           widget.onDragHoverChanged?.call(hovering),
     );
-    widget.engine.state.addListener(_syncOpenFileAvailability);
-    // Stop 成功会清空活动标题；它也是 hasMedia 从 true 变 false 后的可靠 UI 通知。
-    widget.controller.currentFileName.addListener(_syncOpenFileAvailability);
-    _syncOpenFileAvailability();
     // 阶段2:字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱
     // (每实例调自己 VideoState),不再需本层 _onControlsVisibleChanged 联动.
     // 拖窗纹理重建诊断 — 并联 ResizeFrameMetrics，分类只描述 Dart 侧
     // controller 信号。测试渲染面没有 controller 时仍创建 probe，以输出
     // probeUnavailable 摘要而非将观测源缺失误记成无信号变化。
     _createTextureProbe();
+  }
+
+  /// 主动停止的过渡序列 — 消散（画面淡出+后缩 300ms）→ 卸载媒体 →
+  /// 空置态接手（极光缓入 + 内容延迟显现）。重入期间忽略再次触发。
+  Future<void> _stopWithTransition() async {
+    if (_stopExitAnim.isAnimating) return;
+    if (!widget.engine.hasMedia) return;
+    await _stopExitAnim.forward(from: 0);
+    await widget.controller.stopCurrentMedia();
+    if (mounted) _stopExitAnim.reset();
   }
 
   /// 创建与当前窗口桥和视频控制器绑定的 resize 诊断探针。
@@ -205,26 +222,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// idle 既可能表示尚未加载，也可能表示 stop 正在卸载；两种情况都先隔离打开入口。
-  void _syncOpenFileAvailability() {
-    _openFileDelayTimer?.cancel();
-    if (widget.engine.state.value != MediaState.idle) {
-      _isOpenFileEnabled.value = true;
-      return;
-    }
-
-    _isOpenFileEnabled.value = false;
-    if (!_isEmptyState) return;
-    _openFileDelayTimer = Timer(_openFileDelay, () {
-      if (!mounted || !_isEmptyState) return;
-      _isOpenFileEnabled.value = true;
-    });
-  }
-
-  /// 将所有项目层打开入口收敛到空置态稳定窗口之后。
-  void _openFileWhenReady() {
-    if (!_isOpenFileEnabled.value) return;
-    widget.onOpenFile?.call();
-  }
+  /// （倒计时门禁已随“打开入口常驻”需求移除 — 打开入口不再有任何隔离窗口。）
 
   @override
   void didUpdateWidget(covariant PlayerScreen oldWidget) {
@@ -235,19 +233,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _titleBar = RepaintBoundary(
         child: CustomTitleBar(windowService: widget.windowService),
       );
-    }
-
-    // PlayerScreen 自己持有的空置态 listener 也必须随 source 迁移；否则旧
-    // controller/engine 的延迟状态仍会改写新树的打开文件可用性。
-    if (oldWidget.engine != widget.engine ||
-        oldWidget.controller != widget.controller) {
-      oldWidget.engine.state.removeListener(_syncOpenFileAvailability);
-      oldWidget.controller.currentFileName.removeListener(
-        _syncOpenFileAvailability,
-      );
-      widget.engine.state.addListener(_syncOpenFileAvailability);
-      widget.controller.currentFileName.addListener(_syncOpenFileAvailability);
-      _syncOpenFileAvailability();
     }
 
     // probe 同时监听窗口 resize 与 controller 的 rect/id；任一来源替换时
@@ -261,15 +246,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    _openFileDelayTimer?.cancel();
     // 探针先于其余 listener 移除 — 它监听 windowService.isResizing 与
     // controller.rect/id, 须在二者 dispose 前解除绑定 (此处二者生命周期更长,
     // 但保持 dispose 顺序一致性).
     _textureProbe?.dispose();
     _resizeMetrics?.dispose();
-    widget.controller.currentFileName.removeListener(_syncOpenFileAvailability);
-    widget.engine.state.removeListener(_syncOpenFileAvailability);
-    _isOpenFileEnabled.dispose();
+    _stopExitFade.dispose();
+    _stopExitAnim.dispose();
     super.dispose();
   }
 
@@ -315,7 +298,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           isFullscreen: isFullscreen,
           context: context,
           // O 键与空置页按钮共享同一稳定窗口，不能绕过媒体释放延迟。
-          onOpenFile: _openFileWhenReady,
+          onOpenFile: () => widget.onOpenFile?.call(),
           child: scaffold,
         );
 
@@ -380,14 +363,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (controller == null) return const SizedBox.expand();
     return ValueListenableBuilder<bool>(
       valueListenable: widget.windowService.isResizing,
-      builder: (_, resizing, _) => Video(
-        key: _videoKey,
-        controller: controller,
-        controls: _buildControls,
-        // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
-        // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
-        // 变化，Element 与语义子树均保持挂载；静止时恢复 low 画质。
-        filterQuality: resizing ? FilterQuality.none : FilterQuality.low,
+      builder: (_, resizing, _) => FadeTransition(
+        // 主动停止的消散过渡 — 淡出 + 0.97 后缩（渐退后缩），paint 阶段
+        // 变换不触发布局；完成后 stopCurrentMedia 卸载媒体衔接空置态。
+        opacity: _stopExitFade,
+        child: ScaleTransition(
+          scale: _stopExitScale,
+          child: Video(
+            key: _videoKey,
+            controller: controller,
+            controls: _buildControls,
+            // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
+            // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
+            // 变化，Element 与语义子树均保持挂载；静止时恢复 low 画质。
+            filterQuality: resizing ? FilterQuality.none : FilterQuality.low,
+          ),
+        ),
       ),
     );
   }
@@ -399,7 +390,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       engine: widget.engine,
       actions: _actions,
       currentFileName: widget.controller.currentFileName,
-      openFileEnabled: _isOpenFileEnabled,
       windowMode: widget.windowService.mode,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,
@@ -419,7 +409,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       engine: widget.engine,
       actions: _actions,
       currentFileName: widget.controller.currentFileName,
-      openFileEnabled: _isOpenFileEnabled,
       windowMode: widget.windowService.mode,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,

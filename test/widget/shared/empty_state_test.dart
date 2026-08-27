@@ -10,33 +10,28 @@ void main() {
     home: Scaffold(body: EmptyState(onOpenFile: onOpenFile)),
   );
 
-  testWidgets('enables the open-file button after the empty-state delay', (
+  testWidgets('content reveals after the delay and the button opens files', (
     tester,
   ) async {
     var openCount = 0;
     await tester.pumpWidget(buildSubject(onOpenFile: () => openCount++));
 
-    // 按钮保留布局，但在上一媒体表面完成退场前不得接收交互。
-    await tester.tap(find.byIcon(Icons.folder_open), warnIfMissed: false);
-    expect(openCount, 0);
-
-    await tester.pump(const Duration(seconds: 2));
+    // 入场编排：内容停 1 秒（emptyContentRevealDelayMs）后随 _contentReveal
+    // 淡入。极光为无限 ticker，禁用 pumpAndSettle，用固定时长推进：
+    // 1000ms 延迟触发 + 500ms 覆盖 400ms 淡入。
+    await tester.pump(const Duration(milliseconds: 1000));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byIcon(Icons.folder_open));
     expect(openCount, 1);
   });
 
-  testWidgets(
-    'cancels the delayed enablement when the empty state is removed',
-    (tester) async {
-      var openCount = 0;
-      await tester.pumpWidget(buildSubject(onOpenFile: () => openCount++));
-
-      // Removing the empty state must dispose its timer before a new media view
-      // can be affected by the old delayed callback.
-      await tester.pumpWidget(const MaterialApp(home: Scaffold()));
-      await tester.pump(const Duration(seconds: 2));
-
-      expect(openCount, 0);
-    },
-  );
+  testWidgets('unmounting during the reveal delay disposes safely', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildSubject());
+    // 在 1 秒延迟窗口内直接移除组件 — 定时器取消必须安全。
+    await tester.pumpWidget(const MaterialApp(home: Scaffold()));
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(tester.takeException(), isNull);
+  });
 }

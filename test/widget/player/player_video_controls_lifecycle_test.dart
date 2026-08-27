@@ -61,7 +61,6 @@ Widget _controlsApp({
           engine: engine,
           actions: const PlayerActions(),
           currentFileName: title,
-          openFileEnabled: ValueNotifier<bool>(true),
           windowMode: windowMode,
           resizing: resizing,
         ),
