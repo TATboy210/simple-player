@@ -157,21 +157,6 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     unawaited(_services.controller.openAndPlay(paths.first));
   }
 
-  /// 音频滤镜运行时可用性——默认全支持；目标 Windows smoke 检查建立真实值（Q1）。
-  /// 由 PlayerFeature 组合根拥有，注入到 af 串组合。
-
-  /// Phase 33 音频提交回调——SettingsPanelController 在 Apply/OK 时调用一次。
-  ///
-  /// 组合 af 串（经 [AudioFilterCompositor]，接受可用性结果）→ 调现有
-  /// `setEqualizer(String)` 引擎入口一次（AUDIO-05）→ fire-and-forget 顺序
-  /// 持久化 4 个原始值（AUDIO-07）。engine.setEqualizer 已被 _guardedAction
-  /// 守卫（内部 try-catch+log），此处不再包裹；save 的可恢复异常在
-  /// [_saveAudioSettings] 内记录，绝不静默吞掉。
-
-  /// 组合 af 串——委托确定性 [AudioFilterCompositor.compose]，注入运行时可用性。
-
-  /// 顺序持久化 4 个音频原始值（RC-4 一致性：顺序写，避免部分成功）。
-
   @override
   void dispose() {
     _filePickerCoordinator.dispose();
