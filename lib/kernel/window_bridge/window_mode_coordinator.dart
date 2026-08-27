@@ -9,17 +9,20 @@ final class WindowModeCoordinator {
     required WindowServiceState state,
     required Future<void> Function() maximize,
     required Future<void> Function() unmaximize,
+    required void Function(bool enter) setNativeFullscreen,
     required Future<void> Function() waitForInitialization,
     required void Function(String message) log,
   }) : _state = state,
        _maximize = maximize,
        _unmaximize = unmaximize,
+       _setNativeFullscreen = setNativeFullscreen,
        _waitForInitialization = waitForInitialization,
        _log = log;
 
   final WindowServiceState _state;
   final Future<void> Function() _maximize;
   final Future<void> Function() _unmaximize;
+  final void Function(bool enter) _setNativeFullscreen;
   final Future<void> Function() _waitForInitialization;
   final void Function(String) _log;
   Future<void> _operation = Future<void>.value();
@@ -50,6 +53,8 @@ final class WindowModeCoordinator {
 
   Future<void> _setSerialized(WindowMode target) async {
     if (target == WindowMode.fullscreen) {
+      // 方案 A：物理动作先行（同步 FFI，快照→摘样式→铺满），随后提交语义。
+      _setNativeFullscreen(true);
       syncFullscreenState(true);
       return;
     }
@@ -60,6 +65,10 @@ final class WindowModeCoordinator {
     _log('setMode($target) <- $previous');
     _fullscreenIntent = false;
     _commit(generation, target);
+    if (previous == WindowMode.fullscreen) {
+      // 从全屏离开 — 物理动作同步还原快照；maximized 分支随后照常。
+      _setNativeFullscreen(false);
+    }
     if (target == WindowMode.maximized) {
       await _maximize();
     } else if (previous == WindowMode.maximized) {

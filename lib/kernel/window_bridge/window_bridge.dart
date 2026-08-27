@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
-
 /// 窗口模式：普通窗口、最大化或由 media_kit 承担的全屏。
 enum WindowMode {
   /// 普通窗口。
@@ -44,6 +43,17 @@ abstract interface class WindowBridge {
 
   /// 切换普通窗口或最大化窗口。
   Future<void> setMode(WindowMode target);
+
+  /// 进入原生窗口全屏 — 物理动作（快照样式/矩形并铺满所在显示器）。
+  ///
+  /// 全屏的物理执行者是本桥（FFI），media_kit 仅承担 Flutter route 层；
+  /// 失败时实现内部记录日志并 no-op，绝不抛出到语义层。
+  void enterNativeFullscreen();
+
+  /// 退出原生窗口全屏 — 按进入时快照精确还原样式与矩形。
+  ///
+  /// 未处于原生全屏时为 no-op。
+  void exitNativeFullscreen();
 
   /// 设置窗口置顶状态。
   Future<void> setAlwaysOnTop(bool value);
