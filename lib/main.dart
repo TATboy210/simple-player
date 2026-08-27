@@ -6,10 +6,13 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
-import 'kernel/startup/startup_coordinator.dart';
+import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
 
 /// 应用组合根：初始化平台基础设施并将已准备的窗口服务注入 App。
+///
+/// 初始化顺序均为硬性依赖：绑定 → 引擎 → 日志 → 窗口管理器 → 窗口服务；
+/// 任何一步失败不阻断 runApp（错误态由 UI 层呈现），保证诊断信息可达。
 Future<void> main() async {
   if (kDebugMode) {
     MarionetteBinding.ensureInitialized();
@@ -21,24 +24,15 @@ Future<void> main() async {
   KernelLoggerImpl.init();
   await windowManager.ensureInitialized();
 
-  final coordinator = StartupCoordinator();
-  coordinator.report(StartupPhase.infrastructure, 0.1, 'Initializing...');
+  // 启动时序诊断 — 打点式纯计时器，无 UI 广播职责（见 StartupTimeline 注释）。
+  final startupTimeline = StartupTimeline();
   final windowService = WindowService();
   String? windowInitError;
   try {
     await windowService.init();
-    coordinator.report(
-      StartupPhase.infrastructure,
-      1.0,
-      'Infrastructure ready',
-    );
+    startupTimeline.mark(StartupTimeline.phaseInfrastructure);
   } on Object catch (error, stackTrace) {
     windowInitError = '$error';
-    coordinator.report(
-      StartupPhase.infrastructure,
-      1.0,
-      'Window initialization failed',
-    );
     KernelLogger.I.e(
       '[main] Window initialization failed: $error',
       error: error,
@@ -48,7 +42,7 @@ Future<void> main() async {
 
   runApp(
     App(
-      coordinator: coordinator,
+      startupTimeline: startupTimeline,
       windowService: windowService,
       windowInitError: windowInitError,
     ),

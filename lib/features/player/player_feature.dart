@@ -12,7 +12,7 @@
 /// - PlayerViewModel 是 ChangeNotifier，不涉及 BuildContext，可独立测试
 /// - 本文件同时承担 View 和部分 ViewModel 职责（历史遗留，后续重构目标）
 ///
-/// 架构位置：App → DeferredPlayerFeature → **PlayerFeature** → PlayerScreen
+/// 架构位置：App → **PlayerFeature** → PlayerScreen（启动链两层直挂，见 app.dart）
 /// 依赖链：PlayerFeature → PlayerServices → PlaybackController → MediaKitEngine
 library;
 
@@ -22,8 +22,8 @@ import 'package:flutter/material.dart';
 
 import '../../kernel/window_bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
+import '../../kernel/diagnostics/startup_timeline.dart';
 import '../../kernel/player_services.dart';
-import '../../kernel/startup/startup_coordinator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
@@ -41,15 +41,15 @@ import 'file_picker_coordinator.dart';
 /// 需要 MaterialApp 级 [BuildContext] 的回调（设置面板、右键菜单）
 /// 由上层 App 通过构造函数传入，避免 PlayerFeature 对全局 context 的直接依赖。
 class PlayerFeature extends StatefulWidget {
-  /// 启动协调器，用于上报初始化各阶段进度
-  final StartupCoordinator coordinator;
+  /// 启动计时器 — 服务初始化完成后由本组件打点并输出 Timeline 日志。
+  final StartupTimeline startupTimeline;
 
   /// Win32 窗口桥接服务，用于全屏/窗口控制等原生操作
   final WindowBridge windowService;
 
   const PlayerFeature({
     super.key,
-    required this.coordinator,
+    required this.startupTimeline,
     required this.windowService,
   });
 
@@ -99,28 +99,16 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 异步初始化播放器服务
   ///
   /// 初始化序列：
-  /// 1. 上报 StartupPhase.playerInit 开始（进度 0.0）
-  /// 2. 调用 PlayerServices.init() — 初始化引擎、控制器与视频处理服务
-  /// 3. 上报加载设置阶段（进度 0.7）
-  /// 4. 从 SettingsStore 加载自定义快捷键绑定
-  /// 5. 上报初始化完成，调用 coordinator.markReady()
+  /// 1. 调用 PlayerServices.init() — 初始化引擎、控制器与视频处理服务
+  /// 2. 从 SettingsStore 加载自定义快捷键绑定
+  /// 3. 打点 playerInit 并输出启动 Timeline 日志
   ///
   /// 错误处理：任何步骤失败都会捕获异常，设置 _error 状态显示错误 UI，
   /// 不会向上传播导致 App 崩溃。使用 Stopwatch 记录初始化耗时用于性能分析。
   Future<void> _init() async {
     final sw = Stopwatch()..start();
-    widget.coordinator.report(
-      StartupPhase.playerInit,
-      0.0,
-      'Initializing engine...',
-    );
     try {
       await _services.init();
-      widget.coordinator.report(
-        StartupPhase.playerInit,
-        0.7,
-        'Applying built-in defaults...',
-      );
     } catch (e, stackTrace) {
       KernelLogger.I.e(
         '[PlayerFeature] init failed: $e',
@@ -138,7 +126,9 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     KernelLogger.I.d(
       '[PlayerFeature] init completed in ${sw.elapsedMilliseconds}ms',
     );
-    widget.coordinator.markReady();
+    // 启动时序收尾 — playerInit 打点后输出整条 Timeline 日志（幂等）。
+    widget.startupTimeline.mark(StartupTimeline.phasePlayerInit);
+    widget.startupTimeline.ready();
     if (mounted) setState(() => _ready = true);
   }
 

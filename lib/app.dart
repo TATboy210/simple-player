@@ -1,46 +1,32 @@
 import 'package:flutter/material.dart';
 
-import 'kernel/startup/startup_coordinator.dart';
+import 'features/player/player_feature.dart';
+import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
-import 'features/player/deferred_player_feature.dart';
-import 'ui/shared/progress_splash_screen.dart';
-import 'ui/theme/tokens.dart';
 import 'l10n/app_localizations.dart';
+import 'ui/theme/tokens.dart';
 
 /// 应用壳 — MaterialApp、固定主题与本地化。
-class App extends StatefulWidget {
-  final StartupCoordinator coordinator;
+///
+/// 启动链已压缩为两层直挂：main 完成基础设施后 runApp → 本壳直接组合
+/// [PlayerFeature]（其内部自带 ready/error 状态管理）。历史的多阶段进度
+/// Splash（生产不可达）与 deferred 包装（Windows 桌面无延迟收益）已移除，
+/// 判据与取舍见长期记忆 project_controlbar_resize_constant 同期归档。
+class App extends StatelessWidget {
+  /// 启动计时器 — 由 [PlayerFeature] 在服务初始化完成后输出 Timeline 日志。
+  final StartupTimeline startupTimeline;
+
   final WindowBridge windowService;
+
+  /// 窗口初始化失败信息 — 非 null 时以文字态呈现，不阻断 App 构建。
   final String? windowInitError;
-  final WidgetBuilder? readyHomeBuilder;
 
   const App({
     super.key,
-    required this.coordinator,
+    required this.startupTimeline,
     required this.windowService,
     this.windowInitError,
-    this.readyHomeBuilder,
   });
-
-  @override
-  State<App> createState() => _AppState();
-}
-
-class _AppState extends State<App> {
-  final ValueNotifier<bool> _appReady = ValueNotifier<bool>(true);
-  late final WindowBridge _windowService;
-
-  @override
-  void initState() {
-    super.initState();
-    _windowService = widget.windowService;
-  }
-
-  @override
-  void dispose() {
-    _appReady.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,16 +45,12 @@ class _AppState extends State<App> {
       theme: theme,
       darkTheme: theme,
       themeMode: ThemeMode.dark,
-      home: _StartupHome(
-        appReady: _appReady,
-        coordinator: widget.coordinator,
-        readyHomeBuilder: widget.readyHomeBuilder ?? _buildPlayerHome,
-      ),
+      home: _buildPlayerHome(context),
     );
   }
 
   Widget _buildPlayerHome(BuildContext context) {
-    final error = widget.windowInitError;
+    final error = windowInitError;
     if (error != null) {
       return Center(
         child: Text(
@@ -78,38 +60,9 @@ class _AppState extends State<App> {
         ),
       );
     }
-    return DeferredPlayerFeature(
-      coordinator: widget.coordinator,
-      windowService: _windowService,
-    );
-  }
-}
-
-/// 启动页：未就绪显示闪屏，就绪后进入播放器。
-class _StartupHome extends StatelessWidget {
-  const _StartupHome({
-    required this.appReady,
-    required this.coordinator,
-    required this.readyHomeBuilder,
-  });
-
-  final ValueNotifier<bool> appReady;
-  final StartupCoordinator coordinator;
-  final WidgetBuilder readyHomeBuilder;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: appReady,
-      builder: (context, isReady, _) {
-        if (isReady) return readyHomeBuilder(context);
-
-        return ValueListenableBuilder<StartupState>(
-          valueListenable: coordinator.state,
-          builder: (context, startupState, _) =>
-              ProgressSplashScreen(state: startupState),
-        );
-      },
+    return PlayerFeature(
+      startupTimeline: startupTimeline,
+      windowService: windowService,
     );
   }
 }
