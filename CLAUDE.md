@@ -116,6 +116,20 @@ lib/
 - Glass-morphism: `BackdropFilter` + `bgGlass` + `borderHighlight`
 - All colors/fonts/spacing via `Tokens.*` (no hardcoded values)
 
+## Design Philosophy (Unix Philosophy)
+
+Nine tenets guiding every implementation decision (highest priority when tradeoffs arise):
+
+1. **Small is beautiful** — files <500 lines, functions <50 lines; prefer small complete units
+2. **Make each program do one thing well** — one responsibility per widget/kernel/service; if you can't state its "one thing" in a sentence, re-slice it
+3. **Build a prototype as soon as possible** — ship the minimal visible shell first, refine later (e.g. SettingsDialog shell)
+4. **Choose portability over efficiency** — code against media_kit/window_manager abstractions; no platform-specific optimization without measured bottlenecks
+5. **Store data in flat text files** — persisted config/playlists stay human-readable JSON/text, never opaque binaries
+6. **Use software leverage** — reuse mature libs and existing wrappers (Tokens, GlassButton/AppDialog); never reinvent wheels
+7. **Use shell scripts to increase leverage and portability** — codify repeated build/verify pipelines into scripts
+8. **Avoid captive user interfaces** — prefer non-modal (OSD/floating panels) over interrupts; any modal must offer ESC + barrier-click + close button exits
+9. **Make every program a filter** — design service chains as composable input→transform→output steps with narrow interfaces
+
 ## Coding Conventions
 
 - Use `debugPrint()` not `print()` for logging
