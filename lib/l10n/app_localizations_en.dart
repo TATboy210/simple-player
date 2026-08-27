@@ -81,7 +81,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
-  String get settingsPlaceholder => 'More settings coming soon';
+  String get audioTab => 'Audio';
+
+  @override
+  String get specialThanks => 'Special Thanks';
+
+  @override
+  String get thanksPending => 'The list is being prepared — stay tuned';
+
+  @override
+  String get lgplNotice =>
+      'mpv and FFmpeg are dynamically linked under LGPL-2.1-or-later — compliance details are in the bundled NOTICE file';
 
   @override
   String get generalTab => 'General';
