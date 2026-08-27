@@ -168,6 +168,12 @@ class Tokens {
   /// 用户指定的"停一秒再显 logo"入场节奏。
   static const int emptyContentRevealDelayMs = 1000;
 
+  /// 主动停止时视频面消散时长（淡出+后缩）— 实机调参强化可感知性。
+  static const int stopExitDurationMs = 500;
+
+  /// 空置态极光背景缓入时长 — 拉长让"浮现"层次可感知。
+  static const int emptyAuroraFadeDurationMs = 800;
+
   // ── 标题栏 ──
   static const titleBarHeight = 32.0;
   static const titleBarButtonWidth = 36.0;
