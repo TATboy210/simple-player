@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/engine/engine_state.dart';
 import 'package:flutter/material.dart';
 
@@ -71,9 +72,11 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
     _contentRevealTimer = Timer(
       const Duration(milliseconds: Tokens.emptyContentRevealDelayMs),
       () {
+        KernelLogger.I.d('[EmptyState] content reveal after delay');
         if (mounted) _contentReveal.forward();
       },
     );
+    KernelLogger.I.d('[EmptyState] mounted, aurora fading in');
     // AnimatedBuilder 驱动重建，addListener+setState 会导致整个 build() 每帧重建
     // （包括 AuroraBackground），AnimatedBuilder 只重建包裹的子树
 

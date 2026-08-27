@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../kernel/window_bridge/window_manager_service.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';
@@ -200,9 +201,14 @@ class _PlayerScreenState extends State<PlayerScreen>
   /// 出现在同一帧，避免恢复可见时闪现旧内容。
   Future<void> _stopWithTransition() async {
     if (_stopExitAnim.isAnimating) return;
+    KernelLogger.I.d(
+      '[StopTransition] begin (hasMedia=${widget.engine.hasMedia})',
+    );
     if (!widget.engine.hasMedia) return;
     await _stopExitAnim.reverse();
+    KernelLogger.I.d('[StopTransition] fade-out done');
     await widget.controller.stopCurrentMedia();
+    KernelLogger.I.d('[StopTransition] media stopped, empty state armed');
     if (mounted) _stopExitAnim.reset();
   }
 
