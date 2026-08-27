@@ -19,6 +19,8 @@ class FakeWindowService implements WindowBridge {
   int minimizeCallCount = 0;
   int closeCallCount = 0;
   int startDraggingCallCount = 0;
+  int enterNativeFullscreenCallCount = 0;
+  int exitNativeFullscreenCallCount = 0;
 
   // ─── ValueNotifiers ───
 
@@ -47,6 +49,18 @@ class FakeWindowService implements WindowBridge {
     modeCallCount++;
     lastModeValue = target;
     mode.value = target;
+  }
+
+  @override
+  void enterNativeFullscreen() {
+    if (_disposed) return;
+    enterNativeFullscreenCallCount++;
+  }
+
+  @override
+  void exitNativeFullscreen() {
+    if (_disposed) return;
+    exitNativeFullscreenCallCount++;
   }
 
   @override

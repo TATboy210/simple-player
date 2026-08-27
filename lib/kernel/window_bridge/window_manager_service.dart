@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../bridge/win32/native_fullscreen_bridge.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
 import 'window_bridge.dart';
@@ -48,10 +49,21 @@ class WindowService with WindowListener implements WindowBridge {
   bool _isClosing = false;
   bool _initialized = false;
   Future<void>? _initOperation;
+
+  /// 原生全屏 FFI 桥 — 物理全屏动作的唯一执行者（方案 A）。
+  ///
+  /// media_kit 的 utils.cc 退出时以"标准窗口假设"恢复样式，会漂移
+  /// window_manager hidden/frameless 样式位；本桥以进入时快照精确还原。
+  final NativeFullscreenBridge _nativeFullscreen = NativeFullscreenBridge();
+
   late final WindowModeCoordinator _modeCoordinator = WindowModeCoordinator(
     state: _state,
     maximize: windowManager.maximize,
     unmaximize: windowManager.unmaximize,
+    // 方案 A：全屏物理动作在语义队列内收编到本桥 — 无论 UI 路径（F 键/
+    // 双击/按钮）走哪条，setMode 的全屏分支都是唯一触发点。
+    setNativeFullscreen: (enter) =>
+        enter ? _nativeFullscreen.enter() : _nativeFullscreen.exit(),
     waitForInitialization: () async {
       final operation = _initOperation;
       if (operation != null) await operation;
@@ -320,6 +332,24 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   Future<void> setMode(WindowMode target) => _modeCoordinator.setMode(target);
+
+  @override
+  void enterNativeFullscreen() {
+    if (_disposed) return;
+    _modeCoordinator.enqueue(() async {
+      if (_disposed) return;
+      _nativeFullscreen.enter();
+    });
+  }
+
+  @override
+  void exitNativeFullscreen() {
+    if (_disposed) return;
+    _modeCoordinator.enqueue(() async {
+      if (_disposed) return;
+      _nativeFullscreen.exit();
+    });
+  }
 
   @override
   Future<void> setAlwaysOnTop(bool value) {
