@@ -192,6 +192,7 @@ void main() {
     late FakeVideoControlsPort video;
     late ValueNotifier<String> currentFileName;
     late ValueNotifier<bool> openFileEnabled;
+
     /// 窗口模式单一数据源 — 全屏按钮图标/auto-hide/ESC 的驱动源(C2)。
     late ValueNotifier<WindowMode> windowMode;
 
@@ -319,9 +320,10 @@ void main() {
       final backdropFinder = find.byType(BackdropFilter, skipOffstage: false);
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
 
+      // 视觉恒定契约：resize 进入/退出均不改变滤镜状态。
       resizing.value = true;
       await tester.pump();
-      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
 
       resizing.value = false;
       await tester.pump();
@@ -444,8 +446,9 @@ void main() {
       replacementEngine.state.value = MediaState.playing;
       await tester.pump();
       expect(find.text('latest.mp4'), findsOneWidget);
+      // 视觉恒定契约：resize 上升沿不再关闭 backdrop filter。
       final backdrop = find.byType(BackdropFilter, skipOffstage: false);
-      expect(tester.widget<BackdropFilter>(backdrop).enabled, isFalse);
+      expect(tester.widget<BackdropFilter>(backdrop).enabled, isTrue);
       replacementResizing.value = false;
       await tester.pump();
       expect(tester.widget<BackdropFilter>(backdrop).enabled, isTrue);
@@ -1408,12 +1411,10 @@ void main() {
       expect(tester.element(backdropFinder), same(initialElement));
     });
 
-    testWidgets('resize 立即停用并在 non-idle 状态恢复控制栏 backdrop filter', (
-      tester,
-    ) async {
+    testWidgets('resize 会话期间控制栏 backdrop filter 恒定且元素稳定', (tester) async {
       final resizing = ValueNotifier<bool>(false);
       addTearDown(resizing.dispose);
-      // 使用非 idle 的 engine，锁定正常媒体态完成 resize 后恢复 blur 的契约。
+      // 使用非 idle 的 engine，锁定正常媒体态下的视觉恒定契约。
       widgetEngine.play();
 
       await pumpControls(
@@ -1431,12 +1432,13 @@ void main() {
       final initialElement = tester.element(backdropFinder);
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
 
-      // resize 上升沿必须直接停用实时背景采样，不能等待 decoration 的淡出动画。
+      // 视觉恒定：进入 resize 不得关闭实时采样或替换 Element。
       resizing.value = true;
       await tester.pump();
-      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
       expect(tester.element(backdropFinder), same(initialElement));
 
+      // 退出 resize 同样无状态翻转 — 玻璃质感拖动全程零跳变。
       resizing.value = false;
       await tester.pump();
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);

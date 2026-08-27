@@ -376,7 +376,7 @@ void main() {
     });
 
     testWidgets(
-      '_buildBlur toggles filter for resize without replacing its element',
+      'blur stays enabled during resize without replacing its element',
       (tester) async {
         final opacityController = AnimationController(vsync: tester, value: 1);
         final resizing = ValueNotifier(false);
@@ -407,14 +407,14 @@ void main() {
         final initialElement = tester.element(backdropFinder);
         expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
 
-        // resize 起始边沿应立即停用实时视频背景采样，而不是等待淡出结束。
+        // 视觉恒定契约：resize 进入不得关闭滤镜，也绝不替换 Element。
         resizing.value = true;
         await tester.pump();
-        expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
+        expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
         expect(
           identical(tester.element(backdropFinder), initialElement),
           isTrue,
-          reason: 'resize 期间只能切换滤镜状态，不能替换其 Element',
+          reason: 'resize 会话期间玻璃保持启用，且不更换其 Element',
         );
 
         resizing.value = false;
@@ -428,7 +428,7 @@ void main() {
       },
     );
 
-    testWidgets('replacing resizing notifier detaches the old source', (
+    testWidgets('resizing notifier changes do not affect blur state', (
       tester,
     ) async {
       final opacityController = AnimationController(vsync: tester, value: 1);
@@ -461,7 +461,8 @@ void main() {
       final initialElement = tester.element(backdropFinder);
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
 
-      // 父级改用 replacement 后，旧源应已从合并监听器解绑。
+      // 父级改用 replacement 后，blur 层不订阅任何 resize 源 — 新旧源的
+      // 变化都不得触发 blur 层重建或改变滤镜状态。
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -488,11 +489,17 @@ void main() {
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
       expect(tester.element(backdropFinder), same(initialElement));
 
+      // 新源变化会由其合法消费者（如 ProgressBar 几何冻结）调度帧，
+      // 但 blur 层自身不再订阅 — 滤镜状态与 Element 身份纹丝不动。
       replacement.value = true;
-      expect(tester.binding.hasScheduledFrame, isTrue);
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+      expect(tester.element(backdropFinder), same(initialElement));
+
+      // opacity 仍是滤镜启停的唯一开关。
+      opacityController.value = 0;
       await tester.pump();
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isFalse);
-      expect(tester.element(backdropFinder), same(initialElement));
     });
   });
 }

@@ -50,7 +50,8 @@ class ControlBar extends StatelessWidget {
   /// 装饰动画 — 驱动 playing/idle 状态切换的 DecorationTween 插值（D-01/D-02）
   final Animation<double>? decoration;
 
-  /// 窗口 resize 信号 — 同时停用实时背景 blur，并让 ProgressBar 冻结绘制几何。
+  /// 窗口 resize 信号 — 让 ProgressBar 冻结绘制几何（静止型冻结，无视觉跳变）；
+  /// 玻璃模糊与辉光不随 resize 降级（视觉恒定策略，见 [_ControlBarBlur]）。
   final ValueListenable<bool>? resizing;
 
   /// 进度条 seek 开始/结束回调 — 透传给 ProgressBar,通知 AutoHideController
@@ -94,10 +95,11 @@ class ControlBar extends StatelessWidget {
       null => _decorationPlaying,
     };
 
+    // 视觉恒定策略：不再向 EdgeGlow 注入 resize 降级信号 — 辉光在拖动全程
+    // 保持完整渲染（组件内部分支保留，供标题栏等其他场景使用）。
     final content = EdgeGlow(
       variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
-      resizing: resizing,
       child: Material(
         color: Colors.transparent,
         child: LayoutBuilder(
@@ -147,49 +149,43 @@ class ControlBar extends StatelessWidget {
   }
 
   Widget _buildBlur(Widget content) {
-    return _ControlBarBlur(
-      content: content,
-      opacity: opacity,
-      resizing: resizing,
-    );
+    return _ControlBarBlur(content: content, opacity: opacity);
   }
 }
 
 /// 控制栏的模糊壳层。
 ///
-/// 将 opacity 与 resize 信号的合并监听器缓存到 State 中，避免 [ControlBar]
-/// 因标题或视图模型更新而重新 build 时反复分配并重新接线 [Listenable.merge]。
-/// 控件祖先链仍保持 ClipRRect → BackdropFilter → content 不变。
+/// 视觉恒定策略：[BackdropFilter] 在整个 resize 会话中**保持启用** — 历史上
+/// resize 时停用滤镜以规避 GPU readback，但实测证明 raster 尖峰主因为视频
+/// 纹理采样（textureIdChanges=0），且关闭/恢复会造成拖动始末的玻璃质感硬
+/// 跳变。现在 blur 只随自动隐藏透明度启停（不可见即停用采样）；`resizing`
+/// 信号仅由 ProgressBar / OsdOverlay 等静止型冻结消费，不再进入本层。
 class _ControlBarBlur extends StatefulWidget {
   final Widget content;
   final Animation<double>? opacity;
-  final ValueListenable<bool>? resizing;
 
-  const _ControlBarBlur({
-    required this.content,
-    required this.opacity,
-    required this.resizing,
-  });
+  const _ControlBarBlur({required this.content, this.opacity});
 
   @override
   State<_ControlBarBlur> createState() => _ControlBarBlurState();
 }
 
 class _ControlBarBlurState extends State<_ControlBarBlur> {
-  Listenable? _animation;
+  Animation<double>? _animation;
 
   @override
   void initState() {
     super.initState();
-    _animation = _mergeSignals(widget.opacity, widget.resizing);
+    _animation = widget.opacity;
   }
 
   @override
   void didUpdateWidget(covariant _ControlBarBlur oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.opacity != widget.opacity ||
-        oldWidget.resizing != widget.resizing) {
-      _animation = _mergeSignals(widget.opacity, widget.resizing);
+    // 单一监听源（opacity），引用替换时同步即可 — 原 Listenable.merge 接线
+    // 随 resize 降级分支一并移除。
+    if (oldWidget.opacity != widget.opacity) {
+      _animation = widget.opacity;
     }
   }
 
@@ -204,27 +200,14 @@ class _ControlBarBlurState extends State<_ControlBarBlur> {
     return AnimatedBuilder(
       animation: animation,
       builder: (_, child) {
-        final isVisible = (widget.opacity?.value ?? 1) >= 0.01;
-        final isResizing = widget.resizing?.value ?? false;
         return _withBlur(
           child ?? blurContent,
-          enabled: isVisible && !isResizing,
+          // 仅透明度决定滤镜启停；resize 会话期间恒定启用。
+          enabled: (widget.opacity?.value ?? 1) >= 0.01,
         );
       },
       child: blurContent,
     );
-  }
-
-  Listenable? _mergeSignals(
-    Animation<double>? opacity,
-    ValueListenable<bool>? resizing,
-  ) {
-    return switch ((opacity, resizing)) {
-      (final opacity?, final resize?) => Listenable.merge([opacity, resize]),
-      (final opacity?, null) => opacity,
-      (null, final resize?) => resize,
-      (null, null) => null,
-    };
   }
 
   Widget _withBlur(Widget child, {required bool enabled}) => ClipRRect(
