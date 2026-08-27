@@ -150,9 +150,10 @@ void main() {
       newResizing.value = true;
       await tester.pump();
       expect(find.text('latest.mp4'), findsOneWidget);
+      // 视觉恒定契约：resize 会话期间玻璃滤镜保持启用。
       expect(
         tester.widget<BackdropFilter>(find.byType(BackdropFilter)).enabled,
-        isFalse,
+        isTrue,
       );
 
       final paddingAtDispose = newVideo.subtitlePaddingHistory.length;
@@ -168,7 +169,7 @@ void main() {
   );
 
   testWidgets(
-    'ControlBar blur merge ignores replaced opacity and resize sources',
+    'ControlBar blur is not driven by any resize source, old or new',
     (tester) async {
       final oldOpacity = AnimationController(
         vsync: tester,
@@ -235,6 +236,9 @@ void main() {
 
       await tester.pumpWidget(buildBar(oldOpacity, oldResizing));
       await tester.pumpWidget(buildBar(newOpacity, newResizing));
+      // blur 层不订阅任何 resize 源 — 被替换下来的旧源与当前新源的
+      // 变化都不得改变滤镜状态；启停只由 opacity 决定（control_bar_test
+      // 已覆盖 opacity 契约）。
       oldResizing.value = true;
       await tester.pump();
       expect(
@@ -246,7 +250,7 @@ void main() {
       await tester.pump();
       expect(
         tester.widget<BackdropFilter>(find.byType(BackdropFilter)).enabled,
-        isFalse,
+        isTrue,
       );
     },
   );
