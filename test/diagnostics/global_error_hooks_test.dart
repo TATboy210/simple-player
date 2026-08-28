@@ -76,17 +76,22 @@ void main() {
 
       // Act
       hooks.installCallbacks(_ThrowingReporter());
-      final frameworkInvocation = () => frameworkCallback?.call(
-        FlutterErrorDetails(exception: StateError('framework failure')),
-      );
-      final dispatcherInvocation = () => dispatcherCallback?.call(
-        StateError('dispatcher failure'),
-        StackTrace.current,
-      );
+      void invokeFramework() {
+        frameworkCallback?.call(
+          FlutterErrorDetails(exception: StateError('framework failure')),
+        );
+      }
+
+      void invokeDispatcher() {
+        dispatcherCallback?.call(
+          StateError('dispatcher failure'),
+          StackTrace.current,
+        );
+      }
 
       // Assert
-      expect(frameworkInvocation, returnsNormally);
-      expect(dispatcherInvocation, returnsNormally);
+      expect(invokeFramework, returnsNormally);
+      expect(invokeDispatcher, returnsNormally);
       expect(
         dispatcherCallback?.call(StateError('again'), StackTrace.current),
         isTrue,
@@ -111,12 +116,14 @@ void main() {
 
         // Act
         hooks.installCallbacks(reporter);
-        final invocation = () => frameworkCallback?.call(
-          FlutterErrorDetails(exception: StateError('framework failure')),
-        );
+        void invokeFramework() {
+          frameworkCallback?.call(
+            FlutterErrorDetails(exception: StateError('framework failure')),
+          );
+        }
 
         // Assert
-        expect(invocation, returnsNormally);
+        expect(invokeFramework, returnsNormally);
         expect(dispatcherCallback, isNotNull);
         expect(reporter.flutterDetails, hasLength(1));
         expect(fallbackErrors.single, isA<StateError>());
