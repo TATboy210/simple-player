@@ -1,6 +1,8 @@
 /// Behavioral tests for global Flutter and dispatcher diagnostic hooks.
 library;
 
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
@@ -10,6 +12,42 @@ import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
 void main() {
   group('GlobalErrorHooks', () {
+    test('declares guarded bootstrap installation ordering in main source', () {
+      // Arrange
+      final source = File('lib/main.dart').readAsStringSync();
+
+      // Assert
+      expect(
+        source.indexOf('runZonedGuarded<Future<void>>'),
+        greaterThanOrEqualTo(0),
+      );
+      expect(
+        source.indexOf('ErrorReporterImpl.init()'),
+        greaterThanOrEqualTo(0),
+      );
+      expect(
+        source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
+        greaterThanOrEqualTo(0),
+      );
+      expect(
+        source.indexOf('ErrorReporterImpl.init()'),
+        lessThan(
+          source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
+        ),
+      );
+    });
+
+    test('declares bootstrap fallback containment helpers in main source', () {
+      // Arrange
+      final source = File('lib/main.dart').readAsStringSync();
+
+      // Assert
+      expect(source, contains('BootstrapErrorFallback'));
+      expect(source, contains('reportBootstrapSafely'));
+      expect(source, contains('isInitialized'));
+      expect(source, contains('windowInitError ='));
+    });
+
     test(
       'presents framework details before forwarding them to the reporter',
       () {
