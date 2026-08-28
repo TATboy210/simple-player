@@ -1,82 +1,95 @@
 ---
 phase: 01-unified-capture-contract
-reviewed: 2026-08-28T00:00:00Z
+reviewed: 2026-08-28T21:30:00+08:00
 depth: standard
-files_reviewed: 9
+files_reviewed: 13
 files_reviewed_list:
+  - lib/kernel/diagnostics/diagnostic_redactor.dart
   - lib/kernel/diagnostics/error_report.dart
   - lib/kernel/diagnostics/error_reporter.dart
   - lib/kernel/diagnostics/error_reporting_dependencies.dart
   - lib/kernel/diagnostics/global_error_hooks.dart
+  - lib/kernel/diagnostics/player_error_report_bridge.dart
   - lib/kernel/player_services.dart
   - lib/main.dart
   - test/diagnostics/error_report_test.dart
   - test/diagnostics/error_reporter_test.dart
   - test/diagnostics/global_error_hooks_test.dart
+  - test/diagnostics/player_error_report_bridge_test.dart
+  - test/kernel/player_services_test.dart
 findings:
-  critical: 2
-  warning: 1
+  blocker: 2
+  critical: 0
+  warning: 2
   info: 0
-  total: 3
+  total: 4
 status: findings
 ---
 
-# Phase 01: Code Review Report
+# Phase 01: Code Review Report (post gap-closure re-review)
 
-**Reviewed:** 2026-08-28T00:00:00Z  
-**Depth:** standard  
-**Files Reviewed:** 9  
-**Status:** findings
+_Reviewed: 2026-08-28T21:30:00+08:00_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard_
 
 ## Summary
 
-The global Flutter and platform-dispatcher adapters are wired and the focused diagnostic tests pass, but the submitted integration does not connect player-engine failures to the new reporter. In addition, the report contract preserves full media paths and arbitrary error/path content for future effects, violating the stated diagnostic-path redaction requirement. A wall-clock rollback can also make the deduplication window merge occurrences that are not temporally adjacent.
+Re-review after the 01-03 gap-closure plan (PlayerError bridge production reachability, diagnostic redaction, rollback-safe dedupe). The prior review's CR-01 (fourth source unreachable) and CR-02 (raw path disclosure) are resolved: the bridge is wired through `PlayerServices`, and paths are redacted before queue/fan-out. Validation performed by the reviewer: `flutter analyze` on the eight production files passed; targeted diagnostics + PlayerServices tests (32) passed. This round surfaced two residual/new blockers and two warnings.
 
-Verification performed: `flutter analyze` on all nine scoped files and the three focused diagnostic test files passed; `flutter test test/diagnostics/error_report_test.dart test/diagnostics/error_reporter_test.dart test/diagnostics/global_error_hooks_test.dart` passed (20 tests).
+## Blockers
 
-## Narrative Findings (AI reviewer)
+### BL-01: Path redaction leaks directory components when a local path contains whitespace
 
-## Critical Issues
+**Classification:** **BLOCKER**
+**File:** `lib/kernel/diagnostics/diagnostic_redactor.dart:32-39`
+**Issue:** The embedded Windows and POSIX path regexes terminate at whitespace. The remainder of a path is left untouched, despite the documented contract that redaction retains only the filename. For example, redacting `Unable to open C:\Users\alice\Private Videos\incident.mp4` produces text equivalent to `Unable to open Private Videos\incident.mp4` — the user-name prefix is removed, but sensitive directory names remain in the error message and stack snapshot. The same flaw affects POSIX paths such as `/home/alice/Private Videos/incident.mp4`. Those snapshots are intended for cards and future logs, turning a diagnostic failure into local filesystem metadata disclosure.
 
-### CR-01: Player-engine failures never enter the unified reporter
+**Fix:** Replace whitespace-delimited regex matching with a path-token parser that handles quoted paths and spaces, or expand the match through known diagnostic delimiters while preserving the whole path token before passing it to `_basename`. Add regression cases for Windows and POSIX paths containing spaces, parentheses, and bracket characters; assert that only `incident.mp4` remains.
 
-**Classification:** **BLOCKER**  
-**File:** `D:/simple_player_flutter/lib/kernel/player_services.dart:132`  
-**Related paths:** `D:/simple_player_flutter/lib/kernel/services/playback_controller.dart:157-159`, `D:/simple_player_flutter/lib/kernel/engine/media_kit_engine.dart:168-176`, `D:/simple_player_flutter/lib/kernel/engine/media_kit_engine.dart:591-597`  
-**Issue:** `PlayerServices` constructs `PlaybackController(engine: engine)` without its optional `onError` callback. The only controller paths that forward a `PlayerError` are consequently no-ops. Separately, engine failures emitted through `lastError` (including `_player.stream.error`) have no listener anywhere in the application that calls `reportPlayerError`. Repository-wide call-site review shows that `reportPlayerError` has no production caller. Thus the claimed fourth capture boundary, `ErrorSource.playerEngine`, is unreachable in the shipped application; playback errors remain limited to the legacy engine/UI notifier and never reach the FIFO, effects, or future persisted/card presentation.
+### BL-02: Dedupe merges errors with different severities and media targets, hiding fatal errors
 
-**Fix:** Inject the reporter at the service composition boundary and establish exactly one engine-error bridge, with deduplication ownership remaining in `ErrorReporterImpl`. For example, pass `onError: (error) => ErrorReporterImpl.I.reportPlayerError(error, mediaPath: controller.currentPath.value)` when constructing the controller, and subscribe once to `engine.lastError` for asynchronous engine-stream errors (removing that listener during disposal). Alternatively, make `PlaybackController` own the single subscription and inject the narrow `ErrorReporter` interface. Add integration tests that prove an `OpenError`, a validation error, and an asynchronous `lastError` update each produce a `playerEngine` report exactly once.
+**Classification:** **BLOCKER**
+**File:** `lib/kernel/diagnostics/error_reporter.dart:268-283,316-318`
+**Issue:** `_fingerprint` consists only of source, runtime type, message, and top stack frame. It excludes `severity`, any structured `PlayerError` code, and `mediaPath`. Consequently, two `PlayerError`s of the same subtype and message at the same source line are merged even if one is recoverable and the other is fatal, or if they concern different media. `_accept` preserves the first report's immutable severity and path, so a subsequent fatal event can be presented and persisted as the earlier non-fatal event. A concrete collision is possible between differently coded `FileError` or `PlaybackError` instances that share a message and callback frame. The later report increments `occurrenceCount` but loses its fatal classification and media association.
 
-### CR-02: Error reports retain and expose full user filesystem paths
-
-**Classification:** **BLOCKER**  
-**File:** `D:/simple_player_flutter/lib/kernel/diagnostics/error_reporter.dart:245-260`  
-**Related paths:** `D:/simple_player_flutter/lib/kernel/diagnostics/error_reporter.dart:328-342`, `D:/simple_player_flutter/lib/kernel/diagnostics/error_report.dart:75-76`  
-**Issue:** The reporter copies `mediaPathOverride`, `ErrorContext.path`, and the current-media-path provider verbatim into `ErrorReport.mediaPath`. It also accepts arbitrary `error.toString()`/`PlayerError.message` and raw stack text without path redaction. These values are subsequently handed to every `ErrorReportEffect`, which is the planned logging/persistence path, and will be displayed by the planned card host. A Windows absolute media path commonly discloses the account name and directory structure. This contradicts the phase's explicit security requirement that diagnostics not leak sensitive paths and the project convention that diagnostic paths are redacted. Length bounding limits volume, not disclosure.
-
-**Fix:** Normalize all diagnostic text before constructing the report. Store only a basename (or a dedicated redacted path token) for `mediaPath`, and redact Windows, POSIX, URI, message, and stack-trace path forms before queuing or invoking effects. Reuse or extend the project redaction utility so a single, tested policy applies. Add tests with `C:\\Users\\Alice\\Videos\\secret.mp4`, UNC paths, `file:///C:/Users/Alice/...`, and error messages/stacks containing those values; assert that neither the queue snapshot nor a captured effect receives `Alice` or the directory prefix.
+**Fix:** Include all semantic identity fields in the dedupe key. At minimum include `severity` and sanitized `mediaPath`; preferably add an explicit structured error-code/discriminator field to `ErrorReport` and include it in `_fingerprint`. Add tests proving that (1) recoverable and fatal errors with otherwise identical text/frame remain separate; (2) identical errors for different media paths remain separate.
 
 ## Warnings
 
-### WR-01: Clock rollback makes the 10-second dedupe window unbounded backward in time
+### WR-01: Bridge silently drops player diagnostics if metadata lookup or reporter intake throws
 
-**Classification:** **WARNING**  
-**File:** `D:/simple_player_flutter/lib/kernel/diagnostics/error_reporter.dart:268-275`  
-**Issue:** The comparison only checks whether `candidate.lastOccurredAt.difference(existing.lastOccurredAt) <= _dedupeWindow`. `SystemClock` is wall-clock based and can move backward following NTP correction or a user clock change. Any negative duration satisfies this condition, so an identical error observed minutes or hours later can be merged into an old FIFO entry rather than appended as a new incident. This incorrectly suppresses a recurrence and preserves an obsolete queue position.
+**Classification:** **WARNING**
+**File:** `lib/kernel/diagnostics/player_error_report_bridge.dart:53-60`
+**Issue:** `_reportSafely` catches every `Object` and silently discards it. In particular, if `currentMediaPath()` throws, the bridge never calls the reporter with a null fallback path. This violates the unified-capture goal: a failure in optional diagnostic metadata prevents the underlying player error from being captured at all. The empty handler also conflicts with the project convention requiring an explicit logged or terminal fallback for caught errors.
 
-**Fix:** Require a non-negative elapsed duration before merging, or use a monotonic elapsed-time source for dedupe policy:
+**Fix:** Isolate path lookup from report submission. If path lookup fails, call `reportPlayerError(error)` without `mediaPath`; if reporter submission itself fails, send the failure to an injected non-recursive `LastResortOutput`:
 
 ```dart
-final elapsed = candidate.lastOccurredAt.difference(existing.lastOccurredAt);
-if (elapsed >= Duration.zero && elapsed <= _dedupeWindow) {
-  // merge
+String? mediaPath;
+try {
+  mediaPath = error.context?.path ?? _currentMediaPath();
+} on Object catch (failure, stackTrace) {
+  _lastResortOutput(failure, stackTrace);
 }
+_reporter.reportPlayerError(error, mediaPath: mediaPath);
 ```
 
-Add a `FakeClock` regression test that moves backward by more than ten seconds and verifies a second FIFO report is appended rather than merged.
+Add a bridge test where `currentMediaPath` throws and verify the player error still reaches the reporter.
+
+### WR-02: Redactor modifies valid network URLs containing a drive-like path segment
+
+**Classification:** **WARNING**
+**File:** `lib/kernel/diagnostics/diagnostic_redactor.dart:32-35`
+**Issue:** The Windows-path regex can match a valid remote URL path segment when it resembles `C:/...`. For example, `https://example.test/C:/streams/camera.m3u8` is transformed because the `C:/streams/...` suffix satisfies the Windows-path expression. This contradicts the stated contract that network URLs remain untouched and removes useful source information from stream failures.
+
+**Fix:** Detect and preserve URI spans before scanning local filesystem paths, or require a non-URI context before applying Windows-drive redaction. Add test coverage for `http`, `https`, `rtsp`, and `rtmp` URLs whose path contains `X:/`.
 
 ---
 
-_Reviewed: 2026-08-28T00:00:00Z_  
-_Reviewer: Claude (gsd-code-reviewer)_  
-_Depth: standard_
+## Prior-Round Findings Status (resolved by 01-03)
+
+| Prior ID | Title | Status |
+|----------|-------|--------|
+| CR-01 | Player-engine failures never enter the unified reporter | ✅ Resolved — bridge wired via PlayerServices (01-03) |
+| CR-02 | Error reports retain and expose full user filesystem paths | ⚠️ Mostly resolved — redaction added, but BL-01 (whitespace paths) and WR-02 (URLs) are residual gaps |
+| WR-01 (old) | Clock rollback makes 10-second dedupe window unbounded backward | ✅ Resolved — rollback rejected (01-03); BL-02 is a distinct dedupe identity gap |
