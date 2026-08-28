@@ -76,3 +76,14 @@ nul
 # Windows icon backups (local-only, not version controlled)
 *.ico.bak
 
+
+# 发布产物(二进制走 GitHub Releases)
+dist/
+
+# GSD 运行时状态(不进版本库)
+.gsd/
+.planning/milestone.lock
+.planning/research/.cache/
+
+# 本机 VSCode 多根 workspace
+默认-workspace.code-workspace
