@@ -34,7 +34,7 @@ final class DiagnosticRedactor {
       (match) => _basename(match[0] ?? ''),
     );
     return withoutWindowsPaths.replaceAllMapped(
-      RegExp(r'(?<![:\w])/(?:[^\s/]+/)+[^\s\]\)]+'),
+      RegExp(r'(?<![:/\w])/(?:[^\s/]+/)+[^\s\]\)]+'),
       (match) => _basename(match[0] ?? ''),
     );
   }

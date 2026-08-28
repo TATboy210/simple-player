@@ -4,6 +4,7 @@ library;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/diagnostic_redactor.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
@@ -209,6 +210,134 @@ void main() {
         expect(reporter.queuedReports.single.occurrenceCount, 1000);
       },
     );
+  });
+
+  group('ErrorReporterImpl diagnostic redaction', () {
+    test(
+      'redacts every local path family before queue effect and presentation',
+      () {
+        const cases = <({String path, String secret, String basename})>[
+          (
+            path: r'C:\Users\alice\Videos\clip.mp4',
+            secret: r'C:\Users\alice\Videos',
+            basename: 'clip.mp4',
+          ),
+          (
+            path: r'\\server\private-share\clip.mp4',
+            secret: r'\\server\private-share',
+            basename: 'clip.mp4',
+          ),
+          (
+            path: '/home/alice/Videos/clip.mp4',
+            secret: '/home/alice/Videos',
+            basename: 'clip.mp4',
+          ),
+          (
+            path: 'file:///C:/Users/alice/Videos/clip%20one.mp4',
+            secret: 'C:/Users/alice/Videos',
+            basename: 'clip one.mp4',
+          ),
+        ];
+
+        for (final pathCase in cases) {
+          // Arrange
+          final effects = <ErrorReport>[];
+          final reporter = _reporter(
+            effects: [(report, _) => effects.add(report)],
+          );
+          final stack = StackTrace.fromString(
+            'at Player.open (${pathCase.path}:7:8)\n'
+            'package:simple_player_flutter/player.dart:2',
+          );
+          final error = UnknownError(
+            'Unable to open ${pathCase.path}',
+            null,
+            ErrorContext(path: pathCase.path, callbackStackTrace: stack),
+          );
+
+          // Act
+          reporter.reportPlayerError(error);
+          reporter.flushPresentation();
+
+          // Assert
+          final report = reporter.queuedReports.single;
+          final observed = <ErrorReport>[
+            report,
+            effects.single,
+            reporter.presentation.value.current!,
+          ];
+          for (final snapshot in observed) {
+            expect(snapshot.mediaPath, isNot(contains(pathCase.secret)));
+            expect(snapshot.message, isNot(contains(pathCase.secret)));
+            expect(snapshot.rawStackTrace, isNot(contains(pathCase.secret)));
+            expect(snapshot.mediaPath, contains(pathCase.basename));
+            expect(snapshot.rawStackTrace, contains(':7:8'));
+          }
+        }
+      },
+    );
+
+    test('is idempotent and leaves package frames and network URLs intact', () {
+      // Arrange
+      const text =
+          'package:simple_player_flutter/player.dart:2 https://example.test/a rtsp://camera/live';
+
+      // Act
+      final once = DiagnosticRedactor.redactDiagnosticText(text);
+      final twice = DiagnosticRedactor.redactDiagnosticText(once);
+
+      // Assert
+      expect(twice, once);
+      expect(once, contains('package:simple_player_flutter/player.dart:2'));
+      expect(once, contains('https://example.test/a'));
+      expect(once, contains('rtsp://camera/live'));
+    });
+  });
+
+  group('ErrorReporterImpl queue policy', () {
+    test(
+      'does not merge a matching report after the wall clock rolls back',
+      () {
+        // Arrange
+        final clock = FakeClock(DateTime.utc(2026, 8, 28, 12));
+        final reporter = _reporter(clock: clock);
+        final stack = _stack('rollback.dart');
+
+        // Act
+        reporter.reportPlatformSafely(StateError('same'), stack);
+        clock.currentTime = clock.now().subtract(const Duration(minutes: 3));
+        reporter.reportPlatformSafely(StateError('same'), stack);
+
+        // Assert
+        expect(reporter.queuedReports, hasLength(2));
+        expect(reporter.queuedReports.first.occurrenceCount, 1);
+        expect(reporter.queuedReports.last.occurrenceCount, 1);
+        expect(
+          reporter.queuedReports.first.eventId,
+          isNot(reporter.queuedReports.last.eventId),
+        );
+      },
+    );
+
+    test('merges duplicate reports at zero and ten seconds but not above', () {
+      // Arrange
+      final clock = FakeClock(DateTime.utc(2026, 8, 28, 12));
+      final reporter = _reporter(clock: clock);
+      final stack = _stack('boundary.dart');
+
+      // Act
+      reporter.reportPlatformSafely(StateError('same'), stack);
+      reporter.reportPlatformSafely(StateError('same'), stack);
+      clock.currentTime = clock.now().add(const Duration(seconds: 10));
+      reporter.reportPlatformSafely(StateError('same'), stack);
+      clock.currentTime = clock.now().add(const Duration(seconds: 11));
+      reporter.reportPlatformSafely(StateError('same'), stack);
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(2));
+      expect(reporter.queuedReports.first.occurrenceCount, 3);
+      expect(reporter.queuedReports.last.occurrenceCount, 1);
+    });
   });
 
   group('ErrorReporterImpl fault isolation', () {
