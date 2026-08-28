@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. 应用启动后，框架错误仍保留开发调试输出，异步未捕获错误被应用接管而不会作为未处理错误继续冒泡。
   3. 连续发生的相同错误会在当前报告中合并重复次数；不同错误按发生顺序等待用户处理，关闭当前项会展示下一项而不丢失已记录证据。
   4. 报告服务、其任一副作用或错误处理重入发生故障时，播放器不会因错误反馈链再次崩溃。
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Build and fully test the immutable ErrorReport kernel tracer, singleton reporter, bounded FIFO, dedupe, flush, and fault isolation.
+- [ ] 01-02-PLAN.md — Wire Flutter/Dart global hooks and same-zone guarded startup to the reporter; consolidate diagnostic initialization ownership.
 
 ### Phase 2: 可信定位与文件证据
 **Goal**: 每份错误报告都能给出可信的项目位置和媒体上下文，并独立写入可读取、可复制的本地诊断证据。
