@@ -1,6 +1,13 @@
 ---
-gsd_state_version: '1.0'
+gsd_state_version: 1.0
+current_phase: 1
+current_phase_name: 统一捕获与报告契约
 status: planning
+stopped_at: Phase 1 context gathered
+last_updated: "2026-08-28T09:19:47.299Z"
+last_activity: 2026-08-28
+last_activity_desc: Created v2.1 roadmap and mapped all 21 v1 requirements.
+state_head: 1a958ef08b8325bcbfadc72d68f4ec12b35a4ca5
 progress:
   total_phases: 5
   completed_phases: 0
@@ -30,6 +37,7 @@ Progress: [░░░░░░░░░░] 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: -
 - Total execution time: 0 hours
@@ -41,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: Not established
 
@@ -72,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-28
-Stopped at: v2.1 roadmap creation completed; Phase 1 is ready for detailed planning.
-Resume file: None
+Last session: 2026-08-28T09:19:47.281Z
+Stopped at: Phase 1 context gathered
+Resume file: .planning/phases/01-unified-capture-contract/01-CONTEXT.md
