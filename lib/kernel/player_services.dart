@@ -21,6 +21,7 @@
 /// v1.8:移除 Playlist/playlistGeneration(单文件播放器,无队列)。
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'diagnostics/clock.dart';
 import 'diagnostics/error_reporter.dart';
@@ -45,7 +46,10 @@ import 'services/video_processing_service.dart';
 ///
 /// No UI state, no BuildContext — independently unit-testable.
 class PlayerServices {
-  PlayerServices({required this.windowService});
+  PlayerServices({
+    required this.windowService,
+    PlayerServicesDependencies? testingDependencies,
+  }) : _testingDependencies = testingDependencies;
 
   /// 异步创建并初始化 PlayerServices 实例.
   ///
@@ -59,6 +63,9 @@ class PlayerServices {
     await services.init();
     return services;
   }
+
+  /// Test-only dependency seam; production keeps native construction unchanged.
+  final PlayerServicesDependencies? _testingDependencies;
 
   /// 视频渲染引擎实例.
   ///
@@ -129,14 +136,18 @@ class PlayerServices {
       MemoryMonitor.init(memoryMonitor);
 
       _throwIfDisposed();
-      _mediaKitEngine = MediaKitEngine();
-      _engine = _mediaKitEngine;
+      final dependencies = _testingDependencies;
+      _engine = dependencies?.engineFactory() ?? MediaKitEngine();
+      _mediaKitEngine = switch (_engine) {
+        final MediaKitEngine mediaKitEngine => mediaKitEngine,
+        _ => null,
+      };
       _engineCreated = true;
 
       _throwIfDisposed();
       _playerErrorBridge = PlayerErrorReportBridge(
         engine: engine,
-        reporter: ErrorReporterImpl.I,
+        reporter: dependencies?.reporter ?? ErrorReporterImpl.I,
         currentMediaPath: () => _controller?.currentPath.value,
       );
       _controller = PlaybackController(
@@ -209,4 +220,20 @@ class PlayerServices {
       _disposeCreatedResources();
     }
   }
+}
+
+/// Test-only construction collaborators for lifecycle behavior without libmpv.
+@visibleForTesting
+final class PlayerServicesDependencies {
+  /// Creates test dependencies while preserving production defaults by omission.
+  const PlayerServicesDependencies({
+    required this.engineFactory,
+    required this.reporter,
+  });
+
+  /// Creates the project-owned [MediaEngine] substitute.
+  final MediaEngine Function() engineFactory;
+
+  /// Receives diagnostics from the one owned bridge.
+  final ErrorReporter reporter;
 }
