@@ -9,6 +9,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/global_error_hooks.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
+import 'package:simple_player_flutter/main.dart' show BootstrapErrorFallback;
 
 void main() {
   group('GlobalErrorHooks', () {
@@ -46,6 +47,54 @@ void main() {
       expect(source, contains('reportBootstrapSafely'));
       expect(source, contains('isInitialized'));
       expect(source, contains('windowInitError ='));
+    });
+
+    test(
+      'contains unavailable reporter fallback and throwing terminal output',
+      () {
+        // Arrange
+        final outputs = <Object>[];
+
+        // Act
+        BootstrapErrorFallback.reportWith(
+          StateError('bootstrap failure'),
+          StackTrace.current,
+          isReporterInitialized: () => false,
+          reportInitialized: (_, _) => fail('reporter must not be accessed'),
+          lastResortOutput: (error, _) => outputs.add(error),
+        );
+
+        // Assert
+        expect(outputs.single, isA<StateError>());
+        expect(
+          () => BootstrapErrorFallback.reportWith(
+            StateError('bootstrap failure'),
+            StackTrace.current,
+            isReporterInitialized: () => throw StateError('probe failed'),
+            reportInitialized: (_, _) => fail('reporter must not be accessed'),
+            lastResortOutput: (_, _) => throw StateError('output failed'),
+          ),
+          returnsNormally,
+        );
+      },
+    );
+
+    test('delegates an initialized bootstrap error once', () {
+      // Arrange
+      final reported = <Object>[];
+      final error = StateError('bootstrap failure');
+
+      // Act
+      BootstrapErrorFallback.reportWith(
+        error,
+        StackTrace.current,
+        isReporterInitialized: () => true,
+        reportInitialized: (failure, _) => reported.add(failure),
+        lastResortOutput: (_, _) => fail('fallback must not run'),
+      );
+
+      // Assert
+      expect(reported, [same(error)]);
     });
 
     test(
