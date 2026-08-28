@@ -42,6 +42,7 @@ final class ErrorReport {
     required this.firstOccurredAt,
     required this.lastOccurredAt,
     required this.errorType,
+    required this.playerErrorCode,
     required this.message,
     required this.rawStackTrace,
     required this.mediaPath,
@@ -65,6 +66,12 @@ final class ErrorReport {
 
   /// Snapshot of the incoming error runtime type.
   final String errorType;
+
+  /// Stable structured PlayerError discriminator captured at player intake.
+  ///
+  /// Non-player capture boundaries store null so semantic dedupe cannot confuse
+  /// two typed player failures that happen to share text and a stack frame.
+  final String? playerErrorCode;
 
   /// Bounded opaque diagnostic message snapshot.
   final String message;
@@ -90,6 +97,7 @@ final class ErrorReport {
       firstOccurredAt: firstOccurredAt,
       lastOccurredAt: lastOccurredAt ?? this.lastOccurredAt,
       errorType: errorType,
+      playerErrorCode: playerErrorCode,
       message: message,
       rawStackTrace: rawStackTrace,
       mediaPath: mediaPath,
