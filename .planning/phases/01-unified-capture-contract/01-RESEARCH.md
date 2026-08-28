@@ -480,6 +480,7 @@ Inject a clock, ID source, media provider, and effect list rather than changing 
 3. **Will a report effect be required to run once per duplicate occurrence in Phase 2?**
    - What we know: Phase 1 only requires duplicate count merging and queue semantics; Phase 2 owns file evidence. [VERIFIED: D:/simple_player_flutter/.planning/REQUIREMENTS.md:10-14; 21-27]
    - Recommendation: Define a `ReportAcceptance` disposition now (`new`, `merged`, `dropped`, `reentrantSuppressed`) so Phase 2 can decide whether to append a bounded repeat-summary without changing public reporter APIs. [ASSUMED]
+   - **RESOLVED (2026-08-28, plan-phase final iteration):** Effects fire on every accepted capture/merge — each accepted report (new append, merged in-slot replacement, or post-window new append) dispatches its effects carrying the `ReportAcceptance` disposition, while `dropped` (head eviction) and `reentrantSuppressed` intakes dispatch no effects. This is consistent with D-04's merge-count semantics and lets Phase 2 add a bounded repeat-summary effect for merged occurrences without changing public reporter APIs. Test assertion recorded in 01-01-PLAN.md Task 2 acceptance_criteria.
 
 ## Environment Availability
 
