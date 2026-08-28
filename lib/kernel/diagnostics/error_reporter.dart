@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/player_error.dart';
 import 'clock.dart';
+import 'diagnostic_redactor.dart';
 import 'error_report.dart';
 import 'error_reporting_dependencies.dart';
 
@@ -242,8 +243,11 @@ final class ErrorReporterImpl implements ErrorReporter {
     required String? mediaPathOverride,
   }) {
     final now = _clock.now();
+    // Sanitize before length bounds and every downstream queue/effect fan-out.
     final message = _bounded(
-      messageOverride ?? error.toString(),
+      DiagnosticRedactor.redactDiagnosticText(
+        messageOverride ?? error.toString(),
+      ),
       _maxTextLength,
     );
     final stack = _snapshotStack(suppliedStack);
@@ -256,7 +260,7 @@ final class ErrorReporterImpl implements ErrorReporter {
       errorType: _bounded(error.runtimeType.toString(), _maxTextLength),
       message: message,
       rawStackTrace: stack,
-      mediaPath: _boundedNullable(mediaPathOverride ?? _currentMediaPath()),
+      mediaPath: _sanitizeMediaPath(mediaPathOverride ?? _currentMediaPath()),
       occurrenceCount: 1,
     );
   }
@@ -265,8 +269,11 @@ final class ErrorReporterImpl implements ErrorReporter {
     final matchingIndex = _findMatchingIndex(candidate);
     if (matchingIndex != null) {
       final existing = _queue.elementAt(matchingIndex);
-      if (candidate.lastOccurredAt.difference(existing.lastOccurredAt) <=
-          _dedupeWindow) {
+      final elapsed = candidate.lastOccurredAt.difference(
+        existing.lastOccurredAt,
+      );
+      // Wall-clock rollback must preserve new evidence instead of merging stale.
+      if (elapsed >= Duration.zero && elapsed <= _dedupeWindow) {
         final merged = existing.copyWith(
           lastOccurredAt: candidate.lastOccurredAt,
           occurrenceCount: existing.occurrenceCount + 1,
@@ -328,7 +335,15 @@ final class ErrorReporterImpl implements ErrorReporter {
   String _snapshotStack(StackTrace? suppliedStack) {
     final snapshot =
         suppliedStack?.toString() ?? unavailableOriginalStackMarker;
-    return _bounded(snapshot, _maxStackLength);
+    return _bounded(
+      DiagnosticRedactor.redactDiagnosticText(snapshot),
+      _maxStackLength,
+    );
+  }
+
+  String? _sanitizeMediaPath(String? value) {
+    if (value == null) return null;
+    return _bounded(DiagnosticRedactor.redactPathValue(value), _maxTextLength);
   }
 
   String _bounded(String value, int maximum) {
@@ -337,9 +352,6 @@ final class ErrorReporterImpl implements ErrorReporter {
     }
     return '${value.substring(0, maximum)}…[truncated]';
   }
-
-  String? _boundedNullable(String? value) =>
-      value == null ? null : _bounded(value, _maxTextLength);
 
   void _publishSafely({bool? isReady}) {
     try {
