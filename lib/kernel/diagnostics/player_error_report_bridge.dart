@@ -52,11 +52,21 @@ final class PlayerErrorReportBridge {
 
   /// Contains untrusted error access so diagnostic intake never changes playback.
   void _reportSafely(PlayerError error) {
+    final mediaPath = _snapshotMediaPath(error);
     try {
-      final mediaPath = error.context?.path ?? _currentMediaPath();
       _reporter.reportPlayerError(error, mediaPath: mediaPath);
     } on Object {
       // The reporter has its own terminal fallback; bridge intake stays inert.
+    }
+  }
+
+  /// Captures optional metadata without allowing its failure to drop evidence.
+  String? _snapshotMediaPath(PlayerError error) {
+    try {
+      return error.context?.path ?? _currentMediaPath();
+    } on Object {
+      // This external callback boundary may throw; the player event is required.
+      return null;
     }
   }
 }

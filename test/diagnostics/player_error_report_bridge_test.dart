@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
@@ -88,6 +89,28 @@ void main() {
       expect(fixture.reporter.queuedReports.single.occurrenceCount, 2);
     });
 
+    test('forwards once with null metadata when the path provider throws', () {
+      // Arrange
+      final engine = FakeEngine();
+      final reporter = _RecordingReporter();
+      final error = UnknownError('provider failure');
+      final bridge = PlayerErrorReportBridge(
+        engine: engine,
+        reporter: reporter,
+        currentMediaPath: () => throw StateError('metadata unavailable'),
+      );
+      addTearDown(() {
+        bridge.dispose();
+        engine.dispose();
+      });
+
+      // Act and assert
+      expect(() => bridge.reportControllerError(error), returnsNormally);
+      expect(reporter.calls, hasLength(1));
+      expect(reporter.calls.single.error, same(error));
+      expect(reporter.calls.single.mediaPath, isNull);
+    });
+
     test('detaches the listener and allows repeated disposal', () {
       // Arrange
       final fixture = _BridgeFixture();
@@ -133,6 +156,31 @@ final class _BridgeFixture {
 }
 
 /// Builds a deterministic reporter for bridge behavior tests.
+/// Records bridge intake independently from queue deduplication policy.
+final class _RecordingReporter implements ErrorReporter {
+  final List<({PlayerError error, String? mediaPath})> calls = [];
+
+  @override
+  void dismissCurrent() {}
+
+  @override
+  void flushPresentation() {}
+
+  @override
+  void reportBootstrapSafely(Object error, StackTrace stackTrace) {}
+
+  @override
+  void reportFlutterSafely(FlutterErrorDetails details) {}
+
+  @override
+  void reportPlatformSafely(Object error, StackTrace stackTrace) {}
+
+  @override
+  void reportPlayerError(PlayerError error, {String? mediaPath}) {
+    calls.add((error: error, mediaPath: mediaPath));
+  }
+}
+
 ErrorReporterImpl _reporter() {
   var sequence = 0;
   return ErrorReporterImpl.forTesting(
