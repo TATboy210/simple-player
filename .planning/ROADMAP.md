@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 连续发生的相同错误会在当前报告中合并重复次数；不同错误按发生顺序等待用户处理，关闭当前项会展示下一项而不丢失已记录证据。
   4. 报告服务、其任一副作用或错误处理重入发生故障时，播放器不会因错误反馈链再次崩溃。
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 Plans:
 **Wave 1**
 
@@ -46,7 +46,7 @@ Plans:
 
 **Wave 3** *(gap closure; blocked on Waves 1–2 completion)*
 
-- [ ] 01-03-PLAN.md — Connect one lifecycle-owned player-error bridge, redact diagnostic paths before fan-out, and reject rollback-negative dedupe intervals.
+- [x] 01-03-PLAN.md — Connect one lifecycle-owned player-error bridge, redact diagnostic paths before fan-out, and reject rollback-negative dedupe intervals.
 
 ### Phase 2: 可信定位与文件证据
 
@@ -119,7 +119,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 统一捕获与报告契约 | 2/2 | In Progress|  |
+| 1. 统一捕获与报告契约 | 3/3 | In Progress|  |
 | 2. 可信定位与文件证据 | 0/TBD | Not started | - |
 | 3. 播放错误桥与非模态卡片 | 0/TBD | Not started | - |
 | 4. 错误反馈设置 | 0/TBD | Not started | - |
