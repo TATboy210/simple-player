@@ -269,8 +269,11 @@ final class ErrorReporterImpl implements ErrorReporter {
     final matchingIndex = _findMatchingIndex(candidate);
     if (matchingIndex != null) {
       final existing = _queue.elementAt(matchingIndex);
-      if (candidate.lastOccurredAt.difference(existing.lastOccurredAt) <=
-          _dedupeWindow) {
+      final elapsed = candidate.lastOccurredAt.difference(
+        existing.lastOccurredAt,
+      );
+      // Wall-clock rollback must preserve new evidence instead of merging stale.
+      if (elapsed >= Duration.zero && elapsed <= _dedupeWindow) {
         final merged = existing.copyWith(
           lastOccurredAt: candidate.lastOccurredAt,
           occurrenceCount: existing.occurrenceCount + 1,
