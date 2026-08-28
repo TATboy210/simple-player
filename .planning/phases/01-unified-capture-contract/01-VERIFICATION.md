@@ -1,60 +1,63 @@
 ---
 phase: 01-unified-capture-contract
-verified: 2026-08-28T14:30:00Z
+verified: 2026-08-28T16:10:00Z
 status: gaps_found
-score: 1/4 must-haves verified
+score: 2/4 must-haves verified
 behavior_unverified: 1
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
-  previous_score: 2/4
+  previous_score: 1/4
   gaps_closed:
-    - "GAP-1 production reachability: PlayerServices now owns one PlayerErrorReportBridge wired to PlaybackController.onError and MediaEngine.lastError."
-    - "GAP-2 rollback handling: negative elapsed wall-clock intervals now append instead of merging."
+    - "CAP-01-WHITESPACE-PATH-REDACTION: delimiter-aware redaction now removes Windows/POSIX directory prefixes containing whitespace, parentheses, and brackets before queue, effects, and presentation."
+    - "CAP-01-BRIDGE-METADATA-CONTAINMENT: a throwing media-path provider now degrades to null while the original PlayerError is forwarded once."
   gaps_remaining:
-    - "CAP-01 path sanitization is incomplete for local paths containing whitespace."
-  regressions:
-    - "Dedupe identity omits severity and mediaPath, allowing semantically distinct player reports to merge."
+    - "CAP-04-SEMANTIC-DEDUPE-IDENTITY remains incomplete: the queue chooses the oldest equal fingerprint instead of the newest in-window occurrence, and delimiter-based fingerprint serialization permits distinct reports to collide."
+  regressions: []
 gaps:
-  - truth: "框架异常、未捕获异步异常、启动期异常和播放引擎异常都可产生同一种含事件 ID、时间、严重级、错误、调用栈及当时媒体路径的不可变报告。"
+  - truth: "Matching reports received within the inclusive zero-through-ten-second window merge with the applicable retained report while post-window reports remain distinct."
     status: failed
-    reason: "The PlayerError bridge is now production-wired, but DiagnosticRedactor stops embedded local-path matches at whitespace. Reports can retain sensitive directory components in message and stack snapshots, so the safety requirement is not met for all valid local paths."
-    artifacts:
-      - path: "lib/kernel/diagnostics/diagnostic_redactor.dart"
-        issue: "Lines 24-38 use path regexes whose [^\\s...] tails stop at whitespace; e.g. C:\\Users\\alice\\Private Videos\\incident.mp4 is reduced only to Private Videos\\incident.mp4."
-      - path: "test/diagnostics/error_reporter_test.dart"
-        issue: "Lines 218-276 cover only path values with no whitespace, parentheses, or brackets and therefore do not prove the stated all-local-path safety contract."
-    missing:
-      - "Replace whitespace-terminated matching with a local-path token parser or delimiter-aware matcher that consumes quoted/unquoted paths containing spaces, parentheses, and brackets."
-      - "Add Windows and POSIX regression tests asserting that only incident.mp4 remains in mediaPath, message, rawStackTrace, effects, and presentation."
-  - truth: "连续发生的相同错误会在当前报告中合并重复次数；不同错误按发生顺序等待用户处理，关闭当前项会展示下一项而不丢失已记录证据。"
-    status: failed
-    reason: "The fingerprint includes only source, runtime type, sanitized message, and top frame. It omits severity, structured PlayerError code, and mediaPath, so a later fatal error or an error for another media target can merge into an earlier recoverable report and retain the earlier severity/path."
+    reason: "_findMatchingIndex scans FIFO from oldest to newest and returns the first equal fingerprint. After equal reports at t=0 and t=11, an equal report at t=15 is compared only to t=0, fails the window check, and is appended instead of merging into the t=11 report."
     artifacts:
       - path: "lib/kernel/diagnostics/error_reporter.dart"
-        issue: "Lines 268-283 merge any matching fingerprint, while lines 316-318 construct that fingerprint without severity, PlayerError code, or mediaPath."
-      - path: "test/diagnostics/player_error_report_bridge_test.dart"
-        issue: "Lines 76-89 call a same-message but distinct error and assert occurrenceCount 2. This demonstrates bridge identity correlation but leaves the reporter's incorrect semantic merge unchallenged."
+        issue: "Lines 274-288 apply the time check only after _findMatchingIndex; lines 297-304 return the oldest equal fingerprint."
+      - path: "test/diagnostics/error_reporter_test.dart"
+        issue: "No active regression covers occurrences at 0s, 11s, and 15s."
     missing:
-      - "Include severity and sanitized mediaPath in the dedupe identity; retain a structured PlayerError discriminator/code in ErrorReport and fingerprint it as well."
-      - "Add active regression tests proving same text/frame errors with different severity, PlayerError code, or media path remain separate FIFO reports."
+      - "Select the newest same-fingerprint retained report that has a nonnegative elapsed duration no greater than 10 seconds, rather than selecting the first FIFO match."
+      - "Add a deterministic FakeClock regression for t=0, t=11, and t=15 proving the final occurrence merges into the t=11 report."
+  - truth: "Reports merge only when every semantic fingerprint field matches; reports with a different sanitized message or sanitized media path remain distinct."
+    status: failed
+    reason: "_fingerprint joins untrusted variable-length fields with an unescaped | delimiter, so distinct field boundaries can serialize identically and merge."
+    artifacts:
+      - path: "lib/kernel/diagnostics/error_reporter.dart"
+        issue: "Line 323 concatenates message, mediaPath, and top frame with raw | separators. For example message 'open failed|segment' plus mediaPath 'clip.mp4' collides with message 'open failed' plus mediaPath 'segment|clip.mp4' when all other fields match."
+      - path: "test/diagnostics/error_reporter_test.dart"
+        issue: "No active test includes a | boundary-collision pair."
+    missing:
+      - "Use a typed equality key/record or direct field comparison; do not serialize unescaped variable-length fields with delimiters."
+      - "Add a regression proving the two | boundary-collision reports remain two FIFO entries."
 behavior_unverified_items:
-  - truth: "应用启动后，框架错误仍保留开发调试输出，异步未捕获错误被应用接管而不会作为未处理错误继续冒泡。"
-    test: "In a Windows debug build, trigger one Flutter framework exception and one root-isolate uncaught asynchronous exception after startup."
-    expected: "Flutter's normal development diagnostic is still presented and exactly one framework report is captured; the dispatcher error produces one report, PlatformDispatcher.onError handles it by returning true, and the player remains usable."
-    why_human: "Injected callback tests establish adapter ordering and the literal true return, but do not exercise Flutter Windows process-global callbacks inside the booted app's real guarded zone."
-human_verification:
-  - test: "Windows debug global-hook smoke"
-    expected: "A framework error retains Flutter development output and yields one report; a root-isolate asynchronous error is handled without terminating the player."
-    why_human: "The current tests invoke setter-injected callbacks rather than the actual Windows Flutter runtime boundary."
+  - truth: "After the real Windows application starts, framework errors retain Flutter development presentation and root-isolate asynchronous errors are handled by PlatformDispatcher without terminating the player."
+    test: "Run a Windows debug build, trigger one Flutter framework exception and one root-isolate uncaught asynchronous exception after startup."
+    expected: "Flutter's normal development diagnostic remains visible; each source produces exactly one report; dispatcher handling returns true and the player remains usable."
+    why_human: "The focused tests invoke setter-injected callback seams. They do not exercise Flutter Windows process-global dispatch from a booted application in its real guarded zone."
+coincidental_reliance_items:
+  - truth: "CAP-03 failure containment"
+    reason: fixture-only
+    harden: "The public reporter is covered with injected throwing collaborators, but production bridge containment relies on the concrete reporter's internal fallback; an alternate ErrorReporter implementation would be silently swallowed by PlayerErrorReportBridge."
 ---
 
 # Phase 1: 统一捕获与报告契约 Verification Report
 
 **Phase Goal:** 应用可将四类错误来源安全归一化为可追踪、可去重、可按序处理的报告，而不会因报告自身失败造成新的应用故障。  
-**Verified:** 2026-08-28T14:30:00Z  
+**Verified:** 2026-08-28T16:10:00Z  
 **Status:** gaps_found  
-**Re-verification:** Yes — after 01-03 gap-closure execution
+**Re-verification:** Yes — after 01-04 gap-closure execution
+
+## MVP Mode Guard
+
+Phase 1 is marked `mvp`, but its roadmap goal is not a valid required User Story (`As a ..., I want to ..., so that ....`). The centralized validation query returned `false`. Therefore a formal MVP user-flow/UAT verdict cannot be produced until the phase goal is reformatted. The technical evidence audit below was completed because the phase has independently observable roadmap criteria and the user explicitly requested re-verification; it found blocking implementation defects regardless of the metadata discrepancy.
 
 ## Goal Achievement
 
@@ -62,123 +65,150 @@ human_verification:
 
 | # | Truth | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | 框架异常、未捕获异步异常、启动期异常和播放引擎异常都可产生同一种含事件 ID、时间、严重级、错误、调用栈及当时媒体路径的不可变报告。 | ✗ FAILED | The original missing production PlayerError route is fixed: `PlayerServices` constructs the bridge at `lib/kernel/player_services.dart:148-156`; bridge listener/callback wiring reaches the sole production `reportPlayerError` call at `lib/kernel/diagnostics/player_error_report_bridge.dart:22, 31-57`. However, `DiagnosticRedactor.redactDiagnosticText` at lines 24-38 terminates every local-path match at whitespace, leaking e.g. `Private Videos\\incident.mp4` in reports. This contradicts CAP-01's safe unified-report contract. |
-| 2 | 应用启动后，框架错误仍保留开发调试输出，异步未捕获错误被应用接管而不会作为未处理错误继续冒泡。 | ⚠️ PRESENT_BEHAVIOR_UNVERIFIED | `lib/main.dart:22-62` creates the guarded bootstrap then initializes/report-installs hooks; `global_error_hooks.dart:69-93` presents framework errors first and returns literal `true` for dispatcher errors. The focused injected-seam tests pass, but no test exercises those process-global callbacks in a booted Windows app. |
-| 3 | 连续发生的相同错误会在当前报告中合并重复次数；不同错误按发生顺序等待用户处理，关闭当前项会展示下一项而不丢失已记录证据。 | ✗ FAILED | FIFO, dismissal, capacity, and rollback handling are implemented and tested, but `_fingerprint` in `error_reporter.dart:316-318` omits severity, code, and mediaPath. Thus distinct fatal/recoverable events or different media targets can be treated as the same error. `_accept` retains the first report's immutable severity/path at lines 268-283, hiding the later event's semantics. |
-| 4 | 报告服务、其任一副作用或错误处理重入发生故障时，播放器不会因错误反馈链再次崩溃。 | ✓ VERIFIED | `ErrorReporterImpl._reportSafely`, `_publishSafely`, `_notifyEffects`, and terminal `_emitLastResort` contain failures (`error_reporter.dart:200-235, 356-390`). Focused tests exercise throwing collaborators, effect, notifier listener, reentrant intake, hooks, and fallback output; all passed. The bridge's silent metadata-failure drop is a warning because it can lose a report but does not create a new app fault. |
+| 1 | 框架异常、未捕获异步异常、启动期异常和播放引擎异常都可产生同一种含事件 ID、时间、严重级、错误、调用栈及当时媒体路径的不可变报告。 | VERIFIED | `ErrorReport` is immutable (`error_report.dart:36-105`); reporter implements all four adapters (`error_reporter.dart:129-180`); globals are installed from `main.dart:30-32`; and `PlayerServices` owns the bridge (`player_services.dart:148-156`). The focused tests directly exercise adapter normalization, bridge validation/OpenError/notifier ingress, timestamps, stack markers, IDs, and immutable PlayerError snapshots. Whitespace-path and throwing-provider gaps from the prior verification are covered by active passing tests. |
+| 2 | 应用启动后，框架错误仍保留开发调试输出，异步未捕获错误被应用接管而不会作为未处理错误继续冒泡。 | PRESENT_BEHAVIOR_UNVERIFIED | `GlobalErrorHooks` presents first then reports (`global_error_hooks.dart:69-80`), always returns literal `true` for dispatcher errors (`:83-94`), and is installed inside `runZonedGuarded` after reporter initialization (`main.dart:22-34`). Injected-seam tests pass, but a booted Windows Flutter runtime has not exercised its actual process-global callbacks. |
+| 3 | 连续发生的相同错误会在当前报告中合并重复次数；不同错误按发生顺序等待用户处理，关闭当前项会展示下一项而不丢失已记录证据。 | FAILED | FIFO capacity, dismissal, flush, and several separation cases work, but the matching algorithm selects an out-of-window oldest duplicate and the delimiter-serialized fingerprint can collide across distinct message/path fields. Either defect permits incorrect retention/merging. |
+| 4 | 报告服务、其任一副作用或错误处理重入发生故障时，播放器不会因错误反馈链再次崩溃。 | VERIFIED (coincidental-reliance) | `_reportSafely`, `_publishSafely`, per-effect `_notifyEffects`, and terminal `_emitLastResort` isolate failures (`error_reporter.dart:201-237,373-407`); focused tests pass for throwing collaborators, effects, listeners, reentry, hook reporters/presenters, and fallback output. The bridge's broad silent catch is a warning because it makes this proof depend on the concrete reporter's own containment. |
 
-**Score:** 1/4 truths verified (1 present, behavior-unverified)
+**Score:** 2/4 truths verified (1 present, behavior-unverified)
 
-### Re-verification Results
+## Re-verification Results
 
-The two named previous failures were checked against current code rather than accepting the 01-03 summary:
-
-| Previous gap | Current evidence | Result |
+| Previous residual gap | Independent current-code evidence | Result |
 | --- | --- | --- |
-| GAP-1: PlayerError was not production-reachable | One bridge is created by `PlayerServices`, receives `PlaybackController.onError`, listens to `MediaEngine.lastError`, and detaches before controller/engine teardown. Focused bridge and service tests passed. | Production wiring closed; safe redaction remains incomplete (new residual blocker). |
-| GAP-2: Wall-clock rollback merged stale reports | `_accept` requires `elapsed >= Duration.zero && elapsed <= _dedupeWindow` at `error_reporter.dart:275-283`; test at `error_reporter_test.dart:297-320` passes. | Closed. |
+| CAP-01-WHITESPACE-PATH-REDACTION | `DiagnosticRedactor` uses a token scanner rather than whitespace-terminated matching (`diagnostic_redactor.dart:23-193`). Active tests cover quoted/unquoted Windows/POSIX paths containing whitespace, parentheses, and brackets through report, effect, and presentation (`error_reporter_test.dart:313-433`). | CLOSED |
+| CAP-01-BRIDGE-METADATA-CONTAINMENT | `_snapshotMediaPath` catches metadata failure and returns null, after which `_reportSafely` invokes `reportPlayerError` once (`player_error_report_bridge.dart:53-71`). The active recording-reporter test asserts original identity and null metadata (`player_error_report_bridge_test.dart:92-112`). | CLOSED |
+| CAP-04-SEMANTIC-DEDUPE-IDENTITY | Severity, PlayerError discriminator, and sanitized path were added to the identity inputs, but queue selection and serialization still violate semantic dedupe. | NOT CLOSED |
+
+## Detailed Plan Must-Have Audit
+
+| Plan | Must-have group | Status | Evidence |
+| --- | --- | --- | --- |
+| 01-01 | Four adapter APIs make immutable bounded reports; supplied/absent stack policy is retained. | VERIFIED | Adapter and snapshot tests pass; report fields are final and `copyWith` preserves identity. |
+| 01-01 | Fan-in is non-throwing, effects isolate, and recursive intake terminates. | VERIFIED | Reentrancy/effect/listener/collaborator fault-injection tests pass. |
+| 01-01 | Capacity is five; sixth distinct report evicts head; dismiss and flush preserve FIFO. | VERIFIED | `error_reporter_test.dart:152-188` passes. |
+| 01-01 | A matching report inside 10 seconds merges; after 10 seconds it is distinct. | FAILED | This claim is not true once more than one equal post-window report is retained; oldest-match selection breaks the 0s/11s/15s sequence. |
+| 01-01 | Pre-ready reports remain queued and idempotent flush presents the original head. | VERIFIED | Queue/flush test passes and `_publishSafely` does not mutate `_queue`. |
+| 01-02 | Framework hook presents first and forwards; dispatcher forwards exact values and returns true. | VERIFIED | Active setter-injected behavioral tests prove order, identity, containment, and `true`. Real-Windows behavior remains separately behavior-unverified above. |
+| 01-02 | One guarded bootstrap owns bindings, initialization, hooks, and runApp; unavailable reporter fallback returns normally. | VERIFIED | `main.dart:22-62` and deterministic fallback tests verify the structural/lifecycle contract. |
+| 01-02 | Window initialization recovery preserves App state and reports once; main owns diagnostic initialization. | PRESENT_BEHAVIOR_UNVERIFIED | Source code has one local catch/forward path (`main.dart:40-52`) and PlayerServices no longer initializes the logger, but no test injects a real WindowService initialization failure to prove state plus exactly-once reporting. |
+| 01-03 | Validation, OpenError dual ingress, later notifier error, and disposal flow through one production-owned bridge. | VERIFIED | Bridge and PlayerServices tests cover validation, identity-scoped dual ingress suppression, later notifier input, ownership, order, and idempotent detach. |
+| 01-03 | Windows/UNC/POSIX/file-URI material is redacted before queue/effects/presentation. | VERIFIED | Active table-driven redaction and downstream observation test passes. |
+| 01-03 | Deduplication merges only for nonnegative elapsed time through ten seconds. | FAILED | The negative-clock guard exists, but selection of an older equal report means the complete time-window invariant is false for retained repeated fingerprints. |
+| 01-04 | Whitespace-bearing local paths expose basename-only values through all fan-out. | VERIFIED | The gap-closure scanner and end-to-end tests cover the named Windows/POSIX cases. |
+| 01-04 | Different severity, typed PlayerError code, or sanitized media path stay distinct. | VERIFIED | Active semantic-separation test verifies these three dimensions. |
+| 01-04 | Every fully equal report merges only within the inclusive 0–10 second window; capacity remains five. | FAILED | Oldest-match selection violates the within-window portion; raw delimiter serialization violates the every-semantic-field portion. |
+| 01-04 | PlayerError structured identity is frozen at intake; throwing bridge metadata lookup forwards once with null. | VERIFIED | `playerErrorCode` is immutable/copy-preserved; active mutation and throwing-provider tests pass. |
+| 01-04 | D-01/D-02/D-03/CAP-03 behavior remains unchanged. | VERIFIED | No Wave-4 production changes touch bootstrap or presentation ownership; focused diagnostics and static analysis pass. |
 
 ## Required Artifacts
 
 | Artifact | Expected | Status | Details |
 | --- | --- | --- | --- |
-| `lib/kernel/diagnostics/error_report.dart` | Immutable report and presentation contracts | ✓ VERIFIED | `ErrorReport` and `ErrorPresentationState` have final snapshot fields; `copyWith` preserves identity fields (`:36-121`). Contract test passed. |
-| `lib/kernel/diagnostics/error_reporting_dependencies.dart` | Injectable reporting seams | ✓ VERIFIED | Typed ID, path, effect, terminal fallback seams plus reused `Clock` alias are substantive (`:9-49`) and consumed by reporter/hooks/bridge. |
-| `lib/kernel/diagnostics/error_reporter.dart` | Sole safe fan-in, FIFO, dedupe, effects | ⚠️ PARTIAL | All four APIs and containment paths are substantive and wired, but semantic dedupe can merge different severity/code/media reports. |
-| `lib/kernel/diagnostics/diagnostic_redactor.dart` | Redact every local path before fan-out | ✗ FAILED | Substantive implementation is called before bounds/queue, but whitespace-delimited regexes at `:24-38` leak directory components. |
-| `lib/kernel/diagnostics/player_error_report_bridge.dart` | Single PlayerError ingress bridge and cleanup | ✓ VERIFIED | Subscribes only to project-owned `lastError`, accepts controller callback, correlates by object identity, and removes exact listener (`:15-61`). |
-| `lib/kernel/player_services.dart` | Production bridge composition and disposal ownership | ✓ VERIFIED | Creates one bridge then injects callback (`:148-157`); removes bridge before controller/engine disposal (`:181-191`). |
-| `lib/kernel/diagnostics/global_error_hooks.dart` | Framework and dispatcher adapters | ✓ VERIFIED | Production global setters at `:104-114`; framework presentation precedes report at `:69-80`; dispatcher returns `true` at `:83-94`. |
-| `lib/main.dart` | Same-zone bootstrap and early reporter initialization | ✓ VERIFIED | `runZonedGuarded` is the first executable operation (`:22-23`), and logger/reporter initialize before hook registration (`:30-34`). |
-| `test/diagnostics/error_reporter_test.dart` | Reporter policy and redaction regressions | ⚠️ PARTIAL | Active and passing, but local-path samples omit whitespace and no semantic-fingerprint separation test exists. |
-| `test/diagnostics/player_error_report_bridge_test.dart` | Production ingress/lifecycle behavior | ⚠️ PARTIAL | Active and passing; its distinct-instance test intentionally observes a merge, so it does not prove semantically distinct reports remain separate. |
+| `lib/kernel/diagnostics/error_report.dart` | Immutable report/presentation contracts and player discriminator snapshot | VERIFIED | Final fields and replacement-only `copyWith`; direct contract test passes. |
+| `lib/kernel/diagnostics/error_reporting_dependencies.dart` | Injected clock/ID/path/effect/fallback seams | VERIFIED | Substantive typed interfaces consumed by reporter, hooks, and bridge. |
+| `lib/kernel/diagnostics/error_reporter.dart` | Four-source fan-in, bounded FIFO, effects, dedupe | PARTIAL | Exists, substantive, and production-wired, but contains both dedupe blockers at `:274-304` and `:321-324`. |
+| `lib/kernel/diagnostics/diagnostic_redactor.dart` | Pre-fan-out local path redaction | VERIFIED | Scanner is called from `_createReport` before bounds/queue/effects/presentation. |
+| `lib/kernel/diagnostics/global_error_hooks.dart` | Framework/dispatcher callbacks | VERIFIED | Production setters and tested injected seams are wired from main. |
+| `lib/main.dart` | Same-zone bootstrap and early initialization | VERIFIED | The first executable operation is `runZonedGuarded`; initialization precedes hook installation. |
+| `lib/kernel/diagnostics/player_error_report_bridge.dart` | Sole project-owned player ingress bridge | VERIFIED with warning | Listener/callback and lifecycle wiring work. Its `on Object` catch at `:57-60` silently swallows an alternate reporter failure. |
+| `lib/kernel/player_services.dart` | Bridge composition and teardown ownership | VERIFIED | Exactly one bridge is created and detached before controller/engine disposal. |
+| `test/diagnostics/error_reporter_test.dart` | Report, queue, redaction, containment regression proof | PARTIAL | 18 active passing tests, but missing 0/11/15 recurrence and `|` collision regression coverage. |
+| `test/diagnostics/global_error_hooks_test.dart` | Global hook/fallback test proof | VERIFIED | 9 active passing tests; runtime process-global coverage still requires Windows verification. |
+| `test/diagnostics/player_error_report_bridge_test.dart` | Player ingress and metadata fault proof | VERIFIED | 6 active passing tests including null-path exactly-once behavior. |
 
 ## Key Link Verification
 
 | From | To | Via | Status | Details |
 | --- | --- | --- | --- | --- |
-| `GlobalErrorHooks.install` | Flutter framework / platform dispatcher callbacks | Production setter callbacks | ✓ WIRED | `main.dart:32` calls install after reporter init; setters assign both Flutter global callbacks in `global_error_hooks.dart:104-114`. |
-| guarded zone handler | `ErrorReporterImpl.reportBootstrapSafely` | lifecycle-probed `BootstrapErrorFallback` | ✓ WIRED | `main.dart:61` supplies fallback; `:69-118` avoids unsafe singleton access and contains terminal-output failure. |
-| Player failure boundaries | `ErrorReporter.reportPlayerError` | `PlaybackController.onError` plus `MediaEngine.lastError` through one bridge | ✓ WIRED | Composition and bridge calls at `player_services.dart:148-156` and `player_error_report_bridge.dart:22, 31-57`; no other production player ingress invokes reporter. |
-| Reporter normalization | FIFO, `presentation`, effects | `_createReport` then `_accept`, publish, notify | ⚠️ PARTIAL | Fan-out wiring is correct, but redaction feeds unsafe residual local path text and dedupe identity omits semantic fields. |
+| `GlobalErrorHooks.install` | Flutter and dispatcher globals | synchronous production setter assignment | WIRED | `main.dart:32` calls install; both globals are assigned in `global_error_hooks.dart:104-114`. |
+| guarded-zone callback | bootstrap reporter intake | lifecycle-probed `BootstrapErrorFallback` | WIRED | `main.dart:61`, `:69-126` contain unavailable-singleton and terminal-output paths. |
+| `PlayerServices` | `PlaybackController.onError` and `MediaEngine.lastError` | one `PlayerErrorReportBridge` | WIRED | `player_services.dart:148-156`; bridge adds/removes the notifier listener and calls reporter at `player_error_report_bridge.dart:22,57`. |
+| `_createReport` | redactor, immutable queue, effect, presentation | sanitize → bound → `_accept` → publish/effect | PARTIAL | Dynamic source data flows correctly, but erroneous dedupe identity/selection corrupts the queue behavior. |
+| `ErrorReport.copyWith` | retained FIFO merge slot | replacement at matching index | PARTIAL | Replacement preserves semantic fields, but the selected index may be the wrong historical occurrence. |
 
 ## Data-Flow Trace (Level 4)
 
-| Artifact | Data Variable | Source | Produces Real Data | Status |
+| Artifact | Data variable | Source | Produces real data | Status |
 | --- | --- | --- | --- | --- |
-| `global_error_hooks.dart` / `main.dart` | framework, dispatcher, bootstrap error inputs | Live Flutter callbacks and guarded startup path | Yes | ✓ FLOWING |
-| `player_error_report_bridge.dart` | `PlayerError` / current media path | Live controller callback and `MediaEngine.lastError` notifier | Yes | ✓ FLOWING |
-| `error_reporter.dart` | immutable report snapshots | `_createReport` normalizes real ingress values before queue/effect/presentation | Yes, but unsafe for paths with whitespace | ⚠️ UNSAFE_FLOW |
-| `error_reporter.dart` | dedupe selection | Retained FIFO reports and injected clock | Yes, but semantically incomplete | ⚠️ COLLIDING_FLOW |
+| global hooks / main | Flutter, dispatcher, and zone error inputs | Flutter runtime boundaries | Yes | FLOWING (runtime Windows hook dispatch not directly exercised) |
+| player bridge | `PlayerError` and current media snapshot | Controller callback plus `MediaEngine.lastError` | Yes | FLOWING |
+| reporter normalization | immutable report values | source errors and injected clock/path provider | Yes | FLOWING |
+| dedupe queue | semantic report identity and occurrence count | retained reports plus clock | No, for recurrence/collision edge cases | DISCONNECTED FROM REQUIRED SEMANTICS |
 
 ## Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 | --- | --- | --- | --- |
-| Immutable reports, all adapters, FIFO/dedupe, fault containment, global hooks, player bridge/lifecycle | `D:/flutter/bin/flutter test test/diagnostics/error_report_test.dart test/diagnostics/error_reporter_test.dart test/diagnostics/global_error_hooks_test.dart test/diagnostics/player_error_report_bridge_test.dart test/kernel/player_services_test.dart test/kernel/services/playback_controller_test.dart` | 46 tests passed | ✓ PASS |
-| Static analysis | `flutter analyze` | Orchestrator-confirmed: `No issues found` | ✓ PASS |
-| Full workspace regression suite | `flutter test` | Orchestrator-confirmed: 1,254 passed | ✓ PASS |
-| Real Windows global-hook behavior | Application not started by verifier | Requires interactive runtime injection | ? SKIP |
+| Immutable reports, four adapters, FIFO, redaction, containment, hooks, player bridge, lifecycle | `flutter test test/diagnostics/error_report_test.dart test/diagnostics/error_reporter_test.dart test/diagnostics/global_error_hooks_test.dart test/diagnostics/player_error_report_bridge_test.dart test/kernel/player_services_test.dart test/kernel/services/playback_controller_test.dart` | 51 tests passed | PASS |
+| Static analysis | `flutter analyze` | `No issues found!` | PASS |
+| 0s → 11s → 15s equal recurrence | Manual source trace of `_findMatchingIndex` and `_accept` | Selects index 0 at t=15, sees 15 seconds, appends; t=11 item is never examined | FAIL |
+| `|` message/path boundary collision | Manual source trace of `_fingerprint` | Both differing tuples serialize to the same raw delimiter string | FAIL |
+| Real Windows global hooks | No server/application started by verifier | Cannot safely invoke actual process-global callbacks without a Windows app run | SKIP |
 
 ## Requirements Coverage
 
-| Requirement | Source Plan | Description | Status | Evidence |
+| Requirement | Source plans | Description | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| CAP-01 | 01-01, 01-02, 01-03 | Four source types normalize to one immutable report with timestamp, severity, error, stack, media snapshot, and event ID | ✗ BLOCKED | Four code paths and current production player bridge exist, but the report safety boundary leaks directory fragments for whitespace-containing local paths. A bridge metadata lookup failure is also silently dropped rather than falling back to a null media path (`player_error_report_bridge.dart:53-60`). |
-| CAP-02 | 01-02 | Same guarded-zone hook installation, framework development presentation, dispatcher returns true | ⚠️ NEEDS HUMAN | Static composition and injected callback tests prove intended behavior. Actual Windows global runtime behavior has not been exercised. |
-| CAP-03 | 01-01, 01-02 | Single non-throwing fan-in/fan-out, isolated effects, reentrancy safety | ✓ SATISFIED | Reporter/hook fault-injection tests prove all named public paths return normally after collaborator/effect/listener/reentrant failures. |
-| CAP-04 | 01-01, 01-03 | Bounded FIFO, correct dedupe/count, and dismissal preservation | ✗ BLOCKED | Capacity/FIFO/dismissal/rollback tests pass, but identity excludes severity, structured code, and media target. Reports that are observably different can be merged and lose their fatal/path meaning. |
+| CAP-01 | 01-01, 01-02, 01-03, 01-04 | Four sources share immutable report contract with timestamps, severity, error, stack, path and event ID | NEEDS HUMAN | Code and focused tests verify the report contract, player wiring, redaction, and injected global callbacks. The real Windows global-hook outcome is not exercised. |
+| CAP-02 | 01-02, 01-04 | Three global hooks are installed in one guarded zone; framework presentation remains; dispatcher returns true | NEEDS HUMAN | Source and injected callback tests pass; process-global Windows runtime behavior remains unproven. |
+| CAP-03 | 01-01, 01-02, 01-04 | Sole non-throwing reentrancy-safe fan-in/fan-out with isolated effects | SATISFIED | Fault injection verifies reporter/hook behavior. Warning: bridge swallows failures from an arbitrary injected reporter without terminal output. |
+| CAP-04 | 01-01, 01-03, 01-04 | Bounded FIFO plus correct fingerprint dedupe/count/dismissal | BLOCKED | Capacity, FIFO and normal separations work, but the two dedupe blockers make the full semantic window contract false. |
 
-All plan-declared IDs are accounted for: CAP-01, CAP-02, CAP-03, CAP-04. No additional Phase 1 IDs are orphaned in `D:/simple_player_flutter/.planning/REQUIREMENTS.md`. Its traceability table currently marks CAP-01 and CAP-04 `Complete`, which is stale relative to this code-based verdict.
+All plan-declared IDs are accounted for: CAP-01, CAP-02, CAP-03, and CAP-04. No additional Phase 1 requirements are orphaned in `D:/simple_player_flutter/.planning/REQUIREMENTS.md`.
 
 ## Test Quality Audit
 
-| Test File | Linked Req | Active | Skipped | Circular | Assertion Level | Verdict |
+| Test file | Linked requirements | Active | Skipped | Circular | Assertion level | Verdict |
 | --- | --- | ---: | ---: | --- | --- | --- |
-| `test/diagnostics/error_report_test.dart` | CAP-01 | 1 | 0 | No | Value | Valid immutable-value contract. |
-| `test/diagnostics/error_reporter_test.dart` | CAP-01, CAP-03, CAP-04 | 15 | 0 | No | Behavioral | Valid normal-path/fault coverage; insufficient for whitespace paths and semantic dedupe identity. |
-| `test/diagnostics/global_error_hooks_test.dart` | CAP-01, CAP-02, CAP-03 | 9 | 0 | No | Behavioral/source-order | Valid injected seam checks; not a real Windows global-hook proof. |
-| `test/diagnostics/player_error_report_bridge_test.dart` | CAP-01, CAP-04 | 5 | 0 | No | Behavioral | Valid bridge ingress/cleanup coverage; the same-message-distinct-instance test asserts merge count 2, so it cannot prove correct semantic deduplication. |
-| `test/kernel/player_services_test.dart` | CAP-01 | 3 | 0 | No | Behavioral | Valid composition/lifecycle seam coverage. |
+| `test/diagnostics/error_report_test.dart` | CAP-01, CAP-04 | 1 | 0 | No | Value | Valid immutable replacement check. |
+| `test/diagnostics/error_reporter_test.dart` | CAP-01, CAP-03, CAP-04 | 18 | 0 | No | Behavioral | Insufficient for newest-in-window recurrence and delimiter collision. |
+| `test/diagnostics/global_error_hooks_test.dart` | CAP-01, CAP-02, CAP-03 | 9 | 0 | No | Behavioral/source-order | Valid injected-seam evidence; not production-Windows callback proof. |
+| `test/diagnostics/player_error_report_bridge_test.dart` | CAP-01, CAP-04 | 6 | 0 | No | Behavioral | Valid bridge/metadata/lifecycle evidence. |
+| `test/kernel/player_services_test.dart` | CAP-01 | 3 | 0 | No | Behavioral | Valid composition and disposal evidence. |
 
 **Disabled tests on requirements:** 0  
 **Circular patterns detected:** 0  
-**Insufficient assertions:** 2 gaps — missing whitespace-path redaction cases and missing severity/code/media fingerprint separation cases.
+**Insufficient assertions:** 2 blocker omissions — no 0/11/15 recurrence test and no `|` fingerprint-collision test.
 
 ## Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 | --- | ---: | --- | --- | --- |
-| `lib/kernel/diagnostics/diagnostic_redactor.dart` | 24-38 | Whitespace-terminated regex path matching | BLOCKER | Leaks local directory names in retained message/stack fields. |
-| `lib/kernel/diagnostics/error_reporter.dart` | 268-283, 316-318 | Dedupe fingerprint lacks semantic identity fields | BLOCKER | A fatal/different-media player error can be represented as the earlier recoverable report. |
-| `lib/kernel/diagnostics/player_error_report_bridge.dart` | 53-60 | Catch-all silently drops a player report if media metadata lookup fails | WARNING | Optional metadata failure prevents unified capture instead of reporting with a null media path. |
-| `lib/kernel/diagnostics/diagnostic_redactor.dart` | 32-35 | Drive-style matching can alter remote URL paths containing `X:/` | WARNING | Can remove useful network stream diagnostic context. |
+| `lib/kernel/diagnostics/error_reporter.dart` | 274-304 | First FIFO equality match selected before time-window evaluation | BLOCKER | A valid current recurrence fragments into an unnecessary third report rather than increasing the newer report's count. |
+| `lib/kernel/diagnostics/error_reporter.dart` | 321-324 | Unescaped delimiter serialization of semantic identity | BLOCKER | Distinct message/media-path evidence can collide and be incorrectly merged. |
+| `lib/kernel/diagnostics/player_error_report_bridge.dart` | 57-60 | Silent broad reporter-failure catch | WARNING | An alternate `ErrorReporter` implementation can lose diagnostic evidence without terminal output; it does not currently crash the player. |
+| `lib/kernel/player_services.dart` | 163-171, 194-201 | Broad cleanup catches | WARNING | Catches programming errors during disposal; pre-existing lifecycle behavior is not a direct cause of the Phase 1 goal failure. |
 
-No `TBD`, `FIXME`, or `XXX` debt markers were found in the phase diagnostic implementation files. No remote telemetry sender or endpoint is present in the phase reporting path. The bridge is not UI/modal-dependent, and diagnostic listeners are detached on service disposal.
+No `TBD`, `FIXME`, or `XXX` debt marker exists in Phase-1 diagnostic production files. Static source review found no remote telemetry transport, no mounted-UI/modal dependency in capture, and no media_kit package modification. These prohibition checks are non-authoritative static judgments; the phase already has concrete blockers and they must not be treated as a substitute for fixing them.
 
 ### Decision Coverage
 
-All four trackable `01-CONTEXT.md` decisions remain represented: a single guarded startup zone (`main.dart`), main-owned reporter initialization, readiness-gated FIFO presentation, and capacity-five/time-window queue policy. This is non-blocking coverage information.
+All 4/4 trackable `01-CONTEXT.md` decisions are represented in shipped artifacts: same-zone bootstrap (D-01), main-owned initialization (D-02), readiness-gated FIFO publication (D-03), and capacity/time-window policy (D-04). This non-blocking check does not establish that the D-04 implementation is correct.
 
-## Human Verification Required
+## Deferred Items
+
+None. The two failed dedupe properties are Phase-1 CAP-04 responsibilities. No later roadmap success criterion specifically schedules their repair, so they are not deferred to Phases 2–5.
+
+## Human Verification Required After Gap Closure
 
 ### 1. Windows debug global-hook smoke
 
-**Test:** Run `D:/flutter/bin/flutter run -d windows` in debug mode. Trigger a controlled Flutter framework exception and a controlled root-isolate unhandled asynchronous exception after application startup.
+**Test:** Run `flutter run -d windows` in debug mode. Trigger a controlled Flutter framework exception and a root-isolate uncaught asynchronous exception after startup.
 
-**Expected:** The framework exception retains normal Flutter developer diagnostics and creates one report. The asynchronous exception creates one report, is treated as handled by dispatcher return `true`, and the player remains usable.
+**Expected:** Flutter's normal development diagnostic remains visible; each input results in exactly one report; dispatcher handling prevents application termination and the player remains usable.
 
-**Why human:** Existing tests use setter-injected callbacks; they do not invoke Flutter Windows' process-global callback dispatch in the real startup zone.
+**Why human:** The active tests use setter-injected callbacks rather than Flutter Windows' live process-global callback dispatch.
 
 ## Gaps Summary
 
-The 01-03 closure genuinely repaired the original missing player bridge and wall-clock rollback behavior, and the focused code/test evidence proves those repairs. The phase nevertheless still fails its goal contract.
+The 01-04 work genuinely closes the prior whitespace redaction and bridge-metadata gaps. It also correctly adds severity, structured PlayerError code, and sanitized media path to the intended identity dimensions. However, its implementation is still not a correct semantic deduplicator.
 
-First, local diagnostic capture is not safe for valid local filenames containing spaces: the redactor leaves directory fragments in report message and stack text. Second, dedupe treats reports with different severity, PlayerError code, or media target as equivalent. That can hide a later fatal event as an earlier recoverable event and therefore violates both the safe traceability and distinct-error FIFO portions of the Phase 1 goal.
+First, it searches equal fingerprints FIFO-first, not newest applicable occurrence. The reproducible timeline `t=0`, `t=11`, `t=15` violates the stated inclusive 0–10-second merge policy. Second, it represents the identity as a raw pipe-delimited string. Since message and media path are untrusted strings that can contain `|`, different reports can have the same serialized key. Both defects are observable in the actual implementation and are BLOCKERS for CAP-04 and the phase goal.
 
-These are Phase 1 requirements, not deferred Phase 2/3 work: CAP-01 explicitly requires safe four-source immutable reports and CAP-04 requires correct fingerprint deduplication. No later roadmap criterion specifically schedules repair of these two defects, so neither is deferred.
+The phase must not proceed until the two gaps are repaired and targeted regression tests are added. After automated closure, retain the Windows debug hook smoke as the remaining human verification item and correct the invalid MVP goal metadata before relying on an MVP/UAT completion verdict.
 
 ---
 
-_Verified: 2026-08-28T14:30:00Z_  
+_Verified: 2026-08-28T16:10:00Z_  
 _Verifier: Claude (gsd-verifier)_
