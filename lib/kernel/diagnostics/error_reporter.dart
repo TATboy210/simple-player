@@ -172,6 +172,7 @@ final class ErrorReporterImpl implements ErrorReporter {
         suppliedStack: context?.callbackStackTrace,
         messageOverride: error.message,
         mediaPathOverride: mediaPath ?? context?.path,
+        playerErrorCode: _playerErrorCode(error),
       );
     } on Object catch (failure, stackTrace) {
       // PlayerError implementations are untrusted at this boundary.
@@ -204,6 +205,7 @@ final class ErrorReporterImpl implements ErrorReporter {
     required StackTrace? suppliedStack,
     String? messageOverride,
     String? mediaPathOverride,
+    String? playerErrorCode,
   }) {
     if (_isReporting) {
       _emitLastResort(
@@ -222,6 +224,7 @@ final class ErrorReporterImpl implements ErrorReporter {
         suppliedStack: suppliedStack,
         messageOverride: messageOverride,
         mediaPathOverride: mediaPathOverride,
+        playerErrorCode: playerErrorCode,
       );
       final acceptance = _accept(report);
       _publishSafely();
@@ -241,6 +244,7 @@ final class ErrorReporterImpl implements ErrorReporter {
     required StackTrace? suppliedStack,
     required String? messageOverride,
     required String? mediaPathOverride,
+    required String? playerErrorCode,
   }) {
     final now = _clock.now();
     // Sanitize before length bounds and every downstream queue/effect fan-out.
@@ -258,6 +262,7 @@ final class ErrorReporterImpl implements ErrorReporter {
       firstOccurredAt: now,
       lastOccurredAt: now,
       errorType: _bounded(error.runtimeType.toString(), _maxTextLength),
+      playerErrorCode: playerErrorCode,
       message: message,
       rawStackTrace: stack,
       mediaPath: _sanitizeMediaPath(mediaPathOverride ?? _currentMediaPath()),
@@ -313,8 +318,20 @@ final class ErrorReporterImpl implements ErrorReporter {
       ]);
   }
 
+  /// Builds the fixed-order semantic identity used only for short-window merges.
   String _fingerprint(ErrorReport report) {
-    return '${report.source.name}|${report.errorType}|${report.message}|${_topFrame(report.rawStackTrace)}';
+    return '${report.source.name}|${report.severity.name}|${report.errorType}|${report.playerErrorCode}|${report.message}|${report.mediaPath}|${_topFrame(report.rawStackTrace)}';
+  }
+
+  /// Converts the sealed player hierarchy into an immutable, stable primitive.
+  String _playerErrorCode(PlayerError error) {
+    return switch (error) {
+      FileError(:final code) => 'file:${code.name}',
+      CodecError(:final code) => 'codec:${code.name}',
+      PlaybackError(:final code) => 'playback:${code.name}',
+      NetworkError(:final code) => 'network:${code.name}',
+      UnknownError() => 'unknown',
+    };
   }
 
   String _topFrame(String stack) {

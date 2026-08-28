@@ -42,9 +42,36 @@ void main() {
       ]);
       final report = reporter.queuedReports.last;
       expect(report.severity, ErrorSeverity.fatal);
+      expect(report.playerErrorCode, 'playback:textureFailed');
       expect(report.mediaPath, 'explicit.mp4');
       expect(report.rawStackTrace, supplied.toString());
       _expectCompleteReport(report);
+    });
+
+    test('maps every PlayerError subtype to a stable discriminator', () {
+      // Arrange
+      final reporter = _reporter();
+      final errors = <PlayerError>[
+        FileError(FileErrorCode.fileNotFound, 'file'),
+        CodecError(CodecErrorCode.decodeFailed, 'codec'),
+        PlaybackError(PlaybackErrorCode.playFailed, 'playback'),
+        NetworkError(NetworkErrorCode.timeout, 'network'),
+        UnknownError('unknown'),
+      ];
+
+      // Act
+      for (final error in errors) {
+        reporter.reportPlayerError(error);
+      }
+
+      // Assert
+      expect(reporter.queuedReports.map((report) => report.playerErrorCode), [
+        'file:fileNotFound',
+        'codec:decodeFailed',
+        'playback:playFailed',
+        'network:timeout',
+        'unknown',
+      ]);
     });
 
     test(
@@ -183,6 +210,77 @@ void main() {
         expect(reporter.queuedReports.first.eventId, merged.eventId);
       },
     );
+
+    test('keeps same-message player reports distinct by semantic evidence', () {
+      // Arrange
+      final reporter = _reporter();
+      final stack = _stack('semantic.dart');
+
+      // Act
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'same failure',
+          null,
+          ErrorContext(path: 'C:/Videos/first.mp4', callbackStackTrace: stack),
+        ),
+      );
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.textureFailed,
+          'same failure',
+          null,
+          ErrorContext(path: 'C:/Videos/first.mp4', callbackStackTrace: stack),
+        ),
+      );
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'same failure',
+          null,
+          ErrorContext(path: 'C:/Videos/second.mp4', callbackStackTrace: stack),
+        ),
+      );
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(3));
+      expect(reporter.queuedReports.map((report) => report.severity), [
+        ErrorSeverity.error,
+        ErrorSeverity.fatal,
+        ErrorSeverity.error,
+      ]);
+      expect(reporter.queuedReports.map((report) => report.playerErrorCode), [
+        'playback:playFailed',
+        'playback:textureFailed',
+        'playback:playFailed',
+      ]);
+      expect(reporter.queuedReports.map((report) => report.mediaPath), [
+        'first.mp4',
+        'first.mp4',
+        'second.mp4',
+      ]);
+    });
+
+    test('merges fully equivalent player reports inside the dedupe window', () {
+      // Arrange
+      final reporter = _reporter();
+      final stack = _stack('equivalent.dart');
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        'same failure',
+        null,
+        ErrorContext(path: 'C:/Videos/first.mp4', callbackStackTrace: stack),
+      );
+
+      // Act
+      reporter.reportPlayerError(error);
+      reporter.reportPlayerError(error);
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(1));
+      expect(reporter.queuedReports.single.occurrenceCount, 2);
+      expect(reporter.queuedReports.single.eventId, 'event-1');
+    });
 
     test(
       'keeps 100 and 1000 duplicate bursts bounded with accumulated counts',
