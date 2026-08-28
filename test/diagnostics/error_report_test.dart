@@ -18,6 +18,7 @@ void main() {
           firstOccurredAt: firstOccurredAt,
           lastOccurredAt: firstOccurredAt,
           errorType: 'StateError',
+          playerErrorCode: 'playback:playFailed',
           message: 'decoder callback failed',
           rawStackTrace: 'package:simple_player_flutter/test.dart:10',
           mediaPath: r'D:\media\demo.mp4',
@@ -36,6 +37,8 @@ void main() {
         expect(replacement.eventId, report.eventId);
         expect(replacement.firstOccurredAt, report.firstOccurredAt);
         expect(replacement.source, report.source);
+        expect(replacement.severity, report.severity);
+        expect(replacement.playerErrorCode, report.playerErrorCode);
         expect(replacement.rawStackTrace, report.rawStackTrace);
         expect(replacement.mediaPath, report.mediaPath);
         expect(replacement.occurrenceCount, 2);

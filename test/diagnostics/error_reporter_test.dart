@@ -42,9 +42,36 @@ void main() {
       ]);
       final report = reporter.queuedReports.last;
       expect(report.severity, ErrorSeverity.fatal);
+      expect(report.playerErrorCode, 'playback:textureFailed');
       expect(report.mediaPath, 'explicit.mp4');
       expect(report.rawStackTrace, supplied.toString());
       _expectCompleteReport(report);
+    });
+
+    test('maps every PlayerError subtype to a stable discriminator', () {
+      // Arrange
+      final reporter = _reporter();
+      final errors = <PlayerError>[
+        FileError(FileErrorCode.fileNotFound, 'file'),
+        CodecError(CodecErrorCode.decodeFailed, 'codec'),
+        PlaybackError(PlaybackErrorCode.playFailed, 'playback'),
+        NetworkError(NetworkErrorCode.timeout, 'network'),
+        UnknownError('unknown'),
+      ];
+
+      // Act
+      for (final error in errors) {
+        reporter.reportPlayerError(error);
+      }
+
+      // Assert
+      expect(reporter.queuedReports.map((report) => report.playerErrorCode), [
+        'file:fileNotFound',
+        'codec:decodeFailed',
+        'playback:playFailed',
+        'network:timeout',
+        'unknown',
+      ]);
     });
 
     test(
@@ -184,6 +211,77 @@ void main() {
       },
     );
 
+    test('keeps same-message player reports distinct by semantic evidence', () {
+      // Arrange
+      final reporter = _reporter();
+      final stack = _stack('semantic.dart');
+
+      // Act
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'same failure',
+          null,
+          ErrorContext(path: 'C:/Videos/first.mp4', callbackStackTrace: stack),
+        ),
+      );
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.textureFailed,
+          'same failure',
+          null,
+          ErrorContext(path: 'C:/Videos/first.mp4', callbackStackTrace: stack),
+        ),
+      );
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'same failure',
+          null,
+          ErrorContext(path: 'C:/Videos/second.mp4', callbackStackTrace: stack),
+        ),
+      );
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(3));
+      expect(reporter.queuedReports.map((report) => report.severity), [
+        ErrorSeverity.error,
+        ErrorSeverity.fatal,
+        ErrorSeverity.error,
+      ]);
+      expect(reporter.queuedReports.map((report) => report.playerErrorCode), [
+        'playback:playFailed',
+        'playback:textureFailed',
+        'playback:playFailed',
+      ]);
+      expect(reporter.queuedReports.map((report) => report.mediaPath), [
+        'first.mp4',
+        'first.mp4',
+        'second.mp4',
+      ]);
+    });
+
+    test('merges fully equivalent player reports inside the dedupe window', () {
+      // Arrange
+      final reporter = _reporter();
+      final stack = _stack('equivalent.dart');
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        'same failure',
+        null,
+        ErrorContext(path: 'C:/Videos/first.mp4', callbackStackTrace: stack),
+      );
+
+      // Act
+      reporter.reportPlayerError(error);
+      reporter.reportPlayerError(error);
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(1));
+      expect(reporter.queuedReports.single.occurrenceCount, 2);
+      expect(reporter.queuedReports.single.eventId, 'event-1');
+    });
+
     test(
       'keeps 100 and 1000 duplicate bursts bounded with accumulated counts',
       () {
@@ -237,6 +335,17 @@ void main() {
             secret: 'C:/Users/alice/Videos',
             basename: 'clip one.mp4',
           ),
+          (
+            path:
+                r'C:\Users\alice\Private Videos (Archive)\[2026]\incident.mp4',
+            secret: r'C:\Users\alice\Private Videos (Archive)\[2026]',
+            basename: 'incident.mp4',
+          ),
+          (
+            path: '/home/alice/Private Videos (Archive)/[2026]/incident.mp4',
+            secret: '/home/alice/Private Videos (Archive)/[2026]',
+            basename: 'incident.mp4',
+          ),
         ];
 
         for (final pathCase in cases) {
@@ -277,10 +386,39 @@ void main() {
       },
     );
 
+    test(
+      'redacts quoted and unquoted whitespace paths without consuming diagnostics',
+      () {
+        // Arrange
+        const windows =
+            r'C:\Users\alice\Private Videos (Archive)\[2026]\incident.mp4';
+        const posix =
+            '/home/alice/Private Videos (Archive)/[2026]/incident.mp4';
+        final cases = <({String input, String secret})>[
+          (input: 'Unable to open "$windows":7:8 (retry)', secret: windows),
+          (input: 'Unable to open $posix:7:8 [retry]', secret: posix),
+        ];
+
+        for (final pathCase in cases) {
+          // Act
+          final redacted = DiagnosticRedactor.redactDiagnosticText(
+            pathCase.input,
+          );
+
+          // Assert
+          expect(redacted, isNot(contains(pathCase.secret)));
+          expect(redacted, contains('incident.mp4'));
+          expect(redacted, contains(':7:8'));
+          expect(redacted, contains('Unable to open'));
+          expect(redacted, contains('retry'));
+        }
+      },
+    );
+
     test('is idempotent and leaves package frames and network URLs intact', () {
       // Arrange
       const text =
-          'package:simple_player_flutter/player.dart:2 https://example.test/a rtsp://camera/live';
+          'package:simple_player_flutter/player.dart:2 http://example.test/a https://example.test/a rtsp://camera/live';
 
       // Act
       final once = DiagnosticRedactor.redactDiagnosticText(text);
@@ -289,6 +427,7 @@ void main() {
       // Assert
       expect(twice, once);
       expect(once, contains('package:simple_player_flutter/player.dart:2'));
+      expect(once, contains('http://example.test/a'));
       expect(once, contains('https://example.test/a'));
       expect(once, contains('rtsp://camera/live'));
     });
