@@ -7,7 +7,7 @@
 
 ### 捕获与契约 (Capture)
 
-- [ ] **CAP-01**: 四类错误源（FlutterError.onError 框架异常、PlatformDispatcher.onError 异步未捕获、runZonedGuarded 启动兜底、PlayerError 引擎错误）统一归一化为同一不可变 ErrorReport 契约（时间戳/严重级/错误/栈/媒体路径快照/event ID）
+- [x] **CAP-01**: 四类错误源（FlutterError.onError 框架异常、PlatformDispatcher.onError 异步未捕获、runZonedGuarded 启动兜底、PlayerError 引擎错误）统一归一化为同一不可变 ErrorReport 契约（时间戳/严重级/错误/栈/媒体路径快照/event ID）
 - [ ] **CAP-02**: 三全局钩子在启动时于同一 guarded zone 内安装，保留 FlutterError.presentError 调试输出，dispatcher 处理后返回 true
 - [ ] **CAP-03**: ErrorReporter 为唯一 fan-in/fan-out 服务，入口不抛异常（reentrancy-safe），副作用逐一隔离，故障注入测试覆盖
 - [x] **CAP-04**: 有界 FIFO 队列 + 指纹去重（类型/消息/来源/顶部应用帧），重复错误合并计数，关闭卡片推进队列不删证据
@@ -76,7 +76,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAP-01 | Phase 1 | Pending |
+| CAP-01 | Phase 1 | Complete |
 | CAP-02 | Phase 1 | Pending |
 | CAP-03 | Phase 1 | Pending |
 | CAP-04 | Phase 1 | Complete |
