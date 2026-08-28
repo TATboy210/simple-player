@@ -30,7 +30,7 @@ final class DiagnosticRedactor {
       (match) => _basename(match[0] ?? ''),
     );
     final withoutWindowsPaths = withoutUncPaths.replaceAllMapped(
-      RegExp(r'[A-Za-z]:\\[^\s\]\)]+'),
+      RegExp(r'(?<![A-Za-z])[A-Za-z]:[\\/][^\s\]\)]+'),
       (match) => _basename(match[0] ?? ''),
     );
     return withoutWindowsPaths.replaceAllMapped(
