@@ -23,7 +23,9 @@ library;
 
 import 'package:media_kit_video/media_kit_video.dart';
 import 'diagnostics/clock.dart';
+import 'diagnostics/error_reporter.dart';
 import 'diagnostics/kernel_logger.dart';
+import 'diagnostics/player_error_report_bridge.dart';
 import 'diagnostics/memory_monitor.dart';
 import 'diagnostics/rss_provider.dart';
 
@@ -71,6 +73,9 @@ class PlayerServices {
   PlaybackController? _controller;
 
   PlaybackController get controller => _controller!;
+
+  /// Sole diagnostics ingress bridge owned with the engine/controller lifetime.
+  PlayerErrorReportBridge? _playerErrorBridge;
 
   /// 视频处理服务 — 亮度/对比度/饱和度/色调/旋转/宽高比/去隔行.
   ///
@@ -129,7 +134,15 @@ class PlayerServices {
       _engineCreated = true;
 
       _throwIfDisposed();
-      _controller = PlaybackController(engine: engine);
+      _playerErrorBridge = PlayerErrorReportBridge(
+        engine: engine,
+        reporter: ErrorReporterImpl.I,
+        currentMediaPath: () => _controller?.currentPath.value,
+      );
+      _controller = PlaybackController(
+        engine: engine,
+        onError: _playerErrorBridge?.reportControllerError,
+      );
       _controllerCreated = true;
 
       _throwIfDisposed();
@@ -156,6 +169,9 @@ class PlayerServices {
 
   void _disposeCreatedResources() {
     if (_videoProcessingCreated) _disposeSafely(_videoProcessing?.dispose);
+    // Detach diagnostics before disposing either notifier owner or callback user.
+    _disposeSafely(_playerErrorBridge?.dispose);
+    _playerErrorBridge = null;
     if (_controllerCreated) _disposeSafely(_controller?.dispose);
     if (_engineCreated) _disposeSafely(_engine?.dispose);
     MemoryMonitor.disposeStatic();
