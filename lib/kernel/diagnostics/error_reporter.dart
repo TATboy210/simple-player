@@ -353,9 +353,6 @@ final class ErrorReporterImpl implements ErrorReporter {
     return '${value.substring(0, maximum)}…[truncated]';
   }
 
-  String? _boundedNullable(String? value) =>
-      value == null ? null : _bounded(value, _maxTextLength);
-
   void _publishSafely({bool? isReady}) {
     try {
       final prior = presentation.value;
