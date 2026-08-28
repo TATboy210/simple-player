@@ -237,6 +237,17 @@ void main() {
             secret: 'C:/Users/alice/Videos',
             basename: 'clip one.mp4',
           ),
+          (
+            path:
+                r'C:\Users\alice\Private Videos (Archive)\[2026]\incident.mp4',
+            secret: r'C:\Users\alice\Private Videos (Archive)\[2026]',
+            basename: 'incident.mp4',
+          ),
+          (
+            path: '/home/alice/Private Videos (Archive)/[2026]/incident.mp4',
+            secret: '/home/alice/Private Videos (Archive)/[2026]',
+            basename: 'incident.mp4',
+          ),
         ];
 
         for (final pathCase in cases) {
@@ -277,10 +288,39 @@ void main() {
       },
     );
 
+    test(
+      'redacts quoted and unquoted whitespace paths without consuming diagnostics',
+      () {
+        // Arrange
+        const windows =
+            r'C:\Users\alice\Private Videos (Archive)\[2026]\incident.mp4';
+        const posix =
+            '/home/alice/Private Videos (Archive)/[2026]/incident.mp4';
+        final cases = <({String input, String secret})>[
+          (input: 'Unable to open "$windows":7:8 (retry)', secret: windows),
+          (input: 'Unable to open $posix:7:8 [retry]', secret: posix),
+        ];
+
+        for (final pathCase in cases) {
+          // Act
+          final redacted = DiagnosticRedactor.redactDiagnosticText(
+            pathCase.input,
+          );
+
+          // Assert
+          expect(redacted, isNot(contains(pathCase.secret)));
+          expect(redacted, contains('incident.mp4'));
+          expect(redacted, contains(':7:8'));
+          expect(redacted, contains('Unable to open'));
+          expect(redacted, contains('retry'));
+        }
+      },
+    );
+
     test('is idempotent and leaves package frames and network URLs intact', () {
       // Arrange
       const text =
-          'package:simple_player_flutter/player.dart:2 https://example.test/a rtsp://camera/live';
+          'package:simple_player_flutter/player.dart:2 http://example.test/a https://example.test/a rtsp://camera/live';
 
       // Act
       final once = DiagnosticRedactor.redactDiagnosticText(text);
@@ -289,6 +329,7 @@ void main() {
       // Assert
       expect(twice, once);
       expect(once, contains('package:simple_player_flutter/player.dart:2'));
+      expect(once, contains('http://example.test/a'));
       expect(once, contains('https://example.test/a'));
       expect(once, contains('rtsp://camera/live'));
     });
