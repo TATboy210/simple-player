@@ -1,7 +1,7 @@
 /// Thin synchronous adapters from Flutter's global error boundaries to reports.
 library;
 
-import 'dart:ui' show PlatformDispatcher;
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 
@@ -114,7 +114,14 @@ final class GlobalErrorHooks {
   }
 
   static void _defaultLastResortOutput(Object error, StackTrace stackTrace) {
-    // This adapter intentionally delegates final containment to the reporter's
-    // production fallback instead of introducing logging or I/O in hooks.
+    try {
+      // This terminal output avoids the reporter/logger path to prevent loops.
+      developer.log(
+        'Global error hook containment failure: $error',
+        stackTrace: stackTrace,
+      );
+    } on Object {
+      // The fallback cannot safely retry after its own output fails.
+    }
   }
 }
