@@ -76,19 +76,39 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAP-01 ~ CAP-04 | Phase 1 | Pending |
-| LOC-01 ~ LOC-03 | Phase 2 | Pending |
-| LOG-01 ~ LOG-05 | Phase 2 | Pending |
-| CARD-01 ~ CARD-06 | Phase 3 | Pending |
+| CAP-01 | Phase 1 | Pending |
+| CAP-02 | Phase 1 | Pending |
+| CAP-03 | Phase 1 | Pending |
+| CAP-04 | Phase 1 | Pending |
+| LOC-01 | Phase 2 | Pending |
+| LOC-02 | Phase 2 | Pending |
+| LOC-03 | Phase 2 | Pending |
+| LOG-01 | Phase 2 | Pending |
+| LOG-02 | Phase 2 | Pending |
+| LOG-03 | Phase 2 | Pending |
+| LOG-04 | Phase 2 | Pending |
+| LOG-05 | Phase 2 | Pending |
+| CARD-01 | Phase 3 | Pending |
+| CARD-02 | Phase 3 | Pending |
+| CARD-03 | Phase 3 | Pending |
+| CARD-04 | Phase 3 | Pending |
+| CARD-05 | Phase 3 | Pending |
+| CARD-06 | Phase 3 | Pending |
 | MIG-01 | Phase 3 | Pending |
-| SET-01 ~ SET-03 | Phase 4 | Pending |
-| VER-01 ~ VER-05 | Phase 5 | Pending |
+| SET-01 | Phase 4 | Pending |
+| SET-02 | Phase 4 | Pending |
+| SET-03 | Phase 4 | Pending |
+| VER-01 | Phase 5 | Pending |
+| VER-02 | Phase 5 | Pending |
+| VER-03 | Phase 5 | Pending |
+| VER-04 | Phase 5 | Pending |
+| VER-05 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 21
-- Mapped to phases: 21
+- v1 requirements: 27
+- Mapped to phases: 27
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after initial definition*
+*Last updated: 2026-08-28 after roadmap creation*
