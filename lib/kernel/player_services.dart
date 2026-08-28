@@ -104,7 +104,7 @@ class PlayerServices {
   /// 初始化所有播放服务.
   ///
   /// Initialization order (sequential — each step depends on the previous):
-  /// 1. KernelLogger + MemoryMonitor (diagnostics)
+  /// 1. MemoryMonitor using the logger initialized by the composition root
   /// 2. MediaKitEngine (engine)
   /// 3. PlaybackController (orchestration)
   /// 4. VideoProcessingService (video effects)
@@ -116,7 +116,6 @@ class PlayerServices {
 
   Future<void> _initOnce() async {
     try {
-      KernelLoggerImpl.init();
       final memoryMonitor = MemoryMonitor(
         rssProvider: const ProcessInfoRssProvider(),
         clock: const SystemClock(),
