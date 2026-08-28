@@ -78,8 +78,10 @@ void main() {
         expect(engine.lastSkipForwardMs, 30000);
       });
 
-      test('play and pause expose the current engine state', () {
-        controller.play();
+      test('play and pause expose the current engine state', () async {
+        // 先加载媒体 — 空置态 (hasMedia=false) play 已被引擎幂等忽略
+        // (guard 契约由 race_condition_test 的 Play guard group 锁定).
+        await controller.openAndPlay('/test.mp4');
         expect(controller.isPlaying, true);
 
         controller.pause();

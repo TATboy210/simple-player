@@ -179,11 +179,15 @@ void main() {
       expect(() => notifier.value = 1, throwsFlutterError);
     });
 
-    test('FakeEngine ValueNotifiers survive listener flood', () {
+    test('FakeEngine ValueNotifiers survive listener flood', () async {
       final engine = FakeEngine();
       var stateChanges = 0;
       var positionChanges = 0;
       var volumeChanges = 0;
+
+      // 先加载媒体 — 空置态 (hasMedia=false) play 会被 hasMedia guard 幂等
+      // 忽略. open 在监听器注册前完成, state 通知计数只含 play 的 1 次.
+      await engine.open('/test.mp4');
 
       // 每个 ValueNotifier 注册 200 个监听器
       for (var i = 0; i < 200; i++) {
@@ -192,11 +196,11 @@ void main() {
         engine.volume.addListener(() => volumeChanges++);
       }
 
-      engine.play();
+      engine.play(); // idle→playing = 1 次通知 × 200 监听器
       engine.setVolume(0.5);
       engine.position.value = 5000;
 
-      expect(stateChanges, 200); // idle→playing = 1 次通知 × 200 监听器
+      expect(stateChanges, 200);
       expect(volumeChanges, 200);
       expect(positionChanges, 200);
 

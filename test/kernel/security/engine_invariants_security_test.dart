@@ -1,14 +1,16 @@
-// State machine security tests — validates state corruption detection,
-// callback safety, generation guard, and numeric invariants.
+// Engine invariants security tests — validates state corruption detection,
+// callback safety, and numeric invariants.
 //
-// 状态机瘦身后(向后兼容方案):
-// - transitionTo 不再校验合法性矩阵 → 删除 illegal transitions 组.
-// - 删除 lifecyclePhase / recover() → 删除相关用例.
-// - 保留: generation 守卫、dispose 安全、FakeEngine 不变量、回调安全.
+// 由 state_machine_security_test.dart 改名而来 — EngineStateMachine 已移除:
+// - 删除直接创建 EngineStateMachine 的用例 (double-dispose/listener/stale
+//   generation/toggle callback — 外部行为已由 race_condition_test 覆盖).
+// - 保留: FakeEngine dispose 安全、状态污染检测、ValueNotifier 通用安全性、
+//   数值不变量.
+// - play guard 语义适配: 空置态 (hasMedia=false) play 幂等忽略, 涉及播放
+//   循环的用例先 await open() 确保媒体已加载.
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
-import 'package:simple_player_flutter/kernel/engine/engine_state_machine.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/kernel/engine/open_result.dart';
 
@@ -22,13 +24,6 @@ void main() {
   // 1. Post-dispose safety — double-dispose and post-dispose no-ops.
   // ─────────────────────────────────────────────────────────────────────────
   group('Post-dispose safety', () {
-    test('double dispose is safe no-op', () {
-      final m = EngineStateMachine();
-      m.state.value = MediaState.playing;
-      m.dispose();
-      expect(() => m.dispose(), returnsNormally);
-    });
-
     test('FakeEngine operations after dispose are no-ops', () {
       final engine = FakeEngine();
       engine.dispose();
@@ -91,7 +86,7 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 3. Callback ordering and safety
+  // 3. Callback ordering and safety (ValueNotifier 通用行为)
   // ─────────────────────────────────────────────────────────────────────────
   group('Callback ordering and safety', () {
     test('ValueNotifier listeners fire in subscription order', () {
@@ -119,84 +114,11 @@ void main() {
       // After dispose, existing listeners are removed — verify no crash.
       expect(callCount, 1);
     });
-
-    test('state change listeners see consistent state values', () {
-      final m = EngineStateMachine();
-      final observed = <MediaState>[];
-
-      m.state.addListener(() => observed.add(m.state.value));
-
-      // Walk through a valid path: idle -> opening -> playing -> paused.
-      m.transitionTo(MediaState.opening, 'test');
-      m.transitionTo(MediaState.playing, 'test');
-      m.transitionTo(MediaState.paused, 'test');
-
-      expect(observed, [
-        MediaState.opening,
-        MediaState.playing,
-        MediaState.paused,
-      ]);
-
-      m.dispose();
-    });
-
-    test('stale generation transition does NOT fire state listener', () {
-      final m = EngineStateMachine();
-      var fireCount = 0;
-      m.state.addListener(() => fireCount++);
-
-      final gen1 = m.nextGeneration(); // 1
-      m.nextGeneration(); // 2 — gen1 is now stale
-
-      m.state.value = MediaState.opening;
-      fireCount = 0; // reset after direct assignment
-
-      m.transitionTo(MediaState.playing, 'test', generation: gen1);
-
-      expect(fireCount, 0, reason: 'Stale generation must not fire listener');
-      expect(m.state.value, MediaState.opening);
-
-      m.dispose();
-    });
-
-    test('togglePlayPause callbacks respect state boundaries', () {
-      final playCalls = <String>[];
-      final pauseCalls = <String>[];
-      final m = EngineStateMachine(
-        onPlay: () => playCalls.add('play'),
-        onPause: () => pauseCalls.add('pause'),
-      );
-
-      // idle -> play callback.
-      m.togglePlayPause();
-      expect(playCalls.length, 1);
-      expect(pauseCalls.length, 0);
-
-      // playing -> pause callback.
-      m.state.value = MediaState.playing;
-      m.togglePlayPause();
-      expect(playCalls.length, 1);
-      expect(pauseCalls.length, 1);
-
-      // opening -> no callback.
-      m.state.value = MediaState.opening;
-      m.togglePlayPause();
-      expect(playCalls.length, 1);
-      expect(pauseCalls.length, 1);
-
-      // error -> no callback.
-      m.state.value = MediaState.error;
-      m.togglePlayPause();
-      expect(playCalls.length, 1);
-      expect(pauseCalls.length, 1);
-
-      m.dispose();
-    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────
   // 4. Invariant checks — position, volume, mute consistency.
-  //    (与状态机瘦身无关 — 验证 FakeEngine clamp 逻辑.)
+  //    (验证 FakeEngine clamp 逻辑.)
   // ─────────────────────────────────────────────────────────────────────────
   group('Invariant checks', () {
     late FakeEngine engine;
@@ -314,7 +236,9 @@ void main() {
         expect(engine.isMuted.value, false);
       });
 
-      test('mute state survives play/pause cycle', () {
+      test('mute state survives play/pause cycle', () async {
+        // 先 await open — 空置态 play 会被 hasMedia guard 幂等忽略.
+        await engine.open('/test.mp4');
         engine.setMute(true);
         engine.play();
         expect(engine.isMuted.value, true);
@@ -348,8 +272,9 @@ void main() {
     });
 
     group('state machine invariants after rapid operations', () {
-      test('rapid play/pause does not corrupt state', () {
-        engine.open('/test.mp4');
+      test('rapid play/pause does not corrupt state', () async {
+        // 先 await open — 空置态 play 会被 hasMedia guard 幂等忽略.
+        await engine.open('/test.mp4');
 
         // Rapid fire.
         for (var i = 0; i < 20; i++) {
@@ -373,67 +298,6 @@ void main() {
         }
         expect(engine.volume.value, inInclusiveRange(0.0, 1.0));
       });
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 5. Generation guard — stale callback protection.
-  // ─────────────────────────────────────────────────────────────────────────
-  group('Generation guard — stale callback protection', () {
-    test('stale generation rejects transition and preserves state', () {
-      final m = EngineStateMachine();
-
-      final gen1 = m.nextGeneration(); // 1
-      m.nextGeneration(); // 2 — gen1 is now stale
-
-      m.state.value = MediaState.opening;
-      m.transitionTo(MediaState.playing, 'test', generation: gen1);
-
-      // Stale 被拒绝,state 不变.
-      expect(m.state.value, MediaState.opening);
-
-      m.dispose();
-    });
-
-    test('current generation accepts transition', () {
-      final m = EngineStateMachine();
-      final gen = m.nextGeneration();
-
-      m.state.value = MediaState.opening;
-      m.transitionTo(MediaState.playing, 'test', generation: gen);
-
-      expect(m.state.value, MediaState.playing);
-
-      m.dispose();
-    });
-
-    test('transition without generation skips generation check', () {
-      final m = EngineStateMachine();
-      m.nextGeneration(); // bump generation
-      m.nextGeneration(); // bump again
-
-      m.state.value = MediaState.opening;
-      // No generation param — should succeed regardless of generation mismatch.
-      m.transitionTo(MediaState.playing, 'test');
-
-      expect(m.state.value, MediaState.playing);
-
-      m.dispose();
-    });
-
-    test('stale generation after dispose-time bump is rejected', () {
-      final m = EngineStateMachine();
-      final gen = m.nextGeneration();
-
-      // Simulate engine dispose: bump generation, gen is now stale.
-      m.nextGeneration();
-
-      m.state.value = MediaState.opening;
-      m.transitionTo(MediaState.playing, 'test', generation: gen);
-
-      expect(m.state.value, MediaState.opening);
-
-      m.dispose();
     });
   });
 }

@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import 'engine_state_machine.dart';
 import 'media_engine.dart';
 import 'media_state.dart';
 import 'open_result.dart';
@@ -24,7 +23,8 @@ import 'models/video_codec_info.dart';
 ///
 /// 身份保持转发 (Blocking Constraint #6 — UI ValueListenableBuilder 监听
 /// 的是引擎自己的 notifier 实例, 不能包装新 notifier 否则 listener detach):
-///   - `state` / `isSeeking` / `isBuffering` 复用 [EngineStateMachine] 的 notifier
+///   - `state` / `isSeeking` / `isBuffering` 由引擎自建 notifier 持有
+///     (原 EngineStateMachine 已移除 — 状态容器与 generation 守卫内联于此)
 ///   - `textureId` 复用 [VideoController.id]
 ///   - 其余 7 个 (position/duration/volume/isMuted/subtitleText/buffered/
 ///     aspectRatio/lastError/playbackSpeed) 自建, 由 stream 写入
@@ -40,25 +40,30 @@ class MediaKitEngine implements MediaEngine {
   MediaKitEngine({PlayerConfiguration? configuration})
     : _player = Player(
         configuration: configuration ?? const PlayerConfiguration(),
-      ),
-      _stateMachine = EngineStateMachine() {
+      ) {
     // VideoController 依赖 _player, 须在 _player 初始化后创建.
     // late final 合法: 构造体立即赋值, 首次使用前必然已初始化.
     _controller = VideoController(_player);
-    // 注入 toggle 回调 — 构造后赋值以打破 stateMachine ↔ engine 循环依赖
-    // (见 EngineStateMachine doc 的循环依赖说明).
-    _stateMachine.onPlay = play;
-    _stateMachine.onPause = pause;
     _subscribeStreams();
   }
 
   final Player _player;
-  final EngineStateMachine _stateMachine;
 
   // VideoController 在构造体里创建 (依赖 _player), 故 late final.
   late final VideoController _controller;
 
   // ---- 自建 ValueNotifier (由 Player.stream 写入) ----
+  // state/isSeeking/isBuffering 原由 EngineStateMachine 持有 — 状态机移除后
+  // 内联为引擎自建 notifier. 实例身份保持: UI 的 ValueListenableBuilder 监听
+  // 的是 getter 返回的同一实例, 不能包装否则 listener detach.
+  final ValueNotifier<MediaState> _state = ValueNotifier(MediaState.idle);
+  final ValueNotifier<bool> _isSeeking = ValueNotifier(false);
+  final ValueNotifier<bool> _isBuffering = ValueNotifier(false);
+
+  // open/stop 请求计数器 — 每次请求递增, 使旧异步 continuation 过期
+  // (stale 回调不得发布状态/错误/清空新媒体派生状态).
+  int _operationGeneration = 0;
+
   final ValueNotifier<int> _position = ValueNotifier<int>(0);
   final ValueNotifier<int> _duration = ValueNotifier<int>(0);
   final ValueNotifier<double> _volume = ValueNotifier<double>(1.0);
@@ -102,7 +107,7 @@ class MediaKitEngine implements MediaEngine {
   ValueNotifier<int?> get textureId => _controller.id;
 
   @override
-  ValueNotifier<MediaState> get state => _stateMachine.state;
+  ValueNotifier<MediaState> get state => _state;
 
   @override
   ValueNotifier<int> get position => _position;
@@ -117,10 +122,10 @@ class MediaKitEngine implements MediaEngine {
   ValueNotifier<bool> get isMuted => _isMuted;
 
   @override
-  ValueNotifier<bool> get isBuffering => _stateMachine.isBuffering;
+  ValueNotifier<bool> get isBuffering => _isBuffering;
 
   @override
-  ValueNotifier<bool> get isSeeking => _stateMachine.isSeeking;
+  ValueNotifier<bool> get isSeeking => _isSeeking;
 
   @override
   ValueNotifier<String> get subtitleText => _subtitleText;
@@ -143,9 +148,6 @@ class MediaKitEngine implements MediaEngine {
   @override
   bool get hasMedia => _hasMedia;
 
-  @override
-  EngineStateMachine get stateMachine => _stateMachine;
-
   /// media_kit [VideoController] — 供 UI 层的 [Video] widget 使用.
   ///
   /// 契约缺口: [MediaEngine] 抽象未暴露 controller (fvp 走 textureId 自建 Texture,
@@ -163,7 +165,7 @@ class MediaKitEngine implements MediaEngine {
 
     final trimmed = path.trim();
     if (trimmed.isEmpty) {
-      _stateMachine.transitionTo(MediaState.error, 'open');
+      _state.value = MediaState.error;
       final error = FileError(
         FileErrorCode.pathEmpty,
         '文件路径为空',
@@ -174,12 +176,11 @@ class MediaKitEngine implements MediaEngine {
       return OpenError(error);
     }
 
-    // generation 守卫: 仅最新 open 可发布状态.
-    // 切歌时若从 playing 直转 opening 会被状态矩阵拒, 依赖后续 stream 修正
-    // (切歌不频繁, 单次 warn 可接受).
-    final gen = _stateMachine.nextGeneration();
-    _stateMachine.transitionTo(MediaState.opening, 'open', generation: gen);
-    _stateMachine.isBuffering.value = true;
+    // generation 守卫: 仅最新 open 可发布状态 (stale continuation 不得
+    // 覆盖新会话). 切歌时从 playing 直写 opening 是引擎本地允许的转换.
+    final gen = ++_operationGeneration;
+    _state.value = MediaState.opening;
+    _isBuffering.value = true;
 
     try {
       // play:false — 由 PlaybackController.open 成功后显式 play() 控制,
@@ -190,7 +191,7 @@ class MediaKitEngine implements MediaEngine {
       // 成功: 回 idle (契约: 成功后 state==idle, 调用方随后 play()).
       // duration/tracks 由 stream 异步到达, _mediaInfo 随之重建.
       _hasMedia = true;
-      _stateMachine.transitionTo(MediaState.idle, 'open', generation: gen);
+      _state.value = MediaState.idle;
       return OpenSuccess(_mediaInfo);
     } on Exception catch (error, stackTrace) {
       if (!_isCurrentGeneration(gen)) return const OpenSuperseded();
@@ -206,33 +207,37 @@ class MediaKitEngine implements MediaEngine {
         ),
       );
       _lastError.value = playerError;
-      _stateMachine.transitionTo(MediaState.error, 'open', generation: gen);
+      _state.value = MediaState.error;
       return OpenError(playerError);
     } finally {
-      if (_isCurrentGeneration(gen)) _stateMachine.isBuffering.value = false;
+      if (_isCurrentGeneration(gen)) _isBuffering.value = false;
     }
   }
 
   @override
   void play() {
     if (_disposed) return;
-    final s = _stateMachine.state.value;
-    // playing/opening/error 态 play 无意义且会触发 illegal 转换, 跳过.
+    // 空置态 (无媒体) play 无意义 — state 保持 idle, 防止 UI 把空置页
+    // (极光背景) 卸载露出底层无媒体的黑色 Video. idle 同时表示
+    // "未加载"与"已 open 未 play", 故以 _hasMedia 而非状态值判定.
+    if (!_hasMedia) return;
+    final s = _state.value;
+    // playing/opening/error 态 play 无意义, 跳过.
     if (s == MediaState.playing ||
         s == MediaState.opening ||
         s == MediaState.error) {
       return;
     }
     _completing = false; // 重新播放, 清完成态.
-    _stateMachine.transitionTo(MediaState.playing, 'play');
+    _state.value = MediaState.playing;
     unawaited(_player.play());
   }
 
   @override
   void pause() {
     if (_disposed) return;
-    if (_stateMachine.state.value != MediaState.playing) return;
-    _stateMachine.transitionTo(MediaState.paused, 'pause');
+    if (_state.value != MediaState.playing) return;
+    _state.value = MediaState.paused;
     unawaited(_player.pause());
   }
 
@@ -241,7 +246,7 @@ class MediaKitEngine implements MediaEngine {
     if (_disposed) return;
 
     // 使等待中的 open 失效；后续新 open/stop 也会使本次异步 stop 过期。
-    final generation = _stateMachine.nextGeneration();
+    final generation = ++_operationGeneration;
     _completing = false;
     try {
       await _player.stop();
@@ -261,40 +266,49 @@ class MediaKitEngine implements MediaEngine {
         ),
       );
       _lastError.value = playerError;
-      _stateMachine.transitionTo(
-        MediaState.error,
-        'stop',
-        generation: generation,
-      );
+      _state.value = MediaState.error;
       return;
     }
 
     // 旧 stop 的完成不能清空新 open 已经发布的媒体派生状态。
     if (!_isCurrentGeneration(generation)) return;
     _clearLoadedMediaState();
-    if (_stateMachine.state.value != MediaState.idle) {
-      _stateMachine.transitionTo(
-        MediaState.idle,
-        'stop',
-        generation: generation,
-      );
+    if (_state.value != MediaState.idle) {
+      _state.value = MediaState.idle;
     }
   }
 
+  /// 切换播放/暂停 — 按当前状态分派到 [play]/[pause].
+  ///
+  /// State-to-action mapping:
+  /// - playing → [pause]
+  /// - idle/paused/completed → [play]
+  /// - opening/error → no-op (not toggleable)
+  /// 命令合法性 (如空置态 play) 由 play/pause 内部 guard 幂等处理.
   @override
-  void togglePlayPause() => _stateMachine.togglePlayPause();
+  void togglePlayPause() {
+    final current = _state.value;
+    if (current == MediaState.playing) {
+      pause();
+    } else if (current == MediaState.idle ||
+        current == MediaState.paused ||
+        current == MediaState.completed) {
+      play();
+    }
+    // opening/error — no-op
+  }
 
   @override
   Future<void> seekTo(int ms) async {
     if (_disposed) return;
     final dur = _duration.value;
-    if (_stateMachine.state.value == MediaState.idle || dur <= 0) return;
+    if (_state.value == MediaState.idle || dur <= 0) return;
 
     final clamped = ms.clamp(0, dur);
     // 乐观定位: 立即反馈 UI; stream.position 随后推送真实值纠正.
     // 这是 media_kit 治"进度不准"的核心 — position 跟事件流, 不靠轮询.
     _position.value = clamped;
-    _stateMachine.isSeeking.value = true;
+    _isSeeking.value = true;
     try {
       await _player.seek(Duration(milliseconds: clamped));
     } on Exception catch (error) {
@@ -307,7 +321,7 @@ class MediaKitEngine implements MediaEngine {
       _lastError.value = pe;
       // position 由 stream 纠正, 不回退本地乐观值.
     } finally {
-      _stateMachine.isSeeking.value = false;
+      _isSeeking.value = false;
     }
   }
 
@@ -471,7 +485,9 @@ class MediaKitEngine implements MediaEngine {
       unawaited(_cancelSubscription(cancel));
     }
     _subscriptionCancels.clear();
-    _stateMachine.dispose();
+    _state.dispose();
+    _isSeeking.dispose();
+    _isBuffering.dispose();
     _position.dispose();
     _duration.dispose();
     _volume.dispose();
@@ -532,7 +548,7 @@ class MediaKitEngine implements MediaEngine {
     );
     _addSubscription(
       _player.stream.buffering.listen((b) {
-        _stateMachine.isBuffering.value = b;
+        _isBuffering.value = b;
       }),
     );
     _addSubscription(
@@ -587,14 +603,14 @@ class MediaKitEngine implements MediaEngine {
   void _onPlaying(bool playing) {
     if (_disposed) return;
     if (playing) {
-      if (_stateMachine.state.value != MediaState.playing) {
-        _stateMachine.transitionTo(MediaState.playing, 'stream.playing');
+      if (_state.value != MediaState.playing) {
+        _state.value = MediaState.playing;
       }
     } else {
       // 完成态抢占: completed 已处理, 跳过 paused 转换.
       if (_completing) return;
-      if (_stateMachine.state.value == MediaState.playing) {
-        _stateMachine.transitionTo(MediaState.paused, 'stream.playing');
+      if (_state.value == MediaState.playing) {
+        _state.value = MediaState.paused;
       }
     }
   }
@@ -602,9 +618,8 @@ class MediaKitEngine implements MediaEngine {
   void _onCompleted(bool completed) {
     if (_disposed || !completed) return;
     _completing = true;
-    // playing→completed 合法; 若 playing(false) 已先把 state 转 paused,
-    // 此处 paused→completed 会 illegal (矩阵未收录) — 已知边界, 阶段 5 覆盖.
-    _stateMachine.transitionTo(MediaState.completed, 'stream.completed');
+    // completed 事件驱动转换 (playing→completed 合法路径).
+    _state.value = MediaState.completed;
   }
 
   void _updateAspectRatio() {
@@ -628,8 +643,8 @@ class MediaKitEngine implements MediaEngine {
     _videoWidth = null;
     _videoHeight = null;
     _mediaInfo = const MediaInfo();
-    _stateMachine.isSeeking.value = false;
-    _stateMachine.isBuffering.value = false;
+    _isSeeking.value = false;
+    _isBuffering.value = false;
   }
 
   /// media_kit width/height 事件流 → [VideoCodecInfo].
@@ -663,7 +678,7 @@ class MediaKitEngine implements MediaEngine {
   // 内部工具
   // ============================================================
 
-  bool _isCurrentGeneration(int gen) => gen == _stateMachine.currentGeneration;
+  bool _isCurrentGeneration(int gen) => gen == _operationGeneration;
 
   /// 过滤掉 media_kit 的 auto/no 占位轨, 只留真实轨道.
   List<AudioTrack> _realAudioTracks() {
