@@ -1,6 +1,6 @@
 ---
-phase: 01-unified-capture-contract
-reviewed: 2026-08-28T21:30:00+08:00
+phase: 01
+reviewed: 2026-08-28T15:21:22Z
 depth: standard
 files_reviewed: 13
 files_reviewed_list:
@@ -19,77 +19,79 @@ files_reviewed_list:
   - test/kernel/player_services_test.dart
 findings:
   blocker: 2
-  critical: 0
   warning: 2
   info: 0
   total: 4
-status: findings
+status: issues_found
 ---
 
-# Phase 01: Code Review Report (post gap-closure re-review)
+# Phase 01: Code Review Report
 
-_Reviewed: 2026-08-28T21:30:00+08:00_
-_Reviewer: Claude (gsd-code-reviewer)_
-_Depth: standard_
+**Reviewed:** 2026-08-28T15:21:22Z
+**Depth:** standard
+**Files Reviewed:** 13
+**Status:** issues_found
 
 ## Summary
 
-Re-review after the 01-03 gap-closure plan (PlayerError bridge production reachability, diagnostic redaction, rollback-safe dedupe). The prior review's CR-01 (fourth source unreachable) and CR-02 (raw path disclosure) are resolved: the bridge is wired through `PlayerServices`, and paths are redacted before queue/fan-out. Validation performed by the reviewer: `flutter analyze` on the eight production files passed; targeted diagnostics + PlayerServices tests (32) passed. This round surfaced two residual/new blockers and two warnings.
+The unified error capture and reporting pipeline was reviewed at standard depth, including global hooks, report construction and deduplication, path redaction, player-error bridging, service lifecycle integration, and their focused tests. Two defects break the promised semantic deduplication contract, and two error-containment paths silently discard diagnostic failures or catch programming errors too broadly.
 
-## Blockers
+## Critical Issues
 
-### BL-01: Path redaction leaks directory components when a local path contains whitespace
+### BL-01: Deduplication selects the oldest matching report, not a match within the dedupe window
 
-**Classification:** **BLOCKER**
-**File:** `lib/kernel/diagnostics/diagnostic_redactor.dart:32-39`
-**Issue:** The embedded Windows and POSIX path regexes terminate at whitespace. The remainder of a path is left untouched, despite the documented contract that redaction retains only the filename. For example, redacting `Unable to open C:\Users\alice\Private Videos\incident.mp4` produces text equivalent to `Unable to open Private Videos\incident.mp4` — the user-name prefix is removed, but sensitive directory names remain in the error message and stack snapshot. The same flaw affects POSIX paths such as `/home/alice/Private Videos/incident.mp4`. Those snapshots are intended for cards and future logs, turning a diagnostic failure into local filesystem metadata disclosure.
+**File:** `lib/kernel/diagnostics/error_reporter.dart:274-289,297-304`
 
-**Fix:** Replace whitespace-delimited regex matching with a path-token parser that handles quoted paths and spaces, or expand the match through known diagnostic delimiters while preserving the whole path token before passing it to `_basename`. Add regression cases for Windows and POSIX paths containing spaces, parentheses, and bracket characters; assert that only `incident.mp4` remains.
+**Issue:** `_findMatchingIndex` returns the first same-fingerprint report in FIFO order. When the same failure has already recurred outside the 10-second window, the queue can contain multiple matching reports. A later recurrence within 10 seconds of the newest one is compared only to the oldest one; its elapsed time exceeds the window, so the new report is appended rather than merged.
 
-### BL-02: Dedupe merges errors with different severities and media targets, hiding fatal errors
+Example timeline: identical failures at `t=0` and `t=11` produce two queue items. At `t=15`, the new failure should merge into the `t=11` item, but the code compares it with `t=0` and adds a third item.
 
-**Classification:** **BLOCKER**
-**File:** `lib/kernel/diagnostics/error_reporter.dart:268-283,316-318`
-**Issue:** `_fingerprint` consists only of source, runtime type, message, and top stack frame. It excludes `severity`, any structured `PlayerError` code, and `mediaPath`. Consequently, two `PlayerError`s of the same subtype and message at the same source line are merged even if one is recoverable and the other is fatal, or if they concern different media. `_accept` preserves the first report's immutable severity and path, so a subsequent fatal event can be presented and persisted as the earlier non-fatal event. A concrete collision is possible between differently coded `FileError` or `PlaybackError` instances that share a message and callback frame. The later report increments `occurrenceCount` but loses its fatal classification and media association.
+This violates the stated 0–10 second semantic-dedupe contract and causes duplicate-storm counts to fragment once a failure recurs over time.
 
-**Fix:** Include all semantic identity fields in the dedupe key. At minimum include `severity` and sanitized `mediaPath`; preferably add an explicit structured error-code/discriminator field to `ErrorReport` and include it in `_fingerprint`. Add tests proving that (1) recoverable and fatal errors with otherwise identical text/frame remain separate; (2) identical errors for different media paths remain separate.
+**Fix:** Search matching reports from newest to oldest and select the first match whose `lastOccurredAt` is not in the future and is within `_dedupeWindow`; alternatively, include the time-window test in the search predicate. Add a regression test for occurrences at 0s, 11s, and 15s.
+
+### BL-02: Delimiter-concatenated fingerprints can collide across different report fields
+
+**File:** `lib/kernel/diagnostics/error_reporter.dart:321-324`
+
+**Issue:** `_fingerprint` uses unescaped `|` delimiters between attacker-/runtime-controlled text fields (`message`, `mediaPath`, stack frame). Different reports can therefore serialize to the same fingerprint if a field contains `|`.
+
+For example, reports with the same fixed fields and top frame can collide when one has `message: 'open failed|segment'` and `mediaPath: 'clip.mp4'`, while another has `message: 'open failed'` and `mediaPath: 'segment|clip.mp4'`. Remote media URLs and error text can legally contain this character. The second report will be merged into the first despite representing distinct diagnostic evidence.
+
+This directly defeats the phase requirement that only a full semantic match may merge reports.
+
+**Fix:** Replace the string serialization with a typed immutable equality key, such as a private record containing the individual fields, or compare all fingerprint fields directly. Do not use delimiter-based serialization unless every component is unambiguously length-prefixed or escaped. Add collision regression tests using `|` in message and media-path values.
 
 ## Warnings
 
-### WR-01: Bridge silently drops player diagnostics if metadata lookup or reporter intake throws
+### WR-01: The bridge silently discards reporter failures without invoking a terminal fallback
 
-**Classification:** **WARNING**
-**File:** `lib/kernel/diagnostics/player_error_report_bridge.dart:53-60`
-**Issue:** `_reportSafely` catches every `Object` and silently discards it. In particular, if `currentMediaPath()` throws, the bridge never calls the reporter with a null fallback path. This violates the unified-capture goal: a failure in optional diagnostic metadata prevents the underlying player error from being captured at all. The empty handler also conflicts with the project convention requiring an explicit logged or terminal fallback for caught errors.
+**File:** `lib/kernel/diagnostics/player_error_report_bridge.dart:53-61`
 
-**Fix:** Isolate path lookup from report submission. If path lookup fails, call `reportPlayerError(error)` without `mediaPath`; if reporter submission itself fails, send the failure to an injected non-recursive `LastResortOutput`:
+**Issue:** `_reportSafely` catches all `Object` failures from `_reporter.reportPlayerError` and intentionally does nothing. Although the production reporter currently contains its own fallback handling, the bridge accepts the `ErrorReporter` interface and can be given another implementation. A failing reporter implementation then drops player diagnostics completely and leaves no terminal trace, contrary to the project rule against silent error swallowing.
 
-```dart
-String? mediaPath;
-try {
-  mediaPath = error.context?.path ?? _currentMediaPath();
-} on Object catch (failure, stackTrace) {
-  _lastResortOutput(failure, stackTrace);
-}
-_reporter.reportPlayerError(error, mediaPath: mediaPath);
+**Fix:** Inject or use a non-recursive `LastResortOutput` at this boundary and invoke it with the caught error and stack trace. Narrow the catch to expected recoverable failures where possible; do not silently catch programming `Error` subtypes.
+
+### WR-02: Service initialization uses a bare catch and catches programming errors during cleanup
+
+**File:** `lib/kernel/player_services.dart:163-171`
+
+**Issue:** `catch (_)` catches every `Object`, including `Error` subclasses, without retaining the failure or stack trace locally. This violates the project convention requiring typed error handling and avoiding catches of programming errors. While `rethrow` preserves propagation, cleanup operations can obscure diagnostics if a cleanup path itself fails, and the bare catch makes the intended boundary unclear.
+
+**Fix:** Use `on Exception catch (error, stackTrace)` for expected initialization failures, log the cleanup context through `KernelLogger`, and let programming `Error`s propagate unless there is a documented reason to contain them.
+
+## Verification Performed
+
+- Read all 13 required source and test files.
+- Traced the player-error path across `MediaKitEngine`/`PlaybackController` → `PlayerErrorReportBridge` → `ErrorReporterImpl`.
+- Ran focused diagnostics and lifecycle tests successfully:
+
+```text
+flutter test test/diagnostics/error_reporter_test.dart test/diagnostics/global_error_hooks_test.dart test/diagnostics/player_error_report_bridge_test.dart test/kernel/player_services_test.dart
 ```
-
-Add a bridge test where `currentMediaPath` throws and verify the player error still reaches the reporter.
-
-### WR-02: Redactor modifies valid network URLs containing a drive-like path segment
-
-**Classification:** **WARNING**
-**File:** `lib/kernel/diagnostics/diagnostic_redactor.dart:32-35`
-**Issue:** The Windows-path regex can match a valid remote URL path segment when it resembles `C:/...`. For example, `https://example.test/C:/streams/camera.m3u8` is transformed because the `C:/streams/...` suffix satisfies the Windows-path expression. This contradicts the stated contract that network URLs remain untouched and removes useful source information from stream failures.
-
-**Fix:** Detect and preserve URI spans before scanning local filesystem paths, or require a non-URI context before applying Windows-drive redaction. Add test coverage for `http`, `https`, `rtsp`, and `rtmp` URLs whose path contains `X:/`.
 
 ---
 
-## Prior-Round Findings Status (resolved by 01-03)
-
-| Prior ID | Title | Status |
-|----------|-------|--------|
-| CR-01 | Player-engine failures never enter the unified reporter | ✅ Resolved — bridge wired via PlayerServices (01-03) |
-| CR-02 | Error reports retain and expose full user filesystem paths | ⚠️ Mostly resolved — redaction added, but BL-01 (whitespace paths) and WR-02 (URLs) are residual gaps |
-| WR-01 (old) | Clock rollback makes 10-second dedupe window unbounded backward | ✅ Resolved — rollback rejected (01-03); BL-02 is a distinct dedupe identity gap |
+_Reviewed: 2026-08-28T15:21:22Z_
+_Reviewer: Claude (gsd-code-reviewer)_
+_Depth: standard_
