@@ -25,7 +25,12 @@ import '../theme/tokens.dart';
 /// 会把命中测试一并裁剪到圆角矩形内，这是 CARD-02 hit-test 边界的实现基础。
 class ErrorCard extends StatefulWidget {
   /// Creates the expandable error card projecting the immutable [report].
-  const ErrorCard({super.key, required this.report, required this.totalCount});
+  const ErrorCard({
+    super.key,
+    required this.report,
+    required this.totalCount,
+    this.onClose,
+  });
 
   /// The FIFO head report to project; fields are already redacted/bounded at
   /// intake — this widget never renders developer-only full paths (T-03-05).
@@ -33,6 +38,10 @@ class ErrorCard extends StatefulWidget {
 
   /// D-01 计数徽标：已捕获错误总数（含队首）。
   final int totalCount;
+
+  /// CARD-01 手动关闭回调 —— 宿主接线 `ErrorReporterImpl.I.dismissCurrent()`
+  /// （关闭推进 FIFO）；只在手动关闭调用，徽标轮览不得复用此路径。
+  final VoidCallback? onClose;
 
   @override
   State<ErrorCard> createState() => _ErrorCardState();
@@ -178,6 +187,26 @@ class _ErrorCardState extends State<ErrorCard> {
               size: Tokens.iconSm,
               color: Tokens.textSecondary,
             ),
+            // CARD-01 手动关闭：GestureDetector + Semantics 语义（不用
+            // GlassButton —— 其 FocusableActionDetector 会请求焦点，破坏
+            // KeyboardHandler 单焦点源假设）。onTap 为 null 时不渲染。
+            if (widget.onClose != null)
+              Semantics(
+                label: l10n.errorCardClose,
+                button: true,
+                child: GestureDetector(
+                  key: const ValueKey('error-card-close'),
+                  onTap: widget.onClose,
+                  child: const Padding(
+                    padding: EdgeInsets.all(Tokens.spXs),
+                    child: Icon(
+                      Icons.close,
+                      size: Tokens.iconSm,
+                      color: Tokens.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         // D-07：折叠区媒体路径只允许 basename 形态（intake 已脱敏 + 防御性截取）。

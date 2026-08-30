@@ -103,7 +103,14 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
         final totalCount = state.pendingCount + 1;
         return ExcludeFocus(
           // CARD-01 前置：卡内无焦点可请求，键盘操作不会被卡片劫持。
-          child: ErrorCard(report: report, totalCount: totalCount),
+          child: ErrorCard(
+            report: report,
+            totalCount: totalCount,
+            // CARD-01 手动关闭唯一接线点：dismissCurrent 推进 FIFO，队首
+            // 下一项经 presentation 通知自然上屏（CAP-04）。徽标轮览
+            // （03-03）不得复用此回调 —— 轮览只翻页不消费队列。
+            onClose: () => ErrorReporterImpl.I.dismissCurrent(),
+          ),
         );
       },
     );
