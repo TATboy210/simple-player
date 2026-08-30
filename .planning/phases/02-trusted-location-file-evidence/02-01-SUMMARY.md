@@ -2,7 +2,7 @@
 phase: 02
 plan: 01
 subsystem: kernel-diagnostics
- tags: [dart, flutter, diagnostics, durable-file-evidence, security]
+tags: [dart, flutter, diagnostics, durable-file-evidence, security]
 requires:
   - phase: 01
     provides: immutable ErrorReport, ErrorReporter effect seam, bounded FIFO acceptance
