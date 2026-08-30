@@ -4,10 +4,10 @@ current_phase: 02
 current_phase_name: 可信定位与文件证据
 status: executing
 stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-08-30T13:49:15.875Z"
+last_updated: "2026-08-30T13:50:35.915Z"
 last_activity: 2026-08-30
 last_activity_desc: Phase 02 execution started
-state_head: dc29139569e99c6956d3f00d945649ae7fc57520
+state_head: 4cc6a240f857c6d5640acf54898dbbf1f5e67b3c
 progress:
   total_phases: 5
   completed_phases: 1
@@ -73,6 +73,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecti
 - [Phase 02]: File evidence attaches only through ErrorReporter effects, not KernelLogger CompositeSink. — File evidence attaches only through ErrorReporter effects, not KernelLogger CompositeSink.
 - [Phase 02]: Direct dart:io append+UTF-8+flush writes are serialized through a non-poisoning Future chain. — Direct dart:io append+UTF-8+flush writes are serialized through a non-poisoning Future chain.
 - [Phase 02]: Formatter escapes all non-stack fields; raw stack is terminal and copied verbatim. — Formatter escapes all non-stack fields; raw stack is terminal and copied verbatim.
+- [Phase 02]: D-05 location extraction accepts only exact package:simple_player_flutter frames; the first is primary and no more than two later project frames are retained. — D-05 location extraction accepts only exact package:simple_player_flutter frames; the first is primary and no more than two later project frames are retained.
+- [Phase 02]: D-01 source I/O is limited to debug/profile after an owned diagnostics file frame establishes a trusted root; there is no cwd, executable-directory, or arbitrary-frame fallback. — D-01 source I/O is limited to debug/profile after an owned diagnostics file frame establishes a trusted root; there is no cwd, executable-directory, or arbitrary-frame fallback.
+- [Phase 02]: Exact component-aware canonical containment, after pre-canonical traversal rejection, is required for every source path. — Exact component-aware canonical containment, after pre-canonical traversal rejection, is required for every source path.
 
 ### Pending Todos
 
