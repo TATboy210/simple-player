@@ -32,6 +32,13 @@ String formatDiagnosticPack(ErrorReport report, {String? logPath}) {
     ..writeln()
     ..writeln('== Media ==')
     ..writeln('Path: ${_singleLine(report.mediaPath ?? 'none')}')
+    // Developer evidence is explicitly separate from the ordinary safe path.
+    ..writeln(
+      'Current Media Full Path: ${_singleLine(report.fullMediaPath ?? 'none')}',
+    )
+    ..writeln(
+      'Failed Open Path: ${_singleLine(report.failedOpenPath ?? 'none')}',
+    )
     ..writeln()
     ..writeln('== Location ==');
 

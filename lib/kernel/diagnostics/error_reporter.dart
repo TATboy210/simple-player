@@ -9,8 +9,10 @@ import 'package:flutter/foundation.dart';
 import '../models/player_error.dart';
 import 'clock.dart';
 import 'diagnostic_redactor.dart';
+import 'error_location.dart';
 import 'error_report.dart';
 import 'error_reporting_dependencies.dart';
+import 'source_line_reader.dart';
 
 /// 错误报告服务的窄接口。
 ///
@@ -63,11 +65,13 @@ final class ErrorReporterImpl implements ErrorReporter {
     Clock clock = const SystemClock(),
     EventIdGenerator? eventIdGenerator,
     CurrentMediaPathProvider currentMediaPath = _noMediaPath,
+    ErrorLocationEnricher locationEnricher = _defaultLocationEnricher,
     List<ErrorReportEffect> effects = const [],
     LastResortOutput lastResortOutput = _defaultLastResortOutput,
   }) : _clock = clock,
        _eventIdGenerator = eventIdGenerator ?? _createEventIdGenerator(),
        _currentMediaPath = currentMediaPath,
+       _locationEnricher = locationEnricher,
        _effects = List<ErrorReportEffect>.unmodifiable(effects),
        _lastResortOutput = lastResortOutput;
 
@@ -76,11 +80,13 @@ final class ErrorReporterImpl implements ErrorReporter {
     required Clock clock,
     required EventIdGenerator eventIdGenerator,
     required CurrentMediaPathProvider currentMediaPath,
+    ErrorLocationEnricher locationEnricher = _defaultLocationEnricher,
     List<ErrorReportEffect> effects = const [],
     LastResortOutput lastResortOutput = _defaultLastResortOutput,
   }) : _clock = clock,
        _eventIdGenerator = eventIdGenerator,
        _currentMediaPath = currentMediaPath,
+       _locationEnricher = locationEnricher,
        _effects = List<ErrorReportEffect>.unmodifiable(effects),
        _lastResortOutput = lastResortOutput;
 
@@ -89,6 +95,7 @@ final class ErrorReporterImpl implements ErrorReporter {
   final Clock _clock;
   final EventIdGenerator _eventIdGenerator;
   final CurrentMediaPathProvider _currentMediaPath;
+  final ErrorLocationEnricher _locationEnricher;
   final List<ErrorReportEffect> _effects;
   final LastResortOutput _lastResortOutput;
   final ListQueue<ErrorReport> _queue = ListQueue<ErrorReport>();
@@ -269,6 +276,7 @@ final class ErrorReporterImpl implements ErrorReporter {
       mediaPathOverride ?? _currentMediaPath(),
     );
     final failedOpenPath = _boundedDeveloperPath(failedOpenPathOverride);
+    final location = _enrichLocation(stack);
     return ErrorReport(
       eventId: _eventIdGenerator(),
       source: source,
@@ -282,8 +290,21 @@ final class ErrorReporterImpl implements ErrorReporter {
       mediaPath: _sanitizeMediaPath(fullMediaPath),
       fullMediaPath: fullMediaPath,
       failedOpenPath: failedOpenPath,
+      location: location,
       occurrenceCount: 1,
     );
+  }
+
+  /// Produces final location evidence before any queue or effect can observe it.
+  ///
+  /// Failure is intentionally an evidence downgrade: public capture still accepts
+  /// the report and formatter emits the stable no-project-frame fallback.
+  ErrorLocation? _enrichLocation(String rawStackTrace) {
+    try {
+      return _locationEnricher(rawStackTrace);
+    } on Object {
+      return null;
+    }
   }
 
   _AcceptanceResult _accept(ErrorReport candidate) {
@@ -457,6 +478,21 @@ final class ErrorReporterImpl implements ErrorReporter {
 
   static String? _noMediaPath() => null;
 
+  /// Extracts source frames from frozen evidence and reads optional trusted lines.
+  static ErrorLocation? _defaultLocationEnricher(String rawStackTrace) {
+    final location = extractErrorLocation(rawStackTrace);
+    if (location == null) return null;
+    final excerpt = SourceLineReader().read(location.primaryFrame);
+    if (excerpt == null) return location;
+    return ErrorLocation(
+      primaryFrame: location.primaryFrame,
+      secondaryFrames: location.secondaryFrames,
+      sourceLines: [
+        for (final line in excerpt.lines) '${line.lineNumber}: ${line.text}',
+      ],
+    );
+  }
+
   static EventIdGenerator _createEventIdGenerator() {
     var sequence = 0;
     return () => 'error-${DateTime.now().microsecondsSinceEpoch}-${++sequence}';
@@ -473,6 +509,9 @@ final class ErrorReporterImpl implements ErrorReporter {
     }
   }
 }
+
+/// Narrow synchronous enrichment seam used before report acceptance/effects.
+typedef ErrorLocationEnricher = ErrorLocation? Function(String rawStackTrace);
 
 /// Immutable internal result used to keep queue policy separate from effects.
 final class _AcceptanceResult {

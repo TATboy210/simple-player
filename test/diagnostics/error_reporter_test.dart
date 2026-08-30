@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/diagnostic_redactor.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/error_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
@@ -633,6 +634,87 @@ void main() {
         'segment|clip.mp4',
       ]);
     });
+  });
+
+  group('ErrorReporterImpl location enrichment', () {
+    test('enriches frozen raw stack and source evidence before effects', () {
+      // Arrange
+      final sourceLines = <String>['10: alpha', '11: target', '12: omega'];
+      final delivered = <ErrorReport>[];
+      final reporter = ErrorReporterImpl.forTesting(
+        clock: FakeClock(DateTime.utc(2026, 8, 28)),
+        eventIdGenerator: () => 'event-1',
+        currentMediaPath: () => 'C:/Videos/current.mp4',
+        locationEnricher: (rawStackTrace) => ErrorLocation(
+          primaryFrame: const ErrorLocationFrame(
+            file: 'package:simple_player_flutter/primary.dart',
+            packageScheme: 'package',
+            package: projectPackageName,
+            packagePath: 'primary.dart',
+            line: 11,
+            column: 2,
+            member: 'Primary.run',
+          ),
+          secondaryFrames: const [
+            ErrorLocationFrame(
+              file: 'package:simple_player_flutter/secondary.dart',
+              packageScheme: 'package',
+              package: projectPackageName,
+              packagePath: 'secondary.dart',
+              line: 21,
+              column: 2,
+              member: 'Secondary.run',
+            ),
+          ],
+          sourceLines: sourceLines,
+        ),
+        effects: [(report, _) => delivered.add(report)],
+      );
+      final stack = StackTrace.fromString(
+        '#0 Primary.run (package:simple_player_flutter/primary.dart:11:2)\n'
+        '#1 Secondary.run (package:simple_player_flutter/secondary.dart:21:2)',
+      );
+
+      // Act
+      reporter.reportPlatformSafely(StateError('failed'), stack);
+
+      // Assert
+      final report = reporter.queuedReports.single;
+      expect(report.location?.primaryFrame.member, 'Primary.run');
+      expect(report.location?.secondaryFrames, hasLength(1));
+      expect(report.location?.sourceLines, sourceLines);
+      expect(delivered.single, same(report));
+      expect(report.rawStackTrace, stack.toString());
+    });
+
+    test(
+      'contains enricher failure with explicit fallback before sibling effects',
+      () {
+        // Arrange
+        final delivered = <ErrorReport>[];
+        final reporter = ErrorReporterImpl.forTesting(
+          clock: FakeClock(DateTime.utc(2026, 8, 28)),
+          eventIdGenerator: () => 'event-1',
+          currentMediaPath: () => null,
+          locationEnricher: (_) => throw StateError('reader failed'),
+          effects: [(report, _) => delivered.add(report)],
+        );
+
+        // Act and assert
+        expect(
+          () => reporter.reportPlatformSafely(
+            StateError('failed'),
+            _stack('fallback.dart'),
+          ),
+          returnsNormally,
+        );
+        expect(delivered.single.location, isNull);
+        expect(
+          delivered.single.rawStackTrace,
+          _stack('fallback.dart').toString(),
+        );
+      },
+    );
   });
 
   group('ErrorReporterImpl fault isolation', () {
