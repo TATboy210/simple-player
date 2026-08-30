@@ -15,6 +15,11 @@ import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
 
+/// UAT Test 16 故障注入开关 — 仅当
+/// `--dart-define=UAT_FAULT_WINDOW_INIT=true` 时启用，模拟 windowService.init()
+/// 平台通道故障。生产构建默认 false，无任何行为变化。
+const uatFaultWindowInit = bool.fromEnvironment('UAT_FAULT_WINDOW_INIT');
+
 /// 应用组合根：在同一 guarded zone 内初始化并启动应用。
 ///
 /// The zone encloses binding creation, diagnostic setup, global callbacks, and
@@ -38,6 +43,10 @@ Future<void> main() {
         final windowService = WindowService();
         String? windowInitError;
         try {
+          // 故障注入：在真正调用 init 前抛出，走同一 try/catch 容纳路径（UAT Test 16）。
+          if (uatFaultWindowInit) {
+            throw StateError('UAT fault injection: windowService.init() faulted');
+          }
           await windowService.init();
           startupTimeline.mark(StartupTimeline.phaseInfrastructure);
         } on Object catch (error, stackTrace) {
@@ -49,6 +58,14 @@ Future<void> main() {
             stackTrace: stackTrace,
           );
           ErrorReporterImpl.I.reportBootstrapSafely(error, stackTrace);
+        }
+
+        // 故障注入模式下的可观察证据：打印待展示报告数，验证恰好一份入队。
+        if (uatFaultWindowInit) {
+          debugPrint(
+            '[uat-window-init-fault] pendingCount='
+            '${ErrorReporterImpl.I.presentation.value.pendingCount}',
+          );
         }
 
         runApp(
