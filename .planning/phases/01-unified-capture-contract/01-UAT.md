@@ -3,17 +3,12 @@ status: testing
 phase: 01-unified-capture-contract
 source: 01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md, 01-04-SUMMARY.md
 started: 2026-08-30T08:01:50Z
-updated: 2026-08-30T08:10:00Z
+updated: 2026-08-30T08:55:00Z
 ---
 
 ## Current Test
-<!-- OVERWRITE each test - shows where we are -->
 
-number: 15
-name: Windows debug 全局钩子行为（来自 VERIFICATION.md 人工项）
-expected: |
-  在运行中的应用左下角 debug 面板分别点击"触发框架异常"与"触发异步异常"：Flutter 正常开发诊断输出保持可见（控制台）；每类来源恰好产生一份报告（debug 输出 `[debug-error-triggers] report:` 各出现一次且 occurrenceCount 为 1）；应用不中断、播放器保持可用。
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -101,14 +96,17 @@ result: pass
 
 ### 15. Windows debug 全局钩子行为（来自 VERIFICATION.md 人工项）
 expected: 在运行中的应用左下角 debug 面板分别点击"触发框架异常"与"触发异步异常"：Flutter 正常开发诊断输出保持可见（控制台）；每类来源恰好产生一份报告（debug 输出 `[debug-error-triggers] report:` 各出现一次且 occurrenceCount 为 1）；应用不中断、播放器保持可用。
-result: [pending]
+result: pass
+reported: "实机日志证据：两类来源各入队（1→2）；10 秒窗内重复点击合并（队列数不变，occurrenceCount 累计）；窗外复现作为新报告入队（2→4）；诊断输出可见；应用全程不中断。用户确认通过。"
+source: manual
+evidence: "面板 debugPrint 队列计数序列 1→2→(窗内合并保持 2)→4"
 
 ## Summary
 
 total: 15
-passed: 14
+passed: 15
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 
 ## Gaps
