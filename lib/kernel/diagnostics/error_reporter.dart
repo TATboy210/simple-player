@@ -67,12 +67,18 @@ final class ErrorReporterImpl implements ErrorReporter {
     CurrentMediaPathProvider currentMediaPath = _noMediaPath,
     ErrorLocationEnricher locationEnricher = _defaultLocationEnricher,
     List<ErrorReportEffect> effects = const [],
+    DiagnosticLogStatus? diagnosticLogStatus,
     LastResortOutput lastResortOutput = _defaultLastResortOutput,
   }) : _clock = clock,
        _eventIdGenerator = eventIdGenerator ?? _createEventIdGenerator(),
        _currentMediaPath = currentMediaPath,
        _locationEnricher = locationEnricher,
        _effects = List<ErrorReportEffect>.unmodifiable(effects),
+       _diagnosticLogStatus = diagnosticLogStatus,
+       _diagnosticLogStatusOwner =
+           diagnosticLogStatus is DelegatingDiagnosticLogEffect
+           ? diagnosticLogStatus
+           : null,
        _lastResortOutput = lastResortOutput;
 
   /// Creates a reporter with deterministic seams for tests.
@@ -82,12 +88,18 @@ final class ErrorReporterImpl implements ErrorReporter {
     required CurrentMediaPathProvider currentMediaPath,
     ErrorLocationEnricher locationEnricher = _defaultLocationEnricher,
     List<ErrorReportEffect> effects = const [],
+    DiagnosticLogStatus? diagnosticLogStatus,
     LastResortOutput lastResortOutput = _defaultLastResortOutput,
   }) : _clock = clock,
        _eventIdGenerator = eventIdGenerator,
        _currentMediaPath = currentMediaPath,
        _locationEnricher = locationEnricher,
        _effects = List<ErrorReportEffect>.unmodifiable(effects),
+       _diagnosticLogStatus = diagnosticLogStatus,
+       _diagnosticLogStatusOwner =
+           diagnosticLogStatus is DelegatingDiagnosticLogEffect
+           ? diagnosticLogStatus
+           : null,
        _lastResortOutput = lastResortOutput;
 
   static ErrorReporterImpl? _instance;
@@ -97,6 +109,8 @@ final class ErrorReporterImpl implements ErrorReporter {
   final CurrentMediaPathProvider _currentMediaPath;
   final ErrorLocationEnricher _locationEnricher;
   final List<ErrorReportEffect> _effects;
+  final DiagnosticLogStatus? _diagnosticLogStatus;
+  final DelegatingDiagnosticLogEffect? _diagnosticLogStatusOwner;
   final LastResortOutput _lastResortOutput;
   final ListQueue<ErrorReport> _queue = ListQueue<ErrorReport>();
 
@@ -112,6 +126,14 @@ final class ErrorReporterImpl implements ErrorReporter {
 
   bool _isReporting = false;
 
+  /// Stable read-only availability state for the production diagnostic file.
+  ValueListenable<bool>? get diagnosticLogsAvailable =>
+      _diagnosticLogStatus?.logsAvailable;
+
+  /// Stable read-only resolved path for the production diagnostic file.
+  ValueListenable<String?>? get diagnosticLogPath =>
+      _diagnosticLogStatus?.logPath;
+
   /// Global reporter instance. [init] must run before access.
   static ErrorReporterImpl get I {
     final instance = _instance;
@@ -125,11 +147,23 @@ final class ErrorReporterImpl implements ErrorReporter {
   static bool get isInitialized => _instance != null;
 
   /// Initializes the process-wide reporter once without replacing consumers.
-  static void init() => _instance ??= ErrorReporterImpl();
+  static void init({
+    List<ErrorReportEffect> effects = const [],
+    DiagnosticLogStatus? diagnosticLogStatus,
+  }) {
+    _instance ??= ErrorReporterImpl(
+      effects: effects,
+      diagnosticLogStatus: diagnosticLogStatus,
+    );
+  }
 
   /// Resets the process-wide reporter for isolated tests.
   @visibleForTesting
-  static void resetForTesting() => _instance = null;
+  static Future<void> resetForTesting() async {
+    final instance = _instance;
+    _instance = null;
+    await instance?._diagnosticLogStatusOwner?.dispose();
+  }
 
   /// Read-only FIFO snapshot for deterministic policy tests.
   @visibleForTesting

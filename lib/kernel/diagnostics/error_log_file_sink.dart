@@ -21,7 +21,7 @@ typedef ErrorLogWriter = Future<void> Function(String pack);
 ///
 /// The Future chain orders independent append-and-flush operations without
 /// batching. It never awaits or throws into ErrorReporter effect dispatch.
-final class ErrorLogFileSink {
+final class ErrorLogFileSink implements DiagnosticLogSink {
   /// Reports the first and every fiftieth consecutive failure to avoid turning
   /// an unavailable disk into a diagnostic-output flood.
   static const int _failureReportInterval = 50;
@@ -49,9 +49,11 @@ final class ErrorLogFileSink {
   int _consecutiveFailures = 0;
 
   /// Stable availability state for a future non-modal presentation.
+  @override
   final ValueNotifier<bool> logsAvailable = ValueNotifier<bool>(true);
 
   /// Accepts an ErrorReporter effect call and queues eligible durable evidence.
+  @override
   void record(ErrorReport report, ReportAcceptance acceptance) {
     if (!_isPersistentSeverity(report.severity)) {
       return;
@@ -76,6 +78,7 @@ final class ErrorLogFileSink {
   /// Drains queued writes for lifecycle shutdown; the effect remains reusable.
   ///
   /// No OS handle is retained, so repeated close calls only await the chain.
+  @override
   Future<void> dispose() => drain();
 
   /// Executes the injected write, restoring availability only after full success.
