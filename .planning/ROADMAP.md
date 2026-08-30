@@ -66,11 +66,11 @@ Plans:
   4. 每个 error/fatal 报告都会以 UTF-8 追加到默认或已验证的本地单一日志文件；普通 debug/info 输出不会污染该文件，关闭卡片也不会停止落盘。
   5. 日志写入或关闭失败时，应用仍可继续使用，并以受限调试输出和“日志不可用”状态降级；文件内容和复制内容使用相同的稳定诊断包格式。
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Prove the reporter-effect → shared formatter → durable UTF-8 append tracer and harden single-writer failure isolation.
+- [x] 02-01-PLAN.md — Prove the reporter-effect → shared formatter → durable UTF-8 append tracer and harden single-writer failure isolation.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
-| 2. 可信定位与文件证据 | 0/TBD | Not started | - |
+| 2. 可信定位与文件证据 | 1/4 | In Progress|  |
 | 3. 播放错误桥与非模态卡片 | 0/TBD | Not started | - |
 | 4. 错误反馈设置 | 0/TBD | Not started | - |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |
