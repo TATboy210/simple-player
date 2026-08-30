@@ -175,18 +175,35 @@ SourceReadBuildMode _runtimeBuildMode() => kReleaseMode
 
 /// Captures a root only from an owned diagnostic file frame, never cwd/executable.
 String? _captureTrustedRoot(StackTrace stackTrace) {
-  final location = extractErrorLocation(stackTrace.toString());
-  final primary = location?.primaryFrame;
-  if (primary == null || primary.packageScheme != 'file') {
-    return null;
+  try {
+    final safeLines = stackTrace
+        .toString()
+        .split('\n')
+        .where(
+          (line) => !line.startsWith('#') || _vmFramePattern.hasMatch(line),
+        );
+    final frames = StackFrame.fromStackString(safeLines.join('\n'));
+    for (final frame in frames) {
+      if (frame.packageScheme != 'file') {
+        continue;
+      }
+      final path = _normalizePath(frame.packagePath);
+      const marker = '/lib/kernel/diagnostics/';
+      final markerIndex = path?.toLowerCase().indexOf(marker);
+      if (markerIndex != null && markerIndex >= 0) {
+        return path!.substring(0, markerIndex);
+      }
+    }
+  } on Object {
+    // No fallback is intentional: a missing owned anchor leaves the root untrusted.
   }
-  final path = _normalizePath(primary.packagePath);
-  const marker = '/lib/kernel/diagnostics/';
-  final markerIndex = path?.toLowerCase().indexOf(marker);
-  return markerIndex == null || markerIndex < 0
-      ? null
-      : path!.substring(0, markerIndex);
+  return null;
 }
+
+/// Mirrors Flutter's VM grammar before delegating to StackFrame's parser.
+final RegExp _vmFramePattern = RegExp(
+  r'^#(\d+) +(.+) \((.+?):?(\d+){0,1}:?(\d+){0,1}\)$',
+);
 
 /// Normalizes separators and removes the URI-only Windows leading slash.
 String? _normalizePath(String? value) {
