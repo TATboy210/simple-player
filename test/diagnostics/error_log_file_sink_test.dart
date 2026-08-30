@@ -83,6 +83,66 @@ void main() {
     );
 
     test(
+      'contains write failures, restores availability, and rate-limits output',
+      () async {
+        // Arrange
+        final failures = <Object>[];
+        final writer = _ControlledWriter(failuresBeforeSuccess: 1);
+        final sink = ErrorLogFileSink(
+          file: File('unused.log'),
+          writer: writer.write,
+          degradedOutput: (error, _) => failures.add(error),
+        );
+
+        // Act
+        sink.record(
+          _report(message: 'first failure'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
+        final unavailableAfterFailure = sink.logsAvailable.value;
+        sink.record(
+          _report(message: 'second success'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
+
+        // Assert
+        expect(unavailableAfterFailure, isFalse);
+        expect(sink.logsAvailable.value, isTrue);
+        expect(writer.packs, hasLength(2));
+        expect(failures, hasLength(1));
+      },
+    );
+
+    test('serializes concurrent writes in record order', () async {
+      // Arrange
+      final writer = _ControlledWriter(delay: const Duration(milliseconds: 5));
+      final sink = ErrorLogFileSink(
+        file: File('unused.log'),
+        writer: writer.write,
+      );
+
+      // Act
+      for (var index = 0; index < 5; index += 1) {
+        sink.record(
+          _report(eventId: 'event-$index', message: 'message-$index'),
+          ReportAcceptance.newReport,
+        );
+      }
+      await sink.drain();
+
+      // Assert
+      expect(writer.maxActive, 1);
+      expect(
+        writer.packs.map(
+          (pack) => pack.contains('event-${writer.packs.indexOf(pack)}'),
+        ),
+        everyElement(isTrue),
+      );
+    });
+
+    test(
       'writes only error and fatal reports independently of presentation',
       () async {
         // Arrange
@@ -130,21 +190,60 @@ ErrorReporterImpl _reporter({required List<ErrorReportEffect> effects}) {
 }
 
 /// Builds a direct warning input because capture boundaries only create errors.
-ErrorReport _report({required ErrorSeverity severity}) {
+ErrorReport _report({
+  ErrorSeverity severity = ErrorSeverity.warning,
+  String eventId = 'warning-id',
+  String message = 'warning evidence',
+}) {
   final occurredAt = DateTime.utc(2026, 8, 30, 12);
   return ErrorReport(
-    eventId: 'warning-id',
+    eventId: eventId,
     source: ErrorSource.platformDispatcher,
     severity: severity,
     firstOccurredAt: occurredAt,
     lastOccurredAt: occurredAt,
     errorType: 'StateError',
     playerErrorCode: null,
-    message: 'warning evidence',
+    message: message,
     rawStackTrace: 'warning stack',
     mediaPath: null,
     occurrenceCount: 1,
   );
+}
+
+/// Controlled asynchronous writer used to prove sink ordering and containment.
+final class _ControlledWriter {
+  _ControlledWriter({
+    this.failuresBeforeSuccess = 0,
+    this.delay = Duration.zero,
+  });
+
+  final int failuresBeforeSuccess;
+  final Duration delay;
+  final List<String> packs = [];
+  int _attempts = 0;
+  int _active = 0;
+  int maxActive = 0;
+
+  /// Records one pack after an optional delay or injected first-write failure.
+  Future<void> write(String pack) async {
+    _active += 1;
+    if (_active > maxActive) {
+      maxActive = _active;
+    }
+    try {
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
+      _attempts += 1;
+      packs.add(pack);
+      if (_attempts <= failuresBeforeSuccess) {
+        throw FileSystemException('injected write failure');
+      }
+    } finally {
+      _active -= 1;
+    }
+  }
 }
 
 /// Owns a unique temporary directory for a real-file integration test.
