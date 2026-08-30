@@ -52,17 +52,18 @@ Widget _timelineTree({required ControlBarViewModel viewModel}) => MaterialApp(
 
 /// Creates the actual production shell, which is separately inspected for its
 /// timeline insertion point without making a second controls tree.
-Widget _productionShell({required ControlBarViewModel viewModel}) => MaterialApp(
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
-  supportedLocales: AppLocalizations.supportedLocales,
-  home: Scaffold(
-    body: SizedBox(
-      width: 900,
-      height: 200,
-      child: ControlBar(vm: viewModel, actions: const PlayerActions()),
-    ),
-  ),
-);
+Widget _productionShell({required ControlBarViewModel viewModel}) =>
+    MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SizedBox(
+          width: 900,
+          height: 200,
+          child: ControlBar(vm: viewModel, actions: const PlayerActions()),
+        ),
+      ),
+    );
 
 /// Waits while preserving integration-test frame processing for native events.
 Future<void> _waitForSignals(WidgetTester tester) async {
@@ -79,7 +80,9 @@ void main() {
     tester,
   ) async {
     final trace = _P39Trace();
-    final fixture = File('${Directory.current.path}/test/fixtures/tiny_valid.mp4');
+    final fixture = File(
+      '${Directory.current.path}/test/fixtures/tiny_valid.mp4',
+    );
     final fixtureName = fixture.uri.pathSegments.last;
     final engine = FakeEngine();
     final player = Player();
@@ -213,12 +216,14 @@ void main() {
                 identical(viewModel.position, controlsState.positionMs)
             ? 'observed'
             : 'mismatch',
-        detail: 'duration=${identityHashCode(viewModel.duration)} position=${identityHashCode(viewModel.position)}',
+        detail:
+            'duration=${identityHashCode(viewModel.duration)} position=${identityHashCode(viewModel.position)}',
       );
       trace.log(
         'timeline.notifier.identity',
         'observed',
-        detail: 'duration=${identityHashCode(viewModel.duration)} position=${identityHashCode(viewModel.position)}',
+        detail:
+            'duration=${identityHashCode(viewModel.duration)} position=${identityHashCode(viewModel.position)}',
       );
 
       await tester.pumpWidget(_timelineTree(viewModel: viewModel));
@@ -239,7 +244,9 @@ void main() {
       );
       trace.log(
         'widget.positionMs',
-        progressBar.evaluate().isNotEmpty ? 'observed' : 'missing-after-deadline',
+        progressBar.evaluate().isNotEmpty
+            ? 'observed'
+            : 'missing-after-deadline',
         value: widgetPosition,
       );
       trace.log(
@@ -252,8 +259,10 @@ void main() {
       // it must not be confused with the direct timeline handoff above.
       await tester.pumpWidget(_productionShell(viewModel: viewModel));
       await tester.pump();
-      final productionTimelinePresent =
-          find.byType(ControlBarTimeline).evaluate().isNotEmpty;
+      final productionTimelinePresent = find
+          .byType(ControlBarTimeline)
+          .evaluate()
+          .isNotEmpty;
       trace.log(
         'production.timeline.insertion',
         productionTimelinePresent ? 'observed' : 'missing-after-deadline',
@@ -265,15 +274,23 @@ void main() {
       expect(
         rawDurationMs,
         greaterThan(0),
-        reason: 'invalid harness: raw Player.stream.duration never became non-zero',
+        reason:
+            'invalid harness: raw Player.stream.duration never became non-zero',
       );
-      expect(rawPositionObserved, isTrue, reason: 'raw position stream did not emit');
+      expect(
+        rawPositionObserved,
+        isTrue,
+        reason: 'raw position stream did not emit',
+      );
 
       final strictMode = Platform.environment['P39_POST_REPAIR'] == 'true';
-      final boundary = switch ((portDurationMs > 0, state.durationMs.value > 0,
-          productionTimelinePresent, strictMode)) {
-        (false, _, _, _) =>
-          'lib/ui/player/media_kit_player_port.dart:MediaKitPlayerPort.duration',
+      final boundary = switch ((
+        portDurationMs > 0,
+        state.durationMs.value > 0,
+        productionTimelinePresent,
+        strictMode,
+      )) {
+        (false, _, _, _) => 'lib/ui/player/media_kit_player_port.dart:MediaKitPlayerPort.duration',
         (true, false, _, _) =>
           'lib/ui/player/player_video_controls.dart:PlayerControlsState.init',
         (true, true, false, _) =>
