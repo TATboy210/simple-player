@@ -58,12 +58,12 @@ Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 四类错误全捕获 | 全覆盖无盲区 | — Pending |
+| 四类错误全捕获 | 全覆盖无盲区 | ✓ Phase 01（UAT 16/16） |
 | 左上角非模态卡片常驻手动关 | 不遮挡交互 + 不丢错误 | — Pending |
 | 源码行 release 优雅降级 | 读不到源码退化为定位文本 | — Pending |
 | 仅错误上盘 | 文件干净易读 | — Pending |
-| kernel_logger 门面 + logger 包输出 | 存量零改动 + 杠杆效应 | — Pending |
-| 新建 error_reporter 独立服务 | 各司其职（原则 2） | — Pending |
+| kernel_logger 门面 + logger 包输出 | 存量零改动 + 杠杆效应 | ✓ Phase 01（沿用） |
+| 新建 error_reporter 独立服务 | 各司其职（原则 2） | ✓ Phase 01（含语义去重/路径净化） |
 | 统一替换旧 ErrorBanner | 一套展示逻辑 | — Pending |
 | 设置开关 + 输出路径可配 | 关卡片不关落盘 | — Pending |
 
@@ -75,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone:** 全节审查、Core Value 复核、Out of Scope 审计
 
 ---
-*Last updated: 2026-08-28 after initialization*
+*Last updated: 2026-08-30 after Phase 01*
