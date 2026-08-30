@@ -112,6 +112,48 @@ void main() {
     );
 
     test(
+      'resolves an owned package config for production-style package frames',
+      () {
+        // Arrange
+        final packageConfig =
+            File('${root.path}/.dart_tool/package_config.json')
+              ..parent.createSync(recursive: true)
+              ..writeAsStringSync('''
+{
+  "configVersion": 2,
+  "packages": [
+    {
+      "name": "simple_player_flutter",
+      "rootUri": "../",
+      "packageUri": "lib/"
+    }
+  ]
+}
+''');
+        const fileAccess = DartIoSourceFileAccess();
+        final reader = SourceLineReader.fromPackageConfigForTesting(
+          buildMode: SourceReadBuildMode.debug,
+          fileAccess: fileAccess,
+          packageConfigAccess: _PackageConfigAccess(
+            packageConfigPath: packageConfig.uri.toString(),
+          ),
+        );
+
+        // Act
+        final excerpt = reader.read(_packageFrame(line: 4));
+
+        // Assert
+        expect(excerpt?.lines.map((line) => line.text), [
+          'line 2',
+          'line 3',
+          'line 4',
+          'line 5',
+          'line 6',
+        ]);
+      },
+    );
+
+    test(
       'does no file access in release and degrades without a trusted root',
       () {
         // Arrange
@@ -163,6 +205,23 @@ ErrorLocationFrame _fileFrame(String path, {required int line}) {
     column: 1,
     member: 'Example.run',
   );
+}
+
+/// Runtime package-config seam that keeps production-style package resolution deterministic.
+final class _PackageConfigAccess implements SourcePackageConfigAccess {
+  const _PackageConfigAccess({required this.packageConfigPath});
+
+  @override
+  final String packageConfigPath;
+
+  @override
+  bool hasSourceDirectory(String root) => Directory('$root/lib').existsSync();
+
+  @override
+  String? readConfig(String packageConfigPath) {
+    final uri = Uri.tryParse(packageConfigPath);
+    return uri == null ? null : File.fromUri(uri).readAsStringSync();
+  }
 }
 
 /// Test seam that records every prospective filesystem operation.
