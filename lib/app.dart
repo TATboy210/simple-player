@@ -4,6 +4,7 @@ import 'features/player/player_feature.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
 import 'l10n/app_localizations.dart';
+import 'ui/player/error_card_host.dart';
 import 'ui/theme/tokens.dart';
 
 /// 应用壳 — MaterialApp、固定主题与本地化。
@@ -46,6 +47,7 @@ class App extends StatelessWidget {
       darkTheme: theme,
       themeMode: ThemeMode.dark,
       home: _buildPlayerHome(context),
+      builder: buildErrorCardMount,
     );
   }
 
@@ -76,4 +78,28 @@ class App extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 构建错误卡片挂载层（D-10 修订，2026-08-30 用户拍板）。
+///
+/// 卡片挂载于 MaterialApp.builder 的 root Stack、**Navigator 之上**：
+/// media_kit 全屏 route 与设置对话框均不再覆盖卡片，卡片在两者期间持续存活。
+/// D-05 的「设置打开时卡片被覆盖」语义被 D-10 取代；D-05 其余意图
+/// （root Stack 顶层、打开期间存活）保留。
+///
+/// hit-test 边界（CARD-02 / T-03-04）：宿主以 Positioned(left, top) 内在尺寸
+/// 挂载——RenderStack 对未被子节点覆盖的位置 hitTestSelf 返回 false，点击
+/// 自然穿透到下层内容。严禁 Positioned.fill/全尺寸透明容器包裹宿主，严禁
+/// IgnorePointer 包卡片——过大的可命中矩形会吞掉全应用的点击。
+Widget buildErrorCardMount(BuildContext context, Widget? navigator) {
+  return Stack(
+    children: [
+      Positioned.fill(child: navigator ?? const SizedBox.shrink()),
+      const Positioned(
+        left: Tokens.controlBarMarginH,
+        top: Tokens.spMd,
+        child: RepaintBoundary(child: ErrorCardHost()),
+      ),
+    ],
+  );
 }

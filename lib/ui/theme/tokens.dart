@@ -245,6 +245,11 @@ class Tokens {
   static const double sliderLabelWidth = 64;
   static const double sliderValueWidth = 36;
 
+  // ── 错误卡片（Phase 3）──
+  /// 折叠视图 message 文本的最大宽度 —— 长诊断文本省略号截断，
+  /// 不横向撑爆左上角卡片。
+  static const double errorCardMaxWidth = 320.0;
+
   // ── 按钮尺寸 ──
   static const double iconButtonSizeLarge = 48;
   static const double iconButtonSizeSmall = 24;
