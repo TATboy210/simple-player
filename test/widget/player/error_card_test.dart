@@ -231,7 +231,8 @@ void main() {
     testWidgets('close button dismisses current and advances the FIFO', (
       tester,
     ) async {
-      // Arrange：两份报告入队，卡片显示队首甲、徽标计总数。
+      // Arrange：两份报告入队。D-01 替换语义（03-03）：卡片显示**最新**（乙），
+      // 甲留在宿主快照中经徽标轮览可回看；徽标 = 快照长度（D-11）。
       await tester.pumpWidget(
         buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
       );
@@ -245,14 +246,16 @@ void main() {
         StackTrace.current,
       );
       await tester.pump();
-      expect(find.textContaining('错误甲'), findsOneWidget);
+      expect(find.textContaining('错误乙'), findsOneWidget);
+      expect(find.textContaining('错误甲'), findsNothing);
       expect(find.text('2 错误'), findsOneWidget);
 
-      // Act：点击关闭按钮。
+      // Act：点击关闭按钮 —— dismissCurrent 消费真实队首（甲），
+      // 宿主快照同步移除该条并重置轮览到最新。
       await tester.tap(find.byKey(const ValueKey('error-card-close')));
       await tester.pump();
 
-      // Assert：CAP-04 —— 关闭推进到队首下一项，徽标计数减一。
+      // Assert：卡片继续显示最新（乙），徽标计数减一（CAP-04 推进 + D-11 快照）。
       expect(find.textContaining('错误乙'), findsOneWidget);
       expect(find.text('1 错误'), findsOneWidget);
 

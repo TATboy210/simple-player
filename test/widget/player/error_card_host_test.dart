@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/startup_timeline.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
+import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
 import '../../helpers/fake_window_service.dart';
 
@@ -236,10 +238,237 @@ void main() {
       expect(phases, everyElement(SchedulerPhase.persistentCallbacks));
       // 收敛为一次终值更新：setState 帧 + 帧尾一次应用 = 2 次调度。
       expect(buildScheduledCount, 2);
-      // 卡片显示队首（甲）而非后入队的乙，徽标计总数。
-      expect(find.textContaining('同帧报告甲'), findsOneWidget);
-      expect(find.textContaining('同帧报告乙'), findsNothing);
+      // D-01 替换语义（03-03）：卡片显示**最新**入队的乙，甲留在快照中
+      // 经徽标轮览可回看 —— 适配值保持 reporter 队首语义，渲染层取快照。
+      expect(find.textContaining('同帧报告乙'), findsOneWidget);
+      expect(find.textContaining('同帧报告甲'), findsNothing);
       expect(find.text('2 错误'), findsOneWidget);
+    });
+  });
+
+  // ---------- 03-03 Task 2：严重级路由（D-02）与徽标轮览（D-01/D-11） ----------
+  //
+  // warning 路由的合成数据说明：四个捕获源均硬编码 error/fatal（D-02 分层
+  // 本就是给 Phase 4/5 来源的前瞻），`ErrorReporterImpl.forTesting` intake
+  // 产不出 warning —— 直接向公开的 `presentation` ValueNotifier 发布合成
+  // 快照（宿主唯一监听缝，零 kernel 改动）。error/fatal 用例仍走真实 intake。
+  //
+  // 合成报告构造器：不可变快照直构（同 03-02 口径：纯数据，零引擎构造）。
+  ErrorReport syntheticReport({
+    required String message,
+    ErrorSeverity severity = ErrorSeverity.error,
+    String? eventId,
+  }) {
+    final timestamp = DateTime.utc(2026, 8, 31, 8, 0, 0);
+    return ErrorReport(
+      eventId: eventId ?? 'synthetic-$message',
+      source: ErrorSource.playerEngine,
+      severity: severity,
+      firstOccurredAt: timestamp,
+      lastOccurredAt: timestamp,
+      errorType: 'SyntheticError',
+      playerErrorCode: null,
+      message: message,
+      rawStackTrace: '#0 synthetic (synthetic.dart:1:1)',
+      mediaPath: null,
+      occurrenceCount: 1,
+    );
+  }
+
+  // 直接向 reporter.presentation 发布快照（宿主适配层唯一监听缝）。
+  void publishPresentation(ErrorReport? report, {int pendingCount = 0}) {
+    ErrorReporterImpl.I.presentation.value = ErrorPresentationState(
+      current: report,
+      pendingCount: pendingCount,
+      isReady: true,
+    );
+  }
+
+  group('warning 严重级路由（D-02）', () {
+    testWidgets('warning head routes to OSD and advances exactly once', (
+      tester,
+    ) async {
+      // Arrange：宿主就绪 + presentation/OSD 通知计数（恰好一次断言缝）。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      var presentationChanges = 0;
+      void onPresentationChanged() => presentationChanges++;
+      ErrorReporterImpl.I.presentation.addListener(onPresentationChanged);
+      addTearDown(
+        () => ErrorReporterImpl.I.presentation.removeListener(onPresentationChanged),
+      );
+      var osdShows = 0;
+      void onOsdMessage() {
+        if (OsdService.I.message.value != null) osdShows++;
+      }
+      OsdService.I.message.addListener(onOsdMessage);
+      addTearDown(() => OsdService.I.message.removeListener(onOsdMessage));
+
+      // Act：warning 成为队首（合成快照直接发布）。
+      final warning = syntheticReport(
+        message: '降级警告',
+        severity: ErrorSeverity.warning,
+        eventId: 'warn-1',
+      );
+      publishPresentation(warning);
+      await tester.pump();
+
+      // Assert：OSD 收到提示（warning 图标）、卡片不显示该 warning。
+      expect(osdShows, 1);
+      expect(OsdService.I.message.value?.text, '降级警告');
+      expect(OsdService.I.message.value?.icon, Icons.warning_amber_outlined);
+      expect(find.byType(ErrorCard), findsNothing);
+
+      // Assert：队列恰好推进一次 —— 发布(1) + dismissCurrent 推进(2)。
+      expect(presentationChanges, 2);
+
+      // Act：重复触发（同 eventId 新快照实例 —— 模拟去重合并后的重发布 /
+      // 相位守卫双回调以同一终值调用 _apply 的场景）。
+      publishPresentation(warning);
+      await tester.pump();
+
+      // Assert：无二次提示、无二次 dismiss（无重建循环，T-03-09）。
+      expect(osdShows, 1);
+      expect(presentationChanges, 3); // 重复发布本身 +1，守卫后无推进
+
+      // Act / Assert：warning 分流后下一 error 正常上卡。
+      ErrorReporterImpl.I.reportBootstrapSafely(
+        StateError('后续错误'),
+        StackTrace.current,
+      );
+      await tester.pump();
+      expect(find.byType(ErrorCard), findsOneWidget);
+      expect(find.textContaining('后续错误'), findsOneWidget);
+    });
+  });
+
+  group('badge 徽标轮览（D-01/D-11）', () {
+    testWidgets('newest error replaces the card and badge counts the snapshot', (
+      tester,
+    ) async {
+      // Arrange。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+
+      // Act：连续接纳 3 份不同报告（真实 intake）。
+      for (final message in ['错误一', '错误二', '错误三']) {
+        ErrorReporterImpl.I.reportBootstrapSafely(StateError(message), StackTrace.current);
+      }
+      await tester.pump();
+
+      // Assert：D-01 替换语义 —— 卡片显示最新，不堆叠；徽标 = 快照长度。
+      expect(find.byType(ErrorCard), findsOneWidget);
+      expect(find.textContaining('错误三'), findsOneWidget);
+      expect(find.textContaining('错误一'), findsNothing);
+      expect(find.text('3 错误'), findsOneWidget);
+
+      // Act / Assert：新报告到达替换内容，计数跟进。
+      ErrorReporterImpl.I.reportBootstrapSafely(StateError('错误四'), StackTrace.current);
+      await tester.pump();
+      expect(find.textContaining('错误四'), findsOneWidget);
+      expect(find.text('4 错误'), findsOneWidget);
+    });
+
+    testWidgets('badge tap cycles older through the snapshot and wraps', (
+      tester,
+    ) async {
+      // Arrange：3 份报告在卡，显示最新。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      for (final message in ['错误一', '错误二', '错误三']) {
+        ErrorReporterImpl.I.reportBootstrapSafely(StateError(message), StackTrace.current);
+      }
+      await tester.pump();
+      expect(find.textContaining('错误三'), findsOneWidget);
+
+      // dismissCurrent 零调用观察缝：轮览期间 presentation 通知数不增。
+      var presentationChanges = 0;
+      void onPresentationChanged() => presentationChanges++;
+      ErrorReporterImpl.I.presentation.addListener(onPresentationChanged);
+      addTearDown(
+        () => ErrorReporterImpl.I.presentation.removeListener(onPresentationChanged),
+      );
+
+      // Act / Assert：点击徽标沿快照向旧轮览（循环）。
+      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+      await tester.pump();
+      expect(find.textContaining('错误二'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+      await tester.pump();
+      expect(find.textContaining('错误一'), findsOneWidget);
+      // 轮览到最旧后再点 → 回到最新（循环语义）。
+      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+      await tester.pump();
+      expect(find.textContaining('错误三'), findsOneWidget);
+
+      // Assert：轮览是纯视图偏移 —— presentation 通知数保持 0。
+      expect(presentationChanges, 0);
+    });
+
+    testWidgets('snapshot caps at the bound and evicts the oldest', (
+      tester,
+    ) async {
+      // Arrange：连续 21 份报告，快照上界 20（命名常量 _maxSnapshotLength）。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+
+      // Act：21 份不同报告。
+      for (var i = 1; i <= 21; i++) {
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('溢出-$i'),
+          StackTrace.current,
+        );
+      }
+      await tester.pump();
+
+      // Assert：徽标封顶于上界；最旧被挤出（轮览到最旧应显示第 2 份）。
+      expect(find.text('20 错误'), findsOneWidget);
+      for (var tap = 0; tap < 19; tap++) {
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+      }
+      expect(find.textContaining('溢出-2'), findsOneWidget);
+      expect(find.textContaining('溢出-1'), findsNothing);
+    });
+
+    testWidgets('manual close during cycling advances the real head and resets', (
+      tester,
+    ) async {
+      // Arrange：3 份报告在卡（显示最新），轮览到最旧。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      for (final message in ['错误一', '错误二', '错误三']) {
+        ErrorReporterImpl.I.reportBootstrapSafely(StateError(message), StackTrace.current);
+      }
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+      await tester.pump();
+      expect(find.textContaining('错误一'), findsOneWidget);
+
+      // Act：轮览状态下手动关闭 —— dismissCurrent 推进真实队首并重置轮览。
+      await tester.tap(find.byKey(const ValueKey('error-card-close')));
+      await tester.pump();
+
+      // Assert：真实队首（一）被消费；快照移除后计数减一；轮览重置到最新。
+      expect(find.textContaining('错误三'), findsOneWidget);
+      expect(find.text('2 错误'), findsOneWidget);
+
+      // 轮览重置后可继续向旧翻页：此处只验证翻一页命中二。
+      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+      await tester.pump();
+      expect(find.textContaining('错误二'), findsOneWidget);
     });
   });
 }
