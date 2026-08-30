@@ -100,7 +100,7 @@ Plans:
   4. 卡片以外的界面区域仍可正常命中，标题栏、控制栏和播放列表操作不被遮挡；卡片显示期间键盘快捷键保持可用。
   5. 播放引擎错误经桥接后与其他来源显示在同一错误卡片中，且在等效覆盖得到验证后旧 ErrorBanner 已被移除。
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 Plans:
 **Wave 1**
 
@@ -108,7 +108,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — 折叠/展开五段详情与严重级语义色（CARD-03/D-03/D-04），常驻手动关、零焦点抢占与严格 hit-test（CARD-01/CARD-02）。
+- [x] 03-02-PLAN.md — 折叠/展开五段详情与严重级语义色（CARD-03/D-03/D-04），常驻手动关、零焦点抢占与严格 hit-test（CARD-01/CARD-02）。
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -158,6 +158,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
-| 3. 播放错误桥与非模态卡片 | 1/4 | In Progress|  |
+| 3. 播放错误桥与非模态卡片 | 2/4 | In Progress|  |
 | 4. 错误反馈设置 | 0/TBD | Not started | - |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |
