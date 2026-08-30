@@ -4,6 +4,7 @@
 /// build mode permits it. Every rejected input degrades without throwing.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -53,10 +54,42 @@ abstract interface class SourceFileAccess {
   List<String>? readLines(String path);
 }
 
+/// Reads runtime package metadata through an owned, injectable boundary.
+abstract interface class SourcePackageConfigAccess {
+  /// Returns the runtime package-config URI string, or null when unavailable.
+  String? get packageConfigPath;
+
+  /// Reads package-config JSON text, or null when it cannot be obtained.
+  String? readConfig(String packageConfigPath);
+
+  /// Confirms the resolved project root contains the expected source directory.
+  bool hasSourceDirectory(String root);
+}
+
 /// Production `dart:io` implementation that contains filesystem failures.
-final class DartIoSourceFileAccess implements SourceFileAccess {
+final class DartIoSourceFileAccess
+    implements SourceFileAccess, SourcePackageConfigAccess {
   /// Creates the production source-file access seam.
   const DartIoSourceFileAccess();
+
+  @override
+  String? get packageConfigPath => Platform.packageConfig;
+
+  @override
+  String? readConfig(String packageConfigPath) {
+    try {
+      final configUri = Uri.tryParse(packageConfigPath);
+      if (configUri == null || configUri.scheme != 'file') {
+        return null;
+      }
+      return File.fromUri(configUri).readAsStringSync();
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  @override
+  bool hasSourceDirectory(String root) => Directory('$root/lib').existsSync();
 
   @override
   String? canonicalize(String path) {
@@ -81,14 +114,15 @@ final class DartIoSourceFileAccess implements SourceFileAccess {
 ///
 /// Maps application package frames to `<root>/lib/` and accepts file frames
 /// only after component-aware containment. It never falls back to cwd or an
-/// executable directory when self-anchored root capture is unavailable.
+/// executable directory when application-owned package resolution is unavailable.
 final class SourceLineReader {
-  /// Production construction captures a root only from locator-owned frames.
+  /// Production construction resolves the owned diagnostics package through pub's config.
   factory SourceLineReader() {
+    const fileAccess = DartIoSourceFileAccess();
     return SourceLineReader._(
-      _captureTrustedRoot(StackTrace.current),
+      _resolveTrustedRoot(fileAccess, fileAccess),
       _runtimeBuildMode(),
-      const DartIoSourceFileAccess(),
+      fileAccess,
     );
   }
 
@@ -99,6 +133,20 @@ final class SourceLineReader {
     SourceFileAccess fileAccess = const DartIoSourceFileAccess(),
   }) {
     return SourceLineReader._(trustedRoot, buildMode, fileAccess);
+  }
+
+  /// Resolves the production root with an injectable runtime-config path for tests.
+  @visibleForTesting
+  factory SourceLineReader.fromPackageConfigForTesting({
+    required SourceReadBuildMode buildMode,
+    required SourceFileAccess fileAccess,
+    required SourcePackageConfigAccess packageConfigAccess,
+  }) {
+    return SourceLineReader._(
+      _resolveTrustedRoot(fileAccess, packageConfigAccess),
+      buildMode,
+      fileAccess,
+    );
   }
 
   SourceLineReader._(String? trustedRoot, this._buildMode, this._fileAccess)
@@ -173,37 +221,93 @@ SourceReadBuildMode _runtimeBuildMode() => kReleaseMode
     ? SourceReadBuildMode.profile
     : SourceReadBuildMode.debug;
 
-/// Captures a root only from an owned diagnostic file frame, never cwd/executable.
-String? _captureTrustedRoot(StackTrace stackTrace) {
+/// Resolves this application's package root from the active pub package configuration.
+///
+/// The config location comes from the Dart runtime, not cwd or the executable path.
+/// Only the exact project package and an existing `lib/` directory establish trust.
+String? _resolveTrustedRoot(
+  SourceFileAccess fileAccess,
+  SourcePackageConfigAccess packageConfigAccess,
+) {
+  final configPath = packageConfigAccess.packageConfigPath;
+  if (configPath == null) {
+    return null;
+  }
   try {
-    final safeLines = stackTrace
-        .toString()
-        .split('\n')
-        .where(
-          (line) => !line.startsWith('#') || _vmFramePattern.hasMatch(line),
-        );
-    final frames = StackFrame.fromStackString(safeLines.join('\n'));
-    for (final frame in frames) {
-      if (frame.packageScheme != 'file') {
+    final configUri = _packageConfigUri(configPath);
+    final configText = packageConfigAccess.readConfig(configPath);
+    if (configUri == null || configText == null) {
+      return null;
+    }
+    final config = jsonDecode(configText);
+    if (config is! Map<String, Object?>) {
+      return null;
+    }
+    final packages = config['packages'];
+    if (packages is! List<Object?>) {
+      return null;
+    }
+    for (final package in packages) {
+      final root = _projectRootFromPackageEntry(
+        package,
+        configUri.resolve('.').toFilePath(),
+      );
+      if (root == null) {
         continue;
       }
-      final path = _normalizePath(frame.packagePath);
-      const marker = '/lib/kernel/diagnostics/';
-      final markerIndex = path?.toLowerCase().indexOf(marker);
-      if (markerIndex != null && markerIndex >= 0) {
-        return path!.substring(0, markerIndex);
+      final canonicalRoot = fileAccess.canonicalize(root);
+      if (canonicalRoot == null ||
+          !packageConfigAccess.hasSourceDirectory(canonicalRoot)) {
+        return null;
       }
+      return canonicalRoot;
     }
-  } on Object {
-    // No fallback is intentional: a missing owned anchor leaves the root untrusted.
+  } on FormatException {
+    // Invalid package metadata must not establish a filesystem root.
   }
   return null;
 }
 
-/// Mirrors Flutter's VM grammar before delegating to StackFrame's parser.
-final RegExp _vmFramePattern = RegExp(
-  r'^#(\d+) +(.+) \((.+?):?(\d+){0,1}:?(\d+){0,1}\)$',
-);
+/// Accepts only an absolute file URI or absolute filesystem path supplied by Dart.
+Uri? _packageConfigUri(String configPath) {
+  final parsed = Uri.tryParse(configPath);
+  if (parsed != null && parsed.scheme == 'file') {
+    return parsed;
+  }
+  if (!Platform.isWindows && configPath.startsWith('/')) {
+    return Uri.file(configPath);
+  }
+  if (Platform.isWindows && RegExp(r'^[A-Za-z]:[\\/]').hasMatch(configPath)) {
+    return Uri.file(configPath, windows: true);
+  }
+  return null;
+}
+
+/// Extracts the application root only from the exact owned package entry.
+String? _projectRootFromPackageEntry(Object? entry, String configDirectory) {
+  if (entry is! Map<String, Object?> || entry['name'] != projectPackageName) {
+    return null;
+  }
+  final rootUri = entry['rootUri'];
+  if (rootUri is! String || rootUri.isEmpty) {
+    return null;
+  }
+  final parsedRoot = Uri.tryParse(rootUri);
+  if (parsedRoot == null) {
+    return null;
+  }
+  final absoluteRoot = parsedRoot.scheme.isEmpty
+      ? Uri.directory(configDirectory).resolveUri(parsedRoot)
+      : parsedRoot;
+  final packageUri = entry['packageUri'];
+  if (packageUri is! String || packageUri != 'lib/') {
+    return null;
+  }
+  if (absoluteRoot.scheme != 'file') {
+    return null;
+  }
+  return _normalizePath(absoluteRoot.toFilePath());
+}
 
 /// Normalizes separators and removes the URI-only Windows leading slash.
 String? _normalizePath(String? value) {
