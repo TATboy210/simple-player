@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
@@ -9,7 +8,6 @@ import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/startup_timeline.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
-import 'package:simple_player_flutter/ui/player/error_card_host.dart';
 
 import '../../helpers/fake_window_service.dart';
 
@@ -32,20 +30,20 @@ void main() {
   // builder 挂载层（D-10）对两种 home 一视同仁，降级路径同时充当
   // Task 2 的 windowInitError 存活用例。
   Widget buildApp() => App(
-        startupTimeline: StartupTimeline(),
-        windowService: FakeWindowService(),
-        windowInitError: 'window init failed',
-      );
+    startupTimeline: StartupTimeline(),
+    windowService: FakeWindowService(),
+    windowInitError: 'window init failed',
+  );
 
   // 挂载层语义副本：直接复用 app.dart 的 buildErrorCardMount，
   // home 可注入自定义控件（穿透/故障注入用例需要）。
   Widget buildMountHarness({required Widget home}) => MaterialApp(
-        locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: home,
-        builder: buildErrorCardMount,
-      );
+    locale: const Locale('zh'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: home,
+    builder: buildErrorCardMount,
+  );
 
   group('ErrorCardHost 端到端呈现（tracer）', () {
     testWidgets('accepts a report and shows the card at the top-left', (
