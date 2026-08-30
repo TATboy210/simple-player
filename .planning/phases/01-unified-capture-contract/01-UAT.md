@@ -8,11 +8,7 @@ updated: 2026-08-30T09:05:00Z
 
 ## Current Test
 
-number: 16
-name: Window-init 失败容纳（来自重验 VERIFICATION.md 人工项）
-expected: |
-  在真实 Windows debug 启动中让 windowService.init() 抛出一次（临时 throw 或故障注入构建），然后启动应用：应用以降级但存活的状态进入播放器界面，windowInitError 送达 App，恰好一份 bootstrap 报告入队，且无未处理异常冒出 guarded zone（main.dart:41-52 路径）。
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -107,16 +103,18 @@ evidence: "面板 debugPrint 队列计数序列 1→2→(窗内合并保持 2)�
 
 ### 16. Window-init 失败容纳（来自重验 VERIFICATION.md 人工项）
 expected: 在真实 Windows debug 启动中让 windowService.init() 抛出一次（临时 throw 或故障注入构建）：应用以降级但存活的状态进入播放器界面，windowInitError 送达 App，恰好一份 bootstrap 报告入队，无未处理异常冒出 guarded zone（main.dart:41-52）。
-result: [pending]
+result: pass
+reported: "实机日志证据：恰好一条 `[main] Window initialization failed: Bad state: UAT fault injection...`；`[uat-window-init-fault] pendingCount=1`；无 Unhandled exception；应用保持存活。首轮实测发现降级文字态 AppLocalizations.of 崩溃（app.dart:57 在 MaterialApp 外 context 用 `!`），已修复（d85197ec Builder 子 context）后复测通过。"
 source: manual
+evidence: "flutter run --dart-define=UAT_FAULT_WINDOW_INIT=true 控制台输出：单条错误日志 + pendingCount=1 + 无异常堆栈"
 coverage_id: 01-02-window-init-containment
 
 ## Summary
 
 total: 16
-passed: 15
+passed: 16
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 
 ## Gaps
