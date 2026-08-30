@@ -1,3 +1,5 @@
+import 'error_location.dart';
+
 /// 统一错误来源；每个值只描述捕获边界，不描述展示或存储策略。
 ///
 /// Unified error sources. Each value identifies a capture boundary only.
@@ -47,6 +49,7 @@ final class ErrorReport {
     required this.rawStackTrace,
     required this.mediaPath,
     required this.occurrenceCount,
+    this.location,
   });
 
   /// Process-local identifier assigned to a distinct report.
@@ -85,6 +88,9 @@ final class ErrorReport {
   /// Number of occurrences represented by this FIFO item.
   final int occurrenceCount;
 
+  /// Optional trusted source location; null retains the explicit D-05 fallback.
+  final ErrorLocation? location;
+
   /// Creates a replacement for deduplication without changing report identity.
   ///
   /// Only occurrence metadata changes so the original queue position, source,
@@ -102,6 +108,7 @@ final class ErrorReport {
       rawStackTrace: rawStackTrace,
       mediaPath: mediaPath,
       occurrenceCount: occurrenceCount ?? this.occurrenceCount,
+      location: location,
     );
   }
 }

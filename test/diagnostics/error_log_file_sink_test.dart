@@ -13,96 +13,108 @@ import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
 void main() {
   group('ErrorLogFileSink', () {
-    test('persists an accepted platform report through the reporter effect', () async {
-      // Arrange
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final sink = ErrorLogFileSink(file: fixture.file);
-      final reporter = _reporter(effects: [sink.record]);
-      final rawStack = 'raw stack\npackage:simple_player_flutter/test.dart:7';
+    test(
+      'persists an accepted platform report through the reporter effect',
+      () async {
+        // Arrange
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final sink = ErrorLogFileSink(file: fixture.file);
+        final reporter = _reporter(effects: [sink.record]);
+        final rawStack = 'raw stack\npackage:simple_player_flutter/test.dart:7';
 
-      // Act
-      reporter.reportPlatformSafely(
-        StateError('中文错误'),
-        StackTrace.fromString(rawStack),
-      );
-      await sink.drain();
+        // Act
+        reporter.reportPlatformSafely(
+          StateError('中文错误'),
+          StackTrace.fromString(rawStack),
+        );
+        await sink.drain();
 
-      // Assert
-      final contents = await fixture.file.readAsString();
-      expect(contents, contains('== Report =='));
-      expect(contents, contains('event-1'));
-      expect(contents, contains('platformDispatcher'));
-      expect(contents, contains('error'));
-      expect(contents, contains('== Timing =='));
-      expect(contents, contains('== Media =='));
-      expect(contents, contains('== Location =='));
-      expect(contents, contains('No project frame; see raw stack for details.'));
-      expect(contents, contains('== Repetition =='));
-      expect(contents, contains('== Log Path =='));
-      expect(contents, contains(fixture.file.path));
-      expect(contents, endsWith(rawStack));
-    });
+        // Assert
+        final contents = await fixture.file.readAsString();
+        expect(contents, contains('== Report =='));
+        expect(contents, contains('event-1'));
+        expect(contents, contains('platformDispatcher'));
+        expect(contents, contains('error'));
+        expect(contents, contains('== Timing =='));
+        expect(contents, contains('== Media =='));
+        expect(contents, contains('== Location =='));
+        expect(
+          contents,
+          contains('No project frame; see raw stack for details.'),
+        );
+        expect(contents, contains('== Repetition =='));
+        expect(contents, contains('== Log Path =='));
+        expect(contents, contains(fixture.file.path));
+        expect(contents, endsWith('$rawStack\n\n'));
+      },
+    );
 
-    test('appends UTF-8 records across sink instances in acceptance order', () async {
-      // Arrange
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final first = ErrorLogFileSink(file: fixture.file);
-      final second = ErrorLogFileSink(file: fixture.file);
-      final firstReporter = _reporter(effects: [first.record]);
-      final secondReporter = _reporter(effects: [second.record]);
+    test(
+      'appends UTF-8 records across sink instances in acceptance order',
+      () async {
+        // Arrange
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final first = ErrorLogFileSink(file: fixture.file);
+        final second = ErrorLogFileSink(file: fixture.file);
+        final firstReporter = _reporter(effects: [first.record]);
+        final secondReporter = _reporter(effects: [second.record]);
 
-      // Act
-      firstReporter.reportPlatformSafely(
-        StateError('第一份中文记录'),
-        StackTrace.fromString('first raw stack'),
-      );
-      await first.drain();
-      secondReporter.reportPlatformSafely(
-        StateError('第二份中文记录'),
-        StackTrace.fromString('second raw stack'),
-      );
-      await second.drain();
+        // Act
+        firstReporter.reportPlatformSafely(
+          StateError('第一份中文记录'),
+          StackTrace.fromString('first raw stack'),
+        );
+        await first.drain();
+        secondReporter.reportPlatformSafely(
+          StateError('第二份中文记录'),
+          StackTrace.fromString('second raw stack'),
+        );
+        await second.drain();
 
-      // Assert
-      final contents = await fixture.file.readAsString();
-      final firstOffset = contents.indexOf('第一份中文记录');
-      final secondOffset = contents.indexOf('第二份中文记录');
-      expect(firstOffset, greaterThanOrEqualTo(0));
-      expect(secondOffset, greaterThan(firstOffset));
-    });
+        // Assert
+        final contents = await fixture.file.readAsString();
+        final firstOffset = contents.indexOf('第一份中文记录');
+        final secondOffset = contents.indexOf('第二份中文记录');
+        expect(firstOffset, greaterThanOrEqualTo(0));
+        expect(secondOffset, greaterThan(firstOffset));
+      },
+    );
 
-    test('writes only error and fatal reports independently of presentation', () async {
-      // Arrange
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final sink = ErrorLogFileSink(file: fixture.file);
-      final reporter = _reporter(effects: [sink.record]);
+    test(
+      'writes only error and fatal reports independently of presentation',
+      () async {
+        // Arrange
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final sink = ErrorLogFileSink(file: fixture.file);
+        final reporter = _reporter(effects: [sink.record]);
 
-      // Act
-      sink.record(_report(severity: ErrorSeverity.warning), ReportAcceptance.newReport);
-      reporter.reportPlatformSafely(
-        StateError('error evidence'),
-        StackTrace.fromString('error stack'),
-      );
-      reporter.reportPlayerError(
-        PlaybackError(
-          PlaybackErrorCode.textureFailed,
-          'fatal evidence',
-        ),
-        mediaPath: 'fatal.mp4',
-      );
-      reporter.flushPresentation();
-      reporter.dismissCurrent();
-      await sink.drain();
+        // Act
+        sink.record(
+          _report(severity: ErrorSeverity.warning),
+          ReportAcceptance.newReport,
+        );
+        reporter.reportPlatformSafely(
+          StateError('error evidence'),
+          StackTrace.fromString('error stack'),
+        );
+        reporter.reportPlayerError(
+          PlaybackError(PlaybackErrorCode.textureFailed, 'fatal evidence'),
+          mediaPath: 'fatal.mp4',
+        );
+        reporter.flushPresentation();
+        reporter.dismissCurrent();
+        await sink.drain();
 
-      // Assert
-      final contents = await fixture.file.readAsString();
-      expect(contents, isNot(contains('warning evidence')));
-      expect(contents, contains('error evidence'));
-      expect(contents, contains('fatal evidence'));
-    });
+        // Assert
+        final contents = await fixture.file.readAsString();
+        expect(contents, isNot(contains('warning evidence')));
+        expect(contents, contains('error evidence'));
+        expect(contents, contains('fatal evidence'));
+      },
+    );
   });
 }
 
