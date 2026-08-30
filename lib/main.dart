@@ -58,6 +58,21 @@ Future<void> main() {
             stackTrace: stackTrace,
           );
           ErrorReporterImpl.I.reportBootstrapSafely(error, stackTrace);
+
+          // 降级可见性兜底：原生窗口的 show 由 WindowService.init 内部负责，
+          // init 失败时窗口保持隐藏，降级文字态将对用户不可见（UAT Test 16
+          // 首轮实测发现的"隐形孤儿进程"）。这里 best-effort 直接 show——
+          // 窗口以系统默认标题栏形态出现（紧急态可接受），setPreventClose
+          // 未生效故默认关闭行为可用。若 show 本身失败，仅记录、不再上抛，
+          // 保证容纳路径本身不会制造新的未处理异常。
+          try {
+            await windowManager.show();
+          } on Object catch (showError, showStack) {
+            KernelLogger.I.w(
+              '[main] Degraded window show failed: $showError',
+              context: {'error': '$showError', 'stackTrace': '$showStack'},
+            );
+          }
         }
 
         // 故障注入模式下的可观察证据：打印待展示报告数，验证恰好一份入队。
