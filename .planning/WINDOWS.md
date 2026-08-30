@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 6
 waived_count: 0
 fixed_count: 0
-total_count: 5
-last_updated: 2026-08-30T17:24:10.426Z
+total_count: 6
+last_updated: 2026-08-30T18:41:23.380Z
 ---
 
 # Broken Windows Ledger
@@ -20,6 +20,7 @@ last_updated: 2026-08-30T17:24:10.426Z
 | 3 | 31 | deviation | test/widget/settings/general_equalizer_tab_test.dart |  | Consumer regression tests rebased from stale pre-Phase-28 APIs while retaining glass and header coverage | open |  | 2026-07-27T17:28:05.584Z |  |
 | 4 | 31 | unrun-verify | .planning/STATE.md |  | Full flutter analyze remains blocked by 114 pre-existing kernel bridge and stash-related diagnostics outside Phase 31-02 paths | open |  | 2026-07-27T17:28:31.722Z |  |
 | 5 | 03 | stub | lib/ui/player/error_card.dart | 86 | 计数徽标 onTap 为空占位,徽标轮览接线归 03-03 | open |  | 2026-08-30T17:24:10.426Z |  |
+| 6 | 03 | deviation | .planning/phases/03-playback-error-card-bridge/03-03-SUMMARY.md |  | D-11 snapshot source switched from presentation notifications to the existing effects seam (presentation publishes FIFO head only); no kernel API added | open |  | 2026-08-30T18:41:23.380Z |  |
 
 ````json
 [
@@ -81,6 +82,18 @@ last_updated: 2026-08-30T17:24:10.426Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-30T17:24:10.426Z",
+    "resolved_at": null
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "03",
+    "file": ".planning/phases/03-playback-error-card-bridge/03-03-SUMMARY.md",
+    "line": null,
+    "description": "D-11 snapshot source switched from presentation notifications to the existing effects seam (presentation publishes FIFO head only); no kernel API added",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-30T18:41:23.380Z",
     "resolved_at": null
   }
 ]
