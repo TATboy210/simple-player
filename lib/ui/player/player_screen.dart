@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+
 import '../../kernel/window_bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
@@ -14,6 +16,7 @@ import '../dialogs/settings/settings_dialog.dart';
 import '../window/custom_title_bar.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
+import 'debug_error_triggers.dart';
 import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
 
@@ -250,6 +253,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   children: [
                     // v1.8 单文件模式不再维护播放列表侧栏，视频 surface 始终占满内容区。
                     RepaintBoundary(child: cachedVideoContent),
+                    // debug 专用全局错误触发面板：验证 CAP-01/02 捕获链路的人工
+                    // UAT 项；生产构建不挂载，见 debug_error_triggers.dart。
+                    if (kDebugMode)
+                      const Positioned(
+                        left: Tokens.spSm,
+                        bottom: Tokens.spSm,
+                        child: DebugErrorTriggers(),
+                      ),
                   ],
                 ),
               ),
