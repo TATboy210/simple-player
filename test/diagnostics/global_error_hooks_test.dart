@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/global_error_hooks.dart';
@@ -84,6 +85,61 @@ void main() {
         await activation;
       },
     );
+
+    test(
+      'flushes pre-activation reports before subsequent sink records',
+      () async {
+        // Arrange
+        final delegate = DelegatingDiagnosticLogEffect();
+        final reporter = _reporter(delegate);
+        final sink = _RecordingDiagnosticSink();
+        addTearDown(delegate.dispose);
+
+        // Act
+        reporter.reportPlatformSafely(
+          StateError('first startup failure'),
+          StackTrace.current,
+        );
+        reporter.reportPlatformSafely(
+          StateError('second startup failure'),
+          StackTrace.current,
+        );
+        delegate.activate(sink: sink, resolvedPath: 'error.log');
+        reporter.reportPlatformSafely(
+          StateError('post-activation failure'),
+          StackTrace.current,
+        );
+
+        // Assert
+        expect(sink.messages, [
+          'Bad state: first startup failure',
+          'Bad state: second startup failure',
+          'Bad state: post-activation failure',
+        ]);
+      },
+    );
+
+    test('ignores repeated activation without replacing or leaking the initial sink', () async {
+      // Arrange
+      final delegate = DelegatingDiagnosticLogEffect();
+      final reporter = _reporter(delegate);
+      final first = _RecordingDiagnosticSink();
+      final replacement = _RecordingDiagnosticSink();
+      addTearDown(delegate.dispose);
+
+      // Act
+      delegate.activate(sink: first, resolvedPath: 'first.log');
+      delegate.activate(sink: replacement, resolvedPath: 'replacement.log');
+      reporter.reportPlatformSafely(
+        StateError('persist through first sink'),
+        StackTrace.current,
+      );
+
+      // Assert
+      expect(delegate.logPath.value, 'first.log');
+      expect(first.messages, ['Bad state: persist through first sink']);
+      expect(replacement.messages, isEmpty);
+    });
 
     test(
       'activates the same delegate and status listenables after resolution',
@@ -352,6 +408,25 @@ void main() {
       },
     );
   });
+}
+
+/// In-memory sink that exposes forwarding order and listener ownership.
+final class _RecordingDiagnosticSink implements DiagnosticLogSink {
+  final ValueNotifier<bool> _availability = ValueNotifier<bool>(true);
+  final List<String> messages = <String>[];
+
+  @override
+  ValueListenable<bool> get logsAvailable => _availability;
+
+  @override
+  void record(ErrorReport report, ReportAcceptance acceptance) {
+    messages.add(report.message);
+  }
+
+  @override
+  Future<void> dispose() async {
+    _availability.dispose();
+  }
 }
 
 /// Builds a deterministic reporter with the production-owned diagnostic delegate.

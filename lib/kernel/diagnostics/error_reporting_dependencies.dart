@@ -1,10 +1,13 @@
 /// Injectable dependencies for deterministic, failure-isolated error reporting.
 library;
 
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 
 import 'clock.dart';
 import 'error_report.dart';
+import 'kernel_logger.dart';
 
 /// 生成进程内报告 ID 的纯函数。
 ///
@@ -76,16 +79,24 @@ abstract interface class DiagnosticLogStatus {
   ValueListenable<String?> get logPath;
 }
 
-/// Startup-stable reporter effect that safely forwards only after writer activation.
+/// Startup-stable reporter effect that buffers durable evidence until activation.
 ///
-/// Pending or failed path resolution leaves [record] as a no-op. Activation updates
-/// notifier values in place so no reporter, callback, or UI listener loses identity.
+/// Pending path resolution retains a bounded FIFO so hooks-first startup cannot lose
+/// accepted error evidence. Activation drains that FIFO before accepting direct writes,
+/// while notifier identities remain stable for reporter and UI consumers.
 final class DelegatingDiagnosticLogEffect implements DiagnosticLogStatus {
   DelegatingDiagnosticLogEffect();
 
+  /// Retains only a bounded startup burst while path-provider resolution is pending.
+  static const int _pendingCapacity = 32;
+
   final ValueNotifier<bool> _logsAvailable = ValueNotifier<bool>(false);
   final ValueNotifier<String?> _logPath = ValueNotifier<String?>(null);
+  final ListQueue<_PendingDiagnosticRecord> _pending =
+      ListQueue<_PendingDiagnosticRecord>();
   DiagnosticLogSink? _sink;
+  bool _isActivated = false;
+  bool _isFlushingPending = false;
 
   @override
   ValueListenable<bool> get logsAvailable => _logsAvailable;
@@ -95,18 +106,54 @@ final class DelegatingDiagnosticLogEffect implements DiagnosticLogStatus {
 
   /// Accepts an ErrorReporter effect call without exposing a concrete writer.
   void record(ErrorReport report, ReportAcceptance acceptance) {
-    _sink?.record(report, acceptance);
+    final sink = _sink;
+    if (sink != null && !_isFlushingPending) {
+      sink.record(report, acceptance);
+      return;
+    }
+    _enqueuePending(report, acceptance);
   }
 
-  /// Activates [sink] in place after the default path and writer are ready.
+  /// Retains a bounded record while initial activation serializes the sink handoff.
+  void _enqueuePending(ErrorReport report, ReportAcceptance acceptance) {
+    // Drop the oldest record to preserve the most recent bounded startup evidence.
+    if (_pending.length == _pendingCapacity) {
+      _pending.removeFirst();
+    }
+    _pending.addLast(_PendingDiagnosticRecord(report, acceptance));
+  }
+
+  /// Activates [sink] once and flushes unresolved reports in their original order.
   void activate({
     required DiagnosticLogSink sink,
     required String resolvedPath,
   }) {
+    if (_isActivated) {
+      _warnRepeatedActivation();
+      return;
+    }
+    _isActivated = true;
+    // Keep arrivals queued until every original record reaches the sink, including
+    // reentrant effect calls made during a synchronous record implementation.
     _sink = sink;
+    _isFlushingPending = true;
+    sink.logsAvailable.addListener(_syncAvailability);
     _logPath.value = resolvedPath;
     _logsAvailable.value = sink.logsAvailable.value;
-    sink.logsAvailable.addListener(_syncAvailability);
+    while (_pending.isNotEmpty) {
+      final pending = _pending.removeFirst();
+      sink.record(pending.report, pending.acceptance);
+    }
+    _isFlushingPending = false;
+  }
+
+  /// Contains repeated activation diagnostics because this effect is a hook target.
+  void _warnRepeatedActivation() {
+    try {
+      KernelLogger.I.warn('Diagnostic log effect ignored repeated activation.');
+    } on Object {
+      // Logger initialization cannot be assumed by direct unit-test construction.
+    }
   }
 
   void _syncAvailability() {
@@ -121,10 +168,21 @@ final class DelegatingDiagnosticLogEffect implements DiagnosticLogStatus {
     final sink = _sink;
     sink?.logsAvailable.removeListener(_syncAvailability);
     _sink = null;
+    _isActivated = false;
+    _isFlushingPending = false;
+    _pending.clear();
     _logPath.value = null;
     _logsAvailable.value = false;
     if (sink != null) {
       await sink.dispose();
     }
   }
+}
+
+/// Immutable startup record that preserves the reporter effect call contract.
+final class _PendingDiagnosticRecord {
+  const _PendingDiagnosticRecord(this.report, this.acceptance);
+
+  final ErrorReport report;
+  final ReportAcceptance acceptance;
 }
