@@ -12,7 +12,7 @@ Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放
 - 四类错误全捕获：UI/框架异常、异步未捕获异常、播放引擎错误、启动期异常
 - 左上角非模态错误卡片：常驻手动关，不遮挡控制栏/标题栏交互区
 - 卡片详情：文件:行号 + 源码行（release 优雅降级）+ 完整调用栈 + 一键复制 + 日志路径 + 媒体路径
-- 错误自动落盘：kernel_logger 新增 FileSink（logger 包作输出引擎），仅错误事件上盘，单文件追加纯文本
+- 错误自动落盘：ErrorReporter 副作用链新增 FileSink（dart:io append+flush 单写者；logger FileOutput 不按条 flush 已证实弃用），仅错误事件上盘，单文件追加纯文本
 - 设置"通用"tab：错误卡片开关（默认开）+ 日志输出路径可配置
 - 替换旧 ErrorBanner，所有错误统一走新卡片
 
@@ -42,7 +42,7 @@ Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放
 
 - **零全局错误钩子现状**：`FlutterError.onError`/`PlatformDispatcher.onError`/`runZonedGuarded` 全项目零匹配，未捕获异常直接崩溃/红屏
 - **诊断设施已备**：lib/kernel/diagnostics/ 已有 8 文件（kernel_logger 三 sink、MemoryMonitor、startup_timeline 等），在其上扩展而非重写
-- **logger ^2.7.0 激活**：pubspec 已有但零使用，激活为 FileSink 输出引擎
+- **logger ^2.7.0 弃用修订（2026-08-30）**：FileOutput 不按条 flush（仅 destroy 时刷）且 kernel gate 禁止 lib/kernel/ 导入 package:logger，FileSink 改 dart:io 直写；后续可从 pubspec 移除 logger
 - **旧 ErrorBanner**：已展示播放引擎错误（监听 engine.lastError），将被统一替换
 - **媒体路径来源**：PlaybackController.currentPath
 - **v1.9 归档**：见 Key context
