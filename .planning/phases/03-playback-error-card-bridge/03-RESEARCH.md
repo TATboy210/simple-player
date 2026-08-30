@@ -387,27 +387,34 @@ Expanded long-text container: a `SingleChildScrollView` is sufficient — the ra
 | A4 | `test/bundle backup` git-recovery assumption for MIG-01 deletion: standard git history suffices | Runtime State Inventory | None (delete is reviewed in diff) |
 | A5 | Adapter-notifier approach satisfies D-08's "ValueListenableBuilder 订阅 ErrorReporter 呈现状态" wording (it subscribes via an adapter, not literally to `presentation`) | Summary/Pattern 1 | Low-Medium — deviation is justified by CARD-05; flag in plan for user visibility |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> 全部四问已在 `/gsd-discuss-phase` 会话中由用户拍板，权威记录见 03-CONTEXT.md 的 `## Decisions`（D-09/D-10/D-11/D-12）。以下逐条标注解析指针；原问题文本与研究建议保留作历史参考，**执行以决策为准**。
+> All four resolved by user decisions during `/gsd-discuss-phase`; authoritative record: 03-CONTEXT.md `## Decisions`. Original text kept for history — **execution follows the decisions, not the research recommendations below.**
 
 1. **Card visibility during media_kit fullscreen**
    - What we know: D-05 locks root-Stack mount and settings-coverage semantics; fullscreen route replicates the controls builder and will cover a body-Stack card (A3).
    - What's unclear: should the card also be replicated inside `Video.controls` for fullscreen?
    - Recommendation: accept hidden-in-fullscreen for this phase (note it in the plan + VER-04 smoke checklist); revisit only if the user objects.
+   - **RESOLVED → D-10（03-CONTEXT.md）**：用户选择**全屏期间卡片仍显示**——卡片须挂载于全屏 route 之上（root Overlay/navigator 层而非 body Stack 内）。此为用户对研究建议「accept hidden-in-fullscreen」的**显式覆盖**（user override）；研究提示的 CARD-02 hit-test 风险由 03-02 Task 2 的严格边界命中测试承接。
 
 2. **Do ErrorBanner's action buttons (reopen/select-other-file/retry) intentionally disappear?**
    - What we know: `error_banner.dart:44-64` maps each `PlayerError` subtype to a recovery action; CARD-01..06 and D-01..D-08 specify copy/close/expand only — no recovery actions. "可见反馈等效" (D-07) is satisfiable without them.
    - What's unclear: whether dropping one-click recovery is user-accepted UX regression.
    - Recommendation: treat equivalence as message+severity visibility equivalence; surface the action-button drop explicitly in the plan for user confirmation (cheap to defer, not to retrofit).
+   - **RESOLVED → D-09（03-CONTEXT.md）**：动作按钮**确认不保留**——卡片职责为信息展示+复制（Unix 原则：只做好一件事）；MIG-01 等效覆盖按「消息+严重级可见性」断言，不含按钮行为。
 
 3. **Badge cycling source of truth**
    - What we know: `presentation` exposes only `current` + `pendingCount`; the full queue is `@visibleForTesting` (`error_reporter.dart:169-170`). D-08 says no structural changes needed.
    - What's unclear: whether local-snapshot history (bounded, e.g. last 20 eventIds) is acceptable vs. exposing a read-only reporter API.
    - Recommendation: local snapshot first (zero kernel change); fall back to a reporter read API only if tests show snapshot semantics break (e.g. merged reports changing identity).
+   - **RESOLVED → D-11（03-CONTEXT.md）**：采纳本地有界错误快照（宿主自 reporter presentation 通知维护），不给 kernel 新增只读历史 API——与研究建议方向一致，正式锁定。
 
 4. **Pre-mount window host**
    - What we know: bootstrap errors (e.g. `windowInitError` path, `main.dart:71`) are queued before `PlayerScreen` mounts; the card host lives inside the deferred PlayerFeature module, so a failure during deferred loading leaves the queue un-presented until/unless a host mounts.
    - What's unclear: acceptable for MVP (file evidence still lands).
    - Recommendation: accept; note that `flushPresentation()` on mount retroactively presents queued bootstrap errors — that is the designed behavior.
+   - **RESOLVED → D-12（03-CONTEXT.md）**：挂载完成前的错误在宿主首次 `flushPresentation()` 时**补呈现**（MVP 接受窗口内不可见，最终可见）——即研究描述的既有设计行为，正式锁定。
 
 ## Environment Availability
 
