@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
@@ -9,11 +10,13 @@ import 'package:simple_player_flutter/kernel/diagnostics/error_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/diagnostic_pack_formatter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
+import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 /// ErrorCard 折叠/展开详情测试（CARD-03/D-03/D-04，T-03-05 脱敏边界）。
@@ -551,6 +554,157 @@ void main() {
       // Assert：显示真实日志路径而非降级文案。
       expect(find.text('C:/logs/diag.txt'), findsOneWidget);
       expect(find.text('日志文件不可用'), findsNothing);
+    });
+  });
+
+  group('copy 一键复制诊断包与失败隔离（CARD-04/D-06）', () {
+    // 注册 flutter/platform channel mock —— 同时是成功捕获与失败注入的缝
+    // （03-VALIDATION Headless 基线：Clipboard 必须 mock channel 驱动而非
+    // 真实剪贴板；未注册 handler 抛 MissingPluginException 正好构成天然
+    // 失败路径）。测试结束自动摘除，避免污染后续用例。
+    void mockPlatformChannel(
+      WidgetTester tester,
+      Future<Object?>? Function(MethodCall call)? handler,
+    ) {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        handler,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+    }
+
+    // 推进 OSD hold 计时器（osdDefaultHoldMs=1200）：OsdService 是全局
+    // 单例，show() 会启动 hide Timer —— 测试结束前不推进会遗留 pending
+    // timer 导致 flutter_test 报错。
+    Future<void> settleOsdTimer(WidgetTester tester) =>
+        tester.pump(const Duration(seconds: 2));
+
+    testWidgets('copy sends a formatter-identical pack and shows copied OSD', (
+      tester,
+    ) async {
+      // Arrange：真实 intake 报告 + 默认单例（无 diagnosticLogStatus →
+      // logPath 为 null，与 formatter 对 null 的既有降级一致）。
+      final reporter = makeReporter(mediaPath: r'D:\media\movies\bunny.mp4');
+      final report = acceptHead(reporter, () {
+        reporter.reportPlayerError(
+          FileError(FileErrorCode.fileNotFound, 'raw path'),
+        );
+      });
+      await tester.pumpWidget(buildCard(report));
+
+      final calls = <MethodCall>[];
+      mockPlatformChannel(tester, (call) async {
+        calls.add(call);
+        return null;
+      });
+
+      // Act：点击复制按钮。
+      await tester.tap(find.byKey(const ValueKey('error-card-copy')));
+      await tester.pump();
+
+      // Assert：LOG-05 单一来源 —— 复制文本与 formatDiagnosticPack 输出
+      // 逐字符相等（卡内禁止自拼格式字符串）。
+      expect(calls, hasLength(1));
+      expect(calls.single.method, 'Clipboard.setData');
+      final arguments = calls.single.arguments! as Map<Object?, Object?>;
+      expect(arguments['text'], formatDiagnosticPack(report));
+      // D-06 成功反馈：OSD「已复制」pill。
+      expect(OsdService.I.message.value?.text, '已复制');
+      expect(OsdService.I.message.value?.icon, Icons.check);
+      // 复制不改变折叠/展开状态，也不禁用卡片其余交互。
+      expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+
+      await settleOsdTimer(tester);
+    });
+
+    testWidgets('pack logPath section reflects diagnosticLogPath at copy time', (
+      tester,
+    ) async {
+      // Arrange：注入提供路径的 DiagnosticLogStatus fake，logPath 段应取
+      // 该值（复制时刻取值，与展开区日志路径段同一读取路径）。
+      await ErrorReporterImpl.resetForTesting();
+      ErrorReporterImpl.init(diagnosticLogStatus: _FakeLogStatus('C:/logs/diag.txt'));
+      final reporter = makeReporter();
+      final report = acceptHead(reporter, () {
+        reporter.reportBootstrapSafely(StateError('日志路径复制'), StackTrace.current);
+      });
+      await tester.pumpWidget(buildCard(report));
+
+      final calls = <MethodCall>[];
+      mockPlatformChannel(tester, (call) async {
+        calls.add(call);
+        return null;
+      });
+
+      await tester.tap(find.byKey(const ValueKey('error-card-copy')));
+      await tester.pump();
+
+      final arguments = calls.single.arguments! as Map<Object?, Object?>;
+      expect(
+        arguments['text'],
+        formatDiagnosticPack(report, logPath: 'C:/logs/diag.txt'),
+      );
+      expect(arguments['text'], contains('Path: C:/logs/diag.txt'));
+
+      await settleOsdTimer(tester);
+    });
+
+    testWidgets('PlatformException injection shows failed OSD and keeps card intact', (
+      tester,
+    ) async {
+      // Arrange：卡片可见后，把 channel mock 换成注入故障。
+      final reporter = makeReporter();
+      final report = acceptHead(reporter, () {
+        reporter.reportBootstrapSafely(StateError('复制隔离检查'), StackTrace.current);
+      });
+      await tester.pumpWidget(buildCard(report));
+      mockPlatformChannel(
+        tester,
+        (call) async => throw PlatformException(code: 'copy_failed', message: 'injected'),
+      );
+
+      // Act。
+      await tester.tap(find.byKey(const ValueKey('error-card-copy')));
+      await tester.pump();
+
+      // Assert：失败反馈 + 失败隔离 —— 卡片仍可见、内容不变、无异常外溢
+      // （T-03-11：typed catch 吸收 PlatformException）。
+      expect(OsdService.I.message.value?.text, '复制失败');
+      expect(OsdService.I.message.value?.icon, Icons.error_outline);
+      expect(find.byType(ErrorCard), findsOneWidget);
+      expect(find.text('Bad state: 复制隔离检查'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await settleOsdTimer(tester);
+    });
+
+    testWidgets('unregistered channel (MissingPluginException) degrades to failed OSD', (
+      tester,
+    ) async {
+      // Arrange：不注册任何 handler —— Clipboard.setData 天然抛
+      // MissingPluginException（widget 测试默认路径）。
+      final reporter = makeReporter();
+      final report = acceptHead(reporter, () {
+        reporter.reportBootstrapSafely(StateError('缺插件检查'), StackTrace.current);
+      });
+      await tester.pumpWidget(buildCard(report));
+
+      // Act。
+      await tester.tap(find.byKey(const ValueKey('error-card-copy')));
+      await tester.pump();
+
+      // Assert：与 PlatformException 同态反馈，卡片无恙。
+      expect(OsdService.I.message.value?.text, '复制失败');
+      expect(find.byType(ErrorCard), findsOneWidget);
+      expect(find.text('Bad state: 缺插件检查'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await settleOsdTimer(tester);
     });
   });
 }
