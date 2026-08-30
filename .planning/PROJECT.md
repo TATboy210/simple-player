@@ -75,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone:** 全节审查、Core Value 复核、Out of Scope 审计
 
 ---
-*Last updated: 2026-08-30 after Phase 01*
+*Last updated: 2026-08-30 after Phase 02*
