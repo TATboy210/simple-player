@@ -14,9 +14,9 @@
 
 ### 定位 (Locate)
 
-- [ ] **LOC-01**: 保守首帧定位——StackFrame.fromStackTrace 提取首个 package:simple_player_flutter 帧，raw stack 全程保留
-- [ ] **LOC-02**: 源码行显示——可信源码根路径校验（containment check），debug/profile 可读源码行；release 读不到源码优雅降级为仅定位文本，不报错不闪退
-- [ ] **LOC-03**: 报告含媒体路径快照（PlaybackController.currentPath，报告时快照不可变）与 failed-open 尝试路径上下文
+- [x] **LOC-01**: 保守首帧定位——StackFrame.fromStackTrace 提取首个 package:simple_player_flutter 帧，raw stack 全程保留
+- [x] **LOC-02**: 源码行显示——可信源码根路径校验（containment check），debug/profile 可读源码行；release 读不到源码优雅降级为仅定位文本，不报错不闪退
+- [x] **LOC-03**: 报告含媒体路径快照（PlaybackController.currentPath，报告时快照不可变）与 failed-open 尝试路径上下文
 
 ### 落盘 (Log)
 
@@ -80,9 +80,9 @@
 | CAP-02 | Phase 1 | Complete |
 | CAP-03 | Phase 1 | Complete |
 | CAP-04 | Phase 1 | Complete |
-| LOC-01 | Phase 2 | Pending |
-| LOC-02 | Phase 2 | Pending |
-| LOC-03 | Phase 2 | Pending |
+| LOC-01 | Phase 2 | Complete |
+| LOC-02 | Phase 2 | Complete |
+| LOC-03 | Phase 2 | Complete |
 | LOG-01 | Phase 2 | Complete |
 | LOG-02 | Phase 2 | Complete |
 | LOG-03 | Phase 2 | Complete |
