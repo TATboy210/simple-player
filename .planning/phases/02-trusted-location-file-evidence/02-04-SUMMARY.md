@@ -2,7 +2,7 @@
 phase: 02
 plan: 04
 subsystem: kernel-diagnostics
- tags: [dart, flutter, diagnostics, path-provider, durable-file-evidence, startup]
+tags: [dart, flutter, diagnostics, path-provider, durable-file-evidence, startup]
 requires:
   - phase: 02-01
     provides: durable ErrorReporter file-sink writer and shared diagnostic-pack formatter
