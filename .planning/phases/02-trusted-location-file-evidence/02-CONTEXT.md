@@ -28,6 +28,11 @@
 ### 定位帧提取策略
 - **D-05:** 定位字段 = 首个 `package:simple_player_flutter` 帧（文件:行:成员）+ 后续最多 2 个项目帧；raw stack 全文始终保留在诊断包尾部；提取失败时降级为「无项目帧，完整栈见 raw stack」定位文本，不产生新错误 — **Reversibility:** reversible — 提取函数参数
 
+### 研究后修订决策（2026-08-30，用户拍板）
+- **D-06:** FileSink 实现用 dart:io `File.writeAsString(mode: FileMode.append, flush: true)` + 单写者 Future 链队列，**不用** logger `FileOutput`——研究证实其 output() 不 flush 仅 destroy() 时刷（掉电丢尾，违背 D-02 即时写），且 kernel CI gate 禁止 lib/kernel/ 导入 package:logger；PROJECT.md 原 FileOutput 锁定方案已修订 — **Reversibility:** reversible
+- **D-07:** 诊断包（文件记录与复制）中媒体快照与 failed-open 路径显示**完整路径**（开发者定位用途）；UI 卡片（Phase 3）显示 basename 脱敏——脱敏边界在 formatter 输出层区分，raw report 保持现状 — **Reversibility:** reversible
+- **D-08:** FileSink 挂 **ErrorReporter 副作用链**（拿到富化后完整 ErrorReport，单写者语义干净），不走 KernelLogger CompositeSink 分流；KernelLogger 门面保持现状不动 — **Reversibility:** reversible
+
 ### Claude's Discretion
 - 源码根路径的界定方式（编译时断言 vs 运行时探测，researcher 定）
 - StackFrame.fromStackTrace 解析失败的具体兜底形态
