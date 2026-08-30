@@ -87,7 +87,8 @@ Plans:
 
 ### Phase 3: 播放错误桥与非模态卡片
 
-**Goal**: 用户在播放器界面中可获得所有错误的统一、可展开且不阻碍控制的即时反馈，旧错误横幅不再形成第二条展示路径。
+**Goal**: As a player user, I want to see every error in one unified, expandable non-modal card that never blocks playback controls, so that I get immediate feedback without a second error display path.
+(中文原意：用户在播放器界面中可获得所有错误的统一、可展开且不阻碍控制的即时反馈，旧错误横幅不再形成第二条展示路径。)
 **Mode:** mvp
 **Depends on**: Phase 2
 **Requirements**: CARD-01, CARD-02, CARD-03, CARD-04, CARD-05, CARD-06, MIG-01
