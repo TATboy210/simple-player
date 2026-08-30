@@ -683,23 +683,29 @@ void main() {
       await settleOsdTimer(tester);
     });
 
-    testWidgets('unregistered channel (MissingPluginException) degrades to failed OSD', (
+    testWidgets('unmocked clipboard channel leaves card intact with no crash', (
       tester,
     ) async {
-      // Arrange：不注册任何 handler —— Clipboard.setData 天然抛
-      // MissingPluginException（widget 测试默认路径）。
+      // Arrange：不注册任何 handler —— channel 层真实语义验证。
+      // 注（计划假设修正，见 03-03 SUMMARY）：SystemChannels.platform 是
+      // OptionalMethodChannel，其 invokeMethod 内部**吞掉**
+      // MissingPluginException 并返回 null；未注册 handler 的 send 在测试
+      // binding 中更是永不完成。因此「未 mock → 复制失败」不可达，真实可断
+      // 言行为是：复制调用不崩溃、卡片无恙；生产代码的
+      // `on MissingPluginException` catch 保留作防御分支（不可经 channel 触达）。
       final reporter = makeReporter();
       final report = acceptHead(reporter, () {
         reporter.reportBootstrapSafely(StateError('缺插件检查'), StackTrace.current);
       });
       await tester.pumpWidget(buildCard(report));
 
-      // Act。
+      // Act。（两次 pump：让 tap 触发的异步链充分落地）
       await tester.tap(find.byKey(const ValueKey('error-card-copy')));
       await tester.pump();
+      await tester.pump();
 
-      // Assert：与 PlatformException 同态反馈，卡片无恙。
-      expect(OsdService.I.message.value?.text, '复制失败');
+      // Assert：无崩溃、卡片可见且内容不变（无反馈 pill —— Future 未完成，
+      // 真实桌面运行时引擎始终应答，不会出现此悬挂形态）。
       expect(find.byType(ErrorCard), findsOneWidget);
       expect(find.text('Bad state: 缺插件检查'), findsOneWidget);
       expect(tester.takeException(), isNull);

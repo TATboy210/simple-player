@@ -1,9 +1,15 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../kernel/diagnostics/diagnostic_pack_formatter.dart';
 import '../../kernel/diagnostics/error_report.dart';
 import '../../kernel/diagnostics/error_reporter.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_container.dart';
+import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
 
 /// 错误卡片 — 折叠摘要 + 展开详情的纯呈现 widget（CARD-03/D-03/D-04）。
@@ -15,8 +21,8 @@ import '../theme/tokens.dart';
 ///   → 重复信息，长文本段 SingleChildScrollView + SelectableText（A2：栈硬
 ///   上界 16384 字符，无需虚拟化）；
 /// - **交互**：整卡点击切换折叠/展开（StatefulWidget 内部状态，无新状态库）；
-///   徽标点击为空操作占位（轮览接线归 03-03）；关闭按钮与 hit-test 宿主级
-///   义务归 03-02 Task 2；
+///   一键复制诊断包（CARD-04/D-06，失败隔离）；徽标点击为空操作占位
+///   （轮览接线归 03-03）；关闭按钮与 hit-test 宿主级义务归 03-02 Task 2；
 /// - **数据来源不变**：投影不可变 [ErrorReport]，intake 已脱敏限界；
 ///   T-03-05 —— 可见树不渲染 fullMediaPath/failedOpenPath 完整路径字段。
 ///
@@ -114,6 +120,52 @@ class _ErrorCardState extends State<ErrorCard> {
     return ErrorReporterImpl.I.diagnosticLogPath?.value;
   }
 
+  /// CARD-04/D-06 一键复制诊断包 —— 格式一律走
+  /// [formatDiagnosticPack]（LOG-05 单一来源：卡内复制 == 日志文件格式，
+  /// 卡内禁止自拼格式字符串），logPath 在**复制时刻**从
+  /// `diagnosticLogPath.value` 取值（不缓存，与展开区日志路径段同一读取路径）。
+  ///
+  /// 失败隔离（T-03-11）：typed catch 只捕 [PlatformException] 与
+  /// [MissingPluginException]（widget 测试未 mock channel 的天然路径），
+  /// 两态都以 OsdService pill 反馈（成功「已复制」/失败「复制失败」）；
+  /// 不捕获任何 Error 子类型，异常绝不外溢到调用方，卡片可见性与内容
+  /// 不受复制结果影响。复制期间折叠/展开状态不变（D-06）。
+  Future<void> _copyDiagnosticPack() async {
+    // l10n 必须在 await 之前解析（await 后使用 context 需 mounted 检查，
+    // 提前捕获一次即可覆盖成功/失败两条反馈路径）。
+    final l10n = AppLocalizations.of(context);
+    final pack = formatDiagnosticPack(widget.report, logPath: _resolveLogPath());
+    try {
+      await Clipboard.setData(ClipboardData(text: pack));
+      OsdService.I.show(l10n.errorCardCopied, icon: Icons.check);
+    } on PlatformException catch (error) {
+      _showCopyFailed(l10n);
+      // PlatformException 属可恢复运行期故障：结构化 warn 供日志回溯
+      // （kernel 红线内 UI 层允许 debugPrint，但结构化日志优先）。
+      KernelLogger.I.w(
+        'clipboard copy failed',
+        context: {'code': error.code, 'message': error.message},
+      );
+    } on MissingPluginException catch (error) {
+      // 防御分支：Clipboard 走 OptionalMethodChannel，其 invokeMethod 已在
+      // 内部吞掉 MissingPluginException（测试环境未 mock 的 send 更是永不
+      // 完成）—— 此 catch 正常不可触达，保留以对冲 channel 实现变化。
+      _showCopyFailed(l10n);
+      assert(() {
+        KernelLogger.I.w(
+          'clipboard channel unavailable (MissingPluginException)',
+          context: {'error': error.toString()},
+        );
+        return true;
+      }());
+    }
+  }
+
+  /// 复制失败两态共用的 OSD 反馈（D-06「复制失败」pill）。
+  void _showCopyFailed(AppLocalizations l10n) {
+    OsdService.I.show(l10n.errorCardCopyFailed, icon: Icons.error_outline);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -174,6 +226,27 @@ class _ErrorCardState extends State<ErrorCard> {
                   style: const TextStyle(
                     color: Tokens.textSecondary,
                     fontSize: Tokens.fontCaption,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: Tokens.spSm),
+            // CARD-04 一键复制按钮：GestureDetector（不用 GlassButton ——
+            // 其 FocusableActionDetector 会请求焦点，破坏 CARD-01 零焦点
+            // 抢占）。嵌在整卡 GestureDetector 内层 —— 命中测试天然内层
+            // 优先（点复制不触发展开切换），无需 IgnorePointer。
+            Semantics(
+              label: l10n.errorCardCopyTooltip,
+              button: true,
+              child: GestureDetector(
+                key: const ValueKey('error-card-copy'),
+                onTap: () => unawaited(_copyDiagnosticPack()),
+                child: const Padding(
+                  padding: EdgeInsets.all(Tokens.spXs),
+                  child: Icon(
+                    Icons.copy,
+                    size: Tokens.iconSm,
+                    color: Tokens.textSecondary,
                   ),
                 ),
               ),
