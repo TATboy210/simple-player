@@ -52,17 +52,28 @@ class App extends StatelessWidget {
   Widget _buildPlayerHome(BuildContext context) {
     final error = windowInitError;
     if (error != null) {
-      return Center(
+      return _buildErrorHome(error);
+    }
+    return PlayerFeature(
+      startupTimeline: startupTimeline,
+      windowService: windowService,
+    );
+  }
+
+  /// 窗口初始化失败时的降级文字态。
+  ///
+  /// 用 [Builder] 的子 context 查本地化：`home` 在 MaterialApp 之外用 App 自身
+  /// context 构建，直接调 AppLocalizations.of(context) 会拿到 null（UAT Test 16
+  /// 实机复现的崩溃根因）。
+  Widget _buildErrorHome(String error) {
+    return Builder(
+      builder: (context) => Center(
         child: Text(
           '${AppLocalizations.of(context).windowInitializationFailed}: $error',
           textAlign: TextAlign.center,
           style: const TextStyle(color: Colors.white70),
         ),
-      );
-    }
-    return PlayerFeature(
-      startupTimeline: startupTimeline,
-      windowService: windowService,
+      ),
     );
   }
 }
