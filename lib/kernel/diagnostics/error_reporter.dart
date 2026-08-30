@@ -49,6 +49,8 @@ final class ErrorReporterImpl implements ErrorReporter {
 
   /// Bounded snapshots prevent diagnostic input from growing local memory.
   static const int _maxTextLength = 4096;
+  // Developer-only evidence needs the same bounded-memory guarantee as text.
+  static const int _maxDeveloperPathLength = 4096;
   static const int _maxStackLength = 16384;
   static const int _maxFrameLength = 512;
 
@@ -171,7 +173,10 @@ final class ErrorReporterImpl implements ErrorReporter {
         error: error,
         suppliedStack: context?.callbackStackTrace,
         messageOverride: error.message,
-        mediaPathOverride: mediaPath ?? context?.path,
+        // Context path names the failed open target, never the successfully
+        // current media. The provider preserves the current-media snapshot.
+        mediaPathOverride: mediaPath,
+        failedOpenPathOverride: context?.path,
         playerErrorCode: _playerErrorCode(error),
       );
     } on Object catch (failure, stackTrace) {
@@ -205,6 +210,7 @@ final class ErrorReporterImpl implements ErrorReporter {
     required StackTrace? suppliedStack,
     String? messageOverride,
     String? mediaPathOverride,
+    String? failedOpenPathOverride,
     String? playerErrorCode,
   }) {
     if (_isReporting) {
@@ -224,6 +230,7 @@ final class ErrorReporterImpl implements ErrorReporter {
         suppliedStack: suppliedStack,
         messageOverride: messageOverride,
         mediaPathOverride: mediaPathOverride,
+        failedOpenPathOverride: failedOpenPathOverride,
         playerErrorCode: playerErrorCode,
       );
       final acceptance = _accept(report);
@@ -244,6 +251,7 @@ final class ErrorReporterImpl implements ErrorReporter {
     required StackTrace? suppliedStack,
     required String? messageOverride,
     required String? mediaPathOverride,
+    required String? failedOpenPathOverride,
     required String? playerErrorCode,
   }) {
     final now = _clock.now();
@@ -255,6 +263,12 @@ final class ErrorReporterImpl implements ErrorReporter {
       _maxTextLength,
     );
     final stack = _snapshotStack(suppliedStack);
+    // Read the live provider once before any redaction so accepted reports cannot
+    // drift when playback changes while effects later consume the snapshot.
+    final fullMediaPath = _boundedDeveloperPath(
+      mediaPathOverride ?? _currentMediaPath(),
+    );
+    final failedOpenPath = _boundedDeveloperPath(failedOpenPathOverride);
     return ErrorReport(
       eventId: _eventIdGenerator(),
       source: source,
@@ -265,7 +279,9 @@ final class ErrorReporterImpl implements ErrorReporter {
       playerErrorCode: playerErrorCode,
       message: message,
       rawStackTrace: stack,
-      mediaPath: _sanitizeMediaPath(mediaPathOverride ?? _currentMediaPath()),
+      mediaPath: _sanitizeMediaPath(fullMediaPath),
+      fullMediaPath: fullMediaPath,
+      failedOpenPath: failedOpenPath,
       occurrenceCount: 1,
     );
   }
@@ -338,6 +354,9 @@ final class ErrorReporterImpl implements ErrorReporter {
       report.playerErrorCode,
       report.message,
       report.mediaPath,
+      // A safely redacted attempt target distinguishes independent failed opens
+      // without exposing developer-only full paths to presentation consumers.
+      _sanitizeMediaPath(report.failedOpenPath),
       _topFrame(report.rawStackTrace),
     );
   }
@@ -382,11 +401,22 @@ final class ErrorReporterImpl implements ErrorReporter {
     return _bounded(DiagnosticRedactor.redactPathValue(value), _maxTextLength);
   }
 
+  /// Bounds opaque developer-only paths without applying UI-safe redaction.
+  String? _boundedDeveloperPath(String? value) {
+    if (value == null) return null;
+    return _bounded(value, _maxDeveloperPathLength);
+  }
+
   String _bounded(String value, int maximum) {
     if (value.length <= maximum) {
       return value;
     }
-    return '${value.substring(0, maximum)}…[truncated]';
+    const truncationMarker = '…[truncated]';
+    if (maximum <= truncationMarker.length) {
+      return truncationMarker.substring(0, maximum);
+    }
+    return '${value.substring(0, maximum - truncationMarker.length)}'
+        '$truncationMarker';
   }
 
   void _publishSafely({bool? isReady}) {
@@ -453,13 +483,14 @@ final class _AcceptanceResult {
 }
 
 /// 语义身份元组类型：source/severity/errorType/playerErrorCode/message/
-/// mediaPath/topFrame 七字段 record，结构相等即语义等价。
+/// mediaPath/safeFailedOpenPath/topFrame 八字段 record，结构相等即语义等价。
 typedef _ReportIdentity = (
   ErrorSource,
   ErrorSeverity,
   String,
   String?,
   String,
+  String?,
   String?,
   String,
 );

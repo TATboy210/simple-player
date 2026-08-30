@@ -50,6 +50,8 @@ final class ErrorReport {
     required this.mediaPath,
     required this.occurrenceCount,
     this.location,
+    this.fullMediaPath,
+    this.failedOpenPath,
   });
 
   /// Process-local identifier assigned to a distinct report.
@@ -91,6 +93,19 @@ final class ErrorReport {
   /// Optional trusted source location; null retains the explicit D-05 fallback.
   final ErrorLocation? location;
 
+  /// 完整当前媒体路径快照，仅供 diagnostic pack/copy 开发者证据使用。
+  ///
+  /// Full current-media snapshot for diagnostic pack/copy developer evidence
+  /// only. Ordinary presentation and effects must use [mediaPath] instead.
+  final String? fullMediaPath;
+
+  /// 失败打开目标的完整路径快照，仅供 diagnostic pack/copy 使用。
+  ///
+  /// Full failed-open attempt snapshot for diagnostic pack/copy evidence only.
+  /// It is deliberately separate from [fullMediaPath] to avoid claiming a
+  /// failed target became the current successfully opened media.
+  final String? failedOpenPath;
+
   /// Creates a replacement for deduplication without changing report identity.
   ///
   /// Only occurrence metadata changes so the original queue position, source,
@@ -109,6 +124,8 @@ final class ErrorReport {
       mediaPath: mediaPath,
       occurrenceCount: occurrenceCount ?? this.occurrenceCount,
       location: location,
+      fullMediaPath: fullMediaPath,
+      failedOpenPath: failedOpenPath,
     );
   }
 }

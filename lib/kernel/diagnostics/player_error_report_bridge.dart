@@ -60,10 +60,12 @@ final class PlayerErrorReportBridge {
     }
   }
 
-  /// Captures optional metadata without allowing its failure to drop evidence.
+  /// Captures the last successful current media without treating an open target
+  /// as current. The reporter snapshots ErrorContext.path separately as failed-open
+  /// evidence, preserving both meanings for the diagnostic pack.
   String? _snapshotMediaPath(PlayerError error) {
     try {
-      return error.context?.path ?? _currentMediaPath();
+      return _currentMediaPath();
     } on Object {
       // This external callback boundary may throw; the player event is required.
       return null;
