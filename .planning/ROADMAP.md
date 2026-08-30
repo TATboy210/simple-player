@@ -66,7 +66,7 @@ Plans:
   4. 每个 error/fatal 报告都会以 UTF-8 追加到默认或已验证的本地单一日志文件；普通 debug/info 输出不会污染该文件，关闭卡片也不会停止落盘。
   5. 日志写入或关闭失败时，应用仍可继续使用，并以受限调试输出和“日志不可用”状态降级；文件内容和复制内容使用相同的稳定诊断包格式。
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 Plans:
 **Wave 1**
 
@@ -78,7 +78,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1–2 completion)*
 
-- [ ] 02-03-PLAN.md — Freeze full current/failed-open media evidence and enrich immutable reports before effect fan-out.
+- [x] 02-03-PLAN.md — Freeze full current/failed-open media evidence and enrich immutable reports before effect fan-out.
 
 **Wave 4** *(blocked on Waves 1–3 completion)*
 
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
-| 2. 可信定位与文件证据 | 2/4 | In Progress|  |
+| 2. 可信定位与文件证据 | 3/4 | In Progress|  |
 | 3. 播放错误桥与非模态卡片 | 0/TBD | Not started | - |
 | 4. 错误反馈设置 | 0/TBD | Not started | - |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |

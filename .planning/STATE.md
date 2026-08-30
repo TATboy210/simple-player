@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: 可信定位与文件证据
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-08-30T13:50:35.915Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-08-30T14:10:28.815Z"
 last_activity: 2026-08-30
 last_activity_desc: Phase 02 execution started
-state_head: 4cc6a240f857c6d5640acf54898dbbf1f5e67b3c
+state_head: 4caab53b430b614480817a47fdd304e832588e1f
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 20
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 ## Current Position
 
 Phase: 02 (可信定位与文件证据) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-08-30 — Phase 02 execution started
 
@@ -59,6 +59,7 @@ Progress: [██░░░░░░░░] 20%
 |------|----------|-------|-------|
 | Phase 02 P02-01 | 620 | 2 tasks | 6 files |
 | Phase 02 P02-02 | 1123 | 2 tasks | 4 files |
+| Phase 02 P02-03 | 773 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecti
 - [Phase 02]: D-05 location extraction accepts only exact package:simple_player_flutter frames; the first is primary and no more than two later project frames are retained. — D-05 location extraction accepts only exact package:simple_player_flutter frames; the first is primary and no more than two later project frames are retained.
 - [Phase 02]: D-01 source I/O is limited to debug/profile after an owned diagnostics file frame establishes a trusted root; there is no cwd, executable-directory, or arbitrary-frame fallback. — D-01 source I/O is limited to debug/profile after an owned diagnostics file frame establishes a trusted root; there is no cwd, executable-directory, or arbitrary-frame fallback.
 - [Phase 02]: Exact component-aware canonical containment, after pre-canonical traversal rejection, is required for every source path. — Exact component-aware canonical containment, after pre-canonical traversal rejection, is required for every source path.
+- [Phase 02]: D-07 stores fullMediaPath and failedOpenPath separately; ordinary mediaPath remains basename-safe for presentation and existing effects. — D-07 stores fullMediaPath and failedOpenPath separately; ordinary mediaPath remains basename-safe for presentation and existing effects.
+- [Phase 02]: D-05 enrichment uses the stored raw stack and completes before queue/effect fan-out; failures degrade to null location without dropping reports. — D-05 enrichment uses the stored raw stack and completes before queue/effect fan-out; failures degrade to null location without dropping reports.
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-30T13:49:15.665Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-08-30T14:09:52.786Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
