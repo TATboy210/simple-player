@@ -32,8 +32,8 @@
 - [ ] **CARD-02**: 卡片 hit-test 严格限卡片边界，不遮挡控制栏/标题栏/播放列表交互（Windows 冒烟验证）
 - [ ] **CARD-03**: 渐进详情——折叠显示摘要+严重级+媒体路径，展开显示文件:行号/源码行/raw stack/日志路径
 - [ ] **CARD-04**: 一键复制诊断包（与 LOG-05 同格式），复制失败不影响卡片
-- [ ] **CARD-05**: build 期捕获的错误经 post-frame 合并发布 UI，不产生 markNeedsBuild 次生错误
-- [ ] **CARD-06**: 挂载于 app/player root Stack，ValueListenableBuilder 订阅 reporter 呈现状态（项目 ValueNotifier 惯例，不引入新状态库）
+- [x] **CARD-05**: build 期捕获的错误经 post-frame 合并发布 UI，不产生 markNeedsBuild 次生错误
+- [x] **CARD-06**: 挂载于 app/player root Stack，ValueListenableBuilder 订阅 reporter 呈现状态（项目 ValueNotifier 惯例，不引入新状态库）
 
 ### 设置 (Settings)
 
@@ -92,8 +92,8 @@
 | CARD-02 | Phase 3 | Pending |
 | CARD-03 | Phase 3 | Pending |
 | CARD-04 | Phase 3 | Pending |
-| CARD-05 | Phase 3 | Pending |
-| CARD-06 | Phase 3 | Pending |
+| CARD-05 | Phase 3 | Complete |
+| CARD-06 | Phase 3 | Complete |
 | MIG-01 | Phase 3 | Pending |
 | SET-01 | Phase 4 | Pending |
 | SET-02 | Phase 4 | Pending |
