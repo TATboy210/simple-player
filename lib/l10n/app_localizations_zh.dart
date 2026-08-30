@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -581,4 +582,47 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get errorUnknown => '发生未知错误';
+
+  @override
+  String errorCardBadgeLabel(int count) {
+    return '$count 错误';
+  }
+
+  @override
+  String get errorCardClose => '关闭';
+
+  @override
+  String get errorCardCopyTooltip => '复制诊断信息';
+
+  @override
+  String get errorCardCopied => '已复制';
+
+  @override
+  String get errorCardCopyFailed => '复制失败';
+
+  @override
+  String get errorCardSectionLocation => '定位';
+
+  @override
+  String get errorCardSectionSource => '源码行';
+
+  @override
+  String get errorCardSectionStack => '调用栈';
+
+  @override
+  String get errorCardSectionLogPath => '日志文件';
+
+  @override
+  String errorCardSectionRepeats(int count) {
+    return '重复 $count 次';
+  }
+
+  @override
+  String get errorCardLogUnavailable => '日志文件不可用';
+
+  @override
+  String get errorCardLocationUnavailable => '定位不可用';
+
+  @override
+  String get errorCardCycleTooltip => '轮览错误';
 }
