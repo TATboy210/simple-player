@@ -305,11 +305,14 @@ await logsDir.create(recursive: true); // idempotent; catch FileSystemException 
 | A2 | Under `flutter run` debug, project lib frames appear as `package:simple_player_flutter/...` (test-mode probes showed `file:///` for the test file itself; lib frame could not be observed due to inlining) | Pattern 2 / LOC-02 | If frames are `file:` instead, Pattern 2's file-path branch already handles it — design is form-agnostic, low risk |
 | A3 | AOT release stack traces lack reliable line numbers, so kReleaseMode short-circuit loses nothing | Pattern 2 | None material — D-01 mandates release degradation regardless |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **FileOutput vs dart:io (A1)** — PROJECT.md Key Decisions records the logger-FileOutput plan; research shows it cannot meet D-02 (no per-record flush) and is banned by GATE 1 inside kernel. Recommendation: dart:io + remove logger from pubspec in a later cleanup. Needs user sign-off since it revises a locked decision.
+   - **已解决 / RESOLVED（D-06）：** 采用直接 `dart:io` `File.writeAsString(..., mode: FileMode.append, flush: true)` + 单写者 Future 队列；见 [02-CONTEXT.md](./02-CONTEXT.md) D-06。
 2. **Media path granularity in the pack (LOC-03)** — Phase-1 policy basename-redacts `mediaPath` at intake (error_reporter.dart:380-383), so the pack's 媒体快照 segment will show a basename, not the full path. Success criterion says "报告冻结发生时的当前媒体路径" — confirm basename-only satisfies it or whether full path is desired for this developer-only tool (redaction would then need a policy carve-out).
+   - **已解决 / RESOLVED（D-07）：** 诊断包与复制输出携带完整媒体路径，普通日志维持 basename 脱敏；见 [02-CONTEXT.md](./02-CONTEXT.md) D-07。
 3. **FileSink dual attachment** — CONTEXT lists both "error_reporter fan-out 新增 FileSink" and "kernel_logger CompositeSink error/fatal 分流". Recommended primary: reporter effect (it owns the rich ErrorReport); raw `KernelLogger.e/f` passthrough to the same file is optional. Planner should pick one, not both, to keep single-writer trivial.
+   - **已解决 / RESOLVED（D-08）：** FileSink 通过 `ErrorReporter` 副作用链挂接，不走 `KernelLogger` `CompositeSink` 分流；见 [02-CONTEXT.md](./02-CONTEXT.md) D-08。
 
 ## Environment Availability
 
