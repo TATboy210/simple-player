@@ -150,43 +150,40 @@ void main() {
   });
 
   group('ErrorReporterImpl queue policy', () {
-    test(
-      'evicts the sixth distinct head, dismisses FIFO head, and flushes idempotently',
-      () {
-        // Arrange
-        final reporter = _reporter();
-        final stack = _stack('policy.dart');
+    test('evicts the sixth distinct head, dismisses FIFO head, and flushes idempotently', () {
+      // Arrange
+      final reporter = _reporter();
+      final stack = _stack('policy.dart');
 
-        // Act
-        for (var index = 1; index <= 6; index += 1) {
-          reporter.reportPlatformSafely(StateError('error-$index'), stack);
-        }
-        reporter.flushPresentation();
-        reporter.flushPresentation();
+      // Act
+      for (var index = 1; index <= 6; index += 1) {
+        reporter.reportPlatformSafely(StateError('error-$index'), stack);
+      }
+      reporter.flushPresentation();
+      reporter.flushPresentation();
 
-        // Assert
-        expect(reporter.queuedReports.map((report) => report.message), [
-          'Bad state: error-2',
-          'Bad state: error-3',
-          'Bad state: error-4',
-          'Bad state: error-5',
-          'Bad state: error-6',
-        ]);
-        expect(
-          reporter.presentation.value.current,
-          same(reporter.queuedReports.first),
-        );
-        expect(reporter.presentation.value.pendingCount, 4);
+      // Assert
+      expect(reporter.queuedReports.map((report) => report.message), [
+        'Bad state: error-2',
+        'Bad state: error-3',
+        'Bad state: error-4',
+        'Bad state: error-5',
+        'Bad state: error-6',
+      ]);
+      expect(
+        reporter.presentation.value.current,
+        same(reporter.queuedReports.first),
+      );
+      expect(reporter.presentation.value.pendingCount, 4);
 
-        reporter.dismissCurrent();
+      reporter.dismissCurrent();
 
-        expect(
-          reporter.presentation.value.current,
-          same(reporter.queuedReports.first),
-        );
-        expect(reporter.queuedReports.first.message, 'Bad state: error-3');
-      },
-    );
+      expect(
+        reporter.presentation.value.current,
+        same(reporter.queuedReports.first),
+      );
+      expect(reporter.queuedReports.first.message, 'Bad state: error-3');
+    });
 
     test(
       'merges matching inputs inside ten seconds and appends after the window',
@@ -386,34 +383,30 @@ void main() {
       },
     );
 
-    test(
-      'redacts quoted and unquoted whitespace paths without consuming diagnostics',
-      () {
-        // Arrange
-        const windows =
-            r'C:\Users\alice\Private Videos (Archive)\[2026]\incident.mp4';
-        const posix =
-            '/home/alice/Private Videos (Archive)/[2026]/incident.mp4';
-        final cases = <({String input, String secret})>[
-          (input: 'Unable to open "$windows":7:8 (retry)', secret: windows),
-          (input: 'Unable to open $posix:7:8 [retry]', secret: posix),
-        ];
+    test('redacts quoted and unquoted whitespace paths without consuming diagnostics', () {
+      // Arrange
+      const windows =
+          r'C:\Users\alice\Private Videos (Archive)\[2026]\incident.mp4';
+      const posix = '/home/alice/Private Videos (Archive)/[2026]/incident.mp4';
+      final cases = <({String input, String secret})>[
+        (input: 'Unable to open "$windows":7:8 (retry)', secret: windows),
+        (input: 'Unable to open $posix:7:8 [retry]', secret: posix),
+      ];
 
-        for (final pathCase in cases) {
-          // Act
-          final redacted = DiagnosticRedactor.redactDiagnosticText(
-            pathCase.input,
-          );
+      for (final pathCase in cases) {
+        // Act
+        final redacted = DiagnosticRedactor.redactDiagnosticText(
+          pathCase.input,
+        );
 
-          // Assert
-          expect(redacted, isNot(contains(pathCase.secret)));
-          expect(redacted, contains('incident.mp4'));
-          expect(redacted, contains(':7:8'));
-          expect(redacted, contains('Unable to open'));
-          expect(redacted, contains('retry'));
-        }
-      },
-    );
+        // Assert
+        expect(redacted, isNot(contains(pathCase.secret)));
+        expect(redacted, contains('incident.mp4'));
+        expect(redacted, contains(':7:8'));
+        expect(redacted, contains('Unable to open'));
+        expect(redacted, contains('retry'));
+      }
+    });
 
     test('is idempotent and leaves package frames and network URLs intact', () {
       // Arrange
@@ -477,6 +470,67 @@ void main() {
       expect(reporter.queuedReports.first.occurrenceCount, 3);
       expect(reporter.queuedReports.last.occurrenceCount, 1);
     });
+
+    test('merges a recurrence into the newest in-window occurrence', () {
+      // Arrange — t=0 与 t=11 已各占一条，t=15 的复现必须并入 t=11 而非 t=0
+      final clock = FakeClock(DateTime.utc(2026, 8, 28, 12));
+      final reporter = _reporter(clock: clock);
+      final stack = _stack('recurrence.dart');
+
+      // Act
+      reporter.reportPlatformSafely(StateError('same'), stack);
+      clock.currentTime = clock.now().add(const Duration(seconds: 11));
+      reporter.reportPlatformSafely(StateError('same'), stack);
+      clock.currentTime = clock.now().add(const Duration(seconds: 4));
+      reporter.reportPlatformSafely(StateError('same'), stack);
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(2));
+      expect(reporter.queuedReports.first.occurrenceCount, 1);
+      expect(reporter.queuedReports.last.occurrenceCount, 2);
+      expect(reporter.queuedReports.last.lastOccurredAt, clock.now());
+    });
+
+    test('keeps pipe-boundary message and media path pairs distinct', () {
+      // Arrange — message 与 mediaPath 携带 | 时不得因分隔符串接而碰撞
+      final reporter = _reporter();
+      final stack = _stack('boundary-collision.dart');
+
+      // Act
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'open failed|segment',
+          null,
+          ErrorContext(callbackStackTrace: stack),
+        ),
+        mediaPath: 'clip.mp4',
+      );
+      reporter.reportPlayerError(
+        PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'open failed',
+          null,
+          ErrorContext(callbackStackTrace: stack),
+        ),
+        mediaPath: 'segment|clip.mp4',
+      );
+
+      // Assert
+      expect(reporter.queuedReports, hasLength(2));
+      expect(reporter.queuedReports.map((report) => report.occurrenceCount), [
+        1,
+        1,
+      ]);
+      expect(reporter.queuedReports.map((report) => report.message), [
+        'open failed|segment',
+        'open failed',
+      ]);
+      expect(reporter.queuedReports.map((report) => report.mediaPath), [
+        'clip.mp4',
+        'segment|clip.mp4',
+      ]);
+    });
   });
 
   group('ErrorReporterImpl fault isolation', () {
@@ -502,49 +556,46 @@ void main() {
       expect(lastResort, isNotEmpty);
     });
 
-    test(
-      'isolates listener and effect failures while suppressing reentrant intake',
-      () {
-        // Arrange
-        final delivered = <(ErrorReport, ReportAcceptance)>[];
-        final lastResort = <Object>[];
-        late final ErrorReporterImpl reporter;
-        reporter = ErrorReporterImpl.forTesting(
-          clock: FakeClock(),
-          eventIdGenerator: () => 'id',
-          currentMediaPath: () => 'media.mp4',
-          lastResortOutput: (error, _) => lastResort.add(error),
-          effects: [
-            (_, _) => throw StateError('effect failed'),
-            (report, acceptance) => delivered.add((report, acceptance)),
-            (_, _) => reporter.reportBootstrapSafely(
-              StateError('reentrant'),
-              _stack('reentrant.dart'),
-            ),
-          ],
-        );
-        final originalFlutterErrorHandler = FlutterError.onError;
-        final listenerFailures = <FlutterErrorDetails>[];
-        FlutterError.onError = listenerFailures.add;
-        addTearDown(() => FlutterError.onError = originalFlutterErrorHandler);
-        reporter.presentation.addListener(
-          () => throw StateError('listener failed'),
-        );
-
-        // Act and assert
-        expect(
-          () => reporter.reportPlatformSafely(
-            StateError('accepted'),
-            _stack('fault.dart'),
+    test('isolates listener and effect failures while suppressing reentrant intake', () {
+      // Arrange
+      final delivered = <(ErrorReport, ReportAcceptance)>[];
+      final lastResort = <Object>[];
+      late final ErrorReporterImpl reporter;
+      reporter = ErrorReporterImpl.forTesting(
+        clock: FakeClock(),
+        eventIdGenerator: () => 'id',
+        currentMediaPath: () => 'media.mp4',
+        lastResortOutput: (error, _) => lastResort.add(error),
+        effects: [
+          (_, _) => throw StateError('effect failed'),
+          (report, acceptance) => delivered.add((report, acceptance)),
+          (_, _) => reporter.reportBootstrapSafely(
+            StateError('reentrant'),
+            _stack('reentrant.dart'),
           ),
-          returnsNormally,
-        );
-        expect(reporter.queuedReports, hasLength(1));
-        expect(delivered.single.$2, ReportAcceptance.newReport);
-        expect(listenerFailures, hasLength(1));
-        expect(lastResort, hasLength(2));
-      },
-    );
+        ],
+      );
+      final originalFlutterErrorHandler = FlutterError.onError;
+      final listenerFailures = <FlutterErrorDetails>[];
+      FlutterError.onError = listenerFailures.add;
+      addTearDown(() => FlutterError.onError = originalFlutterErrorHandler);
+      reporter.presentation.addListener(
+        () => throw StateError('listener failed'),
+      );
+
+      // Act and assert
+      expect(
+        () => reporter.reportPlatformSafely(
+          StateError('accepted'),
+          _stack('fault.dart'),
+        ),
+        returnsNormally,
+      );
+      expect(reporter.queuedReports, hasLength(1));
+      expect(delivered.single.$2, ReportAcceptance.newReport);
+      expect(listenerFailures, hasLength(1));
+      expect(lastResort, hasLength(2));
+    });
 
     test('notifies effects for new, merged, and post-window captures only', () {
       // Arrange

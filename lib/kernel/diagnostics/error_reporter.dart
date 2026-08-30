@@ -271,21 +271,15 @@ final class ErrorReporterImpl implements ErrorReporter {
   }
 
   _AcceptanceResult _accept(ErrorReport candidate) {
-    final matchingIndex = _findMatchingIndex(candidate);
+    final matchingIndex = _newestInWindowIndex(candidate);
     if (matchingIndex != null) {
       final existing = _queue.elementAt(matchingIndex);
-      final elapsed = candidate.lastOccurredAt.difference(
-        existing.lastOccurredAt,
+      final merged = existing.copyWith(
+        lastOccurredAt: candidate.lastOccurredAt,
+        occurrenceCount: existing.occurrenceCount + 1,
       );
-      // Wall-clock rollback must preserve new evidence instead of merging stale.
-      if (elapsed >= Duration.zero && elapsed <= _dedupeWindow) {
-        final merged = existing.copyWith(
-          lastOccurredAt: candidate.lastOccurredAt,
-          occurrenceCount: existing.occurrenceCount + 1,
-        );
-        _replaceAt(matchingIndex, merged);
-        return _AcceptanceResult(merged, ReportAcceptance.merged);
-      }
+      _replaceAt(matchingIndex, merged);
+      return _AcceptanceResult(merged, ReportAcceptance.merged);
     }
     if (_queue.length == _maxQueueLength) {
       _queue.removeFirst();
@@ -294,10 +288,23 @@ final class ErrorReporterImpl implements ErrorReporter {
     return _AcceptanceResult(candidate, ReportAcceptance.newReport);
   }
 
-  int? _findMatchingIndex(ErrorReport candidate) {
-    final fingerprint = _fingerprint(candidate);
-    for (var index = 0; index < _queue.length; index += 1) {
-      if (_fingerprint(_queue.elementAt(index)) == fingerprint) {
+  /// 从最新端向最旧端扫描，返回首个"等语义身份且落在 0–10 秒窗内"的项下标。
+  ///
+  /// 时间窗检查必须与选择同趟完成：若先取最旧等指纹项再看时间，t=0、t=11、
+  /// t=15 的复现序列会只与 t=0 比较（elapsed=15s 超窗）而被错误追加为第三条
+  /// （01-VERIFICATION gap 1）。从最新端扫描保证最近一次窗内出现优先获得合并。
+  int? _newestInWindowIndex(ErrorReport candidate) {
+    final identity = _identity(candidate);
+    for (var index = _queue.length - 1; index >= 0; index -= 1) {
+      final existing = _queue.elementAt(index);
+      if (_identity(existing) != identity) {
+        continue;
+      }
+      final elapsed = candidate.lastOccurredAt.difference(
+        existing.lastOccurredAt,
+      );
+      // Wall-clock rollback must preserve new evidence instead of merging stale.
+      if (elapsed >= Duration.zero && elapsed <= _dedupeWindow) {
         return index;
       }
     }
@@ -318,9 +325,21 @@ final class ErrorReporterImpl implements ErrorReporter {
       ]);
   }
 
-  /// Builds the fixed-order semantic identity used only for short-window merges.
-  String _fingerprint(ErrorReport report) {
-    return '${report.source.name}|${report.severity.name}|${report.errorType}|${report.playerErrorCode}|${report.message}|${report.mediaPath}|${_topFrame(report.rawStackTrace)}';
+  /// 报告的语义身份：仅用于短窗合并判定的固定字段顺序元组。
+  ///
+  /// record 的 `==` 是逐字段结构相等，直接比较值本身而非序列化串——
+  /// message/mediaPath 等可变长字段携带 `|` 也不会产生分隔符碰撞
+  /// （01-VERIFICATION gap 2）。
+  _ReportIdentity _identity(ErrorReport report) {
+    return (
+      report.source,
+      report.severity,
+      report.errorType,
+      report.playerErrorCode,
+      report.message,
+      report.mediaPath,
+      _topFrame(report.rawStackTrace),
+    );
   }
 
   /// Converts the sealed player hierarchy into an immutable, stable primitive.
@@ -432,3 +451,15 @@ final class _AcceptanceResult {
   final ErrorReport report;
   final ReportAcceptance disposition;
 }
+
+/// 语义身份元组类型：source/severity/errorType/playerErrorCode/message/
+/// mediaPath/topFrame 七字段 record，结构相等即语义等价。
+typedef _ReportIdentity = (
+  ErrorSource,
+  ErrorSeverity,
+  String,
+  String?,
+  String,
+  String?,
+  String,
+);
