@@ -13,7 +13,7 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 统一捕获与报告契约** - 四类错误安全地汇入同一个有界、可展示的报告服务。
+- [x] **Phase 1: 统一捕获与报告契约** - 四类错误安全地汇入同一个有界、可展示的报告服务。 (completed 2026-08-30)
 - [ ] **Phase 2: 可信定位与文件证据** - 每份报告获得安全的位置富化和独立、可回溯的错误日志。
 - [ ] **Phase 3: 播放错误桥与非模态卡片** - 播放器内所有错误以不妨碍操作的统一卡片反馈给用户。
 - [ ] **Phase 4: 错误反馈设置** - 用户可持久控制卡片显示和安全配置日志落点。
@@ -123,7 +123,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 统一捕获与报告契约 | 4/4 | In Progress|  |
+| 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
 | 2. 可信定位与文件证据 | 0/TBD | Not started | - |
 | 3. 播放错误桥与非模态卡片 | 0/TBD | Not started | - |
 | 4. 错误反馈设置 | 0/TBD | Not started | - |
