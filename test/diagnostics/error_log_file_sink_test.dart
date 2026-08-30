@@ -115,6 +115,34 @@ void main() {
       },
     );
 
+    test(
+      'rate-limits fifty consecutive failures and keeps drain reusable',
+      () async {
+        // Arrange
+        final failures = <Object>[];
+        final writer = _ControlledWriter(failuresBeforeSuccess: 50);
+        final sink = ErrorLogFileSink(
+          file: File('unused.log'),
+          writer: writer.write,
+          degradedOutput: (error, _) => failures.add(error),
+        );
+
+        // Act
+        for (var index = 0; index < 50; index += 1) {
+          sink.record(
+            _report(eventId: 'failure-$index'),
+            ReportAcceptance.newReport,
+          );
+        }
+        await sink.dispose();
+        await sink.dispose();
+
+        // Assert
+        expect(failures, hasLength(2));
+        expect(sink.logsAvailable.value, isFalse);
+      },
+    );
+
     test('serializes concurrent writes in record order', () async {
       // Arrange
       final writer = _ControlledWriter(delay: const Duration(milliseconds: 5));
@@ -191,7 +219,7 @@ ErrorReporterImpl _reporter({required List<ErrorReportEffect> effects}) {
 
 /// Builds a direct warning input because capture boundaries only create errors.
 ErrorReport _report({
-  ErrorSeverity severity = ErrorSeverity.warning,
+  ErrorSeverity severity = ErrorSeverity.error,
   String eventId = 'warning-id',
   String message = 'warning evidence',
 }) {
@@ -238,7 +266,7 @@ final class _ControlledWriter {
       _attempts += 1;
       packs.add(pack);
       if (_attempts <= failuresBeforeSuccess) {
-        throw FileSystemException('injected write failure');
+        throw const FileSystemException('injected write failure');
       }
     } finally {
       _active -= 1;
