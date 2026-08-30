@@ -34,10 +34,10 @@ final class _DebugErrorTriggersState extends State<DebugErrorTriggers> {
       final state = ErrorReporterImpl.I.presentation.value;
       final current = state.current;
       debugPrint(
-        '[debug-error-triggers] report: '
-        '${current == null ? '-' : '${current.source.name} ${current.eventId} '
-                  'x${current.occurrenceCount} "${current.message}"'}, '
-        'pending=${state.pendingCount}, isReady=${state.isReady}',
+        '[debug-error-triggers] 捕获成功: 队列现有 ${state.pendingCount + (current == null ? 0 : 1)} 份报告'
+        '${current == null ? '' : '；当前展示: ${current.source.name} ${current.eventId} '
+                  'x${current.occurrenceCount} "${current.message}"'}'
+        '（isReady=${state.isReady}：false=暂无卡片宿主，属 Phase 3 交付，属预期）',
       );
     };
     ErrorReporterImpl.I.presentation.addListener(_presentationListener!);
