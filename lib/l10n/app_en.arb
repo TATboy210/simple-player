@@ -434,5 +434,38 @@
   "errorNetworkConnectionLost": "Connection lost",
   "@errorNetworkConnectionLost": { "description": "Error message when network connection is lost" },
   "errorUnknown": "An unexpected error occurred",
-  "@errorUnknown": { "description": "Error message for unknown/unclassified errors" }
+  "@errorUnknown": { "description": "Error message for unknown/unclassified errors" },
+
+  "errorCardBadgeLabel": "{count} errors",
+  "@errorCardBadgeLabel": {
+    "description": "Badge label showing the total number of captured errors on the collapsed card",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "errorCardClose": "Close",
+  "@errorCardClose": { "description": "Close button label on the error card" },
+  "errorCardCopyTooltip": "Copy diagnostics",
+  "@errorCardCopyTooltip": { "description": "Tooltip for the copy-diagnostic-pack action" },
+  "errorCardCopied": "Copied",
+  "@errorCardCopied": { "description": "OSD feedback after a successful copy" },
+  "errorCardCopyFailed": "Copy failed",
+  "@errorCardCopyFailed": { "description": "OSD feedback after a failed copy" },
+  "errorCardSectionLocation": "Location",
+  "@errorCardSectionLocation": { "description": "Expanded section title: file:line location" },
+  "errorCardSectionSource": "Source lines",
+  "@errorCardSectionSource": { "description": "Expanded section title: source code excerpt" },
+  "errorCardSectionStack": "Stack trace",
+  "@errorCardSectionStack": { "description": "Expanded section title: raw stack trace" },
+  "errorCardSectionLogPath": "Log file",
+  "@errorCardSectionLogPath": { "description": "Expanded section title: diagnostic log file path" },
+  "errorCardSectionRepeats": "Repeats: {count}",
+  "@errorCardSectionRepeats": {
+    "description": "Expanded section line: how many times this error recurred",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "errorCardLogUnavailable": "Log file unavailable",
+  "@errorCardLogUnavailable": { "description": "Fallback text when the diagnostic log path is unavailable" },
+  "errorCardLocationUnavailable": "Location unavailable",
+  "@errorCardLocationUnavailable": { "description": "Fallback text when no trusted source location was extracted" },
+  "errorCardCycleTooltip": "Cycle between errors",
+  "@errorCardCycleTooltip": { "description": "Tooltip for the badge used to cycle through captured errors" }
 }

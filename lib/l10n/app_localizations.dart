@@ -1195,6 +1195,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An unexpected error occurred'**
   String get errorUnknown;
+
+  /// Badge label showing the total number of captured errors on the collapsed card
+  ///
+  /// In en, this message translates to:
+  /// **'{count} errors'**
+  String errorCardBadgeLabel(int count);
+
+  /// Close button label on the error card
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get errorCardClose;
+
+  /// Tooltip for the copy-diagnostic-pack action
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get errorCardCopyTooltip;
+
+  /// OSD feedback after a successful copy
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get errorCardCopied;
+
+  /// OSD feedback after a failed copy
+  ///
+  /// In en, this message translates to:
+  /// **'Copy failed'**
+  String get errorCardCopyFailed;
+
+  /// Expanded section title: file:line location
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get errorCardSectionLocation;
+
+  /// Expanded section title: source code excerpt
+  ///
+  /// In en, this message translates to:
+  /// **'Source lines'**
+  String get errorCardSectionSource;
+
+  /// Expanded section title: raw stack trace
+  ///
+  /// In en, this message translates to:
+  /// **'Stack trace'**
+  String get errorCardSectionStack;
+
+  /// Expanded section title: diagnostic log file path
+  ///
+  /// In en, this message translates to:
+  /// **'Log file'**
+  String get errorCardSectionLogPath;
+
+  /// Expanded section line: how many times this error recurred
+  ///
+  /// In en, this message translates to:
+  /// **'Repeats: {count}'**
+  String errorCardSectionRepeats(int count);
+
+  /// Fallback text when the diagnostic log path is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'Log file unavailable'**
+  String get errorCardLogUnavailable;
+
+  /// Fallback text when no trusted source location was extracted
+  ///
+  /// In en, this message translates to:
+  /// **'Location unavailable'**
+  String get errorCardLocationUnavailable;
+
+  /// Tooltip for the badge used to cycle through captured errors
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle between errors'**
+  String get errorCardCycleTooltip;
 }
 
 class _AppLocalizationsDelegate

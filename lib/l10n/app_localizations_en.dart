@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -586,4 +587,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorUnknown => 'An unexpected error occurred';
+
+  @override
+  String errorCardBadgeLabel(int count) {
+    return '$count errors';
+  }
+
+  @override
+  String get errorCardClose => 'Close';
+
+  @override
+  String get errorCardCopyTooltip => 'Copy diagnostics';
+
+  @override
+  String get errorCardCopied => 'Copied';
+
+  @override
+  String get errorCardCopyFailed => 'Copy failed';
+
+  @override
+  String get errorCardSectionLocation => 'Location';
+
+  @override
+  String get errorCardSectionSource => 'Source lines';
+
+  @override
+  String get errorCardSectionStack => 'Stack trace';
+
+  @override
+  String get errorCardSectionLogPath => 'Log file';
+
+  @override
+  String errorCardSectionRepeats(int count) {
+    return 'Repeats: $count';
+  }
+
+  @override
+  String get errorCardLogUnavailable => 'Log file unavailable';
+
+  @override
+  String get errorCardLocationUnavailable => 'Location unavailable';
+
+  @override
+  String get errorCardCycleTooltip => 'Cycle between errors';
 }

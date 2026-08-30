@@ -207,5 +207,19 @@
   "errorPlaybackOpenTimeout": "打开超时",
   "errorNetworkTimeout": "网络超时",
   "errorNetworkConnectionLost": "连接中断",
-  "errorUnknown": "发生未知错误"
+  "errorUnknown": "发生未知错误",
+
+  "errorCardBadgeLabel": "{count} 错误",
+  "errorCardClose": "关闭",
+  "errorCardCopyTooltip": "复制诊断信息",
+  "errorCardCopied": "已复制",
+  "errorCardCopyFailed": "复制失败",
+  "errorCardSectionLocation": "定位",
+  "errorCardSectionSource": "源码行",
+  "errorCardSectionStack": "调用栈",
+  "errorCardSectionLogPath": "日志文件",
+  "errorCardSectionRepeats": "重复 {count} 次",
+  "errorCardLogUnavailable": "日志文件不可用",
+  "errorCardLocationUnavailable": "定位不可用",
+  "errorCardCycleTooltip": "轮览错误"
 }
