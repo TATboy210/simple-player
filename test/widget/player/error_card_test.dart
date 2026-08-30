@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/app.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
@@ -10,6 +13,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
+import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 /// ErrorCard 折叠/展开详情测试（CARD-03/D-03/D-04，T-03-05 脱敏边界）。
@@ -97,6 +101,241 @@ void main() {
         (widget.decoration! as BoxDecoration).shape == BoxShape.circle,
   );
 
+  // 宿主挂载 harness：复用 app.dart 的 buildErrorCardMount（与生产同一挂载
+  // 语义），home 可注入探针/焦点节点（CARD-01/CARD-02 行为归宿主层级）。
+  Widget buildMountHarness({required Widget home}) => MaterialApp(
+    locale: const Locale('zh'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: home,
+    builder: buildErrorCardMount,
+  );
+
+  // 经单例接纳一份 bootstrap 报告并等一帧渲染。
+  Future<void> showReport(WidgetTester tester, String message) async {
+    ErrorReporterImpl.I.reportBootstrapSafely(
+      StateError(message),
+      StackTrace.current,
+    );
+    await tester.pump();
+  }
+
+  group('hit-test 卡片命中边界与 D-10 route 命中（CARD-02/D-10）', () {
+    testWidgets('taps inside the card do not reach widgets below; taps outside pass through', (
+      tester,
+    ) async {
+      // Arrange：卡片下方铺满一层点击探针（真实 Stack 层级复刻挂载形态）。
+      var probeTaps = 0;
+      await tester.pumpWidget(
+        buildMountHarness(
+          home: Scaffold(
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    key: const ValueKey('probe'),
+                    onTap: () => probeTaps++,
+                    child: Container(color: Colors.blue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await showReport(tester, '命中边界');
+      expect(find.byType(ErrorCard), findsOneWidget);
+
+      // Act：卡片矩形内点击（点 message 文本区，避开徽标/chevron 自身手势）。
+      final inCardPoint = tester.getCenter(find.text('Bad state: 命中边界'));
+      await tester.tapAt(inCardPoint);
+      await tester.pump();
+
+      // Assert：卡内点击被卡片吸收 —— 下层探针不触发，卡片自身收到（展开）。
+      expect(probeTaps, 0);
+      expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+
+      // Act：卡片矩形外点击。
+      await tester.tapAt(const Offset(600, 500));
+      await tester.pump();
+
+      // Assert：卡外点击穿透到下层控件；卡片展开态不变（未收到点击）。
+      expect(probeTaps, 1);
+      expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+    });
+
+    testWidgets('tap on route content above the navigator still hits while card visible (D-10)', (
+      tester,
+    ) async {
+      // Arrange：卡片可见后 push 不透明 route（模拟 media_kit 全屏 route 层级）。
+      var routeTaps = 0;
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      await showReport(tester, 'route 之下错误');
+      expect(find.byType(ErrorCard), findsOneWidget);
+
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+              body: Center(
+                child: GestureDetector(
+                  key: const ValueKey('route-probe'),
+                  onTap: () => routeTaps++,
+                  child: Container(width: 200, height: 100, color: Colors.green),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Act：点击 route 内容。
+      await tester.tap(find.byKey(const ValueKey('route-probe')));
+      await tester.pump();
+
+      // Assert：D-10 —— 挂载层不吞 Navigator 命中；卡片仍在 route 之上可见。
+      expect(routeTaps, 1);
+      expect(find.byType(ErrorCard), findsOneWidget);
+    });
+  });
+
+  group('close 常驻手动关与 FIFO 推进（CARD-01/CAP-04）', () {
+    testWidgets('card persists across frames with no auto-hide timer', (
+      tester,
+    ) async {
+      // Arrange：卡片可见。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      await showReport(tester, '常驻检查');
+      expect(find.byType(ErrorCard), findsOneWidget);
+
+      // Act：连续推进多帧时间（若存在自动隐藏 Timer，卡片会在此消失）。
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 5));
+
+      // Assert：卡片常驻 —— 唯一消失途径为手动关闭。
+      expect(find.byType(ErrorCard), findsOneWidget);
+    });
+
+    testWidgets('close button dismisses current and advances the FIFO', (
+      tester,
+    ) async {
+      // Arrange：两份报告入队，卡片显示队首甲、徽标计总数。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      ErrorReporterImpl.I.reportBootstrapSafely(
+        StateError('错误甲'),
+        StackTrace.current,
+      );
+      ErrorReporterImpl.I.reportBootstrapSafely(
+        StateError('错误乙'),
+        StackTrace.current,
+      );
+      await tester.pump();
+      expect(find.textContaining('错误甲'), findsOneWidget);
+      expect(find.text('2 错误'), findsOneWidget);
+
+      // Act：点击关闭按钮。
+      await tester.tap(find.byKey(const ValueKey('error-card-close')));
+      await tester.pump();
+
+      // Assert：CAP-04 —— 关闭推进到队首下一项，徽标计数减一。
+      expect(find.textContaining('错误乙'), findsOneWidget);
+      expect(find.text('1 错误'), findsOneWidget);
+
+      // Act / Assert：再次关闭，单报告归零（卡片消失）。
+      await tester.tap(find.byKey(const ValueKey('error-card-close')));
+      await tester.pump();
+      expect(find.byType(ErrorCard), findsNothing);
+    });
+  });
+
+  group('focus 零焦点抢占（CARD-01/T-03-07）', () {
+    testWidgets('primary focus unchanged after taps on collapsed, expanded and close button', (
+      tester,
+    ) async {
+      // Arrange：home 带 autofocus 节点 —— KeyboardHandler 根焦点基准。
+      final focusNode = FocusNode();
+      await tester.pumpWidget(
+        buildMountHarness(
+          home: Focus(
+            focusNode: focusNode,
+            autofocus: true,
+            child: const Scaffold(body: SizedBox.shrink()),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(focusNode));
+      await showReport(tester, '焦点检查');
+      final messageCenter = tester.getCenter(find.text('Bad state: 焦点检查'));
+
+      // Act / Assert：折叠态点击 → primaryFocus 不变。
+      await tester.tapAt(messageCenter);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(focusNode));
+
+      // Act / Assert：展开态点击（含源码/栈文本区）→ primaryFocus 不变。
+      final stackCenter = tester.getCenter(
+        find.byWidgetPredicate((widget) => widget is SelectableText),
+      );
+      await tester.tapAt(stackCenter);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(focusNode));
+
+      // Act / Assert：关闭按钮点击 → primaryFocus 不变（卡片随之消失）。
+      await tester.tap(find.byKey(const ValueKey('error-card-close')));
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(focusNode));
+      expect(find.byType(ErrorCard), findsNothing);
+    });
+
+    testWidgets('card subtree has no focusable nodes and no GlassButton/FocusableActionDetector', (
+      tester,
+    ) async {
+      // Arrange：卡片可见（经宿主挂载，ExcludeFocus 包裹生效）。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      await showReport(tester, '结构检查');
+
+      // Assert：卡片子树无焦点抢夺面。
+      expect(
+        find.descendant(
+          of: find.byType(ErrorCard),
+          matching: find.byType(GlassButton),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ErrorCard),
+          matching: find.byType(FocusableActionDetector),
+        ),
+        findsNothing,
+      );
+      // 宿主 ExcludeFocus 的 Focus 节点：自身不可请求焦点且禁用后代焦点
+      // （SelectableText 等内部节点被焦点系统整体屏蔽 —— primaryFocus 不变
+      // 由上一用例行为断言锁死）。
+      final hostFocus = tester.widget<Focus>(
+        find.ancestor(of: find.byType(ErrorCard), matching: find.byType(Focus)).first,
+      );
+      expect(hostFocus.canRequestFocus, isFalse);
+      expect(hostFocus.descendantsAreFocusable, isFalse);
+    });
+  });
+
   group('expand 折叠/展开详情（CARD-03/D-03/D-04）', () {
     testWidgets('collapsed shows localized message, severity dot and basename', (
       tester,
@@ -146,8 +385,11 @@ void main() {
       // Assert：chevron 翻转，五段齐备。
       expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
       expect(find.byIcon(Icons.keyboard_arrow_down), findsNothing);
-      // ① 定位：file:line。
-      expect(find.textContaining('lib/main.dart:42'), findsOneWidget);
+      // ① 定位：file:line + 成员名（与实现渲染格式逐字符一致）。
+      expect(
+        find.text('package:simple_player_flutter/lib/main.dart:42  main'),
+        findsOneWidget,
+      );
       // ② 源码行：lineNumber: text 逐行展示。
       expect(find.textContaining('41: void boom() {'), findsOneWidget);
       expect(find.textContaining('42:   throw StateError(boom);'), findsOneWidget);
