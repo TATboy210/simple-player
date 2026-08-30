@@ -41,6 +41,9 @@ void main() {
         expect(replacement.playerErrorCode, report.playerErrorCode);
         expect(replacement.rawStackTrace, report.rawStackTrace);
         expect(replacement.mediaPath, report.mediaPath);
+        expect(replacement.fullMediaPath, report.fullMediaPath);
+        expect(replacement.failedOpenPath, report.failedOpenPath);
+        expect(replacement.location, report.location);
         expect(replacement.occurrenceCount, 2);
         expect(replacement.lastOccurredAt, later);
       },

@@ -125,7 +125,9 @@ void main() {
         // Assert
         final report = reporter.queuedReports.single;
         expect(report.rawStackTrace, contextualStack.toString());
-        expect(report.mediaPath, 'context.mp4');
+        expect(report.mediaPath, 'provider.mp4');
+        expect(report.fullMediaPath, 'provider.mp4');
+        expect(report.failedOpenPath, 'context.mp4');
         _expectCompleteReport(report);
       },
     );
@@ -252,9 +254,14 @@ void main() {
         'playback:playFailed',
       ]);
       expect(reporter.queuedReports.map((report) => report.mediaPath), [
-        'first.mp4',
-        'first.mp4',
-        'second.mp4',
+        'provider.mp4',
+        'provider.mp4',
+        'provider.mp4',
+      ]);
+      expect(reporter.queuedReports.map((report) => report.failedOpenPath), [
+        'C:/Videos/first.mp4',
+        'C:/Videos/first.mp4',
+        'C:/Videos/second.mp4',
       ]);
     });
 
@@ -303,6 +310,101 @@ void main() {
         // Assert
         expect(reporter.queuedReports, hasLength(1));
         expect(reporter.queuedReports.single.occurrenceCount, 1000);
+      },
+    );
+  });
+
+  group('ErrorReporterImpl developer path evidence', () {
+    test(
+      'freezes separate current-media and failed-open paths before redaction',
+      () {
+        // Arrange
+        var currentPath = 'C:/Videos/current-a.mp4';
+        final delivered = <ErrorReport>[];
+        final reporter = ErrorReporterImpl.forTesting(
+          clock: FakeClock(DateTime.utc(2026, 8, 28)),
+          eventIdGenerator: () => 'event-1',
+          currentMediaPath: () => currentPath,
+          effects: [(report, _) => delivered.add(report)],
+        );
+        final error = PlaybackError(
+          PlaybackErrorCode.playFailed,
+          'Unable to open B',
+          null,
+          ErrorContext(
+            path: 'D:/Attempts/failed-b.mp4',
+            callbackStackTrace: _stack('failed_open.dart'),
+          ),
+        );
+
+        // Act
+        reporter.reportPlayerError(error);
+        currentPath = 'E:/Videos/current-c.mp4';
+
+        // Assert
+        final report = reporter.queuedReports.single;
+        expect(report.mediaPath, 'current-a.mp4');
+        expect(report.fullMediaPath, 'C:/Videos/current-a.mp4');
+        expect(report.failedOpenPath, 'D:/Attempts/failed-b.mp4');
+        expect(delivered.single, same(report));
+        expect(report.fullMediaPath, isNot(contains('current-c.mp4')));
+      },
+    );
+
+    test('keeps explicit player media path as current snapshot and context as failed open', () {
+      // Arrange
+      final reporter = _reporter();
+      final error = PlaybackError(
+        PlaybackErrorCode.playFailed,
+        'open failed',
+        null,
+        ErrorContext(
+          path: 'D:/Attempts/failed-b.mp4',
+          callbackStackTrace: _stack('explicit_current.dart'),
+        ),
+      );
+
+      // Act
+      reporter.reportPlayerError(error, mediaPath: 'C:/Videos/current-a.mp4');
+
+      // Assert
+      final report = reporter.queuedReports.single;
+      expect(report.mediaPath, 'current-a.mp4');
+      expect(report.fullMediaPath, 'C:/Videos/current-a.mp4');
+      expect(report.failedOpenPath, 'D:/Attempts/failed-b.mp4');
+    });
+
+    test(
+      'bounds immutable developer path evidence independently from safe fields',
+      () {
+        // Arrange
+        final reporter = _reporter();
+        final longPath = 'C:/${'folder/' * 900}clip\r\n.mp4';
+
+        // Act
+        reporter.reportPlatformSafely(
+          StateError('failed'),
+          _stack('bounded_path.dart'),
+        );
+        reporter.reportPlayerError(
+          PlaybackError(
+            PlaybackErrorCode.playFailed,
+            'open failed',
+            null,
+            ErrorContext(
+              path: longPath,
+              callbackStackTrace: _stack('long.dart'),
+            ),
+          ),
+        );
+
+        // Assert
+        final report = reporter.queuedReports.last;
+        expect(report.fullMediaPath, 'provider.mp4');
+        expect(report.failedOpenPath, isNotNull);
+        expect(report.failedOpenPath!.length, lessThanOrEqualTo(4096));
+        expect(report.failedOpenPath, contains('[truncated]'));
+        expect(report.mediaPath, 'provider.mp4');
       },
     );
   });
@@ -362,7 +464,7 @@ void main() {
           );
 
           // Act
-          reporter.reportPlayerError(error);
+          reporter.reportPlayerError(error, mediaPath: pathCase.path);
           reporter.flushPresentation();
 
           // Assert
