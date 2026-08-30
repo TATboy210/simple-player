@@ -29,6 +29,12 @@
 - **D-07:** MIG-01 同 phase 内替换+删除——同一组集成测试同时覆盖新旧两条路径,断言新卡片对同一错误源的可见反馈与旧 ErrorBanner 等效后,在 phase 内删除 error_banner.dart 及其挂载;不留双路径 — **Reversibility:** irreversible-ish — 删除不可逆,但 git 历史可恢复
 - **D-08:** 数据源统一——卡片通过 ValueListenableBuilder 订阅 ErrorReporter 呈现状态(ValueNotifier 惯例),所有来源(engine 桥/全局钩子/验证失败)自动汇入同一卡片;PlayerErrorReportBridge 已存在(74 行),本 phase 只需集成测试等效覆盖,不需结构改动 — **Reversibility:** reversible
 
+### 研究后修订决策（2026-08-30，用户拍板）
+- **D-09:** 新卡片**不保留**旧 ErrorBanner 的 reopen/retry 动作按钮——卡片职责为信息展示+复制（Unix 原则：只做好一件事）；播放中断类错误的恢复由用户重新打开文件；MIG-01 等效覆盖按「消息+严重级可见性」断言，不含按钮行为 — **Reversibility:** reversible — 可后补按钮
+- **D-10:** **media_kit 全屏期间卡片仍显示**——卡片须挂载于全屏 route 之上（root Overlay/navigator 层而非 body Stack 内）；研究已提示此形态的 CARD-02 hit-test 风险更高，规划时须给出严格边界 hit-test 验证 — **Reversibility:** reversible — 挂载层调整
+- **D-11:** 计数徽标轮览数据源 = 卡片宿主**本地有界错误快照**（自 reporter presentation 通知维护），不给 kernel 新增只读历史 API — **Reversibility:** reversible
+- **D-12:** PlayerFeature 挂载完成前的错误（如 deferred 加载失败）= 宿主首次 `flushPresentation()` 时**补呈现**（MVP 接受窗口内不可见，最终可见） — **Reversibility:** reversible
+
 ### Claude's Discretion
 - 计数徽标确切样式与轮览交互细节(上一条/下一条 vs 循环)
 - warning OSD 提示的节流参数与时长

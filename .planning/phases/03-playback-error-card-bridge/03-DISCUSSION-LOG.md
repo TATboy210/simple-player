@@ -30,6 +30,15 @@
 | MIG-01 等效覆盖验证标准与旧 ErrorBanner 删除时序? | 同 phase 替换+删(推荐) / 分 phase 删 | 同 phase 替换+删 |
 | 卡片数据源与 PlayerErrorReportBridge 的关系? | 统一订阅 reporter(推荐) / engine 直连 | 统一订阅 reporter |
 
+## 研究后确认（RESEARCH open questions 用户拍板）
+
+| Question | Options | Selection |
+|---|---|---|
+| 旧 ErrorBanner 的 reopen/retry 按钮在新卡片中保留吗? | 不保留(推荐) / 保留重开按钮 | 不保留 |
+| ① media_kit 全屏期间错误卡片的可见性? | 全屏不显示(研究建议) / 全屏也显示 | **全屏也显示**（用户覆盖研究建议 → D-10，CARD-02 风险抬高） |
+| ② 计数徽标轮览的数据源? | 本地快照(推荐) / reporter 新 API | 本地快照 |
+| ③ 预挂载错误处理? | 补呈现(接受) / 不补呈现 | 补呈现 |
+
 ## Deferred Ideas
 
 None — 未出现范围外提议
