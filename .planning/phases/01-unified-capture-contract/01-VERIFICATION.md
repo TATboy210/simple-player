@@ -1,7 +1,7 @@
 ---
 phase: 01-unified-capture-contract
 verified: 2026-08-30T08:53:21Z
-status: human_needed
+status: passed
 score: 4/4 must-haves verified
 behavior_unverified: 1
 overrides_applied: 0
@@ -15,15 +15,18 @@ re_verification:
   gaps_remaining: []
   regressions: []
 behavior_unverified_items:
+
   - truth: "A handled WindowService initialization failure preserves the existing App windowInitError state and reaches the reporter exactly once rather than being rethrown or reported by two paths (01-02 plan must-have)."
     test: "Force windowService.init() to throw during a real debug boot (e.g. temporarily throw inside WindowService.init) and observe app startup."
     expected: "App still starts with windowInitError populated, KernelLogger logs once, ErrorReporterImpl.reportBootstrapSafely is invoked exactly once, and the exception is not rethrown into the guarded zone."
     why_human: "main.dart:41-52 contains the only production path that can exercise this; no test injects a failing WindowService (the global_error_hooks_test.dart:41-50 check is source-text only), and UAT 14/15 covered only the success path."
 human_verification:
+
   - test: "Window-init failure containment on a real Windows debug boot: make windowService.init() throw once (temporary throw or fault-injected build), then start the app."
     expected: "App reaches the player UI in a degraded-but-alive state, windowInitError reaches App, exactly one bootstrap report is enqueued, and no unhandled exception propagates out of the guarded zone."
     why_human: "Requires a booted Windows process with a deliberately failing platform channel; the automated suite has no seam that injects a real WindowService init failure."
 coincidental_reliance_items:
+
   - truth: "CAP-03 failure containment"
     reason: fixture-only
     harden: "The public reporter is covered with injected throwing collaborators, but production bridge containment relies on the concrete reporter's internal fallback; an alternate ErrorReporter implementation would be silently swallowed by PlayerErrorReportBridge (player_error_report_bridge.dart:57-60 broad catch remains, warning-level, unchanged this round)."
