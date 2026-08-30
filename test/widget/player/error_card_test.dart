@@ -15,6 +15,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
+import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
@@ -35,8 +36,12 @@ void main() {
   setUp(() async {
     // 卡片 build 内读取 ErrorReporterImpl.I.diagnosticLogPath；
     // 每个测试重建单例，保证 log 状态不跨测试泄漏。
+    // D-11 快照 effect：徽标轮览数据源须与生产 main.dart 同一接线
+    // （reporter 既有 effects 缝 → ErrorCaptureSnapshot.I.record）——
+    // 关闭/同帧类用例的徽标计数与「显示最新」断言依赖它。
     await ErrorReporterImpl.resetForTesting();
-    ErrorReporterImpl.init();
+    ErrorCaptureSnapshot.I.resetForTesting();
+    ErrorReporterImpl.init(effects: [ErrorCaptureSnapshot.I.record]);
   });
 
   // 卡片纯呈现测试 harness：直接挂 ErrorCard，无宿主（宿主级行为在

@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/startup_timeline.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
+import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
 import '../../helpers/fake_window_service.dart';
@@ -24,8 +25,11 @@ void main() {
   setUp(() async {
     // ErrorCardHost 经 ErrorReporterImpl.I 单例订阅呈现状态；
     // 每个测试重建单例，保证 FIFO/isReady 不跨测试泄漏。
+    // D-11 快照 effect：徽标轮览数据源须与生产 main.dart 同一接线
+    // （reporter 既有 effects 缝 → ErrorCaptureSnapshot.I.record）。
     await ErrorReporterImpl.resetForTesting();
-    ErrorReporterImpl.init();
+    ErrorCaptureSnapshot.I.resetForTesting();
+    ErrorReporterImpl.init(effects: [ErrorCaptureSnapshot.I.record]);
   });
 
   // 真实 App 组合根，走 windowInitError 降级文字态 home —— 避免构造
@@ -341,6 +345,10 @@ void main() {
       await tester.pump();
       expect(find.byType(ErrorCard), findsOneWidget);
       expect(find.textContaining('后续错误'), findsOneWidget);
+
+      // 推进 OSD hold 计时器（osdDefaultHoldMs=1200），避免测试结束遗留
+      // pending timer；hide() 置空 message，不影响上面的非空计数断言。
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 
