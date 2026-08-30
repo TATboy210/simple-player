@@ -66,7 +66,23 @@ Plans:
   4. 每个 error/fatal 报告都会以 UTF-8 追加到默认或已验证的本地单一日志文件；普通 debug/info 输出不会污染该文件，关闭卡片也不会停止落盘。
   5. 日志写入或关闭失败时，应用仍可继续使用，并以受限调试输出和“日志不可用”状态降级；文件内容和复制内容使用相同的稳定诊断包格式。
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Prove the reporter-effect → shared formatter → durable UTF-8 append tracer and harden single-writer failure isolation.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Extract trustworthy project frames and read debug/profile source context within a contained project root.
+
+**Wave 3** *(blocked on Waves 1–2 completion)*
+
+- [ ] 02-03-PLAN.md — Freeze full current/failed-open media evidence and enrich immutable reports before effect fan-out.
+
+**Wave 4** *(blocked on Waves 1–3 completion)*
+
+- [ ] 02-04-PLAN.md — Resolve Application Support/logs/error.log, wire the production sink before global hooks, and close quality gates.
 
 ### Phase 3: 播放错误桥与非模态卡片
 
