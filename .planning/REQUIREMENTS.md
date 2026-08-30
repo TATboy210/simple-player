@@ -20,11 +20,11 @@
 
 ### 落盘 (Log)
 
-- [ ] **LOG-01**: kernel_logger 保持门面，新增 error/fatal-only FileSink，输出引擎为 logger 2.7.0 `FileOutput(file, overrideExisting: false, encoding: utf8)` 单文件追加（context7 验证：append 语义正确）
-- [ ] **LOG-02**: 仅错误事件上盘（普通 debug/info 日志不上盘），落盘独立于卡片可见性
-- [ ] **LOG-03**: 单写者串行写队列（UTF-8 追加、有界 close/drain），写盘失败非致命不递归，降级为限流 debugPrint + "日志不可用"状态
-- [ ] **LOG-04**: path_provider 提供默认日志位置（不用 exe 目录/进程 cwd），配置路径写入前校验
-- [ ] **LOG-05**: 稳定诊断包格式（report ID/来源/时序/媒体快照/定位/可选源码行/重复信息/raw stack/日志路径），卡片复制与文件记录同格式
+- [x] **LOG-01**: kernel_logger 保持门面，新增 error/fatal-only FileSink，输出引擎为 logger 2.7.0 `FileOutput(file, overrideExisting: false, encoding: utf8)` 单文件追加（context7 验证：append 语义正确）
+- [x] **LOG-02**: 仅错误事件上盘（普通 debug/info 日志不上盘），落盘独立于卡片可见性
+- [x] **LOG-03**: 单写者串行写队列（UTF-8 追加、有界 close/drain），写盘失败非致命不递归，降级为限流 debugPrint + "日志不可用"状态
+- [x] **LOG-04**: path_provider 提供默认日志位置（不用 exe 目录/进程 cwd），配置路径写入前校验
+- [x] **LOG-05**: 稳定诊断包格式（report ID/来源/时序/媒体快照/定位/可选源码行/重复信息/raw stack/日志路径），卡片复制与文件记录同格式
 
 ### 卡片 (Card)
 
@@ -83,11 +83,11 @@
 | LOC-01 | Phase 2 | Pending |
 | LOC-02 | Phase 2 | Pending |
 | LOC-03 | Phase 2 | Pending |
-| LOG-01 | Phase 2 | Pending |
-| LOG-02 | Phase 2 | Pending |
-| LOG-03 | Phase 2 | Pending |
-| LOG-04 | Phase 2 | Pending |
-| LOG-05 | Phase 2 | Pending |
+| LOG-01 | Phase 2 | Complete |
+| LOG-02 | Phase 2 | Complete |
+| LOG-03 | Phase 2 | Complete |
+| LOG-04 | Phase 2 | Complete |
+| LOG-05 | Phase 2 | Complete |
 | CARD-01 | Phase 3 | Pending |
 | CARD-02 | Phase 3 | Pending |
 | CARD-03 | Phase 3 | Pending |
