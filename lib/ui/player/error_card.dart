@@ -21,8 +21,9 @@ import '../theme/tokens.dart';
 ///   → 重复信息，长文本段 SingleChildScrollView + SelectableText（A2：栈硬
 ///   上界 16384 字符，无需虚拟化）；
 /// - **交互**：整卡点击切换折叠/展开（StatefulWidget 内部状态，无新状态库）；
-///   一键复制诊断包（CARD-04/D-06，失败隔离）；徽标点击为空操作占位
-///   （轮览接线归 03-03）；关闭按钮与 hit-test 宿主级义务归 03-02 Task 2；
+///   一键复制诊断包（CARD-04/D-06，失败隔离）；徽标点击轮览历史错误
+///   （D-01/D-11，宿主接线，纯视图偏移）；关闭按钮与 hit-test 宿主级
+///   义务归 03-02 Task 2；
 /// - **数据来源不变**：投影不可变 [ErrorReport]，intake 已脱敏限界；
 ///   T-03-05 —— 可见树不渲染 fullMediaPath/failedOpenPath 完整路径字段。
 ///
@@ -35,15 +36,25 @@ class ErrorCard extends StatefulWidget {
     super.key,
     required this.report,
     required this.totalCount,
+    this.onBadgeTap,
     this.onClose,
   });
 
-  /// The FIFO head report to project; fields are already redacted/bounded at
-  /// intake — this widget never renders developer-only full paths (T-03-05).
+  /// The report to project; fields are already redacted/bounded at intake —
+  /// this widget never renders developer-only full paths (T-03-05). The host
+  /// decides which snapshot entry (newest or cycled) to project here.
   final ErrorReport report;
 
-  /// D-01 计数徽标：已捕获错误总数（含队首）。
+  /// D-01/D-11 计数徽标：宿主本地快照长度（已捕获且未被手动关闭的错误数，
+  /// 封顶 20）。
   final int totalCount;
+
+  /// D-01/D-11 徽标轮览回调（03-03 接线）：点击沿宿主本地快照向旧循环翻页。
+  ///
+  /// **纯视图偏移** —— 轮览绝不调用 dismissCurrent（research Anti-Pattern：
+  /// 误用会永久丢队首）；`dismissCurrent` 仅由手动关闭（[onClose]）与
+  /// D-02 warning 分流调用。为 null 时徽标不可点（纯计数展示）。
+  final VoidCallback? onBadgeTap;
 
   /// CARD-01 手动关闭回调 —— 宿主接线 `ErrorReporterImpl.I.dismissCurrent()`
   /// （关闭推进 FIFO）；只在手动关闭调用，徽标轮览不得复用此路径。
@@ -206,26 +217,30 @@ class _ErrorCardState extends State<ErrorCard> {
               ),
             ),
             const SizedBox(width: Tokens.spSm),
-            // D-01 计数徽标：GestureDetector 承载（03-03 接轮览回调），
-            // 不用 GlassButton —— 避免 FocusableActionDetector 抢焦点（CARD-01）。
-            GestureDetector(
-              onTap: () {},
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Tokens.spSm,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: Tokens.bgElevated,
-                  borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-                ),
-                child: Text(
-                  // 03-03 在此接线徽标轮览；点击目标目前为空操作占位由该
-                  // 计划回收 —— 非可消失 stub。
-                  l10n.errorCardBadgeLabel(widget.totalCount),
-                  style: const TextStyle(
-                    color: Tokens.textSecondary,
-                    fontSize: Tokens.fontCaption,
+            // D-01/D-11 计数徽标：可点击轮览入口（onBadgeTap 由宿主接线，
+            // 纯视图偏移不消费队列）。GestureDetector 承载，不用 GlassButton
+            // —— 避免 FocusableActionDetector 抢焦点（CARD-01）。
+            Semantics(
+              label: l10n.errorCardCycleTooltip,
+              button: widget.onBadgeTap != null,
+              child: GestureDetector(
+                key: const ValueKey('error-card-badge'),
+                onTap: widget.onBadgeTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Tokens.spSm,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Tokens.bgElevated,
+                    borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+                  ),
+                  child: Text(
+                    l10n.errorCardBadgeLabel(widget.totalCount),
+                    style: const TextStyle(
+                      color: Tokens.textSecondary,
+                      fontSize: Tokens.fontCaption,
+                    ),
                   ),
                 ),
               ),

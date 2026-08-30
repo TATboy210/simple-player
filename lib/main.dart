@@ -17,6 +17,7 @@ import 'kernel/diagnostics/global_error_hooks.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
+import 'ui/player/error_capture_snapshot.dart';
 
 /// UAT Test 16 故障注入开关 — 仅当
 /// `--dart-define=UAT_FAULT_WINDOW_INIT=true` 时启用，模拟 windowService.init()
@@ -37,9 +38,11 @@ Future<void> main() {
 
         KernelLoggerImpl.init();
         // Install capture before any platform path or directory I/O can fail or stall.
+        // 快照 effect（D-11）：错误卡片徽标轮览的呈现层有界快照数据源，
+        // 经既有 effects 缝挂入 —— kernel 零改动（见 ErrorCaptureSnapshot 注释）。
         final diagnosticLogEffect = DelegatingDiagnosticLogEffect();
         ErrorReporterImpl.init(
-          effects: [diagnosticLogEffect.record],
+          effects: [diagnosticLogEffect.record, ErrorCaptureSnapshot.I.record],
           diagnosticLogStatus: diagnosticLogEffect,
         );
         GlobalErrorHooks.install(ErrorReporterImpl.I);
