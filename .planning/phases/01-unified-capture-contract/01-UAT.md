@@ -1,14 +1,18 @@
 ---
 status: testing
 phase: 01-unified-capture-contract
-source: 01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md, 01-04-SUMMARY.md
+source: 01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md, 01-04-SUMMARY.md, 01-VERIFICATION.md (re-verification 0c4f336a)
 started: 2026-08-30T08:01:50Z
-updated: 2026-08-30T08:55:00Z
+updated: 2026-08-30T09:05:00Z
 ---
 
 ## Current Test
 
-[testing complete]
+number: 16
+name: Window-init 失败容纳（来自重验 VERIFICATION.md 人工项）
+expected: |
+  在真实 Windows debug 启动中让 windowService.init() 抛出一次（临时 throw 或故障注入构建），然后启动应用：应用以降级但存活的状态进入播放器界面，windowInitError 送达 App，恰好一份 bootstrap 报告入队，且无未处理异常冒出 guarded zone（main.dart:41-52 路径）。
+awaiting: user response
 
 ## Tests
 
@@ -101,12 +105,18 @@ reported: "实机日志证据：两类来源各入队（1→2）；10 秒窗内�
 source: manual
 evidence: "面板 debugPrint 队列计数序列 1→2→(窗内合并保持 2)→4"
 
+### 16. Window-init 失败容纳（来自重验 VERIFICATION.md 人工项）
+expected: 在真实 Windows debug 启动中让 windowService.init() 抛出一次（临时 throw 或故障注入构建）：应用以降级但存活的状态进入播放器界面，windowInitError 送达 App，恰好一份 bootstrap 报告入队，无未处理异常冒出 guarded zone（main.dart:41-52）。
+result: [pending]
+source: manual
+coverage_id: 01-02-window-init-containment
+
 ## Summary
 
-total: 15
+total: 16
 passed: 15
 issues: 0
-pending: 0
+pending: 1
 skipped: 0
 
 ## Gaps
