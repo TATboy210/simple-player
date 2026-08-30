@@ -1,10 +1,13 @@
 /// Behavioral tests for global Flutter and dispatcher diagnostic hooks.
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/clock.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/global_error_hooks.dart';
@@ -13,29 +16,128 @@ import 'package:simple_player_flutter/main.dart' show BootstrapErrorFallback;
 
 void main() {
   group('GlobalErrorHooks', () {
-    test('declares guarded bootstrap installation ordering in main source', () {
+    test(
+      'declares hooks-first diagnostic file startup ordering in main source',
+      () {
+        // Arrange
+        final source = File('lib/main.dart').readAsStringSync();
+
+        // Assert
+        expect(
+          source.indexOf('KernelLoggerImpl.init()'),
+          greaterThanOrEqualTo(0),
+        );
+        expect(
+          source.indexOf('DelegatingDiagnosticLogEffect'),
+          greaterThanOrEqualTo(0),
+        );
+        expect(
+          source.indexOf('ErrorReporterImpl.init('),
+          greaterThanOrEqualTo(0),
+        );
+        expect(
+          source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
+          greaterThanOrEqualTo(0),
+        );
+        expect(
+          source.indexOf('getApplicationSupportDirectory'),
+          greaterThanOrEqualTo(0),
+        );
+        expect(
+          source.indexOf('ErrorReporterImpl.init('),
+          lessThan(
+            source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
+          ),
+        );
+        expect(
+          source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
+          lessThan(source.indexOf('getApplicationSupportDirectory')),
+        );
+      },
+    );
+
+    test(
+      'keeps capture available while location resolution is pending',
+      () async {
+        // Arrange
+        final delegate = DelegatingDiagnosticLogEffect();
+        final reporter = _reporter(delegate);
+        final availability = reporter.diagnosticLogsAvailable;
+        final logPath = reporter.diagnosticLogPath;
+        final pending = Completer<void>();
+
+        // Act
+        final activation = pending.future.then((_) {});
+        reporter.reportPlatformSafely(
+          StateError('capture before log location'),
+          StackTrace.current,
+        );
+
+        // Assert
+        expect(activation, isA<Future<void>>());
+        expect(availability, same(delegate.logsAvailable));
+        expect(logPath, same(delegate.logPath));
+        expect(availability?.value, isFalse);
+        expect(logPath?.value, isNull);
+        expect(reporter.queuedReports, hasLength(1));
+        pending.complete();
+        await activation;
+      },
+    );
+
+    test(
+      'activates the same delegate and status listenables after resolution',
+      () async {
+        // Arrange
+        final root = await Directory.systemTemp.createTemp(
+          'diagnostic delegate',
+        );
+        final target = File('${root.path}${Platform.pathSeparator}error.log');
+        final delegate = DelegatingDiagnosticLogEffect();
+        final reporter = _reporter(delegate);
+        final availability = reporter.diagnosticLogsAvailable;
+        final logPath = reporter.diagnosticLogPath;
+        final sink = ErrorLogFileSink(file: target);
+        addTearDown(() async {
+          await delegate.dispose();
+          await root.delete(recursive: true);
+        });
+
+        // Act
+        delegate.activate(sink: sink, resolvedPath: target.path);
+        reporter.reportPlatformSafely(
+          StateError('capture after activation'),
+          StackTrace.current,
+        );
+        await sink.drain();
+
+        // Assert
+        expect(reporter.diagnosticLogsAvailable, same(availability));
+        expect(reporter.diagnosticLogPath, same(logPath));
+        expect(availability?.value, isTrue);
+        expect(logPath?.value, target.path);
+        expect(
+          await target.readAsString(),
+          contains('capture after activation'),
+        );
+      },
+    );
+
+    test('keeps capture live when diagnostic file activation never occurs', () {
       // Arrange
-      final source = File('lib/main.dart').readAsStringSync();
+      final delegate = DelegatingDiagnosticLogEffect();
+      final reporter = _reporter(delegate);
+
+      // Act
+      reporter.reportBootstrapSafely(
+        StateError('degraded startup'),
+        StackTrace.current,
+      );
 
       // Assert
-      expect(
-        source.indexOf('runZonedGuarded<Future<void>>'),
-        greaterThanOrEqualTo(0),
-      );
-      expect(
-        source.indexOf('ErrorReporterImpl.init()'),
-        greaterThanOrEqualTo(0),
-      );
-      expect(
-        source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
-        greaterThanOrEqualTo(0),
-      );
-      expect(
-        source.indexOf('ErrorReporterImpl.init()'),
-        lessThan(
-          source.indexOf('GlobalErrorHooks.install(ErrorReporterImpl.I)'),
-        ),
-      );
+      expect(delegate.logsAvailable.value, isFalse);
+      expect(delegate.logPath.value, isNull);
+      expect(reporter.queuedReports, hasLength(1));
     });
 
     test('declares bootstrap fallback containment helpers in main source', () {
@@ -250,6 +352,18 @@ void main() {
       },
     );
   });
+}
+
+/// Builds a deterministic reporter with the production-owned diagnostic delegate.
+ErrorReporterImpl _reporter(DelegatingDiagnosticLogEffect delegate) {
+  var sequence = 0;
+  return ErrorReporterImpl.forTesting(
+    clock: FakeClock(DateTime.utc(2026)),
+    eventIdGenerator: () => 'test-${++sequence}',
+    currentMediaPath: () => null,
+    effects: [delegate.record],
+    diagnosticLogStatus: delegate,
+  );
 }
 
 /// Builds hook seams without mutating real process-global callbacks.

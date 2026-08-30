@@ -5,9 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'kernel/diagnostics/error_log_file_sink.dart';
+import 'kernel/diagnostics/error_log_location.dart';
 import 'kernel/diagnostics/error_reporter.dart';
 import 'kernel/diagnostics/error_reporting_dependencies.dart';
 import 'kernel/diagnostics/global_error_hooks.dart';
@@ -33,8 +36,14 @@ Future<void> main() {
         }
 
         KernelLoggerImpl.init();
-        ErrorReporterImpl.init();
+        // Install capture before any platform path or directory I/O can fail or stall.
+        final diagnosticLogEffect = DelegatingDiagnosticLogEffect();
+        ErrorReporterImpl.init(
+          effects: [diagnosticLogEffect.record],
+          diagnosticLogStatus: diagnosticLogEffect,
+        );
         GlobalErrorHooks.install(ErrorReporterImpl.I);
+        unawaited(_activateDiagnosticLog(diagnosticLogEffect));
         MediaKit.ensureInitialized();
         await windowManager.ensureInitialized();
 
@@ -45,7 +54,9 @@ Future<void> main() {
         try {
           // 故障注入：在真正调用 init 前抛出，走同一 try/catch 容纳路径（UAT Test 16）。
           if (uatFaultWindowInit) {
-            throw StateError('UAT fault injection: windowService.init() faulted');
+            throw StateError(
+              'UAT fault injection: windowService.init() faulted',
+            );
           }
           await windowService.init();
           startupTimeline.mark(StartupTimeline.phaseInfrastructure);
@@ -92,6 +103,42 @@ Future<void> main() {
         );
       }, BootstrapErrorFallback.report) ??
       Future<void>.value();
+}
+
+/// Resolves and activates durable diagnostic evidence after global capture is live.
+///
+/// This asynchronous side effect intentionally does not delay MediaKit, window,
+/// or runApp. Its failure is reported only through KernelLogger to avoid reporter
+/// reentrancy while the file effect is itself unavailable.
+Future<void> _activateDiagnosticLog(
+  DelegatingDiagnosticLogEffect diagnosticLogEffect,
+) async {
+  try {
+    final result = await ErrorLogLocation.resolve(
+      applicationSupportDirectory: getApplicationSupportDirectory,
+    );
+    switch (result) {
+      case ErrorLogLocationResolved(:final file):
+        final sink = ErrorLogFileSink(file: file);
+        diagnosticLogEffect.activate(sink: sink, resolvedPath: file.path);
+      case ErrorLogLocationUnavailable(:final error, :final stackTrace):
+        KernelLogger.I.warn(
+          'Diagnostic file evidence is unavailable during startup.',
+          context: <String, Object?>{
+            'error': error.toString(),
+            'stackTrace': stackTrace.toString(),
+          },
+        );
+    }
+  } on Object catch (error, stackTrace) {
+    KernelLogger.I.warn(
+      'Diagnostic file activation failed.',
+      context: <String, Object?>{
+        'error': error.toString(),
+        'stackTrace': stackTrace.toString(),
+      },
+    );
+  }
 }
 
 /// 启动期 zone 错误的独立、非递归兜底。
