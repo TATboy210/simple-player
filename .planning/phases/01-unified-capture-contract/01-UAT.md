@@ -3,7 +3,7 @@ status: complete
 phase: 01-unified-capture-contract
 source: 01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md, 01-04-SUMMARY.md, 01-VERIFICATION.md (re-verification 0c4f336a)
 started: 2026-08-30T08:01:50Z
-updated: 2026-08-30T09:20:00Z
+updated: 2026-08-30T09:55:00Z
 ---
 
 ## Current Test
@@ -102,11 +102,11 @@ source: manual
 evidence: "面板 debugPrint 队列计数序列 1→2→(窗内合并保持 2)→4"
 
 ### 16. Window-init 失败容纳（来自重验 VERIFICATION.md 人工项）
-expected: 在真实 Windows debug 启动中让 windowService.init() 抛出一次（临时 throw 或故障注入构建）：应用以降级但存活的状态进入播放器界面，windowInitError 送达 App，恰好一份 bootstrap 报告入队，无未处理异常冒出 guarded zone（main.dart:41-52）。
+expected: 在真实 Windows debug 启动中让 windowService.init() 抛出一次（故障注入构建）：窗口以降级文字态实际可见，windowInitError 送达 App，恰好一份 bootstrap 报告入队，无未处理异常冒出 guarded zone，窗口默认关闭行为可用。
 result: pass
-reported: "实机日志证据：恰好一条 `[main] Window initialization failed: Bad state: UAT fault injection...`；`[uat-window-init-fault] pendingCount=1`；无 Unhandled exception；应用保持存活。首轮实测发现降级文字态 AppLocalizations.of 崩溃（app.dart:57 在 MaterialApp 外 context 用 `!`），已修复（d85197ec Builder 子 context）后复测通过。"
+reported: "三轮实测：R1 捕获链正常（单条错误日志 + pendingCount=1 + 无异常）但降级文字态崩溃——AppLocalizations.of 在 MaterialApp 外 context 用 `!`（app.dart:57），修复 d85197ec（Builder 子 context）。R2 崩溃消失但窗口根本未弹出——show 由 WindowService.init 内部负责（window_manager_service.dart:200），init 失败即无人 show，形成隐形孤儿进程；此为 orchestrator 从控制台无崩溃错误推断降级界面已呈现的判断失误，由用户实测指出。修复 956a4a29（catch 内 best-effort windowManager.show() + 失败仅记录）。R3 全过：窗口以系统标题栏形态弹出、降级文字正确、pendingCount=1、单条错误日志、无异常、× 可关闭。"
 source: manual
-evidence: "flutter run --dart-define=UAT_FAULT_WINDOW_INIT=true 控制台输出：单条错误日志 + pendingCount=1 + 无异常堆栈"
+evidence: "flutter run --dart-define=UAT_FAULT_WINDOW_INIT=true 三轮控制台输出 + 实机窗口观察（用户确认）"
 coverage_id: 01-02-window-init-containment
 
 ## Summary
