@@ -100,8 +100,23 @@ Plans:
   4. 卡片以外的界面区域仍可正常命中，标题栏、控制栏和播放列表操作不被遮挡；卡片显示期间键盘快捷键保持可用。
   5. 播放引擎错误经桥接后与其他来源显示在同一错误卡片中，且在等效覆盖得到验证后旧 ErrorBanner 已被移除。
 
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — 贯通 presentation → ErrorCardHost → ErrorCard 折叠视图到 app root Stack（D-10 挂载层）的端到端 tracer，锁死 CARD-05 build 期安全与 D-12 补呈现。
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — 折叠/展开五段详情与严重级语义色（CARD-03/D-03/D-04），常驻手动关、零焦点抢占与严格 hit-test（CARD-01/CARD-02）。
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-03-PLAN.md — 一键复制诊断包与失败隔离（CARD-04/D-06），warning 分流与计数徽标轮览（D-01/D-02/D-11）。
+
+**Wave 4** *(blocked on Wave 3 completion; 含人工删除确认门)*
+
+- [ ] 03-04-PLAN.md — MIG-01 双路径等效覆盖测试（D-07/D-09），人工确认后删除 ErrorBanner 并收尾质量门。
 
 ### Phase 4: 错误反馈设置
 
@@ -143,6 +158,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
-| 3. 播放错误桥与非模态卡片 | 0/TBD | Not started | - |
+| 3. 播放错误桥与非模态卡片 | 0/4 | Not started | - |
 | 4. 错误反馈设置 | 0/TBD | Not started | - |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |
