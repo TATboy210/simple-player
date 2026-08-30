@@ -17,6 +17,15 @@ class Tokens {
   static const accentEgg = Color.fromARGB(255, 102, 204, 255);
   static const danger = Color.fromARGB(255, 250, 55, 55);
 
+  // ── 严重级语义色（D-03 语义色分层）──
+  /// warning 严重级语义色 — amber 系（可恢复降级条件，如 Phase 4 后的 warning 提示）
+  /// Warning severity color — amber family (recoverable degraded condition).
+  static const warning = Color.fromARGB(255, 245, 166, 35);
+
+  /// fatal 严重级语义色 — 深红（[danger] 加深，不可恢复错误与普通错误区分）
+  /// Fatal severity color — deepened danger red (unrecoverable errors).
+  static const dangerFatal = Color.fromARGB(255, 168, 16, 16);
+
   // ── 边缘微光 ──
   static const glowCore = Color(0xE6A0BEFF); // rgba(160,190,255,0.9)
   static const glowMid = Color(0x40648CFF); // rgba(100,140,255,0.25)
@@ -249,6 +258,10 @@ class Tokens {
   /// 折叠视图 message 文本的最大宽度 —— 长诊断文本省略号截断，
   /// 不横向撑爆左上角卡片。
   static const double errorCardMaxWidth = 320.0;
+
+  /// 展开态详情区最大宽度 —— 比折叠态更宽以容纳调用栈/源码行换行可读性
+  /// Expanded details max width — wider than collapsed for stack readability.
+  static const double errorCardExpandedMaxWidth = 420.0;
 
   // ── 按钮尺寸 ──
   static const double iconButtonSizeLarge = 48;
