@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 3
 current_phase_name: 播放错误桥与非模态卡片
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-08-30T17:51:29.584Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-08-30T18:40:26.352Z"
 last_activity: 2026-08-31
 last_activity_desc: Phase 3 execution started
-state_head: 351cf97e50f15ec00f35f3bcfe8325c1c1923bbd
+state_head: 21b632c65a299b7fe71fbd2c582b795ef120b93a
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 40
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 ## Current Position
 
 Phase: 3 (播放错误桥与非模态卡片) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-08-31 — Phase 3 execution started
 
@@ -64,6 +64,7 @@ Progress: [████░░░░░░] 40%
 | Phase 02 P02-04 | 870 | 2 tasks | 7 files |
 | Phase 03 P03-01 | 45 | 2 tasks | 10 files |
 | Phase 03 P03-02 | 25 | 2 tasks | 4 files |
+| Phase 03 P03-03 | 34 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecti
 - [Phase 02]: D-08 production persistence remains an ErrorReporter effect, not a KernelLogger CompositeSink responsibility. — D-08 production persistence remains an ErrorReporter effect, not a KernelLogger CompositeSink responsibility.
 - [Phase 02]: A stable unavailable delegating effect is constructed before hooks; successful activation changes only its internal writer and notifier values. — A stable unavailable delegating effect is constructed before hooks; successful activation changes only its internal writer and notifier values.
 - [Phase 02]: Pending or failed activation never blocks MediaKit, window initialization, runApp, or the global capture chain. — Pending or failed activation never blocks MediaKit, window initialization, runApp, or the global capture chain.
+- [Phase 3]: D-11 badge-cycling snapshot feeds from the existing reporter effects seam (ErrorCaptureSnapshot, UI-layer, bounded 20) because presentation only publishes the FIFO head — Plan assumption falsified by tests during 03-03 Task 2: _publishSafely exposes only queue.first, so D-01 newest-display and captured-count badge are unachievable via presentation notifications; the effects seam keeps kernel at zero changes with no new read-only API
+- [Phase 3]: D-01 replacement semantics: the card always shows the newest captured error; manual close consumes the real FIFO head and removes it from the snapshot — Plan Task 2 RED mandates newest-on-card and older-first cycling; 03-02 FIFO-head display assertions were flipped accordingly
 
 ### Pending Todos
 
@@ -105,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-30T17:51:29.234Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-08-30T18:40:25.948Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
