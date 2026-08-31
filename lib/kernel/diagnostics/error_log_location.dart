@@ -52,6 +52,55 @@ final class ErrorLogLocationUnavailable extends ErrorLogLocationResult {
   final StackTrace stackTrace;
 }
 
+/// 用户配置目录校验的失败原因封闭集 —— 可被 UI 映射为本地化文案。
+///
+/// Closed set of configured-directory validation failures so the settings UI
+/// can map each reason to localized inline copy (D-04) without string matching.
+enum ConfiguredDirectoryFailure {
+  /// 空串/纯空白或相对路径 —— 用户配置的是目录，必须是绝对路径。
+  notAbsolute,
+
+  /// 含 null 字节或控制字符（借 path_validator.dart:98-107 的拒绝哲学：
+  /// 目录校验只做字符级防御，路径遍历交由探测与封闭写路径约束）。
+  invalidCharacters,
+
+  /// UNC 网络路径（\\server\share）—— A3 采纳：v1 拒绝并文档化，用户可
+  /// 后续放开；断网的驱动器会让诊断证据静默不可达，v1 选择拒收。
+  uncPathUnsupported,
+
+  /// 超过 [ErrorLogLocation.maxConfiguredPathLength] 的极端输入。
+  pathTooLong,
+
+  /// 形态合法但目录创建或写入探测失败（被同名文件占据/权限不足等），
+  /// [ConfiguredDirectoryInvalid.error] 携带收窄捕获的原始异常。
+  notWritable,
+}
+
+/// 用户配置目录的单层校验结果（sealed —— 调用方以 switch 穷举）。
+sealed class ConfiguredDirectoryValidation {
+  const ConfiguredDirectoryValidation();
+}
+
+/// 校验通过：目录已创建且经写入探测证明可写，可作为 sink 落点。
+final class ConfiguredDirectoryValid extends ConfiguredDirectoryValidation {
+  const ConfiguredDirectoryValid(this.directory);
+
+  /// The prepared, probe-proven directory the sink may write into.
+  final Directory directory;
+}
+
+/// 校验失败：携带封闭原因与收窄捕获的原始异常（仅作 contained 证据随行，
+/// 不含报告正文，也绝不向调用方抛出）。
+final class ConfiguredDirectoryInvalid extends ConfiguredDirectoryValidation {
+  const ConfiguredDirectoryInvalid(this.reason, {this.error});
+
+  /// The closed-set reason for UI localization mapping.
+  final ConfiguredDirectoryFailure reason;
+
+  /// The narrowed original exception, retained only as contained evidence.
+  final Object? error;
+}
+
 /// 一层候选的准备结果：成功返回 null，失败返回收窄捕获的异常与配对堆栈。
 final class _TierFailure {
   const _TierFailure(this.error, this.stackTrace);
@@ -75,6 +124,10 @@ final class ErrorLogLocation {
 
   /// Single source of truth for the default diagnostic filename.
   static const String logFileName = 'error.log';
+
+  /// 用户配置目录的静态长度上界 —— 日志目录的常识上界（防极端输入占满
+  /// 探测/写路径；远超任何合理盘符路径，普通用户不受影响）。
+  static const int maxConfiguredPathLength = 1024;
 
   /// Resolves the first writable diagnostic log target along the chain.
   static Future<ErrorLogLocationResult> resolve({
@@ -113,6 +166,70 @@ final class ErrorLogLocation {
     } on Exception catch (error, stackTrace) {
       return ErrorLogLocationUnavailable(error, stackTrace);
     }
+  }
+
+  /// 单层校验用户配置的日志目录 —— 「校验即证明 sink 可用」（SET-02/T-04-02-01）。
+  ///
+  /// 校验顺序（形态拒绝先行，探测收尾）：
+  /// 1. trim 后为空或非绝对路径 → [ConfiguredDirectoryFailure.notAbsolute]；
+  /// 2. 含 null 字节/控制字符（codeUnits < 0x20 或 == 0x7F）→
+  ///    [ConfiguredDirectoryFailure.invalidCharacters]；
+  /// 3. 以 `\\` 开头的 UNC → [ConfiguredDirectoryFailure.uncPathUnsupported]
+  ///    （A3：v1 拒绝并文档化）；
+  /// 4. 长度超过 [maxConfiguredPathLength] →
+  ///    [ConfiguredDirectoryFailure.pathTooLong]；
+  /// 5. 复用链层的「create(recursive) + 临时文件探测」私有帮助函数做单层
+  ///    准备与探测，任何 FileSystemException/IOException →
+  ///    [ConfiguredDirectoryFailure.notWritable]（原始异常 contained 随行）。
+  ///
+  /// 绝不抛出：所有外部失败折叠为 typed Invalid；探测失败永不作为可用落点。
+  static Future<ConfiguredDirectoryValidation> validateConfiguredDirectory(
+    String configuredDirectory, {
+    WritableDirectoryProbe? writable,
+  }) async {
+    final trimmed = configuredDirectory.trim();
+    if (trimmed.isEmpty || !Directory(trimmed).isAbsolute) {
+      return const ConfiguredDirectoryInvalid(
+        ConfiguredDirectoryFailure.notAbsolute,
+      );
+    }
+    if (_containsControlCharacter(trimmed)) {
+      return const ConfiguredDirectoryInvalid(
+        ConfiguredDirectoryFailure.invalidCharacters,
+      );
+    }
+    if (trimmed.startsWith('\\\\')) {
+      return const ConfiguredDirectoryInvalid(
+        ConfiguredDirectoryFailure.uncPathUnsupported,
+      );
+    }
+    if (trimmed.length > maxConfiguredPathLength) {
+      return const ConfiguredDirectoryInvalid(
+        ConfiguredDirectoryFailure.pathTooLong,
+      );
+    }
+    final directory = Directory(trimmed);
+    final failure = await _prepareTier(
+      directory,
+      writable ?? _probeDirectoryWritable,
+    );
+    if (failure != null) {
+      return ConfiguredDirectoryInvalid(
+        ConfiguredDirectoryFailure.notWritable,
+        error: failure.error,
+      );
+    }
+    return ConfiguredDirectoryValid(directory);
+  }
+
+  /// 扫描 null 字节与控制字符（C0 全段 + DEL；\x00 空字节即含于 < 0x20）。
+  static bool _containsControlCharacter(String value) {
+    for (final unit in value.codeUnits) {
+      if (unit < 0x20 || unit == 0x7F) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// 走默认两层链：exe 根 logs/ → Application Support logs/。

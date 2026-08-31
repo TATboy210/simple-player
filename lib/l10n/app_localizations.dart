@@ -1273,6 +1273,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cycle between errors'**
   String get errorCardCycleTooltip;
+
+  /// One-shot OSD notice shown when the configured diagnostic log directory failed validation and the location chain fell back to the default location
+  ///
+  /// In en, this message translates to:
+  /// **'Log fell back to the default location'**
+  String get logFallbackNotice;
 }
 
 class _AppLocalizationsDelegate
