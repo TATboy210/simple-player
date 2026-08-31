@@ -1,0 +1,126 @@
+{
+  "version": "1.0",
+  "max_entries": 50,
+  "entries": [
+    {
+      "agent_id": "a4be4bb6679fcef9c",
+      "task_description": "Execute plan 02-01 (file sink tracer)",
+      "phase": "02",
+      "plan": "02-01",
+      "segment": null,
+      "timestamp": "2026-08-30T13:16:46Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-30T13:31:55Z"
+    },
+    {
+      "agent_id": "ac8274122ae37ace5",
+      "task_description": "Execute plan 02-02 (trusted location)",
+      "phase": "02",
+      "plan": "02-02",
+      "segment": null,
+      "timestamp": "2026-08-30T13:36:40Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-30T13:50:30Z"
+    },
+    {
+      "agent_id": "a3a5bd14c93724f66",
+      "task_description": "Execute plan 02-03 (media evidence freeze)",
+      "phase": "02",
+      "plan": "02-03",
+      "segment": null,
+      "timestamp": "2026-08-30T13:51:20Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-30T14:04:30Z"
+    },
+    {
+      "agent_id": "adf4b6a9f37b0e194",
+      "task_description": "Execute plan 02-04 (production assembly + full gates)",
+      "phase": "02",
+      "plan": "02-04",
+      "segment": null,
+      "timestamp": "2026-08-30T14:05:10Z",
+      "status": "failed",
+      "completion_timestamp": "2026-08-30T14:20:00Z"
+    },
+    {
+      "agent_id": "a96b5673c27c7311c",
+      "task_description": "Execute plan 02-04 retry (production assembly + full gates)",
+      "phase": "02",
+      "plan": "02-04",
+      "segment": null,
+      "timestamp": "2026-08-30T14:21:30Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-30T14:38:00Z"
+    },
+    {
+      "agent_id": "ae06661befcf2d1cd",
+      "task_description": "Execute plan 03-01 (tracer: host+card+mount+l10n)",
+      "phase": "03",
+      "plan": "03-01",
+      "segment": null,
+      "timestamp": "2026-08-31T00:00:00Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-31T00:30:00Z"
+    },
+    {
+      "agent_id": "a6cc210c969c84ebf",
+      "task_description": "Execute plan 03-02 (expand details + focus/hit-test)",
+      "phase": "03",
+      "plan": "03-02",
+      "segment": null,
+      "timestamp": "2026-08-31T00:35:00Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-31T01:05:00Z"
+    },
+    {
+      "agent_id": "a71ffb4a210a9d86e",
+      "task_description": "Execute plan 03-03 (copy + warning routing + badge)",
+      "phase": "03",
+      "plan": "03-03",
+      "segment": null,
+      "timestamp": "2026-08-31T01:10:00Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-31T01:55:00Z"
+    },
+    {
+      "agent_id": "a400a89744f7aca21",
+      "task_description": "Execute plan 03-04 (equivalence + checkpoint + deletion)",
+      "phase": "03",
+      "plan": "03-04",
+      "segment": null,
+      "timestamp": "2026-08-31T02:00:00Z",
+      "status": "spawned",
+      "completion_timestamp": null
+    },
+    {
+      "agent_id": "a6b3f402845964814",
+      "task_description": "Continue 03-04 Task 3 (approved deletion)",
+      "phase": "03",
+      "plan": "03-04",
+      "segment": 2,
+      "timestamp": "2026-08-31T02:20:00Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-31T02:30:00Z"
+    },
+    {
+      "agent_id": "a6b9c3663f82f449e",
+      "task_description": "Execute plan 03-05 (gap closure: debug inject entry)",
+      "phase": "03",
+      "plan": "03-05",
+      "segment": null,
+      "timestamp": "2026-08-31T05:00:00Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-31T05:20:00Z"
+    },
+    {
+      "agent_id": "ad5171f212c33e18b",
+      "task_description": "Execute plan 03-06 (gap closure: position + keyboard dispatch + entry removal)",
+      "phase": "03",
+      "plan": "03-06",
+      "segment": null,
+      "timestamp": "2026-08-31T06:40:00Z",
+      "status": "completed",
+      "completion_timestamp": "2026-08-31T20:40:00+08:00"
+    }
+  ]
+}
