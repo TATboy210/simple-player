@@ -173,7 +173,18 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
   /// 丢队首），快照同步移除该条（已关闭的错误不再计入徽标，D-11），
   /// 轮览重置到最新；随后 dismissCurrent 推进队列，下一项经 presentation
   /// 通知自然上屏（CAP-04）。
+  ///
+  /// **已知分歧（WR-01，零 kernel 改动取舍）**：关闭按钮消费的是 reporter
+  /// FIFO 队首（最旧未关闭），而卡片渲染的是快照最新/轮览条目 —— 当
+  /// 队列 ≥2 条且用户正在轮览时，「可见的关闭按钮」与「被消费的条目」
+  /// 可能不是同一条。按-by-id 精确 dismiss 需要 kernel 新增 dismissById
+  /// API（Rule 4 红线，未获签核），故保留 head-dismissal 语义。但**不会
+  /// 出现「从未展示的错误被静默丢弃」**：队首条目必然曾在抵达时作为最新
+  /// 内容上屏过（D-01），且快照中其余条目仍可经轮览回看；本分歧由
+  /// error_card_host_test 的 close/cycle 一致性用例锁死行为边界。
   void _onClose() {
+    // WR-02：reporter 未初始化时该回调不可达（卡片未渲染），防御性直返。
+    if (!ErrorReporterImpl.isInitialized) return;
     final head = ErrorReporterImpl.I.presentation.value.current;
     if (head != null) {
       ErrorCaptureSnapshot.I.removeById(head.eventId);

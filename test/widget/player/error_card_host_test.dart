@@ -607,6 +607,50 @@ void main() {
         expect(find.text('4 错误'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'close while cycling keeps display and snapshot consistent (WR-01)',
+      (tester) async {
+        // Arrange：3 份报告在卡（显示三），轮览一页到二。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        for (final message in ['错误一', '错误二', '错误三']) {
+          ErrorReporterImpl.I.reportBootstrapSafely(
+            StateError(message),
+            StackTrace.current,
+          );
+        }
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        expect(find.textContaining('错误二'), findsOneWidget);
+
+        // Act / Assert #1：关闭消费真实队首（一 —— 它抵达时已作为最新上屏过，
+        // 非静默丢弃）；显示重置到最新（三），徽标减一。
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
+        expect(find.textContaining('错误三'), findsOneWidget);
+        expect(find.text('2 错误'), findsOneWidget);
+
+        // Act / Assert #2：被消费条目之外的历史仍可轮览回看（无一被静默丢弃）。
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        expect(find.textContaining('错误二'), findsOneWidget);
+
+        // Act / Assert #3：再次关闭消费二（此前刚被展示过），显示回到三。
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
+        expect(find.textContaining('错误三'), findsOneWidget);
+        expect(find.text('1 错误'), findsOneWidget);
+
+        // Act / Assert #4：最后一次关闭，队列与快照同步清空，卡片消失。
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsNothing);
+      },
+    );
   });
 }
 
