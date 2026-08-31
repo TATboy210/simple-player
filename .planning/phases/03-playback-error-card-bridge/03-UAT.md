@@ -1,20 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 03-playback-error-card-bridge
 source: [03-VERIFICATION.md]
 started: 2026-08-31T03:30:00Z
-updated: 2026-08-31T03:30:00Z
+updated: 2026-08-31T04:10:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: VER-04 Windows 实机冒烟——错误卡片显示期间宿主窗口交互不变
-expected: |
-  卡片矩形外的一切交互照常:标题栏拖动/按钮、控制栏(播放/暂停/进度/音量)、播放列表操作;
-  键盘快捷键(Space/←→/M/N/P/O 等)在卡片显示期间保持可用;进入 media_kit 全屏后卡片仍显示
-  (D-10)、退出全屏后状态一致;一键复制将诊断包写入真实剪贴板(粘贴可验证)。
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -28,15 +22,26 @@ expected: |
   4. 一键复制:点复制按钮 → OSD「已复制」;在任意文本框粘贴,确认诊断包内容与日志文件一致
   5. 全屏(D-10):进入全屏(双击画面/快捷键)——卡片仍显示在画面之上;退出全屏——卡片状态一致
   6. 关闭:点卡片关闭按钮——卡片消失,后续错误仍能再次弹出
-result: [pending]
+result: issue
+reported: "没有个专门启动调试的按钮，不反馈错误我也不知道"
+severity: major
 
 ## Summary
 
 total: 1
 passed: 0
-issues: 0
-pending: 1
+issues: 1
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+- gap_id: G-03-1
+  truth: "存在开发用错误注入入口（调试触发），可按需构造合成错误走真实链路使卡片弹出，供日常验证与调试观察"
+  status: failed
+  reason: "User reported: 没有个专门启动调试的按钮，不反馈错误我也不知道"
+  severity: major
+  test: 1
+  artifacts: []
+  missing: []
