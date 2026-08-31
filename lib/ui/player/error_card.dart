@@ -18,8 +18,9 @@ import '../theme/tokens.dart';
 /// - **折叠态**：severity 色点 + message（l10nKey 解析）+ 媒体路径 basename
 ///   + D-01 计数徽标 + chevron 指示；
 /// - **展开态**：D-04 Phase 2 段序五段 —— 定位 → 源码行 → 调用栈 → 日志路径
-///   → 重复信息，长文本段 SingleChildScrollView + SelectableText（A2：栈硬
-///   上界 16384 字符，无需虚拟化）；
+///   → 重复信息，整体包在单一外层 SingleChildScrollView 内滚动（IN-02：
+///   删除内层同轴死滚动，SelectableText 附带自由文本选择；A2：栈硬上界
+///   16384 字符，无需虚拟化）；
 /// - **交互**：整卡点击切换折叠/展开（StatefulWidget 内部状态，无新状态库）；
 ///   一键复制诊断包（CARD-04/D-06，失败隔离）；徽标点击轮览历史错误
 ///   （D-01/D-11，宿主接线，纯视图偏移）；关闭按钮与 hit-test 宿主级
@@ -372,12 +373,11 @@ class _ErrorCardState extends State<ErrorCard> {
         SelectableText(location.sourceLines.join('\n'), style: _monoStyle),
       ],
       // ③ 调用栈：rawStackTrace 逐字符原样（terminal 语义，不二次处理）；
-      // 栈硬上界 16384 字符（A2），SingleChildScrollView 足够，SelectableText
+      // 栈硬上界 16384 字符（A2），外层展开区滚动视图足够（IN-02：内层同轴
+      // SingleChildScrollView 恒不可滚且与外层手势冲突，已删除），SelectableText
       // 附带自由文本选择。
       _sectionTitle(l10n.errorCardSectionStack),
-      SingleChildScrollView(
-        child: SelectableText(report.rawStackTrace, style: _monoStyle),
-      ),
+      SelectableText(report.rawStackTrace, style: _monoStyle),
       // ④ 日志路径：diagnosticLogPath 当前值；不可用 → 降级文案。
       _sectionTitle(l10n.errorCardSectionLogPath),
       Text(
