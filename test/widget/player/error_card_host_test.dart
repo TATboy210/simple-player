@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -9,6 +10,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/startup_timeline.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/error_feedback_settings.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
@@ -31,6 +33,26 @@ void main() {
     await ErrorReporterImpl.resetForTesting();
     ErrorCaptureSnapshot.I.resetForTesting();
     ErrorReporterImpl.init(effects: [ErrorCaptureSnapshot.I.record]);
+
+    // SET-01 门控测试隔离：复位设置 store 单例为默认值（默认开）并重绑
+    // settings 文件 seam 到系统临时目录下**不存在**的路径 —— 生产默认位置
+    // （cwd 旁 settings.json）与真实磁盘 I/O 被完全隔离；开关翻转的
+    // fire-and-forget 持久化静默失败（D-01），不污染工作区。
+    final settingsTmp = await Directory.systemTemp.createTemp(
+      'error_card_host_settings',
+    );
+    addTearDown(() async {
+      try {
+        await settingsTmp.delete(recursive: true);
+      } on FileSystemException {
+        // 清理失败不致命（临时目录由 OS 兜底回收）。
+      }
+    });
+    ErrorFeedbackSettings.I.resetForTesting(
+      settingsFile: () => File(
+        '${settingsTmp.path}${Platform.pathSeparator}settings.json',
+      ),
+    );
   });
 
   // 真实 App 组合根，走 windowInitError 降级文字态 home —— 避免构造
@@ -651,6 +673,149 @@ void main() {
         expect(find.byType(ErrorCard), findsNothing);
       },
     );
+  });
+
+  // ---------- SET-01 呈现门控（D-05）：开关只影响渲染，不动捕获/快照/落盘 ----------
+  //
+  // 语义四用例：off 同帧消失 / off 期间快照继续收 / on 恢复最新（含 off 期间
+  // 错误）/ 默认开（settings 缺失静默回退）。零 kernel 证明：off 期间
+  // ErrorCaptureSnapshot.record 照常接纳（record 从不查询任何开关），
+  // presentation 链照常推进。
+  group('SET-01 卡片开关呈现门控（D-05）', () {
+    testWidgets('toggle off hides the card the same frame and keeps the queue', (
+      tester,
+    ) async {
+      // Arrange：宿主就绪 + 注入一份错误使卡片可见。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      ErrorReporterImpl.I.reportBootstrapSafely(
+        StateError('开关前错误'),
+        StackTrace.current,
+      );
+      await tester.pump();
+      expect(find.byType(ErrorCard), findsOneWidget);
+
+      // Act：关闭开关（呈现门控）。
+      ErrorFeedbackSettings.I.setCardEnabled(false);
+      await tester.pump();
+
+      // Assert：同帧消失（D-05 立即生效，无退场动画）。
+      expect(find.byType(ErrorCard), findsNothing);
+      // Assert：reporter 队列未被消费 —— 关卡片不动队列（presentation.current
+      // 仍持有队首），证据链完整。
+      expect(ErrorReporterImpl.I.presentation.value.current, isNotNull);
+    });
+
+    testWidgets(
+      'reports keep flowing into snapshot and presenter while gated off',
+      (tester) async {
+        // Arrange：注入一份错误后关闭开关。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('关闭前错误'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        ErrorFeedbackSettings.I.setCardEnabled(false);
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsNothing);
+
+        // Act：off 状态下再注入一份新错误。
+        final snapshotBefore = ErrorCaptureSnapshot.I.reports.value.length;
+        final presentationBefore = ErrorReporterImpl.I.presentation.value;
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('关闭期间错误'),
+          StackTrace.current,
+        );
+        await tester.pump();
+
+        // Assert：快照继续接纳（record 从不查询任何开关 —— 零 kernel 前提）。
+        expect(
+          ErrorCaptureSnapshot.I.reports.value.length,
+          greaterThan(snapshotBefore),
+        );
+        // Assert：presenter 链照常更新（队列推进，pendingCount 增长）。
+        expect(
+          ErrorReporterImpl.I.presentation.value.pendingCount,
+          greaterThan(presentationBefore.pendingCount),
+        );
+        // Assert：卡片仍隐藏 —— 只落盘不弹卡的呈现侧证明（落盘侧由 04-01/
+        // 04-02 的 sink 用例与既有 sink 测试承载）。
+        expect(find.byType(ErrorCard), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'toggle on restores the newest report including off-period errors',
+      (tester) async {
+        // Arrange：注入错误一后关闭开关，再注入错误二（off 期间到达）。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('开启前错误'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        ErrorFeedbackSettings.I.setCardEnabled(false);
+        await tester.pump();
+        // 门控先隐藏 —— 快照保留机制是「开启恢复」语义的前提。
+        expect(find.byType(ErrorCard), findsNothing);
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('关闭期间错误'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsNothing);
+
+        // Act：重新开启开关。
+        ErrorFeedbackSettings.I.setCardEnabled(true);
+        await tester.pump();
+
+        // Assert：立即渲染快照最新报告（含 off 期间到达的那条 —— D-05
+        // 「开启→恢复显示(含队列中错误)」，快照保留机制天然满足）。
+        expect(find.byType(ErrorCard), findsOneWidget);
+        expect(find.textContaining('关闭期间错误'), findsOneWidget);
+      },
+    );
+
+    testWidgets('missing settings file keeps the card enabled by default', (
+      tester,
+    ) async {
+      // Arrange：模拟 settings.json 缺失 —— seam 指向不存在文件后 load，
+      // 静默回退默认值（D-01/04-01 已锁定的默认开语义）。
+      final missing = File(
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        'error-card-host-missing-${DateTime.now().microsecondsSinceEpoch}'
+        '${Platform.pathSeparator}settings.json',
+      );
+      ErrorFeedbackSettings.I.resetForTesting(settingsFile: () => missing);
+      // runAsync 包裹真实 I/O：testWidgets 的 FakeAsync zone 不会派发真实
+      // 文件事件，直接 await load() 会永不完成（RED 期实测 10 分钟超时）。
+      await tester.runAsync(() => ErrorFeedbackSettings.I.load());
+      expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isTrue);
+
+      // Act：挂载宿主并注入错误。
+      await tester.pumpWidget(
+        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+      );
+      await tester.pump();
+      ErrorReporterImpl.I.reportBootstrapSafely(
+        StateError('默认开'),
+        StackTrace.current,
+      );
+      await tester.pump();
+
+      // Assert：卡片正常显示（默认开启 —— 与 Phase 3 行为完全一致）。
+      expect(find.byType(ErrorCard), findsOneWidget);
+      expect(find.textContaining('默认开'), findsOneWidget);
+    });
   });
 }
 
