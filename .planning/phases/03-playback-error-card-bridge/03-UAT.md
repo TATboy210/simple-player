@@ -96,8 +96,17 @@ blocked: 0
   reason: "User reported: 按f1没用"
   severity: major
   test: 3
-  artifacts: []
-  missing: []
+  root_cause: "F1 的 KeyDownEvent 从未到达 KeyboardHandler._handleKeyEvent——焦点链 dead-keyboard 态:主焦点滞留在 handler Focus 子树之外(首要嫌疑=全屏进出循环后的焦点回落边界,player_video_controls.dart:466-468 自认的已知问题域);整条 F1→对话框代码链路经 22/22 单测 + 6 项组合复现测试证明正确,实机 error.log 零异常佐证『按键未到达』而非『到达后失败』"
+  artifacts:
+    - path: "lib/ui/player/keyboard_handler.dart"
+      issue: "非缺陷——脆弱点在 Focus(autofocus) 依赖焦点树冒泡,焦点态异常时全局快捷键整体失聪(Space/M 同死)"
+    - path: "lib/ui/player/player_video_controls.dart"
+      issue: "全屏循环焦点回落边界(:466-468 注释自认的已知问题域),焦点滞留的首要嫌疑点"
+  missing:
+    - "快捷键分发从 per-route Focus 冒泡改为 HardwareKeyboard.instance.addHandler 全局入口(UI 层单文件,保留 EditableText 守卫防输入框吞键),零 kernel 改动"
+    - "KernelLogger 埋点:F1 到达但焦点在子树外时留证"
+    - "回归测试:复现配方已录 .planning/debug/g03-3-f1-help-dialog-no-op.md"
+  debug_session: ".planning/debug/g03-3-f1-help-dialog-no-op.md"
 - gap_id: G-03-4
   truth: "调试注入入口(Ctrl+Shift+I 及其 F1 条目、l10n key)从源码移除"
   status: failed
