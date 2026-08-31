@@ -114,7 +114,7 @@ final class ErrorFeedbackSettings {
       logDirectory: state.value.logDirectory,
     );
     state.value = next;
-    _persistFuture = _persist(next);
+    _schedulePersist(next);
   }
 
   /// SET-02 日志目录写入：内存态立即更新，fire-and-forget 持久化。
@@ -126,7 +126,20 @@ final class ErrorFeedbackSettings {
       logDirectory: directory,
     );
     state.value = next;
-    _persistFuture = _persist(next);
+    _schedulePersist(next);
+  }
+
+  /// 排队一笔 fire-and-forget 持久化（WR-05 串行链）。
+  ///
+  /// 每笔写入接在前序之后，至多一个 [_atomicWrite] 在飞 —— 并发写同一
+  /// settings.json 的共享冲突（Windows errno-32 sharing violation 静默
+  /// 丢写）与三级降级「删活文件再 rename」竞态都被消除；前序失败（D-01
+  /// 吞没）经 onError 适配器维持链活性，绝不中断后续写入。
+  void _schedulePersist(ErrorFeedbackSettingsData next) {
+    final pending = _persistFuture;
+    _persistFuture = pending
+        .then<void>((_) {}, onError: (Object _) {})
+        .then((_) => _persist(next));
   }
 
   /// 最近一次 fire-and-forget 持久化的 Future —— 生产路径不等待；
@@ -151,6 +164,10 @@ final class ErrorFeedbackSettings {
 
   /// 原子写：tmp(flush) → rename（replace-on-existing）+ 四级降级链。
   ///
+  /// tmp 名唯一（WR-05）：pid + 微秒时间戳后缀 —— 任意两笔写入（含串行链
+  /// 之外的多进程/多实例并发源）永不共享同一 .tmp，杜绝共享冲突写丢失；
+  /// finally 清理只删本笔自己的 tmp，绝不误删他笔的有效文件。
+  ///
   /// Windows 实测语义（RESEARCH Pattern 3 / Pitfall 1）：rename 覆盖已存在
   /// 目标成立，但瞬态 errno-5（杀软/扫描器句柄锁）可使同一操作间歇性
   /// PathAccessException —— 降级链逐级收窄 `on FileSystemException`，任何
@@ -160,7 +177,9 @@ final class ErrorFeedbackSettings {
   /// 3. 仍失败 → 删除目标后重试 rename（实测有效的兜底形态）；
   /// 4. 最终兜底 → 直接 writeAsString 覆盖（非原子，但 D-01 使残缺无害）。
   Future<void> _atomicWrite(File target, String contents) async {
-    final tmp = File('${target.path}.tmp');
+    final tmp = File(
+      '${target.path}.tmp.$pid-${DateTime.now().microsecondsSinceEpoch}',
+    );
     try {
       await tmp.writeAsString(contents, flush: true);
       // 第一级：直接 rename（覆盖已存在目标）。
