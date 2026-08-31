@@ -4,14 +4,20 @@
 /// toggle (SET-01) and the diagnostic log directory (SET-02). State is exposed
 /// as a ValueNotifier (project convention, no new state library). Persistence
 /// is a portable `settings.json` beside the executable — debug runs keep it
-/// beside the project directory — and every read/write failure silently keeps
-/// the defaults (D-01) so startup and UI are never blocked.
+/// beside the project directory — with a two-tier fallback mirroring the log
+/// location chain (WR-06/D-02): when the primary directory is not writable
+/// (MSIX/ACL-protected install dirs), settings move to Application Support
+/// for the session, probed once at load and never per write. Every read/write
+/// failure silently keeps the defaults (D-01) so startup and UI are never
+/// blocked.
 library;
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+
+import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 
 /// 不可变错误反馈设置数据 —— settings.json 的内存形态（扁平 key + version）。
 final class ErrorFeedbackSettingsData {
@@ -78,14 +84,27 @@ final class ErrorFeedbackSettings {
   /// settings 文件 seam —— 可被 [resetForTesting] 重绑以隔离测试。
   File Function() _settingsFile;
 
-  /// 从 settings.json 加载设置；任何失败静默保持默认值（D-01）。
+  /// 会话内已解析的生效设置文件（WR-06）—— [load] 时探测一次并缓存，
+  /// 之后读写沿用同一层，绝不逐写探测（D-02 哲学：探测一次，记住层级）。
+  File? _resolvedSettingsFile;
+
+  /// 从生效层的 settings.json 加载设置；任何失败静默保持默认值（D-01）。
   ///
-  /// Side effect: settings.json 的 I/O 读取；成功时整体更新 [state]。
+  /// [applicationSupportDirectory] 为回退层 provider（WR-06，D-02 哲学
+  /// 镜像）：层 1（exe 旁，debug 为项目目录旁）目录经**单次**写入探测
+  /// 不可写时（MSIX/ACL 保护目录），改用 Application Support 旁
+  /// settings.json 并为本次会话记住该层；provider 未注入或两层都不可用
+  /// 时维持层 1 文件对象（读写失败静默回默认值，绝不阻断启动）。
+  /// Side effect: 层级探测的临时文件 I/O + settings.json 的读取；成功时
+  /// 整体更新 [state]。
   /// 形状校验模板循 source_line_reader.dart:236-268（is! Map 守卫承重：
   /// `[1,2]` 解码为 List 而非 Map；空串/尾随垃圾抛 FormatException）。
-  Future<void> load() async {
+  Future<void> load({
+    ApplicationSupportDirectoryProvider? applicationSupportDirectory,
+  }) async {
+    final file = await _resolveSettingsFile(applicationSupportDirectory);
     try {
-      final text = await _settingsFile().readAsString();
+      final text = await file.readAsString();
       final Object? decoded = jsonDecode(text);
       if (decoded is! Map<String, Object?>) {
         // 形状错误（List/null 等）→ 静默回退默认值。
@@ -150,17 +169,66 @@ final class ErrorFeedbackSettings {
   @visibleForTesting
   Future<void> get pendingPersist => _persistFuture;
 
+  /// 解析本次会话的生效设置文件（WR-06 两层回退，D-02 哲学镜像）。
+  ///
+  /// 层 1 exe 旁（debug 为项目目录旁）：对该目录做**一次**「create +
+  /// 临时文件探测」（复用 kernel 的 validateConfiguredDirectory 单一
+  /// 实现，无第二份探测逻辑），可写即用；层 2 Application Support：层 1
+  /// 不可写且 provider 注入时改用 AS 旁 settings.json。两层都不可用 →
+  /// 维持层 1 文件对象（D-01：读写失败静默回默认值，绝不阻断）。结果
+  /// 缓存于 [_resolvedSettingsFile]，每会话至多探测一次。
+  Future<File> _resolveSettingsFile(
+    ApplicationSupportDirectoryProvider? applicationSupportDirectory,
+  ) async {
+    final cached = _resolvedSettingsFile;
+    if (cached != null) {
+      return cached;
+    }
+    final primary = _settingsFile();
+    if (await _isDirectoryWritable(primary.parent)) {
+      return _resolvedSettingsFile = primary;
+    }
+    final asProvider = applicationSupportDirectory;
+    if (asProvider != null) {
+      try {
+        final supportDirectory = await asProvider();
+        if (await _isDirectoryWritable(supportDirectory)) {
+          return _resolvedSettingsFile = File(
+            '${supportDirectory.path}${Platform.pathSeparator}settings.json',
+          );
+        }
+      } on Exception {
+        // AS provider 失败（插件/平台异常）→ 维持层 1（D-01 静默）。
+      }
+    }
+    return _resolvedSettingsFile = primary;
+  }
+
+  /// 目录可写性的单次探测 —— 复用 kernel 的 validateConfiguredDirectory
+  ///（「校验即证明可写」单一实现）；Valid 即可写，Invalid（含探测失败）
+  /// 一律视为不可写。绝不抛出。
+  static Future<bool> _isDirectoryWritable(Directory directory) async {
+    final validation = await ErrorLogLocation.validateConfiguredDirectory(
+      directory.path,
+    );
+    return validation is ConfiguredDirectoryValid;
+  }
+
   /// 序列化并落盘当前设置：原子写 + 保存失败静默吞没（D-01）。
   ///
   /// 任何失败都不向调用方抛出、绝不回滚内存态（window_persistence.dart
   /// 的 on Exception 静默模板）。
   Future<void> _persist(ErrorFeedbackSettingsData next) async {
     try {
-      await _atomicWrite(_settingsFile(), _encode(next));
+      await _atomicWrite(_effectiveSettingsFile(), _encode(next));
     } on Exception {
       // 保存失败静默（D-01）——残缺文件下次 load 静默回退默认值。
     }
   }
+
+  /// 当前生效设置文件 —— 会话内已解析层级优先（WR-06）；未执行 [load] 的
+  /// 路径（纯写场景与既有测试形态）退回层 1 默认对象，行为与既有单层一致。
+  File _effectiveSettingsFile() => _resolvedSettingsFile ?? _settingsFile();
 
   /// 原子写：tmp(flush) → rename（replace-on-existing）+ 四级降级链。
   ///
@@ -233,12 +301,15 @@ final class ErrorFeedbackSettings {
 
   /// 测试隔离：复位内存态为默认值并可选重绑 settings 文件 seam。
   ///
+  /// 会话层级缓存一并复位（跨用例残留会让后续用例写到错误层 —— 与
+  /// notifier 同一复位理由）。
   /// 禁止生产路径调用（循 ErrorReporterImpl.resetForTesting 惯例）。
   @visibleForTesting
   void resetForTesting({File Function()? settingsFile}) {
     if (settingsFile != null) {
       _settingsFile = settingsFile;
     }
+    _resolvedSettingsFile = null;
     state.value = const ErrorFeedbackSettingsData();
   }
 }
