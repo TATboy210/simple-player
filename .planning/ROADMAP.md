@@ -128,7 +128,8 @@ Plans:
 
 ### Phase 4: 错误反馈设置
 
-**Goal**: 用户可在设置界面持久选择是否显示错误卡片，并安全地配置诊断日志输出位置而不削弱捕获和落盘。
+**Goal**: As a player user, I want to toggle the error card and configure the diagnostic log location in settings with persistence and safe fallback, so that feedback behavior fits my workflow without weakening capture.
+(中文原意：用户可在设置界面持久选择是否显示错误卡片，并安全地配置诊断日志输出位置而不削弱捕获和落盘。)
 **Mode:** mvp
 **Depends on**: Phase 3
 **Requirements**: SET-01, SET-02, SET-03
