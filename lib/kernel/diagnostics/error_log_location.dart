@@ -36,7 +36,8 @@ final class ErrorLogLocationResolved extends ErrorLogLocationResult {
   /// The prepared `logs/error.log` target (configured tier: directly under it).
   final File file;
 
-  /// 配置层被尝试且失败时携带的回退原因（该层收窄捕获的异常对象）；
+  /// 配置层被尝试且失败时携带的回退原因：探测/创建失败为该层收窄捕获的
+  /// 异常对象，形态拒绝（相对路径/UNC 等，WR-03）为封闭原因枚举值；
   /// 配置层缺省或胜出时为 null。供设置 UI 行内呈现回退原因（D-04）。
   final Object? configuredFailure;
 }
@@ -64,8 +65,9 @@ enum ConfiguredDirectoryFailure {
   /// 目录校验只做字符级防御，路径遍历交由探测与封闭写路径约束）。
   invalidCharacters,
 
-  /// UNC 网络路径（\\server\share）—— A3 采纳：v1 拒绝并文档化，用户可
-  /// 后续放开；断网的驱动器会让诊断证据静默不可达，v1 选择拒收。
+  /// UNC 网络路径（\\server\share 与 //server/share 两种分隔符形态）——
+  /// A3 采纳：v1 拒绝并文档化，用户可后续放开；断网的驱动器会让诊断
+  /// 证据静默不可达，v1 选择拒收。
   uncPathUnsupported,
 
   /// 超过 [ErrorLogLocation.maxConfiguredPathLength] 的极端输入。
@@ -140,28 +142,38 @@ final class ErrorLogLocation {
     try {
       // 层 1：配置目录（settings.logDirectory）——空串/null 跳层
       //（'' = 走默认链，D-01 语义），失败不阻断但携带回退原因（D-02/D-04）。
+      // 配置值与 UI 路径共用同一校验实现（WR-03）：trim/形态/UNC/长度/探测
+      // 全部经 validateConfiguredDirectory，杜绝手编 settings.json 的空白、
+      // 相对路径、UNC 等畸形值绕过校验直达文件系统；纯空白值按 '' 语义
+      // 处理（与 store 的空配置同义，静默走默认链）。
       final configured = configuredDirectory;
-      if (configured != null && configured.isNotEmpty) {
-        final configuredDirectory = Directory(configured);
-        final failure = await _prepareTier(configuredDirectory, probe);
-        if (failure == null) {
-          return ErrorLogLocationResolved(_logFileUnder(configuredDirectory));
-        }
-        return await _resolveDefaultChain(
-          probe,
-          applicationSupportDirectory,
-          executableDirectory,
-          configuredFailure: failure.error,
+      if (configured != null && configured.trim().isNotEmpty) {
+        final validation = await validateConfiguredDirectory(
+          configured,
+          writable: probe,
         );
+        switch (validation) {
+          case ConfiguredDirectoryValid(:final directory):
+            return ErrorLogLocationResolved(_logFileUnder(directory));
+          case ConfiguredDirectoryInvalid(:final reason, :final error):
+            return await _resolveDefaultChain(
+              probe,
+              applicationSupportDirectory,
+              executableDirectory,
+              // 形态拒绝（相对路径/UNC 等）无原始异常 —— 以封闭原因枚举
+              // 本身作为 contained 回退证据，保证 D-04 回退通知对畸形配置
+              // 同样触发（WR-03）。
+              configuredFailure: error ?? reason,
+            );
+        }
       }
       return await _resolveDefaultChain(
         probe,
         applicationSupportDirectory,
         executableDirectory,
       );
-    } on FileSystemException catch (error, stackTrace) {
-      return ErrorLogLocationUnavailable(error, stackTrace);
     } on IOException catch (error, stackTrace) {
+      // FileSystemException extends IOException —— 单一子句覆盖（IN-05）。
       return ErrorLogLocationUnavailable(error, stackTrace);
     } on Exception catch (error, stackTrace) {
       return ErrorLogLocationUnavailable(error, stackTrace);
@@ -171,14 +183,18 @@ final class ErrorLogLocation {
   /// 单层校验用户配置的日志目录 —— 「校验即证明 sink 可用」（SET-02/T-04-02-01）。
   ///
   /// 校验顺序（形态拒绝先行，探测收尾）：
-  /// 1. trim 后为空或非绝对路径 → [ConfiguredDirectoryFailure.notAbsolute]；
+  /// 1. trim 后为空 → [ConfiguredDirectoryFailure.notAbsolute]；
   /// 2. 含 null 字节/控制字符（codeUnits < 0x20 或 == 0x7F）→
   ///    [ConfiguredDirectoryFailure.invalidCharacters]；
-  /// 3. 以 `\\` 开头的 UNC → [ConfiguredDirectoryFailure.uncPathUnsupported]
-  ///    （A3：v1 拒绝并文档化）；
-  /// 4. 长度超过 [maxConfiguredPathLength] →
+  /// 3. 以 `\\` 或 `//` 开头的 UNC →
+  ///    [ConfiguredDirectoryFailure.uncPathUnsupported]
+  ///    （A3：v1 拒绝并文档化；两种分隔符形态都拦截 —— WR-04。置于
+  ///    isAbsolute 判定**之前**：`//server/share` 在 Dart 3.13 Windows 下
+  ///    isAbsolute=false，若先查绝对性会误报 notAbsolute 而非 UNC 原因）；
+  /// 4. 非绝对路径 → [ConfiguredDirectoryFailure.notAbsolute]；
+  /// 5. 长度超过 [maxConfiguredPathLength] →
   ///    [ConfiguredDirectoryFailure.pathTooLong]；
-  /// 5. 复用链层的「create(recursive) + 临时文件探测」私有帮助函数做单层
+  /// 6. 复用链层的「create(recursive) + 临时文件探测」私有帮助函数做单层
   ///    准备与探测，任何 FileSystemException/IOException →
   ///    [ConfiguredDirectoryFailure.notWritable]（原始异常 contained 随行）。
   ///
@@ -188,7 +204,7 @@ final class ErrorLogLocation {
     WritableDirectoryProbe? writable,
   }) async {
     final trimmed = configuredDirectory.trim();
-    if (trimmed.isEmpty || !Directory(trimmed).isAbsolute) {
+    if (trimmed.isEmpty) {
       return const ConfiguredDirectoryInvalid(
         ConfiguredDirectoryFailure.notAbsolute,
       );
@@ -198,9 +214,16 @@ final class ErrorLogLocation {
         ConfiguredDirectoryFailure.invalidCharacters,
       );
     }
-    if (trimmed.startsWith('\\\\')) {
+    if (trimmed.startsWith('\\\\') || trimmed.startsWith('//')) {
+      // A3：UNC 网络路径拒绝 —— 两种分隔符形态统一拦截（WR-04）：
+      // 断网的共享会让诊断证据静默不可达，v1 拒收并文档化。
       return const ConfiguredDirectoryInvalid(
         ConfiguredDirectoryFailure.uncPathUnsupported,
+      );
+    }
+    if (!Directory(trimmed).isAbsolute) {
+      return const ConfiguredDirectoryInvalid(
+        ConfiguredDirectoryFailure.notAbsolute,
       );
     }
     if (trimmed.length > maxConfiguredPathLength) {
@@ -282,9 +305,8 @@ final class ErrorLogLocation {
         FileSystemException('writability probe failed', candidate.path),
         StackTrace.current,
       );
-    } on FileSystemException catch (error, stackTrace) {
-      return _TierFailure(error, stackTrace);
     } on IOException catch (error, stackTrace) {
+      // FileSystemException extends IOException —— 单一子句覆盖（IN-05）。
       return _TierFailure(error, stackTrace);
     } on Exception catch (error, stackTrace) {
       return _TierFailure(error, stackTrace);
