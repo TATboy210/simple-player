@@ -630,4 +630,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorCardCycleTooltip => 'Cycle between errors';
+
+  @override
+  String get logFallbackNotice => 'Log fell back to the default location';
 }

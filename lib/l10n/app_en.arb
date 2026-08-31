@@ -467,5 +467,9 @@
   "errorCardLocationUnavailable": "Location unavailable",
   "@errorCardLocationUnavailable": { "description": "Fallback text when no trusted source location was extracted" },
   "errorCardCycleTooltip": "Cycle between errors",
-  "@errorCardCycleTooltip": { "description": "Tooltip for the badge used to cycle through captured errors" }
+  "@errorCardCycleTooltip": { "description": "Tooltip for the badge used to cycle through captured errors" },
+  "logFallbackNotice": "Log fell back to the default location",
+  "@logFallbackNotice": {
+    "description": "One-shot OSD notice shown when the configured diagnostic log directory failed validation and the location chain fell back to the default location"
+  }
 }

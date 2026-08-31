@@ -625,4 +625,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get errorCardCycleTooltip => '轮览错误';
+
+  @override
+  String get logFallbackNotice => '日志已回退到默认位置';
 }

@@ -221,5 +221,6 @@
   "errorCardSectionRepeats": "重复 {count} 次",
   "errorCardLogUnavailable": "日志文件不可用",
   "errorCardLocationUnavailable": "定位不可用",
-  "errorCardCycleTooltip": "轮览错误"
+  "errorCardCycleTooltip": "轮览错误",
+  "logFallbackNotice": "日志已回退到默认位置"
 }
