@@ -236,12 +236,6 @@ abstract class AppLocalizations {
   /// **'Play/Pause'**
   String get shortcutMediaKeys;
 
-  /// Keyboard shortcut description for the Ctrl+Shift+I debug error-injection shortcut
-  ///
-  /// In en, this message translates to:
-  /// **'Inject test error (debug)'**
-  String get shortcutDebugInjectError;
-
   /// Settings dialog title and tooltip
   ///
   /// In en, this message translates to:
