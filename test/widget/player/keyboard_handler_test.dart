@@ -276,4 +276,39 @@ void main() {
       expect(tracker.showHelp, 1);
     });
   });
+
+  // ── G-03-4：调试注入入口已移除（用后即撤，03-05 验证使命完成）──
+
+  group('KeyboardHandler debug injection entry removed (G-03-4)', () {
+    test('F1 help single source omits the debug injection entry', () {
+      final l10n = lookupAppLocalizations(const Locale('zh'));
+
+      final keyLabels = shortcutDefinitions(
+        l10n,
+      ).map(((String, String) item) => item.$1);
+
+      expect(keyLabels, isNot(contains('Ctrl+Shift+I')));
+    });
+
+    testWidgets('Ctrl+Shift+I combo press triggers no callback', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+
+      // 组合键序列：control 按下 → shift 按下 → keyI 按下/抬起，随后按
+      // 逆序释放修饰键，不留悬挂修饰态（HardwareKeyboard 全局状态）。
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyI);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyI);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+
+      // 入口已移除：全部回调计数保持 0（RED 时现行注入分支会触碰未初始化
+      // 的 ErrorReporterImpl.I 抛 StateError，本用例失败）。
+      expect(tracker.playPause, 0);
+      expect(tracker.showHelp, 0);
+      expect(tracker.toggleMute, 0);
+    });
+  });
 }
