@@ -47,6 +47,15 @@ final class DiagnosticLogTarget {
   final ValueNotifier<Object?> pendingFallbackNotice =
       ValueNotifier<Object?>(null);
 
+  /// 重定向串行队列（WR-01）—— 每次 apply 接在前序之后执行。
+  ///
+  /// validate→save→dispose→activate 全程至多一个在飞：dispose→activate 的
+  /// 换位序列绝不与其他 apply 交错（否则「A.dispose→B.dispose→A.activate→
+  /// B.activate(被一次性锁吞)」会让 sink 停在旧落点而 UI 报告新落点——诊断
+  /// 证据错位）。onError 吞没仅为维持链活性：apply 自身已把外部失败折叠为
+  /// typed Invalid，绝不向队列泄漏异常。
+  Future<void> _retargetQueue = Future<void>.value();
+
   /// 组合根同步绑定：main 在 runApp 之前调用一次，携带两个目录 provider。
   ///
   /// 重复 attach 静默忽略（先绑定者胜）——组合根契约是只调用一次，防御性
@@ -67,9 +76,11 @@ final class DiagnosticLogTarget {
   /// 唯一激活实现 —— 启动激活与重定向共用（research 单一激活实现 caveat）。
   ///
   /// Side effect: 创建 [ErrorLogFileSink] 并经 delegate.activate 换入（activate
-  /// 的一次性锁前置条件由 `_swapTo` 的 dispose 复位保证）；随后同步写
-  /// [effectiveLogPath]，configuredFailure 非空时将 [pendingFallbackNotice]
-  /// 置值一次（仅 null→值）。
+  /// 的一次性锁前置条件由 `_swapTo` 的 dispose 复位保证）；随后回读
+  /// delegate 的实际激活态写入 [effectiveLogPath]（WR-01：并发竞争下
+  /// activate 可能被一次性锁吞掉，此时 delegate.logPath 保留真实生效的
+  /// 旧落点 —— UI 权威读数必须与 delegate 一致，绝不无条件断言 file.path），
+  /// configuredFailure 非空时将 [pendingFallbackNotice] 置值一次（仅 null→值）。
   void activateResolved({required File file, Object? configuredFailure}) {
     final effect = _effect;
     if (effect == null) {
@@ -81,7 +92,7 @@ final class DiagnosticLogTarget {
       sink: ErrorLogFileSink(file: file),
       resolvedPath: file.path,
     );
-    effectiveLogPath.value = file.path;
+    effectiveLogPath.value = effect.logPath.value;
     if (configuredFailure != null && pendingFallbackNotice.value == null) {
       pendingFallbackNotice.value = configuredFailure;
     }
@@ -102,11 +113,21 @@ final class DiagnosticLogTarget {
 
   /// 校验→保存→换位的安全重定向入口（SET-02 配置变更面）。
   ///
+  /// 并发安全（WR-01）：重叠发起的多次 apply 经 [_retargetQueue] 串行执行，
+  /// 每次调用的返回值仍归属自身调用方；前序 apply 完成前，后序在队列中等待。
   /// 非空输入：校验失败原样返回 Invalid —— 三不：不保存 / 不换位 / 不通知；
   /// 通过后（a）与当前有效落点同目录时幂等返回（无换位副作用），
   /// （b）否则先保存（D-03 discretion：校验通过即保存）再经 [_swapTo] 换位。
   /// 空输入：保存 '' 后走默认三层链（跳过配置层），链结果换位。
-  Future<ConfiguredDirectoryValidation> apply(String directory) async {
+  Future<ConfiguredDirectoryValidation> apply(String directory) {
+    final job = _retargetQueue.then((_) => _applyNow(directory));
+    // Future<void> 适配器：吞没错误维持队列活性（apply 不抛出，防御性兜底）。
+    _retargetQueue = job.then<void>((_) {}, onError: (Object _) {});
+    return job;
+  }
+
+  /// 单次重定向协议体 —— 仅由 [apply] 在串行队列内调用。
+  Future<ConfiguredDirectoryValidation> _applyNow(String directory) async {
     final trimmed = directory.trim();
     if (trimmed.isEmpty) {
       return _applyDefaultChain();
@@ -185,7 +206,9 @@ final class DiagnosticLogTarget {
 
   /// 测试隔离：重绑 effect/provider seam 并清空两个 notifier。
   ///
-  /// 非空参数覆盖重绑、空参数保留原值；notifier 恒复位初始态。
+  /// 非空参数覆盖重绑、空参数保留原值；notifier 恒复位初始态；串行队列
+  /// 恒复位为空链（会话级状态，跨用例残留的死 zone Future 会卡死后续
+  /// apply —— 与 notifier 同一复位理由）。
   /// 禁止生产路径调用（循 resetForTesting 惯例）。
   @visibleForTesting
   void resetForTesting({
@@ -202,6 +225,7 @@ final class DiagnosticLogTarget {
     if (executableDirectory != null) {
       _exeProvider = executableDirectory;
     }
+    _retargetQueue = Future<void>.value();
     effectiveLogPath.value = null;
     pendingFallbackNotice.value = null;
   }

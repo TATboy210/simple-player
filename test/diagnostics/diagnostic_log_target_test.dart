@@ -168,6 +168,38 @@ void main() {
       expect(delegate.logPath.value, newFile.path);
     });
 
+    test('overlapping applies serialize; final target is the last request',
+        () async {
+      // Arrange — 激活旧落点，准备两个真实可写的新目录。
+      target.activateResolved(file: oldFile);
+      final dirA = Directory('${root.path}${Platform.pathSeparator}race-a');
+      final dirB = Directory('${root.path}${Platform.pathSeparator}race-b');
+      final fileA = nextFileOf(dirA);
+      final fileB = nextFileOf(dirB);
+
+      // Act — 两个 apply 重叠发起（第二个不等第一个完成），校验含真实
+      // create+探测 I/O，恰好构成 WR-01 的交错窗口。
+      final first = target.apply(dirA.path);
+      final second = target.apply(dirB.path);
+      final firstResult = await first;
+      final secondResult = await second;
+
+      // Assert — 串行化保证最终落点是第二次请求：delegate 与 UI 权威读数
+      // 一致（不出现「sink 停在 A 而 UI 报告 B」的错位）。
+      expect(firstResult, isA<ConfiguredDirectoryValid>());
+      expect(secondResult, isA<ConfiguredDirectoryValid>());
+      expect(delegate.logPath.value, fileB.path);
+      expect(target.effectiveLogPath.value, fileB.path);
+      expect(ErrorFeedbackSettings.I.state.value.logDirectory, dirB.path);
+      // 无证据错位：后续记录只落入第二次请求的文件，首个目标从未被写入。
+      delegate.record(
+        _report(eventId: 'event-race', message: 'race-evidence'),
+        ReportAcceptance.newReport,
+      );
+      await _waitForFileContains(fileB, 'race-evidence');
+      expect(fileA.existsSync(), isFalse);
+    });
+
     test('invalid path: no save, no swap, no notice; old sink keeps serving',
         () async {
       // Arrange
