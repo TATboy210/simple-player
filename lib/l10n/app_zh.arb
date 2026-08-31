@@ -231,6 +231,7 @@
   "logPathValidatingStatus": "校验中…",
   "logPathValidStatus": "目录可写",
   "logPathInvalidStatus": "无法写入该目录",
+  "logPathPickerFailureStatus": "无法打开目录选择器",
   "logFallbackReasonPrefix": "已回退到默认位置",
-  "logEffectivePathLabel": "当前有效路径"
+  "logEffectivePathLabel": "当前有效路径：{path}"
 }

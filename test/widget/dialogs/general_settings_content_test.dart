@@ -303,4 +303,38 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('picker failure shows a dedicated inline status (IN-02)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildSubject(directoryPicker: () async => throw Exception('picker boom')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('settings-log-path-browse')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 30));
+
+    // Assert — picker 自身失败不复用 notWritable 文案（IN-02），且无任何
+    // 校验/保存/重定向副作用。
+    expect(find.text('无法打开目录选择器'), findsOneWidget);
+    expect(find.text('无法写入该目录'), findsNothing);
+    expect(DiagnosticLogTarget.I.effectiveLogPath.value, activeFile.path);
+    expect(ErrorFeedbackSettings.I.state.value.logDirectory, isEmpty);
+  });
+
+  testWidgets('fallback detection is case-insensitive (IN-01)', (tester) async {
+    await tester.pumpWidget(buildSubject());
+
+    // Arrange — 配置目录 = 有效落点父目录的大小写翻转变体。
+    final parent = activeFile.parent.path;
+    final flipped = parent == parent.toUpperCase()
+        ? parent.toLowerCase()
+        : parent.toUpperCase();
+    ErrorFeedbackSettings.I.setLogDirectory(flipped);
+    await tester.pump();
+
+    // Assert — Windows 大小写不敏感：同目录不同大小写不应误报「已回退」。
+    expect(find.text('已回退到默认位置'), findsNothing);
+  });
 }

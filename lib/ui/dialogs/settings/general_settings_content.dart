@@ -47,6 +47,13 @@ final class _InvalidStatus extends _PathStatus {
   final ConfiguredDirectoryFailure reason;
 }
 
+/// 目录选择器自身失败（IN-02）—— 与目录校验失败分型：picker 抛异常时
+/// 未发生任何目录校验，沿用 notWritable 文案会误导用户去怀疑一个并未
+/// 参与校验的目录。
+final class _PickerFailureStatus extends _PathStatus {
+  const _PickerFailureStatus();
+}
+
 /// 「通用」分区内容 —— 错误卡片开关行 + 日志目录路径行。
 ///
 /// 开关行翻转即生效并 fire-and-forget 持久化（SET-01/03）；路径行手输防抖
@@ -142,14 +149,13 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
           ? picker()
           : _pickDirectoryWithPlugin());
     } on Exception catch (error) {
-      // picker 异常收窄捕获：行内报错不抛出（T-04-04-02）。
+      // picker 异常收窄捕获：行内报错不抛出（T-04-04-02）。分型为 picker
+      // 自身失败（IN-02），不复用 notWritable 文案误导用户。
       debugPrint('[general_settings_content] directory picker failed: $error');
       if (!mounted) {
         return;
       }
-      _pathStatus.value = const _InvalidStatus(
-        ConfiguredDirectoryFailure.notWritable,
-      );
+      _pathStatus.value = const _PickerFailureStatus();
       return;
     }
     if (!mounted) {
@@ -278,14 +284,17 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
 
   /// 「已回退」呈现判断 —— best-effort 展示启发（非正确性门）：配置目录非空
   /// 且有效路径不在其之下即视为回退。落点形态固定为 `<dir><sep>error.log`
-  ///（与协调器 _logFileIn 同构），前缀比对在构造层即一致，无需归一化。
+  ///（与协调器 _logFileIn 同构），前缀比对在构造层即一致，无需归一化；
+  /// 两侧统一小写后比对（IN-01）—— Windows 文件系统大小写不敏感，用户
+  /// 手输的大小写与解析路径不一致时不应误报「已回退」。
   static bool _fellBack(String configured, String? effectivePath) {
-    final base = configured.trim();
+    final base = configured.trim().toLowerCase();
     if (base.isEmpty || effectivePath == null) {
       return false;
     }
-    return !(effectivePath == base ||
-        effectivePath.startsWith('$base${Platform.pathSeparator}'));
+    final effective = effectivePath.toLowerCase();
+    return !(effective == base ||
+        effective.startsWith('$base${Platform.pathSeparator}'));
   }
 }
 
@@ -408,6 +417,10 @@ class _PathStatusLine extends StatelessWidget {
           l10n.logPathInvalidStatus,
           Tokens.danger,
         ),
+      _PickerFailureStatus() => _StatusText(
+          l10n.logPathPickerFailureStatus,
+          Tokens.danger,
+        ),
     };
   }
 }
@@ -435,7 +448,8 @@ class _EffectivePathLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${l10n.logEffectivePathLabel}：$path',
+          // 分隔符（全角/半角冒号）由 ARB 文案承载（IN-04），不硬编码。
+          l10n.logEffectivePathLabel(path),
           style: const TextStyle(
             color: Tokens.textSecondary,
             fontSize: Tokens.fontCaption,

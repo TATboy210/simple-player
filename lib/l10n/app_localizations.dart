@@ -1322,17 +1322,23 @@ abstract class AppLocalizations {
   /// **'Cannot write to this directory'**
   String get logPathInvalidStatus;
 
+  /// Inline status shown when the native directory picker itself failed (distinct from a directory validation failure)
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the directory picker'**
+  String get logPathPickerFailureStatus;
+
   /// Inline notice shown when the configured log directory failed and the default location chain took over
   ///
   /// In en, this message translates to:
   /// **'Fell back to the default location'**
   String get logFallbackReasonPrefix;
 
-  /// Label before the currently effective diagnostic log file path (always visible, D-04 first channel)
+  /// Full line showing the currently effective diagnostic log file path (always visible, D-04 first channel)
   ///
   /// In en, this message translates to:
-  /// **'Effective log location'**
-  String get logEffectivePathLabel;
+  /// **'Effective log location: {path}'**
+  String logEffectivePathLabel(Object path);
 }
 
 class _AppLocalizationsDelegate
