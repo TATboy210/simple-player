@@ -7,6 +7,7 @@
 /// effective-path / fallback-reason display.
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -102,7 +103,12 @@ void main() {
           Directory('${root.path}${Platform.pathSeparator}exe'),
     );
     DiagnosticLogTarget.I.activateResolved(file: activeFile);
-    addTearDown(delegate.dispose);
+    // dispose 的内部 await 链（drain）在 body 结束后的 teardown 阶段无 pump
+    // 推进 —— FakeAsync 微任务饥饿会让 await 永不完成（10 分钟超时实证）。
+    // fire-and-forget：dispose 的同步段立即复位 activate 一次性锁与 notifier，
+    // sink 不持 OS 句柄，残余链无害；下一用例 setUp 的 resetForTesting 重绑。
+    addTearDown(() => unawaited(delegate.dispose()));
+    addTearDown(() => ErrorFeedbackSettings.I.resetForTesting());
   });
 
   testWidgets('toggle row flips the store and persists to settings.json', (
@@ -163,8 +169,10 @@ void main() {
     tester,
   ) async {
     // 指向「文件」的路径 —— 目录 create 遇同名文件占据，探测必败。
+    // 写文件用同步 I/O：testWidgets body 的 FakeAsync zone 不派发真实文件
+    // 事件，await 真实 I/O 会永不完成（04-03 实证陷阱）。
     final fileAsPath = File('${root.path}${Platform.pathSeparator}plain.txt');
-    await fileAsPath.writeAsString('x');
+    fileAsPath.writeAsStringSync('x');
     await tester.pumpWidget(buildSubject());
 
     await tester.enterText(find.byType(TextField), fileAsPath.path);
@@ -186,20 +194,27 @@ void main() {
     await tester.pumpWidget(buildSubject());
 
     // 先配置到自定义目录，再清空 → 应回默认链（'' = reset 语义）。
+    // 第一段等待以「有效路径已换位」为准（swap 完成 = 链完全落定）——
+    // store 先于 swap 更新，若在其间继续输入会与未完成的换位并发竞争。
     await tester.enterText(find.byType(TextField), writable.path);
     await tester.pump(const Duration(milliseconds: 30));
     await pumpUntil(
       tester,
-      () => ErrorFeedbackSettings.I.state.value.logDirectory == writable.path,
+      () => DiagnosticLogTarget.I.effectiveLogPath.value ==
+          '${writable.path}${Platform.pathSeparator}'
+          '${ErrorLogLocation.logFileName}',
     );
 
     await tester.enterText(find.byType(TextField), '');
     await tester.pump(const Duration(milliseconds: 30));
+    // 条件以「链解析出的最终落点」为准 —— store=='' 同步先置，effective 换位
+    // 完成才算提交链落定（避免 swap 未完成即返回的竞态）。
     await pumpUntil(
       tester,
-      () => ErrorFeedbackSettings.I.state.value.logDirectory == '' &&
-          DiagnosticLogTarget.I.effectiveLogPath.value != null &&
-          DiagnosticLogTarget.I.effectiveLogPath.value != activeFile.path,
+      () => DiagnosticLogTarget.I.effectiveLogPath.value ==
+          '${root.path}${Platform.pathSeparator}exe'
+          '${Platform.pathSeparator}${ErrorLogLocation.logsDirectoryName}'
+          '${Platform.pathSeparator}${ErrorLogLocation.logFileName}',
     );
 
     // 默认链解析：注入 exe 根（root/exe，校验时现场创建）logs/error.log。
@@ -265,8 +280,11 @@ void main() {
     await tester.pump();
 
     // D-04 第一通道：当前有效路径常显 + 回退原因。
-    expect(find.textContaining('当前有效路径'), findsOneWidget);
-    expect(find.textContaining(activeFile.path), findsOneWidget);
+    // 完整行 = 标签 + 路径单匹配（输入框初值同路径但无标签前缀，不误配）。
+    expect(
+      find.textContaining('当前有效路径：${activeFile.path}'),
+      findsOneWidget,
+    );
     expect(find.text('已回退到默认位置'), findsOneWidget);
   });
 }
