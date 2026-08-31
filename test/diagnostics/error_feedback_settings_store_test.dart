@@ -204,14 +204,46 @@ void main() {
         store.setLogDirectory(root.path);
         await store.pendingPersist;
 
-        // Assert — 目标文件存在且内容可解析；settings.json.tmp 不残留。
+        // Assert — 目标文件存在且内容可解析；任何形态的 tmp 都不残留
+        //（WR-05 后 tmp 名唯一，断言扩为全目录无 .tmp 痕迹）。
         expect(settingsFile.existsSync(), isTrue);
         final decoded = jsonDecode(settingsFile.readAsStringSync());
         expect(decoded['version'], 1);
         expect(decoded['logDirectory'], root.path);
         expect(decoded['errorCardEnabled'], isTrue);
-        final tmp = File('${settingsFile.path}.tmp');
-        expect(tmp.existsSync(), isFalse);
+        final residue = root
+            .listSync()
+            .where((entry) => entry.path.contains('.tmp'))
+            .toList();
+        expect(residue, isEmpty);
+      });
+
+      test('rapid successive persists serialize; final state is the last write',
+          () async {
+        // Arrange — 交叉开关与目录两路写入，模拟高频设置变更。
+        final store = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        final dirA = '${root.path}${Platform.pathSeparator}a';
+        final dirB = '${root.path}${Platform.pathSeparator}b';
+
+        // Act — 三笔背靠背发起（不等待前一笔完成）。
+        store.setLogDirectory(dirA);
+        store.setCardEnabled(false);
+        store.setLogDirectory(dirB);
+        await store.pendingPersist;
+
+        // Assert — 串行链保证最终状态 = 最后一笔（WR-05）；无 tmp 残留。
+        final decoded =
+            jsonDecode(await settingsFile.readAsString())
+                as Map<String, Object?>;
+        expect(decoded['logDirectory'], dirB);
+        expect(decoded['errorCardEnabled'], isFalse);
+        final residue = root
+            .listSync()
+            .where((entry) => entry.path.contains('.tmp'))
+            .toList();
+        expect(residue, isEmpty);
       });
 
       test('保存失败静默：state 保持更新且不抛出、不回滚内存态', () async {
