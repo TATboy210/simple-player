@@ -273,6 +273,87 @@ void main() {
       });
     });
 
+    group('启动配置层校验契约（WR-03：startup tier shares the UI contract）', () {
+      late Directory root;
+      late Directory exeRoot;
+      late Directory support;
+
+      setUp(() async {
+        root = await Directory.systemTemp.createTemp('log-startup-tier-');
+        addTearDown(() => root.delete(recursive: true));
+        exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
+        support = Directory('${root.path}${Platform.pathSeparator}as');
+      });
+
+      test('whitespace-only configured value silently skips to the default '
+          'chain', () async {
+        // Act — 纯空白配置值与 '' 同义：静默走默认链（D-01 空配置语义）。
+        final result = await ErrorLogLocation.resolve(
+          applicationSupportDirectory: () async => support,
+          executableDirectory: () => exeRoot,
+          configuredDirectory: '   ',
+        );
+
+        // Assert — 落点在 exe 层；无任何以空白命名的目录被创建（旧缺陷会
+        // 在进程 cwd 下 create 出空白目录并当作层 1 胜出）。
+        final resolved = result as ErrorLogLocationResolved;
+        expect(resolved.file.path, startsWith(exeRoot.path));
+        expect(resolved.configuredFailure, isNull);
+      });
+
+      test('relative configured value falls back carrying the typed reason',
+          () async {
+        // Act
+        final result = await ErrorLogLocation.resolve(
+          applicationSupportDirectory: () async => support,
+          executableDirectory: () => exeRoot,
+          configuredDirectory: 'relative-logs',
+        );
+
+        // Assert — 相对路径被单层校验拒绝：回退默认链且携带封闭原因
+        //（D-04 回退通知对畸形配置同样触发）。
+        final resolved = result as ErrorLogLocationResolved;
+        expect(resolved.configuredFailure, ConfiguredDirectoryFailure.notAbsolute);
+        expect(resolved.file.path, startsWith(exeRoot.path));
+      });
+
+      test('forward-slash UNC configured value falls back carrying the '
+          'typed reason', () async {
+        // Act — WR-03+WR-04 组合：启动层拒绝 //server/share 形态。
+        final result = await ErrorLogLocation.resolve(
+          applicationSupportDirectory: () async => support,
+          executableDirectory: () => exeRoot,
+          configuredDirectory: '//server/share',
+        );
+
+        // Assert
+        final resolved = result as ErrorLogLocationResolved;
+        expect(
+          resolved.configuredFailure,
+          ConfiguredDirectoryFailure.uncPathUnsupported,
+        );
+        expect(resolved.file.path, startsWith(exeRoot.path));
+      });
+
+      test('whitespace-padded valid directory is accepted via trim', () async {
+        // Arrange
+        final configured = Directory('${root.path}${Platform.pathSeparator}cfg');
+        await configured.create();
+
+        // Act — 前后空白在单层校验内被 trim，配置层照常胜出。
+        final result = await ErrorLogLocation.resolve(
+          applicationSupportDirectory: () async => support,
+          executableDirectory: () => exeRoot,
+          configuredDirectory: '  ${configured.path}  ',
+        );
+
+        // Assert — 胜出层为 trim 后的目录；无回退原因。
+        final resolved = result as ErrorLogLocationResolved;
+        expect(resolved.configuredFailure, isNull);
+        expect(resolved.file.path, startsWith(configured.path));
+      });
+    });
+
     group('validateConfiguredDirectory 单层校验（SET-02 采用面）', () {
       late Directory root;
 
@@ -362,6 +443,19 @@ void main() {
         // Act — A3 采纳：v1 拒绝 UNC 并文档化。
         final result = await ErrorLogLocation.validateConfiguredDirectory(
           '\\\\server${Platform.pathSeparator}share',
+        );
+
+        // Assert
+        expect(
+          (result as ConfiguredDirectoryInvalid).reason,
+          ConfiguredDirectoryFailure.uncPathUnsupported,
+        );
+      });
+
+      test('forward-slash UNC form is rejected identically (WR-04)', () async {
+        // Act — 正斜杠 UNC 形态（//server/share）与反斜杠形态同判（WR-04）。
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          '//server/share',
         );
 
         // Assert
