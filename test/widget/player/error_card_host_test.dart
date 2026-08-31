@@ -511,7 +511,7 @@ void main() {
     testWidgets('snapshot caps at the bound and evicts the oldest', (
       tester,
     ) async {
-      // Arrange：连续 21 份报告，快照上界 20（命名常量 _maxSnapshotLength）。
+      // Arrange：连续 21 份报告，快照上界 20（ErrorCaptureSnapshot.maxLength）。
       await tester.pumpWidget(
         buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
       );
