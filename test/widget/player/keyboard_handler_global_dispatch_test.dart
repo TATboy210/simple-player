@@ -20,14 +20,18 @@ void main() {
     tracker = _CallbackTracker();
   });
 
-  // 基础 harness：home 注入 KeyboardHandler（autofocus 焦点子树），
-  // onShowHelp 真弹对话框 —— 弹窗可见性即真实分发证据。
+  // 基础 harness：home 注入 KeyboardHandler（autofocus 焦点子树），全部
+  // 回调接 tracker；onShowHelp 额外真弹对话框 —— 弹窗可见性即真实分发证据。
   Widget buildHarness(_CallbackTracker t) {
     return MaterialApp(
       home: Scaffold(
         body: Builder(
           builder: (helpContext) {
             return KeyboardHandler(
+              onPlayPause: () => t.playPause += 1,
+              onSeekBackward: () => t.seekBackward += 1,
+              onVolumeUp: () => t.volumeUp += 1,
+              onExitFullscreen: () => t.exitFullscreen += 1,
               onShowHelp: () {
                 t.showHelp += 1;
                 showDialog<void>(
@@ -68,17 +72,19 @@ void main() {
           reason: '前置：主焦点滞留在 handler 焦点子树之外',
         );
 
-        // Act + Assert：三个代表性快捷键全部经回退路径可达。
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.f1);
-        await tester.pump();
-        expect(tracker.showHelp, 1, reason: 'F1 必须弹出帮助（UAT「按f1没用」）');
-        expect(find.byType(AlertDialog), findsOneWidget);
-
+        // Act + Assert：三个代表性快捷键全部经回退路径可达。Space/ESC 先按
+        // —— F1 弹出对话框后按键所有权移交对话框路由（守卫矩阵的对偶面），
+        // 故 F1 收尾并断言弹窗可见。
         await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
         expect(tracker.playPause, 1, reason: 'Space 同样经回退路径可达');
 
         await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
         expect(tracker.exitFullscreen, 1, reason: 'ESC 同样经回退路径可达');
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.f1);
+        await tester.pump();
+        expect(tracker.showHelp, 1, reason: 'F1 必须弹出帮助（UAT「按f1没用」）');
+        expect(find.byType(AlertDialog), findsOneWidget);
       },
     );
 
@@ -283,7 +289,7 @@ void main() {
       await tester.pumpWidget(buildHarness(tracker));
       await tester.pump();
       await tester.pumpWidget(
-        MaterialApp(home: Scaffold(body: const SizedBox.expand())),
+        const MaterialApp(home: Scaffold(body: SizedBox.expand())),
       );
       await tester.pump();
 
