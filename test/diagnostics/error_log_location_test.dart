@@ -272,6 +272,184 @@ void main() {
         expect(result, isA<ErrorLogLocationUnavailable>());
       });
     });
+
+    group('validateConfiguredDirectory 单层校验（SET-02 采用面）', () {
+      late Directory root;
+
+      setUp(() async {
+        root = await Directory.systemTemp.createTemp('log-dir-validate-');
+        addTearDown(() => root.delete(recursive: true));
+      });
+
+      test('existing directory validates with the directory handle', () async {
+        // Arrange
+        final dir = Directory('${root.path}${Platform.pathSeparator}existing');
+        await dir.create();
+
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          dir.path,
+        );
+
+        // Assert
+        final valid = result as ConfiguredDirectoryValid;
+        expect(valid.directory.path, dir.path);
+      });
+
+      test('creatable deep path validates after recursive create', () async {
+        // Arrange — 不存在但可创建的深路径（与链层同语义：create recursive 后探测）。
+        final deep = Directory(
+          '${root.path}${Platform.pathSeparator}a${Platform.pathSeparator}b',
+        );
+
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          deep.path,
+        );
+
+        // Assert
+        expect(result, isA<ConfiguredDirectoryValid>());
+        expect(deep.existsSync(), isTrue);
+      });
+
+      test('empty and whitespace-only inputs are notAbsolute', () async {
+        // Act + Assert — 空串/纯空白都归入 notAbsolute（封闭原因集）。
+        for (final input in <String>['', '   ']) {
+          final result = await ErrorLogLocation.validateConfiguredDirectory(
+            input,
+          );
+          final invalid = result as ConfiguredDirectoryInvalid;
+          expect(invalid.reason, ConfiguredDirectoryFailure.notAbsolute);
+          expect(invalid.error, isNull);
+        }
+      });
+
+      test('relative path is notAbsolute', () async {
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          'relative${Platform.pathSeparator}dir',
+        );
+
+        // Assert
+        expect(
+          (result as ConfiguredDirectoryInvalid).reason,
+          ConfiguredDirectoryFailure.notAbsolute,
+        );
+      });
+
+      test('null byte and control characters are invalidCharacters', () async {
+        // Arrange — 绝对路径骨架内注入控制字符（相对路径会先被 notAbsolute 拦下）。
+        final withNullByte =
+            '${root.path}${Platform.pathSeparator}'
+            'bad${String.fromCharCode(0)}name';
+        final withControl =
+            '${root.path}${Platform.pathSeparator}'
+            'bad${String.fromCharCode(1)}name';
+
+        // Act + Assert
+        for (final input in <String>[withNullByte, withControl]) {
+          final result = await ErrorLogLocation.validateConfiguredDirectory(
+            input,
+          );
+          expect(
+            (result as ConfiguredDirectoryInvalid).reason,
+            ConfiguredDirectoryFailure.invalidCharacters,
+          );
+        }
+      });
+
+      test('UNC path is rejected as uncPathUnsupported (A3)', () async {
+        // Act — A3 采纳：v1 拒绝 UNC 并文档化。
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          '\\\\server${Platform.pathSeparator}share',
+        );
+
+        // Assert
+        expect(
+          (result as ConfiguredDirectoryInvalid).reason,
+          ConfiguredDirectoryFailure.uncPathUnsupported,
+        );
+      });
+
+      test('over-long path is pathTooLong at the named constant bound',
+          () async {
+        // Arrange — 超过 maxConfiguredPathLength（1024）的绝对路径。
+        final overLong =
+            '${root.path}${Platform.pathSeparator}${'x' * 1030}';
+
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          overLong,
+        );
+
+        // Assert
+        expect(ErrorLogLocation.maxConfiguredPathLength, 1024);
+        expect(
+          (result as ConfiguredDirectoryInvalid).reason,
+          ConfiguredDirectoryFailure.pathTooLong,
+        );
+      });
+
+      test('file-occupied segment fails as notWritable with original error',
+          () async {
+        // Arrange — 实测形态：Directory.create 撞上同名文件 →
+        // PathExistsException（errno 183），原始异常随行。
+        final occupied = File('${root.path}${Platform.pathSeparator}occupied');
+        await occupied.writeAsString('not a directory');
+        final target = Directory(
+          '${occupied.path}${Platform.pathSeparator}sub',
+        );
+
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          target.path,
+        );
+
+        // Assert
+        final invalid = result as ConfiguredDirectoryInvalid;
+        expect(invalid.reason, ConfiguredDirectoryFailure.notWritable);
+        expect(invalid.error, isA<FileSystemException>());
+      });
+
+      test('injected probe failure is notWritable without real I/O', () async {
+        // Arrange — 真实存在的目录 + 恒 false 探测（探测 seam 承载
+        // file-as-dir 下写探测的 PathNotFoundException errno 3 形态）。
+        final dir = Directory('${root.path}${Platform.pathSeparator}real');
+        await dir.create();
+
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          dir.path,
+          writable: (_) async => false,
+        );
+
+        // Assert
+        expect(
+          (result as ConfiguredDirectoryInvalid).reason,
+          ConfiguredDirectoryFailure.notWritable,
+        );
+      });
+
+      test('injected probe success validates through the seam', () async {
+        // Arrange — seam 恒 true：探测 I/O 由 seam 表达，校验只判 seam 结论。
+        final dir = Directory('${root.path}${Platform.pathSeparator}real');
+        await dir.create();
+        var probed = 0;
+
+        // Act
+        final result = await ErrorLogLocation.validateConfiguredDirectory(
+          dir.path,
+          writable: (_) async {
+            probed += 1;
+            return true;
+          },
+        );
+
+        // Assert
+        expect(result, isA<ConfiguredDirectoryValid>());
+        expect(probed, 1);
+      });
+    });
   });
 }
 
