@@ -85,5 +85,8 @@ dist/
 .planning/milestone.lock
 .planning/research/.cache/
 
+# Debug 运行的便携设置文件(debug 构建的 store 写在项目 cwd 旁)
+/settings.json
+
 # 本机 VSCode 多根 workspace
 默认-workspace.code-workspace
