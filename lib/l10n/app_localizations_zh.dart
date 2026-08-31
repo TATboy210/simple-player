@@ -79,6 +79,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutMediaKeys => '播放/暂停';
 
   @override
+  String get shortcutDebugInjectError => '注入测试错误（调试）';
+
+  @override
   String get settings => '设置';
 
   @override

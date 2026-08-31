@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../kernel/diagnostics/error_reporter.dart';
 import '../../kernel/utils/debug_exporter.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/osd_overlay.dart';
 
 /// 快捷键定义 — KeyboardHandler 和帮助对话框共享的单一数据源
 ///
@@ -24,6 +25,9 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('] / [', l10n.shortcutSubtitleDelay),
   ('F1 / ?', l10n.shortcutHelp),
   ('媒体键', l10n.shortcutMediaKeys),
+  // dev-only 注入入口（G-03-1）：kDebugMode 为编译期 const，release 构建
+  // 的 F1 帮助自动不含该行；shortcuts_help_dialog.dart 渲染此单一数据源。
+  if (kDebugMode) ('Ctrl+Shift+I', l10n.shortcutDebugInjectError),
 ];
 
 /// 键盘快捷键包装器 — 支持自定义绑定
@@ -217,10 +221,10 @@ class KeyboardHandler extends StatelessWidget {
 
   /// 注入一份合成错误（Ctrl+Shift+I，仅 kDebugMode 可达，G-03-1）。
   ///
-  /// 走 [ErrorReporterImpl.I] 现有公开 intake（reportPlatformSafely）——
+  /// 走 [ErrorReporterImpl.I] 真实链路（reportPlatformSafely 公开 intake）：
   /// FIFO → presentation → ErrorCardHost → ErrorCard + 捕获徽标 +
-  /// error.log 全真实链路，无任何旁路显示。合成 [StateError] 仅作
-  /// reporter 的数据载荷，绝不 throw；计数后缀见 [_debugInjectedErrorCount]。
+  /// error.log，无任何旁路显示。合成 [StateError] 仅作 reporter 的数据
+  /// 载荷，绝不 throw；计数后缀见 [_debugInjectedErrorCount]。
   ///
   /// 前置：reporter 已初始化（生产中 main.dart 组合根先于 runApp 完成
   /// init），与 error_card_host.dart 直接用 `ErrorReporterImpl.I` 的先例
@@ -231,5 +235,10 @@ class KeyboardHandler extends StatelessWidget {
       StateError('调试注入的合成错误 #$_debugInjectedErrorCount'),
       StackTrace.current,
     );
+    // OSD pill 触发确认 —— 循 error_card.dart:155（errorCardCopied）与
+    // error_card_host.dart:168（warning 分流）的既有 OSD 反馈先例。文本用
+    // dev-only 中文字面量：该路径仅 kDebugMode 可达，与 speed_button.dart
+    // '1x' 同类不进 l10n；卡片本体消息带计数，OSD 只做触发确认。
+    OsdService.I.show('已注入测试错误', icon: Icons.bug_report);
   }
 }

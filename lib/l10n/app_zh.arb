@@ -25,6 +25,7 @@
   "shortcutSubtitleDelay": "字幕延迟 +/- 500ms",
   "shortcutHelp": "显示帮助",
   "shortcutMediaKeys": "播放/暂停",
+  "shortcutDebugInjectError": "注入测试错误（调试）",
 
   "settings": "设置",
   "audioTab": "音频",
