@@ -656,8 +656,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logPathInvalidStatus => 'Cannot write to this directory';
 
   @override
+  String get logPathPickerFailureStatus =>
+      'Could not open the directory picker';
+
+  @override
   String get logFallbackReasonPrefix => 'Fell back to the default location';
 
   @override
-  String get logEffectivePathLabel => 'Effective log location';
+  String logEffectivePathLabel(Object path) {
+    return 'Effective log location: $path';
+  }
 }

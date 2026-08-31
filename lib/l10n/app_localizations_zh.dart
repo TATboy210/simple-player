@@ -651,8 +651,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get logPathInvalidStatus => '无法写入该目录';
 
   @override
+  String get logPathPickerFailureStatus => '无法打开目录选择器';
+
+  @override
   String get logFallbackReasonPrefix => '已回退到默认位置';
 
   @override
-  String get logEffectivePathLabel => '当前有效路径';
+  String logEffectivePathLabel(Object path) {
+    return '当前有效路径：$path';
+  }
 }
