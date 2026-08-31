@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../kernel/diagnostics/error_report.dart';
 import '../../kernel/diagnostics/error_reporter.dart';
+import '../dialogs/settings/error_feedback_settings.dart';
 import '../shared/osd_overlay.dart';
 import 'error_capture_snapshot.dart';
 import 'error_card.dart';
@@ -10,7 +11,7 @@ import 'error_card.dart';
 /// 错误卡片宿主 — ErrorReporter 呈现状态到 UI 的唯一接线人
 /// （CARD-05 相位守卫适配器 + CARD-06/D-08/D-12）。
 ///
-/// 六项骨架义务：
+/// 七项骨架义务：
 /// 1. **监听**：initState 对 `ErrorReporterImpl.I.presentation` addListener；
 /// 2. **首帧 flushPresentation**：post-frame 宣布就绪，补呈现挂载前入队的
 ///    bootstrap/windowInit 窗口错误（D-12）——isReady 门不解除则 `current`
@@ -24,6 +25,11 @@ import 'error_card.dart';
 ///    warning，该分支为 Phase 4/5 来源前瞻）；
 /// 5. **适配 notifier（D-08/A5）**：见 `_presentation` 字段注释；
 /// 6. **dispose 摘除**：removeListener + notifier dispose，幂等安全。
+/// 7. **SET-01 呈现门控（D-05）**：build 最外层订阅
+///    [ErrorFeedbackSettings.I.state] 的 errorCardEnabled —— 开关只影响
+///    渲染（off 同帧消失、on 恢复快照最新），捕获/快照/落盘链零影响
+///    （快照 record 从不查询任何开关，零 kernel 依据）；门控绝不进入
+///    [_apply]/[_routeWarning] —— warning OSD 分流与轮览重置不受影响。
 class ErrorCardHost extends StatefulWidget {
   /// Creates the presentation host; state is read from [ErrorReporterImpl.I].
   const ErrorCardHost({super.key});
@@ -205,35 +211,47 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ErrorPresentationState>(
-      valueListenable: _presentation,
-      builder: (context, state, _) {
-        // 隐藏门保持 03-01 语义：reporter 队列空（current == null）→ 卡片
-        // 隐藏 —— 防止「关闭后快照残留项」形成永远关不掉的僵尸卡片。
-        if (state.current == null) return const SizedBox.shrink();
-        final history = ErrorCaptureSnapshot.I.reports.value;
-        // 渲染报告取自快照（D-01/D-11）：非轮览显示**最新**（快照尾，即
-        // D-01「新错误替换卡片内容」）；轮览中按索引向旧偏移（取模循环）。
-        // 适配 notifier 保持 reporter 队首语义（CAP-04/dismissCurrent 的
-        // 真实消费目标），渲染层的最新/轮览是纯视图偏移。
-        final report = _displayedReport(history, state);
-        if (report == null) return const SizedBox.shrink();
-        // D-01/D-11 计数徽标 = 快照长度（已捕获且未被手动关闭的错误数，
-        // 封顶 ErrorCaptureSnapshot.maxLength）。
-        return ExcludeFocus(
-          // CARD-01 前置：卡内无焦点可请求，键盘操作不会被卡片劫持。
-          child: ErrorCard(
-            report: report,
-            // IN-03：快照为空（未挂 effect 的极简挂载，展示 presentation
-            // 兜底）时徽标仍应反映正在展示的这一条 —— 否则出现「0 错误」
-            // 徽标与卡片内容自相矛盾。
-            totalCount: history.isEmpty ? 1 : history.length,
-            // D-01 徽标轮览接线（03-03）：纯视图偏移，不消费队列。
-            onBadgeTap: _cycleBadge,
-            // CARD-01 手动关闭唯一接线点：dismissCurrent 推进 FIFO，队首
-            // 下一项经 presentation 通知自然上屏（CAP-04）。
-            onClose: _onClose,
-          ),
+    // SET-01 呈现门控（D-05 立即生效）：外层订阅设置 store 单例（UI→UI
+    // 单例，与 OsdService.I 同一惯例）。开关只影响渲染：off 同帧移除卡片
+    // （无退场动画），on 恢复时渲染快照最新（含关闭期间到达的报告）。门控
+    // 绝不进入 _apply/_routeWarning —— warning OSD 分流与轮览重置不受呈现
+    // 开关影响；reporter 捕获/落盘/effects 链零接触（快照 record 从不查询
+    // 任何开关，零 kernel 依据）。
+    return ValueListenableBuilder<ErrorFeedbackSettingsData>(
+      valueListenable: ErrorFeedbackSettings.I.state,
+      builder: (context, settings, _) {
+        if (!settings.errorCardEnabled) return const SizedBox.shrink();
+        return ValueListenableBuilder<ErrorPresentationState>(
+          valueListenable: _presentation,
+          builder: (context, state, _) {
+            // 隐藏门保持 03-01 语义：reporter 队列空（current == null）→ 卡片
+            // 隐藏 —— 防止「关闭后快照残留项」形成永远关不掉的僵尸卡片。
+            if (state.current == null) return const SizedBox.shrink();
+            final history = ErrorCaptureSnapshot.I.reports.value;
+            // 渲染报告取自快照（D-01/D-11）：非轮览显示**最新**（快照尾，即
+            // D-01「新错误替换卡片内容」）；轮览中按索引向旧偏移（取模循环）。
+            // 适配 notifier 保持 reporter 队首语义（CAP-04/dismissCurrent 的
+            // 真实消费目标），渲染层的最新/轮览是纯视图偏移。
+            final report = _displayedReport(history, state);
+            if (report == null) return const SizedBox.shrink();
+            // D-01/D-11 计数徽标 = 快照长度（已捕获且未被手动关闭的错误数，
+            // 封顶 ErrorCaptureSnapshot.maxLength）。
+            return ExcludeFocus(
+              // CARD-01 前置：卡内无焦点可请求，键盘操作不会被卡片劫持。
+              child: ErrorCard(
+                report: report,
+                // IN-03：快照为空（未挂 effect 的极简挂载，展示 presentation
+                // 兜底）时徽标仍应反映正在展示的这一条 —— 否则出现「0 错误」
+                // 徽标与卡片内容自相矛盾。
+                totalCount: history.isEmpty ? 1 : history.length,
+                // D-01 徽标轮览接线（03-03）：纯视图偏移，不消费队列。
+                onBadgeTap: _cycleBadge,
+                // CARD-01 手动关闭唯一接线点：dismissCurrent 推进 FIFO，队首
+                // 下一项经 presentation 通知自然上屏（CAP-04）。
+                onClose: _onClose,
+              ),
+            );
+          },
         );
       },
     );
