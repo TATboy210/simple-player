@@ -10,7 +10,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
-import 'kernel/diagnostics/error_log_file_sink.dart';
 import 'kernel/diagnostics/error_log_location.dart';
 import 'kernel/diagnostics/error_reporter.dart';
 import 'kernel/diagnostics/error_reporting_dependencies.dart';
@@ -18,6 +17,7 @@ import 'kernel/diagnostics/global_error_hooks.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
+import 'ui/dialogs/settings/diagnostic_log_target.dart';
 import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_capture_snapshot.dart';
 
@@ -43,6 +43,13 @@ Future<void> main() {
         // 快照 effect（D-11）：错误卡片徽标轮览的呈现层有界快照数据源，
         // 经既有 effects 缝挂入 —— kernel 零改动（见 ErrorCaptureSnapshot 注释）。
         final diagnosticLogEffect = DelegatingDiagnosticLogEffect();
+        // 协调器同步 attach（先于 ErrorReporterImpl.init 与 runApp——协调器
+        // 在应用任意 UI 交互前就绪；重复 attach 静默忽略由协调器承载）。
+        DiagnosticLogTarget.I.attach(
+          effect: diagnosticLogEffect,
+          applicationSupportDirectory: getApplicationSupportDirectory,
+          executableDirectory: () => File(Platform.resolvedExecutable).parent,
+        );
         ErrorReporterImpl.init(
           effects: [diagnosticLogEffect.record, ErrorCaptureSnapshot.I.record],
           diagnosticLogStatus: diagnosticLogEffect,
@@ -132,9 +139,13 @@ Future<void> _activateDiagnosticLog(
       configuredDirectory: ErrorFeedbackSettings.I.state.value.logDirectory,
     );
     switch (result) {
-      case ErrorLogLocationResolved(:final file):
-        final sink = ErrorLogFileSink(file: file);
-        diagnosticLogEffect.activate(sink: sink, resolvedPath: file.path);
+      case ErrorLogLocationResolved(:final file, :final configuredFailure):
+        // 启动激活收敛到协调器的唯一激活实现（research 单一激活实现
+        // caveat）：sink 构造与 delegate.activate 只存在于协调器内。
+        DiagnosticLogTarget.I.activateResolved(
+          file: file,
+          configuredFailure: configuredFailure,
+        );
       case ErrorLogLocationUnavailable(:final error, :final stackTrace):
         KernelLogger.I.warn(
           'Diagnostic file evidence is unavailable during startup.',
