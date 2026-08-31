@@ -1,17 +1,18 @@
 ---
-status: partial
+status: testing
 phase: 03-playback-error-card-bridge
 source: [03-VERIFICATION.md]
 started: 2026-08-31T03:30:00Z
-updated: 2026-08-31T06:00:00Z
+updated: 2026-08-31T21:00:00+08:00
 ---
 
 ## Current Test
 
-number: 4
-name: 调试入口移除(用后即撤)
+number: 2
+name: 卡片位置——视频区域左上角(复测)
 expected: |
-  Ctrl+Shift+I 注入入口及 F1 帮助条目、l10n key 从 debug 构建移除(用户验证完毕,日常使用不需要)
+  窗口化时:卡片出现在视频区域左上角(标题栏下方),标题栏完整可见可点;
+  全屏时:卡片仍在画面左上角可见(D-10)
 awaiting: user response
 
 ## Tests
@@ -32,30 +33,27 @@ note: "G-03-1 注入入口按预期工作(用户借此观察到卡片并给出�
 ### 2. 卡片位置——视频区域左上角
 expected: |
   卡片出现在视频区域左上角,不遮挡自定义标题栏(当前实现位于窗口左上角压在标题栏前)
-result: issue
-reported: "报错窗口现在在自定义标题栏前面，调整下位置，在播放视频区域的左上角，而不是在左上角标题栏前面"
-severity: major
+result: [pending]
+note: "上轮 issue(标题栏被遮)已由 03-06 G-03-2 修复(窗口化 dy=44.0),本轮实机复测"
 
 ### 3. F1 快捷键帮助
 expected: |
   按 F1 弹出快捷键帮助对话框
-result: issue
-reported: "按f1没用"
-severity: major
+result: [pending]
+note: "上轮 issue(F1 无响应)已由 03-06 G-03-3 修复(HardwareKeyboard 回退分发),本轮实机复测——任意时刻按 F1,含全屏进出后"
 
 ### 4. 调试入口移除(用后即撤)
 expected: |
   Ctrl+Shift+I 注入入口及 F1 帮助条目、l10n key 从 debug 构建移除(用户验证完毕,日常使用不需要)
-result: issue
-reported: "还有测试用的入口记得移除"
-severity: minor
+result: [pending]
+note: "上轮 issue 已由 03-06 G-03-4 修复(注入四件套+ l10n + 测试全移除,负 grep=0),本轮实机复测"
 
 ## Summary
 
 total: 4
 passed: 1
-issues: 3
-pending: 0
+issues: 0
+pending: 3
 skipped: 0
 blocked: 0
 
@@ -80,7 +78,9 @@ blocked: 0
   resolved_at: 2026-08-31
 - gap_id: G-03-2
   truth: "错误卡片位于视频区域左上角，不遮挡自定义标题栏"
-  status: failed
+  status: resolved
+  resolved_by: 03-06-PLAN
+  resolved_at: 2026-08-31
   reason: "User reported: 报错窗口现在在自定义标题栏前面，调整下位置，在播放视频区域的左上角，而不是在左上角标题栏前面"
   severity: major
   test: 2
@@ -92,7 +92,9 @@ blocked: 0
     - "定位改到视频区域左上角:全屏时=窗口左上角(D-10 保持);窗口化时需向下偏移标题栏高度(视频区上缘);可通过 GlobalKey/布局回调取视频区位置或按标题栏高度常量偏移"
 - gap_id: G-03-3
   truth: "按 F1 弹出快捷键帮助对话框"
-  status: failed
+  status: resolved
+  resolved_by: 03-06-PLAN
+  resolved_at: 2026-08-31
   reason: "User reported: 按f1没用"
   severity: major
   test: 3
@@ -109,7 +111,9 @@ blocked: 0
   debug_session: ".planning/debug/g03-3-f1-help-dialog-no-op.md"
 - gap_id: G-03-4
   truth: "调试注入入口(Ctrl+Shift+I 及其 F1 条目、l10n key)从源码移除"
-  status: failed
+  status: resolved
+  resolved_by: 03-06-PLAN
+  resolved_at: 2026-08-31
   reason: "User reported: 还有测试用的入口记得移除"
   severity: minor
   test: 4
