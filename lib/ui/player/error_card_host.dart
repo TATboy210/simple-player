@@ -67,24 +67,34 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
   @override
   void initState() {
     super.initState();
-    ErrorReporterImpl.I.presentation.addListener(_onPresentationChanged);
+    // WR-02 防御姿态：reporter 未初始化（极简测试挂载/未来独立挂载）时
+    // 不访问 ErrorReporterImpl.I —— 与 ErrorCard._resolveLogPath 的
+    // isInitialized 探针同一防御边界，宿主静默降级为纯空壳，不抛
+    // StateError。快照单例（UI 层）无初始化门，始终监听即可。
+    if (ErrorReporterImpl.isInitialized) {
+      ErrorReporterImpl.I.presentation.addListener(_onPresentationChanged);
+      // 吸收挂载前已发布的快照（isReady=false 的计数态），保证首帧前
+      // 适配值与 reporter 一致。
+      _onPresentationChanged();
+      // D-12：首帧后宣布就绪，补呈现挂载前入队的错误。post-frame 相位内
+      // 到达的通知同样被相位守卫推迟到下一帧落地。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ErrorReporterImpl.I.flushPresentation();
+      });
+    }
     // D-11：快照变化（effect 接纳新报告/合并/移除）同样触发重渲染；
     // 相位守卫与 presentation 通知一致（CARD-05：effect 可能在 build 期
     // 被 reporter fan-out 调用，直接 setState 会次生 markNeedsBuild）。
     ErrorCaptureSnapshot.I.reports.addListener(_onSnapshotChanged);
-    // 吸收挂载前已发布的快照（isReady=false 的计数态），保证首帧前
-    // 适配值与 reporter 一致。
-    _onPresentationChanged();
-    // D-12：首帧后宣布就绪，补呈现挂载前入队的错误。post-frame 相位内
-    // 到达的通知同样被相位守卫推迟到下一帧落地。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ErrorReporterImpl.I.flushPresentation();
-    });
   }
 
   @override
   void dispose() {
-    ErrorReporterImpl.I.presentation.removeListener(_onPresentationChanged);
+    // 与 initState 同一守卫：reporter 未初始化时从未注册过监听，直接访问
+    // I 会在 teardown 时抛 StateError（WR-02 dispose 侧对称防御）。
+    if (ErrorReporterImpl.isInitialized) {
+      ErrorReporterImpl.I.presentation.removeListener(_onPresentationChanged);
+    }
     ErrorCaptureSnapshot.I.reports.removeListener(_onSnapshotChanged);
     _presentation.dispose();
     super.dispose();
