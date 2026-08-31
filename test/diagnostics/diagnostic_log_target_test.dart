@@ -9,6 +9,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
@@ -16,6 +17,8 @@ import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/diagnostic_log_target.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/error_feedback_settings.dart';
+import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
 void main() {
   group('DiagnosticLogTarget 重定向协调器', () {
@@ -334,6 +337,89 @@ void main() {
 
       // Assert — 仅 null→值 转换：保持第一个通知，不被覆盖。
       expect(target.pendingFallbackNotice.value, same(first));
+    });
+
+    test('startup activation path wires delegate, effective path, and notice',
+        () async {
+      // Act — 启动激活语义（Task 3 组合根走同一实现）。
+      final failure = const FileSystemException('startup boom');
+      target.activateResolved(file: oldFile, configuredFailure: failure);
+
+      // Assert — delegate 与协调器路径同步、通知置值。
+      expect(delegate.logPath.value, oldFile.path);
+      expect(target.effectiveLogPath.value, oldFile.path);
+      expect(target.pendingFallbackNotice.value, same(failure));
+    });
+  });
+
+  group('DiagnosticFallbackNotice 通知桥（D-04 第二通道）', () {
+    late Directory root;
+    late DelegatingDiagnosticLogEffect delegate;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('log-notice-');
+      addTearDown(() => root.delete(recursive: true));
+      delegate = DelegatingDiagnosticLogEffect();
+      DiagnosticLogTarget.I.resetForTesting(
+        effect: delegate,
+        applicationSupportDirectory: () async => root,
+        executableDirectory: () => root,
+      );
+      addTearDown(DiagnosticLogTarget.I.resetForTesting);
+      // OSD 单例基线复位 + 防御性清理挂起的 hide Timer。
+      OsdService.I.hide();
+      addTearDown(OsdService.I.hide);
+    });
+
+    testWidgets('shows the localized notice once and consumes it',
+        (tester) async {
+      // Arrange — 预置一次性通知（启动激活先于首帧的时序形态）。
+      final failure = const FileSystemException('configured boom');
+      final activatedFile = File(
+        '${root.path}${Platform.pathSeparator}'
+        '${ErrorLogLocation.logFileName}',
+      );
+      DiagnosticLogTarget.I.activateResolved(
+        file: activatedFile,
+        configuredFailure: failure,
+      );
+
+      String? expectedText;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
+          home: Builder(
+            builder: (context) {
+              expectedText = AppLocalizations.of(context).logFallbackNotice;
+              return const DiagnosticFallbackNotice();
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Assert — OSD 文案为 l10n 值，通知恰好消费一次。
+      expect(OsdService.I.message.value?.text, expectedText);
+      expect(DiagnosticLogTarget.I.pendingFallbackNotice.value, isNull);
+      // 烧掉 hide Timer，避免测试结束时悬挂 Timer。
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('does not trigger OsdService without a pending notice',
+        (tester) async {
+      // Arrange — 无挂起通知。
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: DiagnosticFallbackNotice(),
+        ),
+      );
+      await tester.pump();
+
+      // Assert — 无通知时不触发 OsdService。
+      expect(OsdService.I.message.value, isNull);
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 }
