@@ -1,19 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 03-playback-error-card-bridge
 source: [03-VERIFICATION.md]
 started: 2026-08-31T03:30:00Z
-updated: 2026-08-31T21:00:00+08:00
+updated: 2026-08-31T21:15:00+08:00
 ---
 
 ## Current Test
 
-number: 2
-name: 卡片位置——视频区域左上角(复测)
-expected: |
-  窗口化时:卡片出现在视频区域左上角(标题栏下方),标题栏完整可见可点;
-  全屏时:卡片仍在画面左上角可见(D-10)
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -33,27 +28,27 @@ note: "G-03-1 注入入口按预期工作(用户借此观察到卡片并给出�
 ### 2. 卡片位置——视频区域左上角
 expected: |
   卡片出现在视频区域左上角,不遮挡自定义标题栏(当前实现位于窗口左上角压在标题栏前)
-result: [pending]
-note: "上轮 issue(标题栏被遮)已由 03-06 G-03-2 修复(窗口化 dy=44.0),本轮实机复测"
+result: pass
+note: "用户确认(就这样吧);03-06 G-03-2 修复生效(窗口化 dy=44.0)"
 
 ### 3. F1 快捷键帮助
 expected: |
   按 F1 弹出快捷键帮助对话框
-result: [pending]
-note: "上轮 issue(F1 无响应)已由 03-06 G-03-3 修复(HardwareKeyboard 回退分发),本轮实机复测——任意时刻按 F1,含全屏进出后"
+result: pass
+note: "用户确认 pass;03-06 G-03-3 修复生效(HardwareKeyboard 回退分发)"
 
 ### 4. 调试入口移除(用后即撤)
 expected: |
   Ctrl+Shift+I 注入入口及 F1 帮助条目、l10n key 从 debug 构建移除(用户验证完毕,日常使用不需要)
-result: [pending]
-note: "上轮 issue 已由 03-06 G-03-4 修复(注入四件套+ l10n + 测试全移除,负 grep=0),本轮实机复测"
+result: pass
+note: "用户确认 pass;03-06 G-03-4 修复生效(入口已移除)"
 
 ## Summary
 
 total: 4
-passed: 1
+passed: 4
 issues: 0
-pending: 3
+pending: 0
 skipped: 0
 blocked: 0
 
