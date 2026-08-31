@@ -92,13 +92,13 @@ class _ErrorCardState extends State<ErrorCard> {
   };
 
   /// l10nKey → AppLocalizations 查找，未知键 fallback 到原始 message（MIG-01
-  /// 迁移基线 —— 与 error_banner.dart 的 13 key 枚举逐项一致，D-09 明确
-  /// **不**迁移其动作按钮 switch）。
+  /// 迁移基线 —— 与旧横幅（legacy banner，03-04 已删除）的 13 key 枚举逐项
+  /// 一致，D-09 明确**不**迁移其动作按钮 switch）。
   ///
   /// ErrorReport 不携带 PlayerError 对象，只携带 intake 快照的
   /// `playerErrorCode`（`file:fileNotFound` 形态）——先还原为与旧横幅同构的
-  /// `error.file.fileNotFound` 键，再走完全一致的 switch，保证 03-04 删除
-  /// ErrorBanner 后零解析能力缺口。非 player 来源（无 code）直接用 raw
+  /// `error.file.fileNotFound` 键，再走完全一致的 switch，保证旧横幅删除后
+  /// 零解析能力缺口。非 player 来源（无 code）直接用 raw
   /// message（全局钩子错误的 message 本身可读）。
   String _resolveMessage(AppLocalizations l10n, ErrorReport report) {
     final code = report.playerErrorCode;
