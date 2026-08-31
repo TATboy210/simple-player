@@ -43,18 +43,21 @@ Future<void> main() {
         // 快照 effect（D-11）：错误卡片徽标轮览的呈现层有界快照数据源，
         // 经既有 effects 缝挂入 —— kernel 零改动（见 ErrorCaptureSnapshot 注释）。
         final diagnosticLogEffect = DelegatingDiagnosticLogEffect();
-        // 协调器同步 attach（先于 ErrorReporterImpl.init 与 runApp——协调器
-        // 在应用任意 UI 交互前就绪；重复 attach 静默忽略由协调器承载）。
-        DiagnosticLogTarget.I.attach(
-          effect: diagnosticLogEffect,
-          applicationSupportDirectory: getApplicationSupportDirectory,
-          executableDirectory: () => File(Platform.resolvedExecutable).parent,
-        );
         ErrorReporterImpl.init(
           effects: [diagnosticLogEffect.record, ErrorCaptureSnapshot.I.record],
           diagnosticLogStatus: diagnosticLogEffect,
         );
         GlobalErrorHooks.install(ErrorReporterImpl.I);
+        // 协调器同步 attach：先于任何激活路径（unawaited）与 runApp，协调器
+        // 在应用任意 UI 交互前就绪；重复 attach 静默忽略由协调器承载。
+        // 位置约束：必须位于 hooks 安装之后（hooks-first 契约测试锁定
+        // 「首个平台目录引用不得先于 GlobalErrorHooks.install」），且在
+        // _activateDiagnosticLog 启动之前完成绑定。
+        DiagnosticLogTarget.I.attach(
+          effect: diagnosticLogEffect,
+          applicationSupportDirectory: getApplicationSupportDirectory,
+          executableDirectory: () => File(Platform.resolvedExecutable).parent,
+        );
         unawaited(_activateDiagnosticLog(diagnosticLogEffect));
         MediaKit.ensureInitialized();
         await windowManager.ensureInitialized();
