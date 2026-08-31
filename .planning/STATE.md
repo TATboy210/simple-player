@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 3
 current_phase_name: 播放错误桥与非模态卡片
-status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-08-30T18:40:26.352Z"
+status: verifying
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-08-31T00:29:46.351Z"
 last_activity: 2026-08-31
 last_activity_desc: Phase 3 execution started
-state_head: 21b632c65a299b7fe71fbd2c582b795ef120b93a
+state_head: 0805618b157faf924db7ce54c077345207d961b8
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 40
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 
 Phase: 3 (播放错误桥与非模态卡片) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-31 — Phase 3 execution started
 
 Progress: [████░░░░░░] 40%
@@ -65,6 +65,7 @@ Progress: [████░░░░░░] 40%
 | Phase 03 P03-01 | 45 | 2 tasks | 10 files |
 | Phase 03 P03-02 | 25 | 2 tasks | 4 files |
 | Phase 03 P03-03 | 34 | 2 tasks | 6 files |
+| Phase 03 P03-04 | 4 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecti
 - [Phase 02]: Pending or failed activation never blocks MediaKit, window initialization, runApp, or the global capture chain. — Pending or failed activation never blocks MediaKit, window initialization, runApp, or the global capture chain.
 - [Phase 3]: D-11 badge-cycling snapshot feeds from the existing reporter effects seam (ErrorCaptureSnapshot, UI-layer, bounded 20) because presentation only publishes the FIFO head — Plan assumption falsified by tests during 03-03 Task 2: _publishSafely exposes only queue.first, so D-01 newest-display and captured-count badge are unachievable via presentation notifications; the effects seam keeps kernel at zero changes with no new read-only API
 - [Phase 3]: D-01 replacement semantics: the card always shows the newest captured error; manual close consumes the real FIFO head and removes it from the snapshot — Plan Task 2 RED mandates newest-on-card and older-first cycling; 03-02 FIFO-head display assertions were flipped accordingly
+- [Phase 3]: MIG-01 收官：旧横幅在删前双路径等效证明（372b10a9）+ 用户批准后全量删除（0805618b）——错误展示收敛为 ErrorCard 单一路径；动作按钮按 D-09 不迁移；error_card.dart doc 字面量同步改写以满足 grep 门（Rule 3）
 
 ### Pending Todos
 
@@ -108,6 +110,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-30T18:40:25.948Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-08-31T00:29:05.909Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None

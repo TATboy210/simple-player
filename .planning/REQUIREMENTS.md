@@ -43,7 +43,7 @@
 
 ### 迁移 (Migration)
 
-- [ ] **MIG-01**: PlayerErrorReportBridge（engine.lastError → ErrorReporter）经集成测试证明等效覆盖后，替换并移除旧 ErrorBanner——v1 内完成统一
+- [x] **MIG-01**: PlayerErrorReportBridge（engine.lastError → ErrorReporter）经集成测试证明等效覆盖后，替换并移除旧 ErrorBanner——v1 内完成统一
 
 ### 验证 (Verification)
 
@@ -94,7 +94,7 @@
 | CARD-04 | Phase 3 | Complete |
 | CARD-05 | Phase 3 | Complete |
 | CARD-06 | Phase 3 | Complete |
-| MIG-01 | Phase 3 | Pending |
+| MIG-01 | Phase 3 | Complete |
 | SET-01 | Phase 4 | Pending |
 | SET-02 | Phase 4 | Pending |
 | SET-03 | Phase 4 | Pending |
