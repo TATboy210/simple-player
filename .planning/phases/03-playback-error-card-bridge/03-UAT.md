@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 03-playback-error-card-bridge
 source: [03-VERIFICATION.md]
 started: 2026-08-31T03:30:00Z
@@ -43,5 +43,15 @@ blocked: 0
   reason: "User reported: 没有个专门启动调试的按钮，不反馈错误我也不知道"
   severity: major
   test: 1
-  artifacts: []
-  missing: []
+  root_cause: "设计/范围缺失而非缺陷：Phase 3 需求集从未包含开发用错误注入入口；注入缝已生产就绪——ErrorReporterImpl.I 的 4 个公开 intake 方法一次调用即走真实链路（FIFO→presentation→Host→Card+effects 快照+error.log），零 kernel 改动"
+  artifacts:
+    - path: "lib/kernel/diagnostics/error_reporter.dart"
+      issue: "非缺陷——现有公开 intake 即注入接口（reportPlatformSafely/reportPlayerError），forTesting 为测试专用不应使用"
+    - path: "lib/ui/player/keyboard_handler.dart"
+      issue: "缺少 kDebugMode 门控的注入快捷键（Ctrl+Shift+D 调试导出先例在 :171-178，可循例）"
+  missing:
+    - "kDebugMode 门控快捷键（建议 Ctrl+Shift+I，循 Ctrl+Shift+D 内联先例）调用 ErrorReporterImpl.I.reportPlatformSafely(StateError('调试注入的合成错误 #<计数>'), StackTrace.current)"
+    - "OsdService.I.show('已注入测试错误', icon: Icons.bug_report) 反馈"
+    - "合成消息需带计数/时间戳以绕过 reporter 10s 去重窗口，保证每次按下出新卡"
+    - "可选：shortcutDefinitions + F1 帮助条目 + l10n ARB key"
+  debug_session: ".planning/debug/g03-1-no-error-injection-entry.md"
