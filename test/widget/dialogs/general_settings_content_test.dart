@@ -287,4 +287,20 @@ void main() {
     );
     expect(find.text('已回退到默认位置'), findsOneWidget);
   });
+
+  testWidgets('directory input is seeded from the store, not the file path', (
+    tester,
+  ) async {
+    // Arrange — store 预置配置目录（≠ 解析后的有效文件路径）。
+    ErrorFeedbackSettings.I.setLogDirectory(root.path);
+    await tester.pumpWidget(buildSubject());
+
+    // Assert — 输入框初值 = 配置目录本身（WR-02：以 error.log 文件路径作
+    // 种子会让增量编辑把文件段带进目录值）；有效文件路径仍由常显行承载。
+    expect(find.text(root.path), findsOneWidget);
+    expect(
+      find.textContaining('当前有效路径：${activeFile.path}'),
+      findsOneWidget,
+    );
+  });
 }
