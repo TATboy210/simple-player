@@ -9,6 +9,7 @@ import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
+import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
 /// G-03-1 开发用错误注入入口（Ctrl+Shift+I，kDebugMode 门控）全链路验证。
 ///
@@ -72,6 +73,10 @@ void main() {
       // presentation → Host → Card 全真实链路。
       expect(find.byType(ErrorCard), findsOneWidget);
       expect(find.textContaining('调试注入的合成错误'), findsOneWidget);
+
+      // 推进 OSD hold 计时器（osdDefaultHoldMs=1200）—— 注入伴随 OSD 反馈，
+      // 避免测试结束遗留 pending timer（同 error_card_host_test 惯例）。
+      await tester.pump(const Duration(seconds: 2));
     });
 
     testWidgets('rapid double press yields two distinct reports', (
@@ -104,6 +109,9 @@ void main() {
       );
       expect(reports[0].occurrenceCount, 1);
       expect(reports[1].occurrenceCount, 1);
+
+      // 推进 OSD hold 计时器（注入伴随 OSD 反馈），避免 pending timer。
+      await tester.pump(const Duration(seconds: 2));
     });
 
     testWidgets('synthetic report carries real-chain source and severity', (
@@ -124,6 +132,47 @@ void main() {
       final report = ErrorReporterImpl.I.queuedReports.single;
       expect(report.source, ErrorSource.platformDispatcher);
       expect(report.severity, ErrorSeverity.error);
+
+      // 推进 OSD hold 计时器（注入伴随 OSD 反馈），避免 pending timer。
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('injection confirms with an OSD pill', (tester) async {
+      // Arrange：宿主就绪。
+      await tester.pumpWidget(buildMountHarness());
+      await tester.pump();
+
+      // Act：组合键注入一次。
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyI);
+      await tester.pump();
+
+      // Assert：OSD pill 反馈（触发确认，OsdMessage 字段 text/icon，
+      // osd_overlay.dart:9-16）。
+      expect(OsdService.I.message.value?.text, '已注入测试错误');
+      expect(OsdService.I.message.value?.icon, Icons.bug_report);
+
+      // 推进 OSD hold 计时器，避免测试结束遗留 pending timer。
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('F1 help list includes the debug injection entry', (
+      tester,
+    ) async {
+      // Arrange：MaterialApp delegates 上下文。flutter test 运行于 debug
+      // 模式（kDebugMode == true），条目应出现；release 排除由编译期 const
+      // 折叠保证，属代码审查级证据（T-03-05-01 mitigation）。
+      await tester.pumpWidget(buildMountHarness());
+      await tester.pump();
+
+      // Act：取 home 上下文的 AppLocalizations，渲染 F1 帮助单一数据源。
+      final context = tester.element(find.byType(KeyboardHandler));
+      final l10n = AppLocalizations.of(context);
+      final entries = shortcutDefinitions(l10n);
+
+      // Assert：存在按键显示文本为 'Ctrl+Shift+I' 的条目。
+      expect(entries.map((entry) => entry.$1), contains('Ctrl+Shift+I'));
     });
 
     testWidgets('bare I press without modifiers never injects', (tester) async {
