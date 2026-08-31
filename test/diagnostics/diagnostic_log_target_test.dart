@@ -118,7 +118,11 @@ void main() {
         file: oldFile,
         writer: (pack) async {
           writerEntries += 1;
-          await gate.future;
+          // 首条挂起以制造 dispose 间隙；释放后与其余记录一样真实落盘。
+          if (writerEntries == 1) {
+            await gate.future;
+          }
+          await oldFile.writeAsString(pack, mode: FileMode.append, flush: true);
         },
       );
       delegate.activate(sink: slowOldSink, resolvedPath: oldFile.path);
@@ -312,19 +316,23 @@ void main() {
     });
 
     test('a pending notice is not overwritten by a later failure', () async {
-      // Arrange — 第一次回退通知尚未消费。
+      // Arrange — 第一次回退通知尚未消费（不经 resetForTesting 以保留挂起态）。
       final first = const FileSystemException('first boom');
       final second = const FileSystemException('second boom');
       target.activateResolved(file: oldFile, configuredFailure: first);
+      expect(target.pendingFallbackNotice.value, same(first));
 
-      // Act — 换位激活携带第二个 failure（通知仍在挂起）。
-      final nextDelegate = DelegatingDiagnosticLogEffect();
+      // Act — 同一 delegate 经 dispose 复位锁后再次激活（真实换位形态），
+      // 携带第二个 failure；此时通知仍挂起。
+      await delegate.dispose();
       final nextDir = Directory('${root.path}${Platform.pathSeparator}next');
       await nextDir.create();
-      rebind(nextDelegate);
-      target.activateResolved(file: nextFileOf(nextDir), configuredFailure: second);
+      target.activateResolved(
+        file: nextFileOf(nextDir),
+        configuredFailure: second,
+      );
 
-      // Assert — 仅 null→值 转换：保持第一个通知。
+      // Assert — 仅 null→值 转换：保持第一个通知，不被覆盖。
       expect(target.pendingFallbackNotice.value, same(first));
     });
   });
