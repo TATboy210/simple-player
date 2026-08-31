@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../kernel/diagnostics/error_reporter.dart';
 import '../../kernel/utils/debug_exporter.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -33,6 +34,13 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
 ///
 /// [customBindings] 覆盖默认按键映射 (action → LogicalKeyboardKey.keyName)
 class KeyboardHandler extends StatelessWidget {
+  /// dev-only 注入计数器 —— 仅 debug 会话存活，无持久化。
+  ///
+  /// 计数后缀使每次注入的 message 语义身份差异化，绕过 reporter 的 10s
+  /// 去重合并窗（error_reporter.dart `_dedupeWindow`，身份 = 8 字段 record
+  /// 含 message），保证快速连按每次都产生新的卡片条目（G-03-1）。
+  static int _debugInjectedErrorCount = 0;
+
   final Widget child;
   final Map<String, String> customBindings;
   final VoidCallback? onPlayPause;
@@ -177,6 +185,17 @@ class KeyboardHandler extends StatelessWidget {
       return KeyEventResult.handled;
     }
 
+    // 调试快捷键: Ctrl+Shift+I 注入合成错误走真实链路（G-03-1）。
+    // kDebugMode 为编译期 const —— release/MSIX 构建物理不含该入口
+    // （T-03-05-01 mitigation）；'I' 单键无既有映射，不进 customBindings 体系。
+    if (kDebugMode &&
+        key == LogicalKeyboardKey.keyI &&
+        HardwareKeyboard.instance.isControlPressed &&
+        HardwareKeyboard.instance.isShiftPressed) {
+      _injectTestError();
+      return KeyEventResult.handled;
+    }
+
     // 系统媒体播放键固定映射，不受自定义快捷键配置影响。
     if (key == LogicalKeyboardKey.mediaPlayPause) {
       onMediaPlayPause?.call();
@@ -194,5 +213,23 @@ class KeyboardHandler extends StatelessWidget {
     if (path != null) {
       developer.log('Debug data saved to: $path', name: 'Debug');
     }
+  }
+
+  /// 注入一份合成错误（Ctrl+Shift+I，仅 kDebugMode 可达，G-03-1）。
+  ///
+  /// 走 [ErrorReporterImpl.I] 现有公开 intake（reportPlatformSafely）——
+  /// FIFO → presentation → ErrorCardHost → ErrorCard + 捕获徽标 +
+  /// error.log 全真实链路，无任何旁路显示。合成 [StateError] 仅作
+  /// reporter 的数据载荷，绝不 throw；计数后缀见 [_debugInjectedErrorCount]。
+  ///
+  /// 前置：reporter 已初始化（生产中 main.dart 组合根先于 runApp 完成
+  /// init），与 error_card_host.dart 直接用 `ErrorReporterImpl.I` 的先例
+  /// 一致，不加额外守卫。
+  void _injectTestError() {
+    _debugInjectedErrorCount += 1;
+    ErrorReporterImpl.I.reportPlatformSafely(
+      StateError('调试注入的合成错误 #$_debugInjectedErrorCount'),
+      StackTrace.current,
+    );
   }
 }

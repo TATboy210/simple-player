@@ -36,13 +36,22 @@ void main() {
   // buildErrorCardMount，home 注入 KeyboardHandler（autofocus Focus 接收
   // 真实按键流）——不构造 MediaKitEngine/media_kit Player（headless
   // mdk.dll 预存失败基线）。
-  Widget buildMountHarness() => MaterialApp(
-    locale: const Locale('zh'),
+  Widget buildMountHarness() => const MaterialApp(
+    locale: Locale('zh'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: const KeyboardHandler(child: SizedBox.expand()),
+    home: KeyboardHandler(child: SizedBox.expand()),
     builder: buildErrorCardMount,
   );
+
+  /// 提取合成 message 尾部的「#N」计数 —— 注入计数器是 KeyboardHandler 的
+  /// static（debug 会话存活、跨测试不复位），断言递增必须用相对比较而非
+  /// 绝对序号。
+  int trailingInjectedCount(String message) {
+    final digits = RegExp(r'#(\d+)$').firstMatch(message)?.group(1);
+    if (digits == null) return 0;
+    return int.tryParse(digits) ?? 0;
+  }
 
   group('G-03-1 开发用错误注入（Ctrl+Shift+I）', () {
     testWidgets('combo press routes a synthetic error to the card', (
@@ -81,13 +90,18 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyI);
       await tester.pump();
 
-      // Assert：两份独立报告 —— 计数后缀差异化 8 字段语义身份（message 不同），
-      // 绕过 reporter 的 _dedupeWindow 合并窗；各自 occurrenceCount == 1。
+      // Assert：两份独立报告 —— 计数后缀差异化 8 字段语义身份（message 不同，
+      // 且第二条计数严格递增），绕过 reporter 的 _dedupeWindow 合并窗；
+      // 各自 occurrenceCount == 1。
       final reports = ErrorReporterImpl.I.queuedReports;
       expect(reports.length, 2);
-      expect(reports[0].message, contains('#1'));
-      expect(reports[1].message, contains('#2'));
+      expect(reports[0].message, contains('调试注入的合成错误 #'));
+      expect(reports[1].message, contains('调试注入的合成错误 #'));
       expect(reports[0].message, isNot(reports[1].message));
+      expect(
+        trailingInjectedCount(reports[1].message),
+        greaterThan(trailingInjectedCount(reports[0].message)),
+      );
       expect(reports[0].occurrenceCount, 1);
       expect(reports[1].occurrenceCount, 1);
     });
