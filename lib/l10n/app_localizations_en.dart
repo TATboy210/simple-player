@@ -633,4 +633,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logFallbackNotice => 'Log fell back to the default location';
+
+  @override
+  String get errorCardToggleLabel => 'Error card';
+
+  @override
+  String get logPathLabel => 'Log directory';
+
+  @override
+  String get logPathHint => 'Leave empty to use the default location';
+
+  @override
+  String get logPathBrowse => 'Browse…';
+
+  @override
+  String get logPathValidatingStatus => 'Checking…';
+
+  @override
+  String get logPathValidStatus => 'Directory is writable';
+
+  @override
+  String get logPathInvalidStatus => 'Cannot write to this directory';
+
+  @override
+  String get logFallbackReasonPrefix => 'Fell back to the default location';
+
+  @override
+  String get logEffectivePathLabel => 'Effective log location';
 }

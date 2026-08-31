@@ -1279,6 +1279,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Log fell back to the default location'**
   String get logFallbackNotice;
+
+  /// Label for the error-card visibility toggle in the general settings tab
+  ///
+  /// In en, this message translates to:
+  /// **'Error card'**
+  String get errorCardToggleLabel;
+
+  /// Label for the diagnostic log directory input row in the general settings tab
+  ///
+  /// In en, this message translates to:
+  /// **'Log directory'**
+  String get logPathLabel;
+
+  /// Hint text for the log directory input when it is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to use the default location'**
+  String get logPathHint;
+
+  /// Label for the directory-picker button next to the log directory input
+  ///
+  /// In en, this message translates to:
+  /// **'Browse…'**
+  String get logPathBrowse;
+
+  /// Inline status shown while the log directory writability probe is running
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get logPathValidatingStatus;
+
+  /// Inline status shown when the log directory passed validation
+  ///
+  /// In en, this message translates to:
+  /// **'Directory is writable'**
+  String get logPathValidStatus;
+
+  /// Inline status shown when the log directory failed validation (closed-set reason mapped to this single user-facing copy)
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot write to this directory'**
+  String get logPathInvalidStatus;
+
+  /// Inline notice shown when the configured log directory failed and the default location chain took over
+  ///
+  /// In en, this message translates to:
+  /// **'Fell back to the default location'**
+  String get logFallbackReasonPrefix;
+
+  /// Label before the currently effective diagnostic log file path (always visible, D-04 first channel)
+  ///
+  /// In en, this message translates to:
+  /// **'Effective log location'**
+  String get logEffectivePathLabel;
 }
 
 class _AppLocalizationsDelegate
