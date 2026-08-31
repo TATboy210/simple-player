@@ -172,6 +172,80 @@ void main() {
         );
       });
     });
+
+    group('存储层生产加固（SET-03：原子写 + 保存失败吞没 + 默认位置）', () {
+      test('round-trip：新实例从同一文件读回写入值（重启模拟）', () async {
+        // Arrange — 第一个实例写入并等待持久化完成。
+        final writer = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        writer.setCardEnabled(false);
+        writer.setLogDirectory(root.path);
+        await writer.pendingPersist;
+
+        // Act — 「重启」：第二个实例从同一文件加载。
+        final reader = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        await reader.load();
+
+        // Assert — SET-03 重启持久化语义。
+        expect(reader.state.value.errorCardEnabled, isFalse);
+        expect(reader.state.value.logDirectory, root.path);
+      });
+
+      test('原子写：保存后目标存在可解析且无 tmp 残留', () async {
+        // Arrange
+        final store = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+
+        // Act
+        store.setLogDirectory(root.path);
+        await store.pendingPersist;
+
+        // Assert — 目标文件存在且内容可解析；settings.json.tmp 不残留。
+        expect(settingsFile.existsSync(), isTrue);
+        final decoded = jsonDecode(settingsFile.readAsStringSync());
+        expect(decoded['version'], 1);
+        expect(decoded['logDirectory'], root.path);
+        expect(decoded['errorCardEnabled'], isTrue);
+        final tmp = File('${settingsFile.path}.tmp');
+        expect(tmp.existsSync(), isFalse);
+      });
+
+      test('保存失败静默：state 保持更新且不抛出、不回滚内存态', () async {
+        // Arrange — 文件路径的中间段被同名文件占据（深路径无法创建），
+        // writeAsString/rename/兜底各级全部失败的真实形态。
+        final occupied = File('${root.path}${Platform.pathSeparator}occupied');
+        await occupied.writeAsString('not a directory');
+        final doomed = File(
+          '${occupied.path}${Platform.pathSeparator}deep'
+          '${Platform.pathSeparator}settings.json',
+        );
+        final store = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => doomed,
+        );
+
+        // Act — 保存失败被吞没，不向调用方抛出。
+        store.setLogDirectory(root.path);
+        await store.pendingPersist;
+
+        // Assert — D-01：内存态保持用户刚设置的值。
+        expect(store.state.value.logDirectory, root.path);
+        expect(doomed.existsSync(), isFalse);
+      });
+
+      test('debug 默认 provider 指向项目目录旁 settings.json', () {
+        // Act
+        final file = ErrorFeedbackSettings.defaultSettingsFile();
+
+        // Assert — debug 模式默认存 cwd 旁（release 差异由 kDebugMode 三目
+        // 与 doc comment 承载，编译期 const 无法在 debug 测试中切换）。
+        expect(file.path, startsWith(Directory.current.path));
+        expect(file.path, endsWith('settings.json'));
+      });
+    });
   });
 }
 
