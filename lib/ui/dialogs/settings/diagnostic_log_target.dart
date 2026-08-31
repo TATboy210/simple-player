@@ -14,12 +14,14 @@ library;
 
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 
+import '../../../l10n/app_localizations.dart';
+import '../../shared/osd_overlay.dart';
 import 'error_feedback_settings.dart';
 
 /// 诊断日志落点协调器单例 —— 设置 UI 与组合根共用的重定向协议实现。
@@ -202,5 +204,72 @@ final class DiagnosticLogTarget {
     }
     effectiveLogPath.value = null;
     pendingFallbackNotice.value = null;
+  }
+}
+
+/// 回退通知桥 —— 协调器的一次性回退通知 → 应用层 OSD（D-04 第二通道）。
+///
+/// Zero-layout bridge widget mounted at the root error-card Stack: it renders
+/// nothing and owns no hit-test surface; its only side effect is showing the
+/// localized one-shot OSD notice ([OsdService.I.show]) when a fallback notice
+/// is pending, then consuming it so the notice can never repeat or stack up.
+final class DiagnosticFallbackNotice extends StatefulWidget {
+  const DiagnosticFallbackNotice({super.key});
+
+  @override
+  State<DiagnosticFallbackNotice> createState() =>
+      _DiagnosticFallbackNoticeState();
+}
+
+final class _DiagnosticFallbackNoticeState
+    extends State<DiagnosticFallbackNotice> {
+  @override
+  void initState() {
+    super.initState();
+    DiagnosticLogTarget.I.pendingFallbackNotice.addListener(_onNoticeChanged);
+    // 启动激活可能先于本壳首帧完成（激活在 unawaited 路径内，时序不定，
+    // RESEARCH Pitfall 7 同源）：挂载时补检一次既有通知。
+    if (DiagnosticLogTarget.I.pendingFallbackNotice.value != null) {
+      _scheduleNotice();
+    }
+  }
+
+  @override
+  void dispose() {
+    DiagnosticLogTarget.I.pendingFallbackNotice
+        .removeListener(_onNoticeChanged);
+    super.dispose();
+  }
+
+  /// 通知到达 → 调度 post-frame 展示（副作用不在 build 内）。
+  void _onNoticeChanged() {
+    if (DiagnosticLogTarget.I.pendingFallbackNotice.value != null) {
+      _scheduleNotice();
+    }
+  }
+
+  void _scheduleNotice() {
+    // post-frame 保证 OSD 挂载后才 show：osdDefaultHoldMs=1200 的 hide Timer
+    // 从可见期起算，不会先于可见期耗尽（RESEARCH Pitfall 7 时序）。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showPendingNotice());
+  }
+
+  /// 展示一次性通知并立即消费（D-04：出现恰一次，不刷屏）。
+  void _showPendingNotice() {
+    if (!mounted) {
+      return;
+    }
+    if (DiagnosticLogTarget.I.pendingFallbackNotice.value == null) {
+      // 已被消费或已清空 —— 幂等防御。
+      return;
+    }
+    OsdService.I.show(AppLocalizations.of(context).logFallbackNotice);
+    DiagnosticLogTarget.I.consumeFallbackNotice();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 零布局占用、无 hit-test 面：副作用全部在监听回调 + post-frame 内。
+    return const SizedBox.shrink();
   }
 }
