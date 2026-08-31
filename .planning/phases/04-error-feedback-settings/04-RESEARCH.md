@@ -505,22 +505,25 @@ Note: if the new chain fails *after* dispose, the delegate stays deactivated (re
 | A4 | Mid-session loss of a previously valid configured directory (e.g., disconnected network drive) is covered by the existing Phase 2 degradation (`logsAvailable=false`) rather than auto-re-fallback | Pattern 1 | Medium: if the user expects auto-recovery, an extra "re-probe on failure" step would be needed — flagged as Open Question 3 |
 | A5 | `flutter gen-l10n` runs as part of `flutter pub get`/build in this project's toolchain (standard Flutter l10n.yaml setup) | Pitfall 8 | Low: worst case an explicit command step in the plan |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the fallback reason persist anywhere?**
    - What we know: D-04 mandates inline status + one-shot OSD at fallback time. The settings.json keeps the *configured* value.
    - What's unclear: whether the UI should also persist/display *why* the fallback happened after restart (e.g., last probe error) or recompute live.
    - Recommendation: recompute live at each startup (cheap probe); no persistence of the reason. Confirm in plan review.
+   - RESOLVED → 采纳建议：回退原因不持久化，每次启动重算（已写入 04-02-PLAN must_haves.truths 第 4 条 + Task 2 acceptance_criteria「无持久化回退原因」）。
 
 2. **"last-known-good" interpretation**
    - What we know: SET-02 says "无效路径回退默认/last-known-good"; the chain (configured → exe-root → AS) effectively *is* last-known-good because the AS location from Phase 2 still exists on disk.
    - What's unclear: whether the user expects a separate persisted lastKnownGood key.
    - Recommendation: no extra key — the chain's exe-root/AS tiers are inherently known-good; document this interpretation in PLAN.md for user visibility.
+   - RESOLVED → 采纳建议：不新增 lastKnownGood 持久化 key，回退链（configured → exe-root → AS）本身即 last-known-good（已写入 04-02-PLAN must_haves.truths 第 4 条 + Task 2 acceptance_criteria「无 lastKnownGood key」）。
 
 3. **Auto re-fallback mid-session?**
    - What we know: the sink's containment flips `logsAvailable=false` if the active directory becomes unwritable mid-session.
    - What's unclear: whether Phase 4 should add "re-probe + re-fallback on repeated write failure" (a behavior extension beyond SET-02's wording).
    - Recommendation: defer to the deferred backend-optimization round (D-06); Phase 4 covers configuration-time validation only.
+   - RESOLVED → 采纳建议：会话内自动重回退不做，延后至 D-06 后端优化轮；Phase 4 仅覆盖配置时校验（已写入 04-02-PLAN must_haves.truths 第 4 条 + Task 2 acceptance_criteria「无会话内自动重回退代码」）。
 
 ## Environment Availability
 
