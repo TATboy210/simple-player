@@ -277,6 +277,73 @@ void main() {
         expect(file.path, startsWith(Directory.current.path));
         expect(file.path, endsWith('settings.json'));
       });
+
+      group('两层回退（WR-06：exe 旁不可写 → Application Support）', () {
+        test('probe-fail primary falls back to Application Support and '
+            'round-trips', () async {
+          // Arrange — 层 1 父目录被同名文件占据（create+探测必败的真实形态），
+          // AS 层指向真实临时目录并预置一份持久值。
+          final occupied = File('${root.path}${Platform.pathSeparator}occupied');
+          await occupied.writeAsString('not a directory');
+          final doomedPrimary = File(
+            '${occupied.path}${Platform.pathSeparator}settings.json',
+          );
+          final support = Directory(
+            '${root.path}${Platform.pathSeparator}support',
+          );
+          await support.create();
+          final asFile = File(
+            '${support.path}${Platform.pathSeparator}settings.json',
+          );
+          await asFile.writeAsString('{"version":1,"errorCardEnabled":false}');
+          ErrorFeedbackSettings.I.resetForTesting(
+            settingsFile: () => doomedPrimary,
+          );
+
+          // Act
+          await ErrorFeedbackSettings.I.load(
+            applicationSupportDirectory: () async => support,
+          );
+
+          // Assert — 回退层读取生效：false 来自 AS 文件而非默认值。
+          expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isFalse);
+
+          // 写入同样落在回退层（会话内记住层级，不逐写探测）。
+          ErrorFeedbackSettings.I.setCardEnabled(true);
+          await ErrorFeedbackSettings.I.pendingPersist;
+          final decoded = jsonDecode(await asFile.readAsString());
+          expect(decoded['errorCardEnabled'], isTrue);
+          expect(doomedPrimary.existsSync(), isFalse);
+        });
+
+        test('both tiers unwritable: defaults in memory, no crash, silent '
+            'persist', () async {
+          // Arrange — 层 1 父目录被文件占据 + AS provider 抛出。
+          final occupied = File('${root.path}${Platform.pathSeparator}occupied');
+          await occupied.writeAsString('not a directory');
+          final doomedPrimary = File(
+            '${occupied.path}${Platform.pathSeparator}settings.json',
+          );
+          ErrorFeedbackSettings.I.resetForTesting(
+            settingsFile: () => doomedPrimary,
+          );
+
+          // Act — load 不抛出，状态保持默认。
+          await ErrorFeedbackSettings.I.load(
+            applicationSupportDirectory: () async =>
+                throw const FileSystemException('support unavailable'),
+          );
+
+          // Assert — D-01：内存默认值；persist 静默失败且不产生任何文件。
+          expect(
+            ErrorFeedbackSettings.I.state.value,
+            const ErrorFeedbackSettingsData(),
+          );
+          ErrorFeedbackSettings.I.setCardEnabled(false);
+          await ErrorFeedbackSettings.I.pendingPersist;
+          expect(doomedPrimary.existsSync(), isFalse);
+        });
+      });
     });
   });
 }

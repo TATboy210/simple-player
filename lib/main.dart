@@ -132,7 +132,11 @@ Future<void> _activateDiagnosticLog(
     // 设置加载先于位置解析且同在 unawaited 激活路径内（RESEARCH Pitfall 7）：
     // 配置的日志目录当次启动即生效，且绝不阻塞 MediaKit/window/runApp。
     // store 构造同步零 I/O；save 失败静默回退（D-01），解析失败逐层跳层。
-    await ErrorFeedbackSettings.I.load();
+    // AS provider 供 WR-06 两层回退：exe 旁目录不可写（MSIX/ACL 保护目录）
+    // 时设置改存 Application Support，探测一次性在 load 内完成并记住层级。
+    await ErrorFeedbackSettings.I.load(
+      applicationSupportDirectory: getApplicationSupportDirectory,
+    );
     final result = await ErrorLogLocation.resolve(
       applicationSupportDirectory: getApplicationSupportDirectory,
       // 组合根注入运行中可执行文件所在目录（kernel 不直接读进程位置；
