@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import 'features/player/player_feature.dart';
@@ -47,7 +48,8 @@ class App extends StatelessWidget {
       darkTheme: theme,
       themeMode: ThemeMode.dark,
       home: _buildPlayerHome(context),
-      builder: buildErrorCardMount,
+      builder: (context, navigator) =>
+          buildErrorCardMount(context, navigator, mode: windowService.mode),
     );
   }
 
@@ -80,17 +82,27 @@ class App extends StatelessWidget {
   }
 }
 
-/// 构建错误卡片挂载层（D-10 修订，2026-08-30 用户拍板）。
+/// 构建错误卡片挂载层（D-10 修订，2026-08-30 用户拍板；G-03-2 位置修订）。
 ///
 /// 卡片挂载于 MaterialApp.builder 的 root Stack、**Navigator 之上**：
 /// media_kit 全屏 route 与设置对话框均不再覆盖卡片，卡片在两者期间持续存活。
 /// D-05 的「设置打开时卡片被覆盖」语义被 D-10 取代；D-05 其余意图
 /// （root Stack 顶层、打开期间存活）保留。
 ///
+/// **双定位语义（G-03-2，UAT「卡片压标题栏」修复）**：[mode] 非 null 时
+/// 订阅窗口模式（CARD-06 ValueListenable 惯例）——全屏（D-10）保持窗口
+/// 左上角 [Tokens.spMd]；窗口化/最大化时卡片顶缘下移到标题栏下缘
+/// （`_errorCardWindowedTop` = 视频区上缘 + 既有呼吸距），不再遮挡自定义
+/// 标题栏。[mode] 为 null 时按窗口化偏移定位（确定性分支，供 tear-off
+/// 调用方与非窗口宿主使用）。
+///
 /// hit-test 边界（CARD-02 / T-03-04）：宿主以 Positioned(left, top) 内在尺寸
 /// 挂载——RenderStack 对未被子节点覆盖的位置 hitTestSelf 返回 false，点击
 /// 自然穿透到下层内容。严禁 Positioned.fill/全尺寸透明容器包裹宿主，严禁
 /// IgnorePointer 包卡片——过大的可命中矩形会吞掉全应用的点击。
+/// （Positioned 经 ValueListenableBuilder 构建仍作用于 RenderStack：VLB 不
+/// 引入 render object，ParentData 直达 Stack——穿透语义不变，仅 top 值随
+/// mode 变化。）
 ///
 /// 局部 Overlay（CR-01 修复配套）：卡片挂载于 Navigator 之外（D-10，root
 /// Stack 层），子树内没有 Overlay 祖先 —— 展开详情的 SelectableText 在点击
@@ -100,20 +112,46 @@ class App extends StatelessWidget {
 /// 内在尺寸自适应（Overlay 收到无限约束时的专用路径——有限约束会让
 /// theatre tight-fill 撑满并破坏内在尺寸/穿透），卡片本身再由
 /// [_ErrorCardOverlayMount] 内的 ConstrainedBox 收口（见其文档）。
-Widget buildErrorCardMount(BuildContext context, Widget? navigator) {
+Widget buildErrorCardMount(
+  BuildContext context,
+  Widget? navigator, {
+  ValueListenable<WindowMode>? mode,
+}) {
   return Stack(
     children: [
       Positioned.fill(child: navigator ?? const SizedBox.shrink()),
-      const Positioned(
-        left: Tokens.controlBarMarginH,
-        top: Tokens.spMd,
-        child: RepaintBoundary(child: _ErrorCardOverlayMount()),
-      ),
+      if (mode == null)
+        Positioned(
+          left: Tokens.controlBarMarginH,
+          top: _errorCardWindowedTop,
+          child: const RepaintBoundary(child: _ErrorCardOverlayMount()),
+        )
+      else
+        ValueListenableBuilder<WindowMode>(
+          valueListenable: mode,
+          builder: (context, current, _) => Positioned(
+            left: Tokens.controlBarMarginH,
+            top: current.isFullscreen ? Tokens.spMd : _errorCardWindowedTop,
+            child: const RepaintBoundary(child: _ErrorCardOverlayMount()),
+          ),
+        ),
     ],
   );
 }
 
+/// 窗口化时错误卡片的顶缘偏移 —— 标题栏下缘 + 既有呼吸距（G-03-2）。
+///
+/// [Tokens.titleBarHeight] 是 CustomTitleBar 实际布局高度的同一编译期常量
+/// （custom_title_bar.dart 的 SizedBox 直接消费），单源保证卡片顶缘与视频
+/// 区上缘永不错位；相比 GlobalKey/布局回调取视频区实际位置，零新耦合且
+/// 精度足够（标题栏高度恒定，不随窗口尺寸/布局变化）。
+const double _errorCardWindowedTop = Tokens.titleBarHeight + Tokens.spMd;
+
 /// 错误卡片挂载壳 —— 局部 Overlay + 尺寸收口（CR-01）。
+///
+/// 定位不归本壳负责：窗口化/全屏双位置语义（G-03-2）由外层
+/// [buildErrorCardMount] 的 Positioned top 值决定，本壳只负责从 Positioned
+/// 原点向下的 Overlay 提供与尺寸收口。
 ///
 /// 两层职责缺一不可：
 /// - **Overlay**（见 [buildErrorCardMount] 文档）：为卡片子树提供 Overlay
