@@ -135,24 +135,36 @@ void main() {
     expect(find.byType(GeneralSettingsContent), findsOneWidget);
 
     // 灰显占位项不可交互（Avoid captive UI）：点击无伪反馈、内容不切换。
-    await tester.tap(find.text('视频'));
+    // IgnorePointer 拦截命中是灰显行为的直接证据 —— warnIfMissed: false 显式
+    // 声明「点击落空即预期」。
+    await tester.tap(find.text('视频'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('音频'));
+    await tester.tap(find.text('音频'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(GeneralSettingsContent), findsOneWidget);
     expect(find.text('media_kit'), findsNothing);
 
     // 灰显语义结构锁：38% 不透明度 + IgnorePointer 保持原状。
+    // .first 取最内层（导航条目自身的 Opacity/IgnorePointer）。
     final videoOpacity = tester.widget<Opacity>(
-      find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)),
+      find.ancestor(
+        of: find.text('视频'),
+        matching: find.byType(Opacity),
+      ).first,
     );
     expect(videoOpacity.opacity, 0.38);
     final audioOpacity = tester.widget<Opacity>(
-      find.ancestor(of: find.text('音频'), matching: find.byType(Opacity)),
+      find.ancestor(
+        of: find.text('音频'),
+        matching: find.byType(Opacity),
+      ).first,
     );
     expect(audioOpacity.opacity, 0.38);
     final videoPointer = tester.widget<IgnorePointer>(
-      find.ancestor(of: find.text('视频'), matching: find.byType(IgnorePointer)),
+      find.ancestor(
+        of: find.text('视频'),
+        matching: find.byType(IgnorePointer),
+      ).first,
     );
     expect(videoPointer.ignoring, isTrue);
   });

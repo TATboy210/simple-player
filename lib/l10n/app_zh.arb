@@ -222,5 +222,15 @@
   "errorCardLogUnavailable": "日志文件不可用",
   "errorCardLocationUnavailable": "定位不可用",
   "errorCardCycleTooltip": "轮览错误",
-  "logFallbackNotice": "日志已回退到默认位置"
+  "logFallbackNotice": "日志已回退到默认位置",
+
+  "errorCardToggleLabel": "错误卡片",
+  "logPathLabel": "日志目录",
+  "logPathHint": "留空使用默认位置",
+  "logPathBrowse": "浏览…",
+  "logPathValidatingStatus": "校验中…",
+  "logPathValidStatus": "目录可写",
+  "logPathInvalidStatus": "无法写入该目录",
+  "logFallbackReasonPrefix": "已回退到默认位置",
+  "logEffectivePathLabel": "当前有效路径"
 }
