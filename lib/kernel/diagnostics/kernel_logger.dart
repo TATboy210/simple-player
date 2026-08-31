@@ -503,6 +503,13 @@ final class KernelLoggerImpl extends KernelLogger {
     return inst;
   }
 
+  /// 是否已初始化 —— 无副作用的防御探针（WR-02）。
+  ///
+  /// 与 [ErrorReporterImpl.isInitialized] 同一模式：UI 层失败隔离路径
+  /// （ErrorCard 复制失败分支）在访问 [I] 前先探测，避免把被捕获的
+  /// PlatformException 变成外溢的 StateError（CARD-04/T-03-11 保证）。
+  static bool get isInitialized => _instance != null;
+
   /// 组合根 — 根据 Flutter 构建模式初始化默认 sink.
   ///
   /// Debug 双路输出，Profile 仅写 DevTools，Release 使用 [NullSink]。必须在

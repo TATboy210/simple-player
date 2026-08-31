@@ -156,20 +156,27 @@ class _ErrorCardState extends State<ErrorCard> {
       _showCopyFailed(l10n);
       // PlatformException 属可恢复运行期故障：结构化 warn 供日志回溯
       // （kernel 红线内 UI 层允许 debugPrint，但结构化日志优先）。
-      KernelLogger.I.w(
-        'clipboard copy failed',
-        context: {'code': error.code, 'message': error.message},
-      );
+      // WR-02/CARD-04：KernelLogger.I 在未 init 时抛 StateError —— 失败
+      // 隔离路径不得自己先炸，先用 isInitialized 探针守卫。
+      if (KernelLoggerImpl.isInitialized) {
+        KernelLogger.I.w(
+          'clipboard copy failed',
+          context: {'code': error.code, 'message': error.message},
+        );
+      }
     } on MissingPluginException catch (error) {
       // 防御分支：Clipboard 走 OptionalMethodChannel，其 invokeMethod 已在
       // 内部吞掉 MissingPluginException（测试环境未 mock 的 send 更是永不
       // 完成）—— 此 catch 正常不可触达，保留以对冲 channel 实现变化。
       _showCopyFailed(l10n);
       assert(() {
-        KernelLogger.I.w(
-          'clipboard channel unavailable (MissingPluginException)',
-          context: {'error': error.toString()},
-        );
+        // 同 WR-02：assert 内的日志调用同样不得在未 init 时抛错。
+        if (KernelLoggerImpl.isInitialized) {
+          KernelLogger.I.w(
+            'clipboard channel unavailable (MissingPluginException)',
+            context: {'error': error.toString()},
+          );
+        }
         return true;
       }());
     }
