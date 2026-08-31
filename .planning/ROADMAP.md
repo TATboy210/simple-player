@@ -139,7 +139,7 @@ Plans:
   2. 用户可配置日志输出路径，应用会在采用前验证可写性；无效路径自动回退到默认或最后一个可用位置，而不会中断错误记录。
   3. 用户修改卡片偏好或有效日志路径后重启应用，设置仍被保留；切换日志路径不会损坏写入中的诊断记录。
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 Plans:
 **Wave 1**
 
@@ -152,7 +152,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1–2 completion)*
 
-- [ ] 04-04-PLAN.md — 设置「通用」tab 实装（选中态架构 + 开关行 + 路径行防抖校验/浏览/行内状态）与 Phase 收口质量门（SET-01/02/03）。
+- [x] 04-04-PLAN.md — 设置「通用」tab 实装（选中态架构 + 开关行 + 路径行防抖校验/浏览/行内状态）与 Phase 收口质量门（SET-01/02/03）。
 
 **UI hint**: yes
 
@@ -182,5 +182,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
 | 3. 播放错误桥与非模态卡片 | 6/6 | Complete    | 2026-08-31 |
-| 4. 错误反馈设置 | 3/4 | In Progress|  |
+| 4. 错误反馈设置 | 4/4 | In Progress|  |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |

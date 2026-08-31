@@ -37,9 +37,9 @@
 
 ### 设置 (Settings)
 
-- [ ] **SET-01**: 设置"通用"tab 错误卡片开关（默认开；关掉后只落盘不弹卡，捕获与落盘不受影响）
-- [ ] **SET-02**: 设置"通用"tab 日志输出路径可配置，写入前可写性校验，无效路径回退默认/last-known-good，配置变更后 sink 安全重建
-- [ ] **SET-03**: 设置值重启持久化
+- [x] **SET-01**: 设置"通用"tab 错误卡片开关（默认开；关掉后只落盘不弹卡，捕获与落盘不受影响）
+- [x] **SET-02**: 设置"通用"tab 日志输出路径可配置，写入前可写性校验，无效路径回退默认/last-known-good，配置变更后 sink 安全重建
+- [x] **SET-03**: 设置值重启持久化
 
 ### 迁移 (Migration)
 
@@ -95,9 +95,9 @@
 | CARD-05 | Phase 3 | Complete |
 | CARD-06 | Phase 3 | Complete |
 | MIG-01 | Phase 3 | Complete |
-| SET-01 | Phase 4 | Pending |
-| SET-02 | Phase 4 | Pending |
-| SET-03 | Phase 4 | Pending |
+| SET-01 | Phase 4 | Complete |
+| SET-02 | Phase 4 | Complete |
+| SET-03 | Phase 4 | Complete |
 | VER-01 | Phase 5 | Pending |
 | VER-02 | Phase 5 | Pending |
 | VER-03 | Phase 5 | Pending |
