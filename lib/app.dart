@@ -122,10 +122,10 @@ Widget buildErrorCardMount(
     children: [
       Positioned.fill(child: navigator ?? const SizedBox.shrink()),
       if (mode == null)
-        Positioned(
+        const Positioned(
           left: Tokens.controlBarMarginH,
           top: _errorCardWindowedTop,
-          child: const RepaintBoundary(child: _ErrorCardOverlayMount()),
+          child: RepaintBoundary(child: _ErrorCardOverlayMount()),
         )
       else
         ValueListenableBuilder<WindowMode>(
