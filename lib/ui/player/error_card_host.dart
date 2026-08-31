@@ -224,7 +224,10 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
           // CARD-01 前置：卡内无焦点可请求，键盘操作不会被卡片劫持。
           child: ErrorCard(
             report: report,
-            totalCount: history.length,
+            // IN-03：快照为空（未挂 effect 的极简挂载，展示 presentation
+            // 兜底）时徽标仍应反映正在展示的这一条 —— 否则出现「0 错误」
+            // 徽标与卡片内容自相矛盾。
+            totalCount: history.isEmpty ? 1 : history.length,
             // D-01 徽标轮览接线（03-03）：纯视图偏移，不消费队列。
             onBadgeTap: _cycleBadge,
             // CARD-01 手动关闭唯一接线点：dismissCurrent 推进 FIFO，队首
