@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 4
 current_phase_name: 错误反馈设置
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-08-31T16:07:23.719Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-08-31T16:37:58.398Z"
 last_activity: 2026-08-31
 last_activity_desc: Phase 4 execution started
-state_head: f2287ad08638da495c07eb7c4c67d7ed643fcb15
+state_head: 6f2a5289133d7234edb69df091d2f0b9b4f1fc83
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
   percent: 60
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 ## Current Position
 
 Phase: 4 (错误反馈设置) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-08-31 — Phase 4 execution started
 
@@ -71,6 +71,7 @@ Progress: [██████░░░░] 60%
 | Phase 03 P03-06 | 3840 | 3 tasks | 11 files |
 | Phase 04 P04-01 | 17min | 2 tasks | 5 files |
 | Phase 04 P04-02 | 30min | 3 tasks | 11 files |
+| Phase 04 P04-03 | 24min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecti
 - [Phase 3]: MIG-01 收官：旧横幅在删前双路径等效证明（372b10a9）+ 用户批准后全量删除（0805618b）——错误展示收敛为 ErrorCard 单一路径；动作按钮按 D-09 不迁移；error_card.dart doc 字面量同步改写以满足 grep 门（Rule 3）
 - [Phase 04]: D-02 修订落地:三层回退链(配置目录→exe根 logs/→Application Support logs/)取代 Phase-02 D-03 单一 AS 位置 — D-02 是对 Phase 2 单点位置函数的修订;回退链本身即 last-known-good(research OQ2),旧 AS 日志不迁移是一次性行为决策(零迁移代码)
 - [Phase 04]: 设置存储放 UI 层单例 store(便携 settings.json + 注入文件 seam),kernel 编辑仅限 error_log_location.dart 三层链扩展;reporter/单写者语义零接触 — main.dart:20 导入 UI 层文件已有先例;kernel_logger_gate GATE 1/2 与 reporter/sink/deps 零 diff 验证通过;原子写走 tmp+rename 四级降级(research 实测 errno-5 瞬态)
+- [Phase 04]: SET-01 呈现门控：ErrorCardHost.build 外层 ValueListenableBuilder 订阅 ErrorFeedbackSettings.I.state，off 同帧消失/on 恢复最新，_apply/_routeWarning 零改动 — 门控只影响渲染，捕获/快照/落盘链零接触（D-05 零 kernel 由 diff 面与 kernel gate 双重证明）；默认开语义由 store 损坏矩阵（04-01）+ host 回归锁用例双层锁定
 
 ### Pending Todos
 
@@ -117,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-31T16:07:23.075Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-08-31T16:37:18.311Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None

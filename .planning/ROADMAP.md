@@ -139,7 +139,7 @@ Plans:
   2. 用户可配置日志输出路径，应用会在采用前验证可写性；无效路径自动回退到默认或最后一个可用位置，而不会中断错误记录。
   3. 用户修改卡片偏好或有效日志路径后重启应用，设置仍被保留；切换日志路径不会损坏写入中的诊断记录。
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 Plans:
 **Wave 1**
 
@@ -148,7 +148,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 04-02-PLAN.md — 日志路径单层校验 + DiagnosticLogTarget 重定向协调器 + 回退双通道告知（SET-02，D-03/D-04）。
-- [ ] 04-03-PLAN.md — 错误卡片开关呈现门控：off 同帧消失、捕获落盘零影响、on 恢复最新（SET-01，D-05，零 kernel）。
+- [x] 04-03-PLAN.md — 错误卡片开关呈现门控：off 同帧消失、捕获落盘零影响、on 恢复最新（SET-01，D-05，零 kernel）。
 
 **Wave 3** *(blocked on Waves 1–2 completion)*
 
@@ -182,5 +182,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
 | 3. 播放错误桥与非模态卡片 | 6/6 | Complete    | 2026-08-31 |
-| 4. 错误反馈设置 | 2/4 | In Progress|  |
+| 4. 错误反馈设置 | 3/4 | In Progress|  |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |
