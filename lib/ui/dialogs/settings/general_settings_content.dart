@@ -87,9 +87,13 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
   @override
   void initState() {
     super.initState();
-    // D-03：输入框初始显示当前有效路径 —— 用户永远知道日志在哪。
+    // D-03：输入框初始显示当前「配置的日志目录」（store 值，WR-02）——
+    // 而非解析后的有效文件路径（…\logs\error.log）：本字段提交为目录，
+    // 以文件路径作种子会让增量编辑（如改盘符）把 error.log 段带进目录值，
+    // 校验器 create(recursive) 会造出 error.log/ 目录树。完整有效路径由
+    // 常显的 _EffectivePathLine（D-04 第一通道）承载，用户仍一眼可知落点。
     _pathController = TextEditingController(
-      text: DiagnosticLogTarget.I.effectiveLogPath.value ?? '',
+      text: ErrorFeedbackSettings.I.state.value.logDirectory,
     );
   }
 
