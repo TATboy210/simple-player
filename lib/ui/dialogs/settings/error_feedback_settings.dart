@@ -8,7 +8,6 @@
 /// the defaults (D-01) so startup and UI are never blocked.
 library;
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -46,6 +45,12 @@ final class ErrorFeedbackSettingsData {
 /// 阻塞 MediaKit/window/runApp）。读写失败静默回退默认值（D-01）。
 final class ErrorFeedbackSettings {
   ErrorFeedbackSettings._({File Function()? settingsFile})
+    : _settingsFile = settingsFile ?? defaultSettingsFile;
+
+  /// 测试专用：以注入 seam 构造独立实例（round-trip 重启模拟用），
+  /// 不触碰单例 [I] 的内存态（循 ErrorReporterImpl.forTesting 惯例）。
+  @visibleForTesting
+  ErrorFeedbackSettings.forTesting({File Function()? settingsFile})
     : _settingsFile = settingsFile ?? defaultSettingsFile;
 
   /// 全局单例 —— 循 ErrorCaptureSnapshot.I 形态，跨层共享同一份内存态。
@@ -109,7 +114,7 @@ final class ErrorFeedbackSettings {
       logDirectory: state.value.logDirectory,
     );
     state.value = next;
-    unawaited(_persist(next));
+    _persistFuture = _persist(next);
   }
 
   /// SET-02 日志目录写入：内存态立即更新，fire-and-forget 持久化。
@@ -121,15 +126,81 @@ final class ErrorFeedbackSettings {
       logDirectory: directory,
     );
     state.value = next;
-    unawaited(_persist(next));
+    _persistFuture = _persist(next);
   }
 
-  /// 序列化并落盘当前设置（直写形态；生产加固的原子写见 Task 2）。
+  /// 最近一次 fire-and-forget 持久化的 Future —— 生产路径不等待；
+  /// 测试经 [pendingPersist] 等待写入完成（无生产分支差异）。
+  Future<void> _persistFuture = Future<void>.value();
+
+  /// 测试等待点：等待最近一次持久化完成（含被吞没的失败）。
+  @visibleForTesting
+  Future<void> get pendingPersist => _persistFuture;
+
+  /// 序列化并落盘当前设置：原子写 + 保存失败静默吞没（D-01）。
+  ///
+  /// 任何失败都不向调用方抛出、绝不回滚内存态（window_persistence.dart
+  /// 的 on Exception 静默模板）。
   Future<void> _persist(ErrorFeedbackSettingsData next) async {
     try {
-      await _settingsFile().writeAsString(_encode(next), flush: true);
+      await _atomicWrite(_settingsFile(), _encode(next));
     } on Exception {
-      // 保存失败静默（D-01）——绝不向调用方抛出、绝不回滚内存态。
+      // 保存失败静默（D-01）——残缺文件下次 load 静默回退默认值。
+    }
+  }
+
+  /// 原子写：tmp(flush) → rename（replace-on-existing）+ 四级降级链。
+  ///
+  /// Windows 实测语义（RESEARCH Pattern 3 / Pitfall 1）：rename 覆盖已存在
+  /// 目标成立，但瞬态 errno-5（杀软/扫描器句柄锁）可使同一操作间歇性
+  /// PathAccessException —— 降级链逐级收窄 `on FileSystemException`，任何
+  /// 一级成功即返回：
+  /// 1. 直接 rename（覆盖已存在目标）；
+  /// 2. errno-5 瞬态失败 → 单次重试 rename；
+  /// 3. 仍失败 → 删除目标后重试 rename（实测有效的兜底形态）；
+  /// 4. 最终兜底 → 直接 writeAsString 覆盖（非原子，但 D-01 使残缺无害）。
+  Future<void> _atomicWrite(File target, String contents) async {
+    final tmp = File('${target.path}.tmp');
+    try {
+      await tmp.writeAsString(contents, flush: true);
+      // 第一级：直接 rename（覆盖已存在目标）。
+      if (await _tryRename(tmp, target)) {
+        return;
+      }
+      // 第二级：errno-5 瞬态失败 → 单次重试。
+      if (await _tryRename(tmp, target)) {
+        return;
+      }
+      // 第三级：删除目标后重试 rename。
+      try {
+        await target.delete();
+      } on FileSystemException {
+        // 目标可能本就不存在；rename 的 replace 语义仍可能成功。
+      }
+      if (await _tryRename(tmp, target)) {
+        return;
+      }
+      // 第四级：最终兜底 —— 直接覆盖写。
+      await target.writeAsString(contents, flush: true);
+    } finally {
+      // best-effort 清理 tmp：任何成功/失败路径都不留 settings.json.tmp。
+      try {
+        if (await tmp.exists()) {
+          await tmp.delete();
+        }
+      } on FileSystemException {
+        // 清理失败不致命（D-01：残缺文件下次 load 静默回退默认值）。
+      }
+    }
+  }
+
+  /// 单次 rename 尝试：失败吞 FileSystemException 返回 false（逐级收窄点）。
+  static Future<bool> _tryRename(File tmp, File target) async {
+    try {
+      await tmp.rename(target.path);
+      return true;
+    } on FileSystemException {
+      return false;
     }
   }
 
