@@ -100,7 +100,7 @@ Plans:
   4. 卡片以外的界面区域仍可正常命中，标题栏、控制栏和播放列表操作不被遮挡；卡片显示期间键盘快捷键保持可用。
   5. 播放引擎错误经桥接后与其他来源显示在同一错误卡片中，且在等效覆盖得到验证后旧 ErrorBanner 已被移除。
 
-**Plans**: 4/4 plans executed
+**Plans**: 5 plans (03-01~03-04 executed; 03-05 gap-closure pending — G-03-1)
 Plans:
 **Wave 1**
 
@@ -117,6 +117,10 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion; 含人工删除确认门)*
 
 - [x] 03-04-PLAN.md — MIG-01 双路径等效覆盖测试（D-07/D-09），人工确认后删除 ErrorBanner 并收尾质量门。
+
+**Wave 5** *(gap closure — UAT G-03-1)*
+
+- [ ] 03-05-PLAN.md — 开发用错误注入入口：kDebugMode 门控 Ctrl+Shift+I 经 ErrorReporterImpl 公开 intake 走真实链路弹卡（UAT G-03-1，零 kernel 改动）。
 
 ### Phase 4: 错误反馈设置
 
