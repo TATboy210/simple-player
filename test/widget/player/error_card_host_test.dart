@@ -571,6 +571,42 @@ void main() {
         expect(find.textContaining('错误二'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'new report arrival resets the cycle offset (D-01 replacement)',
+      (tester) async {
+        // Arrange：3 份报告在卡，轮览到最旧（错误一）。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        for (final message in ['错误一', '错误二', '错误三']) {
+          ErrorReporterImpl.I.reportBootstrapSafely(
+            StateError(message),
+            StackTrace.current,
+          );
+        }
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        expect(find.textContaining('错误一'), findsOneWidget);
+
+        // Act：轮览中新报告（错误四）到达 —— 快照变化必须重置轮览偏移（CR-02），
+        // 否则偏移取模后显示位移后的陈旧条目，D-01 替换语义被劫持。
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('错误四'),
+          StackTrace.current,
+        );
+        await tester.pump();
+
+        // Assert：卡片显示新报告，徽标计数跟进。
+        expect(find.textContaining('错误四'), findsOneWidget);
+        expect(find.textContaining('错误一'), findsNothing);
+        expect(find.text('4 错误'), findsOneWidget);
+      },
+    );
   });
 }
 

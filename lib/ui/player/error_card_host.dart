@@ -93,7 +93,12 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
   /// 快照变化 → 相位守卫重渲染（与 [_onPresentationChanged] 同一守卫纪律）：
   /// idle 同步 setState；build/layout/paint 与 post-frame 相位推迟到帧尾，
   /// 帧尾直接重读快照最新值（同帧多报告自然合并为一次重建）。
+  ///
+  /// CR-02：任何快照变化（新报告/合并/移除）都使轮览索引失效 —— 重置到 0
+  /// （最新），保证 D-01「新报告替换卡片内容」不被残留偏移劫持：否则轮览
+  /// 到旧条目后来新报告，偏移取模后显示的是位移后的陈旧条目而非新报告。
   void _onSnapshotChanged() {
+    if (_cycleIndex != 0) _cycleIndex = 0;
     final phase = SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.idle) {
       setState(() {});
