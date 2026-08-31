@@ -263,6 +263,11 @@ class Tokens {
   /// Expanded details max width — wider than collapsed for stack readability.
   static const double errorCardExpandedMaxWidth = 420.0;
 
+  /// 错误卡片最大高度占窗口高度比例（CR-01 修复配套）——挂载层用窗口高度
+  /// × 此比例约束宿主，超出部分由展开详情区的滚动路径消化，卡片不再溢出
+  /// 窗口底部。折叠态高度远低于此上界，不受影响。
+  static const double errorCardMaxHeightRatio = 0.6;
+
   // ── 按钮尺寸 ──
   static const double iconButtonSizeLarge = 48;
   static const double iconButtonSizeSmall = 24;

@@ -145,7 +145,10 @@ class _ErrorCardState extends State<ErrorCard> {
     // l10n 必须在 await 之前解析（await 后使用 context 需 mounted 检查，
     // 提前捕获一次即可覆盖成功/失败两条反馈路径）。
     final l10n = AppLocalizations.of(context);
-    final pack = formatDiagnosticPack(widget.report, logPath: _resolveLogPath());
+    final pack = formatDiagnosticPack(
+      widget.report,
+      logPath: _resolveLogPath(),
+    );
     try {
       await Clipboard.setData(ClipboardData(text: pack));
       OsdService.I.show(l10n.errorCardCopied, icon: Icons.check);
@@ -202,17 +205,22 @@ class _ErrorCardState extends State<ErrorCard> {
               ),
             ),
             const SizedBox(width: Tokens.spSm),
-            ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: Tokens.errorCardMaxWidth,
-              ),
-              child: Text(
-                _resolveMessage(l10n, report),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Tokens.textPrimary,
-                  fontSize: Tokens.fontBody,
+            // CR-01：挂载层收口到 errorCardExpandedMaxWidth 后，本 Row 的
+            // 可用宽度有界 —— message 必须 Flexible 才能在剩余空间内换行
+            // 省略，否则长消息（自身 320 上限）会把 Row 撑溢出。
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: Tokens.errorCardMaxWidth,
+                ),
+                child: Text(
+                  _resolveMessage(l10n, report),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: Tokens.fontBody,
+                  ),
                 ),
               ),
             ),
@@ -269,9 +277,7 @@ class _ErrorCardState extends State<ErrorCard> {
             const SizedBox(width: Tokens.spSm),
             // D-04 chevron 状态指示（纯指示器，点击切换由整卡 GestureDetector 承担）。
             Icon(
-              _expanded
-                  ? Icons.keyboard_arrow_up
-                  : Icons.keyboard_arrow_down,
+              _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
               size: Tokens.iconSm,
               color: Tokens.textSecondary,
             ),
@@ -337,7 +343,10 @@ class _ErrorCardState extends State<ErrorCard> {
   ///
   /// location 为 null（D-05 fallback）时定位段降级为 errorCardLocationUnavailable，
   /// 其余段照常展示 —— 不抛错不缺段；源码行段依赖 location 数据，随之省略。
-  List<Widget> _buildExpandedSections(AppLocalizations l10n, ErrorReport report) {
+  List<Widget> _buildExpandedSections(
+    AppLocalizations l10n,
+    ErrorReport report,
+  ) {
     final location = report.location;
     return [
       // ① 定位：file:line + 成员名；无项目帧 → 降级文案。
@@ -364,7 +373,10 @@ class _ErrorCardState extends State<ErrorCard> {
       ),
       // ④ 日志路径：diagnosticLogPath 当前值；不可用 → 降级文案。
       _sectionTitle(l10n.errorCardSectionLogPath),
-      Text(_resolveLogPath() ?? l10n.errorCardLogUnavailable, style: _secondaryStyle),
+      Text(
+        _resolveLogPath() ?? l10n.errorCardLogUnavailable,
+        style: _secondaryStyle,
+      ),
       // ⑤ 重复信息：出现次数 + 首次/末次时间。
       _sectionTitle(l10n.errorCardSectionRepeats(report.occurrenceCount)),
       Text(
