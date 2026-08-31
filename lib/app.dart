@@ -91,6 +91,15 @@ class App extends StatelessWidget {
 /// 挂载——RenderStack 对未被子节点覆盖的位置 hitTestSelf 返回 false，点击
 /// 自然穿透到下层内容。严禁 Positioned.fill/全尺寸透明容器包裹宿主，严禁
 /// IgnorePointer 包卡片——过大的可命中矩形会吞掉全应用的点击。
+///
+/// 局部 Overlay（CR-01 修复配套）：卡片挂载于 Navigator 之外（D-10，root
+/// Stack 层），子树内没有 Overlay 祖先 —— 展开详情的 SelectableText 在点击
+/// 选择文本时 TextSelectionOverlay 会因 "No Overlay widget found" 断言崩溃
+/// （HEAD 上即存在的隐性问题，CR-01 约束修复让栈文本变得可点后暴露）。
+/// 故挂载壳自带一个最小 Overlay：entry 以 `canSizeOverlay` 让 theatre 按卡片
+/// 内在尺寸自适应（Overlay 收到无限约束时的专用路径——有限约束会让
+/// theatre tight-fill 撑满并破坏内在尺寸/穿透），卡片本身再由
+/// [_ErrorCardOverlayMount] 内的 ConstrainedBox 收口（见其文档）。
 Widget buildErrorCardMount(BuildContext context, Widget? navigator) {
   return Stack(
     children: [
@@ -98,8 +107,47 @@ Widget buildErrorCardMount(BuildContext context, Widget? navigator) {
       const Positioned(
         left: Tokens.controlBarMarginH,
         top: Tokens.spMd,
-        child: RepaintBoundary(child: ErrorCardHost()),
+        child: RepaintBoundary(child: _ErrorCardOverlayMount()),
       ),
     ],
   );
+}
+
+/// 错误卡片挂载壳 —— 局部 Overlay + 尺寸收口（CR-01）。
+///
+/// 两层职责缺一不可：
+/// - **Overlay**（见 [buildErrorCardMount] 文档）：为卡片子树提供 Overlay
+///   祖先；entry `canSizeOverlay: true` 使 theatre 在无限约束下按子树内在
+///   尺寸定Size，空白区点击穿透语义（CARD-02）不变；
+/// - **ConstrainedBox**：RenderStack 对只有 left/top 锚点的 Positioned 子
+///   节点给**无界**约束——展开卡片曾被长调用栈撑到 1133px（800px 窗口），
+///   Flexible(SingleChildScrollView) 滚动失效。宽度上界
+///   [Tokens.errorCardExpandedMaxWidth]（折叠态天然更窄，message 另有
+///   [Tokens.errorCardMaxWidth] 截断）；高度上界为窗口高度 ×
+///   [Tokens.errorCardMaxHeightRatio]，超出部分进入展开详情区滚动路径。
+///   卡片仍以顶左内在尺寸放置，命中区域只覆盖卡片自身矩形。
+class _ErrorCardOverlayMount extends StatelessWidget {
+  const _ErrorCardOverlayMount();
+
+  @override
+  Widget build(BuildContext context) {
+    // 窗口尺寸经挂载子树内的 context 读取（builder 的 context 位于
+    // WidgetsApp 的 MediaQuery 之上，不能直接在 buildErrorCardMount 里读）。
+    final maxHeight =
+        MediaQuery.sizeOf(context).height * Tokens.errorCardMaxHeightRatio;
+    return Overlay(
+      initialEntries: [
+        OverlayEntry(
+          canSizeOverlay: true,
+          builder: (_) => ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: Tokens.errorCardExpandedMaxWidth,
+              maxHeight: maxHeight,
+            ),
+            child: const ErrorCardHost(),
+          ),
+        ),
+      ],
+    );
+  }
 }

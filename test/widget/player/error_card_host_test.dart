@@ -12,6 +12,7 @@ import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_window_service.dart';
 
@@ -164,6 +165,79 @@ void main() {
     });
   });
 
+  // ---------- CR-01 生产挂载约束：展开卡片不再无界 ----------
+  //
+  // 关键：必须复用 buildErrorCardMount（生产挂载路径）——旧套件全部把卡片
+  // 挂在有界 Align/Center 里，掩盖了 RenderStack 对 left/top Positioned
+  // 子节点给无界约束的问题。本组用无界 Positioned + 长调用栈复现原始缺陷。
+  group('CR-01 挂载约束（生产 mount 路径）', () {
+    testWidgets(
+      'expanded card is width/height bounded and taps outside pass through',
+      (tester) async {
+        // Arrange：卡片下方铺满点击探针；真实 intake 接纳长调用栈报告。
+        var probeTaps = 0;
+        await tester.pumpWidget(
+          buildMountHarness(
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  Positioned.fill(
+                    child: GestureDetector(
+                      key: const ValueKey('probe'),
+                      onTap: () => probeTaps++,
+                      child: Container(color: Colors.blue),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        // 长调用栈：每行远超展开宽度上界，无界挂载下曾把卡片撑到 ~1133px 宽
+        // （review CR-01 实测值），并使滚动与穿透全部失效。
+        final longStack = List.generate(
+          30,
+          (i) =>
+              '#$i      frame_$i '
+              '(package:simple_player_flutter/lib/kernel/engine/'
+              'media_kit_engine.dart:${100 + i}:7)',
+        ).join('\n');
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('约束检查'),
+          StackTrace.fromString(longStack),
+        );
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsOneWidget);
+
+        // Act：整卡点击展开。
+        await tester.tapAt(tester.getCenter(find.text('Bad state: 约束检查')));
+        await tester.pump();
+        expect(find.text('调用栈'), findsOneWidget);
+
+        // Assert：宽度 ≤ token 上界（无界挂载回归锁）。
+        final cardRect = tester.getRect(find.byType(ErrorCard));
+        expect(
+          cardRect.width,
+          lessThanOrEqualTo(Tokens.errorCardExpandedMaxWidth),
+        );
+        // Assert：高度不溢出窗口 —— bounded maxHeight 让展开详情区进入
+        // Flexible+SingleChildScrollView 滚动路径而非溢出窗口底部。
+        final windowHeight = MediaQuery.sizeOf(
+          tester.element(find.byType(ErrorCard)),
+        ).height;
+        expect(cardRect.bottom, lessThanOrEqualTo(windowHeight));
+
+        // Act / Assert：展开态下卡片矩形之外点击仍穿透到下层控件（ClipRRect
+        // 命中裁剪以卡片真实矩形为准 —— 有界卡片不再吞掉全窗口点击）。
+        await tester.tapAt(const Offset(700, 300));
+        await tester.pump();
+        expect(probeTaps, 1);
+        expect(find.text('调用栈'), findsOneWidget);
+      },
+    );
+  });
+
   group('CARD-05 build 期安全与宿主调度时序', () {
     testWidgets(
       'build-phase report arrival causes no secondary markNeedsBuild',
@@ -301,12 +375,15 @@ void main() {
       void onPresentationChanged() => presentationChanges++;
       ErrorReporterImpl.I.presentation.addListener(onPresentationChanged);
       addTearDown(
-        () => ErrorReporterImpl.I.presentation.removeListener(onPresentationChanged),
+        () => ErrorReporterImpl.I.presentation.removeListener(
+          onPresentationChanged,
+        ),
       );
       var osdShows = 0;
       void onOsdMessage() {
         if (OsdService.I.message.value != null) osdShows++;
       }
+
       OsdService.I.message.addListener(onOsdMessage);
       addTearDown(() => OsdService.I.message.removeListener(onOsdMessage));
 
@@ -353,33 +430,40 @@ void main() {
   });
 
   group('badge 徽标轮览（D-01/D-11）', () {
-    testWidgets('newest error replaces the card and badge counts the snapshot', (
-      tester,
-    ) async {
-      // Arrange。
-      await tester.pumpWidget(
-        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
-      );
-      await tester.pump();
+    testWidgets(
+      'newest error replaces the card and badge counts the snapshot',
+      (tester) async {
+        // Arrange。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
 
-      // Act：连续接纳 3 份不同报告（真实 intake）。
-      for (final message in ['错误一', '错误二', '错误三']) {
-        ErrorReporterImpl.I.reportBootstrapSafely(StateError(message), StackTrace.current);
-      }
-      await tester.pump();
+        // Act：连续接纳 3 份不同报告（真实 intake）。
+        for (final message in ['错误一', '错误二', '错误三']) {
+          ErrorReporterImpl.I.reportBootstrapSafely(
+            StateError(message),
+            StackTrace.current,
+          );
+        }
+        await tester.pump();
 
-      // Assert：D-01 替换语义 —— 卡片显示最新，不堆叠；徽标 = 快照长度。
-      expect(find.byType(ErrorCard), findsOneWidget);
-      expect(find.textContaining('错误三'), findsOneWidget);
-      expect(find.textContaining('错误一'), findsNothing);
-      expect(find.text('3 错误'), findsOneWidget);
+        // Assert：D-01 替换语义 —— 卡片显示最新，不堆叠；徽标 = 快照长度。
+        expect(find.byType(ErrorCard), findsOneWidget);
+        expect(find.textContaining('错误三'), findsOneWidget);
+        expect(find.textContaining('错误一'), findsNothing);
+        expect(find.text('3 错误'), findsOneWidget);
 
-      // Act / Assert：新报告到达替换内容，计数跟进。
-      ErrorReporterImpl.I.reportBootstrapSafely(StateError('错误四'), StackTrace.current);
-      await tester.pump();
-      expect(find.textContaining('错误四'), findsOneWidget);
-      expect(find.text('4 错误'), findsOneWidget);
-    });
+        // Act / Assert：新报告到达替换内容，计数跟进。
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('错误四'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.textContaining('错误四'), findsOneWidget);
+        expect(find.text('4 错误'), findsOneWidget);
+      },
+    );
 
     testWidgets('badge tap cycles older through the snapshot and wraps', (
       tester,
@@ -390,7 +474,10 @@ void main() {
       );
       await tester.pump();
       for (final message in ['错误一', '错误二', '错误三']) {
-        ErrorReporterImpl.I.reportBootstrapSafely(StateError(message), StackTrace.current);
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError(message),
+          StackTrace.current,
+        );
       }
       await tester.pump();
       expect(find.textContaining('错误三'), findsOneWidget);
@@ -400,7 +487,9 @@ void main() {
       void onPresentationChanged() => presentationChanges++;
       ErrorReporterImpl.I.presentation.addListener(onPresentationChanged);
       addTearDown(
-        () => ErrorReporterImpl.I.presentation.removeListener(onPresentationChanged),
+        () => ErrorReporterImpl.I.presentation.removeListener(
+          onPresentationChanged,
+        ),
       );
 
       // Act / Assert：点击徽标沿快照向旧轮览（循环）。
@@ -447,37 +536,41 @@ void main() {
       expect(find.textContaining('溢出-1'), findsNothing);
     });
 
-    testWidgets('manual close during cycling advances the real head and resets', (
-      tester,
-    ) async {
-      // Arrange：3 份报告在卡（显示最新），轮览到最旧。
-      await tester.pumpWidget(
-        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
-      );
-      await tester.pump();
-      for (final message in ['错误一', '错误二', '错误三']) {
-        ErrorReporterImpl.I.reportBootstrapSafely(StateError(message), StackTrace.current);
-      }
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
-      await tester.pump();
-      expect(find.textContaining('错误一'), findsOneWidget);
+    testWidgets(
+      'manual close during cycling advances the real head and resets',
+      (tester) async {
+        // Arrange：3 份报告在卡（显示最新），轮览到最旧。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        for (final message in ['错误一', '错误二', '错误三']) {
+          ErrorReporterImpl.I.reportBootstrapSafely(
+            StateError(message),
+            StackTrace.current,
+          );
+        }
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        expect(find.textContaining('错误一'), findsOneWidget);
 
-      // Act：轮览状态下手动关闭 —— dismissCurrent 推进真实队首并重置轮览。
-      await tester.tap(find.byKey(const ValueKey('error-card-close')));
-      await tester.pump();
+        // Act：轮览状态下手动关闭 —— dismissCurrent 推进真实队首并重置轮览。
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
 
-      // Assert：真实队首（一）被消费；快照移除后计数减一；轮览重置到最新。
-      expect(find.textContaining('错误三'), findsOneWidget);
-      expect(find.text('2 错误'), findsOneWidget);
+        // Assert：真实队首（一）被消费；快照移除后计数减一；轮览重置到最新。
+        expect(find.textContaining('错误三'), findsOneWidget);
+        expect(find.text('2 错误'), findsOneWidget);
 
-      // 轮览重置后可继续向旧翻页：此处只验证翻一页命中二。
-      await tester.tap(find.byKey(const ValueKey('error-card-badge')));
-      await tester.pump();
-      expect(find.textContaining('错误二'), findsOneWidget);
-    });
+        // 轮览重置后可继续向旧翻页：此处只验证翻一页命中二。
+        await tester.tap(find.byKey(const ValueKey('error-card-badge')));
+        await tester.pump();
+        expect(find.textContaining('错误二'), findsOneWidget);
+      },
+    );
   });
 }
 
