@@ -1,22 +1,17 @@
-/// MIG-01 等效覆盖测试 —— 旧横幅删除前的双路径判定集（D-07 判定 + D-09 断言边界）。
+/// MIG-01 卡片路径集成测试 —— 旧横幅（legacy banner）删除后的唯一展示路径证据。
+///
+/// **等效证明已发生在删除前**（见 03-04 Task 1 提交 372b10a9：双路径对同一组
+/// 代表性 PlayerError case 的消息 + 严重级断言全绿），本文件此后保留为
+/// 卡片路径（bridge → reporter → ErrorCardHost）的集成证据。
 ///
 /// **等效定义（D-09）**：同一引擎错误在两条展示路径上给出相同的可见反馈 ——
 /// ① 相同的 l10n 解析消息；② 可辨认的严重级语义（fatal/error 一致）。
 /// 断言集**不含** reopen/select-other-file/retry 动作按钮查找 —— 动作按钮按
 /// 用户决策（D-09）不迁移到新卡片；也不含 fullMediaPath 可见性断言（T-03-05）。
 ///
-/// **双路径**：
-/// - 旧路径（legacy banner）：FakeEngine 直连旧横幅 widget（同 error_banner
-///   测试的 buildSubject 形态，`state == MediaState.error` 门控）；
-/// - 新路径：FakeEngine 经真实 PlayerErrorReportBridge → ErrorReporterImpl.I
-///   （player_services.dart:148 同构的生产接线）→ ErrorCardHost → ErrorCard。
-///
 /// **路径差异（非等效破坏项）**：同一错误重复发生时，桥接路径的
 /// occurrenceCount 去重合并语义在新卡片展开区可见（旧横幅无此能力）——
 /// 单独用例记录该增量能力，不参与 D-09 等效判定。
-///
-/// 本文件在删除（03-04 Task 3）前对**双路径同时**运行（删除安全前提）；
-/// 删除后移除旧 harness，保留为卡片路径集成证据。
 library;
 
 import 'package:flutter/material.dart';
@@ -29,7 +24,6 @@ import 'package:simple_player_flutter/kernel/diagnostics/player_error_report_bri
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
-import 'package:simple_player_flutter/ui/player/error_banner.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
@@ -52,15 +46,7 @@ void main() {
     ErrorReporterImpl.init(effects: [ErrorCaptureSnapshot.I.record]);
   });
 
-  // ── 旧路径 harness：FakeEngine 直连旧横幅（error_banner_test 同形态）──
-  Widget buildLegacyHarness(FakeEngine engine) => MaterialApp(
-    locale: const Locale('en'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: ErrorBanner(engine: engine)),
-  );
-
-  // ── 新路径 harness：MaterialApp builder 挂 ErrorCardHost（03-01 挂载形态，
+  // ── 卡片路径 harness：MaterialApp builder 挂 ErrorCardHost（03-01 挂载形态，
   //    复用 app.dart 的 buildErrorCardMount 与生产同一挂载语义）──
   Widget buildCardHarness() => const MaterialApp(
     locale: Locale('en'),
@@ -87,19 +73,9 @@ void main() {
             decoration.color == severityColor(severity);
       });
 
-  // 旧横幅 danger 底色探针（severity 观感：与旧横幅装饰同值）—— 旧路径
-  // 不区分 fatal/error，danger 底色 + error_outline 图标即其全部严重级语义。
-  bool legacySurfaceVisible(WidgetTester tester) =>
-      tester.widgetList<Container>(find.byType(Container)).any((widget) {
-        final decoration = widget.decoration;
-        return decoration is BoxDecoration &&
-            decoration.color == Tokens.danger.withValues(alpha: 0.78) &&
-            decoration.borderRadius == BorderRadius.circular(8);
-      });
-
-  group('MIG-01 双路径等效判定（D-07，删除前硬门）', () {
+  group('MIG-01 卡片路径集成证据（删除前已双路径等效，D-07/D-09）', () {
     // 代表性 case 集：四类 PlayerError 子类型 + isFatal 案例。
-    // expectedMessage = 两条路径共用的 l10n 解析结果（en ARB）；
+    // expectedMessage = l10n 解析结果（en ARB，与删除前的旧横幅逐项一致）；
     // expectedSeverity = ErrorReporterImpl 对 isFatal 的映射（fatal/error）。
     final scenarios = <_EquivalenceScenario>[
       _EquivalenceScenario(
@@ -140,27 +116,9 @@ void main() {
 
     for (final scenario in scenarios) {
       testWidgets(
-        '${scenario.label}: both paths show the same message and severity',
+        '${scenario.label}: card shows the l10n message and severity color',
         (tester) async {
-          // ── 旧路径：FakeEngine 直连旧横幅 ──
-          final legacyEngine = FakeEngine();
-          addTearDown(legacyEngine.dispose);
-          // 旧横幅 state==error 门控：先置状态再注入错误（simulateError 同序）。
-          legacyEngine.state.value = MediaState.error;
-          legacyEngine.lastError.value = scenario.errorFactory();
-          await tester.pumpWidget(buildLegacyHarness(legacyEngine));
-
-          // 等效断言 ①：l10n 解析消息可见（D-09：零动作按钮查找）。
-          expect(find.text(scenario.expectedMessage), findsOneWidget);
-          // 等效断言 ②（旧路径侧）：danger 底色 + error_outline 图标。
-          expect(find.byIcon(Icons.error_outline), findsOneWidget);
-          expect(
-            legacySurfaceVisible(tester),
-            isTrue,
-            reason: '旧横幅 danger 底色（error 级观感）必须可见',
-          );
-
-          // ── 新路径：FakeEngine → 真实桥 → reporter → 宿主 → 卡片 ──
+          // ── 卡片路径：FakeEngine → 真实桥 → reporter → 宿主 → 卡片 ──
           final fixture = _BridgeFixture();
           addTearDown(fixture.dispose);
           await tester.pumpWidget(buildCardHarness());
@@ -169,10 +127,10 @@ void main() {
           fixture.engine.lastError.value = scenario.errorFactory();
           await tester.pump();
 
-          // 等效断言 ①：与旧路径相同的 l10n 解析消息。
+          // 等效断言 ①：l10n 解析消息可见（D-09：零动作按钮查找）。
           expect(find.byType(ErrorCard), findsOneWidget);
           expect(find.text(scenario.expectedMessage), findsOneWidget);
-          // 等效断言 ②（新路径侧）：severity 色点 + 卡片 border 同色 ——
+          // 等效断言 ②：severity 色点 + 卡片 border 同色 ——
           // fatal 与 error 语义可分辨（D-03）。
           expect(
             severityDot(scenario.expectedSeverity),
@@ -195,7 +153,8 @@ void main() {
     testWidgets(
       'repeat occurrence merges on the bridge path; count is visible on the expanded card',
       (tester) async {
-        // 旧横幅无重复计数能力 —— 该差异按计划记录于文件头注释，不参与等效判定。
+        // 旧横幅（legacy banner）无重复计数能力 —— 该差异按计划记录于文件头
+        // 注释，不参与等效判定。
         final fixture = _BridgeFixture();
         addTearDown(fixture.dispose);
         await tester.pumpWidget(buildCardHarness());

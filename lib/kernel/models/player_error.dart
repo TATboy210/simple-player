@@ -45,7 +45,7 @@ sealed class PlayerError {
   /// `UnknownError` always returns false (always recoverable).
   bool get isFatal;
 
-  /// UI 翻译键 — ErrorBanner 用此键查找 AppLocalizations (D7)
+  /// UI 翻译键 — 错误卡片（ErrorCard）用此键查找 AppLocalizations (D7)
   ///
   /// Format: `error.{type}.{code}` (e.g., `error.file.fileNotFound`).
   /// `UnknownError` returns `'error.unknown'`.

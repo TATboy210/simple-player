@@ -16,7 +16,6 @@ import '../theme/tokens.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'control_bar_view_model.dart';
-import 'error_banner.dart';
 import 'media_kit_player_port.dart';
 import 'player_actions.dart';
 import 'player_units.dart';
@@ -879,22 +878,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   child: OsdOverlay(resizing: widget.resizing),
                 ),
                 _buildControlBar(),
-                // ErrorBanner 自己监听 state + lastError，父层不再重复监听。
-                Positioned(
-                  left: Tokens.controlBarMarginH + 16,
-                  right: Tokens.controlBarMarginH + 16,
-                  bottom:
-                      Tokens.controlBarMarginBottom +
-                      Tokens.controlBarHeight +
-                      8,
-                  child: RepaintBoundary(
-                    child: ErrorBanner(
-                      engine: widget.engine,
-                      onOpenFile: widget.actions.onOpenFile,
-                      onRetry: widget.actions.onOpenFile,
-                    ),
-                  ),
-                ),
+                // 错误展示统一走 ErrorCardHost（app.dart builder 全局挂载，
+                // 经 PlayerErrorReportBridge → ErrorReporter 呈现，D-07）。
               ],
             ),
           ),
