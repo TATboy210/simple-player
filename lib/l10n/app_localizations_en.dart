@@ -79,9 +79,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutMediaKeys => 'Play/Pause';
 
   @override
-  String get shortcutDebugInjectError => 'Inject test error (debug)';
-
-  @override
   String get settings => 'Settings';
 
   @override
