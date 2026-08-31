@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import 'kernel/diagnostics/global_error_hooks.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
+import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_capture_snapshot.dart';
 
 /// UAT Test 16 故障注入开关 — 仅当
@@ -117,8 +119,17 @@ Future<void> _activateDiagnosticLog(
   DelegatingDiagnosticLogEffect diagnosticLogEffect,
 ) async {
   try {
+    // 设置加载先于位置解析且同在 unawaited 激活路径内（RESEARCH Pitfall 7）：
+    // 配置的日志目录当次启动即生效，且绝不阻塞 MediaKit/window/runApp。
+    // store 构造同步零 I/O；save 失败静默回退（D-01），解析失败逐层跳层。
+    await ErrorFeedbackSettings.I.load();
     final result = await ErrorLogLocation.resolve(
       applicationSupportDirectory: getApplicationSupportDirectory,
+      // 组合根注入运行中可执行文件所在目录（kernel 不直接读进程位置；
+      // 生产注入真实 exe 目录，测试注入临时目录）。
+      executableDirectory: () => File(Platform.resolvedExecutable).parent,
+      // 配置层输入：'' 表示走默认链（resolver 自行跳层）。
+      configuredDirectory: ErrorFeedbackSettings.I.state.value.logDirectory,
     );
     switch (result) {
       case ErrorLogLocationResolved(:final file):
