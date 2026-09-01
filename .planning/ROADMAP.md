@@ -175,7 +175,11 @@ Plans:
   4. Windows 实机中卡片显示期间，标题拖动、窗口控制、seek、播放列表、全屏、ESC 和媒体键仍全部可用。
   5. 开发者可查阅 release 下源码/符号可用性的降级策略，以及 Dart 错误钩子无法捕获 libmpv/FFI 原生进程崩溃的边界。
 
-**Plans**: TBD
+**Plans**: 0/1 plans executed
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — 四源端到端整合注入用例(tracer)+ 爆发压测补差 + VER-01~05 证据归档映射表 + VER-05 开发者文档
 
 ## Progress
 
