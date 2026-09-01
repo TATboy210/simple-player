@@ -18,41 +18,37 @@ awaiting: user response
 
 ## Tests
 
-### 1. 实机开关切换 + 日志文件分布(SET-01/SET-02)
+### 1. 实机开关切换(SET-01)
 expected: |
   设置→通用→关闭错误卡片开关:已显示卡片同帧消失;触发错误→错误仍写入日志(卡片不弹);
-  重新开启:队列中最新错误恢复显示。日志路径配置为新目录后触发错误:新目录出现 error.log
-  且含新记录,旧文件保留全部旧行。
+  重新开启:队列中最新错误恢复显示。log 固定写软件根目录 logs/(无路径配置入口——用户决策移除)。
 result: [pending]
 
-### 2. 路径修改 + 重启持久化(SET-03)
+### 2. 开关重启持久化(SET-03)
 expected: |
-  修改路径/开关后完全退出并重启应用:设置仍保留(settings.json 位于 exe 旁;debug run 时
-  位于项目运行目录旁)。重启后开关状态与日志路径生效。
+  切换开关后完全退出并重启应用:开关状态仍保留(settings.json 位于 exe 旁;debug run 时
+  位于项目运行目录旁;MSIX 下回退 Application Support 层)。
 result: [pending]
 
-### 3. 一次性回退 OSD(D-04)
-expected: |
-  配置一个无效路径(如指向一个文件):设置页行内显示 ✗ 与回退原因;OSD pill「日志已回退到
-  默认位置」出现恰一次,不重复刷屏;错误记录不间断(自动落回默认位置)。
-result: [pending]
+### 3. 已移除(用户决策:路径配置功能整体移除)
+expected: 日志路径配置入口不再存在;log 固定软件根目录 logs/,exe 不可写时静默回退 Application Support。
+result: skipped
+reason: "Deferred follow-up: 用户决策——更改 log 保存路径的功能太鸡肋,移除该细节(gap 闭环计划执行后此项作废)"
 
-### 4. MSIX ACL 冒烟(WR-06 回退层)
+### 4. MSIX ACL 冒烟(设置双层回退)
 expected: |
   MSIX 安装包运行:exe 旁 settings.json 探测失败 → 设置静默回退到 Application Support
-  settings.json;修改设置后重启仍保留(落在 AS 层);无崩溃。
+  settings.json;切换开关后重启仍保留(落在 AS 层);无崩溃。
 result: [pending]
 
-### 5. 非法路径行内呈现 + 浏览按钮(SET-02 UI)
-expected: |
-  手输非法路径(指向一个文件/纯空格/相对路径):行内即时 ✗ 与具体原因,不保存;
-  「浏览」选目录回填后校验 ✓ 并保存;取消选择无副作用。
-result: [pending]
+### 5. 已移除(同 Test 3)
+expected: 路径配置 UI 不再存在。
+result: skipped
+reason: "Deferred follow-up: 同 Test 3——路径配置功能整体移除"
 
-### 6. 并发/重定向实机确认(WR-01/WR-05)
+### 6. 快速开关并发确认(简化后)
 expected: |
-  快速连续修改日志路径数次(模拟并发 apply):最终卡片/行内显示的有效路径与实际写入
-  位置一致(诊断证据不误路由);快速开关设置项:最终状态 = 最后一次操作。
+  快速连续切换卡片开关数次:最终状态 = 最后一次操作;无卡死/崩溃。
 result: [pending]
 
 ## Summary
@@ -60,7 +56,7 @@ result: [pending]
 total: 6
 passed: 0
 issues: 0
-pending: 6
+pending: 4
 skipped: 0
 blocked: 0
 
