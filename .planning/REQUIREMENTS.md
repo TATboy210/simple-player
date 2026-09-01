@@ -1,115 +1,78 @@
-# Requirements: 错误捕获定位反馈系统
+# Requirements: Simple Player — v1.1 窗口外观与全屏体验
 
-**Defined:** 2026-08-28
-**Core Value:** 出错可定位——任何错误发生时，无需接调试器即可知道错误在哪个文件哪一行、调用链是什么，一键复制或从日志文件回溯。
+**Defined:** 2026-09-01
+**Core Value:** 窗口外壳完全自绘自治——系统主题、平台差异不得渗透到窗口视觉与交互
 
-## v1 Requirements
+## Milestone v1.1 Requirements
 
-### 捕获与契约 (Capture)
+### 使能层
 
-- [x] **CAP-01**: 四类错误源（FlutterError.onError 框架异常、PlatformDispatcher.onError 异步未捕获、runZonedGuarded 启动兜底、PlayerError 引擎错误）统一归一化为同一不可变 ErrorReport 契约（时间戳/严重级/错误/栈/媒体路径快照/event ID）
-- [x] **CAP-02**: 三全局钩子在启动时于同一 guarded zone 内安装，保留 FlutterError.presentError 调试输出，dispatcher 处理后返回 true
-- [x] **CAP-03**: ErrorReporter 为唯一 fan-in/fan-out 服务，入口不抛异常（reentrancy-safe），副作用逐一隔离，故障注入测试覆盖
-- [x] **CAP-04**: 有界 FIFO 队列 + 指纹去重（类型/消息/来源/顶部应用帧），重复错误合并计数，关闭卡片推进队列不删证据
+- [ ] **ENAB-01**: 启动时一次性 `DwmCapabilities` 探测（Windows build number + borderColor/cornerPreference 等属性可用性布尔），所有 DWM 属性调用以其为门，Win10 上绝不调用 Win11 22000+ 专属属性
+- [ ] **ENAB-02**: C1 缝隙修复钉死——`WM_NCCALCSIZE` 多分支处理器（fullscreen→8px inset / maximized→overshoot / default→return 0）附回归测试 + 守卫注释，后续任何 chrome 工作不得使其回归
+- [ ] **ENAB-03**: Linux 合成器探测（Wayland/X11/gamescope）结构性实现
 
-### 定位 (Locate)
+### 边框
 
-- [x] **LOC-01**: 保守首帧定位——StackFrame.fromStackTrace 提取首个 package:simple_player_flutter 帧，raw stack 全程保留
-- [x] **LOC-02**: 源码行显示——可信源码根路径校验（containment check），debug/profile 可读源码行；release 读不到源码优雅降级为仅定位文本，不报错不闪退
-- [x] **LOC-03**: 报告含媒体路径快照（PlaybackController.currentPath，报告时快照不可变）与 failed-open 尝试路径上下文
+- [ ] **BORD-01**: Win11 上窗口边缘无系统强调色描边（`DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE`，build 22000+ 门控）
+- [ ] **BORD-02**: Win10 上接受 1px 主题色边框为已知平台差异（用户裁决 2026-09-01 选项1；文档化于 PROJECT.md Key Decisions，不做强行去除）
+- [ ] **BORD-03**: DWM 属性在主题/DPI/模式变化后重新应用（settle-point 重应用：启动 + `WM_THEMECHANGED` + `WM_DPICHANGED` + 全屏落定后）
 
-### 落盘 (Log)
+### 圆角
 
-- [x] **LOG-01**: kernel_logger 保持门面，新增 error/fatal-only FileSink，输出引擎为 logger 2.7.0 `FileOutput(file, overrideExisting: false, encoding: utf8)` 单文件追加（context7 验证：append 语义正确）
-- [x] **LOG-02**: 仅错误事件上盘（普通 debug/info 日志不上盘），落盘独立于卡片可见性
-- [x] **LOG-03**: 单写者串行写队列（UTF-8 追加、有界 close/drain），写盘失败非致命不递归，降级为限流 debugPrint + "日志不可用"状态
-- [x] **LOG-04**: path_provider 提供默认日志位置（不用 exe 目录/进程 cwd），配置路径写入前校验
-- [x] **LOG-05**: 稳定诊断包格式（report ID/来源/时序/媒体快照/定位/可选源码行/重复信息/raw stack/日志路径），卡片复制与文件记录同格式
+- [ ] **CORN-01**: Win11 上窗口四角为系统原生圆角（`DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND`）
+- [ ] **CORN-02**: Win10 接受直角（Windows Terminal/VLC/VS Code 同款行业取舍，文档化平台差异）
+- [ ] **CORN-03**: Linux 通用桌面结构性圆角路径（borderless 场景 `ClipRRect` 回退；标记待实机验证）
 
-### 卡片 (Card)
+### 全屏
 
-- [x] **CARD-01**: 左上角非模态错误卡片，常驻手动关，无自动消失、无 route/barrier/autofocus、不抢焦点
-- [x] **CARD-02**: 卡片 hit-test 严格限卡片边界，不遮挡控制栏/标题栏/播放列表交互（Windows 冒烟验证）
-- [x] **CARD-03**: 渐进详情——折叠显示摘要+严重级+媒体路径，展开显示文件:行号/源码行/raw stack/日志路径
-- [x] **CARD-04**: 一键复制诊断包（与 LOG-05 同格式），复制失败不影响卡片
-- [x] **CARD-05**: build 期捕获的错误经 post-frame 合并发布 UI，不产生 markNeedsBuild 次生错误
-- [x] **CARD-06**: 挂载于 app/player root Stack，ValueListenableBuilder 订阅 reporter 呈现状态（项目 ValueNotifier 惯例，不引入新状态库）
+- [ ] **FSCR-01**: 进入全屏时标题栏即时隐藏（消除渐隐与异步 resize 的竞态），退出时渐隐恢复
+- [ ] **FSCR-02**: media_kit 全屏 `SetWindowPos` 加 `SWP_NOCOPYBITS` + 全屏态 `WM_NCPAINT` 抑制（红线解禁范围内，仅限全屏功能）
+- [ ] **FSCR-03**: 退出全屏恢复进入前的窗口模式（最大化↔窗口化），而非一律窗口化
+- [ ] **FSCR-04**: 进/出全屏过渡零可见闪烁（实机 UAT 验收 + `textureIdChanges` 探测）
+- [ ] **FSCR-05**: 全屏体验达到成熟播放器产品级——对照 mpv/VLC/Windows Terminal 行为基线；执行期授权使用编程插件与 skills（code-reviewer/feature-dev 等）交叉审查；Win10/Win11 实机验收，Linux 结构性正确同标准交付
 
-### 设置 (Settings)
+### 拖拽
 
-- [x] **SET-01**: 设置"通用"tab 错误卡片开关（默认开；关掉后只落盘不弹卡，捕获与落盘不受影响）
-- [x] **SET-02**: ~~设置"通用"tab 日志输出路径可配置~~ **2026-09-01 用户决策修订:路径配置功能移除**(实测判定鸡肋)——log 固定写软件根目录 logs/,exe 旁不可写时静默回退 Application Support(双层链与内部可写探测保留,配置 UI/配置层按 gap 闭环移除)
-- [x] **SET-03**: 设置值重启持久化
+- [ ] **DRAG-01**: Windows 上标题栏拖拽改走原生 `HTCAPTION` 命中测试（`WM_NCHITTEST` → `SC_MOVE` 模态拖拽循环），偶发不跟手消除
+- [ ] **DRAG-02**: 双击最大化与拖拽共存；标题栏按钮簇区域不触发拖拽；最大化状态下拖拽守卫（`IsZoomed`）
+- [ ] **DRAG-03**: 非 Windows 平台保留现有拖拽路径（`startDragging` fallback）
 
-### 迁移 (Migration)
+### 打磨
 
-- [x] **MIG-01**: PlayerErrorReportBridge（engine.lastError → ErrorReporter）经集成测试证明等效覆盖后，替换并移除旧 ErrorBanner——v1 内完成统一
+- [ ] **PLSH-01**: 文档修正 window_manager 版本笔误（CLAUDE.md 5.15.0 → 实际 0.5.2）
 
-### 验证 (Verification)
+## Future Requirements (deferred)
 
-- [x] **VER-01**: 四源端到端故障注入——每源各产单报告+文件证据+卡片（开关开启时）
-- [x] **VER-02**: 合成错误爆发（100-1000 事件）下有界内存、合并 UI、受控写盘、播放控制仍响应
-- [x] **VER-03**: zone 一致性冒烟（binding/runApp 同 zone）、reentrancy 测试、复制/关闭失败隔离测试
-- [x] **VER-04**: Windows 实机冒烟：标题拖动/窗口控制/seek/播放列表/全屏/ESC/媒体键在卡片显示期间全部正常
-- [x] **VER-05**: 文档化 release 源码/符号策略与原生崩溃边界（Dart 钩子不覆盖 libmpv/FFI 进程崩溃）
-
-## v2 Requirements
-
-### 增强 (Enhancement)
-
-- **ENH-01**: "打开日志目录"快捷操作（Windows UX 验证后）
-- **ENH-02**: 细粒度 per-origin 节流策略（从真实观测日志调优）
-- **ENH-03**: 内置只读日志查看器（外编辑器不足时才考虑）
+- **CORNR-01**: corner-preference 用户设置项（round/square，Win11 only）
+- **MAC-01**: macOS 窗口外壳验证（结构性支持已存在，非发布目标）
+- **MULTI-01**: 多显示器全屏几何恢复
+- **WIN10-ROUND-01**: Win10 伪圆角（当前为反模式，除非用户日后明确要求）
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 远程上报/遥测（Sentry/Crashlytics） | 个人桌面应用无此需求，本地文件够用 |
-| 日志轮转/压缩/加密 | 单文件追加已满足，不预建轮子 |
-| 跨会话错误历史数据库 | 纯文本日志回溯足够（Unix 原则 5） |
-| AI 归因/自动重试恢复 | 超出"定位反馈"边界，自动恢复有风险 |
-| 原生崩溃捕获（libmpv/FFI access violation） | Dart 钩子覆盖不到，属 WER LocalDumps 开发机工具域 |
-| 播放功能演进 | 与错误反馈无关 |
+| 全屏后边缘有缝修复 | 已解决（C1），本里程碑钉死防回归，不重开 |
+| 全局 DWMNCRP 方案 | 2026-08-27 实机撤回，用户红线「勿重提」 |
+| 方案A（FFI 桥）/ 方案B（DWM 禁用）全屏样式 | 2026-08-27 实机 revert |
+| `window_manager.setFullScreen` | frameless 下 no-op（`is_frameless_` guard）；上游 PR #531 存在未修回归 #579 |
+| Win10 伪圆角（透明分层窗口） | 所有成熟软件均接受 Win10 直角；`WS_EX_LAYERED` 禁用 DXGI flip 模型，视频性能不可接受 |
+| 自绘全屏进/出动画 | 动画与过渡竞争（VLC/mpv 均即时切换） |
+| 自绘拖拽（mouse-move + SetWindowPos） | 丢失 Snap Layout/多显示器/DPI/Aero Peek |
+| media_kit 非全屏部分修改 | 红线仅为全屏功能解禁 |
+| 播放功能演进 | 与窗口外壳无关 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAP-01 | Phase 1 | Complete |
-| CAP-02 | Phase 1 | Complete |
-| CAP-03 | Phase 1 | Complete |
-| CAP-04 | Phase 1 | Complete |
-| LOC-01 | Phase 2 | Complete |
-| LOC-02 | Phase 2 | Complete |
-| LOC-03 | Phase 2 | Complete |
-| LOG-01 | Phase 2 | Complete |
-| LOG-02 | Phase 2 | Complete |
-| LOG-03 | Phase 2 | Complete |
-| LOG-04 | Phase 2 | Complete |
-| LOG-05 | Phase 2 | Complete |
-| CARD-01 | Phase 3 | Complete |
-| CARD-02 | Phase 3 | Complete |
-| CARD-03 | Phase 3 | Complete |
-| CARD-04 | Phase 3 | Complete |
-| CARD-05 | Phase 3 | Complete |
-| CARD-06 | Phase 3 | Complete |
-| MIG-01 | Phase 3 | Complete |
-| SET-01 | Phase 4 | Complete |
-| SET-02 | Phase 4 | Complete |
-| SET-03 | Phase 4 | Complete |
-| VER-01 | Phase 5 | Complete |
-| VER-02 | Phase 5 | Complete |
-| VER-03 | Phase 5 | Complete |
-| VER-04 | Phase 5 | Complete |
-| VER-05 | Phase 5 | Complete |
+| (待 roadmap 填充) | | |
 
 **Coverage:**
-
-- v1 requirements: 27
-- Mapped to phases: 27
-- Unmapped: 0 ✓
+- v1.1 requirements: 16 total
+- Mapped to phases: 0
+- Unmapped: 16 ⚠️
 
 ---
-*Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after roadmap creation*
+*Requirements defined: 2026-09-01*
+*Last updated: 2026-09-01 after milestone v1.1 definition*
