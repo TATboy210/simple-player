@@ -1,4 +1,4 @@
-/// 诊断日志落点解析 —— 配置目录 → exe 根 → Application Support 的三层回退链。
+/// 诊断日志落点解析 —— exe 根 → Application Support 的双层回退链。
 ///
 /// Resolves the durable diagnostic log target by walking a priority chain of
 /// candidate directories and keeping the first provably writable one. The
@@ -31,15 +31,10 @@ sealed class ErrorLogLocationResult {
 
 /// Prepared diagnostic log target under the first writable chain tier.
 final class ErrorLogLocationResolved extends ErrorLogLocationResult {
-  const ErrorLogLocationResolved(this.file, {this.configuredFailure});
+  const ErrorLogLocationResolved(this.file);
 
-  /// The prepared `logs/error.log` target (configured tier: directly under it).
+  /// The prepared `logs/error.log` target under the winning tier.
   final File file;
-
-  /// 配置层被尝试且失败时携带的回退原因：探测/创建失败为该层收窄捕获的
-  /// 异常对象，形态拒绝（相对路径/UNC 等，WR-03）为封闭原因枚举值；
-  /// 配置层缺省或胜出时为 null。供设置 UI 行内呈现回退原因（D-04）。
-  final Object? configuredFailure;
 }
 
 /// Unavailable default target with its contained external failure reason.
@@ -53,12 +48,14 @@ final class ErrorLogLocationUnavailable extends ErrorLogLocationResult {
   final StackTrace stackTrace;
 }
 
-/// 用户配置目录校验的失败原因封闭集 —— 可被 UI 映射为本地化文案。
+/// 目录校验失败原因封闭集 —— [validateConfiguredDirectory] 的返回词汇表。
 ///
-/// Closed set of configured-directory validation failures so the settings UI
-/// can map each reason to localized inline copy (D-04) without string matching.
+/// Closed set of directory validation failures carried by the typed
+/// validation result. The set is kept intact after the G-04-1 removal: the
+/// store's two-tier settings fallback reuses [validateConfiguredDirectory]
+/// as its single writability-probe implementation (WR-06).
 enum ConfiguredDirectoryFailure {
-  /// 空串/纯空白或相对路径 —— 用户配置的是目录，必须是绝对路径。
+  /// 空串/纯空白或相对路径 —— 输入的是目录，必须是绝对路径。
   notAbsolute,
 
   /// 含 null 字节或控制字符（借 path_validator.dart:98-107 的拒绝哲学：
@@ -96,7 +93,7 @@ final class ConfiguredDirectoryValid extends ConfiguredDirectoryValidation {
 final class ConfiguredDirectoryInvalid extends ConfiguredDirectoryValidation {
   const ConfiguredDirectoryInvalid(this.reason, {this.error});
 
-  /// The closed-set reason for UI localization mapping.
+  /// The closed-set reason for callers to branch on without string matching.
   final ConfiguredDirectoryFailure reason;
 
   /// The narrowed original exception, retained only as contained evidence.
@@ -111,13 +108,13 @@ final class _TierFailure {
   final StackTrace stackTrace;
 }
 
-/// Walks the priority chain 配置目录 → exe 根 → Application Support and keeps
-/// the first provably writable `logs/error.log` target.
+/// Walks the priority chain exe 根 → Application Support and keeps the first
+/// provably writable `logs/error.log` target.
 ///
 /// 每层执行「幂等 create(recursive) + 临时文件探测」，首个可写层胜出；全部层
 /// 失败返回 [ErrorLogLocationUnavailable]（携带最后一层的失败证据），绝不向
-/// 调用方抛出。三层参数均可空：为空（或配置为空串）时该层跳过，保持向后
-/// 兼容既有单层调用（Phase 2 形态）。
+/// 调用方抛出。G-04-1 后链为固定双层（D-07）：exe 根 logs/ 优先，exe 层不可
+/// 写（如 MSIX/ACL 保护目录）时静默回退 Application Support logs/。
 final class ErrorLogLocation {
   ErrorLogLocation._();
 
@@ -127,7 +124,7 @@ final class ErrorLogLocation {
   /// Single source of truth for the default diagnostic filename.
   static const String logFileName = 'error.log';
 
-  /// 用户配置目录的静态长度上界 —— 日志目录的常识上界（防极端输入占满
+  /// 目录输入的静态长度上界 —— 日志目录的常识上界（防极端输入占满
   /// 探测/写路径；远超任何合理盘符路径，普通用户不受影响）。
   static const int maxConfiguredPathLength = 1024;
 
@@ -135,38 +132,10 @@ final class ErrorLogLocation {
   static Future<ErrorLogLocationResult> resolve({
     required ApplicationSupportDirectoryProvider applicationSupportDirectory,
     ExecutableDirectoryProvider? executableDirectory,
-    String? configuredDirectory,
     WritableDirectoryProbe? writable,
   }) async {
     final probe = writable ?? _probeDirectoryWritable;
     try {
-      // 层 1：配置目录（settings.logDirectory）——空串/null 跳层
-      //（'' = 走默认链，D-01 语义），失败不阻断但携带回退原因（D-02/D-04）。
-      // 配置值与 UI 路径共用同一校验实现（WR-03）：trim/形态/UNC/长度/探测
-      // 全部经 validateConfiguredDirectory，杜绝手编 settings.json 的空白、
-      // 相对路径、UNC 等畸形值绕过校验直达文件系统；纯空白值按 '' 语义
-      // 处理（与 store 的空配置同义，静默走默认链）。
-      final configured = configuredDirectory;
-      if (configured != null && configured.trim().isNotEmpty) {
-        final validation = await validateConfiguredDirectory(
-          configured,
-          writable: probe,
-        );
-        switch (validation) {
-          case ConfiguredDirectoryValid(:final directory):
-            return ErrorLogLocationResolved(_logFileUnder(directory));
-          case ConfiguredDirectoryInvalid(:final reason, :final error):
-            return await _resolveDefaultChain(
-              probe,
-              applicationSupportDirectory,
-              executableDirectory,
-              // 形态拒绝（相对路径/UNC 等）无原始异常 —— 以封闭原因枚举
-              // 本身作为 contained 回退证据，保证 D-04 回退通知对畸形配置
-              // 同样触发（WR-03）。
-              configuredFailure: error ?? reason,
-            );
-        }
-      }
       return await _resolveDefaultChain(
         probe,
         applicationSupportDirectory,
@@ -180,7 +149,8 @@ final class ErrorLogLocation {
     }
   }
 
-  /// 单层校验用户配置的日志目录 —— 「校验即证明 sink 可用」（SET-02/T-04-02-01）。
+  /// 单层校验日志目录的可写性 —— 「校验即证明可写」的单一实现
+  ///（store 双层回退探测复用，WR-06）。
   ///
   /// 校验顺序（形态拒绝先行，探测收尾）：
   /// 1. trim 后为空 → [ConfiguredDirectoryFailure.notAbsolute]；
@@ -200,10 +170,10 @@ final class ErrorLogLocation {
   ///
   /// 绝不抛出：所有外部失败折叠为 typed Invalid；探测失败永不作为可用落点。
   static Future<ConfiguredDirectoryValidation> validateConfiguredDirectory(
-    String configuredDirectory, {
+    String directory, {
     WritableDirectoryProbe? writable,
   }) async {
-    final trimmed = configuredDirectory.trim();
+    final trimmed = directory.trim();
     if (trimmed.isEmpty) {
       return const ConfiguredDirectoryInvalid(
         ConfiguredDirectoryFailure.notAbsolute,
@@ -231,9 +201,9 @@ final class ErrorLogLocation {
         ConfiguredDirectoryFailure.pathTooLong,
       );
     }
-    final directory = Directory(trimmed);
+    final candidate = Directory(trimmed);
     final failure = await _prepareTier(
-      directory,
+      candidate,
       writable ?? _probeDirectoryWritable,
     );
     if (failure != null) {
@@ -242,7 +212,7 @@ final class ErrorLogLocation {
         error: failure.error,
       );
     }
-    return ConfiguredDirectoryValid(directory);
+    return ConfiguredDirectoryValid(candidate);
   }
 
   /// 扫描 null 字节与控制字符（C0 全段 + DEL；\x00 空字节即含于 < 0x20）。
@@ -255,42 +225,33 @@ final class ErrorLogLocation {
     return false;
   }
 
-  /// 走默认两层链：exe 根 logs/ → Application Support logs/。
-  ///
-  /// [configuredFailure] 透传自失败的配置层，使成功层的结果仍携带回退原因。
+  /// 走双层链：exe 根 logs/ → Application Support logs/。
   static Future<ErrorLogLocationResult> _resolveDefaultChain(
     WritableDirectoryProbe probe,
     ApplicationSupportDirectoryProvider applicationSupportDirectory,
-    ExecutableDirectoryProvider? executableDirectory, {
-    Object? configuredFailure,
-  }) async {
-    // 层 2：exe 根 logs/（D-02：exe 根优先于 AS；provider 未注入时跳层）。
+    ExecutableDirectoryProvider? executableDirectory,
+  ) async {
+    // 层 1：exe 根 logs/（D-02：exe 根优先于 AS；provider 未注入时跳层）。
     final executableDirectoryProvider = executableDirectory;
     if (executableDirectoryProvider != null) {
       final exeLogs = _logsDirectoryIn(executableDirectoryProvider());
       final failure = await _prepareTier(exeLogs, probe);
       if (failure == null) {
-        return ErrorLogLocationResolved(
-          _logFileUnder(exeLogs),
-          configuredFailure: configuredFailure,
-        );
+        return ErrorLogLocationResolved(_logFileUnder(exeLogs));
       }
     }
-    // 层 3：Application Support logs/（Phase 2 原行为，降为最后回退层）。
+    // 层 2：Application Support logs/（Phase 2 原行为，降为回退层）。
     final supportLogs = _logsDirectoryIn(await applicationSupportDirectory());
     final failure = await _prepareTier(supportLogs, probe);
     if (failure == null) {
-      return ErrorLogLocationResolved(
-        _logFileUnder(supportLogs),
-        configuredFailure: configuredFailure,
-      );
+      return ErrorLogLocationResolved(_logFileUnder(supportLogs));
     }
     return ErrorLogLocationUnavailable(failure.error, failure.stackTrace);
   }
 
   /// 准备一个候选层：幂等 create(recursive) + 可写探测。
   ///
-  /// 成功返回 null；失败返回收窄捕获的证据（供 configuredFailure/降级复用）。
+  /// 成功返回 null；失败返回收窄捕获的证据（供降级结果随行）。
   static Future<_TierFailure?> _prepareTier(
     Directory candidate,
     WritableDirectoryProbe probe,

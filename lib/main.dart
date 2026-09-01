@@ -130,29 +130,26 @@ Future<void> _activateDiagnosticLog(
 ) async {
   try {
     // 设置加载先于位置解析且同在 unawaited 激活路径内（RESEARCH Pitfall 7）：
-    // 配置的日志目录当次启动即生效，且绝不阻塞 MediaKit/window/runApp。
-    // store 构造同步零 I/O；save 失败静默回退（D-01），解析失败逐层跳层。
-    // AS provider 供 WR-06 两层回退：exe 旁目录不可写（MSIX/ACL 保护目录）
-    // 时设置改存 Application Support，探测一次性在 load 内完成并记住层级。
+    // 绝不阻塞 MediaKit/window/runApp。store 构造同步零 I/O；save 失败静默
+    // 回退（D-01）。AS provider 供 WR-06 两层回退：exe 旁目录不可写
+    //（MSIX/ACL 保护目录）时设置改存 Application Support，探测一次性在
+    // load 内完成并记住层级。
     await ErrorFeedbackSettings.I.load(
       applicationSupportDirectory: getApplicationSupportDirectory,
     );
+    // 双层链（D-07：G-04-1 后无用户配置目录）：exe 根 logs/error.log 优先，
+    // exe 层不可写时静默回退 Application Support logs/。
     final result = await ErrorLogLocation.resolve(
       applicationSupportDirectory: getApplicationSupportDirectory,
       // 组合根注入运行中可执行文件所在目录（kernel 不直接读进程位置；
       // 生产注入真实 exe 目录，测试注入临时目录）。
       executableDirectory: () => File(Platform.resolvedExecutable).parent,
-      // 配置层输入：'' 表示走默认链（resolver 自行跳层）。
-      configuredDirectory: ErrorFeedbackSettings.I.state.value.logDirectory,
     );
     switch (result) {
-      case ErrorLogLocationResolved(:final file, :final configuredFailure):
+      case ErrorLogLocationResolved(:final file):
         // 启动激活收敛到协调器的唯一激活实现（research 单一激活实现
         // caveat）：sink 构造与 delegate.activate 只存在于协调器内。
-        DiagnosticLogTarget.I.activateResolved(
-          file: file,
-          configuredFailure: configuredFailure,
-        );
+        DiagnosticLogTarget.I.activateResolved(file: file);
       case ErrorLogLocationUnavailable(:final error, :final stackTrace):
         KernelLogger.I.warn(
           'Diagnostic file evidence is unavailable during startup.',

@@ -1,30 +1,26 @@
-/// 诊断日志落点协调器 —— 校验→保存→dispose→activate 的安全重定向单点。
+/// 诊断日志落点协调器 —— 仅启动激活的最小形态（G-04-1 收窄后）。
 ///
-/// UI-layer coordinator owning the SET-02 retarget protocol on top of the
-/// stable startup delegate: validate first, save only on success, then swap
-/// the sink through the existing public `dispose()` → `activate()` cycle
-/// (single-writer semantics untouched, kernel zero change). Startup activation
-/// and user-initiated retarget share the same activation implementation
-/// ([activateResolved]) so exactly one activation path exists.
+/// UI-layer coordinator owning the single activation implementation on top
+/// of the stable startup delegate: it constructs the sink and swaps it in
+/// through `activate()` once at startup. The runtime retarget protocol
+/// (validate/save/swap) and the D-04 fallback notice bridge were removed
+/// together with the log-path configuration feature — there is no user
+/// configurable log directory anymore (D-07), so startup activation is the
+/// only activation path.
 ///
 /// 边界（D-05/D-06）：本协调器不触碰 ErrorReporter、不触碰 ErrorCaptureSnapshot、
-/// 不感知错误卡片开关；也不持久化回退原因、不维护 last-known-good key、不做
-/// 会话内自动重回退（回退链本身即 last-known-good，原因每次启动重算）。
+/// 不感知错误卡片开关。
 library;
 
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 
-import '../../../l10n/app_localizations.dart';
-import '../../shared/osd_overlay.dart';
-import 'error_feedback_settings.dart';
-
-/// 诊断日志落点协调器单例 —— 设置 UI 与组合根共用的重定向协议实现。
+/// 诊断日志落点协调器单例 —— 组合根共用的启动激活实现。
 final class DiagnosticLogTarget {
   DiagnosticLogTarget._();
 
@@ -32,34 +28,13 @@ final class DiagnosticLogTarget {
   static final DiagnosticLogTarget I = DiagnosticLogTarget._();
 
   DelegatingDiagnosticLogEffect? _effect;
-  ApplicationSupportDirectoryProvider? _asProvider;
-  ExecutableDirectoryProvider? _exeProvider;
-
-  /// UI 的权威有效日志路径 —— 每次 activate 时写入。
-  ///
-  /// 免疫 dispose 期间 delegate.logPath 的瞬时 null 闪烁（RESEARCH Pattern 2
-  /// caveat）：设置 UI 的「当前有效路径」应读此 notifier，而非 delegate 的。
-  final ValueNotifier<String?> effectiveLogPath = ValueNotifier<String?>(null);
-
-  /// D-04 一次性回退通知 —— 置值一次、消费即清空；null = 无待通知。
-  ///
-  /// 仅 null→值 转换：挂起未消费时后到的失败不覆盖，避免通知刷屏。
-  final ValueNotifier<Object?> pendingFallbackNotice =
-      ValueNotifier<Object?>(null);
-
-  /// 重定向串行队列（WR-01）—— 每次 apply 接在前序之后执行。
-  ///
-  /// validate→save→dispose→activate 全程至多一个在飞：dispose→activate 的
-  /// 换位序列绝不与其他 apply 交错（否则「A.dispose→B.dispose→A.activate→
-  /// B.activate(被一次性锁吞)」会让 sink 停在旧落点而 UI 报告新落点——诊断
-  /// 证据错位）。onError 吞没仅为维持链活性：apply 自身已把外部失败折叠为
-  /// typed Invalid，绝不向队列泄漏异常。
-  Future<void> _retargetQueue = Future<void>.value();
 
   /// 组合根同步绑定：main 在 runApp 之前调用一次，携带两个目录 provider。
   ///
   /// 重复 attach 静默忽略（先绑定者胜）——组合根契约是只调用一次，防御性
-  /// 忽略重复调用以免运行中悄然换绑 delegate。
+  /// 忽略重复调用以免运行中悄然换绑 delegate。provider 形参保留组合根
+  /// 调用形态（签名不变），但落点解析已收敛到 main 的 resolve 链，协调器
+  /// 只消费 effect 缝。
   void attach({
     required DelegatingDiagnosticLogEffect effect,
     required ApplicationSupportDirectoryProvider applicationSupportDirectory,
@@ -69,231 +44,31 @@ final class DiagnosticLogTarget {
       return;
     }
     _effect = effect;
-    _asProvider = applicationSupportDirectory;
-    _exeProvider = executableDirectory;
   }
 
-  /// 唯一激活实现 —— 启动激活与重定向共用（research 单一激活实现 caveat）。
+  /// 唯一激活实现 —— 启动激活（G-04-1 后无重定向调用方）。
   ///
-  /// Side effect: 创建 [ErrorLogFileSink] 并经 delegate.activate 换入（activate
-  /// 的一次性锁前置条件由 `_swapTo` 的 dispose 复位保证）；随后回读
-  /// delegate 的实际激活态写入 [effectiveLogPath]（WR-01：并发竞争下
-  /// activate 可能被一次性锁吞掉，此时 delegate.logPath 保留真实生效的
-  /// 旧落点 —— UI 权威读数必须与 delegate 一致，绝不无条件断言 file.path），
-  /// configuredFailure 非空时将 [pendingFallbackNotice] 置值一次（仅 null→值）。
-  void activateResolved({required File file, Object? configuredFailure}) {
+  /// Side effect: 创建 [ErrorLogFileSink] 并经 delegate.activate 换入。激活
+  /// 只发生一次（activate 的一次性锁）：重复激活被 delegate 锁静默吞掉，
+  /// 旧落点保持真实生效 —— 协调器不缓存任何平行读数，权威状态永远在
+  /// delegate（effect.logPath）上。
+  void activateResolved({required File file}) {
     final effect = _effect;
     if (effect == null) {
-      // attach 未发生属组合根编程错误：不伪造激活状态，也不触碰 notifier
-      //（此时任何路径值都是谎言）。生产路径 attach 先于 runApp，不可达。
+      // attach 未发生属组合根编程错误：不伪造激活状态。生产路径 attach
+      // 先于 runApp，不可达。
       return;
     }
-    effect.activate(
-      sink: ErrorLogFileSink(file: file),
-      resolvedPath: file.path,
-    );
-    effectiveLogPath.value = effect.logPath.value;
-    if (configuredFailure != null && pendingFallbackNotice.value == null) {
-      pendingFallbackNotice.value = configuredFailure;
-    }
+    effect.activate(sink: ErrorLogFileSink(file: file), resolvedPath: file.path);
   }
 
-  /// 校验非空目录（D-03 行内校验数据源）；空串返回 Invalid。
+  /// 测试隔离：重绑 effect 缝。
   ///
-  /// 空串的「回默认链」语义由 [apply] 处理，本方法只管非空输入的形态与
-  /// 可写性校验，转发 kernel 单层校验（唯一实现，无第二份探测逻辑）。
-  Future<ConfiguredDirectoryValidation> validate(String directory) async {
-    if (directory.trim().isEmpty) {
-      return const ConfiguredDirectoryInvalid(
-        ConfiguredDirectoryFailure.notAbsolute,
-      );
-    }
-    return ErrorLogLocation.validateConfiguredDirectory(directory);
-  }
-
-  /// 校验→保存→换位的安全重定向入口（SET-02 配置变更面）。
-  ///
-  /// 并发安全（WR-01）：重叠发起的多次 apply 经 [_retargetQueue] 串行执行，
-  /// 每次调用的返回值仍归属自身调用方；前序 apply 完成前，后序在队列中等待。
-  /// 非空输入：校验失败原样返回 Invalid —— 三不：不保存 / 不换位 / 不通知；
-  /// 通过后（a）与当前有效落点同目录时幂等返回（无换位副作用），
-  /// （b）否则先保存（D-03 discretion：校验通过即保存）再经 [_swapTo] 换位。
-  /// 空输入：保存 '' 后走默认三层链（跳过配置层），链结果换位。
-  Future<ConfiguredDirectoryValidation> apply(String directory) {
-    final job = _retargetQueue.then((_) => _applyNow(directory));
-    // Future<void> 适配器：吞没错误维持队列活性（apply 不抛出，防御性兜底）。
-    _retargetQueue = job.then<void>((_) {}, onError: (Object _) {});
-    return job;
-  }
-
-  /// 单次重定向协议体 —— 仅由 [apply] 在串行队列内调用。
-  Future<ConfiguredDirectoryValidation> _applyNow(String directory) async {
-    final trimmed = directory.trim();
-    if (trimmed.isEmpty) {
-      return _applyDefaultChain();
-    }
-    final validation = await validate(trimmed);
-    switch (validation) {
-      case ConfiguredDirectoryInvalid():
-        return validation;
-      case ConfiguredDirectoryValid(:final directory):
-        final newFile = _logFileIn(directory);
-        if (newFile.path == effectiveLogPath.value) {
-          // (a) 幂等：同目录不保存、不换位（无副作用返回）。
-          return validation;
-        }
-        // (b) 校验通过即保存（D-03 discretion）——保存失败静默由 store 承担，
-        // 内存态不回滚（D-01），随后仍换位（内存态与真实落点一致）。
-        ErrorFeedbackSettings.I.setLogDirectory(trimmed);
-        await _swapTo(newFile);
-        return validation;
-    }
-  }
-
-  /// 空输入 = 回默认链：保存 '' 后 resolve 三层链（configuredDirectory 省略）。
-  ///
-  /// resolve 失败返回 Invalid 且**不 dispose** —— 「先确认新位置再换位」消除
-  /// 失败窗口（RESEARCH Pattern 2 caveat），旧 sink 继续服务。
-  Future<ConfiguredDirectoryValidation> _applyDefaultChain() async {
-    final asProvider = _asProvider;
-    final exeProvider = _exeProvider;
-    if (asProvider == null || exeProvider == null) {
-      // 未 attach 属组合根编程错误：折叠为 typed 失败而非伪造成功。
-      return ConfiguredDirectoryInvalid(
-        ConfiguredDirectoryFailure.notWritable,
-        error: StateError('DiagnosticLogTarget is not attached'),
-      );
-    }
-    ErrorFeedbackSettings.I.setLogDirectory('');
-    final result = await ErrorLogLocation.resolve(
-      applicationSupportDirectory: asProvider,
-      executableDirectory: exeProvider,
-    );
-    switch (result) {
-      case ErrorLogLocationResolved(:final file):
-        await _swapTo(file);
-        return ConfiguredDirectoryValid(file.parent);
-      case ErrorLogLocationUnavailable(:final error):
-        return ConfiguredDirectoryInvalid(
-          ConfiguredDirectoryFailure.notWritable,
-          error: error,
-        );
-    }
-  }
-
-  /// 全协调器唯一的 dispose→activate 通道（RESEARCH Pitfall 2：绝不
-  /// activate→activate —— activate 的一次性锁只有 dispose 会复位）。
-  ///
-  /// 1. `dispose()` drain 旧 Future 链 → 旧文件完整收尾（每条记录都是独立
-  ///    append、无 OS 句柄残留），同步复位 delegate 的激活锁；
-  /// 2. `activateResolved` 换入新 sink —— 换位间隙到达的记录由 delegate 的
-  ///    有界 pending FIFO（容量 32，drop-oldest）保序缓冲，activate 时冲刷。
-  Future<void> _swapTo(File newFile) async {
-    await _effect?.dispose();
-    activateResolved(file: newFile);
-  }
-
-  /// 组合一个候选目录下的诊断日志文件路径（与链层落点形态一致，不触 I/O）。
-  static File _logFileIn(Directory directory) => File(
-        '${directory.path}${Platform.pathSeparator}'
-        '${ErrorLogLocation.logFileName}',
-      );
-
-  /// 消费一次性回退通知（D-04）：置回 null，此后新失败可再次置值。
-  void consumeFallbackNotice() {
-    pendingFallbackNotice.value = null;
-  }
-
-  /// 测试隔离：重绑 effect/provider seam 并清空两个 notifier。
-  ///
-  /// 非空参数覆盖重绑、空参数保留原值；notifier 恒复位初始态；串行队列
-  /// 恒复位为空链（会话级状态，跨用例残留的死 zone Future 会卡死后续
-  /// apply —— 与 notifier 同一复位理由）。
   /// 禁止生产路径调用（循 resetForTesting 惯例）。
   @visibleForTesting
-  void resetForTesting({
-    DelegatingDiagnosticLogEffect? effect,
-    ApplicationSupportDirectoryProvider? applicationSupportDirectory,
-    ExecutableDirectoryProvider? executableDirectory,
-  }) {
+  void resetForTesting({DelegatingDiagnosticLogEffect? effect}) {
     if (effect != null) {
       _effect = effect;
     }
-    if (applicationSupportDirectory != null) {
-      _asProvider = applicationSupportDirectory;
-    }
-    if (executableDirectory != null) {
-      _exeProvider = executableDirectory;
-    }
-    _retargetQueue = Future<void>.value();
-    effectiveLogPath.value = null;
-    pendingFallbackNotice.value = null;
-  }
-}
-
-/// 回退通知桥 —— 协调器的一次性回退通知 → 应用层 OSD（D-04 第二通道）。
-///
-/// Zero-layout bridge widget mounted at the root error-card Stack: it renders
-/// nothing and owns no hit-test surface; its only side effect is showing the
-/// localized one-shot OSD notice ([OsdService.I.show]) when a fallback notice
-/// is pending, then consuming it so the notice can never repeat or stack up.
-final class DiagnosticFallbackNotice extends StatefulWidget {
-  const DiagnosticFallbackNotice({super.key});
-
-  @override
-  State<DiagnosticFallbackNotice> createState() =>
-      _DiagnosticFallbackNoticeState();
-}
-
-final class _DiagnosticFallbackNoticeState
-    extends State<DiagnosticFallbackNotice> {
-  @override
-  void initState() {
-    super.initState();
-    DiagnosticLogTarget.I.pendingFallbackNotice.addListener(_onNoticeChanged);
-    // 启动激活可能先于本壳首帧完成（激活在 unawaited 路径内，时序不定，
-    // RESEARCH Pitfall 7 同源）：挂载时补检一次既有通知。
-    if (DiagnosticLogTarget.I.pendingFallbackNotice.value != null) {
-      _scheduleNotice();
-    }
-  }
-
-  @override
-  void dispose() {
-    DiagnosticLogTarget.I.pendingFallbackNotice
-        .removeListener(_onNoticeChanged);
-    super.dispose();
-  }
-
-  /// 通知到达 → 调度 post-frame 展示（副作用不在 build 内）。
-  void _onNoticeChanged() {
-    if (DiagnosticLogTarget.I.pendingFallbackNotice.value != null) {
-      _scheduleNotice();
-    }
-  }
-
-  void _scheduleNotice() {
-    // post-frame 保证 OSD 挂载后才 show：osdDefaultHoldMs=1200 的 hide Timer
-    // 从可见期起算，不会先于可见期耗尽（RESEARCH Pitfall 7 时序）。
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showPendingNotice());
-  }
-
-  /// 展示一次性通知并立即消费（D-04：出现恰一次，不刷屏）。
-  void _showPendingNotice() {
-    if (!mounted) {
-      return;
-    }
-    if (DiagnosticLogTarget.I.pendingFallbackNotice.value == null) {
-      // 已被消费或已清空 —— 幂等防御。
-      return;
-    }
-    OsdService.I.show(AppLocalizations.of(context).logFallbackNotice);
-    DiagnosticLogTarget.I.consumeFallbackNotice();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // 零布局占用、无 hit-test 面：副作用全部在监听回调 + post-frame 内。
-    return const SizedBox.shrink();
   }
 }
