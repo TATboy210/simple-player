@@ -1,195 +1,135 @@
-# Roadmap: Simple Player — 错误捕获定位反馈系统
+# Roadmap: Simple Player — 窗口外观与全屏体验
 
 ## Overview
 
-本里程碑以一条可隔离的本地诊断管线交付“出错可定位”：先建立四源统一的错误契约、安全捕获和有界报告队列；再让每个报告具备可信定位和可回溯的纯文本文件证据；随后把播放引擎错误与统一的非模态界面反馈接通；最后提供持久化配置，并以端到端、洪流和 Windows 实机验证证明系统不会妨碍播放器正常操作。
+本里程碑对外壳层四个体验问题做外科手术式修复：系统主题色边框消除、跨平台圆角一致性、全屏进出过渡无闪烁、自绘标题栏拖拽稳定跟手。所有修复建立在已交付的 C1（NCCALCSIZE 多分支）与 C2（WindowMode 单一数据源）不变量之上。阶段顺序遵循依赖链：先钉死不变量与能力探测，再做 chrome 属性（边框→圆角共享 ApplyChromeAttributes），拖拽在全屏闪烁之前落地（两者共享 WM_NCHITTEST），全屏闪烁作为压轴阶段因其触及三层且解禁 media_kit 红线，Linux 结构性实现与文档打磨收尾。
+
+## Milestones
+
+- ✅ **v1.0 错误捕获定位反馈系统** - Phases 1-5 (shipped 2026-09-01, archived)
+- 🚧 **v1.1 窗口外观与全屏体验** - Phases 6-11 (in progress)
 
 ## Phases
 
 **Phase Numbering:**
-
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+- Integer phases (6, 7, 8): Planned milestone work (continuing from v1.0 Phase 5)
+- Decimal phases (6.1, 6.2): Urgent insertions (marked with INSERTED)
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: 统一捕获与报告契约** - 四类错误安全地汇入同一个有界、可展示的报告服务。 (completed 2026-08-30)
-- [x] **Phase 2: 可信定位与文件证据** - 每份报告获得安全的位置富化和独立、可回溯的错误日志。 (completed 2026-08-30)
-- [x] **Phase 3: 播放错误桥与非模态卡片** - 播放器内所有错误以不妨碍操作的统一卡片反馈给用户。 (completed 2026-08-31)
-- [x] **Phase 4: 错误反馈设置** - 用户可持久控制卡片显示和安全配置日志落点。 (completed 2026-09-01)
-- [x] **Phase 5: 端到端韧性验证** - 证明四源捕获、洪流处理和 Windows 交互在交付环境中可靠可用。 (completed 2026-09-01)
+- [ ] **Phase 6: 能力探测与 C1/C2 钉死** - 启动期 DWM 能力探测门控所有属性调用，C1 缝隙不变量钉死防回归。
+- [ ] **Phase 7: 去主题色边框** - Win11 消除系统强调色描边，Win10 接受 1px 为已知平台差异，属性在主题/DPI/模式变化后重应用。
+- [ ] **Phase 8: 圆角统一** - Win11 原生 DWM 圆角，Win10 接受直角（行业同款取舍），无视频性能代价。
+- [ ] **Phase 9: 标题栏拖拽可靠性** - 原生 HTCAPTION 命中测试消除偶发不跟手，双击最大化与按钮簇共存。
+- [ ] **Phase 10: 全屏过渡无闪烁** - 进出全屏零可见闪烁，恢复进入前窗口模式，达产品级基线。
+- [ ] **Phase 11: Linux 结构性实现与打磨** - Linux 合成器分支结构性正确（待实机验证），文档修正。
 
 ## Phase Details
 
-### Phase 1: 统一捕获与报告契约
+### Phase 6: 能力探测与 C1/C2 钉死
 
-**Goal**: 应用可将四类错误来源安全归一化为可追踪、可去重、可按序处理的报告，而不会因报告自身失败造成新的应用故障。
-**Mode:** mvp
-**Depends on**: Nothing (first phase)
-**Requirements**: CAP-01, CAP-02, CAP-03, CAP-04
+**Goal**: 后续所有阶段可安全调用 DWM 属性——启动期一次性能力快照门控全部调用，Win10 绝不收到 Win11 专属属性；C1 缝隙不变量以回归测试与守卫注释钉死，后续 chrome 工作不得使其回归。
+**Depends on**: Nothing (first phase of milestone)
+**Requirements**: ENAB-01, ENAB-02
 **Success Criteria** (what must be TRUE):
+  1. 应用在 Win10 上启动时不产生 DWM 属性错误——能力探测正确识别 Win10 并门控 Win11 22000+ 专属属性调用（实机可观测：日志无 E_INVALIDARG，不崩溃）。
+  2. 应用在 Win11 上启动时能力探测正确识别 build 22000+，使后续阶段的边框/圆角属性可生效（实机可观测：后续阶段属性生效）。
+  3. C1 NCCALCSIZE 多分支处理器（fullscreen→8px inset / maximized→overshoot / default→return 0）有自动化回归测试，折叠为裸 `return 0` 时测试失败；全屏切换在 Win11 实机上无 8px 缝隙（实机 UAT）。
+**Plans**: TBD
 
-  1. 框架异常、未捕获异步异常、启动期异常和播放引擎异常都可产生同一种含事件 ID、时间、严重级、错误、调用栈及当时媒体路径的不可变报告。
-  2. 应用启动后，框架错误仍保留开发调试输出，异步未捕获错误被应用接管而不会作为未处理错误继续冒泡。
-  3. 连续发生的相同错误会在当前报告中合并重复次数；不同错误按发生顺序等待用户处理，关闭当前项会展示下一项而不丢失已记录证据。
-  4. 报告服务、其任一副作用或错误处理重入发生故障时，播放器不会因错误反馈链再次崩溃。
-
-**Plans**: 4/4 plans executed
 Plans:
-**Wave 1**
+- [ ] 06-01: TBD
 
-- [x] 01-01-PLAN.md — Build and fully test the immutable ErrorReport kernel tracer, singleton reporter, bounded FIFO, dedupe, flush, and fault isolation.
+### Phase 7: 去主题色边框
 
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 01-02-PLAN.md — Wire Flutter/Dart global hooks and same-zone guarded startup to the reporter; consolidate diagnostic initialization ownership.
-
-**Wave 3** *(gap closure; blocked on Waves 1–2 completion)*
-
-- [x] 01-03-PLAN.md — Connect one lifecycle-owned player-error bridge, redact diagnostic paths before fan-out, and reject rollback-negative dedupe intervals.
-
-**Wave 4** *(gap closure; blocked on Waves 1–3 completion)*
-
-- [x] 01-04-PLAN.md — Redact whitespace-bearing local paths end to end and preserve severity, structured player code, and media target in dedupe identity.
-
-### Phase 2: 可信定位与文件证据
-
-**Goal**: As a developer using the player daily, I want to see a trusted project location, media context, and readable, copyable local diagnostic evidence for every error report, so that I can pinpoint the problem without attaching a debugger.
-(中文原意：每份错误报告都能给出可信的项目位置和媒体上下文，并独立写入可读取、可复制的本地诊断证据。)
-**Mode:** mvp
-**Depends on**: Phase 1
-**Requirements**: LOC-01, LOC-02, LOC-03, LOG-01, LOG-02, LOG-03, LOG-04, LOG-05
+**Goal**: Win11 上窗口边缘无系统强调色描边，Win10 上接受 1px 主题色边框为已知平台差异（用户裁决），DWM 属性在主题/DPI/模式变化后重新应用不丢失。
+**Depends on**: Phase 6 (capability probe gates all attribute calls)
+**Requirements**: BORD-01, BORD-02, BORD-03
 **Success Criteria** (what must be TRUE):
+  1. Win11 上窗口边缘无系统强调色描边——将系统强调色设为红色后窗口边缘不为红色（实机 UAT：DWMWA_BORDER_COLOR=NONE 生效）。
+  2. Win10 上 1px 主题色边框存在且被接受为已知平台差异，不尝试 WS_THICKFRAME 剥离或 DWMNCRP（文档化于 PROJECT.md Key Decisions）。
+  3. 运行中切换 Windows 主题或 DPI 后，Win11 上边框属性重新应用——切换深色/浅色主题后边框仍被抑制（实机 UAT）。
+  4. 进入和退出全屏后，Win11 上边框属性在 settle point 重新应用——无陈旧边框闪入（实机 UAT）。
+**Plans**: TBD
 
-  1. 发生项目代码错误时，报告保留完整原始调用栈并优先显示首个项目文件与行号；无法可靠定位时仍能安全显示完整错误信息。
-  2. 在 debug/profile 可读取且位于受信源码根目录的源码行会随报告显示；release 或不可读、越界路径时仅降级为定位文本，不出现新的错误或闪退。
-  3. 报告始终冻结发生时的当前媒体路径和 failed-open 尝试路径，使之后切换媒体不会改写历史证据。
-  4. 每个 error/fatal 报告都会以 UTF-8 追加到默认或已验证的本地单一日志文件；普通 debug/info 输出不会污染该文件，关闭卡片也不会停止落盘。
-  5. 日志写入或关闭失败时，应用仍可继续使用，并以受限调试输出和“日志不可用”状态降级；文件内容和复制内容使用相同的稳定诊断包格式。
-
-**Plans**: 4/4 plans executed
 Plans:
-**Wave 1**
+- [ ] 07-01: TBD
 
-- [x] 02-01-PLAN.md — Prove the reporter-effect → shared formatter → durable UTF-8 append tracer and harden single-writer failure isolation.
+### Phase 8: 圆角统一
 
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 02-02-PLAN.md — Extract trustworthy project frames and read debug/profile source context within a contained project root.
-
-**Wave 3** *(blocked on Waves 1–2 completion)*
-
-- [x] 02-03-PLAN.md — Freeze full current/failed-open media evidence and enrich immutable reports before effect fan-out.
-
-**Wave 4** *(blocked on Waves 1–3 completion)*
-
-- [x] 02-04-PLAN.md — Resolve Application Support/logs/error.log, wire the production sink before global hooks, and close quality gates.
-
-### Phase 3: 播放错误桥与非模态卡片
-
-**Goal**: As a player user, I want to see every error in one unified, expandable non-modal card that never blocks playback controls, so that I get immediate feedback without a second error display path.
-(中文原意：用户在播放器界面中可获得所有错误的统一、可展开且不阻碍控制的即时反馈，旧错误横幅不再形成第二条展示路径。)
-**Mode:** mvp
-**Depends on**: Phase 2
-**Requirements**: CARD-01, CARD-02, CARD-03, CARD-04, CARD-05, CARD-06, MIG-01
+**Goal**: 窗口四角符合 OS 约定——Win11 系统原生圆角，Win10 直角（与 Windows Terminal/VLC/VS Code 同款行业取舍），无透明分层窗口的视频性能代价。
+**Depends on**: Phase 7 (ApplyChromeAttributes helper established)
+**Requirements**: CORN-01, CORN-02
 **Success Criteria** (what must be TRUE):
+  1. Win11 上窗口四角为系统原生圆角，抗锯齿，视觉与 Windows Terminal 一致（实机 UAT：DWMWCP_ROUND 生效）。
+  2. Win10 上窗口四角为直角，无透明分层窗口伪圆角（文档化平台差异，与 VLC/VS Code 同款取舍）。
+  3. 视频播放性能不受影响——无 WS_EX_LAYERED，无逐像素合成代价（可观测：resize/帧时序基线与 phase 前无退化）。
+**Plans**: TBD
 
-  1. 错误发生时，用户可在播放器左上角看到常驻的非模态错误卡片，并可手动关闭它；卡片不会自动消失、抢占焦点或打开 route/barrier。
-  2. 用户可从折叠卡片读取摘要、严重级和媒体路径，并可展开查看文件:行号、可用源码行、完整调用栈和日志路径。
-  3. 用户可一键复制与日志文件一致的完整诊断包；复制失败或关闭卡片时，播放和后续错误反馈仍保持可用。
-  4. 卡片以外的界面区域仍可正常命中，标题栏、控制栏和播放列表操作不被遮挡；卡片显示期间键盘快捷键保持可用。
-  5. 播放引擎错误经桥接后与其他来源显示在同一错误卡片中，且在等效覆盖得到验证后旧 ErrorBanner 已被移除。
-
-**Plans**: 6/6 plans executed (03-01~03-05 executed; 03-06 gap-closure pending — G-03-2/G-03-3/G-03-4)
 Plans:
-**Wave 1**
+- [ ] 08-01: TBD
 
-- [x] 03-01-PLAN.md — 贯通 presentation → ErrorCardHost → ErrorCard 折叠视图到 app root Stack（D-10 挂载层）的端到端 tracer，锁死 CARD-05 build 期安全与 D-12 补呈现。
+### Phase 9: 标题栏拖拽可靠性
 
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 03-02-PLAN.md — 折叠/展开五段详情与严重级语义色（CARD-03/D-03/D-04），常驻手动关、零焦点抢占与严格 hit-test（CARD-01/CARD-02）。
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 03-03-PLAN.md — 一键复制诊断包与失败隔离（CARD-04/D-06），warning 分流与计数徽标轮览（D-01/D-02/D-11）。
-
-**Wave 4** *(blocked on Wave 3 completion; 含人工删除确认门)*
-
-- [x] 03-04-PLAN.md — MIG-01 双路径等效覆盖测试（D-07/D-09），人工确认后删除 ErrorBanner 并收尾质量门。
-
-**Wave 5** *(gap closure — UAT G-03-1)*
-
-- [x] 03-05-PLAN.md — 开发用错误注入入口：kDebugMode 门控 Ctrl+Shift+I 经 ErrorReporterImpl 公开 intake 走真实链路弹卡（UAT G-03-1，零 kernel 改动）。
-
-**Wave 6** *(gap closure — UAT G-03-2/G-03-3/G-03-4)*
-
-- [x] 03-06-PLAN.md — 错误卡片窗口化时下移至视频区上缘不遮挡标题栏（G-03-2）；快捷键分发增加 HardwareKeyboard 全局回退修 dead-keyboard 的 F1 失效并附 KernelLogger 埋点（G-03-3）；移除 Ctrl+Shift+I 调试注入入口（G-03-4，用后即撤）。
-
-### Phase 4: 错误反馈设置
-
-**Goal**: As a player user, I want to toggle the error card and configure the diagnostic log location in settings with persistence and safe fallback, so that feedback behavior fits my workflow without weakening capture.
-(中文原意：用户可在设置界面持久选择是否显示错误卡片，并安全地配置诊断日志输出位置而不削弱捕获和落盘。)
-**Mode:** mvp
-**Depends on**: Phase 3
-**Requirements**: SET-01, SET-02, SET-03
+**Goal**: Windows 上拖拽自绘标题栏始终跟手——原生 HTCAPTION 命中测试消除偶发不跟手；双击最大化与按钮簇区域不触发拖拽；最大化状态下拖拽有守卫。
+**Depends on**: Phase 6 (C1 pin — both touch WM_NCHITTEST/NCCALCSIZE region)
+**Requirements**: DRAG-01, DRAG-02, DRAG-03
 **Success Criteria** (what must be TRUE):
+  1. Windows 上拖拽标题栏始终跟手——连续 20 次拖拽全部跟随指针，无漏拽事件（实机 UAT：HTCAPTION 原生模态拖拽循环）。
+  2. 双击标题栏最大化/还原窗口正常工作；点击标题栏按钮（最小化/最大化/关闭）不启动拖拽。
+  3. 窗口最大化时拖拽标题栏不脱离窗口（IsZoomed 守卫）。
+  4. 非 Windows 平台保留现有 startDragging fallback 路径，无回归。
+**Plans**: TBD
 
-  1. 用户可在设置“通用”tab 开关错误卡片，默认开启；关闭后错误仍被捕获并写入日志，只是不再显示卡片。
-  2. ~~用户可配置日志输出路径~~ **2026-09-01 用户决策修订:路径配置功能移除**——log 固定写软件根目录 logs/,exe 旁不可写时静默回退 Application Support;错误记录不因回退中断。
-  3. 用户修改卡片偏好或有效日志路径后重启应用，设置仍被保留；切换日志路径不会损坏写入中的诊断记录。
-
-**Plans**: 5/5 plans executed（4 executed + 1 gap closure）
 Plans:
-**Wave 1**
+- [ ] 09-01: TBD
 
-- [x] 04-01-PLAN.md — 贯通 settings.json → 三层位置链 → sink 激活 → 诊断包落盘的端到端 tracer，落地便携设置存储与 exe 根优先位置链（SET-02/SET-03，D-01/D-02）。
+### Phase 10: 全屏过渡无闪烁
 
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 04-02-PLAN.md — 日志路径单层校验 + DiagnosticLogTarget 重定向协调器 + 回退双通道告知（SET-02，D-03/D-04）。
-- [x] 04-03-PLAN.md — 错误卡片开关呈现门控：off 同帧消失、捕获落盘零影响、on 恢复最新（SET-01，D-05，零 kernel）。
-
-**Wave 3** *(blocked on Waves 1–2 completion)*
-
-- [x] 04-04-PLAN.md — 设置「通用」tab 实装（选中态架构 + 开关行 + 路径行防抖校验/浏览/行内状态）与 Phase 收口质量门（SET-01/02/03）。
-
-**Gap closure** *(blocked on Waves 1–3 completion；G-04-1，D-07 修订语义)*
-
-- [x] 04-05-PLAN.md — 日志路径配置功能整体移除：通用 tab 仅留开关行、设置 store 单偏好化、位置链收窄双层（exe 根 → AS）、协调器仅启动激活、D-04 通知桥作废、测试与 l10n 同步收窄（SET-02 修订语义）。
-
-**UI hint**: yes
-
-### Phase 5: 端到端韧性验证
-
-**Goal**: As a developer and user of the player, I want to verify that the diagnostics system reliably captures, persists, and surfaces errors under real, burst, and Windows-interaction conditions, so that I can trust it without a debugger.
-(中文原意：用户和开发者可确信该诊断系统在真实错误、高频错误及 Windows 播放器交互期间完整捕获、可回溯且不妨碍使用。)
-**Mode:** mvp
-**Depends on**: Phase 4
-**Requirements**: VER-01, VER-02, VER-03, VER-04, VER-05
+**Goal**: 进出全屏零可见闪烁——无标题栏闪现、无尺寸跳变、无纹理撕裂；退出全屏恢复进入前窗口模式（最大化↔窗口化）而非一律窗口化；全屏体验达产品级基线。
+**Depends on**: Phase 6 (probe + C1 pin), Phase 7 (settle-point re-apply), Phase 9 (HTCAPTION stable)
+**Requirements**: FSCR-01, FSCR-02, FSCR-03, FSCR-04, FSCR-05
 **Success Criteria** (what must be TRUE):
+  1. 进入全屏时标题栏即时隐藏（无渐隐闪现），退出全屏时标题栏渐隐恢复（实机 UAT）。
+  2. 全屏过渡零可见闪烁——无标题栏闪现、无边框闪现、无尺寸跳变、无纹理撕裂，Win10 与 Win11 均通过（实机 UAT + textureIdChanges=0 探测）。
+  3. 退出全屏恢复进入前窗口模式——进入前若为最大化则退出后回到最大化，非一律窗口化。
+  4. 全屏体验对照 mpv/VLC/Windows Terminal 行为基线达产品级——即时切换、无动画竞争、几何正确（FSCR-05 产品级验收，含执行期交叉审查授权）。
+  5. DWMWA_TRANSITIONS_FORCEDISABLED 在实机 spike 中通过 raster<33ms + 视觉无闪烁门则采纳，否则不作为默认提交（spike-gated，非承诺默认）。
 
-  1. 对四个错误来源分别进行故障注入时，每次都产生一份报告、相应的文件证据，并在卡片开启时展示一张卡片。
-  2. 发生 100–1000 个合成错误的爆发时，内存和排队保持有界、重复项被合并、写盘保持受控，播放控制仍能响应。
-  3. 捕获钩子与 runApp 在同一 zone 中工作，报告重入、复制失败和关闭失败均不会造成第二个未处理错误。
-  4. Windows 实机中卡片显示期间，标题拖动、窗口控制、seek、播放列表、全屏、ESC 和媒体键仍全部可用。
-  5. 开发者可查阅 release 下源码/符号可用性的降级策略，以及 Dart 错误钩子无法捕获 libmpv/FFI 原生进程崩溃的边界。
+**Constraints** (reverted-approaches denylist — 硬约束):
+- 方案 A（FFI 桥）/ 方案 B（DWM 禁用 / DWMWA_NCRENDERING_POLICY）/ 全局 DWMNCRP / `window_manager.setFullScreen` 均为已撤回方案，禁止重提。
+- 任何全屏 PR 须在设计文档首段声明其不是上述方案之一；重新考虑需实机 pilot + 针对具体失败的 documented delta。
+- media_kit 红线仅对全屏功能解禁（FSCR-02 触及 media_kit_video/windows/utils.cc），其余部分不可改动。
+**Plans**: TBD
 
-**Plans**: 1/1 plans executed
 Plans:
-**Wave 1**
+- [ ] 10-01: TBD
 
-- [x] 05-01-PLAN.md — 四源端到端整合注入用例(tracer)+ 爆发压测补差 + VER-01~05 证据归档映射表 + VER-05 开发者文档
+### Phase 11: Linux 结构性实现与打磨
+
+**Goal**: Linux 窗口外壳结构性正确（合成器分支、待实机验证），文档准确。
+**Depends on**: Phase 6 (capability probe pattern), Phase 8 (corner path), Phase 10 (fullscreen structural pattern)
+**Requirements**: ENAB-03, CORN-03, PLSH-01
+**Success Criteria** (what must be TRUE):
+  1. Linux 上应用启动时探测合成器（Wayland/X11/gamescope）并分支窗口外壳路径（结构性正确，待实机验证）。
+  2. Linux borderless 场景 ClipRRect 回退路径产出结构性圆角（待实机验证）。
+  3. Linux 全屏结构性路径（Wayland `xdg_toplevel.set_fullscreen` / X11 既有路径）按 window_manager Linux 插件源码正确实现，满足 FSCR-05 Linux 结构性正确同标准交付条款（待实机验证）。
+  4. CLAUDE.md window_manager 版本由 "5.15.0" 修正为 "0.5.2"（PLSH-01，文档可观测）。
+**Plans**: TBD
+
+Plans:
+- [ ] 11-01: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
-| 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
-| 3. 播放错误桥与非模态卡片 | 6/6 | Complete    | 2026-08-31 |
-| 4. 错误反馈设置 | 5/5 | Complete    | 2026-09-01 |
-| 5. 端到端韧性验证 | 1/1 | Complete    | 2026-09-01 |
+| 6. 能力探测与 C1/C2 钉死 | 0/TBD | Not started | - |
+| 7. 去主题色边框 | 0/TBD | Not started | - |
+| 8. 圆角统一 | 0/TBD | Not started | - |
+| 9. 标题栏拖拽可靠性 | 0/TBD | Not started | - |
+| 10. 全屏过渡无闪烁 | 0/TBD | Not started | - |
+| 11. Linux 结构性实现与打磨 | 0/TBD | Not started | - |

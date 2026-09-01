@@ -66,13 +66,30 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (待 roadmap 填充) | | |
+| ENAB-01 | Phase 6 | Pending |
+| ENAB-02 | Phase 6 | Pending |
+| ENAB-03 | Phase 11 | Pending |
+| BORD-01 | Phase 7 | Pending |
+| BORD-02 | Phase 7 | Pending |
+| BORD-03 | Phase 7 | Pending |
+| CORN-01 | Phase 8 | Pending |
+| CORN-02 | Phase 8 | Pending |
+| CORN-03 | Phase 11 | Pending |
+| FSCR-01 | Phase 10 | Pending |
+| FSCR-02 | Phase 10 | Pending |
+| FSCR-03 | Phase 10 | Pending |
+| FSCR-04 | Phase 10 | Pending |
+| FSCR-05 | Phase 10 | Pending |
+| DRAG-01 | Phase 9 | Pending |
+| DRAG-02 | Phase 9 | Pending |
+| DRAG-03 | Phase 9 | Pending |
+| PLSH-01 | Phase 11 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- v1.1 requirements: 18 total
+- Mapped to phases: 18
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-01*
-*Last updated: 2026-09-01 after milestone v1.1 definition*
+*Last updated: 2026-09-02 after roadmap creation*
