@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,9 +52,8 @@ void main() {
       }
     });
     ErrorFeedbackSettings.I.resetForTesting(
-      settingsFile: () => File(
-        '${settingsTmp.path}${Platform.pathSeparator}settings.json',
-      ),
+      settingsFile: () =>
+          File('${settingsTmp.path}${Platform.pathSeparator}settings.json'),
     );
   });
 
@@ -695,31 +695,32 @@ void main() {
   // ErrorCaptureSnapshot.record 照常接纳（record 从不查询任何开关），
   // presentation 链照常推进。
   group('SET-01 卡片开关呈现门控（D-05）', () {
-    testWidgets('toggle off hides the card the same frame and keeps the queue', (
-      tester,
-    ) async {
-      // Arrange：宿主就绪 + 注入一份错误使卡片可见。
-      await tester.pumpWidget(
-        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
-      );
-      await tester.pump();
-      ErrorReporterImpl.I.reportBootstrapSafely(
-        StateError('开关前错误'),
-        StackTrace.current,
-      );
-      await tester.pump();
-      expect(find.byType(ErrorCard), findsOneWidget);
+    testWidgets(
+      'toggle off hides the card the same frame and keeps the queue',
+      (tester) async {
+        // Arrange：宿主就绪 + 注入一份错误使卡片可见。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('开关前错误'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsOneWidget);
 
-      // Act：关闭开关（呈现门控）。
-      ErrorFeedbackSettings.I.setCardEnabled(false);
-      await tester.pump();
+        // Act：关闭开关（呈现门控）。
+        ErrorFeedbackSettings.I.setCardEnabled(false);
+        await tester.pump();
 
-      // Assert：同帧消失（D-05 立即生效，无退场动画）。
-      expect(find.byType(ErrorCard), findsNothing);
-      // Assert：reporter 队列未被消费 —— 关卡片不动队列（presentation.current
-      // 仍持有队首），证据链完整。
-      expect(ErrorReporterImpl.I.presentation.value.current, isNotNull);
-    });
+        // Assert：同帧消失（D-05 立即生效，无退场动画）。
+        expect(find.byType(ErrorCard), findsNothing);
+        // Assert：reporter 队列未被消费 —— 关卡片不动队列（presentation.current
+        // 仍持有队首），证据链完整。
+        expect(ErrorReporterImpl.I.presentation.value.current, isNotNull);
+      },
+    );
 
     testWidgets(
       'reports keep flowing into snapshot and presenter while gated off',

@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../kernel/diagnostics/error_report.dart';
 import '../../kernel/diagnostics/error_reporter.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
+import '../../l10n/app_localizations.dart';
 import '../dialogs/settings/error_feedback_settings.dart';
 import '../shared/osd_overlay.dart';
 import 'error_capture_snapshot.dart';
@@ -11,7 +16,7 @@ import 'error_card.dart';
 /// 错误卡片宿主 — ErrorReporter 呈现状态到 UI 的唯一接线人
 /// （CARD-05 相位守卫适配器 + CARD-06/D-08/D-12）。
 ///
-/// 七项骨架义务：
+/// 八项骨架义务：
 /// 1. **监听**：initState 对 `ErrorReporterImpl.I.presentation` addListener；
 /// 2. **首帧 flushPresentation**：post-frame 宣布就绪，补呈现挂载前入队的
 ///    bootstrap/windowInit 窗口错误（D-12）——isReady 门不解除则 `current`
@@ -30,9 +35,28 @@ import 'error_card.dart';
 ///    渲染（off 同帧消失、on 恢复快照最新），捕获/快照/落盘链零影响
 ///    （快照 record 从不查询任何开关，零 kernel 依据）；门控绝不进入
 ///    [_apply]/[_routeWarning] —— warning OSD 分流与轮览重置不受影响。
+/// 8. **E97 打开日志接线**：卡片折叠态「打开日志」动作的宿主回调 —— 以
+///    explorer.exe 定位当前生效 error.log（缝注入可测 + 失败隔离 OSD 反馈）。
+///
+/// E97 生产 explorer 启动器：列表参数形态（argList）启动 —— 无 shell、无
+/// 字符串拼接，路径不参与命令行字符串拼装（T-E97-01 缓解）；`/select,` +
+/// 路径为规划钦定的 Windows 资源管理器语义（打开日志所在目录并选中该文件）。
+/// 路径只进进程参数，绝不渲染进可见树（T-03-05）。
+Future<void> _launchExplorerSelect(String logPath) =>
+    Process.start('explorer.exe', ['/select,', logPath]);
+
 class ErrorCardHost extends StatefulWidget {
   /// Creates the presentation host; state is read from [ErrorReporterImpl.I].
-  const ErrorCardHost({super.key});
+  ///
+  /// [logExplorer] is a test-only injection seam for the open-log action:
+  /// production uses the default launcher ([_launchExplorerSelect]); widget
+  /// tests inject a recording fake so they never spawn a real process.
+  const ErrorCardHost({super.key, this.logExplorer});
+
+  /// E97 仅测试注入缝：打开日志动作的进程启动器。生产走默认
+  /// [_launchExplorerSelect]；widget 测试注入记录型假缝，绝不拉起真实
+  /// explorer.exe 进程。为 null 时走生产默认。
+  final Future<void> Function(String logPath)? logExplorer;
 
   @override
   State<ErrorCardHost> createState() => _ErrorCardHostState();
@@ -209,6 +233,52 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
     ErrorReporterImpl.I.dismissCurrent();
   }
 
+  /// E97 打开日志：以资源管理器定位当前生效 error.log —— 路径在**动作时刻**
+  /// 从 `ErrorReporterImpl.I.diagnosticLogPath.value` 读取（不缓存，与卡片
+  /// 展开区日志路径段同一读取路径），交由 [widget.logExplorer]（测试缝）或
+  /// 生产 [_launchExplorerSelect] 启动。
+  ///
+  /// 失败隔离（CARD-04 形态，异常绝不外溢）：
+  /// - reporter 未初始化或 logPath 为 null/空 → errorCardLogUnavailable
+  ///   降级 OSD（复用既有 key，不新增第四个 l10n key）；
+  /// - typed catch 只捕 [ProcessException]（进程启动失败/非 Windows 平台，
+  ///   T-E97-03 缓解），不捕任何 Error 子类型；成功/失败两态均以 OSD 反馈；
+  /// - 日志 context 只记 `error.executable` 与 `error.message`，不记完整
+  ///   路径（D-07 日志侧纪律）；KernelLogger.I 未 init 时抛 StateError
+  ///   （WR-02）—— 失败隔离路径不得自己先炸，先用 isInitialized 探针守卫。
+  Future<void> _openLog() async {
+    // l10n 必须在 await 之前解析（沿用 _copyDiagnosticPack 的 context 提前
+    // 捕获纪律，一次捕获覆盖成功/失败两条反馈路径）。
+    final l10n = AppLocalizations.of(context);
+    final String? logPath = ErrorReporterImpl.isInitialized
+        ? ErrorReporterImpl.I.diagnosticLogPath?.value
+        : null;
+    if (logPath == null || logPath.isEmpty) {
+      // 路径不可用降级：零缝调用（绝不以空路径启动 explorer）。
+      OsdService.I.show(l10n.errorCardLogUnavailable, icon: Icons.info_outline);
+      return;
+    }
+    try {
+      await (widget.logExplorer ?? _launchExplorerSelect)(logPath);
+      OsdService.I.show(l10n.errorCardLogOpened, icon: Icons.folder_open);
+    } on ProcessException catch (error) {
+      OsdService.I.show(l10n.errorCardOpenLogFailed, icon: Icons.error_outline);
+      // 可恢复运行期故障：结构化 warn 供日志回溯（不含完整路径，D-07）。
+      if (KernelLoggerImpl.isInitialized) {
+        KernelLogger.I.w(
+          'open log failed',
+          context: {'executable': error.executable, 'message': error.message},
+        );
+      }
+    }
+  }
+
+  /// VoidCallback 适配：fire-and-forget 启动打开日志动作（unawaited 显式
+  /// 标注意图 —— 异常隔离在 [_openLog] 内部完成，不外溢到卡片）。
+  void _onOpenLog() {
+    unawaited(_openLog());
+  }
+
   @override
   Widget build(BuildContext context) {
     // SET-01 呈现门控（D-05 立即生效）：外层订阅设置 store 单例（UI→UI
@@ -249,6 +319,9 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
                 // CARD-01 手动关闭唯一接线点：dismissCurrent 推进 FIFO，队首
                 // 下一项经 presentation 通知自然上屏（CAP-04）。
                 onClose: _onClose,
+                // E97 打开日志接线（与 onClose 同级）：宿主持有缝注入与
+                // 失败隔离，卡片只暴露动作入口。
+                onOpenLog: _onOpenLog,
               ),
             );
           },
