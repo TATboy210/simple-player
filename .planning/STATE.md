@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 Phase: 4 (错误反馈设置) — EXECUTING
 Plan: 4 of 4
 Status: Phase complete — ready for verification
-Last activity: 2026-08-31 — Phase 4 execution started
+Last activity: 2026-09-01 - Completed quick task 260901-e97: 错误卡片加复制详情与打开日志按钮
 
 Progress: [██████░░░░] 60%
 
@@ -110,6 +110,13 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions affecti
 ### Pending Todos
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260901-e97 | 错误卡片加复制详情与打开日志按钮 | 2026-09-01 | 92d04f8f | [260901-e97-error-card-buttons](./quick/260901-e97-error-card-buttons/) |
+
 
 ### Blockers/Concerns
 
