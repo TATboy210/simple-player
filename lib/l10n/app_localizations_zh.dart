@@ -627,37 +627,5 @@ class AppLocalizationsZh extends AppLocalizations {
   String get errorCardCycleTooltip => '轮览错误';
 
   @override
-  String get logFallbackNotice => '日志已回退到默认位置';
-
-  @override
   String get errorCardToggleLabel => '错误卡片';
-
-  @override
-  String get logPathLabel => '日志目录';
-
-  @override
-  String get logPathHint => '留空使用默认位置';
-
-  @override
-  String get logPathBrowse => '浏览…';
-
-  @override
-  String get logPathValidatingStatus => '校验中…';
-
-  @override
-  String get logPathValidStatus => '目录可写';
-
-  @override
-  String get logPathInvalidStatus => '无法写入该目录';
-
-  @override
-  String get logPathPickerFailureStatus => '无法打开目录选择器';
-
-  @override
-  String get logFallbackReasonPrefix => '已回退到默认位置';
-
-  @override
-  String logEffectivePathLabel(Object path) {
-    return '当前有效路径：$path';
-  }
 }
