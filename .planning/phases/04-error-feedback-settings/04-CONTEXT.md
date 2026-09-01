@@ -21,6 +21,9 @@
 - **D-05:** 卡片开关语义 = **立即生效**:关闭 → 已显示卡片立即消失 + 后续错误只落盘不弹卡;开启 → 恢复显示(含队列中错误)。实现接缝在 UI 呈现层(ErrorCardHost/快照过滤),**零 kernel 改动**——ErrorReporter 捕获/落盘/effects 链完全不受开关影响 — **Reversibility:** reversible
 - **D-06:** 后端持续优化(用户方向)**不混入**本 phase——SET-01/02/03 之外不做 sink/序列化优化;优化作为独立轮,在设置功能落地后按 profile 驱动细化 — **Reversibility:** n/a(范围决策)
 
+### UAT 后修订决策（2026-09-01，用户拍板）
+- **D-07:** **移除日志路径配置功能**(用户实测后判定鸡肋)——通用 tab 不再有路径行/浏览按钮/校验 UI;设置 store 移除 logDirectory 字段(仅保留卡片开关);三层位置链收窄为**双层**(exe 根 logs/ → Application Support logs/),`validateConfiguredDirectory` 保留作内部可写探测(双层回退与设置 store WR-06 回退层复用);`DiagnosticLogTarget` 协调器简化为仅启动激活(无运行时重定向);D-04 双通道回退告知随之作废(无配置即无配置失败告知);SET-02 已按修订语义在 REQUIREMENTS.md 关账 — **Reversibility:** reversible——功能移除,git 可恢复
+
 ### Claude's Discretion
 - settings.json 的字段命名/结构(建议扁平 key-value + version 字段)
 - 「输入即校验」的防抖时长与校验实现(临时目录探测 vs 直接 open/write 探测)
