@@ -125,10 +125,7 @@ void main() {
 
         // Act — 先成功落盘，再删除整个目录制造真实写失败，再重建目录证明
         // 每消息现开句柄可恢复（镜像既有「restores availability」用例）。
-        sink.record(
-          _report(message: '删除前记录'),
-          ReportAcceptance.newReport,
-        );
+        sink.record(_report(message: '删除前记录'), ReportAcceptance.newReport);
         await sink.drain();
         await fixture.directory.delete(recursive: true);
         sink.record(
@@ -221,6 +218,12 @@ final class _LogFixture {
     return _LogFixture(directory, File('${directory.path}/error.log'));
   }
 
-  /// Cleans the test-owned temporary directory after all pending writes finish.
-  Future<void> dispose() => directory.delete(recursive: true);
+  /// Cleans the test-owned temporary directory; tolerates mid-test deletion
+  /// (failure-path tests delete the directory to simulate disk loss).
+  Future<void> dispose() async {
+    if (!directory.existsSync()) {
+      return;
+    }
+    await directory.delete(recursive: true);
+  }
 }
