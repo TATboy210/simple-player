@@ -1226,6 +1226,24 @@ abstract class AppLocalizations {
   /// **'Copy failed'**
   String get errorCardCopyFailed;
 
+  /// Tooltip for the open-log-location action on the error card
+  ///
+  /// In en, this message translates to:
+  /// **'Open log location'**
+  String get errorCardOpenLogTooltip;
+
+  /// OSD feedback after the log location opened successfully
+  ///
+  /// In en, this message translates to:
+  /// **'Log opened'**
+  String get errorCardLogOpened;
+
+  /// OSD feedback after opening the log location failed
+  ///
+  /// In en, this message translates to:
+  /// **'Open log failed'**
+  String get errorCardOpenLogFailed;
+
   /// Expanded section title: file:line location
   ///
   /// In en, this message translates to:

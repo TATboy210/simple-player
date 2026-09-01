@@ -601,6 +601,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get errorCardCopyFailed => '复制失败';
 
   @override
+  String get errorCardOpenLogTooltip => '打开日志位置';
+
+  @override
+  String get errorCardLogOpened => '已打开日志位置';
+
+  @override
+  String get errorCardOpenLogFailed => '打开日志失败';
+
+  @override
   String get errorCardSectionLocation => '定位';
 
   @override

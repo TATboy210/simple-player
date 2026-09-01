@@ -606,6 +606,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorCardCopyFailed => 'Copy failed';
 
   @override
+  String get errorCardOpenLogTooltip => 'Open log location';
+
+  @override
+  String get errorCardLogOpened => 'Log opened';
+
+  @override
+  String get errorCardOpenLogFailed => 'Open log failed';
+
+  @override
   String get errorCardSectionLocation => 'Location';
 
   @override
