@@ -47,11 +47,11 @@
 
 ### 验证 (Verification)
 
-- [ ] **VER-01**: 四源端到端故障注入——每源各产单报告+文件证据+卡片（开关开启时）
-- [ ] **VER-02**: 合成错误爆发（100-1000 事件）下有界内存、合并 UI、受控写盘、播放控制仍响应
-- [ ] **VER-03**: zone 一致性冒烟（binding/runApp 同 zone）、reentrancy 测试、复制/关闭失败隔离测试
-- [ ] **VER-04**: Windows 实机冒烟：标题拖动/窗口控制/seek/播放列表/全屏/ESC/媒体键在卡片显示期间全部正常
-- [ ] **VER-05**: 文档化 release 源码/符号策略与原生崩溃边界（Dart 钩子不覆盖 libmpv/FFI 进程崩溃）
+- [x] **VER-01**: 四源端到端故障注入——每源各产单报告+文件证据+卡片（开关开启时）
+- [x] **VER-02**: 合成错误爆发（100-1000 事件）下有界内存、合并 UI、受控写盘、播放控制仍响应
+- [x] **VER-03**: zone 一致性冒烟（binding/runApp 同 zone）、reentrancy 测试、复制/关闭失败隔离测试
+- [x] **VER-04**: Windows 实机冒烟：标题拖动/窗口控制/seek/播放列表/全屏/ESC/媒体键在卡片显示期间全部正常
+- [x] **VER-05**: 文档化 release 源码/符号策略与原生崩溃边界（Dart 钩子不覆盖 libmpv/FFI 进程崩溃）
 
 ## v2 Requirements
 
@@ -98,11 +98,11 @@
 | SET-01 | Phase 4 | Complete |
 | SET-02 | Phase 4 | Complete |
 | SET-03 | Phase 4 | Complete |
-| VER-01 | Phase 5 | Pending |
-| VER-02 | Phase 5 | Pending |
-| VER-03 | Phase 5 | Pending |
-| VER-04 | Phase 5 | Pending |
-| VER-05 | Phase 5 | Pending |
+| VER-01 | Phase 5 | Complete |
+| VER-02 | Phase 5 | Complete |
+| VER-03 | Phase 5 | Complete |
+| VER-04 | Phase 5 | Complete |
+| VER-05 | Phase 5 | Complete |
 
 **Coverage:**
 

@@ -175,11 +175,11 @@ Plans:
   4. Windows 实机中卡片显示期间，标题拖动、窗口控制、seek、播放列表、全屏、ESC 和媒体键仍全部可用。
   5. 开发者可查阅 release 下源码/符号可用性的降级策略，以及 Dart 错误钩子无法捕获 libmpv/FFI 原生进程崩溃的边界。
 
-**Plans**: 0/1 plans executed
+**Plans**: 1/1 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — 四源端到端整合注入用例(tracer)+ 爆发压测补差 + VER-01~05 证据归档映射表 + VER-05 开发者文档
+- [x] 05-01-PLAN.md — 四源端到端整合注入用例(tracer)+ 爆发压测补差 + VER-01~05 证据归档映射表 + VER-05 开发者文档
 
 ## Progress
 
@@ -192,4 +192,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
 | 3. 播放错误桥与非模态卡片 | 6/6 | Complete    | 2026-08-31 |
 | 4. 错误反馈设置 | 5/5 | Complete    | 2026-09-01 |
-| 5. 端到端韧性验证 | 0/TBD | Not started | - |
+| 5. 端到端韧性验证 | 1/1 | In Progress|  |
