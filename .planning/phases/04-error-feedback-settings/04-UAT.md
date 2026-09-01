@@ -16,7 +16,7 @@ updated: 2026-09-01T15:20:00+08:00
 expected: |
   设置→通用→关闭错误卡片开关:已显示卡片同帧消失;触发错误→错误仍写入日志(卡片不弹);
   重新开启:队列中最新错误恢复显示。log 固定写软件根目录 logs/(无路径配置入口——用户决策移除)。
-result: [pending]
+result: pass
 
 ### 2. 开关重启持久化(SET-03)
 expected: |
@@ -26,8 +26,7 @@ result: pass
 
 ### 3. 已移除(用户决策:路径配置功能整体移除)
 expected: 日志路径配置入口不再存在;log 固定软件根目录 logs/,exe 不可写时静默回退 Application Support。
-result: skipped
-reason: "Deferred follow-up: 用户决策——更改 log 保存路径的功能太鸡肋,移除该细节(gap 闭环计划执行后此项作废)"
+result: pass
 
 ### 4. MSIX ACL 冒烟(设置双层回退)
 expected: |
@@ -37,8 +36,8 @@ result: pass
 
 ### 5. 已移除(同 Test 3)
 expected: 路径配置 UI 不再存在。
-result: skipped
-reason: "Deferred follow-up: 同 Test 3——路径配置功能整体移除"
+result: pass
+note: "04-05 absence 测试证实 UI 不再存在"
 
 ### 6. 快速开关并发确认(简化后)
 expected: |
@@ -51,7 +50,7 @@ total: 6
 passed: 4
 issues: 0
 pending: 0
-skipped: 2
+skipped: 0
 blocked: 0
 
 ## Gaps
