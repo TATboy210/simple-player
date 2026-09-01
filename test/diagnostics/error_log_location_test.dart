@@ -1,4 +1,4 @@
-/// Behavioral tests for the three-tier default diagnostic log location chain.
+/// Behavioral tests for the two-tier default diagnostic log location chain.
 library;
 
 import 'dart:io';
@@ -98,79 +98,12 @@ void main() {
       expect(source, isNot(contains('resolvedExecutable')));
     });
 
-    group('三层回退链（D-02：配置 → exe 根 → Application Support）', () {
+    group('双层回退链（D-02/D-07：exe 根 → Application Support）', () {
       late Directory root;
 
       setUp(() async {
         root = await Directory.systemTemp.createTemp('error-log-chain-');
         addTearDown(() => root.delete(recursive: true));
-      });
-
-      test('configured tier wins over exe-root and Application Support tiers',
-          () async {
-        // Arrange
-        final configured = Directory('${root.path}${Platform.pathSeparator}cfg');
-        await configured.create();
-        final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
-        final support = Directory('${root.path}${Platform.pathSeparator}as');
-
-        // Act
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: configured.path,
-        );
-
-        // Assert — file 直接位于配置目录下，其余层未被触碰。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(
-          resolved.file.path,
-          startsWith(configured.path),
-        );
-        expect(resolved.configuredFailure, isNull);
-        expect(
-          Directory(
-            '${exeRoot.path}${Platform.pathSeparator}'
-            'logs',
-          ).existsSync(),
-          isFalse,
-        );
-        expect(
-          Directory(
-            '${support.path}${Platform.pathSeparator}logs',
-          ).existsSync(),
-          isFalse,
-        );
-      });
-
-      test('empty configured directory skips to the injected exe-root tier',
-          () async {
-        // Arrange
-        final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
-        final support = Directory('${root.path}${Platform.pathSeparator}as');
-
-        // Act — configuredDirectory 空串 = 跳过配置层走默认链（D-01 语义）。
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: '',
-        );
-
-        // Assert — D-02：exe 根优先于 AS。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.file.path, startsWith(exeRoot.path));
-        expect(
-          resolved.file.path,
-          endsWith(
-            '${Platform.pathSeparator}logs${Platform.pathSeparator}error.log',
-          ),
-        );
-        expect(
-          Directory(
-            '${support.path}${Platform.pathSeparator}logs',
-          ).existsSync(),
-          isFalse,
-        );
       });
 
       test('unwritable exe tier falls back to the Application Support tier',
@@ -193,51 +126,9 @@ void main() {
         expect(resolved.file.path, startsWith(support.path));
       });
 
-      test('file-occupied configured path skips the tier and carries the '
-          'failure', () async {
-        // Arrange — 实测形态：Directory.create 撞上同名文件 → PathExistsException。
-        final occupied = File('${root.path}${Platform.pathSeparator}occupied');
-        await occupied.writeAsString('not a directory');
-        final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
-        final support = Directory('${root.path}${Platform.pathSeparator}as');
-
-        // Act
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: occupied.path,
-        );
-
-        // Assert — 结果落在 exe 层且携带配置层回退原因。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.configuredFailure, isNotNull);
-        expect(resolved.file.path, startsWith(exeRoot.path));
-      });
-
-      test('valid configured win keeps configuredFailure null', () async {
-        // Arrange
-        final configured = Directory('${root.path}${Platform.pathSeparator}cfg');
-        await configured.create();
-        final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
-        final support = Directory('${root.path}${Platform.pathSeparator}as');
-
-        // Act
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: configured.path,
-        );
-
-        // Assert
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.configuredFailure, isNull);
-      });
-
       test('all tiers failing degrades to unavailable without throwing',
           () async {
         // Arrange — 探测恒 false + AS provider 抛出（既有降级态，不抛出）。
-        final configured = Directory('${root.path}${Platform.pathSeparator}cfg');
-        await configured.create();
         final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
 
         // Act
@@ -245,7 +136,6 @@ void main() {
           applicationSupportDirectory: () async =>
               throw const FileSystemException('support unavailable'),
           executableDirectory: () => exeRoot,
-          configuredDirectory: configured.path,
           writable: (_) async => false,
         );
 
@@ -255,8 +145,6 @@ void main() {
 
       test('probe-failing every real tier degrades to unavailable', () async {
         // Arrange — AS provider 返回真实目录但探测恒 false（探测型全败路径）。
-        final configured = Directory('${root.path}${Platform.pathSeparator}cfg');
-        await configured.create();
         final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
         final support = Directory('${root.path}${Platform.pathSeparator}as');
 
@@ -264,7 +152,6 @@ void main() {
         final result = await ErrorLogLocation.resolve(
           applicationSupportDirectory: () async => support,
           executableDirectory: () => exeRoot,
-          configuredDirectory: configured.path,
           writable: (_) async => false,
         );
 
@@ -273,88 +160,7 @@ void main() {
       });
     });
 
-    group('启动配置层校验契约（WR-03：startup tier shares the UI contract）', () {
-      late Directory root;
-      late Directory exeRoot;
-      late Directory support;
-
-      setUp(() async {
-        root = await Directory.systemTemp.createTemp('log-startup-tier-');
-        addTearDown(() => root.delete(recursive: true));
-        exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
-        support = Directory('${root.path}${Platform.pathSeparator}as');
-      });
-
-      test('whitespace-only configured value silently skips to the default '
-          'chain', () async {
-        // Act — 纯空白配置值与 '' 同义：静默走默认链（D-01 空配置语义）。
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: '   ',
-        );
-
-        // Assert — 落点在 exe 层；无任何以空白命名的目录被创建（旧缺陷会
-        // 在进程 cwd 下 create 出空白目录并当作层 1 胜出）。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.file.path, startsWith(exeRoot.path));
-        expect(resolved.configuredFailure, isNull);
-      });
-
-      test('relative configured value falls back carrying the typed reason',
-          () async {
-        // Act
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: 'relative-logs',
-        );
-
-        // Assert — 相对路径被单层校验拒绝：回退默认链且携带封闭原因
-        //（D-04 回退通知对畸形配置同样触发）。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.configuredFailure, ConfiguredDirectoryFailure.notAbsolute);
-        expect(resolved.file.path, startsWith(exeRoot.path));
-      });
-
-      test('forward-slash UNC configured value falls back carrying the '
-          'typed reason', () async {
-        // Act — WR-03+WR-04 组合：启动层拒绝 //server/share 形态。
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: '//server/share',
-        );
-
-        // Assert
-        final resolved = result as ErrorLogLocationResolved;
-        expect(
-          resolved.configuredFailure,
-          ConfiguredDirectoryFailure.uncPathUnsupported,
-        );
-        expect(resolved.file.path, startsWith(exeRoot.path));
-      });
-
-      test('whitespace-padded valid directory is accepted via trim', () async {
-        // Arrange
-        final configured = Directory('${root.path}${Platform.pathSeparator}cfg');
-        await configured.create();
-
-        // Act — 前后空白在单层校验内被 trim，配置层照常胜出。
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          configuredDirectory: '  ${configured.path}  ',
-        );
-
-        // Assert — 胜出层为 trim 后的目录；无回退原因。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.configuredFailure, isNull);
-        expect(resolved.file.path, startsWith(configured.path));
-      });
-    });
-
-    group('validateConfiguredDirectory 单层校验（SET-02 采用面）', () {
+    group('内部可写探测契约（store 双层回退复用）', () {
       late Directory root;
 
       setUp(() async {

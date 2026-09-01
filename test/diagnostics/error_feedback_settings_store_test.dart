@@ -1,8 +1,9 @@
 /// ErrorFeedbackSettings 便携 JSON 存储的行为测试（SET-03 / D-01 / tracer 纵切）。
 ///
-/// Behavioral tests for the portable settings store: silent fallback on
+/// Behavioral tests for the portable settings store after the G-04-1 removal:
+/// two-key settings.json (version + error-card toggle), silent fallback on
 /// corrupted input, and the tracer end-to-end slice proving a real
-/// settings.json drives the three-tier log location chain into sink evidence.
+/// settings.json drives the two-tier log location chain into sink evidence.
 library;
 
 import 'dart:convert';
@@ -36,12 +37,8 @@ void main() {
     });
 
     group('tracer 端到端纵切', () {
-      test('真实 settings.json 的 logDirectory 经三层链成为 sink 落盘位置', () async {
-        // Arrange — 配置层/exe 层/AS 层全部指向真实临时目录（不触真实 exe 与 cwd）。
-        final configured = Directory(
-          '${root.path}${Platform.pathSeparator}configured-logs',
-        );
-        await configured.create();
+      test('两键 settings.json 经双层链成为 sink 落盘位置（无第三键）', () async {
+        // Arrange — exe/AS 层全部指向真实临时目录（不触真实 exe 与 cwd）。
         final exeRoot = Directory(
           '${root.path}${Platform.pathSeparator}exe-root',
         );
@@ -50,26 +47,41 @@ void main() {
           '${root.path}${Platform.pathSeparator}support',
         );
         await support.create();
-        await settingsFile.writeAsString(
-          '{"version":1,"errorCardEnabled":true,'
-          '"logDirectory":${jsonEncode(configured.path)}}',
-        );
         ErrorFeedbackSettings.I.resetForTesting(
           settingsFile: () => settingsFile,
         );
 
-        // Act — load 先于 resolve（同一条 unawaited 激活路径语义）。
+        // Act — store 自身写盘（fire-and-forget 链）：真实 settings.json 只
+        // 承载 version 与开关两个键（G-04-1：配置第三键不复存在）。
+        await ErrorFeedbackSettings.I.load();
+        ErrorFeedbackSettings.I.setCardEnabled(false);
+        await ErrorFeedbackSettings.I.pendingPersist;
+
+        // Assert — 解码后 JSON 恰为这两个键、不含第三键
+        //（旧实现写三键 → 本断言 RED）。
+        final decoded =
+            jsonDecode(settingsFile.readAsStringSync())
+                as Map<String, Object?>;
+        expect(decoded.keys.toSet(), <String>{'version', 'errorCardEnabled'});
+        expect(decoded['errorCardEnabled'], isFalse);
+
+        // Act — 装载先于位置解析（组合根 unawaited 激活路径的启动顺序），
+        // 两键文件重载干净；随后注入 exe/AS provider 走双层链。
         await ErrorFeedbackSettings.I.load();
         final result = await ErrorLogLocation.resolve(
           applicationSupportDirectory: () async => support,
           executableDirectory: () => exeRoot,
-          configuredDirectory: ErrorFeedbackSettings.I.state.value.logDirectory,
         );
 
-        // Assert — 配置层优先于 exe/AS 层胜出，无回退原因。
+        // Assert — exe 根 logs/error.log 胜出（双层链：D-02/D-07 修订语义）。
         final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.configuredFailure, isNull);
-        expect(resolved.file.path, startsWith(configured.path));
+        expect(resolved.file.path, startsWith(exeRoot.path));
+        expect(
+          resolved.file.path,
+          endsWith(
+            '${Platform.pathSeparator}logs${Platform.pathSeparator}error.log',
+          ),
+        );
 
         // Act — sink 激活 + 真实报告落盘（store→链→sink→磁盘全链贯通）。
         final sink = ErrorLogFileSink(file: resolved.file);
@@ -80,7 +92,7 @@ void main() {
         );
         await sink.drain();
 
-        // Assert — 诊断包内容落在配置目录的文件中。
+        // Assert — 诊断包内容落在 exe 层文件中。
         final pack = await resolved.file.readAsString();
         expect(pack, contains('== Report =='));
         expect(pack, contains('tracer 链路证据'));
@@ -165,11 +177,27 @@ void main() {
         // Act
         await ErrorFeedbackSettings.I.load();
 
-        // Assert — errorCardEnabled=true、logDirectory=''（SET-01 默认开）。
+        // Assert — errorCardEnabled=true（SET-01 默认开，逐字段类型校验）。
         expect(
           ErrorFeedbackSettings.I.state.value,
           const ErrorFeedbackSettingsData(),
         );
+      });
+
+      test('残留第三键（旧 logDirectory）被静默忽略且开关字段正常装载', () async {
+        // Arrange — 旧版本三键文件的手编残留形态：未知键错型也不抛出。
+        await settingsFile.writeAsString(
+          '{"version":1,"errorCardEnabled":false,"logDirectory":123}',
+        );
+        ErrorFeedbackSettings.I.resetForTesting(
+          settingsFile: () => settingsFile,
+        );
+
+        // Act
+        await ErrorFeedbackSettings.I.load();
+
+        // Assert — 向后兼容：未知键静默忽略，开关字段照常装载（T-04-05-02）。
+        expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isFalse);
       });
     });
 
@@ -180,7 +208,6 @@ void main() {
           settingsFile: () => settingsFile,
         );
         writer.setCardEnabled(false);
-        writer.setLogDirectory(root.path);
         await writer.pendingPersist;
 
         // Act — 「重启」：第二个实例从同一文件加载。
@@ -191,7 +218,6 @@ void main() {
 
         // Assert — SET-03 重启持久化语义。
         expect(reader.state.value.errorCardEnabled, isFalse);
-        expect(reader.state.value.logDirectory, root.path);
       });
 
       test('原子写：保存后目标存在可解析且无 tmp 残留', () async {
@@ -201,7 +227,7 @@ void main() {
         );
 
         // Act
-        store.setLogDirectory(root.path);
+        store.setCardEnabled(false);
         await store.pendingPersist;
 
         // Assert — 目标文件存在且内容可解析；任何形态的 tmp 都不残留
@@ -209,8 +235,7 @@ void main() {
         expect(settingsFile.existsSync(), isTrue);
         final decoded = jsonDecode(settingsFile.readAsStringSync());
         expect(decoded['version'], 1);
-        expect(decoded['logDirectory'], root.path);
-        expect(decoded['errorCardEnabled'], isTrue);
+        expect(decoded['errorCardEnabled'], isFalse);
         final residue = root
             .listSync()
             .where((entry) => entry.path.contains('.tmp'))
@@ -220,24 +245,21 @@ void main() {
 
       test('rapid successive persists serialize; final state is the last write',
           () async {
-        // Arrange — 交叉开关与目录两路写入，模拟高频设置变更。
+        // Arrange — 交叉开关多路写入，模拟高频设置变更。
         final store = ErrorFeedbackSettings.forTesting(
           settingsFile: () => settingsFile,
         );
-        final dirA = '${root.path}${Platform.pathSeparator}a';
-        final dirB = '${root.path}${Platform.pathSeparator}b';
 
         // Act — 三笔背靠背发起（不等待前一笔完成）。
-        store.setLogDirectory(dirA);
         store.setCardEnabled(false);
-        store.setLogDirectory(dirB);
+        store.setCardEnabled(true);
+        store.setCardEnabled(false);
         await store.pendingPersist;
 
         // Assert — 串行链保证最终状态 = 最后一笔（WR-05）；无 tmp 残留。
         final decoded =
             jsonDecode(await settingsFile.readAsString())
                 as Map<String, Object?>;
-        expect(decoded['logDirectory'], dirB);
         expect(decoded['errorCardEnabled'], isFalse);
         final residue = root
             .listSync()
@@ -260,11 +282,11 @@ void main() {
         );
 
         // Act — 保存失败被吞没，不向调用方抛出。
-        store.setLogDirectory(root.path);
+        store.setCardEnabled(false);
         await store.pendingPersist;
 
         // Assert — D-01：内存态保持用户刚设置的值。
-        expect(store.state.value.logDirectory, root.path);
+        expect(store.state.value.errorCardEnabled, isFalse);
         expect(doomed.existsSync(), isFalse);
       });
 
