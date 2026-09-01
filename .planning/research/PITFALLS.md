@@ -1,318 +1,381 @@
 # Pitfalls Research
 
-**Domain:** Flutter Windows desktop global error capture, local error logging, and non-modal in-app diagnostic cards
-**Researched:** 2026-08-28
-**Confidence:** MEDIUM — primary Flutter/Dart documentation establishes the capture, zone, widget-error, and Windows I/O behaviors. The exact release-symbol workflow depends on this app's chosen build flags and must be verified in the implementation phase.
+**Domain:** Frameless Flutter desktop window chrome + media_kit fullscreen transitions (Win10/Win11/Linux)
+**Researched:** 2026-09-01
+**Confidence:** HIGH (Win/NCCALCSIZE/DWM/window_manager), MEDIUM (Linux/gpu-texture — no real hardware)
+
+This catalog targets mistakes that arise **when ADDING** accent-border removal, rounded corners, flicker-free fullscreen, and reliable drag to an **already-frameless** Flutter + media_kit player. It assumes the shipped foundations (white-border fix via `WM_NCCALCSIZE` return 0 + `setAsFrameless`; fullscreen gap fix via NCCALCSIZE 8px inset C1 + `WindowMode` single source C2; `SmartDragToResizeArea` for system resize) and treats regressing them as the #1 risk.
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Treating `runZonedGuarded` as a universal safety net
+### Pitfall 1: Re-touching `WM_NCCALCSIZE` and re-opening the solved fullscreen gap (C1 regression)
 
 **What goes wrong:**
-The application installs only `runZonedGuarded`, assumes every exception will reach its handler, and misses framework errors or platform-dispatcher errors. Conversely, wrapping only a later startup fragment creates a second error zone: a `Future` which completes with an error in that zone cannot propagate its error to consumers in a different error zone and can appear never to complete. This produces mysterious stalled startup or logger initialization rather than a visible exception.
+The v1.0 fullscreen gap fix (C1) works by returning a computed 8px-inset rect from `WM_NCCALCSIZE` instead of a bare `return 0`. Any new chrome work that edits the runner's `WM_NCCALCSIZE` handler — e.g. to strip the Win10 accent border, to add a transparent margin for fake rounded corners, or to "clean up" the frameless path — silently reverts C1. Symptom: fullscreen shows an 8px transparent/white gap at the edges again, the exact bug the team already fixed and promised not to reopen.
 
 **Why it happens:**
-The three hooks cover different routes, not three interchangeable spellings of the same hook. Flutter framework callback failures (build/layout/paint) arrive through `FlutterError.onError`; uncaught asynchronous failures without a Flutter callback on the stack arrive through `PlatformDispatcher.instance.onError`; `runZonedGuarded` handles uncaught synchronous/asynchronous work created in its guarded error zone. Dart deliberately prevents asynchronous errors from crossing error-zone boundaries.
+`WM_NCCALCSIZE` is the single choke point for *all* frameless geometry: the white-border fix, the C1 gap fix, and any future rounded-corner/accent-border work all want to edit the same handler. A developer adding "just one more" adjustment overwrites the C1 inset branch with a plain `return 0` (Microsoft's documented "remove frame" recipe) and the gap returns. The Win32 docs actively encourage `return 0` for frameless chrome, so the regression looks like the "correct" textbook answer.
 
 **How to avoid:**
-- Install all three routes, but make all of them call one small, non-throwing `ErrorReporter.report(...)` boundary. Preserve `FlutterError.presentError(details)` in the framework handler so debug-console diagnostics remain available.
-- Return `true` from `PlatformDispatcher.instance.onError` only after the reporter has accepted the event; this declares that the error was handled.
-- Prefer no zone unless it is needed for the startup-period catch-all. If it is retained, put `WidgetsFlutterBinding.ensureInitialized()`, diagnostics initialization, hook installation, and `runApp()` inside the *same* `runZonedGuarded` closure. Do not create nested guarded zones around individual services and do not pass `Future`s that may error across zone boundaries.
-- Keep ordinary application `await`/`try`/`catch` ownership intact. A zone is a last-resort observer, not a substitute for handling a known failing operation at its boundary. For `Stream`/`async*` work, provide `onError` to subscriptions or handle errors in the producer; do not rely solely on a zone after a stream has crossed an ownership boundary.
-- Do not install a custom `ZoneSpecification.handleUncaughtError` in addition to `runZonedGuarded` unless a concrete need is documented. The guarded constructor deliberately wires its own handler; extra zone specifications make reporting order and duplicate events harder to reason about.
+- Treat the runner's `WM_NCCALCSIZE` handler as a **multi-branch state machine**, not a recipe. Branches: `isFullscreen` → C1 8px inset; `isMaximized` → overshoot handling (Pitfall 2); default frameless → `return 0`. Never collapse branches.
+- Pin C1 with a regression test: a widget/integration assertion that, in fullscreen, the client rect equals the monitor rect minus the documented inset (or that no gap is visible). The project already has a `fullscreen-seam-icon-fix` memory recording C1 — link the test to that memory so deletion triggers a review.
+- Add a `// DO NOT REMOVE — C1 fullscreen gap fix (see memory project_fullscreen_seam_icon_fix.md)` guard comment on the inset branch. Comments are load-bearing here.
+- Any accent-border / rounded-corner work must edit a **different** Win32 surface (DWM attributes, `GWL_STYLE`, or a Flutter clip layer), NOT the `WM_NCCALCSIZE` inset branch.
 
 **Warning signs:**
-- `PlatformDispatcher.onError` tests pass but a deliberately thrown build exception creates no card, or vice versa.
-- A `Future` started during startup never completes after moving only `runApp()` into `runZonedGuarded`.
-- The same exception is shown twice (for example by a zone handler and a dispatcher handler), or debug console output disappears after installing hooks.
-- A test awaits a `Future` created inside a guarded zone from outside that zone and times out.
+- Fullscreen shows a thin transparent/white seam at any edge on real hardware (headless tests will NOT catch this — geometry looks identical in a headless run; the gap is a DWM-composition visual).
+- `git diff` on `windows/runner/win32_window.cpp` shows the `WM_NCCALCSIZE` inset math replaced by `return 0`.
+- A "fullscreen looks cleaner now" comment in a PR touching the runner.
 
 **Phase to address:**
-**Phase 1 — diagnostic model and global-hook foundation.** Define a single normalized report type, hook ownership, deduplication identity, and automated probes for each of the four promised sources (framework, uncaught async, engine, startup). Add the zone-boundary regression test before UI or file logging.
+Phase 1 (capability detection + C1 pinning). Before *any* chrome work, add the C1 regression test and the branch-guard comment. Every later phase that touches the runner must keep that test green.
 
 ---
 
-### Pitfall 2: Initializing Flutter bindings in one zone and calling `runApp` in another
+### Pitfall 2: `WM_NCCALCSIZE` maximized overshoot + autohide taskbar — window covers the taskbar
 
 **What goes wrong:**
-A conventional-looking startup sequence calls `WidgetsFlutterBinding.ensureInitialized()` in the root zone, then calls `runApp()` inside `runZonedGuarded`. Flutter 3.10+ emits a debug-only “Zone mismatch” diagnostic; more importantly, framework callbacks can execute under zone values different from initialization and cause unrelated, intermittent behavior.
+On Windows, a maximized window deliberately overshoots the work area by ~`SM_CXSIZEFRAME + SM_CXPADDEDBORDER` (~8px) per side. This hides the resize border *and* keeps the autohide taskbar's trigger zone usable. A frameless `WM_NCCALCSIZE` handler that returns the work-area rect (or `return 0`) strips the overshoot, so a maximized window on a monitor with an autohide taskbar covers the taskbar's peek zone — the user can no longer summon the taskbar over the player. Worse: on Win10 vs Win11 the overshoot math differs slightly, so a fix that works on the dev's Win11 machine regresses on Win10.
 
 **Why it happens:**
-Many older error-capture snippets initialize the binding before adding a guarded zone. `runZonedGuarded` itself is **not deprecated**. The common deprecation confusion is with `runZoned`'s old `onError` argument, not the guarded API. The real requirement is one zone for Flutter binding initialization and framework execution.
+Developers copy the "frameless = return 0" recipe from Win32 docs without reading the `Remarks` noting that `return 0` makes the client area equal the *window* rect (which for a maximized window already includes the overshoot) — but only if the proposed rect was the maximized rect. Custom-chrome code that recomputes the rect from `GetMonitorInfo.rcWork` (work area) explicitly discards the overshoot, reintroducing the bug.
 
 **How to avoid:**
-- If a guarded zone remains in the design, make its closure own the complete Flutter startup path, including binding initialization and `runApp`.
-- During debug/test startup, set `BindingBase.debugZoneErrorsAreFatal = true` as the first statement before binding initialization, then run a startup smoke test. This makes accidental future drift fail immediately instead of becoming a console warning.
-- Do not use zone values for mutable application state or reporter configuration. Construct and inject normal objects instead; zone values behave as implicit globals and make tests less deterministic.
+- In the `isMaximized` branch, do **not** clamp to `rcWork`. Either call `DefWindowProc` first and let Windows compute the overshoot, or explicitly add `GetSystemMetrics(SM_CXSIZEFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER)` on each side when maximized.
+- Detect autohide taskbars per-monitor via `ABM_GETSTATE` / `SHAppBarMessage` (a taskbar can be autohide on one monitor and not another). For autohide monitors, keep the overshoot on the taskbar edge.
+- Test on **both** Win10 and Win11 with an autohide taskbar on a multi-monitor setup. This is a real-hardware-only check — headless cannot reveal a covered taskbar.
 
 **Warning signs:**
-- The debug console prints “The Flutter bindings were initialized in a different zone than is now being used.”
-- Diagnostics depend on a `Zone.current[...]` value, and callbacks see missing/default values.
-- A refactor that moves only `runApp` causes test-only or keyboard-callback behavior to change.
+- "The taskbar disappeared when I maximized the player" on a user machine with autohide taskbar.
+- Maximized window has a 1-pixel line of the desktop visible on non-taskbar edges (undershoot — the inverse mistake).
+- Works on Win11 dev box, fails on a Win10 user report.
 
 **Phase to address:**
-**Phase 1 — global-hook foundation.** Make zone consistency a startup acceptance criterion, not an after-the-fact cleanup.
+Phase 1 (capability detection — detect Win10 vs Win11, monitor layout, autohide state) and verify in the transition-sequence phase (Phase 4) that maximize→fullscreen and maximize+autohide stay correct.
 
 ---
 
-### Pitfall 3: The reporter or card throws while reporting an error (recursive failure storm)
+### Pitfall 3: `DWMWA_BORDER_COLOR` / `DWMWA_WINDOW_CORNER_PREFERENCE` called on Windows 10 (silent no-op or `E_INVALIDARG`)
 
 **What goes wrong:**
-A framework error enters `FlutterError.onError`; the handler reads a missing source file, formats an unexpected stack, writes a denied log path, or updates UI state and itself throws. Flutter does not catch an exception thrown by a custom `FlutterError.onError` handler. A more severe loop is: an error triggers a card; the card's build/formatting/theme/localization/clipboard code throws; the global handler reports that new failure; each report attempts to build the same card again.
+The Win10 accent-border (red theme-color border) removal is the milestone's headline feature. The obvious fix is `DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, DWMWA_COLOR_DEFAULT)`. But `DWMWA_BORDER_COLOR` (34) and `DWMWA_WINDOW_CORNER_PREFERENCE` (33) are **Windows 11 build 22000+ only** — they do not exist on Windows 10. On Win10 the call returns `E_INVALIDARG` (or, worse, if the constants are undefined in the targeted SDK, the build breaks). The developer who "fixed the red border" actually fixed nothing on the Win10 machine where the user reported it.
 
 **Why it happens:**
-Error UI is treated as ordinary feature UI even though it runs precisely when application state may be inconsistent. Developers also put I/O, source lookup, asynchronous work, or UI mutation directly in a global hook because it is convenient.
+MSDN lists these attributes in one enum page without a per-attribute "minimum build" column, so they look universally available. The constants are only compiled in when `NTDDI_VERSION >= NTDDI_WIN10_CO`; if the project targets an older SDK they don't even compile, and if it targets a new SDK they compile but fail at runtime on Win10. The Win10 red border is drawn by a *different* mechanism (the DWM/system accent frame) than the Win11 colored border — the Win11 attribute can't remove it because it's not the same border.
 
 **How to avoid:**
-- Make the capture boundary deliberately boring: normalize primitive fields, enqueue the immutable report, and never let a reporting exception escape. Use a private reentrancy guard that suppresses secondary reporter failures and sends a minimal `debugPrint` fallback rather than recursively reporting them.
-- Keep UI presentation separate from capture. The reporter emits an immutable `ValueNotifier` state; the root overlay observes it. The card must tolerate absent media path, absent stack, unknown file/line, unreadable source, unavailable clipboard, and disposed app state.
-- Use a minimal `ErrorWidget.builder` fallback only for the widget that failed to build. It must be a self-contained, no-I/O, no-state-write fallback. Do not use it to install the normal error card, report an event, navigate, read settings, or look up inherited dependencies.
-- Wrap external side effects independently: file append failure must disable only the file sink; clipboard failure must show a local, non-reporting feedback state; source lookup failure must result in “source unavailable.”
-- Add a bounded recursion/deduplication policy: fingerprint error type + message + normalized top frames; suppress identical events inside a short window while maintaining a suppressed-count indicator in the card/log entry.
+- Runtime version-gate every `DwmSetWindowAttribute` call: use `IsWindows11OrGreater()` (via `RtlGetVersion` — not the deprecated `GetVersionEx`) **and** check the returned `HRESULT`, degrading silently on Win10. Never trust compile-time SDK presence.
+- For Win10 accent-border removal specifically: `DWMWA_BORDER_COLOR` is the wrong tool. Win10's accent border is tied to the `WS_THICKFRAME` / DWM caption frame; the project's existing `WS_THICKFRAME | WS_MAXIMIZEBOX` (from window_manager PR #531) + `setAsFrameless` path is the lever, not a DWM color attribute. Verify the red border actually disappears on a real Win10 machine before claiming the feature done.
+- Keep a single `DwmCapabilities` probe (Phase 1) that records, once at startup: `borderColor`, `cornerPreference`, `captionColor`, `textColor`, `systemBackdrop` booleans. Every later call reads these flags — never re-probe per frame.
 
 **Warning signs:**
-- Repeated identical records appear with increasing timestamps, CPU rises, or the process produces an ever-growing log after a single error.
-- The displayed exception changes from the original business error to `setState() or markNeedsBuild() called during build`, layout exceptions, a file-system exception, or a card-specific null error.
-- Triggering an exception in a card formatter, source reader, or file sink crashes the application or produces more than one card.
-- The reporter's own error is attributed to `FlutterError.onError` rather than kept as a one-line fallback diagnostic.
+- "The red border is gone" on the dev's Win11 machine but user reports on Win10 persist.
+- `DwmSetWindowAttribute` returns non-zero `HRESULT` in the debugger (log it; never ignore).
+- Build breaks on a CI image with an older Windows SDK.
 
 **Phase to address:**
-**Phase 1 — reporter core** must implement reentrancy isolation and normalization. **Phase 3 — error-card UI** must include failure-injection tests for source lookup, formatting, copy, and card-build fallback. **Phase 4 — file sink** must be independently failure-contained.
+Phase 1 (capability detection — the `DwmCapabilities` probe is the first thing built). Phase 2 (accent-border) then consumes the probe; the Win10 path is explicit and tested on real Win10 hardware.
 
 ---
 
-### Pitfall 4: Calling `notifyListeners` while Flutter is building the failed subtree
+### Pitfall 4: DWM attributes applied once and never re-applied (flicker after theme/DPI/mode change)
 
 **What goes wrong:**
-A build error synchronously updates the `ValueNotifier` that drives the root error-card overlay. A listening widget is already in the build pass, so the update triggers `setState()`/`markNeedsBuild()` during build. The capture system converts a recoverable original error into a second framework error and can enter the recursive loop above.
+A DWM attribute (`DWMWA_BORDER_COLOR`, `DWMWA_CAPTION_COLOR`, `DWMWA_WINDOW_CORNER_PREFERENCE`) is set once at startup or on entering fullscreen. Then the user: switches dark/light theme (`WM_THEMECHANGED`), drags the window to a monitor with a different DPI scaling (`WM_DPICHANGED`), or enters/exits fullscreen. The DWM attribute is now stale — the border reappears, the caption color flips back, the corner preference reverts — and the transition itself flickers because DWM re-evaluates the frame mid-transition.
 
 **Why it happens:**
-`FlutterError.onError` and `ErrorWidget.builder` often execute while Flutter is processing the build/layout/paint pipeline. `ValueNotifier.value = ...` synchronously notifies `ValueListenableBuilder`s; it is not intrinsically safe just because the notifier is global.
+DWM attributes are not sticky across these events. `WM_THEMECHANGED` and `WM_DPICHANGED` cause DWM to recompute the frame; if the app doesn't re-assert its preference, the system default wins. Fullscreen transitions change the window style and DWM re-derives the border. This is the **exact** trap that killed the reverted global-`DWMNCRP` (方案B / `DWMWA_NCRENDERING_POLICY`) approach: applying it globally once produced flicker on transitions and had to be re-applied on every change, which raced with the transition.
 
 **How to avoid:**
-- Record and persist the report synchronously without notifying UI listeners during a build-time callback.
-- If the card must become visible, coalesce publication through `WidgetsBinding.instance.addPostFrameCallback`, guarded by a pending-publication flag. At the callback, check that the reporter is still alive and publish one immutable snapshot. Do not delay durable error capture merely to delay the UI.
-- Place the normal card overlay above the app shell/root `Stack`, not inside the potentially failing page subtree. The overlay's data model should be able to accept a report before `runApp`/first frame and publish it after the UI becomes available.
-- Write widget tests that deliberately throw from a child build and assert: one captured report, no “during build” error, and a functional close button after the next frame.
+- Re-apply DWM attributes from a single `applyChromeAttributes()` function called on: startup, `WM_THEMECHANGED`, `WM_DPICHANGED`, and at the **stable end-state** of every fullscreen enter/exit (not during the transition — see Pitfall 6).
+- Never apply DWM attributes mid-transition. The transition-sequence phase must define a clear "settle" point (e.g. after `WM_SIZE` with the final geometry) where attributes are re-asserted. Applying during the size jump is what causes the flicker the reverted approaches hit.
+- **Reverted-approach flag:** `DWMWA_NCRENDERING_POLICY` / `DWMNCRP_DISABLED` (方案B / global DWMNCRP) was reverted on real hardware (commits aad3ba36/36883b77) because of exactly this re-apply + transition-flicker problem. **Do not re-propose DWMNCRP as-is.** If a DWM-based border fix is reconsidered, it must use `DWMWA_BORDER_COLOR` (Win11 only) re-applied via the settle-point pattern, never `DWMWA_NCRENDERING_POLICY`.
 
 **Warning signs:**
-- The first card shown after a build failure contains a `markNeedsBuild` error rather than the original error.
-- Tests intermittently fail depending on whether they `pump()` once or twice.
-- A ValueNotifier update occurs from `FlutterError.onError`, `ErrorWidget.builder`, or a build method without post-frame scheduling.
+- Border/caption color is correct on startup but wrong after a theme toggle or monitor move.
+- Single-frame flicker of the system frame during fullscreen enter/exit (visible only on real hardware — a captured frame in DevTools won't show it; use a high-speed screen capture or human eye).
+- The same class of "transition flicker" the team already reverted once.
 
 **Phase to address:**
-**Phase 3 — non-modal error-card integration.** The phase is incomplete without a build-time failure test and frame-deferred publication contract.
+Phase 1 (probe) → Phase 2 (accent-border, with re-apply hooks for `WM_THEMECHANGED`/`WM_DPICHANGED`) → Phase 4 (transition-sequence: wire the settle-point re-apply into fullscreen enter/exit). The settle-point contract is the milestone's central anti-flicker mechanism.
 
 ---
 
-### Pitfall 5: Promising source-line precision in release without a graceful fallback
+### Pitfall 5: Fake rounded corners via transparent (`WS_EX_LAYERED`) window + Flutter clip — video perf cost and black fringes
 
 **What goes wrong:**
-The card assumes every `StackTrace` contains a local `file:line`, calls `File(path).readAsLines()`, and crashes or shows a misleading path in release. Installed desktop builds usually do not contain `lib/` source files. If the release pipeline uses obfuscation and/or `--split-debug-info`, human-readable Dart method/file/line locations depend on retaining the matching per-build debug-information artifacts. A stack that references tree-shaken code is not the main problem: removed code cannot produce a live runtime frame; unreadable locations stem from compilation/symbol information and source availability, not ordinary asset/icon tree shaking.
+Win10 has no DWM rounded-corner API, so the "obvious" fake-round approach is: make the window transparent (`WS_EX_LAYERED` + per-pixel alpha) and clip the four corners with a Flutter widget. Three failures follow:
+1. **Video perf cost:** `WS_EX_LAYERED` disables the DXGI flip model and hardware overlay planes — DWM composites the window via a readback path every frame. For a media_kit/libmpv video texture updating at 30/60fps, this measurably raises GPU/CPU usage and can drop frames on weak hardware.
+2. **Video corners not clipped:** the media_kit `Video` texture is rectangular and renders *under* the Flutter clip layer. If the clip layer has rounded corners, the video shows through the corners as black triangles/fringes (the clip is transparent, but the texture behind it is opaque-black outside its own bounds — or the texture extends into the corner and the clip reveals a hard edge).
+3. **GPU texture artifacts / per-pixel alpha seams:** on some GPUs, per-pixel-alpha windows show a 1px fringe at clip boundaries (premultiplied-alpha mismatch), and on Intel GPUs the corner anti-aliasing shimmers during playback due to the readback composite.
 
 **Why it happens:**
-Debug mode provides local source checkout paths and rich frames, so source lookup appears reliable. The project requirement asks for source lines, which can be misread as a production guarantee rather than best-effort developer tooling.
+The approach conflates "window transparency" (a DWM/window-style concern) with "corner clipping" (a Flutter widget concern). The video texture is a separate GPU surface that doesn't participate in Flutter's clip hierarchy the way regular widgets do. And `WS_EX_LAYERED`'s readback path is the documented cost of per-pixel alpha — but it's invisible until you play video through it.
 
 **How to avoid:**
-- Model location enrichment as best effort with explicit states: parsed location, source line available, source unavailable, stack unavailable/unparseable. Never report a guessed line as authoritative.
-- Parse conservatively and keep the raw stack in the log. Do not make a single frame format mandatory; native/plugin frames and optimized AOT traces may not match Dart source-frame syntax.
-- Only read a source file after strict validation: it must be a local absolute path, exist, be a regular file, and have a positive bounded line number. Catch `FileSystemException`, decoding errors, and line-range failures. Never accept a path from external error text as a command or as an unrestricted file-read instruction.
-- For developer-distributed release builds that use `--obfuscate`/`--split-debug-info`, archive the exact build's symbol/debug-info directory alongside the artifact and record the app version/build identifier in every log. This milestone excludes remote symbolication, so the UI should clearly downgrade rather than imply automatic recovery.
-- Test release/profile behavior or an equivalent injected “source unavailable” adapter; do not use only debug widget tests as evidence.
+- **Prefer native corners where they exist:** Win11 → `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND` (no layered window, no perf cost). Linux → GTK CSD / compositor SSD (Pitfall 9). Only fall back to fake-round on Win10.
+- **Win10 fake-round that avoids `WS_EX_LAYERED`:** keep the window opaque and let the *corner mask* be a tiny Flutter widget (4 small black/transparent corner widgets on top of the video) rather than full-window transparency. This keeps flip model + overlays intact.
+- **If full transparency is unavoidable:** document the measured perf cost on the target hardware before shipping. The project's `PerfMonitor`/`ResizeFrameMetrics` exist for exactly this — profile RSS/GPU before and after with a real video playing. **Do not ship transparent-window rounding on video without a perf gate** (raster max < 33ms with video playing).
+- **Video corner clip:** if the video must reach the corners, clip the *texture widget itself* (`ClipRRect` on the `Video` widget) so the rounding applies to the texture, not a sibling layer. Test for black fringes on Intel/Nvidia/AMD.
 
 **Warning signs:**
-- Error-card rendering calls `File.readAsLines` without a `try`/fallback.
-- An installed release card exposes local build-machine paths that do not exist on the user machine.
-- Obfuscated/split-debug builds produce frames without expected file/line text and the UI becomes blank, throws, or labels it “unknown bug.”
-- The build process deletes debug artifacts immediately, making an archived log impossible to interpret later.
+- CPU/GPU usage rises ~1.5–2x when switching from opaque to transparent window during playback.
+- Black triangles visible at the four corners when a bright video plays.
+- Corner AA shimmers during fast-motion video scenes (readback composite artifacts).
+- `ResizeFrameMetrics` raster max spikes above 33ms with transparency on.
 
 **Phase to address:**
-**Phase 2 — report enrichment and release fallback.** Establish a testable `SourceContextResolver` boundary before card detail rendering. **Release verification phase** must document the actual Windows build flags and artifact-retention decision.
+Phase 1 (probe: `DWMWA_WINDOW_CORNER_PREFERENCE` available? → native; else Win10 fake-round path). Phase 3 (rounded corners) must ship the native Win11 path first, treat Win10 fake-round as a gated fallback, and run the perf gate before merging. No Linux real-hardware verification (mark `待实机验证`).
 
 ---
 
-### Pitfall 6: Concurrent or fragile Windows log writes turn logging into a new outage
+### Pitfall 6: Fullscreen enter/exit flicker — texture rebuild, resize ordering, animation-vs-transition fight, wrong restore geometry
 
 **What goes wrong:**
-Every hook opens and appends to the same text file independently. A burst of playback errors interleaves records, an old writer remains open during application close, or an external viewer/second instance causes sharing/lock failures. On Windows, a `RandomAccessFile` lock belongs to the particular handle that acquired it; writing through another handle—even in the same process—can fail. If log I/O exceptions escape a global handler, the app enters the reporting recursion loop.
+The milestone targets three flicker symptoms: (1) title bar/border flash on enter, (2) size jump on enter, (3) exit flicker. Four independent root causes produce them:
+1. **Texture/surface rebuild:** media_kit's `Video` texture is rebuilt when the window geometry changes sharply. During fullscreen enter, the Dart-side resize and the native `WM_SIZE` arrive in a racy order; if the texture is recreated mid-transition, a blank/black frame flashes. The project's own profile sessions found `textureIdChanges=0` across 13 sessions *after* the resize-three-sources fix — but a fullscreen toggle is a *different* resize path and can re-trigger it.
+2. **Resize ordering:** Dart `WindowBridge.setFullscreen` calls `windowManager.setFullScreen`/size setters; native `WM_SIZE` fires back; the `ValueNotifier` chain updates; media_kit re-lays the `Video` widget. If Dart sets size before the native style change lands, the window briefly renders at the old style + new size = the size jump.
+3. **Animation fighting transition:** an `AnimatedOpacity`/`AnimatedSlide` on the title bar or an OSD during enter/exit overlaps the mode transition; the animation's intermediate frames show a half-sized title bar or a border at the wrong position = the flash.
+4. **Wrong restore geometry on exit:** exiting fullscreen restores the pre-fullscreen bounds. If bounds were saved *after* the enter-transition started (capturing a half-transitioned size), the window exits to the wrong size/position — the classic window_manager issue #181 ("right bound overlapped after leaving fullscreen") and #266 ("Fullscreen/Set as frameless bugs MediaQuery screen sizes").
 
 **Why it happens:**
-A one-line `writeAsString(..., mode: FileMode.append)` is correct for a single awaited write but does not provide queue ordering across concurrent fire-and-forget calls. Developers also assume `IOSink.flush()` means data is physically durable; it only guarantees acceptance by the underlying `StreamConsumer`, not necessarily an OS disk flush.
+Fullscreen enter/exit is a multi-frame, multi-layer (native style → native size → Dart notifier → media_kit texture → Flutter widget) transition. Each layer has its own timing. A developer who "just calls `setFullScreen(true)`" leaves the ordering to luck; the visible artifacts are the layers disagreeing for a few frames.
 
 **How to avoid:**
-- Make `FileSink` one owner of one serialized write queue. Every report submits a preformatted immutable line/event; no hook independently opens the same file. Await queue operations internally and explicitly use `unawaited` only at the caller boundary after the sink has captured failures.
-- Use application-support storage as the default app-managed location, validate configured paths at the settings boundary, create the parent directory once, and use a fixed explicit UTF-8 encoding. Use `Platform.lineTerminator` if Windows-native CRLF is a desired human-readable convention; Dart does not translate `\n` automatically.
-- For this single-process personal player, do **not** add file locks merely by default. A single in-process queue avoids the problem. If supporting multiple processes later, lock/write/flush/unlock/close through the exact same `RandomAccessFile` handle and matching locked range on Windows.
-- Catch `FileSystemException` and failures from write, flush, and close. Mark the sink temporarily unavailable, emit a rate-limited `debugPrint`, preserve in-memory/card reporting, and retry only on the next eligible event or configuration change. Never report a file-sink failure back through the same failing file sink.
-- On orderly app shutdown, stop accepting new writes, await the queue, and close the writer with a bounded timeout. An OS kill, power loss, or crash cannot be fully solved by shutdown flushing; make this limitation explicit.
-- Scope note: the milestone deliberately excludes rotation. Therefore do not silently add rotation, but still surface append failure/disk-full behavior and ensure one pathological failure cannot generate unbounded new writes.
+- **Snapshot restore geometry before the transition starts.** In `WindowBridge`, capture `{x, y, w, h, maximized}` into a `FullscreenSnapshot` at the *first* call to enter, before any native call. Restore from this snapshot on exit, never from a live `ValueNotifier` that the transition itself is mutating. This directly prevents #181-class regressions.
+- **Sequence the enter in a defined order:** (a) hide custom title bar (instant, no animation), (b) snapshot geometry, (c) native style/size change to monitor rect, (d) wait for `WM_SIZE` with final geometry (the "settle point"), (e) re-apply DWM attributes, (f) reveal any in-player chrome. Exit is the reverse. Never interleave an animation with (c)–(d).
+- **Suppress transition animations during mode switch.** Any `Animated*` on chrome that overlaps the transition must be gated off (set `isFullscreenTransition` flag → animations skip / use `Duration.zero`). The v1.0 `WindowMode` single-source (C2) fix already proved this pattern; extend it to the title bar.
+- **Confirm texture not rebuilt.** Keep the `textureIdChanges=0` probe running during fullscreen toggle in the perf gate. If it rises above 0 on toggle, the texture is being recreated — investigate the `Video` widget's identity key and the `VideoController` lifecycle before shipping.
+- **media_kit is in limited maintenance** (GitHub #1337, opened Nov 2025 — upstream will not fix fullscreen texture issues promptly). The project owns this fix; do not wait on an upstream patch.
 
 **Warning signs:**
-- “The process cannot access the file”/access denied errors during error bursts or close.
-- Adjacent error records are concatenated, partially written, or out of order.
-- The app hangs on exit while waiting on an unresolved write/flush future.
-- Disk-full, read-only directory, invalid configured path, or removed log directory makes the card/reporting path throw.
-- Code opens a `RandomAccessFile`, locks it, then uses `File.writeAsString` or another handle to write.
+- A single black/blank frame during fullscreen enter or exit (texture rebuild).
+- Title bar visibly slides/fades during the transition (animation fighting).
+- After exit, window is 8px off, on the wrong monitor, or the wrong size (restore snapshot bug).
+- `ResizeFrameMetrics` shows a raster spike exactly at toggle.
 
 **Phase to address:**
-**Phase 4 — durable file sink and settings path.** Include Windows-specific queue, permission-denied, directory-removed, disk-full/flush-failure simulation, and app-close drain tests before connecting it to global hooks.
+Phase 4 (flicker-free fullscreen transitions) — the central phase. Depends on Phase 1 (probe) for monitor/DPI info, Phase 2 (DWM settle-point re-apply) for the attribute timing, and the C1 pin (Pitfall 1) so the gap doesn't return. Sequence + snapshot + animation-gate are the three deliverables.
 
 ---
 
-### Pitfall 7: A “non-modal” card steals focus or blocks player controls
+### Pitfall 7: `window_manager` PR #531 fullscreen path + open regression #579 (title bar not reappearing on exit)
 
 **What goes wrong:**
-The card is placed in a full-screen `Stack` layer that absorbs pointer events outside the card, uses a modal barrier, invokes focus/autofocus, or sits over the title bar/control bar. A video user cannot seek, drag the frameless window, use keyboard shortcuts, or operate playback until closing a diagnostic card—contradicting the stated non-modal requirement.
+The project's frameless fullscreen currently goes through the media_kit chain (red line lifted for fullscreen). But the temptation is to delegate to `window_manager`'s newer frameless-fullscreen path (PR #531, merged May 2025), which switches the window style to `WS_THICKFRAME | WS_MAXIMIZEBOX` (dropping `WS_OVERLAPPEDWINDOW`) and calls `setAsFrameless` + separate position/size setting. **That path has an open, unresolved regression (issue #579, Dec 2025): on exit, the title bar does not reappear.** The reporter's workaround is "don't touch `titleBarStyle` on Windows." For a frameless app with a *custom* title bar (this project), the regression manifests as the custom title bar failing to re-bind to the restored window — the window is draggable/closable only via keyboard.
 
 **Why it happens:**
-Overlay implementations often reuse dialog/snackbar patterns. A `Positioned.fill`, `GestureDetector`, `ModalBarrier`, `FocusScope`, or fullscreen `Material` can accidentally win hit testing even when visually transparent.
+PR #531 changed the style math to avoid the native title bar flashing on exit, but the exit-restore path doesn't fully re-assert the style that `TitleBarStyle.hidden` expects. The project's existing memory (`wm.setFullScreen has a known frameless defect`) already records that `window_manager.setFullScreen` is broken for frameless windows — PR #531 is the attempted fix, #579 is evidence it didn't fully land. There was no formal code review before merge.
 
 **How to avoid:**
-- Mount only the card's bounded hit-test region at the top-left and keep the rest of the overlay `IgnorePointer(ignoring: true)` (or absent). Do not use a barrier, route push, autofocus, or focus request for an arriving error.
-- Define exclusion/inset rules from existing title-bar and controls layout before choosing the card position. Verify at minimum: window drag region/title-bar buttons, video surface seek interactions, control bar, playlist toggle, keyboard media shortcuts, and ESC behavior remain functional while a card is visible.
-- The close/copy controls must be keyboard-accessible only when the user intentionally tabs into the card; automatic arrival must not change the current focus or interrupt fullscreen playback.
-- Keep cards persistent by user decision as required, but cap the visible queue (for example current card plus count) rather than stacking a hundred interactive cards.
+- **Do not switch the project's fullscreen path to `window_manager.setFullScreen` as-is.** The project already reverted 方案A/B for real-hardware reasons; #579 is a third reason to keep fullscreen under the project's own `WindowBridge`/media_kit chain.
+- If borrowing the `WS_THICKFRAME | WS_MAXIMIZEBOX` style idea from #531, borrow the *style math only*, and own the exit-restore: explicitly re-apply the frameless style + re-bind the custom title bar on exit, with a regression test that the title bar is interactive after exit.
+- **Avoid the companion older path (PR #367)** too: its 6-step approach (remove native title bar → hide custom bar → remove borders/corners → maximize → disable `startResizing` → disable `startDragging`) was itself followed by regression #389 ("frameless is broken after #367"). The history is: every window_manager fullscreen rewrite has been followed by a frameless-regression. Treat the whole `window_manager` fullscreen surface as load-bearing legacy, not a greenfield to migrate onto.
+- Pin the current working path (media_kit chain) with a real-hardware UAT: title bar interactive after enter→exit→enter cycle.
 
 **Warning signs:**
-- A transparent overlay has `Positioned.fill`, `GestureDetector`, `AbsorbPointer`, `ModalBarrier`, or an automatically focused button/text field.
-- After an injected error, Space/arrow media shortcuts or title-bar drag stop working.
-- Screenshot looks correct but pointer hit tests show the overlay receiving clicks outside card bounds.
+- After exiting fullscreen, the custom title bar no longer responds to drag/close (the #579 symptom, in custom-bar form).
+- A "migrate to window_manager fullscreen" PR appears (this is the trap — reject or scope tightly).
+- `TitleBarStyle` is being toggled on enter/exit (the exact pattern #579 says to avoid).
 
 **Phase to address:**
-**Phase 3 — card UI integration.** Add widget/integration tests for hit testing and focus preservation alongside visual tests; manual Windows smoke testing is required for frameless drag behavior.
+Phase 4 (transitions). The decision "stay on the project's media_kit chain vs. migrate to window_manager #531" is a Phase-4 design gate — make it explicit and record the rationale in the phase's design doc so a future dev doesn't "modernize" onto a regressing path.
 
 ---
 
-### Pitfall 8: Error flooding overwhelms UI, logs, and the event loop
+### Pitfall 8: Title bar drag — `startDragging` no-op, double-click-vs-drag, drag-during-maximized, Linux "cannot drag again"
 
 **What goes wrong:**
-A repeated engine callback, failed periodic timer, or render exception emits hundreds of near-identical reports per second. The app creates a card per report, schedules a frame per update, repeatedly reads source files, and appends each event. The diagnostics system then causes jank, a giant log, and potentially fills the disk while hiding the original signal.
+The milestone targets "reliable title bar drag." Four concrete failure modes are reported in window_manager's tracker and match the user's "极小概率拖动无效" observation:
+1. **`startDragging` no-op on frameless Windows (#399, closed but the pattern recurs):** calling `windowManager.startDragging()` from a `GestureDetector.onPanStart` is swallowed by Flutter's gesture arena before the native channel responds. The drag silently does nothing.
+2. **Double-click vs drag (#511 open, #372 closed):** Windows doesn't fire maximize on `onDoubleTapDown` reliably; `DragToMoveArea` double-click-maximize collides with drag detection, so a slow double-click starts a drag instead, or a drag ends as a maximize.
+3. **Drag during maximized state:** a maximized frameless window drag should restore windowed size and move — but if `startDragging` is called while the window is still maximized (style not yet flipped), the drag no-ops or jumps.
+4. **Linux "cannot drag again after startDragging" (#203, merged but the class of bug):** after one successful drag, subsequent `startDragging` calls no-op until the window is reconfigured.
 
 **Why it happens:**
-Global hooks see symptoms, not necessarily root causes. A persistent engine error can recur on every event tick; a faulty widget can throw on every rebuild. “Capture every error” is incorrectly implemented as “perform every expensive enrichment and presentation action for every occurrence.”
+`startDragging` is a thin FFI shim over `ReleaseCapture` + `SendMessage(WM_NCLBUTTONDOWN, HTCAPTION)`. It requires: (a) the pointer-down to still be the active capture, (b) the window style to permit move, (c) no competing gesture-arena member to have won. Flutter's gesture arena resolves *after* `onPointerDown` in many configurations, so calling from `onPanStart` is too late — the arena may have already assigned the gesture to a child. On Linux/X11, `move` via `_NET_WM_MOVERESIZE` has a single-shot semantics that some compositors honor once.
 
 **How to avoid:**
-- Make capture cheap and bounded. Create a stable fingerprint from error type/message plus normalized top stack frames; deduplicate equivalent reports over a short monotonic-time window.
-- Retain the first full report, increment a suppressed-occurrence count, and publish/log a bounded summary at a controlled interval. Different fingerprints must still be retained so deduplication does not erase new failures.
-- Bound the in-memory card queue and source-enrichment work. One visible latest card plus an error count/history summary is appropriate for this personal diagnostics UI; do not create an unbounded widget list.
-- Use a reentrancy flag separate from deduplication: recursion prevention protects correctness, while fingerprint throttling protects performance and disk use.
-- Test with a synthetic 100–1,000 identical-event burst and assert stable queue size, bounded log writes, no uncaught reporter error, and playback controls remain responsive.
+- **Call `startDragging` from `Listener.onPointerDown` (lowest level, before the gesture arena), not from `GestureDetector.onPanStart`.** This is the documented window_manager recommendation and the project's `custom_title_bar.dart` should enforce it.
+- **Separate double-click-maximize from drag** with an explicit delay/timeout gate: on pointer-up within `kDoubleTapTimeout` *and* with movement < `kTouchSlop`, treat as double-click → maximize; else the `onPointerDown`-initiated drag already won. Don't let both paths fire.
+- **Flip maximized→windowed before `startDragging`:** if `WindowMode == maximized`, first restore windowed size (centered under the cursor, per Windows convention — restore width = saved restore width, x = cursor.x - width/2), then call `startDragging` on the next frame. Never drag while still maximized.
+- **Linux:** after #203's fix, `startDragging` should re-arm, but verify on the target compositor (X11: `_NET_WM_MOVERESIZE`; Wayland: `xdg_toplevel.move`). For Wayland, drag is a compositor request — there is no "global coordinate" and the move is best-effort. Mark Linux drag as `待实机验证`.
+- **Hit-test the title bar region natively** as a backup: on Windows, handling `WM_NCHITTEST` returning `HTCAPTION` for the title bar region gives a drag path that doesn't depend on `startDragging` at all — it's the OS handling the drag directly. This is the most reliable path and sidesteps the gesture arena entirely. (The project already has a SmartDragToResizeArea; extend the same native-hit-test approach to the title-bar move region.)
 
 **Warning signs:**
-- Frame time/jank begins exactly when the same error repeats.
-- Log size grows linearly at a high rate, the card counter grows without bound, or source reading occurs repeatedly for the same frame.
-- The error reporter itself becomes a top contributor in a performance trace.
+- "Sometimes I drag the title bar and nothing happens" — the no-op, especially after a recent pointer interaction with a child widget.
+- Slow double-click starts a drag (or a drag ends as a maximize).
+- Drag from a maximized window leaves a ghost frame or jumps.
+- On Linux, the first drag works, the second doesn't.
 
 **Phase to address:**
-**Phase 1 — reporter core** defines fingerprint and bounded-buffer semantics. **Phase 4 — file sink** enforces write coalescing. **Phase 5 — integration hardening** runs burst/performance verification with a simulated repeating engine error.
+Phase 5 (title bar drag reliability). Depends on Phase 4 (window-mode state machine is correct so "maximized→windowed before drag" works). The native `WM_NCHITTEST`/`HTCAPTION` path is the recommended primary mechanism; `startDragging` from `onPointerDown` is the fallback.
+
+---
+
+### Pitfall 9: Linux — Wayland no-global-coordinates, server-vs-client decorations, GTK CSD rounding, gamescope fullscreen-shell
+
+**What goes wrong:**
+The milestone marks Linux as "structural correctness, 待实机验证." Four structural traps:
+1. **No global coordinates on Wayland:** any code that positions the window via absolute screen coords (the X11/Win32 pattern) fails silently — Wayland clients can't know their position. Fullscreen must use `xdg_toplevel.set_fullscreen(output)`, not `setPosition`.
+2. **SSD vs CSD is the compositor's choice:** `xdg-decoration-unstable-v1` lets the client *request* server-side decorations, but Mutter (GNOME) forces CSD; wlroots (Sway/KDE) may honor SSD. A "rounded corner via SSD" approach works on one compositor and not another.
+3. **GTK CSD rounded corners vs rectangular `wl_surface`:** GTK draws rounded corners, but the underlying `wl_surface` is still rectangular. Clicks at the corners hit-test the rectangle (not the visible round edge) — corner interactions land on whatever is beneath. The input region must be explicitly shaped to match the visible region.
+4. **gamescope (SteamOS) is a fullscreen shell:** it ignores `xdg-decoration` entirely and runs the app as a borderless fullscreen surface. Corner rounding/SSD/CSD is moot inside gamescope — the app gets a virtual display. Code that branches on "is CSD available" may take the wrong path under gamescope.
+
+**Why it happens:**
+X11/Win32 devs assume they control window position, decoration, and shape. Wayland deliberately removes all three from client control. `window_manager` abstracts some of this, but its Linux fullscreen/drag paths have their own bugs (#203, #116). The project has no Linux real hardware, so these failures are invisible until a user reports them.
+
+**How to avoid:**
+- **Branch on compositor, not on "Linux":** detect Wayland vs X11 at runtime (`WAYLAND_DISPLAY` env or `gtk` init). On Wayland, never call `setPosition`/`setGeometry` for fullscreen — use the fullscreen hint. On X11, the existing path works.
+- **Don't assume SSD or CSD — request CSD and draw your own round corners** in the Flutter layer (a `ClipRRect` on the root), and shape the input region to match. This is compositor-portable. SSD-native rounding is a bonus, not a reliance.
+- **For gamescope:** detect (heuristic: `STEAM_RUNTIME`/`GAMESCOPE_WAYLAND_DISPLAY`) and skip all chrome work — gamescope fullscreen-shells the window; rounding/border/drag are no-ops. Document this path.
+- **Drag on Wayland** uses `xdg_toplevel.move` (a compositor best-effort request, no coords). The `WM_NCHITTEST`/`HTCAPTION` fallback from Pitfall 8 is Windows-only — on Linux, `startDragging` is the only path, so the `onPointerDown`-call rule matters even more.
+- Mark every Linux chrome deliverable `待实机验证` in the plan; do not claim "done on Linux" from headless tests.
+
+**Warning signs:**
+- On a Wayland user report: "window position is wrong / fullscreen targets the wrong monitor / drag doesn't work after the first try."
+- Code calls `setPosition`/`setGeometry` inside a `Platform.isLinux && isWayland` block (always wrong on Wayland).
+- Rounding looks right but corner clicks miss (input region = rectangle).
+- "Works on my SteamOS box" but not on a GNOME user's box (gamescope vs Mutter divergence).
+
+**Phase to address:**
+Phase 1 (capability detection: detect Wayland/X11/gamescope; probe `xdg-decoration`; record compositor). Phase 6 (Linux structural implementation) consumes the probe and branches. No real-hardware verification phase — deliverables stay `待实机验证`.
+
+---
+
+### Pitfall 10: Re-proposing a reverted fullscreen approach (方案A FFI-bridge / 方案B DWM-disable / global DWMNCRP)
+
+**What goes wrong:**
+The milestone restarts fullscreen work after a revert. The three reverted approaches — 方案A (FFI-bridge fullscreen styling), 方案B (DWM-disable via `DWMWA_NCRENDERING_POLICY`/`DWMNCRP_DISABLED`), and global `DWMNCRP` — were each reverted on real hardware (commits aad3ba36, 36883b77) because they produced flicker, didn't fully remove the border, or raced with transitions. A new contributor (or an AI agent without the memory) re-proposes one of them verbatim as the "clean" fix, sending the milestone back into the same revert cycle. The `fullscreen-style-authority` memory records that these are technically-documented but practically-failed.
+
+**Why it happens:**
+The reverted approaches each have a coherent technical rationale (FFI bridge gives styling control; DWM-disable removes the system frame; DWMNCRP forces no native rendering). They look correct on paper and in a headless unit test. They fail only on real-hardware transitions, which the re-proposer hasn't run. Without the project memory, the approaches are indistinguishable from genuine new ideas.
+
+**How to avoid:**
+- **Treat the three reverted approaches as a denylist.** Add a "Reverted Approaches Registry" to the Phase 4 design doc listing: 方案A (FFI-bridge fullscreen styling), 方案B (DWM-disable / `DWMWA_NCRENDERING_POLICY`), global `DWMNCRP`. Each entry: what it was, why it failed on hardware, the revert commit. Any PR touching fullscreen styling must cite why it's NOT one of these.
+- **`wm.setFullScreen` is also on the denylist** (known frameless defect, memory `project_fullscreen_style_authority`). Do not delegate fullscreen to `window_manager.setFullScreen` (see Pitfall 7 — #579 confirms the defect persists).
+- **If re-considering one, the bar is:** a real-hardware pilot on the exact transition (enter + exit, on Win10 + Win11), with a perf/raster gate, AND a documented delta from the reverted approach that addresses the specific failure. "Same approach, same transition" = reject.
+- The media_kit red line is lifted **for fullscreen only** — this permits modifying the media_kit fullscreen chain, not re-proposing a non-media_kit FFI bridge.
+
+**Warning signs:**
+- A design doc / PR description containing `DWMWA_NCRENDERING_POLICY`, `DWMNCRP_DISABLED`, "FFI bridge for fullscreen styling", or `windowManager.setFullScreen`.
+- "This is the clean approach we tried before" without citing the revert.
+- Headless tests pass but no real-hardware transition pilot.
+
+**Phase to address:**
+Phase 4 design gate (the denylist is a phase-4 entry artifact). Phase 1 (capability) establishes the probe that any new approach must use, so re-proposed approaches can be compared apples-to-apples.
 
 ---
 
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Only install `runZonedGuarded` | Very little startup code | Framework and platform routes remain incomplete; zone-boundary stalls are hard to diagnose | Never for the promised four-source capture scope |
-| Report, enrich source, notify UI, and append a file directly inside a hook | One function appears to do everything | Reentrancy, build-time notification failures, slow global handler, no isolated tests | Never |
-| Assume every stack has a local Dart `file:line` | Fast debug-only demo | Release card crashes/misleads and can read arbitrary paths | Only in a test-only formatter, never production |
-| Fire-and-forget `File.writeAsString` on every error | Minimal FileSink implementation | Record reordering, unhandled I/O futures, exit loss, flood amplification | Only for a short prototype not wired to global hooks |
-| Add a modal dialog or route for every exception | Easy visible proof of capture | Breaks media playback/keyboard/frameless interaction and causes focus theft | Never; this milestone explicitly requires non-modal behavior |
-| Implement unlimited in-memory error history | No policy required | Memory/UI/log work grows forever during repeated faults | Never; use bounded current/history state |
+|----------|-------------------|-----------------|-----------------|
+| Bare `return 0` in `WM_NCCALCSIZE` for all frameless cases | One-line frameless; matches Win32 docs | Reopens C1 gap (Pitfall 1), breaks maximized overshoot (Pitfall 2) | Never — use the branched state machine |
+| Calling `windowManager.setFullScreen(true)` for fullscreen | Delegates to "maintained" plugin | Hits #579 regression + known frameless defect (Pitfall 7, 10) | Never on frameless — own the path in `WindowBridge`/media_kit |
+| `WS_EX_LAYERED` full-window transparency for Win10 rounding | "It works" visually | Disables flip model + overlays → video perf cost (Pitfall 5) | Only with a passing perf gate on real video playback; prefer corner-mask |
+| DWM attribute set-once at startup | Simple init | Stale after theme/DPI/mode change → flicker (Pitfall 4) | Never — re-apply at settle-points |
+| `startDragging` from `onPanStart` | Uses familiar gesture API | Gesture arena swallows it → no-op drag (Pitfall 8) | Never — use `Listener.onPointerDown` or native `HTCAPTION` |
+| Assuming "Linux" is one target | One code path | Wayland/X11/gamescope divergence silently fails (Pitfall 9) | Never — branch on compositor |
+| Trusting `flutter test` for fullscreen visuals | Fast CI | Headless can't see gap/flicker/title-bar flash (Pitfalls 1, 4, 6) | CI is necessary but never sufficient — real-hardware UAT required |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| `FlutterError.onError` | Replace the handler and omit `FlutterError.presentError`; let reporter failures escape | Present original details, then invoke an exception-safe reporter with a reentrancy guard |
-| `PlatformDispatcher.instance.onError` | Return `false` after accepting an error, or expect it to receive framework callback failures | Normalize and enqueue the report, then return `true`; retain `FlutterError.onError` for framework routes |
-| `runZonedGuarded` + Flutter binding | Initialize binding outside zone and run app inside it | Put binding initialization and `runApp` in the same guarded closure, or omit the zone |
-| `ErrorWidget.builder` | Put the normal card, notifier updates, I/O, localization, or report logic in the fallback builder | Return only a dependency-light static fallback; report/publish elsewhere |
-| `ValueNotifier` card state | Assign `value` synchronously in a build-time error path | Capture immediately, publish a coalesced immutable state after the current frame |
-| `media_kit` engine errors | Treat a recurring engine error callback as a unique event every time | Normalize engine context/media path and dedupe before UI/file work; do not modify media_kit |
-| Configurable Windows log path | Trust user-provided path or use process current directory/executable directory | Validate at the settings boundary; default to app-support storage; catch path/permission failures |
-| Windows file locks | Lock one handle then append using another | Prefer one serial writer; if locking is necessary, perform lock/write/flush/unlock through the same handle |
+|-------------|----------------|-------------------|
+| `window_manager` (leanflutter) | Migrating fullscreen onto PR #531's `WS_THICKFRAME \| WS_MAXIMIZEBOX` path wholesale | Borrow style math only; own exit-restore + title-bar rebind; track #579 (Pitfall 7) |
+| `window_manager` drag API | `startDragging()` from `GestureDetector.onPanStart` | `Listener.onPointerDown`, or native `WM_NCHITTEST`→`HTCAPTION` (Pitfall 8) |
+| media_kit `Video` texture | Assuming texture survives fullscreen resize because it survives window resize | Probe `textureIdChanges=0` *during fullscreen toggle* specifically (Pitfall 6); media_kit is limited-maintenance (#1337), project owns the fix |
+| DWM (`DwmSetWindowAttribute`) | Win11-only attrs called on Win10; attrs set once | Probe `DwmCapabilities` in Phase 1; re-apply at settle-points (Pitfalls 3, 4) |
+| Win32 `WM_NCCALCSIZE` | One `return 0` for all cases | Branched handler: fullscreen→C1 inset, maximized→overshoot, default→`return 0` (Pitfalls 1, 2) |
+| Wayland compositors | `setPosition` for fullscreen | `xdg_toplevel.set_fullscreen(output)`; branch on compositor (Pitfall 9) |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Per-event source-file reads and stack parsing | UI jank and repeated disk reads when one error loops | Parse/enrich once per fingerprint and cache bounded results; source lookup is best effort | A repeated build/engine fault, potentially tens to hundreds of events per second |
-| One notification/card per report | Rebuild storm, enormous card list, controls become unresponsive | Coalesce post-frame publication; bounded current card/history and duplicate counter | Immediately during a recurring timer/render error |
-| Open/close/flush a file for uncontrolled concurrent writes | Reordered lines, I/O failures, slow shutdown | Single serialized writer and controlled flush/close lifecycle | First overlapping async report or app close under an I/O stall |
-| Synchronous durable flush on every repeated error | Media playback stutters during log flood | Coalesce/dedupe errors; use bounded orderly shutdown drain rather than per-event expensive work | Any sustained recurring error on a slower disk |
+| `WS_EX_LAYERED` transparency on video window | CPU/GPU ~1.5–2x during playback; raster >33ms | Native corners (Win11) / corner-mask (Win10); perf gate before merge | Any video playing through a transparent window on Intel iGPU |
+| Texture rebuild on fullscreen toggle | Single blank/black frame on enter/exit | Sequence resize; keep `Video` widget identity stable; probe `textureIdChanges` | Fullscreen toggle mid-playback (the project's own profile sessions showed `textureIdChanges=0` only *after* the resize-three-sources fix; fullscreen is a new path) |
+| Animation overlapping fullscreen transition | Title-bar flash / size jump visible | `isFullscreenTransition` flag → `Duration.zero` animations | Any `Animated*` on chrome not gated off during transition |
+| DWM attribute re-apply during (not after) transition | Single-frame flicker of system frame | Re-apply at settle-point (post-`WM_SIZE` final geometry) | Every theme/DPI/fullscreen change |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Displaying or logging media paths without considering shared screenshots/logs | Personal directory names and filenames are exposed when logs/cards are shared | Keep full local detail for the developer-focused tool, but label logs as sensitive and provide a future redaction boundary; never upload remotely in this milestone |
-| Reading a source path parsed from untrusted/plugin error text without validation | Diagnostic feature becomes an arbitrary local-file reader and can expose content in UI/logs | Accept only validated local regular-file paths and bounded line reads; on any doubt show “source unavailable” |
-| Trusting settings-provided output paths blindly | Writes outside expected location, repeated permission failures, accidental overwrite semantics | Validate and normalize configuration, create only intended directories, append only, and surface local non-fatal path errors |
-| Logging every error payload verbatim without bounds | Sensitive media paths and huge plugin payloads fill disk or make logs unsafe to share | Bound individual fields/stack size, preserve necessary context, and mark truncation explicitly |
+| FFI fullscreen bridge touching `user32`/`dwmapi` without null-checking function pointers | Crash on a Windows build missing the API (older Win10) | Probe `GetProcAddress`; fall back if null (Pitfall 3); never assume the export exists |
+| Native `WM_NCHITTEST` returning `HTCAPTION` for too large a region | User can't click controls in the title bar area; drag steals input | Narrow `HTCAPTION` rect to the actual title-bar pixels; exclude button regions | 
+| Storing fullscreen snapshot in a global mutable without locking | Concurrent toggle calls corrupt restore geometry | Snapshot is immutable `final`; single owner (`WindowBridge`); idempotent enter/exit (Pitfall 6) |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Full-window transparent overlay intercepts input | Cannot seek/play, drag frameless window, or reach title controls | Only the card bounds receive pointers; outside region is ignored by the overlay |
-| Automatic focus/autofocus on incoming card | Keyboard shortcuts suddenly operate card controls instead of player | Preserve existing focus; make card controls reachable by deliberate keyboard navigation only |
-| A card per repeated error | Screen becomes a stack of diagnostics, original problem is obscured | One current card plus count/summary/history with fingerprint deduplication |
-| Card assumes a source line is always available | Release display looks broken or blames incorrect file | Show file/line/source only when independently available; use clear unavailable text otherwise |
-| Closing card disables capture or file logging | User loses diagnostics by hiding a visual nuisance | The settings card toggle affects presentation only; capture and error-file append remain active |
+| Title bar flash on fullscreen enter | Feels janky, "am I in fullscreen?" confusion | Hide chrome *before* native style change; reveal at settle-point (Pitfall 6) |
+| Wrong restore geometry on exit | Window lands off-screen or wrong size; user must resize | Snapshot *before* transition; restore from immutable snapshot (Pitfall 6, #181/#266) |
+| Drag no-op on title bar | "The window is stuck" — core UX failure | Native `HTCAPTION` hit-test path (Pitfall 8); `onPointerDown` fallback |
+| Red border persists on Win10 | "I thought you fixed this" — feature looks unfinished | Win10 path is NOT `DWMWA_BORDER_COLOR`; verify on real Win10 (Pitfall 3) |
+| Rounded corners with black video fringes | Looks broken on bright videos | `ClipRRect` on the `Video` widget itself, not a sibling (Pitfall 5) |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Four-route capture:** Deliberately trigger one framework/build error, one uncaught future/platform-dispatcher error, one startup error, and one normalized `PlayerError`; verify exactly one normalized report for each expected route.
-- [ ] **Zone startup:** Run debug startup with `BindingBase.debugZoneErrorsAreFatal = true`; no zone mismatch is emitted, and no startup future crosses an error-zone boundary.
-- [ ] **Reporter failure isolation:** Make formatter, source resolver, clipboard, directory creation, append, flush, and close fail independently; verify original reporting/card capture survives and no recursive exception storm occurs.
-- [ ] **Build safety:** Throw from a child build; verify no `setState`/`markNeedsBuild`-during-build error and that the normal card appears only after the frame boundary.
-- [ ] **Release fallback:** Run profile/release-equivalent test with no source checkout/file available and with unparseable/native frames; verify useful raw stack/location fallback, not a second error.
-- [ ] **Windows file behavior:** Validate configured path, UTF-8 append ordering, permission-denied/removed-directory/full-disk handling, and bounded shutdown drain without hangs.
-- [ ] **Non-modal interaction:** With a persistent card visible, verify title-bar drag/window buttons, seek/control bar, playlist access, Space/arrows/media keys, fullscreen, ESC, and close/copy behavior.
-- [ ] **Flood control:** Inject a high-rate duplicate engine error; verify bounded queue, rate-limited log work, duplicate count, and responsive video controls.
+- [ ] **Accent-border removal:** "Works on my Win11 dev box" — verify on real Win10 with a non-default accent color (Pitfall 3); `DWMWA_BORDER_COLOR` is Win11-only.
+- [ ] **Rounded corners:** "Corners are round" — verify video corners aren't black-fringed (Pitfall 5) and `WS_EX_LAYERED` perf gate passes with video playing.
+- [ ] **Fullscreen enter:** "No gap at edges" — verify on real hardware, not headless (Pitfall 1, C1 regression is invisible headless).
+- [ ] **Fullscreen exit:** "Window comes back" — verify restore geometry on the *same* monitor and after a monitor-change DPI jump (Pitfall 6, #181/#266).
+- [ ] **Title bar drag:** "Drag works" — verify after enter→exit→enter cycle (Pitfall 7, #579 regression) and after a maximize (Pitfall 8).
+- [ ] **DWM attributes:** "Set at startup" — verify after a theme toggle and a DPI change (Pitfall 4).
+- [ ] **Linux:** "Structurally correct" — verify Wayland compositor branch is taken and `setPosition` is NOT called for fullscreen (Pitfall 9); mark `待实机验证`.
+- [ ] **Reverted approach:** "New clean fix" — check it isn't 方案A/B/DWMNCRP/`wm.setFullScreen` (Pitfall 10).
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Zone mismatch / lost startup error | MEDIUM | Move binding setup and `runApp` into one zone (or remove zone), enable fatal debug diagnostic, add route-specific tests |
-| Reporter/card recursion | MEDIUM | Disable card publication temporarily, keep minimal console fallback, add reentrancy guard and isolate each side effect before re-enabling UI |
-| `notifyListeners` during build | LOW | Move visual publication to guarded post-frame callback; keep capture/file enqueue synchronous and test the original failing build |
-| Release source lookup failure | LOW | Stop treating source lookup as required; retain raw stack and app build ID, use “source unavailable,” archive symbols if relevant |
-| Windows file sink outage | MEDIUM | Disable only file sink, retain in-memory/card/console route, show log-path issue locally, retry after path/config change; do not recursively log the failure |
-| Error flood | MEDIUM | Activate duplicate suppression and bounded queue, retain first full occurrence plus counts, identify/fix root source separately |
-| Overlay blocks playback | LOW | Remove fullscreen hit-test layer/focus request, constrain interactive bounds, add widget and manual Windows regression tests |
+| C1 gap regression (Pitfall 1) | LOW | `git revert` the `WM_NCCALCSIZE` change; re-assert branched handler; C1 test should go red then green |
+| Maximized overshoot / autohide (Pitfall 2) | MEDIUM | Re-add `DefWindowProc`-first or explicit overshoot math in `isMaximized` branch; test on Win10+Win11 multi-monitor autohide |
+| DWM attr on Win10 (Pitfall 3) | LOW | Wrap call in `IsWindows11OrGreater()` + `HRESULT` check; log failures; route Win10 via `WS_THICKFRAME` path |
+| DWM attr stale after change (Pitfall 4) | MEDIUM | Add `applyChromeAttributes()` to `WM_THEMECHANGED`/`WM_DPICHANGED`/settle-point; re-test transitions |
+| Fake-round perf cost (Pitfall 5) | MEDIUM | Revert `WS_EX_LAYERED`; ship native Win11 + corner-mask Win10; re-run perf gate |
+| Fullscreen flicker (Pitfall 6) | HIGH | Sequence + snapshot + animation-gate are interdependent; fix as a set, not piecemeal; re-run real-hardware UAT |
+| #579 title-bar-no-return (Pitfall 7) | HIGH | If migrated to #531 path, revert to project's media_kit chain; re-assert frameless style + rebind title bar on exit |
+| Drag no-op (Pitfall 8) | MEDIUM | Switch to `Listener.onPointerDown` or native `HTCAPTION`; re-test after maximize + enter/exit cycle |
+| Linux Wayland failures (Pitfall 9) | HIGH (no hardware) | Can't recover without real hardware; mark `待实机验证`, document the compositor branches so a user can self-report |
+| Reverted approach re-proposed (Pitfall 10) | LOW | Reject at PR review against the denylist; cite the revert commit and memory |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Incomplete/error-zone-loss capture | Phase 1 — diagnostic model and global hooks | Four source-specific injection tests; zone-crossing future regression test |
-| Binding/runApp zone mismatch | Phase 1 — startup hook installation | Fatal debug-zone-errors startup smoke test |
-| Reporter/card recursive failure | Phase 1 core, Phase 3 UI, Phase 4 sink | Fault-inject each reporter dependency and assert one primary report/no uncaught secondary reporter error |
-| Notifier update during build | Phase 3 — card integration | Throw from child build, pump frame, assert original error/card and no `markNeedsBuild` exception |
-| Release source/symbol assumptions | Phase 2 — enrichment/release fallback | Missing-source and unparseable-stack tests; documented build-artifact policy |
-| Windows append/lock/shutdown/disk failure | Phase 4 — FileSink and settings | Serialized-write, denied-path, removed-directory, flush/close, and exit-drain tests on Windows |
-| Focus/input interception | Phase 3 — card integration | Widget hit-test/focus tests plus manual frameless Windows control smoke test |
-| Error flood and repeated engine events | Phase 1 policy, Phase 5 hardening | Synthetic burst verifies bounded state, log coalescing, and responsive controls |
+| 1. C1 gap regression | Phase 1 (pin C1 + test + guard comment) | Real-hardware fullscreen: no edge seam (headless can't verify) |
+| 2. Maximized overshoot / autohide | Phase 1 (probe) + Phase 4 (transition) | Win10+Win11 multi-monitor autohide: taskbar summonable over maximized player |
+| 3. DWM attr Win10 no-op | Phase 1 (`DwmCapabilities` probe) + Phase 2 | Real Win10 with non-default accent color: no red border |
+| 4. DWM attr stale after change | Phase 2 (re-apply hooks) + Phase 4 (settle-point) | Theme toggle + DPI change + fullscreen cycle: attrs stable, no mid-transition flicker |
+| 5. Fake-round perf/fringes | Phase 1 (probe) + Phase 3 (native-first, fake-round fallback) | Perf gate raster <33ms with video; no black corners on bright video |
+| 6. Fullscreen flicker (4 causes) | Phase 4 (sequence + snapshot + animation-gate + texture probe) | Real-hardware enter/exit: no blank frame, no title flash, correct restore geometry |
+| 7. #531/#579 regression | Phase 4 (design gate: stay on media_kit chain) | Title bar interactive after enter→exit→enter on real hardware |
+| 8. Drag no-op / double-click / maximized | Phase 5 (native `HTCAPTION` primary; `onPointerDown` fallback) | Drag works after maximize, after enter/exit, repeated 20× |
+| 9. Linux Wayland/gamescope | Phase 1 (compositor probe) + Phase 6 (branch) | `待实机验证`; structural: no `setPosition` on Wayland; input region shaped |
+| 10. Reverted approach re-proposal | Phase 4 (denylist in design doc) | PR review cites why approach ≠ 方案A/B/DWMNCRP/`wm.setFullScreen` |
 
 ## Sources
 
-Confidence values are produced by the research confidence classifier: Context7 documentation results are **MEDIUM**; the web-research routing itself is **LOW**, though the following primary documents were directly cross-checked and underpin the findings.
-
-- [Flutter: Handling errors in Flutter](https://docs.flutter.dev/testing/errors) — framework vs. platform-dispatcher routes, custom handler guidance, and `ErrorWidget.builder` behavior. **MEDIUM**
-- [Flutter: Zone mismatch breaking change](https://docs.flutter.dev/release/breaking-changes/zone-errors) — Flutter 3.10 zone consistency requirement and debug fatal diagnostic. **MEDIUM**
-- [Dart: Zones — handling uncaught errors](https://dart.dev/libraries/async/zones) — error-zone containment and asynchronous Future boundary behavior. **MEDIUM**
-- [Dart API: `runZonedGuarded`](https://api.dart.dev/dart-async/runZonedGuarded.html) — guarded-zone API semantics and error handler behavior. **MEDIUM**
-- [Flutter API: `FlutterError.onError`](https://api.flutter.dev/flutter/foundation/FlutterError/onError.html) — handler failure caveat and default presentation behavior. **MEDIUM**
-- [Flutter API: `ErrorWidget.builder`](https://api.flutter.dev/flutter/widgets/ErrorWidget/builder.html) — build-error fallback lifecycle. **MEDIUM**
-- [Flutter: Common errors — setState/markNeedsBuild during build](https://docs.flutter.dev/testing/common-errors) — build-time state mutation failure mode. **MEDIUM**
-- [Dart API: `File.writeAsString`](https://api.dart.dev/dart-io/File/writeAsString.html) and [FileMode](https://api.dart.dev/dart-io/FileMode-class.html) — append, UTF-8 default, flush, and newline semantics. **MEDIUM**
-- [Dart API: `RandomAccessFile.lock`](https://api.dart.dev/dart-io/RandomAccessFile/lock.html) — Windows handle-specific locking requirements. **MEDIUM**
-- [Dart API: `IOSink.flush`](https://api.dart.dev/dart-io/IOSink/flush.html) — flush limitation and close implications. **MEDIUM**
-- [Flutter file persistence cookbook](https://docs.flutter.dev/cookbook/persistence/reading-writing-files) — application-managed storage with `path_provider`. **MEDIUM**
-- [Sentry Flutter debug symbols](https://docs.sentry.io/platforms/dart/guides/flutter/debug-symbols/) — corroborating explanation of split-debug-info/obfuscation symbol artifacts. **LOW; validate against the selected Windows build command before relying on it.**
+- [leanflutter/window_manager — startDragging issues search](https://github.com/leanflutter/window_manager/issues?q=startDragging) — #399 (no-op, closed), #203 (Linux cannot-drag-again, merged), #511 (no maximize in onDoubleTapDown, open), #372 (DragToMoveArea double-click, closed) [HIGH]
+- [leanflutter/window_manager — fullscreen+frameless issues search](https://github.com/leanflutter/window_manager/issues?q=fullscreen+frameless) — PR #531 (frameless fullscreen, merged May 2025), #456 (frameless fullscreen request), #367 (better fullscreen, merged), #389 (frameless broken after #367), #181 (right bound overlapped after leaving fullscreen), #266 (Fullscreen/Set as frameless bugs MediaQuery), #579 (title bar not appearing after exit — OPEN regression, Dec 2025) [HIGH]
+- [window_manager PR #531](https://github.com/leanflutter/window_manager/pull/531) — `WS_THICKFRAME | WS_MAXIMIZEBOX` approach, SetAsFrameless + separate position/size, removed force-refresh; follow-up regression #579 [HIGH]
+- [window_manager PR #367](https://github.com/leanflutter/window_manager/pull/367) — 6-step fullscreen method; #389 regression cycle [HIGH]
+- [window_manager issue #579](https://github.com/leanflutter/window_manager/issues/579) — OPEN regression: title bar not reappearing after fullscreen exit on Windows; workaround = don't touch `titleBarStyle` [HIGH]
+- [Microsoft Learn — WM_NCCALCSIZE message](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-nccalcsize) — `return 0` when `wParam==TRUE` removes frame+caption; WVR_* return values; Vista+ DwmExtendFrameIntoClientArea caveat [HIGH]
+- [Microsoft Learn — DwmSetWindowAttribute](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/nf-dwmapi-dwmsetwindowattribute) + [DWM_WINDOW_ATTRIBUTE enum](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwm_window_attribute) — `DWMWA_WINDOW_CORNER_PREFERENCE` (33) and `DWMWA_BORDER_COLOR` (34) are Windows 11 build 22000+ only; `E_INVALIDARG` on Win10 [HIGH]
+- [Microsoft Learn — Layered Windows](https://learn.microsoft.com/en-us/windows/win32/winmsg/layered-windows), [DXGI Flip Model](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-flip-model), [DXGI Hardware Overlay Support](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-hardware-overlay-support) — `WS_EX_LAYERED` forces DWM readback, disables flip model + hardware overlays (Pitfall 5) [HIGH]
+- [media-kit/media-kit — limited maintenance](https://github.com/media-kit/media-kit/issues/1337) — repo under limited maintenance since Nov 2025; project owns fullscreen/texture fixes [HIGH]
+- [media-kit/media-kit — texture resize/rebuild issues](https://github.com/media-kit/media-kit/issues?q=texture+resize+rebuild) — only #1395 (mobile ANR); no desktop fullscreen texture-rebuild issue tracked upstream (project-owned) [MEDIUM]
+- [flutter/flutter — desktop resize janky #44136](https://github.com/flutter/flutter/issues/44136) — engine-level desktop resize jank; texture/surface handling involved [MEDIUM]
+- [flutter/flutter — texture flicker search](https://github.com/flutter/flutter/issues?q=texture+flicker+resize+desktop) — only macOS #135999 (video_player_avfoundation flickering, open); no Windows/Linux desktop texture-flicker issue upstream [MEDIUM]
+- Project memory: `project_fullscreen_seam_icon_fix.md` (C1/C2 fixes, shipped), `project_fullscreen_style_authority.md` (方案A/B/DWMNCRP reverted, `wm.setFullScreen` defect), `bugfix_white_border_frameless.md` (frameless + SmartDragToResizeArea origin) [HIGH — project-specific]
 
 ---
-*Pitfalls research for: Simple Player Flutter error capture, local diagnostics, and non-modal error-card system*
-*Researched: 2026-08-28*
+*Pitfalls research for: frameless Flutter desktop window chrome + media_kit fullscreen transitions (Win10/Win11/Linux)*
+*Researched: 2026-09-01*

@@ -1,194 +1,195 @@
 # Stack Research
 
-**Domain:** Flutter Windows desktop local error capture, localization, and feedback
-**Researched:** 2026-08-28
-**Confidence:** HIGH for Flutter/logger APIs; MEDIUM for package-market recommendation
+**Domain:** Flutter desktop (Windows primary, Linux secondary) window chrome + media_kit fullscreen
+**Researched:** 2026-09-01
+**Confidence:** HIGH (Win32 DWM APIs verified against Microsoft Learn; window_manager/media_kit internals verified against pub-cache source)
 
 ## Recommended Stack
+
+This milestone adds four window-chrome fixes to an existing, validated Flutter desktop + media_kit player. The "stack" here is **not a new framework** — it is a set of **Win32 DWM attribute APIs**, **Win32 window-style / hit-test techniques**, **GTK window primitives** (Linux), and **surgical fixes to the existing window_manager 0.5.2 + media_kit 1.2.6 + runner C++ chain**. No new pub dependencies are required.
 
 ### Core Technologies
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Flutter framework error boundary | Flutter SDK already pinned by project | Capture Flutter build/layout/paint and framework-callback exceptions | Use the framework-supported `FlutterError.onError` hook. It receives a rich `FlutterErrorDetails` record, including the original exception, throwing-site stack when available, context, library, and diagnostic collector. Preserve `FlutterError.presentError(details)` so debug console/IDE behavior remains intact, then forward the normalized record to `ErrorReporter`. **Confidence: HIGH.** |
-| Dart platform error boundary | Dart/Flutter SDK | Capture unhandled root-isolate errors outside a Flutter callback, notably async/plugin errors | Use `PlatformDispatcher.instance.onError`; Flutter explicitly recommends it for errors not routed to `FlutterError.onError`. The callback must return `true` after durable capture to mark the error handled. Register it once during startup. **Confidence: HIGH.** |
-| Narrow Zone startup guard | Dart SDK | Last-resort capture of synchronous startup failures and any uncaught error routed to the guarded zone | Use `runZonedGuarded` only around bootstrap, not as the primary async-error mechanism. Flutter 3.3+ recommends `PlatformDispatcher.onError` over custom Zones for application exceptions; Zones create a separate error zone and can make failed futures appear not to complete across zone boundaries. Put `WidgetsFlutterBinding.ensureInitialized()`, hook installation, initialization, and `runApp()` inside the *same* guarded callback to avoid Flutter's zone-mismatch error. **Confidence: HIGH.** |
-| `logger` | `2.7.0` (already locked) | Formatting/output engine behind the project `FileSink` | Reuse the existing direct dependency rather than adopting an error-reporting suite. `Logger` composes `LogFilter`, `LogPrinter`, and `LogOutput`; it provides the exact file output required by this milestone while `KernelLogger` remains the project-facing facade. **Confidence: HIGH.** |
-| `path_provider` | `2.1.6` declared | Resolve an application-writable Windows log directory | Retain the existing package and resolve a directory before creating the logger output. Do not use `Directory.current` or the installed executable directory: those are not dependable writable storage locations for Windows release installs. **Confidence: HIGH for existing dependency/use; MEDIUM for exact chosen directory policy.** |
+| `DwmSetWindowAttribute` + `DWMWA_BORDER_COLOR` | Win11 build 22000+ | Suppress the DWM-drawn accent-color border on the frameless window | The one targeted call `DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &DWMWA_COLOR_NONE, sizeof(COLORREF))` with `DWMWA_COLOR_NONE = 0xFFFFFFFE` **suppresses border drawing entirely** without touching non-client rendering policy. Verified on Microsoft Learn (`dwmapi.h`, enum `DWMWINDOWATTRIBUTE`). This is the clean fix the user needs on their Win11 26200 system. |
+| `DwmSetWindowAttribute` + `DWMWA_WINDOW_CORNER_PREFERENCE` | Win11 build 22000+ | Native rounded corners on Win11 | `DWMWCP_ROUND = 2` gives the OS-native, anti-aliased, free rounded corners. Win11 already rounds by default, but setting it explicitly guarantees consistency regardless of user theme / snap state. Verified on Microsoft Learn (`DWM_WINDOW_CORNER_PREFERENCE` enum, min build 22000). |
+| `SetWindowRgn` + `CreateRoundRectRgn` | Win10 fallback only | Fake rounded corners on Win10 (no native API) | Win10 has **no** DWM corner API. `SetWindowRgn` is the only zero-overhead option (1-bit mask, no per-pixel alpha tax). Aliased edges are the accepted trade-off — a video player's dynamic content rules out the layered-window alternative. Mark "accept aliasing or accept square corners" as a product decision. |
+| `WM_NCHITTEST` → `HTCAPTION` in runner C++ | Win32, all Windows | Reliable title-bar drag without channel round-trip | Returning `HTCAPTION` from the existing `WM_NCHITTEST` handler lets `DefWindowProc` run the native modal drag loop (`WM_NCLBUTTONDOWN` → `HTCAPTION` → `SC_MOVE`) **synchronously** on pointer-down. Zero channel latency, zero race. The runner already handles `WM_NCHITTEST` for resize — extending it to `HTCAPTION` for the title bar region is a small, additive change. |
+| `SetWindowPos` with `SWP_FRAMECHANGED` | Win32, all Windows | Flicker-free fullscreen style+size transition | The window_manager `SetFullScreen` reference (and media_kit's `utils.cc` which it copies) uses `SetWindowLongPtr(GWL_STYLE, …)` to strip `WS_THICKFRAME|WS_MAXIMIZEBOX` then `SetWindowPos(…, SWP_FRAMECHANGED)` to apply. Ordering: strip style → apply frame change → resize to monitor in one or two `SetWindowPos` calls. `WM_ERASEBKGND` returning 1 (already in runner) suppresses the background-erase flash. |
+| `DWMWA_TRANSITIONS_FORCEDISABLED` (targeted) | Win Vista+ (attribute itself); relevant Win10/11 | Suppress DWM's own transition animation during fullscreen enter/exit | Set `TRUE` immediately before the fullscreen style change, `FALSE` immediately after. This is **a different attribute** from the withdrawn `DWMWA_NCRENDERING_POLICY` (DWMNCRP) — it disables transition *animations*, not non-client *rendering*. MEDIUM confidence: adjacent to the withdrawn family, verify on real hardware before committing. |
+| `gtk_window_begin_move_drag` / `gdk_toplevel_begin_move` | GTK3 (Linux embedder) | Linux title-bar drag | The GTK equivalent of `SC_MOVE`. Already what `window_manager`'s Linux plugin calls. Same async-via-GDK-event-loop race as Windows; Linux fix is structural (CSD hit-test) not a quick patch. Mark "待实机验证". |
 
-### Minimum Correct Global Wiring
+### Supporting Libraries / Primitives
 
-Install all three boundaries before application services can throw. The reporter must make its in-memory/UI update synchronous and make disk failure non-fatal; an error handler that itself throws creates a second failure and can defeat reporting.
-
-```dart
-void main() {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-
-    // Initialize the reporter and its append-only file output before capture starts.
-    await ErrorReporter.I.initialize();
-
-    FlutterError.onError = (FlutterErrorDetails details) {
-      FlutterError.presentError(details);
-      ErrorReporter.I.reportFlutterError(details);
-    };
-
-    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-      ErrorReporter.I.report(
-        error: error,
-        stackTrace: stack,
-        origin: ErrorOrigin.platformDispatcher,
-      );
-      return true;
-    };
-
-    runApp(const SimplePlayerApp());
-  }, (Object error, StackTrace stack) {
-    // Must be safe before/after reporter initialization and must never throw.
-    ErrorReporter.I.reportBootstrapError(error, stack);
-  });
-}
-```
-
-**Capture boundaries and limits**
-
-| Boundary | Catches | Does not promise to catch | Required behavior |
-|----------|---------|---------------------------|-------------------|
-| `FlutterError.onError` | Exceptions Flutter catches in its own callbacks: commonly build, layout, paint, gestures and framework lifecycle work | Async/plugin errors outside a Flutter callback | Call `FlutterError.presentError(details)` and forward `details`; do not set it to `null`. |
-| `PlatformDispatcher.instance.onError` | Unhandled root-isolate errors outside Flutter callbacks, including typical asynchronous platform/plugin failures | Errors in spawned isolates; VM/process termination before callback execution; native access violations | Report and return `true`. Give every spawned isolate its own error listener/forwarding path if the app later adds isolates. |
-| `runZonedGuarded` | Synchronous bootstrap failure and uncaught asynchronous errors belonging to its zone | Native process crashes; a complete substitute for platform dispatcher; errors/futures crossing incompatible error zones | Keep bootstrap and `runApp()` in the same zone. Do not nest zones gratuitously. |
-| Engine adapter / `PlayerError` path | Errors deliberately surfaced by the existing media-engine wrapper | A libmpv/native crash that terminates the process | Forward directly to the same `ErrorReporter`; it is an explicit fourth source, not a global-hook side effect. |
-
-`ErrorWidget.builder` is **not** an error-capture hook. It is optional presentation fallback for a widget that fails to build. The planned non-modal error card should be driven by `ErrorReporter` instead; use `ErrorWidget.builder` only if a neutral replacement widget is needed to keep a damaged subtree from obscuring the application.
-
-### Supporting Libraries
-
-| Library/API | Version | Purpose | When to Use |
-|-------------|---------|---------|-------------|
-| `logger.FileOutput` | `logger 2.7.0` | Append formatted `OutputEvent.lines` to one `dart:io` `File` | Use for the required single plain-text error file. Constructor: `FileOutput(file: file, overrideExisting: false, encoding: utf8)`. `false` is the default and means append. Create the parent directory first; `FileOutput.init()` opens the file but does not create parents. Await `logger.init` before writing and call `logger.close()` during orderly shutdown to flush/close. **Confidence: HIGH.** |
-| Custom `LogPrinter` | `logger 2.7.0` | Emit stable, readable error-record blocks without terminal coloring or decorative borders | Preferred for this feature. Extend `LogPrinter`, implement `List<String> log(LogEvent event)`, and output timestamp, origin, media path, localized `file:line`, exception, raw stack, and separator. This preserves one authoritative serialized format in the `logger` pipeline. **Confidence: HIGH.** |
-| `SimplePrinter` | `logger 2.7.0` | Built-in concise formatter | Acceptable only for a prototype; configure `colors: false, printTime: true`. It is insufficient if the log must include the full stack/source-location record in a predictable multiline form. **Confidence: HIGH.** |
-| `PrettyPrinter`, `PrefixPrinter`, `HybridPrinter`, `LogfmtPrinter` | `logger 2.7.0` | Built-in alternate formatters | Do **not** choose these for the milestone's human-readable, append-only error journal: Pretty output is verbose/decorative; logfmt targets structured key/value ingestion; prefix/hybrid add presentation policy with no localization benefit. They remain supported package APIs. **Confidence: HIGH.** |
-| `logger.MultiOutput` | `logger 2.7.0` | Fan out a single logger record to multiple `LogOutput`s | Do not need it initially because the project's `CompositeSink` already owns sink fan-out. Consider only if the file engine must also write to another `logger` output. **Confidence: HIGH.** |
-| `logger.AdvancedFileOutput` | `logger 2.7.0` | Buffered output and optional rotation | Explicitly defer: the milestone excludes rotation. It adds timers, buffering, rotation and its own error printing. If later adopted, configure immediate writes for errors/fatals and confirm shutdown flushing. **Confidence: HIGH.** |
-| `StackFrame` (`foundation.dart`) | Flutter SDK | Parse a conventional VM `StackTrace` into package/path/line/column/method | Use `StackFrame.fromStackTrace(stack)` to select the first app-owned `package:simple_player_flutter/...` frame, then display its `packagePath:line` and preserve the entire raw stack. Treat parse failure, `line < 0`, and async-suspension/stack-overflow markers as ordinary graceful-degradation cases. **Confidence: HIGH.** |
-
-### `logger` API Status: Exact Names and Recommended Adapter
-
-The project has **`logger: ^2.7.0` in `pubspec.yaml` and resolves exactly `logger 2.7.0` in `pubspec.lock`**. Pub.dev reports `2.7.0` as the current stable release (published 2026-03-15).
-
-* Valid file APIs: **`FileOutput`** and **`AdvancedFileOutput`**.
-* There is **no `LogFileOutput`** in logger 2.7.0. Do not plan against that name.
-* The extensibility base is **`LogOutput`**, not `Output`. Its relevant contract is `Future<void> init()`, `void output(OutputEvent event)`, and `Future<void> destroy()`.
-* `Logger` constructor accepts `filter`, `printer`, `output`, and `level`; its `init` future completes when all components initialize.
-
-Use a **thin adapter**, not a replacement for `KernelLogger`:
-
-1. `ErrorReporter` normalizes all four origins into an immutable `ErrorReport`.
-2. `FileSink implements LogSink` owns one `Logger(output: FileOutput(...), printer: ErrorReportPrinter(), level: Level.error)`.
-3. `FileSink.log(...)` returns immediately for any level below `LogLevel.error`; for error/fatal it maps project level to `logger.Level`, passes `error` and `stackTrace`, and sends the normalized record as its message.
-4. `ErrorReporter` independently updates its `ValueNotifier` for the error card. A disabled card must not disable file persistence.
-5. `FileSink` catches `FileSystemException`/logger output failure, reports it only through `debugPrint`/`FlutterError.presentError` without recursively calling `ErrorReporter`, and exposes a safe failure state to settings UI.
-
-This honors the existing `KernelLogger → LogSink` seam and keeps `logger` as an output engine rather than letting a third-party global logger become a second logging architecture.
-
-### Error Localization and Source-Line Policy
-
-| Available runtime data | Reliable use | Limitation / policy |
-|------------------------|--------------|--------------------|
-| `FlutterErrorDetails.exception`, `.stack`, `.context`, `.library`, `.informationCollector`, `.silent` | Preserve the exception and diagnostics; `.stack` represents where the exception was thrown rather than caught | `.stack` is nullable and `FlutterErrorDetails` contains **no source-code excerpt**. Do not scrape `details.toString()` as the canonical data model. |
-| `StackTrace` | Preserve its complete `toString()` verbatim in the report | Dart's public `StackTrace` API is fundamentally string-oriented; it does not guarantee structured frames, source files, source text, or a stable parser format. |
-| `StackFrame.fromStackTrace` | Best-effort file/line/column/method extraction for a normal Flutter Windows VM trace | It parses the trace string. Frames may be unparseable/missing, represent async suspension, or have unknown (`-1`) line/column. Never allow parser failure to discard the raw stack. |
-| App source checkout in debug/development | After selecting a verified app-owned relative path (`lib/...`) and valid positive line, read the line from the checkout and show it as an optional convenience | Do not accept arbitrary absolute stack paths. Canonicalize and enforce that resolved paths remain under project root. Guard file I/O and line bounds. This capability is for a developer checkout, not a generic installed application. |
-| Installed/profile/release executable | Show error, selected location when available, full raw stack, log path and media path | Flutter/Dart source files are not normally shipped in the release bundle. Never promise a source line; show “source unavailable in this build” when no trusted readable local source is present. Symbol/location fidelity can also be weaker than debug. |
-
-**Recommended locator algorithm:** parse once; choose the first frame with `packageScheme == 'package'`, `package == 'simple_player_flutter'`, a non-empty `packagePath`, and `line > 0`; render `packagePath:line[:column]`. If none qualifies, use the first parseable non-SDK frame as labeled fallback; otherwise show `Location unavailable`. Keep a raw `StackTrace.toString()` field in every report. This prevents the UI from inventing a location when the runtime cannot provide one.
+| Library / Primitive | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `window_manager` | **0.5.2** (actual `pubspec.lock`; CLAUDE.md's "5.15.0" is a doc typo) | Existing window control: `setAsFrameless`, `titleBarStyle.hidden`, `startDragging`, `setPreventClose` | Keep as the Dart↔native bridge. **Do not call `setFullScreen()`** — it is a no-op on frameless windows (`is_frameless_` guard at `window_manager.cpp:593` skips the style change). Fullscreen must go through the media_kit chain. |
+| `media_kit` / `media_kit_video` | 1.2.6 / 2.0.1 | Existing playback + fullscreen chain | Red line **lifted for fullscreen only** this milestone. `enterFullscreen()` pushes a Flutter route wrapped in `FullscreenInheritedWidget` + calls `enterNativeFullscreen()` (strips `WS_OVERLAPPEDWINDOW`, resizes to monitor). Flicker fixes go here. |
+| `dart:ffi` → `DwmSetWindowAttribute` | Dart 3.13 FFI | Call DWM attribute APIs from Dart (optional) | If the runner-C++ path is undesirable, a thin FFI wrapper in `lib/kernel/window_bridge/` can call `DwmSetWindowAttribute` directly. **Prefer the runner C++ path** — DWM calls belong with the native window, and the runner already owns `WM_NCCALCSIZE`/`WM_NCHITTEST`. Reserve FFI only for attributes that must be set from Dart (e.g. a `setBorderColor` method on `WindowBridge`). |
+| `windows/runner/win32_window.cpp` + `flutter_window.cpp` | Existing C++ | Native hit-test, NCCALCSIZE, fullscreen preemption | **Primary implementation surface** for (a) border, (b) corners via DWM, (d) `HTCAPTION` drag. Already handles `WM_NCCALCSIZE` (frameless + media_kit fullscreen preemption), `WM_NCHITTEST` (8px resize), `WM_ERASEBKGND` (return 1). |
+| Flutter `ClipRRect` (Linux CSD only) | Flutter 3.47.0 | Draw rounded corners on a borderless Linux window | Only when the Linux window is undecorated (CSD/borderless) and the compositor doesn't round. On GNOME/Mutter Wayland, decorated windows get compositor-rounded corners for free; on X11 borderless, `ClipRRect` on the outermost widget + transparent window background gives soft corners. **Not for Windows** (use DWM `DWMWCP_ROUND` instead — `ClipRRect` on Windows would need a layered/transparent window = video perf tax). |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| `flutter test` | Verify normalization, frame selection, FileSink error-only filtering, and hook delegation | Inject `LogSink`, source reader, clock and path resolver. Never write to a real user log directory in tests. Test `FlutterErrorDetails.stack == null`, malformed stacks, no app frame, invalid line, missing source file, and disk write failure. |
-| `flutter analyze` | Enforce strict Dart checks | Keep error-hook bodies small, typed, and non-throwing. Explicitly use `unawaited()` only for deliberate fire-and-forget persistence, with a failure observer. |
-| Windows WER LocalDumps / WinDbg (developer machine only) | Diagnose hard native process crashes beyond Dart/Flutter hooks | Not part of application functionality. WER LocalDumps is disabled by default, requires administrator registry configuration, and is independently managed by Windows. It can capture native process dumps after a crash; app-level Dart hooks cannot reliably do so. |
+| `dwmapi.lib` / `dwmapi.dll` | Link DWM attribute calls | Already available via Windows SDK; add `#pragma comment(lib, "dwmapi.lib")` or CMake `target_link_libraries(... dwmapi)` in `windows/CMakeLists.txt`. No new dependency. |
+| `windowsx.h` macros (`GET_X_LPARAM`, `HTCAPTION`, etc.) | Win32 hit-test helpers | Already included in `win32_window.cpp`. |
+| Microsoft Learn Win32 docs | Authoritative DWM API reference | `learn.microsoft.com/windows/win32/api/dwmapi/` — verified 2024-2026 content. |
 
 ## Installation
 
-No additional runtime dependency is recommended.
+No new pub dependencies. The existing stack is sufficient. The only build change is linking `dwmapi.lib` if not already linked:
 
 ```bash
-# Existing direct dependencies — retain their current constraints.
-flutter pub get
+# CMake (windows/CMakeLists.txt) — add to target_link_libraries if dwmapi not already present
+# target_link_libraries(${BINARY_NAME} PRIVATE ... dwmapi)
 
-# logger currently resolves to 2.7.0; confirm after any dependency update.
-flutter pub deps | findstr logger
+# Verify the existing dependency tree (no changes expected)
+flutter pub get
+flutter analyze
+flutter test
 ```
 
-Do **not** add a source-reading, crash-reporting, state-management, or remote-observability package for this milestone. Implement the small source-reader and `FileSink` behind existing narrow interfaces.
+The DWM calls are added to the **existing** `windows/runner/*.cpp` files and (optionally) a thin FFI file under `lib/kernel/window_bridge/` — no package additions.
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `FlutterError.onError` + `PlatformDispatcher.instance.onError` | `runZonedGuarded` as the sole global handler | Do not use as sole handler. Use the Zone only as startup/fallback guard; PlatformDispatcher is Flutter's current recommended app-exception boundary. |
-| Existing `KernelLogger` facade + `logger.FileOutput` adapter | Make `logger.Logger` the application-wide logger | Only in a greenfield app with no diagnostics facade. Here it would require broad migration and duplicate the current `LogSink` abstraction. |
-| Custom `ErrorReportPrinter` + `FileOutput` | `AdvancedFileOutput` | Use only if scope later adds rotation/buffering. It conflicts with the explicit single-file append-only scope today. |
-| Small in-house reporter | `crash_forensics 1.0.0` | Consider only if the product later needs structured JSON bundles, breadcrumbs, device snapshots, encrypted reports, or optional transport. It claims Windows support/local storage, but is a new package (v1.0.0), from an unverified uploader, with very low observed adoption and broad dependencies—poor fit for this local plain-text requirement. **Confidence: MEDIUM.** |
-| Small in-house reporter | `talker 5.1.20` | Consider when rich interactive in-app log history/sharing is a product requirement. It lists Windows support, but published package information does not establish the required local append-only file persistence; it is unnecessary architecture for this milestone. **Confidence: MEDIUM.** |
-| Developer source checkout lookup | Bundle `.dart` files/source reader into release app | Only for a purpose-built developer distribution that deliberately ships source and accepts the disclosure/size tradeoff. Never do this for the normal release merely to fill a card field. |
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Accent border (Win11) | `DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE` | `DWMWA_NCRENDERING_POLICY = DWMNCRP_DISABLED` | **Withdrawn by user** (2026-08-27, real-hardware效果不理想). Do NOT re-propose. |
+| Accent border (Win11) | `DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE` | Strip `WS_THICKFRAME` from `GWL_STYLE` | Works but cascades: breaks the media_kit fullscreen detection (`(style & WS_OVERLAPPEDWINDOW) == 0` heuristic in `flutter_window.cpp:67`) and loses native resize (already lost, but the heuristic break is the real cost). `DWMWA_BORDER_COLOR` is surgical — no style cascading. |
+| Accent border (Win10) | Accept 1px accent border OR strip `WS_THICKFRAME` + update fullscreen heuristic | `DWMWA_NCRENDERING_POLICY` | Withdrawn (see above). `DWMWA_BORDER_COLOR` is 22000+ only — not available on Win10. |
+| Rounded corners (Win11) | `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND` | Flutter `ClipRRect` on transparent window | Would require `WS_EX_LAYERED` / transparent window background = per-pixel composite tax on every video frame. DWM native is free + anti-aliased. |
+| Rounded corners (Win10) | `SetWindowRgn` + `CreateRoundRectRgn` (accept aliasing) OR accept square | Layered window (`WS_EX_LAYERED`) + `UpdateLayeredWindow` ARGB | Anti-aliased but **video performance tax** — the entire window is composited per-pixel on each frame. A media player's dynamic content rules this out. |
+| Rounded corners (Win10) | Accept square corners | `SetWindowRgn` (aliased) | Product call. Unix principle: don't fake what the OS can't do natively. Win10 is legacy; the user is on Win11 26200. Square corners on Win10 is acceptable divergence. |
+| Fullscreen transition | `SetWindowPos` ordering + `WM_ERASEBKGND` + targeted `DWMWA_TRANSITIONS_FORCEDISABLED` | `wm.setFullScreen()` (window_manager) | **No-op on frameless windows** (`is_frameless_` guard skips the style change). Known frameless defect per project memory. Use the media_kit chain instead. |
+| Fullscreen transition | media_kit chain + `SetWindowPos` ordering | 方案A (FFI bridge) / 方案B (DWM 禁用) | **Reverted on real hardware** 2026-08-27. Do NOT re-propose. |
+| Title-bar drag | Tier 1: bypass `await isFullScreen()` (sync check) + direct channel call. Tier 2: native `WM_NCHITTEST → HTCAPTION` | `PostMessage(WM_NCLBUTTONDOWN, HTCAPTION, …)` | Async post = unreliable (mouse state may change between post and dispatch). window_manager already uses `SendMessage(WM_SYSCOMMAND, SC_MOVE|HTCAPTION)` (synchronous) — the problem is the Dart double-async, not the native call. |
+| Title-bar drag (Linux) | Keep `gtk_window_begin_move_drag` (accept same async race) | Native CSD hit-test override | Complex GTK CSD work; no real hardware to verify. Mark "待实机验证". |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `LogFileOutput` | This API name does not exist in `logger 2.7.0`; implementation would fail at compile time or force an unrelated package. | `logger.FileOutput`. |
-| Replacing `PlatformDispatcher.onError` with a Zone-only strategy | Flutter identifies platform dispatcher handling as the modern recommended mechanism; Zone boundaries can introduce error-zone/future semantics and Flutter zone mismatch. | Both first-party hooks plus a narrow bootstrap `runZonedGuarded`. |
-| Calling `runZonedGuarded` only around `runApp` after binding initialization | Flutter binding initialization and `runApp` then occur in different zones, which triggers a debug zone-mismatch warning/error path. | Put `ensureInitialized`, hook registration, initialization and `runApp` in the same zone. |
-| Recursive error reporting when file output fails | A failed error handler can create a reporting loop during the very event meant to be captured. | A non-recursive fallback (`debugPrint`/original Flutter presentation) and a visible “log unavailable” state. |
-| Trusting absolute file paths from a stack trace | Stack strings are diagnostic text, not an authorization boundary; reading arbitrary paths risks disclosure and unreliable behavior. | Only resolve verified `package:simple_player_flutter` frames relative to an injected project source root, then canonicalize and enforce containment. |
-| Sentry, Crashlytics, or remote telemetry | Explicitly out of scope; they create credentials, privacy, network and operational surface without serving the developer-local workflow. | Local `ErrorReporter` + text file. |
-| Expecting Dart hooks to capture libmpv/FFI access violations or abrupt process death | The VM/process can terminate before Dart callbacks run. | Developer-only Windows WER LocalDumps/WinDbg for native-crash triage; retain engine error-channel forwarding for recoverable errors. |
+| `DWMWA_NCRENDERING_POLICY` (`DWMNCRP_DISABLED` / global DWMNCRP) | Withdrawn 2026-08-27 — real-hardware效果不理想. User explicitly said "勿重提". | `DWMWA_BORDER_COLOR = DWMWA_COLOR_NONE` for border; `DWMWA_WINDOW_CORNER_PREFERENCE` for corners. |
+| `wm.setFullScreen()` (window_manager `SetFullScreen`) | No-op on frameless windows — `is_frameless_` guard skips the entire style/resize block (`window_manager.cpp:593`). | media_kit fullscreen chain (`enterFullscreen`/`exitFullscreen` + `enterNativeFullscreen`/`exitNativeFullscreen`). |
+| 方案A (FFI bridge for fullscreen) | Reverted on real hardware 2026-08-27. | media_kit native fullscreen + `SetWindowPos` ordering in runner. |
+| 方案B (DWM disable for fullscreen) | Reverted on real hardware 2026-08-27. | `DWMWA_TRANSITIONS_FORCEDISABLED` targeted (different attribute) — but verify on hardware first. |
+| Layered window (`WS_EX_LAYERED`) + `UpdateLayeredWindow` for rounded corners on Windows | Per-pixel composite tax on every frame — unacceptable for a texture-rendered video player. | Win11: `DWMWCP_ROUND`. Win10: `SetWindowRgn` (aliased) or accept square. |
+| `PostMessage(WM_NCLBUTTONDOWN, HTCAPTION, …)` for drag | Async post — mouse capture/button state can change between post and dispatch, causing missed drags. | `SendMessage(WM_SYSCOMMAND, SC_MOVE|HTCAPTION)` (synchronous) — already what window_manager native uses. The fix is eliminating the Dart-side double-async, not changing the native call. |
+| Flutter `ClipRRect` for rounded corners on Windows | Requires transparent window background → layered/alpha window → video perf tax. | DWM `DWMWA_WINDOW_CORNER_PREFERENCE` (Win11) or `SetWindowRgn` (Win10). |
 
 ## Stack Patterns by Variant
 
-**If running from the repository in debug/development:**
-- Enable trusted source-line lookup after app-frame selection and strict project-root containment.
-- Because the developer's checkout contains matching `.dart` files and the feature's core value is immediate local diagnosis.
+### Accent-color border suppression
 
-**If running an installed/profile/release Windows build:**
-- Persist the selected `file:line` only when the stack yields it; otherwise show “Location unavailable”; always preserve error, origin, raw stack and log path.
-- Because source files are normally absent, and fabricated/failed source lookup is worse than explicit degradation.
+**If Windows 11 (build ≥ 22000, user's system is 26200):**
+- Call `DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &DWMWA_COLOR_NONE, sizeof(COLORREF))` once after window creation (`OnCreate` or after `waitUntilReadyToShow`).
+- `DWMWA_COLOR_NONE = 0xFFFFFFFE` — **suppresses** border drawing entirely (enables "rounded window with no border" per Microsoft Learn).
+- Confidence: **HIGH** — verified on Microsoft Learn `dwmapi.h` enum page.
+- Optionally also set `DWMWA_CAPTION_COLOR` / `DWMWA_TEXT_COLOR` if a custom title-bar color is desired later (both 22000+).
 
-**If a future phase adds background isolates:**
-- Register an isolate error listener and forward a normalized event to `ErrorReporter` on the root isolate.
-- Because `PlatformDispatcher.instance.onError` only handles the root isolate.
+**If Windows 10 (build < 22000):**
+- `DWMWA_BORDER_COLOR` is **not available** (returns `E_INVALIDARG` / no-op on Win10).
+- Option A (pragmatic, recommended): **accept the 1px accent border** on Win10. The user is on Win11; Win10 is a legacy fallback. Square/rounded corners already diverge on Win10, so a 1px border is consistent with "Win10 is best-effort".
+- Option B (if border must be suppressed): strip `WS_THICKFRAME` from `GWL_STYLE` via `SetWindowLongPtr` + `SetWindowPos(SWP_FRAMECHANGED)`. **Cascading effect**: the media_kit fullscreen preemption in `flutter_window.cpp:67` checks `(style & WS_OVERLAPPEDWINDOW) == 0` — if `WS_THICKFRAME` is stripped but `WS_OVERLAPPEDWINDOW` flags remain, the heuristic still works; if the full `WS_OVERLAPPEDWINDOW` is stripped, the heuristic breaks. Careful: strip only `WS_THICKFRAME`/`WS_SIZEBOX`, keep `WS_OVERLAPPEDWINDOW` base for the heuristic. Confidence: **MEDIUM** — needs cascading-effect verification.
+- Do NOT use `DWMWA_NCRENDERING_POLICY` (withdrawn).
 
-**If a future phase adds log rotation:**
-- Replace only the `FileOutput` construction with `AdvancedFileOutput`, configure `writeImmediately` for error/fatal, and add explicit shutdown-flush tests.
-- Because the adapter shields the rest of the application, while avoiding premature rotation machinery now.
+### Rounded corners
+
+**If Windows 11 (build ≥ 22000):**
+- `DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &DWMWCP_ROUND, sizeof(int))` where `DWMWCP_ROUND = 2`.
+- Native, anti-aliased, free. Set once at window creation.
+- Confidence: **HIGH** — verified on Microsoft Learn `DWM_WINDOW_CORNER_PREFERENCE` enum page (min build 22000).
+
+**If Windows 10 (build < 22000):**
+- No native corner API.
+- **Recommended: accept square corners.** Unix principle: don't fake what the OS can't do natively. Win10 is legacy; the primary target is Win11.
+- If rounding is truly required: `SetWindowRgn(hwnd, CreateRoundRectRgn(0, 0, w, h, r, r), TRUE)` — aliased (jagged) edges, zero per-frame cost. Recompute on resize (`WM_SIZE` → re-`SetWindowRgn`). Accept the aliasing.
+- Do NOT use layered window for a video player (perf tax).
+- Confidence: **MEDIUM** (product decision).
+
+**If Linux (GTK3, Wayland or X11):**
+- **Decorated window (SSD/CSD default):** GNOME/Mutter (Wayland) draws compositor-rounded corners for free. KDE/KWin (X11) likewise. Keep the window decorated (`gtk_window_set_decorated(TRUE)`) and let the compositor handle corners.
+- **Borderless/undecorated window:** the compositor won't round. Draw `ClipRRect` on the outermost Flutter widget with a transparent window background (`backgroundColor: Colors.transparent` in `WindowOptions`, already set). The compositor composites the transparent corners. Soft anti-aliased edges.
+- **SteamOS/gamescope:** gamescope is a micro-compositor that runs apps fullscreen/borderless by design. Rounded corners are irrelevant in fullscreen mode. No action needed.
+- Confidence: **MEDIUM** — no Linux real hardware; mark "待实机验证".
+
+### Flicker-free fullscreen transition
+
+**Enter fullscreen (media_kit chain):**
+1. Make the title bar **synchronously** invisible before the route push — replace `AnimatedOpacity` with `Visibility(maintainState: true, visible: !isFullscreen)` or set opacity to 0 immediately (no animation) on the enter half. The animation causes the "title bar flash" during the route transition.
+2. media_kit `enterNativeFullscreen()` strips `WS_OVERLAPPEDWINDOW` and resizes to monitor. Ensure the runner's `WM_NCCALCSIZE` preemption (already in `flutter_window.cpp:63-71`) returns 0 for the fullscreen style — this is already done and working.
+3. `WM_ERASEBKGND` returning 1 (already in `win32_window.cpp:250-251`) suppresses the background-erase flash.
+4. Optional: `DWMWA_TRANSITIONS_FORCEDISABLED` set `TRUE` before, `FALSE` after the `SetWindowPos` sequence — suppresses DWM's own transition animation. **MEDIUM confidence** — adjacent to the withdrawn DWMNCRP family; verify on real hardware.
+
+**Exit fullscreen (media_kit chain):**
+1. Restore window style (`WS_OVERLAPPEDWINDOW`) before restoring size — or combine in one `SetWindowPos(SWP_FRAMECHANGED)` call.
+2. `WM_ERASEBKGND` return 1 suppresses flash.
+3. Title bar `Visibility` flips back to visible **after** the route pop completes (not during).
+4. Optional: `DWMWA_TRANSITIONS_FORCEDISABLED` targeted (same as enter).
+
+**Do NOT use:**
+- `wm.setFullScreen()` — no-op on frameless windows.
+- 方案A (FFI bridge) / 方案B (DWM disable) — reverted on real hardware.
+- `DWMWA_NCRENDERING_POLICY` — withdrawn.
+
+Confidence: **MEDIUM** — the individual pieces (`WM_ERASEBKGND`, `SetWindowPos` ordering, route pre-hiding) are well-established; the `DWMWA_TRANSITIONS_FORCEDISABLED` targeted use is the novel part and needs real-hardware verification.
+
+### Title-bar drag reliability
+
+**Tier 1 (minimal, high-impact, recommended first):**
+- The root cause: `window_manager`'s Dart `startDragging()` does `await isFullScreen()` (channel round-trip 1) THEN `await _channel.invokeMethod('startDragging')` (channel round-trip 2) before the native `ReleaseCapture()` + `SendMessage(WM_SYSCOMMAND, SC_MOVE|HTCAPTION)`. The double-async latency means the native drag loop starts ~2 channel round-trips after `onPanStart` — on quick clicks the mouse button may be released by then.
+- Fix: bypass the `await isFullScreen()` check. The project already has a **synchronous** fullscreen state via `WindowBridge.mode.value.isFullscreen`. Call the channel directly (single round-trip) or add a project-level `startDragging` that checks fullscreen synchronously first.
+- The native `SendMessage(SC_MOVE|HTCAPTION)` is already synchronous and reliable — Tier 1 keeps it, just removes the redundant async round-trip.
+- Confidence: **HIGH** that this reduces the race frequency; **MEDIUM** that it fully eliminates it (one channel round-trip remains).
+
+**Tier 2 (belt-and-suspenders, fully eliminates the race):**
+- Extend the runner's `WM_NCHITTEST` handler (`win32_window.cpp:256-271`) to return `HTCAPTION` for the title-bar drag region (top `Tokens.titleBarHeight` = 32px, minus the 8px resize edges, minus the right-side button group width).
+- `DefWindowProc` handles `WM_NCLBUTTONDOWN` with `HTCAPTION` → enters the native modal drag loop **synchronously** on pointer-down. Zero channel latency, zero race.
+- The challenge: the button group width is responsive (`showPin` depends on `constraints.maxWidth >= 4 * buttonWidth`). Options:
+  - (a) Use a fixed offset for the button area (e.g. rightmost 160px = 4 buttons × 40px). Fragile if button widths change.
+  - (b) Communicate the button bounds from Flutter to the runner via a platform channel (`setDragRegion(rightEdgeOffset)`), and the runner returns `HTCAPTION` only left of that offset.
+  - (c) Return `HTCAPTION` for the full title bar, and move the window buttons to a separate top-level `HWND` (overkill).
+- Recommended: option (b) — a `setHitTestCaptionExcludeRight(int pixels)` channel call. The runner stores the offset and returns `HTCAPTION` for `pt.x < rect.right - offset` in the title-bar band, `HTCLIENT` otherwise (buttons receive clicks normally).
+- Confidence: **HIGH** that this fully eliminates the race; **MEDIUM** on the button-bounds coordination (needs the channel call to stay in sync on resize).
+
+**Linux equivalent:**
+- `gtk_window_begin_move_drag()` (X11) / `gdk_toplevel_begin_move` (Wayland) — also async via the GDK event loop. Same race potential.
+- Native CSD hit-test override on GTK is complex; no real hardware to verify.
+- Recommended: keep the GTK call, accept the same async race on Linux, mark "待实机验证".
+- Confidence: **MEDIUM**.
 
 ## Version Compatibility
 
-| Package/API | Compatible With | Notes |
-|-------------|-----------------|-------|
-| `logger 2.7.0` | Dart SDK `>=2.17.0 <4.0.0` | Existing app resolves 2.7.0. File outputs are conditionally exported for `dart:io`, which is available on Windows desktop. |
-| `logger.FileOutput` | Windows desktop (`dart:io`) | Requires a writable pre-created parent directory and `await logger.init`; append mode is default. |
-| `FlutterError.onError` + `PlatformDispatcher.instance.onError` | Flutter 3.3+ | `PlatformDispatcher.onError` was introduced as the recommended app-exception hook in Flutter 3.3. This project should use it rather than relying on Zone-only handling. |
-| `StackFrame` | Flutter Windows VM stack traces | Best-effort parser over `StackTrace.toString`, not a language-level structured-stack guarantee. Retain raw trace. |
+| Package / API | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `window_manager` 0.5.2 | Flutter 3.47.0, Dart 3.13 | Actual locked version. **CLAUDE.md's "5.15.0" is a documentation typo** — `pubspec.yaml` says `^0.5.2`, `pubspec.lock` confirms 0.5.2. No action needed beyond correcting the doc. |
+| `DWMWA_BORDER_COLOR` (34) | Windows 11 build 22000+ | Returns `E_INVALIDARG` on Win10. Guard with `IsWindows10BuildOrGreater(22000)` or RtlGetVersion. |
+| `DWMWA_WINDOW_CORNER_PREFERENCE` (33) | Windows 11 build 22000+ | Same guard. `DWMWCP_ROUND = 2`. |
+| `DWMWA_CAPTION_COLOR` (35) / `DWMWA_TEXT_COLOR` (36) | Windows 11 build 22000+ | Same guard. |
+| `DWMWA_TRANSITIONS_FORCEDISABLED` | Windows Vista+ | The attribute itself is Vista+, but the transition-suppression behavior is most relevant on Win10/11. |
+| `DWMWA_NCRENDERING_POLICY` | Windows Vista+ | **Withdrawn — do NOT use** regardless of availability. |
+| `DWMWA_SYSTEMBACKDROP_TYPE` (38) | Windows 11 build **22621** (22H2+) | Not needed this milestone; note the higher build floor if used later. |
+| `SetWindowRgn` / `CreateRoundRectRgn` | All Windows versions | Win10 fallback for rounded corners. |
+| media_kit 1.2.6 fullscreen | Flutter 3.47.0, libmpv (media_kit_libs_windows_video 1.0.11) | Red line lifted for fullscreen only this milestone. Route-push + `enterNativeFullscreen` chain. |
+| `DwmSetWindowAttribute` (function) | Windows Vista+, `Dwmapi.lib` / `Dwmapi.dll` | The function itself is Vista+; individual attributes have their own build floors (see above). Link `dwmapi.lib` in CMake. |
 
 ## Sources
 
-- [Flutter: Handling errors in Flutter](https://docs.flutter.dev/testing/errors) — official global-hook guidance and combined `FlutterError`/`PlatformDispatcher` pattern. **Confidence: HIGH**
-- [Flutter 3.3: PlatformDispatcher.onError](https://docs.flutter.dev/release/release-notes/release-notes-3.3.0) — current direction away from custom Zone handling for application exceptions. **Confidence: HIGH**
-- [Flutter: Zone mismatch breaking change](https://docs.flutter.dev/release/breaking-changes/zone-errors) — same-zone requirement for binding initialization and `runApp`. **Confidence: HIGH**
-- [Flutter API: PlatformDispatcher.onError](https://api.flutter.dev/flutter/dart-ui/PlatformDispatcher/onError.html) — root-isolate scope, registered-zone behavior, and boolean handling contract. **Confidence: HIGH**
-- [Flutter API: FlutterErrorDetails](https://api.flutter.dev/flutter/foundation/FlutterErrorDetails-class.html) and [stack property](https://api.flutter.dev/flutter/foundation/FlutterErrorDetails/stack.html) — available structured diagnostics and no source excerpt. **Confidence: HIGH**
-- [Flutter API: StackFrame](https://api.flutter.dev/flutter/foundation/StackFrame-class.html) and [Flutter source parser](https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/foundation/stack_frame.dart) — best-effort frame extraction fields/limitations. **Confidence: HIGH**
-- [Dart API: runZonedGuarded](https://api.dart.dev/stable/dart-async/runZonedGuarded.html) and [StackTrace](https://api.dart.dev/stable/dart-core/StackTrace-class.html) — zone semantics and string-oriented trace contract. **Confidence: HIGH**
-- [logger 2.7.0 on pub.dev](https://pub.dev/packages/logger) and [logger source](https://github.com/SourceHorizon/logger) — current version and `FileOutput`/`AdvancedFileOutput`/printer/output APIs. **Confidence: HIGH**
-- [crash_forensics 1.0.0](https://pub.dev/packages/crash_forensics) and [talker 5.1.20](https://pub.dev/packages/talker) — package alternatives assessed for local Windows reporting. **Confidence: MEDIUM**
-- [Microsoft: Collecting User-Mode Dumps (WER LocalDumps)](https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps) — native-crash diagnostic boundary outside Dart error hooks. **Confidence: HIGH**
+- **Microsoft Learn — `DWMWINDOWATTRIBUTE` enum** (`learn.microsoft.com/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute`) — verified `DWMWA_BORDER_COLOR=34`, `DWMWA_COLOR_NONE=0xFFFFFFFE`, `DWMWA_WINDOW_CORNER_PREFERENCE=33`, `DWMWA_CAPTION_COLOR=35`, `DWMWA_TEXT_COLOR=36`, `DWMWA_TRANSITIONS_FORCEDISABLED`, `DWMWA_NCRENDERING_POLICY`, all with min build 22000 where applicable. **HIGH confidence.**
+- **Microsoft Learn — `DwmSetWindowAttribute` function** (`learn.microsoft.com/windows/win32/api/dwmapi/nf-dwmapi-dwmsetwindowattribute`) — verified signature, min Windows Vista, `Dwmapi.lib`. **HIGH confidence.**
+- **Microsoft Learn — `DWM_WINDOW_CORNER_PREFERENCE` enum** (`learn.microsoft.com/windows/win32/api/dwmapi/ne-dwmapi-dwm_window_corner_preference`) — verified `DWMWCP_DEFAULT=0, DWMWCP_DONOTROUND=1, DWMWCP_ROUND=2, DWMWCP_ROUNDSMALL=3`, min build 22000. **HIGH confidence.**
+- **window_manager 0.5.2 source** (`pub-cache/.../window_manager-0.5.2/windows/window_manager.cpp`) — verified native `StartDragging()` = `ReleaseCapture()` + `SendMessage(WM_SYSCOMMAND, SC_MOVE|HTCAPTION)`, `SetFullScreen()` `is_frameless_` guard (no-op on frameless). **HIGH confidence.**
+- **window_manager 0.5.2 Dart source** (`lib/src/window_manager.dart:719-722`) — verified double-async `startDragging()` (`await isFullScreen()` + `await invokeMethod`). **HIGH confidence.**
+- **window_manager 0.5.2 Linux source** (`linux/window_manager_plugin.cc:611-627`) — verified `gtk_window_begin_move_drag` path. **HIGH confidence.**
+- **Context7 — window_manager `/leanflutter/window_manager`** — `WindowOptions`, `titleBarStyle.hidden`, `WindowListener` events (`onWindowEnterFullScreen`/`onWindowLeaveFullScreen`). **HIGH confidence.**
+- **Context7 — media_kit `/media-kit/media-kit`** — `toggleFullscreen`/`enterFullscreen`/`exitFullscreen` route-push + `FullscreenInheritedWidget`, `VideoState` fullscreen API, `enterNativeFullscreen`/`exitNativeFullscreen`. **HIGH confidence.**
+- **Win32 drag-technique community knowledge** (WebSearch synthesis of Stack Overflow / Win32 community) — `SendMessage` vs `PostMessage` for `WM_NCLBUTTONDOWN`/`HTCAPTION`; `SC_MOVE` reliability ranking. **MEDIUM confidence** (training-knowledge synthesis, consistent with verified source code).
+- **Win10 rounded-corners community knowledge** (WebSearch synthesis) — `SetWindowRgn` (aliased, fast) vs layered window (anti-aliased, perf tax) trade-off. **MEDIUM confidence** (consistent with Win32 API semantics).
 
 ---
-*Stack research for: Simple Player Flutter v2.1 local error capture, locate, and feedback system*
-*Researched: 2026-08-28*
+*Stack research for: Flutter desktop window chrome + media_kit fullscreen (Windows primary, Linux secondary)*
+*Researched: 2026-09-01*
