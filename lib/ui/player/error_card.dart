@@ -39,6 +39,7 @@ class ErrorCard extends StatefulWidget {
     required this.totalCount,
     this.onBadgeTap,
     this.onClose,
+    this.onOpenLog,
   });
 
   /// The report to project; fields are already redacted/bounded at intake —
@@ -60,6 +61,12 @@ class ErrorCard extends StatefulWidget {
   /// CARD-01 手动关闭回调 —— 宿主接线 `ErrorReporterImpl.I.dismissCurrent()`
   /// （关闭推进 FIFO）；只在手动关闭调用，徽标轮览不得复用此路径。
   final VoidCallback? onClose;
+
+  /// E97 打开日志回调 —— 宿主接线以资源管理器定位当前生效 error.log
+  /// （`explorer.exe /select,`）；路径解析与失败隔离（ProcessException →
+  /// OSD 反馈）全在宿主 [_openLog] 内完成，卡片只负责暴露动作入口。
+  /// 为 null 时不渲染按钮（与 [onClose] 同一条件渲染纪律）。
+  final VoidCallback? onOpenLog;
 
   @override
   State<ErrorCard> createState() => _ErrorCardState();
@@ -282,6 +289,29 @@ class _ErrorCardState extends State<ErrorCard> {
                 ),
               ),
             ),
+            const SizedBox(width: Tokens.spSm),
+            // E97 打开日志按钮：GestureDetector（不用 GlassButton —— 其
+            // FocusableActionDetector 会请求焦点，破坏 CARD-01 零焦点抢占，
+            // 与 copy/close 同一理由）。嵌在整卡 GestureDetector 内层 ——
+            // 命中测试天然内层优先（点开日志不触发展开切换）。按钮只渲染
+            // 图标，不渲染任何路径文本（T-03-05：完整路径不进可见树）。
+            if (widget.onOpenLog != null)
+              Semantics(
+                label: l10n.errorCardOpenLogTooltip,
+                button: true,
+                child: GestureDetector(
+                  key: const ValueKey('error-card-open-log'),
+                  onTap: widget.onOpenLog,
+                  child: const Padding(
+                    padding: EdgeInsets.all(Tokens.spXs),
+                    child: Icon(
+                      Icons.folder_open,
+                      size: Tokens.iconSm,
+                      color: Tokens.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(width: Tokens.spSm),
             // D-04 chevron 状态指示（纯指示器，点击切换由整卡 GestureDetector 承担）。
             Icon(
