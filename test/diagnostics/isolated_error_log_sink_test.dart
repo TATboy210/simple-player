@@ -8,6 +8,7 @@
 library;
 
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
@@ -176,6 +177,98 @@ void main() {
       // Assert — 首条 + 第 50 条恰好两次限流上报。
       expect(failures, hasLength(2));
       expect(sink.logsAvailable.value, isFalse);
+    });
+
+    test('writes heartbeat lines through the logging isolate', () async {
+      // Arrange — 心跳间隔注入 1ms；真实 Timer 走主 isolate 事件循环。
+      final fixture = await _LogFixture.create();
+      addTearDown(fixture.dispose);
+      final sink = IsolatedErrorLogSink(
+        file: fixture.file,
+        heartbeatInterval: const Duration(milliseconds: 1),
+      );
+
+      // Act — 真实等待让多次 tick 到达 worker 落盘。
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await sink.dispose();
+
+      // Assert — 日志文件出现可 grep 的心跳行。
+      final contents = await fixture.file.readAsString();
+      expect(contents, contains('main alive @'));
+      expect(sink.logsAvailable.value, isTrue);
+    });
+
+    test('spawn failure degrades silently and writes via direct fallback',
+        () async {
+      // Arrange — spawnWorker 注入同步抛 StateError 的假缝。
+      final fixture = await _LogFixture.create();
+      addTearDown(fixture.dispose);
+      final failures = <Object>[];
+      final sink = IsolatedErrorLogSink(
+        file: fixture.file,
+        degradedOutput: (error, _) => failures.add(error),
+        spawnWorker: (entry, config, {onExit, onError}) =>
+            throw StateError('spawn blocked'),
+      );
+
+      // Act — record 两条（降级后经回退直写）→ drain。
+      sink.record(_report(message: '缓冲一'), ReportAcceptance.newReport);
+      sink.record(
+        _report(eventId: 'second', message: '缓冲二'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
+
+      // Assert — 降级是模式切换非写失败：零 degradedOutput、可用性 true。
+      final contents = await fixture.file.readAsString();
+      expect(contents, contains('缓冲一'));
+      expect(contents, contains('缓冲二'));
+      expect(sink.logsAvailable.value, isTrue);
+      expect(failures, isEmpty);
+    });
+
+    test('unexpected worker death degrades and keeps recording', () async {
+      // Arrange — passthrough 假缝捕获真 Isolate 供 kill。
+      final fixture = await _LogFixture.create();
+      addTearDown(fixture.dispose);
+      final failures = <Object>[];
+      Isolate? worker;
+      final sink = IsolatedErrorLogSink(
+        file: fixture.file,
+        degradedOutput: (error, _) => failures.add(error),
+        spawnWorker: (entry, config, {onExit, onError}) async {
+          final isolate = await Isolate.spawn(
+            entry,
+            config,
+            onExit: onExit,
+            onError: onError,
+            errorsAreFatal: false,
+          );
+          worker = isolate;
+          return isolate;
+        },
+      );
+
+      // Act — 先正常落盘，再杀死 worker，真实轮询降级标志（上限 2s，
+      // 消除 kill→onExit 竞态）。
+      sink.record(_report(message: '死亡前记录'), ReportAcceptance.newReport);
+      await sink.drain();
+      worker?.kill(priority: Isolate.immediate);
+      final deadline = DateTime.now().add(const Duration(seconds: 2));
+      while (!sink.isDegradedForTesting && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      // Assert — 降级后记录经回退直写不丢失。
+      expect(sink.isDegradedForTesting, isTrue);
+      sink.record(
+        _report(eventId: 'after-death', message: '死亡后记录'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
+      final contents = await fixture.file.readAsString();
+      expect(contents, contains('死亡后记录'));
+      await sink.dispose();
     });
   });
 }
