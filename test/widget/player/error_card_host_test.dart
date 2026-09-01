@@ -7,11 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/startup_timeline.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/error_feedback_settings.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
+import 'package:simple_player_flutter/ui/player/error_card_host.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
@@ -73,6 +75,17 @@ void main() {
     supportedLocales: AppLocalizations.supportedLocales,
     home: home,
     builder: buildErrorCardMount,
+  );
+
+  // E97 宿主 harness：直接挂 ErrorCardHost 实例 —— logExplorer 缝仅测试
+  // 可达（生产挂载点 app.dart 保持 const ErrorCardHost() 零参形态）。
+  Widget buildHostHarness(ErrorCardHost host) => MaterialApp(
+    locale: const Locale('zh'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(
+      body: Align(alignment: Alignment.topLeft, child: host),
+    ),
   );
 
   group('ErrorCardHost 端到端呈现（tracer）', () {
@@ -817,6 +830,143 @@ void main() {
       expect(find.textContaining('默认开'), findsOneWidget);
     });
   });
+
+  // ---------- E97 open-log 宿主接线与失败隔离 ----------
+  //
+  // 全链路缝注入：logExplorer 仅测试可达（生产走 _launchExplorerSelect），
+  // 三个用例全部注入假缝 —— 严禁不注入缝就 tap open-log（真实缝会拉起
+  // explorer.exe）。失败两态：null 路径降级（复用 errorCardLogUnavailable）
+  // 与 ProcessException typed catch，均以 OSD 反馈且异常零外溢（CARD-04 形态）。
+  group('open-log 宿主接线与失败隔离（E97）', () {
+    // 推进 OSD hold 计时器（osdDefaultHoldMs=1200）：OsdService 是全局
+    // 单例，show() 会启动 hide Timer —— 不推进会遗留 pending timer。
+    Future<void> settleOsdTimer(WidgetTester tester) =>
+        tester.pump(const Duration(seconds: 2));
+
+    testWidgets(
+      'open-log passes diagnosticLogPath value to the seam and shows opened OSD',
+      (tester) async {
+        // Arrange：重建单例注入提供路径的 DiagnosticLogStatus fake + 记录型
+        // logExplorer 缝（同 error_card_test 的 log-path 用例纪律）。
+        await ErrorReporterImpl.resetForTesting();
+        ErrorCaptureSnapshot.I.resetForTesting();
+        ErrorReporterImpl.init(
+          effects: [ErrorCaptureSnapshot.I.record],
+          diagnosticLogStatus: _FakeLogStatus('C:/logs/diag.txt'),
+        );
+        final seamCalls = <String>[];
+        await tester.pumpWidget(
+          buildHostHarness(
+            ErrorCardHost(
+              logExplorer: (path) async {
+                seamCalls.add(path);
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('打开日志接线'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsOneWidget);
+
+        // Act：点击打开日志按钮。
+        await tester.tap(find.byKey(const ValueKey('error-card-open-log')));
+        await tester.pump();
+
+        // Assert：缝收到的唯一实参逐字符等于 diagnosticLogPath.value
+        // （取值同源）；成功反馈 OSD「已打开日志位置」。
+        expect(seamCalls, ['C:/logs/diag.txt']);
+        expect(OsdService.I.message.value?.text, '已打开日志位置');
+        expect(OsdService.I.message.value?.icon, Icons.folder_open);
+
+        await settleOsdTimer(tester);
+      },
+    );
+
+    testWidgets(
+      'null diagnosticLogPath degrades to unavailable OSD with zero seam calls',
+      (tester) async {
+        // Arrange：setUp 默认 reporter（无 diagnosticLogStatus → logPath
+        // null）+ 记录型缝 —— 路径不可用绝不允许启动 explorer。
+        final seamCalls = <String>[];
+        await tester.pumpWidget(
+          buildHostHarness(
+            ErrorCardHost(
+              logExplorer: (path) async {
+                seamCalls.add(path);
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('路径不可用'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsOneWidget);
+
+        // Act：点击打开日志按钮。
+        await tester.tap(find.byKey(const ValueKey('error-card-open-log')));
+        await tester.pump();
+
+        // Assert：缝零调用；降级 OSD（复用既有 errorCardLogUnavailable key）。
+        expect(seamCalls, isEmpty);
+        expect(OsdService.I.message.value?.text, '日志文件不可用');
+        expect(OsdService.I.message.value?.icon, Icons.info_outline);
+
+        await settleOsdTimer(tester);
+      },
+    );
+
+    testWidgets(
+      'ProcessException from the seam shows failed OSD without escaping',
+      (tester) async {
+        // Arrange：重建单例注入提供路径的 fake + 抛 ProcessException 的缝
+        // （typed catch 目标态 —— 异常绝不外溢，isolation 由测试正常完成证明）。
+        await ErrorReporterImpl.resetForTesting();
+        ErrorCaptureSnapshot.I.resetForTesting();
+        ErrorReporterImpl.init(
+          effects: [ErrorCaptureSnapshot.I.record],
+          diagnosticLogStatus: _FakeLogStatus('C:/logs/diag.txt'),
+        );
+        await tester.pumpWidget(
+          buildHostHarness(
+            ErrorCardHost(
+              logExplorer: (path) async => throw ProcessException(
+                'explorer.exe',
+                const ['/select,', 'C:/logs/diag.txt'],
+                'injected',
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('打开日志隔离'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsOneWidget);
+
+        // Act：点击打开日志按钮。
+        await tester.tap(find.byKey(const ValueKey('error-card-open-log')));
+        await tester.pump();
+
+        // Assert：失败反馈 OSD「打开日志失败」+ 卡片无恙 + 零未捕获异常。
+        expect(OsdService.I.message.value?.text, '打开日志失败');
+        expect(OsdService.I.message.value?.icon, Icons.error_outline);
+        expect(find.byType(ErrorCard), findsOneWidget);
+        expect(find.text('Bad state: 打开日志隔离'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        await settleOsdTimer(tester);
+      },
+    );
+  });
 }
 
 /// build 期抛错的探针 widget —— 故障注入点（FlutterError.onError 触发
@@ -826,6 +976,20 @@ class _ThrowingBuildWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => throw StateError('构建期炸弹');
+}
+
+/// DiagnosticLogStatus 测试替身 —— 提供固定日志路径（fakes-over-mocks）。
+class _FakeLogStatus implements DiagnosticLogStatus {
+  _FakeLogStatus(String path) : _logPath = ValueNotifier<String?>(path);
+
+  final ValueNotifier<bool> _logsAvailable = ValueNotifier<bool>(true);
+  final ValueNotifier<String?> _logPath;
+
+  @override
+  ValueListenable<bool> get logsAvailable => _logsAvailable;
+
+  @override
+  ValueListenable<String?> get logPath => _logPath;
 }
 
 /// 在自身 build（persistentCallbacks 相位）内接纳两份不同报告的探针，
