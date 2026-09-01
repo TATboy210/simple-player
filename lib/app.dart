@@ -5,7 +5,6 @@ import 'features/player/player_feature.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
 import 'l10n/app_localizations.dart';
-import 'ui/dialogs/settings/diagnostic_log_target.dart';
 import 'ui/player/error_card_host.dart';
 import 'ui/theme/tokens.dart';
 
@@ -136,15 +135,6 @@ Widget buildErrorCardMount(
             child: const RepaintBoundary(child: _ErrorCardOverlayMount()),
           ),
         ),
-      // 回退通知桥（D-04 第二通道）——零布局占用、无 hit-test 面。
-      // 注意必须以 Positioned 挂载：Stack 一旦存在非 Positioned 子节点，
-      // 会收缩为该子节点尺寸（0x0），令上方 Positioned.fill 的 Navigator
-      // 一并塌缩成空屏——零尺寸子节点也必须保持 positioned 语义。
-      const Positioned(
-        left: 0,
-        top: 0,
-        child: DiagnosticFallbackNotice(),
-      ),
     ],
   );
 }

@@ -27,8 +27,8 @@ void main() {
 
   // 固定中文 locale —— 断言文案不随宿主环境漂移。
   Widget buildSubject() {
-    return MaterialApp(
-      locale: const Locale('zh'),
+    return const MaterialApp(
+      locale: Locale('zh'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
@@ -121,6 +121,18 @@ void main() {
     await tester.tap(find.byType(Switch));
     await tester.pump();
     expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isTrue);
+
+    // 收尾排空串行持久化链（含 _persist 的 finally tmp 清理段）：whenComplete
+    // 旗标 + pump+runAsync 交替。只等「文件内容出现」会在 rename 落盘与
+    // finally 完成之间留下未排空链 —— 残留写会在下一用例的重绑 seam 上
+    // 落盘，污染其 settings.json 内容与基于存在性的等待条件（04-04 协议）。
+    var drained = false;
+    unawaited(
+      ErrorFeedbackSettings.I.pendingPersist.whenComplete(
+        () => drained = true,
+      ),
+    );
+    await pumpUntil(tester, () => drained);
   });
 
   testWidgets('general tab renders the toggle row only; the removed log-path '
@@ -137,13 +149,15 @@ void main() {
     expect(find.text('无法打开目录选择器'), findsNothing);
     expect(find.textContaining('当前有效路径'), findsNothing);
 
-    // 开关行仍是唯一设置行且行为不变：翻转置 store 并可等待持久化
-    //（pendingPersist 等待点经 runAsync 放行真实 I/O，见 04-04 协议）。
+    // 开关行仍是唯一设置行且行为不变：翻转置 store 并可等待持久化。
+    // 持久化等待沿用 04-04 协议：pendingPersist 的续体驻留 fake-zone 微任务
+    // 队列，runAsync 内直接 await 会微任务饥饿死锁（10 分钟超时实证）——
+    // 以 settings.json 落盘出现为 pump+runAsync 交替的完成锚点。
     expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
     await tester.tap(find.byType(Switch));
     await tester.pump();
     expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isFalse);
-    await tester.runAsync(() => ErrorFeedbackSettings.I.pendingPersist);
+    await pumpUntil(tester, () => settingsFile.existsSync());
     final persisted = await tester.runAsync(
       () => settingsFile.readAsString(),
     );

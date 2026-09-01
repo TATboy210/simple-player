@@ -1,15 +1,14 @@
 /// 错误反馈设置存储 —— 便携 settings.json（D-01）的加载/保存/内存态单点。
 ///
-/// UI-layer store owning the two error-feedback preferences: the error-card
-/// toggle (SET-01) and the diagnostic log directory (SET-02). State is exposed
-/// as a ValueNotifier (project convention, no new state library). Persistence
-/// is a portable `settings.json` beside the executable — debug runs keep it
-/// beside the project directory — with a two-tier fallback mirroring the log
-/// location chain (WR-06/D-02): when the primary directory is not writable
-/// (MSIX/ACL-protected install dirs), settings move to Application Support
-/// for the session, probed once at load and never per write. Every read/write
-/// failure silently keeps the defaults (D-01) so startup and UI are never
-/// blocked.
+/// UI-layer store owning the single error-feedback preference: the error-card
+/// toggle (SET-01). State is exposed as a ValueNotifier (project convention,
+/// no new state library). Persistence is a portable `settings.json` beside
+/// the executable — debug runs keep it beside the project directory — with a
+/// two-tier fallback mirroring the log location chain (WR-06/D-02): when the
+/// primary directory is not writable (MSIX/ACL-protected install dirs),
+/// settings move to Application Support for the session, probed once at load
+/// and never per write. Every read/write failure silently keeps the defaults
+/// (D-01) so startup and UI are never blocked.
 library;
 
 import 'dart:convert';
@@ -21,34 +20,27 @@ import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart
 
 /// 不可变错误反馈设置数据 —— settings.json 的内存形态（扁平 key + version）。
 final class ErrorFeedbackSettingsData {
-  /// 创建设置快照；两个字段都携带 SET-01/SET-02 的默认语义。
-  const ErrorFeedbackSettingsData({
-    this.errorCardEnabled = true,
-    this.logDirectory = '',
-  });
+  /// 创建设置快照；字段携带 SET-01 的默认语义。
+  const ErrorFeedbackSettingsData({this.errorCardEnabled = true});
 
   /// SET-01 错误卡片开关 —— 默认开；损坏/缺失文件回退到该值。
   final bool errorCardEnabled;
-
-  /// SET-02 日志目录配置 —— '' 表示走默认链（exe 根 → Application Support）。
-  final String logDirectory;
 
   /// 值相等 —— 损坏回退后的默认快照与初始态可比（不可变数据类契约）。
   @override
   bool operator ==(Object other) =>
       other is ErrorFeedbackSettingsData &&
-      other.errorCardEnabled == errorCardEnabled &&
-      other.logDirectory == logDirectory;
+      other.errorCardEnabled == errorCardEnabled;
 
   @override
-  int get hashCode => Object.hash(errorCardEnabled, logDirectory);
+  int get hashCode => errorCardEnabled.hashCode;
 }
 
-/// 错误反馈设置单例 store —— 组合根与后续设置 UI 的唯一数据源。
+/// 错误反馈设置单例 store —— 组合根与设置 UI 的唯一数据源。
 ///
 /// 同步构造零 I/O（先于 runApp 的任何时点都安全）；加载只发生在组合根的
-/// unawaited 激活路径内（RESEARCH Pitfall 7：配置路径当次启动即生效，且绝不
-/// 阻塞 MediaKit/window/runApp）。读写失败静默回退默认值（D-01）。
+/// unawaited 激活路径内（RESEARCH Pitfall 7：绝不阻塞 MediaKit/window/
+/// runApp）。读写失败静默回退默认值（D-01）。
 final class ErrorFeedbackSettings {
   ErrorFeedbackSettings._({File Function()? settingsFile})
     : _settingsFile = settingsFile ?? defaultSettingsFile;
@@ -99,6 +91,7 @@ final class ErrorFeedbackSettings {
   /// 整体更新 [state]。
   /// 形状校验模板循 source_line_reader.dart:236-268（is! Map 守卫承重：
   /// `[1,2]` 解码为 List 而非 Map；空串/尾随垃圾抛 FormatException）。
+  /// 未知键（如旧版本残留的第三键）逐字段校验天然忽略，向后兼容。
   Future<void> load({
     ApplicationSupportDirectoryProvider? applicationSupportDirectory,
   }) async {
@@ -112,10 +105,8 @@ final class ErrorFeedbackSettings {
       }
       // 逐字段独立类型校验：错型字段回退该字段默认值，不抛出。
       final cardEnabled = decoded['errorCardEnabled'];
-      final directory = decoded['logDirectory'];
       state.value = ErrorFeedbackSettingsData(
         errorCardEnabled: cardEnabled is bool ? cardEnabled : true,
-        logDirectory: directory is String ? directory : '',
       );
     } on FormatException {
       // 尾随垃圾/空串抛 FormatException（实测失败形态）→ 默认值。
@@ -128,22 +119,7 @@ final class ErrorFeedbackSettings {
 
   /// SET-01 开关写入：内存态立即生效，fire-and-forget 持久化。
   void setCardEnabled(bool enabled) {
-    final next = ErrorFeedbackSettingsData(
-      errorCardEnabled: enabled,
-      logDirectory: state.value.logDirectory,
-    );
-    state.value = next;
-    _schedulePersist(next);
-  }
-
-  /// SET-02 日志目录写入：内存态立即更新，fire-and-forget 持久化。
-  ///
-  /// 保存失败静默（D-01）——不回滚内存态、不阻断调用方。
-  void setLogDirectory(String directory) {
-    final next = ErrorFeedbackSettingsData(
-      errorCardEnabled: state.value.errorCardEnabled,
-      logDirectory: directory,
-    );
+    final next = ErrorFeedbackSettingsData(errorCardEnabled: enabled);
     state.value = next;
     _schedulePersist(next);
   }
@@ -291,12 +267,12 @@ final class ErrorFeedbackSettings {
     }
   }
 
-  /// 序列化为扁平 key + version 字段的 JSON（D-01 discretion 形态）。
+  /// 序列化为扁平 key + version 字段的 JSON（D-01 discretion 形态；
+  /// G-04-1 后恰为两键 —— version + errorCardEnabled，无第三键）。
   static String _encode(ErrorFeedbackSettingsData data) =>
       jsonEncode(<String, Object?>{
         'version': 1,
         'errorCardEnabled': data.errorCardEnabled,
-        'logDirectory': data.logDirectory,
       });
 
   /// 测试隔离：复位内存态为默认值并可选重绑 settings 文件 seam。
@@ -311,5 +287,11 @@ final class ErrorFeedbackSettings {
     }
     _resolvedSettingsFile = null;
     state.value = const ErrorFeedbackSettingsData();
+    // 串行持久化链一并复位：链头 Future 创建于**上一个用例的 FakeAsync
+    // zone**，其完成事件只投递给同 zone 的监听器 —— 跨用例 `.then` 的续体
+    // 会被排进已销毁 zone 的队列而永不执行（实测：下一用例的写入永远排在
+    // 死链头之后，文件永不落盘）。重建于当前 zone 的空链恢复写入活性；
+    // 生产路径无 FakeAsync zone 切换，不受影响。
+    _persistFuture = Future<void>.value();
   }
 }
