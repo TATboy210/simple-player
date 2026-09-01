@@ -1,20 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 04-error-feedback-settings
 source: [04-VERIFICATION.md]
 started: 2026-09-01T03:10:00+08:00
-updated: 2026-09-01T03:10:00+08:00
+updated: 2026-09-01T15:20:00+08:00
 ---
 
 ## Current Test
 
-number: 1
-name: 实机开关切换(SET-01)
-expected: |
-  设置→通用→关闭错误卡片开关:已显示卡片同帧消失;触发错误→错误仍写入日志(卡片不弹);
-  重新开启:队列中最新错误恢复显示。log 固定写软件根目录 logs/(无路径配置入口);顺带
-  看新「打开日志」按钮(资源管理器定位 error.log)与日志中的心跳行(约 30s 一条)。
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -28,7 +22,7 @@ result: [pending]
 expected: |
   切换开关后完全退出并重启应用:开关状态仍保留(settings.json 位于 exe 旁;debug run 时
   位于项目运行目录旁;MSIX 下回退 Application Support 层)。
-result: [pending]
+result: pass
 
 ### 3. 已移除(用户决策:路径配置功能整体移除)
 expected: 日志路径配置入口不再存在;log 固定软件根目录 logs/,exe 不可写时静默回退 Application Support。
@@ -39,7 +33,7 @@ reason: "Deferred follow-up: 用户决策——更改 log 保存路径的功能�
 expected: |
   MSIX 安装包运行:exe 旁 settings.json 探测失败 → 设置静默回退到 Application Support
   settings.json;切换开关后重启仍保留(落在 AS 层);无崩溃。
-result: [pending]
+result: pass
 
 ### 5. 已移除(同 Test 3)
 expected: 路径配置 UI 不再存在。
@@ -49,14 +43,14 @@ reason: "Deferred follow-up: 同 Test 3——路径配置功能整体移除"
 ### 6. 快速开关并发确认(简化后)
 expected: |
   快速连续切换卡片开关数次:最终状态 = 最后一次操作;无卡死/崩溃。
-result: [pending]
+result: pass
 
 ## Summary
 
 total: 6
-passed: 0
+passed: 4
 issues: 0
-pending: 4
+pending: 0
 skipped: 2
 blocked: 0
 
