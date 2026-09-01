@@ -19,7 +19,7 @@
 ## Implementation Decisions
 
 ### 探测暴露层
-- **D-01:** DwmCapabilities 探测在 runner C++ 实现（复制 `RtlGetVersion` 模式，参照 media_kit pub cache `media_kit_video/windows/utils.cc:85`，不链接它），结果经 MethodChannel 透出 Dart，Dart 侧统一消费——Phase 11 的 Linux compositor 探测做对等 Dart 结构，诊断日志统一走 Dart 链 — **Reversibility:** costly — Phase 7/8 的属性门控将读取 Dart 侧快照，后撤需改动多个消费方
+- **D-01:** DwmCapabilities 探测走 **Dart FFI**（`ntdll.dll` RtlGetVersion 拿 build 号 + `dwmapi.dll` 探测属性可用性，HRESULT 同步返回），无 MethodChannel、无新增 C++；Dart 侧统一消费，Phase 11 的 Linux compositor 探测做对等 Dart 结构，诊断日志统一走 Dart 链 — **Reversibility:** costly — Phase 7/8 的属性门控将读取 Dart 侧快照，后撤需改动多个消费方。（修订记录：初稿为「C++ 探测 + MethodChannel」，用户表达全面 Dart 化意愿后于规划前修订；C++ 仅保留 WndProc 消息拦截存量段——NCCALCSIZE/NCHITTEST 物理 C++ 不可移）
 
 ### C1 测试形态
 - **D-02:** C1 回归钉死采用 gate 脚本 + 结构契约（复用 `tool/audit/` bash 脚本先例）：守卫注释存在性检查 + `WM_NCCALCSIZE` 分支结构指纹 + 「禁止裸 `return 0`」grep gate + 实机 UAT 清单（缝隙为 DWM 视觉，headless 不可见，研究明确）。不引入 C++ 测试 harness（项目零 C++ 测试基建，违「小即是美」）
@@ -100,7 +100,8 @@
 <deferred>
 ## Deferred Ideas
 
-None — discussion stayed within phase scope
+- **死代码清扫 + 依赖瘦身**（`lib/ui/playlist/` 4 文件 + `lib/kernel/playlist/playlist.dart` 整链；pubspec 未用依赖 go_router/dio/logger/get/flutter_secure_storage/freezed——删 freezed+pigeon 可顺带解 analyzer 14 生态阻塞）——独立 `/gsd-quick` 任务，不属本里程碑；CLAUDE.md 的 `bridge/win32` FFI 过时描述一并修正
+- **Phase 7/8 属性设置的 Dart FFI 化**——本阶段已按 D-01 走 Dart FFI 探测；属性设置（DwmSetWindowAttribute）同样倾向 Dart FFI，属 Phase 7/8 规划时的决策
 
 </deferred>
 
