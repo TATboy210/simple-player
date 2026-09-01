@@ -45,15 +45,24 @@ void main() {
   });
 
   // 卡片纯呈现测试 harness：直接挂 ErrorCard，无宿主（宿主级行为在
-  // error_card_host_test.dart 与本文件 hit-test 组覆盖）。
-  Widget buildCard(ErrorReport report, {int totalCount = 1}) => MaterialApp(
+  // error_card_host_test.dart 与本文件 hit-test 组覆盖）。onOpenLog 为
+  // E97 打开日志动作的注入缝（null = 不渲染按钮的条件渲染纪律）。
+  Widget buildCard(
+    ErrorReport report, {
+    int totalCount = 1,
+    VoidCallback? onOpenLog,
+  }) => MaterialApp(
     locale: const Locale('zh'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Align(
         alignment: Alignment.topLeft,
-        child: ErrorCard(report: report, totalCount: totalCount),
+        child: ErrorCard(
+          report: report,
+          totalCount: totalCount,
+          onOpenLog: onOpenLog,
+        ),
       ),
     ),
   );
@@ -719,6 +728,78 @@ void main() {
       expect(tester.takeException(), isNull);
 
       await settleOsdTimer(tester);
+    });
+  });
+
+  group('open-log 打开日志按钮（E97）', () {
+    testWidgets('collapsed card exposes open-log button wired to onOpenLog', (
+      tester,
+    ) async {
+      // Arrange：折叠态卡片 + 记录型回调。
+      var openLogCalls = 0;
+      final reporter = makeReporter();
+      final report = acceptHead(reporter, () {
+        reporter.reportBootstrapSafely(
+          StateError('打开日志接线'),
+          StackTrace.current,
+        );
+      });
+      await tester.pumpWidget(buildCard(report, onOpenLog: () => openLogCalls++));
+
+      // Assert：折叠态下按钮存在 —— 无需展开即可定位日志（E97 目标）。
+      expect(
+        find.byKey(const ValueKey('error-card-open-log')),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+
+      // Act：点击打开日志按钮。
+      await tester.tap(find.byKey(const ValueKey('error-card-open-log')));
+      await tester.pump();
+
+      // Assert：回调恰好一次；卡片保持折叠（chevron-down 仍在，未展开）。
+      expect(openLogCalls, 1);
+      expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+      expect(find.byIcon(Icons.keyboard_arrow_up), findsNothing);
+    });
+
+    testWidgets(
+      'tap on open-log does not toggle the card (CARD-04 hit isolation)',
+      (tester) async {
+        // Arrange：折叠态卡片。
+        final reporter = makeReporter();
+        final report = acceptHead(reporter, () {
+          reporter.reportBootstrapSafely(
+            StateError('命中隔离'),
+            StackTrace.current,
+          );
+        });
+        await tester.pumpWidget(buildCard(report, onOpenLog: () {}));
+
+        // Act：点击打开日志按钮。
+        await tester.tap(find.byKey(const ValueKey('error-card-open-log')));
+        await tester.pump();
+
+        // Assert：展开区段不出现 —— 按钮内层 GestureDetector 命中优先，
+        // 整卡 _toggle 未被触发（与 copy 按钮同一 CARD-04 命中保证）。
+        expect(find.text('定位'), findsNothing);
+        expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+      },
+    );
+
+    testWidgets('open-log button absent when onOpenLog is null', (tester) async {
+      // Arrange：默认构造（无 onOpenLog）—— 与 onClose 的条件渲染同一纪律。
+      final reporter = makeReporter();
+      final report = acceptHead(reporter, () {
+        reporter.reportBootstrapSafely(
+          StateError('条件渲染'),
+          StackTrace.current,
+        );
+      });
+      await tester.pumpWidget(buildCard(report));
+
+      // Assert：按钮不渲染。
+      expect(find.byKey(const ValueKey('error-card-open-log')), findsNothing);
     });
   });
 }
