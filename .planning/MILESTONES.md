@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.0 错误捕获定位反馈系统 (Shipped: 2026-09-01)
+
+**Phases completed:** 5 phases, 20 plans, 25 tasks
+
+**Key accomplishments:**
+
+- Shipped a local, immutable four-source error reporter that snapshots unsafe diagnostic inputs, retains a five-item FIFO, merges immediate repeats, and prevents reporting failures from cascading into the player.
+- Shipped synchronous, failure-contained Flutter framework and root-isolate hooks plus a single guarded startup zone that initializes diagnostics before application services.
+- Shipped one lifecycle-owned player-error bridge plus pre-fan-out local-path redaction and rollback-safe ten-second deduplication for immutable diagnostic reports.
+- Local diagnostic paths now retain only safe basenames through every report observation, while FIFO deduplication preserves distinct player severity, typed code, and media-target evidence.
+- 一份真实接纳的 ErrorReport 全链路贯通：`ErrorReporterImpl.presentation` → CARD-05 相位守卫宿主 → 折叠视图卡片 → app root Navigator 之上的左上角常驻显示，build 期故障注入与同帧多报告时序由回归测试锁死。
+- ErrorCard 从「能看到」升级为「能定位」且「不妨碍操作」——整卡点击展开定位/源码行/调用栈/日志路径/重复五段（D-04 段序）、严重级三值语义色 token、l10nKey 13 key 解析迁移基线，以及常驻手动关、零焦点抢占与卡内外双向 hit-test 边界（含 D-10 route 命中）。
+- 卡片补齐「复制即证据」闭环（复制文本与日志文件逐字符同源，成功/失败两态 OSD 反馈且异常不外溢）与多错误回看能力（warning 分流 OSD 恰好一次推进、徽标在 20 条本地有界快照内向旧循环轮览），至此除 MIG-01 迁移外的全部卡片行为到位。
+- 旧错误横幅（142 行 widget + 测试 + 挂载子树 + doc 引用）经删前双路径等效证明与用户批准后全量删除，错误展示收敛为 ErrorCard 单一路径，四重质量门（grep 零残留 / analyze 0 error / 313 测试全绿 / kernel_logger_gate）收尾。
+- Ctrl+Shift+I（kDebugMode 门控）构造带计数后缀的合成错误，经 `ErrorReporterImpl.I.reportPlatformSafely` 现有公开 intake 走 FIFO → presentation → ErrorCardHost → ErrorCard + 捕获徽标 + error.log 全真实链路，伴随 OSD「已注入测试错误」pill 与 F1 帮助 debug 条目，快速连按绕过 10s 去重窗每次出新卡——补上 UAT 实测缺失的开发用触发入口，零 kernel 改动、零 media_kit 接触。
+- 一句话：
+- settings.json（便携 JSON）经 load 驱动三层位置链（配置目录 → exe 根 → Application Support）解析出首个可写落点并完成 sink 激活，诊断包当次启动即落在配置目录；存储层加固到生产级（原子写 + 四级降级 + 保存失败静默 + 重启 round-trip）。
+- 用户配置的日志目录先经 kernel 单层校验证明可写才被采用，变更经「先确认新位置 → dispose → activate」完成零丢失零乱序的安全换位，启动回退以一次性 OSD 告知——SET-02 的写入前校验、无效回退、sink 安全重建三件事全部落地。
+- ErrorCardHost.build 外层一行门控锁死 SET-01 全部呈现语义：关→同帧消失只落盘不弹卡、开→恢复含队列中错误的最新报告、缺省→默认开，捕获/快照/落盘链零接触（D-05 零 kernel 由 diff 面与 kernel gate 双重证明）。
+- 设置壳从静态 About 页升级为可导航选中态架构，「通用」tab 承载错误卡片开关行（翻转即生效+持久化）与日志目录路径行（手输防抖校验/浏览回填/行内状态/有效路径常显）——SET-01/02/03 的用户可见面全部落地，Phase 4 质量门全绿（analyze 0 error / 1377 tests / kernel gate 1&2）。
+- 日志路径配置功能按 D-07 整体移除：通用 tab 只剩错误卡片开关行，日志固定落 exe 根 logs/error.log（Application Support 静默回退的双层链），settings.json 收窄为两键且旧文件第三键向后兼容，D-04 通知桥与运行时重定向协议不复存在——UAT Test 3/5 作废项获得自动化对应面，G-04-1 关账。
+- 四源端到端整合注入 + 爆发/关闭隔离补差用例全绿,VER-01~05 证据映射表与开发者边界文档归档,产品实现零 diff,质量四门禁(analyze/machine 基线 diff/kernel_logger_gate/零 diff)全绿——里程碑验证闭环收官。
+
+---
+
 ## v4.0 设置面板框架重构 (Shipped: 2026-07-25)
 
 **Phases completed:** 14 phases, 44 plans, 68 tasks
