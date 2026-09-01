@@ -162,7 +162,8 @@ Plans:
 
 ### Phase 5: 端到端韧性验证
 
-**Goal**: 用户和开发者可确信该诊断系统在真实错误、高频错误及 Windows 播放器交互期间完整捕获、可回溯且不妨碍使用。
+**Goal**: As a developer and user of the player, I want to verify that the diagnostics system reliably captures, persists, and surfaces errors under real, burst, and Windows-interaction conditions, so that I can trust it without a debugger.
+(中文原意：用户和开发者可确信该诊断系统在真实错误、高频错误及 Windows 播放器交互期间完整捕获、可回溯且不妨碍使用。)
 **Mode:** mvp
 **Depends on**: Phase 4
 **Requirements**: VER-01, VER-02, VER-03, VER-04, VER-05
