@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: 可信定位与文件证据** - 每份报告获得安全的位置富化和独立、可回溯的错误日志。 (completed 2026-08-30)
 - [x] **Phase 3: 播放错误桥与非模态卡片** - 播放器内所有错误以不妨碍操作的统一卡片反馈给用户。 (completed 2026-08-31)
 - [x] **Phase 4: 错误反馈设置** - 用户可持久控制卡片显示和安全配置日志落点。 (completed 2026-09-01)
-- [ ] **Phase 5: 端到端韧性验证** - 证明四源捕获、洪流处理和 Windows 交互在交付环境中可靠可用。
+- [x] **Phase 5: 端到端韧性验证** - 证明四源捕获、洪流处理和 Windows 交互在交付环境中可靠可用。 (completed 2026-09-01)
 
 ## Phase Details
 
@@ -192,4 +192,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
 | 3. 播放错误桥与非模态卡片 | 6/6 | Complete    | 2026-08-31 |
 | 4. 错误反馈设置 | 5/5 | Complete    | 2026-09-01 |
-| 5. 端到端韧性验证 | 1/1 | In Progress|  |
+| 5. 端到端韧性验证 | 1/1 | Complete    | 2026-09-01 |
