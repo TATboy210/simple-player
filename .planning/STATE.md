@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-30)
 Phase: 4 (错误反馈设置) — EXECUTING
 Plan: 4 of 4
 Status: Phase complete — ready for verification
-Last activity: 2026-09-01 - Completed quick task 260901-e97: 错误卡片加复制详情与打开日志按钮
+Last activity: 2026-09-01 - Completed quick task 260901-eyw: 日志写入挪进独立 isolate 加心跳日志
 
 Progress: [██████░░░░] 60%
 
@@ -49,6 +49,7 @@ Progress: [██████░░░░] 60%
 | 01 | 4 | - | - |
 | 2 | 4 | - | - |
 | 3 | 6 | - | - |
+| 260901-eyw | 日志写入挪进独立 isolate 加心跳日志 | 2026-09-01 | 2cee141e | [260901-eyw-logging-isolate](./quick/260901-eyw-logging-isolate/) |
 
 **Recent Trend:**
 
