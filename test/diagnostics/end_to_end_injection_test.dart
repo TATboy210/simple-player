@@ -1,4 +1,15 @@
-/// 端到端整合注入用例(VER-01, D-01)——四源各经真实注入入口走完整链路。
+/// 端到端整合注入用例(VER-01, D-01)——四源各经真实注入入口走完整捕获→呈现链路。
+///
+/// 范围口径:文件证据腿经 `ErrorLogFileSink` 直写——生产激活的是
+/// `IsolatedErrorLogSink`,此直写 sink 即其降级回退,契约逐项一致
+/// (同严重级门限 / append+UTF-8+flush / 失败收容);isolate 边界
+/// (握手、未决缓冲、worker 协议)由 isolated_error_log_sink_test
+/// 覆盖,不在本套件范围内。
+///
+/// Scoping: the durable-evidence leg writes via `ErrorLogFileSink`
+/// directly — the contract-equivalent degraded fallback of the production
+/// `IsolatedErrorLogSink`; the isolate boundary itself is covered by the
+/// dedicated isolated_error_log_sink suite.
 ///
 /// End-to-end injection suite (VER-01, D-01): each of the four capture
 /// sources is injected once through its real entry point and must produce
@@ -136,10 +147,15 @@ void main() {
   ///
   /// [displayed] 覆盖卡片实际渲染文本:PlayerError 报告经 l10nKey 解析
   /// (error_card.dart _resolveMessage),卡片显示本地化文案而非原始消息。
+  /// 徽标文案同样经 l10n 解析(errorCardBadgeLabel(1),:262-265 先例
+  /// 同款)——不硬编码 ARB 字面量,ARB 措辞变更不再连坐全部用例。
   void expectCardVisible(String message, {String? displayed}) {
-    expect(find.byType(ErrorCard), findsOneWidget);
+    final card = find.byType(ErrorCard);
+    expect(card, findsOneWidget);
     expect(find.textContaining(displayed ?? message), findsOneWidget);
-    expect(find.text('1 错误'), findsOneWidget);
+    final context = card.evaluate().single;
+    final badgeLabel = AppLocalizations.of(context).errorCardBadgeLabel(1);
+    expect(find.text(badgeLabel), findsOneWidget);
   }
 
   group('四源端到端整合注入(VER-01, D-01)', () {
@@ -248,10 +264,7 @@ void main() {
         await pumpHost(tester);
 
         // Act:FileError 经桥注入一次。
-        engine.lastError.value = FileError(
-          FileErrorCode.pathEmpty,
-          '播放器源错误',
-        );
+        engine.lastError.value = FileError(FileErrorCode.pathEmpty, '播放器源错误');
         await tester.pump();
         await tester.pump();
 
