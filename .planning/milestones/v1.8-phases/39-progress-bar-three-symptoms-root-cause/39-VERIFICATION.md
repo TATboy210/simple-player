@@ -5,18 +5,24 @@ status: human_needed
 score: 4/6 must-haves verified
 behavior_unverified: 1
 behavior_unverified_items:
+
   - truth: "Tap/drag seek holds the thumb against an old active-source position until the target arrives, then clears on arrival or the configured timeout."
     test: "Drag to a target, emit an older position from the same active notifier after release, then separately emit target-arrival and advance past `Tokens.progressSeekHoldTimeoutMs`."
     expected: "Semantics/thumb remains at the target after the older event; it follows the stream after target arrival, and the timeout independently releases the hold."
     why_human: "The implementation contains the arrival/timer branches and focused tests cover active replacement plus arrival, but no named test exercises the same-source old-position rollback and timeout branches required by the phase contract."
 overrides_applied: 0
 human_verification:
+
   - test: "On a Windows desktop, open a real video with `D:/flutter/bin/flutter run -d windows`, move the mouse from roughly 25% to 75% across the visible progress bar, then leave the bar and repeat while dragging."
     expected: "A self-drawn preview bubble is visibly rendered, changes from about 00:15 to 00:45 for a 60-second video, moves right with the pointer, disappears on ordinary pointer exit, and remains coherent during drag. Static action tooltips remain independent."
     why_human: "The PROG-03 roadmap behavior is explicitly a visual Windows mouse-hover backstop. Widget tests prove text/geometry and the real-runtime test proves the data chain, but neither observes actual desktop rendering or pointer hit behavior in a user session."
   - test: "Drag to a new time in the real Windows app while playback is still reporting an older position, then wait for the seek to settle and repeat with a delayed/failed seek if practical."
     expected: "The thumb does not jump back to the old position after release; it releases only when the active position reaches the target tolerance or after the configured timeout backstop."
     why_human: "This is a state-transition invariant. Presence inspection and the current test corpus do not exercise the old-active-position and timeout paths together."
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-01
+  status: human_needed
 ---
 
 # Phase 39: 进度条三症状根因诊断与修复 Verification Report
