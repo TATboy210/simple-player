@@ -64,7 +64,9 @@ blocked: 0
 
 - gap_id: G-04-1
   truth: "日志路径配置功能整体移除——通用 tab 仅剩卡片开关;log 固定软件根目录 logs/(双层回退 exe→AS 保留,校验保留作内部探测);SET-02 按修订语义关账"
-  status: failed
+  status: resolved
+  resolved_by: 04-05-PLAN
+  resolved_at: 2026-09-01
   reason: "User reported: 只是觉得更改log的保存路径的功能太鸡肋，移除这个细节吧，log文件保存在软件的根目录下"
   severity: minor
   test: 3
