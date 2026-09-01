@@ -198,34 +198,36 @@ void main() {
       expect(sink.logsAvailable.value, isTrue);
     });
 
-    test('spawn failure degrades silently and writes via direct fallback',
-        () async {
-      // Arrange — spawnWorker 注入同步抛 StateError 的假缝。
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final failures = <Object>[];
-      final sink = IsolatedErrorLogSink(
-        file: fixture.file,
-        degradedOutput: (error, _) => failures.add(error),
-        spawnWorker: (entry, config, {onExit, onError}) =>
-            throw StateError('spawn blocked'),
-      );
+    test(
+      'spawn failure degrades silently and writes via direct fallback',
+      () async {
+        // Arrange — spawnWorker 注入同步抛 StateError 的假缝。
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final failures = <Object>[];
+        final sink = IsolatedErrorLogSink(
+          file: fixture.file,
+          degradedOutput: (error, _) => failures.add(error),
+          spawnWorker: (entry, config, {onExit, onError}) =>
+              throw StateError('spawn blocked'),
+        );
 
-      // Act — record 两条（降级后经回退直写）→ drain。
-      sink.record(_report(message: '缓冲一'), ReportAcceptance.newReport);
-      sink.record(
-        _report(eventId: 'second', message: '缓冲二'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
+        // Act — record 两条（降级后经回退直写）→ drain。
+        sink.record(_report(message: '缓冲一'), ReportAcceptance.newReport);
+        sink.record(
+          _report(eventId: 'second', message: '缓冲二'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
 
-      // Assert — 降级是模式切换非写失败：零 degradedOutput、可用性 true。
-      final contents = await fixture.file.readAsString();
-      expect(contents, contains('缓冲一'));
-      expect(contents, contains('缓冲二'));
-      expect(sink.logsAvailable.value, isTrue);
-      expect(failures, isEmpty);
-    });
+        // Assert — 降级是模式切换非写失败：零 degradedOutput、可用性 true。
+        final contents = await fixture.file.readAsString();
+        expect(contents, contains('缓冲一'));
+        expect(contents, contains('缓冲二'));
+        expect(sink.logsAvailable.value, isTrue);
+        expect(failures, isEmpty);
+      },
+    );
 
     test('unexpected worker death degrades and keeps recording', () async {
       // Arrange — passthrough 假缝捕获真 Isolate 供 kill。

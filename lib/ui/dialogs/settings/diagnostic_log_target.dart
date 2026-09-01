@@ -16,9 +16,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
-import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/isolated_error_log_sink.dart';
 
 /// 诊断日志落点协调器单例 —— 组合根共用的启动激活实现。
 final class DiagnosticLogTarget {
@@ -48,10 +48,12 @@ final class DiagnosticLogTarget {
 
   /// 唯一激活实现 —— 启动激活（G-04-1 后无重定向调用方）。
   ///
-  /// Side effect: 创建 [ErrorLogFileSink] 并经 delegate.activate 换入。激活
-  /// 只发生一次（activate 的一次性锁）：重复激活被 delegate 锁静默吞掉，
-  /// 旧落点保持真实生效 —— 协调器不缓存任何平行读数，权威状态永远在
-  /// delegate（effect.logPath）上。
+  /// Side effect: 创建 [IsolatedErrorLogSink] 并经 delegate.activate 换入。
+  /// 日志写入已移交常驻 logging isolate（主 isolate 卡死时已递送记录仍落盘），
+  /// spawn 失败/worker 死亡时幂等降级经既有 ErrorLogFileSink 直写，捕获链
+  /// 永不阻断。激活只发生一次（activate 的一次性锁）：重复激活被 delegate
+  /// 锁静默吞掉，旧落点保持真实生效 —— 协调器不缓存任何平行读数，权威
+  /// 状态永远在 delegate（effect.logPath）上。
   void activateResolved({required File file}) {
     final effect = _effect;
     if (effect == null) {
@@ -59,7 +61,10 @@ final class DiagnosticLogTarget {
       // 先于 runApp，不可达。
       return;
     }
-    effect.activate(sink: ErrorLogFileSink(file: file), resolvedPath: file.path);
+    effect.activate(
+      sink: IsolatedErrorLogSink(file: file),
+      resolvedPath: file.path,
+    );
   }
 
   /// 测试隔离：重绑 effect 缝。
