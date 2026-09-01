@@ -1,71 +1,71 @@
-# Simple Player — 错误捕获定位反馈系统
+# Simple Player — 窗口外观与全屏体验
 
 ## What This Is
 
-Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放器。本里程碑为播放器建立统一的错误捕获→定位→反馈系统：四类错误接入全局钩子，出错时左上角滑入非模态错误卡片，显示定位信息与源码行，自动落盘纯文本日志。服务于开发者本人日常使用，出错时可即时定位问题方位。
+Simple Player 是基于 Flutter desktop、media_kit/libmpv 的桌面媒体播放器。本里程碑解决窗口外壳层的四个体验问题：系统主题色渗透（Win10 红边）、跨平台圆角一致性、全屏进出过渡闪烁、自绘标题栏拖拽偶发不跟手。窗口视觉与交互完全由应用自绘控制，不受系统主题与平台差异污染。服务于开发者本人日常使用。
 
-## Current Milestone: v2.1 错误捕获定位反馈系统
+## Current Milestone: v1.1 窗口外观与全屏体验
 
-**Goal:** 全局错误钩子零接入 → 四类错误全捕获，出错可定位、可复制、可回溯。
+**Goal:** 窗口视觉跨平台一致（圆角、无系统主题色污染），全屏过渡无闪烁，标题栏拖拽稳定跟手。
 
 **Target features:**
-- 四类错误全捕获：UI/框架异常、异步未捕获异常、播放引擎错误、启动期异常
-- 左上角非模态错误卡片：常驻手动关，不遮挡控制栏/标题栏交互区
-- 卡片详情：文件:行号 + 源码行（release 优雅降级）+ 完整调用栈 + 一键复制 + 日志路径 + 媒体路径
-- 错误自动落盘：ErrorReporter 副作用链新增 FileSink（dart:io append+flush 单写者；logger FileOutput 不按条 flush 已证实弃用），仅错误事件上盘，单文件追加纯文本
-- 设置"通用"tab：错误卡片开关（默认开）+ 日志输出路径可配置
-- 替换旧 ErrorBanner，所有错误统一走新卡片
+- 去主题色边框：Win10 上窗口边缘被系统主题强调色（用户案例红色）描边，彻底消除
+- 圆角统一：Win11 原生 DWM 圆角；Win10/Linux 方案（伪圆角 or 直角）等研究结论再定；Linux（SteamOS/通用桌面）按通用方案实现正确
+- 全屏过渡无闪烁：进入时标题栏/边框闪现 + 尺寸跳变、退出时闪烁，三个症状全消
+- 标题栏拖拽可靠性：自绘标题栏拖动偶发不跟手，达到必现跟手
 
-**Key context:** v1.9（进度条三症状）停在 Phase 39 Wave 2 未完成，已归档至 `.planning/milestones/v1.9-progress-bar/`（进度记录完整保留可恢复）。
+**Key context:**
+- 全屏后边缘有缝的问题已解决（v1.0 前修复），本里程碑不动
+- 「标题栏闪现」2026-08-27 曾暂缓（当时全局 DWMNCRP 方案已撤回、勿重提），本次重新攻坚需找新路径
+- 窗口为 frameless（runner WM_NCCALCSIZE return 0 + window_manager setAsFrameless），系统 resize 由 SmartDragToResizeArea 兜底——拖拽问题与此链路同源，一并排查
+- Linux 无实机——实现正确性以通用桌面方案为准，交付物标记「待实机验证」
+- 研究工具：Context7 文档 + GitHub 同类播放器（mpv 前端、IINA 等）方案调研
 
 ## Core Value
 
-**出错可定位**：任何错误发生时，无需接调试器即可知道错误在哪个文件哪一行、调用链是什么，一键复制或从日志文件回溯——出错不再是无名黑盒。
+**窗口外壳完全自绘自治**：系统主题、平台差异不得渗透到窗口视觉与交互——红边、圆角缺失、全屏闪烁、拖拽失灵都是这一原则的违反；用户在任何系统上看到的窗口都是应用自己的样子。
 
 ## Scope
 
-- lib/kernel/diagnostics/（error_reporter 新建 + kernel_logger 扩展 FileSink）
-- main.dart / app.dart（全局错误钩子：FlutterError.onError、PlatformDispatcher.onError、runZonedGuarded）
-- 播放引擎错误通道（PlayerError → error_reporter 统一汇入）
-- 左上角错误卡片 widget（非模态、不遮挡交互区）
-- settings_dialog 通用 tab（开关 + 输出路径）
-- 旧 ErrorBanner 撤除整合
+- windows/runner（C++ 层：WM_NCCALCSIZE / DWM 属性 / 拖拽消息链路）
+- lib/kernel/window_Bridge/（窗口模式协调、全屏切换链路）
+- lib/ui/window/custom_title_bar.dart（自绘标题栏拖拽入口）
+- media_kit 全屏功能链路（本里程碑授权解禁，仅限全屏部分）
+- Linux 桌面（GTK/ Wayland/X11）窗口外壳适配的结构性实现
 
 ## Out of Scope
 
-- 播放功能演进（自动下一首/播放列表）— 与错误反馈无关
-- 远程上报/遥测（Sentry/Crashlytics）— 个人桌面应用无此需求
-- 日志轮转/压缩/加密 — 单文件追加已满足
-- 其他 UI 功能 — 本里程碑只做错误反馈
+- 全屏后边缘有缝问题 — 已解决，不重开
+- 播放功能演进 — 与窗口外壳无关
+- media_kit 非全屏部分（播放/轨道/字幕链路）— 红线仅对全屏功能解禁
+- macOS 窗口外壳 — 结构性支持存在但非发布目标，本里程碑不验证
+- 全局 DWMNCRP 方案 — 2026-08-27 已撤回，勿重提
 
 ## Context
 
-- **零全局错误钩子现状**：`FlutterError.onError`/`PlatformDispatcher.onError`/`runZonedGuarded` 全项目零匹配，未捕获异常直接崩溃/红屏
-- **诊断设施已备**：lib/kernel/diagnostics/ 已有 8 文件（kernel_logger 三 sink、MemoryMonitor、startup_timeline 等），在其上扩展而非重写
-- **logger ^2.7.0 弃用修订（2026-08-30）**：FileOutput 不按条 flush（仅 destroy 时刷）且 kernel gate 禁止 lib/kernel/ 导入 package:logger，FileSink 改 dart:io 直写；后续可从 pubspec 移除 logger
-- **旧 ErrorBanner**：已展示播放引擎错误（监听 engine.lastError），将被统一替换
-- **媒体路径来源**：PlaybackController.currentPath
-- **v1.9 归档**：见 Key context
+- **frameless 现状**：白边修复时采用 setAsFrameless（WM_NCCALCSIZE return 0），代价是失去系统 resize，靠 SmartDragToResizeArea 兜底；红边与拖拽问题都发生在这条链路上
+- **全屏链路现状**：当前走 media_kit 链路（用户授权本里程碑解禁该部分红线）；此前方案 A（FFI 桥）/方案 B（DWM 禁用）实机效果不理想已 revert，「全屏样式权威收编」记录了技术事实（route+utils.cc 双层链路/Vulkan 不可行/wm.setFullScreen frameless 缺陷），重启攻坚前先采集撤回时具体症状
+- **Win10 圆角**：原生不支持窗口圆角（Win11 才有 DWM 圆角），伪圆角 = 窗口透明 + Flutter 层裁剪，有性能与锯齿代价——取舍等研究结论
+- **拖拽偶发不跟手**：用户观察到极小概率拖动无效，疑似 window_manager startDragging 或 hit-test 时序问题
+- **v1.0 归档**：错误捕获定位反馈系统已发布（ErrorCard 全链路），本里程碑与其正交
 
 ## Constraints
 
 - **Unix 九原则**（用户钦定，取舍最高依据）：小即是美/只做好一件事/快建原型/可移植优先/纯文本存储/软件杠杆/shell 脚本/避免强制式 UI/程序皆过滤器
-- **media_kit 不可改动**（memory 红线）：只处理项目封装/UI/测试层
+- **media_kit 红线（部分解禁）**：本里程碑仅允许为全屏功能修改 media_kit 相关代码；其余部分（播放/轨道/字幕）仍不可改动
 - **质量红线**：flutter analyze 0 error；flutter test 全绿
 - **状态管理惯例**：ValueNotifier + ValueListenableBuilder，不引入新状态库
+- **平台边界**：Windows 实机验证为主；Linux 结构性正确即可并标记待实机验证
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 四类错误全捕获 | 全覆盖无盲区 | ✓ Phase 01（UAT 16/16） |
-| 左上角非模态卡片常驻手动关 | 不遮挡交互 + 不丢错误 | — Pending |
-| 源码行 release 优雅降级 | 读不到源码退化为定位文本 | — Pending |
-| 仅错误上盘 | 文件干净易读 | — Pending |
-| kernel_logger 门面 + logger 包输出 | 存量零改动 + 杠杆效应 | ✓ Phase 01（沿用） |
-| 新建 error_reporter 独立服务 | 各司其职（原则 2） | ✓ Phase 01（含语义去重/路径净化） |
-| 统一替换旧 ErrorBanner | 一套展示逻辑 | — Pending |
-| 设置开关 + 输出路径可配 | 关卡片不关落盘 | — Pending |
+| media_kit 红线仅为全屏功能解禁 | 全屏链路问题源自该链路；其余能力不动 | — Pending |
+| 圆角方案等研究结论再定 | Win10 伪圆角有代价，先看同类播放器怎么做 | — Pending |
+| 全局 DWMNCRP 不重提 | 2026-08-27 实机效果不理想已撤回 | ✓ 已定 |
+| Linux 标记待实机验证 | 无实机，只保证实现正确 | ✓ 已定 |
+| 全屏缝隙不重开 | 已解决 | ✓ 已定 |
 
 ## Evolution
 
@@ -75,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone:** 全节审查、Core Value 复核、Out of Scope 审计
 
 ---
-*Last updated: 2026-09-01 after Phase 05*
+*Last updated: 2026-09-01 after milestone v1.1 start*
