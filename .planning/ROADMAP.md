@@ -139,7 +139,7 @@ Plans:
   2. ~~用户可配置日志输出路径~~ **2026-09-01 用户决策修订:路径配置功能移除**——log 固定写软件根目录 logs/,exe 旁不可写时静默回退 Application Support;错误记录不因回退中断。
   3. 用户修改卡片偏好或有效日志路径后重启应用，设置仍被保留；切换日志路径不会损坏写入中的诊断记录。
 
-**Plans**: 5 plans（4 executed + 1 gap closure）
+**Plans**: 5/5 plans executed（4 executed + 1 gap closure）
 Plans:
 **Wave 1**
 
@@ -156,7 +156,7 @@ Plans:
 
 **Gap closure** *(blocked on Waves 1–3 completion；G-04-1，D-07 修订语义)*
 
-- [ ] 04-05-PLAN.md — 日志路径配置功能整体移除：通用 tab 仅留开关行、设置 store 单偏好化、位置链收窄双层（exe 根 → AS）、协调器仅启动激活、D-04 通知桥作废、测试与 l10n 同步收窄（SET-02 修订语义）。
+- [x] 04-05-PLAN.md — 日志路径配置功能整体移除：通用 tab 仅留开关行、设置 store 单偏好化、位置链收窄双层（exe 根 → AS）、协调器仅启动激活、D-04 通知桥作废、测试与 l10n 同步收窄（SET-02 修订语义）。
 
 **UI hint**: yes
 
@@ -186,5 +186,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. 统一捕获与报告契约 | 4/4 | Complete    | 2026-08-30 |
 | 2. 可信定位与文件证据 | 4/4 | Complete    | 2026-08-30 |
 | 3. 播放错误桥与非模态卡片 | 6/6 | Complete    | 2026-08-31 |
-| 4. 错误反馈设置 | 4/4 | In Progress|  |
+| 4. 错误反馈设置 | 5/5 | In Progress|  |
 | 5. 端到端韧性验证 | 0/TBD | Not started | - |
