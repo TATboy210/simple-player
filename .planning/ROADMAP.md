@@ -35,10 +35,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. 应用在 Win10 上启动时不产生 DWM 属性错误——能力探测正确识别 Win10 并门控 Win11 22000+ 专属属性调用（实机可观测：日志无 E_INVALIDARG，不崩溃）。
   2. 应用在 Win11 上启动时能力探测正确识别 build 22000+，使后续阶段的边框/圆角属性可生效（实机可观测：后续阶段属性生效）。
   3. C1 NCCALCSIZE 多分支处理器（fullscreen→8px inset / maximized→overshoot / default→return 0）有自动化回归测试，折叠为裸 `return 0` 时测试失败；全屏切换在 Win11 实机上无 8px 缝隙（实机 UAT）。
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01-PLAN.md — DwmCapabilities FFI probe (ENAB-01): RtlGetVersion build number + DwmGetWindowAttribute availability for 4 Win11 22000+ attributes, facade + ValueNotifier + D-04 failure reporting
+- [ ] 06-02-PLAN.md — C1/C2 pinning gate (ENAB-02): gate script (GATE 1 C1 structure fingerprint + GATE 2 C2 VideoState.isFullscreen negative-grep) + real-hardware UAT checklist
 
 ### Phase 7: 去主题色边框
 
@@ -127,7 +128,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 6. 能力探测与 C1/C2 钉死 | 0/TBD | Not started | - |
+| 6. 能力探测与 C1/C2 钉死 | 0/2 | Planning complete | - |
 | 7. 去主题色边框 | 0/TBD | Not started | - |
 | 8. 圆角统一 | 0/TBD | Not started | - |
 | 9. 标题栏拖拽可靠性 | 0/TBD | Not started | - |
