@@ -61,3 +61,26 @@ skipped: 2
 blocked: 0
 
 ## Gaps
+
+- gap_id: G-04-1
+  truth: "日志路径配置功能整体移除——通用 tab 仅剩卡片开关;log 固定软件根目录 logs/(双层回退 exe→AS 保留,校验保留作内部探测);SET-02 按修订语义关账"
+  status: failed
+  reason: "User reported: 只是觉得更改log的保存路径的功能太鸡肋，移除这个细节吧，log文件保存在软件的根目录下"
+  severity: minor
+  test: 3
+  root_cause: "产品决策而非缺陷——功能已按原 SET-02 交付并验证,用户实测后判定不需要;D-07 已锁定修订语义"
+  artifacts:
+    - path: "lib/ui/dialogs/settings/general_settings_content.dart"
+      issue: "路径行/浏览/防抖校验 UI 待移除(保留开关行)"
+    - path: "lib/ui/dialogs/settings/error_feedback_settings.dart"
+      issue: "logDirectory 字段待移除(保留 errorCardEnabled);双层回退保留"
+    - path: "lib/kernel/diagnostics/error_log_location.dart"
+      issue: "配置层(configured tier)待移除,链收窄为 exe→AS;validateConfiguredDirectory 保留作内部探测"
+    - path: "lib/ui/dialogs/settings/diagnostic_log_target.dart"
+      issue: "协调器简化为仅启动激活(运行时重定向 API 无调用方后可收窄)"
+  missing:
+    - "移除路径行 UI 与 logDirectory 字段及关联测试"
+    - "resolve 链收窄为双层;启动激活接线保持"
+    - "D-04 通知桥移除(无配置失败场景)"
+    - "受影响测试同步收窄(契约翻转用例改写为双层断言)"
+  debug_session: ""
