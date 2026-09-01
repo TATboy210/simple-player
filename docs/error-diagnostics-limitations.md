@@ -72,9 +72,13 @@ Out of Scope).
 - **心跳行:** 主侧默认每 **30 秒**写一条心跳行(`heartbeatInterval`)。
   应用健康时,日志时间戳以 ≤30s 的间隔持续推进。
 - **「日志不可用」状态含义:** `logsAvailable` notifier 置 false = 写盘链
-  已降级(磁盘 I/O 失败,once-guard:cancel 心跳 → 缓冲重放 → 放行未决
-  drain/dispose)。此时卡片「打开日志」按钮给「日志文件不可用」提示;
-  捕获链**不受影响**——错误照常入队、照常上卡,只是文件证据暂缺。
+  已降级,**分两种成因,处置不同**:
+  - **磁盘 I/O 写失败**(失败被收容,不毒化后续写):`logsAvailable`
+    置假但**心跳继续**——心跳停写不是磁盘失败的信号;
+  - **worker 死亡 / spawn 失败**:走 once-guard 降级(cancel 心跳 →
+    缓冲重放 → 放行未决 drain/dispose),心跳**停写**。
+  两种成因下卡片「打开日志」按钮都给「日志文件不可用」提示;捕获链
+  **不受影响**——错误照常入队、照常上卡,只是文件证据暂缺。
 - **卡死时间窗读数方法(核心):** 主 isolate 卡死时,心跳 Timer 无法触发,
   心跳行**停写**;恢复后下一条记录(错误或心跳)会接上。因此:
   1. 在 error.log 中找到**最后一条正常心跳行**的时间戳 T1;
@@ -91,7 +95,11 @@ Out of Scope).
 written every 30s by default. When the main isolate freezes, heartbeats
 stop — the gap between the last healthy heartbeat (T1) and the first
 following record (T2) is the frozen window. `logsAvailable == false` means
-the write chain degraded (capture/presentation continue unaffected). The
+the write chain degraded, with two distinct causes: a disk I/O write
+failure sets it false while the heartbeat keeps running; only worker
+death/spawn failure triggers the once-guard (cancel heartbeat → pending
+replay → release drain/dispose) and stops heartbeats. Capture/presentation
+continue unaffected in both cases. The
 log path resolves via the exe-root → Application Support fallback chain in
 `error_log_location.dart`.
 
@@ -108,11 +116,15 @@ log path resolves via the exe-root → Application Support fallback chain in
 **注册表键位(管理员权限):**
 
 ```
-HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\simple_player.exe
+HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\simple_player_flutter.exe
 ```
 
-- 全局兜底可省略 `\simple_player.exe` 子键(对所有应用生效);建议建
-  per-app 子键只兜本项目。
+- 全局兜底可省略 `\simple_player_flutter.exe` 子键(对所有应用生效);
+  建议建 per-app 子键只兜本项目。
+- 子键名必须与可执行文件名**逐字一致**——以 `windows/CMakeLists.txt`
+  的 `set(BINARY_NAME "simple_player_flutter")` 为准;将来改名需同步
+  此键与下文 dump 文件名,否则 WER **静默不生效**(dump 一个都不会
+  产出,且无任何报错)。
 - 用户级替代:`HKCU\...\LocalDumps` 同结构(HKLM 需管理员,二选一)。
 
 **建议值:**
@@ -125,7 +137,8 @@ HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\simple_player
 
 **与本项目的配合读数:**
 
-1. 原生崩溃发生后,先查 `DumpFolder` 下是否有新 `simple_player.exe.<pid>.dmp`;
+1. 原生崩溃发生后,先查 `DumpFolder` 下是否有新
+   `simple_player_flutter.exe.<pid>.dmp`;
 2. 用 WinDbg/VisualStudio 打开 dump,`!analyze -v` 定位崩溃模块
    (预期常落在 libmpv/FFI 相关 DLL);
 3. 同时检查 error.log 的最后心跳时间戳(§3 方法)——若最后记录远早于
