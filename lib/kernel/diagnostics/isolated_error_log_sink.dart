@@ -20,153 +20,8 @@ import 'error_report.dart';
 import 'error_reporting_dependencies.dart';
 import 'kernel_logger.dart';
 
-/// 主 isolate → worker isolate 的请求消息。
-///
-/// 私有 sealed 协议；同 isolate 组内对象可直接经 SendPort 递送。
-sealed class _MainToWorker {
-  const _MainToWorker();
-}
-
-/// 追加写入一个已格式化诊断包。
-final class _WriteRequest extends _MainToWorker {
-  const _WriteRequest(this.id, this.pack);
-
-  final int id;
-  final String pack;
-}
-
-/// 同步点 —— drain 等待此前全部写入请求处理完成。
-final class _DrainRequest extends _MainToWorker {
-  const _DrainRequest(this.id);
-
-  final int id;
-}
-
-/// 优雅关闭 —— worker 处理完此前全部请求后携带最终消息退出。
-final class _CloseRequest extends _MainToWorker {
-  const _CloseRequest(this.id);
-
-  final int id;
-}
-
-/// worker isolate → 主 isolate 的应答消息。
-sealed class _WorkerToMain {
-  const _WorkerToMain();
-}
-
-/// 握手 —— worker 就绪并交出请求口。
-final class _WorkerHandshake extends _WorkerToMain {
-  const _WorkerHandshake(this.requestPort);
-
-  final SendPort requestPort;
-}
-
-/// 单条写入成功。
-final class _WriteOk extends _WorkerToMain {
-  const _WriteOk(this.id);
-
-  final int id;
-}
-
-/// drain 同步点完成。
-final class _DrainOk extends _WorkerToMain {
-  const _DrainOk(this.id);
-
-  final int id;
-}
-
-/// 优雅关闭完成（Isolate.exit 的最终消息）。
-final class _ClosedOk extends _WorkerToMain {
-  const _ClosedOk(this.id);
-
-  final int id;
-}
-
-/// 单条写入失败 —— 只回 errorType 字符串，不跨 SendPort 传 message。
-final class _WriteFailed extends _WorkerToMain {
-  const _WriteFailed(this.id, this.errorType);
-
-  final int id;
-  final String errorType;
-}
-
-/// spawn 时递给 worker 的启动载荷：应答口与受控日志路径。
-final class _WorkerConfig {
-  const _WorkerConfig({required this.replyTo, required this.path});
-
-  final SendPort replyTo;
-  final String path;
-}
-
-/// worker isolate 入口（Isolate.spawn 要求顶层函数）。
-///
-/// 写盘语义镜像 ErrorLogFileSink 的 writeAsString append 逐次开合：
-/// append 打开（不存在则创建）→ UTF-8 写入 → flush。写失败绝不外溢，
-/// 以 [_WriteFailed]（errorType-only）回流主侧失败门。
-Future<void> _logWorkerEntry(_WorkerConfig config) async {
-  final requestPort = ReceivePort();
-  config.replyTo.send(_WorkerHandshake(requestPort.sendPort));
-  await for (final message in requestPort) {
-    switch (message) {
-      case _WriteRequest(:final id, :final pack):
-        config.replyTo.send(_writePackSync(config.path, id, pack));
-      case _DrainRequest(:final id):
-        config.replyTo.send(_DrainOk(id));
-      case _CloseRequest(:final id):
-        // 最终消息经就绪口回流（Isolate.exit 保证送达）后立即退出；
-        // 请求口随 exit 一并关闭，此后到达的请求被丢弃。
-        Isolate.exit(config.replyTo, _ClosedOk(id));
-    }
-  }
-}
-
-/// 同步写一个 pack：每消息现开现关句柄。
-///
-/// 为什么不持常驻句柄：空闲期 worker 零 OS 句柄，既有消费者的 teardown
-/// 删临时目录（diagnostic_log_target_test）与 fire-and-forget dispose
-/// （general_settings_content_test）都不会被常驻 worker 阻塞。
-/// 成功回 _WriteOk，失败回 _WriteFailed（sealed 应答组）。
-_WorkerToMain _writePackSync(String path, int id, String pack) {
-  RandomAccessFile? handle;
-  try {
-    // 用非空局部承接句柄：写/flush 走非空变量；try 内赋值的可空局部
-    // 不参与空安全提升。
-    final opened = File(path).openSync(mode: FileMode.append);
-    handle = opened;
-    opened.writeStringSync(pack, encoding: utf8);
-    opened.flushSync();
-    return _WriteOk(id);
-  } on Object catch (error) {
-    // errorType-only 纪律：与 _defaultDegradedOutput 一致，只传 runtimeType
-    // 字符串，不把诊断 message 带出子 isolate。
-    return _WriteFailed(id, error.runtimeType.toString());
-  } finally {
-    // best-effort 关闭：清理失败不改变已判定的写结果（D-01 静默失败哲学）。
-    try {
-      handle?.closeSync();
-    } on Object {
-      // 句柄可能已随写失败失效；忽略清理异常。
-    }
-  }
-}
-
-/// 默认 spawn 实现。
-///
-/// 显式 errorsAreFatal: false 使 worker 自容错：单条写失败经 _WriteFailed
-/// 回流主侧，绝不让未捕获异常把 isolate 整体带走；真正的意外死亡由
-/// onExit/onError 兜底降级。
-Future<Isolate> _defaultSpawnWorker(
-  void Function(_WorkerConfig config) entry,
-  _WorkerConfig config, {
-  SendPort? onExit,
-  SendPort? onError,
-}) => Isolate.spawn(
-  entry,
-  config,
-  onExit: onExit,
-  onError: onError,
-  errorsAreFatal: false,
-);
+// Worker 协议/入口/spawn 缝位于同一 library 的 part 文件（文件尺寸预算）。
+part 'isolated_error_log_sink_worker.dart';
 
 /// 主 isolate 卡死容忍的日志 sink —— 写入执行位置挪进常驻 logging isolate。
 ///
@@ -184,12 +39,19 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   ///
   /// Worker spawn starts immediately; spawn failure never throws out of the
   /// constructor (degradation is handled internally).
+  ///
+  /// [spawnWorker] 仅为测试注入缝；[heartbeatInterval] 默认 30s，心跳空档
+  /// 即主 isolate 卡死时间窗的运营读数（headless 不可单测时间窗本身）。
   IsolatedErrorLogSink({
     required File file,
     void Function(Object error, StackTrace stackTrace)? degradedOutput,
+    @visibleForTesting WorkerSpawner? spawnWorker,
+    Duration heartbeatInterval = const Duration(seconds: 30),
   }) : _file = file,
        _path = file.path,
-       _degradedOutput = degradedOutput ?? _defaultDegradedOutput {
+       _degradedOutput = degradedOutput ?? _defaultDegradedOutput,
+       _spawnWorker = spawnWorker ?? _defaultSpawnWorker,
+       _heartbeatInterval = heartbeatInterval {
     _startWorker();
   }
 
@@ -197,6 +59,8 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
 
   /// 受控日志路径快照 —— worker 配置与 pack 的 Log Path 段共用同一读数。
   final String _path;
+  final WorkerSpawner _spawnWorker;
+  final Duration _heartbeatInterval;
   final void Function(Object error, StackTrace stackTrace) _degradedOutput;
 
   /// Stable availability state for a future non-modal presentation.
@@ -219,19 +83,26 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   final Completer<void> _modeReady = Completer<void>();
 
   bool _closed = false;
+  bool _degraded = false;
+  bool _receivedClosedOk = false;
   Future<void>? _disposeFuture;
   ErrorLogFileSink? _fallback;
+  Timer? _heartbeatTimer;
   ReceivePort? _readyPort;
   ReceivePort? _exitPort;
   ReceivePort? _errorPort;
 
+  /// 供测试轮询降级完成（消除 kill→onExit 事件竞态）。
+  @visibleForTesting
+  bool get isDegradedForTesting => _degraded;
+
   /// Accepts an ErrorReporter effect call and queues eligible durable evidence.
   ///
-  /// 永不上抛（effect 契约）：关断后经回退直写，握手前缓冲，其余经
+  /// 永不上抛（effect 契约）：关断/降级后经回退直写，握手前缓冲，其余经
   /// severity 门格式化后递送 worker。
   @override
   void record(ErrorReport report, ReportAcceptance acceptance) {
-    if (_closed) {
+    if (_closed || _degraded) {
       _ensureFallback()?.record(report, acceptance);
       return;
     }
@@ -250,13 +121,14 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   /// drain 不在 DiagnosticLogSink 接口内（同 ErrorLogFileSink 的额外能力）。
   Future<void> drain() async {
     await _modeReady.future;
-    if (_closed) {
+    if (_closed || _degraded) {
+      // 降级路径：等待回退链完成（含缓冲重放的直写）。
       final fallback = _ensureFallback();
       return fallback?.drain() ?? Future<void>.value();
     }
     final requestPort = _requestPort;
     if (requestPort == null) {
-      // 不可达防御：modeReady 只在握手后完成。兜底避免任何路径挂死。
+      // 不可达防御：modeReady 只在握手/降级后完成。兜底避免任何路径挂死。
       return;
     }
     final id = ++_nextId;
@@ -275,8 +147,11 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   /// Sends the close request and awaits the worker's final message.
   Future<void> _disposeNow() async {
     await _modeReady.future;
+    // dispose 与降级两路径都必须 cancel 心跳（T-EYW-05 生命周期纪律）。
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     final requestPort = _requestPort;
-    if (_closed || requestPort == null) {
+    if (_closed || _degraded || requestPort == null) {
       _closed = true;
       final fallback = _fallback;
       if (fallback != null) {
@@ -291,6 +166,11 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
     await ack.future;
     _closed = true;
     _closeWorkerPorts();
+    // 关闭确认与降级竞争时兜底释放回退链（无 OS 句柄，幂等无害）。
+    final fallback = _fallback;
+    if (_degraded && fallback != null) {
+      await fallback.dispose();
+    }
   }
 
   /// 关闭主侧三个监听口（干净关闭与降级共用）。
@@ -306,7 +186,7 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
     _errorPort = null;
   }
 
-  /// 派生常驻 worker：建就绪口与退出/错误口，spawn 并监听应答。
+  /// 派生常驻 worker：建就绪口与退出/错误口，经注入缝 spawn 并监听应答。
   void _startWorker() {
     final readyPort = ReceivePort();
     final exitPort = ReceivePort();
@@ -315,23 +195,28 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
     _exitPort = exitPort;
     _errorPort = errorPort;
     readyPort.listen(_handleWorkerMessage);
-    // onExit/onError 都汇入幂等 _handleWorkerGone（降级编排在后续任务填充）。
+    // onExit/onError 都汇入幂等 _handleWorkerGone（干净关闭静默收尾）。
     exitPort.listen((_) => _handleWorkerGone());
     errorPort.listen((_) => _handleWorkerGone());
-    // spawn Future 的异步失败同样汇入 _handleWorkerGone，绝不外溢。
-    unawaited(
-      _defaultSpawnWorker(
-        _logWorkerEntry,
-        _WorkerConfig(replyTo: readyPort.sendPort, path: _path),
-        onExit: exitPort.sendPort,
-        onError: errorPort.sendPort,
-      ).then<void>(
-        (_) {},
-        onError: (Object error, StackTrace stackTrace) {
-          _handleWorkerGone();
-        },
-      ),
-    );
+    try {
+      // 同步 spawn 失败立即降级；异步失败经 then/onError 汇入同一幂等路径。
+      unawaited(
+        _spawnWorker(
+          _logWorkerEntry,
+          _WorkerConfig(replyTo: readyPort.sendPort, path: _path),
+          onExit: exitPort.sendPort,
+          onError: errorPort.sendPort,
+        ).then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stackTrace) {
+            _handleWorkerGone();
+          },
+        ),
+      );
+    } on Object {
+      // 同步 spawn 失败（注入假缝或环境拒绝）：降级永不外溢。
+      _handleWorkerGone();
+    }
   }
 
   /// 就绪口唯一监听：握手 → 存请求口 → flush 缓冲 → 放行 drain/dispose。
@@ -344,7 +229,10 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
       case _WorkerHandshake(:final requestPort):
         _requestPort = requestPort;
         _flushPending();
-        _modeReady.complete();
+        _startHeartbeat();
+        if (!_modeReady.isCompleted) {
+          _modeReady.complete();
+        }
       case _WriteOk():
         _consecutiveFailures = 0;
         logsAvailable.value = true;
@@ -353,12 +241,80 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
       case _DrainOk(:final id):
         _drainAcks.remove(id)?.complete();
       case _ClosedOk(:final id):
+        // 先于 onExit 空消息到达（Isolate.exit 的最终消息保证先发）：
+        // 标记干净关闭，使随后的 _handleWorkerGone 不误降级。
+        _receivedClosedOk = true;
         _closeAcks.remove(id)?.complete();
     }
   }
 
-  /// worker 退出/出错兜底 —— 降级编排在后续任务填充（当前留空）。
-  void _handleWorkerGone() {}
+  /// worker 退出/出错兜底：干净关闭只收尾端口，意外退出幂等降级。
+  void _handleWorkerGone() {
+    if (_closed || _receivedClosedOk || _degraded) {
+      _closeWorkerPorts();
+      return;
+    }
+    _degradeAndReplay();
+  }
+
+  /// 幂等降级（once-guard）：cancel 心跳 → 缓冲重放 → 放行未决 drain/dispose。
+  ///
+  /// Side effect: 请求口置空、主侧监听口全关、后续 record 直通回退链；
+  /// 降级全程不上抛（D-01/D-02 静默失败哲学），模式切换不触碰失败门读数。
+  void _degradeAndReplay() {
+    if (_degraded || _closed) {
+      return;
+    }
+    _degraded = true;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _requestPort = null;
+    _closeWorkerPorts();
+    // 缓冲重放：原始 report 经 fallback.record 重格式化
+    // （formatDiagnosticPack 纯函数输出逐字符一致，绝不双写）。
+    while (_pending.isNotEmpty) {
+      final (report, acceptance) = _pending.removeFirst();
+      _ensureFallback()?.record(report, acceptance);
+    }
+    if (!_modeReady.isCompleted) {
+      _modeReady.complete();
+    }
+    // 未决 drain/close 应答直接放行，避免 worker 死亡后挂死调用方。
+    for (final ack in _drainAcks.values) {
+      ack.complete();
+    }
+    _drainAcks.clear();
+    for (final ack in _closeAcks.values) {
+      ack.complete();
+    }
+    _closeAcks.clear();
+  }
+
+  /// 握手后启动心跳 Timer：tick 经写请求通道落盘心跳行。
+  void _startHeartbeat() {
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      _sendHeartbeat();
+    });
+  }
+
+  /// 心跳 tick：缓冲期/降级期/关闭期直接丢弃（错过一条 30s 心跳无害）。
+  ///
+  /// 心跳不经 severity 门，但共享 ack 失败门（磁盘健康信号语义一致）。
+  void _sendHeartbeat() {
+    if (_closed || _degraded) {
+      return;
+    }
+    final requestPort = _requestPort;
+    if (requestPort == null) {
+      return;
+    }
+    requestPort.send(_WriteRequest(++_nextId, _heartbeatLine()));
+  }
+
+  /// 心跳行（钦定格式）：单行、可 grep（'main alive'）、单 \n 结尾，
+  /// 与报告块的双 \n 结尾形成视觉区分。
+  static String _heartbeatLine() =>
+      '[heartbeat] main alive @ ${DateTime.now().toUtc().toIso8601String()}\n';
 
   /// 握手后一次性回放缓冲记录（逐条 severity 门 + 格式化 + 发送）。
   void _flushPending() {
@@ -405,20 +361,32 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   /// 惰性构造降级回退 sink（[ErrorLogFileSink] 本体，冻结契约零 diff）。
   ///
   /// 构造不可达失败时丢弃并上报降级、返回 null（调用方静默丢弃该记录），
-  /// 保证 record/dispose 路径永不因降级而上抛。
+  /// 保证 record/dispose 路径永不因降级而上抛。回退链的可用性读数前向
+  /// 同步到本 sink 的 notifier，保持「logsAvailable 失败置假/成功恢复」
+  /// 对 delegate 消费者的既有语义。
   ErrorLogFileSink? _ensureFallback() {
     final existing = _fallback;
     if (existing != null) {
       return existing;
     }
     try {
-      return _fallback = ErrorLogFileSink(
+      final fallback = ErrorLogFileSink(
         file: _file,
         degradedOutput: _degradedOutput,
       );
+      fallback.logsAvailable.addListener(_syncFallbackAvailability);
+      return _fallback = fallback;
     } on Object catch (error) {
       _emitDegradedOutput(error);
       return null;
+    }
+  }
+
+  /// 回退链可用性 → 本 sink notifier 的单向同步（降级期唯一写点）。
+  void _syncFallbackAvailability() {
+    final fallback = _fallback;
+    if (fallback != null) {
+      logsAvailable.value = fallback.logsAvailable.value;
     }
   }
 
