@@ -1,10 +1,10 @@
-/// GeneralSettingsContent 通用设置行的行为测试（SET-01/02/03 UI 收口）。
+/// GeneralSettingsContent 通用设置行的行为测试（SET-01/03 UI 收口，G-04-1 后形态）。
 ///
-/// Behavioral tests for the general settings rows: the error-card toggle
-/// (flip-then-persist), the debounced log-directory input (validate → save →
-/// apply, three-nos on failure, clear-to-default-chain), the browse gateway
-/// seam (null-cancel ignored, backfill same chain), and the D-04 inline
-/// effective-path / fallback-reason display.
+/// Behavioral tests for the general settings rows after the G-04-1 removal:
+/// the error-card toggle (flip-then-persist) is the only row, and the removed
+/// log-path surface (input field / browse button / validation status /
+/// effective-path line) is asserted absent (G-04-1 UI 面，UAT Test 3/5 对应
+/// 自动化证据).
 library;
 
 import 'dart:async';
@@ -25,11 +25,8 @@ void main() {
   late DelegatingDiagnosticLogEffect delegate;
   late File activeFile;
 
-  // 固定中文 locale —— 行内状态文案断言不随宿主环境漂移。
-  Widget buildSubject({
-    Duration debounceDuration = const Duration(milliseconds: 20),
-    Future<String?> Function()? directoryPicker,
-  }) {
+  // 固定中文 locale —— 断言文案不随宿主环境漂移。
+  Widget buildSubject() {
     return MaterialApp(
       locale: const Locale('zh'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -38,10 +35,7 @@ void main() {
         body: SizedBox(
           width: 420,
           height: 320,
-          child: GeneralSettingsContent(
-            debounceDuration: debounceDuration,
-            directoryPicker: directoryPicker,
-          ),
+          child: GeneralSettingsContent(),
         ),
       ),
     );
@@ -50,7 +44,7 @@ void main() {
   /// 交替推进 fake 微任务与真实 I/O 直到 [condition] 成立。
   ///
   /// widget 测试的 FakeAsync zone 不派发真实文件事件：pump 冲刷 fake 微任务
-  /// （推进 coordinator 链的续体），runAsync 窗口放行真实 I/O 完成事件。
+  /// （推进持久化链的续体），runAsync 窗口放行真实 I/O 完成事件。
   Future<void> pumpUntil(
     WidgetTester tester,
     bool Function() condition,
@@ -86,8 +80,8 @@ void main() {
     );
     ErrorFeedbackSettings.I.resetForTesting(settingsFile: () => settingsFile);
     addTearDown(() => ErrorFeedbackSettings.I.resetForTesting());
-    // 协调器重绑：真实 delegate + 临时 exe/AS 目录（04-02 测试惯例），
-    // 激活一个旧落点使 effectiveLogPath 有初值。
+    // 协调器重绑：真实 delegate + 临时落点（04-02 测试惯例）。provider 形参
+    // 已随 G-04-1 重定向面移除，resetForTesting 只重绑 effect 缝。
     delegate = DelegatingDiagnosticLogEffect();
     final activeDir =
         Directory('${root.path}${Platform.pathSeparator}active')..createSync();
@@ -95,13 +89,7 @@ void main() {
       '${activeDir.path}${Platform.pathSeparator}'
       '${ErrorLogLocation.logFileName}',
     );
-    DiagnosticLogTarget.I.resetForTesting(
-      effect: delegate,
-      applicationSupportDirectory: () async =>
-          Directory('${root.path}${Platform.pathSeparator}as'),
-      executableDirectory: () =>
-          Directory('${root.path}${Platform.pathSeparator}exe'),
-    );
+    DiagnosticLogTarget.I.resetForTesting(effect: delegate);
     DiagnosticLogTarget.I.activateResolved(file: activeFile);
     // dispose 的内部 await 链（drain）在 body 结束后的 teardown 阶段无 pump
     // 推进 —— FakeAsync 微任务饥饿会让 await 永不完成（10 分钟超时实证）。
@@ -135,206 +123,30 @@ void main() {
     expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isTrue);
   });
 
-  testWidgets('debounced valid directory validates, saves, and retargets', (
-    tester,
-  ) async {
-    final writable =
-        Directory('${root.path}${Platform.pathSeparator}writable');
+  testWidgets('general tab renders the toggle row only; the removed log-path '
+      'surface is absent (G-04-1)', (tester) async {
     await tester.pumpWidget(buildSubject());
 
-    await tester.enterText(find.byType(TextField), writable.path);
-    // 防抖到期前零副作用：store 未保存、有效路径未变、状态未进校验中。
-    await tester.pump(const Duration(milliseconds: 5));
-    expect(ErrorFeedbackSettings.I.state.value.logDirectory, isEmpty);
-    expect(DiagnosticLogTarget.I.effectiveLogPath.value, activeFile.path);
+    // 路径配置面整体缺席（G-04-1）：文本输入框 / 浏览按钮 / 行内校验状态 /
+    // 有效路径行在任何形态下都不渲染。
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byKey(const ValueKey('settings-log-path-browse')), findsNothing);
     expect(find.text('校验中…'), findsNothing);
-
-    // 防抖到期 → 行内校验→保存→apply 全协议生效。
-    await tester.pump(const Duration(milliseconds: 30));
-    await pumpUntil(
-      tester,
-      () => DiagnosticLogTarget.I.effectiveLogPath.value != activeFile.path,
-    );
-
-    final expectedFile = '${writable.path}${Platform.pathSeparator}'
-        '${ErrorLogLocation.logFileName}';
-    expect(DiagnosticLogTarget.I.effectiveLogPath.value, expectedFile);
-    // 校验通过即保存（D-03 discretion）。
-    expect(ErrorFeedbackSettings.I.state.value.logDirectory, writable.path);
-    // 行内状态：可写✓。
-    expect(find.text('目录可写'), findsOneWidget);
-  });
-
-  testWidgets('invalid path shows inline failure without saving or retargeting', (
-    tester,
-  ) async {
-    // 指向「文件」的路径 —— 目录 create 遇同名文件占据，探测必败。
-    // 写文件用同步 I/O：testWidgets body 的 FakeAsync zone 不派发真实文件
-    // 事件，await 真实 I/O 会永不完成（04-03 实证陷阱）。
-    final fileAsPath = File('${root.path}${Platform.pathSeparator}plain.txt');
-    fileAsPath.writeAsStringSync('x');
-    await tester.pumpWidget(buildSubject());
-
-    await tester.enterText(find.byType(TextField), fileAsPath.path);
-    await tester.pump(const Duration(milliseconds: 30));
-    await pumpUntil(
-      tester,
-      () => find.text('无法写入该目录').evaluate().isNotEmpty,
-    );
-
-    // 三不：不保存 / 不重定向 / 行内✗；输入内容保留（用户可修正）。
-    expect(ErrorFeedbackSettings.I.state.value.logDirectory, isEmpty);
-    expect(DiagnosticLogTarget.I.effectiveLogPath.value, activeFile.path);
-    expect(find.text(fileAsPath.path), findsOneWidget);
-  });
-
-  testWidgets('clearing the input restores the default chain', (tester) async {
-    final writable =
-        Directory('${root.path}${Platform.pathSeparator}custom');
-    await tester.pumpWidget(buildSubject());
-
-    // 先配置到自定义目录，再清空 → 应回默认链（'' = reset 语义）。
-    // 第一段等待以「有效路径已换位」为准（swap 完成 = 链完全落定）——
-    // store 先于 swap 更新，若在其间继续输入会与未完成的换位并发竞争。
-    await tester.enterText(find.byType(TextField), writable.path);
-    await tester.pump(const Duration(milliseconds: 30));
-    await pumpUntil(
-      tester,
-      () => DiagnosticLogTarget.I.effectiveLogPath.value ==
-          '${writable.path}${Platform.pathSeparator}'
-          '${ErrorLogLocation.logFileName}',
-    );
-
-    await tester.enterText(find.byType(TextField), '');
-    await tester.pump(const Duration(milliseconds: 30));
-    // 条件以「链解析出的最终落点」为准 —— store=='' 同步先置，effective 换位
-    // 完成才算提交链落定（避免 swap 未完成即返回的竞态）。
-    await pumpUntil(
-      tester,
-      () => DiagnosticLogTarget.I.effectiveLogPath.value ==
-          '${root.path}${Platform.pathSeparator}exe'
-          '${Platform.pathSeparator}${ErrorLogLocation.logsDirectoryName}'
-          '${Platform.pathSeparator}${ErrorLogLocation.logFileName}',
-    );
-
-    // 默认链解析：注入 exe 根（root/exe，校验时现场创建）logs/error.log。
-    expect(
-      DiagnosticLogTarget.I.effectiveLogPath.value,
-      '${root.path}${Platform.pathSeparator}exe'
-      '${Platform.pathSeparator}${ErrorLogLocation.logsDirectoryName}'
-      '${Platform.pathSeparator}${ErrorLogLocation.logFileName}',
-    );
-  });
-
-  testWidgets('browse cancel is ignored without side effects', (tester) async {
-    await tester.pumpWidget(
-      buildSubject(directoryPicker: () async => null),
-    );
-    final before = DiagnosticLogTarget.I.effectiveLogPath.value;
-
-    await tester.tap(find.byKey(const ValueKey('settings-log-path-browse')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 30)),
-    );
-    await tester.pump();
-
-    // null ≠ 清空：无任何校验/保存/重定向副作用（Pitfall：null-cancel）。
-    expect(DiagnosticLogTarget.I.effectiveLogPath.value, before);
-    expect(ErrorFeedbackSettings.I.state.value.logDirectory, isEmpty);
-    expect(find.text('校验中…'), findsNothing);
-  });
-
-  testWidgets('browse backfill runs the same validate-save-apply chain', (
-    tester,
-  ) async {
-    final picked = Directory('${root.path}${Platform.pathSeparator}picked');
-    await tester.pumpWidget(
-      buildSubject(directoryPicker: () async => picked.path),
-    );
-
-    await tester.tap(find.byKey(const ValueKey('settings-log-path-browse')));
-    // 回填立即出现在输入框（与手输同一防抖链路，尚未到期）。
-    await tester.pump();
-    expect(find.text(picked.path), findsOneWidget);
-
-    await tester.pump(const Duration(milliseconds: 30));
-    final expectedFile = '${picked.path}${Platform.pathSeparator}'
-        '${ErrorLogLocation.logFileName}';
-    await pumpUntil(
-      tester,
-      () => DiagnosticLogTarget.I.effectiveLogPath.value == expectedFile,
-    );
-    expect(ErrorFeedbackSettings.I.state.value.logDirectory, picked.path);
-    expect(find.text('目录可写'), findsOneWidget);
-  });
-
-  testWidgets('effective path and fallback reason are shown inline', (
-    tester,
-  ) async {
-    await tester.pumpWidget(buildSubject());
-
-    // 模拟「配置层失败后的有效路径」：store 指向一个目录而有效落点不同。
-    ErrorFeedbackSettings.I.setLogDirectory('Z:\\not\\a\\real\\directory');
-    await tester.pump();
-
-    // D-04 第一通道：当前有效路径常显 + 回退原因。
-    // 完整行 = 标签 + 路径单匹配（输入框初值同路径但无标签前缀，不误配）。
-    expect(
-      find.textContaining('当前有效路径：${activeFile.path}'),
-      findsOneWidget,
-    );
-    expect(find.text('已回退到默认位置'), findsOneWidget);
-  });
-
-  testWidgets('directory input is seeded from the store, not the file path', (
-    tester,
-  ) async {
-    // Arrange — store 预置配置目录（≠ 解析后的有效文件路径）。
-    ErrorFeedbackSettings.I.setLogDirectory(root.path);
-    await tester.pumpWidget(buildSubject());
-
-    // Assert — 输入框初值 = 配置目录本身（WR-02：以 error.log 文件路径作
-    // 种子会让增量编辑把文件段带进目录值）；有效文件路径仍由常显行承载。
-    expect(find.text(root.path), findsOneWidget);
-    expect(
-      find.textContaining('当前有效路径：${activeFile.path}'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('picker failure shows a dedicated inline status (IN-02)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      buildSubject(directoryPicker: () async => throw Exception('picker boom')),
-    );
-
-    await tester.tap(find.byKey(const ValueKey('settings-log-path-browse')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 30));
-
-    // Assert — picker 自身失败不复用 notWritable 文案（IN-02），且无任何
-    // 校验/保存/重定向副作用。
-    expect(find.text('无法打开目录选择器'), findsOneWidget);
+    expect(find.text('目录可写'), findsNothing);
     expect(find.text('无法写入该目录'), findsNothing);
-    expect(DiagnosticLogTarget.I.effectiveLogPath.value, activeFile.path);
-    expect(ErrorFeedbackSettings.I.state.value.logDirectory, isEmpty);
-  });
+    expect(find.text('无法打开目录选择器'), findsNothing);
+    expect(find.textContaining('当前有效路径'), findsNothing);
 
-  testWidgets('fallback detection is case-insensitive (IN-01)', (tester) async {
-    await tester.pumpWidget(buildSubject());
-
-    // Arrange — 配置目录 = 有效落点父目录的大小写翻转变体。
-    final parent = activeFile.parent.path;
-    final flipped = parent == parent.toUpperCase()
-        ? parent.toLowerCase()
-        : parent.toUpperCase();
-    ErrorFeedbackSettings.I.setLogDirectory(flipped);
+    // 开关行仍是唯一设置行且行为不变：翻转置 store 并可等待持久化
+    //（pendingPersist 等待点经 runAsync 放行真实 I/O，见 04-04 协议）。
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    await tester.tap(find.byType(Switch));
     await tester.pump();
-
-    // Assert — Windows 大小写不敏感：同目录不同大小写不应误报「已回退」。
-    expect(find.text('已回退到默认位置'), findsNothing);
+    expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isFalse);
+    await tester.runAsync(() => ErrorFeedbackSettings.I.pendingPersist);
+    final persisted = await tester.runAsync(
+      () => settingsFile.readAsString(),
+    );
+    expect(persisted, contains('"errorCardEnabled":false'));
   });
 }
