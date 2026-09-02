@@ -30,6 +30,9 @@
 ### DWM 调用失败上报
 - **D-04:** 属性调用 HRESULT 非 S_OK 时：KernelLogger 每次失败必记；同类失败首次聚合成一条 ErrorReport 上报（复用 v1.0 ErrorReporter 语义去重），错误卡片不刷屏
 
+### C1 规范形态
+- **D-05:** C1 现有单分支结构（守卫注释 + `WS_OVERLAPPEDWINDOW` 样式检查 → 条件 `return 0`）为规范形态——2026-09-02 用户裁决「接受单分支为规范形态」；ENAB-02/ROADMAP 准则 3 的「多分支」措辞系研究对理想形态的描述，已同步修正。Plan 06-02 的 FLAGGED ASSUMPTION 与 06-UAT.md 第 3 节的复核项就此解决：无需三分支，GATE 1 钉死单分支现状（由 Plan 06-02 Task 1 实现）
+
 ### Claude's Discretion
 - MethodChannel 名称与消息结构（遵循项目现有 channel 惯例即可）
 - C++ 侧日志出口选择（OutputDebugString / channel 透传 / 两者）

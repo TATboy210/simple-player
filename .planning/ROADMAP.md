@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Success Criteria** (what must be TRUE):
   1. 应用在 Win10 上启动时不产生 DWM 属性错误——能力探测正确识别 Win10 并门控 Win11 22000+ 专属属性调用（实机可观测：日志无 E_INVALIDARG，不崩溃）。
   2. 应用在 Win11 上启动时能力探测正确识别 build 22000+，使后续阶段的边框/圆角属性可生效（实机可观测：后续阶段属性生效）。
-  3. C1 NCCALCSIZE 多分支处理器（fullscreen→8px inset / maximized→overshoot / default→return 0）有自动化回归测试，折叠为裸 `return 0` 时测试失败；全屏切换在 Win11 实机上无 8px 缝隙（实机 UAT）。
+  3. C1 NCCALCSIZE 处理器的现有规范化结构（守卫注释 + `WS_OVERLAPPEDWINDOW` 样式检查 → 条件 `return 0`；单分支为规范形态——2026-09-02 用户裁决）有自动化回归 gate，折叠为裸 `return 0`（移除样式检查）时 gate 失败；全屏切换在 Win11 实机上无 8px 缝隙（实机 UAT）。
 **Plans**: 2 plans
 
 Plans:
