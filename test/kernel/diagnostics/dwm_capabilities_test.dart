@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/dwm_capabilities.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/dwm_capabilities_probe.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_service_state.dart';
+
+import '../../helpers/fake_kernel_logger.dart';
 
 void main() {
   setUpAll(() {
@@ -105,6 +109,54 @@ void main() {
 
       // Act + Assert — 重复 dispose 安全（既有容器契约）
       expect(state.dispose, returnsNormally);
+    });
+  });
+
+  group('D-04 failure reporting', () {
+    late RecordingLogSink sink;
+    late DwmCapabilitiesProbe probe;
+
+    setUp(() async {
+      await ErrorReporterImpl.resetForTesting();
+      ErrorReporterImpl.init();
+      sink = RecordingLogSink();
+      probe = DwmCapabilitiesProbe(logger: KernelLoggerImpl(sink));
+    });
+
+    tearDown(() async {
+      await ErrorReporterImpl.resetForTesting();
+    });
+
+    test('非 S_OK HRESULT 逐次记录错误日志，含 attribute/build 上下文（每次必记）', () {
+      // Act — 两个不同属性在同一窗口内失败
+      probe.processHResult(0x80070057, 34, 22000);
+      probe.processHResult(0x80070057, 33, 22000);
+
+      // Assert — D-04「每次失败必记」：不抑制、不聚合日志
+      final errors = sink.records.where((r) => r.$1 == LogLevel.error).toList();
+      expect(errors.length, 2, reason: 'D-04: 每次失败必记');
+      expect(errors.first.$2, contains('[DwmCapabilities]'));
+      expect(errors.first.$3?['attribute'], 34);
+      expect(errors.first.$3?['build'], 22000);
+    });
+
+    test('同类失败首次聚合为一条 ErrorReport（10s 窗去重，卡片不刷屏）', () {
+      // Act — 两个不同属性失败，通用消息 + 同源栈 → 语义身份相同
+      probe.processHResult(0x80070057, 34, 22000);
+      probe.processHResult(0x80070057, 33, 22000);
+
+      // Assert — 仅首条入队，第二条合并进 occurrenceCount
+      expect(ErrorReporterImpl.I.queuedReports.length, 1);
+    });
+
+    test('S_OK 不产生错误日志与报告', () {
+      // Act
+      final available = probe.processHResult(0, 34, 22000);
+
+      // Assert
+      expect(available, isTrue);
+      expect(sink.records.where((r) => r.$1 == LogLevel.error), isEmpty);
+      expect(ErrorReporterImpl.I.queuedReports, isEmpty);
     });
   });
 }
