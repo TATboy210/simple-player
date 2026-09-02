@@ -8,7 +8,7 @@
 ### 使能层
 
 - [ ] **ENAB-01**: 启动时一次性 `DwmCapabilities` 探测（Windows build number + borderColor/cornerPreference 等属性可用性布尔），所有 DWM 属性调用以其为门，Win10 上绝不调用 Win11 22000+ 专属属性
-- [ ] **ENAB-02**: C1 缝隙修复钉死——`WM_NCCALCSIZE` 多分支处理器（fullscreen→8px inset / maximized→overshoot / default→return 0）附回归测试 + 守卫注释，后续任何 chrome 工作不得使其回归
+- [ ] **ENAB-02**: C1 缝隙修复钉死——`WM_NCCALCSIZE` 处理器的现有规范化结构（守卫注释 + `WS_OVERLAPPEDWINDOW` 样式检查 → 条件 `return 0`；fullscreen 单分支，maximized/default 走插件回退——2026-09-02 用户裁决「单分支为规范形态」，原「多分支」措辞系研究对理想形态的描述已修正）附回归 gate + 守卫注释，后续任何 chrome 工作不得使其回归
 - [ ] **ENAB-03**: Linux 合成器探测（Wayland/X11/gamescope）结构性实现
 
 ### 边框
