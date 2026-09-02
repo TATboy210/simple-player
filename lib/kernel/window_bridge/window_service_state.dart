@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
+import '../diagnostics/dwm_capabilities.dart';
 import 'window_bridge.dart';
 import 'window_constants.dart';
 
@@ -21,6 +22,13 @@ final class WindowServiceState {
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
+  /// DWM 能力快照 — 启动期探测结果（null until probed）
+  ///
+  /// DWM capability snapshot notifier (peer to [mode]). Identity-preserved:
+  /// Phase 7/8 attribute gates addListener on THIS instance directly.
+  final ValueNotifier<DwmCapabilitySnapshot?> dwmCapabilities =
+      ValueNotifier<DwmCapabilitySnapshot?>(null);
+
   bool _disposed = false;
   bool get disposed => _disposed;
 
@@ -36,5 +44,6 @@ final class WindowServiceState {
     resizeSessionId.dispose();
     isResizing.dispose();
     isAlwaysOnTop.dispose();
+    dwmCapabilities.dispose();
   }
 }
