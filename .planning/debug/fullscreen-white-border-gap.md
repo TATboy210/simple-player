@@ -1,11 +1,16 @@
 ---
-status: investigating
+status: resolved
 trigger: "只读分析 D:\\simple_player_flutter 的 Windows frameless/window bridge/C++ runner 与全屏相关实现。结合当前 git 工作区修改，定位全屏时白边/边框缝隙可能的根因及最小修复方案。不要改文件；指出准确文件和函数。"
 created: 2026-08-03T05:57:49Z
-updated: 2026-08-03T05:57:49Z
+updated: 2026-09-02
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-01
+  status: investigating
 ---
 
 ## Current Focus
+
 <!-- OVERWRITE on each update - reflects NOW -->
 
 hypothesis: Confirmed: window_manager intercepts WM_NCCALCSIZE before FlutterWindow::MessageHandler. waitUntilReadyToShow applies TitleBarStyle.hidden, whose native SetTitleBarStyle forcibly clears is_frameless_. The plugin then takes its hidden/non-maximized path and deliberately subtracts 8px from right/bottom (and offsets left), leaving a resize inset. The runner's return-0 handler is therefore bypassed. Calling setAsFrameless after waitUntilReadyToShow restores the plugin flag before first show and routes all later non-client sizing through its frameless branch.
@@ -17,6 +22,7 @@ candidate_causes: code: native non-client-area calculation; config/environment: 
 and_gate: yes — a visible gap requires both the runner's conditional layout behavior and a Dart/plugin window style state that selects it.
 
 ## Symptoms
+
 <!-- Written during gathering, then IMMUTABLE -->
 
 expected: Frameless and fullscreen Windows player content fills the intended client/display area with no white border or edge seam.
@@ -26,9 +32,11 @@ reproduction: Launch the Windows player and enter fullscreen; inspect all edges,
 started: Not supplied; current working-tree modification is under investigation.
 
 ## Eliminated
+
 <!-- APPEND only - prevents re-investigating -->
 
 ## Evidence
+
 <!-- APPEND only - facts discovered -->
 
 - timestamp: 2026-08-03T05:57:49Z
@@ -52,10 +60,13 @@ started: Not supplied; current working-tree modification is under investigation.
   implication: The observed fullscreen issue is exposed by the native style/message transition; the bridge init ordering is the minimal application-controlled fix.
 
 ## Resolution
+
 <!-- OVERWRITE as understanding evolves -->
 
 root_cause: window_manager 0.5.2 processes WM_NCCALCSIZE before the app runner. WindowService.init requests TitleBarStyle.hidden; its native SetTitleBarStyle resets is_frameless_ to false. For a non-maximized hidden window, the plugin's HandleWindowProc deliberately retains an 8px right/bottom resize allowance, which appears as the white border/edge seam. The runner's unconditional WM_NCCALCSIZE return 0 does not run because the plugin has already returned a result.
-fix: Keep the existing working-tree change: in WindowService.init's windowManager.waitUntilReadyToShow callback, await windowManager.setAsFrameless() immediately before any bounds/show/maximize operation. It must be after waitUntilReadyToShow's internal setTitleBarStyle(hidden), because that call clears the frameless flag. Do not change media_kit fullscreen, UI padding, or the runner handler.
-verification: Static source trace confirms cause and ordering. Runtime Windows verification remains required: launch, inspect all four windowed edges; toggle fullscreen repeatedly; exit fullscreen and confirm window resize behavior remains supplied by SmartDragToResizeArea.
+fix: 两段演进，均已落地。(1) 2026-08-03 按本案结论实施 — WindowService.init 的 waitUntilReadyToShow 回调内 await setAsFrameless()（须在 setTitleBarStyle(hidden) 之后，因该调用清除 frameless 标志），代价为系统 resize 改由 SmartDragToResizeArea 兜底。(2) 后被 C1 取代 — runner 侧 flutter_window.cpp 在插件 delegate 之前抢先处理 WM_NCCALCSIZE（仅当 WS_OVERLAPPEDWINDOW 已摘除时条件 return 0），8px 内缩改由 runner 原生消除；setAsFrameless 方案随后移除，现行代码已无该调用。C1 单分支 NCCALCSIZE 即 2026-09-02 用户裁决的规范形态，由 v1.1 Phase 6 (06-02 gate) 钉死。
+verification: 2026-08-23 实机验证白边/缝隙等三症状全过（C1 b291d7a + C2 0286c22 生效，用户确认结案）。2026-09-02 会话清理核验：windows/runner/flutter_window.cpp:51-67 抢先分支与 win32_window.cpp:39 8px 注释在现行代码中存在；lib/ 已无 setAsFrameless 调用。
 files_changed:
-  - lib/kernel/bridge/window_service.dart
+
+  - lib/kernel/bridge/window_service.dart（2026-08-03 方案，后被 C1 取代）
+  - windows/runner/flutter_window.cpp（C1 抢先分支，现行机制）

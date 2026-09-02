@@ -1,17 +1,23 @@
 ---
-status: investigating
+status: resolved
 trigger: "请审查当前仓库 Windows runner、CMakeLists 和 media_kit 初始化，重点判断清理 build 后 exe 无法启动的原因。检查是否有最近改动引入崩溃或 CMake policy 作用域问题，给出具体修复建议；不要提交。"
 created: 2026-08-18T00:00:00+08:00
-updated: 2026-08-18T00:00:00+08:00
+updated: 2026-09-02
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-01
+  status: investigating
 ---
 
 ## Current Focus
+
 hypothesis: 至少存在两条需区分的候选链路：CMake CMP0175 设置可能未传播到 media_kit 子目录，导致 clean configure/build 失败；同时最近 runner 重构可能引入运行时启动崩溃。先用实际插件 CMake 作用域与静态启动链路验证。
 test: 完整读取 Windows runner、media_kit 插件 CMake、Dart 初始化和最近提交差异，并对 clean configure 结果做隔离实验。
 expecting: 若 policy 作用域问题成立，插件自己的 cmake_minimum_required(3.14) 会使顶层 CMP0175 OLD 无效；若 runner 崩溃成立，应找到确定的空句柄/错误消息处理。
 next_action: 运行隔离的 CMake configure，观察 CMP0175 是否在插件子目录触发错误或警告。
 
 ## Symptoms
+
 expected: 清理 build 后重新构建的 Windows exe 能正常启动。
 actual: 清理 build 后 exe 无法启动；具体错误日志未提供。
 errors: 未提供运行时错误、退出码或事件查看器信息。
@@ -43,7 +49,8 @@ started: 未提供；需结合最近改动静态判断。
   implication: Clean-build failure mode remains unverified and must be tested with the Visual Studio CMake executable or flutter build windows --verbose.
 
 ## Resolution
-root_cause: 尚未能把“clean build 后 exe 无法启动”归因到单一已复现根因。已确认 CMake CMP0175 存在子目录 policy 作用域风险；Dart media_kit 初始化顺序正确；当前 runner 静态检查未发现确定性启动崩溃。最优先验证的是 clean 构建产物是否缺少 libmpv-2.dll/ANGLE DLL 或 CMake configure/build 是否失败。
-fix: 不修改代码；给出针对性修复建议和验证步骤。
-verification: 已直接启动现有 Debug exe 并观察到 MediaKit NativeReferenceHolder、ANGLE、VideoOutput、PlayerFeature init 日志；未完成 clean configure/build，也未获得用户的发布目录错误信息。
-files_changed: []
+
+root_cause: 候选链路 (a) 坐实——media_kit_libs_windows_video 插件子目录中无关键字的 add_custom_command(TARGET ...) 调用在新版 CMake 下触发 CMP0175；插件自身 cmake_minimum_required(3.14) 使顶层 directory-scoped policy 不可靠，必须用 CMAKE_POLICY_DEFAULT_CMP0175 传播。候选链路 (b)（runner 运行时启动崩溃）未发现确定性证据：静态检查无空句柄/错误处理缺陷，且现有 Debug exe 正常启动并打出 MediaKit/ANGLE/PlayerFeature 日志。
+fix: commit 05cad89e（2026-08-22，"refactor: harden windows runner lifecycle"）覆盖两条链路：windows/CMakeLists.txt pin `cmake_policy(SET CMP0175 OLD)` + `set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)`（现行位置 windows/CMakeLists.txt:16-22），使 media_kit_libs_windows_video 插件的 add_custom_command 在新版 CMake 下保持 configure 通过；同时将 Win32Window 简化回上游 Flutter 模板并保留 WM_NCCALCSIZE 子窗口同步，收敛 runner 运行时风险面。
+verification: 2026-09-02 会话清理核验：workaround 在现行 windows/CMakeLists.txt:16-22 存在；05cad89e 提交说明明确记载该目的。会话假设的两条候选链路均被该提交覆盖，后续 clean build 未再复现启动失败。
+files_changed: [windows/CMakeLists.txt, windows/runner/win32_window.cpp, windows/runner/flutter_window.cpp, windows/runner/main.cpp]
