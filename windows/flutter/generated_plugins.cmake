@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  bitsdojo_window_windows
   desktop_drop
   flutter_secure_storage_windows
   media_kit_libs_windows_video

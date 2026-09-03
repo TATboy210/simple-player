@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -111,8 +112,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       type: FileType.custom,
       allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
     );
-    // file_picker 12.x：pickFiles 非空返回列表，用户取消返回空列表（非 null）。
-    return result.isEmpty ? null : result.single.path;
+    return result?.files.single.path;
   }
 
   /// 选择并加载外部字幕；取消或不可加载的路径不会传给底层解析器。
@@ -273,12 +273,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: scaffold,
         );
 
-        // 边缘缩放由 Windows 原生 WM_NCHITTEST 处理；Flutter 层只负责
-        // 标题栏/视频内容交互，避免手势层与原生窗口 resize loop 竞争。
+        // 边缘缩放：bitsdojo BDW_CUSTOM_FRAME 在原生层对四边等宽判定
+        // （WM_NCHITTEST → HT*），Flutter 层不再自建缩放热区。WindowBorder
+        // width:0 仅作声明容器（BB 同款），视觉无边框、不遮挡内容。
         // 全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动。
-        return MouseRegion(
-          cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
-          child: keyboardHandler,
+        return WindowBorder(
+          color: Colors.transparent,
+          width: 0,
+          child: MouseRegion(
+            cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
+            child: keyboardHandler,
+          ),
         );
       },
     );

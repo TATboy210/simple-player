@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -105,12 +106,18 @@ class WindowService with WindowListener implements WindowBridge {
       // windowManager.ensureInitialized() is owned by main.dart.
       // 拦截原生关闭事件，确保异步窗口状态持久化完成后再销毁窗口。
       await windowManager.setPreventClose(true);
+      // BB 同款：window_manager 在 Windows 上不碰标题栏/边框——bitsdojo 的
+      // BDW_CUSTOM_FRAME 已接管 NCCALCSIZE（return 0），两个插件都改 NCCALCSIZE
+      // 会打架（window_manager hidden 分支的 8px 内缩会重新引入白边）。
       const options = WindowOptions(
         backgroundColor: Colors.transparent,
-        titleBarStyle: TitleBarStyle.hidden,
         windowButtonVisibility: false,
         minimumSize: minimumWindowSize,
       );
+      // 最小尺寸双通道同步：bitsdojo 的 WM_GETMINMAXINFO hook 无条件 return 0，
+      // 会吞掉 window_manager 的 setMinimumSize（其 min_size 默认 {0,0} 即无下限）。
+      // 两侧设同一值后，无论 hook 先后顺序如何，854×480 下限都确定生效。
+      doWhenWindowReady(() => appWindow.minSize = minimumWindowSize);
       final ready = Completer<void>();
       // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
       // 传递给 init()，确保调用方等待到窗口真正 show/focus 完成。
@@ -166,11 +173,11 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   Future<void> _initWindow() async {
-    // 保持 hidden title bar 配置，不再切换 frameless 样式；Windows runner
-    // 在 WM_NCHITTEST 中统一四边 8px 判定区（含插件未覆盖的顶部），
-    // 命中 HT* 后交给系统原生 resize loop。
+    // 边框/标题栏视觉归 bitsdojo（BDW_CUSTOM_FRAME 已在 runner 全局接线，
+    // 见 main.cpp）：WindowOptions 不设置 titleBarStyle，window_manager 只
+    // 负责几何/事件/置顶。resize 由 bitsdojo 原生 WM_NCHITTEST 四边等宽判定。
     if (_disposed) return;
-    // Restore only validated geometry; corrupt preferences fall back to 1280×752.
+    // Restore only validated geometry; corrupt preferences fall back to 720p.
     final persisted = await _persistence.load();
     if (_disposed) return;
     if (persisted.position case final position?) {
@@ -354,6 +361,10 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   Future<void> startDragging() async {
+    // 标题栏拖动（窗口移动）归 window_manager——按 2026-09-03 取舍裁决：
+    // bitsdojo 只负责 frame 视觉与命中（无边框 + 四边等宽 resize + 连带的
+    // minSize 同步），其余一切留在 window_manager，bitsdojo 接触面最小化，
+    // 日后单点替换（如 window_plus）只需动 main.cpp 一行 + WindowBorder。
     if (_disposed) return;
     await windowManager.startDragging();
   }
