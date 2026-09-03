@@ -22,18 +22,21 @@ final class WindowServiceState {
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
-  /// DWM 能力快照 — 启动期探测结果（null until probed）
-  ///
-  /// DWM capability snapshot notifier (peer to [mode]). Identity-preserved:
-  /// Phase 7/8 attribute gates addListener on THIS instance directly.
-  final ValueNotifier<DwmCapabilitySnapshot?> dwmCapabilities =
-      ValueNotifier<DwmCapabilitySnapshot?>(null);
-
   bool _disposed = false;
   bool get disposed => _disposed;
 
   /// 当前窗口尺寸的内部写入端。
   ValueNotifier<Size> get windowSize => _windowSize;
+
+  /// DWM 能力快照 — 转发 DwmCapabilities 门面的同一 notifier 实例。
+  ///
+  /// Forwards the SAME notifier instance owned by [DwmCapabilities]
+  /// (identity-preserved per CONTEXT.md D-01：Phase 7/8 属性门监听的就是
+  /// 门面这一个实例，不复制不包装)。借用语义：通知器生命周期由门面持有，
+  /// 本容器 [dispose] 不释放它（同 PlayerServices 不 dispose WindowBridge
+  /// 的既有借用约束）。
+  ValueNotifier<DwmCapabilitySnapshot?> get dwmCapabilities =>
+      DwmCapabilities.I.snapshot;
 
   /// 释放所有 notifier；重复调用安全。
   void dispose() {
@@ -44,6 +47,5 @@ final class WindowServiceState {
     resizeSessionId.dispose();
     isResizing.dispose();
     isAlwaysOnTop.dispose();
-    dwmCapabilities.dispose();
   }
 }

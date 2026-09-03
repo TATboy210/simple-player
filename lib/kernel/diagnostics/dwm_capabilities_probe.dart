@@ -11,6 +11,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
 import 'dwm_capabilities.dart';
+import 'error_reporter.dart';
 import 'kernel_logger.dart';
 
 /// 日志门面 — DwmCapabilitiesProbe 共用（kernel 惯例）
@@ -153,13 +154,24 @@ class DwmCapabilitiesProbe {
 
   /// 处理 DwmGetWindowAttribute 的 HRESULT — 返回属性是否可用
   ///
-  /// Processes the HRESULT from a DwmGetWindowAttribute call.
-  /// Returns true when [hr] == S_OK (0), false otherwise.
-  /// Task 2 adds D-04 failure reporting here (every non-S_OK logged,
-  /// first-of-kind reported via ErrorReporterImpl dedup).
+  /// Processes the HRESULT from a DwmGetWindowAttribute call. Non-S_OK
+  /// results fire the D-04 failure path (CONTEXT.md D-04)：每次失败必记
+  /// KernelLogger 错误日志（携带属性 ID 与 build 号上下文，不抑制）；同类
+  /// 失败首次经 [ErrorReporterImpl.reportPlatformSafely] 聚合上报——通用
+  /// 消息 + 同源调用栈顶帧使全部属性失败收敛进既有 10s 语义去重窗，
+  /// 错误卡片不刷屏。返回 true 当且仅当 [hr] == S_OK (0)。
   @visibleForTesting
   bool processHResult(int hr, int attributeId, int buildNumber) {
-    return hr == _sOk;
+    if (hr == _sOk) return true;
+    _logger.e(
+      '[DwmCapabilities] DwmGetWindowAttribute hr=0x${hr.toRadixString(16)}',
+      context: {'attribute': attributeId, 'build': buildNumber},
+    );
+    ErrorReporterImpl.I.reportPlatformSafely(
+      Exception('DWM capability probe reported non-S_OK HRESULT'),
+      StackTrace.current,
+    );
+    return false;
   }
 
   /// RtlGetVersion → dwBuildNumber (integer-exact, ENAB-01)

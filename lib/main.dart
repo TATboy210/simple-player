@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'kernel/diagnostics/dwm_capabilities.dart';
 import 'kernel/diagnostics/error_log_location.dart';
 import 'kernel/diagnostics/error_reporter.dart';
 import 'kernel/diagnostics/error_reporting_dependencies.dart';
@@ -106,6 +107,21 @@ Future<void> main() {
           debugPrint(
             '[uat-window-init-fault] pendingCount='
             '${ErrorReporterImpl.I.presentation.value.pendingCount}',
+          );
+        }
+
+        // 启动期一次性 DWM 能力探测（D-01，Phase 6 ENAB-01）：同步 FFI，
+        // 结果写入门面自有 notifier（WindowServiceState.dwmCapabilities
+        // 转发同一实例）。失败优雅降级——快照保持 null，Phase 7/8 属性门
+        // 视 null 为「能力未知」跳过属性调用；本 try/catch 保证探测故障
+        // 不阻断应用启动。
+        try {
+          DwmCapabilities.I.probe();
+        } on Exception catch (error, stackTrace) {
+          KernelLogger.I.e(
+            '[main] DwmCapabilities probe failed: $error',
+            error: error,
+            stackTrace: stackTrace,
           );
         }
 

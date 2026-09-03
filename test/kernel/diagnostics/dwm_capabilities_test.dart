@@ -93,6 +93,18 @@ void main() {
   });
 
   group('WindowServiceState integration', () {
+    test('dwmCapabilities 转发门面同一 notifier 实例（identity-preserved）', () {
+      // Arrange
+      final state = WindowServiceState();
+
+      // Act + Assert — D-01：Phase 7/8 监听的就是门面那一个实例
+      expect(
+        identical(state.dwmCapabilities, DwmCapabilities.I.snapshot),
+        isTrue,
+      );
+      state.dispose();
+    });
+
     test('dwmCapabilities notifier 暴露且初始为 null', () {
       // Arrange
       final state = WindowServiceState();
@@ -102,7 +114,19 @@ void main() {
       state.dispose();
     });
 
-    test('dispose 幂等且不抛出（快照通知器生命周期由门面持有）', () {
+    test('state.dispose 不释放借用通知器——释放后仍可写入（借用语义）', () {
+      // Arrange — 通知器生命周期由 DwmCapabilities 门面持有
+      final state = WindowServiceState();
+      state.dispose();
+
+      // Act + Assert — 借用通知器在容器释放后依旧存活可用
+      expect(
+        () => state.dwmCapabilities.value = null,
+        returnsNormally,
+      );
+    });
+
+    test('dispose 幂等且不抛出', () {
       // Arrange
       final state = WindowServiceState();
       state.dispose();
