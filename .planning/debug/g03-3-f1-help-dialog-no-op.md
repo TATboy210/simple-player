@@ -4,6 +4,10 @@ trigger: "UAT G-03-3: 按 F1 弹出快捷键帮助对话框 — actual: 按f1没
 created: 2026-08-31T00:00:00Z
 updated: 2026-08-31T11:00:00Z
 goal: find_root_cause_only
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-01
+  status: diagnosed
 ---
 
 ## Current Focus
