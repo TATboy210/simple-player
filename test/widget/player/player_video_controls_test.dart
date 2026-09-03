@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
@@ -1293,6 +1294,68 @@ void main() {
           same(initialVisibilityElement),
         );
         expect(find.bySemanticsLabel('Play'), findsNothing);
+      } finally {
+        semanticsHandle.dispose();
+      }
+    });
+
+    testWidgets('resize 期间 suppress 控制栏语义 settle 后恢复（AXTree 洪流回归）', (
+      tester,
+    ) async {
+      // 回归 AXTree "Nodes left pending by the update: 34" 洪流：resize 期间
+      // 控制栏 visible 子树随 MediaQuery 每帧 re-emit semantics → bridge 每帧
+      // 同步失败。ExcludeSemantics(gated on resizing) 经 RenderExcludeSemantics
+      // .visitChildrenForSemantics 早返回，在 assembled owner 树中丢弃控制栏子树
+      // semantics；settle 后 VLB 翻回 excluding=false 恢复。非 playing 控制栏永显，
+      // 排除 auto-hide 干扰。
+      // 验证用 SemanticsOwner.rootSemanticsNode 遍历 assembled 树（find.bySemanticsLabel
+      // 查 renderObject.debugSemantics，ExcludeSemantics 翻转时子节点 debugSemantics
+      // 残留旧值不可靠——production 行为由 visitChildrenForSemantics 保证）。
+      final semanticsHandle = tester.ensureSemantics();
+      final resizing = ValueNotifier<bool>(false);
+      addTearDown(resizing.dispose);
+
+      Set<String> assembledSemanticsLabels() {
+        // 测试渲染树的 semantics 由 binding 的 pipelineOwner 持有（rootPipelineOwner
+        // 在 widget test 中是另一棵 owner 子树，rootSemanticsNode 为空）。
+        // pipelineOwner 虽已 deprecated，但仍是 test 渲染树语义组装的正确 owner。
+        // ignore: deprecated_member_use
+        final owner = tester.binding.pipelineOwner.semanticsOwner;
+        final root = owner?.rootSemanticsNode;
+        final labels = <String>{};
+        void visit(SemanticsNode node) {
+          if (node.label.isNotEmpty) labels.add(node.label);
+          node.visitChildren((SemanticsNode child) {
+            visit(child);
+            return true;
+          });
+        }
+        if (root != null) visit(root);
+        return labels;
+      }
+
+      try {
+        await pumpControls(
+          tester,
+          resizing: resizing,
+          actions: const PlayerActions(),
+        );
+
+        // 基线：非 playing 控制栏永显，'Play' 在 assembled 语义树中。
+        expect(assembledSemanticsLabels(), contains('Play'));
+
+        // resize 上升沿：ExcludeSemantics(excluding: true) 经
+        // RenderExcludeSemantics.visitChildrenForSemantics 早返回，控制栏子树
+        // semantics 从 assembled 树丢弃——AXTree 洪流源消除。
+        resizing.value = true;
+        await tester.pump();
+        expect(assembledSemanticsLabels(), isNot(contains('Play')));
+
+        // settle：VLB 翻回 excluding=false，visitChildrenForSemantics 恢复遍历，
+        // 控制栏语义回到 assembled 树。
+        resizing.value = false;
+        await tester.pump();
+        expect(assembledSemanticsLabels(), contains('Play'));
       } finally {
         semanticsHandle.dispose();
       }
