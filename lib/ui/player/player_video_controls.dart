@@ -856,7 +856,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 仅测试观测外层 build；状态监听仍下沉到真正依赖它的局部区域。
     widget.onBuild?.call();
     final isFullscreenForCursor = _isFullscreenForCursor();
-    return Focus(
+    final controls = Focus(
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
@@ -908,6 +908,24 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
             ),
           ),
         ],
+      ),
+    );
+    // resize 期间控制栏 visible 子树随 MediaQuery 每帧 rebuild 重新发射
+    // semantics → accessibility_bridge AXTree 每帧同步失败（"Nodes left pending
+    // by the update: 34"）+ 错误日志洪流 + 语义遍历成本，白烧主线程 build 预算。
+    // ExcludeSemantics(excluding: resizing) 在 resize 期间丢弃控制栏子树 semantics：
+    // 控件本就视觉淡出（_animController.reverse）且用户在拖窗不读控件，suppress
+    // 语义零可用性损失；settle 后 VLB 自动恢复 excluding=false，语义即恢复。
+    // 用 ValueListenableBuilder 而非 .value 直读：parent build 不被 resizing
+    // notifier 触发（build-boundary 契约），须 VLB 自身监听 settle 翻回。
+    // null resizing（测试注入无 resize 源）走不包裹分支，保留既有语义断言。
+    final resizing = widget.resizing;
+    if (resizing == null) return controls;
+    return ValueListenableBuilder<bool>(
+      valueListenable: resizing,
+      builder: (_, isResizing, _) => ExcludeSemantics(
+        excluding: isResizing,
+        child: controls,
       ),
     );
   }
