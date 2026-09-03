@@ -10,13 +10,8 @@
       "type": "stdio"
     },
     "marionette": {
-      "command": "dart",
-      "args": [
-        "pub",
-        "global",
-        "run",
-        "marionette_mcp"
-      ],
+      "command": "C:\\Users\\35490\\AppData\\Local\\Pub\\Cache\\bin\\marionette_mcp.bat",
+      "args": [],
       "cwd": "D:\\simple_player_flutter",
       "type": "stdio"
     }
