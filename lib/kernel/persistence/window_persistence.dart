@@ -30,7 +30,7 @@ final class PersistedWindowState {
 /// Stores the small amount of desktop window state that survives restarts.
 ///
 /// Invalid or unavailable preferences deliberately fall back to the stable
-/// 1280×752 launch geometry rather than preventing the application from opening.
+/// 1280×720 launch geometry rather than preventing the application from opening.
 final class WindowPersistence {
   /// Creates persistence backed by [preferences], when supplied for tests.
   WindowPersistence({SharedPreferences? preferences})

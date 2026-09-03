@@ -20,14 +20,11 @@ class FilePickerMediaGateway implements FilePickerGateway {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: PathValidator.supportedExtensions,
-      // file_picker 12.x：顶层 lockParentWindow 已弃用，迁至平台选项。
-      windowsOptions: const WindowsOptions(lockParentWindow: true),
+      lockParentWindow: true,
     );
-    // file_picker 12.x：pickFiles 非空返回 List<PlatformFile>，用户取消返回
-    // 空列表（11.x 返回 FilePickerResult?，取消为 null）——空列表统一视为取消。
-    if (result.isEmpty) return null;
+    if (result == null) return null;
 
-    return result
+    return result.files
         .map((file) => file.path)
         .whereType<String>()
         .toList(growable: false);
