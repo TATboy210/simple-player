@@ -3,6 +3,10 @@ status: diagnosed
 trigger: "UAT G-03-1: 没有个专门启动调试的按钮，不反馈错误我也不知道 — truth: 存在开发用错误注入入口（调试触发），可按需构造合成错误走真实链路使卡片弹出"
 created: 2026-08-31T00:00:00Z
 updated: 2026-08-31T00:00:00Z
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-09-01
+  status: diagnosed
 ---
 
 ## Current Focus

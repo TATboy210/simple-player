@@ -1,0 +1,43 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v1.1 — 窗口外观与全屏体验",
+  "phases": [
+    {
+      "number": "6",
+      "name": "能力探测与 C1/C2 钉死",
+      "status": "pending"
+    },
+    {
+      "number": "7",
+      "name": "去主题色边框",
+      "status": "pending"
+    },
+    {
+      "number": "8",
+      "name": "圆角统一",
+      "status": "pending"
+    },
+    {
+      "number": "9",
+      "name": "标题栏拖拽可靠性",
+      "status": "pending"
+    },
+    {
+      "number": "10",
+      "name": "全屏过渡无闪烁",
+      "status": "pending"
+    },
+    {
+      "number": "11",
+      "name": "Linux 结构性实现与打磨",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 6 of 6 · executing"
+  },
+  "updated_at": "2026-09-02T05:49:11.213Z"
+}
