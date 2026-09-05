@@ -378,7 +378,7 @@ void main() {
   // resize settle 若更新 windowSize, 显示器尺寸会经关闭路径持久化, 下次启动
   // 恢复成巨窗。settle 在全屏模式期间只清 isResizing, 不更新 windowSize。
   group('fullscreen transition resize settle guard', () {
-    const wmChannel = MethodChannel('window_manager');
+    const wmChannel = MethodChannel('window_frame_kit');
 
     /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding,
     /// 其 defaultBinaryMessenger 静态类型即 TestDefaultBinaryMessenger.
@@ -425,10 +425,10 @@ void main() {
   // resize debounce + isResizing 恢复 (方向2 — isResizing 卡 true bug 回归)
   // =========================================================================
   group('resize debounce + isResizing recovery', () {
-    // window_manager 包用 MethodChannel('window_manager')，getSize() 内部走
+    // window_frame_kit 包用 MethodChannel('window_frame_kit')，getSize() 内部走
     // getBounds 并返回 x/y/width/height。mock 之以便 fakeAsync 推进 500ms
     // timer 后验证回调逻辑（无需真实窗口）。
-    const wmChannel = MethodChannel('window_manager');
+    const wmChannel = MethodChannel('window_frame_kit');
     Size? mockSize;
     var shouldFailBounds = false;
     final pendingBounds = <Completer<Map<String, double>>>[];
@@ -641,7 +641,7 @@ void main() {
   // 关窗路径 — hide-first 模式 (学自 BlueBubbles)
   // =========================================================================
   group('close path (hide-first)', () {
-    const wmChannel = MethodChannel('window_manager');
+    const wmChannel = MethodChannel('window_frame_kit');
 
     /// 取测试用 messenger — TestWidgetsFlutterBinding 提供可 mock 的
     /// TestDefaultBinaryMessenger（无需 is 提升或 as cast）.
