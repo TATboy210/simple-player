@@ -4,11 +4,12 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
+  desktop_window
   flutter_secure_storage_linux
   media_kit_libs_linux
   media_kit_video
   screen_retriever_linux
-  window_frame_kit
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
