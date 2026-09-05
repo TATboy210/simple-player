@@ -20,9 +20,9 @@ dependencies:
   media_kit_libs_macos_video: ^1.1.4
   media_kit_libs_linux: ^1.2.1
   path_provider: ^2.1.6
-  file_picker: ^11.0.3
+  file_picker: ^12.2.0
   shared_preferences: ^2.5.5
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^11.0.0
   desktop_drop: ^0.7.1
   logger: ^2.7.0
   path: ^1.9.1
@@ -30,9 +30,10 @@ dependencies:
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
   ffi: ^2.2.0
-  window_manager: ^0.5.2
-  # BB 同款双包: bitsdojo 接管边框/标题栏视觉(BDW_CUSTOM_FRAME), window_manager 管事件/状态
-  bitsdojo_window: ^0.1.6
+  # 单包窗口方案: window_frame_kit = window_manager 0.5.2 verbatim 底座
+  # + FrameController 原生 frame 接管(customFrame: true),替代 bitsdojo
+  # + window_manager 双包;依赖树不再锁 win32 5.x。
+  window_frame_kit: ^0.1.1
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.6.0
   i18n: ^4.2.6
