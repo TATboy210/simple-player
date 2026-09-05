@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:desktop_window/desktop_window.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -118,7 +119,7 @@ class WindowService with WindowListener implements WindowBridge {
       // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
       // 传递给 init()，确保调用方等待到窗口真正 show/focus 完成。
       await windowManager.waitUntilReadyToShow(options, () {
-        unawaited(_completeReadyAfterInit(ready));
+        unawaited(_applySelfDrawnChromeAndComplete(ready));
       });
       if (_disposed) return;
       windowManager.addListener(this);
@@ -135,6 +136,19 @@ class WindowService with WindowListener implements WindowBridge {
       _cleanupFailedInit(listenerAdded: listenerAdded);
       rethrow;
     }
+  }
+
+  /// 启用自绘标题栏：隐藏系统标题栏与边框视觉（desktop_window.setBorders
+  /// 移除 WS_CAPTION、保留 WS_THICKFRAME——四边等宽原生缩放与 Win11 描边/
+  /// 圆角不受影响），在窗口 show 之前执行避免标题栏闪现；失败仅降级为
+  /// 系统标题栏，不阻塞初始化。
+  Future<void> _applySelfDrawnChromeAndComplete(Completer<void> ready) async {
+    try {
+      await DesktopWindow.setBorders(false);
+    } on Exception catch (error) {
+      _log.w('[WindowService] setBorders(false) failed: $error');
+    }
+    unawaited(_completeReadyAfterInit(ready));
   }
 
   Future<void> _completeReadyAfterInit(Completer<void> ready) async {
