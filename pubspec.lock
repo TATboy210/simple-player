@@ -1229,10 +1229,10 @@ packages:
     dependency: "direct main"
     description:
       name: window_frame_kit
-      sha256: "1b3c64d761825c6eb17c3c19e1764b0783de4201a853eb9550db74df48f0420e"
+      sha256: a75695c35268d75ba7013e042ee7a84ad5d1d8d2df7575b6b697eafb22679393
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.1"
+    version: "0.2.2"
   windows_file_picker:
     dependency: transitive
     description:
