@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "fullscreen_resize_guard.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -26,6 +27,14 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+
+  // 临时兼容 bitsdojo：必须晚于插件注册，先于其父子窗口边缘命中处理。
+  // 后续迁移 window_frame_kit 时连同 fullscreen_resize_guard.h 一起删除。
+  if (!InstallFullscreenResizeGuard(
+          GetHandle(), flutter_controller_->view()->GetNativeWindow())) {
+    OutputDebugStringW(L"Failed to install fullscreen resize guard.\n");
+    return false;
+  }
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
