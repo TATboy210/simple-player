@@ -31,9 +31,9 @@ dependencies:
   json_annotation: ^4.12.0
   ffi: ^2.2.0
   # 单包窗口方案: window_frame_kit = window_manager 0.5.2 verbatim 底座
-  # + FrameController 原生 frame 接管(customFrame: true),替代 bitsdojo
-  # + window_manager 双包;依赖树不再锁 win32 5.x。
-  window_frame_kit: ^0.1.1
+  # + FrameController 等宽带 frame 接管(customFrame: true):自绘标题栏 +
+  # 保留系统边框(Win11 描边/圆角) + 四边等宽缩放,替代 bitsdojo+window_manager 双包。
+  window_frame_kit: ^0.2.0
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.6.0
   i18n: ^4.2.6
