@@ -152,9 +152,9 @@ void main() {
     });
 
     test('非 S_OK HRESULT 逐次记录错误日志，含 attribute/build 上下文（每次必记）', () {
-      // Act — 两个不同属性在同一窗口内失败
-      probe.processHResult(0x80070057, 34, 22000);
-      probe.processHResult(0x80070057, 33, 22000);
+      // Act — 两个不同属性在同一窗口内失败（E_FAIL = 意外错误类别）
+      probe.processHResult(0x80004005, 34, 22000);
+      probe.processHResult(0x80004005, 33, 22000);
 
       // Assert — D-04「每次失败必记」：不抑制、不聚合日志
       final errors = sink.records.where((r) => r.$1 == LogLevel.error).toList();
@@ -166,11 +166,26 @@ void main() {
 
     test('同类失败首次聚合为一条 ErrorReport（10s 窗去重，卡片不刷屏）', () {
       // Act — 两个不同属性失败，通用消息 + 同源栈 → 语义身份相同
-      probe.processHResult(0x80070057, 34, 22000);
-      probe.processHResult(0x80070057, 33, 22000);
+      probe.processHResult(0x80004005, 34, 22000);
+      probe.processHResult(0x80004005, 33, 22000);
 
       // Assert — 仅首条入队，第二条合并进 occurrenceCount
       expect(ErrorReporterImpl.I.queuedReports.length, 1);
+    });
+
+    test('合法不支持 HRESULT（E_INVALIDARG/E_NOTIMPL/DWM_E_*）降级不报错', () {
+      // Act — 实测 Win11 26200 对 Progman 查询 COLOR 系属性返回的类别
+      probe.processHResult(0x80070057, 34, 26200);
+      probe.processHResult(0x80004001, 35, 26200);
+      probe.processHResult(0x80263001, 36, 26200);
+
+      // Assert — 返回 false（不支持）但无错误日志、无错误卡片
+      expect(
+        sink.records.where((r) => r.$1 == LogLevel.error),
+        isEmpty,
+        reason: '能力探测的「不支持」不是错误',
+      );
+      expect(ErrorReporterImpl.I.queuedReports, isEmpty);
     });
 
     test('S_OK 不产生错误日志与报告', () {

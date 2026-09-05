@@ -58,6 +58,18 @@ typedef _DwmGetWindowAttributeDart = int Function(
 /// S_OK HRESULT (0) — DwmGetWindowAttribute 成功
 const int _sOk = 0;
 
+/// 能力探测语义下的「合法不支持」HRESULT 集合 — 非错误,正常降级
+///
+/// E_INVALIDARG (0x80070057)：属性/窗口上下文不适用。实测 Win11 build
+/// 26200 上对 shell (Progman) 窗口查询 COLOR 系属性 (34/35/36) 返回此值,
+/// 而 CORNER_PREFERENCE (33) 成功 — DWM 对特殊窗口上下文拒绝 COLOR 查询。
+/// E_NOTIMPL (0x80004001)：该 build 的 DWM 未实现此属性。DWM_E_* 家族
+/// (0x8026xxxx)：DWM 自身的「不支持」家族错误码。
+const int _hrInvalidArg = 0x80070057;
+const int _hrNotImpl = 0x80004001;
+const int _dwmErrorFamilyMask = 0xFFFF0000;
+const int _dwmErrorFamilyValue = 0x80260000;
+
 /// DWM 属性 ID 常量（STACK.md build-floor matrix）
 const int _dwmwaWindowCornerPreference = 33;
 const int _dwmwaBorderColor = 34;
@@ -154,15 +166,30 @@ class DwmCapabilitiesProbe {
 
   /// 处理 DwmGetWindowAttribute 的 HRESULT — 返回属性是否可用
   ///
-  /// Processes the HRESULT from a DwmGetWindowAttribute call. Non-S_OK
-  /// results fire the D-04 failure path (CONTEXT.md D-04)：每次失败必记
-  /// KernelLogger 错误日志（携带属性 ID 与 build 号上下文，不抑制）；同类
-  /// 失败首次经 [ErrorReporterImpl.reportPlatformSafely] 聚合上报——通用
-  /// 消息 + 同源调用栈顶帧使全部属性失败收敛进既有 10s 语义去重窗，
-  /// 错误卡片不刷屏。返回 true 当且仅当 [hr] == S_OK (0)。
+  /// Processes the HRESULT from a DwmGetWindowAttribute call. Results in the
+  /// 「合法不支持」family (E_INVALIDARG / E_NOTIMPL / DWM_E_*) return false
+  /// with a debug-level log only — 能力探测的目的是容忍不支持并降级,把
+  /// 「不支持」当错误上报会把每次启动都变成错误卡片（2026-09-05 实测:
+  /// Win11 26200 对 Progman 查询 COLOR 系属性 34/35/36 返回 E_INVALIDARG,
+  /// 而 CORNER_PREFERENCE 33 成功）。其余非 S_OK 视为意外错误,走 D-04
+  /// failure path：每次必记 KernelLogger 错误日志（携带属性 ID 与 build
+  /// 上下文）,首次经 [ErrorReporterImpl.reportPlatformSafely] 聚合上报
+  /// （10s 语义去重窗,卡片不刷屏）。返回 true 当且仅当 [hr] == S_OK (0)。
   @visibleForTesting
   bool processHResult(int hr, int attributeId, int buildNumber) {
     if (hr == _sOk) return true;
+    final bool isExpectedUnsupported = hr == _hrInvalidArg ||
+        hr == _hrNotImpl ||
+        (hr & _dwmErrorFamilyMask) == _dwmErrorFamilyValue;
+    if (isExpectedUnsupported) {
+      // 合法降级:仅 debug 记录,不进错误卡片。
+      _logger.d(
+        '[DwmCapabilities] attribute $attributeId unsupported '
+        'hr=0x${hr.toRadixString(16)} — degraded',
+        context: {'attribute': attributeId, 'build': buildNumber},
+      );
+      return false;
+    }
     _logger.e(
       '[DwmCapabilities] DwmGetWindowAttribute hr=0x${hr.toRadixString(16)}',
       context: {'attribute': attributeId, 'build': buildNumber},
