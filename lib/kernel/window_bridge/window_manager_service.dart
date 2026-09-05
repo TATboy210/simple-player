@@ -105,15 +105,14 @@ class WindowService with WindowListener implements WindowBridge {
       // windowManager.ensureInitialized() is owned by main.dart.
       // 拦截原生关闭事件，确保异步窗口状态持久化完成后再销毁窗口。
       await windowManager.setPreventClose(true);
-      // window_frame_kit 单包：customFrame 可让原生 FrameController 接管
-      // NCCALCSIZE/四边命中/协作式 GETMINMAXINFO。
-      // **无边框已关闭（用户 2026-09-05 裁决）**：宿主保持系统原生边框窗口
-      // 运行；重开只需取消下一行注释。
+      // window_frame_kit 单包：customFrame 等宽带路线（2026-09-05 重设计）
+      // ——自绘标题栏 + 保留系统边框（Win11 1px 描边/圆角）+ 四边等宽
+      // DPI 感知缩放带 + 协作式 GETMINMAXINFO + 全屏双路径禁缩放。
       const options = WindowOptions(
         backgroundColor: Colors.transparent,
         windowButtonVisibility: false,
         minimumSize: minimumWindowSize,
-        // customFrame: true,
+        customFrame: true,
       );
       final ready = Completer<void>();
       // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
