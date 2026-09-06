@@ -30,6 +30,8 @@ patreon  https://www.patreon.com/SimplePlayerTeam/posts/bo-fang-qi-v0-0-16866855
 
 itch.io  https://simple-player-team.itch.io/simple-player
 
+ifdian   https://ifdian.net/a/SimplePlayerTeam
+
 ## 功能特性 / Features
 
 - **全格式播放** — libmpv / FFmpeg 后端，支持 MP4 / MKV / AVI / MOV / FLAC / MP3 等主流格式
