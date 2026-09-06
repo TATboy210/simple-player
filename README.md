@@ -32,6 +32,8 @@ itch.io  https://simple-player-team.itch.io/simple-player
 
 ifdian   https://ifdian.net/a/SimplePlayerTeam
 
+zenmux   https://zenmux.ai/invite/B2Y66E
+
 ## 功能特性 / Features
 
 - **全格式播放** — libmpv / FFmpeg 后端，支持 MP4 / MKV / AVI / MOV / FLAC / MP3 等主流格式
