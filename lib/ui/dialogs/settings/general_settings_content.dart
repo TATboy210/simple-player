@@ -82,8 +82,9 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
               ),
             ],
             onChanged: (language) {
-              if (language != null)
+              if (language != null) {
                 ErrorFeedbackSettings.I.setLanguage(language);
+              }
             },
           ),
         );
