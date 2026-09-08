@@ -3,14 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/edge_glow.dart';
 
 void main() {
-  Widget buildTestWidget({
-    EdgeGlowVariant variant = EdgeGlowVariant.gradient,
-    double? glowIntensity,
-  }) {
+  Widget buildTestWidget({double? glowIntensity}) {
     return MaterialApp(
       home: Scaffold(
         body: EdgeGlow(
-          variant: variant,
           glowIntensity: glowIntensity,
           child: const SizedBox(width: 100, height: 50),
         ),
@@ -39,22 +35,6 @@ void main() {
 
     testWidgets('glowIntensity=1.0 renders without error', (tester) async {
       await tester.pumpWidget(buildTestWidget(glowIntensity: 1.0));
-      expect(find.byType(EdgeGlow), findsOneWidget);
-    });
-
-    testWidgets('pulse variant with glowIntensity renders', (tester) async {
-      await tester.pumpWidget(
-        buildTestWidget(variant: EdgeGlowVariant.pulse, glowIntensity: 0.5),
-      );
-      expect(find.byType(EdgeGlow), findsOneWidget);
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(find.byType(EdgeGlow), findsOneWidget);
-    });
-
-    testWidgets('omni variant with glowIntensity renders', (tester) async {
-      await tester.pumpWidget(
-        buildTestWidget(variant: EdgeGlowVariant.omni, glowIntensity: 0.3),
-      );
       expect(find.byType(EdgeGlow), findsOneWidget);
     });
 
