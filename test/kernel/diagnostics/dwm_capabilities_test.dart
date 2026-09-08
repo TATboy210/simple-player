@@ -120,10 +120,7 @@ void main() {
       state.dispose();
 
       // Act + Assert — 借用通知器在容器释放后依旧存活可用
-      expect(
-        () => state.dwmCapabilities.value = null,
-        returnsNormally,
-      );
+      expect(() => state.dwmCapabilities.value = null, returnsNormally);
     });
 
     test('dispose 幂等且不抛出', () {
@@ -151,26 +148,32 @@ void main() {
       await ErrorReporterImpl.resetForTesting();
     });
 
-    test('非 S_OK HRESULT 逐次记录错误日志，含 attribute/build 上下文（每次必记）', () {
-      // Act — 两个不同属性在同一窗口内失败（E_FAIL = 意外错误类别）
+    test('非 S_OK HRESULT 记 warn 级观测日志，含 attribute/hr 上下文', () {
+      // Act — 两个不同属性在同一窗口内失败（E_FAIL = 任意非 S_OK 族）
       probe.processHResult(0x80004005, 34, 22000);
       probe.processHResult(0x80004005, 33, 22000);
 
-      // Assert — D-04「每次失败必记」：不抑制、不聚合日志
-      final errors = sink.records.where((r) => r.$1 == LogLevel.error).toList();
-      expect(errors.length, 2, reason: 'D-04: 每次失败必记');
-      expect(errors.first.$2, contains('[DwmCapabilities]'));
-      expect(errors.first.$3?['attribute'], 34);
-      expect(errors.first.$3?['build'], 22000);
+      // Assert — 2026-09-06 语义软化：非 S_OK 是探测答案，warn 级观测
+      //（携带 hr/attribute/build），不上错误卡片。
+      final warns = sink.records.where((r) => r.$1 == LogLevel.warn).toList();
+      expect(warns.length, 2, reason: '每次探测答案必记 warn');
+      expect(warns.first.$2, contains('[DwmCapabilities]'));
+      expect(warns.first.$3?['attribute'], 34);
+      expect(warns.first.$3?['build'], 22000);
+      expect(
+        sink.records.where((r) => r.$1 == LogLevel.error),
+        isEmpty,
+        reason: '探测答案不进 error 级',
+      );
     });
 
-    test('同类失败首次聚合为一条 ErrorReport（10s 窗去重，卡片不刷屏）', () {
-      // Act — 两个不同属性失败，通用消息 + 同源栈 → 语义身份相同
+    test('意外 HRESULT 不产生 ErrorReport（探测答案 ≠ 应用故障）', () {
+      // Act — E_FAIL 族（Release 实机出现过的 Occurrence 3 来源）
       probe.processHResult(0x80004005, 34, 22000);
       probe.processHResult(0x80004005, 33, 22000);
 
-      // Assert — 仅首条入队，第二条合并进 occurrenceCount
-      expect(ErrorReporterImpl.I.queuedReports.length, 1);
+      // Assert — 能力探测是容错查询，任何非 S_OK 都不上报错误卡片。
+      expect(ErrorReporterImpl.I.queuedReports, isEmpty);
     });
 
     test('合法不支持 HRESULT（E_INVALIDARG/E_NOTIMPL/DWM_E_*）降级不报错', () {

@@ -275,11 +275,12 @@ final class _ReentrantMetricsLogger extends _RecordingLogger {
   bool _hasReentered = false;
 
   @override
-  void info(String message, {Map<String, Object?>? context}) {
-    super.info(message, context: context);
+  void debug(String message, {Map<String, Object?>? context}) {
+    super.debug(message, context: context);
     if (_hasReentered) return;
     _hasReentered = true;
     // 旧摘要尚在写出时启动新会话，复现同步 sink 的重入边界。
+    // （2026-09-06 降噪：metrics 摘要从 info 降为 debug，重入钩子随行。）
     onFirstEntry();
   }
 }

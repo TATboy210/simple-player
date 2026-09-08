@@ -19,26 +19,17 @@ import 'kernel_logger.dart';
 final class VideoTextureResizeProbe {
   /// 创建探针，并同步接管构造时已经开始的 resize 会话。
   VideoTextureResizeProbe({
-    required ValueListenable<bool> isResizing,
-    required ValueListenable<int> resizeSessionId,
-    ValueListenable<Rect?>? rect,
-    ValueListenable<int?>? textureId,
-    ValueListenable<Size?>? windowSize,
-    ValueListenable<double?>? devicePixelRatio,
-    ValueListenable<WindowMode>? windowMode,
-    KernelLogger? logger,
+    required this._isResizing,
+    required this._resizeSessionId,
+    this._rect,
+    this._textureId,
+    this._windowSize,
+    this._devicePixelRatio,
+    this._windowMode,
+    this._logger,
     Duration Function()? monotonicNow,
-    bool enabled = !kReleaseMode,
-  }) : _isResizing = isResizing,
-       _resizeSessionId = resizeSessionId,
-       _rect = rect,
-       _textureId = textureId,
-       _windowSize = windowSize,
-       _devicePixelRatio = devicePixelRatio,
-       _windowMode = windowMode,
-       _logger = logger,
-       _enabled = enabled,
-       _stopwatch = monotonicNow == null ? (Stopwatch()..start()) : null,
+    this._enabled = !kReleaseMode,
+  }) : _stopwatch = monotonicNow == null ? (Stopwatch()..start()) : null,
        _monotonicNow = monotonicNow {
     if (_enabled) {
       _isResizing.addListener(_onResizingChanged);
@@ -96,10 +87,13 @@ final class VideoTextureResizeProbe {
   final ValueListenable<int?>? _textureId;
   final ValueListenable<Size?>? _windowSize;
   final ValueListenable<double?>? _devicePixelRatio;
+
   /// 窗口模式观察源 — 用于把 resize 会话分类为全屏进入/退出(取证用)。
   final ValueListenable<WindowMode>? _windowMode;
+
   /// 当前窗口模式 — 用于检测全屏进入/退出迁移。
   WindowMode? _mode;
+
   /// 最近一次进入/离开全屏的单调时钟时刻 — 实机时序表明 mode 提交与原生
   /// resize 会话先后不定(进入: 脉冲先于 setMode 提交),且"最大化→全屏→
   /// 退出"路径退出会话内 mode 会经 windowed→maximized 再迁移,单靠迁移
@@ -122,6 +116,7 @@ final class VideoTextureResizeProbe {
   Duration _sessionStart = Duration.zero;
   Rect? _rectAtStart;
   int? _textureIdAtStart;
+
   /// 会话开始时的窗口模式 — 与会话结束时的 mode 组合出 sessionKind。
   WindowMode? _modeAtStart;
   Rect? _previousRect;
@@ -164,7 +159,7 @@ final class VideoTextureResizeProbe {
         renderedRect: renderedRect,
       ),
     };
-    (_logger ?? KernelLogger.I).info(
+    (_logger ?? KernelLogger.I).debug(
       'video_texture_first_frame',
       context: context,
     );
@@ -300,7 +295,7 @@ final class VideoTextureResizeProbe {
     // 先关闭会话并清除旧采样，再调用可重入的外部 logger。否则日志 sink 若同步
     // 开启下一次 resize，当前收尾返回后会错误清空新会话的快照与计数。
     _resetSessionState();
-    (_logger ?? KernelLogger.I).info(
+    (_logger ?? KernelLogger.I).debug(
       'video_texture_resize_probe',
       context: context,
     );

@@ -11,7 +11,6 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
 import 'dwm_capabilities.dart';
-import 'error_reporter.dart';
 import 'kernel_logger.dart';
 
 /// 日志门面 — DwmCapabilitiesProbe 共用（kernel 惯例）
@@ -24,12 +23,18 @@ final _log = KernelLogger.I;
 /// dwBuildNumber is a ULONG (Uint32) at offset 12 — integer-exact, no
 /// floating point, no overflow at realistic build numbers (< 2^32).
 final class _OSVERSIONINFOW extends Struct {
-  @Uint32() external int dwOSVersionInfoSize;
-  @Uint32() external int dwMajorVersion;
-  @Uint32() external int dwMinorVersion;
-  @Uint32() external int dwBuildNumber;
-  @Uint32() external int dwPlatformId;
-  @Array(128) external Array<Uint16> szCSDVersion;
+  @Uint32()
+  external int dwOSVersionInfoSize;
+  @Uint32()
+  external int dwMajorVersion;
+  @Uint32()
+  external int dwMinorVersion;
+  @Uint32()
+  external int dwBuildNumber;
+  @Uint32()
+  external int dwPlatformId;
+  @Array(128)
+  external Array<Uint16> szCSDVersion;
 }
 
 typedef _RtlGetVersionNative = Int32 Function(Pointer<_OSVERSIONINFOW>);
@@ -57,18 +62,6 @@ typedef _DwmGetWindowAttributeDart = int Function(
 
 /// S_OK HRESULT (0) — DwmGetWindowAttribute 成功
 const int _sOk = 0;
-
-/// 能力探测语义下的「合法不支持」HRESULT 集合 — 非错误,正常降级
-///
-/// E_INVALIDARG (0x80070057)：属性/窗口上下文不适用。实测 Win11 build
-/// 26200 上对 shell (Progman) 窗口查询 COLOR 系属性 (34/35/36) 返回此值,
-/// 而 CORNER_PREFERENCE (33) 成功 — DWM 对特殊窗口上下文拒绝 COLOR 查询。
-/// E_NOTIMPL (0x80004001)：该 build 的 DWM 未实现此属性。DWM_E_* 家族
-/// (0x8026xxxx)：DWM 自身的「不支持」家族错误码。
-const int _hrInvalidArg = 0x80070057;
-const int _hrNotImpl = 0x80004001;
-const int _dwmErrorFamilyMask = 0xFFFF0000;
-const int _dwmErrorFamilyValue = 0x80260000;
 
 /// DWM 属性 ID 常量（STACK.md build-floor matrix）
 const int _dwmwaWindowCornerPreference = 33;
@@ -142,14 +135,26 @@ class DwmCapabilitiesProbe {
 
         return DwmCapabilitySnapshot(
           buildNumber: buildNumber,
-          supportsCornerPreference:
-              processHResult(hrCorner, _dwmwaWindowCornerPreference, buildNumber),
-          supportsBorderColor:
-              processHResult(hrBorder, _dwmwaBorderColor, buildNumber),
-          supportsCaptionColor:
-              processHResult(hrCaption, _dwmwaCaptionColor, buildNumber),
-          supportsTextColor:
-              processHResult(hrText, _dwmwaTextColor, buildNumber),
+          supportsCornerPreference: processHResult(
+            hrCorner,
+            _dwmwaWindowCornerPreference,
+            buildNumber,
+          ),
+          supportsBorderColor: processHResult(
+            hrBorder,
+            _dwmwaBorderColor,
+            buildNumber,
+          ),
+          supportsCaptionColor: processHResult(
+            hrCaption,
+            _dwmwaCaptionColor,
+            buildNumber,
+          ),
+          supportsTextColor: processHResult(
+            hrText,
+            _dwmwaTextColor,
+            buildNumber,
+          ),
         );
       } finally {
         malloc.free(dummy);
@@ -166,37 +171,23 @@ class DwmCapabilitiesProbe {
 
   /// 处理 DwmGetWindowAttribute 的 HRESULT — 返回属性是否可用
   ///
-  /// Processes the HRESULT from a DwmGetWindowAttribute call. Results in the
-  /// 「合法不支持」family (E_INVALIDARG / E_NOTIMPL / DWM_E_*) return false
-  /// with a debug-level log only — 能力探测的目的是容忍不支持并降级,把
-  /// 「不支持」当错误上报会把每次启动都变成错误卡片（2026-09-05 实测:
-  /// Win11 26200 对 Progman 查询 COLOR 系属性 34/35/36 返回 E_INVALIDARG,
-  /// 而 CORNER_PREFERENCE 33 成功）。其余非 S_OK 视为意外错误,走 D-04
-  /// failure path：每次必记 KernelLogger 错误日志（携带属性 ID 与 build
-  /// 上下文）,首次经 [ErrorReporterImpl.reportPlatformSafely] 聚合上报
-  /// （10s 语义去重窗,卡片不刷屏）。返回 true 当且仅当 [hr] == S_OK (0)。
+  /// Processes the HRESULT from a DwmGetWindowAttribute call. **任何非 S_OK
+  /// 都是探测答案而非应用故障**（2026-09-06 语义软化）：能力探测是容错
+  /// 查询——E_INVALIDARG（实测 Win11 26200 对 Progman 查询 COLOR 系属性）、
+  /// E_NOTIMPL、DWM_E_*，乃至 Release 实机出现过的 E_FAIL 族（Progman
+  /// 的 DWM 语义随桌面状态漂移），全部只意味着「该属性在当前环境不可用」，
+  /// 消费方按 false 走降级路径。旧版「预期族白名单 + 意外 hr 上报错误
+  /// 卡片」把探测答案当故障处理（Occurrence 3 的 E_FAIL 报告），与探测
+  /// 的容错目的自相矛盾——D-04 上报语义仅适用于真实操作场景，此处统一
+  /// 降为 warn 级观测日志（携带 hr/属性/build 上下文，可诊断），快照记
+  /// false。返回 true 当且仅当 [hr] == S_OK (0)。
   @visibleForTesting
   bool processHResult(int hr, int attributeId, int buildNumber) {
     if (hr == _sOk) return true;
-    final bool isExpectedUnsupported = hr == _hrInvalidArg ||
-        hr == _hrNotImpl ||
-        (hr & _dwmErrorFamilyMask) == _dwmErrorFamilyValue;
-    if (isExpectedUnsupported) {
-      // 合法降级:仅 debug 记录,不进错误卡片。
-      _logger.d(
-        '[DwmCapabilities] attribute $attributeId unsupported '
-        'hr=0x${hr.toRadixString(16)} — degraded',
-        context: {'attribute': attributeId, 'build': buildNumber},
-      );
-      return false;
-    }
-    _logger.e(
-      '[DwmCapabilities] DwmGetWindowAttribute hr=0x${hr.toRadixString(16)}',
+    _logger.w(
+      '[DwmCapabilities] attribute $attributeId unavailable '
+      'hr=0x${hr.toRadixString(16)} — probe answer, degraded',
       context: {'attribute': attributeId, 'build': buildNumber},
-    );
-    ErrorReporterImpl.I.reportPlatformSafely(
-      Exception('DWM capability probe reported non-S_OK HRESULT'),
-      StackTrace.current,
     );
     return false;
   }
@@ -204,8 +195,10 @@ class DwmCapabilitiesProbe {
   /// RtlGetVersion → dwBuildNumber (integer-exact, ENAB-01)
   int? _readBuildNumber() {
     final ntdll = DynamicLibrary.open('ntdll.dll');
-    final rtlGetVersion = ntdll.lookupFunction<
-        _RtlGetVersionNative, _RtlGetVersionDart>('RtlGetVersion');
+    final rtlGetVersion = ntdll
+        .lookupFunction<_RtlGetVersionNative, _RtlGetVersionDart>(
+          'RtlGetVersion',
+        );
 
     final info = malloc<_OSVERSIONINFOW>();
     try {
@@ -226,22 +219,20 @@ class DwmCapabilitiesProbe {
   /// GetShellWindow → shell (Progman) HWND
   Pointer<Void> _getShellHwnd() {
     final user32 = DynamicLibrary.open('user32.dll');
-    final getShellWindow = user32.lookupFunction<
-        _GetShellWindowNative, _GetShellWindowDart>('GetShellWindow');
+    final getShellWindow = user32
+        .lookupFunction<_GetShellWindowNative, _GetShellWindowDart>(
+          'GetShellWindow',
+        );
     return getShellWindow();
   }
 
   /// DwmGetWindowAttribute lookup
-  int Function(
-    Pointer<Void>,
-    int,
-    Pointer<Void>,
-    int,
-  ) _lookupDwmGetWindowAttribute() {
+  int Function(Pointer<Void>, int, Pointer<Void>, int)
+  _lookupDwmGetWindowAttribute() {
     final dwmapi = DynamicLibrary.open('dwmapi.dll');
     return dwmapi.lookupFunction<
-        _DwmGetWindowAttributeNative, _DwmGetWindowAttributeDart>(
-      'DwmGetWindowAttribute',
-    );
+      _DwmGetWindowAttributeNative,
+      _DwmGetWindowAttributeDart
+    >('DwmGetWindowAttribute');
   }
 }

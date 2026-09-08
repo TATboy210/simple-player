@@ -253,7 +253,15 @@ final class DevToolsSink implements LogSink {
 /// Outputs via `debugPrint` with `LEVEL: message {context}` format.
 /// Message paths are redacted via [redactPath] before output.
 /// Only active in debug mode (kDebugMode gate at composition root).
+///
+/// 控制台降噪门控（2026-09-06）：Windows 控制台写入发生在 platform 线程
+/// 且代价高（每次写入可占数毫秒），快速拖拽 resize 时直接挤压帧预算。
+/// [minLevel] 以下的级别（trace/debug 高频 chatter）不再进 debugPrint，
+/// 仍经 DevToolsSink 全量进入 DevTools —— 数据不丢，控制台清净。
 final class DebugPrintSink implements LogSink {
+  /// 控制台输出的最低级别 — 默认 info（i/w/e/f 进控制台，t/d 不进）。
+  static LogLevel minLevel = LogLevel.info;
+
   /// const 构造 — 无状态, 支持编译时常量 (D16).
   const DebugPrintSink();
   @override
@@ -264,6 +272,8 @@ final class DebugPrintSink implements LogSink {
     Object? error,
     StackTrace? stackTrace,
   }) {
+    // 门控在格式化之前 — 序列化大 JSON 本身也有成本，静默的调用零开销。
+    if (level.index < minLevel.index) return;
     final redacted = redactPath(msg);
     final contextStr = context != null && context.isNotEmpty
         ? ' ${serializeLogContext(context)}'
