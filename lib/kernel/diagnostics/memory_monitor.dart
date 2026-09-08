@@ -62,6 +62,12 @@ final class MemoryMonitor implements MemoryMonitorSlot {
     _instance = monitor;
   }
 
+  /// 是否已初始化 —— 无副作用防御探针（WR-02 先例，与
+  /// KernelLoggerImpl.isInitialized 同一模式）。release 构建下
+  /// PlayerServices 不构造 MemoryMonitor，消费方（DebugExporter）
+  /// 须先探测，避免外溢 StateError。
+  static bool get isInitialized => _instance != null;
+
   /// 测试重置 — 清除静态实例, 隔离测试间状态。
   @visibleForTesting
   static void resetForTesting() {
@@ -268,6 +274,7 @@ final class MemoryMonitor implements MemoryMonitorSlot {
   }
 
   /// 日志当前 RSS — 使用 [KernelLogger.info] (MEM-05 prep)。
+  /// 2026-09-06 用户裁定：RSS 周期打点保留 info 级控制台可见性。
   void _logCurrent(int rssBytes) {
     final mb = (rssBytes / (1024 * 1024)).toStringAsFixed(1);
     _logger?.info('[MemoryMonitor] RSS: $mb MB');

@@ -56,6 +56,9 @@ class DebugExporter {
   }
 
   static Map<String, Object>? _memorySnapshot() {
+    // 探针守卫（WR-02）：release 下 MemoryMonitor 未初始化时导出 memory=null，
+    // 而非抛 StateError（saveToFile 的 `on Exception` 接不住 Error 子类型）。
+    if (!MemoryMonitor.isInitialized) return null;
     final snap = MemoryMonitor.I.snapshot();
     return snap?.toJson();
   }
