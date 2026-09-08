@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
-
 /// 窗口模式：普通窗口、最大化或由 media_kit 承担的全屏。
 enum WindowMode {
   /// 普通窗口。
@@ -21,23 +20,24 @@ enum WindowMode {
 
 /// 面向 UI 的窗口管理抽象，隐藏平台窗口库的具体实现。
 ///
-/// ## 单包架构（2026-09-05 迁移，替代 2026-09-03 双包方案）
+/// ## 双包架构边界（BB 同款，2026-09-06 迁移，替代 desktop_window 路线）
 ///
-/// 本接口的实现（[WindowService]）之下是 **window_frame_kit** 单包
-/// （window_manager 0.5.2 verbatim 底座 + FrameController frame 嫁接）：
+/// 本接口的实现（[WindowService]）之下是两个窗口包的分工：
 ///
-/// - **FrameController 命中与视觉域**（`WindowOptions customFrame: true`
-///   接线）：原生 NCCALCSIZE 无边框（无主题色描边、无 Win11 顶部内缩）、
-///   四边四角 DPI 感知 WM_NCHITTEST 缩放、协作式 GETMINMAXINFO
-///   （setMinimumSize 真正生效，无双包时代的 minSize 双通道同步）、
-///   全屏双路径禁缩放。
-/// - **窗口事件与状态域**：WindowListener 事件流
+/// - **bitsdojo_window**（BDW_CUSTOM_FRAME，`windows/runner/main.cpp` 全局
+///   接线）：窗口**视觉与命中域**——原生 NCCALCSIZE return 0（无边框、无
+///   系统主题色描边、无顶部内缩），原生 WM_NCHITTEST 四边等宽 resize 判定，
+///   连带其 GETMINMAXINFO hook 要求的 minSize 双通道同步。runner 保持
+///   Flutter 上游模板，零自写窗口消息代码（全屏态缩放屏蔽见
+///   fullscreen_resize_guard.h）。
+/// - **window_manager**：窗口**事件与状态域**——WindowListener 事件流
 ///   （maximize/resize/move/close/focus/blur）、setPreventClose 关闭拦截、
 ///   几何读写（setBounds/setSize/getPosition）、置顶、最小化、窗口移动
-///   （startDragging）——与原 window_manager 同名同语义。
+///   （startDragging）。
 ///
-/// UI 层约定：一切**能力调用**（拖动/模式切换/置顶/关闭）必须经本接口，
-/// 禁止直接持有 `windowManager` 全局单例，以保持可替换性。
+/// UI 层约定：widget 级视觉件（如 `WindowBorder`/`MoveWindow`）可直接使用
+/// bitsdojo 包；一切**能力调用**（模式切换/置顶/关闭）必须经本接口，禁止
+/// 直接持有 `appWindow` / `windowManager` 全局单例，以保持可替换性。
 abstract interface class WindowBridge {
   /// 当前窗口模式；全屏状态由 media_kit 同步，而非本接口执行原生切换。
   ValueListenable<WindowMode> get mode;

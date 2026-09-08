@@ -115,11 +115,12 @@ class _WindowServiceScope extends InheritedWidget {
 
 /// 标题栏可拖区 — 标题与左侧空白，负责窗口移动与双击最大化。
 ///
-/// 手势仅挂在此区域（非整行）：`onPanStart` 经 `WindowBridge.startDragging()`
-/// （实现=window_manager；窗口移动按取舍裁决不经过 bitsdojo，见
-/// window_bridge.dart 双包边界文档）。命中行为用 `opaque`：空标题区点击
-/// 不得漏进下层视频区。双击切换最大化/还原走 `WindowService.setMode`
-/// （C2 单一数据源直连）。
+/// 手势仅挂在此区域（非整行）：
+/// - onPanStart → startDragging（拖动窗口）
+/// - onDoubleTap → setMode 在 maximized / windowed 之间切换
+///
+/// 用 GestureDetector，不要用 Listener(onPointerDown)：
+/// startDragging 的 WM_NCLBUTTONDOWN 会吞掉 up，破坏自写双击检测。
 class _TitleBarDragArea extends StatelessWidget {
   final WindowBridge windowService;
 
@@ -129,7 +130,9 @@ class _TitleBarDragArea extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPanStart: (_) => unawaited(windowService.startDragging()),
+      onPanStart: (_) {
+        unawaited(windowService.startDragging());
+      },
       onDoubleTap: () {
         final mode = windowService.mode.value;
         unawaited(

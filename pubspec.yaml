@@ -1,7 +1,7 @@
 name: simple_player_flutter
 description: "Simple Player - A dark-themed media player"
 publish_to: 'none'
-version: 0.0.2
+version: 0.0.3
 
 environment:
   sdk: ^3.13.2
@@ -20,9 +20,9 @@ dependencies:
   media_kit_libs_macos_video: ^1.1.4
   media_kit_libs_linux: ^1.2.1
   path_provider: ^2.1.6
-  file_picker: ^12.2.0
+  file_picker: ^11.0.3
   shared_preferences: ^2.5.5
-  flutter_secure_storage: ^11.0.0
+  flutter_secure_storage: ^9.2.4
   desktop_drop: ^0.7.1
   logger: ^2.7.0
   path: ^1.9.1
@@ -30,10 +30,12 @@ dependencies:
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
   ffi: ^2.2.0
-  # 窗口方案(2026-09-05 用户裁决): window_manager(事件/几何/关闭拦截)
-  # + desktop_window(窗口尺寸/边框开关/全屏),替代 window_frame_kit 实验。
+  # 窗口方案(2026-09-06 用户裁决, BB 同款双包): bitsdojo(BDW_CUSTOM_FRAME
+  # — 原生 NCCALCSIZE return 0 自绘标题栏形态 + WM_NCHITTEST 四边等宽
+  # 缩放 + GETMINMAXINFO) + window_manager(事件/几何/关闭拦截/拖动)。
+  # desktop_window/nativeapi 已移除。
   window_manager: ^0.5.2
-  desktop_window: ^0.4.4
+  bitsdojo_window: ^0.1.6
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.6.0
   i18n: ^4.2.6
