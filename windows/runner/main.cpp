@@ -11,8 +11,9 @@
 // bitsdojo 接管 NCCALCSIZE/NCHITTEST（BDW_CUSTOM_FRAME），自绘客户区扩展
 // 到整窗，四边等宽原生 resize 判定 + 无系统主题色边框，系统标题栏由自绘
 // 标题栏（custom_title_bar.dart）替代。
-// 不用 BDW_HIDE_ON_STARTUP——窗口可见性由 WindowService 在 Dart 侧几何
-// 恢复后 show() 控制（window_manager waitUntilReadyToShow 时序，防启动闪白）。
+// 不用 BDW_HIDE_ON_STARTUP——窗口创建即隐藏（CreateWindow 无 WS_VISIBLE），
+// 可见性由 Dart 侧控制：WindowService 以隐藏态完成几何恢复，组合根在首帧
+// 栅格化后 reveal 亮窗（v0.0.4 空白窗口修复，详见 main.dart）。
 auto bdw = bitsdojo_window_configure(BDW_CUSTOM_FRAME);
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,

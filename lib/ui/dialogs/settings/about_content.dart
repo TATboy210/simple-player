@@ -334,7 +334,7 @@ class _SpecialThanksBody extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _SupporterAvatar(name: name),
+                const _SupporterAvatar(),
                 const SizedBox(width: Tokens.spSm),
                 Text(
                   name,
@@ -360,18 +360,18 @@ const _thanksAreaDecoration = BoxDecoration(
   ),
 );
 
-/// 支持者头像 — accent 渐变圆 + 姓名首字。
+/// 支持者头像 — accent 渐变圆底 + 爱发电品牌图标（v0.0.4 用户裁定）。
 ///
-/// 占位实现（v0.0.4）：昵称首字居中于 32px 渐变圆上，Segoe UI/SF Pro
-/// 字重 medium。首字取第一个 UTF-16 码元（中英文/emoji 简单场景够用）。
+/// 与品牌行的 afdian logo 同源资产（assets/logos/afdian.svg，白色 tint），
+/// 32px 渐变圆内 18px 图标留呼吸边 —— 支持者头像与赞助品牌视觉同款。
 class _SupporterAvatar extends StatelessWidget {
-  final String name;
+  const _SupporterAvatar();
 
-  const _SupporterAvatar({required this.name});
+  /// 头像内图标尺寸 — 32px 渐变圆内留呼吸边。
+  static const _iconSize = 18.0;
 
   @override
   Widget build(BuildContext context) {
-    final initial = name.isEmpty ? '?' : name.characters.first;
     return Container(
       width: 32,
       height: 32,
@@ -384,13 +384,11 @@ class _SupporterAvatar extends StatelessWidget {
           colors: [Tokens.accent, Tokens.accentBlue],
         ),
       ),
-      child: Text(
-        initial,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: Tokens.fontBody,
-          fontWeight: Tokens.weightMedium,
-        ),
+      child: SvgPicture.asset(
+        'assets/logos/afdian.svg',
+        width: _iconSize,
+        height: _iconSize,
+        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
       ),
     );
   }

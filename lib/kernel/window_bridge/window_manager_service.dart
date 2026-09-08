@@ -214,9 +214,23 @@ class WindowService with WindowListener implements WindowBridge {
         ? WindowMode.maximized
         : WindowMode.windowed;
     _activeResizeSuppression = ++_resizeSuppressionGeneration;
+    // v0.0.4 空白窗口修复：show/maximize/focus 从 init 拆出至 [reveal] —
+    // init 在 runApp 之前以隐藏态完成几何恢复，组合根待首帧栅格化后亮窗，
+    // 窗口出现即带完整首帧内容（此前 show 先于 runApp，用户看到数百毫秒
+    // 空白窗口）。
+  }
+
+  /// 亮窗 — 首帧栅格化后由组合根调用（v0.0.4 空白窗口修复）。
+  ///
+  /// 补上 init 拆出的可见性收尾：show + 条件 maximize（以当前 mode 为准，
+  /// 恢复路径已在 [_initWindow] 同步持久化态）+ focus。init 失败路径
+  /// （组合根降级 show 已直接亮窗）再调用本方法无害：show 幂等，
+  /// maximize/focus 重复无副作用。
+  Future<void> reveal() async {
+    if (_disposed) return;
     await windowManager.show();
     if (_disposed) return;
-    if (persisted.isMaximized) {
+    if (_state.mode.value.isMaximized) {
       await windowManager.maximize();
       if (_disposed) return;
     }
