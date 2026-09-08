@@ -58,8 +58,14 @@ void main() {
     await openDialog(tester);
 
     // 名单区位于长列表尾部 — ListView 惰性构建，先滚到它再断言。
+    // 滚动目标直接用占位文案（标签露出时占位可能仍在惰性构建区外 —
+    // v0.0.4 对话框 chrome 高度变化会漂移滚动落点）。
     final list = find.byType(Scrollable).last;
-    await tester.scrollUntilVisible(find.text('特别鸣谢'), 120, scrollable: list);
+    await tester.scrollUntilVisible(
+      find.text('名单正在准备中，敬请期待'),
+      120,
+      scrollable: list,
+    );
     expect(find.text('特别鸣谢'), findsOneWidget);
     // 名单尚未录入 — 显示空态占位文案。
     expect(find.text('名单正在准备中，敬请期待'), findsOneWidget);

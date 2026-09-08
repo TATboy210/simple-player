@@ -47,8 +47,22 @@ class _SettingsDialogState extends State<SettingsDialog> {
             selected: _selected,
             onSelect: (tab) => setState(() => _selected = tab),
           ),
-          // 左右分区的细分隔线 — 复用边框高亮 token 保持玻璃体系一致。
-          Container(width: 1, color: Tokens.borderHighlight),
+          // 左右分区的细分隔线 — 垂直渐变（上下端透明→borderHighlight），
+          // 模拟毛玻璃边缘的光线收束，比通高纯色实线更轻。
+          Container(
+            width: 1,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Tokens.borderHighlight,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           Expanded(
             child: switch (_selected) {
               _SettingsTab.general => const GeneralSettingsContent(),
@@ -163,6 +177,19 @@ class _NavEntry extends StatelessWidget {
             ),
             child: Row(
               children: [
+                // 选中指示条 — accent 竖条从左侧点亮（对齐 AppDialog 标题
+                // 竖条/控制栏 accent 强调的同一设计语言）；未选中时保留
+                // 2px 槽位，切换不跳布局。
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: Tokens.durationFast),
+                  width: 2,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: selected ? Tokens.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+                  ),
+                ),
+                const SizedBox(width: Tokens.spSm),
                 Icon(
                   icon,
                   size: 18,
