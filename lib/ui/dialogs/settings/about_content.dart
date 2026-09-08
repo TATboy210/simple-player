@@ -56,7 +56,7 @@ typedef SocialLink = ({String asset, String tooltip, String url});
 
 const List<SocialLink> kSocialLinks = [
   (
-    asset: 'assets/logos/x.png',
+    asset: 'assets/logos/x.svg',
     tooltip: 'X (Twitter)',
     url: 'https://x.com/SimplePlayTeam',
   ),
@@ -187,33 +187,22 @@ class _SocialLogoButton extends StatelessWidget {
 
   const _SocialLogoButton({required this.link});
 
-  /// PNG 白色 tint 滤镜 — srcIn 用白色替换像素色相、保留原图 alpha。
-  static const _pngWhiteTint = ColorFilter.mode(Colors.white, BlendMode.srcIn);
+  /// logo 绘制尺寸 — 20px（v0.0.4 用户裁定放大一档），装在 30px 点击热区内。
+  static const _logoSize = 20.0;
 
-  /// logo 绘制尺寸 — 16px 与 nav 图标/正文字号同档，装在 26px 点击热区内。
-  static const _logoSize = 16.0;
+  /// 点击热区边长 — logo 外扩 10px 呼吸距，保持桌面易点性。
+  static const _hitZone = 30.0;
 
   Widget _buildLogo() {
-    final isSvg = link.asset.endsWith('.svg');
-    if (isSvg) {
-      return SvgPicture.asset(
-        link.asset,
-        width: _logoSize,
-        height: _logoSize,
-        colorFilter: const ColorFilter.mode(
-          Tokens.textSecondary,
-          BlendMode.srcIn,
-        ),
-      );
-    }
-    return ColorFiltered(
-      colorFilter: _pngWhiteTint,
-      child: Image.asset(
-        link.asset,
-        width: _logoSize,
-        height: _logoSize,
-        // 品牌徽标硬边缘 — 禁用双线性插值防发糊。
-        filterQuality: FilterQuality.none,
+    return SvgPicture.asset(
+      link.asset,
+      width: _logoSize,
+      height: _logoSize,
+      // 统一 tint 到 textSecondary（73% 白）：原素材黑色或白色填充不一，
+      // srcIn 以 alpha 形状为准替换色相，四枚 logo 视觉档位一致。
+      colorFilter: const ColorFilter.mode(
+        Tokens.textSecondary,
+        BlendMode.srcIn,
       ),
     );
   }
@@ -235,8 +224,8 @@ class _SocialLogoButton extends StatelessWidget {
             splashColor: Colors.transparent,
             splashFactory: NoSplash.splashFactory,
             child: SizedBox(
-              width: 26,
-              height: 26,
+              width: _hitZone,
+              height: _hitZone,
               child: Center(child: _buildLogo()),
             ),
           ),
