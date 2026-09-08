@@ -637,4 +637,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get errorCardToggleLabel => '错误卡片';
+
+  @override
+  String get languageLabel => '语言';
+
+  @override
+  String get languageSystem => '跟随系统';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get languageChinese => '中文';
 }

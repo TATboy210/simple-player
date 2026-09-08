@@ -5,6 +5,7 @@ import 'features/player/player_feature.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
 import 'l10n/app_localizations.dart';
+import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_card_host.dart';
 import 'ui/theme/tokens.dart';
 
@@ -38,18 +39,30 @@ class App extends StatelessWidget {
       ),
     );
 
-    return MaterialApp(
-      locale: const Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      debugShowCheckedModeBanner: false,
-      theme: theme,
-      darkTheme: theme,
-      themeMode: ThemeMode.dark,
-      home: _buildPlayerHome(context),
-      builder: (context, navigator) =>
-          buildErrorCardMount(context, navigator, mode: windowService.mode),
+    // 语言解析（2026-09-06 中英文切换）：订阅设置 store，切换同帧生效。
+    // system → null = MaterialApp 官方的「跟随系统」语义。
+    return ValueListenableBuilder<ErrorFeedbackSettingsData>(
+      valueListenable: ErrorFeedbackSettings.I.state,
+      builder: (context, settings, _) {
+        final Locale? locale = switch (settings.language) {
+          AppLanguage.system => null,
+          AppLanguage.english => const Locale('en'),
+          AppLanguage.chinese => const Locale('zh'),
+        };
+        return MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+          debugShowCheckedModeBanner: false,
+          theme: theme,
+          darkTheme: theme,
+          themeMode: ThemeMode.dark,
+          home: _buildPlayerHome(context),
+          builder: (context, navigator) =>
+              buildErrorCardMount(context, navigator, mode: windowService.mode),
+        );
+      },
     );
   }
 

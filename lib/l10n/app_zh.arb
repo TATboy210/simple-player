@@ -226,5 +226,10 @@
   "errorCardLocationUnavailable": "定位不可用",
   "errorCardCycleTooltip": "轮览错误",
 
-  "errorCardToggleLabel": "错误卡片"
+  "errorCardToggleLabel": "错误卡片",
+
+  "languageLabel": "语言",
+  "languageSystem": "跟随系统",
+  "languageEnglish": "English",
+  "languageChinese": "中文"
 }

@@ -22,8 +22,7 @@ class GeneralSettingsContent extends StatefulWidget {
   const GeneralSettingsContent({super.key});
 
   @override
-  State<GeneralSettingsContent> createState() =>
-      _GeneralSettingsContentState();
+  State<GeneralSettingsContent> createState() => _GeneralSettingsContentState();
 }
 
 class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
@@ -39,10 +38,56 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       padding: const EdgeInsets.all(Tokens.spLg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildErrorCardToggleRow(l10n),
-        ],
+        children: [_buildLanguageRow(l10n), _buildErrorCardToggleRow(l10n)],
       ),
+    );
+  }
+
+  /// 语言选择行 —— Dropdown 三选（跟随系统/English/中文），切换经
+  /// [ErrorFeedbackSettings.setLanguage] 同帧生效（App 订阅同一 store）。
+  ///
+  /// 语言名按国际惯例以各自母语显示（English/中文），label 随当前语言切换。
+  Widget _buildLanguageRow(AppLocalizations l10n) {
+    return ValueListenableBuilder<ErrorFeedbackSettingsData>(
+      valueListenable: ErrorFeedbackSettings.I.state,
+      builder: (context, settings, _) {
+        return _SettingsRow(
+          label: l10n.languageLabel,
+          trailing: DropdownButton<AppLanguage>(
+            value: settings.language,
+            underline: const SizedBox.shrink(),
+            dropdownColor: Tokens.bgGlass,
+            borderRadius: BorderRadius.circular(Tokens.radiusSm),
+            style: const TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontCaption,
+            ),
+            icon: const Icon(
+              Icons.expand_more,
+              size: Tokens.iconSm,
+              color: Tokens.textSecondary,
+            ),
+            items: [
+              DropdownMenuItem(
+                value: AppLanguage.system,
+                child: Text(l10n.languageSystem),
+              ),
+              const DropdownMenuItem(
+                value: AppLanguage.english,
+                child: Text('English'),
+              ),
+              const DropdownMenuItem(
+                value: AppLanguage.chinese,
+                child: Text('中文'),
+              ),
+            ],
+            onChanged: (language) {
+              if (language != null)
+                ErrorFeedbackSettings.I.setLanguage(language);
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -70,11 +115,7 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
 /// 通用设置行 — MouseRegion hover + AnimatedContainer 行语法
 /// （循 setting_action_row.dart:54-76 先例；trailing 位置放行内控件）。
 class _SettingsRow extends StatefulWidget {
-  const _SettingsRow({
-    required this.label,
-    required this.trailing,
-    this.onTap,
-  });
+  const _SettingsRow({required this.label, required this.trailing, this.onTap});
 
   final String label;
   final Widget trailing;
