@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show exit;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
@@ -29,11 +30,18 @@ final _log = KernelLogger.I;
 class WindowService with WindowListener implements WindowBridge {
   /// 创建 WindowService。
   ///
-  /// 创建窗口服务。
-  WindowService({WindowPersistence? persistence})
-    : _persistence = persistence ?? WindowPersistence();
+  /// 创建窗口服务。[exitOnClose] 注入 seam — 关窗终点的进程终止调用，
+  /// 生产绑定 dart:io exit；测试注入 no-op 避免 test runner 被杀。
+  WindowService({
+    WindowPersistence? persistence,
+    void Function(int code)? exitOnClose,
+  }) : _persistence = persistence ?? WindowPersistence(),
+       _exitOnClose = exitOnClose ?? exit;
 
   final WindowPersistence _persistence;
+
+  /// 关窗终点的进程终止调用（见 [_persistThenDestroy] 第 4 步）。
+  final void Function(int code) _exitOnClose;
   final WindowServiceState _state = WindowServiceState();
   WindowResizeCoordinator? _resizeCoordinator;
   late final WindowPersistenceCoordinator _persistenceCoordinator =
@@ -106,17 +114,19 @@ class WindowService with WindowListener implements WindowBridge {
       // windowManager.ensureInitialized() is owned by main.dart.
       // 拦截原生关闭事件，确保异步窗口状态持久化完成后再销毁窗口。
       await windowManager.setPreventClose(true);
-      // BB 同款：window_manager 在 Windows 上不碰标题栏/边框——bitsdojo 的
-      // BDW_CUSTOM_FRAME 已接管 NCCALCSIZE（return 0），两个插件都改 NCCALCSIZE
+      // BB 同款（2026-09-06 用户裁决）：window_manager 在 Windows 上不碰
+      // 标题栏/边框——bitsdojo 的 BDW_CUSTOM_FRAME 已接管 NCCALCSIZE
+      // （return 0，自绘标题栏形态 + 四边等宽缩放），两个插件都改 NCCALCSIZE
       // 会打架（window_manager hidden 分支的 8px 内缩会重新引入白边）。
       const options = WindowOptions(
         backgroundColor: Colors.transparent,
         windowButtonVisibility: false,
         minimumSize: minimumWindowSize,
       );
-      // 最小尺寸双通道同步：bitsdojo 的 WM_GETMINMAXINFO hook 无条件 return 0，
-      // 会吞掉 window_manager 的 setMinimumSize（其 min_size 默认 {0,0} 即无下限）。
-      // 两侧设同一值后，无论 hook 先后顺序如何，854×480 下限都确定生效。
+      // 最小尺寸双通道同步：bitsdojo 的 WM_GETMINMAXINFO hook 无条件
+      // return 0，会吞掉 window_manager 的 setMinimumSize（其 min_size
+      // 默认 {0,0} 即无下限）。两侧设同一值后，无论 hook 先后顺序如何，
+      // 854×480 下限都确定生效。
       doWhenWindowReady(() => appWindow.minSize = minimumWindowSize);
       final ready = Completer<void>();
       // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
@@ -173,9 +183,9 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   Future<void> _initWindow() async {
-    // 边框/标题栏视觉归 bitsdojo（BDW_CUSTOM_FRAME 已在 runner 全局接线，
-    // 见 main.cpp）：WindowOptions 不设置 titleBarStyle，window_manager 只
-    // 负责几何/事件/置顶。resize 由 bitsdojo 原生 WM_NCHITTEST 四边等宽判定。
+    // frame 视觉与边缘命中归 bitsdojo 的 BDW_CUSTOM_FRAME（main.cpp 一行
+    // 接线）：原生接管 NCCALCSIZE return 0/四边等宽 WM_NCHITTEST，本服务
+    // 专注几何/事件/置顶等窗口管理语义。
     if (_disposed) return;
     // Restore only validated geometry; corrupt preferences fall back to 720p.
     final persisted = await _persistence.load();
@@ -204,9 +214,23 @@ class WindowService with WindowListener implements WindowBridge {
         ? WindowMode.maximized
         : WindowMode.windowed;
     _activeResizeSuppression = ++_resizeSuppressionGeneration;
+    // v0.0.4 空白窗口修复：show/maximize/focus 从 init 拆出至 [reveal] —
+    // init 在 runApp 之前以隐藏态完成几何恢复，组合根待首帧栅格化后亮窗，
+    // 窗口出现即带完整首帧内容（此前 show 先于 runApp，用户看到数百毫秒
+    // 空白窗口）。
+  }
+
+  /// 亮窗 — 首帧栅格化后由组合根调用（v0.0.4 空白窗口修复）。
+  ///
+  /// 补上 init 拆出的可见性收尾：show + 条件 maximize（以当前 mode 为准，
+  /// 恢复路径已在 [_initWindow] 同步持久化态）+ focus。init 失败路径
+  /// （组合根降级 show 已直接亮窗）再调用本方法无害：show 幂等，
+  /// maximize/focus 重复无副作用。
+  Future<void> reveal() async {
+    if (_disposed) return;
     await windowManager.show();
     if (_disposed) return;
-    if (persisted.isMaximized) {
+    if (_state.mode.value.isMaximized) {
       await windowManager.maximize();
       if (_disposed) return;
     }
@@ -280,25 +304,38 @@ class WindowService with WindowListener implements WindowBridge {
 
   Future<void> _persistThenDestroy() async {
     // 1) hide-first:窗口先视觉消失（BlueBubbles 模式），后续持久化与
-    //    销毁在"看不见"的状态下完成。hide 本身也可能卡 channel — 加
+    //    退出在"看不见"的状态下完成。hide 本身也可能卡 channel — 加
     //    超时兜底，超时后继续走持久化。
     await _runCloseCommand('hide', windowManager.hide);
     // 2) 仅等待轻量的偏好设置写入（含超时兜底），确保下次启动仍能
-    //    恢复最后稳定的窗口几何。
+    //    恢复最后稳定的窗口几何。await 返回即数据已安全落盘
+    //    （shared_preferences 平台实现同步写入后应答）。
     await _runCloseCommand(
       'persist',
       () => _saveWindowState(size: _state.windowSize.value),
     );
-    // 3) 销毁窗口。失败仅记录 — dispose() 仍会执行，服务进入终态。
-    try {
-      await _runCloseCommand('destroy', windowManager.destroy);
-    } on Object catch (error, stackTrace) {
-      _log.e(
-        '[WindowService._persistThenDestroy] destroy failed: $error\n$stackTrace',
-      );
-    } finally {
-      dispose();
-    }
+    // 3) 销毁窗口 — fire 不等：destroy 的意义只是触发平台侧 WM_DESTROY
+    //    链，而下一步 exit(0) 会瞬时终止进程（OS 收尾销毁所有窗口），
+    //    等待它只会平添滞留。失败仅记录。
+    unawaited(
+      _runCloseCommand('destroy', windowManager.destroy).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        _log.e(
+          '[WindowService._persistThenDestroy] destroy failed: '
+          '$error\n$stackTrace',
+        );
+      }),
+    );
+    dispose();
+    // 4) exit(0) 立即终止进程（BB 同款硬杀）：destroy 触发消息循环退出后，
+    //    wWinMain 返回时 CRT 仍需等待 Flutter 引擎线程 / libmpv 渲染与
+    //    音频线程收尾 — 这就是"窗口已消失但进程滞留"的根源。此刻窗口已
+    //    不可见、窗口状态已落盘，进程没有存续价值，直接终止，跳过引擎
+    //    与线程的清理等待。播放器无跨进程状态/锁文件，硬杀无副作用。
+    //    测试注入 [_exitOnClose] seam 拦截，避免杀掉 test runner。
+    _exitOnClose(0);
   }
 
   /// 执行关窗路径中的单个平台命令，附带超时兜底。
@@ -361,10 +398,8 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   Future<void> startDragging() async {
-    // 标题栏拖动（窗口移动）归 window_manager——按 2026-09-03 取舍裁决：
-    // bitsdojo 只负责 frame 视觉与命中（无边框 + 四边等宽 resize + 连带的
-    // minSize 同步），其余一切留在 window_manager，bitsdojo 接触面最小化，
-    // 日后单点替换（如 window_plus）只需动 main.cpp 一行 + WindowBorder。
+    // 标题栏拖动（窗口移动）走插件 startDragging——单包后 frame 命中
+    // （FrameController）与窗口移动（startDragging）同源，无双包抢权问题。
     if (_disposed) return;
     await windowManager.startDragging();
   }

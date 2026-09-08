@@ -47,8 +47,22 @@ class _SettingsDialogState extends State<SettingsDialog> {
             selected: _selected,
             onSelect: (tab) => setState(() => _selected = tab),
           ),
-          // 左右分区的细分隔线 — 复用边框高亮 token 保持玻璃体系一致。
-          Container(width: 1, color: Tokens.borderHighlight),
+          // 左右分区的细分隔线 — 垂直渐变（上下端透明→borderHighlight），
+          // 模拟毛玻璃边缘的光线收束，比通高纯色实线更轻。
+          Container(
+            width: 1,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Tokens.borderHighlight,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
           Expanded(
             child: switch (_selected) {
               _SettingsTab.general => const GeneralSettingsContent(),
@@ -56,8 +70,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               // 视频/音频分支不可达 —— 灰显占位项不会进入选中态；
               // 防御分支返回空视图而非伪造内容。
               _SettingsTab.video ||
-              _SettingsTab.audio =>
-                const SizedBox.shrink(),
+              _SettingsTab.audio => const SizedBox.shrink(),
             },
           ),
         ],
@@ -124,6 +137,11 @@ class _SettingsNav extends StatelessWidget {
 /// enabled 且未选中：完整不透明 + 无底色（可点击等待选中）；
 /// [selected]：bgHover 圆角底 + accent 图标/文字的持续高亮 —— 区别于 hover 的
 /// 瞬态，选中态不随鼠标离开消失。
+///
+/// v0.0.4 交互反馈对齐控制栏按钮（custom_title_bar._TitleBarButton 同款）：
+/// Material(transparent) + InkWell 水波纹禁用但保留 hover/pressed 色阶 +
+/// MouseRegion click cursor —— 与纯 GestureDetector 的差异是 hover 即有
+/// 底色渐现与手型光标，pressed 有按下沉降色。
 class _NavEntry extends StatelessWidget {
   final _SettingsTab tab;
   final IconData icon;
@@ -147,39 +165,71 @@ class _NavEntry extends StatelessWidget {
       opacity: enabled ? 1 : 0.38,
       child: IgnorePointer(
         ignoring: !enabled,
-        child: GestureDetector(
-          onTap: onTap,
-          // opaque 让行内空白区也可点击（桌面友好，无伪交互语义）。
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            // Key 供测试断言选中高亮（以枚举名区分条目）。
-            key: ValueKey('settings-nav-${tab.name}'),
-            decoration: BoxDecoration(
-              color: selected ? Tokens.bgHover : null,
+        child: MouseRegion(
+          // 可点击条目才给手型光标（与控制栏按钮同一反馈）。
+          cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              // 圆角裁剪 hover/pressed 色块，与行底色同轮廓。
               borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: Tokens.spSm,
-              vertical: 10,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: selected ? Tokens.accent : Tokens.textPrimary,
+              // hover 色与选中底色同 token：未选中时 hover 渐现底色，
+              // 已选中时底色本就常驻、hover 不再叠加。
+              hoverColor: enabled && !selected
+                  ? Tokens.bgHover
+                  : Colors.transparent,
+              highlightColor: enabled
+                  ? Tokens.titleBarPressed
+                  : Colors.transparent,
+              splashColor: Colors.transparent,
+              splashFactory: NoSplash.splashFactory,
+              child: Container(
+                // Key 供测试断言选中高亮（以枚举名区分条目）。
+                key: ValueKey('settings-nav-${tab.name}'),
+                decoration: BoxDecoration(
+                  color: selected ? Tokens.bgHover : null,
+                  borderRadius: BorderRadius.circular(Tokens.radiusBtn),
                 ),
-                const SizedBox(width: Tokens.spSm),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? Tokens.accent : Tokens.textPrimary,
-                      fontSize: Tokens.fontCaption,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Tokens.spSm,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    // 选中指示条 — accent 竖条从左侧点亮（对齐 AppDialog 标题
+                    // 竖条/控制栏 accent 强调的同一设计语言）；未选中时保留
+                    // 2px 槽位，切换不跳布局。
+                    AnimatedContainer(
+                      duration: const Duration(
+                        milliseconds: Tokens.durationFast,
+                      ),
+                      width: 2,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: selected ? Tokens.accent : Colors.transparent,
+                        borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: Tokens.spSm),
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: selected ? Tokens.accent : Tokens.textPrimary,
+                    ),
+                    const SizedBox(width: Tokens.spSm),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected ? Tokens.accent : Tokens.textPrimary,
+                          fontSize: Tokens.fontCaption,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

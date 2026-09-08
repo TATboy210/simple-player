@@ -7,10 +7,13 @@
 #include "flutter_window.h"
 #include "utils.h"
 
-// BB 同款全局配置：bitsdojo 接管 NCCALCSIZE/NCHITTEST（BDW_CUSTOM_FRAME），
-// 自绘客户区扩展到整窗，四边等宽原生 resize 判定 + 无系统主题色边框。
-// 不用 BDW_HIDE_ON_STARTUP——无原生 splash，窗口可见性仍由 WindowService
-// 在 Dart 侧几何恢复后 show() 控制（防启动闪白）。
+// BB 同款全局配置（2026-09-06 用户裁决，window_manager + bitsdojo 双包）：
+// bitsdojo 接管 NCCALCSIZE/NCHITTEST（BDW_CUSTOM_FRAME），自绘客户区扩展
+// 到整窗，四边等宽原生 resize 判定 + 无系统主题色边框，系统标题栏由自绘
+// 标题栏（custom_title_bar.dart）替代。
+// 不用 BDW_HIDE_ON_STARTUP——窗口创建即隐藏（CreateWindow 无 WS_VISIBLE），
+// 可见性由 Dart 侧控制：WindowService 以隐藏态完成几何恢复，组合根在首帧
+// 栅格化后 reveal 亮窗（v0.0.4 空白窗口修复，详见 main.dart）。
 auto bdw = bitsdojo_window_configure(BDW_CUSTOM_FRAME);
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
@@ -26,6 +29,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
   flutter::DartProject project(L"data");
+
+  // BB 同款（2026-09-06 窗口帧数配置）：显式锁定 UI isolate 独立线程。
+  // Flutter Windows 的 Default 当前即为独立线程（dart_project.h 官方注释
+  // "Currently will run the UI isolate on separate thread, later will be
+  // changed to running the UI isolate on platform thread"），BB 以注释行
+  // 形式保留同一配置。显式设置的意义：
+  // 1) 锁定行为 — 阻止未来 Flutter SDK 把默认切到 platform 线程后，UI 帧
+  //    调度与 platform 线程上的原生模态 resize loop（WM_SIZE 风暴）、
+  //    控制台 I/O 重新合并争线，导致拖拽 resize 掉帧回归；
+  // 2) 独立线程下 Dart 帧流水线（build/layout/raster 调度）与原生窗口
+  //    消息处理解耦，快速拖拽边框时帧率更稳。
+  // MethodChannel 插件（window_manager/bitsdojo/media_kit）均走 messenger
+  // 线程无关路径，不受此策略影响；纹理仍由 raster 线程消费。
+  project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
 
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();

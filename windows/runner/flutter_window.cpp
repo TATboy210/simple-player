@@ -29,7 +29,10 @@ bool FlutterWindow::OnCreate() {
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   // 临时兼容 bitsdojo：必须晚于插件注册，先于其父子窗口边缘命中处理。
-  // 后续迁移 window_frame_kit 时连同 fullscreen_resize_guard.h 一起删除。
+  // media_kit 入原生全屏时摘除 WS_OVERLAPPEDWINDOW、退出时恢复；全屏态下
+  // bitsdojo 的 WM_NCHITTEST 仍会对四边给出缩放命中，且 Flutter 子窗口可能
+  // 被判 HTTRANSPARENT——本 guard 在全屏态屏蔽两者。销毁时经 WM_NCDESTROY
+  // 自动解除，runner 不持有 Dart/Flutter 对象。
   if (!InstallFullscreenResizeGuard(
           GetHandle(), flutter_controller_->view()->GetNativeWindow())) {
     OutputDebugStringW(L"Failed to install fullscreen resize guard.\n");

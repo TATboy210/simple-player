@@ -26,9 +26,7 @@ void main() {
       // Arrange — 每个用例独立的真实临时目录（既有惯例）。
       root = await Directory.systemTemp.createTemp('ef-settings-store-');
       addTearDown(() => root.delete(recursive: true));
-      settingsFile = File(
-        '${root.path}${Platform.pathSeparator}settings.json',
-      );
+      settingsFile = File('${root.path}${Platform.pathSeparator}settings.json');
     });
 
     tearDown(() {
@@ -57,12 +55,15 @@ void main() {
         ErrorFeedbackSettings.I.setCardEnabled(false);
         await ErrorFeedbackSettings.I.pendingPersist;
 
-        // Assert — 解码后 JSON 恰为这两个键、不含第三键
-        //（旧实现写三键 → 本断言 RED）。
+        // Assert — 解码后 JSON 恰为这三键、不含第四键
+        //（旧实现写三键 → 本断言 RED；2026-09-06 语言键加入后扩为三键）。
         final decoded =
-            jsonDecode(settingsFile.readAsStringSync())
-                as Map<String, Object?>;
-        expect(decoded.keys.toSet(), <String>{'version', 'errorCardEnabled'});
+            jsonDecode(settingsFile.readAsStringSync()) as Map<String, Object?>;
+        expect(decoded.keys.toSet(), <String>{
+          'version',
+          'errorCardEnabled',
+          'language',
+        });
         expect(decoded['errorCardEnabled'], isFalse);
 
         // Act — 装载先于位置解析（组合根 unawaited 激活路径的启动顺序），
@@ -243,30 +244,32 @@ void main() {
         expect(residue, isEmpty);
       });
 
-      test('rapid successive persists serialize; final state is the last write',
-          () async {
-        // Arrange — 交叉开关多路写入，模拟高频设置变更。
-        final store = ErrorFeedbackSettings.forTesting(
-          settingsFile: () => settingsFile,
-        );
+      test(
+        'rapid successive persists serialize; final state is the last write',
+        () async {
+          // Arrange — 交叉开关多路写入，模拟高频设置变更。
+          final store = ErrorFeedbackSettings.forTesting(
+            settingsFile: () => settingsFile,
+          );
 
-        // Act — 三笔背靠背发起（不等待前一笔完成）。
-        store.setCardEnabled(false);
-        store.setCardEnabled(true);
-        store.setCardEnabled(false);
-        await store.pendingPersist;
+          // Act — 三笔背靠背发起（不等待前一笔完成）。
+          store.setCardEnabled(false);
+          store.setCardEnabled(true);
+          store.setCardEnabled(false);
+          await store.pendingPersist;
 
-        // Assert — 串行链保证最终状态 = 最后一笔（WR-05）；无 tmp 残留。
-        final decoded =
-            jsonDecode(await settingsFile.readAsString())
-                as Map<String, Object?>;
-        expect(decoded['errorCardEnabled'], isFalse);
-        final residue = root
-            .listSync()
-            .where((entry) => entry.path.contains('.tmp'))
-            .toList();
-        expect(residue, isEmpty);
-      });
+          // Assert — 串行链保证最终状态 = 最后一笔（WR-05）；无 tmp 残留。
+          final decoded = jsonDecode(
+            await settingsFile.readAsString(),
+          ) as Map<String, Object?>;
+          expect(decoded['errorCardEnabled'], isFalse);
+          final residue = root
+              .listSync()
+              .where((entry) => entry.path.contains('.tmp'))
+              .toList();
+          expect(residue, isEmpty);
+        },
+      );
 
       test('保存失败静默：state 保持更新且不抛出、不回滚内存态', () async {
         // Arrange — 文件路径的中间段被同名文件占据（深路径无法创建），
@@ -305,7 +308,9 @@ void main() {
             'round-trips', () async {
           // Arrange — 层 1 父目录被同名文件占据（create+探测必败的真实形态），
           // AS 层指向真实临时目录并预置一份持久值。
-          final occupied = File('${root.path}${Platform.pathSeparator}occupied');
+          final occupied = File(
+            '${root.path}${Platform.pathSeparator}occupied',
+          );
           await occupied.writeAsString('not a directory');
           final doomedPrimary = File(
             '${occupied.path}${Platform.pathSeparator}settings.json',
@@ -341,7 +346,9 @@ void main() {
         test('both tiers unwritable: defaults in memory, no crash, silent '
             'persist', () async {
           // Arrange — 层 1 父目录被文件占据 + AS provider 抛出。
-          final occupied = File('${root.path}${Platform.pathSeparator}occupied');
+          final occupied = File(
+            '${root.path}${Platform.pathSeparator}occupied',
+          );
           await occupied.writeAsString('not a directory');
           final doomedPrimary = File(
             '${occupied.path}${Platform.pathSeparator}settings.json',
@@ -365,6 +372,66 @@ void main() {
           await ErrorFeedbackSettings.I.pendingPersist;
           expect(doomedPrimary.existsSync(), isFalse);
         });
+      });
+    });
+
+    group('界面语言持久化（2026-09-06 中英文切换）', () {
+      test('round-trip：语言写入后经「重启」读回', () async {
+        // Arrange — 写入 english 并等待落盘。
+        final writer = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        writer.setLanguage(AppLanguage.english);
+        await writer.pendingPersist;
+
+        // Act — 重启模拟：新实例从同一文件加载。
+        final reader = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        await reader.load();
+
+        // Assert
+        expect(reader.state.value.language, AppLanguage.english);
+        // 既有字段不受语言写入影响（copyWith 保字段）。
+        expect(reader.state.value.errorCardEnabled, isTrue);
+      });
+
+      test('setCardEnabled 保留已写入的语言（旧版「全新快照」丢字段回归）', () async {
+        // Arrange — 先写语言，再翻开关。
+        final store = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        store.setLanguage(AppLanguage.chinese);
+        await store.pendingPersist;
+
+        // Act
+        store.setCardEnabled(false);
+        await store.pendingPersist;
+
+        // Assert — 语言字段在开关写入后保持（copyWith 契约）。
+        expect(store.state.value.language, AppLanguage.chinese);
+        expect(store.state.value.errorCardEnabled, isFalse);
+      });
+
+      test('损坏 language 值逐字段回退 system 且不抛出（D-01）', () async {
+        // Arrange — 手写含未知 language 值的合法 JSON。
+        settingsFile.writeAsStringSync(
+          jsonEncode(<String, Object?>{
+            'version': 1,
+            'errorCardEnabled': false,
+            'language': 'klingon',
+          }),
+        );
+
+        // Act
+        final store = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        await store.load();
+
+        // Assert — language 回退 system，其余字段正常装载。
+        expect(store.state.value.language, AppLanguage.system);
+        expect(store.state.value.errorCardEnabled, isFalse);
       });
     });
   });

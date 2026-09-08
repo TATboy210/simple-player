@@ -118,8 +118,7 @@ final class MediaKitVideoControlsPort implements VideoControlsPort {
 /// int 差值比较,零改动迁移。volume 用 0-1(项目语义),从 media_kit 0-100 转换。
 /// mute/volume 写走 [engine](保 `_preMuteVolume`),不写 [PlayerPort]。
 class PlayerControlsState {
-  PlayerControlsState(this._port, {required MediaEngine engine})
-    : _engine = engine;
+  PlayerControlsState(this._port, {required this._engine});
 
   PlayerPort _port;
   MediaEngine _engine;
@@ -322,6 +321,25 @@ class PlayerVideoControls extends StatefulWidget {
     this.resizing,
     this.onBuild,
   });
+
+  /// 控制栏显现判定 — 指针是否落在控制栏自身的矩形内。
+  ///
+  /// v0.0.4:自动显现的响应区从「底部 150px 全宽」(原 bottomTriggerZoneHeight)
+  /// 收窄到控制栏本体矩形：左右各缩进 [Tokens.controlBarMarginH]、距底
+  /// [Tokens.controlBarMarginBottom]、高 [Tokens.controlBarHeight]。
+  /// 紧凑模式(minimal)栏高 100，判定仍按 110 —— 10px 容差取保守侧：
+  /// 宁可多 10px 触发，也不让用户指着控制栏它却不出现。
+  @visibleForTesting
+  static bool isPointerInsideControlBar(Size area, Offset localPosition) {
+    final fromBottom = area.height - localPosition.dy;
+    final withinBarHeight =
+        fromBottom >= Tokens.controlBarMarginBottom &&
+        fromBottom <= Tokens.controlBarMarginBottom + Tokens.controlBarHeight;
+    final withinBarWidth =
+        localPosition.dx >= Tokens.controlBarMarginH &&
+        localPosition.dx <= area.width - Tokens.controlBarMarginH;
+    return withinBarHeight && withinBarWidth;
+  }
 
   @override
   State<PlayerVideoControls> createState() => _PlayerVideoControlsState();
@@ -896,12 +914,26 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                 onHover: (event) {
                   final size = context.size;
                   if (size == null) return;
-                  final mouseFromBottom = size.height - event.localPosition.dy;
-                  if (mouseFromBottom < Tokens.bottomTriggerZoneHeight) {
+                  // v0.0.4:仅控制栏矩形内的移动刷新显现与保活计时。
+                  if (PlayerVideoControls.isPointerInsideControlBar(
+                    size,
+                    event.localPosition,
+                  )) {
                     _autoHide.onMouseMove();
                   }
                 },
-                onEnter: (_) => _autoHide.onMouseEnter(),
+                // v0.0.4:进入即显限定在控制栏矩形内 — 从窗口任意位置进入
+                // 不再唤醒控制栏;进入后移入矩形由 onHover 揭示。
+                onEnter: (event) {
+                  final size = context.size;
+                  if (size == null) return;
+                  if (PlayerVideoControls.isPointerInsideControlBar(
+                    size,
+                    event.localPosition,
+                  )) {
+                    _autoHide.onMouseEnter();
+                  }
+                },
                 onExit: (_) => _autoHide.onMouseExit(),
                 child: const SizedBox.expand(),
               ),
@@ -923,10 +955,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     if (resizing == null) return controls;
     return ValueListenableBuilder<bool>(
       valueListenable: resizing,
-      builder: (_, isResizing, _) => ExcludeSemantics(
-        excluding: isResizing,
-        child: controls,
-      ),
+      builder: (_, isResizing, _) =>
+          ExcludeSemantics(excluding: isResizing, child: controls),
     );
   }
 }

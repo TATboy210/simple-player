@@ -98,7 +98,6 @@ class ControlBar extends StatelessWidget {
     // 视觉恒定策略：不再向 EdgeGlow 注入 resize 降级信号 — 辉光在拖动全程
     // 保持完整渲染（组件内部分支保留，供标题栏等其他场景使用）。
     final content = EdgeGlow(
-      variant: EdgeGlowVariant.gradient,
       borderRadius: _borderRadius,
       child: Material(
         color: Colors.transparent,

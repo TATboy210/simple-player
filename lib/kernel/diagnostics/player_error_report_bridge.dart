@@ -13,12 +13,10 @@ import 'error_reporting_dependencies.dart';
 final class PlayerErrorReportBridge {
   /// Creates the bridge and subscribes only to [MediaEngine.lastError].
   PlayerErrorReportBridge({
-    required MediaEngine engine,
-    required ErrorReporter reporter,
-    required CurrentMediaPathProvider currentMediaPath,
-  }) : _engine = engine,
-       _reporter = reporter,
-       _currentMediaPath = currentMediaPath {
+    required this._engine,
+    required this._reporter,
+    required this._currentMediaPath,
+  }) {
     _engine.lastError.addListener(_onEngineError);
   }
 

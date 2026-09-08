@@ -283,9 +283,8 @@ void main() {
     test('F1 help single source omits the debug injection entry', () {
       final l10n = lookupAppLocalizations(const Locale('zh'));
 
-      final keyLabels = shortcutDefinitions(
-        l10n,
-      ).map(((String, String) item) => item.$1);
+      final keyLabels = shortcutDefinitions(l10n)
+          .map(((String, String) item) => item.$1);
 
       expect(keyLabels, isNot(contains('Ctrl+Shift+I')));
     });

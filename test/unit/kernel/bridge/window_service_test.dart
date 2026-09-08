@@ -34,10 +34,9 @@ void main() {
       service.dispose();
     });
 
-    test('state windowSize defaults to 1280x752', () {
+    test('state windowSize defaults to defaultWindowSize', () {
       final service = WindowService();
-      expect(service.windowSize.value.width, 1280);
-      expect(service.windowSize.value.height, 752);
+      expect(service.windowSize.value, defaultWindowSize);
       service.dispose();
     });
   });
@@ -114,10 +113,9 @@ void main() {
   // Deep coverage: WindowState fields
   // =========================================================================
   group('WindowState', () {
-    test('windowSize defaults to 1280x752', () {
+    test('windowSize defaults to defaultWindowSize', () {
       final service = WindowService();
-      expect(service.windowSize.value.width, 1280);
-      expect(service.windowSize.value.height, 752);
+      expect(service.windowSize.value, defaultWindowSize);
       service.dispose();
     });
 
@@ -415,7 +413,7 @@ void main() {
         // isResizing 必须清除 (filterQuality 恢复依赖)
         expect(service.isResizing.value, isFalse);
         // windowSize 保持窗口态尺寸, 不被显示器尺寸污染
-        expect(service.windowSize.value, const Size(1280, 752));
+        expect(service.windowSize.value, defaultWindowSize);
         service.dispose();
       });
     });
@@ -425,7 +423,7 @@ void main() {
   // resize debounce + isResizing 恢复 (方向2 — isResizing 卡 true bug 回归)
   // =========================================================================
   group('resize debounce + isResizing recovery', () {
-    // window_manager 包用 MethodChannel('window_manager')，getSize() 内部走
+    // window_frame_kit 包用 MethodChannel('window_manager')，getSize() 内部走
     // getBounds 并返回 x/y/width/height。mock 之以便 fakeAsync 推进 500ms
     // timer 后验证回调逻辑（无需真实窗口）。
     const wmChannel = MethodChannel('window_manager');
@@ -648,7 +646,7 @@ void main() {
     TestDefaultBinaryMessenger messenger() =>
         TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
 
-    test('onWindowClose hides the window before persisting and destroying', () {
+    test('onWindowClose hides the window before persisting and exiting', () {
       fakeAsync((async) {
         // 记录 window_manager channel 上每个被调用 method 的顺序。
         final calls = <String>[];
@@ -662,11 +660,13 @@ void main() {
         }
 
         messenger().setMockMethodCallHandler(wmChannel, handler);
+        final exitCodes = <int>[];
 
-        final service = WindowService();
+        final service = WindowService(exitOnClose: exitCodes.add);
         service.onWindowClose();
 
-        // 推进足够时间让 hide → persist(getBounds) → destroy 全部完成。
+        // 推进足够时间让 hide → persist(getBounds) → destroy(fire) → exit
+        // 全部完成。
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
@@ -677,6 +677,8 @@ void main() {
         final destroyIndex = calls.indexOf('destroy');
         expect(persistIndex, greaterThan(calls.indexOf('hide')));
         expect(destroyIndex, greaterThan(persistIndex));
+        // 进程终止恰好一次、退出码 0（BB 同款硬杀 — 立即退出不留滞留）。
+        expect(exitCodes, [0]);
         // 服务进入终态。
         expect(service.isResizing.value, isFalse);
 
@@ -684,7 +686,7 @@ void main() {
       });
     });
 
-    test('a stuck hide does not block persist or destroy (timeout guard)', () {
+    test('a stuck hide does not block persist or exit (timeout guard)', () {
       fakeAsync((async) {
         final calls = <String>[];
         // hide 永远不返回 — 模拟 channel 卡死。
@@ -699,16 +701,18 @@ void main() {
         }
 
         messenger().setMockMethodCallHandler(wmChannel, handler);
+        final exitCodes = <int>[];
 
-        final service = WindowService();
+        final service = WindowService(exitOnClose: exitCodes.add);
         service.onWindowClose();
 
-        // 800ms hide 超时 + persist + destroy — 5s 足够全部走完。
+        // 800ms hide 超时 + persist — 5s 足够全部走完。
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
-        // hide 卡死但 destroy 依然被调用 — 超时兜底生效。
+        // hide 卡死但 destroy 依然被触发、exit(0) 依然到达 — 超时兜底生效。
         expect(calls, contains('destroy'));
+        expect(exitCodes, [0]);
 
         messenger().setMockMethodCallHandler(wmChannel, null);
       });

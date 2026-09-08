@@ -9,6 +9,7 @@ import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/ui/window/custom_title_bar.dart';
+
 import '../../helpers/fake_window_service.dart';
 import '../../helpers/fake_engine.dart';
 

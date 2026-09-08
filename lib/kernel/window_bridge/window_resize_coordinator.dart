@@ -11,14 +11,11 @@ import 'window_ui_thread.dart';
 final class WindowResizeCoordinator {
   /// 创建 resize 协调器。
   WindowResizeCoordinator({
-    required WindowServiceState state,
-    required Future<Size> Function() readSize,
-    required Future<void> Function(Size size) persistSize,
-    KernelLogger? logger,
-  }) : _state = state,
-       _readSize = readSize,
-       _persistSize = persistSize,
-       _logger = logger;
+    required this._state,
+    required this._readSize,
+    required this._persistSize,
+    this._logger,
+  });
 
   static const _debounce = Duration(milliseconds: 500);
 
@@ -46,11 +43,14 @@ final class WindowResizeCoordinator {
     // 持久化,避免把显示器尺寸写进偏好导致下次启动恢复成巨窗。isResizing
     // 仍须清除(filterQuality 降级依赖它恢复)。
     if (_state.mode.value.isFullscreen) {
-      updateOnUIThread(() {
-        if (_isCurrent(generation)) _state.isResizing.value = false;
-      }, warn: (error, stackTrace) => _loggerOrFallback.w(
-        '[WindowResizeCoordinator._settle] $error\n$stackTrace',
-      ));
+      updateOnUIThread(
+        () {
+          if (_isCurrent(generation)) _state.isResizing.value = false;
+        },
+        warn: (error, stackTrace) => _loggerOrFallback.w(
+          '[WindowResizeCoordinator._settle] $error\n$stackTrace',
+        ),
+      );
       return;
     }
     Size? size;
@@ -62,19 +62,22 @@ final class WindowResizeCoordinator {
       );
     }
     if (!_isCurrent(generation)) return;
-    updateOnUIThread(() {
-      if (!_isCurrent(generation)) return;
-      if (size != null && size != _state.windowSize.value) {
-        _state.windowSize.value = Size(
-          math.max(size.width, minimumWindowSize.width),
-          math.max(size.height, minimumWindowSize.height),
-        );
-      }
-      _state.isResizing.value = false;
-      unawaited(_persistSafely(_state.windowSize.value));
-    }, warn: (error, stackTrace) => _loggerOrFallback.w(
-      '[WindowResizeCoordinator._updateOnUIThread] $error\n$stackTrace',
-    ));
+    updateOnUIThread(
+      () {
+        if (!_isCurrent(generation)) return;
+        if (size != null && size != _state.windowSize.value) {
+          _state.windowSize.value = Size(
+            math.max(size.width, minimumWindowSize.width),
+            math.max(size.height, minimumWindowSize.height),
+          );
+        }
+        _state.isResizing.value = false;
+        unawaited(_persistSafely(_state.windowSize.value));
+      },
+      warn: (error, stackTrace) => _loggerOrFallback.w(
+        '[WindowResizeCoordinator._updateOnUIThread] $error\n$stackTrace',
+      ),
+    );
   }
 
   bool _isCurrent(int generation) => !_disposed && generation == _generation;

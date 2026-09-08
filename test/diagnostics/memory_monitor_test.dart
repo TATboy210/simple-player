@@ -11,10 +11,11 @@ import 'package:simple_player_flutter/kernel/diagnostics/memory_monitor.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/memory_snapshot.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/rss_provider.dart';
 
-/// 内联 FakeLogger — 记录 warn/info 调用以验证日志行为。
+/// 内联 FakeLogger — 记录 warn/debug 调用以验证日志行为。
 ///
-/// Lightweight fake that records warn/info calls for verification.
-/// ~15 lines, no mocktail dependency.
+/// Lightweight fake that records warn/debug calls for verification.
+/// （2026-09-06 降噪：MemoryMonitor 周期 RSS 打点从 info 降为 debug，
+/// infos 列表随之收集 debug 级。）~15 lines, no mocktail dependency.
 class FakeLogger extends KernelLogger {
   final List<String> warnings = [];
   final List<String> infos = [];
@@ -23,7 +24,9 @@ class FakeLogger extends KernelLogger {
   void trace(String message, {Map<String, Object?>? context}) {}
 
   @override
-  void debug(String message, {Map<String, Object?>? context}) {}
+  void debug(String message, {Map<String, Object?>? context}) {
+    infos.add(message);
+  }
 
   @override
   void info(String message, {Map<String, Object?>? context}) {
@@ -339,6 +342,31 @@ void main() {
       expect(MemoryMonitor.I, same(monitor2));
       monitor1.dispose();
       monitor2.dispose();
+    });
+
+    // isInitialized 探针（WR-02 模式）— release 门控的配套防御:
+    // PlayerServices 在 release 下不构造, 消费方 (DebugExporter) 依赖此探针.
+    test('isInitialized is false before init(), true after', () {
+      expect(MemoryMonitor.isInitialized, isFalse);
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      MemoryMonitor.init(monitor);
+      expect(MemoryMonitor.isInitialized, isTrue);
+      monitor.dispose();
+    });
+
+    test('disposeStatic() resets isInitialized', () {
+      final monitor = MemoryMonitor(
+        rssProvider: rss,
+        clock: clock,
+        interval: const Duration(milliseconds: 50),
+      );
+      MemoryMonitor.init(monitor);
+      MemoryMonitor.disposeStatic();
+      expect(MemoryMonitor.isInitialized, isFalse);
     });
   });
 

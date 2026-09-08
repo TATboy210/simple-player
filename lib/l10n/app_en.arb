@@ -478,5 +478,22 @@
   "errorCardToggleLabel": "Error card",
   "@errorCardToggleLabel": {
     "description": "Label for the error-card visibility toggle in the general settings tab"
+  },
+
+  "languageLabel": "Language",
+  "@languageLabel": {
+    "description": "Label for the UI-language selector in the general settings tab"
+  },
+  "languageSystem": "Follow system",
+  "@languageSystem": {
+    "description": "Dropdown option: resolve the UI language from the operating system locale"
+  },
+  "languageEnglish": "English",
+  "@languageEnglish": {
+    "description": "Dropdown option: force the UI language to English (always shown in English)"
+  },
+  "languageChinese": "中文",
+  "@languageChinese": {
+    "description": "Dropdown option: force the UI language to Chinese (always shown in Chinese)"
   }
 }

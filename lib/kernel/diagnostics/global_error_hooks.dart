@@ -9,16 +9,20 @@ import 'error_reporter.dart';
 import 'error_reporting_dependencies.dart';
 
 /// Callback shape assigned to [FlutterError.onError].
-typedef FlutterErrorHandlerSetter =
-    void Function(FlutterExceptionHandler? callback);
+typedef FlutterErrorHandlerSetter = void Function(
+  FlutterExceptionHandler? callback,
+);
 
 /// Root-isolate callback shape assigned to [PlatformDispatcher.onError].
-typedef PlatformErrorCallback =
-    bool Function(Object error, StackTrace stackTrace);
+typedef PlatformErrorCallback = bool Function(
+  Object error,
+  StackTrace stackTrace,
+);
 
 /// Callback setter seam for [PlatformDispatcher.onError].
-typedef PlatformErrorHandlerSetter =
-    void Function(PlatformErrorCallback? callback);
+typedef PlatformErrorHandlerSetter = void Function(
+  PlatformErrorCallback? callback,
+);
 
 /// Framework diagnostic presentation seam.
 typedef FrameworkErrorPresentation = void Function(FlutterErrorDetails details);
@@ -39,14 +43,11 @@ final class GlobalErrorHooks {
   /// Creates callback seams for deterministic tests without global mutation.
   @visibleForTesting
   const GlobalErrorHooks.forTesting({
-    required FlutterErrorHandlerSetter setFrameworkErrorHandler,
-    required PlatformErrorHandlerSetter setPlatformErrorHandler,
-    required FrameworkErrorPresentation presentFrameworkError,
-    LastResortOutput lastResortOutput = _defaultLastResortOutput,
-  }) : _setFrameworkErrorHandler = setFrameworkErrorHandler,
-       _setPlatformErrorHandler = setPlatformErrorHandler,
-       _presentFrameworkError = presentFrameworkError,
-       _lastResortOutput = lastResortOutput;
+    required this._setFrameworkErrorHandler,
+    required this._setPlatformErrorHandler,
+    required this._presentFrameworkError,
+    this._lastResortOutput = _defaultLastResortOutput,
+  });
 
   final FlutterErrorHandlerSetter _setFrameworkErrorHandler;
   final PlatformErrorHandlerSetter _setPlatformErrorHandler;

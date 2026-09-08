@@ -166,9 +166,8 @@ class Tokens {
   static const hideDelayWindowed = 3;
   static const hideDelayFullscreen = 3;
 
-  /// 鼠标距底部多少 px 内触发控制栏显示
-  /// controlBarHeight(110) + controlBarMarginBottom(16) + 24px buffer = 150
-  static const bottomTriggerZoneHeight = 150.0;
+  // (v0.0.4 移除 bottomTriggerZoneHeight=150 — 显现判定收窄到控制栏本体
+  // 矩形,见 PlayerVideoControls.isPointerInsideControlBar)
 
   // ── 全屏动画 ──
   static const durationFullscreenAnim = 200;

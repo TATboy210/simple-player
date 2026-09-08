@@ -18,22 +18,70 @@ import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 
+/// 应用界面语言 —— 跟随系统（默认）或强制中/英。
+enum AppLanguage {
+  /// 跟随系统 locale（MaterialApp locale = null 的官方语义）。
+  system,
+
+  /// 强制英文。
+  english,
+
+  /// 强制中文。
+  chinese;
+
+  /// settings.json 序列化形式 —— 稳定字符串键（append-only，勿改既有值）。
+  String get raw => switch (this) {
+    AppLanguage.system => 'system',
+    AppLanguage.english => 'english',
+    AppLanguage.chinese => 'chinese',
+  };
+
+  /// 从 settings.json 反序列化；未知值（旧版本/手改）回退 system。
+  static AppLanguage fromRaw(Object? raw) => switch (raw) {
+    'english' => AppLanguage.english,
+    'chinese' => AppLanguage.chinese,
+    _ => AppLanguage.system,
+  };
+}
+
 /// 不可变错误反馈设置数据 —— settings.json 的内存形态（扁平 key + version）。
+///
+/// 域已从「错误反馈」泛化为应用偏好（错误卡片开关 + 界面语言，2026-09-06
+/// 中英文切换功能）；文件与类名保持既有（重命名成本高于语义收益）。
 final class ErrorFeedbackSettingsData {
-  /// 创建设置快照；字段携带 SET-01 的默认语义。
-  const ErrorFeedbackSettingsData({this.errorCardEnabled = true});
+  /// 创建设置快照；字段携带 SET-01/语言默认语义。
+  const ErrorFeedbackSettingsData({
+    this.errorCardEnabled = true,
+    this.language = AppLanguage.system,
+  });
 
   /// SET-01 错误卡片开关 —— 默认开；损坏/缺失文件回退到该值。
   final bool errorCardEnabled;
+
+  /// 界面语言 —— 默认跟随系统；损坏/缺失文件回退到该值。
+  final AppLanguage language;
+
+  /// 不可变变更 —— 任意字段写入时保留其余字段（setCardEnabled/setLanguage
+  /// 共用；避免旧版「构造全新快照」模式丢字段）。
+  ErrorFeedbackSettingsData copyWith({
+    bool? errorCardEnabled,
+    AppLanguage? language,
+  }) {
+    return ErrorFeedbackSettingsData(
+      errorCardEnabled: errorCardEnabled ?? this.errorCardEnabled,
+      language: language ?? this.language,
+    );
+  }
 
   /// 值相等 —— 损坏回退后的默认快照与初始态可比（不可变数据类契约）。
   @override
   bool operator ==(Object other) =>
       other is ErrorFeedbackSettingsData &&
-      other.errorCardEnabled == errorCardEnabled;
+      other.errorCardEnabled == errorCardEnabled &&
+      other.language == language;
 
   @override
-  int get hashCode => errorCardEnabled.hashCode;
+  int get hashCode => Object.hash(errorCardEnabled, language);
 }
 
 /// 错误反馈设置单例 store —— 组合根与设置 UI 的唯一数据源。
@@ -107,6 +155,7 @@ final class ErrorFeedbackSettings {
       final cardEnabled = decoded['errorCardEnabled'];
       state.value = ErrorFeedbackSettingsData(
         errorCardEnabled: cardEnabled is bool ? cardEnabled : true,
+        language: AppLanguage.fromRaw(decoded['language']),
       );
     } on FormatException {
       // 尾随垃圾/空串抛 FormatException（实测失败形态）→ 默认值。
@@ -119,7 +168,15 @@ final class ErrorFeedbackSettings {
 
   /// SET-01 开关写入：内存态立即生效，fire-and-forget 持久化。
   void setCardEnabled(bool enabled) {
-    final next = ErrorFeedbackSettingsData(errorCardEnabled: enabled);
+    final next = state.value.copyWith(errorCardEnabled: enabled);
+    state.value = next;
+    _schedulePersist(next);
+  }
+
+  /// 界面语言写入：内存态立即生效（App 订阅同 notifier，MaterialApp 同帧
+  /// 切换 locale），fire-and-forget 持久化。
+  void setLanguage(AppLanguage language) {
+    final next = state.value.copyWith(language: language);
     state.value = next;
     _schedulePersist(next);
   }
@@ -273,6 +330,7 @@ final class ErrorFeedbackSettings {
       jsonEncode(<String, Object?>{
         'version': 1,
         'errorCardEnabled': data.errorCardEnabled,
+        'language': data.language.raw,
       });
 
   /// 测试隔离：复位内存态为默认值并可选重绑 settings 文件 seam。

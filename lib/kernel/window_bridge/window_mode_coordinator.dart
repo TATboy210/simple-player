@@ -6,16 +6,12 @@ import 'window_service_state.dart';
 /// 串行协调普通窗口、最大化和 media_kit 全屏语义。
 final class WindowModeCoordinator {
   WindowModeCoordinator({
-    required WindowServiceState state,
-    required Future<void> Function() maximize,
-    required Future<void> Function() unmaximize,
-    required Future<void> Function() waitForInitialization,
-    required void Function(String message) log,
-  }) : _state = state,
-       _maximize = maximize,
-       _unmaximize = unmaximize,
-       _waitForInitialization = waitForInitialization,
-       _log = log;
+    required this._state,
+    required this._maximize,
+    required this._unmaximize,
+    required this._waitForInitialization,
+    required this._log,
+  });
 
   final WindowServiceState _state;
   final Future<void> Function() _maximize;

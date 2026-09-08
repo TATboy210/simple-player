@@ -92,5 +92,27 @@ void main() {
         expect(DebugExporter.saveToFile, isA<Function>());
       });
     });
+
+    // release 门控配套: MemoryMonitor 未初始化 (release 构建态) 时
+    // exportAll 必须安静返回 memory=null, 不得外溢 StateError.
+    group('exportAll without MemoryMonitor instance', () {
+      test('memory is null and does not throw StateError', () {
+        MemoryMonitor.resetForTesting(); // 模拟 release 未初始化态
+        expect(MemoryMonitor.isInitialized, isFalse);
+
+        final json = DebugExporter.exportAll();
+        final map = jsonDecode(json) as Map<String, dynamic>;
+        expect(map['memory'], isNull);
+
+        // 恢复实例, 保护同文件后续可能的测试依赖
+        MemoryMonitor.init(
+          MemoryMonitor(
+            rssProvider: FakeRssProvider(1024 * 1024),
+            clock: const SystemClock(),
+            logger: KernelLoggerImpl.I,
+          ),
+        );
+      });
+    });
   });
 }

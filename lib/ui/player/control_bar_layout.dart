@@ -83,10 +83,7 @@ class ControlBarLayout extends StatelessWidget {
       children: [
         Flexible(
           fit: mode.isMinimal ? FlexFit.loose : FlexFit.tight,
-          child: SizedBox(
-            height: titleHeight,
-            child: title,
-          ),
+          child: SizedBox(height: titleHeight, child: title),
         ),
         // Keep the timeline in the production content tree so the stable
         // ViewModel listenables can drive the same ProgressBar instance.
@@ -102,10 +99,7 @@ class ControlBarLayout extends StatelessWidget {
         ),
         Flexible(
           fit: mode.isMinimal ? FlexFit.loose : FlexFit.tight,
-          child: SizedBox(
-            height: actionsHeight,
-            child: actions,
-          ),
+          child: SizedBox(height: actionsHeight, child: actions),
         ),
       ],
     );

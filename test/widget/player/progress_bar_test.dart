@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
+
 import '../../helpers/fake_engine.dart';
 
 void main() {
@@ -172,13 +173,21 @@ void main() {
       await mouse.addPointer(location: quarter);
       await mouse.moveBy(const Offset(1, 0));
       await tester.pump();
-      final firstText = tester.widget<Text>(find.textContaining('0:').last).data;
-      final firstLeft = tester.widget<Positioned>(find.byType(Positioned).last).left;
+      final firstText = tester
+          .widget<Text>(find.textContaining('0:').last)
+          .data;
+      final firstLeft = tester
+          .widget<Positioned>(find.byType(Positioned).last)
+          .left;
 
       await mouse.moveTo(Offset(rect.left + rect.width * 0.75, rect.center.dy));
       await tester.pump();
-      final secondText = tester.widget<Text>(find.textContaining('0:').last).data;
-      final secondLeft = tester.widget<Positioned>(find.byType(Positioned).last).left;
+      final secondText = tester
+          .widget<Text>(find.textContaining('0:').last)
+          .data;
+      final secondLeft = tester
+          .widget<Positioned>(find.byType(Positioned).last)
+          .left;
 
       expect(firstText, '00:15');
       expect(secondText, '00:45');

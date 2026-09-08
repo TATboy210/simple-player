@@ -1330,6 +1330,7 @@ void main() {
             return true;
           });
         }
+
         if (root != null) visit(root);
         return labels;
       }
