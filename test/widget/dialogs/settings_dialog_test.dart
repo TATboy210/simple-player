@@ -52,23 +52,36 @@ void main() {
     expect(find.text('LGPL-2.1-or-later'), findsNWidgets(2));
   });
 
-  testWidgets('about pane shows the special-thanks section at the bottom', (
+  testWidgets('about pane shows special thanks above tech stack with donors', (
     tester,
   ) async {
     await openDialog(tester);
 
-    // 名单区位于长列表尾部 — ListView 惰性构建，先滚到它再断言。
-    // 滚动目标直接用占位文案（标签露出时占位可能仍在惰性构建区外 —
-    // v0.0.4 对话框 chrome 高度变化会漂移滚动落点）。
-    final list = find.byType(Scrollable).last;
-    await tester.scrollUntilVisible(
-      find.text('名单正在准备中，敬请期待'),
-      120,
-      scrollable: list,
-    );
+    // v0.0.4：鸣谢区上移至技术栈之前，进门即见（无需滚动）。
     expect(find.text('特别鸣谢'), findsOneWidget);
-    // 名单尚未录入 — 显示空态占位文案。
-    expect(find.text('名单正在准备中，敬请期待'), findsOneWidget);
+    // 已录入的爱发电支持者以「头像 + 姓名」条目呈现。
+    expect(find.text('爱发电用户_24f3f'), findsOneWidget);
+    // 空态占位文案不再出现（名单非空）。
+    expect(find.text('名单正在准备中，敬请期待'), findsNothing);
+    // 技术栈仍在鸣谢区之后（同一 ListView 内先后顺序）。
+    expect(find.text('技术栈'), findsOneWidget);
+    final thanksDy = tester.getTopLeft(find.text('特别鸣谢')).dy;
+    final techDy = tester.getTopLeft(find.text('技术栈')).dy;
+    expect(thanksDy, lessThan(techDy));
+  });
+
+  testWidgets('about pane brand row renders social link buttons', (
+    tester,
+  ) async {
+    await openDialog(tester);
+
+    // v0.0.4：品牌行右侧的社交/赞助 logo 按钮（X/爱发电/Patreon/GitHub）。
+    // Material 近似图标，tooltip 提示品牌名；点击行为（openUrl）走系统
+    // 浏览器，widget 测试不触真进程，只断言按钮存在与可点语义。
+    expect(find.byTooltip('X (Twitter)'), findsOneWidget);
+    expect(find.byTooltip('爱发电'), findsOneWidget);
+    expect(find.byTooltip('Patreon'), findsOneWidget);
+    expect(find.byTooltip('GitHub'), findsOneWidget);
   });
 
   testWidgets('closes via the built-in close button', (tester) async {

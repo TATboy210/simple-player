@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../kernel/utils/path_utils.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../theme/tokens.dart';
+import '../../shared/app_tooltip.dart';
 
 /// 应用版本号 — 发版时随 pubspec.yaml `version` 同步更新。
-const String kAppVersion = '0.0.1';
+const String kAppVersion = '0.0.4';
 
 /// 开源组件条目 — 名称与 SPDX 许可证标识对。
 ///
@@ -35,15 +37,49 @@ const List<OpenSourceComponent> kOpenSourceComponents = [
   (name: 'Noto Sans SC（思源黑体）', license: 'SIL OFL 1.1'),
 ];
 
-/// 特别鸣谢名单 — 支持本项目的网友昵称，一项一个名字，按展示顺序排列。
+/// 特别鸣谢名单 — 支持本项目的用户昵称，一项一个名字，按展示顺序排列。
 ///
-/// 在此列表追加字符串即可上屏（渲染为胶囊墙）；列表为空时显示占位文案。
-const List<String> kSpecialThanks = [];
+/// 在此列表追加字符串即可上屏（渲染为深色圆角鸣谢区的头像+姓名条目）；
+/// 列表为空时显示占位文案。
+const List<String> kSpecialThanks = [
+  // 爱发电支持者（afdian.net/u/24f3f2729b0811f18cb252540025c377）
+  '爱发电用户_24f3f',
+];
+
+/// 社交/赞助外链 — 品牌行右侧 logo 按钮组的数据源。
+///
+/// 图标为 Material 近似形（品牌徽标非 Material 资产，后续可换真实 logo
+/// 资源）；tooltip 与跳转 URL 为国际通用专名，不做本地化。
+typedef SocialLink = ({IconData icon, String tooltip, String url});
+
+const List<SocialLink> kSocialLinks = [
+  (
+    icon: Icons.close,
+    tooltip: 'X (Twitter)',
+    url: 'https://x.com/SimplePlayTeam',
+  ),
+  (
+    icon: Icons.bolt_rounded,
+    tooltip: '爱发电',
+    url: 'https://ifdian.net/a/SimplePlayerTeam',
+  ),
+  (
+    icon: Icons.workspace_premium_rounded,
+    tooltip: 'Patreon',
+    url: 'https://www.patreon.com/cw/SimplePlayerTeam',
+  ),
+  (
+    icon: Icons.code_rounded,
+    tooltip: 'GitHub',
+    url: 'https://github.com/TATboy210/simple-player',
+  ),
+];
 
 /// 「关于」分区内容 — 设置窗口右侧的静态信息页。
 ///
-/// 三段式：软件标识（品牌 + 版本 + 一句话技术构成）→ 开源技术全清单 →
-/// 特别鸣谢。纯展示视图，无任何交互或功能行为。
+/// v0.0.4 段序：软件标识（品牌 + 社交 logo + 版本）→ **特别鸣谢**（深色
+/// 圆角区域，上移至技术栈之前，支持者一进门即见）→ 开源技术全清单。
+/// 社交 logo 点击经 [PathUtils.openUrl] 走系统浏览器。
 class AboutContent extends StatelessWidget {
   const AboutContent({super.key});
 
@@ -54,6 +90,10 @@ class AboutContent extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: Tokens.spLg),
       children: [
         _AppIdentity(l10n: l10n),
+        const SizedBox(height: Tokens.spLg),
+        // 鸣谢区上移（v0.0.4）：支持者比技术栈更值得被先看见。
+        _SectionLabel(l10n.specialThanks),
+        const _SpecialThanksBody(),
         const SizedBox(height: Tokens.spLg),
         _SectionLabel(l10n.techStack),
         for (final component in kOpenSourceComponents)
@@ -67,15 +107,12 @@ class AboutContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: Tokens.spLg),
-        _SectionLabel(l10n.specialThanks),
-        const _SpecialThanksBody(),
-        const SizedBox(height: Tokens.spLg),
       ],
     );
   }
 }
 
-/// 软件标识头部 — 品牌名 + 版本徽标 + 版权一句话。
+/// 软件标识头部 — 品牌名 + 社交 logo 组 + 版本徽标 + 版权一句话。
 class _AppIdentity extends StatelessWidget {
   final AppLocalizations l10n;
   const _AppIdentity({required this.l10n});
@@ -99,6 +136,12 @@ class _AppIdentity extends StatelessWidget {
                 ),
               ),
             ),
+            // 社交/赞助 logo 组 — 点击经 PathUtils.openUrl 走系统浏览器
+            // （v0.0.4；外链常量收敛于 kSocialLinks 表）。
+            for (final link in kSocialLinks) ...[
+              _SocialLogoButton(link: link),
+              const SizedBox(width: Tokens.spXs),
+            ],
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: const BoxDecoration(
@@ -127,6 +170,45 @@ class _AppIdentity extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 社交 logo 按钮 — 与标题栏窗口按钮同款交互反馈（hover 底色 + 手型
+/// 光标 + 按下色阶），tooltip 提示品牌名与跳转语义。
+class _SocialLogoButton extends StatelessWidget {
+  final SocialLink link;
+
+  const _SocialLogoButton({required this.link});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTooltip(
+      message: link.tooltip,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+          child: InkWell(
+            onTap: () => PathUtils.openUrl(link.url),
+            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+            hoverColor: Tokens.bgHover,
+            highlightColor: Tokens.titleBarPressed,
+            splashColor: Colors.transparent,
+            splashFactory: NoSplash.splashFactory,
+            child: SizedBox(
+              width: 26,
+              height: 26,
+              child: Icon(
+                link.icon,
+                size: Tokens.iconSm,
+                color: Tokens.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -188,7 +270,13 @@ class _ComponentRow extends StatelessWidget {
   }
 }
 
-/// 特别鸣谢正文 — 有名单渲染胶囊墙，空名单渲染占位文案。
+/// 特别鸣谢正文 — 深色圆角区域内渲染支持者条目（头像 + 姓名）。
+///
+/// v0.0.4：鸣谢从技术栈下方的胶囊墙上移为独立深色圆角区域
+/// （bgDeep 底 + 玻璃描边 + radiusMd 圆角），与面板 chrome 形成层次。
+/// 头像用「姓名首字 + accent 渐变圆」占位 —— 无网络依赖，将来接入
+/// 真实头像 URL 时替换 [_SupporterAvatar] 内部实现即可。空名单仍回退
+/// 占位文案。
 class _SpecialThanksBody extends StatelessWidget {
   const _SpecialThanksBody();
 
@@ -196,39 +284,92 @@ class _SpecialThanksBody extends StatelessWidget {
   Widget build(BuildContext context) {
     if (kSpecialThanks.isEmpty) {
       final l10n = AppLocalizations.of(context);
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          l10n.thanksPending,
-          style: const TextStyle(
-            color: Tokens.textSecondary,
-            fontSize: Tokens.fontCaption,
+      return Container(
+        padding: const EdgeInsets.all(Tokens.spMd),
+        decoration: _thanksAreaDecoration,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            l10n.thanksPending,
+            style: const TextStyle(
+              color: Tokens.textSecondary,
+              fontSize: Tokens.fontCaption,
+            ),
           ),
         ),
       );
     }
 
-    // 名单胶囊墙 — 每位支持者一枚轻量圆角胶囊；Wrap 自动换行。
-    return Wrap(
-      spacing: Tokens.spSm,
-      runSpacing: Tokens.spSm,
-      children: [
-        for (final name in kSpecialThanks)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Tokens.bgHover,
-              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+    // 支持者条目墙 — 每位支持者一行（头像 + 姓名）；Wrap 自动换行。
+    return Container(
+      padding: const EdgeInsets.all(Tokens.spMd),
+      decoration: _thanksAreaDecoration,
+      child: Wrap(
+        spacing: Tokens.spLg,
+        runSpacing: Tokens.spSm,
+        children: [
+          for (final name in kSpecialThanks)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _SupporterAvatar(name: name),
+                const SizedBox(width: Tokens.spSm),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: Tokens.fontBody,
+                  ),
+                ),
+              ],
             ),
-            child: Text(
-              name,
-              style: const TextStyle(
-                color: Tokens.textPrimary,
-                fontSize: Tokens.fontCaption,
-              ),
-            ),
-          ),
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 鸣谢区域底色 — 最深背景层 + 玻璃描边，圆角与色板方块同档。
+const _thanksAreaDecoration = BoxDecoration(
+  color: Tokens.bgDeep,
+  borderRadius: BorderRadius.all(Radius.circular(Tokens.radiusMd)),
+  border: Border.fromBorderSide(
+    BorderSide(color: Tokens.glassBorderIdle, width: 1),
+  ),
+);
+
+/// 支持者头像 — accent 渐变圆 + 姓名首字。
+///
+/// 占位实现（v0.0.4）：昵称首字居中于 32px 渐变圆上，Segoe UI/SF Pro
+/// 字重 medium。首字取第一个 UTF-16 码元（中英文/emoji 简单场景够用）。
+class _SupporterAvatar extends StatelessWidget {
+  final String name;
+
+  const _SupporterAvatar({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.isEmpty ? '?' : name.characters.first;
+    return Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Tokens.accent, Tokens.accentBlue],
+        ),
+      ),
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: Tokens.fontBody,
+          fontWeight: Tokens.weightMedium,
+        ),
+      ),
     );
   }
 }
