@@ -16,12 +16,10 @@ import '../theme/tokens.dart';
 class AutoHideController {
   AutoHideController({
     required TickerProvider vsync,
-    required ValueNotifier<bool> isPlaying,
-    required bool isFullscreen,
-    ValueNotifier<int>? popupCloseNotifier,
-  }) : _isPlaying = isPlaying,
-       _isFullscreen = isFullscreen,
-       _popupCloseNotifier = popupCloseNotifier {
+    required this._isPlaying,
+    required this._isFullscreen,
+    this._popupCloseNotifier,
+  }) {
     _animController = AnimationController(
       vsync: vsync,
       // 对齐 media_kit 原生 150ms 控件淡入淡出(原 durationFade=400ms 偏慢)

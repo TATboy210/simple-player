@@ -59,17 +59,14 @@ void main() {
       engine.dispose();
     });
 
-    test(
-      'after failed open, state returns to error (not stuck in opening)',
-      () async {
-        engine.failNextOpenWith = 'corrupt file';
-        final result = await engine.open('/bad/file.mp4');
+    test('after failed open, state returns to error (not stuck in opening)', () async {
+      engine.failNextOpenWith = 'corrupt file';
+      final result = await engine.open('/bad/file.mp4');
 
-        expect(result, isA<OpenError>());
-        expect(engine.state.value, MediaState.error);
-        // State is NOT stuck in `opening` — it correctly transitioned to `error`.
-      },
-    );
+      expect(result, isA<OpenError>());
+      expect(engine.state.value, MediaState.error);
+      // State is NOT stuck in `opening` — it correctly transitioned to `error`.
+    });
 
     test('rapid open + supersede does not corrupt state', () async {
       engine.configureMedia(durationMs: 1000);

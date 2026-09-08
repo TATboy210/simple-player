@@ -32,9 +32,8 @@ final class PersistedWindowState {
 /// Invalid or unavailable preferences deliberately fall back to the stable
 /// 1280×720 launch geometry rather than preventing the application from opening.
 final class WindowPersistence {
-  /// Creates persistence backed by [preferences], when supplied for tests.
-  WindowPersistence({SharedPreferences? preferences})
-    : _preferences = preferences;
+  /// Creates persistence backed by [_preferences], when supplied for tests.
+  WindowPersistence({this._preferences});
 
   static const _widthKey = 'windowWidth';
   static const _heightKey = 'windowHeight';
@@ -88,11 +87,19 @@ final class WindowPersistence {
       // Sequential writes avoid a partially reordered geometry snapshot.
       await preferences.setDouble(
         _widthKey,
-        _dimension(size.width, defaultWindowSize.width, minimumWindowSize.width),
+        _dimension(
+          size.width,
+          defaultWindowSize.width,
+          minimumWindowSize.width,
+        ),
       );
       await preferences.setDouble(
         _heightKey,
-        _dimension(size.height, defaultWindowSize.height, minimumWindowSize.height),
+        _dimension(
+          size.height,
+          defaultWindowSize.height,
+          minimumWindowSize.height,
+        ),
       );
       if (position == null) {
         await preferences.remove(_xKey);

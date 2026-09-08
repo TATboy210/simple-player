@@ -93,7 +93,7 @@ final class MemoryMonitor implements MemoryMonitorSlot {
   /// [thresholdBytes] RSS 增长阈值 (默认 50 MB, D9).
   /// [maxHistory] 环形缓冲上限 (默认 200, D9).
   /// [interval] 采样间隔 (默认 30s, D9).
-  /// [logger] 可选日志门面 (MEM-05 prep).
+  /// [_logger] 可选日志门面 (MEM-05 prep).
   /// [onTick] 每次 tick 回调.
   MemoryMonitor({
     required this.rssProvider,
@@ -101,9 +101,9 @@ final class MemoryMonitor implements MemoryMonitorSlot {
     this.thresholdBytes = 50 * 1024 * 1024,
     this.maxHistory = 200,
     this.interval = const Duration(seconds: 30),
-    KernelLogger? logger,
+    this._logger,
     this.onTick,
-  }) : _logger = logger {
+  }) {
     _startImpl();
   }
 

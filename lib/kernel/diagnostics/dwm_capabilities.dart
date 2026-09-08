@@ -104,8 +104,8 @@ class DwmCapabilities {
     if (existing != null) return existing;
     final created = switch (defaultTargetPlatform) {
       TargetPlatform.windows => DwmCapabilitiesProbe(),
-      TargetPlatform.linux || TargetPlatform.macOS =>
-        const LinuxCompositorCapabilities(),
+      TargetPlatform.linux ||
+      TargetPlatform.macOS => const LinuxCompositorCapabilities(),
       _ => const LinuxCompositorCapabilities(),
     };
     _probeImpl = created;

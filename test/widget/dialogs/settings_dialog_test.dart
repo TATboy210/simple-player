@@ -59,11 +59,7 @@ void main() {
 
     // 名单区位于长列表尾部 — ListView 惰性构建，先滚到它再断言。
     final list = find.byType(Scrollable).last;
-    await tester.scrollUntilVisible(
-      find.text('特别鸣谢'),
-      120,
-      scrollable: list,
-    );
+    await tester.scrollUntilVisible(find.text('特别鸣谢'), 120, scrollable: list);
     expect(find.text('特别鸣谢'), findsOneWidget);
     // 名单尚未录入 — 显示空态占位文案。
     expect(find.text('名单正在准备中，敬请期待'), findsOneWidget);
@@ -80,33 +76,34 @@ void main() {
     expect(find.text('关于'), findsNothing);
   });
 
-  testWidgets('selecting the general tab switches content and marks it selected', (
-    tester,
-  ) async {
-    await openDialog(tester);
+  testWidgets(
+    'selecting the general tab switches content and marks it selected',
+    (tester) async {
+      await openDialog(tester);
 
-    // 初始选中态为「关于」（向后兼容现状：直接打开设置看到 About）。
-    expect(find.text('media_kit'), findsOneWidget);
-    expect(find.byType(GeneralSettingsContent), findsNothing);
+      // 初始选中态为「关于」（向后兼容现状：直接打开设置看到 About）。
+      expect(find.text('media_kit'), findsOneWidget);
+      expect(find.byType(GeneralSettingsContent), findsNothing);
 
-    await tester.tap(find.text('通用'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('通用'));
+      await tester.pumpAndSettle();
 
-    // 内容切换为通用分区，About 的组件列表消失。
-    expect(find.byType(GeneralSettingsContent), findsOneWidget);
-    expect(find.text('media_kit'), findsNothing);
+      // 内容切换为通用分区，About 的组件列表消失。
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+      expect(find.text('media_kit'), findsNothing);
 
-    // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 圆角底；
-    // 未选中的「关于」条目恢复无底色。
-    final general = tester.widget<Container>(
-      find.byKey(const ValueKey('settings-nav-general')),
-    );
-    expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
-    final about = tester.widget<Container>(
-      find.byKey(const ValueKey('settings-nav-about')),
-    );
-    expect((about.decoration! as BoxDecoration).color, isNull);
-  });
+      // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 圆角底；
+      // 未选中的「关于」条目恢复无底色。
+      final general = tester.widget<Container>(
+        find.byKey(const ValueKey('settings-nav-general')),
+      );
+      expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
+      final about = tester.widget<Container>(
+        find.byKey(const ValueKey('settings-nav-about')),
+      );
+      expect((about.decoration! as BoxDecoration).color, isNull);
+    },
+  );
 
   testWidgets('returning to the about tab restores the about content', (
     tester,
@@ -147,24 +144,17 @@ void main() {
     // 灰显语义结构锁：38% 不透明度 + IgnorePointer 保持原状。
     // .first 取最内层（导航条目自身的 Opacity/IgnorePointer）。
     final videoOpacity = tester.widget<Opacity>(
-      find.ancestor(
-        of: find.text('视频'),
-        matching: find.byType(Opacity),
-      ).first,
+      find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
     );
     expect(videoOpacity.opacity, 0.38);
     final audioOpacity = tester.widget<Opacity>(
-      find.ancestor(
-        of: find.text('音频'),
-        matching: find.byType(Opacity),
-      ).first,
+      find.ancestor(of: find.text('音频'), matching: find.byType(Opacity)).first,
     );
     expect(audioOpacity.opacity, 0.38);
     final videoPointer = tester.widget<IgnorePointer>(
-      find.ancestor(
-        of: find.text('视频'),
-        matching: find.byType(IgnorePointer),
-      ).first,
+      find
+          .ancestor(of: find.text('视频'), matching: find.byType(IgnorePointer))
+          .first,
     );
     expect(videoPointer.ignoring, isTrue);
   });

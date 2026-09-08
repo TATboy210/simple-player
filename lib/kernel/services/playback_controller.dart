@@ -38,12 +38,10 @@ final _log = KernelLogger.I;
 class PlaybackController {
   PlaybackController({
     required this.engine,
-    void Function(PlayerError error)? onError,
-    SubtitleService? subtitleService,
-    TrackPreferenceService? trackPreferenceService,
-  }) : _onError = onError,
-       _subtitleService = subtitleService,
-       _trackPreferenceService = trackPreferenceService;
+    this._onError,
+    this._subtitleService,
+    this._trackPreferenceService,
+  });
 
   /// 视频渲染引擎实例.
   ///

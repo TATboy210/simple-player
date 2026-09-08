@@ -108,9 +108,8 @@ void main() {
       () {
         // D-03：playing/idle 提取至共享，DecorationTween 保留在 control_bar.dart
         // 本地。私有静态字段无法直接访问，用源码存在性断言锁定归属不被误迁。
-        final source = File(
-          'lib/ui/player/control_bar.dart',
-        ).readAsStringSync();
+        final source = File('lib/ui/player/control_bar.dart')
+            .readAsStringSync();
         expect(source, contains('_decorationTween'));
         expect(source, contains('ControlBarDecoration.playing()'));
         expect(source, contains('ControlBarDecoration.idle()'));

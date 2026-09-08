@@ -47,10 +47,7 @@ import 'services/video_processing_service.dart';
 ///
 /// No UI state, no BuildContext — independently unit-testable.
 class PlayerServices {
-  PlayerServices({
-    required this.windowService,
-    PlayerServicesDependencies? testingDependencies,
-  }) : _testingDependencies = testingDependencies;
+  PlayerServices({required this.windowService, this._testingDependencies});
 
   /// 异步创建并初始化 PlayerServices 实例.
   ///

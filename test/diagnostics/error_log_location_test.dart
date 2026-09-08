@@ -106,42 +106,46 @@ void main() {
         addTearDown(() => root.delete(recursive: true));
       });
 
-      test('unwritable exe tier falls back to the Application Support tier',
-          () async {
-        // Arrange — 注入路径选择探测：exe 层不可写，AS 层可写。
-        final exeRoot = Directory(
-          '${root.path}${Platform.pathSeparator}exe-root',
-        );
-        final support = Directory('${root.path}${Platform.pathSeparator}as');
+      test(
+        'unwritable exe tier falls back to the Application Support tier',
+        () async {
+          // Arrange — 注入路径选择探测：exe 层不可写，AS 层可写。
+          final exeRoot = Directory(
+            '${root.path}${Platform.pathSeparator}exe-root',
+          );
+          final support = Directory('${root.path}${Platform.pathSeparator}as');
 
-        // Act
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async => support,
-          executableDirectory: () => exeRoot,
-          writable: (dir) async => !dir.path.contains('exe-root'),
-        );
+          // Act
+          final result = await ErrorLogLocation.resolve(
+            applicationSupportDirectory: () async => support,
+            executableDirectory: () => exeRoot,
+            writable: (dir) async => !dir.path.contains('exe-root'),
+          );
 
-        // Assert — exe 层探测失败 → 跳层到 AS。
-        final resolved = result as ErrorLogLocationResolved;
-        expect(resolved.file.path, startsWith(support.path));
-      });
+          // Assert — exe 层探测失败 → 跳层到 AS。
+          final resolved = result as ErrorLogLocationResolved;
+          expect(resolved.file.path, startsWith(support.path));
+        },
+      );
 
-      test('all tiers failing degrades to unavailable without throwing',
-          () async {
-        // Arrange — 探测恒 false + AS provider 抛出（既有降级态，不抛出）。
-        final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
+      test(
+        'all tiers failing degrades to unavailable without throwing',
+        () async {
+          // Arrange — 探测恒 false + AS provider 抛出（既有降级态，不抛出）。
+          final exeRoot = Directory('${root.path}${Platform.pathSeparator}exe');
 
-        // Act
-        final result = await ErrorLogLocation.resolve(
-          applicationSupportDirectory: () async =>
-              throw const FileSystemException('support unavailable'),
-          executableDirectory: () => exeRoot,
-          writable: (_) async => false,
-        );
+          // Act
+          final result = await ErrorLogLocation.resolve(
+            applicationSupportDirectory: () async =>
+                throw const FileSystemException('support unavailable'),
+            executableDirectory: () => exeRoot,
+            writable: (_) async => false,
+          );
 
-        // Assert
-        expect(result, isA<ErrorLogLocationUnavailable>());
-      });
+          // Assert
+          expect(result, isA<ErrorLogLocationUnavailable>());
+        },
+      );
 
       test('probe-failing every real tier degrades to unavailable', () async {
         // Arrange — AS provider 返回真实目录但探测恒 false（探测型全败路径）。
@@ -271,45 +275,50 @@ void main() {
         );
       });
 
-      test('over-long path is pathTooLong at the named constant bound',
-          () async {
-        // Arrange — 超过 maxConfiguredPathLength（1024）的绝对路径。
-        final overLong =
-            '${root.path}${Platform.pathSeparator}${'x' * 1030}';
+      test(
+        'over-long path is pathTooLong at the named constant bound',
+        () async {
+          // Arrange — 超过 maxConfiguredPathLength（1024）的绝对路径。
+          final overLong = '${root.path}${Platform.pathSeparator}${'x' * 1030}';
 
-        // Act
-        final result = await ErrorLogLocation.validateConfiguredDirectory(
-          overLong,
-        );
+          // Act
+          final result = await ErrorLogLocation.validateConfiguredDirectory(
+            overLong,
+          );
 
-        // Assert
-        expect(ErrorLogLocation.maxConfiguredPathLength, 1024);
-        expect(
-          (result as ConfiguredDirectoryInvalid).reason,
-          ConfiguredDirectoryFailure.pathTooLong,
-        );
-      });
+          // Assert
+          expect(ErrorLogLocation.maxConfiguredPathLength, 1024);
+          expect(
+            (result as ConfiguredDirectoryInvalid).reason,
+            ConfiguredDirectoryFailure.pathTooLong,
+          );
+        },
+      );
 
-      test('file-occupied segment fails as notWritable with original error',
-          () async {
-        // Arrange — 实测形态：Directory.create 撞上同名文件 →
-        // PathExistsException（errno 183），原始异常随行。
-        final occupied = File('${root.path}${Platform.pathSeparator}occupied');
-        await occupied.writeAsString('not a directory');
-        final target = Directory(
-          '${occupied.path}${Platform.pathSeparator}sub',
-        );
+      test(
+        'file-occupied segment fails as notWritable with original error',
+        () async {
+          // Arrange — 实测形态：Directory.create 撞上同名文件 →
+          // PathExistsException（errno 183），原始异常随行。
+          final occupied = File(
+            '${root.path}${Platform.pathSeparator}occupied',
+          );
+          await occupied.writeAsString('not a directory');
+          final target = Directory(
+            '${occupied.path}${Platform.pathSeparator}sub',
+          );
 
-        // Act
-        final result = await ErrorLogLocation.validateConfiguredDirectory(
-          target.path,
-        );
+          // Act
+          final result = await ErrorLogLocation.validateConfiguredDirectory(
+            target.path,
+          );
 
-        // Assert
-        final invalid = result as ConfiguredDirectoryInvalid;
-        expect(invalid.reason, ConfiguredDirectoryFailure.notWritable);
-        expect(invalid.error, isA<FileSystemException>());
-      });
+          // Assert
+          final invalid = result as ConfiguredDirectoryInvalid;
+          expect(invalid.reason, ConfiguredDirectoryFailure.notWritable);
+          expect(invalid.error, isA<FileSystemException>());
+        },
+      );
 
       test('injected probe failure is notWritable without real I/O', () async {
         // Arrange — 真实存在的目录 + 恒 false 探测（探测 seam 承载

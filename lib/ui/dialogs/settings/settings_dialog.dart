@@ -56,8 +56,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               // 视频/音频分支不可达 —— 灰显占位项不会进入选中态；
               // 防御分支返回空视图而非伪造内容。
               _SettingsTab.video ||
-              _SettingsTab.audio =>
-                const SizedBox.shrink(),
+              _SettingsTab.audio => const SizedBox.shrink(),
             },
           ),
         ],

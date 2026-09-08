@@ -118,8 +118,7 @@ final class MediaKitVideoControlsPort implements VideoControlsPort {
 /// int 差值比较,零改动迁移。volume 用 0-1(项目语义),从 media_kit 0-100 转换。
 /// mute/volume 写走 [engine](保 `_preMuteVolume`),不写 [PlayerPort]。
 class PlayerControlsState {
-  PlayerControlsState(this._port, {required MediaEngine engine})
-    : _engine = engine;
+  PlayerControlsState(this._port, {required this._engine});
 
   PlayerPort _port;
   MediaEngine _engine;
@@ -923,10 +922,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     if (resizing == null) return controls;
     return ValueListenableBuilder<bool>(
       valueListenable: resizing,
-      builder: (_, isResizing, _) => ExcludeSemantics(
-        excluding: isResizing,
-        child: controls,
-      ),
+      builder: (_, isResizing, _) =>
+          ExcludeSemantics(excluding: isResizing, child: controls),
     );
   }
 }
