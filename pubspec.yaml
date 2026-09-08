@@ -36,6 +36,8 @@ dependencies:
   # desktop_window/nativeapi 已移除。
   window_manager: ^0.5.2
   bitsdojo_window: ^0.1.6
+  # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
+  flutter_svg: ^2.2.0
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.6.0
   i18n: ^4.2.6
@@ -63,6 +65,9 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+
+  assets:
+    - assets/logos/
 
   fonts:
     - family: Noto Sans SC

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../kernel/utils/path_utils.dart';
 import '../../../l10n/app_localizations.dart';
@@ -48,28 +49,29 @@ const List<String> kSpecialThanks = [
 
 /// 社交/赞助外链 — 品牌行右侧 logo 按钮组的数据源。
 ///
-/// 图标为 Material 近似形（品牌徽标非 Material 资产，后续可换真实 logo
-/// 资源）；tooltip 与跳转 URL 为国际通用专名，不做本地化。
-typedef SocialLink = ({IconData icon, String tooltip, String url});
+/// logo 为 assets/logos/ 下的真实品牌资产（SVG 经 colorFilter 白色 tint、
+/// PNG 经 ColorFilter.srcIn 白色覆盖 —— 原素材全为黑色填充，深色面板上
+/// 必须反转才可见）；tooltip 与跳转 URL 为国际通用专名，不做本地化。
+typedef SocialLink = ({String asset, String tooltip, String url});
 
 const List<SocialLink> kSocialLinks = [
   (
-    icon: Icons.close,
+    asset: 'assets/logos/x.png',
     tooltip: 'X (Twitter)',
     url: 'https://x.com/SimplePlayTeam',
   ),
   (
-    icon: Icons.bolt_rounded,
+    asset: 'assets/logos/afdian.svg',
     tooltip: '爱发电',
     url: 'https://ifdian.net/a/SimplePlayerTeam',
   ),
   (
-    icon: Icons.workspace_premium_rounded,
+    asset: 'assets/logos/patreon.svg',
     tooltip: 'Patreon',
     url: 'https://www.patreon.com/cw/SimplePlayerTeam',
   ),
   (
-    icon: Icons.code_rounded,
+    asset: 'assets/logos/github.svg',
     tooltip: 'GitHub',
     url: 'https://github.com/TATboy210/simple-player',
   ),
@@ -176,10 +178,45 @@ class _AppIdentity extends StatelessWidget {
 
 /// 社交 logo 按钮 — 与标题栏窗口按钮同款交互反馈（hover 底色 + 手型
 /// 光标 + 按下色阶），tooltip 提示品牌名与跳转语义。
+///
+/// logo 渲染统一白色 tint（原素材全为黑色填充）：SVG 走 flutter_svg 的
+/// colorFilter，PNG 走 ColorFilter.srcIn 白色覆盖（保留 alpha 通道形状）。
+/// 视觉档位对齐 nav 图标 —— textSecondary（73% 白），与面板文字浑然一体。
 class _SocialLogoButton extends StatelessWidget {
   final SocialLink link;
 
   const _SocialLogoButton({required this.link});
+
+  /// PNG 白色 tint 滤镜 — srcIn 用白色替换像素色相、保留原图 alpha。
+  static const _pngWhiteTint = ColorFilter.mode(Colors.white, BlendMode.srcIn);
+
+  /// logo 绘制尺寸 — 16px 与 nav 图标/正文字号同档，装在 26px 点击热区内。
+  static const _logoSize = 16.0;
+
+  Widget _buildLogo() {
+    final isSvg = link.asset.endsWith('.svg');
+    if (isSvg) {
+      return SvgPicture.asset(
+        link.asset,
+        width: _logoSize,
+        height: _logoSize,
+        colorFilter: const ColorFilter.mode(
+          Tokens.textSecondary,
+          BlendMode.srcIn,
+        ),
+      );
+    }
+    return ColorFiltered(
+      colorFilter: _pngWhiteTint,
+      child: Image.asset(
+        link.asset,
+        width: _logoSize,
+        height: _logoSize,
+        // 品牌徽标硬边缘 — 禁用双线性插值防发糊。
+        filterQuality: FilterQuality.none,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -200,11 +237,7 @@ class _SocialLogoButton extends StatelessWidget {
             child: SizedBox(
               width: 26,
               height: 26,
-              child: Icon(
-                link.icon,
-                size: Tokens.iconSm,
-                color: Tokens.textSecondary,
-              ),
+              child: Center(child: _buildLogo()),
             ),
           ),
         ),
