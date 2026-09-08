@@ -74,7 +74,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       if let panel = self.attachedSheet as? NSOpenPanel {
         panel.makeKeyAndOrderFront(nil)
       }
-      NSBeep()
+      // NSBeep() C 全局函数在 Xcode 26+ SDK 的 Swift 可见性中被移除 —
+      // NSApp.beep() 是同一行为的现代 Swift 形态。
+      NSApp.beep()
       result(["found": found])
     }
 
