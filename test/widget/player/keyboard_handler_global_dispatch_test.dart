@@ -270,9 +270,7 @@ void main() {
         );
 
         // Act：Space。
-        final handled = await tester.sendKeyDownEvent(
-          LogicalKeyboardKey.space,
-        );
+        final handled = await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
 
         // Assert：回退不消费（事件穿透给文本输入链），playPause 不触发。
         expect(handled, isFalse, reason: 'Space 不被回退吞掉');

@@ -1,7 +1,7 @@
 name: simple_player_flutter
 description: "Simple Player - A dark-themed media player"
 publish_to: 'none'
-version: 0.0.2
+version: 0.0.4
 
 environment:
   sdk: ^3.13.2
@@ -30,9 +30,14 @@ dependencies:
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
   ffi: ^2.2.0
+  # 窗口方案(2026-09-06 用户裁决, BB 同款双包): bitsdojo(BDW_CUSTOM_FRAME
+  # — 原生 NCCALCSIZE return 0 自绘标题栏形态 + WM_NCHITTEST 四边等宽
+  # 缩放 + GETMINMAXINFO) + window_manager(事件/几何/关闭拦截/拖动)。
+  # desktop_window/nativeapi 已移除。
   window_manager: ^0.5.2
-  # BB 同款双包: bitsdojo 接管边框/标题栏视觉(BDW_CUSTOM_FRAME), window_manager 管事件/状态
   bitsdojo_window: ^0.1.6
+  # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
+  flutter_svg: ^2.2.0
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.6.0
   i18n: ^4.2.6
@@ -60,6 +65,9 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+
+  assets:
+    - assets/logos/
 
   fonts:
     - family: Noto Sans SC

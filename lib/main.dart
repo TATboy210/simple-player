@@ -86,12 +86,12 @@ Future<void> main() {
           );
           ErrorReporterImpl.I.reportBootstrapSafely(error, stackTrace);
 
-          // 降级可见性兜底：原生窗口的 show 由 WindowService.init 内部负责，
-          // init 失败时窗口保持隐藏，降级文字态将对用户不可见（UAT Test 16
-          // 首轮实测发现的"隐形孤儿进程"）。这里 best-effort 直接 show——
-          // 窗口以系统默认标题栏形态出现（紧急态可接受），setPreventClose
-          // 未生效故默认关闭行为可用。若 show 本身失败，仅记录、不再上抛，
-          // 保证容纳路径本身不会制造新的未处理异常。
+          // 降级可见性兜底：原生窗口的 show 由首帧后的 reveal 路径负责，
+          // 但 init 失败时 reveal 可能同样受阻，降级文字态将对用户不可见
+          // （UAT Test 16 首轮实测发现的"隐形孤儿进程"）。这里 best-effort
+          // 直接 show——窗口以系统默认标题栏形态出现（紧急态可接受），
+          // setPreventClose 未生效故默认关闭行为可用。若 show 本身失败，
+          // 仅记录、不再上抛，保证容纳路径本身不会制造新的未处理异常。
           try {
             await windowManager.show();
           } on Object catch (showError, showStack) {
@@ -132,9 +132,63 @@ Future<void> main() {
             windowInitError: windowInitError,
           ),
         );
+
+        // v0.0.4 空白窗口修复：首帧栅格化后再亮窗。此前窗口在
+        // windowService.init()（runApp 之前）内 show，首帧尚未渲染，
+        // 用户看到数百毫秒空白窗口。窗口隐藏态完成几何恢复 + runApp
+        // 排程首帧 → 此处亮窗，窗口出现即带完整内容。
+        unawaited(_revealWindowAfterFirstFrame(windowService));
       }, BootstrapErrorFallback.report) ??
       Future<void>.value();
 }
+
+/// 首帧栅格化后亮窗 — 窗口出现即带完整首帧内容（v0.0.4 空白窗口修复）。
+///
+/// 等待 [WidgetsBinding.waitUntilFirstFrameRasterized]，带超时兜底：
+/// 若引擎在隐藏窗口下迟迟不产帧（平台差异风险），超时后照常亮窗 ——
+/// 最坏情形退化为旧行为（短暂空白），窗口绝不因等待而永不显示。
+/// 等待或亮窗失败都 best-effort 直接 show（与 init 失败降级同一兜底），
+/// 绝不影响已 runApp 的应用本体。
+Future<void> _revealWindowAfterFirstFrame(WindowService windowService) async {
+  try {
+    await WidgetsBinding.instance.waitUntilFirstFrameRasterized.timeout(
+      _firstFrameRevealTimeout,
+    );
+  } on Object catch (error, stackTrace) {
+    // 超时/等待异常不阻断亮窗 — 记 warn 后继续。
+    KernelLogger.I.w(
+      '[main] First-frame wait timed out or failed: $error',
+      context: <String, Object?>{
+        'error': error.toString(),
+        'stackTrace': stackTrace.toString(),
+      },
+    );
+  }
+  try {
+    await windowService.reveal();
+  } on Object catch (error, stackTrace) {
+    KernelLogger.I.e(
+      '[main] Window reveal failed: $error',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    // 与 init 失败降级同款 best-effort 直接 show；再失败仅记录，不上抛。
+    try {
+      await windowManager.show();
+    } on Object catch (showError, showStack) {
+      KernelLogger.I.w(
+        '[main] Degraded window show failed: $showError',
+        context: <String, Object?>{
+          'error': '$showError',
+          'stackTrace': '$showStack',
+        },
+      );
+    }
+  }
+}
+
+/// 首帧等待超时 — 覆盖引擎在隐藏窗口下不产帧的平台差异风险。
+const _firstFrameRevealTimeout = Duration(milliseconds: 800);
 
 /// Resolves and activates durable diagnostic evidence after global capture is live.
 ///

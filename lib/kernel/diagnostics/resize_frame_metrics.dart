@@ -218,14 +218,11 @@ abstract final class ResizeFrameMetricsReducer {
 final class ResizeFrameMetrics {
   /// 绑定 resize 状态，并在构造时同步当前值以避免漏掉已开始的会话。
   ResizeFrameMetrics({
-    required ValueListenable<bool> isResizing,
-    required ValueListenable<int> resizeSessionId,
-    KernelLogger? logger,
-    bool enabled = !kReleaseMode,
-  }) : _isResizing = isResizing,
-       _resizeSessionId = resizeSessionId,
-       _logger = logger,
-       _enabled = enabled {
+    required this._isResizing,
+    required this._resizeSessionId,
+    this._logger,
+    this._enabled = !kReleaseMode,
+  }) {
     if (_enabled) {
       _isResizing.addListener(_onResizingChanged);
       _onResizingChanged();
@@ -289,7 +286,7 @@ final class ResizeFrameMetrics {
     // 先清除旧会话样本，再调用可重入的外部 logger；若日志 sink 同步开启下一次
     // resize，旧收尾不能在返回后清掉新会话已采集的帧。
     _samples.clear();
-    (_logger ?? KernelLogger.I).info(
+    (_logger ?? KernelLogger.I).debug(
       'resize_frame_metrics',
       context: summary.toContext(sessionId: _sessionId),
     );

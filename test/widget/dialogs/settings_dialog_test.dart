@@ -52,21 +52,36 @@ void main() {
     expect(find.text('LGPL-2.1-or-later'), findsNWidgets(2));
   });
 
-  testWidgets('about pane shows the special-thanks section at the bottom', (
+  testWidgets('about pane shows special thanks above tech stack with donors', (
     tester,
   ) async {
     await openDialog(tester);
 
-    // 名单区位于长列表尾部 — ListView 惰性构建，先滚到它再断言。
-    final list = find.byType(Scrollable).last;
-    await tester.scrollUntilVisible(
-      find.text('特别鸣谢'),
-      120,
-      scrollable: list,
-    );
+    // v0.0.4：鸣谢区上移至技术栈之前，进门即见（无需滚动）。
     expect(find.text('特别鸣谢'), findsOneWidget);
-    // 名单尚未录入 — 显示空态占位文案。
-    expect(find.text('名单正在准备中，敬请期待'), findsOneWidget);
+    // 已录入的爱发电支持者以「头像 + 姓名」条目呈现。
+    expect(find.text('爱发电用户_24f3f'), findsOneWidget);
+    // 空态占位文案不再出现（名单非空）。
+    expect(find.text('名单正在准备中，敬请期待'), findsNothing);
+    // 技术栈仍在鸣谢区之后（同一 ListView 内先后顺序）。
+    expect(find.text('技术栈'), findsOneWidget);
+    final thanksDy = tester.getTopLeft(find.text('特别鸣谢')).dy;
+    final techDy = tester.getTopLeft(find.text('技术栈')).dy;
+    expect(thanksDy, lessThan(techDy));
+  });
+
+  testWidgets('about pane brand row renders social link buttons', (
+    tester,
+  ) async {
+    await openDialog(tester);
+
+    // v0.0.4：品牌行右侧的社交/赞助 logo 按钮（X/爱发电/Patreon/GitHub）。
+    // Material 近似图标，tooltip 提示品牌名；点击行为（openUrl）走系统
+    // 浏览器，widget 测试不触真进程，只断言按钮存在与可点语义。
+    expect(find.byTooltip('X (Twitter)'), findsOneWidget);
+    expect(find.byTooltip('爱发电'), findsOneWidget);
+    expect(find.byTooltip('Patreon'), findsOneWidget);
+    expect(find.byTooltip('GitHub'), findsOneWidget);
   });
 
   testWidgets('closes via the built-in close button', (tester) async {
@@ -80,33 +95,34 @@ void main() {
     expect(find.text('关于'), findsNothing);
   });
 
-  testWidgets('selecting the general tab switches content and marks it selected', (
-    tester,
-  ) async {
-    await openDialog(tester);
+  testWidgets(
+    'selecting the general tab switches content and marks it selected',
+    (tester) async {
+      await openDialog(tester);
 
-    // 初始选中态为「关于」（向后兼容现状：直接打开设置看到 About）。
-    expect(find.text('media_kit'), findsOneWidget);
-    expect(find.byType(GeneralSettingsContent), findsNothing);
+      // 初始选中态为「关于」（向后兼容现状：直接打开设置看到 About）。
+      expect(find.text('media_kit'), findsOneWidget);
+      expect(find.byType(GeneralSettingsContent), findsNothing);
 
-    await tester.tap(find.text('通用'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('通用'));
+      await tester.pumpAndSettle();
 
-    // 内容切换为通用分区，About 的组件列表消失。
-    expect(find.byType(GeneralSettingsContent), findsOneWidget);
-    expect(find.text('media_kit'), findsNothing);
+      // 内容切换为通用分区，About 的组件列表消失。
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+      expect(find.text('media_kit'), findsNothing);
 
-    // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 圆角底；
-    // 未选中的「关于」条目恢复无底色。
-    final general = tester.widget<Container>(
-      find.byKey(const ValueKey('settings-nav-general')),
-    );
-    expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
-    final about = tester.widget<Container>(
-      find.byKey(const ValueKey('settings-nav-about')),
-    );
-    expect((about.decoration! as BoxDecoration).color, isNull);
-  });
+      // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 圆角底；
+      // 未选中的「关于」条目恢复无底色。
+      final general = tester.widget<Container>(
+        find.byKey(const ValueKey('settings-nav-general')),
+      );
+      expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
+      final about = tester.widget<Container>(
+        find.byKey(const ValueKey('settings-nav-about')),
+      );
+      expect((about.decoration! as BoxDecoration).color, isNull);
+    },
+  );
 
   testWidgets('returning to the about tab restores the about content', (
     tester,
@@ -147,24 +163,17 @@ void main() {
     // 灰显语义结构锁：38% 不透明度 + IgnorePointer 保持原状。
     // .first 取最内层（导航条目自身的 Opacity/IgnorePointer）。
     final videoOpacity = tester.widget<Opacity>(
-      find.ancestor(
-        of: find.text('视频'),
-        matching: find.byType(Opacity),
-      ).first,
+      find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
     );
     expect(videoOpacity.opacity, 0.38);
     final audioOpacity = tester.widget<Opacity>(
-      find.ancestor(
-        of: find.text('音频'),
-        matching: find.byType(Opacity),
-      ).first,
+      find.ancestor(of: find.text('音频'), matching: find.byType(Opacity)).first,
     );
     expect(audioOpacity.opacity, 0.38);
     final videoPointer = tester.widget<IgnorePointer>(
-      find.ancestor(
-        of: find.text('视频'),
-        matching: find.byType(IgnorePointer),
-      ).first,
+      find
+          .ancestor(of: find.text('视频'), matching: find.byType(IgnorePointer))
+          .first,
     );
     expect(videoPointer.ignoring, isTrue);
   });

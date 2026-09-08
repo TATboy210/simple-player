@@ -29,10 +29,6 @@ class AppTooltip extends StatelessWidget {
     final text = message?.trim();
     if (text == null || text.isEmpty) return child;
 
-    return Tooltip(
-      message: text,
-      waitDuration: waitDuration,
-      child: child,
-    );
+    return Tooltip(message: text, waitDuration: waitDuration, child: child);
   }
 }

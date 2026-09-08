@@ -11,6 +11,7 @@ import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
+
 import '../helpers/fake_engine.dart';
 
 void main() {

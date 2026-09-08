@@ -62,45 +62,36 @@ final class ErrorReporterImpl implements ErrorReporter {
 
   /// Production construction with default injectable collaborators.
   ErrorReporterImpl({
-    Clock clock = const SystemClock(),
+    this._clock = const SystemClock(),
     EventIdGenerator? eventIdGenerator,
-    CurrentMediaPathProvider currentMediaPath = _noMediaPath,
-    ErrorLocationEnricher locationEnricher = _defaultLocationEnricher,
+    this._currentMediaPath = _noMediaPath,
+    this._locationEnricher = _defaultLocationEnricher,
     List<ErrorReportEffect> effects = const [],
     DiagnosticLogStatus? diagnosticLogStatus,
-    LastResortOutput lastResortOutput = _defaultLastResortOutput,
-  }) : _clock = clock,
-       _eventIdGenerator = eventIdGenerator ?? _createEventIdGenerator(),
-       _currentMediaPath = currentMediaPath,
-       _locationEnricher = locationEnricher,
+    this._lastResortOutput = _defaultLastResortOutput,
+  }) : _eventIdGenerator = eventIdGenerator ?? _createEventIdGenerator(),
        _effects = List<ErrorReportEffect>.unmodifiable(effects),
        _diagnosticLogStatus = diagnosticLogStatus,
        _diagnosticLogStatusOwner =
            diagnosticLogStatus is DelegatingDiagnosticLogEffect
            ? diagnosticLogStatus
-           : null,
-       _lastResortOutput = lastResortOutput;
+           : null;
 
   /// Creates a reporter with deterministic seams for tests.
   ErrorReporterImpl.forTesting({
-    required Clock clock,
-    required EventIdGenerator eventIdGenerator,
-    required CurrentMediaPathProvider currentMediaPath,
-    ErrorLocationEnricher locationEnricher = _defaultLocationEnricher,
+    required this._clock,
+    required this._eventIdGenerator,
+    required this._currentMediaPath,
+    this._locationEnricher = _defaultLocationEnricher,
     List<ErrorReportEffect> effects = const [],
     DiagnosticLogStatus? diagnosticLogStatus,
-    LastResortOutput lastResortOutput = _defaultLastResortOutput,
-  }) : _clock = clock,
-       _eventIdGenerator = eventIdGenerator,
-       _currentMediaPath = currentMediaPath,
-       _locationEnricher = locationEnricher,
-       _effects = List<ErrorReportEffect>.unmodifiable(effects),
+    this._lastResortOutput = _defaultLastResortOutput,
+  }) : _effects = List<ErrorReportEffect>.unmodifiable(effects),
        _diagnosticLogStatus = diagnosticLogStatus,
        _diagnosticLogStatusOwner =
            diagnosticLogStatus is DelegatingDiagnosticLogEffect
            ? diagnosticLogStatus
-           : null,
-       _lastResortOutput = lastResortOutput;
+           : null;
 
   static ErrorReporterImpl? _instance;
 

@@ -16,12 +16,10 @@ import '../theme/tokens.dart';
 class AutoHideController {
   AutoHideController({
     required TickerProvider vsync,
-    required ValueNotifier<bool> isPlaying,
-    required bool isFullscreen,
-    ValueNotifier<int>? popupCloseNotifier,
-  }) : _isPlaying = isPlaying,
-       _isFullscreen = isFullscreen,
-       _popupCloseNotifier = popupCloseNotifier {
+    required this._isPlaying,
+    required this._isFullscreen,
+    this._popupCloseNotifier,
+  }) {
     _animController = AnimationController(
       vsync: vsync,
       // 对齐 media_kit 原生 150ms 控件淡入淡出(原 durationFade=400ms 偏慢)
@@ -120,9 +118,9 @@ class AutoHideController {
     }
     _hideTimer = Timer(_hideDelay, () {
       // 阶段3问题3修复:去掉 !_hovering 检查 — 对齐 media_kit 原生「静止 3s 隐藏」。
-      // MouseRegion 整区覆盖(含 ControlBar),鼠标在 Video 内 _hovering 恒 true,
-      // 原 !_hovering 检查致静止永不隐藏。整区 MouseRegion 下 onExit 不会误触
-      // 控制栏由同一 MouseRegion 管理，因此进入子控件时不应重启退出计时。
+      // v0.0.4:显现/保活的响应区已由 UI 层 MouseRegion 门控到控制栏本体矩形
+      // (见 PlayerVideoControls.isPointerInsideControlBar) — 指针移出矩形
+      // 即不再刷新计时,静止或悬停区外 3s 后照常隐藏。本控制器策略不变:
       // _activeInteractionCount 仍保护拖拽进度条/滑块交互期间不隐藏。
       if (_activeInteractionCount == 0) hide();
     });

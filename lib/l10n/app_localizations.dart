@@ -1297,6 +1297,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error card'**
   String get errorCardToggleLabel;
+
+  /// Label for the UI-language selector in the general settings tab
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get languageLabel;
+
+  /// Dropdown option: resolve the UI language from the operating system locale
+  ///
+  /// In en, this message translates to:
+  /// **'Follow system'**
+  String get languageSystem;
+
+  /// Dropdown option: force the UI language to English (always shown in English)
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageEnglish;
+
+  /// Dropdown option: force the UI language to Chinese (always shown in Chinese)
+  ///
+  /// In en, this message translates to:
+  /// **'中文'**
+  String get languageChinese;
 }
 
 class _AppLocalizationsDelegate

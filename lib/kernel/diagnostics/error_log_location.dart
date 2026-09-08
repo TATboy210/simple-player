@@ -303,12 +303,10 @@ final class ErrorLogLocation {
   }
 
   /// 组合一个候选根下的 logs 子目录路径（不触碰文件系统）。
-  static Directory _logsDirectoryIn(Directory base) => Directory(
-        '${base.path}${Platform.pathSeparator}$logsDirectoryName',
-      );
+  static Directory _logsDirectoryIn(Directory base) =>
+      Directory('${base.path}${Platform.pathSeparator}$logsDirectoryName');
 
   /// 组合一个候选目录下的诊断日志文件路径（不触碰文件系统）。
-  static File _logFileUnder(Directory directory) => File(
-        '${directory.path}${Platform.pathSeparator}$logFileName',
-      );
+  static File _logFileUnder(Directory directory) =>
+      File('${directory.path}${Platform.pathSeparator}$logFileName');
 }

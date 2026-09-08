@@ -93,6 +93,10 @@ void main() {
       tester,
     ) async {
       // Arrange：挂载宿主并等首帧 post-frame flushPresentation（D-12 门）。
+      // App 的 locale 由 store 解析（2026-09-06 中英文切换）——flutter test
+      // 环境下 system→null 的系统解析不受 localeTestValue 控制，直接将
+      // store 设为 chinese 锁定 zh 文案契约（store→locale 链路本用例覆盖）。
+      ErrorFeedbackSettings.I.setLanguage(AppLanguage.chinese);
       await tester.pumpWidget(buildApp());
       await tester.pump();
 
@@ -937,9 +941,9 @@ void main() {
         await tester.pumpWidget(
           buildHostHarness(
             ErrorCardHost(
-              logExplorer: (path) async => throw ProcessException(
+              logExplorer: (path) async => throw const ProcessException(
                 'explorer.exe',
-                const ['/select,', 'C:/logs/diag.txt'],
+                ['/select,', 'C:/logs/diag.txt'],
                 'injected',
               ),
             ),

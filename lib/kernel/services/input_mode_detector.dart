@@ -44,12 +44,10 @@ enum ArrowDirection { up, down }
 /// 而非 [DateTime.now]，否则 idle 比较永不前进 (PLAN acceptance: injected clock)。
 class InputModeDetector {
   InputModeDetector._({
-    required Duration idleTimeout,
-    required Duration glowResetDuration,
-    required DateTime Function() clock,
-  }) : _idleTimeout = idleTimeout,
-       _glowResetDuration = glowResetDuration,
-       _clock = clock;
+    required this._idleTimeout,
+    required this._glowResetDuration,
+    required this._clock,
+  });
 
   // ── singleton ──
   static InputModeDetector? _instance;

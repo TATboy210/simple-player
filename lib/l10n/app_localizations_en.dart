@@ -642,4 +642,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorCardToggleLabel => 'Error card';
+
+  @override
+  String get languageLabel => 'Language';
+
+  @override
+  String get languageSystem => 'Follow system';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get languageChinese => '中文';
 }

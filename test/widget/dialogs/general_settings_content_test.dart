@@ -45,10 +45,7 @@ void main() {
   ///
   /// widget 测试的 FakeAsync zone 不派发真实文件事件：pump 冲刷 fake 微任务
   /// （推进持久化链的续体），runAsync 窗口放行真实 I/O 完成事件。
-  Future<void> pumpUntil(
-    WidgetTester tester,
-    bool Function() condition,
-  ) async {
+  Future<void> pumpUntil(WidgetTester tester, bool Function() condition) async {
     for (var i = 0; i < 100; i++) {
       if (condition()) {
         await tester.pump();
@@ -75,16 +72,14 @@ void main() {
       }
     });
     // store seam 指向用例临时 settings.json，避免触碰真实设置（04-03 惯例）。
-    settingsFile = File(
-      '${root.path}${Platform.pathSeparator}settings.json',
-    );
+    settingsFile = File('${root.path}${Platform.pathSeparator}settings.json');
     ErrorFeedbackSettings.I.resetForTesting(settingsFile: () => settingsFile);
     addTearDown(() => ErrorFeedbackSettings.I.resetForTesting());
     // 协调器重绑：真实 delegate + 临时落点（04-02 测试惯例）。provider 形参
     // 已随 G-04-1 重定向面移除，resetForTesting 只重绑 effect 缝。
     delegate = DelegatingDiagnosticLogEffect();
-    final activeDir =
-        Directory('${root.path}${Platform.pathSeparator}active')..createSync();
+    final activeDir = Directory('${root.path}${Platform.pathSeparator}active')
+      ..createSync();
     activeFile = File(
       '${activeDir.path}${Platform.pathSeparator}'
       '${ErrorLogLocation.logFileName}',
@@ -113,9 +108,7 @@ void main() {
 
     // fire-and-forget 持久化可观测：临时 settings.json 已被写入 false。
     await pumpUntil(tester, () => settingsFile.existsSync());
-    final persisted = await tester.runAsync(
-      () => settingsFile.readAsString(),
-    );
+    final persisted = await tester.runAsync(() => settingsFile.readAsString());
     expect(persisted, contains('"errorCardEnabled":false'));
 
     await tester.tap(find.byType(Switch));
@@ -128,9 +121,7 @@ void main() {
     // 落盘，污染其 settings.json 内容与基于存在性的等待条件（04-04 协议）。
     var drained = false;
     unawaited(
-      ErrorFeedbackSettings.I.pendingPersist.whenComplete(
-        () => drained = true,
-      ),
+      ErrorFeedbackSettings.I.pendingPersist.whenComplete(() => drained = true),
     );
     await pumpUntil(tester, () => drained);
   });
@@ -142,7 +133,10 @@ void main() {
     // 路径配置面整体缺席（G-04-1）：文本输入框 / 浏览按钮 / 行内校验状态 /
     // 有效路径行在任何形态下都不渲染。
     expect(find.byType(TextField), findsNothing);
-    expect(find.byKey(const ValueKey('settings-log-path-browse')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-log-path-browse')),
+      findsNothing,
+    );
     expect(find.text('校验中…'), findsNothing);
     expect(find.text('目录可写'), findsNothing);
     expect(find.text('无法写入该目录'), findsNothing);
@@ -158,9 +152,7 @@ void main() {
     await tester.pump();
     expect(ErrorFeedbackSettings.I.state.value.errorCardEnabled, isFalse);
     await pumpUntil(tester, () => settingsFile.existsSync());
-    final persisted = await tester.runAsync(
-      () => settingsFile.readAsString(),
-    );
+    final persisted = await tester.runAsync(() => settingsFile.readAsString());
     expect(persisted, contains('"errorCardEnabled":false'));
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Process;
 
 import 'package:flutter/foundation.dart';
@@ -86,6 +87,47 @@ class PathUtils {
         run('open', [dir]);
       default:
         _log.w('openFileLocation: unsupported platform');
+    }
+  }
+
+  /// 用系统默认浏览器打开外部 URL（平台感知）。
+  ///
+  /// - `url`: http(s) 外链；调用方负责给 URL 做白名单/常量来源约束
+  ///   （本项目内只有「关于」页的社交链接常量表调用）。
+  /// - Side effect: 启动平台浏览器（cmd start / xdg-open / open）。
+  /// - Fire-and-forget：启动失败只记 warn 日志，绝不外抛（点链接失败
+  ///   不应打断设置面板交互）。
+  /// - No-op with a warning log on unsupported platforms.
+  static void openUrl(String url) {
+    void onLaunchError(Object error) {
+      _log.w(
+        'openUrl: failed to launch browser',
+        context: {'error': error.toString()},
+      );
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.windows:
+        // start 是 cmd 内建命令（不是可执行文件），必须经 cmd /c 调用；
+        // 空串参数占位防止 URL 里的 # 等字符被 start 当窗口标题解析。
+        unawaited(
+          Process.run('cmd', [
+            '/c',
+            'start',
+            '',
+            url,
+          ]).then((_) {}, onError: onLaunchError),
+        );
+      case TargetPlatform.linux:
+        unawaited(
+          Process.run('xdg-open', [url]).then((_) {}, onError: onLaunchError),
+        );
+      case TargetPlatform.macOS:
+        unawaited(
+          Process.run('open', [url]).then((_) {}, onError: onLaunchError),
+        );
+      default:
+        _log.w('openUrl: unsupported platform');
     }
   }
 }

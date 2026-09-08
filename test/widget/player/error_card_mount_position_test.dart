@@ -92,40 +92,37 @@ void main() {
       // Assert：全屏 = 窗口左上角（12.0），dx 不变。
       final topLeft = tester.getTopLeft(find.byType(ErrorCardHost));
       expect(topLeft.dx, Tokens.controlBarMarginH);
-      expect(
-        topLeft.dy,
-        Tokens.spMd,
-        reason: '全屏时 D-10 语义保持：卡片仍显示于窗口左上角',
-      );
+      expect(topLeft.dy, Tokens.spMd, reason: '全屏时 D-10 语义保持：卡片仍显示于窗口左上角');
     });
 
-    testWidgets('tear-off default (mode omitted) positions at windowed offset', (
-      tester,
-    ) async {
-      // Arrange：builder 直接 tear-off 引用 buildErrorCardMount（mode 缺省，
-      // error_card_host_test.dart:53 既有用法）——确定性回归锚。
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const SizedBox.shrink(),
-          builder: buildErrorCardMount,
-        ),
-      );
-      await tester.pump();
-      reportVisibleError();
-      await tester.pump();
-      await tester.pump();
+    testWidgets(
+      'tear-off default (mode omitted) positions at windowed offset',
+      (tester) async {
+        // Arrange：builder 直接 tear-off 引用 buildErrorCardMount（mode 缺省，
+        // error_card_host_test.dart:53 既有用法）——确定性回归锚。
+        await tester.pumpWidget(
+          const MaterialApp(
+            locale: Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: SizedBox.shrink(),
+            builder: buildErrorCardMount,
+          ),
+        );
+        await tester.pump();
+        reportVisibleError();
+        await tester.pump();
+        await tester.pump();
 
-      // Assert：缺省路径按窗口化偏移定位（既有挂载测试的确定性锚）。
-      final topLeft = tester.getTopLeft(find.byType(ErrorCardHost));
-      expect(topLeft.dx, Tokens.controlBarMarginH);
-      expect(
-        topLeft.dy,
-        Tokens.titleBarHeight + Tokens.spMd,
-        reason: 'mode 缺省时按窗口化偏移定位（确定性分支）',
-      );
-    });
+        // Assert：缺省路径按窗口化偏移定位（既有挂载测试的确定性锚）。
+        final topLeft = tester.getTopLeft(find.byType(ErrorCardHost));
+        expect(topLeft.dx, Tokens.controlBarMarginH);
+        expect(
+          topLeft.dy,
+          Tokens.titleBarHeight + Tokens.spMd,
+          reason: 'mode 缺省时按窗口化偏移定位（确定性分支）',
+        );
+      },
+    );
   });
 }

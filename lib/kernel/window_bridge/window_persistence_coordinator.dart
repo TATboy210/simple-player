@@ -8,15 +8,11 @@ import 'window_service_state.dart';
 /// 串行保存窗口快照，隔离平台读取和持久化异常。
 final class WindowPersistenceCoordinator {
   WindowPersistenceCoordinator({
-    required WindowServiceState state,
-    required WindowPersistence persistence,
-    required Future<Offset> Function() readPosition,
-    required void Function(String message, Object error, StackTrace stackTrace)
-    log,
-  }) : _state = state,
-       _persistence = persistence,
-       _readPosition = readPosition,
-       _log = log;
+    required this._state,
+    required this._persistence,
+    required this._readPosition,
+    required this._log,
+  });
 
   final WindowServiceState _state;
   final WindowPersistence _persistence;

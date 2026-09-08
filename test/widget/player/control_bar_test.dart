@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/ui/player/speed_button.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/player/time_range_display.dart';
+
 import '../../helpers/fake_engine.dart';
 
 void _noop() {}
@@ -184,8 +185,7 @@ void main() {
             (details) => details.exceptionAsString().contains('overflowed'),
           ),
           isEmpty,
-          reason:
-              'both layout modes must fit their control rows without a RenderFlex overflow',
+          reason: 'both layout modes must fit their control rows without a RenderFlex overflow',
         );
       },
     );

@@ -40,18 +40,17 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   /// Worker spawn starts immediately; spawn failure never throws out of the
   /// constructor (degradation is handled internally).
   ///
-  /// [spawnWorker] 仅为测试注入缝；[heartbeatInterval] 默认 30s，心跳空档
+  /// [spawnWorker] 仅为测试注入缝；[_heartbeatInterval] 默认 30s，心跳空档
   /// 即主 isolate 卡死时间窗的运营读数（headless 不可单测时间窗本身）。
   IsolatedErrorLogSink({
     required File file,
     void Function(Object error, StackTrace stackTrace)? degradedOutput,
     @visibleForTesting WorkerSpawner? spawnWorker,
-    Duration heartbeatInterval = const Duration(seconds: 30),
+    this._heartbeatInterval = const Duration(seconds: 30),
   }) : _file = file,
        _path = file.path,
        _degradedOutput = degradedOutput ?? _defaultDegradedOutput,
-       _spawnWorker = spawnWorker ?? _defaultSpawnWorker,
-       _heartbeatInterval = heartbeatInterval {
+       _spawnWorker = spawnWorker ?? _defaultSpawnWorker {
     _startWorker();
   }
 
@@ -203,7 +202,7 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
       unawaited(
         _spawnWorker(
           _logWorkerEntry,
-          _WorkerConfig(replyTo: readyPort.sendPort, path: _path),
+          WorkerConfig(replyTo: readyPort.sendPort, path: _path),
           onExit: exitPort.sendPort,
           onError: errorPort.sendPort,
         ).then<void>(

@@ -169,19 +169,21 @@ void main() {
       expect(engine.togglePlayPauseCallCount, 1);
     });
 
-    test('play() after open succeeds — guard does not block normal flow',
-        () async {
-      final engine = FakeEngine();
-      engine.configureMedia(durationMs: 1000);
+    test(
+      'play() after open succeeds — guard does not block normal flow',
+      () async {
+        final engine = FakeEngine();
+        engine.configureMedia(durationMs: 1000);
 
-      await engine.open('a.mp4');
-      engine.play();
-      expect(engine.state.value, MediaState.playing);
+        await engine.open('a.mp4');
+        engine.play();
+        expect(engine.state.value, MediaState.playing);
 
-      // stop 清空媒体后, 再 play 又被幂等忽略.
-      await engine.stop();
-      engine.play();
-      expect(engine.state.value, MediaState.idle);
-    });
+        // stop 清空媒体后, 再 play 又被幂等忽略.
+        await engine.stop();
+        engine.play();
+        expect(engine.state.value, MediaState.idle);
+      },
+    );
   });
 }

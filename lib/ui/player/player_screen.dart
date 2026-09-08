@@ -112,7 +112,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       type: FileType.custom,
       allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
     );
-    return result?.files.single.path;
+    // file_picker 11.x：返回 FilePickerResult?，用户取消为 null——视为取消。
+    if (result == null) return null;
+    return result.files.single.path;
   }
 
   /// 选择并加载外部字幕；取消或不可加载的路径不会传给底层解析器。

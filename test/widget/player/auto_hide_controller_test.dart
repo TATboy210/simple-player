@@ -305,24 +305,21 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
-    test(
-      'resizing=true prevents a stale hide callback from starting fade-out',
-      () {
-        isPlaying.value = true;
-        final popupCloseNotifier = ValueNotifier<int>(0);
-        addTearDown(popupCloseNotifier.dispose);
-        final c = createController(popupCloseNotifier: popupCloseNotifier);
-        c.init();
-        c.resizing = true;
+    test('resizing=true prevents a stale hide callback from starting fade-out', () {
+      isPlaying.value = true;
+      final popupCloseNotifier = ValueNotifier<int>(0);
+      addTearDown(popupCloseNotifier.dispose);
+      final c = createController(popupCloseNotifier: popupCloseNotifier);
+      c.init();
+      c.resizing = true;
 
-        // Model a timer callback that was already queued when resize began. The
-        // final hide gate, rather than Timer.cancel timing, owns this invariant.
-        c.hide();
+      // Model a timer callback that was already queued when resize began. The
+      // final hide gate, rather than Timer.cancel timing, owns this invariant.
+      c.hide();
 
-        expect(popupCloseNotifier.value, 0);
-        expect(c.visible.value, isTrue);
-      },
-    );
+      expect(popupCloseNotifier.value, 0);
+      expect(c.visible.value, isTrue);
+    });
 
     test('resizing=false schedules hide', () {
       isPlaying.value = true;

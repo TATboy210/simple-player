@@ -209,14 +209,22 @@ class _ErrorCardState extends State<ErrorCard> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 严重级色点 —— 语义色随 severity 分层（D-03）；message 一律
-            // 纯文本渲染，无富文本解析。
+            // 严重级色点 —— 语义色随 severity 分层（D-03）；v0.0.4 加同色
+            // 辉光（6px blur），让状态色从玻璃底上"点亮"而非平涂；
+            // message 一律纯文本渲染，无富文本解析。
             Container(
               width: Tokens.spSm,
               height: Tokens.spSm,
               decoration: BoxDecoration(
                 color: severityColor,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: severityColor.withValues(alpha: 0.45),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: Tokens.spSm),
@@ -364,14 +372,43 @@ class _ErrorCardState extends State<ErrorCard> {
 
     return GestureDetector(
       onTap: _toggle,
-      child: GlassContainer(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Tokens.spMd,
-          vertical: Tokens.spSm,
+      // v0.0.4 severity 分层辉光：对齐控制栏 4-shadow 手法的 severity
+      // 语义版 —— severity 外环（替换蓝外环）+ 顶部内高光 + 外层投影。
+      // 阴影 Container 不参与命中测试（CARD-02 边界仍由 GlassContainer
+      // 的 ClipRRect 裁剪决定），无 color 不画背景。
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+          boxShadow: [
+            // severity 外环 — 20% 语义色 1px 扩散，随严重级变色。
+            BoxShadow(
+              color: severityColor.withValues(alpha: 0.20),
+              blurRadius: 1,
+              spreadRadius: 1,
+            ),
+            // 顶部内高光 — 与 ControlBarDecoration.playing 同款手法。
+            const BoxShadow(
+              color: Tokens.controlBarBorderWhite,
+              blurRadius: 0,
+              offset: Offset(0, -1),
+            ),
+            // 外层投影 — 抬离视频画面的深度感。
+            const BoxShadow(
+              color: Tokens.controlBarOuterShadow,
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
-        // D-03：severity 对应色 border 分层（覆盖默认 borderHighlight）。
-        border: Border.all(color: severityColor, width: 1),
-        child: content,
+        child: GlassContainer(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spMd,
+            vertical: Tokens.spSm,
+          ),
+          // D-03：severity 对应色 border 分层（覆盖默认 borderHighlight）。
+          border: Border.all(color: severityColor, width: 1),
+          child: content,
+        ),
       ),
     );
   }

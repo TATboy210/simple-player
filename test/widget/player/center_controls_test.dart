@@ -143,19 +143,20 @@ void main() {
       expect(engine.stopCallCount, 0);
     });
 
-    testWidgets('replay 10 requests a 10-second backward skip in milliseconds', (
-      tester,
-    ) async {
-      await tester.pumpWidget(buildSubject(child: buildCenterGroup()));
+    testWidgets(
+      'replay 10 requests a 10-second backward skip in milliseconds',
+      (tester) async {
+        await tester.pumpWidget(buildSubject(child: buildCenterGroup()));
 
-      // Act
-      await tester.tap(find.byIcon(Icons.replay_10));
-      await tester.pump();
+        // Act
+        await tester.tap(find.byIcon(Icons.replay_10));
+        await tester.pump();
 
-      // Assert: prevent passing the displayed seconds value (10) as milliseconds.
-      expect(engine.skipBackCallCount, 1);
-      expect(engine.lastSkipBackMs, Tokens.skipShortMs);
-    });
+        // Assert: prevent passing the displayed seconds value (10) as milliseconds.
+        expect(engine.skipBackCallCount, 1);
+        expect(engine.lastSkipBackMs, Tokens.skipShortMs);
+      },
+    );
 
     testWidgets(
       'forward 30 requests a 30-second forward skip in milliseconds',

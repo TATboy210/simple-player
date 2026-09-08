@@ -101,8 +101,10 @@ void main() {
       clockProbe.advance(const Duration(seconds: 4));
       resizing.value = true;
       resizing.value = false;
-      expect(clockProbe.logger.entries.single.context?['sessionKind'],
-        'drag+settle');
+      expect(
+        clockProbe.logger.entries.single.context?['sessionKind'],
+        'drag+settle',
+      );
       clockProbe.dispose();
 
       probe.dispose();
@@ -615,7 +617,8 @@ class _RecordingLogger extends KernelLogger {
 
   @override
   void debug(String message, {Map<String, Object?>? context}) {
-    // Debug output is intentionally ignored by this test logger.
+    // 2026-09-06 降噪后探针摘要走 debug 级 — 记录到 entries 供断言。
+    entries.add(_LogEntry(message, context));
   }
 
   @override
@@ -656,11 +659,12 @@ final class _ReentrantProbeLogger extends _RecordingLogger {
   bool _hasReentered = false;
 
   @override
-  void info(String message, {Map<String, Object?>? context}) {
-    super.info(message, context: context);
+  void debug(String message, {Map<String, Object?>? context}) {
+    super.debug(message, context: context);
     if (_hasReentered) return;
     _hasReentered = true;
     // 模拟同步日志 sink 在旧摘要写出期间立刻启动下一段 resize。
+    // （2026-09-06 降噪：探针摘要从 info 降为 debug，重入钩子随行。）
     onFirstEntry();
   }
 }

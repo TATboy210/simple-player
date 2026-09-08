@@ -78,8 +78,8 @@ final class _WriteFailed extends _WorkerToMain {
 }
 
 /// spawn 时递给 worker 的启动载荷：应答口与受控日志路径。
-final class _WorkerConfig {
-  const _WorkerConfig({required this.replyTo, required this.path});
+final class WorkerConfig {
+  const WorkerConfig({required this.replyTo, required this.path});
 
   final SendPort replyTo;
   final String path;
@@ -90,7 +90,7 @@ final class _WorkerConfig {
 /// 写盘语义镜像 ErrorLogFileSink 的 writeAsString append 逐次开合：
 /// append 打开（不存在则创建）→ UTF-8 写入 → flush。写失败绝不外溢，
 /// 以 [_WriteFailed]（errorType-only）回流主侧失败门。
-Future<void> _logWorkerEntry(_WorkerConfig config) async {
+Future<void> _logWorkerEntry(WorkerConfig config) async {
   final requestPort = ReceivePort();
   config.replyTo.send(_WorkerHandshake(requestPort.sendPort));
   await for (final message in requestPort) {
@@ -139,10 +139,11 @@ _WorkerToMain _writePackSync(String path, int id, String pack) {
 
 /// spawn 实现缝 —— 默认 [_defaultSpawnWorker]；仅测试注入假缝。
 ///
-/// 参数类型含私有 [_WorkerConfig]：外部使用方经闭包推断获得类型，无需命名。
+/// [WorkerConfig] 为公开类型：public typedef 不得引用私有类型
+/// （library_private_types_in_public_api）。
 typedef WorkerSpawner = Future<Isolate> Function(
-  void Function(_WorkerConfig config) entry,
-  _WorkerConfig config, {
+  void Function(WorkerConfig config) entry,
+  WorkerConfig config, {
   SendPort? onExit,
   SendPort? onError,
 });
@@ -153,8 +154,8 @@ typedef WorkerSpawner = Future<Isolate> Function(
 /// 回流主侧，绝不让未捕获异常把 isolate 整体带走；真正的意外死亡由
 /// onExit/onError 兜底降级。
 Future<Isolate> _defaultSpawnWorker(
-  void Function(_WorkerConfig config) entry,
-  _WorkerConfig config, {
+  void Function(WorkerConfig config) entry,
+  WorkerConfig config, {
   SendPort? onExit,
   SendPort? onError,
 }) => Isolate.spawn(

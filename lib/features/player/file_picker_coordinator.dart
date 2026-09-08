@@ -24,12 +24,10 @@ abstract interface class FilePickerAttention {
 /// 已存在的 picker 带回注意力。选中路径始终按 picker 返回顺序串行播放。
 class FilePickerCoordinator {
   FilePickerCoordinator({
-    required FilePickerGateway picker,
-    required FilePickerAttention attention,
-    required Future<void> Function(String path) openAndPlay,
-  }) : _picker = picker,
-       _attention = attention,
-       _openAndPlay = openAndPlay;
+    required this._picker,
+    required this._attention,
+    required this._openAndPlay,
+  });
 
   final FilePickerGateway _picker;
   final FilePickerAttention _attention;

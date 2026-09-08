@@ -23,6 +23,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+
 import 'diagnostics/clock.dart';
 import 'diagnostics/error_reporter.dart';
 import 'diagnostics/kernel_logger.dart';
@@ -46,10 +47,7 @@ import 'services/video_processing_service.dart';
 ///
 /// No UI state, no BuildContext — independently unit-testable.
 class PlayerServices {
-  PlayerServices({
-    required this.windowService,
-    PlayerServicesDependencies? testingDependencies,
-  }) : _testingDependencies = testingDependencies;
+  PlayerServices({required this.windowService, this._testingDependencies});
 
   /// 异步创建并初始化 PlayerServices 实例.
   ///
@@ -128,12 +126,17 @@ class PlayerServices {
 
   Future<void> _initOnce() async {
     try {
-      final memoryMonitor = MemoryMonitor(
-        rssProvider: const ProcessInfoRssProvider(),
-        clock: const SystemClock(),
-        logger: KernelLoggerImpl.I,
-      );
-      MemoryMonitor.init(memoryMonitor);
+      // Release 构建不构造 MemoryMonitor：快照数据唯一运行时消费方是
+      // DebugExporter（debug 快捷键导出），release 下无消费者，30s 定时器
+      // 只产生 RSS 读取与日志噪音。DebugExporter 侧以 isInitialized 探针守卫。
+      if (!kReleaseMode) {
+        final memoryMonitor = MemoryMonitor(
+          rssProvider: const ProcessInfoRssProvider(),
+          clock: const SystemClock(),
+          logger: KernelLoggerImpl.I,
+        );
+        MemoryMonitor.init(memoryMonitor);
+      }
 
       _throwIfDisposed();
       final dependencies = _testingDependencies;

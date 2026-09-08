@@ -49,7 +49,12 @@ void main() {
       expect(windowService.startDraggingCallCount, greaterThan(0));
     });
 
-    testWidgets('double tap on title area toggles maximize', (tester) async {
+    testWidgets('double tap on title area toggles maximize via setMode', (
+      tester,
+    ) async {
+      // 2026-09-06 双击检测：两次按下间隔 <=300ms 且位移 <=24px →
+      // 判定双击，经 setMode 切换最大化/还原（原生 HTCAPTION 模拟不产生
+      // 系统级 WM_NCLBUTTONDBLCLK，Dart 层检测是唯一路径）。
       await tester.pumpWidget(
         _wrapWithApp(CustomTitleBar(windowService: windowService)),
       );
@@ -60,12 +65,78 @@ void main() {
       );
       final titlePoint = Offset(dragAreaCenter.dx - 200, dragAreaCenter.dy);
 
+      // Act — 快速双击（100ms 间隔 < 300ms 阈值）。
       await tester.tapAt(titlePoint);
-      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 100));
       await tester.tapAt(titlePoint);
       await tester.pumpAndSettle();
 
+      // Assert — 双击切换到最大化（setMode 被 Dart 层调用）。
       expect(windowService.lastModeValue, WindowMode.maximized);
+      // 裸点击（无位移）不触发 onPanStart — GestureDetector 方案下
+      // startDragging 仅在真实拖动（超过 slop）时发生。
+      expect(windowService.startDraggingCallCount, 0);
+    });
+
+    testWidgets('double tap on maximized title area restores to windowed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapWithApp(CustomTitleBar(windowService: windowService)),
+      );
+      await tester.pump();
+
+      final dragAreaCenter = tester.getCenter(
+        find.byKey(const ValueKey('titlebar-minimize')),
+      );
+      final titlePoint = Offset(dragAreaCenter.dx - 200, dragAreaCenter.dy);
+
+      // Arrange — 最大化态。
+      windowService.mode.value = WindowMode.maximized;
+
+      // Act — 快速双击。
+      await tester.tapAt(titlePoint);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tapAt(titlePoint);
+      await tester.pumpAndSettle();
+
+      // Assert — 还原为窗口态。
+      expect(windowService.lastModeValue, WindowMode.windowed);
+    });
+
+    testWidgets('two slow taps on title area do not toggle maximize', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapWithApp(CustomTitleBar(windowService: windowService)),
+      );
+      await tester.pump();
+
+      final dragAreaCenter = tester.getCenter(
+        find.byKey(const ValueKey('titlebar-minimize')),
+      );
+      final titlePoint = Offset(dragAreaCenter.dx - 200, dragAreaCenter.dy);
+
+      // Act — 慢速两次点击：直接构造带显式时间戳的事件（tapAt 的事件
+      // timeStamp 不随 pump 推进，无法表达 500ms 间隔）。
+      Future<void> tapAtWithStamp(Duration stamp) async {
+        tester.binding.handlePointerEvent(
+          PointerDownEvent(position: titlePoint, timeStamp: stamp),
+        );
+        tester.binding.handlePointerEvent(
+          PointerUpEvent(position: titlePoint, timeStamp: stamp),
+        );
+        await tester.pump();
+      }
+
+      await tapAtWithStamp(Duration.zero);
+      await tapAtWithStamp(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      // Assert — 不判定双击：无 setMode；裸点击不触发拖动（无位移
+      // 不过 pan slop，与 pointer-down 直拖方案的差异由实现注释锁定）。
+      expect(windowService.lastModeValue, isNull);
+      expect(windowService.startDraggingCallCount, 0);
     });
 
     testWidgets('clicking close button does not trigger drag', (tester) async {

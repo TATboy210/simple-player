@@ -1,5 +1,6 @@
 #include "my_application.h"
 
+#include <bitsdojo_window_linux/bitsdojo_window_plugin.h>
 #include <cstring>
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
@@ -69,13 +70,13 @@ static void window_method_handler(FlMethodChannel* channel,
 static void register_window_channel(GtkApplication* app, FlView* view) {
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   window_channel = fl_method_channel_new(
-      fl_engine_get_binary_message_engine(fl_view_get_engine(view)),
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
       "com.simple_player/window", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
       window_channel, window_method_handler, app, nullptr);
 
   file_picker_attention_channel = fl_method_channel_new(
-      fl_engine_get_binary_message_engine(fl_view_get_engine(view)),
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
       "com.simple_player/file_picker_attention", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
       file_picker_attention_channel, file_picker_attention_method_handler, app,
@@ -119,6 +120,11 @@ static void my_application_activate(GApplication* application) {
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
+    // BB 同款（2026-09-06）：非 GNOME 的 X11 窗口管理器下启用 bitsdojo
+    // 自定义 frame——与 Windows 一致的自绘标题栏 + 四边等宽缩放；GNOME/
+    // Wayland 仍用 GTK header bar（系统标题栏）。
+    auto bdw = bitsdojo_window_from(window);
+    bdw->setCustomFrame(true);
     gtk_window_set_title(window, "simple_player_flutter");
   }
 

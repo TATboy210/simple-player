@@ -10,11 +10,10 @@ import 'fake_player_controls.dart';
 final class FakeVideoControlsPort implements VideoControlsPort {
   FakeVideoControlsPort({
     FakePlayerControls? player,
-    bool isFullscreen = false,
+    this._isFullscreen = false,
     this.isMounted = true,
     this.subtitlePadding = EdgeInsets.zero,
-  }) : _isFullscreen = isFullscreen,
-       player = player ?? FakePlayerControls();
+  }) : player = player ?? FakePlayerControls();
 
   @override
   final FakePlayerControls player;
