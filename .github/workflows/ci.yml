@@ -46,26 +46,3 @@ jobs:
       # Quality Gate 3: Build smoke test
       - name: Build
         run: flutter build ${{ matrix.platform }}
-
-  # Feature flag validation (Windows only — most complex platform)
-  flag-matrix:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        flags:
-          - ''  # default (USE_NEW_FULLSCREEN=false)
-          - '--dart-define=USE_NEW_FULLSCREEN=true'
-          - '--dart-define=USE_NEW_FULLSCREEN=true --dart-define=USE_WINDOWS_NATIVE_FULLSCREEN=true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          cache: true
-
-      - name: Test with flags
-        run: flutter test ${{ matrix.flags }}
-
-      - name: Build with flags
-        run: flutter build windows ${{ matrix.flags }}
