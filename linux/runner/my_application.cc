@@ -70,13 +70,13 @@ static void window_method_handler(FlMethodChannel* channel,
 static void register_window_channel(GtkApplication* app, FlView* view) {
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   window_channel = fl_method_channel_new(
-      fl_engine_get_binary_message_engine(fl_view_get_engine(view)),
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
       "com.simple_player/window", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
       window_channel, window_method_handler, app, nullptr);
 
   file_picker_attention_channel = fl_method_channel_new(
-      fl_engine_get_binary_message_engine(fl_view_get_engine(view)),
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
       "com.simple_player/file_picker_attention", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
       file_picker_attention_channel, file_picker_attention_method_handler, app,
