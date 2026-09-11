@@ -3,27 +3,35 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show Uint8List;
-import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import 'package:flutter/painting.dart';
+import 'package:flutter_video_thumbnail_plus/flutter_video_thumbnail_plus.dart';
 import 'package:path/path.dart' as p;
 
 import 'thumbnail_provider.dart';
 
-/// Windows 缩略图 Provider — fc_native_video_thumbnail 原生生成 + 磁盘缓存.
+/// Windows 缩略图 Provider — Media Foundation 解帧 + WIC 编码 + 磁盘缓存.
 ///
-/// Windows thumbnail provider — native generation via
-/// [FcNativeVideoThumbnail] (Windows Shell thumbnail API, 与资源管理器同款)
-/// with a on-disk JPEG cache to survive app restarts.
+/// Windows thumbnail provider — frame extraction via Media Foundation
+/// ([FlutterVideoThumbnailPlus]) with a on-disk JPEG cache to survive
+/// app restarts.
+///
+/// 依赖选型 (v0.0.5, fc_native_video_thumbnail 已弃): 前者走 Windows Shell
+/// 缩略图缓存, 对缓存 miss/特殊容器会 WTS_E_FAILEDEXTRACTION; 本包走
+/// Media Foundation 系统解码器直接解帧, 与播放器解码能力同源.
 ///
 /// 缓存布局: `<appSupport>/cache/thumbnails/<md5(path)>.jpg` —
 /// md5(path) 为键与 Linux XDG provider 同风格; 生成一次永久复用,
-/// 不随源文件变化失效 (视频首帧基本恒定, 断点进度条另由 UI 层表达).
+/// 不随源文件变化失效 (断点进度条另由 UI 层表达).
 class WindowsThumbnailProvider implements ThumbnailProvider {
   /// [resolveCacheDirectory] 可注入以便测试 (production 用 path_provider).
   const WindowsThumbnailProvider({this.resolveCacheDirectory});
 
-  /// 缩略图最长边 — 列表卡片 16:9 显示足够, 生成开销最小化.
+  /// 缩略图最长边 — 列表卡片 16:9 显示足够, 解帧开销最小化.
   static const _maxSize = 320;
+
+  /// 截帧时间点 (ms) — 取 1s 处避开常见黑屏首帧; 超出时长的短视频由
+  /// Media Foundation 收敛到末帧.
+  static const _timeMs = 1000;
 
   /// 磁盘缓存目录解析 — 可注入以便测试 (production 用 path_provider).
   final Future<Directory> Function()? resolveCacheDirectory;
@@ -35,19 +43,19 @@ class WindowsThumbnailProvider implements ThumbnailProvider {
       return FileImage(cacheFile);
     }
 
-    // 原生生成 — Windows 槽位仅支持本地 Path 且不支持 seeking
-    // (Shell thumbnail 语义 = 默认代表帧, 与资源管理器一致).
+    // 解帧 — 失败 (损坏文件/不支持的容器) 静默返回 null, 占位态由 UI 呈现.
     final Uint8List? bytes;
     try {
-      bytes = await FcNativeVideoThumbnail().saveThumbnailToBytes(
-        srcFile: filePath,
-        width: _maxSize,
-        height: _maxSize,
-        format: 'jpeg',
+      bytes = await FlutterVideoThumbnailPlus.thumbnailData(
+        video: filePath,
+        imageFormat: ImageFormat.jpeg,
+        maxWidth: _maxSize,
+        maxHeight: _maxSize,
+        timeMs: _timeMs,
         quality: 85,
       );
     } on Exception {
-      return null; // 生成失败 (损坏文件/不支持容器) — 占位态由 UI 呈现
+      return null;
     }
     if (bytes == null) return null;
 

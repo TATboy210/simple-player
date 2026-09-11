@@ -44,6 +44,7 @@ void main() {
     Widget buildPanel({
       bool visible = true,
       void Function(int)? onPlayEntry,
+      void Function(int)? onResumeEntry,
       void Function(int)? onRemoveEntry,
       VoidCallback? onCyclePlayMode,
       VoidCallback? onClose,
@@ -54,6 +55,7 @@ void main() {
         visible: visible,
         onClose: onClose ?? () {},
         onPlayEntry: onPlayEntry ?? (_) {},
+        onResumeEntry: onResumeEntry ?? (_) {},
         onRemoveEntry: onRemoveEntry ?? (_) {},
         playMode: playMode,
         onCyclePlayMode: onCyclePlayMode ?? () {},
@@ -101,11 +103,12 @@ void main() {
   });
 
   group('PlaylistTile', () {
-    testWidgets('断点进度条在 position/duration 齐备时渲染', (tester) async {
+    testWidgets('有断点时续播按钮可用并触发 onResume', (tester) async {
+      var resumed = 0;
       await tester.pumpWidget(
         _wrap(
           SizedBox(
-            width: 320,
+            width: 280,
             child: PlaylistTile(
               item: PlaylistItem(
                 path: 'a.mp4',
@@ -114,6 +117,7 @@ void main() {
               ),
               isCurrent: false,
               onPlay: () {},
+              onResume: () => resumed++,
               onRemove: () {},
             ),
           ),
@@ -121,27 +125,23 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
-      expect(
-        tester
-            .widget<LinearProgressIndicator>(
-              find.byType(LinearProgressIndicator),
-            )
-            .value,
-        closeTo(1 / 3, 0.001),
-      );
+      // 续播按钮 (replay 图标) 可点.
+      await tester.tap(find.byIcon(Icons.replay));
+      await tester.pump();
+      expect(resumed, 1);
     });
 
-    testWidgets('无断点时不渲染进度条; 点击触发 onPlay', (tester) async {
+    testWidgets('无断点时续播按钮禁用; 点击卡片触发 onPlay', (tester) async {
       var played = 0;
       await tester.pumpWidget(
         _wrap(
           SizedBox(
-            width: 320,
+            width: 280,
             child: PlaylistTile(
               item: PlaylistItem(path: 'a.mp4'),
               isCurrent: false,
               onPlay: () => played++,
+              onResume: () {},
               onRemove: () {},
             ),
           ),
@@ -149,7 +149,16 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // 续播按钮禁用态 — 图标 alpha 减弱且不可点.
+      final resumeButton = tester.widget<InkWell>(
+        find
+            .ancestor(
+              of: find.byIcon(Icons.replay),
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
+      expect(resumeButton.onTap, isNull);
 
       await tester.tap(find.byType(PlaylistTile));
       await tester.pump();

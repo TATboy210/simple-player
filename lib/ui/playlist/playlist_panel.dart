@@ -1,11 +1,11 @@
-import 'dart:ui' as ui show ImageFilter;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/control_bar_decoration.dart';
+import '../shared/glass_container.dart' show GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
@@ -37,6 +37,9 @@ class PlaylistPanel extends StatefulWidget {
   /// 播放指定索引条目.
   final ValueChanged<int> onPlayEntry;
 
+  /// 断点续播指定索引条目 — 播放 + seek 到断点 (v0.0.5 按钮化).
+  final ValueChanged<int> onResumeEntry;
+
   /// 移除指定索引条目.
   final ValueChanged<int> onRemoveEntry;
 
@@ -53,6 +56,7 @@ class PlaylistPanel extends StatefulWidget {
     required this.visible,
     required this.onClose,
     required this.onPlayEntry,
+    required this.onResumeEntry,
     required this.onRemoveEntry,
     required this.playMode,
     required this.onCyclePlayMode,
@@ -67,8 +71,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 蔓延动画单一时间轴 — 面板宽度揭示与条目 stagger 同源同步 (无违和关键).
   late final AnimationController _controller;
 
-  /// 面板竖条宽度 — 窄于 1/3 视口, 不遮挡视频主体.
-  static const _panelWidth = 340.0;
+  /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
+  static const _panelWidth = 280.0;
 
   /// 条目 stagger 交错步长 (时间轴比例) — 前 10 项错开, 其余随末段直进.
   static const _staggerStep = 0.05;
@@ -129,70 +133,20 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     );
   }
 
-  /// 无边框沉浸式玻璃壳 — 毛玻璃强度/底色/蓝色 tint 三层同步右深左浅.
-  ///
-  /// 不走 GlassContainer (其边框/圆角语言与本面板的"贴边沉浸"相反).
-  /// Flutter 的 [BackdropFilter] 只支持均匀 sigma, 渐变模糊用**分段切片**:
-  /// 横向 4 条等宽切片, sigma 从右缘 [Tokens.glassBlur] 向左缘 0 递减 —
-  /// 总采样面积与单块 BackdropFilter 相同 (每片只采样自身区域), 零额外成本.
+  /// 控制栏同款玻璃壳 — ControlBarDecoration.playing 装饰 (深色毛玻璃 +
+  /// 蓝色微光边框 + 4-shadow) + 圆角与边框全部对齐控制栏 (v0.0.5 用户钦定:
+  /// 弃右侧渐变模糊, 回归控制栏设计语言).
   Widget _buildShell(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // ① 分段渐变模糊 — Row 左→右布局, factors 左浅右深.
-        Row(
-          children: [
-            for (final factor in _blurFactors) Expanded(child: _blurSlice(factor)),
-          ],
+    return Container(
+      decoration: ControlBarDecoration.playing(
+        borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+        child: BackdropFilter(
+          filter: GlassTier.normal.blurFilter,
+          child: _buildContent(context),
         ),
-        // ② 底色渐变 — bgGlass 右浓左浅 (与模糊强度同向).
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Tokens.bgGlass.withValues(alpha: 0.30),
-                  Tokens.bgGlass,
-                ],
-              ),
-            ),
-          ),
-        ),
-        // ③ 蓝色 tint 渐变 — 视觉重心靠操作侧 (右浓左浅).
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerRight,
-                end: Alignment.centerLeft,
-                colors: [
-                  Tokens.accent.withValues(alpha: 0.16),
-                  Tokens.accent.withValues(alpha: 0.02),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // ④ 内容 — 标题行 + 条目纵列.
-        _buildContent(context),
-      ],
-    );
-  }
-
-  /// 模糊强度系数 (左→右) — 左缘 0 (无模糊) 到右缘 1 (normal 档).
-  /// 切片数 4 为平滑度与 readback 次数的平衡; sigma 阶梯差 ~4 视觉无硬边.
-  static const _blurFactors = [0.0, 0.35, 0.65, 1.0];
-
-  /// 单条模糊切片 — sigma≤0 直接空片 (省一次 readback).
-  Widget _blurSlice(double factor) {
-    final sigma = Tokens.glassBlur * factor;
-    if (sigma <= 0) return const SizedBox.expand();
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-        child: const SizedBox.expand(),
       ),
     );
   }
@@ -272,6 +226,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                       item: items[i],
                       isCurrent: i == index,
                       onPlay: () => widget.onPlayEntry(i),
+                      onResume: () => widget.onResumeEntry(i),
                       onRemove: () => widget.onRemoveEntry(i),
                     ),
                   ),

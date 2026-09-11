@@ -15,6 +15,7 @@ import '../../kernel/window_bridge/window_bridge.dart';
 import '../playlist/playlist_panel.dart';
 import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
+import 'modal_hold_observer.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'control_bar_view_model.dart';
@@ -647,6 +648,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.windowMode.addListener(_syncModeFullscreen);
     widget.resizing?.addListener(_onResizeChanged);
     _autoHide.visible.addListener(_scheduleSubtitlePaddingSync);
+    // v0.0.5: 模态窗口开启期间冻结控制栏自动隐藏 (需求 4).
+    ModalHoldObserver.openModalCount.addListener(_onModalCountChanged);
+    _onModalCountChanged(); // attach 即同步一次 (先开窗后进全屏的时序).
     _lifecycleListenersAttached = true;
   }
 
@@ -656,7 +660,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.windowMode.removeListener(_syncModeFullscreen);
     widget.resizing?.removeListener(_onResizeChanged);
     _autoHide.visible.removeListener(_scheduleSubtitlePaddingSync);
+    ModalHoldObserver.openModalCount.removeListener(_onModalCountChanged);
     _lifecycleListenersAttached = false;
+  }
+
+  /// 模态弹层计数 → 控制栏 auto-hold (开窗冻结, 关窗重新计时).
+  void _onModalCountChanged() {
+    _autoHide.modalOpen = ModalHoldObserver.openModalCount.value > 0;
   }
 
   void _onEngineStateChanged() {
@@ -910,15 +920,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         children: [
           // 空状态与手势共享判定，但不会触发其余 overlay 重建。
           Positioned.fill(child: _buildEmptyAndGesture()),
-          // v0.0.5 播放列表面板 — 右侧竖条, 避开控制栏区域; 手势层在其
-          // 下方, 点击面板外(视频区)经 _handleTap 关闭面板. 全屏 route
-          // 复制 builder 时自动携带 → 全屏可见(与控制栏同机制).
+          // v0.0.5 播放列表面板 — 右侧竖条 (圆角与控制栏对齐, 不贴边),
+          // 底部避开控制栏区域; 手势层在其下方, 点击面板外(视频区)经
+          // _handleTap 关闭面板. 全屏 route 复制 builder 时自动携带.
           if (widget.playlistCoordinator != null)
             ValueListenableBuilder<bool>(
               valueListenable: widget.playlistVisible!,
               builder: (_, visible, _) => Positioned(
-                right: 0,
-                top: 0,
+                right: Tokens.controlBarMarginH,
+                top: Tokens.spMd,
                 bottom:
                     Tokens.controlBarMarginBottom +
                     Tokens.controlBarHeight +
@@ -928,16 +938,17 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   currentIndex: widget.playlistCoordinator!.currentIndex,
                   visible: visible,
                   onClose: () => widget.playlistVisible!.value = false,
-                  onPlayEntry: (index) => unawaited(
-                    widget.playlistCoordinator!.playEntryAt(index),
+                  onPlayEntry: (index) =>
+                      unawaited(widget.playlistCoordinator!.playEntryAt(index)),
+                  onResumeEntry: (index) => unawaited(
+                    widget.playlistCoordinator!.resumeEntryAt(index),
                   ),
                   onRemoveEntry: (index) => unawaited(
                     widget.playlistCoordinator!.removeEntryAt(index),
                   ),
                   playMode: widget.playlistCoordinator!.playMode,
-                  onCyclePlayMode: () => unawaited(
-                    widget.playlistCoordinator!.cyclePlayMode(),
-                  ),
+                  onCyclePlayMode: () =>
+                      unawaited(widget.playlistCoordinator!.cyclePlayMode()),
                 ),
               ),
             ),
@@ -960,42 +971,52 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               ],
             ),
           ),
-          // 顶层 MouseRegion 仅监听 auto-hide 可见性，保持鼠标交互与 cursor 语义。
+          // 顶层 MouseRegion 监听 auto-hide 可见性 + 面板可见性 (v0.0.5:
+          // 播放列表面板开启时用户仍在交互, 全屏静置不隐藏鼠标 — 需求 2),
+          // 保持鼠标交互与 cursor 语义。
           Positioned.fill(
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _autoHide.visible,
-              builder: (_, isVisible, _) => MouseRegion(
-                opaque: false,
-                hitTestBehavior: HitTestBehavior.translucent,
-                cursor: isFullscreenForCursor && !isVisible
-                    ? SystemMouseCursors.none
-                    : MouseCursor.defer,
-                onHover: (event) {
-                  final size = context.size;
-                  if (size == null) return;
-                  // v0.0.4:仅控制栏矩形内的移动刷新显现与保活计时。
-                  if (PlayerVideoControls.isPointerInsideControlBar(
-                    size,
-                    event.localPosition,
-                  )) {
-                    _autoHide.onMouseMove();
-                  }
-                },
-                // v0.0.4:进入即显限定在控制栏矩形内 — 从窗口任意位置进入
-                // 不再唤醒控制栏;进入后移入矩形由 onHover 揭示。
-                onEnter: (event) {
-                  final size = context.size;
-                  if (size == null) return;
-                  if (PlayerVideoControls.isPointerInsideControlBar(
-                    size,
-                    event.localPosition,
-                  )) {
-                    _autoHide.onMouseEnter();
-                  }
-                },
-                onExit: (_) => _autoHide.onMouseExit(),
-                child: const SizedBox.expand(),
-              ),
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                _autoHide.visible,
+                if (widget.playlistVisible != null) widget.playlistVisible,
+              ]),
+              builder: (_, _) {
+                final isVisible = _autoHide.visible.value;
+                final playlistVisible = widget.playlistVisible?.value ?? false;
+                return MouseRegion(
+                  opaque: false,
+                  hitTestBehavior: HitTestBehavior.translucent,
+                  cursor:
+                      isFullscreenForCursor && !isVisible && !playlistVisible
+                      ? SystemMouseCursors.none
+                      : MouseCursor.defer,
+                  onHover: (event) {
+                    final size = context.size;
+                    if (size == null) return;
+                    // v0.0.4:仅控制栏矩形内的移动刷新显现与保活计时。
+                    if (PlayerVideoControls.isPointerInsideControlBar(
+                      size,
+                      event.localPosition,
+                    )) {
+                      _autoHide.onMouseMove();
+                    }
+                  },
+                  // v0.0.4:进入即显限定在控制栏矩形内 — 从窗口任意位置进入
+                  // 不再唤醒控制栏;进入后移入矩形由 onHover 揭示。
+                  onEnter: (event) {
+                    final size = context.size;
+                    if (size == null) return;
+                    if (PlayerVideoControls.isPointerInsideControlBar(
+                      size,
+                      event.localPosition,
+                    )) {
+                      _autoHide.onMouseEnter();
+                    }
+                  },
+                  onExit: (_) => _autoHide.onMouseExit(),
+                  child: const SizedBox.expand(),
+                );
+              },
             ),
           ),
         ],

@@ -38,8 +38,8 @@ dependencies:
   bitsdojo_window: ^0.1.6
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
-  # 视频缩略图（v0.0.5 Windows 槽位 — 原生 API 生成 JPEG，资源管理器同款）
-  fc_native_video_thumbnail: ^3.0.1
+  # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）
+  flutter_video_thumbnail_plus: ^1.0.6
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.6.0
   i18n: ^4.2.6

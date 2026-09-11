@@ -46,6 +46,7 @@ class AutoHideController {
 
   bool _hovering = false;
   bool _resizing = false;
+  bool _modalOpen = false;
 
   /// 正在进行的子控件交互数量。
   ///
@@ -92,9 +93,9 @@ class AutoHideController {
   /// 单击非 playing 状态不再隐藏控件(与永显策略一致,消除原 paused 单击隐藏
   /// 的不一致)。
   void hide() {
-    // 将 resize gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调即使
-    // 无法再被 cancel，也不能在会话内启动淡出动画。
-    if (!_isPlaying.value || _resizing) return;
+    // 将 resize/modal gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调
+    // 即使无法再被 cancel，也不能在会话内启动淡出动画。
+    if (!_isPlaying.value || _resizing || _modalOpen) return;
     if (visible.value) {
       _popupCloseNotifier?.value++;
       _animController.reverse();
@@ -113,7 +114,10 @@ class AutoHideController {
   /// 调用方均经过此处，避免窗口状态变化绕开交互会话保护。
   void scheduleHide() {
     _hideTimer?.cancel();
-    if (!_isPlaying.value || _resizing || _activeInteractionCount > 0) {
+    if (!_isPlaying.value ||
+        _resizing ||
+        _modalOpen ||
+        _activeInteractionCount > 0) {
       return;
     }
     _hideTimer = Timer(_hideDelay, () {
@@ -132,6 +136,19 @@ class AutoHideController {
     if (value) {
       _hideTimer?.cancel();
     } else {
+      scheduleHide();
+    }
+  }
+
+  /// 打开中的模态窗口 (设置/菜单等) — 开窗冻结自动隐藏计时,
+  /// 关窗后重新计时 (v0.0.5: 已显示的控制栏在模态开启期间保持显示).
+  set modalOpen(bool value) {
+    if (_modalOpen == value) return;
+    _modalOpen = value;
+    if (value) {
+      _hideTimer?.cancel();
+    } else {
+      // 关闭后重新开始计时 — 不强制 show (若已隐藏保持隐藏).
       scheduleHide();
     }
   }

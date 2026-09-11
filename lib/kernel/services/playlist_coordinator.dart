@@ -93,9 +93,10 @@ class PlaylistCoordinator {
         _engine.play();
         return true;
       case OpenError(:final error):
-        _log.e('PlaylistCoordinator: failed to play entry', context: {
-          'error': error.message,
-        });
+        _log.e(
+          'PlaylistCoordinator: failed to play entry',
+          context: {'error': error.message},
+        );
         return false;
       case OpenSuperseded():
         return false;
@@ -134,6 +135,31 @@ class PlaylistCoordinator {
   /// 跳到上一个条目.
   bool previous() => _engine.previousInQueue();
 
+  /// 断点续播指定索引条目 (v0.0.5) — 播放 + seek 到该条目的断点位置.
+  ///
+  /// 装载场景下 duration 异步到达, seek 需等 duration > 0 (seekTo 的
+  /// idle/零时长守卫): 记入 [_pendingResumeMs], 由 [_trackDuration]
+  /// 在首个有效 duration 事件时补 seek. 已装载场景 (引擎 duration 已知)
+  /// 直接 seek, 无等待.
+  Future<bool> resumeEntryAt(int index) async {
+    final items = _entries.value;
+    if (index < 0 || index >= items.length) return false;
+    final resumeMs = items[index].positionMs ?? 0;
+
+    final ok = await playEntryAt(index);
+    if (!ok || resumeMs <= 0) return ok;
+
+    if (_engine.duration.value > 0) {
+      unawaited(_engine.seekTo(resumeMs));
+    } else {
+      _pendingResumeMs = resumeMs; // duration 到达后由 _trackDuration 补 seek
+    }
+    return true;
+  }
+
+  /// 待补的断点 seek 位置 — null = 无挂起请求.
+  int? _pendingResumeMs;
+
   /// 设置播放模式 — 引擎为模式单一数据源, 本类仅落盘.
   Future<void> setPlayMode(PlayMode mode) async {
     await _engine.setPlayMode(mode);
@@ -167,9 +193,9 @@ class PlaylistCoordinator {
     for (final item in snapshot.items) {
       _metaByPath[item.path] = item;
     }
-    _entries.value = List<PlaylistItem>.unmodifiable(
-      <PlaylistItem>[for (final item in snapshot.items) item],
-    );
+    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
+      for (final item in snapshot.items) item,
+    ]);
     // 模式恢复不装载队列也可设置（mpv 属性级, 队列空时无副作用）.
     await _engine.setPlayMode(snapshot.playMode);
     _log.i(
@@ -193,8 +219,8 @@ class PlaylistCoordinator {
     final index = _engine.queueIndex.value;
     final current = (index >= 0 && index < paths.length) ? paths[index] : null;
 
-    final queueChanged = _observedPaths == null ||
-        !_listEquals(paths, _observedPaths!);
+    final queueChanged =
+        _observedPaths == null || !_listEquals(paths, _observedPaths!);
     if (queueChanged && paths.isNotEmpty) {
       // 装载/替换/移除/乱序 → 逻辑队列以引擎为准重建（元数据按 path 合并）.
       // 空装载（stop 的 playlist-clear）视作"停止" — 逻辑队列保留不清空.
@@ -236,16 +262,14 @@ class PlaylistCoordinator {
     _metaByPath[path] = updated;
     // 就地刷新视图中的同 path 条目（保持顺序不变）.
     _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
-      for (final entry in _entries.value)
-        entry.path == path ? updated : entry,
+      for (final entry in _entries.value) entry.path == path ? updated : entry,
     ]);
   }
 
   /// 以引擎 paths 为准重建逻辑队列（元数据按 path 合并, 乱序重排后顺序跟随引擎）.
   void _rebuildEntries(List<String> paths) {
     _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
-      for (final path in paths)
-        _metaByPath[path] ?? PlaylistItem(path: path),
+      for (final path in paths) _metaByPath[path] ?? PlaylistItem(path: path),
     ]);
   }
 
@@ -273,6 +297,12 @@ class PlaylistCoordinator {
 
   void _trackDuration() {
     _lastKnownDurationMs = _engine.duration.value;
+    // 断点续播的挂起 seek — duration 首次有效即补齐 (装载场景).
+    final pending = _pendingResumeMs;
+    if (pending != null && _lastKnownDurationMs > 0) {
+      _pendingResumeMs = null;
+      unawaited(_engine.seekTo(pending));
+    }
   }
 
   // ============================================================

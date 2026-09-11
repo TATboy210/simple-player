@@ -5,25 +5,27 @@ import '../../kernel/services/thumbnail_service.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/context_menu_row.dart';
-import '../theme/tokens.dart';
 import '../shared/hover_glow.dart';
+import '../theme/tokens.dart';
 
-/// 播放列表条目卡 — 横向布局: 缩略图左 + 断点信息右 (v0.0.5 竖条形态).
+/// 播放列表条目卡 — 缩略图 + 右侧双按钮列 (v0.0.5 窄条形态, 用户钦定布局).
 ///
-/// Playlist entry card — horizontal layout (thumbnail left, resume info
-/// right) for the side-panel list. 当前条目以左侧 accent 竖条 + 标题着色
-/// 高亮; 断点以细进度条呈现"上次看到这里".
+/// Playlist entry card — thumbnail with overlaid name, plus a vertical
+/// button stack on the right: 播放按钮 (3/5 高) 上, 断点续播按钮 (2/5 高) 下.
+/// 无断点的条目续播按钮禁用; 当前条目以缩略图 accent 描边高亮.
 ///
-/// 数据源为不可变 [PlaylistItem]; 缩略图经 [ThumbnailService] 缓存异步
-/// 加载 (加载中显示占位, 绝不阻断列表滚动).
+/// 缩略图经 [ThumbnailService] 缓存异步加载 (加载中显示占位, 绝不阻断列表滚动).
 class PlaylistTile extends StatefulWidget {
   final PlaylistItem item;
 
   /// 是否为当前正在播放的条目 — 驱动高亮.
   final bool isCurrent;
 
-  /// 点击卡片 → 播放该条目.
+  /// 点击卡片/播放按钮 → 从头播放该条目.
   final VoidCallback onPlay;
+
+  /// 断点续播按钮 — 播放并 seek 到 [PlaylistItem.positionMs].
+  final VoidCallback onResume;
 
   /// 右键菜单"移除"动作.
   final VoidCallback onRemove;
@@ -33,6 +35,7 @@ class PlaylistTile extends StatefulWidget {
     required this.item,
     required this.isCurrent,
     required this.onPlay,
+    required this.onResume,
     required this.onRemove,
   });
 
@@ -70,7 +73,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
     setState(() => _thumbnail = provider);
   }
 
-  /// 断点进度 (0-1) — 无时长或未播放时不显示进度条.
+  /// 断点进度 (0-1) — 无时长或未播放时续播按钮禁用.
   double? get _resumeProgress {
     final position = widget.item.positionMs ?? 0;
     final duration = widget.item.durationMs ?? 0;
@@ -81,6 +84,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final borderColor = widget.isCurrent ? Tokens.accent : Colors.transparent;
 
     return Tooltip(
       message: widget.item.name,
@@ -93,23 +97,49 @@ class _PlaylistTileState extends State<PlaylistTile> {
         child: HoverGlow(
           child: Container(
             padding: const EdgeInsets.all(Tokens.spXs),
-            // 当前条目左侧 accent 竖条高亮 — 视觉锚点不依赖边框.
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Tokens.radiusSm),
-              border: Border(
-                left: BorderSide(
-                  color: widget.isCurrent
-                      ? Tokens.accent
-                      : Colors.transparent,
-                  width: 3,
-                ),
+              border: Border.all(
+                color: borderColor,
+                width: widget.isCurrent ? 1.5 : 0,
               ),
             ),
             child: Row(
+              // 固定尺寸布局 — 缩略图 128×72 (16:9), 按钮列 44×72:
+              // ListView 给条目无界高度, 尺寸必须自洽 (Expanded 会爆炸).
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _buildThumbnail(),
-                const SizedBox(width: Tokens.spSm),
-                Expanded(child: _buildInfo(l10n)),
+                const SizedBox(width: Tokens.spXs),
+                // 双按钮列 — 播放 3/5 + 断点续播 2/5 (与缩略图同高).
+                SizedBox(
+                  width: 44,
+                  height: _thumbHeight,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: _SideButton(
+                          icon: Icons.play_arrow,
+                          tooltip: l10n.play,
+                          onPressed: widget.onPlay,
+                          accent: widget.isCurrent,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Expanded(
+                        flex: 2,
+                        child: _SideButton(
+                          icon: Icons.replay,
+                          tooltip: l10n.resumePlayback,
+                          onPressed: _resumeProgress == null
+                              ? null
+                              : widget.onResume,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -118,80 +148,67 @@ class _PlaylistTileState extends State<PlaylistTile> {
     );
   }
 
-  /// 信息列 — 标题 + 断点细进度条.
-  Widget _buildInfo(AppLocalizations l10n) {
-    final progress = _resumeProgress;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.item.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: widget.isCurrent ? Tokens.accent : Tokens.textPrimary,
-            fontSize: Tokens.fontCaption,
-          ),
-        ),
-        const SizedBox(height: Tokens.spXs),
-        // 断点细进度条 — 有断点才显示, 提示"上次看到这里".
-        progress == null
-            ? const SizedBox.shrink()
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 3,
-                  backgroundColor: Colors.black26,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    Tokens.accent,
+  /// 缩略图宽度 — 决定条目高度 (16:9 → 72px), 与按钮列同高.
+  static const _thumbWidth = 128.0;
+  static const _thumbHeight = 72.0;
+
+  /// 16:9 缩略图 — 占位 → 异步图像; 名称 overlay 底部; 播放中角标.
+  Widget _buildThumbnail() {
+    return SizedBox(
+      width: _thumbWidth,
+      height: _thumbHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 占位底色 — 缩略图加载完成前保持视觉占位.
+            const ColoredBox(color: Tokens.bgGlass),
+            if (_thumbnail != null)
+              Image(
+                image: _thumbnail!,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              )
+            else
+              const Center(
+                child: Icon(
+                  Icons.movie_outlined,
+                  size: 22,
+                  color: Tokens.textSecondary,
+                ),
+              ),
+            // 名称 overlay — 底部半透明条, 单行省略.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                color: Colors.black54,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text(
+                  widget.item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: 10,
                   ),
                 ),
               ),
-      ],
-    );
-  }
-
-  /// 16:9 缩略图 — 占位 → 异步图像; 播放中叠加角标.
-  Widget _buildThumbnail() {
-    return SizedBox(
-      width: 112,
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(Tokens.radiusSm),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 占位底色 — 缩略图加载完成前保持视觉占位.
-              const ColoredBox(color: Tokens.bgGlass),
-              if (_thumbnail != null)
-                Image(
-                  image: _thumbnail!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                )
-              else
-                const Center(
-                  child: Icon(
-                    Icons.movie_outlined,
-                    size: 24,
-                    color: Tokens.textSecondary,
-                  ),
+            ),
+            // 播放中角标.
+            if (widget.isCurrent)
+              const Positioned(
+                right: 3,
+                top: 3,
+                child: Icon(
+                  Icons.play_circle_fill,
+                  size: 14,
+                  color: Tokens.accent,
                 ),
-              // 播放中角标.
-              if (widget.isCurrent)
-                const Positioned(
-                  right: 3,
-                  top: 3,
-                  child: Icon(
-                    Icons.play_circle_fill,
-                    size: 16,
-                    color: Tokens.accent,
-                  ),
-                ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -232,5 +249,49 @@ class _PlaylistTileState extends State<PlaylistTile> {
       case 'remove':
         widget.onRemove();
     }
+  }
+}
+
+/// 条目侧边小按钮 — 紧凑玻璃质感, 铺满分配空间.
+class _SideButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  /// 当前条目高亮态 — 图标着 accent 色.
+  final bool accent;
+
+  const _SideButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.accent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
+      child: Material(
+        color: Tokens.bgGlass,
+        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(Tokens.radiusSm),
+          child: Center(
+            child: Icon(
+              icon,
+              size: 20,
+              color: onPressed == null
+                  ? Tokens.textSecondary.withValues(alpha: 0.4)
+                  : accent
+                  ? Tokens.accent
+                  : Tokens.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
