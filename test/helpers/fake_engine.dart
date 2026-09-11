@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 
 /// Hand-written Fake implementing all ISP interfaces for testing.
 ///
@@ -65,6 +66,21 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
 
+  // ─── 队列状态镜像 (QueueControl — 与 MediaKitEngine 同语义) ───
+
+  @override
+  final ValueNotifier<List<String>> queuePaths = ValueNotifier<List<String>>(
+    const <String>[],
+  );
+
+  @override
+  final ValueNotifier<int> queueIndex = ValueNotifier<int>(-1);
+
+  @override
+  final ValueNotifier<PlayMode> playMode = ValueNotifier<PlayMode>(
+    PlayMode.loopAll,
+  );
+
   /// 派生 isPlaying(监听 state==playing) — 路径B Commit1:
   /// CenterGroup/PlayPauseButton 新签名需 `ValueListenable<bool>` isPlaying,
   /// FakeEngine 原无此字段,加派生 notifier 供测试构造（供 ControlBar 测试构造）.
@@ -115,6 +131,17 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   int? lastSkipBackMs;
   int? lastSkipForwardMs;
   final List<String> openPaths = [];
+
+  // ─── Queue call tracking (QueueControl) ───
+  int openPlaylistCallCount = 0;
+  List<String>? lastOpenPlaylistPaths;
+  int? lastOpenPlaylistStartIndex;
+  final List<String> appendedPaths = [];
+  final List<int> removedIndices = [];
+  final List<int> jumpedToIndices = [];
+  int nextInQueueCallCount = 0;
+  int previousInQueueCallCount = 0;
+  PlayMode? lastSetPlayMode;
 
   /// When set, the next open() will simulate an error after loading.
   String? failNextOpenWith;
@@ -324,6 +351,118 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     // no-op in fake
   }
 
+  // ─── Queue control (QueueControl — 镜像 MediaKitEngine 同语义) ───
+
+  @override
+  Future<OpenResult> openPlaylist(
+    List<String> paths, {
+    int startIndex = 0,
+  }) async {
+    if (_disposed) return const OpenSuperseded();
+    openPlaylistCallCount++;
+    lastOpenPlaylistPaths = paths;
+    lastOpenPlaylistStartIndex = startIndex;
+    if (paths.isEmpty) {
+      final error = UnknownError('队列为空');
+      state.value = MediaState.error;
+      lastError.value = error;
+      return OpenError(error);
+    }
+    final gen = ++_operationGeneration;
+    state.value = MediaState.opening;
+    await (openGate?.future ?? Future<void>.value());
+    if (_disposed || gen != _operationGeneration) {
+      return const OpenSuperseded();
+    }
+    final clampedStart = startIndex.clamp(0, paths.length - 1);
+    queuePaths.value = List<String>.unmodifiable(paths);
+    queueIndex.value = clampedStart;
+    _mediaInfo = _configuredMediaInfo;
+    _hasMedia = true;
+    duration.value = _mediaInfo.duration;
+    position.value = 0;
+    lastError.value = null;
+    state.value = MediaState.idle;
+    return OpenSuccess(_mediaInfo);
+  }
+
+  @override
+  Future<void> appendToQueue(List<String> paths) async {
+    if (_disposed || paths.isEmpty) return;
+    appendedPaths.addAll(paths);
+    queuePaths.value = List<String>.unmodifiable([
+      ...queuePaths.value,
+      ...paths,
+    ]);
+  }
+
+  @override
+  Future<void> removeFromQueue(int index) async {
+    if (_disposed) return;
+    final paths = queuePaths.value;
+    if (index < 0 || index >= paths.length) return;
+    removedIndices.add(index);
+    final remaining = [...paths]..removeAt(index);
+    final current = queueIndex.value;
+    var nextIndex = current;
+    if (current > index) {
+      nextIndex = current - 1;
+    } else if (current == index) {
+      nextIndex = remaining.isEmpty
+          ? -1
+          : index.clamp(0, remaining.length - 1);
+    }
+    queuePaths.value = List<String>.unmodifiable(remaining);
+    queueIndex.value = nextIndex;
+  }
+
+  @override
+  Future<bool> jumpTo(int index) async {
+    if (_disposed) return false;
+    if (index < 0 || index >= queuePaths.value.length) return false;
+    jumpedToIndices.add(index);
+    queueIndex.value = index;
+    position.value = 0;
+    state.value = MediaState.playing;
+    return true;
+  }
+
+  @override
+  bool nextInQueue() => _stepQueue(forward: true);
+
+  @override
+  bool previousInQueue() => _stepQueue(forward: false);
+
+  bool _stepQueue({required bool forward}) {
+    if (_disposed) return false;
+    final count = queuePaths.value.length;
+    if (count == 0) return false;
+    if (forward) {
+      nextInQueueCallCount++;
+    } else {
+      previousInQueueCallCount++;
+    }
+    final current = queueIndex.value;
+    if (current < 0) {
+      unawaited(jumpTo(forward ? 0 : count - 1));
+      return true;
+    }
+    final target = forward ? current + 1 : current - 1;
+    if (target >= 0 && target < count) {
+      unawaited(jumpTo(target));
+      return true;
+    }
+    unawaited(jumpTo(forward ? 0 : count - 1));
+    return true;
+  }
+
+  @override
+  Future<void> setPlayMode(PlayMode mode) async {
+    if (_disposed) return;
+    lastSetPlayMode = mode;
+    playMode.value = mode;
+  }
+
   // ─── Audio tracks (TrackControl) ───
 
   @override
@@ -469,6 +608,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     aspectRatio.dispose();
     lastError.dispose();
     playbackSpeed.dispose();
+    queuePaths.dispose();
+    queueIndex.dispose();
+    playMode.dispose();
   }
 
   // ─── Test helper methods ───

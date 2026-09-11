@@ -1,5 +1,6 @@
 import 'engine_state_view.dart';
 import 'playback_control.dart';
+import 'queue_control.dart';
 import 'track_control.dart';
 import 'subtitle_config.dart';
 import 'video_effect_control.dart';
@@ -10,9 +11,9 @@ import 'volume_control.dart';
 ///
 /// Composite engine interface — unified dependency type for service layer.
 ///
-/// Aggregates [EngineStateView] (read-only state) with 6 control ISP
-/// interfaces (7 `implements` total) into a single type. Service layer
-/// (PlaybackController, PlaybackStateManager, AutoAdvancePolicy, etc.)
+/// Aggregates [EngineStateView] (read-only state) with 7 control ISP
+/// interfaces (8 `implements` total) into a single type. Service layer
+/// (PlaybackController, PlaylistCoordinator, etc.)
 /// accesses both state and control through this interface without
 /// depending on concrete [MediaKitEngine].
 ///
@@ -28,6 +29,7 @@ abstract class MediaEngine
     implements
         EngineStateView,
         PlaybackControl,
+        QueueControl,
         TrackControl,
         SubtitleConfig,
         VideoEffectControl,
