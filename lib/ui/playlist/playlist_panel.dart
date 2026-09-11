@@ -4,31 +4,33 @@ import 'package:flutter/material.dart';
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_container.dart';
+import '../shared/glass_container.dart' show GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
 
-/// 播放列表浮窗面板 — 玻璃质感网格缩略图 + 播放模式切换 (v0.0.5 精简 v1).
+/// 播放列表面板 — 右侧竖条, 无边框沉浸式蓝色毛玻璃 (v0.0.5 重设计).
 ///
-/// Immersive floating playlist panel — glass grid of thumbnails with
-/// play-mode toggle. 精简 v1: 单列表视图 (文件夹分组/历史 tab 留待后续).
+/// Playlist side panel — right-edge vertical strip with borderless
+/// blue-tinted glassmorphism. 避开控制栏区域, 与控制栏同屏共存.
 ///
-/// 交互契约:
-/// - [visible] 驱动滑入/滑出动画, 滑出后经 [onClosed] 由宿主移除 barrier;
-/// - 面板下层的全屏 barrier 点击任意处关闭 (点外关闭);
-/// - Esc 关闭由宿主键盘层经 [onClosed] 处理, 面板自身不抢焦点.
-class PlaylistPanel extends StatelessWidget {
+/// 动画设计(用户钦定"从右向左蔓延"):
+/// - 面板外壳 [ClipRect] + `Align(widthFactor)` — 打开时从右缘向左蔓延揭示,
+///   关闭反向收回; [Curves.easeOutCubic] 蔓延缓动;
+/// - 条目 [Opacity] + `Transform.translate` — 从右向左缓进显现, 与面板
+///   蔓延共用同一 [AnimationController] 时间轴(按索引 [Interval] 交错),
+///   滚动懒加载的条目在动画结束后直通(不重播).
+class PlaylistPanel extends StatefulWidget {
   /// 队列条目视图 (协调器逻辑队列, 断点元数据已合并).
   final ValueListenable<List<PlaylistItem>> entries;
 
   /// 当前播放条目索引 (-1 = 未播放) — 驱动高亮.
   final ValueListenable<int> currentIndex;
 
-  /// 面板是否可见 — 驱动滑入动画.
+  /// 面板是否可见 — 驱动蔓延进入/收回动画 (宿主共享 notifier, 全屏同源).
   final bool visible;
 
-  /// 点击模式按钮 / 关闭后通知宿主 (宿主管理可见性与 barrier).
+  /// 点击关闭按钮后通知宿主 (宿主翻转可见性 notifier).
   final VoidCallback onClose;
 
   /// 播放指定索引条目.
@@ -43,9 +45,6 @@ class PlaylistPanel extends StatelessWidget {
   /// 切换播放模式 (循环: loopAll → loopSingle → shuffle → loopAll).
   final VoidCallback onCyclePlayMode;
 
-  /// 宿主内容区宽度 — 驱动窄窗收缩 (面板不溢出小窗).
-  final double availableWidth;
-
   const PlaylistPanel({
     super.key,
     required this.entries,
@@ -56,43 +55,100 @@ class PlaylistPanel extends StatelessWidget {
     required this.onRemoveEntry,
     required this.playMode,
     required this.onCyclePlayMode,
-    required this.availableWidth,
   });
 
-  /// 面板几何 — 窄窗 (<500px) 用收缩尺寸, 常规窗用标准尺寸.
-  double get _panelWidth => availableWidth < Tokens.compactBreakpoint
-      ? Tokens.playlistPanelWidthNarrow
-      : Tokens.playlistPanelWidth;
+  @override
+  State<PlaylistPanel> createState() => _PlaylistPanelState();
+}
 
-  double get _panelHeight => availableWidth < Tokens.compactBreakpoint
-      ? Tokens.playlistPanelHeightNarrow
-      : Tokens.playlistPanelHeight;
+class _PlaylistPanelState extends State<PlaylistPanel>
+    with SingleTickerProviderStateMixin {
+  /// 蔓延动画单一时间轴 — 面板宽度揭示与条目 stagger 同源同步 (无违和关键).
+  late final AnimationController _controller;
+
+  /// 面板竖条宽度 — 窄于 1/3 视口, 不遮挡视频主体.
+  static const _panelWidth = 340.0;
+
+  /// 条目 stagger 交错步长 (时间轴比例) — 前 10 项错开, 其余随末段直进.
+  static const _staggerStep = 0.05;
+
+  /// 单条目缓进时长占比 (stagger 之后的窗口).
+  static const _staggerSpan = 0.45;
+
+  /// 条目从右向左缓进的初始位移 (px).
+  static const _staggerShift = 36.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _duration)
+      ..value = widget.visible ? 1.0 : 0.0;
+  }
+
+  static const _duration = Duration(milliseconds: 280);
+
+  @override
+  void didUpdateWidget(covariant PlaylistPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visible != widget.visible) {
+      widget.visible ? _controller.forward() : _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// 条目在时间轴 t 上的缓进进度 — [Interval] 交错, 收敛到 [0, 1].
+  double _staggerProgress(int index, double t) {
+    final start = (index * _staggerStep).clamp(0.0, 1.0 - _staggerSpan);
+    if (t <= start) return 0;
+    if (t >= start + _staggerSpan) return 1;
+    return Curves.easeOutCubic.transform((t - start) / _staggerSpan);
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 常驻动画树: visible 切换只动 slide/opacity, 不卸载子树 (滑出动画完整);
-    // 不可见时 IgnorePointer 让点击穿透回视频区.
-    return IgnorePointer(
-      ignoring: !visible,
-      child: Align(
-        alignment: Alignment.bottomRight,
-        child: Padding(
-          padding: const EdgeInsets.all(Tokens.spMd),
-          child: AnimatedSlide(
-            offset: visible ? Offset.zero : const Offset(0, 0.2),
-            duration: const Duration(milliseconds: Tokens.durationNormal),
-            curve: Curves.easeOutCubic,
-            child: AnimatedOpacity(
-              opacity: visible ? 1 : 0,
-              duration: const Duration(milliseconds: Tokens.durationNormal),
-              child: GlassContainer(
-                tier: GlassTier.normal,
-                borderRadius: BorderRadius.circular(Tokens.radiusMd),
-                width: _panelWidth,
-                height: _panelHeight,
-                child: _buildContent(context),
+    // 外壳: ClipRect + Align(widthFactor) — 从右向左蔓延揭示.
+    // AnimatedBuilder 驱动重建: controller 前进时 widthFactor 跟随,
+    // 否则 forward 动画不会触发 build (value 直读无监听).
+    // widthFactor=0 时零宽零命中, 关闭后自动让出点击区域.
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, child) => ClipRect(
+        child: Align(
+          alignment: Alignment.centerRight,
+          widthFactor: Curves.easeOutCubic.transform(_controller.value),
+          child: SizedBox(width: _panelWidth, child: child),
+        ),
+      ),
+      child: _buildShell(context),
+    );
+  }
+
+  /// 无边框沉浸式玻璃壳 — 底色 + BackdropFilter + 蓝色渐变(右浓左浅).
+  /// 不走 GlassContainer (其边框/圆角语言与本面板的"贴边沉浸"相反).
+  Widget _buildShell(BuildContext context) {
+    return Container(
+      color: Tokens.bgGlass,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: GlassTier.normal.blurFilter,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+                colors: [
+                  // 右缘蓝浓 → 左缘几乎透明 — 视觉重心靠操作侧.
+                  Tokens.accent.withValues(alpha: 0.16),
+                  Tokens.accent.withValues(alpha: 0.02),
+                ],
               ),
             ),
+            child: _buildContent(context),
           ),
         ),
       ),
@@ -108,9 +164,9 @@ class PlaylistPanel extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(
             Tokens.spMd,
+            Tokens.spMd,
             Tokens.spSm,
             Tokens.spSm,
-            Tokens.spXs,
           ),
           child: Row(
             children: [
@@ -126,28 +182,28 @@ class PlaylistPanel extends StatelessWidget {
               ),
               // 模式切换 — 图标随 playMode 变化, 点击循环切换.
               ValueListenableBuilder<PlayMode>(
-                valueListenable: playMode,
+                valueListenable: widget.playMode,
                 builder: (_, mode, _) => IconButton(
                   icon: Icon(playModeIcon(mode), size: 20),
                   color: Tokens.textSecondary,
                   tooltip: playModeLabel(mode, l10n),
-                  onPressed: onCyclePlayMode,
+                  onPressed: widget.onCyclePlayMode,
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
                 color: Tokens.textSecondary,
                 tooltip: l10n.close,
-                onPressed: onClose,
+                onPressed: widget.onClose,
               ),
             ],
           ),
         ),
         const Divider(height: 1),
-        // 条目网格 — 协调器逻辑队列; index 高亮随切曲实时刷新.
+        // 条目纵列 — 索引高亮随切曲实时刷新; 条目 stagger 与蔓延同步.
         Expanded(
           child: ValueListenableBuilder<List<PlaylistItem>>(
-            valueListenable: entries,
+            valueListenable: widget.entries,
             builder: (_, items, _) {
               if (items.isEmpty) {
                 return Center(
@@ -161,21 +217,21 @@ class PlaylistPanel extends StatelessWidget {
                 );
               }
               return ValueListenableBuilder<int>(
-                valueListenable: currentIndex,
-                builder: (_, index, _) => GridView.builder(
-                  padding: const EdgeInsets.all(Tokens.spSm),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 180,
-                    mainAxisSpacing: Tokens.spXs,
-                    crossAxisSpacing: Tokens.spXs,
-                    childAspectRatio: 0.92,
+                valueListenable: widget.currentIndex,
+                builder: (_, index, _) => ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: Tokens.spSm,
+                    horizontal: Tokens.spXs,
                   ),
                   itemCount: items.length,
-                  itemBuilder: (_, i) => PlaylistTile(
-                    item: items[i],
-                    isCurrent: i == index,
-                    onPlay: () => onPlayEntry(i),
-                    onRemove: () => onRemoveEntry(i),
+                  itemBuilder: (_, i) => _staggered(
+                    i,
+                    PlaylistTile(
+                      item: items[i],
+                      isCurrent: i == index,
+                      onPlay: () => widget.onPlayEntry(i),
+                      onRemove: () => widget.onRemoveEntry(i),
+                    ),
                   ),
                 ),
               );
@@ -183,6 +239,26 @@ class PlaylistPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// 条目缓进包装 — 动画结束后直通(零包装), 滚动懒加载不重播.
+  Widget _staggered(int index, Widget child) {
+    final progress = _staggerProgress(index, _controller.value);
+    if (progress >= 1) return child;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, child) {
+        final p = _staggerProgress(index, _controller.value);
+        return Opacity(
+          opacity: p,
+          child: Transform.translate(
+            offset: Offset((1 - p) * _staggerShift, 0),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

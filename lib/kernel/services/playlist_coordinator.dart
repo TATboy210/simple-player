@@ -140,6 +140,18 @@ class PlaylistCoordinator {
     unawaited(_save());
   }
 
+  /// 循环切换播放模式 — loopAll → loopSingle → shuffle → loopAll.
+  ///
+  /// UI (控制栏按钮/面板按钮) 共用此入口, 图标随引擎 playMode notifier 刷新.
+  Future<void> cyclePlayMode() async {
+    const cycle = {
+      PlayMode.loopAll: PlayMode.loopSingle,
+      PlayMode.loopSingle: PlayMode.shuffle,
+      PlayMode.shuffle: PlayMode.loopAll,
+    };
+    await setPlayMode(cycle[_engine.playMode.value] ?? PlayMode.loopAll);
+  }
+
   // ============================================================
   // 启动恢复
   // ============================================================

@@ -6,18 +6,20 @@ import '../../kernel/utils/path_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/context_menu_row.dart';
 import '../theme/tokens.dart';
+import '../shared/hover_glow.dart';
 
-/// 播放列表条目卡片 — 16:9 缩略图 + 断点进度条 + 右键菜单 (v0.0.5).
+/// 播放列表条目卡 — 横向布局: 缩略图左 + 断点信息右 (v0.0.5 竖条形态).
 ///
-/// Playlist entry card — 16:9 thumbnail with resume-progress bar and
-/// context menu (play / remove / open file location).
+/// Playlist entry card — horizontal layout (thumbnail left, resume info
+/// right) for the side-panel list. 当前条目以左侧 accent 竖条 + 标题着色
+/// 高亮; 断点以细进度条呈现"上次看到这里".
 ///
-/// 数据源为不可变 [PlaylistItem] — 断点/时长随协调器刷新整体重建,
-/// 缩略图经 [ThumbnailService] LRU 缓存异步加载 (加载中显示占位).
+/// 数据源为不可变 [PlaylistItem]; 缩略图经 [ThumbnailService] 缓存异步
+/// 加载 (加载中显示占位, 绝不阻断列表滚动).
 class PlaylistTile extends StatefulWidget {
   final PlaylistItem item;
 
-  /// 是否为当前正在播放的条目 — 驱动高亮描边.
+  /// 是否为当前正在播放的条目 — 驱动高亮.
   final bool isCurrent;
 
   /// 点击卡片 → 播放该条目.
@@ -60,8 +62,8 @@ class _PlaylistTileState extends State<PlaylistTile> {
     super.dispose();
   }
 
-  /// 异步取缩略图 — ThumbnailService 内部带 LRU 缓存与平台降级;
-  /// 取消/失败保持占位态, 绝不阻断列表滚动.
+  /// 异步取缩略图 — ThumbnailService 内部带 LRU/磁盘缓存与平台降级;
+  /// 失败保持占位态, 绝不阻断列表滚动.
   Future<void> _loadThumbnail() async {
     final provider = await ThumbnailService.getThumbnail(widget.item.path);
     if (_disposed || !mounted) return;
@@ -78,7 +80,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = widget.isCurrent ? Tokens.accent : Colors.transparent;
+    final l10n = AppLocalizations.of(context);
 
     return Tooltip(
       message: widget.item.name,
@@ -88,29 +90,106 @@ class _PlaylistTileState extends State<PlaylistTile> {
         onSecondaryTapUp: (details) =>
             _showContextMenu(context, details.globalPosition),
         borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        child: Container(
-          padding: const EdgeInsets.all(Tokens.spXs),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Tokens.radiusSm),
-            border: Border.all(
-              color: borderColor,
-              width: widget.isCurrent ? 1.5 : 0,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildThumbnail(),
-              const SizedBox(height: Tokens.spXs),
-              Text(
-                widget.item.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: widget.isCurrent ? Tokens.accent : Tokens.textPrimary,
-                  fontSize: 12,
+        child: HoverGlow(
+          child: Container(
+            padding: const EdgeInsets.all(Tokens.spXs),
+            // 当前条目左侧 accent 竖条高亮 — 视觉锚点不依赖边框.
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Tokens.radiusSm),
+              border: Border(
+                left: BorderSide(
+                  color: widget.isCurrent
+                      ? Tokens.accent
+                      : Colors.transparent,
+                  width: 3,
                 ),
               ),
+            ),
+            child: Row(
+              children: [
+                _buildThumbnail(),
+                const SizedBox(width: Tokens.spSm),
+                Expanded(child: _buildInfo(l10n)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 信息列 — 标题 + 断点细进度条.
+  Widget _buildInfo(AppLocalizations l10n) {
+    final progress = _resumeProgress;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.item.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: widget.isCurrent ? Tokens.accent : Tokens.textPrimary,
+            fontSize: Tokens.fontCaption,
+          ),
+        ),
+        const SizedBox(height: Tokens.spXs),
+        // 断点细进度条 — 有断点才显示, 提示"上次看到这里".
+        progress == null
+            ? const SizedBox.shrink()
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(Tokens.radiusSm),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: Colors.black26,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Tokens.accent,
+                  ),
+                ),
+              ),
+      ],
+    );
+  }
+
+  /// 16:9 缩略图 — 占位 → 异步图像; 播放中叠加角标.
+  Widget _buildThumbnail() {
+    return SizedBox(
+      width: 112,
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(Tokens.radiusSm),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 占位底色 — 缩略图加载完成前保持视觉占位.
+              const ColoredBox(color: Tokens.bgGlass),
+              if (_thumbnail != null)
+                Image(
+                  image: _thumbnail!,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                )
+              else
+                const Center(
+                  child: Icon(
+                    Icons.movie_outlined,
+                    size: 24,
+                    color: Tokens.textSecondary,
+                  ),
+                ),
+              // 播放中角标.
+              if (widget.isCurrent)
+                const Positioned(
+                  right: 3,
+                  top: 3,
+                  child: Icon(
+                    Icons.play_circle_fill,
+                    size: 16,
+                    color: Tokens.accent,
+                  ),
+                ),
             ],
           ),
         ),
@@ -153,63 +232,5 @@ class _PlaylistTileState extends State<PlaylistTile> {
       case 'remove':
         widget.onRemove();
     }
-  }
-
-  /// 16:9 缩略图区 — 占位 → 异步图像; 断点进度条覆盖在底部.
-  Widget _buildThumbnail() {
-    final progress = _resumeProgress;
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 占位底色 — 缩略图加载完成前保持视觉占位.
-            const ColoredBox(color: Tokens.bgGlass),
-            if (_thumbnail != null)
-              Image(
-                image: _thumbnail!,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              )
-            else
-              const Center(
-                child: Icon(
-                  Icons.movie_outlined,
-                  size: 28,
-                  color: Tokens.textSecondary,
-                ),
-              ),
-            // 播放中角标.
-            if (widget.isCurrent)
-              const Positioned(
-                right: 4,
-                top: 4,
-                child: Icon(
-                  Icons.play_circle_fill,
-                  size: 20,
-                  color: Tokens.accent,
-                ),
-              ),
-            // 断点进度条 — 底缘细条, 提示"上次看到这里".
-            if (progress != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 3,
-                  backgroundColor: Colors.black38,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    Tokens.accent,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 }

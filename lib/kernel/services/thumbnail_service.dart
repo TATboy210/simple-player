@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'linux_thumbnail_provider.dart';
 import 'macos_thumbnail_provider.dart';
 import 'noop_thumbnail_provider.dart';
 import 'thumbnail_provider.dart';
+import 'windows_thumbnail_provider.dart';
 
 /// 平台感知的缩略图服务门面
 ///
@@ -33,7 +35,10 @@ class ThumbnailService {
     final existing = _impl;
     if (existing != null) return existing;
     final created = switch (defaultTargetPlatform) {
-      TargetPlatform.windows => const NoopThumbnailProvider(),
+      // v0.0.5: Windows 从 Noop 升级为 fc_native 原生缩略图 (磁盘缓存层).
+      TargetPlatform.windows => const WindowsThumbnailProvider(
+        resolveCacheDirectory: getApplicationSupportDirectory,
+      ),
       TargetPlatform.linux => const LinuxThumbnailProvider(),
       TargetPlatform.macOS => const MacosThumbnailProvider(),
       _ => const NoopThumbnailProvider(),
