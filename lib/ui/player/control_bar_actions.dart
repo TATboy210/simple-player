@@ -65,6 +65,9 @@ class ControlBarActions extends StatelessWidget {
             isIdle: isIdle,
             isIdleListenable: isIdleListenable,
             onStop: actions.onStop,
+            // v0.0.5 队列步进 — VM 从 actions 装配, null 时 CenterGroup 隐藏按钮.
+            onPreviousEntry: vm.onPreviousEntry,
+            onNextEntry: vm.onNextEntry,
           ),
           const Spacer(),
           RightButtonGroup(

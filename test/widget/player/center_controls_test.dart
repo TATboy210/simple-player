@@ -344,4 +344,41 @@ void main() {
       semantics.dispose();
     });
   });
+
+  group('CenterGroup queue navigation buttons (v0.0.5)', () {
+    testWidgets('回调齐备时渲染上一个/下一个按钮并响应点击', (tester) async {
+      var previous = 0;
+      var next = 0;
+      await tester.pumpWidget(
+        buildSubject(
+          child: CenterGroup(
+            isPlaying: engine.isPlayingNotifier,
+            onPlayPause: engine.togglePlayPause,
+            onSeekBack: engine.skipBack,
+            onSeekForward: engine.skipForward,
+            isIdle: false,
+            onPreviousEntry: () => previous++,
+            onNextEntry: () => next++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(Icons.skip_previous), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.skip_previous));
+      await tester.tap(find.byIcon(Icons.skip_next));
+      expect(previous, 1);
+      expect(next, 1);
+    });
+
+    testWidgets('回调为 null 时按钮整体隐藏 (无协调器退路)', (tester) async {
+      await tester.pumpWidget(buildSubject(child: buildCenterGroup()));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.skip_previous), findsNothing);
+      expect(find.byIcon(Icons.skip_next), findsNothing);
+    });
+  });
 }
