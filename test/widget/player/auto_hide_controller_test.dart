@@ -116,7 +116,7 @@ void main() {
   });
 
   group('AutoHideController.onMouseMove()', () {
-    test('no-op when not playing', () {
+    test('shows controls when paused too (media_kit aligned, v0.0.5)', () {
       isPlaying.value = false;
       final c = createController();
       c.init();
@@ -124,7 +124,8 @@ void main() {
 
       c.onMouseMove();
 
-      expect(c.visible.value, isFalse);
+      // v0.0.5 对齐 media_kit 原生: 隐藏与播放状态无关, 暂停时 hover 同样唤起.
+      expect(c.visible.value, isTrue);
     });
 
     test('shows and schedules hide when playing', () {
@@ -554,12 +555,10 @@ void main() {
     });
   });
 
-  group('AutoHideController isPlaying transitions — 非 playing persistence', () {
-    testWidgets('non-playing keeps controls visible past hide delay', (
-      tester,
-    ) async {
-      // 非 playing 永显:进入非 playing 后 timer 被 cancel,
-      // pump 超过 hide delay 仍可见
+  group('AutoHideController isPlaying transitions — media_kit aligned', () {
+    testWidgets('non-playing also hides past hide delay', (tester) async {
+      // v0.0.5 对齐 media_kit 原生: 暂停后唤起控件, 静置超过 hide delay
+      // 照常隐藏 (无"非 playing 永显"特例).
       isPlaying.value = true;
       await tester.pumpWidget(
         MaterialApp(home: _TestAutoHideWrapper(isPlaying: isPlaying)),
@@ -571,13 +570,12 @@ void main() {
       final c = state.controller;
       c.visible.value = false;
 
-      isPlaying.value = false; // true→false 触发永显 + cancel timer
+      isPlaying.value = false; // true→false 触发唤起 + 重启计时
 
-      // pump 超过 hide delay(3s)— 非 playing 永显,timer 被 cancel,不隐藏
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
 
-      expect(c.visible.value, isTrue);
+      expect(c.visible.value, isFalse);
     });
   });
 
@@ -625,16 +623,18 @@ void main() {
       expect(controller.visible.value, isFalse);
     });
 
-    test('interaction methods are no-ops when not playing', () {
+    test('interaction sessions work when paused too (media_kit aligned)', () {
       isPlaying.value = false;
       final controller = createController();
       controller.init();
       controller.visible.value = false;
 
+      // v0.0.5 对齐 media_kit 原生: 暂停时交互会话同样生效 (唤起 + 保持).
       controller.onInteractionStart();
+      expect(controller.visible.value, isTrue);
       controller.onInteractionEnd();
 
-      expect(controller.visible.value, isFalse);
+      expect(controller.visible.value, isTrue); // End 重启计时, 未到 delay
     });
   });
 
@@ -688,17 +688,18 @@ void main() {
       expect(c.visible.value, isFalse); // timer fires → hide
     });
 
-    test('onSeekStart/onSeekEnd are no-op when not playing', () {
+    test('onSeekStart/onSeekEnd work when paused too (media_kit aligned)', () {
       isPlaying.value = false;
       final c = createController();
       c.init();
       c.visible.value = false;
 
+      // v0.0.5 对齐 media_kit 原生: 暂停时 seek 会话同样生效.
       c.onSeekStart();
-      expect(c.visible.value, isFalse); // 非 playing 跳过
+      expect(c.visible.value, isTrue);
 
       c.onSeekEnd();
-      expect(c.visible.value, isFalse); // 非 playing 跳过
+      expect(c.visible.value, isTrue); // End 重启计时, 未到 delay
     });
   });
 }

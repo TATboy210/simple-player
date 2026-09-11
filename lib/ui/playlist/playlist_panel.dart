@@ -68,29 +68,24 @@ class PlaylistPanel extends StatefulWidget {
 
 class _PlaylistPanelState extends State<PlaylistPanel>
     with SingleTickerProviderStateMixin {
-  /// 蔓延动画单一时间轴 — 面板宽度揭示与条目 stagger 同源同步 (无违和关键).
+  /// 渐进渐退动画 — 与控制栏同款 (FadeTransition + easeInOut +
+  /// durationControlsFade, v0.0.5 用户钦定: 弃蔓延/条目 stagger).
   late final AnimationController _controller;
+
+  late final Animation<double> _fade;
 
   /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
   static const _panelWidth = 280.0;
 
-  /// 条目 stagger 交错步长 (时间轴比例) — 前 10 项错开, 其余随末段直进.
-  static const _staggerStep = 0.05;
-
-  /// 单条目缓进时长占比 (stagger 之后的窗口).
-  static const _staggerSpan = 0.45;
-
-  /// 条目从右向左缓进的初始位移 (px).
-  static const _staggerShift = 36.0;
-
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: _duration)
-      ..value = widget.visible ? 1.0 : 0.0;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationControlsFade),
+    )..value = widget.visible ? 1.0 : 0.0;
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
   }
-
-  static const _duration = Duration(milliseconds: 280);
 
   @override
   void didUpdateWidget(covariant PlaylistPanel oldWidget) {
@@ -106,30 +101,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     super.dispose();
   }
 
-  /// 条目在时间轴 t 上的缓进进度 — [Interval] 交错, 收敛到 [0, 1].
-  double _staggerProgress(int index, double t) {
-    final start = (index * _staggerStep).clamp(0.0, 1.0 - _staggerSpan);
-    if (t <= start) return 0;
-    if (t >= start + _staggerSpan) return 1;
-    return Curves.easeOutCubic.transform((t - start) / _staggerSpan);
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 外壳: ClipRect + Align(widthFactor) — 从右向左蔓延揭示.
-    // AnimatedBuilder 驱动重建: controller 前进时 widthFactor 跟随,
-    // 否则 forward 动画不会触发 build (value 直读无监听).
-    // widthFactor=0 时零宽零命中, 关闭后自动让出点击区域.
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (_, child) => ClipRect(
-        child: Align(
-          alignment: Alignment.centerRight,
-          widthFactor: Curves.easeOutCubic.transform(_controller.value),
-          child: SizedBox(width: _panelWidth, child: child),
+    // 控制栏同款渐进渐退 — FadeTransition 驱动, dismissed(完全收回)后
+    // 让出命中 (与控制栏 _onAnimStatus dismissed 同语义).
+    return IgnorePointer(
+      ignoring: _controller.status == AnimationStatus.dismissed,
+      child: FadeTransition(
+        opacity: _fade,
+        child: SizedBox(
+          width: _panelWidth,
+          child: _buildShell(context),
         ),
       ),
-      child: _buildShell(context),
     );
   }
 
@@ -195,8 +179,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             ],
           ),
         ),
-        const Divider(height: 1),
-        // 条目纵列 — 索引高亮随切曲实时刷新; 条目 stagger 与蔓延同步.
+        // 无分割线 — 浑然天成 (v0.0.5 用户钦定): 标题行与条目纵列以
+        // 呼吸间距自然过渡.
         Expanded(
           child: ValueListenableBuilder<List<PlaylistItem>>(
             valueListenable: widget.entries,
@@ -220,15 +204,12 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                     horizontal: Tokens.spXs,
                   ),
                   itemCount: items.length,
-                  itemBuilder: (_, i) => _staggered(
-                    i,
-                    PlaylistTile(
-                      item: items[i],
-                      isCurrent: i == index,
-                      onPlay: () => widget.onPlayEntry(i),
-                      onResume: () => widget.onResumeEntry(i),
-                      onRemove: () => widget.onRemoveEntry(i),
-                    ),
+                  itemBuilder: (_, i) => PlaylistTile(
+                    item: items[i],
+                    isCurrent: i == index,
+                    onPlay: () => widget.onPlayEntry(i),
+                    onResume: () => widget.onResumeEntry(i),
+                    onRemove: () => widget.onRemoveEntry(i),
                   ),
                 ),
               );
@@ -236,26 +217,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           ),
         ),
       ],
-    );
-  }
-
-  /// 条目缓进包装 — 动画结束后直通(零包装), 滚动懒加载不重播.
-  Widget _staggered(int index, Widget child) {
-    final progress = _staggerProgress(index, _controller.value);
-    if (progress >= 1) return child;
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (_, child) {
-        final p = _staggerProgress(index, _controller.value);
-        return Opacity(
-          opacity: p,
-          child: Transform.translate(
-            offset: Offset((1 - p) * _staggerShift, 0),
-            child: child,
-          ),
-        );
-      },
-      child: child,
     );
   }
 }

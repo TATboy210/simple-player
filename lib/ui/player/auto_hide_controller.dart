@@ -8,11 +8,13 @@ import '../theme/tokens.dart';
 ///
 /// 控制栏自动隐藏逻辑，独立可测试。
 ///
-/// 路径B阶段2:仅接收 [ValueNotifier<bool>] `isPlaying` — 非 playing 永显,
-/// 仅 playing 自动隐藏。归约原 `MediaState` 多状态策略(opening/paused/completed
-/// /error 均视为非 playing 永显),与原策略一致。原 idle 专清 `_activeInteractionCount`
-/// 语义扩展为「任意 false 转换都清」(更保守,无副作用 — 新媒体/暂停/出错中断旧手势
-/// 序列都需清计数,避免下一次播放永久不自动隐藏)。
+/// v0.0.5 对齐 media_kit 原生交互 (用户裁决: 原生优先): 隐藏与播放状态
+/// **无关** — 静置 (hover 离开/不响应区) 计时到点即隐藏, 暂停时同样隐藏
+/// (media_kit material_desktop.dart onHover/onEnter 的 controlsHoverDuration
+/// 语义)。在此基础上的项目层优化:
+/// - [modalOpen]: 模态窗口 (设置/菜单) 开启期间冻结隐藏计时, 关窗重新计时
+/// - [_activeInteractionCount]: 进度条/滑块拖拽等交互会话保持显示
+/// - resizing 冻结; hover 节流; popup 关闭通知
 class AutoHideController {
   AutoHideController({
     required TickerProvider vsync,
@@ -33,8 +35,8 @@ class AutoHideController {
     );
     // fade-out 完成后立即关闭 hit test，避免透明 overlay 拦截点击
     _animController.addStatusListener(_onAnimStatus);
-    // 阶段2:监听 isPlaying 自动响应(替代原 onEngineStateChanged 手动调用)。
-    // 调用方只需更新 isPlaying notifier,本控制器自行触发 _onPlayingChanged。
+    // 监听 isPlaying — 状态切换瞬间显示控制栏并重启计时 (对齐原生:
+    // 暂停/恢复都会唤起控件, 之后静置照常隐藏).
     _isPlaying.addListener(_onPlayingChanged);
   }
 
@@ -87,15 +89,12 @@ class AutoHideController {
     _animController.forward();
   }
 
-  /// 隐藏控制栏（带动画，非 playing 或 resize 中不隐藏）
-  ///
-  /// 阶段2:归约自原 `if (engineState == idle) return` — 非 playing 永显,
-  /// 单击非 playing 状态不再隐藏控件(与永显策略一致,消除原 paused 单击隐藏
-  /// 的不一致)。
+  /// 隐藏控制栏（带动画，resize/模态窗口中不隐藏 — 对齐 media_kit 原生:
+  /// 暂停状态同样可隐藏).
   void hide() {
     // 将 resize/modal gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调
     // 即使无法再被 cancel，也不能在会话内启动淡出动画。
-    if (!_isPlaying.value || _resizing || _modalOpen) return;
+    if (_resizing || _modalOpen) return;
     if (visible.value) {
       _popupCloseNotifier?.value++;
       _animController.reverse();
@@ -110,22 +109,17 @@ class AutoHideController {
 
   /// 取消旧 Timer 再设新的，避免多次鼠标移动导致 Timer 堆积。
   ///
-  /// 只有 playing 状态、未 resize 且没有活跃子控件交互时才允许自动隐藏；所有
-  /// 调用方均经过此处，避免窗口状态变化绕开交互会话保护。
+  /// 对齐 media_kit 原生: 隐藏与播放状态无关 — 未 resize、无模态窗口、
+  /// 无活跃子控件交互时计时隐藏。
   void scheduleHide() {
     _hideTimer?.cancel();
-    if (!_isPlaying.value ||
-        _resizing ||
-        _modalOpen ||
-        _activeInteractionCount > 0) {
+    if (_resizing || _modalOpen || _activeInteractionCount > 0) {
       return;
     }
     _hideTimer = Timer(_hideDelay, () {
-      // 阶段3问题3修复:去掉 !_hovering 检查 — 对齐 media_kit 原生「静止 3s 隐藏」。
       // v0.0.4:显现/保活的响应区已由 UI 层 MouseRegion 门控到控制栏本体矩形
       // (见 PlayerVideoControls.isPointerInsideControlBar) — 指针移出矩形
-      // 即不再刷新计时,静止或悬停区外 3s 后照常隐藏。本控制器策略不变:
-      // _activeInteractionCount 仍保护拖拽进度条/滑块交互期间不隐藏。
+      // 即不再刷新计时,静止或悬停区外 3s 后照常隐藏。
       if (_activeInteractionCount == 0) hide();
     });
   }
@@ -153,12 +147,9 @@ class AutoHideController {
     }
   }
 
-  /// 鼠标移动（节流 100ms）
-  ///
-  /// 阶段2:非 playing 直接 return(原 idle return 扩展)。非 playing 永显,
-  /// show() 本就是 no-op,故无实质行为变化。
+  /// 鼠标移动（节流 100ms）— 对齐 media_kit 原生: 暂停时 hover 同样唤起.
   void onMouseMove() {
-    if (!_isPlaying.value || _resizing) return;
+    if (_resizing) return;
     final now = DateTime.now();
     if (now.difference(_lastHoverTime) < _hoverThrottle) return;
     _lastHoverTime = now;
@@ -177,41 +168,27 @@ class AutoHideController {
     scheduleHide();
   }
 
-  /// 鼠标离开
-  ///
-  /// 阶段2:仅 playing 调度隐藏(原 `!= idle` 调度,但 scheduleHide 内部非 playing
-  /// 本就 no-op,故等价)。
+  /// 鼠标离开 — 静置计时隐藏 (对齐 media_kit 原生, 状态无关).
   void onMouseExit() {
     _hovering = false;
-    if (_isPlaying.value) scheduleHide();
+    scheduleHide();
   }
 
   /// isPlaying 变化处理 — 由 [_isPlaying] listener 自动触发。
   ///
-  /// 状态策略(对齐 media_kit 原生 + 增强,归约自原 MediaState 多状态):
-  /// - playing(true): show + scheduleHide(唯一自动隐藏状态)
-  /// - 非 playing(false): 清交互计数 + cancel timer + 永显(覆盖原 idle/opening
-  ///   /paused/completed/error;idle 专清计数语义扩展为任意 false 转换都清)
+  /// 对齐 media_kit 原生: 状态切换瞬间唤起控件 (暂停/恢复同理), 之后
+  /// 静置照常计时隐藏 — 无"非 playing 永显"特例。
   void _onPlayingChanged() {
-    if (_isPlaying.value) {
-      show();
-      // 无论当前是否可见，始终重置隐藏定时器
-      scheduleHide();
-      return;
-    }
-    // 非 playing:清计数(中断旧手势序列)+ cancel + 永显。无条件调用 show()
-    // 以反转可能正在进行的自动淡出动画，避免 dismissed 回调随后隐藏控件。
     _activeInteractionCount = 0;
-    _hideTimer?.cancel();
     show();
+    scheduleHide();
   }
 
-  /// 开始一个子控件交互会话，并冻结 playing 状态的自动隐藏。
+  /// 开始一个子控件交互会话，冻结自动隐藏。
   ///
   /// UI 子组件只报告交互边界，不自行维护隐藏 Timer，避免拖拽、悬停和 popup
-  /// 的异步结束顺序造成控制栏提前消失。非 playing 没有可自动隐藏的控件,保持 no-op。
+  /// 的异步结束顺序造成控制栏提前消失。
   void onInteractionStart() {
-    if (!_isPlaying.value) return;
     _activeInteractionCount++;
     show();
     _hideTimer?.cancel();
@@ -219,7 +196,7 @@ class AutoHideController {
 
   /// 结束一个子控件交互会话；最后一个会话结束后恢复既有隐藏策略。
   void onInteractionEnd() {
-    if (!_isPlaying.value || _activeInteractionCount == 0) {
+    if (_activeInteractionCount == 0) {
       return;
     }
     _activeInteractionCount--;
@@ -235,14 +212,11 @@ class AutoHideController {
   /// 用户结束拖动进度条 — 在最后一个活跃交互结束后重启隐藏计时。
   void onSeekEnd() => onInteractionEnd();
 
-  /// 初始状态：非 playing 时永久显示，否则启动自动隐藏
+  /// 初始状态：显示控制栏并启动自动隐藏计时 (状态无关, 对齐 media_kit 原生).
   void init() {
-    if (!_isPlaying.value) {
-      visible.value = true;
-      _animController.value = 1;
-    } else {
-      scheduleHide();
-    }
+    visible.value = true;
+    _animController.value = 1;
+    scheduleHide();
   }
 
   /// 清理资源
