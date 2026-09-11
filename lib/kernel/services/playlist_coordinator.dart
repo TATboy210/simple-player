@@ -149,16 +149,28 @@ class PlaylistCoordinator {
 
     final ok = await playEntryAt(index);
     if (!ok) return false;
-    if (resumeMs > 0) _pendingResumeMs = resumeMs;
+    if (resumeMs > 0) {
+      _pendingResumeMs = resumeMs;
+      _pendingResumeTimeout?.cancel();
+      _pendingResumeTimeout = Timer(_resumeTimeout, () {
+        if (_disposed) return;
+        _pendingResumeMs = null; // 超时放弃 — 播放继续, 不悬挂
+      });
+    }
     return true;
   }
 
   /// 待补的断点 seek 位置 — null = 无挂起请求.
   int? _pendingResumeMs;
+  Timer? _pendingResumeTimeout;
 
   /// 补 seek 的 position 低位锁存区 — 新条目开始播放时首个 position 事件
   /// 必然低于此值; 超出即视为非起始态 (旧条目残留事件), 继续等待.
   static const _resumeSeekLatchMs = 2000;
+
+  /// 挂起 seek 超时兜底 — 媒体加载极慢 (网络流/损坏文件) 时低位信号
+  /// 可能迟迟不到; 超时放弃挂起, 防悬挂 (断点丢失可接受, 播放不受阻).
+  static const _resumeTimeout = Duration(seconds: 5);
 
   /// 设置播放模式 — 引擎为模式单一数据源, 本类仅落盘.
   Future<void> setPlayMode(PlayMode mode) async {
@@ -340,6 +352,7 @@ class PlaylistCoordinator {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _pendingResumeTimeout?.cancel();
     _engine.queueRevision.removeListener(_onQueueRevision);
     _engine.position.removeListener(_trackPosition);
     _engine.duration.removeListener(_trackDuration);

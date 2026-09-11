@@ -31,8 +31,10 @@ class AppDialog extends StatelessWidget {
     this.height = 350,
   });
 
-  /// 面板圆角 — 与控制栏同档（radiusLg 22），替代旧 radiusLarge(12)。
-  static final _panelRadius = BorderRadius.circular(Tokens.radiusLg);
+  /// 面板圆角 — v0.0.5 绑定控制栏单一事实源 ([Tokens.controlBarRadius]
+  /// 22px, 与控制栏/播放列表面板同款); 替代旧 radiusLarge(12) 与值巧合的
+  /// radiusLg 引用 — 控制栏改圆角时本面板自动跟随.
+  static final _panelRadius = BorderRadius.circular(Tokens.controlBarRadius);
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +52,9 @@ class AppDialog extends StatelessWidget {
           child: ClipRRect(
             borderRadius: _panelRadius,
             child: BackdropFilter(
-              filter: GlassTier.thick.blurFilter,
+              // v0.0.5: 与控制栏同档模糊 (GlassTier.normal) — thick 已与
+              // normal 合并同值, 引用收敛到控制栏单一档位, 消除档位分叉.
+              filter: GlassTier.normal.blurFilter,
               child: EdgeGlow(
                 borderRadius: _panelRadius,
                 child: Container(

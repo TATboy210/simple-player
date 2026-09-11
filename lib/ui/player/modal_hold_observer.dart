@@ -11,7 +11,14 @@ import 'package:flutter/material.dart';
 /// navigator — showDialog/showMenu 默认都走 root).
 class ModalHoldObserver extends NavigatorObserver {
   /// 打开中的模态弹层数量 — 全局单一数据源.
+  ///
+  /// 消费方 [AutoHideController.modalOpen] (经 PlayerVideoControls 三源
+  /// 合成之一) 读本计数决定是否冻结控制栏自动隐藏.
   static final ValueNotifier<int> openModalCount = ValueNotifier<int>(0);
+
+  /// 重置计数 (仅供测试隔离 — 跨测试的静态计数器会互相污染).
+  @visibleForTesting
+  static void resetForTesting() => openModalCount.value = 0;
 
   static bool _isModal(Route<Object?> route) => route is PopupRoute<Object?>;
 
