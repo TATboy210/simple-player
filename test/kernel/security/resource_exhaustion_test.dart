@@ -4,11 +4,14 @@
 /// without unbounded memory growth, file handle leaks, or denial-of-service.
 ///
 /// Five attack surfaces:
-///   1. Memory pressure — massive playlist, repeated engine opens
+///   1. Memory pressure — repeated engine opens
 ///   2. File handle exhaustion — rapid open/close cycles
 ///   3. Callback accumulation — ValueNotifier listener flood
 ///   4. Path validation performance — malicious path flood (no ReDoS)
-///   5. Queue exhaustion — generation superseding, playlist bounds
+///   5. Generation guard exhaustion — superseded operations discarded
+///
+/// Uses FakeEngine — no libmpv FFI, headless CI safe.
+/// (v0.0.5: 旧 Playlist 压力测试随自研队列删除 — 队列权威移交 mpv 原生 playlist.)
 ///
 /// Uses FakeEngine + Playlist directly — no mdk.dll FFI, headless CI safe.
 library;
@@ -17,8 +20,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/models/play_mode.dart';
-import 'package:simple_player_flutter/kernel/playlist/playlist.dart';
 import 'package:simple_player_flutter/kernel/services/path_validator.dart';
 
 import '../../helpers/fake_engine.dart';
@@ -36,37 +37,6 @@ void main() {
   // ────────────────────────────────────────────────────────────────────────────
 
   group('Memory pressure', () {
-    test('Playlist handles 100,000 items without error', () {
-      final playlist = Playlist();
-      const count = 100000;
-
-      // 添加 100k 条目 — 验证不抛异常、长度正确
-      for (var i = 0; i < count; i++) {
-        playlist.add('C:\\media\\video_$i.mp4');
-      }
-
-      expect(playlist.length, count);
-      expect(playlist.currentIndex, 0);
-      expect(playlist.current?.path, 'C:\\media\\video_0.mp4');
-
-      // 导航到末尾 — 确保 peekNext 不越界
-      playlist.currentIndex = count - 1;
-      expect(playlist.peekNext(), 0); // loopAll 回绕
-
-      // 删除操作在大列表上不崩溃
-      playlist.removeAt(count - 1);
-      expect(playlist.length, count - 1);
-    });
-
-    test('Playlist.addAll with 100,000 items completes', () {
-      final playlist = Playlist();
-      final paths = List.generate(100000, (i) => 'C:\\media\\bulk_$i.mp4');
-
-      playlist.addAll(paths);
-
-      expect(playlist.length, 100000);
-    });
-
     test('FakeEngine handles repeated open without close', () async {
       // 模拟"打开 1000 个文件但从不关闭" — 引擎应只保留最后一个
       final engine = FakeEngine();
@@ -344,10 +314,10 @@ void main() {
   });
 
   // ────────────────────────────────────────────────────────────────────────────
-  // 5. Queue Exhaustion
+  // 5. Generation Guard Exhaustion
   // ────────────────────────────────────────────────────────────────────────────
 
-  group('Queue exhaustion', () {
+  group('Generation guard exhaustion', () {
     test(
       'FakeEngine generation guard — superseded operations discarded',
       () async {
@@ -375,60 +345,5 @@ void main() {
         engine.dispose();
       },
     );
-
-    test('Playlist operations on empty playlist — no crash', () {
-      final playlist = Playlist();
-
-      expect(playlist.length, 0);
-      expect(playlist.isEmpty, isTrue);
-      expect(playlist.current, isNull);
-      expect(playlist.hasNext, isFalse);
-      expect(playlist.hasPrevious, isFalse);
-      expect(playlist.peekNext(), -1);
-      expect(playlist.peekPrevious(), -1);
-
-      // removeAt on empty — 安全
-      expect(playlist.removeAt(0), isFalse);
-
-      // clear on empty — 安全
-      playlist.clear();
-      expect(playlist.length, 0);
-    });
-
-    test('Playlist rapid add/remove — index stays consistent', () {
-      final playlist = Playlist();
-
-      // 添加 1000 项
-      for (var i = 0; i < 1000; i++) {
-        playlist.add('C:\\media\\item_$i.mp4');
-      }
-      expect(playlist.length, 1000);
-
-      // 删除所有偶数索引
-      for (var i = 999; i >= 0; i -= 2) {
-        playlist.removeAt(i);
-      }
-      expect(playlist.length, 500);
-
-      // currentIndex 自动调整 — 不越界
-      expect(playlist.currentIndex, lessThan(playlist.length));
-      expect(playlist.currentIndex, greaterThanOrEqualTo(0));
-    });
-
-    test('Playlist shuffle mode with massive list — peekNext terminates', () {
-      final playlist = Playlist();
-      playlist.mode = PlayMode.shuffle;
-
-      for (var i = 0; i < 10000; i++) {
-        playlist.add('C:\\media\\shuffle_$i.mp4');
-      }
-      playlist.currentIndex = 5000;
-
-      // shuffle 的 do-while 循环在 >1 项时必须终止
-      final next = playlist.peekNext();
-      expect(next, isNot(-1));
-      expect(next, isNot(5000)); // shuffle 不返回自身
-      expect(next, inInclusiveRange(0, 9999));
-    });
   });
 }
