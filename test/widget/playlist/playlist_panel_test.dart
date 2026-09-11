@@ -190,16 +190,17 @@ void main() {
       );
       await tester.pump();
 
-      // 续播按钮禁用态 — 图标 alpha 减弱且不可点.
-      final resumeButton = tester.widget<InkWell>(
+      // v0.0.5 塑料膜按钮: 续播分区禁用 — GestureDetector.onTap 为 null
+      // (点击穿透无响应).
+      final resumeGesture = tester.widget<GestureDetector>(
         find
             .ancestor(
               of: find.byIcon(Icons.replay),
-              matching: find.byType(InkWell),
+              matching: find.byType(GestureDetector),
             )
             .first,
       );
-      expect(resumeButton.onTap, isNull);
+      expect(resumeGesture.onTap, isNull);
 
       await tester.tap(find.byType(PlaylistTile));
       await tester.pump();

@@ -10,17 +10,15 @@ import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
 
-/// 播放列表面板 — 右侧竖条, 无边框沉浸式蓝色毛玻璃 (v0.0.5 重设计).
+/// 播放列表面板 — 右侧竖条, 控制栏同款圆角玻璃 (v0.0.5).
 ///
-/// Playlist side panel — right-edge vertical strip with borderless
-/// blue-tinted glassmorphism. 避开控制栏区域, 与控制栏同屏共存.
+/// Playlist side panel — right-edge vertical strip with control-bar-grade
+/// rounded glassmorphism. 底部避开控制栏区域, 与控制栏同屏共存.
 ///
-/// 动画设计(用户钦定"从右向左蔓延"):
-/// - 面板外壳 [ClipRect] + `Align(widthFactor)` — 打开时从右缘向左蔓延揭示,
-///   关闭反向收回; [Curves.easeOutCubic] 蔓延缓动;
-/// - 条目 [Opacity] + `Transform.translate` — 从右向左缓进显现, 与面板
-///   蔓延共用同一 [AnimationController] 时间轴(按索引 [Interval] 交错),
-///   滚动懒加载的条目在动画结束后直通(不重播).
+/// 动画: 控制栏同款渐进渐退 (FadeTransition + easeInOut +
+/// durationControlsFade); 渐入渐出期间 BackdropFilter 采样随透明度启停
+/// (消除与视频纹理混合的闪烁); IgnorePointer 锚定 [visible] — 关闭瞬间
+/// 让出命中, 杜绝渐退中"虚空点击".
 class PlaylistPanel extends StatefulWidget {
   /// 队列条目视图 (协调器逻辑队列, 断点元数据已合并).
   final ValueListenable<List<PlaylistItem>> entries;
@@ -103,35 +101,48 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   Widget build(BuildContext context) {
-    // 控制栏同款渐进渐退 — FadeTransition 驱动, dismissed(完全收回)后
-    // 让出命中 (与控制栏 _onAnimStatus dismissed 同语义).
+    // 控制栏同款渐进渐退 — FadeTransition 驱动.
+    // IgnorePointer 锚定 widget.visible (而非动画状态): 关闭瞬间立即让出
+    // 命中, 根治"面板渐退中还能虚空点击条目触发播放"的竞态;
+    // RepaintBoundary 隔离重绘, BackdropFilter 采样随透明度启停 —
+    // 消除渐入渐出时玻璃采样与视频纹理逐帧混合的"一闪一闪".
     return IgnorePointer(
-      ignoring: _controller.status == AnimationStatus.dismissed,
-      child: FadeTransition(
-        opacity: _fade,
-        child: SizedBox(
-          width: _panelWidth,
-          child: _buildShell(context),
+      ignoring: !widget.visible,
+      child: RepaintBoundary(
+        child: FadeTransition(
+          opacity: _fade,
+          child: SizedBox(width: _panelWidth, child: _buildShell(context)),
         ),
       ),
     );
   }
 
   /// 控制栏同款玻璃壳 — ControlBarDecoration.playing 装饰 (深色毛玻璃 +
-  /// 蓝色微光边框 + 4-shadow) + 圆角与边框全部对齐控制栏 (v0.0.5 用户钦定:
-  /// 弃右侧渐变模糊, 回归控制栏设计语言).
+  /// 蓝色微光边框 + 4-shadow) + 圆角与边框全部对齐控制栏.
+  ///
+  /// BackdropFilter 采样随透明度启停 (对齐控制栏 _withBlur 的"透明尾部
+  /// 停用滤镜"策略) — 不可见/半透明过渡期不做全区域 GPU readback,
+  /// 这是面板渐入渐出闪烁的根源修复.
   Widget _buildShell(BuildContext context) {
-    return Container(
-      decoration: ControlBarDecoration.playing(
-        borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-        child: BackdropFilter(
-          filter: GlassTier.normal.blurFilter,
-          child: _buildContent(context),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _fade,
+      builder: (_, child) {
+        final opacity = _fade.value;
+        return Container(
+          decoration: ControlBarDecoration.playing(
+            borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+            child: BackdropFilter(
+              filter: GlassTier.normal.blurFilter,
+              enabled: opacity >= 0.01,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: _buildContent(context),
     );
   }
 
