@@ -62,22 +62,63 @@ void main() {
       ),
     );
 
-    testWidgets('初始不可见 — 蔓延时间轴为 0 (widthFactor 零宽)', (tester) async {
+    testWidgets('初始不可见 — fade 时间轴为 0 且不响应命中', (tester) async {
       await tester.pumpWidget(buildPanel(visible: false));
 
-      // Align widthFactor 由 controller 驱动 — 初始 value=0 → 零宽无命中.
-      final align = tester.widget<Align>(find.byType(Align).first);
-      expect(align.widthFactor, 0);
+      // IgnorePointer + FadeTransition(opacity 0) — 控制栏同款渐进渐退.
+      // 面板自身 IgnorePointer 是其子树最浅层 (外部框架/子组件内也有).
+      expect(
+        tester
+            .widgetList<IgnorePointer>(
+              find.descendant(
+                of: find.byType(PlaylistPanel),
+                matching: find.byType(IgnorePointer),
+              ),
+            )
+            .first
+            .ignoring,
+        isTrue,
+      );
+      // 子组件 (GlassButton 等) 也有 FadeTransition — 面板自身的是最外层.
+      final fade = tester
+          .widgetList<FadeTransition>(
+            find.descendant(
+              of: find.byType(PlaylistPanel),
+              matching: find.byType(FadeTransition),
+            ),
+          )
+          .first;
+      expect(fade.opacity.value, 0);
     });
 
-    testWidgets('visible 翻转触发 forward 动画 — 最终完全展开', (tester) async {
+    testWidgets('visible 翻转触发 forward 动画 — 最终完全显示', (tester) async {
       await tester.pumpWidget(buildPanel(visible: false));
       // 翻转可见性 — 状态动画需重建 widget 才触发 didUpdateWidget.
       await tester.pumpWidget(buildPanel(visible: true));
       await tester.pumpAndSettle();
 
-      final align = tester.widget<Align>(find.byType(Align).first);
-      expect(align.widthFactor, 1);
+      expect(
+        tester
+            .widgetList<IgnorePointer>(
+              find.descendant(
+                of: find.byType(PlaylistPanel),
+                matching: find.byType(IgnorePointer),
+              ),
+            )
+            .first
+            .ignoring,
+        isFalse,
+      );
+      // 子组件 (GlassButton 等) 也有 FadeTransition — 面板自身的是最外层.
+      final fade = tester
+          .widgetList<FadeTransition>(
+            find.descendant(
+              of: find.byType(PlaylistPanel),
+              matching: find.byType(FadeTransition),
+            ),
+          )
+          .first;
+      expect(fade.opacity.value, 1);
     });
 
     testWidgets('点击条目触发 onPlayEntry 并带索引', (tester) async {
