@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   bitsdojo_window_linux
   desktop_drop
+  fc_native_video_thumbnail
   flutter_secure_storage_linux
   media_kit_libs_linux
   media_kit_video

@@ -10,7 +10,9 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/window_bridge/window_bridge.dart';
+import '../playlist/playlist_panel.dart';
 import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
 import 'auto_hide_controller.dart';
@@ -246,6 +248,8 @@ Widget playerVideoControls(
   required PlayerActions actions,
   required ValueListenable<String> currentFileName,
   required ValueListenable<WindowMode> windowMode,
+  ValueNotifier<bool>? playlistVisible,
+  PlaylistCoordinator? playlistCoordinator,
   Widget? emptyState,
   ValueListenable<bool>? resizing,
 }) {
@@ -255,6 +259,8 @@ Widget playerVideoControls(
     actions: actions,
     currentFileName: currentFileName,
     windowMode: windowMode,
+    playlistVisible: playlistVisible,
+    playlistCoordinator: playlistCoordinator,
     emptyState: emptyState,
     resizing: resizing,
   );
@@ -303,6 +309,16 @@ class PlayerVideoControls extends StatefulWidget {
   /// 必然提交状态,图标/标题栏/cursor 同步还原,不依赖 Video 重建时序。
   final ValueListenable<WindowMode> windowMode;
 
+  /// 播放列表面板可见性 (v0.0.5) — 宿主持有的共享 notifier.
+  ///
+  /// 面板住进 controls builder:media_kit 全屏 route 复制 builder 时自动
+  /// 携带本控件 → 面板全屏可见(与控制栏同机制);共享同一 notifier 使
+  /// 窗口态/全屏两实例状态同步。null 时面板整体不挂载(测试退路).
+  final ValueNotifier<bool>? playlistVisible;
+
+  /// 播放列表协调器 — 面板数据源与动作入口。null 时面板不挂载.
+  final PlaylistCoordinator? playlistCoordinator;
+
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter。
   final ValueListenable<bool>? resizing;
 
@@ -317,6 +333,8 @@ class PlayerVideoControls extends StatefulWidget {
     required this.actions,
     required this.currentFileName,
     required this.windowMode,
+    this.playlistVisible,
+    this.playlistCoordinator,
     this.emptyState,
     this.resizing,
     this.onBuild,
@@ -577,6 +595,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   }
 
   void _handleTap() {
+    // v0.0.5: 播放列表面板可见时点击视频区(面板外)先关面板 —
+    // 点外关闭语义, 不触发双击全屏/隐藏判定.
+    final visibleNotifier = widget.playlistVisible;
+    if (visibleNotifier != null && visibleNotifier.value) {
+      visibleNotifier.value = false;
+      return;
+    }
     if (_clickTimer?.isActive ?? false) {
       // 第二次点击在延迟内 → 双击,切换全屏
       _clickTimer?.cancel();
@@ -885,6 +910,37 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         children: [
           // 空状态与手势共享判定，但不会触发其余 overlay 重建。
           Positioned.fill(child: _buildEmptyAndGesture()),
+          // v0.0.5 播放列表面板 — 右侧竖条, 避开控制栏区域; 手势层在其
+          // 下方, 点击面板外(视频区)经 _handleTap 关闭面板. 全屏 route
+          // 复制 builder 时自动携带 → 全屏可见(与控制栏同机制).
+          if (widget.playlistCoordinator != null)
+            ValueListenableBuilder<bool>(
+              valueListenable: widget.playlistVisible!,
+              builder: (_, visible, _) => Positioned(
+                right: 0,
+                top: 0,
+                bottom:
+                    Tokens.controlBarMarginBottom +
+                    Tokens.controlBarHeight +
+                    Tokens.spMd,
+                child: PlaylistPanel(
+                  entries: widget.playlistCoordinator!.entries,
+                  currentIndex: widget.playlistCoordinator!.currentIndex,
+                  visible: visible,
+                  onClose: () => widget.playlistVisible!.value = false,
+                  onPlayEntry: (index) => unawaited(
+                    widget.playlistCoordinator!.playEntryAt(index),
+                  ),
+                  onRemoveEntry: (index) => unawaited(
+                    widget.playlistCoordinator!.removeEntryAt(index),
+                  ),
+                  playMode: widget.playlistCoordinator!.playMode,
+                  onCyclePlayMode: () => unawaited(
+                    widget.playlistCoordinator!.cyclePlayMode(),
+                  ),
+                ),
+              ),
+            ),
           RepaintBoundary(
             child: Stack(
               children: [

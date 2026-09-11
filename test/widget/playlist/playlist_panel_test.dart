@@ -1,6 +1,6 @@
-/// 播放列表 UI 组件测试 (v0.0.5 Phase 4).
+/// 播放列表 UI 组件测试 (v0.0.5 竖条重设计).
 ///
-/// PlaylistPanel 开合/高亮/回调 + PlaylistTile 断点进度条/右键动作.
+/// PlaylistPanel 蔓延动画/条目 stagger/回调 + PlaylistTile 断点进度条/点击.
 /// 数据源直接构造 ValueNotifier — 无需协调器与引擎.
 library;
 
@@ -57,30 +57,25 @@ void main() {
         onRemoveEntry: onRemoveEntry ?? (_) {},
         playMode: playMode,
         onCyclePlayMode: onCyclePlayMode ?? () {},
-        availableWidth: 800,
       ),
     );
 
-    testWidgets('visible=false 时 IgnorePointer 且透明', (tester) async {
+    testWidgets('初始不可见 — 蔓延时间轴为 0 (widthFactor 零宽)', (tester) async {
       await tester.pumpWidget(buildPanel(visible: false));
 
-      // 框架其他位置可能也有 AnimatedOpacity — 只取 PlaylistPanel 子树内的.
-      final panel = find.byType(PlaylistPanel);
-      final opacity = tester
-          .widgetList<AnimatedOpacity>(
-            find.descendant(of: panel, matching: find.byType(AnimatedOpacity)),
-          )
-          .first;
-      expect(opacity.opacity, 0);
-      expect(
-        tester
-            .widgetList<IgnorePointer>(
-              find.descendant(of: panel, matching: find.byType(IgnorePointer)),
-            )
-            .first
-            .ignoring,
-        isTrue,
-      );
+      // Align widthFactor 由 controller 驱动 — 初始 value=0 → 零宽无命中.
+      final align = tester.widget<Align>(find.byType(Align).first);
+      expect(align.widthFactor, 0);
+    });
+
+    testWidgets('visible 翻转触发 forward 动画 — 最终完全展开', (tester) async {
+      await tester.pumpWidget(buildPanel(visible: false));
+      // 翻转可见性 — 状态动画需重建 widget 才触发 didUpdateWidget.
+      await tester.pumpWidget(buildPanel(visible: true));
+      await tester.pumpAndSettle();
+
+      final align = tester.widget<Align>(find.byType(Align).first);
+      expect(align.widthFactor, 1);
     });
 
     testWidgets('点击条目触发 onPlayEntry 并带索引', (tester) async {
@@ -94,15 +89,13 @@ void main() {
       expect(played, [1]);
     });
 
-    testWidgets('当前条目索引驱动高亮重建', (tester) async {
+    testWidgets('条目纵列渲染 — 索引高亮刷新不抛异常', (tester) async {
       await tester.pumpWidget(buildPanel());
       await tester.pumpAndSettle();
 
       currentIndex.value = 1;
       await tester.pump();
 
-      // 高亮路径经 ValueListenableBuilder — 索引变化不抛异常即链路通畅;
-      // 视觉断言在 PlaylistTile 高亮描边测试覆盖.
       expect(find.byType(PlaylistTile), findsNWidgets(2));
     });
   });
@@ -112,7 +105,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           SizedBox(
-            width: 200,
+            width: 320,
             child: PlaylistTile(
               item: PlaylistItem(
                 path: 'a.mp4',
@@ -130,9 +123,11 @@ void main() {
 
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(
-        tester.widget<LinearProgressIndicator>(
-          find.byType(LinearProgressIndicator),
-        ).value,
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byType(LinearProgressIndicator),
+            )
+            .value,
         closeTo(1 / 3, 0.001),
       );
     });
@@ -142,7 +137,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           SizedBox(
-            width: 200,
+            width: 320,
             child: PlaylistTile(
               item: PlaylistItem(path: 'a.mp4'),
               isCurrent: false,
