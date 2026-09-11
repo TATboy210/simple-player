@@ -211,6 +211,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get play => 'Play';
 
   @override
+  String get resumePlayback => 'Resume from breakpoint';
+
+  @override
   String get pause => 'Pause';
 
   @override

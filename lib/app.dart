@@ -7,6 +7,7 @@ import 'kernel/window_bridge/window_manager_service.dart';
 import 'l10n/app_localizations.dart';
 import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_card_host.dart';
+import 'ui/player/modal_hold_observer.dart';
 import 'ui/theme/tokens.dart';
 
 /// 应用壳 — MaterialApp、固定主题与本地化。
@@ -67,6 +68,8 @@ class App extends StatelessWidget {
           theme: theme,
           darkTheme: theme,
           themeMode: ThemeMode.dark,
+          // v0.0.5: 模态路由观察 — 控制栏自动隐藏在设置/菜单开启期间冻结.
+          navigatorObservers: [ModalHoldObserver()],
           home: _buildPlayerHome(context),
           builder: (context, navigator) =>
               buildErrorCardMount(context, navigator, mode: windowService.mode),

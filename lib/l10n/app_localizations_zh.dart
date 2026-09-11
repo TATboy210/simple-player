@@ -211,6 +211,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get play => '播放';
 
   @override
+  String get resumePlayback => '断点续播';
+
+  @override
   String get pause => '暂停';
 
   @override

@@ -494,6 +494,12 @@ abstract class AppLocalizations {
   /// **'Play'**
   String get play;
 
+  /// No description provided for @resumePlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume from breakpoint'**
+  String get resumePlayback;
+
   /// Tooltip for pause button
   ///
   /// In en, this message translates to:
