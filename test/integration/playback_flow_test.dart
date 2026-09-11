@@ -22,8 +22,9 @@ void main() {
     test('open file starts playback', () async {
       await controller.openAndPlay('C:/test.mp4');
       expect(engine.state.value, MediaState.playing);
-      expect(engine.openCallCount, 1);
-      expect(engine.openPaths, ['C:/test.mp4']);
+      // v0.0.5: openAndPlay 走队列装载 (扫描退化 → 单元素队列).
+      expect(engine.openPlaylistCallCount, 1);
+      expect(engine.lastOpenPlaylistPaths, ['C:/test.mp4']);
     });
 
     test('seek updates position', () async {

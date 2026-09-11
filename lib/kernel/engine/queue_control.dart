@@ -61,6 +61,13 @@ abstract class QueueControl {
   /// 当前播放条目索引; 空队列 / 无媒体为 -1.
   ValueNotifier<int> get queueIndex;
 
+  /// 队列状态代数 — [queuePaths] / [queueIndex] 任一变更后递增.
+  ///
+  /// 单通知点: paths 与 index 是两次独立赋值, 分开监听会读到"新列表+旧索引"
+  /// 的中间态 (整队列替换时产生虚假切曲). 需要原子观察两者一致状态的服务层
+  /// 只监听本 notifier, 触发时再读两者即为一致快照.
+  ValueNotifier<int> get queueRevision;
+
   /// 当前播放模式 — 引擎为单一数据源, Coordinator 重启恢复时经 [setPlayMode] 写回.
   ValueNotifier<PlayMode> get playMode;
 }

@@ -1,16 +1,15 @@
-/// Services 层播放控制模块 — 单文件播放器门面
+/// Services 层播放控制模块 — 打开与播放门面（v0.0.5 起队列感知）.
 ///
-/// 本文件实现 [PlaybackController] 作为单文件播放器运行时能力的统一入口，
-/// UI 层只与本类交互。
+/// 本文件实现 [PlaybackController] 作为播放运行时能力的统一入口，UI 层只与本类交互。
 ///
 /// 架构位置：PlayerViewModel → **PlaybackController** → MediaEngine
 /// 设计模式：Facade（门面模式）— 简化 UI 层对播放能力的调用路径
 ///
-/// v1.8 重写：移除播放队列/历史/断点/播放模式，回归单文件播放。
-/// - 打开：[openAndPlay] 内联路径校验 + engine.open + OpenResult 分发
-/// - 播完：engine completed 不主动处理（播完停止，符合产品决策）
-/// - 状态：音量/静音由引擎默认值管理（用户设置已移除）
-/// - 当前媒体：[currentPath] / [currentFileName] ValueNotifier 驱动 UI
+/// v0.0.5 打开语义（用户拍板「自动装载同目录」）:
+/// - 打开单个本地视频 → 扫描同目录视频文件装进队列（[FolderScanner] 排序）,
+///   从该文件起播（相册式体验）; 队列权威在 mpv 原生 playlist.
+/// - URL / 扫描失败 / 目标不在扫描结果 → 退化为单元素队列.
+/// - 拖入多文件的批量装载不经本类（调用方直接走 [QueueControl.openPlaylist]）.
 library;
 
 import 'dart:async';
@@ -19,6 +18,7 @@ import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
 import '../engine/engine_state.dart';
+import '../scanner/folder_scanner.dart';
 import '../utils/debug_probe.dart';
 import '../utils/path_utils.dart';
 import 'path_validator.dart';
@@ -27,10 +27,10 @@ import 'track_preference_service.dart';
 
 final _log = KernelLogger.I;
 
-/// 播放控制器 — 单文件播放器运行时能力的统一门面入口
+/// 播放控制器 — 播放运行时能力的统一门面入口
 ///
 /// 职责划分：
-/// - 打开并播放：[openAndPlay]（路径校验 → engine.open → OpenResult 分发）
+/// - 打开并播放：[openAndPlay]（路径校验 → 同目录装载 → OpenResult 分发）
 /// - 停止卸载：[stopCurrentMedia]
 /// - 播放/暂停：pause / play / isPlaying 薄委托（无打开流程交互）
 ///
@@ -81,6 +81,12 @@ class PlaybackController {
   /// Error callback invoked by sub-modules.
   void Function(PlayerError error)? get onError => _onError;
 
+  /// 打开请求代数 — [openAndPlay] 在"校验→同目录扫描→装载"之间存在真实
+  /// IO 窗口 ([FolderScanner.scan]), 引擎 generation 只覆盖最后一段;
+  /// 本计数器在扫描窗口内淘汰旧请求 ([stopCurrentMedia] 同样递增),
+  /// 防止"停止后扫描完成又把媒体装回"的竞争.
+  int _openRequestGeneration = 0;
+
   /// 获取字幕服务（可能为 null）.
   ///
   /// Returns the subtitle service, or null if not configured.
@@ -119,17 +125,22 @@ class PlaybackController {
   /// 位置边界由 [MediaEngine] clamp，默认快进 10 秒。
   void skipForward([int ms = 10000]) => engine.skipForward(ms);
 
-  // ── 单文件播放 ──
+  // ── 打开与播放（v0.0.5: 同目录自动装载队列）──
 
-  /// 打开并播放单个文件 — 完整打开流程（路径校验 → engine.open → 副作用提交）.
+  /// 打开并播放文件 — 完整打开流程（路径校验 → 同目录装载 → 副作用提交）.
   ///
-  /// 并发安全由引擎 [OpenResult] 契约表达：较新的打开请求使旧请求返回
-  /// [OpenSuperseded]，本方法据此跳过旧请求的副作用（字幕检测 / 标题更新等），
-  /// 无需自维护 generation 计数器。
+  /// 装载语义: 本地视频扫描同目录视频文件成队列, 从该文件起播;
+  /// URL/扫描退化 → 单元素队列. 队列权威在 mpv, 面板视图由
+  /// [PlaylistCoordinator] 随引擎镜像自动同步, 本类无需通知它.
+  ///
+  /// 并发安全分两层: 引擎 [OpenResult] 契约覆盖装载段（旧请求返回
+  /// [OpenSuperseded]）; 本类 `_openRequestGeneration` 覆盖扫描 IO 窗口
+  /// （新请求/停止使旧请求在进引擎前淘汰）. 淘汰的请求不发布任何副作用.
   ///
   /// 返回 true 表示成功打开并开始播放；
   /// false 表示校验失败 / 打开错误 / 被更新请求淘汰。
   Future<bool> openAndPlay(String path) async {
+    final requestGen = ++_openRequestGeneration;
     final validationMsg = PathValidator.validate(path);
     if (validationMsg != null) {
       validationError.value = validationMsg;
@@ -138,9 +149,20 @@ class PlaybackController {
     }
     validationError.value = null;
 
-    final result = await engine.open(path);
+    // 同目录装载（毫秒级: FolderScanner 流式扫描 + mpv loadlist 整体装载）;
+    // 失败/退化路径均归一为单元素队列, 不阻断打开.
+    final queuePaths = await _buildQueuePaths(path);
+    // 扫描 IO 窗口内被新请求或停止淘汰 → 不进引擎, 也不发布任何状态.
+    if (requestGen != _openRequestGeneration) return false;
+    final startIndex = _locateInQueue(queuePaths, path);
+    final result = await engine.openPlaylist(
+      queuePaths,
+      startIndex: startIndex < 0 ? 0 : startIndex,
+    );
     switch (result) {
       case OpenSuccess():
+        // 装载成功后再查代数 — 引擎装载期间到达的停止/新请求使本请求过期.
+        if (requestGen != _openRequestGeneration) return false;
         // 字幕检测不影响主播放链路，失败仅记录诊断信息。
         unawaited(
           subtitleService?.detectAndLoad(path).catchError((Object error) {
@@ -161,11 +183,48 @@ class PlaybackController {
     }
   }
 
-  /// 停止并卸载当前媒体。
+  /// 构造装载队列: URL → 单元素; 本地文件 → 同目录视频扫描（文件名升序）.
+  /// 目标不在扫描结果（权限/时序等异常）→ 退化为单元素队列, 打开绝不因此失败.
+  static Future<List<String>> _buildQueuePaths(String path) async {
+    if (_isNetworkPath(path)) return <String>[path];
+    final scanned = await FolderScanner.scan(FolderScanner.directoryOf(path));
+    if (scanned.isEmpty) return <String>[path];
+    final paths = <String>[for (final file in scanned) file.path];
+    if (_locateInQueue(paths, path) < 0) return <String>[path];
+    return paths;
+  }
+
+  /// 在队列中定位目标文件（startIndex 来源）.
+  /// 三层回退: 精确匹配 → 大小写不敏感（Windows 语义）→ 文件名匹配;
+  /// 全部未命中返回 -1（调用方回退 0）.
+  static int _locateInQueue(List<String> paths, String path) {
+    var index = paths.indexOf(path);
+    if (index >= 0) return index;
+    final lowerPath = path.toLowerCase();
+    index = paths.indexWhere((candidate) => candidate.toLowerCase() == lowerPath);
+    if (index >= 0) return index;
+    final base = PathUtils.basename(path).toLowerCase();
+    return paths.indexWhere(
+      (candidate) => PathUtils.basename(candidate).toLowerCase() == base,
+    );
+  }
+
+  /// 是否网络流地址（PathValidator 同款 scheme 语义）— 不做同目录扫描.
+  static bool _isNetworkPath(String path) {
+    const schemes = <String>['http://', 'https://', 'rtsp://', 'rtmp://'];
+    for (final scheme in schemes) {
+      if (path.startsWith(scheme)) return true;
+    }
+    return false;
+  }
+
+  /// 停止并卸载当前媒体.
   ///
   /// 只有引擎确认媒体已卸载时才清空活动标题与路径；停止失败会保留标题，
-  /// 使 UI 与仍可恢复的底层媒体状态保持一致。
+  /// 使 UI 与仍可恢复的底层媒体状态保持一致.
+  /// 递增请求代数 — 淘汰正卡在扫描窗口里的 [openAndPlay]（防"停止后又装回"）.
   Future<void> stopCurrentMedia() async {
+    _openRequestGeneration++;
     await engine.stop();
     if (engine.hasMedia) return;
     currentFileName.value = '';
