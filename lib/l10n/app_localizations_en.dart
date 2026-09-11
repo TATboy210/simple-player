@@ -58,16 +58,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutMute => 'Toggle Mute';
 
   @override
-  String get shortcutNext => 'Next Track';
+  String get shortcutNext => 'Next';
 
   @override
-  String get shortcutPrevious => 'Previous Track';
+  String get shortcutPrevious => 'Previous';
 
   @override
   String get shortcutOpenFile => 'Open File';
 
   @override
   String get shortcutSubtitle => 'Toggle Subtitle';
+
+  @override
+  String get shortcutPlaylist => 'Toggle Playlist';
 
   @override
   String get shortcutSubtitleDelay => 'Subtitle Delay +/- 500ms';

@@ -9,11 +9,14 @@ import '../../kernel/window_bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/models/play_mode.dart';
 import '../../kernel/services/playback_controller.dart';
+import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/services/subtitle_path_validator.dart';
 import '../theme/tokens.dart';
 import '../dialogs/settings/settings_dialog.dart';
 import '../window/custom_title_bar.dart';
+import '../playlist/playlist_panel.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
@@ -42,6 +45,10 @@ class PlayerScreen extends StatefulWidget {
   final VideoControlsPort? testVideoControls;
 
   final PlaybackController controller;
+
+  /// 播放列表协调器 (v0.0.5) — 面板数据源与队列动作入口.
+  /// null 时面板与切曲入口整体隐藏 (测试/单文件退路).
+  final PlaylistCoordinator? playlistCoordinator;
   final WindowBridge windowService;
   final Map<String, String> customBindings;
   final VoidCallback? onOpenFile;
@@ -63,6 +70,7 @@ class PlayerScreen extends StatefulWidget {
     this.videoSurfaceBuilder,
     this.testVideoControls,
     required this.controller,
+    this.playlistCoordinator,
     required this.windowService,
     this.customBindings = const {},
     this.onOpenFile,
@@ -100,6 +108,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 状态继续由 PlayerVideoControls 订阅的 stream/listenable 驱动。
   late final PlayerActions _actions;
 
+  /// 播放列表面板可见性 (v0.0.5) — L 键/按钮/点外/Esc 切换.
+  bool _playlistVisible = false;
+
   /// 缓存标题栏 widget，避免窗口模式或 resize 导致父级 build 时重新创建标题栏子树。
   ///
   /// 标题栏内部仍自行监听窗口状态；这里只固定外层 widget identity，缩小无关
@@ -128,6 +139,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!isLoadable || !mounted) return;
 
     widget.engine.setExternalSubtitle(path);
+  }
+
+  /// 循环切换播放模式 — loopAll → loopSingle → shuffle → loopAll.
+  /// 写入走协调器 (引擎单一数据源), 图标随 engine.playMode notifier 自动刷新.
+  Future<void> _cyclePlayMode() async {
+    final coordinator = widget.playlistCoordinator;
+    if (coordinator == null) return;
+    const cycle = {
+      PlayMode.loopAll: PlayMode.loopSingle,
+      PlayMode.loopSingle: PlayMode.shuffle,
+      PlayMode.shuffle: PlayMode.loopAll,
+    };
+    final next = cycle[coordinator.playMode.value] ?? PlayMode.loopAll;
+    await coordinator.setPlayMode(next);
   }
 
   @override
@@ -164,6 +189,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onFilesDropped: (paths) => widget.onFilesDropped?.call(paths),
       onDragHoverChanged: (hovering) =>
           widget.onDragHoverChanged?.call(hovering),
+      // ── v0.0.5 播放列表 — coordinator 为 null 时全部隐藏 (测试退路) ──
+      onTogglePlaylist: widget.playlistCoordinator == null
+          ? null
+          : () => setState(() => _playlistVisible = !_playlistVisible),
+      onPreviousEntry: widget.playlistCoordinator == null
+          ? null
+          : () => widget.playlistCoordinator!.previous(),
+      onNextEntry: widget.playlistCoordinator == null
+          ? null
+          : () => widget.playlistCoordinator!.next(),
+      onCyclePlayMode: widget.playlistCoordinator == null
+          ? null
+          : () => unawaited(_cyclePlayMode()),
+      playMode: widget.playlistCoordinator?.playMode,
+      onEscapePressed: () {
+        if (!_playlistVisible) return false;
+        setState(() => _playlistVisible = false);
+        return true;
+      },
     );
     // 阶段2:字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱
     // (每实例调自己 VideoState),不再需本层 _onControlsVisibleChanged 联动.
@@ -254,6 +298,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   children: [
                     // v1.8 单文件模式不再维护播放列表侧栏，视频 surface 始终占满内容区。
                     RepaintBoundary(child: cachedVideoContent),
+                    // v0.0.5 播放列表浮窗 — 可见时铺点外关闭 barrier.
+                    // coordinator 为 null (测试) 时整体不挂载.
+                    if (widget.playlistCoordinator != null &&
+                        _playlistVisible)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () =>
+                              setState(() => _playlistVisible = false),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    if (widget.playlistCoordinator != null)
+                      PlaylistPanel(
+                        entries: widget.playlistCoordinator!.entries,
+                        currentIndex:
+                            widget.playlistCoordinator!.currentIndex,
+                        visible: _playlistVisible,
+                        onClose: () =>
+                            setState(() => _playlistVisible = false),
+                        onPlayEntry: (index) => unawaited(
+                          widget.playlistCoordinator!.playEntryAt(index),
+                        ),
+                        onRemoveEntry: (index) => unawaited(
+                          widget.playlistCoordinator!.removeEntryAt(index),
+                        ),
+                        playMode: widget.playlistCoordinator!.playMode,
+                        onCyclePlayMode: () => unawaited(_cyclePlayMode()),
+                        availableWidth: MediaQuery.sizeOf(context).width,
+                      ),
                   ],
                 ),
               ),

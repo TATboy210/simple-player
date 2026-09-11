@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import '../../kernel/window_bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/diagnostics/startup_timeline.dart';
+import '../../kernel/engine/engine_state.dart';
 import '../../kernel/player_services.dart';
 import '../../l10n/app_localizations.dart';
 import '../../ui/player/player_screen.dart';
@@ -100,7 +101,8 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   ///
   /// 初始化序列：
   /// 1. 调用 PlayerServices.init() — 初始化引擎、控制器与视频处理服务
-  /// 2. 打点 playerInit 并输出启动 Timeline 日志
+  /// 2. 恢复播放列表 (v0.0.5) — 从磁盘读队列/断点/模式, 不装载不自动播
+  /// 3. 打点 playerInit 并输出启动 Timeline 日志
   ///
   /// 错误处理：任何步骤失败都会捕获异常，设置 _error 状态显示错误 UI，
   /// 不会向上传播导致 App 崩溃。使用 Stopwatch 记录初始化耗时用于性能分析。
@@ -108,6 +110,8 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     final sw = Stopwatch()..start();
     try {
       await _services.init();
+      // 恢复失败仅记日志 (store 内部已容错), 不阻断初始化.
+      await _services.playlistCoordinator.restoreFromDisk();
     } catch (e, stackTrace) {
       KernelLogger.I.e(
         '[PlayerFeature] init failed: $e',
@@ -137,13 +141,32 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 快捷键触发同一单开会话语义。
   Future<void> _openFile() => _filePickerCoordinator.open();
 
-  /// 处理文件拖放事件，仅打开第一个路径。
+  /// 处理文件拖放事件 (v0.0.5 队列语义).
   ///
-  /// 拖放边界可能一次提供多个文件，但 v1.8 不再隐式建立播放队列；实际路径
-  /// 安全与媒体类型校验继续统一由 [PlaybackController.openAndPlay] 执行。
+  /// 单文件 → [PlaybackController.openAndPlay] (自动装载同目录队列);
+  /// 多文件 → 按拖入顺序整体装载队列并从第一个起播。路径安全校验统一
+  /// 由引擎装载前各层执行 (多文件路径交引擎镜像, 单文件走 controller 安检)。
   void _onFilesDropped(List<String> paths) {
     if (paths.isEmpty) return;
-    unawaited(_services.controller.openAndPlay(paths.first));
+    if (paths.length == 1) {
+      unawaited(_services.controller.openAndPlay(paths.first));
+      return;
+    }
+    unawaited(_openDroppedQueue(paths));
+  }
+
+  /// 多文件拖入 → 整体装载队列 (替换语义), 从第一个起播.
+  Future<void> _openDroppedQueue(List<String> paths) async {
+    final engine = _services.engine;
+    final result = await engine.openPlaylist(paths, startIndex: 0);
+    switch (result) {
+      case OpenSuccess():
+        engine.play();
+      case OpenError(:final error):
+        _services.controller.onError?.call(error);
+      case OpenSuperseded():
+        break;
+    }
   }
 
   @override
@@ -191,6 +214,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       engine: engine,
       mediaKitController: _services.mediaKitVideoController,
       controller: _services.controller,
+      playlistCoordinator: _services.playlistCoordinator,
       customBindings: _customBindings,
       windowService: _services.windowService,
       onOpenFile: () => unawaited(_openFile()),

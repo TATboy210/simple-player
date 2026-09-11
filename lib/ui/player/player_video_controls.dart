@@ -818,6 +818,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     onToggleMute: _controlsState.toggleMute,
     onSetVolume: _controlsState.setVolume,
     onSetRate: _controlsState.setRate,
+    // v0.0.5 队列步进 — null 时 CenterGroup 隐藏切曲按钮 (无协调器场景).
+    onPreviousEntry: widget.actions.onPreviousEntry,
+    onNextEntry: widget.actions.onNextEntry,
   );
 
   ///

@@ -58,16 +58,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutMute => '静音切换';
 
   @override
-  String get shortcutNext => '下一首';
+  String get shortcutNext => '下一个';
 
   @override
-  String get shortcutPrevious => '上一首';
+  String get shortcutPrevious => '上一个';
 
   @override
   String get shortcutOpenFile => '打开文件';
 
   @override
   String get shortcutSubtitle => '字幕开关';
+
+  @override
+  String get shortcutPlaylist => '开关播放列表';
 
   @override
   String get shortcutSubtitleDelay => '字幕延迟 +/- 500ms';
@@ -187,10 +190,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get close => '关闭';
 
   @override
-  String get previousTrack => '上一首';
+  String get previousTrack => '上一个';
 
   @override
-  String get nextTrack => '下一首';
+  String get nextTrack => '下一个';
 
   @override
   String get playlist => '播放列表';

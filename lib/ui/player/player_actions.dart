@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
+import '../../kernel/models/play_mode.dart';
 
 /// 播放器稳定回调集合，沿 `Video.controls` 构建链共享。
 class PlayerActions {
@@ -35,6 +37,26 @@ class PlayerActions {
   /// 拖拽悬停状态变化。
   final void Function(bool hovering)? onDragHoverChanged;
 
+  /// ── v0.0.5 播放列表 ──
+
+  /// L 键 / 控制栏按钮 — 开关播放列表面板。
+  final VoidCallback? onTogglePlaylist;
+
+  /// 跳到队列上一个条目。
+  final VoidCallback? onPreviousEntry;
+
+  /// 跳到队列下一个条目。
+  final VoidCallback? onNextEntry;
+
+  /// 循环切换播放模式 (loopAll → loopSingle → shuffle)。
+  final VoidCallback? onCyclePlayMode;
+
+  /// 当前播放模式 — 驱动模式按钮图标 (null 时按钮隐藏)。
+  final ValueListenable<PlayMode>? playMode;
+
+  /// Esc 键分派 — 面板可见时关闭面板并返回 true; 返回 false 走全屏退出。
+  final bool Function()? onEscapePressed;
+
   const PlayerActions({
     this.onPlayPause,
     this.onSeekBack,
@@ -47,5 +69,11 @@ class PlayerActions {
     this.onOpenSettings,
     this.onFilesDropped,
     this.onDragHoverChanged,
+    this.onTogglePlaylist,
+    this.onPreviousEntry,
+    this.onNextEntry,
+    this.onCyclePlayMode,
+    this.playMode,
+    this.onEscapePressed,
   });
 }

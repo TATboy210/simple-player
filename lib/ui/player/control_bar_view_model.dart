@@ -27,6 +27,8 @@ class ControlBarViewModel {
     required this.onToggleMute,
     required this.onSetVolume,
     required this.onSetRate,
+    this.onPreviousEntry,
+    this.onNextEntry,
   });
 
   /// 播放中(驱动播放/暂停图标)。
@@ -72,4 +74,12 @@ class ControlBarViewModel {
 
   /// 设置倍速。
   final void Function(double rate) onSetRate;
+
+  /// 跳到队列上一个条目 (v0.0.5) — 边界回绕语义由引擎裁定。
+  ///
+  /// null 表示无队列协调器 (单文件退路), CenterGroup 隐藏按钮。
+  final VoidCallback? onPreviousEntry;
+
+  /// 跳到队列下一个条目 (v0.0.5) — 边界回绕语义由引擎裁定。
+  final VoidCallback? onNextEntry;
 }
