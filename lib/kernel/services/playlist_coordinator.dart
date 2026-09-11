@@ -137,28 +137,28 @@ class PlaylistCoordinator {
 
   /// 断点续播指定索引条目 (v0.0.5) — 播放 + seek 到该条目的断点位置.
   ///
-  /// 装载场景下 duration 异步到达, seek 需等 duration > 0 (seekTo 的
-  /// idle/零时长守卫): 记入 [_pendingResumeMs], 由 [_trackDuration]
-  /// 在首个有效 duration 事件时补 seek. 已装载场景 (引擎 duration 已知)
-  /// 直接 seek, 无等待.
+  /// **时序竞态修复** (media_kit 文档查证): `seek` 只等播放器初始化, 不等
+  /// 新文件加载完成 — 装载/跳转后立即 seek 会被发到尚未切换的 mpv 状态
+  /// 而丢失. 因此无论装载还是已装载分支, 一律记入 [_pendingResumeMs] 挂起,
+  /// 由 [_trackPosition] 在"新条目开始播放"信号 (position 回到低位锁存区
+  /// 且时长有效) 时补 seek — loadfile 完成后首个 position 事件必然落位.
   Future<bool> resumeEntryAt(int index) async {
     final items = _entries.value;
     if (index < 0 || index >= items.length) return false;
     final resumeMs = items[index].positionMs ?? 0;
 
     final ok = await playEntryAt(index);
-    if (!ok || resumeMs <= 0) return ok;
-
-    if (_engine.duration.value > 0) {
-      unawaited(_engine.seekTo(resumeMs));
-    } else {
-      _pendingResumeMs = resumeMs; // duration 到达后由 _trackDuration 补 seek
-    }
+    if (!ok) return false;
+    if (resumeMs > 0) _pendingResumeMs = resumeMs;
     return true;
   }
 
   /// 待补的断点 seek 位置 — null = 无挂起请求.
   int? _pendingResumeMs;
+
+  /// 补 seek 的 position 低位锁存区 — 新条目开始播放时首个 position 事件
+  /// 必然低于此值; 超出即视为非起始态 (旧条目残留事件), 继续等待.
+  static const _resumeSeekLatchMs = 2000;
 
   /// 设置播放模式 — 引擎为模式单一数据源, 本类仅落盘.
   Future<void> setPlayMode(PlayMode mode) async {
@@ -293,6 +293,16 @@ class PlaylistCoordinator {
 
   void _trackPosition() {
     _lastKnownPositionMs = _engine.position.value;
+    // 断点续播补 seek — "新条目开始播放"锁存信号: position 落入低位区
+    // 且时长有效. 一次性消费 (置 null), 后续 seek 本身产生的 position
+    // 事件不会重复触发.
+    final pending = _pendingResumeMs;
+    if (pending != null &&
+        _lastKnownPositionMs < _resumeSeekLatchMs &&
+        _engine.duration.value > 0) {
+      _pendingResumeMs = null;
+      unawaited(_engine.seekTo(pending));
+    }
   }
 
   void _trackDuration() {

@@ -6,15 +6,19 @@ import '../../kernel/utils/path_utils.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/context_menu_row.dart';
-import '../shared/glass_container.dart';
 import '../shared/hover_glow.dart';
 import '../theme/tokens.dart';
 
-/// 播放列表条目卡 — 缩略图 + 右侧名称/断点信息 (v0.0.5 窄条形态).
+/// 播放列表条目卡 — 缩略图 + 透明"塑料膜"按钮层 + 右侧名称/断点信息.
 ///
-/// Playlist entry card — thumbnail with play/resume buttons overlaid on it
-/// (播放 3/5 + 断点续播 2/5, 盖在缩略图右缘), 名称与上次播放进度在缩略图
-/// 右侧. 当前条目以缩略图 accent 描边高亮.
+/// Playlist entry card — thumbnail with a transparent plastic-film button
+/// layer covering it (播放 3/5 上 + 断点续播 2/5 下, 用户钦定交互):
+/// - 按钮本身**不可见** — 只有 hover 时该分区微亮 (white 6%), 按下变暗
+///   (black 12%, pointer-down 即时反馈); 亮度绝不喧宾夺主抢缩略图焦点.
+/// - hover 按钮分区: 图标左移 + 功能名 (播放/断点续播) 渐进展示 —
+///   与面板 fade 同节奏 (durationControlsFade), 移出反向渐退.
+/// - 无 Tooltip — 文字本身就是提示 (用户钦定).
+/// - 名称与上次播放进度 (细进度条 + 断点时间) 在缩略图右侧.
 ///
 /// 缩略图经 [ThumbnailService] 缓存异步加载 (加载中显示占位, 绝不阻断列表滚动).
 class PlaylistTile extends StatefulWidget {
@@ -23,10 +27,10 @@ class PlaylistTile extends StatefulWidget {
   /// 是否为当前正在播放的条目 — 驱动高亮.
   final bool isCurrent;
 
-  /// 点击卡片/播放按钮 → 播放该条目.
+  /// 播放该条目 (点卡片/播放分区).
   final VoidCallback onPlay;
 
-  /// 断点续播按钮 — 播放并 seek 到 [PlaylistItem.positionMs].
+  /// 断点续播 — 播放并 seek 到 [PlaylistItem.positionMs].
   final VoidCallback onResume;
 
   /// 右键菜单"移除"动作.
@@ -75,7 +79,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
     setState(() => _thumbnail = provider);
   }
 
-  /// 断点进度 (0-1) — 无时长或未播放时续播按钮禁用/进度区不显示.
+  /// 断点进度 (0-1) — 无时长或未播放时续播分区禁用/进度区不显示.
   double? get _resumeProgress {
     final position = widget.item.positionMs ?? 0;
     final duration = widget.item.durationMs ?? 0;
@@ -109,18 +113,40 @@ class _PlaylistTileState extends State<PlaylistTile> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 缩略图 — 播放/断点续播按钮盖在其右缘 (用户钦定布局).
-                Stack(
-                  children: [
-                    _buildThumbnail(),
-                    Positioned(
-                      right: 4,
-                      top: 4,
-                      bottom: 4,
-                      width: _buttonStackWidth,
-                      child: _buildOverlayButtons(),
-                    ),
-                  ],
+                // 缩略图 — 透明塑料膜按钮层覆盖其上 (整个缩略图区域).
+                SizedBox(
+                  width: _thumbWidth,
+                  height: _thumbHeight,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _buildThumbnail()),
+                      Positioned.fill(
+                        child: Column(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _FilmButton(
+                                icon: Icons.play_arrow,
+                                label: l10n.play,
+                                onTap: widget.onPlay,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: _FilmButton(
+                                icon: Icons.replay,
+                                label: l10n.resumePlayback,
+                                enabled: _resumeProgress != null,
+                                onTap: _resumeProgress == null
+                                    ? null
+                                    : widget.onResume,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: Tokens.spSm),
                 // 名称 + 上次播放进度 — 缩略图右侧.
@@ -143,9 +169,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
                         const SizedBox(height: Tokens.spXs),
                         // 上次播放进度 — 细进度条 + 断点时间.
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            Tokens.radiusSm,
-                          ),
+                          borderRadius: BorderRadius.circular(Tokens.radiusSm),
                           child: LinearProgressIndicator(
                             value: _resumeProgress,
                             minHeight: 3,
@@ -177,80 +201,30 @@ class _PlaylistTileState extends State<PlaylistTile> {
     );
   }
 
-  /// overlay 双按钮列高度 — 缩略图 72 减上下留白.
-  static const _buttonStackWidth = 30.0;
-
-  /// 盖在缩略图上的双按钮 — 播放 3/5 + 断点续播 2/5, GlassButton 控制栏同款.
-  Widget _buildOverlayButtons() {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      children: [
-        Expanded(
-          flex: 3,
-          child: GlassButton.iconOnly(
-            icon: Icons.play_arrow,
-            iconSize: 16,
-            tooltip: l10n.play,
-            onPressed: widget.onPlay,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Expanded(
-          flex: 2,
-          child: GlassButton.iconOnly(
-            icon: Icons.replay,
-            iconSize: 14,
-            tooltip: l10n.resumePlayback,
-            onPressed: _resumeProgress == null ? null : widget.onResume,
-          ),
-        ),
-      ],
-    );
-  }
-
   /// 缩略图宽度 — 决定条目高度 (16:9 → 72px).
   static const _thumbWidth = 128.0;
   static const _thumbHeight = 72.0;
 
   /// 16:9 缩略图 — 占位 → 异步图像; 播放中角标.
   Widget _buildThumbnail() {
-    return SizedBox(
-      width: _thumbWidth,
-      height: _thumbHeight,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 占位底色 — 缩略图加载完成前保持视觉占位.
-            const ColoredBox(color: Tokens.bgGlass),
-            if (_thumbnail != null)
-              Image(
-                image: _thumbnail!,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              )
-            else
-              const Center(
-                child: Icon(
-                  Icons.movie_outlined,
-                  size: 22,
-                  color: Tokens.textSecondary,
-                ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(Tokens.radiusSm),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 占位底色 — 缩略图加载完成前保持视觉占位.
+          const ColoredBox(color: Tokens.bgGlass),
+          if (_thumbnail != null)
+            Image(image: _thumbnail!, fit: BoxFit.cover, gaplessPlayback: true)
+          else
+            const Center(
+              child: Icon(
+                Icons.movie_outlined,
+                size: 22,
+                color: Tokens.textSecondary,
               ),
-            // 播放中角标.
-            if (widget.isCurrent)
-              const Positioned(
-                left: 3,
-                top: 3,
-                child: Icon(
-                  Icons.play_circle_fill,
-                  size: 14,
-                  color: Tokens.accent,
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -290,5 +264,115 @@ class _PlaylistTileState extends State<PlaylistTile> {
       case 'remove':
         widget.onRemove();
     }
+  }
+}
+
+/// 透明"塑料膜"按钮分区 — 覆盖缩略图的一片区域, 交互三态:
+/// 静置完全透明 (缩略图焦点不受损), hover 微亮 (white 6%), 按下变暗
+/// (black 12%, pointer-down 即时 — Apple fluid interfaces §1).
+///
+/// hover 时图标左移 + 功能名渐进展示: [AnimatedAlign] 把 Row 从居中推到
+/// 左对齐, [ClipRect] 内 `Align(widthFactor)` 由 [TweenAnimationBuilder]
+/// 驱动文字展开 — 图标被自然推左, 文字按面板 fade 同节奏渐显.
+class _FilmButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+
+  /// null = 禁用 (如无断点的续播) — 不响应点击, hover 无反馈.
+  final VoidCallback? onTap;
+
+  /// 禁用态显式标记 — 与 onTap == null 同源传入, 驱动图标淡化.
+  final bool enabled;
+
+  const _FilmButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  @override
+  State<_FilmButton> createState() => _FilmButtonState();
+}
+
+class _FilmButtonState extends State<_FilmButton> {
+  bool _hovering = false;
+  bool _pressed = false;
+
+  static const _fadeDuration = Duration(
+    milliseconds: Tokens.durationControlsFade,
+  );
+
+  bool get _enabled => widget.enabled && widget.onTap != null;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: _enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() {
+        _hovering = false;
+        _pressed = false;
+      }),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapCancel: _enabled ? () => setState(() => _pressed = false) : null,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100), // 即时反馈 (§1)
+          color: _pressed
+              ? Colors.black.withValues(alpha: 0.12)
+              : _hovering && _enabled
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: _buildContent(),
+        ),
+      ),
+    );
+  }
+
+  /// 图标 + 渐显文字 — hover 时文字区 widthFactor 0→1 展开, 图标被推左.
+  Widget _buildContent() {
+    final active = _hovering && _enabled;
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            widget.icon,
+            size: 15,
+            color: _enabled ? Tokens.textPrimary : Tokens.textSecondary,
+          ),
+          // 渐显文字区 — ClipRect + widthFactor 0→1 (展开推图标左移);
+          // 静置宽 0 不占位, 缩略图焦点不受损.
+          ClipRect(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: active ? 1.0 : 0.0),
+              duration: _fadeDuration,
+              curve: Curves.easeInOut,
+              builder: (_, width, child) => Align(
+                alignment: Alignment.centerLeft,
+                widthFactor: width,
+                heightFactor: 1.0,
+                child: child,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

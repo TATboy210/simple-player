@@ -648,9 +648,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.windowMode.addListener(_syncModeFullscreen);
     widget.resizing?.addListener(_onResizeChanged);
     _autoHide.visible.addListener(_scheduleSubtitlePaddingSync);
-    // v0.0.5: 模态窗口开启期间冻结控制栏自动隐藏 (需求 4).
-    ModalHoldObserver.openModalCount.addListener(_onModalCountChanged);
-    _onModalCountChanged(); // attach 即同步一次 (先开窗后进全屏的时序).
+    // v0.0.5: 控制栏自动隐藏 hold — 模态窗口/播放列表面板开启或无媒体时
+    // 冻结 (三源合成, 任一变化即时同步).
+    ModalHoldObserver.openModalCount.addListener(_syncAutoHideHold);
+    widget.playlistVisible?.addListener(_syncAutoHideHold);
+    _syncAutoHideHold(); // attach 即同步一次 (先开窗后进全屏的时序).
     _lifecycleListenersAttached = true;
   }
 
@@ -660,13 +662,19 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.windowMode.removeListener(_syncModeFullscreen);
     widget.resizing?.removeListener(_onResizeChanged);
     _autoHide.visible.removeListener(_scheduleSubtitlePaddingSync);
-    ModalHoldObserver.openModalCount.removeListener(_onModalCountChanged);
+    ModalHoldObserver.openModalCount.removeListener(_syncAutoHideHold);
+    widget.playlistVisible?.removeListener(_syncAutoHideHold);
     _lifecycleListenersAttached = false;
   }
 
-  /// 模态弹层计数 → 控制栏 auto-hold (开窗冻结, 关窗重新计时).
-  void _onModalCountChanged() {
-    _autoHide.modalOpen = ModalHoldObserver.openModalCount.value > 0;
+  /// 控制栏自动隐藏 hold 两源合成 — 任一为真即冻结隐藏计时:
+  /// ① 模态弹层开启 (设置/菜单) ② 播放列表面板可见 (用户正在浏览队列,
+  /// 含空置态开面板的场景). media_kit 对齐原则下不加"无媒体冻结"特例 —
+  /// 原生交互里空置态控制栏照常隐藏.
+  void _syncAutoHideHold() {
+    _autoHide.modalOpen =
+        ModalHoldObserver.openModalCount.value > 0 ||
+        (widget.playlistVisible?.value ?? false);
   }
 
   void _onEngineStateChanged() {
@@ -683,6 +691,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     } else {
       _animController.forward();
     }
+    // v0.0.5: hasMedia 跨越 0 边界影响 auto-hide hold (无媒体冻结) — 即时同步.
+    _syncAutoHideHold();
   }
 
   @override
