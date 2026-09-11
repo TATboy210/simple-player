@@ -19,9 +19,9 @@ lib/
 ├── app.dart                     # MaterialApp shell, service wiring
 ├── kernel/                      # Core logic (no UI)
 │   ├── engine/                  # media_kit (libmpv) engine — ISP facets
-│   │   ├── media_engine.dart       # Composite interface (7 ISP facets)
+│   │   ├── media_engine.dart       # Composite interface (8 ISP facets)
 │   │   ├── media_kit_engine.dart   # Concrete media_kit implementation
-│   │   ├── engine_state_machine.dart # State machine + generation guard
+│   │   ├── queue_control.dart      # ISP: playlist load/step/mode (v0.0.5)
 │   │   ├── playback_control.dart   # ISP: open/play/pause/seek
 │   │   ├── track_control.dart      # ISP: audio track query/switch
 │   │   └── subtitle_config.dart    # ISP: subtitle track query/switch
@@ -39,15 +39,13 @@ lib/
 │   │   ├── play_mode.dart          # LoopAll/LoopSingle/Shuffle
 │   │   └── media_info.dart         # Codec/resolution metadata
 │   ├── persistence/             # Storage
-│   │   ├── playlist_store.dart     # Playlist save/load
+│   │   ├── playlist_store.dart     # Playlist JSON save/load (v0.0.5 重建)
 │   │   └── settings_store.dart     # Preferences (locale, volume, etc.)
-│   ├── playlist/
-│   │   └── playlist.dart           # Playlist model + play mode logic
 │   ├── scanner/
 │   │   └── folder_scanner.dart     # Directory video file scanner
 │   ├── services/
-│   │   ├── playback_controller.dart   # Orchestrator (open/next/prev/seek)
-│   │   ├── playback_navigator.dart    # Track advancement logic
+│   │   ├── playback_controller.dart   # Orchestrator (openAndPlay=同目录装载队列)
+│   │   ├── playlist_coordinator.dart  # 队列视图/断点/持久化编排 (v0.0.5)
 │   │   ├── thumbnail_service.dart     # Platform-aware thumbnail facade (LRU cache)
 │   │   ├── video_processing_service.dart # Color correction, rotation
 │   │   └── file_operations.dart       # File open/drop handling
@@ -68,11 +66,9 @@ lib/
 │   │   ├── keyboard_handler.dart   # 20+ key Focus handler
 │   │   ├── video_surface.dart      # Texture renderer
 │   │   └── drop_handler.dart       # Drag-and-drop files
-│   ├── playlist/                # Immersive floating playlist
-│   │   ├── playlist_panel.dart     # Floating window (glass, animation)
-│   │   ├── folder_tab.dart         # Folder-grouped thumbnails
-│   │   ├── history_tab.dart        # Timestamp-sorted history
-│   │   └── thumbnail_tile.dart     # 16:9 thumbnail card
+│   ├── playlist/                # Immersive floating playlist (v0.0.5 重做)
+│   │   ├── playlist_panel.dart     # Floating window (glass, mode toggle)
+│   │   └── playlist_tile.dart      # 16:9 thumbnail card + resume bar
 │   ├── shared/                  # Reusable components
 │   │   ├── glass_container.dart    # Glassmorphism wrapper
 │   │   ├── empty_state.dart        # Empty state screen
@@ -88,8 +84,10 @@ lib/
 ## State Management
 
 - **ValueNotifier + ValueListenableBuilder** (no Provider/Riverpod/Bloc)
-- `MediaEngine` exposes ValueNotifiers for playback state (position, volume, mute, etc.)
-- `PlaybackController` orchestrates playlist + engine state
+- `MediaEngine` exposes ValueNotifiers for playback state (position, volume, mute, queue mirror, etc.)
+- `PlaybackController` orchestrates open flow (openAndPlay = 同目录装载队列)
+- `PlaylistCoordinator` owns the logical queue view + resume breakpoints + persistence;
+  队列权威在 mpv 原生 playlist (v0.0.5), 经 `QueueControl.queueRevision` 单通知点同步
 - Widgets rebuild via `ValueListenableBuilder` wrappers
 
 ## Keyboard Shortcuts
@@ -100,13 +98,15 @@ lib/
 | Left/Right | Seek ±5s |
 | Up/Down | Volume ±5% |
 | M | Toggle mute |
-| N | Previous track |
-| P | Next track |
+| N | 上一个 (queue previous) |
+| P | 下一个 (queue next) |
+| L | 开关播放列表面板 |
 | O | Open file |
 | S | Toggle subtitle |
 | [ / ] | Subtitle delay ±500ms (stub — media_kit 不支持) |
+| F | Toggle fullscreen |
 | F1 / ? | Show shortcuts help |
-| ESC | Exit fullscreen / Close playlist |
+| ESC | Exit fullscreen / Close playlist (面板可见时先关面板) |
 | Media keys | Play/Pause, Next, Previous |
 
 ## Design System
