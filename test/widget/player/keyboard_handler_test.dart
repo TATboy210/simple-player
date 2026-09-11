@@ -20,6 +20,9 @@ class _CallbackTracker {
   int subtitleDelayForward = 0;
   int subtitleDelayBackward = 0;
   int mediaPlayPause = 0;
+  int togglePlaylist = 0;
+  int playPrevious = 0;
+  int playNext = 0;
 }
 
 /// 构建测试用 KeyboardHandler wrapper
@@ -47,6 +50,9 @@ Widget _buildSubject(
       onSubtitleDelayForward: () => t.subtitleDelayForward++,
       onSubtitleDelayBackward: () => t.subtitleDelayBackward++,
       onMediaPlayPause: () => t.mediaPlayPause++,
+      onTogglePlaylist: () => t.togglePlaylist++,
+      onPlayPrevious: () => t.playPrevious++,
+      onPlayNext: () => t.playNext++,
       child: const SizedBox.expand(),
     ),
   ),
@@ -107,21 +113,22 @@ void main() {
       expect(tracker.toggleMute, 1);
     });
 
-    testWidgets('N/P keys remain unhandled in single-file mode', (
+    testWidgets('N/P/L keys dispatch queue navigation (v0.0.5)', (
       tester,
     ) async {
       await tester.pumpWidget(_buildSubject(tracker));
 
-      // 单文件播放器不拥有队列导航，事件必须继续向焦点树上层传播。
-      final nextHandled = await tester.sendKeyDownEvent(
-        LogicalKeyboardKey.keyN,
-      );
-      final previousHandled = await tester.sendKeyDownEvent(
-        LogicalKeyboardKey.keyP,
-      );
+      // v0.0.5: 播放列表恢复 — N/P 步进队列, L 开关面板, 均由 handler 消费.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyN);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyP);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyP);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyL);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyL);
 
-      expect(nextHandled, isFalse);
-      expect(previousHandled, isFalse);
+      expect(tracker.playNext, 1);
+      expect(tracker.playPrevious, 1);
+      expect(tracker.togglePlaylist, 1);
     });
 
     testWidgets('O key opens file picker', (tester) async {
@@ -172,19 +179,18 @@ void main() {
   });
 
   group('KeyboardHandler shortcut definitions', () {
-    test('single-file mode omits queue navigation shortcuts', () {
+    test('shortcut definitions include queue navigation (v0.0.5)', () {
       final l10n = lookupAppLocalizations(const Locale('zh'));
 
       final definitions = shortcutDefinitions(l10n);
       final keyLabels = definitions.map(((String, String) item) => item.$1);
       final descriptions = definitions.map(((String, String) item) => item.$2);
 
-      expect(keyLabels, isNot(contains('N')));
-      expect(keyLabels, isNot(contains('P')));
-      expect(descriptions, isNot(contains(l10n.shortcutNext)));
-      expect(descriptions, isNot(contains(l10n.shortcutPrevious)));
-      expect(l10n.shortcutMediaKeys, isNot(contains(l10n.shortcutNext)));
-      expect(l10n.shortcutMediaKeys, isNot(contains(l10n.shortcutPrevious)));
+      // v0.0.5: 播放列表恢复 — N/P/L 键位与描述进入帮助面板.
+      expect(keyLabels, containsAll(['N', 'P', 'L']));
+      expect(descriptions, contains(l10n.shortcutNext));
+      expect(descriptions, contains(l10n.shortcutPrevious));
+      expect(descriptions, contains(l10n.shortcutPlaylist));
     });
   });
 

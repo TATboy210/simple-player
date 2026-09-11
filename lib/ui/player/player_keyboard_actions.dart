@@ -51,6 +51,10 @@ KeyboardHandler buildPlayerKeyboardActions({
       final newIndex = active.isEmpty ? -1 : active.first;
       controller.trackPreferenceService?.recordSubtitleTrack(newIndex);
     },
+    // v0.0.5 播放列表键位 — 面板开关/队列步进统一走稳定 actions.
+    onTogglePlaylist: () => actions.onTogglePlaylist?.call(),
+    onPlayPrevious: () => actions.onPreviousEntry?.call(),
+    onPlayNext: () => actions.onNextEntry?.call(),
     onShowHelp: () => _showShortcutsHelp(context),
     onSubtitleDelayForward: () {
       final delay = engine.subtitleDelay;
@@ -85,6 +89,10 @@ KeyboardHandler buildPlayerKeyboardActions({
       }
     },
     onExitFullscreen: () {
+      // v0.0.5: 播放列表面板可见时 Esc 先关面板 (非全屏态), 不触发全屏退出.
+      if (!isFullscreen && (actions.onEscapePressed?.call() ?? false)) {
+        return;
+      }
       if (isFullscreen) {
         // 先同步 mode 回 windowed,再关闭 route — route 内 PopScope 统一
         // 触发 media_kit 原生全屏退出,此处不重复操作窗口几何。

@@ -19,9 +19,13 @@ List<(String, String)> shortcutDefinitions(AppLocalizations l10n) => [
   ('↑ / ↓', l10n.shortcutVolume),
   ('ESC', l10n.shortcutExitFullscreen),
   ('M', l10n.shortcutMute),
+  ('N', l10n.shortcutPrevious),
+  ('P', l10n.shortcutNext),
+  ('L', l10n.shortcutPlaylist),
   ('O', l10n.shortcutOpenFile),
   ('S', l10n.shortcutSubtitle),
   ('] / [', l10n.shortcutSubtitleDelay),
+  ('F', l10n.shortcutFullscreen),
   ('F1 / ?', l10n.shortcutHelp),
   ('媒体键', l10n.shortcutMediaKeys),
 ];
@@ -63,6 +67,9 @@ class KeyboardHandler extends StatefulWidget {
     this.onSubtitleDelayForward,
     this.onSubtitleDelayBackward,
     this.onMediaPlayPause,
+    this.onTogglePlaylist,
+    this.onPlayPrevious,
+    this.onPlayNext,
   });
 
   final Widget child;
@@ -81,6 +88,9 @@ class KeyboardHandler extends StatefulWidget {
   final VoidCallback? onSubtitleDelayForward;
   final VoidCallback? onSubtitleDelayBackward;
   final VoidCallback? onMediaPlayPause;
+  final VoidCallback? onTogglePlaylist;
+  final VoidCallback? onPlayPrevious;
+  final VoidCallback? onPlayNext;
 
   @override
   State<KeyboardHandler> createState() => _KeyboardHandlerState();
@@ -247,6 +257,19 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
     }
     if (_keyMatches(key, 'subtitle', LogicalKeyboardKey.keyS)) {
       widget.onToggleSubtitle?.call();
+      return true;
+    }
+    // v0.0.5 播放列表键位 — L 开关面板, N/P 队列步进 (引擎裁定边界回绕).
+    if (_keyMatches(key, 'togglePlaylist', LogicalKeyboardKey.keyL)) {
+      widget.onTogglePlaylist?.call();
+      return true;
+    }
+    if (_keyMatches(key, 'playPrevious', LogicalKeyboardKey.keyN)) {
+      widget.onPlayPrevious?.call();
+      return true;
+    }
+    if (_keyMatches(key, 'playNext', LogicalKeyboardKey.keyP)) {
+      widget.onPlayNext?.call();
       return true;
     }
     if (_keyMatches(key, 'exitFullscreen', LogicalKeyboardKey.escape)) {

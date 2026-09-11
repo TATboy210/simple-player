@@ -43,9 +43,11 @@ class PlayPauseButton extends StatelessWidget {
   }
 }
 
-/// 单文件播放器中央控制组：后退、播放/暂停、前进与停止。
+/// 中央控制组：上一个、后退、播放/暂停、前进、下一个与停止 (v0.0.5)。
 ///
-/// 四个按钮均保留稳定命中目标；[isIdle] 只控制视觉淡化。停止命令必须通过
+/// 切曲按钮紧贴播放键两侧（高频动作）；边界回绕合法性由引擎统一守卫
+/// （越界时 media_kit 步进经引擎裁定，越界不循环场景回 false，配 OSD 提示）。
+/// [isIdle] 只控制视觉淡化。停止命令必须通过
 /// [onStop] 进入项目控制器，以统一完成媒体卸载、标题和空置态收尾。
 class CenterGroup extends StatelessWidget {
   final ValueListenable<bool> isPlaying;
@@ -61,6 +63,12 @@ class CenterGroup extends StatelessWidget {
   final VoidCallback? onStop;
   final bool showTransportActions;
 
+  /// 跳到队列上一个条目 — null 时隐藏按钮（无队列协调器场景）。
+  final VoidCallback? onPreviousEntry;
+
+  /// 跳到队列下一个条目 — null 时隐藏按钮。
+  final VoidCallback? onNextEntry;
+
   const CenterGroup({
     super.key,
     required this.isPlaying,
@@ -71,6 +79,8 @@ class CenterGroup extends StatelessWidget {
     this.isIdleListenable,
     this.onStop,
     this.showTransportActions = true,
+    this.onPreviousEntry,
+    this.onNextEntry,
   });
 
   @override
@@ -84,6 +94,8 @@ class CenterGroup extends StatelessWidget {
       isIdle: isIdle,
       showTransportActions: showTransportActions,
       onStop: onStop,
+      onPreviousEntry: onPreviousEntry,
+      onNextEntry: onNextEntry,
     );
     if (listenable == null) return content;
 
@@ -97,6 +109,8 @@ class CenterGroup extends StatelessWidget {
         isIdle: value,
         showTransportActions: showTransportActions,
         onStop: onStop,
+        onPreviousEntry: onPreviousEntry,
+        onNextEntry: onNextEntry,
       ),
     );
   }
@@ -111,6 +125,8 @@ class _CenterGroupContent extends StatelessWidget {
   final bool isIdle;
   final bool showTransportActions;
   final VoidCallback? onStop;
+  final VoidCallback? onPreviousEntry;
+  final VoidCallback? onNextEntry;
 
   const _CenterGroupContent({
     required this.isPlaying,
@@ -120,6 +136,8 @@ class _CenterGroupContent extends StatelessWidget {
     required this.isIdle,
     required this.showTransportActions,
     required this.onStop,
+    this.onPreviousEntry,
+    this.onNextEntry,
   });
 
   @override
@@ -129,15 +147,27 @@ class _CenterGroupContent extends StatelessWidget {
         : Tokens.textPrimary;
     final l10n = AppLocalizations.of(context);
 
-    // 显式顺序确保删去队列导航按钮后，Tab 仍按视觉顺序遍历。
+    // 显式顺序保证 Tab 按视觉顺序遍历 — v0.0.5 恢复队列导航按钮（1-6）。
     return FocusTraversalGroup(
       policy: OrderedTraversalPolicy(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (showTransportActions)
+          if (showTransportActions && onPreviousEntry != null)
             FocusTraversalOrder(
               order: const NumericFocusOrder(1),
+              child: GlassButton.iconOnly(
+                icon: Icons.skip_previous,
+                color: dimmed,
+                onPressed: onPreviousEntry,
+                tooltip: l10n.previousTrack,
+                semanticsLabel: l10n.previousTrack,
+              ),
+            ),
+          if (showTransportActions) const SizedBox(width: Tokens.spSm),
+          if (showTransportActions)
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(2),
               child: GlassButton.iconOnly(
                 icon: Icons.replay_10,
                 color: dimmed,
@@ -148,7 +178,7 @@ class _CenterGroupContent extends StatelessWidget {
             ),
           const SizedBox(width: Tokens.spSm),
           FocusTraversalOrder(
-            order: const NumericFocusOrder(2),
+            order: const NumericFocusOrder(3),
             child: TweenAnimationBuilder<double>(
               tween: Tween<double>(end: isIdle ? 0.20 : 1.0),
               duration: const Duration(milliseconds: Tokens.durationFade),
@@ -164,7 +194,7 @@ class _CenterGroupContent extends StatelessWidget {
           if (showTransportActions) const SizedBox(width: Tokens.spSm),
           if (showTransportActions)
             FocusTraversalOrder(
-              order: const NumericFocusOrder(3),
+              order: const NumericFocusOrder(4),
               child: GlassButton.iconOnly(
                 icon: Icons.forward_30,
                 color: dimmed,
@@ -173,10 +203,21 @@ class _CenterGroupContent extends StatelessWidget {
                 semanticsLabel: l10n.forward30,
               ),
             ),
+          if (showTransportActions && onNextEntry != null)
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(5),
+              child: GlassButton.iconOnly(
+                icon: Icons.skip_next,
+                color: dimmed,
+                onPressed: onNextEntry,
+                tooltip: l10n.nextTrack,
+                semanticsLabel: l10n.nextTrack,
+              ),
+            ),
           if (showTransportActions) const SizedBox(width: Tokens.spXs),
           if (showTransportActions)
             FocusTraversalOrder(
-              order: const NumericFocusOrder(4),
+              order: const NumericFocusOrder(6),
               child: GlassButton.iconOnly(
                 icon: Icons.stop,
                 color: dimmed,

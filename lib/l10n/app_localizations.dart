@@ -197,13 +197,13 @@ abstract class AppLocalizations {
   /// Keyboard shortcut description for N key
   ///
   /// In en, this message translates to:
-  /// **'Next Track'**
+  /// **'Next'**
   String get shortcutNext;
 
   /// Keyboard shortcut description for P key
   ///
   /// In en, this message translates to:
-  /// **'Previous Track'**
+  /// **'Previous'**
   String get shortcutPrevious;
 
   /// Keyboard shortcut description for O key
@@ -217,6 +217,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Toggle Subtitle'**
   String get shortcutSubtitle;
+
+  /// No description provided for @shortcutPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Playlist'**
+  String get shortcutPlaylist;
 
   /// Keyboard shortcut description for bracket keys
   ///
