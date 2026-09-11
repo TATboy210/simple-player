@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/playlist_item.dart';
@@ -113,7 +115,8 @@ class _PlaylistTileState extends State<PlaylistTile> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 缩略图 — 透明塑料膜按钮层覆盖其上 (整个缩略图区域).
+                // 缩略图 — 透明塑料膜按钮层覆盖其上 (整个缩略图区域,
+                // 膜层 ClipRRect 与缩略图同款圆角 — 用户钦定).
                 SizedBox(
                   width: _thumbWidth,
                   height: _thumbHeight,
@@ -121,28 +124,31 @@ class _PlaylistTileState extends State<PlaylistTile> {
                     children: [
                       Positioned.fill(child: _buildThumbnail()),
                       Positioned.fill(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: _FilmButton(
-                                icon: Icons.play_arrow,
-                                label: l10n.play,
-                                onTap: widget.onPlay,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(Tokens.radiusSm),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: _FilmButton(
+                                  icon: Icons.play_arrow,
+                                  label: l10n.play,
+                                  onTap: widget.onPlay,
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: _FilmButton(
-                                icon: Icons.replay,
-                                label: l10n.resumePlayback,
-                                enabled: _resumeProgress != null,
-                                onTap: _resumeProgress == null
-                                    ? null
-                                    : widget.onResume,
+                              Expanded(
+                                flex: 2,
+                                child: _FilmButton(
+                                  icon: Icons.replay,
+                                  label: l10n.resumePlayback,
+                                  enabled: _resumeProgress != null,
+                                  onTap: _resumeProgress == null
+                                      ? null
+                                      : widget.onResume,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -271,9 +277,10 @@ class _PlaylistTileState extends State<PlaylistTile> {
 /// 静置完全透明 (缩略图焦点不受损), hover 微亮 (white 6%), 按下变暗
 /// (black 12%, pointer-down 即时 — Apple fluid interfaces §1).
 ///
-/// hover 时图标左移 + 功能名渐进展示: [AnimatedAlign] 把 Row 从居中推到
-/// 左对齐, [ClipRect] 内 `Align(widthFactor)` 由 [TweenAnimationBuilder]
-/// 驱动文字展开 — 图标被自然推左, 文字按面板 fade 同节奏渐显.
+/// 两段延迟揭示 (用户钦定): hover 1s 后图标渐显 (居中), 再 1s 后功能名
+/// 渐进展示 — [ClipRect] 内 `Align(widthFactor)` 由 [TweenAnimationBuilder]
+/// 驱动文字展开, 图标被自然推左; 移出立即反向渐退 (计时器作废, 两态同帧
+/// 回落, [AnimatedOpacity]/widthFactor 各自渐退).
 class _FilmButton extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -299,21 +306,64 @@ class _FilmButtonState extends State<_FilmButton> {
   bool _hovering = false;
   bool _pressed = false;
 
+  /// 两段延迟揭示状态 — hover 1s 后图标渐显, 再 1s 后文字展开.
+  bool _iconShown = false;
+  bool _textShown = false;
+  Timer? _iconTimer;
+  Timer? _textTimer;
+
+  /// 图标显现的 hover 延迟 (用户钦定 1s).
+  static const _iconDelay = Duration(seconds: 1);
+
+  /// 文字展开距图标显现的间隔 (用户钦定再 1s).
+  static const _textDelay = Duration(seconds: 1);
+
   static const _fadeDuration = Duration(
     milliseconds: Tokens.durationControlsFade,
   );
 
   bool get _enabled => widget.enabled && widget.onTap != null;
 
+  void _onEnter() {
+    setState(() => _hovering = true);
+    if (!_enabled) return;
+    _iconTimer = Timer(_iconDelay, () {
+      if (!mounted) return;
+      setState(() => _iconShown = true);
+      _textTimer = Timer(_textDelay, () {
+        if (mounted) setState(() => _textShown = true);
+      });
+    });
+  }
+
+  void _onExit() {
+    // 移出立即反向渐退 — 计时器作废, 两态同帧回落 (AnimatedOpacity 与
+    // widthFactor 各自渐退), 未触发的延迟揭示不再发生.
+    _iconTimer?.cancel();
+    _textTimer?.cancel();
+    _iconTimer = null;
+    _textTimer = null;
+    setState(() {
+      _hovering = false;
+      _pressed = false;
+      _iconShown = false;
+      _textShown = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _iconTimer?.cancel();
+    _textTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: _enabled ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() {
-        _hovering = false;
-        _pressed = false;
-      }),
+      onEnter: (_) => _onEnter(),
+      onExit: (_) => _onExit(),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
@@ -333,23 +383,28 @@ class _FilmButtonState extends State<_FilmButton> {
     );
   }
 
-  /// 图标 + 渐显文字 — hover 时文字区 widthFactor 0→1 展开, 图标被推左.
+  /// 图标 + 渐显文字 — 图标 hover 1s 后渐显 (居中), 文字再 1s 后
+  /// widthFactor 0→1 展开, 图标被推左.
   Widget _buildContent() {
-    final active = _hovering && _enabled;
     return Center(
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            widget.icon,
-            size: 15,
-            color: _enabled ? Tokens.textPrimary : Tokens.textSecondary,
+          // 图标 — hover 1s 后渐显.
+          AnimatedOpacity(
+            opacity: _iconShown && _enabled ? 1.0 : 0.0,
+            duration: _fadeDuration,
+            child: Icon(
+              widget.icon,
+              size: 15,
+              color: _enabled ? Tokens.textPrimary : Tokens.textSecondary,
+            ),
           ),
           // 渐显文字区 — ClipRect + widthFactor 0→1 (展开推图标左移);
           // 静置宽 0 不占位, 缩略图焦点不受损.
           ClipRect(
             child: TweenAnimationBuilder<double>(
-              tween: Tween(end: active ? 1.0 : 0.0),
+              tween: Tween(end: _textShown && _enabled ? 1.0 : 0.0),
               duration: _fadeDuration,
               curve: Curves.easeInOut,
               builder: (_, width, child) => Align(
