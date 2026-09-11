@@ -1,10 +1,11 @@
+import 'dart:ui' as ui show ImageFilter;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_container.dart' show GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
@@ -128,29 +129,70 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     );
   }
 
-  /// 无边框沉浸式玻璃壳 — 底色 + BackdropFilter + 蓝色渐变(右浓左浅).
+  /// 无边框沉浸式玻璃壳 — 毛玻璃强度/底色/蓝色 tint 三层同步右深左浅.
+  ///
   /// 不走 GlassContainer (其边框/圆角语言与本面板的"贴边沉浸"相反).
+  /// Flutter 的 [BackdropFilter] 只支持均匀 sigma, 渐变模糊用**分段切片**:
+  /// 横向 4 条等宽切片, sigma 从右缘 [Tokens.glassBlur] 向左缘 0 递减 —
+  /// 总采样面积与单块 BackdropFilter 相同 (每片只采样自身区域), 零额外成本.
   Widget _buildShell(BuildContext context) {
-    return Container(
-      color: Tokens.bgGlass,
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: GlassTier.normal.blurFilter,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // ① 分段渐变模糊 — Row 左→右布局, factors 左浅右深.
+        Row(
+          children: [
+            for (final factor in _blurFactors) Expanded(child: _blurSlice(factor)),
+          ],
+        ),
+        // ② 底色渐变 — bgGlass 右浓左浅 (与模糊强度同向).
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Tokens.bgGlass.withValues(alpha: 0.30),
+                  Tokens.bgGlass,
+                ],
+              ),
+            ),
+          ),
+        ),
+        // ③ 蓝色 tint 渐变 — 视觉重心靠操作侧 (右浓左浅).
+        Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerRight,
                 end: Alignment.centerLeft,
                 colors: [
-                  // 右缘蓝浓 → 左缘几乎透明 — 视觉重心靠操作侧.
                   Tokens.accent.withValues(alpha: 0.16),
                   Tokens.accent.withValues(alpha: 0.02),
                 ],
               ),
             ),
-            child: _buildContent(context),
           ),
         ),
+        // ④ 内容 — 标题行 + 条目纵列.
+        _buildContent(context),
+      ],
+    );
+  }
+
+  /// 模糊强度系数 (左→右) — 左缘 0 (无模糊) 到右缘 1 (normal 档).
+  /// 切片数 4 为平滑度与 readback 次数的平衡; sigma 阶梯差 ~4 视觉无硬边.
+  static const _blurFactors = [0.0, 0.35, 0.65, 1.0];
+
+  /// 单条模糊切片 — sigma≤0 直接空片 (省一次 readback).
+  Widget _blurSlice(double factor) {
+    final sigma = Tokens.glassBlur * factor;
+    if (sigma <= 0) return const SizedBox.expand();
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+        child: const SizedBox.expand(),
       ),
     );
   }
