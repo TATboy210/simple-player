@@ -34,7 +34,9 @@ import 'diagnostics/rss_provider.dart';
 import 'window_bridge/window_manager_service.dart';
 import 'engine/media_engine.dart';
 import 'engine/media_kit_engine.dart';
+import 'persistence/playlist_store.dart';
 import 'services/playback_controller.dart';
+import 'services/playlist_coordinator.dart';
 import 'services/video_processing_service.dart';
 
 /// 播放器服务容器 — 创建并管理所有播放服务的生命周期.
@@ -90,6 +92,13 @@ class PlayerServices {
 
   VideoProcessingService get videoProcessing => _videoProcessing!;
 
+  /// 播放列表协调器 — 队列视图/断点/持久化 (v0.0.5).
+  ///
+  /// Playlist coordinator — queue view, resume breakpoints, persistence.
+  PlaylistCoordinator? _playlistCoordinator;
+
+  PlaylistCoordinator get playlistCoordinator => _playlistCoordinator!;
+
   /// Win32 窗口桥接服务.
   ///
   /// Win32 window bridge service.
@@ -109,6 +118,7 @@ class PlayerServices {
   bool _engineCreated = false;
   bool _controllerCreated = false;
   bool _videoProcessingCreated = false;
+  bool _playlistCoordinatorCreated = false;
   Future<void>? _initOperation;
 
   /// 初始化所有播放服务.
@@ -162,6 +172,13 @@ class PlayerServices {
       _throwIfDisposed();
       _videoProcessing = VideoProcessingService(engine);
       _videoProcessingCreated = true;
+
+      _throwIfDisposed();
+      _playlistCoordinator = PlaylistCoordinator(
+        engine: engine,
+        store: PlaylistStore(),
+      );
+      _playlistCoordinatorCreated = true;
       _initialized = true;
     } catch (_) {
       // Cleanup must be best-effort: a failure in one disposer must not mask
@@ -186,10 +203,15 @@ class PlayerServices {
     // Detach diagnostics before disposing either notifier owner or callback user.
     _disposeSafely(_playerErrorBridge?.dispose);
     _playerErrorBridge = null;
+    if (_playlistCoordinatorCreated) {
+      _disposeSafely(_playlistCoordinator?.dispose);
+    }
+    _playlistCoordinator = null;
     if (_controllerCreated) _disposeSafely(_controller?.dispose);
     if (_engineCreated) _disposeSafely(_engine?.dispose);
     MemoryMonitor.disposeStatic();
     _videoProcessingCreated = false;
+    _playlistCoordinatorCreated = false;
     _controllerCreated = false;
     _engineCreated = false;
   }

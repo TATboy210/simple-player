@@ -86,6 +86,7 @@ class MediaKitEngine implements MediaEngine {
     const <String>[],
   );
   final ValueNotifier<int> _queueIndex = ValueNotifier<int>(-1);
+  final ValueNotifier<int> _queueRevision = ValueNotifier<int>(0);
   final ValueNotifier<PlayMode> _playMode = ValueNotifier<PlayMode>(
     PlayMode.loopAll,
   );
@@ -171,6 +172,9 @@ class MediaKitEngine implements MediaEngine {
 
   @override
   ValueNotifier<int> get queueIndex => _queueIndex;
+
+  @override
+  ValueNotifier<int> get queueRevision => _queueRevision;
 
   @override
   ValueNotifier<PlayMode> get playMode => _playMode;
@@ -369,6 +373,7 @@ class MediaKitEngine implements MediaEngine {
       // 乐观镜像: stream.playlist 广播稍后到达, 值相同幂等覆盖.
       _queuePaths.value = List<String>.unmodifiable(paths);
       _queueIndex.value = clampedStart;
+      _touchQueueRevision();
       _hasMedia = true;
       _state.value = MediaState.idle;
       return OpenSuccess(_mediaInfo);
@@ -406,6 +411,7 @@ class MediaKitEngine implements MediaEngine {
         ..._queuePaths.value,
         ...paths,
       ]);
+      _touchQueueRevision();
     } on Exception catch (error, stackTrace) {
       _lastError.value = UnknownError(
         '追加播放队列失败: $error',
@@ -441,6 +447,7 @@ class MediaKitEngine implements MediaEngine {
       }
       _queuePaths.value = List<String>.unmodifiable(remaining);
       _queueIndex.value = nextIndex;
+      _touchQueueRevision();
     } on Exception catch (error, stackTrace) {
       _lastError.value = UnknownError(
         '移除队列条目失败: $error',
@@ -463,6 +470,7 @@ class MediaKitEngine implements MediaEngine {
 
     _completing = false; // 跳转即重新进入播放会话, 清完成态.
     _queueIndex.value = index; // 乐观镜像, stream 幂等覆盖.
+    _touchQueueRevision();
     try {
       // media_kit jump 内部先 play 再 playlist-pos — 跳转即播放,
       // 符合"点击列表条目直接播放"的 UI 语义.
@@ -552,6 +560,10 @@ class MediaKitEngine implements MediaEngine {
       );
     }
   }
+
+  /// 队列代数递增 — paths/index 乐观镜像全部赋值完成后调用,
+  /// 保证 revision 监听者读到一致快照 (单通知点契约).
+  void _touchQueueRevision() => _queueRevision.value++;
 
   @override
   Future<void> seekTo(int ms) async {
@@ -754,6 +766,7 @@ class MediaKitEngine implements MediaEngine {
     _playbackSpeed.dispose();
     _queuePaths.dispose();
     _queueIndex.dispose();
+    _queueRevision.dispose();
     _playMode.dispose();
     // textureId (_controller.id) 由 player 生命周期管理, 不单独 dispose.
     // Player.dispose 是 Future — 用 unawaited 标记 fire-and-forget.
@@ -818,6 +831,7 @@ class MediaKitEngine implements MediaEngine {
           for (final m in pl.medias) pathFromMediaUri(m.uri),
         ]);
         _queueIndex.value = pl.medias.isEmpty ? -1 : pl.index;
+        _touchQueueRevision();
       }),
     );
     _addSubscription(

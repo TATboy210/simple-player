@@ -100,7 +100,10 @@ void main() {
           final result = await controller.openAndPlay('C:/test/video.mp4');
 
           expect(result, true);
-          expect(engine.openPaths, <String>['C:/test/video.mp4']);
+          // v0.0.5: openAndPlay 走队列装载 (同目录扫描退化 → 单元素队列).
+          expect(engine.openPlaylistCallCount, 1);
+          expect(engine.lastOpenPlaylistPaths, <String>['C:/test/video.mp4']);
+          expect(engine.lastOpenPlaylistStartIndex, 0);
           expect(engine.playCallCount, 1);
           expect(engine.state.value, MediaState.playing);
           expect(controller.currentPath.value, 'C:/test/video.mp4');
@@ -114,7 +117,7 @@ void main() {
         final result = await controller.openAndPlay('');
 
         expect(result, false);
-        expect(engine.openCallCount, 0);
+        expect(engine.openPlaylistCallCount, 0);
         expect(engine.playCallCount, 0);
         expect(controller.currentPath.value, isNull);
         expect(controller.currentFileName.value, isEmpty);
@@ -127,7 +130,7 @@ void main() {
         final result = await controller.openAndPlay('C:/test/file.txt');
 
         expect(result, false);
-        expect(engine.openCallCount, 0);
+        expect(engine.openPlaylistCallCount, 0);
         expect(controller.validationError.value, contains('不支持'));
       });
 
@@ -155,7 +158,7 @@ void main() {
 
           final older = controller.openAndPlay('C:/test/older.mp4');
           final latest = controller.openAndPlay('C:/test/latest.mp4');
-          await Future<void>.value();
+          await pumpEventQueue(); // flush 同目录扫描 IO, 使 openPlaylist 到达 gate
           openGate.complete();
 
           expect(await older, false);
@@ -187,7 +190,7 @@ void main() {
 
           final older = controller.openAndPlay('C:/test/older.mp4');
           final latest = controller.openAndPlay('C:/test/latest.mp4');
-          await Future<void>.value();
+          await pumpEventQueue(); // flush 同目录扫描 IO, 使 openPlaylist 到达 gate
           openGate.complete();
 
           expect(await older, false);
@@ -252,7 +255,7 @@ void main() {
 
         final stopping = controller.stopCurrentMedia();
         final opening = controller.openAndPlay('C:/test/latest.mp4');
-        await Future<void>.value();
+        await pumpEventQueue(); // flush 同目录扫描 IO, 使 openPlaylist 到达 gate
 
         expect(engine.state.value, MediaState.opening);
         stopGate.complete();
@@ -274,7 +277,7 @@ void main() {
           engine.openGate = openGate;
 
           final opening = controller.openAndPlay('C:/test/pending.mp4');
-          await Future<void>.value();
+          await pumpEventQueue(); // flush 同目录扫描 IO, 使 openPlaylist 到达 gate
           await controller.stopCurrentMedia();
           openGate.complete();
 

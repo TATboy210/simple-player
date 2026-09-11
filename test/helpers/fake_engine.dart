@@ -77,6 +77,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   final ValueNotifier<int> queueIndex = ValueNotifier<int>(-1);
 
   @override
+  final ValueNotifier<int> queueRevision = ValueNotifier<int>(0);
+
+  @override
   final ValueNotifier<PlayMode> playMode = ValueNotifier<PlayMode>(
     PlayMode.loopAll,
   );
@@ -268,6 +271,11 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     lastError.value = null;
     isSeeking.value = false;
     isBuffering.value = false;
+    // 模拟 mpv stop 的 playlist-clear — 装载队列清空 (MediaKitEngine.stop
+    // 经 stream.playlist 广播空列表回流到镜像).
+    queuePaths.value = const <String>[];
+    queueIndex.value = -1;
+    queueRevision.value++;
     state.value = MediaState.idle;
   }
 
@@ -374,9 +382,20 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (_disposed || gen != _operationGeneration) {
       return const OpenSuperseded();
     }
+
+    final failureMessage = failNextOpenWith;
+    if (failureMessage != null) {
+      failNextOpenWith = null;
+      final error = UnknownError(failureMessage);
+      state.value = MediaState.error;
+      lastError.value = error;
+      return OpenError(error);
+    }
+
     final clampedStart = startIndex.clamp(0, paths.length - 1);
     queuePaths.value = List<String>.unmodifiable(paths);
     queueIndex.value = clampedStart;
+    queueRevision.value++;
     _mediaInfo = _configuredMediaInfo;
     _hasMedia = true;
     duration.value = _mediaInfo.duration;
@@ -394,6 +413,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
       ...queuePaths.value,
       ...paths,
     ]);
+    queueRevision.value++;
   }
 
   @override
@@ -414,6 +434,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     }
     queuePaths.value = List<String>.unmodifiable(remaining);
     queueIndex.value = nextIndex;
+    queueRevision.value++;
   }
 
   @override
@@ -422,6 +443,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (index < 0 || index >= queuePaths.value.length) return false;
     jumpedToIndices.add(index);
     queueIndex.value = index;
+    queueRevision.value++;
     position.value = 0;
     state.value = MediaState.playing;
     return true;
@@ -610,6 +632,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     playbackSpeed.dispose();
     queuePaths.dispose();
     queueIndex.dispose();
+    queueRevision.dispose();
     playMode.dispose();
   }
 
