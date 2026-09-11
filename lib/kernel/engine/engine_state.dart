@@ -4,6 +4,7 @@
 // mixin continue to work unchanged — they get all new types through this barrel.
 export 'engine_state_view.dart';
 export 'playback_control.dart';
+export 'queue_control.dart';
 export 'track_control.dart';
 export 'subtitle_config.dart';
 export 'video_effect_control.dart';
