@@ -61,13 +61,6 @@ class RightButtonGroup extends StatelessWidget {
             onPressed: actions.onOpenSubtitle,
             tooltip: l10n.openSubtitle,
           ),
-        // 设置入口位于字幕与全屏之间 — 打开设置窗口壳(仅 UI，无实际功能)。
-        if (showSecondaryActions && actions.onOpenSettings != null)
-          GlassButton.iconOnly(
-            icon: Icons.settings_outlined,
-            onPressed: actions.onOpenSettings,
-            tooltip: l10n.settings,
-          ),
         // 播放列表面板开关 (v0.0.5) — L 键同款动作。
         if (showSecondaryActions && actions.onTogglePlaylist != null)
           GlassButton.iconOnly(
@@ -86,6 +79,13 @@ class RightButtonGroup extends StatelessWidget {
               onPressed: actions.onCyclePlayMode,
               tooltip: playModeLabel(mode, l10n),
             ),
+          ),
+        // 设置入口位于播放顺序与全屏之间 — 打开设置窗口壳。
+        if (showSecondaryActions && actions.onOpenSettings != null)
+          GlassButton.iconOnly(
+            icon: Icons.settings_outlined,
+            onPressed: actions.onOpenSettings,
+            tooltip: l10n.settings,
           ),
         if (fullscreenCb != null)
           // isFullscreen 驱动图标:全屏时 exit 图标,非全屏时 enter 图标.
