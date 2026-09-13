@@ -1,5 +1,3 @@
-import 'dart:ui' as ui show ImageFilter;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +5,7 @@ import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/control_bar_decoration.dart';
+import '../shared/glass_container.dart' show GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
@@ -16,10 +15,9 @@ import 'playlist_tile.dart';
 /// Playlist side panel — right-edge vertical strip with control-bar-grade
 /// rounded glassmorphism. 底部避开控制栏区域, 与控制栏同屏共存.
 ///
-/// 动画: 控制栏同款渐进渐退 (FadeTransition + easeInOut +
-/// durationControlsFade) + 材质凝聚式 blur 半径动画 (Apple fluid
-/// interfaces §12); IgnorePointer 锚定 [visible] — 关闭瞬间让出命中,
-/// 杜绝渐退中"虚空点击".
+/// 动画: 控制栏同款渐进渐退 — 纯 opacity FadeTransition, 渲染层驱动,
+/// 动画期间 widget 树零重建; IgnorePointer 锚定 [visible] — 关闭瞬间
+/// 让出命中, 杜绝渐退中"虚空点击".
 class PlaylistPanel extends StatefulWidget {
   /// 队列条目视图 (协调器逻辑队列, 断点元数据已合并).
   final ValueListenable<List<PlaylistItem>> entries;
@@ -73,10 +71,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   late final Animation<double> _fade;
 
-  /// blur 凝聚曲线 — 与 _fade 同源不同速 (easeOutCubic 前段快: 玻璃先
-  /// 迅速"凝"出轮廓, 内容透明度随后拖尾到位).
-  late final Animation<double> _blurCoalesce;
-
   /// 条目列表滚动控制器 — Scrollbar 显式挂载用 (桌面默认滚动条贴边
   /// 拉满高度, 底部与面板圆角相交).
   final ScrollController _scrollController = ScrollController();
@@ -92,10 +86,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       duration: const Duration(milliseconds: Tokens.durationControlsFade),
     )..value = widget.visible ? 1.0 : 0.0;
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-    _blurCoalesce = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    );
   }
 
   @override
@@ -115,7 +105,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   Widget build(BuildContext context) {
-    // 控制栏同款渐进渐退 — FadeTransition 驱动.
+    // 控制栏同款渐进渐退 — FadeTransition 纯渲染层驱动, 动画全程
+    // widget 树零重建 (与控制栏完全一致, v0.0.5 方案 A).
     // IgnorePointer 锚定 widget.visible (而非动画状态): 关闭瞬间立即让出
     // 命中, 根治"面板渐退中还能虚空点击条目触发播放"的竞态.
     return IgnorePointer(
@@ -132,42 +123,25 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 控制栏同款玻璃壳 — ControlBarDecoration.playing 装饰 (深色毛玻璃 +
   /// 蓝色微光边框 + 4-shadow) + 圆角与边框全部对齐控制栏.
   ///
-  /// 丝滑入场关键 (v0.0.5 用户反馈"出现有一帧不流畅"): 弃用
-  /// `BackdropFilter.enabled` 切换 — enabled false→true 的首帧要重建
-  /// 模糊渲染层, 那一帧就是肉眼可见的卡顿. 改为**材质凝聚式**入场
-  /// (Apple fluid interfaces §12 "Materialize, don't just fade"):
-  /// 渲染层结构恒定、blur 半径随透明度从 0 凝聚到全值 — 玻璃"像材质
-  /// 一样凝聚成形"而非"凭空出现", 零层切换零卡顿. 叠加右缘锚定微缩放
-  /// (空间连续性 §7) 消除"贴纸感". 装饰对象 static 缓存, 动画期间零分配.
+  /// 方案 A (完全看齐控制栏): 纯 opacity 渐变 — 玻璃恒定全值模糊, 使用
+  /// [GlassTier.normal.blurFilter] 的**缓存 filter 单例** (与控制栏同一
+  /// 实例, 零分配); 渲染结构恒定, 开关动画期间 widget 树零重建.
+  /// BackdropFilter 的模糊层在面板首次挂载时建立, 之后开关动画无任何
+  /// 渲染层结构变化 — 丝滑的根源.
   Widget _buildShell(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _fade,
-      builder: (_, child) {
-        final blur = _blurCoalesce.value;
-        final scale = 0.985 + 0.015 * blur;
-        return Transform(
-          alignment: Alignment.centerRight,
-          transform: Matrix4.diagonal3Values(scale, scale, 1),
-          child: Container(
-            decoration: _panelDecoration,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(
-                  sigmaX: Tokens.glassBlur * blur,
-                  sigmaY: Tokens.glassBlur * blur,
-                ),
-                child: child,
-              ),
-            ),
-          ),
-        );
-      },
-      child: _buildContent(context),
+    return Container(
+      decoration: _panelDecoration,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+        child: BackdropFilter(
+          filter: GlassTier.normal.blurFilter,
+          child: _buildContent(context),
+        ),
+      ),
     );
   }
 
-  /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存 (动画逐帧重建时零分配).
+  /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存.
   static final _panelDecoration = ControlBarDecoration.playing(
     borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
   );
