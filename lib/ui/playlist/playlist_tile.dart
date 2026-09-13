@@ -94,113 +94,110 @@ class _PlaylistTileState extends State<PlaylistTile> {
     final l10n = AppLocalizations.of(context);
     final borderColor = widget.isCurrent ? Tokens.accent : Colors.transparent;
 
-    return Tooltip(
-      message: widget.item.name,
-      waitDuration: const Duration(milliseconds: Tokens.tooltipDelayShort),
-      child: InkWell(
-        onTap: widget.onPlay,
-        onSecondaryTapUp: (details) =>
-            _showContextMenu(context, details.globalPosition),
-        borderRadius: BorderRadius.circular(Tokens.radiusSm),
-        child: HoverGlow(
-          child: Container(
-            padding: const EdgeInsets.all(Tokens.spXs),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(Tokens.radiusSm),
-              border: Border.all(
-                color: borderColor,
-                width: widget.isCurrent ? 1.5 : 0,
-              ),
+    // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
+    return InkWell(
+      onTap: widget.onPlay,
+      onSecondaryTapUp: (details) =>
+          _showContextMenu(context, details.globalPosition),
+      borderRadius: BorderRadius.circular(Tokens.radiusSm),
+      child: HoverGlow(
+        child: Container(
+          padding: const EdgeInsets.all(Tokens.spXs),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Tokens.radiusSm),
+            border: Border.all(
+              color: borderColor,
+              width: widget.isCurrent ? 1.5 : 0,
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 缩略图 — 透明塑料膜按钮层覆盖其上 (整个缩略图区域,
-                // 膜层 ClipRRect 与缩略图同款圆角 — 用户钦定).
-                SizedBox(
-                  width: _thumbWidth,
-                  height: _thumbHeight,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: _buildThumbnail()),
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: _FilmButton(
-                                  icon: Icons.play_arrow,
-                                  label: l10n.play,
-                                  onTap: widget.onPlay,
-                                ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 缩略图 — 透明塑料膜按钮层覆盖其上 (整个缩略图区域,
+              // 膜层 ClipRRect 与缩略图同款圆角 — 用户钦定).
+              SizedBox(
+                width: _thumbWidth,
+                height: _thumbHeight,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: _buildThumbnail()),
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _FilmButton(
+                                icon: Icons.play_arrow,
+                                label: l10n.play,
+                                onTap: widget.onPlay,
                               ),
-                              Expanded(
-                                flex: 2,
-                                child: _FilmButton(
-                                  icon: Icons.replay,
-                                  label: l10n.resumePlayback,
-                                  enabled: _resumeProgress != null,
-                                  onTap: _resumeProgress == null
-                                      ? null
-                                      : widget.onResume,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: Tokens.spSm),
-                // 名称 + 上次播放进度 — 缩略图右侧.
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.item.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: widget.isCurrent
-                              ? Tokens.accent
-                              : Tokens.textPrimary,
-                          fontSize: Tokens.fontCaption,
-                        ),
-                      ),
-                      if (_resumeProgress != null) ...[
-                        const SizedBox(height: Tokens.spXs),
-                        // 上次播放进度 — 细进度条 + 断点时间.
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                          child: LinearProgressIndicator(
-                            value: _resumeProgress,
-                            minHeight: 3,
-                            backgroundColor: Colors.black26,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Tokens.accent,
                             ),
-                          ),
+                            Expanded(
+                              flex: 2,
+                              child: _FilmButton(
+                                icon: Icons.replay,
+                                label: l10n.resumePlayback,
+                                enabled: _resumeProgress != null,
+                                onTap: _resumeProgress == null
+                                    ? null
+                                    : widget.onResume,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          l10n.breakpointAt(
-                            formatMs(widget.item.positionMs ?? 0),
-                          ),
-                          style: const TextStyle(
-                            color: Tokens.textSecondary,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: Tokens.spSm),
+              // 名称 + 上次播放进度 — 缩略图右侧.
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: widget.isCurrent
+                            ? Tokens.accent
+                            : Tokens.textPrimary,
+                        fontSize: Tokens.fontCaption,
+                      ),
+                    ),
+                    if (_resumeProgress != null) ...[
+                      const SizedBox(height: Tokens.spXs),
+                      // 上次播放进度 — 细进度条 + 断点时间.
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(Tokens.radiusSm),
+                        child: LinearProgressIndicator(
+                          value: _resumeProgress,
+                          minHeight: 3,
+                          backgroundColor: Colors.black26,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Tokens.accent,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.breakpointAt(
+                          formatMs(widget.item.positionMs ?? 0),
+                        ),
+                        style: const TextStyle(
+                          color: Tokens.textSecondary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -312,8 +309,8 @@ class _FilmButtonState extends State<_FilmButton> {
   Timer? _iconTimer;
   Timer? _textTimer;
 
-  /// 图标显现的 hover 延迟 (用户钦定 1s).
-  static const _iconDelay = Duration(seconds: 1);
+  /// 图标显现的 hover 延迟 (用户钦定 0.4s).
+  static const _iconDelay = Duration(milliseconds: 400);
 
   /// 文字展开距图标显现的间隔 (用户钦定再 1s).
   static const _textDelay = Duration(seconds: 1);
@@ -396,7 +393,7 @@ class _FilmButtonState extends State<_FilmButton> {
             duration: _fadeDuration,
             child: Icon(
               widget.icon,
-              size: 15,
+              size: 22,
               color: _enabled ? Tokens.textPrimary : Tokens.textSecondary,
             ),
           ),
