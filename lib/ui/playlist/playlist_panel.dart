@@ -1,3 +1,5 @@
+import 'dart:ui' as ui show ImageFilter;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -5,7 +7,6 @@ import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/control_bar_decoration.dart';
-import '../shared/glass_container.dart' show GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
@@ -72,6 +73,10 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   late final Animation<double> _fade;
 
+  /// 条目列表滚动控制器 — Scrollbar 显式挂载用 (桌面默认滚动条贴边
+  /// 拉满高度, 底部与面板圆角相交).
+  final ScrollController _scrollController = ScrollController();
+
   /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
   static const _panelWidth = 280.0;
 
@@ -95,6 +100,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -120,23 +126,27 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 控制栏同款玻璃壳 — ControlBarDecoration.playing 装饰 (深色毛玻璃 +
   /// 蓝色微光边框 + 4-shadow) + 圆角与边框全部对齐控制栏.
   ///
-  /// BackdropFilter 采样随透明度启停 (对齐控制栏 _withBlur 的"透明尾部
-  /// 停用滤镜"策略) — 不可见/半透明过渡期不做全区域 GPU readback,
-  /// 这是面板渐入渐出闪烁的根源修复.
+  /// 丝滑入场关键 (v0.0.5 用户反馈"出现有一帧不流畅"): 弃用
+  /// `BackdropFilter.enabled` 切换 — enabled false→true 的首帧要重建
+  /// 模糊渲染层, 那一帧就是肉眼可见的卡顿. 改为**材质凝聚式**入场
+  /// (Apple fluid interfaces §12 "Materialize, don't just fade"):
+  /// 渲染层结构恒定、blur 半径随透明度从 0 凝聚到全值 — 玻璃"像材质
+  /// 一样凝聚成形"而非"凭空出现", 零层切换零卡顿.
+  /// 装饰对象 static 缓存, 动画期间零分配.
   Widget _buildShell(BuildContext context) {
     return AnimatedBuilder(
       animation: _fade,
       builder: (_, child) {
-        final opacity = _fade.value;
+        final t = _fade.value;
         return Container(
-          decoration: ControlBarDecoration.playing(
-            borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-          ),
+          decoration: _panelDecoration,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
             child: BackdropFilter(
-              filter: GlassTier.normal.blurFilter,
-              enabled: opacity >= 0.01,
+              filter: ui.ImageFilter.blur(
+                sigmaX: Tokens.glassBlur * t,
+                sigmaY: Tokens.glassBlur * t,
+              ),
               child: child,
             ),
           ),
@@ -145,6 +155,11 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: _buildContent(context),
     );
   }
+
+  /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存 (动画逐帧重建时零分配).
+  static final _panelDecoration = ControlBarDecoration.playing(
+    borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+  );
 
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -209,18 +224,27 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               }
               return ValueListenableBuilder<int>(
                 valueListenable: widget.currentIndex,
-                builder: (_, index, _) => ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: Tokens.spSm,
-                    horizontal: Tokens.spXs,
-                  ),
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => PlaylistTile(
-                    item: items[i],
-                    isCurrent: i == index,
-                    onPlay: () => widget.onPlayEntry(i),
-                    onResume: () => widget.onResumeEntry(i),
-                    onRemove: () => widget.onRemoveEntry(i),
+                builder: (_, index, _) => Scrollbar(
+                  controller: _scrollController,
+                  thumbVisibility: true,
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
+                    // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
+                    padding: const EdgeInsets.fromLTRB(
+                      Tokens.spXs,
+                      Tokens.spSm,
+                      8,
+                      Tokens.controlBarRadius,
+                    ),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) => PlaylistTile(
+                      item: items[i],
+                      isCurrent: i == index,
+                      onPlay: () => widget.onPlayEntry(i),
+                      onResume: () => widget.onResumeEntry(i),
+                      onRemove: () => widget.onRemoveEntry(i),
+                    ),
                   ),
                 ),
               );
