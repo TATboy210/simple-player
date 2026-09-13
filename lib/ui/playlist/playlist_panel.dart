@@ -17,9 +17,9 @@ import 'playlist_tile.dart';
 /// rounded glassmorphism. 底部避开控制栏区域, 与控制栏同屏共存.
 ///
 /// 动画: 控制栏同款渐进渐退 (FadeTransition + easeInOut +
-/// durationControlsFade); 渐入渐出期间 BackdropFilter 采样随透明度启停
-/// (消除与视频纹理混合的闪烁); IgnorePointer 锚定 [visible] — 关闭瞬间
-/// 让出命中, 杜绝渐退中"虚空点击".
+/// durationControlsFade) + 材质凝聚式 blur 半径动画 (Apple fluid
+/// interfaces §12); IgnorePointer 锚定 [visible] — 关闭瞬间让出命中,
+/// 杜绝渐退中"虚空点击".
 class PlaylistPanel extends StatefulWidget {
   /// 队列条目视图 (协调器逻辑队列, 断点元数据已合并).
   final ValueListenable<List<PlaylistItem>> entries;
@@ -27,7 +27,7 @@ class PlaylistPanel extends StatefulWidget {
   /// 当前播放条目索引 (-1 = 未播放) — 驱动高亮.
   final ValueListenable<int> currentIndex;
 
-  /// 面板是否可见 — 驱动蔓延进入/收回动画 (宿主共享 notifier, 全屏同源).
+  /// 面板是否可见 — 驱动渐入渐出动画 (宿主共享 notifier, 全屏同源).
   final bool visible;
 
   /// 点击关闭按钮后通知宿主 (宿主翻转可见性 notifier).
@@ -36,7 +36,7 @@ class PlaylistPanel extends StatefulWidget {
   /// 播放指定索引条目.
   final ValueChanged<int> onPlayEntry;
 
-  /// 断点续播指定索引条目 — 播放 + seek 到断点 (v0.0.5 按钮化).
+  /// 断点续播指定索引条目 — 播放 + seek 到断点.
   final ValueChanged<int> onResumeEntry;
 
   /// 移除指定索引条目.
@@ -68,10 +68,14 @@ class PlaylistPanel extends StatefulWidget {
 class _PlaylistPanelState extends State<PlaylistPanel>
     with SingleTickerProviderStateMixin {
   /// 渐进渐退动画 — 与控制栏同款 (FadeTransition + easeInOut +
-  /// durationControlsFade, v0.0.5 用户钦定: 弃蔓延/条目 stagger).
+  /// durationControlsFade).
   late final AnimationController _controller;
 
   late final Animation<double> _fade;
+
+  /// blur 凝聚曲线 — 与 _fade 同源不同速 (easeOutCubic 前段快: 玻璃先
+  /// 迅速"凝"出轮廓, 内容透明度随后拖尾到位).
+  late final Animation<double> _blurCoalesce;
 
   /// 条目列表滚动控制器 — Scrollbar 显式挂载用 (桌面默认滚动条贴边
   /// 拉满高度, 底部与面板圆角相交).
@@ -88,6 +92,10 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       duration: const Duration(milliseconds: Tokens.durationControlsFade),
     )..value = widget.visible ? 1.0 : 0.0;
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _blurCoalesce = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -109,9 +117,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   Widget build(BuildContext context) {
     // 控制栏同款渐进渐退 — FadeTransition 驱动.
     // IgnorePointer 锚定 widget.visible (而非动画状态): 关闭瞬间立即让出
-    // 命中, 根治"面板渐退中还能虚空点击条目触发播放"的竞态;
-    // RepaintBoundary 隔离重绘, BackdropFilter 采样随透明度启停 —
-    // 消除渐入渐出时玻璃采样与视频纹理逐帧混合的"一闪一闪".
+    // 命中, 根治"面板渐退中还能虚空点击条目触发播放"的竞态.
     return IgnorePointer(
       ignoring: !widget.visible,
       child: RepaintBoundary(
@@ -131,23 +137,28 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 模糊渲染层, 那一帧就是肉眼可见的卡顿. 改为**材质凝聚式**入场
   /// (Apple fluid interfaces §12 "Materialize, don't just fade"):
   /// 渲染层结构恒定、blur 半径随透明度从 0 凝聚到全值 — 玻璃"像材质
-  /// 一样凝聚成形"而非"凭空出现", 零层切换零卡顿.
-  /// 装饰对象 static 缓存, 动画期间零分配.
+  /// 一样凝聚成形"而非"凭空出现", 零层切换零卡顿. 叠加右缘锚定微缩放
+  /// (空间连续性 §7) 消除"贴纸感". 装饰对象 static 缓存, 动画期间零分配.
   Widget _buildShell(BuildContext context) {
     return AnimatedBuilder(
       animation: _fade,
       builder: (_, child) {
-        final t = _fade.value;
-        return Container(
-          decoration: _panelDecoration,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(
-                sigmaX: Tokens.glassBlur * t,
-                sigmaY: Tokens.glassBlur * t,
+        final blur = _blurCoalesce.value;
+        final scale = 0.985 + 0.015 * blur;
+        return Transform(
+          alignment: Alignment.centerRight,
+          transform: Matrix4.diagonal3Values(scale, scale, 1),
+          child: Container(
+            decoration: _panelDecoration,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(
+                  sigmaX: Tokens.glassBlur * blur,
+                  sigmaY: Tokens.glassBlur * blur,
+                ),
+                child: child,
               ),
-              child: child,
             ),
           ),
         );
@@ -224,26 +235,35 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               }
               return ValueListenableBuilder<int>(
                 valueListenable: widget.currentIndex,
-                builder: (_, index, _) => Scrollbar(
-                  controller: _scrollController,
-                  thumbVisibility: true,
-                  child: ListView.builder(
+                builder: (_, index, _) => ScrollbarTheme(
+                  // 两端内缩一个圆角半径 — thumb 拉到底不再与面板圆角
+                  // 相交 (Scrollbar 绘制区域不受 ListView padding 影响,
+                  // margin 必须经 ScrollbarThemeData 传入).
+                  data: const ScrollbarThemeData(
+                    mainAxisMargin: Tokens.controlBarRadius,
+                    crossAxisMargin: 3,
+                  ),
+                  child: Scrollbar(
                     controller: _scrollController,
-                    // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
-                    // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
-                    padding: const EdgeInsets.fromLTRB(
-                      Tokens.spXs,
-                      Tokens.spSm,
-                      8,
-                      Tokens.controlBarRadius,
-                    ),
-                    itemCount: items.length,
-                    itemBuilder: (_, i) => PlaylistTile(
-                      item: items[i],
-                      isCurrent: i == index,
-                      onPlay: () => widget.onPlayEntry(i),
-                      onResume: () => widget.onResumeEntry(i),
-                      onRemove: () => widget.onRemoveEntry(i),
+                    thumbVisibility: true,
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
+                      // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
+                      padding: const EdgeInsets.fromLTRB(
+                        Tokens.spXs,
+                        Tokens.spSm,
+                        8,
+                        Tokens.controlBarRadius,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (_, i) => PlaylistTile(
+                        item: items[i],
+                        isCurrent: i == index,
+                        onPlay: () => widget.onPlayEntry(i),
+                        onResume: () => widget.onResumeEntry(i),
+                        onRemove: () => widget.onRemoveEntry(i),
+                      ),
                     ),
                   ),
                 ),
