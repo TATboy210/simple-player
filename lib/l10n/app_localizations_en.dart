@@ -244,6 +244,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistEmpty => 'Playlist is empty';
 
   @override
+  String get sortBy => 'Sort';
+
+  @override
+  String get sortByAddedOrder => 'By Added Order';
+
+  @override
+  String get sortByName => 'By Name';
+
+  @override
+  String get sortByLastPlayed => 'By Last Played';
+
+  @override
+  String get sortByDuration => 'By Duration';
+
+  @override
+  String get sortAscending => 'Ascending';
+
+  @override
+  String get sortDescending => 'Descending';
+
+  @override
   String get noHistory => 'No playback history';
 
   @override

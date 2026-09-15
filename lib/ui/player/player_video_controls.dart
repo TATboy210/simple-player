@@ -959,6 +959,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   playMode: widget.playlistCoordinator!.playMode,
                   onCyclePlayMode: () =>
                       unawaited(widget.playlistCoordinator!.cyclePlayMode()),
+                  sortKey: widget.playlistCoordinator!.sortKey,
+                  sortAscending: widget.playlistCoordinator!.sortAscending,
+                  onSortSelected: (key) => unawaited(
+                    widget.playlistCoordinator!.sortEntries(key),
+                  ),
                 ),
               ),
             ),

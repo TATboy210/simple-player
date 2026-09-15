@@ -244,6 +244,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playlistEmpty => '播放列表为空';
 
   @override
+  String get sortBy => '排序';
+
+  @override
+  String get sortByAddedOrder => '按添加顺序';
+
+  @override
+  String get sortByName => '按名称';
+
+  @override
+  String get sortByLastPlayed => '按最后播放';
+
+  @override
+  String get sortByDuration => '按时长';
+
+  @override
+  String get sortAscending => '升序';
+
+  @override
+  String get sortDescending => '降序';
+
+  @override
   String get noHistory => '暂无播放记录';
 
   @override

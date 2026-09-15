@@ -32,6 +32,18 @@ abstract class QueueControl {
   /// 移除指定索引条目. 删除正在播放条目时 mpv 自动跳转, 经 stream 镜像同步.
   Future<void> removeFromQueue(int index);
 
+  /// 按 [targetOrder] 物理重排队列 (v0.0.6 排序功能) — 不打断当前播放.
+  ///
+  /// Physical queue reorder via mpv `playlist-move` sequence (planned by
+  /// `planPlaylistMoves`, 不变式保证命令恒 from > to). mpv 保留条目的
+  /// current 标记, 播放中的文件不受移动影响.
+  ///
+  /// requires: [targetOrder] 是当前 [queuePaths] 的排列 (同元素集合);
+  ///   违反时 no-op (防御 — 以调用时刻快照为准消化竞态).
+  /// ensures: 成功时队列镜像已一次性更新到目标顺序, [queueIndex] 跟随
+  ///   当前播放 path 的新位置; stream.playlist 回流幂等覆盖.
+  Future<void> sortQueue(List<String> targetOrder);
+
   /// 跳到指定索引并播放; 越界 (index ∉ [0, length)) 为 no-op 返回 `false`.
   Future<bool> jumpTo(int index);
 

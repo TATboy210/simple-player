@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
+import '../../kernel/models/playlist_sort.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/control_bar_decoration.dart';
-import '../shared/glass_container.dart' show GlassTier;
+import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
@@ -46,6 +49,15 @@ class PlaylistPanel extends StatefulWidget {
   /// 切换播放模式 (循环: loopAll → loopSingle → shuffle → loopAll).
   final VoidCallback onCyclePlayMode;
 
+  /// 当前排序键 — 菜单勾选态 (菜单瞬态弹出, 打开时取值即最新).
+  final PlaylistSortKey sortKey;
+
+  /// 当前排序方向 — true = 升序.
+  final bool sortAscending;
+
+  /// 选择排序键 (v0.0.6) — 同键再次选择 = 翻转方向, 由协调器裁定.
+  final ValueChanged<PlaylistSortKey> onSortSelected;
+
   const PlaylistPanel({
     super.key,
     required this.entries,
@@ -57,6 +69,9 @@ class PlaylistPanel extends StatefulWidget {
     required this.onRemoveEntry,
     required this.playMode,
     required this.onCyclePlayMode,
+    required this.sortKey,
+    required this.sortAscending,
+    required this.onSortSelected,
   });
 
   @override
@@ -151,7 +166,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 标题行 — 标题 + 模式切换 + 关闭.
+        // 标题行 — 标题 + 排序 + 模式切换 + 关闭 (v0.0.6: 三按钮统一
+        // GlassButton.iconOnly 方块风格, 向控制栏看齐).
         Padding(
           padding: const EdgeInsets.fromLTRB(
             Tokens.spMd,
@@ -171,19 +187,25 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                   ),
                 ),
               ),
+              // 排序 (v0.0.6) — 弹出排序方式菜单.
+              Builder(
+                builder: (buttonContext) => GlassButton.iconOnly(
+                  icon: Icons.sort,
+                  tooltip: l10n.sortBy,
+                  onPressed: () => unawaited(_showSortMenu(buttonContext)),
+                ),
+              ),
               // 模式切换 — 图标随 playMode 变化, 点击循环切换.
               ValueListenableBuilder<PlayMode>(
                 valueListenable: widget.playMode,
-                builder: (_, mode, _) => IconButton(
-                  icon: Icon(playModeIcon(mode), size: 20),
-                  color: Tokens.textSecondary,
+                builder: (_, mode, _) => GlassButton.iconOnly(
+                  icon: playModeIcon(mode),
                   tooltip: playModeLabel(mode, l10n),
                   onPressed: widget.onCyclePlayMode,
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                color: Tokens.textSecondary,
+              GlassButton.iconOnly(
+                icon: Icons.close,
                 tooltip: l10n.close,
                 onPressed: widget.onClose,
               ),
@@ -248,4 +270,68 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       ],
     );
   }
+
+  // ============================================================
+  // 排序 (v0.0.6)
+  // ============================================================
+
+  /// 排序方式菜单 — 锚定排序按钮下方, 当前键打勾并显示方向箭头.
+  /// 同键再次选择 = 翻转方向 (由协调器裁定); 菜单为瞬态弹出,
+  /// 打开时读取的 sortKey/sortAscending 即最新状态.
+  Future<void> _showSortMenu(BuildContext buttonContext) async {
+    final l10n = AppLocalizations.of(context);
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject() as RenderBox?;
+    final button =
+        buttonContext.findRenderObject() as RenderBox?;
+    if (overlay == null || button == null) return;
+    final anchor = button.localToGlobal(
+      Offset(0, button.size.height),
+      ancestor: overlay,
+    );
+    final action = await showMenu<PlaylistSortKey>(
+      context: buttonContext,
+      position: RelativeRect.fromRect(
+        anchor & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final key in PlaylistSortKey.values)
+          PopupMenuItem<PlaylistSortKey>(
+            value: key,
+            child: Row(
+              children: [
+                // 勾选标记占位 — 未选项对齐.
+                SizedBox(
+                  width: 20,
+                  child: key == widget.sortKey
+                      ? const Icon(Icons.check, size: 16, color: Tokens.accent)
+                      : null,
+                ),
+                Expanded(child: Text(_sortKeyLabel(key, l10n))),
+                if (key == widget.sortKey)
+                  Icon(
+                    widget.sortAscending
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
+                    size: 14,
+                    color: Tokens.textSecondary,
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (action == null) return;
+    widget.onSortSelected(action);
+  }
+
+  /// 排序键 → 菜单文案.
+  static String _sortKeyLabel(PlaylistSortKey key, AppLocalizations l10n) =>
+      switch (key) {
+        PlaylistSortKey.addedOrder => l10n.sortByAddedOrder,
+        PlaylistSortKey.name => l10n.sortByName,
+        PlaylistSortKey.lastPlayed => l10n.sortByLastPlayed,
+        PlaylistSortKey.duration => l10n.sortByDuration,
+      };
 }

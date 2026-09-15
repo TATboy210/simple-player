@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'media_engine.dart';
 import 'media_state.dart';
 import 'open_result.dart';
+import 'playlist_move_planner.dart';
 import 'video_effect_type.dart';
 import '../models/play_mode.dart';
 import '../models/player_error.dart';
@@ -454,6 +455,44 @@ class MediaKitEngine implements MediaEngine {
         error,
         ErrorContext(
           action: 'removeFromQueue',
+          module: 'MediaKitEngine',
+          callbackStackTrace: stackTrace,
+        ),
+      );
+    }
+  }
+
+  @override
+  Future<void> sortQueue(List<String> targetOrder) async {
+    if (_disposed) return;
+    final current = _queuePaths.value;
+    // 规划 move 序列 — 恒等排列/非排列返回空序列 (no-op 防御).
+    final moves = planPlaylistMoves(current, targetOrder);
+    if (moves.isEmpty) return;
+    try {
+      // mpv 命令队列串行保序; 每条 move 会触发 stream.playlist 事件,
+      // 中间态由最终乐观镜像 + 回流幂等覆盖收敛.
+      for (final move in moves) {
+        await _player.move(move.from, move.to);
+      }
+      // 乐观镜像一次到位 — 当前 path 在目标顺序中的位置即新 index
+      // (mpv playlist-move 保留条目 current 标记, 播放不中断).
+      final currentIndex = _queueIndex.value;
+      final currentPath =
+          (currentIndex >= 0 && currentIndex < current.length)
+          ? current[currentIndex]
+          : null;
+      _queuePaths.value = List<String>.unmodifiable(targetOrder);
+      _queueIndex.value = currentPath == null
+          ? -1
+          : targetOrder.indexOf(currentPath);
+      _touchQueueRevision();
+    } on Exception catch (error, stackTrace) {
+      _lastError.value = UnknownError(
+        '排序队列失败: $error',
+        error,
+        ErrorContext(
+          action: 'sortQueue',
           module: 'MediaKitEngine',
           callbackStackTrace: stackTrace,
         ),

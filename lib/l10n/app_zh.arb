@@ -87,6 +87,13 @@
   "restore": "还原",
 
   "playlistEmpty": "播放列表为空",
+  "sortBy": "排序",
+  "sortByAddedOrder": "按添加顺序",
+  "sortByName": "按名称",
+  "sortByLastPlayed": "按最后播放",
+  "sortByDuration": "按时长",
+  "sortAscending": "升序",
+  "sortDescending": "降序",
   "noHistory": "暂无播放记录",
   "playlistTab": "播放列表",
   "historyTab": "播放历史",
