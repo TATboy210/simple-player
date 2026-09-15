@@ -29,6 +29,19 @@ Future<void> _deleteTempDir(Directory dir) async {
   }
 }
 
+/// 计数包装 — 断点节流落盘测试用（save 次数可观测, 内容仍真写盘）.
+class _CountingStore extends PlaylistStore {
+  _CountingStore({required super.resolveDirectory});
+
+  int saveCount = 0;
+
+  @override
+  Future<void> save(PersistedPlaylistSnapshot snapshot) async {
+    saveCount++;
+    return super.save(snapshot);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -131,6 +144,98 @@ void main() {
       final x = coordinator.entries.value.firstWhere((e) => e.path == 'x.mp4');
       expect(a.positionMs, 10000); // 旧断点未错位到别的条目
       expect(x.positionMs, 7000);
+    });
+  });
+
+  group('断点补全 (v0.0.6)', () {
+    test('effectiveBreakpointMs — 近 EOF 规则纯函数', () {
+      // 正常中途 — 保留.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(50000, 100000), 50000);
+      // ≥ duration−5s — 视为看完.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(95000, 100000), isNull);
+      // ≥ 98% — 视为看完.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(98000, 100000), isNull);
+      // 未播放 — 不留断点.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(0, 100000), isNull);
+      // 时长未知 — 位置有效即保留.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(42000, 0), 42000);
+      // 短文件 (<5s) — 整个都在片尾阈值区, 永不留断点.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(3000, 4000), isNull);
+      // 防御: 非法负值.
+      expect(PlaylistCoordinator.effectiveBreakpointMs(-1, 100000), isNull);
+    });
+
+    test('stop 保留断点 — 粘性最后非零位置（修复停止清零）', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 0);
+      engine.duration.value = 100000;
+      engine.position.value = 42000;
+
+      // FakeEngine.stop 同步置 position=0 先于 revision 回流 —
+      // 与真机 _clearLoadedMediaState 时序同构, 复现"停止清零"场景.
+      await engine.stop();
+
+      final a = coordinator.entries.value.firstWhere((e) => e.path == 'a.mp4');
+      expect(a.positionMs, 42000);
+      expect(a.durationMs, 100000);
+    });
+
+    test('切曲竞态 — 新曲 position(0) 先到不污染旧曲断点', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      engine.duration.value = 100000;
+      engine.position.value = 42000;
+
+      // 模拟 mpv 真实时序: 新文件 position(0) 先于 playlist 事件到达.
+      engine.position.value = 0;
+      await coordinator.playEntryAt(1);
+
+      final a = coordinator.entries.value.firstWhere((e) => e.path == 'a.mp4');
+      expect(a.positionMs, 42000);
+    });
+
+    test('曲目切换后粘性取材重置 — 死文件不继承上曲断点', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      engine.duration.value = 100000;
+      engine.position.value = 42000;
+      await coordinator.playEntryAt(1); // a 记 42000, 粘性取材重置
+
+      // b 是"死文件": position/duration 从不推进 (b 未被断点污染的前提).
+      await coordinator.playEntryAt(0); // 切回 a — 给 b 记断点
+
+      final b = coordinator.entries.value.firstWhere((e) => e.path == 'b.mp4');
+      expect(b.positionMs, isNull); // 不是 42000 — 无上曲残留
+    });
+
+    test('节流落盘 — 5s 窗口内多次 position 只落盘一次', () async {
+      final tempDir = await Directory.systemTemp.createTemp('bp_throttle_test');
+      final store = _CountingStore(resolveDirectory: () async => tempDir);
+      final coord = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(() => coord.dispose());
+      addTearDown(() => _deleteTempDir(tempDir));
+
+      var now = DateTime(2026, 1, 1);
+      coord.clock = () => now;
+
+      await engine.openPlaylist(['a.mp4']);
+      engine.duration.value = 100000;
+
+      // 装载本身触发一次 _save (既有行为) — 以此为基线计数.
+      final baseline = store.saveCount;
+      expect(baseline, greaterThanOrEqualTo(1));
+
+      engine.position.value = 1000; // 首次进度 → 立即落盘
+      expect(store.saveCount, baseline + 1);
+
+      now = now.add(const Duration(seconds: 1));
+      engine.position.value = 2000; // 窗口内 → 不落盘
+      expect(store.saveCount, baseline + 1);
+
+      now = now.add(const Duration(seconds: 6));
+      engine.position.value = 3000; // 窗口已过 → 落盘
+      expect(store.saveCount, baseline + 2);
+
+      // 当前曲目断点内容已随节流保存刷新.
+      final a = coord.entries.value.firstWhere((e) => e.path == 'a.mp4');
+      expect(a.positionMs, 3000);
     });
   });
 
