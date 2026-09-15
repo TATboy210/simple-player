@@ -109,6 +109,15 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
                 value: AppLanguage.chinese,
                 child: Text('中文'),
               ),
+              // 语言名按国际惯例以各自母语显示 (v0.0.6 增韩/日).
+              const DropdownMenuItem(
+                value: AppLanguage.korean,
+                child: Text('한국어'),
+              ),
+              const DropdownMenuItem(
+                value: AppLanguage.japanese,
+                child: Text('日本語'),
+              ),
             ],
             onChanged: (language) {
               if (language != null) {

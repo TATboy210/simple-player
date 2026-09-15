@@ -396,6 +396,33 @@ void main() {
         expect(reader.state.value.errorCardEnabled, isTrue);
       });
 
+      test('korean/japanese 语言 round-trip（v0.0.6 append-only 契约）', () async {
+        // Arrange — 写入 korean 并等待落盘。
+        final writerKo = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        writerKo.setLanguage(AppLanguage.korean);
+        await writerKo.pendingPersist;
+
+        // Act — 重启模拟。
+        final readerKo = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        await readerKo.load();
+
+        // Assert
+        expect(readerKo.state.value.language, AppLanguage.korean);
+
+        // japanese 同路径.
+        writerKo.setLanguage(AppLanguage.japanese);
+        await writerKo.pendingPersist;
+        final readerJa = ErrorFeedbackSettings.forTesting(
+          settingsFile: () => settingsFile,
+        );
+        await readerJa.load();
+        expect(readerJa.state.value.language, AppLanguage.japanese);
+      });
+
       test('setCardEnabled 保留已写入的语言（旧版「全新快照」丢字段回归）', () async {
         // Arrange — 先写语言，再翻开关。
         final store = ErrorFeedbackSettings.forTesting(
