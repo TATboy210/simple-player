@@ -53,11 +53,26 @@ class PlaylistCoordinator {
   final Map<String, PlaylistItem> _metaByPath = <String, PlaylistItem>{};
 
   /// 切曲前最后一次已知的 position/duration 快照 — 断点更新取材处.
+  /// **粘性语义 (v0.0.6)**: 进 0 不回写 — engine.stop 的
+  /// `_clearLoadedMediaState` 会同步把 position/duration 清 0, 先于
+  /// queueRevision 回流的断点写入; 无粘性时 stop 断点恒为 0
+  /// ("停止=丢断点"), 切曲时新文件 position(0) 先到的竞态同理.
   /// position 流高频但只写两个 int 字段, 无 notifier 通知, 开销可忽略.
   int _lastKnownPositionMs = 0;
   int _lastKnownDurationMs = 0;
 
   bool _disposed = false;
+
+  /// 断点节流落盘间隔 — 播放中每 5s 把当前进度刷进断点元数据并落盘,
+  /// 保证强杀进程/异常退出时断点损失不超过该粒度.
+  static const Duration _breakpointSaveInterval = Duration(seconds: 5);
+
+  /// 上次断点节流落盘时刻 (毫秒纪元) — 0 = 从未落盘 (首次进度立即保存).
+  int _lastBreakpointSaveMs = 0;
+
+  /// 可注入时钟 — 测试控制节流窗口 (默认真实时钟).
+  @visibleForTesting
+  DateTime Function() clock = DateTime.now;
 
   // ============================================================
   // UI 视图
@@ -243,6 +258,11 @@ class PlaylistCoordinator {
     final previous = _observedPlayingPath;
     if (previous != null && previous != current) {
       _updateBreakpoint(previous);
+      // 新曲目开始 — 重置粘性取材, 防上曲残留污染新曲断点
+      // (死文件场景: 新曲 position/duration 从不推进, 若不重置会
+      //  继承上曲位置; 正常播放会立即以新值覆盖).
+      _lastKnownPositionMs = 0;
+      _lastKnownDurationMs = 0;
     }
     _observedPaths = List<String>.unmodifiable(paths);
     _observedPlayingPath = current;
@@ -258,8 +278,29 @@ class PlaylistCoordinator {
     return true;
   }
 
+  /// 片尾阈值 — position 落入 [duration−5s, duration] 视为看完.
+  static const _nearEofTailMs = 5000;
+
+  /// 片尾百分比阈值 — position ≥ 98% duration 同样视为看完 (长片 5s 太窄).
+  static const _nearEofPercent = 98;
+
+  /// 近 EOF 断点规则 — 纯函数 (单测锚点, VLC 惯例).
+  ///
+  /// 返回应写入的断点位置: 正常中途返回原值; 未播放/看完返回 null.
+  /// 短文件 (时长 ≤ 5s) 整体都在片尾阈值区, 永不留断点.
+  @visibleForTesting
+  static int? effectiveBreakpointMs(int positionMs, int durationMs) {
+    if (positionMs <= 0) return null;
+    if (durationMs <= 0) return positionMs; // 时长未知 — 位置有效即保留
+    if (positionMs >= durationMs - _nearEofTailMs) return null;
+    if (positionMs * 100 >= durationMs * _nearEofPercent) return null;
+    return positionMs;
+  }
+
   /// 给指定 path 的条目写断点（最后位置 + 时长 + 时间戳）并刷新视图.
   /// 已从逻辑队列移除的条目跳过（删除正在播条目时触发的断点回写是无主记录）.
+  /// 近 EOF 的条目写 positionMs=null — 看完不留断点, durationMs 照写
+  /// （排序按时长需要它）.
   void _updateBreakpoint(String path) {
     final existing = _metaByPath[path];
     if (existing == null && !_entries.value.any((e) => e.path == path)) {
@@ -267,7 +308,7 @@ class PlaylistCoordinator {
     }
     final base = existing ?? PlaylistItem(path: path);
     final updated = base.copyWith(
-      positionMs: _lastKnownPositionMs,
+      positionMs: effectiveBreakpointMs(_lastKnownPositionMs, _lastKnownDurationMs),
       durationMs: _lastKnownDurationMs > 0 ? _lastKnownDurationMs : null,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
@@ -304,13 +345,17 @@ class PlaylistCoordinator {
   }
 
   void _trackPosition() {
-    _lastKnownPositionMs = _engine.position.value;
+    // 粘性取材: 进 0 不回写 (_lastKnown* 字段注释详见粘性语义说明).
+    final live = _engine.position.value;
+    if (live > 0) _lastKnownPositionMs = live;
+    _maybeThrottledSave(live);
     // 断点续播补 seek — "新条目开始播放"锁存信号: position 落入低位区
-    // 且时长有效. 一次性消费 (置 null), 后续 seek 本身产生的 position
-    // 事件不会重复触发.
+    // 且时长有效. **必须读引擎活值而非粘性值** — 上曲遗留的高位粘性值
+    // 会让低位信号永不满足, 续播静默失效. 一次性消费 (置 null), 后续
+    // seek 本身产生的 position 事件不会重复触发.
     final pending = _pendingResumeMs;
     if (pending != null &&
-        _lastKnownPositionMs < _resumeSeekLatchMs &&
+        live < _resumeSeekLatchMs &&
         _engine.duration.value > 0) {
       _pendingResumeMs = null;
       unawaited(_engine.seekTo(pending));
@@ -318,13 +363,33 @@ class PlaylistCoordinator {
   }
 
   void _trackDuration() {
-    _lastKnownDurationMs = _engine.duration.value;
+    // 粘性取材同 position — duration 清 0 (stop/装载) 不回写.
+    final live = _engine.duration.value;
+    if (live > 0) _lastKnownDurationMs = live;
     // 断点续播的挂起 seek — duration 首次有效即补齐 (装载场景).
     final pending = _pendingResumeMs;
-    if (pending != null && _lastKnownDurationMs > 0) {
+    if (pending != null && live > 0) {
       _pendingResumeMs = null;
       unawaited(_engine.seekTo(pending));
     }
+  }
+
+  /// 断点节流落盘 — 播放中每 [_breakpointSaveInterval] 把当前条目进度
+  /// 刷进断点元数据并落盘. 无此机制时 _save 只在切曲/装载等事件触发,
+  /// 播放中途强杀进程会丢失自上次事件以来的全部进度.
+  void _maybeThrottledSave(int livePositionMs) {
+    final current = _observedPlayingPath;
+    if (current == null) return; // 未在播放任何条目
+    if (livePositionMs <= 0) return; // 起始/清零事件无进度可存
+    final nowMs = clock().millisecondsSinceEpoch;
+    if (nowMs - _lastBreakpointSaveMs < _breakpointSaveInterval.inMilliseconds) {
+      return; // 节流窗口内
+    }
+    _lastBreakpointSaveMs = nowMs;
+    // 先把当前条目断点刷进元数据 (含近 EOF 判定), 再落盘 —
+    // 否则 _save 只会写出切曲时的旧快照.
+    _updateBreakpoint(current);
+    unawaited(_save());
   }
 
   // ============================================================
