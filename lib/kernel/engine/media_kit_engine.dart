@@ -1,6 +1,8 @@
 // ignore_for_file: invalid_use_of_visible_for_testing_member
 
 import 'dart:async';
+import 'dart:collection';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
@@ -10,6 +12,7 @@ import 'media_engine.dart';
 import 'media_state.dart';
 import 'open_result.dart';
 import 'playlist_move_planner.dart';
+import 'shuffle_policy.dart';
 import 'video_effect_type.dart';
 import '../models/play_mode.dart';
 import '../models/player_error.dart';
@@ -106,6 +109,17 @@ class MediaKitEngine implements MediaEngine {
   // 完成态抢占标志 — completed 事件先于 playing(false) 到达时,
   // 用它阻止 _onPlaying 把 completed 误转 paused (顺序见 _onPlaying 注释).
   bool _completing = false;
+
+  // ─── shuffle 播放顺序覆盖层 (v0.0.6) ───
+  // media_kit setShuffle 底层是 mpv `playlist-shuffle` = 物理重排队列,
+  // v0.0.6 起弃用; 随机性全部在 Dart 层 (见 shuffle_policy.dart):
+  // 列表展示顺序与播放顺序解耦, shuffle 永不改变队列排列.
+
+  /// 播放历史栈 (path 键, 索引会因队列编辑漂移) — previous 回溯用.
+  final ListQueue<String> _shuffleHistory = ListQueue<String>();
+
+  /// 随机源 — 每引擎实例一个.
+  final Random _rng = Random();
 
   // 已告警的 stub 方法集合 — 每个 stub 只 debugPrint 一次, 避免刷屏.
   final Set<String> _warnedUnsupported = <String>{};
@@ -555,15 +569,56 @@ class MediaKitEngine implements MediaEngine {
       return true;
     }
 
+    // v0.0.6: shuffle 模式 — 随机/历史覆盖层 (队列顺序不动).
+    if (_playMode.value == PlayMode.shuffle) {
+      return _stepShuffle(forward: forward, current: current);
+    }
+
     final target = forward ? current + 1 : current - 1;
     if (target >= 0 && target < count) {
       unawaited(jumpTo(target));
       return true;
     }
 
-    // 越界: 三种 PlayMode 均为循环语义 — 回绕 (loopSingle 只约束自然播完,
+    // 越界: 循环语义 — 回绕 (loopSingle 只约束自然播完,
     // 用户主动切曲照常回绕). PlayMode 无 none 值, 此分支恒可达.
     unawaited(jumpTo(forward ? 0 : count - 1));
+    return true;
+  }
+
+  /// shuffle 模式步进 — next 随机选曲 (当前曲入历史栈), previous 弹栈
+  /// 回溯 (VLC 式精确回退); 栈空回退线性回绕保证永远有响应.
+  bool _stepShuffle({required bool forward, required int current}) {
+    final queue = _queuePaths.value;
+    final currentPath = queue[current];
+    if (forward) {
+      ShufflePolicy.pushHistory(_shuffleHistory, currentPath);
+      final next = ShufflePolicy.pickShuffleNext(
+        queue: queue,
+        current: currentPath,
+        recent: _shuffleHistory.toList(),
+        random: _rng,
+      );
+      if (next == null) {
+        // 单文件队列 — 随机唯一候选即当前曲, 重播 (与循环回绕观感一致).
+        unawaited(jumpTo(current));
+        return true;
+      }
+      unawaited(jumpTo(queue.indexOf(next)));
+      return true;
+    }
+    // previous: 弹历史栈, 被删条目惰性跳过 (path 键天然免疫索引漂移).
+    while (_shuffleHistory.isNotEmpty) {
+      final candidate = _shuffleHistory.removeLast();
+      final index = queue.indexOf(candidate);
+      if (index >= 0 && index != current) {
+        unawaited(jumpTo(index));
+        return true;
+      }
+    }
+    // 栈空 — 线性回绕兜底.
+    final target = current - 1;
+    unawaited(jumpTo(target >= 0 ? target : queue.length - 1));
     return true;
   }
 
@@ -574,17 +629,18 @@ class MediaKitEngine implements MediaEngine {
     try {
       switch (mode) {
         case PlayMode.loopAll:
+          // mpv 原生线性循环 (loop-playlist).
           await _player.setPlaylistMode(PlaylistMode.loop);
-          await _player.setShuffle(false);
         case PlayMode.loopSingle:
           // mpv loop-file — 自然播完单文件循环, 队列不动.
           await _player.setPlaylistMode(PlaylistMode.single);
-          await _player.setShuffle(false);
         case PlayMode.shuffle:
-          // 乱序循环: loop-playlist 保循环 + playlist-shuffle 一次性重排;
-          // 重排后的新顺序经 stream.playlist 广播回流镜像.
-          await _player.setPlaylistMode(PlaylistMode.loop);
-          await _player.setShuffle(true);
+          // v0.0.6 解耦: 随机 = 播放顺序覆盖层, 列表永不乱序.
+          // 不再调用 setShuffle (mpv playlist-shuffle 物理重排 — 弃用);
+          // loop-playlist 关掉: shuffle 的 EOF 自动续播由 [_onCompleted]
+          // 钩子随机再定向, 防止 mpv 线性自动推进破坏随机性.
+          _shuffleHistory.clear();
+          await _player.setPlaylistMode(PlaylistMode.none);
       }
     } on Exception catch (error, stackTrace) {
       _lastError.value = PlaybackError(
@@ -942,6 +998,38 @@ class MediaKitEngine implements MediaEngine {
     _completing = true;
     // completed 事件驱动转换 (playing→completed 合法路径).
     _state.value = MediaState.completed;
+    // v0.0.6: shuffle 的 EOF 自动续播 — 随机覆盖层再定向 (mpv normal
+    // 模式列中文件 EOF 仍线性前进, 本钩子改为随机跳转; 线性加载窗口
+    // 为已知观感项, UAT-3 验证; loopAll/loopSingle 走 mpv 原生, 不入此).
+    if (_playMode.value == PlayMode.shuffle) {
+      _autoAdvanceShuffle();
+    }
+  }
+
+  /// shuffle EOF 自动续播 — 当前曲入历史栈后随机选下一曲.
+  void _autoAdvanceShuffle() {
+    final queue = _queuePaths.value;
+    if (queue.isEmpty) return;
+    final currentIndex = _queueIndex.value;
+    final currentPath =
+        (currentIndex >= 0 && currentIndex < queue.length)
+        ? queue[currentIndex]
+        : null;
+    if (currentPath != null) {
+      ShufflePolicy.pushHistory(_shuffleHistory, currentPath);
+    }
+    final next = ShufflePolicy.pickShuffleNext(
+      queue: queue,
+      current: currentPath,
+      recent: _shuffleHistory.toList(),
+      random: _rng,
+    );
+    if (next == null) {
+      // 单文件队列 — 重播当前曲 (与循环回绕观感一致).
+      if (currentPath != null) unawaited(jumpTo(currentIndex));
+      return;
+    }
+    unawaited(jumpTo(queue.indexOf(next)));
   }
 
   void _updateAspectRatio() {

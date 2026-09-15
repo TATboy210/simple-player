@@ -353,6 +353,38 @@ void main() {
     });
   });
 
+  group('shuffle 解耦 (v0.0.6)', () {
+    test('随机播放不再乱序列表 — 面板顺序恒定 (bug 修复直接断言)', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4', 'c.mp4']);
+      await coordinator.setPlayMode(PlayMode.shuffle);
+
+      // 连续步进 — 旧实现此处会触发 mpv playlist-shuffle 物理重排.
+      coordinator.next();
+      coordinator.next();
+      coordinator.next();
+
+      expect(engine.lastSetPlayMode, PlayMode.shuffle);
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['a.mp4', 'b.mp4', 'c.mp4'],
+      );
+      expect(engine.queuePaths.value, ['a.mp4', 'b.mp4', 'c.mp4']);
+      expect(coordinator.currentIndex.value, isNonNegative);
+    });
+
+    test('shuffle 下切曲 — 断点仍按 path 正常记录', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      engine.duration.value = 100000;
+      engine.position.value = 42000;
+      await coordinator.setPlayMode(PlayMode.shuffle);
+
+      coordinator.next(); // 随机跳走 — a 的断点照记
+
+      final a = coordinator.entries.value.firstWhere((e) => e.path == 'a.mp4');
+      expect(a.positionMs, 42000);
+    });
+  });
+
   group('playEntryAt 装载分支', () {
     test('停止态点击条目 — 重新装载完整逻辑队列并起播', () async {
       await engine.openPlaylist(['a.mp4', 'b.mp4']);
