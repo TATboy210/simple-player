@@ -42,6 +42,19 @@ abstract class SubtitleConfig {
   /// - No-op when the engine is disposed.
   void setSubtitleDelay(int delay);
 
+  /// 设置音频延迟（毫秒，正值延后音频，负值提前）
+  ///
+  /// - `delay`: delay in milliseconds; positive = audio later, negative = earlier.
+  /// - Side effect: updates audio timing in the underlying engine.
+  /// - No-op when the engine is disposed.
+  void setAudioDelay(int delay);
+
+  /// 当前音频延迟（毫秒）
+  ///
+  /// - Returns: current audio delay in ms; 0 when disposed.
+  /// - Pure read: no side effects.
+  int get audioDelay;
+
   /// 设置音频均衡器预设
   ///
   /// - `preset`: EQ preset string; format constrained by the underlying af filter syntax.

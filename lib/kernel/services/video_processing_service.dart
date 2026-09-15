@@ -69,6 +69,28 @@ class VideoProcessingService {
   /// 重置所有视频处理状态到默认值
   void resetAll() => state.value = VideoProcessingState.defaults;
 
+  /// 从持久化状态装载 (v0.0.6) — 更新视图但不触发引擎 diff
+  /// (上一状态同步置为新值, diff 恒空). 引擎回放由 [reapplyAll] 显式执行.
+  void loadFrom(VideoProcessingState loaded) {
+    _previousState = loaded;
+    state.value = loaded;
+  }
+
+  /// 全量重放 (v0.0.6) — 把当前状态的所有属性推送到引擎.
+  ///
+  /// 装载持久偏好后调用一次: 引擎的 file-scoped 属性缓存随这些调用
+  /// 建立, 新文件装载后由引擎自动重放 (保持效果跨文件).
+  void reapplyAll() {
+    final v = state.value;
+    _engine.setVideoEffect(VideoEffectType.brightness, v.brightness);
+    _engine.setVideoEffect(VideoEffectType.contrast, v.contrast);
+    _engine.setVideoEffect(VideoEffectType.saturation, v.saturation);
+    _engine.setVideoEffect(VideoEffectType.hue, v.hue);
+    _engine.setDeinterlace(v.deinterlaceEnabled);
+    _engine.rotate(v.rotation);
+    _engine.setAspectRatio(v.aspectRatioMode.mdkValue);
+  }
+
   /// 释放资源 — 取消防抖定时器，注销监听器，释放 ValueNotifier
   void dispose() {
     if (_disposed) return;

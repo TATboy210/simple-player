@@ -35,6 +35,8 @@ import 'window_bridge/window_manager_service.dart';
 import 'engine/media_engine.dart';
 import 'engine/media_kit_engine.dart';
 import 'persistence/playlist_store.dart';
+import 'persistence/settings_store.dart';
+import 'services/app_settings_service.dart';
 import 'services/playback_controller.dart';
 import 'services/playlist_coordinator.dart';
 import 'services/video_processing_service.dart';
@@ -98,6 +100,13 @@ class PlayerServices {
   PlaylistCoordinator? _playlistCoordinator;
 
   PlaylistCoordinator get playlistCoordinator => _playlistCoordinator!;
+
+  /// 应用偏好编排服务 (v0.0.6) — 设置持久化 + 断点开关持有.
+  ///
+  /// App settings orchestration — persisted preferences + resume switch.
+  AppSettingsService? _settings;
+
+  AppSettingsService get settings => _settings!;
 
   /// Win32 窗口桥接服务.
   ///
@@ -170,13 +179,25 @@ class PlayerServices {
       _controllerCreated = true;
 
       _throwIfDisposed();
-      _videoProcessing = VideoProcessingService(engine);
+      final videoProcessing = VideoProcessingService(engine);
+      _videoProcessing = videoProcessing;
       _videoProcessingCreated = true;
+
+      _throwIfDisposed();
+      // v0.0.6: 偏好回放先于 controller/coordinator — 后者构造时
+      // resumeEnabled 已是持久值 (依赖单向: settings 只依赖 engine/videoProcessing).
+      _settings = AppSettingsService(
+        engine: engine,
+        videoProcessing: videoProcessing,
+        store: AppSettingsStore(),
+      );
+      await _settings!.initialize();
 
       _throwIfDisposed();
       _playlistCoordinator = PlaylistCoordinator(
         engine: engine,
         store: PlaylistStore(),
+        resumeEnabled: _settings!.resumeEnabled,
       );
       _playlistCoordinatorCreated = true;
       _initialized = true;
@@ -184,6 +205,7 @@ class PlayerServices {
       // Cleanup must be best-effort: a failure in one disposer must not mask
       // the initialization error or prevent dependent resources from closing.
       _disposeCreatedResources();
+      _settings = null;
       _videoProcessing = null;
       _controller = null;
       _engine = null;
@@ -207,6 +229,10 @@ class PlayerServices {
       _disposeSafely(_playlistCoordinator?.dispose);
     }
     _playlistCoordinator = null;
+    // settings 在 coordinator 之后释放 (coordinator 借用其 resumeEnabled
+    // notifier; dispose 需先解除借用方再释放 notifier 持有者).
+    _disposeSafely(_settings?.dispose);
+    _settings = null;
     if (_controllerCreated) _disposeSafely(_controller?.dispose);
     if (_engineCreated) _disposeSafely(_engine?.dispose);
     MemoryMonitor.disposeStatic();
