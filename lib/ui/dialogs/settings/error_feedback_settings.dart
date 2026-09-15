@@ -18,7 +18,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 
-/// 应用界面语言 —— 跟随系统（默认）或强制中/英。
+/// 应用界面语言 —— 跟随系统（默认）或强制指定（v0.0.6 增韩/日）。
 enum AppLanguage {
   /// 跟随系统 locale（MaterialApp locale = null 的官方语义）。
   system,
@@ -27,19 +27,29 @@ enum AppLanguage {
   english,
 
   /// 强制中文。
-  chinese;
+  chinese,
+
+  /// 强制韩文 (v0.0.6)。
+  korean,
+
+  /// 强制日文 (v0.0.6)。
+  japanese;
 
   /// settings.json 序列化形式 —— 稳定字符串键（append-only，勿改既有值）。
   String get raw => switch (this) {
     AppLanguage.system => 'system',
     AppLanguage.english => 'english',
     AppLanguage.chinese => 'chinese',
+    AppLanguage.korean => 'korean',
+    AppLanguage.japanese => 'japanese',
   };
 
   /// 从 settings.json 反序列化；未知值（旧版本/手改）回退 system。
   static AppLanguage fromRaw(Object? raw) => switch (raw) {
     'english' => AppLanguage.english,
     'chinese' => AppLanguage.chinese,
+    'korean' => AppLanguage.korean,
+    'japanese' => AppLanguage.japanese,
     _ => AppLanguage.system,
   };
 }

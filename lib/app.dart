@@ -58,6 +58,8 @@ class App extends StatelessWidget {
           AppLanguage.system => null,
           AppLanguage.english => const Locale('en'),
           AppLanguage.chinese => const Locale('zh'),
+          AppLanguage.korean => const Locale('ko'),
+          AppLanguage.japanese => const Locale('ja'),
         };
         return MaterialApp(
           locale: locale,
