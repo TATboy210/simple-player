@@ -60,14 +60,20 @@ abstract class QueueControl {
 
   /// 设置播放模式.
   ///
-  /// 映射: `loopAll` → PlaylistMode.loop + 无 shuffle;
-  /// `loopSingle` → PlaylistMode.single (mpv `loop-file`);
-  /// `shuffle` → PlaylistMode.loop + mpv `playlist-shuffle` (乱序循环).
+  /// 映射 (v0.0.6 解耦后):
+  /// - `loopAll` → PlaylistMode.loop (mpv 原生线性循环)
+  /// - `loopSingle` → PlaylistMode.single (mpv `loop-file`)
+  /// - `shuffle` → PlaylistMode.none + **Dart 层随机覆盖层**:
+  ///   手动 next = 随机选曲, previous = 播放历史栈回溯 (VLC 式),
+  ///   EOF 自动续播 = 随机再定向 ([_onCompleted] 钩子).
+  ///   不再调用 mpv `playlist-shuffle` (物理重排) — 随机播放永不
+  ///   改变队列排列, 列表展示顺序与播放顺序解耦.
   Future<void> setPlayMode(PlayMode mode);
 
   // ---- 队列状态镜像 (身份保持 — UI/服务层监听同一实例) ----
 
-  /// 队列条目路径列表 (展示顺序 = mpv 队列顺序, shuffle 重排后随之更新).
+  /// 队列条目路径列表 (展示顺序 = mpv 队列顺序; v0.0.6 起随机播放
+  /// 不再重排队列 — 顺序仅随装载/追加/移除/显式排序变化).
   ValueNotifier<List<String>> get queuePaths;
 
   /// 当前播放条目索引; 空队列 / 无媒体为 -1.

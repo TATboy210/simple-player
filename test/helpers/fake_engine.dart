@@ -1,10 +1,13 @@
 // ignore_for_file: overridden_fields — intentional: each engine needs independent ValueNotifier instances
 import 'dart:async';
+import 'dart:collection';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/engine/playlist_move_planner.dart';
+import 'package:simple_player_flutter/kernel/engine/shuffle_policy.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 
 /// Hand-written Fake implementing all ISP interfaces for testing.
@@ -148,6 +151,21 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   int nextInQueueCallCount = 0;
   int previousInQueueCallCount = 0;
   PlayMode? lastSetPlayMode;
+
+  // ─── shuffle 覆盖层 (v0.0.6 — 与 MediaKitEngine 同构) ───
+
+  /// 播放历史栈 (path 键) — 测试可内省.
+  final ListQueue<String> shuffleHistory = ListQueue<String>();
+
+  /// 随机源 — 固定种子默认值, 测试可覆写.
+  Random shuffleRandom = Random(1);
+
+  /// 随机选曲注入点 — 非 null 时优先于 ShufflePolicy (确定性测试).
+  String? Function({
+    required List<String> queue,
+    required String? current,
+    required List<String> recent,
+  })? shufflePicker;
 
   /// When set, the next open() will simulate an error after loading.
   String? failNextOpenWith;
@@ -493,6 +511,10 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
       unawaited(jumpTo(forward ? 0 : count - 1));
       return true;
     }
+    // v0.0.6: shuffle 模式 — 随机/历史覆盖层 (与 MediaKitEngine 同构).
+    if (playMode.value == PlayMode.shuffle) {
+      return _stepShuffle(forward: forward, current: current);
+    }
     final target = forward ? current + 1 : current - 1;
     if (target >= 0 && target < count) {
       unawaited(jumpTo(target));
@@ -502,11 +524,84 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     return true;
   }
 
+  /// shuffle 步进 — next 随机选曲, previous 弹栈回溯; 栈空线性回绕.
+  bool _stepShuffle({required bool forward, required int current}) {
+    final queue = queuePaths.value;
+    final currentPath = queue[current];
+    if (forward) {
+      ShufflePolicy.pushHistory(shuffleHistory, currentPath);
+      final next = shufflePicker != null
+          ? shufflePicker!(
+              queue: queue,
+              current: currentPath,
+              recent: shuffleHistory.toList(),
+            )
+          : ShufflePolicy.pickShuffleNext(
+              queue: queue,
+              current: currentPath,
+              recent: shuffleHistory.toList(),
+              random: shuffleRandom,
+            );
+      if (next == null) {
+        unawaited(jumpTo(current)); // 单文件重播
+        return true;
+      }
+      unawaited(jumpTo(queue.indexOf(next)));
+      return true;
+    }
+    while (shuffleHistory.isNotEmpty) {
+      final candidate = shuffleHistory.removeLast();
+      final index = queue.indexOf(candidate);
+      if (index >= 0 && index != current) {
+        unawaited(jumpTo(index));
+        return true;
+      }
+    }
+    final target = current - 1;
+    unawaited(jumpTo(target >= 0 ? target : queue.length - 1));
+    return true;
+  }
+
+  /// shuffle EOF 自动续播 — 与 MediaKitEngine._autoAdvanceShuffle 同构.
+  void _autoAdvanceShuffle() {
+    final queue = queuePaths.value;
+    if (queue.isEmpty) return;
+    final currentIndex = queueIndex.value;
+    final currentPath =
+        (currentIndex >= 0 && currentIndex < queue.length)
+        ? queue[currentIndex]
+        : null;
+    if (currentPath != null) {
+      ShufflePolicy.pushHistory(shuffleHistory, currentPath);
+    }
+    final next = shufflePicker != null
+        ? shufflePicker!(
+            queue: queue,
+            current: currentPath,
+            recent: shuffleHistory.toList(),
+          )
+        : ShufflePolicy.pickShuffleNext(
+            queue: queue,
+            current: currentPath,
+            recent: shuffleHistory.toList(),
+            random: shuffleRandom,
+          );
+    if (next == null) {
+      if (currentPath != null) unawaited(jumpTo(currentIndex));
+      return;
+    }
+    unawaited(jumpTo(queue.indexOf(next)));
+  }
+
   @override
   Future<void> setPlayMode(PlayMode mode) async {
     if (_disposed) return;
     lastSetPlayMode = mode;
     playMode.value = mode;
+    // 与 MediaKitEngine 同构: 进入 shuffle 清空历史栈.
+    if (mode == PlayMode.shuffle) {
+      shuffleHistory.clear();
+    }
   }
 
   // ─── Audio tracks (TrackControl) ───
@@ -681,9 +776,13 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     lastError.value = UnknownError(message);
   }
 
-  /// Simulate playback completed.
+  /// Simulate playback completed — shuffle 模式下同构触发 Dart 层
+  /// 随机自动续播 (镜像 MediaKitEngine._onCompleted 钩子).
   void simulateCompleted() {
     state.value = MediaState.completed;
+    if (playMode.value == PlayMode.shuffle) {
+      _autoAdvanceShuffle();
+    }
   }
 
   /// Simulate buffering state — only sets transient flag, does not change main state.
