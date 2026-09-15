@@ -11,7 +11,7 @@ import 'package:simple_player_flutter/ui/player/control_bar_timeline.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
 import 'package:simple_player_flutter/ui/player/media_kit_player_port.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
-import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
+import 'package:simple_player_flutter/ui/player/player_controls_state.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
 
 import '../test/helpers/fake_engine.dart';

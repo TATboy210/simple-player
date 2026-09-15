@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
+import 'package:simple_player_flutter/ui/player/player_controls_state.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
@@ -387,7 +388,7 @@ void main() {
       expect(controlsKey.currentState, same(originalState));
       expect(video.player.hasListeners, isFalse);
       expect(replacementVideo.player.hasListeners, isTrue);
-      expect(replacementVideo.player.streamListenAccessCount, 8);
+      expect(replacementVideo.player.streamListenAccessCount, 6);
       expect(find.text('replacement.mp4'), findsOneWidget);
       expect(
         replacementVideo.lastSubtitlePadding,
@@ -454,7 +455,7 @@ void main() {
       hostKey.currentState!.moveChild();
       await tester.pump();
       expect(controlsKey.currentState, same(originalState));
-      expect(replacementVideo.player.streamListenAccessCount, 8);
+      expect(replacementVideo.player.streamListenAccessCount, 6);
     });
 
     testWidgets('subtitle padding 按 source base 恢复且 replacement 后隔离旧 route', (
@@ -826,11 +827,11 @@ void main() {
       await tester.pump();
       expect(controlsKey.currentState, isNotNull);
       expect(video.player.hasListeners, isTrue);
-      expect(video.player.streamListenAccessCount, 8);
+      expect(video.player.streamListenAccessCount, 6);
       // 第二次 reparent 不能重新读取 8 条 stream，否则意味着重复初始化订阅。
       hostKey.currentState!.moveChild();
       await tester.pump();
-      expect(video.player.streamListenAccessCount, 8);
+      expect(video.player.streamListenAccessCount, 6);
 
       // 反复切换外部 resize source，验证 activate 后仍只保留当前 listener；
       // 这里不等待 auto-hide timer，避免把生命周期测试绑定到动画时钟。
@@ -901,7 +902,7 @@ void main() {
       expect(controlsKey.currentState, isNotNull);
       expect(video.player.hasListeners, isFalse);
       expect(replacementVideo.player.hasListeners, isTrue);
-      expect(replacementVideo.player.streamListenAccessCount, 8);
+      expect(replacementVideo.player.streamListenAccessCount, 6);
       // FakeEngine 自身有内部状态派生 listener；旧/new source 的解绑由
       // stream 事件隔离和卸载后的无更新断言共同覆盖。
       final paddingCallsBeforeDispose =

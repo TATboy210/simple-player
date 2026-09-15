@@ -7,18 +7,18 @@ import '../theme/tokens.dart';
 
 /// 播放/暂停按钮。
 ///
-/// [isIdle] 仅用于视觉淡化；命令合法性由引擎状态机统一守卫。
+/// 播放/暂停切换的视觉状态完全由 [isPlaying] 驱动；空置态淡化由
+/// [iconAlpha] 承担（中央组 TweenAnimationBuilder 渐变），命令合法性由
+/// 引擎状态机统一守卫。
 class PlayPauseButton extends StatelessWidget {
   final ValueListenable<bool> isPlaying;
   final VoidCallback onPlayPause;
-  final bool isIdle;
   final double iconAlpha;
 
   const PlayPauseButton({
     super.key,
     required this.isPlaying,
     required this.onPlayPause,
-    this.isIdle = false,
     this.iconAlpha = 1.0,
   });
 
@@ -85,33 +85,24 @@ class CenterGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final listenable = isIdleListenable;
-    final content = _CenterGroupContent(
+    // 单构造 + idle 参数化 — 有/无 isIdleListenable 两分支共享同一装配.
+    Widget buildContent(bool idle) => _CenterGroupContent(
       isPlaying: isPlaying,
       onPlayPause: onPlayPause,
       onSeekBack: onSeekBack,
       onSeekForward: onSeekForward,
-      isIdle: isIdle,
+      isIdle: idle,
       showTransportActions: showTransportActions,
       onStop: onStop,
       onPreviousEntry: onPreviousEntry,
       onNextEntry: onNextEntry,
     );
-    if (listenable == null) return content;
+    final listenable = isIdleListenable;
+    if (listenable == null) return buildContent(isIdle);
 
     return ValueListenableBuilder<bool>(
       valueListenable: listenable,
-      builder: (_, value, _) => _CenterGroupContent(
-        isPlaying: isPlaying,
-        onPlayPause: onPlayPause,
-        onSeekBack: onSeekBack,
-        onSeekForward: onSeekForward,
-        isIdle: value,
-        showTransportActions: showTransportActions,
-        onStop: onStop,
-        onPreviousEntry: onPreviousEntry,
-        onNextEntry: onNextEntry,
-      ),
+      builder: (_, value, _) => buildContent(value),
     );
   }
 }
@@ -186,7 +177,6 @@ class _CenterGroupContent extends StatelessWidget {
               builder: (context, alpha, _) => PlayPauseButton(
                 isPlaying: isPlaying,
                 onPlayPause: onPlayPause,
-                isIdle: isIdle,
                 iconAlpha: alpha,
               ),
             ),

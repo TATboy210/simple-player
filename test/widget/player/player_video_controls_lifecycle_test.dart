@@ -125,16 +125,16 @@ void main() {
       expect(controlsKey.currentState, same(retainedState));
       expect(oldVideo.player.hasListeners, isFalse);
       expect(newVideo.player.hasListeners, isTrue);
-      expect(newVideo.player.streamListenAccessCount, 8);
+      expect(newVideo.player.streamListenAccessCount, 6);
       expect(find.text('new.mp4'), findsOneWidget);
 
-      // Two deactivate/activate rounds must retain the existing eight streams.
+      // Two deactivate/activate rounds must retain the existing six streams.
       hostKey.currentState!.move();
       await tester.pump();
       hostKey.currentState!.move();
       await tester.pump();
       expect(controlsKey.currentState, same(retainedState));
-      expect(newVideo.player.streamListenAccessCount, 8);
+      expect(newVideo.player.streamListenAccessCount, 6);
 
       final paddingBeforeOldEvents = newVideo.subtitlePaddingHistory.length;
       oldTitle.value = 'stale.mp4';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
+import 'package:simple_player_flutter/ui/player/media_kit_player_port.dart';
 
 import 'fake_player_controls.dart';
 
