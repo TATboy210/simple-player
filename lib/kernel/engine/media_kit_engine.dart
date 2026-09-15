@@ -8,9 +8,11 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../diagnostics/kernel_logger.dart' show KernelLoggerImpl;
 import 'media_engine.dart';
 import 'media_state.dart';
 import 'mpv_property_mapper.dart';
+import 'open_failure_circuit_breaker.dart';
 import 'open_result.dart';
 import 'playlist_move_planner.dart';
 import 'shuffle_policy.dart';
@@ -181,6 +183,11 @@ class MediaKitEngine implements MediaEngine {
 
   // 已告警的 stub 方法集合 — 每个 stub 只 debugPrint 一次, 避免刷屏.
   final Set<String> _warnedUnsupported = <String>{};
+
+  /// 连续打开失败熔断器 (v0.0.6.1) — 队列级访问阻断时终止连锁失败.
+  /// 成功装载 (stream.duration) 复位; 详见 [OpenFailureCircuitBreaker].
+  final OpenFailureCircuitBreaker _openFailureBreaker =
+      OpenFailureCircuitBreaker();
 
   // 异构 stream 只保存取消回调，避免用 dynamic 统一不同的 stream 类型。
   final List<Future<void> Function()> _subscriptionCancels =
@@ -718,6 +725,15 @@ class MediaKitEngine implements MediaEngine {
   /// 保证 revision 监听者读到一致快照 (单通知点契约).
   void _touchQueueRevision() => _queueRevision.value++;
 
+  /// 当前队列条目路径 (越界/空返回 null) — mpv 错误事件的失败路径取材处.
+  String? _currentQueuePath() {
+    if (_disposed) return null;
+    final paths = _queuePaths.value;
+    final index = _queueIndex.value;
+    if (index < 0 || index >= paths.length) return null;
+    return paths[index];
+  }
+
   @override
   Future<void> seekTo(int ms) async {
     if (_disposed) return;
@@ -995,6 +1011,8 @@ class MediaKitEngine implements MediaEngine {
       _player.stream.duration.listen((d) {
         _duration.value = d.inMilliseconds;
         _rebuildMediaInfo();
+        // 媒体真正装载成功 — 连续打开失败计数复位 (v0.0.6.1).
+        _openFailureBreaker.reset();
         // 新文件装载信号 (所有媒体类型都发) — file-scoped 属性重放.
         _reapplyFileScopedProps();
       }),
@@ -1069,10 +1087,47 @@ class MediaKitEngine implements MediaEngine {
     );
     _addSubscription(
       _player.stream.error.listen((msg) {
+        // v0.0.6.1: 失败条目路径入上下文 — 错误报告的 Failed Open Path
+        // 不再是 none (修复定位盲区). 当前队列条目即 mpv 正在尝试的条目.
+        final failedPath = _currentQueuePath();
+        // 连续失败熔断 — 队列级访问阻断时终止 mpv 原生自动推进的连锁失败
+        // (实机证据: 90 秒 207 条错误). 达阈值即停止并聚合上报.
+        if (_openFailureBreaker.registerFailure()) {
+          unawaited(stop());
+          _lastError.value = UnknownError(
+            '连续 ${_openFailureBreaker.threshold} 个文件打开失败, 已停止播放. '
+            '最后失败: $msg',
+            null,
+            ErrorContext(
+              action: 'stream.error.circuit-break',
+              module: 'MediaKitEngine',
+              path: failedPath,
+            ),
+          );
+          return;
+        }
         _lastError.value = UnknownError(
           msg,
           null,
-          ErrorContext(action: 'stream', module: 'MediaKitEngine'),
+          ErrorContext(
+            action: 'stream.error',
+            module: 'MediaKitEngine',
+            path: failedPath,
+          ),
+        );
+      }),
+    );
+    // v0.0.6.1: 捕获 mpv 内部日志 (warn/error 级) — "Failed to open" 类
+    // 失败在 mpv 日志里带 errno/协议层细节, 是排障的一手证据.
+    _addSubscription(
+      _player.stream.log.listen((entry) {
+        if (_disposed) return;
+        if (entry.level != 'error' && entry.level != 'warn') return;
+        // logger 未初始化环境 (部分测试) 静默跳过 — 探针守卫对齐 keyboard_handler.
+        if (!KernelLoggerImpl.isInitialized) return;
+        KernelLoggerImpl.I.d(
+          'mpv[${entry.level}] ${entry.prefix}: ${entry.text}',
+          context: {'failedPath': _currentQueuePath()},
         );
       }),
     );

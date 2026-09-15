@@ -236,29 +236,23 @@ void main() {
       ),
     );
 
-    testWidgets('video/audio 分区启用并可切换内容', (tester) async {
+    testWidgets('video/audio 分区保持关闭 (v0.0.6.1 用户裁决, bundle 注入也不例外)',
+        (tester) async {
       await tester.pumpWidget(buildInjectedSubject());
       await tester.tap(find.text('打开设置'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('视频'));
+      // 入口灰显: 点击不切换内容.
+      await tester.tap(find.text('视频'), warnIfMissed: false);
       await tester.pumpAndSettle();
-      expect(find.byType(VideoSettingsContent), findsOneWidget);
-      // 视频分区含亮度滑条与硬解开关.
-      expect(find.text('亮度'), findsOneWidget);
-      expect(find.text('硬件解码'), findsOneWidget);
-
-      await tester.tap(find.text('音频'));
+      expect(find.byType(VideoSettingsContent), findsNothing);
+      await tester.tap(find.text('音频'), warnIfMissed: false);
       await tester.pumpAndSettle();
-      // 音频分区含双延迟行.
-      expect(find.text('音频延迟'), findsOneWidget);
-      expect(find.text('字幕延迟'), findsOneWidget);
 
-      // 注入后导航不再灰显.
       final videoOpacity = tester.widget<Opacity>(
         find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
       );
-      expect(videoOpacity.opacity, 1);
+      expect(videoOpacity.opacity, 0.38);
     });
 
     testWidgets('通用分区出现断点续播开关并可翻转', (tester) async {
@@ -277,15 +271,25 @@ void main() {
       expect(settings.resumeEnabled.value, isFalse);
     });
 
-    testWidgets('视频分区滑条变化写入 VideoProcessingService', (tester) async {
-      await tester.pumpWidget(buildInjectedSubject());
-      await tester.tap(find.text('打开设置'));
+    testWidgets('VideoSettingsContent 组件级 — 滑条变化写入 VideoProcessingService',
+        (tester) async {
+      // 分区入口已按用户裁决关闭, 组件本身的服务写入契约独立验证.
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: 480,
+              height: 400,
+              child: VideoSettingsContent(videoProcessing: videoProcessing),
+            ),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('视频'));
-      await tester.pumpAndSettle();
-
-      // 滑条存在性 + 拖动到最右 (亮度 -1..1).
       final brightnessSlider = find.byType(Slider).first;
       await tester.drag(brightnessSlider, const Offset(200, 0));
       await tester.pumpAndSettle();
