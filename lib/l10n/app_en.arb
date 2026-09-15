@@ -169,6 +169,12 @@
 
   "playlistEmpty": "Playlist is empty",
   "@playlistEmpty": { "description": "Shown when playlist has no items" },
+  "resumeRememberPosition": "Remember playback position",
+  "@resumeRememberPosition": { "description": "Toggle label for resume breakpoint setting (v0.0.6)" },
+  "audioDelay": "Audio Delay",
+  "@audioDelay": { "description": "Label for audio delay setting (v0.0.6)" },
+  "subtitleDelay": "Subtitle Delay",
+  "@subtitleDelay": { "description": "Label for subtitle delay setting (v0.0.6)" },
   "sortBy": "Sort",
   "@sortBy": { "description": "Tooltip for the playlist sort button (v0.0.6)" },
   "sortByAddedOrder": "By Added Order",

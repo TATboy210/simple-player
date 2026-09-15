@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/engine/engine_state.dart';
+import '../dialogs/settings/settings_dialog.dart' show SettingsServicesBundle;
 import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/window_bridge/window_bridge.dart';
 import '../playlist/playlist_panel.dart';
@@ -320,6 +321,9 @@ class PlayerVideoControls extends StatefulWidget {
   /// 播放列表协调器 — 面板数据源与动作入口。null 时面板不挂载.
   final PlaylistCoordinator? playlistCoordinator;
 
+  /// 设置服务集合 (v0.0.6) — 断点续播开关等面板门控数据源.
+  final SettingsServicesBundle? settingsServices;
+
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter。
   final ValueListenable<bool>? resizing;
 
@@ -336,6 +340,7 @@ class PlayerVideoControls extends StatefulWidget {
     required this.windowMode,
     this.playlistVisible,
     this.playlistCoordinator,
+    this.settingsServices,
     this.emptyState,
     this.resizing,
     this.onBuild,
@@ -964,6 +969,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   onSortSelected: (key) => unawaited(
                     widget.playlistCoordinator!.sortEntries(key),
                   ),
+                  // v0.0.6: 断点续播总开关 — 设置关闭时条目断点 UI 隐藏.
+                  resumeEnabled: widget.settingsServices?.settings
+                      ?.resumeEnabled,
                 ),
               ),
             ),

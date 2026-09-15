@@ -26,6 +26,7 @@ import '../../kernel/diagnostics/startup_timeline.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/player_services.dart';
 import '../../l10n/app_localizations.dart';
+import '../../ui/dialogs/settings/settings_dialog.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
 import 'file_picker_adapters.dart';
@@ -215,6 +216,11 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       mediaKitController: _services.mediaKitVideoController,
       controller: _services.controller,
       playlistCoordinator: _services.playlistCoordinator,
+      // v0.0.6: 设置页服务注入 — video/audio 分区 + 断点续播开关启用.
+      settingsServices: SettingsServicesBundle(
+        videoProcessing: _services.videoProcessing,
+        settings: _services.settings,
+      ),
       customBindings: _customBindings,
       windowService: _services.windowService,
       onOpenFile: () => unawaited(_openFile()),

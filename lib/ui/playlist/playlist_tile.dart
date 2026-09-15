@@ -38,6 +38,10 @@ class PlaylistTile extends StatefulWidget {
   /// 右键菜单"移除"动作.
   final VoidCallback onRemove;
 
+  /// 断点续播 UI 总开关 (v0.0.6, 默认 true) — false 时续播分区禁用 +
+  /// 断点进度条不显示 (设置"记住播放位置"关闭).
+  final bool resumeAllowed;
+
   const PlaylistTile({
     super.key,
     required this.item,
@@ -45,6 +49,7 @@ class PlaylistTile extends StatefulWidget {
     required this.onPlay,
     required this.onResume,
     required this.onRemove,
+    this.resumeAllowed = true,
   });
 
   @override
@@ -81,8 +86,9 @@ class _PlaylistTileState extends State<PlaylistTile> {
     setState(() => _thumbnail = provider);
   }
 
-  /// 断点进度 (0-1) — 无时长或未播放时续播分区禁用/进度区不显示.
+  /// 断点进度 (0-1) — 无时长/未播放/总开关关闭时续播分区禁用/进度区不显示.
   double? get _resumeProgress {
+    if (!widget.resumeAllowed) return null;
     final position = widget.item.positionMs ?? 0;
     final duration = widget.item.durationMs ?? 0;
     if (duration <= 0 || position <= 0) return null;

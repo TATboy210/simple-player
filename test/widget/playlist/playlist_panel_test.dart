@@ -248,5 +248,42 @@ void main() {
       await tester.pump();
       expect(played, 1);
     });
+
+    testWidgets('resumeAllowed=false — 有断点也不显示进度区 (v0.0.6 门控)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          SizedBox(
+            width: 280,
+            child: PlaylistTile(
+              item: PlaylistItem(
+                path: 'a.mp4',
+                positionMs: 30000,
+                durationMs: 90000,
+              ),
+              isCurrent: false,
+              onPlay: () {},
+              onResume: () {},
+              onRemove: () {},
+              resumeAllowed: false, // 设置"记住播放位置"关闭
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // 断点进度条与"断点于"文字均不渲染; 续播分区禁用.
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.textContaining('断点于'), findsNothing);
+      final resumeGesture = tester.widget<GestureDetector>(
+        find
+            .ancestor(
+              of: find.byIcon(Icons.replay),
+              matching: find.byType(GestureDetector),
+            )
+            .first,
+      );
+      expect(resumeGesture.onTap, isNull);
+    });
   });
 }

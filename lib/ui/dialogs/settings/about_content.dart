@@ -7,7 +7,7 @@ import '../../theme/tokens.dart';
 import '../../shared/app_tooltip.dart';
 
 /// 应用版本号 — 发版时随 pubspec.yaml `version` 同步更新。
-const String kAppVersion = '0.0.4';
+const String kAppVersion = '0.0.6';
 
 /// 开源组件条目 — 名称与 SPDX 许可证标识对。
 ///

@@ -87,6 +87,9 @@
   "restore": "还原",
 
   "playlistEmpty": "播放列表为空",
+  "resumeRememberPosition": "记住播放位置",
+  "audioDelay": "音频延迟",
+  "subtitleDelay": "字幕延迟",
   "sortBy": "排序",
   "sortByAddedOrder": "按添加顺序",
   "sortByName": "按名称",

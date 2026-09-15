@@ -244,6 +244,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playlistEmpty => '播放列表为空';
 
   @override
+  String get resumeRememberPosition => '记住播放位置';
+
+  @override
+  String get audioDelay => '音频延迟';
+
+  @override
+  String get subtitleDelay => '字幕延迟';
+
+  @override
   String get sortBy => '排序';
 
   @override
