@@ -120,6 +120,17 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   int get subtitleDelay => _subtitleDelayMs;
 
+  int _audioDelayMs = 0;
+
+  @override
+  void setAudioDelay(int delay) {
+    if (_disposed) return;
+    _audioDelayMs = delay;
+  }
+
+  @override
+  int get audioDelay => _audioDelayMs;
+
   // ─── Call tracking for test introspection ───
 
   int openCallCount = 0;

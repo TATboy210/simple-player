@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import 'media_engine.dart';
 import 'media_state.dart';
+import 'mpv_property_mapper.dart';
 import 'open_result.dart';
 import 'playlist_move_planner.dart';
 import 'shuffle_policy.dart';
@@ -105,6 +106,63 @@ class MediaKitEngine implements MediaEngine {
 
   // 静音前音量快照 — unmute 时恢复. media_kit 无独立 mute API, 借 setVolume(0).
   double _preMuteVolume = 1.0;
+
+  // ─── mpv 属性直通 (v0.0.6 — NativePlayer.setProperty 公开 API) ───
+
+  /// 字幕/音频延迟当前值 (毫秒) — facet getter 返回源.
+  int _subtitleDelayMs = 0;
+  int _audioDelayMs = 0;
+
+  /// file-scoped mpv 属性缓存 — brightness/contrast/…/sub-delay 等
+  /// mpv 语义为"作用于当前文件", 新文件装载即重置; 应用过的值记录于此,
+  /// 经 width/duration 流在新文件就绪时幂等重放 (覆盖 open/jumpTo/
+  /// 自动续播全部装载路径). 引擎不依赖存储 — 缓存只是"最后应用的值".
+  final Map<String, String> _fileScopedProps = <String, String>{};
+
+  /// NativePlayer 直通 — 不可得 (非桌面后端) 时返回 null, 调用方降级.
+  NativePlayer? get _nativePlayer {
+    final platform = _player.platform;
+    return platform is NativePlayer ? platform : null;
+  }
+
+  /// 应用一条 mpv 属性 — 写 file-scoped 缓存 (可选) + setProperty.
+  void _applyMpvProperty(MpvProperty property, {bool fileScoped = true}) {
+    if (_disposed) return;
+    if (fileScoped) _fileScopedProps[property.key] = property.value;
+    final native = _nativePlayer;
+    if (native == null) {
+      _unsupported('mpvProperty.${property.key}');
+      return;
+    }
+    unawaited(
+      native.setProperty(property.key, property.value).catchError((
+        Object error,
+      ) {
+        // 单条属性失败不致命 — 记录即可, 播放不受阻.
+        _lastError.value = UnknownError(
+          'mpv 属性应用失败: ${property.key}=${property.value}: $error',
+          null,
+          ErrorContext(action: 'setProperty', module: 'MediaKitEngine'),
+        );
+      }),
+    );
+  }
+
+  /// 重放全部 file-scoped 属性 — 新文件视频/播放链就绪信号触发, 幂等.
+  void _reapplyFileScopedProps() {
+    if (_disposed || _fileScopedProps.isEmpty) return;
+    final native = _nativePlayer;
+    if (native == null) return;
+    for (final entry in _fileScopedProps.entries) {
+      unawaited(
+        native.setProperty(entry.key, entry.value).catchError((Object error) {
+          debugPrint(
+            '[MediaKitEngine] replay ${entry.key} failed: $error',
+          );
+        }),
+      );
+    }
+  }
 
   // 完成态抢占标志 — completed 事件先于 playing(false) 到达时,
   // 用它阻止 _onPlaying 把 completed 误转 paused (顺序见 _onPlaying 注释).
@@ -792,13 +850,27 @@ class MediaKitEngine implements MediaEngine {
   }
 
   @override
-  void setSubtitleDelay(int delay) => _unsupported('setSubtitleDelay');
+  void setSubtitleDelay(int delay) {
+    if (_disposed) return;
+    _subtitleDelayMs = delay;
+    _applyMpvProperty(MpvPropertyMapper.mapDelay('sub-delay', delay));
+  }
+
+  @override
+  void setAudioDelay(int delay) {
+    if (_disposed) return;
+    _audioDelayMs = delay;
+    _applyMpvProperty(MpvPropertyMapper.mapDelay('audio-delay', delay));
+  }
 
   @override
   void setEqualizer(String preset) => _unsupported('setEqualizer');
 
   @override
-  int get subtitleDelay => 0;
+  int get subtitleDelay => _subtitleDelayMs;
+
+  @override
+  int get audioDelay => _audioDelayMs;
 
   @override
   List<int> get activeSubtitleTracks {
@@ -809,31 +881,56 @@ class MediaKitEngine implements MediaEngine {
   }
 
   // ============================================================
-  // VideoEffectControl — 全部 stub (media_kit 无直接 API)
+  // VideoEffectControl — 经 NativePlayer.setProperty 落地 (v0.0.6)
+  // mpv 属性为 file-scoped: 新文件装载会重置, 应用后写入
+  // [_fileScopedProps] 缓存, 经 width/duration 流在新文件就绪时重放.
   // ============================================================
 
   @override
-  void setVideoEffect(VideoEffectType effectType, double value) =>
-      _unsupported('setVideoEffect.${effectType.name}');
+  void setVideoEffect(VideoEffectType effectType, double value) {
+    if (_disposed) return;
+    _applyMpvProperty(MpvPropertyMapper.mapVideoEffect(effectType, value));
+  }
 
   @override
-  void rotate(int degrees) => _unsupported('rotate');
+  void rotate(int degrees) {
+    if (_disposed) return;
+    _applyMpvProperty(MpvPropertyMapper.mapRotation(degrees));
+  }
 
   @override
-  void setAspectRatio(double ratio) => _unsupported('setAspectRatio');
+  void setAspectRatio(double ratio) {
+    if (_disposed) return;
+    final property = MpvPropertyMapper.mapAspectRatio(ratio);
+    if (property == null) {
+      // stretch/cropFill 单属性不可表达 — 诚实降级, 保持原状不伪造.
+      _unsupported('setAspectRatio.$ratio');
+      return;
+    }
+    _applyMpvProperty(property);
+  }
 
   @override
-  void setDeinterlace(bool enable) => _unsupported('setDeinterlace');
+  void setDeinterlace(bool enable) {
+    if (_disposed) return;
+    _applyMpvProperty(MpvPropertyMapper.mapDeinterlace(enable));
+  }
 
   // ============================================================
-  // RendererControl — 全部 stub (硬解经 PlayerConfiguration 配, 运行时切换不支持)
+  // RendererControl
   // ============================================================
 
   @override
   void setD3d11SyncEnabled(bool enabled) => _unsupported('setD3d11SyncEnabled');
 
   @override
-  void setHardwareDecoding(bool enabled) => _unsupported('setHardwareDecoding');
+  void setHardwareDecoding(bool enabled) {
+    if (_disposed) return;
+    _applyMpvProperty(
+      MpvPropertyMapper.mapHardwareDecoding(enabled),
+      fileScoped: false, // hwdec 是全局属性 — 新文件装载不重置, 不入缓存
+    );
+  }
 
   // ============================================================
   // dispose
@@ -898,6 +995,8 @@ class MediaKitEngine implements MediaEngine {
       _player.stream.duration.listen((d) {
         _duration.value = d.inMilliseconds;
         _rebuildMediaInfo();
+        // 新文件装载信号 (所有媒体类型都发) — file-scoped 属性重放.
+        _reapplyFileScopedProps();
       }),
     );
     // media_kit volume 0~100 → 项目 0.0~1.0.
@@ -948,10 +1047,13 @@ class MediaKitEngine implements MediaEngine {
       }),
     );
     // 用 width/height 流算 aspectRatio, 避开 VideoParams 字段名版本差异.
+    // width 事件 = 新文件视频链初始化完成 — file-scoped 属性重放的
+    // 权威信号 (duration 只保证元数据就绪, 视频链可能未挂载).
     _addSubscription(
       _player.stream.width.listen((w) {
         _videoWidth = w;
         _updateAspectRatio();
+        _reapplyFileScopedProps();
       }),
     );
     _addSubscription(

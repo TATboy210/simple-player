@@ -33,7 +33,10 @@ final _log = KernelLogger.I;
 /// 播放列表协调器 — 逻辑队列 + 断点元数据 + 持久化的统一入口.
 class PlaylistCoordinator {
   /// [_store] 为 null 时跳过持久化（纯内存模式, 测试便捷）.
-  PlaylistCoordinator({required this._engine, this._store}) {
+  ///
+  /// [resumeEnabled] 为断点续播总开关 (v0.0.6, null = 恒启用):
+  /// false 时**不记录**断点 (含节流落盘) — 已存断点的隐藏由 UI 门控.
+  PlaylistCoordinator({required this._engine, this._store, this.resumeEnabled}) {
     // 只监听 queueRevision 单通知点 — paths/index 分开监听会读到
     // "新列表+旧索引"的中间态 (revision 保证两者都已赋值, 快照一致).
     _engine.queueRevision.addListener(_onQueueRevision);
@@ -43,6 +46,12 @@ class PlaylistCoordinator {
 
   final MediaEngine _engine;
   final PlaylistStore? _store;
+
+  /// 断点续播总开关 — 拉取式读取 (每次记录前判值, 无需监听).
+  final ValueListenable<bool>? resumeEnabled;
+
+  /// 断点记录是否允许 — 门控取值点.
+  bool get _isBreakpointAllowed => resumeEnabled?.value ?? true;
 
   /// 逻辑队列条目（含断点元数据）— UI 面板的数据源.
   final ValueNotifier<List<PlaylistItem>> _entries = ValueNotifier(
@@ -375,6 +384,7 @@ class PlaylistCoordinator {
   /// 近 EOF 的条目写 positionMs=null — 看完不留断点, durationMs 照写
   /// （排序按时长需要它）.
   void _updateBreakpoint(String path) {
+    if (!_isBreakpointAllowed) return; // 断点续播总开关关闭 — 不记录
     final existing = _metaByPath[path];
     if (existing == null && !_entries.value.any((e) => e.path == path)) {
       return; // 已移除且无元数据 — 不产生孤儿断点
