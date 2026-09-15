@@ -49,6 +49,7 @@ class AutoHideController {
   bool _hovering = false;
   bool _resizing = false;
   bool _modalOpen = false;
+  bool _pinned = false;
 
   /// 正在进行的子控件交互数量。
   ///
@@ -89,12 +90,12 @@ class AutoHideController {
     _animController.forward();
   }
 
-  /// 隐藏控制栏（带动画，resize/模态窗口中不隐藏 — 对齐 media_kit 原生:
+  /// 隐藏控制栏（带动画，resize/模态窗口/钉住中不隐藏 — 对齐 media_kit 原生:
   /// 暂停状态同样可隐藏).
   void hide() {
-    // 将 resize/modal gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调
+    // 将 resize/modal/pinned gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调
     // 即使无法再被 cancel，也不能在会话内启动淡出动画。
-    if (_resizing || _modalOpen) return;
+    if (_resizing || _modalOpen || _pinned) return;
     if (visible.value) {
       _popupCloseNotifier?.value++;
       _animController.reverse();
@@ -113,7 +114,7 @@ class AutoHideController {
   /// 无活跃子控件交互时计时隐藏。
   void scheduleHide() {
     _hideTimer?.cancel();
-    if (_resizing || _modalOpen || _activeInteractionCount > 0) {
+    if (_resizing || _modalOpen || _activeInteractionCount > 0 || _pinned) {
       return;
     }
     _hideTimer = Timer(_hideDelay, () {
@@ -122,6 +123,25 @@ class AutoHideController {
       // 即不再刷新计时,静止或悬停区外 3s 后照常隐藏。
       if (_activeInteractionCount == 0) hide();
     });
+  }
+
+  /// 空置态固定显示 (v0.0.6) — 无媒体时控制栏是唯一操作入口
+  /// (打开文件/播放列表/设置/全屏), 不参与自动隐藏; 置回 false 恢复
+  /// 既有静置计时策略.
+  ///
+  /// 特例声明: media_kit 原生交互无"空置态"概念 (空置页是项目自有的
+  /// empty state), 本钉住语义不违背播放中的"状态无关隐藏"对齐原则.
+  set pinned(bool value) {
+    if (_pinned == value) return;
+    _pinned = value;
+    if (value) {
+      // 钉住: 立即唤起 + 取消在途隐藏计时.
+      _hideTimer?.cancel();
+      show();
+    } else {
+      // 解除: 回到常规静置计时.
+      scheduleHide();
+    }
   }
 
   /// 更新 resize 状态 — resize 期间冻结自动隐藏逻辑

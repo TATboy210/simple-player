@@ -269,6 +269,73 @@ void main() {
     });
   });
 
+  group('AutoHideController.pinned (v0.0.6 空置态固定显示)', () {
+    testWidgets('pinned=true — 静置超时后仍可见 (隐藏计时被钉住取消)',
+        (tester) async {
+      isPlaying.value = true; // 模拟常规可隐藏场景
+      final c = createController();
+      c.init();
+      c.pinned = true;
+
+      // 窗口态隐藏延迟 3s — 推进 4s 覆盖计时窗口.
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    test('pinned=true — 显式 hide() 被拒绝 (钉住优先)', () {
+      final c = createController();
+      c.init();
+      c.pinned = true;
+
+      c.hide();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    testWidgets('pinned=true 期间鼠标事件 — 照常 show 且不重启隐藏',
+        (tester) async {
+      final c = createController();
+      c.init();
+      c.pinned = true;
+
+      c.onMouseMove();
+      c.onMouseExit(); // 静置 → scheduleHide 被钉住拦截
+
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      expect(c.visible.value, isTrue);
+    });
+
+    testWidgets('pinned 置回 false — 恢复常规静置计时隐藏', (tester) async {
+      isPlaying.value = true;
+      final c = createController();
+      c.init();
+      c.pinned = true;
+
+      c.pinned = false; // 解除 → scheduleHide 重新计时
+      // 解除本身不立即隐藏 (回到常规策略).
+      await tester.pump();
+      expect(c.visible.value, isTrue);
+
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle(); // 3s 计时 + 150ms 淡出完成
+      expect(c.visible.value, isFalse);
+    });
+
+    test('pinned 幂等 — 重复置 true 不重复 show', () {
+      final c = createController();
+      c.init();
+
+      c.pinned = true;
+      c.pinned = true; // no-op
+
+      expect(c.visible.value, isTrue);
+    });
+  });
+
   group('AutoHideController opacity', () {
     test('opacity animation is available', () {
       final c = createController();
