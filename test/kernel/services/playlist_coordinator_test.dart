@@ -11,6 +11,7 @@ import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
+import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/kernel/persistence/playlist_store.dart';
 import 'package:simple_player_flutter/kernel/services/playlist_coordinator.dart';
 
@@ -236,6 +237,119 @@ void main() {
       // 当前曲目断点内容已随节流保存刷新.
       final a = coord.entries.value.firstWhere((e) => e.path == 'a.mp4');
       expect(a.positionMs, 3000);
+    });
+  });
+
+  group('排序 (v0.0.6)', () {
+    test('sortEntries 按名称 — 引擎队列物理重排, 当前 index 跟随', () async {
+      await engine.openPlaylist(['c.mp4', 'a.mp4', 'b.mp4'], startIndex: 2);
+
+      await coordinator.sortEntries(PlaylistSortKey.name);
+
+      expect(engine.lastSortQueueTarget, ['a.mp4', 'b.mp4', 'c.mp4']);
+      // 引擎镜像已重排 (FakeEngine 同构), 视图经 revision 回流重建.
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['a.mp4', 'b.mp4', 'c.mp4'],
+      );
+      // 当前播放 b.mp4 (原 index 2) → 新 index 1 — 播放身份不丢.
+      expect(coordinator.currentIndex.value, 1);
+    });
+
+    test('同键再次排序 — 翻转方向', () async {
+      await engine.openPlaylist(['b.mp4', 'a.mp4']);
+
+      await coordinator.sortEntries(PlaylistSortKey.name);
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['a.mp4', 'b.mp4'],
+      );
+
+      await coordinator.sortEntries(PlaylistSortKey.name);
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['b.mp4', 'a.mp4'],
+      );
+    });
+
+    test('停止态排序 — 仅重排逻辑队列, 引擎队列不动', () async {
+      await engine.openPlaylist(['b.mp4', 'a.mp4']);
+      await engine.stop(); // 引擎装载清空, 逻辑队列保留
+
+      await coordinator.sortEntries(PlaylistSortKey.name);
+
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['a.mp4', 'b.mp4'],
+      );
+      expect(engine.queuePaths.value, isEmpty);
+      // 下次点击装载时按排序后的逻辑队列装载.
+      await coordinator.playEntryAt(0);
+      expect(engine.queuePaths.value, ['a.mp4', 'b.mp4']);
+    });
+
+    test('addedOrder 排序 — 依 addedSeq 还原添加顺序 (物理重排后仍可逆)',
+        () async {
+      await engine.openPlaylist(['c.mp4', 'a.mp4', 'b.mp4']);
+
+      await coordinator.sortEntries(PlaylistSortKey.name);
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['a.mp4', 'b.mp4', 'c.mp4'],
+      );
+
+      await coordinator.sortEntries(PlaylistSortKey.addedOrder);
+      expect(
+        [for (final e in coordinator.entries.value) e.path],
+        ['c.mp4', 'a.mp4', 'b.mp4'], // 添加顺序还原
+      );
+    });
+
+    test('排序状态持久化 — 落盘含 sortKey/排序方向/addedSeq', () async {
+      final tempDir = await Directory.systemTemp.createTemp('sort_persist');
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      final coord = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(() => coord.dispose());
+      addTearDown(() => _deleteTempDir(tempDir));
+
+      await engine.openPlaylist(['b.mp4', 'a.mp4']);
+      await coord.sortEntries(PlaylistSortKey.name);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final loaded = await store.load();
+      expect(loaded, isNotNull);
+      expect(loaded!.sortKey, PlaylistSortKey.name);
+      expect(loaded.sortAscending, isTrue);
+      expect(loaded.items.first.path, 'a.mp4');
+      expect(loaded.items.first.addedSeq, isNotNull); // addedSeq 已持久化
+    });
+
+    test('恢复重放排序 — restoreFromDisk 按持久化排序键重排逻辑队列',
+        () async {
+      final tempDir = await Directory.systemTemp.createTemp('sort_restore');
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      addTearDown(() => _deleteTempDir(tempDir));
+      await store.save(
+        PersistedPlaylistSnapshot(
+          items: [
+            PlaylistItem(path: 'b.mp4', addedSeq: 0),
+            PlaylistItem(path: 'a.mp4', addedSeq: 1),
+          ],
+          playMode: PlayMode.loopAll,
+          sortKey: PlaylistSortKey.name,
+          sortAscending: true,
+        ),
+      );
+
+      final restoring = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(restoring.dispose);
+      await restoring.restoreFromDisk();
+
+      expect(
+        [for (final e in restoring.entries.value) e.path],
+        ['a.mp4', 'b.mp4'], // name 排序重放
+      );
+      expect(restoring.sortKey, PlaylistSortKey.name);
     });
   });
 

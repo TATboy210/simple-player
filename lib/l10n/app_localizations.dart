@@ -560,6 +560,48 @@ abstract class AppLocalizations {
   /// **'Playlist is empty'**
   String get playlistEmpty;
 
+  /// Tooltip for the playlist sort button (v0.0.6)
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get sortBy;
+
+  /// Sort menu item: order items were added
+  ///
+  /// In en, this message translates to:
+  /// **'By Added Order'**
+  String get sortByAddedOrder;
+
+  /// Sort menu item: by file name
+  ///
+  /// In en, this message translates to:
+  /// **'By Name'**
+  String get sortByName;
+
+  /// Sort menu item: by last played time
+  ///
+  /// In en, this message translates to:
+  /// **'By Last Played'**
+  String get sortByLastPlayed;
+
+  /// Sort menu item: by media duration
+  ///
+  /// In en, this message translates to:
+  /// **'By Duration'**
+  String get sortByDuration;
+
+  /// Sort direction: ascending
+  ///
+  /// In en, this message translates to:
+  /// **'Ascending'**
+  String get sortAscending;
+
+  /// Sort direction: descending
+  ///
+  /// In en, this message translates to:
+  /// **'Descending'**
+  String get sortDescending;
+
   /// Shown when playback history is empty
   ///
   /// In en, this message translates to:

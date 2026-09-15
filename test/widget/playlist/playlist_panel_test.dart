@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
+import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
@@ -48,6 +49,9 @@ void main() {
       void Function(int)? onRemoveEntry,
       VoidCallback? onCyclePlayMode,
       VoidCallback? onClose,
+      PlaylistSortKey sortKey = PlaylistSortKey.addedOrder,
+      bool sortAscending = true,
+      void Function(PlaylistSortKey)? onSortSelected,
     }) => _wrap(
       PlaylistPanel(
         entries: entries,
@@ -59,6 +63,9 @@ void main() {
         onRemoveEntry: onRemoveEntry ?? (_) {},
         playMode: playMode,
         onCyclePlayMode: onCyclePlayMode ?? () {},
+        sortKey: sortKey,
+        sortAscending: sortAscending,
+        onSortSelected: onSortSelected ?? (_) {},
       ),
     );
 
@@ -140,6 +147,41 @@ void main() {
       await tester.pump();
 
       expect(find.byType(PlaylistTile), findsNWidgets(2));
+    });
+
+    testWidgets('排序按钮 — 弹出菜单, 选择键触发 onSortSelected (v0.0.6)',
+        (tester) async {
+      final selected = <PlaylistSortKey>[];
+      await tester.pumpWidget(buildPanel(onSortSelected: selected.add));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+
+      // 四个排序项齐全 (英文模板 — 测试 locale 未指定).
+      expect(find.text('By Added Order'), findsOneWidget);
+      expect(find.text('By Name'), findsOneWidget);
+      expect(find.text('By Last Played'), findsOneWidget);
+      expect(find.text('By Duration'), findsOneWidget);
+
+      await tester.tap(find.text('By Name'));
+      await tester.pumpAndSettle();
+      expect(selected, [PlaylistSortKey.name]);
+    });
+
+    testWidgets('当前排序键勾选并显示方向箭头', (tester) async {
+      await tester.pumpWidget(
+        buildPanel(sortKey: PlaylistSortKey.name, sortAscending: false),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.sort));
+      await tester.pumpAndSettle();
+
+      // 当前键唯一 — 勾选 + 降序箭头各一个.
+      expect(find.byIcon(Icons.check), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_upward), findsNothing);
+      expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
     });
   });
 

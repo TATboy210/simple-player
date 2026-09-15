@@ -25,6 +25,7 @@ import '../diagnostics/kernel_logger.dart';
 import '../engine/engine_state.dart';
 import '../models/play_mode.dart';
 import '../models/playlist_item.dart';
+import '../models/playlist_sort.dart';
 import '../persistence/playlist_store.dart';
 
 final _log = KernelLogger.I;
@@ -51,6 +52,27 @@ class PlaylistCoordinator {
   /// path → 元数据缓存. 队列重建时按 path 合并, 条目移除后不主动清理
   /// （断点元数据量级 = 用户看过的文件数, 内存影响可忽略）.
   final Map<String, PlaylistItem> _metaByPath = <String, PlaylistItem>{};
+
+  /// 下一个待分配的添加顺序序号 (addedSeq) — 单调递增, 只增不回收
+  /// （删除条目留下空洞无碍排序语义）.
+  int _nextAddedSeq = 0;
+
+  /// 当前排序键 (v0.0.6) — 持久化 + 面板菜单勾选态.
+  PlaylistSortKey _sortKey = PlaylistSortKey.addedOrder;
+
+  /// 当前排序方向 — true = 升序.
+  bool _sortAscending = true;
+
+  /// 取条目元数据; 新 path 分配 addedSeq 并登记入缓存 —
+  /// [addedSeq] 是排序键 addedOrder 的数据前提, 必须稳定持久
+  /// （on-the-fly 生成会随重建漂移）.
+  PlaylistItem _itemFor(String path) {
+    final existing = _metaByPath[path];
+    if (existing != null) return existing;
+    final created = PlaylistItem(path: path, addedSeq: _nextAddedSeq++);
+    _metaByPath[path] = created;
+    return created;
+  }
 
   /// 切曲前最后一次已知的 position/duration 快照 — 断点更新取材处.
   /// **粘性语义 (v0.0.6)**: 进 0 不回写 — engine.stop 的
@@ -86,6 +108,12 @@ class PlaylistCoordinator {
 
   /// 当前播放模式 — 身份保持转发引擎镜像（引擎为模式单一数据源）.
   ValueNotifier<PlayMode> get playMode => _engine.playMode;
+
+  /// 当前排序键 (v0.0.6) — 面板菜单勾选态.
+  PlaylistSortKey get sortKey => _sortKey;
+
+  /// 当前排序方向 — true = 升序.
+  bool get sortAscending => _sortAscending;
 
   // ============================================================
   // 动作转发
@@ -142,6 +170,33 @@ class PlaylistCoordinator {
     _appendToLogicalQueue(paths);
     await _engine.appendToQueue(paths);
     unawaited(_save());
+  }
+
+  /// 按指定键排序队列 (v0.0.6) — 用户显式意图的物理重排.
+  ///
+  /// 排序与播放顺序严格分离: 这是唯一合法的队列物理重排（随机播放是
+  /// 播放顺序覆盖层, 永不改列表排列）. 引擎已装载时经 [QueueControl.sortQueue]
+  /// 物理重排 mpv 队列（revision 回流自动重建视图 + 落盘）; 停止态
+  /// （引擎队列空）仅重排逻辑队列, 下次装载按新顺序生效.
+  ///
+  /// [ascending] 省略时: 同键再次排序 = 翻转方向, 换键 = 重置为升序.
+  Future<void> sortEntries(PlaylistSortKey key, {bool? ascending}) async {
+    final nextAscending = ascending ?? (key == _sortKey ? !_sortAscending : true);
+    _sortKey = key;
+    _sortAscending = nextAscending;
+
+    final target = [..._entries.value]..sort(
+      (a, b) => comparePlaylistEntries(a, b, key: key, ascending: nextAscending),
+    );
+    final targetPaths = <String>[for (final entry in target) entry.path];
+
+    await _engine.sortQueue(targetPaths);
+    if (!_engineQueueMatches(targetPaths)) {
+      // 停止态: 引擎队列空 (或与逻辑队列不一致), sortQueue no-op 无回流 —
+      // 手工重排逻辑队列并落盘, 下次装载按新顺序生效.
+      _entries.value = List<PlaylistItem>.unmodifiable(target);
+      unawaited(_save());
+    }
   }
 
   /// 跳到下一个条目 — 边界回绕语义由引擎 [QueueControl] 统一裁定.
@@ -209,7 +264,7 @@ class PlaylistCoordinator {
   // 启动恢复
   // ============================================================
 
-  /// 从磁盘恢复逻辑队列与播放模式 — **不装载 mpv 队列, 不自动播放**
+  /// 从磁盘恢复逻辑队列、播放模式与排序状态 — **不装载 mpv 队列, 不自动播放**
   /// （装载留给用户首次点击条目时的 [playEntryAt] 装载分支）.
   Future<void> restoreFromDisk() async {
     final store = _store;
@@ -217,17 +272,35 @@ class PlaylistCoordinator {
     final snapshot = await store.load();
     if (snapshot == null || snapshot.items.isEmpty) return;
 
+    var maxSeq = -1;
     for (final item in snapshot.items) {
       _metaByPath[item.path] = item;
+      final seq = item.addedSeq;
+      if (seq != null && seq > maxSeq) maxSeq = seq;
     }
-    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
-      for (final item in snapshot.items) item,
-    ]);
+    _nextAddedSeq = maxSeq + 1; // 后续新增条目接着编号, 不与恢复值冲突
+    _sortKey = snapshot.sortKey;
+    _sortAscending = snapshot.sortAscending;
+    // 幂等重放排序 — 恢复顺序即上次落盘顺序, 已排序时恒等 (addedOrder
+    // 模式下重放按 addedSeq 归位, 修正手工删改造成的漂移).
+    final sorted = [...snapshot.items]..sort(
+      (a, b) => comparePlaylistEntries(
+        a,
+        b,
+        key: _sortKey,
+        ascending: _sortAscending,
+      ),
+    );
+    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[...sorted]);
     // 模式恢复不装载队列也可设置（mpv 属性级, 队列空时无副作用）.
     await _engine.setPlayMode(snapshot.playMode);
     _log.i(
       'PlaylistCoordinator: restored queue from disk',
-      context: {'count': snapshot.items.length, 'mode': snapshot.playMode.name},
+      context: {
+        'count': snapshot.items.length,
+        'mode': snapshot.playMode.name,
+        'sort': '${_sortKey.name}/${_sortAscending ? 'asc' : 'desc'}',
+      },
     );
   }
 
@@ -306,7 +379,8 @@ class PlaylistCoordinator {
     if (existing == null && !_entries.value.any((e) => e.path == path)) {
       return; // 已移除且无元数据 — 不产生孤儿断点
     }
-    final base = existing ?? PlaylistItem(path: path);
+    // _itemFor 兜底: 条目在视图中但元数据缺失时登记 (含 addedSeq 分配).
+    final base = _itemFor(path);
     final updated = base.copyWith(
       positionMs: effectiveBreakpointMs(_lastKnownPositionMs, _lastKnownDurationMs),
       durationMs: _lastKnownDurationMs > 0 ? _lastKnownDurationMs : null,
@@ -319,10 +393,11 @@ class PlaylistCoordinator {
     ]);
   }
 
-  /// 以引擎 paths 为准重建逻辑队列（元数据按 path 合并, 乱序重排后顺序跟随引擎）.
+  /// 以引擎 paths 为准重建逻辑队列（元数据按 path 合并, 排序重排后顺序跟随引擎;
+  /// 新 path 经 [_itemFor] 登记元数据并分配 addedSeq）.
   void _rebuildEntries(List<String> paths) {
     _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
-      for (final path in paths) _metaByPath[path] ?? PlaylistItem(path: path),
+      for (final path in paths) _itemFor(path),
     ]);
   }
 
@@ -330,7 +405,7 @@ class PlaylistCoordinator {
   void _appendToLogicalQueue(List<String> paths) {
     _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
       ..._entries.value,
-      for (final path in paths) _metaByPath[path] ?? PlaylistItem(path: path),
+      for (final path in paths) _itemFor(path),
     ]);
   }
 
@@ -396,7 +471,8 @@ class PlaylistCoordinator {
   // 持久化
   // ============================================================
 
-  /// 落盘当前逻辑队列 + 模式（切曲/移除/追加/模式变化时触发; 失败静默降级）.
+  /// 落盘当前逻辑队列 + 模式 + 排序状态（切曲/移除/追加/模式变化时触发;
+  /// 失败静默降级）.
   Future<void> _save() async {
     final store = _store;
     if (store == null) return;
@@ -405,7 +481,12 @@ class PlaylistCoordinator {
       for (final entry in _entries.value) _metaByPath[entry.path] ?? entry,
     ];
     await store.save(
-      PersistedPlaylistSnapshot(items: items, playMode: _engine.playMode.value),
+      PersistedPlaylistSnapshot(
+        items: items,
+        playMode: _engine.playMode.value,
+        sortKey: _sortKey,
+        sortAscending: _sortAscending,
+      ),
     );
   }
 

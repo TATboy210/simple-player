@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
+import 'package:simple_player_flutter/kernel/engine/playlist_move_planner.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 
 /// Hand-written Fake implementing all ISP interfaces for testing.
@@ -141,6 +142,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   int? lastOpenPlaylistStartIndex;
   final List<String> appendedPaths = [];
   final List<int> removedIndices = [];
+  /// 最近一次 sortQueue 的目标顺序 (v0.0.6 排序测试内省).
+  List<String>? lastSortQueueTarget;
   final List<int> jumpedToIndices = [];
   int nextInQueueCallCount = 0;
   int previousInQueueCallCount = 0;
@@ -434,6 +437,27 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     }
     queuePaths.value = List<String>.unmodifiable(remaining);
     queueIndex.value = nextIndex;
+    queueRevision.value++;
+  }
+
+  @override
+  Future<void> sortQueue(List<String> targetOrder) async {
+    if (_disposed) return;
+    // 测试内省: 记录最近一次排序目标顺序.
+    lastSortQueueTarget = List<String>.unmodifiable(targetOrder);
+    // 与 MediaKitEngine 同构: 规划器恒等/非排列 no-op, 乐观镜像 + revision.
+    final moves = planPlaylistMoves(queuePaths.value, targetOrder);
+    if (moves.isEmpty) return;
+    final current = queuePaths.value;
+    final currentIndex = queueIndex.value;
+    final currentPath =
+        (currentIndex >= 0 && currentIndex < current.length)
+        ? current[currentIndex]
+        : null;
+    queuePaths.value = List<String>.unmodifiable(targetOrder);
+    queueIndex.value = currentPath == null
+        ? -1
+        : targetOrder.indexOf(currentPath);
     queueRevision.value++;
   }
 
