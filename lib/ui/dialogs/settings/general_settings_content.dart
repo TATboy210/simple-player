@@ -10,16 +10,20 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../kernel/services/app_settings_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../theme/tokens.dart';
 import 'error_feedback_settings.dart';
 
-/// 「通用」分区内容 —— 错误卡片开关行。
+/// 「通用」分区内容 —— 语言 / 错误卡片开关 / 断点续播开关（v0.0.6）。
 ///
 /// 开关行翻转即生效并 fire-and-forget 持久化（SET-01/03）；呈现门控由
 /// ErrorCardHost 订阅同一 store notifier 实现（D-05），捕获/落盘链零接触。
 class GeneralSettingsContent extends StatefulWidget {
-  const GeneralSettingsContent({super.key});
+  const GeneralSettingsContent({super.key, this.settings});
+
+  /// 应用偏好编排服务 — null 时断点续播开关行隐藏（测试退路）.
+  final AppSettingsService? settings;
 
   @override
   State<GeneralSettingsContent> createState() => _GeneralSettingsContentState();
@@ -38,8 +42,33 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       padding: const EdgeInsets.all(Tokens.spLg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [_buildLanguageRow(l10n), _buildErrorCardToggleRow(l10n)],
+        children: [
+          _buildLanguageRow(l10n),
+          _buildErrorCardToggleRow(l10n),
+          // v0.0.6 断点续播总开关 — 服务注入后显示 (测试退路隐藏).
+          if (widget.settings != null) _buildResumeToggleRow(l10n),
+        ],
       ),
+    );
+  }
+
+  /// 断点续播开关行 (v0.0.6) — 关闭时 coordinator 不记录断点,
+  /// 面板隐藏断点进度; 打开恢复记录.
+  Widget _buildResumeToggleRow(AppLocalizations l10n) {
+    final settings = widget.settings!;
+    return ValueListenableBuilder<bool>(
+      valueListenable: settings.resumeEnabled,
+      builder: (context, enabled, _) {
+        return _SettingsRow(
+          label: l10n.resumeRememberPosition,
+          onTap: () => settings.setResumeEnabled(!enabled),
+          trailing: Switch(
+            value: enabled,
+            activeThumbColor: Tokens.accent,
+            onChanged: settings.setResumeEnabled,
+          ),
+        );
+      },
     );
   }
 

@@ -560,6 +560,24 @@ abstract class AppLocalizations {
   /// **'Playlist is empty'**
   String get playlistEmpty;
 
+  /// Toggle label for resume breakpoint setting (v0.0.6)
+  ///
+  /// In en, this message translates to:
+  /// **'Remember playback position'**
+  String get resumeRememberPosition;
+
+  /// Label for audio delay setting (v0.0.6)
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Delay'**
+  String get audioDelay;
+
+  /// Label for subtitle delay setting (v0.0.6)
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle Delay'**
+  String get subtitleDelay;
+
   /// Tooltip for the playlist sort button (v0.0.6)
   ///
   /// In en, this message translates to:

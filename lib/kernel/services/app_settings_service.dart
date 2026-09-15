@@ -71,18 +71,17 @@ class AppSettingsService {
   /// 断点续播总开关 — coordinator 记录门控 + 面板显示门控共同消费.
   final ValueNotifier<bool> resumeEnabled = ValueNotifier(true);
 
+  /// 硬解开关 — 设置 UI 消费 (ValueNotifier 体系).
+  final ValueNotifier<bool> hardwareDecoding = ValueNotifier(true);
+
   /// 音频延迟 (毫秒) — 当前生效值 (内存镜像, UI 读取).
   int _audioDelayMs = 0;
 
   /// 字幕延迟 (毫秒).
   int _subtitleDelayMs = 0;
 
-  /// 硬解当前值.
-  bool _hardwareDecoding = true;
-
   int get audioDelayMs => _audioDelayMs;
   int get subtitleDelayMs => _subtitleDelayMs;
-  bool get hardwareDecoding => _hardwareDecoding;
 
   /// 初始化 — 载入持久值 → 回放到引擎/服务 → 挂变更监听.
   ///
@@ -95,9 +94,9 @@ class AppSettingsService {
     _restoring = true; // 回放期屏蔽写回监听 (回声抑制)
     try {
       resumeEnabled.value = data.resumeEnabled;
+      hardwareDecoding.value = data.hardwareDecoding;
       _audioDelayMs = data.audioDelayMs;
       _subtitleDelayMs = data.subtitleDelayMs;
-      _hardwareDecoding = data.hardwareDecoding;
 
       engine.setVolume(data.volume);
       if (data.isMuted) engine.setMute(true);
@@ -154,7 +153,7 @@ class AppSettingsService {
   /// 设置硬解开关 — 引擎生效 + 落盘.
   void setHardwareDecoding(bool v) {
     if (_disposed) return;
-    _hardwareDecoding = v;
+    hardwareDecoding.value = v;
     engine.setHardwareDecoding(v);
     unawaited(store.saveHardwareDecoding(v));
   }
@@ -242,5 +241,6 @@ class AppSettingsService {
     final video = pendingVideo;
     if (video != null) unawaited(store.saveVideo(video));
     resumeEnabled.dispose();
+    hardwareDecoding.dispose();
   }
 }

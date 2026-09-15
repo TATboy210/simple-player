@@ -58,6 +58,10 @@ class PlaylistPanel extends StatefulWidget {
   /// 选择排序键 (v0.0.6) — 同键再次选择 = 翻转方向, 由协调器裁定.
   final ValueChanged<PlaylistSortKey> onSortSelected;
 
+  /// 断点续播总开关 (v0.0.6, 可选) — false 时条目断点进度/续播分区隐藏;
+  /// null 恒允许 (测试退路).
+  final ValueListenable<bool>? resumeEnabled;
+
   const PlaylistPanel({
     super.key,
     required this.entries,
@@ -72,6 +76,7 @@ class PlaylistPanel extends StatefulWidget {
     required this.sortKey,
     required this.sortAscending,
     required this.onSortSelected,
+    this.resumeEnabled,
   });
 
   @override
@@ -229,45 +234,69 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                   ),
                 );
               }
-              return ValueListenableBuilder<int>(
-                valueListenable: widget.currentIndex,
-                builder: (_, index, _) => ScrollbarTheme(
-                  // 两端内缩一个圆角半径 — thumb 拉到底不再与面板圆角
-                  // 相交 (Scrollbar 绘制区域不受 ListView padding 影响,
-                  // margin 必须经 ScrollbarThemeData 传入).
-                  data: const ScrollbarThemeData(
-                    mainAxisMargin: Tokens.controlBarRadius,
-                    crossAxisMargin: 3,
-                  ),
-                  child: Scrollbar(
-                    controller: _scrollController,
-                    thumbVisibility: true,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
-                      // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
-                      padding: const EdgeInsets.fromLTRB(
-                        Tokens.spXs,
-                        Tokens.spSm,
-                        8,
-                        Tokens.controlBarRadius,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (_, i) => PlaylistTile(
-                        item: items[i],
-                        isCurrent: i == index,
-                        onPlay: () => widget.onPlayEntry(i),
-                        onResume: () => widget.onResumeEntry(i),
-                        onRemove: () => widget.onRemoveEntry(i),
-                      ),
-                    ),
-                  ),
+              // v0.0.6: 断点开关监听层 — null 恒允许 (测试退路),
+              // ValueListenableBuilder 直挂恒真 notifier 的开销省略.
+              final resume = widget.resumeEnabled;
+              if (resume == null) {
+                return ValueListenableBuilder<int>(
+                  valueListenable: widget.currentIndex,
+                  builder: (_, index, _) => _buildList(l10n, items, index, true),
+                );
+              }
+              return ValueListenableBuilder<bool>(
+                valueListenable: resume,
+                builder: (_, allowed, _) => ValueListenableBuilder<int>(
+                  valueListenable: widget.currentIndex,
+                  builder: (_, index, _) =>
+                      _buildList(l10n, items, index, allowed),
                 ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  /// 条目纵列 — [resumeAllowed] 传递断点 UI 门控 (v0.0.6).
+  Widget _buildList(
+    AppLocalizations l10n,
+    List<PlaylistItem> items,
+    int index,
+    bool resumeAllowed,
+  ) {
+    return ScrollbarTheme(
+      // 两端内缩一个圆角半径 — thumb 拉到底不再与面板圆角
+      // 相交 (Scrollbar 绘制区域不受 ListView padding 影响,
+      // margin 必须经 ScrollbarThemeData 传入).
+      data: const ScrollbarThemeData(
+        mainAxisMargin: Tokens.controlBarRadius,
+        crossAxisMargin: 3,
+      ),
+      child: Scrollbar(
+        controller: _scrollController,
+        thumbVisibility: true,
+        child: ListView.builder(
+          controller: _scrollController,
+          // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
+          // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
+          padding: const EdgeInsets.fromLTRB(
+            Tokens.spXs,
+            Tokens.spSm,
+            8,
+            Tokens.controlBarRadius,
+          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) => PlaylistTile(
+            item: items[i],
+            isCurrent: i == index,
+            onPlay: () => widget.onPlayEntry(i),
+            onResume: () => widget.onResumeEntry(i),
+            onRemove: () => widget.onRemoveEntry(i),
+            resumeAllowed: resumeAllowed,
+          ),
+        ),
+      ),
     );
   }
 

@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
+import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
+import 'package:simple_player_flutter/kernel/services/app_settings_service.dart';
+import 'package:simple_player_flutter/kernel/services/video_processing_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_dialog.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/video_settings_content.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
+import '../../helpers/fake_engine.dart';
+
 void main() {
+  setUpAll(() {
+    // v0.0.6 bundle 注入用例经 AppSettingsService → KernelLogger (项目惯例).
+    KernelLoggerImpl.resetForTesting();
+    KernelLoggerImpl.init();
+  });
+
   // 固定中文 locale — 文案断言（标题/导航/分区名）不随宿主环境漂移。
   Widget buildSubject() => MaterialApp(
     locale: const Locale('zh'),
@@ -176,5 +190,110 @@ void main() {
           .first,
     );
     expect(videoPointer.ignoring, isTrue);
+  });
+
+  group('bundle 注入 (v0.0.6)', () {
+    late FakeEngine engine;
+    late VideoProcessingService videoProcessing;
+    late AppSettingsService settings;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      engine = FakeEngine();
+      videoProcessing = VideoProcessingService(engine);
+      settings = AppSettingsService(
+        engine: engine,
+        videoProcessing: videoProcessing,
+        store: AppSettingsStore(),
+      );
+    });
+
+    tearDown(() {
+      settings.dispose();
+      videoProcessing.dispose();
+      engine.dispose();
+    });
+
+    Widget buildInjectedSubject() => MaterialApp(
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => Center(
+            child: TextButton(
+              onPressed: () => SettingsDialog.show(
+                context,
+                services: SettingsServicesBundle(
+                  videoProcessing: videoProcessing,
+                  settings: settings,
+                ),
+              ),
+              child: const Text('打开设置'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('video/audio 分区启用并可切换内容', (tester) async {
+      await tester.pumpWidget(buildInjectedSubject());
+      await tester.tap(find.text('打开设置'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('视频'));
+      await tester.pumpAndSettle();
+      expect(find.byType(VideoSettingsContent), findsOneWidget);
+      // 视频分区含亮度滑条与硬解开关.
+      expect(find.text('亮度'), findsOneWidget);
+      expect(find.text('硬件解码'), findsOneWidget);
+
+      await tester.tap(find.text('音频'));
+      await tester.pumpAndSettle();
+      // 音频分区含双延迟行.
+      expect(find.text('音频延迟'), findsOneWidget);
+      expect(find.text('字幕延迟'), findsOneWidget);
+
+      // 注入后导航不再灰显.
+      final videoOpacity = tester.widget<Opacity>(
+        find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
+      );
+      expect(videoOpacity.opacity, 1);
+    });
+
+    testWidgets('通用分区出现断点续播开关并可翻转', (tester) async {
+      await tester.pumpWidget(buildInjectedSubject());
+      await tester.tap(find.text('打开设置'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('通用'));
+      await tester.pumpAndSettle();
+      expect(find.text('记住播放位置'), findsOneWidget);
+      expect(settings.resumeEnabled.value, isTrue);
+
+      // 点行翻转 → 服务状态变化.
+      await tester.tap(find.text('记住播放位置'));
+      await tester.pumpAndSettle();
+      expect(settings.resumeEnabled.value, isFalse);
+    });
+
+    testWidgets('视频分区滑条变化写入 VideoProcessingService', (tester) async {
+      await tester.pumpWidget(buildInjectedSubject());
+      await tester.tap(find.text('打开设置'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('视频'));
+      await tester.pumpAndSettle();
+
+      // 滑条存在性 + 拖动到最右 (亮度 -1..1).
+      final brightnessSlider = find.byType(Slider).first;
+      await tester.drag(brightnessSlider, const Offset(200, 0));
+      await tester.pumpAndSettle();
+
+      expect(
+        videoProcessing.state.value.brightness,
+        greaterThan(0.5),
+      );
+    });
   });
 }

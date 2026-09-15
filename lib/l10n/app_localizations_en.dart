@@ -244,6 +244,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistEmpty => 'Playlist is empty';
 
   @override
+  String get resumeRememberPosition => 'Remember playback position';
+
+  @override
+  String get audioDelay => 'Audio Delay';
+
+  @override
+  String get subtitleDelay => 'Subtitle Delay';
+
+  @override
   String get sortBy => 'Sort';
 
   @override

@@ -34,6 +34,10 @@ KeyboardHandler buildPlayerKeyboardActions({
   required BuildContext context,
   required Widget child,
   VoidCallback? onOpenFile,
+
+  /// `[`/`]` 字幕延迟调整路由 (v0.0.6) — 非 null 时走持久化通道
+  /// (AppSettingsService), null 时退回 engine 直调 (旧路径).
+  void Function(int deltaMs)? onAdjustSubtitleDelay,
 }) {
   return KeyboardHandler(
     customBindings: customBindings,
@@ -57,12 +61,20 @@ KeyboardHandler buildPlayerKeyboardActions({
     onPlayNext: () => actions.onNextEntry?.call(),
     onShowHelp: () => _showShortcutsHelp(context),
     onSubtitleDelayForward: () {
+      if (onAdjustSubtitleDelay != null) {
+        onAdjustSubtitleDelay(500);
+        return;
+      }
       final delay = engine.subtitleDelay;
       engine.setSubtitleDelay(delay + 500);
       // 录制字幕延迟偏好 — 跨会话恢复
       controller.trackPreferenceService?.recordSubtitleDelay(delay + 500);
     },
     onSubtitleDelayBackward: () {
+      if (onAdjustSubtitleDelay != null) {
+        onAdjustSubtitleDelay(-500);
+        return;
+      }
       final delay = engine.subtitleDelay;
       engine.setSubtitleDelay(delay - 500);
       controller.trackPreferenceService?.recordSubtitleDelay(delay - 500);

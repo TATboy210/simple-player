@@ -47,6 +47,9 @@ class PlayerScreen extends StatefulWidget {
   /// 播放列表协调器 (v0.0.5) — 面板数据源与队列动作入口.
   /// null 时面板与切曲入口整体隐藏 (测试/单文件退路).
   final PlaylistCoordinator? playlistCoordinator;
+
+  /// 设置服务集合 (v0.0.6) — null 时设置 video/audio 分区灰显 (测试退路).
+  final SettingsServicesBundle? settingsServices;
   final WindowBridge windowService;
   final Map<String, String> customBindings;
   final VoidCallback? onOpenFile;
@@ -69,6 +72,7 @@ class PlayerScreen extends StatefulWidget {
     this.testVideoControls,
     required this.controller,
     this.playlistCoordinator,
+    this.settingsServices,
     required this.windowService,
     this.customBindings = const {},
     this.onOpenFile,
@@ -161,7 +165,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onOpenFile: () => widget.onOpenFile?.call(),
       onOpenSubtitle: () => unawaited(_openSubtitle()),
       // 设置窗口壳 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
-      onOpenSettings: () => unawaited(SettingsDialog.show(context)),
+      // v0.0.6: 传入 services bundle — video/audio 分区按注入启用。
+      onOpenSettings: () => unawaited(
+        SettingsDialog.show(context, services: widget.settingsServices),
+      ),
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
@@ -304,6 +311,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
           context: context,
           // O 键与空置页按钮共享同一稳定窗口，不能绕过媒体释放延迟。
           onOpenFile: () => widget.onOpenFile?.call(),
+          // [ ] 字幕延迟 — 设置服务在场时路由到持久化通道 (v0.0.6)。
+          onAdjustSubtitleDelay: widget.settingsServices?.settings == null
+              ? null
+              : (deltaMs) {
+                  final settings = widget.settingsServices!.settings!;
+                  settings.setSubtitleDelayMs(
+                    settings.subtitleDelayMs + deltaMs,
+                  );
+                  // TrackPreference 与持久化双写同步, 避免 open 后重放冲突.
+                  widget.controller.trackPreferenceService?.recordSubtitleDelay(
+                    settings.subtitleDelayMs,
+                  );
+                },
           child: scaffold,
         );
 
@@ -395,6 +415,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       windowMode: widget.windowService.mode,
       playlistVisible: _playlistVisible,
       playlistCoordinator: widget.playlistCoordinator,
+      settingsServices: widget.settingsServices,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,
     );
