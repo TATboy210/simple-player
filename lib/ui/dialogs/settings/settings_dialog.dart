@@ -72,8 +72,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
             l10n: l10n,
             selected: _selected,
             onSelect: (tab) => setState(() => _selected = tab),
-            videoEnabled: services?.videoProcessing != null,
-            audioEnabled: services?.settings != null,
+            // v0.0.6.1 用户裁决 (2026-09-15): 视频/音频分区暂关闭 —
+            // mpv 属性链路实机验证未完成, 重新开放前维持灰显占位.
+            // bundle 接线保留 (general 的断点续播开关仍消费 settings).
+            videoEnabled: false,
+            audioEnabled: false,
           ),
           // 左右分区的细分隔线 — 垂直渐变（上下端透明→borderHighlight），
           // 模拟毛玻璃边缘的光线收束，比通高纯色实线更轻。
