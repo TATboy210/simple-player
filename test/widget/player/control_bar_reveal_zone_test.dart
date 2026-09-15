@@ -10,6 +10,7 @@ import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
@@ -175,6 +176,76 @@ void main() {
     bool visibilityOf(WidgetTester tester) => tester
         .widget<Visibility>(find.byKey(const Key('player-controls-visibility')))
         .visible;
+
+    /// 空置态装配 (v0.0.6) — 与生产 PlayerScreen 同构: 传 emptyState +
+    /// 空引擎 (idle && !hasMedia), 钉住语义生效的前提.
+    Future<void> pumpEmpty(WidgetTester tester) async {
+      tester.view.physicalSize = _surface;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              width: _surface.width,
+              height: _surface.height,
+              child: PlayerVideoControls(
+                video: video,
+                engine: engine,
+                actions: const PlayerActions(),
+                currentFileName: currentFileName,
+                windowMode: windowMode,
+                emptyState: const SizedBox.shrink(), // 生产恒传 — 触发钉住
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('空置态 — 控制栏钉住常显, 静置超时不隐藏 (v0.0.6)', (tester) async {
+      await pumpEmpty(tester);
+      expect(visibilityOf(tester), isTrue);
+
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+
+      // 空置页只有中央"打开文件"按钮 — 控制栏是其余入口的唯一可达通道.
+      expect(visibilityOf(tester), isTrue, reason: '空置态控制栏不得自动隐藏');
+
+      // 鼠标离开也不隐藏 (scheduleHide/hide 均被钉住拦截).
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(gesture.removePointer);
+      await gesture.addPointer(location: Offset.zero);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      await tester.pumpAndSettle();
+      expect(visibilityOf(tester), isTrue);
+    });
+
+    testWidgets('空置态开始播放后 — 解除钉住, 恢复常规静置隐藏', (tester) async {
+      await pumpEmpty(tester);
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      expect(visibilityOf(tester), isTrue);
+
+      // 开始播放: hasMedia + playing → 钉住解除 → 计时隐藏.
+      engine.state.value = MediaState.playing;
+      port.emitPlaying(true);
+      await tester.pump(const Duration(seconds: Tokens.hideDelayWindowed));
+      await tester.pump(
+        const Duration(milliseconds: Tokens.durationControlsFade + 1),
+      );
+
+      expect(visibilityOf(tester), isFalse, reason: '播放中恢复静置隐藏');
+
+      await settleForTestEnd(tester);
+    });
 
     /// 从实际布局取控制栏矩形（初始可见期）,判定点不依赖表面尺寸假设。
     Rect controlBarRect(WidgetTester tester) =>

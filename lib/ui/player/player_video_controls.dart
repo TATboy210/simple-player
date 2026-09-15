@@ -566,6 +566,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       popupCloseNotifier: _popupCloseNotifier,
     );
     _autoHide.init();
+    // v0.0.6: 空置态钉住 — 应用启动即空置态, 控制栏保持可见.
+    _syncAutoHidePinned();
 
     // 创建共享 AnimationController — 初始 value=1.0(不 resize 时完全可见)
     _animController = AnimationController(
@@ -639,6 +641,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       final isIdle = widget.engine.state.value == MediaState.idle;
       // resize 期间状态变化被暂缓，结束时补同步中央按钮视觉状态。
       _isIdleNotifier.value = isIdle;
+      // resize 期间被暂缓的引擎状态变化 — 补同步空置态钉住 (v0.0.6).
+      _syncAutoHidePinned();
       if (isIdle) {
         _animController.reverse(); // 恢复到 idle 装饰
       } else {
@@ -673,13 +677,24 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   }
 
   /// 控制栏自动隐藏 hold 两源合成 — 任一为真即冻结隐藏计时:
-  /// ① 模态弹层开启 (设置/菜单) ② 播放列表面板可见 (用户正在浏览队列,
-  /// 含空置态开面板的场景). media_kit 对齐原则下不加"无媒体冻结"特例 —
-  /// 原生交互里空置态控制栏照常隐藏.
+  /// ① 模态弹层开启 (设置/菜单) ② 播放列表面板可见 (用户正在浏览队列).
   void _syncAutoHideHold() {
     _autoHide.modalOpen =
         ModalHoldObserver.openModalCount.value > 0 ||
         (widget.playlistVisible?.value ?? false);
+  }
+
+  /// 空置态钉住控制栏 (v0.0.6) — 钉住条件与空置页渲染条件 (**emptyActive**
+  /// = emptyState 非空 && idle && !hasMedia) 完全一致: 空置页只有中央
+  /// "打开文件"按钮, 控制栏是播放列表/设置/全屏的唯一入口, 自动隐藏会让
+  /// 它们全部不可达. 引擎 stop 先清 hasMedia 再发 state=idle, 状态监听器
+  /// 里读到的是变更后的完整快照. emptyState 为 null (测试装配/无空置页
+  /// 场景) 恒不钉住 — 维持既有静置隐藏行为.
+  void _syncAutoHidePinned() {
+    _autoHide.pinned =
+        widget.emptyState != null &&
+        widget.engine.state.value == MediaState.idle &&
+        !widget.engine.hasMedia;
   }
 
   void _onEngineStateChanged() {
@@ -696,8 +711,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     } else {
       _animController.forward();
     }
-    // v0.0.5: hasMedia 跨越 0 边界影响 auto-hide hold (无媒体冻结) — 即时同步.
     _syncAutoHideHold();
+    // v0.0.6: 空置态钉住同步 (stop→idle+无媒体 ⇒ 钉住; 开始播放 ⇒ 解除).
+    _syncAutoHidePinned();
   }
 
   @override
@@ -795,6 +811,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _attachLifecycleListeners();
     _onResizeChanged();
     _isIdleNotifier.value = widget.engine.state.value == MediaState.idle;
+    // engine 实例可能被替换 (测试) — 新引擎的空置态重新判定钉住 (v0.0.6).
+    _syncAutoHidePinned();
     _scheduleSubtitlePaddingSync();
   }
 
