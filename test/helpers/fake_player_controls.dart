@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
+import 'package:simple_player_flutter/ui/player/media_kit_player_port.dart';
 
 /// 路径B 测试 fake — 实现 [PlayerPort] 用纯 Dart [StreamController.broadcast]。
 ///
@@ -41,7 +41,6 @@ class FakePlayerControls implements PlayerPort {
     return _buffering.stream;
   }
 
-  @override
   Stream<bool> get completed {
     streamListenAccessCount++;
     return _completed.stream;
@@ -59,7 +58,6 @@ class FakePlayerControls implements PlayerPort {
     return _duration.stream;
   }
 
-  @override
   Stream<Duration> get buffer {
     streamListenAccessCount++;
     return _buffer.stream;

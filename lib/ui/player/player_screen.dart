@@ -15,6 +15,7 @@ import '../../kernel/services/subtitle_path_validator.dart';
 import '../theme/tokens.dart';
 import '../dialogs/settings/settings_dialog.dart';
 import '../window/custom_title_bar.dart';
+import 'media_kit_player_port.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
@@ -406,7 +407,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// 测试 surface 使用的 controls 装配；生产仍只走 [_buildControls]。
-  Widget _buildTestControls(VideoControlsPort video) {
+  Widget _buildTestControls(VideoControlsPort video) => _controlsFor(video);
+
+  /// Video.controls builder — 符合 `Widget Function(VideoState)` 签名.
+  ///
+  /// 闭包捕获稳定对象（engine、actions 与当前文件名），在 Video 渲染时
+  ///（含全屏 route）调用；全屏状态由各 route 的 [VideoState] 实例实时提供。
+  Widget _buildControls(VideoState state) =>
+      _controlsFor(MediaKitVideoControlsPort(state));
+
+  /// 控制层装配的**唯一**入口 — 测试 seam 与生产 Video.controls 复用同一
+  /// 构造，防止双路径漂移 (v0.0.6 修复: 生产路径曾漏传 settingsServices,
+  /// 导致"记住播放位置"的面板门控失效)。
+  Widget _controlsFor(VideoControlsPort video) {
     return PlayerVideoControls(
       video: video,
       engine: widget.engine,
@@ -416,27 +429,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       playlistVisible: _playlistVisible,
       playlistCoordinator: widget.playlistCoordinator,
       settingsServices: widget.settingsServices,
-      emptyState: widget.emptyState,
-      resizing: widget.windowService.isResizing,
-    );
-  }
-
-  /// Video.controls builder — 符合 `Widget Function(VideoState)` 签名.
-  ///
-  /// 闭包捕获稳定对象（engine、actions 与当前文件名），在 Video 渲染时
-  ///（含全屏 route）调用；全屏状态由各 route 的 [VideoState] 实例实时提供。
-  Widget _buildControls(VideoState state) {
-    // 路径B:返回 playerVideoControls(直连 player.stream),非 PlayerVideoControls.
-    // isFullscreen/videoState 不再显式传 — PlayerVideoControls 内部从 state
-    // 现取(每实例独立,修复"图标不动态"). 闭包捕获的其余稳定对象不变.
-    return playerVideoControls(
-      state,
-      engine: widget.engine,
-      actions: _actions,
-      currentFileName: widget.controller.currentFileName,
-      windowMode: widget.windowService.mode,
-      playlistVisible: _playlistVisible,
-      playlistCoordinator: widget.playlistCoordinator,
       emptyState: widget.emptyState,
       resizing: widget.windowService.isResizing,
     );

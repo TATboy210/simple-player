@@ -16,9 +16,6 @@ class PlayerActions {
   /// 停止并卸载当前媒体。
   final VoidCallback? onStop;
 
-  /// media_kit 完成真实全屏切换后同步窗口语义状态。
-  final void Function(bool isFullscreen)? onFullscreenStateChanged;
-
   /// O 键或菜单“打开文件”。
   final VoidCallback? onOpenFile;
 
@@ -62,7 +59,6 @@ class PlayerActions {
     this.onSeekBack,
     this.onSeekForward,
     this.onStop,
-    this.onFullscreenStateChanged,
     this.onOpenFile,
     this.onToggleFullscreen,
     this.onOpenSubtitle,

@@ -81,14 +81,13 @@ void main() {
     testWidgets('idle PlayPauseButton routes tap to togglePlayPause', (
       tester,
     ) async {
-      // RED: PlayPauseButton currently sets onPressed to null when isIdle is true.
+      // isIdle 字段已删 (v0.0.6 清理: 声明未读) — 按钮视觉只由 isPlaying/iconAlpha 驱动.
       engine.state.value = MediaState.idle;
       await tester.pumpWidget(
         buildSubject(
           child: PlayPauseButton(
             isPlaying: engine.isPlayingNotifier,
             onPlayPause: engine.togglePlayPause,
-            isIdle: true,
           ),
         ),
       );
@@ -105,14 +104,13 @@ void main() {
     testWidgets('opening PlayPauseButton routes tap rather than disabling it', (
       tester,
     ) async {
-      // RED: opening is treated as idle by ControlBar and currently disables play.
+      // opening 态同样不受 isIdle 影响 — 命令合法性由引擎守卫, 按钮恒可按.
       engine.state.value = MediaState.opening;
       await tester.pumpWidget(
         buildSubject(
           child: PlayPauseButton(
             isPlaying: engine.isPlayingNotifier,
             onPlayPause: engine.togglePlayPause,
-            isIdle: true,
           ),
         ),
       );
