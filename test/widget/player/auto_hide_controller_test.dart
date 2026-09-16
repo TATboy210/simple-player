@@ -122,7 +122,7 @@ void main() {
       c.init();
       c.visible.value = false;
 
-      c.onMouseMove();
+      c.onMouseMove(Duration.zero);
 
       // v0.0.5 对齐 media_kit 原生: 隐藏与播放状态无关, 暂停时 hover 同样唤起.
       expect(c.visible.value, isTrue);
@@ -134,7 +134,7 @@ void main() {
       c.init();
       c.visible.value = false;
 
-      c.onMouseMove();
+      c.onMouseMove(Duration.zero);
 
       expect(c.visible.value, isTrue);
     });
@@ -300,7 +300,7 @@ void main() {
       c.init();
       c.pinned = true;
 
-      c.onMouseMove();
+      c.onMouseMove(Duration.zero);
       c.onMouseExit(); // 静置 → scheduleHide 被钉住拦截
 
       await tester.pump(const Duration(seconds: 4));
@@ -408,9 +408,9 @@ void main() {
       final c = createController();
       c.init();
 
-      c.onMouseMove(); // first call — shows
+      c.onMouseMove(Duration.zero); // first call — shows
       c.visible.value = false;
-      c.onMouseMove(); // within 100ms throttle — no-op
+      c.onMouseMove(Duration.zero); // within 100ms throttle — no-op
 
       expect(c.visible.value, isFalse);
     });
@@ -424,7 +424,7 @@ void main() {
       c.resizing = true;
       c.visible.value = false;
 
-      c.onMouseMove();
+      c.onMouseMove(Duration.zero);
 
       // resizing blocks onMouseMove — visible stays false
       expect(c.visible.value, isFalse);
@@ -437,11 +437,11 @@ void main() {
       c.resizing = true;
       c.visible.value = false;
 
-      c.onMouseMove(); // no-op during resize
+      c.onMouseMove(Duration.zero); // no-op during resize
       expect(c.visible.value, isFalse);
 
       c.resizing = false;
-      c.onMouseMove(); // now allowed (throttle may still apply)
+      c.onMouseMove(Duration.zero); // now allowed (throttle may still apply)
     });
   });
 
@@ -482,11 +482,11 @@ void main() {
       final c = createController();
       c.init();
 
-      c.onMouseMove(); // first call — show + scheduleHide
+      c.onMouseMove(Duration.zero); // first call — show + scheduleHide
       c.visible.value = false;
 
       // Within 100ms — throttled, no-op
-      c.onMouseMove();
+      c.onMouseMove(Duration.zero);
       expect(c.visible.value, isFalse);
     });
   });

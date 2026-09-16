@@ -57,7 +57,11 @@ class AutoHideController {
   /// 交互仍活跃时不会过早恢复自动隐藏。
   int _activeInteractionCount = 0;
   Timer? _hideTimer;
-  DateTime _lastHoverTime = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 上次 hover 事件时间戳 — 取自 [PointerEvent.timeStamp] (Windows 嵌入器
+  /// 为 high_resolution_clock 单调微秒, context7 已核), 替代 DateTime.now()
+  /// 的每次事件双对象分配. null = 尚无事件 (首个事件恒通过节流).
+  Duration? _lastHoverTimeStamp;
   static const _hoverThrottle = Duration(milliseconds: 100);
 
   /// 可见性通知器（用于 ValueListenableBuilder 局部重建）
@@ -167,12 +171,13 @@ class AutoHideController {
     }
   }
 
-  /// 鼠标移动（节流 100ms）— 对齐 media_kit 原生: 暂停时 hover 同样唤起.
-  void onMouseMove() {
+  /// 鼠标移动（节流 100ms，基于事件时间戳 — 热路径零分配）— 对齐 media_kit
+  /// 原生: 暂停时 hover 同样唤起.
+  void onMouseMove(Duration eventTimeStamp) {
     if (_resizing) return;
-    final now = DateTime.now();
-    if (now.difference(_lastHoverTime) < _hoverThrottle) return;
-    _lastHoverTime = now;
+    final last = _lastHoverTimeStamp;
+    if (last != null && eventTimeStamp - last < _hoverThrottle) return;
+    _lastHoverTimeStamp = eventTimeStamp;
     show();
     scheduleHide();
   }
