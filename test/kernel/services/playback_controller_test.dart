@@ -57,6 +57,66 @@ void main() {
   });
 
   group('PlaybackController', () {
+    group('标题跟随队列切换 (v0.0.6.1)', () {
+      test('播放列表 jumpTo — 标题/路径跟随实际装载条目', () async {
+        // 模拟播放列表场景: 队列已装载, playEntryAt 走 jumpTo 分支
+        // (不经过 openAndPlay, 旧实现标题因此永不更新).
+        await engine.openPlaylist(
+          [r'D:\v\a.mp4', r'D:\v\b.mp4'],
+          startIndex: 0,
+        );
+        engine.state.value = MediaState.playing;
+        engine.play();
+
+        expect(controller.currentFileName.value, 'a.mp4');
+        expect(controller.currentPath.value, r'D:\v\a.mp4');
+
+        await engine.jumpTo(1);
+
+        expect(controller.currentFileName.value, 'b.mp4');
+        expect(controller.currentPath.value, r'D:\v\b.mp4');
+      });
+
+      test('自动续播 — 队列 index 变化时标题跟随', () async {
+        await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 0);
+        engine.state.value = MediaState.playing;
+        engine.play();
+        expect(controller.currentFileName.value, 'a.mp4');
+
+        // EOF 自动续播: mpv 直接推进 index + revision (无 openAndPlay).
+        engine.queueIndex.value = 1;
+        engine.queueRevision.value++;
+
+        expect(controller.currentFileName.value, 'b.mp4');
+      });
+
+      test('门控 — opening/idle (乐观镜像) 不写入标题', () async {
+        // openPlaylist 内部乐观镜像先于装载确认; 失败时状态回落 idle,
+        // 标题不得短暂指向打不开的文件.
+        await engine.openPlaylist(['a.mp4'], startIndex: 0);
+        // openPlaylist 成功后 state=idle (FakeEngine 同构) — 手动清空标题
+        // 模拟"尚未确认装载", 随后的 revision 抖动不得写入.
+        controller.currentFileName.value = '';
+        controller.currentPath.value = null;
+        engine.queueRevision.value++; // 乐观镜像抖动
+
+        expect(controller.currentFileName.value, '');
+        expect(controller.currentPath.value, isNull);
+      });
+
+      test('stopCurrentMedia — 标题清空契约保持', () async {
+        await engine.openPlaylist(['a.mp4'], startIndex: 0);
+        engine.state.value = MediaState.playing;
+        engine.play();
+        expect(controller.currentFileName.value, 'a.mp4');
+
+        await controller.stopCurrentMedia();
+
+        expect(controller.currentFileName.value, '');
+        expect(controller.currentPath.value, isNull);
+      });
+    });
+
     group('基础播放控制门面', () {
       test('togglePlayPause delegates to the media engine', () {
         controller.togglePlayPause();
