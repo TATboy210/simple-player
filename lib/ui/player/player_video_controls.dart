@@ -174,6 +174,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 控件创建后读取一次的字幕基础 padding，避免 activate 重复叠加自身 inset。
   EdgeInsets? _subtitleBasePadding;
 
+  /// 最近一次应用到 VideoState 的字幕 padding — 值未变化时跳过
+  /// setSubtitleViewPadding (v0.0.6.1: 显隐翻转高频触发的空写守卫,
+  /// 避免 media_kit 内部 notifier 无谓通知).
+  EdgeInsets? _lastAppliedSubtitlePadding;
+
   /// 控制栏可见时为字幕预留的底部安全区。
   static const _subtitleControlBarInset = EdgeInsets.only(
     bottom: Tokens.controlBarHeight + Tokens.controlBarMarginBottom,
@@ -244,6 +249,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     final padding = _autoHide.visible.value
         ? base + _subtitleControlBarInset
         : base;
+    // 空写守卫 — 与上次应用值相同则跳过 (media_kit 内部按值通知, 跳过
+    // 即省一次 SubtitleView 状态通知).
+    if (padding == _lastAppliedSubtitlePadding) return;
+    _lastAppliedSubtitlePadding = padding;
     videoState.setSubtitleViewPadding(padding);
   }
 
@@ -497,7 +506,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       _controlsState.updateSources(widget.video.player, engine: widget.engine);
       // 只有 VideoState 更换时基础 padding 才失效；仅替换 engine 时，
       // 复用同一视频端口可避免把已加过的 control bar inset 再次当作基础值。
-      if (oldWidget.video != widget.video) _subtitleBasePadding = null;
+      if (oldWidget.video != widget.video) {
+        _subtitleBasePadding = null;
+        // 新 VideoState 必须至少收到一次写入 — 空写守卫一并失效.
+        _lastAppliedSubtitlePadding = null;
+      }
       // active replacement 不一定伴随可见性、resize 或 engine 状态变化，
       // 因此必须立即把当前控制栏可见性同步到新的 VideoState；inactive 阶段
       // 则延迟到 activate，避免访问已经脱离祖先树的 media_kit 状态。
@@ -540,6 +553,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 避免把一次宿主回调替换扩散成整套控制状态订阅重建。
     if (oldWidget.actions != widget.actions) {
       _controlBarViewModel = _createControlBarViewModel();
+      _controlBarCache = null; // 缓存子树随 vm 重建失效 (v0.0.6.1)
+    }
+    // 标题源 / resizing 源替换 — 缓存子树持有的 listenable 引用随之失效.
+    if (oldWidget.currentFileName != widget.currentFileName ||
+        oldWidget.resizing != widget.resizing) {
+      _controlBarCache = null;
     }
   }
 
@@ -568,6 +587,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _isIdleNotifier.value = widget.engine.state.value == MediaState.idle;
     // engine 实例可能被替换 (测试) — 新引擎的空置态重新判定钉住 (v0.0.6).
     _syncAutoHidePinned();
+    // activate 视为新的写入契约起点 (reparent 后 VideoState 可能是全新实例,
+    // 必须至少收到一次当前安全区) — 空写守卫复位, 允许一次值相同的重放.
+    _lastAppliedSubtitlePadding = null;
     _scheduleSubtitlePaddingSync();
   }
 
@@ -649,7 +671,33 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   ///
   /// 文件名和 idle 状态只在控制栏需要时监听；控制栏之外的稳定 overlay
   /// 不会因标题或空状态变化而重新 build。
+  ///
+  /// v0.0.6.1 (context7 官方 perf best-practice: "build that part of the
+  /// subtree once and pass it as a child"): ControlBar 按钮子树**构建一次**
+  /// 并跨显隐翻转复用 — FadeTransition 是渲染层驱动动画, 翻转本无需重建
+  /// 按钮树; 失效点与 [_controlBarViewModel] 的重建点对齐 (didUpdateWidget:
+  /// actions 替换 / 标题源替换 / resizing 源替换). plain isIdle 从生产调用
+  /// 移除 (CenterGroup 由 isIdleListenable 单源驱动, 缓存后冻结无碍).
+  Widget? _controlBarCache;
+
   Widget _buildControlBar() {
+    final bar =
+        _controlBarCache ??= ControlBar(
+          vm: _controlBarViewModel,
+          actions: widget.actions,
+          isIdleListenable: _isIdleNotifier,
+          titleListenable: widget.currentFileName,
+          // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
+          opacity: _autoHide.opacity,
+          enableBlur: true,
+          decoration: _animController,
+          resizing: widget.resizing,
+          onToggleFullscreen: _toggleFullscreen,
+          onSeekStart: _autoHide.onSeekStart,
+          onSeekEnd: _autoHide.onSeekEnd,
+          onInteractionStart: _autoHide.onInteractionStart,
+          onInteractionEnd: _autoHide.onInteractionEnd,
+        );
     return ValueListenableBuilder<bool>(
       valueListenable: _autoHide.visible,
       builder: (_, isVisible, _) => Positioned(
@@ -661,26 +709,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
           visible: isVisible,
           maintainState: true,
           maintainAnimation: true,
-          child: FadeTransition(
-            opacity: _autoHide.opacity,
-            child: ControlBar(
-              vm: _controlBarViewModel,
-              actions: widget.actions,
-              isIdle: _isIdleNotifier.value,
-              isIdleListenable: _isIdleNotifier,
-              titleListenable: widget.currentFileName,
-              // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
-              opacity: _autoHide.opacity,
-              enableBlur: true,
-              decoration: _animController,
-              resizing: widget.resizing,
-              onToggleFullscreen: _toggleFullscreen,
-              onSeekStart: _autoHide.onSeekStart,
-              onSeekEnd: _autoHide.onSeekEnd,
-              onInteractionStart: _autoHide.onInteractionStart,
-              onInteractionEnd: _autoHide.onInteractionEnd,
-            ),
-          ),
+          child: FadeTransition(opacity: _autoHide.opacity, child: bar),
         ),
       ),
     );
@@ -794,7 +823,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                       size,
                       event.localPosition,
                     )) {
-                      _autoHide.onMouseMove();
+                      // v0.0.6.1: 传事件时间戳 (单调时钟) — 节流零分配.
+                      _autoHide.onMouseMove(event.timeStamp);
                     }
                   },
                   // v0.0.4:进入即显限定在控制栏矩形内 — 从窗口任意位置进入
