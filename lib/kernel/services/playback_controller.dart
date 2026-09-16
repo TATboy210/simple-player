@@ -41,7 +41,14 @@ class PlaybackController {
     this._onError,
     this._subtitleService,
     this._trackPreferenceService,
-  });
+  }) {
+    // v0.0.6.1 修复: 播放列表切换 (playEntryAt→jumpTo / 自动续播 / shuffle
+    // 随机跳转) 从不经过 [openAndPlay], currentFileName/currentPath 因此
+    // 永不更新 — 控制栏标题停留在上一个文件. 监听队列代数 + 引擎状态,
+    // 跟随**实际装载**的条目同步标题 (见 [_syncCurrentMediaFromQueue]).
+    engine.queueRevision.addListener(_syncCurrentMediaFromQueue);
+    engine.state.addListener(_syncCurrentMediaFromQueue);
+  }
 
   /// 视频渲染引擎实例.
   ///
@@ -231,10 +238,37 @@ class PlaybackController {
     currentPath.value = null;
   }
 
+  /// 队列驱动的标题同步 (v0.0.6.1) — 引擎队列代数/状态变化时, 把
+  /// currentFileName/currentPath 跟随到**实际装载**的条目.
+  ///
+  /// 门控: 仅在媒体已装载态 (playing/paused/completed) 跟随 —
+  /// - opening/idle (装载中的乐观镜像) 不写入, 防止 OpenError 时标题
+  ///   短暂指向打不开的文件 (乐观镜像随后被 stream 回流纠正);
+  /// - error 不写入; idle 的标题清空仍由 [stopCurrentMedia] 保守处理
+  ///   (停止失败保留标题的既有契约);
+  /// - 值相同 (打开文件路径自身的 revision 抖动) 去重跳过.
+  void _syncCurrentMediaFromQueue() {
+    final state = engine.state.value;
+    final loaded =
+        state == MediaState.playing ||
+        state == MediaState.paused ||
+        state == MediaState.completed;
+    if (!loaded) return;
+    final paths = engine.queuePaths.value;
+    final index = engine.queueIndex.value;
+    if (index < 0 || index >= paths.length) return;
+    final current = paths[index];
+    if (current == currentPath.value) return;
+    currentPath.value = current;
+    currentFileName.value = PathUtils.basename(current);
+  }
+
   // ── 生命周期 ──
 
   /// 释放运行时资源和状态通知器。
   void dispose() {
+    engine.queueRevision.removeListener(_syncCurrentMediaFromQueue);
+    engine.state.removeListener(_syncCurrentMediaFromQueue);
     currentFileName.dispose();
     currentPath.dispose();
     validationError.dispose();
