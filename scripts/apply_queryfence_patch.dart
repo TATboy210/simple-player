@@ -14,7 +14,7 @@ import 'dart:io';
 ///
 /// 用法: dart run scripts/apply_queryfence_patch.dart
 /// 退出码: 0=成功/已应用, 1=错误
-void main(List<String> args) async {
+void main(List<String> _) async {
   final projectRoot = _findProjectRoot();
   if (projectRoot == null) {
     print('ERROR: Could not find project root (pubspec.yaml not found)');
@@ -37,8 +37,9 @@ void main(List<String> args) async {
     exit(1);
   }
 
-  final configContent = jsonDecode(packageConfig.readAsStringSync()) as Map<String, dynamic>;
-  final packages = configContent['packages'] as List<dynamic>?;
+  final configContent =
+      jsonDecode(packageConfig.readAsStringSync()) as Map<String, Object?>;
+  final packages = configContent['packages'] as List<Object?>?;
 
   if (packages == null) {
     print('ERROR: Invalid package_config.json format');
@@ -47,7 +48,7 @@ void main(List<String> args) async {
 
   String? fvpRoot;
   for (final pkg in packages) {
-    final map = pkg as Map<String, dynamic>;
+    final map = pkg as Map<String, Object?>;
     if (map['name'] == 'fvp') {
       final rootUri = map['rootUri'] as String?;
       if (rootUri != null) {
