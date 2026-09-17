@@ -10,16 +10,18 @@ import '../models/playlist_sort.dart';
 
 final _log = KernelLogger.I;
 
-/// 播放列表持久化快照 — 队列条目（含断点元数据）、播放模式与排序状态.
+/// 播放列表持久化快照 — 队列条目（含断点元数据）、播放模式、排序状态
+/// 与上次播放锚点.
 ///
 /// Persisted playlist snapshot — queue entries (with resume metadata),
-/// play mode and sort state. [items] 顺序即队列顺序.
+/// play mode, sort state and last-played anchor. [items] 顺序即队列顺序.
 class PersistedPlaylistSnapshot {
   const PersistedPlaylistSnapshot({
     required this.items,
     required this.playMode,
     this.sortKey = PlaylistSortKey.addedOrder,
     this.sortAscending = true,
+    this.lastPlayedPath,
   });
 
   /// 队列条目 — 顺序即队列顺序, 各条目携带断点/时间戳元数据.
@@ -33,27 +35,36 @@ class PersistedPlaylistSnapshot {
 
   /// 上次的排序方向 (v0.0.6).
   final bool sortAscending;
+
+  /// 上次播放的条目路径 (v0.0.6.2) — 恢复后逻辑高亮 + 一键续播锚点.
+  ///
+  /// 用 path 不用 index: 排序/删除会使 index 漂移 (mpv watch-later 同为
+  /// 按文件路径记位); path 不在队列时高亮自然不渲染, 无需清理.
+  final String? lastPlayedPath;
 }
 
 /// 播放列表持久化 — 纯文本 JSON（Unix 原则: flat text files）.
 ///
 /// Playlist persistence — plain-text JSON at
-/// `<ApplicationSupport>/playlist.json`. 结构 (version 2, v0.0.6):
+/// `<ApplicationSupport>/playlist.json`. 结构 (version 3, v0.0.6.2):
 /// ```json
 /// {
-///   "version": 2,
+///   "version": 3,
 ///   "playMode": "loopAll",
 ///   "sortKey": "addedOrder",
 ///   "sortAscending": true,
+///   "lastPlayedPath": "D:/a.mp4",
 ///   "items": [{"path": "D:/a.mp4", "positionMs": 1200, "durationMs": 90000,
 ///              "addedSeq": 0}]
 /// }
 /// ```
 ///
-/// 迁移契约 (v1 → v2, 双向向后兼容):
+/// 迁移契约 (v1 → v2 → v3, 双向向后兼容):
 /// - 读 v1 (或条目缺 `addedSeq`): 排序状态回退默认 (addedOrder/升序),
 ///   addedSeq 由上层按数组下标合成 — 旧文件顺序即添加顺序.
-/// - 旧版本 app 读 v2: 不校验 version、fromJson 丢弃未知 key → 完全兼容.
+/// - 读 v2 (或顶层缺 `lastPlayedPath`): 该字段回退 null — 启动后无
+///   "上次播放"高亮, 断点/排序照常恢复; 下次保存即升级为 v3.
+/// - 旧版本 app 读 v3: 不校验 version、fromJson 丢弃未知 key → 完全兼容.
 ///
 /// 容错契约: 文件缺失 / JSON 损坏 / 字段类型异常 → [load] 返回 null
 /// （视作"无历史"），绝不抛出到调用方; [save] 失败仅记日志.
@@ -63,7 +74,7 @@ class PlaylistStore {
     : _resolveDirectory = resolveDirectory ?? _defaultDirectory;
 
   static const _fileName = 'playlist.json';
-  static const _version = 2;
+  static const _version = 3;
 
   final Future<Directory> Function() _resolveDirectory;
 
@@ -107,11 +118,14 @@ class PlaylistStore {
     try {
       final directory = await _resolveDirectory();
       final file = File('${directory.path}/$_fileName');
-      final json = {
+      final json = <String, Object?>{
         'version': _version,
         'playMode': snapshot.playMode.name,
         'sortKey': snapshot.sortKey.name,
         'sortAscending': snapshot.sortAscending,
+        // null 省略 — 与 PlaylistItem.toJson 同惯例, 缩短人读文件.
+        if (snapshot.lastPlayedPath != null)
+          'lastPlayedPath': snapshot.lastPlayedPath,
         'items': [for (final item in snapshot.items) item.toJson()],
       };
       await file.writeAsString(jsonEncode(json));
@@ -148,6 +162,10 @@ class PlaylistStore {
     final rawAscending = decoded['sortAscending'];
     final sortAscending = rawAscending is bool ? rawAscending : true;
 
+    // 上次播放锚点 (v3 新增) — 缺失/类型异常回退 null (v2/v1 文件路径).
+    final rawLastPlayed = decoded['lastPlayedPath'];
+    final lastPlayedPath = rawLastPlayed is String ? rawLastPlayed : null;
+
     final rawItems = decoded['items'];
     if (rawItems is! List) return null;
     final items = <PlaylistItem>[];
@@ -170,6 +188,7 @@ class PlaylistStore {
       playMode: playMode,
       sortKey: sortKey,
       sortAscending: sortAscending,
+      lastPlayedPath: lastPlayedPath,
     );
   }
 }

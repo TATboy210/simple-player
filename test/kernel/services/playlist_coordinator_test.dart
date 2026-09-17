@@ -564,5 +564,60 @@ void main() {
 
       expect(loaded!.playMode, PlayMode.loopAll);
     });
+
+    test('v3 往返保真 — lastPlayedPath 落盘后原样读回', () async {
+      await store.save(
+        PersistedPlaylistSnapshot(
+          items: [PlaylistItem(path: r'D:\v\a.mp4')],
+          playMode: PlayMode.loopAll,
+          lastPlayedPath: r'D:\v\a.mp4',
+        ),
+      );
+
+      final loaded = await store.load();
+
+      expect(loaded, isNotNull);
+      expect(loaded!.lastPlayedPath, r'D:\v\a.mp4');
+    });
+
+    test('v2 文件迁移 — 顶层缺 lastPlayedPath 回退 null, 其余字段完好', () async {
+      await File('${tempDir.path}/playlist.json').writeAsString(
+        '{"version":2,"playMode":"shuffle","sortKey":"name","sortAscending":false,'
+        '"items":[{"path":"a.mp4","positionMs":5000}]}',
+      );
+
+      final loaded = await store.load();
+
+      expect(loaded, isNotNull);
+      expect(loaded!.lastPlayedPath, isNull);
+      expect(loaded.playMode, PlayMode.shuffle);
+      expect(loaded.items.single.positionMs, 5000);
+    });
+
+    test('lastPlayedPath 类型异常回退 null 不抛', () async {
+      await File('${tempDir.path}/playlist.json').writeAsString(
+        '{"version":3,"playMode":"loopAll","lastPlayedPath":42,'
+        '"items":[{"path":"a.mp4"}]}',
+      );
+
+      final loaded = await store.load();
+
+      expect(loaded!.lastPlayedPath, isNull);
+    });
+
+    test('lastPlayedPath 为 null 时落盘 JSON 不含该键', () async {
+      await store.save(
+        PersistedPlaylistSnapshot(
+          items: [PlaylistItem(path: r'D:\v\a.mp4')],
+          playMode: PlayMode.loopAll,
+        ),
+      );
+
+      final content = await File(
+        '${tempDir.path}/playlist.json',
+      ).readAsString();
+
+      expect(content.contains('lastPlayedPath'), isFalse);
+    });
   });
 }
