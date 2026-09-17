@@ -4,6 +4,7 @@
 /// 数据源直接构造 ValueNotifier — 无需协调器与引擎.
 library;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
@@ -190,11 +191,11 @@ void main() {
     });
 
     group('停止态高亮合成 (v0.0.6.2)', () {
-      // 高亮可视断言锚点 — tile 名称色随 isCurrent 翻转 (accent/常规).
+      // 高亮可视断言锚点 — tile 名称色随状态翻转 (播放 accent / 锚点白 / 常规).
       Color nameColorOf(WidgetTester tester, String path) =>
           tester.widget<Text>(find.text(path)).style!.color!;
 
-      testWidgets('停止态 (index=-1) + lastPlayedPath 命中 → 该条目高亮', (
+      testWidgets('停止态 (index=-1) + lastPlayedPath 命中 → 锚点白色高亮', (
         tester,
       ) async {
         currentIndex.value = -1;
@@ -202,11 +203,12 @@ void main() {
         await tester.pumpWidget(buildPanel());
         await tester.pump();
 
-        expect(nameColorOf(tester, 'b.mp4'), Tokens.accent); // 锚点条目高亮
+        // 锚点 = playlistAnchorWhite, 与播放态 accent 蓝区分状态语义.
+        expect(nameColorOf(tester, 'b.mp4'), Tokens.playlistAnchorWhite);
         expect(nameColorOf(tester, 'a.mp4'), Tokens.textPrimary); // 其他不高亮
       });
 
-      testWidgets('播放态 — currentIndex 优先, 锚不引发双高亮', (tester) async {
+      testWidgets('播放态 — accent 蓝, 锚不引发双高亮', (tester) async {
         currentIndex.value = 0; // 播放 a
         lastPlayedPath.value = 'b.mp4';
         await tester.pumpWidget(buildPanel());
@@ -216,7 +218,7 @@ void main() {
         expect(nameColorOf(tester, 'b.mp4'), Tokens.textPrimary);
       });
 
-      testWidgets('播放态 currentIndex 命中 → 该条目高亮', (tester) async {
+      testWidgets('播放态 currentIndex 命中 → 该条目 accent 蓝', (tester) async {
         currentIndex.value = 1;
         lastPlayedPath.value = null;
         await tester.pumpWidget(buildPanel());
@@ -235,6 +237,45 @@ void main() {
         expect(nameColorOf(tester, 'a.mp4'), Tokens.textPrimary);
         expect(nameColorOf(tester, 'b.mp4'), Tokens.textPrimary);
       });
+
+      testWidgets('hover 微亮 — 鼠标进入整卡背景泛白, 移出恢复', (tester) async {
+        currentIndex.value = -1;
+        await tester.pumpWidget(buildPanel());
+        await tester.pump();
+
+        Color? tileColorOf(String path) => switch (
+          tester
+              .widget<AnimatedContainer>(
+                find
+                    .ancestor(
+                      of: find.text(path),
+                      matching: find.byType(AnimatedContainer),
+                    )
+                    .first,
+              )
+              .decoration
+        ) {
+          final BoxDecoration box => box.color,
+          _ => null,
+        };
+
+        expect(tileColorOf('a.mp4'), Colors.transparent); // 初始无 tint
+
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(location: Offset.zero);
+        addTearDown(gesture.removePointer);
+        await gesture.moveTo(tester.getCenter(find.text('a.mp4')));
+        await tester.pumpAndSettle();
+
+        expect(tileColorOf('a.mp4'), Tokens.glowHighlightWhite); // 微亮
+        expect(tileColorOf('b.mp4'), Colors.transparent); // 兄弟条目不受影响
+
+        await gesture.moveTo(Offset.zero); // 移出
+        await tester.pumpAndSettle();
+        expect(tileColorOf('a.mp4'), Colors.transparent);
+      });
     });
   });
 
@@ -252,6 +293,7 @@ void main() {
                 durationMs: 90000,
               ),
               isCurrent: false,
+              isResumeAnchor: false,
               onPlay: () {},
               onResume: () => resumed++,
               onRemove: () {},
@@ -276,6 +318,7 @@ void main() {
             child: PlaylistTile(
               item: PlaylistItem(path: 'a.mp4'),
               isCurrent: false,
+              isResumeAnchor: false,
               onPlay: () => played++,
               onResume: () {},
               onRemove: () {},
@@ -315,6 +358,7 @@ void main() {
                 durationMs: 90000,
               ),
               isCurrent: false,
+              isResumeAnchor: false,
               onPlay: () {},
               onResume: () {},
               onRemove: () {},
