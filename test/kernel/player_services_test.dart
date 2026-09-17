@@ -77,6 +77,53 @@ void main() {
         },
       );
     });
+
+    group('closing listener wiring (v0.0.6.2)', () {
+      test('init 注册 flushForExit 到关窗链; 触发即落盘不抛', () async {
+        final windowService = FakeWindowService();
+        final services = PlayerServices(
+          windowService: windowService,
+          testingDependencies: PlayerServicesDependencies(
+            engineFactory: () => FakeEngine(),
+            reporter: _reporter(),
+          ),
+        );
+        await services.init();
+
+        // init 后关窗链上恰好一个监听 (flushForExit).
+        expect(windowService.closingListeners, hasLength(1));
+
+        // 触发监听 = 关窗链第 2.5 步 — 完成即落盘, 不抛.
+        await expectLater(
+          windowService.closingListeners.single(),
+          completes,
+        );
+
+        services.dispose();
+        windowService.dispose();
+      });
+
+      test('dispose 先摘除关窗监听再销毁 coordinator', () async {
+        final windowService = FakeWindowService();
+        final services = PlayerServices(
+          windowService: windowService,
+          testingDependencies: PlayerServicesDependencies(
+            engineFactory: () => FakeEngine(),
+            reporter: _reporter(),
+          ),
+        );
+        await services.init();
+        final listener = windowService.closingListeners.single;
+
+        services.dispose();
+
+        // 摘除被调用; 再次手动触发监听 → coordinator 已销毁 → no-op 不抛.
+        expect(windowService.removeClosingListenerCallCount, 1);
+        expect(windowService.closingListeners, isEmpty);
+        await expectLater(listener(), completes);
+        windowService.dispose();
+      });
+    });
   });
 }
 

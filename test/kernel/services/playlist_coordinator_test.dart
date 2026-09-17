@@ -603,6 +603,70 @@ void main() {
     });
   });
 
+  group('退出落盘 flushForExit (v0.0.6.2)', () {
+    test('播放中 flushForExit — 绕过 5s 节流把最新位置落盘', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'playlist_flush_test',
+      );
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      final withStore = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(withStore.dispose);
+
+      // 固定时钟: 首次节流落盘发生在 position=42000 (窗口起点 0 → 立即).
+      var nowMs = 1000000;
+      withStore.clock = () => DateTime.fromMillisecondsSinceEpoch(nowMs);
+
+      await engine.openPlaylist(['a.mp4'], startIndex: 0);
+      engine.position.value = 42000; // 首存 — 节流窗口从现在起算
+      // _save 是 fire-and-forget 异步写 — 等待落盘完成再断言.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      var loaded = await store.load();
+      expect(loaded!.items.single.positionMs, 42000);
+
+      nowMs += 2000; // 2s < 5s 节流窗口
+      engine.position.value = 60000; // 窗口内 → 节流落盘跳过, 盘上仍是 42000
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      loaded = await store.load();
+      expect(loaded!.items.single.positionMs, 42000);
+
+      // flushForExit 绕过节流 — 强杀前的最终断点落盘.
+      await withStore.flushForExit();
+
+      loaded = await store.load();
+      expect(loaded!.items.single.positionMs, 60000);
+      expect(loaded.lastPlayedPath, 'a.mp4');
+    });
+
+    test('未播放 flushForExit — 仅落盘当前快照不抛', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'playlist_flush_test',
+      );
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      final withStore = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(withStore.dispose);
+
+      await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 0);
+      await engine.stop(); // 停止: current = null
+
+      await withStore.flushForExit();
+
+      final loaded = await store.load();
+      expect(loaded, isNotNull);
+      expect(loaded!.items, hasLength(2)); // 逻辑队列照常落盘
+      expect(loaded.lastPlayedPath, 'a.mp4'); // 停止不清锚
+    });
+
+    test('dispose 后 flushForExit no-op 不抛', () async {
+      coordinator.dispose();
+
+      await expectLater(coordinator.flushForExit(), completes);
+    });
+  });
+
   group('PlaylistStore', () {
     late Directory tempDir;
     late PlaylistStore store;

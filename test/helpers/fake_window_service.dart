@@ -20,6 +20,11 @@ class FakeWindowService implements WindowBridge {
   int closeCallCount = 0;
   int startDraggingCallCount = 0;
 
+  /// 关窗持久化监听注册表 (v0.0.6.2) — 记录注册的监听器, 供测试侧
+  /// 手动触发以验证 PlayerServices 的退出落盘接线.
+  final List<Future<void> Function()> closingListeners = [];
+  int removeClosingListenerCallCount = 0;
+
   // ─── ValueNotifiers ───
 
   @override
@@ -73,6 +78,16 @@ class FakeWindowService implements WindowBridge {
   Future<void> startDragging() async {
     if (_disposed) return;
     startDraggingCallCount++;
+  }
+
+  @override
+  void Function() addClosingListener(Future<void> Function() listener) {
+    closingListeners.add(listener);
+    return () {
+      if (closingListeners.remove(listener)) {
+        removeClosingListenerCallCount++;
+      }
+    };
   }
 
   @override
