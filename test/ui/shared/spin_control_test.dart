@@ -1,4 +1,4 @@
-// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters — 测试/脚本惯例 (空回调兜底/断言辅助/async testWidgets), 非生产缺陷.
+// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 // SpinControl widget 测试 — 覆盖 D-08/D-09/D-03/D-10。
 //
 // 验证：渲染当前值、箭头图标、边界变灰、点击增减、键盘 D-pad、

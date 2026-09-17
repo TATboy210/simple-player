@@ -37,13 +37,8 @@ linter:
     close_sinks: true
     unawaited_futures: true
 dcm:
-  # 测试/脚本目录排除测试惯例规则 — 测试中 `() {}` 空回调、`!` 断言、
-  # async testWidgets 回调、dynamic 泛型解析是 flutter_test 惯例, 非缺陷.
-  exclude:
-    patterns:
-      - "test/**"
-      - "scripts/**"
-      - "integration_test/**"
+  # 测试/脚本目录的惯例豁免 (空回调/! 断言/async testWidgets/dynamic)
+  # 经各文件头部 ignore_for_file 逐文件声明, 不使用 dcm.exclude 配置.
   rules:
     # Keep only the rule IDs that are valid for the current DCM subscription.
     - avoid-dynamic
