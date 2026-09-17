@@ -116,6 +116,8 @@ class _PlaylistTileState extends State<PlaylistTile> {
     // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
     return InkWell(
       onTap: widget.onPlay,
+      // InkWell 默认 defer (箭头) — 整卡可点播, 显式给食指与膜按钮一致.
+      mouseCursor: SystemMouseCursors.click,
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, details.globalPosition),
       borderRadius: BorderRadius.circular(Tokens.radiusSm),
