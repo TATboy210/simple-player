@@ -36,6 +36,8 @@ final class ErrorCaptureSnapshot {
   ///
   /// 身份语义：以 [ErrorReport.eventId] 为身份 —— 合并只改 occurrenceCount
   /// 不改 eventId，故合并报告在快照中**原地替换**（保持捕获顺序）。
+  // [acceptance] 为接口契约保留 — 快照分层只消费 report 自身.
+  // ignore: avoid-unused-parameters
   void record(ErrorReport report, ReportAcceptance acceptance) {
     if (report.severity == ErrorSeverity.warning) return;
     final list = _reports.value;

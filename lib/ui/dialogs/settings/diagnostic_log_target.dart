@@ -37,7 +37,10 @@ final class DiagnosticLogTarget {
   /// 只消费 effect 缝。
   void attach({
     required DelegatingDiagnosticLogEffect effect,
+    // 以下 provider 参数为调用形态兼容保留 (落点解析已收敛到 main).
+    // ignore: avoid-unused-parameters
     required ApplicationSupportDirectoryProvider applicationSupportDirectory,
+    // ignore: avoid-unused-parameters
     required ExecutableDirectoryProvider executableDirectory,
   }) {
     if (_effect != null) {

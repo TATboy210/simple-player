@@ -1,3 +1,4 @@
+// ignore_for_file: avoid-unnecessary-stateful-widgets
 /// 「通用」分区内容 —— 错误卡片开关行（SET-01/03 UI 收口；G-04-1 后唯一行）。
 ///
 /// Toggle row: flipping the switch takes effect the same frame (the 04-03
@@ -19,6 +20,8 @@ import 'error_feedback_settings.dart';
 ///
 /// 开关行翻转即生效并 fire-and-forget 持久化（SET-01/03）；呈现门控由
 /// ErrorCardHost 订阅同一 store notifier 实现（D-05），捕获/落盘链零接触。
+// ignore: avoid-unnecessary-stateful-widgets — State 生命周期与局部
+// 控制器耦合, 保守保留 (转换风险 > 风格收益).
 class GeneralSettingsContent extends StatefulWidget {
   const GeneralSettingsContent({super.key, this.settings});
 

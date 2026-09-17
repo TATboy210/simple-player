@@ -103,12 +103,11 @@ class _OsdOverlayState extends State<OsdOverlay> {
 
   void _handleResizeChanged() {
     final resizing = widget.resizing?.value ?? false;
-    if (resizing) {
-      _messageAtResizeStart = OsdService.I.message.value;
-    } else {
-      _messageAtResizeStart = null;
+    _messageAtResizeStart = resizing ? OsdService.I.message.value : null;
+    if (mounted) {
+      // ignore: no-empty-block
+      setState(() {});
     }
-    if (mounted) setState(() {});
   }
 
   @override

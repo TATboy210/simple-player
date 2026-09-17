@@ -249,7 +249,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                   builder: (_, index, _) => ValueListenableBuilder<String?>(
                     valueListenable: widget.lastPlayedPath,
                     builder: (_, lastPlayed, _) =>
-                        _buildList(l10n, items, index, lastPlayed, true),
+                        _buildList(items, index, lastPlayed, true),
                   ),
                 );
               }
@@ -260,7 +260,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
                   builder: (_, index, _) => ValueListenableBuilder<String?>(
                     valueListenable: widget.lastPlayedPath,
                     builder: (_, lastPlayed, _) =>
-                        _buildList(l10n, items, index, lastPlayed, allowed),
+                        _buildList(items, index, lastPlayed, allowed),
                   ),
                 ),
               );
@@ -274,7 +274,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 条目纵列 — [lastPlayed] 为停止态高亮锚点; [resumeAllowed] 传递断点
   /// UI 门控 (v0.0.6).
   Widget _buildList(
-    AppLocalizations l10n,
     List<PlaylistItem> items,
     int index,
     String? lastPlayed,

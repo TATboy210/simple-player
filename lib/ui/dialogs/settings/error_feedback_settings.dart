@@ -200,7 +200,9 @@ final class ErrorFeedbackSettings {
   void _schedulePersist(ErrorFeedbackSettingsData next) {
     final pending = _persistFuture;
     _persistFuture = pending
+        // ignore: prefer-async-await, no-empty-block
         .then<void>((_) {}, onError: (Object _) {})
+        // ignore: prefer-async-await
         .then((_) => _persist(next));
   }
 

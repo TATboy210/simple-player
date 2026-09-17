@@ -141,10 +141,16 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
     if (_cycleIndex != 0) _cycleIndex = 0;
     final phase = SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.idle) {
+      // 显式空重建 — 通知依赖快照状态的子树重绘.
+      // ignore: no-empty-block
       setState(() {});
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
+        if (mounted) {
+          // 显式空重建 — 同上.
+          // ignore: no-empty-block
+          setState(() {});
+        }
       });
     }
   }

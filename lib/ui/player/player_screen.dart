@@ -305,7 +305,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
           engine: widget.engine,
           controller: widget.controller,
           actions: _actions,
-          windowService: widget.windowService,
           customBindings: widget.customBindings,
           videoKey: _videoKey,
           isFullscreen: isFullscreen,
@@ -355,7 +354,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     children: [
       Expanded(
         child: DropHandler(
-          onFilesDropped: widget.onFilesDropped ?? (_) {},
+          // 空块刻意 — 空置态无拖放目标.
+              // ignore: no-empty-block
+              onFilesDropped: widget.onFilesDropped ?? (_) {},
           onHoverChanged: widget.onDragHoverChanged,
           child: Stack(
             fit: StackFit.expand,

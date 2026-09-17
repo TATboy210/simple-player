@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 /// GlassButton 光标解析实证测试 (v0.0.6.2) — 复现 MouseTracker 的
 /// firstNonDeferred 解析, 验证 hover 命中路径上的光标注解序列.
 ///

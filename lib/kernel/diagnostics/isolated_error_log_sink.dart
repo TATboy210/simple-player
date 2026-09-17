@@ -1,3 +1,5 @@
+// 串行队列/fire-and-forget 的刻意 .then 续接模式, async/await 改写会破坏语义.
+// ignore_for_file: prefer-async-await, avoid-passing-async-when-sync-expected
 /// 常驻 logging isolate 日志 sink —— 主 isolate 卡死时已递送记录仍落盘。
 ///
 /// Durable error-log sink whose write execution lives in a resident logging
@@ -206,6 +208,7 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
           onExit: exitPort.sendPort,
           onError: errorPort.sendPort,
         ).then<void>(
+          // ignore: no-empty-block
           (_) {},
           onError: (Object error, StackTrace stackTrace) {
             _handleWorkerGone();

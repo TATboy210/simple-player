@@ -105,8 +105,12 @@ class PlaylistStore {
   /// 触发 — 并发 `writeAsString` 的 open/write/close 交错会让旧快照
   /// 后完成、覆盖新快照. 链式队列保证按调用顺序落盘 (last-call-wins).
   Future<void> save(PersistedPlaylistSnapshot snapshot) {
+    // 链式续接是写入串行化的核心模式 — async/await 改写会破坏 last-call-wins.
+    // ignore: prefer-async-await
     final operation = _writeQueue.then((_) => _write(snapshot));
     // 链续接吞异常防断裂 — _write 内部已捕获 Exception, 此处兜底.
+    // 空块刻意: 断链异常已由 _write 记日志, 此处仅维持队列不断裂.
+    // ignore: no-empty-block
     _writeQueue = operation.catchError((Object _) {});
     return operation;
   }

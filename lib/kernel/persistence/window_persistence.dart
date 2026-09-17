@@ -115,8 +115,11 @@ final class WindowPersistence {
     }
   }
 
-  Future<SharedPreferences> _getPreferences() async =>
-      _preferences ?? SharedPreferences.getInstance();
+  Future<SharedPreferences> _getPreferences() {
+    final preferences = _preferences;
+    if (preferences != null) return Future<SharedPreferences>.value(preferences);
+    return SharedPreferences.getInstance();
+  }
 
   static double _dimension(double? value, double fallback, double minimum) {
     if (value == null || !value.isFinite || value < minimum) return fallback;

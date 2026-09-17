@@ -384,6 +384,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         _autoHide.hide();
       }
       // Timer 仅用于双击检测窗口(超时自动失效,空回调)
+      // 空块刻意 — 延迟到期无动作, 仅作单击判定窗口兜底.
+      // ignore: no-empty-block
       _clickTimer = Timer(const Duration(milliseconds: _clickDelayMs), () {});
     }
   }
@@ -657,9 +659,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     rate: _controlsState.rate,
     isFullscreen: _isFullscreenNotifier,
     onSeek: _controlsState.seek,
-    onPlayPause: widget.actions.onPlayPause ?? () {},
-    onSeekBack: widget.actions.onSeekBack ?? (_) {},
-    onSeekForward: widget.actions.onSeekForward ?? (_) {},
+    // 以下空回调为空置态兜底 (未播放时控制栏可显但无动作).
+      // ignore: no-empty-block
+      onPlayPause: widget.actions.onPlayPause ?? () {},
+    // ignore: no-empty-block
+      onSeekBack: widget.actions.onSeekBack ?? (_) {},
+    // ignore: no-empty-block
+      onSeekForward: widget.actions.onSeekForward ?? (_) {},
     onToggleMute: _controlsState.toggleMute,
     onSetVolume: _controlsState.setVolume,
     onSetRate: _controlsState.setRate,
