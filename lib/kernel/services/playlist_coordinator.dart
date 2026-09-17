@@ -505,6 +505,18 @@ class PlaylistCoordinator {
   // 持久化
   // ============================================================
 
+  /// 退出前最终落盘 (v0.0.6.2) — 绕过 5s 节流把当前条目断点刷进元数据后
+  /// 同步落盘一次, 由关窗链经 WindowBridge.addClosingListener 调用.
+  ///
+  /// 正常切曲/节流已覆盖大部分场景, 本方法消除"最后一次切曲后的节流窗口
+  /// 内强杀进程"的断点缝隙. 已 dispose 或未在播放时仅落盘当前快照, 不抛.
+  Future<void> flushForExit() async {
+    if (_disposed) return;
+    final current = _observedPlayingPath;
+    if (current != null) _updateBreakpoint(current); // 内部自守 _isBreakpointAllowed
+    await _save();
+  }
+
   /// 落盘当前逻辑队列 + 模式 + 排序状态（切曲/移除/追加/模式变化时触发;
   /// 失败静默降级）.
   Future<void> _save() async {

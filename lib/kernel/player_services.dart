@@ -130,6 +130,10 @@ class PlayerServices {
   bool _playlistCoordinatorCreated = false;
   Future<void>? _initOperation;
 
+  /// 关窗持久化监听摘除函数 (v0.0.6.2) — init 时注册 flushForExit,
+  /// dispose 时先摘除 (借用规则: notifier 持有者销毁前解除窗口回调).
+  void Function()? _removeClosingListener;
+
   /// 初始化所有播放服务.
   ///
   /// Initialization order (sequential — each step depends on the previous):
@@ -200,6 +204,14 @@ class PlayerServices {
         resumeEnabled: _settings!.resumeEnabled,
       );
       _playlistCoordinatorCreated = true;
+      // v0.0.6.2: 退出前断点落盘 — 注册到窗口关窗链 (第 2.5 步被 await),
+      // 消除"最后一次切曲后 5s 节流窗口内强杀进程"的断点缝隙.
+      // 闭包判空而非 `!` — dispose 置空 coordinator 后残留触发不得崩.
+      _removeClosingListener = windowService.addClosingListener(() async {
+        final coordinator = _playlistCoordinator;
+        if (coordinator == null) return;
+        await coordinator.flushForExit();
+      });
       _initialized = true;
     } catch (_) {
       // Cleanup must be best-effort: a failure in one disposer must not mask
@@ -221,6 +233,10 @@ class PlayerServices {
   }
 
   void _disposeCreatedResources() {
+    // 先摘关窗监听 — coordinator/notifier 即将销毁, 关窗链不得再触发其
+    // flushForExit (借用规则: 借用方销毁前解除对被借方的回调引用).
+    _removeClosingListener?.call();
+    _removeClosingListener = null;
     if (_videoProcessingCreated) _disposeSafely(_videoProcessing?.dispose);
     // Detach diagnostics before disposing either notifier owner or callback user.
     _disposeSafely(_playerErrorBridge?.dispose);
