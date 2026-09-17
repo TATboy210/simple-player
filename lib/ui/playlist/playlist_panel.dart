@@ -28,6 +28,10 @@ class PlaylistPanel extends StatefulWidget {
   /// 当前播放条目索引 (-1 = 未播放) — 驱动高亮.
   final ValueListenable<int> currentIndex;
 
+  /// 上次播放条目路径 (v0.0.6.2) — 停止态 (index == -1) 逻辑高亮锚点;
+  /// 播放态高亮以 currentIndex 优先, 锚仅作兜底显示.
+  final ValueListenable<String?> lastPlayedPath;
+
   /// 面板是否可见 — 驱动渐入渐出动画 (宿主共享 notifier, 全屏同源).
   final bool visible;
 
@@ -66,6 +70,7 @@ class PlaylistPanel extends StatefulWidget {
     super.key,
     required this.entries,
     required this.currentIndex,
+    required this.lastPlayedPath,
     required this.visible,
     required this.onClose,
     required this.onPlayEntry,
@@ -236,19 +241,27 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               }
               // v0.0.6: 断点开关监听层 — null 恒允许 (测试退路),
               // ValueListenableBuilder 直挂恒真 notifier 的开销省略.
+              // v0.0.6.2: 锚点监听层 — 停止态高亮随 lastPlayedPath 刷新.
               final resume = widget.resumeEnabled;
               if (resume == null) {
                 return ValueListenableBuilder<int>(
                   valueListenable: widget.currentIndex,
-                  builder: (_, index, _) => _buildList(l10n, items, index, true),
+                  builder: (_, index, _) => ValueListenableBuilder<String?>(
+                    valueListenable: widget.lastPlayedPath,
+                    builder: (_, lastPlayed, _) =>
+                        _buildList(l10n, items, index, lastPlayed, true),
+                  ),
                 );
               }
               return ValueListenableBuilder<bool>(
                 valueListenable: resume,
                 builder: (_, allowed, _) => ValueListenableBuilder<int>(
                   valueListenable: widget.currentIndex,
-                  builder: (_, index, _) =>
-                      _buildList(l10n, items, index, allowed),
+                  builder: (_, index, _) => ValueListenableBuilder<String?>(
+                    valueListenable: widget.lastPlayedPath,
+                    builder: (_, lastPlayed, _) =>
+                        _buildList(l10n, items, index, lastPlayed, allowed),
+                  ),
                 ),
               );
             },
@@ -258,11 +271,13 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     );
   }
 
-  /// 条目纵列 — [resumeAllowed] 传递断点 UI 门控 (v0.0.6).
+  /// 条目纵列 — [lastPlayed] 为停止态高亮锚点; [resumeAllowed] 传递断点
+  /// UI 门控 (v0.0.6).
   Widget _buildList(
     AppLocalizations l10n,
     List<PlaylistItem> items,
     int index,
+    String? lastPlayed,
     bool resumeAllowed,
   ) {
     return ScrollbarTheme(
@@ -287,14 +302,21 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             Tokens.controlBarRadius,
           ),
           itemCount: items.length,
-          itemBuilder: (_, i) => PlaylistTile(
-            item: items[i],
-            isCurrent: i == index,
-            onPlay: () => widget.onPlayEntry(i),
-            onResume: () => widget.onResumeEntry(i),
-            onRemove: () => widget.onRemoveEntry(i),
-            resumeAllowed: resumeAllowed,
-          ),
+          itemBuilder: (_, i) {
+            // 高亮合成 (v0.0.6.2): 播放中条目恒高亮; 停止态 (index == -1)
+            // 高亮"上次会话最后播放"那条 (path 匹配). 播放态锚已被 revision
+            // 同步为当前 path, 两判据天然不双高亮.
+            final isCurrent =
+                i == index || (index < 0 && items[i].path == lastPlayed);
+            return PlaylistTile(
+              item: items[i],
+              isCurrent: isCurrent,
+              onPlay: () => widget.onPlayEntry(i),
+              onResume: () => widget.onResumeEntry(i),
+              onRemove: () => widget.onRemoveEntry(i),
+              resumeAllowed: resumeAllowed,
+            );
+          },
         ),
       ),
     );

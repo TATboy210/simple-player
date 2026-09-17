@@ -753,6 +753,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                 child: PlaylistPanel(
                   entries: widget.playlistCoordinator!.entries,
                   currentIndex: widget.playlistCoordinator!.currentIndex,
+                  // v0.0.6.2: 上次播放锚点 — 停止态高亮"上次会话那条".
+                  lastPlayedPath: widget.playlistCoordinator!.lastPlayedPath,
                   visible: visible,
                   onClose: () => widget.playlistVisible!.value = false,
                   onPlayEntry: (index) =>

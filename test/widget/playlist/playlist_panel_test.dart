@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
 
@@ -25,6 +26,7 @@ void main() {
   group('PlaylistPanel', () {
     late ValueNotifier<List<PlaylistItem>> entries;
     late ValueNotifier<int> currentIndex;
+    late ValueNotifier<String?> lastPlayedPath;
     late ValueNotifier<PlayMode> playMode;
 
     setUp(() {
@@ -33,12 +35,14 @@ void main() {
         PlaylistItem(path: 'b.mp4'),
       ]);
       currentIndex = ValueNotifier(0);
+      lastPlayedPath = ValueNotifier<String?>(null);
       playMode = ValueNotifier(PlayMode.loopAll);
     });
 
     tearDown(() {
       entries.dispose();
       currentIndex.dispose();
+      lastPlayedPath.dispose();
       playMode.dispose();
     });
 
@@ -56,6 +60,7 @@ void main() {
       PlaylistPanel(
         entries: entries,
         currentIndex: currentIndex,
+        lastPlayedPath: lastPlayedPath,
         visible: visible,
         onClose: onClose ?? () {},
         onPlayEntry: onPlayEntry ?? (_) {},
@@ -182,6 +187,54 @@ void main() {
       expect(find.byIcon(Icons.check), findsOneWidget);
       expect(find.byIcon(Icons.arrow_upward), findsNothing);
       expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+    });
+
+    group('停止态高亮合成 (v0.0.6.2)', () {
+      // 高亮可视断言锚点 — tile 名称色随 isCurrent 翻转 (accent/常规).
+      Color nameColorOf(WidgetTester tester, String path) =>
+          tester.widget<Text>(find.text(path)).style!.color!;
+
+      testWidgets('停止态 (index=-1) + lastPlayedPath 命中 → 该条目高亮', (
+        tester,
+      ) async {
+        currentIndex.value = -1;
+        lastPlayedPath.value = 'b.mp4';
+        await tester.pumpWidget(buildPanel());
+        await tester.pump();
+
+        expect(nameColorOf(tester, 'b.mp4'), Tokens.accent); // 锚点条目高亮
+        expect(nameColorOf(tester, 'a.mp4'), Tokens.textPrimary); // 其他不高亮
+      });
+
+      testWidgets('播放态 — currentIndex 优先, 锚不引发双高亮', (tester) async {
+        currentIndex.value = 0; // 播放 a
+        lastPlayedPath.value = 'b.mp4';
+        await tester.pumpWidget(buildPanel());
+        await tester.pump();
+
+        expect(nameColorOf(tester, 'a.mp4'), Tokens.accent);
+        expect(nameColorOf(tester, 'b.mp4'), Tokens.textPrimary);
+      });
+
+      testWidgets('播放态 currentIndex 命中 → 该条目高亮', (tester) async {
+        currentIndex.value = 1;
+        lastPlayedPath.value = null;
+        await tester.pumpWidget(buildPanel());
+        await tester.pump();
+
+        expect(nameColorOf(tester, 'b.mp4'), Tokens.accent);
+        expect(nameColorOf(tester, 'a.mp4'), Tokens.textPrimary);
+      });
+
+      testWidgets('lastPlayedPath 不匹配任何条目 → 无高亮', (tester) async {
+        currentIndex.value = -1;
+        lastPlayedPath.value = 'ghost.mp4';
+        await tester.pumpWidget(buildPanel());
+        await tester.pump();
+
+        expect(nameColorOf(tester, 'a.mp4'), Tokens.textPrimary);
+        expect(nameColorOf(tester, 'b.mp4'), Tokens.textPrimary);
+      });
     });
   });
 
