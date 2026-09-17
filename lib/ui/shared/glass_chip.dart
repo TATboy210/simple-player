@@ -27,6 +27,7 @@ class GlassChip extends StatelessWidget {
       label: label,
       child: InkWell(
         onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(Tokens.radiusBtn),
         hoverColor: Tokens.bgHover,
         child: AnimatedContainer(

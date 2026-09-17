@@ -221,6 +221,7 @@ class _NavEntry extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: onTap,
+              mouseCursor: SystemMouseCursors.click,
               // 圆角裁剪 hover/pressed 色块，与行底色同轮廓。
               borderRadius: BorderRadius.circular(Tokens.radiusBtn),
               // hover 色与选中底色同 token：未选中时 hover 渐现底色，
