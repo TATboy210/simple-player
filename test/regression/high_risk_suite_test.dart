@@ -1,4 +1,4 @@
-// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters — 测试惯例, 非生产缺陷.
+// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters
 /// 高风险回归测试套件 — 覆盖 D-35 高风险场景。
 ///
 /// 测试目标:

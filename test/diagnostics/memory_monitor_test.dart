@@ -1,4 +1,4 @@
-// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters — 测试惯例, 非生产缺陷.
+// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters
 /// 实例化 MemoryMonitor 单元测试 — 使用 FakeRssProvider + FakeClock + FakeLogger。
 ///
 /// Tests the new instance-based MemoryMonitor with injectable dependencies.

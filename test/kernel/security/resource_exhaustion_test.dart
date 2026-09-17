@@ -1,4 +1,4 @@
-// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters — 测试/脚本惯例 (空回调兜底/断言辅助/async testWidgets), 非生产缺陷.
+// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 /// Resource exhaustion security tests.
 ///
 /// Verifies that kernel components handle extreme resource pressure gracefully
