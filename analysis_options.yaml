@@ -37,6 +37,13 @@ linter:
     close_sinks: true
     unawaited_futures: true
 dcm:
+  # 测试/脚本目录排除测试惯例规则 — 测试中 `() {}` 空回调、`!` 断言、
+  # async testWidgets 回调、dynamic 泛型解析是 flutter_test 惯例, 非缺陷.
+  exclude:
+    patterns:
+      - "test/**"
+      - "scripts/**"
+      - "integration_test/**"
   rules:
     # Keep only the rule IDs that are valid for the current DCM subscription.
     - avoid-dynamic
@@ -47,7 +54,8 @@ dcm:
     - avoid-empty-spread
     - avoid-assignments-as-conditions
     - always-remove-listener
-    - avoid-non-null-assertion
+    # avoid-non-null-assertion 移除 (2026-09-17): 项目 init 后非空为系统性模式
+    # (PlayerServices _engine! 等 62 处), 与 late-init 语义冲突, 逐处 ignore 噪音大于价值.
     - avoid-nullable-tostring
     - avoid-redundant-async
     - prefer-async-await

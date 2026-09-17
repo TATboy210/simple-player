@@ -196,7 +196,7 @@ const _firstFrameRevealTimeout = Duration(milliseconds: 800);
 /// or runApp. Its failure is reported only through KernelLogger to avoid reporter
 /// reentrancy while the file effect is itself unavailable.
 Future<void> _activateDiagnosticLog(
-  DelegatingDiagnosticLogEffect diagnosticLogEffect,
+  DelegatingDiagnosticLogEffect _, // 参数保留兼容调用契约 — 落点解析已收敛到 resolve 链.
 ) async {
   try {
     // 设置加载先于位置解析且同在 unawaited 激活路径内（RESEARCH Pitfall 7）：

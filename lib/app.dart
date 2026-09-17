@@ -72,7 +72,7 @@ class App extends StatelessWidget {
           themeMode: ThemeMode.dark,
           // v0.0.5: 模态路由观察 — 控制栏自动隐藏在设置/菜单开启期间冻结.
           navigatorObservers: [ModalHoldObserver()],
-          home: _buildPlayerHome(context),
+          home: _buildPlayerHome(),
           builder: (context, navigator) =>
               buildErrorCardMount(context, navigator, mode: windowService.mode),
         );
@@ -80,7 +80,7 @@ class App extends StatelessWidget {
     );
   }
 
-  Widget _buildPlayerHome(BuildContext context) {
+  Widget _buildPlayerHome() {
     final error = windowInitError;
     if (error != null) {
       return _buildErrorHome(error);
@@ -140,7 +140,7 @@ class App extends StatelessWidget {
 /// theatre tight-fill 撑满并破坏内在尺寸/穿透），卡片本身再由
 /// [_ErrorCardOverlayMount] 内的 ConstrainedBox 收口（见其文档）。
 Widget buildErrorCardMount(
-  BuildContext context,
+  BuildContext _, // 未使用 — 保留位置以兼容 MaterialApp.builder tear-off 签名.
   Widget? navigator, {
   ValueListenable<WindowMode>? mode,
 }) {

@@ -1,4 +1,5 @@
-// ignore_for_file: overridden_fields — intentional: each engine needs independent ValueNotifier instances
+// ignore_for_file: overridden_fields, no-empty-block
+// intentional: each engine needs independent ValueNotifier instances
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math';

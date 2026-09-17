@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters — 测试/脚本惯例 (空回调兜底/断言辅助/async testWidgets), 非生产缺陷.
 /// 端到端整合注入用例(VER-01, D-01)——四源各经真实注入入口走完整捕获→呈现链路。
 ///
 /// 范围口径:文件证据腿经 `ErrorLogFileSink` 直写——生产激活的是

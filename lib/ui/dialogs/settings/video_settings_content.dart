@@ -1,3 +1,4 @@
+// ignore_for_file: avoid-unnecessary-stateful-widgets
 /// 「视频」分区内容 (v0.0.6) — 亮度/对比度/饱和度/色调滑条 + 旋转 +
 /// 宽高比 + 去隔行 + 硬解 + 重置。
 ///
@@ -18,6 +19,7 @@ import '../../shared/spin_control.dart';
 import '../../theme/tokens.dart';
 
 /// 「视频」分区内容.
+// ignore: avoid-unnecessary-stateful-widgets — 同 general 保守保留.
 class VideoSettingsContent extends StatefulWidget {
   const VideoSettingsContent({
     super.key,

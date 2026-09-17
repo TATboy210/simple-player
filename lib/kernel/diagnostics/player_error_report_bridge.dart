@@ -61,6 +61,8 @@ final class PlayerErrorReportBridge {
   /// Captures the last successful current media without treating an open target
   /// as current. The reporter snapshots ErrorContext.path separately as failed-open
   /// evidence, preserving both meanings for the diagnostic pack.
+  // 参数 [error] 为调用契约保留 — 语义上仅快照 currentMediaPath.
+  // ignore: avoid-unused-parameters
   String? _snapshotMediaPath(PlayerError error) {
     try {
       return _currentMediaPath();

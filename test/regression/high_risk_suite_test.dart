@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters — 测试惯例, 非生产缺陷.
 /// 高风险回归测试套件 — 覆盖 D-35 高风险场景。
 ///
 /// 测试目标:
@@ -21,7 +22,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('High Risk Suite', () {
-    // TODO: 全屏回归场景 (HR-001 ~ HR-006) 依赖已删除的 FullscreenDriver,
+    // 待办: 全屏回归场景 (HR-001 ~ HR-006) 依赖已删除的 FullscreenDriver,
     // 现全屏走 media_kit VideoState.toggleFullscreen — 待用 media_kit 集成测试重写.
   });
 }

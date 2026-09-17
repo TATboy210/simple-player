@@ -11,6 +11,9 @@ import '../theme/tokens.dart';
 ///
 /// 全屏时整体透明并忽略交互；窗口控制按钮始终由单一右侧控制组拥有，
 /// 避免标题拖动区域与按钮布局分别管理响应式约束。
+// DCM avoid-unnecessary-stateful-widgets: State 持有窗口生命周期回调注册,
+// 保守保留 StatefulWidget (转换风险 > 风格收益).
+// ignore: avoid-unnecessary-stateful-widgets
 class CustomTitleBar extends StatefulWidget {
   final WindowBridge windowService;
 

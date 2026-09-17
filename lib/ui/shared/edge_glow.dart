@@ -8,6 +8,7 @@ import '../theme/tokens.dart';
 /// 设计语言中的微光效果（原 pulse/omni 变体为死代码，已于 2026-09-08
 /// 移除 —— pulse 携带永不停止的 AnimationController.repeat() 每帧动画，
 /// 留在代码库中是误用陷阱）。
+// ignore: avoid-unnecessary-stateful-widgets
 class EdgeGlow extends StatefulWidget {
   final Widget child;
   final BorderRadius? borderRadius;

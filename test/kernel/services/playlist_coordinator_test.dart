@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 /// PlaylistCoordinator + PlaylistStore 服务层测试 (v0.0.5 Phase 3).
 ///
 /// Coordinator: 引擎镜像同步/停止保留逻辑队列/path 键断点/磁盘恢复装载分支.

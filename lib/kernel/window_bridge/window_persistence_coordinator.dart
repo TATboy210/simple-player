@@ -1,3 +1,4 @@
+// ignore_for_file: prefer-async-await, avoid-passing-async-when-sync-expected — 串行队列/fire-and-forget 的刻意 .then 续接模式, async/await 改写会破坏语义.
 import 'dart:async';
 import 'dart:ui';
 

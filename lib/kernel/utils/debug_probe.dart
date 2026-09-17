@@ -159,7 +159,7 @@ class DebugProbeRegistry {
         probe.name: {
           'eventCount': probe.eventCount,
           'lastEvent': probe.events.isNotEmpty
-              ? probe.events.last.toJson() as Object
+              ? probe.events.last.toJson()
               : Object(),
         },
     };

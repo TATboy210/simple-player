@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters — 测试惯例, 非生产缺陷.
 /// 冒烟测试套件 — 覆盖 8 项必测场景（D-32）。
 ///
 /// 每个测试标注 case ID（FS-REG-001 ~ FS-REG-008），与 regression_matrix.md 对应。
@@ -16,7 +17,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Smoke Suite — 8 Mandatory Scenarios', () {
-    // TODO: 全屏回归场景 (FS-REG-001 ~ FS-REG-008) 依赖已删除的 FullscreenDriver,
+    // 待办: 全屏回归场景 (FS-REG-001 ~ FS-REG-008) 依赖已删除的 FullscreenDriver,
     // 现全屏走 media_kit VideoState.toggleFullscreen — 待用 media_kit 集成测试重写.
   });
 }

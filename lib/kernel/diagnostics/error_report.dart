@@ -110,6 +110,10 @@ final class ErrorReport {
   ///
   /// Only occurrence metadata changes so the original queue position, source,
   /// primitive snapshots, and event identifier remain stable.
+  // 故意不复制全部字段 — eventId/source/snapshot 等身份字段不可变, 仅
+  // occurrence 元数据允许更新 (合并语义), DCM 的 incomplete-copy-with
+  // 与该设计冲突.
+  // ignore: avoid-incomplete-copy-with
   ErrorReport copyWith({DateTime? lastOccurredAt, int? occurrenceCount}) {
     return ErrorReport(
       eventId: eventId,

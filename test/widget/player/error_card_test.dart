@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, prefer-async-await, avoid-unused-parameters — 测试惯例, 非生产缺陷.
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

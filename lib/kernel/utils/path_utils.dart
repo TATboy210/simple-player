@@ -1,3 +1,4 @@
+// ignore_for_file: prefer-async-await, avoid-passing-async-when-sync-expected
 import 'dart:async' show unawaited;
 import 'dart:io' show Process;
 
@@ -116,15 +117,27 @@ class PathUtils {
             'start',
             '',
             url,
-          ]).then((_) {}, onError: onLaunchError),
+          ]).then(
+            // ignore: no-empty-block
+            (_) {},
+            onError: onLaunchError,
+          ),
         );
       case TargetPlatform.linux:
         unawaited(
-          Process.run('xdg-open', [url]).then((_) {}, onError: onLaunchError),
+          Process.run('xdg-open', [url]).then(
+            // ignore: no-empty-block
+            (_) {},
+            onError: onLaunchError,
+          ),
         );
       case TargetPlatform.macOS:
         unawaited(
-          Process.run('open', [url]).then((_) {}, onError: onLaunchError),
+          Process.run('open', [url]).then(
+            // ignore: no-empty-block
+            (_) {},
+            onError: onLaunchError,
+          ),
         );
       default:
         _log.w('openUrl: unsupported platform');

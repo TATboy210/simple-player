@@ -213,6 +213,9 @@ class _ProgressBarState extends State<ProgressBar>
       const Duration(milliseconds: Tokens.progressSeekHoldTimeoutMs),
       _finishSeekHold,
     );
+    // 误报 — listener 存入 _seekHoldListener 字段, _cancelSeekHoldListeners
+    // (含 dispose 路径) 统一移除.
+    // ignore: always-remove-listener
     widget.position.addListener(listener);
     // 立即检查一次: FakeEngine/同步 seek 可能已让 position 到达目标,
     // addListener 只对未来变化触发, 不立即检查会卡到超时 (测试/同步路径).
@@ -316,6 +319,8 @@ class _ProgressBarState extends State<ProgressBar>
                   widget.onSeek(_dragPositionMs);
                   _seekThrottle = Timer(
                     const Duration(milliseconds: Tokens.progressSeekThrottleMs),
+                    // 空块刻意 — 拖拽结束由 seek hold 机制接管.
+                    // ignore: no-empty-block
                     () {},
                   );
                 }

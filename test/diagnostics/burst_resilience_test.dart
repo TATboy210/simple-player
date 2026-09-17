@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters — 测试/脚本惯例 (空回调兜底/断言辅助/async testWidgets), 非生产缺陷.
 /// 爆发压测补差与关闭失败隔离补差(VER-02/VER-03, D-03/D-04)。
 ///
 /// Burst-resilience gap tests (VER-02/VER-03, D-03/D-04). Existing primary

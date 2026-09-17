@@ -74,13 +74,13 @@ void main() {
     });
   });
 
-  // TODO: Phase 4 — rewrite driver creation tests without FullscreenDriver
+  // 待办: Phase 4 — rewrite driver creation tests without FullscreenDriver
   // WindowService no longer accepts driver parameter (Phase 1 removed it).
 
-  // TODO: Phase 4 — rewrite FullscreenResult tests
+  // 待办: Phase 4 — rewrite FullscreenResult tests
   // FullscreenResult/FullscreenSuccess/FullscreenFailure sealed class deleted in Phase 1.
 
-  // TODO: Phase 4 — rewrite confirmation chain tests
+  // 待办: Phase 4 — rewrite confirmation chain tests
   // FullscreenDriver mock and WindowService(driver:) constructor deleted in Phase 1.
 
   group('isFullscreen derives from mode', () {

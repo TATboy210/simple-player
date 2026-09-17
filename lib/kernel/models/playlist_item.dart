@@ -69,6 +69,9 @@ class PlaylistItem {
   ///
   /// Returns a copy with the given playback metadata replaced.
   /// [path] is always preserved. Omitted parameters retain their current value.
+  // 故意不含 [path] — 路径是条目身份键 (断点/排序/锚点均按 path 键),
+  // copyWith 不允许改路径, DCM 的 incomplete-copy-with 与该设计冲突.
+  // ignore: avoid-incomplete-copy-with
   PlaylistItem copyWith({
     int? timestamp,
     int? positionMs,

@@ -39,7 +39,6 @@ void main() {
               engine: engine,
               controller: controller,
               actions: actions,
-              windowService: windowService,
               customBindings: const {},
               videoKey: GlobalKey<VideoState>(),
               isFullscreen: false,
