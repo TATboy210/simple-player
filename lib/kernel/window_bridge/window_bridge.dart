@@ -72,6 +72,13 @@ abstract interface class WindowBridge {
   /// 关闭窗口。
   Future<void> close();
 
+  /// 订阅窗口关闭前的持久化窗口 (v0.0.6.2) — 通用能力, 不感知订阅者业务.
+  ///
+  /// 在 hide/窗口几何持久化之后、destroy/进程终止之前依次 await 各监听器;
+  /// 单条超时兜底, 失败记日志后继续, 绝不阻塞退出. 返回移除函数 (幂等) —
+  /// 持有者销毁前应调用以摘除监听 (借用规则: notifier 持有者先于本服务销毁).
+  void Function() addClosingListener(Future<void> Function() listener);
+
   /// 开始拖动窗口。
   Future<void> startDragging();
 

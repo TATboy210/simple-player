@@ -57,6 +57,10 @@ class WindowService with WindowListener implements WindowBridge {
   bool _isClosing = false;
   bool _initialized = false;
   Future<void>? _initOperation;
+
+  /// 关窗持久化窗口监听器 (v0.0.6.2) — 组合根经 [addClosingListener] 注册
+  /// 应用级退出落盘（播放列表断点等）; 本类只管时序, 不感知业务语义.
+  final List<Future<void> Function()> _closingListeners = [];
   late final WindowModeCoordinator _modeCoordinator = WindowModeCoordinator(
     state: _state,
     maximize: windowManager.maximize,
@@ -314,6 +318,12 @@ class WindowService with WindowListener implements WindowBridge {
       'persist',
       () => _saveWindowState(size: _state.windowSize.value),
     );
+    // 2.5) 应用级退出落盘 (v0.0.6.2) — 组合根经 addClosingListener 注册
+    //      （播放列表断点等）。List.of 快照迭代防遍历中变更; 单条复用
+    //      _closeCommandTimeout 兜底, 失败记日志后继续, 绝不阻塞退出。
+    for (final listener in List.of(_closingListeners)) {
+      await _runCloseCommand('closing-listener', listener);
+    }
     // 3) 销毁窗口 — fire 不等：destroy 的意义只是触发平台侧 WM_DESTROY
     //    链，而下一步 exit(0) 会瞬时终止进程（OS 收尾销毁所有窗口），
     //    等待它只会平添滞留。失败仅记录。
@@ -394,6 +404,13 @@ class WindowService with WindowListener implements WindowBridge {
     _isClosing = true;
     _resizeCoordinator?.dispose();
     await _closeWindowOperation();
+  }
+
+  @override
+  void Function() addClosingListener(Future<void> Function() listener) {
+    _closingListeners.add(listener);
+    // 移除函数幂等 — remove 对不存在元素是 no-op, 重复调用安全.
+    return () => _closingListeners.remove(listener);
   }
 
   @override
