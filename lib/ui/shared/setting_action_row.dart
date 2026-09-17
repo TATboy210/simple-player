@@ -106,6 +106,7 @@ class _SettingActionRowState extends State<SettingActionRow> {
             const SizedBox(width: Tokens.spXs),
             InkWell(
               onTap: widget.isActive ? widget.onDeactivate : widget.onAction,
+              mouseCursor: SystemMouseCursors.click,
               borderRadius: BorderRadius.circular(Tokens.radiusBtn),
               child: Padding(
                 padding: const EdgeInsets.all(Tokens.spXs),

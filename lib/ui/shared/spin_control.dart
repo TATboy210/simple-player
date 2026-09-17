@@ -190,6 +190,7 @@ class _SpinControlState extends State<SpinControl> {
       height: 36,
       child: InkWell(
         onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(Tokens.radiusBtn),
         child: Center(
           child: Icon(icon, size: Tokens.iconMd, color: color),

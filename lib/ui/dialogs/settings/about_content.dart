@@ -218,6 +218,7 @@ class _SocialLogoButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(Tokens.radiusBtn),
           child: InkWell(
             onTap: () => PathUtils.openUrl(link.url),
+            mouseCursor: SystemMouseCursors.click,
             borderRadius: BorderRadius.circular(Tokens.radiusBtn),
             hoverColor: Tokens.bgHover,
             highlightColor: Tokens.titleBarPressed,

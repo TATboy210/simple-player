@@ -254,6 +254,10 @@ class _TitleBarButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
+            // v0.0.6.2: 显式食指光标 — 与 GlassButton 同根因, InkWell 内置
+            // MouseRegion 处于命中路径最深层, 解析值 (箭头) 会覆盖外层
+            // MouseRegion 的 click; 不显式传则整组窗口按钮均为箭头.
+            mouseCursor: SystemMouseCursors.click,
             hoverColor: isClose ? Tokens.closeHoverBg : Tokens.titleBarHover,
             highlightColor: isClose
                 ? Tokens.closePressedBg
