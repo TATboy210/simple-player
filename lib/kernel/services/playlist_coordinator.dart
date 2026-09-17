@@ -94,6 +94,14 @@ class PlaylistCoordinator {
 
   bool _disposed = false;
 
+  /// 上次播放的条目路径 (v0.0.6.2) — 跨会话逻辑高亮锚点.
+  ///
+  /// 与引擎 queueIndex 解耦: 停止态/引擎队列空时仍有值（"停止也有锚"
+  /// 正是本特性目的）; 引擎对此无概念, 属持久化语义域. 更新时机:
+  /// revision 回流的 current 非空时置锚（单通知点覆盖装载/切曲/shuffle）,
+  /// stop 回流不动, 移除锚点条目清空, 磁盘恢复时还原.
+  final ValueNotifier<String?> _lastPlayedPath = ValueNotifier<String?>(null);
+
   /// 断点节流落盘间隔 — 播放中每 5s 把当前进度刷进断点元数据并落盘,
   /// 保证强杀进程/异常退出时断点损失不超过该粒度.
   static const Duration _breakpointSaveInterval = Duration(seconds: 5);
@@ -123,6 +131,10 @@ class PlaylistCoordinator {
 
   /// 当前排序方向 — true = 升序.
   bool get sortAscending => _sortAscending;
+
+  /// 上次播放的条目路径 (v0.0.6.2) — 身份保持转发, 面板停止态高亮锚点
+  /// （path 不在队列时 UI 无匹配, 高亮自然不渲染）.
+  ValueNotifier<String?> get lastPlayedPath => _lastPlayedPath;
 
   // ============================================================
   // 动作转发
@@ -163,6 +175,9 @@ class PlaylistCoordinator {
 
     final removed = _entries.value[index];
     _metaByPath.remove(removed.path);
+    // 移除锚点条目 → 清空锚 (用户显式丢弃该条目, 高亮失效);
+    // 移除其他条目不动 (path 键防误伤同名不同条).
+    if (_lastPlayedPath.value == removed.path) _lastPlayedPath.value = null;
     _entries.value = List<PlaylistItem>.unmodifiable([
       for (var i = 0; i < _entries.value.length; i++)
         if (i != index) _entries.value[i],
@@ -301,6 +316,9 @@ class PlaylistCoordinator {
       ),
     );
     _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[...sorted]);
+    // 上次播放锚点恢复 (v0.0.6.2) — 仅逻辑高亮, 引擎仍不装载不自动播;
+    // path 不在队列时 UI 无匹配, 高亮自然不渲染.
+    _lastPlayedPath.value = snapshot.lastPlayedPath;
     // 模式恢复不装载队列也可设置（mpv 属性级, 队列空时无副作用）.
     await _engine.setPlayMode(snapshot.playMode);
     _log.i(
@@ -309,6 +327,7 @@ class PlaylistCoordinator {
         'count': snapshot.items.length,
         'mode': snapshot.playMode.name,
         'sort': '${_sortKey.name}/${_sortAscending ? 'asc' : 'desc'}',
+        'lastPlayed': snapshot.lastPlayedPath,
       },
     );
   }
@@ -348,6 +367,11 @@ class PlaylistCoordinator {
     }
     _observedPaths = List<String>.unmodifiable(paths);
     _observedPlayingPath = current;
+
+    // 上次播放锚点 (v0.0.6.2) — current 非空即置锚 (装载/切曲/shuffle 全
+    // 走此单通知点); current 为 null 是 stop 的空装载回流, 锚保留
+    // ("停止也有锚"). notifier 值相等时自动去重, 重复置锚无通知开销.
+    if (current != null) _lastPlayedPath.value = current;
 
     if (queueChanged || previous != current) unawaited(_save());
   }
@@ -496,6 +520,7 @@ class PlaylistCoordinator {
         playMode: _engine.playMode.value,
         sortKey: _sortKey,
         sortAscending: _sortAscending,
+        lastPlayedPath: _lastPlayedPath.value,
       ),
     );
   }
@@ -513,5 +538,6 @@ class PlaylistCoordinator {
     _engine.position.removeListener(_trackPosition);
     _engine.duration.removeListener(_trackDuration);
     _entries.dispose();
+    _lastPlayedPath.dispose();
   }
 }
