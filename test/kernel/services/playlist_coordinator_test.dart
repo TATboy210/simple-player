@@ -492,6 +492,117 @@ void main() {
     });
   });
 
+  group('上次播放锚点 (v0.0.6.2)', () {
+    test('装载置锚 — lastPlayedPath 跟随装载起点', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 0);
+
+      expect(coordinator.lastPlayedPath.value, 'a.mp4');
+    });
+
+    test('切曲置锚 — jumpTo 后锚随当前条目更新', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 0);
+      await coordinator.playEntryAt(1);
+
+      expect(coordinator.lastPlayedPath.value, 'b.mp4');
+    });
+
+    test('stop 不清锚 — 停止态锚保留 ("停止也有锚")', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 0);
+      expect(coordinator.lastPlayedPath.value, 'a.mp4');
+
+      await engine.stop();
+
+      expect(coordinator.lastPlayedPath.value, 'a.mp4');
+    });
+
+    test('播放态移除非播放条目 → 锚不动; 删正在播 → 锚跟随 mpv 跳转', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4', 'c.mp4'], startIndex: 1);
+      expect(coordinator.lastPlayedPath.value, 'b.mp4');
+
+      await coordinator.removeEntryAt(0); // 移除 a (非播放) — 锚 b 不动
+
+      expect(coordinator.lastPlayedPath.value, 'b.mp4');
+
+      await coordinator.removeEntryAt(0); // 移除正在播的 b → mpv 跳下一首
+
+      expect(coordinator.lastPlayedPath.value, 'c.mp4');
+    });
+
+    test('停止态移除锚点条目 → 锚清空 (无回流覆盖)', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4'], startIndex: 1);
+      expect(coordinator.lastPlayedPath.value, 'b.mp4');
+
+      await engine.stop(); // 逻辑队列保留, 锚保留
+      expect(coordinator.lastPlayedPath.value, 'b.mp4');
+
+      await coordinator.removeEntryAt(1); // 停止态移除 b (锚)
+
+      expect(coordinator.lastPlayedPath.value, isNull);
+    });
+
+    test('restoreFromDisk — 恢复 lastPlayedPath 锚点', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'playlist_anchor_test',
+      );
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      await store.save(
+        PersistedPlaylistSnapshot(
+          items: [PlaylistItem(path: 'a.mp4'), PlaylistItem(path: 'b.mp4')],
+          playMode: PlayMode.loopAll,
+          lastPlayedPath: 'b.mp4',
+        ),
+      );
+
+      final restoring = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(restoring.dispose);
+      await restoring.restoreFromDisk();
+
+      expect(restoring.lastPlayedPath.value, 'b.mp4');
+      // 引擎仍不装载 — 锚恢复是纯逻辑态.
+      expect(engine.queuePaths.value, isEmpty);
+    });
+
+    test('restoreFromDisk — v2 快照 (无字段) 锚点为 null', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'playlist_anchor_test',
+      );
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      await File('${tempDir.path}/playlist.json').writeAsString(
+        '{"version":2,"playMode":"loopAll",'
+        '"items":[{"path":"a.mp4"},{"path":"b.mp4"}]}',
+      );
+
+      final restoring = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(restoring.dispose);
+      await restoring.restoreFromDisk();
+
+      expect(restoring.lastPlayedPath.value, isNull);
+      expect(restoring.entries.value, hasLength(2));
+    });
+
+    test('锚随 _save 落盘 — 切曲后盘上快照含 lastPlayedPath', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'playlist_anchor_test',
+      );
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      final withStore = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(withStore.dispose);
+
+      // 引擎装载 → revision 回流置锚 → 同步块内 unawaited(_save) 落盘.
+      await engine.openPlaylist(['a.mp4'], startIndex: 0);
+
+      // _save 是 fire-and-forget — 短暂等待写入队列消化 (同 _deleteTempDir 注释).
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final loaded = await store.load();
+      expect(loaded, isNotNull);
+      expect(loaded!.lastPlayedPath, 'a.mp4');
+    });
+  });
+
   group('PlaylistStore', () {
     late Directory tempDir;
     late PlaylistStore store;
