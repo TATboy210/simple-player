@@ -423,6 +423,12 @@ class _GlassButtonState extends State<GlassButton>
           borderRadius: GlassButton._radiusBtn,
           child: InkWell(
             onTap: _effectiveEnabled ? widget.onPressed : null,
+            // v0.0.6.2: 显式食指光标 — InkWell 内置 MouseRegion 在命中路径
+            // 最深层, 其解析值会覆盖外层 GlassButton MouseRegion 的 click
+            // (MouseTracker firstNonDeferred 由深到浅遍历), 实机实测为箭头.
+            mouseCursor: _effectiveEnabled
+                ? SystemMouseCursors.click
+                : SystemMouseCursors.basic,
             onSecondaryTapUp: widget.onSecondaryTapUp,
             onTapDown: _onTapDown,
             onTapUp: _onTapUp,
@@ -483,6 +489,10 @@ class _GlassButtonState extends State<GlassButton>
       borderRadius: GlassButton._radiusIcon,
       child: InkWell(
         onTap: _effectiveEnabled ? widget.onPressed : null,
+        // v0.0.6.2: 显式食指光标 — 同 iconOnly 路径, 内置 MR 须被显式值覆盖.
+        mouseCursor: _effectiveEnabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
         onSecondaryTapUp: widget.onSecondaryTapUp,
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
