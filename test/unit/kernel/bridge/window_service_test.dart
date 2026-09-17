@@ -717,5 +717,99 @@ void main() {
         messenger().setMockMethodCallHandler(wmChannel, null);
       });
     });
+
+    test('closing listener 在 exit 前被 await 完成 (v0.0.6.2)', () {
+      fakeAsync((async) {
+        final events = <String>[];
+        Future<Object?> handler(MethodCall call) async {
+          if (call.method == 'getBounds') {
+            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
+          }
+          if (call.method == 'isPreventClose') return true;
+          return null;
+        }
+
+        messenger().setMockMethodCallHandler(wmChannel, handler);
+
+        final service = WindowService(
+          exitOnClose: (code) => events.add('exit:$code'),
+        );
+        service.addClosingListener(() async {
+          events.add('listener-start');
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          events.add('listener-done');
+        });
+
+        service.onWindowClose();
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        // 监听器完整执行（start→done）先于进程终止 — 断点落盘窗口有保证.
+        expect(events, ['listener-start', 'listener-done', 'exit:0']);
+
+        messenger().setMockMethodCallHandler(wmChannel, null);
+      });
+    });
+
+    test('closing listener 抛异常不阻断退出 (v0.0.6.2)', () {
+      fakeAsync((async) {
+        Future<Object?> handler(MethodCall call) async {
+          if (call.method == 'getBounds') {
+            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
+          }
+          if (call.method == 'isPreventClose') return true;
+          return null;
+        }
+
+        messenger().setMockMethodCallHandler(wmChannel, handler);
+        final exitCodes = <int>[];
+
+        final service = WindowService(exitOnClose: exitCodes.add);
+        var called = false;
+        service.addClosingListener(() async {
+          called = true;
+          throw Exception('listener boom');
+        });
+
+        service.onWindowClose();
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        expect(called, isTrue);
+        expect(exitCodes, [0]); // 异常被 _runCloseCommand 吞掉记日志, 退出仍到达
+
+        messenger().setMockMethodCallHandler(wmChannel, null);
+      });
+    });
+
+    test('closing listener 卡死触发 800ms 超时后继续退出 (v0.0.6.2)', () {
+      fakeAsync((async) {
+        Future<Object?> handler(MethodCall call) async {
+          if (call.method == 'getBounds') {
+            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
+          }
+          if (call.method == 'isPreventClose') return true;
+          return null;
+        }
+
+        messenger().setMockMethodCallHandler(wmChannel, handler);
+        final exitCodes = <int>[];
+
+        final service = WindowService(exitOnClose: exitCodes.add);
+        // 返回永不完成的 future — 模拟落盘卡死 (磁盘满/杀毒锁文件等).
+        final never = Completer<void>();
+        service.addClosingListener(() => never.future);
+
+        service.onWindowClose();
+
+        // 800ms 超时 + 收尾 — 5s 足够走完.
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+
+        expect(exitCodes, [0]); // 超时兜底生效, 绝不让用户面对滞留窗口
+
+        messenger().setMockMethodCallHandler(wmChannel, null);
+      });
+    });
   });
 }
