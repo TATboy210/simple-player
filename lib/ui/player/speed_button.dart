@@ -138,6 +138,8 @@ class _Segment extends StatelessWidget {
             borderRadius: _radius,
             child: InkWell(
               onTap: onTap,
+              // InkWell 默认 defer (箭头) — 显式给食指, 与控制栏其他按钮一致.
+              mouseCursor: SystemMouseCursors.click,
               hoverColor: Tokens.bgHover,
               highlightColor: Colors.transparent,
               borderRadius: _radius,
