@@ -15,6 +15,13 @@ class Tokens {
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
   static const accentBlue = Color(0xFF4A8EFF); // 蓝色辉光（进度条/边框）
   static const accentEgg = Color.fromARGB(255, 102, 204, 255);
+
+  /// 播放列表续播锚点高亮白 (v0.0.6.2) — 停止态"上次播放"条目的边框与
+  /// 名称色, 与播放中的 accent 蓝区分两种状态语义.
+  /// Playlist resume-anchor highlight white — border/name tint of the
+  /// "last played" entry while idle; distinct from the playing accent blue.
+  static const playlistAnchorWhite = Color(0xEBFFFFFF);
+
   static const danger = Color.fromARGB(255, 250, 55, 55);
 
   // ── 严重级语义色（D-03 语义色分层）──

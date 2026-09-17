@@ -303,14 +303,13 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           ),
           itemCount: items.length,
           itemBuilder: (_, i) {
-            // 高亮合成 (v0.0.6.2): 播放中条目恒高亮; 停止态 (index == -1)
-            // 高亮"上次会话最后播放"那条 (path 匹配). 播放态锚已被 revision
-            // 同步为当前 path, 两判据天然不双高亮.
-            final isCurrent =
-                i == index || (index < 0 && items[i].path == lastPlayed);
+            // 状态合成 (v0.0.6.2): 播放中 = accent 蓝; 停止态 (index == -1)
+            // 的"上次会话最后播放"条目 = 续播锚点白 (path 匹配). 播放态
+            // 锚已被 revision 同步为当前 path, 两状态天然不并存.
             return PlaylistTile(
               item: items[i],
-              isCurrent: isCurrent,
+              isCurrent: i == index,
+              isResumeAnchor: index < 0 && items[i].path == lastPlayed,
               onPlay: () => widget.onPlayEntry(i),
               onResume: () => widget.onResumeEntry(i),
               onRemove: () => widget.onRemoveEntry(i),

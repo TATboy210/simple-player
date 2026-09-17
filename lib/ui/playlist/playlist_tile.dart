@@ -8,7 +8,6 @@ import '../../kernel/utils/path_utils.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/context_menu_row.dart';
-import '../shared/hover_glow.dart';
 import '../theme/tokens.dart';
 
 /// 播放列表条目卡 — 缩略图 + 透明"塑料膜"按钮层 + 右侧名称/断点信息.
@@ -26,8 +25,13 @@ import '../theme/tokens.dart';
 class PlaylistTile extends StatefulWidget {
   final PlaylistItem item;
 
-  /// 是否为当前正在播放的条目 — 驱动高亮.
+  /// 是否为当前正在播放的条目 — accent 蓝高亮 (边框 + 名称).
   final bool isCurrent;
+
+  /// 是否为续播锚点 (v0.0.6.2) — 停止态"上次会话最后播放"的条目,
+  /// 白色高亮与播放中的 accent 蓝区分状态语义. 播放态下恒 false
+  /// (面板合成层保证不双高亮).
+  final bool isResumeAnchor;
 
   /// 播放该条目 (点卡片/播放分区).
   final VoidCallback onPlay;
@@ -46,6 +50,7 @@ class PlaylistTile extends StatefulWidget {
     super.key,
     required this.item,
     required this.isCurrent,
+    required this.isResumeAnchor,
     required this.onPlay,
     required this.onResume,
     required this.onRemove,
@@ -59,6 +64,9 @@ class PlaylistTile extends StatefulWidget {
 class _PlaylistTileState extends State<PlaylistTile> {
   ImageProvider? _thumbnail;
   bool _disposed = false;
+
+  /// 鼠标悬停态 — 驱动整卡背景微亮 (v0.0.6.2).
+  bool _hovered = false;
 
   @override
   void initState() {
@@ -98,7 +106,12 @@ class _PlaylistTileState extends State<PlaylistTile> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final borderColor = widget.isCurrent ? Tokens.accent : Colors.transparent;
+    // 状态色三态 (v0.0.6.2): 播放中 accent 蓝 / 续播锚点白 / 普通无边框.
+    // 名称色复用同一高亮色 — 锚点白与 textPrimary 同亮度, 视觉一致.
+    final highlightColor = widget.isCurrent
+        ? Tokens.accent
+        : (widget.isResumeAnchor ? Tokens.playlistAnchorWhite : null);
+    final borderColor = highlightColor ?? Colors.transparent;
 
     // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
     return InkWell(
@@ -106,14 +119,21 @@ class _PlaylistTileState extends State<PlaylistTile> {
       onSecondaryTapUp: (details) =>
           _showContextMenu(context, details.globalPosition),
       borderRadius: BorderRadius.circular(Tokens.radiusSm),
-      child: HoverGlow(
-        child: Container(
+      // hover 微亮 (v0.0.6.2) — 整卡背景白 tint 渐入渐出, 替代原蓝色
+      // 辉光边框 (blue glow 与播放态 accent 蓝语义混淆; 微亮即定位反馈,
+      // 不与两种状态高亮争夺视觉层级).
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: Tokens.durationNormal),
           padding: const EdgeInsets.all(Tokens.spXs),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(Tokens.radiusSm),
+            color: _hovered ? Tokens.glowHighlightWhite : Colors.transparent,
             border: Border.all(
               color: borderColor,
-              width: widget.isCurrent ? 1.5 : 0,
+              width: highlightColor != null ? 1.5 : 0,
             ),
           ),
           child: Row(
@@ -169,9 +189,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: widget.isCurrent
-                            ? Tokens.accent
-                            : Tokens.textPrimary,
+                        color: highlightColor ?? Tokens.textPrimary,
                         fontSize: Tokens.fontCaption,
                       ),
                     ),
