@@ -315,7 +315,14 @@ void main() {
 
         final stopping = controller.stopCurrentMedia();
         final opening = controller.openAndPlay('C:/test/latest.mp4');
-        await pumpEventQueue(); // flush 同目录扫描 IO, 使 openPlaylist 到达 gate
+        // flush 同目录扫描 IO, 使 openPlaylist 到达 gate — CI 磁盘 IO 时序
+        // 不定, 固定 pump 一次在慢盘上不够; opening 在 openGate 之前发布,
+        // 轮询必然收敛 (上限防病态挂死).
+        var pumps = 0;
+        while (engine.state.value != MediaState.opening && pumps < 200) {
+          await pumpEventQueue();
+          pumps++;
+        }
 
         expect(engine.state.value, MediaState.opening);
         stopGate.complete();
