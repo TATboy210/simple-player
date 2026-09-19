@@ -197,6 +197,9 @@ class Tokens {
   static const controlBarTitleHeightMinimal = 16.0;
   static const controlBarActionsHeightMinimal = 44.0;
 
+  /// 标题跑马灯滚动速度（px/s）— 超长文件名往返滚动的恒定速率
+  static const titleMarqueeSpeed = 30.0;
+
   /// 低于该宽度仅保留核心播放控制，避免动作组发生横向溢出。
   static const controlBarMinimalBreakpoint = 600.0;
   static const controlBarRadius = 22.0; // 修正为 22px（与设计稿一致）
