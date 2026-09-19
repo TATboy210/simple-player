@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../shared/marquee_text.dart';
 import '../theme/tokens.dart';
 
 /// 控制栏标题行，保持标题独占空间以免挤压时间读数。
@@ -36,7 +37,8 @@ class ControlBarTitle extends StatelessWidget {
   }
 }
 
-/// 控制栏标题文本，保持标题对齐、截断和视觉样式稳定。
+/// 控制栏标题文本，保持标题对齐和视觉样式稳定；
+/// 超长文件名由 [MarqueeText] 往返滚动完整展示，不再 ellipsis 截断。
 class _ControlBarTitleText extends StatelessWidget {
   final String? value;
   final bool minimal;
@@ -46,15 +48,13 @@ class _ControlBarTitleText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.centerLeft,
-    child: Text(
-      value ?? '',
+    child: MarqueeText(
+      text: value ?? '',
       style: TextStyle(
         color: Tokens.textPrimary,
         fontSize: minimal ? Tokens.fontCaption : Tokens.fontBody,
         fontWeight: Tokens.weightMedium,
       ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
     ),
   );
 }
