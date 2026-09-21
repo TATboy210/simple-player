@@ -27,6 +27,7 @@ import '../models/play_mode.dart';
 import '../models/playlist_item.dart';
 import '../models/playlist_sort.dart';
 import '../persistence/playlist_store.dart';
+import 'thumbnail_service.dart';
 
 final _log = KernelLogger.I;
 
@@ -188,6 +189,56 @@ class PlaylistCoordinator {
     ]);
 
     await _engine.removeFromQueue(index);
+    unawaited(_save());
+  }
+
+  /// 批量移除指定索引集合的条目 (右键菜单批量删除, v0.0.7) —
+  /// 逻辑队列一次性重算 (UI 即时反馈), 引擎侧**降序**逐个移除
+  /// (降序保证前置索引不受删除位移影响), 最后统一落盘一次.
+  ///
+  /// 缩略图缓存按 P-Thumb §40.1/§40.2 契约接线: 移除**成功后**逐 path
+  /// evict (O(移除数), 绝不 clearCache) — 遵循"业务成功才清缓存"顺序.
+  Future<void> removeEntriesAt(Set<int> indices) async {
+    if (indices.isEmpty) return;
+    final valid = indices
+        .where((i) => i >= 0 && i < _entries.value.length)
+        .toSet();
+    if (valid.isEmpty) return;
+
+    final paths = <String>[for (final entry in _entries.value) entry.path];
+    final removedPaths = <String>[for (final i in valid) paths[i]];
+
+    // 逻辑队列一次性重算 — 排除全部选中索引 (unmodifiable 新列表).
+    for (final path in removedPaths) {
+      _metaByPath.remove(path);
+    }
+    _entries.value = List<PlaylistItem>.unmodifiable([
+      for (var i = 0; i < _entries.value.length; i++)
+        if (!valid.contains(i)) _entries.value[i],
+    ]);
+
+    // 引擎装载态: 降序逐个移除 — 每次 revision 回流以 mpv 为权威重建,
+    // 最终视图自动收敛 (删除正在播放条目的跳转同单条语义).
+    final enginePaths = _engine.queuePaths.value;
+    if (enginePaths.isNotEmpty) {
+      final descending = valid.toList()..sort((a, b) => b.compareTo(a));
+      for (final i in descending) {
+        if (i < enginePaths.length) {
+          await _engine.removeFromQueue(i);
+        }
+      }
+    }
+
+    // 锚点清理 — 被移除条目曾是"上次播放"锚则置空 (与单条语义一致).
+    if (removedPaths.contains(_lastPlayedPath.value)) {
+      _lastPlayedPath.value = null;
+    }
+
+    // P-Thumb §40.1/§40.2: 业务成功后批量失效缩略图缓存.
+    for (final path in removedPaths) {
+      ThumbnailService.evict(path);
+    }
+
     unawaited(_save());
   }
 

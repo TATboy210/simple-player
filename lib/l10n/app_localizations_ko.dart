@@ -686,4 +686,26 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get languageChinese => '中文';
+
+  @override
+  String get batchDelete => '일괄 삭제';
+
+  @override
+  String batchSelectedCount(int count) {
+    return '$count개 선택됨';
+  }
+
+  @override
+  String get selectAll => '전체 선택';
+
+  @override
+  String get batchDeleteConfirmTitle => '선택한 동영상 항목 삭제';
+
+  @override
+  String batchDeleteConfirmBody(int count) {
+    return '재생 목록에서 $count개의 동영상 항목이 제거됩니다. 이 작업은 재생 목록에만 영향을 미치며 로컬 디스크의 파일은 삭제되지 않습니다.';
+  }
+
+  @override
+  String get batchDeleteConfirmAction => '삭제 확인';
 }

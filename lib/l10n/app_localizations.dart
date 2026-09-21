@@ -1397,6 +1397,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'中文'**
   String get languageChinese;
+
+  /// No description provided for @batchDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch delete'**
+  String get batchDelete;
+
+  /// Selected item count in batch mode
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String batchSelectedCount(int count);
+
+  /// No description provided for @selectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get selectAll;
+
+  /// No description provided for @batchDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected videos'**
+  String get batchDeleteConfirmTitle;
+
+  /// Batch delete confirmation body
+  ///
+  /// In en, this message translates to:
+  /// **'{count} video entries will be removed from the playlist. This operation only affects the playlist itself and will not delete any files from your local disk.'**
+  String batchDeleteConfirmBody(int count);
+
+  /// No description provided for @batchDeleteConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm deletion'**
+  String get batchDeleteConfirmAction;
 }
 
 class _AppLocalizationsDelegate

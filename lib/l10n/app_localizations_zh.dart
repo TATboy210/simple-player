@@ -685,4 +685,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get languageChinese => '中文';
+
+  @override
+  String get batchDelete => '批量删除';
+
+  @override
+  String batchSelectedCount(int count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get selectAll => '全选';
+
+  @override
+  String get batchDeleteConfirmTitle => '删除所选视频项';
+
+  @override
+  String batchDeleteConfirmBody(int count) {
+    return '即将从播放列表中移除 $count 个视频条目。此操作仅影响播放列表本身，不会删除本地磁盘上的任何文件。';
+  }
+
+  @override
+  String get batchDeleteConfirmAction => '确认删除';
 }

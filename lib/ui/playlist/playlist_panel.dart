@@ -7,6 +7,7 @@ import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/models/playlist_sort.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/app_dialog.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
@@ -47,6 +48,10 @@ class PlaylistPanel extends StatefulWidget {
   /// 移除指定索引条目.
   final ValueChanged<int> onRemoveEntry;
 
+  /// 批量移除选中索引集合 (v0.0.7) — 确认对话框后调用.
+  /// null 时右键菜单"批量删除"入口隐藏 (旧调用方兼容).
+  final ValueChanged<Set<int>>? onRemoveEntries;
+
   /// 当前播放模式 — 驱动模式按钮图标.
   final ValueListenable<PlayMode> playMode;
 
@@ -76,6 +81,7 @@ class PlaylistPanel extends StatefulWidget {
     required this.onPlayEntry,
     required this.onResumeEntry,
     required this.onRemoveEntry,
+    this.onRemoveEntries,
     required this.playMode,
     required this.onCyclePlayMode,
     required this.sortKey,
@@ -99,6 +105,12 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 条目列表滚动控制器 — Scrollbar 显式挂载用 (桌面默认滚动条贴边
   /// 拉满高度, 底部与面板圆角相交).
   final ScrollController _scrollController = ScrollController();
+
+  /// 批量选择模式 (v0.0.7) — 右键菜单"批量删除"进入, 操作条退出.
+  bool _batchMode = false;
+
+  /// 批量选中的条目索引集合 — 逻辑队列索引, 条目数变化时自动过滤越界.
+  final Set<int> _batchSelected = <int>{};
 
   /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
   static const _panelWidth = 280.0;
@@ -176,8 +188,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 标题行 — 标题 + 排序 + 模式切换 + 关闭 (v0.0.6: 三按钮统一
-        // GlassButton.iconOnly 方块风格, 向控制栏看齐).
+        // 标题行 — 常态: 标题 + 排序 + 模式切换 + 关闭; 批量模式: 操作条.
         Padding(
           padding: const EdgeInsets.fromLTRB(
             Tokens.spMd,
@@ -185,42 +196,9 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             Tokens.spSm,
             Tokens.spSm,
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.playlist,
-                  style: const TextStyle(
-                    color: Tokens.textPrimary,
-                    fontSize: Tokens.fontBody,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              // 排序 (v0.0.6) — 弹出排序方式菜单.
-              Builder(
-                builder: (buttonContext) => GlassButton.iconOnly(
-                  icon: Icons.sort,
-                  tooltip: l10n.sortBy,
-                  onPressed: () => unawaited(_showSortMenu(buttonContext)),
-                ),
-              ),
-              // 模式切换 — 图标随 playMode 变化, 点击循环切换.
-              ValueListenableBuilder<PlayMode>(
-                valueListenable: widget.playMode,
-                builder: (_, mode, _) => GlassButton.iconOnly(
-                  icon: playModeIcon(mode),
-                  tooltip: playModeLabel(mode, l10n),
-                  onPressed: widget.onCyclePlayMode,
-                ),
-              ),
-              GlassButton.iconOnly(
-                icon: Icons.close,
-                tooltip: l10n.close,
-                onPressed: widget.onClose,
-              ),
-            ],
-          ),
+          child: _batchMode
+              ? _buildBatchHeader(l10n)
+              : _buildNormalHeader(l10n),
         ),
         // 无分割线 — 浑然天成 (v0.0.5 用户钦定): 标题行与条目纵列以
         // 呼吸间距自然过渡.
@@ -271,6 +249,167 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     );
   }
 
+  /// 常态标题行 — 标题 + 排序 + 模式切换 + 关闭 (v0.0.6: 三按钮统一
+  /// GlassButton.iconOnly 方块风格, 向控制栏看齐).
+  Widget _buildNormalHeader(AppLocalizations l10n) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            l10n.playlist,
+            style: const TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontBody,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        // 排序 (v0.0.6) — 弹出排序方式菜单.
+        Builder(
+          builder: (buttonContext) => GlassButton.iconOnly(
+            icon: Icons.sort,
+            tooltip: l10n.sortBy,
+            onPressed: () => unawaited(_showSortMenu(buttonContext)),
+          ),
+        ),
+        // 模式切换 — 图标随 playMode 变化, 点击循环切换.
+        ValueListenableBuilder<PlayMode>(
+          valueListenable: widget.playMode,
+          builder: (_, mode, _) => GlassButton.iconOnly(
+            icon: playModeIcon(mode),
+            tooltip: playModeLabel(mode, l10n),
+            onPressed: widget.onCyclePlayMode,
+          ),
+        ),
+        GlassButton.iconOnly(
+          icon: Icons.close,
+          tooltip: l10n.close,
+          onPressed: widget.onClose,
+        ),
+      ],
+    );
+  }
+
+  /// 批量模式操作条 (v0.0.7) — 已选计数 + 全选 + 删除 + 取消,
+  /// 按钮沿用 GlassButton.iconOnly 方块风格与标题行同框替换.
+  Widget _buildBatchHeader(AppLocalizations l10n) {
+    final selectedCount = _batchSelected.length;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            l10n.batchSelectedCount(selectedCount),
+            style: const TextStyle(
+              color: Tokens.accent,
+              fontSize: Tokens.fontBody,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        // 全选/反选 — 图标随全选态切换.
+        GlassButton.iconOnly(
+          icon: selectedCount > 0 ? Icons.deselect : Icons.select_all,
+          tooltip: l10n.selectAll,
+          onPressed: () => setState(_toggleSelectAll),
+        ),
+        // 删除 — 确认对话框后执行 (0 选中时禁用).
+        GlassButton.iconOnly(
+          icon: Icons.delete_outline,
+          tooltip: l10n.batchDeleteConfirmAction,
+          onPressed: selectedCount == 0
+              ? null
+              : () => unawaited(_confirmBatchDelete()),
+        ),
+        GlassButton.iconOnly(
+          icon: Icons.close,
+          tooltip: l10n.cancel,
+          onPressed: _exitBatchMode,
+        ),
+      ],
+    );
+  }
+
+  /// 进入批量选择模式 — [initialIndex] 为右键发起条目, 默认选中 (v0.0.7).
+  void _enterBatchMode(int? initialIndex) {
+    setState(() {
+      _batchMode = true;
+      _batchSelected.clear();
+      if (initialIndex != null) _batchSelected.add(initialIndex);
+    });
+  }
+
+  void _exitBatchMode() {
+    setState(() {
+      _batchMode = false;
+      _batchSelected.clear();
+    });
+  }
+
+  /// 切换单条选中态 — 越界索引自动忽略 (队列外部变化防护).
+  void _toggleSelect(int index) {
+    setState(() {
+      if (!_batchSelected.add(index)) _batchSelected.remove(index);
+    });
+  }
+
+  /// 全选/反选 — 已全选则清空, 否则选中全部当前条目.
+  void _toggleSelectAll() {
+    setState(() {
+      // 全选判定用 builder 内传入的 items 长度 — 此处经 entries 快照.
+      final total = widget.entries.value.length;
+      if (_batchSelected.length >= total) {
+        _batchSelected.clear();
+      } else {
+        _batchSelected
+          ..clear()
+          ..addAll([for (var i = 0; i < total; i++) i]);
+      }
+    });
+  }
+
+  /// 批量删除确认对话框 — 正式文案明示"不影响本地磁盘文件", 确认后
+  /// 执行移除并退出多选模式 (v0.0.7).
+  Future<void> _confirmBatchDelete() async {
+    final l10n = AppLocalizations.of(context);
+    final count = _batchSelected.length;
+    if (count == 0) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppDialog(
+        title: l10n.batchDeleteConfirmTitle,
+        width: 380,
+        height: 240,
+        content: Text(
+          l10n.batchDeleteConfirmBody(count),
+          style: const TextStyle(
+            color: Tokens.textPrimary,
+            fontSize: Tokens.fontBody,
+            height: 1.6,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              l10n.batchDeleteConfirmAction,
+              style: const TextStyle(color: Tokens.accent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    final toRemove = Set<int>.of(_batchSelected);
+    _exitBatchMode();
+    widget.onRemoveEntries?.call(toRemove);
+  }
+
   /// 条目纵列 — [lastPlayed] 为停止态高亮锚点; [resumeAllowed] 传递断点
   /// UI 门控 (v0.0.6).
   Widget _buildList(
@@ -279,6 +418,11 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     String? lastPlayed,
     bool resumeAllowed,
   ) {
+    // 批量模式越界防护 — 队列被外部变化 (引擎回流/落盘恢复) 收缩时,
+    // 选中索引可能越界; builder 内过滤保证渲染与删除输入恒有效.
+    final validSelection = _batchSelected
+        .where((i) => i >= 0 && i < items.length)
+        .toSet();
     return ScrollbarTheme(
       // 两端内缩一个圆角半径 — thumb 拉到底不再与面板圆角
       // 相交 (Scrollbar 绘制区域不受 ListView padding 影响,
@@ -312,6 +456,12 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               onPlay: () => widget.onPlayEntry(i),
               onResume: () => widget.onResumeEntry(i),
               onRemove: () => widget.onRemoveEntry(i),
+              selectionMode: _batchMode,
+              isSelected: validSelection.contains(i),
+              onToggleSelect: () => _toggleSelect(i),
+              onStartBatchSelect: widget.onRemoveEntries == null || _batchMode
+                  ? null
+                  : () => _enterBatchMode(i),
               resumeAllowed: resumeAllowed,
             );
           },

@@ -770,6 +770,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   onRemoveEntry: (index) => unawaited(
                     widget.playlistCoordinator!.removeEntryAt(index),
                   ),
+                  // v0.0.7: 批量删除 — 确认对话框后移除选中条目,
+                  // Coordinator 内按 P-Thumb §40.2 契约同步 evict 缩略图.
+                  onRemoveEntries: (indices) => unawaited(
+                    widget.playlistCoordinator!.removeEntriesAt(indices),
+                  ),
                   playMode: widget.playlistCoordinator!.playMode,
                   onCyclePlayMode: () =>
                       unawaited(widget.playlistCoordinator!.cyclePlayMode()),

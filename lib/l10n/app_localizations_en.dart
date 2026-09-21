@@ -690,4 +690,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languageChinese => '中文';
+
+  @override
+  String get batchDelete => 'Batch delete';
+
+  @override
+  String batchSelectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get selectAll => 'Select all';
+
+  @override
+  String get batchDeleteConfirmTitle => 'Delete selected videos';
+
+  @override
+  String batchDeleteConfirmBody(int count) {
+    return '$count video entries will be removed from the playlist. This operation only affects the playlist itself and will not delete any files from your local disk.';
+  }
+
+  @override
+  String get batchDeleteConfirmAction => 'Confirm deletion';
 }

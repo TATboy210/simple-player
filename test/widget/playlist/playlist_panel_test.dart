@@ -12,6 +12,7 @@ import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/shared/app_dialog.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
@@ -378,6 +379,114 @@ void main() {
             .first,
       );
       expect(resumeGesture.onTap, isNull);
+    });
+  });
+  group('批量删除 (v0.0.7)', () {
+    late ValueNotifier<List<PlaylistItem>> entries;
+    Set<int>? removed;
+
+    setUp(() {
+      entries = ValueNotifier([
+        PlaylistItem(path: 'a.mp4'),
+        PlaylistItem(path: 'b.mp4'),
+        PlaylistItem(path: 'c.mp4'),
+      ]);
+      removed = null;
+    });
+
+    Future<void> pumpBatchPanel(WidgetTester tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          PlaylistPanel(
+            entries: entries,
+            currentIndex: ValueNotifier(-1),
+            lastPlayedPath: ValueNotifier(null),
+            visible: true,
+            onClose: () {},
+            onPlayEntry: (_) {},
+            onResumeEntry: (_) {},
+            onRemoveEntry: (_) {},
+            onRemoveEntries: (indices) => removed = indices,
+            playMode: ValueNotifier(PlayMode.loopAll),
+            onCyclePlayMode: () {},
+            sortKey: PlaylistSortKey.addedOrder,
+            sortAscending: true,
+            onSortSelected: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('右键菜单含批量删除 — 点击进入多选模式并选中发起条', (tester) async {
+      await pumpBatchPanel(tester);
+
+      // 右键第二个条目
+      await tester.tap(
+        find.byType(PlaylistTile).at(1),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Batch delete'));
+      await tester.pumpAndSettle();
+
+      // 操作条出现 + 发起条默认选中 → 全选按钮呈 deselect 态
+      expect(find.byIcon(Icons.deselect), findsOneWidget);
+      expect(find.text('1 selected'), findsOneWidget);
+    });
+
+    testWidgets('多选态点击切换选中 — 确认对话框执行批量移除', (tester) async {
+      await pumpBatchPanel(tester);
+
+      // 进入批量模式 (经右键菜单)
+      await tester.tap(
+        find.byType(PlaylistTile).at(0),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Batch delete'));
+      await tester.pumpAndSettle();
+
+      // 点选第二、三条
+      await tester.tap(find.byType(PlaylistTile).at(1));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(PlaylistTile).at(2));
+      await tester.pumpAndSettle();
+      expect(find.text('3 selected'), findsOneWidget);
+
+      // 删除 → 确认对话框 (正式文案)
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppDialog), findsOneWidget);
+      expect(
+        find.textContaining('will not delete any files from your local disk'),
+        findsOneWidget,
+      );
+
+      // 确认删除 → onRemoveEntries 收到全部选中索引 + 退出多选
+      await tester.tap(find.text('Confirm deletion'));
+      await tester.pumpAndSettle();
+      expect(removed, equals({0, 1, 2}));
+      expect(find.byIcon(Icons.deselect), findsNothing);
+    });
+
+    testWidgets('取消退出多选模式 — 不触发移除', (tester) async {
+      await pumpBatchPanel(tester);
+
+      await tester.tap(
+        find.byType(PlaylistTile).at(0),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Batch delete'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.deselect), findsNothing);
+      expect(removed, isNull);
     });
   });
 }
