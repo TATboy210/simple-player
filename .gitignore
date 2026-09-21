@@ -80,10 +80,9 @@ nul
 # 发布产物(二进制走 GitHub Releases)
 dist/
 
-# GSD 运行时状态(不进版本库)
+# GSD / 本地规划与运行时状态（整目录不进版本库）
 .gsd/
-.planning/milestone.lock
-.planning/research/.cache/
+.planning/
 
 # Debug 运行的便携设置文件(debug 构建的 store 写在项目 cwd 旁)
 /settings.json
