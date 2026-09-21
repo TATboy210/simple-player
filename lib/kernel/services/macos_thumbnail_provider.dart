@@ -1,4 +1,4 @@
-import 'package:flutter/painting.dart';
+import 'package:flutter/foundation.dart' show Uint8List;
 
 import 'thumbnail_provider.dart';
 
@@ -9,5 +9,5 @@ class MacosThumbnailProvider implements ThumbnailProvider {
   const MacosThumbnailProvider();
 
   @override
-  Future<ImageProvider?> getThumbnail(String filePath) async => null;
+  Future<Uint8List?> generateThumbnail(String filePath) async => null;
 }
