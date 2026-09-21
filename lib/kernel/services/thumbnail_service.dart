@@ -11,6 +11,7 @@ import 'linux_thumbnail_provider.dart';
 import 'macos_thumbnail_provider.dart';
 import 'noop_thumbnail_provider.dart';
 import 'thumbnail_disk_cache.dart';
+import 'thumbnail_flight_registry.dart';
 import 'thumbnail_provider.dart';
 import 'windows_thumbnail_provider.dart';
 
@@ -64,6 +65,9 @@ final class ThumbnailMetrics {
   int diskHits = 0;
   int providerCalls = 0;
   int failures = 0;
+
+  /// in-flight join 合并的请求数（F1/F2 生效度）
+  int coalescedJoins = 0;
 
   /// 磁盘写失败降级 MemoryImage 的次数（R6 disk 域观察）
   int diskWriteFallbacks = 0;
@@ -127,6 +131,9 @@ class ThumbnailService {
   /// 由 Coordinator 的 evict 调用契约覆盖 — §40.1）。
   final Map<String, _FileIdentity> _identityMemo = {};
 
+  /// in-flight 注册表 + epoch 内核（B3）— join/失效/isCurrent 唯一入口
+  final ThumbnailFlightRegistry _registry = ThumbnailFlightRegistry();
+
   /// debug metrics 访问器（测试观测用）
   @visibleForTesting
   static ThumbnailMetrics get metrics => _metrics;
@@ -186,48 +193,139 @@ class ThumbnailService {
       return diskProvider;
     }
 
-    // Provider 解帧（bytes 契约 — B2 起）
-    final bytes = await _generateBytes(identity.path);
-    if (bytes == null) return null;
-
-    return _commitBytes(identity, bytes);
+    // in-flight join 或新 flight（B3 — §18）
+    return _getFlightImpl(identity, forceRefresh: false);
   }
 
-  /// Provider 域异常兜底（R6 §31.1）— 解帧失败返回 null，Error 不捕获
-  Future<Uint8List?> _generateBytes(String path) async {
+  /// flight 注册与 join（A.5 — H5 force join + M5 收敛）
+  ///
+  /// - normal 请求：existing 存在即 join（F1/F2 — provider 只执行一次）
+  /// - force 请求：只 join 已有的 force flight（H5 — 双击 retry 不重复解帧）；
+  ///   forceRefresh 仅由 [retry] 内部传入（M5，B5 接入），
+  ///   retry 已先 evict → 旧 normal flight 必然 stale，覆盖注册表键安全。
+  Future<ImageProvider?> _getFlightImpl(
+    _FileIdentity identity, {
+    required bool forceRefresh,
+  }) {
+    final key = identity.cacheKey;
+    final existing = _registry.forKey(key);
+
+    if (existing != null && (!forceRefresh || existing.isForce)) {
+      if (kDebugMode) _metrics.coalescedJoins++;
+      return existing.future;
+    }
+
+    final flight = _registry.create(
+      path: identity.path,
+      cacheKey: key,
+      isForce: forceRefresh,
+    );
+    _registry.register(flight);
+
+    // fire-and-forget — flight 自己经 completer 交付结果，
+    // 异常域全包在 _runFlight 内不会逃逸（R6）
+    unawaited(_runFlight(flight, identity, forceRefresh: forceRefresh));
+    return flight.future;
+  }
+
+  /// flight 执行体（A.6 — R6 三层异常域 + R7 紧贴 commit + M2）
+  Future<void> _runFlight(
+    ThumbnailFlight flight,
+    _FileIdentity identity, {
+    required bool forceRefresh,
+  }) async {
     try {
-      if (kDebugMode) _metrics.providerCalls++;
-      return await _providerImpl.generateThumbnail(path);
-    } on Exception {
-      if (kDebugMode) _metrics.failures++;
+      // ── Provider 域：失败 = negative cache 语义（仅 current，M2/21.5）──
+      Uint8List? bytes;
+      try {
+        if (kDebugMode) _metrics.providerCalls++;
+        bytes = await _providerImpl.generateThumbnail(identity.path);
+      } on Exception {
+        // 不捕获 Error — 编程 bug 必须暴露给 zone（I11）
+        if (kDebugMode) _metrics.failures++;
+        _recordFailureIfCurrent(flight, identity);
+        flight.complete(null);
+        return;
+      }
+
+      if (bytes == null || bytes.isEmpty) {
+        if (kDebugMode) _metrics.failures++;
+        _recordFailureIfCurrent(flight, identity);
+        flight.complete(null);
+        return;
+      }
+
+      // 检查点 1（await 点 1 之后）— stale 可返回原请求，无 commit 权（§19.7）
+      if (!_registry.isCurrent(flight)) {
+        flight.complete(MemoryImage(bytes));
+        return;
+      }
+
+      // ── Disk/commit 域：失败 = 降级 MemoryImage，不进 negative cache ──
+      ImageProvider? committed;
+      try {
+        committed = await _commitToCache(
+          flight,
+          identity,
+          bytes,
+          forceRefresh: forceRefresh,
+        );
+      } on Exception {
+        // D7：写失败 ≠ 生成失败 — bytes 已拿到，降级展示（Error 不捕获）
+        flight.complete(MemoryImage(bytes));
+        return;
+      }
+
+      flight.complete(committed ?? MemoryImage(bytes));
+    } finally {
+      _registry.remove(flight);
+    }
+  }
+
+  /// negative memo 记录 — M2/21.5：stale flight 的失败不记 memo（B5 接入存储）
+  void _recordFailureIfCurrent(
+    ThumbnailFlight flight,
+    _FileIdentity identity,
+  ) {
+    if (!_registry.isCurrent(flight)) return;
+    // B5：写入 _failedUntil / _failureKeysByPath
+  }
+
+  /// commit 阶段 — 内含检查点 2（R7/H1：紧贴 _cachePut，§19.8）
+  Future<ImageProvider?> _commitToCache(
+    ThumbnailFlight flight,
+    _FileIdentity identity,
+    Uint8List bytes, {
+    required bool forceRefresh,
+  }) async {
+    if (forceRefresh) {
+      // 22.3：覆写同名 cache file 前清 Flutter ImageCache 旧条目（X6）
+      final oldFile = await _diskCache.fileFor(identity.cacheKey);
+      if (oldFile != null) {
+        await FileImage(oldFile).evict();
+      }
+    }
+
+    final committedFile = await _diskCache.write(
+      identity.cacheKey,
+      bytes,
+      replaceExisting: forceRefresh,
+    );
+
+    if (committedFile == null) {
+      if (kDebugMode) _metrics.diskWriteFallbacks++;
+      return null; // 磁盘失败 → caller 降级 MemoryImage（不记 memo）
+    }
+
+    // 检查点 2（R7/H1）：write 是 await 窗口，期间 clearCache()/evict()
+    // 可能已穿过检查点 1 — commit 权在最后一刻确认
+    if (!_registry.isCurrent(flight)) {
       return null;
     }
-  }
 
-  /// Disk/commit 域（R6 §31.1）— 写盘失败降级 MemoryImage，不进 negative cache
-  ///
-  /// 成功 commit 时返回 FileImage 并放入 LRU；写失败返回 MemoryImage
-  /// （D7：bytes 已拿到，存储失败 ≠ 生成失败）。
-  Future<ImageProvider?> _commitBytes(
-    _FileIdentity identity,
-    Uint8List bytes,
-  ) async {
-    try {
-      final committed = await _diskCache.write(
-        identity.cacheKey,
-        bytes,
-        replaceExisting: false,
-      );
-      if (committed != null) {
-        final provider = FileImage(committed);
-        _cachePutImpl(identity.path, identity.cacheKey, provider);
-        return provider;
-      }
-    } on Exception {
-      // 磁盘写失败 — 降级 MemoryImage（D7/R6），Error 不捕获（I11）
-    }
-    if (kDebugMode) _metrics.diskWriteFallbacks++;
-    return MemoryImage(bytes);
+    final provider = FileImage(committedFile);
+    _cachePutImpl(identity.path, identity.cacheKey, provider);
+    return provider;
   }
 
   /// 启动后延迟清理只调度一次（§17.3 入口 1）
@@ -366,6 +464,9 @@ class ThumbnailService {
     // R5：memo 同步失效 — 这是文件替换后 identity 能刷新的唯一通道
     _identityMemo.remove(path);
 
+    // B3：pathEpoch++ + 该 path 全部在飞 flight 出 join 表（A.9）
+    _registry.evictPath(path);
+
     final keys = _cacheKeysByPath.remove(path);
     if (keys != null) {
       for (final key in keys) {
@@ -382,6 +483,8 @@ class ThumbnailService {
   static void clearCache() => _instance._clearCacheImpl();
 
   void _clearCacheImpl() {
+    // B3：globalEpoch++ O(1) 失效全部 flight（A.10）
+    _registry.clear();
     _cache.clear();
     _cacheKeysByPath.clear();
     _pathByCacheKey.clear();
@@ -406,6 +509,7 @@ class ThumbnailService {
     _instance._impl = provider;
     _instance._diskCacheOverride = diskCache;
     _instance._startupCleanupScheduled = false;
+    _instance._registry.clear();
     _instance._clearCacheImpl();
     _metrics
       ..requests = 0
@@ -413,6 +517,7 @@ class ThumbnailService {
       ..diskHits = 0
       ..providerCalls = 0
       ..failures = 0
+      ..coalescedJoins = 0
       ..diskWriteFallbacks = 0
       ..statCalls = 0
       ..identityMemoHits = 0;

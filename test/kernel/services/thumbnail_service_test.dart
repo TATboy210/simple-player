@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/painting.dart' show ImageProvider;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:simple_player_flutter/kernel/services/thumbnail_disk_cache.dart';
 import 'package:simple_player_flutter/kernel/services/thumbnail_service.dart';
+
+import '../../helpers/fake_thumbnail_provider.dart';
 
 void main() {
   group('ThumbnailService', () {
@@ -244,6 +249,227 @@ void main() {
 
       expect(ThumbnailService.metrics.statCalls,
           equals(statCallsAfterFirst + 1));
+    });
+  });
+
+  group('In-flight + Epoch (P-Thumb v1.3.2 F1-F5 / E1-E6)', () {
+    late Directory tempDir;
+    late File fileA;
+    late File fileB;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('pthumb_flight');
+      fileA = File(p.join(tempDir.path, 'a.mp4'));
+      fileB = File(p.join(tempDir.path, 'b.mp4'));
+      await fileA.writeAsString('A' * 10);
+      await fileB.writeAsString('B' * 10);
+    });
+
+    tearDown(() async {
+      ThumbnailService.reset();
+      try {
+        await tempDir.delete(recursive: true);
+      } on FileSystemException {
+        // best effort
+      }
+    });
+
+    /// 禁用磁盘层 — F/E 组专注 flight/epoch；
+    /// resolve 抛 Exception（非 Error）→ DiskCache 永久降级（I9）
+    ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
+          resolveDirectory: () async =>
+              throw const FileSystemException('disk disabled'),
+        );
+
+    test('F1: concurrent same-key requests coalesce to one decode',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+      final f2 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      expect(fake.calls, equals(1));
+      expect(ThumbnailService.metrics.coalescedJoins, equals(1));
+
+      fake.release(fileA.path);
+      final r1 = await f1;
+      final r2 = await f2;
+      expect(r1, isNotNull);
+      expect(identical(r1, r2), isTrue); // join 拿同一实例
+    });
+
+    test('F2: ten same-key requests still decode once', () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final futures = <Future<ImageProvider?>>[
+        ThumbnailService.getThumbnail(fileA.path),
+      ];
+      await pumpEventQueue();
+      for (var i = 0; i < 9; i++) {
+        futures.add(ThumbnailService.getThumbnail(fileA.path));
+      }
+      await pumpEventQueue();
+
+      expect(fake.calls, equals(1));
+      expect(ThumbnailService.metrics.coalescedJoins, equals(9));
+
+      fake.release(fileA.path);
+      for (final future in futures) {
+        expect(await future, isNotNull);
+      }
+    });
+
+    test('F3: different identities decode independently', () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      final f2 = ThumbnailService.getThumbnail(fileB.path);
+      await pumpEventQueue();
+
+      expect(fake.calls, equals(2));
+
+      fake.release(fileA.path);
+      fake.release(fileB.path);
+      expect(await f1, isNotNull);
+      expect(await f2, isNotNull);
+    });
+
+    test('F4/E4: old flight completing after new flight cannot commit',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      // evict 使 F1 失效（pathEpoch++）— 新请求 F2 注册
+      ThumbnailService.evict(fileA.path);
+      final f2 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      // 旧代 F1 晚完成 — 允许返回原请求，但不得 commit（§19.7）
+      fake.release(fileA.path);
+      final r1 = await f1;
+      expect(r1, isNotNull);
+      expect(ThumbnailService.cacheLength, equals(0));
+
+      // 新代 F2 完成后正常 commit，且不被旧代完成破坏（E4）
+      fake.release(fileA.path, bytes: makeJpegBytes(seed: 9));
+      final r2 = await f2;
+      expect(r2, isNotNull);
+      expect(ThumbnailService.cacheLength, equals(1));
+    });
+
+    test('E2: clearCache during decode invalidates flight commit',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      ThumbnailService.clearCache();
+      fake.release(fileA.path);
+
+      final r1 = await f1;
+      expect(r1, isNotNull); // 仍返回给原请求
+      expect(ThumbnailService.cacheLength, equals(0)); // 无 commit
+    });
+
+    test('E3: request after evict creates fresh flight and commits',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+      ThumbnailService.evict(fileA.path);
+      fake.release(fileA.path);
+      await f1; // 旧代降级返回，无 commit
+
+      final f2 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+      fake.release(fileA.path);
+      final r2 = await f2;
+      expect(r2, isNotNull);
+      expect(ThumbnailService.cacheLength, equals(1)); // 新 flight commit
+    });
+
+    test('E5: clearCache inside disk-write window cannot commit (R7)',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      // 微任务序：release 恢复 _runFlight → write 在 _ensureDirectory
+      // 让出 → clearCache 执行（穿透检查点 1）→ write 返回 → 检查点 2 拦截
+      fake.release(fileA.path);
+      scheduleMicrotask(() => ThumbnailService.clearCache());
+
+      final r = await f1;
+      expect(r, isNotNull); // 降级 MemoryImage
+      expect(ThumbnailService.cacheLength, equals(0)); // 检查点 2 生效
+    });
+
+    test('E6: evict inside disk-write window cannot commit (R7)',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      fake.release(fileA.path);
+      scheduleMicrotask(() => ThumbnailService.evict(fileA.path));
+
+      final r = await f1;
+      expect(r, isNotNull);
+      expect(ThumbnailService.cacheLength, equals(0)); // 检查点 2 生效
+    });
+
+    test('provider exception yields null and releases the flight',
+        () async {
+      final fake = FakeThumbnailProvider()
+        ..holdJobs = true
+        ..error = const FileSystemException('decode failed');
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+      fake.failJob(fileA.path, const FileSystemException('decode failed'));
+
+      expect(await f1, isNull);
+      expect(ThumbnailService.cacheLength, equals(0));
+      expect(ThumbnailService.metrics.failures, equals(1));
+
+      // flight 已出表 — 新请求不被旧失败卡住
+      fake
+        ..holdJobs = false
+        ..error = null;
+      final f2 = ThumbnailService.getThumbnail(fileA.path);
+      expect(await f2, isNotNull);
     });
   });
 }
