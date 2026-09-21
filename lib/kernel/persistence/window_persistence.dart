@@ -117,7 +117,9 @@ final class WindowPersistence {
 
   Future<SharedPreferences> _getPreferences() {
     final preferences = _preferences;
-    if (preferences != null) return Future<SharedPreferences>.value(preferences);
+    if (preferences != null) {
+      return Future<SharedPreferences>.value(preferences);
+    }
     return SharedPreferences.getInstance();
   }
 

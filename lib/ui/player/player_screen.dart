@@ -355,8 +355,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       Expanded(
         child: DropHandler(
           // 空块刻意 — 空置态无拖放目标.
-              // ignore: no-empty-block
-              onFilesDropped: widget.onFilesDropped ?? (_) {},
+          // ignore: no-empty-block
+          onFilesDropped: widget.onFilesDropped ?? (_) {},
           onHoverChanged: widget.onDragHoverChanged,
           child: Stack(
             fit: StackFit.expand,

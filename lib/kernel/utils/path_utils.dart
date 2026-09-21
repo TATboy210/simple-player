@@ -112,12 +112,7 @@ class PathUtils {
         // start 是 cmd 内建命令（不是可执行文件），必须经 cmd /c 调用；
         // 空串参数占位防止 URL 里的 # 等字符被 start 当窗口标题解析。
         unawaited(
-          Process.run('cmd', [
-            '/c',
-            'start',
-            '',
-            url,
-          ]).then(
+          Process.run('cmd', ['/c', 'start', '', url]).then(
             // ignore: no-empty-block
             (_) {},
             onError: onLaunchError,

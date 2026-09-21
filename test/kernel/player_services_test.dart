@@ -94,10 +94,7 @@ void main() {
         expect(windowService.closingListeners, hasLength(1));
 
         // 触发监听 = 关窗链第 2.5 步 — 完成即落盘, 不抛.
-        await expectLater(
-          windowService.closingListeners.single(),
-          completes,
-        );
+        await expectLater(windowService.closingListeners.single(), completes);
 
         services.dispose();
         windowService.dispose();

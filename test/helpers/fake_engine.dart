@@ -157,6 +157,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   int? lastOpenPlaylistStartIndex;
   final List<String> appendedPaths = [];
   final List<int> removedIndices = [];
+
   /// 最近一次 sortQueue 的目标顺序 (v0.0.6 排序测试内省).
   List<String>? lastSortQueueTarget;
   final List<int> jumpedToIndices = [];
@@ -177,7 +178,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     required List<String> queue,
     required String? current,
     required List<String> recent,
-  })? shufflePicker;
+  })?
+  shufflePicker;
 
   /// When set, the next open() will simulate an error after loading.
   String? failNextOpenWith;
@@ -461,9 +463,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (current > index) {
       nextIndex = current - 1;
     } else if (current == index) {
-      nextIndex = remaining.isEmpty
-          ? -1
-          : index.clamp(0, remaining.length - 1);
+      nextIndex = remaining.isEmpty ? -1 : index.clamp(0, remaining.length - 1);
     }
     queuePaths.value = List<String>.unmodifiable(remaining);
     queueIndex.value = nextIndex;
@@ -480,8 +480,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (moves.isEmpty) return;
     final current = queuePaths.value;
     final currentIndex = queueIndex.value;
-    final currentPath =
-        (currentIndex >= 0 && currentIndex < current.length)
+    final currentPath = (currentIndex >= 0 && currentIndex < current.length)
         ? current[currentIndex]
         : null;
     queuePaths.value = List<String>.unmodifiable(targetOrder);
@@ -579,8 +578,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     final queue = queuePaths.value;
     if (queue.isEmpty) return;
     final currentIndex = queueIndex.value;
-    final currentPath =
-        (currentIndex >= 0 && currentIndex < queue.length)
+    final currentPath = (currentIndex >= 0 && currentIndex < queue.length)
         ? queue[currentIndex]
         : null;
     if (currentPath != null) {

@@ -88,10 +88,7 @@ void main() {
 
       await coordinator.removeEntryAt(0);
 
-      expect(
-        [for (final e in coordinator.entries.value) e.path],
-        ['b.mp4'],
-      );
+      expect([for (final e in coordinator.entries.value) e.path], ['b.mp4']);
     });
 
     test('引擎 stop 清空装载队列 — 逻辑队列保留（停止不清面板）', () async {
@@ -110,10 +107,7 @@ void main() {
       await engine.openPlaylist(['old1.mp4', 'old2.mp4']);
       await engine.openPlaylist(['new.mp4']);
 
-      expect(
-        [for (final e in coordinator.entries.value) e.path],
-        ['new.mp4'],
-      );
+      expect([for (final e in coordinator.entries.value) e.path], ['new.mp4']);
     });
   });
 
@@ -289,8 +283,7 @@ void main() {
       expect(engine.queuePaths.value, ['a.mp4', 'b.mp4']);
     });
 
-    test('addedOrder 排序 — 依 addedSeq 还原添加顺序 (物理重排后仍可逆)',
-        () async {
+    test('addedOrder 排序 — 依 addedSeq 还原添加顺序 (物理重排后仍可逆)', () async {
       await engine.openPlaylist(['c.mp4', 'a.mp4', 'b.mp4']);
 
       await coordinator.sortEntries(PlaylistSortKey.name);
@@ -325,8 +318,7 @@ void main() {
       expect(loaded.items.first.addedSeq, isNotNull); // addedSeq 已持久化
     });
 
-    test('恢复重放排序 — restoreFromDisk 按持久化排序键重排逻辑队列',
-        () async {
+    test('恢复重放排序 — restoreFromDisk 按持久化排序键重排逻辑队列', () async {
       final tempDir = await Directory.systemTemp.createTemp('sort_restore');
       final store = PlaylistStore(resolveDirectory: () async => tempDir);
       addTearDown(() => _deleteTempDir(tempDir));
@@ -477,7 +469,10 @@ void main() {
     test('恢复后点击条目 — 走装载分支并从该条目起播', () async {
       await store.save(
         PersistedPlaylistSnapshot(
-          items: [PlaylistItem(path: 'a.mp4'), PlaylistItem(path: 'b.mp4')],
+          items: [
+            PlaylistItem(path: 'a.mp4'),
+            PlaylistItem(path: 'b.mp4'),
+          ],
           playMode: PlayMode.loopAll,
         ),
       );
@@ -549,7 +544,10 @@ void main() {
       final store = PlaylistStore(resolveDirectory: () async => tempDir);
       await store.save(
         PersistedPlaylistSnapshot(
-          items: [PlaylistItem(path: 'a.mp4'), PlaylistItem(path: 'b.mp4')],
+          items: [
+            PlaylistItem(path: 'a.mp4'),
+            PlaylistItem(path: 'b.mp4'),
+          ],
           playMode: PlayMode.loopAll,
           lastPlayedPath: 'b.mp4',
         ),
@@ -789,9 +787,8 @@ void main() {
         ),
       );
 
-      final content = await File(
-        '${tempDir.path}/playlist.json',
-      ).readAsString();
+      final content = await File('${tempDir.path}/playlist.json')
+          .readAsString();
 
       expect(content.contains('lastPlayedPath'), isFalse);
     });

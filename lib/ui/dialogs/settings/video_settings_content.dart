@@ -81,8 +81,7 @@ class _VideoSettingsContentState extends State<VideoSettingsContent> {
                 value: state.deinterlaceEnabled,
                 onChanged: (v) => widget.videoProcessing.updateDeinterlace(v),
               ),
-              if (widget.settings != null)
-                _buildHardwareDecodingRow(l10n),
+              if (widget.settings != null) _buildHardwareDecodingRow(l10n),
               const SizedBox(height: Tokens.spSm),
               Align(
                 alignment: Alignment.centerRight,
@@ -124,10 +123,9 @@ class _VideoSettingsContentState extends State<VideoSettingsContent> {
     VideoProcessingState state,
   ) {
     final modes = AspectRatioMode.values;
-    final index = modes.indexOf(state.aspectRatioMode).clamp(
-          0,
-          modes.length - 1,
-        );
+    final index = modes
+        .indexOf(state.aspectRatioMode)
+        .clamp(0, modes.length - 1);
     return _SettingNavRow(
       label: l10n.aspectRatio,
       child: SpinControl(

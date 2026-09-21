@@ -73,7 +73,8 @@ void main() {
         expect(
           applied,
           target,
-          reason: 'round $round: current=$current target=$target '
+          reason:
+              'round $round: current=$current target=$target '
               'moves=$moves applied=$applied',
         );
       }

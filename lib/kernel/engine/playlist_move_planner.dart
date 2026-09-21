@@ -20,11 +20,13 @@ typedef PlaylistMove = ({int from, int to});
 /// requires: [target] 是 [current] 的排列（同元素集合、同长度）;
 /// 违反时返回空序列（no-op 防御 — 排序请求与引擎镜像间的竞态
 /// 由"以调用时刻快照为准"消化）.
-List<PlaylistMove> planPlaylistMoves(List<String> current, List<String> target) {
+List<PlaylistMove> planPlaylistMoves(
+  List<String> current,
+  List<String> target,
+) {
   if (current.length != target.length) return const [];
   final currentSet = current.toSet();
-  if (currentSet.length != target.length ||
-      !currentSet.containsAll(target)) {
+  if (currentSet.length != target.length || !currentSet.containsAll(target)) {
     return const []; // 非排列 (元素缺失/重复) — 防御
   }
 

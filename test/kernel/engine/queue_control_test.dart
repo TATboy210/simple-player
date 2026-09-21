@@ -26,10 +26,11 @@ void main() {
 
   group('openPlaylist', () {
     test('装载队列 — 镜像更新 + OpenSuccess + state idle', () async {
-      final result = await engine.openPlaylist(
-        ['a.mp4', 'b.mp4', 'c.mp4'],
-        startIndex: 1,
-      );
+      final result = await engine.openPlaylist([
+        'a.mp4',
+        'b.mp4',
+        'c.mp4',
+      ], startIndex: 1);
 
       expect(result, isA<OpenSuccess>());
       expect(engine.queuePaths.value, ['a.mp4', 'b.mp4', 'c.mp4']);

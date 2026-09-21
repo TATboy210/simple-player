@@ -15,9 +15,7 @@ void main() {
   /// 解析 ARB 的用户可见 key (排除 @ 描述 / @@locale 元数据).
   Set<String> keysOf(File file) {
     final decoded = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-    return decoded.keys
-        .where((k) => !k.startsWith('@'))
-        .toSet();
+    return decoded.keys.where((k) => !k.startsWith('@')).toSet();
   }
 
   final templateFile = File('lib/l10n/app_en.arb');

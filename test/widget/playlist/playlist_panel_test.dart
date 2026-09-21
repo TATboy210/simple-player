@@ -156,8 +156,7 @@ void main() {
       expect(find.byType(PlaylistTile), findsNWidgets(2));
     });
 
-    testWidgets('排序按钮 — 弹出菜单, 选择键触发 onSortSelected (v0.0.6)',
-        (tester) async {
+    testWidgets('排序按钮 — 弹出菜单, 选择键触发 onSortSelected (v0.0.6)', (tester) async {
       final selected = <PlaylistSortKey>[];
       await tester.pumpWidget(buildPanel(onSortSelected: selected.add));
       await tester.pumpAndSettle();
@@ -244,18 +243,16 @@ void main() {
         await tester.pumpWidget(buildPanel());
         await tester.pump();
 
-        Color? tileColorOf(String path) => switch (
-          tester
-              .widget<AnimatedContainer>(
-                find
-                    .ancestor(
-                      of: find.text(path),
-                      matching: find.byType(AnimatedContainer),
-                    )
-                    .first,
-              )
-              .decoration
-        ) {
+        Color? tileColorOf(String path) => switch (tester
+            .widget<AnimatedContainer>(
+              find
+                  .ancestor(
+                    of: find.text(path),
+                    matching: find.byType(AnimatedContainer),
+                  )
+                  .first,
+            )
+            .decoration) {
           final BoxDecoration box => box.color,
           _ => null,
         };
@@ -346,8 +343,7 @@ void main() {
       expect(played, 1);
     });
 
-    testWidgets('resumeAllowed=false — 有断点也不显示进度区 (v0.0.6 门控)',
-        (tester) async {
+    testWidgets('resumeAllowed=false — 有断点也不显示进度区 (v0.0.6 门控)', (tester) async {
       await tester.pumpWidget(
         _wrap(
           SizedBox(

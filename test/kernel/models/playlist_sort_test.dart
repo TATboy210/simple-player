@@ -23,7 +23,12 @@ void main() {
       final b = _item('b.mp4');
       final a = _item('a.mp4');
       expect(
-        comparePlaylistEntries(a, b, key: PlaylistSortKey.name, ascending: true),
+        comparePlaylistEntries(
+          a,
+          b,
+          key: PlaylistSortKey.name,
+          ascending: true,
+        ),
         isNegative,
       );
     });
@@ -60,7 +65,12 @@ void main() {
       final b = _item('b.mp4');
       final a = _item('a.mp4');
       expect(
-        comparePlaylistEntries(a, b, key: PlaylistSortKey.name, ascending: false),
+        comparePlaylistEntries(
+          a,
+          b,
+          key: PlaylistSortKey.name,
+          ascending: false,
+        ),
         isPositive,
       );
     });

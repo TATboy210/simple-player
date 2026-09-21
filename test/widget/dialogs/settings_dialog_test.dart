@@ -236,8 +236,9 @@ void main() {
       ),
     );
 
-    testWidgets('video/audio 分区保持关闭 (v0.0.6.1 用户裁决, bundle 注入也不例外)',
-        (tester) async {
+    testWidgets('video/audio 分区保持关闭 (v0.0.6.1 用户裁决, bundle 注入也不例外)', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildInjectedSubject());
       await tester.tap(find.text('打开设置'));
       await tester.pumpAndSettle();
@@ -250,7 +251,9 @@ void main() {
       await tester.pumpAndSettle();
 
       final videoOpacity = tester.widget<Opacity>(
-        find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
+        find
+            .ancestor(of: find.text('视频'), matching: find.byType(Opacity))
+            .first,
       );
       expect(videoOpacity.opacity, 0.38);
     });
@@ -271,8 +274,9 @@ void main() {
       expect(settings.resumeEnabled.value, isFalse);
     });
 
-    testWidgets('VideoSettingsContent 组件级 — 滑条变化写入 VideoProcessingService',
-        (tester) async {
+    testWidgets('VideoSettingsContent 组件级 — 滑条变化写入 VideoProcessingService', (
+      tester,
+    ) async {
       // 分区入口已按用户裁决关闭, 组件本身的服务写入契约独立验证.
       await tester.pumpWidget(
         MaterialApp(
@@ -294,10 +298,7 @@ void main() {
       await tester.drag(brightnessSlider, const Offset(200, 0));
       await tester.pumpAndSettle();
 
-      expect(
-        videoProcessing.state.value.brightness,
-        greaterThan(0.5),
-      );
+      expect(videoProcessing.state.value.brightness, greaterThan(0.5));
     });
   });
 }

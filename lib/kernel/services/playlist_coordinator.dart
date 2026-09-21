@@ -36,7 +36,11 @@ class PlaylistCoordinator {
   ///
   /// [resumeEnabled] 为断点续播总开关 (v0.0.6, null = 恒启用):
   /// false 时**不记录**断点 (含节流落盘) — 已存断点的隐藏由 UI 门控.
-  PlaylistCoordinator({required this._engine, this._store, this.resumeEnabled}) {
+  PlaylistCoordinator({
+    required this._engine,
+    this._store,
+    this.resumeEnabled,
+  }) {
     // 只监听 queueRevision 单通知点 — paths/index 分开监听会读到
     // "新列表+旧索引"的中间态 (revision 保证两者都已赋值, 快照一致).
     _engine.queueRevision.addListener(_onQueueRevision);
@@ -205,13 +209,16 @@ class PlaylistCoordinator {
   ///
   /// [ascending] 省略时: 同键再次排序 = 翻转方向, 换键 = 重置为升序.
   Future<void> sortEntries(PlaylistSortKey key, {bool? ascending}) async {
-    final nextAscending = ascending ?? (key == _sortKey ? !_sortAscending : true);
+    final nextAscending =
+        ascending ?? (key == _sortKey ? !_sortAscending : true);
     _sortKey = key;
     _sortAscending = nextAscending;
 
-    final target = [..._entries.value]..sort(
-      (a, b) => comparePlaylistEntries(a, b, key: key, ascending: nextAscending),
-    );
+    final target = [..._entries.value]
+      ..sort(
+        (a, b) =>
+            comparePlaylistEntries(a, b, key: key, ascending: nextAscending),
+      );
     final targetPaths = <String>[for (final entry in target) entry.path];
 
     await _engine.sortQueue(targetPaths);
@@ -307,14 +314,15 @@ class PlaylistCoordinator {
     _sortAscending = snapshot.sortAscending;
     // 幂等重放排序 — 恢复顺序即上次落盘顺序, 已排序时恒等 (addedOrder
     // 模式下重放按 addedSeq 归位, 修正手工删改造成的漂移).
-    final sorted = [...snapshot.items]..sort(
-      (a, b) => comparePlaylistEntries(
-        a,
-        b,
-        key: _sortKey,
-        ascending: _sortAscending,
-      ),
-    );
+    final sorted = [...snapshot.items]
+      ..sort(
+        (a, b) => comparePlaylistEntries(
+          a,
+          b,
+          key: _sortKey,
+          ascending: _sortAscending,
+        ),
+      );
     _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[...sorted]);
     // 上次播放锚点恢复 (v0.0.6.2) — 仅逻辑高亮, 引擎仍不装载不自动播;
     // path 不在队列时 UI 无匹配, 高亮自然不渲染.
@@ -416,7 +424,10 @@ class PlaylistCoordinator {
     // _itemFor 兜底: 条目在视图中但元数据缺失时登记 (含 addedSeq 分配).
     final base = _itemFor(path);
     final updated = base.copyWith(
-      positionMs: effectiveBreakpointMs(_lastKnownPositionMs, _lastKnownDurationMs),
+      positionMs: effectiveBreakpointMs(
+        _lastKnownPositionMs,
+        _lastKnownDurationMs,
+      ),
       durationMs: _lastKnownDurationMs > 0 ? _lastKnownDurationMs : null,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
@@ -491,7 +502,8 @@ class PlaylistCoordinator {
     if (current == null) return; // 未在播放任何条目
     if (livePositionMs <= 0) return; // 起始/清零事件无进度可存
     final nowMs = clock().millisecondsSinceEpoch;
-    if (nowMs - _lastBreakpointSaveMs < _breakpointSaveInterval.inMilliseconds) {
+    if (nowMs - _lastBreakpointSaveMs <
+        _breakpointSaveInterval.inMilliseconds) {
       return; // 节流窗口内
     }
     _lastBreakpointSaveMs = nowMs;
@@ -513,7 +525,9 @@ class PlaylistCoordinator {
   Future<void> flushForExit() async {
     if (_disposed) return;
     final current = _observedPlayingPath;
-    if (current != null) _updateBreakpoint(current); // 内部自守 _isBreakpointAllowed
+    if (current != null) {
+      _updateBreakpoint(current); // 内部自守 _isBreakpointAllowed
+    }
     await _save();
   }
 

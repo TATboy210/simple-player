@@ -93,7 +93,10 @@ class PlaylistStore {
       // 损坏文件视作无历史 — 播放列表不是关键数据, 不值得打断启动.
       _log.w(
         'PlaylistStore: failed to load playlist.json',
-        context: {'error': error.toString(), 'stackTrace': stackTrace.toString()},
+        context: {
+          'error': error.toString(),
+          'stackTrace': stackTrace.toString(),
+        },
       );
       return null;
     }

@@ -30,24 +30,19 @@ class AudioSettingsContent extends StatefulWidget {
 
 class _AudioSettingsContentState extends State<AudioSettingsContent> {
   /// 延迟毫秒 → SpinControl 索引 (双向线性映射).
-  int _msToIndex(int ms) => ((ms - _delayMinMs) ~/ _delayStepMs).clamp(
-    0,
-    _optionCount - 1,
-  );
+  int _msToIndex(int ms) =>
+      ((ms - _delayMinMs) ~/ _delayStepMs).clamp(0, _optionCount - 1);
 
   /// SpinControl 索引 → 延迟毫秒.
   int _indexToMs(int index) => _delayMinMs + index * _delayStepMs;
 
-  static const _optionCount =
-      ((_delayMaxMs - _delayMinMs) ~/ _delayStepMs) + 1;
+  static const _optionCount = ((_delayMaxMs - _delayMinMs) ~/ _delayStepMs) + 1;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final settings = widget.settings;
-    final options = [
-      for (var i = 0; i < _optionCount; i++) '${_indexToMs(i)}',
-    ];
+    final options = [for (var i = 0; i < _optionCount; i++) '${_indexToMs(i)}'];
 
     return Padding(
       padding: const EdgeInsets.all(Tokens.spLg),

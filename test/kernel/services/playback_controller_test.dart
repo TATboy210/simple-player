@@ -61,10 +61,10 @@ void main() {
       test('播放列表 jumpTo — 标题/路径跟随实际装载条目', () async {
         // 模拟播放列表场景: 队列已装载, playEntryAt 走 jumpTo 分支
         // (不经过 openAndPlay, 旧实现标题因此永不更新).
-        await engine.openPlaylist(
-          [r'D:\v\a.mp4', r'D:\v\b.mp4'],
-          startIndex: 0,
-        );
+        await engine.openPlaylist([
+          r'D:\v\a.mp4',
+          r'D:\v\b.mp4',
+        ], startIndex: 0);
         engine.state.value = MediaState.playing;
         engine.play();
 

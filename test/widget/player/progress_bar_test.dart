@@ -160,30 +160,29 @@ void main() {
       expect(clickCursor, isTrue);
     });
 
-    testWidgets(
-      'cursor switches to click when duration arrives after mount',
-      (tester) async {
-        // 模拟 media_kit 真实时序: 挂载时未装载(duration=0), 装载完成后
-        // duration notifier 才异步到达 — cursor 必须随之切换, 不依赖顶层 rebuild.
-        bool hasClickCursor() => tester.widgetList<MouseRegion>(
-          find.byType(MouseRegion),
-        ).any((m) => m.cursor == SystemMouseCursors.click);
+    testWidgets('cursor switches to click when duration arrives after mount', (
+      tester,
+    ) async {
+      // 模拟 media_kit 真实时序: 挂载时未装载(duration=0), 装载完成后
+      // duration notifier 才异步到达 — cursor 必须随之切换, 不依赖顶层 rebuild.
+      bool hasClickCursor() => tester
+          .widgetList<MouseRegion>(find.byType(MouseRegion))
+          .any((m) => m.cursor == SystemMouseCursors.click);
 
-        engine.duration.value = 0;
-        await tester.pumpWidget(buildSubject());
-        expect(hasClickCursor(), isFalse);
+      engine.duration.value = 0;
+      await tester.pumpWidget(buildSubject());
+      expect(hasClickCursor(), isFalse);
 
-        // 装载完成 — duration 迟到, 光标应变手型
-        engine.duration.value = 10000;
-        await tester.pump();
-        expect(hasClickCursor(), isTrue);
+      // 装载完成 — duration 迟到, 光标应变手型
+      engine.duration.value = 10000;
+      await tester.pump();
+      expect(hasClickCursor(), isTrue);
 
-        // 反向: 停止/卸载后回到箭头
-        engine.duration.value = 0;
-        await tester.pump();
-        expect(hasClickCursor(), isFalse);
-      },
-    );
+      // 反向: 停止/卸载后回到箭头
+      engine.duration.value = 0;
+      await tester.pump();
+      expect(hasClickCursor(), isFalse);
+    });
 
     // ── Hover interaction tests ──
 

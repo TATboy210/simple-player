@@ -208,7 +208,9 @@ class PlaybackController {
     var index = paths.indexOf(path);
     if (index >= 0) return index;
     final lowerPath = path.toLowerCase();
-    index = paths.indexWhere((candidate) => candidate.toLowerCase() == lowerPath);
+    index = paths.indexWhere(
+      (candidate) => candidate.toLowerCase() == lowerPath,
+    );
     if (index >= 0) return index;
     final base = PathUtils.basename(path).toLowerCase();
     return paths.indexWhere(

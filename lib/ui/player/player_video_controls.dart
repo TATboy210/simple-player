@@ -660,12 +660,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     isFullscreen: _isFullscreenNotifier,
     onSeek: _controlsState.seek,
     // 以下空回调为空置态兜底 (未播放时控制栏可显但无动作).
-      // ignore: no-empty-block
-      onPlayPause: widget.actions.onPlayPause ?? () {},
     // ignore: no-empty-block
-      onSeekBack: widget.actions.onSeekBack ?? (_) {},
+    onPlayPause: widget.actions.onPlayPause ?? () {},
     // ignore: no-empty-block
-      onSeekForward: widget.actions.onSeekForward ?? (_) {},
+    onSeekBack: widget.actions.onSeekBack ?? (_) {},
+    // ignore: no-empty-block
+    onSeekForward: widget.actions.onSeekForward ?? (_) {},
     onToggleMute: _controlsState.toggleMute,
     onSetVolume: _controlsState.setVolume,
     onSetRate: _controlsState.setRate,
@@ -687,23 +687,22 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   Widget? _controlBarCache;
 
   Widget _buildControlBar() {
-    final bar =
-        _controlBarCache ??= ControlBar(
-          vm: _controlBarViewModel,
-          actions: widget.actions,
-          isIdleListenable: _isIdleNotifier,
-          titleListenable: widget.currentFileName,
-          // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
-          opacity: _autoHide.opacity,
-          enableBlur: true,
-          decoration: _animController,
-          resizing: widget.resizing,
-          onToggleFullscreen: _toggleFullscreen,
-          onSeekStart: _autoHide.onSeekStart,
-          onSeekEnd: _autoHide.onSeekEnd,
-          onInteractionStart: _autoHide.onInteractionStart,
-          onInteractionEnd: _autoHide.onInteractionEnd,
-        );
+    final bar = _controlBarCache ??= ControlBar(
+      vm: _controlBarViewModel,
+      actions: widget.actions,
+      isIdleListenable: _isIdleNotifier,
+      titleListenable: widget.currentFileName,
+      // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
+      opacity: _autoHide.opacity,
+      enableBlur: true,
+      decoration: _animController,
+      resizing: widget.resizing,
+      onToggleFullscreen: _toggleFullscreen,
+      onSeekStart: _autoHide.onSeekStart,
+      onSeekEnd: _autoHide.onSeekEnd,
+      onInteractionStart: _autoHide.onInteractionStart,
+      onInteractionEnd: _autoHide.onInteractionEnd,
+    );
     return ValueListenableBuilder<bool>(
       valueListenable: _autoHide.visible,
       builder: (_, isVisible, _) => Positioned(
@@ -776,12 +775,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                       unawaited(widget.playlistCoordinator!.cyclePlayMode()),
                   sortKey: widget.playlistCoordinator!.sortKey,
                   sortAscending: widget.playlistCoordinator!.sortAscending,
-                  onSortSelected: (key) => unawaited(
-                    widget.playlistCoordinator!.sortEntries(key),
-                  ),
+                  onSortSelected: (key) =>
+                      unawaited(widget.playlistCoordinator!.sortEntries(key)),
                   // v0.0.6: 断点续播总开关 — 设置关闭时条目断点 UI 隐藏.
-                  resumeEnabled: widget.settingsServices?.settings
-                      ?.resumeEnabled,
+                  resumeEnabled:
+                      widget.settingsServices?.settings?.resumeEnabled,
                 ),
               ),
             ),
