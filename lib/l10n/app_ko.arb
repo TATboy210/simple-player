@@ -7,11 +7,9 @@
   "openFile": "파일 열기",
   "openFileTooltip": "파일 열기 (O)",
   "dragHint": "동영상을 창으로 끌어다 놓으면 재생됩니다",
-
   "playModeLoopAll": "순차 재생",
   "playModeLoopSingle": "한 곡 반복",
   "playModeShuffle": "랜덤 재생",
-
   "shortcutPlayPause": "재생 / 일시정지",
   "shortcutSeek": "5초 뒤로 / 앞으로",
   "shortcutVolume": "음량 +/- 5%",
@@ -26,7 +24,6 @@
   "shortcutSubtitleDelay": "자막 지연 +/- 500ms",
   "shortcutHelp": "도움말 표시",
   "shortcutMediaKeys": "재생/일시정지",
-
   "settings": "설정",
   "audioTab": "오디오",
   "specialThanks": "특별 감사",
@@ -48,7 +45,6 @@
   "eqVocalBoost": "보컬 강화",
   "eqRock": "록",
   "eqClassical": "클래식",
-
   "colorCorrection": "색상 보정",
   "brightness": "밝기",
   "contrast": "대비",
@@ -61,10 +57,8 @@
   "enableDeinterlace": "디인터레이스 사용",
   "softwareDecoderOnly": "소프트웨어 디코더에서만 작동",
   "videoProcessing": "화면",
-
   "shortcutsHelpTitle": "단축키",
   "close": "닫기",
-
   "previousTrack": "이전",
   "nextTrack": "다음",
   "playlist": "재생 목록",
@@ -77,13 +71,11 @@
   "stop": "정지",
   "rewind10": "10초 뒤로",
   "forward30": "30초 앞으로",
-
   "pin": "항상 위",
   "unpin": "항상 위 해제",
   "minimize": "최소화",
   "maximize": "최대화",
   "restore": "복원",
-
   "playlistEmpty": "재생 목록이 비어 있습니다",
   "resumeRememberPosition": "재생 위치 기억",
   "audioDelay": "오디오 지연",
@@ -106,12 +98,10 @@
   "pathCopied": "경로가 복사되었습니다",
   "breakpointAt": "이어보기 지점 {time}",
   "lastPlayedAt": "지난 재생: {time}",
-
   "justNow": "방금 전",
   "minutesAgo": "{minutes}분 전",
   "hoursAgo": "{hours}시간 전",
   "daysAgo": "{days}일 전",
-
   "propertiesDialog": "속성",
   "fileSection": "파일",
   "filePath": "경로",
@@ -130,34 +120,27 @@
   "copied": "복사됨",
   "doubleClickToCopy": "두 번 클릭하여 복사",
   "unknown": "알 수 없음",
-
   "reopen": "다시 열기",
   "selectOtherFile": "다른 파일 선택",
   "retry": "다시 시도",
-
   "unmute": "음소거 해제",
   "mute": "음소거",
   "volume": "음량",
   "volumePercent": "음량 {percent}%",
-
   "aspectRatioOriginal": "원본",
   "aspectRatioStretch": "늘리기",
   "aspectRatioCropFill": "가득 채우기",
   "aspectRatioFree": "자유",
-
   "progressBar": "재생 진행률",
-
   "speedDecrease": "느리게",
   "speedReset": "배속 (두 번 클릭하여 재설정)",
   "speedIncrease": "빠르게",
-
   "folderTab": "폴더",
   "resumeAction": "이어서 재생",
   "openFileLocation": "파일 위치 열기",
   "clearHistory": "기록 비우기",
   "scanFolder": "폴더 스캔",
   "noVideosInFolder": "폴더에 동영상이 없습니다",
-
   "themeMidnight": "미드나잇",
   "themeOcean": "오션",
   "themeForest": "포레스트",
@@ -165,20 +148,15 @@
   "techStack": "기술 스택",
   "licenses": "오픈 소스 라이선스",
   "copyright": "Flutter + media_kit (libmpv) 기반",
-
   "resetShortcuts": "기본값 복원",
   "pressKeyToBind": "새 키를 누르세요...",
   "shortcutConflict": "이미 사용 중인 키입니다",
   "currentTheme": "현재 테마",
-
   "ok": "확인",
   "cancel": "취소",
   "apply": "적용",
-
   "playerLoadError": "플레이어 모듈 로드 실패",
-
   "playerInitFailed": "플레이어 초기화 실패",
-
   "performanceTab": "성능",
   "d3d11Rendering": "D3D11 렌더링",
   "d3d11Sync": "D3D11 CPU 동기화",
@@ -187,12 +165,10 @@
   "hardwareDecoding": "하드웨어 디코딩",
   "hardwareDecodingDesc": "GPU로 비디오를 디코딩합니다. 화면 이상이 있으면 끄세요.",
   "performanceHint": "변경 사항은 다음 파일을 열 때 적용됩니다.",
-
   "resetToDefaults": "기본값 복원",
   "resetConfirmTitle": "{tabName} 설정을 재설정하시겠습니까?",
   "resetConfirmMessage": "다음 설정이 기본값으로 복원됩니다:",
   "confirmReset": "재설정 확인",
-
   "exportSettings": "내보내기",
   "importSettings": "가져오기",
   "importConfirmTitle": "설정을 가져오시겠습니까?",
@@ -206,7 +182,6 @@
   "importFileReadError": "파일을 읽을 수 없습니다: {error}",
   "openingMedia": "미디어를 여는 중",
   "bufferingMedia": "미디어를 버퍼링하는 중",
-
   "errorFilePathEmpty": "파일 경로가 비어 있습니다",
   "errorFileNotFound": "파일이 존재하지 않습니다",
   "errorFilepathTraversal": "파일 경로가 잘못되었습니다",
@@ -220,7 +195,6 @@
   "errorNetworkTimeout": "네트워크 시간 초과",
   "errorNetworkConnectionLost": "연결이 끊겼습니다",
   "errorUnknown": "알 수 없는 오류가 발생했습니다",
-
   "errorCardBadgeLabel": "오류 {count}개",
   "errorCardClose": "닫기",
   "errorCardCopyTooltip": "진단 정보 복사",
@@ -237,11 +211,31 @@
   "errorCardLogUnavailable": "로그 파일을 사용할 수 없습니다",
   "errorCardLocationUnavailable": "위치를 사용할 수 없습니다",
   "errorCardCycleTooltip": "오류 순환 보기",
-
   "errorCardToggleLabel": "오류 카드",
-
   "languageLabel": "언어",
   "languageSystem": "시스템 따르기",
   "languageEnglish": "English",
-  "languageChinese": "中文"
+  "languageChinese": "中文",
+  "batchDelete": "일괄 삭제",
+  "batchSelectedCount": "{count}개 선택됨",
+  "@batchSelectedCount": {
+    "description": "Selected item count in batch mode",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "전체 선택",
+  "batchDeleteConfirmTitle": "선택한 동영상 항목 삭제",
+  "batchDeleteConfirmBody": "재생 목록에서 {count}개의 동영상 항목이 제거됩니다. 이 작업은 재생 목록에만 영향을 미치며 로컬 디스크의 파일은 삭제되지 않습니다.",
+  "@batchDeleteConfirmBody": {
+    "description": "Batch delete confirmation body",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "batchDeleteConfirmAction": "삭제 확인"
 }

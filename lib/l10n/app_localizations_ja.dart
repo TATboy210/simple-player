@@ -686,4 +686,26 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get languageChinese => '中文';
+
+  @override
+  String get batchDelete => '一括削除';
+
+  @override
+  String batchSelectedCount(int count) {
+    return '$count件選択中';
+  }
+
+  @override
+  String get selectAll => 'すべて選択';
+
+  @override
+  String get batchDeleteConfirmTitle => '選択した動画項目を削除';
+
+  @override
+  String batchDeleteConfirmBody(int count) {
+    return '再生リストから $count 件の動画項目を削除します。この操作は再生リストにのみ影響し、ローカルディスク上のファイルは削除されません。';
+  }
+
+  @override
+  String get batchDeleteConfirmAction => '削除を確定';
 }

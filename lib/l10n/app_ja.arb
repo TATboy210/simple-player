@@ -7,11 +7,9 @@
   "openFile": "ファイルを開く",
   "openFileTooltip": "ファイルを開く (O)",
   "dragHint": "動画をウィンドウにドラッグ＆ドロップで再生できます",
-
   "playModeLoopAll": "順次再生",
   "playModeLoopSingle": "1曲リピート",
   "playModeShuffle": "シャッフル再生",
-
   "shortcutPlayPause": "再生 / 一時停止",
   "shortcutSeek": "5秒 戻る / 進む",
   "shortcutVolume": "音量 +/- 5%",
@@ -26,7 +24,6 @@
   "shortcutSubtitleDelay": "字幕遅延 +/- 500ms",
   "shortcutHelp": "ヘルプを表示",
   "shortcutMediaKeys": "再生/一時停止",
-
   "settings": "設定",
   "audioTab": "オーディオ",
   "specialThanks": "スペシャルサンクス",
@@ -48,7 +45,6 @@
   "eqVocalBoost": "ボーカルブースト",
   "eqRock": "ロック",
   "eqClassical": "クラシック",
-
   "colorCorrection": "カラーコレクション",
   "brightness": "明るさ",
   "contrast": "コントラスト",
@@ -61,10 +57,8 @@
   "enableDeinterlace": "インターレース解除を有効化",
   "softwareDecoderOnly": "ソフトウェアデコーダーでのみ有効",
   "videoProcessing": "映像",
-
   "shortcutsHelpTitle": "ショートカット",
   "close": "閉じる",
-
   "previousTrack": "前へ",
   "nextTrack": "次へ",
   "playlist": "再生リスト",
@@ -77,13 +71,11 @@
   "stop": "停止",
   "rewind10": "10秒戻る",
   "forward30": "30秒進む",
-
   "pin": "常に最前面",
   "unpin": "最前面を解除",
   "minimize": "最小化",
   "maximize": "最大化",
   "restore": "元に戻す",
-
   "playlistEmpty": "再生リストは空です",
   "resumeRememberPosition": "再生位置を記憶する",
   "audioDelay": "音声の遅延",
@@ -106,12 +98,10 @@
   "pathCopied": "パスをコピーしました",
   "breakpointAt": "再開ポイント {time}",
   "lastPlayedAt": "前回の再生: {time}",
-
   "justNow": "たった今",
   "minutesAgo": "{minutes}分前",
   "hoursAgo": "{hours}時間前",
   "daysAgo": "{days}日前",
-
   "propertiesDialog": "プロパティ",
   "fileSection": "ファイル",
   "filePath": "パス",
@@ -130,34 +120,27 @@
   "copied": "コピーしました",
   "doubleClickToCopy": "ダブルクリックでコピー",
   "unknown": "不明",
-
   "reopen": "再度開く",
   "selectOtherFile": "他のファイルを選択",
   "retry": "再試行",
-
   "unmute": "ミュート解除",
   "mute": "ミュート",
   "volume": "音量",
   "volumePercent": "音量 {percent}%",
-
   "aspectRatioOriginal": "オリジナル",
   "aspectRatioStretch": "引き伸ばし",
   "aspectRatioCropFill": "切り抜き填充",
   "aspectRatioFree": "自由",
-
   "progressBar": "再生の進行状況",
-
   "speedDecrease": "減速",
   "speedReset": "再生速度 (ダブルクリックでリセット)",
   "speedIncrease": "加速",
-
   "folderTab": "フォルダー",
   "resumeAction": "続きから再生",
   "openFileLocation": "ファイルの場所を開く",
   "clearHistory": "履歴をクリア",
   "scanFolder": "フォルダーをスキャン",
   "noVideosInFolder": "フォルダーに動画がありません",
-
   "themeMidnight": "ミッドナイト",
   "themeOcean": "オーシャン",
   "themeForest": "フォレスト",
@@ -165,20 +148,15 @@
   "techStack": "技術スタック",
   "licenses": "オープンソースライセンス",
   "copyright": "Flutter + media_kit (libmpv) ベース",
-
   "resetShortcuts": "デフォルトに戻す",
   "pressKeyToBind": "新しいキーを押してください...",
   "shortcutConflict": "このキーは使用中です",
   "currentTheme": "現在のテーマ",
-
   "ok": "OK",
   "cancel": "キャンセル",
   "apply": "適用",
-
   "playerLoadError": "プレーヤーモジュールの読み込みに失敗しました",
-
   "playerInitFailed": "プレーヤーの初期化に失敗しました",
-
   "performanceTab": "パフォーマンス",
   "d3d11Rendering": "D3D11 レンダリング",
   "d3d11Sync": "D3D11 CPU 同期",
@@ -187,12 +165,10 @@
   "hardwareDecoding": "ハードウェアデコード",
   "hardwareDecodingDesc": "GPU で動画をデコードします。画面に異常がある場合はオフにしてください。",
   "performanceHint": "変更は次のファイルを開くときに適用されます。",
-
   "resetToDefaults": "デフォルトに戻す",
   "resetConfirmTitle": "{tabName}設定をリセットしますか？",
   "resetConfirmMessage": "以下の設定がデフォルトに戻されます：",
   "confirmReset": "リセットを確認",
-
   "exportSettings": "エクスポート",
   "importSettings": "インポート",
   "importConfirmTitle": "設定をインポートしますか？",
@@ -206,7 +182,6 @@
   "importFileReadError": "ファイルを読み取れません：{error}",
   "openingMedia": "メディアを開いています",
   "bufferingMedia": "メディアをバッファリングしています",
-
   "errorFilePathEmpty": "ファイルパスが空です",
   "errorFileNotFound": "ファイルが存在しません",
   "errorFilepathTraversal": "ファイルパスが無効です",
@@ -220,7 +195,6 @@
   "errorNetworkTimeout": "ネットワークがタイムアウトしました",
   "errorNetworkConnectionLost": "接続が切断されました",
   "errorUnknown": "不明なエラーが発生しました",
-
   "errorCardBadgeLabel": "エラー {count}件",
   "errorCardClose": "閉じる",
   "errorCardCopyTooltip": "診断情報をコピー",
@@ -237,11 +211,31 @@
   "errorCardLogUnavailable": "ログファイルを利用できません",
   "errorCardLocationUnavailable": "位置情報を利用できません",
   "errorCardCycleTooltip": "エラーを切り替えて表示",
-
   "errorCardToggleLabel": "エラーカード",
-
   "languageLabel": "言語",
   "languageSystem": "システムに従う",
   "languageEnglish": "English",
-  "languageChinese": "中文"
+  "languageChinese": "中文",
+  "batchDelete": "一括削除",
+  "batchSelectedCount": "{count}件選択中",
+  "@batchSelectedCount": {
+    "description": "Selected item count in batch mode",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "すべて選択",
+  "batchDeleteConfirmTitle": "選択した動画項目を削除",
+  "batchDeleteConfirmBody": "再生リストから {count} 件の動画項目を削除します。この操作は再生リストにのみ影響し、ローカルディスク上のファイルは削除されません。",
+  "@batchDeleteConfirmBody": {
+    "description": "Batch delete confirmation body",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "batchDeleteConfirmAction": "削除を確定"
 }

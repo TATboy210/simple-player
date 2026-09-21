@@ -42,6 +42,20 @@ class PlaylistTile extends StatefulWidget {
   /// 右键菜单"移除"动作.
   final VoidCallback onRemove;
 
+  /// 批量选择模式 (v0.0.7) — true 时整卡点击 = 切换选中态,
+  /// 播放/续播膜分区禁用, 右上角显示勾选圆标.
+  final bool selectionMode;
+
+  /// 批量选择模式下的选中态 (配合 [selectionMode]).
+  final bool isSelected;
+
+  /// 批量选择模式下的点击回调 — 切换选中态.
+  final VoidCallback? onToggleSelect;
+
+  /// 右键菜单"批量删除"回调 — 面板进入多选模式并选中本条目 (v0.0.7).
+  /// null 时菜单项隐藏.
+  final VoidCallback? onStartBatchSelect;
+
   /// 断点续播 UI 总开关 (v0.0.6, 默认 true) — false 时续播分区禁用 +
   /// 断点进度条不显示 (设置"记住播放位置"关闭).
   final bool resumeAllowed;
@@ -54,6 +68,10 @@ class PlaylistTile extends StatefulWidget {
     required this.onPlay,
     required this.onResume,
     required this.onRemove,
+    this.selectionMode = false,
+    this.isSelected = false,
+    this.onToggleSelect,
+    this.onStartBatchSelect,
     this.resumeAllowed = true,
   });
 
@@ -166,14 +184,19 @@ class _PlaylistTileState extends State<PlaylistTile> {
     final l10n = AppLocalizations.of(context);
     // 状态色三态 (v0.0.6.2): 播放中 accent 蓝 / 续播锚点白 / 普通无边框.
     // 名称色复用同一高亮色 — 锚点白与 textPrimary 同亮度, 视觉一致.
+    // v0.0.7: 批量选中态复用 accent 蓝 — 与播放高亮同色但叠加勾选圆标,
+    // 两态语义靠圆标区分 (选中态必然显示圆标).
     final highlightColor = widget.isCurrent
         ? Tokens.accent
         : (widget.isResumeAnchor ? Tokens.playlistAnchorWhite : null);
-    final borderColor = highlightColor ?? Colors.transparent;
+    final borderColor = widget.isSelected
+        ? Tokens.accent
+        : (highlightColor ?? Colors.transparent);
 
     // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
     return InkWell(
-      onTap: widget.onPlay,
+      // v0.0.7: 批量选择模式下整卡点击 = 切换选中 (播放/续播让位).
+      onTap: widget.selectionMode ? widget.onToggleSelect : widget.onPlay,
       // InkWell 默认 defer (箭头) — 整卡可点播, 显式给食指与膜按钮一致.
       mouseCursor: SystemMouseCursors.click,
       onSecondaryTapUp: (details) =>
@@ -193,7 +216,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
             color: _hovered ? Tokens.glowHighlightWhite : Colors.transparent,
             border: Border.all(
               color: borderColor,
-              width: highlightColor != null ? 1.5 : 0,
+              width: highlightColor != null || widget.isSelected ? 1.5 : 0,
             ),
           ),
           child: Row(
@@ -207,34 +230,50 @@ class _PlaylistTileState extends State<PlaylistTile> {
                 child: Stack(
                   children: [
                     Positioned.fill(child: _buildThumbnail()),
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                        child: Column(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: _FilmButton(
-                                icon: Icons.play_arrow,
-                                label: l10n.play,
-                                onTap: widget.onPlay,
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: _FilmButton(
-                                icon: Icons.replay,
-                                label: l10n.resumePlayback,
-                                enabled: _resumeProgress != null,
-                                onTap: _resumeProgress == null
-                                    ? null
-                                    : widget.onResume,
-                              ),
-                            ),
-                          ],
+                    // v0.0.7: 批量选中指示 — 右上角勾选圆标.
+                    if (widget.selectionMode)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Icon(
+                          widget.isSelected
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          size: 18,
+                          color: widget.isSelected
+                              ? Tokens.accent
+                              : Tokens.textSecondary,
                         ),
                       ),
-                    ),
+                    if (!widget.selectionMode)
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(Tokens.radiusSm),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: _FilmButton(
+                                  icon: Icons.play_arrow,
+                                  label: l10n.play,
+                                  onTap: widget.onPlay,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: _FilmButton(
+                                  icon: Icons.replay,
+                                  label: l10n.resumePlayback,
+                                  enabled: _resumeProgress != null,
+                                  onTap: _resumeProgress == null
+                                      ? null
+                                      : widget.onResume,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -412,6 +451,13 @@ class _PlaylistTileState extends State<PlaylistTile> {
           value: 'remove',
           child: ContextMenuRow(Icons.delete_outline, l10n.remove),
         ),
+        // v0.0.7: 批量删除 — 进入多选模式并默认选中本条目
+        // (onStartBatchSelect == null 时隐藏 — 旧调用方兼容).
+        if (widget.onStartBatchSelect != null)
+          PopupMenuItem<String>(
+            value: 'batchDelete',
+            child: ContextMenuRow(Icons.checklist, l10n.batchDelete),
+          ),
       ],
     );
     if (!mounted || action == null) return;
@@ -422,6 +468,8 @@ class _PlaylistTileState extends State<PlaylistTile> {
         PathUtils.openFileLocation(widget.item.path);
       case 'remove':
         widget.onRemove();
+      case 'batchDelete':
+        widget.onStartBatchSelect?.call();
     }
   }
 }

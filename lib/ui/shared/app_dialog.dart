@@ -134,12 +134,18 @@ class _DialogTitle extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: Tokens.spSm),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Tokens.textPrimary,
-                  fontSize: Tokens.fontBody,
-                  fontWeight: FontWeight.w600,
+              // Expanded — 长标题 (如批量删除正式文案) 溢出防护:
+              // 超宽时 ellipsis 而非渲染报错 (v0.0.7).
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: Tokens.fontBody,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -180,8 +186,12 @@ class _DialogActions extends StatelessWidget {
         right: Tokens.spSm,
         bottom: Tokens.spXs,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      // Wrap 替代 Row — 多按钮 (外部 actions + 统一 Close) 超宽时
+      // 自动换行而非溢出报错 (v0.0.7 长文案场景).
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: Tokens.spXs,
         children: [
           ...?actions,
           TextButton(

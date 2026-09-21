@@ -793,4 +793,50 @@ void main() {
       expect(content.contains('lastPlayedPath'), isFalse);
     });
   });
+  group('批量移除 removeEntriesAt (v0.0.7)', () {
+    test('停止态批量移除 — 逻辑队列重算 + 引擎降序移除', () async {
+      await coordinator.appendEntries(['a.mp4', 'b.mp4', 'c.mp4', 'd.mp4']);
+      expect(coordinator.entries.value.length, equals(4));
+
+      await coordinator.removeEntriesAt({0, 2});
+
+      // 逻辑队列剩 a/c 之外的两条, 顺序保持
+      expect([
+        for (final e in coordinator.entries.value) e.path,
+      ], equals(['b.mp4', 'd.mp4']));
+      // 引擎降序移除 — 2 先于 0 (删除位移安全序)
+      expect(engine.removedIndices, equals([2, 0]));
+    });
+
+    test('锚点清理 — 被移除条目是上次播放锚时置空', () async {
+      await coordinator.appendEntries(['a.mp4', 'b.mp4']);
+      // 锚点条目 b.mp4 (index 1)
+      coordinator.lastPlayedPath.value = 'b.mp4';
+
+      await coordinator.removeEntriesAt({1});
+
+      expect(coordinator.lastPlayedPath.value, isNull);
+      expect(coordinator.entries.value.length, equals(1));
+    });
+
+    test('非锚条目移除不动锚 (path 键防误伤)', () async {
+      await coordinator.appendEntries(['a.mp4', 'b.mp4']);
+      coordinator.lastPlayedPath.value = 'a.mp4';
+
+      await coordinator.removeEntriesAt({1});
+
+      expect(coordinator.lastPlayedPath.value, equals('a.mp4'));
+    });
+
+    test('空集合与越界索引 — no-op 不落盘不崩', () async {
+      await coordinator.appendEntries(['a.mp4']);
+      final before = coordinator.entries.value;
+
+      await coordinator.removeEntriesAt({});
+      await coordinator.removeEntriesAt({5, -1});
+
+      expect(coordinator.entries.value, same(before));
+      expect(engine.removedIndices, isEmpty);
+    });
+  });
 }

@@ -2,62 +2,106 @@
   "@@locale": "en",
   "appTitle": "Simple Player",
   "windowInitializationFailed": "Window initialization failed",
-  "@appTitle": { "description": "Application title shown in title bar and taskbar" },
-
+  "@appTitle": {
+    "description": "Application title shown in title bar and taskbar"
+  },
   "brandName": "S I M P L E   P L A Y E R",
-  "@brandName": { "description": "Brand name displayed on empty state screen with wide letter spacing" },
+  "@brandName": {
+    "description": "Brand name displayed on empty state screen with wide letter spacing"
+  },
   "emptyStateSubtitle": "Immersive Audiovisual Experience",
-  "@emptyStateSubtitle": { "description": "Subtitle text below brand name on empty state" },
+  "@emptyStateSubtitle": {
+    "description": "Subtitle text below brand name on empty state"
+  },
   "openFile": "Open File",
-  "@openFile": { "description": "Button label to open a file" },
+  "@openFile": {
+    "description": "Button label to open a file"
+  },
   "openFileTooltip": "Open File (O)",
-  "@openFileTooltip": { "description": "Tooltip for open file button showing keyboard shortcut" },
+  "@openFileTooltip": {
+    "description": "Tooltip for open file button showing keyboard shortcut"
+  },
   "dragHint": "Drop video here to play",
-  "@dragHint": { "description": "Hint shown while dragging a file over the window" },
-
+  "@dragHint": {
+    "description": "Hint shown while dragging a file over the window"
+  },
   "playModeLoopAll": "Sequential",
-  "@playModeLoopAll": { "description": "Play mode: play tracks in order and loop" },
+  "@playModeLoopAll": {
+    "description": "Play mode: play tracks in order and loop"
+  },
   "playModeLoopSingle": "Loop Single",
-  "@playModeLoopSingle": { "description": "Play mode: loop current track" },
+  "@playModeLoopSingle": {
+    "description": "Play mode: loop current track"
+  },
   "playModeShuffle": "Shuffle",
-  "@playModeShuffle": { "description": "Play mode: random order" },
-
+  "@playModeShuffle": {
+    "description": "Play mode: random order"
+  },
   "shortcutPlayPause": "Play / Pause",
-  "@shortcutPlayPause": { "description": "Keyboard shortcut description for Space key" },
+  "@shortcutPlayPause": {
+    "description": "Keyboard shortcut description for Space key"
+  },
   "shortcutSeek": "Seek -/+ 5 seconds",
-  "@shortcutSeek": { "description": "Keyboard shortcut description for arrow keys" },
+  "@shortcutSeek": {
+    "description": "Keyboard shortcut description for arrow keys"
+  },
   "shortcutVolume": "Volume +/- 5%",
-  "@shortcutVolume": { "description": "Keyboard shortcut description for up/down arrows" },
+  "@shortcutVolume": {
+    "description": "Keyboard shortcut description for up/down arrows"
+  },
   "shortcutFullscreen": "Toggle Fullscreen",
-  "@shortcutFullscreen": { "description": "Keyboard shortcut description for F key" },
+  "@shortcutFullscreen": {
+    "description": "Keyboard shortcut description for F key"
+  },
   "shortcutExitFullscreen": "Exit Fullscreen",
-  "@shortcutExitFullscreen": { "description": "Keyboard shortcut description for ESC key" },
+  "@shortcutExitFullscreen": {
+    "description": "Keyboard shortcut description for ESC key"
+  },
   "shortcutMute": "Toggle Mute",
-  "@shortcutMute": { "description": "Keyboard shortcut description for M key" },
-  "shortcutNext": "Next Track",
-  "@shortcutNext": { "description": "Keyboard shortcut description for N key" },
-  "shortcutPrevious": "Previous Track",
-  "@shortcutPrevious": { "description": "Keyboard shortcut description for P key" },
+  "@shortcutMute": {
+    "description": "Keyboard shortcut description for M key"
+  },
+  "shortcutNext": "Next",
+  "@shortcutNext": {
+    "description": "Keyboard shortcut description for N key"
+  },
+  "shortcutPrevious": "Previous",
+  "@shortcutPrevious": {
+    "description": "Keyboard shortcut description for P key"
+  },
   "shortcutOpenFile": "Open File",
-  "@shortcutOpenFile": { "description": "Keyboard shortcut description for O key" },
+  "@shortcutOpenFile": {
+    "description": "Keyboard shortcut description for O key"
+  },
   "shortcutSubtitle": "Toggle Subtitle",
   "shortcutPlaylist": "Toggle Playlist",
-  "shortcutPrevious": "Previous",
-  "shortcutNext": "Next",
-  "@shortcutSubtitle": { "description": "Keyboard shortcut description for S key" },
+  "@shortcutSubtitle": {
+    "description": "Keyboard shortcut description for S key"
+  },
   "shortcutSubtitleDelay": "Subtitle Delay +/- 500ms",
-  "@shortcutSubtitleDelay": { "description": "Keyboard shortcut description for bracket keys" },
+  "@shortcutSubtitleDelay": {
+    "description": "Keyboard shortcut description for bracket keys"
+  },
   "shortcutHelp": "Show Help",
-  "@shortcutHelp": { "description": "Keyboard shortcut description for F1 key" },
+  "@shortcutHelp": {
+    "description": "Keyboard shortcut description for F1 key"
+  },
   "shortcutMediaKeys": "Play/Pause",
-  "@shortcutMediaKeys": { "description": "Keyboard shortcut description for the media play/pause key" },
-
+  "@shortcutMediaKeys": {
+    "description": "Keyboard shortcut description for the media play/pause key"
+  },
   "settings": "Settings",
-  "@settings": { "description": "Settings dialog title and tooltip" },
+  "@settings": {
+    "description": "Settings dialog title and tooltip"
+  },
   "audioTab": "Audio",
-  "@audioTab": { "description": "Audio settings section label (placeholder nav entry)" },
+  "@audioTab": {
+    "description": "Audio settings section label (placeholder nav entry)"
+  },
   "specialThanks": "Special Thanks",
-  "@specialThanks": { "description": "Section title honoring supporters of the project" },
+  "@specialThanks": {
+    "description": "Section title honoring supporters of the project"
+  },
   "thanksPending": "The list is being prepared — stay tuned",
   "@thanksPending": {
     "description": "Shown while the special-thanks list has no entries yet"
@@ -67,362 +111,665 @@
     "description": "LGPL attribution note displayed under the tech-stack list"
   },
   "generalTab": "General",
-  "@generalTab": { "description": "General settings tab label" },
+  "@generalTab": {
+    "description": "General settings tab label"
+  },
   "language": "Language",
-  "@language": { "description": "Language setting label" },
+  "@language": {
+    "description": "Language setting label"
+  },
   "theme": "Theme",
-  "@theme": { "description": "Theme setting label" },
+  "@theme": {
+    "description": "Theme setting label"
+  },
   "shortcutsTab": "Shortcuts",
-  "@shortcutsTab": { "description": "Shortcuts settings tab label" },
+  "@shortcutsTab": {
+    "description": "Shortcuts settings tab label"
+  },
   "aboutTab": "About",
-  "@aboutTab": { "description": "About tab label" },
+  "@aboutTab": {
+    "description": "About tab label"
+  },
   "equalizer": "Equalizer",
-  "@equalizer": { "description": "Equalizer tab label in settings" },
+  "@equalizer": {
+    "description": "Equalizer tab label in settings"
+  },
   "audioTrack": "Audio Track",
-  "@audioTrack": { "description": "Audio track tab label in settings" },
+  "@audioTrack": {
+    "description": "Audio track tab label in settings"
+  },
   "videoTab": "Video",
-  "@videoTab": { "description": "Video processing tab label in settings" },
+  "@videoTab": {
+    "description": "Video processing tab label in settings"
+  },
   "noAudioTracks": "No audio tracks available",
-  "@noAudioTracks": { "description": "Shown when no audio tracks are found" },
+  "@noAudioTracks": {
+    "description": "Shown when no audio tracks are found"
+  },
   "videoProcessingUnavailable": "Video processing unavailable",
-  "@videoProcessingUnavailable": { "description": "Shown when video processing service is not available" },
+  "@videoProcessingUnavailable": {
+    "description": "Shown when video processing service is not available"
+  },
   "audioTrackN": "Track {index}",
   "@audioTrackN": {
     "description": "Audio track label with index",
-    "placeholders": { "index": { "type": "int" } }
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
   },
   "eqOff": "Off",
-  "@eqOff": { "description": "Equalizer preset: disabled" },
+  "@eqOff": {
+    "description": "Equalizer preset: disabled"
+  },
   "eqBassBoost": "Bass Boost",
-  "@eqBassBoost": { "description": "Equalizer preset: bass boost" },
+  "@eqBassBoost": {
+    "description": "Equalizer preset: bass boost"
+  },
   "eqVocalBoost": "Vocal Boost",
-  "@eqVocalBoost": { "description": "Equalizer preset: vocal boost" },
+  "@eqVocalBoost": {
+    "description": "Equalizer preset: vocal boost"
+  },
   "eqRock": "Rock",
-  "@eqRock": { "description": "Equalizer preset: rock" },
+  "@eqRock": {
+    "description": "Equalizer preset: rock"
+  },
   "eqClassical": "Classical",
-  "@eqClassical": { "description": "Equalizer preset: classical" },
-
+  "@eqClassical": {
+    "description": "Equalizer preset: classical"
+  },
   "colorCorrection": "Color Correction",
-  "@colorCorrection": { "description": "Section header for color correction controls" },
+  "@colorCorrection": {
+    "description": "Section header for color correction controls"
+  },
   "brightness": "Brightness",
-  "@brightness": { "description": "Slider label for brightness adjustment" },
+  "@brightness": {
+    "description": "Slider label for brightness adjustment"
+  },
   "contrast": "Contrast",
-  "@contrast": { "description": "Slider label for contrast adjustment" },
+  "@contrast": {
+    "description": "Slider label for contrast adjustment"
+  },
   "saturation": "Saturation",
-  "@saturation": { "description": "Slider label for saturation adjustment" },
+  "@saturation": {
+    "description": "Slider label for saturation adjustment"
+  },
   "hue": "Hue",
-  "@hue": { "description": "Slider label for hue adjustment" },
+  "@hue": {
+    "description": "Slider label for hue adjustment"
+  },
   "rotation": "Rotation",
-  "@rotation": { "description": "Section header for rotation controls" },
+  "@rotation": {
+    "description": "Section header for rotation controls"
+  },
   "aspectRatio": "Aspect Ratio",
-  "@aspectRatio": { "description": "Section header for aspect ratio selector" },
+  "@aspectRatio": {
+    "description": "Section header for aspect ratio selector"
+  },
   "deinterlace": "Deinterlace",
-  "@deinterlace": { "description": "Section header for deinterlace toggle" },
+  "@deinterlace": {
+    "description": "Section header for deinterlace toggle"
+  },
   "resetAll": "Reset All",
-  "@resetAll": { "description": "Button to reset all video processing settings" },
+  "@resetAll": {
+    "description": "Button to reset all video processing settings"
+  },
   "enableDeinterlace": "Enable Deinterlace",
-  "@enableDeinterlace": { "description": "Toggle label for deinterlace" },
+  "@enableDeinterlace": {
+    "description": "Toggle label for deinterlace"
+  },
   "softwareDecoderOnly": "Software decoder only",
-  "@softwareDecoderOnly": { "description": "Hint that deinterlace only works with software decoder" },
+  "@softwareDecoderOnly": {
+    "description": "Hint that deinterlace only works with software decoder"
+  },
   "videoProcessing": "Video",
-  "@videoProcessing": { "description": "Tab label for video processing settings" },
-
+  "@videoProcessing": {
+    "description": "Tab label for video processing settings"
+  },
   "shortcutsHelpTitle": "Keyboard Shortcuts",
-  "@shortcutsHelpTitle": { "description": "Title of keyboard shortcuts help dialog" },
+  "@shortcutsHelpTitle": {
+    "description": "Title of keyboard shortcuts help dialog"
+  },
   "close": "Close",
-  "@close": { "description": "Close button text in dialogs" },
-
+  "@close": {
+    "description": "Close button text in dialogs"
+  },
   "previousTrack": "Previous",
-  "@previousTrack": { "description": "Tooltip for previous track button" },
+  "@previousTrack": {
+    "description": "Tooltip for previous track button"
+  },
   "nextTrack": "Next",
-  "@nextTrack": { "description": "Tooltip for next track button" },
+  "@nextTrack": {
+    "description": "Tooltip for next track button"
+  },
   "playlist": "Playlist",
-  "@playlist": { "description": "Tooltip for playlist toggle button" },
+  "@playlist": {
+    "description": "Tooltip for playlist toggle button"
+  },
   "fullscreen": "Fullscreen (F)",
-  "@fullscreen": { "description": "Tooltip for fullscreen button" },
+  "@fullscreen": {
+    "description": "Tooltip for fullscreen button"
+  },
   "exitFullscreen": "Exit Fullscreen (F)",
-  "@exitFullscreen": { "description": "Tooltip for exit fullscreen button" },
+  "@exitFullscreen": {
+    "description": "Tooltip for exit fullscreen button"
+  },
   "openSubtitle": "Open Subtitle",
-  "@openSubtitle": { "description": "Tooltip for subtitle import button" },
+  "@openSubtitle": {
+    "description": "Tooltip for subtitle import button"
+  },
   "play": "Play",
   "resumePlayback": "Resume from breakpoint",
-  "@play": { "description": "Tooltip for play button" },
+  "@play": {
+    "description": "Tooltip for play button"
+  },
   "pause": "Pause",
-  "@pause": { "description": "Tooltip for pause button" },
+  "@pause": {
+    "description": "Tooltip for pause button"
+  },
   "stop": "Stop",
-  "@stop": { "description": "Tooltip for stop button" },
+  "@stop": {
+    "description": "Tooltip for stop button"
+  },
   "rewind10": "Rewind 10s",
-  "@rewind10": { "description": "Tooltip for rewind 10 seconds button" },
+  "@rewind10": {
+    "description": "Tooltip for rewind 10 seconds button"
+  },
   "forward30": "Forward 30s",
-  "@forward30": { "description": "Tooltip for forward 30 seconds button" },
-
+  "@forward30": {
+    "description": "Tooltip for forward 30 seconds button"
+  },
   "pin": "Pin on Top",
-  "@pin": { "description": "Tooltip for pin window button" },
+  "@pin": {
+    "description": "Tooltip for pin window button"
+  },
   "unpin": "Unpin",
-  "@unpin": { "description": "Tooltip for unpin window button" },
+  "@unpin": {
+    "description": "Tooltip for unpin window button"
+  },
   "minimize": "Minimize",
-  "@minimize": { "description": "Tooltip for minimize button" },
+  "@minimize": {
+    "description": "Tooltip for minimize button"
+  },
   "maximize": "Maximize",
-  "@maximize": { "description": "Tooltip for maximize button" },
+  "@maximize": {
+    "description": "Tooltip for maximize button"
+  },
   "restore": "Restore",
-  "@restore": { "description": "Tooltip for restore down button" },
-
+  "@restore": {
+    "description": "Tooltip for restore down button"
+  },
   "playlistEmpty": "Playlist is empty",
-  "@playlistEmpty": { "description": "Shown when playlist has no items" },
+  "@playlistEmpty": {
+    "description": "Shown when playlist has no items"
+  },
   "resumeRememberPosition": "Remember playback position",
-  "@resumeRememberPosition": { "description": "Toggle label for resume breakpoint setting (v0.0.6)" },
+  "@resumeRememberPosition": {
+    "description": "Toggle label for resume breakpoint setting (v0.0.6)"
+  },
   "audioDelay": "Audio Delay",
-  "@audioDelay": { "description": "Label for audio delay setting (v0.0.6)" },
+  "@audioDelay": {
+    "description": "Label for audio delay setting (v0.0.6)"
+  },
   "subtitleDelay": "Subtitle Delay",
-  "@subtitleDelay": { "description": "Label for subtitle delay setting (v0.0.6)" },
+  "@subtitleDelay": {
+    "description": "Label for subtitle delay setting (v0.0.6)"
+  },
   "sortBy": "Sort",
-  "@sortBy": { "description": "Tooltip for the playlist sort button (v0.0.6)" },
+  "@sortBy": {
+    "description": "Tooltip for the playlist sort button (v0.0.6)"
+  },
   "sortByAddedOrder": "By Added Order",
-  "@sortByAddedOrder": { "description": "Sort menu item: order items were added" },
+  "@sortByAddedOrder": {
+    "description": "Sort menu item: order items were added"
+  },
   "sortByName": "By Name",
-  "@sortByName": { "description": "Sort menu item: by file name" },
+  "@sortByName": {
+    "description": "Sort menu item: by file name"
+  },
   "sortByLastPlayed": "By Last Played",
-  "@sortByLastPlayed": { "description": "Sort menu item: by last played time" },
+  "@sortByLastPlayed": {
+    "description": "Sort menu item: by last played time"
+  },
   "sortByDuration": "By Duration",
-  "@sortByDuration": { "description": "Sort menu item: by media duration" },
+  "@sortByDuration": {
+    "description": "Sort menu item: by media duration"
+  },
   "sortAscending": "Ascending",
-  "@sortAscending": { "description": "Sort direction: ascending" },
+  "@sortAscending": {
+    "description": "Sort direction: ascending"
+  },
   "sortDescending": "Descending",
-  "@sortDescending": { "description": "Sort direction: descending" },
+  "@sortDescending": {
+    "description": "Sort direction: descending"
+  },
   "noHistory": "No playback history",
-  "@noHistory": { "description": "Shown when playback history is empty" },
+  "@noHistory": {
+    "description": "Shown when playback history is empty"
+  },
   "playlistTab": "Playlist",
-  "@playlistTab": { "description": "Tab label for playlist" },
+  "@playlistTab": {
+    "description": "Tab label for playlist"
+  },
   "historyTab": "History",
-  "@historyTab": { "description": "Tab label for playback history" },
+  "@historyTab": {
+    "description": "Tab label for playback history"
+  },
   "clear": "Clear",
-  "@clear": { "description": "Tooltip for clear playlist button" },
+  "@clear": {
+    "description": "Tooltip for clear playlist button"
+  },
   "playAction": "Play",
-  "@playAction": { "description": "Context menu item to play selected item" },
+  "@playAction": {
+    "description": "Context menu item to play selected item"
+  },
   "copyPath": "Copy Path",
-  "@copyPath": { "description": "Context menu item to copy file path" },
+  "@copyPath": {
+    "description": "Context menu item to copy file path"
+  },
   "properties": "Properties",
-  "@properties": { "description": "Context menu item and dialog title for file properties" },
+  "@properties": {
+    "description": "Context menu item and dialog title for file properties"
+  },
   "remove": "Remove",
-  "@remove": { "description": "Context menu item to remove from playlist" },
+  "@remove": {
+    "description": "Context menu item to remove from playlist"
+  },
   "pathCopied": "Path copied",
-  "@pathCopied": { "description": "Snackbar message after copying path" },
+  "@pathCopied": {
+    "description": "Snackbar message after copying path"
+  },
   "breakpointAt": "Breakpoint {time}",
   "@breakpointAt": {
     "description": "Subtitle showing breakpoint time in playlist item",
-    "placeholders": { "time": { "type": "String" } }
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "lastPlayedAt": "Last played to {time}",
   "@lastPlayedAt": {
     "description": "Tooltip showing last played position",
-    "placeholders": { "time": { "type": "String" } }
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   },
-
   "justNow": "Just now",
-  "@justNow": { "description": "Relative time: less than 1 minute ago" },
+  "@justNow": {
+    "description": "Relative time: less than 1 minute ago"
+  },
   "minutesAgo": "{minutes} min ago",
   "@minutesAgo": {
     "description": "Relative time: N minutes ago",
-    "placeholders": { "minutes": { "type": "int" } }
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
   },
   "hoursAgo": "{hours} hr ago",
   "@hoursAgo": {
     "description": "Relative time: N hours ago",
-    "placeholders": { "hours": { "type": "int" } }
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
   },
   "daysAgo": "{days} days ago",
   "@daysAgo": {
     "description": "Relative time: N days ago",
-    "placeholders": { "days": { "type": "int" } }
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
   },
-
   "propertiesDialog": "Properties",
-  "@propertiesDialog": { "description": "Title of media info properties dialog" },
+  "@propertiesDialog": {
+    "description": "Title of media info properties dialog"
+  },
   "fileSection": "File",
-  "@fileSection": { "description": "Section header for file info" },
+  "@fileSection": {
+    "description": "Section header for file info"
+  },
   "filePath": "Path",
-  "@filePath": { "description": "Label for file path row" },
+  "@filePath": {
+    "description": "Label for file path row"
+  },
   "fileName": "File Name",
-  "@fileName": { "description": "Label for file name row" },
+  "@fileName": {
+    "description": "Label for file name row"
+  },
   "videoSection": "Video",
-  "@videoSection": { "description": "Section header for video info" },
+  "@videoSection": {
+    "description": "Section header for video info"
+  },
   "resolution": "Resolution",
-  "@resolution": { "description": "Label for video resolution" },
+  "@resolution": {
+    "description": "Label for video resolution"
+  },
   "codec": "Codec",
-  "@codec": { "description": "Label for video/audio codec" },
+  "@codec": {
+    "description": "Label for video/audio codec"
+  },
   "pixelAspectRatio": "Pixel Aspect Ratio",
-  "@pixelAspectRatio": { "description": "Label for pixel aspect ratio" },
+  "@pixelAspectRatio": {
+    "description": "Label for pixel aspect ratio"
+  },
   "aspectRatioLabel": "Aspect Ratio",
-  "@aspectRatioLabel": { "description": "Label for display aspect ratio" },
+  "@aspectRatioLabel": {
+    "description": "Label for display aspect ratio"
+  },
   "durationSection": "Duration",
-  "@durationSection": { "description": "Section header for duration info" },
+  "@durationSection": {
+    "description": "Section header for duration info"
+  },
   "totalDuration": "Total Duration",
-  "@totalDuration": { "description": "Label for total duration row" },
+  "@totalDuration": {
+    "description": "Label for total duration row"
+  },
   "audioSection": "Audio",
-  "@audioSection": { "description": "Section header for audio info" },
+  "@audioSection": {
+    "description": "Section header for audio info"
+  },
   "trackCount": "Track Count",
-  "@trackCount": { "description": "Label for number of tracks" },
+  "@trackCount": {
+    "description": "Label for number of tracks"
+  },
   "trackN": "Track {index}",
   "@trackN": {
     "description": "Label for individual track with index",
-    "placeholders": { "index": { "type": "int" } }
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
   },
   "subtitleSection": "Subtitle",
-  "@subtitleSection": { "description": "Section header for subtitle info" },
+  "@subtitleSection": {
+    "description": "Section header for subtitle info"
+  },
   "copied": "Copied",
-  "@copied": { "description": "Snackbar message after copying value" },
+  "@copied": {
+    "description": "Snackbar message after copying value"
+  },
   "doubleClickToCopy": "Double-click to copy",
-  "@doubleClickToCopy": { "description": "Tooltip hint for copyable rows" },
+  "@doubleClickToCopy": {
+    "description": "Tooltip hint for copyable rows"
+  },
   "unknown": "Unknown",
-  "@unknown": { "description": "Fallback text when track info is unknown" },
-
+  "@unknown": {
+    "description": "Fallback text when track info is unknown"
+  },
   "reopen": "Reopen",
-  "@reopen": { "description": "Error banner action: reopen file" },
+  "@reopen": {
+    "description": "Error banner action: reopen file"
+  },
   "selectOtherFile": "Select Other File",
-  "@selectOtherFile": { "description": "Error banner action: select a different file" },
+  "@selectOtherFile": {
+    "description": "Error banner action: select a different file"
+  },
   "retry": "Retry",
-  "@retry": { "description": "Error banner action: retry operation" },
-
+  "@retry": {
+    "description": "Error banner action: retry operation"
+  },
   "unmute": "Unmute",
-  "@unmute": { "description": "Tooltip for unmute button" },
+  "@unmute": {
+    "description": "Tooltip for unmute button"
+  },
   "mute": "Mute",
-  "@mute": { "description": "Tooltip for mute button and OSD message" },
+  "@mute": {
+    "description": "Tooltip for mute button and OSD message"
+  },
   "volume": "Volume",
-  "@volume": { "description": "Semantics label for volume slider" },
+  "@volume": {
+    "description": "Semantics label for volume slider"
+  },
   "volumePercent": "Volume {percent}%",
   "@volumePercent": {
     "description": "OSD message showing volume percentage",
-    "placeholders": { "percent": { "type": "String" } }
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
   },
-
   "aspectRatioOriginal": "Original",
-  "@aspectRatioOriginal": { "description": "Aspect ratio mode: keep original" },
+  "@aspectRatioOriginal": {
+    "description": "Aspect ratio mode: keep original"
+  },
   "aspectRatioStretch": "Stretch",
-  "@aspectRatioStretch": { "description": "Aspect ratio mode: stretch to fill" },
+  "@aspectRatioStretch": {
+    "description": "Aspect ratio mode: stretch to fill"
+  },
   "aspectRatioCropFill": "Crop Fill",
-  "@aspectRatioCropFill": { "description": "Aspect ratio mode: crop to fill" },
+  "@aspectRatioCropFill": {
+    "description": "Aspect ratio mode: crop to fill"
+  },
   "aspectRatioFree": "Free",
-  "@aspectRatioFree": { "description": "Aspect ratio mode: no constraint" },
-
+  "@aspectRatioFree": {
+    "description": "Aspect ratio mode: no constraint"
+  },
   "progressBar": "Playback Progress",
-  "@progressBar": { "description": "Semantics label for playback progress bar" },
-
+  "@progressBar": {
+    "description": "Semantics label for playback progress bar"
+  },
   "speedDecrease": "Decrease Speed",
-  "@speedDecrease": { "description": "Tooltip for speed decrease button" },
+  "@speedDecrease": {
+    "description": "Tooltip for speed decrease button"
+  },
   "speedReset": "Speed (double-click to reset)",
-  "@speedReset": { "description": "Tooltip for speed label showing reset hint" },
+  "@speedReset": {
+    "description": "Tooltip for speed label showing reset hint"
+  },
   "speedIncrease": "Increase Speed",
-  "@speedIncrease": { "description": "Tooltip for speed increase button" },
-
+  "@speedIncrease": {
+    "description": "Tooltip for speed increase button"
+  },
   "folderTab": "Folder",
-  "@folderTab": { "description": "Tab label for folder scan view in floating playlist" },
+  "@folderTab": {
+    "description": "Tab label for folder scan view in floating playlist"
+  },
   "resumeAction": "Resume",
-  "@resumeAction": { "description": "Context menu item to resume from breakpoint" },
+  "@resumeAction": {
+    "description": "Context menu item to resume from breakpoint"
+  },
   "openFileLocation": "Open File Location",
-  "@openFileLocation": { "description": "Context menu item to open containing folder" },
+  "@openFileLocation": {
+    "description": "Context menu item to open containing folder"
+  },
   "clearHistory": "Clear History",
-  "@clearHistory": { "description": "Context menu item to clear all playback history" },
+  "@clearHistory": {
+    "description": "Context menu item to clear all playback history"
+  },
   "scanFolder": "Scan Folder",
-  "@scanFolder": { "description": "Context menu item to scan folder for other videos" },
+  "@scanFolder": {
+    "description": "Context menu item to scan folder for other videos"
+  },
   "noVideosInFolder": "No videos in folder",
-  "@noVideosInFolder": { "description": "Shown when folder scan finds no video files" },
-
+  "@noVideosInFolder": {
+    "description": "Shown when folder scan finds no video files"
+  },
   "themeMidnight": "Midnight",
-  "@themeMidnight": { "description": "Theme preset: midnight blue" },
+  "@themeMidnight": {
+    "description": "Theme preset: midnight blue"
+  },
   "themeOcean": "Ocean",
-  "@themeOcean": { "description": "Theme preset: ocean cyan" },
+  "@themeOcean": {
+    "description": "Theme preset: ocean cyan"
+  },
   "themeForest": "Forest",
-  "@themeForest": { "description": "Theme preset: forest green" },
+  "@themeForest": {
+    "description": "Theme preset: forest green"
+  },
   "version": "Version",
-  "@version": { "description": "Label for app version" },
+  "@version": {
+    "description": "Label for app version"
+  },
   "techStack": "Tech Stack",
-  "@techStack": { "description": "Label for technology stack" },
+  "@techStack": {
+    "description": "Label for technology stack"
+  },
   "licenses": "Licenses",
-  "@licenses": { "description": "Button to show open source licenses" },
+  "@licenses": {
+    "description": "Button to show open source licenses"
+  },
   "copyright": "Built with Flutter + media_kit (libmpv)",
-  "@copyright": { "description": "Copyright/technology description" },
-
+  "@copyright": {
+    "description": "Copyright/technology description"
+  },
   "resetShortcuts": "Reset to Default",
-  "@resetShortcuts": { "description": "Button to reset all keyboard shortcuts to defaults" },
+  "@resetShortcuts": {
+    "description": "Button to reset all keyboard shortcuts to defaults"
+  },
   "pressKeyToBind": "Press a key...",
-  "@pressKeyToBind": { "description": "Hint shown when waiting for user to press a key for binding" },
+  "@pressKeyToBind": {
+    "description": "Hint shown when waiting for user to press a key for binding"
+  },
   "shortcutConflict": "Key already bound",
-  "@shortcutConflict": { "description": "Warning when a key is already assigned to another action" },
+  "@shortcutConflict": {
+    "description": "Warning when a key is already assigned to another action"
+  },
   "currentTheme": "Theme",
-  "@currentTheme": { "description": "Quick menu label for current theme section" },
-
+  "@currentTheme": {
+    "description": "Quick menu label for current theme section"
+  },
   "ok": "OK",
-  "@ok": { "description": "Confirm button" },
+  "@ok": {
+    "description": "Confirm button"
+  },
   "cancel": "Cancel",
-  "@cancel": { "description": "Cancel button" },
+  "@cancel": {
+    "description": "Cancel button"
+  },
   "apply": "Apply",
-  "@apply": { "description": "Apply button - save without closing" },
-
+  "@apply": {
+    "description": "Apply button - save without closing"
+  },
   "playerLoadError": "Failed to load player module",
-  "@playerLoadError": { "description": "Error message when deferred player module fails to load" },
-
+  "@playerLoadError": {
+    "description": "Error message when deferred player module fails to load"
+  },
   "playerInitFailed": "Player initialization failed",
-  "@playerInitFailed": { "description": "Error title when player fails to initialize" },
-
+  "@playerInitFailed": {
+    "description": "Error title when player fails to initialize"
+  },
   "performanceTab": "Performance",
-  "@performanceTab": { "description": "Performance settings tab label" },
+  "@performanceTab": {
+    "description": "Performance settings tab label"
+  },
   "d3d11Rendering": "D3D11 Rendering",
-  "@d3d11Rendering": { "description": "Section header for D3D11 rendering settings" },
+  "@d3d11Rendering": {
+    "description": "Section header for D3D11 rendering settings"
+  },
   "d3d11Sync": "D3D11 CPU Sync",
-  "@d3d11Sync": { "description": "Toggle label for D3D11 CPU/GPU synchronization" },
+  "@d3d11Sync": {
+    "description": "Toggle label for D3D11 CPU/GPU synchronization"
+  },
   "d3d11SyncDesc": "Synchronize CPU and GPU per frame. Disable for lower latency, may cause tearing.",
-  "@d3d11SyncDesc": { "description": "Description for D3D11 sync toggle" },
+  "@d3d11SyncDesc": {
+    "description": "Description for D3D11 sync toggle"
+  },
   "decoderSettings": "Decoder",
-  "@decoderSettings": { "description": "Section header for decoder settings" },
+  "@decoderSettings": {
+    "description": "Section header for decoder settings"
+  },
   "hardwareDecoding": "Hardware Decoding",
-  "@hardwareDecoding": { "description": "Toggle label for hardware decoding" },
+  "@hardwareDecoding": {
+    "description": "Toggle label for hardware decoding"
+  },
   "hardwareDecodingDesc": "Use GPU for video decoding. Disable if experiencing artifacts.",
-  "@hardwareDecodingDesc": { "description": "Description for hardware decoding toggle" },
+  "@hardwareDecodingDesc": {
+    "description": "Description for hardware decoding toggle"
+  },
   "performanceHint": "Changes take effect on next file open.",
-  "@performanceHint": { "description": "Hint that performance changes require reopening file" },
-
+  "@performanceHint": {
+    "description": "Hint that performance changes require reopening file"
+  },
   "resetToDefaults": "Restore Defaults",
-  "@resetToDefaults": { "description": "Button to reset current tab settings to defaults" },
+  "@resetToDefaults": {
+    "description": "Button to reset current tab settings to defaults"
+  },
   "resetConfirmTitle": "Reset {tabName} Settings?",
   "@resetConfirmTitle": {
     "description": "Confirmation dialog title for resetting tab settings",
-    "placeholders": { "tabName": { "type": "String" } }
+    "placeholders": {
+      "tabName": {
+        "type": "String"
+      }
+    }
   },
   "resetConfirmMessage": "The following settings will be restored to defaults:",
-  "@resetConfirmMessage": { "description": "Confirmation dialog message listing settings to reset" },
+  "@resetConfirmMessage": {
+    "description": "Confirmation dialog message listing settings to reset"
+  },
   "confirmReset": "Reset",
-  "@confirmReset": { "description": "Confirm button in reset dialog" },
-
+  "@confirmReset": {
+    "description": "Confirm button in reset dialog"
+  },
   "exportSettings": "Export",
-  "@exportSettings": { "description": "Button to export settings to JSON file" },
+  "@exportSettings": {
+    "description": "Button to export settings to JSON file"
+  },
   "importSettings": "Import",
-  "@importSettings": { "description": "Button to import settings from JSON file" },
+  "@importSettings": {
+    "description": "Button to import settings from JSON file"
+  },
   "importConfirmTitle": "Import Settings?",
-  "@importConfirmTitle": { "description": "Title of import confirmation dialog" },
+  "@importConfirmTitle": {
+    "description": "Title of import confirmation dialog"
+  },
   "importConfirmMessage": "The following settings will be overwritten:",
-  "@importConfirmMessage": { "description": "Message in import confirmation dialog" },
+  "@importConfirmMessage": {
+    "description": "Message in import confirmation dialog"
+  },
   "importConfirmCategories": "Playback, Video, Subtitle, Window, Shortcuts, Theme, Language",
-  "@importConfirmCategories": { "description": "Categories that will be overwritten on import" },
+  "@importConfirmCategories": {
+    "description": "Categories that will be overwritten on import"
+  },
   "importSuccess": "Settings imported",
-  "@importSuccess": { "description": "OSD message after successful import" },
+  "@importSuccess": {
+    "description": "OSD message after successful import"
+  },
   "importError": "Import failed: {error}",
   "@importError": {
     "description": "Error message when import fails",
-    "placeholders": { "error": { "type": "String" } }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "exportError": "Export failed",
-  "@exportError": { "description": "Generic error message when export fails" },
+  "@exportError": {
+    "description": "Generic error message when export fails"
+  },
   "exportSuccess": "Settings exported",
-  "@exportSuccess": { "description": "OSD message after successful export" },
+  "@exportSuccess": {
+    "description": "OSD message after successful export"
+  },
   "importParseError": "Invalid JSON: {error}",
   "@importParseError": {
     "description": "Error when imported file contains invalid JSON",
-    "placeholders": { "error": { "type": "String" } }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "importFileReadError": "Cannot read file: {error}",
   "@importFileReadError": {
     "description": "Error when imported file cannot be read from disk",
-    "placeholders": { "error": { "type": "String" } }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "openingMedia": "Opening media",
   "@openingMedia": {
@@ -432,78 +779,136 @@
   "@bufferingMedia": {
     "description": "Accessibility status while media data is buffering"
   },
-
   "errorFilePathEmpty": "File path is empty",
-  "@errorFilePathEmpty": { "description": "Error message when file path is empty" },
+  "@errorFilePathEmpty": {
+    "description": "Error message when file path is empty"
+  },
   "errorFileNotFound": "File not found",
-  "@errorFileNotFound": { "description": "Error message when file does not exist" },
+  "@errorFileNotFound": {
+    "description": "Error message when file does not exist"
+  },
   "errorFilepathTraversal": "Invalid file path",
-  "@errorFilepathTraversal": { "description": "Error message for path traversal attempt (security — no details)" },
+  "@errorFilepathTraversal": {
+    "description": "Error message for path traversal attempt (security — no details)"
+  },
   "errorCodecUnsupportedFormat": "Unsupported media format",
-  "@errorCodecUnsupportedFormat": { "description": "Error message for unsupported media format" },
+  "@errorCodecUnsupportedFormat": {
+    "description": "Error message for unsupported media format"
+  },
   "errorCodecDecodeFailed": "Failed to decode media",
-  "@errorCodecDecodeFailed": { "description": "Error message when media decoding fails" },
+  "@errorCodecDecodeFailed": {
+    "description": "Error message when media decoding fails"
+  },
   "errorCodecCodecUnsupported": "Codec not supported",
-  "@errorCodecCodecUnsupported": { "description": "Error message when codec is not supported" },
+  "@errorCodecCodecUnsupported": {
+    "description": "Error message when codec is not supported"
+  },
   "errorPlaybackPlayFailed": "Playback failed",
-  "@errorPlaybackPlayFailed": { "description": "Error message when playback fails" },
+  "@errorPlaybackPlayFailed": {
+    "description": "Error message when playback fails"
+  },
   "errorPlaybackSeekFailed": "Seek failed",
-  "@errorPlaybackSeekFailed": { "description": "Error message when seeking fails" },
+  "@errorPlaybackSeekFailed": {
+    "description": "Error message when seeking fails"
+  },
   "errorPlaybackTextureFailed": "Video rendering failed",
-  "@errorPlaybackTextureFailed": { "description": "Error message when video texture creation fails" },
+  "@errorPlaybackTextureFailed": {
+    "description": "Error message when video texture creation fails"
+  },
   "errorPlaybackOpenTimeout": "Open timed out",
-  "@errorPlaybackOpenTimeout": { "description": "Error message when opening media times out" },
+  "@errorPlaybackOpenTimeout": {
+    "description": "Error message when opening media times out"
+  },
   "errorNetworkTimeout": "Network timeout",
-  "@errorNetworkTimeout": { "description": "Error message for network timeout" },
+  "@errorNetworkTimeout": {
+    "description": "Error message for network timeout"
+  },
   "errorNetworkConnectionLost": "Connection lost",
-  "@errorNetworkConnectionLost": { "description": "Error message when network connection is lost" },
+  "@errorNetworkConnectionLost": {
+    "description": "Error message when network connection is lost"
+  },
   "errorUnknown": "An unexpected error occurred",
-  "@errorUnknown": { "description": "Error message for unknown/unclassified errors" },
-
+  "@errorUnknown": {
+    "description": "Error message for unknown/unclassified errors"
+  },
   "errorCardBadgeLabel": "{count} errors",
   "@errorCardBadgeLabel": {
     "description": "Badge label showing the total number of captured errors on the collapsed card",
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "errorCardClose": "Close",
-  "@errorCardClose": { "description": "Close button label on the error card" },
+  "@errorCardClose": {
+    "description": "Close button label on the error card"
+  },
   "errorCardCopyTooltip": "Copy diagnostics",
-  "@errorCardCopyTooltip": { "description": "Tooltip for the copy-diagnostic-pack action" },
+  "@errorCardCopyTooltip": {
+    "description": "Tooltip for the copy-diagnostic-pack action"
+  },
   "errorCardCopied": "Copied",
-  "@errorCardCopied": { "description": "OSD feedback after a successful copy" },
+  "@errorCardCopied": {
+    "description": "OSD feedback after a successful copy"
+  },
   "errorCardCopyFailed": "Copy failed",
-  "@errorCardCopyFailed": { "description": "OSD feedback after a failed copy" },
+  "@errorCardCopyFailed": {
+    "description": "OSD feedback after a failed copy"
+  },
   "errorCardOpenLogTooltip": "Open log location",
-  "@errorCardOpenLogTooltip": { "description": "Tooltip for the open-log-location action on the error card" },
+  "@errorCardOpenLogTooltip": {
+    "description": "Tooltip for the open-log-location action on the error card"
+  },
   "errorCardLogOpened": "Log opened",
-  "@errorCardLogOpened": { "description": "OSD feedback after the log location opened successfully" },
+  "@errorCardLogOpened": {
+    "description": "OSD feedback after the log location opened successfully"
+  },
   "errorCardOpenLogFailed": "Open log failed",
-  "@errorCardOpenLogFailed": { "description": "OSD feedback after opening the log location failed" },
+  "@errorCardOpenLogFailed": {
+    "description": "OSD feedback after opening the log location failed"
+  },
   "errorCardSectionLocation": "Location",
-  "@errorCardSectionLocation": { "description": "Expanded section title: file:line location" },
+  "@errorCardSectionLocation": {
+    "description": "Expanded section title: file:line location"
+  },
   "errorCardSectionSource": "Source lines",
-  "@errorCardSectionSource": { "description": "Expanded section title: source code excerpt" },
+  "@errorCardSectionSource": {
+    "description": "Expanded section title: source code excerpt"
+  },
   "errorCardSectionStack": "Stack trace",
-  "@errorCardSectionStack": { "description": "Expanded section title: raw stack trace" },
+  "@errorCardSectionStack": {
+    "description": "Expanded section title: raw stack trace"
+  },
   "errorCardSectionLogPath": "Log file",
-  "@errorCardSectionLogPath": { "description": "Expanded section title: diagnostic log file path" },
+  "@errorCardSectionLogPath": {
+    "description": "Expanded section title: diagnostic log file path"
+  },
   "errorCardSectionRepeats": "Repeats: {count}",
   "@errorCardSectionRepeats": {
     "description": "Expanded section line: how many times this error recurred",
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "errorCardLogUnavailable": "Log file unavailable",
-  "@errorCardLogUnavailable": { "description": "Fallback text when the diagnostic log path is unavailable" },
+  "@errorCardLogUnavailable": {
+    "description": "Fallback text when the diagnostic log path is unavailable"
+  },
   "errorCardLocationUnavailable": "Location unavailable",
-  "@errorCardLocationUnavailable": { "description": "Fallback text when no trusted source location was extracted" },
+  "@errorCardLocationUnavailable": {
+    "description": "Fallback text when no trusted source location was extracted"
+  },
   "errorCardCycleTooltip": "Cycle between errors",
-  "@errorCardCycleTooltip": { "description": "Tooltip for the badge used to cycle through captured errors" },
-
+  "@errorCardCycleTooltip": {
+    "description": "Tooltip for the badge used to cycle through captured errors"
+  },
   "errorCardToggleLabel": "Error card",
   "@errorCardToggleLabel": {
     "description": "Label for the error-card visibility toggle in the general settings tab"
   },
-
   "languageLabel": "Language",
   "@languageLabel": {
     "description": "Label for the UI-language selector in the general settings tab"
@@ -519,5 +924,27 @@
   "languageChinese": "中文",
   "@languageChinese": {
     "description": "Dropdown option: force the UI language to Chinese (always shown in Chinese)"
-  }
+  },
+  "batchDelete": "Batch delete",
+  "batchSelectedCount": "{count} selected",
+  "@batchSelectedCount": {
+    "description": "Selected item count in batch mode",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "Select all",
+  "batchDeleteConfirmTitle": "Delete selected videos",
+  "batchDeleteConfirmBody": "{count} video entries will be removed from the playlist. This operation only affects the playlist itself and will not delete any files from your local disk.",
+  "@batchDeleteConfirmBody": {
+    "description": "Batch delete confirmation body",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "batchDeleteConfirmAction": "Confirm deletion"
 }

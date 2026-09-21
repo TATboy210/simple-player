@@ -7,28 +7,23 @@
   "openFile": "打开文件",
   "openFileTooltip": "打开文件 (O)",
   "dragHint": "拖拽视频至窗口松开即可播放",
-
   "playModeLoopAll": "顺序播放",
   "playModeLoopSingle": "单曲循环",
   "playModeShuffle": "随机播放",
-
   "shortcutPlayPause": "播放 / 暂停",
   "shortcutSeek": "后退 / 前进 5 秒",
   "shortcutVolume": "音量 +/- 5%",
   "shortcutFullscreen": "全屏切换",
   "shortcutExitFullscreen": "退出全屏",
   "shortcutMute": "静音切换",
-  "shortcutNext": "下一首",
-  "shortcutPrevious": "上一首",
+  "shortcutNext": "下一个",
+  "shortcutPrevious": "上一个",
   "shortcutOpenFile": "打开文件",
   "shortcutSubtitle": "字幕开关",
   "shortcutPlaylist": "开关播放列表",
-  "shortcutPrevious": "上一个",
-  "shortcutNext": "下一个",
   "shortcutSubtitleDelay": "字幕延迟 +/- 500ms",
   "shortcutHelp": "显示帮助",
   "shortcutMediaKeys": "播放/暂停",
-
   "settings": "设置",
   "audioTab": "音频",
   "specialThanks": "特别鸣谢",
@@ -50,7 +45,6 @@
   "eqVocalBoost": "人声增强",
   "eqRock": "摇滚",
   "eqClassical": "古典",
-
   "colorCorrection": "色彩校正",
   "brightness": "亮度",
   "contrast": "对比度",
@@ -63,10 +57,8 @@
   "enableDeinterlace": "启用去隔行",
   "softwareDecoderOnly": "仅软件解码器生效",
   "videoProcessing": "画面",
-
   "shortcutsHelpTitle": "快捷键",
   "close": "关闭",
-
   "previousTrack": "上一个",
   "nextTrack": "下一个",
   "playlist": "播放列表",
@@ -79,13 +71,11 @@
   "stop": "停止",
   "rewind10": "快退 10 秒",
   "forward30": "快进 30 秒",
-
   "pin": "置顶",
   "unpin": "取消置顶",
   "minimize": "最小化",
   "maximize": "最大化",
   "restore": "还原",
-
   "playlistEmpty": "播放列表为空",
   "resumeRememberPosition": "记住播放位置",
   "audioDelay": "音频延迟",
@@ -108,12 +98,10 @@
   "pathCopied": "路径已复制",
   "breakpointAt": "断点 {time}",
   "lastPlayedAt": "上次播放到 {time}",
-
   "justNow": "刚刚",
   "minutesAgo": "{minutes}分钟前",
   "hoursAgo": "{hours}小时前",
   "daysAgo": "{days}天前",
-
   "propertiesDialog": "属性",
   "fileSection": "文件",
   "filePath": "路径",
@@ -132,34 +120,27 @@
   "copied": "已复制",
   "doubleClickToCopy": "双击复制",
   "unknown": "未知",
-
   "reopen": "重新打开",
   "selectOtherFile": "选择其他文件",
   "retry": "重试",
-
   "unmute": "取消静音",
   "mute": "静音",
   "volume": "音量",
   "volumePercent": "音量 {percent}%",
-
   "aspectRatioOriginal": "原始",
   "aspectRatioStretch": "拉伸",
   "aspectRatioCropFill": "裁剪填充",
   "aspectRatioFree": "自由",
-
   "progressBar": "播放进度",
-
   "speedDecrease": "减速",
   "speedReset": "倍速 (双击重置)",
   "speedIncrease": "加速",
-
   "folderTab": "文件夹",
   "resumeAction": "继续播放",
   "openFileLocation": "打开文件所在目录",
   "clearHistory": "清空历史",
   "scanFolder": "扫描文件夹",
   "noVideosInFolder": "文件夹中无视频",
-
   "themeMidnight": "午夜",
   "themeOcean": "海洋",
   "themeForest": "森林",
@@ -167,20 +148,15 @@
   "techStack": "技术栈",
   "licenses": "开源许可",
   "copyright": "基于 Flutter + media_kit (libmpv) 构建",
-
   "resetShortcuts": "恢复默认",
   "pressKeyToBind": "请按下新按键...",
   "shortcutConflict": "按键已被占用",
   "currentTheme": "当前主题",
-
   "ok": "确定",
   "cancel": "取消",
   "apply": "应用",
-
   "playerLoadError": "播放器模块加载失败",
-
   "playerInitFailed": "播放器初始化失败",
-
   "performanceTab": "性能",
   "d3d11Rendering": "D3D11 渲染",
   "d3d11Sync": "D3D11 CPU 同步",
@@ -189,12 +165,10 @@
   "hardwareDecoding": "硬件解码",
   "hardwareDecodingDesc": "使用 GPU 进行视频解码。如出现画面异常请关闭。",
   "performanceHint": "更改在下次打开文件时生效。",
-
   "resetToDefaults": "恢复默认",
   "resetConfirmTitle": "重置{tabName}设置？",
   "resetConfirmMessage": "以下设置将恢复为默认值：",
   "confirmReset": "确认重置",
-
   "exportSettings": "导出",
   "importSettings": "导入",
   "importConfirmTitle": "导入设置？",
@@ -208,7 +182,6 @@
   "importFileReadError": "无法读取文件：{error}",
   "openingMedia": "正在打开媒体",
   "bufferingMedia": "正在缓冲媒体",
-
   "errorFilePathEmpty": "文件路径为空",
   "errorFileNotFound": "文件不存在",
   "errorFilepathTraversal": "文件路径无效",
@@ -222,7 +195,6 @@
   "errorNetworkTimeout": "网络超时",
   "errorNetworkConnectionLost": "连接中断",
   "errorUnknown": "发生未知错误",
-
   "errorCardBadgeLabel": "{count} 错误",
   "errorCardClose": "关闭",
   "errorCardCopyTooltip": "复制诊断信息",
@@ -239,11 +211,31 @@
   "errorCardLogUnavailable": "日志文件不可用",
   "errorCardLocationUnavailable": "定位不可用",
   "errorCardCycleTooltip": "轮览错误",
-
   "errorCardToggleLabel": "错误卡片",
-
   "languageLabel": "语言",
   "languageSystem": "跟随系统",
   "languageEnglish": "English",
-  "languageChinese": "中文"
+  "languageChinese": "中文",
+  "batchDelete": "批量删除",
+  "batchSelectedCount": "已选择 {count} 项",
+  "@batchSelectedCount": {
+    "description": "Selected item count in batch mode",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "全选",
+  "batchDeleteConfirmTitle": "删除所选视频项",
+  "batchDeleteConfirmBody": "即将从播放列表中移除 {count} 个视频条目。此操作仅影响播放列表本身，不会删除本地磁盘上的任何文件。",
+  "@batchDeleteConfirmBody": {
+    "description": "Batch delete confirmation body",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "batchDeleteConfirmAction": "确认删除"
 }
