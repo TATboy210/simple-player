@@ -13,7 +13,7 @@ import 'package:flutter/foundation.dart';
 /// gate（X4），磁盘命中不该排在两个 native decode 后面（§20.3）。
 final class ThumbnailConcurrencyGate {
   ThumbnailConcurrencyGate(this.maxConcurrent)
-      : assert(maxConcurrent > 0, 'gate capacity must be positive');
+    : assert(maxConcurrent > 0, 'gate capacity must be positive');
 
   final int maxConcurrent;
 

@@ -62,11 +62,7 @@ class PlaylistTile extends StatefulWidget {
 }
 
 /// 缩略图三态（P-Thumb v1.3.2 §26）— loading/ready/failed 驱动占位与重试入口
-enum _ThumbPhase {
-  loading,
-  ready,
-  failed,
-}
+enum _ThumbPhase { loading, ready, failed }
 
 class _PlaylistTileState extends State<PlaylistTile> {
   ImageProvider? _thumbnail;
@@ -120,9 +116,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
     final provider = await ThumbnailService.getThumbnail(path);
 
-    if (!mounted ||
-        generation != _loadGeneration ||
-        path != widget.item.path) {
+    if (!mounted || generation != _loadGeneration || path != widget.item.path) {
       return;
     }
 
@@ -148,9 +142,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
     final provider = await ThumbnailService.retry(path);
 
-    if (!mounted ||
-        generation != _loadGeneration ||
-        path != widget.item.path) {
+    if (!mounted || generation != _loadGeneration || path != widget.item.path) {
       return;
     }
 
@@ -316,8 +308,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   /// 失败重试入口可见性 — provider 失败（phase failed）或解码失败
   /// （decodeFailed）任一即显示（§27.1/§27.3）.
-  bool get _showRetry =>
-      _phase == _ThumbPhase.failed || _decodeFailed;
+  bool get _showRetry => _phase == _ThumbPhase.failed || _decodeFailed;
 
   /// 失败重试入口 — 24px 热区 icon-only（refresh 语义自明），
   /// 位于名称行右侧，不改变 Tile 总高度（§27.1）.
@@ -345,11 +336,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
   /// spinner 噪音；failed 的重试入口在名称行）.
   Widget _thumbPlaceholder() {
     return const Center(
-      child: Icon(
-        Icons.movie_outlined,
-        size: 22,
-        color: Tokens.textSecondary,
-      ),
+      child: Icon(Icons.movie_outlined, size: 22, color: Tokens.textSecondary),
     );
   }
 

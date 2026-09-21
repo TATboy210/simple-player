@@ -42,10 +42,7 @@ final class _ThumbnailSpec {
 /// cache key. Resolved once per request; async stages must never re-stat
 /// or mutate it — they consume the same instance.
 final class _FileIdentity {
-  const _FileIdentity({
-    required this.path,
-    required this.cacheKey,
-  });
+  const _FileIdentity({required this.path, required this.cacheKey});
 
   /// normalize 后的绝对路径 — 传给 provider 的唯一形态
   final String path;
@@ -150,8 +147,9 @@ class ThumbnailService {
   final ThumbnailFlightRegistry _registry = ThumbnailFlightRegistry();
 
   /// 并发闸（B4 — §20）— 只包 Provider generation，gate 外零昂贵步骤
-  final ThumbnailConcurrencyGate _gate =
-      ThumbnailConcurrencyGate(maxConcurrent);
+  final ThumbnailConcurrencyGate _gate = ThumbnailConcurrencyGate(
+    maxConcurrent,
+  );
 
   /// gate 内当前活跃 provider 数（峰值观测）
   int _activeProviderCount = 0;
@@ -335,13 +333,9 @@ class ThumbnailService {
 
   /// negative memo 记录（§21.2）— M2/21.5：stale flight 的失败不记 memo，
   /// 否则文件替换恢复后的新请求会被旧代的失败挡住 10 秒
-  void _recordFailureIfCurrent(
-    ThumbnailFlight flight,
-    _FileIdentity identity,
-  ) {
+  void _recordFailureIfCurrent(ThumbnailFlight flight, _FileIdentity identity) {
     if (!_registry.isCurrent(flight)) return;
-    _failedUntil[identity.cacheKey] =
-        DateTime.now().add(_negativeTtl);
+    _failedUntil[identity.cacheKey] = DateTime.now().add(_negativeTtl);
     _failureKeysByPath
         .putIfAbsent(identity.path, () => <String>{})
         .add(identity.cacheKey);
