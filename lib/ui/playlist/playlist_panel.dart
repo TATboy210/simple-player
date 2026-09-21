@@ -7,7 +7,7 @@ import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/models/playlist_sort.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/app_dialog.dart';
+import '../shared/glass_confirm_strip.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
@@ -367,47 +367,39 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     });
   }
 
-  /// 批量删除确认对话框 — 正式文案明示"不影响本地磁盘文件", 确认后
-  /// 执行移除并退出多选模式 (v0.0.7).
+  /// 批量删除确认 — 长条玻璃确认条 (正式文案明示"不影响本地磁盘文件"),
+  /// 确认后执行移除并退出多选模式 (v0.0.7).
   Future<void> _confirmBatchDelete() async {
     final l10n = AppLocalizations.of(context);
     final count = _batchSelected.length;
     if (count == 0) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AppDialog(
-        title: l10n.batchDeleteConfirmTitle,
-        width: 380,
-        height: 240,
-        content: Text(
-          l10n.batchDeleteConfirmBody(count),
-          style: const TextStyle(
-            color: Tokens.textPrimary,
-            fontSize: Tokens.fontBody,
-            height: 1.6,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              l10n.batchDeleteConfirmAction,
-              style: const TextStyle(color: Tokens.accent),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await GlassConfirmStrip.show(
+      context,
+      message: l10n.batchDeleteConfirmBody(count),
+      confirmTooltip: l10n.batchDeleteConfirmAction,
     );
 
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     final toRemove = Set<int>.of(_batchSelected);
     _exitBatchMode();
     widget.onRemoveEntries?.call(toRemove);
+  }
+
+  /// 单条移除确认 (v0.0.7) — 与批量删除共用确认条; 计数恒 1,
+  /// 文案语义复用同一正式模板.
+  Future<void> _confirmSingleRemove(int index) async {
+    final l10n = AppLocalizations.of(context);
+    if (index < 0 || index >= widget.entries.value.length) return;
+
+    final confirmed = await GlassConfirmStrip.show(
+      context,
+      message: l10n.batchDeleteConfirmBody(1),
+      confirmTooltip: l10n.batchDeleteConfirmAction,
+    );
+
+    if (!confirmed || !mounted) return;
+    widget.onRemoveEntry(index);
   }
 
   /// 条目纵列 — [lastPlayed] 为停止态高亮锚点; [resumeAllowed] 传递断点
@@ -455,7 +447,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               isResumeAnchor: index < 0 && items[i].path == lastPlayed,
               onPlay: () => widget.onPlayEntry(i),
               onResume: () => widget.onResumeEntry(i),
-              onRemove: () => widget.onRemoveEntry(i),
+              // v0.0.7: 单条移除也过确认条 (与批量共用正式文案).
+              onRemove: () => unawaited(_confirmSingleRemove(i)),
               selectionMode: _batchMode,
               isSelected: validSelection.contains(i),
               onToggleSelect: () => _toggleSelect(i),

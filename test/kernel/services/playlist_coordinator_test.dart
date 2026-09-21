@@ -828,6 +828,25 @@ void main() {
       expect(coordinator.lastPlayedPath.value, equals('a.mp4'));
     });
 
+    test('契合: 批量删除含正在播放条目 — 引擎跳转 + 视图收敛 + 无崩溃', () async {
+      // 装载并从 index 0 起播 — coordinator 镜像同步 current
+      await coordinator.appendEntries(['a.mp4', 'b.mp4', 'c.mp4']);
+      await coordinator.playEntryAt(0);
+      await Future<void>.delayed(Duration.zero); // revision 回流
+      expect(coordinator.currentIndex.value, equals(0));
+
+      // 批量删除含正在播的 index 0 + 尾部 index 2
+      await coordinator.removeEntriesAt({0, 2});
+      await Future<void>.delayed(Duration.zero);
+
+      // 视图收敛到剩余条目, 引擎同步移除两次
+      expect([
+        for (final e in coordinator.entries.value) e.path,
+      ], equals(['b.mp4']));
+      expect(engine.removedIndices, equals([2, 0]));
+      // 断点孤儿防护: _updateBreakpoint 对已删条目 return — 无异常即通过
+    });
+
     test('空集合与越界索引 — no-op 不落盘不崩', () async {
       await coordinator.appendEntries(['a.mp4']);
       final before = coordinator.entries.value;

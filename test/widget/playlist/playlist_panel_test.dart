@@ -12,7 +12,7 @@ import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
-import 'package:simple_player_flutter/ui/shared/app_dialog.dart';
+import 'package:simple_player_flutter/ui/shared/glass_confirm_strip.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
@@ -455,17 +455,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('3 selected'), findsOneWidget);
 
-      // 删除 → 确认对话框 (正式文案)
+      // 删除 → 长条玻璃确认条 (正式文案)
       await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();
-      expect(find.byType(AppDialog), findsOneWidget);
+      expect(find.byType(GlassConfirmStrip), findsOneWidget);
       expect(
         find.textContaining('will not delete any files from your local disk'),
         findsOneWidget,
       );
 
-      // 确认删除 → onRemoveEntries 收到全部选中索引 + 退出多选
-      await tester.tap(find.text('Confirm deletion'));
+      // 确认删除 (danger 红方块按钮) → onRemoveEntries 收到全部选中索引
+      await tester.tap(find.byIcon(Icons.delete).last);
       await tester.pumpAndSettle();
       expect(removed, equals({0, 1, 2}));
       expect(find.byIcon(Icons.deselect), findsNothing);
@@ -487,6 +487,73 @@ void main() {
 
       expect(find.byIcon(Icons.deselect), findsNothing);
       expect(removed, isNull);
+    });
+  });
+  group('单条移除确认 (v0.0.7)', () {
+    late ValueNotifier<List<PlaylistItem>> entries;
+    int? removedIndex;
+
+    setUp(() {
+      entries = ValueNotifier([
+        PlaylistItem(path: 'a.mp4'),
+        PlaylistItem(path: 'b.mp4'),
+      ]);
+      removedIndex = null;
+    });
+
+    testWidgets('右键移除 → 确认条 → 确认后执行', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          PlaylistPanel(
+            entries: entries,
+            currentIndex: ValueNotifier(-1),
+            lastPlayedPath: ValueNotifier(null),
+            visible: true,
+            onClose: () {},
+            onPlayEntry: (_) {},
+            onResumeEntry: (_) {},
+            onRemoveEntry: (index) => removedIndex = index,
+            onRemoveEntries: (_) {},
+            playMode: ValueNotifier(PlayMode.loopAll),
+            onCyclePlayMode: () {},
+            sortKey: PlaylistSortKey.addedOrder,
+            sortAscending: true,
+            onSortSelected: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 右键第一条 → 菜单 Remove
+      await tester.tap(
+        find.byType(PlaylistTile).at(0),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
+      // 确认条出现 (计数 1) — 未确认前不执行
+      expect(find.byType(GlassConfirmStrip), findsOneWidget);
+      expect(removedIndex, isNull);
+
+      // 取消 — 不执行
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pumpAndSettle();
+      expect(removedIndex, isNull);
+
+      // 再走一次 → 确认
+      await tester.tap(
+        find.byType(PlaylistTile).at(0),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.delete).last);
+      await tester.pumpAndSettle();
+
+      expect(removedIndex, equals(0));
     });
   });
 }
