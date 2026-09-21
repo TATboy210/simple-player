@@ -25,24 +25,27 @@ void main() {
   );
 
   PlaylistTile buildTile(PlaylistItem item) {
+    // 刻意空操作桩（DCM no-empty-block 明示豁免）— T 组只测缩略图
+    // 生命周期，播放/续播/移除行为由 panel 测试覆盖
     return PlaylistTile(
       item: item,
       isCurrent: false,
       isResumeAnchor: false,
+      // ignore: no-empty-block
       onPlay: () {},
+      // ignore: no-empty-block
       onResume: () {},
+      // ignore: no-empty-block
       onRemove: () {},
     );
   }
 
   Widget wrap(Widget child) => MaterialApp(
-        // Tile build 依赖 AppLocalizations.of — delegates 必须就位
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SizedBox(width: 280, child: child),
-        ),
-      );
+    // Tile build 依赖 AppLocalizations.of — delegates 必须就位
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(body: SizedBox(width: 280, child: child)),
+  );
 
   Future<void> settleIO(WidgetTester tester) async {
     // 放行 dart:io 真实异步（identity stat）— FakeAsync 不推进真实 IO
@@ -79,8 +82,9 @@ void main() {
       }
     });
 
-    testWidgets('T1: successful load reaches ready (no retry entry)',
-        (tester) async {
+    testWidgets('T1: successful load reaches ready (no retry entry)', (
+      tester,
+    ) async {
       await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester);
 
@@ -91,18 +95,15 @@ void main() {
       ThumbnailService.reset();
     });
 
-    testWidgets('T2: A→B reuse — stale A result cannot surface (B wins)',
-        (tester) async {
+    testWidgets('T2: A→B reuse — stale A result cannot surface (B wins)', (
+      tester,
+    ) async {
       fake.holdJobs = true;
-            await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathA))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester); // job A 挂起
 
       // path A→B — didUpdateWidget 触发第二次 load（B）
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathB))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathB))));
       await settleIO(tester);
       expect(fake.calls, equals(2));
 
@@ -119,13 +120,12 @@ void main() {
       ThumbnailService.reset();
     });
 
-    testWidgets('T3: dispose before completion never setState-after-dispose',
-        (tester) async {
+    testWidgets('T3: dispose before completion never setState-after-dispose', (
+      tester,
+    ) async {
       fake.holdJobs = true;
 
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathA))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester); // job 挂起
 
       await tester.pumpWidget(wrap(const SizedBox.shrink())); // dispose
@@ -139,9 +139,7 @@ void main() {
     testWidgets('T4: provider failure shows retry entry', (tester) async {
       fake.result = null; // 解帧失败 → failed phase
 
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathA))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester);
 
       expect(find.byIcon(Icons.refresh_outlined), findsOneWidget);
@@ -150,9 +148,7 @@ void main() {
 
     testWidgets('T5: tapping retry recovers to ready', (tester) async {
       fake.result = null;
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathA))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester);
       expect(find.byIcon(Icons.refresh_outlined), findsOneWidget);
 
@@ -166,14 +162,13 @@ void main() {
       ThumbnailService.reset();
     });
 
-    testWidgets('T6: image decode error surfaces retry entry (errorBuilder)',
-        (tester) async {
+    testWidgets('T6: image decode error surfaces retry entry (errorBuilder)', (
+      tester,
+    ) async {
       // 非 JPEG 4 字节 — provider 成功（phase ready）但 Image 解码失败
       fake.result = Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xD9]);
 
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathA))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester);
 
       // errorBuilder → post-frame 回写 decodeFailed → 重试入口可见
@@ -182,17 +177,14 @@ void main() {
       ThumbnailService.reset();
     });
 
-    testWidgets('T7: didUpdateWidget path change triggers a fresh load',
-        (tester) async {
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathA))),
-      );
+    testWidgets('T7: didUpdateWidget path change triggers a fresh load', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
       await settleIO(tester);
       expect(fake.calls, equals(1));
 
-      await tester.pumpWidget(
-        wrap(buildTile(PlaylistItem(path: pathB))),
-      );
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathB))));
       await settleIO(tester);
 
       // §26.0：path 变化必须触发新 load（触发器回归保护 — 契约 45）
