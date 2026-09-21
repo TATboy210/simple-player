@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/painting.dart' show ImageProvider;
+import 'package:flutter/painting.dart' show ImageProvider, MemoryImage;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:simple_player_flutter/kernel/services/thumbnail_disk_cache.dart';
@@ -464,10 +464,15 @@ void main() {
       expect(ThumbnailService.cacheLength, equals(0));
       expect(ThumbnailService.metrics.failures, equals(1));
 
-      // flight 已出表 — 新请求不被旧失败卡住
+      // B5 后：current 失败进 negative memo — TTL 内重取被挡（§21）
+      expect(await ThumbnailService.getThumbnail(fileA.path), isNull);
+      expect(fake.calls, equals(1));
+
+      // evict 清 memo（契约路径）— 新请求恢复解帧
       fake
         ..holdJobs = false
         ..error = null;
+      ThumbnailService.evict(fileA.path);
       final f2 = ThumbnailService.getThumbnail(fileA.path);
       expect(await f2, isNotNull);
     });
@@ -616,6 +621,137 @@ void main() {
       expect(await f2, isNotNull);
       expect(ThumbnailService.cacheLength, equals(0)); // 全部无 commit
       expect(fake.calls, equals(3)); // gate 不感知 epoch — 排队者照常执行
+    });
+  });
+  group('Retry + Negative Cache (P-Thumb v1.3.2 R1-R5 / F6-F7 / E7)', () {
+    late Directory tempDir;
+    late File fileA;
+
+    setUp(() async {
+      // retry 的 force 路径调用 FileImage.evict → 需要 PaintingBinding
+      TestWidgetsFlutterBinding.ensureInitialized();
+      tempDir = await Directory.systemTemp.createTemp('pthumb_retry');
+      fileA = File(p.join(tempDir.path, 'a.mp4'));
+      await fileA.writeAsString('A' * 10);
+    });
+
+    tearDown(() async {
+      ThumbnailService.reset();
+      try {
+        await tempDir.delete(recursive: true);
+      } on FileSystemException {
+        // best effort
+      }
+    });
+
+    test('R1/R2: failed → memo blocks refetch → retry clears and decodes',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      // 第一次解帧失败 → 进 negative memo
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+      fake.failJob(fileA.path, const FileSystemException('bad'));
+      expect(await f1, isNull);
+      expect(fake.calls, equals(1));
+
+      // §21：TTL 内立即重取被 memo 挡住 — 不再解帧
+      expect(await ThumbnailService.getThumbnail(fileA.path), isNull);
+      expect(fake.calls, equals(1));
+
+      // retry 清 memo 并 force 解帧
+      fake
+        ..holdJobs = false
+        ..error = null;
+      final r = await ThumbnailService.retry(fileA.path);
+      expect(r, isNotNull);
+      expect(fake.calls, equals(2));
+    });
+
+    test('R3/R4: retry skips existing disk hit and returns MemoryImage',
+        () async {
+      final fake = FakeThumbnailProvider();
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      await ThumbnailService.getThumbnail(fileA.path); // 解帧 + 写盘
+      ThumbnailService.evict(fileA.path);
+      expect(await ThumbnailService.getThumbnail(fileA.path), isNotNull);
+      expect(ThumbnailService.metrics.diskHits, equals(1)); // 磁盘有缓存
+      expect(fake.calls, equals(1));
+      ThumbnailService.evict(fileA.path);
+
+      // retry — 强制跳过磁盘命中
+      final r = await ThumbnailService.retry(fileA.path);
+      expect(fake.calls, equals(2)); // 磁盘未拦截 → 重新解帧
+      expect(r, isA<MemoryImage>()); // R4：即时展示新 bytes
+    });
+
+    test('R5: disk-write failure is not memoized — retry not blocked',
+        () async {
+      // brokenDisk：decode 成功但写盘恒败 — R6 disk 域不进 negative memo
+      final fake = FakeThumbnailProvider();
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final r1 = await ThumbnailService.getThumbnail(fileA.path);
+      expect(r1, isA<MemoryImage>()); // bytes 已拿到，降级展示
+      expect(ThumbnailService.metrics.diskWriteFallbacks, equals(1));
+
+      // 若 disk-write 失败被错误记入 memo，retry 会立即返回 null
+      final r2 = await ThumbnailService.retry(fileA.path);
+      expect(r2, isNotNull);
+      expect(fake.calls, equals(2));
+    });
+
+    test('F6/F7: double-click retry joins one force flight', () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final r1 = ThumbnailService.retry(fileA.path);
+      await pumpEventQueue();
+      final r2 = ThumbnailService.retry(fileA.path); // 双击 — join
+      await pumpEventQueue();
+
+      expect(fake.calls, equals(1)); // H5：不产生第二次解帧
+
+      fake.release(fileA.path);
+      final a = await r1;
+      final b = await r2;
+      expect(identical(a, b), isTrue); // F7：joiner 拿同一结果
+      expect(a, isA<MemoryImage>());
+    });
+
+    test('E7: stale flight failure does not pollute negative memo (M2)',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f1 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+      ThumbnailService.evict(fileA.path); // F1 变 stale
+      final f2 = ThumbnailService.getThumbnail(fileA.path);
+      await pumpEventQueue();
+
+      // 旧代失败 — 若误记 memo，后续同 key 请求会被挡 10 秒
+      fake.failJob(fileA.path, const FileSystemException('stale fail'));
+      expect(await f1, isNull);
+
+      // 新请求 join 在飞的 F2（未被 memo 挡 — M2 生效的判据）
+      final f3 = ThumbnailService.getThumbnail(fileA.path);
+      var settled = false;
+      unawaited(f3.then((_) => settled = true));
+      await pumpEventQueue();
+      expect(settled, isFalse); // 挂起中 = join 成功，而非 memo 立即拒绝
+
+      fake.release(fileA.path);
+      expect(await f2, isNotNull);
+      expect(await f3, isNotNull);
     });
   });
 }

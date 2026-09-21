@@ -65,6 +65,16 @@ final class ThumbnailFlightRegistry {
   /// 当前占用该 key 的 flight（join 入口）
   ThumbnailFlight? forKey(String cacheKey) => _byKey[cacheKey];
 
+  /// 该 path 上在飞的 force flight — 双击 retry 的 join 入口（H5/F6）。
+  /// retry 若直接重复 evict 会把前一个 force flight 打成 stale，
+  /// 产生第二次解帧 — 必须先查在飞 force 再决定 evict。
+  ThumbnailFlight? forceFlightFor(String path) {
+    for (final flight in _byPath[path] ?? const <ThumbnailFlight>[]) {
+      if (flight.isForce) return flight;
+    }
+    return null;
+  }
+
   /// 创建 flight — 捕获当前 epoch 快照（§19.4）
   ThumbnailFlight create({
     required String path,
