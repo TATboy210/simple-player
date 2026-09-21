@@ -9,6 +9,13 @@ import 'package:simple_player_flutter/kernel/services/thumbnail_service.dart';
 
 import '../../helpers/fake_thumbnail_provider.dart';
 
+/// 禁用磁盘层 — flight/gate 组专注协调逻辑；
+/// resolve 抛 Exception（非 Error）→ DiskCache 永久降级（I9）
+ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
+      resolveDirectory: () async =>
+          throw const FileSystemException('disk disabled'),
+    );
+
 void main() {
   group('ThumbnailService', () {
     setUp(() {
@@ -274,13 +281,6 @@ void main() {
       }
     });
 
-    /// 禁用磁盘层 — F/E 组专注 flight/epoch；
-    /// resolve 抛 Exception（非 Error）→ DiskCache 永久降级（I9）
-    ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
-          resolveDirectory: () async =>
-              throw const FileSystemException('disk disabled'),
-        );
-
     test('F1: concurrent same-key requests coalesce to one decode',
         () async {
       final fake = FakeThumbnailProvider()..holdJobs = true;
@@ -472,4 +472,151 @@ void main() {
       expect(await f2, isNotNull);
     });
   });
+  group('ConcurrencyGate (P-Thumb v1.3.2 G1-G5)', () {
+    late Directory tempDir;
+    late List<File> files;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('pthumb_gate');
+      // 10 个真实文件 — G1 需要 10 个并发请求
+      files = List.generate(
+        10,
+        (i) => File(p.join(tempDir.path, 'v$i.mp4')),
+      );
+      for (final file in files) {
+        await file.writeAsString('v' * 10);
+      }
+    });
+
+    tearDown(() async {
+      ThumbnailService.reset();
+      try {
+        await tempDir.delete(recursive: true);
+      } on FileSystemException {
+        // best effort
+      }
+    });
+
+    test('G1: ten concurrent requests never exceed two decodes', () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final futures = <Future<ImageProvider?>>[];
+      for (final file in files) {
+        futures.add(ThumbnailService.getThumbnail(file.path));
+      }
+      await pumpEventQueue();
+
+      // gate 限流 — 第 3 个起的请求在队列中，未触达 provider
+      expect(fake.peakActive, equals(2));
+      expect(fake.calls, equals(2));
+
+      // 逐个 release + pump — gate 排队者需微任务推进才能进入 provider
+      for (final file in files) {
+        fake.release(file.path);
+        await pumpEventQueue();
+      }
+      for (final future in futures) {
+        expect(await future, isNotNull);
+      }
+      expect(ThumbnailService.metrics.peakConcurrent, equals(2));
+    });
+
+    test('G2: first task throwing releases its slot for the next',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final f0 = ThumbnailService.getThumbnail(files[0].path);
+      final f1 = ThumbnailService.getThumbnail(files[1].path);
+      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      await pumpEventQueue();
+
+      // 2 进 provider、1 排队 — 第一个抛异常 → slot 释放 → 排队者进入
+      fake.failJob(files[0].path, const FileSystemException('boom'));
+      await pumpEventQueue();
+      expect(fake.calls, equals(3)); // 第 3 个已进入 provider
+
+      expect(await f0, isNull);
+      fake.release(files[1].path);
+      fake.release(files[2].path);
+      expect(await f1, isNotNull);
+      expect(await f2, isNotNull);
+    });
+
+    test('G3: task returning null releases its slot', () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final f0 = ThumbnailService.getThumbnail(files[0].path);
+      final f1 = ThumbnailService.getThumbnail(files[1].path);
+      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      await pumpEventQueue();
+
+      fake.releaseNull(files[0].path);
+      await pumpEventQueue();
+      expect(fake.calls, equals(3)); // null 结果同样归还 slot
+
+      expect(await f0, isNull);
+      fake.release(files[1].path);
+      fake.release(files[2].path);
+      expect(await f1, isNotNull);
+      expect(await f2, isNotNull);
+    });
+
+    test('G4: third request queues while two decodes are active',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
+
+      final f0 = ThumbnailService.getThumbnail(files[0].path);
+      final f1 = ThumbnailService.getThumbnail(files[1].path);
+      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      await pumpEventQueue();
+
+      expect(fake.active, equals(2));
+      expect(fake.calls, equals(2)); // 第 3 个尚未触达 provider
+      expect(fake.peakActive, equals(2));
+
+      fake.release(files[0].path);
+      await pumpEventQueue(); // 第 3 个此时才进入 provider 并挂起 job
+      fake.release(files[1].path);
+      await pumpEventQueue();
+      fake.release(files[2].path);
+      await f0;
+      await f1;
+      await f2;
+    });
+
+    test('G5: clearCache while queued — old flights resolve without commit',
+        () async {
+      final fake = FakeThumbnailProvider()..holdJobs = true;
+      // 真实磁盘层 — write 成功路径下验证“检查点拦住而非磁盘没写”
+      ThumbnailService.reset(
+        provider: fake,
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
+      );
+
+      final f0 = ThumbnailService.getThumbnail(files[0].path);
+      final f1 = ThumbnailService.getThumbnail(files[1].path);
+      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      await pumpEventQueue();
+
+      ThumbnailService.clearCache(); // globalEpoch++ 失效全部（含排队者）
+
+      fake.release(files[0].path);
+      await pumpEventQueue(); // 排队的第 3 个进入 provider
+      fake.release(files[1].path);
+      await pumpEventQueue();
+      fake.release(files[2].path);
+      await pumpEventQueue();
+
+      expect(await f0, isNotNull); // 旧请求仍拿到结果（MemoryImage）
+      expect(await f1, isNotNull);
+      expect(await f2, isNotNull);
+      expect(ThumbnailService.cacheLength, equals(0)); // 全部无 commit
+      expect(fake.calls, equals(3)); // gate 不感知 epoch — 排队者照常执行
+    });
+  });
 }
+
