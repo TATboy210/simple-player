@@ -57,9 +57,9 @@ final class ThumbnailDiskCache {
     Future<Directory> Function()? resolveDirectory,
     DateTime Function()? now,
     this.limits = ThumbnailDiskCacheLimits.production,
-  })  : _resolveDirectory =
-            resolveDirectory ?? ThumbnailDiskCache._defaultResolve,
-        _now = now ?? DateTime.now;
+  }) : _resolveDirectory =
+           resolveDirectory ?? ThumbnailDiskCache._defaultResolve,
+       _now = now ?? DateTime.now;
 
   final Future<Directory> Function() _resolveDirectory;
   final DateTime Function() _now;
@@ -74,9 +74,7 @@ final class ThumbnailDiskCache {
   /// 默认目录 — `<appCache>/simple_player/thumbnail/v3`（§16.1）
   static Future<Directory> _defaultResolve() async {
     final base = await getApplicationCacheDirectory();
-    return Directory(
-      p.join(base.path, 'simple_player', 'thumbnail', 'v3'),
-    );
+    return Directory(p.join(base.path, 'simple_player', 'thumbnail', 'v3'));
   }
 
   Directory? _cachedDir;
@@ -209,7 +207,8 @@ final class ThumbnailDiskCache {
         await raf.setPosition(length - 2);
         final tail = await raf.read(2);
 
-        isJpeg = head.length == 2 &&
+        isJpeg =
+            head.length == 2 &&
             tail.length == 2 &&
             head[0] == 0xFF &&
             head[1] == 0xD8 &&
@@ -260,8 +259,7 @@ final class ThumbnailDiskCache {
     }
   }
 
-  bool _isSafeHash(String cacheKey) =>
-      _safeHashPattern.hasMatch(cacheKey);
+  bool _isSafeHash(String cacheKey) => _safeHashPattern.hasMatch(cacheKey);
 
   /// 清理主体 — age 淘汰 + 水位淘汰（§17.4/§17.5）
   ///

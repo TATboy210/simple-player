@@ -41,7 +41,7 @@ String hexKey(String tag) => tag.padLeft(64, '0');
 ///   [release]/[failJob] 决定哪个请求先完成 — 覆盖 F4/E1-E6 时序场景
 final class FakeThumbnailProvider implements ThumbnailProvider {
   FakeThumbnailProvider({Uint8List? result, this.error})
-      : result = result ?? makeJpegBytes();
+    : result = result ?? makeJpegBytes();
 
   Uint8List? result;
   Object? error;

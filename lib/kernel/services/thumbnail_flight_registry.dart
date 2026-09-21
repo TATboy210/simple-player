@@ -31,8 +31,7 @@ final class ThumbnailFlight {
   /// H5：force 请求只 join force flight — 双击 retry 不产生第二个并发解帧
   final bool isForce;
 
-  final Completer<ImageProvider?> _completer =
-      Completer<ImageProvider?>();
+  final Completer<ImageProvider?> _completer = Completer<ImageProvider?>();
 
   Future<ImageProvider?> get future => _completer.future;
 
