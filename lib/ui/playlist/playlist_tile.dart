@@ -61,9 +61,23 @@ class PlaylistTile extends StatefulWidget {
   State<PlaylistTile> createState() => _PlaylistTileState();
 }
 
+/// 缩略图三态（P-Thumb v1.3.2 §26）— loading/ready/failed 驱动占位与重试入口
+enum _ThumbPhase {
+  loading,
+  ready,
+  failed,
+}
+
 class _PlaylistTileState extends State<PlaylistTile> {
   ImageProvider? _thumbnail;
-  bool _disposed = false;
+  _ThumbPhase _phase = _ThumbPhase.loading;
+
+  /// 生命周期代次 — didUpdateWidget/dispose 递增失效旧异步回写（§26）
+  int _loadGeneration = 0;
+
+  /// Image 解码失败标记 — errorBuilder 经 post-frame 回写；
+  /// phase 可能是 ready（provider 非 null 但 bytes 损坏），重试入口需可见
+  bool _decodeFailed = false;
 
   /// 鼠标悬停态 — 驱动整卡背景微亮 (v0.0.6.2).
   bool _hovered = false;
@@ -74,6 +88,8 @@ class _PlaylistTileState extends State<PlaylistTile> {
     _loadThumbnail();
   }
 
+  /// path 变化触发重载 — P-Thumb v1.3.2 §26.0 强制保留的触发器
+  /// （generation 机制的第二个递增来源；实施契约 45）
   @override
   void didUpdateWidget(covariant PlaylistTile oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -82,16 +98,66 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   @override
   void dispose() {
-    _disposed = true;
+    // dispose 后 generation 失效 + mounted false — 双保险拒绝旧回写（§26.4）
+    _loadGeneration++;
     super.dispose();
   }
 
-  /// 异步取缩略图 — ThumbnailService 内部带 LRU/磁盘缓存与平台降级;
-  /// 失败保持占位态, 绝不阻断列表滚动.
+  /// 异步取缩略图 — 三保险防 path reuse（§26.2）：mounted + generation +
+  /// capturedPath。ThumbnailService 内部带 identity/LRU/磁盘缓存与降级；
+  /// 失败转入 failed 态（右侧出现重试入口），绝不阻断列表滚动.
   Future<void> _loadThumbnail() async {
-    final provider = await ThumbnailService.getThumbnail(widget.item.path);
-    if (_disposed || !mounted) return;
-    setState(() => _thumbnail = provider);
+    final generation = ++_loadGeneration;
+    final path = widget.item.path;
+
+    if (!mounted) return;
+
+    setState(() {
+      _thumbnail = null;
+      _decodeFailed = false;
+      _phase = _ThumbPhase.loading;
+    });
+
+    final provider = await ThumbnailService.getThumbnail(path);
+
+    if (!mounted ||
+        generation != _loadGeneration ||
+        path != widget.item.path) {
+      return;
+    }
+
+    setState(() {
+      _thumbnail = provider;
+      _phase = provider == null ? _ThumbPhase.failed : _ThumbPhase.ready;
+    });
+  }
+
+  /// 用户点击重试 — ThumbnailService.retry 强制绕过内存/磁盘缓存重新
+  /// 解帧（§27.4）；成功返回 MemoryImage 即时展示新 bytes.
+  Future<void> _retryThumbnail() async {
+    final generation = ++_loadGeneration;
+    final path = widget.item.path;
+
+    if (!mounted) return;
+
+    setState(() {
+      _thumbnail = null;
+      _decodeFailed = false;
+      _phase = _ThumbPhase.loading;
+    });
+
+    final provider = await ThumbnailService.retry(path);
+
+    if (!mounted ||
+        generation != _loadGeneration ||
+        path != widget.item.path) {
+      return;
+    }
+
+    setState(() {
+      _thumbnail = provider;
+      _phase = provider == null ? _ThumbPhase.failed : _ThumbPhase.ready;
+    });
   }
 
   /// 断点进度 (0-1) — 无时长/未播放/总开关关闭时续播分区禁用/进度区不显示.
@@ -186,14 +252,24 @@ class _PlaylistTileState extends State<PlaylistTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      widget.item.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: highlightColor ?? Tokens.textPrimary,
-                        fontSize: Tokens.fontCaption,
-                      ),
+                    // 名称 + 失败重试入口同行 — 重试 24px 热区（§27.2）
+                    // 位于缩略图外，绝不覆盖 FilmButton 播放/续播分区.
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.item.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: highlightColor ?? Tokens.textPrimary,
+                              fontSize: Tokens.fontCaption,
+                            ),
+                          ),
+                        ),
+                        if (_showRetry) _buildRetryButton(),
+                      ],
                     ),
                     if (_resumeProgress != null) ...[
                       const SizedBox(height: Tokens.spXs),
@@ -234,8 +310,63 @@ class _PlaylistTileState extends State<PlaylistTile> {
   static const _thumbWidth = 128.0;
   static const _thumbHeight = 72.0;
 
-  /// 16:9 缩略图 — 占位 → 异步图像; 播放中角标.
+  /// 解码宽度上限 — 与 ThumbnailSpec 冻结值 320 一致（§14A.2，
+  /// 防 高 DPI 把 decoded image 无限制放大）.
+  static const _maxDecodeWidth = 320;
+
+  /// 失败重试入口可见性 — provider 失败（phase failed）或解码失败
+  /// （decodeFailed）任一即显示（§27.1/§27.3）.
+  bool get _showRetry =>
+      _phase == _ThumbPhase.failed || _decodeFailed;
+
+  /// 失败重试入口 — 24px 热区 icon-only（refresh 语义自明），
+  /// 位于名称行右侧，不改变 Tile 总高度（§27.1）.
+  Widget _buildRetryButton() {
+    return SizedBox(
+      width: Tokens.iconButtonSizeSmall,
+      height: Tokens.iconButtonSizeSmall,
+      child: IconButton(
+        onPressed: _retryThumbnail,
+        icon: const Icon(
+          Icons.refresh_outlined,
+          size: 16,
+          color: Tokens.textSecondary,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(
+          minWidth: Tokens.iconButtonSizeSmall,
+          minHeight: Tokens.iconButtonSizeSmall,
+        ),
+      ),
+    );
+  }
+
+  /// loading/failed 共用占位 — 电影 icon（§27.1：不为 loading 加独立
+  /// spinner 噪音；failed 的重试入口在名称行）.
+  Widget _thumbPlaceholder() {
+    return const Center(
+      child: Icon(
+        Icons.movie_outlined,
+        size: 22,
+        color: Tokens.textSecondary,
+      ),
+    );
+  }
+
+  /// 解码失败回写 — errorBuilder 在 build 期间触发，post-frame 再 setState.
+  void _scheduleDecodeFailed() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _decodeFailed) return;
+      setState(() => _decodeFailed = true);
+    });
+  }
+
+  /// 16:9 缩略图三态渲染（§27.1）— 占位 → 异步图像; ready 按 Tile 物理
+  /// 宽度解码降内存（§14A.2：显示不变，decoded 工作集 ~230→~144 KiB/张）.
   Widget _buildThumbnail() {
+    final thumbnail = _thumbnail;
+    final isReady = _phase == _ThumbPhase.ready;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(Tokens.radiusSm),
       child: Stack(
@@ -243,16 +374,26 @@ class _PlaylistTileState extends State<PlaylistTile> {
         children: [
           // 占位底色 — 缩略图加载完成前保持视觉占位.
           const ColoredBox(color: Tokens.bgGlass),
-          if (_thumbnail != null)
-            Image(image: _thumbnail!, fit: BoxFit.cover, gaplessPlayback: true)
-          else
-            const Center(
-              child: Icon(
-                Icons.movie_outlined,
-                size: 22,
-                color: Tokens.textSecondary,
+          if (isReady && thumbnail != null)
+            Image(
+              image: ResizeImage(
+                thumbnail,
+                // 单轴 width 保持纵横比 — 128 logical × DPR，clamp 128..320
+                width: (_thumbWidth * MediaQuery.devicePixelRatioOf(context))
+                    .round()
+                    .clamp(_thumbWidth.toInt(), _maxDecodeWidth)
+                    .toInt(),
               ),
-            ),
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (context, error, stack) {
+                // bytes 损坏等解码失败 — 立即占位 + post-frame 揭示重试入口
+                _scheduleDecodeFailed();
+                return _thumbPlaceholder();
+              },
+            )
+          else
+            _thumbPlaceholder(),
         ],
       ),
     );

@@ -123,9 +123,6 @@ class ThumbnailService {
 
   ThumbnailDiskCache get _diskCache => _diskCacheOverride ?? _defaultDiskCache;
 
-  /// 启动清理只调度一次的守卫
-  bool _startupCleanupScheduled = false;
-
   /// LRU — LinkedHashMap 维护插入顺序，访问时 remove+reinsert 移到末尾；
   /// 键为 cacheKey（非 path — 同一 path 可随文件变化产生多个 identity）
   final _cache = <String, ImageProvider>{};
@@ -193,7 +190,6 @@ class ThumbnailService {
       _instance._getThumbnailImpl(filePath);
 
   Future<ImageProvider?> _getThumbnailImpl(String filePath) async {
-    _scheduleStartupCleanupOnce();
     if (kDebugMode) _metrics.requests++;
 
     // identity 解析（memo 命中 = 零磁盘 I/O — I10）
@@ -386,13 +382,6 @@ class ThumbnailService {
     final provider = FileImage(committedFile);
     _cachePutImpl(identity.path, identity.cacheKey, provider);
     return provider;
-  }
-
-  /// 启动后延迟清理只调度一次（§17.3 入口 1）
-  void _scheduleStartupCleanupOnce() {
-    if (_startupCleanupScheduled) return;
-    _startupCleanupScheduled = true;
-    _diskCache.scheduleStartupCleanup();
   }
 
   /// identity 解析 — normalize → memo → stat → canonical → SHA-256
@@ -599,13 +588,8 @@ class ThumbnailService {
     ThumbnailProvider? provider,
     ThumbnailDiskCache? diskCache,
   }) {
-    // 先取消启动清理 timer — 防 pending timer 泄漏进 widget 测试
-    _defaultDiskCache.cancelStartupCleanup();
-    _instance._diskCacheOverride?.cancelStartupCleanup();
-
     _instance._impl = provider;
     _instance._diskCacheOverride = diskCache;
-    _instance._startupCleanupScheduled = false;
     _instance._registry.clear();
     _instance._activeProviderCount = 0;
     _instance._failedUntil.clear();

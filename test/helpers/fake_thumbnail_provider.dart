@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:simple_player_flutter/kernel/services/thumbnail_provider.dart';
@@ -12,6 +13,19 @@ Uint8List makeJpegBytes({int payload = 8, int seed = 0}) {
   bytes.add([0xFF, 0xD9]);
   return bytes.toBytes();
 }
+
+/// 最小可解码 1×1 JPEG — Tile 层测试的成功路径需要 Image 真解码成功；
+/// [makeJpegBytes] 骨架只通过 SOI/EOI 校验，decode 必炸（errorBuilder 路径用）
+final Uint8List realJpegBytes = base64Decode(
+  '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof'
+  'Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwh'
+  'MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAAR'
+  'CAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAA'
+  'AgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkK'
+  'FhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWG'
+  'h4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl'
+  '5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APn+v//Z',
+);
 
 /// 合法 64-hex cache key — DiskCache 白名单校验的合法输入。
 ///
