@@ -1,4 +1,4 @@
-import 'package:flutter/painting.dart';
+import 'package:flutter/foundation.dart' show Uint8List;
 
 import 'thumbnail_provider.dart';
 
@@ -6,11 +6,11 @@ import 'thumbnail_provider.dart';
 ///
 /// No-op thumbnail provider for platforms that lack thumbnail support.
 ///
-/// Always returns `null` from [getThumbnail], serving as a safe fallback
-/// when native thumbnail generation is unavailable.
+/// Always returns `null` from [generateThumbnail], serving as a safe
+/// fallback when native thumbnail generation is unavailable.
 class NoopThumbnailProvider implements ThumbnailProvider {
   const NoopThumbnailProvider();
 
   @override
-  Future<ImageProvider?> getThumbnail(String filePath) async => null;
+  Future<Uint8List?> generateThumbnail(String filePath) async => null;
 }
