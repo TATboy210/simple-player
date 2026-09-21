@@ -270,8 +270,7 @@ void main() {
   });
 
   group('AutoHideController.pinned (v0.0.6 空置态固定显示)', () {
-    testWidgets('pinned=true — 静置超时后仍可见 (隐藏计时被钉住取消)',
-        (tester) async {
+    testWidgets('pinned=true — 静置超时后仍可见 (隐藏计时被钉住取消)', (tester) async {
       isPlaying.value = true; // 模拟常规可隐藏场景
       final c = createController();
       c.init();
@@ -294,8 +293,7 @@ void main() {
       expect(c.visible.value, isTrue);
     });
 
-    testWidgets('pinned=true 期间鼠标事件 — 照常 show 且不重启隐藏',
-        (tester) async {
+    testWidgets('pinned=true 期间鼠标事件 — 照常 show 且不重启隐藏', (tester) async {
       final c = createController();
       c.init();
       c.pinned = true;

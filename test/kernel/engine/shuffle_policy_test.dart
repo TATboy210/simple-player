@@ -103,8 +103,7 @@ void main() {
     setUp(() => engine = FakeEngine());
     tearDown(() => engine.dispose());
 
-    test('shuffle 手动 next — 队列顺序恒定, 跳转发生 (解耦直接断言)',
-        () async {
+    test('shuffle 手动 next — 队列顺序恒定, 跳转发生 (解耦直接断言)', () async {
       await engine.openPlaylist(['a.mp4', 'b.mp4', 'c.mp4']);
       await engine.setPlayMode(PlayMode.shuffle);
 
@@ -119,9 +118,11 @@ void main() {
 
     test('shuffle previous — 沿历史栈精确回溯', () async {
       // 注入确定 picker: 恒选队列末尾元素.
-      engine.shufflePicker =
-          ({required queue, required current, required recent}) =>
-              queue.reversed.firstWhere((p) => p != current);
+      engine.shufflePicker = ({
+        required queue,
+        required current,
+        required recent,
+      }) => queue.reversed.firstWhere((p) => p != current);
       await engine.openPlaylist(['a.mp4', 'b.mp4', 'c.mp4']);
       await engine.setPlayMode(PlayMode.shuffle);
 
@@ -165,9 +166,11 @@ void main() {
     });
 
     test('切换出 shuffle 再切回 — 历史栈清空', () async {
-      engine.shufflePicker =
-          ({required queue, required current, required recent}) =>
-              queue.reversed.firstWhere((p) => p != current);
+      engine.shufflePicker = ({
+        required queue,
+        required current,
+        required recent,
+      }) => queue.reversed.firstWhere((p) => p != current);
       await engine.openPlaylist(['a.mp4', 'b.mp4']);
       await engine.setPlayMode(PlayMode.shuffle);
       engine.nextInQueue(); // 历史: [a]

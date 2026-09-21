@@ -42,11 +42,13 @@ void main() {
       expect(await cache.read(key), isNull);
     });
 
-    test('D2: valid JPEG round-trips through write/read (disk hit)',
-        () async {
+    test('D2: valid JPEG round-trips through write/read (disk hit)', () async {
       final key = hexKey('ab');
-      final file = await cache.write(key, makeJpegBytes(seed: 1),
-          replaceExisting: false);
+      final file = await cache.write(
+        key,
+        makeJpegBytes(seed: 1),
+        replaceExisting: false,
+      );
 
       expect(file, isNotNull);
       final provider = await cache.read(key);
@@ -61,20 +63,28 @@ void main() {
 
     test('D4: invalid SOI head is rejected and deleted on read', () async {
       // 首两字节 00 D8 — 非 FF D8
-      final file = await seedFile(
-        '${hexKey('ad')}.jpg',
-        [0x00, 0xD8, 0x01, 0x02, 0xFF, 0xD9],
-      );
+      final file = await seedFile('${hexKey('ad')}.jpg', [
+        0x00,
+        0xD8,
+        0x01,
+        0x02,
+        0xFF,
+        0xD9,
+      ]);
       expect(await cache.read(hexKey('ad')), isNull);
       expect(await file.exists(), isFalse);
     });
 
     test('D5: invalid EOI tail is rejected and deleted on read', () async {
       // 尾两字节 FF 00 — 非 FF D9
-      final file = await seedFile(
-        '${hexKey('ae')}.jpg',
-        [0xFF, 0xD8, 0x01, 0x02, 0xFF, 0x00],
-      );
+      final file = await seedFile('${hexKey('ae')}.jpg', [
+        0xFF,
+        0xD8,
+        0x01,
+        0x02,
+        0xFF,
+        0x00,
+      ]);
       expect(await cache.read(hexKey('ae')), isNull);
       expect(await file.exists(), isFalse);
     });
@@ -103,19 +113,26 @@ void main() {
       expect(stored, equals(newBytes));
     });
 
-    test('D7: directory resolve failure degrades to null (no disk layer)',
-        () async {
-      final broken = ThumbnailDiskCache(
-        resolveDirectory: () async => throw const FileSystemException('denied'),
-      );
+    test(
+      'D7: directory resolve failure degrades to null (no disk layer)',
+      () async {
+        final broken = ThumbnailDiskCache(
+          resolveDirectory: () async =>
+              throw const FileSystemException('denied'),
+        );
 
-      expect(
-        await broken.write(hexKey('bb'), makeJpegBytes(), replaceExisting: false),
-        isNull,
-      );
-      expect(await broken.read(hexKey('bb')), isNull);
-      expect(await broken.fileFor(hexKey('bb')), isNull);
-    });
+        expect(
+          await broken.write(
+            hexKey('bb'),
+            makeJpegBytes(),
+            replaceExisting: false,
+          ),
+          isNull,
+        );
+        expect(await broken.read(hexKey('bb')), isNull);
+        expect(await broken.fileFor(hexKey('bb')), isNull);
+      },
+    );
 
     test('write rejects non-safe hash keys (path traversal guard)', () async {
       expect(
@@ -139,24 +156,34 @@ void main() {
       expect(await cache.read(hexKey('bc')), isNull);
     });
 
-    test('D12: legacy 0xFF-head corrupted file rejected + self-healed',
-        () async {
-      // 旧实现只查首字节 0xFF 会放行的垃圾文件
-      final file = await seedFile(
-        '${hexKey('bd')}.jpg',
-        [0xFF, 0x00, 0x01, 0x02, 0xFF, 0xD9],
-      );
-      expect(await cache.read(hexKey('bd')), isNull);
-      expect(await file.exists(), isFalse);
-    });
+    test(
+      'D12: legacy 0xFF-head corrupted file rejected + self-healed',
+      () async {
+        // 旧实现只查首字节 0xFF 会放行的垃圾文件
+        final file = await seedFile('${hexKey('bd')}.jpg', [
+          0xFF,
+          0x00,
+          0x01,
+          0x02,
+          0xFF,
+          0xD9,
+        ]);
+        expect(await cache.read(hexKey('bd')), isNull);
+        expect(await file.exists(), isFalse);
+      },
+    );
 
     test('D8: stale .part leftovers are removed by cleanup', () async {
       final stale = await seedFile('${hexKey('be')}.jpg.123-1.part', [1, 2, 3]);
       final fresh = await seedFile('${hexKey('bf')}.jpg.456-2.part', [4, 5, 6]);
 
       // stale 拨到 2 小时前，fresh 保持 1 分钟前
-      await stale.setLastModified(DateTime.now().subtract(const Duration(hours: 2)));
-      await fresh.setLastModified(DateTime.now().subtract(const Duration(minutes: 1)));
+      await stale.setLastModified(
+        DateTime.now().subtract(const Duration(hours: 2)),
+      );
+      await fresh.setLastModified(
+        DateTime.now().subtract(const Duration(minutes: 1)),
+      );
 
       await cache.scheduleCleanup();
 
@@ -164,57 +191,63 @@ void main() {
       expect(await fresh.exists(), isTrue);
     });
 
-    test('D10: entries older than maxAge are purged (clock injection)',
-        () async {
-      final writtenAt = DateTime(2026, 1, 1, 12);
-      var fakeNow = writtenAt;
-      final aging = ThumbnailDiskCache(
-        resolveDirectory: () async => tempDir,
-        now: () => fakeNow,
-      );
+    test(
+      'D10: entries older than maxAge are purged (clock injection)',
+      () async {
+        final writtenAt = DateTime(2026, 1, 1, 12);
+        var fakeNow = writtenAt;
+        final aging = ThumbnailDiskCache(
+          resolveDirectory: () async => tempDir,
+          now: () => fakeNow,
+        );
 
-      await aging.write(hexKey('c1'), makeJpegBytes(), replaceExisting: false);
-
-      // 对齐 mtime 与注入时钟基准 — fs mtime 由 OS 管理，需手动拨到
-      // 写入时刻，注入的 now 才能驱动 age 判定
-      await (await aging.fileFor(hexKey('c1')))!
-          .setLastModified(writtenAt);
-
-      // 拨快 31 天
-      fakeNow = writtenAt.add(const Duration(days: 31));
-      await aging.scheduleCleanup();
-
-      expect(await (await aging.fileFor(hexKey('c1')))!.exists(), isFalse);
-    });
-
-    test('D9: watermark eviction kicks in over byte cap (shrunk limits)',
-        () async {
-      final tight = ThumbnailDiskCache(
-        resolveDirectory: () async => tempDir,
-        now: DateTime.now,
-        limits: const ThumbnailDiskCacheLimits(
-          maxEntries: 10,
-          maxBytes: 100,
-          targetEntries: 4,
-          targetBytes: 40,
-        ),
-      );
-
-      // 3 个 40 字节文件 = 120 bytes > 100 cap → 删到 ≤ 40 bytes
-      for (var i = 0; i < 3; i++) {
-        await tight.write(
-          '${'a$i'.padLeft(63, '0')}0',
-          makeJpegBytes(payload: 36, seed: i),
+        await aging.write(
+          hexKey('c1'),
+          makeJpegBytes(),
           replaceExisting: false,
         );
-      }
 
-      await tight.scheduleCleanup();
+        // 对齐 mtime 与注入时钟基准 — fs mtime 由 OS 管理，需手动拨到
+        // 写入时刻，注入的 now 才能驱动 age 判定
+        await (await aging.fileFor(hexKey('c1')))!.setLastModified(writtenAt);
 
-      final remaining =
-          tempDir.listSync().whereType<File>().toList();
-      expect(remaining.length, equals(1));
-    });
+        // 拨快 31 天
+        fakeNow = writtenAt.add(const Duration(days: 31));
+        await aging.scheduleCleanup();
+
+        expect(await (await aging.fileFor(hexKey('c1')))!.exists(), isFalse);
+      },
+    );
+
+    test(
+      'D9: watermark eviction kicks in over byte cap (shrunk limits)',
+      () async {
+        final tight = ThumbnailDiskCache(
+          resolveDirectory: () async => tempDir,
+          now: DateTime.now,
+          limits: const ThumbnailDiskCacheLimits(
+            maxEntries: 10,
+            maxBytes: 100,
+            targetEntries: 4,
+            targetBytes: 40,
+          ),
+        );
+
+        // 3 个 40 字节文件 = 120 bytes > 100 cap → 删到 ≤ 40 bytes
+        for (var i = 0; i < 3; i++) {
+          await tight.write(
+            '${'a$i'.padLeft(63, '0')}0',
+            makeJpegBytes(payload: 36, seed: i),
+            replaceExisting: false,
+          );
+        }
+
+        await tight.scheduleCleanup();
+
+        final remaining = tempDir.listSync().whereType<File>().toList();
+        expect(remaining.length, equals(1));
+      },
+    );
   });
 
   group('ThumbnailService disk integration (B2)', () {
@@ -239,9 +272,7 @@ void main() {
 
       ThumbnailService.reset(
         provider: FakeThumbnailProvider(),
-        diskCache: ThumbnailDiskCache(
-          resolveDirectory: () async => tempDir,
-        ),
+        diskCache: ThumbnailDiskCache(resolveDirectory: () async => tempDir),
       );
 
       final first = await ThumbnailService.getThumbnail(file.path);

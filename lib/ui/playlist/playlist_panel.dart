@@ -331,8 +331,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     final l10n = AppLocalizations.of(context);
     final overlay =
         Overlay.of(buttonContext).context.findRenderObject() as RenderBox?;
-    final button =
-        buttonContext.findRenderObject() as RenderBox?;
+    final button = buttonContext.findRenderObject() as RenderBox?;
     if (overlay == null || button == null) return;
     final anchor = button.localToGlobal(
       Offset(0, button.size.height),

@@ -96,18 +96,21 @@ class _SettingsDialogState extends State<SettingsDialog> {
           ),
           Expanded(
             child: switch (_selected) {
-              _SettingsTab.general =>
-                GeneralSettingsContent(settings: services?.settings),
-              _SettingsTab.video => services?.videoProcessing == null
-                  // 防御分支 —— 灰显占位项不会进入选中态；返回空视图而非伪造内容。
-                  ? const SizedBox.shrink()
-                  : VideoSettingsContent(
-                      videoProcessing: services!.videoProcessing!,
-                      settings: services.settings,
-                    ),
-              _SettingsTab.audio => services?.settings == null
-                  ? const SizedBox.shrink()
-                  : AudioSettingsContent(settings: services!.settings!),
+              _SettingsTab.general => GeneralSettingsContent(
+                settings: services?.settings,
+              ),
+              _SettingsTab.video =>
+                services?.videoProcessing == null
+                    // 防御分支 —— 灰显占位项不会进入选中态；返回空视图而非伪造内容。
+                    ? const SizedBox.shrink()
+                    : VideoSettingsContent(
+                        videoProcessing: services!.videoProcessing!,
+                        settings: services.settings,
+                      ),
+              _SettingsTab.audio =>
+                services?.settings == null
+                    ? const SizedBox.shrink()
+                    : AudioSettingsContent(settings: services!.settings!),
               _SettingsTab.about => const AboutContent(),
             },
           ),

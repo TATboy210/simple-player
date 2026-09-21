@@ -8,7 +8,6 @@
 /// cursor 值, 实证 GlassButton 的 click 是否会被框架选中.
 library;
 
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -57,9 +56,7 @@ void main() {
       );
       await tester.pump();
 
-      final gesture = await tester.createGesture(
-        kind: PointerDeviceKind.mouse,
-      );
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       final center = tester.getCenter(find.byIcon(Icons.play_arrow));
@@ -88,9 +85,7 @@ void main() {
       );
       await tester.pump();
 
-      final gesture = await tester.createGesture(
-        kind: PointerDeviceKind.mouse,
-      );
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       final center = tester.getCenter(find.byType(SpeedButton));
@@ -115,9 +110,7 @@ void main() {
       );
       await tester.pump();
 
-      final gesture = await tester.createGesture(
-        kind: PointerDeviceKind.mouse,
-      );
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
       addTearDown(gesture.removePointer);
       final center = tester.getCenter(find.byIcon(Icons.play_arrow));

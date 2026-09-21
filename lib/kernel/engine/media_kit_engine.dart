@@ -158,9 +158,7 @@ class MediaKitEngine implements MediaEngine {
     for (final entry in _fileScopedProps.entries) {
       unawaited(
         native.setProperty(entry.key, entry.value).catchError((Object error) {
-          debugPrint(
-            '[MediaKitEngine] replay ${entry.key} failed: $error',
-          );
+          debugPrint('[MediaKitEngine] replay ${entry.key} failed: $error');
         }),
       );
     }
@@ -425,10 +423,7 @@ class MediaKitEngine implements MediaEngine {
         FileErrorCode.pathEmpty,
         '队列为空, 无法装载',
         null,
-        ErrorContext(
-          action: 'openPlaylist',
-          module: 'MediaKitEngine',
-        ),
+        ErrorContext(action: 'openPlaylist', module: 'MediaKitEngine'),
       );
       _lastError.value = error;
       return OpenError(error);
@@ -557,8 +552,7 @@ class MediaKitEngine implements MediaEngine {
       // 乐观镜像一次到位 — 当前 path 在目标顺序中的位置即新 index
       // (mpv playlist-move 保留条目 current 标记, 播放不中断).
       final currentIndex = _queueIndex.value;
-      final currentPath =
-          (currentIndex >= 0 && currentIndex < current.length)
+      final currentPath = (currentIndex >= 0 && currentIndex < current.length)
           ? current[currentIndex]
           : null;
       _queuePaths.value = List<String>.unmodifiable(targetOrder);
@@ -1168,8 +1162,7 @@ class MediaKitEngine implements MediaEngine {
     final queue = _queuePaths.value;
     if (queue.isEmpty) return;
     final currentIndex = _queueIndex.value;
-    final currentPath =
-        (currentIndex >= 0 && currentIndex < queue.length)
+    final currentPath = (currentIndex >= 0 && currentIndex < queue.length)
         ? queue[currentIndex]
         : null;
     if (currentPath != null) {

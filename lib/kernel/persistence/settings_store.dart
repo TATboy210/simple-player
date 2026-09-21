@@ -108,15 +108,18 @@ final class AppSettingsStore {
   Future<void> saveSubtitleDelayMs(int v) => _write(_subtitleDelayKey, v);
 
   /// 视频处理状态 — 序列化为单 key JSON blob (原子整体写).
-  Future<void> saveVideo(VideoProcessingState v) => _write(_videoKey, jsonEncode({
-    'brightness': v.brightness,
-    'contrast': v.contrast,
-    'saturation': v.saturation,
-    'hue': v.hue,
-    'deinterlaceEnabled': v.deinterlaceEnabled,
-    'rotation': v.rotation,
-    'aspectRatioMode': v.aspectRatioMode.name,
-  }));
+  Future<void> saveVideo(VideoProcessingState v) => _write(
+    _videoKey,
+    jsonEncode({
+      'brightness': v.brightness,
+      'contrast': v.contrast,
+      'saturation': v.saturation,
+      'hue': v.hue,
+      'deinterlaceEnabled': v.deinterlaceEnabled,
+      'rotation': v.rotation,
+      'aspectRatioMode': v.aspectRatioMode.name,
+    }),
+  );
 
   Future<void> _write(String key, Object value) async {
     try {
