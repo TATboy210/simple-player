@@ -7,7 +7,7 @@ import '../../kernel/services/thumbnail_service.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/context_menu_row.dart';
+import '../shared/glass_menu.dart';
 import '../theme/tokens.dart';
 
 /// 播放列表条目卡 — 缩略图 + 透明"塑料膜"按钮层 + 右侧名称/断点信息.
@@ -184,14 +184,17 @@ class _PlaylistTileState extends State<PlaylistTile> {
     final l10n = AppLocalizations.of(context);
     // 状态色三态 (v0.0.6.2): 播放中 accent 蓝 / 续播锚点白 / 普通无边框.
     // 名称色复用同一高亮色 — 锚点白与 textPrimary 同亮度, 视觉一致.
-    // v0.0.7: 批量选中态复用 accent 蓝 — 与播放高亮同色但叠加勾选圆标,
-    // 两态语义靠圆标区分 (选中态必然显示圆标).
+    // v0.0.7: 批量选中态 = danger 红 (用户钦定, 与播放蓝区分语义).
     final highlightColor = widget.isCurrent
         ? Tokens.accent
         : (widget.isResumeAnchor ? Tokens.playlistAnchorWhite : null);
     final borderColor = widget.isSelected
-        ? Tokens.accent
+        ? Tokens.danger
         : (highlightColor ?? Colors.transparent);
+
+    // v0.0.7: 边框**恒定 1.5px 占位** — 宽度 0↔1.5 切换会让条目内容区
+    // 随高亮跳变 (用户钦定: 选中前后条目尺寸不变); 透明↔有色仅过渡颜色.
+    const borderWidth = 1.5;
 
     // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
     return InkWell(
@@ -214,10 +217,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(Tokens.radiusSm),
             color: _hovered ? Tokens.glowHighlightWhite : Colors.transparent,
-            border: Border.all(
-              color: borderColor,
-              width: highlightColor != null || widget.isSelected ? 1.5 : 0,
-            ),
+            border: Border.all(color: borderColor, width: borderWidth),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,36 +427,33 @@ class _PlaylistTileState extends State<PlaylistTile> {
     );
   }
 
-  /// 右键菜单 — 播放 / 打开所在目录 / 移除.
+  /// 右键菜单 — 玻璃菜单 (v0.0.7 控制栏同款主题, 替换 Material showMenu):
+  /// 播放 / 打开所在目录 / 移除 / 批量删除.
   Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final l10n = AppLocalizations.of(context);
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final action = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromRect(
-        position & const Size(1, 1),
-        Offset.zero & (overlay?.size ?? MediaQuery.sizeOf(context)),
-      ),
+    final action = await GlassMenu.show(
+      context,
+      position: position,
       items: [
-        PopupMenuItem<String>(
-          value: 'play',
-          child: ContextMenuRow(Icons.play_arrow, l10n.play),
-        ),
-        PopupMenuItem<String>(
+        GlassMenuItem(Icons.play_arrow, l10n.play, value: 'play'),
+        GlassMenuItem(
+          Icons.folder_open,
+          l10n.openFileLocation,
           value: 'locate',
-          child: ContextMenuRow(Icons.folder_open, l10n.openFileLocation),
         ),
-        PopupMenuItem<String>(
+        GlassMenuItem(
+          Icons.delete_outline,
+          l10n.remove,
           value: 'remove',
-          child: ContextMenuRow(Icons.delete_outline, l10n.remove),
+          isDestructive: true,
         ),
         // v0.0.7: 批量删除 — 进入多选模式并默认选中本条目
         // (onStartBatchSelect == null 时隐藏 — 旧调用方兼容).
         if (widget.onStartBatchSelect != null)
-          PopupMenuItem<String>(
+          GlassMenuItem(
+            Icons.checklist,
+            l10n.batchDelete,
             value: 'batchDelete',
-            child: ContextMenuRow(Icons.checklist, l10n.batchDelete),
           ),
       ],
     );
