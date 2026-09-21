@@ -317,7 +317,9 @@ class _PlaylistTileState extends State<PlaylistTile> {
       width: Tokens.iconButtonSizeSmall,
       height: Tokens.iconButtonSizeSmall,
       child: IconButton(
-        onPressed: _retryThumbnail,
+        // async 回调包 sync wrapper — VoidCallback 期望同步签名（DCM
+        // avoid-passing-async-when-sync-expected）；unawaited 显式弃 Future
+        onPressed: () => unawaited(_retryThumbnail()),
         icon: const Icon(
           Icons.refresh_outlined,
           size: 16,
