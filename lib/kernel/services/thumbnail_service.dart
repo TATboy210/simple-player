@@ -105,6 +105,10 @@ class ThumbnailService {
   /// provider 并发上限（§20.1）— 两个并发提升吞吐又不无限堆 native decoder
   static const maxConcurrent = 2;
 
+  /// negative memo TTL（§21.1）— 只防 Tile 反复重建导致的重复解帧，
+  /// 不写磁盘；retry 显式清除（§21.3）
+  static const _negativeTtl = Duration(seconds: 10);
+
   /// 内部实例 — 持有缓存状态，消除 static mutable state
   static final ThumbnailService _instance = ThumbnailService._();
 
@@ -137,6 +141,13 @@ class ThumbnailService {
   /// 文件被外部替换但未 evict → 显示旧图（与 v1.2 现状行为一致，
   /// 由 Coordinator 的 evict 调用契约覆盖 — §40.1）。
   final Map<String, _FileIdentity> _identityMemo = {};
+
+  /// negative memo — cacheKey → 失败屏蔽截止时刻（§21.2，TTL 10s）
+  final Map<String, DateTime> _failedUntil = {};
+
+  /// path → 失败 key 反向索引 — evict 时 O(keys-of-path) 清理（M6），
+  /// 杜绝 v1.3.1 A.9 startsWith prefix collision
+  final Map<String, Set<String>> _failureKeysByPath = {};
 
   /// in-flight 注册表 + epoch 内核（B3）— join/失效/isCurrent 唯一入口
   final ThumbnailFlightRegistry _registry = ThumbnailFlightRegistry();
@@ -197,6 +208,17 @@ class ThumbnailService {
       _cache[key] = cached;
       if (kDebugMode) _metrics.memoryHits++;
       return cached;
+    }
+
+    // negative memo 命中 — TTL 内直接失败，挡住坏文件的重复解帧（§21）
+    final failedUntil = _failedUntil[key];
+    if (failedUntil != null) {
+      if (DateTime.now().isBefore(failedUntil)) {
+        return null;
+      }
+      // TTL 已过 — 回收后走正常流程
+      _failedUntil.remove(key);
+      _failureKeysByPath[identity.path]?.remove(key);
     }
 
     // 磁盘命中（第二优先级 — 零 native decode，§28.3）
@@ -303,19 +325,30 @@ class ThumbnailService {
         return;
       }
 
+      if (forceRefresh) {
+        // R2：retry 当前请求即时展示新 bytes — 旧 decoded FileImage 已在
+        // _commitToCache 内 evict，下次滚动从新磁盘文件重新 decode（§22.3）
+        flight.complete(MemoryImage(bytes));
+        return;
+      }
       flight.complete(committed ?? MemoryImage(bytes));
     } finally {
       _registry.remove(flight);
     }
   }
 
-  /// negative memo 记录 — M2/21.5：stale flight 的失败不记 memo（B5 接入存储）
+  /// negative memo 记录（§21.2）— M2/21.5：stale flight 的失败不记 memo，
+  /// 否则文件替换恢复后的新请求会被旧代的失败挡住 10 秒
   void _recordFailureIfCurrent(
     ThumbnailFlight flight,
     _FileIdentity identity,
   ) {
     if (!_registry.isCurrent(flight)) return;
-    // B5：写入 _failedUntil / _failureKeysByPath
+    _failedUntil[identity.cacheKey] =
+        DateTime.now().add(_negativeTtl);
+    _failureKeysByPath
+        .putIfAbsent(identity.path, () => <String>{})
+        .add(identity.cacheKey);
   }
 
   /// commit 阶段 — 内含检查点 2（R7/H1：紧贴 _cachePut，§19.8）
@@ -501,6 +534,14 @@ class ThumbnailService {
         _pathByCacheKey.remove(key);
       }
     }
+
+    // B5：negative memo 反向索引清理（A.9 — O(keys-of-path)，无 prefix 碰撞）
+    final failedKeys = _failureKeysByPath.remove(path);
+    if (failedKeys != null) {
+      for (final key in failedKeys) {
+        _failedUntil.remove(key);
+      }
+    }
   }
 
   /// 清空全部缓存
@@ -516,6 +557,35 @@ class ThumbnailService {
     _cacheKeysByPath.clear();
     _pathByCacheKey.clear();
     _identityMemo.clear();
+    _failedUntil.clear();
+    _failureKeysByPath.clear();
+  }
+
+  /// 强制重新生成指定文件的缩略图（P-Thumb v1.3.2 §22 — 唯一 force 入口）
+  ///
+  /// Forces a fresh decode of [rawPath], bypassing memory/disk caches.
+  /// 内部流程（A.11）：evict（memo 失效 / pathEpoch++ / negative memo 清理）
+  /// → forceRefresh 解帧 → 覆写磁盘 → 返回 [MemoryImage]（R2 即时展示）。
+  ///
+  /// 双击 retry 场景（H5/F6）：已有在飞 force flight 时直接 join，
+  /// 不重复 evict/decode。`forceRefresh` 不作为公开参数暴露（M5）。
+  static Future<ImageProvider?> retry(String rawPath) =>
+      _instance._retryImpl(rawPath);
+
+  Future<ImageProvider?> _retryImpl(String rawPath) async {
+    final path = p.normalize(rawPath);
+
+    // H5/F6：先查在飞 force flight — 直接 join，绝不重复 evict
+    final forceFlight = _registry.forceFlightFor(path);
+    if (forceFlight != null) {
+      if (kDebugMode) _metrics.coalescedJoins++;
+      return forceFlight.future;
+    }
+
+    evict(path);
+    final identity = await _resolveIdentityImpl(path);
+    if (identity == null) return null;
+    return _getFlightImpl(identity, forceRefresh: true);
   }
 
   /// 重置全部状态（仅供测试使用）
@@ -538,6 +608,8 @@ class ThumbnailService {
     _instance._startupCleanupScheduled = false;
     _instance._registry.clear();
     _instance._activeProviderCount = 0;
+    _instance._failedUntil.clear();
+    _instance._failureKeysByPath.clear();
     _instance._clearCacheImpl();
     _metrics
       ..requests = 0
