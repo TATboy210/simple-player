@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'linux_thumbnail_provider.dart';
 import 'macos_thumbnail_provider.dart';
 import 'noop_thumbnail_provider.dart';
+import 'thumbnail_concurrency_gate.dart';
 import 'thumbnail_disk_cache.dart';
 import 'thumbnail_flight_registry.dart';
 import 'thumbnail_provider.dart';
@@ -72,6 +73,9 @@ final class ThumbnailMetrics {
   /// 磁盘写失败降级 MemoryImage 的次数（R6 disk 域观察）
   int diskWriteFallbacks = 0;
 
+  /// provider 并发峰值（G1 — gate 生效度观测）
+  int peakConcurrent = 0;
+
   /// identity 解析触发的 File.stat 次数 — ID7 用：memo 生效则第二次请求不再增长
   int statCalls = 0;
 
@@ -97,6 +101,9 @@ class ThumbnailService {
 
   /// LRU 容量 — 远大于典型可见区，万级媒体库内存驻留不是本架构目标
   static const _maxCacheSize = 200;
+
+  /// provider 并发上限（§20.1）— 两个并发提升吞吐又不无限堆 native decoder
+  static const maxConcurrent = 2;
 
   /// 内部实例 — 持有缓存状态，消除 static mutable state
   static final ThumbnailService _instance = ThumbnailService._();
@@ -133,6 +140,13 @@ class ThumbnailService {
 
   /// in-flight 注册表 + epoch 内核（B3）— join/失效/isCurrent 唯一入口
   final ThumbnailFlightRegistry _registry = ThumbnailFlightRegistry();
+
+  /// 并发闸（B4 — §20）— 只包 Provider generation，gate 外零昂贵步骤
+  final ThumbnailConcurrencyGate _gate =
+      ThumbnailConcurrencyGate(maxConcurrent);
+
+  /// gate 内当前活跃 provider 数（峰值观测）
+  int _activeProviderCount = 0;
 
   /// debug metrics 访问器（测试观测用）
   @visibleForTesting
@@ -238,8 +252,21 @@ class ThumbnailService {
       // ── Provider 域：失败 = negative cache 语义（仅 current，M2/21.5）──
       Uint8List? bytes;
       try {
-        if (kDebugMode) _metrics.providerCalls++;
-        bytes = await _providerImpl.generateThumbnail(identity.path);
+        bytes = await _gate.run(() async {
+          // 峰值观测在 gate 内 — 排队中的请求未真正占用解帧资源
+          if (kDebugMode) {
+            _metrics.providerCalls++;
+            _activeProviderCount++;
+            if (_activeProviderCount > _metrics.peakConcurrent) {
+              _metrics.peakConcurrent = _activeProviderCount;
+            }
+          }
+          try {
+            return await _providerImpl.generateThumbnail(identity.path);
+          } finally {
+            if (kDebugMode) _activeProviderCount--;
+          }
+        });
       } on Exception {
         // 不捕获 Error — 编程 bug 必须暴露给 zone（I11）
         if (kDebugMode) _metrics.failures++;
@@ -510,6 +537,7 @@ class ThumbnailService {
     _instance._diskCacheOverride = diskCache;
     _instance._startupCleanupScheduled = false;
     _instance._registry.clear();
+    _instance._activeProviderCount = 0;
     _instance._clearCacheImpl();
     _metrics
       ..requests = 0
@@ -519,6 +547,7 @@ class ThumbnailService {
       ..failures = 0
       ..coalescedJoins = 0
       ..diskWriteFallbacks = 0
+      ..peakConcurrent = 0
       ..statCalls = 0
       ..identityMemoHits = 0;
   }

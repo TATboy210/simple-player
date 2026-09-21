@@ -53,6 +53,11 @@ final class FakeThumbnailProvider implements ThumbnailProvider {
     jobs[filePath]?.removeFirst().completeError(error);
   }
 
+  /// 手动放行该 path 最早的挂起 job 为 null — 模拟解帧失败返回 null（G3）
+  void releaseNull(String filePath) {
+    jobs[filePath]?.removeFirst().complete(null);
+  }
+
   @override
   Future<Uint8List?> generateThumbnail(String filePath) async {
     calls++;
