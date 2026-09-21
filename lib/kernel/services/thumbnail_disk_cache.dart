@@ -91,7 +91,8 @@ final class ThumbnailDiskCache {
   /// 单飞清理 — 同一时间只有一个 cleanup Future（§17.3）
   Future<void>? _cleanupFuture;
 
-  Timer? _startupTimer;
+  /// 本进程是否已跑过启动清理（惰性守卫）
+  DateTime? _lastStartupCleanupAt;
 
   /// 解析缓存目录 — 一次性；失败永久降级为无磁盘层
   Future<Directory?> _ensureDirectory() async {
@@ -102,6 +103,9 @@ final class ThumbnailDiskCache {
       final dir = await _resolveDirectory();
       await dir.create(recursive: true);
       _cachedDir = dir;
+      // §17.3 入口 1：目录就绪后安排一次启动清理 — 惰性无 timer；
+      // 解析失败路径（沙盒/测试）天然不触发
+      scheduleStartupCleanup();
       return dir;
     } on Exception {
       // 目录不可创建（MSIX 沙盒/权限）— 环境性问题，不再反复触碰；
@@ -236,15 +240,15 @@ final class ThumbnailDiskCache {
     return task;
   }
 
-  /// 启动后延迟清理（§17.3 入口 1）— 由 Service 首次使用时触发一次
-  void scheduleStartupCleanup({Duration delay = const Duration(seconds: 30)}) {
-    _startupTimer ??= Timer(delay, () => unawaited(scheduleCleanup()));
-  }
-
-  /// 取消启动清理 — 测试 reset 用，防 pending timer 泄漏进 widget 测试
-  void cancelStartupCleanup() {
-    _startupTimer?.cancel();
-    _startupTimer = null;
+  /// 启动后首次使用时安排一次后台清理（§17.3 入口 1）
+  ///
+  /// 惰性触发（无 Timer）：首次缩略图请求本就是启动后的第一个自然点，
+  /// 避免为“延迟 30s”挂全局 timer — 那会向测试/预览环境泄漏 pending
+  /// timers（widget 测试的 invariant 检查会失败）。
+  void scheduleStartupCleanup() {
+    if (_lastStartupCleanupAt != null) return;
+    _lastStartupCleanupAt = _now();
+    unawaited(scheduleCleanup());
   }
 
   /// 成功写盘计数 — 累计 64 次安排一次清理（§17.3 入口 2）
