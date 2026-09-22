@@ -7,7 +7,7 @@ import 'package:simple_player_flutter/kernel/services/app_settings_service.dart'
 import 'package:simple_player_flutter/kernel/services/video_processing_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
-import 'package:simple_player_flutter/ui/dialogs/settings/settings_dialog.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/video_settings_content.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
@@ -21,14 +21,16 @@ void main() {
   });
 
   // 固定中文 locale — 文案断言（标题/导航/分区名）不随宿主环境漂移。
-  // 非 route 浮动面板：直接 pump SettingsDialog（生产挂载于控制层 Stack，
-  // 显隐由宿主 notifier 驱动），Close 按钮经 onClose 收口。
+  // 非 route 停靠面板：直接 pump SettingsPanel（生产挂载于控制层 Stack
+  // 中列，显隐由宿主 notifier 经 visible 驱动），关闭按钮经 onClose 收口。
   Widget buildSubject({VoidCallback? onClose}) => MaterialApp(
     locale: const Locale('zh'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
-      body: Center(child: SettingsDialog(onClose: onClose)),
+      body: Center(
+        child: SettingsPanel(visible: true, onClose: onClose ?? () {}),
+      ),
     ),
   );
 
@@ -96,10 +98,12 @@ void main() {
     var closed = false;
     await openDialog(tester, onClose: () => closed = true);
 
-    await tester.tap(find.text('关闭'));
+    // 标题行关闭按钮为 GlassButton.iconOnly — 经 tooltip 定位（播放列表
+    // 同款交互）.
+    await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
 
-    // 非 route 面板：Close 经 onClose 回调收口到宿主 notifier（生产中
+    // 非 route 面板：关闭按钮经 onClose 回调收口到宿主 notifier（生产中
     // settingsVisible.value = false），面板移除由宿主 Stack 显隐控制。
     expect(closed, isTrue);
   });
@@ -215,7 +219,9 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(
-          child: SettingsDialog(
+          child: SettingsPanel(
+            visible: true,
+            onClose: () {},
             services: SettingsServicesBundle(
               videoProcessing: videoProcessing,
               settings: settings,

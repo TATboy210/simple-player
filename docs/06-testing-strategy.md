@@ -180,7 +180,7 @@ test('playback controller opens file and starts playing', () async {
 | 集成测试 | 无 `integration_test/` 目录，无端到端测试 |
 | Golden 测试 | 无视觉回归测试 |
 | 播放列表面板测试 | `playlist_panel.dart` 无对应测试 |
-| 对话框测试 | `settings_dialog.dart` / `media_info_dialog.dart` 无测试 |
+| 对话框测试 | `settings_panel.dart` 已有 `settings_panel_test.dart` / `media_info_dialog.dart` 无测试 |
 | 拖放测试 | `drop_handler.dart` 无测试 |
 | Aurora 背景测试 | 动画组件无测试 |
 | 性能基准测试 | `startup_parallel_init_test.dart` 存在但覆盖面窄 |

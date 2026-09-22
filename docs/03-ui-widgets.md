@@ -308,7 +308,7 @@ Container (width: Tokens.playlistPanelWidth, bgPanel, border left)
 
 ### 12.2 Settings Dialog (设置对话框)
 
-**文件:** `lib/ui/dialogs/settings_dialog.dart` (~150行)
+**文件:** `lib/ui/dialogs/settings/settings_panel.dart` (停靠面板, 控制栏同款玻璃壳)
 
 标签页设置对话框:
 - **Equalizer Tab**: 10段均衡器

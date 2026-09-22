@@ -9,7 +9,7 @@
 ///   内存缓存 + 新文件装载后重放
 /// - 本类 = 编排: 启动回放 → 变更防抖写回 → 断点开关持有
 ///
-/// 架构位置: SettingsDialog (UI) → **AppSettingsService** → MediaEngine /
+/// 架构位置: SettingsPanel (UI) → **AppSettingsService** → MediaEngine /
 /// VideoProcessingService / AppSettingsStore
 library;
 

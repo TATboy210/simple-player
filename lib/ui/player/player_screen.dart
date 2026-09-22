@@ -13,7 +13,7 @@ import '../../kernel/services/playback_controller.dart';
 import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/services/subtitle_path_validator.dart';
 import '../theme/tokens.dart';
-import '../dialogs/settings/settings_dialog.dart';
+import '../dialogs/settings/settings_panel.dart';
 import '../window/custom_title_bar.dart';
 import 'media_kit_player_port.dart';
 import 'player_video_controls.dart';

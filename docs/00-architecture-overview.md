@@ -74,7 +74,7 @@ lib/
 │   │   ├── playlist_panel.dart        # 右侧面板 (拖拽排序)
 │   │   └── recent_files_panel.dart    # 最近播放面板
 │   ├── dialogs/                       # 对话框
-│   │   ├── settings_dialog.dart       # 设置 (EQ/音轨/视频处理)
+│   │   ├── settings_panel.dart        # 设置面板 (通用/视频/音频/关于)
 │   │   └── media_info_dialog.dart     # 媒体属性
 │   └── shared/                        # 共享组件
 │       ├── glass_container.dart       # 毛玻璃容器 (3级模糊)

@@ -26,7 +26,7 @@ import '../../kernel/diagnostics/startup_timeline.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/player_services.dart';
 import '../../l10n/app_localizations.dart';
-import '../../ui/dialogs/settings/settings_dialog.dart';
+import '../../ui/dialogs/settings/settings_panel.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
 import 'file_picker_adapters.dart';

@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../kernel/engine/engine_state.dart';
-import '../dialogs/settings/settings_dialog.dart';
+import '../dialogs/settings/settings_panel.dart';
 import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/window_bridge/window_bridge.dart';
 import '../playlist/playlist_panel.dart';
@@ -376,7 +376,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
   void _handleTap() {
     // 点外关闭语义 (面板可见时点击视频区先关面板), 不触发双击全屏/隐藏
-    // 判定. 设置面板居中且 z 序在上, 先于播放列表关闭.
+    // 判定. 设置面板与播放列表同层, 先于播放列表关闭.
     final settingsNotifier = widget.settingsVisible;
     if (settingsNotifier != null && settingsNotifier.value) {
       settingsNotifier.value = false;
@@ -746,31 +746,49 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     return widget.windowMode.value.isFullscreen;
   }
 
-  /// 设置面板挂载 (v0.0.7.1) — 居中浮动玻璃面板, 与播放列表面板同构.
+  /// 设置面板挂载 (v0.0.7.2 停靠化) — 控制栏上方区域**中列**槽位,
+  /// 与播放列表面板同层 (右列).
   ///
-  /// 非 route 弹层: 无全屏 barrier, 打开时标题栏拖动不受阻. 显隐由
-  /// [settingsVisible] 驱动 — IgnorePointer 保证隐藏期零命中, AnimatedOpacity
-  /// 提供淡入淡出; 点击面板外经 _handleTap 关闭, Close 按钮经
-  /// SettingsDialog.onClose 收口回同一 notifier. z 序在控制栏 RepaintBoundary
-  /// 之后 — 小窗口下面板与控制栏重叠时面板优先 (用户裁决 2026-09-22).
+  /// 左中右分区: 右列 = 播放列表 (panelWidth + 呼吸距), 中列 = 设置面板
+  /// 在扣除右列后的剩余区域居中 (播放列表开关时居中位置动态移动),
+  /// 左列 = 自由区 (错误卡片/视频). 槽位 top/bottom 与播放列表挂载逐字
+  /// 相同 (bottom 避开控制栏区域) — 几何上永不与控制栏重叠.
+  ///
+  /// 显隐由 [settingsVisible] 驱动 (面板内部 FadeTransition, 播放列表
+  /// 同款); 点击面板外经 _handleTap 关闭, 标题行关闭按钮经 onClose
+  /// 收口回同一 notifier. 双 notifier merge 仅重算 Positioned 避让量,
+  /// SettingsPanel State 因树位稳定被保留, didUpdateWidget 驱动动画.
   Widget _buildSettingsPanel(ValueNotifier<bool> settingsVisible) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: settingsVisible,
-      builder: (_, visible, _) => Positioned.fill(
-        child: IgnorePointer(
-          ignoring: !visible,
-          child: AnimatedOpacity(
-            opacity: visible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: Tokens.durationNormal),
-            child: Center(
-              child: SettingsDialog(
-                services: widget.settingsServices,
-                onClose: () => settingsVisible.value = false,
-              ),
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        settingsVisible,
+        if (widget.playlistVisible != null) widget.playlistVisible,
+      ]),
+      builder: (_, _) {
+        // 避让量必须带 playlistVisible != null 门控: 测试装配可能
+        // notifier 非 null 而 coordinator 为 null (播放列表不挂载).
+        final playlistOpen =
+            widget.playlistVisible != null && widget.playlistVisible!.value;
+        return Positioned(
+          left: Tokens.controlBarMarginH,
+          // 播放列表可见时右缘避让整列宽 + 呼吸距; 不可见时全宽居中.
+          right:
+              Tokens.controlBarMarginH +
+              (playlistOpen ? PlaylistPanel.panelWidth + Tokens.spMd : 0),
+          top: Tokens.spMd,
+          bottom:
+              Tokens.controlBarMarginBottom +
+              Tokens.controlBarHeight +
+              Tokens.spMd,
+          child: Center(
+            child: SettingsPanel(
+              visible: settingsVisible.value,
+              services: widget.settingsServices,
+              onClose: () => settingsVisible.value = false,
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -833,6 +851,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                 ),
               ),
             ),
+          // v0.0.7.2 设置面板 — 控制栏上方区域**中列**槽位, 与播放列表
+          // 同层 (同 top/bottom 槽位约束, 几何上避开控制栏区域);
+          // 全屏 route 复制 builder 时自动携带.
+          if (widget.settingsVisible case final settingsVisible?)
+            _buildSettingsPanel(settingsVisible),
           RepaintBoundary(
             child: Stack(
               children: [
@@ -852,11 +875,6 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               ],
             ),
           ),
-          // v0.0.7.1 设置面板 — 居中浮动层, 挂载于控制栏 RepaintBoundary
-          // **之后** (z 序更高): 小窗口下面板与控制栏几何重叠时面板优先,
-          // 控制栏不被面板穿透误触; 全屏 route 复制 builder 时自动携带.
-          if (widget.settingsVisible case final settingsVisible?)
-            _buildSettingsPanel(settingsVisible),
           // 顶层 MouseRegion 监听 auto-hide 可见性 + 面板可见性 (v0.0.5:
           // 播放列表面板开启时用户仍在交互, 全屏静置不隐藏鼠标 — 需求 2;
           // v0.0.7.1 设置面板同理), 保持鼠标交互与 cursor 语义。
