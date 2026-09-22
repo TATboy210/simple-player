@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../kernel/engine/engine_state.dart';
-import '../dialogs/settings/settings_dialog.dart' show SettingsServicesBundle;
+import '../dialogs/settings/settings_dialog.dart';
 import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/window_bridge/window_bridge.dart';
 import '../playlist/playlist_panel.dart';
@@ -76,6 +76,13 @@ class PlayerVideoControls extends StatefulWidget {
   /// 播放列表协调器 — 面板数据源与动作入口。null 时面板不挂载.
   final PlaylistCoordinator? playlistCoordinator;
 
+  /// 设置面板可见性 — 宿主持有的共享 notifier.
+  ///
+  /// 与 [playlistVisible] 同构:面板住进 controls builder(全屏 route 自动
+  /// 携带),共享 notifier 使窗口态/全屏两实例状态同步。null 时不挂载
+  /// (测试退路)。
+  final ValueNotifier<bool>? settingsVisible;
+
   /// 设置服务集合 (v0.0.6) — 断点续播开关等面板门控数据源.
   final SettingsServicesBundle? settingsServices;
 
@@ -94,6 +101,7 @@ class PlayerVideoControls extends StatefulWidget {
     required this.currentFileName,
     required this.windowMode,
     this.playlistVisible,
+    this.settingsVisible,
     this.playlistCoordinator,
     this.settingsServices,
     this.emptyState,
@@ -367,8 +375,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   }
 
   void _handleTap() {
-    // v0.0.5: 播放列表面板可见时点击视频区(面板外)先关面板 —
-    // 点外关闭语义, 不触发双击全屏/隐藏判定.
+    // 点外关闭语义 (面板可见时点击视频区先关面板), 不触发双击全屏/隐藏
+    // 判定. 设置面板居中且 z 序在上, 先于播放列表关闭.
+    final settingsNotifier = widget.settingsVisible;
+    if (settingsNotifier != null && settingsNotifier.value) {
+      settingsNotifier.value = false;
+      return;
+    }
     final visibleNotifier = widget.playlistVisible;
     if (visibleNotifier != null && visibleNotifier.value) {
       visibleNotifier.value = false;
@@ -423,10 +436,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.windowMode.addListener(_syncModeFullscreen);
     widget.resizing?.addListener(_onResizeChanged);
     _autoHide.visible.addListener(_scheduleSubtitlePaddingSync);
-    // v0.0.5: 控制栏自动隐藏 hold — 模态窗口/播放列表面板开启或无媒体时
-    // 冻结 (三源合成, 任一变化即时同步).
+    // v0.0.5: 控制栏自动隐藏 hold — 模态窗口/播放列表面板/设置面板开启或
+    // 无媒体时冻结 (多源合成, 任一变化即时同步).
     ModalHoldObserver.openModalCount.addListener(_syncAutoHideHold);
     widget.playlistVisible?.addListener(_syncAutoHideHold);
+    widget.settingsVisible?.addListener(_syncAutoHideHold);
     _syncAutoHideHold(); // attach 即同步一次 (先开窗后进全屏的时序).
     _lifecycleListenersAttached = true;
   }
@@ -439,15 +453,18 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _autoHide.visible.removeListener(_scheduleSubtitlePaddingSync);
     ModalHoldObserver.openModalCount.removeListener(_syncAutoHideHold);
     widget.playlistVisible?.removeListener(_syncAutoHideHold);
+    widget.settingsVisible?.removeListener(_syncAutoHideHold);
     _lifecycleListenersAttached = false;
   }
 
-  /// 控制栏自动隐藏 hold 两源合成 — 任一为真即冻结隐藏计时:
-  /// ① 模态弹层开启 (设置/菜单) ② 播放列表面板可见 (用户正在浏览队列).
+  /// 控制栏自动隐藏 hold 多源合成 — 任一为真即冻结隐藏计时:
+  /// ① 模态弹层开启 (菜单等 PopupRoute) ② 播放列表面板可见 (用户正在
+  /// 浏览队列) ③ 设置面板可见 (浮动面板无 route, 不经 ModalHoldObserver).
   void _syncAutoHideHold() {
     _autoHide.modalOpen =
         ModalHoldObserver.openModalCount.value > 0 ||
-        (widget.playlistVisible?.value ?? false);
+        (widget.playlistVisible?.value ?? false) ||
+        (widget.settingsVisible?.value ?? false);
   }
 
   /// 空置态钉住控制栏 (v0.0.6) — 钉住条件与空置页渲染条件 (**emptyActive**
@@ -729,6 +746,33 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     return widget.windowMode.value.isFullscreen;
   }
 
+  /// 设置面板挂载 (v0.0.7.1) — 居中浮动玻璃面板, 与播放列表面板同构.
+  ///
+  /// 非 route 弹层: 无全屏 barrier, 打开时标题栏拖动不受阻. 显隐由
+  /// [settingsVisible] 驱动 — IgnorePointer 保证隐藏期零命中, AnimatedOpacity
+  /// 提供淡入淡出; 点击面板外经 _handleTap 关闭, Close 按钮经
+  /// SettingsDialog.onClose 收口回同一 notifier.
+  Widget _buildSettingsPanel(ValueNotifier<bool> settingsVisible) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: settingsVisible,
+      builder: (_, visible, _) => Positioned.fill(
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: AnimatedOpacity(
+            opacity: visible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: Tokens.durationNormal),
+            child: Center(
+              child: SettingsDialog(
+                services: widget.settingsServices,
+                onClose: () => settingsVisible.value = false,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 仅测试观测外层 build；状态监听仍下沉到真正依赖它的局部区域。
@@ -788,6 +832,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                 ),
               ),
             ),
+          // v0.0.7.1 设置面板 — 居中浮动层, 在播放列表之后/控制栏之前
+          // (z 序规则与播放列表一致); 全屏 route 复制 builder 时自动携带.
+          if (widget.settingsVisible case final settingsVisible?)
+            _buildSettingsPanel(settingsVisible),
           RepaintBoundary(
             child: Stack(
               children: [
@@ -808,22 +856,27 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
             ),
           ),
           // 顶层 MouseRegion 监听 auto-hide 可见性 + 面板可见性 (v0.0.5:
-          // 播放列表面板开启时用户仍在交互, 全屏静置不隐藏鼠标 — 需求 2),
-          // 保持鼠标交互与 cursor 语义。
+          // 播放列表面板开启时用户仍在交互, 全屏静置不隐藏鼠标 — 需求 2;
+          // v0.0.7.1 设置面板同理), 保持鼠标交互与 cursor 语义。
           Positioned.fill(
             child: ListenableBuilder(
               listenable: Listenable.merge([
                 _autoHide.visible,
                 if (widget.playlistVisible != null) widget.playlistVisible,
+                if (widget.settingsVisible != null) widget.settingsVisible,
               ]),
               builder: (_, _) {
                 final isVisible = _autoHide.visible.value;
                 final playlistVisible = widget.playlistVisible?.value ?? false;
+                final settingsVisible = widget.settingsVisible?.value ?? false;
                 return MouseRegion(
                   opaque: false,
                   hitTestBehavior: HitTestBehavior.translucent,
                   cursor:
-                      isFullscreenForCursor && !isVisible && !playlistVisible
+                      isFullscreenForCursor &&
+                          !isVisible &&
+                          !playlistVisible &&
+                          !settingsVisible
                       ? SystemMouseCursors.none
                       : MouseCursor.defer,
                   onHover: (event) {

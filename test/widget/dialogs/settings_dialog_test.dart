@@ -21,26 +21,20 @@ void main() {
   });
 
   // 固定中文 locale — 文案断言（标题/导航/分区名）不随宿主环境漂移。
-  Widget buildSubject() => MaterialApp(
+  // 非 route 浮动面板：直接 pump SettingsDialog（生产挂载于控制层 Stack，
+  // 显隐由宿主 notifier 驱动），Close 按钮经 onClose 收口。
+  Widget buildSubject({VoidCallback? onClose}) => MaterialApp(
     locale: const Locale('zh'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
-      body: Builder(
-        builder: (context) => Center(
-          child: TextButton(
-            onPressed: () => SettingsDialog.show(context),
-            child: const Text('打开设置'),
-          ),
-        ),
-      ),
+      body: Center(child: SettingsDialog(onClose: onClose)),
     ),
   );
 
-  Future<void> openDialog(WidgetTester tester) async {
-    await tester.pumpWidget(buildSubject());
-    await tester.tap(find.text('打开设置'));
-    await tester.pumpAndSettle(); // 弹出动画 + 内容淡入完成
+  Future<void> openDialog(WidgetTester tester, {VoidCallback? onClose}) async {
+    await tester.pumpWidget(buildSubject(onClose: onClose));
+    await tester.pumpAndSettle(); // 内容淡入完成
   }
 
   testWidgets('shows a two-pane shell with nav entries', (tester) async {
@@ -99,14 +93,15 @@ void main() {
   });
 
   testWidgets('closes via the built-in close button', (tester) async {
-    await openDialog(tester);
+    var closed = false;
+    await openDialog(tester, onClose: () => closed = true);
 
     await tester.tap(find.text('关闭'));
-    await tester.pumpAndSettle(); // 关闭动画走完
+    await tester.pumpAndSettle();
 
-    // 回到承载页 — 入口按钮仍在，弹层消失以右区标题消失为准。
-    expect(find.text('打开设置'), findsOneWidget);
-    expect(find.text('关于'), findsNothing);
+    // 非 route 面板：Close 经 onClose 回调收口到宿主 notifier（生产中
+    // settingsVisible.value = false），面板移除由宿主 Stack 显隐控制。
+    expect(closed, isTrue);
   });
 
   testWidgets(
@@ -219,17 +214,11 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
-        body: Builder(
-          builder: (context) => Center(
-            child: TextButton(
-              onPressed: () => SettingsDialog.show(
-                context,
-                services: SettingsServicesBundle(
-                  videoProcessing: videoProcessing,
-                  settings: settings,
-                ),
-              ),
-              child: const Text('打开设置'),
+        body: Center(
+          child: SettingsDialog(
+            services: SettingsServicesBundle(
+              videoProcessing: videoProcessing,
+              settings: settings,
             ),
           ),
         ),
@@ -240,7 +229,6 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(buildInjectedSubject());
-      await tester.tap(find.text('打开设置'));
       await tester.pumpAndSettle();
 
       // 入口灰显: 点击不切换内容.
@@ -260,7 +248,6 @@ void main() {
 
     testWidgets('通用分区出现断点续播开关并可翻转', (tester) async {
       await tester.pumpWidget(buildInjectedSubject());
-      await tester.tap(find.text('打开设置'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('通用'));

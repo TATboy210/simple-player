@@ -115,6 +115,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 翻转; controls builder 内的面板(含全屏 route 复制实例)统一消费它.
   final ValueNotifier<bool> _playlistVisible = ValueNotifier<bool>(false);
 
+  /// 设置面板可见性 — 共享 notifier: 设置按钮/点视频区/Esc 翻转;
+  /// 面板挂载于控制层 Stack (无 route barrier), 打开时标题栏仍可拖动.
+  final ValueNotifier<bool> _settingsVisible = ValueNotifier<bool>(false);
+
   /// 缓存标题栏 widget，避免窗口模式或 resize 导致父级 build 时重新创建标题栏子树。
   ///
   /// 标题栏内部仍自行监听窗口状态；这里只固定外层 widget identity，缩小无关
@@ -165,11 +169,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onStop: () => unawaited(widget.controller.stopCurrentMedia()),
       onOpenFile: () => widget.onOpenFile?.call(),
       onOpenSubtitle: () => unawaited(_openSubtitle()),
-      // 设置窗口壳 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
-      // v0.0.6: 传入 services bundle — video/audio 分区按注入启用。
-      onOpenSettings: () => unawaited(
-        SettingsDialog.show(context, services: widget.settingsServices),
-      ),
+      // 设置面板 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
+      // v0.0.6: services bundle 经 PlayerVideoControls 传入挂载的面板。
+      onOpenSettings: () => _settingsVisible.value = true,
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
@@ -197,6 +199,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
           : () => unawaited(widget.playlistCoordinator!.cyclePlayMode()),
       playMode: widget.playlistCoordinator?.playMode,
       onEscapePressed: () {
+        // 逐层退出: 设置面板 → 播放列表面板 → 交回退出全屏.
+        if (_settingsVisible.value) {
+          _settingsVisible.value = false;
+          return true;
+        }
         if (!_playlistVisible.value) return false;
         _playlistVisible.value = false;
         return true;
@@ -264,6 +271,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _textureProbe?.dispose();
     _resizeMetrics?.dispose();
     _playlistVisible.dispose();
+    _settingsVisible.dispose();
     super.dispose();
   }
 
@@ -428,6 +436,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       currentFileName: widget.controller.currentFileName,
       windowMode: widget.windowService.mode,
       playlistVisible: _playlistVisible,
+      settingsVisible: _settingsVisible,
       playlistCoordinator: widget.playlistCoordinator,
       settingsServices: widget.settingsServices,
       emptyState: widget.emptyState,
