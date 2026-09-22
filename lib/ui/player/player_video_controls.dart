@@ -751,7 +751,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 非 route 弹层: 无全屏 barrier, 打开时标题栏拖动不受阻. 显隐由
   /// [settingsVisible] 驱动 — IgnorePointer 保证隐藏期零命中, AnimatedOpacity
   /// 提供淡入淡出; 点击面板外经 _handleTap 关闭, Close 按钮经
-  /// SettingsDialog.onClose 收口回同一 notifier.
+  /// SettingsDialog.onClose 收口回同一 notifier. z 序在控制栏 RepaintBoundary
+  /// 之后 — 小窗口下面板与控制栏重叠时面板优先 (用户裁决 2026-09-22).
   Widget _buildSettingsPanel(ValueNotifier<bool> settingsVisible) {
     return ValueListenableBuilder<bool>(
       valueListenable: settingsVisible,
@@ -832,10 +833,6 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                 ),
               ),
             ),
-          // v0.0.7.1 设置面板 — 居中浮动层, 在播放列表之后/控制栏之前
-          // (z 序规则与播放列表一致); 全屏 route 复制 builder 时自动携带.
-          if (widget.settingsVisible case final settingsVisible?)
-            _buildSettingsPanel(settingsVisible),
           RepaintBoundary(
             child: Stack(
               children: [
@@ -855,6 +852,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               ],
             ),
           ),
+          // v0.0.7.1 设置面板 — 居中浮动层, 挂载于控制栏 RepaintBoundary
+          // **之后** (z 序更高): 小窗口下面板与控制栏几何重叠时面板优先,
+          // 控制栏不被面板穿透误触; 全屏 route 复制 builder 时自动携带.
+          if (widget.settingsVisible case final settingsVisible?)
+            _buildSettingsPanel(settingsVisible),
           // 顶层 MouseRegion 监听 auto-hide 可见性 + 面板可见性 (v0.0.5:
           // 播放列表面板开启时用户仍在交互, 全屏静置不隐藏鼠标 — 需求 2;
           // v0.0.7.1 设置面板同理), 保持鼠标交互与 cursor 语义。
