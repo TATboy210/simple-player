@@ -23,6 +23,10 @@ import 'playlist_tile.dart';
 /// 动画期间 widget 树零重建; IgnorePointer 锚定 [visible] — 关闭瞬间
 /// 让出命中, 杜绝渐退中"虚空点击".
 class PlaylistPanel extends StatefulWidget {
+  /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
+  /// 公开常量: 设置面板中列挂载 (v0.0.7.2) 计算右缘避让量需要它.
+  static const double panelWidth = 280.0;
+
   /// 队列条目视图 (协调器逻辑队列, 断点元数据已合并).
   final ValueListenable<List<PlaylistItem>> entries;
 
@@ -112,9 +116,6 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 批量选中的条目索引集合 — 逻辑队列索引, 条目数变化时自动过滤越界.
   final Set<int> _batchSelected = <int>{};
 
-  /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
-  static const _panelWidth = 280.0;
-
   @override
   void initState() {
     super.initState();
@@ -151,7 +152,10 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: RepaintBoundary(
         child: FadeTransition(
           opacity: _fade,
-          child: SizedBox(width: _panelWidth, child: _buildShell(context)),
+          child: SizedBox(
+            width: PlaylistPanel.panelWidth,
+            child: _buildShell(context),
+          ),
         ),
       ),
     );
