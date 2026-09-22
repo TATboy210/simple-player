@@ -30,24 +30,20 @@ class SettingsServicesBundle {
 
 /// 设置窗口 — 左右结构壳：左侧分区导航，右侧分区内容。
 ///
+/// 非 route 浮动面板：由 PlayerVideoControls 控制层 Stack 挂载（与播放列表
+/// 面板同构），显隐由 PlayerScreen 的 settingsVisible notifier 驱动 —
+/// 无全屏 barrier，打开时标题栏拖动/按钮不受阻。
+///
 /// 「通用 / 关于」恒可交互；「视频 / 音频」在 bundle 提供对应服务后启用
 /// （v0.0.6）。内容区按选中分区切换各 Content；bundle 缺成员时分区
 /// 灰显占位（Avoid captive UI：无伪交互）。
 class SettingsDialog extends StatefulWidget {
-  const SettingsDialog({super.key, this.services});
+  const SettingsDialog({super.key, this.services, this.onClose});
 
   final SettingsServicesBundle? services;
 
-  /// 以默认 navigator 弹出设置窗口；全屏 route 上层同样正常浮起。
-  ///
-  /// Fire-and-forget 调用方可不等待返回值（返回值供需要 await 的测试使用）。
-  static Future<void> show(
-    BuildContext context, {
-    SettingsServicesBundle? services,
-  }) => showDialog(
-    context: context,
-    builder: (_) => SettingsDialog(services: services),
-  );
+  /// 关闭回调 — Close 按钮触发；不提供时 AppDialog 回退 Navigator.pop。
+  final VoidCallback? onClose;
 
   @override
   State<SettingsDialog> createState() => _SettingsDialogState();
@@ -65,6 +61,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       title: l10n.settings,
       width: 620,
       height: 440,
+      onClose: widget.onClose,
       content: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

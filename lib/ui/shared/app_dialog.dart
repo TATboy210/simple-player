@@ -22,11 +22,16 @@ class AppDialog extends StatelessWidget {
   final double width;
   final double height;
 
+  /// 关闭回调 — 非 route 场景（Stack 内嵌浮动面板）由调用方提供，
+  /// Close 按钮走它而非 Navigator.pop；null 保持旧 route 语义（向后兼容）。
+  final VoidCallback? onClose;
+
   const AppDialog({
     super.key,
     required this.title,
     required this.content,
     this.actions,
+    this.onClose,
     this.width = 400,
     this.height = 350,
   });
@@ -85,7 +90,7 @@ class AppDialog extends StatelessWidget {
                               child: content,
                             ),
                           ),
-                          _DialogActions(actions: actions),
+                          _DialogActions(actions: actions, onClose: onClose),
                         ],
                       ),
                     ),
@@ -176,7 +181,11 @@ class _DialogTitle extends StatelessWidget {
 class _DialogActions extends StatelessWidget {
   final List<Widget>? actions;
 
-  const _DialogActions({this.actions});
+  /// 关闭回调 — 非 null 时 Close 按钮走它（Stack 内嵌场景无 route 可 pop）；
+  /// null 走 Navigator.pop（route 弹出的既有语义）。
+  final VoidCallback? onClose;
+
+  const _DialogActions({this.actions, this.onClose});
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +204,8 @@ class _DialogActions extends StatelessWidget {
         children: [
           ...?actions,
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            // onClose 优先 — Stack 内嵌面板无 route 可 pop，由调用方收口。
+            onPressed: onClose ?? () => Navigator.of(context).pop(),
             child: Text(
               AppLocalizations.of(context).close,
               style: const TextStyle(color: Tokens.textSecondary),
