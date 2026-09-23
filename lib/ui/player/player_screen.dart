@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../kernel/window_bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
+import '../../kernel/bridge/win32/ime_bridge.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/services/playlist_coordinator.dart';
@@ -126,10 +127,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late Widget _titleBar;
 
   /// 打开系统字幕选择器并返回用户选择的本地路径。
+  ///
+  /// 对话框期间临时恢复 IME — 窗口 IMC 已解除（flutter_window.cpp），
+  /// 原生文件对话框在 NULL IMC 下触发 msctf 崩溃（与打开文件同因）。
   Future<String?> _pickSubtitlePath() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
+    final result = await Win32ImeBridge.withImeRestored(
+      () => FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
+      ),
     );
     // file_picker 11.x：返回 FilePickerResult?，用户取消为 null——视为取消。
     if (result == null) return null;

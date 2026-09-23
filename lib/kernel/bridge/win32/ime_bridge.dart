@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:ffi' as ffi;
+import 'dart:io' show Platform;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -43,6 +44,30 @@ class Win32ImeBridge {
 
   /// 再次解除窗口的输入法上下文（禁用 IME 组合）。
   bool disable() => _associate(0, 'disable');
+
+  /// 在 [action] 执行期间**临时恢复** IME（仅 Windows；其他平台直接透传）。
+  ///
+  /// 背景：窗口的 IMC 被解除后，原生文件对话框（IFileOpenDialog）创建
+  /// 子窗口/编辑控件时 TSF/UI Automation 路径假定 IMC 存在，NULL 上下文
+  /// 触发 imm32/msctf 空指针崩溃（已知 Windows bug 类，Windows 10 多个
+  /// 版本受影响）——因此一切原生文件对话框调用必须经本方法包裹：
+  /// 弹窗期间恢复输入法（对话框内文件名可正常输入中文），关闭后再禁用。
+  ///
+  /// enable 失败（如前台已切走）时仍执行 [action]，但跳过收尾禁用
+  /// （从未恢复过就无从禁用）；[action] 的异常原样传播。
+  static Future<T> withImeRestored<T>(
+    Future<T> Function() action, {
+    KernelLogger? logger,
+  }) async {
+    if (!Platform.isWindows) return action();
+    final bridge = Win32ImeBridge(logger: logger);
+    final restored = bridge.enable();
+    try {
+      return await action();
+    } finally {
+      if (restored) bridge.disable();
+    }
+  }
 
   /// 统一执行：定位 hwnd → 按模式关联 → 日志与返回。
   bool _associate(int mode, String operation) {
