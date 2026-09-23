@@ -241,36 +241,36 @@ void main() {
       );
     });
 
-    testWidgets('Enter 进入内容层、Esc 逐层返回后关闭面板', (tester) async {
+    testWidgets('→ 键进入内容层；L1 内 ← 返回 tag 层；Esc 恒冒泡关面板', (tester) async {
       var closeCount = 0;
       await openDialog(tester, onClose: () => closeCount++);
 
-      // Enter 进入「通用」内容层。
+      // → 直接进入「通用」内容层（默认选中通用 → ↑ 先切到通用）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
       expect(find.byType(GeneralSettingsContent), findsOneWidget);
 
-      // Esc 第一次 = 返回 tag 层（面板仍打开，onClose 不触发）。
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      // L1 内 ← = 返回 tag 层（新语义，面板仍打开，onClose 不触发）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
       expect(find.byType(GeneralSettingsContent), findsNothing);
       expect(closeCount, 0);
 
-      // Esc 第二次 = 面板级返回 ignored → 冒泡宿主（本测试装配无宿主
+      // Esc 在任何层级都 ignored 冒泡宿主关整个面板（本测试装配无宿主
       // KeyboardHandler 链，无效果）— 锁定「面板不自行关闭、不吞键」.
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(closeCount, 0);
     });
 
-    testWidgets('L1 内左右键方向性切换分区', (tester) async {
+    testWidgets('L1 内 → 切下一分区；← 返回 tag 层', (tester) async {
       await openDialog(tester);
-      // 进入「通用」内容层（默认选中关于 → ↑ 到通用 → Enter）。
+      // 进入「通用」内容层（默认选中关于 → ↑ 到通用 → →）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
       expect(find.byType(GeneralSettingsContent), findsOneWidget);
 
@@ -280,10 +280,10 @@ void main() {
       expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
       expect(find.byType(GeneralSettingsContent), findsNothing);
 
-      // ← 切回「通用」。
+      // ← 返回 tag 层（关于内容消失 — Offstage）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
-      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+      expect(find.byType(GeneralSettingsContent), findsNothing);
     });
 
     testWidgets('General 行导航 — ↓ 高亮首行、Enter 翻转错误卡片开关', (tester) async {
