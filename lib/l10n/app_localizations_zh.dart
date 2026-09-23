@@ -85,6 +85,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings => '设置';
 
   @override
+  String get back => '返回';
+
+  @override
+  String get settingsSummaryGeneral => '语言 · 错误卡片 · 断点续播';
+
+  @override
+  String get settingsSummaryVideo => '亮度 · 对比度 · 旋转 · 宽高比';
+
+  @override
+  String get settingsSummaryAudio => '音频延迟 · 字幕延迟';
+
+  @override
+  String get settingsSummaryAbout => '开源组件 · 特别鸣谢 · 技术栈';
+
+  @override
   String get audioTab => '音频';
 
   @override

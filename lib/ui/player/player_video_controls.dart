@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -441,6 +442,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     ModalHoldObserver.openModalCount.addListener(_syncAutoHideHold);
     widget.playlistVisible?.addListener(_syncAutoHideHold);
     widget.settingsVisible?.addListener(_syncAutoHideHold);
+    // E1 焦点归还 — 关面板时把焦点显式还给控制层 (unfocus() 会落到
+    // 路由 scope 致全屏按键死区, 见 _handleSettingsVisibleChanged).
+    widget.settingsVisible?.addListener(_handleSettingsVisibleChanged);
+    _lastSettingsVisible = widget.settingsVisible?.value ?? false;
     _syncAutoHideHold(); // attach 即同步一次 (先开窗后进全屏的时序).
     _lifecycleListenersAttached = true;
   }
@@ -454,6 +459,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     ModalHoldObserver.openModalCount.removeListener(_syncAutoHideHold);
     widget.playlistVisible?.removeListener(_syncAutoHideHold);
     widget.settingsVisible?.removeListener(_syncAutoHideHold);
+    widget.settingsVisible?.removeListener(_handleSettingsVisibleChanged);
     _lifecycleListenersAttached = false;
   }
 
@@ -465,6 +471,21 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         ModalHoldObserver.openModalCount.value > 0 ||
         (widget.playlistVisible?.value ?? false) ||
         (widget.settingsVisible?.value ?? false);
+  }
+
+  /// 上一次设置面板可见性 — 焦点归还的边沿检测基准.
+  bool _lastSettingsVisible = false;
+
+  /// 设置面板关闭时归还焦点（E1）— `FocusNode.unfocus()` 默认把焦点落到
+  /// 路由级 scope（位于控制层 Focus 之上），全屏 route 无 KeyboardHandler
+  /// 兜底，按键会全部失聪；故宿主在翻 false 的边沿显式 requestFocus
+  /// 回控制层焦点（唯一焦点写入点，无双重 mark 竞态）.
+  void _handleSettingsVisibleChanged() {
+    final value = widget.settingsVisible?.value ?? false;
+    if (!value && _lastSettingsVisible && mounted && !_isDeactivating) {
+      _focusNode.requestFocus();
+    }
+    _lastSettingsVisible = value;
   }
 
   /// 空置态钉住控制栏 (v0.0.6) — 钉住条件与空置页渲染条件 (**emptyActive**
@@ -746,46 +767,47 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     return widget.windowMode.value.isFullscreen;
   }
 
-  /// 设置面板挂载 (v0.0.7.2 停靠化) — 控制栏上方区域**中列**槽位,
-  /// 与播放列表面板同层 (右列).
+  /// 设置面板挂载 (v0.0.8 XMB 化) — 控制栏上方区域**中列**槽位, 位置恒定.
   ///
-  /// 左中右分区: 右列 = 播放列表 (panelWidth + 呼吸距), 中列 = 设置面板
-  /// 在扣除右列后的剩余区域居中 (播放列表开关时居中位置动态移动),
-  /// 左列 = 自由区 (错误卡片/视频). 槽位 top/bottom 与播放列表挂载逐字
-  /// 相同 (bottom 避开控制栏区域) — 几何上永不与控制栏重叠.
+  /// 三等分: 面板宽 = 槽位宽/3 (854→273 / 1280→415), 高度撑满 (与播放
+  /// 列表同形态); 右缘恒贴播放列表左侧 spMd (播放列表关闭时右侧留白,
+  /// 位置不随其开关变化 — 动态避让已删除). 槽位 top/bottom 与播放列表
+  /// 挂载逐字相同 (bottom 避开控制栏区域).
   ///
-  /// 显隐由 [settingsVisible] 驱动 (面板内部 FadeTransition, 播放列表
-  /// 同款); 点击面板外经 _handleTap 关闭, 标题行关闭按钮经 onClose
-  /// 收口回同一 notifier. 双 notifier merge 仅重算 Positioned 避让量,
-  /// SettingsPanel State 因树位稳定被保留, didUpdateWidget 驱动动画.
+  /// 显隐由 [settingsVisible] 驱动 (面板内部 FadeTransition); 点击面板外
+  /// 经 _handleTap 关闭, 标题行关闭按钮经 onClose 收口回同一 notifier.
   Widget _buildSettingsPanel(ValueNotifier<bool> settingsVisible) {
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        settingsVisible,
-        if (widget.playlistVisible != null) widget.playlistVisible,
-      ]),
+      listenable: settingsVisible,
       builder: (_, _) {
-        // 避让量必须带 playlistVisible != null 门控: 测试装配可能
-        // notifier 非 null 而 coordinator 为 null (播放列表不挂载).
-        final playlistOpen =
-            widget.playlistVisible != null && widget.playlistVisible!.value;
         return Positioned(
           left: Tokens.controlBarMarginH,
-          // 播放列表可见时右缘避让整列宽 + 呼吸距; 不可见时全宽居中.
+          // 恒定右缘 — 贴播放列表左侧 spMd (panelWidth=280 不变).
           right:
-              Tokens.controlBarMarginH +
-              (playlistOpen ? PlaylistPanel.panelWidth + Tokens.spMd : 0),
+              Tokens.controlBarMarginH + PlaylistPanel.panelWidth + Tokens.spMd,
           top: Tokens.spMd,
           bottom:
               Tokens.controlBarMarginBottom +
               Tokens.controlBarHeight +
               Tokens.spMd,
-          child: Center(
-            child: SettingsPanel(
-              visible: settingsVisible.value,
-              services: widget.settingsServices,
-              onClose: () => settingsVisible.value = false,
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 还原整槽宽 → 三等分; 槽宽不足 (最小窗) 时收缩到可用宽.
+              final slotW =
+                  constraints.maxWidth + PlaylistPanel.panelWidth + Tokens.spMd;
+              final colW = math.min(slotW / 3, constraints.maxWidth);
+              return Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: colW,
+                  child: SettingsPanel(
+                    visible: settingsVisible.value,
+                    services: widget.settingsServices,
+                    onClose: () => settingsVisible.value = false,
+                  ),
+                ),
+              );
+            },
           ),
         );
       },

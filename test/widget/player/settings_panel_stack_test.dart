@@ -1,5 +1,6 @@
 // ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/services/playlist_coordinator.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
@@ -8,25 +9,32 @@ import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
+import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
 
-/// 设置面板停靠化 (v0.0.7.2) 行为契约 —
-/// 面板挂载于控制层 Stack 中列槽位（与播放列表同层，非 route），
-/// 打开时标题栏拖动不被 barrier 拦截、播放列表同开时左移避让不重叠。
-void main() {
-  // 与 lifecycle 测试同尺寸: 槽位居中后四周仍有面板外区域可点.
-  const surface = Size(1280, 720);
+/// 设置面板停靠化 + XMB 化 (v0.0.8) 行为契约 —
+/// 面板挂载于控制层 Stack 中列槽位（与播放列表同层，非 route）：
+/// 宽 = 槽位/3、高撑满、位置恒定（不随播放列表开关变化）；
+/// 键盘交叉导航（面板开着方向键不触发 seek，关闭后归还宿主）。
+/// 与 lifecycle 测试同尺寸: 槽位居中后四周仍有面板外区域可点.
+const Size surface = Size(1280, 720);
 
+/// 槽位宽 = 窗口 - 左右 margin; 面板宽 = 槽位/3 (恒定, 与播放列表无关).
+double expectedPanelWidth() =>
+    (surface.width - 2 * Tokens.controlBarMarginH) / 3;
+
+void main() {
   /// [playlistVisible] 非 null 时同时装配播放列表 (coordinator 内部创建,
-  /// 纯内存 store) — 避让用例需要真实接线.
+  /// 纯内存 store) — 位置恒定用例需要真实接线.
   Future<void> pumpControls(
     WidgetTester tester,
     ValueNotifier<bool> settingsVisible, {
     bool initialVisible = false,
     ValueNotifier<bool>? playlistVisible,
+    PlayerActions? actions,
   }) async {
     settingsVisible.value = initialVisible;
     final video = FakeVideoControlsPort(player: FakePlayerControls());
@@ -50,7 +58,7 @@ void main() {
             child: PlayerVideoControls(
               video: video,
               engine: engine,
-              actions: const PlayerActions(),
+              actions: actions ?? const PlayerActions(),
               currentFileName: ValueNotifier<String>('a.mp4'),
               windowMode: ValueNotifier<WindowMode>(WindowMode.windowed),
               playlistVisible: playlistVisible,
@@ -97,7 +105,7 @@ void main() {
     expect(settingsVisible.value, isFalse);
   });
 
-  testWidgets('播放列表打开时设置面板左移避让 — 中列/右列不重叠', (tester) async {
+  testWidgets('三等分: 面板宽=槽位/3 高撑满且位置恒定 (播放列表开关不移动)', (tester) async {
     final settingsVisible = ValueNotifier<bool>(true);
     final playlistVisible = ValueNotifier<bool>(false);
     addTearDown(settingsVisible.dispose);
@@ -108,18 +116,63 @@ void main() {
       playlistVisible: playlistVisible,
     );
 
-    // 播放列表关闭: 设置面板在控制栏上方区域全宽居中 (决策 A).
+    // 播放列表关闭: 面板恒在中列 (右缘贴播放列表槽位左侧 spMd),
+    // 宽 = 槽位/3, 高撑满槽位.
     final closedRect = tester.getRect(find.byType(SettingsPanel));
-    expect(closedRect.center.dx, closeTo(surface.width / 2, 0.5));
+    expect(closedRect.width, closeTo(expectedPanelWidth(), 0.5));
+    expect(closedRect.height, closeTo(surface.height - 12 - 138, 0.5));
+    // 与播放列表槽位的呼吸距 (spMd) — 播放列表关闭时右缘同样恒定.
+    expect(
+      surface.width -
+          Tokens.controlBarMarginH -
+          PlaylistPanel.panelWidth -
+          closedRect.right,
+      closeTo(Tokens.spMd, 0.5),
+    );
 
-    // 播放列表打开: 设置面板在扣除右列槽位后的剩余区域居中 → 左移,
-    // 右缘留 spMd 呼吸距, 两面板 Rect 不相交.
+    // 播放列表打开: 面板位置与尺寸完全不变 (恒定中列, 无动态避让).
     playlistVisible.value = true;
     await tester.pumpAndSettle();
-    final panelRect = tester.getRect(find.byType(SettingsPanel));
+    final openRect = tester.getRect(find.byType(SettingsPanel));
+    expect(openRect, closedRect);
+
+    // 与真实播放列表 Rect 不相交.
     final playlistRect = tester.getRect(find.byType(PlaylistPanel));
-    expect(panelRect.center.dx, lessThan(closedRect.center.dx));
-    expect(panelRect.right, lessThanOrEqualTo(playlistRect.left));
-    expect(panelRect.overlaps(playlistRect), isFalse);
+    expect(playlistRect.left - openRect.right, closeTo(Tokens.spMd, 0.5));
+    expect(openRect.overlaps(playlistRect), isFalse);
+  });
+
+  testWidgets('面板开着方向键被面板消费不触发 seek, 关面板后归还宿主', (tester) async {
+    var seekCalls = 0;
+    final settingsVisible = ValueNotifier<bool>(false);
+    addTearDown(settingsVisible.dispose);
+    await pumpControls(
+      tester,
+      settingsVisible,
+      actions: PlayerActions(
+        onSeekBack: (_) => seekCalls++,
+        onSeekForward: (_) => seekCalls++,
+      ),
+    );
+
+    // 打开面板: 焦点入面板 (post-frame), ← 被面板级消费 (L0 无 ←→ 绑定,
+    // 返回 ignored → 冒泡? 否 — 面板 Focus L0 分支 ignored 会冒泡宿主!
+    // L1 才消费 ←→; 用 ↑↓/Enter 验证 L0 消费, ←→ 验证 L1).
+    settingsVisible.value = true;
+    await tester.pumpAndSettle();
+
+    // L1 内 ← 消费 (不冒泡 seek).
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter); // 进入内容层
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(seekCalls, 0, reason: '面板开着时方向键不得泄漏为 seek');
+
+    // 关闭面板: 宿主归还焦点, ← 恢复为 seek (E1 焦点归还契约).
+    settingsVisible.value = false;
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(seekCalls, 1, reason: '关面板后方向键必须恢复 seek (焦点归还)');
   });
 }

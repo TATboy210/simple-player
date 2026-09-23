@@ -85,6 +85,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settings => '설정';
 
   @override
+  String get back => '뒤로';
+
+  @override
+  String get settingsSummaryGeneral => '언어 · 오류 카드 · 이어보기';
+
+  @override
+  String get settingsSummaryVideo => '밝기 · 대비 · 회전 · 화면 비율';
+
+  @override
+  String get settingsSummaryAudio => '오디오 지연 · 자막 지연';
+
+  @override
+  String get settingsSummaryAbout => '구성 요소 · 감사 · 기술 스택';
+
+  @override
   String get audioTab => '오디오';
 
   @override

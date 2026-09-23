@@ -10,6 +10,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../kernel/services/app_settings_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -20,37 +21,104 @@ import 'error_feedback_settings.dart';
 ///
 /// 开关行翻转即生效并 fire-and-forget 持久化（SET-01/03）；呈现门控由
 /// ErrorCardHost 订阅同一 store notifier 实现（D-05），捕获/落盘链零接触。
+///
+/// 纵轴键盘导航（v0.0.8 XMB 化）：宿主面板注入 [rowsFocusNode] 后，
+/// ↑↓ 在行间移动焦点（回绕）、Enter/Space 激活当前行（语言行 no-op —
+/// Dropdown 需鼠标展开）；←→ 及其余按键 ignored（冒泡给面板切分区）。
+/// 焦点行高亮 = bgHover 常亮 + 行首 accent 竖条（与 hover 同色系并存）。
 // ignore: avoid-unnecessary-stateful-widgets — State 生命周期与局部
 // 控制器耦合, 保守保留 (转换风险 > 风格收益).
 class GeneralSettingsContent extends StatefulWidget {
-  const GeneralSettingsContent({super.key, this.settings});
+  const GeneralSettingsContent({super.key, this.settings, this.rowsFocusNode});
 
   /// 应用偏好编排服务 — null 时断点续播开关行隐藏（测试退路）.
   final AppSettingsService? settings;
+
+  /// 行导航焦点节点 — 面板注入（↑↓/Enter 消费者）；null 时不挂键盘
+  /// 导航（直 pump 测试退路，行 hover/点击不受影响）.
+  final FocusNode? rowsFocusNode;
 
   @override
   State<GeneralSettingsContent> createState() => _GeneralSettingsContentState();
 }
 
 class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
+  /// 键盘行焦点索引 — 0 语言 / 1 错误卡片 / 2 断点（行序恒定）.
+  int _focusedRow = 0;
+
+  bool _rowsFocused = false;
+
+  /// 行数 — 断点行随服务注入显隐，键盘导航同步收缩（天然无越界）.
+  int get _rowCount => 2 + (widget.settings != null ? 1 : 0);
+
   /// SET-01 开关翻转 —— 立即生效（04-03 门控同帧响应）+ 持久化（SET-03）。
   void _setErrorCardEnabled(bool enabled) {
     ErrorFeedbackSettings.I.setCardEnabled(enabled);
   }
 
+  /// 错误卡片行激活 — 行点击与键盘 Enter 共用.
+  void _toggleErrorCard() {
+    final current = ErrorFeedbackSettings.I.state.value.errorCardEnabled;
+    _setErrorCardEnabled(!current);
+  }
+
+  /// 断点续播行激活 — 行点击与键盘 Enter 共用.
+  void _toggleResume() {
+    final settings = widget.settings!;
+    settings.setResumeEnabled(!settings.resumeEnabled.value);
+  }
+
+  /// 行激活分发 — 语言行（0）为纯展示 + Dropdown 需鼠标展开，键盘激活
+  /// no-op 但仍 handled（消费按键防外层泄漏）.
+  void _activateRow(int index) {
+    switch (index) {
+      case 1:
+        _toggleErrorCard();
+      case 2:
+        if (widget.settings != null) _toggleResume();
+    }
+  }
+
+  /// 纵轴按键 — ↑↓ 回绕移动焦点行；Enter/Space 激活；←→ 及其余 ignored
+  /// （冒泡给面板级 Focus：←→ 切分区、Esc 返回 tag 层）.
+  KeyEventResult _handleRowsKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        final dir = key == LogicalKeyboardKey.arrowDown ? 1 : -1;
+        _focusedRow = (_focusedRow + dir + _rowCount) % _rowCount;
+      });
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space) {
+      _activateRow(_focusedRow);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(Tokens.spLg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildLanguageRow(l10n),
-          _buildErrorCardToggleRow(l10n),
-          // v0.0.6 断点续播总开关 — 服务注入后显示 (测试退路隐藏).
-          if (widget.settings != null) _buildResumeToggleRow(l10n),
-        ],
+    return Focus(
+      focusNode: widget.rowsFocusNode,
+      onFocusChange: (focused) => setState(() => _rowsFocused = focused),
+      onKeyEvent: _handleRowsKeyEvent,
+      child: Padding(
+        padding: const EdgeInsets.all(Tokens.spLg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildLanguageRow(l10n),
+            _buildErrorCardToggleRow(l10n),
+            // v0.0.6 断点续播总开关 — 服务注入后显示 (测试退路隐藏).
+            if (widget.settings != null) _buildResumeToggleRow(l10n),
+          ],
+        ),
       ),
     );
   }
@@ -64,7 +132,8 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       builder: (context, enabled, _) {
         return _SettingsRow(
           label: l10n.resumeRememberPosition,
-          onTap: () => settings.setResumeEnabled(!enabled),
+          onTap: _toggleResume,
+          isFocused: _rowsFocused && _focusedRow == 2,
           trailing: Switch(
             value: enabled,
             activeThumbColor: Tokens.accent,
@@ -85,6 +154,7 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       builder: (context, settings, _) {
         return _SettingsRow(
           label: l10n.languageLabel,
+          isFocused: _rowsFocused && _focusedRow == 0,
           trailing: DropdownButton<AppLanguage>(
             value: settings.language,
             underline: const SizedBox.shrink(),
@@ -141,7 +211,8 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       builder: (context, settings, _) {
         return _SettingsRow(
           label: l10n.errorCardToggleLabel,
-          onTap: () => _setErrorCardEnabled(!settings.errorCardEnabled),
+          onTap: _toggleErrorCard,
+          isFocused: _rowsFocused && _focusedRow == 1,
           trailing: Switch(
             value: settings.errorCardEnabled,
             // activeColor 已废弃（Flutter 3.31+）—— 用 activeThumbColor。
@@ -156,14 +227,25 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
 
 /// 通用设置行 — MouseRegion hover + AnimatedContainer 行语法
 /// （循 setting_action_row.dart:54-76 先例；trailing 位置放行内控件）。
+///
+/// v0.0.8 纵轴键盘焦点：[isFocused] 恒亮 bgHover（与 hover 同色并存）+
+/// 行首恒 2px 槽位 accent 竖条（透明→点亮，防布局跳动 — 旧 _NavEntry 技法）。
 class _SettingsRow extends StatefulWidget {
-  const _SettingsRow({required this.label, required this.trailing, this.onTap});
+  const _SettingsRow({
+    required this.label,
+    required this.trailing,
+    this.onTap,
+    this.isFocused = false,
+  });
 
   final String label;
   final Widget trailing;
 
   /// 行本体点击（可为 null —— 纯展示行无行级交互）。
   final VoidCallback? onTap;
+
+  /// 键盘焦点行 — 恒亮高亮（与 hover 同色并存）.
+  final bool isFocused;
 
   @override
   State<_SettingsRow> createState() => _SettingsRowState();
@@ -188,11 +270,24 @@ class _SettingsRowState extends State<_SettingsRow> {
             horizontal: Tokens.spSm,
           ),
           decoration: BoxDecoration(
-            color: _hovered ? Tokens.bgHover : Colors.transparent,
+            color: (_hovered || widget.isFocused)
+                ? Tokens.bgHover
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(Tokens.radiusSm),
           ),
           child: Row(
             children: [
+              // 焦点指示竖条 — 恒 2px 槽位（透明→accent 点亮），防跳动.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: Tokens.durationFast),
+                width: 2,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: widget.isFocused ? Tokens.accent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(Tokens.radiusBtn),
+                ),
+              ),
+              const SizedBox(width: Tokens.spSm),
               Expanded(
                 child: Text(
                   widget.label,

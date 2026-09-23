@@ -91,6 +91,11 @@
     "description": "Keyboard shortcut description for the media play/pause key"
   },
   "settings": "Settings",
+  "back": "Back",
+  "settingsSummaryGeneral": "Language · Error card · Resume playback",
+  "settingsSummaryVideo": "Brightness · Contrast · Rotation · Aspect ratio",
+  "settingsSummaryAudio": "Audio delay · Subtitle delay",
+  "settingsSummaryAbout": "Components · Thanks · Tech stack",
   "@settings": {
     "description": "Settings dialog title and tooltip"
   },
