@@ -5,6 +5,7 @@
 
 #include "flutter/generated_plugin_registrant.h"
 #include "fullscreen_resize_guard.h"
+#include "ime_bridge_messages.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -50,10 +51,12 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_->ForceRedraw();
 
   // 播放器无文本输入场景 — 解除窗口与默认输入法上下文 (IMC) 的关联,
-  // 根治中文输入法在窗口左上角弹候选窗的问题 (flutter/flutter#74723 同
-  // 款: 无 EditableText 锚点时组合窗定位到 0,0)。恢复走 Dart 侧
-  // Win32ImeBridge 的 ImmAssociateContextEx(IACE_DEFAULT), 未来落地文本
-  // 输入框时按焦点启停。
+  // 根治中文输入法在窗口左上角弹候选窗的问题 (同 flutter/flutter#92050
+  // 家族: 无 EditableText 锚点时组合窗定位到 0,0; 相关 #190042)。
+  // 恢复入口已迁至本线程的 kAppSetImeEnabled 消息 (见 MessageHandler) —
+  // Dart 侧 Win32ImeBridge 经 SendMessageTimeoutW 投递, IMC 切换始终在
+  // 创建窗口的 platform 线程执行 (IMM32 线程亲和, UI 线程直调会静默
+  // 失效)。未来落地文本输入框时按焦点启停 enable/disable。
   // ⚠ 必须同时解除 **主窗口与 FlutterView 子窗口** — 键盘焦点在子窗口,
   // 组合发生在子窗口的 IMC 上, 只解除主窗口候选窗照弹 (首版实测踩坑)。
   // ⚠ NULL IMC 与原生文件对话框冲突 (IFileOpenDialog 子窗口的 TSF 路径
@@ -92,6 +95,14 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case ime_bridge_messages::kAppSetImeEnabled:
+      // Dart 侧 Win32ImeBridge 投递 — 本线程即创建窗口的 platform 线程,
+      // IMM32 调用在此亲和正确。flutter_view 句柄从控制器现取 (可能为
+      // null 仅在销毁期, HandleSetImeEnabled 内部已判空跳过)。
+      return ime_bridge_messages::HandleSetImeEnabled(
+          hwnd, wparam,
+          flutter_controller_ ? flutter_controller_->view()->GetNativeWindow()
+                              : nullptr);
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
