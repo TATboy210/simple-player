@@ -106,6 +106,32 @@ void main() {
       expect(fade.opacity.value, 0);
     });
 
+    testWidgets('blur 门控随 fade — 全隐态停用采样, 展开后启用 (v0.0.8.2)', (tester) async {
+      await tester.pumpWidget(buildPanel(visible: false));
+      await tester.pumpAndSettle();
+
+      // 全隐态 (fade=0) — GlassBlurLayer 的 opacity 门控停用 GPU 背景采样.
+      final backdrop = tester.widget<BackdropFilter>(
+        find.descendant(
+          of: find.byType(PlaylistPanel),
+          matching: find.byType(BackdropFilter),
+        ),
+      );
+      expect(backdrop.enabled, isFalse, reason: '隐藏期零合成成本');
+
+      // 展开完成后 — 模糊启用.
+      await tester.pumpWidget(buildPanel(visible: true));
+      await tester.pumpAndSettle();
+      final opened = tester.widget<BackdropFilter>(
+        find.descendant(
+          of: find.byType(PlaylistPanel),
+          matching: find.byType(BackdropFilter),
+        ),
+      );
+      expect(opened.enabled, isTrue);
+      expect(find.byType(BackdropFilter), findsOneWidget, reason: '数量恒定契约');
+    });
+
     testWidgets('visible 翻转触发 forward 动画 — 最终完全显示', (tester) async {
       await tester.pumpWidget(buildPanel(visible: false));
       // 翻转可见性 — 状态动画需重建 widget 才触发 didUpdateWidget.

@@ -9,6 +9,7 @@ import '../../kernel/models/playlist_sort.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_confirm_strip.dart';
 import '../shared/control_bar_decoration.dart';
+import '../shared/glass_blur_layer.dart';
 import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
@@ -164,20 +165,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 控制栏同款玻璃壳 — ControlBarDecoration.playing 装饰 (深色毛玻璃 +
   /// 蓝色微光边框 + 4-shadow) + 圆角与边框全部对齐控制栏.
   ///
-  /// 方案 A (完全看齐控制栏): 纯 opacity 渐变 — 玻璃恒定全值模糊, 使用
-  /// [GlassTier.normal.blurFilter] 的**缓存 filter 单例** (与控制栏同一
-  /// 实例, 零分配); 渲染结构恒定, 开关动画期间 widget 树零重建.
-  /// BackdropFilter 的模糊层在面板首次挂载时建立, 之后开关动画无任何
-  /// 渲染层结构变化 — 丝滑的根源.
+  /// v0.0.8.2 起走 [GlassBlurLayer] 统一门控层：filter 仍是
+  /// [GlassTier.normal.blurFilter] 缓存单例（与控制栏同一实例，零分配）；
+  /// 新增 opacity 门控 — 淡出至近透明（<1%）即停用 GPU 背景采样
+  /// （控制栏同款语义；全隐态 RenderOpacity 本就跳过绘制，门控补上
+  /// 的是淡出尾段）。enabled 翻转只换 BackdropFilter.enabled 布尔，
+  /// 渲染结构恒定 — 开关动画丝滑的根源不变。
   Widget _buildShell(BuildContext context) {
     return Container(
       decoration: _panelDecoration,
-      child: ClipRRect(
+      child: GlassBlurLayer(
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-        child: BackdropFilter(
-          filter: GlassTier.normal.blurFilter,
-          child: _buildContent(context),
-        ),
+        opacity: _fade,
+        child: _buildContent(context),
       ),
     );
   }

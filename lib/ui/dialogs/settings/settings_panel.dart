@@ -6,7 +6,8 @@ import '../../../kernel/services/app_settings_service.dart';
 import '../../../kernel/services/video_processing_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/control_bar_decoration.dart';
-import '../../shared/glass_container.dart' show GlassButton, GlassTier;
+import '../../shared/glass_blur_layer.dart';
+import '../../shared/glass_container.dart' show GlassButton;
 import '../../shared/loop_marquee_text.dart';
 import '../../theme/tokens.dart';
 import 'about_content.dart';
@@ -296,34 +297,26 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   /// 控制栏同款玻璃壳 — 对照 PlaylistPanel._buildShell (无 EdgeGlow,
   /// 同层两面板视觉一致优先).
+  ///
+  /// v0.0.8.2 收敛到 [GlassBlurLayer] — 门控语义不变（淡出 <1% 停用
+  /// GPU 背景采样），内容子树仍走常量 child，动画帧只换 enabled 布尔
+  /// （零重建契约保持）。
   Widget _buildShell(BuildContext context) {
     return Container(
       decoration: _panelDecoration,
-      child: ClipRRect(
+      child: GlassBlurLayer(
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-        // BackdropFilter 带 opacity 门控 — 面板淡出至近透明 (<1%) 即停用
-        // GPU 背景采样模糊, 隐藏期零合成成本 (ControlBar 同款门控语义);
-        // 内容子树走 child: 参数, 动画帧只换 enabled 布尔.
-        child: AnimatedBuilder(
-          animation: _fade,
-          child: Material(
-            // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
-            color: Colors.transparent,
-            child: Focus(
-              focusNode: _focusNode,
-              // Tab 遍历不进面板（requestFocus 不受影响）.
-              skipTraversal: true,
-              onKeyEvent: _handleKeyEvent,
-              child: _buildContent(context),
-            ),
+        opacity: _fade,
+        child: Material(
+          // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
+          color: Colors.transparent,
+          child: Focus(
+            focusNode: _focusNode,
+            // Tab 遍历不进面板（requestFocus 不受影响）.
+            skipTraversal: true,
+            onKeyEvent: _handleKeyEvent,
+            child: _buildContent(context),
           ),
-          builder: (context, child) {
-            return BackdropFilter(
-              enabled: _fade.value >= 0.01,
-              filter: GlassTier.normal.blurFilter,
-              child: child,
-            );
-          },
         ),
       ),
     );

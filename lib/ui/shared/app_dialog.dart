@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../theme/tokens.dart';
 import 'control_bar_decoration.dart';
 import 'edge_glow.dart';
+import 'glass_blur_layer.dart';
 import 'glass_container.dart';
 
 /// 共享对话框包装器 — 统一视觉风格和关闭按钮
@@ -49,15 +50,14 @@ class AppDialog extends StatelessWidget {
           // 透明底 + 零 elevation：投影/辉光由 playing 装饰的 shadow 层承担。
           backgroundColor: Colors.transparent,
           elevation: 0,
-          child: ClipRRect(
+          child: GlassBlurLayer(
+            // v0.0.8.2 收敛到统一门控层 — 滤镜仍与控制栏同档
+            // (GlassTier.normal 缓存单例), 消除档位分叉; 模态对话框无
+            // fade/suspend 源, 恒启用 (挂载期即可见期).
             borderRadius: _panelRadius,
-            child: BackdropFilter(
-              // v0.0.5: 与控制栏同档模糊 (GlassTier.normal) — thick 已与
-              // normal 合并同值, 引用收敛到控制栏单一档位, 消除档位分叉.
-              filter: GlassTier.normal.blurFilter,
-              child: EdgeGlow(
-                borderRadius: _panelRadius,
-                child: Container(
+            child: EdgeGlow(
+              borderRadius: _panelRadius,
+              child: Container(
                   width: w,
                   // 面板 chrome 恒用 playing 装饰（视觉对齐，非状态对齐；
                   // 对话框无 playing/idle 状态机 — ControlBarDecoration
@@ -93,10 +93,9 @@ class AppDialog extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
   }
 }
 
