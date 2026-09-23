@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io' show Platform;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -17,6 +18,7 @@ import 'open_result.dart';
 import 'playlist_move_planner.dart';
 import 'shuffle_policy.dart';
 import 'video_effect_type.dart';
+import 'volume_resync_gate.dart';
 import '../models/play_mode.dart';
 import '../models/player_error.dart';
 import 'models/audio_track_info.dart';
@@ -108,6 +110,10 @@ class MediaKitEngine implements MediaEngine {
 
   // 静音语义 (v0.0.8.1): 走 mpv 原生 `mute` 属性 (见 setMute),
   // 无需"静音前音量快照" — 音量属性在静音期间不动, unmute 即原响度.
+
+  // WASAPI 首播音量 re-sync 门 (v0.0.8.1) — open 成功点 arm, 首个
+  // playing 事件消费重写 volume+mute (见 _armVolumeResync / _onPlaying).
+  final VolumeResyncGate _volumeResync = VolumeResyncGate();
 
   // ─── mpv 属性直通 (v0.0.6 — NativePlayer.setProperty 公开 API) ───
 
@@ -300,6 +306,7 @@ class MediaKitEngine implements MediaEngine {
       // 成功: 回 idle (契约: 成功后 state==idle, 调用方随后 play()).
       // duration/tracks 由 stream 异步到达, _mediaInfo 随之重建.
       _hasMedia = true;
+      _armVolumeResync();
       _state.value = MediaState.idle;
       return OpenSuccess(_mediaInfo);
     } on Exception catch (error, stackTrace) {
@@ -450,6 +457,7 @@ class MediaKitEngine implements MediaEngine {
       _queueIndex.value = clampedStart;
       _touchQueueRevision();
       _hasMedia = true;
+      _armVolumeResync();
       _state.value = MediaState.idle;
       return OpenSuccess(_mediaInfo);
     } on Exception catch (error, stackTrace) {
@@ -790,6 +798,12 @@ class MediaKitEngine implements MediaEngine {
   /// _fileScopedProps 缓存被新文件装载错误重放, hwdec 同理).
   void _applyMuteProperty(bool mute) =>
       _applyMpvProperty(MpvPropertyMapper.mapMute(mute), fileScoped: false);
+
+  /// arm 首播音量 re-sync — 仅 Windows (WASAPI 特性), 其他平台零开销.
+  void _armVolumeResync() {
+    if (!Platform.isWindows) return;
+    _volumeResync.arm();
+  }
 
   @override
   void setPlaybackRate(double rate) {
@@ -1141,6 +1155,15 @@ class MediaKitEngine implements MediaEngine {
   void _onPlaying(bool playing) {
     if (_disposed) return;
     if (playing) {
+      // WASAPI 首播 re-sync (v0.0.8.1): Windows 音频设备可能延迟到首次
+      // 实际播放才就绪, open 时写入的 volume/mute 属性可能不生效 — 首个
+      // playing 事件幂等重写一次 (门逻辑见 volume_resync_gate.dart).
+      if (_volumeResync.consumeOnPlaying()) {
+        unawaited(
+          _player.setVolume(MpvPropertyMapper.mapVolumeToMpv(_volume.value)),
+        );
+        _applyMuteProperty(_isMuted.value);
+      }
       if (_state.value != MediaState.playing) {
         _state.value = MediaState.playing;
       }
