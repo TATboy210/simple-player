@@ -164,7 +164,11 @@ class MediaKitEngine implements MediaEngine {
     for (final entry in _fileScopedProps.entries) {
       unawaited(
         native.setProperty(entry.key, entry.value).catchError((Object error) {
-          debugPrint('[MediaKitEngine] replay ${entry.key} failed: $error');
+          // kernel 门禁: 禁 debugPrint, 统一 KernelLogger (未初始化环境静默).
+          if (!KernelLoggerImpl.isInitialized) return;
+          KernelLoggerImpl.I.w(
+            'file-scoped 属性重放失败: ${entry.key}=${entry.value}: $error',
+          );
         }),
       );
     }
@@ -1011,8 +1015,12 @@ class MediaKitEngine implements MediaEngine {
     try {
       await cancel();
     } on Exception catch (error, stackTrace) {
-      debugPrint('Failed to cancel media stream subscription: $error');
-      debugPrintStack(stackTrace: stackTrace);
+      // kernel 门禁: 禁 debugPrint, 统一 KernelLogger (未初始化环境静默).
+      if (!KernelLoggerImpl.isInitialized) return;
+      KernelLoggerImpl.I.w(
+        '取消 media stream 订阅失败: $error',
+        context: {'stackTrace': stackTrace.toString()},
+      );
     }
   }
 
@@ -1285,9 +1293,11 @@ class MediaKitEngine implements MediaEngine {
 
   void _unsupported(String name) {
     if (_warnedUnsupported.add(name)) {
-      debugPrint(
-        '[MediaKitEngine] $name: media_kit 后端不支持, 已 stub '
-        '(阶段 4+ 评估是否经 NativePlayer.handle FFI 补)',
+      // kernel 门禁: 禁 debugPrint, 统一 KernelLogger (未初始化环境静默).
+      if (!KernelLoggerImpl.isInitialized) return;
+      KernelLoggerImpl.I.w(
+        '$name: media_kit 后端不支持, 已 stub (阶段 4+ 评估是否经 '
+        'NativePlayer.handle FFI 补)',
       );
     }
   }
