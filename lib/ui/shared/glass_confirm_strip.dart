@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme/tokens.dart';
 import 'control_bar_decoration.dart';
+import 'glass_blur_layer.dart';
 import 'glass_container.dart' show GlassButton, GlassTier;
 
 /// 长条玻璃确认条 — 删除类操作的统一确认浮层 (v0.0.7).
@@ -70,11 +71,11 @@ class GlassConfirmStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: ControlBarDecoration.playing(borderRadius: _stripRadius),
-      child: ClipRRect(
+      // v0.0.8.2 收敛到 GlassBlurLayer 统一门控层 — 结构等价换装
+      // (无门控源恒启用), sigma 降档在 D1 commit 单独落.
+      child: GlassBlurLayer(
         borderRadius: _stripRadius,
-        child: BackdropFilter(
-          filter: GlassTier.normal.blurFilter,
-          child: Padding(
+        child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: Tokens.spMd,
               vertical: Tokens.spSm,
@@ -122,7 +123,6 @@ class GlassConfirmStrip extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
