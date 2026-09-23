@@ -76,6 +76,10 @@ class PlaylistPanel extends StatefulWidget {
   /// null 恒允许 (测试退路).
   final ValueListenable<bool>? resumeEnabled;
 
+  /// seek 拖动挂起信号 (v0.0.8.2, 可选) — true 时玻璃模糊短暂停用,
+  /// 松手恢复. null = 无挂起源 (恒不挂起).
+  final ValueListenable<bool>? scrubbing;
+
   const PlaylistPanel({
     super.key,
     required this.entries,
@@ -93,6 +97,7 @@ class PlaylistPanel extends StatefulWidget {
     required this.sortAscending,
     required this.onSortSelected,
     this.resumeEnabled,
+    this.scrubbing,
   });
 
   @override
@@ -177,6 +182,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: GlassBlurLayer(
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
         opacity: _fade,
+        suspend: widget.scrubbing,
         child: _buildContent(context),
       ),
     );

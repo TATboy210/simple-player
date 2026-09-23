@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 // services: LogicalKeyboardKey / KeyEventResult (material.dart 不完整导出).
 import 'package:flutter/services.dart';
@@ -69,11 +70,16 @@ class SettingsPanel extends StatefulWidget {
 
   final SettingsServicesBundle? services;
 
+  /// seek 拖动挂起信号 (v0.0.8.2, 可选) — true 时玻璃模糊短暂停用,
+  /// 松手恢复. null = 无挂起源 (恒不挂起).
+  final ValueListenable<bool>? scrubbing;
+
   const SettingsPanel({
     super.key,
     required this.visible,
     required this.onClose,
     this.services,
+    this.scrubbing,
   });
 
   @override
@@ -307,6 +313,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       child: GlassBlurLayer(
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
         opacity: _fade,
+        suspend: widget.scrubbing,
         child: Material(
           // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
           color: Colors.transparent,

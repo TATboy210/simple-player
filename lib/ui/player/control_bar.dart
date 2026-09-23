@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/edge_glow.dart';
-import '../shared/glass_container.dart';
 import '../shared/glass_widgets.dart';
 import 'control_bar_layout.dart';
 import 'control_bar_view_model.dart';
@@ -54,6 +53,10 @@ class ControlBar extends StatelessWidget {
   /// 玻璃模糊与辉光不随 resize 降级（视觉恒定策略，见 [_ControlBarBlur]）。
   final ValueListenable<bool>? resizing;
 
+  /// seek 拖动挂起信号 — true 时玻璃模糊短暂停用（v0.0.8.2：拖动中视频
+  /// 背景剧烈变化是 blur 每帧重算最痛的窗口，用户已裁决接受瞬态降级）。
+  final ValueListenable<bool>? scrubbing;
+
   /// 进度条 seek 开始/结束回调 — 透传给 ProgressBar,通知 AutoHideController
   /// 在 seek 期间冻结/重启隐藏计时
   final VoidCallback? onSeekStart;
@@ -79,6 +82,7 @@ class ControlBar extends StatelessWidget {
     this.opacity,
     this.decoration,
     this.resizing,
+    this.scrubbing,
     this.onSeekStart,
     this.onSeekEnd,
     this.onToggleFullscreen,
@@ -148,7 +152,7 @@ class ControlBar extends StatelessWidget {
   }
 
   Widget _buildBlur(Widget content) {
-    return _ControlBarBlur(content: content, opacity: opacity);
+    return _ControlBarBlur(content: content, opacity: opacity, scrubbing: scrubbing);
   }
 }
 
@@ -157,13 +161,20 @@ class ControlBar extends StatelessWidget {
 /// 视觉恒定策略：[BackdropFilter] 在整个 resize 会话中**保持启用** — 历史上
 /// resize 时停用滤镜以规避 GPU readback，但实测证明 raster 尖峰主因为视频
 /// 纹理采样（textureIdChanges=0），且关闭/恢复会造成拖动始末的玻璃质感硬
-/// 跳变。现在 blur 只随自动隐藏透明度启停（不可见即停用采样）；`resizing`
-/// 信号仅由 ProgressBar / OsdOverlay 等静止型冻结消费，不再进入本层。
+/// 跳变。blur 启停门控（v0.0.8.2 起收敛到 [GlassBlurLayer]）：
+/// ① 自动隐藏透明度（不可见即停用采样）；② seek 拖动挂起（[scrubbing]，
+/// 松手一帧恢复）— 拖动中视频背景剧烈变化，blur 每帧重算成本最高且视觉
+/// 扰动被 seek 动画掩盖。`resizing` 信号不进入本层（视觉恒定契约）。
 class _ControlBarBlur extends StatefulWidget {
   final Widget content;
   final Animation<double>? opacity;
+  final ValueListenable<bool>? scrubbing;
 
-  const _ControlBarBlur({required this.content, this.opacity});
+  const _ControlBarBlur({
+    required this.content,
+    this.opacity,
+    this.scrubbing,
+  });
 
   @override
   State<_ControlBarBlur> createState() => _ControlBarBlurState();
@@ -190,31 +201,14 @@ class _ControlBarBlurState extends State<_ControlBarBlur> {
 
   @override
   Widget build(BuildContext context) {
-    final animation = _animation;
-    final blurContent = RepaintBoundary(child: widget.content);
-    if (animation == null) {
-      return _withBlur(blurContent, enabled: true);
-    }
-
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (_, child) {
-        return _withBlur(
-          child ?? blurContent,
-          // 仅透明度决定滤镜启停；resize 会话期间恒定启用。
-          enabled: (widget.opacity?.value ?? 1) >= 0.01,
-        );
-      },
-      child: blurContent,
+    // v0.0.8.2: 门控逻辑收敛到 GlassBlurLayer（opacity + suspend 双源，
+    // 子树常量 + RepaintBoundary 由其内部保证），本类仅保留 opacity 引用
+    // 的生命周期同步职责。
+    return GlassBlurLayer(
+      borderRadius: ControlBar._borderRadius,
+      opacity: _animation,
+      suspend: widget.scrubbing,
+      child: widget.content,
     );
   }
-
-  Widget _withBlur(Widget child, {required bool enabled}) => ClipRRect(
-    borderRadius: ControlBar._borderRadius,
-    child: BackdropFilter(
-      filter: GlassTier.normal.blurFilter,
-      enabled: enabled,
-      child: child,
-    ),
-  );
 }
