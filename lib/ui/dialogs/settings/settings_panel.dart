@@ -49,7 +49,7 @@ class SettingsServicesBundle {
 /// - L0 tag 层：竖排分区入口撑满内容区（居中对称，宽度随面板响应，
 ///   摘要跑马灯随宽度联动），↑↓ 切换、→ 或 Enter 进入；tag 反馈沿用
 ///   hover/pressed 色阶语言，无选中竖条
-/// - L1 内容层：从右滑入覆盖标题行以下区域（左缘竖向渐变线随层移动），
+/// - L1 内容层：从右滑入覆盖标题行以下区域，
 ///   L0 后退（左移+微缩）淡出至完全消失（纯渲染层动画，零新增 GPU）
 /// - 键盘：→ 进入 L1 / 切下一分区；L1 ← 返回 L0；↑↓ 选条目（General
 ///   分区经 [GeneralSettingsContent.rowsFocusNode] 下沉消费）、Enter/Space
@@ -372,11 +372,11 @@ class _SettingsPanelState extends State<SettingsPanel>
                   ),
                 ),
               ),
-              // L1 内容层 — 从右滑入覆盖（左缘竖向渐变线随层移动）;
+              // L1 内容层 — 从右滑入覆盖标题行以下区域;
               // L0 静止期 Offstage（不 paint/不命中/语义不可见），滑出
               // 动画期间保持挂载以呈现退出动效.
               // 内容层走 child: 参数 — 动画帧只换 Offstage 开关，
-              // Row/渐变线/分区内容子树零重建（修复每帧全量重建卡顿）.
+              // Row/分区内容子树零重建（修复每帧全量重建卡顿）.
               AnimatedBuilder(
                 animation: _layerController,
                 child: IgnorePointer(
@@ -428,27 +428,11 @@ class _SettingsPanelState extends State<SettingsPanel>
     );
   }
 
-  /// L1 内容层 — 左缘竖向渐变线 + 分区内容（方向性滑动切换）.
+  /// L1 内容层 — 分区内容（方向性滑动切换）.
   Widget _buildContentLayer(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 竖向渐变分割线 — 内容层左缘（上下端透明→borderHighlight→透明），
-        // 随层滑入移动，模拟毛玻璃边缘的光线收束.
-        Container(
-          width: 1,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.transparent,
-                Tokens.borderHighlight,
-                Colors.transparent,
-              ],
-            ),
-          ),
-        ),
         Expanded(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: Tokens.durationNormal),
