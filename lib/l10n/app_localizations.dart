@@ -1458,18 +1458,6 @@ abstract class AppLocalizations {
   /// **'{count} video entries will be removed from the playlist. This operation only affects the playlist itself and will not delete any files from your local disk.'**
   String batchDeleteConfirmBody(int count);
 
-  /// Debug-only IME verification section label in general settings
-  ///
-  /// In en, this message translates to:
-  /// **'IME Test (debug)'**
-  String get imeTestTitle;
-
-  /// Hint text of the IME verification TextField
-  ///
-  /// In en, this message translates to:
-  /// **'Focus here and type Chinese to verify IME governance'**
-  String get imeTestHint;
-
   /// No description provided for @batchDeleteConfirmAction.
   ///
   /// In en, this message translates to:

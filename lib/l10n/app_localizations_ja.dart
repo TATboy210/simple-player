@@ -722,11 +722,5 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get imeTestTitle => 'IMEテスト（デバッグ）';
-
-  @override
-  String get imeTestHint => 'ここをフォーカスして中国語入力で IME を確認';
-
-  @override
   String get batchDeleteConfirmAction => '削除を確定';
 }

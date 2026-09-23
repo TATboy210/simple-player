@@ -14,21 +14,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporting_dependencies.dart';
-import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/diagnostic_log_target.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/error_feedback_settings.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
-import 'package:simple_player_flutter/ui/dialogs/settings/ime_test_field.dart';
 
 void main() {
-  setUpAll(() {
-    // debug IME 验证框 (v0.0.8.2) 构造 Win32ImeBridge → KernelLogger
-    // (项目惯例: 测试显式初始化).
-    KernelLoggerImpl.resetForTesting();
-    KernelLoggerImpl.init();
-  });
-
   late Directory root;
   late File settingsFile;
   late DelegatingDiagnosticLogEffect delegate;
@@ -141,16 +132,7 @@ void main() {
 
     // 路径配置面整体缺席（G-04-1）：文本输入框 / 浏览按钮 / 行内校验状态 /
     // 有效路径行在任何形态下都不渲染。
-    // v0.0.8.2: debug IME 验证框是唯一合法 TextField（ImeTestField 内），
-    // 除此之外仍应零 —— 日志路径输入框回归会被此断言拦住。
-    final textFieldsOutsideIme = find
-        .byType(TextField)
-        .evaluate()
-        .where(
-          (element) =>
-              element.findAncestorWidgetOfExactType<ImeTestField>() == null,
-        );
-    expect(textFieldsOutsideIme, isEmpty);
+    expect(find.byType(TextField), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-log-path-browse')),
       findsNothing,

@@ -242,13 +242,5 @@
       }
     }
   },
-  "imeTestTitle": "IME 테스트(디버그)",
-  "@imeTestTitle": {
-    "description": "Debug-only IME verification section label in general settings"
-  },
-  "imeTestHint": "여기를 포커스하고 중국어 입력으로 IME 확인",
-  "@imeTestHint": {
-    "description": "Hint text of the IME verification TextField"
-  },
   "batchDeleteConfirmAction": "삭제 확인"
 }
