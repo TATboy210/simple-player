@@ -101,7 +101,7 @@ void main() {
       expect(find.byIcon(Icons.volume_up), findsOneWidget);
     });
 
-    testWidgets('tap toggles mute on', (tester) async {
+    testWidgets('tap toggles mute on — 音量保持不动 (v0.0.8.1 原生静音)', (tester) async {
       engine.volume.value = 0.8;
       engine.isMuted.value = false;
       await tester.pumpWidget(
@@ -120,7 +120,9 @@ void main() {
       await tester.pump();
 
       expect(engine.isMuted.value, isTrue);
-      expect(engine.volume.value, 0.0);
+      // 原生静音: mute 只切 isMuted, 音量属性不动 (滑条停在原值).
+      expect(engine.volume.value, 0.8);
+      expect(engine.setVolumeCallCount, 0, reason: 'mute 路径不得触碰音量');
       OsdService.I.hide();
     });
 
@@ -358,7 +360,7 @@ void main() {
       OsdService.I.hide();
     });
 
-    testWidgets('unmute restores previously saved volume', (tester) async {
+    testWidgets('unmute 保持音量不变 (原生静音, 无需快照恢复)', (tester) async {
       // Arrange: set volume to 0.7, then mute
       engine.volume.value = 0.7;
       engine.isMuted.value = false;
@@ -374,13 +376,13 @@ void main() {
       );
       await tester.pump();
 
-      // Tap to mute — saves 0.7
+      // Tap to mute — 音量不动
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pump();
       expect(engine.isMuted.value, isTrue);
-      expect(engine.volume.value, 0.0);
+      expect(engine.volume.value, closeTo(0.7, 0.01));
 
-      // Tap again to unmute — restores 0.7
+      // Tap again to unmute — 音量原地即是原响度
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pump();
       expect(engine.isMuted.value, isFalse);
@@ -388,10 +390,58 @@ void main() {
       OsdService.I.hide();
     });
 
+    testWidgets('静音时拖滑块到非零 — 自动取消静音', (tester) async {
+      engine.volume.value = 0.0;
+      engine.isMuted.value = true;
+      await tester.pumpWidget(
+        buildSubject(
+          child: VolumeButton(
+            volume: engine.volume,
+            isMuted: engine.isMuted,
+            onToggleMute: () => engine.setMute(!engine.isMuted.value),
+            onSetVolume: engine.setVolume,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // 模拟拖滑块到非零 — volume notifier 变更驱动 _onVolumeChanged.
+      engine.volume.value = 0.45;
+      await tester.pump();
+
+      expect(engine.isMuted.value, isFalse, reason: '非零音量自动取消静音');
+      OsdService.I.hide();
+    });
+
+    testWidgets('unmute OSD 显示当前音量百分比', (tester) async {
+      engine.volume.value = 0.6;
+      engine.isMuted.value = true;
+      await tester.pumpWidget(
+        buildSubject(
+          child: VolumeButton(
+            volume: engine.volume,
+            isMuted: engine.isMuted,
+            onToggleMute: () => engine.setMute(!engine.isMuted.value),
+            onSetVolume: engine.setVolume,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump();
+
+      // OSD 渲染层挂载于 PlayerVideoControls — 本隔离装配断言 OsdService
+      // 消息状态 (渲染层 find.text 由 player_video_controls_test 覆盖).
+      expect(OsdService.I.message.value?.text, '60%', reason: 'OSD 显示当前音量');
+      OsdService.I.hide();
+      await tester.pump(const Duration(seconds: 2));
+    });
+
     // ── Wave 2: interaction-level tests ──
 
-    testWidgets('mute toggle sets engine.isMuted and volume', (tester) async {
-      // 验证 VolumeButton._toggleMute 正确调用 engine.setMute + engine.setVolume
+    testWidgets('mute toggle 只切 isMuted 不触碰音量', (tester) async {
+      // v0.0.8.1: _toggleMute 只走 onToggleMute(setMute), 不再 setVolume(0).
       engine.volume.value = 0.5;
       engine.isMuted.value = false;
       await tester.pumpWidget(
@@ -410,14 +460,15 @@ void main() {
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pump();
 
-      // Assert: muted + volume set to 0
+      // Assert: muted + volume 保持
       expect(engine.isMuted.value, isTrue);
-      expect(engine.volume.value, 0.0);
+      expect(engine.volume.value, 0.5);
+      expect(engine.setVolumeCallCount, 0);
       OsdService.I.hide();
     });
 
-    testWidgets('unmute restores saved volume via setVolume', (tester) async {
-      // 验证静音→取消静音 的完整 round-trip
+    testWidgets('unmute round-trip — 音量全程不被改动', (tester) async {
+      // 验证静音→取消静音 的完整 round-trip (原生静音语义)
       engine.volume.value = 0.6;
       engine.isMuted.value = false;
       await tester.pumpWidget(
@@ -432,16 +483,18 @@ void main() {
       );
       await tester.pump();
 
-      // Mute: saves 0.6, sets volume=0
+      // Mute: 音量不动
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pump();
       expect(engine.isMuted.value, isTrue);
+      expect(engine.volume.value, closeTo(0.6, 0.01));
 
-      // Unmute: restores 0.6
+      // Unmute: 音量原地即原响度
       await tester.tap(find.byType(GestureDetector).first);
       await tester.pump();
       expect(engine.isMuted.value, isFalse);
       expect(engine.volume.value, closeTo(0.6, 0.01));
+      expect(engine.setVolumeCallCount, 0);
       OsdService.I.hide();
     });
 

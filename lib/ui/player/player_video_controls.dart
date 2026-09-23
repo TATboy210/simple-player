@@ -26,10 +26,11 @@ import 'player_controls_state.dart';
 /// 路径B 控制栏 widget — 数据源直连 media_kit [PlayerPort].
 ///
 /// 控制层由 Stack 组合空状态、控制栏、错误提示和鼠标唤起区域:
-/// - 播放/位置/时长/倍速/音量(读): [PlayerControlsState] 订阅 `player.stream`
+/// - 播放/位置/时长/倍速(读): [PlayerControlsState] 订阅 `player.stream`
 /// - 播放/暂停、快退、快进(写): 经 [PlayerActions] 进入 PlaybackController 门面
 /// - 进度条 seek/倍速(写): 经 [PlayerPort] 直写 `player`，保留低延迟精细交互
-/// - 音量/静音(写): 走 [MediaEngine](保 `_preMuteVolume` 语义)
+/// - 音量/静音(读写): 走 [MediaEngine] 单一数据源(感知曲线 + 原生静音,
+///   v0.0.8.1 — 双源线性换算会使滑条漂移到 mpv 立方空间)
 /// - isFullscreen: 由 [WindowMode] 单一数据源驱动(图标/auto-hide/cursor/
 ///   ESC)。不再读 route 本地 [VideoState.isFullscreen] — media_kit 在全屏
 ///   期间把窗口态 VideoState 的 context 换成 route context(窗口态实例读

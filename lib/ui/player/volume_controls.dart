@@ -13,11 +13,10 @@ import '../shared/osd_overlay.dart';
 /// 音量按钮（单击静音）
 ///
 /// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [volume]/[isMuted]
-/// ValueListenable + [onToggleMute]/[onSetVolume] 回调。mute/unmute 仍
-/// 通过 onToggleMute(=setMute(!isMuted)) + onSetVolume 协同,保 _savedVolume
-/// 语义等价。mute 分支反序(onToggleMute 先 + onSetVolume(0) 后):
-/// 避免 FakeEngine.setVolume(0) 联动 isMuted=true 后 onToggleMute 翻回 false
-/// (生产 MediaKitEngine.setVolume 不联动 isMuted,两种 engine 下都正确)。
+/// ValueListenable + [onToggleMute]/[onSetVolume] 回调。
+/// v0.0.8.1 原生静音：mute 只切 [onToggleMute]（引擎写 mpv `mute` 属性），
+/// 音量在静音期间不动 — 滑条停在原值，unmute 即恢复原响度，UI 侧无需
+/// "静音前快照"（旧 _savedVolume 与引擎 _preMuteVolume 双份冗余已删）。
 class VolumeButton extends StatefulWidget {
   final ValueListenable<double> volume;
   final ValueListenable<bool> isMuted;
@@ -37,8 +36,6 @@ class VolumeButton extends StatefulWidget {
 }
 
 class _VolumeButtonState extends State<VolumeButton> {
-  double _savedVolume = 1.0;
-
   @override
   void initState() {
     super.initState();
@@ -60,39 +57,24 @@ class _VolumeButtonState extends State<VolumeButton> {
     super.dispose();
   }
 
-  /// 同步 _savedVolume：用户拖滑块时自动跟踪，并在静音状态下自动取消静音
+  /// 静音状态下拖滑块到非零值 → 自动取消静音（UX 便捷操作）。
+  /// 引擎侧 setVolume 零边界联动同语义，此处幂等兜底（兼容 FakeEngine）。
   void _onVolumeChanged() {
-    final v = widget.volume.value;
-    if (v > 0) {
-      _savedVolume = v;
-      // 静音状态下拖滑块到非零值 → 自动取消静音
-      // onToggleMute = setMute(!isMuted),此处 isMuted=true → setMute(false) 等价
-      if (widget.isMuted.value) {
-        widget.onToggleMute();
-      }
+    if (widget.volume.value > 0 && widget.isMuted.value) {
+      widget.onToggleMute();
     }
   }
 
   void _toggleMute() {
     final l10n = AppLocalizations.of(context);
-    if (widget.isMuted.value) {
-      // unmute: setMute(false) + 恢复 saved 音量
-      // onToggleMute = setMute(!true) = setMute(false),等价原 engine.setMute(false)
-      widget.onToggleMute();
-      widget.onSetVolume(_savedVolume);
-      OsdService.I.show(
-        '${(_savedVolume * 100).round()}%',
-        progress: _savedVolume,
-      );
+    final unmuting = widget.isMuted.value;
+    widget.onToggleMute();
+    // unmute: 音量未被静音改动（原生静音语义）— OSD 直接显示当前值;
+    // mute: 引擎层静音, 音量属性不动, 滑条保持原值.
+    if (unmuting) {
+      final v = widget.volume.value;
+      OsdService.I.show('${(v * 100).round()}%', progress: v);
     } else {
-      // mute: 存 saved → setMute(true) → setVolume(0)
-      // 反序:onToggleMute(=setMute(!false)=setMute(true)) 必须在 onSetVolume(0)
-      // 之前,避免 FakeEngine.setVolume(0) 联动 isMuted=true 后 onToggleMute
-      // =setMute(!true)=setMute(false) 翻回 false。生产 MediaKitEngine.setVolume
-      // 不联动 isMuted,两种 engine 下结果都是 isMuted=true + volume=0.
-      _savedVolume = widget.volume.value;
-      widget.onToggleMute();
-      widget.onSetVolume(0);
       OsdService.I.show(l10n.mute, icon: Icons.volume_off);
     }
   }
