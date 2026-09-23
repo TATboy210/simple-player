@@ -124,6 +124,19 @@ class _SettingsPanelState extends State<SettingsPanel>
     borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
   );
 
+  /// L0 tag 层子树缓存 (v0.0.8.2 渲染优化) — 面板开关/层级翻转的 setState
+  /// 不再全量重跑 tag 层 build（与 _controlBarCache 同款 identity 复用：
+  /// identical widget 短路 element diff，chips×4 + 跑马灯 LayoutBuilder×4
+  /// 的 build 方法整树跳过）。失效点：_selected 变化 / locale 变化。
+  Widget? _tagLayerCache;
+
+  /// L1 内容层子树缓存 — 同上；AnimatedSwitcher + 当前分区内容子树。
+  Widget? _contentLayerCache;
+
+  /// 缓存构建时的 locale — 语言切换（App 级重建）经 build 时的 locale
+  /// 比对失效缓存，防止缓存的 l10n 字符串陈旧。
+  Locale? _layerCacheLocale;
+
   @override
   void initState() {
     super.initState();
@@ -162,6 +175,9 @@ class _SettingsPanelState extends State<SettingsPanel>
         });
       }
     }
+    // services 替换 → 内容层缓存失效（分区内容依赖 services 注入）。
+    // 注意：visible 翻转/宿主重建**不**失效——这正是打开帧零重建的关键。
+    if (oldWidget.services != widget.services) _contentLayerCache = null;
   }
 
   @override
@@ -174,6 +190,17 @@ class _SettingsPanelState extends State<SettingsPanel>
   }
 
   // ── 层级流转 ──────────────────────────────────────────────────
+
+  /// _selected 变更统一入口 — setState 同时失效两层子树缓存（tag 层的
+  /// 选中高亮与内容层的 KeyedSubtree key 都依赖 _selected，漏失效会
+  /// 高亮/内容陈旧）。
+  void _changeSelected(_SettingsTab tab) {
+    setState(() {
+      _selected = tab;
+      _tagLayerCache = null;
+      _contentLayerCache = null;
+    });
+  }
 
   /// L0 → L1（点 tag / Enter）— 进入即聚焦 General 首行（键盘 ↑↓ 立即可用）.
   void _enterContent() {
@@ -203,7 +230,7 @@ class _SettingsPanelState extends State<SettingsPanel>
   void _switchTo(_SettingsTab tab) {
     if (tab == _selected) return;
     final wasGeneral = _selected == _SettingsTab.general;
-    setState(() => _selected = tab);
+    _changeSelected(tab);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _level != _PanelLevel.content) return;
       if (wasGeneral) {
@@ -239,7 +266,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       final index = _enabledTabs.indexOf(_selected);
       final next = (index + dir).clamp(0, _enabledTabs.length - 1);
       if (next != index) {
-        setState(() => _selected = _enabledTabs[next]);
+        _changeSelected(_enabledTabs[next]);
       }
       return KeyEventResult.handled;
     }
@@ -329,17 +356,46 @@ class _SettingsPanelState extends State<SettingsPanel>
     );
   }
 
+  /// L0 tag 层缓存取用 — 缓存内含 RepaintBoundary（退入场动画的重绘
+  /// 隔离到 L0 子层）。命中时 identical widget 短路 element diff，
+  /// chips×4 + 跑马灯 LayoutBuilder×4 的 build 方法整树跳过。
+  /// Key 供测试断言缓存命中（实例 identity）。
+  Widget _cachedTagLayer(BuildContext context) =>
+      _tagLayerCache ??= RepaintBoundary(
+        key: ValueKey('settings-l0-boundary-${_selected.name}'),
+        child: _buildTagLayer(context),
+      );
+
+  /// L1 内容层缓存取用 — 同上；AnimatedSwitcher + 当前分区内容子树。
+  Widget _cachedContentLayer(BuildContext context) =>
+      _contentLayerCache ??= RepaintBoundary(
+        key: ValueKey('settings-l1-boundary-${_selected.name}'),
+        child: _buildContentLayer(context),
+      );
+
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // locale 门 — Localizations.localeOf 注册依赖，语言切换（App 级重建）
+    // 触发本 build 后此处失缓存，防缓存内 l10n 字符串陈旧。
+    final locale = Localizations.localeOf(context);
+    if (_layerCacheLocale != locale) {
+      _layerCacheLocale = locale;
+      _tagLayerCache = null;
+      _contentLayerCache = null;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _PanelHeader(
-          l10n: l10n,
-          onBack: _backToTags,
-          onClose: widget.onClose,
-          showBack: _level == _PanelLevel.content,
-          backOpacity: _layerEase,
+        // header 重绘隔离 — backOpacity FadeTransition 与层动画并行期间
+        // 只重录 header 子层, 不连带 tag/内容层 (v0.0.8.2 渲染优化).
+        RepaintBoundary(
+          child: _PanelHeader(
+            l10n: l10n,
+            onBack: _backToTags,
+            onClose: widget.onClose,
+            showBack: _level == _PanelLevel.content,
+            backOpacity: _layerEase,
+          ),
         ),
         Expanded(
           child: Stack(
@@ -353,9 +409,10 @@ class _SettingsPanelState extends State<SettingsPanel>
                   ignoring: _level == _PanelLevel.content,
                   child: AnimatedBuilder(
                     animation: _layerEase,
-                    // child 恒定 — 动画帧只换 Opacity/Transform 矩阵，
-                    // 子树零重建（paint 层合成）.
-                    child: _buildTagLayer(context),
+                    // child 走缓存 (v0.0.8.2) — 动画帧只换 Opacity/Transform
+                    // 矩阵；level 翻转/面板开关的 setState 帧也 identity 复用
+                    // (identical widget 短路 diff), chips+跑马灯 build 跳过.
+                    child: _cachedTagLayer(context),
                     builder: (context, child) {
                       final t = _layerEase.value;
                       return Opacity(
@@ -386,7 +443,9 @@ class _SettingsPanelState extends State<SettingsPanel>
                       begin: const Offset(1, 0),
                       end: Offset.zero,
                     ).animate(_layerEase),
-                    child: _buildContentLayer(context),
+                    // 缓存同 L0 — level 翻转不重建内容子树, 只有 _selected
+                    // 变化 (分区切换) 才失效重建.
+                    child: _cachedContentLayer(context),
                   ),
                 ),
                 builder: (_, child) {
@@ -419,7 +478,7 @@ class _SettingsPanelState extends State<SettingsPanel>
               // 一步直达 — 点击任意 enabled tag 选中并进入其内容层.
               onTap: () {
                 if (_level != _PanelLevel.tags) return;
-                setState(() => _selected = tab);
+                _changeSelected(tab);
                 _enterContent();
               },
             ),
@@ -450,12 +509,16 @@ class _SettingsPanelState extends State<SettingsPanel>
               final offset = isIncoming
                   ? const Offset(1, 0)
                   : const Offset(-1, 0);
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: offset,
-                  end: Offset.zero,
-                ).animate(animation),
-                child: FadeTransition(opacity: animation, child: child),
+              // RepaintBoundary — 分区切换 150ms 内出入双子树并存, 各自
+              // 隔离重绘区域 (layout 双算不可避免, paint 减半).
+              return RepaintBoundary(
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: offset,
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
               );
             },
             child: KeyedSubtree(
