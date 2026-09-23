@@ -7,6 +7,7 @@ import '../../../kernel/services/video_processing_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../shared/control_bar_decoration.dart';
 import '../../shared/glass_container.dart' show GlassButton, GlassTier;
+import '../../shared/loop_marquee_text.dart';
 import '../../theme/tokens.dart';
 import 'about_content.dart';
 import 'audio_settings_content.dart';
@@ -42,14 +43,16 @@ class SettingsServicesBundle {
 /// （渲染层驱动，动画期间 widget 树零重建），IgnorePointer 锚定 [visible]
 /// 杜绝渐退中"虚空点击"。
 ///
-/// 交互（v0.0.8 XMB 化）：
-/// - L0 tag 层：竖排分区入口（图标 + 类别名 + 条目枚举小字），↑↓ 切换、
-///   Enter 进入；tag 反馈沿用 hover/pressed 色阶语言，无选中竖条
+/// 交互（v0.0.9 键盘重定义）：
+/// - L0 tag 层：竖排分区入口撑满内容区（居中对称，宽度随面板响应，
+///   摘要跑马灯随宽度联动），↑↓ 切换、→ 或 Enter 进入；tag 反馈沿用
+///   hover/pressed 色阶语言，无选中竖条
 /// - L1 内容层：从右滑入覆盖标题行以下区域（左缘竖向渐变线随层移动），
-///   L0 后退虚化（纯 opacity 0.4，零新增 GPU）；← 返回 / Esc 逐层
-/// - 键盘交叉导航：L1 内 ←→ 直接切分区（方向性滑动）、↑↓ 选条目
-///   （General 分区经 [GeneralSettingsContent.rowsFocusNode] 下沉消费）、
-///   Enter/Space 激活；面板聚焦期间 Space 不再透传播放/暂停
+///   L0 后退（左移+微缩）淡出至完全消失（纯渲染层动画，零新增 GPU）
+/// - 键盘：→ 进入 L1 / 切下一分区；L1 ← 返回 L0；↑↓ 选条目（General
+///   分区经 [GeneralSettingsContent.rowsFocusNode] 下沉消费）、Enter/Space
+///   激活；Esc 任何层级冒泡宿主关整个面板；面板聚焦期间 Space 不再
+///   透传播放/暂停
 /// - 灰显分区（视频/音频）键盘不可达：←→/↑↓ 只在 enabled 集合内移动
 ///   （键盘绕过 IgnorePointer，必须显式过滤）
 ///
@@ -84,19 +87,11 @@ class _SettingsPanelState extends State<SettingsPanel>
     _SettingsTab.about,
   ];
 
-  /// 竖排 tag chip 宽度 — 固定宽（摘要单行省略），最小窗 273px 中列下
-  /// 留足呼吸距; 参照 PlaylistPanel.panelWidth 的本地常量先例.
-  static const double _tagChipWidth = 168.0;
-
   /// 当前分区 — 跨显隐持久（State 常驻 = "记忆上次 L1" 免费实现）.
   _SettingsTab _selected = _SettingsTab.about;
 
   /// 当前层级 — 首次打开 L0；进入内容层后保持（同上）.
   _PanelLevel _level = _PanelLevel.tags;
-
-  /// 方向性滑动 — L1 内 ←→ 切分区时置位（true = 切向枚举后一个），
-  /// AnimatedSwitcher 按此生成进入/退出滑动方向.
-  bool _switchForward = true;
 
   /// 渐入渐出动画 — 与控制栏/播放列表同款（FadeTransition + easeInOut +
   /// durationControlsFade）.
@@ -193,17 +188,13 @@ class _SettingsPanelState extends State<SettingsPanel>
     });
   }
 
-  /// L1 内 ←→ 切分区 — 记录方向供 AnimatedSwitcher 生成方向性滑动；
-  /// 离开/进入 general 时 post-frame 归还/接力焦点（rows 节点随分区
-  /// unmount，同步 requestFocus 会被 dispose 覆盖 — 实测坑）.
+  /// L1 内 → 切分区 — 离开/进入 general 时 post-frame 归还/接力焦点
+  /// （rows 节点随分区 unmount，同步 requestFocus 会被 dispose 覆盖 —
+  /// 实测坑）.
   void _switchTo(_SettingsTab tab) {
     if (tab == _selected) return;
     final wasGeneral = _selected == _SettingsTab.general;
-    setState(() {
-      _switchForward =
-          _enabledTabs.indexOf(tab) > _enabledTabs.indexOf(_selected);
-      _selected = tab;
-    });
+    setState(() => _selected = tab);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _level != _PanelLevel.content) return;
       if (wasGeneral) {
@@ -230,7 +221,8 @@ class _SettingsPanelState extends State<SettingsPanel>
     return _handleContentLevelKey(key);
   }
 
-  /// L0 — ↑↓ 在 tag 列间移动（enabled 集合内到头即停），Enter/Space 进入.
+  /// L0 — ↑↓ 在 tag 列间移动（enabled 集合内到头即停），→ 或 Enter/Space
+  /// 进入内容层；← handled 空操作（ignored 会冒泡成 seek）；Esc 冒泡关面板.
   KeyEventResult _handleTagsLevelKey(LogicalKeyboardKey key) {
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowDown) {
@@ -242,31 +234,33 @@ class _SettingsPanelState extends State<SettingsPanel>
       }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.enter ||
+    if (key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter ||
         key == LogicalKeyboardKey.space) {
       _enterContent();
       return KeyEventResult.handled;
     }
-    // ←→ / Esc / 其余 — 冒泡（Esc 关面板，←→ 外层无绑定亦无害）.
+    // ← handled 空操作（挡 seek 泄漏）；Esc/其余 — 冒泡（Esc 关面板）.
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.ignored;
   }
 
-  /// L1 — ←→ 直接切分区；↑↓/Enter/Space 交给 rows 节点（General 后代先
-  /// 消费，未聚焦则聚焦）；非 General 分区同键 handled 空操作（防泄漏）；
-  /// Esc 返回 L0.
+  /// L1 — → 切下一分区；← 返回 tag 层；↑↓/Enter/Space 交给 rows 节点
+  /// （General 后代先消费，未聚焦则聚焦）；非 General 分区同键 handled
+  /// 空操作（防泄漏）；Esc 冒泡宿主关整个面板（返回专属 ← 键）.
   KeyEventResult _handleContentLevelKey(LogicalKeyboardKey key) {
-    if (key == LogicalKeyboardKey.arrowLeft ||
-        key == LogicalKeyboardKey.arrowRight) {
-      final dir = key == LogicalKeyboardKey.arrowRight ? 1 : -1;
+    if (key == LogicalKeyboardKey.arrowRight) {
       final index = _enabledTabs.indexOf(_selected);
-      final next = (index + dir).clamp(0, _enabledTabs.length - 1);
+      final next = (index + 1).clamp(0, _enabledTabs.length - 1);
       if (next != index) {
         _switchTo(_enabledTabs[next]);
       }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.escape) {
+    if (key == LogicalKeyboardKey.arrowLeft) {
       _backToTags();
       return KeyEventResult.handled;
     }
@@ -280,6 +274,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       }
       return KeyEventResult.handled;
     }
+    // Esc/其余 — 冒泡（Esc 经宿主 onEscapePressed 关整个面板）.
     return KeyEventResult.ignored;
   }
 
@@ -337,15 +332,32 @@ class _SettingsPanelState extends State<SettingsPanel>
         Expanded(
           child: Stack(
             children: [
-              // L0 tag 层 — 进入 L1 后整体虚化 0.4 并让出命中（D3）.
-              IgnorePointer(
-                ignoring: _level == _PanelLevel.content,
-                child: FadeTransition(
-                  opacity: Tween<double>(
-                    begin: 1.0,
-                    end: 0.4,
-                  ).animate(_layerEase),
-                  child: _buildTagLayer(context),
+              // L0 tag 层 — 进入 L1 后退（左移+微缩）淡出至完全消失并
+              // 让出命中（D3）; 退出 L1 反向回来. TickerMode 在隐藏/L1 时
+              // 静音跑马灯与 chip 隐式动画（零白耗 ticker）.
+              TickerMode(
+                enabled: widget.visible && _level == _PanelLevel.tags,
+                child: IgnorePointer(
+                  ignoring: _level == _PanelLevel.content,
+                  child: AnimatedBuilder(
+                    animation: _layerEase,
+                    // child 恒定 — 动画帧只换 Opacity/Transform 矩阵，
+                    // 子树零重建（paint 层合成）.
+                    child: _buildTagLayer(context),
+                    builder: (context, child) {
+                      final t = _layerEase.value;
+                      return Opacity(
+                        opacity: 1.0 - t,
+                        child: Transform.translate(
+                          offset: Offset(-16 * t, 0),
+                          child: Transform.scale(
+                            scale: 1.0 - 0.04 * t,
+                            child: child,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
               // L1 内容层 — 从右滑入覆盖（左缘竖向渐变线随层移动）;
@@ -379,35 +391,28 @@ class _SettingsPanelState extends State<SettingsPanel>
     );
   }
 
-  /// L0 tag 层 — 竖排分区入口（左列），右侧呼吸留白.
+  /// L0 tag 层 — 竖排分区入口，撑满内容区（水平对称居中），
+  /// 宽度随面板/窗口响应；摘要跑马灯的滚动空间随之联动.
   Widget _buildTagLayer(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 固定 chip 宽（摘要单行省略）— IntrinsicWidth 会取枚举摘要的
-        // 不折行固有宽把 Row 撑爆，固定宽 + ellipsis 才是稳定上界.
-        SizedBox(
-          width: _tagChipWidth,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final tab in _SettingsTab.values)
-                _SettingsTabChip(
-                  tab: tab,
-                  selected: _selected == tab,
-                  enabled: _enabledTabs.contains(tab),
-                  // 一步直达 — 点击任意 enabled tag 选中并进入其内容层.
-                  onTap: () {
-                    if (_level != _PanelLevel.tags) return;
-                    setState(() => _selected = tab);
-                    _enterContent();
-                  },
-                ),
-            ],
-          ),
-        ),
-        // 呼吸留白 — XMB 式克制（D1 摘要已入 chip，右侧不再堆内容）.
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Tokens.spLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final tab in _SettingsTab.values)
+            _SettingsTabChip(
+              tab: tab,
+              selected: _selected == tab,
+              enabled: _enabledTabs.contains(tab),
+              // 一步直达 — 点击任意 enabled tag 选中并进入其内容层.
+              onTap: () {
+                if (_level != _PanelLevel.tags) return;
+                setState(() => _selected = tab);
+                _enterContent();
+              },
+            ),
+        ],
+      ),
     );
   }
 
@@ -443,11 +448,12 @@ class _SettingsPanelState extends State<SettingsPanel>
               children: [...previousChildren, ?currentChild],
             ),
             transitionBuilder: (child, animation) {
-              // 方向性滑动（细节终裁）— 进入者从按键方向侧滑入,
-              // 退出者向反侧滑出（→ 下一个: 旧左出新右进）.
+              // 方向性滑动 — 进入者从右侧滑入, 退出者向左滑出（恒正向:
+              // L1 内只剩 → 切下一分区, ← 已改为返回 tag 层）.
               final isIncoming = child.key == ValueKey(_selected);
-              final dir = _switchForward ? 1.0 : -1.0;
-              final offset = isIncoming ? Offset(dir, 0) : Offset(-dir, 0);
+              final offset = isIncoming
+                  ? const Offset(1, 0)
+                  : const Offset(-1, 0);
               return SlideTransition(
                 position: Tween<Offset>(
                   begin: offset,
@@ -642,10 +648,10 @@ class _SettingsTabChipState extends State<_SettingsTabChip> {
                     ],
                   ),
                   const SizedBox(height: Tokens.spXs),
-                  Text(
-                    _tabSummary(l10n),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  // 摘要跑马灯 — 空间足够静止全显, 不足从右向左循环滚动;
+                  // 滚动空间随 chip 宽（面板宽）响应联动.
+                  LoopMarqueeText(
+                    text: _tabSummary(l10n),
                     style: const TextStyle(
                       color: Tokens.textSecondary,
                       fontSize: Tokens.fontCaption,

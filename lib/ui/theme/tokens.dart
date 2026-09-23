@@ -296,19 +296,6 @@ class Tokens {
   static const double breakpointUltraCompact = 360;
   static const double breakpointWide = 1200;
 
-  // ── 设置面板 chrome ──
-  /// 设置面板的半透明背景遮罩。
-  static const Color settingsOverlayMask = Colors.black54;
-
-  /// 设置面板标题栏高度。
-  static const double settingsTitleBarHeight = 44.0;
-
-  /// 紧凑布局的设置 tab 条高度。
-  static const double tabStripHeightCompact = 56.0;
-
-  /// 常规布局的设置 tab 条高度。
-  static const double tabStripHeightNormal = 64.0;
-
   // ── 控制栏局部布局 ──
   /// 控制栏内容与底部边缘之间的留白。
   static const double controlBarContentBottomPadding = 6.0;
@@ -318,40 +305,6 @@ class Tokens {
 
   /// 控制栏按钮行的水平留白。
   static const double controlBarButtonRowPadding = 4.0;
-
-  // ── 响应式设置面板（D-04：严格 16:9 几何）──
-  /// 设置面板 tab bar 切换 normal/compact 的窗口宽度断点（>=800 normal, <800 compact）
-  /// 注意：仅驱动 tab-compact 呈现，不参与 sizing 公式（D-04：sizing 无断点分支）
-  static const double breakpointResponsive = 800.0;
-
-  /// 面板最小宽度（clamp 下限）
-  static const double panelMinWidth = 400.0;
-
-  /// 面板最大宽度（clamp 上限，D-04：16:9 几何上限 960）
-  static const double panelMaxWidth = 960.0;
-
-  /// 面板宽度占窗口宽度比例（D-04：0.5，width=min(0.5×W, H×16/9)）
-  static const double panelWidthRatio = 0.5;
-
-  /// 面板宽高比（D-04：16:9，height = width / panelAspectRatio）
-  static const double panelAspectRatio = 16.0 / 9.0;
-
-  /// normal 模式 tab 字体大小
-  static const double tabBarFontNormal = 14.0;
-
-  /// compact 模式 tab 字体大小
-  static const double tabBarFontCompact = 12.0;
-
-  /// normal 模式 tab 内容间距
-  static const double tabBarSpacingNormal = 16.0;
-
-  /// compact 模式 tab 内容间距
-  static const double tabBarSpacingCompact = 8.0;
-
-  // ── 响应式设置面板结构色路由（D-02 / LAYOUT-05）──
-  /// 设置面板四段（标题栏 / tab 条 / 内容区 / 按钮栏）结构背景统一路由。
-  /// Phase 30 保留 bgGlass 值；Phase 31 chrome 对齐时单点改此别名即可，不动四消费者。
-  static const Color panelSectionBg = bgGlass;
 
   // ── 跳秒（毫秒）──
   // P0' 修复:原 skipSecondsShort/Long(秒命名 + 值 10/30)误传引擎 ms 接口,
@@ -385,15 +338,6 @@ class Tokens {
   /// 方向辉光显示窗口（毫秒）—— setArrowGlow 后到此时长自动回 null (NAV-06)，
   /// 复用 osdDefaultHoldMs=1200 的瞬态显示先例。
   static const int arrowGlowDuration = 1200;
-
-  // ── Phase 32 端帽箭头 + 输入提示 (NAV-01/NAV-03) ──
-  /// 端帽箭头圆角 —— 复用 [radiusBtn] 按钮尺度（GlassButton 先例），端帽为
-  /// 按钮级可交互元素，4px 圆角在零圆角 tab 条内作微妙区分 (NAV-01)。
-  static const double tabArrowRadius = radiusBtn;
-
-  /// 端帽箭头固定宽 —— 匹配 GlassButton.iconOnly 的 36px 点击靶，留给 7 个
-  /// Expanded tab 足够空间（面板最小宽 400 - 2×36 = 328px / 7 ≈ 47px/项）。
-  static const double tabArrowWidth = 36.0;
 
   /// 输入提示淡入淡出时长（毫秒）—— AnimatedSwitcher 交叉淡入键盘↔手柄标签，
   /// 复用 [durationSlide] 的瞬态切换先例 (NAV-03)。

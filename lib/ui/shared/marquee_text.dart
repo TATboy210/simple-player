@@ -64,12 +64,20 @@ class _MarqueeTextState extends State<MarqueeText>
   }
 
   /// 超长文本的往返滚动渲染 — ClipRect 裁剪平移出界的部分。
+  ///
+  /// softWrap: false 必须显式 — 缺省折行会让 RenderParagraph 按容器宽
+  /// 截断字形，平移永远显示不出尾部内容（v0.0.9 修复）。
   Widget _buildScrollingText(AnimationController controller) {
     return RepaintBoundary(
       child: ClipRect(
         child: AnimatedBuilder(
           animation: controller,
-          child: Text(widget.text, style: widget.style, maxLines: 1),
+          child: Text(
+            widget.text,
+            style: widget.style,
+            maxLines: 1,
+            softWrap: false,
+          ),
           builder: (context, child) => Transform.translate(
             // repeat(reverse: true) 使 value 在 0↔1 线性往返 → 平移无跳变
             offset: Offset(-_overflow * controller.value, 0),

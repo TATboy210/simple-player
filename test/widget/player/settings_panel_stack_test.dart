@@ -49,6 +49,9 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
+        // 固定 zh — 英文摘要在 Ahem 字体下必超宽, 会启动跑马灯 repeat 使
+        // pumpAndSettle 死循环 (SDK 无 timeout); 中文摘要不溢出全静止.
+        locale: const Locale('zh'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -140,6 +143,17 @@ void main() {
     final playlistRect = tester.getRect(find.byType(PlaylistPanel));
     expect(playlistRect.left - openRect.right, closeTo(Tokens.spMd, 0.5));
     expect(openRect.overlaps(playlistRect), isFalse);
+
+    // tag 居中对称: chip 撑满面板内容区 (宽 = 面板 - 壳 border 2px - 2×spLg),
+    // 左缘 = 面板 left + border 1px + spLg (离开面板圆角区).
+    final chipRect = tester.getRect(
+      find.byKey(const ValueKey('settings-tab-general')),
+    );
+    expect(
+      chipRect.width,
+      closeTo(closedRect.width - 2 * Tokens.spLg - 2, 0.5),
+    );
+    expect(chipRect.left, closeTo(closedRect.left + Tokens.spLg + 1, 0.5));
   });
 
   testWidgets('面板开着方向键被面板消费不触发 seek, 关面板后归还宿主', (tester) async {
@@ -155,18 +169,22 @@ void main() {
       ),
     );
 
-    // 打开面板: 焦点入面板 (post-frame), ← 被面板级消费 (L0 无 ←→ 绑定,
-    // 返回 ignored → 冒泡? 否 — 面板 Focus L0 分支 ignored 会冒泡宿主!
-    // L1 才消费 ←→; 用 ↑↓/Enter 验证 L0 消费, ←→ 验证 L1).
     settingsVisible.value = true;
     await tester.pumpAndSettle();
 
-    // L1 内 ← 消费 (不冒泡 seek).
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter); // 进入内容层
-    await tester.pumpAndSettle();
+    // L0: ← handled 空操作 (不冒泡 seek) — C5 契约.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
-    expect(seekCalls, 0, reason: '面板开着时方向键不得泄漏为 seek');
+    expect(seekCalls, 0, reason: 'L0 的 ← 不得泄漏为 seek');
+
+    // → 进入内容层 (L1)。
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    // L1: ← 返回 tag 层 (新语义), 仍不泄漏 seek.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(seekCalls, 0, reason: 'L1 的 ← 不得泄漏为 seek');
 
     // 关闭面板: 宿主归还焦点, ← 恢复为 seek (E1 焦点归还契约).
     settingsVisible.value = false;
