@@ -54,11 +54,14 @@ bool FlutterWindow::OnCreate() {
   // 款: 无 EditableText 锚点时组合窗定位到 0,0)。恢复走 Dart 侧
   // Win32ImeBridge 的 ImmAssociateContextEx(IACE_DEFAULT), 未来落地文本
   // 输入框时按焦点启停。
+  // ⚠ 必须同时解除 **主窗口与 FlutterView 子窗口** — 键盘焦点在子窗口,
+  // 组合发生在子窗口的 IMC 上, 只解除主窗口候选窗照弹 (首版实测踩坑)。
   // ⚠ NULL IMC 与原生文件对话框冲突 (IFileOpenDialog 子窗口的 TSF 路径
   // 假定 IMC 存在 → imm32/msctf 空指针崩溃) — 一切原生文件对话框调用
   // 必须经 Dart 侧 Win32ImeBridge.withImeRestored 包裹 (弹窗期间临时
   // 恢复 IME), 新增 picker 时务必遵循。
   ImmAssociateContext(GetHandle(), nullptr);
+  ImmAssociateContext(flutter_controller_->view()->GetNativeWindow(), nullptr);
 
   return true;
 }
