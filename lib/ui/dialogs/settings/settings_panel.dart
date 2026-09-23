@@ -299,8 +299,11 @@ class _SettingsPanelState extends State<SettingsPanel>
       decoration: _panelDecoration,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
-        child: BackdropFilter(
-          filter: GlassTier.normal.blurFilter,
+        // BackdropFilter 带 opacity 门控 — 面板淡出至近透明 (<1%) 即停用
+        // GPU 背景采样模糊, 隐藏期零合成成本 (ControlBar 同款门控语义);
+        // 内容子树走 child: 参数, 动画帧只换 enabled 布尔.
+        child: AnimatedBuilder(
+          animation: _fade,
           child: Material(
             // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
             color: Colors.transparent,
@@ -312,6 +315,13 @@ class _SettingsPanelState extends State<SettingsPanel>
               child: _buildContent(context),
             ),
           ),
+          builder: (context, child) {
+            return BackdropFilter(
+              enabled: _fade.value >= 0.01,
+              filter: GlassTier.normal.blurFilter,
+              child: child,
+            );
+          },
         ),
       ),
     );
@@ -363,25 +373,25 @@ class _SettingsPanelState extends State<SettingsPanel>
               // L1 内容层 — 从右滑入覆盖（左缘竖向渐变线随层移动）;
               // L0 静止期 Offstage（不 paint/不命中/语义不可见），滑出
               // 动画期间保持挂载以呈现退出动效.
+              // 内容层走 child: 参数 — 动画帧只换 Offstage 开关，
+              // Row/渐变线/分区内容子树零重建（修复每帧全量重建卡顿）.
               AnimatedBuilder(
                 animation: _layerController,
-                builder: (_, _) {
+                child: IgnorePointer(
+                  ignoring: _level == _PanelLevel.tags,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(1, 0),
+                      end: Offset.zero,
+                    ).animate(_layerEase),
+                    child: _buildContentLayer(context),
+                  ),
+                ),
+                builder: (_, child) {
                   final offstage =
                       _level == _PanelLevel.tags &&
                       !_layerController.isAnimating;
-                  return Offstage(
-                    offstage: offstage,
-                    child: IgnorePointer(
-                      ignoring: _level == _PanelLevel.tags,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(1, 0),
-                          end: Offset.zero,
-                        ).animate(_layerEase),
-                        child: _buildContentLayer(context),
-                      ),
-                    ),
-                  );
+                  return Offstage(offstage: offstage, child: child);
                 },
               ),
             ],
