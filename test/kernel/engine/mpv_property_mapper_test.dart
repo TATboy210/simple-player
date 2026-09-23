@@ -137,4 +137,52 @@ void main() {
       expect(MpvPropertyMapper.mapAspectRatio(2.718281828), isNull);
     });
   });
+
+  group('mapVolumeToMpv / mapVolumeFromMpv — 感知音量曲线 (v0.0.8.1)', () {
+    test('边界幂等 — 0→0, 1→100 unity', () {
+      expect(MpvPropertyMapper.mapVolumeToMpv(0.0), 0.0);
+      expect(MpvPropertyMapper.mapVolumeToMpv(1.0), closeTo(100.0, 1e-9));
+    });
+
+    test('立方根反演 — 0.5 → ≈79.37 (感知半响度)', () {
+      // mpv 软增益是立方 gain=(v/100)³: v=79.37 → gain=0.5.
+      expect(MpvPropertyMapper.mapVolumeToMpv(0.5), closeTo(79.3701, 0.001));
+    });
+
+    test('超界 clamp — 负值/超 1 均不越界', () {
+      expect(MpvPropertyMapper.mapVolumeToMpv(-0.5), 0.0);
+      expect(MpvPropertyMapper.mapVolumeToMpv(1.5), closeTo(100.0, 1e-9));
+    });
+
+    test('round-trip 互逆 — setVolume 写入与回声反演回环恒等', () {
+      for (final u in [0.1, 0.3, 0.5, 0.7, 0.9]) {
+        final mpv = MpvPropertyMapper.mapVolumeToMpv(u);
+        expect(
+          MpvPropertyMapper.mapVolumeFromMpv(mpv),
+          closeTo(u, 1e-6),
+          reason: 'u=$u 回环应恒等',
+        );
+      }
+    });
+
+    test('mapVolumeFromMpv — 立方正演 + 输入 clamp + v=100 浮点安全', () {
+      expect(MpvPropertyMapper.mapVolumeFromMpv(0.0), 0.0);
+      // v=79.3701 → gain=(0.7937)³ ≈ 0.5.
+      expect(MpvPropertyMapper.mapVolumeFromMpv(79.3701), closeTo(0.5, 1e-6));
+      // v=100 立方后浮点可能微超 1.0 — clamp 保证.
+      final v = MpvPropertyMapper.mapVolumeFromMpv(100.0);
+      expect(v, lessThanOrEqualTo(1.0));
+      // 外部异常值 (负数/超 100) 同样安全.
+      expect(MpvPropertyMapper.mapVolumeFromMpv(-10.0), 0.0);
+      expect(MpvPropertyMapper.mapVolumeFromMpv(250.0), lessThanOrEqualTo(1.0));
+    });
+  });
+
+  group('mapMute — mpv 原生静音 (v0.0.8.1)', () {
+    test('布尔 → yes/no, 键为 mute', () {
+      expect(MpvPropertyMapper.mapMute(true).value, 'yes');
+      expect(MpvPropertyMapper.mapMute(false).value, 'no');
+      expect(MpvPropertyMapper.mapMute(true).key, 'mute');
+    });
+  });
 }

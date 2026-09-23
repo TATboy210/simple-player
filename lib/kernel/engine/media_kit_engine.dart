@@ -106,8 +106,8 @@ class MediaKitEngine implements MediaEngine {
   MediaInfo _mediaInfo = const MediaInfo();
   bool _hasMedia = false;
 
-  // 静音前音量快照 — unmute 时恢复. media_kit 无独立 mute API, 借 setVolume(0).
-  double _preMuteVolume = 1.0;
+  // 静音语义 (v0.0.8.1): 走 mpv 原生 `mute` 属性 (见 setMute),
+  // 无需"静音前音量快照" — 音量属性在静音期间不动, unmute 即原响度.
 
   // ─── mpv 属性直通 (v0.0.6 — NativePlayer.setProperty 公开 API) ───
 
@@ -760,28 +760,36 @@ class MediaKitEngine implements MediaEngine {
     if (_disposed) return;
     final clamped = value.clamp(0.0, 1.0);
     _volume.value = clamped;
-    // 穿越 0 边界联动静音标志 (契约: 0 自动静音, 调高取消).
+    // 穿越 0 边界联动静音标志 (契约: 0 自动静音, 调高取消) — notifier 与
+    // mpv mute 属性同步翻转, 使滑条零边界与 setMute 两条路径在 mpv 侧
+    // 语义一致 (否则 muted 中拖滑条会 UI 已取消静音而 mpv 仍 mute).
     if (clamped == 0.0) {
       _isMuted.value = true;
+      _applyMuteProperty(true);
     } else if (_isMuted.value) {
       _isMuted.value = false;
+      _applyMuteProperty(false);
     }
-    // media_kit 音量 0~100, 项目 0.0~1.0.
-    unawaited(_player.setVolume(clamped * 100));
+    // 感知曲线: mpv volume 是立方软增益 gain=(v/100)³, 传立方根使滑条
+    // 位置即感知响度 (u=1 → 100 unity, 不做 >100% 放大).
+    unawaited(_player.setVolume(MpvPropertyMapper.mapVolumeToMpv(clamped)));
   }
 
   @override
   void setMute(bool mute) {
     if (_disposed) return;
-    if (mute) {
-      if (!_isMuted.value) _preMuteVolume = _volume.value;
-      _isMuted.value = true;
-      unawaited(_player.setVolume(0));
-    } else {
-      _isMuted.value = false;
-      unawaited(_player.setVolume(_preMuteVolume * 100));
-    }
+    // 原生静音 — 写 mpv `mute` 属性, 音量属性不动: 静音时滑条停在原值,
+    // unmute 自动回到原响度; 消除旧 setVolume(0) 模拟所需的双份
+    // "静音前快照" (_preMuteVolume / UI _savedVolume) 及 mute 期间
+    // 落盘 volume=0 的 wart.
+    _isMuted.value = mute;
+    _applyMuteProperty(mute);
   }
+
+  /// mute → mpv `mute` 属性 — 全局属性, 显式 fileScoped:false (否则进
+  /// _fileScopedProps 缓存被新文件装载错误重放, hwdec 同理).
+  void _applyMuteProperty(bool mute) =>
+      _applyMpvProperty(MpvPropertyMapper.mapMute(mute), fileScoped: false);
 
   @override
   void setPlaybackRate(double rate) {
@@ -1011,11 +1019,12 @@ class MediaKitEngine implements MediaEngine {
         _reapplyFileScopedProps();
       }),
     );
-    // media_kit volume 0~100 → 项目 0.0~1.0.
+    // media_kit volume 0~100 → 用户感知刻度 0.0~1.0 — 立方增益正演,
+    // 与 setVolume 的立方根写入互逆 (回环幂等无循环).
     // 仅同步数值, 不联动 isMuted (静音由 setMute 显式管).
     _addSubscription(
       _player.stream.volume.listen((v) {
-        _volume.value = (v / 100).clamp(0.0, 1.0);
+        _volume.value = MpvPropertyMapper.mapVolumeFromMpv(v);
       }),
     );
     _addSubscription(
