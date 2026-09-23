@@ -7,6 +7,7 @@ import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
 import 'package:simple_player_flutter/kernel/services/app_settings_service.dart';
 import 'package:simple_player_flutter/kernel/services/video_processing_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/audio_settings_content.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/video_settings_content.dart';
@@ -178,17 +179,13 @@ void main() {
     expect(find.byType(GeneralSettingsContent), findsNothing);
   });
 
-  testWidgets('disabled video and audio entries never switch content', (
-    tester,
-  ) async {
+  testWidgets('video 分区保持灰显，audio 已解灰 (v0.0.8.1)', (tester) async {
     await openDialog(tester);
 
-    // 灰显占位项不可交互（Avoid captive UI）：点击无伪反馈、内容层不进入。
-    // IgnorePointer 拦截命中是灰显行为的直接证据 —— warnIfMissed: false
-    // 显式声明「点击落空即预期」。
+    // video 灰显占位项不可交互（Avoid captive UI）：点击无伪反馈、内容层
+    // 不进入。IgnorePointer 拦截命中是灰显行为的直接证据 ——
+    // warnIfMissed: false 显式声明「点击落空即预期」。
     await tester.tap(find.text('视频'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('音频'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(GeneralSettingsContent), findsNothing);
     expect(find.text('media_kit'), findsNothing);
@@ -199,22 +196,24 @@ void main() {
       find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
     );
     expect(videoOpacity.opacity, 0.38);
-    final audioOpacity = tester.widget<Opacity>(
-      find.ancestor(of: find.text('音频'), matching: find.byType(Opacity)).first,
-    );
-    expect(audioOpacity.opacity, 0.38);
     final videoPointer = tester.widget<IgnorePointer>(
       find
           .ancestor(of: find.text('视频'), matching: find.byType(IgnorePointer))
           .first,
     );
     expect(videoPointer.ignoring, isTrue);
+
+    // audio 已解灰（v0.0.8.1）：不透明度恢复 1.0（无灰显 Opacity 修饰）。
+    final audioOpacity = tester.widget<Opacity>(
+      find.ancestor(of: find.text('音频'), matching: find.byType(Opacity)).first,
+    );
+    expect(audioOpacity.opacity, 1.0);
   });
 
   group('键盘交叉导航 (v0.0.8 XMB 化)', () {
     testWidgets('L0 上下键切换分区高亮且灰显分区不可达', (tester) async {
       await openDialog(tester);
-      // 默认选中「关于」（enabled 序列 [通用, 关于] 的末位）。
+      // 默认选中「关于」（enabled 序列 [通用, 音频, 关于] 的末位）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pumpAndSettle();
       // 到头即停：仍在「关于」。
@@ -223,14 +222,14 @@ void main() {
       );
       expect((about.decoration! as BoxDecoration).color, Tokens.bgHover);
 
-      // ↑ 回到「通用」（enabled 首位）。注意：ArrowUp 后须重取 widget —
-      // 旧实例的 decoration 是陈旧快照。
+      // ↑ 回到「音频」（enabled 序列中位，v0.0.8.1 解灰后可达）。注意：
+      // ArrowUp 后须重取 widget — 旧实例的 decoration 是陈旧快照。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
-      final general = tester.widget<AnimatedContainer>(
-        find.byKey(const ValueKey('settings-tab-general')),
+      final audio = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-audio')),
       );
-      expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
+      expect((audio.decoration! as BoxDecoration).color, Tokens.bgHover);
       final aboutAfterUp = tester.widget<AnimatedContainer>(
         find.byKey(const ValueKey('settings-tab-about')),
       );
@@ -239,13 +238,23 @@ void main() {
         Colors.transparent,
         reason: '↑↓ 移动后旧分区失去选中底色',
       );
+
+      // 再 ↑ 回到「通用」（enabled 首位）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      final general = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-general')),
+      );
+      expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
     });
 
     testWidgets('→ 键进入内容层；L1 内 ← 返回 tag 层；Esc 恒冒泡关面板', (tester) async {
       var closeCount = 0;
       await openDialog(tester, onClose: () => closeCount++);
 
-      // → 直接进入「通用」内容层（默认选中通用 → ↑ 先切到通用）。
+      // → 直接进入「通用」内容层（默认选中关于 → ↑↑ 切到通用）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
@@ -267,20 +276,22 @@ void main() {
 
     testWidgets('L1 内 → 切下一分区；← 返回 tag 层', (tester) async {
       await openDialog(tester);
-      // 进入「通用」内容层（默认选中关于 → ↑ 到通用 → →）。
+      // 进入「通用」内容层（默认选中关于 → ↑↑ 到通用 → →）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
       expect(find.byType(GeneralSettingsContent), findsOneWidget);
 
-      // → 切到「关于」（enabled 序列 [通用, 关于] 的后一位）。
+      // → 切到「音频」（enabled 序列 [通用, 音频, 关于] 的后一位；
+      // 无 bundle 注入时音频内容为空壳 — 通用内容消失即分区已切）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
-      expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
       expect(find.byType(GeneralSettingsContent), findsNothing);
 
-      // ← 返回 tag 层（关于内容消失 — Offstage）。
+      // ← 返回 tag 层（内容消失 — Offstage）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
       expect(find.byType(GeneralSettingsContent), findsNothing);
@@ -288,7 +299,10 @@ void main() {
 
     testWidgets('General 行导航 — ↓ 高亮首行、Enter 翻转错误卡片开关', (tester) async {
       await openDialog(tester);
-      // 进入「通用」内容层（进入即聚焦第 0 行 — 细节终裁）。
+      // 进入「通用」内容层（默认选中关于 → ↑↑ 到通用；进入即聚焦第 0 行
+      // — 细节终裁）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -358,9 +372,7 @@ void main() {
       ),
     );
 
-    testWidgets('video/audio 分区保持关闭 (v0.0.6.1 用户裁决, bundle 注入也不例外)', (
-      tester,
-    ) async {
+    testWidgets('video 分区保持关闭 (bundle 注入也不例外)', (tester) async {
       await tester.pumpWidget(buildInjectedSubject());
       await tester.pumpAndSettle();
 
@@ -368,8 +380,6 @@ void main() {
       await tester.tap(find.text('视频'), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.byType(VideoSettingsContent), findsNothing);
-      await tester.tap(find.text('音频'), warnIfMissed: false);
-      await tester.pumpAndSettle();
 
       final videoOpacity = tester.widget<Opacity>(
         find
@@ -377,6 +387,26 @@ void main() {
             .first,
       );
       expect(videoOpacity.opacity, 0.38);
+    });
+
+    testWidgets('audio 分区可进入 — SpinControl 写入 AppSettingsService', (tester) async {
+      await tester.pumpWidget(buildInjectedSubject());
+      await tester.pumpAndSettle();
+
+      // 解灰后音频分区可点进（v0.0.8.1），AudioSettingsContent 两行
+      // 延迟 SpinControl 渲染。
+      await tester.tap(find.text('音频'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AudioSettingsContent), findsOneWidget);
+      expect(settings.audioDelayMs, 0);
+
+      // 点第一个 SpinControl 的右箭头（音频延迟行）— 0ms + 50ms 步进。
+      final increaseButtons = find.byIcon(Icons.chevron_right);
+      await tester.tap(increaseButtons.first);
+      await tester.pumpAndSettle();
+
+      expect(settings.audioDelayMs, 50, reason: 'SpinControl 写入服务并落盘通道');
+      expect(settings.subtitleDelayMs, 0, reason: '字幕延迟行不受影响');
     });
 
     testWidgets('通用分区出现断点续播开关并可翻转', (tester) async {
