@@ -9,6 +9,7 @@ import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
+import 'package:simple_player_flutter/ui/shared/empty_state.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
@@ -35,6 +36,7 @@ void main() {
     bool initialVisible = false,
     ValueNotifier<bool>? playlistVisible,
     PlayerActions? actions,
+    bool withEmptyState = false,
   }) async {
     settingsVisible.value = initialVisible;
     final video = FakeVideoControlsPort(player: FakePlayerControls());
@@ -67,12 +69,15 @@ void main() {
               playlistVisible: playlistVisible,
               playlistCoordinator: coordinator,
               settingsVisible: settingsVisible,
+              emptyState: withEmptyState
+                  ? EmptyState(engineState: engine.state)
+                  : null,
             ),
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
   }
 
   testWidgets('设置面板常驻挂载于控制层 Stack 且无 route barrier', (tester) async {
@@ -154,6 +159,46 @@ void main() {
       closeTo(closedRect.width - 2 * Tokens.spLg - 2, 0.5),
     );
     expect(chipRect.left, closeTo(closedRect.left + Tokens.spLg + 1, 0.5));
+  });
+
+  testWidgets('空置态: 面板外点击关闭浮层面板 (设置优先于播放列表)', (tester) async {
+    final settingsVisible = ValueNotifier<bool>(true);
+    final playlistVisible = ValueNotifier<bool>(true);
+    addTearDown(settingsVisible.dispose);
+    addTearDown(playlistVisible.dispose);
+    await pumpControls(
+      tester,
+      settingsVisible,
+      playlistVisible: playlistVisible,
+      withEmptyState: true,
+    );
+    // pump 后开面板 (initialVisible 默认 false — 面板先关着再打开).
+    settingsVisible.value = true;
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 空置态手势层不再整体禁用 — 面板外点击走仅关面板回调 (设置优先).
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(settingsVisible.value, isFalse);
+    expect(playlistVisible.value, isTrue);
+
+    // 再点 → 关播放列表.
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(playlistVisible.value, isFalse);
+  });
+
+  testWidgets('空置态: 面板矩形内点击不关闭 (背景装饰吸收)', (tester) async {
+    final settingsVisible = ValueNotifier<bool>(true);
+    addTearDown(settingsVisible.dispose);
+    await pumpControls(tester, settingsVisible, withEmptyState: true);
+    settingsVisible.value = true;
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final panelRect = tester.getRect(find.byType(SettingsPanel));
+    await tester.tapAt(Offset(panelRect.left + 10, panelRect.bottom - 30));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(settingsVisible.value, isTrue, reason: '面板矩形内背景吸收, 不触发点外关闭');
   });
 
   testWidgets('面板开着方向键被面板消费不触发 seek, 关面板后归还宿主', (tester) async {

@@ -375,6 +375,21 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     }
   }
 
+  /// 空置态手势 — 只负责关闭浮层面板（设置 → 播放列表），不触发双击
+  /// 全屏 / 控制栏隐藏：空置态控制栏钉住恒显、全屏无意义（空置页历史
+  /// 设计意图保留，仅补上面板外点击的关闭通路）。
+  void _handleEmptyAreaTap() {
+    final settingsNotifier = widget.settingsVisible;
+    if (settingsNotifier != null && settingsNotifier.value) {
+      settingsNotifier.value = false;
+      return;
+    }
+    final playlistNotifier = widget.playlistVisible;
+    if (playlistNotifier != null && playlistNotifier.value) {
+      playlistNotifier.value = false;
+    }
+  }
+
   void _handleTap() {
     // 点外关闭语义 (面板可见时点击视频区先关面板), 不触发双击全屏/隐藏
     // 判定. 设置面板与播放列表同层, 先于播放列表关闭.
@@ -673,10 +688,26 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: emptyActive ? null : _handleTap,
-                child: IgnorePointer(
-                  ignoring: emptyActive,
-                  child: const SizedBox.expand(),
+                // 空置态切换为仅关面板的回调 — 空置页历史设计是整层让位
+                // (中央按钮可点 + 防双击全屏误触), 副作用是面板外点击
+                // 完全无处理, 浮层面板收不到关闭信号 (v0.0.8 修复).
+                onTap: emptyActive ? _handleEmptyAreaTap : _handleTap,
+                child: ListenableBuilder(
+                  listenable: Listenable.merge([
+                    if (widget.settingsVisible != null) widget.settingsVisible,
+                    if (widget.playlistVisible != null) widget.playlistVisible,
+                  ]),
+                  builder: (context, _) {
+                    // 任一面板开着 → 手势层活跃 (点击面板外 = 关面板);
+                    // 全关后让位空置页 (中央"打开文件"按钮可点).
+                    final anyPanel =
+                        (widget.settingsVisible?.value ?? false) ||
+                        (widget.playlistVisible?.value ?? false);
+                    return IgnorePointer(
+                      ignoring: emptyActive && !anyPanel,
+                      child: const SizedBox.expand(),
+                    );
+                  },
                 ),
               ),
             ),
