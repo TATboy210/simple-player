@@ -41,7 +41,7 @@ Use **`Tokens.*` static compile-time constants** as the single design system, de
 | **Icon sizes** | `iconSm` (16), `iconMd` (18), `iconLg` (20), `iconXl` (28) | 4 |
 | **Spacing** | `spXs` (4), `spSm` (8), `spMd` (12), `spLg` (16), `spXl` (24) | 5 |
 | **Border radius** | `radiusSm` (8), `radiusMd` (14), `radiusLg` (22), `radiusXl` (32) | 6 |
-| **Glass blur** | `glassBlurThin` (8), `glassBlur` (11.5), `glassBlurThick` (24) | 3 |
+| **Glass blur** | `glassBlurThin` (8), `glassBlur` (11.5) | 2 |
 | **Animation durations** | `durationFast` (80ms), `durationNormal` (150ms), `durationFade` (400ms), `durationSlide` (300ms) | 6 |
 | **Component dimensions** | `controlBarHeight` (110), `titleBarHeight` (32), `playlistPanelWidth` (420), etc. | ~20 |
 | **Progress bar** | `progressBarRadius`, `progressBarThickness`, `progressPlayed`, etc. | ~15 |
@@ -81,7 +81,7 @@ Three accent color themes (Midnight/Ocean/Forest) are handled by `ThemeService` 
 - **Single source of truth.** Changing `Tokens.glassBlur` from 11.5 to 16.0 updates every glass component in the app. No hunting for hardcoded values.
 - **Zero runtime cost.** All tokens are `static const` — inlined by the Dart compiler. No runtime map lookups, no theme resolution overhead.
 - **IDE autocomplete.** `Tokens.` triggers autocomplete showing all available design values. Developers don't need to memorize hex colors or pixel values.
-- **Glass-morphism consistency.** The three-tier blur system (`glassBlurThin`/`glassBlur`/`glassBlurThick`) and glow color palette ensure all glass components look cohesive.
+- **Glass-morphism consistency.** The two-tier blur system (`glassBlurThin`/`glassBlur`; the legacy `glassBlurThick` dead tier was removed in v0.0.8.2 — its enum sigma field and filter instance had diverged) and glow color palette ensure all glass components look cohesive.
 - **Responsive breakpoints.** `compactBreakpoint` (500dp) and `breakpointUltraCompact` (360dp) enable consistent responsive layout across components.
 
 ### Negative

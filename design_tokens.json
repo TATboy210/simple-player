@@ -87,9 +87,8 @@
       "controlBarOuterShadow": { "value": "0x40000000", "alpha": "25%", "desc": "外阴影" }
     },
     "glassmorphism": {
-      "glassBlur":     { "value": 18.0, "unit": "px (sigma)", "desc": "控制栏模糊度" },
-      "glassBlurThin": { "value": 8.0,  "unit": "px (sigma)", "desc": "标题栏模糊度" },
-      "glassBlurThick":{ "value": 20.0, "unit": "px (sigma)", "desc": "弹窗模糊度" }
+      "glassBlur":     { "value": 11.5, "unit": "px (sigma)", "desc": "控制栏/大面板模糊度" },
+      "glassBlurThin": { "value": 8.0,  "unit": "px (sigma)", "desc": "轻量小件模糊度" }
     },
     "layout": {
       "controlBarHeight":      { "value": 110.0, "unit": "dp", "desc": "控制栏总高度" },

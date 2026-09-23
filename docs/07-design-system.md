@@ -52,7 +52,7 @@
 
 ### 毛玻璃模糊
 
-`glassBlurThin` (12) / `glassBlur` (16) / `glassBlurThick` (24)
+`glassBlurThin` (8.0) / `glassBlur` (11.5) — 两档体系 (v0.0.8.2 删 thick 死档)
 
 ### 动画时长 (毫秒)
 
@@ -116,9 +116,8 @@ class AppTheme {
 
 ```dart
 enum GlassTier {
-  thin(Tokens.glassBlurThin),    // 标题栏 — 12 sigma
-  normal(Tokens.glassBlur),      // 控制栏 — 16 sigma
-  thick(Tokens.glassBlurThick);  // 弹窗 — 24 sigma
+  thin(Tokens.glassBlurThin),    // 轻量小件 — 8.0 sigma
+  normal(Tokens.glassBlur);      // 控制栏/大面板 — 11.5 sigma
 }
 
 class GlassContainer extends StatelessWidget {

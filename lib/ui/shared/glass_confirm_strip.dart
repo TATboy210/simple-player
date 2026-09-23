@@ -77,53 +77,53 @@ class GlassConfirmStrip extends StatelessWidget {
         borderRadius: _stripRadius,
         filter: GlassTier.thin.blurFilter,
         child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Tokens.spMd,
-              vertical: Tokens.spSm,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 警示图标 — danger 红, 语义先行.
-                const Icon(
-                  Icons.warning_amber_outlined,
-                  size: 22,
-                  color: Tokens.danger,
-                ),
-                const SizedBox(width: Tokens.spSm),
-                // 正文 — Expanded 自适应宽度, 两行封顶.
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Text(
-                    message,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Tokens.textPrimary,
-                      fontSize: Tokens.fontCaption,
-                      height: 1.4,
-                    ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.spMd,
+            vertical: Tokens.spSm,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 警示图标 — danger 红, 语义先行.
+              const Icon(
+                Icons.warning_amber_outlined,
+                size: 22,
+                color: Tokens.danger,
+              ),
+              const SizedBox(width: Tokens.spSm),
+              // 正文 — Expanded 自适应宽度, 两行封顶.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Text(
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: Tokens.fontCaption,
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(width: Tokens.spMd),
-                // 取消 — 控制栏同款小方块按钮.
-                GlassButton.iconOnly(
-                  icon: Icons.close,
-                  tooltip: cancelLabel,
-                  onPressed: () => Navigator.of(context).pop(false),
-                ),
-                const SizedBox(width: Tokens.spXs),
-                // 确认删除 — danger 红图标, 同款小方块交互.
-                GlassButton.iconOnly(
-                  icon: confirmIcon,
-                  tooltip: confirmTooltip,
-                  color: Tokens.danger,
-                  onPressed: () => Navigator.of(context).pop(true),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: Tokens.spMd),
+              // 取消 — 控制栏同款小方块按钮.
+              GlassButton.iconOnly(
+                icon: Icons.close,
+                tooltip: cancelLabel,
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+              const SizedBox(width: Tokens.spXs),
+              // 确认删除 — danger 红图标, 同款小方块交互.
+              GlassButton.iconOnly(
+                icon: confirmIcon,
+                tooltip: confirmTooltip,
+                color: Tokens.danger,
+                onPressed: () => Navigator.of(context).pop(true),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
   }
 }
