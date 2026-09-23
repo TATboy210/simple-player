@@ -66,7 +66,7 @@ class ControlBarViewModel {
   /// 前进 ms(中央组前进按钮)。
   final void Function(int ms) onSeekForward;
 
-  /// 静音切换(写走 engine,保 _preMuteVolume 语义)。
+  /// 静音切换(写走 engine — v0.0.8.1 原生 mpv mute 属性, 音量不动)。
   final VoidCallback onToggleMute;
 
   /// 设置音量(0-1)。

@@ -76,11 +76,14 @@ void main() {
     engine.dispose();
   });
 
-  // 1. init 从 port 快照初始化 isPlaying 与 volume01
-  test('init 从 port 快照初始化 isPlaying 与 volume01', () {
-    // 默认 FakePlayerControls: isPlayingNow=false, volumeNow=100 → volume01=1.0
+  // 1. init 从 port 快照初始化 isPlaying; volume01 复用 engine.volume 单一数据源
+  test('init 后 volume01 来自 engine.volume(单一数据源)', () {
+    // 默认 FakePlayerControls: isPlayingNow=false → isPlaying=false.
+    // v0.0.8.1: volume01 即 engine.volume notifier(感知曲线换算在引擎层),
+    // port 的 volumeNow 不再参与 — 双源线性换算会使滑条漂移到 mpv 空间.
     expect(state.isPlaying.value, false);
     expect(state.volume01.value, 1.0);
+    expect(state.volume01, same(engine.volume), reason: 'identity 保持契约');
   });
 
   // 2. seek 乐观更新 positionMs 再调 port.seek — 让 seek-hold 立即到达容差
@@ -91,7 +94,7 @@ void main() {
     expect(state.positionMs.value, 5000); // 乐观更新立即生效,不等 stream
   });
 
-  // 4. setVolume 写走 engine(保 _preMuteVolume 语义),不写 port
+  // 4. setVolume 写走 engine(感知曲线 + 原生静音在引擎层),不写 port
   test('setVolume 写走 engine,不写 port', () {
     state.setVolume(0.5);
     expect(engine.setVolumeCallCount, 1);
@@ -119,11 +122,16 @@ void main() {
     expect(state.positionMs.value, 3000);
   });
 
-  // 8. stream.volume(0-100) 推送 → volume01(0-1) 转换
-  test('stream.volume(0-100) 推送 → volume01(0-1) 转换', () async {
+  // 8. volume01 跟随 engine.volume(引擎完成 mpv↔感知刻度换算);
+  //    port.volume 流不再直驱 — 双源换算漂移回归守卫
+  test('volume01 复用 engine.volume, port.volume 流不参与', () async {
+    engine.setVolume(0.75);
+    expect(state.volume01.value, closeTo(0.75, 1e-9));
+
+    // port 层 mpv 空间推送(旧双源路径)不得影响 volume01.
     port.emitVolume(75.0);
     await Future<void>.delayed(Duration.zero);
-    expect(state.volume01.value, closeTo(0.75, 1e-9));
+    expect(state.volume01.value, closeTo(0.75, 1e-9), reason: '单一数据源契约');
   });
 
   test('dispose 后旧 port stream 不再更新 notifier', () async {
@@ -157,9 +165,9 @@ void main() {
     final replacementPort = FakePlayerControls(
       isPlayingNow: true,
       positionNow: const Duration(milliseconds: 1200),
-      volumeNow: 40,
     );
     final replacementEngine = FakeEngine();
+    replacementEngine.setVolume(0.4);
     addTearDown(replacementPort.dispose);
     addTearDown(replacementEngine.dispose);
 
@@ -168,6 +176,7 @@ void main() {
     expect(state.isPlaying.value, isTrue);
     expect(state.positionMs.value, 1200);
     expect(state.volume01.value, closeTo(0.4, 1e-9));
+    expect(state.volume01, same(replacementEngine.volume), reason: '跟随新引擎实例');
 
     // 旧 port 已取消订阅，事件不能再污染当前控制状态。
     port.emitPosition(const Duration(milliseconds: 9000));
@@ -389,7 +398,7 @@ void main() {
       expect(controlsKey.currentState, same(originalState));
       expect(video.player.hasListeners, isFalse);
       expect(replacementVideo.player.hasListeners, isTrue);
-      expect(replacementVideo.player.streamListenAccessCount, 6);
+      expect(replacementVideo.player.streamListenAccessCount, 5);
       expect(find.text('replacement.mp4'), findsOneWidget);
       expect(
         replacementVideo.lastSubtitlePadding,
@@ -456,7 +465,7 @@ void main() {
       hostKey.currentState!.moveChild();
       await tester.pump();
       expect(controlsKey.currentState, same(originalState));
-      expect(replacementVideo.player.streamListenAccessCount, 6);
+      expect(replacementVideo.player.streamListenAccessCount, 5);
     });
 
     testWidgets('subtitle padding 按 source base 恢复且 replacement 后隔离旧 route', (
@@ -828,11 +837,11 @@ void main() {
       await tester.pump();
       expect(controlsKey.currentState, isNotNull);
       expect(video.player.hasListeners, isTrue);
-      expect(video.player.streamListenAccessCount, 6);
+      expect(video.player.streamListenAccessCount, 5);
       // 第二次 reparent 不能重新读取 8 条 stream，否则意味着重复初始化订阅。
       hostKey.currentState!.moveChild();
       await tester.pump();
-      expect(video.player.streamListenAccessCount, 6);
+      expect(video.player.streamListenAccessCount, 5);
 
       // 反复切换外部 resize source，验证 activate 后仍只保留当前 listener；
       // 这里不等待 auto-hide timer，避免把生命周期测试绑定到动画时钟。
@@ -903,7 +912,7 @@ void main() {
       expect(controlsKey.currentState, isNotNull);
       expect(video.player.hasListeners, isFalse);
       expect(replacementVideo.player.hasListeners, isTrue);
-      expect(replacementVideo.player.streamListenAccessCount, 6);
+      expect(replacementVideo.player.streamListenAccessCount, 5);
       // FakeEngine 自身有内部状态派生 listener；旧/new source 的解绑由
       // stream 事件隔离和卸载后的无更新断言共同覆盖。
       final paddingCallsBeforeDispose =
