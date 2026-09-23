@@ -86,4 +86,19 @@ void main() {
 
     expect(wparams, [1, 0], reason: 'dispose 兜底 disable');
   });
+
+  testWidgets('失焦配对后再卸载 — 无冗余第三条消息 (_hadFocus 复位语义)', (tester) async {
+    await pumpField(tester);
+    await tester.tap(find.byType(TextField).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TextField).last);
+    await tester.pumpAndSettle();
+    expect(wparams, [1, 0]);
+
+    // 失焦已复位 _hadFocus — 卸载不得重发 disable.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pumpAndSettle();
+
+    expect(wparams, [1, 0], reason: '冗余 disable = 原生侧幂等但语义含混');
+  });
 }

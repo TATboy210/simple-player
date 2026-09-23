@@ -38,8 +38,8 @@ class _AudioSettingsContentState extends State<AudioSettingsContent> {
 
   static const _optionCount = ((_delayMaxMs - _delayMinMs) ~/ _delayStepMs) + 1;
 
-  /// SpinControl 选项 — 编译期常量预生成 (v0.0.8.2: 旧实现每次 build
-  /// 分配 41 字符串 × 2 行; 常量列表命中 identical 短路重建).
+  /// SpinControl 选项 — 类加载单次初始化 (v0.0.8.2: 旧实现每次 build
+  /// 分配 41 字符串 × 2 行; 稳定列表命中 identical 短路重建).
   static final _delayOptions = List<String>.generate(
     _optionCount,
     (i) => '${_delayMinMs + i * _delayStepMs}',

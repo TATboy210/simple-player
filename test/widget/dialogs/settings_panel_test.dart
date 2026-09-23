@@ -498,6 +498,104 @@ void main() {
       expect(settings.resumeEnabled.value, isFalse);
     });
 
+    testWidgets('services 同实例重建 — 内容层缓存命中 (审查 MEDIUM-1 契约)', (tester) async {
+      // 宿主（PlayerFeature）已按审查建议缓存 bundle 实例 — 本用例锁定
+      // 面板侧语义：同实例重建不得失效内容层缓存。
+      final bundle = SettingsServicesBundle(
+        videoProcessing: videoProcessing,
+        settings: settings,
+      );
+      Future<void> pump() async {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 400,
+                  height: 330,
+                  child: SettingsPanel(
+                    visible: true,
+                    onClose: () {},
+                    services: bundle,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await pump();
+      Finder l1Boundary() => find.byKey(
+        const ValueKey('settings-l1-boundary-about'),
+        skipOffstage: false,
+      );
+      final before = tester.widget<RepaintBoundary>(l1Boundary());
+
+      await pump(); // 宿主式同实例重建
+
+      expect(
+        identical(before, tester.widget<RepaintBoundary>(l1Boundary())),
+        isTrue,
+        reason: '同实例 services 重建不得失效内容层缓存',
+      );
+    });
+
+    testWidgets('services 换新实例 — 内容层缓存失效 (保守语义文档化)', (tester) async {
+      Future<void> pumpWith(SettingsServicesBundle bundle) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 400,
+                  height: 330,
+                  child: SettingsPanel(
+                    visible: true,
+                    onClose: () {},
+                    services: bundle,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await pumpWith(
+        SettingsServicesBundle(
+          videoProcessing: videoProcessing,
+          settings: settings,
+        ),
+      );
+      Finder l1Boundary() => find.byKey(
+        const ValueKey('settings-l1-boundary-about'),
+        skipOffstage: false,
+      );
+      final before = tester.widget<RepaintBoundary>(l1Boundary());
+
+      await pumpWith(
+        SettingsServicesBundle(
+          videoProcessing: videoProcessing,
+          settings: settings,
+        ),
+      );
+
+      expect(
+        identical(before, tester.widget<RepaintBoundary>(l1Boundary())),
+        isFalse,
+        reason: '新实例按 identity 比较保守失效 — 语义文档化于此',
+      );
+    });
+
     testWidgets('VideoSettingsContent 组件级 — 滑条变化写入 VideoProcessingService', (
       tester,
     ) async {
