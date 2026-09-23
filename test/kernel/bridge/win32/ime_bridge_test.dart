@@ -91,4 +91,34 @@ void main() {
       expect(bridge.disable(), isFalse);
     });
   });
+
+  group('withImeRestored — 文件对话框期间的 IME 临时恢复', () {
+    testWidgets('action 正常执行且返回值透传', (tester) async {
+      // 测试进程无 runner 窗口 — enable 走"前台不匹配"失败分支,
+      // 锁定「enable 失败时 action 仍执行」的降级语义.
+      final result = await Win32ImeBridge.withImeRestored(() async => 42);
+
+      expect(result, 42);
+    });
+
+    testWidgets('action 抛异常 — 原样传播不吞', (tester) async {
+      await expectLater(
+        Win32ImeBridge.withImeRestored(() async => throw StateError('boom')),
+        throwsStateError,
+      );
+    });
+
+    // 普通 test（非 testWidgets）— Future.delayed 需真实时钟推进.
+    test('Future 延迟完成 — 等待 action 结束才返回', () async {
+      var completed = false;
+      final result = await Win32ImeBridge.withImeRestored(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        completed = true;
+        return 'done';
+      });
+
+      expect(completed, isTrue);
+      expect(result, 'done');
+    });
+  });
 }

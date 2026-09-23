@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 
+import '../../kernel/bridge/win32/ime_bridge.dart';
 import '../../kernel/services/path_validator.dart';
 import 'file_picker_coordinator.dart';
 
@@ -17,12 +18,16 @@ class FilePickerMediaGateway implements FilePickerGateway {
 
   @override
   Future<List<String>?> pickMediaPaths() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: PathValidator.supportedExtensions,
-      // file_picker 11.x：顶层 lockParentWindow 保持对话框模态前置
-      //（12.x 起迁至 WindowsOptions，回退后恢复顶层参数）。
-      lockParentWindow: true,
+    // 对话框期间临时恢复 IME — 窗口 IMC 已解除 (flutter_window.cpp),
+    // 原生文件对话框在 NULL IMC 下触发 msctf 空指针崩溃 (v0.0.8 闪退).
+    final result = await Win32ImeBridge.withImeRestored(
+      () => FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: PathValidator.supportedExtensions,
+        // file_picker 11.x：顶层 lockParentWindow 保持对话框模态前置
+        //（12.x 起迁至 WindowsOptions，回退后恢复顶层参数）。
+        lockParentWindow: true,
+      ),
     );
     // file_picker 11.x：pickFiles 返回 FilePickerResult?，用户取消为 null
     //（12.x 起改为非空 List，取消为空列表）——null 统一视为取消。
