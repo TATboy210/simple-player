@@ -9,6 +9,9 @@
 /// two-tier chain (exe root logs/ → Application Support logs/).
 library;
 
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -16,6 +19,7 @@ import '../../../kernel/services/app_settings_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../theme/tokens.dart';
 import 'error_feedback_settings.dart';
+import 'ime_test_field.dart';
 
 /// 「通用」分区内容 —— 语言 / 错误卡片开关 / 断点续播开关（v0.0.6）。
 ///
@@ -108,7 +112,9 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       focusNode: widget.rowsFocusNode,
       onFocusChange: (focused) => setState(() => _rowsFocused = focused),
       onKeyEvent: _handleRowsKeyEvent,
-      child: Padding(
+      child: SingleChildScrollView(
+        // 滚动兜底 — debug IME 验证框使内容高于小窗口面板 (Audio 分区
+        // 同款先例); 常规尺寸下内容不超视口, 滚动不出现.
         padding: const EdgeInsets.all(Tokens.spLg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,6 +123,14 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
             _buildErrorCardToggleRow(l10n),
             // v0.0.6 断点续播总开关 — 服务注入后显示 (测试退路隐藏).
             if (widget.settings != null) _buildResumeToggleRow(l10n),
+            // IME 治理验证输入框 (v0.0.8.2, debug-only + Windows) —
+            // UAT 工具: 聚焦恢复默认 IMC (中文可组合/候选窗锚定光标),
+            // 失焦再解除 (无文本框场景左上角候选窗不再弹出)。刻意置于
+            // 行导航 Focus 之外 — 不参与 ↑↓ 行序, 不改变行数契约.
+            if (kDebugMode && Platform.isWindows) ...[
+              const SizedBox(height: Tokens.spMd),
+              const ImeTestField(),
+            ],
           ],
         ),
       ),

@@ -722,5 +722,11 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get imeTestTitle => 'IME 테스트(디버그)';
+
+  @override
+  String get imeTestHint => '여기를 포커스하고 중국어 입력으로 IME 확인';
+
+  @override
   String get batchDeleteConfirmAction => '삭제 확인';
 }
