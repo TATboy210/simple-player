@@ -71,10 +71,11 @@ class GlassConfirmStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: ControlBarDecoration.playing(borderRadius: _stripRadius),
-      // v0.0.8.2 收敛到 GlassBlurLayer 统一门控层 — 结构等价换装
-      // (无门控源恒启用), sigma 降档在 D1 commit 单独落.
+      // v0.0.8.2 D1: 瞬态小件降档 thin(8.0) — 长条确认条面积小,
+      // 叠加 black26 遮罩后模糊层次肉眼近无差.
       child: GlassBlurLayer(
         borderRadius: _stripRadius,
+        filter: GlassTier.thin.blurFilter,
         child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: Tokens.spMd,

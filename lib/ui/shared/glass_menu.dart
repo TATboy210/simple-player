@@ -83,10 +83,11 @@ class GlassMenu {
             decoration: ControlBarDecoration.playing(
               borderRadius: BorderRadius.circular(Tokens.radiusLg),
             ),
-            // v0.0.8.2 收敛到 GlassBlurLayer 统一门控层 — 结构等价换装
-            // (无门控源恒启用), sigma 降档在 D1 commit 单独落.
+            // v0.0.8.2 D1: 瞬态小组件降档 thin(8.0) — 菜单行自带高不透明
+            // 装饰 (menuBg 同族), 模糊量减少不影响信息获取, 肉眼近无差.
             child: GlassBlurLayer(
               borderRadius: BorderRadius.circular(Tokens.radiusLg),
+              filter: GlassTier.thin.blurFilter,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(

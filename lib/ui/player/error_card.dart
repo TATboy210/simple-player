@@ -405,6 +405,9 @@ class _ErrorCardState extends State<ErrorCard> {
             horizontal: Tokens.spMd,
             vertical: Tokens.spSm,
           ),
+          // v0.0.8.2 D1: 播放期持续挂载的小卡片 — 降档 thin(8.0) 降本
+          // (severity 描边+底色承担视觉分层, 模糊层次感弱, 肉眼近无差).
+          tier: GlassTier.thin,
           // D-03：severity 对应色 border 分层（覆盖默认 borderHighlight）。
           border: Border.all(color: severityColor, width: 1),
           child: content,
