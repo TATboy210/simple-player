@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import 'control_bar_decoration.dart';
+import 'glass_blur_layer.dart';
 import 'glass_container.dart' show GlassTier;
 
 /// 玻璃右键菜单 — 控制栏同款主题的上下文菜单 (v0.0.7).
@@ -82,23 +83,22 @@ class GlassMenu {
             decoration: ControlBarDecoration.playing(
               borderRadius: BorderRadius.circular(Tokens.radiusLg),
             ),
-            child: ClipRRect(
+            // v0.0.8.2 收敛到 GlassBlurLayer 统一门控层 — 结构等价换装
+            // (无门控源恒启用), sigma 降档在 D1 commit 单独落.
+            child: GlassBlurLayer(
               borderRadius: BorderRadius.circular(Tokens.radiusLg),
-              child: BackdropFilter(
-                filter: GlassTier.normal.blurFilter,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final item in items)
-                        _GlassMenuRow(
-                          item: item,
-                          onSelected: () => close(item.value),
-                        ),
-                    ],
-                  ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final item in items)
+                      _GlassMenuRow(
+                        item: item,
+                        onSelected: () => close(item.value),
+                      ),
+                  ],
                 ),
               ),
             ),
