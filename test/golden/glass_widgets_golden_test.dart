@@ -41,22 +41,6 @@ void main() {
         matchesGoldenFile('goldens/glass_container_normal.png'),
       );
     });
-
-    testWidgets('thick tier', (tester) async {
-      await tester.pumpWidget(
-        wrapForGolden(
-          const GlassContainer(
-            tier: GlassTier.thick,
-            blurEnabled: false,
-            child: Text('Thick'),
-          ),
-        ),
-      );
-      await expectLater(
-        find.byType(GlassContainer),
-        matchesGoldenFile('goldens/glass_container_thick.png'),
-      );
-    });
   });
 
   group('GlassButton golden', () {

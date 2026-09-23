@@ -7,21 +7,17 @@ import 'package:flutter/services.dart';
 import '../theme/tokens.dart';
 import 'app_tooltip.dart';
 
-/// 毛玻璃模糊层级
+/// 毛玻璃模糊层级 — 两档体系 (v0.0.8.2 删 thick 死档)
 ///
-/// 保留 3 个层级（thin/normal/thick），不合并为 2 个。
-/// thin(8) 和 normal(10) 之间仅 2 sigma 差距，但在 4K 显示器上
-/// 标题栏和控制栏的模糊层次仍有可辨别的视觉区分。
-/// 额外一个 enum 值的维护成本可忽略，视觉层次收益值得保留。（D-15）
+/// thin(8.0) 用于轻量小件（拖拽提示/瞬态菜单），normal(11.5) 是
+/// 控制栏与大面板的默认档。曾存在的 thick 档 sigma 字段与 filter
+/// 实例值不一致（11.5 vs 24.0）且全库零生产引用 — 删除治理。
 enum GlassTier {
-  /// 标题栏 — 轻模糊，低 GPU 开销
+  /// 轻模糊，低 GPU 开销 — 瞬态小组件/轻量提示
   thin(Tokens.glassBlurThin),
 
-  /// 控制栏 — 默认模糊
-  normal(Tokens.glassBlur),
-
-  /// 弹窗/对话框 — 与 normal 相同（10 vs 12px 差异不可感知，已合并）
-  thick(Tokens.glassBlur);
+  /// 默认模糊 — 控制栏/大面板
+  normal(Tokens.glassBlur);
 
   final double sigma;
   const GlassTier(this.sigma);
@@ -30,7 +26,6 @@ enum GlassTier {
   ui.ImageFilter get blurFilter => switch (this) {
     GlassTier.thin => _thinBlur,
     GlassTier.normal => _normalBlur,
-    GlassTier.thick => _thickBlur,
   };
 
   /// 缓存的 ImageFilter 实例 — 避免每次 build 创建新对象（D-10/D-11）
@@ -41,10 +36,6 @@ enum GlassTier {
   static final ui.ImageFilter _normalBlur = ui.ImageFilter.blur(
     sigmaX: Tokens.glassBlur,
     sigmaY: Tokens.glassBlur,
-  );
-  static final ui.ImageFilter _thickBlur = ui.ImageFilter.blur(
-    sigmaX: Tokens.glassBlurThick,
-    sigmaY: Tokens.glassBlurThick,
   );
 }
 

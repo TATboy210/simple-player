@@ -35,11 +35,6 @@ void main() {
       expect(find.text('test'), findsOneWidget);
     });
 
-    testWidgets('renders with thick tier', (tester) async {
-      await tester.pumpWidget(buildSubject(tier: GlassTier.thick));
-      expect(find.text('test'), findsOneWidget);
-    });
-
     testWidgets('blurEnabled=false skips BackdropFilter', (tester) async {
       await tester.pumpWidget(buildSubject(blurEnabled: false));
       // Should render ClipRRect but no BackdropFilter
@@ -250,8 +245,9 @@ void main() {
       expect(GlassTier.thin.sigma, lessThan(GlassTier.normal.sigma));
     });
 
-    test('normal sigma equals thick (merged — 2-tier system)', () {
-      expect(GlassTier.normal.sigma, equals(GlassTier.thick.sigma));
+    test('两档体系 — thick 死档已删 (v0.0.8.2)', () {
+      expect(GlassTier.values, hasLength(2));
+      expect(GlassTier.values, containsAll([GlassTier.thin, GlassTier.normal]));
     });
   });
 }

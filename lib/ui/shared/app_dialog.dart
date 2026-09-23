@@ -11,7 +11,7 @@ import 'glass_container.dart';
 /// v0.0.4 设计语言同步：对话框壳从实色 bgElevated 升级为控制栏同款
 /// 毛玻璃面板 —— [ControlBarDecoration.playing] 4-shadow 分层装饰
 /// （顶部内高光 / 底部内阴影 / 外层投影 / 蓝色外环）+ [EdgeGlow]
-/// 渐变描边辉光 + [GlassTier.thick] 背景模糊，标题区新增 accent 竖条
+/// 渐变描边辉光 + [GlassTier.normal] 背景模糊，标题区新增 accent 竖条
 /// 与渐变分隔线两个质感细节。
 ///
 /// 仍支持 LayoutBuilder 响应式：宽屏用指定尺寸，窄屏自适应。

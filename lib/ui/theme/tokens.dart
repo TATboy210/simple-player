@@ -153,9 +153,10 @@ class Tokens {
   static const radiusPopup = 8.0;
 
   // ── 毛玻璃 ──
+  // 两档体系 (v0.0.8.2 删 thick 死档 — sigma 字段与 filter 实例值不一致,
+  // 全库零生产引用); 若未来需面板专属 sigma 用新命名, 勿复活 thick.
   static const glassBlurThin = 8.0;
   static const glassBlur = 11.5;
-  static const glassBlurThick = 24.0;
 
   // ── 动画 ──
   static const durationFast = 80;
