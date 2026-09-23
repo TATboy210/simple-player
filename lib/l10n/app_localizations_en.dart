@@ -85,6 +85,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settings => 'Settings';
 
   @override
+  String get back => 'Back';
+
+  @override
+  String get settingsSummaryGeneral =>
+      'Language · Error card · Resume playback';
+
+  @override
+  String get settingsSummaryVideo =>
+      'Brightness · Contrast · Rotation · Aspect ratio';
+
+  @override
+  String get settingsSummaryAudio => 'Audio delay · Subtitle delay';
+
+  @override
+  String get settingsSummaryAbout => 'Components · Thanks · Tech stack';
+
+  @override
   String get audioTab => 'Audio';
 
   @override

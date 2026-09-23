@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// services: LogicalKeyboardKey / KeyEventResult (material.dart 不完整导出).
+import 'package:flutter/services.dart';
 
 import '../../../kernel/services/app_settings_service.dart';
 import '../../../kernel/services/video_processing_service.dart';
@@ -13,6 +15,10 @@ import 'video_settings_content.dart';
 
 /// 设置分区 —— 左侧导航的四个条目。
 enum _SettingsTab { general, video, audio, about }
+
+/// 面板层级 —— 两级覆盖导航（XMB 交叉模型，通用模式实现）：
+/// L0 tag 层（竖排分区入口）→ L1 内容层（从右滑入覆盖，tag 层虚化后退）。
+enum _PanelLevel { tags, content }
 
 /// 设置页可注入的服务集合 — null 成员时对应分区灰显（向后兼容：
 /// 既有测试零注入仍可用，video/audio 维持占位）。
@@ -29,28 +35,28 @@ class SettingsServicesBundle {
   final AppSettingsService? settings;
 }
 
-/// 设置面板 — 左右结构壳：左侧分区导航，右侧分区内容。
+/// 设置面板 — 停靠于控制层 Stack 中列的两级玻璃面板。
 ///
-/// 控制栏/播放列表同款停靠玻璃面板 (v0.0.7.2 面板化重构)：脱离 AppDialog
-/// 的 Dialog 包装，壳与动画逐字对齐 [PlaylistPanel] —— ControlBarDecoration
-/// playing 装饰 + GlassTier.normal 缓存模糊 + controlBarRadius 圆角；
-/// 渐进渐退为纯 opacity FadeTransition (渲染层驱动，动画期间 widget 树
-/// 零重建)，IgnorePointer 锚定 [visible] 杜绝渐退中"虚空点击"。
+/// 控制栏/播放列表同款壳（ControlBarDecoration playing + GlassTier.normal
+/// 缓存模糊 + controlBarRadius 圆角）；渐进渐退为纯 opacity FadeTransition
+/// （渲染层驱动，动画期间 widget 树零重建），IgnorePointer 锚定 [visible]
+/// 杜绝渐退中"虚空点击"。
 ///
-/// 挂载于 PlayerVideoControls 控制层 Stack 中列（与播放列表同层，右列
-/// 避让见挂载点）：无 route barrier，打开时标题栏拖动不受阻；错误卡片
-/// 挂于 root Stack Navigator 之上，面板重排不影响报错功能。
+/// 交互（v0.0.8 XMB 化）：
+/// - L0 tag 层：竖排分区入口（图标 + 类别名 + 条目枚举小字），↑↓ 切换、
+///   Enter 进入；tag 反馈沿用 hover/pressed 色阶语言，无选中竖条
+/// - L1 内容层：从右滑入覆盖标题行以下区域（左缘竖向渐变线随层移动），
+///   L0 后退虚化（纯 opacity 0.4，零新增 GPU）；← 返回 / Esc 逐层
+/// - 键盘交叉导航：L1 内 ←→ 直接切分区（方向性滑动）、↑↓ 选条目
+///   （General 分区经 [GeneralSettingsContent.rowsFocusNode] 下沉消费）、
+///   Enter/Space 激活；面板聚焦期间 Space 不再透传播放/暂停
+/// - 灰显分区（视频/音频）键盘不可达：←→/↑↓ 只在 enabled 集合内移动
+///   （键盘绕过 IgnorePointer，必须显式过滤）
 ///
-/// 「通用 / 关于」恒可交互；「视频 / 音频」在 bundle 提供对应服务后启用
-/// （v0.0.6）。内容区按选中分区切换各 Content；bundle 缺成员时分区
-/// 灰显占位（Avoid captive UI：无伪交互）。
+/// 焦点纪律：面板从不调用 unfocus——隐藏时由宿主
+/// （PlayerVideoControls 监听 settingsVisible）显式 requestFocus 归还，
+/// 避免 `unfocus()` 落到路由 scope 造成全屏按键死区。
 class SettingsPanel extends StatefulWidget {
-  /// 面板目标内容尺寸 — 经 max 约束生效：槽位充足时恒为此尺寸，
-  /// 不足时精确收缩（固定 SizedBox 在 854×480 + 播放列表同开、槽宽
-  /// 仅 526 时会溢出，故用 ConstrainedBox(max) + SizedBox.expand）。
-  static const double panelMaxWidth = 620.0;
-  static const double panelMaxHeight = 440.0;
-
   /// 面板是否可见 — 驱动渐入渐出动画 (宿主共享 notifier, 全屏同源).
   final bool visible;
 
@@ -71,15 +77,43 @@ class SettingsPanel extends StatefulWidget {
 }
 
 class _SettingsPanelState extends State<SettingsPanel>
-    with SingleTickerProviderStateMixin {
-  /// 当前选中分区 —— 初始「关于」（向后兼容现状：直接打开设置看到 About）。
+    with TickerProviderStateMixin {
+  /// 键盘可达分区 — video/audio 灰显（v0.0.6.1 裁决），服务启用后自动纳入.
+  static const List<_SettingsTab> _enabledTabs = [
+    _SettingsTab.general,
+    _SettingsTab.about,
+  ];
+
+  /// 竖排 tag chip 宽度 — 固定宽（摘要单行省略），最小窗 273px 中列下
+  /// 留足呼吸距; 参照 PlaylistPanel.panelWidth 的本地常量先例.
+  static const double _tagChipWidth = 168.0;
+
+  /// 当前分区 — 跨显隐持久（State 常驻 = "记忆上次 L1" 免费实现）.
   _SettingsTab _selected = _SettingsTab.about;
 
-  /// 渐进渐退动画 — 与控制栏/播放列表同款 (FadeTransition + easeInOut +
-  /// durationControlsFade)，照抄 PlaylistPanel 实现保持三面板一致.
+  /// 当前层级 — 首次打开 L0；进入内容层后保持（同上）.
+  _PanelLevel _level = _PanelLevel.tags;
+
+  /// 方向性滑动 — L1 内 ←→ 切分区时置位（true = 切向枚举后一个），
+  /// AnimatedSwitcher 按此生成进入/退出滑动方向.
+  bool _switchForward = true;
+
+  /// 渐入渐出动画 — 与控制栏/播放列表同款（FadeTransition + easeInOut +
+  /// durationControlsFade）.
   late final AnimationController _controller;
 
   late final Animation<double> _fade;
+
+  /// 层级切换动画 — L0 虚化 + L1 滑入共用（150ms easeInOut，与家族同节奏）.
+  late final AnimationController _layerController;
+
+  late final CurvedAnimation _layerEase;
+
+  /// 面板级焦点 — ←→ 切分区 / Enter 进出层级 / Esc 逐层.
+  late final FocusNode _focusNode;
+
+  /// General 分区行导航焦点 — ↑↓ 选条目 / Enter 激活（注入 content）.
+  late final FocusNode _rowsFocusNode;
 
   /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存 (同 PlaylistPanel).
   static final _panelDecoration = ControlBarDecoration.playing(
@@ -94,6 +128,22 @@ class _SettingsPanelState extends State<SettingsPanel>
       duration: const Duration(milliseconds: Tokens.durationControlsFade),
     )..value = widget.visible ? 1.0 : 0.0;
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _layerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: Tokens.durationNormal),
+    );
+    _layerEase = CurvedAnimation(
+      parent: _layerController,
+      curve: Curves.easeInOut,
+    );
+    _focusNode = FocusNode(debugLabel: 'SettingsPanel');
+    _rowsFocusNode = FocusNode(debugLabel: 'SettingsPanelRows');
+    if (widget.visible) {
+      // post-frame：等面板挂上树再取焦点（initState 内不能同步请求）.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.visible) _focusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -101,35 +151,148 @@ class _SettingsPanelState extends State<SettingsPanel>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.visible != widget.visible) {
       widget.visible ? _controller.forward() : _controller.reverse();
+      // 重开面板：焦点回面板级（宿主在关闭时已归还外层；此处为打开侧接力）.
+      if (widget.visible) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && widget.visible) _focusNode.requestFocus();
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
+    _rowsFocusNode.dispose();
+    _layerController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  // ── 层级流转 ──────────────────────────────────────────────────
+
+  /// L0 → L1（点 tag / Enter）— 进入即聚焦 General 首行（键盘 ↑↓ 立即可用）.
+  void _enterContent() {
+    setState(() => _level = _PanelLevel.content);
+    _layerController.forward();
+    if (_selected == _SettingsTab.general) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _level == _PanelLevel.content) {
+          _rowsFocusNode.requestFocus();
+        }
+      });
+    }
+  }
+
+  /// L1 → L0（← / Esc）— 焦点回面板级（tag 层 ↑↓ 恢复可用）.
+  void _backToTags() {
+    setState(() => _level = _PanelLevel.tags);
+    _layerController.reverse();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  /// L1 内 ←→ 切分区 — 记录方向供 AnimatedSwitcher 生成方向性滑动；
+  /// 离开/进入 general 时 post-frame 归还/接力焦点（rows 节点随分区
+  /// unmount，同步 requestFocus 会被 dispose 覆盖 — 实测坑）.
+  void _switchTo(_SettingsTab tab) {
+    if (tab == _selected) return;
+    final wasGeneral = _selected == _SettingsTab.general;
+    setState(() {
+      _switchForward =
+          _enabledTabs.indexOf(tab) > _enabledTabs.indexOf(_selected);
+      _selected = tab;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _level != _PanelLevel.content) return;
+      if (wasGeneral) {
+        _focusNode.requestFocus();
+      } else if (_selected == _SettingsTab.general) {
+        _rowsFocusNode.requestFocus();
+      }
+    });
+  }
+
+  // ── 键盘（XMB 交叉模型）──────────────────────────────────────
+
+  /// 面板级按键 — 返回 handled 阻断冒泡（防外层 seek/音量/暂停泄漏），
+  /// Esc 在 L0 时刻意 ignored（冒泡 → 宿主 onEscapePressed 关面板）.
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    // 防线：焦点滞留隐藏面板时绝不吞键（宿主负责归还焦点，此处兜底）.
+    if (!widget.visible) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+
+    if (_level == _PanelLevel.tags) {
+      return _handleTagsLevelKey(key);
+    }
+    return _handleContentLevelKey(key);
+  }
+
+  /// L0 — ↑↓ 在 tag 列间移动（enabled 集合内到头即停），Enter/Space 进入.
+  KeyEventResult _handleTagsLevelKey(LogicalKeyboardKey key) {
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown) {
+      final dir = key == LogicalKeyboardKey.arrowDown ? 1 : -1;
+      final index = _enabledTabs.indexOf(_selected);
+      final next = (index + dir).clamp(0, _enabledTabs.length - 1);
+      if (next != index) {
+        setState(() => _selected = _enabledTabs[next]);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space) {
+      _enterContent();
+      return KeyEventResult.handled;
+    }
+    // ←→ / Esc / 其余 — 冒泡（Esc 关面板，←→ 外层无绑定亦无害）.
+    return KeyEventResult.ignored;
+  }
+
+  /// L1 — ←→ 直接切分区；↑↓/Enter/Space 交给 rows 节点（General 后代先
+  /// 消费，未聚焦则聚焦）；非 General 分区同键 handled 空操作（防泄漏）；
+  /// Esc 返回 L0.
+  KeyEventResult _handleContentLevelKey(LogicalKeyboardKey key) {
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      final dir = key == LogicalKeyboardKey.arrowRight ? 1 : -1;
+      final index = _enabledTabs.indexOf(_selected);
+      final next = (index + dir).clamp(0, _enabledTabs.length - 1);
+      if (next != index) {
+        _switchTo(_enabledTabs[next]);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      _backToTags();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space) {
+      if (_selected == _SettingsTab.general && !_rowsFocusNode.hasFocus) {
+        _rowsFocusNode.requestFocus();
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  // ── 构建 ────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    // 控制栏同款渐进渐退 — FadeTransition 纯渲染层驱动, 动画全程
-    // widget 树零重建; IgnorePointer 锚定 widget.visible: 关闭瞬间立即
-    // 让出命中 (与播放列表同一竞态防治).
+    // 控制栏同款渐进渐退 — FadeTransition 纯渲染层驱动; IgnorePointer
+    // 锚定 widget.visible: 关闭瞬间立即让出命中.
     return IgnorePointer(
       ignoring: !widget.visible,
       child: RepaintBoundary(
-        child: FadeTransition(
-          opacity: _fade,
-          // max 约束 + expand: 槽位充足时恒 620×440, 不足时收缩填满槽位
-          // (Center 负责槽内居中).
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: SettingsPanel.panelMaxWidth,
-              maxHeight: SettingsPanel.panelMaxHeight,
-            ),
-            child: SizedBox.expand(child: _buildShell(context)),
-          ),
-        ),
+        child: FadeTransition(opacity: _fade, child: _buildShell(context)),
       ),
     );
   }
@@ -144,10 +307,15 @@ class _SettingsPanelState extends State<SettingsPanel>
         child: BackdropFilter(
           filter: GlassTier.normal.blurFilter,
           child: Material(
-            // 透明 Material 祖先 — nav 条目的 InkWell hover 色阶与
-            // About 链接按钮的水波纹/命中依赖它 (原 AppDialog 亦有此层).
+            // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
             color: Colors.transparent,
-            child: _buildContent(context),
+            child: Focus(
+              focusNode: _focusNode,
+              // Tab 遍历不进面板（requestFocus 不受影响）.
+              skipTraversal: true,
+              onKeyEvent: _handleKeyEvent,
+              child: _buildContent(context),
+            ),
           ),
         ),
       ),
@@ -156,68 +324,52 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final services = widget.services;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 标题行 — 与播放列表同款呼吸过渡 (无分割线), 关闭按钮 GlassButton 收口.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            Tokens.spMd,
-            Tokens.spMd,
-            Tokens.spSm,
-            Tokens.spSm,
-          ),
-          child: _PanelHeader(l10n: l10n, onClose: widget.onClose),
+        _PanelHeader(
+          l10n: l10n,
+          onBack: _backToTags,
+          onClose: widget.onClose,
+          showBack: _level == _PanelLevel.content,
+          backOpacity: _layerEase,
         ),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
             children: [
-              _SettingsNav(
-                l10n: l10n,
-                selected: _selected,
-                onSelect: (tab) => setState(() => _selected = tab),
-                // v0.0.6.1 用户裁决 (2026-09-15): 视频/音频分区暂关闭 —
-                // mpv 属性链路实机验证未完成, 重新开放前维持灰显占位.
-                // bundle 接线保留 (general 的断点续播开关仍消费 settings).
-                videoEnabled: false,
-                audioEnabled: false,
-              ),
-              // 左右分区的细分隔线 — 垂直渐变（上下端透明→borderHighlight），
-              // 模拟毛玻璃边缘的光线收束，比通高纯色实线更轻。
-              Container(
-                width: 1,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Tokens.borderHighlight,
-                      Colors.transparent,
-                    ],
-                  ),
+              // L0 tag 层 — 进入 L1 后整体虚化 0.4 并让出命中（D3）.
+              IgnorePointer(
+                ignoring: _level == _PanelLevel.content,
+                child: FadeTransition(
+                  opacity: Tween<double>(
+                    begin: 1.0,
+                    end: 0.4,
+                  ).animate(_layerEase),
+                  child: _buildTagLayer(context),
                 ),
               ),
-              Expanded(
-                child: switch (_selected) {
-                  _SettingsTab.general => GeneralSettingsContent(
-                    settings: services?.settings,
-                  ),
-                  _SettingsTab.video =>
-                    services?.videoProcessing == null
-                        // 防御分支 —— 灰显占位项不会进入选中态；返回空视图而非伪造内容。
-                        ? const SizedBox.shrink()
-                        : VideoSettingsContent(
-                            videoProcessing: services!.videoProcessing!,
-                            settings: services.settings,
-                          ),
-                  _SettingsTab.audio =>
-                    services?.settings == null
-                        ? const SizedBox.shrink()
-                        : AudioSettingsContent(settings: services!.settings!),
-                  _SettingsTab.about => const AboutContent(),
+              // L1 内容层 — 从右滑入覆盖（左缘竖向渐变线随层移动）;
+              // L0 静止期 Offstage（不 paint/不命中/语义不可见），滑出
+              // 动画期间保持挂载以呈现退出动效.
+              AnimatedBuilder(
+                animation: _layerController,
+                builder: (_, _) {
+                  final offstage =
+                      _level == _PanelLevel.tags &&
+                      !_layerController.isAnimating;
+                  return Offstage(
+                    offstage: offstage,
+                    child: IgnorePointer(
+                      ignoring: _level == _PanelLevel.tags,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(1, 0),
+                          end: Offset.zero,
+                        ).animate(_layerEase),
+                        child: _buildContentLayer(context),
+                      ),
+                    ),
+                  );
                 },
               ),
             ],
@@ -226,35 +378,150 @@ class _SettingsPanelState extends State<SettingsPanel>
       ],
     );
   }
+
+  /// L0 tag 层 — 竖排分区入口（左列），右侧呼吸留白.
+  Widget _buildTagLayer(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 固定 chip 宽（摘要单行省略）— IntrinsicWidth 会取枚举摘要的
+        // 不折行固有宽把 Row 撑爆，固定宽 + ellipsis 才是稳定上界.
+        SizedBox(
+          width: _tagChipWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final tab in _SettingsTab.values)
+                _SettingsTabChip(
+                  tab: tab,
+                  selected: _selected == tab,
+                  enabled: _enabledTabs.contains(tab),
+                  // 一步直达 — 点击任意 enabled tag 选中并进入其内容层.
+                  onTap: () {
+                    if (_level != _PanelLevel.tags) return;
+                    setState(() => _selected = tab);
+                    _enterContent();
+                  },
+                ),
+            ],
+          ),
+        ),
+        // 呼吸留白 — XMB 式克制（D1 摘要已入 chip，右侧不再堆内容）.
+      ],
+    );
+  }
+
+  /// L1 内容层 — 左缘竖向渐变线 + 分区内容（方向性滑动切换）.
+  Widget _buildContentLayer(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 竖向渐变分割线 — 内容层左缘（上下端透明→borderHighlight→透明），
+        // 随层滑入移动，模拟毛玻璃边缘的光线收束.
+        Container(
+          width: 1,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                Tokens.borderHighlight,
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: Tokens.durationNormal),
+            switchInCurve: Curves.easeInOut,
+            switchOutCurve: Curves.easeInOut,
+            // 顶部对齐 — 分区内容高度不同时切换不跳中.
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              alignment: Alignment.topLeft,
+              children: [...previousChildren, ?currentChild],
+            ),
+            transitionBuilder: (child, animation) {
+              // 方向性滑动（细节终裁）— 进入者从按键方向侧滑入,
+              // 退出者向反侧滑出（→ 下一个: 旧左出新右进）.
+              final isIncoming = child.key == ValueKey(_selected);
+              final dir = _switchForward ? 1.0 : -1.0;
+              final offset = isIncoming ? Offset(dir, 0) : Offset(-dir, 0);
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: offset,
+                  end: Offset.zero,
+                ).animate(animation),
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey(_selected),
+              child: _buildTabContent(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 分区内容 switch — 内容组件零改动复用（拓展点：服务启用后自动获得
+  /// L1 通道）; 灰显防御分支返回空视图而非伪造内容.
+  Widget _buildTabContent() {
+    final services = widget.services;
+    return switch (_selected) {
+      _SettingsTab.general => GeneralSettingsContent(
+        settings: services?.settings,
+        rowsFocusNode: _rowsFocusNode,
+      ),
+      _SettingsTab.video =>
+        services?.videoProcessing == null
+            ? const SizedBox.shrink()
+            : VideoSettingsContent(
+                videoProcessing: services!.videoProcessing!,
+                settings: services.settings,
+              ),
+      _SettingsTab.audio =>
+        services?.settings == null
+            ? const SizedBox.shrink()
+            : AudioSettingsContent(settings: services!.settings!),
+      _SettingsTab.about => const AboutContent(),
+    };
+  }
 }
 
-/// 面板标题行 — accent 竖条 + 标题 + 关闭按钮。
+/// 面板标题行 — "设置" + 返回按钮（仅 L1 出现） + 关闭按钮。
 ///
-/// 关闭按钮用 GlassButton.iconOnly（播放列表 _buildNormalHeader 同款
-/// 方块风格）；accent 竖条规格取自原 AppDialog._DialogTitle（3×16,
-/// radiusBtn 圆角），保留设置面板原有的选中强调语言。
+/// 无 accent 竖条（v0.0.8 用户裁决）；返回按钮出现在"设置"右侧，
+/// 淡入淡出 + 恒定占位防标题跳动；字号/按钮与播放列表标题行同规格。
 class _PanelHeader extends StatelessWidget {
   final AppLocalizations l10n;
+  final VoidCallback onBack;
   final VoidCallback onClose;
+  final bool showBack;
+  final Animation<double> backOpacity;
 
-  const _PanelHeader({required this.l10n, required this.onClose});
+  const _PanelHeader({
+    required this.l10n,
+    required this.onBack,
+    required this.onClose,
+    required this.showBack,
+    required this.backOpacity,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // accent 竖条 — 与标题字号对齐的强调标识 (继承自 AppDialog 标题行).
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            color: Tokens.accent,
-            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-          ),
-        ),
-        const SizedBox(width: Tokens.spSm),
-        Expanded(
-          child: Text(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Tokens.spMd,
+        Tokens.spMd,
+        Tokens.spSm,
+        Tokens.spSm,
+      ),
+      child: Row(
+        children: [
+          Text(
             l10n.settings,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -264,73 +531,27 @@ class _PanelHeader extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-        GlassButton.iconOnly(
-          icon: Icons.close,
-          tooltip: l10n.close,
-          onPressed: onClose,
-        ),
-      ],
-    );
-  }
-}
-
-/// 左侧竖排分区导航 — 分区按服务注入情况启用/灰显。
-class _SettingsNav extends StatelessWidget {
-  final AppLocalizations l10n;
-  final _SettingsTab selected;
-  final ValueChanged<_SettingsTab> onSelect;
-  final bool videoEnabled;
-  final bool audioEnabled;
-
-  const _SettingsNav({
-    required this.l10n,
-    required this.selected,
-    required this.onSelect,
-    required this.videoEnabled,
-    required this.audioEnabled,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 148,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _NavEntry(
-            tab: _SettingsTab.general,
-            icon: Icons.tune,
-            label: l10n.generalTab,
-            enabled: true,
-            selected: selected == _SettingsTab.general,
-            onTap: () => onSelect(_SettingsTab.general),
+          const SizedBox(width: Tokens.spSm),
+          // 返回按钮 — 仅 L1 出现（层级动画驱动淡入淡出，恒占位防跳）.
+          FadeTransition(
+            opacity: backOpacity,
+            child: IgnorePointer(
+              ignoring: !showBack,
+              child: Opacity(
+                opacity: showBack ? 1.0 : 0.0,
+                child: GlassButton.iconOnly(
+                  icon: Icons.arrow_back,
+                  tooltip: l10n.back,
+                  onPressed: onBack,
+                ),
+              ),
+            ),
           ),
-          // v0.0.6: 服务注入后启用; 未注入保持灰显占位
-          // （Avoid captive UI：无伪交互）。
-          _NavEntry(
-            tab: _SettingsTab.video,
-            icon: Icons.smart_display_outlined,
-            label: l10n.videoTab,
-            enabled: videoEnabled,
-            selected: selected == _SettingsTab.video,
-            onTap: videoEnabled ? () => onSelect(_SettingsTab.video) : null,
-          ),
-          _NavEntry(
-            tab: _SettingsTab.audio,
-            icon: Icons.graphic_eq,
-            label: l10n.audioTab,
-            enabled: audioEnabled,
-            selected: selected == _SettingsTab.audio,
-            onTap: audioEnabled ? () => onSelect(_SettingsTab.audio) : null,
-          ),
-          _NavEntry(
-            tab: _SettingsTab.about,
-            icon: Icons.info_outline,
-            label: l10n.aboutTab,
-            enabled: true,
-            selected: selected == _SettingsTab.about,
-            onTap: () => onSelect(_SettingsTab.about),
+          const Spacer(),
+          GlassButton.iconOnly(
+            icon: Icons.close,
+            tooltip: l10n.close,
+            onPressed: onClose,
           ),
         ],
       ),
@@ -338,104 +559,99 @@ class _SettingsNav extends StatelessWidget {
   }
 }
 
-/// 导航条目 — 图标 + 文字的横排行。
+/// 竖排分区 tag — 图标 + 类别名 + 条目枚举摘要小字（三行，左对齐）。
 ///
-/// 灰显占位（enabled=false）：38% 不透明度 + IgnorePointer，明确传达不可点击；
-/// enabled 且未选中：完整不透明 + 无底色（可点击等待选中）；
-/// [selected]：bgHover 圆角底 + accent 图标/文字的持续高亮 —— 区别于 hover 的
-/// 瞬态，选中态不随鼠标离开消失。
-///
-/// v0.0.4 交互反馈对齐控制栏按钮（custom_title_bar._TitleBarButton 同款）：
-/// Material(transparent) + InkWell 水波纹禁用但保留 hover/pressed 色阶 +
-/// MouseRegion click cursor —— 与纯 GestureDetector 的差异是 hover 即有
-/// 底色渐现与手型光标，pressed 有按下沉降色。
-class _NavEntry extends StatelessWidget {
+/// hover/pressed 色阶沿用旧 _NavEntry 语言（hover 渐现 bgHover、pressed
+/// 按下沉降色）；选中态 = bgHover 常驻底 + accent 图标/文字，**无竖条
+/// 指示**（v0.0.8 裁决）。灰显分区 38% 不透明 + IgnorePointer。
+class _SettingsTabChip extends StatefulWidget {
   final _SettingsTab tab;
-  final IconData icon;
-  final String label;
-  final bool enabled;
   final bool selected;
-  final VoidCallback? onTap;
+  final bool enabled;
+  final VoidCallback onTap;
 
-  const _NavEntry({
+  const _SettingsTabChip({
     required this.tab,
-    required this.icon,
-    required this.label,
-    this.enabled = false,
-    this.selected = false,
-    this.onTap,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
   });
 
   @override
+  State<_SettingsTabChip> createState() => _SettingsTabChipState();
+}
+
+class _SettingsTabChipState extends State<_SettingsTabChip> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final selected = widget.selected;
     return Opacity(
-      opacity: enabled ? 1 : 0.38,
+      opacity: widget.enabled ? 1 : 0.38,
       child: IgnorePointer(
-        ignoring: !enabled,
+        ignoring: !widget.enabled,
         child: MouseRegion(
-          // 可点击条目才给手型光标（与控制栏按钮同一反馈）。
-          cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onTap,
-              mouseCursor: SystemMouseCursors.click,
-              // 圆角裁剪 hover/pressed 色块，与行底色同轮廓。
-              borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-              // hover 色与选中底色同 token：未选中时 hover 渐现底色，
-              // 已选中时底色本就常驻、hover 不再叠加。
-              hoverColor: enabled && !selected
-                  ? Tokens.bgHover
-                  : Colors.transparent,
-              highlightColor: enabled
-                  ? Tokens.titleBarPressed
-                  : Colors.transparent,
-              splashColor: Colors.transparent,
-              splashFactory: NoSplash.splashFactory,
-              child: Container(
-                // Key 供测试断言选中高亮（以枚举名区分条目）。
-                key: ValueKey('settings-nav-${tab.name}'),
-                decoration: BoxDecoration(
-                  color: selected ? Tokens.bgHover : null,
-                  borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Tokens.spSm,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    // 选中指示条 — accent 竖条从左侧点亮（对齐控制栏 accent
-                    // 强调的同一设计语言）；未选中时保留 2px 槽位，切换不跳布局。
-                    AnimatedContainer(
-                      duration: const Duration(
-                        milliseconds: Tokens.durationFast,
+          cursor: widget.enabled
+              ? SystemMouseCursors.click
+              : SystemMouseCursors.basic,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            onTap: widget.enabled ? widget.onTap : null,
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              // Key 供测试断言选中底色（以枚举名区分分区）.
+              key: ValueKey('settings-tab-${widget.tab.name}'),
+              duration: const Duration(milliseconds: Tokens.durationFast),
+              padding: const EdgeInsets.symmetric(
+                horizontal: Tokens.spSm,
+                vertical: Tokens.spSm,
+              ),
+              decoration: BoxDecoration(
+                // 选中恒亮 / 悬停瞬态同底色（_NavEntry 同款语义）。
+                color: (selected || _hovered) && widget.enabled
+                    ? Tokens.bgHover
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(Tokens.radiusSm),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _tabIcon(widget.tab),
+                        size: 18,
+                        color: selected && widget.enabled
+                            ? Tokens.accent
+                            : Tokens.textPrimary,
                       ),
-                      width: 2,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: selected ? Tokens.accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-                      ),
-                    ),
-                    const SizedBox(width: Tokens.spSm),
-                    Icon(
-                      icon,
-                      size: 18,
-                      color: selected ? Tokens.accent : Tokens.textPrimary,
-                    ),
-                    const SizedBox(width: Tokens.spSm),
-                    Expanded(
-                      child: Text(
-                        label,
+                      const SizedBox(width: Tokens.spSm),
+                      Text(
+                        _tabLabel(l10n),
                         style: TextStyle(
-                          color: selected ? Tokens.accent : Tokens.textPrimary,
-                          fontSize: Tokens.fontCaption,
+                          color: selected && widget.enabled
+                              ? Tokens.accent
+                              : Tokens.textPrimary,
+                          fontSize: Tokens.fontBody,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: Tokens.spXs),
+                  Text(
+                    _tabSummary(l10n),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Tokens.textSecondary,
+                      fontSize: Tokens.fontCaption,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -443,4 +659,25 @@ class _NavEntry extends StatelessWidget {
       ),
     );
   }
+
+  IconData _tabIcon(_SettingsTab tab) => switch (tab) {
+    _SettingsTab.general => Icons.tune,
+    _SettingsTab.video => Icons.smart_display_outlined,
+    _SettingsTab.audio => Icons.graphic_eq,
+    _SettingsTab.about => Icons.info_outline,
+  };
+
+  String _tabLabel(AppLocalizations l10n) => switch (widget.tab) {
+    _SettingsTab.general => l10n.generalTab,
+    _SettingsTab.video => l10n.videoTab,
+    _SettingsTab.audio => l10n.audioTab,
+    _SettingsTab.about => l10n.aboutTab,
+  };
+
+  String _tabSummary(AppLocalizations l10n) => switch (widget.tab) {
+    _SettingsTab.general => l10n.settingsSummaryGeneral,
+    _SettingsTab.video => l10n.settingsSummaryVideo,
+    _SettingsTab.audio => l10n.settingsSummaryAudio,
+    _SettingsTab.about => l10n.settingsSummaryAbout,
+  };
 }

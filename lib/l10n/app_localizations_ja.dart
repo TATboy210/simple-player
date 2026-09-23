@@ -85,6 +85,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settings => '設定';
 
   @override
+  String get back => '戻る';
+
+  @override
+  String get settingsSummaryGeneral => '言語 · エラーカード · 再生位置';
+
+  @override
+  String get settingsSummaryVideo => '明るさ · コントラスト · 回転 · アスペクト比';
+
+  @override
+  String get settingsSummaryAudio => '音声遅延 · 字幕遅延';
+
+  @override
+  String get settingsSummaryAbout => 'コンポーネント · 謝辞 · 技術スタック';
+
+  @override
   String get audioTab => 'オーディオ';
 
   @override

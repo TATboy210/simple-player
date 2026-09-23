@@ -252,6 +252,36 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settings;
 
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// No description provided for @settingsSummaryGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'Language · Error card · Resume playback'**
+  String get settingsSummaryGeneral;
+
+  /// No description provided for @settingsSummaryVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness · Contrast · Rotation · Aspect ratio'**
+  String get settingsSummaryVideo;
+
+  /// No description provided for @settingsSummaryAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio delay · Subtitle delay'**
+  String get settingsSummaryAudio;
+
+  /// No description provided for @settingsSummaryAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'Components · Thanks · Tech stack'**
+  String get settingsSummaryAbout;
+
   /// Audio settings section label (placeholder nav entry)
   ///
   /// In en, this message translates to:

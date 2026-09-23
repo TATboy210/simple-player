@@ -124,6 +124,8 @@ class _AppIdentity extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // v0.0.8: 品牌行拆两行 — 三等分窄面板（273px）下单行会被
+        // 4 个社交 logo + 版本徽标挤压到 ellipsis.
         Row(
           children: [
             Expanded(
@@ -138,12 +140,6 @@ class _AppIdentity extends StatelessWidget {
                 ),
               ),
             ),
-            // 社交/赞助 logo 组 — 点击经 PathUtils.openUrl 走系统浏览器
-            // （v0.0.4；外链常量收敛于 kSocialLinks 表）。
-            for (final link in kSocialLinks) ...[
-              _SocialLogoButton(link: link),
-              const SizedBox(width: Tokens.spXs),
-            ],
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: const BoxDecoration(
@@ -161,6 +157,17 @@ class _AppIdentity extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+        // 社交/赞助 logo 组 — 点击经 PathUtils.openUrl 走系统浏览器
+        // （v0.0.4；外链常量收敛于 kSocialLinks 表）。
+        const SizedBox(height: Tokens.spSm),
+        Row(
+          children: [
+            for (final link in kSocialLinks) ...[
+              _SocialLogoButton(link: link),
+              const SizedBox(width: Tokens.spXs),
+            ],
           ],
         ),
         const SizedBox(height: Tokens.spSm),

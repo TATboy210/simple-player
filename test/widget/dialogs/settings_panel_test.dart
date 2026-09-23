@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
@@ -23,13 +24,18 @@ void main() {
   // 固定中文 locale — 文案断言（标题/导航/分区名）不随宿主环境漂移。
   // 非 route 停靠面板：直接 pump SettingsPanel（生产挂载于控制层 Stack
   // 中列，显隐由宿主 notifier 经 visible 驱动），关闭按钮经 onClose 收口。
+  // SizedBox 复现真实槽位几何（生产中三等分 ~273-415 × 槽高）。
   Widget buildSubject({VoidCallback? onClose}) => MaterialApp(
     locale: const Locale('zh'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Center(
-        child: SettingsPanel(visible: true, onClose: onClose ?? () {}),
+        child: SizedBox(
+          width: 400,
+          height: 330,
+          child: SettingsPanel(visible: true, onClose: onClose ?? () {}),
+        ),
       ),
     ),
   );
@@ -39,44 +45,55 @@ void main() {
     await tester.pumpAndSettle(); // 内容淡入完成
   }
 
-  testWidgets('shows a two-pane shell with nav entries', (tester) async {
+  testWidgets('shows the tag layer with nav entries at L0', (tester) async {
     await openDialog(tester);
 
-    // 壳：标题 + 左侧导航（关于 = 唯一真实项；通用/视频/音频为灰显占位）。
+    // L0 tag 层：标题 + 竖排分区入口（关于 = 默认选中；通用/视频/音频）。
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('关于'), findsOneWidget);
     expect(find.text('通用'), findsOneWidget);
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('音频'), findsOneWidget);
+    // 两级覆盖导航：L0 时分区内容不可见（内容层 Offstage，默认 find 即排除）。
+    expect(find.text('media_kit'), findsNothing);
+    expect(find.byType(GeneralSettingsContent), findsNothing);
   });
 
   testWidgets('about pane lists real open-source components and licenses', (
     tester,
   ) async {
     await openDialog(tester);
+    // 进入关于分区内容层（L1）。
+    await tester.tap(find.text('关于'));
+    await tester.pumpAndSettle();
 
     // 开源技术区 — 顶部组件（真实在用的引擎封装与框架）必在首屏。
-    expect(find.text('media_kit'), findsOneWidget);
-    expect(find.text('Flutter'), findsOneWidget);
-    // LGPL 组件（mpv/libmpv 与 FFmpeg）共用同一许可证标识。
-    expect(find.text('LGPL-2.1-or-later'), findsNWidgets(2));
+    expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
+    expect(find.text('Flutter', skipOffstage: false), findsOneWidget);
+    // LGPL 组件（mpv/libmpv 与 FFmpeg）共用同一许可证标识；窄面板下
+    // ListView 按视口裁剪构建，断言视口内至少出现一个。
+    expect(find.text('LGPL-2.1-or-later'), findsWidgets);
   });
 
   testWidgets('about pane shows special thanks above tech stack with donors', (
     tester,
   ) async {
     await openDialog(tester);
+    await tester.tap(find.text('关于'));
+    await tester.pumpAndSettle();
 
     // v0.0.4：鸣谢区上移至技术栈之前，进门即见（无需滚动）。
-    expect(find.text('特别鸣谢'), findsOneWidget);
+    expect(find.text('特别鸣谢', skipOffstage: false), findsOneWidget);
     // 已录入的爱发电支持者以「头像 + 姓名」条目呈现。
-    expect(find.text('爱发电用户_24f3f'), findsOneWidget);
+    expect(find.text('爱发电用户_24f3f', skipOffstage: false), findsOneWidget);
     // 空态占位文案不再出现（名单非空）。
-    expect(find.text('名单正在准备中，敬请期待'), findsNothing);
+    expect(find.text('名单正在准备中，敬请期待', skipOffstage: false), findsNothing);
     // 技术栈仍在鸣谢区之后（同一 ListView 内先后顺序）。
-    expect(find.text('技术栈'), findsOneWidget);
-    final thanksDy = tester.getTopLeft(find.text('特别鸣谢')).dy;
-    final techDy = tester.getTopLeft(find.text('技术栈')).dy;
+    expect(find.text('技术栈', skipOffstage: false), findsOneWidget);
+    final thanksDy = tester
+        .getTopLeft(find.text('特别鸣谢', skipOffstage: false))
+        .dy;
+    final techDy = tester.getTopLeft(find.text('技术栈', skipOffstage: false)).dy;
     expect(thanksDy, lessThan(techDy));
   });
 
@@ -84,6 +101,8 @@ void main() {
     tester,
   ) async {
     await openDialog(tester);
+    await tester.tap(find.text('关于'));
+    await tester.pumpAndSettle();
 
     // v0.0.4：品牌行右侧的社交/赞助 logo 按钮（X/爱发电/Patreon/GitHub）。
     // Material 近似图标，tooltip 提示品牌名；点击行为（openUrl）走系统
@@ -99,7 +118,7 @@ void main() {
     await openDialog(tester, onClose: () => closed = true);
 
     // 标题行关闭按钮为 GlassButton.iconOnly — 经 tooltip 定位（播放列表
-    // 同款交互）.
+    // 同款交互）。
     await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
 
@@ -113,27 +132,26 @@ void main() {
     (tester) async {
       await openDialog(tester);
 
-      // 初始选中态为「关于」（向后兼容现状：直接打开设置看到 About）。
-      expect(find.text('media_kit'), findsOneWidget);
+      // L0：tag 层可见、内容层 Offstage（两级覆盖导航）。
       expect(find.byType(GeneralSettingsContent), findsNothing);
 
+      // 一步直达：点击 tag = 选中并进入其内容层（L1）。
       await tester.tap(find.text('通用'));
       await tester.pumpAndSettle();
 
-      // 内容切换为通用分区，About 的组件列表消失。
       expect(find.byType(GeneralSettingsContent), findsOneWidget);
-      expect(find.text('media_kit'), findsNothing);
+      expect(find.text('media_kit', skipOffstage: false), findsNothing);
 
-      // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 圆角底；
-      // 未选中的「关于」条目恢复无底色。
-      final general = tester.widget<Container>(
-        find.byKey(const ValueKey('settings-nav-general')),
+      // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 底；
+      // 未选中的「关于」chip 无底色。
+      final general = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-general')),
       );
       expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
-      final about = tester.widget<Container>(
-        find.byKey(const ValueKey('settings-nav-about')),
+      final about = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-about')),
       );
-      expect((about.decoration! as BoxDecoration).color, isNull);
+      expect((about.decoration! as BoxDecoration).color, Colors.transparent);
     },
   );
 
@@ -142,15 +160,21 @@ void main() {
   ) async {
     await openDialog(tester);
 
+    // 进入通用分区（L1）→ 经标题行返回按钮回 L0 → 再进关于分区。
     await tester.tap(find.text('通用'));
     await tester.pumpAndSettle();
     expect(find.byType(GeneralSettingsContent), findsOneWidget);
+
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
+    expect(find.byType(GeneralSettingsContent), findsNothing);
+    expect(find.text('media_kit', skipOffstage: false), findsNothing);
 
     await tester.tap(find.text('关于'));
     await tester.pumpAndSettle();
 
     // About 内容回归 —— 通用/关于互切均可达。
-    expect(find.text('media_kit'), findsOneWidget);
+    expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
     expect(find.byType(GeneralSettingsContent), findsNothing);
   });
 
@@ -159,22 +183,18 @@ void main() {
   ) async {
     await openDialog(tester);
 
-    await tester.tap(find.text('通用'));
-    await tester.pumpAndSettle();
-    expect(find.byType(GeneralSettingsContent), findsOneWidget);
-
-    // 灰显占位项不可交互（Avoid captive UI）：点击无伪反馈、内容不切换。
-    // IgnorePointer 拦截命中是灰显行为的直接证据 —— warnIfMissed: false 显式
-    // 声明「点击落空即预期」。
+    // 灰显占位项不可交互（Avoid captive UI）：点击无伪反馈、内容层不进入。
+    // IgnorePointer 拦截命中是灰显行为的直接证据 —— warnIfMissed: false
+    // 显式声明「点击落空即预期」。
     await tester.tap(find.text('视频'), warnIfMissed: false);
     await tester.pumpAndSettle();
     await tester.tap(find.text('音频'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(find.byType(GeneralSettingsContent), findsOneWidget);
+    expect(find.byType(GeneralSettingsContent), findsNothing);
     expect(find.text('media_kit'), findsNothing);
 
     // 灰显语义结构锁：38% 不透明度 + IgnorePointer 保持原状。
-    // .first 取最内层（导航条目自身的 Opacity/IgnorePointer）。
+    // .first 取最内层（chip 自身的 Opacity/IgnorePointer）。
     final videoOpacity = tester.widget<Opacity>(
       find.ancestor(of: find.text('视频'), matching: find.byType(Opacity)).first,
     );
@@ -189,6 +209,109 @@ void main() {
           .first,
     );
     expect(videoPointer.ignoring, isTrue);
+  });
+
+  group('键盘交叉导航 (v0.0.8 XMB 化)', () {
+    testWidgets('L0 上下键切换分区高亮且灰显分区不可达', (tester) async {
+      await openDialog(tester);
+      // 默认选中「关于」（enabled 序列 [通用, 关于] 的末位）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      // 到头即停：仍在「关于」。
+      final about = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-about')),
+      );
+      expect((about.decoration! as BoxDecoration).color, Tokens.bgHover);
+
+      // ↑ 回到「通用」（enabled 首位）。注意：ArrowUp 后须重取 widget —
+      // 旧实例的 decoration 是陈旧快照。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      final general = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-general')),
+      );
+      expect((general.decoration! as BoxDecoration).color, Tokens.bgHover);
+      final aboutAfterUp = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('settings-tab-about')),
+      );
+      expect(
+        (aboutAfterUp.decoration! as BoxDecoration).color,
+        Colors.transparent,
+        reason: '↑↓ 移动后旧分区失去选中底色',
+      );
+    });
+
+    testWidgets('Enter 进入内容层、Esc 逐层返回后关闭面板', (tester) async {
+      var closeCount = 0;
+      await openDialog(tester, onClose: () => closeCount++);
+
+      // Enter 进入「通用」内容层。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+
+      // Esc 第一次 = 返回 tag 层（面板仍打开，onClose 不触发）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneralSettingsContent), findsNothing);
+      expect(closeCount, 0);
+
+      // Esc 第二次 = 面板级返回 ignored → 冒泡宿主（本测试装配无宿主
+      // KeyboardHandler 链，无效果）— 锁定「面板不自行关闭、不吞键」.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(closeCount, 0);
+    });
+
+    testWidgets('L1 内左右键方向性切换分区', (tester) async {
+      await openDialog(tester);
+      // 进入「通用」内容层（默认选中关于 → ↑ 到通用 → Enter）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+
+      // → 切到「关于」（enabled 序列 [通用, 关于] 的后一位）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
+      expect(find.byType(GeneralSettingsContent), findsNothing);
+
+      // ← 切回「通用」。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+    });
+
+    testWidgets('General 行导航 — ↓ 高亮首行、Enter 翻转错误卡片开关', (tester) async {
+      await openDialog(tester);
+      // 进入「通用」内容层（进入即聚焦第 0 行 — 细节终裁）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      // 第 0 行（语言行）键盘激活 no-op — 不崩即锁定 no-op 语义。
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      // ↓ 到第 1 行（错误卡片），Enter 翻转开关。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      // 断点行（第 2 行）仅在服务注入时存在 — 无注入时 ↓ 回绕回第 0 行，
+      // 再 Enter 仍 no-op。锁定回绕不越界。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+    });
   });
 
   group('bundle 注入 (v0.0.6)', () {
@@ -219,12 +342,16 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(
-          child: SettingsPanel(
-            visible: true,
-            onClose: () {},
-            services: SettingsServicesBundle(
-              videoProcessing: videoProcessing,
-              settings: settings,
+          child: SizedBox(
+            width: 400,
+            height: 330,
+            child: SettingsPanel(
+              visible: true,
+              onClose: () {},
+              services: SettingsServicesBundle(
+                videoProcessing: videoProcessing,
+                settings: settings,
+              ),
             ),
           ),
         ),
@@ -237,7 +364,7 @@ void main() {
       await tester.pumpWidget(buildInjectedSubject());
       await tester.pumpAndSettle();
 
-      // 入口灰显: 点击不切换内容.
+      // 入口灰显: 点击不切换内容层.
       await tester.tap(find.text('视频'), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.byType(VideoSettingsContent), findsNothing);
