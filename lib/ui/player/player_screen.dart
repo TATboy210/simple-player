@@ -169,9 +169,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       onStop: () => unawaited(widget.controller.stopCurrentMedia()),
       onOpenFile: () => widget.onOpenFile?.call(),
       onOpenSubtitle: () => unawaited(_openSubtitle()),
-      // 设置面板 — 纯 UI 弹层，不改播放状态，无需空置态隔离。
+      // 设置面板 — toggle 语义（成熟播放器惯例）：开→关、关→开；
+      // 纯 UI 弹层，不改播放状态，无需空置态隔离。
       // v0.0.6: services bundle 经 PlayerVideoControls 传入挂载的面板。
-      onOpenSettings: () => _settingsVisible.value = true,
+      onOpenSettings: () => _settingsVisible.value = !_settingsVisible.value,
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
