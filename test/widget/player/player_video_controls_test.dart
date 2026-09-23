@@ -11,6 +11,8 @@ import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_controls_state.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
+import 'package:simple_player_flutter/ui/player/progress_bar.dart'
+    as progress_bar;
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
@@ -335,6 +337,43 @@ void main() {
       resizing.value = false;
       await tester.pump();
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+    });
+
+    testWidgets('拖动进度条期间玻璃挂起、松手一帧恢复 (v0.0.8.2)', (tester) async {
+      await pumpControls(tester, actions: const PlayerActions());
+
+      // duration > 0 才有 seek 手势 (progress_bar.dart onHorizontalDragStart 守卫).
+      video.player.emitDuration(const Duration(minutes: 1));
+      video.player.emitPosition(const Duration(seconds: 10));
+      await tester.pump();
+
+      final backdropFinder = find.byType(BackdropFilter, skipOffstage: false);
+      expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
+
+      // 水平拖动进度条 (超过 progressDragThreshold) — onSeekStart 置位挂起.
+      final barCenter = tester.getCenter(
+        find.byType(progress_bar.ProgressBar),
+      );
+      final gesture = await tester.startGesture(barCenter);
+      await gesture.moveBy(const Offset(60, 0));
+      await tester.pump();
+      expect(
+        tester.widget<BackdropFilter>(backdropFinder).enabled,
+        isFalse,
+        reason: '拖动中视频背景剧烈变化, blur 每帧重算最痛 — 挂起',
+      );
+
+      // 松手 — onSeekEnd 一帧恢复.
+      await gesture.up();
+      await tester.pump();
+      expect(
+        tester.widget<BackdropFilter>(backdropFinder).enabled,
+        isTrue,
+        reason: '松手恢复, 无跳变 (BackdropFilter.enabled 布尔翻转)',
+      );
+
+      // 排空 seek throttle/hold 定时器, 避免 pending timer 不变量失败.
+      await tester.pump(const Duration(seconds: 3));
     });
 
     testWidgets('reparent 同时替换全部 source 后只响应新依赖', (tester) async {

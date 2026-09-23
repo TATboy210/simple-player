@@ -170,6 +170,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 将 idle 状态变化限制在中央控制组，同时保留装饰动画独立监听。
   late final ValueNotifier<bool> _isIdleNotifier;
 
+  /// seek 拖动挂起信号 (v0.0.8.2) — 拖进度条期间玻璃模糊短暂停用，
+  /// 松手恢复。State 字段 identity 恒定（_controlBarCache 一次构建契约）。
+  /// 信号源 = ProgressBar 的 onSeekStart/onSeekEnd 回调链（非 engine
+  /// .isSeeking — 后者拖动中高频抖动且不覆盖 seek-hold 尾窗）。
+  final ValueNotifier<bool> _seekScrubbing = ValueNotifier<bool>(false);
+
   /// 全屏切换过渡标记 — 跳过 isResizing 触发的控制栏淡出,避免全屏切换闪烁消失。
   /// mode 进出全屏时置位,resize 平息后由 _onResizeChanged 清除。
   bool _isFullscreenTransition = false;
@@ -658,6 +664,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _isFullscreenNotifier.dispose();
     _animController.dispose();
     _isIdleNotifier.dispose();
+    _seekScrubbing.dispose();
     _autoHide.dispose();
     _controlsState.dispose(); // 取消 stream 订阅 + dispose notifiers
     super.dispose();
@@ -763,6 +770,18 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 移除 (CenterGroup 由 isIdleListenable 单源驱动, 缓存后冻结无碍).
   Widget? _controlBarCache;
 
+  /// seek 拖动包装 — 置位挂起信号并透传 auto-hide 原语义（拖动中冻结
+  /// 隐藏计时）。瞬时 tap 的 start/end 同帧配对翻转由 Flutter 合帧消化。
+  void _handleSeekStart() {
+    _seekScrubbing.value = true;
+    _autoHide.onSeekStart();
+  }
+
+  void _handleSeekEnd() {
+    _seekScrubbing.value = false;
+    _autoHide.onSeekEnd();
+  }
+
   Widget _buildControlBar() {
     final bar = _controlBarCache ??= ControlBar(
       vm: _controlBarViewModel,
@@ -774,9 +793,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       enableBlur: true,
       decoration: _animController,
       resizing: widget.resizing,
+      // seek 拖动期间玻璃模糊短暂挂起 (v0.0.8.2) — State 字段 identity 恒定.
+      scrubbing: _seekScrubbing,
       onToggleFullscreen: _toggleFullscreen,
-      onSeekStart: _autoHide.onSeekStart,
-      onSeekEnd: _autoHide.onSeekEnd,
+      onSeekStart: _handleSeekStart,
+      onSeekEnd: _handleSeekEnd,
       onInteractionStart: _autoHide.onInteractionStart,
       onInteractionEnd: _autoHide.onInteractionEnd,
     );
@@ -843,6 +864,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                     visible: settingsVisible.value,
                     services: widget.settingsServices,
                     onClose: () => settingsVisible.value = false,
+                    // seek 拖动挂起玻璃模糊 (v0.0.8.2).
+                    scrubbing: _seekScrubbing,
                   ),
                 ),
               );
@@ -885,6 +908,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   // v0.0.6.2: 上次播放锚点 — 停止态高亮"上次会话那条".
                   lastPlayedPath: widget.playlistCoordinator!.lastPlayedPath,
                   visible: visible,
+                  // seek 拖动挂起玻璃模糊 (v0.0.8.2).
+                  scrubbing: _seekScrubbing,
                   onClose: () => widget.playlistVisible!.value = false,
                   onPlayEntry: (index) =>
                       unawaited(widget.playlistCoordinator!.playEntryAt(index)),

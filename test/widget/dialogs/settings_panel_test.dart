@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,23 +27,32 @@ void main() {
   // 非 route 停靠面板：直接 pump SettingsPanel（生产挂载于控制层 Stack
   // 中列，显隐由宿主 notifier 经 visible 驱动），关闭按钮经 onClose 收口。
   // SizedBox 复现真实槽位几何（生产中三等分 ~273-415 × 槽高）。
-  Widget buildSubject({VoidCallback? onClose}) => MaterialApp(
-    locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(
-      body: Center(
-        child: SizedBox(
-          width: 400,
-          height: 330,
-          child: SettingsPanel(visible: true, onClose: onClose ?? () {}),
+  Widget buildSubject({VoidCallback? onClose, ValueListenable<bool>? scrubbing}) =>
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 400,
+              height: 330,
+              child: SettingsPanel(
+                visible: true,
+                onClose: onClose ?? () {},
+                scrubbing: scrubbing,
+              ),
+            ),
+          ),
         ),
-      ),
-    ),
-  );
+      );
 
-  Future<void> openDialog(WidgetTester tester, {VoidCallback? onClose}) async {
-    await tester.pumpWidget(buildSubject(onClose: onClose));
+  Future<void> openDialog(
+    WidgetTester tester, {
+    VoidCallback? onClose,
+    ValueListenable<bool>? scrubbing,
+  }) async {
+    await tester.pumpWidget(buildSubject(onClose: onClose, scrubbing: scrubbing));
     await tester.pumpAndSettle(); // 内容淡入完成
   }
 
@@ -208,6 +218,30 @@ void main() {
       find.ancestor(of: find.text('音频'), matching: find.byType(Opacity)).first,
     );
     expect(audioOpacity.opacity, 1.0);
+  });
+
+  testWidgets('seek 拖动挂起 — suspend 翻转停用/恢复玻璃 (v0.0.8.2)', (tester) async {
+    final scrubbing = ValueNotifier<bool>(false);
+    addTearDown(scrubbing.dispose);
+    await openDialog(tester, scrubbing: scrubbing);
+
+    final finder = find.descendant(
+      of: find.byType(SettingsPanel),
+      matching: find.byType(BackdropFilter),
+    );
+    expect(tester.widget<BackdropFilter>(finder).enabled, isTrue);
+
+    scrubbing.value = true;
+    await tester.pump();
+    expect(
+      tester.widget<BackdropFilter>(finder).enabled,
+      isFalse,
+      reason: '拖动进度条期间挂起面板玻璃',
+    );
+
+    scrubbing.value = false;
+    await tester.pump();
+    expect(tester.widget<BackdropFilter>(finder).enabled, isTrue);
   });
 
   group('键盘交叉导航 (v0.0.8 XMB 化)', () {

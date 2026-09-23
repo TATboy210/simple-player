@@ -5,6 +5,7 @@
 /// 数据源直接构造 ValueNotifier — 无需协调器与引擎.
 library;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,6 +60,7 @@ void main() {
       PlaylistSortKey sortKey = PlaylistSortKey.addedOrder,
       bool sortAscending = true,
       void Function(PlaylistSortKey)? onSortSelected,
+      ValueListenable<bool>? scrubbing,
     }) => _wrap(
       PlaylistPanel(
         entries: entries,
@@ -74,6 +76,7 @@ void main() {
         sortKey: sortKey,
         sortAscending: sortAscending,
         onSortSelected: onSortSelected ?? (_) {},
+        scrubbing: scrubbing,
       ),
     );
 
@@ -130,6 +133,31 @@ void main() {
       );
       expect(opened.enabled, isTrue);
       expect(find.byType(BackdropFilter), findsOneWidget, reason: '数量恒定契约');
+    });
+
+    testWidgets('seek 拖动挂起 — suspend 翻转停用/恢复 (v0.0.8.2)', (tester) async {
+      final scrubbing = ValueNotifier<bool>(false);
+      addTearDown(scrubbing.dispose);
+      await tester.pumpWidget(buildPanel(visible: true, scrubbing: scrubbing));
+      await tester.pumpAndSettle();
+
+      final finder = find.descendant(
+        of: find.byType(PlaylistPanel),
+        matching: find.byType(BackdropFilter),
+      );
+      expect(tester.widget<BackdropFilter>(finder).enabled, isTrue);
+
+      scrubbing.value = true;
+      await tester.pump();
+      expect(
+        tester.widget<BackdropFilter>(finder).enabled,
+        isFalse,
+        reason: '拖动进度条期间挂起面板玻璃',
+      );
+
+      scrubbing.value = false;
+      await tester.pump();
+      expect(tester.widget<BackdropFilter>(finder).enabled, isTrue);
     });
 
     testWidgets('visible 翻转触发 forward 动画 — 最终完全显示', (tester) async {
