@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 
+#include <imm.h>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -47,6 +48,13 @@ bool FlutterWindow::OnCreate() {
   // registered. The following call ensures a frame is pending to ensure the
   // window is shown. It is a no-op if the first frame hasn't completed yet.
   flutter_controller_->ForceRedraw();
+
+  // 播放器无文本输入场景 — 解除窗口与默认输入法上下文 (IMC) 的关联,
+  // 根治中文输入法在窗口左上角弹候选窗的问题 (flutter/flutter#74723 同
+  // 款: 无 EditableText 锚点时组合窗定位到 0,0)。恢复走 Dart 侧
+  // Win32ImeBridge 的 ImmAssociateContextEx(IACE_DEFAULT), 未来落地文本
+  // 输入框时按焦点启停。
+  ImmAssociateContext(GetHandle(), nullptr);
 
   return true;
 }

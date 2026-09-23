@@ -151,6 +151,9 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
   /// 吞键。守卫判定顺序：
   /// 1. 仅 KeyDownEvent（与焦点路径一致，KeyUp/KeyRepeat 放行）；
   /// 2. 文本编辑守卫：主焦点位于 EditableText 焦点链内 → 放行；
+  ///    ⓘ 未来落地文本输入框时，须在获得焦点的回调里接
+  ///    Win32ImeBridge.enable()（runner 已在窗口创建时解除 IMC — 见
+  ///    flutter_window.cpp OnCreate），失焦时 disable() 恢复禁用；
   /// 3. 主焦点是本 handler 焦点节点自身或后代 → 放行（焦点分发上行必经
   ///    本 handler，不会死键）；
   /// 4. 主焦点位于其他路由（ModalRoute 祖先存在且非本 handler 路由）→
