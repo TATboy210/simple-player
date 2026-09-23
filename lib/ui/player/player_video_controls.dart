@@ -686,29 +686,36 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               Positioned.fill(child: _buildEmptyState(emptyActive)),
             Positioned.fill(
               bottom: Tokens.controlBarMarginBottom + Tokens.controlBarHeight,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                // 空置态切换为仅关面板的回调 — 空置页历史设计是整层让位
-                // (中央按钮可点 + 防双击全屏误触), 副作用是面板外点击
-                // 完全无处理, 浮层面板收不到关闭信号 (v0.0.8 修复).
-                onTap: emptyActive ? _handleEmptyAreaTap : _handleTap,
-                child: ListenableBuilder(
-                  listenable: Listenable.merge([
-                    if (widget.settingsVisible != null) widget.settingsVisible,
-                    if (widget.playlistVisible != null) widget.playlistVisible,
-                  ]),
-                  builder: (context, _) {
-                    // 任一面板开着 → 手势层活跃 (点击面板外 = 关面板);
-                    // 全关后让位空置页 (中央"打开文件"按钮可点).
-                    final anyPanel =
-                        (widget.settingsVisible?.value ?? false) ||
-                        (widget.playlistVisible?.value ?? false);
-                    return IgnorePointer(
-                      ignoring: emptyActive && !anyPanel,
-                      child: const SizedBox.expand(),
-                    );
-                  },
-                ),
+              // GestureDetector 必须在面板可见性 builder 内构建 — onTap
+              // 三态依赖 anyPanel, 且 onTap 为 null 才能退出手势竞技场.
+              child: ListenableBuilder(
+                listenable: Listenable.merge([
+                  if (widget.settingsVisible != null) widget.settingsVisible,
+                  if (widget.playlistVisible != null) widget.playlistVisible,
+                ]),
+                builder: (context, _) {
+                  // 任一面板开着 → 手势层活跃 (点击面板外 = 关面板).
+                  final anyPanel =
+                      (widget.settingsVisible?.value ?? false) ||
+                      (widget.playlistVisible?.value ?? false);
+                  // 空置态无面板时 onTap 必须为 null — translucent 手势层
+                  // 恒把自己加入命中结果, 只要注册了 TapGestureRecognizer
+                  // 就参与竞技场且先注册先赢 (eager winner), 底层空置页
+                  // 中央"打开文件"按钮的 InkWell 被拒 (fb9d383f 回归根因;
+                  // 外层 IgnorePointer 只能挡 child 挡不住 GD 自身).
+                  // null = 不注册 recognizer = 让位按钮, 这才是空置页
+                  // "整层让位"的本意.
+                  final onTap = !emptyActive
+                      ? _handleTap
+                      : (anyPanel ? _handleEmptyAreaTap : null);
+                  return GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: onTap,
+                    // translucent 下 GD 无论子节点命中与否都参战 — child
+                    // 仅用于撑命中体 (无 child 零尺寸收不到指针事件).
+                    child: const SizedBox.expand(),
+                  );
+                },
               ),
             ),
           ],

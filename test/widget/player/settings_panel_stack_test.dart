@@ -37,6 +37,7 @@ void main() {
     ValueNotifier<bool>? playlistVisible,
     PlayerActions? actions,
     bool withEmptyState = false,
+    VoidCallback? onOpenFile,
   }) async {
     settingsVisible.value = initialVisible;
     final video = FakeVideoControlsPort(player: FakePlayerControls());
@@ -70,7 +71,7 @@ void main() {
               playlistCoordinator: coordinator,
               settingsVisible: settingsVisible,
               emptyState: withEmptyState
-                  ? EmptyState(engineState: engine.state)
+                  ? EmptyState(engineState: engine.state, onOpenFile: onOpenFile)
                   : null,
             ),
           ),
@@ -199,6 +200,47 @@ void main() {
     await tester.tapAt(Offset(panelRect.left + 10, panelRect.bottom - 30));
     await tester.pump(const Duration(milliseconds: 300));
     expect(settingsVisible.value, isTrue, reason: '面板矩形内背景吸收, 不触发点外关闭');
+  });
+
+  testWidgets('空置态无面板: 中央"打开文件"按钮可点 (fb9d383f 回归)', (tester) async {
+    // 根因: 空置态手势层 onTap 恒非 null → TapGestureRecognizer 恒注册 →
+    // translucent GD 参与竞技场且先注册先赢, 底层按钮 InkWell 被拒.
+    // 契约: 手势层必须让位 (onTap=null 不参战), 按钮回调触发.
+    var openCalls = 0;
+    final settingsVisible = ValueNotifier<bool>(false);
+    addTearDown(settingsVisible.dispose);
+    await pumpControls(
+      tester,
+      settingsVisible,
+      withEmptyState: true,
+      onOpenFile: () => openCalls++,
+    );
+
+    // 空置态中央按钮 (EmptyState 内 GlassButton, folder_open 图标定位).
+    await tester.tap(find.byIcon(Icons.folder_open));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(openCalls, 1, reason: '无面板时手势层让位, 按钮回调必须触发');
+  });
+
+  testWidgets('空置态面板开着: 面板外点击只关面板不触发按钮', (tester) async {
+    var openCalls = 0;
+    final settingsVisible = ValueNotifier<bool>(false);
+    addTearDown(settingsVisible.dispose);
+    await pumpControls(
+      tester,
+      settingsVisible,
+      withEmptyState: true,
+      onOpenFile: () => openCalls++,
+    );
+    settingsVisible.value = true;
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 面板外点击 → 手势层活跃 (onTap=_handleEmptyAreaTap) 关面板,
+    // 不应穿透到中央按钮.
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(settingsVisible.value, isFalse);
+    expect(openCalls, 0, reason: '关面板点击不得误触打开文件按钮');
   });
 
   testWidgets('面板开着方向键被面板消费不触发 seek, 关面板后归还宿主', (tester) async {
