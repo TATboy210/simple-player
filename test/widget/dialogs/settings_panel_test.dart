@@ -244,6 +244,46 @@ void main() {
     expect(tester.widget<BackdropFilter>(finder).enabled, isTrue);
   });
 
+  group('层子树缓存 identity (v0.0.8.2 渲染优化)', () {
+    Finder l0Boundary() => find.byKey(const ValueKey('settings-l0-boundary-about'));
+
+    testWidgets('L0→L1 层级翻转 — _selected 不变, tag 层缓存命中实例不变', (
+      tester,
+    ) async {
+      await openDialog(tester);
+      final before = tester.widget<RepaintBoundary>(l0Boundary());
+
+      // → 进 L1 — 只改 _level, 不改 _selected → 缓存必须命中.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+
+      final after = tester.widget<RepaintBoundary>(l0Boundary());
+      expect(
+        identical(before, after),
+        isTrue,
+        reason: '层级翻转不得重建 tag 层 — 这是打开/进出 L1 零重建的核心',
+      );
+    });
+
+    testWidgets('↑ 切换选中 — 缓存失效, 新实例 (高亮/内容必须更新)', (tester) async {
+      await openDialog(tester);
+      final before = tester.widget<RepaintBoundary>(l0Boundary());
+
+      // 默认选中关于 → ↑ 切到音频 → _selected 变化必须失效缓存.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+
+      final after = tester.widget<RepaintBoundary>(
+        find.byKey(const ValueKey('settings-l0-boundary-audio')),
+      );
+      expect(
+        identical(before, after),
+        isFalse,
+        reason: '_selected 变化必须失效缓存, 否则高亮/内容陈旧',
+      );
+    });
+  });
+
   group('键盘交叉导航 (v0.0.8 XMB 化)', () {
     testWidgets('L0 上下键切换分区高亮且灰显分区不可达', (tester) async {
       await openDialog(tester);

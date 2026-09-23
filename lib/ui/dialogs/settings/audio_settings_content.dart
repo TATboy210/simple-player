@@ -38,11 +38,18 @@ class _AudioSettingsContentState extends State<AudioSettingsContent> {
 
   static const _optionCount = ((_delayMaxMs - _delayMinMs) ~/ _delayStepMs) + 1;
 
+  /// SpinControl 选项 — 编译期常量预生成 (v0.0.8.2: 旧实现每次 build
+  /// 分配 41 字符串 × 2 行; 常量列表命中 identical 短路重建).
+  static final _delayOptions = List<String>.generate(
+    _optionCount,
+    (i) => '${_delayMinMs + i * _delayStepMs}',
+  );
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final settings = widget.settings;
-    final options = [for (var i = 0; i < _optionCount; i++) '${_indexToMs(i)}'];
+    final options = _delayOptions;
 
     return Padding(
       padding: const EdgeInsets.all(Tokens.spLg),
