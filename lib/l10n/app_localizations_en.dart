@@ -728,5 +728,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get imeTestTitle => 'IME Test (debug)';
+
+  @override
+  String get imeTestHint =>
+      'Focus here and type Chinese to verify IME governance';
+
+  @override
   String get batchDeleteConfirmAction => 'Confirm deletion';
 }

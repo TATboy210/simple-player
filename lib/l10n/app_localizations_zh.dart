@@ -721,5 +721,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get imeTestTitle => '输入法测试（调试）';
+
+  @override
+  String get imeTestHint => '点此聚焦后输入中文，验证输入法组合与候选窗';
+
+  @override
   String get batchDeleteConfirmAction => '确认删除';
 }

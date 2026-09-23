@@ -242,5 +242,13 @@
       }
     }
   },
+  "imeTestTitle": "IMEテスト（デバッグ）",
+  "@imeTestTitle": {
+    "description": "Debug-only IME verification section label in general settings"
+  },
+  "imeTestHint": "ここをフォーカスして中国語入力で IME を確認",
+  "@imeTestHint": {
+    "description": "Hint text of the IME verification TextField"
+  },
   "batchDeleteConfirmAction": "削除を確定"
 }
