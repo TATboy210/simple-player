@@ -3,6 +3,8 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/services/playback_controller.dart';
+import '../../l10n/app_localizations.dart';
+import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
 import 'keyboard_handler.dart';
 import 'player_actions.dart';
@@ -42,9 +44,33 @@ KeyboardHandler buildPlayerKeyboardActions({
     onPlayPause: actions.onPlayPause,
     onSeekBackward: () => actions.onSeekBack?.call(Tokens.skipShortMs),
     onSeekForward: () => actions.onSeekForward?.call(Tokens.skipLongMs),
-    onVolumeUp: () => engine.setVolume(engine.volume.value + 0.05),
-    onVolumeDown: () => engine.setVolume(engine.volume.value - 0.05),
-    onToggleMute: () => engine.setMute(!engine.isMuted.value),
+    // 键盘音量/静音 OSD 反馈补齐 (v0.0.8.1) — 滑条/滚轮/按钮路径已有
+    // OSD, 唯独键盘缺失; 先 clamp 再写引擎, OSD 显示实际生效值.
+    onVolumeUp: () {
+      final v = (engine.volume.value + 0.05).clamp(0.0, 1.0);
+      engine.setVolume(v);
+      OsdService.I.show('${(v * 100).round()}%', progress: v);
+    },
+    onVolumeDown: () {
+      final v = (engine.volume.value - 0.05).clamp(0.0, 1.0);
+      engine.setVolume(v);
+      OsdService.I.show('${(v * 100).round()}%', progress: v);
+    },
+    onToggleMute: () {
+      final unmuting = engine.isMuted.value;
+      engine.setMute(!unmuting);
+      // 与 VolumeButton 同构: 静音期间音量不动 (原生静音), unmute 直接
+      // 显示当前响度.
+      if (unmuting) {
+        final v = engine.volume.value;
+        OsdService.I.show('${(v * 100).round()}%', progress: v);
+      } else {
+        OsdService.I.show(
+          AppLocalizations.of(context).mute,
+          icon: Icons.volume_off,
+        );
+      }
+    },
     onOpenFile: onOpenFile,
     onToggleSubtitle: () {
       engine.toggleSubtitle();
