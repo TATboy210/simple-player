@@ -207,6 +207,12 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     );
   }
 
+  /// 设置服务包缓存 (v0.0.8.2 审查 MEDIUM-1) — 每次 build 新建实例会让
+  /// SettingsPanel 的 services identity 失效比较恒不等, 侵蚀其内容层
+  /// 子树缓存（拖拽悬停等日常 setState 即触发重建）。成员来自
+  /// late final 的 _services（应用生命周期稳定），构造一次即可。
+  SettingsServicesBundle? _settingsBundle;
+
   /// 构建播放器主界面，将单文件播放服务注入 [PlayerScreen]。
   Widget _buildPlayerScreen() {
     final engine = _services.engine;
@@ -217,7 +223,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       controller: _services.controller,
       playlistCoordinator: _services.playlistCoordinator,
       // v0.0.6: 设置页服务注入 — video/audio 分区 + 断点续播开关启用.
-      settingsServices: SettingsServicesBundle(
+      settingsServices: _settingsBundle ??= SettingsServicesBundle(
         videoProcessing: _services.videoProcessing,
         settings: _services.settings,
       ),

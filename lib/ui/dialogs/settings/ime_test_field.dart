@@ -33,8 +33,8 @@ class _ImeTestFieldState extends State<ImeTestField> {
   late final FocusNode _focusNode;
   final TextEditingController _controller = TextEditingController();
 
-  /// 最后已知焦点态 — 整树卸载时 FocusManager 直接丢弃焦点层级,
-  /// hasFocus 监听不可靠, dispose 兜底按此标记解除。
+  /// 是否持有焦点（跟随失焦复位）— 整树卸载时 FocusManager 直接丢弃
+  /// 焦点层级、hasFocus 监听不可达，dispose 兜底按此标记解除。
   bool _hadFocus = false;
 
   @override
@@ -61,8 +61,12 @@ class _ImeTestFieldState extends State<ImeTestField> {
   /// （见 Win32ImeBridge 文档）。
   void _onFocusChanged() {
     final focused = _focusNode.hasFocus;
-    if (focused) _hadFocus = true;
-    focused ? _bridge.enable() : _bridge.disable();
+    _hadFocus = focused;
+    if (focused) {
+      _bridge.enable();
+    } else {
+      _bridge.disable();
+    }
   }
 
   @override
