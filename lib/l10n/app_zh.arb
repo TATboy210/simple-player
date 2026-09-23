@@ -242,13 +242,5 @@
       }
     }
   },
-  "imeTestTitle": "输入法测试（调试）",
-  "@imeTestTitle": {
-    "description": "Debug-only IME verification section label in general settings"
-  },
-  "imeTestHint": "点此聚焦后输入中文，验证输入法组合与候选窗",
-  "@imeTestHint": {
-    "description": "Hint text of the IME verification TextField"
-  },
   "batchDeleteConfirmAction": "确认删除"
 }

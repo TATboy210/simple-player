@@ -951,13 +951,5 @@
       }
     }
   },
-  "imeTestTitle": "IME Test (debug)",
-  "@imeTestTitle": {
-    "description": "Debug-only IME verification section label in general settings"
-  },
-  "imeTestHint": "Focus here and type Chinese to verify IME governance",
-  "@imeTestHint": {
-    "description": "Hint text of the IME verification TextField"
-  },
   "batchDeleteConfirmAction": "Confirm deletion"
 }
