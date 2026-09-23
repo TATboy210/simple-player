@@ -153,6 +153,24 @@ void main() {
       expect(prefs.getBool('settingsMuted'), isFalse);
     });
 
+    test('mute 后快照保真 — 音量保持原值 + muted=true (v0.0.8.1 契约)', () async {
+      // 真引擎 v0.0.8.1 起 mute 走 mpv 原生属性, 音量 notifier 不动;
+      // 旧 setVolume(0) 模拟会把 volume=0 落盘导致重启丢音量 — 本用例
+      // 锁定「静音不得污染音量持久值」的服务层契约 (FakeEngine 与真引擎
+      // 新语义同构).
+      await service.initialize();
+
+      engine.setVolume(0.6);
+      engine.setMute(true);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(engine.isMuted.value, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble('settingsVolume'), 0.6, reason: '静音不得归零音量持久值');
+      expect(prefs.getBool('settingsMuted'), isTrue);
+    });
+
     test('视频状态变更 — 零防抖下一轮落盘', () async {
       await service.initialize();
 

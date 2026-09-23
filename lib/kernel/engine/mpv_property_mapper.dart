@@ -8,6 +8,8 @@
 /// 项目层均为 -1..1 (0 = 无调整) → mpv -100..100 线性映射 ×100.
 library;
 
+import 'dart:math' as math;
+
 import '../models/aspect_ratio_mode.dart';
 import 'video_effect_type.dart';
 
@@ -24,6 +26,29 @@ abstract final class MpvPropertyMapper {
         VideoEffectType.saturation => (key: 'saturation', value: _mapUnit(v)),
         VideoEffectType.hue => (key: 'hue', value: _mapUnit(v)),
       };
+
+  /// 用户音量 (0.0~1.0 感知刻度) → mpv `volume` 属性值 (0~100).
+  ///
+  /// mpv 的 volume 本身是立方软增益 gain=(volume/100)³ — 线性直通会让
+  /// 滑条前半段感知响度剧变 (滑条 50% 实际增益仅 12.5%). 立方根反演后
+  /// 滑条位置即感知响度 (NipaPlay-Reload 同款); u=0/1 边界幂等
+  /// (0→0, 1→100 unity), 不做 >100% 放大.
+  static double mapVolumeToMpv(double u) =>
+      math.pow(u.clamp(0.0, 1.0), 1 / 3).toDouble() * 100.0;
+
+  /// mpv `volume` (0~100) → 用户感知刻度 0.0~1.0 — 立方增益正演.
+  ///
+  /// 与 [mapVolumeToMpv] 互逆 (引擎 stream 回声反解用); v=100 时浮点
+  /// 可能微超 1.0, 必须 clamp. 输入本身也 clamp (防外部异常值).
+  static double mapVolumeFromMpv(double v) =>
+      math.pow((v / 100).clamp(0.0, 1.0), 3).toDouble().clamp(0.0, 1.0).toDouble();
+
+  /// 静音开关 → mpv `mute` 属性 — 原生静音, 音量属性不动.
+  ///
+  /// 全局属性 (非 file-scoped): 调用方必须以 `fileScoped: false` 应用,
+  /// 否则会进引擎重放缓存被新文件装载错误重放.
+  static MpvProperty mapMute(bool muted) =>
+      (key: 'mute', value: muted ? 'yes' : 'no');
 
   /// 旋转角度 (0/90/180/270) → mpv `video-rotate`.
   static MpvProperty mapRotation(int degrees) =>
