@@ -28,6 +28,13 @@ class Win32ImeBridge {
   /// ImmAssociateContextEx 的恢复标志 — 重新关联系统默认输入法上下文.
   static const int _iaceDefault = 0x0001;
 
+  /// ImmAssociateContextEx 的解除标志 — 不关联任何输入法上下文.
+  static const int _iaceIgnore = 0x0002;
+
+  /// 同时作用于子窗口 — Flutter 键盘焦点在 FlutterView 子窗口上,
+  /// 只解除主窗口候选窗照弹 (首版实测踩坑).
+  static const int _iaceChildren = 0x0008;
+
   final KernelLogger _log;
 
   /// 可注入的 FFI 函数束 — 测试用 fake 替换，生产走真实动态库.
@@ -37,13 +44,13 @@ class Win32ImeBridge {
     : _log = logger ?? KernelLogger.I,
       _fns = functions ?? _resolveDefaultFunctions();
 
-  /// 恢复窗口的系统默认输入法上下文（允许 IME 组合）。
+  /// 恢复窗口（含 FlutterView 子窗口）的系统默认输入法上下文。
   ///
   /// 返回是否成功（hwnd 定位失败或 API 返回 0 均为失败）。
-  bool enable() => _associate(_iaceDefault, 'enable');
+  bool enable() => _associate(_iaceDefault | _iaceChildren, 'enable');
 
-  /// 再次解除窗口的输入法上下文（禁用 IME 组合）。
-  bool disable() => _associate(0, 'disable');
+  /// 再次解除窗口（含 FlutterView 子窗口）的输入法上下文。
+  bool disable() => _associate(_iaceIgnore | _iaceChildren, 'disable');
 
   /// 在 [action] 执行期间**临时恢复** IME（仅 Windows；其他平台直接透传）。
   ///
@@ -69,8 +76,8 @@ class Win32ImeBridge {
     }
   }
 
-  /// 统一执行：定位 hwnd → 按模式关联 → 日志与返回。
-  bool _associate(int mode, String operation) {
+  /// 统一执行：定位 hwnd → 按模式关联（含子窗口）→ 日志与返回。
+  bool _associate(int flags, String operation) {
     final hwnd = _resolveForegroundHwnd();
     if (hwnd == 0) {
       _log.warn(
@@ -79,10 +86,9 @@ class Win32ImeBridge {
       );
       return false;
     }
-    // 空上下文以句柄 0 表示 (HIMC NULL).
-    final ok = mode == _iaceDefault
-        ? _fns.associateContextEx(hwnd, 0, _iaceDefault) != 0
-        : _fns.associateContext(hwnd, 0) != 0;
+    // 空上下文以句柄 0 表示 (HIMC NULL); IACE_CHILDREN 覆盖 FlutterView
+    // 子窗口 — 组合发生在持有键盘焦点的子窗口 IMC 上.
+    final ok = _fns.associateContextEx(hwnd, 0, flags) != 0;
     _log.info(
       'Win32ImeBridge.$operation: hwnd=0x${hwnd.toRadixString(16)} ok=$ok',
     );
@@ -121,11 +127,6 @@ class Win32ImeBridge {
           calloc.free(buffer);
         }
       },
-      associateContext: imm32
-          .lookupFunction<
-            IntPtr Function(IntPtr, IntPtr),
-            int Function(int, int)
-          >('ImmAssociateContext'),
       associateContextEx: imm32
           .lookupFunction<
             Int32 Function(IntPtr, IntPtr, Uint32),
@@ -144,16 +145,12 @@ class Win32ImeFunctions {
   /// 校验句柄的窗口类名是否匹配（GetClassNameW + Utf16 解码）。
   final bool Function(int hwnd, String expected) windowClassNameMatches;
 
-  /// 解除/关联输入法上下文（ImmAssociateContext；非零 = 成功）。
-  final int Function(int hwnd, int context) associateContext;
-
   /// 带标志的上下文关联（ImmAssociateContextEx；非零 = 成功）。
   final int Function(int hwnd, int context, int flags) associateContextEx;
 
   const Win32ImeFunctions({
     required this.foregroundWindow,
     required this.windowClassNameMatches,
-    required this.associateContext,
     required this.associateContextEx,
   });
 }
