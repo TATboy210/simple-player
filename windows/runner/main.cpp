@@ -44,6 +44,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // 线程无关路径，不受此策略影响；纹理仍由 raster 线程消费。
   project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
 
+  // 毛玻璃取证开关（v0.0.8.2 A/B，协议见 docs/audit/glass-perf-ab.md）：
+  // SIMPLER_PLAYER_FORCE_SKIA=1 → 禁用 Impeller 走 Skia。
+  // 用环境变量而非命令行 flag——命令行参数会经 set_dart_entrypoint_arguments
+  // 混入 Dart 入口参数流；环境变量零污染，同一产物即可双后端对比。
+  // 不设或值非 "1" 时行为与 SDK 默认（ImpellerSwitch::Default）完全一致。
+  // A/B 裁决后按结论保留（锁 Skia）或删除本段（E1 阶段落锤）。
+  wchar_t force_skia[2] = {0};
+  if (::GetEnvironmentVariableW(L"SIMPLER_PLAYER_FORCE_SKIA", force_skia, 2) ==
+          1 &&
+      force_skia[0] == L'1') {
+    project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
+  }
+
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
 
