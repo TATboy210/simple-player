@@ -81,9 +81,11 @@ class SettingsPanel extends StatefulWidget {
 
 class _SettingsPanelState extends State<SettingsPanel>
     with TickerProviderStateMixin {
-  /// 键盘可达分区 — video/audio 灰显（v0.0.6.1 裁决），服务启用后自动纳入.
+  /// 键盘可达分区 — audio 已解灰（v0.0.8.1：audio delay 实现完整，仅 UI
+  /// 被灰显），video 仍灰显（视频处理走控制层，无面板内容需求）.
   static const List<_SettingsTab> _enabledTabs = [
     _SettingsTab.general,
+    _SettingsTab.audio,
     _SettingsTab.about,
   ];
 
