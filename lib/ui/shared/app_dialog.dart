@@ -58,44 +58,40 @@ class AppDialog extends StatelessWidget {
             child: EdgeGlow(
               borderRadius: _panelRadius,
               child: Container(
-                  width: w,
-                  // 面板 chrome 恒用 playing 装饰（视觉对齐，非状态对齐；
-                  // 对话框无 playing/idle 状态机 — ControlBarDecoration
-                  // 头注释预留的复用语义在此落地）。
-                  decoration: ControlBarDecoration.playing(
-                    borderRadius: _panelRadius,
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    // maxH 约束整个对话框（含标题/动作行）—— 小窗口下
-                    // 内容区经 Flexible 收缩，滚动型内容（ListView）转入
-                    // 滚动而非把面板顶出裁剪边界（v0.0.4 最小窗口 854×480
-                    // 绘制不完整的根因修复）。
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: maxH),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _DialogTitle(title),
-                          Flexible(
-                            child: SizedBox(
-                              width: w,
-                              height: h,
-                              child: content,
-                            ),
-                          ),
-                          _DialogActions(actions: actions),
-                        ],
-                      ),
+                width: w,
+                // 面板 chrome 恒用 playing 装饰（视觉对齐，非状态对齐；
+                // 对话框无 playing/idle 状态机 — ControlBarDecoration
+                // 头注释预留的复用语义在此落地）。
+                decoration: ControlBarDecoration.playing(
+                  borderRadius: _panelRadius,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  // maxH 约束整个对话框（含标题/动作行）—— 小窗口下
+                  // 内容区经 Flexible 收缩，滚动型内容（ListView）转入
+                  // 滚动而非把面板顶出裁剪边界（v0.0.4 最小窗口 854×480
+                  // 绘制不完整的根因修复）。
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: maxH),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _DialogTitle(title),
+                        Flexible(
+                          child: SizedBox(width: w, height: h, child: content),
+                        ),
+                        _DialogActions(actions: actions),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-          );
-        },
-      );
+          ),
+        );
+      },
+    );
   }
 }
 

@@ -218,7 +218,7 @@ void hide();
 - 不对称时长: 150ms 进入, 300ms 退出
 - `FadeTransition` + `ScaleTransition` 组合 (0.95→1.0缩放)
 - 进入: `Curves.easeOutCubic`, 退出: `Curves.easeIn`
-- 内容: `GlassContainer` (thick tier) + Row (可选图标 + 文字 + 可选进度条)
+- 内容: `GlassContainer` (thin tier) + Row (可选图标 + 文字 + 可选进度条)
 
 ### OsdMessage 数据
 
@@ -329,9 +329,8 @@ Container (width: Tokens.playlistPanelWidth, bgPanel, border left)
 
 | Tier | 模糊度 (sigma) | 用途 |
 |------|---------------|------|
-| `thin` | 12 | 标题栏 |
-| `normal` | 16 | 控制栏 |
-| `thick` | 24 | 对话框 |
+| `thin` | 8.0 | 轻量小件（拖拽提示/瞬态菜单/确认条/错误卡） |
+| `normal` | 11.5 | 控制栏/大面板/对话框 |
 
 **`respectResizeState`**: 为 true 时监听 `WindowBridge.I.isResizing`，窗口调整大小期间跳过 `BackdropFilter`，降级为纯色 `bgGlass`。防止调整大小期间GPU卡顿。
 
@@ -457,7 +456,7 @@ Stack
 
 #### 毛玻璃模糊度
 
-`glassBlurThin`(12), `glassBlur`(16), `glassBlurThick`(24)
+`glassBlurThin`(8.0), `glassBlur`(11.5) — 两档体系 (thick 死档已删, v0.0.8.2)
 
 #### 动画时长 (ms)
 

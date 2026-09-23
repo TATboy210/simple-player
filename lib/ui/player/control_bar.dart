@@ -152,7 +152,11 @@ class ControlBar extends StatelessWidget {
   }
 
   Widget _buildBlur(Widget content) {
-    return _ControlBarBlur(content: content, opacity: opacity, scrubbing: scrubbing);
+    return _ControlBarBlur(
+      content: content,
+      opacity: opacity,
+      scrubbing: scrubbing,
+    );
   }
 }
 
@@ -170,11 +174,7 @@ class _ControlBarBlur extends StatefulWidget {
   final Animation<double>? opacity;
   final ValueListenable<bool>? scrubbing;
 
-  const _ControlBarBlur({
-    required this.content,
-    this.opacity,
-    this.scrubbing,
-  });
+  const _ControlBarBlur({required this.content, this.opacity, this.scrubbing});
 
   @override
   State<_ControlBarBlur> createState() => _ControlBarBlurState();

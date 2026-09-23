@@ -17,11 +17,16 @@ import 'glass_container.dart';
 /// - enabled 翻转只换 `BackdropFilter.enabled` 布尔，子树与祖先拓扑恒定
 ///   （resize 冻结先例 glass_container.dart 同款语义）— 无渲染层结构
 ///   重建，AX 链不破坏，恢复无跳变
-/// - child 外层恒包 [RepaintBoundary]，隔离外部重绘对玻璃子树的连带
+/// - child 外层恒包 [RepaintBoundary]：仅隔离 enabled 翻转时 child 的
+///   重绘（µs 级收益）。**它不隔断"视频每帧变化 → blur 重算"链** —
+///   backdrop 采样由 layer tree 中背景内容变化触发，与 child 侧边界
+///   无关；停掉视频期 blur 重算的唯一手段是 enabled=false 门控
 ///
 /// 与 [GlassContainer] 的分工：本层只管"裸模糊层"（菜单/确认条/对话框/
 /// 面板壳的 BackdropFilter 散点收敛）；完整玻璃容器（装饰+容器+blur 一体）
-/// 仍用 GlassContainer，两者并存。
+/// 仍用 GlassContainer，两者并存。⚠ resize 语义相反：GlassContainer 的
+/// resizing 分支在 resize 时停用 blur（冻结），本层**无 resize 钩子** —
+/// 控制栏视觉恒定契约要求 resize 全程 blur 恒开（438e76a9 实测量裁）。
 class GlassBlurLayer extends StatelessWidget {
   const GlassBlurLayer({
     super.key,
@@ -67,13 +72,13 @@ class GlassBlurLayer extends StatelessWidget {
       // 常量子树 — 门控翻转零重建契约（与控制栏/设置面板先例一致）。
       child: constantChild,
       builder: (context, child) {
+        // 编程错误守卫: child 缺失会让每帧 builder 新建子树, 静默破坏
+        // 零重建契约 — debug 下立即失败优于静默退化.
+        assert(child != null, 'child 必须传入 AnimatedBuilder 以保零重建契约');
         // 门控语义: enabled(静态) && 可见(opacity≥0.01) && 未挂起(!suspend).
         final visible = (opacity?.value ?? 1) >= 0.01;
         final suspended = suspend?.value ?? false;
-        return _buildBlur(
-          child ?? constantChild,
-          enabled: enabled && visible && !suspended,
-        );
+        return _buildBlur(child!, enabled: enabled && visible && !suspended);
       },
     );
   }

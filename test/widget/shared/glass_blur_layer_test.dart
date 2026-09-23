@@ -1,4 +1,3 @@
-// ignore_for_file: avoid-unnecessary-type-assertions
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -107,5 +106,48 @@ void main() {
       identical(backdrop(tester).filter, GlassTier.thin.blurFilter),
       isTrue,
     );
+  });
+
+  group('门控组合矩阵 (合取式 enabled && visible && !suspended)', () {
+    testWidgets('opacity≥0.01 + suspend=true — 挂起压过可见 (生产主组合)', (
+      tester,
+    ) async {
+      final controller = AnimationController(vsync: tester, value: 1.0);
+      final suspend = ValueNotifier<bool>(true);
+      addTearDown(controller.dispose);
+      addTearDown(suspend.dispose);
+      await pumpLayer(tester, opacity: controller, suspend: suspend);
+
+      expect(backdrop(tester).enabled, isFalse, reason: '可见但挂起 → 停用');
+    });
+
+    testWidgets('opacity<0.01 + suspend=true — 双违规仍停用', (tester) async {
+      final controller = AnimationController(vsync: tester, value: 0.0);
+      final suspend = ValueNotifier<bool>(true);
+      addTearDown(controller.dispose);
+      addTearDown(suspend.dispose);
+      await pumpLayer(tester, opacity: controller, suspend: suspend);
+
+      expect(backdrop(tester).enabled, isFalse);
+    });
+
+    testWidgets('fade 穿越阈值期间 suspend 释放 — 终态由 opacity 决定', (tester) async {
+      final controller = AnimationController(vsync: tester, value: 0.0);
+      final suspend = ValueNotifier<bool>(true);
+      addTearDown(controller.dispose);
+      addTearDown(suspend.dispose);
+      await pumpLayer(tester, opacity: controller, suspend: suspend);
+      expect(backdrop(tester).enabled, isFalse);
+
+      // fade 已过阈值但仍在挂起 — 终态仍停用.
+      controller.value = 1.0;
+      await tester.pump();
+      expect(backdrop(tester).enabled, isFalse, reason: 'suspend 仍 true');
+
+      // 释放挂起 — 立即恢复 (竞态终态 = 合取式求值结果).
+      suspend.value = false;
+      await tester.pump();
+      expect(backdrop(tester).enabled, isTrue);
+    });
   });
 }

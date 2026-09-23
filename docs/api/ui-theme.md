@@ -63,9 +63,8 @@
 
 | Token | Value | Description |
 |-------|-------|-------------|
-| `glassBlurThin` | `8.0` | 标题栏模糊 |
-| `glassBlur` | `11.5` | 控制栏模糊 |
-| `glassBlurThick` | `24.0` | 弹窗模糊 |
+| `glassBlurThin` | `8.0` | 轻量小件模糊（拖拽提示/瞬态菜单/确认条/错误卡） |
+| `glassBlur` | `11.5` | 控制栏/大面板模糊 |
 
 ### Animation Durations (ms)
 

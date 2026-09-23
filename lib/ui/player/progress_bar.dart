@@ -187,6 +187,42 @@ class _ProgressBarState extends State<ProgressBar>
     }
   }
 
+  /// drag 结束/取消统一收尾 (v0.0.8.2 审查 H-1) — onSeekEnd **无条件配对**.
+  ///
+  /// [cancelled] = true 为手势被系统取消 (Flutter 只调 Cancel 不调 End)。
+  /// 旧实现的 onSeekEnd 被 duration>0 守卫: 拖动中 duration 翻转 ≤0 (如
+  /// 停止播放) 时释放被跳过 → scrubbing 挂起信号卡死, 三玻璃面模糊永久
+  /// 冻结。start 无条件, end 也必须无条件; seek 补发/清理仍守卫 duration。
+  void _finishDrag({required bool cancelled}) {
+    _dragStartX = null;
+    _seekThrottle?.cancel();
+    // 配对 onSeekStart — 重启隐藏计时(即使未真正拖动也保持 start/end 配对,
+    // 避免 onSeekStart cancel 了 timer 却无 onSeekEnd 重启导致控件永显).
+    widget.onSeekEnd?.call();
+    if (cancelled) {
+      // 取消路径: 不补发 seek / 不进 seek-hold, 仅复位拖拽态.
+      if (_dragNotifier.value != null) {
+        _dragNotifier.value = null;
+        _updateTooltipVisibility();
+      }
+      return;
+    }
+    if (_dragNotifier.value == null) return;
+    if (widget.duration.value <= 0) {
+      _dragNotifier.value = null;
+      _updateTooltipVisibility();
+      return;
+    }
+    widget.onSeek(_dragPositionMs);
+    // 修 C (事件驱动 v2): 不立即清 drag — 监听 position 到达目标容差内
+    // 才清, 遮住旧 stream 回拨防回跳. 比 v1 固定 300ms 更贴近原生内部
+    // 协调, 网络流/慢 seek 下不回跳. 超时兜底防 seek 失败永久卡住.
+    _beginSeekHold(_dragPositionMs);
+    // 恢复悬停状态（鼠标仍在 bar 上）
+    _hoverNotifier.value = _HoverState(true, _hoverX);
+    _updateTooltipVisibility();
+  }
+
   /// 修 C (事件驱动 v2): dragEnd 后启动 seek hold — 监听 [widget.position]
   /// 到达 [targetMs] 容差内才清 [_dragNotifier], 遮住旧 stream 回拨防回跳.
   /// 加超时兜底: seek 失败/极慢时强制清, 避免进度条永久卡在 drag 位置.
@@ -329,29 +365,12 @@ class _ProgressBarState extends State<ProgressBar>
                 );
               }
             },
-            onHorizontalDragEnd: (_) {
-              _dragStartX = null;
-              _seekThrottle?.cancel();
-              // 配对 onSeekStart — 重启隐藏计时(即使未真正拖动也保持 start/end 配对,
-              // 避免 onSeekStart cancel 了 timer 却无 onSeekEnd 重启导致控件永显)
-              if (widget.duration.value > 0) {
-                widget.onSeekEnd?.call();
-              }
-              if (_dragNotifier.value == null) return;
-              if (widget.duration.value <= 0) {
-                _dragNotifier.value = null;
-                _updateTooltipVisibility();
-                return;
-              }
-              widget.onSeek(_dragPositionMs);
-              // 修 C (事件驱动 v2): 不立即清 drag — 监听 position 到达目标容差内
-              // 才清, 遮住旧 stream 回拨防回跳. 比 v1 固定 300ms 更贴近原生内部
-              // 协调, 网络流/慢 seek 下不回跳. 超时兜底防 seek 失败永久卡住.
-              _beginSeekHold(_dragPositionMs);
-              // 恢复悬停状态（鼠标仍在 bar 上）
-              _hoverNotifier.value = _HoverState(true, _hoverX);
-              _updateTooltipVisibility();
-            },
+            onHorizontalDragEnd: (_) => _finishDrag(cancelled: false),
+            // 手势被系统取消 (指针捕获丢失/窗口失焦) 时 Flutter 只调 Cancel
+            // 不调 End — 不配对则 onSeekEnd 丢失, scrubbing 挂起信号卡死,
+            // 三玻璃面模糊永久冻结 (v0.0.8.2 审查 H-1)。End 与 Cancel 互斥,
+            // 不会双调。
+            onHorizontalDragCancel: () => _finishDrag(cancelled: true),
             onTapDown: (details) {
               if (widget.duration.value <= 0) return;
               // 瞬时 seek — 配对 start+end(等同 show + scheduleHide:
