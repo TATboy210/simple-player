@@ -26,7 +26,7 @@
 
 **English:** Simple Player is a desktop media player built with Flutter, powered by [media_kit](https://pub.dev/packages/media_kit) (libmpv / FFmpeg) for playback of all common video and audio formats. It uses `ValueNotifier` + `ValueListenableBuilder` for reactive state (no Provider / Riverpod / Bloc), a single Midnight glassmorphism design system, and semantic design tokens (`Tokens.*`).
 
-patreon  https://www.patreon.com/SimplePlayerTeam/posts/bo-fang-qi-v0-0-168668550?pr=true
+patreon  https://www.patreon.com/cw/SimplePlayerTeam
 
 itch.io  https://simple-player-team.itch.io/simple-player
 
