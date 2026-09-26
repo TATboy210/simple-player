@@ -52,6 +52,14 @@ app.*.map.json
 .openclaw/
 skills-lock.json
 
+# 本地开发/文档私有文件（不上传 GitHub）
+/.analyze_issues.txt
+/.continue-here.md
+/.mcp.json
+/CLAUDE.md
+/docs/
+/design_tokens.json
+
 # Node.js (tooling scripts)
 node_modules/
 package-lock.json
