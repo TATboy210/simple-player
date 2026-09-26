@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/readme-icon.png" width="160" alt="Simple Player" />
+  <img src="图标2号_.png" width="160" alt="Simple Player" />
 </p>
 
 <h1 align="center">Simple Player</h1>
