@@ -19,6 +19,15 @@
 
 ---
 
+## 截图 / Screenshots
+
+<!-- 上传截图后，把下面路径改成你的实际文件路径 -->
+<p align="center">
+  <img src="grok-image-27a38fd1-46a0-48ad-bb52-6be689406c42.jpg" width="80%" alt="主界面" />
+</p>
+
+---
+
 ## 概述 / Overview
 
 **中文：** Simple Player 是一款使用 Flutter 构建的桌面媒体播放器，播放后端基于 [media_kit](https://pub.dev/packages/media_kit)（封装 libmpv / FFmpeg），支持主流视频与音频格式。项目采用 `ValueNotifier` + `ValueListenableBuilder` 响应式状态管理（无 Provider / Riverpod / Bloc），单一 Midnight 毛玻璃设计系统，全部视觉值经 `Tokens.*` 语义化访问。
@@ -30,6 +39,8 @@ patreon  https://www.patreon.com/cw/SimplePlayerTeam
 itch.io  https://simple-player-team.itch.io/simple-player
 
 ifdian   https://ifdian.net/a/SimplePlayerTeam
+
+itch.io  https://simple-player-team.itch.io/simple-player
 
 zenmux   https://zenmux.ai/invite/B2Y66E
 
