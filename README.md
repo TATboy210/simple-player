@@ -17,6 +17,14 @@
   <img src="https://img.shields.io/badge/license-Apache_2.0-blue.svg" alt="Apache 2.0" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/TATboy210/simple-player/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Windows_10%2F11_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows 10/11 x64" />
+  </a>
+  <br/>
+  <sub>下载最新版 Windows 10/11 x64 安装包 · Download the latest Windows 10/11 x64 installer</sub>
+</p>
+
 ---
 
 ## 截图 / Screenshots
