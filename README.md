@@ -32,6 +32,7 @@
 <!-- 上传截图后，把下面路径改成你的实际文件路径 -->
 <p align="center">
   <img src="grok-image-27a38fd1-46a0-48ad-bb52-6be689406c42.jpg" width="80%" alt="主界面" />
+  <img src="屏幕截图 2026-09-29 175709.png" width="80%" alt="雨姐大汗脚" />
 </p>
 
 ---
