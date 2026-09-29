@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.11-02569B?logo=flutter&logoColor=white" alt="Flutter 3.11" />
+  <img src="https://img.shields.io/badge/Flutter-3.11-02569B?logo=flutter&logoColor=white" alt="Flutter 3.13.2" />
   <img src="https://img.shields.io/badge/Dart-3-0175C2?logo=dart&logoColor=white" alt="Dart 3" />
   <img src="https://img.shields.io/badge/engine-media__kit_(libmpv)-00B4D8" alt="media_kit" />
   <img src="https://img.shields.io/badge/platform-Windows_10%2F11-0078D6?logo=windows&logoColor=white" alt="Windows" />
@@ -64,13 +64,13 @@ zenmux   https://zenmux.ai/invite/B2Y66E
 
 ## 功能特性 / Features
 
-- **全格式播放** — libmpv / FFmpeg 后端，支持 MP4 / MKV / AVI / MOV / FLAC / MP3 等主流格式
+- **常见音视频格式** — libmpv / FFmpeg 后端，支持 MP4 / MKV / AVI / MOV / FLAC / MP3 等主流格式
 - **多音轨与字幕** — 音轨切换、外挂字幕加载与轨道切换、字幕延迟微调
 - **文件拖放** — 拖拽文件即可播放
 - **无缝全屏** — 基于 `WindowMode` 单一数据源，进出全屏无边缘缝隙 / 图标错位
 - **20+ 键盘快捷键** — 含媒体键
 - **国际化** — 中英双语（ARB + 生成代码）
-- **毛玻璃设计系统** — 单一 Midnight 主题，编译时常量，零运行时开销
+- **毛玻璃设计系统** — 单一 Midnight 主题，编译时常量
 
 ## 快捷键 / Keyboard Shortcuts
 
