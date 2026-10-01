@@ -299,6 +299,51 @@ void main() {
       );
     });
 
+    test('identity 快路径 — 同实例 paths+同 index 重复 revision 零重建零落盘', () async {
+      final tempDir = await Directory.systemTemp.createTemp('rev_identity');
+      final store = _CountingStore(resolveDirectory: () async => tempDir);
+      final coord = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(() => coord.dispose());
+      addTearDown(() => _deleteTempDir(tempDir));
+
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      final baseline = store.saveCount;
+      final entriesBefore = coord.entries.value;
+
+      // 模拟重复/同值 revision 通知 — 引擎镜像未换实例、index 未变。
+      engine.queueRevision.value++;
+      engine.queueRevision.value++;
+
+      expect(identical(coord.entries.value, entriesBefore), isTrue,
+          reason: '快路径短路 — 零重建');
+      expect(store.saveCount, baseline, reason: '快路径短路 — 零落盘');
+    });
+
+    test('paths 换实例 — 快路径不误吞, 视图照常重建', () async {
+      final tempDir = await Directory.systemTemp.createTemp('rev_rebuild');
+      final store = _CountingStore(resolveDirectory: () async => tempDir);
+      final coord = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(() => coord.dispose());
+      addTearDown(() => _deleteTempDir(tempDir));
+
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      final baseline = store.saveCount;
+
+      // 引擎每次变化都新建 unmodifiable List — 换实例必须走主路径。
+      engine.queuePaths.value = List<String>.unmodifiable(
+        <String>['a.mp4', 'b.mp4', 'c.mp4'],
+      );
+      engine.queueIndex.value = 0;
+      engine.queueRevision.value++;
+
+      expect(
+        [for (final e in coord.entries.value) e.path],
+        ['a.mp4', 'b.mp4', 'c.mp4'],
+        reason: '内容虽含旧条目, 引用已变 — 必须重建',
+      );
+      expect(store.saveCount, greaterThan(baseline), reason: '变化须落盘');
+    });
+
     test('排序状态持久化 — 落盘含 sortKey/排序方向/addedSeq', () async {
       final tempDir = await Directory.systemTemp.createTemp('sort_persist');
       final store = PlaylistStore(resolveDirectory: () async => tempDir);

@@ -548,6 +548,11 @@ class MediaKitEngine implements MediaEngine {
     }
   }
 
+  /// sortQueue 抑制期标记 (v0.0.9 P1 事件放大治理) — move 循环期间
+  /// stream.playlist 回流照常更新镜像但不发 revision，循环结束统一
+  /// touch 一次 (N+1 → 1)；finally 兜底保证异常路径也回流一次。
+  bool _sortInProgress = false;
+
   @override
   Future<void> sortQueue(List<String> targetOrder) async {
     if (_disposed) return;
@@ -555,9 +560,11 @@ class MediaKitEngine implements MediaEngine {
     // 规划 move 序列 — 恒等排列/非排列返回空序列 (no-op 防御).
     final moves = planPlaylistMoves(current, targetOrder);
     if (moves.isEmpty) return;
+    _sortInProgress = true;
     try {
       // mpv 命令队列串行保序; 每条 move 会触发 stream.playlist 事件,
-      // 中间态由最终乐观镜像 + 回流幂等覆盖收敛.
+      // 中间态由最终乐观镜像 + 回流幂等覆盖收敛 (revision 侧由
+      // [_sortInProgress] 抑制为单发).
       for (final move in moves) {
         await _player.move(move.from, move.to);
       }
@@ -571,7 +578,6 @@ class MediaKitEngine implements MediaEngine {
       _queueIndex.value = currentPath == null
           ? -1
           : targetOrder.indexOf(currentPath);
-      _touchQueueRevision();
     } on Exception catch (error, stackTrace) {
       _lastError.value = UnknownError(
         '排序队列失败: $error',
@@ -582,6 +588,12 @@ class MediaKitEngine implements MediaEngine {
           callbackStackTrace: stackTrace,
         ),
       );
+    } finally {
+      // 兜底 — 即使中途失败也 touch 一次，保证 Coordinator 读到当前
+      // 真实镜像 (抑制期不吞最终态); 若 mpv 回流晚于 touch 到达,
+      // 此时抑制已解除, 事件照常 touch (Coordinator 幂等收敛).
+      _sortInProgress = false;
+      _touchQueueRevision();
     }
   }
 
@@ -1062,13 +1074,15 @@ class MediaKitEngine implements MediaEngine {
     // 队列状态回流 — mpv 侧 playlist-playing-pos 属性观察: 装载/追加/移除/
     // shuffle 重排/自动续播全部经此同步到镜像 (最终一致). 空列表广播
     // (stop 时 Playlist([]) index 默认 0) 归一为 -1 的"无当前条目"语义.
+    // sortQueue 抑制期镜像照常更新但不发 revision (单发收敛, 见
+    // _sortInProgress) — 其余路径 revision 单发语义不变.
     _addSubscription(
       _player.stream.playlist.listen((pl) {
         _queuePaths.value = List<String>.unmodifiable(<String>[
           for (final m in pl.medias) pathFromMediaUri(m.uri),
         ]);
         _queueIndex.value = pl.medias.isEmpty ? -1 : pl.index;
-        _touchQueueRevision();
+        if (!_sortInProgress) _touchQueueRevision();
       }),
     );
     _addSubscription(

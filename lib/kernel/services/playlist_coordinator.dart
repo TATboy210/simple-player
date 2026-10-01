@@ -399,11 +399,20 @@ class PlaylistCoordinator {
   List<String>? _observedPaths;
   String? _observedPlayingPath;
 
+  /// 上一次处理的引擎队列索引 (identity 快路径比对基准, v0.0.9 P1).
+  int _observedIndex = -1;
+
   /// 引擎队列状态变化 (装载/追加/移除/乱序/切曲/自动续播) —
   /// revision 触发时 queuePaths 与 queueIndex 均已是最新值, 读到一致快照.
   void _onQueueRevision() {
     final paths = _engine.queuePaths.value;
     final index = _engine.queueIndex.value;
+
+    // identity 快路径 (v0.0.9 P1 事件放大治理) — 引擎每次队列变化都新建
+    // unmodifiable List, 引用相同 + index 相同 ⇒ 快照逐字节等价, 重复
+    // 通知零成本短路 (跳过 O(n) 比较与潜在落盘).
+    if (identical(paths, _observedPaths) && index == _observedIndex) return;
+
     final current = (index >= 0 && index < paths.length) ? paths[index] : null;
 
     final queueChanged =
@@ -426,6 +435,7 @@ class PlaylistCoordinator {
     }
     _observedPaths = List<String>.unmodifiable(paths);
     _observedPlayingPath = current;
+    _observedIndex = index;
 
     // 上次播放锚点 (v0.0.6.2) — current 非空即置锚 (装载/切曲/shuffle 全
     // 走此单通知点); current 为 null 是 stop 的空装载回流, 锚保留
