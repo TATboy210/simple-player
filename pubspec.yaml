@@ -74,12 +74,9 @@ flutter:
   fonts:
     - family: Noto Sans SC
       fonts:
-        - asset: assets/fonts/NotoSansSC-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/NotoSansSC-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/NotoSansSC-SemiBold.ttf
-          weight: 600
+        # 可变字体单文件（wght 100-900 轴）— FontWeight 按 wght 轴解析，
+        # 替代三个静态字重（31.6MB → 17.8MB，且字体此前从未被主题引用）。
+        - asset: assets/fonts/NotoSansSC-Variable.ttf
 
 msix_config:
   display_name: Simple Player

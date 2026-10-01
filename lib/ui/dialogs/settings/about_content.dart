@@ -35,7 +35,8 @@ const List<OpenSourceComponent> kOpenSourceComponents = [
   (name: 'shared_preferences', license: 'BSD-3-Clause'),
   (name: 'path_provider', license: 'BSD-3-Clause'),
   // ── 字体 ──
-  (name: 'Noto Sans SC（思源黑体）', license: 'SIL OFL 1.1'),
+  // v0.0.9：随包字体改为 Noto Sans SC 可变字体单文件（wght 轴）。
+  (name: 'Noto Sans SC（思源黑体，可变字体）', license: 'SIL OFL 1.1'),
 ];
 
 /// 特别鸣谢名单 — 支持本项目的用户昵称，一项一个名字，按展示顺序排列。

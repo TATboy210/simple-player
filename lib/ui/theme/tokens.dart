@@ -113,8 +113,11 @@ class Tokens {
   static const glassBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 字体 ──
-  static const fontFamily = 'SF Pro Display'; // 主字体（Windows 回退 Segoe UI）
-  static const fontFamilyMono = 'SF Mono'; // 等宽字体
+  // v0.0.9 P0-4：'SF Pro Display' 在 Windows 不存在（实际渲染一直是系统
+  // 回退字体），pubspec 注册的 Noto Sans SC 也零引用 — 现已改为真正引用
+  // 随包可变字体（英/中/日假名覆盖；谚文缺字形由 Flutter 回退系统字体）。
+  static const fontFamily = 'Noto Sans SC';
+  static const fontFamilyMono = 'Consolas'; // 等宽（Windows 系统字体）
   static const fontTitle = 18.0;
   static const fontBody = 14.0;
   static const fontCaption = 12.0;
