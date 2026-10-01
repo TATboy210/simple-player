@@ -158,6 +158,17 @@ class Tokens {
   static const glassBlurThin = 8.0;
   static const glassBlur = 11.5;
 
+  /// 编译期 blur 总开关 — 仅 A/B 取证用 (v0.0.9 P0-3, 协议
+  /// docs/audit/glass-perf-ab.md)。
+  ///
+  /// `--dart-define=SIMPLER_PLAYER_BLUR_OFF=true` 时全应用停用 blur
+  /// （走既有降级分支：GlassBlurLayer enabled=false / GlassContainer
+  /// ClipRRect 路径）。bool.fromEnvironment 先例 main.dart UAT 开关；
+  /// 编译期常量默认 false，正常构建零开销、tree-shake 友好。
+  static const blurDisabled = bool.fromEnvironment(
+    'SIMPLER_PLAYER_BLUR_OFF',
+  );
+
   // ── 动画 ──
   static const durationFast = 80;
   static const durationNormal = 150;

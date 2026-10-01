@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import 'glass_container.dart';
+import '../theme/tokens.dart';
 
 /// 统一玻璃模糊层 — ClipRRect + BackdropFilter + 门控收敛点 (v0.0.8.2)。
 ///
@@ -89,7 +90,8 @@ class GlassBlurLayer extends StatelessWidget {
     borderRadius: borderRadius,
     child: BackdropFilter(
       filter: filter ?? GlassTier.normal.blurFilter,
-      enabled: enabled,
+      // 编译期取证开关在此单点收敛 — A/B 时全应用 blur 经由此处停用。
+      enabled: enabled && !Tokens.blurDisabled,
       child: child,
     ),
   );

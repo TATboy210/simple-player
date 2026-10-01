@@ -104,8 +104,9 @@ class GlassContainer extends StatelessWidget {
     // local 捕获 resizing/margin 字段消除 `!` (字段不提升); child `??` 兜底
     final r = resizing;
     final m = margin;
-    // 降级模式：跳过 BackdropFilter，仅渲染半透明背景（D-14）
-    if (!blurEnabled) {
+    // 降级模式：跳过 BackdropFilter，仅渲染半透明背景（D-14）。
+    // Tokens.blurDisabled 为编译期 A/B 取证开关（v0.0.9 P0-3），复用本分支。
+    if (!blurEnabled || Tokens.blurDisabled) {
       result = ClipRRect(
         borderRadius: rRect,
         child: RepaintBoundary(child: content),
