@@ -1,10 +1,12 @@
 import 'dart:async';
-import 'dart:io' show exit;
+import 'dart:io' show Platform, exit;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../bridge/win32/sizemove_bridge.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
 import 'window_bridge.dart';
@@ -255,7 +257,16 @@ class WindowService with WindowListener implements WindowBridge {
       readSize: windowManager.getSize,
       persistSize: (size) => _persistenceCoordinator.save(size: size),
       logger: _log,
+      sizemoveProbe: _createSizemoveProbe(),
     );
+  }
+
+  /// v0.0.9 P0-1 SIZEMOVE 取证接线 — 仅 Debug/Profile 构建（Release 零
+  /// 开销，同 ResizeFrameMetrics 的 !kReleaseMode gate 先例）；非 Windows
+  /// 平台桥内部也直接返回 null。纯观测不改任何窗口行为。
+  SizemoveProbe? _createSizemoveProbe() {
+    if (kReleaseMode || !Platform.isWindows) return null;
+    return Win32SizemoveBridge(logger: _log);
   }
 
   @override

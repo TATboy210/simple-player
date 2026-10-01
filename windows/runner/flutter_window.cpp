@@ -6,6 +6,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "fullscreen_resize_guard.h"
 #include "ime_bridge_messages.h"
+#include "sizemove_bridge_messages.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -103,6 +104,19 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
           hwnd, wparam,
           flutter_controller_ ? flutter_controller_->view()->GetNativeWindow()
                               : nullptr);
+    case WM_ENTERSIZEMOVE:
+      // v0.0.9 P0-1 拖窗/Resize 取证 — 仅记录原生模态循环起点, 不消费
+      // 消息(落到 DefWindowProc), 窗口行为零变化 (见 sizemove_bridge_messages.h)。
+      sizemove_bridge_messages::OnEnter();
+      break;
+    case WM_EXITSIZEMOVE:
+      // 同上 — 记录模态循环终点。lag 由查询时刻现算, 此处只落 tick。
+      sizemove_bridge_messages::OnExit();
+      break;
+    case sizemove_bridge_messages::kAppQuerySizemove:
+      // Dart 侧 Win32SizemoveBridge 在 settle 关键时点查询 — 返回打包
+      // 状态 (active + exitLag + enterTick), 见 sizemove_bridge_messages.h。
+      return sizemove_bridge_messages::HandleQuerySizemove();
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
