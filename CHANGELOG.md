@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.0.9 · 工程优化版 · 证据驱动性能治理 📐
+
+> 一句话版本：**没有新功能——这一版用实测证据定位真实热点，用最小
+> 改动治理 Resize/重建/队列放大/启动/包体积五条线。**
+
+### 📐 拖窗 / Resize（P0-1）
+- 新增 `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE` 原生模态循环观测桥
+  （复用 IME 桥的跨线程消息模式，纯观测零行为变化）——此前 resize
+  起止完全靠 500ms 防抖推断，无原生边沿证据
+- Debug/Profile 构建每次 resize 会话输出结构化取证日志
+  （settle 时原生是否仍在拖拽、exitLag 毫秒），实机数据裁决是否
+  需要 settle 重臂修复
+
+### 🔁 主界面重建治理（P0-2）
+- 修复拖拽悬停触发 `PlayerFeature.setState` 重建整棵播放器主界面：
+  hover 改经 `ValueNotifier` 直达空置态动画（listener 驱动
+  AnimationController，零 rebuild），空置态实例恒定缓存
+- 修复"缓存视频子树"名实不符（原为 build 局部变量）：视频链提升为
+  `initState` 构造 + `AnimatedBuilder.child` 透传，窗口模式翻转时
+  视频 widget 链零重建、依赖替换经单点比对正确失效（防陈旧拖放回调）
+- 新增 PlayerScreen 层重建矩阵测试（hover/resize/模式翻转/缓存失效）
+
+### 🪟 毛玻璃 A/B 取证开关（P0-3）
+- 新增编译期开关 `--dart-define=SIMPLER_PLAYER_BLUR_OFF=true`：
+  全应用停用 blur 走既有降级路径，用于实测 blur 真实 GPU/raster 成本
+  （配合既有 `SIMPLER_PLAYER_FORCE_SKIA` 渲染后端开关）；A/B 数据
+  回填 `docs/audit/glass-perf-ab.md` 后裁决
+
+### 🔤 字体治理 · 包体积（P0-4）
+- 实锤修复：主题引用的 `SF Pro Display` 在 Windows 不存在（实际渲染
+  一直是系统回退字体），随包 Noto Sans SC 三字重 31.6MB 从未被引用
+- 换用 Google Fonts 官方可变字体单文件（17.8MB，wght 100-900 轴
+  覆盖全部字重），并**首次真正接线**为主题字体——中文字形跨机器统一，
+  英/中/日假名全覆盖，谚文回退系统字体
+- 等宽字体显式 `Consolas`（原 `SF Mono` 同样不存在）
+- 干净 Release 产物实测 94MB（字体目录 31.6→17.8MB，-44%）
+
+### 📋 播放列表排序 · 事件放大（P1）
+- 修复排序 N+1 事件放大：`sortQueue` 的 N 条 move 各触发一次
+  `stream.playlist` → 队列 revision → O(n) 比较与落盘（排序 1000 项
+  = 上千次潜在落盘）；现在抑制期镜像照常更新、revision 单发收敛
+- Coordinator 新增 identity 快路径：重复/同值 revision 通知零成本短路
+
+### 🚀 启动提速（P1）
+- 启动打点细化：`playerServices` 段独立可观测（此前只有 2 个粗粒度
+  phase，慢在哪一步无法回答）
+- 播放列表磁盘恢复移出启动关键路径（语义本就"不装载不自动播"），
+  空置页不再等待 JSON 落盘；新增守卫——用户在恢复完成前已拖入文件时
+  磁盘快照自动让位，绝不覆盖用户会话
+
+### 🔧 杂项
+- 版本号对齐：`msix_version` 0.0.2.0 → 0.0.9.0（长期背离修复）
+- 待实机 UAT：Resize 取证判定 / blur A/B 数据 / 可变字体四语言回归 /
+  播放列表大规模（500+）滚动压力实测
+
 ## 0.0.8 · 设置面板停靠化 · XMB 式两级导航 🪟
 
 > 一句话版本：**设置面板不再是弹窗——它成了一条窄面板：打开设置也能
