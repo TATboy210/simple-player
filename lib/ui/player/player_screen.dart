@@ -66,6 +66,12 @@ class PlayerScreen extends StatefulWidget {
   final Future<String?> Function()? pickSubtitlePath;
   final Widget? emptyState;
 
+  /// build 计数探针（v0.0.9 P0-2）— rebuild boundary 测试用。
+  ///
+  /// 仿 [PlayerVideoControls.onBuild] 先例：生产 null 零成本，测试注入
+  /// 计数回调观测 PlayerScreen 层重建次数。
+  final VoidCallback? debugOnBuild;
+
   const PlayerScreen({
     super.key,
     required this.engine,
@@ -82,6 +88,7 @@ class PlayerScreen extends StatefulWidget {
     this.onDragHoverChanged,
     this.pickSubtitlePath,
     this.emptyState,
+    this.debugOnBuild,
   }) : assert(mediaKitController != null || videoSurfaceBuilder != null),
        assert(testVideoControls == null || videoSurfaceBuilder != null);
 
@@ -125,6 +132,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 标题栏内部仍自行监听窗口状态；这里只固定外层 widget identity，缩小无关
   /// 重建范围，不冻结全屏透明度、置顶图标和最大化图标等必要更新。
   late Widget _titleBar;
+
+  /// 缓存视频内容子树（v0.0.9 P0-2 名实相符）— initState 构造一次，
+  /// 作为 [AnimatedBuilder.child] 传入：窗口模式翻转只重组外层窗口壳，
+  /// 视频链（Row→DropHandler→Stack→Video）widget identity 恒定，Element
+  /// 全复用。此前"缓存"实为 build 局部变量，父级每次 build 都重构造整链。
+  ///
+  /// 依赖失效：[didUpdateWidget] 经 [_videoContentDepsMatch] 比对数据源
+  /// 身份，替换时重建。resize 画质切换由子树内部 isResizing listenable
+  /// 驱动，不经过此层。
+  late Widget _videoContent;
 
   /// 打开系统字幕选择器并返回用户选择的本地路径。
   ///
@@ -222,6 +239,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // controller 信号。测试渲染面没有 controller 时仍创建 probe，以输出
     // probeUnavailable 摘要而非将观测源缺失误记成无信号变化。
     _createTextureProbe();
+    _videoContent = _createVideoContent();
   }
 
   /// 创建与当前窗口桥和视频控制器绑定的 resize 诊断探针。
@@ -268,6 +286,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _textureProbe?.dispose();
       _createTextureProbe();
     }
+
+    // 视频子树数据源替换 — 集中比对防漏判（漏判 = DropHandler 持陈旧
+    // 回调，拖放丢失）。windowService 已在上面分支处理，此处补其余五源。
+    if (!_videoContentDepsMatch(oldWidget)) {
+      _videoContent = _createVideoContent();
+    }
+  }
+
+  /// 视频子树缓存失效比对 — 覆盖 [_createVideoContent] 读取的全部
+  /// widget 数据源（identity 比较）。单一入口防新增依赖时漏判。
+  bool _videoContentDepsMatch(PlayerScreen oldWidget) {
+    return oldWidget.windowService == widget.windowService &&
+        oldWidget.onFilesDropped == widget.onFilesDropped &&
+        oldWidget.onDragHoverChanged == widget.onDragHoverChanged &&
+        oldWidget.mediaKitController == widget.mediaKitController &&
+        oldWidget.videoSurfaceBuilder == widget.videoSurfaceBuilder &&
+        oldWidget.testVideoControls == widget.testVideoControls;
   }
 
   @override
@@ -284,12 +319,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 缓存视频子树，使窗口模式变化只重组外层窗口壳，不重新创建 Video。
-    // resize 期间的画质切换由视频子树内部 listenable 驱动，Element identity 保持稳定。
-    final cachedVideoContent = _buildVideoContent(context);
+    widget.debugOnBuild?.call();
     return AnimatedBuilder(
       animation: widget.windowService.mode,
-      builder: (context, _) {
+      // 视频子树经 child 参数传入 — AnimatedBuilder 的 child 在动画帧间
+      // 原样透传，mode 翻转只重组 builder 内的窗口壳，视频链零重建。
+      child: RepaintBoundary(child: _videoContent),
+      builder: (context, videoContent) {
         final m = widget.windowService.mode.value;
         // BUG-02: isFullscreen 仅在真正全屏时为 true,
         // 最大化不应触发全屏 auto-hide 和禁用拖拽.
@@ -308,7 +344,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     // v0.0.5: 播放列表面板已迁入 controls builder
                     // (player_video_controls) — media_kit 全屏 route 复制
                     // builder 时自动携带, 解决全屏下面板不可见.
-                    RepaintBoundary(child: cachedVideoContent),
+                    videoContent!,
                   ],
                 ),
               ),
@@ -358,40 +394,48 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// 视频内容区 — DropHandler 包裹 media_kit [Video] (controls 住进 builder).
+  /// 创建视频内容子树 — 仅在 initState 与 [_videoContentDepsMatch] 判定
+  /// 依赖替换时调用（构造快照，非每 build）。
   ///
-  /// 渐进路径核心:PlayerVideoControls + emptyState 都住进 Video.controls builder,
-  /// media_kit 全屏 route 复制 builder 时自动携带控制栏(解决全屏控制栏消失).
-  /// engine/VideoController/videoKey/全屏机制不变,数据源暂留 engine.
-  // context 参数保留以维持签名一致性 (Video.controls builder 契约),
-  // 但 _buildVideoContent 提到 build() 顶层后不再使用 — 命名 _ 豁免 DCM avoid-unused-parameters.
-  Widget _buildVideoContent(BuildContext _) => Row(
-    children: [
-      Expanded(
-        child: DropHandler(
-          // 空块刻意 — 空置态无拖放目标.
-          // ignore: no-empty-block
-          onFilesDropped: widget.onFilesDropped ?? (_) {},
-          onHoverChanged: widget.onDragHoverChanged,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Video.controls builder 内含 PlayerVideoControls + emptyState,
-              // 全屏 route 复制 builder 时自动携带. 生产路径 media_kit 纯渲染；
-              // 测试可注入无原生依赖 surface (videoSurfaceBuilder).
-              _buildVideoSurface(),
-            ],
+  /// DropHandler 包裹 media_kit [Video] (controls 住进 builder)。
+  /// 渐进路径核心:PlayerVideoControls + emptyState 都住进 Video.controls
+  /// builder, media_kit 全屏 route 复制 builder 时自动携带控制栏(解决
+  /// 全屏控制栏消失). engine/VideoController/videoKey/全屏机制不变.
+  ///
+  /// ⚠ 兜底闭包在此固化 — `onFilesDropped ?? (_) {}` 若放进 build 会让
+  /// 缓存比对（原始可空值 identity）与实际消费值脱节。
+  Widget _createVideoContent() {
+    final onFilesDropped = widget.onFilesDropped ?? (_) {};
+    final onHoverChanged = widget.onDragHoverChanged;
+    final surface = _createVideoSurface();
+    return Row(
+      children: [
+        Expanded(
+          child: DropHandler(
+            // 空块刻意 — 空置态无拖放目标.
+            // ignore: no-empty-block
+            onFilesDropped: onFilesDropped,
+            onHoverChanged: onHoverChanged,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Video.controls builder 内含 PlayerVideoControls + emptyState,
+                // 全屏 route 复制 builder 时自动携带. 生产路径 media_kit 纯渲染；
+                // 测试可注入无原生依赖 surface (videoSurfaceBuilder).
+                surface,
+              ],
+            ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
-  /// 构建视频渲染面；默认实现保持原有 media_kit [Video] 生命周期不变。
+  /// 创建视频渲染面；默认实现保持原有 media_kit [Video] 生命周期不变。
   ///
   /// controls 传 [_buildControls] builder — media_kit 全屏 route 会复制此 builder
   /// (fullscreen.dart:63), 使全屏态自动获得同一份 PlayerVideoControls.
-  Widget _buildVideoSurface() {
+  Widget _createVideoSurface() {
     final testSurface = widget.videoSurfaceBuilder;
     if (testSurface != null) {
       final surface = testSurface(_videoKey);

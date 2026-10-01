@@ -1,5 +1,6 @@
 import '../../kernel/engine/engine_state.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -17,7 +18,16 @@ class EmptyState extends StatefulWidget {
   final VoidCallback? onOpenFile;
 
   /// 文件拖拽悬停状态（由 DropHandler 通过父级传入）
+  ///
+  /// 仅在未提供 [dragHoveringListenable] 时生效（旧路径，向后兼容）。
   final bool isDragHovering;
+
+  /// 拖拽悬停状态源（v0.0.9 P0-2）— 提供时优先于 [isDragHovering]。
+  ///
+  /// hover 翻转由 listener 直接驱动 [AnimationController]（动画系统自驱
+  /// FadeTransition/AnimatedBuilder 子树），**不触发本 widget rebuild** —
+  /// 宿主因此可以把 EmptyState 实例缓存为恒稳定 identity。
+  final ValueListenable<bool>? dragHoveringListenable;
 
   /// 播放引擎状态 — 传递给 AuroraBackground，非 idle 时暂停 Ticker
   final ValueNotifier<MediaState>? engineState;
@@ -26,6 +36,7 @@ class EmptyState extends StatefulWidget {
     super.key,
     this.onOpenFile,
     this.isDragHovering = false,
+    this.dragHoveringListenable,
     this.engineState,
   });
 
@@ -54,25 +65,43 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
     // AnimatedBuilder 驱动重建，addListener+setState 会导致整个 build() 每帧重建
     // （包括 AuroraBackground），AnimatedBuilder 只重建包裹的子树
 
-    if (widget.isDragHovering) {
+    widget.dragHoveringListenable?.addListener(_onHoverChanged);
+    _syncHoverAnim();
+  }
+
+  /// 当前生效的 hover 状态 — listenable 优先，bool 参数为旧路径兜底。
+  bool get _isHovering =>
+      widget.dragHoveringListenable?.value ?? widget.isDragHovering;
+
+  /// hover 翻转 → 仅驱动拖拽动画，不 rebuild（UI 由动画系统表达）。
+  void _onHoverChanged() => _syncHoverAnim();
+
+  void _syncHoverAnim() {
+    if (_isHovering) {
       _dragAnim.forward();
+    } else {
+      _dragAnim.reverse();
     }
   }
 
   @override
   void didUpdateWidget(EmptyState oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isDragHovering != oldWidget.isDragHovering) {
-      if (widget.isDragHovering) {
-        _dragAnim.forward();
-      } else {
-        _dragAnim.reverse();
-      }
+    // listenable 源替换 — 迁移监听并按新源同步动画。
+    if (widget.dragHoveringListenable != oldWidget.dragHoveringListenable) {
+      oldWidget.dragHoveringListenable?.removeListener(_onHoverChanged);
+      widget.dragHoveringListenable?.addListener(_onHoverChanged);
+      _syncHoverAnim();
+    } else if (widget.dragHoveringListenable == null &&
+        widget.isDragHovering != oldWidget.isDragHovering) {
+      // 旧 bool 路径（listenable 未提供时向后兼容）。
+      _syncHoverAnim();
     }
   }
 
   @override
   void dispose() {
+    widget.dragHoveringListenable?.removeListener(_onHoverChanged);
     _dragCurve.dispose();
     _dragAnim.dispose();
     super.dispose();

@@ -77,8 +77,22 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   /// 错误信息文本（显示在错误状态 UI 中）
   String _errorMessage = '';
 
-  /// 是否处于文件拖拽悬停状态（控制拖拽提示 UI 显示）
-  bool _isDragHovering = false;
+  /// 文件拖拽悬停状态源（v0.0.9 P0-2）— 替代旧 bool+setState 路径。
+  ///
+  /// hover 翻转直写 notifier，EmptyState 经 listenable 自驱动画，
+  /// **不触发 PlayerFeature.setState** — 否则每次拖入悬停都会重建整棵
+  /// PlayerScreen 子树（新 PlayerScreen/EmptyState/闭包链，见
+  /// _buildPlayerScreen）。
+  final ValueNotifier<bool> _dragHovering = ValueNotifier<bool>(false);
+
+  /// 空置态实例缓存 — hover 改经 listenable 驱动后 EmptyState 的参数
+  /// 全部生命周期稳定（notifier/tear-off 闭包），实例可恒定 identity
+  /// （同 _settingsBundle 先例：每次 build 新建会侵蚀子树缓存）。
+  late final EmptyState _emptyState = EmptyState(
+    onOpenFile: () => unawaited(_openFile()),
+    dragHoveringListenable: _dragHovering,
+    engineState: _services.engine.state,
+  );
 
   /// 内置快捷键映射，移除用户设置后不再从磁盘读取。
   static const Map<String, String> _customBindings = {};
@@ -136,6 +150,11 @@ class _PlayerFeatureState extends State<PlayerFeature> {
     if (mounted) setState(() => _ready = true);
   }
 
+  /// 拖拽悬停翻转入口 — tear-off 引用（identity 稳定），直写 notifier。
+  ///
+  /// 不 setState：EmptyState 经 listenable 自驱动画，上层零重建。
+  void _onDragHoverChanged(bool hovering) => _dragHovering.value = hovering;
+
   /// 打开媒体文件选择器，或在选择器已显示时请求其获得 attention。
   ///
   /// 选择、路径过滤与顺序播放由 [FilePickerCoordinator] 统一处理，确保按钮和
@@ -174,6 +193,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   void dispose() {
     _filePickerCoordinator.dispose();
     _services.dispose();
+    _dragHovering.dispose();
     super.dispose();
   }
 
@@ -231,14 +251,10 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       windowService: _services.windowService,
       onOpenFile: () => unawaited(_openFile()),
       onFilesDropped: _onFilesDropped,
-      onDragHoverChanged: (hovering) {
-        setState(() => _isDragHovering = hovering);
-      },
-      emptyState: EmptyState(
-        onOpenFile: () => unawaited(_openFile()),
-        isDragHovering: _isDragHovering,
-        engineState: engine.state,
-      ),
+      // hover 直写 notifier（不 setState）— PlayerFeature.build 仅在
+      // _ready/_error 翻转时运行，拖拽悬停零上层重建。
+      onDragHoverChanged: _onDragHoverChanged,
+      emptyState: _emptyState,
     );
   }
 }
