@@ -20,6 +20,16 @@ import 'kernel_logger.dart';
 final class StartupTimeline {
   /// 阶段锚点常量 — 避免调用方散落裸字符串导致口径漂移。
   static const phaseInfrastructure = 'infrastructure';
+
+  /// PlayerServices 初始化段起点（v0.0.9 P1 启动打点细化）—
+  /// `playerServicesMs` 即 services.init() 段耗时（engine/controller/
+  /// settings 等串行构造），此前粗粒度 playerInit 无法区分慢点。
+  static const phasePlayerServices = 'playerServices';
+
+  /// 播放列表恢复排程锚点 — restoreFromDisk 已移出启动关键路径
+  /// （unawaited），`restoreDispatchMs` ≈ 0；若未来有人把 await 加回
+  /// 关键路径，此段耗时会显著变大，作为回归锚。
+  static const phaseRestoreDispatch = 'restoreDispatch';
   static const phasePlayerInit = 'playerInit';
 
   StartupTimeline({KernelLogger? logger}) : _logger = logger ?? KernelLogger.I;

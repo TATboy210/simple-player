@@ -348,10 +348,28 @@ class PlaylistCoordinator {
 
   /// 从磁盘恢复逻辑队列、播放模式与排序状态 — **不装载 mpv 队列, 不自动播放**
   /// （装载留给用户首次点击条目时的 [playEntryAt] 装载分支）.
+  ///
+  /// 守卫 (v0.0.9 P1 启动提速) — restore 已移出启动关键路径 (unawaited),
+  /// 用户可能在恢复完成前已拖入文件; 引擎队列非空说明会话已开始,
+  /// 磁盘快照不得覆盖用户会话. 入口 + load 返回后双检封住异步间隙.
   Future<void> restoreFromDisk() async {
     final store = _store;
     if (store == null) return;
+    if (_engine.queuePaths.value.isNotEmpty) {
+      _log.w(
+        'PlaylistCoordinator: restore skipped — engine queue already '
+        'active, disk snapshot would shadow the live session',
+      );
+      return;
+    }
     final snapshot = await store.load();
+    if (_engine.queuePaths.value.isNotEmpty) {
+      _log.w(
+        'PlaylistCoordinator: restore skipped after load — engine queue '
+        'became active during disk read',
+      );
+      return;
+    }
     if (snapshot == null || snapshot.items.isEmpty) return;
 
     var maxSeq = -1;

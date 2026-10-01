@@ -124,9 +124,15 @@ class _PlayerFeatureState extends State<PlayerFeature> {
   Future<void> _init() async {
     final sw = Stopwatch()..start();
     try {
+      // 打点细化 (v0.0.9 P1) — playerServices 段独立可观测, 此前
+      // 粗粒度 playerInit 无法区分慢在 engine/settings 哪一步.
+      widget.startupTimeline.mark(StartupTimeline.phasePlayerServices);
       await _services.init();
-      // 恢复失败仅记日志 (store 内部已容错), 不阻断初始化.
-      await _services.playlistCoordinator.restoreFromDisk();
+      // 恢复移出启动关键路径 (v0.0.9 P1) — restore 语义"不装载不自动
+      // 播", 空置页无需等待磁盘 JSON; Coordinator 内置引擎队列非空
+      // 守卫, 用户在恢复完成前已拖入文件时快照自动让位.
+      widget.startupTimeline.mark(StartupTimeline.phaseRestoreDispatch);
+      unawaited(_services.playlistCoordinator.restoreFromDisk());
     } catch (e, stackTrace) {
       KernelLogger.I.e(
         '[PlayerFeature] init failed: $e',

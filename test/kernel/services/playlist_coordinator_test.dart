@@ -482,6 +482,31 @@ void main() {
 
     tearDown(() => _deleteTempDir(tempDir));
 
+    test('restoreFromDisk — 引擎队列非空时跳过（磁盘快照不覆盖用户会话）', () async {
+      // 预置磁盘快照.
+      await store.save(
+        PersistedPlaylistSnapshot(
+          items: [PlaylistItem(path: 'from-disk.mp4')],
+          playMode: PlayMode.loopAll,
+        ),
+      );
+
+      final restoring = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(restoring.dispose);
+      // 用户在恢复排程前已拖入文件（restore 移出关键路径后的竞态窗口）.
+      await engine.openPlaylist(['live-session.mp4']);
+
+      await restoring.restoreFromDisk();
+
+      // 引擎队列非空 → 快照让位, 用户会话视图不被覆盖.
+      expect(
+        [for (final e in restoring.entries.value) e.path],
+        ['live-session.mp4'],
+      );
+      // 模式也不吃快照 — 保持引擎当前值（FakeEngine 默认 loopAll）.
+      expect(restoring.playMode.value, engine.playMode.value);
+    });
+
     test('restoreFromDisk — 恢复逻辑队列与模式, 不装载引擎', () async {
       // 预置快照.
       await store.save(
