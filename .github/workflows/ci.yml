@@ -8,17 +8,48 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Quality Gate: analyze + test + build on all 3 platforms
+  # Quality Gate: analyze + test on 3 platforms × x64/arm64 + build smoke
+  # (ARM runner 免费 GA: ubuntu-24.04-arm 2025-01, windows-11-arm 2025-08;
+  # macos-latest 即 arm64 Apple Silicon, macos-15-intel 为 x64)
   quality-gates:
     strategy:
+      fail-fast: false
       matrix:
         include:
+          # ---- x86_64 三平台基线 ----
           - os: windows-latest
             platform: windows
-          - os: macos-latest
+            arch: x64
+            build: true
+            flutter-arch: x64
+          - os: macos-15-intel
             platform: macos
+            arch: x64
+            build: true
+            flutter-arch: x64
           - os: ubuntu-latest
             platform: linux
+            arch: x64
+            build: true
+            flutter-arch: x64
+          # ---- arm64 三平台 ----
+          - os: macos-latest
+            platform: macos
+            arch: arm64
+            build: true
+            flutter-arch: arm64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            build: true
+            flutter-arch: x64
+          - os: windows-11-arm
+            platform: windows
+            arch: arm64
+            # Flutter Windows arm64 target 仍 experimental — arm 机器上
+            # 跑 x64 SDK 仿真执行测试门, build 门跳过 (首轮验证后放开)
+            build: false
+            flutter-arch: x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -26,11 +57,15 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          # 固定版本: 三平台可复现, 保证 Dart 3.13 语言特性可用
+          flutter-version: 3.47.0
+          architecture: ${{ matrix.flutter-arch }}
           cache: true
 
       # Linux desktop build dependencies (clang/cmake/ninja/pkg-config/gtk3
       # + libmpv-dev — media_kit_video 的 CMake 经 pkg-config 找 mpv，
-      # 缺开发头文件时 target_link_libraries 解析 PkgConfig::mpv 失败)
+      # 缺开发头文件时 target_link_libraries 解析 PkgConfig::mpv 失败;
+      # Ubuntu 24.04 arm64 仓库同样提供全部包)
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
         run: |
@@ -45,6 +80,7 @@ jobs:
       - name: Test
         run: flutter test
 
-      # Quality Gate 3: Build smoke test
+      # Quality Gate 3: Build smoke test (arm64 Windows 跳过, 见矩阵注释)
       - name: Build
+        if: matrix.build
         run: flutter build ${{ matrix.platform }}
