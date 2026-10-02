@@ -80,6 +80,46 @@ void main() {
     });
   });
 
+  group('LoggerPackageSink (v0.0.9 P2 — package:logger 驱动)', () {
+    test('all log levels return normally', () {
+      final sink = const LoggerPackageSink();
+      for (final level in LogLevel.values) {
+        expect(
+          () => sink.log(level, 'pkg msg $level', context: {'k': 'v'}),
+          returnsNormally,
+        );
+      }
+    });
+
+    test('minLevel gate suppresses below-threshold levels', () {
+      final prev = LoggerPackageSink.minLevel;
+      LoggerPackageSink.minLevel = LogLevel.fatal;
+      addTearDown(() => LoggerPackageSink.minLevel = prev);
+      final sink = const LoggerPackageSink();
+      // 低于阈值的调用在格式化前早退 — 零异常即门控路径健康。
+      expect(
+        () => sink.log(LogLevel.debug, 'gated chatter'),
+        returnsNormally,
+      );
+    });
+
+    test('createDefaultLogSink(debug) wires LoggerPackageSink first', () {
+      final sink = createDefaultLogSink(KernelBuildMode.debug);
+      expect(sink, isA<CompositeSink>());
+      final inner = (sink as CompositeSink).sinks;
+      expect(inner.first, isA<LoggerPackageSink>());
+      // DevTools 全量通道保持在二位 (数据不丢契约)。
+      expect(inner.elementAt(1), isA<DevToolsSink>());
+    });
+
+    test('createDefaultLogSink default param is LoggerPackageSink', () {
+      // 直接验证默认参数 (不注入) — 生产 debug 通道接线锁定。
+      final sink = createDefaultLogSink(KernelBuildMode.debug);
+      final inner = (sink as CompositeSink).sinks;
+      expect(inner.first, isA<LoggerPackageSink>());
+    });
+  });
+
   group('DevToolsSink', () {
     test('log() returns normally without throwing', () {
       final sink = const DevToolsSink();

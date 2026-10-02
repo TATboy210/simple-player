@@ -1,9 +1,12 @@
 /// 内核诊断日志门面 (D5/D6/D7 — Phase 17 具体实现)
 ///
-/// Kernel diagnostics logging facade. Concrete implementation with
-/// zero third-party dependencies: LogLevel enum, LogSink interface,
-/// three sink implementations (DevToolsSink/DebugPrintSink/NullSink)
+/// Kernel diagnostics logging facade. LogLevel enum, LogSink interface,
+/// sink implementations (DevToolsSink/DebugPrintSink/NullSink/LoggerPackageSink)
 /// + CompositeSink, and KernelLoggerImpl with static `I` accessor.
+///
+/// 控制台输出由 `package:logger` 驱动 ([LoggerPackageSink] — v0.0.9 P2):
+/// 级别体系映射到 logger.Level, 格式化经自定义 Printer, 输出仍走
+/// debugPrint 保留帧预算节流. [DebugPrintSink] 为旧直连实现, 保留供测试.
 ///
 /// 层级映射表 (D8, locked) — Phase 17 迁移已完成 (24 个 kernel 文件已迁移),
 /// 此表为迁移期工作清单, 保留作历史参考:
@@ -25,6 +28,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart' as pkg;
 
 // ---------------------------------------------------------------------------
 // LogLevel — 6 severity levels, 1:1 with KernelLogger methods (D14)
@@ -102,11 +106,12 @@ enum KernelBuildMode {
 
 /// 根据构建模式创建默认日志输出策略。
 ///
-/// sink 参数可注入以通过行为验证路由；生产环境使用默认实现。Release 始终
-/// 返回 [NullSink]，从而不注册任何实际输出目标。
+/// sink 参数可注入以通过行为验证路由；生产环境 debug 通道由
+/// [LoggerPackageSink]（package:logger 驱动）承担，[DebugPrintSink] 为
+/// 旧直连实现（测试引用保留）。Release 始终返回 [NullSink]。
 LogSink createDefaultLogSink(
   KernelBuildMode mode, {
-  LogSink debugSink = const DebugPrintSink(),
+  LogSink debugSink = const LoggerPackageSink(),
   LogSink devToolsSink = const DevToolsSink(),
 }) => switch (mode) {
   KernelBuildMode.debug => CompositeSink([debugSink, devToolsSink]),
@@ -254,6 +259,9 @@ final class DevToolsSink implements LogSink {
 /// Message paths are redacted via [redactPath] before output.
 /// Only active in debug mode (kDebugMode gate at composition root).
 ///
+/// **生产接线已切换**到 [LoggerPackageSink]（package:logger 驱动，格式
+/// 逐字节一致）；本类为旧直连实现，保留供 sink 行为测试与手动对照。
+///
 /// 控制台降噪门控（2026-09-06）：Windows 控制台写入发生在 platform 线程
 /// 且代价高（每次写入可占数毫秒），快速拖拽 resize 时直接挤压帧预算。
 /// [minLevel] 以下的级别（trace/debug 高频 chatter）不再进 debugPrint，
@@ -328,6 +336,9 @@ final class CompositeSink implements LogSink {
 
   final List<LogSink> _sinks;
 
+  /// 只读视图 — 供测试断言生产接线（debug 通道是否为 [LoggerPackageSink]）。
+  List<LogSink> get sinks => List.unmodifiable(_sinks);
+
   @override
   void log(
     LogLevel level,
@@ -345,6 +356,93 @@ final class CompositeSink implements LogSink {
         stackTrace: stackTrace,
       );
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LoggerPackageSink — package:logger driven console output (v0.0.9 P2)
+// ---------------------------------------------------------------------------
+
+/// `package:logger` 驱动的控制台输出 — debug/profile 构建的生产接线.
+///
+/// Console sink backed by `package:logger` (v0.0.9 P2 依赖复活): KernelLogger
+/// 六级别 1:1 映射到 logger.Level, 格式化经 [_KernelConsolePrinter], 输出经
+/// [_DebugPrintOutput] 仍走 debugPrint 保留帧预算节流 (见 [DebugPrintSink]
+/// 的降噪门控说明). 消息路径在进入 logger 管道前完成脱敏.
+///
+/// 控制台降噪门控与 [DebugPrintSink.minLevel] 同语义: [minLevel] 以下的
+/// 级别（trace/debug 高频 chatter）不进控制台, 仍经 DevToolsSink 全量
+/// 进入 DevTools —— 数据不丢, 控制台清净.
+final class LoggerPackageSink implements LogSink {
+  /// 控制台输出的最低级别 — 默认 info（i/w/e/f 进控制台，t/d 不进）。
+  static LogLevel minLevel = LogLevel.info;
+
+  /// const 构造 — 内部 Logger 为文件级单例（[_consoleLogger]），支持
+  /// [createDefaultLogSink] 的 const 默认参数约束。
+  const LoggerPackageSink();
+
+  @override
+  void log(
+    LogLevel level,
+    String msg, {
+    Map<String, Object?>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    // 门控在格式化之前 — 序列化大 JSON 本身也有成本，静默的调用零开销。
+    if (level.index < minLevel.index) return;
+    final redacted = redactPath(msg);
+    final contextStr = context != null && context.isNotEmpty
+        ? ' ${serializeLogContext(context)}'
+        : '';
+    _consoleLogger.log(
+      _toLoggerLevel(level),
+      '$redacted$contextStr',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
+/// KernelLogger.LogLevel → logger.Level 1:1 映射 — 两套级别体系数值
+/// 语义一致（trace 最轻 / fatal 最重），无常量落空。
+pkg.Level _toLoggerLevel(LogLevel level) => switch (level) {
+  LogLevel.trace => pkg.Level.trace,
+  LogLevel.debug => pkg.Level.debug,
+  LogLevel.info => pkg.Level.info,
+  LogLevel.warn => pkg.Level.warning,
+  LogLevel.error => pkg.Level.error,
+  LogLevel.fatal => pkg.Level.fatal,
+};
+
+/// 文件级 logger 实例 — filter 放行全量（降噪门控已在 [LoggerPackageSink]
+/// 入口完成，此处不重复过滤），格式与输出见配套 Printer/Output。
+final pkg.Logger _consoleLogger = pkg.Logger(
+  filter: pkg.DevelopmentFilter(),
+  printer: _KernelConsolePrinter(),
+  output: _DebugPrintOutput(),
+);
+
+/// 控制台格式化 — 与旧 [DebugPrintSink] 输出格式逐字节一致
+/// （`LEVEL: message error=...`），保证控制台习惯与格式断言测试零迁移。
+final class _KernelConsolePrinter extends pkg.LogPrinter {
+  @override
+  List<String> log(pkg.LogEvent event) {
+    final levelName = event.level.name.toUpperCase();
+    // logger 包无结构化错误通道, error/stack 拼入文本 (与旧实现一致)。
+    final errorStr = event.error != null ? ' error=${event.error}' : '';
+    final stackStr = event.stackTrace != null ? '\n${event.stackTrace}' : '';
+    return ['$levelName: ${event.message}$errorStr$stackStr'];
+  }
+}
+
+/// debugPrint 输出通道 — 不用 logger 包默认 ConsoleOutput（直接 print
+/// 无节流），保留 debugPrint 的帧间限流，防止 resize 期间高频日志
+/// 挤压帧预算（2026-09-06 降噪门控的同类考量）。
+final class _DebugPrintOutput extends pkg.LogOutput {
+  @override
+  void output(pkg.OutputEvent event) {
+    debugPrint(event.lines.join('\n'));
   }
 }
 
