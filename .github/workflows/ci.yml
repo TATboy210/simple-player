@@ -9,8 +9,14 @@ on:
 
 jobs:
   # Quality Gate: analyze + test on 3 platforms × x64/arm64 + build smoke
-  # (ARM runner 免费 GA: ubuntu-24.04-arm 2025-01, windows-11-arm 2025-08;
-  # macos-latest 即 arm64 Apple Silicon, macos-15-intel 为 x64)
+  # (ARM runner 免费 GA: windows-11-arm 2025-08, macos-latest 即 arm64
+  # Apple Silicon, macos-15-intel 为 x64)
+  #
+  # 注: ubuntu-24.04-arm 不在矩阵 — Flutter stable 不发布 Linux ARM64
+  # host SDK (releases_linux.json arm64 条目为 0, git 自举亦无
+  # dart-sdk-linux-arm64.zip), 该平台无法运行 flutter test; Linux 测试
+  # 覆盖由 ubuntu-latest (x64) 承担, arm 覆盖由 macOS arm64 + WoA 仿真
+  # 的 windows-11-arm 承担。
   quality-gates:
     strategy:
       fail-fast: false
@@ -35,21 +41,13 @@ jobs:
             build: true
             flutter-arch: x64
             git-source: false
-          # ---- arm64 三平台 ----
+          # ---- arm64 两平台 ----
           - os: macos-latest
             platform: macos
             arch: arm64
             build: true
             flutter-arch: arm64
             git-source: false
-          - os: ubuntu-24.04-arm
-            platform: linux
-            arch: arm64
-            build: true
-            flutter-arch: arm64
-            # release manifest 无 3.47.6+linux-arm64 条目 — 走 git 克隆
-            # 自举 (flutter 工具链按 host 架构拉 engine artifacts)
-            git-source: true
           - os: windows-11-arm
             platform: windows
             arch: arm64
@@ -74,8 +72,7 @@ jobs:
 
       # Linux desktop build dependencies (clang/cmake/ninja/pkg-config/gtk3
       # + libmpv-dev — media_kit_video 的 CMake 经 pkg-config 找 mpv，
-      # 缺开发头文件时 target_link_libraries 解析 PkgConfig::mpv 失败;
-      # Ubuntu 24.04 arm64 仓库同样提供全部包)
+      # 缺开发头文件时 target_link_libraries 解析 PkgConfig::mpv 失败)
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
         run: |
@@ -86,9 +83,10 @@ jobs:
       - name: Analyze
         run: flutter analyze --fatal-infos
 
-      # Quality Gate 2: Unit + widget tests
+      # Quality Gate 2: Unit + widget tests — 90s/用例 (默认 30s 对 WoA
+      # x64 仿真的 windows-11-arm 过紧, 曾致 P-Thumb 时序组整组超时)
       - name: Test
-        run: flutter test
+        run: flutter test --timeout 90s
 
       # Quality Gate 3: Build smoke test (arm64 Windows 跳过, 见矩阵注释)
       - name: Build

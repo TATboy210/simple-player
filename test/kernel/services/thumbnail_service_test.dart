@@ -18,6 +18,16 @@ ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
       throw const FileSystemException('disk disabled'),
 );
 
+/// 多轮事件泵 — brokenDisk 的 async throw 在慢 CI 仿真环境 (ARM WoA)
+/// 需要更多事件循环轮次传播到位, 单轮 pumpEventQueue 时序假设过强
+/// (G1 曾在 windows-11-arm 上 Actual 1)。holdJobs 挂起下 gate 恒满载,
+/// 多泵不会让断言过冲。
+Future<void> settle() async {
+  for (var i = 0; i < 8; i++) {
+    await pumpEventQueue();
+  }
+}
+
 void main() {
   setUpAll(() {
     // 锁定 Windows 平台语义 — ThumbnailService 经 defaultTargetPlatform
@@ -308,9 +318,9 @@ void main() {
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
       final f2 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
 
       expect(fake.calls, equals(1));
       expect(ThumbnailService.metrics.coalescedJoins, equals(1));
@@ -329,11 +339,11 @@ void main() {
       final futures = <Future<ImageProvider?>>[
         ThumbnailService.getThumbnail(fileA.path),
       ];
-      await pumpEventQueue();
+      await settle();
       for (var i = 0; i < 9; i++) {
         futures.add(ThumbnailService.getThumbnail(fileA.path));
       }
-      await pumpEventQueue();
+      await settle();
 
       expect(fake.calls, equals(1));
       expect(ThumbnailService.metrics.coalescedJoins, equals(9));
@@ -350,7 +360,7 @@ void main() {
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
       final f2 = ThumbnailService.getThumbnail(fileB.path);
-      await pumpEventQueue();
+      await settle();
 
       expect(fake.calls, equals(2));
 
@@ -370,12 +380,12 @@ void main() {
         );
 
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await pumpEventQueue();
+        await settle();
 
         // evict 使 F1 失效（pathEpoch++）— 新请求 F2 注册
         ThumbnailService.evict(fileA.path);
         final f2 = ThumbnailService.getThumbnail(fileA.path);
-        await pumpEventQueue();
+        await settle();
 
         // 旧代 F1 晚完成 — 允许返回原请求，但不得 commit（§19.7）
         fake.release(fileA.path);
@@ -399,7 +409,7 @@ void main() {
       );
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
 
       ThumbnailService.clearCache();
       fake.release(fileA.path);
@@ -417,13 +427,13 @@ void main() {
       );
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
       ThumbnailService.evict(fileA.path);
       fake.release(fileA.path);
       await f1; // 旧代降级返回，无 commit
 
       final f2 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
       fake.release(fileA.path);
       final r2 = await f2;
       expect(r2, isNotNull);
@@ -440,7 +450,7 @@ void main() {
         );
 
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await pumpEventQueue();
+        await settle();
 
         // 微任务序：release 恢复 _runFlight → write 在 _ensureDirectory
         // 让出 → clearCache 执行（穿透检查点 1）→ write 返回 → 检查点 2 拦截
@@ -461,7 +471,7 @@ void main() {
       );
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
 
       fake.release(fileA.path);
       scheduleMicrotask(() => ThumbnailService.evict(fileA.path));
@@ -478,7 +488,7 @@ void main() {
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await pumpEventQueue();
+      await settle();
       fake.failJob(fileA.path, const FileSystemException('decode failed'));
 
       expect(await f1, isNull);
@@ -528,7 +538,7 @@ void main() {
       for (final file in files) {
         futures.add(ThumbnailService.getThumbnail(file.path));
       }
-      await pumpEventQueue();
+      await settle();
 
       // gate 限流 — 第 3 个起的请求在队列中，未触达 provider
       expect(fake.peakActive, equals(2));
@@ -537,7 +547,7 @@ void main() {
       // 逐个 release + pump — gate 排队者需微任务推进才能进入 provider
       for (final file in files) {
         fake.release(file.path);
-        await pumpEventQueue();
+        await settle();
       }
       for (final future in futures) {
         expect(await future, isNotNull);
@@ -552,11 +562,11 @@ void main() {
       final f0 = ThumbnailService.getThumbnail(files[0].path);
       final f1 = ThumbnailService.getThumbnail(files[1].path);
       final f2 = ThumbnailService.getThumbnail(files[2].path);
-      await pumpEventQueue();
+      await settle();
 
       // 2 进 provider、1 排队 — 第一个抛异常 → slot 释放 → 排队者进入
       fake.failJob(files[0].path, const FileSystemException('boom'));
-      await pumpEventQueue();
+      await settle();
       expect(fake.calls, equals(3)); // 第 3 个已进入 provider
 
       expect(await f0, isNull);
@@ -573,10 +583,10 @@ void main() {
       final f0 = ThumbnailService.getThumbnail(files[0].path);
       final f1 = ThumbnailService.getThumbnail(files[1].path);
       final f2 = ThumbnailService.getThumbnail(files[2].path);
-      await pumpEventQueue();
+      await settle();
 
       fake.releaseNull(files[0].path);
-      await pumpEventQueue();
+      await settle();
       expect(fake.calls, equals(3)); // null 结果同样归还 slot
 
       expect(await f0, isNull);
@@ -593,16 +603,16 @@ void main() {
       final f0 = ThumbnailService.getThumbnail(files[0].path);
       final f1 = ThumbnailService.getThumbnail(files[1].path);
       final f2 = ThumbnailService.getThumbnail(files[2].path);
-      await pumpEventQueue();
+      await settle();
 
       expect(fake.active, equals(2));
       expect(fake.calls, equals(2)); // 第 3 个尚未触达 provider
       expect(fake.peakActive, equals(2));
 
       fake.release(files[0].path);
-      await pumpEventQueue(); // 第 3 个此时才进入 provider 并挂起 job
+      await settle(); // 第 3 个此时才进入 provider 并挂起 job
       fake.release(files[1].path);
-      await pumpEventQueue();
+      await settle();
       fake.release(files[2].path);
       await f0;
       await f1;
@@ -622,16 +632,16 @@ void main() {
         final f0 = ThumbnailService.getThumbnail(files[0].path);
         final f1 = ThumbnailService.getThumbnail(files[1].path);
         final f2 = ThumbnailService.getThumbnail(files[2].path);
-        await pumpEventQueue();
+        await settle();
 
         ThumbnailService.clearCache(); // globalEpoch++ 失效全部（含排队者）
 
         fake.release(files[0].path);
-        await pumpEventQueue(); // 排队的第 3 个进入 provider
+        await settle(); // 排队的第 3 个进入 provider
         fake.release(files[1].path);
-        await pumpEventQueue();
+        await settle();
         fake.release(files[2].path);
-        await pumpEventQueue();
+        await settle();
 
         expect(await f0, isNotNull); // 旧请求仍拿到结果（MemoryImage）
         expect(await f1, isNotNull);
@@ -670,7 +680,7 @@ void main() {
 
         // 第一次解帧失败 → 进 negative memo
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await pumpEventQueue();
+        await settle();
         fake.failJob(fileA.path, const FileSystemException('bad'));
         expect(await f1, isNull);
         expect(fake.calls, equals(1));
@@ -735,9 +745,9 @@ void main() {
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
       final r1 = ThumbnailService.retry(fileA.path);
-      await pumpEventQueue();
+      await settle();
       final r2 = ThumbnailService.retry(fileA.path); // 双击 — join
-      await pumpEventQueue();
+      await settle();
 
       expect(fake.calls, equals(1)); // H5：不产生第二次解帧
 
@@ -758,10 +768,10 @@ void main() {
         );
 
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await pumpEventQueue();
+        await settle();
         ThumbnailService.evict(fileA.path); // F1 变 stale
         final f2 = ThumbnailService.getThumbnail(fileA.path);
-        await pumpEventQueue();
+        await settle();
 
         // 旧代失败 — 若误记 memo，后续同 key 请求会被挡 10 秒
         fake.failJob(fileA.path, const FileSystemException('stale fail'));
@@ -772,7 +782,7 @@ void main() {
         final f3 = ThumbnailService.getThumbnail(fileA.path);
         final f3Done = Completer<void>();
         unawaited(f3.whenComplete(f3Done.complete));
-        await pumpEventQueue();
+        await settle();
         expect(f3Done.isCompleted, isFalse); // 挂起 = join，而非 memo 立即拒绝
 
         fake.release(fileA.path);
