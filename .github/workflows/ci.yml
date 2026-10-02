@@ -42,7 +42,7 @@ jobs:
             platform: linux
             arch: arm64
             build: true
-            flutter-arch: x64
+            flutter-arch: arm64
           - os: windows-11-arm
             platform: windows
             arch: arm64
@@ -57,8 +57,9 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          # 固定版本: 三平台可复现, 保证 Dart 3.13 语言特性可用
-          flutter-version: 3.47.0
+          # 固定版本: 三平台可复现; 3.47.6 是附带 Dart >=3.13.5 的最低
+          # stable (3.47.0 只带 Dart 3.13.0, 不满足 pubspec ^3.13.5)
+          flutter-version: 3.47.6
           architecture: ${{ matrix.flutter-arch }}
           cache: true
 
