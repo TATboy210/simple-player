@@ -408,14 +408,16 @@ class MediaKitEngine implements MediaEngine {
   @override
   void togglePlayPause() {
     final current = _state.value;
-    if (current == MediaState.playing) {
-      pause();
-    } else if (current == MediaState.idle ||
-        current == MediaState.paused ||
-        current == MediaState.completed) {
-      play();
+    // 状态→动作映射 (Dart 3 枚举穷举 switch: 未来新增状态漏处理时
+    // 编译期即报错, 而非静默吞掉).
+    switch (current) {
+      case MediaState.playing:
+        pause();
+      case MediaState.idle || MediaState.paused || MediaState.completed:
+        play();
+      case MediaState.opening || MediaState.error:
+        break; // not toggleable — no-op
     }
-    // opening/error — no-op
   }
 
   // ============================================================
