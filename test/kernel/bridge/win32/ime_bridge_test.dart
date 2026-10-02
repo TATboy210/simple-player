@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/win32/ime_bridge.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
@@ -86,7 +88,12 @@ void main() {
     });
   });
 
-  group('withImeRestored — 文件对话框期间的 IME 临时恢复', () {
+  // enable/disable 的临时恢复链路带 Platform.isWindows gate — 非 Windows
+  // 透传路径的直调组 (上方 group) 全平台保留, 本组仅 Windows runner 执行.
+  group(
+    'withImeRestored — 文件对话框期间的 IME 临时恢复',
+    skip: !Platform.isWindows,
+    () {
     // 注入 fake — 测试进程若恰有真 runner 窗口在运行, 真实 FFI 会向其
     // 投递消息; 密闭 fake 保证单测零副作用.
     Win32ImeFunctions fakeFns({required bool findSucceeds, bool sendOk = true}) =>

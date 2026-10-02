@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/painting.dart' show ImageProvider, MemoryImage;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -17,6 +19,18 @@ ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
 );
 
 void main() {
+  setUpAll(() {
+    // 锁定 Windows 平台语义 — ThumbnailService 经 defaultTargetPlatform
+    // 分支选 provider, Linux/macOS runner 上不锁定会走真实 Linux/macOS
+    // provider (执行真实媒体解码) 而非测试注入的 fake, 导致用例超时。
+    // (path_utils_test 同款先例)
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+  });
+
+  tearDownAll(() {
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   group('ThumbnailService', () {
     setUp(() {
       ThumbnailService.reset();
@@ -211,7 +225,10 @@ void main() {
       expect(keyFor(), isNot(equals(keyFor(timeMs: 2000))));
     });
 
-    test('ID5: path normalize collapses .. segments (ID5)', () {
+    // Windows 路径语义 — path 包按宿主 OS 选 context, POSIX 下反斜杠
+    // 路径的 `..` 折叠无意义, 仅在 Windows runner 断言.
+    test('ID5: path normalize collapses .. segments (ID5)',
+        skip: !Platform.isWindows, () {
       expect(
         ThumbnailService.normalizePathForTest('C:\\A\\..\\B\\file.mp4'),
         equals(ThumbnailService.normalizePathForTest('C:\\B\\file.mp4')),

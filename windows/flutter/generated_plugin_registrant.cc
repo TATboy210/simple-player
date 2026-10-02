@@ -8,7 +8,6 @@
 
 #include <bitsdojo_window_windows/bitsdojo_window_plugin.h>
 #include <desktop_drop/desktop_drop_plugin.h>
-#include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
 #include <flutter_video_thumbnail_plus/flutter_video_thumbnail_plus_plugin_c_api.h>
 #include <media_kit_libs_windows_video/media_kit_libs_windows_video_plugin_c_api.h>
 #include <media_kit_video/media_kit_video_plugin_c_api.h>
@@ -20,8 +19,6 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("BitsdojoWindowPlugin"));
   DesktopDropPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("DesktopDropPlugin"));
-  FlutterSecureStorageWindowsPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("FlutterSecureStorageWindowsPlugin"));
   FlutterVideoThumbnailPlusPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterVideoThumbnailPlusPluginCApi"));
   MediaKitLibsWindowsVideoPluginCApiRegisterWithRegistrar(

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/bridge/win32/sizemove_bridge.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
@@ -45,7 +47,13 @@ void main() {
     });
   });
 
-  group('Win32SizemoveBridge — WM_APP 查询消息投递', () {
+  // Win32 查询路径入口有 Platform.isWindows gate (fake functions 绕不过
+  // dart:io 的真实平台判定) — 仅 Windows runner 执行; decode group 为
+  // 纯 Dart 布局解码, 全平台保留.
+  group(
+    'Win32SizemoveBridge — WM_APP 查询消息投递',
+    skip: !Platform.isWindows,
+    () {
     // 消息常量须与 runner 侧 sizemove_bridge_messages.h 对偶 — 双向锁定.
     const messageId = 0x8000 + 0x4A; // WM_APP + 0x4A
     const smtoAbortIfHung = 0x0002;

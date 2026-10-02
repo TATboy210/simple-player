@@ -22,27 +22,34 @@ jobs:
             arch: x64
             build: true
             flutter-arch: x64
+            git-source: false
           - os: macos-15-intel
             platform: macos
             arch: x64
             build: true
             flutter-arch: x64
+            git-source: false
           - os: ubuntu-latest
             platform: linux
             arch: x64
             build: true
             flutter-arch: x64
+            git-source: false
           # ---- arm64 三平台 ----
           - os: macos-latest
             platform: macos
             arch: arm64
             build: true
             flutter-arch: arm64
+            git-source: false
           - os: ubuntu-24.04-arm
             platform: linux
             arch: arm64
             build: true
             flutter-arch: arm64
+            # release manifest 无 3.47.6+linux-arm64 条目 — 走 git 克隆
+            # 自举 (flutter 工具链按 host 架构拉 engine artifacts)
+            git-source: true
           - os: windows-11-arm
             platform: windows
             arch: arm64
@@ -50,6 +57,7 @@ jobs:
             # 跑 x64 SDK 仿真执行测试门, build 门跳过 (首轮验证后放开)
             build: false
             flutter-arch: x64
+            git-source: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +69,7 @@ jobs:
           # stable (3.47.0 只带 Dart 3.13.0, 不满足 pubspec ^3.13.5)
           flutter-version: 3.47.6
           architecture: ${{ matrix.flutter-arch }}
+          git-source: ${{ matrix.git-source }}
           cache: true
 
       # Linux desktop build dependencies (clang/cmake/ninja/pkg-config/gtk3
