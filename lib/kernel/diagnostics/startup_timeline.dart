@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
+
 import 'kernel_logger.dart';
 
 /// 启动计时器 — 纯诊断工具（单一职责：测量并记录启动时序）。
@@ -32,11 +34,17 @@ final class StartupTimeline {
   static const phaseRestoreDispatch = 'restoreDispatch';
   static const phasePlayerInit = 'playerInit';
 
-  StartupTimeline({KernelLogger? logger}) : _logger = logger ?? KernelLogger.I;
+  StartupTimeline({KernelLogger? logger})
+    : _logger = logger ?? KernelLogger.I,
+      // 纯诊断工具 — Release 下零价值：Stopwatch 不启动、打点即丢弃，
+      // mark/ready 全链路 no-op（P2 诊断瘦身，调用方无需感知）。
+      _enabled = !kReleaseMode;
 
   final KernelLogger _logger;
 
-  final Stopwatch _stopwatch = Stopwatch()..start();
+  final bool _enabled;
+
+  final Stopwatch _stopwatch = Stopwatch();
 
   /// 有序打点表 — Dart Map 保持插入序，遍历即可还原阶段先后。
   final Map<String, int> _marks = {};
@@ -45,7 +53,7 @@ final class StartupTimeline {
 
   /// 记录一个时间点。重复标记同一阶段以首点为准；[ready] 后为 no-op。
   void mark(String phase) {
-    if (_reported) return;
+    if (!_enabled || _reported) return;
     _marks.putIfAbsent(phase, () => _stopwatch.elapsedMilliseconds);
   }
 
@@ -54,7 +62,7 @@ final class StartupTimeline {
   /// side effect: 停止内部 Stopwatch 并向 kernel logger 发出一条 info 记录，
   /// context 字段形如 `<phase>Ms` + `totalMs`（保留一位小数）。
   void ready() {
-    if (_reported) return;
+    if (!_enabled || _reported) return;
     _reported = true;
 
     var previousMs = 0;

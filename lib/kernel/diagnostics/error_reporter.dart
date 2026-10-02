@@ -507,6 +507,10 @@ final class ErrorReporterImpl implements ErrorReporter {
   static ErrorLocation? _defaultLocationEnricher(String rawStackTrace) {
     final location = extractErrorLocation(rawStackTrace);
     if (location == null) return null;
+    // Release 下 read() 恒返回 null（SourceLineReader 内部安全早退）——
+    // 直接跳过 reader 构造（package-config 读取 + JSON decode 是真实
+    // 磁盘 I/O），仅保留 frame 级定位信息 (P2 诊断瘦身)。
+    if (kReleaseMode) return location;
     final excerpt = SourceLineReader().read(location.primaryFrame);
     if (excerpt == null) return location;
     return ErrorLocation(
