@@ -217,16 +217,11 @@ class PlaylistCoordinator {
         if (!valid.contains(i)) _entries.value[i],
     ]);
 
-    // 引擎装载态: 降序逐个移除 — 每次 revision 回流以 mpv 为权威重建,
-    // 最终视图自动收敛 (删除正在播放条目的跳转同单条语义).
+    // 引擎装载态: 单次批量调用 (v0.0.9 事件放大治理) — 引擎侧降序移除
+    // + revision 单发收敛 (N → 1), 删除正在播放条目的跳转同单条语义.
     final enginePaths = _engine.queuePaths.value;
     if (enginePaths.isNotEmpty) {
-      final descending = valid.toList()..sort((a, b) => b.compareTo(a));
-      for (final i in descending) {
-        if (i < enginePaths.length) {
-          await _engine.removeFromQueue(i);
-        }
-      }
+      await _engine.removeFromQueueBatch(valid);
     }
 
     // 锚点清理 — 被移除条目曾是"上次播放"锚则置空 (与单条语义一致).

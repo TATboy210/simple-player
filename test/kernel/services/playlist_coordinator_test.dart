@@ -874,8 +874,8 @@ void main() {
       expect([
         for (final e in coordinator.entries.value) e.path,
       ], equals(['b.mp4', 'd.mp4']));
-      // 引擎降序移除 — 2 先于 0 (删除位移安全序)
-      expect(engine.removedIndices, equals([2, 0]));
+      // 引擎批量降序移除 — 2 先于 0 (删除位移安全序)
+      expect(engine.batchRemovedIndices, equals([2, 0]));
     });
 
     test('锚点清理 — 被移除条目是上次播放锚时置空', () async {
@@ -909,11 +909,11 @@ void main() {
       await coordinator.removeEntriesAt({0, 2});
       await Future<void>.delayed(Duration.zero);
 
-      // 视图收敛到剩余条目, 引擎同步移除两次
+      // 视图收敛到剩余条目, 引擎批量同步移除
       expect([
         for (final e in coordinator.entries.value) e.path,
       ], equals(['b.mp4']));
-      expect(engine.removedIndices, equals([2, 0]));
+      expect(engine.batchRemovedIndices, equals([2, 0]));
       // 断点孤儿防护: _updateBreakpoint 对已删条目 return — 无异常即通过
     });
 
@@ -926,6 +926,69 @@ void main() {
 
       expect(coordinator.entries.value, same(before));
       expect(engine.removedIndices, isEmpty);
+      expect(engine.batchRemovedIndices, isEmpty);
+    });
+  });
+  group('批量删除事件放大治理 (v0.0.9)', () {
+    test('装载态批量删除 N 项 — revision 单发收敛 (恰好 +1)', () async {
+      await coordinator.appendEntries(
+        ['a.mp4', 'b.mp4', 'c.mp4', 'd.mp4', 'e.mp4'],
+      );
+      final revisionBefore = engine.queueRevision.value;
+
+      await coordinator.removeEntriesAt({0, 2, 4});
+
+      // 引擎单次批量调用, 降序删除序列内省 (位移安全序)
+      expect(engine.batchRemovedIndices, equals([4, 2, 0]));
+      // 治理前 N 项 = N 次 touch; 治理后恰好 +1 (单发收敛契约)
+      expect(engine.queueRevision.value, equals(revisionBefore + 1));
+      // 视图收敛
+      expect([
+        for (final e in coordinator.entries.value) e.path,
+      ], equals(['b.mp4', 'd.mp4']));
+    });
+
+    test('批量删除含正在播放条目 — index 收敛 + revision 单发', () async {
+      await coordinator.appendEntries(['a.mp4', 'b.mp4', 'c.mp4']);
+      await coordinator.playEntryAt(0);
+      await Future<void>.delayed(Duration.zero); // revision 回流
+      expect(coordinator.currentIndex.value, equals(0));
+      final revisionBefore = engine.queueRevision.value;
+
+      await coordinator.removeEntriesAt({0, 2});
+      await Future<void>.delayed(Duration.zero);
+
+      expect([
+        for (final e in coordinator.entries.value) e.path,
+      ], equals(['b.mp4']));
+      expect(engine.batchRemovedIndices, equals([2, 0]));
+      expect(engine.queueRevision.value, equals(revisionBefore + 1));
+    });
+
+    test('混合 valid/越界索引 — coordinator 域先滤, 只删 valid', () async {
+      await coordinator.appendEntries(['a.mp4', 'b.mp4', 'c.mp4']);
+      final revisionBefore = engine.queueRevision.value;
+
+      await coordinator.removeEntriesAt({0, 5, -1});
+
+      // coordinator 域校验滤掉 5/-1 (entries 长度 3), 引擎只收到 {0}
+      expect(engine.batchRemovedIndices, equals([0]));
+      expect(engine.queueRevision.value, equals(revisionBefore + 1));
+      expect([
+        for (final e in coordinator.entries.value) e.path,
+      ], equals(['b.mp4', 'c.mp4']));
+    });
+
+    test('engine 域越界过滤 — 直接传混合集合只删引擎队列内索引', () async {
+      await coordinator.appendEntries(['a.mp4', 'b.mp4', 'c.mp4']);
+      final revisionBefore = engine.queueRevision.value;
+
+      await engine.removeFromQueueBatch({0, 5, -1});
+
+      // engine 域校验基于引擎队列长度 (3), 滤掉 5/-1
+      expect(engine.batchRemovedIndices, equals([0]));
+      expect(engine.queueRevision.value, equals(revisionBefore + 1));
+      expect(engine.queuePaths.value, equals(['b.mp4', 'c.mp4']));
     });
   });
 }

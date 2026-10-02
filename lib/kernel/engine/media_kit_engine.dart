@@ -520,20 +520,8 @@ class MediaKitEngine implements MediaEngine {
     if (index < 0 || index >= paths.length) return;
     try {
       await _player.remove(index);
-      // 乐观镜像: 移除条目并平移 index. 正在播放条目被删时 mpv 自动跳转,
-      // 精确 index 由 stream.playlist 回流纠正 — 这里只保证不越界.
-      final remaining = [...paths]..removeAt(index);
-      final current = _queueIndex.value;
-      var nextIndex = current;
-      if (current > index) {
-        nextIndex = current - 1;
-      } else if (current == index) {
-        nextIndex = remaining.isEmpty
-            ? -1
-            : index.clamp(0, remaining.length - 1);
-      }
-      _queuePaths.value = List<String>.unmodifiable(remaining);
-      _queueIndex.value = nextIndex;
+      // 乐观镜像: 移除条目并平移 index (入参 paths 为删除前快照).
+      _applyRemoveMirror(paths, index);
       _touchQueueRevision();
     } on Exception catch (error, stackTrace) {
       _lastError.value = UnknownError(
@@ -548,10 +536,63 @@ class MediaKitEngine implements MediaEngine {
     }
   }
 
-  /// sortQueue 抑制期标记 (v0.0.9 P1 事件放大治理) — move 循环期间
-  /// stream.playlist 回流照常更新镜像但不发 revision，循环结束统一
-  /// touch 一次 (N+1 → 1)；finally 兜底保证异常路径也回流一次。
-  bool _sortInProgress = false;
+  @override
+  Future<void> removeFromQueueBatch(Set<int> indices) async {
+    if (_disposed || indices.isEmpty) return;
+    final count = _queuePaths.value.length;
+    // 越界过滤 + 降序处理 — 前置索引不受删除位移影响 (引擎队列索引域).
+    final valid = indices.where((i) => i >= 0 && i < count).toList()
+      ..sort((a, b) => b.compareTo(a));
+    if (valid.isEmpty) return;
+    _queueEditInProgress = true;
+    try {
+      for (final index in valid) {
+        await _player.remove(index);
+        // 每轮读最新镜像传入 (前序删除已平移) — 等价于逐次调用单条语义.
+        _applyRemoveMirror(_queuePaths.value, index);
+      }
+    } on Exception catch (error, stackTrace) {
+      _lastError.value = UnknownError(
+        '批量移除队列条目失败: $error',
+        error,
+        ErrorContext(
+          action: 'removeFromQueueBatch',
+          module: 'MediaKitEngine',
+          callbackStackTrace: stackTrace,
+        ),
+      );
+    } finally {
+      // 兜底与 sortQueue 同款: 中途失败也 touch 一次, 保证 Coordinator
+      // 读到当前真实镜像 (抑制期不吞最终态); 若 mpv 回流晚于 touch 到达,
+      // 此时抑制已解除, 事件照常 touch (Coordinator 幂等收敛).
+      _queueEditInProgress = false;
+      _touchQueueRevision();
+    }
+  }
+
+  /// 删除单条目的乐观镜像平移 (不含 revision touch) — 正在播放条目被删时
+  /// mpv 自动跳转, 精确 index 由 stream.playlist 回流纠正, 这里只保证
+  /// 不越界. 入参 [paths] 须为删除前快照; 批量循环每轮读最新镜像传入.
+  void _applyRemoveMirror(List<String> paths, int index) {
+    final remaining = [...paths]..removeAt(index);
+    final current = _queueIndex.value;
+    var nextIndex = current;
+    if (current > index) {
+      nextIndex = current - 1;
+    } else if (current == index) {
+      nextIndex = remaining.isEmpty
+          ? -1
+          : index.clamp(0, remaining.length - 1);
+    }
+    _queuePaths.value = List<String>.unmodifiable(remaining);
+    _queueIndex.value = nextIndex;
+  }
+
+  /// 队列编辑抑制期标记 (v0.0.9 P1 事件放大治理) — sortQueue 的 move
+  /// 循环与 removeFromQueueBatch 的降序删除循环期间，stream.playlist
+  /// 回流照常更新镜像但不发 revision，循环结束统一 touch 一次
+  /// (N+1 → 1)；finally 兜底保证异常路径也回流一次。
+  bool _queueEditInProgress = false;
 
   @override
   Future<void> sortQueue(List<String> targetOrder) async {
@@ -560,11 +601,11 @@ class MediaKitEngine implements MediaEngine {
     // 规划 move 序列 — 恒等排列/非排列返回空序列 (no-op 防御).
     final moves = planPlaylistMoves(current, targetOrder);
     if (moves.isEmpty) return;
-    _sortInProgress = true;
+    _queueEditInProgress = true;
     try {
       // mpv 命令队列串行保序; 每条 move 会触发 stream.playlist 事件,
       // 中间态由最终乐观镜像 + 回流幂等覆盖收敛 (revision 侧由
-      // [_sortInProgress] 抑制为单发).
+      // [_queueEditInProgress] 抑制为单发).
       for (final move in moves) {
         await _player.move(move.from, move.to);
       }
@@ -592,7 +633,7 @@ class MediaKitEngine implements MediaEngine {
       // 兜底 — 即使中途失败也 touch 一次，保证 Coordinator 读到当前
       // 真实镜像 (抑制期不吞最终态); 若 mpv 回流晚于 touch 到达,
       // 此时抑制已解除, 事件照常 touch (Coordinator 幂等收敛).
-      _sortInProgress = false;
+      _queueEditInProgress = false;
       _touchQueueRevision();
     }
   }
@@ -1074,15 +1115,16 @@ class MediaKitEngine implements MediaEngine {
     // 队列状态回流 — mpv 侧 playlist-playing-pos 属性观察: 装载/追加/移除/
     // shuffle 重排/自动续播全部经此同步到镜像 (最终一致). 空列表广播
     // (stop 时 Playlist([]) index 默认 0) 归一为 -1 的"无当前条目"语义.
-    // sortQueue 抑制期镜像照常更新但不发 revision (单发收敛, 见
-    // _sortInProgress) — 其余路径 revision 单发语义不变.
+    // 队列编辑抑制期 (sortQueue move 循环 / removeFromQueueBatch 删除循环)
+    // 镜像照常更新但不发 revision (单发收敛, 见 _queueEditInProgress) —
+    // 其余路径 revision 单发语义不变.
     _addSubscription(
       _player.stream.playlist.listen((pl) {
         _queuePaths.value = List<String>.unmodifiable(<String>[
           for (final m in pl.medias) pathFromMediaUri(m.uri),
         ]);
         _queueIndex.value = pl.medias.isEmpty ? -1 : pl.index;
-        if (!_sortInProgress) _touchQueueRevision();
+        if (!_queueEditInProgress) _touchQueueRevision();
       }),
     );
     _addSubscription(

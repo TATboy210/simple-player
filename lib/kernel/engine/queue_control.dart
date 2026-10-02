@@ -32,6 +32,15 @@ abstract class QueueControl {
   /// 移除指定索引条目. 删除正在播放条目时 mpv 自动跳转, 经 stream 镜像同步.
   Future<void> removeFromQueue(int index);
 
+  /// 批量移除多个索引条目 (v0.0.9 批量删除事件放大治理) — 语义等价于
+  /// 降序逐次调用 [removeFromQueue], 但 [queueRevision] 单发收敛 (N → 1).
+  ///
+  /// requires: [indices] 任意顺序 (实现内部过滤越界 + 降序处理,
+  ///   降序保证前置索引不受删除位移影响).
+  /// ensures: 成功时队列镜像已更新到删除终态; 编辑抑制期内 stream.playlist
+  ///   回流照常更新镜像但不发 revision, 结束统一 touch 一次.
+  Future<void> removeFromQueueBatch(Set<int> indices);
+
   /// 按 [targetOrder] 物理重排队列 (v0.0.6 排序功能) — 不打断当前播放.
   ///
   /// Physical queue reorder via mpv `playlist-move` sequence (planned by

@@ -158,6 +158,9 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   final List<String> appendedPaths = [];
   final List<int> removedIndices = [];
 
+  /// 最近一次 removeFromQueueBatch 的降序删除序列 (批量删除测试内省).
+  final List<int> batchRemovedIndices = [];
+
   /// 最近一次 sortQueue 的目标顺序 (v0.0.6 排序测试内省).
   List<String>? lastSortQueueTarget;
   final List<int> jumpedToIndices = [];
@@ -457,6 +460,29 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     final paths = queuePaths.value;
     if (index < 0 || index >= paths.length) return;
     removedIndices.add(index);
+    _removeMirrorUpdate(index);
+    queueRevision.value++;
+  }
+
+  @override
+  Future<void> removeFromQueueBatch(Set<int> indices) async {
+    if (_disposed || indices.isEmpty) return;
+    final count = queuePaths.value.length;
+    // 与 MediaKitEngine 同构: 越界过滤 + 降序处理, revision 单发.
+    final valid = indices.where((i) => i >= 0 && i < count).toList()
+      ..sort((a, b) => b.compareTo(a));
+    if (valid.isEmpty) return;
+    batchRemovedIndices.addAll(valid);
+    for (final index in valid) {
+      _removeMirrorUpdate(index);
+    }
+    queueRevision.value++;
+  }
+
+  /// 删除单条目的镜像平移 (不含 revision touch) — 单条/批量共用,
+  /// 每次基于当前 queuePaths 最新值计算 (批量循环前序删除已平移).
+  void _removeMirrorUpdate(int index) {
+    final paths = queuePaths.value;
     final remaining = [...paths]..removeAt(index);
     final current = queueIndex.value;
     var nextIndex = current;
@@ -467,7 +493,6 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     }
     queuePaths.value = List<String>.unmodifiable(remaining);
     queueIndex.value = nextIndex;
-    queueRevision.value++;
   }
 
   @override
