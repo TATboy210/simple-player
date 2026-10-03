@@ -83,7 +83,13 @@ class MediaKitEngine implements MediaEngine {
     };
     for (final entry in tunedProps.entries) {
       unawaited(
-        native.setProperty(entry.key, entry.value).catchError((Object error) {
+        native.setProperty(entry.key, entry.value).then((_) {
+          // 成功路径日志 — 内存治理的属性必须可验证生效 (UAT 归因依赖).
+          if (!KernelLoggerImpl.isInitialized) return;
+          KernelLoggerImpl.I.i(
+            'mpv 内存调优属性已应用: ${entry.key}=${entry.value}',
+          );
+        }, onError: (Object error) {
           _lastError.value = UnknownError(
             '内存调优 mpv 属性应用失败: ${entry.key}=${entry.value}: $error',
             null,
