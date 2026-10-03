@@ -1349,14 +1349,12 @@ void main() {
       }
     });
 
-    testWidgets('控制栏子树恒定语义排除（AXTree 洪流终局规避契约）', (
+    testWidgets('resize 期间与隐藏期 suppress 控制栏语义 settle 后恢复（AXTree 洪流回归）', (
       tester,
     ) async {
-      // 契约升级 (v0.0.9 第三刀)：引擎 accessibility_bridge 序列化 bug
-      // (#113741/#173118) 下本子树任何语义更新都携带整树 (42 节点) 且失败
-      // 重试成洪流——时间文本/隐藏态/resize 三个驱动源逐个治理后切曲仍触发。
-      // 终局方案：controls 子树恒定 ExcludeSemantics，任何状态翻转
-      // (resize 上升/下降沿) 均不改变排除态；引擎修复后恢复条件化排除。
+      // 契约 (v0.0.9 回退后): 恒定 ExcludeSemantics 会触发引擎 AXTree
+      // "根节点缺失"型 CHECK 失败 (debug 构建致命, 启动闪退) — 仅条件化
+      // 排除 resize/隐藏两态。settle 后语义恢复。
       // 验证用 SemanticsOwner.rootSemanticsNode 遍历 assembled 树。
       final semanticsHandle = tester.ensureSemantics();
       final resizing = ValueNotifier<bool>(false);
@@ -1389,17 +1387,18 @@ void main() {
           actions: const PlayerActions(),
         );
 
-        // 恒定排除契约：基线即无 'Play' 语义（控制栏视觉正常显示）。
-        expect(assembledSemanticsLabels(), isNot(contains('Play')));
+        // 基线：非 playing 控制栏永显，'Play' 在 assembled 语义树中。
+        expect(assembledSemanticsLabels(), contains('Play'));
 
-        // resize 上升沿/下降沿：排除态不随状态翻转变化。
+        // resize 上升沿：控制栏子树语义从 assembled 树丢弃。
         resizing.value = true;
         await tester.pump();
         expect(assembledSemanticsLabels(), isNot(contains('Play')));
 
+        // settle：翻回 excluding=false，控制栏语义恢复。
         resizing.value = false;
         await tester.pump();
-        expect(assembledSemanticsLabels(), isNot(contains('Play')));
+        expect(assembledSemanticsLabels(), contains('Play'));
       } finally {
         semanticsHandle.dispose();
       }

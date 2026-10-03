@@ -48,20 +48,15 @@ class _TimeRangeDisplayState extends State<TimeRangeDisplay> {
     return ValueListenableBuilder<TimePair>(
       valueListenable: _merged,
       builder: (_, pair, _) {
-        // ExcludeSemantics (v0.0.9 内存/卡顿治理): 本文本每秒变化, 若暴露
-        // 语义则每秒触发 controls 子树整树语义重序列化 — 撞上
-        // accessibility_bridge 的已知序列化 bug (flutter #113741/#173118,
-        // "Nodes left pending by the update") 形成错误洪流, 白烧主线程
-        // 并推高 RSS。时间信息已由进度条 Semantics (百分比 slider) 承载,
-        // 文本级时间朗读是冗余通道。
-        return ExcludeSemantics(
-          child: Text(
-            '${formatMs(pair.a)} / ${formatMs(pair.b)}',
-            style: const TextStyle(
-              color: Tokens.textSecondary,
-              fontSize: Tokens.fontCaption,
-              fontFeatures: [Tokens.tabularFigures],
-            ),
+        // ExcludeSemantics 已临时移除 (闪退二分排查): 恒定/条件排除组合
+        // 下引擎报 "0 will not be in the tree" 根节点缺失型损坏, debug
+        // 构建 CHECK fatal。逐个摘除语义排除点定位元凶后再定治理形态。
+        return Text(
+          '${formatMs(pair.a)} / ${formatMs(pair.b)}',
+          style: const TextStyle(
+            color: Tokens.textSecondary,
+            fontSize: Tokens.fontCaption,
+            fontFeatures: [Tokens.tabularFigures],
           ),
         );
       },

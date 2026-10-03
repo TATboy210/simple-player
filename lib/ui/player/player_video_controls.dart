@@ -1030,14 +1030,21 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     final resizing = widget.resizing;
     // 测试旁路: 无 resize 源的注入场景保留裸树供语义契约断言 (生产恒非 null)。
     if (resizing == null) return controls;
-    // 恒定丢弃 controls 子树语义 (v0.0.9 第三刀, 引擎 bug 规避终局):
-    // Flutter 引擎 accessibility_bridge 序列化 bug (#113741/#173118) 下,
-    // 本子树任何语义变化都携带整树 (42 节点) 更新并失败重试成洪流 —
-    // 已先后治理 resize (34 节点) / 隐藏态 / 时间文本三个驱动源, 但切曲
-    // (idle 瞬间布局切换) 与可见态残余源仍触发 (UAT 2026-10-03 实证)。
-    // 本应用为开发者个人桌面工具, 无读屏场景; 子树恒定排除后引擎不再
-    // 收到任何本域语义更新, 洪流归零。引擎修复 (#113741 close) 后可
-    // 恢复条件化排除。
-    return ExcludeSemantics(child: controls);
+    // 注意: 不可恒定 ExcludeSemantics (v0.0.9 第三刀已回退) — 恒定排除
+    // 会使语义树出现"根节点缺失"型损坏, 引擎 AXTree CHECK 失败在 debug
+    // 构建是 fatal abort (启动闪退, "0 will not be in the tree" 前兆)。
+    // 仅条件化排除: resize 期间 + 自动隐藏期 (两态用户均读不到控件)。
+    return ValueListenableBuilder<bool>(
+      valueListenable: resizing,
+      builder: (_, isResizing, child) => ValueListenableBuilder<bool>(
+        valueListenable: _autoHide.visible,
+        builder: (_, controlsVisible, innerChild) => ExcludeSemantics(
+          excluding: isResizing || !controlsVisible,
+          child: innerChild!,
+        ),
+        child: child,
+      ),
+      child: controls,
+    );
   }
 }
