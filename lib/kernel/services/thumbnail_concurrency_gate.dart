@@ -60,4 +60,21 @@ final class ThumbnailConcurrencyGate {
   /// 排队数（测试观测）
   @visibleForTesting
   int get queued => _waiters.length;
+
+  /// 重置占用与等待队列 — 仅测试基建使用 (经 [ThumbnailService.reset])。
+  ///
+  /// [ThumbnailService.reset] 换 provider/diskCache 时若不清 gate,
+  /// 上一用例未归还的 slot 会跨用例存活 (CI 全量跑时前组竞态残留
+  /// 可致后组 calls 永卡 < 上限, 条件泵 500 轮耗尽 → 90s 超时)。
+  /// 生产路径不得调用: 真实占用必须自然归还, 清零会超发并发。
+  // 非 @visibleForTesting: 唯一调用方 ThumbnailService.reset 同为
+  // 测试基建链路, 注解会在生产文件内调用点触发 invalid_use lint。
+  void reset() {
+    _active = 0;
+    for (final waiter in _waiters) {
+      // 唤醒全部排队者 — 被重置的等待方重新走 acquire 分配。
+      waiter.complete();
+    }
+    _waiters.clear();
+  }
 }

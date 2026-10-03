@@ -589,6 +589,10 @@ class ThumbnailService {
     _instance._activeProviderCount = 0;
     _instance._failedUntil.clear();
     _instance._failureKeysByPath.clear();
+    // gate 同步重置 (v0.0.9 CI 稳定性) — 上一用例未归还的 slot 若跨
+    // reset 存活, 后组可用并发永久减少 (G1 曾在 CI 全量跑时 calls 永卡
+    // < 2)。gate.reset 唤醒排队者重新分配, 测试隔离完整。
+    _instance._gate.reset();
     _instance._clearCacheImpl();
     _metrics
       ..requests = 0
