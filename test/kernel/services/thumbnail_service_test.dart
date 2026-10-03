@@ -18,12 +18,13 @@ ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
       throw const FileSystemException('disk disabled'),
 );
 
-/// 多轮事件泵 — brokenDisk 的 async throw 在慢 CI 仿真环境 (ARM WoA)
-/// 需要更多事件循环轮次传播到位, 单轮 pumpEventQueue 时序假设过强
-/// (G1 曾在 windows-11-arm 上 Actual 1)。holdJobs 挂起下 gate 恒满载,
-/// 多泵不会让断言过冲。
-Future<void> settle() async {
-  for (var i = 0; i < 8; i++) {
+/// 多轮事件泵 — brokenDisk 的 async throw 在慢 CI 仿真环境 (ARM WoA /
+/// macOS runner 负载波动) 传播所需事件轮次不可预测, 固定轮数是赌。
+/// 带 [until] 条件时泵到条件满足为止 (治本); 无条件时固定 8 轮兜底
+/// (holdJobs 挂起下 gate 恒满载, 多泵不会让断言过冲)。
+Future<void> settle([bool Function()? until]) async {
+  for (var i = 0; i < (until == null ? 8 : 500); i++) {
+    if (until != null && until()) return;
     await pumpEventQueue();
   }
 }
@@ -380,12 +381,12 @@ void main() {
         );
 
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await settle();
+        await settle(() => fake.calls >= 1);
 
         // evict 使 F1 失效（pathEpoch++）— 新请求 F2 注册
         ThumbnailService.evict(fileA.path);
         final f2 = ThumbnailService.getThumbnail(fileA.path);
-        await settle();
+        await settle(() => fake.calls >= 2);
 
         // 旧代 F1 晚完成 — 允许返回原请求，但不得 commit（§19.7）
         fake.release(fileA.path);
@@ -409,7 +410,7 @@ void main() {
       );
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await settle();
+      await settle(() => fake.calls >= 1);
 
       ThumbnailService.clearCache();
       fake.release(fileA.path);
@@ -427,13 +428,13 @@ void main() {
       );
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await settle();
+      await settle(() => fake.calls >= 1);
       ThumbnailService.evict(fileA.path);
       fake.release(fileA.path);
       await f1; // 旧代降级返回，无 commit
 
       final f2 = ThumbnailService.getThumbnail(fileA.path);
-      await settle();
+      await settle(() => fake.calls >= 2);
       fake.release(fileA.path);
       final r2 = await f2;
       expect(r2, isNotNull);
@@ -450,7 +451,7 @@ void main() {
         );
 
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await settle();
+        await settle(() => fake.calls >= 1);
 
         // 微任务序：release 恢复 _runFlight → write 在 _ensureDirectory
         // 让出 → clearCache 执行（穿透检查点 1）→ write 返回 → 检查点 2 拦截
@@ -471,7 +472,7 @@ void main() {
       );
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await settle();
+      await settle(() => fake.calls >= 1);
 
       fake.release(fileA.path);
       scheduleMicrotask(() => ThumbnailService.evict(fileA.path));
@@ -488,7 +489,7 @@ void main() {
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
       final f1 = ThumbnailService.getThumbnail(fileA.path);
-      await settle();
+      await settle(() => fake.calls >= 1);
       fake.failJob(fileA.path, const FileSystemException('decode failed'));
 
       expect(await f1, isNull);
@@ -538,7 +539,7 @@ void main() {
       for (final file in files) {
         futures.add(ThumbnailService.getThumbnail(file.path));
       }
-      await settle();
+      await settle(() => fake.calls >= 2);
 
       // gate 限流 — 第 3 个起的请求在队列中，未触达 provider
       expect(fake.peakActive, equals(2));
@@ -562,11 +563,11 @@ void main() {
       final f0 = ThumbnailService.getThumbnail(files[0].path);
       final f1 = ThumbnailService.getThumbnail(files[1].path);
       final f2 = ThumbnailService.getThumbnail(files[2].path);
-      await settle();
+      await settle(() => fake.calls >= 2);
 
       // 2 进 provider、1 排队 — 第一个抛异常 → slot 释放 → 排队者进入
       fake.failJob(files[0].path, const FileSystemException('boom'));
-      await settle();
+      await settle(() => fake.calls >= 3);
       expect(fake.calls, equals(3)); // 第 3 个已进入 provider
 
       expect(await f0, isNull);
@@ -583,10 +584,10 @@ void main() {
       final f0 = ThumbnailService.getThumbnail(files[0].path);
       final f1 = ThumbnailService.getThumbnail(files[1].path);
       final f2 = ThumbnailService.getThumbnail(files[2].path);
-      await settle();
+      await settle(() => fake.calls >= 2);
 
       fake.releaseNull(files[0].path);
-      await settle();
+      await settle(() => fake.calls >= 3);
       expect(fake.calls, equals(3)); // null 结果同样归还 slot
 
       expect(await f0, isNull);
@@ -603,16 +604,16 @@ void main() {
       final f0 = ThumbnailService.getThumbnail(files[0].path);
       final f1 = ThumbnailService.getThumbnail(files[1].path);
       final f2 = ThumbnailService.getThumbnail(files[2].path);
-      await settle();
+      await settle(() => fake.calls >= 2);
 
       expect(fake.active, equals(2));
       expect(fake.calls, equals(2)); // 第 3 个尚未触达 provider
       expect(fake.peakActive, equals(2));
 
       fake.release(files[0].path);
-      await settle(); // 第 3 个此时才进入 provider 并挂起 job
+      await settle(() => fake.calls >= 3); // 第 3 个此时才进入 provider 并挂起 job
       fake.release(files[1].path);
-      await settle();
+      await settle(() => fake.calls >= 1);
       fake.release(files[2].path);
       await f0;
       await f1;
@@ -632,14 +633,14 @@ void main() {
         final f0 = ThumbnailService.getThumbnail(files[0].path);
         final f1 = ThumbnailService.getThumbnail(files[1].path);
         final f2 = ThumbnailService.getThumbnail(files[2].path);
-        await settle();
+        await settle(() => fake.calls >= 2);
 
         ThumbnailService.clearCache(); // globalEpoch++ 失效全部（含排队者）
 
         fake.release(files[0].path);
-        await settle(); // 排队的第 3 个进入 provider
+        await settle(() => fake.calls >= 3);
         fake.release(files[1].path);
-        await settle();
+        await settle(() => fake.calls >= 1);
         fake.release(files[2].path);
         await settle();
 
@@ -680,7 +681,7 @@ void main() {
 
         // 第一次解帧失败 → 进 negative memo
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await settle();
+        await settle(() => fake.calls >= 1);
         fake.failJob(fileA.path, const FileSystemException('bad'));
         expect(await f1, isNull);
         expect(fake.calls, equals(1));
@@ -745,7 +746,7 @@ void main() {
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
       final r1 = ThumbnailService.retry(fileA.path);
-      await settle();
+      await settle(() => fake.calls >= 1);
       final r2 = ThumbnailService.retry(fileA.path); // 双击 — join
       await settle();
 
@@ -768,10 +769,10 @@ void main() {
         );
 
         final f1 = ThumbnailService.getThumbnail(fileA.path);
-        await settle();
+        await settle(() => fake.calls >= 1);
         ThumbnailService.evict(fileA.path); // F1 变 stale
         final f2 = ThumbnailService.getThumbnail(fileA.path);
-        await settle();
+        await settle(() => fake.calls >= 2);
 
         // 旧代失败 — 若误记 memo，后续同 key 请求会被挡 10 秒
         fake.failJob(fileA.path, const FileSystemException('stale fail'));
