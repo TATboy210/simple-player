@@ -1029,10 +1029,22 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // null resizing（测试注入无 resize 源）走不包裹分支，保留既有语义断言。
     final resizing = widget.resizing;
     if (resizing == null) return controls;
+    // 自动隐藏期间同样丢弃语义 (v0.0.9 内存/卡顿治理): 控件视觉淡出后
+    // 隐藏态翻 false 若保留语义, 鼠标悬停触发显示时子树语义整树恢复,
+    // 经 accessibility_bridge 的已知序列化 bug 每次整树更新失败
+    // ("Nodes left pending by the update: 42") — 洪流白烧主线程。
+    // 隐藏态用户本就读不到控件, suppress 语义零可用性损失。
     return ValueListenableBuilder<bool>(
       valueListenable: resizing,
-      builder: (_, isResizing, _) =>
-          ExcludeSemantics(excluding: isResizing, child: controls),
+      builder: (_, isResizing, child) => ValueListenableBuilder<bool>(
+        valueListenable: _autoHide.visible,
+        builder: (_, controlsVisible, innerChild) => ExcludeSemantics(
+          excluding: isResizing || !controlsVisible,
+          child: innerChild!,
+        ),
+        child: child,
+      ),
+      child: controls,
     );
   }
 }
