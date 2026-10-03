@@ -45,21 +45,27 @@ class _TimeRangeDisplayState extends State<TimeRangeDisplay> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<TimePair>(
-      valueListenable: _merged,
-      builder: (_, pair, _) {
-        // ExcludeSemantics 已临时移除 (闪退二分排查): 恒定/条件排除组合
-        // 下引擎报 "0 will not be in the tree" 根节点缺失型损坏, debug
-        // 构建 CHECK fatal。逐个摘除语义排除点定位元凶后再定治理形态。
-        return Text(
-          '${formatMs(pair.a)} / ${formatMs(pair.b)}',
-          style: const TextStyle(
-            color: Tokens.textSecondary,
-            fontSize: Tokens.fontCaption,
-            fontFeatures: [Tokens.tabularFigures],
-          ),
-        );
-      },
+    // ExcludeSemantics 必须位于 VLB **外层** — 排除边界的 RenderObject
+    // identity 稳定 (TimeRangeDisplay 自身几乎不 rebuild), 子树语义永不
+    // 组装, 每秒文本变化不产生任何语义更新 (AXTree 洪水源消除)。
+    // ⚠️ 形态学 (v0.0.9 闪退教训): ExcludeSemantics 若放 builder 内部,
+    // 每秒重建排除边界本身 → 引擎语义树"根节点缺失"损坏 → debug CHECK
+    // fatal (启动闪退已实证)。identity 稳定是安全前提。
+    // 时间信息已由进度条 Semantics (百分比 slider) 承载, 文本级朗读冗余。
+    return ExcludeSemantics(
+      child: ValueListenableBuilder<TimePair>(
+        valueListenable: _merged,
+        builder: (_, pair, _) {
+          return Text(
+            '${formatMs(pair.a)} / ${formatMs(pair.b)}',
+            style: const TextStyle(
+              color: Tokens.textSecondary,
+              fontSize: Tokens.fontCaption,
+              fontFeatures: [Tokens.tabularFigures],
+            ),
+          );
+        },
+      ),
     );
   }
 }
