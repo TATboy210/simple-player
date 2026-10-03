@@ -22,10 +22,36 @@ ThumbnailDiskCache brokenDisk() => ThumbnailDiskCache(
 /// macOS runner 负载波动) 传播所需事件轮次不可预测, 固定轮数是赌。
 /// 带 [until] 条件时泵到条件满足为止 (治本); 无条件时固定 8 轮兜底
 /// (holdJobs 挂起下 gate 恒满载, 多泵不会让断言过冲)。
-Future<void> settle([bool Function()? until]) async {
+/// 返回条件是否达成 (诊断用)。
+Future<bool> settle([bool Function()? until]) async {
   for (var i = 0; i < (until == null ? 8 : 500); i++) {
-    if (until != null && until()) return;
+    if (until != null && until()) return true;
     await pumpEventQueue();
+  }
+  return until == null || until();
+}
+
+/// 按实际挂起序放行 [count] 个 job — 请求进入 provider 的顺序 = 各自
+/// disk-read/identity 解析完成序 (CI 慢机上随机乱序), 按**固定 path 序**
+/// release 会错配落空 (job 未注册时 release 是静默 no-op), 对应 future
+/// 永挂 → 90s 超时 (G1/G5 曾在 CI 随机死锁的根因)。
+Future<void> releaseAllHeld(FakeThumbnailProvider fake, int count) async {
+  for (var i = 0; i < count; i++) {
+    final ok = await settle(() => fake.jobs.values.any((q) => q.isNotEmpty));
+    if (!ok) {
+      // ignore: avoid_print
+      print('releaseAllHeld STALL: round=$i calls=${fake.calls} '
+          'jobs=${fake.jobs.map((k, v) => MapEntry(k, v.length))} '
+          'active=${fake.active}');
+      // 条件未达成仍尝试放行 (旧契约) — 让断言给出真实差异而非静默挂起
+    }
+    final held = fake.jobs.entries
+        .where((e) => e.value.isNotEmpty)
+        .map((e) => e.key)
+        .toList();
+    if (held.isEmpty) break;
+    fake.release(held.first);
+    await settle();
   }
 }
 
@@ -545,11 +571,8 @@ void main() {
       expect(fake.peakActive, equals(2));
       expect(fake.calls, equals(2));
 
-      // 逐个 release + pump — gate 排队者需微任务推进才能进入 provider
-      for (final file in files) {
-        fake.release(file.path);
-        await settle();
-      }
+      // 逐个放行挂起 job — 乱序安全版 (见 releaseAllHeld 注释)
+      await releaseAllHeld(fake, files.length);
       for (final future in futures) {
         expect(await future, isNotNull);
       }
@@ -637,12 +660,8 @@ void main() {
 
         ThumbnailService.clearCache(); // globalEpoch++ 失效全部（含排队者）
 
-        fake.release(files[0].path);
-        await settle(() => fake.calls >= 3);
-        fake.release(files[1].path);
-        await settle(() => fake.calls >= 1);
-        fake.release(files[2].path);
-        await settle();
+        // 乱序安全放行 (进入序 = disk-read 完成序, 固定 path 序会错配落空)
+        await releaseAllHeld(fake, files.length);
 
         expect(await f0, isNotNull); // 旧请求仍拿到结果（MemoryImage）
         expect(await f1, isNotNull);
