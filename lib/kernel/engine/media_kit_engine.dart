@@ -80,6 +80,15 @@ class MediaKitEngine implements MediaEngine {
       // 后向缓冲 8MB = 8388608 (media_kit 默认喂 32MB) — 本地 seek 重读
       // 盘延迟微秒级, 大后向缓冲仅驻留已播数据白占 RSS.
       'demuxer-max-back-bytes': '8388608',
+      // ── 第二轮泄漏治理 (v0.0.9 UAT: 停播后 350MB 恒定不回落) ──
+      // 覆盖 media_kit 硬编码 keep-open=yes — 播放到末尾即卸载解码器
+      // 链 (loopAll 自动续播经 mpv playlist 处理不受影响; 仅 none 模式
+      // 播完的 UI 从"停最后帧"变"黑屏 idle", 可接受).
+      'keep-open': 'no',
+      // 硬解 surface 池压缩 — d3d11va 每张 1080p NV12 ~3MB, 默认池偏大.
+      'hwdec-extra-frames': '2',
+      // 秒维度兜底 — 高码率源下 bytes 上限被 secs 二次夹紧.
+      'demuxer-max-secs': '10',
     };
     for (final entry in tunedProps.entries) {
       unawaited(
