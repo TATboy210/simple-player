@@ -74,6 +74,9 @@ class PlayerServices {
   /// Media rendering engine (media_kit/libmpv wrapper).
   MediaEngine? _engine;
 
+  /// 内存治理状态锚点监听 (v0.0.9, debug/profile) — dispose 时摘除。
+  void Function()? _engineStateListener;
+
   MediaEngine get engine => _engine!;
 
   /// 播放控制编排器 — 单文件播放器门面.
@@ -170,6 +173,17 @@ class PlayerServices {
       };
       _engineCreated = true;
 
+      // 内存治理锚点 (v0.0.9, debug/profile) — 播放状态每次变化即时采样
+      // RSS 并带状态名入日志, 切曲 +60MB 阶梯可直接归因到具体状态事件。
+      if (!kReleaseMode) {
+        _engineStateListener = () {
+          if (MemoryMonitor.isInitialized) {
+            MemoryMonitor.I.sampleNow('state:${_engine?.state.value.name}');
+          }
+        };
+        _engine?.state.addListener(_engineStateListener!);
+      }
+
       _throwIfDisposed();
       _playerErrorBridge = PlayerErrorReportBridge(
         engine: engine,
@@ -237,6 +251,11 @@ class PlayerServices {
     // flushForExit (借用规则: 借用方销毁前解除对被借方的回调引用).
     _removeClosingListener?.call();
     _removeClosingListener = null;
+    // 摘内存锚点监听 — engine 即将销毁, 不得再触发采样。
+    if (_engineStateListener != null) {
+      _engine?.state.removeListener(_engineStateListener!);
+      _engineStateListener = null;
+    }
     if (_videoProcessingCreated) _disposeSafely(_videoProcessing?.dispose);
     // Detach diagnostics before disposing either notifier owner or callback user.
     _disposeSafely(_playerErrorBridge?.dispose);

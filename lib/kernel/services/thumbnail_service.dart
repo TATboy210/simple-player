@@ -97,7 +97,8 @@ class ThumbnailService {
   ThumbnailService._();
 
   /// LRU 容量 — 远大于典型可见区，万级媒体库内存驻留不是本架构目标
-  static const _maxCacheSize = 200;
+  /// (v0.0.9 内存治理: 200→120, 单张 decoded ~144KiB, 120 张 ≈ 17MB)
+  static const _maxCacheSize = 120;
 
   /// provider 并发上限（§20.1）— 两个并发提升吞吐又不无限堆 native decoder
   static const maxConcurrent = 2;

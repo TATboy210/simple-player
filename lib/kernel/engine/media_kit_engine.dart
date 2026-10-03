@@ -48,13 +48,53 @@ class MediaKitEngine implements MediaEngine {
   /// 单测不应实例化本类 (依赖 native libmpv); 纯逻辑走 [@visibleForTesting]
   /// 静态方法 ([mediaUriFromPath] / [audioTracksFromMediaKit] / ...).
   MediaKitEngine({PlayerConfiguration? configuration})
-    : _player = Player(
-        configuration: configuration ?? const PlayerConfiguration(),
-      ) {
+    : _player = Player(configuration: configuration ?? _memoryTunedConfig()) {
     // VideoController 依赖 _player, 须在 _player 初始化后创建.
     // late final 合法: 构造体立即赋值, 首次使用前必然已初始化.
     _controller = VideoController(_player);
     _subscribeStreams();
+    // 内存治理 mpv 属性 (v0.0.9) — 覆盖 media_kit 硬编码的全局默认.
+    _applyMemoryTunedGlobalProps();
+  }
+
+  /// 内存调优配置 (v0.0.9 内存治理) — media_kit 默认 bufferSize 32MB
+  /// 同时喂 `demuxer-max-bytes` 与 `demuxer-max-back-bytes` (双向共
+  /// 64MB). 本地文件读盘速度远超解码消耗, 16MB 前向 ≈ 4K UHD
+  /// (~50Mbps) 约 2.5s 缓冲, 不会因缓冲不足卡顿; 预期省 ~32MB RSS.
+  static PlayerConfiguration _memoryTunedConfig() =>
+      const PlayerConfiguration(bufferSize: 16 * 1024 * 1024);
+
+  /// 覆盖 media_kit 硬编码的全局 mpv 属性 (内存治理 v0.0.9).
+  ///
+  /// media_kit real.dart 初始化时硬编码 `cache-on-disk: yes` — 这是为
+  /// RTSP 网络流防延迟设计的, 本地文件播放磁盘缓存只增加磁盘 IO 与
+  /// 页缓存; 后向缓冲对本地文件同样过剩 (回退 seek 直接重读盘即可).
+  /// side effect: 异步 setProperty, 失败仅记 lastError 不阻塞播放.
+  void _applyMemoryTunedGlobalProps() {
+    if (_disposed) return;
+    final native = _nativePlayer;
+    if (native == null) return;
+    const tunedProps = <String, String>{
+      // 关磁盘 demuxer 缓存 — 本地文件无网络抖动可抗, 页缓存白占.
+      'cache-on-disk': 'no',
+      // 后向缓冲 8MB = 8388608 (media_kit 默认喂 32MB) — 本地 seek 重读
+      // 盘延迟微秒级, 大后向缓冲仅驻留已播数据白占 RSS.
+      'demuxer-max-back-bytes': '8388608',
+    };
+    for (final entry in tunedProps.entries) {
+      unawaited(
+        native.setProperty(entry.key, entry.value).catchError((Object error) {
+          _lastError.value = UnknownError(
+            '内存调优 mpv 属性应用失败: ${entry.key}=${entry.value}: $error',
+            null,
+            ErrorContext(
+              action: 'applyMemoryTunedProps',
+              module: 'MediaKitEngine',
+            ),
+          );
+        }),
+      );
+    }
   }
 
   final Player _player;

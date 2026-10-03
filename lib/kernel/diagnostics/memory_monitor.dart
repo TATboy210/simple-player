@@ -273,6 +273,20 @@ final class MemoryMonitor implements MemoryMonitorSlot {
     }
   }
 
+  /// 即时采样锚点 — 播放状态变化等关键事件时同步记录一次 RSS。
+  ///
+  /// 与周期采样共用环形缓冲与峰值跟踪; [reason] 进入日志, 便于事后把
+  /// RSS 阶梯与具体播放事件对齐 (v0.0.9 内存治理: 30s 周期无法归因
+  /// 切曲的 +60MB 阶梯, 状态锚点补此缺口)。
+  void sampleNow([String reason = 'manual']) {
+    final current = rssProvider.currentRss;
+    if (current > _peakRss) _peakRss = current;
+    _recordSample(current);
+    _lastRss = current;
+    final mb = (current / (1024 * 1024)).toStringAsFixed(1);
+    _logger?.info('[MemoryMonitor] RSS sample ($reason): $mb MB');
+  }
+
   /// 日志当前 RSS — 使用 [KernelLogger.info] (MEM-05 prep)。
   /// 2026-09-06 用户裁定：RSS 周期打点保留 info 级控制台可见性。
   void _logCurrent(int rssBytes) {

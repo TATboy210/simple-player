@@ -40,6 +40,12 @@ Future<void> main() {
         }
 
         KernelLoggerImpl.init();
+        // Dart 侧图像缓存治理 (v0.0.9 内存) — Flutter 默认 1000 条/100MB
+        // 对播放器场景过大 (缩略图 LRU 之外的双层缓存), 压到 500 条/32MB.
+        // 预期省 ~50-70MB RSS (大量列表滚动时) 且不产生可感知重解码.
+        PaintingBinding.instance.imageCache
+          ..maximumSize = 500
+          ..maximumSizeBytes = 32 << 20;
         // Install capture before any platform path or directory I/O can fail or stall.
         // 快照 effect（D-11）：错误卡片徽标轮览的呈现层有界快照数据源，
         // 经既有 effects 缝挂入 —— kernel 零改动（见 ErrorCaptureSnapshot 注释）。
