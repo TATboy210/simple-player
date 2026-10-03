@@ -583,64 +583,81 @@ void main() {
       final fake = FakeThumbnailProvider()..holdJobs = true;
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
-      final f0 = ThumbnailService.getThumbnail(files[0].path);
-      final f1 = ThumbnailService.getThumbnail(files[1].path);
-      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      // 乱序安全: 进入 provider 的顺序 = disk-read 完成序 (随机), "第一个
+      // task" = 先挂起 job 的那个 — 按 path 定向 fail 会错配落空。
+      final first3 = files.take(3).toList();
+      final futures = <String, Future<ImageProvider?>>{
+        for (final file in first3) file.path: ThumbnailService.getThumbnail(file.path),
+      };
       await settle(() => fake.calls >= 2);
+      await settle(() => fake.jobs.values.any((q) => q.isNotEmpty));
 
-      // 2 进 provider、1 排队 — 第一个抛异常 → slot 释放 → 排队者进入
-      fake.failJob(files[0].path, const FileSystemException('boom'));
+      // 2 进 provider、1 排队 — 先进入者抛异常 → slot 释放 → 排队者进入
+      final failedPath = fake.jobs.entries
+          .where((e) => e.value.isNotEmpty)
+          .map((e) => e.key)
+          .first;
+      fake.failJob(failedPath, const FileSystemException('boom'));
       await settle(() => fake.calls >= 3);
       expect(fake.calls, equals(3)); // 第 3 个已进入 provider
 
-      expect(await f0, isNull);
-      fake.release(files[1].path);
-      fake.release(files[2].path);
-      expect(await f1, isNotNull);
-      expect(await f2, isNotNull);
+      expect(await futures[failedPath]!, isNull);
+      await releaseAllHeld(fake, first3.length); // 剩余挂起 + 排队进入者
+      for (final entry in futures.entries) {
+        if (entry.key == failedPath) continue;
+        expect(await entry.value, isNotNull);
+      }
     });
 
     test('G3: task returning null releases its slot', () async {
       final fake = FakeThumbnailProvider()..holdJobs = true;
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
-      final f0 = ThumbnailService.getThumbnail(files[0].path);
-      final f1 = ThumbnailService.getThumbnail(files[1].path);
-      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      // 乱序安全 (同 G2): releaseNull 先挂起 job 的那个。
+      final first3 = files.take(3).toList();
+      final futures = <String, Future<ImageProvider?>>{
+        for (final file in first3) file.path: ThumbnailService.getThumbnail(file.path),
+      };
       await settle(() => fake.calls >= 2);
+      await settle(() => fake.jobs.values.any((q) => q.isNotEmpty));
 
-      fake.releaseNull(files[0].path);
+      final nullPath = fake.jobs.entries
+          .where((e) => e.value.isNotEmpty)
+          .map((e) => e.key)
+          .first;
+      fake.releaseNull(nullPath);
       await settle(() => fake.calls >= 3);
       expect(fake.calls, equals(3)); // null 结果同样归还 slot
 
-      expect(await f0, isNull);
-      fake.release(files[1].path);
-      fake.release(files[2].path);
-      expect(await f1, isNotNull);
-      expect(await f2, isNotNull);
+      expect(await futures[nullPath]!, isNull);
+      await releaseAllHeld(fake, first3.length);
+      for (final entry in futures.entries) {
+        if (entry.key == nullPath) continue;
+        expect(await entry.value, isNotNull);
+      }
     });
 
     test('G4: third request queues while two decodes are active', () async {
       final fake = FakeThumbnailProvider()..holdJobs = true;
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
-      final f0 = ThumbnailService.getThumbnail(files[0].path);
-      final f1 = ThumbnailService.getThumbnail(files[1].path);
-      final f2 = ThumbnailService.getThumbnail(files[2].path);
+      final futures = <Future<ImageProvider?>>[
+        for (final file in files.take(3)) ThumbnailService.getThumbnail(file.path),
+      ];
       await settle(() => fake.calls >= 2);
 
       expect(fake.active, equals(2));
       expect(fake.calls, equals(2)); // 第 3 个尚未触达 provider
       expect(fake.peakActive, equals(2));
 
-      fake.release(files[0].path);
-      await settle(() => fake.calls >= 3); // 第 3 个此时才进入 provider 并挂起 job
-      fake.release(files[1].path);
-      await settle(() => fake.calls >= 1);
-      fake.release(files[2].path);
-      await f0;
-      await f1;
-      await f2;
+      // 放行一个活跃 job → slot 移交排队者 → 第 3 个进入并挂起
+      await releaseAllHeld(fake, 1);
+      await settle(() => fake.calls >= 3);
+      // 放行剩余两个 (先进入的 1 个 + 排队进入的 1 个)
+      await releaseAllHeld(fake, 2);
+      for (final future in futures) {
+        expect(await future, isNotNull);
+      }
     });
 
     test(
