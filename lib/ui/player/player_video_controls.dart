@@ -1028,23 +1028,16 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // notifier 触发（build-boundary 契约），须 VLB 自身监听 settle 翻回。
     // null resizing（测试注入无 resize 源）走不包裹分支，保留既有语义断言。
     final resizing = widget.resizing;
+    // 测试旁路: 无 resize 源的注入场景保留裸树供语义契约断言 (生产恒非 null)。
     if (resizing == null) return controls;
-    // 自动隐藏期间同样丢弃语义 (v0.0.9 内存/卡顿治理): 控件视觉淡出后
-    // 隐藏态翻 false 若保留语义, 鼠标悬停触发显示时子树语义整树恢复,
-    // 经 accessibility_bridge 的已知序列化 bug 每次整树更新失败
-    // ("Nodes left pending by the update: 42") — 洪流白烧主线程。
-    // 隐藏态用户本就读不到控件, suppress 语义零可用性损失。
-    return ValueListenableBuilder<bool>(
-      valueListenable: resizing,
-      builder: (_, isResizing, child) => ValueListenableBuilder<bool>(
-        valueListenable: _autoHide.visible,
-        builder: (_, controlsVisible, innerChild) => ExcludeSemantics(
-          excluding: isResizing || !controlsVisible,
-          child: innerChild!,
-        ),
-        child: child,
-      ),
-      child: controls,
-    );
+    // 恒定丢弃 controls 子树语义 (v0.0.9 第三刀, 引擎 bug 规避终局):
+    // Flutter 引擎 accessibility_bridge 序列化 bug (#113741/#173118) 下,
+    // 本子树任何语义变化都携带整树 (42 节点) 更新并失败重试成洪流 —
+    // 已先后治理 resize (34 节点) / 隐藏态 / 时间文本三个驱动源, 但切曲
+    // (idle 瞬间布局切换) 与可见态残余源仍触发 (UAT 2026-10-03 实证)。
+    // 本应用为开发者个人桌面工具, 无读屏场景; 子树恒定排除后引擎不再
+    // 收到任何本域语义更新, 洪流归零。引擎修复 (#113741 close) 后可
+    // 恢复条件化排除。
+    return ExcludeSemantics(child: controls);
   }
 }

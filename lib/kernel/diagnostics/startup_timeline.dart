@@ -44,7 +44,10 @@ final class StartupTimeline {
 
   final bool _enabled;
 
-  final Stopwatch _stopwatch = Stopwatch();
+  /// 必须在字段初始化时 start — P2 瘦身曾误删 ..start() 致 elapsed 恒 0,
+  /// 全部打点归零 (2026-10-03 UAT 实证)。Release 下闲置 Stopwatch 仅是
+  /// 一个惰性读时钟对象, 成本可忽略 (mark/ready 已由 _enabled 早退)。
+  final Stopwatch _stopwatch = Stopwatch()..start();
 
   /// 有序打点表 — Dart Map 保持插入序，遍历即可还原阶段先后。
   final Map<String, int> _marks = {};

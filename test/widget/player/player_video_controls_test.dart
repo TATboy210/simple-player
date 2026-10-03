@@ -1349,18 +1349,15 @@ void main() {
       }
     });
 
-    testWidgets('resize 期间 suppress 控制栏语义 settle 后恢复（AXTree 洪流回归）', (
+    testWidgets('控制栏子树恒定语义排除（AXTree 洪流终局规避契约）', (
       tester,
     ) async {
-      // 回归 AXTree "Nodes left pending by the update: 34" 洪流：resize 期间
-      // 控制栏 visible 子树随 MediaQuery 每帧 re-emit semantics → bridge 每帧
-      // 同步失败。ExcludeSemantics(gated on resizing) 经 RenderExcludeSemantics
-      // .visitChildrenForSemantics 早返回，在 assembled owner 树中丢弃控制栏子树
-      // semantics；settle 后 VLB 翻回 excluding=false 恢复。非 playing 控制栏永显，
-      // 排除 auto-hide 干扰。
-      // 验证用 SemanticsOwner.rootSemanticsNode 遍历 assembled 树（find.bySemanticsLabel
-      // 查 renderObject.debugSemantics，ExcludeSemantics 翻转时子节点 debugSemantics
-      // 残留旧值不可靠——production 行为由 visitChildrenForSemantics 保证）。
+      // 契约升级 (v0.0.9 第三刀)：引擎 accessibility_bridge 序列化 bug
+      // (#113741/#173118) 下本子树任何语义更新都携带整树 (42 节点) 且失败
+      // 重试成洪流——时间文本/隐藏态/resize 三个驱动源逐个治理后切曲仍触发。
+      // 终局方案：controls 子树恒定 ExcludeSemantics，任何状态翻转
+      // (resize 上升/下降沿) 均不改变排除态；引擎修复后恢复条件化排除。
+      // 验证用 SemanticsOwner.rootSemanticsNode 遍历 assembled 树。
       final semanticsHandle = tester.ensureSemantics();
       final resizing = ValueNotifier<bool>(false);
       addTearDown(resizing.dispose);
@@ -1392,21 +1389,17 @@ void main() {
           actions: const PlayerActions(),
         );
 
-        // 基线：非 playing 控制栏永显，'Play' 在 assembled 语义树中。
-        expect(assembledSemanticsLabels(), contains('Play'));
+        // 恒定排除契约：基线即无 'Play' 语义（控制栏视觉正常显示）。
+        expect(assembledSemanticsLabels(), isNot(contains('Play')));
 
-        // resize 上升沿：ExcludeSemantics(excluding: true) 经
-        // RenderExcludeSemantics.visitChildrenForSemantics 早返回，控制栏子树
-        // semantics 从 assembled 树丢弃——AXTree 洪流源消除。
+        // resize 上升沿/下降沿：排除态不随状态翻转变化。
         resizing.value = true;
         await tester.pump();
         expect(assembledSemanticsLabels(), isNot(contains('Play')));
 
-        // settle：VLB 翻回 excluding=false，visitChildrenForSemantics 恢复遍历，
-        // 控制栏语义回到 assembled 树。
         resizing.value = false;
         await tester.pump();
-        expect(assembledSemanticsLabels(), contains('Play'));
+        expect(assembledSemanticsLabels(), isNot(contains('Play')));
       } finally {
         semanticsHandle.dispose();
       }
