@@ -58,11 +58,12 @@ class MediaKitEngine implements MediaEngine {
   }
 
   /// 内存调优配置 (v0.0.9 内存治理) — media_kit 默认 bufferSize 32MB
-  /// 同时喂 `demuxer-max-bytes` 与 `demuxer-max-back-bytes` (双向共
-  /// 64MB). 本地文件读盘速度远超解码消耗, 16MB 前向 ≈ 4K UHD
-  /// (~50Mbps) 约 2.5s 缓冲, 不会因缓冲不足卡顿; 预期省 ~32MB RSS.
+  /// 同时喂 `demuxer-max-bytes` 与 `demuxer-max-back-bytes`.
+  /// 保持默认 32MB (v0.0.9 第二轮曾压 16MB, 4K60 高码率下 5.5s 前向
+  /// 缓冲偏紧致卡顿, UAT 实证回退): 4K60 @ 23Mbps ≈ 2.9MB/s, 32MB
+  /// ≈ 11s 前向缓冲是流畅下限, 后向由 demuxer-max-back-bytes 单独压。
   static PlayerConfiguration _memoryTunedConfig() =>
-      const PlayerConfiguration(bufferSize: 16 * 1024 * 1024);
+      const PlayerConfiguration();
 
   /// 覆盖 media_kit 硬编码的全局 mpv 属性 (内存治理 v0.0.9).
   ///
@@ -85,8 +86,9 @@ class MediaKitEngine implements MediaEngine {
       // 链 (loopAll 自动续播经 mpv playlist 处理不受影响; 仅 none 模式
       // 播完的 UI 从"停最后帧"变"黑屏 idle", 可接受).
       'keep-open': 'no',
-      // 硬解 surface 池压缩 — d3d11va 每张 1080p NV12 ~3MB, 默认池偏大.
-      'hwdec-extra-frames': '2',
+      // ⚠️ hwdec-extra-frames=2 已回退 (v0.0.9 第二轮曾压, 4K60 实证
+      // 卡顿): d3d11va surface 池不足时解码器等渲染器回收, 高帧率高
+      // 分辨率下掉帧 — 4K NV12 每张 ~12MB, 压缩省的内存远不值卡顿。
       // 秒维度兜底 — 高码率源下 bytes 上限被 secs 二次夹紧.
       'demuxer-max-secs': '10',
     };
