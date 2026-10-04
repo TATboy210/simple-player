@@ -62,8 +62,11 @@ class MediaKitEngine implements MediaEngine {
   /// 保持默认 32MB (v0.0.9 第二轮曾压 16MB, 4K60 高码率下 5.5s 前向
   /// 缓冲偏紧致卡顿, UAT 实证回退): 4K60 @ 23Mbps ≈ 2.9MB/s, 32MB
   /// ≈ 11s 前向缓冲是流畅下限, 后向由 demuxer-max-back-bytes 单独压。
+  /// logLevel=info (4K 排障): 解码路径关键行 ("Using hardware decoding"
+  /// 等) 为 info 级, error 级完全看不到硬解实锤 — Dart 侧白名单过滤,
+  /// 不刷屏。
   static PlayerConfiguration _memoryTunedConfig() =>
-      const PlayerConfiguration();
+      const PlayerConfiguration(logLevel: MPVLogLevel.info);
 
   /// 覆盖 media_kit 硬编码的全局 mpv 属性 (内存治理 v0.0.9).
   ///
@@ -89,6 +92,10 @@ class MediaKitEngine implements MediaEngine {
       // ⚠️ hwdec-extra-frames=2 已回退 (v0.0.9 第二轮曾压, 4K60 实证
       // 卡顿): d3d11va surface 池不足时解码器等渲染器回收, 高帧率高
       // 分辨率下掉帧 — 4K NV12 每张 ~12MB, 压缩省的内存远不值卡顿。
+      // 硬解编解码白名单全覆盖 (4K 排障): mpv 默认名单不含全部格式,
+      // 格式不在名单 → 静默回退软解 → 4K60 必卡。all = 常见格式全走
+      // 硬解 (独占白名单格式仍由 mpv 自行降级并日志可见)。
+      'hwdec-codecs': 'all',
       // 秒维度兜底 — 高码率源下 bytes 上限被 secs 二次夹紧.
       'demuxer-max-secs': '10',
     };
@@ -1262,7 +1269,18 @@ class MediaKitEngine implements MediaEngine {
     _addSubscription(
       _player.stream.log.listen((entry) {
         if (_disposed) return;
-        if (entry.level != 'error' && entry.level != 'warn') return;
+        if (entry.level != 'error' && entry.level != 'warn') {
+          // 4K 排障白名单 (v0.0.9): 硬解/输出路径的关键 info 行放行 —
+          // "Using hardware decoding" / "VO:" 是实锤解码路径的唯一证据
+          // (logLevel=info 后 mpv 才会发出这些行, 其余 info 仍被挡).
+          final text = entry.text;
+          final isDiag = entry.level == 'info' &&
+              (text.contains('ardware decoding') ||
+                  text.contains('hwdec') ||
+                  text.contains('VO ') ||
+                  text.contains('video output'));
+          if (!isDiag) return;
+        }
         // logger 未初始化环境 (部分测试) 静默跳过 — 探针守卫对齐 keyboard_handler.
         if (!KernelLoggerImpl.isInitialized) return;
         KernelLoggerImpl.I.d(
