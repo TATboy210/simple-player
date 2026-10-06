@@ -88,7 +88,7 @@ final class ThumbnailMetrics {
 /// Invariants (P-Thumb v1.3.2):
 /// - Cache identity = `(normalized path, size, mtime, spec)` 的 SHA-256，
 ///   绝不用裸 path 当 key（X1/X5）。
-/// - Memory LRU 以 cacheKey 为键，容量上限 [_maxCacheSize] (200)。
+/// - Memory LRU 以 cacheKey 为键，容量上限 [_maxCacheSize]。
 /// - identity memo：path → identity 解析缓存，memory hit 全程零磁盘 I/O
 ///   (I10)；`evict(path)` 必须同步删除 memo 条目 (R5)。
 /// - All public methods are static — consumers call [ThumbnailService.xxx] directly.

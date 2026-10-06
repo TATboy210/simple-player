@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -319,7 +320,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    widget.debugOnBuild?.call();
+    // 重建探针只服务测试/调试; kReleaseMode 是编译期常量, Release 下整支树摇剔除
+    if (!kReleaseMode) widget.debugOnBuild?.call();
     return AnimatedBuilder(
       animation: widget.windowService.mode,
       // 视频子树经 child 参数传入 — AnimatedBuilder 的 child 在动画帧间
