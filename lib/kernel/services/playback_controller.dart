@@ -17,6 +17,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
+import '../diagnostics/network_diagnostics.dart';
 import '../engine/engine_state.dart';
 import '../scanner/folder_scanner.dart';
 import '../utils/debug_probe.dart';
@@ -41,7 +42,9 @@ class PlaybackController {
     this._onError,
     this._subtitleService,
     this._trackPreferenceService,
-  }) {
+    Future<NetworkInterfaceSnapshot?> Function()? networkSnapshotProvider,
+  }) : _networkSnapshotProvider =
+           networkSnapshotProvider ?? collectNetworkSnapshot {
     // v0.0.6.1 修复: 播放列表切换 (playEntryAt→jumpTo / 自动续播 / shuffle
     // 随机跳转) 从不经过 [openAndPlay], currentFileName/currentPath 因此
     // 永不更新 — 控制栏标题停留在上一个文件. 监听队列代数 + 引擎状态,
@@ -57,6 +60,9 @@ class PlaybackController {
 
   /// 错误回调 — 捕获异常时调用（null 表示忽略错误）
   final void Function(PlayerError error)? _onError;
+
+  /// 网络接口快照采集器 — 默认 [collectNetworkSnapshot], 测试可注入 fake (B5/9).
+  final Future<NetworkInterfaceSnapshot?> Function() _networkSnapshotProvider;
 
   /// 字幕服务 — 可选依赖，null 表示无外挂字幕支持
   final SubtitleService? _subtitleService;
@@ -182,12 +188,39 @@ class PlaybackController {
         currentPath.value = path;
         return true;
       case OpenError(:final error):
+        // B5/9: 网络流打开失败时附带本机接口摘要 (interfaceCount + hasNonLoopback),
+        // 帮助定位"本机离线"vs"远端不可达". isUrl 门控确保本地文件失败不触发查询.
+        if (PathValidator.isUrl(path)) {
+          await _enrichNetworkSnapshot(error);
+        }
         onError?.call(error);
         return false;
       case OpenSuperseded():
         // 旧请求被新请求淘汰，不提交任何属于旧请求的副作用。
         return false;
     }
+  }
+
+  /// 网络流打开失败时附带本机接口摘要 (B5/9).
+  ///
+  /// 调用 [_networkSnapshotProvider] 采集快照, 重建 [ErrorContext] 把
+  /// `networkInterfaceCount`/`networkHasNonLoopback` 附进错误上下文.
+  /// snapshot 为 null (降级/超时) 时无操作; 调用方负责 isUrl 门控.
+  /// ErrorContext 字段 final 故整体重建 (无 copyWith 惯例).
+  Future<void> _enrichNetworkSnapshot(PlayerError error) async {
+    final snapshot = await _networkSnapshotProvider();
+    if (snapshot == null) return;
+    final ctx = error.context;
+    error.context = ErrorContext(
+      action: ctx?.action,
+      generation: ctx?.generation,
+      path: ctx?.path,
+      timestamp: ctx?.timestamp,
+      module: ctx?.module,
+      callbackStackTrace: ctx?.callbackStackTrace,
+      networkInterfaceCount: snapshot.interfaceCount,
+      networkHasNonLoopback: snapshot.hasNonLoopback,
+    );
   }
 
   /// 构造装载队列: URL → 单元素; 本地文件 → 同目录视频扫描（文件名升序）.

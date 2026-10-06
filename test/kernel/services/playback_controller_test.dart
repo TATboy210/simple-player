@@ -298,6 +298,54 @@ void main() {
       );
     });
 
+    group('网络流打开失败附带接口摘要 (B5/9)', () {
+      test('URL 打开失败 → ErrorContext 含接口快照 (fake 注入确定性值)',
+          () async {
+        // 复用 setUp 的 engine, 重建 controller 注入 fake networkSnapshotProvider
+        // (确定性返回, 不依赖真实 NetworkInterface.list).
+        controller.dispose();
+        final localErrors = <PlayerError>[];
+        controller = PlaybackController(
+          engine: engine,
+          onError: localErrors.add,
+          networkSnapshotProvider: () async =>
+              (interfaceCount: 2, hasNonLoopback: true),
+        );
+        engine.failNextOpenWith = 'network unreachable';
+
+        final result = await controller.openAndPlay(
+          'http://example.com/stream.mp4',
+        );
+
+        expect(result, isFalse);
+        expect(localErrors, hasLength(1));
+        expect(localErrors.single.context, isNotNull);
+        expect(localErrors.single.context?.networkInterfaceCount, 2);
+        expect(localErrors.single.context?.networkHasNonLoopback, isTrue);
+      });
+
+      test('本地文件打开失败 → context 不含接口快照 (isUrl 门控跳过 enrichment)',
+          () async {
+        controller.dispose();
+        final localErrors = <PlayerError>[];
+        controller = PlaybackController(
+          engine: engine,
+          onError: localErrors.add,
+          networkSnapshotProvider: () async =>
+              (interfaceCount: 2, hasNonLoopback: true),
+        );
+        engine.failNextOpenWith = 'file corrupt';
+
+        final result = await controller.openAndPlay('C:/test/broken.mp4');
+
+        expect(result, isFalse);
+        expect(localErrors, hasLength(1));
+        // isUrl 门控: 本地路径不触发 enrichment, context 保持 engine 原样 (null).
+        expect(localErrors.single.context?.networkInterfaceCount, isNull);
+        expect(localErrors.single.context?.networkHasNonLoopback, isNull);
+      });
+    });
+
     group('stopCurrentMedia', () {
       test(
         'clears the published identity after the engine unloads media',

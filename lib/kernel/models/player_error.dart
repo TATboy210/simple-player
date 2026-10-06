@@ -90,6 +90,18 @@ class ErrorContext {
   /// mdk callback thread stack trace — populated only during cross-thread marshalling.
   final StackTrace? callbackStackTrace;
 
+  /// 本机网络接口数 — 网络流打开失败时附带的诊断值 (B5/9),
+  /// 帮助区分"本机离线"与"远端不可达". null 表示未采集 (本地文件路径或降级).
+  ///
+  /// Local network interface count — diagnostic value attached when a network
+  /// stream open fails (B5/9). null when not collected (local file path or degraded).
+  final int? networkInterfaceCount;
+
+  /// 是否存在非环回接口 — 网络流打开失败时附带的诊断值 (B5/9).
+  ///
+  /// Whether a non-loopback interface exists — diagnostic value (B5/9).
+  final bool? networkHasNonLoopback;
+
   ErrorContext({
     this.action,
     this.generation,
@@ -97,6 +109,8 @@ class ErrorContext {
     DateTime? timestamp,
     this.module,
     this.callbackStackTrace,
+    this.networkInterfaceCount,
+    this.networkHasNonLoopback,
   }) : timestamp = timestamp ?? DateTime.now();
 
   /// 序列化为 Map — 传给 KernelLogger.error(context:) 参数
@@ -110,6 +124,10 @@ class ErrorContext {
     if (module != null) 'module': module,
     if (callbackStackTrace != null)
       'callbackStackTrace': callbackStackTrace.toString(),
+    if (networkInterfaceCount != null)
+      'networkInterfaceCount': networkInterfaceCount,
+    if (networkHasNonLoopback != null)
+      'networkHasNonLoopback': networkHasNonLoopback,
   };
 }
 
