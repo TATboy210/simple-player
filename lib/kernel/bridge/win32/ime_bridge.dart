@@ -1,11 +1,50 @@
 import 'dart:ffi';
-import 'dart:ffi' as ffi;
 import 'dart:io' show Platform;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../diagnostics/kernel_logger.dart';
+
+// --- @Native external bindings (Dart 3.13 assetId 直连, B0 probe 5a GO) ---
+// B0 探针实测 assetId='user32' 无需 native-assets 注册即可解析 user32 独有
+// 函数 (GetDoubleClickTime 返回 500ms)。原 DynamicLibrary.open+lookupFunction
+// 被替换为声明式 @Native external; user32 在 Windows 恒存在,无解析失败路径。
+
+/// user32!FindWindowW — 按类名(可选+窗口名)定位顶层窗口,找不到返回 0。
+///
+/// native HWND 是指针宽度,用 `IntPtr` 承载;LPCWSTR 按 UTF-16 布局以
+/// `Pointer<Uint16>` 传入(Utf16 与 Uint16 同为 16 位,cast 是 FFI 惯用法)。
+@Native<IntPtr Function(Pointer<Uint16>, Pointer<Uint16>)>(
+  symbol: 'FindWindowW',
+  assetId: 'user32',
+)
+external int _findWindowW(Pointer<Uint16> lpClassName, Pointer<Uint16> lpWindowName);
+
+/// user32!SendMessageTimeoutW — 投递消息并等待目标线程处理(跨线程安全)。
+///
+/// LRESULT/UINT/WPARAM/LPARAM 分别用 IntPtr/Uint32/UintPtr/UintPtr 承载;
+/// 第七参数 PDWORD_PTR 指向 handler 返回值。返回非零=投递成功。
+@Native<
+  IntPtr Function(
+    IntPtr,
+    Uint32,
+    UintPtr,
+    UintPtr,
+    Uint32,
+    Uint32,
+    Pointer<UintPtr>,
+  )
+>(symbol: 'SendMessageTimeoutW', assetId: 'user32')
+external int _sendMessageTimeoutW(
+  int hwnd,
+  int message,
+  int wparam,
+  int lparam,
+  int fuFlags,
+  int uTimeout,
+  Pointer<UintPtr> lpdwResult,
+);
 
 /// Win32 IME 桥 — 窗口级输入法上下文开关（跨线程消息版）。
 ///
@@ -120,32 +159,15 @@ class Win32ImeBridge {
   /// 定位 runner 主窗口 — FindWindowW 按类名查找（不依赖前台窗口）.
   int _resolveRunnerWindow() => _fns.findWindow(_windowClassName);
 
-  /// 生产 FFI 函数束 — 从 user32.dll 解析.
+  /// 生产 FFI 函数束 — 调用顶层 @Native external 绑定(Dart 3.13 assetId 直连).
   static Win32ImeFunctions _resolveDefaultFunctions() {
-    final user32 = ffi.DynamicLibrary.open('user32.dll');
-    final findWindowW = user32.lookupFunction<
-      IntPtr Function(Pointer<Uint16>, Pointer<Uint16>),
-      int Function(Pointer<Uint16>, Pointer<Uint16>)
-    >('FindWindowW');
-    final sendMessageTimeoutW = user32.lookupFunction<
-      IntPtr Function(
-        IntPtr,
-        Uint32,
-        UintPtr,
-        UintPtr,
-        Uint32,
-        Uint32,
-        Pointer<UintPtr>,
-      ),
-      int Function(int, int, int, int, int, int, Pointer<UintPtr>)
-    >('SendMessageTimeoutW');
     return Win32ImeFunctions(
       findWindow: (className) {
         final namePtr = className.toNativeUtf16();
         try {
           // Utf16 与 Uint16 同为 16 位布局，cast 是 FFI 标准惯用法；
           // 第二参数 nullptr — 不按窗口标题过滤，仅按类名.
-          return findWindowW(namePtr.cast<Uint16>(), nullptr);
+          return _findWindowW(namePtr.cast<Uint16>(), nullptr);
         } finally {
           calloc.free(namePtr);
         }
@@ -155,7 +177,7 @@ class Win32ImeBridge {
         try {
           // 返回非零 = 投递成功；lpdwResult 为目标窗口处理返回值 —
           // handler 返回 TRUE 表示切换已执行，二者同时成立才算成功.
-          final sent = sendMessageTimeoutW(
+          final sent = _sendMessageTimeoutW(
             hwnd,
             message,
             wparam,

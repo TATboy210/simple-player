@@ -38,12 +38,10 @@ final class _OSVERSIONINFOW extends Struct {
 }
 
 typedef _RtlGetVersionNative = Int32 Function(Pointer<_OSVERSIONINFOW>);
-typedef _RtlGetVersionDart = int Function(Pointer<_OSVERSIONINFOW>);
 
 // --- FFI: GetShellWindow ---
 
 typedef _GetShellWindowNative = Pointer<Void> Function();
-typedef _GetShellWindowDart = Pointer<Void> Function();
 
 // --- FFI: DwmGetWindowAttribute ---
 
@@ -53,7 +51,39 @@ typedef _DwmGetWindowAttributeNative = Int32 Function(
   Pointer<Void> pvAttribute,
   Uint32 cbAttribute,
 );
-typedef _DwmGetWindowAttributeDart = int Function(
+
+// --- @Native external bindings (Dart 3.13 assetId 直连, B0 probe 5a GO) ---
+// 复用上方 native-side typedef 作 @Native 类型实参(B0 探针用内联类型,本文件
+// 已有 typedef 故直接复用;两种形态对 native 签名等价)。原 lookupFunction 的
+// Dart-side typedef 已删除。probe() 的 on Exception catch 是三个 @Native 调用
+// 的统一捕获点 — 解析失败语义与 lookupFunction 时代一致(null 降级)。
+
+/// ntdll!RtlGetVersion — 读取 OSVERSIONINFOW.dwBuildNumber。
+///
+/// 注意:assetId 'ntdll' 在 B0 探针中**未实测**(探针只验证了 user32)。
+/// 若 UAT 实机探测失败,按 5c 兜底回退本函数为
+/// `DynamicLibrary.open('ntdll.dll')` + `lookupFunction`(混合模式合法且优先于
+/// 强制单一模式)——作为后续 quick task 实施,勿在此处预判。
+@Native<_RtlGetVersionNative>(symbol: 'RtlGetVersion', assetId: 'ntdll')
+external int _rtlGetVersion(Pointer<_OSVERSIONINFOW> info);
+
+/// user32!GetShellWindow — 返回 shell(Progman) 顶层窗口 HWND。
+///
+/// B0 探针已验证 assetId 'user32' 解析 user32 独有函数成功。
+@Native<_GetShellWindowNative>(symbol: 'GetShellWindow', assetId: 'user32')
+external Pointer<Void> _getShellWindow();
+
+/// dwmapi!DwmGetWindowAttribute — 查询窗口的 DWM 属性值。
+///
+/// 注意:assetId 'dwmapi' 在 B0 探针中**未实测**(探针只验证了 user32)。
+/// 若 UAT 实机探测失败,按 5c 兜底回退本函数为
+/// `DynamicLibrary.open('dwmapi.dll')` + `lookupFunction`(混合模式合法且优先于
+/// 强制单一模式)——作为后续 quick task 实施,勿在此处预判。
+@Native<_DwmGetWindowAttributeNative>(
+  symbol: 'DwmGetWindowAttribute',
+  assetId: 'dwmapi',
+)
+external int _dwmGetWindowAttribute(
   Pointer<Void> hwnd,
   int dwAttribute,
   Pointer<Void> pvAttribute,
@@ -194,16 +224,10 @@ class DwmCapabilitiesProbe {
 
   /// RtlGetVersion → dwBuildNumber (integer-exact, ENAB-01)
   int? _readBuildNumber() {
-    final ntdll = DynamicLibrary.open('ntdll.dll');
-    final rtlGetVersion = ntdll
-        .lookupFunction<_RtlGetVersionNative, _RtlGetVersionDart>(
-          'RtlGetVersion',
-        );
-
     final info = malloc<_OSVERSIONINFOW>();
     try {
       info.ref.dwOSVersionInfoSize = sizeOf<_OSVERSIONINFOW>();
-      final status = rtlGetVersion(info);
+      final status = _rtlGetVersion(info);
       if (status != 0) {
         _logger.e(
           '[DwmCapabilities] RtlGetVersion status=0x${status.toRadixString(16)}',
@@ -218,21 +242,15 @@ class DwmCapabilitiesProbe {
 
   /// GetShellWindow → shell (Progman) HWND
   Pointer<Void> _getShellHwnd() {
-    final user32 = DynamicLibrary.open('user32.dll');
-    final getShellWindow = user32
-        .lookupFunction<_GetShellWindowNative, _GetShellWindowDart>(
-          'GetShellWindow',
-        );
-    return getShellWindow();
+    return _getShellWindow();
   }
 
-  /// DwmGetWindowAttribute lookup
+  /// DwmGetWindowAttribute lookup — 返回顶层 @Native 绑定的 tear-off。
+  ///
+  /// 保留 helper 形态以最小化改动(probe() 的 4 个调用站与赋值行不变);
+  /// @Native external 函数可作顶层函数引用 tear-off。
   int Function(Pointer<Void>, int, Pointer<Void>, int)
   _lookupDwmGetWindowAttribute() {
-    final dwmapi = DynamicLibrary.open('dwmapi.dll');
-    return dwmapi.lookupFunction<
-      _DwmGetWindowAttributeNative,
-      _DwmGetWindowAttributeDart
-    >('DwmGetWindowAttribute');
+    return _dwmGetWindowAttribute;
   }
 }
