@@ -193,7 +193,9 @@ class PlaybackController {
   /// 构造装载队列: URL → 单元素; 本地文件 → 同目录视频扫描（文件名升序）.
   /// 目标不在扫描结果（权限/时序等异常）→ 退化为单元素队列, 打开绝不因此失败.
   static Future<List<String>> _buildQueuePaths(String path) async {
-    if (_isNetworkPath(path)) return <String>[path];
+    // URL 早退 — 委托 PathValidator 的 URL 判定 (7-scheme 单一真相源:
+    // http/https/rtmp/rtsp/srt/udp/tcp), 避免对 URL 做无意义的同目录扫描.
+    if (PathValidator.isUrl(path)) return <String>[path];
     final scanned = await FolderScanner.scan(FolderScanner.directoryOf(path));
     if (scanned.isEmpty) return <String>[path];
     final paths = <String>[for (final file in scanned) file.path];
@@ -216,15 +218,6 @@ class PlaybackController {
     return paths.indexWhere(
       (candidate) => PathUtils.basename(candidate).toLowerCase() == base,
     );
-  }
-
-  /// 是否网络流地址（PathValidator 同款 scheme 语义）— 不做同目录扫描.
-  static bool _isNetworkPath(String path) {
-    const schemes = <String>['http://', 'https://', 'rtsp://', 'rtmp://'];
-    for (final scheme in schemes) {
-      if (path.startsWith(scheme)) return true;
-    }
-    return false;
   }
 
   /// 停止并卸载当前媒体.

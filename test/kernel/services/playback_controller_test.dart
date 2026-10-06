@@ -261,6 +261,41 @@ void main() {
           expect(controller.currentPath.value, 'C:/test/latest.mp4');
         },
       );
+
+      test(
+        'network URL schemes produce single-element queue — no same-directory scan (B7/9)',
+        () async {
+          engine.configureMedia(durationMs: 60000);
+          const urls = <String>[
+            'http://example.com/stream.mp4',
+            'https://example.com/stream.mp4',
+            'rtsp://example.com/stream',
+            'rtmp://example.com/stream',
+            'srt://example.com:1234/stream',
+            'udp://example.com:1234',
+            'tcp://example.com:1234',
+          ];
+          for (final url in urls) {
+            // Reset per-iteration call tracking so each scheme is independently verified.
+            engine.openPlaylistCallCount = 0;
+            engine.lastOpenPlaylistPaths = null;
+            final result = await controller.openAndPlay(url);
+            expect(result, true, reason: 'openAndPlay should succeed for $url');
+            expect(
+              engine.openPlaylistCallCount,
+              1,
+              reason: 'engine.openPlaylist called exactly once for $url',
+            );
+            expect(
+              engine.lastOpenPlaylistPaths,
+              <String>[url],
+              reason: 'queue should be single-element [$url] via '
+                  'PathValidator.isUrl early return, not a same-directory scan '
+                  'result',
+            );
+          }
+        },
+      );
     });
 
     group('stopCurrentMedia', () {
