@@ -18,9 +18,8 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # Build with new fullscreen enabled for RC releases
       - name: Build Windows
-        run: flutter build windows --dart-define=USE_NEW_FULLSCREEN=true
+        run: flutter build windows
 
       # Create MSIX package using pubspec.yaml msix_config
       - name: Create MSIX

@@ -2,7 +2,7 @@
 
 **Branch:** feat/v1.8-stability-polish-plan-02-02
 **Build:** {commit hash}
-**Flags:** USE_NEW_FULLSCREEN={true|false}, USE_WINDOWS_NATIVE_FULLSCREEN={true|false}
+**Flags:** USE_WINDOWS_NATIVE_FULLSCREEN={true|false}
 **Date:** 2026-07-10
 **Tester:** CI / Manual
 
@@ -83,7 +83,6 @@ Every test run MUST record:
 |------------------------------------|--------------------------------------|
 | Branch                             | Git branch name                      |
 | Commit                             | Git commit hash                      |
-| USE_NEW_FULLSCREEN                 | true / false                         |
 | USE_WINDOWS_NATIVE_FULLSCREEN      | true / false                         |
 | Flutter SDK version                | flutter --version output             |
 | Date                               | YYYY-MM-DD                           |

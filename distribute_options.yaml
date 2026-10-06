@@ -6,5 +6,4 @@ releases:
         package:
           platform: windows
           target: msix
-          build_args:
-            - --dart-define=USE_MOCK_ENGINE=false
+          build_args: []
