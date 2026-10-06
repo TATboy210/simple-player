@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter/painting.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+
+import '../diagnostics/kernel_logger.dart';
 
 /// 磁盘缓存限额（P-Thumb v1.3.2 §17）
 ///
@@ -38,6 +41,130 @@ final class ThumbnailDiskCacheLimits {
   static const ThumbnailDiskCacheLimits production = ThumbnailDiskCacheLimits();
 }
 
+/// 清理结果摘要 — 跨 isolate 边界回传的可发送 record
+///
+/// Sendable summary returned from the worker isolate for main-isolate logging.
+typedef CleanupSummary = ({int freedBytes, int evictedCount, int survivors});
+
+/// Isolate 运行器抽象 — 匹配 [Isolate.run] 签名, 测试可注入假实现
+///
+/// Matches [Isolate.run]'s signature exactly; tests inject a fake to simulate
+/// [IsolateSpawnException] without spawning a real isolate.
+typedef DiskCacheIsolateRunner<T> = Future<T> Function(
+  FutureOr<T> Function() task,
+);
+
+/// 隔离执行的清理纯函数 — age 淘汰 + 水位淘汰（§17.4/§17.5）
+///
+/// 在 worker isolate 中运行; 只接收 sendable 参数 (路径 String / 限额值
+/// 对象 / hash pattern String / 当前 DateTime)。Directory/RegExp 在函数
+/// 内部重建, 绝不捕获跨 isolate 不可发送的对象。
+///
+/// 语义与原内联清理逐字节一致: D8 .part 1hr 淘汰 / D10 age 淘汰 / 水位
+/// oldest-first 淘汰。返回 [CleanupSummary] 供主 isolate 日志记录。
+///
+/// 目录扫描失败返回零摘要 (与原 early-return 一致); 单文件 stat/delete
+/// 失败 best-effort 继续。
+Future<CleanupSummary> runDiskCacheCleanupInIsolate({
+  required String directoryPath,
+  required ThumbnailDiskCacheLimits limits,
+  required String hashPattern,
+  required DateTime now,
+}) async {
+  final dir = Directory(directoryPath);
+  final safeHash = RegExp(hashPattern);
+  final survivors = <(File, FileStat)>[];
+  var totalBytes = 0;
+  var freedBytes = 0;
+  var evictedCount = 0;
+
+  try {
+    final entries = await dir.list(followLinks: false).toList();
+
+    for (final entry in entries) {
+      if (entry is! File) continue;
+
+      final name = p.basename(entry.path);
+
+      // D8：崩溃残留的 .part — 超过 1 小时即删
+      if (name.endsWith('.part')) {
+        try {
+          final stat = await entry.stat();
+          if (now.difference(stat.modified) > const Duration(hours: 1)) {
+            await entry.delete();
+            freedBytes += stat.size;
+            evictedCount++;
+          }
+        } on FileSystemException {
+          // best effort
+        }
+        continue;
+      }
+
+      if (!name.endsWith('.jpg')) continue;
+      final stem = name.substring(0, name.length - 4);
+      if (!safeHash.hasMatch(stem)) continue;
+
+      try {
+        final stat = await entry.stat();
+
+        // D10：age 超限直接淘汰（不占水位）
+        if (now.difference(stat.modified) > limits.maxAge) {
+          await entry.delete();
+          freedBytes += stat.size;
+          evictedCount++;
+          continue;
+        }
+
+        totalBytes += stat.size;
+        survivors.add((entry, stat));
+      } on FileSystemException {
+        // best effort — 文件可能已被并发删除
+      }
+    }
+  } on FileSystemException {
+    // 目录扫描失败 — 本轮放弃, 下轮重试; 返回零摘要 (与原 early-return 一致)
+    return (freedBytes: 0, evictedCount: 0, survivors: 0);
+  }
+
+  // 水位检查 — 未超限直接返回
+  if (survivors.length <= limits.maxEntries &&
+      totalBytes <= limits.maxBytes) {
+    return (
+      freedBytes: freedBytes,
+      evictedCount: evictedCount,
+      survivors: survivors.length,
+    );
+  }
+
+  // oldest-first 淘汰到水位（§17.4）
+  survivors.sort((a, b) => a.$2.modified.compareTo(b.$2.modified));
+  var currentBytes = totalBytes;
+  var currentCount = survivors.length;
+
+  for (final (file, stat) in survivors) {
+    if (currentCount <= limits.targetEntries &&
+        currentBytes <= limits.targetBytes) {
+      break;
+    }
+    try {
+      await file.delete();
+      currentBytes -= stat.size;
+      currentCount--;
+      freedBytes += stat.size;
+      evictedCount++;
+    } on FileSystemException {
+      // best effort
+    }
+  }
+
+  return (
+    freedBytes: freedBytes,
+    evictedCount: evictedCount,
+    survivors: currentCount,
+  );
+}
+
 /// 磁盘缓存 — 持久化 JPEG 存储（P-Thumb v1.3.2 §16，v1.3 从 Provider 上移的职责）
 ///
 /// Persistent JPEG store keyed by 64-hex cache key. Responsibilities:
@@ -57,12 +184,18 @@ final class ThumbnailDiskCache {
     Future<Directory> Function()? resolveDirectory,
     DateTime Function()? now,
     this.limits = ThumbnailDiskCacheLimits.production,
+    DiskCacheIsolateRunner<CleanupSummary>? isolateRunner,
   }) : _resolveDirectory =
            resolveDirectory ?? ThumbnailDiskCache._defaultResolve,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _isolateRunner = isolateRunner ??
+           ((task) => Isolate.run(task));
 
   final Future<Directory> Function() _resolveDirectory;
   final DateTime Function() _now;
+
+  /// 清理计算执行点 — 默认 [Isolate.run]; 测试注入假实现模拟 spawn 失败
+  final DiskCacheIsolateRunner<CleanupSummary> _isolateRunner;
 
   /// 限额 — 公开只读，测试缩小以驱动水位/age 淘汰（D9/D10）
   final ThumbnailDiskCacheLimits limits;
@@ -261,7 +394,32 @@ final class ThumbnailDiskCache {
 
   bool _isSafeHash(String cacheKey) => _safeHashPattern.hasMatch(cacheKey);
 
+  /// 防御性 info 日志 — 包裹 KernelLogger, 测试中未初始化 logger 时静默降级
+  /// (匹配 isolated_error_log_sink.dart:402-411 降级模式)
+  void _logInfo(String message, {Map<String, Object?>? context}) {
+    try {
+      KernelLogger.I.info(message, context: context);
+    } on Object {
+      // 测试中 KernelLogger 可能未初始化 — 静默降级, 不影响清理流程
+    }
+  }
+
+  /// 防御性 warn 日志 — 包裹 KernelLogger, 测试中未初始化 logger 时静默降级
+  void _logWarn(String message, {Map<String, Object?>? context}) {
+    try {
+      KernelLogger.I.warn(message, context: context);
+    } on Object {
+      // 测试中 KernelLogger 可能未初始化 — 静默降级
+    }
+  }
+
   /// 清理主体 — age 淘汰 + 水位淘汰（§17.4/§17.5）
+  ///
+  /// 计算与删除在 worker isolate 中执行 (via [Isolate.run]), 释放主 isolate
+  /// 事件循环; [IsolateSpawnException] 降级为内联 async 路径 (匹配项目降级
+  /// 哲学 — isolated_error_log_sink.dart spawn 失败回退 ErrorLogFileSink)。
+  /// 闭包只捕获可发送数据 (路径 String / 限额值对象 / pattern String /
+  /// DateTime), Directory/RegExp 在 isolate 内部重建。
   ///
   /// 排序依据 file.stat().modified 作为 approximate recency；
   /// 不承诺跨重启绝对 LRU（X9：不为此制造每次 hit 的磁盘写）。
@@ -270,77 +428,47 @@ final class ThumbnailDiskCache {
     if (dir == null) return;
 
     final now = _now();
-    final survivors = <(File, FileStat)>[];
-    var totalBytes = 0;
+    final dirPath = dir.path;
+    final hashPatternStr = _safeHashPattern.pattern;
+    // 提取限额到局部变量 — 闭包只捕获 sendable 数据, 避免 `this` 跨 isolate
+    final cachedLimits = limits;
 
     try {
-      final entries = await dir.list(followLinks: false).toList();
-
-      for (final entry in entries) {
-        if (entry is! File) continue;
-
-        final name = p.basename(entry.path);
-
-        // D8：崩溃残留的 .part — 超过 1 小时即删
-        if (name.endsWith('.part')) {
-          try {
-            final stat = await entry.stat();
-            if (now.difference(stat.modified) > const Duration(hours: 1)) {
-              await entry.delete();
-            }
-          } on FileSystemException {
-            // best effort
-          }
-          continue;
-        }
-
-        if (!name.endsWith('.jpg')) continue;
-        final stem = name.substring(0, name.length - 4);
-        if (!_safeHashPattern.hasMatch(stem)) continue;
-
-        try {
-          final stat = await entry.stat();
-
-          // D10：age 超限直接淘汰（不占水位）
-          if (now.difference(stat.modified) > limits.maxAge) {
-            await entry.delete();
-            continue;
-          }
-
-          totalBytes += stat.size;
-          survivors.add((entry, stat));
-        } on FileSystemException {
-          // best effort — 文件可能已被并发删除
-        }
-      }
-    } on FileSystemException {
-      // 目录扫描失败 — 本轮放弃，下轮重试
-      return;
-    }
-
-    // 水位检查 — 未超限直接返回
-    if (survivors.length <= limits.maxEntries &&
-        totalBytes <= limits.maxBytes) {
-      return;
-    }
-
-    // oldest-first 淘汰到水位（§17.4）
-    survivors.sort((a, b) => a.$2.modified.compareTo(b.$2.modified));
-    var currentBytes = totalBytes;
-    var currentCount = survivors.length;
-
-    for (final (file, stat) in survivors) {
-      if (currentCount <= limits.targetEntries &&
-          currentBytes <= limits.targetBytes) {
-        break;
-      }
-      try {
-        await file.delete();
-        currentBytes -= stat.size;
-        currentCount--;
-      } on FileSystemException {
-        // best effort
-      }
+      final summary = await _isolateRunner(
+        () => runDiskCacheCleanupInIsolate(
+          directoryPath: dirPath,
+          limits: cachedLimits,
+          hashPattern: hashPatternStr,
+          now: now,
+        ),
+      );
+      _logInfo(
+        'thumbnail disk cache cleanup finished',
+        context: {
+          'freedBytes': summary.freedBytes,
+          'evictedCount': summary.evictedCount,
+          'survivors': summary.survivors,
+        },
+      );
+    } on IsolateSpawnException catch (e) {
+      _logWarn(
+        'isolate cleanup unavailable — falling back to inline',
+        context: {'error': e.toString()},
+      );
+      final summary = await runDiskCacheCleanupInIsolate(
+        directoryPath: dirPath,
+        limits: cachedLimits,
+        hashPattern: hashPatternStr,
+        now: now,
+      );
+      _logInfo(
+        'thumbnail disk cache cleanup finished (inline fallback)',
+        context: {
+          'freedBytes': summary.freedBytes,
+          'evictedCount': summary.evictedCount,
+          'survivors': summary.survivors,
+        },
+      );
     }
   }
 }
