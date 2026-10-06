@@ -40,8 +40,11 @@ abstract final class MpvPropertyMapper {
   ///
   /// 与 [mapVolumeToMpv] 互逆 (引擎 stream 回声反解用); v=100 时浮点
   /// 可能微超 1.0, 必须 clamp. 输入本身也 clamp (防外部异常值).
-  static double mapVolumeFromMpv(double v) =>
-      math.pow((v / 100).clamp(0.0, 1.0), 3).toDouble().clamp(0.0, 1.0).toDouble();
+  static double mapVolumeFromMpv(double v) => math
+      .pow((v / 100).clamp(0.0, 1.0), 3)
+      .toDouble()
+      .clamp(0.0, 1.0)
+      .toDouble();
 
   /// 静音开关 → mpv `mute` 属性 — 原生静音, 音量属性不动.
   ///

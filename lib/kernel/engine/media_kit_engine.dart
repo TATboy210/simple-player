@@ -101,22 +101,27 @@ class MediaKitEngine implements MediaEngine {
     };
     for (final entry in tunedProps.entries) {
       unawaited(
-        native.setProperty(entry.key, entry.value).then((_) {
-          // 成功路径日志 — 内存治理的属性必须可验证生效 (UAT 归因依赖).
-          if (!KernelLoggerImpl.isInitialized) return;
-          KernelLoggerImpl.I.i(
-            'mpv 内存调优属性已应用: ${entry.key}=${entry.value}',
-          );
-        }, onError: (Object error) {
-          _lastError.value = UnknownError(
-            '内存调优 mpv 属性应用失败: ${entry.key}=${entry.value}: $error',
-            null,
-            ErrorContext(
-              action: 'applyMemoryTunedProps',
-              module: 'MediaKitEngine',
+        native
+            .setProperty(entry.key, entry.value)
+            .then(
+              (_) {
+                // 成功路径日志 — 内存治理的属性必须可验证生效 (UAT 归因依赖).
+                if (!KernelLoggerImpl.isInitialized) return;
+                KernelLoggerImpl.I.i(
+                  'mpv 内存调优属性已应用: ${entry.key}=${entry.value}',
+                );
+              },
+              onError: (Object error) {
+                _lastError.value = UnknownError(
+                  '内存调优 mpv 属性应用失败: ${entry.key}=${entry.value}: $error',
+                  null,
+                  ErrorContext(
+                    action: 'applyMemoryTunedProps',
+                    module: 'MediaKitEngine',
+                  ),
+                );
+              },
             ),
-          );
-        }),
       );
     }
   }
@@ -560,10 +565,7 @@ class MediaKitEngine implements MediaEngine {
       }
       // 乐观镜像; index 不变 (追加不动当前播放). 空队列首次追加时保持 -1
       // (mpv playlist-playing-pos 语义: 未播放即 -1), 由 jumpTo/stream 纠正.
-      _queuePaths.value = List.unmodifiableOf([
-        ..._queuePaths.value,
-        ...paths,
-      ]);
+      _queuePaths.value = List.unmodifiableOf([..._queuePaths.value, ...paths]);
       _touchQueueRevision();
     } on Exception catch (error, stackTrace) {
       _lastError.value = UnknownError(
@@ -646,9 +648,7 @@ class MediaKitEngine implements MediaEngine {
     if (current > index) {
       nextIndex = current - 1;
     } else if (current == index) {
-      nextIndex = remaining.isEmpty
-          ? -1
-          : index.clamp(0, remaining.length - 1);
+      nextIndex = remaining.isEmpty ? -1 : index.clamp(0, remaining.length - 1);
     }
     _queuePaths.value = List.unmodifiableOf(remaining);
     _queueIndex.value = nextIndex;
@@ -1274,7 +1274,8 @@ class MediaKitEngine implements MediaEngine {
           // "Using hardware decoding" / "VO:" 是实锤解码路径的唯一证据
           // (logLevel=info 后 mpv 才会发出这些行, 其余 info 仍被挡).
           final text = entry.text;
-          final isDiag = entry.level == 'info' &&
+          final isDiag =
+              entry.level == 'info' &&
               (text.contains('ardware decoding') ||
                   text.contains('hwdec') ||
                   text.contains('VO ') ||

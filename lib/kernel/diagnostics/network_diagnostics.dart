@@ -6,7 +6,8 @@ import 'dart:io';
 typedef NetworkInterfaceSnapshot = ({int interfaceCount, bool hasNonLoopback});
 
 /// 可注入的网络接口枚举器 — 测试用 fake 替身, 不依赖真实网络.
-typedef NetworkInterfaceEnumerator = Future<List<({bool isLoopback})>> Function();
+typedef NetworkInterfaceEnumerator =
+    Future<List<({bool isLoopback})>> Function();
 
 /// 采集本机网络接口摘要 — 网络流打开失败时附带进 ErrorContext 供"出错可定位"
 /// 回溯. 静默降级: 枚举/超时/异常均返回 null, 不阻断错误处理主路径.
@@ -15,7 +16,9 @@ Future<NetworkInterfaceSnapshot?> collectNetworkSnapshot({
   Duration timeout = const Duration(seconds: 2),
 }) async {
   try {
-    final interfaces = await (enumerate ?? _defaultEnumerate)().timeout(timeout);
+    final interfaces = await (enumerate ?? _defaultEnumerate)().timeout(
+      timeout,
+    );
     return (
       interfaceCount: interfaces.length,
       hasNonLoopback: interfaces.any((i) => !i.isLoopback),

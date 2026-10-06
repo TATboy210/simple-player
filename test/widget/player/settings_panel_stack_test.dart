@@ -71,7 +71,10 @@ void main() {
               playlistCoordinator: coordinator,
               settingsVisible: settingsVisible,
               emptyState: withEmptyState
-                  ? EmptyState(engineState: engine.state, onOpenFile: onOpenFile)
+                  ? EmptyState(
+                      engineState: engine.state,
+                      onOpenFile: onOpenFile,
+                    )
                   : null,
             ),
           ),

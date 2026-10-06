@@ -109,9 +109,7 @@ void main() {
   });
 
   group('门控组合矩阵 (合取式 enabled && visible && !suspended)', () {
-    testWidgets('opacity≥0.01 + suspend=true — 挂起压过可见 (生产主组合)', (
-      tester,
-    ) async {
+    testWidgets('opacity≥0.01 + suspend=true — 挂起压过可见 (生产主组合)', (tester) async {
       final controller = AnimationController(vsync: tester, value: 1.0);
       final suspend = ValueNotifier<bool>(true);
       addTearDown(controller.dispose);

@@ -65,9 +65,7 @@ void main() {
       expect(persistCalls, 1, reason: '防抖结束后照常持久化');
     });
 
-    testWidgets('probe 接线 — 会话首查 + settle 关键点查，共 2 次', (
-      tester,
-    ) async {
+    testWidgets('probe 接线 — 会话首查 + settle 关键点查，共 2 次', (tester) async {
       const snapshot = SizemoveSnapshot(isActive: true, enterTick: 0x1000);
       final probe = FakeProbe(snapshot: snapshot);
       final coordinator = buildCoordinator(probe: probe);
@@ -107,9 +105,7 @@ void main() {
       expect(persistCalls, 1);
     });
 
-    testWidgets('probe 报告 settle 时原生仍在拖拽 — 行为仍按防抖收敛（纯观测锁定）', (
-      tester,
-    ) async {
+    testWidgets('probe 报告 settle 时原生仍在拖拽 — 行为仍按防抖收敛（纯观测锁定）', (tester) async {
       // 关键契约：当前阶段只取证不修复 — 即使原生模态循环仍在进行
       // （settle 误判场景），isResizing 也照常清除。修复 B（settle 重臂）
       // 须待实机证据裁决后另行实施。

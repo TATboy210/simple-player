@@ -140,9 +140,7 @@ void main() {
     expect(screenBuilds, buildsBefore, reason: 'resize 画质切换由视频子树内部 VLB 驱动');
   });
 
-  testWidgets('mode 翻转 — AnimatedBuilder 内部驱动，视频链 identity 恒定', (
-    tester,
-  ) async {
+  testWidgets('mode 翻转 — AnimatedBuilder 内部驱动，视频链 identity 恒定', (tester) async {
     await pumpScreen(tester);
     final dropHandlerBefore = tester.widget<DropHandler>(
       find.byType(DropHandler),
@@ -158,8 +156,11 @@ void main() {
     final dropHandlerAfter = tester.widget<DropHandler>(
       find.byType(DropHandler),
     );
-    expect(identical(dropHandlerBefore, dropHandlerAfter), isTrue,
-        reason: '视频链经 AnimatedBuilder.child 透传，mode 翻转零重建');
+    expect(
+      identical(dropHandlerBefore, dropHandlerAfter),
+      isTrue,
+      reason: '视频链经 AnimatedBuilder.child 透传，mode 翻转零重建',
+    );
   });
 
   testWidgets('父级重泵（同依赖新实例）— 视频链缓存保留', (tester) async {
@@ -175,13 +176,14 @@ void main() {
     final dropHandlerAfter = tester.widget<DropHandler>(
       find.byType(DropHandler),
     );
-    expect(identical(dropHandlerBefore, dropHandlerAfter), isTrue,
-        reason: '依赖 identity 未变时视频子树缓存必须保留');
+    expect(
+      identical(dropHandlerBefore, dropHandlerAfter),
+      isTrue,
+      reason: '依赖 identity 未变时视频子树缓存必须保留',
+    );
   });
 
-  testWidgets('onFilesDropped 替换 — 缓存正确失效，DropHandler 收到新回调', (
-    tester,
-  ) async {
+  testWidgets('onFilesDropped 替换 — 缓存正确失效，DropHandler 收到新回调', (tester) async {
     var dropCount = 0;
     void onDropV1(List<String> paths) {}
     void onDropV2(List<String> paths) => dropCount++;
@@ -190,9 +192,9 @@ void main() {
     await pumpScreen(tester, onFilesDropped: onDropV2);
 
     // 陈旧闭包防御：替换后拖放必须路由到新回调（漏判 = 拖放静默丢失）。
-    tester
-        .widget<DropHandler>(find.byType(DropHandler))
-        .onFilesDropped(const ['C:\\video\\a.mp4']);
+    tester.widget<DropHandler>(find.byType(DropHandler)).onFilesDropped(const [
+      'C:\\video\\a.mp4',
+    ]);
     expect(dropCount, 1);
   });
 }

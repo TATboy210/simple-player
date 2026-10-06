@@ -262,45 +262,42 @@ void main() {
         },
       );
 
-      test(
-        'network URL schemes produce single-element queue — no same-directory scan (B7/9)',
-        () async {
-          engine.configureMedia(durationMs: 60000);
-          const urls = <String>[
-            'http://example.com/stream.mp4',
-            'https://example.com/stream.mp4',
-            'rtsp://example.com/stream',
-            'rtmp://example.com/stream',
-            'srt://example.com:1234/stream',
-            'udp://example.com:1234',
-            'tcp://example.com:1234',
-          ];
-          for (final url in urls) {
-            // Reset per-iteration call tracking so each scheme is independently verified.
-            engine.openPlaylistCallCount = 0;
-            engine.lastOpenPlaylistPaths = null;
-            final result = await controller.openAndPlay(url);
-            expect(result, true, reason: 'openAndPlay should succeed for $url');
-            expect(
-              engine.openPlaylistCallCount,
-              1,
-              reason: 'engine.openPlaylist called exactly once for $url',
-            );
-            expect(
-              engine.lastOpenPlaylistPaths,
-              <String>[url],
-              reason: 'queue should be single-element [$url] via '
-                  'PathValidator.isUrl early return, not a same-directory scan '
-                  'result',
-            );
-          }
-        },
-      );
+      test('network URL schemes produce single-element queue — no same-directory scan (B7/9)', () async {
+        engine.configureMedia(durationMs: 60000);
+        const urls = <String>[
+          'http://example.com/stream.mp4',
+          'https://example.com/stream.mp4',
+          'rtsp://example.com/stream',
+          'rtmp://example.com/stream',
+          'srt://example.com:1234/stream',
+          'udp://example.com:1234',
+          'tcp://example.com:1234',
+        ];
+        for (final url in urls) {
+          // Reset per-iteration call tracking so each scheme is independently verified.
+          engine.openPlaylistCallCount = 0;
+          engine.lastOpenPlaylistPaths = null;
+          final result = await controller.openAndPlay(url);
+          expect(result, true, reason: 'openAndPlay should succeed for $url');
+          expect(
+            engine.openPlaylistCallCount,
+            1,
+            reason: 'engine.openPlaylist called exactly once for $url',
+          );
+          expect(
+            engine.lastOpenPlaylistPaths,
+            <String>[url],
+            reason:
+                'queue should be single-element [$url] via '
+                'PathValidator.isUrl early return, not a same-directory scan '
+                'result',
+          );
+        }
+      });
     });
 
     group('网络流打开失败附带接口摘要 (B5/9)', () {
-      test('URL 打开失败 → ErrorContext 含接口快照 (fake 注入确定性值)',
-          () async {
+      test('URL 打开失败 → ErrorContext 含接口快照 (fake 注入确定性值)', () async {
         // 复用 setUp 的 engine, 重建 controller 注入 fake networkSnapshotProvider
         // (确定性返回, 不依赖真实 NetworkInterface.list).
         controller.dispose();
@@ -324,8 +321,7 @@ void main() {
         expect(localErrors.single.context?.networkHasNonLoopback, isTrue);
       });
 
-      test('本地文件打开失败 → context 不含接口快照 (isUrl 门控跳过 enrichment)',
-          () async {
+      test('本地文件打开失败 → context 不含接口快照 (isUrl 门控跳过 enrichment)', () async {
         controller.dispose();
         final localErrors = <PlayerError>[];
         controller = PlaybackController(

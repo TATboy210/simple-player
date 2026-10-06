@@ -19,7 +19,10 @@ import '../../diagnostics/kernel_logger.dart';
   symbol: 'FindWindowW',
   assetId: 'user32',
 )
-external int _findWindowW(Pointer<Uint16> lpClassName, Pointer<Uint16> lpWindowName);
+external int _findWindowW(
+  Pointer<Uint16> lpClassName,
+  Pointer<Uint16> lpWindowName,
+);
 
 /// user32!SendMessageTimeoutW — 投递消息并等待目标线程处理(跨线程安全)。
 ///
@@ -204,7 +207,13 @@ class Win32ImeFunctions {
   /// 投递自定义消息并等待目标线程处理（SendMessageTimeoutW 封装）。
   ///
   /// 返回「投递成功且 handler 返回非零」；超时/挂死/失败均为 false。
-  final bool Function(int hwnd, int message, int wparam, int flags, int timeoutMs)
+  final bool Function(
+    int hwnd,
+    int message,
+    int wparam,
+    int flags,
+    int timeoutMs,
+  )
   sendMessageTimeout;
 
   const Win32ImeFunctions({

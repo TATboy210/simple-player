@@ -298,92 +298,89 @@ void main() {
       return file;
     }
 
-    test(
-      'top-level function: D8+D10+watermark in one pass, summary accurate',
-      () async {
-        final dir = await Directory.systemTemp.createTemp('pthumb_isolate_fn');
-        try {
-          // --- D8: stale .part (>1hr) deleted, fresh .part (<1hr) kept ---
-          final stalePart = await seedFile(dir, 'stale.part', [1, 2, 3]);
-          await stalePart.setLastModified(
-            DateTime.now().subtract(const Duration(hours: 2)),
-          );
-          final freshPart = await seedFile(dir, 'fresh.part', [4, 5, 6]);
-          await freshPart.setLastModified(
-            DateTime.now().subtract(const Duration(minutes: 1)),
-          );
+    test('top-level function: D8+D10+watermark in one pass, summary accurate', () async {
+      final dir = await Directory.systemTemp.createTemp('pthumb_isolate_fn');
+      try {
+        // --- D8: stale .part (>1hr) deleted, fresh .part (<1hr) kept ---
+        final stalePart = await seedFile(dir, 'stale.part', [1, 2, 3]);
+        await stalePart.setLastModified(
+          DateTime.now().subtract(const Duration(hours: 2)),
+        );
+        final freshPart = await seedFile(dir, 'fresh.part', [4, 5, 6]);
+        await freshPart.setLastModified(
+          DateTime.now().subtract(const Duration(minutes: 1)),
+        );
 
-          // --- D10: old .jpg (31 days) evicted by age ---
-          final oldKey = hexKey('da');
-          final oldJpg = await seedFile(
+        // --- D10: old .jpg (31 days) evicted by age ---
+        final oldKey = hexKey('da');
+        final oldJpg = await seedFile(
+          dir,
+          '$oldKey.jpg',
+          makeJpegBytes(seed: 1, payload: 4),
+        );
+        await oldJpg.setLastModified(
+          DateTime.now().subtract(const Duration(days: 31)),
+        );
+
+        // --- Watermark: 3 × 40-byte .jpg (120 > 100 cap) → evict oldest 2 ---
+        for (var i = 0; i < 3; i++) {
+          final key = '${'a$i'.padLeft(63, '0')}0';
+          final file = await seedFile(
             dir,
-            '$oldKey.jpg',
-            makeJpegBytes(seed: 1, payload: 4),
+            '$key.jpg',
+            makeJpegBytes(payload: 36, seed: i),
           );
-          await oldJpg.setLastModified(
-            DateTime.now().subtract(const Duration(days: 31)),
+          // i=0 oldest, i=2 newest — deterministic oldest-first order
+          await file.setLastModified(
+            DateTime.now().subtract(Duration(minutes: 10 - i)),
           );
-
-          // --- Watermark: 3 × 40-byte .jpg (120 > 100 cap) → evict oldest 2 ---
-          for (var i = 0; i < 3; i++) {
-            final key = '${'a$i'.padLeft(63, '0')}0';
-            final file = await seedFile(
-              dir,
-              '$key.jpg',
-              makeJpegBytes(payload: 36, seed: i),
-            );
-            // i=0 oldest, i=2 newest — deterministic oldest-first order
-            await file.setLastModified(
-              DateTime.now().subtract(Duration(minutes: 10 - i)),
-            );
-          }
-
-          const shrunkLimits = ThumbnailDiskCacheLimits(
-            maxEntries: 10,
-            maxBytes: 100,
-            targetEntries: 4,
-            targetBytes: 40,
-          );
-
-          // Call the pure function directly (not via Isolate.run)
-          final summary = await runDiskCacheCleanupInIsolate(
-            directoryPath: dir.path,
-            limits: shrunkLimits,
-            hashPattern: r'^[0-9a-f]{64}$',
-            now: DateTime.now(),
-          );
-
-          // D8: stale .part deleted, fresh .part kept
-          expect(await stalePart.exists(), isFalse);
-          expect(await freshPart.exists(), isTrue);
-
-          // D10: old .jpg deleted (age eviction)
-          expect(await oldJpg.exists(), isFalse);
-
-          // Watermark: 3 files (120 bytes > 100) → evict oldest 2, 1 survivor
-          final remainingJpgs = dir
-              .listSync()
-              .whereType<File>()
-              .where((f) => f.path.endsWith('.jpg'))
-              .toList();
-          expect(remainingJpgs.length, equals(1));
-
-          // Summary accuracy: freedBytes > 0, evictedCount = 4, survivors = 1
-          expect(summary.freedBytes, greaterThan(0));
-          expect(
-            summary.evictedCount,
-            equals(4),
-          ); // 1 stale.part + 1 old.jpg + 2 watermark
-          expect(summary.survivors, equals(1));
-        } finally {
-          try {
-            await dir.delete(recursive: true);
-          } on FileSystemException {
-            // best effort
-          }
         }
-      },
-    );
+
+        const shrunkLimits = ThumbnailDiskCacheLimits(
+          maxEntries: 10,
+          maxBytes: 100,
+          targetEntries: 4,
+          targetBytes: 40,
+        );
+
+        // Call the pure function directly (not via Isolate.run)
+        final summary = await runDiskCacheCleanupInIsolate(
+          directoryPath: dir.path,
+          limits: shrunkLimits,
+          hashPattern: r'^[0-9a-f]{64}$',
+          now: DateTime.now(),
+        );
+
+        // D8: stale .part deleted, fresh .part kept
+        expect(await stalePart.exists(), isFalse);
+        expect(await freshPart.exists(), isTrue);
+
+        // D10: old .jpg deleted (age eviction)
+        expect(await oldJpg.exists(), isFalse);
+
+        // Watermark: 3 files (120 bytes > 100) → evict oldest 2, 1 survivor
+        final remainingJpgs = dir
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.jpg'))
+            .toList();
+        expect(remainingJpgs.length, equals(1));
+
+        // Summary accuracy: freedBytes > 0, evictedCount = 4, survivors = 1
+        expect(summary.freedBytes, greaterThan(0));
+        expect(
+          summary.evictedCount,
+          equals(4),
+        ); // 1 stale.part + 1 old.jpg + 2 watermark
+        expect(summary.survivors, equals(1));
+      } finally {
+        try {
+          await dir.delete(recursive: true);
+        } on FileSystemException {
+          // best effort
+        }
+      }
+    });
 
     test('isolate spawn failure falls back to inline cleanup', () async {
       final dir = await Directory.systemTemp.createTemp('pthumb_isolate_fb');
@@ -392,10 +389,8 @@ void main() {
         final cache = ThumbnailDiskCache(
           resolveDirectory: () async => dir,
           now: DateTime.now,
-          isolateRunner:
-              (task) async => throw IsolateSpawnException(
-                'test: spawn disabled',
-              ),
+          isolateRunner: (task) async =>
+              throw IsolateSpawnException('test: spawn disabled'),
         );
 
         final stale = await seedFile(dir, 'stale.part', [1, 2, 3]);
@@ -404,11 +399,7 @@ void main() {
         );
 
         final validKey = hexKey('db');
-        final validJpg = await seedFile(
-          dir,
-          '$validKey.jpg',
-          makeJpegBytes(),
-        );
+        final validJpg = await seedFile(dir, '$validKey.jpg', makeJpegBytes());
 
         await cache.scheduleCleanup();
 

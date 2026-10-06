@@ -351,9 +351,7 @@ void main() {
       expect(tester.widget<BackdropFilter>(backdropFinder).enabled, isTrue);
 
       // 水平拖动进度条 (超过 progressDragThreshold) — onSeekStart 置位挂起.
-      final barCenter = tester.getCenter(
-        find.byType(progress_bar.ProgressBar),
-      );
+      final barCenter = tester.getCenter(find.byType(progress_bar.ProgressBar));
       final gesture = await tester.startGesture(barCenter);
       await gesture.moveBy(const Offset(60, 0));
       await tester.pump();

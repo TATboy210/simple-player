@@ -19,7 +19,10 @@ import '../../diagnostics/kernel_logger.dart';
   symbol: 'FindWindowW',
   assetId: 'user32',
 )
-external int _findWindowW(Pointer<Uint16> lpClassName, Pointer<Uint16> lpWindowName);
+external int _findWindowW(
+  Pointer<Uint16> lpClassName,
+  Pointer<Uint16> lpWindowName,
+);
 
 /// user32!SendMessageTimeoutW — 投递消息并等待目标线程处理(跨线程安全)。
 ///
@@ -124,8 +127,10 @@ class Win32SizemoveBridge implements SizemoveProbe {
     if (!Platform.isWindows) return null;
     final hwnd = _fns.findWindow(_windowClassName);
     if (hwnd == 0) {
-      _log.warn('Win32SizemoveBridge.query: runner window not found by class '
-          'name, sizemove state unavailable');
+      _log.warn(
+        'Win32SizemoveBridge.query: runner window not found by class '
+        'name, sizemove state unavailable',
+      );
       return null;
     }
     // 与 ime_bridge 的差异：透传 handler 返回值而非判非零 — 打包状态
@@ -138,8 +143,10 @@ class Win32SizemoveBridge implements SizemoveProbe {
       _sendTimeoutMs,
     );
     if (raw == null) {
-      _log.warn('Win32SizemoveBridge.query: message delivery failed '
-          '(timeout/hung), sizemove state unavailable');
+      _log.warn(
+        'Win32SizemoveBridge.query: message delivery failed '
+        '(timeout/hung), sizemove state unavailable',
+      );
       return null;
     }
     return SizemoveSnapshot.decode(raw);
@@ -188,7 +195,13 @@ class Win32SizemoveFunctions {
   ///
   /// 返回 handler 打包结果（见 [SizemoveSnapshot.decode]）；投递失败
   /// （超时/挂死/失败）返回 null。
-  final int? Function(int hwnd, int message, int wparam, int flags, int timeoutMs)
+  final int? Function(
+    int hwnd,
+    int message,
+    int wparam,
+    int flags,
+    int timeoutMs,
+  )
   sendMessageTimeout;
 
   const Win32SizemoveFunctions({

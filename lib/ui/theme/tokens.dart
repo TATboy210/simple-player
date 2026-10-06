@@ -168,9 +168,7 @@ class Tokens {
   /// （走既有降级分支：GlassBlurLayer enabled=false / GlassContainer
   /// ClipRRect 路径）。bool.fromEnvironment 先例 main.dart UAT 开关；
   /// 编译期常量默认 false，正常构建零开销、tree-shake 友好。
-  static const blurDisabled = bool.fromEnvironment(
-    'SIMPLER_PLAYER_BLUR_OFF',
-  );
+  static const blurDisabled = bool.fromEnvironment('SIMPLER_PLAYER_BLUR_OFF');
 
   // ── 动画 ──
   static const durationFast = 80;

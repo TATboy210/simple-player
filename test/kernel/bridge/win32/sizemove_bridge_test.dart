@@ -50,10 +50,7 @@ void main() {
   // Win32 查询路径入口有 Platform.isWindows gate (fake functions 绕不过
   // dart:io 的真实平台判定) — 仅 Windows runner 执行; decode group 为
   // 纯 Dart 布局解码, 全平台保留.
-  group(
-    'Win32SizemoveBridge — WM_APP 查询消息投递',
-    skip: !Platform.isWindows,
-    () {
+  group('Win32SizemoveBridge — WM_APP 查询消息投递', skip: !Platform.isWindows, () {
     // 消息常量须与 runner 侧 sizemove_bridge_messages.h 对偶 — 双向锁定.
     const messageId = 0x8000 + 0x4A; // WM_APP + 0x4A
     const smtoAbortIfHung = 0x0002;
@@ -64,27 +61,25 @@ void main() {
     sendCalls;
 
     Win32SizemoveFunctions fakeFns() => Win32SizemoveFunctions(
-          findWindow: (className) {
-            expect(
-              className,
-              'FLUTTER_RUNNER_WIN32_WINDOW',
-              reason: '类名必须与 win32_window.cpp 的 kWindowClassName 对齐',
-            );
-            return runnerHwnd ?? 0;
-          },
-          sendMessageTimeout: (hwnd, message, wparam, flags, timeoutMs) {
-            sendCalls.add(
-              (
-                hwnd: hwnd,
-                message: message,
-                wparam: wparam,
-                flags: flags,
-                timeoutMs: timeoutMs,
-              ),
-            );
-            return sendRawResult;
-          },
+      findWindow: (className) {
+        expect(
+          className,
+          'FLUTTER_RUNNER_WIN32_WINDOW',
+          reason: '类名必须与 win32_window.cpp 的 kWindowClassName 对齐',
         );
+        return runnerHwnd ?? 0;
+      },
+      sendMessageTimeout: (hwnd, message, wparam, flags, timeoutMs) {
+        sendCalls.add((
+          hwnd: hwnd,
+          message: message,
+          wparam: wparam,
+          flags: flags,
+          timeoutMs: timeoutMs,
+        ));
+        return sendRawResult;
+      },
+    );
 
     setUp(() {
       runnerHwnd = 0x1234;
@@ -105,7 +100,11 @@ void main() {
       expect(sendCalls, hasLength(1));
       final call = sendCalls.single;
       expect(call.hwnd, 0x1234);
-      expect(call.message, messageId, reason: '与 runner 侧 kAppQuerySizemove 对偶');
+      expect(
+        call.message,
+        messageId,
+        reason: '与 runner 侧 kAppQuerySizemove 对偶',
+      );
       expect(call.wparam, 0);
       expect(call.flags, smtoAbortIfHung);
       expect(call.timeoutMs, 1000);

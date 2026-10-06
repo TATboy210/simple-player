@@ -21,27 +21,25 @@ void main() {
     sendCalls;
 
     Win32ImeFunctions fakeFns() => Win32ImeFunctions(
-          findWindow: (className) {
-            expect(
-              className,
-              'FLUTTER_RUNNER_WIN32_WINDOW',
-              reason: '类名必须与 win32_window.cpp 的 kWindowClassName 对齐',
-            );
-            return runnerHwnd ?? 0;
-          },
-          sendMessageTimeout: (hwnd, message, wparam, flags, timeoutMs) {
-            sendCalls.add(
-              (
-                hwnd: hwnd,
-                message: message,
-                wparam: wparam,
-                flags: flags,
-                timeoutMs: timeoutMs,
-              ),
-            );
-            return sendResult;
-          },
+      findWindow: (className) {
+        expect(
+          className,
+          'FLUTTER_RUNNER_WIN32_WINDOW',
+          reason: '类名必须与 win32_window.cpp 的 kWindowClassName 对齐',
         );
+        return runnerHwnd ?? 0;
+      },
+      sendMessageTimeout: (hwnd, message, wparam, flags, timeoutMs) {
+        sendCalls.add((
+          hwnd: hwnd,
+          message: message,
+          wparam: wparam,
+          flags: flags,
+          timeoutMs: timeoutMs,
+        ));
+        return sendResult;
+      },
+    );
 
     setUp(() {
       runnerHwnd = 0x1234;
@@ -56,7 +54,11 @@ void main() {
       expect(sendCalls, hasLength(1));
       final call = sendCalls.single;
       expect(call.hwnd, 0x1234);
-      expect(call.message, messageId, reason: '与 runner 侧 kAppSetImeEnabled 对偶');
+      expect(
+        call.message,
+        messageId,
+        reason: '与 runner 侧 kAppSetImeEnabled 对偶',
+      );
       expect(call.wparam, 1, reason: 'runner 侧解读为 IACE_DEFAULT|IACE_CHILDREN');
       expect(call.flags, smtoAbortIfHung);
       expect(call.timeoutMs, 1000);
@@ -90,17 +92,16 @@ void main() {
 
   // enable/disable 的临时恢复链路带 Platform.isWindows gate — 非 Windows
   // 透传路径的直调组 (上方 group) 全平台保留, 本组仅 Windows runner 执行.
-  group(
-    'withImeRestored — 文件对话框期间的 IME 临时恢复',
-    skip: !Platform.isWindows,
-    () {
+  group('withImeRestored — 文件对话框期间的 IME 临时恢复', skip: !Platform.isWindows, () {
     // 注入 fake — 测试进程若恰有真 runner 窗口在运行, 真实 FFI 会向其
     // 投递消息; 密闭 fake 保证单测零副作用.
-    Win32ImeFunctions fakeFns({required bool findSucceeds, bool sendOk = true}) =>
-        Win32ImeFunctions(
-          findWindow: (_) => findSucceeds ? 0x42 : 0,
-          sendMessageTimeout: (_, _, _, _, _) => sendOk,
-        );
+    Win32ImeFunctions fakeFns({
+      required bool findSucceeds,
+      bool sendOk = true,
+    }) => Win32ImeFunctions(
+      findWindow: (_) => findSucceeds ? 0x42 : 0,
+      sendMessageTimeout: (_, _, _, _, _) => sendOk,
+    );
 
     testWidgets('action 正常执行且返回值透传', (tester) async {
       // enable 失败 — 锁定「enable 失败时 action 仍执行」的降级语义.

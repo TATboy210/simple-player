@@ -314,8 +314,11 @@ void main() {
       engine.queueRevision.value++;
       engine.queueRevision.value++;
 
-      expect(identical(coord.entries.value, entriesBefore), isTrue,
-          reason: '快路径短路 — 零重建');
+      expect(
+        identical(coord.entries.value, entriesBefore),
+        isTrue,
+        reason: '快路径短路 — 零重建',
+      );
       expect(store.saveCount, baseline, reason: '快路径短路 — 零落盘');
     });
 
@@ -330,9 +333,11 @@ void main() {
       final baseline = store.saveCount;
 
       // 引擎每次变化都新建 unmodifiable List — 换实例必须走主路径。
-      engine.queuePaths.value = List<String>.unmodifiable(
-        <String>['a.mp4', 'b.mp4', 'c.mp4'],
-      );
+      engine.queuePaths.value = List<String>.unmodifiable(<String>[
+        'a.mp4',
+        'b.mp4',
+        'c.mp4',
+      ]);
       engine.queueIndex.value = 0;
       engine.queueRevision.value++;
 
@@ -931,9 +936,13 @@ void main() {
   });
   group('批量删除事件放大治理 (v0.0.9)', () {
     test('装载态批量删除 N 项 — revision 单发收敛 (恰好 +1)', () async {
-      await coordinator.appendEntries(
-        ['a.mp4', 'b.mp4', 'c.mp4', 'd.mp4', 'e.mp4'],
-      );
+      await coordinator.appendEntries([
+        'a.mp4',
+        'b.mp4',
+        'c.mp4',
+        'd.mp4',
+        'e.mp4',
+      ]);
       final revisionBefore = engine.queueRevision.value;
 
       await coordinator.removeEntriesAt({0, 2, 4});

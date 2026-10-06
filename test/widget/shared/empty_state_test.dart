@@ -40,10 +40,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: EmptyState(
-              onOpenFile: () {},
-              dragHoveringListenable: hover,
-            ),
+            body: EmptyState(onOpenFile: () {}, dragHoveringListenable: hover),
           ),
         ),
       );
@@ -66,10 +63,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: EmptyState(
-              onOpenFile: () {},
-              dragHoveringListenable: hover,
-            ),
+            body: EmptyState(onOpenFile: () {}, dragHoveringListenable: hover),
           ),
         ),
       );
@@ -91,10 +85,7 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: EmptyState(
-              onOpenFile: () {},
-              dragHoveringListenable: hoverA,
-            ),
+            body: EmptyState(onOpenFile: () {}, dragHoveringListenable: hoverA),
           ),
         ),
       );

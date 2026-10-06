@@ -40,9 +40,11 @@ Future<void> releaseAllHeld(FakeThumbnailProvider fake, int count) async {
     final ok = await settle(() => fake.jobs.values.any((q) => q.isNotEmpty));
     if (!ok) {
       // ignore: avoid_print
-      print('releaseAllHeld STALL: round=$i calls=${fake.calls} '
-          'jobs=${fake.jobs.map((k, v) => MapEntry(k, v.length))} '
-          'active=${fake.active}');
+      print(
+        'releaseAllHeld STALL: round=$i calls=${fake.calls} '
+        'jobs=${fake.jobs.map((k, v) => MapEntry(k, v.length))} '
+        'active=${fake.active}',
+      );
       // 条件未达成仍尝试放行 (旧契约) — 让断言给出真实差异而非静默挂起
     }
     final held = fake.jobs.entries
@@ -264,13 +266,16 @@ void main() {
 
     // Windows 路径语义 — path 包按宿主 OS 选 context, POSIX 下反斜杠
     // 路径的 `..` 折叠无意义, 仅在 Windows runner 断言.
-    test('ID5: path normalize collapses .. segments (ID5)',
-        skip: !Platform.isWindows, () {
-      expect(
-        ThumbnailService.normalizePathForTest('C:\\A\\..\\B\\file.mp4'),
-        equals(ThumbnailService.normalizePathForTest('C:\\B\\file.mp4')),
-      );
-    });
+    test(
+      'ID5: path normalize collapses .. segments (ID5)',
+      skip: !Platform.isWindows,
+      () {
+        expect(
+          ThumbnailService.normalizePathForTest('C:\\A\\..\\B\\file.mp4'),
+          equals(ThumbnailService.normalizePathForTest('C:\\B\\file.mp4')),
+        );
+      },
+    );
 
     test('ID6: case-differing paths stay distinct (no lower-case)', () {
       expect(
@@ -587,7 +592,8 @@ void main() {
       // task" = 先挂起 job 的那个 — 按 path 定向 fail 会错配落空。
       final first3 = files.take(3).toList();
       final futures = <String, Future<ImageProvider?>>{
-        for (final file in first3) file.path: ThumbnailService.getThumbnail(file.path),
+        for (final file in first3)
+          file.path: ThumbnailService.getThumbnail(file.path),
       };
       await settle(() => fake.calls >= 2);
       await settle(() => fake.jobs.values.any((q) => q.isNotEmpty));
@@ -616,7 +622,8 @@ void main() {
       // 乱序安全 (同 G2): releaseNull 先挂起 job 的那个。
       final first3 = files.take(3).toList();
       final futures = <String, Future<ImageProvider?>>{
-        for (final file in first3) file.path: ThumbnailService.getThumbnail(file.path),
+        for (final file in first3)
+          file.path: ThumbnailService.getThumbnail(file.path),
       };
       await settle(() => fake.calls >= 2);
       await settle(() => fake.jobs.values.any((q) => q.isNotEmpty));
@@ -642,7 +649,8 @@ void main() {
       ThumbnailService.reset(provider: fake, diskCache: brokenDisk());
 
       final futures = <Future<ImageProvider?>>[
-        for (final file in files.take(3)) ThumbnailService.getThumbnail(file.path),
+        for (final file in files.take(3))
+          ThumbnailService.getThumbnail(file.path),
       ];
       await settle(() => fake.calls >= 2);
 

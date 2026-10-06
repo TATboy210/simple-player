@@ -128,8 +128,7 @@ Future<CleanupSummary> runDiskCacheCleanupInIsolate({
   }
 
   // 水位检查 — 未超限直接返回
-  if (survivors.length <= limits.maxEntries &&
-      totalBytes <= limits.maxBytes) {
+  if (survivors.length <= limits.maxEntries && totalBytes <= limits.maxBytes) {
     return (
       freedBytes: freedBytes,
       evictedCount: evictedCount,
@@ -188,8 +187,7 @@ final class ThumbnailDiskCache {
   }) : _resolveDirectory =
            resolveDirectory ?? ThumbnailDiskCache._defaultResolve,
        _now = now ?? DateTime.now,
-       _isolateRunner = isolateRunner ??
-           ((task) => Isolate.run(task));
+       _isolateRunner = isolateRunner ?? ((task) => Isolate.run(task));
 
   final Future<Directory> Function() _resolveDirectory;
   final DateTime Function() _now;

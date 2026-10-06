@@ -284,9 +284,7 @@ final class VideoTextureResizeProbe {
       'textureIdAtEnd': probeUnavailable ? null : textureId?.value,
       'rectTrail': List.unmodifiableOf(_rectTrail),
       'rectTrailOmitted': _rectTrailOmitted,
-      'textureIdTrail': List.unmodifiableOf(
-        _textureIdTrail,
-      ),
+      'textureIdTrail': List.unmodifiableOf(_textureIdTrail),
       'textureIdTrailOmitted': _textureIdTrailOmitted,
       'modeAtStart': _modeAtStart?.name,
       'modeAtEnd': modeAtEnd?.name,

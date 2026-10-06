@@ -97,10 +97,7 @@ void main() {
       addTearDown(() => LoggerPackageSink.minLevel = prev);
       final sink = const LoggerPackageSink();
       // 低于阈值的调用在格式化前早退 — 零异常即门控路径健康。
-      expect(
-        () => sink.log(LogLevel.debug, 'gated chatter'),
-        returnsNormally,
-      );
+      expect(() => sink.log(LogLevel.debug, 'gated chatter'), returnsNormally);
     });
 
     test('createDefaultLogSink(debug) wires LoggerPackageSink first', () {
