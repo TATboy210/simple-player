@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.0.10 · Dart 3.13 定向采纳 · 网络路径修复 🎯
+
+> 一句话版本：**Dart 3.13 新特性用在正确的地方——@Native FFI 迁移清零
+> lookupFunction、列表拷贝语义对齐 unmodifiableOf、缩略图磁盘清理上
+> worker isolate;网络流打开失败带本机接口摘要进 ErrorContext,出错可定位。**
+
+### 🎯 Dart 3.13 API 探针 · 判定矩阵（B0）
+- 7 类新 API 实测判定:PC const/init-list/sealed-super 4/7 可用、
+  @Native assetId GO、unmodifiableOf 拷贝语义确认（7855f455）
+- 22 候选 PC 迁移点全审:0/22 可迁——PC const/init-list/sealed-super
+  三项 Dart 3.13.5 不可用,待后续 Dart 版本(诚实 defer,不硬凑)
+- Isolate.runSync/lifecycle 新 API NO-GO 未采用(静态方法不存在 /
+  签名不符)
+- 探针文档 `.planning/debug/v0.0.10_dart313_probe.md`
+
+### 🔧 Win32 FFI · @Native assetId 迁移（B4）
+- Win32 三桥(ntdll/dwmapi/user32)7 处叶子绑定迁 @Native assetId,
+  lookupFunction 清零(9553044d)
+- ntdll/dwmapi 运行时解析:assetId 指向预加载库,首调解析地址;
+  无 import 变更,纯绑定层;UAT 待实机验证
+
+### 📋 列表拷贝语义 · List.unmodifiableOf（B2）
+- 27 站 List.unmodifiable→List.unmodifiableOf(10 文件,048f73e7)
+- SDK 源码实锤:unmodifiableOf 是 unmodifiable 的别名恒等(同视图
+  拷贝语义),Dart 3.13 文档钦定;迁移对齐新 API 命名,行为零变化
+
+### ⚡ 缩略图磁盘清理 · worker isolate（B3）
+- 缩略图磁盘缓存清理迁 Isolate.run,主 isolate 零阻塞(b78b6fd6)
+- IsolateSpawnException 降级回退主线程同步清理,worker 不可用时
+  不丢功能;+2 单测锁降级路径
+
+### 🌐 网络路径 · scheme 统一 + 失败诊断（B7 + B5）
+- B7(4b5941be):网络路径 scheme 判定统一走 PathValidator.isUrl,
+  srt/udp/tcp 修复;7-scheme 回归测试(file/http/https/rtsp/udp/
+  tcp/srt 全覆盖)
+- B5(a3aea953):网络流打开失败附本机接口摘要进 ErrorContext——
+  isUrl 门控 + 2s 超时 + DI 注入,+6 测试;本里程碑"出错可定位"
+  核心价值在网络路径侧落地
+
+### 📦 Pub Workspace（B6）
+- Pub Workspace 实测:4 探针全 WORKS,单包项目不启用(2d11d056)
+- 结论:workspace 对单包(无共享包/无多 target)无收益,徒增层级;
+  结论文档 `.planning/debug/v0.0.10_workspace_probe.md`,无代码变更
+
+### 🧹 内部
+- 版本号 0.0.9→0.0.10 + msix_version 0.0.9.0→0.0.10.0
+- .claude/CLAUDE.md 过时依赖描述清理:get 4.7.3 / go_router 16.3.0
+  / dio 5.11.0 三行删除(三包已于 v0.0.9 物理删除,描述滞留属事实
+  错误);line 66(ValueNotifier,GetIt 作 transitive 仍存在)与
+  line 84(devtools_options get_it 扩展)保持原样
+- 干净 Release 体积盘点见 `.planning/debug/v0.0.10_size_inventory.md`
+
+### ⚠️ 诚实记录
+- B1 PC 迁移 defer:探针 0/22 候选可迁,PC const/init-list/
+  sealed-super 三项 Dart 3.13.5 不可用,待后续 Dart 版本;不硬凑
+- Isolate.runSync/lifecycle 新 API NO-GO:静态方法不存在 / 签名
+  不符,未采用
+
 ## 0.0.9 · 工程优化版 · 证据驱动性能治理 📐
 
 > 一句话版本：**没有新功能——这一版用实测证据定位真实热点，用最小
