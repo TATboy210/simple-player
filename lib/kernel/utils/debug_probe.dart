@@ -62,7 +62,7 @@ class DebugProbe {
   final List<ProbeEvent> _events = [];
 
   /// 事件历史（只读快照）。
-  List<ProbeEvent> get events => List.unmodifiable(_events);
+  List<ProbeEvent> get events => List.unmodifiableOf(_events);
 
   /// 事件计数。
   int get eventCount => _events.length;
@@ -150,7 +150,7 @@ class DebugProbeRegistry {
   }
 
   /// 所有已注册探针。
-  static List<DebugProbe> get all => List.unmodifiable(_probes.values);
+  static List<DebugProbe> get all => List.unmodifiableOf(_probes.values);
 
   /// 汇总统计 — 每个探针的名称和事件计数。
   static Map<String, Map<String, Object>> summary() {

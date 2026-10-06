@@ -160,7 +160,7 @@ abstract final class ResizeFrameMetricsReducer {
 
   /// 使用 nearest-rank 计算 P50/P95/P99，并统计严格超预算的帧。
   static ResizeFrameSummary reduce(Iterable<ResizeFrameSample> samples) {
-    final snapshot = List<ResizeFrameSample>.unmodifiable(samples);
+    final snapshot = List.unmodifiableOf(samples);
     if (snapshot.isEmpty) {
       return const ResizeFrameSummary(
         sampleCount: 0,

@@ -282,9 +282,9 @@ final class VideoTextureResizeProbe {
       'rectAtEnd': probeUnavailable ? null : _rectToContext(rect?.value),
       'textureIdAtStart': _textureIdAtStart,
       'textureIdAtEnd': probeUnavailable ? null : textureId?.value,
-      'rectTrail': List<Map<String, Object?>>.unmodifiable(_rectTrail),
+      'rectTrail': List.unmodifiableOf(_rectTrail),
       'rectTrailOmitted': _rectTrailOmitted,
-      'textureIdTrail': List<Map<String, Object?>>.unmodifiable(
+      'textureIdTrail': List.unmodifiableOf(
         _textureIdTrail,
       ),
       'textureIdTrailOmitted': _textureIdTrailOmitted,

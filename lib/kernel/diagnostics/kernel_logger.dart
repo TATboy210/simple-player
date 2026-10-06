@@ -337,7 +337,7 @@ final class CompositeSink implements LogSink {
   final List<LogSink> _sinks;
 
   /// 只读视图 — 供测试断言生产接线（debug 通道是否为 [LoggerPackageSink]）。
-  List<LogSink> get sinks => List.unmodifiable(_sinks);
+  List<LogSink> get sinks => List.unmodifiableOf(_sinks);
 
   @override
   void log(

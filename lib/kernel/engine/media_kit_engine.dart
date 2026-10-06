@@ -523,7 +523,7 @@ class MediaKitEngine implements MediaEngine {
       if (!_isCurrentGeneration(gen)) return const OpenSuperseded();
 
       // 乐观镜像: stream.playlist 广播稍后到达, 值相同幂等覆盖.
-      _queuePaths.value = List<String>.unmodifiable(paths);
+      _queuePaths.value = List.unmodifiableOf(paths);
       _queueIndex.value = clampedStart;
       _touchQueueRevision();
       _hasMedia = true;
@@ -560,7 +560,7 @@ class MediaKitEngine implements MediaEngine {
       }
       // 乐观镜像; index 不变 (追加不动当前播放). 空队列首次追加时保持 -1
       // (mpv playlist-playing-pos 语义: 未播放即 -1), 由 jumpTo/stream 纠正.
-      _queuePaths.value = List<String>.unmodifiable([
+      _queuePaths.value = List.unmodifiableOf([
         ..._queuePaths.value,
         ...paths,
       ]);
@@ -650,7 +650,7 @@ class MediaKitEngine implements MediaEngine {
           ? -1
           : index.clamp(0, remaining.length - 1);
     }
-    _queuePaths.value = List<String>.unmodifiable(remaining);
+    _queuePaths.value = List.unmodifiableOf(remaining);
     _queueIndex.value = nextIndex;
   }
 
@@ -681,7 +681,7 @@ class MediaKitEngine implements MediaEngine {
       final currentPath = (currentIndex >= 0 && currentIndex < current.length)
           ? current[currentIndex]
           : null;
-      _queuePaths.value = List<String>.unmodifiable(targetOrder);
+      _queuePaths.value = List.unmodifiableOf(targetOrder);
       _queueIndex.value = currentPath == null
           ? -1
           : targetOrder.indexOf(currentPath);
@@ -1186,7 +1186,7 @@ class MediaKitEngine implements MediaEngine {
     // 其余路径 revision 单发语义不变.
     _addSubscription(
       _player.stream.playlist.listen((pl) {
-        _queuePaths.value = List<String>.unmodifiable(<String>[
+        _queuePaths.value = List.unmodifiableOf(<String>[
           for (final m in pl.medias) pathFromMediaUri(m.uri),
         ]);
         _queueIndex.value = pl.medias.isEmpty ? -1 : pl.index;

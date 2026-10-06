@@ -70,7 +70,7 @@ final class ErrorReporterImpl implements ErrorReporter {
     DiagnosticLogStatus? diagnosticLogStatus,
     this._lastResortOutput = _defaultLastResortOutput,
   }) : _eventIdGenerator = eventIdGenerator ?? _createEventIdGenerator(),
-       _effects = List<ErrorReportEffect>.unmodifiable(effects),
+       _effects = List.unmodifiableOf(effects),
        _diagnosticLogStatus = diagnosticLogStatus,
        _diagnosticLogStatusOwner =
            diagnosticLogStatus is DelegatingDiagnosticLogEffect
@@ -86,7 +86,7 @@ final class ErrorReporterImpl implements ErrorReporter {
     List<ErrorReportEffect> effects = const [],
     DiagnosticLogStatus? diagnosticLogStatus,
     this._lastResortOutput = _defaultLastResortOutput,
-  }) : _effects = List<ErrorReportEffect>.unmodifiable(effects),
+  }) : _effects = List.unmodifiableOf(effects),
        _diagnosticLogStatus = diagnosticLogStatus,
        _diagnosticLogStatusOwner =
            diagnosticLogStatus is DelegatingDiagnosticLogEffect
@@ -158,7 +158,7 @@ final class ErrorReporterImpl implements ErrorReporter {
 
   /// Read-only FIFO snapshot for deterministic policy tests.
   @visibleForTesting
-  List<ErrorReport> get queuedReports => List<ErrorReport>.unmodifiable(_queue);
+  List<ErrorReport> get queuedReports => List.unmodifiableOf(_queue);
 
   /// Captures a Flutter framework error with a supplied or explicit absent stack.
   @override

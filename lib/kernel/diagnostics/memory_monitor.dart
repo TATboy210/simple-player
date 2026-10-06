@@ -189,7 +189,7 @@ final class MemoryMonitor implements MemoryMonitorSlot {
       rssBytes: _lastRss,
       maxRssBytes: _peakRss,
       deltaBytes: 0,
-      history: List.unmodifiable(_history),
+      history: List.unmodifiableOf(_history),
       timestamp: clock.now(),
     );
   }
@@ -254,7 +254,7 @@ final class MemoryMonitor implements MemoryMonitorSlot {
         rssBytes: current,
         maxRssBytes: _peakRss,
         deltaBytes: delta,
-        history: List.unmodifiable(_history),
+        history: List.unmodifiableOf(_history),
         timestamp: clock.now(),
       );
       snapshotNotifier.value = snap;

@@ -62,8 +62,8 @@ final class ErrorLocation {
     required this.primaryFrame,
     List<ErrorLocationFrame> secondaryFrames = const [],
     List<String> sourceLines = const [],
-  }) : secondaryFrames = List<ErrorLocationFrame>.unmodifiable(secondaryFrames),
-       sourceLines = List<String>.unmodifiable(sourceLines);
+  }) : secondaryFrames = List.unmodifiableOf(secondaryFrames),
+       sourceLines = List.unmodifiableOf(sourceLines);
 
   /// First trusted project frame selected for developer-facing evidence.
   final ErrorLocationFrame primaryFrame;

@@ -39,7 +39,7 @@ final class SourceLine {
 final class SourceExcerpt {
   /// Creates an immutable excerpt of at most five numbered source lines.
   SourceExcerpt({required List<SourceLine> lines})
-    : lines = List<SourceLine>.unmodifiable(lines);
+    : lines = List.unmodifiableOf(lines);
 
   /// Numbered source lines ordered as they occurred in the file.
   final List<SourceLine> lines;

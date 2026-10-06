@@ -183,7 +183,7 @@ class PlaylistCoordinator {
     // 移除锚点条目 → 清空锚 (用户显式丢弃该条目, 高亮失效);
     // 移除其他条目不动 (path 键防误伤同名不同条).
     if (_lastPlayedPath.value == removed.path) _lastPlayedPath.value = null;
-    _entries.value = List<PlaylistItem>.unmodifiable([
+    _entries.value = List.unmodifiableOf([
       for (var i = 0; i < _entries.value.length; i++)
         if (i != index) _entries.value[i],
     ]);
@@ -212,7 +212,7 @@ class PlaylistCoordinator {
     for (final path in removedPaths) {
       _metaByPath.remove(path);
     }
-    _entries.value = List<PlaylistItem>.unmodifiable([
+    _entries.value = List.unmodifiableOf([
       for (var i = 0; i < _entries.value.length; i++)
         if (!valid.contains(i)) _entries.value[i],
     ]);
@@ -271,7 +271,7 @@ class PlaylistCoordinator {
     if (!_engineQueueMatches(targetPaths)) {
       // 停止态: 引擎队列空 (或与逻辑队列不一致), sortQueue no-op 无回流 —
       // 手工重排逻辑队列并落盘, 下次装载按新顺序生效.
-      _entries.value = List<PlaylistItem>.unmodifiable(target);
+      _entries.value = List.unmodifiableOf(target);
       unawaited(_save());
     }
   }
@@ -387,7 +387,7 @@ class PlaylistCoordinator {
           ascending: _sortAscending,
         ),
       );
-    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[...sorted]);
+    _entries.value = List.unmodifiableOf(<PlaylistItem>[...sorted]);
     // 上次播放锚点恢复 (v0.0.6.2) — 仅逻辑高亮, 引擎仍不装载不自动播;
     // path 不在队列时 UI 无匹配, 高亮自然不渲染.
     _lastPlayedPath.value = snapshot.lastPlayedPath;
@@ -446,7 +446,7 @@ class PlaylistCoordinator {
       _lastKnownPositionMs = 0;
       _lastKnownDurationMs = 0;
     }
-    _observedPaths = List<String>.unmodifiable(paths);
+    _observedPaths = List.unmodifiableOf(paths);
     _observedPlayingPath = current;
     _observedIndex = index;
 
@@ -507,7 +507,7 @@ class PlaylistCoordinator {
     );
     _metaByPath[path] = updated;
     // 就地刷新视图中的同 path 条目（保持顺序不变）.
-    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
+    _entries.value = List.unmodifiableOf(<PlaylistItem>[
       for (final entry in _entries.value) entry.path == path ? updated : entry,
     ]);
   }
@@ -515,14 +515,14 @@ class PlaylistCoordinator {
   /// 以引擎 paths 为准重建逻辑队列（元数据按 path 合并, 排序重排后顺序跟随引擎;
   /// 新 path 经 [_itemFor] 登记元数据并分配 addedSeq）.
   void _rebuildEntries(List<String> paths) {
-    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
+    _entries.value = List.unmodifiableOf(<PlaylistItem>[
       for (final path in paths) _itemFor(path),
     ]);
   }
 
   /// 逻辑队列追加（保持引擎镜像顺序语义 — 末尾追加）.
   void _appendToLogicalQueue(List<String> paths) {
-    _entries.value = List<PlaylistItem>.unmodifiable(<PlaylistItem>[
+    _entries.value = List.unmodifiableOf(<PlaylistItem>[
       ..._entries.value,
       for (final path in paths) _itemFor(path),
     ]);
