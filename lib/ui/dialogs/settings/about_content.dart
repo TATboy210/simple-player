@@ -137,7 +137,7 @@ class _AppIdentity extends StatelessWidget {
                 style: const TextStyle(
                   color: Tokens.textPrimary,
                   fontSize: Tokens.fontTitle,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: Tokens.weightSemiBold,
                 ),
               ),
             ),
@@ -258,7 +258,7 @@ class _SectionLabel extends StatelessWidget {
         style: const TextStyle(
           color: Tokens.accent,
           fontSize: Tokens.fontCaption,
-          fontWeight: FontWeight.w600,
+          fontWeight: Tokens.weightSemiBold,
         ),
       ),
     );

@@ -593,7 +593,7 @@ class _PanelHeader extends StatelessWidget {
             style: const TextStyle(
               color: Tokens.textPrimary,
               fontSize: Tokens.fontBody,
-              fontWeight: FontWeight.w600,
+              fontWeight: Tokens.weightSemiBold,
             ),
           ),
           const SizedBox(width: Tokens.spSm),
@@ -701,7 +701,7 @@ class _SettingsTabChipState extends State<_SettingsTabChip> {
                               ? Tokens.accent
                               : Tokens.textPrimary,
                           fontSize: Tokens.fontBody,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: Tokens.weightSemiBold,
                         ),
                       ),
                     ],

@@ -121,7 +121,7 @@ class _Section extends StatelessWidget {
         style: const TextStyle(
           color: Tokens.accent,
           fontSize: Tokens.fontCaption,
-          fontWeight: FontWeight.w600,
+          fontWeight: Tokens.weightSemiBold,
         ),
       ),
     );

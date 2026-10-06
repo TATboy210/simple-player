@@ -125,7 +125,6 @@ class Tokens {
   static const fontBranding = 18.0;
 
   static const weightExtraLight = FontWeight.w200;
-  static const weightLight = FontWeight.w300;
   static const weightRegular = FontWeight.w400;
   static const weightMedium = FontWeight.w500;
   static const weightSemiBold = FontWeight.w600;

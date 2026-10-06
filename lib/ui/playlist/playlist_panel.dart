@@ -270,7 +270,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             style: const TextStyle(
               color: Tokens.textPrimary,
               fontSize: Tokens.fontBody,
-              fontWeight: FontWeight.w600,
+              fontWeight: Tokens.weightSemiBold,
             ),
           ),
         ),
@@ -312,7 +312,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             style: const TextStyle(
               color: Tokens.accent,
               fontSize: Tokens.fontBody,
-              fontWeight: FontWeight.w600,
+              fontWeight: Tokens.weightSemiBold,
             ),
           ),
         ),

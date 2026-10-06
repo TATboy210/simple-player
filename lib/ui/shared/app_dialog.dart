@@ -139,7 +139,7 @@ class _DialogTitle extends StatelessWidget {
                   style: const TextStyle(
                     color: Tokens.textPrimary,
                     fontSize: Tokens.fontBody,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: Tokens.weightSemiBold,
                   ),
                 ),
               ),
