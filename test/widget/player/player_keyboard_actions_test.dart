@@ -21,6 +21,9 @@ void main() {
   Future<void> pumpHandler(
     WidgetTester tester, {
     required FakeEngine engine,
+    PlayerActions actions = const PlayerActions(),
+    void Function(int)? adjustSubtitle,
+    VoidCallback? openFile,
   }) async {
     final controller = PlaybackController(engine: engine);
     final windowService = FakeWindowService();
@@ -38,7 +41,9 @@ void main() {
           builder: (context) => buildPlayerKeyboardActions(
             engine: engine,
             controller: controller,
-            actions: const PlayerActions(),
+            actions: actions,
+            onAdjustSubtitleDelay: adjustSubtitle,
+            onOpenFile: openFile,
             customBindings: const {},
             videoKey: GlobalKey<VideoState>(),
             isFullscreen: false,
@@ -102,6 +107,79 @@ void main() {
       expect(engine.skipForwardCallCount, 0);
     },
   );
+
+  testWidgets('subtitle brackets use persistence callback or engine fallback', (
+    tester,
+  ) async {
+    final fallback = FakeEngine();
+    await pumpHandler(tester, engine: fallback);
+    await tester.sendKeyEvent(LogicalKeyboardKey.bracketRight);
+    expect(fallback.subtitleDelay, 500);
+    await tester.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+    expect(fallback.subtitleDelay, 0);
+    final persisted = FakeEngine();
+    final deltas = <int>[];
+    await pumpHandler(tester, engine: persisted, adjustSubtitle: deltas.add);
+    await tester.sendKeyEvent(LogicalKeyboardKey.bracketLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.bracketRight);
+    expect(deltas, [-500, 500]);
+    expect(persisted.subtitleDelay, 0);
+  });
+
+  testWidgets('playlist open subtitle and help callbacks stay reachable', (
+    tester,
+  ) async {
+    final engine = FakeEngine();
+    final calls = <String>[];
+    await pumpHandler(
+      tester,
+      engine: engine,
+      openFile: () => calls.add('open'),
+      actions: PlayerActions(
+        onTogglePlaylist: () => calls.add('list'),
+        onPreviousEntry: () => calls.add('previous'),
+        onNextEntry: () => calls.add('next'),
+        onToggleFullscreen: () => calls.add('fullscreen'),
+      ),
+    );
+    for (final key in [
+      LogicalKeyboardKey.keyL,
+      LogicalKeyboardKey.keyN,
+      LogicalKeyboardKey.keyP,
+      LogicalKeyboardKey.keyO,
+      LogicalKeyboardKey.keyF,
+    ]) {
+      await tester.sendKeyEvent(key);
+    }
+    expect(calls, ['list', 'previous', 'next', 'open', 'fullscreen']);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f1);
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('volume clamps both ends and unmute reports unchanged volume', (
+    tester,
+  ) async {
+    final engine = FakeEngine();
+    await pumpHandler(tester, engine: engine);
+    engine.setVolume(0.99);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(engine.volume.value, 1);
+    engine.setVolume(0.01);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    expect(engine.volume.value, 0);
+    engine.setVolume(0.6);
+    engine.setMute(true);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyM);
+    expect(engine.isMuted.value, isFalse);
+    expect(engine.volume.value, 0.6);
+    expect(OsdService.I.message.value?.text, '60%');
+    OsdService.I.hide();
+  });
 
   testWidgets('ArrowUp — setVolume +0.05 且 OSD 反馈百分比 (v0.0.8.1)', (
     tester,

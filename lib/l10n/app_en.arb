@@ -1,5 +1,6 @@
 {
   "@@locale": "en",
+  "moveToCenter": "Move to center",
   "appTitle": "Simple Player",
   "windowInitializationFailed": "Window initialization failed",
   "@appTitle": {

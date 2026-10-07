@@ -1,5 +1,6 @@
 {
   "@@locale": "zh",
+  "moveToCenter": "移到中间",
   "appTitle": "Simple Player",
   "windowInitializationFailed": "窗口初始化失败",
   "brandName": "S I M P L E   P L A Y E R",

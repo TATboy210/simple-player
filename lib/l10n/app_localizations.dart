@@ -102,6 +102,12 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @moveToCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to center'**
+  String get moveToCenter;
+
   /// Application title shown in title bar and taskbar
   ///
   /// In en, this message translates to:

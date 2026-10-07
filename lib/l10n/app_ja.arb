@@ -1,5 +1,6 @@
 {
   "@@locale": "ja",
+  "moveToCenter": "中央へ移動",
   "appTitle": "Simple Player",
   "windowInitializationFailed": "ウィンドウの初期化に失敗しました",
   "brandName": "S I M P L E   P L A Y E R",

@@ -12,9 +12,13 @@ import '../../shared/glass_container.dart' show GlassButton;
 import '../../shared/loop_marquee_text.dart';
 import '../../theme/tokens.dart';
 import 'about_content.dart';
+import 'settings_panel_session.dart';
+import '../../player/workspace_focus_scope.dart';
 import 'audio_settings_content.dart';
 import 'general_settings_content.dart';
 import 'video_settings_content.dart';
+
+part 'settings_panel_chrome.dart';
 
 /// 设置分区 —— 左侧导航的四个条目。
 enum _SettingsTab { general, video, audio, about }
@@ -53,7 +57,7 @@ class SettingsServicesBundle {
 ///   L0 后退（左移+微缩）淡出至完全消失（纯渲染层动画，零新增 GPU）
 /// - 键盘：→ 进入 L1 / 切下一分区；L1 ← 返回 L0；↑↓ 选条目（General
 ///   分区经 [GeneralSettingsContent.rowsFocusNode] 下沉消费）、Enter/Space
-///   激活；Esc 任何层级冒泡宿主关整个面板；面板聚焦期间 Space 不再
+///   激活；Esc 任何层级冒泡宿主，仅退出全屏；面板聚焦期间 Space 不再
 ///   透传播放/暂停
 /// - 灰显分区（视频/音频）键盘不可达：←→/↑↓ 只在 enabled 集合内移动
 ///   （键盘绕过 IgnorePointer，必须显式过滤）
@@ -70,6 +74,12 @@ class SettingsPanel extends StatefulWidget {
 
   final SettingsServicesBundle? services;
 
+  /// 共享展示数据；不共享各 route 的 FocusNode 或 ScrollController。
+  final SettingsPanelSession? session;
+
+  /// 左任务标题显式提升动作；中任务不显示提升入口。
+  final VoidCallback? onPromote;
+
   /// seek 拖动挂起信号 (v0.0.8.2, 可选) — true 时玻璃模糊短暂停用,
   /// 松手恢复. null = 无挂起源 (恒不挂起).
   final ValueListenable<bool>? scrubbing;
@@ -79,6 +89,8 @@ class SettingsPanel extends StatefulWidget {
     required this.visible,
     required this.onClose,
     this.services,
+    this.session,
+    this.onPromote,
     this.scrubbing,
   });
 
@@ -113,7 +125,7 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   late final CurvedAnimation _layerEase;
 
-  /// 面板级焦点 — ←→ 切分区 / Enter 进出层级 / Esc 逐层.
+  /// 面板级焦点 — ←→ 切分区 / Enter 进出层级 / Esc 退出全屏.
   late final FocusNode _focusNode;
 
   /// General 分区行导航焦点 — ↑↓ 选条目 / Enter 激活（注入 content）.
@@ -137,6 +149,66 @@ class _SettingsPanelState extends State<SettingsPanel>
   /// 比对失效缓存，防止缓存的 l10n 字符串陈旧。
   Locale? _layerCacheLocale;
 
+  /// 控制器只在本 route 附着；会话中仅存数值。
+  final Map<String, ScrollController> _scrollControllers = {};
+  final FocusScopeNode _taskScope = FocusScopeNode(debugLabel: 'settings-task');
+  WorkspaceFocusRegistry? _focusRegistry;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _focusRegistry?.tasks.remove('settings');
+    _focusRegistry = WorkspaceFocusScope.maybeOf(context);
+    _focusRegistry?.tasks['settings'] = _taskScope;
+  }
+
+  /// 从共享数据同步导航；滚动通知不触发整层重建。
+  void _syncSession() {
+    final state = widget.session?.value;
+    if (state == null) return;
+    final selected = _SettingsTab.values.firstWhere(
+      (tab) => tab.name == state.section,
+      orElse: () => _SettingsTab.about,
+    );
+    final level = state.isContent ? _PanelLevel.content : _PanelLevel.tags;
+    // An already mounted window route also follows fullscreen scroll changes.
+    for (final entry in _scrollControllers.entries) {
+      final offset = state.scrollOffsets[entry.key];
+      final controller = entry.value;
+      if (offset == null ||
+          !controller.hasClients ||
+          (controller.offset - offset).abs() < 0.1) {
+        continue;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !controller.hasClients) return;
+        controller.jumpTo(
+          offset.clamp(0.0, controller.position.maxScrollExtent),
+        );
+      });
+    }
+    if (_selected == selected && _level == level) return;
+    setState(() {
+      _selected = selected;
+      _level = level;
+      _tagLayerCache = null;
+      _contentLayerCache = null;
+    });
+    _layerController.value = state.isContent ? 1 : 0;
+  }
+
+  /// 发布展示数据，不把角色变动混入设置业务状态。
+  void _recordNavigation() =>
+      widget.session?.navigate(_selected.name, _level == _PanelLevel.content);
+
+  /// 获取独立分区控制器，首次按共享 offset 恢复。
+  ScrollController _scrollFor(String section) => _scrollControllers.putIfAbsent(
+    section,
+    () => ScrollController(
+      initialScrollOffset: widget.session?.value.scrollOffsets[section] ?? 0,
+    ),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -155,10 +227,24 @@ class _SettingsPanelState extends State<SettingsPanel>
     );
     _focusNode = FocusNode(debugLabel: 'SettingsPanel');
     _rowsFocusNode = FocusNode(debugLabel: 'SettingsPanelRows');
+    final presentation = widget.session?.value;
+    if (presentation != null) {
+      _selected = _SettingsTab.values.firstWhere(
+        (tab) => tab.name == presentation.section,
+        orElse: () => _SettingsTab.about,
+      );
+      _level = presentation.isContent ? _PanelLevel.content : _PanelLevel.tags;
+      _layerController.value = presentation.isContent ? 1 : 0;
+    }
+    widget.session?.addListener(_syncSession);
     if (widget.visible) {
       // post-frame：等面板挂上树再取焦点（initState 内不能同步请求）.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.visible) _focusNode.requestFocus();
+        if (mounted &&
+            widget.visible &&
+            ModalRoute.of(context)?.isCurrent != false) {
+          _focusNode.requestFocus();
+        }
       });
     }
   }
@@ -166,12 +252,21 @@ class _SettingsPanelState extends State<SettingsPanel>
   @override
   void didUpdateWidget(covariant SettingsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session) {
+      oldWidget.session?.removeListener(_syncSession);
+      widget.session?.addListener(_syncSession);
+      _syncSession();
+    }
     if (oldWidget.visible != widget.visible) {
       widget.visible ? _controller.forward() : _controller.reverse();
       // 重开面板：焦点回面板级（宿主在关闭时已归还外层；此处为打开侧接力）.
       if (widget.visible) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && widget.visible) _focusNode.requestFocus();
+          if (mounted &&
+              widget.visible &&
+              ModalRoute.of(context)?.isCurrent != false) {
+            _focusNode.requestFocus();
+          }
         });
       }
     }
@@ -182,6 +277,14 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   @override
   void dispose() {
+    widget.session?.removeListener(_syncSession);
+    for (final controller in _scrollControllers.values) {
+      controller.dispose();
+    }
+    if (identical(_focusRegistry?.tasks['settings'], _taskScope)) {
+      _focusRegistry?.tasks.remove('settings');
+    }
+    _taskScope.dispose();
     _focusNode.dispose();
     _rowsFocusNode.dispose();
     _layerController.dispose();
@@ -200,12 +303,14 @@ class _SettingsPanelState extends State<SettingsPanel>
       _tagLayerCache = null;
       _contentLayerCache = null;
     });
+    _recordNavigation();
   }
 
   /// L0 → L1（点 tag / Enter）— 进入即聚焦 General 首行（键盘 ↑↓ 立即可用）.
   void _enterContent() {
     setState(() => _level = _PanelLevel.content);
     _layerController.forward();
+    _recordNavigation();
     if (_selected == _SettingsTab.general) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _level == _PanelLevel.content) {
@@ -219,6 +324,7 @@ class _SettingsPanelState extends State<SettingsPanel>
   void _backToTags() {
     setState(() => _level = _PanelLevel.tags);
     _layerController.reverse();
+    _recordNavigation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -244,7 +350,7 @@ class _SettingsPanelState extends State<SettingsPanel>
   // ── 键盘（XMB 交叉模型）──────────────────────────────────────
 
   /// 面板级按键 — 返回 handled 阻断冒泡（防外层 seek/音量/暂停泄漏），
-  /// Esc 在 L0 时刻意 ignored（冒泡 → 宿主 onEscapePressed 关面板）.
+  /// Esc 刻意 ignored（冒泡 → 宿主退出全屏）.
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     // 防线：焦点滞留隐藏面板时绝不吞键（宿主负责归还焦点，此处兜底）.
     if (!widget.visible) return KeyEventResult.ignored;
@@ -258,7 +364,7 @@ class _SettingsPanelState extends State<SettingsPanel>
   }
 
   /// L0 — ↑↓ 在 tag 列间移动（enabled 集合内到头即停），→ 或 Enter/Space
-  /// 进入内容层；← handled 空操作（ignored 会冒泡成 seek）；Esc 冒泡关面板.
+  /// 进入内容层；← handled 空操作（ignored 会冒泡成 seek）；Esc 冒泡退出全屏.
   KeyEventResult _handleTagsLevelKey(LogicalKeyboardKey key) {
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowDown) {
@@ -277,7 +383,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       _enterContent();
       return KeyEventResult.handled;
     }
-    // ← handled 空操作（挡 seek 泄漏）；Esc/其余 — 冒泡（Esc 关面板）.
+    // ← handled 空操作（挡 seek 泄漏）；Esc/其余 — 冒泡（Esc 退出全屏）.
     if (key == LogicalKeyboardKey.arrowLeft) {
       return KeyEventResult.handled;
     }
@@ -286,7 +392,7 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   /// L1 — → 切下一分区；← 返回 tag 层；↑↓/Enter/Space 交给 rows 节点
   /// （General 后代先消费，未聚焦则聚焦）；非 General 分区同键 handled
-  /// 空操作（防泄漏）；Esc 冒泡宿主关整个面板（返回专属 ← 键）.
+  /// 空操作（防泄漏）；Esc 冒泡宿主退出全屏（返回专属 ← 键）.
   KeyEventResult _handleContentLevelKey(LogicalKeyboardKey key) {
     if (key == LogicalKeyboardKey.arrowRight) {
       final index = _enabledTabs.indexOf(_selected);
@@ -310,7 +416,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       }
       return KeyEventResult.handled;
     }
-    // Esc/其余 — 冒泡（Esc 经宿主 onEscapePressed 关整个面板）.
+    // Esc/其余 — 冒泡（Esc 经宿主退出全屏）.
     return KeyEventResult.ignored;
   }
 
@@ -320,10 +426,16 @@ class _SettingsPanelState extends State<SettingsPanel>
   Widget build(BuildContext context) {
     // 控制栏同款渐进渐退 — FadeTransition 纯渲染层驱动; IgnorePointer
     // 锚定 widget.visible: 关闭瞬间立即让出命中.
-    return IgnorePointer(
-      ignoring: !widget.visible,
-      child: RepaintBoundary(
-        child: FadeTransition(opacity: _fade, child: _buildShell(context)),
+    return ExcludeFocus(
+      excluding: !widget.visible,
+      child: TickerMode(
+        enabled: widget.visible,
+        child: IgnorePointer(
+          ignoring: !widget.visible,
+          child: RepaintBoundary(
+            child: FadeTransition(opacity: _fade, child: _buildShell(context)),
+          ),
+        ),
       ),
     );
   }
@@ -344,12 +456,15 @@ class _SettingsPanelState extends State<SettingsPanel>
         child: Material(
           // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
           color: Colors.transparent,
-          child: Focus(
-            focusNode: _focusNode,
-            // Tab 遍历不进面板（requestFocus 不受影响）.
-            skipTraversal: true,
-            onKeyEvent: _handleKeyEvent,
-            child: _buildContent(context),
+          child: FocusScope(
+            node: _taskScope,
+            child: Focus(
+              focusNode: _focusNode,
+              // Tab 遍历不进面板（requestFocus 不受影响）.
+              skipTraversal: true,
+              onKeyEvent: _handleKeyEvent,
+              child: _buildContent(context),
+            ),
           ),
         ),
       ),
@@ -393,6 +508,7 @@ class _SettingsPanelState extends State<SettingsPanel>
             l10n: l10n,
             onBack: _backToTags,
             onClose: widget.onClose,
+            onPromote: widget.onPromote,
             showBack: _level == _PanelLevel.content,
             backOpacity: _layerEase,
           ),
@@ -523,7 +639,20 @@ class _SettingsPanelState extends State<SettingsPanel>
             },
             child: KeyedSubtree(
               key: ValueKey(_selected),
-              child: _buildTabContent(),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  // Only the active route writes; a hidden window route may clamp
+                  // its shorter viewport while following fullscreen presentation.
+                  if (ModalRoute.of(context)?.isCurrent != false) {
+                    widget.session?.recordScroll(
+                      _selected.name,
+                      notification.metrics.pixels,
+                    );
+                  }
+                  return false;
+                },
+                child: _buildTabContent(),
+              ),
             ),
           ),
         ),
@@ -539,6 +668,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       _SettingsTab.general => GeneralSettingsContent(
         settings: services?.settings,
         rowsFocusNode: _rowsFocusNode,
+        scrollController: _scrollFor('general'),
       ),
       _SettingsTab.video =>
         services?.videoProcessing == null
@@ -546,203 +676,16 @@ class _SettingsPanelState extends State<SettingsPanel>
             : VideoSettingsContent(
                 videoProcessing: services!.videoProcessing!,
                 settings: services.settings,
+                scrollController: _scrollFor('video'),
               ),
       _SettingsTab.audio =>
         services?.settings == null
             ? const SizedBox.shrink()
-            : AudioSettingsContent(settings: services!.settings!),
-      _SettingsTab.about => const AboutContent(),
+            : AudioSettingsContent(
+                settings: services!.settings!,
+                scrollController: _scrollFor('audio'),
+              ),
+      _SettingsTab.about => AboutContent(scrollController: _scrollFor('about')),
     };
   }
-}
-
-/// 面板标题行 — "设置" + 返回按钮（仅 L1 出现） + 关闭按钮。
-///
-/// 无 accent 竖条（v0.0.8 用户裁决）；返回按钮出现在"设置"右侧，
-/// 淡入淡出 + 恒定占位防标题跳动；字号/按钮与播放列表标题行同规格。
-class _PanelHeader extends StatelessWidget {
-  final AppLocalizations l10n;
-  final VoidCallback onBack;
-  final VoidCallback onClose;
-  final bool showBack;
-  final Animation<double> backOpacity;
-
-  const _PanelHeader({
-    required this.l10n,
-    required this.onBack,
-    required this.onClose,
-    required this.showBack,
-    required this.backOpacity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Tokens.spMd,
-        Tokens.spMd,
-        Tokens.spSm,
-        Tokens.spSm,
-      ),
-      child: Row(
-        children: [
-          Text(
-            l10n.settings,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontBody,
-              fontWeight: Tokens.weightSemiBold,
-            ),
-          ),
-          const SizedBox(width: Tokens.spSm),
-          // 返回按钮 — 仅 L1 出现（层级动画驱动淡入淡出，恒占位防跳）.
-          FadeTransition(
-            opacity: backOpacity,
-            child: IgnorePointer(
-              ignoring: !showBack,
-              child: Opacity(
-                opacity: showBack ? 1.0 : 0.0,
-                child: GlassButton.iconOnly(
-                  icon: Icons.arrow_back,
-                  tooltip: l10n.back,
-                  onPressed: onBack,
-                ),
-              ),
-            ),
-          ),
-          const Spacer(),
-          GlassButton.iconOnly(
-            icon: Icons.close,
-            tooltip: l10n.close,
-            onPressed: onClose,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 竖排分区 tag — 图标 + 类别名 + 条目枚举摘要小字（三行，左对齐）。
-///
-/// hover/pressed 色阶沿用旧 _NavEntry 语言（hover 渐现 bgHover、pressed
-/// 按下沉降色）；选中态 = bgHover 常驻底 + accent 图标/文字，**无竖条
-/// 指示**（v0.0.8 裁决）。灰显分区 38% 不透明 + IgnorePointer。
-class _SettingsTabChip extends StatefulWidget {
-  final _SettingsTab tab;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  const _SettingsTabChip({
-    required this.tab,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  @override
-  State<_SettingsTabChip> createState() => _SettingsTabChipState();
-}
-
-class _SettingsTabChipState extends State<_SettingsTabChip> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final selected = widget.selected;
-    return Opacity(
-      opacity: widget.enabled ? 1 : 0.38,
-      child: IgnorePointer(
-        ignoring: !widget.enabled,
-        child: MouseRegion(
-          cursor: widget.enabled
-              ? SystemMouseCursors.click
-              : SystemMouseCursors.basic,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            onTap: widget.enabled ? widget.onTap : null,
-            behavior: HitTestBehavior.opaque,
-            child: AnimatedContainer(
-              // Key 供测试断言选中底色（以枚举名区分分区）.
-              key: ValueKey('settings-tab-${widget.tab.name}'),
-              duration: const Duration(milliseconds: Tokens.durationFast),
-              padding: const EdgeInsets.symmetric(
-                horizontal: Tokens.spSm,
-                vertical: Tokens.spSm,
-              ),
-              decoration: BoxDecoration(
-                // 选中恒亮 / 悬停瞬态同底色（_NavEntry 同款语义）。
-                color: (selected || _hovered) && widget.enabled
-                    ? Tokens.bgHover
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(Tokens.radiusSm),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _tabIcon(widget.tab),
-                        size: 18,
-                        color: selected && widget.enabled
-                            ? Tokens.accent
-                            : Tokens.textPrimary,
-                      ),
-                      const SizedBox(width: Tokens.spSm),
-                      Text(
-                        _tabLabel(l10n),
-                        style: TextStyle(
-                          color: selected && widget.enabled
-                              ? Tokens.accent
-                              : Tokens.textPrimary,
-                          fontSize: Tokens.fontBody,
-                          fontWeight: Tokens.weightSemiBold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: Tokens.spXs),
-                  // 摘要跑马灯 — 空间足够静止全显, 不足从右向左循环滚动;
-                  // 滚动空间随 chip 宽（面板宽）响应联动.
-                  LoopMarqueeText(
-                    text: _tabSummary(l10n),
-                    style: const TextStyle(
-                      color: Tokens.textSecondary,
-                      fontSize: Tokens.fontCaption,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData _tabIcon(_SettingsTab tab) => switch (tab) {
-    _SettingsTab.general => Icons.tune,
-    _SettingsTab.video => Icons.smart_display_outlined,
-    _SettingsTab.audio => Icons.graphic_eq,
-    _SettingsTab.about => Icons.info_outline,
-  };
-
-  String _tabLabel(AppLocalizations l10n) => switch (widget.tab) {
-    _SettingsTab.general => l10n.generalTab,
-    _SettingsTab.video => l10n.videoTab,
-    _SettingsTab.audio => l10n.audioTab,
-    _SettingsTab.about => l10n.aboutTab,
-  };
-
-  String _tabSummary(AppLocalizations l10n) => switch (widget.tab) {
-    _SettingsTab.general => l10n.settingsSummaryGeneral,
-    _SettingsTab.video => l10n.settingsSummaryVideo,
-    _SettingsTab.audio => l10n.settingsSummaryAudio,
-    _SettingsTab.about => l10n.settingsSummaryAbout,
-  };
 }

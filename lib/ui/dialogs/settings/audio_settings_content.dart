@@ -17,18 +17,20 @@ const _delayMinMs = -1000;
 const _delayMaxMs = 1000;
 const _delayStepMs = 50;
 
-/// 「音频」分区内容 — StatefulWidget: SpinControl 值非响应式 (箭头驱动),
-/// onChanged 里 service 写入后 setState 重建读取最新延迟.
-class AudioSettingsContent extends StatefulWidget {
-  const AudioSettingsContent({super.key, required this.settings});
+/// 「音频」分区内容 — 订阅权威服务的延迟 revision。
+/// Panel and keyboard setters refresh every mounted route without duplicating values.
+class AudioSettingsContent extends StatelessWidget {
+  const AudioSettingsContent({
+    super.key,
+    required this.settings,
+    this.scrollController,
+  });
+
+  /// 由当前设置 route 拥有，不跨 route 共享附着。
+  final ScrollController? scrollController;
 
   final AppSettingsService settings;
 
-  @override
-  State<AudioSettingsContent> createState() => _AudioSettingsContentState();
-}
-
-class _AudioSettingsContentState extends State<AudioSettingsContent> {
   /// 延迟毫秒 → SpinControl 索引 (双向线性映射).
   int _msToIndex(int ms) =>
       ((ms - _delayMinMs) ~/ _delayStepMs).clamp(0, _optionCount - 1);
@@ -48,35 +50,35 @@ class _AudioSettingsContentState extends State<AudioSettingsContent> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final settings = widget.settings;
     final options = _delayOptions;
 
-    return Padding(
-      padding: const EdgeInsets.all(Tokens.spLg),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: Tokens.spXs,
-          children: [
-            _DelayRow(
-              label: l10n.audioDelay,
-              options: options,
-              currentIndex: _msToIndex(settings.audioDelayMs),
-              formatValue: (raw) => '$raw ms',
-              onChanged: (i) => setState(() {
-                settings.setAudioDelayMs(_indexToMs(i));
-              }),
-            ),
-            _DelayRow(
-              label: l10n.subtitleDelay,
-              options: options,
-              currentIndex: _msToIndex(settings.subtitleDelayMs),
-              formatValue: (raw) => '$raw ms',
-              onChanged: (i) => setState(() {
-                settings.setSubtitleDelayMs(_indexToMs(i));
-              }),
-            ),
-          ],
+    return ValueListenableBuilder<int>(
+      valueListenable: settings.delayRevision,
+      builder: (_, revision, _) => Padding(
+        padding: const EdgeInsets.all(Tokens.spLg),
+        child: SingleChildScrollView(
+          controller: scrollController,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: Tokens.spXs,
+            children: [
+              _DelayRow(
+                label: l10n.audioDelay,
+                options: options,
+                currentIndex: _msToIndex(settings.audioDelayMs),
+                formatValue: (raw) => '$raw ms',
+                // Service revision is the sole invalidation for all panels.
+                onChanged: (i) => settings.setAudioDelayMs(_indexToMs(i)),
+              ),
+              _DelayRow(
+                label: l10n.subtitleDelay,
+                options: options,
+                currentIndex: _msToIndex(settings.subtitleDelayMs),
+                formatValue: (raw) => '$raw ms',
+                onChanged: (i) => settings.setSubtitleDelayMs(_indexToMs(i)),
+              ),
+            ],
+          ),
         ),
       ),
     );

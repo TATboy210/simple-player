@@ -1,7 +1,8 @@
 name: simple_player_flutter
 description: "Simple Player - A dark-themed media player"
 publish_to: 'none'
-version: 0.0.10
+# pub accepts three-part SemVer only; build 1 maps to MSIX/display 0.0.10.1.
+version: 0.0.10+1
 
 environment:
   sdk: ^3.13.5
@@ -37,7 +38,7 @@ dependencies:
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）
   flutter_video_thumbnail_plus: ^1.0.6
   # Debug-only VM service bridge for Marionette MCP UI automation.
-  marionette_flutter: 0.6.0
+  marionette_flutter: 0.7.0
   i18n: ^4.2.6
   xdg_directories: ^1.1.0
   cross_file: ^0.3.5+5
@@ -72,6 +73,6 @@ msix_config:
   display_name: Simple Player
   publisher_display_name: Simple Player
   identity_name: com.simpleplayer.app
-  msix_version: 0.0.10.0
+  msix_version: 0.0.10.1
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: internetClient

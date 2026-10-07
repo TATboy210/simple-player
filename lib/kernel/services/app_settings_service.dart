@@ -80,6 +80,12 @@ class AppSettingsService {
   /// 字幕延迟 (毫秒).
   int _subtitleDelayMs = 0;
 
+  final ValueNotifier<int> _delayRevision = ValueNotifier(0);
+
+  /// Read-only invalidation of authoritative delay mirrors for every mounted UI.
+  /// Keyboard and panel setters publish the same revision, without duplicate state.
+  ValueListenable<int> get delayRevision => _delayRevision;
+
   int get audioDelayMs => _audioDelayMs;
   int get subtitleDelayMs => _subtitleDelayMs;
 
@@ -108,6 +114,7 @@ class AppSettingsService {
       engine.setHardwareDecoding(data.hardwareDecoding);
       engine.setSubtitleDelay(_subtitleDelayMs);
       engine.setAudioDelay(_audioDelayMs);
+      _delayRevision.value++;
     } finally {
       _restoring = false;
     }
@@ -139,6 +146,7 @@ class AppSettingsService {
     if (_disposed) return;
     _audioDelayMs = ms;
     engine.setAudioDelay(ms);
+    _delayRevision.value++;
     unawaited(store.saveAudioDelayMs(ms));
   }
 
@@ -147,6 +155,7 @@ class AppSettingsService {
     if (_disposed) return;
     _subtitleDelayMs = ms;
     engine.setSubtitleDelay(ms);
+    _delayRevision.value++;
     unawaited(store.saveSubtitleDelayMs(ms));
   }
 
@@ -242,5 +251,6 @@ class AppSettingsService {
     if (video != null) unawaited(store.saveVideo(video));
     resumeEnabled.dispose();
     hardwareDecoding.dispose();
+    _delayRevision.dispose();
   }
 }

@@ -10,6 +10,9 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get moveToCenter => '移到中间';
+
+  @override
   String get appTitle => 'Simple Player';
 
   @override

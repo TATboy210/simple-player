@@ -51,9 +51,6 @@ class PlayerActions {
   /// 当前播放模式 — 驱动模式按钮图标 (null 时按钮隐藏)。
   final ValueListenable<PlayMode>? playMode;
 
-  /// Esc 键分派 — 面板可见时关闭面板并返回 true; 返回 false 走全屏退出。
-  final bool Function()? onEscapePressed;
-
   const PlayerActions({
     this.onPlayPause,
     this.onSeekBack,
@@ -70,6 +67,5 @@ class PlayerActions {
     this.onNextEntry,
     this.onCyclePlayMode,
     this.playMode,
-    this.onEscapePressed,
   });
 }

@@ -1,5 +1,6 @@
 {
   "@@locale": "ko",
+  "moveToCenter": "가운데로 이동",
   "appTitle": "Simple Player",
   "windowInitializationFailed": "창 초기화 실패",
   "brandName": "S I M P L E   P L A Y E R",

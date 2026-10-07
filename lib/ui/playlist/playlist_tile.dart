@@ -9,6 +9,7 @@ import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_menu.dart';
 import '../theme/tokens.dart';
+import '../player/workspace_menu_session.dart';
 
 /// 播放列表条目卡 — 缩略图 + 透明"塑料膜"按钮层 + 右侧名称/断点信息.
 ///
@@ -95,6 +96,11 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   /// 鼠标悬停态 — 驱动整卡背景微亮 (v0.0.6.2).
   bool _hovered = false;
+  WorkspaceMenuSession? _ownedMenus;
+  final Object _menuOwner = Object();
+  final FocusNode _menuTrigger = FocusNode(
+    debugLabel: 'playlist-entry-trigger',
+  );
 
   @override
   void initState() {
@@ -107,13 +113,18 @@ class _PlaylistTileState extends State<PlaylistTile> {
   @override
   void didUpdateWidget(covariant PlaylistTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.path != widget.item.path) _loadThumbnail();
+    if (oldWidget.item.path != widget.item.path) {
+      _ownedMenus?.cancelOwner(_menuOwner);
+      _loadThumbnail();
+    }
   }
 
   @override
   void dispose() {
     // dispose 后 generation 失效 + mounted false — 双保险拒绝旧回写（§26.4）
     _loadGeneration++;
+    _ownedMenus?.cancelOwner(_menuOwner);
+    _menuTrigger.dispose();
     super.dispose();
   }
 
@@ -198,6 +209,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
     // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
     return InkWell(
+      focusNode: _menuTrigger,
       // v0.0.7: 批量选择模式下整卡点击 = 切换选中 (播放/续播让位).
       onTap: widget.selectionMode ? widget.onToggleSelect : widget.onPlay,
       // InkWell 默认 defer (箭头) — 整卡可点播, 显式给食指与膜按钮一致.
@@ -431,9 +443,22 @@ class _PlaylistTileState extends State<PlaylistTile> {
   /// 播放 / 打开所在目录 / 移除 / 批量删除.
   Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final l10n = AppLocalizations.of(context);
+    final scope = WorkspaceMenuScope.maybeOf(context);
+    _ownedMenus = scope?.session;
+    Object? menuToken;
+    final path = widget.item.path;
     final action = await GlassMenu.show(
       context,
       position: position,
+      onOpened: (cancel) {
+        menuToken = scope?.session.open(
+          owner: _menuOwner,
+          cancel: cancel,
+          // This menu acts on the captured playlist entry, not current playback.
+          isCurrent: () => mounted && ModalRoute.of(context)?.isCurrent == true,
+          onEscape: scope.onEscape,
+        );
+      },
       items: [
         GlassMenuItem(Icons.play_arrow, l10n.play, value: 'play'),
         GlassMenuItem(
@@ -457,7 +482,15 @@ class _PlaylistTileState extends State<PlaylistTile> {
           ),
       ],
     );
-    if (!mounted || action == null) return;
+    if (menuToken case final token?) scope?.session.finish(token);
+    if (mounted &&
+        context.mounted &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        _menuTrigger.context != null &&
+        _menuTrigger.canRequestFocus) {
+      _menuTrigger.requestFocus();
+    }
+    if (!mounted || action == null || path != widget.item.path) return;
     switch (action) {
       case 'play':
         widget.onPlay();

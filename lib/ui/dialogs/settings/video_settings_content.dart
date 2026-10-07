@@ -25,7 +25,11 @@ class VideoSettingsContent extends StatefulWidget {
     super.key,
     required this.videoProcessing,
     this.settings,
+    this.scrollController,
   });
+
+  /// 当前 route 独立附着的滚动控制器。
+  final ScrollController? scrollController;
 
   final VideoProcessingService videoProcessing;
 
@@ -43,6 +47,7 @@ class _VideoSettingsContentState extends State<VideoSettingsContent> {
     return Padding(
       padding: const EdgeInsets.all(Tokens.spLg),
       child: SingleChildScrollView(
+        controller: widget.scrollController,
         child: ValueListenableBuilder<VideoProcessingState>(
           valueListenable: widget.videoProcessing.state,
           builder: (context, state, _) => Column(

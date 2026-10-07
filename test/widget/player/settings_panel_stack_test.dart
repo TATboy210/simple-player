@@ -23,9 +23,10 @@ import '../../helpers/fake_video_controls.dart';
 /// 与 lifecycle 测试同尺寸: 槽位居中后四周仍有面板外区域可点.
 const Size surface = Size(1280, 720);
 
-/// 槽位宽 = 窗口 - 左右 margin; 面板宽 = 槽位/3 (恒定, 与播放列表无关).
+/// 两个间隔先扣除；右三分之一超出固定列表280的余量交给中列。
 double expectedPanelWidth() =>
-    (surface.width - 2 * Tokens.controlBarMarginH) / 3;
+    (surface.width - 2 * Tokens.controlBarMarginH - 2 * Tokens.spMd) * 2 / 3 -
+    PlaylistPanel.panelWidth;
 
 void main() {
   /// [playlistVisible] 非 null 时同时装配播放列表 (coordinator 内部创建,

@@ -16,6 +16,7 @@ import '../../../kernel/services/app_settings_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../theme/tokens.dart';
 import 'error_feedback_settings.dart';
+import '../../player/workspace_menu_session.dart';
 
 /// 「通用」分区内容 —— 语言 / 错误卡片开关 / 断点续播开关（v0.0.6）。
 ///
@@ -29,7 +30,15 @@ import 'error_feedback_settings.dart';
 // ignore: avoid-unnecessary-stateful-widgets — State 生命周期与局部
 // 控制器耦合, 保守保留 (转换风险 > 风格收益).
 class GeneralSettingsContent extends StatefulWidget {
-  const GeneralSettingsContent({super.key, this.settings, this.rowsFocusNode});
+  const GeneralSettingsContent({
+    super.key,
+    this.settings,
+    this.rowsFocusNode,
+    this.scrollController,
+  });
+
+  /// 当前 route 独立附着的滚动控制器。
+  final ScrollController? scrollController;
 
   /// 应用偏好编排服务 — null 时断点续播开关行隐藏（测试退路）.
   final AppSettingsService? settings;
@@ -47,6 +56,16 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
   int _focusedRow = 0;
 
   bool _rowsFocused = false;
+  final Object _languageOwner = Object();
+  final FocusNode _languageFocus = FocusNode(debugLabel: 'language-trigger');
+  WorkspaceMenuSession? _menus;
+
+  @override
+  void dispose() {
+    _menus?.cancelOwner(_languageOwner);
+    _languageFocus.dispose();
+    super.dispose();
+  }
 
   /// 行数 — 断点行随服务注入显隐，键盘导航同步收缩（天然无越界）.
   int get _rowCount => 2 + (widget.settings != null ? 1 : 0);
@@ -108,7 +127,8 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       focusNode: widget.rowsFocusNode,
       onFocusChange: (focused) => setState(() => _rowsFocused = focused),
       onKeyEvent: _handleRowsKeyEvent,
-      child: Padding(
+      child: SingleChildScrollView(
+        controller: widget.scrollController,
         padding: const EdgeInsets.all(Tokens.spLg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -156,6 +176,7 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
           label: l10n.languageLabel,
           isFocused: _rowsFocused && _focusedRow == 0,
           trailing: DropdownButton<AppLanguage>(
+            focusNode: _languageFocus,
             value: settings.language,
             underline: const SizedBox.shrink(),
             dropdownColor: Tokens.bgGlass,
@@ -192,6 +213,16 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
                 child: Text('日本語'),
               ),
             ],
+            // DropdownButton invokes onTap after pushing its route; own exactly it.
+            onTap: () {
+              final scope = WorkspaceMenuScope.maybeOf(context);
+              _menus = scope?.session;
+              scope?.ownLatestRoute(
+                context,
+                _languageOwner,
+                triggerFocus: _languageFocus,
+              );
+            },
             onChanged: (language) {
               if (language != null) {
                 ErrorFeedbackSettings.I.setLanguage(language);

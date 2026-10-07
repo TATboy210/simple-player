@@ -525,6 +525,37 @@ void main() {
       expect(find.byIcon(Icons.deselect), findsNothing);
     });
 
+    testWidgets(
+      'select all clears selection and deselected item stays excluded',
+      (tester) async {
+        await pumpBatchPanel(tester);
+        await tester.tap(
+          find.byType(PlaylistTile).first,
+          buttons: kSecondaryButton,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Batch delete'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.deselect));
+        await tester.pumpAndSettle();
+        expect(find.text('3 selected'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.deselect));
+        await tester.pumpAndSettle();
+        expect(find.text('0 selected'), findsOneWidget);
+        expect(find.byIcon(Icons.select_all), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.select_all));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(PlaylistTile).at(1));
+        await tester.pumpAndSettle();
+        expect(find.text('2 selected'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.delete_outline));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.delete).last);
+        await tester.pumpAndSettle();
+        expect(removed, {0, 2});
+      },
+    );
+
     testWidgets('取消退出多选模式 — 不触发移除', (tester) async {
       await pumpBatchPanel(tester);
 

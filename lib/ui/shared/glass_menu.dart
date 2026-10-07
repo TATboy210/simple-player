@@ -25,6 +25,7 @@ class GlassMenu {
     BuildContext context, {
     required Offset position,
     required List<GlassMenuItem> items,
+    void Function(VoidCallback cancel)? onOpened,
   }) {
     final overlay =
         Overlay.of(context, rootOverlay: true).context.findRenderObject()
@@ -109,6 +110,8 @@ class GlassMenu {
     );
 
     Overlay.of(context, rootOverlay: true).insertAll([barrier, menu]);
+    // Expose idempotent cancellation to the owning workspace only.
+    onOpened?.call(() => close());
     return completer.future;
   }
 

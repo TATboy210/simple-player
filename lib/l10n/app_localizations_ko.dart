@@ -10,6 +10,9 @@ class AppLocalizationsKo extends AppLocalizations {
   AppLocalizationsKo([String locale = 'ko']) : super(locale);
 
   @override
+  String get moveToCenter => '가운데로 이동';
+
+  @override
   String get appTitle => 'Simple Player';
 
   @override

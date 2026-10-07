@@ -22,6 +22,9 @@ import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
+import 'panel_workspace_controller.dart';
+import 'workspace_menu_session.dart';
+import '../dialogs/settings/settings_panel_session.dart';
 
 /// 播放器主屏幕 — 组合窗口壳、视频 surface、键盘与控制层。
 ///
@@ -120,13 +123,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 状态继续由 PlayerVideoControls 订阅的 stream/listenable 驱动。
   late final PlayerActions _actions;
 
-  /// 播放列表面板可见性 (v0.0.5) — 共享 notifier: L 键/按钮/点视频区/Esc
+  /// 播放列表面板可见性 (v0.0.5) — 共享 notifier: L 键/按钮/点视频区
   /// 翻转; controls builder 内的面板(含全屏 route 复制实例)统一消费它.
   final ValueNotifier<bool> _playlistVisible = ValueNotifier<bool>(false);
 
-  /// 设置面板可见性 — 共享 notifier: 设置按钮/点视频区/Esc 翻转;
-  /// 面板挂载于控制层 Stack (无 route barrier), 打开时标题栏仍可拖动.
-  final ValueNotifier<bool> _settingsVisible = ValueNotifier<bool>(false);
+  /// 跨 controls 全屏实例共享纯会话数据，不共享 Element/FocusNode。
+  final PanelWorkspaceController _workspace = PanelWorkspaceController();
+  final SettingsPanelSession _settingsSession = SettingsPanelSession();
+  final WorkspaceMenuSession _menus = WorkspaceMenuSession();
 
   /// 缓存标题栏 widget，避免窗口模式或 resize 导致父级 build 时重新创建标题栏子树。
   ///
@@ -196,10 +200,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 设置面板 — toggle 语义（成熟播放器惯例）：开→关、关→开；
       // 纯 UI 弹层，不改播放状态，无需空置态隔离。
       // v0.0.6: services bundle 经 PlayerVideoControls 传入挂载的面板。
-      onOpenSettings: () => _settingsVisible.value = !_settingsVisible.value,
+      onOpenSettings: () => _workspace.toggle('settings'),
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
+        // Remove only owned menus before the existing media_kit route exit/pop.
+        _menus.cancel();
         final m = widget.windowService.mode.value;
         final entering = m != WindowMode.fullscreen;
         widget.windowService.setMode(
@@ -223,16 +229,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ? null
           : () => unawaited(widget.playlistCoordinator!.cyclePlayMode()),
       playMode: widget.playlistCoordinator?.playMode,
-      onEscapePressed: () {
-        // 逐层退出: 设置面板 → 播放列表面板 → 交回退出全屏.
-        if (_settingsVisible.value) {
-          _settingsVisible.value = false;
-          return true;
-        }
-        if (!_playlistVisible.value) return false;
-        _playlistVisible.value = false;
-        return true;
-      },
     );
     // 阶段2:字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱
     // (每实例调自己 VideoState),不再需本层 _onControlsVisibleChanged 联动.
@@ -314,7 +310,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _textureProbe?.dispose();
     _resizeMetrics?.dispose();
     _playlistVisible.dispose();
-    _settingsVisible.dispose();
+    _workspace.dispose();
+    _settingsSession.dispose();
+    _menus.dispose();
     super.dispose();
   }
 
@@ -487,9 +485,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
       engine: widget.engine,
       actions: _actions,
       currentFileName: widget.controller.currentFileName,
+      mediaIdentity: widget.controller.currentPath,
       windowMode: widget.windowService.mode,
       playlistVisible: _playlistVisible,
-      settingsVisible: _settingsVisible,
+      workspace: _workspace,
+      settingsSession: _settingsSession,
+      menuSession: _menus,
       playlistCoordinator: widget.playlistCoordinator,
       settingsServices: widget.settingsServices,
       emptyState: widget.emptyState,

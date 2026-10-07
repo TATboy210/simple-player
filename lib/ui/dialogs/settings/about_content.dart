@@ -7,7 +7,7 @@ import '../../theme/tokens.dart';
 import '../../shared/app_tooltip.dart';
 
 /// 应用版本号 — 发版时随 pubspec.yaml `version` 同步更新。
-const String kAppVersion = '0.0.8';
+const String kAppVersion = '0.0.10.1';
 
 /// 开源组件条目 — 名称与 SPDX 许可证标识对。
 ///
@@ -84,12 +84,16 @@ const List<SocialLink> kSocialLinks = [
 /// 圆角区域，上移至技术栈之前，支持者一进门即见）→ 开源技术全清单。
 /// 社交 logo 点击经 [PathUtils.openUrl] 走系统浏览器。
 class AboutContent extends StatelessWidget {
-  const AboutContent({super.key});
+  const AboutContent({super.key, this.scrollController});
+
+  /// route 本地滚动控制器；共享会话仅记录 offset。
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: Tokens.spLg),
       children: [
         _AppIdentity(l10n: l10n),

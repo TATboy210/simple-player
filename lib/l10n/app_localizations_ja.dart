@@ -10,6 +10,9 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
+  String get moveToCenter => '中央へ移動';
+
+  @override
   String get appTitle => 'Simple Player';
 
   @override

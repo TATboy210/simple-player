@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +21,12 @@ import 'control_bar_view_model.dart';
 import 'media_kit_player_port.dart';
 import 'player_actions.dart';
 import 'player_controls_state.dart';
+import 'panel_workspace_controller.dart';
+import 'panel_workspace_host.dart';
+import 'panel_workspace_layout.dart';
+import 'workspace_menu_session.dart';
+import 'workspace_focus_scope.dart';
+import '../dialogs/settings/settings_panel_session.dart';
 
 /// 路径B 控制栏 widget — 数据源直连 media_kit [PlayerPort].
 ///
@@ -59,6 +64,9 @@ class PlayerVideoControls extends StatefulWidget {
   /// 活动文件名 — 驱动 ControlBar 标题 + 空状态判定(hasMedia 依赖它)。
   final ValueListenable<String> currentFileName;
 
+  /// 完整媒体身份，不用可能重名的显示标题判断旧媒体菜单失效。
+  final ValueListenable<String?>? mediaIdentity;
+
   /// 空状态页 — 空状态(idle && !hasMedia)时在 Stack 最底层渲染。
   final Widget? emptyState;
 
@@ -88,6 +96,11 @@ class PlayerVideoControls extends StatefulWidget {
   /// 设置服务集合 (v0.0.6) — 断点续播开关等面板门控数据源.
   final SettingsServicesBundle? settingsServices;
 
+  /// 跨全屏共享的角色与展示数据；本实例仍拥有临时焦点。
+  final PanelWorkspaceController? workspace;
+  final SettingsPanelSession? settingsSession;
+  final WorkspaceMenuSession? menuSession;
+
   /// 窗口 resize 信号 — 传递给 ControlBar 跳过 BackdropFilter。
   final ValueListenable<bool>? resizing;
 
@@ -102,10 +115,14 @@ class PlayerVideoControls extends StatefulWidget {
     required this.actions,
     required this.currentFileName,
     required this.windowMode,
+    this.mediaIdentity,
     this.playlistVisible,
     this.settingsVisible,
     this.playlistCoordinator,
     this.settingsServices,
+    this.workspace,
+    this.settingsSession,
+    this.menuSession,
     this.emptyState,
     this.resizing,
     this.onBuild,
@@ -217,6 +234,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// (修复症状④退出渲染出错,见 memory [[project_fullscreen_minimal_fix]])。
   void _toggleFullscreen() {
     if (!mounted || _isDeactivating || !widget.video.isMounted) return;
+    // Cancel exact menu before media_kit touches its own fullscreen route.
+    widget.menuSession?.cancel();
     // media_kit 负责真实 route 切换，宿主只在根 Video 生命周期回调中同步状态。
     widget.actions.onToggleFullscreen?.call();
     // The host callback may synchronously pop the fullscreen route, so re-check
@@ -285,19 +304,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
-      // ESC:仅全屏态退出(窗口态 ESC 冒泡给 KeyboardHandler 关播放列表/设置)。
-      // 全屏判定用 mode 单一数据源 — 窗口态实例在全屏期间同样收到该键时
-      // (焦点回落边界)也能正确退出,不再依赖 route 本地 context 查询。
-      if (widget.windowMode.value.isFullscreen) {
-        widget.actions.onToggleFullscreen?.call();
-        // Route callbacks may deactivate this VideoState synchronously.
-        if (!mounted || _isDeactivating || !widget.video.isMounted) {
-          return KeyEventResult.handled;
-        }
-        widget.video.exitFullscreen();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
+      return _exitFullscreen()
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
     }
     if (key == LogicalKeyboardKey.keyF) {
       _toggleFullscreen();
@@ -316,6 +325,20 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  /// Route-local ESC command: cancel menu, notify host, then guard video exit.
+  /// Window mode remains authoritative across media_kit context exchanges.
+  bool _exitFullscreen() {
+    if (!widget.windowMode.value.isFullscreen) return false;
+    widget.menuSession?.cancel();
+    if (_isDeactivating || !mounted || !widget.video.isMounted) return false;
+    widget.actions.onToggleFullscreen?.call();
+    // Host callbacks may synchronously deactivate this route or its VideoState.
+    if (mounted && !_isDeactivating && widget.video.isMounted) {
+      widget.video.exitFullscreen();
+    }
+    return true;
   }
 
   @override
@@ -373,6 +396,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 退出后必然同步回 false(修按钮图标卡死)。
   void _syncModeFullscreen() {
     final fs = widget.windowMode.value.isFullscreen;
+    if (_isFullscreenNotifier.value != fs) widget.menuSession?.cancel();
     if (_isFullscreenNotifier.value != fs) {
       _isFullscreenNotifier.value = fs;
       _autoHide.isFullscreen = fs;
@@ -386,7 +410,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 全屏 / 控制栏隐藏：空置态控制栏钉住恒显、全屏无意义（空置页历史
   /// 设计意图保留，仅补上面板外点击的关闭通路）。
   void _handleEmptyAreaTap() {
-    final settingsNotifier = widget.settingsVisible;
+    if (_closeWorkspaceFromBlank()) return;
+    final settingsNotifier = _legacySettingsVisible;
     if (settingsNotifier != null && settingsNotifier.value) {
       settingsNotifier.value = false;
       return;
@@ -397,10 +422,20 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     }
   }
 
+  /// 空白先独立取消菜单，再关闭一个中心任务并归还播放器焦点。
+  bool _closeWorkspaceFromBlank() {
+    if (widget.menuSession?.cancel() == true) return true;
+    final center = widget.workspace?.value.center;
+    if (center == null) return false;
+    _workspaceFocus?.close(center, WorkspaceCloseCause.blank);
+    return true;
+  }
+
   void _handleTap() {
+    if (_closeWorkspaceFromBlank()) return;
     // 点外关闭语义 (面板可见时点击视频区先关面板), 不触发双击全屏/隐藏
-    // 判定. 设置面板与播放列表同层, 先于播放列表关闭.
-    final settingsNotifier = widget.settingsVisible;
+    // 判定. 任务逐个关闭，任务为空后关闭播放列表.
+    final settingsNotifier = _legacySettingsVisible;
     if (settingsNotifier != null && settingsNotifier.value) {
       settingsNotifier.value = false;
       return;
@@ -463,11 +498,16 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 无媒体时冻结 (多源合成, 任一变化即时同步).
     ModalHoldObserver.openModalCount.addListener(_syncAutoHideHold);
     widget.playlistVisible?.addListener(_syncAutoHideHold);
-    widget.settingsVisible?.addListener(_syncAutoHideHold);
+    _legacySettingsVisible?.addListener(_syncAutoHideHold);
+    widget.workspace?.addListener(_syncAutoHideHold);
+    widget.menuSession?.addListener(_syncAutoHideHold);
+    (widget.mediaIdentity ?? widget.currentFileName).addListener(
+      _onMediaIdentityChanged,
+    );
     // E1 焦点归还 — 关面板时把焦点显式还给控制层 (unfocus() 会落到
     // 路由 scope 致全屏按键死区, 见 _handleSettingsVisibleChanged).
-    widget.settingsVisible?.addListener(_handleSettingsVisibleChanged);
-    _lastSettingsVisible = widget.settingsVisible?.value ?? false;
+    _legacySettingsVisible?.addListener(_handleSettingsVisibleChanged);
+    _lastSettingsVisible = _legacySettingsVisible?.value ?? false;
     _syncAutoHideHold(); // attach 即同步一次 (先开窗后进全屏的时序).
     _lifecycleListenersAttached = true;
   }
@@ -480,8 +520,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _autoHide.visible.removeListener(_scheduleSubtitlePaddingSync);
     ModalHoldObserver.openModalCount.removeListener(_syncAutoHideHold);
     widget.playlistVisible?.removeListener(_syncAutoHideHold);
-    widget.settingsVisible?.removeListener(_syncAutoHideHold);
-    widget.settingsVisible?.removeListener(_handleSettingsVisibleChanged);
+    _legacySettingsVisible?.removeListener(_syncAutoHideHold);
+    widget.workspace?.removeListener(_syncAutoHideHold);
+    widget.menuSession?.removeListener(_syncAutoHideHold);
+    (widget.mediaIdentity ?? widget.currentFileName).removeListener(
+      _onMediaIdentityChanged,
+    );
+    _legacySettingsVisible?.removeListener(_handleSettingsVisibleChanged);
     _lifecycleListenersAttached = false;
   }
 
@@ -492,18 +537,36 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _autoHide.modalOpen =
         ModalHoldObserver.openModalCount.value > 0 ||
         (widget.playlistVisible?.value ?? false) ||
-        (widget.settingsVisible?.value ?? false);
+        _hasTaskPanel ||
+        (widget.menuSession?.value ?? false);
   }
+
+  /// Legacy seam is inactive when workspace owns visibility and focus.
+  ValueNotifier<bool>? get _legacySettingsVisible =>
+      widget.workspace == null ? widget.settingsVisible : null;
+
+  /// Task holds use the workspace authority, never its legacy boolean mirror.
+  bool get _hasTaskPanel =>
+      widget.workspace?.value.hasTasks ??
+      (_legacySettingsVisible?.value ?? false);
 
   /// 上一次设置面板可见性 — 焦点归还的边沿检测基准.
   bool _lastSettingsVisible = false;
+  WorkspaceFocusRegistry? _workspaceFocus;
+
+  /// 媒体更新只失效媒体绑定菜单，工作区角色与设置会话保持不变。
+  String get _currentMediaIdentity =>
+      widget.mediaIdentity?.value ?? widget.currentFileName.value;
+
+  void _onMediaIdentityChanged() =>
+      widget.menuSession?.mediaChanged(_currentMediaIdentity);
 
   /// 设置面板关闭时归还焦点（E1）— `FocusNode.unfocus()` 默认把焦点落到
   /// 路由级 scope（位于控制层 Focus 之上），全屏 route 无 KeyboardHandler
   /// 兜底，按键会全部失聪；故宿主在翻 false 的边沿显式 requestFocus
   /// 回控制层焦点（唯一焦点写入点，无双重 mark 竞态）.
   void _handleSettingsVisibleChanged() {
-    final value = widget.settingsVisible?.value ?? false;
+    final value = _legacySettingsVisible?.value ?? false;
     if (!value && _lastSettingsVisible && mounted && !_isDeactivating) {
       _focusNode.requestFocus();
     }
@@ -617,6 +680,44 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
       _controlBarViewModel = _createControlBarViewModel();
       _controlBarCache = null; // 缓存子树随 vm 重建失效 (v0.0.6.1)
     }
+    // Legacy visibility is attached only without a workspace, including swaps.
+    final oldLegacy = oldWidget.workspace == null
+        ? oldWidget.settingsVisible
+        : null;
+    if (!identical(oldLegacy, _legacySettingsVisible)) {
+      oldLegacy?.removeListener(_syncAutoHideHold);
+      oldLegacy?.removeListener(_handleSettingsVisibleChanged);
+      if (_lifecycleListenersAttached) {
+        _legacySettingsVisible?.addListener(_syncAutoHideHold);
+        _legacySettingsVisible?.addListener(_handleSettingsVisibleChanged);
+      }
+      _lastSettingsVisible = _legacySettingsVisible?.value ?? false;
+    }
+    // Shared session source replacement must migrate listeners like engine ports.
+    if (oldWidget.workspace != widget.workspace) {
+      oldWidget.workspace?.removeListener(_syncAutoHideHold);
+      if (_lifecycleListenersAttached) {
+        widget.workspace?.addListener(_syncAutoHideHold);
+      }
+    }
+    if (oldWidget.menuSession != widget.menuSession) {
+      oldWidget.menuSession?.removeListener(_syncAutoHideHold);
+      if (_lifecycleListenersAttached) {
+        widget.menuSession?.addListener(_syncAutoHideHold);
+      }
+    }
+    if (oldWidget.mediaIdentity != widget.mediaIdentity ||
+        oldWidget.currentFileName != widget.currentFileName) {
+      (oldWidget.mediaIdentity ?? oldWidget.currentFileName).removeListener(
+        _onMediaIdentityChanged,
+      );
+      if (_lifecycleListenersAttached) {
+        (widget.mediaIdentity ?? widget.currentFileName).addListener(
+          _onMediaIdentityChanged,
+        );
+      }
+    }
+    _syncAutoHideHold();
     // 标题源 / resizing 源替换 — 缓存子树持有的 listenable 引用随之失效.
     if (oldWidget.currentFileName != widget.currentFileName ||
         oldWidget.resizing != widget.resizing) {
@@ -698,14 +799,17 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               // 三态依赖 anyPanel, 且 onTap 为 null 才能退出手势竞技场.
               child: ListenableBuilder(
                 listenable: Listenable.merge([
-                  if (widget.settingsVisible != null) widget.settingsVisible,
+                  if (widget.workspace != null) widget.workspace,
+                  if (_legacySettingsVisible != null) _legacySettingsVisible,
+                  if (widget.menuSession != null) widget.menuSession,
                   if (widget.playlistVisible != null) widget.playlistVisible,
                 ]),
                 builder: (context, _) {
                   // 任一面板开着 → 手势层活跃 (点击面板外 = 关面板).
                   final anyPanel =
-                      (widget.settingsVisible?.value ?? false) ||
-                      (widget.playlistVisible?.value ?? false);
+                      _hasTaskPanel ||
+                      (widget.playlistVisible?.value ?? false) ||
+                      (widget.menuSession?.value ?? false);
                   // 空置态无面板时 onTap 必须为 null — translucent 手势层
                   // 恒把自己加入命中结果, 只要注册了 TapGestureRecognizer
                   // 就参与竞技场且先注册先赢 (eager winner), 底层空置页
@@ -827,52 +931,62 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     return widget.windowMode.value.isFullscreen;
   }
 
-  /// 设置面板挂载 (v0.0.8 XMB 化) — 控制栏上方区域**中列**槽位, 位置恒定.
-  ///
-  /// 三等分: 面板宽 = 槽位宽/3 (854→273 / 1280→415), 高度撑满 (与播放
-  /// 列表同形态); 右缘恒贴播放列表左侧 spMd (播放列表关闭时右侧留白,
-  /// 位置不随其开关变化 — 动态避让已删除). 槽位 top/bottom 与播放列表
-  /// 挂载逐字相同 (bottom 避开控制栏区域).
-  ///
-  /// 显隐由 [settingsVisible] 驱动 (面板内部 FadeTransition); 点击面板外
-  /// 经 _handleTap 关闭, 标题行关闭按钮经 onClose 收口回同一 notifier.
-  Widget _buildSettingsPanel(ValueNotifier<bool> settingsVisible) {
-    return ListenableBuilder(
-      listenable: settingsVisible,
-      builder: (_, _) {
-        return Positioned(
-          left: Tokens.controlBarMarginH,
-          // 恒定右缘 — 贴播放列表左侧 spMd (panelWidth=280 不变).
-          right:
-              Tokens.controlBarMarginH + PlaylistPanel.panelWidth + Tokens.spMd,
-          top: Tokens.spMd,
-          bottom:
-              Tokens.controlBarMarginBottom +
-              Tokens.controlBarHeight +
-              Tokens.spMd,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 还原整槽宽 → 三等分; 槽宽不足 (最小窗) 时收缩到可用宽.
-              final slotW =
-                  constraints.maxWidth + PlaylistPanel.panelWidth + Tokens.spMd;
-              final colW = math.min(slotW / 3, constraints.maxWidth);
-              return Align(
-                alignment: Alignment.centerRight,
-                child: SizedBox(
-                  width: colW,
+  /// 工作区设置任务挂载：固定右侧列表预留槽位，多余三等分份额给中列。
+  /// 全高度避开控制栏；共享会话保存展示数据，各 route 独立拥有焦点。
+  Widget _buildSettingsPanel() {
+    final workspace = widget.workspace;
+    if (workspace != null) {
+      return Positioned.fill(
+        child: PanelWorkspaceHost(
+          controller: workspace,
+          resizeSignal: widget.resizing,
+          tasks: [
+            WorkspaceTask(
+              id: 'settings',
+              builder: (_, visible, role) => SettingsPanel(
+                visible: visible,
+                session: widget.settingsSession,
+                services: widget.settingsServices,
+                scrubbing: _seekScrubbing,
+                onClose: () => _workspaceFocus?.close(
+                  'settings',
+                  WorkspaceCloseCause.header,
+                ),
+                onPromote: role == WorkspaceTaskRole.left
+                    ? () => workspace.promote('settings')
+                    : null,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    // Legacy standalone controls tests retain their boolean seam, same geometry.
+    final settingsVisible = widget.settingsVisible;
+    if (settingsVisible == null) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (_, constraints) {
+          final layout = PanelWorkspaceLayout.calculate(constraints.biggest);
+          return ValueListenableBuilder<bool>(
+            valueListenable: settingsVisible,
+            builder: (_, visible, _) => Stack(
+              children: [
+                Positioned.fromRect(
+                  rect: layout.center,
                   child: SettingsPanel(
-                    visible: settingsVisible.value,
+                    visible: visible,
                     services: widget.settingsServices,
-                    onClose: () => settingsVisible.value = false,
-                    // seek 拖动挂起玻璃模糊 (v0.0.8.2).
+                    session: widget.settingsSession,
                     scrubbing: _seekScrubbing,
+                    onClose: () => settingsVisible.value = false,
                   ),
                 ),
-              );
-            },
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -881,7 +995,14 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 仅测试观测外层 build；状态监听仍下沉到真正依赖它的局部区域。
     widget.onBuild?.call();
     final isFullscreenForCursor = _isFullscreenForCursor();
-    final controls = Focus(
+    final workspace = widget.workspace;
+    if (workspace != null && _workspaceFocus?.controller != workspace) {
+      _workspaceFocus = WorkspaceFocusRegistry(
+        controller: workspace,
+        player: _focusNode,
+      );
+    }
+    final focusedControls = Focus(
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
@@ -940,8 +1061,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
           // v0.0.7.2 设置面板 — 控制栏上方区域**中列**槽位, 与播放列表
           // 同层 (同 top/bottom 槽位约束, 几何上避开控制栏区域);
           // 全屏 route 复制 builder 时自动携带.
-          if (widget.settingsVisible case final settingsVisible?)
-            _buildSettingsPanel(settingsVisible),
+          if (widget.workspace != null || widget.settingsVisible != null)
+            _buildSettingsPanel(),
           RepaintBoundary(
             child: Stack(
               children: [
@@ -969,12 +1090,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               listenable: Listenable.merge([
                 _autoHide.visible,
                 if (widget.playlistVisible != null) widget.playlistVisible,
-                if (widget.settingsVisible != null) widget.settingsVisible,
+                if (widget.workspace != null) widget.workspace,
+                if (_legacySettingsVisible != null) _legacySettingsVisible,
+                if (widget.menuSession != null) widget.menuSession,
               ]),
               builder: (_, _) {
                 final isVisible = _autoHide.visible.value;
                 final playlistVisible = widget.playlistVisible?.value ?? false;
-                final settingsVisible = widget.settingsVisible?.value ?? false;
+                final settingsVisible =
+                    _hasTaskPanel || (widget.menuSession?.value ?? false);
                 return MouseRegion(
                   opaque: false,
                   hitTestBehavior: HitTestBehavior.translucent,
@@ -1027,6 +1151,18 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // 用 ValueListenableBuilder 而非 .value 直读：parent build 不被 resizing
     // notifier 触发（build-boundary 契约），须 VLB 自身监听 settle 翻回。
     // null resizing（测试注入无 resize 源）走不包裹分支，保留既有语义断言。
+    final menus = widget.menuSession;
+    final localFocus = _workspaceFocus;
+    final focusScopedControls = localFocus == null
+        ? focusedControls
+        : WorkspaceFocusScope(registry: localFocus, child: focusedControls);
+    final controls = menus == null
+        ? focusScopedControls
+        : WorkspaceMenuScope(
+            session: menus,
+            onEscape: _exitFullscreen,
+            child: focusScopedControls,
+          );
     final resizing = widget.resizing;
     // 测试旁路: 无 resize 源的注入场景保留裸树供语义契约断言 (生产恒非 null)。
     if (resizing == null) return controls;

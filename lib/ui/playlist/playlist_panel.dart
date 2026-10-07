@@ -14,6 +14,7 @@ import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
+import '../player/workspace_menu_session.dart';
 
 /// 播放列表面板 — 右侧竖条, 控制栏同款圆角玻璃 (v0.0.5).
 ///
@@ -115,6 +116,9 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// 条目列表滚动控制器 — Scrollbar 显式挂载用 (桌面默认滚动条贴边
   /// 拉满高度, 底部与面板圆角相交).
   final ScrollController _scrollController = ScrollController();
+  final Object _sortOwner = Object();
+  final FocusNode _sortFocus = FocusNode(debugLabel: 'playlist-sort-trigger');
+  WorkspaceMenuSession? _menus;
 
   /// 批量选择模式 (v0.0.7) — 右键菜单"批量删除"进入, 操作条退出.
   bool _batchMode = false;
@@ -142,6 +146,8 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   void dispose() {
+    _menus?.cancelOwner(_sortOwner);
+    _sortFocus.dispose();
     _scrollController.dispose();
     _controller.dispose();
     super.dispose();
@@ -278,6 +284,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         Builder(
           builder: (buttonContext) => GlassButton.iconOnly(
             icon: Icons.sort,
+            focusNode: _sortFocus,
             tooltip: l10n.sortBy,
             onPressed: () => unawaited(_showSortMenu(buttonContext)),
           ),
@@ -490,7 +497,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       Offset(0, button.size.height),
       ancestor: overlay,
     );
-    final action = await showMenu<PlaylistSortKey>(
+    final pending = showMenu<PlaylistSortKey>(
       context: buttonContext,
       position: RelativeRect.fromRect(
         anchor & const Size(1, 1),
@@ -523,7 +530,11 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           ),
       ],
     );
-    if (action == null) return;
+    final scope = WorkspaceMenuScope.maybeOf(buttonContext);
+    _menus = scope?.session;
+    scope?.ownLatestRoute(buttonContext, _sortOwner, triggerFocus: _sortFocus);
+    final action = await pending;
+    if (!mounted || action == null) return;
     widget.onSortSelected(action);
   }
 

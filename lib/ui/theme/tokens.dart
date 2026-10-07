@@ -217,6 +217,12 @@ class Tokens {
   static const controlBarRadius = 22.0; // 修正为 22px（与设计稿一致）
   static const controlBarMarginH = 18.0;
   static const controlBarMarginBottom = 16.0;
+
+  /// 工作区中任务最低宽度，与现有右侧列表 280 槽位等宽。
+  static const workspaceTaskMinWidth = 280.0;
+
+  /// 工作区角色位移动效独立于控制栏；resize 时宿主直接落位。
+  static const workspaceMoveDuration = 150;
   static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
   // ── 缩略图 ──

@@ -10,6 +10,9 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get moveToCenter => 'Move to center';
+
+  @override
   String get appTitle => 'Simple Player';
 
   @override

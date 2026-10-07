@@ -18,22 +18,33 @@ class ModalHoldObserver extends NavigatorObserver {
 
   /// 重置计数 (仅供测试隔离 — 跨测试的静态计数器会互相污染).
   @visibleForTesting
-  static void resetForTesting() => openModalCount.value = 0;
+  static void resetForTesting() {
+    openModalCount.value = 0;
+    latestPopup = null;
+  }
+
+  /// 最新 PopupRoute 仅供菜单打开调用同步认领；不推断所有 popup 都是菜单。
+  static Route<Object?>? latestPopup;
 
   static bool _isModal(Route<Object?> route) => route is PopupRoute<Object?>;
 
   @override
   void didPush(Route<Object?> route, Route<Object?>? previousRoute) {
-    if (_isModal(route)) openModalCount.value++;
+    if (_isModal(route)) {
+      latestPopup = route;
+      openModalCount.value++;
+    }
   }
 
   @override
   void didPop(Route<Object?> route, Route<Object?>? previousRoute) {
+    if (identical(latestPopup, route)) latestPopup = null;
     if (_isModal(route)) openModalCount.value = _decrement();
   }
 
   @override
   void didRemove(Route<Object?> route, Route<Object?>? previousRoute) {
+    if (identical(latestPopup, route)) latestPopup = null;
     if (_isModal(route)) openModalCount.value = _decrement();
   }
 

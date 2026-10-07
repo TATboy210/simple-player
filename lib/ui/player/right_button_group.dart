@@ -12,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import '../shared/play_mode_utils.dart';
 import 'player_actions.dart';
+import 'workspace_focus_scope.dart';
 
 /// 右侧按钮组：文件、字幕、设置、播放列表、模式与全屏。
 ///
@@ -82,8 +83,7 @@ class RightButtonGroup extends StatelessWidget {
           ),
         // 设置入口位于播放顺序与全屏之间 — 打开设置窗口壳。
         if (showSecondaryActions && actions.onOpenSettings != null)
-          GlassButton.iconOnly(
-            icon: Icons.settings_outlined,
+          _SettingsWorkspaceTrigger(
             onPressed: actions.onOpenSettings,
             tooltip: l10n.settings,
           ),
@@ -107,4 +107,53 @@ class RightButtonGroup extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Each controls route owns its settings trigger node independently.
+class _SettingsWorkspaceTrigger extends StatefulWidget {
+  const _SettingsWorkspaceTrigger({
+    required this.onPressed,
+    required this.tooltip,
+  });
+  final VoidCallback? onPressed;
+  final String tooltip;
+  @override
+  State<_SettingsWorkspaceTrigger> createState() =>
+      _SettingsWorkspaceTriggerState();
+}
+
+class _SettingsWorkspaceTriggerState extends State<_SettingsWorkspaceTrigger> {
+  final FocusNode _focus = FocusNode(debugLabel: 'settings-trigger');
+  WorkspaceFocusRegistry? _registry;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = WorkspaceFocusScope.maybeOf(context);
+    if (identical(next, _registry)) return;
+    _unbindRegistry();
+    _registry = next;
+    _registry?.triggers['settings'] = _focus;
+  }
+
+  /// Remove only this node's registration, never a newer trigger's entry.
+  void _unbindRegistry() {
+    if (identical(_registry?.triggers['settings'], _focus)) {
+      _registry?.triggers.remove('settings');
+    }
+  }
+
+  @override
+  void dispose() {
+    _unbindRegistry();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => GlassButton.iconOnly(
+    icon: Icons.settings_outlined,
+    focusNode: _focus,
+    tooltip: widget.tooltip,
+    onPressed: widget.onPressed,
+  );
 }
