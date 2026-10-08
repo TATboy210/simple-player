@@ -1,6 +1,9 @@
 // ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:simple_player_flutter/kernel/utils/time_utils.dart';
+import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
@@ -36,6 +39,43 @@ void main() {
         ),
       );
     }
+
+    testWidgets(
+      'drag preview uses complete measured secondary text next frame',
+      (tester) async {
+        engine.duration.value = 3600000000000;
+        await tester.pumpWidget(buildSubject());
+        final rect = tester.getRect(find.byType(ProgressBar));
+        final gesture = await tester.startGesture(
+          rect.centerLeft + const Offset(20, 0),
+        );
+        await gesture.moveTo(rect.center);
+        await gesture.moveTo(rect.centerRight - const Offset(20, 0));
+        await tester.pump();
+        final text = formatMs(engine.lastSeekToMs ?? 0);
+        expect(find.text(text), findsOneWidget);
+        final surface = find.byType(SecondarySurface);
+        expect(surface, findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: find.text(text), matching: find.byType(RichText)),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final boxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: text.length),
+        );
+        expect(boxes, isNotEmpty);
+        final bounds = tester.getRect(surface).inflate(.01);
+        for (final box in boxes) {
+          final painted = box.toRect().shift(
+            paragraph.localToGlobal(Offset.zero),
+          );
+          expect(bounds.contains(painted.topLeft), isTrue);
+          expect(bounds.contains(painted.bottomRight), isTrue);
+        }
+        await gesture.up();
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
 
     testWidgets('renders without crashing', (tester) async {
       await tester.pumpWidget(buildSubject());

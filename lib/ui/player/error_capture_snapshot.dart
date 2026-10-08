@@ -32,14 +32,14 @@ final class ErrorCaptureSnapshot {
   ValueListenable<List<ErrorReport>> get reports => _reports;
 
   /// Effect 缝签名（[ErrorReportEffect]）：每次接纳（新报告或同窗合并）
-  /// 由 reporter 调用。D-02 分层：warning 不上卡片，直接跳过不进快照。
+  /// 由 reporter 调用。Diagnostic warnings also retain their full report for card history.
   ///
   /// 身份语义：以 [ErrorReport.eventId] 为身份 —— 合并只改 occurrenceCount
   /// 不改 eventId，故合并报告在快照中**原地替换**（保持捕获顺序）。
   // [acceptance] 为接口契约保留 — 快照分层只消费 report 自身.
   // ignore: avoid-unused-parameters
   void record(ErrorReport report, ReportAcceptance acceptance) {
-    if (report.severity == ErrorSeverity.warning) return;
+    // Retain diagnostic warnings: no per-event evidence permits discarding them.
     final list = _reports.value;
     final existingIndex = list.indexWhere((r) => r.eventId == report.eventId);
     if (existingIndex >= 0) {

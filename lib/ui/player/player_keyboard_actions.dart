@@ -9,6 +9,7 @@ import '../theme/tokens.dart';
 import 'keyboard_handler.dart';
 import 'player_actions.dart';
 import 'shortcuts_help_dialog.dart';
+import 'workspace_menu_session.dart';
 
 /// 构造播放器键盘处理器 — 绑定 20+ 快捷键到项目动作与引擎能力。
 ///
@@ -35,11 +36,15 @@ KeyboardHandler buildPlayerKeyboardActions({
   required Widget child,
   VoidCallback? onOpenFile,
 
+  /// PlayerScreen 借用会话；外层 handler 不在 controls scope 下，须显式注入。
+  WorkspaceMenuSession? menuSession,
+
   /// `[`/`]` 字幕延迟调整路由 (v0.0.6) — 非 null 时走持久化通道
   /// (AppSettingsService), null 时退回 engine 直调 (旧路径).
   void Function(int deltaMs)? onAdjustSubtitleDelay,
 }) {
   return KeyboardHandler(
+    menuSession: menuSession,
     customBindings: customBindings,
     onPlayPause: actions.onPlayPause,
     onSeekBackward: () => actions.onSeekBack?.call(Tokens.skipShortMs),

@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../player/workspace_menu_session.dart';
 
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
@@ -14,7 +17,8 @@ import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
-import '../player/workspace_menu_session.dart';
+import '../shared/owned_anchored_menu.dart';
+import '../shared/secondary_surface_visibility.dart';
 
 /// 播放列表面板 — 右侧竖条, 控制栏同款圆角玻璃 (v0.0.5).
 ///
@@ -118,7 +122,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   final ScrollController _scrollController = ScrollController();
   final Object _sortOwner = Object();
   final FocusNode _sortFocus = FocusNode(debugLabel: 'playlist-sort-trigger');
-  WorkspaceMenuSession? _menus;
+  OwnedMenuHandle<PlaylistSortKey>? _sortMenu;
 
   /// 批量选择模式 (v0.0.7) — 右键菜单"批量删除"进入, 操作条退出.
   bool _batchMode = false;
@@ -134,6 +138,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       duration: const Duration(milliseconds: Tokens.durationControlsFade),
     )..value = widget.visible ? 1.0 : 0.0;
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    FocusManager.instance.addEarlyKeyEventHandler(_sortKeyEvent);
   }
 
   @override
@@ -145,8 +150,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   }
 
   @override
+  void deactivate() {
+    _sortMenu?.cancel();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
-    _menus?.cancelOwner(_sortOwner);
+    FocusManager.instance.removeEarlyKeyEventHandler(_sortKeyEvent);
+    _sortMenu?.cancel();
     _sortFocus.dispose();
     _scrollController.dispose();
     _controller.dispose();
@@ -159,14 +171,17 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     // widget 树零重建 (与控制栏完全一致, v0.0.5 方案 A).
     // IgnorePointer 锚定 widget.visible (而非动画状态): 关闭瞬间立即让出
     // 命中, 根治"面板渐退中还能虚空点击条目触发播放"的竞态.
-    return IgnorePointer(
-      ignoring: !widget.visible,
-      child: RepaintBoundary(
-        child: FadeTransition(
-          opacity: _fade,
-          child: SizedBox(
-            width: PlaylistPanel.panelWidth,
-            child: _buildShell(context),
+    return SecondarySurfaceOwner(
+      visible: widget.visible,
+      child: IgnorePointer(
+        ignoring: !widget.visible,
+        child: RepaintBoundary(
+          child: FadeTransition(
+            opacity: _fade,
+            child: SizedBox(
+              width: PlaylistPanel.panelWidth,
+              child: _buildShell(context),
+            ),
           ),
         ),
       ),
@@ -484,58 +499,61 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   // 排序 (v0.0.6)
   // ============================================================
 
+  /// Observe only the actual trigger: latch before FAD activates or mutates routes.
+  KeyEventResult _sortKeyEvent(KeyEvent event) {
+    final trigger = _sortFocus.context;
+    if (trigger == null ||
+        !_sortFocus.hasPrimaryFocus ||
+        !widget.visible ||
+        ModalRoute.of(trigger)?.isCurrent != true ||
+        SecondarySurfaceVisibility.read(trigger)?.value == false ||
+        event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.space) {
+      WorkspaceMenuScope.maybeOf(trigger)?.session.latchEvent(event);
+    }
+    return KeyEventResult.ignored;
+  }
+
   /// 排序方式菜单 — 锚定排序按钮下方, 当前键打勾并显示方向箭头.
   /// 同键再次选择 = 翻转方向 (由协调器裁定); 菜单为瞬态弹出,
   /// 打开时读取的 sortKey/sortAscending 即最新状态.
   Future<void> _showSortMenu(BuildContext buttonContext) async {
     final l10n = AppLocalizations.of(context);
-    final overlay =
-        Overlay.of(buttonContext).context.findRenderObject() as RenderBox?;
-    final button = buttonContext.findRenderObject() as RenderBox?;
-    if (overlay == null || button == null) return;
-    final anchor = button.localToGlobal(
-      Offset(0, button.size.height),
-      ancestor: overlay,
-    );
-    final pending = showMenu<PlaylistSortKey>(
-      context: buttonContext,
-      position: RelativeRect.fromRect(
-        anchor & const Size(1, 1),
-        Offset.zero & overlay.size,
-      ),
-      items: [
+    final handle = OwnedAnchoredMenu.open<PlaylistSortKey>(
+      buttonContext,
+      owner: _sortOwner,
+      triggerFocus: _sortFocus,
+      entries: [
         for (final key in PlaylistSortKey.values)
-          PopupMenuItem<PlaylistSortKey>(
+          OwnedMenuEntry(
             value: key,
-            child: Row(
-              children: [
-                // 勾选标记占位 — 未选项对齐.
-                SizedBox(
-                  width: 20,
-                  child: key == widget.sortKey
-                      ? const Icon(Icons.check, size: 16, color: Tokens.accent)
-                      : null,
-                ),
-                Expanded(child: Text(_sortKeyLabel(key, l10n))),
-                if (key == widget.sortKey)
-                  Icon(
-                    widget.sortAscending
-                        ? Icons.arrow_upward
-                        : Icons.arrow_downward,
-                    size: 14,
-                    color: Tokens.textSecondary,
-                  ),
-              ],
-            ),
+            label: _sortKeyLabel(key, l10n),
+            isChecked: key == widget.sortKey,
+            icon: key == widget.sortKey
+                ? (widget.sortAscending
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward)
+                : null,
           ),
       ],
     );
-    final scope = WorkspaceMenuScope.maybeOf(buttonContext);
-    _menus = scope?.session;
-    scope?.ownLatestRoute(buttonContext, _sortOwner, triggerFocus: _sortFocus);
-    final action = await pending;
-    if (!mounted || action == null) return;
-    widget.onSortSelected(action);
+    _sortMenu = handle;
+    final action = await handle.result;
+    if (!identical(_sortMenu, handle)) return;
+    _sortMenu = null;
+    if (!mounted ||
+        action == null ||
+        !widget.visible ||
+        !buttonContext.mounted ||
+        SecondarySurfaceVisibility.read(buttonContext)?.value == false ||
+        ModalRoute.of(buttonContext)?.isCurrent != true) {
+      return;
+    }
+    // Checked keys are still actions: the coordinator alone flips direction.
+    widget.onSortSelected(action.value);
   }
 
   /// 排序键 → 菜单文案.

@@ -8,7 +8,7 @@ import '../../kernel/diagnostics/error_report.dart';
 import '../../kernel/diagnostics/error_reporter.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_container.dart';
+import '../shared/secondary_surface.dart';
 import '../shared/osd_overlay.dart';
 import '../theme/tokens.dart';
 
@@ -19,7 +19,7 @@ import '../theme/tokens.dart';
 ///   + D-01 计数徽标 + chevron 指示；
 /// - **展开态**：D-04 Phase 2 段序五段 —— 定位 → 源码行 → 调用栈 → 日志路径
 ///   → 重复信息，整体包在单一外层 SingleChildScrollView 内滚动（IN-02：
-///   删除内层同轴死滚动，SelectableText 附带自由文本选择；A2：栈硬上界
+///   单一外层滚动，SelectableText 附带自由文本选择；A2：栈硬上界
 ///   16384 字符，无需虚拟化）；
 /// - **交互**：整卡点击切换折叠/展开（StatefulWidget 内部状态，无新状态库）；
 ///   一键复制诊断包（CARD-04/D-06，失败隔离）；徽标点击轮览历史错误
@@ -28,9 +28,9 @@ import '../theme/tokens.dart';
 /// - **数据来源不变**：投影不可变 [ErrorReport]，intake 已脱敏限界；
 ///   T-03-05 —— 可见树不渲染 fullMediaPath/failedOpenPath 完整路径字段。
 ///
-/// 视觉复用 [GlassContainer]（D-03 零新视觉体系）；border 按严重级语义色
+/// 视觉复用 [SecondarySurface]（D-03 零新视觉体系）；border 按严重级语义色
 /// 分层（[Tokens.warning]/[Tokens.danger]/[Tokens.dangerFatal]）。ClipRRect
-/// 会把命中测试一并裁剪到圆角矩形内，这是 CARD-02 hit-test 边界的实现基础。
+/// surface clipping includes the rounded hit-test boundary，这是 CARD-02 hit-test 边界的实现基础。
 class ErrorCard extends StatefulWidget {
   /// Creates the expandable error card projecting the immutable [report].
   const ErrorCard({
@@ -40,7 +40,12 @@ class ErrorCard extends StatefulWidget {
     this.onBadgeTap,
     this.onClose,
     this.onOpenLog,
+    this.osdService,
   });
+
+  /// Borrowed feedback service; defaults to the production singleton.
+  /// The card never resets or disposes it.
+  final OsdService? osdService;
 
   /// The report to project; fields are already redacted/bounded at intake —
   /// this widget never renders developer-only full paths (T-03-05). The host
@@ -55,7 +60,7 @@ class ErrorCard extends StatefulWidget {
   ///
   /// **纯视图偏移** —— 轮览绝不调用 dismissCurrent（research Anti-Pattern：
   /// 误用会永久丢队首）；`dismissCurrent` 仅由手动关闭（[onClose]）与
-  /// D-02 warning 分流调用。为 null 时徽标不可点（纯计数展示）。
+  /// explicit manual close only.为 null 时徽标不可点（纯计数展示）。
   final VoidCallback? onBadgeTap;
 
   /// CARD-01 手动关闭回调 —— 宿主接线 `ErrorReporterImpl.I.dismissCurrent()`
@@ -159,7 +164,11 @@ class _ErrorCardState extends State<ErrorCard> {
     );
     try {
       await Clipboard.setData(ClipboardData(text: pack));
-      OsdService.I.show(l10n.errorCardCopied, icon: Icons.check);
+      (widget.osdService ?? OsdService.I).show(
+        l10n.errorCardCopied,
+        icon: Icons.check,
+        priority: OsdPriority.success,
+      );
     } on PlatformException catch (error) {
       _showCopyFailed(l10n);
       // PlatformException 属可恢复运行期故障：结构化 warn 供日志回溯
@@ -192,7 +201,11 @@ class _ErrorCardState extends State<ErrorCard> {
 
   /// 复制失败两态共用的 OSD 反馈（D-06「复制失败」pill）。
   void _showCopyFailed(AppLocalizations l10n) {
-    OsdService.I.show(l10n.errorCardCopyFailed, icon: Icons.error_outline);
+    (widget.osdService ?? OsdService.I).show(
+      l10n.errorCardCopyFailed,
+      icon: Icons.error_outline,
+      priority: OsdPriority.failure,
+    );
   }
 
   @override
@@ -202,6 +215,8 @@ class _ErrorCardState extends State<ErrorCard> {
     final severityColor = _severityColor(report.severity);
     final basename = _displayMediaPath(report.mediaPath);
 
+    // One outer scroll owns both full summary and diagnostics; action row stays
+    // before the message so long text cannot bury copy/log/close controls.
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -218,35 +233,13 @@ class _ErrorCardState extends State<ErrorCard> {
               decoration: BoxDecoration(
                 color: severityColor,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: severityColor.withValues(alpha: 0.45),
-                    blurRadius: 6,
-                    spreadRadius: 1,
-                  ),
-                ],
+                // Flat semantic dot: secondary surfaces have no optical glow.
               ),
             ),
             const SizedBox(width: Tokens.spSm),
             // CR-01：挂载层收口到 errorCardExpandedMaxWidth 后，本 Row 的
             // 可用宽度有界 —— message 必须 Flexible 才能在剩余空间内换行
             // 省略，否则长消息（自身 320 上限）会把 Row 撑溢出。
-            Flexible(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: Tokens.errorCardMaxWidth,
-                ),
-                child: Text(
-                  _resolveMessage(l10n, report),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Tokens.textPrimary,
-                    fontSize: Tokens.fontBody,
-                  ),
-                ),
-              ),
-            ),
             const SizedBox(width: Tokens.spSm),
             // D-01/D-11 计数徽标：可点击轮览入口（onBadgeTap 由宿主接线，
             // 纯视图偏移不消费队列）。GestureDetector 承载，不用 GlassButton
@@ -349,6 +342,14 @@ class _ErrorCardState extends State<ErrorCard> {
               ),
           ],
         ),
+        Text(
+          _resolveMessage(l10n, report),
+          softWrap: true,
+          style: const TextStyle(
+            color: Tokens.textPrimary,
+            fontSize: Tokens.fontBody,
+          ),
+        ),
         // D-07：折叠区媒体路径只允许 basename 形态（intake 已脱敏 + 防御性截取）。
         if (basename != null) ...[
           const SizedBox(height: Tokens.spXs),
@@ -358,60 +359,24 @@ class _ErrorCardState extends State<ErrorCard> {
         // 区内 —— 展开高度超出窗口可用空间时滚动而非溢出（A2：栈硬上界
         // 16384 字符，无需虚拟化）。
         if (_expanded)
-          Flexible(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: _buildExpandedSections(l10n, report),
-              ),
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: _buildExpandedSections(l10n, report),
           ),
       ],
     );
 
+    // Clipping belongs to the opaque surface, including its hit-test boundary.
     return GestureDetector(
       onTap: _toggle,
-      // v0.0.4 severity 分层辉光：对齐控制栏 4-shadow 手法的 severity
-      // 语义版 —— severity 外环（替换蓝外环）+ 顶部内高光 + 外层投影。
-      // 阴影 Container 不参与命中测试（CARD-02 边界仍由 GlassContainer
-      // 的 ClipRRect 裁剪决定），无 color 不画背景。
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Tokens.radiusLarge),
-          boxShadow: [
-            // severity 外环 — 20% 语义色 1px 扩散，随严重级变色。
-            BoxShadow(
-              color: severityColor.withValues(alpha: 0.20),
-              blurRadius: 1,
-              spreadRadius: 1,
-            ),
-            // 顶部内高光 — 与 ControlBarDecoration.playing 同款手法。
-            const BoxShadow(
-              color: Tokens.controlBarBorderWhite,
-              blurRadius: 0,
-              offset: Offset(0, -1),
-            ),
-            // 外层投影 — 抬离视频画面的深度感。
-            const BoxShadow(
-              color: Tokens.controlBarOuterShadow,
-              blurRadius: 16,
-              offset: Offset(0, 4),
-            ),
-          ],
+      child: SecondarySurface(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Tokens.spMd,
+          vertical: Tokens.spSm,
         ),
-        child: GlassContainer(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Tokens.spMd,
-            vertical: Tokens.spSm,
-          ),
-          // v0.0.8.2 D1: 播放期持续挂载的小卡片 — 降档 thin(8.0) 降本
-          // (severity 描边+底色承担视觉分层, 模糊层次感弱, 肉眼近无差).
-          tier: GlassTier.thin,
-          // D-03：severity 对应色 border 分层（覆盖默认 borderHighlight）。
-          border: Border.all(color: severityColor, width: 1),
-          child: content,
-        ),
+        borderColor: severityColor,
+        child: SingleChildScrollView(child: content),
       ),
     );
   }

@@ -7,9 +7,12 @@ import '../../kernel/services/thumbnail_service.dart';
 import '../../kernel/utils/path_utils.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_menu.dart';
+import '../shared/owned_anchored_menu.dart';
+import '../shared/secondary_surface_visibility.dart';
 import '../theme/tokens.dart';
-import '../player/workspace_menu_session.dart';
+
+/// Captured playlist-entry actions, independent of the currently playing path.
+enum _EntryAction { play, locate, remove, batchDelete }
 
 /// 播放列表条目卡 — 缩略图 + 透明"塑料膜"按钮层 + 右侧名称/断点信息.
 ///
@@ -96,7 +99,7 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   /// 鼠标悬停态 — 驱动整卡背景微亮 (v0.0.6.2).
   bool _hovered = false;
-  WorkspaceMenuSession? _ownedMenus;
+  OwnedMenuHandle<_EntryAction>? _menu;
   final Object _menuOwner = Object();
   final FocusNode _menuTrigger = FocusNode(
     debugLabel: 'playlist-entry-trigger',
@@ -114,16 +117,22 @@ class _PlaylistTileState extends State<PlaylistTile> {
   void didUpdateWidget(covariant PlaylistTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.item.path != widget.item.path) {
-      _ownedMenus?.cancelOwner(_menuOwner);
+      _menu?.cancel();
       _loadThumbnail();
     }
+  }
+
+  @override
+  void deactivate() {
+    _menu?.cancel();
+    super.deactivate();
   }
 
   @override
   void dispose() {
     // dispose 后 generation 失效 + mounted false — 双保险拒绝旧回写（§26.4）
     _loadGeneration++;
-    _ownedMenus?.cancelOwner(_menuOwner);
+    _menu?.cancel();
     _menuTrigger.dispose();
     super.dispose();
   }
@@ -146,7 +155,9 @@ class _PlaylistTileState extends State<PlaylistTile> {
     final provider = await ThumbnailService.getThumbnail(path);
 
     if (!mounted || generation != _loadGeneration || path != widget.item.path) {
-      return;
+      {
+        return;
+      }
     }
 
     setState(() {
@@ -172,7 +183,9 @@ class _PlaylistTileState extends State<PlaylistTile> {
     final provider = await ThumbnailService.retry(path);
 
     if (!mounted || generation != _loadGeneration || path != widget.item.path) {
-      return;
+      {
+        return;
+      }
     }
 
     setState(() {
@@ -439,66 +452,64 @@ class _PlaylistTileState extends State<PlaylistTile> {
     );
   }
 
-  /// 右键菜单 — 玻璃菜单 (v0.0.7 控制栏同款主题, 替换 Material showMenu):
-  /// 播放 / 打开所在目录 / 移除 / 批量删除.
+  /// 右键菜单 — captured pointer/path, exact typed route, no legacy double claim.
   Future<void> _showContextMenu(BuildContext context, Offset position) async {
-    final l10n = AppLocalizations.of(context);
-    final scope = WorkspaceMenuScope.maybeOf(context);
-    _ownedMenus = scope?.session;
-    Object? menuToken;
     final path = widget.item.path;
-    final action = await GlassMenu.show(
+    final l10n = AppLocalizations.of(context);
+    final handle = OwnedAnchoredMenu.open<_EntryAction>(
       context,
+      owner: _menuOwner,
       position: position,
-      onOpened: (cancel) {
-        menuToken = scope?.session.open(
-          owner: _menuOwner,
-          cancel: cancel,
-          // This menu acts on the captured playlist entry, not current playback.
-          isCurrent: () => mounted && ModalRoute.of(context)?.isCurrent == true,
-          onEscape: scope.onEscape,
-        );
-      },
-      items: [
-        GlassMenuItem(Icons.play_arrow, l10n.play, value: 'play'),
-        GlassMenuItem(
-          Icons.folder_open,
-          l10n.openFileLocation,
-          value: 'locate',
+      triggerFocus: _menuTrigger,
+      // State/FocusNode reuse does not mean the captured entry still owns focus
+      // return. Capture only its path, never the mutable playback/item object.
+      isOwnerValid: () => mounted && widget.item.path == path,
+      entries: [
+        OwnedMenuEntry(
+          value: _EntryAction.play,
+          label: l10n.play,
+          icon: Icons.play_arrow,
         ),
-        GlassMenuItem(
-          Icons.delete_outline,
-          l10n.remove,
-          value: 'remove',
+        OwnedMenuEntry(
+          value: _EntryAction.locate,
+          label: l10n.openFileLocation,
+          icon: Icons.folder_open,
+        ),
+        OwnedMenuEntry(
+          value: _EntryAction.remove,
+          label: l10n.remove,
+          icon: Icons.delete_outline,
           isDestructive: true,
         ),
-        // v0.0.7: 批量删除 — 进入多选模式并默认选中本条目
-        // (onStartBatchSelect == null 时隐藏 — 旧调用方兼容).
         if (widget.onStartBatchSelect != null)
-          GlassMenuItem(
-            Icons.checklist,
-            l10n.batchDelete,
-            value: 'batchDelete',
+          OwnedMenuEntry(
+            value: _EntryAction.batchDelete,
+            label: l10n.batchDelete,
+            icon: Icons.checklist,
           ),
       ],
     );
-    if (menuToken case final token?) scope?.session.finish(token);
-    if (mounted &&
-        context.mounted &&
-        ModalRoute.of(context)?.isCurrent == true &&
-        _menuTrigger.context != null &&
-        _menuTrigger.canRequestFocus) {
-      _menuTrigger.requestFocus();
+    _menu = handle;
+    final selection = await handle.result;
+    if (!identical(_menu, handle)) return;
+    _menu = null;
+    if (!mounted ||
+        !context.mounted ||
+        selection == null ||
+        path != widget.item.path ||
+        SecondarySurfaceVisibility.read(context)?.value == false ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
     }
-    if (!mounted || action == null || path != widget.item.path) return;
-    switch (action) {
-      case 'play':
+    // Act only on the captured entry; a playback switch never invalidates this menu.
+    switch (selection.value) {
+      case _EntryAction.play:
         widget.onPlay();
-      case 'locate':
-        PathUtils.openFileLocation(widget.item.path);
-      case 'remove':
+      case _EntryAction.locate:
+        PathUtils.openFileLocation(path);
+      case _EntryAction.remove:
         widget.onRemove();
-      case 'batchDelete':
+      case _EntryAction.batchDelete:
         widget.onStartBatchSelect?.call();
     }
   }

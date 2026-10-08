@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'modal_hold_observer.dart';
+import '../shared/secondary_surface_visibility.dart';
 
 /// 附属菜单所有权 — 非菜单对话框不参与此会话。
 /// Owns one cancellable menu and pairs its early-key handler with its lifetime.
@@ -17,6 +18,56 @@ class WorkspaceMenuSession extends ValueNotifier<bool> {
   String? _mediaIdentity;
   Object? _owner;
   bool _disposed = false;
+  bool _hasKeyHook = false;
+
+  /// Compatibility access for synchronous facade callbacks, not popup guessing.
+  Object? get currentToken => _token;
+
+  /// Rebind a legacy callback's exact token to the route just created by facade.
+  bool bindRoute(
+    Object token,
+    Route<Object?> route,
+    ModalRoute<Object?>? source,
+  ) {
+    if (!owns(token)) return false;
+    _isCurrent = () => route.isCurrent;
+    _canGuardLatchedEvent = () => route.isCurrent || source?.isCurrent == true;
+    return true;
+  }
+
+  final Map<KeyEvent, bool Function()> _ownedEvents = Map.identity();
+  bool Function()? _canGuardLatchedEvent;
+  Object? _lastToken;
+
+  /// Completion may restore focus after cancellation, but never after replacement.
+  bool mayRestoreFocus(Object token) =>
+      !_disposed && _token == null && identical(token, _lastToken);
+
+  /// Synchronous query; notifier publication may intentionally wait for build.
+  bool get isOwnedMenuTopmost => !_disposed && _isCurrent?.call() == true;
+
+  /// Exact token authority for row actions and stale route completion guards.
+  bool owns(Object token) => !_disposed && identical(token, _token);
+
+  /// Retain event identity through every synchronous HardwareKeyboard/Focus path.
+  /// Foreign top dialogs always yield, including a latch from an underlying menu.
+  bool guardsPlayerEvent(KeyEvent event) {
+    if (_token != null && !isOwnedMenuTopmost) return false;
+    final eligible = _ownedEvents[event];
+    if (eligible != null) return eligible();
+    if (!isOwnedMenuTopmost) return false;
+    latchEvent(event);
+    return true;
+  }
+
+  /// Call BEFORE opening/canceling/selecting within a key handler.
+  /// Microtask cleanup preserves suppression even after synchronous route removal.
+  void latchEvent(KeyEvent event) {
+    if (!_ownedEvents.containsKey(event)) {
+      _ownedEvents[event] = _canGuardLatchedEvent ?? () => true;
+      scheduleMicrotask(() => _ownedEvents.remove(event));
+    }
+  }
 
   /// Build-time owner removal invalidates synchronously, but UI/route mutation
   /// waits until the frame ends. Publish the current token, never stale false.
@@ -42,6 +93,7 @@ class WorkspaceMenuSession extends ValueNotifier<bool> {
     required Object owner,
     required VoidCallback cancel,
     required bool Function() isCurrent,
+    bool Function()? canGuardLatchedEvent,
     String? mediaIdentity,
     VoidCallback? onEscape,
   }) {
@@ -52,27 +104,37 @@ class WorkspaceMenuSession extends ValueNotifier<bool> {
     }
     this.cancel();
     _token = token;
+    _lastToken = token;
+    _canGuardLatchedEvent = canGuardLatchedEvent;
     _owner = owner;
     _cancel = cancel;
     _isCurrent = isCurrent;
     _onEscape = onEscape;
     _mediaIdentity = mediaIdentity;
-    FocusManager.instance.addEarlyKeyEventHandler(_handleKey);
+    if (!_hasKeyHook) {
+      FocusManager.instance.addEarlyKeyEventHandler(_handleKey);
+      _hasKeyHook = true;
+    }
     _publish();
     return token;
   }
 
   /// 仅结束匹配代次，避免旧完成回调清理新菜单。
-  void finish(Object token) {
-    if (!identical(token, _token)) return;
-    FocusManager.instance.removeEarlyKeyEventHandler(_handleKey);
+  bool finish(Object token) {
+    if (!identical(token, _token)) return false;
+    if (_hasKeyHook) {
+      FocusManager.instance.removeEarlyKeyEventHandler(_handleKey);
+      _hasKeyHook = false;
+    }
     _token = null;
     _owner = null;
     _cancel = null;
     _isCurrent = null;
+    _canGuardLatchedEvent = null;
     _onEscape = null;
     _mediaIdentity = null;
     _publish();
+    return true;
   }
 
   /// 先清理持有与键盘钩子，再移除精确菜单，避免完成回调重入。
@@ -98,9 +160,10 @@ class WorkspaceMenuSession extends ValueNotifier<bool> {
 
   /// 菜单路由自己的 DismissIntent 之前消费 ESC；其他顶层对话框不受影响。
   KeyEventResult _handleKey(KeyEvent event) {
-    if (event.logicalKey != LogicalKeyboardKey.escape ||
-        _isCurrent?.call() != true) {
-      return KeyEventResult.ignored;
+    if (!isOwnedMenuTopmost) return KeyEventResult.ignored;
+    latchEvent(event);
+    if (event.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored; // Navigation belongs to the actual route.
     }
     if (event is KeyDownEvent) _onEscape?.call();
     return KeyEventResult.handled;
@@ -141,18 +204,32 @@ class WorkspaceMenuScope extends InheritedWidget {
     if (route == null || navigator == null || !route.isCurrent) return;
     final sourceRoute = ModalRoute.of(trigger);
     final focus = triggerFocus;
+    final visibility = SecondarySurfaceVisibility.read(trigger);
     final token = session.open(
       owner: owner,
       cancel: () {
         if (route.isActive) navigator.removeRoute(route);
       },
-      isCurrent: () => route.isCurrent,
+      isCurrent: () => route.isCurrent && visibility?.value != false,
+      canGuardLatchedEvent: () =>
+          route.isCurrent || sourceRoute?.isCurrent == true,
       onEscape: onEscape,
     );
+    void visibilityChanged() {
+      if (visibility?.value == false && session.owns(token)) {
+        session.cancelOwner(owner);
+      }
+    }
+
+    visibility?.addListener(visibilityChanged);
+    visibilityChanged();
     unawaited(
       route.popped.then((_) {
+        visibility?.removeListener(visibilityChanged);
         session.finish(token);
-        if (trigger.mounted &&
+        if (session.mayRestoreFocus(token) &&
+            visibility?.value != false &&
+            trigger.mounted &&
             sourceRoute?.isCurrent == true &&
             focus?.context != null &&
             focus?.canRequestFocus == true) {

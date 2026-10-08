@@ -2,10 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+
+import '../shared/secondary_surface_visibility.dart';
 
 import '../theme/tokens.dart';
 import '../../kernel/utils/time_utils.dart';
 import '../../l10n/app_localizations.dart';
+import '../shared/secondary_surface.dart';
+
+part 'progress_bar_painter.dart';
+part 'progress_bar_listenable.dart';
+part 'progress_time_preview.dart';
 
 class _HoverState {
   const _HoverState(this.hovering, this.x);
@@ -460,142 +468,12 @@ class _ProgressBarState extends State<ProgressBar>
     );
   }
 
-  Widget _buildTooltip({required double fraction, required String text}) {
-    const tooltipWidth = 52.0;
-    const tooltipOffset = 20.0;
-    final halfW = tooltipWidth / 2 + Tokens.spXs;
-    final left = (fraction * _barWidth - tooltipWidth / 2)
-        .clamp(halfW, _barWidth - halfW)
-        .toDouble();
-    return Positioned(
-      bottom: tooltipOffset,
-      left: left,
-      child: FadeTransition(
+  /// Preview presentation is isolated from seek clocks and cached painting.
+  Widget _buildTooltip({required double fraction, required String text}) =>
+      _ProgressTimePreview(
+        fraction: fraction,
+        text: text,
+        barWidth: _barWidth,
         opacity: _tooltipOpacity,
-        child: Container(
-          width: tooltipWidth,
-          padding: const EdgeInsets.symmetric(
-            horizontal: Tokens.spXs,
-            vertical: 2,
-          ),
-          decoration: BoxDecoration(
-            color: Tokens.bgGlass,
-            borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-            border: Border.all(color: Tokens.borderHighlight, width: 0.5),
-          ),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontOverline,
-              fontFeatures: [Tokens.tabularFigures],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Owns the forwarding registrations created for a group of listenables.
-///
-/// [Listenable.merge] has no disposal API, so a retained widget state must keep
-/// explicit callbacks and remove them when its PlayerPort sources are replaced.
-class _MergedListenable extends ChangeNotifier {
-  _MergedListenable(List<Listenable> sources) : _sources = List.of(sources) {
-    for (final source in _sources) {
-      source.addListener(notifyListeners);
-    }
-  }
-
-  final List<Listenable> _sources;
-
-  @override
-  void dispose() {
-    for (final source in _sources) {
-      source.removeListener(notifyListeners);
-    }
-    super.dispose();
-  }
-}
-
-class _BarPainter extends CustomPainter {
-  final double playedFraction;
-  final bool dragging;
-  final double barHeight;
-  final double? hoverFraction;
-  final bool disabled;
-
-  _BarPainter({
-    required this.playedFraction,
-    required this.dragging,
-    required this.barHeight,
-    this.hoverFraction,
-    required this.disabled,
-  });
-
-  static final _bgPaint = Paint()..color = Tokens.bgHover;
-  static final _bgDisabledPaint = Paint()
-    ..color = Tokens.bgHover.withValues(alpha: Tokens.progressDisabledBgAlpha);
-  static final _playedPaint = Paint()..color = Tokens.progressPlayed;
-  static final _playedDisabledPaint = Paint()
-    ..color = Tokens.progressPlayed.withValues(
-      alpha: Tokens.progressDisabledPlayedAlpha,
-    );
-  static final _thumbPaint = Paint()..color = Tokens.progressThumb;
-
-  static const _thumbWidth = 18.0;
-  static const _thumbHeight = 12.0;
-  static const _thumbRadius = Radius.circular(2.0);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final top = (size.height - barHeight) / 2;
-
-    final bg = disabled ? _bgDisabledPaint : _bgPaint;
-    final played = disabled ? _playedDisabledPaint : _playedPaint;
-
-    const radius = Radius.circular(Tokens.progressBarRadius);
-
-    // 背景层（圆角）
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, top, size.width, barHeight),
-        radius,
-      ),
-      bg,
-    );
-    // 已播放层（圆角）
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, top, size.width * playedFraction, barHeight),
-        radius,
-      ),
-      played,
-    );
-
-    // thumb 始终显示在播放进度位置（不跟随鼠标）
-    if (!disabled) {
-      final cx = size.width * playedFraction;
-      final cy = top + barHeight / 2;
-      final rect = Rect.fromCenter(
-        center: Offset(cx, cy),
-        width: _thumbWidth,
-        height: _thumbHeight,
       );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, _thumbRadius),
-        _thumbPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BarPainter old) =>
-      old.playedFraction != playedFraction ||
-      old.dragging != dragging ||
-      old.barHeight != barHeight ||
-      old.hoverFraction != hoverFraction ||
-      old.disabled != disabled;
 }

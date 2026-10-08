@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../kernel/diagnostics/kernel_logger.dart' show KernelLoggerImpl;
 import '../../kernel/utils/debug_exporter.dart';
 import '../../l10n/app_localizations.dart';
+import 'workspace_menu_session.dart';
 
 /// 快捷键定义 — KeyboardHandler 和帮助对话框共享的单一数据源
 ///
@@ -53,6 +54,7 @@ class KeyboardHandler extends StatefulWidget {
     super.key,
     required this.child,
     this.customBindings = const {},
+    this.menuSession,
     this.onPlayPause,
     this.onSeekBackward,
     this.onSeekForward,
@@ -71,6 +73,9 @@ class KeyboardHandler extends StatefulWidget {
     this.onPlayPrevious,
     this.onPlayNext,
   });
+
+  /// 借用共享菜单会话；null 保留独立 KeyboardHandler 的旧分发语义。
+  final WorkspaceMenuSession? menuSession;
 
   final Widget child;
   final Map<String, String> customBindings;
@@ -162,6 +167,9 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
   ///    分发上行不可达本 handler，必死）、无任何路由祖先（外部 Focus/根
   ///    Overlay 节点）。
   bool _handleFallbackKeyEvent(KeyEvent event) {
+    // HardwareKeyboard invokes every registered handler, even after true.
+    // Refuse player work without consuming the menu/foreign route's native keys.
+    if (_isMenuOrCoveredRouteEvent(event)) return false;
     if (event is! KeyDownEvent) return false;
 
     final primary = FocusManager.instance.primaryFocus;
@@ -196,6 +204,20 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
     return _dispatchKeyEvent(event);
   }
 
+  /// 同步菜单/路由守卫 — no notifier delay and no reliance on focus location.
+  /// With no session, preserve standalone fallback semantics unchanged.
+  bool _isMenuOrCoveredRouteEvent(KeyEvent event) {
+    final menus = widget.menuSession;
+    if (menus == null) return false;
+    if (menus.guardsPlayerEvent(event)) return true;
+    // Only actual ownership adds covered-route protection. Production injects
+    // an empty session too; it must preserve fullscreen dead-focus rescue.
+    // currentToken is synchronous even when notifier publication is deferred.
+    return menus.currentToken != null &&
+        _route != null &&
+        _route?.isCurrent != true;
+  }
+
   /// 主焦点是否位于文本编辑焦点链内 —— 文本输入守卫。
   ///
   /// 仅查 `primaryFocus.context.widget is EditableText` 在 TextField 上永不
@@ -223,6 +245,8 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
   /// 共享按键分发 —— 焦点路径与回退路径的**唯一**匹配实现，保证两路按键
   /// 语义永不漂移。返回 true 表示命中并已触发回调。
   bool _dispatchKeyEvent(KeyEvent event) {
+    // Check before editable/help/custom/debug exceptions and every callback.
+    if (_isMenuOrCoveredRouteEvent(event)) return false;
     if (event is! KeyDownEvent) return false;
 
     // 不拦截文本输入框的按键事件

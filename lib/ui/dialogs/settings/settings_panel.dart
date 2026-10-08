@@ -10,6 +10,7 @@ import '../../shared/control_bar_decoration.dart';
 import '../../shared/glass_blur_layer.dart';
 import '../../shared/glass_container.dart' show GlassButton;
 import '../../shared/loop_marquee_text.dart';
+import '../../shared/secondary_surface_visibility.dart';
 import '../../theme/tokens.dart';
 import 'about_content.dart';
 import 'settings_panel_session.dart';
@@ -145,6 +146,9 @@ class _SettingsPanelState extends State<SettingsPanel>
   /// L1 内容层子树缓存 — 同上；AnimatedSwitcher + 当前分区内容子树。
   Widget? _contentLayerCache;
 
+  // General may survive as AnimatedSwitcher's outgoing child; cancel immediately.
+  final ValueNotifier<bool> _generalEligible = ValueNotifier(false);
+
   /// 缓存构建时的 locale — 语言切换（App 级重建）经 build 时的 locale
   /// 比对失效缓存，防止缓存的 l10n 字符串陈旧。
   Locale? _layerCacheLocale;
@@ -189,10 +193,12 @@ class _SettingsPanelState extends State<SettingsPanel>
     }
     if (_selected == selected && _level == level) return;
     setState(() {
+      if (_selected != selected) {
+        _tagLayerCache = null;
+        _contentLayerCache = null;
+      }
       _selected = selected;
       _level = level;
-      _tagLayerCache = null;
-      _contentLayerCache = null;
     });
     _layerController.value = state.isContent ? 1 : 0;
   }
@@ -253,6 +259,8 @@ class _SettingsPanelState extends State<SettingsPanel>
   void didUpdateWidget(covariant SettingsPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session) {
+      // A replacement task source is a new owner, even with identical navigation.
+      _generalEligible.value = false;
       oldWidget.session?.removeListener(_syncSession);
       widget.session?.addListener(_syncSession);
       _syncSession();
@@ -278,6 +286,8 @@ class _SettingsPanelState extends State<SettingsPanel>
   @override
   void dispose() {
     widget.session?.removeListener(_syncSession);
+    _generalEligible.value = false;
+    _generalEligible.dispose();
     for (final controller in _scrollControllers.values) {
       controller.dispose();
     }
@@ -426,14 +436,20 @@ class _SettingsPanelState extends State<SettingsPanel>
   Widget build(BuildContext context) {
     // 控制栏同款渐进渐退 — FadeTransition 纯渲染层驱动; IgnorePointer
     // 锚定 widget.visible: 关闭瞬间立即让出命中.
-    return ExcludeFocus(
-      excluding: !widget.visible,
-      child: TickerMode(
-        enabled: widget.visible,
-        child: IgnorePointer(
-          ignoring: !widget.visible,
-          child: RepaintBoundary(
-            child: FadeTransition(opacity: _fade, child: _buildShell(context)),
+    return SecondarySurfaceOwner(
+      visible: widget.visible,
+      child: ExcludeFocus(
+        excluding: !widget.visible,
+        child: TickerMode(
+          enabled: widget.visible,
+          child: IgnorePointer(
+            ignoring: !widget.visible,
+            child: RepaintBoundary(
+              child: FadeTransition(
+                opacity: _fade,
+                child: _buildShell(context),
+              ),
+            ),
           ),
         ),
       ),
@@ -489,6 +505,11 @@ class _SettingsPanelState extends State<SettingsPanel>
       );
 
   Widget _buildContent(BuildContext context) {
+    // Live signal is outside content caches and outgoing switcher children.
+    _generalEligible.value =
+        widget.visible &&
+        _level == _PanelLevel.content &&
+        _selected == _SettingsTab.general;
     final l10n = AppLocalizations.of(context);
     // locale 门 — Localizations.localeOf 注册依赖，语言切换（App 级重建）
     // 触发本 build 后此处失缓存，防缓存内 l10n 字符串陈旧。
@@ -528,7 +549,10 @@ class _SettingsPanelState extends State<SettingsPanel>
                     // child 走缓存 (v0.0.8.2) — 动画帧只换 Opacity/Transform
                     // 矩阵；level 翻转/面板开关的 setState 帧也 identity 复用
                     // (identical widget 短路 diff), chips+跑马灯 build 跳过.
-                    child: _cachedTagLayer(context),
+                    child: SecondarySurfaceOwner(
+                      visible: widget.visible && _level == _PanelLevel.tags,
+                      child: _cachedTagLayer(context),
+                    ),
                     builder: (context, child) {
                       final t = _layerEase.value;
                       return Opacity(
@@ -561,7 +585,10 @@ class _SettingsPanelState extends State<SettingsPanel>
                     ).animate(_layerEase),
                     // 缓存同 L0 — level 翻转不重建内容子树, 只有 _selected
                     // 变化 (分区切换) 才失效重建.
-                    child: _cachedContentLayer(context),
+                    child: SecondarySurfaceOwner(
+                      visible: widget.visible && _level == _PanelLevel.content,
+                      child: _cachedContentLayer(context),
+                    ),
                   ),
                 ),
                 builder: (_, child) {
@@ -665,10 +692,14 @@ class _SettingsPanelState extends State<SettingsPanel>
   Widget _buildTabContent() {
     final services = widget.services;
     return switch (_selected) {
-      _SettingsTab.general => GeneralSettingsContent(
-        settings: services?.settings,
-        rowsFocusNode: _rowsFocusNode,
-        scrollController: _scrollFor('general'),
+      _SettingsTab.general => SecondarySurfaceOwner(
+        visible: true,
+        eligibility: _generalEligible,
+        child: GeneralSettingsContent(
+          settings: services?.settings,
+          rowsFocusNode: _rowsFocusNode,
+          scrollController: _scrollFor('general'),
+        ),
       ),
       _SettingsTab.video =>
         services?.videoProcessing == null

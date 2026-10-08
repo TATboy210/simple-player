@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../kernel/diagnostics/error_report.dart';
 import '../../kernel/diagnostics/error_reporter.dart';
+import '../../kernel/diagnostics/error_reporting_dependencies.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../l10n/app_localizations.dart';
 import '../dialogs/settings/error_feedback_settings.dart';
@@ -25,8 +26,8 @@ import 'error_card.dart';
 ///    `_reportSafely → _publishSafely`），直接 setState 会产生
 ///    "setState() or markNeedsBuild() called during build" 次生错误并反灌
 ///    诊断流——非 idle 相位一律 addPostFrameCallback 推迟；
-/// 4. **severity 分流入口**：`_apply` 是 error/fatal → 卡片、warning → OSD
-///    + 单次 dismissCurrent 的唯一分流点（D-02 分层，当前四个捕获源不产生
+/// 4. **severity 分流入口**：`_apply` 是 error/fatal → 卡片、warning → retained card
+///    without automatic dismissal（D-02 分层，当前四个捕获源不产生
 ///    warning，该分支为 Phase 4/5 来源前瞻）；
 /// 5. **适配 notifier（D-08/A5）**：见 `_presentation` 字段注释；
 /// 6. **dispose 摘除**：removeListener + notifier dispose，幂等安全。
@@ -34,7 +35,7 @@ import 'error_card.dart';
 ///    [ErrorFeedbackSettings.I.state] 的 errorCardEnabled —— 开关只影响
 ///    渲染（off 同帧消失、on 恢复快照最新），捕获/快照/落盘链零影响
 ///    （快照 record 从不查询任何开关，零 kernel 依据）；门控绝不进入
-///    [_apply]/[_routeWarning] —— warning OSD 分流与轮览重置不受影响。
+///    [_apply] —— warning 卡片保留与轮览重置不受影响。
 /// 8. **E97 打开日志接线**：卡片折叠态「打开日志」动作的宿主回调 —— 以
 ///    explorer.exe 定位当前生效 error.log（缝注入可测 + 失败隔离 OSD 反馈）。
 ///
@@ -51,7 +52,10 @@ class ErrorCardHost extends StatefulWidget {
   /// [logExplorer] is a test-only injection seam for the open-log action:
   /// production uses the default launcher ([_launchExplorerSelect]); widget
   /// tests inject a recording fake so they never spawn a real process.
-  const ErrorCardHost({super.key, this.logExplorer});
+  const ErrorCardHost({super.key, this.logExplorer, this.osdService});
+
+  /// Borrowed feedback service forwarded to the card; never disposed by host.
+  final OsdService? osdService;
 
   /// E97 仅测试注入缝：打开日志动作的进程启动器。生产走默认
   /// [_launchExplorerSelect]；widget 测试注入记录型假缝，绝不拉起真实
@@ -86,13 +90,6 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
   /// 轮览索引：0 = 最新（快照尾）；正数向旧偏移；新报告到达或手动关闭时
   /// 重置到 0。纯视图偏移 —— 轮览绝不写 reporter（T-03-10）。
   int _cycleIndex = 0;
-
-  /// D-02 同帧防重标记：最近一次已分流的 warning eventId。
-  ///
-  /// 去重合并后的重发布（同 eventId 新快照实例）与相位守卫的两次帧尾回调
-  /// 都会让 `_apply` 以同一 warning 被调用多次 —— 不防重就会重复
-  /// dismissCurrent，静默丢弃队首后的待呈现错误（T-03-09/anti-pattern）。
-  String? _lastWarningEventId;
 
   @override
   void initState() {
@@ -170,12 +167,9 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
     }
   }
 
-  /// severity 分流入口（D-02 分层，03-03 完成版）：
-  /// - `current == null` → 卡片隐藏（适配值置空）；
-  /// - warning → OsdService 短暂提示 + 恰好一次 `dismissCurrent()`（队列
-  ///   推进），warning 永不上卡片、不进快照 —— 呈现层过滤，无重建循环；
-  /// - error/fatal → 更新适配 notifier（常驻卡片；快照维护由
-  ///   [ErrorCaptureSnapshot] 经 effect 缝独立完成，宿主不存副本）。
+  /// Present diagnostic reports without claiming per-event log retention.
+  /// Unclassified warnings share the existing card/history and manual-close
+  /// contract; only known finite operation outcomes are sent to OSD.
   void _apply(ErrorPresentationState state) {
     // 相同快照短路：ValueNotifier.value setter 对 == 相等的值本就不再
     // 通知订阅者，这里显式短路避免无效赋值。
@@ -185,31 +179,18 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
       _presentation.value = state;
       return;
     }
+    // No per-event retention proof exists here: keep diagnostic warnings in
+    // actual card history rather than discarding their arbitrary reason text.
     if (report.severity == ErrorSeverity.warning) {
-      _routeWarning(report);
-      return;
+      ErrorCaptureSnapshot.I.record(report, ReportAcceptance.newReport);
     }
     _presentation.value = state;
-  }
-
-  /// D-02 warning 分流：OSD 短暂提示（沿用 OsdService 默认时长）+ 恰好
-  /// 一次 `dismissCurrent()` 推进队列。[_lastWarningEventId] 防同帧/同
-  /// eventId 重复触发（T-03-09：重复 dismiss 会静默丢弃待呈现错误）。
-  ///
-  /// 注意：这里的 `dismissCurrent()` 是 D-02 分流**唯一**授权的非手动关闭
-  /// 调用 —— 徽标轮览（[_cycleIndex]）绝不复用该路径。
-  void _routeWarning(ErrorReport report) {
-    if (report.eventId == _lastWarningEventId) return;
-    _lastWarningEventId = report.eventId;
-    OsdService.I.show(report.message, icon: Icons.warning_amber_outlined);
-    ErrorReporterImpl.I.dismissCurrent();
   }
 
   /// 徽标轮览：沿快照向旧移动一格，越过最旧回到最新（循环语义）。
   ///
   /// 纯视图偏移 —— 只改渲染索引，不触碰 reporter 队列（T-03-10）；
-  /// `dismissCurrent` 仅由手动关闭路径（[_onClose]）与 D-02 warning 分流
-  /// 调用。
+  /// `dismissCurrent` is called only by explicit manual close.
   void _cycleBadge() {
     setState(() => _cycleIndex += 1); // 渲染处按快照长度取模，无需在此钳制
   }
@@ -261,14 +242,26 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
         : null;
     if (logPath == null || logPath.isEmpty) {
       // 路径不可用降级：零缝调用（绝不以空路径启动 explorer）。
-      OsdService.I.show(l10n.errorCardLogUnavailable, icon: Icons.info_outline);
+      (widget.osdService ?? OsdService.I).show(
+        l10n.errorCardLogUnavailable,
+        icon: Icons.info_outline,
+        priority: OsdPriority.warning,
+      );
       return;
     }
     try {
       await (widget.logExplorer ?? _launchExplorerSelect)(logPath);
-      OsdService.I.show(l10n.errorCardLogOpened, icon: Icons.folder_open);
+      (widget.osdService ?? OsdService.I).show(
+        l10n.errorCardLogOpened,
+        icon: Icons.folder_open,
+        priority: OsdPriority.success,
+      );
     } on ProcessException catch (error) {
-      OsdService.I.show(l10n.errorCardOpenLogFailed, icon: Icons.error_outline);
+      (widget.osdService ?? OsdService.I).show(
+        l10n.errorCardOpenLogFailed,
+        icon: Icons.error_outline,
+        priority: OsdPriority.failure,
+      );
       // 可恢复运行期故障：结构化 warn 供日志回溯（不含完整路径，D-07）。
       if (KernelLoggerImpl.isInitialized) {
         KernelLogger.I.w(
@@ -290,7 +283,7 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
     // SET-01 呈现门控（D-05 立即生效）：外层订阅设置 store 单例（UI→UI
     // 单例，与 OsdService.I 同一惯例）。开关只影响渲染：off 同帧移除卡片
     // （无退场动画），on 恢复时渲染快照最新（含关闭期间到达的报告）。门控
-    // 绝不进入 _apply/_routeWarning —— warning OSD 分流与轮览重置不受呈现
+    // 绝不进入 _apply —— warning 卡片保留与轮览重置不受呈现
     // 开关影响；reporter 捕获/落盘/effects 链零接触（快照 record 从不查询
     // 任何开关，零 kernel 依据）。
     return ValueListenableBuilder<ErrorFeedbackSettingsData>(
@@ -316,6 +309,7 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
               // CARD-01 前置：卡内无焦点可请求，键盘操作不会被卡片劫持。
               child: ErrorCard(
                 report: report,
+                osdService: widget.osdService,
                 // IN-03：快照为空（未挂 effect 的极简挂载，展示 presentation
                 // 兜底）时徽标仍应反映正在展示的这一条 —— 否则出现「0 错误」
                 // 徽标与卡片内容自相矛盾。

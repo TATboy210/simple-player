@@ -25,6 +25,7 @@ import 'panel_workspace_controller.dart';
 import 'panel_workspace_host.dart';
 import 'panel_workspace_layout.dart';
 import 'workspace_menu_session.dart';
+import '../shared/secondary_surface_visibility.dart';
 import 'workspace_focus_scope.dart';
 import '../dialogs/settings/settings_panel_session.dart';
 
@@ -298,10 +299,21 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 其余键(N/P/O/S/M/[]/F1/媒体键)return ignored 冒泡给窗口态 KeyboardHandler
   /// (全屏 route 缺这些键 — 已知限制,计划 line 85 认可)。
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    // Refuse player callbacks but let the exact menu route navigate/activate.
+    // Latch survives synchronous close, replacement and fullscreen host teardown.
+    final menus = widget.menuSession;
+    if (menus?.guardsPlayerEvent(event) == true) return KeyEventResult.ignored;
+    // Never query ancestors after a synchronous host deactivation.
     if (_isDeactivating || !mounted || !widget.video.isMounted) {
       return KeyEventResult.ignored;
     }
+    // A dialog above an owned menu must yield native keys, but an empty
+    // injected session must retain the pre-menu route-local dispatch contract.
+    if (menus?.currentToken != null &&
+        ModalRoute.of(context)?.isCurrent == false) {
+      return KeyEventResult.ignored;
+    }
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
       return _exitFullscreen()
@@ -916,7 +928,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
           visible: isVisible,
           maintainState: true,
           maintainAnimation: true,
-          child: FadeTransition(opacity: _autoHide.opacity, child: bar),
+          child: SecondarySurfaceOwner(
+            visible: isVisible,
+            eligibility: _autoHide.visible,
+            child: FadeTransition(opacity: _autoHide.opacity, child: bar),
+          ),
         ),
       ),
     );
@@ -1068,10 +1084,12 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
               children: [
                 // OSD 不依赖 engine.state/currentFileName，保持稳定 Element。
                 Positioned(
+                  // Bound long summaries to the live viewport, above the bar.
+                  top: Tokens.spMd,
                   bottom:
                       Tokens.controlBarMarginBottom +
                       Tokens.controlBarHeight +
-                      12,
+                      Tokens.spMd,
                   left: Tokens.controlBarMarginH,
                   right: Tokens.controlBarMarginH,
                   child: OsdOverlay(resizing: widget.resizing),

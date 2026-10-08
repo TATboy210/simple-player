@@ -55,8 +55,9 @@ void main() {
       expect(engine.setVolumeCallCount, 1);
       expect(engine.lastSetVolumeValue, 0.75);
 
-      // 清理 OsdService 定时器
-      await tester.pump(const Duration(seconds: 2));
+      // Release global feedback before widget-test timer invariants. Its real
+      // monotonic clock is deliberately independent of fake throttle time.
+      OsdService.I.hide();
     });
 
     testWidgets('onChangeEnd immediately flushes final value', (tester) async {
@@ -77,7 +78,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       expect(engine.setVolumeCallCount, 1);
 
-      await tester.pump(const Duration(seconds: 2));
+      // Release global feedback before widget-test timer invariants. Its real
+      // monotonic clock is deliberately independent of fake throttle time.
+      OsdService.I.hide();
     });
 
     testWidgets('scroll wheel calls setVolume immediately (no throttle)', (
@@ -156,7 +159,9 @@ void main() {
       expect(engine.setVolumeCallCount, 3);
       expect(engine.lastSetVolumeValue, 1.0);
 
-      await tester.pump(const Duration(seconds: 2));
+      // Release global feedback before widget-test timer invariants. Its real
+      // monotonic clock is deliberately independent of fake throttle time.
+      OsdService.I.hide();
     });
   });
 }

@@ -26,7 +26,7 @@ import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
-import 'package:simple_player_flutter/ui/shared/glass_container.dart';
+import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
@@ -137,12 +137,36 @@ void main() {
             findsOneWidget,
             reason: '新卡片 severity 色点必须可见且与 isFatal 映射一致',
           );
-          final glass = tester.widget<GlassContainer>(
-            find.byType(GlassContainer),
+          // Secondary material replaces glass, but severity remains a semantic
+          // border on the actual rendered card, not an optical highlight.
+          final surfaceFinder = find.descendant(
+            of: find.byType(ErrorCard),
+            matching: find.byType(SecondarySurface),
           );
+          final surface = tester.widget<SecondarySurface>(surfaceFinder);
+          expect(surface.borderColor, severityColor(scenario.expectedSeverity));
+          final decoration = tester
+              .widget<DecoratedBox>(
+                find
+                    .descendant(
+                      of: surfaceFinder,
+                      matching: find.byType(DecoratedBox),
+                    )
+                    .first,
+              )
+              .decoration;
+          expect(decoration, isA<BoxDecoration>());
+          if (decoration is BoxDecoration) {
+            expect(decoration.color, Tokens.bgPanel);
+            expect(decoration.color?.a, 1);
+            expect(decoration.borderRadius, BorderRadius.circular(12));
+          }
           expect(
-            glass.border?.top.color,
-            severityColor(scenario.expectedSeverity),
+            find.descendant(
+              of: surfaceFinder,
+              matching: find.byType(BackdropFilter),
+            ),
+            findsNothing,
           );
         },
       );

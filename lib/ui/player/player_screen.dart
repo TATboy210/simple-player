@@ -24,6 +24,7 @@ import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
 import 'panel_workspace_controller.dart';
 import 'workspace_menu_session.dart';
+import '../shared/secondary_surface_visibility.dart';
 import '../dialogs/settings/settings_panel_session.dart';
 
 /// 播放器主屏幕 — 组合窗口壳、视频 surface、键盘与控制层。
@@ -131,6 +132,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final PanelWorkspaceController _workspace = PanelWorkspaceController();
   final SettingsPanelSession _settingsSession = SettingsPanelSession();
   final WorkspaceMenuSession _menus = WorkspaceMenuSession();
+  SecondarySurfaceMenuBinding? _tooltipMenus;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final binding = SecondarySurfaceMenuPolicy.bindingOf(context);
+    if (identical(binding, _tooltipMenus)) return;
+    _tooltipMenus?.unbind(_menus);
+    _tooltipMenus = binding;
+    binding?.bind(_menus);
+  }
 
   /// 缓存标题栏 widget，避免窗口模式或 resize 导致父级 build 时重新创建标题栏子树。
   ///
@@ -312,6 +324,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _playlistVisible.dispose();
     _workspace.dispose();
     _settingsSession.dispose();
+    _tooltipMenus?.unbind(_menus);
     _menus.dispose();
     super.dispose();
   }
@@ -337,7 +350,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             children: [
               // 标题栏 widget identity 在 initState 固定；窗口模式变化只更新
               // 标题栏内部真正依赖 mode 的局部节点，不重建整棵标题栏子树。
-              _titleBar,
+              SecondarySurfaceOwner(visible: !isFullscreen, child: _titleBar),
               Expanded(
                 child: Stack(
                   children: [
@@ -356,6 +369,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           engine: widget.engine,
           controller: widget.controller,
           actions: _actions,
+          // Same borrowed session as route-local controls; keep video cache intact.
+          menuSession: _menus,
           customBindings: widget.customBindings,
           videoKey: _videoKey,
           isFullscreen: isFullscreen,

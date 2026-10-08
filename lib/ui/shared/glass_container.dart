@@ -407,6 +407,7 @@ class _GlassButtonState extends State<GlassButton>
 
     final button = AppTooltip(
       message: widget.tooltip,
+      focusNode: _effectiveFocusNode,
       child: SizedBox(
         width: 36,
         height: 36,
@@ -498,6 +499,7 @@ class _GlassButtonState extends State<GlassButton>
         canRequestFocus: false,
         child: AppTooltip(
           message: widget.tooltip ?? widget.label,
+          focusNode: _effectiveFocusNode,
           child: content,
         ),
       ),

@@ -9,7 +9,13 @@
 /// two-tier chain (exe root logs/ → Application Support logs/).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../shared/owned_anchored_menu.dart';
+import '../../shared/secondary_surface_visibility.dart';
+
 import 'package:flutter/services.dart';
 
 import '../../../kernel/services/app_settings_service.dart';
@@ -24,8 +30,7 @@ import '../../player/workspace_menu_session.dart';
 /// ErrorCardHost 订阅同一 store notifier 实现（D-05），捕获/落盘链零接触。
 ///
 /// 纵轴键盘导航（v0.0.8 XMB 化）：宿主面板注入 [rowsFocusNode] 后，
-/// ↑↓ 在行间移动焦点（回绕）、Enter/Space 激活当前行（语言行 no-op —
-/// Dropdown 需鼠标展开）；←→ 及其余按键 ignored（冒泡给面板切分区）。
+/// ↑↓ 在行间移动焦点（回绕）、Enter/Space 激活当前行（含语言菜单）；←→ 及其余按键 ignored（冒泡给面板切分区）。
 /// 焦点行高亮 = bgHover 常亮 + 行首 accent 竖条（与 hover 同色系并存）。
 // ignore: avoid-unnecessary-stateful-widgets — State 生命周期与局部
 // 控制器耦合, 保守保留 (转换风险 > 风格收益).
@@ -58,11 +63,25 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
   bool _rowsFocused = false;
   final Object _languageOwner = Object();
   final FocusNode _languageFocus = FocusNode(debugLabel: 'language-trigger');
-  WorkspaceMenuSession? _menus;
+  OwnedMenuHandle<AppLanguage>? _languageMenu;
+  final GlobalKey _languageAnchor = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addEarlyKeyEventHandler(_latchOpeningKey);
+  }
+
+  @override
+  void deactivate() {
+    _languageMenu?.cancel();
+    super.deactivate();
+  }
 
   @override
   void dispose() {
-    _menus?.cancelOwner(_languageOwner);
+    FocusManager.instance.removeEarlyKeyEventHandler(_latchOpeningKey);
+    _languageMenu?.cancel();
     _languageFocus.dispose();
     super.dispose();
   }
@@ -87,10 +106,11 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     settings.setResumeEnabled(!settings.resumeEnabled.value);
   }
 
-  /// 行激活分发 — 语言行（0）为纯展示 + Dropdown 需鼠标展开，键盘激活
-  /// no-op 但仍 handled（消费按键防外层泄漏）.
+  /// 行激活分发 — 语言行与真实触发按钮共用 opener，不透传播放器.
   void _activateRow(int index) {
     switch (index) {
+      case 0:
+        unawaited(_showLanguageMenu());
       case 1:
         _toggleErrorCard();
       case 2:
@@ -114,7 +134,9 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter ||
         key == LogicalKeyboardKey.space) {
-      _activateRow(_focusedRow);
+      // Actual button focus wins over remembered row navigation after pointer
+      // selection restores it; do not rewrite the row index on pointer use.
+      _activateRow(_languageFocus.hasPrimaryFocus ? 0 : _focusedRow);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -164,73 +186,108 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     );
   }
 
-  /// 语言选择行 —— Dropdown 三选（跟随系统/English/中文），切换经
-  /// [ErrorFeedbackSettings.setLanguage] 同帧生效（App 订阅同一 store）。
-  ///
-  /// 语言名按国际惯例以各自母语显示（English/中文），label 随当前语言切换。
+  /// Latch the opening key before row/FAD handlers mutate focus or routes.
+  KeyEventResult _latchOpeningKey(KeyEvent event) {
+    final trigger = _languageAnchor.currentContext;
+    if (trigger == null ||
+        event is! KeyDownEvent ||
+        ModalRoute.of(trigger)?.isCurrent != true ||
+        SecondarySurfaceVisibility.read(trigger)?.value == false ||
+        !(_languageFocus.hasPrimaryFocus ||
+            (widget.rowsFocusNode?.hasPrimaryFocus == true &&
+                _focusedRow == 0))) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+        event.logicalKey == LogicalKeyboardKey.space) {
+      WorkspaceMenuScope.maybeOf(trigger)?.session.latchEvent(event);
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// All five native language labels share the existing preference service.
+  String _languageLabel(AppLanguage language, AppLocalizations l10n) =>
+      switch (language) {
+        AppLanguage.system => l10n.languageSystem,
+        AppLanguage.english => 'English',
+        AppLanguage.chinese => '中文',
+        AppLanguage.korean => '한국어',
+        AppLanguage.japanese => '日本語',
+      };
+
+  /// Row zero, pointer and actual button activation use this exact live anchor.
+  Future<void> _showLanguageMenu() async {
+    final trigger = _languageAnchor.currentContext;
+    if (trigger == null ||
+        !mounted ||
+        ModalRoute.of(trigger)?.isCurrent != true ||
+        SecondarySurfaceVisibility.read(trigger)?.value == false) {
+      return;
+    }
+    final l10n = AppLocalizations.of(trigger);
+    final handle = OwnedAnchoredMenu.open<AppLanguage>(
+      trigger,
+      owner: _languageOwner,
+      triggerFocus: _languageFocus,
+      entries: [
+        for (final language in AppLanguage.values)
+          OwnedMenuEntry(
+            value: language,
+            label: _languageLabel(language, l10n),
+            isChecked: language == ErrorFeedbackSettings.I.state.value.language,
+          ),
+      ],
+    );
+    _languageMenu = handle;
+    final selected = await handle.result;
+    if (!identical(_languageMenu, handle)) return;
+    _languageMenu = null;
+    if (!mounted ||
+        !trigger.mounted ||
+        selected == null ||
+        ModalRoute.of(trigger)?.isCurrent != true ||
+        SecondarySurfaceVisibility.read(trigger)?.value == false) {
+      return;
+    }
+    // Only a current visible owner writes the shared store (and its persistence).
+    ErrorFeedbackSettings.I.setLanguage(selected.value);
+  }
+
+  /// 语言行 — project-owned popup replaces the SDK's snapshot Dropdown route.
   Widget _buildLanguageRow(AppLocalizations l10n) {
     return ValueListenableBuilder<ErrorFeedbackSettingsData>(
       valueListenable: ErrorFeedbackSettings.I.state,
-      builder: (context, settings, _) {
-        return _SettingsRow(
-          label: l10n.languageLabel,
-          isFocused: _rowsFocused && _focusedRow == 0,
-          trailing: DropdownButton<AppLanguage>(
+      builder: (context, settings, _) => _SettingsRow(
+        label: l10n.languageLabel,
+        onTap: () => unawaited(_showLanguageMenu()),
+        isFocused: _rowsFocused && _focusedRow == 0,
+        trailing: KeyedSubtree(
+          key: _languageAnchor,
+          child: TextButton(
+            key: const ValueKey('language-menu-trigger'),
             focusNode: _languageFocus,
-            value: settings.language,
-            underline: const SizedBox.shrink(),
-            dropdownColor: Tokens.bgGlass,
-            borderRadius: BorderRadius.circular(Tokens.radiusSm),
-            style: const TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontCaption,
+            onPressed: () => unawaited(_showLanguageMenu()),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _languageLabel(settings.language, l10n),
+                  style: const TextStyle(
+                    color: Tokens.textPrimary,
+                    fontSize: Tokens.fontCaption,
+                  ),
+                ),
+                const Icon(
+                  Icons.expand_more,
+                  size: Tokens.iconSm,
+                  color: Tokens.textSecondary,
+                ),
+              ],
             ),
-            icon: const Icon(
-              Icons.expand_more,
-              size: Tokens.iconSm,
-              color: Tokens.textSecondary,
-            ),
-            items: [
-              DropdownMenuItem(
-                value: AppLanguage.system,
-                child: Text(l10n.languageSystem),
-              ),
-              const DropdownMenuItem(
-                value: AppLanguage.english,
-                child: Text('English'),
-              ),
-              const DropdownMenuItem(
-                value: AppLanguage.chinese,
-                child: Text('中文'),
-              ),
-              // 语言名按国际惯例以各自母语显示 (v0.0.6 增韩/日).
-              const DropdownMenuItem(
-                value: AppLanguage.korean,
-                child: Text('한국어'),
-              ),
-              const DropdownMenuItem(
-                value: AppLanguage.japanese,
-                child: Text('日本語'),
-              ),
-            ],
-            // DropdownButton invokes onTap after pushing its route; own exactly it.
-            onTap: () {
-              final scope = WorkspaceMenuScope.maybeOf(context);
-              _menus = scope?.session;
-              scope?.ownLatestRoute(
-                context,
-                _languageOwner,
-                triggerFocus: _languageFocus,
-              );
-            },
-            onChanged: (language) {
-              if (language != null) {
-                ErrorFeedbackSettings.I.setLanguage(language);
-              }
-            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 

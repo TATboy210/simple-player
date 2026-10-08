@@ -9,6 +9,7 @@ import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_card_host.dart';
 import 'ui/player/modal_hold_observer.dart';
 import 'ui/theme/tokens.dart';
+import 'ui/shared/secondary_surface_visibility.dart';
 
 /// 应用壳 — MaterialApp、固定主题与本地化。
 ///
@@ -46,6 +47,17 @@ class App extends StatelessWidget {
         ).copyWith(
           tooltipTheme: const TooltipThemeData(
             waitDuration: Duration(milliseconds: Tokens.tooltipDelayShort),
+            decoration: BoxDecoration(
+              color: Tokens.bgPanel,
+              borderRadius: BorderRadius.all(
+                Radius.circular(Tokens.secondarySurfaceRadius),
+              ),
+            ),
+            textStyle: TextStyle(
+              color: Tokens.textPrimary,
+              fontSize: Tokens.fontCaption,
+              fontFamily: Tokens.fontFamily,
+            ),
           ),
         );
 
@@ -73,8 +85,13 @@ class App extends StatelessWidget {
           // v0.0.5: 模态路由观察 — 控制栏自动隐藏在设置/菜单开启期间冻结.
           navigatorObservers: [ModalHoldObserver()],
           home: _buildPlayerHome(),
-          builder: (context, navigator) =>
-              buildErrorCardMount(context, navigator, mode: windowService.mode),
+          builder: (context, navigator) => SecondarySurfaceMenuRoot(
+            child: buildErrorCardMount(
+              context,
+              navigator,
+              mode: windowService.mode,
+            ),
+          ),
         );
       },
     );
@@ -196,21 +213,25 @@ class _ErrorCardOverlayMount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 窗口尺寸经挂载子树内的 context 读取（builder 的 context 位于
-    // WidgetsApp 的 MediaQuery 之上，不能直接在 buildErrorCardMount 里读）。
-    final maxHeight =
-        MediaQuery.sizeOf(context).height * Tokens.errorCardMaxHeightRatio;
     return Overlay(
       initialEntries: [
         OverlayEntry(
           canSizeOverlay: true,
-          builder: (_) => ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: Tokens.errorCardExpandedMaxWidth,
-              maxHeight: maxHeight,
-            ),
-            child: const ErrorCardHost(),
-          ),
+          builder: (entryContext) {
+            // initialEntries are retained by OverlayState. Subscribe INSIDE the
+            // retained entry so resize updates its cap, not a discarded closure;
+            // Host/card State and the cached player subtree remain untouched.
+            final maxHeight =
+                MediaQuery.sizeOf(entryContext).height *
+                Tokens.errorCardMaxHeightRatio;
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: Tokens.errorCardExpandedMaxWidth,
+                maxHeight: maxHeight,
+              ),
+              child: const ErrorCardHost(),
+            );
+          },
         ),
       ],
     );

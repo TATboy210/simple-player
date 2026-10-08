@@ -4,6 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
+import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
+import 'package:simple_player_flutter/ui/player/player_screen.dart';
+import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
+import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
+import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
+import 'package:simple_player_flutter/l10n/app_localizations.dart';
+
+import '../../helpers/fake_engine.dart';
+import '../../helpers/fake_video_controls.dart';
+import '../../helpers/fake_window_service.dart';
 
 /// G-03-3 全局回退分发回归 —— dead-keyboard 修复 + 守卫判定矩阵。
 ///
@@ -45,6 +56,184 @@ void main() {
         ),
       ),
     );
+  }
+
+  testWidgets(
+    'PlayerScreen shares session with builder and controls without cache replacement',
+    (tester) async {
+      KernelLoggerImpl.resetForTesting();
+      KernelLoggerImpl.init();
+      final engine = FakeEngine();
+      final controller = PlaybackController(engine: engine);
+      final window = FakeWindowService();
+      final video = FakeVideoControlsPort();
+      final external = FocusNode(debugLabel: 'screen-external');
+      var openFiles = 0;
+      addTearDown(controller.dispose);
+      addTearDown(engine.dispose);
+      addTearDown(window.dispose);
+      addTearDown(video.dispose);
+      addTearDown(external.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (_, child) => Focus(
+            focusNode: external,
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: PlayerScreen(
+            engine: engine,
+            controller: controller,
+            windowService: window,
+            videoSurfaceBuilder: (_) =>
+                const SizedBox.expand(key: Key('cached-video')),
+            testVideoControls: video,
+            onOpenFile: () => openFiles++,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final handler = tester.widget<KeyboardHandler>(
+        find.byType(KeyboardHandler),
+      );
+      final controls = tester.widget<PlayerVideoControls>(
+        find.byType(PlayerVideoControls),
+      );
+      expect(handler.menuSession, same(controls.menuSession));
+      expect(handler.menuSession, isNotNull);
+      final videoElement = tester.element(
+        find.byKey(const Key('cached-video')),
+      );
+      final menu = OwnedAnchoredMenu.open(
+        tester.element(find.byType(PlayerVideoControls)),
+        owner: Object(),
+        session: controls.menuSession,
+        entries: const [OwnedMenuEntry(value: 'a', label: 'Screen action')],
+      );
+      await tester.pumpAndSettle();
+      external.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyO);
+      expect(openFiles, 0);
+      menu.cancel();
+      await tester.pumpAndSettle();
+      external.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyO);
+      expect(openFiles, 1);
+      expect(
+        tester.element(find.byKey(const Key('cached-video'))),
+        same(videoElement),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      KernelLoggerImpl.resetForTesting();
+    },
+  );
+
+  for (final injected in [false, true]) {
+    for (final location in ['external', 'root', 'null']) {
+      testWidgets('empty session=$injected PageRoute fallback $location', (
+        tester,
+      ) async {
+        final menus = WorkspaceMenuSession();
+        final external = FocusNode(debugLabel: 'page-external');
+        final navigator = GlobalKey<NavigatorState>();
+        var playerCalls = 0;
+        void act() => playerCalls++;
+        addTearDown(menus.dispose);
+        addTearDown(external.dispose);
+        addTearDown(() async {
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: navigator,
+            builder: (_, child) => Focus(
+              focusNode: external,
+              child: child ?? const SizedBox.shrink(),
+            ),
+            home: KeyboardHandler(
+              menuSession: injected ? menus : null,
+              customBindings: {
+                'openFile': LogicalKeyboardKey.keyQ.keyId.toString(),
+              },
+              onPlayPause: act,
+              onToggleSubtitle: act,
+              onOpenFile: act,
+              onPlayPrevious: act,
+              onPlayNext: act,
+              onToggleMute: act,
+              onShowHelp: act,
+              onMediaPlayPause: act,
+              child: const Text('underlying-player'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final source = ModalRoute.of(
+          tester.element(find.byType(KeyboardHandler)),
+        );
+        unawaited(
+          navigator.currentState?.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Text('fullscreen-page'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(source?.isCurrent, isFalse);
+        expect(menus.currentToken, isNull);
+        for (final key in [
+          LogicalKeyboardKey.space,
+          LogicalKeyboardKey.keyQ,
+          LogicalKeyboardKey.keyN,
+          LogicalKeyboardKey.keyP,
+          LogicalKeyboardKey.keyM,
+          LogicalKeyboardKey.f1,
+          LogicalKeyboardKey.mediaPlayPause,
+        ]) {
+          external.requestFocus();
+          await tester.pump();
+          if (location == 'root') {
+            FocusManager.instance.primaryFocus?.unfocus();
+            FocusManager.instance.rootScope.requestFocus();
+            FocusManager.instance.applyFocusChangesIfNeeded();
+            // Root requests may focus the test View Scope, also outside routes.
+            final primary = FocusManager.instance.primaryFocus;
+            expect(primary, isA<FocusScopeNode>());
+            final focusContext = primary?.context;
+            final route = focusContext == null
+                ? null
+                : ModalRoute.of(focusContext);
+            expect(route, isNull);
+          }
+          // Detach an actual primary node, not a reflected/private focus field.
+          if (location == 'null') {
+            final transient = FocusNode(debugLabel: 'page-transient');
+            final pageContext = tester.element(find.text('fullscreen-page'));
+            final attachment = transient.attach(pageContext);
+            attachment.reparent(parent: FocusManager.instance.rootScope);
+            transient.requestFocus();
+            FocusManager.instance.applyFocusChangesIfNeeded();
+            attachment.detach();
+            expect(FocusManager.instance.primaryFocus, isNull);
+            transient.dispose();
+          }
+          await tester.sendKeyEvent(key);
+        }
+        await tester.pumpAndSettle();
+        expect(playerCalls, 7, reason: 'empty session rescue');
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyO);
+        expect(playerCalls, 7, reason: 'custom Q replaces O');
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+        expect(playerCalls, 8, reason: 'unmapped defaults remain available');
+      });
+    }
   }
 
   group('dead-keyboard rescue (G-03-3)', () {

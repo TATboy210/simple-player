@@ -7,18 +7,224 @@ import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
+import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_session.dart';
 import 'package:simple_player_flutter/ui/player/modal_hold_observer.dart';
 import 'package:simple_player_flutter/ui/player/panel_workspace_controller.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
+import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
+import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
 
 void main() {
+  for (final injected in [false, true]) {
+    testWidgets('empty controls session=$injected retains route-local dispatch', (
+      tester,
+    ) async {
+      final engine = FakeEngine();
+      final video = FakeVideoControlsPort();
+      final menus = WorkspaceMenuSession();
+      final title = ValueNotifier('a.mp4');
+      final mode = ValueNotifier(WindowMode.windowed);
+      final navigator = GlobalKey<NavigatorState>();
+      var playerCalls = 0;
+      addTearDown(engine.dispose);
+      addTearDown(video.dispose);
+      for (final source in [menus, title, mode]) {
+        addTearDown(source.dispose);
+      }
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: PlayerVideoControls(
+              video: video,
+              engine: engine,
+              actions: PlayerActions(
+                onPlayPause: () => playerCalls++,
+                onSeekBack: (_) => playerCalls++,
+                onSeekForward: (_) => playerCalls++,
+              ),
+              currentFileName: title,
+              windowMode: mode,
+              menuSession: injected ? menus : null,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final local = tester
+          .widgetList<Focus>(
+            find.descendant(
+              of: find.byType(PlayerVideoControls),
+              matching: find.byType(Focus),
+            ),
+          )
+          .firstWhere((focus) => focus.autofocus && focus.onKeyEvent != null);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      expect(playerCalls, 1, reason: 'current-route controls dispatch once');
+      final source = ModalRoute.of(
+        tester.element(find.byType(PlayerVideoControls)),
+      );
+      unawaited(
+        navigator.currentState?.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const Text('fullscreen-page'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(source?.isCurrent, isFalse);
+      expect(menus.currentToken, isNull);
+      // Invoke the real retained controls boundary explicitly: no new input or
+      // fullscreen feature is implied by preserving its pre-session semantics.
+      for (final key in [
+        LogicalKeyboardKey.space,
+        LogicalKeyboardKey.arrowLeft,
+        LogicalKeyboardKey.arrowRight,
+      ]) {
+        expect(
+          local.onKeyEvent?.call(
+            local.focusNode ?? FocusManager.instance.rootScope,
+            KeyDownEvent(
+              physicalKey: PhysicalKeyboardKey.space,
+              logicalKey: key,
+              timeStamp: Duration.zero,
+            ),
+          ),
+          KeyEventResult.handled,
+        );
+      }
+      expect(playerCalls, 4);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+  }
+
+  for (final teardown in ['none', 'video', 'host']) {
+    testWidgets(
+      'real owned menu ESC order and keyup/repeat teardown=$teardown',
+      (tester) async {
+        final engine = FakeEngine();
+        final video = FakeVideoControlsPort();
+        final menus = WorkspaceMenuSession();
+        final title = ValueNotifier('a.mp4');
+        final mode = ValueNotifier(WindowMode.fullscreen);
+        final hostVisible = ValueNotifier(true);
+        final order = <String>[];
+        var playerCalls = 0;
+        var outerExit = 0;
+        addTearDown(engine.dispose);
+        addTearDown(video.dispose);
+        for (final source in [menus, title, mode, hostVisible]) {
+          addTearDown(source.dispose);
+        }
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: KeyboardHandler(
+                menuSession: menus,
+                onPlayPause: () => playerCalls++,
+                onExitFullscreen: () => outerExit++,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: hostVisible,
+                  builder: (_, visible, _) => visible
+                      ? PlayerVideoControls(
+                          video: video,
+                          engine: engine,
+                          actions: PlayerActions(
+                            onPlayPause: () => playerCalls++,
+                            onSeekBack: (_) => playerCalls++,
+                            onSeekForward: (_) => playerCalls++,
+                            onToggleFullscreen: () {
+                              expect(menus.currentToken, isNull);
+                              expect(video.exitFullscreenCallCount, 0);
+                              order.add('host');
+                              if (teardown == 'video') video.isMounted = false;
+                              if (teardown == 'host') hostVisible.value = false;
+                              mode.value = WindowMode.windowed;
+                            },
+                          ),
+                          currentFileName: title,
+                          windowMode: mode,
+                          menuSession: menus,
+                        )
+                      : const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final trigger = tester.element(find.byType(PlayerVideoControls));
+        final scope = WorkspaceMenuScope.maybeOf(trigger);
+        // Scope wraps descendants, not the PlayerVideoControls element itself.
+        final scoped = tester.widget<WorkspaceMenuScope>(
+          find.byType(WorkspaceMenuScope),
+        );
+        expect(scope, isNull);
+        final handle = OwnedAnchoredMenu.open(
+          trigger,
+          owner: Object(),
+          session: menus,
+          onEscape: scoped.onEscape,
+          entries: const [OwnedMenuEntry(value: 'a', label: 'Real action')],
+        );
+        await tester.pumpAndSettle();
+        final controlsFocus = tester
+            .widgetList<Focus>(
+              find.descendant(
+                of: find.byType(PlayerVideoControls),
+                matching: find.byType(Focus),
+              ),
+            )
+            .firstWhere((focus) => focus.autofocus && focus.onKeyEvent != null);
+        // Exercise the actual controls-local callback even if focus is stranded.
+        for (final key in [
+          LogicalKeyboardKey.space,
+          LogicalKeyboardKey.arrowLeft,
+          LogicalKeyboardKey.arrowRight,
+          LogicalKeyboardKey.keyF,
+        ]) {
+          final result = controlsFocus.onKeyEvent?.call(
+            controlsFocus.focusNode ?? FocusManager.instance.rootScope,
+            KeyDownEvent(
+              physicalKey: PhysicalKeyboardKey.space,
+              logicalKey: key,
+              timeStamp: Duration.zero,
+            ),
+          );
+          expect(result, KeyEventResult.ignored);
+        }
+        expect(playerCalls, 0);
+        expect(order, isEmpty);
+        menus.addListener(() {
+          if (menus.currentToken == null) order.add('cancel');
+        });
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+        // Repeat and keyup of the same press must never exit a second time.
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.escape);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(await handle.result, isNull);
+        expect(order, ['cancel', 'host']);
+        expect(outerExit, 0);
+        expect(video.exitFullscreenCallCount, teardown == 'video' ? 0 : 1);
+        expect(playerCalls, 0);
+      },
+    );
+  }
   for (final invalidatesVideo in [false, true]) {
     testWidgets(
       'owned menu ESC invokes host before guarded video exit $invalidatesVideo',
@@ -146,7 +352,7 @@ void main() {
   }
 
   testWidgets(
-    'Dropdown ESC preserves owned route but unrelated dialog dismisses',
+    'actual language ESC preserves owned route but unrelated dialog dismisses',
     (tester) async {
       final menus = WorkspaceMenuSession();
       addTearDown(menus.dispose);
@@ -156,33 +362,22 @@ void main() {
         MaterialApp(
           navigatorKey: navigator,
           navigatorObservers: [ModalHoldObserver()],
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: WorkspaceMenuScope(
             session: menus,
             onEscape: () {},
-            child: Scaffold(
-              body: Builder(
-                builder: (context) => DropdownButton<int>(
-                  value: 1,
-                  items: const [
-                    DropdownMenuItem(value: 1, child: Text('one')),
-                    DropdownMenuItem(value: 2, child: Text('two')),
-                  ],
-                  onTap: () =>
-                      WorkspaceMenuScope.maybeOf(context)
-                          ?.ownLatestRoute(context, 'language'),
-                  onChanged: (_) {},
-                ),
-              ),
-            ),
+            child: const Scaffold(body: GeneralSettingsContent()),
           ),
         ),
       );
-      await tester.tap(find.byType(DropdownButton<int>));
+      await tester.tap(find.byKey(const ValueKey('language-menu-trigger')));
       await tester.pumpAndSettle();
       expect(menus.value, isTrue);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
-      expect(find.text('two'), findsOneWidget);
+      expect(find.text('日本語'), findsOneWidget);
       final dialog = showDialog<void>(
         context: navigator.currentContext!,
         builder: (_) => const AlertDialog(content: Text('unrelated help')),
@@ -192,10 +387,10 @@ void main() {
       await tester.pumpAndSettle();
       await dialog;
       expect(find.text('unrelated help'), findsNothing);
-      expect(find.text('two'), findsOneWidget);
+      expect(find.text('日本語'), findsOneWidget);
       menus.cancel();
       await tester.pumpAndSettle();
-      expect(find.text('two'), findsNothing);
+      expect(find.text('日本語'), findsNothing);
       expect(ModalHoldObserver.openModalCount.value, 0);
     },
   );

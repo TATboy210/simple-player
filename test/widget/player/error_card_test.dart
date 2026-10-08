@@ -28,6 +28,8 @@ import 'package:simple_player_flutter/ui/theme/tokens.dart';
 /// enricher 固定，避免依赖测试环境真实源码读取。卡片为纯呈现 widget，
 /// 单例只用于 diagnosticLogPath 读取。
 void main() {
+  // Test owns this service; clock and Timer share the binding FakeAsync zone.
+  var osd = OsdService();
   setUpAll(() {
     // 诊断单例测试惯例：KernelLogger 先复位再 init。
     KernelLoggerImpl.resetForTesting();
@@ -40,6 +42,15 @@ void main() {
     // D-11 快照 effect：徽标轮览数据源须与生产 main.dart 同一接线
     // （reporter 既有 effects 缝 → ErrorCaptureSnapshot.I.record）——
     // 关闭/同帧类用例的徽标计数与「显示最新」断言依赖它。
+    osd.dispose();
+    osd = OsdService(
+      now: () => Duration(
+        milliseconds: TestWidgetsFlutterBinding.instance.clock
+            .now()
+            .millisecondsSinceEpoch,
+      ),
+    );
+    addTearDown(osd.dispose);
     await ErrorReporterImpl.resetForTesting();
     ErrorCaptureSnapshot.I.resetForTesting();
     ErrorReporterImpl.init(effects: [ErrorCaptureSnapshot.I.record]);
@@ -61,6 +72,7 @@ void main() {
         alignment: Alignment.topLeft,
         child: ErrorCard(
           report: report,
+          osdService: osd,
           totalCount: totalCount,
           onOpenLog: onOpenLog,
         ),
@@ -631,8 +643,11 @@ void main() {
     // 推进 OSD hold 计时器（osdDefaultHoldMs=1200）：OsdService 是全局
     // 单例，show() 会启动 hide Timer —— 测试结束前不推进会遗留 pending
     // timer 导致 flutter_test 报错。
-    Future<void> settleOsdTimer(WidgetTester tester) =>
-        tester.pump(const Duration(seconds: 2));
+    Future<void> settleOsdTimer(WidgetTester tester) async {
+      // Explicit fixture cleanup, not a fabricated longer lifetime assertion.
+      osd.hide();
+      await tester.pump();
+    }
 
     testWidgets('copy sends a formatter-identical pack and shows copied OSD', (
       tester,
@@ -664,8 +679,9 @@ void main() {
       final arguments = calls.single.arguments! as Map<Object?, Object?>;
       expect(arguments['text'], formatDiagnosticPack(report));
       // D-06 成功反馈：OSD「已复制」pill。
-      expect(OsdService.I.message.value?.text, '已复制');
-      expect(OsdService.I.message.value?.icon, Icons.check);
+      expect(osd.message.value?.text, '已复制');
+      expect(osd.message.value?.icon, Icons.check);
+      expect(osd.message.value?.priority, OsdPriority.success);
       // 复制不改变折叠/展开状态，也不禁用卡片其余交互。
       expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
 
@@ -734,8 +750,9 @@ void main() {
 
         // Assert：失败反馈 + 失败隔离 —— 卡片仍可见、内容不变、无异常外溢
         // （T-03-11：typed catch 吸收 PlatformException）。
-        expect(OsdService.I.message.value?.text, '复制失败');
-        expect(OsdService.I.message.value?.icon, Icons.error_outline);
+        expect(osd.message.value?.text, '复制失败');
+        expect(osd.message.value?.icon, Icons.error_outline);
+        expect(osd.message.value?.priority, OsdPriority.failure);
         expect(find.byType(ErrorCard), findsOneWidget);
         expect(find.text('Bad state: 复制隔离检查'), findsOneWidget);
         expect(tester.takeException(), isNull);

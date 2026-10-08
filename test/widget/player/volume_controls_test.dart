@@ -216,8 +216,9 @@ void main() {
       // Volume should have changed
       expect(engine.volume.value, greaterThan(0.5));
 
-      // Pump past OsdService hold timer to avoid pending timer
-      await tester.pump(const Duration(seconds: 2));
+      // This tests volume actions, not OSD lifetime. Cancel the borrowed
+      // singleton before widget-test invariants; pump does not advance Stopwatch.
+      OsdService.I.hide();
     });
 
     testWidgets('drag reports the interaction session boundaries', (

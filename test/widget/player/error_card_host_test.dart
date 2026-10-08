@@ -22,6 +22,8 @@ import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import '../../helpers/fake_window_service.dart';
 
 void main() {
+  // Test owns this service; clock and Timer share the binding FakeAsync zone.
+  var osd = OsdService();
   setUpAll(() {
     // 诊断单例测试惯例：KernelLogger 先复位再 init（App 组合根需要它）。
     KernelLoggerImpl.resetForTesting();
@@ -33,6 +35,15 @@ void main() {
     // 每个测试重建单例，保证 FIFO/isReady 不跨测试泄漏。
     // D-11 快照 effect：徽标轮览数据源须与生产 main.dart 同一接线
     // （reporter 既有 effects 缝 → ErrorCaptureSnapshot.I.record）。
+    osd.dispose();
+    osd = OsdService(
+      now: () => Duration(
+        milliseconds: TestWidgetsFlutterBinding.instance.clock
+            .now()
+            .millisecondsSinceEpoch,
+      ),
+    );
+    addTearDown(osd.dispose);
     await ErrorReporterImpl.resetForTesting();
     ErrorCaptureSnapshot.I.resetForTesting();
     ErrorReporterImpl.init(effects: [ErrorCaptureSnapshot.I.record]);
@@ -210,6 +221,113 @@ void main() {
   // 挂在有界 Align/Center 里，掩盖了 RenderStack 对 left/top Positioned
   // 子节点给无界约束的问题。本组用无界 Positioned + 长调用栈复现原始缺陷。
   group('CR-01 挂载约束（生产 mount 路径）', () {
+    testWidgets(
+      'retained App mount follows 800 to 480 resize with full diagnostics',
+      (tester) async {
+        // Window metrics, not only RenderView constraints: MediaQuery reads View.
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(854, 800);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        ErrorFeedbackSettings.I.setLanguage(AppLanguage.chinese);
+        final window = FakeWindowService();
+        addTearDown(window.dispose);
+        await tester.pumpWidget(
+          App(
+            startupTimeline: StartupTimeline(),
+            windowService: window,
+            windowInitError: 'headless fixture',
+          ),
+        );
+        await tester.pump();
+        final stack = List.generate(
+          70,
+          (i) =>
+              '#$i frame_$i (package:simple_player_flutter/resize.dart:${i + 1}:1)',
+        ).join('\n');
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('resize diagnostics'),
+          StackTrace.fromString(stack),
+        );
+        await tester.pump();
+        await tester.tap(find.text('Bad state: resize diagnostics'));
+        await tester.pump();
+        final host = tester.state(find.byType(ErrorCardHost));
+        final card = tester.state(find.byType(ErrorCard));
+        final screen = tester.element(find.byType(Navigator));
+        expect(find.text('调用栈'), findsOneWidget);
+        expect(
+          MediaQuery.sizeOf(tester.element(find.byType(ErrorCard))),
+          const Size(854, 800),
+        );
+        tester.view.physicalSize = const Size(854, 480);
+        await tester.pump();
+        expect(
+          MediaQuery.sizeOf(tester.element(find.byType(ErrorCard))),
+          const Size(854, 480),
+        );
+        expect(tester.state(find.byType(ErrorCardHost)), same(host));
+        expect(tester.state(find.byType(ErrorCard)), same(card));
+        expect(tester.element(find.byType(Navigator)), same(screen));
+        final rect = tester.getRect(find.byType(ErrorCard));
+        expect(
+          rect.height,
+          lessThanOrEqualTo(480 * Tokens.errorCardMaxHeightRatio),
+        );
+        expect(rect.bottom, lessThanOrEqualTo(480));
+        final raw = find.byWidgetPredicate(
+          (widget) => widget is SelectableText && widget.data == stack,
+        );
+        expect(
+          raw,
+          findsOneWidget,
+        ); // Full report unchanged, not a shortened view.
+        final scroll = find
+            .descendant(
+              of: find.byType(ErrorCard),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final position = tester.state<ScrollableState>(scroll).position;
+        expect(position.maxScrollExtent, greaterThan(0));
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pump();
+        final editable = find.descendant(
+          of: raw,
+          matching: find.byType(EditableText),
+        );
+        final render = tester.state<EditableTextState>(editable).renderEditable;
+        final boxes = render.getBoxesForSelection(
+          TextSelection(
+            baseOffset: stack.length - 1,
+            extentOffset: stack.length,
+          ),
+        );
+        expect(boxes, isNotEmpty);
+        final viewport = tester.getRect(scroll);
+        for (final box in boxes) {
+          final end = box.toRect().shift(render.localToGlobal(Offset.zero));
+          expect(end.top, greaterThanOrEqualTo(viewport.top));
+          expect(end.bottom, lessThanOrEqualTo(viewport.bottom));
+          expect(end.bottom, lessThanOrEqualTo(480));
+        }
+        // The existing whole-card scroll includes its header: return to the top
+        // to reach actions after reading the diagnostic tail (not fixed chrome).
+        position.jumpTo(0);
+        await tester.pump();
+        for (final action in ['copy', 'open-log', 'close']) {
+          expect(
+            find.byKey(ValueKey('error-card-$action')).hitTestable(),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
     testWidgets(
       'expanded card is width/height bounded and taps outside pass through',
       (tester) async {
@@ -402,7 +520,7 @@ void main() {
   }
 
   group('warning 严重级路由（D-02）', () {
-    testWidgets('warning head routes to OSD and advances exactly once', (
+    testWidgets('unclassified warning stays in card and closes exactly once', (
       tester,
     ) async {
       // Arrange：宿主就绪 + presentation/OSD 通知计数（恰好一次断言缝）。
@@ -420,11 +538,11 @@ void main() {
       );
       var osdShows = 0;
       void onOsdMessage() {
-        if (OsdService.I.message.value != null) osdShows++;
+        if (osd.message.value != null) osdShows++;
       }
 
-      OsdService.I.message.addListener(onOsdMessage);
-      addTearDown(() => OsdService.I.message.removeListener(onOsdMessage));
+      osd.message.addListener(onOsdMessage);
+      addTearDown(() => osd.message.removeListener(onOsdMessage));
 
       // Act：warning 成为队首（合成快照直接发布）。
       final warning = syntheticReport(
@@ -432,26 +550,33 @@ void main() {
         severity: ErrorSeverity.warning,
         eventId: 'warn-1',
       );
+      ErrorCaptureSnapshot.I.record(warning, ReportAcceptance.newReport);
       publishPresentation(warning);
       await tester.pump();
 
-      // Assert：OSD 收到提示（warning 图标）、卡片不显示该 warning。
-      expect(osdShows, 1);
-      expect(OsdService.I.message.value?.text, '降级警告');
-      expect(OsdService.I.message.value?.icon, Icons.warning_amber_outlined);
-      expect(find.byType(ErrorCard), findsNothing);
-
-      // Assert：队列恰好推进一次 —— 发布(1) + dismissCurrent 推进(2)。
-      expect(presentationChanges, 2);
+      // Unclassified warnings retain actual details, not an invented OSD summary.
+      expect(osdShows, 0);
+      expect(find.text('降级警告'), findsOneWidget);
+      expect(find.byType(ErrorCard), findsOneWidget);
+      expect(ErrorCaptureSnapshot.I.reports.value.single, same(warning));
+      expect(presentationChanges, 1);
 
       // Act：重复触发（同 eventId 新快照实例 —— 模拟去重合并后的重发布 /
       // 相位守卫双回调以同一终值调用 _apply 的场景）。
       publishPresentation(warning);
       await tester.pump();
 
-      // Assert：无二次提示、无二次 dismiss（无重建循环，T-03-09）。
-      expect(osdShows, 1);
-      expect(presentationChanges, 3); // 重复发布本身 +1，守卫后无推进
+      // Repeated presentation does not consume any head or duplicate history.
+      expect(osdShows, 0);
+      expect(presentationChanges, 2);
+      expect(ErrorCaptureSnapshot.I.reports.value, hasLength(1));
+      await tester.pump(const Duration(seconds: 5));
+      expect(find.text('降级警告'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('error-card-close')));
+      await tester.pump();
+      expect(presentationChanges, 3); // One explicit manual advance only.
+      expect(ErrorCaptureSnapshot.I.reports.value, isEmpty);
+      expect(find.byType(ErrorCard), findsNothing);
 
       // Act / Assert：warning 分流后下一 error 正常上卡。
       ErrorReporterImpl.I.reportBootstrapSafely(
@@ -845,8 +970,11 @@ void main() {
   group('open-log 宿主接线与失败隔离（E97）', () {
     // 推进 OSD hold 计时器（osdDefaultHoldMs=1200）：OsdService 是全局
     // 单例，show() 会启动 hide Timer —— 不推进会遗留 pending timer。
-    Future<void> settleOsdTimer(WidgetTester tester) =>
-        tester.pump(const Duration(seconds: 2));
+    Future<void> settleOsdTimer(WidgetTester tester) async {
+      // Explicit fixture cleanup, not a fabricated longer lifetime assertion.
+      osd.hide();
+      await tester.pump();
+    }
 
     testWidgets(
       'open-log passes diagnosticLogPath value to the seam and shows opened OSD',
@@ -863,6 +991,7 @@ void main() {
         await tester.pumpWidget(
           buildHostHarness(
             ErrorCardHost(
+              osdService: osd,
               logExplorer: (path) async {
                 seamCalls.add(path);
               },
@@ -884,8 +1013,9 @@ void main() {
         // Assert：缝收到的唯一实参逐字符等于 diagnosticLogPath.value
         // （取值同源）；成功反馈 OSD「已打开日志位置」。
         expect(seamCalls, ['C:/logs/diag.txt']);
-        expect(OsdService.I.message.value?.text, '已打开日志位置');
-        expect(OsdService.I.message.value?.icon, Icons.folder_open);
+        expect(osd.message.value?.text, '已打开日志位置');
+        expect(osd.message.value?.icon, Icons.folder_open);
+        expect(osd.message.value?.priority, OsdPriority.success);
 
         await settleOsdTimer(tester);
       },
@@ -900,6 +1030,7 @@ void main() {
         await tester.pumpWidget(
           buildHostHarness(
             ErrorCardHost(
+              osdService: osd,
               logExplorer: (path) async {
                 seamCalls.add(path);
               },
@@ -920,8 +1051,9 @@ void main() {
 
         // Assert：缝零调用；降级 OSD（复用既有 errorCardLogUnavailable key）。
         expect(seamCalls, isEmpty);
-        expect(OsdService.I.message.value?.text, '日志文件不可用');
-        expect(OsdService.I.message.value?.icon, Icons.info_outline);
+        expect(osd.message.value?.text, '日志文件不可用');
+        expect(osd.message.value?.icon, Icons.info_outline);
+        expect(osd.message.value?.priority, OsdPriority.warning);
 
         await settleOsdTimer(tester);
       },
@@ -941,6 +1073,7 @@ void main() {
         await tester.pumpWidget(
           buildHostHarness(
             ErrorCardHost(
+              osdService: osd,
               logExplorer: (path) async => throw const ProcessException(
                 'explorer.exe',
                 ['/select,', 'C:/logs/diag.txt'],
@@ -962,8 +1095,9 @@ void main() {
         await tester.pump();
 
         // Assert：失败反馈 OSD「打开日志失败」+ 卡片无恙 + 零未捕获异常。
-        expect(OsdService.I.message.value?.text, '打开日志失败');
-        expect(OsdService.I.message.value?.icon, Icons.error_outline);
+        expect(osd.message.value?.text, '打开日志失败');
+        expect(osd.message.value?.icon, Icons.error_outline);
+        expect(osd.message.value?.priority, OsdPriority.failure);
         expect(find.byType(ErrorCard), findsOneWidget);
         expect(find.text('Bad state: 打开日志隔离'), findsOneWidget);
         expect(tester.takeException(), isNull);

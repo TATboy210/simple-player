@@ -269,6 +269,15 @@ class Tokens {
   static const int osdFadeDurationMs = 200;
   static const int osdDefaultHoldMs = 1200;
 
+  /// Event-time holds: queued feedback never receives a fresh hold on promotion.
+  static const int osdSuccessHoldMs = 1600;
+  static const int osdWarningHoldMs = 4000;
+
+  /// Shared opaque secondary material, independent of primary glass radii.
+  static const double secondarySurfaceRadius = 12;
+  static const double osdProgressWidth = 160;
+  static const double osdProgressHeight = 4;
+
   /// OSD 迷你进度条背景轨道色
   static const Color osdTrackColor = Color(0x33FFFFFF);
 
