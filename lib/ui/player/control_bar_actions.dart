@@ -50,6 +50,9 @@ class ControlBarActions extends StatelessWidget {
             rate: vm.rate,
             onToggleMute: vm.onToggleMute,
             onSetVolume: vm.onSetVolume,
+            // 音量源身份键 — 从 VM 单向透传给 VolumeSlider.sourceKey,
+            // 键值来源单一(_controlsState 实例),装配层不自造键。
+            volumeSourceKey: vm.volumeSourceKey,
             onSetRate: vm.onSetRate,
             showSecondaryActions: mode.showsSecondaryActions,
             onInteractionStart: onInteractionStart,

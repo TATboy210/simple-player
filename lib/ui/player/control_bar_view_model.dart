@@ -29,6 +29,7 @@ class ControlBarViewModel {
     required this.onSetRate,
     this.onPreviousEntry,
     this.onNextEntry,
+    this.volumeSourceKey,
   });
 
   /// 播放中(驱动播放/暂停图标)。
@@ -71,6 +72,15 @@ class ControlBarViewModel {
 
   /// 设置音量(0-1)。
   final void Function(double v) onSetVolume;
+
+  /// 音量源身份键 — 跨 rebuild 稳定、随真实源替换而变。
+  ///
+  /// Volume source identity key: stable across rebuilds, changes only on a
+  /// real source replacement. 透传给 VolumeSlider.sourceKey 作源替换判定
+  /// (双信号取消设计之一);生产链以 PlayerControlsState 实例为键
+  /// (late final 保证身份恒定)。null = 未声明,滑条仅依赖 notifier
+  /// 实例身份检测源替换。
+  final Object? volumeSourceKey;
 
   /// 设置倍速。
   final void Function(double rate) onSetRate;

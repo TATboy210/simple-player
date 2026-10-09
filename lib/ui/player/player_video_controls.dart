@@ -868,6 +868,9 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     onSeekForward: widget.actions.onSeekForward ?? (_) {},
     onToggleMute: _controlsState.toggleMute,
     onSetVolume: _controlsState.setVolume,
+    // 音量源身份键 — _controlsState 为 late final,State 生命周期内身份
+    // 恒定,跨 rebuild 稳定;仅整体替换控件状态时才变(真实源替换)。
+    volumeSourceKey: _controlsState,
     onSetRate: _controlsState.setRate,
     // v0.0.5 队列步进 — null 时 CenterGroup 隐藏切曲按钮 (无协调器场景).
     onPreviousEntry: widget.actions.onPreviousEntry,

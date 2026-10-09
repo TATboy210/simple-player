@@ -21,6 +21,13 @@ class LeftButtonGroup extends StatelessWidget {
   final ValueListenable<double> rate;
   final VoidCallback onToggleMute;
   final void Function(double) onSetVolume;
+
+  /// 音量源身份键 — 透传给 [VolumeSlider.sourceKey] 供源替换判定。
+  ///
+  /// Volume source identity key: stable across rebuilds, changes only on a
+  /// real source replacement; null = 未声明(滑条仅靠 notifier 实例身份
+  /// 检测)。VolumeButton 无拖动态,不透传。
+  final Object? volumeSourceKey;
   final void Function(double) onSetRate;
   final bool showSecondaryActions;
 
@@ -39,6 +46,7 @@ class LeftButtonGroup extends StatelessWidget {
     this.showSecondaryActions = true,
     this.onInteractionStart,
     this.onInteractionEnd,
+    this.volumeSourceKey,
   });
 
   @override
@@ -58,6 +66,8 @@ class LeftButtonGroup extends StatelessWidget {
             onSetVolume: onSetVolume,
             onInteractionStart: onInteractionStart,
             onInteractionEnd: onInteractionEnd,
+            // 键值语义见本类 volumeSourceKey 字段注释 — 单向透传,不自造。
+            sourceKey: volumeSourceKey,
           ),
         if (showSecondaryActions) const SizedBox(width: Tokens.spXs),
         if (showSecondaryActions) SpeedButton(rate: rate, onSetRate: onSetRate),
