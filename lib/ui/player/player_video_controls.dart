@@ -889,6 +889,59 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 移除 (CenterGroup 由 isIdleListenable 单源驱动, 缓存后冻结无碍).
   Widget? _controlBarCache;
 
+  /// 控制栏 actions 包装缓存 — 源 [PlayerActions] identity → 焦点感知产物。
+  /// 与 [_controlBarCache] 同节奏失效：didUpdateWidget 按 actions identity
+  /// 判变置空 _controlBarCache 时，本缓存在下一次取用时因 identity 不匹配
+  /// 自然重建；identity 相同则直接复用，包装对象 identity 跨 build 稳定。
+  PlayerActions? _controlBarActionsSource;
+  PlayerActions? _controlBarActionsWrapped;
+
+  /// 焦点感知的控制栏 actions — 仅把 onOpenSettings 换成
+  /// [_handleSettingsEntry]，其余回调共享原实例字段。
+  ///
+  /// 原回调为 null 时不建包装（设置按钮本就不渲染，原样透传零行为差）；
+  /// workspace 为 null 的 legacy 独立控件场景同样恒透传原对象。
+  PlayerActions get _focusAwareControlBarActions {
+    final source = widget.actions;
+    if (source.onOpenSettings == null || widget.workspace == null) {
+      return source;
+    }
+    if (identical(_controlBarActionsSource, source)) {
+      return _controlBarActionsWrapped ?? source;
+    }
+    _controlBarActionsSource = source;
+    return _controlBarActionsWrapped = source.copyWith(
+      onOpenSettings: _handleSettingsEntry,
+    );
+  }
+
+  /// 设置按钮入口 — 打开方向透传原回调，关闭方向接入 registry 焦点归还链。
+  ///
+  /// 为什么：此前按钮的关闭方向经 `workspace.toggle` 快照直改，绕过
+  /// [WorkspaceFocusRegistry] 的 post-frame 焦点归还，面板卸载后焦点跌落
+  /// 路由死键区（仅剩 KeyboardHandler 全局兜底）；而标题 X 走
+  /// `_workspaceFocus.close(header)` 有完整归还链。本 handler 把关闭方向
+  /// 对齐同一调用形（header cause，逐字镜像面板 onClose 的既有调用），
+  /// 打开方向行为不变。GlassButton 指针点击不迁移焦点，关闭瞬间焦点仍在
+  /// 面板内 — 归还链命中 settings trigger，键盘用户立即可再聚焦有效控件。
+  /// 按压时才读取 [_workspaceFocus] 现值（本方法为 State 成员，不捕获旧
+  /// registry 实例），workspace 替换后经 build 重建 registry 恒指向当前
+  /// route 的 registry。
+  void _handleSettingsEntry() {
+    final original = widget.actions.onOpenSettings;
+    if (original == null) return;
+    final workspace = widget.workspace;
+    if (workspace != null &&
+        workspace.value.isVisible(WorkspaceTaskIds.settings)) {
+      _workspaceFocus?.close(
+        WorkspaceTaskIds.settings,
+        WorkspaceCloseCause.header,
+      );
+      return;
+    }
+    original();
+  }
+
   /// seek 拖动包装 — 置位挂起信号并透传 auto-hide 原语义（拖动中冻结
   /// 隐藏计时）。瞬时 tap 的 start/end 同帧配对翻转由 Flutter 合帧消化。
   void _handleSeekStart() {
@@ -904,7 +957,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   Widget _buildControlBar() {
     final bar = _controlBarCache ??= ControlBar(
       vm: _controlBarViewModel,
-      actions: widget.actions,
+      actions: _focusAwareControlBarActions,
       isIdleListenable: _isIdleNotifier,
       titleListenable: widget.currentFileName,
       // 透明尾段停用 backdrop readback，但保留完整交互祖先链。
