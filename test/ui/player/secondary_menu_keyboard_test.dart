@@ -326,6 +326,105 @@ void main() {
     menu.cancel();
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+    'held arrow repeats walk enabled rows; activation repeats never reselect',
+    (tester) async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.build());
+      await tester.pumpAndSettle();
+      final menu = harness.open(tester);
+      await tester.pumpAndSettle();
+      // 激活键 KeyRepeat 防连发:结果 Future 在重复期间绝不完成。
+      var resultCompleted = false;
+      unawaited(menu.result.then((_) => resultCompleted = true));
+      // 行级 Focus 只带 focusNode/onFocusChange;但 MaterialApp/Navigator
+      // 层作用域在更外侧也装有 onKeyEvent,故不能用 singleWhere。菜单体
+      // Focus 是行 Focus 之上最近一个带 handler 的祖先——真实按键冒泡时
+      // 也恰是它先于外层作用域收到事件,故取 firstWhere。
+      final menuBodyFocus = tester
+          .widgetList<Focus>(
+            find.ancestor(of: find.text('First'), matching: find.byType(Focus)),
+          )
+          .firstWhere((focus) => focus.onKeyEvent != null);
+      // 沿本文件既有直调模式合成 KeyRepeatEvent,并断言每次返回均为
+      // handled —— 重复事件一律吞在菜单门禁,不泄漏给播放器 KeyboardHandler。
+      void sendRepeat(
+        LogicalKeyboardKey logical,
+        PhysicalKeyboardKey physical,
+      ) {
+        final result = menuBodyFocus.onKeyEvent?.call(
+          FocusManager.instance.primaryFocus ?? FocusManager.instance.rootScope,
+          KeyRepeatEvent(
+            physicalKey: physical,
+            logicalKey: logical,
+            timeStamp: Duration.zero,
+          ),
+        );
+        expect(
+          result,
+          KeyEventResult.handled,
+          reason: '$logical repeat must stay swallowed inside the menu',
+        );
+      }
+
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'owned-menu-First',
+      );
+      // 长按 ↓:First → Last(跳过 Disabled)→ First(环绕)。
+      sendRepeat(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'owned-menu-Last',
+        reason: 'repeat moves down and skips the disabled row',
+      );
+      sendRepeat(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'owned-menu-First',
+        reason: 'repeat wraps from last back to first',
+      );
+      // 长按 ↑:First → Last(逆向环绕,同样跳过 Disabled)。
+      sendRepeat(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'owned-menu-Last',
+        reason: 'reverse repeat wraps from first to last',
+      );
+      sendRepeat(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.debugLabel,
+        'owned-menu-First',
+        reason: 'reverse repeat also skips the disabled row',
+      );
+      // 真实 KeyDown 移到 Last,作为激活键防连发断言的落点。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'owned-menu-Last');
+      // 按住激活键:Enter/Space/numpadEnter 的 KeyRepeat 全部在门禁吞掉,
+      // 菜单保持打开、结果 Future 不完成,select() 只能被 KeyDown 触达。
+      sendRepeat(LogicalKeyboardKey.enter, PhysicalKeyboardKey.enter);
+      sendRepeat(LogicalKeyboardKey.space, PhysicalKeyboardKey.space);
+      sendRepeat(
+        LogicalKeyboardKey.numpadEnter,
+        PhysicalKeyboardKey.numpadEnter,
+      );
+      await tester.pump();
+      expect(menu.route.isCurrent, isTrue);
+      expect(resultCompleted, isFalse, reason: 'repeat never selects');
+      // 激活由真实 KeyDown 单发触发:一次 Enter 即以 'last' 关闭菜单。
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect((await menu.result)?.value, 'last');
+      expect(harness.playerCalls, 0);
+    },
+  );
 }
 
 const _playerKeys = [
