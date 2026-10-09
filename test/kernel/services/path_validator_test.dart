@@ -47,6 +47,34 @@ void main() {
       });
     });
 
+    // N1: isUrl 对 scheme 前缀做大小写不敏感比较 — Windows 用户直觉全系统
+    // 大小写不敏感, `HTTP://HOST/v.mp4` 不再被误判本地文件拒为
+    // "不支持的文件类型"。白名单集合本身不变, 仅输入侧折叠大小写。
+    group('isUrl scheme case-insensitive matching (N1)', () {
+      test('recognises uppercase and mixed-case scheme prefixes', () {
+        expect(PathValidator.isUrl('HTTP://example.com/v.mp4'), true);
+        expect(PathValidator.isUrl('HTTPS://example.com/stream'), true);
+        expect(PathValidator.isUrl('RtSp://192.168.1.1/s'), true);
+      });
+
+      test('keeps all 7 lowercase schemes recognised (regression)', () {
+        expect(PathValidator.isUrl('http://example.com/v.mp4'), true);
+        expect(PathValidator.isUrl('https://example.com/stream'), true);
+        expect(PathValidator.isUrl('rtmp://live.example.com'), true);
+        expect(PathValidator.isUrl('rtsp://192.168.1.1/stream'), true);
+        expect(PathValidator.isUrl('srt://192.168.1.1:9000'), true);
+        expect(PathValidator.isUrl('udp://example.com:1234'), true);
+        expect(PathValidator.isUrl('tcp://example.com:1234'), true);
+      });
+
+      test('stays fail-closed: unknown scheme and scheme whitespace', () {
+        // 未知 scheme 不进 URL 分支 — 大小写折叠不得放宽接受集
+        expect(PathValidator.isUrl('FTP://host/v'), false);
+        // scheme 后空白不算前缀 — 折叠后仍非 'http://' 前缀
+        expect(PathValidator.isUrl('HTTP ://x/v'), false);
+      });
+    });
+
     group('isPathTraversal', () {
       test('detects null byte', () {
         expect(PathValidator.isPathTraversal('/safe\x00/path'), true);
@@ -111,6 +139,19 @@ void main() {
 
       test('rejects HTTP URL without authority', () {
         expect(PathValidator.validate('http:///path'), isNotNull);
+      });
+
+      // N1: validate 内层 http/https 结构化门与 isUrl 同步大小写不敏感 —
+      // 否则大写 HTTP URL 通过 isUrl 却跳过 Uri authority 校验, 形成放行
+      // `HTTP://`(无 authority) 的 fail-open 缺口。
+      test('accepts uppercase HTTP URL (case + trim combined)', () {
+        expect(PathValidator.validate('HTTP://example.com/v.mp4'), isNull);
+        expect(PathValidator.validate('  HTTP://example.com/v.mp4  '), isNull);
+      });
+
+      test('still rejects malformed uppercase HTTP URL (fail-closed)', () {
+        expect(PathValidator.validate('HTTP://'), isNotNull);
+        expect(PathValidator.validate('HTTP:///path'), isNotNull);
       });
     });
 
