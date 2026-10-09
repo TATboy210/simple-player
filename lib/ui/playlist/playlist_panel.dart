@@ -480,13 +480,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   /// Freeze target identities and wording before yielding to the user's choice.
   Future<PendingPlaylistConfirmation?> _confirmTargets(Set<int> indices) async {
     if (!widget.visible || !mounted) return null;
+    // message 改为回调形态 — 文案计数由冻结后的 targetCount 求值 (H3:
+    // 重复条目不再被丢弃, 计数与实际可删目标一致)。
     final pending = PendingPlaylistConfirmation(
-      message: AppLocalizations.of(context)
-          .batchDeleteConfirmBody(indices.length),
+      message: (count) =>
+          AppLocalizations.of(context).batchDeleteConfirmBody(count),
       entries: widget.entries.value,
       indices: indices,
     );
-    if (pending.targets.isEmpty) return null;
+    if (pending.isEmpty) return null;
     _finishConfirmation(false, rebuild: false);
     setState(() => _confirmation = pending);
     final confirmed = await pending.result;
