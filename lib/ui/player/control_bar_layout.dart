@@ -165,9 +165,9 @@ class _BarArrowNavScope extends StatelessWidget {
         // 搜索边界是整个 route scope,且嵌套 group 下几何搜索会回退到
         // 焦点路径祖先节点(requestFocus 到祖先 scope 后,后续方向键绕过
         // 本层直接触发全局 seek — 实测坑)。
-        final nodes = FocusScope.of(
-          context,
-        ).traversalDescendants.where((n) => n.canRequestFocus).toList();
+        final nodes = FocusScope.of(context).traversalDescendants
+            .where((n) => n.canRequestFocus)
+            .toList();
         final idx = nodes.indexOf(current);
         if (idx < 0) return KeyEventResult.handled;
         final nextIdx = idx + (dir == TraversalDirection.right ? 1 : -1);

@@ -92,8 +92,10 @@ void main() {
       // 第一代: 损坏 → 隔离
       await File('${tempDir.path}/playlist.json').writeAsString(brokenOne);
       expect(await store.load(), isNull);
-      expect(await File('${tempDir.path}/playlist.json.corrupt').readAsString(),
-          brokenOne);
+      expect(
+        await File('${tempDir.path}/playlist.json.corrupt').readAsString(),
+        brokenOne,
+      );
 
       // 第二代: 不同损坏内容 → 旧 .corrupt 被覆盖 (单系统调用 rename 替换)
       await File('${tempDir.path}/playlist.json').writeAsString(brokenTwo);
@@ -133,8 +135,11 @@ void main() {
       final loaded = await _storeFor(tempDir).load();
 
       expect(loaded, isNull);
-      expect(File('${tempDir.path}/playlist.json.corrupt').existsSync(),
-          isFalse, reason: '无文件时不得凭空制造检疫文件');
+      expect(
+        File('${tempDir.path}/playlist.json.corrupt').existsSync(),
+        isFalse,
+        reason: '无文件时不得凭空制造检疫文件',
+      );
     });
   });
 
@@ -155,8 +160,10 @@ void main() {
       final after = await File('${tempDir.path}/playlist.json').readAsString();
       expect(after, before, reason: '失败仅记日志, 历史文件字节不变');
       final loaded = await goodStore.load();
-      expect(loaded!.items.map((e) => e.path), ['D:/a.mp4', 'D:/b.mp4'],
-          reason: '历史快照仍完整可 load');
+      expect(loaded!.items.map((e) => e.path), [
+        'D:/a.mp4',
+        'D:/b.mp4',
+      ], reason: '历史快照仍完整可 load');
     });
 
     test('写中断残留 — load 无视 .part, save 后残留被清扫且目标完整', () async {
@@ -178,14 +185,13 @@ void main() {
       await store.save(_snapshot(paths: ['D:/c.mp4']));
       final loadedB = await store.load();
       expect(loadedB!.items.map((e) => e.path), ['D:/c.mp4']);
-      expect(
-        part.existsSync(),
-        isFalse,
-        reason: '崩溃 .part 残留应被成功发布后的清扫删除',
-      );
+      expect(part.existsSync(), isFalse, reason: '崩溃 .part 残留应被成功发布后的清扫删除');
       final raw = await File('${tempDir.path}/playlist.json').readAsString();
-      expect(jsonDecode(raw), isA<Map<String, dynamic>>(),
-          reason: 'playlist.json 任何时刻都是完整 JSON');
+      expect(
+        jsonDecode(raw),
+        isA<Map<String, dynamic>>(),
+        reason: 'playlist.json 任何时刻都是完整 JSON',
+      );
     });
 
     test('schema 红线锁 — save 后顶层键集合与值符合 v3 契约', () async {
@@ -197,11 +203,14 @@ void main() {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
 
       // 顶层键集合精确锁定 — 序列化构造不得因原子写改造而变化
-      expect(
-        decoded.keys.toSet(),
-        {'version', 'playMode', 'sortKey', 'sortAscending', 'lastPlayedPath',
-         'items'},
-      );
+      expect(decoded.keys.toSet(), {
+        'version',
+        'playMode',
+        'sortKey',
+        'sortAscending',
+        'lastPlayedPath',
+        'items',
+      });
       expect(decoded['version'], 3);
       expect(decoded['playMode'], 'loopAll');
       expect(decoded['sortKey'], 'addedOrder');

@@ -215,7 +215,8 @@ class PlaylistStore {
   Future<void> _publishAtomic(Directory directory, String contents) async {
     final target = File('${directory.path}/$_fileName');
     // temp 唯一后缀 — microseconds + 进程内计数器（§30.5, M1）.
-    final suffix = '${DateTime.now().microsecondsSinceEpoch}-${++_writeCounter}';
+    final suffix =
+        '${DateTime.now().microsecondsSinceEpoch}-${++_writeCounter}';
     final temp = File('${target.path}.$suffix.part');
     try {
       // flush 是崩溃安全的前提 — 数据确实落盘后 rename 替换才有意义.

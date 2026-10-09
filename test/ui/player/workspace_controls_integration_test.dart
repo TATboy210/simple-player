@@ -594,10 +594,7 @@ void main() {
 
     // 焦点已到音量滑条(volume-slider) — 此后 ←→ 归滑条自身(键盘调节,
     // U3 语义),不再经控制栏组移动;这正是"键随焦点"的预期形态。
-    expect(
-      FocusManager.instance.primaryFocus!.debugLabel,
-      'volume-slider',
-    );
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'volume-slider');
     expect(playerCalls, 0);
 
     // Space 在按钮上激活按钮而非播放/暂停 — ActivateIntent 本地消费,

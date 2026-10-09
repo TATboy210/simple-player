@@ -46,18 +46,20 @@ void main() {
       expect(pending.resolve([a, a, b]), <int>{0});
     });
 
-    test('resolve falls back to the unique (path, addedSeq) match after shift',
-        () {
-      final a = PlaylistItem(path: 'a.mp4');
-      final b = PlaylistItem(path: 'b.mp4');
-      final pending = PendingPlaylistConfirmation(
-        message: (count) => 'remove $count',
-        entries: [a, b],
-        indices: {0},
-      );
-      // 列表移位后冻结位失效, (path, addedSeq) 恰好唯一命中 → 回退取之。
-      expect(pending.resolve([b, a]), <int>{1});
-    });
+    test(
+      'resolve falls back to the unique (path, addedSeq) match after shift',
+      () {
+        final a = PlaylistItem(path: 'a.mp4');
+        final b = PlaylistItem(path: 'b.mp4');
+        final pending = PendingPlaylistConfirmation(
+          message: (count) => 'remove $count',
+          entries: [a, b],
+          indices: {0},
+        );
+        // 列表移位后冻结位失效, (path, addedSeq) 恰好唯一命中 → 回退取之。
+        expect(pending.resolve([b, a]), <int>{1});
+      },
+    );
 
     test('resolve skips a vanished target', () {
       final a = PlaylistItem(path: 'a.mp4');
