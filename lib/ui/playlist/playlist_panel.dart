@@ -241,16 +241,24 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     // widget 树零重建 (与控制栏完全一致, v0.0.5 方案 A).
     // IgnorePointer 锚定 widget.visible (而非动画状态): 关闭瞬间立即让出
     // 命中, 根治"面板渐退中还能虚空点击条目触发播放"的竞态.
+    // ExcludeFocus 与 IgnorePointer 并列 (v0.0.12 U1, 对照
+    // settings_panel.dart:422 同款写法): 面板常驻挂载, 关闭态若只挡指针
+    // 不挡焦点, Tab 遍历仍可落入不可见的 tile 触发器/排序/模式/关闭按钮,
+    // Space/Enter 产生"幽灵动作"(播放条目/切播放模式/关面板 — 均为持久
+    // 状态副作用). excluding 只随 visible 翻转 — 打开态焦点行为零变化.
     return SecondarySurfaceOwner(
       visible: widget.visible,
-      child: IgnorePointer(
-        ignoring: !widget.visible,
-        child: RepaintBoundary(
-          child: FadeTransition(
-            opacity: _fade,
-            child: SizedBox(
-              width: PlaylistPanel.panelWidth,
-              child: _buildShell(context),
+      child: ExcludeFocus(
+        excluding: !widget.visible,
+        child: IgnorePointer(
+          ignoring: !widget.visible,
+          child: RepaintBoundary(
+            child: FadeTransition(
+              opacity: _fade,
+              child: SizedBox(
+                width: PlaylistPanel.panelWidth,
+                child: _buildShell(context),
+              ),
             ),
           ),
         ),

@@ -960,7 +960,8 @@ void main() {
       expect(
         isFocusInsidePanel(),
         isFalse,
-        reason: '关闭面板必须排除出焦点遍历(ExcludeFocus) — '
+        reason:
+            '关闭面板必须排除出焦点遍历(ExcludeFocus) — '
             'Tab 落入不可见控件即幽灵焦点',
       );
     });
