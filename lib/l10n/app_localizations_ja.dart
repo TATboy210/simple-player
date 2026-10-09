@@ -726,4 +726,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get batchDeleteConfirmAction => '削除を確定';
+
+  @override
+  String get playlistEntriesGone => '項目はすでにリストにありません';
 }

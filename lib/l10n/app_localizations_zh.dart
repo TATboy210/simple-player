@@ -725,4 +725,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get batchDeleteConfirmAction => '确认删除';
+
+  @override
+  String get playlistEntriesGone => '条目已不在列表中';
 }

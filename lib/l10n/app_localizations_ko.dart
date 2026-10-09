@@ -726,4 +726,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get batchDeleteConfirmAction => '삭제 확인';
+
+  @override
+  String get playlistEntriesGone => '항목이 더 이상 목록에 없습니다';
 }

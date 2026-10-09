@@ -243,5 +243,6 @@
       }
     }
   },
-  "batchDeleteConfirmAction": "削除を確定"
+  "batchDeleteConfirmAction": "削除を確定",
+  "playlistEntriesGone": "項目はすでにリストにありません"
 }

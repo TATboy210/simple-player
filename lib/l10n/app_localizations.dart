@@ -1469,6 +1469,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm deletion'**
   String get batchDeleteConfirmAction;
+
+  /// Neutral OSD hint shown when every confirmed deletion target has already vanished from the queue before the user confirmed
+  ///
+  /// In en, this message translates to:
+  /// **'Entries are no longer in the playlist'**
+  String get playlistEntriesGone;
 }
 
 class _AppLocalizationsDelegate

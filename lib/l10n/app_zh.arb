@@ -243,5 +243,6 @@
       }
     }
   },
-  "batchDeleteConfirmAction": "确认删除"
+  "batchDeleteConfirmAction": "确认删除",
+  "playlistEntriesGone": "条目已不在列表中"
 }

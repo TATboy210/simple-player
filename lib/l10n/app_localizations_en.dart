@@ -732,4 +732,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchDeleteConfirmAction => 'Confirm deletion';
+
+  @override
+  String get playlistEntriesGone => 'Entries are no longer in the playlist';
 }

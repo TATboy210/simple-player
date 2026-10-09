@@ -243,5 +243,6 @@
       }
     }
   },
-  "batchDeleteConfirmAction": "삭제 확인"
+  "batchDeleteConfirmAction": "삭제 확인",
+  "playlistEntriesGone": "항목이 더 이상 목록에 없습니다"
 }

@@ -952,5 +952,9 @@
       }
     }
   },
-  "batchDeleteConfirmAction": "Confirm deletion"
+  "batchDeleteConfirmAction": "Confirm deletion",
+  "playlistEntriesGone": "Entries are no longer in the playlist",
+  "@playlistEntriesGone": {
+    "description": "Neutral OSD hint shown when every confirmed deletion target has already vanished from the queue before the user confirmed"
+  }
 }
