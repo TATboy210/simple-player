@@ -352,91 +352,99 @@ void main() {
     );
   }
 
-  testWidgets('control-bar settings button close restores focus through registry', (
-    tester,
-  ) async {
-    final engine = FakeEngine()..state.value = MediaState.playing;
-    final video = FakeVideoControlsPort(
-      player: FakePlayerControls(isPlayingNow: true),
-    );
-    final workspace = PanelWorkspaceController()..toggle('settings');
-    final title = ValueNotifier('a.mp4');
-    final mode = ValueNotifier(WindowMode.windowed);
-    final session = SettingsPanelSession();
-    addTearDown(engine.dispose);
-    addTearDown(video.dispose);
-    addTearDown(workspace.dispose);
-    addTearDown(title.dispose);
-    addTearDown(mode.dispose);
-    addTearDown(session.dispose);
-    // 生产接线镜像 (player_screen.dart:205): 按钮回调即 workspace.toggle;
-    // settingsVisible 传 null — workspace 是显隐唯一权威。
-    await tester.binding.setSurfaceSize(const Size(854, 480));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: PlayerVideoControls(
-            video: video,
-            engine: engine,
-            actions: PlayerActions(
-              onOpenSettings: () => workspace.toggle(WorkspaceTaskIds.settings),
+  testWidgets(
+    'control-bar settings button close restores focus through registry',
+    (tester) async {
+      final engine = FakeEngine()..state.value = MediaState.playing;
+      final video = FakeVideoControlsPort(
+        player: FakePlayerControls(isPlayingNow: true),
+      );
+      final workspace = PanelWorkspaceController()..toggle('settings');
+      final title = ValueNotifier('a.mp4');
+      final mode = ValueNotifier(WindowMode.windowed);
+      final session = SettingsPanelSession();
+      addTearDown(engine.dispose);
+      addTearDown(video.dispose);
+      addTearDown(workspace.dispose);
+      addTearDown(title.dispose);
+      addTearDown(mode.dispose);
+      addTearDown(session.dispose);
+      // 生产接线镜像 (player_screen.dart:205): 按钮回调即 workspace.toggle;
+      // settingsVisible 传 null — workspace 是显隐唯一权威。
+      await tester.binding.setSurfaceSize(const Size(854, 480));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: PlayerVideoControls(
+              video: video,
+              engine: engine,
+              actions: PlayerActions(
+                onOpenSettings: () =>
+                    workspace.toggle(WorkspaceTaskIds.settings),
+              ),
+              currentFileName: title,
+              windowMode: mode,
+              settingsVisible: null,
+              workspace: workspace,
+              settingsSession: session,
             ),
-            currentFileName: title,
-            windowMode: mode,
-            settingsVisible: null,
-            workspace: workspace,
-            settingsSession: session,
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    // (1) 前置条件 — 焦点先安置进设置面板 task scope。
-    final registry = WorkspaceFocusScope.maybeOf(
-      tester.element(find.byType(SettingsPanel)),
-    );
-    expect(registry, isNotNull, reason: 'workspace host must expose registry');
-    final taskScope = registry?.tasks[WorkspaceTaskIds.settings];
-    expect(taskScope, isNotNull, reason: 'settings task scope registered');
-    taskScope?.requestFocus();
-    await tester.pump();
-    // FocusScopeNode.requestFocus() 在 scope 已有 focusedChild 时会下放
-    // 给 focusedChild(面板 initState 自动聚焦过 SettingsPanel 节点) —
-    // 故"焦点在面板内"的判据是 primaryFocus 为 task scope 本身或其后代。
-    final primary = FocusManager.instance.primaryFocus;
-    final insidePanel =
-        primary != null &&
-        (identical(primary, taskScope) || primary.ancestors.contains(taskScope));
-    expect(
-      insidePanel,
-      isTrue,
-      reason: 'precondition: focus lives inside the settings task scope',
-    );
-    // (2) 经控制栏设置按钮触发 toggle 关闭方向。
-    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.settings_outlined));
-    await tester.pumpAndSettle();
-    // (3) 关闭方向 — 快照已关, 焦点须归还 settings trigger(有效控件);
-    // 修复前快照直改无归还, 焦点跌落路由 scope, 此断言必失败 (RED)。
-    expect(workspace.value.hasTasks, isFalse);
-    final restored = FocusManager.instance.primaryFocus;
-    expect(
-      identical(restored, registry?.triggers[WorkspaceTaskIds.settings]),
-      isTrue,
-      reason: 'button-close must restore focus to the settings trigger, '
-          'not strand it on the route dead-key scope',
-    );
-    expect(restored?.context, isNotNull);
-    expect(restored?.canRequestFocus, isTrue);
-    // (4) 打开方向回归 — 同一按钮再按一次, 面板重开, 显隐路径未变。
-    await tester.tap(find.byIcon(Icons.settings_outlined));
-    await tester.pumpAndSettle();
-    expect(workspace.value.center, WorkspaceTaskIds.settings);
-  });
+      );
+      await tester.pumpAndSettle();
+      // (1) 前置条件 — 焦点先安置进设置面板 task scope。
+      final registry = WorkspaceFocusScope.maybeOf(
+        tester.element(find.byType(SettingsPanel)),
+      );
+      expect(
+        registry,
+        isNotNull,
+        reason: 'workspace host must expose registry',
+      );
+      final taskScope = registry?.tasks[WorkspaceTaskIds.settings];
+      expect(taskScope, isNotNull, reason: 'settings task scope registered');
+      taskScope?.requestFocus();
+      await tester.pump();
+      // FocusScopeNode.requestFocus() 在 scope 已有 focusedChild 时会下放
+      // 给 focusedChild(面板 initState 自动聚焦过 SettingsPanel 节点) —
+      // 故"焦点在面板内"的判据是 primaryFocus 为 task scope 本身或其后代。
+      final primary = FocusManager.instance.primaryFocus;
+      final insidePanel =
+          primary != null &&
+          (identical(primary, taskScope) ||
+              primary.ancestors.contains(taskScope));
+      expect(
+        insidePanel,
+        isTrue,
+        reason: 'precondition: focus lives inside the settings task scope',
+      );
+      // (2) 经控制栏设置按钮触发 toggle 关闭方向。
+      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.pumpAndSettle();
+      // (3) 关闭方向 — 快照已关, 焦点须归还 settings trigger(有效控件);
+      // 修复前快照直改无归还, 焦点跌落路由 scope, 此断言必失败 (RED)。
+      expect(workspace.value.hasTasks, isFalse);
+      final restored = FocusManager.instance.primaryFocus;
+      expect(
+        identical(restored, registry?.triggers[WorkspaceTaskIds.settings]),
+        isTrue,
+        reason:
+            'button-close must restore focus to the settings trigger, '
+            'not strand it on the route dead-key scope',
+      );
+      expect(restored?.context, isNotNull);
+      expect(restored?.canRequestFocus, isTrue);
+      // (4) 打开方向回归 — 同一按钮再按一次, 面板重开, 显隐路径未变。
+      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.pumpAndSettle();
+      expect(workspace.value.center, WorkspaceTaskIds.settings);
+    },
+  );
 
   testWidgets(
     'actual language ESC preserves owned route but unrelated dialog dismisses',
