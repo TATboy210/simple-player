@@ -1442,14 +1442,19 @@ class MediaKitEngine implements MediaEngine {
 
   /// 本地文件路径 → media_kit [Media] URI.
   /// `D:\video.mp4` → `file:///D:/video.mp4`; http/https/rtsp/file URL 原样返回.
+  ///
+  /// 用 [Uri.file] 而非手工拼接: media_kit [Media] 构造会经 Uri.parse/
+  /// normalizeURI 二次解析, 手工拼接的裸 `#`/`%XX` 被误切 fragment/误解码 —
+  /// 文件名含这些字符时必然打不开 (v0.0.12 K1); Uri.file 自动百分号编码,
+  /// Windows 盘符/反斜杠由其正确处理. `windows: true` 显式锁定 Windows
+  /// 语义 — 引擎映射与宿主 OS 无关, CI 三平台行为一致.
   @visibleForTesting
   static String mediaUriFromPath(String path) {
     const schemes = <String>['http://', 'https://', 'rtsp://', 'file://'];
     for (final s in schemes) {
       if (path.startsWith(s)) return path;
     }
-    // Windows 反斜杠 → 正斜杠, 加 file:/// 前缀 (空 host + 绝对路径).
-    return 'file:///${path.replaceAll('\\', '/')}';
+    return Uri.file(path, windows: true).toString();
   }
 
   /// media_kit [Media] URI → 本地文件路径 ([mediaUriFromPath] 的对称反解).
