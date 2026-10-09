@@ -414,5 +414,53 @@ void main() {
         }
       }
     });
+
+    // 261009-roy S3/F16 — Error 族 catch 面防御: isolate 运行器抛 Error
+    // (非 Exception, 如绑定解析 ArgumentError / StateError) 时不得沿
+    // _runCleanup 上抛 (经 unawaited(scheduleCleanup()) 会变成未处理异步
+    // 异常), 须照 :444-463 既有降级模式回落内联清理.
+    test('isolate runner throws Error — degrades to inline, no crash, '
+        'thumbnail still usable', () async {
+      final dir = await Directory.systemTemp.createTemp('pthumb_error_fb');
+      try {
+        // Inject isolateRunner that throws Error (non-Exception)
+        final cache = ThumbnailDiskCache(
+          resolveDirectory: () async => dir,
+          now: DateTime.now,
+          isolateRunner: (task) async =>
+              throw StateError('test: isolate Error'),
+        );
+
+        final stale = await seedFile(dir, 'stale.part', [1, 2, 3]);
+        await stale.setLastModified(
+          DateTime.now().subtract(const Duration(hours: 2)),
+        );
+        final validKey = hexKey('dc');
+        final validJpg = await seedFile(dir, '$validKey.jpg', makeJpegBytes());
+
+        // 现行为: StateError 沿 _runCleanup 上抛 → await 抛错 (RED)
+        await cache.scheduleCleanup();
+
+        // 降级: 内联回落仍执行清理 — stale .part 已删, valid .jpg 保留
+        expect(await stale.exists(), isFalse);
+        expect(await validJpg.exists(), isTrue);
+
+        // 清理降级后缩略图功能仍可用 — write/read 正常往返
+        final key = hexKey('dd');
+        final written = await cache.write(
+          key,
+          makeJpegBytes(),
+          replaceExisting: false,
+        );
+        expect(written, isNotNull);
+        expect(await cache.read(key), isNotNull);
+      } finally {
+        try {
+          await dir.delete(recursive: true);
+        } on FileSystemException {
+          // best effort
+        }
+      }
+    });
   });
 }

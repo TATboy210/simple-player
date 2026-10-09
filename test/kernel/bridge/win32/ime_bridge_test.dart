@@ -242,4 +242,73 @@ void main() {
       expect(wparams, [1, 0], reason: 'enable 正常投递, disable 触发解析失败降级');
     });
   });
+
+  // 261009-roy S4/F17 — 未 init WR-02 探针防御: KernelLogger 未初始化且未
+  // 注入 logger 时, 桥公开入口降级安全 no-op, 绝不让 KernelLogger.I 的
+  // StateError 外溢（照 kernel_logger WR-02 先例 / media_kit_engine 与
+  // keyboard_handler 的 isInitialized 探针同族）。
+  group('Win32ImeBridge — 未 init WR-02 探针降级 (261009-roy S4/F17)', () {
+    setUp(() {
+      // 进入未 init 场景 — 现行为: 构造即抛 StateError → RED
+      KernelLoggerImpl.resetForTesting();
+    });
+
+    tearDown(() {
+      // 还原全局 init 态 — 文件级 setUpAll 只跑一次, 其余组依赖已 init 态
+      KernelLoggerImpl.resetForTesting();
+      KernelLoggerImpl.init();
+    });
+
+    test('未 init — enable 安全 false no-op, 不抛 StateError 且不触达 FFI', () {
+      var ffiTouched = false;
+      final bridge = Win32ImeBridge(
+        functions: Win32ImeFunctions(
+          findWindow: (_) {
+            ffiTouched = true;
+            return 0;
+          },
+          sendMessageTimeout: (_, _, _, _, _) {
+            ffiTouched = true;
+            return true;
+          },
+        ),
+      );
+
+      expect(bridge.enable(), isFalse);
+      expect(ffiTouched, isFalse, reason: '未 init 安全 no-op, 不得触达 FFI');
+    });
+
+    test('未 init — disable 同样安全 false no-op', () {
+      final bridge = Win32ImeBridge(
+        functions: Win32ImeFunctions(
+          findWindow: (_) => 0x1234,
+          sendMessageTimeout: (_, _, _, _, _) => true,
+        ),
+      );
+
+      expect(bridge.disable(), isFalse);
+    });
+
+    test('未 init — withImeRestored 直接透传 action 不抛（Windows）', () async {
+      var actionCalls = 0;
+      final result = await Win32ImeBridge.withImeRestored(() async {
+        actionCalls++;
+        return 'passthrough';
+      },
+      functions: Win32ImeFunctions(
+        findWindow: (_) => 0x1234,
+        sendMessageTimeout: (_, _, _, _, _) => true,
+      ));
+
+      expect(result, 'passthrough');
+      expect(actionCalls, 1, reason: '未 init 降级为纯透传, action 照跑一次');
+      // 非 Windows 由平台门先透传, 探针分支仅 Windows 可辨 — 与 group 3 同门
+    }, skip: !Platform.isWindows ? '非 Windows 由平台门透传' : null);
+
+    test('isInitialized 探针与 KernelLoggerImpl 初始态一致', () {
+      expect(Win32ImeBridge.isInitialized, isFalse);
+      KernelLoggerImpl.init();
+      expect(Win32ImeBridge.isInitialized, isTrue);
+    });
+  });
 }
