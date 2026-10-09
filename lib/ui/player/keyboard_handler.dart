@@ -154,7 +154,8 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
   /// HardwareKeyboard handler 先于 FocusManager 分发运行，故守卫必须放行
   /// 一切「焦点分发能自洽消费」的按键，否则会抢在 Slider/面板/对话框前面
   /// 吞键。守卫判定顺序：
-  /// 1. 仅 KeyDownEvent（与焦点路径一致，KeyUp/KeyRepeat 放行）；
+  /// 1. 仅 KeyDownEvent 与 ←/→ 的 KeyRepeatEvent（与焦点路径一致，KeyUp/
+  ///    其余键 KeyRepeat 放行）；
   /// 2. 文本编辑守卫：主焦点位于 EditableText 焦点链内 → 放行；
   ///    ⓘ 未来落地文本输入框时，须在获得焦点的回调里接
   ///    Win32ImeBridge.enable()（runner 已在窗口创建时解除 IMC — 见
@@ -170,7 +171,13 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
     // HardwareKeyboard invokes every registered handler, even after true.
     // Refuse player work without consuming the menu/foreign route's native keys.
     if (_isMenuOrCoveredRouteEvent(event)) return false;
-    if (event is! KeyDownEvent) return false;
+    // 长按连续 seek 是桌面播放器惯例:仅 ←/→ 的 KeyRepeat 放行进回退分发,
+    // 其余键(音量 ↑↓/Space/功能键)按住重复一律放行不接管,防连发误触
+    // (与共享分发门禁及 owned 菜单 U6 门禁 T-261009-fiw-01 同一白名单)。
+    // Held-key repeat: only ←/→ repeats reach the fallback dispatch; all
+    // other repeats pass unconsumed (mirror of the shared dispatch gate and
+    // the owned-menu precedent, T-261009-fiw-01).
+    if (event is! KeyDownEvent && !_isSeekRepeat(event)) return false;
 
     final primary = FocusManager.instance.primaryFocus;
     final bool isHelpKey =
@@ -242,12 +249,33 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
     return false;
   }
 
+  /// ←/→ 是否为 seek 键的 KeyRepeat —— 长按连发放行白名单。
+  ///
+  /// [isSeekRepeat] 只认 arrowLeft/arrowRight 的 `KeyRepeatEvent`：长按连续
+  /// seek 是桌面播放器惯例（VLC/mpv 同款）；音量 ↑↓、Space、功能键等其余键
+  /// 的按住重复一律不在此列，维持 KeyDown 单发防连发误触。对齐 owned 菜单
+  /// U6 门禁先例（T-261009-fiw-01：仅 ↑/↓ 放行，激活键吞掉）。
+  ///
+  /// Whether [event] is a KeyRepeat of the seek arrows — the held-key repeat
+  /// whitelist. Only ←/→ repeats qualify (desktop player convention);
+  /// volume/activation/other keys stay KeyDown-only, mirroring the owned-menu
+  /// gate precedent (T-261009-fiw-01).
+  static bool _isSeekRepeat(KeyEvent event) {
+    return event is KeyRepeatEvent &&
+        (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            event.logicalKey == LogicalKeyboardKey.arrowRight);
+  }
+
   /// 共享按键分发 —— 焦点路径与回退路径的**唯一**匹配实现，保证两路按键
   /// 语义永不漂移。返回 true 表示命中并已触发回调。
   bool _dispatchKeyEvent(KeyEvent event) {
     // Check before editable/help/custom/debug exceptions and every callback.
     if (_isMenuOrCoveredRouteEvent(event)) return false;
-    if (event is! KeyDownEvent) return false;
+    // 门禁与回退路径共用 [_isSeekRepeat] 白名单:仅 ←/→ 的 KeyRepeat 放行,
+    // 其余键按住重复一律在此吞掉(语义与焦点路径永不漂移)。
+    // Gate shares the [_isSeekRepeat] whitelist with the fallback path: only
+    // ←/→ repeats pass; every other held-key repeat is swallowed here.
+    if (event is! KeyDownEvent && !_isSeekRepeat(event)) return false;
 
     // 不拦截文本输入框的按键事件
     if (_isTextEditingFocused()) return false;

@@ -315,7 +315,20 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         ModalRoute.of(context)?.isCurrent == false) {
       return KeyEventResult.ignored;
     }
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    // 长按连续 seek 是桌面播放器惯例:仅 ←/→ 的 KeyRepeat 放行进分发;
+    // Space/F/音量 ↑↓ 等其余键按住重复一律忽略,防连发误触
+    // (对齐 KeyboardHandler 分发门禁与 owned 菜单 U6 先例 T-261009-fiw-01)。
+    // Held-key repeat: only ←/→ repeats drive seeking (desktop player
+    // convention); Space/F/volume and other keys stay KeyDown-only to avoid
+    // rapid-fire misfires (mirrors the KeyboardHandler gate and the
+    // owned-menu precedent, T-261009-fiw-01).
+    final isSeekRepeat =
+        event is KeyRepeatEvent &&
+        (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            event.logicalKey == LogicalKeyboardKey.arrowRight);
+    if (event is! KeyDownEvent && !isSeekRepeat) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.escape) {
       return _exitFullscreen()
