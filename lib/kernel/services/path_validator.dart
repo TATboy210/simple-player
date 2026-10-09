@@ -1,3 +1,5 @@
+import '../models/validation_error.dart';
+
 /// 路径安全校验工具 — 统一入口
 ///
 /// Centralised file-path validation: extension whitelist, path-traversal
@@ -7,6 +9,9 @@
 /// - All file-open entry points (FilePicker, drag-and-drop, history replay)
 ///   must pass through [validate] before reaching the engine.
 /// - Extension lists are lowercase, without leading dots.
+/// - [classify] 是五分支判定的单一实现；[validate] 只是
+///   classify + messageFor 的委托外观 — 不得另建第二套分支逻辑，
+///   保证判定与消息各有唯一真相源 (N2, T-261009fiy-02)。
 class PathValidator {
   PathValidator._();
 
@@ -114,6 +119,70 @@ class PathValidator {
     return false;
   }
 
+  /// 校验失败类别判定 — 五分支检查的单一实现 (N2)
+  ///
+  /// Classifies a validation failure for [path] after single-point trim,
+  /// returning the failure category, or `null` when the path is valid.
+  /// Branch order is the decision order of [validate] — callers must not
+  /// re-derive categories from the message string.
+  ///
+  /// 判定顺序与重构前 validate 逐分支恒同（空 → URL → 控制字符 →
+  /// 路径遍历 → 扩展名白名单），对一切输入的类别决定与 validate 的
+  /// accept/reject 决定一一对应（零漂移，T-261009fiy-02）。
+  static ValidationErrorType? classify(String path) {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) return ValidationErrorType.empty;
+    if (isUrl(trimmed)) {
+      // N1 语义继承: 门控对 trimmed 的小写形式做前缀比较，与 isUrl 的
+      // 大小写不敏感语义同步 — 大写 `HTTP://`(无 authority) 仍被判
+      // invalidUrl，不放行。
+      if (!_hasValidHttpAuthority(trimmed)) {
+        return ValidationErrorType.invalidUrl;
+      }
+      return null; // 其他协议（RTSP/RTMP/SRT/UDP/TCP）跳过
+    }
+    if (_hasControlCharacters(trimmed)) {
+      return ValidationErrorType.controlCharacters;
+    }
+    if (isPathTraversal(trimmed)) return ValidationErrorType.pathTraversal;
+    if (!isAllowedMedia(trimmed)) return ValidationErrorType.unsupportedFormat;
+    return null;
+  }
+
+  /// HTTP/HTTPS authority 结构化门 — classify 专用私有判定 (N2)
+  ///
+  /// Returns `true` when [path] is not an http/https URL (no authority
+  /// check applies), or when its Uri carries a non-empty host.
+  /// Mirrors the pre-refactor validate branch byte-for-byte:
+  /// `Uri.tryParse` 失败 / 无 authority / host 为空 都算无效。
+  static bool _hasValidHttpAuthority(String path) {
+    final lower = path.toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+      return true; // 非 http(s) scheme — 无需 authority 校验
+    }
+    final uri = Uri.tryParse(path);
+    return uri != null && uri.hasAuthority && uri.host.isNotEmpty;
+  }
+
+  /// 校验失败消息单一来源 — 按类别返回人类可读中文消息 (N2)
+  ///
+  /// Single source for the five validation messages. Text is byte-identical
+  /// to the pre-refactor [validate] output (消息内嵌 trim 后串);
+  /// drop_handler 校验门与 validationError 通知器依赖这些原文。
+  static String messageFor(ValidationErrorType type, String path) {
+    final trimmed = path.trim();
+    return switch (type) {
+      ValidationErrorType.empty => '路径为空',
+      ValidationErrorType.invalidUrl => 'URL 格式无效: $trimmed',
+      ValidationErrorType.controlCharacters => '路径包含非法控制字符: $trimmed',
+      ValidationErrorType.pathTraversal => '路径不安全: $trimmed',
+      ValidationErrorType.unsupportedFormat => '不支持的文件类型: $trimmed',
+      // classify 现不产生 invalidPath（文件系统层校验未接入）——穷举保留臂，
+      // 防未来追加类别时漏配文案。
+      ValidationErrorType.invalidPath => '路径无效: $trimmed',
+    };
+  }
+
   /// 完整校验：扩展名 + 路径遍历
   ///
   /// Runs the full validation pipeline: empty check, URL scheme validation
@@ -121,30 +190,13 @@ class PathValidator {
   /// path-traversal detection, and extension whitelist.
   ///
   /// Returns `null` when [path] is valid, or a human-readable error string.
+  /// 委托实现：switch (classify) + messageFor — 对外签名与消息文本不变，
+  /// accept/reject 决定逐输入恒同（单一真相源，N2 重构）。
   static String? validate(String path) {
-    final trimmed = path.trim();
-    if (trimmed.isEmpty) return '路径为空';
-    if (isUrl(trimmed)) {
-      // HTTP/HTTPS 需要结构化验证 — 门控对 trimmed 的小写形式做前缀比较，
-      // 与 isUrl 的大小写不敏感语义同步 (N1)：否则大写 HTTP URL 通过
-      // isUrl 却跳过 authority 校验，`HTTP://`(无 authority) 被放行的
-      // fail-open 缺口。
-      final lowerTrimmed = trimmed.toLowerCase();
-      if (lowerTrimmed.startsWith('http://') ||
-          lowerTrimmed.startsWith('https://')) {
-        final uri = Uri.tryParse(trimmed);
-        if (uri == null || !uri.hasAuthority || uri.host.isEmpty) {
-          return 'URL 格式无效: $trimmed';
-        }
-      }
-      return null; // 其他协议（RTSP/RTMP/SRT/UDP/TCP）跳过
-    }
-    if (_hasControlCharacters(trimmed)) {
-      return '路径包含非法控制字符: $trimmed';
-    }
-    if (isPathTraversal(trimmed)) return '路径不安全: $trimmed';
-    if (!isAllowedMedia(trimmed)) return '不支持的文件类型: $trimmed';
-    return null;
+    return switch (classify(path)) {
+      null => null,
+      final type => messageFor(type, path),
+    };
   }
 
   /// 批量校验，返回通过校验的路径列表
