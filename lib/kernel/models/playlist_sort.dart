@@ -21,7 +21,8 @@ enum PlaylistSortKey {
   /// 按最后播放时间 — null (从未播放) 视作最旧.
   lastPlayed,
 
-  /// 按时长 — null (未知) 恒排末尾, 方向无关.
+  /// 按时长 — 非 null 值随升降序翻转 (短→长 / 长→短); null (未知) 恒排
+  /// 末尾 (方向无关).
   duration,
 }
 
@@ -39,8 +40,12 @@ int comparePlaylistEntries(
 }) {
   switch (key) {
     case PlaylistSortKey.addedOrder:
-      final primary = _compareOptInt(a.addedSeq, b.addedSeq);
-      return primary ?? _tiebreak(a, b);
+      final primary = _compareOptIntDirected(
+        a.addedSeq,
+        b.addedSeq,
+        ascending: ascending,
+      );
+      return primary == 0 ? _tiebreak(a, b) : primary;
     case PlaylistSortKey.name:
       final primary = _naturalCompare(
         a.name.toLowerCase(),
@@ -56,18 +61,30 @@ int comparePlaylistEntries(
       }
       return _tiebreak(a, b);
     case PlaylistSortKey.duration:
-      final primary = _compareOptInt(a.durationMs, b.durationMs);
-      return primary ?? _tiebreak(a, b);
+      final primary = _compareOptIntDirected(
+        a.durationMs,
+        b.durationMs,
+        ascending: ascending,
+      );
+      return primary == 0 ? _tiebreak(a, b) : primary;
   }
 }
 
-/// null 恒排末尾 (方向无关); 双非 null 升序比较; 双 null 返回 null (交由
-/// 调用方 tie-break).
-int? _compareOptInt(int? x, int? y) {
-  if (x == null && y == null) return null;
-  if (x == null) return 1; // a 排 b 后
-  if (y == null) return -1;
-  return x < y ? -1 : (x > y ? 1 : 0);
+/// 方向性可空整数比较 — null 分桶 + 非 null 桶内翻转.
+///
+/// null 分桶契约: null 恒排末尾 (升降序无关, 见 [comparePlaylistEntries]
+/// 头注) — 若对 null 桶产生的 ±1 也做符号翻转, 降序会把 null 挪到队首,
+/// 动摇文档契约. 故 null 对先行短路返回方向无关 ±1, 仅双非 null 的桶内
+/// 比较应用 [ascending] 翻转; 双 null 或双非 null 平局返回 0 (交由调用方
+/// tie-break, 符合 "平局一律 path tie-break" 稳定契约).
+int _compareOptIntDirected(int? x, int? y, {required bool ascending}) {
+  if (x == null || y == null) {
+    if (x == null && y == null) return 0;
+    return x == null ? 1 : -1; // null 恒末桶 — 不随方向翻转
+  }
+  final primary = x < y ? -1 : (x > y ? 1 : 0);
+  if (primary != 0) return ascending ? primary : -primary;
+  return 0;
 }
 
 /// 平局裁决 — path 自然序恒升序 (稳定次级键, 方向无关).
