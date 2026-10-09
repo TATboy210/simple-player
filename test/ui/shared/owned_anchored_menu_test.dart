@@ -13,11 +13,7 @@ void main() {
     await tester.pumpAndSettle();
     final menu = harness.open(tester);
     await tester.pumpAndSettle();
-    expect(
-      _focusLabel(),
-      'owned-menu-First',
-      reason: '打开菜单后首启用行应获得初始聚焦',
-    );
+    expect(_focusLabel(), 'owned-menu-First', reason: '打开菜单后首启用行应获得初始聚焦');
     // 期望序列：First → Last（跳过禁用行）→ 回绕 First → 再回绕 Last。
     const expectedStops = [
       'owned-menu-Last',
@@ -50,11 +46,7 @@ void main() {
     await tester.pumpAndSettle();
     final menu = harness.open(tester);
     await tester.pumpAndSettle();
-    expect(
-      _focusLabel(),
-      'owned-menu-First',
-      reason: '打开菜单后首启用行应获得初始聚焦',
-    );
+    expect(_focusLabel(), 'owned-menu-First', reason: '打开菜单后首启用行应获得初始聚焦');
     // Shift+Tab 三段式发键：keyDown shift → tab → keyUp shift。
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -94,11 +86,7 @@ void main() {
       startsWith('owned-menu-'),
       reason: 'Tab 后焦点必须仍停留在菜单行节点上',
     );
-    expect(
-      menu.route.isCurrent,
-      isTrue,
-      reason: '菜单 route 必须保持 current',
-    );
+    expect(menu.route.isCurrent, isTrue, reason: '菜单 route 必须保持 current');
     menu.cancel();
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox.shrink());

@@ -320,9 +320,17 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
   KeyEventResult _key(FocusNode node, KeyEvent event) {
     if (!widget.route.session.isOwnedMenuTopmost) return KeyEventResult.ignored;
     widget.route.session.latchEvent(event);
-    // Let Flutter's route traversal policy handle Tab, including reverse Tab.
+    // 焦点陷阱：Tab 交给默认遍历会越出菜单 route 落到播放器（↑↓ 变 seek）。
+    // Focus trap: default traversal lets Tab escape the menu route and leak
+    // keys to the player; intercept Tab/Shift+Tab and wrap within enabled
+    // rows via _move (末行 Tab 回首行). Repeat/Up swallow without moving,
+    // so the default traversal policy never takes over.
     if (event.logicalKey == LogicalKeyboardKey.tab) {
-      return KeyEventResult.ignored;
+      if (event is KeyDownEvent) {
+        // Shift 状态取自 HardwareKeyboard 全局按压集，KeyEvent 无此 getter。
+        _move(HardwareKeyboard.instance.isShiftPressed ? -1 : 1);
+      }
+      return KeyEventResult.handled; // Down moves; Repeat/Up swallow only.
     }
     if (event is! KeyDownEvent) return KeyEventResult.handled;
     final key = event.logicalKey;
@@ -355,12 +363,18 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
           padding: const EdgeInsets.all(Tokens.spSm),
           child: SingleChildScrollView(
             child: IntrinsicWidth(
-              child: Focus(
-                onKeyEvent: _key,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [for (var i = 0; i < _rows.length; i++) _row(i)],
+              child: FocusTraversalGroup(
+                // 显式遍历域：任何残余遍历（无障碍/程序化 nextFocus）都在
+                // 菜单行内按 Column 顺序进行，绝不越出菜单 route。
+                // Explicit traversal scope: any residual traversal (a11y or
+                // programmatic nextFocus) stays ordered within the menu rows.
+                child: Focus(
+                  onKeyEvent: _key,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [for (var i = 0; i < _rows.length; i++) _row(i)],
+                  ),
                 ),
               ),
             ),
