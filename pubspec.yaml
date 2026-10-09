@@ -1,8 +1,8 @@
 name: simple_player_flutter
 description: "Simple Player - A dark-themed media player"
 publish_to: 'none'
-# pub accepts three-part SemVer only; 0.0.11 起停用 build 号,补丁轮以 0.0.11.1 形式映射 MSIX/display。
-version: 0.0.11
+# pub accepts three-part SemVer only; 0.0.11 起停用 build 号,补丁轮以 0.0.12.1 形式映射 MSIX/display。
+version: 0.0.12
 
 environment:
   sdk: ^3.13.5
@@ -73,6 +73,6 @@ msix_config:
   display_name: Simple Player
   publisher_display_name: Simple Player
   identity_name: com.simpleplayer.app
-  msix_version: 0.0.11.0
+  msix_version: 0.0.12.0
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: internetClient

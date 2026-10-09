@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.0.12 · 最小改动修复轮 · 三路缺陷猎捕 🎯
+
+> 一句话版本：**三路猎捕（历轮台账 + kernel 层 + UI 层）产出候选池，15 计划项全修 + 4 项待验证全部证实并修复（共 20 项）；每项 TDD 红-绿独立 commit，全量 2082+ 测试绿。**
+
+### 🎯 kernel 修复（7 项）
+- **K1** 文件名含 `#`/`%`/空格的媒体文件打不开——`mediaUriFromPath` 改 `Uri.file(windows: true)` 百分号编码（修前 `#` 被 media_kit 二次解析切为 fragment）
+- **K2** 看完视频断点不清——`copyWith(positionMs: null)` 是保留旧值语义，改构造直建清除；下次续播不再跳回片尾
+- **K3** 排序降序对"时长/添加顺序"无效——null 分桶方案（`_compareOptIntDirected`）保住"null 恒末尾"契约，非 null 桶内正确翻转
+- **K4** 轨道偏好恢复双失效——`switchSubtitleTrack(-1)` 映射 `SubtitleTrack.no()`（关字幕不再被吞）；恢复动作挂轨道流首帧（不再读上一文件的陈旧轨道表）
+- **K6** 删正在播末项后暂停被吞——`_completing` 播放重启即清除（media_kit remove() 伪造 completed 的项目侧防御）
+- **V1** 排序迟到 move 事件污染断点（证实）——清流窗 + 权威 index 重申，播放位置不再写进未播放条目
+- **S2/S3/S4** Error 加固三件——network_diagnostics 收窄 `on Object`+诊断输出；缩略图清理链补 Error 分支降级；ime 桥加 isInitialized 防御探针
+
+### 🖥 UI 修复（6 项）
+- **U1** 关闭播放列表面板 Tab 幽灵动作（HIGH）——`ExcludeFocus` 与 SettingsPanel 对照对齐，关闭态不可再聚焦（修前 Enter/Space 隐形切播放模式）
+- **U2** 控制栏 ←→ 焦点跨面——改 `node.traversalDescendants` 收窄子树；顺带纠错旧注释（traversalDescendants 实为后序 DFS 非阅读序）
+- **U3** 全屏 ↑↓ 音量死键——共享 `adjustVolumeByKeyboard` 接入全屏 route（等价重构零双路径漂移），帮助面板宣传自此为真
+- **V3** 长按 ←/→ 无连发（证实）——`isSeekRepeat` 白名单三处门禁统一放行；音量 ↑↓ 保守维持单击
+- **V4** 设置 audio 分区键盘不可达（证实，用户裁决追加修复）——rowsFocusNode 注入复用 General 行导航模式，↑↓ 回绕 + Enter 交焦步进
+- **S5** 错误卡展开态跨报告残留——didUpdateWidget 按 eventId 重置折叠
+
+### 🛡 安全与 native（2 项）
+- **S1** `file://server/share` UNC 绕过拦截（安全）——path validator 拒绝远端 host file URI，本地 file:/// 不受影响
+- **S6** sizemove 取证桥 exitLagMs 16 位回绕改饱和钳制——取证数据不再把"很久前退出"误读成"刚退出"
+
+### 🖥 窗口（1 项）
+- **V2** resize 抑制标志滞留吞首拖（证实）——`reveal()` 清零单次标志，首会话默认尺寸场景首次拖拽生效
+
+### 📌 记录在案
+- **原生 Tooltip 撤回后键盘聚焦暂不出提示**（v0.0.8 起，兑现历轮批注的日志义务）
+- 待验证 4/4 全证实——猎捕候选零冤案（V1/V2/V3/V4 证据链见各 SUMMARY）
+- 留台账：LOW 6 项（K8/K9/K10/U5/U6/U7）+ A 档 11 项；K4 附带发现引擎头注释 stub 清单失实（setVideoEffect/rotate 已实装）留 docs 轮
+- 文件拆分专项 / 网络路径增强 / Impeller E1 / HandleMessage 归因：均不入本轮（范围裁决在案）
+- 实机 UAT 清单：`.planning/debug/v0.0.12_uat_checklist.md`
+
 ## 0.0.11 · 收官发布 · 可用性与健壮性批量修复 🎯
 
 > 一句话版本：**v0.0.10.1 以来压分支的三轮工作（审查修复 20 项 + 浮层打磨）随本版合入发布；外加诊断包剪贴板脱敏、OSD 状态消息不再被吞、错误卡片关闭命中所显示条、播放列表滚轮平滑滚动与缩略图淡入。**
