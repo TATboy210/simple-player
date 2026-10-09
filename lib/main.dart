@@ -120,10 +120,13 @@ Future<void> main() {
         // 结果写入门面自有 notifier（WindowServiceState.dwmCapabilities
         // 转发同一实例）。失败优雅降级——快照保持 null，Phase 7/8 属性门
         // 视 null 为「能力未知」跳过属性调用；本 try/catch 保证探测故障
-        // 不阻断应用启动。
+        // 不阻断应用启动（261009-fio H1：容纳层为 on Object —— probe()
+        // 内部已把绑定解析 ArgumentError 降级 null，此层兜其余 Error 家族
+        // 如分配器故障，与紧邻 windowService.init() 的 on Object 容纳
+        // 同款，保证 Release 下 runApp 恒可达、无隐形孤儿进程）。
         try {
           DwmCapabilities.I.probe();
-        } on Exception catch (error, stackTrace) {
+        } on Object catch (error, stackTrace) {
           KernelLogger.I.e(
             '[main] DwmCapabilities probe failed: $error',
             error: error,

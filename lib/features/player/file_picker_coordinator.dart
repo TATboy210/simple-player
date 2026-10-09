@@ -68,7 +68,11 @@ class FilePickerCoordinator {
         if (_isDisposed) return;
         await _openAndPlay(path);
       }
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // 261009-fio H1：容纳层放宽到 on Object —— 原生插件经 @Native 绑定
+      // 解析失败抛 ArgumentError（Error 族，on Exception 捕不到），任何
+      // 会话故障都必须落日志并让 finally 释放 _isPicking 单开 guard，
+      // 绝不外溢成 zone 级未处理崩溃；日志全量带 error+stackTrace，非静默。
       debugPrint(
         '[FilePickerCoordinator] picker session failed: $error\n$stackTrace',
       );

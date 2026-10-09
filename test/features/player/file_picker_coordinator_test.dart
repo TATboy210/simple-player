@@ -171,6 +171,28 @@ void main() {
       expect(coordinator.isPicking, isFalse);
     });
 
+    test('FFI 绑定解析 ArgumentError 后释放 guard，不外溢崩溃', () async {
+      // Arrange — 261009-fio H1: @Native assetId 绑定解析失败抛
+      // ArgumentError（Error 族，on Exception 捕不到），open() 容纳层
+      // 必须兜住且 finally 释放单开 guard。
+      final picker = _FakeFilePickerGateway()
+        ..completeError(ArgumentError('shell DLL binding unavailable'));
+      final coordinator = FilePickerCoordinator(
+        picker: picker,
+        attention: _FakeFilePickerAttention(),
+        openAndPlay: _FakeMediaPathPlayer().openAndPlay,
+      );
+
+      // Act + Assert — open() 正常完成（不向外抛 Error），guard 已释放。
+      await coordinator.open();
+      expect(coordinator.isPicking, isFalse);
+
+      picker.prepareNextResult();
+      picker.complete(null);
+      await coordinator.open();
+      expect(picker.callCount, 2, reason: 'guard 已释放, 后续打开请求可达 gateway');
+    });
+
     test('销毁后忽略仍在进行的 picker 返回结果', () async {
       // Arrange
       final picker = _FakeFilePickerGateway();
