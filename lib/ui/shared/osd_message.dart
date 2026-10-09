@@ -48,7 +48,17 @@ class OsdMessage {
   final double? progress;
   final OsdPriority priority;
 
-  /// Stable event identity for warning producers; does not infer severity.
+  /// 稳定事件身份 — 合并契约 (与 OsdService.show() 实际行为一致): 同 key 同 rank
+  /// 顶替合并刷新 (新文本 + 新入场绝对到期); 异 key 同 rank 各自排队不互吃, 双槽
+  /// (current+pending) 已被两条异 key 同 rank 消息占满时, 第三条异 key 同 rank 按
+  /// 既有 pending rank 规则被丢弃 (显式容量裁决); 无 key 消息不走身份门, 保持纯
+  /// rank 行为。不推断严重级。
+  /// Stable event identity for warning producers: the same key at the same rank
+  /// coalesces in place; distinct keys at the same rank queue independently via
+  /// the pending slot — with both slots held by distinct keys, a third same-rank
+  /// keyed message is dropped (explicit capacity verdict); unkeyed messages
+  /// bypass the identity gate and keep the legacy rank-only behavior. Does not
+  /// infer severity.
   final Object? coalescingKey;
 }
 

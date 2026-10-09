@@ -55,6 +55,10 @@ class OsdService {
   bool _isDisposed = false;
 
   /// Admit immediate status by default; explicit priorities are ready for1B.
+  ///
+  /// 合并契约: 同 coalescingKey 的同 rank 消息顶替合并刷新 (新文本 + 新入场绝对
+  /// 到期); 异 key 同 rank 不互吃, 落入 pending 等位接续展示 (双槽占满时按容量
+  /// 裁决丢弃第三条); 无 key incoming 走纯 rank 行为, 与旧实现逐字段一致。
   void show(
     String text, {
     IconData? icon,
@@ -77,15 +81,47 @@ class OsdService {
       admittedAt: now,
       expiresAt: now + priority.lifetime,
     );
+    _admit(valid, incoming, now);
+  }
+
+  /// 同步准入判定 — rank 硬门槛之上叠加 coalescingKey 身份门, 经 [_publish] 落账。
+  /// Admission decision: rank gate first (structure unchanged), then the key
+  /// identity gate constrains only same-rank coalescing of keyed messages.
+  void _admit(OsdSnapshot valid, OsdEntry incoming, Duration now) {
     final current = valid.current;
-    // Same rank replaces (and thus coalesces) immediately; higher never requeues.
-    if (current == null || priority.rank >= current.message.priority.rank) {
+    if (current == null) {
+      _publish(incoming, valid.pending, now);
+      return;
+    }
+    final rank = incoming.message.priority.rank;
+    final currentRank = current.message.priority.rank;
+    final key = incoming.message.coalescingKey;
+    // rank 准入是硬门槛: 更高 rank 恒直接顶替 current (身份门不弱化准入结构)。
+    if (rank > currentRank) {
+      _publish(incoming, valid.pending, now);
+      return;
+    }
+    // 同 rank 身份门: 无 key incoming 走纯 rank (与旧实现逐字段一致); 同 key
+    // 顶替合并; 异 key (含 current 无 key) 不得顶替, 落入 pending 各自排队。
+    final sameIdentity = key == null || current.message.coalescingKey == key;
+    if (rank == currentRank && sameIdentity) {
       _publish(incoming, valid.pending, now);
       return;
     }
     final pending = valid.pending;
-    final replacement =
-        pending == null || priority.rank >= pending.message.priority.rank
+    if (rank == currentRank) {
+      // 双槽容量裁决 (异 key 同 rank): 不抢 current 也不顶同 rank 异 key 的
+      // pending — 仅 pending 空位、更高 rank、或与 pending 同 key 时可入位。
+      final canStage =
+          pending == null ||
+          rank > pending.message.priority.rank ||
+          (rank == pending.message.priority.rank &&
+              pending.message.coalescingKey == key);
+      if (canStage) _publish(current, incoming, now);
+      return;
+    }
+    // rank 更低: 既有 pending 准入规则原样保留 (身份门永不豁免 rank 准入)。
+    final replacement = pending == null || rank >= pending.message.priority.rank
         ? incoming
         : pending;
     _publish(current, replacement, now);
