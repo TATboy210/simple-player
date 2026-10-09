@@ -87,6 +87,8 @@ class OsdService {
   /// 同步准入判定 — rank 硬门槛之上叠加 coalescingKey 身份门, 经 [_publish] 落账。
   /// Admission decision: rank gate first (structure unchanged), then the key
   /// identity gate constrains only same-rank coalescing of keyed messages.
+  /// 唯一例外: 更低 rank 分支中 status (rank 0) 恒占 pending 位顶掉旧 pending
+  /// (latest wins) — 这是 rank 准入规则本身, 不涉及身份门豁免。
   void _admit(OsdSnapshot valid, OsdEntry incoming, Duration now) {
     final current = valid.current;
     if (current == null) {
@@ -120,8 +122,12 @@ class OsdService {
       if (canStage) _publish(current, incoming, now);
       return;
     }
-    // rank 更低: 既有 pending 准入规则原样保留 (身份门永不豁免 rank 准入)。
-    final replacement = pending == null || rank >= pending.message.priority.rank
+    // rank 更低: status (rank 0) 恒占 pending 位顶掉任何旧 pending (latest
+    // wins, 261009-oab 方案 b) — 双槽被高 rank 占满时不再整条蒸发, 最坏等
+    // current 到期; 其余更低 rank 保持既有 pending 规则 (身份门永不豁免 rank 准入)。
+    final isStatus = rank == OsdPriority.status.rank;
+    final replacement =
+        isStatus || pending == null || rank >= pending.message.priority.rank
         ? incoming
         : pending;
     _publish(current, replacement, now);

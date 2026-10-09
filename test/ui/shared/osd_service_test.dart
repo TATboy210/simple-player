@@ -82,25 +82,30 @@ void main() {
     },
   );
 
-  test('pending highest priority survives; equal priority latest wins', () {
-    final clock = _Clock();
-    final s = OsdService(now: () => clock.now, schedule: clock.schedule);
-    s.show('warning', priority: OsdPriority.warning);
-    clock.advance(3000);
-    s.show('success old', priority: OsdPriority.success);
-    clock.advance(3100);
-    s.show('success latest', priority: OsdPriority.success);
-    clock.advance(3500);
-    s.show('status');
-    expect(s.snapshot.value.pending?.message.text, 'success latest');
-    clock.advance(4000);
-    expect(s.message.value?.text, 'success latest');
-    expect(s.snapshot.value.current?.expiresAt.inMilliseconds, 4700);
-    clock.advance(4700);
-    expect(s.message.value, isNull);
-    expect(clock.maxOutstanding, 1);
-    s.dispose();
-  });
+  test(
+    'pending highest priority survives; status displaces it latest wins',
+    () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('warning', priority: OsdPriority.warning);
+      clock.advance(3000);
+      s.show('success old', priority: OsdPriority.success);
+      clock.advance(3100);
+      s.show('success latest', priority: OsdPriority.success);
+      clock.advance(3500);
+      // 契约翻转 (261009-oab): status 恒占 pending 位, 顶掉 'success latest'
+      // (latest wins); 晋升的也是 status (3500+1200=4700 到期)。
+      s.show('status');
+      expect(s.snapshot.value.pending?.message.text, 'status');
+      clock.advance(4000);
+      expect(s.message.value?.text, 'status');
+      expect(s.snapshot.value.current?.expiresAt.inMilliseconds, 4700);
+      clock.advance(4700);
+      expect(s.message.value, isNull);
+      expect(clock.maxOutstanding, 1);
+      s.dispose();
+    },
+  );
 
   for (final example in [
     (OsdPriority.success, 500, 1600, 1700),

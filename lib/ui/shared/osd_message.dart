@@ -52,12 +52,15 @@ class OsdMessage {
   /// 顶替合并刷新 (新文本 + 新入场绝对到期); 异 key 同 rank 各自排队不互吃, 双槽
   /// (current+pending) 已被两条异 key 同 rank 消息占满时, 第三条异 key 同 rank 按
   /// 既有 pending rank 规则被丢弃 (显式容量裁决); 无 key 消息不走身份门, 保持纯
-  /// rank 行为。不推断严重级。
+  /// rank 行为, 唯 status (rank 0) 例外 — 更低 rank 分支中 status 恒占 pending 位
+  /// 顶掉旧 pending (latest wins, 261009-oab), 不再按 rank 比较被丢弃。不推断严重级。
   /// Stable event identity for warning producers: the same key at the same rank
   /// coalesces in place; distinct keys at the same rank queue independently via
   /// the pending slot — with both slots held by distinct keys, a third same-rank
   /// keyed message is dropped (explicit capacity verdict); unkeyed messages
-  /// bypass the identity gate and keep the legacy rank-only behavior. Does not
+  /// bypass the identity gate and keep the legacy rank-only behavior, except
+  /// rank-0 status which always occupies the pending slot (latest wins) in the
+  /// lower-rank branch instead of being dropped by the rank comparison. Does not
   /// infer severity.
   final Object? coalescingKey;
 }
