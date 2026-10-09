@@ -53,15 +53,31 @@ Future<PersistedPlaylistSnapshot?> _waitForSavedSnapshot(
 /// 轮询等待落盘快照满足 [condition] — 断点**更新**落盘断言用
 /// （_waitForSavedSnapshot 只等"首次非空", 无法区分"旧快照"与"新快照";
 ///  条件不满足时超时返回最后一次结果, 由调用方断言 — 真失败照常失败）.
+///
+/// **条件必须只匹配目标写点** — 同一 store 的写入按调用序串行落地,
+/// 先落地的是历史写点: 条件若被历史写点满足会读到陈旧快照
+/// （261009-vjf CI 实锤: `positionMs == null` 被装载初存"从未写过断点"
+/// 满足 → 形态 B 假清除; 首个非空轮询吃到 addedOrder 初存 → 排序假败）.
+///
+/// [onStall] — 轮询半程（第 20 次, ~1s）补偿触发器: fire-and-forget save
+/// 与并发读盘碰撞被吞时内容可能永久缺失（Windows errno 32 实测存在,
+/// 写失败仅记日志不重试）, 半程补一次**等价**写点消除单点瞬态丢失;
+/// 真回归两次都写不进, 照常红. null = 不补偿.
 Future<PersistedPlaylistSnapshot?> _waitForSavedSnapshotWhere(
   PlaylistStore store,
-  bool Function(PersistedPlaylistSnapshot snapshot) condition,
-) async {
+  bool Function(PersistedPlaylistSnapshot snapshot) condition, {
+  void Function()? onStall,
+}) async {
   PersistedPlaylistSnapshot? loaded;
+  var nudged = false;
   for (var attempt = 0; attempt < 40; attempt++) {
     await Future<void>.delayed(const Duration(milliseconds: 50));
     loaded = await store.load();
     if (loaded != null && condition(loaded)) return loaded;
+    if (onStall != null && !nudged && attempt == 20) {
+      nudged = true;
+      onStall();
+    }
   }
   return loaded;
 }
@@ -77,6 +93,14 @@ class _CountingStore extends PlaylistStore {
     saveCount++;
     return super.save(snapshot);
   }
+}
+
+/// 按 path 取落盘条目（缺失返回 null, 不抛）— 条件轮询的取材辅助.
+PlaylistItem? _itemOf(PersistedPlaylistSnapshot snapshot, String path) {
+  for (final item in snapshot.items) {
+    if (item.path == path) return item;
+  }
+  return null;
 }
 
 void main() {
@@ -319,14 +343,33 @@ void main() {
       var now = DateTime(2026, 1, 1);
       coord.clock = () => now;
 
+      // 每个写点相位后按内容排空 (261009-vjf 确定性修复): store 写入按
+      // 调用序串行落地, 各相位条件只匹配**本相位**写点 — 轮询先落地的是
+      // 历史快照, 不可能误判; 相位间互不重叠 → 任意时刻至多一个写点在途.
       await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      await _waitForSavedSnapshot(store); // 装载初存 (a 无断点) 排空
+
       engine.duration.value = 100000;
       engine.position.value = 42000; // 首次进度 → 立即节流落盘, a 记 42000
-      engine.position.value = 20000;
-      await coord.playEntryAt(1); // 切到 b (a 断点已在中途区)
-      engine.position.value = 20000;
+      await _waitForSavedSnapshotWhere(
+        store,
+        (s) => _itemOf(s, 'a.mp4')?.positionMs == 42000,
+      );
+
+      engine.position.value = 20000; // 节流窗内 — 不写盘
+      await coord.playEntryAt(1); // 切到 b, a 记 20000
+      await _waitForSavedSnapshotWhere(
+        store,
+        (s) => _itemOf(s, 'a.mp4')?.positionMs == 20000,
+      );
+
+      engine.position.value = 20000; // 节流窗内 — 不写盘
       engine.duration.value = 90000; // b 的时长 (异值必通知 — fake 同值去重)
       await coord.playEntryAt(0); // b 记 20000, current 回到 a
+      await _waitForSavedSnapshotWhere(
+        store,
+        (s) => _itemOf(s, 'b.mp4')?.positionMs == 20000,
+      );
 
       // 看完 a — 节流窗口 (5s) 过后的 position 事件触发断点刷新 + 落盘.
       // duration 先回填 (切曲粘性重置后; b 段已换 90000, 此处为真实通知,
@@ -335,10 +378,16 @@ void main() {
       engine.duration.value = 100000;
       engine.position.value = 98000; // ≥98% — 触发 _maybeThrottledSave
 
-      // 轮询等待盘上 a 的 positionMs 被清 (RED: 2s 超窗后仍是 42000 → 败).
+      // 轮询等待盘上 a 的断点被清除. 条件带 durationMs=100000 — 与装载
+      // 初存 (a=null/null) 区分: 裸 positionMs==null 会被"从未写过断点"
+      // 的陈旧快照满足 (CI 形态 B 实锤). 半程补触发一次等价清除写点
+      // (98500 仍 ≥98%), 消除单次 rename 被并发读盘碰撞吞掉的风险.
       final loaded = await _waitForSavedSnapshotWhere(
         store,
-        (s) => s.items.firstWhere((e) => e.path == 'a.mp4').positionMs == null,
+        (s) =>
+            _itemOf(s, 'a.mp4')?.positionMs == null &&
+            _itemOf(s, 'a.mp4')?.durationMs == 100000,
+        onStall: () => engine.position.value = 98500,
       );
       final a = loaded!.items.firstWhere((e) => e.path == 'a.mp4');
       expect(a.positionMs, isNull); // 盘上断点已清除
@@ -494,8 +543,13 @@ void main() {
 
       await engine.openPlaylist(['b.mp4', 'a.mp4']);
       await coord.sortEntries(PlaylistSortKey.name);
-      // _save 是 fire-and-forget — 轮询等待原子发布落盘（见 helper 注释）.
-      final loaded = await _waitForSavedSnapshot(store);
+      // _save 是 fire-and-forget — 按 sortKey 条件轮询等待排序写点落地
+      // (261009-vjf: 装载初存先落地且 sortKey=addedOrder, "首个非空"
+      // 轮询会吃到它 → Expected name/Actual addedOrder, CI windows-x64 实锤).
+      final loaded = await _waitForSavedSnapshotWhere(
+        store,
+        (s) => s.sortKey == PlaylistSortKey.name,
+      );
       expect(loaded, isNotNull);
       expect(loaded!.sortKey, PlaylistSortKey.name);
       expect(loaded.sortAscending, isTrue);
@@ -826,8 +880,13 @@ void main() {
 
       await engine.openPlaylist(['a.mp4'], startIndex: 0);
       engine.position.value = 42000; // 首存 — 节流窗口从现在起算
-      // _save 是 fire-and-forget — 轮询等待原子发布落盘（见 helper 注释）.
-      var loaded = await _waitForSavedSnapshot(store);
+      // _save 是 fire-and-forget — 按内容条件轮询等待 42000 写点落地
+      // (261009-vjf: 装载初存先落地且 positionMs 为 null, "首个非空"
+      // 轮询会吃到它 → Expected 42000/Actual null, CI windows-arm64 实锤).
+      var loaded = await _waitForSavedSnapshotWhere(
+        store,
+        (s) => s.items.single.positionMs == 42000,
+      );
       expect(loaded!.items.single.positionMs, 42000);
 
       nowMs += 2000; // 2s < 5s 节流窗口
