@@ -37,6 +37,11 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   /// turning an unavailable disk into a diagnostic-output flood.
   static const int _failureReportInterval = 50;
 
+  /// 归档滚动的默认字节阈值（5 MiB）—— error.log 触达即 rename 为
+  /// error.log.1（单代归档）。磁盘占用最坏 ~2x 阈值：活动文件 + 一份
+  /// 归档，旧归档被下一次滚动整体替换，绝不累积。
+  static const int defaultMaxLogBytes = 5 * 1024 * 1024;
+
   /// Creates a sink that hands formatted packs to a resident logging isolate.
   ///
   /// Worker spawn starts immediately; spawn failure never throws out of the
@@ -44,11 +49,13 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   ///
   /// [spawnWorker] 仅为测试注入缝；[_heartbeatInterval] 默认 30s，心跳空档
   /// 即主 isolate 卡死时间窗的运营读数（headless 不可单测时间窗本身）。
+  /// [maxLogBytes] 为归档滚动阈值（经 WorkerConfig 下发 worker 执行）。
   IsolatedErrorLogSink({
     required File file,
     void Function(Object error, StackTrace stackTrace)? degradedOutput,
     @visibleForTesting WorkerSpawner? spawnWorker,
     this._heartbeatInterval = const Duration(seconds: 30),
+    this._maxLogBytes = defaultMaxLogBytes,
   }) : _file = file,
        _path = file.path,
        _degradedOutput = degradedOutput ?? _defaultDegradedOutput,
@@ -62,6 +69,9 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   final String _path;
   final WorkerSpawner _spawnWorker;
   final Duration _heartbeatInterval;
+
+  /// 归档滚动阈值（字节）—— worker 侧每次追加前与启动时各检查一次。
+  final int _maxLogBytes;
   final void Function(Object error, StackTrace stackTrace) _degradedOutput;
 
   /// Stable availability state for a future non-modal presentation.
@@ -204,7 +214,11 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
       unawaited(
         _spawnWorker(
           _logWorkerEntry,
-          WorkerConfig(replyTo: readyPort.sendPort, path: _path),
+          WorkerConfig(
+            replyTo: readyPort.sendPort,
+            path: _path,
+            maxLogBytes: _maxLogBytes,
+          ),
           onExit: exitPort.sendPort,
           onError: errorPort.sendPort,
         ).then<void>(

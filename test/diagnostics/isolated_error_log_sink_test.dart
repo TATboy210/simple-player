@@ -179,80 +179,85 @@ void main() {
       expect(sink.logsAvailable.value, isFalse);
     });
 
-    test('rolls the grown active log to error.log.1 at the byte threshold', () async {
-      // Arrange — 阈值注入 400 字节：单个诊断包的固定分段开销已越阈，
-      // 无需大体积夹具即可驱动滚动。
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final sink = IsolatedErrorLogSink(file: fixture.file, maxLogBytes: 400);
-      final archive = File('${fixture.directory.path}/error.log.1');
+    test(
+      'rolls the grown active log to error.log.1 at the byte threshold',
+      () async {
+        // Arrange — 阈值注入 400 字节：单个诊断包的固定分段开销已越阈，
+        // 无需大体积夹具即可驱动滚动。
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final sink = IsolatedErrorLogSink(file: fixture.file, maxLogBytes: 400);
+        final archive = File('${fixture.directory.path}/error.log.1');
 
-      // Act — 第 1 条把活动文件写越阈；第 2 条在追加前触发滚动（rename
-      // 到 .1 后在全新 error.log 上继续写）。
-      sink.record(
-        _report(eventId: 'early', message: '第一条滚动的中文错误记录'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
-      sink.record(
-        _report(eventId: 'late', message: '第二条落入新文件的中文错误记录'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
+        // Act — 第 1 条把活动文件写越阈；第 2 条在追加前触发滚动（rename
+        // 到 .1 后在全新 error.log 上继续写）。
+        sink.record(
+          _report(eventId: 'early', message: '第一条滚动的中文错误记录'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
+        sink.record(
+          _report(eventId: 'late', message: '第二条落入新文件的中文错误记录'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
 
-      // Assert — 归档留存早期证据，活动文件只含后期证据，可用性恒真。
-      expect(archive.existsSync(), isTrue);
-      final archiveContents = archive.readAsStringSync();
-      final activeContents = fixture.file.readAsStringSync();
-      expect(archiveContents, contains('第一条滚动的中文错误记录'));
-      expect(archiveContents, isNot(contains('第二条落入新文件的中文错误记录')));
-      expect(activeContents, contains('第二条落入新文件的中文错误记录'));
-      expect(activeContents, isNot(contains('第一条滚动的中文错误记录')));
-      expect(sink.logsAvailable.value, isTrue);
-      await sink.dispose();
-    });
+        // Assert — 归档留存早期证据，活动文件只含后期证据，可用性恒真。
+        expect(archive.existsSync(), isTrue);
+        final archiveContents = archive.readAsStringSync();
+        final activeContents = fixture.file.readAsStringSync();
+        expect(archiveContents, contains('第一条滚动的中文错误记录'));
+        expect(archiveContents, isNot(contains('第二条落入新文件的中文错误记录')));
+        expect(activeContents, contains('第二条落入新文件的中文错误记录'));
+        expect(activeContents, isNot(contains('第一条滚动的中文错误记录')));
+        expect(sink.logsAvailable.value, isTrue);
+        await sink.dispose();
+      },
+    );
 
-    test('replaces the previous archive so only one .1 generation exists', () async {
-      // Arrange — 同一阈值；三条记录制造两次滚动，验证单代归档策略。
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final sink = IsolatedErrorLogSink(file: fixture.file, maxLogBytes: 400);
+    test(
+      'replaces the previous archive so only one .1 generation exists',
+      () async {
+        // Arrange — 同一阈值；三条记录制造两次滚动，验证单代归档策略。
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final sink = IsolatedErrorLogSink(file: fixture.file, maxLogBytes: 400);
 
-      // Act — 第 2 条触发第一次滚动，第 3 条触发第二次（覆盖旧归档）。
-      sink.record(
-        _report(eventId: 'roll-1', message: '第一代归档记录'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
-      sink.record(
-        _report(eventId: 'roll-2', message: '第二代归档记录'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
-      sink.record(
-        _report(eventId: 'roll-3', message: '最终活动记录'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
+        // Act — 第 2 条触发第一次滚动，第 3 条触发第二次（覆盖旧归档）。
+        sink.record(
+          _report(eventId: 'roll-1', message: '第一代归档记录'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
+        sink.record(
+          _report(eventId: 'roll-2', message: '第二代归档记录'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
+        sink.record(
+          _report(eventId: 'roll-3', message: '最终活动记录'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
 
-      // Assert — 目录里恰好一个 .1 文件，内容是第二次滚动的归档；
-      // 早期证据随单代策略被替换（有意为之的存储上界）。
-      final archives =
-          fixture.directory
-              .listSync()
-              .whereType<File>()
-              .where((file) => file.path.endsWith('.1'))
-              .toList();
-      expect(archives, hasLength(1));
-      final archiveContents = archives.single.readAsStringSync();
-      expect(archiveContents, contains('roll-2'));
-      expect(archiveContents, contains('第二代归档记录'));
-      expect(archiveContents, isNot(contains('第一代归档记录')));
-      expect(archiveContents, isNot(contains('最终活动记录')));
-      expect(fixture.file.readAsStringSync(), contains('最终活动记录'));
-      expect(sink.logsAvailable.value, isTrue);
-      await sink.dispose();
-    });
+        // Assert — 目录里恰好一个 .1 文件，内容是第二次滚动的归档；
+        // 早期证据随单代策略被替换（有意为之的存储上界）。
+        final archives = fixture.directory
+            .listSync()
+            .whereType<File>()
+            .where((file) => file.path.endsWith('.1'))
+            .toList();
+        expect(archives, hasLength(1));
+        final archiveContents = archives.single.readAsStringSync();
+        expect(archiveContents, contains('roll-2'));
+        expect(archiveContents, contains('第二代归档记录'));
+        expect(archiveContents, isNot(contains('第一代归档记录')));
+        expect(archiveContents, isNot(contains('最终活动记录')));
+        expect(fixture.file.readAsStringSync(), contains('最终活动记录'));
+        expect(sink.logsAvailable.value, isTrue);
+        await sink.dispose();
+      },
+    );
 
     test('archives an oversized pre-existing log at worker startup', () async {
       // Arrange — 上一会话遗留的超限日志先种入，再构造 sink（阈值 400）。
@@ -283,40 +288,37 @@ void main() {
       await sink.dispose();
     });
 
-    test(
-      'archive bytes equal the appended bytes and rotation never flips availability',
-      () async {
-        // Arrange — 监听可用性 notifier 的全部变化（滚动不得产生翻转）。
-        final fixture = await _LogFixture.create();
-        addTearDown(fixture.dispose);
-        final availability = <bool>[];
-        final sink = IsolatedErrorLogSink(file: fixture.file, maxLogBytes: 400);
-        sink.logsAvailable.addListener(
-          () => availability.add(sink.logsAvailable.value),
-        );
+    test('archive bytes equal the appended bytes and rotation never flips availability', () async {
+      // Arrange — 监听可用性 notifier 的全部变化（滚动不得产生翻转）。
+      final fixture = await _LogFixture.create();
+      addTearDown(fixture.dispose);
+      final availability = <bool>[];
+      final sink = IsolatedErrorLogSink(file: fixture.file, maxLogBytes: 400);
+      sink.logsAvailable.addListener(
+        () => availability.add(sink.logsAvailable.value),
+      );
 
-        // Act — 第 1 条落盘后抓取活动文件字节；第 2 条触发滚动。
-        sink.record(
-          _report(eventId: 'bytes-1', message: '滚动前字节样本'),
-          ReportAcceptance.newReport,
-        );
-        await sink.drain();
-        final appended = fixture.file.readAsBytesSync();
-        sink.record(
-          _report(eventId: 'bytes-2', message: '触发滚动的第二条'),
-          ReportAcceptance.newReport,
-        );
-        await sink.drain();
+      // Act — 第 1 条落盘后抓取活动文件字节；第 2 条触发滚动。
+      sink.record(
+        _report(eventId: 'bytes-1', message: '滚动前字节样本'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
+      final appended = fixture.file.readAsBytesSync();
+      sink.record(
+        _report(eventId: 'bytes-2', message: '触发滚动的第二条'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
 
-        // Assert — 归档与滚动前活动文件逐字节一致（rename 不改写）；
-        // 可用性读数零翻转（滚动不是写失败）。
-        final archive = File('${fixture.directory.path}/error.log.1');
-        expect(archive.readAsBytesSync(), appended);
-        expect(availability, isEmpty);
-        expect(sink.logsAvailable.value, isTrue);
-        await sink.dispose();
-      },
-    );
+      // Assert — 归档与滚动前活动文件逐字节一致（rename 不改写）；
+      // 可用性读数零翻转（滚动不是写失败）。
+      final archive = File('${fixture.directory.path}/error.log.1');
+      expect(archive.readAsBytesSync(), appended);
+      expect(availability, isEmpty);
+      expect(sink.logsAvailable.value, isTrue);
+      await sink.dispose();
+    });
 
     test('writes heartbeat lines through the logging isolate', () async {
       // Arrange — 心跳间隔注入 1ms；真实 Timer 走主 isolate 事件循环。
