@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
+import 'package:simple_player_flutter/kernel/diagnostics/network_diagnostics.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/services/subtitle_service.dart';
@@ -472,16 +473,17 @@ void main() {
     });
 
     group('网络流打开失败附带接口摘要 (B5/9)', () {
-      test('URL 打开失败 → ErrorContext 含接口快照 (fake 注入确定性值)', () async {
-        // 复用 setUp 的 engine, 重建 controller 注入 fake networkSnapshotProvider
-        // (确定性返回, 不依赖真实 NetworkInterface.list).
+      // N3 排序契约: 错误先可见, 诊断后补齐 — provider 用 Completer 门控,
+      // 快照采集时序由测试显式控制 (确定性, 不依赖真实 NetworkInterface.list).
+      test('URL 打开失败 → onError 先行, 快照完成后异步补写同一 error', () async {
+        // 复用 setUp 的 engine, 重建 controller 注入门控 provider.
         controller.dispose();
         final localErrors = <PlayerError>[];
+        final snapshotGate = Completer<NetworkInterfaceSnapshot?>();
         controller = PlaybackController(
           engine: engine,
           onError: localErrors.add,
-          networkSnapshotProvider: () async =>
-              (interfaceCount: 2, hasNonLoopback: true),
+          networkSnapshotProvider: () => snapshotGate.future,
         );
         engine.failNextOpenWith = 'network unreachable';
 
@@ -489,11 +491,60 @@ void main() {
           'http://example.com/stream.mp4',
         );
 
+        // 排序契约 (N3): 快照未采集完成 onError 已投递 — 用户立即看到错误,
+        // 网络诊断字段此刻尚未补进 (旧实现在回调前阻塞等待快照).
         expect(result, isFalse);
         expect(localErrors, hasLength(1));
-        expect(localErrors.single.context, isNotNull);
+        final reportedError = localErrors.single;
+        expect(reportedError.context?.networkInterfaceCount, isNull);
+        expect(reportedError.context?.networkHasNonLoopback, isNull);
+
+        // 快照采集完成 → 异步补写进同一 error 对象 (诊断字段不丢).
+        snapshotGate.complete((interfaceCount: 2, hasNonLoopback: true));
+        // 泵两轮事件循环排空补写链的微任务.
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+        expect(localErrors, hasLength(1)); // 红线: 补写不得二次投递 onError
+        expect(identical(localErrors.single, reportedError), isTrue);
         expect(localErrors.single.context?.networkInterfaceCount, 2);
         expect(localErrors.single.context?.networkHasNonLoopback, isTrue);
+      });
+
+      test('新打开淘汰陈旧请求 — 补写被 generation 守卫拦截 (T-261009-03)', () async {
+        // 同样的门控 provider; URL 失败后补写挂起, 第二次成功打开递增
+        // 请求代数使旧请求过期 — 放行门控后陈旧请求不得补写诊断.
+        controller.dispose();
+        final localErrors = <PlayerError>[];
+        final snapshotGate = Completer<NetworkInterfaceSnapshot?>();
+        controller = PlaybackController(
+          engine: engine,
+          onError: localErrors.add,
+          networkSnapshotProvider: () => snapshotGate.future,
+        );
+        engine.failNextOpenWith = 'network unreachable';
+
+        final firstResult = await controller.openAndPlay(
+          'http://example.com/stream.mp4',
+        );
+        expect(firstResult, isFalse);
+        expect(localErrors, hasLength(1));
+        final staleError = localErrors.single;
+        // 门控未放行, 补写挂起中 — 诊断字段尚未写入.
+        expect(staleError.context?.networkInterfaceCount, isNull);
+
+        // 第二次成功打开 (本地文件, 成功路径) 递增 _openRequestGeneration.
+        engine.configureMedia(durationMs: 60000);
+        final secondResult = await controller.openAndPlay('C:/test/video.mp4');
+        expect(secondResult, isTrue);
+
+        // 放行门控 + 排空微任务 — 挂起的补写链此时才恢复执行.
+        snapshotGate.complete((interfaceCount: 2, hasNonLoopback: true));
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        // generation 守卫拦截: 陈旧请求不补写诊断 (context 保持原样).
+        expect(staleError.context?.networkInterfaceCount, isNull);
+        expect(staleError.context?.networkHasNonLoopback, isNull);
       });
 
       test('本地文件打开失败 → context 不含接口快照 (isUrl 门控跳过 enrichment)', () async {
