@@ -416,6 +416,10 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   /// 16:9 缩略图三态渲染（§27.1）— 占位 → 异步图像; ready 按 Tile 物理
   /// 宽度解码降内存（§14A.2：显示不变，decoded 工作集 ~230→~144 KiB/张）.
+  ///
+  /// 261009-o8z T5: 占位图标恒在 Stack 底层, ready 成图经
+  /// TweenAnimationBuilder ~150ms 淡入覆盖 — 消除占位→成图同帧硬切的
+  /// 弹现感 (UAT 实证体验问题); 淡入期间占位从成图底下透出是需求本身.
   Widget _buildThumbnail() {
     final thumbnail = _thumbnail;
     final isReady = _phase == _ThumbPhase.ready;
@@ -427,26 +431,35 @@ class _PlaylistTileState extends State<PlaylistTile> {
         children: [
           // 占位底色 — 缩略图加载完成前保持视觉占位.
           const ColoredBox(color: Tokens.bgGlass),
+          // 占位图标恒在底层（不再条件化）— ready 淡入期间从底下透出.
+          _thumbPlaceholder(),
           if (isReady && thumbnail != null)
-            Image(
-              image: ResizeImage(
-                thumbnail,
-                // 单轴 width 保持纵横比 — 128 logical × DPR，clamp 128..320
-                width: (_thumbWidth * MediaQuery.devicePixelRatioOf(context))
-                    .round()
-                    .clamp(_thumbWidth.toInt(), _maxDecodeWidth)
-                    .toInt(),
+            // 单次插值淡入 — 无常驻 AnimationController; 挂载即从 0 起步,
+            // retry/重载触发重挂载时自动二次淡入. DPR 变化换图不重挂载
+            // (gaplessPlayback), TweenAnimationBuilder 不重建 → 不重播.
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: Tokens.durationNormal),
+              builder: (_, value, child) =>
+                  Opacity(opacity: value, child: child),
+              child: Image(
+                image: ResizeImage(
+                  thumbnail,
+                  // 单轴 width 保持纵横比 — 128 logical × DPR，clamp 128..320
+                  width: (_thumbWidth * MediaQuery.devicePixelRatioOf(context))
+                      .round()
+                      .clamp(_thumbWidth.toInt(), _maxDecodeWidth)
+                      .toInt(),
+                ),
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stack) {
+                  // bytes 损坏等解码失败 — 立即占位 + post-frame 揭示重试入口
+                  _scheduleDecodeFailed();
+                  return _thumbPlaceholder();
+                },
               ),
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              errorBuilder: (context, error, stack) {
-                // bytes 损坏等解码失败 — 立即占位 + post-frame 揭示重试入口
-                _scheduleDecodeFailed();
-                return _thumbPlaceholder();
-              },
-            )
-          else
-            _thumbPlaceholder(),
+            ),
         ],
       ),
     );

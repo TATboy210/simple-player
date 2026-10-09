@@ -233,7 +233,8 @@ void main() {
       await settleIO(tester); // job 挂起 — 占位态
 
       fake.release(pathA);
-      await tester.pump(); // ready 挂载首帧 — 淡入起点
+      await tester.pump(); // 消化 microtask → setState(ready)（本帧可能仍占位）
+      await tester.pump(); // TweenAnimationBuilder 挂载 — 淡入起点 value 0
       await tester.pump(const Duration(milliseconds: 50)); // 动画中段 (~1/3)
 
       // ① 淡入进行中: Image 已挂载且 Opacity ∈ (0,1) — 现行为同帧
@@ -282,7 +283,8 @@ void main() {
       expect(find.byType(Image), findsNothing); // loading 态无成图
 
       fake.release(pathA); // 二次 ready
-      await tester.pump(); // 重挂载首帧
+      await tester.pump(); // 消化 microtask → setState(ready)
+      await tester.pump(); // 重挂载 TweenAnimationBuilder — 淡入起点 value 0
       await tester.pump(const Duration(milliseconds: 50));
 
       // ④ 二次 ready 再次淡入 — TweenAnimationBuilder 重挂载后从 0 重新
