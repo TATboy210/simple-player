@@ -291,14 +291,16 @@ void main() {
 
     test('未 init — withImeRestored 直接透传 action 不抛（Windows）', () async {
       var actionCalls = 0;
-      final result = await Win32ImeBridge.withImeRestored(() async {
-        actionCalls++;
-        return 'passthrough';
-      },
-      functions: Win32ImeFunctions(
-        findWindow: (_) => 0x1234,
-        sendMessageTimeout: (_, _, _, _, _) => true,
-      ));
+      final result = await Win32ImeBridge.withImeRestored(
+        () async {
+          actionCalls++;
+          return 'passthrough';
+        },
+        functions: Win32ImeFunctions(
+          findWindow: (_) => 0x1234,
+          sendMessageTimeout: (_, _, _, _, _) => true,
+        ),
+      );
 
       expect(result, 'passthrough');
       expect(actionCalls, 1, reason: '未 init 降级为纯透传, action 照跑一次');

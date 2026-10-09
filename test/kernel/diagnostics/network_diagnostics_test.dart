@@ -100,7 +100,7 @@ void main() {
       // Arrange — Exception 族（超时/Socket 等）走收窄后的 on Exception 分支.
       final sink = RecordingLogSink();
       Future<List<({bool isLoopback})>> enumerate() async =>
-          throw const _FakeOpException();
+          throw _FakeOpException();
 
       // Act
       final snapshot = await collectNetworkSnapshot(

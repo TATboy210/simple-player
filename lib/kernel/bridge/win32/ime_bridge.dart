@@ -90,14 +90,28 @@ class Win32ImeBridge {
   /// 超时视为失败（跳过收尾 disable，宁可多恢复不禁用）.
   static const int _sendTimeoutMs = 1000;
 
-  final KernelLogger _log;
+  /// 注入的日志面 — null 表示走全局 KernelLogger 单例（经 WR-02 探针守卫）.
+  final KernelLogger? _injectedLog;
 
   /// 可注入的 FFI 函数束 — 测试用 fake 替换，生产走真实动态库.
   final Win32ImeFunctions _fns;
 
   Win32ImeBridge({KernelLogger? logger, Win32ImeFunctions? functions})
-    : _log = logger ?? KernelLogger.I,
+    : _injectedLog = logger,
       _fns = functions ?? _resolveDefaultFunctions();
+
+  /// 是否已初始化 —— 无副作用的防御探针（261009-roy S4/F17, 照
+  /// KernelLoggerImpl.isInitialized 的 WR-02 先例）。
+  ///
+  /// 桥公开入口的诊断面依赖 KernelLogger 单例 —— 未初始化且未注入 logger
+  /// 时 enable/disable/withImeRestored 降级为安全 no-op（false / 透传
+  /// action），绝不让 KernelLogger.I 的 StateError 外溢到调用方。
+  static bool get isInitialized => KernelLoggerImpl.isInitialized;
+
+  /// 日志面 — 注入优先; 未注入时经 WR-02 探针守卫: KernelLogger 未 init
+  /// 返回 null，调用点以局部绑定 + 判空安全跳过（261009-roy S4/F17）。
+  KernelLogger? get _log =>
+      _injectedLog ?? (KernelLoggerImpl.isInitialized ? KernelLogger.I : null);
 
   /// 恢复窗口（含 FlutterView 子窗口）的系统默认输入法上下文。
   ///
@@ -128,6 +142,12 @@ class Win32ImeBridge {
     @visibleForTesting Win32ImeFunctions? functions,
   }) async {
     if (!Platform.isWindows) return action();
+    // 261009-roy S4/F17 — WR-02 探针: KernelLogger 未 init 且未注入 logger
+    // 时，IME 恢复链路（诊断面与 _deliver 皆依赖 logger）安全 no-op —
+    // 直接透传 action，不构造桥、不投递消息，绝不让 StateError 外溢。
+    if (logger == null && !isInitialized) {
+      return action();
+    }
     final log = logger ?? KernelLogger.I;
     final bridge = Win32ImeBridge(logger: log, functions: functions);
     bool restored;
@@ -164,10 +184,15 @@ class Win32ImeBridge {
   /// 只捕获 ArgumentError（绑定解析的专属签名），编程 bug 的其他 Error
   /// 仍原样上抛；降级语义与「runner 窗口未找到」一致（false + warn）。
   bool _deliver(int wparam, String operation) {
+    // 261009-roy S4/F17 — WR-02 探针: 未 init 且未注入 logger 时公开入口
+    // 安全 no-op（false = IME 状态不变, 与「窗口未找到」同义降级），不触达
+    // FFI，绝不让 KernelLogger.I 的 StateError 外溢到调用方。
+    final log = _log;
+    if (log == null) return false;
     try {
       final hwnd = _resolveRunnerWindow();
       if (hwnd == 0) {
-        _log.warn(
+        log.warn(
           'Win32ImeBridge.$operation: runner window not found by class name, '
           'IME state unchanged',
         );
@@ -180,13 +205,13 @@ class Win32ImeBridge {
         _smtoAbortIfHung,
         _sendTimeoutMs,
       );
-      _log.info(
+      log.info(
         'Win32ImeBridge.$operation: hwnd=0x${hwnd.toRadixString(16)} '
         'wparam=$wparam ok=$ok',
       );
       return ok;
     } on ArgumentError catch (error, stackTrace) {
-      _log.warn(
+      log.warn(
         'Win32ImeBridge.$operation: IME binding unavailable '
         '(user32 assetId resolution failed) — degraded, IME state unchanged',
         context: <String, Object?>{

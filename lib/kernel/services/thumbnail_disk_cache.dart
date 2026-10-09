@@ -419,6 +419,12 @@ final class ThumbnailDiskCache {
   /// 闭包只捕获可发送数据 (路径 String / 限额值对象 / pattern String /
   /// DateTime), Directory/RegExp 在 isolate 内部重建。
   ///
+  /// 261009-roy S3/F16: catch 面补 Error 族分支 — 非 Exception 的 Error
+  /// （如绑定解析 ArgumentError, 261009-fio H1 同族环境性失败）与 spawn
+  /// 失败同样回落内联清理; 内联再失败则记 warn 跳过本轮。清理经
+  /// `unawaited(scheduleCleanup())` 触发的路径绝不让错误外溢成未处理
+  /// 异步异常。
+  ///
   /// 排序依据 file.stat().modified 作为 approximate recency；
   /// 不承诺跨重启绝对 LRU（X9：不为此制造每次 hit 的磁盘写）。
   Future<void> _runCleanup() async {
@@ -431,8 +437,11 @@ final class ThumbnailDiskCache {
     // 提取限额到局部变量 — 闭包只捕获 sendable 数据, 避免 `this` 跨 isolate
     final cachedLimits = limits;
 
+    // isolate 优先; spawn 失败与 Error 族均降级内联回落 (summary 为 null
+    // 即回落信号), 内联回落再失败跳过本轮。
+    CleanupSummary? summary;
     try {
-      final summary = await _isolateRunner(
+      summary = await _isolateRunner(
         () => runDiskCacheCleanupInIsolate(
           directoryPath: dirPath,
           limits: cachedLimits,
@@ -448,12 +457,21 @@ final class ThumbnailDiskCache {
           'survivors': summary.survivors,
         },
       );
+      return;
     } on IsolateSpawnException catch (e) {
       _logWarn(
         'isolate cleanup unavailable — falling back to inline',
         context: {'error': e.toString()},
       );
-      final summary = await runDiskCacheCleanupInIsolate(
+    } on Error catch (error, stackTrace) {
+      // S3/F16: Error 族 (非 Exception) 降级内联 — 不再沿清理链上抛
+      _logWarn(
+        'thumbnail isolate cleanup failed (Error) — falling back to inline',
+        context: {'error': '$error', 'stackTrace': '$stackTrace'},
+      );
+    }
+    try {
+      final inline = await runDiskCacheCleanupInIsolate(
         directoryPath: dirPath,
         limits: cachedLimits,
         hashPattern: hashPatternStr,
@@ -462,10 +480,18 @@ final class ThumbnailDiskCache {
       _logInfo(
         'thumbnail disk cache cleanup finished (inline fallback)',
         context: {
-          'freedBytes': summary.freedBytes,
-          'evictedCount': summary.evictedCount,
-          'survivors': summary.survivors,
+          'freedBytes': inline.freedBytes,
+          'evictedCount': inline.evictedCount,
+          'survivors': inline.survivors,
         },
+      );
+    } on Object catch (error, stackTrace) {
+      // 内联回落也失败 — 跳过本轮, 下轮清理重试; 绝不让错误沿
+      // unawaited(scheduleCleanup()) 变成未处理异步异常
+      _logWarn(
+        'thumbnail disk cache cleanup inline fallback failed — '
+        'skipping this round',
+        context: {'error': '$error', 'stackTrace': '$stackTrace'},
       );
     }
   }
