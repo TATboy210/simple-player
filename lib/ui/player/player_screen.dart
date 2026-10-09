@@ -132,17 +132,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final PanelWorkspaceController _workspace = PanelWorkspaceController();
   final SettingsPanelSession _settingsSession = SettingsPanelSession();
   final WorkspaceMenuSession _menus = WorkspaceMenuSession();
-  SecondarySurfaceMenuBinding? _tooltipMenus;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final binding = SecondarySurfaceMenuPolicy.bindingOf(context);
-    if (identical(binding, _tooltipMenus)) return;
-    _tooltipMenus?.unbind(_menus);
-    _tooltipMenus = binding;
-    binding?.bind(_menus);
-  }
 
   /// 缓存标题栏 widget，避免窗口模式或 resize 导致父级 build 时重新创建标题栏子树。
   ///
@@ -324,7 +313,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _playlistVisible.dispose();
     _workspace.dispose();
     _settingsSession.dispose();
-    _tooltipMenus?.unbind(_menus);
     _menus.dispose();
     super.dispose();
   }

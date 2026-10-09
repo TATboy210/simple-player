@@ -149,8 +149,23 @@ class _VolumeSliderState extends State<VolumeSlider> {
   /// 节流窗口内的最新待提交音量值
   double? _pendingVolume;
 
-  /// 拖拽中的节流处理：记录最新值，100ms 内只触发一次引擎调用
+  /// Local gesture authority is independent of throttled engine echoes.
+  double? _dragValue;
+  bool _interacting = false;
+  bool _active = true;
+
+  /// Pair the borrowed auto-hide hold with this gesture only.
+  void _onChangedStart(double value) {
+    if (!_active) return;
+    _interacting = true;
+    setState(() => _dragValue = value);
+    widget.onInteractionStart?.call();
+  }
+
+  /// 拖拽中的节流处理：视觉即时更新，引擎与 OSD 仍为 100ms。
   void _onChanged(double v) {
+    if (!_active || !_interacting) return;
+    setState(() => _dragValue = v);
     _pendingVolume = v;
     _throttleTimer ??= Timer(
       const Duration(milliseconds: Tokens.volumeThrottleMs),
@@ -162,23 +177,61 @@ class _VolumeSliderState extends State<VolumeSlider> {
   void _flushPending() {
     _throttleTimer = null;
     final v = _pendingVolume;
-    if (v == null) return;
+    _pendingVolume = null;
+    if (!_active || v == null) return;
     widget.onSetVolume(v);
     OsdService.I.show('${(v * 100).round()}%', progress: v);
   }
 
   /// 松手时立即同步最终值（取消定时器，零延迟）
   void _onChangedEnd(double v) {
+    if (!_active || !_interacting) return;
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _pendingVolume = null;
     widget.onSetVolume(v);
     OsdService.I.show('${(v * 100).round()}%', progress: v);
+    setState(() => _dragValue = null);
+    _interacting = false;
+    widget.onInteractionEnd?.call();
+  }
+
+  /// Discard uncommitted work; lifecycle hooks must not call setState in build.
+  void _cancelDrag({VoidCallback? onEnd}) {
+    _throttleTimer?.cancel();
+    _throttleTimer = null;
+    _pendingVolume = null;
+    _dragValue = null;
+    final wasInteracting = _interacting;
+    _interacting = false;
+    if (wasInteracting) (onEnd ?? widget.onInteractionEnd)?.call();
+  }
+
+  @override
+  void didUpdateWidget(VolumeSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.volume, widget.volume) ||
+        oldWidget.onSetVolume != widget.onSetVolume) {
+      _cancelDrag(onEnd: oldWidget.onInteractionEnd);
+    }
+  }
+
+  @override
+  void deactivate() {
+    _active = false;
+    _cancelDrag();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _active = true;
   }
 
   @override
   void dispose() {
-    _throttleTimer?.cancel();
+    _cancelDrag();
     super.dispose();
   }
 
@@ -187,6 +240,11 @@ class _VolumeSliderState extends State<VolumeSlider> {
     return SizedBox(
       width: Tokens.volumeSliderWidth,
       child: Listener(
+        // Slider has no public cancel callback: discard before its recognizer ends.
+        onPointerCancel: (_) {
+          _cancelDrag();
+          if (mounted) setState(() {});
+        },
         // 滚轮是离散事件（~3-5 次/秒），无需节流
         onPointerSignal: (event) {
           if (event is PointerScrollEvent) {
@@ -201,13 +259,10 @@ class _VolumeSliderState extends State<VolumeSlider> {
           builder: (_, volume, _) => SliderTheme(
             data: VolumeSlider._sliderTheme,
             child: Slider(
-              value: volume,
-              onChangeStart: (_) => widget.onInteractionStart?.call(),
+              value: _dragValue ?? volume,
+              onChangeStart: _onChangedStart,
               onChanged: _onChanged,
-              onChangeEnd: (value) {
-                _onChangedEnd(value);
-                widget.onInteractionEnd?.call();
-              },
+              onChangeEnd: _onChangedEnd,
               activeColor: Tokens.accent,
               inactiveColor: Tokens.bgHover,
             ),

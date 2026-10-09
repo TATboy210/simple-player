@@ -125,6 +125,8 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowDown) {
+      // Arrow navigation transfers authority from the restored language button.
+      widget.rowsFocusNode?.requestFocus();
       setState(() {
         final dir = key == LogicalKeyboardKey.arrowDown ? 1 : -1;
         _focusedRow = (_focusedRow + dir + _rowCount) % _rowCount;
@@ -229,6 +231,7 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     final handle = OwnedAnchoredMenu.open<AppLanguage>(
       trigger,
       owner: _languageOwner,
+      initialValue: ErrorFeedbackSettings.I.state.value.language,
       triggerFocus: _languageFocus,
       entries: [
         for (final language in AppLanguage.values)

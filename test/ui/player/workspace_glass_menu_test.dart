@@ -59,9 +59,13 @@ void main() {
     expect(focused, isNotNull);
     expect(idle, isNotNull);
     expect(focused?.color, Tokens.bgElevated);
-    expect(focused?.border, Border.all(color: Tokens.accent));
+    expect(
+      focused?.border,
+      isNull,
+      reason: 'focus uses solid background, no accent outline',
+    );
     expect(idle?.color, Colors.transparent);
-    expect(idle?.border, Border.all(color: Colors.transparent));
+    expect(idle?.border, isNull);
     final ink = tester.widget<InkWell>(
       find.ancestor(of: find.text('First'), matching: find.byType(InkWell)),
     );

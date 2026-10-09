@@ -130,14 +130,21 @@ void main() {
         await _drainSettings(tester);
         expect(menus.isOwnedMenuTopmost, isTrue);
         expect(find.byType(SecondarySurface), findsOneWidget);
+        expect(
+          FocusManager.instance.primaryFocus?.debugLabel,
+          'owned-menu-English',
+        );
         expect(ErrorFeedbackSettings.I.state.value, same(selected));
         expect(ErrorFeedbackSettings.I.pendingPersist, same(persistence));
         expect(playerCalls, 0);
         menus.cancel();
         await tester.pumpAndSettle();
-        // Pointer use must not rewrite remembered row navigation: returning to
-        // the rows node still activates row one rather than the language button.
-        rows.requestFocus();
+        // A real arrow transfers focus away from the restored button; Enter then
+        // activates the visibly highlighted row, not the language trigger.
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pump();
+        expect(rows.hasPrimaryFocus, isTrue);
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
         await tester.pump();
         await tester.sendKeyEvent(key);
         await tester.pumpAndSettle();

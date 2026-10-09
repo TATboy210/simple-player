@@ -9,7 +9,6 @@ import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_card_host.dart';
 import 'ui/player/modal_hold_observer.dart';
 import 'ui/theme/tokens.dart';
-import 'ui/shared/secondary_surface_visibility.dart';
 
 /// 应用壳 — MaterialApp、固定主题与本地化。
 ///
@@ -47,17 +46,6 @@ class App extends StatelessWidget {
         ).copyWith(
           tooltipTheme: const TooltipThemeData(
             waitDuration: Duration(milliseconds: Tokens.tooltipDelayShort),
-            decoration: BoxDecoration(
-              color: Tokens.bgPanel,
-              borderRadius: BorderRadius.all(
-                Radius.circular(Tokens.secondarySurfaceRadius),
-              ),
-            ),
-            textStyle: TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontCaption,
-              fontFamily: Tokens.fontFamily,
-            ),
           ),
         );
 
@@ -85,13 +73,8 @@ class App extends StatelessWidget {
           // v0.0.5: 模态路由观察 — 控制栏自动隐藏在设置/菜单开启期间冻结.
           navigatorObservers: [ModalHoldObserver()],
           home: _buildPlayerHome(),
-          builder: (context, navigator) => SecondarySurfaceMenuRoot(
-            child: buildErrorCardMount(
-              context,
-              navigator,
-              mode: windowService.mode,
-            ),
-          ),
+          builder: (context, navigator) =>
+              buildErrorCardMount(context, navigator, mode: windowService.mode),
         );
       },
     );

@@ -58,6 +58,7 @@ class OwnedAnchoredMenu {
     WorkspaceMenuSession? session,
     bool useWorkspaceScope = true,
     Offset? position,
+    T? initialValue,
     FocusNode? triggerFocus,
     bool Function()? isOwnerValid,
     ValueNotifier<bool>? visibility,
@@ -76,6 +77,7 @@ class OwnedAnchoredMenu {
       trigger: trigger,
       position: position,
       entries: List.unmodifiable(entries),
+      initialValue: initialValue,
       session: menus,
     );
     final token = menus.open(
@@ -174,8 +176,10 @@ class _OwnedMenuRoute<T> extends PopupRoute<OwnedMenuSelection<T>> {
     required this.trigger,
     required this.position,
     required this.entries,
+    required this.initialValue,
     required this.session,
   });
+  final T? initialValue;
   final BuildContext trigger;
   final Offset? position;
   final List<OwnedMenuEntry<T>> entries;
@@ -259,7 +263,13 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
         ),
       ),
     );
-    _selected = widget.route.entries.indexWhere((entry) => entry.isEnabled);
+    // Selectors start at their explicit current value; action menus start first.
+    final initial = widget.route.entries.indexWhere(
+      (entry) => entry.isEnabled && entry.value == widget.route.initialValue,
+    );
+    _selected = initial >= 0
+        ? initial
+        : widget.route.entries.indexWhere((entry) => entry.isEnabled);
     _anchor = widget.route.anchor();
     // Only an open live-button menu observes geometry; cached children stay intact.
     WidgetsBinding.instance.addPostFrameCallback(_checkAnchor);
@@ -310,6 +320,10 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
   KeyEventResult _key(FocusNode node, KeyEvent event) {
     if (!widget.route.session.isOwnedMenuTopmost) return KeyEventResult.ignored;
     widget.route.session.latchEvent(event);
+    // Let Flutter's route traversal policy handle Tab, including reverse Tab.
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      return KeyEventResult.ignored;
+    }
     if (event is! KeyDownEvent) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowDown) _move(1);
@@ -377,6 +391,9 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
         checked: entry.isChecked,
         child: InkWell(
           canRequestFocus: false,
+          mouseCursor: entry.isEnabled
+              ? SystemMouseCursors.click
+              : SystemMouseCursors.basic,
           hoverColor: Tokens.bgHover,
           onTap: entry.isEnabled ? () => widget.route.select(entry) : null,
           child: _rowSurface(index, entry),
@@ -388,12 +405,9 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
   /// Token-based keyboard paint, independent of checked and hover feedback.
   Widget _rowSurface(int index, OwnedMenuEntry<T> entry) => DecoratedBox(
     // Paint the real outer Focus node, without another InkWell Tab stop.
-    // Elevated differs from hover; the accent outline identifies keys.
+    // A solid background identifies keyboard focus without an accent outline.
     decoration: BoxDecoration(
       color: _isFocused(index) ? Tokens.bgElevated : Colors.transparent,
-      border: Border.all(
-        color: _isFocused(index) ? Tokens.accent : Colors.transparent,
-      ),
       borderRadius: BorderRadius.circular(Tokens.radiusBtn),
     ),
     child: Padding(

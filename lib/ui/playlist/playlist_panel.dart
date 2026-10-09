@@ -17,6 +17,7 @@ import '../shared/glass_container.dart' show GlassButton, GlassTier;
 import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
 import 'playlist_tile.dart';
+import 'pending_playlist_confirmation.dart';
 import '../shared/owned_anchored_menu.dart';
 import '../shared/secondary_surface_visibility.dart';
 
@@ -129,6 +130,31 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   /// 批量选中的条目索引集合 — 逻辑队列索引, 条目数变化时自动过滤越界.
   final Set<int> _batchSelected = <int>{};
+  PendingPlaylistConfirmation? _confirmation;
+  final FocusNode _cancelFocus = FocusNode(
+    debugLabel: 'playlist-confirm-cancel',
+  );
+
+  /// Resolve once and remove only this panel's local confirmation.
+  void _finishConfirmation(bool confirmed, {bool rebuild = true}) {
+    final pending = _confirmation;
+    _confirmation = null;
+    pending?.complete(confirmed);
+    if (rebuild && mounted) setState(() {});
+  }
+
+  /// Early ESC prevents the player's hardware fallback from exiting fullscreen.
+  KeyEventResult _confirmationKey(KeyEvent event) {
+    if (_confirmation == null ||
+        !widget.visible ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        event.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored;
+    }
+    WorkspaceMenuScope.maybeOf(context)?.session.latchEvent(event);
+    if (event is KeyDownEvent) _finishConfirmation(false);
+    return KeyEventResult.handled;
+  }
 
   @override
   void initState() {
@@ -139,11 +165,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     )..value = widget.visible ? 1.0 : 0.0;
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     FocusManager.instance.addEarlyKeyEventHandler(_sortKeyEvent);
+    FocusManager.instance.addEarlyKeyEventHandler(_confirmationKey);
   }
 
   @override
   void didUpdateWidget(covariant PlaylistPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.visible || !identical(oldWidget.entries, widget.entries)) {
+      _finishConfirmation(false, rebuild: false);
+    }
     if (oldWidget.visible != widget.visible) {
       widget.visible ? _controller.forward() : _controller.reverse();
     }
@@ -151,6 +181,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   void deactivate() {
+    _finishConfirmation(false, rebuild: false);
     _sortMenu?.cancel();
     super.deactivate();
   }
@@ -158,6 +189,9 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   @override
   void dispose() {
     FocusManager.instance.removeEarlyKeyEventHandler(_sortKeyEvent);
+    FocusManager.instance.removeEarlyKeyEventHandler(_confirmationKey);
+    _finishConfirmation(false, rebuild: false);
+    _cancelFocus.dispose();
     _sortMenu?.cancel();
     _sortFocus.dispose();
     _scrollController.dispose();
@@ -204,10 +238,54 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
         opacity: _fade,
         suspend: widget.scrubbing,
-        child: _buildContent(context),
+        child: Stack(
+          fit: StackFit.expand,
+          clipBehavior: Clip.hardEdge,
+          children: [
+            ExcludeFocus(
+              excluding: _confirmation != null,
+              child: _buildContent(context),
+            ),
+            if (_confirmation case final pending?) _buildConfirmation(pending),
+          ],
+        ),
       ),
     );
   }
+
+  /// The hit-test shield is bounded by the existing panel, never the player.
+  Widget _buildConfirmation(PendingPlaylistConfirmation pending) =>
+      Positioned.fill(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _finishConfirmation(false),
+                child: const ColoredBox(color: Tokens.bgGlass),
+              ),
+            ),
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.all(Tokens.spSm),
+                child: Center(
+                  child: FocusScope(
+                    child: GlassConfirmStrip(
+                      message: pending.message,
+                      cancelLabel: AppLocalizations.of(context).cancel,
+                      confirmTooltip: AppLocalizations.of(context)
+                          .batchDeleteConfirmAction,
+                      cancelFocus: _cancelFocus,
+                      onCancel: () => _finishConfirmation(false),
+                      onConfirm: () => _finishConfirmation(true),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 
   /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存.
   static final _panelDecoration = ControlBarDecoration.playing(
@@ -399,39 +477,40 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     });
   }
 
-  /// 批量删除确认 — 长条玻璃确认条 (正式文案明示"不影响本地磁盘文件"),
-  /// 确认后执行移除并退出多选模式 (v0.0.7).
-  Future<void> _confirmBatchDelete() async {
-    final l10n = AppLocalizations.of(context);
-    final count = _batchSelected.length;
-    if (count == 0) return;
-
-    final confirmed = await GlassConfirmStrip.show(
-      context,
-      message: l10n.batchDeleteConfirmBody(count),
-      confirmTooltip: l10n.batchDeleteConfirmAction,
+  /// Freeze target identities and wording before yielding to the user's choice.
+  Future<PendingPlaylistConfirmation?> _confirmTargets(Set<int> indices) async {
+    if (!widget.visible || !mounted) return null;
+    final pending = PendingPlaylistConfirmation(
+      message: AppLocalizations.of(context)
+          .batchDeleteConfirmBody(indices.length),
+      entries: widget.entries.value,
+      indices: indices,
     );
-
-    if (!confirmed || !mounted) return;
-    final toRemove = Set<int>.of(_batchSelected);
-    _exitBatchMode();
-    widget.onRemoveEntries?.call(toRemove);
+    if (pending.targets.isEmpty) return null;
+    _finishConfirmation(false, rebuild: false);
+    setState(() => _confirmation = pending);
+    final confirmed = await pending.result;
+    if (!confirmed || !mounted || !widget.visible) return null;
+    return pending;
   }
 
-  /// 单条移除确认 (v0.0.7) — 与批量删除共用确认条; 计数恒 1,
-  /// 文案语义复用同一正式模板.
+  /// 批量移除仅使用打开时的快照；不影响本地磁盘文件。
+  Future<void> _confirmBatchDelete() async {
+    if (_batchSelected.isEmpty) return;
+    final pending = await _confirmTargets(Set.of(_batchSelected));
+    if (!mounted || !widget.visible || pending == null) return;
+    _exitBatchMode();
+    // Resolve after all asynchronous waits, immediately before the callback.
+    final toRemove = pending.resolve(widget.entries.value);
+    if (toRemove.isNotEmpty) widget.onRemoveEntries?.call(toRemove);
+  }
+
+  /// Single removal resolves the frozen path against the current queue.
   Future<void> _confirmSingleRemove(int index) async {
-    final l10n = AppLocalizations.of(context);
-    if (index < 0 || index >= widget.entries.value.length) return;
-
-    final confirmed = await GlassConfirmStrip.show(
-      context,
-      message: l10n.batchDeleteConfirmBody(1),
-      confirmTooltip: l10n.batchDeleteConfirmAction,
-    );
-
-    if (!confirmed || !mounted) return;
-    widget.onRemoveEntry(index);
+    final pending = await _confirmTargets({index});
+    if (!mounted || !widget.visible || pending == null) return;
+    final toRemove = pending.resolve(widget.entries.value);
+    if (toRemove.isNotEmpty) widget.onRemoveEntry(toRemove.single);
   }
 
   /// 条目纵列 — [lastPlayed] 为停止态高亮锚点; [resumeAllowed] 传递断点

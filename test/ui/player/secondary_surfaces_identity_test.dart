@@ -177,18 +177,54 @@ void main() {
       final settings = ValueNotifier<bool>(true);
       video.player.durationNow = const Duration(hours: 999999);
       engine.duration.value = const Duration(hours: 999999).inMilliseconds;
+      final showConfirmation = ValueNotifier(false);
+      addTearDown(showConfirmation.dispose);
+      bool? confirmationResult;
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: PlayerVideoControls(
-              video: video,
-              engine: engine,
-              actions: const PlayerActions(),
-              currentFileName: title,
-              windowMode: mode,
-              settingsVisible: settings,
+            body: Stack(
+              children: [
+                PlayerVideoControls(
+                  video: video,
+                  engine: engine,
+                  actions: const PlayerActions(),
+                  currentFileName: title,
+                  windowMode: mode,
+                  settingsVisible: settings,
+                ),
+                ValueListenableBuilder<bool>(
+                  valueListenable: showConfirmation,
+                  builder: (_, visible, _) => visible
+                      ? Positioned(
+                          left: 100,
+                          top: 100,
+                          width: 280,
+                          height: 180,
+                          child: Center(
+                            child: Material(
+                              color: Colors.transparent,
+                              child: GlassConfirmStrip(
+                                message: 'Remove complete filename?',
+                                cancelLabel: 'Cancel',
+                                confirmTooltip: 'remove',
+                                onCancel: () {
+                                  confirmationResult = false;
+                                  showConfirmation.value = false;
+                                },
+                                onConfirm: () {
+                                  confirmationResult = true;
+                                  showConfirmation.value = false;
+                                },
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
           ),
         ),
@@ -228,11 +264,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       await menu;
-      final confirmation = GlassConfirmStrip.show(
-        context,
-        message: 'Remove complete filename?',
-        confirmTooltip: 'remove',
-      );
+      showConfirmation.value = true;
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       _secondary(
@@ -250,7 +282,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(await confirmation, isFalse);
+      expect(confirmationResult, isFalse);
       tester.view.physicalSize = const Size(1000, 600);
       await tester.pump();
       expect(tester.element(bar), same(barElement));

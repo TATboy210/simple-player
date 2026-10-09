@@ -36,6 +36,8 @@ void main() {
       await tester.pump();
 
       final slider = tester.widget<Slider>(find.byType(Slider));
+      // Match the Slider gesture lifecycle before invoking move/end callbacks.
+      slider.onChangeStart?.call(engine.volume.value);
       final onChanged = slider.onChanged!;
 
       // 模拟 5 次快速拖拽（100ms 窗口内）
@@ -66,6 +68,8 @@ void main() {
       await tester.pump();
 
       final slider = tester.widget<Slider>(find.byType(Slider));
+      // Match the Slider gesture lifecycle before invoking move/end callbacks.
+      slider.onChangeStart?.call(engine.volume.value);
       slider.onChanged!(0.6);
       slider.onChanged!(0.7);
       slider.onChangeEnd!(0.8);
@@ -115,6 +119,8 @@ void main() {
 
       // 触发节流定时器
       final slider = tester.widget<Slider>(find.byType(Slider));
+      // Match the Slider gesture lifecycle before invoking move/end callbacks.
+      slider.onChangeStart?.call(engine.volume.value);
       slider.onChanged!(0.7);
 
       // 定时器尚未触发
@@ -137,6 +143,8 @@ void main() {
       await tester.pump();
 
       final slider = tester.widget<Slider>(find.byType(Slider));
+      // Match the Slider gesture lifecycle before invoking move/end callbacks.
+      slider.onChangeStart?.call(engine.volume.value);
       final onChanged = slider.onChanged!;
       final onChangeEnd = slider.onChangeEnd!;
 

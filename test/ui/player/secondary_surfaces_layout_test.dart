@@ -144,7 +144,7 @@ void main() {
 
   for (final exit in ['confirm', 'cancel', 'barrier', 'escape']) {
     testWidgets(
-      'confirmation complete scrolling and $exit returns native result',
+      'confirmation content scrolls with reachable actions and local $exit',
       (tester) async {
         tester.view.physicalSize = const Size(854, 480);
         tester.view.devicePixelRatio = 1;
@@ -155,21 +155,53 @@ void main() {
         bool? result;
         await tester.pumpWidget(
           _app(
-            Builder(
-              builder: (context) => TextButton(
-                onPressed: () async {
-                  result = await GlassConfirmStrip.show(
-                    context,
-                    message: message,
-                    confirmTooltip: 'remove',
-                  );
-                },
-                child: const Text('open'),
-              ),
+            StatefulBuilder(
+              builder: (context, update) {
+                void finish(bool value) => update(() => result = value);
+                return SizedBox(
+                  width: 280,
+                  height: 180,
+                  child: Stack(
+                    children: [
+                      if (result == null) ...[
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => finish(false),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.all(Tokens.spSm),
+                            child: Center(
+                              child: Focus(
+                                onKeyEvent: (_, event) {
+                                  if (event.logicalKey ==
+                                      LogicalKeyboardKey.escape) {
+                                    if (event is KeyDownEvent) finish(false);
+                                    return KeyEventResult.handled;
+                                  }
+                                  return KeyEventResult.ignored;
+                                },
+                                child: GlassConfirmStrip(
+                                  message: message,
+                                  cancelLabel: 'Cancel',
+                                  confirmTooltip: 'remove',
+                                  onCancel: () => finish(false),
+                                  onConfirm: () => finish(true),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         );
-        await tester.tap(find.text('open'));
         await tester.pumpAndSettle();
         final surface = find.descendant(
           of: find.byType(GlassConfirmStrip),
@@ -218,7 +250,10 @@ void main() {
           case 'cancel':
             await tester.tap(find.byIcon(Icons.close));
           case 'barrier':
-            await tester.tapAt(const Offset(5, 5));
+            await tester.tapAt(
+              tester.getTopLeft(find.byType(GlassConfirmStrip)) -
+                  const Offset(2, 2),
+            );
           case 'escape':
             await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         }
