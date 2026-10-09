@@ -880,6 +880,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   void simulatePlaying(bool playing) {
     if (_disposed) return;
     if (playing) {
+      // 镜像 K6 修复: 播放重新开始即退出完成态, 清粘滞的 _completing.
+      _completing = false;
       if (state.value != MediaState.playing) {
         state.value = MediaState.playing;
       }

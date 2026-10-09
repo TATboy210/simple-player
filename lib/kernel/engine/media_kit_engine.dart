@@ -1322,6 +1322,11 @@ class MediaKitEngine implements MediaEngine {
   void _onPlaying(bool playing) {
     if (_disposed) return;
     if (playing) {
+      // 播放重新开始即退出完成态 (K6) — media_kit remove() 删正在播末项
+      // 会伪造 completed:true (包特例, 红线只记录), mpv 自动跳 index 0
+      // 续播; 若不清 flag, 后续用户暂停的 playing(false) 被 _completing
+      // 吞掉. 与 play()/jumpTo 的清除语义一致 (重新进入播放会话).
+      _completing = false;
       // WASAPI 首播 re-sync (v0.0.8.1): Windows 音频设备可能延迟到首次
       // 实际播放才就绪, open 时写入的 volume/mute 属性可能不生效 — 首个
       // playing 事件幂等重写一次 (门逻辑见 volume_resync_gate.dart).
