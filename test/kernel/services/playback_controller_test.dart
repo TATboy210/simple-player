@@ -256,6 +256,9 @@ void main() {
 
           expect(await older, false);
           expect(await latest, true);
+          // K4-b: 轨道偏好恢复挂轨道表首帧 — 显式注入回流帧后恢复才发生.
+          engine.emitTrackTableChange();
+          await pumpEventQueue();
           expect(subtitleService.detectedPaths, <String>['C:/test/latest.mp4']);
           expect(trackPreferenceService.restoredMedia, hasLength(1));
           expect(engine.playCallCount, 1);
@@ -470,6 +473,78 @@ void main() {
           }
         },
       );
+    });
+
+    group('轨道偏好恢复时序 (K4-b)', () {
+      // K4-b 缺陷: openAndPlay 在 OpenSuccess 即刻调 restoreAfterOpen —
+      // 真实引擎此刻轨道流尚未回流, mediaInfo 轨道表是上一文件的 (首次
+      // 开启为空表), 索引校验与恢复全错位. 修复契约: 恢复挂
+      // MediaEngine.trackTableChanged 首帧后执行一次.
+      test('恢复延迟到轨道表首帧 — open resolve 时刻不得即刻恢复', () async {
+        final trackPreferenceService = _RecordingTrackPreferenceService(engine);
+        controller.dispose();
+        controller = PlaybackController(
+          engine: engine,
+          onError: errors.add,
+          trackPreferenceService: trackPreferenceService,
+        );
+        engine.configureMedia(
+          durationMs: 60000,
+          audioTracks: [
+            const AudioTrackInfo(index: 0, language: 'en'),
+            const AudioTrackInfo(index: 1, language: 'zh'),
+          ],
+        );
+        trackPreferenceService.recordAudioTrack(1);
+
+        expect(await controller.openAndPlay('C:/test/video.mp4'), true);
+
+        // open resolve 时刻恢复尚未发生 (真实引擎此刻 audioTracks 为空表,
+        // 即刻恢复会让 switchAudioTrack 被范围校验丢弃 — 陈旧读实证).
+        expect(trackPreferenceService.restoredMedia, isEmpty);
+
+        // 轨道表首帧回流 (FakeEngine 显式注入, 模拟 mpv 轨道流) 后
+        // 恰好恢复一次, 且以就绪轨道表执行音频轨道切换.
+        engine.emitTrackTableChange();
+        await pumpEventQueue();
+        expect(trackPreferenceService.restoredMedia, hasLength(1));
+        expect(engine.switchAudioTrackCallCount, 1);
+        expect(engine.lastSwitchAudioTrack, 1);
+      });
+
+      test('轨道流多帧只恢复一次 — 首帧后额外帧不得重复恢复', () async {
+        final trackPreferenceService = _RecordingTrackPreferenceService(engine);
+        controller.dispose();
+        controller = PlaybackController(
+          engine: engine,
+          onError: errors.add,
+          trackPreferenceService: trackPreferenceService,
+        );
+        engine.configureMedia(durationMs: 60000);
+
+        expect(await controller.openAndPlay('C:/test/video.mp4'), true);
+        expect(trackPreferenceService.restoredMedia, isEmpty);
+
+        await pumpEventQueue(); // 无注入帧 — 无订阅方触发的恢复不得发生
+        expect(trackPreferenceService.restoredMedia, isEmpty);
+
+        engine.emitTrackTableChange(); // 首帧 → 恢复一次
+        await pumpEventQueue();
+        expect(trackPreferenceService.restoredMedia, hasLength(1));
+
+        engine.emitTrackTableChange(); // 第二帧 (外挂字幕加载等) — 不再恢复
+        await pumpEventQueue();
+        expect(trackPreferenceService.restoredMedia, hasLength(1));
+      });
+
+      test('无轨道偏好服务时挂起恢复静默完成 — 不抛异常', () async {
+        engine.configureMedia(durationMs: 60000);
+        expect(await controller.openAndPlay('C:/test/video.mp4'), true);
+        engine.emitTrackTableChange();
+        await pumpEventQueue();
+        // trackPreferenceService 为 null — 恢复路径不得崩溃.
+        expect(errors, isEmpty);
+      });
     });
 
     group('网络流打开失败附带接口摘要 (B5/9)', () {

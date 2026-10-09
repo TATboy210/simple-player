@@ -639,14 +639,42 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     }
   }
 
+  // ─── Track-table change signal (K4-b) ───
+
+  /// 轨道表变更广播流 — 镜像 MediaKitEngine 的轨道流对外通知语义
+  /// (K4-b: 真实引擎中轨道帧晚于 open resolve 回流, 恢复类消费方须等
+  /// 首帧而非即刻读 mediaInfo).
+  ///
+  /// Fake 不自动发帧 (规避测试时序歧义), 测试经 [emitTrackTableChange]
+  /// 显式注入模拟 mpv 轨道流回流.
+  final StreamController<void> _trackTableChanges =
+      StreamController<void>.broadcast();
+
+  /// 轨道表变更通知流 (K4-b GREEN 收编进 EngineStateView 后加 @override).
+  Stream<void> get trackTableChanged => _trackTableChanges.stream;
+
+  /// 手工注入一帧轨道表变更 — 模拟 mpv 轨道流回流 (装载后首帧/外挂字幕
+  /// 加载等), dispose 后静默忽略.
+  void emitTrackTableChange() {
+    if (_disposed) return;
+    _trackTableChanges.add(null);
+  }
+
   // ─── Audio tracks (TrackControl) ───
 
   @override
   List<AudioTrackInfo> getAudioTracks() => _mediaInfo.audioTracks;
 
+  int switchAudioTrackCallCount = 0;
+  int? lastSwitchAudioTrack;
+
   @override
   void switchAudioTrack(int trackIndex) {
-    // no-op in fake
+    // 镜像 MediaKitEngine.switchAudioTrack: 范围外静默拒绝.
+    if (_disposed) return;
+    if (trackIndex < 0 || trackIndex >= _mediaInfo.audioTracks.length) return;
+    switchAudioTrackCallCount++;
+    lastSwitchAudioTrack = trackIndex;
   }
 
   @override
@@ -657,9 +685,21 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   List<SubtitleTrackInfo> getSubtitleTracks() => _mediaInfo.subtitleTracks;
 
+  int switchSubtitleTrackCallCount = 0;
+  int? lastSwitchSubtitleTrack;
+
+  /// 字幕关闭调用计数 — trackId == -1 应映射 SubtitleTrack.no() 关闭语义.
+  int subtitleOffCallCount = 0;
+
   @override
   void switchSubtitleTrack(int trackIndex) {
-    // no-op in fake
+    // 镜像 MediaKitEngine.switchSubtitleTrack 现行守卫: trackId < 0 一律
+    // 静默拒绝 (K4-a 缺陷: -1 关闭偏好被吞成永久 no-op — GREEN 翻转此镜像).
+    if (_disposed) return;
+    if (trackIndex < 0) return;
+    if (trackIndex >= _mediaInfo.subtitleTracks.length) return;
+    switchSubtitleTrackCallCount++;
+    lastSwitchSubtitleTrack = trackIndex;
   }
 
   @override
@@ -767,6 +807,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   void dispose() {
     if (_disposed) return; // double-dispose safety
     _disposed = true;
+    // 关闭轨道表变更流 — 广播流 close 后监听方收到 done, 不悬挂.
+    unawaited(_trackTableChanges.close());
     // isPlayingNotifier 监听 state — 必须在 state.dispose() 之前
     // removeListener + dispose, 否则访问已释放的 state 抛 StateError.
     state.removeListener(_onStateChanged);

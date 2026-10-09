@@ -58,6 +58,19 @@ void main() {
         service.restoreAfterOpen(engine.mediaInfo);
       });
 
+      test(
+        'subtitle off (-1) reaches engine as a close-subtitle call (K4-a)',
+        () {
+          // 引擎契约: switchSubtitleTrack(-1) 是字幕关闭偏好, 须映射
+          // SubtitleTrack.no() 关闭调用 — 现行引擎守卫 trackId < 0 一律
+          // 吞掉 (-1 永久 no-op, 关字幕下个文件自动回来), 本断言在引擎
+          // 守卫修复前为红 (K4-a).
+          service.recordSubtitleTrack(-1);
+          service.restoreAfterOpen(engine.mediaInfo);
+          expect(engine.subtitleOffCallCount, 1);
+        },
+      );
+
       test('restores subtitle delay', () {
         service.recordSubtitleDelay(500);
         service.restoreAfterOpen(engine.mediaInfo);
