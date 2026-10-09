@@ -49,6 +49,22 @@ Future<PersistedPlaylistSnapshot?> _waitForSavedSnapshot(
   return loaded;
 }
 
+/// 轮询等待落盘快照满足 [condition] — 断点**更新**落盘断言用
+/// （_waitForSavedSnapshot 只等"首次非空", 无法区分"旧快照"与"新快照";
+///  条件不满足时超时返回最后一次结果, 由调用方断言 — 真失败照常失败）.
+Future<PersistedPlaylistSnapshot?> _waitForSavedSnapshotWhere(
+  PlaylistStore store,
+  bool Function(PersistedPlaylistSnapshot snapshot) condition,
+) async {
+  PersistedPlaylistSnapshot? loaded;
+  for (var attempt = 0; attempt < 40; attempt++) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    loaded = await store.load();
+    if (loaded != null && condition(loaded)) return loaded;
+  }
+  return loaded;
+}
+
 /// 计数包装 — 断点节流落盘测试用（save 次数可观测, 内容仍真写盘）.
 class _CountingStore extends PlaylistStore {
   _CountingStore({required super.resolveDirectory});
@@ -250,6 +266,95 @@ void main() {
       // 当前曲目断点内容已随节流保存刷新.
       final a = coord.entries.value.firstWhere((e) => e.path == 'a.mp4');
       expect(a.positionMs, 3000);
+    });
+  });
+
+  group('看完清除断点 (v0.0.12 K2)', () {
+    test('copyWith null-keep 语义锚点 — copyWith(positionMs: null) 保留旧值', () {
+      // 证伪现状用例: copyWith 的 null 参数 = "保留旧值", 不是"清除为
+      // null" — 这正是断点看完清除失效的根因. 本用例锁定该语义本身,
+      // 防未来对 copyWith 行为的理解漂移.
+      final item = PlaylistItem(
+        path: 'a.mp4',
+        positionMs: 1000,
+        durationMs: 5000,
+      );
+      final updated = item.copyWith(positionMs: null);
+      expect(updated.positionMs, 1000); // null-keep — 未被清除
+      expect(updated.durationMs, 5000); // 其余字段照常保留
+    });
+
+    test('看完清除断点 — 近 EOF 切曲时 positionMs 清为 null', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      engine.duration.value = 100000;
+      engine.position.value = 42000;
+      await coordinator.playEntryAt(1); // a 记中途断点 42000
+      engine.position.value = 20000;
+      await coordinator.playEntryAt(0); // b 记 20000, 回到 a
+
+      // 看完 a — position 推进到 ≥98% 近 EOF 区后切曲, 触发 a 断点更新.
+      engine.position.value = 98000;
+      await coordinator.playEntryAt(1);
+
+      final a = coordinator.entries.value.firstWhere((e) => e.path == 'a.mp4');
+      // effectiveBreakpointMs(98000, 100000) = null ("看完"约定) —
+      // 断点必须真正清为 null (现行为 copyWith 吞掉 null 保留 42000 → 红).
+      expect(a.positionMs, isNull);
+      expect(a.durationMs, 100000); // durationMs 照写 (排序按时长需要)
+      expect(a.timestamp, isNotNull); // 最后播放时间戳照常刷新
+    });
+
+    test('看完清除断点 — 节流落盘路径同步清除 (盘上不留陈旧中途位置)', () async {
+      final tempDir = await Directory.systemTemp.createTemp('bp_watch_end');
+      final store = PlaylistStore(resolveDirectory: () async => tempDir);
+      final coord = PlaylistCoordinator(engine: engine, store: store);
+      addTearDown(() => coord.dispose());
+      addTearDown(() => _deleteTempDir(tempDir));
+
+      var now = DateTime(2026, 1, 1);
+      coord.clock = () => now;
+
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      engine.duration.value = 100000;
+      engine.position.value = 42000; // 首次进度 → 立即节流落盘, a 记 42000
+      engine.position.value = 20000;
+      await coord.playEntryAt(1); // 切到 b (a 断点已在中途区)
+      engine.position.value = 20000;
+      await coord.playEntryAt(0); // b 记 20000, current 回到 a
+
+      // 看完 a — 节流窗口 (5s) 过后的 position 事件触发断点刷新 + 落盘.
+      now = now.add(const Duration(seconds: 6));
+      engine.position.value = 98000; // ≥98% — 触发 _maybeThrottledSave
+
+      // 轮询等待盘上 a 的 positionMs 被清 (RED: 2s 超窗后仍是 42000 → 败).
+      final loaded = await _waitForSavedSnapshotWhere(
+        store,
+        (s) => s.items.firstWhere((e) => e.path == 'a.mp4').positionMs == null,
+      );
+      final a = loaded!.items.firstWhere((e) => e.path == 'a.mp4');
+      expect(a.positionMs, isNull); // 盘上断点已清除
+      expect(a.durationMs, 100000);
+    });
+
+    test('看完后 resumeEntryAt — 断点已清 null → 从头播不挂起 seek', () async {
+      await engine.openPlaylist(['a.mp4', 'b.mp4']);
+      engine.duration.value = 100000;
+      engine.position.value = 42000;
+      await coordinator.playEntryAt(1); // a 记 42000
+      engine.position.value = 20000;
+      await coordinator.playEntryAt(0); // b 记 20000, 回到 a
+      engine.position.value = 98000;
+      await coordinator.playEntryAt(1); // a 断点应被清除
+
+      // 端到端读点: positionMs 已 null → resumeMs=0 → 不挂起补 seek —
+      // 从头起播 (现行为保留 42000 → resume 挂起 seek 跳回片尾 → 红).
+      final ok = await coordinator.resumeEntryAt(0);
+      expect(ok, isTrue);
+      // 模拟"新条目开始播放" — position 落入低位锁存区 (<2s). 挂起的
+      // 补 seek 在此事件触发 (_pendingResumeMs 在 playEntryAt 之后才登记,
+      // jumpTo 自带的 position(0) 事件赶不上, 须显式泵一个低位事件).
+      engine.position.value = 500;
+      expect(engine.lastSeekToMs, isNull); // 无断点补 seek
     });
   });
 
