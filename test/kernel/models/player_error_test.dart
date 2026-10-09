@@ -135,6 +135,101 @@ void main() {
     });
   });
 
+  group('ErrorContext.copyWith (N4)', () {
+    // N4: 富集/派生走 copyWith — 字段保留由结构保证, 不再依赖手工逐字段
+    // 重建 (B5/9 富集点曾因全量手工重建, 后继 ErrorContext 新字段会被
+    // 静默丢诊断且无编译期信号).
+    final fixedTime = DateTime(2026, 1, 15, 10, 30);
+    final fixedStack = StackTrace.fromString('#0 site\n#1 frame');
+    final full = ErrorContext(
+      action: 'open',
+      generation: 7,
+      path: 'https://example.com/stream.mp4',
+      timestamp: fixedTime,
+      module: 'MediaKitEngine',
+      callbackStackTrace: fixedStack,
+      networkInterfaceCount: 4,
+      networkHasNonLoopback: true,
+    );
+
+    test('copyWith() 无参 → 八字段逐项保留, timestamp 同实例透传 (不重跑 DateTime.now())', () {
+      final copy = full.copyWith();
+
+      expect(copy.action, 'open');
+      expect(copy.generation, 7);
+      expect(copy.path, 'https://example.com/stream.mp4');
+      // 透传铁证: 同一 DateTime 实例 — 重跑构造器默认会得到 DateTime.now()
+      expect(copy.timestamp, same(full.timestamp));
+      expect(copy.module, 'MediaKitEngine');
+      expect(copy.callbackStackTrace, same(fixedStack));
+      expect(copy.networkInterfaceCount, 4);
+      expect(copy.networkHasNonLoopback, true);
+    });
+
+    test('copyWith(action:, module:) → 恰好两字段覆盖, 其余六字段保留', () {
+      final copy = full.copyWith(action: 'seek', module: 'Test');
+
+      expect(copy.action, 'seek');
+      expect(copy.module, 'Test');
+      expect(copy.generation, 7);
+      expect(copy.path, 'https://example.com/stream.mp4');
+      expect(copy.timestamp, same(fixedTime));
+      expect(copy.callbackStackTrace, same(fixedStack));
+      expect(copy.networkInterfaceCount, 4);
+      expect(copy.networkHasNonLoopback, true);
+    });
+
+    test('copyWith(网络二字段) → 富集形: 新字段落位, 既有字段原样保留 (N4 Task 2 依赖的调用形)', () {
+      // 富集前形: 上下文已携带环境字段, 网络诊断字段尚未采集 (null) —
+      // 与 playback_controller._enrichNetworkSnapshot 的实际调用形一致.
+      final preEnrich = ErrorContext(
+        action: 'open',
+        generation: 3,
+        path: 'https://example.com/stream.mp4',
+        timestamp: fixedTime,
+        module: 'MediaKitEngine',
+        callbackStackTrace: fixedStack,
+      );
+
+      final enriched = preEnrich.copyWith(
+        networkInterfaceCount: 2,
+        networkHasNonLoopback: true,
+      );
+
+      expect(enriched.networkInterfaceCount, 2);
+      expect(enriched.networkHasNonLoopback, true);
+      expect(enriched.action, 'open');
+      expect(enriched.generation, 3);
+      expect(enriched.path, 'https://example.com/stream.mp4');
+      expect(enriched.timestamp, same(fixedTime));
+      expect(enriched.module, 'MediaKitEngine');
+      expect(enriched.callbackStackTrace, same(fixedStack));
+    });
+
+    test('copyWith(timestamp:) → 显式覆盖非空 timestamp', () {
+      final other = DateTime(2026, 2, 20, 8, 0);
+      final copy = full.copyWith(timestamp: other);
+
+      expect(copy.timestamp, other);
+      expect(copy.timestamp, isNot(same(fixedTime)));
+    });
+
+    test('裸 ErrorContext 上 copyWith → 未列字段保持 null, timestamp 非空, 显式字段落位', () {
+      final bare = ErrorContext();
+
+      final copy = bare.copyWith(networkHasNonLoopback: false);
+
+      expect(copy.networkHasNonLoopback, false);
+      expect(copy.action, isNull);
+      expect(copy.generation, isNull);
+      expect(copy.path, isNull);
+      expect(copy.module, isNull);
+      expect(copy.callbackStackTrace, isNull);
+      expect(copy.networkInterfaceCount, isNull);
+      expect(copy.timestamp, isNotNull);
+    });
+  });
+
   group('isFatal', () {
     test('FileError: pathEmpty is not fatal (recoverable)', () {
       final error = FileError(FileErrorCode.pathEmpty, 'e');
