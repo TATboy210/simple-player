@@ -68,6 +68,8 @@ class PersistedPlaylistSnapshot {
 ///
 /// 容错契约: 文件缺失 / JSON 损坏 / 字段类型异常 → [load] 返回 null
 /// （视作"无历史"），绝不抛出到调用方; [save] 失败仅记日志.
+/// 损坏文件额外隔离为 `playlist.json.corrupt` 留存（单代, 覆盖旧代）—
+/// 现场可回溯, 不再被下次 save 静默覆盖.
 class PlaylistStore {
   /// [resolveDirectory] 可注入以隔离测试; 默认 Application Support 目录.
   PlaylistStore({Future<Directory> Function()? resolveDirectory})
@@ -76,19 +78,41 @@ class PlaylistStore {
   static const _fileName = 'playlist.json';
   static const _version = 3;
 
+  /// 检疫文件后缀 — `<原路径>.corrupt`, 仅保留一代.
+  static const _corruptSuffix = '.corrupt';
+
   final Future<Directory> Function() _resolveDirectory;
 
   static Future<Directory> _defaultDirectory() =>
       getApplicationSupportDirectory();
 
   /// 读取持久化快照; 无文件或损坏时返回 null.
+  ///
+  /// 损坏处理: 成功读入但解析失败 → 文件原子改名 `.corrupt` 隔离留存
+  /// （单代）— 损坏现场可回溯; 读失败/文件缺失仅记日志, 不隔离.
   Future<PersistedPlaylistSnapshot?> load() async {
     try {
       final directory = await _resolveDirectory();
       final file = File('${directory.path}/$_fileName');
       if (!await file.exists()) return null;
-      final content = await file.readAsString();
-      return _parse(content);
+      final String content;
+      try {
+        content = await file.readAsString();
+      } on Exception catch (error, stackTrace) {
+        // 读失败（锁/IO 瞬时故障）— 视作无历史, 原文件原地保留待下次重试.
+        _log.w(
+          'PlaylistStore: failed to read playlist.json',
+          context: {
+            'error': error.toString(),
+            'stackTrace': stackTrace.toString(),
+          },
+        );
+        return null;
+      }
+      final snapshot = _parse(content);
+      // 成功读入但解析失败 = 文件损坏 — 隔离取证, 不再无声覆盖销毁证据.
+      if (snapshot == null) await _quarantineCorrupt(file);
+      return snapshot;
     } on Exception catch (error, stackTrace) {
       // 损坏文件视作无历史 — 播放列表不是关键数据, 不值得打断启动.
       _log.w(
@@ -99,6 +123,32 @@ class PlaylistStore {
         },
       );
       return null;
+    }
+  }
+
+  /// 损坏文件检疫 — 原子改名为 `<原路径>.corrupt` 隔离留存（仅一代）.
+  ///
+  /// Dart `File.rename` 在 Windows 走
+  /// `MoveFileExW(MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING)`
+  /// （runtime/bin/file_win.cc）— 目标已存在时单系统调用原子替换,
+  /// 因此**不要预删除旧 .corrupt**（预删除会引入"证据短暂消失"空窗,
+  /// rename-over-existing 同时达成覆盖与无空窗）.
+  /// rename 失败（杀软/另一实例锁住）→ 原文件原地保留, 仅记日志 —
+  /// best-effort: 证据留存失败可接受, 原文件留待下次 save 覆盖.
+  Future<void> _quarantineCorrupt(File file) async {
+    try {
+      // 字节数须在 rename 前采集 — rename 后原路径已不存在.
+      final bytes = await file.length();
+      await file.rename('${file.path}$_corruptSuffix');
+      _log.w(
+        'PlaylistStore: corrupt playlist.json quarantined',
+        context: {'file': file.path, 'bytes': bytes},
+      );
+    } on FileSystemException catch (error) {
+      _log.w(
+        'PlaylistStore: failed to quarantine corrupt playlist.json',
+        context: {'file': file.path, 'error': error.toString()},
+      );
     }
   }
 
