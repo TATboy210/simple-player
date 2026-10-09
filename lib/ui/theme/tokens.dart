@@ -327,6 +327,11 @@ class Tokens {
   static const double playlistPanelHeightNarrow = 180;
   static const double thumbnailTileHeight = 124;
 
+  /// 滚轮滑行动画时长 (v0.0.11 T4) — 拦截 wheel 信号后单 tick 的
+  /// easeOutCubic 滑行时长; 连发滚轮时 animateTo 自动取消前段并从
+  /// 当前位置接力重算, 形成连续滑行, 替代瞬跳 (flutter#31658).
+  static const int playlistWheelGlideMs = 180;
+
   // ── 断点 ──
   static const double compactBreakpoint = 500;
   static const double breakpointUltraCompact = 360;

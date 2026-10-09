@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -599,39 +600,108 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       child: Scrollbar(
         controller: _scrollController,
         thumbVisibility: true,
-        child: ListView.builder(
+        // 滚轮平滑滚动 (v0.0.11 T4): ListView 塌缩为显式 Scrollable+Viewport,
+        // Listener 必须位于 viewportBuilder 内层 — SDK PointerSignalResolver
+        // "第一注册者胜出" (命中测试自最深叶起派发), 内层注册先于 Scrollable
+        // 自带的瞬跳 Listener, wheel 信号竞拍裁给我们. physics 路线不可行:
+        // 它只过 shouldAcceptUserOffset 门, 收不到 wheel 事件.
+        child: Scrollable(
           controller: _scrollController,
-          // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
-          // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
-          padding: const EdgeInsets.fromLTRB(
-            Tokens.spXs,
-            Tokens.spSm,
-            8,
-            Tokens.controlBarRadius,
+          semanticChildCount: items.length,
+          viewportBuilder: (context, position) => Listener(
+            onPointerSignal: _onWheelSignal,
+            child: Viewport(
+              offset: position,
+              slivers: [
+                SliverPadding(
+                  // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
+                  // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
+                  padding: const EdgeInsets.fromLTRB(
+                    Tokens.spXs,
+                    Tokens.spSm,
+                    8,
+                    Tokens.controlBarRadius,
+                  ),
+                  sliver: SliverList(
+                    // 参数对齐 ListView.builder 默认 (addAutomaticKeepAlives/
+                    // addRepaintBoundaries/addSemanticIndexes 恒 true) —
+                    // 防缩略图 keep-alive/重绘边界行为漂移.
+                    delegate: SliverChildBuilderDelegate((context, i) {
+                      // 状态合成 (v0.0.6.2): 播放中 = accent 蓝; 停止态
+                      // (index == -1) 的"上次会话最后播放"条目 = 续播锚点白
+                      // (path 匹配). 播放态锚已被 revision 同步为当前 path,
+                      // 两状态天然不并存.
+                      return PlaylistTile(
+                        item: items[i],
+                        isCurrent: i == index,
+                        isResumeAnchor:
+                            index < 0 && items[i].path == lastPlayed,
+                        onPlay: () => widget.onPlayEntry(i),
+                        onResume: () => widget.onResumeEntry(i),
+                        // v0.0.7: 单条移除也过确认条 (与批量共用正式文案).
+                        onRemove: () => unawaited(_confirmSingleRemove(i)),
+                        selectionMode: _batchMode,
+                        isSelected: validSelection.contains(i),
+                        onToggleSelect: () => _toggleSelect(i),
+                        onStartBatchSelect:
+                            widget.onRemoveEntries == null || _batchMode
+                            ? null
+                            : () => _enterBatchMode(i),
+                        resumeAllowed: resumeAllowed,
+                      );
+                    }, childCount: items.length),
+                  ),
+                ),
+              ],
+            ),
           ),
-          itemCount: items.length,
-          itemBuilder: (_, i) {
-            // 状态合成 (v0.0.6.2): 播放中 = accent 蓝; 停止态 (index == -1)
-            // 的"上次会话最后播放"条目 = 续播锚点白 (path 匹配). 播放态
-            // 锚已被 revision 同步为当前 path, 两状态天然不并存.
-            return PlaylistTile(
-              item: items[i],
-              isCurrent: i == index,
-              isResumeAnchor: index < 0 && items[i].path == lastPlayed,
-              onPlay: () => widget.onPlayEntry(i),
-              onResume: () => widget.onResumeEntry(i),
-              // v0.0.7: 单条移除也过确认条 (与批量共用正式文案).
-              onRemove: () => unawaited(_confirmSingleRemove(i)),
-              selectionMode: _batchMode,
-              isSelected: validSelection.contains(i),
-              onToggleSelect: () => _toggleSelect(i),
-              onStartBatchSelect: widget.onRemoveEntries == null || _batchMode
-                  ? null
-                  : () => _enterBatchMode(i),
-              resumeAllowed: resumeAllowed,
-            );
-          },
         ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // 滚轮平滑滚动 (v0.0.11 T4)
+  // ============================================================
+
+  /// 滚轮信号入口 — 注册进 PointerSignalResolver 竞拍.
+  ///
+  /// resolver 规则: 同一 signal 事件只有第一个 register 的回调生效,
+  /// 命中测试自最深叶起派发 → 内层 Listener 先注册 → 裁给我们;
+  /// Scrollable 自带的瞬跳 handler (flutter#31658 forcePixels) 因此被压制.
+  void _onWheelSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final position = _scrollController.position;
+    // 首帧空 content dimension 守卫 — 此时 min/maxScrollExtent 尚不可用.
+    if (!position.hasContentDimensions) return;
+    GestureBinding.instance.pointerSignalResolver.register(
+      event,
+      _handleWheelScroll,
+    );
+  }
+
+  /// resolver 中标回调 — wheel delta 换 easeOutCubic 滑行动画.
+  void _handleWheelScroll(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    _glide(event.scrollDelta.dy);
+  }
+
+  /// 从当前 pixels 滑向 clamp 目标 — 连发时 animateTo 自动取消前段并
+  /// 从当前位置接力重算, 形成连续滑行; 已在边界 (target == pixels)
+  /// 时空转不建动画, 不打断在飞的滑行.
+  void _glide(double delta) {
+    final position = _scrollController.position;
+    final target = clampDouble(
+      position.pixels + delta,
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (target == position.pixels) return;
+    unawaited(
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: Tokens.playlistWheelGlideMs),
+        curve: Curves.easeOutCubic,
       ),
     );
   }
