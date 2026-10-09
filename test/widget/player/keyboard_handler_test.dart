@@ -178,6 +178,57 @@ void main() {
     });
   });
 
+  group('KeyboardHandler key repeat (v0.0.12 V3)', () {
+    // 现状:共享分发门禁 `event is! KeyDownEvent` 把 OS KeyRepeat 一并丢弃,
+    // 长按 ←/→ 只 seek 一次。本组照 U6 菜单门禁先例(T-261009-fiw-01)锁定
+    // 目标契约:仅 seek 键(←/→)放行 KeyRepeat;音量/激活键维持单击。
+    testWidgets('held arrow-right keeps seeking (KeyDown + 2 repeats)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      // 长按 →:KeyDown 之后 OS 以 KeyRepeatEvent 连发,期望 3 次前进 seek。
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+      expect(tracker.seekForward, 3, reason: '长按连发 seek 是桌面播放器惯例');
+      expect(tracker.seekBackward, 0);
+    });
+
+    testWidgets('held arrow-left keeps seeking (KeyDown + 2 repeats)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+      expect(tracker.seekBackward, 3, reason: '长按连发 seek 是桌面播放器惯例');
+      expect(tracker.seekForward, 0);
+    });
+
+    testWidgets('volume keys stay single-shot under key repeat', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowUp);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
+      expect(tracker.volumeUp, 1, reason: '音量键维持单击:仅 KeyDown 触达');
+    });
+
+    testWidgets('activation keys stay single-shot under key repeat', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_buildSubject(tracker));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+      expect(tracker.playPause, 1, reason: '按住 Space 不得连发播放/暂停');
+    });
+  });
+
   group('KeyboardHandler shortcut definitions', () {
     test('shortcut definitions include queue navigation (v0.0.5)', () {
       final l10n = lookupAppLocalizations(const Locale('zh'));

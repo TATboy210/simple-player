@@ -278,6 +278,49 @@ void main() {
     );
 
     testWidgets(
+      'held arrow-left keeps seeking through dead-keyboard fallback rescue',
+      (tester) async {
+        // Arrange：外层 Focus 滞留主焦点(handler 焦点子树之外)——回退路径
+        // 接管(UAT 死键盘态的代码级复现,与上一用例同配方)。
+        final outerNode = FocusNode(debugLabel: 'stranded-outer-repeat');
+        addTearDown(outerNode.dispose);
+        // LIFO:本回调先于 outerNode.dispose 执行——先把滞留焦点释放回
+        // root scope,再处置节点。RED 断言抛出时同样生效:带着滞留焦点
+        // 直接 dispose 会让 "marked for focus while being detached" 断言
+        // 污染下一用例的树替换(焦点回收须先出树)。
+        addTearDown(() {
+          FocusManager.instance.primaryFocus?.unfocus();
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (context, navigator) => Focus(
+              focusNode: outerNode,
+              child: navigator ?? const SizedBox.shrink(),
+            ),
+            home: buildHarness(tracker),
+          ),
+        );
+        await tester.pump();
+        outerNode.requestFocus();
+        await tester.pump();
+        expect(
+          FocusManager.instance.primaryFocus,
+          same(outerNode),
+          reason: '前置：主焦点滞留在 handler 焦点子树之外',
+        );
+
+        // Act：长按 ←:KeyDown 经回退路径救活,其后的 OS KeyRepeat 须同样
+        // 放行到分发,否则死键盘态长按仍只 seek 一次(v0.0.12 V3)。
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+
+        // Assert：KeyDown + KeyRepeat = 2 次后退 seek。
+        expect(tracker.seekBackward, 2, reason: '死键盘态长按连发同样须经回退可达');
+      },
+    );
+
+    testWidgets(
       'F1 reaches handler after unfocus(scope) strands primaryFocus on the route scope node',
       (tester) async {
         // Arrange：正常挂载后把焦点释放到 scope —— primaryFocus 变为路由的

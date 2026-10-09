@@ -1333,6 +1333,80 @@ void main() {
       });
     });
 
+    group('长按方向键连发 seek (v0.0.12 V3 KeyRepeat)', () {
+      tearDown(() => OsdService.I.hide());
+
+      // 现状:controls 门禁 `event is! KeyDownEvent` 把 OS KeyRepeat 一并丢弃,
+      // 长按 ←/→ 只 seek 一次,与桌面播放器惯例(按住方向键连续 seek)相悖。
+      // 本组照 U6 菜单门禁先例(T-261009-fiw-01)锁定目标契约:仅 seek 键放行
+      // KeyRepeat;音量 ↑↓/Space 等维持单击,按住重复不叠加(保守取舍)。
+      testWidgets('长按 → KeyDown + 2×KeyRepeat 触发 3 次前进 seek', (tester) async {
+        final seekForwardValues = <int>[];
+        final actions = PlayerActions(onSeekForward: seekForwardValues.add);
+
+        await pumpControls(tester, actions: actions);
+        // 长按 →:KeyDown 之后 OS 以 KeyRepeatEvent 连发。
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+
+        expect(seekForwardValues, [
+          Tokens.skipLongMs,
+          Tokens.skipLongMs,
+          Tokens.skipLongMs,
+        ], reason: '长按连发 seek 是桌面播放器惯例(U6 菜单同款门禁先例)');
+      });
+
+      testWidgets('长按 ← KeyDown + 2×KeyRepeat 触发 3 次后退 seek', (tester) async {
+        final seekBackValues = <int>[];
+        final actions = PlayerActions(onSeekBack: seekBackValues.add);
+
+        await pumpControls(tester, actions: actions);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+
+        expect(seekBackValues, [
+          Tokens.skipShortMs,
+          Tokens.skipShortMs,
+          Tokens.skipShortMs,
+        ], reason: '长按连发 seek 是桌面播放器惯例(U6 菜单同款门禁先例)');
+      });
+
+      testWidgets('音量键维持单击:KeyRepeat 不叠加音量变化(保守取舍)', (tester) async {
+        widgetEngine.setVolume(0.5);
+        await pumpControls(tester, actions: const PlayerActions());
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowUp);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowUp);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
+
+        // 初始 setVolume(0.5) 计 1 次,KeyDown 经 adjustVolumeByKeyboard 再
+        // 计 1 次;两次 KeyRepeat 必须在门禁吞掉,不产生第 3 次调用。
+        expect(
+          widgetEngine.setVolumeCallCount,
+          2,
+          reason: '音量键仅 KeyDown 触达,连发不叠加音量变化',
+        );
+        OsdService.I.hide();
+      });
+
+      testWidgets('Space 连发不叠加播放/暂停(激活键防连发)', (tester) async {
+        var playPauseCount = 0;
+        final actions = PlayerActions(onPlayPause: () => playPauseCount++);
+
+        await pumpControls(tester, actions: actions);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.space);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+
+        expect(playPauseCount, 1, reason: '按住 Space 不得连发播放/暂停');
+      });
+    });
+
     testWidgets('auto-hide 后 resize 保持控件隐藏且不暴露活跃语义', (tester) async {
       final semanticsHandle = tester.ensureSemantics();
       final resizing = ValueNotifier<bool>(false);
