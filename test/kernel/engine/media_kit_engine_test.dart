@@ -50,6 +50,59 @@ void main() {
     });
   });
 
+  group(
+    'MediaKitEngine.mediaUriFromPath — percent-encoding roundtrip (K1)',
+    () {
+      // media_kit Media() 构造内部走 Uri.parse/normalizeURI 二次解析: 手工拼接
+      // 的裸 `#` 被切 fragment、合法 `%XX` 逃逸被解码 — 文件名含这些字符的
+      // 媒体必然打不开 (v0.0.12 K1).
+      // 契约: 产出必须经 Uri.parse().toFilePath(windows: true) 往返恒等回原路径.
+      // 注: `windows: true` 显式锁定 Windows 语义 — 引擎映射与宿主 OS 无关,
+      // CI 三平台跑同一套用例; `?` 是 Windows 文件名非法字符, 不设用例.
+
+      /// 往返恒等断言: 产出经 Uri 解析还原后须逐字符等于原路径.
+      void expectRoundtrip(String path) {
+        final uri = MediaKitEngine.mediaUriFromPath(path);
+        expect(
+          Uri.parse(uri).toFilePath(windows: true),
+          path,
+          reason: 'uri=$uri 未往返恒等回原路径',
+        );
+      }
+
+      test('井号路径往返恒等 (# 被 Uri.parse 切 fragment — 现行为红)', () {
+        expectRoundtrip(r'D:\music\c#minor\a.mp4');
+      });
+
+      test('文件名含合法 %XX 逃逸往返恒等 (%20 被误解码 — 现行为红)', () {
+        expectRoundtrip(r'D:\downloads\report%20final.mp4');
+      });
+
+      test('文件名含孤立百分号往返恒等 (100%.mkv)', () {
+        expectRoundtrip(r'D:\影 库\100%.mkv');
+      });
+
+      test('空格路径往返恒等', () {
+        expectRoundtrip(r'D:\my videos\a b.mp4');
+      });
+
+      test('中文路径往返恒等', () {
+        expectRoundtrip(r'D:\影库\电影.mp4');
+      });
+
+      test('混合特殊字符路径往返恒等 (# + %XX + 空格)', () {
+        expectRoundtrip(r'D:\mix\c#1\100%25 a.mp4');
+      });
+
+      test('编码格式锁定 — # 必须编码为 %23 (裸 # 禁入交给 mpv 的 URI)', () {
+        expect(
+          MediaKitEngine.mediaUriFromPath(r'D:\music\c#minor\a.mp4'),
+          'file:///D:/music/c%23minor/a.mp4',
+        );
+      });
+    },
+  );
+
   group('MediaKitEngine.audioTracksFromMediaKit', () {
     test('null 返回空列表', () {
       expect(MediaKitEngine.audioTracksFromMediaKit(null), isEmpty);
