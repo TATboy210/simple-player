@@ -63,11 +63,19 @@ class PathValidator {
     'tcp://',
   };
 
-  /// 检查路径是否为支持的流媒体 URL
+  /// 检查路径是否为支持的流媒体 URL（scheme 前缀大小写不敏感）
   ///
   /// Returns `true` if [path] starts with a recognised streaming protocol
-  /// (http, https, rtmp, rtsp, srt, udp, tcp).
-  static bool isUrl(String path) => _urlSchemes.any((s) => path.startsWith(s));
+  /// (http, https, rtmp, rtsp, srt, udp, tcp), case-insensitively —
+  /// Windows 用户直觉全系统大小写不敏感，`HTTP://HOST/v.mp4` 不再被误判
+  /// 本地文件拒为"不支持的文件类型" (N1)。
+  ///
+  /// 大小写折叠只在输入侧做一次（[String.toLowerCase]）；[_urlSchemes]
+  /// 集合本身保持全小写不变 — 比较集不放宽，fail-closed 语义保持。
+  static bool isUrl(String path) {
+    final lower = path.toLowerCase();
+    return _urlSchemes.any(lower.startsWith);
+  }
 
   /// 检查扩展名是否为允许的媒体类型
   ///
@@ -117,8 +125,13 @@ class PathValidator {
     final trimmed = path.trim();
     if (trimmed.isEmpty) return '路径为空';
     if (isUrl(trimmed)) {
-      // HTTP/HTTPS 需要结构化验证
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      // HTTP/HTTPS 需要结构化验证 — 门控对 trimmed 的小写形式做前缀比较，
+      // 与 isUrl 的大小写不敏感语义同步 (N1)：否则大写 HTTP URL 通过
+      // isUrl 却跳过 authority 校验，`HTTP://`(无 authority) 被放行的
+      // fail-open 缺口。
+      final lowerTrimmed = trimmed.toLowerCase();
+      if (lowerTrimmed.startsWith('http://') ||
+          lowerTrimmed.startsWith('https://')) {
         final uri = Uri.tryParse(trimmed);
         if (uri == null || !uri.hasAuthority || uri.host.isEmpty) {
           return 'URL 格式无效: $trimmed';
