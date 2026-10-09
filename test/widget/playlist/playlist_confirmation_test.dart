@@ -322,9 +322,7 @@ void main() {
           removed: removed,
           batches: batches,
         );
-        tester
-            .widget<PlaylistTile>(find.byType(PlaylistTile).first)
-            .onRemove();
+        tester.widget<PlaylistTile>(find.byType(PlaylistTile).first).onRemove();
         await tester.pumpAndSettle();
         // 修复前: 重复 path 索引被构造器整体丢弃 → 此处不弹卡、静默返回。
         expect(find.byType(GlassConfirmStrip), findsOneWidget);
@@ -338,48 +336,47 @@ void main() {
       },
     );
 
-    testWidgets(
-      'batch with twins shows the frozen count and removes both',
-      (tester) async {
-        final a = PlaylistItem(path: 'a.mp4');
-        final b = PlaylistItem(path: 'b.mp4');
-        final removed = <int>[];
-        final batches = <Set<int>>[];
-        final entries = ValueNotifier([a, a, b]);
-        await pumpPanel(
-          tester,
-          entries: entries,
-          removed: removed,
-          batches: batches,
-        );
-        // 进入批量模式 (首格默认选中), 再补选第二格孪生。
-        tester
-            .widget<PlaylistTile>(find.byType(PlaylistTile).first)
-            .onStartBatchSelect
-            ?.call();
-        await tester.pumpAndSettle();
-        tester
-            .widget<PlaylistTile>(find.byType(PlaylistTile).at(1))
-            .onToggleSelect
-            ?.call();
-        await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Confirm deletion'));
-        await tester.pumpAndSettle();
-        expect(find.byType(GlassConfirmStrip), findsOneWidget);
-        // 文案计数 == 冻结目标数 2 — 精确匹配批量文案, 避开头部"2 selected"。
-        expect(
-          find.textContaining('2 video entries will be removed'),
-          findsOneWidget,
-        );
-        await tester.tap(confirmInStrip());
-        await tester.pumpAndSettle();
-        expect(batches, [
-          {0, 1},
-        ]);
-        expect(removed, isEmpty);
-        expect(tester.takeException(), isNull);
-      },
-    );
+    testWidgets('batch with twins shows the frozen count and removes both', (
+      tester,
+    ) async {
+      final a = PlaylistItem(path: 'a.mp4');
+      final b = PlaylistItem(path: 'b.mp4');
+      final removed = <int>[];
+      final batches = <Set<int>>[];
+      final entries = ValueNotifier([a, a, b]);
+      await pumpPanel(
+        tester,
+        entries: entries,
+        removed: removed,
+        batches: batches,
+      );
+      // 进入批量模式 (首格默认选中), 再补选第二格孪生。
+      tester
+          .widget<PlaylistTile>(find.byType(PlaylistTile).first)
+          .onStartBatchSelect
+          ?.call();
+      await tester.pumpAndSettle();
+      tester
+          .widget<PlaylistTile>(find.byType(PlaylistTile).at(1))
+          .onToggleSelect
+          ?.call();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Confirm deletion'));
+      await tester.pumpAndSettle();
+      expect(find.byType(GlassConfirmStrip), findsOneWidget);
+      // 文案计数 == 冻结目标数 2 — 精确匹配批量文案, 避开头部"2 selected"。
+      expect(
+        find.textContaining('2 video entries will be removed'),
+        findsOneWidget,
+      );
+      await tester.tap(confirmInStrip());
+      await tester.pumpAndSettle();
+      expect(batches, [
+        {0, 1},
+      ]);
+      expect(removed, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'mixed twins and vanished target resolves frozen positions only',
