@@ -167,7 +167,10 @@ class PlaybackController {
     // 校验失败统一报 pathTraversal fatal, 扩展名不符被误报"路径不安全"。
     final failureType = PathValidator.classify(normalizedPath);
     if (failureType != null) {
-      final validationMsg = PathValidator.messageFor(failureType, normalizedPath);
+      final validationMsg = PathValidator.messageFor(
+        failureType,
+        normalizedPath,
+      );
       validationError.value = validationMsg;
       onError?.call(_playerErrorFor(failureType, validationMsg));
       return false;

@@ -149,11 +149,7 @@ void main() {
           '路径包含非法控制字符: C:/a\x01b.mp4',
         ),
         ('../x.mp4', ValidationErrorType.pathTraversal, '路径不安全: ../x.mp4'),
-        (
-          'a\x00b.mp4',
-          ValidationErrorType.pathTraversal,
-          '路径不安全: a\x00b.mp4',
-        ),
+        ('a\x00b.mp4', ValidationErrorType.pathTraversal, '路径不安全: a\x00b.mp4'),
         (
           '\\\\srv\\share\\v.mp4',
           ValidationErrorType.pathTraversal,
