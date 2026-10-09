@@ -30,6 +30,7 @@ void main() {
     'replace',
     'default-enter',
     'tab-confirm',
+    'tab-trap',
   ]) {
     testWidgets('panel-local frozen target: $action', (tester) async {
       final a = PlaylistItem(path: 'a.mp4');
@@ -119,7 +120,11 @@ void main() {
         FocusManager.instance.primaryFocus?.debugLabel,
         'playlist-confirm-cancel',
       );
-      if (action != 'default-enter' && action != 'tab-confirm') {
+      // tab-trap 是焦点陷阱用例 — 不得先把焦点点到卡外 (outside TextButton),
+      // 否则测试的正是指针旁路而非卡内 Tab 回绕。
+      if (action != 'default-enter' &&
+          action != 'tab-confirm' &&
+          action != 'tab-trap') {
         await tester.tap(find.text('outside'));
         expect(outside, 1);
       }
@@ -159,6 +164,40 @@ void main() {
           await tester.sendKeyEvent(LogicalKeyboardKey.tab);
           await tester.pump();
           await tester.sendKeyEvent(LogicalKeyboardKey.space);
+        case 'tab-trap':
+          // U2 焦点陷阱 — 卡内只有 cancel/confirm 两个可聚焦节点, 连续 Tab
+          // 必须在两节点间前向回绕, 焦点永不越出确认卡 (否则 Tab 后 Enter
+          // 可能误触卡外播放器控件 = 破坏性动作表面)。
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          // 第一次 Tab: cancel → confirm (节点标签由 playlist_panel 的
+          // _confirmFocus 提供, debugLabel 'playlist-confirm-confirm')。
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'playlist-confirm-confirm',
+            reason: 'first Tab lands on the confirm button',
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          // 第二次 Tab: confirm → cancel 前向回绕 — 修复前焦点在此越出
+          // 卡片 (落到 harness 的 outside TextButton), 断言失败 = RED。
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'playlist-confirm-cancel',
+            reason: 'second Tab wraps back to cancel, never leaves the card',
+          );
+          // 反向回绕 — Shift+Tab 三连模拟范式 (同 native_menu_input_test)。
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pump();
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'playlist-confirm-confirm',
+            reason: 'Shift+Tab wraps backward from cancel to confirm',
+          );
+          // Esc 走既有取消路径 — 焦点陷阱不得破坏 Esc 语义。
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         default:
           await tester.tap(
             find.descendant(
