@@ -497,14 +497,34 @@ class PlaylistCoordinator {
     }
     // _itemFor 兜底: 条目在视图中但元数据缺失时登记 (含 addedSeq 分配).
     final base = _itemFor(path);
-    final updated = base.copyWith(
-      positionMs: effectiveBreakpointMs(
-        _lastKnownPositionMs,
-        _lastKnownDurationMs,
-      ),
-      durationMs: _lastKnownDurationMs > 0 ? _lastKnownDurationMs : null,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
+    final bp = effectiveBreakpointMs(
+      _lastKnownPositionMs,
+      _lastKnownDurationMs,
     );
+    final PlaylistItem updated;
+    if (bp == null) {
+      // 看完/未播放 → 清除断点. copyWith(positionMs: null) 是"保留旧值"
+      // 语义, 会把清除意图吞成"保留陈旧中途位置" (下次续播跳回片尾而非
+      // 从头) — 必须构造函数直建全字段显式透传, 让 positionMs 真正落为
+      // null (toJson 省略该键 → 恢复后从头播). durationMs 照写 (排序按
+      // 时长需要它), 时长未知时保留旧值.
+      updated = PlaylistItem(
+        path: base.path,
+        positionMs: null,
+        durationMs: _lastKnownDurationMs > 0
+            ? _lastKnownDurationMs
+            : base.durationMs,
+        addedSeq: base.addedSeq,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+    } else {
+      // 正常中途 → copyWith 语义无冲突 (非 null 直接覆盖).
+      updated = base.copyWith(
+        positionMs: bp,
+        durationMs: _lastKnownDurationMs > 0 ? _lastKnownDurationMs : null,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
     _metaByPath[path] = updated;
     // 就地刷新视图中的同 path 条目（保持顺序不变）.
     _entries.value = List.unmodifiableOf(<PlaylistItem>[

@@ -290,10 +290,14 @@ void main() {
       engine.position.value = 42000;
       await coordinator.playEntryAt(1); // a 记中途断点 42000
       engine.position.value = 20000;
+      engine.duration.value = 90000; // b 的时长 (异值必通知 — fake 同值去重)
       await coordinator.playEntryAt(0); // b 记 20000, 回到 a
 
-      // 看完 a — position 推进到 ≥98% 近 EOF 区后切曲, 触发 a 断点更新.
+      // 看完 a — 真机每次装载都会重发 duration 事件回填粘性取材 (切曲
+      // 粘性重置已清 sticky); fake 同值赋值不再通知, b 段已换成 90000,
+      // 此处 90000 → 100000 为真实通知. 推进到 ≥98% 近 EOF 区后切曲.
       engine.position.value = 98000;
+      engine.duration.value = 100000;
       await coordinator.playEntryAt(1);
 
       final a = coordinator.entries.value.firstWhere((e) => e.path == 'a.mp4');
@@ -320,10 +324,14 @@ void main() {
       engine.position.value = 20000;
       await coord.playEntryAt(1); // 切到 b (a 断点已在中途区)
       engine.position.value = 20000;
+      engine.duration.value = 90000; // b 的时长 (异值必通知 — fake 同值去重)
       await coord.playEntryAt(0); // b 记 20000, current 回到 a
 
       // 看完 a — 节流窗口 (5s) 过后的 position 事件触发断点刷新 + 落盘.
+      // duration 先回填 (切曲粘性重置后; b 段已换 90000, 此处为真实通知,
+      // 真机装载必发 duration), position 事件才以完整取材触发节流写点.
       now = now.add(const Duration(seconds: 6));
+      engine.duration.value = 100000;
       engine.position.value = 98000; // ≥98% — 触发 _maybeThrottledSave
 
       // 轮询等待盘上 a 的 positionMs 被清 (RED: 2s 超窗后仍是 42000 → 败).
@@ -342,8 +350,12 @@ void main() {
       engine.position.value = 42000;
       await coordinator.playEntryAt(1); // a 记 42000
       engine.position.value = 20000;
+      engine.duration.value = 90000; // b 的时长 (异值必通知 — fake 同值去重)
       await coordinator.playEntryAt(0); // b 记 20000, 回到 a
+      // duration 回填 (切曲粘性重置后; b 段已换 90000, 此处为真实通知,
+      // 真机装载必发 duration 事件).
       engine.position.value = 98000;
+      engine.duration.value = 100000;
       await coordinator.playEntryAt(1); // a 断点应被清除
 
       // 端到端读点: positionMs 已 null → resumeMs=0 → 不挂起补 seek —
