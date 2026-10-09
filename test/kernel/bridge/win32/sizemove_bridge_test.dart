@@ -136,5 +136,35 @@ void main() {
 
       expect(bridge.query(), isNull);
     });
+
+    // 261009-fio H1: @Native external 绑定首调才解析, 解析失败抛
+    // ArgumentError — Error 族。SizemoveProbe 契约 (:84-90) 要求查询失败
+    // 返回 null 不抛; fake 在 FFI 束边界抛 ArgumentError 锁定该降级。
+    test('FindWindowW 绑定解析抛 ArgumentError — 降级 null 不抛', () {
+      final bridge = Win32SizemoveBridge(
+        functions: Win32SizemoveFunctions(
+          findWindow: (_) => throw ArgumentError('user32 binding unavailable'),
+          sendMessageTimeout: (_, _, _, _, _) => 1,
+        ),
+      );
+
+      expect(bridge.query(), isNull);
+    });
+
+    test(
+      'FindWindowW OK 但 SendMessageTimeoutW 解析抛 ArgumentError — 降级 null 不抛',
+      () {
+        final bridge = Win32SizemoveBridge(
+          functions: Win32SizemoveFunctions(
+            findWindow: (_) => 0x1234,
+            sendMessageTimeout:
+                (_, _, _, _, _) =>
+                    throw ArgumentError('send binding unavailable'),
+          ),
+        );
+
+        expect(bridge.query(), isNull);
+      },
+    );
   });
 }

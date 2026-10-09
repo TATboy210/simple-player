@@ -90,6 +90,49 @@ void main() {
     });
   });
 
+  group('Win32ImeBridge — @Native assetId 解析失败降级 (261009-fio H1)', () {
+    // @Native external 绑定首调才解析, 解析失败 (DLL/符号缺失) 抛
+    // ArgumentError — Error 族, on Exception 捕获不到。fake 直接在 FFI 束
+    // 边界抛 ArgumentError 模拟该环境性失败; 桥必须降级 false 而非穿透。
+    test('enable — FindWindowW 绑定解析抛 ArgumentError — 降级 false 不抛', () {
+      final bridge = Win32ImeBridge(
+        functions: Win32ImeFunctions(
+          findWindow: (_) => throw ArgumentError('user32 binding unavailable'),
+          sendMessageTimeout: (_, _, _, _, _) => true,
+        ),
+      );
+
+      expect(bridge.enable(), isFalse);
+    });
+
+    test('disable — FindWindowW 绑定解析抛 ArgumentError — 降级 false 不抛', () {
+      final bridge = Win32ImeBridge(
+        functions: Win32ImeFunctions(
+          findWindow: (_) => throw ArgumentError('user32 binding unavailable'),
+          sendMessageTimeout: (_, _, _, _, _) => true,
+        ),
+      );
+
+      expect(bridge.disable(), isFalse);
+    });
+
+    test(
+      'enable — FindWindowW OK 但 SendMessageTimeoutW 解析抛 ArgumentError — 降级 false 不抛',
+      () {
+        final bridge = Win32ImeBridge(
+          functions: Win32ImeFunctions(
+            findWindow: (_) => 0x1234,
+            sendMessageTimeout:
+                (_, _, _, _, _) =>
+                    throw ArgumentError('send binding unavailable'),
+          ),
+        );
+
+        expect(bridge.enable(), isFalse);
+      },
+    );
+  });
+
   // enable/disable 的临时恢复链路带 Platform.isWindows gate — 非 Windows
   // 透传路径的直调组 (上方 group) 全平台保留, 本组仅 Windows runner 执行.
   group('withImeRestored — 文件对话框期间的 IME 临时恢复', skip: !Platform.isWindows, () {
@@ -151,6 +194,56 @@ void main() {
 
       expect(completed, isTrue);
       expect(result, 'done');
+    });
+
+    // 261009-fio H1: enable 的绑定解析失败 (ArgumentError, Error 族) 不得
+    // 中断 action — 降级为「未恢复」, action 照跑且跳过收尾 disable.
+    testWidgets('enable 抛 ArgumentError — action 仍执行一次且不收尾 disable', (
+      tester,
+    ) async {
+      var actionCalls = 0;
+      var sendCalls = 0;
+      final result = await Win32ImeBridge.withImeRestored(
+        () async {
+          actionCalls++;
+          return 'value';
+        },
+        functions: Win32ImeFunctions(
+          findWindow: (_) => throw ArgumentError('user32 binding unavailable'),
+          sendMessageTimeout: (_, _, _, _, _) {
+            sendCalls++;
+            return true;
+          },
+        ),
+      );
+
+      expect(result, 'value');
+      expect(actionCalls, 1, reason: '绑定失败不得中断包裹的 action');
+      expect(sendCalls, 0, reason: 'IME 从未恢复过, 不得投递收尾 disable');
+    });
+
+    // 261009-fio H1: 非对称 fake — enable 成功后 disable 阶段解析失败,
+    // _deliver 的 Error 防御须兜住 finally 内的 disable, action 结果原样透传.
+    testWidgets('enable 成功后 disable 抛 ArgumentError — action 结果仍透传', (
+      tester,
+    ) async {
+      final wparams = <int>[];
+      final result = await Win32ImeBridge.withImeRestored(
+        () async => 'kept',
+        functions: Win32ImeFunctions(
+          findWindow: (_) => 0x42,
+          sendMessageTimeout: (_, _, wparam, _, _) {
+            wparams.add(wparam);
+            if (wparam == 0) {
+              throw ArgumentError('send binding unavailable');
+            }
+            return true;
+          },
+        ),
+      );
+
+      expect(result, 'kept');
+      expect(wparams, [1, 0], reason: 'enable 正常投递, disable 触发解析失败降级');
     });
   });
 }
