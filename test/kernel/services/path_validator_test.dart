@@ -155,6 +155,13 @@ void main() {
           ValidationErrorType.pathTraversal,
           '路径不安全: \\\\srv\\share\\v.mp4',
         ),
+        // v0.0.12 S1: file URI 带远端 host — URI 解析等价裸 UNC,
+        // 并入同一 pathTraversal 类别拒绝(同错误码/文案语义)。
+        (
+          'file://server/share/a.mp4',
+          ValidationErrorType.pathTraversal,
+          '路径不安全: file://server/share/a.mp4',
+        ),
         ('~/v.mp4', ValidationErrorType.pathTraversal, '路径不安全: ~/v.mp4'),
         (
           'C:/test/file.txt',
@@ -163,6 +170,8 @@ void main() {
         ),
         // 有效输入 — 不产生类别, validate 放行。
         ('C:/test/video.mp4', null, null),
+        // v0.0.12 S1 对照组: 空 host 的 file URI 是本地盘路径,行为不变。
+        ('file:///D:/local/a.mp4', null, null),
         ('rtsp://host/s', null, null),
         // N1 语义继承: 大写合法 http URL 经大小写不敏感 isUrl 放行。
         ('HTTP://example.com/v.mp4', null, null),
@@ -196,6 +205,54 @@ void main() {
             );
           }
         }
+      });
+    });
+
+    // v0.0.12 S1: file:// URI 形态的 UNC 绕过拦截。
+    // `file://server/share/a.mp4` 经 URI 解析等价 `\\server\share\a.mp4`,
+    // 但 file scheme 不在 _urlSchemes 白名单,旧判定落进扩展名分支放行 —
+    // 与裸 UNC 的 fail-closed 安全裁决冲突。修复后: file URI host 非空
+    // 即远端共享,并入与裸 UNC 同类的 pathTraversal 拒绝;空 host
+    // (`file:///D:/local`)是本地路径,行为不变。
+    group('file:// URI UNC bypass (v0.0.12 S1)', () {
+      test('rejects file URI with remote host — 同裸 UNC 类别 (fail-closed)', () {
+        expect(
+          PathValidator.classify('file://server/share/a.mp4'),
+          ValidationErrorType.pathTraversal,
+          reason: 'file URI 远端 host 与裸 UNC 同判 pathTraversal',
+        );
+        expect(
+          PathValidator.validate('file://server/share/a.mp4'),
+          '路径不安全: file://server/share/a.mp4',
+          reason: '拒绝文案与裸 UNC 同族 (messageFor pathTraversal)',
+        );
+      });
+
+      test('rejects uppercase FILE:// scheme (N1 大小写不敏感同法)', () {
+        expect(
+          PathValidator.classify('FILE://SERVER/SHARE/A.MP4'),
+          ValidationErrorType.pathTraversal,
+        );
+        expect(PathValidator.validate('FILE://SERVER/SHARE/A.MP4'), isNotNull);
+      });
+
+      test('isPathTraversal detects file-URI UNC form', () {
+        expect(
+          PathValidator.isPathTraversal('file://server/share/a.mp4'),
+          true,
+          reason: 'file URI 形态 UNC 必须进遍历/网络路径检测',
+        );
+        // 对照 — 裸 UNC 同一判定族,维持既有红。
+        expect(PathValidator.isPathTraversal(r'\\server\share\a.mp4'), true);
+      });
+
+      test('empty-host file URI (本地盘路径) 仍放行 — 对照组', () {
+        expect(
+          PathValidator.validate('file:///D:/local/a.mp4'),
+          isNull,
+          reason: '空 host file URI 是本地路径,不得误拒',
+        );
+        expect(PathValidator.isPathTraversal('file:///D:/local/a.mp4'), false);
       });
     });
 
