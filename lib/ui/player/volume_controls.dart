@@ -111,6 +111,11 @@ class _VolumeButtonState extends State<VolumeButton> {
 /// 拖拽期间使用 [Tokens.volumeThrottleMs] 节流引擎和 OSD 调用，
 /// 松手时通过 [onChangeEnd] 立即同步最终值（零感知延迟）。
 /// 鼠标滚轮保持无节流（离散事件，每秒 3-5 次）。
+/// 键盘调节（聚焦滑条后方向键）与拖动共用同一条节流提交链：
+/// 直达回调序列（只有 [Slider.onChanged]、无 onChangeStart/End 的来源）
+/// 经 State 自持 FocusNode 的 hasFocus 门放行 — 无焦点裸 onChanged
+/// （旧手势残留 tearoff）一律拒绝提交；键盘分支不写局部拖拽值，
+/// 视觉反馈经 [volume] 的引擎回声到达。
 ///
 /// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [volume] ValueListenable
 /// + [onSetVolume] 回调。
@@ -143,6 +148,12 @@ class VolumeSlider extends StatefulWidget {
 }
 
 class _VolumeSliderState extends State<VolumeSlider> {
+  /// 键盘路径焦点门 — State 自持节点，build 中传入 [Slider.focusNode]。
+  ///
+  /// 键盘回归本体：直达回调序列（只有 onChanged、无 onChangeStart/End）
+  /// 无法靠 _interacting 识别，必须靠焦点区分真实键盘调节与残留 tearoff。
+  final FocusNode _focusNode = FocusNode(debugLabel: 'volume-slider');
+
   /// 节流定时器（null = 无活跃定时器）
   Timer? _throttleTimer;
 
@@ -162,10 +173,32 @@ class _VolumeSliderState extends State<VolumeSlider> {
     widget.onInteractionStart?.call();
   }
 
-  /// 拖拽中的节流处理：视觉即时更新，引擎与 OSD 仍为 100ms。
-  void _onChanged(double v) {
-    if (!_active || !_interacting) return;
-    setState(() => _dragValue = v);
+  /// 拖拽与键盘共用的节流入口：拖动走局部值门控（视觉即时更新，引擎与
+  /// OSD 仍为 100ms），非拖动走焦点门控的同一节流提交链。
+  void _onChanged(double rawValue) {
+    if (!_active) return;
+    // 入口统一钳制（威胁 T-261009fit-01 防御纵深）：Slider 自身已钳制其
+    // intent 产生的值，直接回调通路（键盘/残留 tearoff）仍可能送入越界值，
+    // 写法对齐滚轮路径的既有 clamp 风格。
+    final v = rawValue.clamp(0.0, 1.0);
+    if (_interacting) {
+      // ── 拖动分支：方法体与修复前逐字一致（拖动红线零变化）──
+      setState(() => _dragValue = v);
+      _pendingVolume = v;
+      _throttleTimer ??= Timer(
+        const Duration(milliseconds: Tokens.volumeThrottleMs),
+        _flushPending,
+      );
+      return;
+    }
+    // ── 键盘分支：只有「焦点」能区分真实键盘调节与残留 tearoff ──
+    // didUpdateWidget 的 _cancelDrag 后 State 实例存活且 _active 仍为 true，
+    // 删掉此门则 volume_drag_feedback_test 的替换用例（旧回调不得复活
+    // 定时器）必然转红，这是红线而非多余防御。
+    if (!_focusNode.hasFocus) return;
+    // 键盘调节没有 onChangeEnd 来清残留：不得 setState / 不得写 _dragValue
+    // （否则滑条冻死在旧值对抗引擎回声）；视觉反馈经 widget.volume 的
+    // 引擎回声到达，与门控前旧实现一致。
     _pendingVolume = v;
     _throttleTimer ??= Timer(
       const Duration(milliseconds: Tokens.volumeThrottleMs),
@@ -232,6 +265,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
   @override
   void dispose() {
     _cancelDrag();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -259,6 +293,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
           builder: (_, volume, _) => SliderTheme(
             data: VolumeSlider._sliderTheme,
             child: Slider(
+              focusNode: _focusNode,
               value: _dragValue ?? volume,
               onChangeStart: _onChangedStart,
               onChanged: _onChanged,
