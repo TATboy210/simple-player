@@ -354,15 +354,17 @@ void main() {
 }
 
 /// Drain real I/O and fake-zone continuations without awaiting a starved zone.
+/// 预算 300×10ms=3s 真实时间——CI runner 五 job 并发时真实文件 I/O 可能远慢于
+/// 本机, 旧预算 100×5ms≈500ms 在 windows runner 上实证不够(2026-10-09 CI)。
 Future<void> _drainSettings(WidgetTester tester) async {
   var drained = false;
   unawaited(
     ErrorFeedbackSettings.I.pendingPersist.whenComplete(() => drained = true),
   );
-  for (var attempt = 0; attempt < 100 && !drained; attempt++) {
+  for (var attempt = 0; attempt < 300 && !drained; attempt++) {
     await tester.pump();
     await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 5)),
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );
   }
   expect(
