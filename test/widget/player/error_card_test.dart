@@ -261,43 +261,44 @@ void main() {
       expect(find.byType(ErrorCard), findsOneWidget);
     });
 
-    testWidgets('close button dismisses the displayed report and advances to the remaining one', (
-      tester,
-    ) async {
-      // Arrange：两份报告入队。D-01 替换语义（03-03）：卡片显示**最新**（乙），
-      // 甲留在宿主快照中经徽标轮览可回看；徽标 = 快照长度（D-11）。
-      await tester.pumpWidget(
-        buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
-      );
-      await tester.pump();
-      ErrorReporterImpl.I.reportBootstrapSafely(
-        StateError('错误甲'),
-        StackTrace.current,
-      );
-      ErrorReporterImpl.I.reportBootstrapSafely(
-        StateError('错误乙'),
-        StackTrace.current,
-      );
-      await tester.pump();
-      expect(find.textContaining('错误乙'), findsOneWidget);
-      expect(find.textContaining('错误甲'), findsNothing);
-      expect(find.text('2 错误'), findsOneWidget);
+    testWidgets(
+      'close button dismisses the displayed report and advances to the remaining one',
+      (tester) async {
+        // Arrange：两份报告入队。D-01 替换语义（03-03）：卡片显示**最新**（乙），
+        // 甲留在宿主快照中经徽标轮览可回看；徽标 = 快照长度（D-11）。
+        await tester.pumpWidget(
+          buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pump();
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('错误甲'),
+          StackTrace.current,
+        );
+        ErrorReporterImpl.I.reportBootstrapSafely(
+          StateError('错误乙'),
+          StackTrace.current,
+        );
+        await tester.pump();
+        expect(find.textContaining('错误乙'), findsOneWidget);
+        expect(find.textContaining('错误甲'), findsNothing);
+        expect(find.text('2 错误'), findsOneWidget);
 
-      // Act：点击关闭按钮 —— v0.0.11 T3（WR-01 用户裁决）：关闭命中**所显示条**（乙），
-      // 不再消费队首（所见即所关）；剩余甲上屏，徽标计数减一（CAP-04 推进 + D-11 快照）。
-      await tester.tap(find.byKey(const ValueKey('error-card-close')));
-      await tester.pump();
+        // Act：点击关闭按钮 —— v0.0.11 T3（WR-01 用户裁决）：关闭命中**所显示条**（乙），
+        // 不再消费队首（所见即所关）；剩余甲上屏，徽标计数减一（CAP-04 推进 + D-11 快照）。
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
 
-      // Assert：被显示的乙消失，剩余甲上屏，徽标计数减一。
-      expect(find.textContaining('错误乙'), findsNothing);
-      expect(find.textContaining('错误甲'), findsOneWidget);
-      expect(find.text('1 错误'), findsOneWidget);
+        // Assert：被显示的乙消失，剩余甲上屏，徽标计数减一。
+        expect(find.textContaining('错误乙'), findsNothing);
+        expect(find.textContaining('错误甲'), findsOneWidget);
+        expect(find.text('1 错误'), findsOneWidget);
 
-      // Act / Assert：再次关闭，单报告归零（卡片消失）。
-      await tester.tap(find.byKey(const ValueKey('error-card-close')));
-      await tester.pump();
-      expect(find.byType(ErrorCard), findsNothing);
-    });
+        // Act / Assert：再次关闭，单报告归零（卡片消失）。
+        await tester.tap(find.byKey(const ValueKey('error-card-close')));
+        await tester.pump();
+        expect(find.byType(ErrorCard), findsNothing);
+      },
+    );
   });
 
   group('focus 零焦点抢占（CARD-01/T-03-07）', () {
