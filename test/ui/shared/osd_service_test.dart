@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/osd_message.dart';
@@ -209,6 +208,9 @@ void main() {
         addTearDown(service.dispose);
         final notifications = <int>[];
         late final OsdSnapshot duringBuild;
+        // 帧末冲刷在 pumpWidget 返回前就已执行 (post-frame 即本帧末),
+        // 因此"构建期零通知"必须在 builder 内部捕获计数快照。
+        late final int duringBuildNotifications;
         await tester.pumpWidget(
           MaterialApp(
             home: Builder(
@@ -220,6 +222,7 @@ void main() {
                 // rank 0 低于 rank 2: 准入对等要求 current=warn + pending=info。
                 service.show('info');
                 duringBuild = service.snapshot.value;
+                duringBuildNotifications = notifications.length;
                 return const SizedBox.shrink();
               },
             ),
@@ -229,7 +232,7 @@ void main() {
         expect(duringBuild.generation, 0);
         expect(duringBuild.current, isNull);
         expect(duringBuild.pending, isNull);
-        expect(notifications, isEmpty);
+        expect(duringBuildNotifications, 0);
         // 帧末一次合并冲刷: 携带两次 show 后的最终一致快照, 不丢消息、不重复通知。
         expect(service.snapshot.value.generation, 2);
         expect(service.snapshot.value.current?.message.text, 'warn');
@@ -263,6 +266,8 @@ void main() {
       addTearDown(service.dispose);
       final notifications = <int>[];
       late final OsdSnapshot duringBuild;
+      // 同上: 冲刷发生在 pumpWidget 帧末, 构建期计数须在 builder 内捕获。
+      late final int duringBuildNotifications;
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(
@@ -273,6 +278,7 @@ void main() {
               service.show('transient', priority: OsdPriority.warning);
               service.hide();
               duringBuild = service.snapshot.value;
+              duringBuildNotifications = notifications.length;
               return const SizedBox.shrink();
             },
           ),
@@ -281,7 +287,7 @@ void main() {
       expect(duringBuild.generation, 0);
       expect(duringBuild.current, isNull);
       expect(duringBuild.pending, isNull);
-      expect(notifications, isEmpty);
+      expect(duringBuildNotifications, 0);
       // show+hide 合并为一次帧末冲刷, 终态清空且只通知一次。
       expect(service.snapshot.value.generation, 2);
       expect(service.snapshot.value.current, isNull);

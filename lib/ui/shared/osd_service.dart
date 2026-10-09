@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'osd_message.dart';
 
@@ -12,6 +13,13 @@ typedef OsdClock = Duration Function();
 typedef OsdScheduler = VoidCallback Function(Duration delay, VoidCallback fire);
 
 /// 全局反馈入口 — owns one current/pending snapshot and at most one timer.
+///
+/// 准入判定 (admission/prune/expiry) 始终读同步记账真值 [_record]; build 期
+/// (SchedulerPhase.persistentCallbacks) 的 show/hide 只把 ValueNotifier 发布
+/// 推迟到本帧末 — 通知延后但不丢、不重, 非 build 期时序与旧实现逐位一致。
+/// Admission decisions stay synchronous; only the notifier publication may
+/// wait for the frame to end during the build phase (mirrors the
+/// WorkspaceMenuSession contract).
 class OsdService {
   OsdService({OsdClock? now, OsdScheduler? schedule})
     : _now = now ?? _productionClock(),
@@ -20,7 +28,16 @@ class OsdService {
   static final I = OsdService();
   final OsdClock _now;
   final OsdScheduler _schedule;
+
+  /// 发布通知器 — build 期可能有意滞后 [_record] 至帧末; 准入判定禁读它。
+  /// Publication notifier: may intentionally lag [_record] by one frame end
+  /// during the build phase; admission/expiry truth must read [_record].
   final _state = ValueNotifier<OsdSnapshot>(const OsdSnapshot(generation: 0));
+
+  /// 同步记账真值 — show/hide 准入、prune 与过期晋升读这里的即时状态。
+  /// Synchronous state of record: never lags, so admission decisions can never
+  /// observe the publication lag of [_state] (see [_afterBuild]).
+  OsdSnapshot _record = const OsdSnapshot(generation: 0);
 
   /// Single coherent state; callers cannot publish partial visibility updates.
   ValueListenable<OsdSnapshot> get snapshot => _state;
@@ -47,7 +64,8 @@ class OsdService {
   }) {
     if (_isDisposed) return;
     final now = _now();
-    final valid = _prune(_state.value, now);
+    // 准入读记账真值而非发布面: build 期发布面滞后一帧时, 准入对等仍逐位一致。
+    final valid = _prune(_record, now);
     final incoming = OsdEntry(
       message: OsdMessage(
         text: text,
@@ -98,21 +116,43 @@ class OsdService {
     _cancelTimer?.call();
     _cancelTimer = null;
     final epoch = ++_timerEpoch;
+    // 代次来源是记账真值而非发布面: build 期发布面滞后时, 连续 show 的代次仍
+    // 严格递增, 不会把两个不同快照编成同代 (overlay 的代次守卫依赖单调性)。
     final next = OsdSnapshot(
-      generation: _state.value.generation + 1,
+      generation: _record.generation + 1,
       current: current,
       pending: pending,
     );
+    _record = next;
     if (current != null) {
       _cancelTimer = _schedule(current.expiresAt - now, () {
         // Cancellation alone cannot retract an already queued callback.
         if (_isDisposed || epoch != _timerEpoch) return;
         final at = _now();
-        final valid = _prune(_state.value, at);
+        final valid = _prune(_record, at);
         _publish(valid.current, valid.pending, at);
       });
     }
-    _state.value = next;
+    // 构建期把发布推迟到帧末; 其余相位同步执行, 可观察时序与旧实现一致。
+    _afterBuild(() {
+      if (_isDisposed) return;
+      // 同引用合并: 一次构建期内多次排队的冲刷塌缩为一次通知, 携带最新一致快照。
+      if (!identical(_state.value, _record)) _state.value = _record;
+    });
+  }
+
+  /// 构建期守卫 — persistentCallbacks 期间把动作推迟到本帧末执行。
+  /// Build-phase guard: a post-frame callback registered during
+  /// SchedulerPhase.persistentCallbacks always fires at the end of the
+  /// in-flight frame, so the deferral is bounded to the current frame and can
+  /// never drop a message. Sister pattern: workspace_menu_session.dart.
+  static void _afterBuild(VoidCallback action) {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => action());
+    } else {
+      action();
+    }
   }
 
   /// Release an explicitly owned test/local service, not the shared renderer.
