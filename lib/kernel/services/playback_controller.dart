@@ -154,7 +154,14 @@ class PlaybackController {
   /// false 表示校验失败 / 打开错误 / 被更新请求淘汰。
   Future<bool> openAndPlay(String path) async {
     final requestGen = ++_openRequestGeneration;
-    final validationMsg = PathValidator.validate(path);
+    // N1 修复: 入口单点 trim 归一化 — validate 内部虽会 trim, 但原串曾直接
+    // 流入下游, 带首尾空格的 URL 会误走同目录扫描 (isUrl 对带空格串返回
+    // false) 并把带空格路径交给引擎. 归一化只在此信任边界做一次,
+    // normalizedPath 同时喂 validate 与全部下游 — 被校验的值即被装载的值
+    // (单一真相源, 不改 _buildQueuePaths/_locateInQueue 签名、不动
+    // FolderScanner).
+    final normalizedPath = path.trim();
+    final validationMsg = PathValidator.validate(normalizedPath);
     if (validationMsg != null) {
       validationError.value = validationMsg;
       onError?.call(FileError(FileErrorCode.pathTraversal, validationMsg));
@@ -164,10 +171,10 @@ class PlaybackController {
 
     // 同目录装载（毫秒级: FolderScanner 流式扫描 + mpv loadlist 整体装载）;
     // 失败/退化路径均归一为单元素队列, 不阻断打开.
-    final queuePaths = await _buildQueuePaths(path);
+    final queuePaths = await _buildQueuePaths(normalizedPath);
     // 扫描 IO 窗口内被新请求或停止淘汰 → 不进引擎, 也不发布任何状态.
     if (requestGen != _openRequestGeneration) return false;
-    final startIndex = _locateInQueue(queuePaths, path);
+    final startIndex = _locateInQueue(queuePaths, normalizedPath);
     final result = await engine.openPlaylist(
       queuePaths,
       startIndex: startIndex < 0 ? 0 : startIndex,
@@ -178,19 +185,22 @@ class PlaybackController {
         if (requestGen != _openRequestGeneration) return false;
         // 字幕检测不影响主播放链路，失败仅记录诊断信息。
         unawaited(
-          subtitleService?.detectAndLoad(path).catchError((Object error) {
-            _log.d('Subtitle detection failed: $error');
-          }),
+          subtitleService
+              ?.detectAndLoad(normalizedPath)
+              .catchError((Object error) {
+                _log.d('Subtitle detection failed: $error');
+              }),
         );
         trackPreferenceService?.restoreAfterOpen(engine.mediaInfo);
         engine.play();
-        currentFileName.value = PathUtils.basename(path);
-        currentPath.value = path;
+        currentFileName.value = PathUtils.basename(normalizedPath);
+        currentPath.value = normalizedPath;
         return true;
       case OpenError(:final error):
         // B5/9: 网络流打开失败时附带本机接口摘要 (interfaceCount + hasNonLoopback),
-        // 帮助定位"本机离线"vs"远端不可达". isUrl 门控确保本地文件失败不触发查询.
-        if (PathValidator.isUrl(path)) {
+        // 帮助定位"本机离线"vs"远端不可达". isUrl 门控确保本地文件失败不触发查询;
+        // 传 trim 后串 — 带前导空格串会被 isUrl 误判本地路径而跳过 enrichment.
+        if (PathValidator.isUrl(normalizedPath)) {
           await _enrichNetworkSnapshot(error);
         }
         onError?.call(error);
