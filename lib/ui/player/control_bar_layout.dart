@@ -160,14 +160,16 @@ class _BarArrowNavScope extends StatelessWidget {
         if (dir == null) return KeyEventResult.ignored;
         final current = FocusManager.instance.primaryFocus;
         if (current == null) return KeyEventResult.ignored;
-        // 线性序移动 — traversalDescendants 已按阅读序排好,控制栏一排
-        // 按钮下线性序即视觉序。不用 findFirstFocusInDirection:其缺省
-        // 搜索边界是整个 route scope,且嵌套 group 下几何搜索会回退到
-        // 焦点路径祖先节点(requestFocus 到祖先 scope 后,后续方向键绕过
-        // 本层直接触发全局 seek — 实测坑)。
-        final nodes = FocusScope.of(context).traversalDescendants
-            .where((n) => n.canRequestFocus)
-            .toList();
+        // 子树序移动 — node 即本 scope 的 Focus 节点,traversalDescendants
+        // 恰为控制栏子树内可遍历节点(后序深度优先树序),与面板开/关无关;
+        // 该 getter 本身已过滤 skipTraversal + canRequestFocus。旧实现取
+        // FocusScope.of(context)(路由 scope),面板打开时遍历含面板 task
+        // scope 等栏外节点,栏边缘方向键会把焦点泄进面板(U2,Space 随即
+        // 作用于跨面控件)。不用 findFirstFocusInDirection:其缺省搜索
+        // 边界是整个 route scope,且嵌套 group 下几何搜索会回退到焦点
+        // 路径祖先节点(requestFocus 到祖先 scope 后,后续方向键绕过本层
+        // 直接触发全局 seek — 实测坑)。
+        final nodes = node.traversalDescendants.toList();
         final idx = nodes.indexOf(current);
         if (idx < 0) return KeyEventResult.handled;
         final nextIdx = idx + (dir == TraversalDirection.right ? 1 : -1);
