@@ -425,4 +425,66 @@ void main() {
       s.dispose();
     });
   });
+
+  // ── status pending-slot admission (261009-oab) ──
+  // 方案 b 最小修: status (rank 0) 恒占 pending 位顶掉任何旧 pending (latest
+  // wins) — 双槽被高 rank 占满时不再整条蒸发, 最坏从"蒸发"收敛为"等 current
+  // 到期"; fj3 既有 coalescingKey 契约组保持原语义不动。
+  group('status always occupies pending slot', () {
+    test('status is never dropped when higher ranks fill both slots', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('failure now', priority: OsdPriority.failure, coalescingKey: 'f');
+      s.show('warning held', priority: OsdPriority.warning, coalescingKey: 'w');
+      // 异 key 同 rank 2 占满双槽: failure 占 current, warning 等 pending。
+      expect(s.snapshot.value.current?.message.text, 'failure now');
+      expect(s.snapshot.value.pending?.message.text, 'warning held');
+      // 新语义: status 恒入 pending 位, 不再整条蒸发。
+      s.show('volume 50%');
+      expect(s.snapshot.value.current?.message.text, 'failure now');
+      expect(s.snapshot.value.pending?.message.text, 'volume 50%');
+      expect(clock.maxOutstanding, 1);
+      s.dispose();
+    });
+
+    test(
+      'status displaces a higher-rank pending and promotes after current',
+      () {
+        final clock = _Clock();
+        final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+        s.show('success now', priority: OsdPriority.success);
+        s.show(
+          'success held',
+          priority: OsdPriority.success,
+          coalescingKey: 'x',
+        );
+        clock.advance(500);
+        s.show('mute on'); // rank 0, 到期 1700 > current 1600, 晋升时仍有效。
+        // 新语义: status 顶掉更高 rank 的 pending (latest wins)。
+        expect(s.snapshot.value.current?.message.text, 'success now');
+        expect(s.snapshot.value.pending?.message.text, 'mute on');
+        clock.advance(1600);
+        // current 到期后晋升的是 status, 而非被顶掉的 'success held'。
+        expect(s.message.value?.text, 'mute on');
+        clock.advance(1700);
+        expect(s.message.value, isNull);
+        expect(clock.maxOutstanding, 1);
+        s.dispose();
+      },
+    );
+
+    test('consecutive statuses keep only the latest in pending', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('failure now', priority: OsdPriority.failure, coalescingKey: 'f');
+      s.show('warning held', priority: OsdPriority.warning, coalescingKey: 'w');
+      s.show('volume 50%');
+      s.show('volume 80%');
+      expect(s.snapshot.value.current?.message.text, 'failure now');
+      // 连发两条 status 只留最新 (latest wins), 被顶掉的旧 pending 不复活。
+      expect(s.snapshot.value.pending?.message.text, 'volume 80%');
+      expect(clock.maxOutstanding, 1);
+      s.dispose();
+    });
+  });
 }
