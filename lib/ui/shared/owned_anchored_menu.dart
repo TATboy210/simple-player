@@ -332,8 +332,20 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
       }
       return KeyEventResult.handled; // Down moves; Repeat/Up swallow only.
     }
-    if (event is! KeyDownEvent) return KeyEventResult.handled;
     final key = event.logicalKey;
+    // 长按连续移动是桌面菜单惯例:KeyRepeat 只放行 ↑/↓ 送入 _move;
+    // 激活键(Enter/Space/numpadEnter)与其他键的按住重复一律在此吞掉,
+    // 永远到不了 select(),按住激活键不可能连发选择(T-261009-fiw-01 缓解)。
+    // Held-key repeat: only ↑/↓ repeats pass the gate into _move; all other
+    // repeats (activation keys included) are swallowed here and can never
+    // reach select(), so holding a key cannot reselect (T-261009-fiw-01).
+    final isArrowRepeat =
+        event is KeyRepeatEvent &&
+        (key == LogicalKeyboardKey.arrowDown ||
+            key == LogicalKeyboardKey.arrowUp);
+    if (event is! KeyDownEvent && !isArrowRepeat) {
+      return KeyEventResult.handled; // 未放行事件一律吞掉,不泄漏到播放器。
+    }
     if (key == LogicalKeyboardKey.arrowDown) _move(1);
     if (key == LogicalKeyboardKey.arrowUp) _move(-1);
     if (_selected >= 0 &&
