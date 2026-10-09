@@ -192,6 +192,21 @@ void main() {
       expect(descriptions, contains(l10n.shortcutPrevious));
       expect(descriptions, contains(l10n.shortcutPlaylist));
     });
+
+    test('shortcut definitions include F-key fullscreen entry', () {
+      final l10n = lookupAppLocalizations(const Locale('zh'));
+
+      final definitions = shortcutDefinitions(l10n);
+
+      // F 键全屏切换已实装 (onToggleFullscreen) — 帮助面板单一数据源必须
+      // 恰含一条 'F' 行且描述指向 shortcutFullscreen. 契约锁: 防条目被删
+      // 后帮助面板缺行失实 (v0.0.11 T6).
+      final fEntries = definitions
+          .where(((String, String) item) => item.$1 == 'F')
+          .toList();
+      expect(fEntries, hasLength(1));
+      expect(fEntries.single.$2, l10n.shortcutFullscreen);
+    });
   });
 
   group('KeyboardHandler edge cases', () {

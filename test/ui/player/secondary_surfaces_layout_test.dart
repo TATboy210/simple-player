@@ -103,6 +103,9 @@ void main() {
         await tester.pump();
         final tail = shortcutDefinitions(l10n).last.$2;
         _complete(tester, find.text(tail), const Rect.fromLTWH(0, 0, 854, 480));
+        // F 键全屏行必须实际渲染进帮助面板 (Table 全量构建, 与滚动位置无
+        // 关; 契约锁防 shortcutDefinitions 缺行回归, v0.0.11 T6).
+        expect(find.text('F'), findsOneWidget);
         expect(close.hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
