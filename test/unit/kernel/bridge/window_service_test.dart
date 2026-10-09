@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_manager_service.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
@@ -631,6 +632,171 @@ void main() {
         async.flushMicrotasks();
 
         expect(service.windowSize.value, initialSize);
+      });
+    });
+  });
+
+  // =========================================================================
+  // resize 抑制标志生命周期 — init → reveal (261009-rp3 证伪测试)
+  // =========================================================================
+  // 假设: _initWindow 在隐藏 init 阶段置位 _activeResizeSuppression, 设计为
+  // 吞掉几何恢复引发的那一次 WM_SIZE; 但只有"真的来了一次 resize 事件"才
+  // 清零。若恢复尺寸与当前尺寸相同(首会话默认 1280×720 从未改过), 平台不
+  // 产生 WM_SIZE → 标志滞留 → 亮窗后用户第一次真实拖拽被吞(isResizing 不
+  // 置位/windowSize 不更新/几何不持久化), 第二次拖拽才恢复。
+  group('resize suppression lifecycle (init → reveal)', () {
+    const wmChannel = MethodChannel('window_manager');
+    // center() → calcWindowPosition 需要 screen_retriever 三件套
+    // (getPrimaryDisplay/getAllDisplays/getCursorScreenPoint); fakeAsync 下
+    // 未 mock 的 channel 会永远挂起 — init 链路要求全部 mock 到位.
+    const srChannel = MethodChannel('dev.leanflutter.plugins/screen_retriever');
+
+    /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding.
+    TestDefaultBinaryMessenger messenger() =>
+        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
+
+    /// 当前原生窗口尺寸 — 与恢复尺寸相同时模拟"零几何变化无 WM_SIZE"。
+    Size? nativeSize;
+
+    setUp(() {
+      nativeSize = null;
+      // 首会话: 无持久化几何 → load() 回落默认 1280×720 (defaultWindowSize).
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      messenger().setMockMethodCallHandler(wmChannel, (call) async {
+        switch (call.method) {
+          case 'getBounds':
+            // window_manager 0.5.2: getSize/getPosition 都走 getBounds,
+            // 期望返回 x/y/width/height 四字段.
+            final sz = nativeSize;
+            if (sz == null) return null;
+            return {'x': 0.0, 'y': 0.0, 'width': sz.width, 'height': sz.height};
+          case 'isFullScreen':
+          case 'isMaximized':
+          case 'isMinimized':
+            // waitUntilReadyToShow 内部对这三者做动态 bool 转型, 返回 null
+            // 会抛 TypeError (Error 族) 使 init 失败 — 必须给真实 false.
+            return false;
+          default:
+            return null;
+        }
+      });
+      const display = <String, Object?>{
+        'id': '0',
+        'size': {'width': 1920.0, 'height': 1080.0},
+        'visiblePosition': {'dx': 0.0, 'dy': 0.0},
+        'visibleSize': {'width': 1920.0, 'height': 1080.0},
+        'scaleFactor': 1.0,
+      };
+      messenger().setMockMethodCallHandler(srChannel, (call) async {
+        switch (call.method) {
+          case 'getCursorScreenPoint':
+            return {'dx': 0.0, 'dy': 0.0};
+          case 'getPrimaryDisplay':
+            return display;
+          case 'getAllDisplays':
+            return {
+              'displays': [display],
+            };
+          default:
+            return null;
+        }
+      });
+    });
+
+    tearDown(() {
+      messenger().setMockMethodCallHandler(wmChannel, null);
+      messenger().setMockMethodCallHandler(srChannel, null);
+    });
+
+    /// 走真实 init() 链路 (channel mock + 内存 prefs 全是 microtask 级),
+    /// flush 后即完成; 同时校验"完成"与"无异常" — 挂起说明 channel mock
+    /// 有缺口 (fakeAsync 下未 mock 的 channel 永不返回, 静默无错误).
+    void runInit(WindowService service, FakeAsync async) {
+      var initDone = false;
+      Object? initError;
+      StackTrace? initStack;
+      unawaited(
+        service.init().then(
+          (_) {
+            initDone = true;
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            initError = error;
+            initStack = stackTrace;
+          },
+        ),
+      );
+      async.flushMicrotasks();
+      expect(
+        initDone,
+        isTrue,
+        reason: 'init 必须在 flush 内完成: error=$initError\n$initStack',
+      );
+      expect(initError, isNull, reason: 'init 必须无异常: $initError\n$initStack');
+    }
+
+    test('first drag-resize after reveal is not swallowed when init restored '
+        'the same size (no WM_SIZE)', () {
+      fakeAsync((async) {
+        nativeSize = defaultWindowSize; // 恢复尺寸 == 当前尺寸 → 无 WM_SIZE
+        final service = WindowService();
+        runInit(service, async);
+
+        // 前提成立: 几何已恢复进状态, 平台全程无 WM_SIZE 回放.
+        expect(service.windowSize.value, defaultWindowSize);
+        expect(service.isResizing.value, isFalse);
+
+        // 亮窗 — 生产时序: 组合根首帧栅格化后调用 (main.dart).
+        unawaited(service.reveal());
+        async.flushMicrotasks();
+
+        // 用户启动后第一次真实拖拽缩放.
+        nativeSize = const Size(1600, 900);
+        service.onWindowResize();
+
+        // === 决定性断言: 首拖必须生效 (不被抑制标志吞掉) ===
+        expect(service.isResizing.value, isTrue);
+
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+        expect(service.isResizing.value, isFalse);
+        expect(service.windowSize.value, const Size(1600, 900));
+
+        // 几何持久化被触发 (windowWidth/Height 落盘到偏好存储).
+        SharedPreferences? prefs;
+        unawaited(SharedPreferences.getInstance().then((p) => prefs = p));
+        async.flushMicrotasks();
+        final resolvedPrefs = prefs;
+        if (resolvedPrefs == null) fail('getInstance 必须已解析');
+        expect(resolvedPrefs.getDouble('windowWidth'), 1600.0);
+        expect(resolvedPrefs.getDouble('windowHeight'), 900.0);
+
+        service.dispose();
+      });
+    });
+
+    test('pre-reveal restore WM_SIZE is still swallowed once (suppression '
+        'purpose preserved)', () {
+      fakeAsync((async) {
+        // 恢复尺寸(1280×720) != 当前尺寸 → init 的 setBounds 会引发
+        // WM_SIZE, 在亮窗前送达 — 这正是抑制标志存在的目的场景.
+        nativeSize = const Size(1600, 900);
+        final service = WindowService();
+        runInit(service, async);
+        expect(service.windowSize.value, defaultWindowSize);
+
+        // init 几何恢复引发的 WM_SIZE 到达 (亮窗前) — 必须被吞一次.
+        service.onWindowResize();
+        expect(service.isResizing.value, isFalse);
+
+        // 亮窗后用户拖拽 — 必须恢复正常 (不被二次吞).
+        service.onWindowResize();
+        expect(service.isResizing.value, isTrue);
+        async.elapse(const Duration(milliseconds: 500));
+        async.flushMicrotasks();
+        expect(service.windowSize.value, const Size(1600, 900));
+
+        service.dispose();
       });
     });
   });
