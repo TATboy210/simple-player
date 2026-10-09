@@ -37,14 +37,20 @@ inline void OnExit() {
 // 返回打包状态（x64 LRESULT 64 位布局）：
 //   bit 0       active — 查询时原生模态循环是否仍在进行
 //   bits 1-16   exitLagMs — 距上次 WM_EXITSIZEMOVE 的毫秒数（active 时为 0；
-//               16 位上限 65535ms，远超 settle 防抖 500ms 的观测窗口）
+//               16 位上限 65535ms，远超 settle 防抖 500ms 的观测窗口；
+//               超限时饱和停在 65535，不回绕，见下）
 //   bits 17-48  enterTick — 进入时刻（GetTickCount 时钟；0 = 本次运行从未
 //               进入过，Dart 侧解码为 null）
 inline LRESULT HandleQuerySizemove() {
   const LRESULT now = static_cast<LRESULT>(::GetTickCount());
   const LRESULT lagMs =
       g_active ? 0 : (now - static_cast<LRESULT>(g_exitTick));
-  return (g_active ? 1 : 0) | ((lagMs & 0xFFFF) << 1) |
+  // 16 位饱和钳制而非 & 0xFFFF 位截断：取证数据超 65.5s 时应显式停在
+  // 65535；回绕成小值会让 Dart 侧把「很久前已退出」误读成「刚退出」，
+  // 直接污染 stale strip 判定（enterTick 字段不受影响——它是 32 位时钟
+  // 原值，位宽内无回绕语义问题）。
+  const LRESULT lagClamped = lagMs > 0xFFFF ? 0xFFFF : lagMs;
+  return (g_active ? 1 : 0) | ((lagClamped) << 1) |
          ((static_cast<LRESULT>(g_enterTick) & 0xFFFFFFFFLL) << 17);
 }
 }  // namespace sizemove_bridge_messages
