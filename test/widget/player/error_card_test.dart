@@ -649,44 +649,52 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('copy sends a formatter-identical pack and shows copied OSD', (
-      tester,
-    ) async {
-      // Arrange：真实 intake 报告 + 默认单例（无 diagnosticLogStatus →
-      // logPath 为 null，与 formatter 对 null 的既有降级一致）。
-      final reporter = makeReporter(mediaPath: r'D:\media\movies\bunny.mp4');
-      final report = acceptHead(reporter, () {
-        reporter.reportPlayerError(
-          FileError(FileErrorCode.fileNotFound, 'raw path'),
+    testWidgets(
+      'copy sends the redacted pack and shows copied-with-log-hint OSD',
+      (tester) async {
+        // Arrange：真实 intake 报告 + 默认单例（无 diagnosticLogStatus →
+        // logPath 为 null，与 formatter 对 null 的既有降级一致）。
+        final reporter = makeReporter(mediaPath: r'D:\media\movies\bunny.mp4');
+        final report = acceptHead(reporter, () {
+          reporter.reportPlayerError(
+            FileError(FileErrorCode.fileNotFound, 'raw path'),
+          );
+        });
+        await tester.pumpWidget(buildCard(report));
+
+        final calls = <MethodCall>[];
+        mockPlatformChannel(tester, (call) async {
+          calls.add(call);
+          return null;
+        });
+
+        // Act：点击复制按钮。
+        await tester.tap(find.byKey(const ValueKey('error-card-copy')));
+        await tester.pump();
+
+        // Assert：LOG-05 契约修订（F11 用户裁决 2026-10-09）—— 卡内复制 ==
+        // 脱敏变体 formatDiagnosticPack(report, redactPaths: true)（逐字符），
+        // 剪贴板三路径只留 basename；完整路径（盘符/目录/用户名）不进剪贴板，
+        // 只落 error.log。
+        expect(calls, hasLength(1));
+        expect(calls.single.method, 'Clipboard.setData');
+        final arguments = calls.single.arguments! as Map<Object?, Object?>;
+        expect(
+          arguments['text'],
+          formatDiagnosticPack(report, redactPaths: true),
         );
-      });
-      await tester.pumpWidget(buildCard(report));
+        expect(arguments['text'], contains('bunny.mp4'));
+        expect(arguments['text'], isNot(contains(r'D:\media\movies')));
+        // D-06 成功反馈（F11 修订）：OSD 文案携带「完整路径见 error.log」语义。
+        expect(osd.message.value?.text, '已复制，完整路径见 error.log');
+        expect(osd.message.value?.icon, Icons.check);
+        expect(osd.message.value?.priority, OsdPriority.success);
+        // 复制不改变折叠/展开状态，也不禁用卡片其余交互。
+        expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
 
-      final calls = <MethodCall>[];
-      mockPlatformChannel(tester, (call) async {
-        calls.add(call);
-        return null;
-      });
-
-      // Act：点击复制按钮。
-      await tester.tap(find.byKey(const ValueKey('error-card-copy')));
-      await tester.pump();
-
-      // Assert：LOG-05 单一来源 —— 复制文本与 formatDiagnosticPack 输出
-      // 逐字符相等（卡内禁止自拼格式字符串）。
-      expect(calls, hasLength(1));
-      expect(calls.single.method, 'Clipboard.setData');
-      final arguments = calls.single.arguments! as Map<Object?, Object?>;
-      expect(arguments['text'], formatDiagnosticPack(report));
-      // D-06 成功反馈：OSD「已复制」pill。
-      expect(osd.message.value?.text, '已复制');
-      expect(osd.message.value?.icon, Icons.check);
-      expect(osd.message.value?.priority, OsdPriority.success);
-      // 复制不改变折叠/展开状态，也不禁用卡片其余交互。
-      expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
-
-      await settleOsdTimer(tester);
-    });
+        await settleOsdTimer(tester);
+      },
+    );
 
     testWidgets(
       'pack logPath section reflects diagnosticLogPath at copy time',
@@ -716,11 +724,18 @@ void main() {
         await tester.pump();
 
         final arguments = calls.single.arguments! as Map<Object?, Object?>;
+        // F11 修订：logPath 段同样脱敏 —— 逐字符等同脱敏变体；剪贴板只留
+        // basename，完整日志路径不进剪贴板（落盘日志不受影响）。
         expect(
           arguments['text'],
-          formatDiagnosticPack(report, logPath: 'C:/logs/diag.txt'),
+          formatDiagnosticPack(
+            report,
+            logPath: 'C:/logs/diag.txt',
+            redactPaths: true,
+          ),
         );
-        expect(arguments['text'], contains('Path: C:/logs/diag.txt'));
+        expect(arguments['text'], contains('Path: diag.txt'));
+        expect(arguments['text'], isNot(contains('C:/logs')));
 
         await settleOsdTimer(tester);
       },
