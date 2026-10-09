@@ -320,4 +320,109 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  // ── coalescingKey contract ──
+  // key 身份门契约: 同 key 同 rank 顶替合并刷新; 异 key 同 rank 各自排队不互吃
+  // (双槽占满时第三条按容量裁决丢弃); 无 key incoming 走纯 rank 行为逐字段一致。
+  group('coalescingKey contract', () {
+    test('distinct keys at same rank coexist and neither is dropped', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('warn a', priority: OsdPriority.warning, coalescingKey: 'a');
+      expect(s.snapshot.value.current?.message.text, 'warn a');
+      clock.advance(1000);
+      s.show('warn b', priority: OsdPriority.warning, coalescingKey: 'b');
+      // 异 key 同 rank 不互吃: 'b' 入 pending 等位, 不得顶替在场的 'a'。
+      expect(s.snapshot.value.current?.message.text, 'warn a');
+      expect(s.snapshot.value.pending?.message.text, 'warn b');
+      clock.advance(4000); // 越过 'a' 的绝对到期 (warning lifetime 4000ms)
+      expect(s.snapshot.value.current?.message.text, 'warn b');
+      clock.advance(5000); // 越过 'b' 的绝对到期 (1000+4000, 晋升不续期)
+      expect(s.snapshot.value.current, isNull);
+      expect(clock.maxOutstanding, 1);
+      s.dispose();
+    });
+
+    test('same key at same rank merges and refreshes in place', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('disk warn', priority: OsdPriority.warning, coalescingKey: 'k');
+      clock.advance(1000);
+      s.show(
+        'disk warn latest',
+        priority: OsdPriority.warning,
+        coalescingKey: 'k',
+      );
+      // 同 key 合并刷新: 新文本 + 新入场绝对到期 (1000+4000), 非续期旧到期。
+      expect(s.snapshot.value.current?.message.text, 'disk warn latest');
+      expect(s.snapshot.value.current?.expiresAt.inMilliseconds, 5000);
+      expect(s.snapshot.value.pending, isNull);
+      s.dispose();
+    });
+
+    test(
+      'unkeyed same-rank incoming still replaces immediately (legacy path)',
+      () {
+        final clock = _Clock();
+        final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+        s.show('keyed warn', priority: OsdPriority.warning, coalescingKey: 'a');
+        s.show('unkeyed warn', priority: OsdPriority.warning);
+        // 无 key incoming 走纯 rank 行为: 仍顶替同 rank current, 无论其带不带 key。
+        expect(s.snapshot.value.current?.message.text, 'unkeyed warn');
+        expect(s.snapshot.value.pending, isNull);
+        s.dispose();
+      },
+    );
+
+    test('keyed same-rank incoming stages instead of displacing unkeyed '
+        'or different-key current', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('unkeyed warn', priority: OsdPriority.warning);
+      clock.advance(1000);
+      s.show('keyed a warn', priority: OsdPriority.warning, coalescingKey: 'a');
+      // keyed 进不可顶替无 key current (同 rank): 'a' 入 pending 等位接续。
+      expect(s.snapshot.value.current?.message.text, 'unkeyed warn');
+      expect(s.snapshot.value.pending?.message.text, 'keyed a warn');
+      clock.advance(4000); // 越过无 key current 的到期
+      expect(s.snapshot.value.current?.message.text, 'keyed a warn');
+      s.dispose();
+    });
+
+    test('third distinct-key same-rank warning is dropped '
+        'when both slots hold distinct keys', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('warn a', priority: OsdPriority.warning, coalescingKey: 'a');
+      clock.advance(1000);
+      s.show('warn b', priority: OsdPriority.warning, coalescingKey: 'b');
+      s.show('warn c', priority: OsdPriority.warning, coalescingKey: 'c');
+      // 双槽容量裁决: 'a'(current)+'b'(pending) 占满后, 'c' 被丢弃不顶替任何在位者。
+      expect(s.snapshot.value.current?.message.text, 'warn a');
+      expect(s.snapshot.value.pending?.message.text, 'warn b');
+      s.dispose();
+    });
+
+    test('same key never demotes a higher-rank current; '
+        'lower ranks stage regardless of key', () {
+      final clock = _Clock();
+      final s = OsdService(now: () => clock.now, schedule: clock.schedule);
+      s.show('failure now', priority: OsdPriority.failure, coalescingKey: 'k');
+      // 同 key 'k' 但 rank 更低 (success 1 < failure 2): 身份匹配不豁免 rank 准入。
+      // 注: warning 与 failure 同为 rank 2 (既有准入结构), 计划原场景 (warning
+      // 带 key 但 rank 更低) 无法构造, 故用 success 钉死同一契约。
+      s.show(
+        'keyed success',
+        priority: OsdPriority.success,
+        coalescingKey: 'k',
+      );
+      expect(s.snapshot.value.current?.message.text, 'failure now');
+      expect(s.snapshot.value.pending?.message.text, 'keyed success');
+      // 无 key 低 rank 同样只进 pending 位 (既有 equal-rank-latest 规则顶掉同位者)。
+      s.show('unkeyed success', priority: OsdPriority.success);
+      expect(s.snapshot.value.current?.message.text, 'failure now');
+      expect(s.snapshot.value.pending?.message.text, 'unkeyed success');
+      s.dispose();
+    });
+  });
 }
