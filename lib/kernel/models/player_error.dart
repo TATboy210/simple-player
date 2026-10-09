@@ -113,6 +113,43 @@ class ErrorContext {
     this.networkHasNonLoopback,
   }) : timestamp = timestamp ?? DateTime.now();
 
+  /// 派生新 [ErrorContext] — 安全的丰富/变形入口, 免去手工逐字段重建 (N4)
+  ///
+  /// Derives a new [ErrorContext] — safe enrichment/derivation without
+  /// hand-copied field rebuilds. 未传参数的字段逐项保留原值; timestamp
+  /// 同样透传 (不重跑构造器默认 DateTime.now()), 传入非空值即可显式覆盖.
+  ///
+  /// 已知限制: `??` 惯用法下 "未传" 与 "显式传 null" 不可区分 — 本方法
+  /// 无法把字段清空为 null. 需要清空字段的调用方须直接构造全新
+  /// [ErrorContext] (当前无此调用形, 不引入哨兵清空机制).
+  ///
+  /// Known limitation: the `?? this.field` idiom conflates "absent" with
+  /// "explicit null" — a field cannot be cleared to null through copyWith.
+  /// Callers needing to clear a field must construct a fresh [ErrorContext].
+  ErrorContext copyWith({
+    String? action,
+    int? generation,
+    String? path,
+    DateTime? timestamp,
+    String? module,
+    StackTrace? callbackStackTrace,
+    int? networkInterfaceCount,
+    bool? networkHasNonLoopback,
+  }) {
+    return ErrorContext(
+      action: action ?? this.action,
+      generation: generation ?? this.generation,
+      path: path ?? this.path,
+      timestamp: timestamp ?? this.timestamp,
+      module: module ?? this.module,
+      callbackStackTrace: callbackStackTrace ?? this.callbackStackTrace,
+      networkInterfaceCount:
+          networkInterfaceCount ?? this.networkInterfaceCount,
+      networkHasNonLoopback:
+          networkHasNonLoopback ?? this.networkHasNonLoopback,
+    );
+  }
+
   /// 序列化为 Map — 传给 KernelLogger.error(context:) 参数
   ///
   /// 路径脱敏：只保留文件名，防止泄露用户目录结构
