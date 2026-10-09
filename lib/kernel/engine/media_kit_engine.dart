@@ -39,8 +39,9 @@ import 'models/video_codec_info.dart';
 ///   - 其余 7 个 (position/duration/volume/isMuted/subtitleText/buffered/
 ///     aspectRatio/lastError/playbackSpeed) 自建, 由 stream 写入
 ///
-/// 不支持能力 (用户决策放弃, 阶段 4+ 再评估): 视频效果/旋转/反交错/字幕延迟/
+/// 不支持能力 (用户决策放弃, 阶段 4+ 再评估): 视频效果/旋转/反交错/
 /// EQ/AB 循环/D3D11 sync/运行时硬解切换 — 全部 stub + 一次性 debugPrint 告警.
+/// (字幕延迟已 v0.0.6 实装: setSubtitleDelay 走 mpv sub-delay 属性, 不再是 stub.)
 class MediaKitEngine implements MediaEngine {
   /// 构造引擎. 须在 `MediaKit.ensureInitialized()` 之后调用 (libmpv 已加载).
   ///
@@ -176,6 +177,14 @@ class MediaKitEngine implements MediaEngine {
   int? _videoHeight;
   MediaInfo _mediaInfo = const MediaInfo();
   bool _hasMedia = false;
+
+  /// 轨道表变更广播流 (K4-b) — [trackTableChanged] 的底层载体.
+  ///
+  /// 真实引擎中轨道帧晚于 open resolve 经 mpv 事件回流; 恢复类消费方
+  /// (TrackPreferenceService 经 PlaybackController) 挂此流首帧再读
+  /// mediaInfo, 避免 open resolve 即刻读到上一文件的陈旧表.
+  final StreamController<void> _trackTableChanged =
+      StreamController<void>.broadcast();
 
   // 静音语义 (v0.0.8.1): 走 mpv 原生 `mute` 属性 (见 setMute),
   // 无需"静音前音量快照" — 音量属性在静音期间不动, unmute 即原响度.
@@ -316,6 +325,9 @@ class MediaKitEngine implements MediaEngine {
 
   @override
   MediaInfo get mediaInfo => _mediaInfo;
+
+  @override
+  Stream<void> get trackTableChanged => _trackTableChanged.stream;
 
   @override
   bool get hasMedia => _hasMedia;
@@ -980,6 +992,13 @@ class MediaKitEngine implements MediaEngine {
   @override
   void switchSubtitleTrack(int trackId) {
     if (_disposed) return;
+    // K4-a: trackId == -1 是字幕关闭偏好 (TrackPreferenceService 约定),
+    // 映射 SubtitleTrack.no() 显式关闭 — 否则关字幕在下一个文件自动回来.
+    // 其余 < 0 仍拒绝 (防误伤未知负值语义).
+    if (trackId == -1) {
+      unawaited(_player.setSubtitleTrack(SubtitleTrack.no()));
+      return;
+    }
     final real = _realSubtitleTracks();
     if (trackId < 0 || trackId >= real.length) return;
     unawaited(_player.setSubtitleTrack(real[trackId]));
@@ -1095,6 +1114,8 @@ class MediaKitEngine implements MediaEngine {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    // 关闭轨道表变更流 — 挂起的恢复等待方收到 done 即静默退出.
+    unawaited(_trackTableChanged.close());
     for (final cancel in _subscriptionCancels) {
       unawaited(_cancelSubscription(cancel));
     }
@@ -1204,6 +1225,10 @@ class MediaKitEngine implements MediaEngine {
       _player.stream.tracks.listen((t) {
         _tracks = t;
         _rebuildMediaInfo();
+        // K4-b: 轨道表就绪单发通知 — 消费方 (轨道偏好恢复) 挂此流首帧
+        // 再读 mediaInfo. 通知在 _rebuildMediaInfo 之后发出, 监听方收到
+        // 事件时 mediaInfo 已是新表.
+        _trackTableChanged.add(null);
       }),
     );
     _addSubscription(

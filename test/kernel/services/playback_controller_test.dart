@@ -481,7 +481,9 @@ void main() {
       // 开启为空表), 索引校验与恢复全错位. 修复契约: 恢复挂
       // MediaEngine.trackTableChanged 首帧后执行一次.
       test('恢复延迟到轨道表首帧 — open resolve 时刻不得即刻恢复', () async {
-        final trackPreferenceService = _RecordingTrackPreferenceService(engine);
+        // 用真实 TrackPreferenceService 走完整恢复链路 (记录型 fake 覆写
+        // restoreAfterOpen 会吞掉引擎调用, 无法证明"以就绪轨道表恢复").
+        final trackPreferenceService = TrackPreferenceService(engine);
         controller.dispose();
         controller = PlaybackController(
           engine: engine,
@@ -499,15 +501,14 @@ void main() {
 
         expect(await controller.openAndPlay('C:/test/video.mp4'), true);
 
-        // open resolve 时刻恢复尚未发生 (真实引擎此刻 audioTracks 为空表,
-        // 即刻恢复会让 switchAudioTrack 被范围校验丢弃 — 陈旧读实证).
-        expect(trackPreferenceService.restoredMedia, isEmpty);
+        // open resolve 时刻恢复尚未发生 — 真实引擎此刻 audioTracks 为空表
+        // (陈旧读实证), 即刻恢复会让 switchAudioTrack 被范围校验丢弃.
+        expect(engine.switchAudioTrackCallCount, 0);
 
-        // 轨道表首帧回流 (FakeEngine 显式注入, 模拟 mpv 轨道流) 后
-        // 恰好恢复一次, 且以就绪轨道表执行音频轨道切换.
+        // 轨道表首帧回流 (FakeEngine 显式注入, 模拟 mpv 轨道流) 后以
+        // 就绪轨道表恢复: 音频轨道切换恰好执行一次.
         engine.emitTrackTableChange();
         await pumpEventQueue();
-        expect(trackPreferenceService.restoredMedia, hasLength(1));
         expect(engine.switchAudioTrackCallCount, 1);
         expect(engine.lastSwitchAudioTrack, 1);
       });

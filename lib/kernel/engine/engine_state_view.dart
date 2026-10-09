@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
@@ -59,6 +61,17 @@ abstract class EngineStateView {
 
   /// 媒体元信息（编解码、分辨率、轨道列表）
   MediaInfo get mediaInfo;
+
+  /// 轨道表变更通知流 — 底层轨道表更新时发出事件（装载后首帧回流等）.
+  ///
+  /// Track-table change notification stream — emitted whenever the
+  /// underlying track table updates (e.g. the first frame after a load).
+  ///
+  /// 时序契约 (K4-b): open resolve 即刻读 [mediaInfo] 是陈旧读 — 轨道流
+  /// 尚未回流, 读到的是上一文件的表（首次开启为空表）. 需要就绪轨道表的
+  /// 调用方（轨道偏好恢复）必须等待 open 之后本流的下一个事件再读.
+  /// 广播流无缓冲: 订阅须先于事件建立.
+  Stream<void> get trackTableChanged;
 
   /// 释放所有 ValueNotifier 资源
   void dispose();

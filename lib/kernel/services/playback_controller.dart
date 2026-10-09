@@ -101,6 +101,11 @@ class PlaybackController {
   /// 防止"停止后扫描完成又把媒体装回"的竞争.
   int _openRequestGeneration = 0;
 
+  /// K4-b: 挂起的轨道偏好恢复订阅 — 一次性（轨道表首帧即取消，防轨道流
+  /// 多帧重复恢复）; 新 open/stop 经 [_scheduleTrackPreferenceRestore]
+  /// 淘汰前一个挂起恢复, dispose 兜底取消.
+  StreamSubscription<void>? _trackRestoreSub;
+
   /// 获取字幕服务（可能为 null）.
   ///
   /// Returns the subtitle service, or null if not configured.
@@ -199,7 +204,9 @@ class PlaybackController {
             _log.d('Subtitle detection failed: $error');
           }),
         );
-        trackPreferenceService?.restoreAfterOpen(engine.mediaInfo);
+        // K4-b: 恢复不再即刻执行 — open resolve 即刻读 mediaInfo 是陈旧
+        // 读 (轨道流未回流), 挂轨道表首帧后执行一次.
+        _scheduleTrackPreferenceRestore(requestGen);
         engine.play();
         currentFileName.value = PathUtils.basename(normalizedPath);
         currentPath.value = normalizedPath;
@@ -229,6 +236,25 @@ class PlaybackController {
         // 旧请求被新请求淘汰，不提交任何属于旧请求的副作用。
         return false;
     }
+  }
+
+  /// K4-b: 轨道偏好恢复延迟挂接 — 挂 [MediaEngine.trackTableChanged]
+  /// 首帧后执行一次.
+  ///
+  /// open resolve 即刻读 [MediaEngine.mediaInfo] 是陈旧读（轨道流未回流，
+  /// 首开读到空表、间开读到上一文件的表，索引校验与恢复全错位）；真实
+  /// 引擎在装载完成后经轨道流回流新表并单发通知，此刻 mediaInfo 已就绪.
+  /// 恢复执行前查 [_openRequestGeneration] — 等待期内到达的停止/新请求
+  /// 使本恢复过期（淘汰的请求不发布任何副作用）.
+  void _scheduleTrackPreferenceRestore(int requestGen) {
+    unawaited(_trackRestoreSub?.cancel());
+    _trackRestoreSub = engine.trackTableChanged.listen((_) {
+      // 一次性: 首帧即取消, 轨道流后续多帧 (外挂字幕加载等) 不再恢复.
+      unawaited(_trackRestoreSub?.cancel());
+      _trackRestoreSub = null;
+      if (requestGen != _openRequestGeneration) return;
+      trackPreferenceService?.restoreAfterOpen(engine.mediaInfo);
+    });
   }
 
   /// 校验失败类别 → PlayerError 错误码映射 (N2)
@@ -370,6 +396,9 @@ class PlaybackController {
 
   /// 释放运行时资源和状态通知器。
   void dispose() {
+    // K4-b: 取消挂起的轨道偏好恢复 — dispose 后不得再触发副作用.
+    unawaited(_trackRestoreSub?.cancel());
+    _trackRestoreSub = null;
     engine.queueRevision.removeListener(_syncCurrentMediaFromQueue);
     engine.state.removeListener(_syncCurrentMediaFromQueue);
     currentFileName.dispose();

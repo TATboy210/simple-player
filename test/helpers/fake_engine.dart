@@ -650,7 +650,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   final StreamController<void> _trackTableChanges =
       StreamController<void>.broadcast();
 
-  /// 轨道表变更通知流 (K4-b GREEN 收编进 EngineStateView 后加 @override).
+  /// 轨道表变更通知流 — 镜像 MediaKitEngine 轨道流单发通知语义.
+  @override
   Stream<void> get trackTableChanged => _trackTableChanges.stream;
 
   /// 手工注入一帧轨道表变更 — 模拟 mpv 轨道流回流 (装载后首帧/外挂字幕
@@ -693,10 +694,13 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   @override
   void switchSubtitleTrack(int trackIndex) {
-    // 镜像 MediaKitEngine.switchSubtitleTrack 现行守卫: trackId < 0 一律
-    // 静默拒绝 (K4-a 缺陷: -1 关闭偏好被吞成永久 no-op — GREEN 翻转此镜像).
+    // 镜像 MediaKitEngine K4-a 修复: -1 是字幕关闭偏好 → 记关闭调用
+    // (SubtitleTrack.no() 语义); 其余 < 0 仍拒绝, 范围外静默拒绝.
     if (_disposed) return;
-    if (trackIndex < 0) return;
+    if (trackIndex == -1) {
+      subtitleOffCallCount++;
+      return;
+    }
     if (trackIndex >= _mediaInfo.subtitleTracks.length) return;
     switchSubtitleTrackCallCount++;
     lastSwitchSubtitleTrack = trackIndex;
