@@ -652,6 +652,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get errorCardCopied => '已复制';
 
   @override
+  String get errorCardCopiedPathInLog => '已复制，完整路径见 error.log';
+
+  @override
   String get errorCardCopyFailed => '复制失败';
 
   @override

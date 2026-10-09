@@ -205,6 +205,7 @@
   "errorCardClose": "閉じる",
   "errorCardCopyTooltip": "診断情報をコピー",
   "errorCardCopied": "コピーしました",
+  "errorCardCopiedPathInLog": "コピーしました（完全パスは error.log 参照）",
   "errorCardCopyFailed": "コピーに失敗しました",
   "errorCardOpenLogTooltip": "ログの場所を開く",
   "errorCardLogOpened": "ログの場所を開きました",

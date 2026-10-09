@@ -3,6 +3,7 @@
 /// Pure formatter shared by durable file evidence and future copy actions.
 library;
 
+import 'diagnostic_redactor.dart';
 import 'error_location.dart';
 import 'error_report.dart';
 
@@ -10,7 +11,17 @@ import 'error_report.dart';
 ///
 /// Formats an accepted report into a stable segmented plain-text diagnostic
 /// pack. Raw stack evidence is deliberately appended last and never escaped.
-String formatDiagnosticPack(ErrorReport report, {String? logPath}) {
+///
+/// [redactPaths] 仅供剪贴板导出（F11 用户裁决 2026-10-09）：true 时三个开发
+/// 证据路径字段（Current Media Full Path / Failed Open Path / Log Path）过
+/// [DiagnosticRedactor.redactPathValue] 只留 basename；默认 false 保持落盘
+/// 日志逐字符不变 —— LOG-05 契约修订为「卡内复制 == 脱敏变体」。网络 URL
+/// 不是本地路径，红处同样原样保留。
+String formatDiagnosticPack(
+  ErrorReport report, {
+  String? logPath,
+  bool redactPaths = false,
+}) {
   final buffer = StringBuffer()
     ..writeln('== Report ==')
     ..writeln('Event ID: ${_singleLine(report.eventId)}')
@@ -33,11 +44,12 @@ String formatDiagnosticPack(ErrorReport report, {String? logPath}) {
     ..writeln('== Media ==')
     ..writeln('Path: ${_singleLine(report.mediaPath ?? 'none')}')
     // Developer evidence is explicitly separate from the ordinary safe path.
+    // F11: 仅这三个开发证据字段参与 redactPaths 脱敏。
     ..writeln(
-      'Current Media Full Path: ${_singleLine(report.fullMediaPath ?? 'none')}',
+      'Current Media Full Path: ${_pathField(report.fullMediaPath, redactPaths)}',
     )
     ..writeln(
-      'Failed Open Path: ${_singleLine(report.failedOpenPath ?? 'none')}',
+      'Failed Open Path: ${_pathField(report.failedOpenPath, redactPaths)}',
     )
     ..writeln()
     ..writeln('== Location ==');
@@ -49,11 +61,22 @@ String formatDiagnosticPack(ErrorReport report, {String? logPath}) {
     ..writeln('Occurrence Count: ${report.occurrenceCount}')
     ..writeln()
     ..writeln('== Log Path ==')
-    ..writeln('Path: ${_singleLine(logPath ?? 'unavailable')}')
+    ..writeln(
+      'Path: ${logPath == null ? 'unavailable' : _pathField(logPath, redactPaths)}',
+    )
     ..writeln()
     ..writeln('== Raw Stack ==')
     ..write(report.rawStackTrace);
   return buffer.toString();
+}
+
+/// 单个路径字段格式化 —— redactPaths 时过 [DiagnosticRedactor.redactPathValue]
+/// 留 basename（本地路径/file URI），再统一单行转义；null 降级 'none'。
+String _pathField(String? value, bool redactPaths) {
+  if (value == null) return 'none';
+  return _singleLine(
+    redactPaths ? DiagnosticRedactor.redactPathValue(value) : value,
+  );
 }
 
 /// Writes the explicit degraded location text until trusted extraction arrives.

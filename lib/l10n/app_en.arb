@@ -858,6 +858,10 @@
   "@errorCardCopied": {
     "description": "OSD feedback after a successful copy"
   },
+  "errorCardCopiedPathInLog": "Copied — full path in error.log",
+  "@errorCardCopiedPathInLog": {
+    "description": "OSD feedback after copying the diagnostic pack; redacted paths only, full paths remain in error.log"
+  },
   "errorCardCopyFailed": "Copy failed",
   "@errorCardCopyFailed": {
     "description": "OSD feedback after a failed copy"

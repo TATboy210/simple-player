@@ -1332,6 +1332,12 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get errorCardCopied;
 
+  /// OSD feedback after copying the diagnostic pack; redacted paths only, full paths remain in error.log
+  ///
+  /// In en, this message translates to:
+  /// **'Copied — full path in error.log'**
+  String get errorCardCopiedPathInLog;
+
   /// OSD feedback after a failed copy
   ///
   /// In en, this message translates to:

@@ -145,15 +145,17 @@ class _ErrorCardState extends State<ErrorCard> {
   }
 
   /// CARD-04/D-06 一键复制诊断包 —— 格式一律走
-  /// [formatDiagnosticPack]（LOG-05 单一来源：卡内复制 == 日志文件格式，
-  /// 卡内禁止自拼格式字符串），logPath 在**复制时刻**从
-  /// `diagnosticLogPath.value` 取值（不缓存，与展开区日志路径段同一读取路径）。
+  /// [formatDiagnosticPack]（LOG-05 单一来源，F11 用户裁决 2026-10-09 契约
+  /// 修订：卡内复制 == **脱敏变体** —— `redactPaths: true`，剪贴板三路径只留
+  /// basename，完整路径只落 error.log；落盘日志保持全文不变，卡内禁止自拼
+  /// 格式字符串），logPath 在**复制时刻**从 `diagnosticLogPath.value` 取值
+  /// （不缓存，与展开区日志路径段同一读取路径）。
   ///
   /// 失败隔离（T-03-11）：typed catch 只捕 [PlatformException] 与
   /// [MissingPluginException]（widget 测试未 mock channel 的天然路径），
-  /// 两态都以 OsdService pill 反馈（成功「已复制」/失败「复制失败」）；
-  /// 不捕获任何 Error 子类型，异常绝不外溢到调用方，卡片可见性与内容
-  /// 不受复制结果影响。复制期间折叠/展开状态不变（D-06）。
+  /// 两态都以 OsdService pill 反馈（成功「已复制+完整路径见 error.log」/
+  /// 失败「复制失败」）；不捕获任何 Error 子类型，异常绝不外溢到调用方，
+  /// 卡片可见性与内容不受复制结果影响。复制期间折叠/展开状态不变（D-06）。
   Future<void> _copyDiagnosticPack() async {
     // l10n 必须在 await 之前解析（await 后使用 context 需 mounted 检查，
     // 提前捕获一次即可覆盖成功/失败两条反馈路径）。
@@ -161,11 +163,12 @@ class _ErrorCardState extends State<ErrorCard> {
     final pack = formatDiagnosticPack(
       widget.report,
       logPath: _resolveLogPath(),
+      redactPaths: true,
     );
     try {
       await Clipboard.setData(ClipboardData(text: pack));
       (widget.osdService ?? OsdService.I).show(
-        l10n.errorCardCopied,
+        l10n.errorCardCopiedPathInLog,
         icon: Icons.check,
         priority: OsdPriority.success,
       );

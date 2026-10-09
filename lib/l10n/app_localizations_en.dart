@@ -659,6 +659,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorCardCopied => 'Copied';
 
   @override
+  String get errorCardCopiedPathInLog => 'Copied — full path in error.log';
+
+  @override
   String get errorCardCopyFailed => 'Copy failed';
 
   @override

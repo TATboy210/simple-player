@@ -653,6 +653,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get errorCardCopied => '복사됨';
 
   @override
+  String get errorCardCopiedPathInLog => '복사됨, 전체 경로는 error.log 참조';
+
+  @override
   String get errorCardCopyFailed => '복사 실패';
 
   @override

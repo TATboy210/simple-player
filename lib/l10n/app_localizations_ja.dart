@@ -653,6 +653,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get errorCardCopied => 'コピーしました';
 
   @override
+  String get errorCardCopiedPathInLog => 'コピーしました（完全パスは error.log 参照）';
+
+  @override
   String get errorCardCopyFailed => 'コピーに失敗しました';
 
   @override

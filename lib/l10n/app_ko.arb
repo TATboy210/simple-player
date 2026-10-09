@@ -205,6 +205,7 @@
   "errorCardClose": "닫기",
   "errorCardCopyTooltip": "진단 정보 복사",
   "errorCardCopied": "복사됨",
+  "errorCardCopiedPathInLog": "복사됨, 전체 경로는 error.log 참조",
   "errorCardCopyFailed": "복사 실패",
   "errorCardOpenLogTooltip": "로그 위치 열기",
   "errorCardLogOpened": "로그 위치를 열었습니다",
