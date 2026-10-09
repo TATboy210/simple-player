@@ -97,13 +97,24 @@ class PathValidator {
   /// 检查路径是否包含路径遍历攻击特征
   ///
   /// Returns `true` if [path] contains null bytes, `../` / `..\` sequences,
-  /// UNC network paths (`\\`), or home-directory expansion (`~`).
+  /// UNC network paths (`\\`) — 裸路径或 file:// URI 形态 (远端 host) —
+  /// or home-directory expansion (`~`).
   /// Does NOT flag bare `..` to avoid false positives on filenames
   /// like `song (live..remix).flac`.
   static bool isPathTraversal(String path) {
     if (path.contains('\x00')) return true; // null byte 注入
     if (path.contains('../') || path.contains('..\\')) return true; // 路径遍历
     if (path.startsWith('\\\\')) return true; // UNC 网络路径
+    // file:// URI 形态 UNC (v0.0.12 S1): `file://server/share` 经 URI 解析
+    // 等价 `\\server\share`,host 非空即远端共享 — 并入裸 UNC 同判
+    // fail-closed,堵住"URI 形态绕过 UNC 拦截"缺口。scheme 大小写折叠
+    // 与 isUrl/N1 同法(只在输入侧折叠一次);空 host(`file:///D:/local`)
+    // 是本地盘路径,不在此拦截。
+    final lower = path.toLowerCase();
+    if (lower.startsWith('file://')) {
+      final uri = Uri.tryParse(path);
+      if (uri != null && uri.host.isNotEmpty) return true;
+    }
     if (path.startsWith('~')) return true; // home 目录展开
     return false;
   }
