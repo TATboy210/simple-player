@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
+import 'package:simple_player_flutter/ui/player/control_bar_layout.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_session.dart';
 import 'package:simple_player_flutter/ui/player/modal_hold_observer.dart';
 import 'package:simple_player_flutter/ui/player/panel_workspace_controller.dart';
@@ -612,4 +613,144 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 200));
   });
+
+  testWidgets(
+    'panel-open arrow at control-bar edge stays inside bar subtree (no cross-surface jump)',
+    (tester) async {
+      // U2 缺陷复现 — 面板打开态:修法前 _BarArrowNavScope 用
+      // FocusScope.of(context).traversalDescendants 拿到的是路由 scope
+      // (控制栏与面板间无 FocusScope),遍历含面板 task scope 在内的
+      // 全路由可聚焦节点;实测(后序深度优先树序)栏内块之后紧跟面板
+      // task scope → 从最右栏内节点按 → 焦点泄进面板,Space 随即作用
+      // 于跨面控件。本用例锁定:←→ 在栏边缘只许停在栏内,绝不落到
+      // PlaylistPanel/SettingsPanel 控件。
+      // (与 U1 互补:U1 管面板关闭态不可聚焦,本例管面板打开态不跨面。)
+      final engine = FakeEngine()..state.value = MediaState.playing;
+      final video = FakeVideoControlsPort(
+        player: FakePlayerControls(isPlayingNow: true),
+      );
+      final workspace = PanelWorkspaceController()..toggle('settings');
+      final title = ValueNotifier('a.mp4');
+      final mode = ValueNotifier(WindowMode.windowed);
+      final session = SettingsPanelSession();
+      var playerCalls = 0;
+      addTearDown(engine.dispose);
+      addTearDown(video.dispose);
+      addTearDown(workspace.dispose);
+      addTearDown(title.dispose);
+      addTearDown(mode.dispose);
+      addTearDown(session.dispose);
+      await tester.binding.setSurfaceSize(const Size(854, 480));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: PlayerVideoControls(
+              video: video,
+              engine: engine,
+              actions: PlayerActions(
+                onSeekBack: (_) => playerCalls++,
+                onSeekForward: (_) => playerCalls++,
+              ),
+              currentFileName: title,
+              windowMode: mode,
+              workspace: workspace,
+              settingsSession: session,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // 前置 — 面板打开且已挂载(打开态才有跨面控件可泄)。
+      expect(find.byType(SettingsPanel), findsOneWidget);
+
+      // 控制栏子树判据:焦点节点的 context 是 ControlBarLayout 元素或其
+      // 后代。路由序取 rootScope.traversalDescendants(与修法前实现同
+      // 口径,后序深度优先树序),过滤 canRequestFocus 后保序。
+      bool inBar(FocusNode node) {
+        final ctx = node.context;
+        if (ctx is! Element) return false;
+        final bar = tester.element(find.byType(ControlBarLayout));
+        if (identical(ctx, bar)) return true;
+        var found = false;
+        ctx.visitAncestorElements((Element ancestor) {
+          if (identical(ancestor, bar)) {
+            found = true;
+            return false; // 命中控制栏元素,提前停止上行。
+          }
+          return true;
+        });
+        return found;
+      }
+
+      final routeOrder = FocusManager.instance.rootScope.traversalDescendants
+          .where((n) => n.canRequestFocus)
+          .toList();
+      final barNodes = routeOrder.where(inBar).toList();
+      expect(
+        barNodes.length,
+        greaterThanOrEqualTo(2),
+        reason: 'control bar must own at least two focusable nodes',
+      );
+      // RED 前置 — 栏内节点在路由序中连续成块,且块尾之后紧跟栏外节点
+      // (打开面板的 task scope):旧实现按 → 从块尾出发的落点正是它,
+      // 故新用例先红。
+      final firstBarIdx = routeOrder.indexOf(barNodes.first);
+      final lastBarIdx = routeOrder.indexOf(barNodes.last);
+      expect(
+        lastBarIdx - firstBarIdx + 1,
+        barNodes.length,
+        reason: 'bar nodes must form a contiguous block in route order',
+      );
+      expect(
+        routeOrder.length,
+        greaterThan(lastBarIdx + 1),
+        reason: 'precondition: a route-order successor exists after the bar',
+      );
+      expect(
+        inBar(routeOrder[lastBarIdx + 1]),
+        isFalse,
+        reason:
+            'precondition: route-order successor of the rightmost bar node '
+            'lies outside the bar (open-panel widget)',
+      );
+
+      // 最左栏内节点按 ← — 边缘停住(两种实现下都成立,锁定契约)。
+      barNodes.first.requestFocus();
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(barNodes.first));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(
+        inBar(FocusManager.instance.primaryFocus!),
+        isTrue,
+        reason: '← at the bar left edge must stay inside the bar subtree',
+      );
+
+      // 最右栏内节点按 → — 判别方向:旧实现路由序后继是面板 task scope,
+      // 焦点泄进面板(Space 随即作用于跨面控件);修法后应边缘停住。
+      barNodes.last.requestFocus();
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(barNodes.last));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      final landed = FocusManager.instance.primaryFocus;
+      expect(
+        landed != null && inBar(landed),
+        isTrue,
+        reason:
+            '→ at the bar right edge must not escape into the open panel; '
+            'actual landing: ${landed?.debugLabel ?? landed?.context?.widget.runtimeType}',
+      );
+      expect(playerCalls, 0);
+
+      // 收尾卫生:耗尽自动隐藏计时再卸树(镜像上一用例)。
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 200));
+    },
+  );
 }
