@@ -32,8 +32,13 @@ import '../shared/secondary_surface_visibility.dart';
 /// 让出命中, 杜绝渐退中"虚空点击".
 class PlaylistPanel extends StatefulWidget {
   /// 面板竖条宽度 — 窄条形态 (v0.0.5 用户要求收窄), 不遮挡视频主体.
-  /// 公开常量: 设置面板中列挂载 (v0.0.7.2) 计算右缘避让量需要它.
-  static const double panelWidth = 280.0;
+  ///
+  /// 单一事实来源: Tokens.workspaceTaskMinWidth (工作区右列预留宽, 即
+  /// panel_workspace_layout.calculate 的右列预留上界) — 编译期常量到常量,
+  /// 保证 854×480 最小窗口下播放列表与右列槽位精确对齐, 任一侧改动不再分叉.
+  /// 公开常量: 设置面板中列挂载 (v0.0.7.2) 计算右缘避让量需要它,
+  /// 测试 (settings_panel_stack_test) 亦经由它取值.
+  static const double panelWidth = Tokens.workspaceTaskMinWidth;
 
   /// 队列条目视图 (协调器逻辑队列, 断点元数据已合并).
   final ValueListenable<List<PlaylistItem>> entries;
