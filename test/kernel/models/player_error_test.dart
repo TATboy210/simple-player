@@ -207,6 +207,11 @@ void main() {
         FileError(FileErrorCode.pathTraversal, 'e').l10nKey,
         'error.file.pathTraversal',
       );
+      // N2: append-only 新增值 — 透传 file:invalidUrl 供错误卡片 fallback。
+      expect(
+        FileError(FileErrorCode.invalidUrl, 'e').l10nKey,
+        'error.file.invalidUrl',
+      );
     });
 
     test('CodecError l10nKey format is error.codec.{code}', () {
@@ -301,6 +306,8 @@ void main() {
       expect(FileErrorCode.pathEmpty.recoverable, isTrue);
       expect(FileErrorCode.fileNotFound.recoverable, isTrue);
       expect(FileErrorCode.pathTraversal.recoverable, isFalse);
+      // N2: URL 格式无效属用户输入错误 — 可恢复, 不触发 fatal 红色误报。
+      expect(FileErrorCode.invalidUrl.recoverable, isTrue);
     });
 
     test('CodecErrorCode values have recoverable defined', () {

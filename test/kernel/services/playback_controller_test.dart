@@ -350,6 +350,106 @@ void main() {
           expect(engine.openPlaylistCallCount, 0);
         },
       );
+
+      // N2: 校验失败按类别映射错误码 — 扩展名不符不再是 pathTraversal 误报,
+      // 空路径/畸形 URL 各归其码; 路径遍历与控制字符保持安全码 + fatal
+      // (威胁模型 T-261009fiy-01: 安全分类零弱化)。
+      test('extension-mismatch maps to CodecError.unsupportedFormat (N2)', () async {
+        final result = await controller.openAndPlay('C:/test/file.txt');
+
+        expect(result, false);
+        expect(engine.openPlaylistCallCount, 0);
+        expect(controller.validationError.value, contains('不支持'));
+        expect(errors, hasLength(1));
+        final (code, l10nKey) = switch (errors.single) {
+          CodecError(:final code, :final l10nKey) => (code, l10nKey),
+          _ => (null, null),
+        };
+        expect(code, CodecErrorCode.unsupportedFormat);
+        expect(l10nKey, 'error.codec.unsupportedFormat');
+        expect(errors.single.isFatal, isFalse);
+      });
+
+      test('empty path maps to FileError.pathEmpty, recoverable (N2)', () async {
+        final result = await controller.openAndPlay('');
+
+        expect(result, false);
+        expect(engine.openPlaylistCallCount, 0);
+        expect(controller.validationError.value, '路径为空');
+        expect(errors, hasLength(1));
+        final (code, isFatal) = switch (errors.single) {
+          FileError(:final code, :final isFatal) => (code, isFatal),
+          _ => (null, null),
+        };
+        expect(code, FileErrorCode.pathEmpty);
+        expect(isFatal, isFalse);
+      });
+
+      test('malformed URL maps to FileError.invalidUrl, recoverable (N2)', () async {
+        final result = await controller.openAndPlay('http://');
+
+        expect(result, false);
+        expect(engine.openPlaylistCallCount, 0);
+        expect(controller.validationError.value, 'URL 格式无效: http://');
+        expect(errors, hasLength(1));
+        final (code, isFatal, l10nKey) = switch (errors.single) {
+          FileError(:final code, :final isFatal, :final l10nKey) => (
+            code,
+            isFatal,
+            l10nKey,
+          ),
+          _ => (null, null, null),
+        };
+        expect(code, FileErrorCode.invalidUrl);
+        expect(l10nKey, 'error.file.invalidUrl');
+        expect(isFatal, isFalse);
+      });
+
+      test('path traversal still maps to FileError.pathTraversal fatal (N2)', () async {
+        final result = await controller.openAndPlay('../x.mp4');
+
+        expect(result, false);
+        expect(engine.openPlaylistCallCount, 0);
+        expect(controller.validationError.value, '路径不安全: ../x.mp4');
+        expect(errors, hasLength(1));
+        final (code, isFatal) = switch (errors.single) {
+          FileError(:final code, :final isFatal) => (code, isFatal),
+          _ => (null, null),
+        };
+        expect(code, FileErrorCode.pathTraversal);
+        expect(isFatal, isTrue);
+      });
+
+      test('injection-family inputs all stay pathTraversal fatal (N2)', () async {
+        // 注入特征 (null byte / 控制字符 / UNC / ~) 必须保留安全码与
+        // fatal 语义 — 逐输入锁定, 不得在映射 refinement 中弱化
+        // (威胁模型 T-261009fiy-01)。
+        const hostilePaths = <String>[
+          'C:/a\x00b.mp4',
+          'C:/a\x01b.mp4',
+          '\\\\srv\\share\\v.mp4',
+          '~/v.mp4',
+        ];
+        for (final hostile in hostilePaths) {
+          errors.clear();
+          engine.openPlaylistCallCount = 0;
+
+          final result = await controller.openAndPlay(hostile);
+
+          expect(result, false, reason: 'openAndPlay("$hostile") 应拒绝');
+          expect(
+            engine.openPlaylistCallCount,
+            0,
+            reason: 'engine 不得收到 hostile 输入: $hostile',
+          );
+          final (code, isFatal) = switch (errors.single) {
+            FileError(:final code, :final isFatal) => (code, isFatal),
+            _ => (null, null),
+          };
+          expect(code, FileErrorCode.pathTraversal, reason: 'hostile: $hostile');
+          expect(isFatal, isTrue, reason: 'hostile: $hostile');
+        }
+      });
     });
 
     group('网络流打开失败附带接口摘要 (B5/9)', () {
