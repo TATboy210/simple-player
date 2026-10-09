@@ -98,6 +98,18 @@ class _ErrorCardState extends State<ErrorCard> {
   /// 整卡点击切换折叠态（D-04）。
   void _toggle() => setState(() => _expanded = !_expanded);
 
+  @override
+  void didUpdateWidget(covariant ErrorCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 跨报告展开态残留防护（v0.0.12 S5）：宿主换 report（新错误上屏或徽标
+    // 轮览切页，eventId 不同）时重置为折叠 —— 否则上一份报告的展开动作会
+    // 泄漏到新报告，卡片直接以展开态展示新报告的完整调用栈（错条栈的误导
+    // 展示）。didUpdateWidget 后框架必然 rebuild，直接赋值即可，无需 setState。
+    if (widget.report.eventId != oldWidget.report.eventId) {
+      _expanded = false;
+    }
+  }
+
   /// D-03 严重级语义色映射 —— 三值均有 token 来源，无硬编码色字面量。
   Color _severityColor(ErrorSeverity severity) => switch (severity) {
     ErrorSeverity.warning => Tokens.warning,
