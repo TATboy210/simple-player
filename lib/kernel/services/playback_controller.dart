@@ -19,6 +19,7 @@ import 'package:flutter/foundation.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../diagnostics/network_diagnostics.dart';
 import '../engine/engine_state.dart';
+import '../models/validation_error.dart';
 import '../scanner/folder_scanner.dart';
 import '../utils/debug_probe.dart';
 import '../utils/path_utils.dart';
@@ -161,10 +162,14 @@ class PlaybackController {
     // (单一真相源, 不改 _buildQueuePaths/_locateInQueue 签名、不动
     // FolderScanner).
     final normalizedPath = path.trim();
-    final validationMsg = PathValidator.validate(normalizedPath);
-    if (validationMsg != null) {
+    // N2: 校验失败按类别映射错误码 — classify 判类别, messageFor 取消息,
+    // 一次 classify 同时供消息与错误码 (类别单一真相源)。旧实现把一切
+    // 校验失败统一报 pathTraversal fatal, 扩展名不符被误报"路径不安全"。
+    final failureType = PathValidator.classify(normalizedPath);
+    if (failureType != null) {
+      final validationMsg = PathValidator.messageFor(failureType, normalizedPath);
       validationError.value = validationMsg;
-      onError?.call(FileError(FileErrorCode.pathTraversal, validationMsg));
+      onError?.call(_playerErrorFor(failureType, validationMsg));
       return false;
     }
     validationError.value = null;
@@ -209,6 +214,47 @@ class PlaybackController {
         // 旧请求被新请求淘汰，不提交任何属于旧请求的副作用。
         return false;
     }
+  }
+
+  /// 校验失败类别 → PlayerError 错误码映射 (N2)
+  ///
+  /// Maps a [ValidationErrorType] to the closest registered error code so
+  /// the error card resolves accurate l10n instead of the blanket
+  /// pathTraversal fatal misreport. 穷举 switch — 每个类别一个显式映射臂。
+  ///
+  /// 安全收敛（威胁模型 T-261009fiy-01）：controlCharacters 与
+  /// pathTraversal 两个类别臂都显式返回 FileErrorCode.pathTraversal —
+  /// 控制字符属注入特征，必须保留安全码与 fatal 语义（isFatal → 卡片
+  /// 红色告警），此决策在此可见而非折叠进分类器内部。
+  static PlayerError _playerErrorFor(ValidationErrorType type, String message) {
+    return switch (type) {
+      // 可用性错配类别 — 映射到最贴近的现有可恢复错误码。
+      ValidationErrorType.empty => FileError(FileErrorCode.pathEmpty, message),
+      ValidationErrorType.invalidUrl => FileError(
+        FileErrorCode.invalidUrl,
+        message,
+      ),
+      // 安全收敛臂 1: 控制字符注入 → pathTraversal 安全码 + fatal。
+      ValidationErrorType.controlCharacters => FileError(
+        FileErrorCode.pathTraversal,
+        message,
+      ),
+      // 安全收敛臂 2: genuine 路径遍历 → pathTraversal 安全码 + fatal。
+      ValidationErrorType.pathTraversal => FileError(
+        FileErrorCode.pathTraversal,
+        message,
+      ),
+      ValidationErrorType.unsupportedFormat => CodecError(
+        CodecErrorCode.unsupportedFormat,
+        message,
+      ),
+      // classify 现不产生 invalidPath（文件系统层校验未接入）——穷举保留臂,
+      // 取最贴近现有值 fileNotFound。
+      ValidationErrorType.invalidPath => FileError(
+        FileErrorCode.fileNotFound,
+        message,
+      ),
+    };
   }
 
   /// 网络流打开失败时附带本机接口摘要 (B5/9).

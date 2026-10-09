@@ -178,7 +178,14 @@ enum FileErrorCode {
   /// 路径遍历攻击（../、null byte、UNC）— 致命
   ///
   /// Path traversal attack (../, null byte, UNC) — fatal.
-  pathTraversal(recoverable: false);
+  pathTraversal(recoverable: false),
+
+  /// URL 格式无效（http/https 缺 authority 等结构化校验失败）— 可恢复 (N2)
+  ///
+  /// Malformed URL (http/https missing authority or unparsable) —
+  /// recoverable. 用户输入错误类别：不触发 fatal 红色告警，错误卡片走
+  /// 设计内 raw-message fallback 显示含真实原因的原始消息。
+  invalidUrl(recoverable: true);
 
   /// 是否可恢复（非致命）— recoverable 错误可被 UI 展示后继续使用
   ///
