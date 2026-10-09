@@ -205,13 +205,25 @@ class PlaybackController {
         currentPath.value = normalizedPath;
         return true;
       case OpenError(:final error):
-        // B5/9: 网络流打开失败时附带本机接口摘要 (interfaceCount + hasNonLoopback),
-        // 帮助定位"本机离线"vs"远端不可达". isUrl 门控确保本地文件失败不触发查询;
-        // 传 trim 后串 — 带前导空格串会被 isUrl 误判本地路径而跳过 enrichment.
-        if (PathValidator.isUrl(normalizedPath)) {
-          await _enrichNetworkSnapshot(error);
-        }
+        // N3 排序契约: 错误先可见, 诊断后补齐 — onError 在快照采集前同步
+        // 投递, 网络流失败不再被快照查询(最长 2s)阻塞. 卡片可见字段
+        // (message/path/stack)是 reporter 摄入时刻的不可变快照, 时序重排
+        // 不影响其完整性.
         onError?.call(error);
+        // B5/9: 网络流打开失败时补采本机接口摘要 (interfaceCount +
+        // hasNonLoopback), 帮助定位"本机离线"vs"远端不可达". isUrl 门控
+        // 确保本地文件失败不触发查询. fire-and-forget: 快照完成后异步
+        // 补写进同一 error.context — 红线: 补写后不得二次调 onError
+        // (reporter 对 controller 错误无去重, 重复回调产生重复卡片).
+        if (PathValidator.isUrl(normalizedPath)) {
+          // 镜像字幕检测模式: catchError 降级防未处理异步异常逃逸
+          // (T-261009-05, provider 可注入).
+          unawaited(
+            _enrichNetworkSnapshot(error, requestGen).catchError((Object e) {
+              _log.d('Network snapshot enrichment failed: $e');
+            }),
+          );
+        }
         return false;
       case OpenSuperseded():
         // 旧请求被新请求淘汰，不提交任何属于旧请求的副作用。
@@ -260,14 +272,21 @@ class PlaybackController {
     };
   }
 
-  /// 网络流打开失败时附带本机接口摘要 (B5/9).
+  /// 网络流打开失败时异步补写本机接口摘要 (B5/9; N3 起改为回调后补齐).
   ///
   /// 调用 [_networkSnapshotProvider] 采集快照, 重建 [ErrorContext] 把
   /// `networkInterfaceCount`/`networkHasNonLoopback` 附进错误上下文.
-  /// snapshot 为 null (降级/超时) 时无操作; 调用方负责 isUrl 门控.
-  /// ErrorContext 字段 final 故整体重建 (无 copyWith 惯例).
-  Future<void> _enrichNetworkSnapshot(PlayerError error) async {
+  /// [requestGen] 是发起打开请求时的代数 — await 返回后与
+  /// [_openRequestGeneration] 比对 (T-261009-03): 快照等待跨越异步窗口,
+  /// 窗口内的新打开/停止 (两处递增点) 均使本请求过期, 陈旧请求不得为
+  /// 已被替代的媒体补写诊断. snapshot 为 null (降级/超时) 时无操作;
+  /// 调用方负责 isUrl 门控与 unawaited 调度. ErrorContext 字段 final
+  /// 故整体重建 (无 copyWith 惯例, 后继 N4 归属).
+  Future<void> _enrichNetworkSnapshot(PlayerError error, int requestGen) async {
     final snapshot = await _networkSnapshotProvider();
+    // generation 守卫: openAndPlay 入口与 stopCurrentMedia 两个递增点
+    // 共用同一计数器, 不匹配即请求已被淘汰 — 放弃补写.
+    if (requestGen != _openRequestGeneration) return;
     if (snapshot == null) return;
     final ctx = error.context;
     error.context = ErrorContext(
