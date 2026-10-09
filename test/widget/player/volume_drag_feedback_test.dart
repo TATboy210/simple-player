@@ -104,52 +104,55 @@ void main() {
   }
 
   group('sourceKey identity signal', () {
-    testWidgets(
-      'same sourceKey rebuild with fresh lambda keeps drag alive',
-      (tester) async {
-        // 用例 A（回归主场景）：上游把 tear-off 重构为 lambda 后，每次父级
-        // 重建都会生成新 onSetVolume 闭包 —— 旧回调相等性推断会把这当成
-        // 「源被替换」而中途取消拖动。只要 sourceKey 不变，拖动必须存活。
-        final volume = ValueNotifier(0.5);
-        addTearDown(volume.dispose);
-        var starts = 0;
-        var ends = 0;
-        final writes = <double>[];
-        // lambda 内联在 subject 函数体内：每次调用生成新闭包，复现
-        // tear-off→lambda 重构场景。
-        Widget subject(Object? key) => MaterialApp(
-          home: Scaffold(
-            body: VolumeSlider(
-              volume: volume,
-              onSetVolume: (v) => writes.add(v),
-              onInteractionStart: () => starts++,
-              onInteractionEnd: () => ends++,
-              sourceKey: key,
-            ),
+    testWidgets('same sourceKey rebuild with fresh lambda keeps drag alive', (
+      tester,
+    ) async {
+      // 用例 A（回归主场景）：上游把 tear-off 重构为 lambda 后，每次父级
+      // 重建都会生成新 onSetVolume 闭包 —— 旧回调相等性推断会把这当成
+      // 「源被替换」而中途取消拖动。只要 sourceKey 不变，拖动必须存活。
+      final volume = ValueNotifier(0.5);
+      addTearDown(volume.dispose);
+      var starts = 0;
+      var ends = 0;
+      final writes = <double>[];
+      // lambda 内联在 subject 函数体内：每次调用生成新闭包，复现
+      // tear-off→lambda 重构场景。
+      Widget subject(Object? key) => MaterialApp(
+        home: Scaffold(
+          body: VolumeSlider(
+            volume: volume,
+            onSetVolume: (v) => writes.add(v),
+            onInteractionStart: () => starts++,
+            onInteractionEnd: () => ends++,
+            sourceKey: key,
           ),
-        );
-        await tester.pumpWidget(subject('stable'));
-        final slider = tester.widget<Slider>(find.byType(Slider));
-        slider.onChangeStart?.call(0.5);
-        slider.onChanged?.call(0.8);
-        await tester.pump();
-        expect(writes, isEmpty);
-        // 父级重建：同 sourceKey + 新 lambda —— 拖动不得被取消。
-        await tester.pumpWidget(subject('stable'));
-        final rebuilt = tester.widget<Slider>(find.byType(Slider));
-        rebuilt.onChanged?.call(0.9);
-        await tester.pump();
-        expect(rebuilt.value, 0.9, reason: 'drag survives same-key rebuild');
-        // 节流 flush 仍提交写入；ends 在 onChangeEnd 前保持 0。
-        await tester.pump(const Duration(milliseconds: 200));
-        expect(writes, [0.9], reason: 'throttled flush survives rebuild');
-        expect(ends, 0, reason: 'same-key rebuild must not cancel drag');
-        rebuilt.onChangeEnd?.call(0.9);
-        await tester.pump();
-        expect(ends, 1, reason: 'release still notifies end exactly once');
-        await tester.pumpWidget(const SizedBox.shrink());
-      },
-    );
+        ),
+      );
+      await tester.pumpWidget(subject('stable'));
+      // 每次断言前重取树上的 Slider —— widget 实例不可变,setState 后
+      // 树上是新实例,旧引用的 .value 永远停在捕获时的值。
+      Slider slider() => tester.widget<Slider>(find.byType(Slider));
+      slider().onChangeStart?.call(0.5);
+      slider().onChanged?.call(0.8);
+      await tester.pump();
+      expect(writes, isEmpty);
+      // 父级重建：同 sourceKey + 新 lambda —— 拖动不得被取消。
+      await tester.pumpWidget(subject('stable'));
+      slider().onChanged?.call(0.9);
+      await tester.pump();
+      expect(slider().value, 0.9, reason: 'drag survives same-key rebuild');
+      // 节流 flush 仍提交写入；ends 在 onChangeEnd 前保持 0。
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(writes, [0.9], reason: 'throttled flush survives rebuild');
+      expect(ends, 0, reason: 'same-key rebuild must not cancel drag');
+      slider().onChangeEnd?.call(0.9);
+      await tester.pump();
+      expect(ends, 1, reason: 'release still notifies end exactly once');
+      // Release global feedback before widget-test timer invariants. Its
+      // real monotonic clock is independent of fake throttle time.
+      OsdService.I.hide();
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
 
     testWidgets('sourceKey change alone cancels pending drag', (tester) async {
       // 用例 B（安全属性）：notifier 不变、sourceKey 变化 = 显式声明的源

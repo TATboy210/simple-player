@@ -135,12 +135,26 @@ class VolumeSlider extends StatefulWidget {
   /// 子控件交互结束时通知上层恢复既有自动隐藏策略。
   final VoidCallback? onInteractionEnd;
 
+  /// 音量源身份键 — 显式声明音量数据源身份（源替换判定双信号之一）。
+  ///
+  /// Volume source identity key: an explicit, caller-declared identity for
+  /// the volume data source. Contract: the value must stay stable across
+  /// parent rebuilds and change only on a real source replacement (the
+  /// production chain passes the `late final` PlayerControlsState instance).
+  /// didUpdateWidget treats a sourceKey change as source replacement and
+  /// cancels any in-flight drag; a same-key rebuild keeps the drag alive.
+  /// null = 未声明：源替换检测仅依赖 volume notifier 实例身份（结构兜底
+  /// 条款）。勿传入每次 build 新建的值（如内联 Object()）——那会复刻
+  /// 「每次重建取消拖动」的误判（威胁 T-261009-fiu-02）。
+  final Object? sourceKey;
+
   const VolumeSlider({
     super.key,
     required this.volume,
     required this.onSetVolume,
     this.onInteractionStart,
     this.onInteractionEnd,
+    this.sourceKey,
   });
 
   @override
@@ -243,8 +257,15 @@ class _VolumeSliderState extends State<VolumeSlider> {
   @override
   void didUpdateWidget(VolumeSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // 双信号取消设计（威胁 T-261009-fiu-01）：任一信号触发即取消在途拖动。
+    // ① notifier 实例身份（结构兜底条款，措辞不动）——即使调用方漏换
+    //    sourceKey，实例替换仍触发取消；
+    // ② 显式 sourceKey 契约——替代旧回调相等性推断条款：回调比较依赖
+    //    tear-off == 身份语义，上游 tear-off→lambda 重构后每次重建都会
+    //    误判为源替换而中途取消拖动；显式声明把身份信号契约化。
+    // _cancelDrag 的旧 onInteractionEnd hook 语义（用旧 widget 通知）原样保留。
     if (!identical(oldWidget.volume, widget.volume) ||
-        oldWidget.onSetVolume != widget.onSetVolume) {
+        oldWidget.sourceKey != widget.sourceKey) {
       _cancelDrag(onEnd: oldWidget.onInteractionEnd);
     }
   }
