@@ -629,4 +629,143 @@ void main() {
       expect(videoProcessing.state.value.brightness, greaterThan(0.5));
     });
   });
+
+  /// 261009-rp5 证伪组 — audio 分区键盘行响应是否存在（零生产改动验证轮）。
+  ///
+  /// 假设: `_enabledTabs` 自称 audio 已解灰（v0.0.8.1），但纯键盘旅程
+  /// （L0 ↑ 切到音频 → → 进 L1 → 发 ↑↓/Enter）下 `_handleContentLevelKey`
+  /// 对非 General 分区把 ↑↓/Enter 全部 handled 空操作，行无任何响应。
+  ///
+  /// 「行响应」断言取焦点拓扑: primaryFocus 是否下沉进分区内容子树 —
+  /// 修复形状无关（rowsFocusNode 注入或 SpinControl 聚焦均满足）。
+  group('audio 分区键盘行响应证伪 (261009-rp5)', () {
+    late FakeEngine engine;
+    late VideoProcessingService videoProcessing;
+    late AppSettingsService settings;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      engine = FakeEngine();
+      videoProcessing = VideoProcessingService(engine);
+      settings = AppSettingsService(
+        engine: engine,
+        videoProcessing: videoProcessing,
+        store: AppSettingsStore(),
+      );
+    });
+
+    tearDown(() {
+      settings.dispose();
+      videoProcessing.dispose();
+      engine.dispose();
+    });
+
+    Widget buildSubject() => MaterialApp(
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 400,
+            height: 330,
+            child: SettingsPanel(
+              visible: true,
+              onClose: () {},
+              services: SettingsServicesBundle(
+                videoProcessing: videoProcessing,
+                settings: settings,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    /// primaryFocus 是否位于 [contentType] 分区内容子树内 — 行级焦点的
+    /// 拓扑判定（面板级 Focus 节点的 context 祖先链不含分区内容组件）。
+    bool isPrimaryFocusInside(Type contentType) {
+      final context = FocusManager.instance.primaryFocus?.context;
+      if (context == null) return false;
+      var found = false;
+      context.visitAncestorElements((element) {
+        if (element.widget.runtimeType == contentType) found = true;
+        return !found;
+      });
+      return found;
+    }
+
+    testWidgets('对照 — General 同旅程焦点下沉行级（harness 可探测行响应）', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      // 默认选中关于 → ↑↑ 到通用 → → 进 L1（General 进入即聚焦首行）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
+
+      // 行焦点已下沉 General 内容子树；↓ 行导航后仍在行级。
+      expect(isPrimaryFocusInside(GeneralSettingsContent), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(isPrimaryFocusInside(GeneralSettingsContent), isTrue);
+    });
+
+    /// 缺陷锁（2026-10-09 RED 证实）——键盘旅程进 audio L1 后 ↑↓/Enter
+    /// 全部 handled 空操作，焦点滞留面板级节点：
+    /// - `_handleContentLevelKey`（settings_panel.dart:391-412）对非 General
+    ///   分区的 ↑↓/Enter 一律 `return handled`，不做任何行聚焦；
+    /// - `_buildTabContent`（settings_panel.dart:693-699）构建
+    ///   AudioSettingsContent 时**不注入 rowsFocusNode**（General 有注入），
+    ///   AudioSettingsContent 本体亦无 Focus/键盘处理——SpinControl 虽有
+    ///   Focus（仅 ←→），纯键盘无路径可达（面板 Focus skipTraversal +
+    ///   无程序化聚焦）。
+    ///
+    /// 与 `_enabledTabs` 注释自称「audio 已解灰（v0.0.8.1）」矛盾：解灰
+    /// 只解了指针路径，键盘用户进了 audio 分区后无法操作任何行。
+    ///
+    /// 契约翻转：修复（AudioSettingsContent 注入 rowsFocusNode 复用
+    /// General 模式，~30 行）落地后，把下方 isFalse 全部翻转为 isTrue，
+    /// 并对照上方 General 用例补 ↑↓ 行移动断言。
+    testWidgets('audio L1 发 ↑↓/Enter — 吞键无行响应（缺陷锁 · 修复待裁决）', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      // 默认选中关于 → ↑ 到音频 → → 进 L1（导航本身可达）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.byType(AudioSettingsContent), findsOneWidget);
+
+      // ↓ handled 但空操作 — 焦点从未下沉进 audio 行。
+      final downHandled = await tester.sendKeyEvent(
+        LogicalKeyboardKey.arrowDown,
+      );
+      await tester.pumpAndSettle();
+      expect(downHandled, isTrue, reason: '↓ 被面板吞掉（handled 返回）');
+      expect(
+        isPrimaryFocusInside(AudioSettingsContent),
+        isFalse,
+        reason: '缺陷锁: ↓ 后焦点仍在面板级 — 修复落地后翻转为 isTrue',
+      );
+
+      // ↑ 同样吞键。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(isPrimaryFocusInside(AudioSettingsContent), isFalse);
+
+      // Enter 同样吞键 — 未激活任何行，两个延迟值不动。
+      final enterHandled = await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(enterHandled, isTrue, reason: 'Enter 被面板吞掉（handled 返回）');
+      expect(isPrimaryFocusInside(AudioSettingsContent), isFalse);
+      expect(settings.audioDelayMs, 0, reason: 'Enter 未激活音频延迟行');
+      expect(settings.subtitleDelayMs, 0, reason: 'Enter 未激活字幕延迟行');
+    });
+  });
 }
