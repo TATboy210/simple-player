@@ -483,6 +483,54 @@ void main() {
       expect(find.text('调用栈'), findsNothing);
     });
 
+    testWidgets(
+      'report swap resets card to collapsed state (cross-report residue)',
+      (tester) async {
+        // Arrange：报告 A 经真实 intake 接纳；报告 B 直接构造不可变快照
+        // （presentation 只暴露 FIFO 队首，第二份无法经 acceptHead 取得 ——
+        // 与 unknown-l10nKey 用例同一构造惯例；eventId 必须不同，轮览/新报告
+        // 上屏同一判等口径）。
+        final reporter = makeReporter();
+        final reportA = acceptHead(reporter, () {
+          reporter.reportBootstrapSafely(StateError('报告甲'), StackTrace.current);
+        });
+        final timestamp = DateTime.utc(2026, 8, 28, 12, 30, 45);
+        final reportB = ErrorReport(
+          eventId: 'card-swap-b',
+          source: ErrorSource.playerEngine,
+          severity: ErrorSeverity.error,
+          firstOccurredAt: timestamp,
+          lastOccurredAt: timestamp,
+          errorType: 'StateError',
+          playerErrorCode: null,
+          message: 'Bad state: 报告乙',
+          rawStackTrace: '#0 fake (fake.dart:1:1)',
+          mediaPath: null,
+          occurrenceCount: 1,
+        );
+        expect(reportA.eventId, isNot(reportB.eventId));
+        await tester.pumpWidget(buildCard(reportA));
+
+        // Act：展开报告 A。
+        await tester.tapAt(tester.getCenter(find.text('Bad state: 报告甲')));
+        await tester.pump();
+        expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+
+        // Act：新报告 B 上屏 —— 宿主换 widget.report（同一卡片 Element，
+        // State 保留，走 didUpdateWidget 路径）。
+        await tester.pumpWidget(buildCard(reportB));
+        expect(find.text('Bad state: 报告乙'), findsOneWidget);
+
+        // Assert：跨报告展开态残留回归锁 —— 卡片必须回到折叠态。
+        // 现行为（无 didUpdateWidget 重置）：A 的展开动作泄漏到 B，
+        // 卡片直接以展开态展示 B 的完整调用栈。
+        expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+        expect(find.byIcon(Icons.keyboard_arrow_up), findsNothing);
+        expect(find.text('定位'), findsNothing);
+        expect(find.text('调用栈'), findsNothing);
+      },
+    );
+
     testWidgets('null location degrades to location-unavailable text', (
       tester,
     ) async {
