@@ -192,4 +192,109 @@ void main() {
       ThumbnailService.reset();
     });
   });
+
+  // 261009-o8z T5: ready 成图淡入 — 占位恒在底层, Image 以 ~150ms 淡入覆盖,
+  // 消除占位→成图同帧硬切的弹现感 (UAT 实证体验问题)。
+  group('PlaylistTile thumbnail fade-in (261009-o8z)', () {
+    late FakeThumbnailProvider fake;
+    late Directory tempDir;
+    late String pathA;
+
+    setUp(() async {
+      fake = FakeThumbnailProvider(result: realJpegBytes);
+      ThumbnailService.reset(provider: fake, diskCache: brokenDisk);
+      tempDir = await Directory.systemTemp.createTemp('pthumb_fade');
+      pathA = p.join(tempDir.path, 'a.mp4');
+      await File(pathA).writeAsString('A' * 10);
+    });
+
+    tearDown(() async {
+      ThumbnailService.reset();
+      try {
+        await tempDir.delete(recursive: true);
+      } on FileSystemException {
+        // best effort
+      }
+    });
+
+    /// 取缩略图 Image 外层淡入 Opacity 值 — 用 Image 祖先锚定, 不受
+    /// hover 膜 AnimatedOpacity (异型) 干扰。
+    double thumbOpacity(WidgetTester tester) => tester
+        .widget<Opacity>(
+          find.ancestor(of: find.byType(Image), matching: find.byType(Opacity)),
+        )
+        .opacity;
+
+    testWidgets('F1: ready fades in — mid-animation in (0,1), settles at 1', (
+      tester,
+    ) async {
+      fake.holdJobs = true;
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
+      await settleIO(tester); // job 挂起 — 占位态
+
+      fake.release(pathA);
+      await tester.pump(); // ready 挂载首帧 — 淡入起点
+      await tester.pump(const Duration(milliseconds: 50)); // 动画中段 (~1/3)
+
+      // ① 淡入进行中: Image 已挂载且 Opacity ∈ (0,1) — 现行为同帧
+      // 硬切 (无 Opacity 层、恒不透明) → RED
+      expect(find.byType(Image), findsOneWidget);
+      expect(thumbOpacity(tester), greaterThan(0));
+      expect(thumbOpacity(tester), lessThan(1));
+
+      // ② settle 后: 淡入完成 — Opacity == 1, 无挂起帧
+      await tester.pumpAndSettle();
+      expect(thumbOpacity(tester), equals(1.0));
+      expect(tester.takeException(), isNull);
+      ThumbnailService.reset();
+    });
+
+    testWidgets('F2: failed shows placeholder immediately (no fade layer)', (
+      tester,
+    ) async {
+      fake.result = null; // 解帧失败 → failed phase
+
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
+      await settleIO(tester);
+
+      // ③ failed 路径: 无 Image 淡入层 — 占位直接呈现 + 重试入口可见
+      expect(find.byType(Image), findsNothing);
+      expect(find.byIcon(Icons.refresh_outlined), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      ThumbnailService.reset();
+    });
+
+    testWidgets('F3: retry re-fades on second ready (remount proof)', (
+      tester,
+    ) async {
+      fake.holdJobs = true;
+      await tester.pumpWidget(wrap(buildTile(PlaylistItem(path: pathA))));
+      await settleIO(tester); // job1 挂起
+      fake.releaseNull(pathA); // 第一次失败 → failed
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.refresh_outlined), findsOneWidget);
+
+      // provider 修复 → 点重试 (job2 挂起, 仍占位)
+      fake.result = realJpegBytes;
+      await tester.tap(find.byIcon(Icons.refresh_outlined));
+      await settleIO(tester);
+      expect(fake.calls, equals(2)); // 走 ThumbnailService.retry force 路径
+      expect(find.byType(Image), findsNothing); // loading 态无成图
+
+      fake.release(pathA); // 二次 ready
+      await tester.pump(); // 重挂载首帧
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // ④ 二次 ready 再次淡入 — TweenAnimationBuilder 重挂载后从 0 重新
+      // 起步 (现行为无淡入层 → RED)
+      expect(find.byType(Image), findsOneWidget);
+      expect(thumbOpacity(tester), greaterThan(0));
+      expect(thumbOpacity(tester), lessThan(1));
+
+      await tester.pumpAndSettle();
+      expect(thumbOpacity(tester), equals(1.0));
+      expect(tester.takeException(), isNull);
+      ThumbnailService.reset();
+    });
+  });
 }
