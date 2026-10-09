@@ -22,7 +22,9 @@ class SecondarySurface extends StatelessWidget {
     clipBehavior: Clip.antiAlias,
     padding: padding,
     decoration: BoxDecoration(
-      color: Tokens.bgPanel,
+      // 浮层专用提亮表面 — 叠在玻璃层之上必须比被叠层亮一级(Apple HIG:
+      // 深色玻璃对比度不足, bgPanel 近黑会沉入被叠层).
+      color: Tokens.surfaceFloating,
       borderRadius: BorderRadius.circular(Tokens.secondarySurfaceRadius),
       border: switch (borderColor) {
         final color? => Border.all(color: color),

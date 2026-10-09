@@ -11,6 +11,15 @@ class Tokens {
   static const bgHover = Color(0xFF283045); // hover 高亮 — 比 bgElevated 明显更亮
   static const bgGlass = Color(0x8C0C0F18); // 加深
 
+  /// 浮层表面 — OSD/菜单/确认卡等叠在玻璃层之上的次要表面底色.
+  /// 比 bgPanel 提亮约一档(Fluent 深色菜单亮度带, 保留 Midnight 蓝黑调性):
+  /// Apple HIG 明言深色玻璃叠深色底对比度不足, 浮层必须比被叠层亮一级才可读.
+  static const surfaceFloating = Color(0xFF242D3F);
+
+  /// 当前项高亮 — 菜单键盘选中与鼠标 hover 共用同一视觉(hover 跟随的
+  /// 统一视觉锚), 比 bgHover 再亮一档, 保证叠在 surfaceFloating 上仍醒目.
+  static const surfaceHighlight = Color(0xFF3A4560);
+
   static const accent = Color.fromARGB(255, 44, 88, 244);
   static const accentLight = Color.fromARGB(180, 44, 87, 244);
   static const accentBlue = Color(0xFF4A8EFF); // 蓝色辉光（进度条/边框）

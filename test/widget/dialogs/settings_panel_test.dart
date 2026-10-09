@@ -351,7 +351,7 @@ void main() {
       expect(closeCount, 0);
     });
 
-    testWidgets('L1 内 → 切下一分区；← 返回 tag 层', (tester) async {
+    testWidgets('L1 内 → 无反应（2026-10-09 裁决）；← 返回 tag 层', (tester) async {
       await openDialog(tester);
       // 进入「通用」内容层（默认选中关于 → ↑↑ 到通用 → →）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
@@ -362,11 +362,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(GeneralSettingsContent), findsOneWidget);
 
-      // → 切到「音频」（enabled 序列 [通用, 音频, 关于] 的后一位；
-      // 无 bundle 注入时音频内容为空壳 — 通用内容消失即分区已切）。
+      // L1 内 → 空操作（handled 防泄漏）— 分区保持「通用」，内容不消失。
+      // 旧行为（→ 切下一分区）系 v0.0.8 XMB 交叉导航，经用户裁决移除：
+      // 分区切换仅发生在 L0（↑↓ 选 tag、→/Enter 进详情）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
-      expect(find.byType(GeneralSettingsContent), findsNothing);
+      expect(find.byType(GeneralSettingsContent), findsOneWidget);
 
       // ← 返回 tag 层（内容消失 — Offstage）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);

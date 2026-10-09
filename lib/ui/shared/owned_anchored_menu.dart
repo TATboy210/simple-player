@@ -420,7 +420,15 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
           mouseCursor: entry.isEnabled
               ? SystemMouseCursors.click
               : SystemMouseCursors.basic,
-          hoverColor: Tokens.bgHover,
+          hoverColor: Tokens.surfaceHighlight,
+          // hover 跟随鼠标 — 悬停行直接成为当前项(真移动焦点), 与键盘
+          // ↑↓ 共用同一高亮与导航锚: 鼠标指哪亮哪, 键盘从悬停行继续,
+          // 消除"hover 亮/键盘暗"的视觉倒挂(桌面菜单惯例).
+          onHover: (hovering) {
+            if (hovering && entry.isEnabled && mounted) {
+              _rows[index].requestFocus();
+            }
+          },
           onTap: entry.isEnabled ? () => widget.route.select(entry) : null,
           child: _rowSurface(index, entry),
         ),
@@ -431,9 +439,10 @@ class _MenuBodyState<T> extends State<_MenuBody<T>> {
   /// Token-based keyboard paint, independent of checked and hover feedback.
   Widget _rowSurface(int index, OwnedMenuEntry<T> entry) => DecoratedBox(
     // Paint the real outer Focus node, without another InkWell Tab stop.
-    // A solid background identifies keyboard focus without an accent outline.
+    // surfaceHighlight 比 bgElevated 提亮一档且与 hover 同色 — 旧 0xFF161A28
+    // 叠在 bgPanel 底上只差 5 个亮度级, 实机反馈"焦点高亮太暗".
     decoration: BoxDecoration(
-      color: _isFocused(index) ? Tokens.bgElevated : Colors.transparent,
+      color: _isFocused(index) ? Tokens.surfaceHighlight : Colors.transparent,
       borderRadius: BorderRadius.circular(Tokens.radiusBtn),
     ),
     child: Padding(

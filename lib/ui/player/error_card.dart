@@ -256,7 +256,7 @@ class _ErrorCardState extends State<ErrorCard> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Tokens.bgElevated,
+                    color: Tokens.surfaceFloating,
                     borderRadius: BorderRadius.circular(Tokens.radiusBtn),
                   ),
                   child: Text(

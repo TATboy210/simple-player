@@ -32,7 +32,7 @@ void _secondary(WidgetTester tester, Finder surface) {
         .decoration;
     expect(decoration, isA<BoxDecoration>());
     if (decoration is BoxDecoration) {
-      expect(decoration.color, Tokens.bgPanel);
+      expect(decoration.color, Tokens.surfaceFloating);
       expect(decoration.color?.a, 1);
       expect(decoration.borderRadius, BorderRadius.circular(12));
       expect(decoration.boxShadow, isNull);

@@ -15,7 +15,7 @@ class ShortcutsHelpDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
-      backgroundColor: Tokens.bgPanel,
+      backgroundColor: Tokens.surfaceFloating,
       // Zero elevation disables Material's tint overlay without changing tint
       // color. Keep native AlertDialog focus, barrier and ESC handling intact.
       elevation: 0,

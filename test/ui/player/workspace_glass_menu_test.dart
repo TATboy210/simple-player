@@ -58,7 +58,7 @@ void main() {
     final idle = rowDecoration(tester, 'Checked');
     expect(focused, isNotNull);
     expect(idle, isNotNull);
-    expect(focused?.color, Tokens.bgElevated);
+    expect(focused?.color, Tokens.surfaceHighlight);
     expect(
       focused?.border,
       isNull,
@@ -69,8 +69,10 @@ void main() {
     final ink = tester.widget<InkWell>(
       find.ancestor(of: find.text('First'), matching: find.byType(InkWell)),
     );
-    expect(ink.hoverColor, Tokens.bgHover);
-    expect(ink.hoverColor, isNot(focused?.color));
+    // hover 跟随鼠标(2026-10-09 裁决) — hover 色与键盘焦点高亮统一为
+    // surfaceHighlight, 消除"hover 亮/键盘暗"的视觉倒挂(桌面菜单惯例).
+    expect(ink.hoverColor, Tokens.surfaceHighlight);
+    expect(ink.hoverColor, focused?.color);
     expect(ink.canRequestFocus, isFalse);
     expect(rowFocus(tester, 'First')?.hasPrimaryFocus, isTrue);
     expect(rowFocus(tester, 'Disabled')?.canRequestFocus, isFalse);

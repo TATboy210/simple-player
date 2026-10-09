@@ -78,7 +78,7 @@ void main() {
         await tester.tap(find.text('open'));
         await tester.pumpAndSettle();
         final dialog = tester.widget<AlertDialog>(find.byType(AlertDialog));
-        expect(dialog.backgroundColor, Tokens.bgPanel);
+        expect(dialog.backgroundColor, Tokens.surfaceFloating);
         expect(dialog.elevation, 0);
         expect(
           dialog.shape,

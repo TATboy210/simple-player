@@ -341,23 +341,6 @@ class _SettingsPanelState extends State<SettingsPanel>
     });
   }
 
-  /// L1 内 → 切分区 — 离开/进入 general 时 post-frame 归还/接力焦点
-  /// （rows 节点随分区 unmount，同步 requestFocus 会被 dispose 覆盖 —
-  /// 实测坑）.
-  void _switchTo(_SettingsTab tab) {
-    if (tab == _selected) return;
-    final wasGeneral = _selected == _SettingsTab.general;
-    _changeSelected(tab);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _level != _PanelLevel.content) return;
-      if (wasGeneral) {
-        _focusNode.requestFocus();
-      } else if (_selected == _SettingsTab.general) {
-        _rowsFocusNode.requestFocus();
-      }
-    });
-  }
-
   // ── 键盘（XMB 交叉模型）──────────────────────────────────────
 
   /// 面板级按键 — 返回 handled 阻断冒泡（防外层 seek/音量/暂停泄漏），
@@ -401,16 +384,13 @@ class _SettingsPanelState extends State<SettingsPanel>
     return KeyEventResult.ignored;
   }
 
-  /// L1 — → 切下一分区；← 返回 tag 层；↑↓/Enter/Space 交给 rows 节点
-  /// （General 后代先消费，未聚焦则聚焦）；非 General 分区同键 handled
-  /// 空操作（防泄漏）；Esc 冒泡宿主退出全屏（返回专属 ← 键）.
+  /// L1 — → handled 空操作（用户裁决 2026-10-09：详情页内 → 不再切分区，
+  /// 进出详情只经 →/Enter 进、← 退）；← 返回 tag 层；↑↓/Enter/Space 交给
+  /// rows 节点（General 后代先消费，未聚焦则聚焦）；非 General 分区同键
+  /// handled 空操作（防泄漏）；Esc 冒泡宿主退出全屏（返回专属 ← 键）.
   KeyEventResult _handleContentLevelKey(LogicalKeyboardKey key) {
     if (key == LogicalKeyboardKey.arrowRight) {
-      final index = _enabledTabs.indexOf(_selected);
-      final next = (index + 1).clamp(0, _enabledTabs.length - 1);
-      if (next != index) {
-        _switchTo(_enabledTabs[next]);
-      }
+      // 空操作但 handled — 防止 → 冒泡成 seek；分区切换仅发生在 L0.
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {

@@ -157,7 +157,9 @@ void main() {
               .decoration;
           expect(decoration, isA<BoxDecoration>());
           if (decoration is BoxDecoration) {
-            expect(decoration.color, Tokens.bgPanel);
+            // 底色随视觉轮提亮(bgPanel→surfaceFloating): 不透明/12 圆角/
+            // 零模糊契约不变, 仅色值升级(Apple HIG 深色浮层对比度要求).
+            expect(decoration.color, Tokens.surfaceFloating);
             expect(decoration.color?.a, 1);
             expect(decoration.borderRadius, BorderRadius.circular(12));
           }
