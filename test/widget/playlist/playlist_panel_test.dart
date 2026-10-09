@@ -14,6 +14,7 @@ import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/shared/glass_confirm_strip.dart';
+import 'package:simple_player_flutter/ui/shared/osd_service.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
@@ -446,7 +447,11 @@ void main() {
         PlaylistItem(path: 'c.mp4'),
       ]);
       removed = null;
+      // 清残留 OSD — 断言以 OsdService.I.message 为准, 须从空白起步.
+      OsdService.I.hide();
     });
+
+    tearDown(OsdService.I.hide);
 
     Future<void> pumpBatchPanel(WidgetTester tester) async {
       await tester.pumpWidget(
@@ -525,6 +530,45 @@ void main() {
       expect(find.byIcon(Icons.deselect), findsNothing);
     });
 
+    testWidgets('确认时目标已全部消失 — OSD 提示且不触发移除', (tester) async {
+      await pumpBatchPanel(tester);
+
+      // 进入批量模式 (经右键菜单) 并选中发起条之外的其余两条.
+      await tester.tap(
+        find.byType(PlaylistTile).at(0),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Batch delete'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.deselect));
+      await tester.pumpAndSettle();
+      expect(find.text('3 selected'), findsOneWidget);
+
+      // 打开确认条后队列被外部清空 — 同一 notifier 实例原地改值,
+      // didUpdateWidget 的 identical 检查不触发取消, 确认卡悬于空队列上.
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+      expect(find.byType(GlassConfirmStrip), findsOneWidget);
+      entries.value = [];
+      await tester.pumpAndSettle();
+
+      // 确认 → 全部目标落空: 固定文案 OSD 轻提示, 移除回调不触发,
+      // 批量模式已退出 (deselect 图标消失), 全程无异常.
+      await tester.tap(find.byIcon(Icons.delete).last);
+      await tester.pumpAndSettle();
+      expect(
+        OsdService.I.message.value?.text,
+        'Entries are no longer in the playlist',
+        reason: '落空确认须有 OSD 反馈',
+      );
+      expect(removed, isNull);
+      expect(find.byIcon(Icons.deselect), findsNothing);
+
+      // OSD hold 定时器在测试体结束时校验 — 体内显式取消 (tearDown 太晚).
+      OsdService.I.hide();
+    });
+
     testWidgets(
       'select all clears selection and deselected item stays excluded',
       (tester) async {
@@ -584,9 +628,13 @@ void main() {
         PlaylistItem(path: 'b.mp4'),
       ]);
       removedIndex = null;
+      // 清残留 OSD — 断言以 OsdService.I.message 为准, 须从空白起步.
+      OsdService.I.hide();
     });
 
-    testWidgets('右键移除 → 确认条 → 确认后执行', (tester) async {
+    tearDown(OsdService.I.hide);
+
+    Future<void> pumpSinglePanel(WidgetTester tester) async {
       await tester.pumpWidget(
         _wrap(
           PlaylistPanel(
@@ -608,6 +656,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('右键移除 → 确认条 → 确认后执行', (tester) async {
+      await pumpSinglePanel(tester);
 
       // 右键第一条 → 菜单 Remove
       await tester.tap(
@@ -639,6 +691,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(removedIndex, equals(0));
+    });
+
+    testWidgets('确认时目标已消失 — OSD 提示且不触发移除', (tester) async {
+      await pumpSinglePanel(tester);
+
+      // 右键第一条 → Remove → 确认条打开 (未确认前不执行).
+      await tester.tap(
+        find.byType(PlaylistTile).at(0),
+        buttons: kSecondaryButton,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      expect(find.byType(GlassConfirmStrip), findsOneWidget);
+
+      // 确认前队列被外部清空 — 确认卡悬于空队列上 (同一 notifier 实例).
+      entries.value = [];
+      await tester.pumpAndSettle();
+
+      // 确认 → 唯一目标落空: 固定文案 OSD 轻提示, removedIndex 不触发.
+      await tester.tap(find.byIcon(Icons.delete).last);
+      await tester.pumpAndSettle();
+      expect(
+        OsdService.I.message.value?.text,
+        'Entries are no longer in the playlist',
+        reason: '落空确认须有 OSD 反馈',
+      );
+      expect(removedIndex, isNull);
+
+      // OSD hold 定时器在测试体结束时校验 — 体内显式取消 (tearDown 太晚).
+      OsdService.I.hide();
     });
   });
 }
