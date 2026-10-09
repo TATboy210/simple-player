@@ -13,6 +13,7 @@ import 'package:simple_player_flutter/ui/player/player_controls_state.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart'
     as progress_bar;
+import 'package:simple_player_flutter/ui/shared/osd_service.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
@@ -1289,6 +1290,47 @@ void main() {
       expect(fullscreenSyncCount, 0);
       expect(video.exitFullscreenCallCount, 0);
       expect(video.toggleFullscreenCallCount, 0);
+    });
+
+    group('全屏 route 音量键 (v0.0.12 U3)', () {
+      tearDown(() => OsdService.I.hide());
+
+      // 全屏 route 键盘拓扑: pumpControls 树只挂 PlayerVideoControls 自带
+      // Focus — KeyboardHandler 在 builder 外不进 route, 窗口态 handler 的
+      // 全局回退守卫又对"其他路由的主焦点"放行, ↑↓ 此前落 ignored 成死键
+      // (与帮助面板 "↑ / ↓ 音量" 宣传不对称)。
+      testWidgets('ArrowUp 音量 +5% 且 OSD 反馈百分比', (tester) async {
+        widgetEngine.setVolume(0.5);
+        windowMode.value = WindowMode.fullscreen;
+        await pumpControls(tester, actions: const PlayerActions());
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+
+        expect(widgetEngine.lastSetVolumeValue, closeTo(0.55, 1e-9));
+        expect(
+          OsdService.I.message.value?.text,
+          '55%',
+          reason: '全屏 route 音量键须有 OSD 反馈(与窗口态同文案)',
+        );
+        // OSD hold 定时器在测试体结束时校验 — 体内显式取消 (tearDown 太晚).
+        OsdService.I.hide();
+      });
+
+      testWidgets('ArrowDown 音量 -5% 且 OSD 反馈百分比', (tester) async {
+        widgetEngine.setVolume(0.5);
+        windowMode.value = WindowMode.fullscreen;
+        await pumpControls(tester, actions: const PlayerActions());
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+
+        expect(widgetEngine.lastSetVolumeValue, closeTo(0.45, 1e-9));
+        expect(
+          OsdService.I.message.value?.text,
+          '45%',
+          reason: '全屏 route 音量键须有 OSD 反馈(与窗口态同文案)',
+        );
+        OsdService.I.hide();
+      });
     });
 
     testWidgets('auto-hide 后 resize 保持控件隐藏且不暴露活跃语义', (tester) async {
