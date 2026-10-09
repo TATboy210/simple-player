@@ -106,36 +106,29 @@ void main() {
       slider.onChangeEnd?.call(0.9);
 
       await tester.pump(const Duration(milliseconds: 200));
-      expect(
-        engine.setVolumeCallCount,
-        0,
-        reason: '无焦点裸 onChanged 绝不提交音量',
-      );
+      expect(engine.setVolumeCallCount, 0, reason: '无焦点裸 onChanged 绝不提交音量');
     });
 
-    testWidgets(
-      'arrow key end-to-end through Material Slider',
-      (tester) async {
-        engine.volume.value = 0.5;
-        await tester.pumpWidget(buildSubject());
-        await tester.pump();
+    testWidgets('arrow key end-to-end through Material Slider', (tester) async {
+      engine.volume.value = 0.5;
+      await tester.pumpWidget(buildSubject());
+      await tester.pump();
 
-        // 机制先例：keyboard_handler_global_dispatch_test 的「Slider keeps
-        // arrow-key adjustment while focused」（focusNode + sendKeyDownEvent
-        // → onChanged 触发），照抄该编排。
-        effectiveFocusNode(tester).requestFocus();
-        await tester.pump();
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      // 机制先例：keyboard_handler_global_dispatch_test 的「Slider keeps
+      // arrow-key adjustment while focused」（focusNode + sendKeyDownEvent
+      // → onChanged 触发），照抄该编排。
+      effectiveFocusNode(tester).requestFocus();
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
 
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(engine.setVolumeCallCount, 1);
-        expect(engine.lastSetVolumeValue, greaterThan(0.5));
-        expect(engine.lastSetVolumeValue, lessThanOrEqualTo(1.0));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(engine.setVolumeCallCount, 1);
+      expect(engine.lastSetVolumeValue, greaterThan(0.5));
+      expect(engine.lastSetVolumeValue, lessThanOrEqualTo(1.0));
 
-        // Release global feedback before widget-test timer invariants. Its real
-        // monotonic clock is deliberately independent of fake throttle time.
-        OsdService.I.hide();
-      },
-    );
+      // Release global feedback before widget-test timer invariants. Its real
+      // monotonic clock is deliberately independent of fake throttle time.
+      OsdService.I.hide();
+    });
   });
 }
