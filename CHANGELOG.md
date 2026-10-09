@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.0.11 · 收官发布 · 可用性与健壮性批量修复 🎯
+
+> 一句话版本：**v0.0.10.1 以来压分支的三轮工作（审查修复 20 项 + 浮层打磨）随本版合入发布；外加诊断包剪贴板脱敏、OSD 状态消息不再被吞、错误卡片关闭命中所显示条、播放列表滚轮平滑滚动与缩略图淡入。**
+
+### 🛡 审查修复 20 项（261009-fin 批，五维度审查 49 条精选落地）
+- **H1** @Native assetId 绑定解析失败 Error 穿透防护——ime/sizemove/dwm 三桥叶子层兜住 ArgumentError 降级，启动 probe 与 picker guard 双 Error-proof（防 Release 隐形孤儿进程）
+- **H2** error.log 大小阈值滚动 + 启动归档 + 空闲心跳零写盘（治理 63MB/年 无限增长）
+- **H3** 重复路径条目单条删除失效修复——冻结身份按 (path, addedSeq) 精确匹配
+- **U1-U6 可用性**：确认落空 OSD 轻提示 / 确认卡 Tab 焦点域回绕 / 音量滑条键盘调节修复 / 音量源替换 sourceKey 显式标识 / 菜单 Tab 首尾回绕 / 菜单 KeyRepeat 连续移动
+- **N1-N6 健壮性**：isUrl 大小写不敏感 + trim 传导 / 校验失败错误码按类别映射（不再一律 pathTraversal）/ 网络失败快照不阻塞错误回调（onError 先行 + generation 防陈旧）/ ErrorContext.copyWith / 日志 error/stackTrace/context 路径脱敏补全 / playlist.json 原子写 + 损坏 .corrupt 检疫留存
+- **W1-W5 工作区收尾**：OSD coalescingKey 合并契约兑现 / _publish 构建期相位守卫 / 设置按钮关闭走焦点归还链 / registry 冲突 assert + WorkspaceTaskIds 常量收敛 / panelWidth 280 单源化到 Tokens
+
+### ✨ 本轮新增（v0.0.11）
+- **F11 诊断包剪贴板脱敏**：错误卡片复制按钮的剪贴板版三路径只留文件名（无盘符/用户名），OSD 提示完整路径在 error.log；落盘日志格式逐字符不变（用户裁决：剪贴板脱敏）
+- **OSD status 恒占 pending 槽**：警告/失败展示期间音量/倍速等状态消息不再被吞或整条蒸发，latest-wins 顶替（方案 b 最小修，~5 行）
+- **错误卡片关闭命中所显示条**：`ErrorReporter.dismissById` 落地，轮览中关闭消失的是正在看的那条而非队首（修 WR-01 分歧）
+- **播放列表滚轮平滑滚动**：wheel 信号经 PointerSignalResolver 竞拍拦截，180ms easeOutCubic 滑翔替代离散瞬跳（flutter#31658），连发连续滑行、边界不越界、拖拽/右键/Scrollbar 行为不变
+- **缩略图淡入**：加载完成 150ms 淡入覆盖常驻占位，消除 pop-in 突跳；retry 重挂载自然二次淡入
+- **帮助面板 F 键契约锁**：F 键全屏切换早已实现，补契约测试 + 清除陈旧 TODO
+
+### 🎨 视觉与交互打磨
+- 浮层视觉提亮轮：新增 surfaceFloating/surfaceHighlight token，玻璃菜单 hover 跟随鼠标，设置 L1 详情页 → 键裁决修正
+- 控制栏 ←→ 组内焦点移动：键随焦点导航，边缘停住不泄漏 seek
+
+### 📌 记录在案
+- 版本号 0.0.11 起停用 build 号（后续补丁轮以 0.0.11.1 形式映射）
+- 覆盖率 80% 门停止追赶（75.9% 在案）；全屏闪烁不处理（用户裁决，media_kit 摘 WS_OVERLAPPEDWINDOW 已知根源）
+- 11 个 >500 行文件拆分留 v0.0.12 专项；网络路径增强单独版本；启动期 HandleMessage 归因 v0.0.12 候选
+- 实机 UAT 清单：`.planning/debug/v0.0.11_uat_checklist.md`（Impeller A/B 落锤为重点，命令见 docs/audit/glass-perf-ab.md）
+- 测试基线 2013 → 2023+ 全绿；analyze 0 issue
+
 ## 0.0.10.1 · 面板工作区
 
 - 左/中任务角色使用不可变会话快照；生产仅注册设置，额外任务只用于测试。
