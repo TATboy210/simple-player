@@ -190,34 +190,28 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
   /// 徽标轮览：沿快照向旧移动一格，越过最旧回到最新（循环语义）。
   ///
   /// 纯视图偏移 —— 只改渲染索引，不触碰 reporter 队列（T-03-10）；
-  /// `dismissCurrent` is called only by explicit manual close.
+  /// `dismissById` is called only by explicit manual close.
   void _cycleBadge() {
     setState(() => _cycleIndex += 1); // 渲染处按快照长度取模，无需在此钳制
   }
 
-  /// CARD-01 手动关闭：dismissCurrent 消费**真实队首**（presentation.current，
-  /// 而非轮览中显示的历史条目 —— research Anti-Pattern：dismiss 误用会永久
-  /// 丢队首），快照同步移除该条（已关闭的错误不再计入徽标，D-11），
-  /// 轮览重置到最新；随后 dismissCurrent 推进队列，下一项经 presentation
-  /// 通知自然上屏（CAP-04）。
+  /// CARD-01 手动关闭：按**当前显示条目**的 eventId 精确关闭（WR-01 裁决：
+  /// kernel `dismissById`）—— 卡片渲染的是快照最新/轮览条目，关闭必须命中
+  /// 用户看见的那条，而非 reporter FIFO 固定队首（head-dismissal 旧语义在
+  /// 队列 ≥2 且轮览时「可见的关闭」≠「被消费的」，由 dismissById 根除）。
+  /// 快照同步移除同一条（已关闭的错误不再计入徽标，D-11），轮览重置到
+  /// 最新；队列中下一条经 presentation 通知自然上屏（CAP-04）。
   ///
-  /// **已知分歧（WR-01，零 kernel 改动取舍）**：关闭按钮消费的是 reporter
-  /// FIFO 队首（最旧未关闭），而卡片渲染的是快照最新/轮览条目 —— 当
-  /// 队列 ≥2 条且用户正在轮览时，「可见的关闭按钮」与「被消费的条目」
-  /// 可能不是同一条。按-by-id 精确 dismiss 需要 kernel 新增 dismissById
-  /// API（Rule 4 红线，未获签核），故保留 head-dismissal 语义。但**不会
-  /// 出现「从未展示的错误被静默丢弃」**：队首条目必然曾在抵达时作为最新
-  /// 内容上屏过（D-01），且快照中其余条目仍可经轮览回看；本分歧由
-  /// error_card_host_test 的 close/cycle 一致性用例锁死行为边界。
-  void _onClose() {
+  /// [report] 是 build 时渲染的那条（含轮览偏移），闭包捕获保证「所见即
+  /// 所关」；ErrorCard 的 VoidCallback 签名不变（widget 层零涟漪）。快照
+  /// 收缩时 [_onSnapshotChanged] 本就会把轮览归零，这里的显式归零是同值
+  /// 冗余（无双重取模越界风险）。
+  void _onCloseReport(ErrorReport report) {
     // WR-02：reporter 未初始化时该回调不可达（卡片未渲染），防御性直返。
     if (!ErrorReporterImpl.isInitialized) return;
-    final head = ErrorReporterImpl.I.presentation.value.current;
-    if (head != null) {
-      ErrorCaptureSnapshot.I.removeById(head.eventId);
-    }
+    ErrorReporterImpl.I.dismissById(report.eventId);
+    ErrorCaptureSnapshot.I.removeById(report.eventId);
     setState(() => _cycleIndex = 0);
-    ErrorReporterImpl.I.dismissCurrent();
   }
 
   /// E97 打开日志：以资源管理器定位当前生效 error.log —— 路径在**动作时刻**
@@ -299,8 +293,8 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
             final history = ErrorCaptureSnapshot.I.reports.value;
             // 渲染报告取自快照（D-01/D-11）：非轮览显示**最新**（快照尾，即
             // D-01「新错误替换卡片内容」）；轮览中按索引向旧偏移（取模循环）。
-            // 适配 notifier 保持 reporter 队首语义（CAP-04/dismissCurrent 的
-            // 真实消费目标），渲染层的最新/轮览是纯视图偏移。
+            // 渲染层的最新/轮览是纯视图偏移；关闭按该条 eventId 精确命中
+            // （WR-01 裁决），不再依赖 reporter 队首语义。
             final report = _displayedReport(history, state);
             if (report == null) return const SizedBox.shrink();
             // D-01/D-11 计数徽标 = 快照长度（已捕获且未被手动关闭的错误数，
@@ -316,9 +310,10 @@ class _ErrorCardHostState extends State<ErrorCardHost> {
                 totalCount: history.isEmpty ? 1 : history.length,
                 // D-01 徽标轮览接线（03-03）：纯视图偏移，不消费队列。
                 onBadgeTap: _cycleBadge,
-                // CARD-01 手动关闭唯一接线点：dismissCurrent 推进 FIFO，队首
-                // 下一项经 presentation 通知自然上屏（CAP-04）。
-                onClose: _onClose,
+                // CARD-01 手动关闭唯一接线点：闭包捕获**当前渲染的 report**
+                // （所见即所关），dismissById 按 eventId 精确命中（WR-01 裁
+                // 决）；队列下一条经 presentation 通知自然上屏（CAP-04）。
+                onClose: () => _onCloseReport(report),
                 // E97 打开日志接线（与 onClose 同级）：宿主持有缝注入与
                 // 失败隔离，卡片只暴露动作入口。
                 onOpenLog: _onOpenLog,

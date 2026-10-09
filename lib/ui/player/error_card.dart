@@ -58,13 +58,14 @@ class ErrorCard extends StatefulWidget {
 
   /// D-01/D-11 徽标轮览回调（03-03 接线）：点击沿宿主本地快照向旧循环翻页。
   ///
-  /// **纯视图偏移** —— 轮览绝不调用 dismissCurrent（research Anti-Pattern：
-  /// 误用会永久丢队首）；`dismissCurrent` 仅由手动关闭（[onClose]）与
-  /// explicit manual close only.为 null 时徽标不可点（纯计数展示）。
+  /// **纯视图偏移** —— 轮览绝不调用 dismissById（research Anti-Pattern：
+  /// dismiss 只由手动关闭（[onClose]）触发）。为 null 时徽标不可点（纯计数
+  /// 展示）。
   final VoidCallback? onBadgeTap;
 
-  /// CARD-01 手动关闭回调 —— 宿主接线 `ErrorReporterImpl.I.dismissCurrent()`
-  /// （关闭推进 FIFO）；只在手动关闭调用，徽标轮览不得复用此路径。
+  /// CARD-01 手动关闭回调 —— 宿主以闭包捕获当前渲染的 report，接线
+  /// `ErrorReporterImpl.I.dismissById(report.eventId)`（关闭精确命中所显示
+  /// 条目，WR-01 裁决）；只在手动关闭调用，徽标轮览不得复用此路径。
   final VoidCallback? onClose;
 
   /// E97 打开日志回调 —— 宿主接线以资源管理器定位当前生效 error.log

@@ -239,13 +239,34 @@ final class ErrorReporterImpl implements ErrorReporter {
     }
   }
 
-  /// RED 占位（261009-oar T1）：仅令失败测试可编译并通过运行期断言暴露缺失
-  /// 行为；命中移除/发布逻辑随 GREEN 提交落地。
+  /// Removes the acknowledged report matching [eventId] at any queue position
+  /// and promotes the next surviving report.
   ///
-  /// RED-phase placeholder so the failing by-id tests compile and expose the
-  /// missing behavior at assertion level; the real removal lands in GREEN.
+  /// WR-01 裁决落地：宿主关闭按钮命中「当前显示/轮览中的那条」，而非固定
+  /// 队首 —— 按所显示 report 的 eventId 精确移除；未命中为 no-op（迟到的
+  /// 关闭回调或已被去重合并/挤出边界的条目不产生副作用）。失败隔离与
+  /// [dismissCurrent] 同构：队列/呈现故障不外溢 UI 输入。
   @override
-  void dismissById(String eventId) {}
+  void dismissById(String eventId) {
+    try {
+      // ListQueue 不暴露 indexWhere/removeAt（List 专属成员）—— 先按 id 找到
+      // 实例，再走 Queue.remove 按引用移除首个匹配（eventId 唯一 ⇒ 恰一条）。
+      ErrorReport? matched;
+      for (final report in _queue) {
+        if (report.eventId == eventId) {
+          matched = report;
+          break;
+        }
+      }
+      if (matched != null) {
+        _queue.remove(matched);
+      }
+      _publishSafely();
+    } on Object catch (failure, stackTrace) {
+      // Containment boundary: queue/presentation failures cannot escape UI input.
+      _emitLastResort(failure, stackTrace);
+    }
+  }
 
   void _reportSafely({
     required ErrorSource source,
