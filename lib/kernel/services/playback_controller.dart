@@ -274,28 +274,25 @@ class PlaybackController {
 
   /// 网络流打开失败时异步补写本机接口摘要 (B5/9; N3 起改为回调后补齐).
   ///
-  /// 调用 [_networkSnapshotProvider] 采集快照, 重建 [ErrorContext] 把
-  /// `networkInterfaceCount`/`networkHasNonLoopback` 附进错误上下文.
+  /// 调用 [_networkSnapshotProvider] 采集快照, 经 [ErrorContext.copyWith]
+  /// 把 `networkInterfaceCount`/`networkHasNonLoopback` 附进错误上下文 —
+  /// 富集走结构化 copyWith, 后继 ErrorContext 新增字段自动透传, 不再依赖
+  /// 逐字段手工重建 (N4, 2026-10-09).
   /// [requestGen] 是发起打开请求时的代数 — await 返回后与
   /// [_openRequestGeneration] 比对 (T-261009-03): 快照等待跨越异步窗口,
   /// 窗口内的新打开/停止 (两处递增点) 均使本请求过期, 陈旧请求不得为
   /// 已被替代的媒体补写诊断. snapshot 为 null (降级/超时) 时无操作;
-  /// 调用方负责 isUrl 门控与 unawaited 调度. ErrorContext 字段 final
-  /// 故整体重建 (无 copyWith 惯例, 后继 N4 归属).
+  /// 调用方负责 isUrl 门控与 unawaited 调度. error 无 context 时以全新
+  /// ErrorContext 兜底 (`error.context ?? ErrorContext()`) — 纯
+  /// `?.copyWith` 链会静默丢掉无 context 错误的富集, 语义必须保持
+  /// "全新 context + 全新 timestamp + 诊断字段落位".
   Future<void> _enrichNetworkSnapshot(PlayerError error, int requestGen) async {
     final snapshot = await _networkSnapshotProvider();
     // generation 守卫: openAndPlay 入口与 stopCurrentMedia 两个递增点
     // 共用同一计数器, 不匹配即请求已被淘汰 — 放弃补写.
     if (requestGen != _openRequestGeneration) return;
     if (snapshot == null) return;
-    final ctx = error.context;
-    error.context = ErrorContext(
-      action: ctx?.action,
-      generation: ctx?.generation,
-      path: ctx?.path,
-      timestamp: ctx?.timestamp,
-      module: ctx?.module,
-      callbackStackTrace: ctx?.callbackStackTrace,
+    error.context = (error.context ?? ErrorContext()).copyWith(
       networkInterfaceCount: snapshot.interfaceCount,
       networkHasNonLoopback: snapshot.hasNonLoopback,
     );
