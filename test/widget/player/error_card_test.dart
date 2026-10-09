@@ -261,7 +261,7 @@ void main() {
       expect(find.byType(ErrorCard), findsOneWidget);
     });
 
-    testWidgets('close button dismisses current and advances the FIFO', (
+    testWidgets('close button dismisses the displayed report and advances to the remaining one', (
       tester,
     ) async {
       // Arrange：两份报告入队。D-01 替换语义（03-03）：卡片显示**最新**（乙），
@@ -283,13 +283,14 @@ void main() {
       expect(find.textContaining('错误甲'), findsNothing);
       expect(find.text('2 错误'), findsOneWidget);
 
-      // Act：点击关闭按钮 —— dismissCurrent 消费真实队首（甲），
-      // 宿主快照同步移除该条并重置轮览到最新。
+      // Act：点击关闭按钮 —— v0.0.11 T3（WR-01 用户裁决）：关闭命中**所显示条**（乙），
+      // 不再消费队首（所见即所关）；剩余甲上屏，徽标计数减一（CAP-04 推进 + D-11 快照）。
       await tester.tap(find.byKey(const ValueKey('error-card-close')));
       await tester.pump();
 
-      // Assert：卡片继续显示最新（乙），徽标计数减一（CAP-04 推进 + D-11 快照）。
-      expect(find.textContaining('错误乙'), findsOneWidget);
+      // Assert：被显示的乙消失，剩余甲上屏，徽标计数减一。
+      expect(find.textContaining('错误乙'), findsNothing);
+      expect(find.textContaining('错误甲'), findsOneWidget);
       expect(find.text('1 错误'), findsOneWidget);
 
       // Act / Assert：再次关闭，单报告归零（卡片消失）。
