@@ -7,17 +7,16 @@ import '../theme/tokens.dart';
 /// 纯布局过滤器 — 列表显隐不参与计算，确保中列位置稳定。
 @immutable
 class PanelWorkspaceLayout {
-  const PanelWorkspaceLayout({
-    required this.left,
-    required this.center,
-    required this.right,
-  });
+  const PanelWorkspaceLayout({required this.left, required this.center});
 
   final Rect left;
   final Rect center;
-  final Rect right;
 
-  /// 把可用视频区域变为左/中/右面板矩形。
+  /// 把可用视频区域变为左/中面板矩形。
+  ///
+  /// 右列槽位不再输出 Rect — 播放列表由 player_video_controls 静态定位
+  /// (right: Tokens.controlBarMarginH), 宽度即 PlaylistPanel.panelWidth
+  /// (= Tokens.workspaceTaskMinWidth); rightWidth 局部变量仍作中列推导上界。
   static PanelWorkspaceLayout calculate(Size size) {
     final margin = math.min(Tokens.controlBarMarginH, size.width / 2);
     final innerWidth = math.max(0.0, size.width - margin * 2);
@@ -39,12 +38,6 @@ class PanelWorkspaceLayout {
     return PanelWorkspaceLayout(
       left: Rect.fromLTWH(margin, top, leftWidth, height),
       center: Rect.fromLTWH(centerX, top, centerWidth, height),
-      right: Rect.fromLTWH(
-        centerX + centerWidth + gap,
-        top,
-        rightWidth,
-        height,
-      ),
     );
   }
 }
