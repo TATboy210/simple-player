@@ -139,6 +139,52 @@ void main() {
         isNegative,
       );
     });
+
+    test('降序 — addedSeq 大→小 (新→旧), null 仍恒末尾', () {
+      final first = _item('a.mp4', addedSeq: 0);
+      final second = _item('b.mp4', addedSeq: 1);
+      expect(
+        comparePlaylistEntries(
+          second,
+          first,
+          key: PlaylistSortKey.addedOrder,
+          ascending: false,
+        ),
+        isNegative,
+      );
+      expect(
+        comparePlaylistEntries(
+          first,
+          second,
+          key: PlaylistSortKey.addedOrder,
+          ascending: false,
+        ),
+        isPositive,
+      );
+      // null 恒末尾是文档契约 — 降序翻转不得前置 null.
+      final unsequenced = _item('z.mp4');
+      expect(
+        comparePlaylistEntries(
+          unsequenced,
+          second,
+          key: PlaylistSortKey.addedOrder,
+          ascending: false,
+        ),
+        isPositive,
+      );
+      // 非 null 平局 — path tie-break (稳定、可复现, 方向无关).
+      final tieLater = _item('d.mp4', addedSeq: 7);
+      final tieEarlier = _item('c.mp4', addedSeq: 7);
+      expect(
+        comparePlaylistEntries(
+          tieLater,
+          tieEarlier,
+          key: PlaylistSortKey.addedOrder,
+          ascending: false,
+        ),
+        isPositive,
+      );
+    });
   });
 
   group('lastPlayed 键', () {
@@ -229,6 +275,52 @@ void main() {
           ascending: true,
         ),
         isNegative,
+      );
+    });
+
+    test('降序 — 时长 长→短, null 仍恒末尾', () {
+      final short = _item('a.mp4', durationMs: 1000);
+      final long = _item('b.mp4', durationMs: 90000);
+      expect(
+        comparePlaylistEntries(
+          long,
+          short,
+          key: PlaylistSortKey.duration,
+          ascending: false,
+        ),
+        isNegative,
+      );
+      expect(
+        comparePlaylistEntries(
+          short,
+          long,
+          key: PlaylistSortKey.duration,
+          ascending: false,
+        ),
+        isPositive,
+      );
+      // null 恒末尾是文档契约 — 降序翻转不得前置 null.
+      final unknown = _item('z.mp4');
+      expect(
+        comparePlaylistEntries(
+          unknown,
+          long,
+          key: PlaylistSortKey.duration,
+          ascending: false,
+        ),
+        isPositive,
+      );
+      // 非 null 平局 — path tie-break (稳定、可复现, 方向无关).
+      final tieLater = _item('d.mp4', durationMs: 5000);
+      final tieEarlier = _item('c.mp4', durationMs: 5000);
+      expect(
+        comparePlaylistEntries(
+          tieLater,
+          tieEarlier,
+          key: PlaylistSortKey.duration,
+          ascending: false,
+        ),
+        isPositive,
       );
     });
   });
