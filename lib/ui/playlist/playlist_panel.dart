@@ -11,6 +11,7 @@ import '../../kernel/models/playlist_item.dart';
 import '../../kernel/models/playlist_sort.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_confirm_strip.dart';
+import '../shared/osd_service.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/glass_blur_layer.dart';
 import '../shared/glass_container.dart' show GlassButton, GlassTier;
@@ -504,7 +505,13 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     _exitBatchMode();
     // Resolve after all asynchronous waits, immediately before the callback.
     final toRemove = pending.resolve(widget.entries.value);
-    if (toRemove.isNotEmpty) widget.onRemoveEntries?.call(toRemove);
+    if (toRemove.isNotEmpty) {
+      widget.onRemoveEntries?.call(toRemove);
+    } else {
+      // 确认后目标全落空 (队列被外部清空/目标全消失) — 不再静默无响应,
+      // 以固定文案 OSD 轻提示告知用户 (U1)。
+      _showEntriesGoneHint();
+    }
   }
 
   /// Single removal resolves the frozen path against the current queue.
@@ -512,7 +519,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     final pending = await _confirmTargets({index});
     if (!mounted || !widget.visible || pending == null) return;
     final toRemove = pending.resolve(widget.entries.value);
-    if (toRemove.isNotEmpty) widget.onRemoveEntry(toRemove.single);
+    if (toRemove.isNotEmpty) {
+      widget.onRemoveEntry(toRemove.single);
+    } else {
+      // 单条路径同一缺陷形态 — 目标落空同样给 OSD 轻提示 (U1)。
+      _showEntriesGoneHint();
+    }
+  }
+
+  /// 确认后目标全落空的轻提示 — 固定本地化文案, 绝不内插条目路径
+  /// (视口 OSD 气泡不暴露文件名); status 级 (rank 0) 永不顶掉在显的
+  /// warning/failure OSD, 仅填充空位/低优先级槽位。
+  void _showEntriesGoneHint() {
+    OsdService.I.show(AppLocalizations.of(context).playlistEntriesGone);
   }
 
   /// 条目纵列 — [lastPlayed] 为停止态高亮锚点; [resumeAllowed] 传递断点
