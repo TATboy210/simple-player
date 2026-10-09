@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/kernel/models/validation_error.dart';
 import 'package:simple_player_flutter/kernel/services/path_validator.dart';
 
 void main() {
@@ -121,6 +122,84 @@ void main() {
 
       test('returns null for URL', () {
         expect(PathValidator.validate('https://example.com/stream'), isNull);
+      });
+    });
+
+    // N2: classify/messageFor 夹具表 — 逐行锁定 类别 + 消息文本。
+    // 消息串必须与重构前 validate 的五条消息逐字节恒同
+    // (威胁模型 T-261009fiy-02 零漂移红线); classify 是五分支判定的
+    // 单一实现, validate 委托 classify + messageFor, 不并存两套分支。
+    group('classify + messageFor 类别分类器 (N2)', () {
+      // (输入, 期望类别, 期望消息) — message 仅在类别非 null 时有意义。
+      // UNC 行用 isPathTraversal 实际检测的反斜杠形式 (\\srv\share);
+      // `//srv/...` 行是零漂移锁定: 现行 validate 接受该形式
+      // (isPathTraversal 只检测反斜杠 UNC), classify 不得改变这一决定。
+      final fixtures = <(String, ValidationErrorType?, String?)>[
+        ('', ValidationErrorType.empty, '路径为空'),
+        ('   ', ValidationErrorType.empty, '路径为空'),
+        ('http://', ValidationErrorType.invalidUrl, 'URL 格式无效: http://'),
+        (
+          'HTTP:///path',
+          ValidationErrorType.invalidUrl,
+          'URL 格式无效: HTTP:///path',
+        ),
+        (
+          'C:/a\x01b.mp4',
+          ValidationErrorType.controlCharacters,
+          '路径包含非法控制字符: C:/a\x01b.mp4',
+        ),
+        ('../x.mp4', ValidationErrorType.pathTraversal, '路径不安全: ../x.mp4'),
+        (
+          'a\x00b.mp4',
+          ValidationErrorType.pathTraversal,
+          '路径不安全: a\x00b.mp4',
+        ),
+        (
+          '\\\\srv\\share\\v.mp4',
+          ValidationErrorType.pathTraversal,
+          '路径不安全: \\\\srv\\share\\v.mp4',
+        ),
+        ('~/v.mp4', ValidationErrorType.pathTraversal, '路径不安全: ~/v.mp4'),
+        (
+          'C:/test/file.txt',
+          ValidationErrorType.unsupportedFormat,
+          '不支持的文件类型: C:/test/file.txt',
+        ),
+        // 有效输入 — 不产生类别, validate 放行。
+        ('C:/test/video.mp4', null, null),
+        ('rtsp://host/s', null, null),
+        // N1 语义继承: 大写合法 http URL 经大小写不敏感 isUrl 放行。
+        ('HTTP://example.com/v.mp4', null, null),
+        // 零漂移锁定: 正斜杠 // 前缀现行即接受 (非 isPathTraversal 检测目标)。
+        ('//srv/share/v.mp4', null, null),
+      ];
+
+      test('classify 类别 + messageFor/validate 消息逐行恒等', () {
+        for (final (input, type, message) in fixtures) {
+          expect(
+            PathValidator.classify(input),
+            type,
+            reason: 'classify("$input") 应归类为 $type',
+          );
+          if (type == null) {
+            expect(
+              PathValidator.validate(input),
+              isNull,
+              reason: 'validate("$input") 应放行',
+            );
+          } else {
+            expect(
+              PathValidator.messageFor(type, input),
+              message,
+              reason: 'messageFor($type, "$input") 消息文本逐字节恒等',
+            );
+            expect(
+              PathValidator.validate(input),
+              message,
+              reason: 'validate("$input") 与 messageFor 输出恒等',
+            );
+          }
+        }
       });
     });
 

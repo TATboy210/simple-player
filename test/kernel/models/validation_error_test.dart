@@ -8,8 +8,10 @@ import 'package:simple_player_flutter/kernel/models/validation_error.dart';
 
 void main() {
   group('ValidationErrorType', () {
+    // N2: 追加 controlCharacters 后共 6 值 — 注册表 append-only,
+    // 现有五值零改名零删除零重排, 只断言 contains 不锁顺序。
     test('has all expected values', () {
-      expect(ValidationErrorType.values, hasLength(5));
+      expect(ValidationErrorType.values, hasLength(6));
       expect(ValidationErrorType.values, contains(ValidationErrorType.empty));
       expect(
         ValidationErrorType.values,
@@ -27,12 +29,28 @@ void main() {
         ValidationErrorType.values,
         contains(ValidationErrorType.invalidPath),
       );
+      expect(
+        ValidationErrorType.values,
+        contains(ValidationErrorType.controlCharacters),
+      );
     });
 
     test('name returns correct string', () {
       expect(ValidationErrorType.empty.name, 'empty');
       expect(ValidationErrorType.pathTraversal.name, 'pathTraversal');
       expect(ValidationErrorType.unsupportedFormat.name, 'unsupportedFormat');
+      expect(ValidationErrorType.controlCharacters.name, 'controlCharacters');
+    });
+
+    test('toString includes controlCharacters type name and message (N2)', () {
+      const error = ValidationError(
+        ValidationErrorType.controlCharacters,
+        'Contains 0x01',
+      );
+      expect(
+        error.toString(),
+        'ValidationError(controlCharacters): Contains 0x01',
+      );
     });
   });
 
