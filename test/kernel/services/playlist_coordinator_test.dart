@@ -5,6 +5,7 @@
 /// Store: JSON 往返 + 损坏容错. 全部 FakeEngine — 无 libmpv FFI, headless 安全.
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -1132,17 +1133,17 @@ void main() {
   });
 
   group('sortQueue 迟到 move 事件断点污染 (v0.0.12 V1 — 证伪测试 261009-rp1)', () {
-    // 假设 (待证伪, 见 quick 261009-rp1 PLAN): sortQueue 完成后 media_kit
-    // 迟到的 move 事件携带排序前 index (包侧已证实: move() 重排条目后不
-    // 修正 playlist.index, 每个事件 index 保持旧值); 引擎抑制期
-    // (_queueEditInProgress) finally 解除后, 循环期间入队未投递的 move
-    // 事件才到达 — 真实桥接 stream.playlist 处理器对每个事件**无条件**
-    // 新建 unmodifiable paths + 写 index + (抑制已解除时) touch revision.
+    // 假设 (261009-rp1 PLAN, T1 已证红): sortQueue 完成后 media_kit 迟到的
+    // move 事件携带排序前 index (包侧已证实: move() 重排条目后不修正
+    // playlist.index, 每个事件 index 保持旧值); 若该事件在引擎抑制期解除
+    // 后投递, 桥接 stream.playlist 处理器会**无条件**新建 unmodifiable
+    // paths + 写 index + touch revision → Coordinator 收到"新序+旧索引"
+    // 陈旧帧, 误判切曲 → 锚点误置 + 未播放条目吸收播放位置 (断点污染).
     //
-    // 本用例回放该场景 (注入帧 = 桥接处理器的可观察效果): 断言正确行为
-    // 契约 — 锚点不被误置 + 未播放条目不吸收播放位置.
-    // 红 = 缺陷证实 (进 T2 引擎修复); 绿 = 证伪成立 (记台账任务结束).
-    test('排序后旧序索引 revision — 锚点不被误置、他条目不吸收断点', () async {
+    // 本用例锁定修复后契约 (T2 引擎清流+重申, FakeEngine 同构): 迟到事件
+    // 在抑制清流窗内投递 — 只写镜像不发 revision; 窗末引擎重申权威 index
+    // 后单发. 断言: 锚点不被误置 + 未播放条目不吸收播放位置.
+    test('排序后清流窗内迟到事件 — 锚点不被误置、他条目不吸收断点', () async {
       var nowMs = 1000000;
       coordinator.clock = () => DateTime.fromMillisecondsSinceEpoch(nowMs);
 
@@ -1153,23 +1154,27 @@ void main() {
       expect(coordinator.lastPlayedPath.value, 'x.mp4');
       nowMs += 6000; // 推过节流窗口 — 下一 position tick 独立成窗
 
-      // ── 2. sortQueue 完成: name 升序 → [a, b, x], x 1→2 ──
-      // 引擎乐观镜像 + revision 回流 — current 仍是 x, 无切曲.
+      // ── 2. 迟到 move 事件预挂清流窗 — 桥接语义回放 (修复后) ──
+      // FakeEngine.sortQueue 的清流 await (Future.delayed(Duration.zero))
+      // 是事件循环 timer — 现在登记的 microtask 必在其前投递, 精确落入
+      // 抑制窗. 处理器写镜像 (新实例 paths + 排序前 index 旧序 1), 抑制
+      // 窗内不发 revision — 有意不 touch queueRevision.
+      scheduleMicrotask(() {
+        engine.queuePaths.value = List<String>.unmodifiable(<String>[
+          'a.mp4',
+          'b.mp4',
+          'x.mp4',
+        ]);
+        engine.queueIndex.value = 1; // 旧序索引 (x 在旧序的位置) — 陈旧值
+      });
+
+      // ── 3. sortQueue 完成: name 升序 → [a, b, x], x 1→2 ──
+      // 清流窗末引擎重申权威 index (2) 后单发 revision — Coordinator 只
+      // 见修正帧, current 恒为 x, 无切曲.
       await coordinator.sortEntries(PlaylistSortKey.name);
       expect(coordinator.lastPlayedPath.value, 'x.mp4');
+      // 重申生效 — 陈旧旧序索引 1 已被权威值 2 覆盖.
       expect(coordinator.currentIndex.value, 2);
-
-      // ── 3. 注入迟到 move 事件帧 — 桥接语义回放 ──
-      // 抑制期已解除, 积压 move 事件此刻投递: 处理器无条件新建 paths 实例
-      // (同内容) + 写入包侧携带的排序前 index (旧序 1) + touch revision.
-      // Coordinator 侧 identity 快路径因新实例失效, 必须走全量处理.
-      engine.queuePaths.value = List<String>.unmodifiable(<String>[
-        'a.mp4',
-        'b.mp4',
-        'x.mp4',
-      ]);
-      engine.queueIndex.value = 1; // 旧序索引 (x 在旧序的位置) — 陈旧值
-      engine.queueRevision.value++;
 
       // ── 4. x 实际仍在播 — 播放推进, 节流窗已过 ──
       engine.position.value = 50000;

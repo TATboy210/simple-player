@@ -518,6 +518,15 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     queueIndex.value = currentPath == null
         ? -1
         : targetOrder.indexOf(currentPath);
+    // 同构迟到 move 事件清流 (v0.0.12 V1, 与 MediaKitEngine.sortQueue
+    // finally 一致): 拖延一轮事件循环再重申权威 index, 之后才单发
+    // revision — "清流窗内投递的迟到事件只写镜像不发 revision"的桥接
+    // 语义由此在 Coordinator 测试中可回放 (261009-rp1 T1).
+    await Future<void>.delayed(Duration.zero);
+    if (_disposed) return;
+    queueIndex.value = currentPath == null
+        ? -1
+        : targetOrder.indexOf(currentPath);
     queueRevision.value++;
   }
 

@@ -679,6 +679,13 @@ class MediaKitEngine implements MediaEngine {
     // 规划 move 序列 — 恒等排列/非排列返回空序列 (no-op 防御).
     final moves = planPlaylistMoves(current, targetOrder);
     if (moves.isEmpty) return;
+    // 播放身份预循环锚定 — 清流窗重申 index 的权威取材. 须读循环前的
+    // 旧序快照: 抑制窗内迟到事件会写脏 _queueIndex, 而旧序 index 恒指
+    // 同一 path (包侧行为: move 事件 index 保持排序前值).
+    final currentIndex = _queueIndex.value;
+    final playingPath = (currentIndex >= 0 && currentIndex < current.length)
+        ? current[currentIndex]
+        : null;
     _queueEditInProgress = true;
     try {
       // mpv 命令队列串行保序; 每条 move 会触发 stream.playlist 事件,
@@ -687,16 +694,12 @@ class MediaKitEngine implements MediaEngine {
       for (final move in moves) {
         await _player.move(move.from, move.to);
       }
-      // 乐观镜像一次到位 — 当前 path 在目标顺序中的位置即新 index
+      // 乐观镜像一次到位 — 播放 path 在目标顺序中的位置即新 index
       // (mpv playlist-move 保留条目 current 标记, 播放不中断).
-      final currentIndex = _queueIndex.value;
-      final currentPath = (currentIndex >= 0 && currentIndex < current.length)
-          ? current[currentIndex]
-          : null;
       _queuePaths.value = List.unmodifiableOf(targetOrder);
-      _queueIndex.value = currentPath == null
+      _queueIndex.value = playingPath == null
           ? -1
-          : targetOrder.indexOf(currentPath);
+          : targetOrder.indexOf(playingPath);
     } on Exception catch (error, stackTrace) {
       _lastError.value = UnknownError(
         '排序队列失败: $error',
@@ -708,12 +711,35 @@ class MediaKitEngine implements MediaEngine {
         ),
       );
     } finally {
-      // 兜底 — 即使中途失败也 touch 一次，保证 Coordinator 读到当前
-      // 真实镜像 (抑制期不吞最终态); 若 mpv 回流晚于 touch 到达,
-      // 此时抑制已解除, 事件照常 touch (Coordinator 幂等收敛).
+      // 迟到 move 事件清流 (v0.0.12 V1) — mpv 对 loop 内已 ACK 的 move
+      // 仍会补发 playlist 事件且携带排序前 index (包侧 move() 不修正
+      // playlist.index). 若在解除抑制后才投递, 事件被无条件写镜像 +
+      // touch revision → Coordinator 收到"新序+旧索引"陈旧帧, 误判切曲
+      // → 断点/锚点污染 (261009-rp1 T1 证伪红实证). 抑制多保持一轮事件
+      // 循环: 积压事件在此窗投递时只写镜像不发 revision; 窗末镜像收敛为
+      // 目标全序, 重申权威 index 后再解除抑制单发.
+      _queueEditInProgress = true;
+      await Future<void>.delayed(Duration.zero);
+      if (!_disposed && _sameContent(_queuePaths.value, targetOrder)) {
+        // 仅镜像已是目标全序时重申 — 异常路径镜像可能是旧序/半重排, 照
+        // 现状回流 (兜底语义); 重入排序场景新序内容不符亦跳过.
+        _queueIndex.value = playingPath == null
+            ? -1
+            : targetOrder.indexOf(playingPath);
+      }
       _queueEditInProgress = false;
-      _touchQueueRevision();
+      if (!_disposed) _touchQueueRevision();
     }
+  }
+
+  /// 逐元素内容等价 — 清流窗后判定镜像是否已收敛为目标全序 (与
+  /// Coordinator 侧 _listEquals 同义; 引擎内无共享 helper 故独立声明).
+  static bool _sameContent(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   @override
