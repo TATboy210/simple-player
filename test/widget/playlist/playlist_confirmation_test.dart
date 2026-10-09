@@ -11,6 +11,7 @@ import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
 import 'package:simple_player_flutter/ui/shared/glass_confirm_strip.dart';
+import 'package:simple_player_flutter/ui/shared/osd_service.dart';
 
 void main() {
   setUpAll(() {
@@ -195,6 +196,13 @@ void main() {
         reason: 'confirmation ESC must not exit fullscreen',
       );
       expect(tester.takeException(), isNull);
+      if (action == 'vanish') {
+        // U1 空落空提示会启动 OsdService.I 的 1200ms 到期 Timer;测试收尾前
+        // 显式清除以满足 widget-test 的 no-pending-timer 不变量(仓库既有模式,
+        // 同 volume_drag_feedback_test 的收尾卫生)。
+        OsdService.I.hide();
+        await tester.pump();
+      }
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
