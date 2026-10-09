@@ -73,6 +73,11 @@ class WindowService with WindowListener implements WindowBridge {
     },
     log: _log.i,
   );
+
+  /// init 隐藏阶段的 resize 抑制 — [_initWindow] 几何恢复会引发一次
+  /// WM_SIZE, 置位后 [onWindowResize] 的首个事件被吞掉（消费即清零）。
+  /// 261009-rp3: 抑制语义以 [reveal] 为终点 — 若恢复尺寸与当前尺寸相同,
+  /// 平台不产生 WM_SIZE, 标志无人消费会滞留, 导致亮窗后首拖被吞。
   int _resizeSuppressionGeneration = 0;
   int _activeResizeSuppression = 0;
 
@@ -234,6 +239,13 @@ class WindowService with WindowListener implements WindowBridge {
   /// maximize/focus 重复无副作用。
   Future<void> reveal() async {
     if (_disposed) return;
+    // 261009-rp3 修复: 抑制标志语义只覆盖隐藏 init 阶段 — 亮窗即解除。
+    // init 几何恢复若与当前尺寸相同, 平台不产生 WM_SIZE, 消费型标志无人
+    // 清零会滞留到亮窗后, 吞掉用户第一次真实拖拽（isResizing 不置位 /
+    // windowSize 不更新 / 几何不持久化）。此刻 init 的 setBounds 早已
+    // 完成, 其 WM_SIZE 若存在必已送达（被 onWindowResize 消费分支吞掉）
+    // 或根本不存在（此处清零防滞留）; 组合根超时兜底保证 reveal 必达。
+    _activeResizeSuppression = 0;
     await windowManager.show();
     if (_disposed) return;
     if (_state.mode.value.isMaximized) {
