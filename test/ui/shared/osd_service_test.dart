@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/osd_message.dart';
 import 'package:simple_player_flutter/ui/shared/osd_service.dart';
@@ -191,4 +192,126 @@ void main() {
       s.dispose();
     },
   );
+
+  // ── Build-phase publication guard ──
+  // 构建期相位守卫: persistentCallbacks 期间 show/hide 只把 ValueNotifier 发布
+  // 推迟到本帧末, 准入记账同步推进, 消息不丢、不重、非 build 期时序不变。
+  group('build-phase publication guard', () {
+    testWidgets(
+      'build-phase shows defer publication to frame end without loss',
+      (tester) async {
+        // 与 osd_overlay_test.dart 相同的注入时钟: 生产 Stopwatch 不跟随假时钟。
+        final binding = tester.binding;
+        final start = binding.clock.now();
+        final service = OsdService(
+          now: () => binding.clock.now().difference(start),
+        );
+        addTearDown(service.dispose);
+        final notifications = <int>[];
+        late final OsdSnapshot duringBuild;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) {
+                service.snapshot.addListener(
+                  () => notifications.add(service.snapshot.value.generation),
+                );
+                service.show('warn', priority: OsdPriority.warning);
+                // rank 0 低于 rank 2: 准入对等要求 current=warn + pending=info。
+                service.show('info');
+                duringBuild = service.snapshot.value;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        );
+        // 构建期: 同步记账真值仍未推进发布面, 监听器零通知。
+        expect(duringBuild.generation, 0);
+        expect(duringBuild.current, isNull);
+        expect(duringBuild.pending, isNull);
+        expect(notifications, isEmpty);
+        // 帧末一次合并冲刷: 携带两次 show 后的最终一致快照, 不丢消息、不重复通知。
+        expect(service.snapshot.value.generation, 2);
+        expect(service.snapshot.value.current?.message.text, 'warn');
+        expect(service.snapshot.value.pending?.message.text, 'info');
+        expect(notifications, [2]);
+        // t=3000: pending 'info' 已过 1200ms 生命期被 prune, warning 仍在场。
+        await tester.pump(const Duration(milliseconds: 3000));
+        service.show('late status'); // 4200ms 到期, 能活过 warning 的 4000ms。
+        expect(service.snapshot.value.generation, 3);
+        expect(service.snapshot.value.pending?.message.text, 'late status');
+        // t=4000: warning 精确到期, 正常过期路径晋升仍有效的 pending。
+        await tester.pump(const Duration(milliseconds: 1000));
+        expect(service.snapshot.value.current?.message.text, 'late status');
+        expect(service.snapshot.value.pending, isNull);
+        expect(notifications, [2, 3, 4]);
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(service.snapshot.value.current, isNull);
+        expect(notifications, [2, 3, 4, 5]);
+        service.dispose();
+      },
+    );
+
+    testWidgets('build-phase hide defers and clears with a single flush', (
+      tester,
+    ) async {
+      final binding = tester.binding;
+      final start = binding.clock.now();
+      final service = OsdService(
+        now: () => binding.clock.now().difference(start),
+      );
+      addTearDown(service.dispose);
+      final notifications = <int>[];
+      late final OsdSnapshot duringBuild;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              service.snapshot.addListener(
+                () => notifications.add(service.snapshot.value.generation),
+              );
+              service.show('transient', priority: OsdPriority.warning);
+              service.hide();
+              duringBuild = service.snapshot.value;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(duringBuild.generation, 0);
+      expect(duringBuild.current, isNull);
+      expect(duringBuild.pending, isNull);
+      expect(notifications, isEmpty);
+      // show+hide 合并为一次帧末冲刷, 终态清空且只通知一次。
+      expect(service.snapshot.value.generation, 2);
+      expect(service.snapshot.value.current, isNull);
+      expect(service.snapshot.value.pending, isNull);
+      expect(notifications, [2]);
+      // show 同步记下的 warning 计时器已由 hide 取消, dispose 兜底释放。
+      service.dispose();
+    });
+
+    testWidgets('dispose during pending deferral does not throw', (
+      tester,
+    ) async {
+      final binding = tester.binding;
+      final start = binding.clock.now();
+      final service = OsdService(
+        now: () => binding.clock.now().difference(start),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              service.show('doomed', priority: OsdPriority.warning);
+              // 冲刷仍在队列中时同步 dispose: 延迟闭包绝不能触碰已释放的 notifier。
+              service.dispose();
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

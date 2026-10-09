@@ -454,5 +454,39 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       resizing.dispose();
     });
+
+    // ── Build-phase publication guard ──
+
+    testWidgets(
+      'show during build defers to frame end without setState error',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  // 先挂载订阅者: 同级 Builder 之后调用 show 时, overlay 已在监听。
+                  // 同步发布会让 overlay 在构建期 setState — 同级元素不可标脏,
+                  // 这正是守卫要拦下的 setState-during-build 崩溃路径。
+                  OsdOverlay(service: service),
+                  Builder(
+                    builder: (context) {
+                      service.show('from build');
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        // 帧末冲刷到达后, 下一帧渲染出内容。
+        await tester.pump();
+        expect(find.text('from build'), findsOneWidget);
+        // 走完 1200ms 生命期, 不留挂起计时器。
+        await tester.pump(const Duration(seconds: 2));
+      },
+    );
   });
 }
