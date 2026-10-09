@@ -360,7 +360,7 @@ void main() {
       sink.log(
         LogLevel.error,
         'open failed',
-        error: FileSystemException(
+        error: const FileSystemException(
           'read failed',
           r'C:\Users\alice\Videos\clip.mp4',
         ),
@@ -421,7 +421,7 @@ void main() {
         sink.log(
           LogLevel.error,
           'open failed',
-          error: FileSystemException(
+          error: const FileSystemException(
             'read failed',
             r'C:\Users\alice\Videos\clip.mp4',
           ),
@@ -460,7 +460,7 @@ void main() {
         // 模拟 playlist_store.dart:97 的 context 泄漏形态:
         // 调用方把 error.toString() 原样塞进字符串值。
         'error':
-            "FileSystemException: read failed, "
+            'FileSystemException: read failed, '
             "path = 'C:\\Users\\alice\\Videos\\clip.mp4'",
       });
 

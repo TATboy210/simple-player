@@ -30,6 +30,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart' as pkg;
 
+import 'diagnostic_redactor.dart';
+
 // ---------------------------------------------------------------------------
 // LogLevel — 6 severity levels, 1:1 with KernelLogger methods (D14)
 // ---------------------------------------------------------------------------
@@ -136,10 +138,27 @@ String redactPath(String msg) {
   );
 }
 
+/// 诊断对象字符串化 + 本地路径脱敏 — error/stackTrace 进控制台前的统一闸口 (N5).
+///
+/// Null-safe stringify + redact in one step. FileSystemException.toString()
+/// embeds the full local path and stack traces embed file-URI frames; both
+/// must be scanned by [DiagnosticRedactor.redactDiagnosticText] before
+/// reaching any console sink. Path-free text passes through byte-identical
+/// (the scanner is an O(n) no-op when no path-start token exists). Null
+/// yields the empty string so interpolation sites stay branch-free.
+String _redactedDiagnostic(Object? value) {
+  if (value == null) return '';
+  return DiagnosticRedactor.redactDiagnosticText(value.toString());
+}
+
 /// 将日志 context 转为键顺序稳定、始终可编码的 JSON。
 ///
 /// Map 递归按键排序，List 保序，Set 按规范化后的值排序；非有限浮点数与
 /// 循环引用使用固定字符串表示，使 Profile 诊断不会因辅助数据异常而中断。
+/// N5: 字符串值统一过本地路径脱敏扫描（basename 化 — 覆盖调用方把
+/// error.toString() 塞进 context 的形态，如 playlist_store 的 catch 块）；
+/// 无路径字符串经 O(n) 扫描逐字节原样返回。键名为代码可控标识符，
+/// 不做脱敏；数字/bool/DateTime 序列化行为不变。
 String serializeLogContext(Map<String, Object?> context) {
   final activeContainers = HashSet<Object>.identity();
   final normalized = _normalizeLogValue(context, activeContainers);
@@ -147,7 +166,13 @@ String serializeLogContext(Map<String, Object?> context) {
 }
 
 Object? _normalizeLogValue(Object? value, Set<Object> activeContainers) {
-  if (value == null || value is bool || value is String || value is int) {
+  // N5: 字符串值可能内嵌本机路径（典型: 调用方把 error.toString() 塞进
+  // context），统一过脱敏扫描；redactDiagnosticText 对无路径文本是
+  // 逐字节恒等的 O(n) 扫描，保证既有日志输出不变。
+  if (value is String) {
+    return DiagnosticRedactor.redactDiagnosticText(value);
+  }
+  if (value == null || value is bool || value is int) {
     return value;
   }
   if (value is double) {
@@ -287,8 +312,15 @@ final class DebugPrintSink implements LogSink {
         ? ' ${serializeLogContext(context)}'
         : '';
     // error/stackTrace 拼入输出 — debugPrint 无结构化错误通道, 仅文本展示。
-    final errorStr = error != null ? ' error=$error' : '';
-    final stackStr = stackTrace != null ? '\n$stackTrace' : '';
+    // N5 脱敏: error.toString()/stackTrace 常内嵌本机绝对路径
+    // (FileSystemException 的 path 字段 / 栈帧里的文件 URI), 出控制台前
+    // 一律过脱敏扫描; 无路径内容逐字节不变, 行结构保持原样。
+    final errorStr = error != null
+        ? ' error=${_redactedDiagnostic(error)}'
+        : '';
+    final stackStr = stackTrace != null
+        ? '\n${_redactedDiagnostic(stackTrace)}'
+        : '';
     debugPrint(
       '${level.name.toUpperCase()}: $redacted$contextStr$errorStr$stackStr',
     );
@@ -425,13 +457,20 @@ final pkg.Logger _consoleLogger = pkg.Logger(
 
 /// 控制台格式化 — 与旧 [DebugPrintSink] 输出格式逐字节一致
 /// （`LEVEL: message error=...`），保证控制台习惯与格式断言测试零迁移。
+/// error/stack 内嵌的本机路径内容按 N5 策略脱敏（basename 化），
+/// 无路径内容逐字节不变。
 final class _KernelConsolePrinter extends pkg.LogPrinter {
   @override
   List<String> log(pkg.LogEvent event) {
     final levelName = event.level.name.toUpperCase();
     // logger 包无结构化错误通道, error/stack 拼入文本 (与旧实现一致)。
-    final errorStr = event.error != null ? ' error=${event.error}' : '';
-    final stackStr = event.stackTrace != null ? '\n${event.stackTrace}' : '';
+    // N5: error/stack 可能携带本机绝对路径, 进文本前统一脱敏。
+    final errorStr = event.error != null
+        ? ' error=${_redactedDiagnostic(event.error)}'
+        : '';
+    final stackStr = event.stackTrace != null
+        ? '\n${_redactedDiagnostic(event.stackTrace)}'
+        : '';
     return ['$levelName: ${event.message}$errorStr$stackStr'];
   }
 }
