@@ -345,42 +345,46 @@ void main() {
       expect(sink.logsAvailable.value, isTrue);
     });
 
-    test('idle heartbeat ticks write nothing between activity periods', () async {
-      // Arrange — 1ms 心跳间隔放大 tick 数；纯空闲窗口内文件必须零增长。
-      final fixture = await _LogFixture.create();
-      addTearDown(fixture.dispose);
-      final sink = IsolatedErrorLogSink(
-        file: fixture.file,
-        heartbeatInterval: const Duration(milliseconds: 1),
-      );
+    test(
+      'idle heartbeat ticks write nothing between activity periods',
+      () async {
+        // Arrange — 1ms 心跳间隔放大 tick 数；纯空闲窗口内文件必须零增长。
+        final fixture = await _LogFixture.create();
+        addTearDown(fixture.dispose);
+        final sink = IsolatedErrorLogSink(
+          file: fixture.file,
+          heartbeatInterval: const Duration(milliseconds: 1),
+        );
 
-      // Act — 种入一条真实记录并 drain，等首个 tick 消费掉活动门槛
-      // （20ms ≫ 1ms 间隔，写入早已落盘），再进入纯空闲窗口。
-      sink.record(
-        _report(eventId: 'seed', message: '空闲前记录'),
-        ReportAcceptance.newReport,
-      );
-      await sink.drain();
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      await sink.drain();
-      final lengthBefore = fixture.file.lengthSync();
-      final heartbeatCountBefore =
-          'main alive @'.allMatches(fixture.file.readAsStringSync()).length;
+        // Act — 种入一条真实记录并 drain，等首个 tick 消费掉活动门槛
+        // （20ms ≫ 1ms 间隔，写入早已落盘），再进入纯空闲窗口。
+        sink.record(
+          _report(eventId: 'seed', message: '空闲前记录'),
+          ReportAcceptance.newReport,
+        );
+        await sink.drain();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await sink.drain();
+        final lengthBefore = fixture.file.lengthSync();
+        final heartbeatCountBefore = 'main alive @'
+            .allMatches(fixture.file.readAsStringSync())
+            .length;
 
-      // 纯空闲窗口横跨数十个 tick（约 60 个）。
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      await sink.drain();
+        // 纯空闲窗口横跨数十个 tick（约 60 个）。
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        await sink.drain();
 
-      // Assert — 空闲 tick 零写盘：文件字节长度与心跳行数恒定。
-      final contentsAfter = fixture.file.readAsStringSync();
-      expect(fixture.file.lengthSync(), lengthBefore);
-      expect(
-        'main alive @'.allMatches(contentsAfter).length,
-        heartbeatCountBefore,
-      );
-      expect(sink.logsAvailable.value, isTrue);
-      await sink.dispose();
-    });
+        // Assert — 空闲 tick 零写盘：文件字节长度与心跳行数恒定。
+        final contentsAfter = fixture.file.readAsStringSync();
+        expect(fixture.file.lengthSync(), lengthBefore);
+        expect(
+          'main alive @'.allMatches(contentsAfter).length,
+          heartbeatCountBefore,
+        );
+        expect(sink.logsAvailable.value, isTrue);
+        await sink.dispose();
+      },
+    );
 
     test('idle suppression gate resets on the next real record', () async {
       // Arrange — 同一 1ms 心跳缝；门槛在真实派发后重置。
@@ -400,8 +404,9 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
       await sink.drain();
       final baselineLength = fixture.file.lengthSync();
-      final baselineCount =
-          'main alive @'.allMatches(fixture.file.readAsStringSync()).length;
+      final baselineCount = 'main alive @'
+          .allMatches(fixture.file.readAsStringSync())
+          .length;
 
       // 纯空闲窗口：基线必须纹丝不动。
       await Future<void>.delayed(const Duration(milliseconds: 60));

@@ -90,6 +90,12 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   int _nextId = 0;
   SendPort? _requestPort;
 
+  /// 空闲门计数：自上次心跳落盘以来实际派发到 worker 的写请求数。
+  /// 为零时心跳 tick 不写任何字节（心跳空闲抑制），真实记录派发即
+  /// 重新解锁；活动期心跳保留「主 isolate 卡死时间窗 = 心跳空档」的
+  /// 冻结读法。
+  int _recordsSentSinceHeartbeat = 0;
+
   /// 握手完成（或降级接管的后续任务）信号 —— drain/dispose 的推进点。
   final Completer<void> _modeReady = Completer<void>();
 
@@ -315,9 +321,18 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
 
   /// 心跳 tick：缓冲期/降级期/关闭期直接丢弃（错过一条 30s 心跳无害）。
   ///
-  /// 心跳不经 severity 门，但共享 ack 失败门（磁盘健康信号语义一致）。
+  /// 空闲抑制：自上次心跳以来没有新记录落盘的 tick 不写任何字节——
+  /// 周期性写盘从磁盘健康探测降为纯活动期标记，空闲磁盘成本归零；
+  /// `logsAvailable` 语义不变（真实写失败置假/成功恢复），设置页行为
+  /// 红线不受影响。心跳不经 severity 门，但共享 ack 失败门（磁盘健康
+  /// 信号语义一致）。
   void _sendHeartbeat() {
     if (_closed || _degraded) {
+      return;
+    }
+    // 空闲门：计数为零 = 上个心跳后无新记录，本 tick 静默跳过
+    // （错过的心跳无害——与上方丢弃容忍同一语义）。
+    if (_recordsSentSinceHeartbeat == 0) {
       return;
     }
     final requestPort = _requestPort;
@@ -325,6 +340,7 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
       return;
     }
     requestPort.send(_WriteRequest(++_nextId, _heartbeatLine()));
+    _recordsSentSinceHeartbeat = 0;
   }
 
   /// 心跳行（钦定格式）：单行、可 grep（'main alive'）、单 \n 结尾，
@@ -341,6 +357,10 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
   }
 
   /// severity 门 + 格式化 + 发送写请求（与 ErrorLogFileSink 门语义一致）。
+  ///
+  /// 实际派发点递增空闲门计数（[_recordsSentSinceHeartbeat]）：缓冲重放
+  /// 经 [_flushPending] 复用本方法一并计入；severity 门拦下的 warning
+  /// 不经过此处，不计入。
   void _dispatchToIsolate(ErrorReport report) {
     if (!_isPersistentSeverity(report.severity)) {
       return;
@@ -353,7 +373,13 @@ final class IsolatedErrorLogSink implements DiagnosticLogSink {
       _containWriteFailure(error.runtimeType.toString());
       return;
     }
-    _requestPort?.send(_WriteRequest(++_nextId, pack));
+    final requestPort = _requestPort;
+    if (requestPort == null) {
+      return;
+    }
+    requestPort.send(_WriteRequest(++_nextId, pack));
+    // 写请求已实际派发：解锁下一个心跳 tick（空闲门重置）。
+    _recordsSentSinceHeartbeat += 1;
   }
 
   /// 失败门：计数、置假、限流上报（errorType-only 纪律）。
