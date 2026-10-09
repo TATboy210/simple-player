@@ -60,8 +60,9 @@ class SettingsServicesBundle {
 ///   分区经 [GeneralSettingsContent.rowsFocusNode] 下沉消费）、Enter/Space
 ///   激活；Esc 任何层级冒泡宿主，仅退出全屏；面板聚焦期间 Space 不再
 ///   透传播放/暂停
-/// - 灰显分区（视频/音频）键盘不可达：←→/↑↓ 只在 enabled 集合内移动
-///   （键盘绕过 IgnorePointer，必须显式过滤）
+/// - 灰显分区（video）键盘不可达：←→/↑↓ 只在 enabled 集合内移动
+///   （键盘绕过 IgnorePointer，必须显式过滤）；audio 行级键盘可达
+///   （261009-upn：rowsFocusNode 注入，General 同模式）
 ///
 /// 焦点纪律：面板从不调用 unfocus——隐藏时由宿主
 /// （PlayerVideoControls 监听 settingsVisible）显式 requestFocus 归还，
@@ -102,7 +103,8 @@ class SettingsPanel extends StatefulWidget {
 class _SettingsPanelState extends State<SettingsPanel>
     with TickerProviderStateMixin {
   /// 键盘可达分区 — audio 已解灰（v0.0.8.1：audio delay 实现完整，仅 UI
-  /// 被灰显），video 仍灰显（视频处理走控制层，无面板内容需求）.
+  /// 被灰显；261009-upn 起行级键盘亦可达，与 General 同模式），video 仍
+  /// 灰显（视频处理走控制层，无面板内容需求）.
   static const List<_SettingsTab> _enabledTabs = [
     _SettingsTab.general,
     _SettingsTab.audio,
@@ -131,6 +133,11 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   /// General 分区行导航焦点 — ↑↓ 选条目 / Enter 激活（注入 content）.
   late final FocusNode _rowsFocusNode;
+
+  /// Audio 分区行导航焦点 — 与 General 同模式（261009-upn 补齐键盘行
+  /// 导航；独立节点：AnimatedSwitcher 过渡期两分区内容短暂并存，共用
+  /// 单节点会触发重复附着断言）.
+  late final FocusNode _audioRowsFocusNode;
 
   /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存 (同 PlaylistPanel).
   static final _panelDecoration = ControlBarDecoration.playing(
@@ -235,6 +242,7 @@ class _SettingsPanelState extends State<SettingsPanel>
     );
     _focusNode = FocusNode(debugLabel: 'SettingsPanel');
     _rowsFocusNode = FocusNode(debugLabel: 'SettingsPanelRows');
+    _audioRowsFocusNode = FocusNode(debugLabel: 'SettingsPanelAudioRows');
     final presentation = widget.session?.value;
     if (presentation != null) {
       _selected = _SettingsTab.values.firstWhere(
@@ -298,6 +306,7 @@ class _SettingsPanelState extends State<SettingsPanel>
     _taskScope.dispose();
     _focusNode.dispose();
     _rowsFocusNode.dispose();
+    _audioRowsFocusNode.dispose();
     _layerController.dispose();
     _controller.dispose();
     super.dispose();
@@ -317,15 +326,24 @@ class _SettingsPanelState extends State<SettingsPanel>
     _recordNavigation();
   }
 
-  /// L0 → L1（点 tag / Enter）— 进入即聚焦 General 首行（键盘 ↑↓ 立即可用）.
+  /// L0 → L1（点 tag / Enter）— 进入即聚焦 General/audio 首行
+  /// （键盘 ↑↓ 立即可用；video/about 无行导航不聚焦）.
   void _enterContent() {
     setState(() => _level = _PanelLevel.content);
     _layerController.forward();
     _recordNavigation();
-    if (_selected == _SettingsTab.general) {
+    // 行导航分区 → 行焦点节点（注入 content 消费 ↑↓/Enter；其余 null）.
+    final FocusNode? rowsNode = switch (_selected) {
+      _SettingsTab.general => _rowsFocusNode,
+      _SettingsTab.audio => _audioRowsFocusNode,
+      _SettingsTab.video => null,
+      _SettingsTab.about => null,
+    };
+    if (rowsNode != null) {
+      // post-frame：等分区内容挂上树再聚焦（节点随 content 附着）.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _level == _PanelLevel.content) {
-          _rowsFocusNode.requestFocus();
+          rowsNode.requestFocus();
         }
       });
     }
@@ -386,8 +404,9 @@ class _SettingsPanelState extends State<SettingsPanel>
 
   /// L1 — → handled 空操作（用户裁决 2026-10-09：详情页内 → 不再切分区，
   /// 进出详情只经 →/Enter 进、← 退）；← 返回 tag 层；↑↓/Enter/Space 交给
-  /// rows 节点（General 后代先消费，未聚焦则聚焦）；非 General 分区同键
-  /// handled 空操作（防泄漏）；Esc 冒泡宿主退出全屏（返回专属 ← 键）.
+  /// rows 节点（General/audio 后代先消费，未聚焦则聚焦下沉行级）；
+  /// video/about 分区同键 handled 空操作（防泄漏）；Esc 冒泡宿主退出全屏
+  /// （返回专属 ← 键）.
   KeyEventResult _handleContentLevelKey(LogicalKeyboardKey key) {
     if (key == LogicalKeyboardKey.arrowRight) {
       // 空操作但 handled — 防止 → 冒泡成 seek；分区切换仅发生在 L0.
@@ -402,8 +421,16 @@ class _SettingsPanelState extends State<SettingsPanel>
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter ||
         key == LogicalKeyboardKey.space) {
-      if (_selected == _SettingsTab.general && !_rowsFocusNode.hasFocus) {
-        _rowsFocusNode.requestFocus();
+      // 行导航分区（General/audio）焦点滞留面板级时下沉行级；
+      // video/about 维持 handled 空操作（键盘不可达分区防泄漏）.
+      final FocusNode? rowsNode = switch (_selected) {
+        _SettingsTab.general => _rowsFocusNode,
+        _SettingsTab.audio => _audioRowsFocusNode,
+        _SettingsTab.video => null,
+        _SettingsTab.about => null,
+      };
+      if (rowsNode != null && !rowsNode.hasFocus) {
+        rowsNode.requestFocus();
       }
       return KeyEventResult.handled;
     }
@@ -695,6 +722,7 @@ class _SettingsPanelState extends State<SettingsPanel>
             ? const SizedBox.shrink()
             : AudioSettingsContent(
                 settings: services!.settings!,
+                rowsFocusNode: _audioRowsFocusNode,
                 scrollController: _scrollFor('audio'),
               ),
       _SettingsTab.about => AboutContent(scrollController: _scrollFor('about')),
