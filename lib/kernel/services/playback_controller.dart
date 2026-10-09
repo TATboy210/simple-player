@@ -185,11 +185,11 @@ class PlaybackController {
         if (requestGen != _openRequestGeneration) return false;
         // 字幕检测不影响主播放链路，失败仅记录诊断信息。
         unawaited(
-          subtitleService
-              ?.detectAndLoad(normalizedPath)
-              .catchError((Object error) {
-                _log.d('Subtitle detection failed: $error');
-              }),
+          subtitleService?.detectAndLoad(normalizedPath).catchError((
+            Object error,
+          ) {
+            _log.d('Subtitle detection failed: $error');
+          }),
         );
         trackPreferenceService?.restoreAfterOpen(engine.mediaInfo);
         engine.play();
