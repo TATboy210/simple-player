@@ -724,4 +724,151 @@ void main() {
       OsdService.I.hide();
     });
   });
+
+  group('滚轮平滑滚动 (v0.0.11 T4)', () {
+    // 20 条 × ~124px 远超视口高度 — 保证有真实滚动余量 (maxScrollExtent > 0).
+    late ValueNotifier<List<PlaylistItem>> entries;
+    int? playedIndex;
+
+    setUp(() {
+      entries = ValueNotifier([
+        for (var i = 0; i < 20; i++) PlaylistItem(path: 'wheel-$i.mp4'),
+      ]);
+      playedIndex = null;
+    });
+
+    tearDown(() {
+      entries.dispose();
+    });
+
+    Future<void> pumpWheelPanel(WidgetTester tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          PlaylistPanel(
+            entries: entries,
+            currentIndex: ValueNotifier(-1),
+            lastPlayedPath: ValueNotifier(null),
+            visible: true,
+            onClose: () {},
+            onPlayEntry: (i) => playedIndex = i,
+            onResumeEntry: (_) {},
+            onRemoveEntry: (_) {},
+            playMode: ValueNotifier(PlayMode.loopAll),
+            onCyclePlayMode: () {},
+            sortKey: PlaylistSortKey.addedOrder,
+            sortAscending: true,
+            onSortSelected: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// 面板内唯一 Scrollable 的滚动位置 — offset 观察口.
+    ScrollPosition scrollPosition(WidgetTester tester) =>
+        tester.state<ScrollableState>(find.byType(Scrollable)).position;
+
+    /// 鼠标指针悬停到列表中心 (滚轮事件按 position 命中测试, 须先落位).
+    Future<TestPointer> hoverListCenter(WidgetTester tester) async {
+      final pointer = TestPointer(1, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(
+        pointer.hover(tester.getCenter(find.byType(Scrollable))),
+      );
+      return pointer;
+    }
+
+    testWidgets('滚轮 tick 后滑行 — 存在严格介于起点与目标之间的采样帧', (tester) async {
+      await pumpWheelPanel(tester);
+      final position = scrollPosition(tester);
+      expect(position.pixels, 0);
+
+      final pointer = await hoverListCenter(tester);
+      await tester.pump();
+
+      await tester.sendEventToBinding(pointer.scroll(const Offset(0, 120)));
+      final start = position.pixels;
+      // 动画帧时序不可精确断言 — 放宽为多帧采样存在中间帧 (断言语义不变:
+      // 证明非瞬跳). 瞬跳行为 (flutter#31658 forcePixels) 采样恒等于目标 → 红.
+      final samples = <double>[];
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 24));
+        samples.add(position.pixels);
+      }
+      expect(
+        samples.any((o) => o > start && o < start + 120),
+        isTrue,
+        reason: '滑行动画必有中间帧; 瞬跳则采样恒等于目标',
+      );
+
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('pumpAndSettle 后到达 clamp 目标 — 不越界', (tester) async {
+      await pumpWheelPanel(tester);
+      final position = scrollPosition(tester);
+
+      final pointer = await hoverListCenter(tester);
+      await tester.pump();
+
+      // 巨型 delta — 目标钳到 maxScrollExtent, 终点不得越界.
+      await tester.sendEventToBinding(pointer.scroll(const Offset(0, 100000)));
+      await tester.pumpAndSettle();
+      expect(position.pixels, position.maxScrollExtent);
+      expect(position.pixels, lessThanOrEqualTo(position.maxScrollExtent));
+    });
+
+    testWidgets('连发 3 tick — offset 单调不减且最终不越界', (tester) async {
+      await pumpWheelPanel(tester);
+      final position = scrollPosition(tester);
+
+      final pointer = await hoverListCenter(tester);
+      await tester.pump();
+
+      final samples = <double>[];
+      for (var i = 0; i < 3; i++) {
+        await tester.sendEventToBinding(pointer.scroll(const Offset(0, 120)));
+        await tester.pump(const Duration(milliseconds: 60));
+        samples.add(position.pixels);
+      }
+      // 单调不减 — 连发滚轮连续滑行, 不回退不抖动.
+      expect(samples[0] <= samples[1] && samples[1] <= samples[2], isTrue);
+
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThanOrEqualTo(samples.last));
+      expect(position.pixels, lessThanOrEqualTo(position.maxScrollExtent));
+    });
+
+    testWidgets('回归 — 拖拽滚动行为不变', (tester) async {
+      await pumpWheelPanel(tester);
+      final position = scrollPosition(tester);
+
+      // 拖拽走手势竞技场 (down/up 事件), 与 pointer signal 无关.
+      // 多段小步 move + 逐帧 pump — 单次大步 move 不触发 drag 识别器.
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(Scrollable)),
+      );
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, -30));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(position.pixels, greaterThan(0));
+    });
+
+    testWidgets('回归 — 滚轮后点击条目仍触发播放', (tester) async {
+      await pumpWheelPanel(tester);
+
+      final pointer = await hoverListCenter(tester);
+      await tester.pump();
+      await tester.sendEventToBinding(pointer.scroll(const Offset(0, 120)));
+      await tester.pumpAndSettle();
+
+      // 滚轮介入后条目点击链路 (手势竞技场 down/up) 不受影响.
+      await tester.tap(find.byType(PlaylistTile).first);
+      await tester.pumpAndSettle();
+      expect(playedIndex, isNotNull);
+    });
+  });
 }
