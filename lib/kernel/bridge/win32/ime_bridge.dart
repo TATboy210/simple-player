@@ -117,14 +117,36 @@ class Win32ImeBridge {
   ///
   /// enable 失败（如窗口定位/投递超时）时仍执行 [action]，但跳过收尾
   /// 禁用（从未恢复过就无从禁用）；[action] 的异常原样传播。
+  ///
+  /// 261009-fio H1：enable 的 @Native assetId 绑定解析失败抛 ArgumentError
+  /// （Error 族，on Exception 捕获不到），此前会把包裹的 action 一并中断
+  /// （文件对话框打不开）。现给 enable 单独的 Error 防御：降级为「未恢复」，
+  /// action 照常执行且跳过收尾 disable。[action] 自身的异常仍原样传播。
   static Future<T> withImeRestored<T>(
     Future<T> Function() action, {
     KernelLogger? logger,
     @visibleForTesting Win32ImeFunctions? functions,
   }) async {
     if (!Platform.isWindows) return action();
-    final bridge = Win32ImeBridge(logger: logger, functions: functions);
-    final restored = bridge.enable();
+    final log = logger ?? KernelLogger.I;
+    final bridge = Win32ImeBridge(logger: log, functions: functions);
+    bool restored;
+    try {
+      restored = bridge.enable();
+    } on ArgumentError catch (error, stackTrace) {
+      // 环境性失败（user32 绑定解析失败）而非编程 bug — 与「窗口定位失败」
+      // 同义降级：未恢复就无从禁用，跳过收尾，绝不让 Error 冲掉 action。
+      log.warn(
+        'Win32ImeBridge.withImeRestored: IME binding unavailable '
+        '(user32 assetId resolution failed) — proceeding without IME '
+        'restore, closing disable skipped',
+        context: <String, Object?>{
+          'error': '$error',
+          'stackTrace': '$stackTrace',
+        },
+      );
+      restored = false;
+    }
     try {
       return await action();
     } finally {
@@ -136,27 +158,45 @@ class Win32ImeBridge {
   ///
   /// side effect：消息在 platform 线程触发对主窗口 + FlutterView 子窗口
   /// 的 ImmAssociateContextEx（见 runner ime_bridge_messages.h）。
+  ///
+  /// 261009-fio H1：FindWindowW/SendMessageTimeoutW 的 @Native 绑定首调
+  /// 才解析，解析失败抛 ArgumentError（Error 族）——此处是叶子防御点，
+  /// 只捕获 ArgumentError（绑定解析的专属签名），编程 bug 的其他 Error
+  /// 仍原样上抛；降级语义与「runner 窗口未找到」一致（false + warn）。
   bool _deliver(int wparam, String operation) {
-    final hwnd = _resolveRunnerWindow();
-    if (hwnd == 0) {
+    try {
+      final hwnd = _resolveRunnerWindow();
+      if (hwnd == 0) {
+        _log.warn(
+          'Win32ImeBridge.$operation: runner window not found by class name, '
+          'IME state unchanged',
+        );
+        return false;
+      }
+      final ok = _fns.sendMessageTimeout(
+        hwnd,
+        _messageId,
+        wparam,
+        _smtoAbortIfHung,
+        _sendTimeoutMs,
+      );
+      _log.info(
+        'Win32ImeBridge.$operation: hwnd=0x${hwnd.toRadixString(16)} '
+        'wparam=$wparam ok=$ok',
+      );
+      return ok;
+    } on ArgumentError catch (error, stackTrace) {
       _log.warn(
-        'Win32ImeBridge.$operation: runner window not found by class name, '
-        'IME state unchanged',
+        'Win32ImeBridge.$operation: IME binding unavailable '
+        '(user32 assetId resolution failed) — degraded, IME state unchanged',
+        context: <String, Object?>{
+          'operation': operation,
+          'error': '$error',
+          'stackTrace': '$stackTrace',
+        },
       );
       return false;
     }
-    final ok = _fns.sendMessageTimeout(
-      hwnd,
-      _messageId,
-      wparam,
-      _smtoAbortIfHung,
-      _sendTimeoutMs,
-    );
-    _log.info(
-      'Win32ImeBridge.$operation: hwnd=0x${hwnd.toRadixString(16)} '
-      'wparam=$wparam ok=$ok',
-    );
-    return ok;
   }
 
   /// 定位 runner 主窗口 — FindWindowW 按类名查找（不依赖前台窗口）.

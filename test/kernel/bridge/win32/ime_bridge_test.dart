@@ -116,21 +116,17 @@ void main() {
       expect(bridge.disable(), isFalse);
     });
 
-    test(
-      'enable — FindWindowW OK 但 SendMessageTimeoutW 解析抛 ArgumentError — 降级 false 不抛',
-      () {
-        final bridge = Win32ImeBridge(
-          functions: Win32ImeFunctions(
-            findWindow: (_) => 0x1234,
-            sendMessageTimeout:
-                (_, _, _, _, _) =>
-                    throw ArgumentError('send binding unavailable'),
-          ),
-        );
+    test('enable — FindWindowW OK 但 SendMessageTimeoutW 解析抛 ArgumentError — 降级 false 不抛', () {
+      final bridge = Win32ImeBridge(
+        functions: Win32ImeFunctions(
+          findWindow: (_) => 0x1234,
+          sendMessageTimeout: (_, _, _, _, _) =>
+              throw ArgumentError('send binding unavailable'),
+        ),
+      );
 
-        expect(bridge.enable(), isFalse);
-      },
-    );
+      expect(bridge.enable(), isFalse);
+    });
   });
 
   // enable/disable 的临时恢复链路带 Platform.isWindows gate — 非 Windows

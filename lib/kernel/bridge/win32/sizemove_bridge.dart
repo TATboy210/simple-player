@@ -125,31 +125,47 @@ class Win32SizemoveBridge implements SizemoveProbe {
   @override
   SizemoveSnapshot? query() {
     if (!Platform.isWindows) return null;
-    final hwnd = _fns.findWindow(_windowClassName);
-    if (hwnd == 0) {
+    // 261009-fio H1：FindWindowW/SendMessageTimeoutW 的 @Native 绑定首调
+    // 才解析，解析失败抛 ArgumentError（Error 族）——为兑现 SizemoveProbe
+    // 契约（查询失败返回 null、绝不抛出）而兜住该环境性失败；只捕获
+    // ArgumentError（绑定解析的专属签名），编程 bug 的其他 Error 仍上抛。
+    try {
+      final hwnd = _fns.findWindow(_windowClassName);
+      if (hwnd == 0) {
+        _log.warn(
+          'Win32SizemoveBridge.query: runner window not found by class '
+          'name, sizemove state unavailable',
+        );
+        return null;
+      }
+      // 与 ime_bridge 的差异：透传 handler 返回值而非判非零 — 打包状态
+      // （active=false 且 tick=0）合法地为 0，不能当失败。
+      final raw = _fns.sendMessageTimeout(
+        hwnd,
+        _messageId,
+        0,
+        _smtoAbortIfHung,
+        _sendTimeoutMs,
+      );
+      if (raw == null) {
+        _log.warn(
+          'Win32SizemoveBridge.query: message delivery failed '
+          '(timeout/hung), sizemove state unavailable',
+        );
+        return null;
+      }
+      return SizemoveSnapshot.decode(raw);
+    } on ArgumentError catch (error, stackTrace) {
       _log.warn(
-        'Win32SizemoveBridge.query: runner window not found by class '
-        'name, sizemove state unavailable',
+        'Win32SizemoveBridge.query: sizemove state unavailable — '
+        'user32 assetId binding resolution failed',
+        context: <String, Object?>{
+          'error': '$error',
+          'stackTrace': '$stackTrace',
+        },
       );
       return null;
     }
-    // 与 ime_bridge 的差异：透传 handler 返回值而非判非零 — 打包状态
-    // （active=false 且 tick=0）合法地为 0，不能当失败。
-    final raw = _fns.sendMessageTimeout(
-      hwnd,
-      _messageId,
-      0,
-      _smtoAbortIfHung,
-      _sendTimeoutMs,
-    );
-    if (raw == null) {
-      _log.warn(
-        'Win32SizemoveBridge.query: message delivery failed '
-        '(timeout/hung), sizemove state unavailable',
-      );
-      return null;
-    }
-    return SizemoveSnapshot.decode(raw);
   }
 
   /// 生产 FFI 函数束 — 调用顶层 @Native external 绑定(Dart 3.13 assetId 直连).

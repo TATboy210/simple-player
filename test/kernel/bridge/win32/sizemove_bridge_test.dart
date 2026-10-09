@@ -157,9 +157,8 @@ void main() {
         final bridge = Win32SizemoveBridge(
           functions: Win32SizemoveFunctions(
             findWindow: (_) => 0x1234,
-            sendMessageTimeout:
-                (_, _, _, _, _) =>
-                    throw ArgumentError('send binding unavailable'),
+            sendMessageTimeout: (_, _, _, _, _) =>
+                throw ArgumentError('send binding unavailable'),
           ),
         );
 
