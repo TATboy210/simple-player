@@ -51,16 +51,9 @@ KeyboardHandler buildPlayerKeyboardActions({
     onSeekForward: () => actions.onSeekForward?.call(Tokens.skipLongMs),
     // 键盘音量/静音 OSD 反馈补齐 (v0.0.8.1) — 滑条/滚轮/按钮路径已有
     // OSD, 唯独键盘缺失; 先 clamp 再写引擎, OSD 显示实际生效值.
-    onVolumeUp: () {
-      final v = (engine.volume.value + 0.05).clamp(0.0, 1.0);
-      engine.setVolume(v);
-      OsdService.I.show('${(v * 100).round()}%', progress: v);
-    },
-    onVolumeDown: () {
-      final v = (engine.volume.value - 0.05).clamp(0.0, 1.0);
-      engine.setVolume(v);
-      OsdService.I.show('${(v * 100).round()}%', progress: v);
-    },
+    // v0.0.12 U3: 实现抽入 adjustVolumeByKeyboard, 与全屏 route 共享唯一实现.
+    onVolumeUp: () => adjustVolumeByKeyboard(engine, keyboardVolumeStep),
+    onVolumeDown: () => adjustVolumeByKeyboard(engine, -keyboardVolumeStep),
     onToggleMute: () {
       final unmuting = engine.isMuted.value;
       engine.setMute(!unmuting);
@@ -141,6 +134,21 @@ KeyboardHandler buildPlayerKeyboardActions({
     },
     child: child,
   );
+}
+
+/// 键盘音量步长 — ↑↓ 单次调节量(感知刻度 5%),窗口态与全屏 route 共用.
+const double keyboardVolumeStep = 0.05;
+
+/// 键盘音量调节 — 窗口态 KeyboardHandler 与全屏 route controls 的**唯一**实现.
+///
+/// 读当前音量 → clamp [0,1] → 写回引擎 → OSD 显示实际生效百分比
+/// (v0.0.8.1 语义原样提取,行为等价重构)。双键盘入口必须共享本函数 —
+/// 各自复制逻辑会让步长/OSD 文案随时间漂移 (v0.0.12 U3 抽取动机:
+/// 全屏 route 此前无音量键,help 面板却宣传 "↑ / ↓ 音量")。
+void adjustVolumeByKeyboard(MediaEngine engine, double delta) {
+  final v = (engine.volume.value + delta).clamp(0.0, 1.0);
+  engine.setVolume(v);
+  OsdService.I.show('${(v * 100).round()}%', progress: v);
 }
 
 /// 弹出快捷键帮助对话框.

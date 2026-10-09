@@ -21,6 +21,7 @@ import 'control_bar_view_model.dart';
 import 'media_kit_player_port.dart';
 import 'player_actions.dart';
 import 'player_controls_state.dart';
+import 'player_keyboard_actions.dart';
 import 'panel_workspace_controller.dart';
 import 'panel_workspace_host.dart';
 import 'panel_workspace_layout.dart';
@@ -295,7 +296,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 阶段2:键盘事件处理 — controls 内 Focus 最小集.
   ///
   /// 全屏 route 复制 builder 时自动携带(KeyboardHandler 在 builder 外不进 route)。
-  /// 最小集:ESC(退出全屏)/F(切换全屏)/Space(播放暂停)/←→(seek ±5s)。
+  /// 最小集:ESC(退出全屏)/F(切换全屏)/Space(播放暂停)/←→(seek ±5s)/
+  /// ↑↓(音量 ±5%,经 adjustVolumeByKeyboard 与窗口态共享唯一实现 — v0.0.12 U3)。
   /// 其余键(N/P/O/S/M/[]/F1/媒体键)return ignored 冒泡给窗口态 KeyboardHandler
   /// (全屏 route 缺这些键 — 已知限制,计划 line 85 认可)。
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -334,6 +336,17 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       widget.actions.onSeekForward?.call(Tokens.skipLongMs);
+      return KeyEventResult.handled;
+    }
+    // ↑↓ 音量 — 全屏 route 无 KeyboardHandler(窗口态 handler 的全局回退
+    // 守卫对 route 外主焦点一律放行),此前落 ignored 成死键。controls 内
+    // 直接消费,与窗口态共享同一 adjuster 防双路径漂移 (v0.0.12 U3)。
+    if (key == LogicalKeyboardKey.arrowUp) {
+      adjustVolumeByKeyboard(widget.engine, keyboardVolumeStep);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      adjustVolumeByKeyboard(widget.engine, -keyboardVolumeStep);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
