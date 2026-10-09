@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
 import 'control_bar_actions.dart';
@@ -104,28 +105,80 @@ class ControlBarLayout extends StatelessWidget {
       ],
     );
 
-    return Stack(
-      children: [
-        // CSS .player-controls::before — 顶部渐变光线。
-        const Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: Tokens.controlBarGradientHeight,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Tokens.glowTransparent,
-                  Tokens.glowAccent,
-                  Tokens.glowTransparent,
-                ],
+    return _BarArrowNavScope(
+      child: Stack(
+        children: [
+          // CSS .player-controls::before — 顶部渐变光线。
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: Tokens.controlBarGradientHeight,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Tokens.glowTransparent,
+                    Tokens.glowAccent,
+                    Tokens.glowTransparent,
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        content,
-      ],
+          content,
+        ],
+      ),
     );
   }
+}
+
+/// 控制栏 ←→ 组内焦点移动 — "键随焦点"导航(2026-10-10 裁决)。
+///
+/// 焦点在控制栏任意可聚焦后代(动作区按钮等)时,←→ 在组内移动焦点,
+/// 符合桌面播放器操作直觉;移到边缘 handled 空操作(不冒泡成全局 seek,
+/// 避免"最左按 ← 突然跳播")。Space/Enter 由 [GlassButton] 自身的
+/// ActivateIntent 消费(激活按钮而非播放/暂停);ProgressBar 聚焦时
+/// ←→ 被滑条自身消费为步进,同样到不了本层。
+class _BarArrowNavScope extends StatelessWidget {
+  final Widget child;
+
+  const _BarArrowNavScope({required this.child});
+
+  @override
+  Widget build(BuildContext context) => FocusTraversalGroup(
+    child: Focus(
+      // 自身不进 Tab 链 — 纯冒泡拦截点,可聚焦性全部交给后代控件.
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        final dir = switch (event.logicalKey) {
+          LogicalKeyboardKey.arrowRight => TraversalDirection.right,
+          LogicalKeyboardKey.arrowLeft => TraversalDirection.left,
+          _ => null,
+        };
+        if (dir == null) return KeyEventResult.ignored;
+        final current = FocusManager.instance.primaryFocus;
+        if (current == null) return KeyEventResult.ignored;
+        // 线性序移动 — traversalDescendants 已按阅读序排好,控制栏一排
+        // 按钮下线性序即视觉序。不用 findFirstFocusInDirection:其缺省
+        // 搜索边界是整个 route scope,且嵌套 group 下几何搜索会回退到
+        // 焦点路径祖先节点(requestFocus 到祖先 scope 后,后续方向键绕过
+        // 本层直接触发全局 seek — 实测坑)。
+        final nodes = FocusScope.of(
+          context,
+        ).traversalDescendants.where((n) => n.canRequestFocus).toList();
+        final idx = nodes.indexOf(current);
+        if (idx < 0) return KeyEventResult.handled;
+        final nextIdx = idx + (dir == TraversalDirection.right ? 1 : -1);
+        // 边缘(首/尾之外)停住 — handled 空操作,不冒泡成全局 seek.
+        if (nextIdx < 0 || nextIdx >= nodes.length) {
+          return KeyEventResult.handled;
+        }
+        nodes[nextIdx].requestFocus();
+        return KeyEventResult.handled;
+      },
+      child: child,
+    ),
+  );
 }

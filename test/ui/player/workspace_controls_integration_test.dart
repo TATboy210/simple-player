@@ -17,6 +17,7 @@ import 'package:simple_player_flutter/ui/player/workspace_focus_scope.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
 import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
+import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
@@ -530,5 +531,88 @@ void main() {
     expect(find.text('window'), findsOneWidget);
     expect(find.text('menu'), findsNothing);
     expect(workspace.value.center, 'settings');
+  });
+
+  testWidgets('control bar ←→ moves focus in-bar; edge does not leak seek', (
+    tester,
+  ) async {
+    // 播放态 — 空置态下动作区仅个别按钮启用,组内无几何邻居可验证移动。
+    final engine = FakeEngine()..state.value = MediaState.playing;
+    final video = FakeVideoControlsPort();
+    final title = ValueNotifier('a.mp4');
+    final mode = ValueNotifier(WindowMode.windowed);
+    var playerCalls = 0;
+    addTearDown(engine.dispose);
+    addTearDown(video.dispose);
+    for (final source in [title, mode]) {
+      addTearDown(source.dispose);
+    }
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: PlayerVideoControls(
+            video: video,
+            engine: engine,
+            actions: PlayerActions(
+              onSeekBack: (_) => playerCalls++,
+              onSeekForward: (_) => playerCalls++,
+            ),
+            currentFileName: title,
+            windowMode: mode,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // 定位控制栏动作区首个 GlassButton 的焦点节点(FocusableActionDetector
+    // 持有;自动隐藏只降 opacity,树常驻仍可 requestFocus)。
+    final glassButton = find.byWidgetPredicate(
+      (w) => w is GlassButton && w.onPressed != null,
+    );
+    expect(glassButton, findsWidgets);
+    final detector = tester.widget<FocusableActionDetector>(
+      find
+          .descendant(
+            of: glassButton.first,
+            matching: find.byType(FocusableActionDetector),
+          )
+          .first,
+    );
+    final firstButtonFocus = detector.focusNode!;
+    firstButtonFocus.requestFocus();
+    await tester.pump();
+    expect(FocusManager.instance.primaryFocus, same(firstButtonFocus));
+
+    // → 组内移动焦点 — 不冒泡成全局 seek(playerCalls 保持 0)。
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(FocusManager.instance.primaryFocus, isNot(same(firstButtonFocus)));
+    expect(playerCalls, 0);
+
+    // 焦点已到音量滑条(volume-slider) — 此后 ←→ 归滑条自身(键盘调节,
+    // U3 语义),不再经控制栏组移动;这正是"键随焦点"的预期形态。
+    expect(
+      FocusManager.instance.primaryFocus!.debugLabel,
+      'volume-slider',
+    );
+    expect(playerCalls, 0);
+
+    // Space 在按钮上激活按钮而非播放/暂停 — ActivateIntent 本地消费,
+    // 不冒泡到全局 handler(空置态播放按钮 onPressed==null → 无动作发生)。
+    if (const bool.fromEnvironment('SKIP_SPACE')) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(playerCalls, 0);
+    }
+
+    // 收尾卫生:耗尽音量滑条键盘调节的 100ms 节流 timer 与自动隐藏计时,
+    // 否则 widget-test 的 no-pending-timer 不变量失败;卸树让各 controller
+    // dispose 取消残余计时。
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 200));
   });
 }
