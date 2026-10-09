@@ -294,6 +294,53 @@ void main() {
           );
         }
       });
+
+      // N1: openAndPlay 入口单点 trim 归一化 — 带首尾空格的 URL 校验后以
+      // trim 后串流向全部下游 (队列构造/引擎/身份发布), 不误走同目录扫描、
+      // 不把带空格路径交给引擎。
+      test('padded URL opens with trimmed queue — no same-directory scan (N1)', () async {
+        engine.configureMedia(durationMs: 60000);
+        engine.openPlaylistCallCount = 0;
+        engine.lastOpenPlaylistPaths = null;
+
+        final result = await controller.openAndPlay(
+          '  http://example.com/stream.mp4  ',
+        );
+
+        expect(result, true);
+        // 精确 trim 后串: 既证明队列未被同目录扫描结果污染, 也证明引擎
+        // 未收到带空格串。
+        expect(engine.lastOpenPlaylistPaths, <String>[
+          'http://example.com/stream.mp4',
+        ]);
+        // 身份发布使用 trim 后串。
+        expect(controller.currentPath.value, 'http://example.com/stream.mp4');
+      });
+
+      test('padded uppercase URL exercises case + trim fixes end-to-end (N1)', () async {
+        engine.configureMedia(durationMs: 60000);
+        engine.openPlaylistCallCount = 0;
+        engine.lastOpenPlaylistPaths = null;
+
+        final result = await controller.openAndPlay(
+          '  HTTP://example.com/stream.mp4  ',
+        );
+
+        expect(result, true);
+        // 大写 + trim 叠加: 端到端走通 PathValidator 大小写修复 + 入口 trim。
+        expect(engine.lastOpenPlaylistPaths, <String>[
+          'HTTP://example.com/stream.mp4',
+        ]);
+        expect(controller.currentPath.value, 'HTTP://example.com/stream.mp4');
+      });
+
+      test('whitespace-only input is still rejected before the engine (N1)', () async {
+        final result = await controller.openAndPlay('   ');
+
+        expect(result, false);
+        expect(controller.validationError.value, isNotNull);
+        expect(engine.openPlaylistCallCount, 0);
+      });
     });
 
     group('网络流打开失败附带接口摘要 (B5/9)', () {
