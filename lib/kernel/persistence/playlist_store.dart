@@ -70,6 +70,10 @@ class PersistedPlaylistSnapshot {
 /// （视作"无历史"），绝不抛出到调用方; [save] 失败仅记日志.
 /// 损坏文件额外隔离为 `playlist.json.corrupt` 留存（单代, 覆盖旧代）—
 /// 现场可回溯, 不再被下次 save 静默覆盖.
+///
+/// 原子发布契约: save 走 temp(`.part`)→flush→rename — 目标只被完整
+/// JSON 一次性替换, 崩溃不产生半截 playlist.json; 发布失败时旧文件
+/// 原样保留; 成功发布后清扫历史 `.part` 残留.
 class PlaylistStore {
   /// [resolveDirectory] 可注入以隔离测试; 默认 Application Support 目录.
   PlaylistStore({Future<Directory> Function()? resolveDirectory})
@@ -171,10 +175,14 @@ class PlaylistStore {
   /// 串行写入队列 — 所有 save 依次执行.
   Future<void> _writeQueue = Future<void>.value();
 
+  /// temp 唯一后缀计数器 — microseconds + counter（§30.5, 同
+  /// thumbnail_disk_cache 方案; 写入已由 _writeQueue 串行化,
+  /// counter 仅为防御性唯一性）.
+  int _writeCounter = 0;
+
   Future<void> _write(PersistedPlaylistSnapshot snapshot) async {
     try {
       final directory = await _resolveDirectory();
-      final file = File('${directory.path}/$_fileName');
       final json = <String, Object?>{
         'version': _version,
         'playMode': snapshot.playMode.name,
@@ -185,12 +193,67 @@ class PlaylistStore {
           'lastPlayedPath': snapshot.lastPlayedPath,
         'items': [for (final item in snapshot.items) item.toJson()],
       };
-      await file.writeAsString(jsonEncode(json));
+      await _publishAtomic(directory, jsonEncode(json));
+      // rename 成功 = 发布完成 — 此刻清扫历史崩溃 .part 残留（见清扫注释）.
+      await _sweepStaleParts(directory);
     } on Exception catch (error) {
       _log.w(
         'PlaylistStore: failed to save playlist.json',
         context: {'error': error.toString()},
       );
+    }
+  }
+
+  /// 原子发布 — temp 完整写毕（含 flush）后 rename 一次性替换目标.
+  ///
+  /// Atomic publish: temp → flush → rename. Dart `File.rename` 在 Windows
+  /// 走 `MoveFileExW(MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING)`
+  /// （runtime/bin/file_win.cc）— 目标已存在时单系统调用原子替换, 无
+  /// "新旧皆无"空窗; 因此**禁止预删除目标** — thumbnail_disk_cache 的
+  /// 先删后改名是 forceRefresh 场景取舍, 此处照抄会引入数据丢失空窗
+  /// （崩溃恰落在删除与 rename 之间 → playlist.json 整个消失）.
+  Future<void> _publishAtomic(Directory directory, String contents) async {
+    final target = File('${directory.path}/$_fileName');
+    // temp 唯一后缀 — microseconds + 进程内计数器（§30.5, M1）.
+    final suffix = '${DateTime.now().microsecondsSinceEpoch}-${++_writeCounter}';
+    final temp = File('${target.path}.$suffix.part');
+    try {
+      // flush 是崩溃安全的前提 — 数据确实落盘后 rename 替换才有意义.
+      await temp.writeAsString(contents, flush: true);
+      await temp.rename(target.path);
+    } on Exception {
+      // 发布失败 — temp 残留 best-effort 清除（锁场景可能仍失败, 吞掉,
+      // 由下次成功发布后的清扫兜底）; 旧目标文件未被动过, 历史无损.
+      try {
+        if (await temp.exists()) await temp.delete();
+      } on FileSystemException {
+        // best effort — 残留 .part 留待下次清扫
+      }
+      rethrow;
+    }
+  }
+
+  /// 清扫 `.part` 崩溃残留 — 历史中断写入不再无限累积（T-261009-fj2-03）.
+  ///
+  /// 调用时机安全性: 本 save 的 temp 已被 rename 消费, 且写入由
+  /// _writeQueue 串行化 — 此刻目录内不存在正在写的 temp, 整体清扫无竞争.
+  /// 逐个 best-effort 吞异常（单文件被锁不影响其余）; 目录不可列（锁/权限）
+  /// 时整体放弃, 残留留待下次 — 不影响本次 save 已成功的事实.
+  Future<void> _sweepStaleParts(Directory directory) async {
+    try {
+      await for (final entity in directory.list()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last;
+        if (name.startsWith('$_fileName.') && name.endsWith('.part')) {
+          try {
+            await entity.delete();
+          } on FileSystemException {
+            // best effort — 留待下次清扫
+          }
+        }
+      }
+    } on FileSystemException {
+      // 目录不可列 — 残留留待下次, 本此 save 已成功
     }
   }
 

@@ -31,6 +31,24 @@ Future<void> _deleteTempDir(Directory dir) async {
   }
 }
 
+/// 轮询等待 fire-and-forget _save 落盘并返回快照.
+///
+/// 261009-fj2 起 store 走原子发布（temp+flush+rename）, 比旧单发
+/// writeAsString 慢 — 固定 50ms 在冷缓存/并行负载下会超窗（实测首跑
+/// 偶发 load 为 null）. 每 50ms 轮询一次, 上限 40 次（~2s）; 超时返回
+/// 最后一次结果, 由调用方断言（真失败照常失败, 不掩盖回归）.
+Future<PersistedPlaylistSnapshot?> _waitForSavedSnapshot(
+  PlaylistStore store,
+) async {
+  PersistedPlaylistSnapshot? loaded;
+  for (var attempt = 0; attempt < 40; attempt++) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    loaded = await store.load();
+    if (loaded != null) return loaded;
+  }
+  return loaded;
+}
+
 /// 计数包装 — 断点节流落盘测试用（save 次数可观测, 内容仍真写盘）.
 class _CountingStore extends PlaylistStore {
   _CountingStore({required super.resolveDirectory});
@@ -358,9 +376,8 @@ void main() {
 
       await engine.openPlaylist(['b.mp4', 'a.mp4']);
       await coord.sortEntries(PlaylistSortKey.name);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      final loaded = await store.load();
+      // _save 是 fire-and-forget — 轮询等待原子发布落盘（见 helper 注释）.
+      final loaded = await _waitForSavedSnapshot(store);
       expect(loaded, isNotNull);
       expect(loaded!.sortKey, PlaylistSortKey.name);
       expect(loaded.sortAscending, isTrue);
@@ -668,10 +685,8 @@ void main() {
       // 引擎装载 → revision 回流置锚 → 同步块内 unawaited(_save) 落盘.
       await engine.openPlaylist(['a.mp4'], startIndex: 0);
 
-      // _save 是 fire-and-forget — 短暂等待写入队列消化 (同 _deleteTempDir 注释).
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      final loaded = await store.load();
+      // _save 是 fire-and-forget — 轮询等待原子发布落盘（见 helper 注释）.
+      final loaded = await _waitForSavedSnapshot(store);
       expect(loaded, isNotNull);
       expect(loaded!.lastPlayedPath, 'a.mp4');
     });
@@ -693,10 +708,8 @@ void main() {
 
       await engine.openPlaylist(['a.mp4'], startIndex: 0);
       engine.position.value = 42000; // 首存 — 节流窗口从现在起算
-      // _save 是 fire-and-forget 异步写 — 等待落盘完成再断言.
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      var loaded = await store.load();
+      // _save 是 fire-and-forget — 轮询等待原子发布落盘（见 helper 注释）.
+      var loaded = await _waitForSavedSnapshot(store);
       expect(loaded!.items.single.positionMs, 42000);
 
       nowMs += 2000; // 2s < 5s 节流窗口
