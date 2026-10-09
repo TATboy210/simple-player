@@ -322,6 +322,7 @@ void main() {
 
     test('writes heartbeat lines through the logging isolate', () async {
       // Arrange — 心跳间隔注入 1ms；真实 Timer 走主 isolate 事件循环。
+      // 活动期契约：先种入一条真实记录（解锁心跳门槛），再观察心跳落盘。
       final fixture = await _LogFixture.create();
       addTearDown(fixture.dispose);
       final sink = IsolatedErrorLogSink(
@@ -329,14 +330,106 @@ void main() {
         heartbeatInterval: const Duration(milliseconds: 1),
       );
 
-      // Act — 真实等待让多次 tick 到达 worker 落盘。
+      // Act — 真实记录 + drain 后，真实等待让后续 tick 到达 worker 落盘。
+      sink.record(
+        _report(eventId: 'activity', message: '活动期记录'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
       await Future<void>.delayed(const Duration(milliseconds: 60));
       await sink.dispose();
 
-      // Assert — 日志文件出现可 grep 的心跳行。
+      // Assert — 日志文件出现可 grep 的心跳行（冻结格式不变）。
       final contents = await fixture.file.readAsString();
       expect(contents, contains('main alive @'));
       expect(sink.logsAvailable.value, isTrue);
+    });
+
+    test('idle heartbeat ticks write nothing between activity periods', () async {
+      // Arrange — 1ms 心跳间隔放大 tick 数；纯空闲窗口内文件必须零增长。
+      final fixture = await _LogFixture.create();
+      addTearDown(fixture.dispose);
+      final sink = IsolatedErrorLogSink(
+        file: fixture.file,
+        heartbeatInterval: const Duration(milliseconds: 1),
+      );
+
+      // Act — 种入一条真实记录并 drain，等首个 tick 消费掉活动门槛
+      // （20ms ≫ 1ms 间隔，写入早已落盘），再进入纯空闲窗口。
+      sink.record(
+        _report(eventId: 'seed', message: '空闲前记录'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await sink.drain();
+      final lengthBefore = fixture.file.lengthSync();
+      final heartbeatCountBefore =
+          'main alive @'.allMatches(fixture.file.readAsStringSync()).length;
+
+      // 纯空闲窗口横跨数十个 tick（约 60 个）。
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await sink.drain();
+
+      // Assert — 空闲 tick 零写盘：文件字节长度与心跳行数恒定。
+      final contentsAfter = fixture.file.readAsStringSync();
+      expect(fixture.file.lengthSync(), lengthBefore);
+      expect(
+        'main alive @'.allMatches(contentsAfter).length,
+        heartbeatCountBefore,
+      );
+      expect(sink.logsAvailable.value, isTrue);
+      await sink.dispose();
+    });
+
+    test('idle suppression gate resets on the next real record', () async {
+      // Arrange — 同一 1ms 心跳缝；门槛在真实派发后重置。
+      final fixture = await _LogFixture.create();
+      addTearDown(fixture.dispose);
+      final sink = IsolatedErrorLogSink(
+        file: fixture.file,
+        heartbeatInterval: const Duration(milliseconds: 1),
+      );
+
+      // Act — 种入记录 → 等 20ms 消费门槛 → 记录空闲基线（行数 + 长度）。
+      sink.record(
+        _report(eventId: 'seed', message: '初始记录'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await sink.drain();
+      final baselineLength = fixture.file.lengthSync();
+      final baselineCount =
+          'main alive @'.allMatches(fixture.file.readAsStringSync()).length;
+
+      // 纯空闲窗口：基线必须纹丝不动。
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await sink.drain();
+      expect(fixture.file.lengthSync(), baselineLength);
+      expect(
+        'main alive @'.allMatches(fixture.file.readAsStringSync()).length,
+        baselineCount,
+      );
+
+      // 新真实记录解锁门槛：下一个 tick 恰好补一条心跳，随后继续抑制。
+      sink.record(
+        _report(eventId: 'wake', message: '唤醒记录'),
+        ReportAcceptance.newReport,
+      );
+      await sink.drain();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await sink.drain();
+
+      // Assert — 恰好多出一条心跳行（格式不变），唤醒记录已落盘。
+      final contentsAfter = fixture.file.readAsStringSync();
+      expect(
+        'main alive @'.allMatches(contentsAfter).length,
+        baselineCount + 1,
+      );
+      expect(contentsAfter, contains('唤醒记录'));
+      expect(sink.logsAvailable.value, isTrue);
+      await sink.dispose();
     });
 
     test(
