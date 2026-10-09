@@ -63,32 +63,30 @@ void main() {
 
     test('readBuildNumber 抛 ArgumentError — 降级 null 不抛且记 error 日志', () {
       final probe = probeWith(
-        fakeBindings(buildNumberError: ArgumentError('ntdll binding unavailable')),
+        fakeBindings(
+          buildNumberError: ArgumentError('ntdll binding unavailable'),
+        ),
       );
 
       expect(probe.probe(), isNull);
-      expect(
-        invocations,
-        ['readBuildNumber'],
-        reason: '绑定解析失败即止, 不得继续后续探测步骤',
-      );
-      final errorRecords =
-          sink.records.where((r) => r.$1 == LogLevel.error).toList();
+      expect(invocations, ['readBuildNumber'], reason: '绑定解析失败即止, 不得继续后续探测步骤');
+      final errorRecords = sink.records
+          .where((r) => r.$1 == LogLevel.error)
+          .toList();
       expect(errorRecords, hasLength(1), reason: 'Error 族降级不得静默');
       expect(errorRecords.single.$2, contains('binding'));
     });
 
     test('getShellWindow 抛 ArgumentError — 降级 null 不抛且记 error 日志', () {
       final probe = probeWith(
-        fakeBindings(shellWindowError: ArgumentError('user32 binding unavailable')),
+        fakeBindings(
+          shellWindowError: ArgumentError('user32 binding unavailable'),
+        ),
       );
 
       expect(probe.probe(), isNull);
       expect(invocations, ['readBuildNumber', 'getShellWindow']);
-      expect(
-        sink.records.where((r) => r.$1 == LogLevel.error),
-        hasLength(1),
-      );
+      expect(sink.records.where((r) => r.$1 == LogLevel.error), hasLength(1));
     });
 
     test('dwmGetWindowAttribute 抛 ArgumentError — 降级 null 不抛且记 error 日志', () {
@@ -99,11 +97,9 @@ void main() {
       );
 
       expect(probe.probe(), isNull);
-      expect(invocations.first, 'dwmGetWindowAttribute:33');
-      expect(
-        sink.records.where((r) => r.$1 == LogLevel.error),
-        hasLength(1),
-      );
+      // fake 先记录后抛错 — 最后一次调用即首个 DWM 属性探测 (corner=33)。
+      expect(invocations.last, 'dwmGetWindowAttribute:33');
+      expect(sink.records.where((r) => r.$1 == LogLevel.error), hasLength(1));
     });
 
     test('happy path — 四属性 S_OK — 完整快照全 true 且属性矩阵锁定', () {
