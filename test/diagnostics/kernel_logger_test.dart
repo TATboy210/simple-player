@@ -3,6 +3,9 @@
 /// KernelLoggerImpl lifecycle, and path redaction (D17).
 library;
 
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
@@ -323,6 +326,168 @@ void main() {
       expect(
         redactPath('lib/a/foo.dart:10 and lib/b/bar.dart:20'),
         equals('foo.dart:10 and bar.dart:20'),
+      );
+    });
+  });
+
+  // =========================================================================
+  // Helpers — debugPrint output capture (N5)
+  // =========================================================================
+
+  /// 捕获 debugPrint 输出 — 重定向顶层 callback 到行列表, 测试结束自动还原。
+  ///
+  /// Captures sink output by reassigning the top-level `debugPrint` callback
+  /// (a settable variable in flutter/foundation) and registers restoration
+  /// via [addTearDown]. Local to main() so it cannot leak state across files.
+  List<String> captureDebugPrint() {
+    final lines = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      lines.add(message ?? '');
+    };
+    addTearDown(() => debugPrint = original);
+    return lines;
+  }
+
+  // =========================================================================
+  // Group 10: DebugPrintSink diagnostic redaction (N5)
+  // =========================================================================
+  group('DebugPrintSink diagnostic redaction (N5)', () {
+    test('error.toString() with local path prints basename only', () {
+      final lines = captureDebugPrint();
+      const sink = DebugPrintSink();
+
+      sink.log(
+        LogLevel.error,
+        'open failed',
+        error: FileSystemException(
+          'read failed',
+          r'C:\Users\alice\Videos\clip.mp4',
+        ),
+      );
+
+      expect(lines, hasLength(1));
+      expect(lines.single, contains('clip.mp4'));
+      expect(lines.single, isNot(contains('Users')));
+      expect(lines.single, isNot(contains(r'C:\Users')));
+    });
+
+    test('stackTrace file-URI frames print redacted', () {
+      final lines = captureDebugPrint();
+      const sink = DebugPrintSink();
+
+      sink.log(
+        LogLevel.error,
+        'render failed',
+        stackTrace: StackTrace.fromString(
+          '#0      main (file:///D:/private/secrets/engine.dart:10:5)\n'
+          '#1      caller (package:simple_player_flutter/app.dart:1:1)',
+        ),
+      );
+
+      expect(lines, hasLength(1));
+      expect(lines.single, isNot(contains('private')));
+      expect(lines.single, isNot(contains('secrets')));
+      expect(lines.single, contains('engine.dart:10:5'));
+    });
+
+    test('byte-identity: path-free error text is unchanged', () {
+      final lines = captureDebugPrint();
+      const sink = DebugPrintSink();
+
+      sink.log(
+        LogLevel.error,
+        'plain',
+        error: StateError('no local paths here'),
+      );
+
+      expect(
+        lines,
+        equals(['ERROR: plain error=Bad state: no local paths here']),
+      );
+    });
+  });
+
+  // =========================================================================
+  // Group 11: LoggerPackageSink diagnostic redaction (N5 — production console)
+  // =========================================================================
+  group(
+    'LoggerPackageSink diagnostic redaction (N5 — production console path)',
+    () {
+      test('error.toString() with local path prints basename only', () {
+        final lines = captureDebugPrint();
+        const sink = LoggerPackageSink();
+
+        sink.log(
+          LogLevel.error,
+          'open failed',
+          error: FileSystemException(
+            'read failed',
+            r'C:\Users\alice\Videos\clip.mp4',
+          ),
+        );
+
+        expect(lines, hasLength(1));
+        expect(lines.single, contains('clip.mp4'));
+        expect(lines.single, isNot(contains('Users')));
+        expect(lines.single, isNot(contains(r'C:\Users')));
+      });
+
+      test('byte-identity: path-free error text is unchanged', () {
+        final lines = captureDebugPrint();
+        const sink = LoggerPackageSink();
+
+        sink.log(
+          LogLevel.error,
+          'plain',
+          error: StateError('no local paths here'),
+        );
+
+        expect(
+          lines,
+          equals(['ERROR: plain error=Bad state: no local paths here']),
+        );
+      });
+    },
+  );
+
+  // =========================================================================
+  // Group 12: serializeLogContext redaction (N5)
+  // =========================================================================
+  group('serializeLogContext redaction (N5)', () {
+    test('string value carrying drive path is reduced to basename', () {
+      final result = serializeLogContext({
+        // 模拟 playlist_store.dart:97 的 context 泄漏形态:
+        // 调用方把 error.toString() 原样塞进字符串值。
+        'error':
+            "FileSystemException: read failed, "
+            "path = 'C:\\Users\\alice\\Videos\\clip.mp4'",
+      });
+
+      expect(result, contains('clip.mp4'));
+      expect(result, isNot(contains('Users')));
+      expect(result, isNot(contains('C:')));
+    });
+
+    test('string value carrying UNC path is reduced to basename', () {
+      final result = serializeLogContext({'error': r'\\NAS\Private\movie.mkv'});
+
+      expect(result, contains('movie.mkv'));
+      expect(result, isNot(contains('NAS')));
+      expect(result, isNot(contains('Private')));
+    });
+
+    test('byte-identity: path-free strings serialize unchanged', () {
+      expect(
+        serializeLogContext({'a': 'hello', 'b': 2}),
+        '{"a":"hello","b":2}',
+      );
+    });
+
+    test('non-string types are not stringified or redacted', () {
+      expect(
+        serializeLogContext({'t': DateTime.utc(2026, 1, 1)}),
+        contains('2026-01-01T00:00:00.000Z'),
       );
     });
   });
