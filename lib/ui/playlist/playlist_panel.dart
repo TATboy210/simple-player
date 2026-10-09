@@ -136,6 +136,34 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     debugLabel: 'playlist-confirm-cancel',
   );
 
+  /// 确认按钮焦点节点 — tab-trap 回绕落点 (U2): 卡内只有 cancel/confirm
+  /// 两个可聚焦节点, [_confirmationTabTrap] 据此把 Tab 落点锚定在两节点
+  /// 之间; debugLabel 供焦点断言与日志定位. dispose 成对释放 (见 dispose).
+  final FocusNode _confirmFocus = FocusNode(
+    debugLabel: 'playlist-confirm-confirm',
+  );
+
+  /// Tab/Shift+Tab 焦点陷阱 (U2) — 确认卡是破坏性动作表面, 焦点越卡后
+  /// Enter 可能误触卡外播放器控件; 此处抢在 FocusManager 默认 Tab 遍历
+  /// (焦点链上溯阶段) 之前返回 handled, 封死越卡路径.
+  ///
+  /// 两节点回绕下 shift 方向信息退化 — Tab 与 Shift+Tab 都移动到另一
+  /// 节点, 故不读 HardwareKeyboard 的 shift 状态.
+  KeyEventResult _confirmationTabTrap(KeyEvent event) {
+    // 仅确认卡在显时拦截; KeyRepeat 不移动焦点 (避免长按连跳).
+    if (_confirmation == null ||
+        event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.tab) {
+      return KeyEventResult.ignored;
+    }
+    if (_cancelFocus.hasFocus) {
+      _confirmFocus.requestFocus();
+    } else {
+      _cancelFocus.requestFocus();
+    }
+    return KeyEventResult.handled;
+  }
+
   /// Resolve once and remove only this panel's local confirmation.
   void _finishConfirmation(bool confirmed, {bool rebuild = true}) {
     final pending = _confirmation;
@@ -193,6 +221,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     FocusManager.instance.removeEarlyKeyEventHandler(_confirmationKey);
     _finishConfirmation(false, rebuild: false);
     _cancelFocus.dispose();
+    _confirmFocus.dispose();
     _sortMenu?.cancel();
     _sortFocus.dispose();
     _scrollController.dispose();
@@ -270,15 +299,22 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               child: Padding(
                 padding: const EdgeInsets.all(Tokens.spSm),
                 child: Center(
+                  // U2 封闭焦点域: FocusTraversalGroup 声明遍历边界,
+                  // FocusScope.onKeyEvent 执行 Tab/Shift+Tab 回绕拦截
+                  // (handled 先于 FocusManager 默认遍历生效).
                   child: FocusScope(
-                    child: GlassConfirmStrip(
-                      message: pending.message,
-                      cancelLabel: AppLocalizations.of(context).cancel,
-                      confirmTooltip: AppLocalizations.of(context)
-                          .batchDeleteConfirmAction,
-                      cancelFocus: _cancelFocus,
-                      onCancel: () => _finishConfirmation(false),
-                      onConfirm: () => _finishConfirmation(true),
+                    onKeyEvent: (node, event) => _confirmationTabTrap(event),
+                    child: FocusTraversalGroup(
+                      child: GlassConfirmStrip(
+                        message: pending.message,
+                        cancelLabel: AppLocalizations.of(context).cancel,
+                        confirmTooltip: AppLocalizations.of(context)
+                            .batchDeleteConfirmAction,
+                        cancelFocus: _cancelFocus,
+                        confirmFocus: _confirmFocus,
+                        onCancel: () => _finishConfirmation(false),
+                        onConfirm: () => _finishConfirmation(true),
+                      ),
                     ),
                   ),
                 ),
