@@ -35,6 +35,10 @@ abstract interface class ErrorReporter {
 
   /// Removes only the FIFO head after presentation is dismissed.
   void dismissCurrent();
+
+  /// Removes the acknowledged report identified by [eventId] at any queue
+  /// position and promotes the next surviving report; no-op without a match.
+  void dismissById(String eventId);
 }
 
 /// 统一错误报告实现；拥有本地有界 FIFO 和副作用隔离。
@@ -234,6 +238,14 @@ final class ErrorReporterImpl implements ErrorReporter {
       _emitLastResort(failure, stackTrace);
     }
   }
+
+  /// RED 占位（261009-oar T1）：仅令失败测试可编译并通过运行期断言暴露缺失
+  /// 行为；命中移除/发布逻辑随 GREEN 提交落地。
+  ///
+  /// RED-phase placeholder so the failing by-id tests compile and expose the
+  /// missing behavior at assertion level; the real removal lands in GREEN.
+  @override
+  void dismissById(String eventId) {}
 
   void _reportSafely({
     required ErrorSource source,

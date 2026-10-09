@@ -467,6 +467,9 @@ final class _RecordingReporter implements ErrorReporter {
   StackTrace? platformStackTrace;
 
   @override
+  void dismissById(String eventId) {}
+
+  @override
   void dismissCurrent() {}
 
   @override
@@ -493,6 +496,9 @@ final class _RecordingReporter implements ErrorReporter {
 
 /// Simulates a reporter failure so callback containment remains observable.
 final class _ThrowingReporter implements ErrorReporter {
+  @override
+  void dismissById(String eventId) {}
+
   @override
   void dismissCurrent() {}
 

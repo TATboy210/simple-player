@@ -315,6 +315,65 @@ void main() {
     );
   });
 
+  group('ErrorReporterImpl dismissById', () {
+    test(
+      'removes the matched report, promotes the next head, and publishes',
+      () {
+        // Arrange
+        final reporter = _reporter();
+        final stack = _stack('by-id.dart');
+        reporter.reportPlatformSafely(StateError('oldest'), stack);
+        reporter.reportPlatformSafely(StateError('middle'), stack);
+        reporter.reportPlatformSafely(StateError('newest'), stack);
+        reporter.flushPresentation();
+        final matchedId = reporter.queuedReports[1].eventId;
+
+        // Act
+        reporter.dismissById(matchedId);
+
+        // Assert：命中的条目（任意队位）被移除，队首推进并经 presentation 发布。
+        expect(reporter.queuedReports.map((report) => report.message), [
+          'Bad state: oldest',
+          'Bad state: newest',
+        ]);
+        expect(
+          reporter.presentation.value.current,
+          same(reporter.queuedReports.first),
+        );
+        expect(reporter.presentation.value.pendingCount, 1);
+      },
+    );
+
+    test('is a no-op when no queued report matches the id', () {
+      // Arrange
+      final reporter = _reporter();
+      final stack = _stack('by-id.dart');
+      reporter.reportPlatformSafely(StateError('only'), stack);
+      reporter.flushPresentation();
+
+      // Act
+      reporter.dismissById('missing-id');
+
+      // Assert：未命中不改队列、不扰动呈现状态（队首与计数原样）。
+      expect(reporter.queuedReports, hasLength(1));
+      expect(
+        reporter.presentation.value.current,
+        same(reporter.queuedReports.first),
+      );
+      expect(reporter.presentation.value.pendingCount, 0);
+    });
+
+    test('returns normally when the queue is empty', () {
+      // Arrange
+      final reporter = _reporter();
+
+      // Act and assert：空队列关闭不抛（防御宿主竞态下的迟到的关闭回调）。
+      expect(() => reporter.dismissById('missing-id'), returnsNormally);
+      expect(reporter.queuedReports, isEmpty);
+      expect(reporter.presentation.value.current, isNull);
+    });
+  });
+
   group('ErrorReporterImpl developer path evidence', () {
     test(
       'freezes separate current-media and failed-open paths before redaction',

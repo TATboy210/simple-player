@@ -162,6 +162,9 @@ final class _RecordingReporter implements ErrorReporter {
   final List<({PlayerError error, String? mediaPath})> calls = [];
 
   @override
+  void dismissById(String eventId) {}
+
+  @override
   void dismissCurrent() {}
 
   @override

@@ -773,9 +773,10 @@ void main() {
     );
 
     testWidgets(
-      'close while cycling keeps display and snapshot consistent (WR-01)',
+      'close while cycling removes the displayed report (WR-01 dismissById)',
       (tester) async {
-        // Arrange：3 份报告在卡（显示三），轮览一页到二。
+        // Arrange：3 份报告在卡（显示三），轮览一页到二 —— 此时显示的
+        // **不是** reporter FIFO 队首（一），正是 WR-01 分歧场景。
         await tester.pumpWidget(
           buildMountHarness(home: const Scaffold(body: SizedBox.shrink())),
         );
@@ -791,19 +792,22 @@ void main() {
         await tester.pump();
         expect(find.textContaining('错误二'), findsOneWidget);
 
-        // Act / Assert #1：关闭消费真实队首（一 —— 它抵达时已作为最新上屏过，
-        // 非静默丢弃）；显示重置到最新（三），徽标减一。
+        // Act / Assert #1：关闭命中**当前显示/轮览中的那条**（二）—— 宿主按
+        // 所显示 report 的 eventId 走 dismissById 精确移除（WR-01 裁决），
+        // 队首一不受牵连；显示重置到最新（三），徽标减一。
         await tester.tap(find.byKey(const ValueKey('error-card-close')));
         await tester.pump();
         expect(find.textContaining('错误三'), findsOneWidget);
         expect(find.text('2 错误'), findsOneWidget);
 
-        // Act / Assert #2：被消费条目之外的历史仍可轮览回看（无一被静默丢弃）。
+        // Act / Assert #2：被关闭的是二 —— 一仍在快照中可经轮览回看，二不再
+        // 出现（head-dismissal 旧行为在此会移除一，本组断言即新旧分辨点）。
         await tester.tap(find.byKey(const ValueKey('error-card-badge')));
         await tester.pump();
-        expect(find.textContaining('错误二'), findsOneWidget);
+        expect(find.textContaining('错误一'), findsOneWidget);
+        expect(find.textContaining('错误二'), findsNothing);
 
-        // Act / Assert #3：再次关闭消费二（此前刚被展示过），显示回到三。
+        // Act / Assert #3：再次关闭命中当前显示的一，显示回到最新（三）。
         await tester.tap(find.byKey(const ValueKey('error-card-close')));
         await tester.pump();
         expect(find.textContaining('错误三'), findsOneWidget);
