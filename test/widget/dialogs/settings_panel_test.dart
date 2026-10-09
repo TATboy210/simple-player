@@ -630,11 +630,14 @@ void main() {
     });
   });
 
-  /// 261009-rp5 证伪组 — audio 分区键盘行响应是否存在（零生产改动验证轮）。
+  /// 261009-rp5 证伪组 → 261009-upn 契约翻转 — audio 分区键盘行导航。
   ///
-  /// 假设: `_enabledTabs` 自称 audio 已解灰（v0.0.8.1），但纯键盘旅程
-  /// （L0 ↑ 切到音频 → → 进 L1 → 发 ↑↓/Enter）下 `_handleContentLevelKey`
-  /// 对非 General 分区把 ↑↓/Enter 全部 handled 空操作，行无任何响应。
+  /// 缺陷史（0895153f 证实）: `_enabledTabs` 自称 audio 已解灰（v0.0.8.1），
+  /// 但纯键盘旅程（L0 ↑ 切到音频 → → 进 L1 → 发 ↑↓/Enter）下
+  /// `_handleContentLevelKey` 对非 General 分区把 ↑↓/Enter 全部 handled
+  /// 空操作，行无任何响应。2026-10-09 用户裁决本轮修复（261009-upn），
+  /// 缺陷锁断言按下述用例内嵌指引翻转：audio 行级键盘与 General 同模式
+  /// （rowsFocusNode 注入 + 进入即聚焦 + ↑↓ 回绕 + Enter 激活）。
   ///
   /// 「行响应」断言取焦点拓扑: primaryFocus 是否下沉进分区内容子树 —
   /// 修复形状无关（rowsFocusNode 注入或 SpinControl 聚焦均满足）。
@@ -715,57 +718,102 @@ void main() {
       expect(isPrimaryFocusInside(GeneralSettingsContent), isTrue);
     });
 
-    /// 缺陷锁（2026-10-09 RED 证实）——键盘旅程进 audio L1 后 ↑↓/Enter
-    /// 全部 handled 空操作，焦点滞留面板级节点：
-    /// - `_handleContentLevelKey`（settings_panel.dart:391-412）对非 General
-    ///   分区的 ↑↓/Enter 一律 `return handled`，不做任何行聚焦；
-    /// - `_buildTabContent`（settings_panel.dart:693-699）构建
-    ///   AudioSettingsContent 时**不注入 rowsFocusNode**（General 有注入），
-    ///   AudioSettingsContent 本体亦无 Focus/键盘处理——SpinControl 虽有
-    ///   Focus（仅 ←→），纯键盘无路径可达（面板 Focus skipTraversal +
-    ///   无程序化聚焦）。
+    /// 契约翻转（261009-upn，2026-10-09 用户裁决本轮修复）——原缺陷锁
+    /// （0895153f）的 isFalse 断言按内嵌指引翻转为 isTrue：audio 分区
+    /// 行级键盘与 General 同模式（rowsFocusNode 注入 + 进入即聚焦 +
+    /// ↑↓ 回绕 + Enter 激活行）。
     ///
-    /// 与 `_enabledTabs` 注释自称「audio 已解灰（v0.0.8.1）」矛盾：解灰
-    /// 只解了指针路径，键盘用户进了 audio 分区后无法操作任何行。
-    ///
-    /// 契约翻转：修复（AudioSettingsContent 注入 rowsFocusNode 复用
-    /// General 模式，~30 行）落地后，把下方 isFalse 全部翻转为 isTrue，
-    /// 并对照上方 General 用例补 ↑↓ 行移动断言。
-    testWidgets('audio L1 发 ↑↓/Enter — 吞键无行响应（缺陷锁 · 修复待裁决）', (tester) async {
+    /// 缺陷史（勿删，0895153f 证实）：`_handleContentLevelKey` 曾对非
+    /// General 分区吞键、AudioSettingsContent 本体无 Focus——键盘用户
+    /// 进 audio L1 后零行响应。
+    testWidgets('audio L1 发 ↑↓/Enter — 焦点下沉行级（契约翻转 · 261009-upn）', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildSubject());
       await tester.pumpAndSettle();
 
-      // 默认选中关于 → ↑ 到音频 → → 进 L1（导航本身可达）。
+      // 默认选中关于 → ↑ 到音频 → → 进 L1（进入即聚焦首行，General 同款）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
       expect(find.byType(AudioSettingsContent), findsOneWidget);
+      expect(
+        isPrimaryFocusInside(AudioSettingsContent),
+        isTrue,
+        reason: '翻转: 进入 audio L1 即聚焦行级（General 对照组已证 harness 可探测）',
+      );
 
-      // ↓ handled 但空操作 — 焦点从未下沉进 audio 行。
+      // ↓ handled 且有行响应 — 焦点保持在行级。
       final downHandled = await tester.sendKeyEvent(
         LogicalKeyboardKey.arrowDown,
       );
       await tester.pumpAndSettle();
-      expect(downHandled, isTrue, reason: '↓ 被面板吞掉（handled 返回）');
-      expect(
-        isPrimaryFocusInside(AudioSettingsContent),
-        isFalse,
-        reason: '缺陷锁: ↓ 后焦点仍在面板级 — 修复落地后翻转为 isTrue',
-      );
+      expect(downHandled, isTrue, reason: '↓ 由行导航消费（handled 返回）');
+      expect(isPrimaryFocusInside(AudioSettingsContent), isTrue);
 
-      // ↑ 同样吞键。
+      // ↑ 同样保持行级。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
-      expect(isPrimaryFocusInside(AudioSettingsContent), isFalse);
+      expect(isPrimaryFocusInside(AudioSettingsContent), isTrue);
 
-      // Enter 同样吞键 — 未激活任何行，两个延迟值不动。
+      // Enter handled — 行 0 激活 = 交焦行值控件（延迟行无菜单/开关，
+      // 值步进专属 ←→），延迟值不动。
       final enterHandled = await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(enterHandled, isTrue, reason: 'Enter 被面板吞掉（handled 返回）');
-      expect(isPrimaryFocusInside(AudioSettingsContent), isFalse);
-      expect(settings.audioDelayMs, 0, reason: 'Enter 未激活音频延迟行');
-      expect(settings.subtitleDelayMs, 0, reason: 'Enter 未激活字幕延迟行');
+      expect(enterHandled, isTrue, reason: 'Enter 由行导航消费（handled 返回）');
+      expect(isPrimaryFocusInside(AudioSettingsContent), isTrue);
+      expect(settings.audioDelayMs, 0, reason: '行 0 激活=交焦，值步进专属 ←→');
+      expect(settings.subtitleDelayMs, 0, reason: '字幕延迟行不受影响');
+    });
+
+    /// ↑↓ 行移动首尾回绕 + Enter 交焦行值控件后 ←→ 步进（对照 General
+    /// 既有行导航用例语法；↑↓ 随时把焦点收回行级 = General「语言按钮
+    /// 权限移交」同款）。
+    ///
+    /// 行落点断言取服务写入路径（behavioral probe）：两行分别写
+    /// audioDelayMs / subtitleDelayMs — 步进落在哪行即导航在哪行。
+    testWidgets('audio 行导航 — ↑↓ 首尾回绕，Enter 交焦行值控件 ←→ 步进', (tester) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      // 进入 audio L1（默认选中关于 → ↑ 到音频 → → 进内容层）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(isPrimaryFocusInside(AudioSettingsContent), isTrue);
+
+      // 行 0（音频延迟）Enter 交焦 → → 步进 +50ms。
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(settings.audioDelayMs, 50, reason: '→ 在行 0 值控件步进音频延迟');
+      expect(settings.subtitleDelayMs, 0, reason: '字幕延迟行不受影响');
+
+      // ↑ 自行 0 回绕到行 1（两行首尾回绕；焦点收回行级）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(isPrimaryFocusInside(AudioSettingsContent), isTrue);
+
+      // 行 1（字幕延迟）Enter 交焦 → → 步进 — 证明回绕落点确为行 1。
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(settings.subtitleDelayMs, 50, reason: '↑ 回绕后激活行 1 字幕延迟');
+      expect(settings.audioDelayMs, 50, reason: '音频延迟不受行 1 步进影响');
+
+      // ↓ 自行 1 回绕到行 0 → Enter 交焦 → ← 反向步进 50→0ms。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(settings.audioDelayMs, 0, reason: '↓ 回绕后 ← 在行 0 反向步进');
+      expect(settings.subtitleDelayMs, 50, reason: '字幕延迟不受行 0 步进影响');
     });
   });
 }
