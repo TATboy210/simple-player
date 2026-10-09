@@ -1130,4 +1130,64 @@ void main() {
       expect(engine.queuePaths.value, equals(['b.mp4', 'c.mp4']));
     });
   });
+
+  group('sortQueue 迟到 move 事件断点污染 (v0.0.12 V1 — 证伪测试 261009-rp1)', () {
+    // 假设 (待证伪, 见 quick 261009-rp1 PLAN): sortQueue 完成后 media_kit
+    // 迟到的 move 事件携带排序前 index (包侧已证实: move() 重排条目后不
+    // 修正 playlist.index, 每个事件 index 保持旧值); 引擎抑制期
+    // (_queueEditInProgress) finally 解除后, 循环期间入队未投递的 move
+    // 事件才到达 — 真实桥接 stream.playlist 处理器对每个事件**无条件**
+    // 新建 unmodifiable paths + 写 index + (抑制已解除时) touch revision.
+    //
+    // 本用例回放该场景 (注入帧 = 桥接处理器的可观察效果): 断言正确行为
+    // 契约 — 锚点不被误置 + 未播放条目不吸收播放位置.
+    // 红 = 缺陷证实 (进 T2 引擎修复); 绿 = 证伪成立 (记台账任务结束).
+    test('排序后旧序索引 revision — 锚点不被误置、他条目不吸收断点', () async {
+      var nowMs = 1000000;
+      coordinator.clock = () => DateTime.fromMillisecondsSinceEpoch(nowMs);
+
+      // ── 1. 播放中: 队列 [a, x, b], x 在播 (index 1), 播到 42s ──
+      await engine.openPlaylist(['a.mp4', 'x.mp4', 'b.mp4'], startIndex: 1);
+      engine.duration.value = 100000;
+      engine.position.value = 42000; // 首次节流落盘 — x 记 42000 (真实断点)
+      expect(coordinator.lastPlayedPath.value, 'x.mp4');
+      nowMs += 6000; // 推过节流窗口 — 下一 position tick 独立成窗
+
+      // ── 2. sortQueue 完成: name 升序 → [a, b, x], x 1→2 ──
+      // 引擎乐观镜像 + revision 回流 — current 仍是 x, 无切曲.
+      await coordinator.sortEntries(PlaylistSortKey.name);
+      expect(coordinator.lastPlayedPath.value, 'x.mp4');
+      expect(coordinator.currentIndex.value, 2);
+
+      // ── 3. 注入迟到 move 事件帧 — 桥接语义回放 ──
+      // 抑制期已解除, 积压 move 事件此刻投递: 处理器无条件新建 paths 实例
+      // (同内容) + 写入包侧携带的排序前 index (旧序 1) + touch revision.
+      // Coordinator 侧 identity 快路径因新实例失效, 必须走全量处理.
+      engine.queuePaths.value = List<String>.unmodifiable(<String>[
+        'a.mp4',
+        'b.mp4',
+        'x.mp4',
+      ]);
+      engine.queueIndex.value = 1; // 旧序索引 (x 在旧序的位置) — 陈旧值
+      engine.queueRevision.value++;
+
+      // ── 4. x 实际仍在播 — 播放推进, 节流窗已过 ──
+      engine.position.value = 50000;
+
+      // ── 裁决断言: 正确行为契约 ──
+      // 锚点不得被旧序索引误置 — paths[1] 是 b.mp4, 但真在播的仍是 x.
+      expect(
+        coordinator.lastPlayedPath.value,
+        'x.mp4',
+        reason:
+            '迟到 move 事件 (旧序索引) 不得被误判为切曲 — '
+            '锚点仍须指向真在播的 x.mp4',
+      );
+      // b.mp4 从未播放 — 不得吸收 x 的节流断点 (断点污染主症状:
+      // 误判切曲后 coordinator 视 b 为当前条目, 节流落盘把 x 的实时
+      // 位置写进 b 的断点元数据).
+      final b = coordinator.entries.value.firstWhere((e) => e.path == 'b.mp4');
+      expect(b.positionMs, isNull, reason: '未播放条目 b.mp4 不得在误判切曲后吸收 x 的节流断点');
+    });
+  });
 }
