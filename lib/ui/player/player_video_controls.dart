@@ -958,18 +958,18 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
           resizeSignal: widget.resizing,
           tasks: [
             WorkspaceTask(
-              id: 'settings',
+              id: WorkspaceTaskIds.settings,
               builder: (_, visible, role) => SettingsPanel(
                 visible: visible,
                 session: widget.settingsSession,
                 services: widget.settingsServices,
                 scrubbing: _seekScrubbing,
                 onClose: () => _workspaceFocus?.close(
-                  'settings',
+                  WorkspaceTaskIds.settings,
                   WorkspaceCloseCause.header,
                 ),
                 onPromote: role == WorkspaceTaskRole.left
-                    ? () => workspace.promote('settings')
+                    ? () => workspace.promote(WorkspaceTaskIds.settings)
                     : null,
               ),
             ),

@@ -161,9 +161,11 @@ class _SettingsPanelState extends State<SettingsPanel>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _focusRegistry?.tasks.remove('settings');
+    // 换注册表：旧 registry 注销（identical 守卫防误删）→ 重读 → 新 registry
+    // 注册（identical 重绑为幂等 no-op）。
+    _focusRegistry?.unregisterTask(WorkspaceTaskIds.settings, _taskScope);
     _focusRegistry = WorkspaceFocusScope.maybeOf(context);
-    _focusRegistry?.tasks['settings'] = _taskScope;
+    _focusRegistry?.registerTask(WorkspaceTaskIds.settings, _taskScope);
   }
 
   /// 从共享数据同步导航；滚动通知不触发整层重建。
@@ -291,9 +293,8 @@ class _SettingsPanelState extends State<SettingsPanel>
     for (final controller in _scrollControllers.values) {
       controller.dispose();
     }
-    if (identical(_focusRegistry?.tasks['settings'], _taskScope)) {
-      _focusRegistry?.tasks.remove('settings');
-    }
+    // identical 守卫已内置契约方法 — 只清自己的注册，不动后来者。
+    _focusRegistry?.unregisterTask(WorkspaceTaskIds.settings, _taskScope);
     _taskScope.dispose();
     _focusNode.dispose();
     _rowsFocusNode.dispose();

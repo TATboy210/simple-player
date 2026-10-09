@@ -132,14 +132,13 @@ class _SettingsWorkspaceTriggerState extends State<_SettingsWorkspaceTrigger> {
     if (identical(next, _registry)) return;
     _unbindRegistry();
     _registry = next;
-    _registry?.triggers['settings'] = _focus;
+    _registry?.registerTrigger(WorkspaceTaskIds.settings, _focus);
   }
 
-  /// Remove only this node's registration, never a newer trigger's entry.
+  /// Remove only this node's registration, never a newer trigger's entry
+  /// (identical guard is built into the registry contract).
   void _unbindRegistry() {
-    if (identical(_registry?.triggers['settings'], _focus)) {
-      _registry?.triggers.remove('settings');
-    }
+    _registry?.unregisterTrigger(WorkspaceTaskIds.settings, _focus);
   }
 
   @override

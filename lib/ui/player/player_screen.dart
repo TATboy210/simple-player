@@ -23,6 +23,7 @@ import 'drop_handler.dart';
 import 'player_actions.dart';
 import 'player_keyboard_actions.dart';
 import 'panel_workspace_controller.dart';
+import 'workspace_focus_scope.dart';
 import 'workspace_menu_session.dart';
 import '../shared/secondary_surface_visibility.dart';
 import '../dialogs/settings/settings_panel_session.dart';
@@ -201,7 +202,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 设置面板 — toggle 语义（成熟播放器惯例）：开→关、关→开；
       // 纯 UI 弹层，不改播放状态，无需空置态隔离。
       // v0.0.6: services bundle 经 PlayerVideoControls 传入挂载的面板。
-      onOpenSettings: () => _workspace.toggle('settings'),
+      onOpenSettings: () => _workspace.toggle(WorkspaceTaskIds.settings),
       // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
       // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
       onToggleFullscreen: () {
