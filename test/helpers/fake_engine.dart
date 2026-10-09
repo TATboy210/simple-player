@@ -42,6 +42,11 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   // 每次请求递增, 使旧异步 continuation 过期 (不得发布状态/错误/清空新媒体).
   int _operationGeneration = 0;
 
+  // 完成态抢占标志 — 镜像 MediaKitEngine._completing (K6 事件时序同构):
+  // completed 先于 playing(false) 到达时拦截 paused 误转, 清除点
+  // play()/jumpTo() 与真引擎一致.
+  bool _completing = false;
+
   @override
   final ValueNotifier<int> position = ValueNotifier<int>(0);
 
@@ -268,6 +273,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     // 空置态 (无媒体) play 无意义 — 与 MediaKitEngine.play 同款 guard:
     // state 保持 idle, 防止 UI 卸载空置页.
     if (!_hasMedia) return;
+    _completing = false; // 镜像真引擎 play(): 重新播放, 清完成态.
     state.value = MediaState.playing;
     playCallCount++;
   }
@@ -519,6 +525,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   Future<bool> jumpTo(int index) async {
     if (_disposed) return false;
     if (index < 0 || index >= queuePaths.value.length) return false;
+    _completing = false; // 镜像真引擎 jumpTo(): 跳转即重新进入播放会话.
     jumpedToIndices.add(index);
     queueIndex.value = index;
     queueRevision.value++;
@@ -860,9 +867,28 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   /// Simulate playback completed — shuffle 模式下同构触发 Dart 层
   /// 随机自动续播 (镜像 MediaKitEngine._onCompleted 钩子).
   void simulateCompleted() {
+    _completing = true; // 镜像 _onCompleted: 进入完成态抢占.
     state.value = MediaState.completed;
     if (playMode.value == PlayMode.shuffle) {
       _autoAdvanceShuffle();
+    }
+  }
+
+  /// Simulate a `Player.stream.playing` 事件 — 镜像 MediaKitEngine._onPlaying
+  /// (K6 事件时序测试用): playing(true) 转 playing, playing(false) 转 paused,
+  /// 完成态抢占 guard 与真引擎同语义.
+  void simulatePlaying(bool playing) {
+    if (_disposed) return;
+    if (playing) {
+      if (state.value != MediaState.playing) {
+        state.value = MediaState.playing;
+      }
+    } else {
+      // 完成态抢占: completed 已处理, 跳过 paused 转换.
+      if (_completing) return;
+      if (state.value == MediaState.playing) {
+        state.value = MediaState.paused;
+      }
     }
   }
 

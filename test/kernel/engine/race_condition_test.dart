@@ -152,6 +152,46 @@ void main() {
     });
   });
 
+  group('Engine state timing — completed → auto-restart → user pause (K6)', () {
+    test(
+      'pause after auto-restart is accepted (completing flag not sticky)',
+      () async {
+        final engine = FakeEngine();
+        engine.configureMedia(durationMs: 10000);
+        await engine.open('a.mp4');
+        engine.play();
+        expect(engine.state.value, MediaState.playing);
+
+        // K6 场景: media_kit remove() 删正在播末项时伪造 completed:true
+        // (包特例, 红线只记录), mpv 自动跳 index 0 续播 — 事件序列:
+        // completed(true) → playing(true) → playing(false).
+        engine.simulateCompleted(); // 伪造 completed (media_kit remove 特例)
+        expect(engine.state.value, MediaState.completed);
+
+        engine.simulatePlaying(true); // mpv 自动续播 (completed 置位仍粘滞)
+        expect(engine.state.value, MediaState.playing);
+
+        engine.simulatePlaying(false); // 用户暂停
+        // 期望: 暂停生效 (state → paused, 转换不被 completing 吞).
+        // 现行为: _completing 粘滞 → playing(false) 被吞, state 停留 playing.
+        expect(engine.state.value, MediaState.paused);
+      },
+    );
+
+    test('completed 抢先 playing(false) 原用途 — completed 不被降级 paused', () async {
+      final engine = FakeEngine();
+      engine.configureMedia(durationMs: 10000);
+      await engine.open('a.mp4');
+      engine.play();
+
+      // 正常播完 (keep-open:'no' EOF): completed 先到, playing(false) 尾随,
+      // 中间无 playing(true) — 完成态抢占须保持, completed 不得误转 paused.
+      engine.simulateCompleted();
+      engine.simulatePlaying(false); // 完成尾随的 playing(false) 须被吞掉
+      expect(engine.state.value, MediaState.completed);
+    });
+  });
+
   group('Play guard — empty state (no media)', () {
     test('play() with hasMedia=false keeps state idle', () {
       final engine = FakeEngine();
