@@ -8,6 +8,7 @@ library;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
@@ -869,6 +870,128 @@ void main() {
       await tester.tap(find.byType(PlaylistTile).first);
       await tester.pumpAndSettle();
       expect(playedIndex, isNotNull);
+    });
+  });
+
+  group('关闭态焦点排除 (v0.0.12 U1)', () {
+    // U1: PlaylistPanel 常驻挂载 — 关闭态只有 IgnorePointer(挡指针)而无
+    // ExcludeFocus(挡焦点), Tab 遍历可落入不可见 tile 触发器/排序/模式/
+    // 关闭按钮, Space/Enter 触发"幽灵动作"(播放条目/切播放模式/关面板 —
+    // 均为持久状态副作用). 修复: 照 SettingsPanel(settings_panel.dart:422)
+    // 对照写法, 与 IgnorePointer 并列挂 ExcludeFocus(excluding: !visible).
+    late ValueNotifier<List<PlaylistItem>> entries;
+    late ValueNotifier<int> currentIndex;
+    late ValueNotifier<String?> lastPlayedPath;
+    late ValueNotifier<PlayMode> playMode;
+    int playCount = 0;
+    int cycleCount = 0;
+    int closeCount = 0;
+
+    setUp(() {
+      entries = ValueNotifier([
+        PlaylistItem(path: 'a.mp4'),
+        PlaylistItem(path: 'b.mp4'),
+      ]);
+      currentIndex = ValueNotifier(-1);
+      lastPlayedPath = ValueNotifier(null);
+      playMode = ValueNotifier(PlayMode.loopAll);
+      playCount = 0;
+      cycleCount = 0;
+      closeCount = 0;
+    });
+
+    tearDown(() {
+      entries.dispose();
+      currentIndex.dispose();
+      lastPlayedPath.dispose();
+      playMode.dispose();
+    });
+
+    Future<void> pumpClosedPanel(WidgetTester tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          PlaylistPanel(
+            entries: entries,
+            currentIndex: currentIndex,
+            lastPlayedPath: lastPlayedPath,
+            visible: false,
+            onClose: () => closeCount++,
+            onPlayEntry: (_) => playCount++,
+            onResumeEntry: (_) {},
+            onRemoveEntry: (_) {},
+            playMode: playMode,
+            onCyclePlayMode: () => cycleCount++,
+            sortKey: PlaylistSortKey.addedOrder,
+            sortAscending: true,
+            onSortSelected: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// 焦点判据 — primaryFocus 的 element 沿祖先链是否命中面板 element.
+    ///
+    /// 关闭态焦点排除的核心观测点: 焦点节点挂在 Focus widget 上,
+    /// 其 context 必然是面板子树内的 element (焦点在面板外/无焦点 → false).
+    bool isFocusInsidePanel() {
+      final focusContext = FocusManager.instance.primaryFocus?.context;
+      if (focusContext is! Element) return false;
+      final panel = find.byType(PlaylistPanel).evaluate().single;
+      if (identical(focusContext, panel)) return true;
+      var inside = false;
+      focusContext.visitAncestorElements((e) {
+        if (identical(e, panel)) inside = true;
+        return true;
+      });
+      return inside;
+    }
+
+    testWidgets('Tab 遍历不落入关闭面板 — 焦点恒在面板子树之外', (tester) async {
+      await pumpClosedPanel(tester);
+
+      // 15 次 Tab — 覆盖面板全部可聚焦节点(tile 触发器 + 排序/模式/
+      // 关闭按钮)并回绕; 修复前遍历落入不可见控件, 本断言红.
+      for (var i = 0; i < 15; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+
+      expect(
+        isFocusInsidePanel(),
+        isFalse,
+        reason: '关闭面板必须排除出焦点遍历(ExcludeFocus) — '
+            'Tab 落入不可见控件即幽灵焦点',
+      );
+    });
+
+    testWidgets('关闭面板控件被聚焦时 Space/Enter 无幽灵动作', (tester) async {
+      await pumpClosedPanel(tester);
+
+      // 直接把焦点钉到面板内 tile 触发器(模拟修复前 Tab 漏入的落点),
+      // 再按 Space/Enter: 修复前激活播放 → 红; 修复后 ExcludeFocus 令
+      // 子树不可聚焦, requestFocus 成 no-op, 两键无落点, 断言恒绿.
+      final tileTrigger = tester
+          .widgetList<Focus>(
+            find.descendant(
+              of: find.byType(PlaylistTile).first,
+              matching: find.byType(Focus),
+            ),
+          )
+          .map((f) => f.focusNode)
+          .whereType<FocusNode>()
+          .first;
+      tileTrigger.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+
+      expect(playCount, 0, reason: '关闭面板不得被键盘激活播放条目');
+      expect(cycleCount, 0, reason: '关闭面板不得被键盘切换播放模式(持久状态)');
+      expect(closeCount, 0, reason: '关闭面板不得被键盘触发关闭回调');
     });
   });
 }
