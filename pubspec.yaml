@@ -17,13 +17,18 @@ dependencies:
   # MaterialDesktopVideoControls 成熟 seekbar. fvp/MDK 已移除.
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
-  media_kit_libs_windows_video: ^1.0.7
+  media_kit_libs_windows_video: ^1.0.11
   media_kit_libs_macos_video: ^1.1.4
   media_kit_libs_linux: ^1.2.1
   path_provider: ^2.1.6
+  # 不可升 12/13：file_picker 12+（federated 重构）→ windows_file_picker（全系）
+  # 要求 win32 ^6.3.0，与 bitsdojo_window_windows 0.1.6 的 win32 ^5.1.1 区间不相交，
+  # pub get 必然解析失败。解封条件：bitsdojo_window 支持 win32 6 后方可升级。
+  # 届时须同步迁移 file_picker_adapters.dart 两处 12.x 破坏点
+  #（lockParentWindow→WindowsOptions；pickFiles 返回非空 List，取消=空列表）。
   file_picker: ^11.0.3
-  shared_preferences: ^2.5.5
-  desktop_drop: ^0.7.1
+  shared_preferences: ^2.5.6
+  desktop_drop: ^0.8.4
   path: ^1.9.1
   crypto: ^3.0.7
   ffi: ^2.2.0
@@ -36,12 +41,12 @@ dependencies:
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）
-  flutter_video_thumbnail_plus: ^1.0.6
+  flutter_video_thumbnail_plus: ^1.0.7
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.7.0
   i18n: ^4.2.6
   xdg_directories: ^1.1.0
-  cross_file: ^0.3.5+5
+  cross_file: ^0.3.4
   intl: ^0.20.3
   logger: ^2.8.0
 
