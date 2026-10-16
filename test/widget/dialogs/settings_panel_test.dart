@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/persistence/settings_store.dart';
@@ -622,7 +623,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final brightnessSlider = find.byType(Slider).first;
+      final brightnessSlider = find.byType(PlainSlider).first;
       await tester.drag(brightnessSlider, const Offset(200, 0));
       await tester.pumpAndSettle();
 

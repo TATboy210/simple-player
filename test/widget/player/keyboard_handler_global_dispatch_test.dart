@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/ui/player/player_screen.dart';
@@ -361,7 +362,7 @@ void main() {
             body: KeyboardHandler(
               child: Column(
                 children: [
-                  Slider(
+                  PlainSlider(
                     focusNode: sliderNode,
                     value: 0.5,
                     onChanged: (_) => sliderChanges += 1,

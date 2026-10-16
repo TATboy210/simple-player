@@ -2,6 +2,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
@@ -165,7 +166,7 @@ void main() {
       );
       await tester.pump();
 
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       expect(slider.value, 0.5);
     });
 
@@ -183,7 +184,7 @@ void main() {
       engine.volume.value = 0.7;
       await tester.pump();
 
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       expect(slider.value, 0.7);
     });
 
@@ -200,7 +201,7 @@ void main() {
       await tester.pump();
 
       // Drag slider
-      final slider = find.byType(Slider);
+      final slider = find.byType(PlainSlider);
       final rect = tester.getRect(slider);
       final center = rect.center;
 
@@ -239,7 +240,7 @@ void main() {
       );
       await tester.pump();
 
-      final slider = find.byType(Slider);
+      final slider = find.byType(PlainSlider);
       final center = tester.getRect(slider).center;
       final gesture = await tester.startGesture(center);
       await gesture.moveBy(const Offset(20, 0));
@@ -514,14 +515,14 @@ void main() {
       );
       await tester.pump();
 
-      var slider = tester.widget<Slider>(find.byType(Slider));
+      var slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       expect(slider.value, 0.3);
 
       // 模拟外部变更（如键盘快捷键触发）
       engine.volume.value = 0.9;
       await tester.pump();
 
-      slider = tester.widget<Slider>(find.byType(Slider));
+      slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       expect(slider.value, 0.9);
     });
   });

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/kernel/engine/media_state.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
@@ -457,7 +458,7 @@ void main() {
       final newPaddingBeforeOldEvents =
           replacementVideo.subtitlePaddingHistory.length;
       final sliderValuesBeforeOldEvents = tester
-          .widgetList<Slider>(find.byType(Slider))
+          .widgetList<PlainSlider>(find.byType(PlainSlider))
           .map((slider) => slider.value)
           .toList(growable: false);
       oldFileName.value = 'stale.mp4';
@@ -471,7 +472,7 @@ void main() {
       expect(find.text('stale.mp4'), findsNothing);
       expect(
         tester
-            .widgetList<Slider>(find.byType(Slider))
+            .widgetList<PlainSlider>(find.byType(PlainSlider))
             .map((slider) => slider.value)
             .toList(growable: false),
         sliderValuesBeforeOldEvents,

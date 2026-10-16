@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
@@ -18,7 +19,8 @@ void main() {
           ),
         ),
       );
-      Slider slider() => tester.widget<Slider>(find.byType(Slider));
+      PlainSlider slider() =>
+          tester.widget<PlainSlider>(find.byType(PlainSlider));
       slider().onChangeStart?.call(0.5);
       for (final value in [0.6, 0.7, 0.8]) {
         slider().onChanged?.call(value);
@@ -79,7 +81,7 @@ void main() {
               ),
             );
         await tester.pumpWidget(subject(old, key: 'source-a'));
-        final slider = tester.widget<Slider>(find.byType(Slider));
+        final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
         slider.onChangeStart?.call(0.5);
         slider.onChanged?.call(0.8);
         await tester.pump();
@@ -96,7 +98,10 @@ void main() {
         expect(starts, 1);
         expect(ends, 1);
         if (replacement) {
-          expect(tester.widget<Slider>(find.byType(Slider)).value, 0.2);
+          expect(
+            tester.widget<PlainSlider>(find.byType(PlainSlider)).value,
+            0.2,
+          );
         }
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -131,7 +136,8 @@ void main() {
       await tester.pumpWidget(subject('stable'));
       // 每次断言前重取树上的 Slider —— widget 实例不可变,setState 后
       // 树上是新实例,旧引用的 .value 永远停在捕获时的值。
-      Slider slider() => tester.widget<Slider>(find.byType(Slider));
+      PlainSlider slider() =>
+          tester.widget<PlainSlider>(find.byType(PlainSlider));
       slider().onChangeStart?.call(0.5);
       slider().onChanged?.call(0.8);
       await tester.pump();
@@ -176,7 +182,7 @@ void main() {
         ),
       );
       await tester.pumpWidget(subject('a'));
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       slider.onChangeStart?.call(0.5);
       slider.onChanged?.call(0.8);
       await tester.pump();
@@ -189,7 +195,7 @@ void main() {
       expect(starts, 1);
       expect(ends, 1, reason: 'cancel notifies the old hook');
       expect(
-        tester.widget<Slider>(find.byType(Slider)).value,
+        tester.widget<PlainSlider>(find.byType(PlainSlider)).value,
         0.5,
         reason: 'slider falls back to notifier value',
       );
@@ -216,7 +222,7 @@ void main() {
         ),
       );
       final gesture = await tester.startGesture(
-        tester.getCenter(find.byType(Slider)),
+        tester.getCenter(find.byType(PlainSlider)),
       );
       await gesture.moveBy(const Offset(20, 0));
       await tester.pump();
@@ -224,7 +230,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       expect(writes, isEmpty);
       expect(ends, 1);
-      expect(tester.widget<Slider>(find.byType(Slider)).value, 0.5);
+      expect(tester.widget<PlainSlider>(find.byType(PlainSlider)).value, 0.5);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

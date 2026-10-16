@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
@@ -35,7 +36,7 @@ void main() {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       // Match the Slider gesture lifecycle before invoking move/end callbacks.
       slider.onChangeStart?.call(engine.volume.value);
       final onChanged = slider.onChanged!;
@@ -67,7 +68,7 @@ void main() {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       // Match the Slider gesture lifecycle before invoking move/end callbacks.
       slider.onChangeStart?.call(engine.volume.value);
       slider.onChanged!(0.6);
@@ -118,7 +119,7 @@ void main() {
       await tester.pump();
 
       // 触发节流定时器
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       // Match the Slider gesture lifecycle before invoking move/end callbacks.
       slider.onChangeStart?.call(engine.volume.value);
       slider.onChanged!(0.7);
@@ -142,7 +143,7 @@ void main() {
       await tester.pumpWidget(buildSubject());
       await tester.pump();
 
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       // Match the Slider gesture lifecycle before invoking move/end callbacks.
       slider.onChangeStart?.call(engine.volume.value);
       final onChanged = slider.onChanged!;

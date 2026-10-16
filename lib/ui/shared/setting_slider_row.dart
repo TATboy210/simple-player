@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'plain_slider.dart';
 
 /// 滑块设置行 — label + slider + 数值显示，带防抖
 ///
@@ -82,7 +83,12 @@ class _SettingSliderRowState extends State<SettingSliderRow> {
                   ),
                 ),
                 Expanded(
-                  child: Slider(
+                  // PlainSlider: 避开 Material Slider 的常驻 OverlayPortal
+                  // (Windows AXTree 错误源, 见 plain_slider.dart).
+                  child: PlainSlider(
+                    trackHeight: 4,
+                    thumbRadius: 7,
+                    overlayRadius: 14,
                     value: display,
                     min: widget.min,
                     max: widget.max,
@@ -99,8 +105,6 @@ class _SettingSliderRowState extends State<SettingSliderRow> {
                     onChangeEnd: (_) {
                       setState(() => _dragging = false);
                     },
-                    activeColor: Tokens.accent,
-                    inactiveColor: Tokens.bgHover,
                   ),
                 ),
                 SizedBox(

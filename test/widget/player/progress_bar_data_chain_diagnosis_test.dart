@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_timeline.dart';
@@ -72,9 +73,19 @@ Widget _timelineTree({
   );
 }
 
+// 排除 PlainSlider (音量条同为 slider 语义角色) — 只取进度条自身节点.
 Semantics _progressSemantics(WidgetTester tester) => tester.widget<Semantics>(
   find.byWidgetPredicate(
-    (widget) => widget is Semantics && (widget.properties.slider ?? false),
+    (widget) =>
+        widget is Semantics &&
+        (widget.properties.slider ?? false) &&
+        find
+            .ancestor(
+              of: find.byWidget(widget),
+              matching: find.byType(PlainSlider),
+            )
+            .evaluate()
+            .isEmpty,
   ),
 );
 

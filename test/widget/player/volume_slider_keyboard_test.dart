@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_player_flutter/ui/shared/plain_slider.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
@@ -34,13 +35,13 @@ void main() {
   /// 两种状态都能持焦，保证 RED 的失败原因落在「引擎调用未发生」而非
   /// 空指针崩溃。
   FocusNode effectiveFocusNode(WidgetTester tester) {
-    final slider = tester.widget<Slider>(find.byType(Slider));
+    final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
     final explicit = slider.focusNode;
     if (explicit != null) return explicit;
     final internal = tester.widget<Focus>(
       find
           .descendant(
-            of: find.byType(Slider),
+            of: find.byType(PlainSlider),
             matching: find.byWidgetPredicate(
               (w) => w is Focus && w.focusNode != null,
             ),
@@ -59,7 +60,7 @@ void main() {
       // Material 键盘调节的回调序列只含 onChanged — 绝不调 onChangeStart/End。
       effectiveFocusNode(tester).requestFocus();
       await tester.pump();
-      tester.widget<Slider>(find.byType(Slider)).onChanged!(0.7);
+      tester.widget<PlainSlider>(find.byType(PlainSlider)).onChanged!(0.7);
 
       // 节流窗口内不应调用引擎
       expect(engine.setVolumeCallCount, 0);
@@ -82,7 +83,7 @@ void main() {
       // 防御纵深（威胁 T-261009fit-01）：故意送入越界值，引擎必须收到 1.0。
       effectiveFocusNode(tester).requestFocus();
       await tester.pump();
-      tester.widget<Slider>(find.byType(Slider)).onChanged!(1.4);
+      tester.widget<PlainSlider>(find.byType(PlainSlider)).onChanged!(1.4);
 
       await tester.pump(const Duration(milliseconds: 100));
       expect(engine.setVolumeCallCount, 1);
@@ -101,7 +102,7 @@ void main() {
       // 不请求焦点 — 模拟被替换手势的残留 tearoff 直接打回回调（
       // volume_drag_feedback_test 的「captured callbacks cannot resurrect
       // a timer」契约在新键盘路径下的钉子）。
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      final slider = tester.widget<PlainSlider>(find.byType(PlainSlider));
       slider.onChanged?.call(0.9);
       slider.onChangeEnd?.call(0.9);
 

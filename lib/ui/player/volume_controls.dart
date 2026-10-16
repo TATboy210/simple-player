@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
 import '../shared/value_listenable_builder2.dart';
 import '../shared/osd_overlay.dart';
+import '../shared/plain_slider.dart';
 
 /// 音量按钮（单击静音）
 ///
@@ -112,7 +113,7 @@ class _VolumeButtonState extends State<VolumeButton> {
 /// 松手时通过 [onChangeEnd] 立即同步最终值（零感知延迟）。
 /// 鼠标滚轮保持无节流（离散事件，每秒 3-5 次）。
 /// 键盘调节（聚焦滑条后方向键）与拖动共用同一条节流提交链：
-/// 直达回调序列（只有 [Slider.onChanged]、无 onChangeStart/End 的来源）
+/// 直达回调序列（只有 [PlainSlider.onChanged]、无 onChangeStart/End 的来源）
 /// 经 State 自持 FocusNode 的 hasFocus 门放行 — 无焦点裸 onChanged
 /// （旧手势残留 tearoff）一律拒绝提交；键盘分支不写局部拖拽值，
 /// 视觉反馈经 [volume] 的引擎回声到达。
@@ -120,12 +121,6 @@ class _VolumeButtonState extends State<VolumeButton> {
 /// 路径B Commit1:数据源从 [MediaEngine] 解耦为 [volume] ValueListenable
 /// + [onSetVolume] 回调。
 class VolumeSlider extends StatefulWidget {
-  static const _sliderTheme = SliderThemeData(
-    trackHeight: 3,
-    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
-    overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
-  );
-
   final ValueListenable<double> volume;
   final void Function(double) onSetVolume;
 
@@ -162,7 +157,7 @@ class VolumeSlider extends StatefulWidget {
 }
 
 class _VolumeSliderState extends State<VolumeSlider> {
-  /// 键盘路径焦点门 — State 自持节点，build 中传入 [Slider.focusNode]。
+  /// 键盘路径焦点门 — State 自持节点，build 中传入 [PlainSlider.focusNode]。
   ///
   /// 键盘回归本体：直达回调序列（只有 onChanged、无 onChangeStart/End）
   /// 无法靠 _interacting 识别，必须靠焦点区分真实键盘调节与残留 tearoff。
@@ -191,7 +186,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
   /// OSD 仍为 100ms），非拖动走焦点门控的同一节流提交链。
   void _onChanged(double rawValue) {
     if (!_active) return;
-    // 入口统一钳制（威胁 T-261009fit-01 防御纵深）：Slider 自身已钳制其
+    // 入口统一钳制（威胁 T-261009fit-01 防御纵深）：PlainSlider 自身已钳制其
     // intent 产生的值，直接回调通路（键盘/残留 tearoff）仍可能送入越界值，
     // 写法对齐滚轮路径的既有 clamp 风格。
     final v = rawValue.clamp(0.0, 1.0);
@@ -295,7 +290,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
     return SizedBox(
       width: Tokens.volumeSliderWidth,
       child: Listener(
-        // Slider has no public cancel callback: discard before its recognizer ends.
+        // 指针取消须先于滑条手势收尾丢弃待提交值 (滑条把取消当 onChangeEnd).
         onPointerCancel: (_) {
           _cancelDrag();
           if (mounted) setState(() {});
@@ -311,17 +306,14 @@ class _VolumeSliderState extends State<VolumeSlider> {
         },
         child: ValueListenableBuilder<double>(
           valueListenable: widget.volume,
-          builder: (_, volume, _) => SliderTheme(
-            data: VolumeSlider._sliderTheme,
-            child: Slider(
-              focusNode: _focusNode,
-              value: _dragValue ?? volume,
-              onChangeStart: _onChangedStart,
-              onChanged: _onChanged,
-              onChangeEnd: _onChangedEnd,
-              activeColor: Tokens.accent,
-              inactiveColor: Tokens.bgHover,
-            ),
+          // PlainSlider 而非 Material Slider: 后者常驻值指示器 OverlayPortal,
+          // Windows 无障碍桥每次语义更新报 AXTree 错误并重建 (见其 doc).
+          builder: (_, volume, _) => PlainSlider(
+            focusNode: _focusNode,
+            value: _dragValue ?? volume,
+            onChangeStart: _onChangedStart,
+            onChanged: _onChanged,
+            onChangeEnd: _onChangedEnd,
           ),
         ),
       ),
