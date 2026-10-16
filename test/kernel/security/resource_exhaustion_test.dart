@@ -25,6 +25,12 @@ import 'package:simple_player_flutter/kernel/services/path_validator.dart';
 
 import '../../helpers/fake_engine.dart';
 
+
+/// 批量 (万次级) 校验的墙钟预算 — 只为拦截灾难性退化 (正则回溯/二次方
+/// 膨胀会超出数量级), 不是性能基准. 共享 CI runner (macos-15-intel) 实测
+/// 1023ms 抖过旧 1000ms 线, 故留 3 倍余量.
+const _bulkBudgetMs = 3000;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -233,7 +239,7 @@ void main() {
       stopwatch.stop();
 
       // 10k 次校验应在 1 秒内完成 — 验证无 ReDoS
-      expect(stopwatch.elapsedMilliseconds, lessThan(1000));
+      expect(stopwatch.elapsedMilliseconds, lessThan(_bulkBudgetMs));
     });
 
     test('Validate 10,000 valid paths — baseline performance', () {
@@ -256,7 +262,7 @@ void main() {
       stopwatch.stop();
 
       // 有效路径同样在 1 秒内完成
-      expect(stopwatch.elapsedMilliseconds, lessThan(1000));
+      expect(stopwatch.elapsedMilliseconds, lessThan(_bulkBudgetMs));
     });
 
     test('filterValid with 10,000 mixed paths — bounded output', () {
@@ -275,7 +281,7 @@ void main() {
       expect(valid.every((p) => p.endsWith('.mp4')), isTrue);
 
       // 完成时间合理
-      expect(stopwatch.elapsedMilliseconds, lessThan(1000));
+      expect(stopwatch.elapsedMilliseconds, lessThan(_bulkBudgetMs));
     });
 
     test('Worst-case path length — no exponential blowup', () {
@@ -310,7 +316,7 @@ void main() {
       }
 
       stopwatch.stop();
-      expect(stopwatch.elapsedMilliseconds, lessThan(1000));
+      expect(stopwatch.elapsedMilliseconds, lessThan(_bulkBudgetMs));
     });
   });
 
