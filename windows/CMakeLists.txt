@@ -58,6 +58,17 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Media Foundation 延迟加载 — 缩略图插件静态导入 mfplat/mfreadwrite, 而
+# Windows N/KN 版未装 Media Feature Pack 时系统无此 DLL: 加载期导入会让
+# 整个 exe 启动失败 (播放走 libmpv, 本不依赖 MF). 延迟到首次调用才解析,
+# Dart 侧 (WindowsThumbnailProvider) 先探测 mfplat.dll 可加载再调用插件,
+# 缺失时缩略图降级占位.
+if(TARGET flutter_video_thumbnail_plus_plugin)
+  target_link_options(flutter_video_thumbnail_plus_plugin PRIVATE
+    "/DELAYLOAD:mfplat.dll" "/DELAYLOAD:mfreadwrite.dll")
+  target_link_libraries(flutter_video_thumbnail_plus_plugin PRIVATE delayimp)
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
@@ -107,6 +118,20 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# 应用本地部署 MSVC 运行时 (msvcp140/vcruntime140/vcruntime140_1 等).
+# 为什么: exe 与全部 C++ 插件 DLL 动态链接 VC++ 运行时, Flutter 模板不随包
+# 分发; 未装 VC++ Redistributable 的干净机器启动即报 "找不到 MSVCP140.dll".
+# 微软允许 app-local 部署 (同目录 DLL 优先加载). UCRT 属 Win10+ 系统组件不带.
+# 仅 Profile/Release: Debug 运行时 (*d.dll) 不可再分发, 开发机自有 VS.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+  install(FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    CONFIGURATIONS Profile;Release
+    COMPONENT Runtime)
+endif()
 
 # 链接期副产物清扫(bitsdojo STATIC 插件库 + exe 自身导入库)。
 # 为什么清扫：bitsdojo 以 add_library(STATIC) 参与构建，generated_plugins.cmake

@@ -1,3 +1,5 @@
+import 'dart:ffi' show DynamicLibrary;
+
 import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter_video_thumbnail_plus/flutter_video_thumbnail_plus.dart';
 
@@ -25,8 +27,25 @@ class WindowsThumbnailProvider implements ThumbnailProvider {
   /// Media Foundation 收敛到末帧.
   static const _timeMs = 1000;
 
+  /// Media Foundation 是否可用 — 进程级一次探测.
+  ///
+  /// Windows N/KN 未装 Media Feature Pack 时无 mfplat.dll; 插件对 MF 是
+  /// 延迟加载 (windows/CMakeLists.txt /DELAYLOAD), 不先探测就调用会在
+  /// 原生侧抛延迟加载 SEH 异常直接崩溃, 故缺失时永久降级为无缩略图.
+  static final bool isMediaFoundationAvailable = _probeMediaFoundation();
+
+  static bool _probeMediaFoundation() {
+    try {
+      DynamicLibrary.open('mfplat.dll'); // side effect: 进程内加载 (随后插件复用)
+      return true;
+    } on ArgumentError {
+      return false; // DynamicLibrary.open 加载失败抛 ArgumentError
+    }
+  }
+
   @override
   Future<Uint8List?> generateThumbnail(String filePath) async {
+    if (!isMediaFoundationAvailable) return null; // 占位呈现, 见上
     try {
       return await FlutterVideoThumbnailPlus.thumbnailData(
         video: filePath,

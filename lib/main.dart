@@ -15,6 +15,7 @@ import 'kernel/diagnostics/error_reporter.dart';
 import 'kernel/diagnostics/error_reporting_dependencies.dart';
 import 'kernel/diagnostics/global_error_hooks.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
+import 'kernel/diagnostics/runtime_environment_report.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
 import 'kernel/window_bridge/window_manager_service.dart';
 import 'ui/dialogs/settings/diagnostic_log_target.dart';
@@ -194,6 +195,22 @@ Future<void> _revealWindowAfterFirstFrame(WindowService windowService) async {
   }
 }
 
+/// 进程静态事实 — 引擎侧 (render/decode) 条目由 MpvKitEngine 运行期补齐.
+void _recordStaticEnvironment() {
+  RuntimeEnvironmentReport.I
+    ..record('started', DateTime.now().toIso8601String())
+    ..record(
+      'build',
+      kReleaseMode ? 'release' : (kProfileMode ? 'profile' : 'debug'),
+    )
+    ..record(
+      'os',
+      '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+    )
+    ..record('cpus', '${Platform.numberOfProcessors}')
+    ..record('locale', Platform.localeName);
+}
+
 /// 首帧等待超时 — 覆盖引擎在隐藏窗口下不产帧的平台差异风险。
 const _firstFrameRevealTimeout = Duration(milliseconds: 800);
 
@@ -227,6 +244,9 @@ Future<void> _activateDiagnosticLog(
         // 启动激活收敛到协调器的唯一激活实现（research 单一激活实现
         // caveat）：sink 构造与 delegate.activate 只存在于协调器内。
         DiagnosticLogTarget.I.activateResolved(file: file);
+        // 运行环境快照与 error.log 同目录 (跨机器排障, 见其 doc).
+        _recordStaticEnvironment();
+        RuntimeEnvironmentReport.I.attach(file.parent);
       case ErrorLogLocationUnavailable(:final error, :final stackTrace):
         KernelLogger.I.warn(
           'Diagnostic file evidence is unavailable during startup.',

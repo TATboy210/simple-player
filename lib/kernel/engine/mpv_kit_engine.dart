@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mpv_kit_video/mpv_kit_video.dart';
 
 import '../diagnostics/kernel_logger.dart' show KernelLoggerImpl;
+import '../diagnostics/runtime_environment_report.dart';
 import '../models/play_mode.dart';
 import '../models/player_error.dart';
 import 'media_engine.dart';
@@ -106,6 +107,10 @@ class MpvKitEngine implements MediaEngine {
     _video = video;
     _textureId.value = video.textureId;
     _log('mpv_kit 视频输出: backend=${video.backend.name} (${video.reason})');
+    // 跨机器排障: release 日志为 NullSink, 渲染路径落盘到 environment.txt.
+    RuntimeEnvironmentReport.I
+      ..record('render.backend', video.backend.name)
+      ..record('render.reason', video.reason);
   }
 
   // ---- 自建 ValueNotifier ----
@@ -774,6 +779,13 @@ class MpvKitEngine implements MediaEngine {
       // 切曲间隙的 -1 不覆盖当前条目 (与 media_kit 镜像语义一致).
       if (v is int && v >= 0) _playingPos = v;
       _scheduleQueueFlush();
+    });
+    // 实际硬解路径 (d3d11va/videotoolbox/vaapi/no) — "no" = CPU 软解, 是
+    // 其他机器卡顿的首要嫌疑; 每次变化落盘 environment.txt.
+    _listen(p.mpv.observeProperty('hwdec-current'), (v) {
+      if (v is String && v.isNotEmpty) {
+        RuntimeEnvironmentReport.I.record('decode.hwdec', v);
+      }
     });
     _listen(p.mpv.events, _onEvent);
     _listen(p.errors, _onPlaybackError);
