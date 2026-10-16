@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path_provider/path_provider.dart';
 
 import '../diagnostics/kernel_logger.dart';
@@ -221,7 +222,7 @@ class PlaylistStore {
     try {
       // flush 是崩溃安全的前提 — 数据确实落盘后 rename 替换才有意义.
       await temp.writeAsString(contents, flush: true);
-      await temp.rename(target.path);
+      await _renameWithRetry(temp, target.path);
     } on Exception {
       // 发布失败 — temp 残留 best-effort 清除（锁场景可能仍失败, 吞掉,
       // 由下次成功发布后的清扫兜底）; 旧目标文件未被动过, 历史无损.
@@ -233,6 +234,43 @@ class PlaylistStore {
       rethrow;
     }
   }
+
+  /// rename 瞬时锁重试退避 (总计约 0.75s, 远小于 5s 断点节流).
+  ///
+  /// Windows 上杀软/搜索索引器/云盘同步会在新文件落盘瞬间短暂持有目标
+  /// 句柄, MoveFileExW 返回 ERROR_ACCESS_DENIED (errno 5) 或
+  /// ERROR_SHARING_VIOLATION (32); 句柄通常几十毫秒内释放. 不重试则装了
+  /// 杀软的机器会随机丢断点 (CI windows-latest 上实测复现).
+  static const _renameRetryDelays = [
+    Duration(milliseconds: 50),
+    Duration(milliseconds: 100),
+    Duration(milliseconds: 200),
+    Duration(milliseconds: 400),
+  ];
+
+  /// rename, 遇 [FileSystemException] 按 [_renameRetryDelays] 退避重试;
+  /// 重试耗尽则抛出最后一次错误 (由 _publishAtomic 清 temp 并上抛记日志).
+  /// [renameOverride] 仅供测试注入瞬时失败.
+  Future<void> _renameWithRetry(File temp, String targetPath) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        final override = renameOverride;
+        if (override != null) {
+          await override(temp, targetPath);
+        } else {
+          await temp.rename(targetPath);
+        }
+        return;
+      } on FileSystemException {
+        if (attempt >= _renameRetryDelays.length) rethrow;
+        await Future<void>.delayed(_renameRetryDelays[attempt]);
+      }
+    }
+  }
+
+  /// 测试缝: 替换 rename 实现以模拟瞬时锁 (生产恒为 null).
+  @visibleForTesting
+  Future<void> Function(File temp, String targetPath)? renameOverride;
 
   /// 清扫 `.part` 崩溃残留 — 历史中断写入不再无限累积（T-261009-fj2-03）.
   ///

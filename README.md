@@ -134,8 +134,8 @@ lib/
 
 ### 环境要求 / Prerequisites
 
-- Flutter SDK 3.11+
-- Windows 10/11（目标平台）
+- Flutter SDK 3.47.6+（Dart 3.13.5+）
+- Windows 10/11（主目标平台）；macOS 12+、Linux（glibc 2.35+）可构建运行
 - Visual Studio Build Tools（C++ 桌面开发）
 
 ### 运行 / Run
@@ -151,6 +151,24 @@ flutter run -d windows
 flutter build windows
 ```
 
+### 运行环境 / Runtime requirements
+
+libmpv 及其 FFmpeg 依赖由 mpv_kit_libs 构建钩子下载并随包分发，目标机器无需安装 mpv。
+
+- **Windows**：VC++ 运行时随包（app-local），无需安装 Redistributable。Windows N/KN 未装 Media Feature Pack 时仅缩略图降级为占位，播放不受影响。
+- **Linux 运行时依赖**：随包 libmpv 直接链接以下系统库（桌面发行版默认自带，精简/服务器安装需补齐）：
+
+  ```bash
+  # Debian/Ubuntu 24.04
+  sudo apt install libpulse0 libasound2t64 libva2 libva-drm2 libvulkan1 libdrm2 libfontconfig1 libssl3t64 zlib1g
+  ```
+
+- **渲染回退**：Vulkan 不可用（无驱动/虚拟机/远程桌面）时自动回退软件渲染；可设环境变量 `MPV_KIT_VIDEO_RENDERER=software|gpu|gpu-next` 强制指定。
+
+### 排障 / Troubleshooting
+
+运行时实际走的路径记录在 exe 旁 `logs/environment.txt`（不可写时在应用数据目录 `logs/`）：系统版本、`render.backend`（vulkan/software）及回退原因、`decode.hwdec`（实际硬解方式，`no` 即 CPU 软解）。反馈"卡顿/黑屏"时请附上该文件与同目录 `error.log`。
+
 ## 测试 / Testing
 
 ```bash
@@ -164,7 +182,7 @@ flutter analyze       # 静态分析（strict-casts / inference / raw-types 全�
 
 | 包 / Package | 用途 / Purpose |
 |--------------|-----------------|
-| [media_kit](https://pub.dev/packages/media_kit) | libmpv / FFmpeg 播放引擎 + 桌面控件 |
+| [mpv_kit_video](https://pub.dev/packages/mpv_kit_video) | libmpv 0.41 播放引擎 + Vulkan 零拷贝视频纹理（随包 libmpv） |
 | [window_manager](https://pub.dev/packages/window_manager) | 窗口尺寸 / 全屏 / 置顶 |
 | [file_picker](https://pub.dev/packages/file_picker) | 文件选择对话框 |
 | [desktop_drop](https://pub.dev/packages/desktop_drop) | 拖放文件 |

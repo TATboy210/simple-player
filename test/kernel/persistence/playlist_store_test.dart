@@ -220,4 +220,50 @@ void main() {
       expect((decoded['items'] as List<dynamic>).length, 2);
     });
   });
+
+  group('transient rename lock (Windows AV/indexer)', () {
+    PersistedPlaylistSnapshot snap(String path) => PersistedPlaylistSnapshot(
+      items: [PlaylistItem(path: path)],
+      playMode: PlayMode.loopAll,
+    );
+
+    test('retries a transiently locked rename and publishes', () async {
+      final dir = await Directory.systemTemp.createTemp('store_lock');
+      addTearDown(() => dir.delete(recursive: true));
+      final store = PlaylistStore(resolveDirectory: () async => dir);
+      var calls = 0;
+      store.renameOverride = (temp, target) async {
+        // 前两次模拟杀软短暂持有句柄 (errno 5), 第三次放行.
+        if (++calls <= 2) {
+          throw const FileSystemException('Access is denied', 'playlist.json');
+        }
+        await temp.rename(target);
+      };
+
+      await store.save(snap('locked.mp4'));
+
+      expect(calls, 3);
+      expect((await store.load())?.items.single.path, 'locked.mp4');
+    });
+
+    test('gives up after the retry budget without throwing', () async {
+      final dir = await Directory.systemTemp.createTemp('store_lock');
+      addTearDown(() => dir.delete(recursive: true));
+      final store = PlaylistStore(resolveDirectory: () async => dir);
+      var calls = 0;
+      store.renameOverride = (temp, target) async {
+        calls++;
+        throw const FileSystemException('Access is denied', 'playlist.json');
+      };
+
+      await store.save(snap('never.mp4')); // 不抛 — 仅记日志
+
+      expect(calls, 5, reason: '首次 + 4 次退避重试');
+      expect(
+        dir.listSync().where((e) => e.path.endsWith('.part')),
+        isEmpty,
+        reason: '放弃时清除 temp',
+      );
+    });
+  });
 }
