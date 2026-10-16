@@ -55,13 +55,30 @@ final class WindowModeCoordinator {
     return operation;
   }
 
+  /// 原生全屏调用隔离 — 平台不支持 (MissingPluginException) 或窗口管理器
+  /// 拒绝 (PlatformException) 时只记录, 模式状态保持已提交的意图: 全屏
+  /// 失败不得让 setMode 抛出、更不得卡住后续串行模式切换.
+  Future<void> _runNativeFullscreen(
+    Future<void> Function() call,
+    String phase,
+  ) async {
+    try {
+      await call();
+    } on Exception catch (error, stackTrace) {
+      _log(
+        '[WindowModeCoordinator] native fullscreen $phase failed: '
+        '$error\n$stackTrace',
+      );
+    }
+  }
+
   Future<void> _setSerialized(WindowMode target) async {
     if (target == WindowMode.fullscreen) {
       // 先提交意图+模式 (onNativeMaximize 依赖意图把原生铺满映射回全屏),
       // 再执行原生全屏.
       if (_state.mode.value == WindowMode.fullscreen) return;
       syncFullscreenState(true);
-      await _enterFullscreen();
+      await _runNativeFullscreen(_enterFullscreen, 'enter');
       return;
     }
     await _waitForInitialization();
@@ -71,7 +88,9 @@ final class WindowModeCoordinator {
     _log('setMode($target) <- $previous');
     _fullscreenIntent = false;
     _commit(generation, target);
-    if (previous == WindowMode.fullscreen) await _exitFullscreen();
+    if (previous == WindowMode.fullscreen) {
+      await _runNativeFullscreen(_exitFullscreen, 'exit');
+    }
     if (target == WindowMode.maximized) {
       await _maximize();
     } else if (previous == WindowMode.maximized) {

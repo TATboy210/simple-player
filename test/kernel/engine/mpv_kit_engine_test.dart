@@ -14,6 +14,8 @@ import 'package:simple_player_flutter/kernel/engine/open_result.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/kernel/models/player_error.dart';
 
+import '../../helpers/bundled_libmpv.dart';
+
 /// 写 [ms] 毫秒 8kHz 单声道 16-bit 静音 WAV.
 File _wav(Directory dir, String name, {int ms = 600}) {
   const rate = 8000;
@@ -60,7 +62,10 @@ void main() {
   late Directory tmp;
   late MpvKitEngine engine;
 
-  setUpAll(() => tmp = Directory.systemTemp.createTempSync('mpvkit_engine'));
+  setUpAll(() {
+    loadBundledLibmpvForTests();
+    tmp = Directory.systemTemp.createTempSync('mpvkit_engine');
+  });
   tearDownAll(() => tmp.deleteSync(recursive: true));
   setUp(
     () => engine = MpvKitEngine(
