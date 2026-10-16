@@ -6,6 +6,8 @@ class Tokens {
 
   static const bgDeep = Color(0xFF060810); // 最深背景 - 加深
   static const bgBase = Color(0xFF0C0F18); // 加深
+  /// 视频面底色 — 纯黑, 与 media_kit Video 默认底色一致 (letterbox 黑边).
+  static const bgVideo = Color(0xFF000000);
   static const bgPanel = Color(0xFF111520); // 加深
   static const bgElevated = Color(0xFF161A28); // 加深
   static const bgHover = Color(0xFF283045); // hover 高亮 — 比 bgElevated 明显更亮

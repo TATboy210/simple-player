@@ -16,13 +16,12 @@
 ///   (window → videoProcessing → controller → engine).
 ///
 /// Architecture: PlayerFeature/PlayerViewModel → **PlayerServices** → concrete services.
-/// Dependency chain: PlayerServices → MediaKitEngine → media_kit/libmpv native.
+/// Dependency chain: PlayerServices → MpvKitEngine → mpv_kit/libmpv native.
 ///
 /// v1.8:移除 Playlist/playlistGeneration(单文件播放器,无队列)。
 library;
 
 import 'package:flutter/foundation.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 import 'diagnostics/clock.dart';
 import 'diagnostics/error_reporter.dart';
@@ -33,7 +32,7 @@ import 'diagnostics/rss_provider.dart';
 
 import 'window_bridge/window_manager_service.dart';
 import 'engine/media_engine.dart';
-import 'engine/media_kit_engine.dart';
+import 'engine/mpv_kit_engine.dart';
 import 'persistence/playlist_store.dart';
 import 'persistence/settings_store.dart';
 import 'services/app_settings_service.dart';
@@ -116,14 +115,11 @@ class PlayerServices {
   /// Win32 window bridge service.
   final WindowBridge windowService;
 
-  /// media_kit [VideoController] — 供 UI [Video] widget 使用.
+  /// mpv_kit 引擎实例 — UI 视频面 ([MpvVideo]) 与控制层端口的取材处.
   ///
-  /// 透传自 [_mediaKitEngine]. media_kit 是唯一后端 (fvp/MDK 已移除).
-  VideoController get mediaKitVideoController =>
-      _mediaKitEngine!.videoController;
-
-  /// media_kit 引擎实例 — 持有以透传 [mediaKitVideoController].
-  MediaKitEngine? _mediaKitEngine;
+  /// 测试注入 fake 引擎时为 null (UI 走 videoSurfaceBuilder 测试缝).
+  MpvKitEngine? get mpvKitEngine => _mpvKitEngine;
+  MpvKitEngine? _mpvKitEngine;
 
   bool _initialized = false;
   bool _disposed = false;
@@ -141,7 +137,7 @@ class PlayerServices {
   ///
   /// Initialization order (sequential — each step depends on the previous):
   /// 1. MemoryMonitor using the logger initialized by the composition root
-  /// 2. MediaKitEngine (engine)
+  /// 2. MpvKitEngine (engine + video output)
   /// 3. PlaybackController (orchestration)
   /// 4. VideoProcessingService (video effects)
   Future<void> init() {
@@ -166,12 +162,15 @@ class PlayerServices {
 
       _throwIfDisposed();
       final dependencies = _testingDependencies;
-      _engine = dependencies?.engineFactory() ?? MediaKitEngine();
-      _mediaKitEngine = switch (_engine) {
-        final MediaKitEngine mediaKitEngine => mediaKitEngine,
+      _engine = dependencies?.engineFactory() ?? MpvKitEngine();
+      _mpvKitEngine = switch (_engine) {
+        final MpvKitEngine mpvKitEngine => mpvKitEngine,
         _ => null,
       };
       _engineCreated = true;
+      // 视频渲染上下文异步创建 (Vulkan 零拷贝, 失败回退软件); 失败走
+      // 下方统一清理路径, 由 PlayerFeature 呈现初始化错误.
+      await _mpvKitEngine?.attachVideo();
 
       // 内存治理锚点 (v0.0.9, debug/profile) — 播放状态每次变化即时采样
       // RSS 并带状态名入日志, 切曲 +60MB 阶梯可直接归因到具体状态事件。
@@ -235,7 +234,7 @@ class PlayerServices {
       _videoProcessing = null;
       _controller = null;
       _engine = null;
-      _mediaKitEngine = null;
+      _mpvKitEngine = null;
       rethrow;
     } finally {
       _initOperation = null;

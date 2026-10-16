@@ -245,7 +245,7 @@ class _PlayerFeatureState extends State<PlayerFeature> {
 
     return PlayerScreen(
       engine: engine,
-      mediaKitController: _services.mediaKitVideoController,
+      mpvKitEngine: _services.mpvKitEngine,
       controller: _services.controller,
       playlistCoordinator: _services.playlistCoordinator,
       // v0.0.6: 设置页服务注入 — video/audio 分区 + 断点续播开关启用.

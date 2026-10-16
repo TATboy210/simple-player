@@ -82,7 +82,7 @@ void main() {
             settings: settings,
           ),
           windowService: windowService,
-          videoSurfaceBuilder: (_) => const SizedBox.expand(),
+          videoSurfaceBuilder: () => const SizedBox.expand(),
           testVideoControls: videoPort,
         ),
       ),

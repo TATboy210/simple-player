@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:simple_player_flutter/ui/player/media_kit_player_port.dart';
+import 'package:simple_player_flutter/ui/player/mpv_kit_player_port.dart';
 
 /// 路径B 测试 fake — 实现 [PlayerPort] 用纯 Dart [StreamController.broadcast]。
 ///

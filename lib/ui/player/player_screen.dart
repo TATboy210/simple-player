@@ -4,20 +4,21 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:mpv_kit_video/mpv_kit_video.dart';
 
 import '../../kernel/window_bridge/window_manager_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/bridge/win32/ime_bridge.dart';
 import '../../kernel/engine/engine_state.dart';
+import '../../kernel/engine/mpv_kit_engine.dart';
 import '../../kernel/services/playback_controller.dart';
 import '../../kernel/services/playlist_coordinator.dart';
 import '../../kernel/services/subtitle_path_validator.dart';
 import '../theme/tokens.dart';
 import '../dialogs/settings/settings_panel.dart';
 import '../window/custom_title_bar.dart';
-import 'media_kit_player_port.dart';
+import 'mpv_kit_player_port.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
@@ -35,14 +36,14 @@ import '../dialogs/settings/settings_panel_session.dart';
 class PlayerScreen extends StatefulWidget {
   final MediaEngine engine;
 
-  /// media_kit [VideoController] — UI 用 [Video] widget. 透传自 PlayerServices.
+  /// mpv_kit 引擎 — 视频面 ([MpvVideo]) 与控制层端口的取材处. 透传自 PlayerServices.
   ///
-  /// 生产组合层必须提供该控制器；仅当 [videoSurfaceBuilder] 注入测试渲染面时可为 null，
-  /// 避免 widget test 绑定 MDK/libmpv 原生运行时。
-  final VideoController? mediaKitController;
+  /// 生产组合层必须提供；仅当 [videoSurfaceBuilder] 注入测试渲染面时可为 null，
+  /// 避免 widget test 绑定 libmpv 原生运行时。
+  final MpvKitEngine? mpvKitEngine;
 
-  /// 可替换的视频渲染面；默认路径仍使用 media_kit [Video]，不改变其生命周期。
-  final Widget Function(GlobalKey<VideoState> videoKey)? videoSurfaceBuilder;
+  /// 可替换的视频渲染面 (测试缝)；默认路径使用 [MpvVideo]。
+  final Widget Function()? videoSurfaceBuilder;
 
   /// 测试渲染面配套的 controls 端口；仅在 [videoSurfaceBuilder] 注入时使用。
   ///
@@ -81,7 +82,7 @@ class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
     super.key,
     required this.engine,
-    this.mediaKitController,
+    this.mpvKitEngine,
     this.videoSurfaceBuilder,
     this.testVideoControls,
     required this.controller,
@@ -95,7 +96,7 @@ class PlayerScreen extends StatefulWidget {
     this.pickSubtitlePath,
     this.emptyState,
     this.debugOnBuild,
-  }) : assert(mediaKitController != null || videoSurfaceBuilder != null),
+  }) : assert(mpvKitEngine != null || videoSurfaceBuilder != null),
        assert(testVideoControls == null || videoSurfaceBuilder != null);
 
   @override
@@ -105,7 +106,11 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   /// media_kit Video 的 state key — 供 setSubtitleViewPadding 调用
   /// (控件可见性联动字幕上移). 不再用于全屏切换 (改走 WindowService.setMode).
-  final GlobalKey<VideoState> _videoKey = GlobalKey<VideoState>();
+  /// 视频面最近一次布局的逻辑高度 — 字幕避让 (sub-margin-y) 的换算基准.
+  double _surfaceHeight = 0;
+
+  /// 生产控制层端口 — 首次构造后复用 (保持 PlayerVideoControls 子树 identity).
+  MpvKitVideoControlsPort? _mpvControlsPort;
 
   /// 空置页刚出现时暂时隔离所有“打开文件”入口的倒计时机制已移除；
   /// 停止即瞬间切换空置态（用户决策：三段过渡动画撤除）。
@@ -247,12 +252,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// resize/drag+settle) — 全屏退出单帧异常的取证维度(C3):退出会话若
   /// 伴随 textureId 变化,指向 native 纹理重建;否则指向合成/布局侧。
   void _createTextureProbe() {
-    final controller = widget.mediaKitController;
+    // mpv_kit 纹理在 resize 时原地重分配 (textureId 恒定), 无 rect notifier.
     _textureProbe = VideoTextureResizeProbe(
       isResizing: widget.windowService.isResizing,
       resizeSessionId: widget.windowService.resizeSessionId,
-      rect: controller?.rect,
-      textureId: controller?.id,
+      rect: null,
+      textureId: widget.mpvKitEngine?.textureId,
       windowMode: widget.windowService.mode,
     );
     // 并联纹理探针:采集同一 resize 会话的 build/raster 帧时序(debug/profile)。
@@ -281,7 +286,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // probe 同时监听窗口 resize 与 controller 的 rect/id；任一来源替换时
     // 都必须解除旧监听，否则诊断会把新窗口会话与旧纹理状态混合。
     if (oldWidget.windowService != widget.windowService ||
-        oldWidget.mediaKitController != widget.mediaKitController) {
+        oldWidget.mpvKitEngine != widget.mpvKitEngine) {
       _textureProbe?.dispose();
       _createTextureProbe();
     }
@@ -299,7 +304,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return oldWidget.windowService == widget.windowService &&
         oldWidget.onFilesDropped == widget.onFilesDropped &&
         oldWidget.onDragHoverChanged == widget.onDragHoverChanged &&
-        oldWidget.mediaKitController == widget.mediaKitController &&
+        oldWidget.mpvKitEngine == widget.mpvKitEngine &&
         oldWidget.videoSurfaceBuilder == widget.videoSurfaceBuilder &&
         oldWidget.testVideoControls == widget.testVideoControls;
   }
@@ -361,7 +366,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
           // Same borrowed session as route-local controls; keep video cache intact.
           menuSession: _menus,
           customBindings: widget.customBindings,
-          videoKey: _videoKey,
           isFullscreen: isFullscreen,
           context: context,
           // O 键与空置页按钮共享同一稳定窗口，不能绕过媒体释放延迟。
@@ -435,50 +439,50 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// 创建视频渲染面；默认实现保持原有 media_kit [Video] 生命周期不变。
+  /// 创建视频渲染面 — [MpvVideo] 纹理与控制层同处一个 Stack.
   ///
-  /// controls 传 [_buildControls] builder — media_kit 全屏 route 会复制此 builder
-  /// (fullscreen.dart:63), 使全屏态自动获得同一份 PlayerVideoControls.
+  /// mpv_kit 无 media_kit 的全屏 route: 全屏由窗口模式驱动原生窗口全屏,
+  /// 控制层无需随 route 复制, 始终挂在此处. MpvVideo 按物理像素渲染并
+  /// 自带 resize 防抖, 不再需要 resize 期间切 filterQuality.
   Widget _createVideoSurface() {
     final testSurface = widget.videoSurfaceBuilder;
     if (testSurface != null) {
-      final surface = testSurface(_videoKey);
+      final surface = testSurface();
       final testVideo = widget.testVideoControls;
       if (testVideo == null) return surface;
-
-      // 测试模式叠加真实 controls widget，但端口由纯 Dart fake 提供，既覆盖
-      // PlayerScreen 装配，又不初始化 MDK/libmpv。生产路径不会进入该分支。
+      // 测试模式叠加真实 controls widget，端口由纯 Dart fake 提供。
       return Stack(
         fit: StackFit.expand,
-        children: [surface, _buildTestControls(testVideo)],
+        children: [surface, _controlsFor(testVideo)],
       );
     }
 
-    final controller = widget.mediaKitController;
-    if (controller == null) return const SizedBox.expand();
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.windowService.isResizing,
-      builder: (_, resizing, _) => Video(
-        key: _videoKey,
-        controller: controller,
-        controls: _buildControls,
-        // resize 期间用 none 跳过双线性重采样 (raster 尖峰, 根因乙纯合成缩放)。
-        // Video.didUpdateWidget (video_texture.dart:258-260) 处理 filterQuality
-        // 变化，Element 与语义子树均保持挂载；静止时恢复 low 画质。
-        filterQuality: resizing ? FilterQuality.none : FilterQuality.low,
-      ),
+    final engine = widget.mpvKitEngine;
+    final video = engine?.videoController;
+    if (engine == null || video == null) return const SizedBox.expand();
+    final port = _mpvControlsPort ??= MpvKitVideoControlsPort(
+      engine: engine,
+      windowMode: widget.windowService.mode,
+      surfaceHeight: () => _surfaceHeight,
+    );
+    final controls = _controlsFor(port);
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        // 只记录, 不 setState — 端口在字幕避让同步时按需读取.
+        _surfaceHeight = constraints.maxHeight;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(
+              color: Tokens.bgVideo,
+              child: MpvVideo(controller: video),
+            ),
+            controls,
+          ],
+        );
+      },
     );
   }
-
-  /// 测试 surface 使用的 controls 装配；生产仍只走 [_buildControls]。
-  Widget _buildTestControls(VideoControlsPort video) => _controlsFor(video);
-
-  /// Video.controls builder — 符合 `Widget Function(VideoState)` 签名.
-  ///
-  /// 闭包捕获稳定对象（engine、actions 与当前文件名），在 Video 渲染时
-  ///（含全屏 route）调用；全屏状态由各 route 的 [VideoState] 实例实时提供。
-  Widget _buildControls(VideoState state) =>
-      _controlsFor(MediaKitVideoControlsPort(state));
 
   /// 控制层装配的**唯一**入口 — 测试 seam 与生产 Video.controls 复用同一
   /// 构造，防止双路径漂移 (v0.0.6 修复: 生产路径曾漏传 settingsServices,

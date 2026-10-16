@@ -12,14 +12,10 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  # media_kit 引擎 + 桌面控件 + Windows 原生库 (libmpv 二进制) — 唯一后端.
-  # MediaKitEngine implements MediaEngine; Player.stream 事件流根治轮询滞后,
-  # MaterialDesktopVideoControls 成熟 seekbar. fvp/MDK 已移除.
-  media_kit: ^1.2.6
-  media_kit_video: ^2.0.1
-  media_kit_libs_windows_video: ^1.0.11
-  media_kit_libs_macos_video: ^1.1.4
-  media_kit_libs_linux: ^1.2.1
+  # mpv_kit (自研 libmpv 0.41 FFI 绑定) — 唯一后端; mpv_kit_video 重导出
+  # mpv_kit 并经 mpv_kit_libs build hook 打包 libmpv (sha256 校验), runner 无需改动.
+  # MpvKitEngine implements MediaEngine. media_kit 全家已移除 (2026-10).
+  mpv_kit_video: ^0.1.0-dev.2
   path_provider: ^2.1.6
   # 不可升 12/13：file_picker 12+（federated 重构）→ windows_file_picker（全系）
   # 要求 win32 ^6.3.0，与 bitsdojo_window_windows 0.1.6 的 win32 ^5.1.1 区间不相交，

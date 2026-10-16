@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../bridge/win32/fullscreen_bridge.dart';
 import '../bridge/win32/sizemove_bridge.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
@@ -72,6 +73,14 @@ class WindowService with WindowListener implements WindowBridge {
       if (operation != null) await operation;
     },
     log: _log.i,
+    // 原生全屏: Windows 走 media_kit 同款样式摘除 (resize guard 依赖该
+    // 样式变化); 其余平台 (非发布目标) 用 window_manager 兜底.
+    enterFullscreen: () async => Win32FullscreenBridge.isSupported
+        ? Win32FullscreenBridge.enter()
+        : windowManager.setFullScreen(true),
+    exitFullscreen: () async => Win32FullscreenBridge.isSupported
+        ? Win32FullscreenBridge.exit()
+        : windowManager.setFullScreen(false),
   );
 
   /// init 隐藏阶段的 resize 抑制 — [_initWindow] 几何恢复会引发一次

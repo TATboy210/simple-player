@@ -6,7 +6,6 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
-import 'package:simple_player_flutter/kernel/engine/media_kit_engine.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 
 import '../../helpers/fake_engine.dart';
@@ -188,24 +187,6 @@ void main() {
 
       expect(engine.playMode.value, PlayMode.shuffle);
       expect(engine.lastSetPlayMode, PlayMode.shuffle);
-    });
-  });
-
-  group('MediaKitEngine URI 纯逻辑', () {
-    test('path ↔ uri 往返对称 (Windows 本地路径)', () {
-      // 通过 MediaKitEngine 静态纯逻辑验证 — 不实例化引擎 (无 libmpv).
-      const path = r'D:\media\video_1.mp4';
-      final uri = MediaKitEngine.mediaUriFromPath(path);
-
-      expect(uri, 'file:///D:/media/video_1.mp4');
-      expect(MediaKitEngine.pathFromMediaUri(uri), path);
-    });
-
-    test('URL 原样往返', () {
-      const url = 'https://example.com/stream.mp4';
-
-      expect(MediaKitEngine.mediaUriFromPath(url), url);
-      expect(MediaKitEngine.pathFromMediaUri(url), url);
     });
   });
 }

@@ -87,7 +87,7 @@ void main() {
             engine: engine,
             controller: controller,
             windowService: window,
-            videoSurfaceBuilder: (_) =>
+            videoSurfaceBuilder: () =>
                 const SizedBox.expand(key: Key('cached-video')),
             testVideoControls: video,
             onOpenFile: () => openFiles++,

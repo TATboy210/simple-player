@@ -4,7 +4,10 @@ import 'dart:async';
 import 'window_bridge.dart';
 import 'window_service_state.dart';
 
-/// 串行协调普通窗口、最大化和 media_kit 全屏语义。
+/// 串行协调普通窗口、最大化和原生全屏语义。
+///
+/// 全屏由本协调器经注入的 [_enterFullscreen]/[_exitFullscreen] 执行
+/// (Windows: Win32FullscreenBridge; 其余平台: window_manager)。
 final class WindowModeCoordinator {
   WindowModeCoordinator({
     required this._state,
@@ -12,13 +15,20 @@ final class WindowModeCoordinator {
     required this._unmaximize,
     required this._waitForInitialization,
     required this._log,
-  });
+    Future<void> Function()? enterFullscreen,
+    Future<void> Function()? exitFullscreen,
+  }) : _enterFullscreen = enterFullscreen ?? _noop,
+       _exitFullscreen = exitFullscreen ?? _noop;
+
+  static Future<void> _noop() async {}
 
   final WindowServiceState _state;
   final Future<void> Function() _maximize;
   final Future<void> Function() _unmaximize;
   final Future<void> Function() _waitForInitialization;
   final void Function(String) _log;
+  final Future<void> Function() _enterFullscreen;
+  final Future<void> Function() _exitFullscreen;
   Future<void> _operation = Future<void>.value();
   int _generation = 0;
   bool _fullscreenIntent = false;
@@ -47,7 +57,11 @@ final class WindowModeCoordinator {
 
   Future<void> _setSerialized(WindowMode target) async {
     if (target == WindowMode.fullscreen) {
+      // 先提交意图+模式 (onNativeMaximize 依赖意图把原生铺满映射回全屏),
+      // 再执行原生全屏.
+      if (_state.mode.value == WindowMode.fullscreen) return;
       syncFullscreenState(true);
+      await _enterFullscreen();
       return;
     }
     await _waitForInitialization();
@@ -57,6 +71,7 @@ final class WindowModeCoordinator {
     _log('setMode($target) <- $previous');
     _fullscreenIntent = false;
     _commit(generation, target);
+    if (previous == WindowMode.fullscreen) await _exitFullscreen();
     if (target == WindowMode.maximized) {
       await _maximize();
     } else if (previous == WindowMode.maximized) {

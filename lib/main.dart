@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -66,7 +65,6 @@ Future<void> main() {
           executableDirectory: () => File(Platform.resolvedExecutable).parent,
         );
         unawaited(_activateDiagnosticLog(diagnosticLogEffect));
-        MediaKit.ensureInitialized();
         await windowManager.ensureInitialized();
 
         // 启动时序诊断 — 打点式纯计时器，无 UI 广播职责（见 StartupTimeline 注释）。

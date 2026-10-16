@@ -47,7 +47,7 @@ void main() {
 
   /// 固定 surface builder — 跨重泵复用同一闭包（依赖比对按 identity）。
   /// 每次新建闭包会正确触发视频链缓存失效（那是行为契约而非 bug）。
-  Widget surfaceBuilder(GlobalKey<dynamic> key) => const SizedBox.expand();
+  Widget surfaceBuilder() => const SizedBox.expand();
 
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});

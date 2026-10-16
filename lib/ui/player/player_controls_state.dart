@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../kernel/engine/engine_state.dart';
-import 'media_kit_player_port.dart';
+import 'mpv_kit_player_port.dart';
 import 'player_units.dart';
 
 /// 控制栏状态容器 — 订阅 [PlayerPort] stream 转写为 [ValueNotifier]。

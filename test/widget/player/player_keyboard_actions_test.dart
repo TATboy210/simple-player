@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
@@ -45,7 +44,6 @@ void main() {
             onAdjustSubtitleDelay: adjustSubtitle,
             onOpenFile: openFile,
             customBindings: const {},
-            videoKey: GlobalKey<VideoState>(),
             isFullscreen: false,
             context: context,
             child: const SizedBox.expand(),
@@ -84,7 +82,6 @@ void main() {
               controller: controller,
               actions: actions,
               customBindings: const {},
-              videoKey: GlobalKey<VideoState>(),
               isFullscreen: false,
               context: context,
               child: const SizedBox.expand(),

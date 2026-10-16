@@ -5,12 +5,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:media_kit/media_kit.dart';
+import 'package:mpv_kit_video/mpv_kit_video.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/control_bar.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_timeline.dart';
 import 'package:simple_player_flutter/ui/player/control_bar_view_model.dart';
-import 'package:simple_player_flutter/ui/player/media_kit_player_port.dart';
+import 'package:simple_player_flutter/ui/player/mpv_kit_player_port.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_controls_state.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
@@ -75,7 +75,6 @@ Future<void> _waitForSignals(WidgetTester tester) async {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
 
   testWidgets('P39 real PlayerPort duration and position boundary diagnosis', (
     tester,
@@ -86,7 +85,7 @@ void main() {
     );
     final fixtureName = fixture.uri.pathSegments.last;
     final engine = FakeEngine();
-    final player = Player();
+    final player = Player(options: const {'vo': 'null'});
     final rawSubscriptions = <StreamSubscription<dynamic>>[];
     final diagnosticListeners = <VoidCallback>[];
     PlayerControlsState? controlsState;
@@ -103,7 +102,7 @@ void main() {
     // Subscribe upstream before constructing the project port so the raw stream
     // remains an independent harness-validity witness.
     rawSubscriptions.add(
-      player.stream.duration.listen((duration) {
+      player.duration.stream.listen((duration) {
         final value = duration.inMilliseconds;
         trace.log(
           'raw.player.stream.duration',
@@ -114,7 +113,7 @@ void main() {
       }),
     );
     rawSubscriptions.add(
-      player.stream.position.listen((position) {
+      player.position.stream.listen((position) {
         rawPositionObserved = true;
         if (rawPositionLogged) return;
         rawPositionLogged = true;
@@ -128,11 +127,11 @@ void main() {
 
     try {
       trace.log('fixture.open', 'started', detail: 'basename=$fixtureName');
-      await player.open(Media(fixture.path));
+      await player.open(fixture.path);
       fixtureOpened = true;
       trace.log('fixture.open', 'observed', detail: 'basename=$fixtureName');
 
-      final port = MediaKitPlayerPort(player);
+      final port = MpvKitPlayerPort(player);
       trace.log('port.subscribe', 'observed');
       trace.log(
         'port.snapshot.duration',
@@ -291,7 +290,7 @@ void main() {
         productionTimelinePresent,
         strictMode,
       )) {
-        (false, _, _, _) => 'lib/ui/player/media_kit_player_port.dart:MediaKitPlayerPort.duration',
+        (false, _, _, _) => 'lib/ui/player/mpv_kit_player_port.dart:MpvKitPlayerPort.duration',
         (true, false, _, _) =>
           'lib/ui/player/player_video_controls.dart:PlayerControlsState.init',
         (true, true, false, _) =>

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/services/playback_controller.dart';
@@ -30,7 +29,6 @@ KeyboardHandler buildPlayerKeyboardActions({
   required PlaybackController controller,
   required PlayerActions actions,
   required Map<String, String> customBindings,
-  required GlobalKey<VideoState> videoKey,
   required bool isFullscreen,
   required BuildContext context,
   required Widget child,
@@ -102,35 +100,12 @@ KeyboardHandler buildPlayerKeyboardActions({
       controller.trackPreferenceService?.recordSubtitleDelay(delay - 500);
     },
     onMediaPlayPause: actions.onPlayPause,
-    // 方案 B: setMode 设 intent+mode (守卫 onWindowMaximize 同步 mode=fullscreen),
-    // route 切换走 media_kit 原生全屏. 修症状④: 窗口态 videoKey 的
-    // toggleFullscreen/exitFullscreen 受 isFullscreen(context) 守卫 — 退出时
-    // (全屏 route 在 root navigator, 窗口态 context 查不到
-    // FullscreenInheritedWidget) 守卫 false → 不 pop → 退出反而 enter → 渲染出错.
-    // 改为: enter 用 enterFullscreen(窗口态 isFullscreen()=false→push, 正确);
-    //       exit 直接 pop root navigator 栈顶全屏 route(绕过守卫).
-    onToggleFullscreen: () {
-      // 先同步 WindowMode(图标/标题栏/cursor 单一数据源),再 route 切换 —
-      // 与 route 内按钮路径同序。旧路径只切 route 不同步 mode,F/ESC 退出
-      // 后 mode 卡 fullscreen,标题栏/cursor/按钮图标全部陈旧(C2 修复)。
-      actions.onToggleFullscreen?.call();
-      final entering = !isFullscreen;
-      if (entering) {
-        videoKey.currentState?.enterFullscreen();
-      } else {
-        final nav = Navigator.of(context, rootNavigator: true);
-        if (nav.canPop()) nav.maybePop();
-      }
-    },
+    // 全屏由窗口模式驱动原生窗口全屏 (WindowModeCoordinator → Win32 FFI),
+    // F/ESC 只切 WindowMode — 无 route 可 push/pop.
+    onToggleFullscreen: () => actions.onToggleFullscreen?.call(),
     onExitFullscreen: () {
       // ESC exclusively exits fullscreen; task/menu dismissals are pointer-owned.
-      if (isFullscreen) {
-        // 先同步 mode 回 windowed,再关闭 route — route 内 PopScope 统一
-        // 触发 media_kit 原生全屏退出,此处不重复操作窗口几何。
-        actions.onToggleFullscreen?.call();
-        final nav = Navigator.of(context, rootNavigator: true);
-        if (nav.canPop()) nav.maybePop();
-      }
+      if (isFullscreen) actions.onToggleFullscreen?.call();
     },
     child: child,
   );

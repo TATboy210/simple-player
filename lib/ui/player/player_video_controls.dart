@@ -18,7 +18,7 @@ import 'modal_hold_observer.dart';
 import 'auto_hide_controller.dart';
 import 'control_bar.dart';
 import 'control_bar_view_model.dart';
-import 'media_kit_player_port.dart';
+import 'mpv_kit_player_port.dart';
 import 'player_actions.dart';
 import 'player_controls_state.dart';
 import 'player_keyboard_actions.dart';
