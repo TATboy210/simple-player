@@ -1,6 +1,5 @@
 #include "my_application.h"
 
-#include <bitsdojo_window_linux/bitsdojo_window_plugin.h>
 #include <cstring>
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
@@ -120,11 +119,10 @@ static void my_application_activate(GApplication* application) {
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    // BB 同款（2026-09-06）：非 GNOME 的 X11 窗口管理器下启用 bitsdojo
-    // 自定义 frame——与 Windows 一致的自绘标题栏 + 四边等宽缩放；GNOME/
-    // Wayland 仍用 GTK header bar（系统标题栏）。
-    auto bdw = bitsdojo_window_from(window);
-    bdw->setCustomFrame(true);
+    // 非 GNOME 的 X11 窗口管理器：传统系统标题栏（Flutter 模板行为）。
+    // 原 bitsdojo 自定义 frame 已随 window_frame_kit 迁移移除——该包在
+    // Linux 的 customFrame 需 Dart 侧 DragToResizeArea 配合，Linux 非发布
+    // 目标，暂不启用。
     gtk_window_set_title(window, "simple_player_flutter");
   }
 

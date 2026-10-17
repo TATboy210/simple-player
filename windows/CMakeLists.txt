@@ -133,10 +133,10 @@ if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
     COMPONENT Runtime)
 endif()
 
-# 链接期副产物清扫(bitsdojo STATIC 插件库 + exe 自身导入库)。
-# 为什么清扫：bitsdojo 以 add_library(STATIC) 参与构建，generated_plugins.cmake
-# 无差别安装 $<TARGET_FILE:..._plugin>，STATIC 目标即 .lib；exe 因传播的 dllexport
-# 符号又被 MSVC 链接器发出 .lib/.exp。运行时只需要 exe/dll/data，.lib/.exp 永远
+# 链接期副产物清扫(STATIC 插件库 + exe 自身导入库)。
+# 为什么清扫：任何以 add_library(STATIC) 参与构建的插件(历史上的 bitsdojo)，
+# generated_plugins.cmake 都会无差别安装 $<TARGET_FILE:..._plugin> 即 .lib；
+# exe 因传播的 dllexport 符号又被 MSVC 链接器发出 .lib/.exp。运行时只需要 exe/dll/data，.lib/.exp 永远
 # 不是运行时文件，留在 bundle 会让每份 MSIX 白背 ~588KB。
 # 为什么安全：GLOB 只匹配 *.lib/*.exp 两种扩展名，绝不触碰 exe/dll/data；
 # 本规则置于全部 install 规则之后（先装后扫），GLOB 在安装脚本期求值即安装后

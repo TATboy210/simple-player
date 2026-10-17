@@ -2,19 +2,16 @@
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
 
-#include <bitsdojo_window_windows/bitsdojo_window_plugin.h>
-
 #include "flutter_window.h"
 #include "utils.h"
 
-// BB 同款全局配置（2026-09-06 用户裁决，window_manager + bitsdojo 双包）：
-// bitsdojo 接管 NCCALCSIZE/NCHITTEST（BDW_CUSTOM_FRAME），自绘客户区扩展
-// 到整窗，四边等宽原生 resize 判定 + 无系统主题色边框，系统标题栏由自绘
-// 标题栏（custom_title_bar.dart）替代。
-// 不用 BDW_HIDE_ON_STARTUP——窗口创建即隐藏（CreateWindow 无 WS_VISIBLE），
-// 可见性由 Dart 侧控制：WindowService 以隐藏态完成几何恢复，组合根在首帧
-// 栅格化后 reveal 亮窗（v0.0.4 空白窗口修复，详见 main.dart）。
-auto bdw = bitsdojo_window_configure(BDW_CUSTOM_FRAME);
+// 窗口 frame（2026-10 起）：由 window_frame_kit 插件在 Dart 侧
+// WindowOptions(customFrame: true) 时接管 NCCALCSIZE/NCHITTEST（自绘客户区
+// 扩展到整窗、四边等宽原生 resize、无 Win10 主题色边框），runner 无需任何
+// 全局配置——原 bitsdojo_window_configure(BDW_CUSTOM_FRAME) 已删除。
+// 窗口创建即隐藏（CreateWindow 无 WS_VISIBLE），可见性由 Dart 侧控制：
+// WindowService 以隐藏态完成几何恢复，组合根在首帧栅格化后 reveal 亮窗
+// （v0.0.4 空白窗口修复，详见 main.dart）。
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
@@ -40,7 +37,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   //    控制台 I/O 重新合并争线，导致拖拽 resize 掉帧回归；
   // 2) 独立线程下 Dart 帧流水线（build/layout/raster 调度）与原生窗口
   //    消息处理解耦，快速拖拽边框时帧率更稳。
-  // MethodChannel 插件（window_manager/bitsdojo/media_kit）均走 messenger
+  // MethodChannel 插件（window_frame_kit/mpv_kit 等）均走 messenger
   // 线程无关路径，不受此策略影响；纹理仍由 raster 线程消费。
   project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
 

@@ -3,9 +3,15 @@
 ///
 /// Native fullscreen for the runner window: strip `WS_OVERLAPPEDWINDOW` and
 /// cover the nearest monitor; on exit restore the style and either refresh
-/// a maximized window or restore the pre-fullscreen normal rect. The
-/// runner's `fullscreen_resize_guard` keys off exactly this style change,
-/// so the behaviour is kept byte-for-byte equivalent to media_kit's.
+/// a maximized window or restore the pre-fullscreen normal rect.
+///
+/// window_frame_kit 协同 (2026-10): customFrame 的 FrameController 把
+/// "WS_OVERLAPPEDWINDOW 全部摘除" 识别为外部全屏 (IsExternalFullscreenStyle
+/// → 无 frame 客户区映射/无缩放带/屏蔽 SC_SIZE), 故原 runner 的
+/// fullscreen_resize_guard 已删除。与 media_kit 原实现唯一的偏差: 退出时
+/// 只恢复**进入前实际拥有**的 WS_OVERLAPPEDWINDOW 位, 而非整组 OR 回去 —
+/// frame 启用期间窗口刻意不带 WS_CAPTION (否则 Win10 缩放循环重绘主题色
+/// 标题栏), 整组恢复会把它加回来。DWM 边距/圆角由 frame 自管, 本桥不触碰.
 ///
 /// 常量逐一核对 Windows SDK 10.0.26100 `WinUser.h` (勿凭记忆改).
 library;
@@ -156,6 +162,10 @@ final class Win32FullscreenBridge {
   static bool _fullscreen = false;
   static (int, int, int, int)? _rectBefore;
 
+  /// 进入全屏前窗口实际拥有的 WS_OVERLAPPEDWINDOW 子位 (customFrame 下不含
+  /// WS_CAPTION); 退出时按此恢复. 默认整组, 兼容无 frame 的样式.
+  static int _overlappedBitsBefore = _wsOverlappedWindow;
+
   /// 是否在 Windows 上可用.
   static bool get isSupported => Platform.isWindows;
 
@@ -174,6 +184,7 @@ final class Win32FullscreenBridge {
       _getWindowPlacement(hwnd, placement);
       final r = placement.ref.rcNormalPosition;
       _rectBefore = (r.left, r.top, r.right, r.bottom);
+      _overlappedBitsBefore = style & _wsOverlappedWindow;
       final monitor = arena<_MonitorInfo>()
         ..ref.cbSize = sizeOf<_MonitorInfo>();
       _getMonitorInfoW(
@@ -203,7 +214,7 @@ final class Win32FullscreenBridge {
     if (hwnd == 0) return;
     final style = _getWindowLongPtrW(hwnd, _gwlStyle);
     if (style & _wsOverlappedWindow != 0) return;
-    _setWindowLongPtrW(hwnd, _gwlStyle, style | _wsOverlappedWindow);
+    _setWindowLongPtrW(hwnd, _gwlStyle, style | _overlappedBitsBefore);
     if (_isZoomed(hwnd) != 0) {
       _setWindowPos(
         hwnd,

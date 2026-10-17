@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -161,14 +160,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 原生文件对话框在 NULL IMC 下触发 msctf 崩溃（与打开文件同因）。
   Future<String?> _pickSubtitlePath() async {
     final result = await Win32ImeBridge.withImeRestored(
-      () => FilePicker.pickFiles(
+      // file_picker 13：pickFiles 变为多选，单选语义改用 pickFile。
+      () => FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
       ),
     );
-    // file_picker 11.x：返回 FilePickerResult?，用户取消为 null——视为取消。
-    if (result == null) return null;
-    return result.files.single.path;
+    // 用户取消为 null——视为取消。
+    return result?.path;
   }
 
   /// 选择并加载外部字幕；取消或不可加载的路径不会传给底层解析器。
@@ -386,17 +385,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: scaffold,
         );
 
-        // 边缘缩放：bitsdojo BDW_CUSTOM_FRAME 在原生层对四边等宽判定
-        // （WM_NCHITTEST → HT*），Flutter 层不再自建缩放热区。WindowBorder
-        // width:0 仅作声明容器（BB 同款），视觉无边框、不遮挡内容。
+        // 边缘缩放：window_frame_kit customFrame 在原生层对四边+四角等宽
+        // 判定（WM_NCHITTEST → HT*，FLUTTERVIEW 子窗口在缩放带返回
+        // HTTRANSPARENT），Flutter 层不自建缩放热区、无需声明容器。
         // 全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动。
-        return WindowBorder(
-          color: Colors.transparent,
-          width: 0,
-          child: MouseRegion(
-            cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
-            child: keyboardHandler,
-          ),
+        return MouseRegion(
+          cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
+          child: keyboardHandler,
         );
       },
     );

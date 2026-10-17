@@ -20,24 +20,26 @@ enum WindowMode {
 
 /// 面向 UI 的窗口管理抽象，隐藏平台窗口库的具体实现。
 ///
-/// ## 双包架构边界（BB 同款，2026-09-06 迁移，替代 desktop_window 路线）
+/// ## 单包架构边界（2026-10 迁移至 window_frame_kit，取代 bitsdojo +
+/// window_manager 双包）
 ///
-/// 本接口的实现（[WindowService]）之下是两个窗口包的分工：
+/// 本接口的实现（[WindowService]）之下只有一个窗口包 window_frame_kit，
+/// 它是 window_manager 0.5.2 API 的超集，且只注册**一个** WndProc delegate：
 ///
-/// - **bitsdojo_window**（BDW_CUSTOM_FRAME，`windows/runner/main.cpp` 全局
-///   接线）：窗口**视觉与命中域**——原生 NCCALCSIZE return 0（无边框、无
-///   系统主题色描边、无顶部内缩），原生 WM_NCHITTEST 四边等宽 resize 判定，
-///   连带其 GETMINMAXINFO hook 要求的 minSize 双通道同步。runner 保持
-///   Flutter 上游模板，零自写窗口消息代码（全屏态缩放屏蔽见
-///   fullscreen_resize_guard.h）。
-/// - **window_manager**：窗口**事件与状态域**——WindowListener 事件流
+/// - **视觉与命中域**（`WindowOptions(customFrame: true)`，仅 Windows）：
+///   原生 FrameController 接管 NCCALCSIZE（整窗即客户区、无 Win10 主题色线）、
+///   NCHITTEST（四边+四角按当前 DPI 等宽缩放带）、交互缩放预同步（防撕裂）；
+///   最小尺寸经 setMinimumSize 单通道真实生效。外部全屏（摘除
+///   WS_OVERLAPPEDWINDOW）由 frame 自行识别为无缩放带。runner 零自写窗口
+///   消息代码。
+/// - **事件与状态域**（同名 `windowManager` 门面）：WindowListener 事件流
 ///   （maximize/resize/move/close/focus/blur）、setPreventClose 关闭拦截、
 ///   几何读写（setBounds/setSize/getPosition）、置顶、最小化、窗口移动
 ///   （startDragging）。
 ///
-/// UI 层约定：widget 级视觉件（如 `WindowBorder`/`MoveWindow`）可直接使用
-/// bitsdojo 包；一切**能力调用**（模式切换/置顶/关闭）必须经本接口，禁止
-/// 直接持有 `appWindow` / `windowManager` 全局单例，以保持可替换性。
+/// UI 层约定：widget 级视觉件（如 `DragToMoveArea`）可直接使用该包；一切
+/// **能力调用**（模式切换/置顶/关闭）必须经本接口，禁止直接持有
+/// `windowManager` 全局单例，以保持可替换性。
 abstract interface class WindowBridge {
   /// 当前窗口模式；全屏状态由 media_kit 同步，而非本接口执行原生切换。
   ValueListenable<WindowMode> get mode;

@@ -3,12 +3,10 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  bitsdojo_window_windows
   desktop_drop
   flutter_video_thumbnail_plus
   mpv_kit_video
-  screen_retriever_windows
-  window_manager
+  window_frame_kit
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

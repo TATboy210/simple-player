@@ -17,23 +17,22 @@ dependencies:
   # MpvKitEngine implements MediaEngine. media_kit 全家已移除 (2026-10).
   mpv_kit_video: ^0.1.0-dev.3
   path_provider: ^2.1.6
-  # 不可升 12/13：file_picker 12+（federated 重构）→ windows_file_picker（全系）
-  # 要求 win32 ^6.3.0，与 bitsdojo_window_windows 0.1.6 的 win32 ^5.1.1 区间不相交，
-  # pub get 必然解析失败。解封条件：bitsdojo_window 支持 win32 6 后方可升级。
-  # 届时须同步迁移 file_picker_adapters.dart 两处 12.x 破坏点
-  #（lockParentWindow→WindowsOptions；pickFiles 返回非空 List，取消=空列表）。
-  file_picker: ^11.0.3
+  # 13.x 解封（2026-10 window_frame_kit 迁移）：此前 bitsdojo_window_windows
+  # 锁 win32 ^5.1.1，与 windows_file_picker 的 win32 ^6.3.0 不相交；window_frame_kit
+  # 无 win32 Dart 依赖，冲突消失。12.x 两处破坏点已在 file_picker_adapters.dart
+  # 迁移（lockParentWindow→平台 options；pickFiles 返回非空 List，取消=空列表）。
+  file_picker: ^13.1.0
   shared_preferences: ^2.5.6
   desktop_drop: ^0.8.4
   path: ^1.9.1
   crypto: ^3.0.7
   ffi: ^2.2.0
-  # 窗口方案(2026-09-06 用户裁决, BB 同款双包): bitsdojo(BDW_CUSTOM_FRAME
-  # — 原生 NCCALCSIZE return 0 自绘标题栏形态 + WM_NCHITTEST 四边等宽
-  # 缩放 + GETMINMAXINFO) + window_manager(事件/几何/关闭拦截/拖动)。
-  # desktop_window/nativeapi 已移除。
-  window_manager: ^0.5.2
-  bitsdojo_window: ^0.1.6
+  # 窗口方案(2026-10 迁移): window_frame_kit 单包 — window_manager 0.5.2
+  # 全量 API 的超集(同名 windowManager 门面/WindowListener/WindowOptions)
+  # + 原生自定义 frame(customFrame: 四边等宽缩放/无 Win10 主题色线/resize
+  # 预同步防撕裂)。取代 bitsdojo(BDW_CUSTOM_FRAME) + window_manager 双包;
+  # 两者都注册 WndProc delegate, 严禁与 window_manager 共存。
+  window_frame_kit: ^0.3.0
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）

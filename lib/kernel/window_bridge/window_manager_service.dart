@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io' show Platform, exit;
 
-import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_frame_kit/window_frame_kit.dart';
 
 import '../bridge/win32/fullscreen_bridge.dart';
 import '../bridge/win32/sizemove_bridge.dart';
@@ -73,8 +72,15 @@ class WindowService with WindowListener implements WindowBridge {
       if (operation != null) await operation;
     },
     log: _log.i,
-    // 原生全屏: Windows 走 media_kit 同款样式摘除 (resize guard 依赖该
-    // 样式变化); 其余平台 (非发布目标) 用 window_manager 兜底.
+    // 原生全屏: Windows 走 media_kit 同款样式摘除 (Win32FullscreenBridge),
+    // 不用 window_frame_kit 自带 setFullScreen — 其退出分支沿用 window_manager
+    // 0.5.2 原实现: 非最大化恢复时 DwmExtendFrameIntoClientArea(0 边距) 抹掉
+    // customFrame 的 DWM 阴影边距并清 is_frameless_, 进入时还会 SetAsFrameless
+    // 改写 NCCALCSIZE 分支状态, 与 FrameController 的样式/DWM 策略互踩。
+    // 摘除 WS_OVERLAPPEDWINDOW 则正是 FrameController 识别的"外部全屏"
+    // (IsExternalFullscreenStyle → 无 frame/无缩放带/屏蔽 SC_SIZE), 退出时
+    // 桥恢复进入前的原样式位 (含 frame 已去掉的 WS_CAPTION), frame 无缝续接。
+    // 其余平台 (非发布目标) 用 windowManager 兜底.
     enterFullscreen: () async => Win32FullscreenBridge.isSupported
         ? Win32FullscreenBridge.enter()
         : windowManager.setFullScreen(true),
@@ -134,20 +140,24 @@ class WindowService with WindowListener implements WindowBridge {
       // windowManager.ensureInitialized() is owned by main.dart.
       // 拦截原生关闭事件，确保异步窗口状态持久化完成后再销毁窗口。
       await windowManager.setPreventClose(true);
-      // BB 同款（2026-09-06 用户裁决）：window_manager 在 Windows 上不碰
-      // 标题栏/边框——bitsdojo 的 BDW_CUSTOM_FRAME 已接管 NCCALCSIZE
-      // （return 0，自绘标题栏形态 + 四边等宽缩放），两个插件都改 NCCALCSIZE
-      // 会打架（window_manager hidden 分支的 8px 内缩会重新引入白边）。
-      const options = WindowOptions(
+      // window_frame_kit 自定义 frame（2026-10 取代 bitsdojo BDW_CUSTOM_FRAME）：
+      // customFrame 在首次 show 之前接管 NCCALCSIZE（整窗即客户区、无
+      // Win10 主题色线）/NCHITTEST（四边+四角按当前 DPI 等宽缩放带）并在
+      // 交互缩放中预同步 Flutter 视图尺寸防撕裂。不设 TitleBarStyle.hidden：
+      // frame 启用时其消息分支先于 hidden 分支，hidden 只会在 frame 关闭后
+      // 引回 window_manager 的 8px 内缩白边。
+      // 仅 Windows 启用：Linux 的 customFrame 是 GTK 去装饰且须自建
+      // DragToResizeArea，macOS 隐藏系统标题栏——两者均非发布目标，保持
+      // 系统标题栏（Linux 非 GNOME X11 此前的 bitsdojo frame 随之退场）。
+      final options = WindowOptions(
         backgroundColor: Colors.transparent,
         windowButtonVisibility: false,
+        // 最小尺寸单通道：bitsdojo 的 GETMINMAXINFO hook 已移除，
+        // windowManager.setMinimumSize（由 waitUntilReadyToShow 应用）
+        // 现在独占且真实生效。
         minimumSize: minimumWindowSize,
+        customFrame: Platform.isWindows ? true : null,
       );
-      // 最小尺寸双通道同步：bitsdojo 的 WM_GETMINMAXINFO hook 无条件
-      // return 0，会吞掉 window_manager 的 setMinimumSize（其 min_size
-      // 默认 {0,0} 即无下限）。两侧设同一值后，无论 hook 先后顺序如何，
-      // 854×480 下限都确定生效。
-      doWhenWindowReady(() => appWindow.minSize = minimumWindowSize);
       final ready = Completer<void>();
       // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
       // 传递给 init()，确保调用方等待到窗口真正 show/focus 完成。
@@ -203,9 +213,9 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   Future<void> _initWindow() async {
-    // frame 视觉与边缘命中归 bitsdojo 的 BDW_CUSTOM_FRAME（main.cpp 一行
-    // 接线）：原生接管 NCCALCSIZE return 0/四边等宽 WM_NCHITTEST，本服务
-    // 专注几何/事件/置顶等窗口管理语义。
+    // frame 视觉与边缘命中归 window_frame_kit 的 customFrame（见 [_initOnce]
+    // 的 WindowOptions）：原生 FrameController 接管 NCCALCSIZE/四边等宽
+    // NCHITTEST，本服务专注几何/事件/置顶等窗口管理语义。
     if (_disposed) return;
     // Restore only validated geometry; corrupt preferences fall back to 720p.
     final persisted = await _persistence.load();

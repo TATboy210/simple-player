@@ -4,7 +4,6 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
-#include "fullscreen_resize_guard.h"
 #include "ime_bridge_messages.h"
 #include "sizemove_bridge_messages.h"
 
@@ -31,16 +30,10 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // 临时兼容 bitsdojo：必须晚于插件注册，先于其父子窗口边缘命中处理。
-  // media_kit 入原生全屏时摘除 WS_OVERLAPPEDWINDOW、退出时恢复；全屏态下
-  // bitsdojo 的 WM_NCHITTEST 仍会对四边给出缩放命中，且 Flutter 子窗口可能
-  // 被判 HTTRANSPARENT——本 guard 在全屏态屏蔽两者。销毁时经 WM_NCDESTROY
-  // 自动解除，runner 不持有 Dart/Flutter 对象。
-  if (!InstallFullscreenResizeGuard(
-          GetHandle(), flutter_controller_->view()->GetNativeWindow())) {
-    OutputDebugStringW(L"Failed to install fullscreen resize guard.\n");
-    return false;
-  }
+  // 原全屏缩放 guard（fullscreen_resize_guard.h）已随 bitsdojo 移除：
+  // window_frame_kit 的 FrameController 把摘除 WS_OVERLAPPEDWINDOW 的
+  // 外部全屏（Win32FullscreenBridge）识别为无缩放带并屏蔽 SC_SIZE，
+  // 父子窗口命中都由它统一处理，runner 不再自写窗口消息 hook。
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();

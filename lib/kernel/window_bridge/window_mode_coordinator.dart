@@ -7,7 +7,7 @@ import 'window_service_state.dart';
 /// 串行协调普通窗口、最大化和原生全屏语义。
 ///
 /// 全屏由本协调器经注入的 [_enterFullscreen]/[_exitFullscreen] 执行
-/// (Windows: Win32FullscreenBridge; 其余平台: window_manager)。
+/// (Windows: Win32FullscreenBridge; 其余平台: window_frame_kit 的 windowManager)。
 final class WindowModeCoordinator {
   WindowModeCoordinator({
     required this._state,

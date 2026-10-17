@@ -21,22 +21,22 @@ class FilePickerMediaGateway implements FilePickerGateway {
     // 对话框期间临时恢复 IME — 窗口 IMC 已解除 (flutter_window.cpp),
     // 原生文件对话框在 NULL IMC 下触发 msctf 空指针崩溃 (v0.0.8 闪退).
     final result = await Win32ImeBridge.withImeRestored(
-      () => FilePicker.pickFiles(
+      // file_picker 13：pickFiles 变为多选 (返回 List)；11.x 默认单选，
+      // 保持原语义改用 pickFile (单个 PlatformFile?)。
+      () => FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: PathValidator.supportedExtensions,
-        // file_picker 11.x：顶层 lockParentWindow 保持对话框模态前置
-        //（12.x 起迁至 WindowsOptions，回退后恢复顶层参数）。
-        lockParentWindow: true,
+        // file_picker 12+：lockParentWindow 迁入平台 options，保持对话框
+        // 模态前置于 runner 窗口（Windows/Linux 各一份）。
+        windowsOptions: const WindowsOptions(lockParentWindow: true),
+        linuxOptions: const LinuxOptions(lockParentWindow: true),
       ),
     );
-    // file_picker 11.x：pickFiles 返回 FilePickerResult?，用户取消为 null
-    //（12.x 起改为非空 List，取消为空列表）——null 统一视为取消。
+    // 用户取消为 null——即 gateway 契约的取消，上游 coordinator 语义不变；
+    // 无本地路径 (非桌面平台) 时返回空列表，与 11.x 的 whereType 过滤一致。
     if (result == null) return null;
-
-    return result.files
-        .map((file) => file.path)
-        .whereType<String>()
-        .toList(growable: false);
+    final path = result.path;
+    return path == null ? const <String>[] : [path];
   }
 }
 
