@@ -192,14 +192,122 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // IgnorePointer 生效后按钮不可点击。
-      await tester.tap(
-        find.byKey(const ValueKey('titlebar-close')),
-        warnIfMissed: false,
+      // 全屏 Offstage 收起整条标题栏: 按钮不在命中树中 (仍挂载, 保持
+      // identity), 在原按钮位置点击也触达不到它。
+      expect(find.byKey(const ValueKey('titlebar-close')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('titlebar-close'), skipOffstage: false),
+        findsOneWidget,
       );
+      await tester.tapAt(const Offset(790, 16));
       await tester.pump();
 
       expect(windowService.closeCallCount, 0);
+    });
+
+    testWidgets('drag area spans the full title bar height', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithApp(CustomTitleBar(windowService: windowService)),
+      );
+      await tester.pump();
+
+      // 回归: 命中区曾只有标题文字高 (约 17px), 上下空白拖不动/双击无效。
+      final area = tester.getRect(
+        find.byKey(const ValueKey('titlebar-drag-area')),
+      );
+      expect(area.top, 0);
+      expect(area.height, Tokens.titleBarHeight);
+
+      // 贴近顶边 (y=2) 的空白处双击同样切换最大化 (手势兜底路径)。
+      final point = Offset(area.left + 40, 2);
+      await tester.tapAt(point);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tapAt(point);
+      await tester.pumpAndSettle();
+      expect(windowService.lastModeValue, WindowMode.maximized);
+    });
+
+    testWidgets('reports the drag area as native caption region', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapWithApp(CustomTitleBar(windowService: windowService)),
+      );
+      await tester.pump();
+
+      final area = tester.getRect(
+        find.byKey(const ValueKey('titlebar-drag-area')),
+      );
+      expect(windowService.dragRegion, area);
+      // 按钮组不在拖动区内 — 按钮仍由 Flutter 命中。
+      final minimize = tester.getRect(
+        find.byKey(const ValueKey('titlebar-minimize')),
+      );
+      expect(area.right, lessThanOrEqualTo(minimize.left));
+
+      // 重复帧不重复上报 (去重)。
+      final calls = windowService.dragRegionCallCount;
+      await tester.pump();
+      expect(windowService.dragRegionCallCount, calls);
+    });
+
+    testWidgets('unsupported platform keeps retrying without caching', (
+      tester,
+    ) async {
+      windowService.supportsDragRegion = false;
+      await tester.pumpWidget(
+        _wrapWithApp(CustomTitleBar(windowService: windowService)),
+      );
+      await tester.pump();
+      final calls = windowService.dragRegionCallCount;
+      expect(calls, greaterThan(0));
+
+      // 平台开始接管 (如宿主绑定较晚) 后的下一次绘制即上报成功。
+      windowService.supportsDragRegion = true;
+      windowService.mode.value = WindowMode.maximized; // 触发重绘
+      await tester.pumpAndSettle();
+      expect(windowService.dragRegionCallCount, greaterThan(calls));
+      expect(windowService.dragRegion, isNotNull);
+    });
+
+    testWidgets('fullscreen collapses the title bar slot and clears region', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Column(
+              children: [
+                CustomTitleBar(windowService: windowService),
+                const Expanded(child: SizedBox(key: ValueKey('content'))),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(windowService.dragRegion, isNotNull);
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('content'))).dy,
+        Tokens.titleBarHeight,
+      );
+
+      windowService.mode.value = WindowMode.fullscreen;
+      await tester.pumpAndSettle();
+
+      // 回归: 全屏只透明化会留一条 32px 空带 (用户所见「全屏仍有标题栏」)。
+      expect(tester.getTopLeft(find.byKey(const ValueKey('content'))).dy, 0);
+      expect(windowService.dragRegion, isNull);
+
+      windowService.mode.value = WindowMode.windowed;
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('content'))).dy,
+        Tokens.titleBarHeight,
+      );
+      expect(windowService.dragRegion, isNotNull);
     });
   });
 }
