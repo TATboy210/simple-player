@@ -5,7 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   mpv_kit_video
-  window_frame_kit
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

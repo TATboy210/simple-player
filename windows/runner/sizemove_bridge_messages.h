@@ -14,7 +14,7 @@ namespace sizemove_bridge_messages {
 //  3. 消息号与 Dart 侧对齐：lib/kernel/bridge/win32/sizemove_bridge.dart
 //     的 _messageId = WM_APP(0x8000) + 0x4A。与 ime 的 0x49 相邻，
 //     runner 全目录无其他 WM_APP 占用（ime_bridge_messages.h 同款实证），
-//     window_frame_kit 走 RegisterWindowMessage（>0xC000），不相交。
+//     nativeapi 走 RegisterWindowMessage（>0xC000），不相交。
 constexpr UINT kAppQuerySizemove = WM_APP + 0x4A;
 
 // 模态循环状态 — 写入与读取都发生在窗口所属的 platform 线程

@@ -183,7 +183,7 @@ flutter analyze       # 静态分析（strict-casts / inference / raw-types 全�
 | 包 / Package | 用途 / Purpose |
 |--------------|-----------------|
 | [mpv_kit_video](https://pub.dev/packages/mpv_kit_video) | libmpv 0.41 播放引擎 + Vulkan 零拷贝视频纹理（随包 libmpv） |
-| [window_manager](https://pub.dev/packages/window_manager) | 窗口尺寸 / 全屏 / 置顶 |
+| [nativeapi](https://pub.dev/packages/nativeapi) | 窗口 frame / 尺寸 / 全屏 / 置顶 / 关闭拦截（Dart FFI，构建钩子源码编译；Linux 构建需 `libgtk-3-dev libx11-dev libxi-dev`） |
 | [file_picker](https://pub.dev/packages/file_picker) | 文件选择对话框 |
 | [desktop_drop](https://pub.dev/packages/desktop_drop) | 拖放文件 |
 | [shared_preferences](https://pub.dev/packages/shared_preferences) | 设置持久化 |

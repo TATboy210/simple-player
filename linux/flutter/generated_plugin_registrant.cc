@@ -8,7 +8,6 @@
 
 #include <desktop_drop/desktop_drop_plugin.h>
 #include <mpv_kit_video/mpv_kit_video_plugin.h>
-#include <window_frame_kit/window_frame_kit_plugin.h>
 
 void fl_register_plugins(FlPluginRegistry* registry) {
   g_autoptr(FlPluginRegistrar) desktop_drop_registrar =
@@ -17,7 +16,4 @@ void fl_register_plugins(FlPluginRegistry* registry) {
   g_autoptr(FlPluginRegistrar) mpv_kit_video_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "MpvKitVideoPlugin");
   mpv_kit_video_plugin_register_with_registrar(mpv_kit_video_registrar);
-  g_autoptr(FlPluginRegistrar) window_frame_kit_registrar =
-      fl_plugin_registry_get_registrar_for_plugin(registry, "WindowFrameKitPlugin");
-  window_frame_kit_plugin_register_with_registrar(window_frame_kit_registrar);
 }

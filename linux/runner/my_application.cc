@@ -120,9 +120,8 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
     // 非 GNOME 的 X11 窗口管理器：传统系统标题栏（Flutter 模板行为）。
-    // 原 bitsdojo 自定义 frame 已随 window_frame_kit 迁移移除——该包在
-    // Linux 的 customFrame 需 Dart 侧 DragToResizeArea 配合，Linux 非发布
-    // 目标，暂不启用。
+    // 窗口层为 nativeapi（Dart FFI），Linux 保持系统装饰——非发布目标，
+    // 不启用隐藏标题栏（需 Dart 侧自建缩放热区）。
     gtk_window_set_title(window, "simple_player_flutter");
   }
 

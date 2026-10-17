@@ -7,7 +7,7 @@ import 'window_service_state.dart';
 /// 串行协调普通窗口、最大化和原生全屏语义。
 ///
 /// 全屏由本协调器经注入的 [_enterFullscreen]/[_exitFullscreen] 执行
-/// (Windows: Win32FullscreenBridge; 其余平台: window_frame_kit 的 windowManager)。
+/// (三平台: nativeapi `Window.isFullScreen`, 经 [NativeWindowHost])。
 final class WindowModeCoordinator {
   WindowModeCoordinator({
     required this._state,
@@ -17,10 +17,13 @@ final class WindowModeCoordinator {
     required this._log,
     Future<void> Function()? enterFullscreen,
     Future<void> Function()? exitFullscreen,
+    Future<bool> Function()? queryMaximized,
   }) : _enterFullscreen = enterFullscreen ?? _noop,
-       _exitFullscreen = exitFullscreen ?? _noop;
+       _exitFullscreen = exitFullscreen ?? _noop,
+       _queryMaximized = queryMaximized ?? _notMaximized;
 
   static Future<void> _noop() async {}
+  static Future<bool> _notMaximized() async => false;
 
   final WindowServiceState _state;
   final Future<void> Function() _maximize;
@@ -29,6 +32,10 @@ final class WindowModeCoordinator {
   final void Function(String) _log;
   final Future<void> Function() _enterFullscreen;
   final Future<void> Function() _exitFullscreen;
+
+  /// 退出全屏后查询原生是否最大化 — 原生全屏退出恢复进入前几何
+  /// (含最大化), 故「退出全屏」落回进入前的模式而非一律 windowed。
+  final Future<bool> Function() _queryMaximized;
   Future<void> _operation = Future<void>.value();
   int _generation = 0;
   bool _fullscreenIntent = false;
@@ -90,11 +97,25 @@ final class WindowModeCoordinator {
     _commit(generation, target);
     if (previous == WindowMode.fullscreen) {
       await _runNativeFullscreen(_exitFullscreen, 'exit');
+      if (target == WindowMode.windowed && await _restoredMaximized()) {
+        _commit(generation, WindowMode.maximized);
+        return;
+      }
     }
     if (target == WindowMode.maximized) {
       await _maximize();
     } else if (previous == WindowMode.maximized) {
       await _unmaximize();
+    }
+  }
+
+  /// 查询失败按「未最大化」处理 — 只影响模式标签, 不影响窗口本身。
+  Future<bool> _restoredMaximized() async {
+    try {
+      return await _queryMaximized();
+    } on Exception catch (error) {
+      _log('[WindowModeCoordinator] isMaximized query failed: $error');
+      return false;
     }
   }
 

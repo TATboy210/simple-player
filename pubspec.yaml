@@ -17,8 +17,8 @@ dependencies:
   # MpvKitEngine implements MediaEngine. media_kit 全家已移除 (2026-10).
   mpv_kit_video: ^0.1.0-dev.3
   path_provider: ^2.1.6
-  # 13.x 解封（2026-10 window_frame_kit 迁移）：此前 bitsdojo_window_windows
-  # 锁 win32 ^5.1.1，与 windows_file_picker 的 win32 ^6.3.0 不相交；window_frame_kit
+  # 13.x 解封（2026-10 窗口层迁移）：此前 bitsdojo_window_windows 锁 win32
+  # ^5.1.1，与 windows_file_picker 的 win32 ^6.3.0 不相交；现窗口层 nativeapi
   # 无 win32 Dart 依赖，冲突消失。12.x 两处破坏点已在 file_picker_adapters.dart
   # 迁移（lockParentWindow→平台 options；pickFiles 返回非空 List，取消=空列表）。
   file_picker: ^13.1.0
@@ -27,12 +27,13 @@ dependencies:
   path: ^1.9.1
   crypto: ^3.0.7
   ffi: ^2.2.0
-  # 窗口方案(2026-10 迁移): window_frame_kit 单包 — window_manager 0.5.2
-  # 全量 API 的超集(同名 windowManager 门面/WindowListener/WindowOptions)
-  # + 原生自定义 frame(customFrame: 四边等宽缩放/无 Win10 主题色线/resize
-  # 预同步防撕裂)。取代 bitsdojo(BDW_CUSTOM_FRAME) + window_manager 双包;
-  # 两者都注册 WndProc delegate, 严禁与 window_manager 共存。
-  window_frame_kit: ^0.3.0
+  # 窗口方案(2026-10): nativeapi (libnativeapi, MIT, window_manager 作者) —
+  # 纯 Dart FFI, cnativeapi 构建钩子用本机 C++ 工具链从源码编译原生库
+  # (native assets, 需 Flutter >=3.38 / Dart ^3.13)。经 NativeWindowHost 端口
+  # 隔离 (lib/kernel/window_bridge/nativeapi_window_host.dart); Windows runner
+  # 须 UI isolate 跑在 platform 线程 (见 windows/runner/main.cpp)。
+  # 不用 nativeapi_flutter: 其 widgets/multi-window 桥本项目不需要。
+  nativeapi: ^0.5.2
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）

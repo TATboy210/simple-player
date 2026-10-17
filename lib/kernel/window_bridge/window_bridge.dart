@@ -20,26 +20,21 @@ enum WindowMode {
 
 /// 面向 UI 的窗口管理抽象，隐藏平台窗口库的具体实现。
 ///
-/// ## 单包架构边界（2026-10 迁移至 window_frame_kit，取代 bitsdojo +
-/// window_manager 双包）
+/// ## 窗口层架构边界（2026-10 迁移至 nativeapi 0.5.2，取代 window_frame_kit）
 ///
-/// 本接口的实现（[WindowService]）之下只有一个窗口包 window_frame_kit，
-/// 它是 window_manager 0.5.2 API 的超集，且只注册**一个** WndProc delegate：
+/// 本接口的实现（[WindowService]）只经 `NativeWindowHost` 端口触达平台窗口，
+/// 生产实现 `NativeApiWindowHost` 封装 nativeapi（纯 Dart FFI，C++ 核心由
+/// cnativeapi 构建钩子从源码编译，无 Flutter 插件/MethodChannel）：
 ///
-/// - **视觉与命中域**（`WindowOptions(customFrame: true)`，仅 Windows）：
-///   原生 FrameController 接管 NCCALCSIZE（整窗即客户区、无 Win10 主题色线）、
-///   NCHITTEST（四边+四角按当前 DPI 等宽缩放带）、交互缩放预同步（防撕裂）；
-///   最小尺寸经 setMinimumSize 单通道真实生效。外部全屏（摘除
-///   WS_OVERLAPPEDWINDOW）由 frame 自行识别为无缩放带。runner 零自写窗口
-///   消息代码。
-/// - **事件与状态域**（同名 `windowManager` 门面）：WindowListener 事件流
-///   （maximize/resize/move/close/focus/blur）、setPreventClose 关闭拦截、
-///   几何读写（setBounds/setSize/getPosition）、置顶、最小化、窗口移动
-///   （startDragging）。
+/// - **视觉与命中域**（仅 Windows）：`TitleBarStyle.hidden` 保留原生 sizing
+///   frame（Aero Snap、系统缩放），顶边带交给客户区并命中 HTTOP；最大化贴合
+///   工作区；Win10 关 DWM frame 防主题色顶线。最小尺寸经 WM_GETMINMAXINFO。
+/// - **事件与状态域**：最大化/恢复/缩放/焦点/关闭请求事件（关闭请求同步
+///   取消默认销毁，持久化完成后退出）、几何读写、置顶、最小化、全屏、
+///   窗口移动（startDragging）。
 ///
-/// UI 层约定：widget 级视觉件（如 `DragToMoveArea`）可直接使用该包；一切
-/// **能力调用**（模式切换/置顶/关闭）必须经本接口，禁止直接持有
-/// `windowManager` 全局单例，以保持可替换性。
+/// UI 层约定：一切窗口能力调用必须经本接口，禁止直接依赖 nativeapi，
+/// 以保持可替换性与可测试性（测试注入 fake 端口）。
 abstract interface class WindowBridge {
   /// 当前窗口模式；全屏状态由 media_kit 同步，而非本接口执行原生切换。
   ValueListenable<WindowMode> get mode;

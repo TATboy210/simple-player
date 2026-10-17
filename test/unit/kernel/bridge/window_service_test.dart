@@ -1,17 +1,17 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:fake_async/fake_async.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_manager_service.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
+import '../../../helpers/fake_native_window_host.dart';
+
 void main() {
   setUpAll(() {
-    // 用 TestWidgetsFlutterBinding (非 WidgetsFlutterBinding) — 其
-    // defaultBinaryMessenger 是 TestDefaultBinaryMessenger, 支持 mock
-    // MethodChannel (resize 测试需 mock window_frame_kit 的 getSize).
+    // shared_preferences 内存 mock 需要 test binding。
     TestWidgetsFlutterBinding.ensureInitialized();
     // WindowService callback methods use KernelLogger.I — must init first
     KernelLoggerImpl.resetForTesting();
@@ -20,15 +20,19 @@ void main() {
 
   tearDownAll(KernelLoggerImpl.resetForTesting);
 
+  // 每个用例一份新的原生窗口端口 fake（取代 window_frame_kit channel mock）。
+  late FakeNativeWindowHost host;
+  setUp(() => host = FakeNativeWindowHost());
+
   group('WindowService composition', () {
     test('state.mode defaults to windowed', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
     test('mode getter delegates to state.mode', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.mode.value, WindowMode.windowed);
       service.mode.value = WindowMode.maximized;
       expect(service.mode.value, WindowMode.maximized);
@@ -36,7 +40,7 @@ void main() {
     });
 
     test('state windowSize defaults to defaultWindowSize', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.windowSize.value, defaultWindowSize);
       service.dispose();
     });
@@ -44,14 +48,14 @@ void main() {
 
   group('WindowListener callbacks', () {
     test('onWindowMaximize sets mode to maximized', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.onWindowMaximize();
       expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
     test('onWindowUnmaximize sets mode to windowed', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.mode.value = WindowMode.maximized;
       service.onWindowUnmaximize();
       expect(service.mode.value, WindowMode.windowed);
@@ -61,7 +65,7 @@ void main() {
 
   group('dispose safety', () {
     test('callback after dispose does not throw', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.dispose();
       expect(() => service.onWindowMaximize(), returnsNormally);
       expect(() => service.onWindowUnmaximize(), returnsNormally);
@@ -69,7 +73,7 @@ void main() {
     });
 
     test('double dispose does not throw', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.dispose();
       expect(() => service.dispose(), returnsNormally);
     });
@@ -86,21 +90,21 @@ void main() {
 
   group('isFullscreen derives from mode', () {
     test('isFullscreen returns false when mode is windowed', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.isFullscreen, isFalse);
       expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
     test('isFullscreen returns true when mode is fullscreen', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.mode.value = WindowMode.fullscreen;
       expect(service.isFullscreen, isTrue);
       service.dispose();
     });
 
     test('isFullscreen tracks mode changes', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.isFullscreen, isFalse);
       service.mode.value = WindowMode.fullscreen;
       expect(service.isFullscreen, isTrue);
@@ -115,25 +119,25 @@ void main() {
   // =========================================================================
   group('WindowState', () {
     test('windowSize defaults to defaultWindowSize', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.windowSize.value, defaultWindowSize);
       service.dispose();
     });
 
     test('mode defaults to windowed', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.mode.value, WindowMode.windowed);
       service.dispose();
     });
 
     test('isResizing defaults to false', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.isResizing.value, isFalse);
       service.dispose();
     });
 
     test('isAlwaysOnTop defaults to false', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.isAlwaysOnTop.value, isFalse);
       service.dispose();
     });
@@ -144,7 +148,7 @@ void main() {
   // =========================================================================
   group('mode transitions', () {
     test('setting mode to same value does not fire extra notification', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       var count = 0;
       service.mode.addListener(() => count++);
       service.mode.value = WindowMode.maximized; // fires once
@@ -154,7 +158,7 @@ void main() {
     });
 
     test('windowed → maximized → windowed cycle', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.mode.value, WindowMode.windowed);
 
       service.mode.value = WindowMode.maximized;
@@ -168,7 +172,7 @@ void main() {
     });
 
     test('windowed → fullscreen → windowed cycle', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.mode.value = WindowMode.fullscreen;
       expect(service.isFullscreen, isTrue);
 
@@ -184,7 +188,7 @@ void main() {
   // =========================================================================
   group('WindowListener callback deep', () {
     test('onWindowMaximize is idempotent when already maximized', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.mode.value = WindowMode.maximized;
       service.onWindowMaximize();
       expect(service.mode.value, WindowMode.maximized);
@@ -192,7 +196,7 @@ void main() {
     });
 
     test('onWindowUnmaximize from non-maximized is no-op', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.mode.value, WindowMode.windowed);
       service.onWindowUnmaximize();
       expect(service.mode.value, WindowMode.windowed);
@@ -200,7 +204,7 @@ void main() {
     });
 
     test('onWindowResize after dispose is no-op', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.dispose();
       expect(() => service.onWindowResize(), returnsNormally);
     });
@@ -211,14 +215,14 @@ void main() {
   // =========================================================================
   group('dispose safety expanded', () {
     test('triple dispose does not throw', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.dispose();
       service.dispose();
       service.dispose();
     });
 
     test('all callbacks are safe after dispose', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.dispose();
       expect(() => service.onWindowMaximize(), returnsNormally);
       expect(() => service.onWindowUnmaximize(), returnsNormally);
@@ -262,7 +266,7 @@ void main() {
   // =========================================================================
   group('ValueNotifier listeners', () {
     test('mode notifier fires listeners', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       var notified = false;
       service.mode.addListener(() => notified = true);
 
@@ -273,7 +277,7 @@ void main() {
     });
 
     test('windowSize notifier fires listeners', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       var notified = false;
       service.windowSize.addListener(() => notified = true);
 
@@ -284,7 +288,7 @@ void main() {
     });
 
     test('isResizing notifier fires listeners', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       var notified = false;
       service.isResizing.addListener(() => notified = true);
 
@@ -295,7 +299,7 @@ void main() {
     });
 
     test('isAlwaysOnTop notifier fires listeners', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       var notified = false;
       service.isAlwaysOnTop.addListener(() => notified = true);
 
@@ -314,7 +318,7 @@ void main() {
     // (实际全屏由 media_kit VideoState.toggleFullscreen 完成). 守卫测试验证 mode 同步.
 
     test('setMode(fullscreen) sets mode + intent', () async {
-      final service = WindowService();
+      final service = WindowService(host: host);
       await service.setMode(WindowMode.fullscreen);
       expect(service.mode.value, WindowMode.fullscreen);
       expect(service.isFullscreen, isTrue);
@@ -325,7 +329,7 @@ void main() {
       'onWindowMaximize during fullscreen intent keeps mode fullscreen',
       () async {
         // SC_MAXIMIZE 噪音不应覆盖 mode — _fullscreenIntent 守卫
-        final service = WindowService();
+        final service = WindowService(host: host);
         await service.setMode(WindowMode.fullscreen);
         service.onWindowMaximize();
         expect(service.mode.value, WindowMode.fullscreen);
@@ -334,7 +338,7 @@ void main() {
     );
 
     test('onWindowUnmaximize during fullscreen intent is no-op', () async {
-      final service = WindowService();
+      final service = WindowService(host: host);
       await service.setMode(WindowMode.fullscreen);
       service.onWindowUnmaximize();
       expect(service.mode.value, WindowMode.fullscreen);
@@ -344,7 +348,7 @@ void main() {
     test(
       'setMode(windowed) from fullscreen clears intent + sets windowed',
       () async {
-        final service = WindowService();
+        final service = WindowService(host: host);
         await service.setMode(WindowMode.fullscreen);
         await service.setMode(WindowMode.windowed);
         expect(service.mode.value, WindowMode.windowed);
@@ -355,14 +359,14 @@ void main() {
 
     test('onWindowMaximize without intent sets maximized (regression)', () {
       // 守卫不影响正常最大化路径
-      final service = WindowService();
+      final service = WindowService(host: host);
       service.onWindowMaximize();
       expect(service.mode.value, WindowMode.maximized);
       service.dispose();
     });
 
     test('setMode(fullscreen) no-op when already fullscreen', () async {
-      final service = WindowService();
+      final service = WindowService(host: host);
       await service.setMode(WindowMode.fullscreen);
       await service.setMode(WindowMode.fullscreen); // 同值, 早退
       expect(service.mode.value, WindowMode.fullscreen);
@@ -377,37 +381,13 @@ void main() {
   // resize settle 若更新 windowSize, 显示器尺寸会经关闭路径持久化, 下次启动
   // 恢复成巨窗。settle 在全屏模式期间只清 isResizing, 不更新 windowSize。
   group('fullscreen transition resize settle guard', () {
-    const wmChannel = MethodChannel('window_frame_kit');
-
-    /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding,
-    /// 其 defaultBinaryMessenger 静态类型即 TestDefaultBinaryMessenger.
-    TestDefaultBinaryMessenger messenger() =>
-        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
-
-    Size? mockSize;
-
-    setUp(() {
-      mockSize = null;
-      messenger().setMockMethodCallHandler(wmChannel, (call) async {
-        // window_manager 0.5.2: getSize() 内部走 getBounds, 返回 x/y/width/height.
-        if (call.method != 'getBounds') return null;
-        final sz = mockSize;
-        if (sz == null) return null;
-        return {'x': 0.0, 'y': 0.0, 'width': sz.width, 'height': sz.height};
-      });
-    });
-
-    tearDown(() {
-      messenger().setMockMethodCallHandler(wmChannel, null);
-    });
-
     test('settle during fullscreen does not update windowSize', () {
       // 全屏进入/退出的 resize 是过渡: settle 只清 isResizing, 不更新
       // windowSize — 否则显示器尺寸会经关闭路径持久化, 下次启动巨窗。
       fakeAsync((async) {
-        final service = WindowService();
+        final service = WindowService(host: host);
         service.mode.value = WindowMode.fullscreen;
-        mockSize = const Size(1920, 1080); // 模拟进入全屏后的显示器尺寸
+        host.size = const Size(1920, 1080); // 模拟进入全屏后的显示器尺寸
         service.onWindowResize();
         expect(service.isResizing.value, isTrue);
         async.elapse(const Duration(milliseconds: 600));
@@ -424,50 +404,8 @@ void main() {
   // resize debounce + isResizing 恢复 (方向2 — isResizing 卡 true bug 回归)
   // =========================================================================
   group('resize debounce + isResizing recovery', () {
-    // window_frame_kit 用 MethodChannel('window_frame_kit')，getSize() 内部走
-    // getBounds 并返回 x/y/width/height。mock 之以便 fakeAsync 推进 500ms
-    // timer 后验证回调逻辑（无需真实窗口）。
-    const wmChannel = MethodChannel('window_frame_kit');
-    Size? mockSize;
-    var shouldFailBounds = false;
-    final pendingBounds = <Completer<Map<String, double>>>[];
-    var deferBounds = false;
-
-    /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding,
-    /// 其 defaultBinaryMessenger 静态类型即 TestDefaultBinaryMessenger
-    /// (无需 is 提升或 as cast).
-    TestDefaultBinaryMessenger messenger() =>
-        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
-
-    setUp(() {
-      mockSize = null;
-      shouldFailBounds = false;
-      deferBounds = false;
-      pendingBounds.clear();
-      messenger().setMockMethodCallHandler(wmChannel, (call) async {
-        // window_manager 0.5.2: getSize() 内部调 getBounds() (非 getWindowSize
-        // method — 该 method 从不被调用, 勿 mock). getBounds 期望返回 Map 字段
-        // x/y/width/height (非 left/top — 否则 Rect.fromLTWH 读 null →
-        // type 'Null' is not subtype of double). 局部提升消除 bang.
-        if (call.method != 'getBounds') return null;
-        if (shouldFailBounds) throw Exception('getBounds failed');
-        if (deferBounds) {
-          final result = Completer<Map<String, double>>();
-          pendingBounds.add(result);
-          return result.future;
-        }
-        final sz = mockSize;
-        if (sz == null) return null;
-        return {'x': 0.0, 'y': 0.0, 'width': sz.width, 'height': sz.height};
-      });
-    });
-
-    tearDown(() {
-      messenger().setMockMethodCallHandler(wmChannel, null);
-    });
-
     test('onWindowResize sets isResizing true immediately', () {
-      final service = WindowService();
+      final service = WindowService(host: host);
       expect(service.isResizing.value, isFalse);
       service.onWindowResize();
       expect(service.isResizing.value, isTrue);
@@ -476,8 +414,8 @@ void main() {
 
     test('resize session ID 在上升沿先发布、活跃期不重复递增', () {
       fakeAsync((async) {
-        mockSize = const Size(1280, 752);
-        final service = WindowService();
+        host.size = const Size(1280, 752);
+        final service = WindowService(host: host);
         final sessionIdsSeenAtStart = <int>[];
         service.isResizing.addListener(() {
           if (service.isResizing.value) {
@@ -503,8 +441,8 @@ void main() {
 
     test('isResizing recovers false after debounce when size changed', () {
       fakeAsync((async) {
-        mockSize = const Size(1920, 1080);
-        final service = WindowService();
+        host.size = const Size(1920, 1080);
+        final service = WindowService(host: host);
         service.onWindowResize();
         expect(service.isResizing.value, isTrue);
 
@@ -522,8 +460,8 @@ void main() {
       // 为零时不落 false → 控制栏永不恢复. 默认 windowSize=1280x752, mock
       // getSize 返回同值 → 触发 bug 场景. 修复后无论 size 是否变化都落 false.
       fakeAsync((async) {
-        mockSize = const Size(1280, 752);
-        final service = WindowService();
+        host.size = const Size(1280, 752);
+        final service = WindowService(host: host);
         service.onWindowResize();
         expect(service.isResizing.value, isTrue);
 
@@ -537,8 +475,8 @@ void main() {
 
     test('repeated onWindowResize resets debounce timer', () {
       fakeAsync((async) {
-        mockSize = const Size(1920, 1080);
-        final service = WindowService();
+        host.size = const Size(1920, 1080);
+        final service = WindowService(host: host);
         service.onWindowResize();
         async.elapse(const Duration(milliseconds: 400));
         expect(service.isResizing.value, isTrue);
@@ -558,35 +496,25 @@ void main() {
       'stale getSize completion cannot overwrite a newer resize session',
       () {
         fakeAsync((async) {
-          deferBounds = true;
-          final service = WindowService();
+          host.deferGetSize = true;
+          final service = WindowService(host: host);
 
           service.onWindowResize();
           async.elapse(const Duration(milliseconds: 500));
           async.flushMicrotasks();
-          expect(pendingBounds, hasLength(1));
+          expect(host.pendingSizes, hasLength(1));
 
           service.onWindowResize();
           async.elapse(const Duration(milliseconds: 500));
           async.flushMicrotasks();
-          expect(pendingBounds, hasLength(2));
+          expect(host.pendingSizes, hasLength(2));
 
-          pendingBounds[1].complete({
-            'x': 0.0,
-            'y': 0.0,
-            'width': 1920.0,
-            'height': 1080.0,
-          });
+          host.pendingSizes[1].complete(const Size(1920, 1080));
           async.flushMicrotasks();
           expect(service.windowSize.value, const Size(1920, 1080));
           expect(service.isResizing.value, isFalse);
 
-          pendingBounds.first.complete({
-            'x': 0.0,
-            'y': 0.0,
-            'width': 1600.0,
-            'height': 900.0,
-          });
+          host.pendingSizes.first.complete(const Size(1600, 900));
           async.flushMicrotasks();
           expect(service.windowSize.value, const Size(1920, 1080));
           expect(service.isResizing.value, isFalse);
@@ -597,8 +525,8 @@ void main() {
 
     test('getSize failure still ends the current resize session', () {
       fakeAsync((async) {
-        shouldFailBounds = true;
-        final service = WindowService();
+        host.failGetSize = true;
+        final service = WindowService(host: host);
         final initialSize = service.windowSize.value;
 
         service.onWindowResize();
@@ -613,22 +541,17 @@ void main() {
 
     test('pending getSize completion is ignored after dispose', () {
       fakeAsync((async) {
-        deferBounds = true;
-        final service = WindowService();
+        host.deferGetSize = true;
+        final service = WindowService(host: host);
         final initialSize = service.windowSize.value;
 
         service.onWindowResize();
         async.elapse(const Duration(milliseconds: 500));
         async.flushMicrotasks();
-        expect(pendingBounds, hasLength(1));
+        expect(host.pendingSizes, hasLength(1));
 
         service.dispose();
-        pendingBounds.single.complete({
-          'x': 0.0,
-          'y': 0.0,
-          'width': 1920.0,
-          'height': 1080.0,
-        });
+        host.pendingSizes.single.complete(const Size(1920, 1080));
         async.flushMicrotasks();
 
         expect(service.windowSize.value, initialSize);
@@ -645,72 +568,14 @@ void main() {
   // 产生 WM_SIZE → 标志滞留 → 亮窗后用户第一次真实拖拽被吞(isResizing 不
   // 置位/windowSize 不更新/几何不持久化), 第二次拖拽才恢复。
   group('resize suppression lifecycle (init → reveal)', () {
-    const wmChannel = MethodChannel('window_frame_kit');
-    // center() → calcWindowPosition 需要 screen_retriever 三件套
-    // (getPrimaryDisplay/getAllDisplays/getCursorScreenPoint); fakeAsync 下
-    // 未 mock 的 channel 会永远挂起 — init 链路要求全部 mock 到位.
-    const srChannel = MethodChannel('dev.leanflutter.plugins/screen_retriever');
-
-    /// 取测试用 messenger — setUpAll 已初始化 TestWidgetsFlutterBinding.
-    TestDefaultBinaryMessenger messenger() =>
-        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
-
-    /// 当前原生窗口尺寸 — 与恢复尺寸相同时模拟"零几何变化无 WM_SIZE"。
-    Size? nativeSize;
-
     setUp(() {
-      nativeSize = null;
       // 首会话: 无持久化几何 → load() 回落默认 1280×720 (defaultWindowSize).
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      messenger().setMockMethodCallHandler(wmChannel, (call) async {
-        switch (call.method) {
-          case 'getBounds':
-            // window_manager 0.5.2: getSize/getPosition 都走 getBounds,
-            // 期望返回 x/y/width/height 四字段.
-            final sz = nativeSize;
-            if (sz == null) return null;
-            return {'x': 0.0, 'y': 0.0, 'width': sz.width, 'height': sz.height};
-          case 'isFullScreen':
-          case 'isMaximized':
-          case 'isMinimized':
-            // waitUntilReadyToShow 内部对这三者做动态 bool 转型, 返回 null
-            // 会抛 TypeError (Error 族) 使 init 失败 — 必须给真实 false.
-            return false;
-          default:
-            return null;
-        }
-      });
-      const display = <String, Object?>{
-        'id': '0',
-        'size': {'width': 1920.0, 'height': 1080.0},
-        'visiblePosition': {'dx': 0.0, 'dy': 0.0},
-        'visibleSize': {'width': 1920.0, 'height': 1080.0},
-        'scaleFactor': 1.0,
-      };
-      messenger().setMockMethodCallHandler(srChannel, (call) async {
-        switch (call.method) {
-          case 'getCursorScreenPoint':
-            return {'dx': 0.0, 'dy': 0.0};
-          case 'getPrimaryDisplay':
-            return display;
-          case 'getAllDisplays':
-            return {
-              'displays': [display],
-            };
-          default:
-            return null;
-        }
-      });
     });
 
-    tearDown(() {
-      messenger().setMockMethodCallHandler(wmChannel, null);
-      messenger().setMockMethodCallHandler(srChannel, null);
-    });
-
-    /// 走真实 init() 链路 (channel mock + 内存 prefs 全是 microtask 级),
-    /// flush 后即完成; 同时校验"完成"与"无异常" — 挂起说明 channel mock
-    /// 有缺口 (fakeAsync 下未 mock 的 channel 永不返回, 静默无错误).
+    /// 走真实 init() 链路 (fake 端口 + 内存 prefs 全是 microtask 级),
+    /// flush 后即完成; 同时校验"完成"与"无异常" — 挂起说明 fake 端口
+    /// 有缺口 (fakeAsync 下永不完成的 future 静默无错误).
     void runInit(WindowService service, FakeAsync async) {
       var initDone = false;
       Object? initError;
@@ -738,8 +603,8 @@ void main() {
     test('first drag-resize after reveal is not swallowed when init restored '
         'the same size (no WM_SIZE)', () {
       fakeAsync((async) {
-        nativeSize = defaultWindowSize; // 恢复尺寸 == 当前尺寸 → 无 WM_SIZE
-        final service = WindowService();
+        host.size = defaultWindowSize; // 恢复尺寸 == 当前尺寸 → 无 WM_SIZE
+        final service = WindowService(host: host);
         runInit(service, async);
 
         // 前提成立: 几何已恢复进状态, 平台全程无 WM_SIZE 回放.
@@ -751,7 +616,7 @@ void main() {
         async.flushMicrotasks();
 
         // 用户启动后第一次真实拖拽缩放.
-        nativeSize = const Size(1600, 900);
+        host.size = const Size(1600, 900);
         service.onWindowResize();
 
         // === 决定性断言: 首拖必须生效 (不被抑制标志吞掉) ===
@@ -780,8 +645,8 @@ void main() {
       fakeAsync((async) {
         // 恢复尺寸(1280×720) != 当前尺寸 → init 的 setBounds 会引发
         // WM_SIZE, 在亮窗前送达 — 这正是抑制标志存在的目的场景.
-        nativeSize = const Size(1600, 900);
-        final service = WindowService();
+        host.size = const Size(1600, 900);
+        final service = WindowService(host: host);
         runInit(service, async);
         expect(service.windowSize.value, defaultWindowSize);
 
@@ -805,41 +670,25 @@ void main() {
   // 关窗路径 — hide-first 模式 (学自 BlueBubbles)
   // =========================================================================
   group('close path (hide-first)', () {
-    const wmChannel = MethodChannel('window_frame_kit');
-
-    /// 取测试用 messenger — TestWidgetsFlutterBinding 提供可 mock 的
-    /// TestDefaultBinaryMessenger（无需 is 提升或 as cast）.
-    TestDefaultBinaryMessenger messenger() =>
-        TestWidgetsFlutterBinding.instance.defaultBinaryMessenger;
-
     test('onWindowClose hides the window before persisting and exiting', () {
       fakeAsync((async) {
-        // 记录 window_frame_kit channel 上每个被调用 method 的顺序。
-        final calls = <String>[];
-        Future<Object?> handler(MethodCall call) async {
-          calls.add(call.method);
-          if (call.method == 'getBounds') {
-            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
-          }
-          if (call.method == 'isPreventClose') return true;
-          return null;
-        }
-
-        messenger().setMockMethodCallHandler(wmChannel, handler);
+        // host.calls 记录原生窗口端口上每个调用的顺序。
+        host.position = const Offset(10, 20);
+        final calls = host.calls;
         final exitCodes = <int>[];
 
-        final service = WindowService(exitOnClose: exitCodes.add);
+        final service = WindowService(host: host, exitOnClose: exitCodes.add);
         service.onWindowClose();
 
-        // 推进足够时间让 hide → persist(getBounds) → destroy(fire) → exit
+        // 推进足够时间让 hide → persist(getPosition) → destroy(fire) → exit
         // 全部完成。
         async.elapse(const Duration(seconds: 5));
         async.flushMicrotasks();
 
         // hide 必须最先 — 用户点 X 后窗口立即消失（BlueBubbles 模式）。
         expect(calls.first, 'hide');
-        // 持久化读取位置(getBounds)发生在 hide 之后、destroy 之前。
-        final persistIndex = calls.indexOf('getBounds');
+        // 持久化读取位置(getPosition)发生在 hide 之后、destroy 之前。
+        final persistIndex = calls.indexOf('getPosition');
         final destroyIndex = calls.indexOf('destroy');
         expect(persistIndex, greaterThan(calls.indexOf('hide')));
         expect(destroyIndex, greaterThan(persistIndex));
@@ -847,29 +696,17 @@ void main() {
         expect(exitCodes, [0]);
         // 服务进入终态。
         expect(service.isResizing.value, isFalse);
-
-        messenger().setMockMethodCallHandler(wmChannel, null);
       });
     });
 
     test('a stuck hide does not block persist or exit (timeout guard)', () {
       fakeAsync((async) {
-        final calls = <String>[];
-        // hide 永远不返回 — 模拟 channel 卡死。
-        final stuckHide = Completer<Object?>();
-        Future<Object?> handler(MethodCall call) async {
-          calls.add(call.method);
-          if (call.method == 'hide') return stuckHide.future;
-          if (call.method == 'getBounds') {
-            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
-          }
-          return null;
-        }
-
-        messenger().setMockMethodCallHandler(wmChannel, handler);
+        final calls = host.calls;
+        // hide 永远不返回 — 模拟平台调用卡死。
+        host.hideResult = Completer<void>().future;
         final exitCodes = <int>[];
 
-        final service = WindowService(exitOnClose: exitCodes.add);
+        final service = WindowService(host: host, exitOnClose: exitCodes.add);
         service.onWindowClose();
 
         // 800ms hide 超时 + persist — 5s 足够全部走完。
@@ -879,25 +716,16 @@ void main() {
         // hide 卡死但 destroy 依然被触发、exit(0) 依然到达 — 超时兜底生效。
         expect(calls, contains('destroy'));
         expect(exitCodes, [0]);
-
-        messenger().setMockMethodCallHandler(wmChannel, null);
       });
     });
 
     test('closing listener 在 exit 前被 await 完成 (v0.0.6.2)', () {
       fakeAsync((async) {
         final events = <String>[];
-        Future<Object?> handler(MethodCall call) async {
-          if (call.method == 'getBounds') {
-            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
-          }
-          if (call.method == 'isPreventClose') return true;
-          return null;
-        }
-
-        messenger().setMockMethodCallHandler(wmChannel, handler);
+        host.position = const Offset(10, 20);
 
         final service = WindowService(
+          host: host,
           exitOnClose: (code) => events.add('exit:$code'),
         );
         service.addClosingListener(() async {
@@ -912,25 +740,15 @@ void main() {
 
         // 监听器完整执行（start→done）先于进程终止 — 断点落盘窗口有保证.
         expect(events, ['listener-start', 'listener-done', 'exit:0']);
-
-        messenger().setMockMethodCallHandler(wmChannel, null);
       });
     });
 
     test('closing listener 抛异常不阻断退出 (v0.0.6.2)', () {
       fakeAsync((async) {
-        Future<Object?> handler(MethodCall call) async {
-          if (call.method == 'getBounds') {
-            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
-          }
-          if (call.method == 'isPreventClose') return true;
-          return null;
-        }
-
-        messenger().setMockMethodCallHandler(wmChannel, handler);
+        host.position = const Offset(10, 20);
         final exitCodes = <int>[];
 
-        final service = WindowService(exitOnClose: exitCodes.add);
+        final service = WindowService(host: host, exitOnClose: exitCodes.add);
         var called = false;
         service.addClosingListener(() async {
           called = true;
@@ -943,25 +761,15 @@ void main() {
 
         expect(called, isTrue);
         expect(exitCodes, [0]); // 异常被 _runCloseCommand 吞掉记日志, 退出仍到达
-
-        messenger().setMockMethodCallHandler(wmChannel, null);
       });
     });
 
     test('closing listener 卡死触发 800ms 超时后继续退出 (v0.0.6.2)', () {
       fakeAsync((async) {
-        Future<Object?> handler(MethodCall call) async {
-          if (call.method == 'getBounds') {
-            return {'x': 10.0, 'y': 20.0, 'width': 1280.0, 'height': 752.0};
-          }
-          if (call.method == 'isPreventClose') return true;
-          return null;
-        }
-
-        messenger().setMockMethodCallHandler(wmChannel, handler);
+        host.position = const Offset(10, 20);
         final exitCodes = <int>[];
 
-        final service = WindowService(exitOnClose: exitCodes.add);
+        final service = WindowService(host: host, exitOnClose: exitCodes.add);
         // 返回永不完成的 future — 模拟落盘卡死 (磁盘满/杀毒锁文件等).
         final never = Completer<void>();
         service.addClosingListener(() => never.future);
@@ -973,8 +781,171 @@ void main() {
         async.flushMicrotasks();
 
         expect(exitCodes, [0]); // 超时兜底生效, 绝不让用户面对滞留窗口
+      });
+    });
+  });
 
-        messenger().setMockMethodCallHandler(wmChannel, null);
+  // =========================================================================
+  // NativeWindowHost 端口接线 (2026-10 nativeapi 迁移)
+  // =========================================================================
+  group('native window host wiring', () {
+    setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+    /// init 全链路在 fake 端口上是 microtask 级 — flush 后必须完成。
+    void initNow(WindowService service, FakeAsync async) {
+      Object? error;
+      var done = false;
+      unawaited(
+        service.init().then(
+          (_) => done = true,
+          onError: (Object e, StackTrace _) => error = e,
+        ),
+      );
+      async.flushMicrotasks();
+      expect(error, isNull);
+      expect(done, isTrue);
+    }
+
+    test('init attaches with the minimum window size before restoring', () {
+      fakeAsync((async) {
+        final service = WindowService(host: host);
+        initNow(service, async);
+        expect(host.calls.first, 'attach');
+        expect(host.minimumSize, minimumWindowSize);
+        expect(host.isAttached, isTrue);
+        // 首会话无位置 → setSize + center（平台居中）。
+        expect(host.calls, containsAllInOrder(['setSize', 'center']));
+        service.dispose();
+        expect(host.isAttached, isFalse);
+      });
+    });
+
+    test('persisted maximized state is applied while hidden, before show', () {
+      fakeAsync((async) {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'isMaximized': true,
+        });
+        final service = WindowService(host: host);
+        initNow(service, async);
+        expect(service.mode.value, WindowMode.maximized);
+        expect(host.calls, contains('maximize'));
+        expect(host.calls, isNot(contains('show')));
+        unawaited(service.reveal());
+        async.flushMicrotasks();
+        expect(
+          host.calls.indexOf('maximize'),
+          lessThan(host.calls.indexOf('show')),
+        );
+        service.dispose();
+      });
+    });
+
+    test('attach failure surfaces from init and leaves no listener', () {
+      fakeAsync((async) {
+        host.failAttach = true;
+        final service = WindowService(host: host);
+        Object? error;
+        unawaited(service.init().catchError((Object e) => error = e));
+        async.flushMicrotasks();
+        expect(error, isA<Exception>());
+        expect(host.isAttached, isFalse);
+        // 降级亮窗在未绑定时不触碰宿主。
+        unawaited(service.showDegraded());
+        async.flushMicrotasks();
+        expect(host.calls, isNot(contains('show')));
+        service.dispose();
+      });
+    });
+
+    test('maximized / restored events drive mode (restore re-queries)', () {
+      fakeAsync((async) {
+        final service = WindowService(host: host);
+        initNow(service, async);
+        host.emit(const NativeWindowMaximized());
+        async.flushMicrotasks();
+        expect(service.mode.value, WindowMode.maximized);
+
+        // 最大化窗口最小化后恢复: 平台只报 restored, 宿主仍最大化。
+        host.maximized = true;
+        host.emit(const NativeWindowRestored());
+        async.flushMicrotasks();
+        expect(service.mode.value, WindowMode.maximized);
+
+        host.maximized = false;
+        host.emit(const NativeWindowRestored());
+        async.flushMicrotasks();
+        expect(service.mode.value, WindowMode.windowed);
+        service.dispose();
+      });
+    });
+
+    test('resize event starts a resize session', () {
+      fakeAsync((async) {
+        final service = WindowService(host: host);
+        initNow(service, async);
+        unawaited(service.reveal()); // 解除 init 抑制
+        async.flushMicrotasks();
+        host.size = const Size(1500, 800);
+        host.emit(const NativeWindowResized());
+        expect(service.isResizing.value, isTrue);
+        async.elapse(const Duration(milliseconds: 600));
+        expect(service.isResizing.value, isFalse);
+        expect(service.windowSize.value, const Size(1500, 800));
+        service.dispose();
+      });
+    });
+
+    test('close request event runs the persist-then-exit path once', () {
+      fakeAsync((async) {
+        final exitCodes = <int>[];
+        final service = WindowService(host: host, exitOnClose: exitCodes.add);
+        initNow(service, async);
+        host.emit(const NativeWindowCloseRequested());
+        host.emit(const NativeWindowCloseRequested()); // 重复请求被忽略
+        async.elapse(const Duration(seconds: 5));
+        expect(host.calls.where((c) => c == 'hide'), hasLength(1));
+        expect(host.calls, contains('destroy'));
+        expect(exitCodes, [0]);
+      });
+    });
+
+    test('fullscreen mode switches go through host.setFullScreen', () {
+      fakeAsync((async) {
+        final service = WindowService(host: host);
+        initNow(service, async);
+        unawaited(service.setMode(WindowMode.fullscreen));
+        async.flushMicrotasks();
+        expect(host.calls, contains('setFullScreen:true'));
+        unawaited(service.setMode(WindowMode.windowed));
+        async.flushMicrotasks();
+        expect(host.calls, contains('setFullScreen:false'));
+        expect(service.mode.value, WindowMode.windowed);
+
+        // 最大化进入全屏: 原生退出恢复最大化 → 模式回到 maximized。
+        host.maximized = true;
+        unawaited(service.setMode(WindowMode.fullscreen));
+        async.flushMicrotasks();
+        unawaited(service.setMode(WindowMode.windowed));
+        async.flushMicrotasks();
+        expect(service.mode.value, WindowMode.maximized);
+        service.dispose();
+      });
+    });
+
+    test('always-on-top, minimize and dragging delegate to the host', () {
+      fakeAsync((async) {
+        final service = WindowService(host: host);
+        initNow(service, async);
+        unawaited(service.setAlwaysOnTop(true));
+        unawaited(service.minimize());
+        unawaited(service.startDragging());
+        async.flushMicrotasks();
+        expect(service.isAlwaysOnTop.value, isTrue);
+        expect(
+          host.calls,
+          containsAll(['setAlwaysOnTop:true', 'minimize', 'startDragging']),
+        );
+        service.dispose();
       });
     });
   });

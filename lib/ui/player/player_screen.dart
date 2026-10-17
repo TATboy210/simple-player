@@ -385,9 +385,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: scaffold,
         );
 
-        // 边缘缩放：window_frame_kit customFrame 在原生层对四边+四角等宽
-        // 判定（WM_NCHITTEST → HT*，FLUTTERVIEW 子窗口在缩放带返回
-        // HTTRANSPARENT），Flutter 层不自建缩放热区、无需声明容器。
+        // 边缘缩放：nativeapi 隐藏标题栏保留原生 sizing frame，系统在左/右/下
+        // 边判定、nativeapi 在顶边带返回 HTTOP（FLUTTERVIEW 子窗口在该带让
+        // 命中穿透），Flutter 层不自建缩放热区、无需声明容器。
         // 全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动。
         return MouseRegion(
           cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,

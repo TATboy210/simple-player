@@ -77,8 +77,9 @@ jobs:
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
         run: |
+          # nativeapi (cnativeapi 构建钩子) 经 pkg-config 链接 gtk+-3.0 / x11 / xi.
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libepoxy-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev libepoxy-dev libx11-dev libxi-dev
           # 随包 libmpv 的系统运行时依赖 (DT_NEEDED 实扫, 桌面发行版默认自带;
           # 无头 runner 缺 libpulse0 时 libmpv.so.2 整体加载失败). 清单同
           # README「Linux 运行时依赖」, 改动须两处同步.

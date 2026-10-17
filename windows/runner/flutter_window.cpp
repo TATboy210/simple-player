@@ -3,6 +3,7 @@
 #include <imm.h>
 #include <optional>
 
+#include "close_bridge_messages.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
 #include "sizemove_bridge_messages.h"
@@ -30,10 +31,10 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // 原全屏缩放 guard（fullscreen_resize_guard.h）已随 bitsdojo 移除：
-  // window_frame_kit 的 FrameController 把摘除 WS_OVERLAPPEDWINDOW 的
-  // 外部全屏（Win32FullscreenBridge）识别为无缩放带并屏蔽 SC_SIZE，
-  // 父子窗口命中都由它统一处理，runner 不再自写窗口消息 hook。
+  // frame/命中/全屏均由 nativeapi（Dart FFI）在窗口子类化层处理：隐藏
+  // 标题栏、最大化贴合工作区、全屏摘除 caption/thickframe。首帧 Show()
+  // 保留——Dart 侧若在隐藏态请求最大化，nativeapi 记标记并让这次 Show
+  // 直接以最大化形态出现。runner 不自写窗口消息 hook。
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -83,6 +84,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     if (result) {
       return *result;
     }
+  }
+
+  // WM_CLOSE → SC_CLOSE 补位，让外部关闭也走 nativeapi 的可取消关闭请求
+  // （Dart 持久化后退出），见 close_bridge_messages.h。
+  if (close_bridge_messages::HandleClose(hwnd, message, wparam)) {
+    return 0;
   }
 
   switch (message) {

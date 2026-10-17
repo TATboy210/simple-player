@@ -10,7 +10,6 @@ import file_picker_darwin
 import flutter_video_thumbnail_plus
 import mpv_kit_video
 import shared_preferences_foundation
-import window_frame_kit
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   DesktopDropPlugin.register(with: registry.registrar(forPlugin: "DesktopDropPlugin"))
@@ -18,5 +17,4 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterVideoThumbnailPlusPlugin.register(with: registry.registrar(forPlugin: "FlutterVideoThumbnailPlusPlugin"))
   MpvKitVideoPlugin.register(with: registry.registrar(forPlugin: "MpvKitVideoPlugin"))
   SharedPreferencesPlugin.register(with: registry.registrar(forPlugin: "SharedPreferencesPlugin"))
-  WindowFrameKitPlugin.register(with: registry.registrar(forPlugin: "WindowFrameKitPlugin"))
 }

@@ -28,7 +28,7 @@ const List<OpenSourceComponent> kOpenSourceComponents = [
   (name: 'Flutter', license: 'BSD-3-Clause'),
   (name: 'Dart', license: 'BSD-3-Clause'),
   // ── 桌面集成 ──
-  (name: 'window_frame_kit', license: 'MIT'),
+  (name: 'nativeapi', license: 'MIT'),
   (name: 'file_picker', license: 'MIT'),
   (name: 'desktop_drop', license: 'MIT'),
   // ── 数据与基础 ──

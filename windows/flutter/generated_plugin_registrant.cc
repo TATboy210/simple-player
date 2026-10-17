@@ -9,7 +9,6 @@
 #include <desktop_drop/desktop_drop_plugin.h>
 #include <flutter_video_thumbnail_plus/flutter_video_thumbnail_plus_plugin_c_api.h>
 #include <mpv_kit_video/mpv_kit_video_plugin_c_api.h>
-#include <window_frame_kit/window_frame_kit_plugin_c_api.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   DesktopDropPluginRegisterWithRegistrar(
@@ -18,6 +17,4 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("FlutterVideoThumbnailPlusPluginCApi"));
   MpvKitVideoPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("MpvKitVideoPluginCApi"));
-  WindowFrameKitPluginCApiRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("WindowFrameKitPluginCApi"));
 }

@@ -3,18 +3,17 @@ import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
-import 'package:window_frame_kit/window_frame_kit.dart';
 
-import '../bridge/win32/fullscreen_bridge.dart';
 import '../bridge/win32/sizemove_bridge.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
 import 'window_bridge.dart';
 import 'window_constants.dart';
+import 'native_window_host.dart';
+import 'nativeapi_window_host.dart';
 import 'window_mode_coordinator.dart';
 import 'window_persistence_coordinator.dart';
 import 'window_resize_coordinator.dart';
-import 'window_resize_diagnostics.dart';
 import 'window_service_state.dart';
 import 'window_ui_thread.dart';
 
@@ -22,8 +21,8 @@ export 'window_bridge.dart';
 export 'window_constants.dart';
 export 'window_mode_coordinator.dart';
 export 'window_persistence_coordinator.dart';
+export 'native_window_host.dart';
 export 'window_resize_coordinator.dart';
-export 'window_resize_diagnostics.dart';
 export 'window_service_state.dart';
 export 'window_ui_thread.dart';
 
@@ -31,32 +30,40 @@ export 'window_ui_thread.dart';
 final _log = KernelLogger.I;
 
 /// Window management service - thin coordinator combining responsibility components.
-class WindowService with WindowListener implements WindowBridge {
+///
+/// 平台窗口能力全部经 [NativeWindowHost] 端口（生产: nativeapi 0.5.2,
+/// 见 [NativeApiWindowHost]）；本类只承载模式/缩放/持久化/关窗时序语义。
+class WindowService implements WindowBridge {
   /// 创建 WindowService。
   ///
   /// 创建窗口服务。[exitOnClose] 注入 seam — 关窗终点的进程终止调用，
   /// 生产绑定 dart:io exit；测试注入 no-op 避免 test runner 被杀。
+  /// [host] 注入 seam — 测试传入手写 fake，生产默认 [NativeApiWindowHost]。
   WindowService({
     WindowPersistence? persistence,
     void Function(int code)? exitOnClose,
+    NativeWindowHost? host,
   }) : _persistence = persistence ?? WindowPersistence(),
-       _exitOnClose = exitOnClose ?? exit;
+       _exitOnClose = exitOnClose ?? exit,
+       _host = host ?? NativeApiWindowHost();
 
   final WindowPersistence _persistence;
+
+  /// 平台窗口端口 — 唯一的原生窗口依赖。
+  final NativeWindowHost _host;
+
+  /// [NativeWindowHost.attach] 成功后置位 — 降级 show 只在已绑定时执行。
+  bool _hostAttached = false;
 
   /// 关窗终点的进程终止调用（见 [_persistThenDestroy] 第 4 步）。
   final void Function(int code) _exitOnClose;
   final WindowServiceState _state = WindowServiceState();
   WindowResizeCoordinator? _resizeCoordinator;
-
-  /// 缩放撕裂取证 (`--dart-define=RESIZE_DIAG=true`, Debug/Profile only);
-  /// 未请求时恒为 null. init 成功后启动, [dispose] 停止.
-  ResizeDiagnostics? _resizeDiagnostics;
   late final WindowPersistenceCoordinator _persistenceCoordinator =
       WindowPersistenceCoordinator(
         state: _state,
         persistence: _persistence,
-        readPosition: windowManager.getPosition,
+        readPosition: _host.getPosition,
         log: (message, error, stackTrace) =>
             _log.w('$message: $error\n$stackTrace'),
       );
@@ -71,28 +78,21 @@ class WindowService with WindowListener implements WindowBridge {
   final List<Future<void> Function()> _closingListeners = [];
   late final WindowModeCoordinator _modeCoordinator = WindowModeCoordinator(
     state: _state,
-    maximize: windowManager.maximize,
-    unmaximize: windowManager.unmaximize,
+    maximize: _host.maximize,
+    unmaximize: _host.unmaximize,
     waitForInitialization: () async {
       final operation = _initOperation;
       if (operation != null) await operation;
     },
     log: _log.i,
-    // 原生全屏: Windows 走 media_kit 同款样式摘除 (Win32FullscreenBridge),
-    // 不用 window_frame_kit 自带 setFullScreen — 其退出分支沿用 window_manager
-    // 0.5.2 原实现: 非最大化恢复时 DwmExtendFrameIntoClientArea(0 边距) 抹掉
-    // customFrame 的 DWM 阴影边距并清 is_frameless_, 进入时还会 SetAsFrameless
-    // 改写 NCCALCSIZE 分支状态, 与 FrameController 的样式/DWM 策略互踩。
-    // 摘除 WS_OVERLAPPEDWINDOW 则正是 FrameController 识别的"外部全屏"
-    // (IsExternalFullscreenStyle → 无 frame/无缩放带/屏蔽 SC_SIZE), 退出时
-    // 桥恢复进入前的原样式位 (含 frame 已去掉的 WS_CAPTION), frame 无缝续接。
-    // 其余平台 (非发布目标) 用 windowManager 兜底.
-    enterFullscreen: () async => Win32FullscreenBridge.isSupported
-        ? Win32FullscreenBridge.enter()
-        : windowManager.setFullScreen(true),
-    exitFullscreen: () async => Win32FullscreenBridge.isSupported
-        ? Win32FullscreenBridge.exit()
-        : windowManager.setFullScreen(false),
+    // 原生全屏走 nativeapi `isFullScreen`（三平台同一入口）。Windows 实现
+    // 摘除 WS_CAPTION/WS_THICKFRAME 并铺满显示器、退出时只放回它摘掉的位
+    // 并 SetWindowPlacement 恢复进入前几何（含最大化），与隐藏标题栏 frame
+    // 状态互不覆盖——原 Win32FullscreenBridge（media_kit utils.cc 移植）
+    // 因此删除。
+    enterFullscreen: () => _host.setFullScreen(true),
+    exitFullscreen: () => _host.setFullScreen(false),
+    queryMaximized: _host.isMaximized,
   );
 
   /// init 隐藏阶段的 resize 抑制 — [_initWindow] 几何恢复会引发一次
@@ -143,41 +143,21 @@ class WindowService with WindowListener implements WindowBridge {
   Future<void> _initOnce() async {
     var listenerAdded = false;
     try {
-      // windowManager.ensureInitialized() is owned by main.dart.
-      // 拦截原生关闭事件，确保异步窗口状态持久化完成后再销毁窗口。
-      await windowManager.setPreventClose(true);
-      // window_frame_kit 自定义 frame（2026-10 取代 bitsdojo BDW_CUSTOM_FRAME）：
-      // customFrame 在首次 show 之前接管 NCCALCSIZE（整窗即客户区、无
-      // Win10 主题色线）/NCHITTEST（四边+四角按当前 DPI 等宽缩放带）并在
-      // 交互缩放中预同步 Flutter 视图尺寸防撕裂。不设 TitleBarStyle.hidden：
-      // frame 启用时其消息分支先于 hidden 分支，hidden 只会在 frame 关闭后
-      // 引回 window_manager 的 8px 内缩白边。
-      // 仅 Windows 启用：Linux 的 customFrame 是 GTK 去装饰且须自建
-      // DragToResizeArea，macOS 隐藏系统标题栏——两者均非发布目标，保持
-      // 系统标题栏（Linux 非 GNOME X11 此前的 bitsdojo frame 随之退场）。
-      final options = WindowOptions(
-        backgroundColor: Colors.transparent,
-        windowButtonVisibility: false,
-        // 最小尺寸单通道：bitsdojo 的 GETMINMAXINFO hook 已移除，
-        // windowManager.setMinimumSize（由 waitUntilReadyToShow 应用）
-        // 现在独占且真实生效。
+      // nativeapi 绑定当前 runner 窗口: 隐藏标题栏 frame（Windows; 见
+      // [NativeApiWindowHost] 库注释）+ 最小尺寸（WM_GETMINMAXINFO 帧尺寸）
+      // + 事件监听。关闭请求由宿主同步取消平台默认关闭后转交
+      // [onWindowClose]，确保异步持久化完成后再退出。
+      await _host.attach(
         minimumSize: minimumWindowSize,
-        customFrame: Platform.isWindows ? true : null,
+        onEvent: _onNativeEvent,
       );
-      final ready = Completer<void>();
-      // waitUntilReadyToShow 只接受同步回调；通过 Completer 将异步恢复结果
-      // 传递给 init()，确保调用方等待到窗口真正 show/focus 完成。
-      await windowManager.waitUntilReadyToShow(options, () {
-        unawaited(_completeReadyAfterInit(ready));
-      });
-      if (_disposed) return;
-      windowManager.addListener(this);
       listenerAdded = true;
+      _hostAttached = true;
+      if (_disposed) return;
       _ensureResizeCoordinator();
-      await ready.future;
+      await _runInitWindowSafely();
       if (_disposed) return;
       _initialized = true;
-      _resizeDiagnostics ??= startResizeDiagnosticsIfRequested(logger: _log);
     } on Exception {
       _cleanupFailedInit(listenerAdded: listenerAdded);
       rethrow;
@@ -188,12 +168,37 @@ class WindowService with WindowListener implements WindowBridge {
     }
   }
 
-  Future<void> _completeReadyAfterInit(Completer<void> ready) async {
+  /// 端口事件分发 — 映射回既有 `onWindow*` 回调（测试直接驱动这些方法）。
+  void _onNativeEvent(NativeWindowEvent event) {
+    switch (event) {
+      case NativeWindowMaximized():
+        onWindowMaximize();
+      case NativeWindowRestored():
+        // 平台对「最大化窗口最小化后恢复」也只报 restored — 以宿主当前
+        // 状态为准，避免把仍最大化的窗口误记为 windowed。
+        unawaited(_onNativeRestored());
+      case NativeWindowResized():
+        onWindowResize();
+      case NativeWindowFocused():
+        _log.d('onWindowFocus()');
+      case NativeWindowBlurred():
+        _log.d('onWindowBlur()');
+      case NativeWindowCloseRequested():
+        onWindowClose();
+    }
+  }
+
+  Future<void> _onNativeRestored() async {
     try {
-      await _runInitWindowSafely();
-      if (!ready.isCompleted) ready.complete();
+      final maximized = await _host.isMaximized();
+      if (maximized) {
+        onWindowMaximize();
+      } else {
+        onWindowUnmaximize();
+      }
     } on Object catch (error, stackTrace) {
-      if (!ready.isCompleted) ready.completeError(error, stackTrace);
+      _log.w('[WindowService.onRestored] $error\n$stackTrace');
+      onWindowUnmaximize();
     }
   }
 
@@ -201,15 +206,12 @@ class WindowService with WindowListener implements WindowBridge {
   void _cleanupFailedInit({required bool listenerAdded}) {
     _resizeCoordinator?.dispose();
     _resizeCoordinator = null;
-    if (listenerAdded) windowManager.removeListener(this);
+    if (listenerAdded) _host.detach();
+    _hostAttached = false;
     _initialized = false;
   }
 
-  /// 窗口初始化 — 在 waitUntilReadyToShow 回调内 fire-and-forget 触发。
-  ///
-  /// 提取为 async 方法以满足回调期望同步 VoidCallback 的契约
-  /// (DCM avoid-passing-async-when-sync-expected)。纯 async 形态重组,
-  /// 信号源逻辑(frameless 设置 / isResizing)一字未改。
+  /// 窗口初始化 — 隐藏态几何恢复（失败记日志后上抛，由 [init] 容纳）。
   Future<void> _runInitWindowSafely() async {
     try {
       await _initWindow();
@@ -220,15 +222,14 @@ class WindowService with WindowListener implements WindowBridge {
   }
 
   Future<void> _initWindow() async {
-    // frame 视觉与边缘命中归 window_frame_kit 的 customFrame（见 [_initOnce]
-    // 的 WindowOptions）：原生 FrameController 接管 NCCALCSIZE/四边等宽
-    // NCHITTEST，本服务专注几何/事件/置顶等窗口管理语义。
+    // frame 视觉与边缘命中归 nativeapi 隐藏标题栏（见 [_initOnce]），
+    // 本服务专注几何/事件/置顶等窗口管理语义。
     if (_disposed) return;
     // Restore only validated geometry; corrupt preferences fall back to 720p.
     final persisted = await _persistence.load();
     if (_disposed) return;
     if (persisted.position case final position?) {
-      await windowManager.setBounds(
+      await _host.setBounds(
         Rect.fromLTWH(
           position.dx,
           position.dy,
@@ -239,12 +240,19 @@ class WindowService with WindowListener implements WindowBridge {
     } else {
       // 首次启动或位置损坏时仍应用已校验的尺寸，并交给平台居中，
       // 避免依赖不可预测的默认窗口几何。
-      await windowManager.setSize(persisted.size);
-      await windowManager.center();
+      await _host.setSize(persisted.size);
+      await _host.center();
     }
     if (_disposed) return;
-    await windowManager.setAlwaysOnTop(persisted.alwaysOnTop);
+    await _host.setAlwaysOnTop(persisted.alwaysOnTop);
     if (_disposed) return;
+    if (persisted.isMaximized) {
+      // 隐藏态 maximize: nativeapi 不立即 SW_MAXIMIZE（会提前亮窗），而是
+      // 标记「显示即最大化」——runner 首帧 Show 直接以最大化形态出现，
+      // 无普通→最大化闪变。
+      await _host.maximize();
+      if (_disposed) return;
+    }
     _state.windowSize.value = persisted.size;
     _state.isAlwaysOnTop.value = persisted.alwaysOnTop;
     _state.mode.value = persisted.isMaximized
@@ -272,13 +280,22 @@ class WindowService with WindowListener implements WindowBridge {
     // 完成, 其 WM_SIZE 若存在必已送达（被 onWindowResize 消费分支吞掉）
     // 或根本不存在（此处清零防滞留）; 组合根超时兜底保证 reveal 必达。
     _activeResizeSuppression = 0;
-    await windowManager.show();
+    await _host.show();
     if (_disposed) return;
     if (_state.mode.value.isMaximized) {
-      await windowManager.maximize();
+      await _host.maximize();
       if (_disposed) return;
     }
-    await windowManager.focus();
+    await _host.focus();
+  }
+
+  /// 降级亮窗 — init/reveal 失败时组合根 best-effort 调用。
+  ///
+  /// 宿主未绑定（attach 本身失败）时无窗口可操作：runner 首帧回调仍会
+  /// 以系统默认形态显示窗口，此处直接返回。
+  Future<void> showDegraded() async {
+    if (!_hostAttached) return;
+    await _host.show();
   }
 
   void _updateOnUIThread(VoidCallback update) {
@@ -292,7 +309,7 @@ class WindowService with WindowListener implements WindowBridge {
   void _ensureResizeCoordinator() {
     _resizeCoordinator ??= WindowResizeCoordinator(
       state: _state,
-      readSize: windowManager.getSize,
+      readSize: _host.getSize,
       persistSize: (size) => _persistenceCoordinator.save(size: size),
       logger: _log,
       sizemoveProbe: _createSizemoveProbe(),
@@ -307,7 +324,7 @@ class WindowService with WindowListener implements WindowBridge {
     return Win32SizemoveBridge(logger: _log);
   }
 
-  @override
+  /// 平台最大化事件（经 [_onNativeEvent] 或测试直接驱动）。
   void onWindowMaximize() {
     if (_disposed) return;
     _log.d('onWindowMaximize()');
@@ -316,7 +333,7 @@ class WindowService with WindowListener implements WindowBridge {
     _updateOnUIThread(_modeCoordinator.onNativeMaximize);
   }
 
-  @override
+  /// 平台取消最大化事件。
   void onWindowUnmaximize() {
     if (_disposed) return;
     _log.d('onWindowUnmaximize()');
@@ -326,7 +343,7 @@ class WindowService with WindowListener implements WindowBridge {
     _updateOnUIThread(_modeCoordinator.onNativeUnmaximize);
   }
 
-  @override
+  /// 平台尺寸变化事件（拖拽期间连续触发）。
   void onWindowResize() {
     if (_disposed) return;
     if (_activeResizeSuppression != 0) {
@@ -337,7 +354,7 @@ class WindowService with WindowListener implements WindowBridge {
     _resizeCoordinator?.onResize();
   }
 
-  @override
+  /// 平台关闭请求（默认关闭已被宿主取消）。
   void onWindowClose() {
     if (_disposed || _isClosing) return;
     _log.i('onWindowClose()');
@@ -359,7 +376,7 @@ class WindowService with WindowListener implements WindowBridge {
     // 1) hide-first:窗口先视觉消失（BlueBubbles 模式），后续持久化与
     //    退出在"看不见"的状态下完成。hide 本身也可能卡 channel — 加
     //    超时兜底，超时后继续走持久化。
-    await _runCloseCommand('hide', windowManager.hide);
+    await _runCloseCommand('hide', _host.hide);
     // 2) 仅等待轻量的偏好设置写入（含超时兜底），确保下次启动仍能
     //    恢复最后稳定的窗口几何。await 返回即数据已安全落盘
     //    （shared_preferences 平台实现同步写入后应答）。
@@ -377,7 +394,7 @@ class WindowService with WindowListener implements WindowBridge {
     //    链，而下一步 exit(0) 会瞬时终止进程（OS 收尾销毁所有窗口），
     //    等待它只会平添滞留。失败仅记录。
     unawaited(
-      _runCloseCommand('destroy', windowManager.destroy).catchError((
+      _runCloseCommand('destroy', _host.destroy).catchError((
         Object error,
         StackTrace stackTrace,
       ) {
@@ -431,7 +448,7 @@ class WindowService with WindowListener implements WindowBridge {
 
   Future<void> _setAlwaysOnTopSerialized(bool value) async {
     if (_disposed || value == _state.isAlwaysOnTop.value) return;
-    await windowManager.setAlwaysOnTop(value);
+    await _host.setAlwaysOnTop(value);
     if (_disposed) return;
     _state.isAlwaysOnTop.value = value;
     await _saveWindowState();
@@ -440,7 +457,7 @@ class WindowService with WindowListener implements WindowBridge {
   @override
   Future<void> minimize() async {
     if (_disposed) return;
-    await windowManager.minimize();
+    await _host.minimize();
   }
 
   @override
@@ -464,10 +481,10 @@ class WindowService with WindowListener implements WindowBridge {
 
   @override
   Future<void> startDragging() async {
-    // 标题栏拖动（窗口移动）走插件 startDragging——单包后 frame 命中
-    // （FrameController）与窗口移动（startDragging）同源，无双包抢权问题。
+    // 标题栏拖动走 nativeapi startDragging（Windows: 系统 HTCAPTION 拖动
+    // 循环，保留 Aero Snap）。
     if (_disposed) return;
-    await windowManager.startDragging();
+    await _host.startDragging();
   }
 
   @override
@@ -476,9 +493,8 @@ class WindowService with WindowListener implements WindowBridge {
     _disposed = true;
     // 先使 resize coordinator 的延迟回调失效，再释放状态 notifier。
     _resizeCoordinator?.dispose();
-    _resizeDiagnostics?.stop();
-    _resizeDiagnostics = null;
     _state.dispose();
-    windowManager.removeListener(this);
+    _host.detach();
+    _hostAttached = false;
   }
 }

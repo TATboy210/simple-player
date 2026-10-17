@@ -11,7 +11,7 @@ namespace ime_bridge_messages {
 // 消息号与 Dart 侧对齐：lib/kernel/bridge/win32/ime_bridge.dart 的
 // _messageId = WM_APP(0x8000) + 0x49 = 0x8049。runner 全目录无其他
 // WM_APP 占用（实证），
-// window_frame_kit 走 RegisterWindowMessage（>0xC000），不相交。
+// nativeapi 走 RegisterWindowMessage（>0xC000），不相交。
 constexpr UINT kAppSetImeEnabled = WM_APP + 0x49;
 
 // wParam: 1 = 恢复系统默认输入法上下文（IACE_DEFAULT|IACE_CHILDREN），

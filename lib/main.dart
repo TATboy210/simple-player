@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:window_frame_kit/window_frame_kit.dart';
 
 import 'app.dart';
 import 'kernel/diagnostics/dwm_capabilities.dart';
@@ -66,7 +65,8 @@ Future<void> main() {
           executableDirectory: () => File(Platform.resolvedExecutable).parent,
         );
         unawaited(_activateDiagnosticLog(diagnosticLogEffect));
-        await windowManager.ensureInitialized();
+        // 窗口层为 nativeapi（纯 FFI，无插件/MethodChannel 初始化步骤）：
+        // 当前 runner 窗口在 windowService.init() 内绑定。
 
         // 启动时序诊断 — 打点式纯计时器，无 UI 广播职责（见 StartupTimeline 注释）。
         final startupTimeline = StartupTimeline();
@@ -95,10 +95,11 @@ Future<void> main() {
           // 但 init 失败时 reveal 可能同样受阻，降级文字态将对用户不可见
           // （UAT Test 16 首轮实测发现的"隐形孤儿进程"）。这里 best-effort
           // 直接 show——窗口以系统默认标题栏形态出现（紧急态可接受），
-          // setPreventClose 未生效故默认关闭行为可用。若 show 本身失败，
+          // 关闭拦截未生效故默认关闭行为可用。若 show 本身失败，
           // 仅记录、不再上抛，保证容纳路径本身不会制造新的未处理异常。
+          // 宿主未绑定时 runner 首帧回调仍会亮窗（windows/runner）。
           try {
-            await windowManager.show();
+            await windowService.showDegraded();
           } on Object catch (showError, showStack) {
             KernelLogger.I.w(
               '[main] Degraded window show failed: $showError',
@@ -182,7 +183,7 @@ Future<void> _revealWindowAfterFirstFrame(WindowService windowService) async {
     );
     // 与 init 失败降级同款 best-effort 直接 show；再失败仅记录，不上抛。
     try {
-      await windowManager.show();
+      await windowService.showDegraded();
     } on Object catch (showError, showStack) {
       KernelLogger.I.w(
         '[main] Degraded window show failed: $showError',
