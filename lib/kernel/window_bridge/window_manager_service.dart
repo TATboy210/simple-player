@@ -14,6 +14,7 @@ import 'window_constants.dart';
 import 'window_mode_coordinator.dart';
 import 'window_persistence_coordinator.dart';
 import 'window_resize_coordinator.dart';
+import 'window_resize_diagnostics.dart';
 import 'window_service_state.dart';
 import 'window_ui_thread.dart';
 
@@ -22,6 +23,7 @@ export 'window_constants.dart';
 export 'window_mode_coordinator.dart';
 export 'window_persistence_coordinator.dart';
 export 'window_resize_coordinator.dart';
+export 'window_resize_diagnostics.dart';
 export 'window_service_state.dart';
 export 'window_ui_thread.dart';
 
@@ -46,6 +48,10 @@ class WindowService with WindowListener implements WindowBridge {
   final void Function(int code) _exitOnClose;
   final WindowServiceState _state = WindowServiceState();
   WindowResizeCoordinator? _resizeCoordinator;
+
+  /// 缩放撕裂取证 (`--dart-define=RESIZE_DIAG=true`, Debug/Profile only);
+  /// 未请求时恒为 null. init 成功后启动, [dispose] 停止.
+  ResizeDiagnostics? _resizeDiagnostics;
   late final WindowPersistenceCoordinator _persistenceCoordinator =
       WindowPersistenceCoordinator(
         state: _state,
@@ -171,6 +177,7 @@ class WindowService with WindowListener implements WindowBridge {
       await ready.future;
       if (_disposed) return;
       _initialized = true;
+      _resizeDiagnostics ??= startResizeDiagnosticsIfRequested(logger: _log);
     } on Exception {
       _cleanupFailedInit(listenerAdded: listenerAdded);
       rethrow;
@@ -469,6 +476,8 @@ class WindowService with WindowListener implements WindowBridge {
     _disposed = true;
     // 先使 resize coordinator 的延迟回调失效，再释放状态 notifier。
     _resizeCoordinator?.dispose();
+    _resizeDiagnostics?.stop();
+    _resizeDiagnostics = null;
     _state.dispose();
     windowManager.removeListener(this);
   }
