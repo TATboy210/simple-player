@@ -948,5 +948,33 @@ void main() {
         service.dispose();
       });
     });
+
+    test('title bar drag region is scaled to physical pixels', () {
+      fakeAsync((async) {
+        final service = WindowService(host: host);
+        // 未绑定宿主前不触达平台。
+        expect(
+          service.setTitleBarDragRegion(const Rect.fromLTWH(0, 0, 10, 10), 1),
+          isFalse,
+        );
+        initNow(service, async);
+
+        final native = service.setTitleBarDragRegion(
+          const Rect.fromLTWH(0, 0, 600, 32),
+          1.5,
+        );
+        expect(native, isTrue);
+        expect(host.dragRegion, const Rect.fromLTWH(0, 0, 900, 48));
+
+        service.setTitleBarDragRegion(null, 1.5);
+        expect(host.dragRegion, isNull);
+
+        service.dispose();
+        expect(
+          service.setTitleBarDragRegion(const Rect.fromLTWH(0, 0, 10, 10), 1),
+          isFalse,
+        );
+      });
+    });
   });
 }

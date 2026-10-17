@@ -75,6 +75,12 @@ abstract interface class NativeWindowHost {
   Future<void> setFullScreen(bool value);
   Future<void> startDragging();
 
+  /// 设置自绘标题栏的原生拖动区（客户区物理像素）；null 清除。
+  ///
+  /// 返回平台是否接管拖动区命中（Windows: runner 对该矩形回答
+  /// HTCAPTION）；false 时调用方须继续以手势 + [startDragging] 兜底。
+  bool setTitleBarDragRegion(Rect? physicalRect);
+
   /// 销毁原生窗口 (关闭拦截已生效时绕过拦截)。
   Future<void> destroy();
 }

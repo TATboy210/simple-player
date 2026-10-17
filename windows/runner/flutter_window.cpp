@@ -3,6 +3,7 @@
 #include <imm.h>
 #include <optional>
 
+#include "caption_region.h"
 #include "close_bridge_messages.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
@@ -61,6 +62,11 @@ bool FlutterWindow::OnCreate() {
   ImmAssociateContext(GetHandle(), nullptr);
   ImmAssociateContext(flutter_controller_->view()->GetNativeWindow(), nullptr);
 
+  // 标题栏原生拖动区：FlutterView 在 Dart 上报的拖动区内命中穿透，顶层
+  // 窗口回答 HTCAPTION（见 caption_region.h）。
+  caption_region::AttachFlutterView(
+      flutter_controller_->view()->GetNativeWindow());
+
   return true;
 }
 
@@ -90,6 +96,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   // （Dart 持久化后退出），见 close_bridge_messages.h。
   if (close_bridge_messages::HandleClose(hwnd, message, wparam)) {
     return 0;
+  }
+
+  // 自绘标题栏拖动区 → HTCAPTION（拖动/双击最大化/Snap/系统菜单全原生）。
+  LRESULT hit_result = 0;
+  if (caption_region::HandleHitTest(hwnd, message, lparam, &hit_result)) {
+    return hit_result;
   }
 
   switch (message) {

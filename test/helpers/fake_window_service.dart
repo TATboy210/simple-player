@@ -80,6 +80,22 @@ class FakeWindowService implements WindowBridge {
     startDraggingCallCount++;
   }
 
+  /// 最近一次上报的逻辑拖动区 (null = 已清除) 与调用次数。
+  Rect? dragRegion;
+  int dragRegionCallCount = 0;
+
+  /// 模拟平台是否原生接管拖动区 (默认 true, 同 Windows 生产路径;
+  /// 手势兜底在 Flutter 侧始终在位, 不受此值影响)。
+  bool supportsDragRegion = true;
+
+  @override
+  bool setTitleBarDragRegion(Rect? logicalRect, double devicePixelRatio) {
+    if (_disposed) return false;
+    dragRegionCallCount++;
+    dragRegion = logicalRect;
+    return supportsDragRegion;
+  }
+
   @override
   void Function() addClosingListener(Future<void> Function() listener) {
     closingListeners.add(listener);

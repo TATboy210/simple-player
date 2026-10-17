@@ -132,6 +132,19 @@ class FakeNativeWindowHost implements NativeWindowHost {
   @override
   Future<void> startDragging() async => calls.add('startDragging');
 
+  /// 最近一次上报的物理拖动区 (null = 已清除)。
+  Rect? dragRegion;
+
+  /// 是否模拟平台原生接管拖动区 (Windows runner HTCAPTION)。
+  bool supportsDragRegion = true;
+
+  @override
+  bool setTitleBarDragRegion(Rect? physicalRect) {
+    calls.add('setTitleBarDragRegion');
+    dragRegion = physicalRect;
+    return supportsDragRegion;
+  }
+
   @override
   Future<void> destroy() async => calls.add('destroy');
 }

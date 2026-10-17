@@ -488,6 +488,21 @@ class WindowService implements WindowBridge {
   }
 
   @override
+  bool setTitleBarDragRegion(Rect? logicalRect, double devicePixelRatio) {
+    if (_disposed || !_hostAttached) return false;
+    // 逻辑 → 物理：Flutter 视图铺满 runner 客户区，原点重合。
+    final physical = logicalRect == null
+        ? null
+        : Rect.fromLTRB(
+            logicalRect.left * devicePixelRatio,
+            logicalRect.top * devicePixelRatio,
+            logicalRect.right * devicePixelRatio,
+            logicalRect.bottom * devicePixelRatio,
+          );
+    return _host.setTitleBarDragRegion(physical);
+  }
+
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;

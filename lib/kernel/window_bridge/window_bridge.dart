@@ -79,6 +79,12 @@ abstract interface class WindowBridge {
   /// 开始拖动窗口。
   Future<void> startDragging();
 
+  /// 上报标题栏可拖区（逻辑像素，Flutter 视图坐标）；null 清除。
+  ///
+  /// 返回平台是否原生接管该区域的拖动/双击最大化/系统菜单（Windows）。
+  /// 返回 false 时标题栏继续以手势调用 [startDragging] 兜底。
+  bool setTitleBarDragRegion(Rect? logicalRect, double devicePixelRatio);
+
   /// 释放窗口资源；重复调用安全。
   void dispose();
 }

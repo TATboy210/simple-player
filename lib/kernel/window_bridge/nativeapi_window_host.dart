@@ -38,6 +38,7 @@ import 'dart:ui';
 
 import 'package:nativeapi/nativeapi.dart' as na;
 
+import '../bridge/win32/caption_region_bridge.dart';
 import '../bridge/win32/runner_window_handle.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'native_window_host.dart';
@@ -203,6 +204,14 @@ final class NativeApiWindowHost implements NativeWindowHost {
 
   @override
   Future<void> startDragging() async => _bound.startDragging();
+
+  @override
+  bool setTitleBarDragRegion(Rect? physicalRect) {
+    // 仅 Windows runner 实现 HTCAPTION 命中 (windows/runner/caption_region.h);
+    // macOS/Linux 继续走 Flutter 手势 + startDragging。
+    if (!Platform.isWindows || _hwnd == 0) return false;
+    return setRunnerCaptionRect(_hwnd, physicalRect);
+  }
 
   @override
   Future<void> destroy() async {
