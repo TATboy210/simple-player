@@ -58,8 +58,6 @@ itch.io  https://simple-player-team.itch.io/simple-player
 
 ifdian   https://ifdian.net/a/SimplePlayerTeam
 
-itch.io  https://simple-player-team.itch.io/simple-player
-
 zenmux   https://zenmux.ai/invite/B2Y66E
 
 ## 功能特性 / Features
