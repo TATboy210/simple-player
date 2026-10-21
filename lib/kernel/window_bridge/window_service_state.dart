@@ -14,19 +14,18 @@ import 'window_constants.dart';
 final class WindowServiceState {
   /// 创建窗口状态，默认使用稳定的启动尺寸。
   WindowServiceState({Size initialSize = defaultWindowSize})
-    : _windowSize = ValueNotifier(initialSize);
+    : windowSize = ValueNotifier(initialSize);
 
   final ValueNotifier<WindowMode> mode = ValueNotifier(WindowMode.windowed);
-  final ValueNotifier<Size> _windowSize;
+
+  /// 当前窗口尺寸 (逻辑像素) — 读写同端, 持久化与 settle 更新直接写本通知器。
+  final ValueNotifier<Size> windowSize;
   final ValueNotifier<int> resizeSessionId = ValueNotifier(0);
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
   bool _disposed = false;
   bool get disposed => _disposed;
-
-  /// 当前窗口尺寸的内部写入端。
-  ValueNotifier<Size> get windowSize => _windowSize;
 
   /// DWM 能力快照 — 转发 DwmCapabilities 门面的同一 notifier 实例。
   ///
@@ -43,7 +42,7 @@ final class WindowServiceState {
     if (_disposed) return;
     _disposed = true;
     mode.dispose();
-    _windowSize.dispose();
+    windowSize.dispose();
     resizeSessionId.dispose();
     isResizing.dispose();
     isAlwaysOnTop.dispose();

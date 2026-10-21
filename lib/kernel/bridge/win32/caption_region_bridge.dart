@@ -54,17 +54,21 @@ int packCaptionRect(Rect? physical) {
   return left | (top << 16) | (right << 32) | (bottom << 48);
 }
 
+/// 属性名的进程级 UTF-16 常驻副本 — 属性名是编译期常量, 缓存后拖拽期
+/// 每帧的 SetPropW/RemovePropW 不再分配/释放原生字符串 (首次调用分配
+/// 一次, 与进程同寿; API 只在调用期间使用该指针, 无需持久所有权)。
+final Pointer<Uint16> _captionRectPropertyName = _captionRectProperty
+    .toNativeUtf16()
+    .cast<Uint16>();
+
 /// 写入/清除 [hwnd] 的标题栏拖动区 (仅 Windows 调用, 调用方负责平台门控)。
 ///
 /// side effect: 写/删窗口属性 (随窗口销毁自动释放)。返回是否成功。
-bool setRunnerCaptionRect(int hwnd, Rect? physical) => using((arena) {
-  final name = _captionRectProperty
-      .toNativeUtf16(allocator: arena)
-      .cast<Uint16>();
+bool setRunnerCaptionRect(int hwnd, Rect? physical) {
   final packed = packCaptionRect(physical);
   if (packed == 0) {
-    _removePropW(hwnd, name);
+    _removePropW(hwnd, _captionRectPropertyName);
     return true;
   }
-  return _setPropW(hwnd, name, packed) != 0;
-});
+  return _setPropW(hwnd, _captionRectPropertyName, packed) != 0;
+}
