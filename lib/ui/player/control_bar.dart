@@ -105,42 +105,7 @@ class ControlBar extends StatelessWidget {
       borderRadius: _borderRadius,
       child: Material(
         color: Colors.transparent,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Match the child LayoutBuilder's post-padding width so the shell
-            // height and its content always select the same responsive mode.
-            final contentWidth = constraints.maxWidth - (Tokens.spSm * 2);
-            final mode = ControlBarLayoutMode.fromWidth(contentWidth);
-            final height = switch (mode) {
-              ControlBarLayoutMode.normal => Tokens.controlBarHeight,
-              ControlBarLayoutMode.minimal => Tokens.controlBarHeightMinimal,
-            };
-            return Container(
-              height: height,
-              decoration: effectiveDecoration,
-              padding: const EdgeInsets.only(
-                left: Tokens.spSm,
-                right: Tokens.spSm,
-                bottom: Tokens.controlBarContentBottomPadding,
-              ),
-              child: ControlBarLayout(
-                vm: vm,
-                actions: actions,
-                mode: mode,
-                isIdle: isIdle,
-                isIdleListenable: isIdleListenable,
-                title: title,
-                titleListenable: titleListenable,
-                resizing: resizing,
-                onSeekStart: onSeekStart,
-                onSeekEnd: onSeekEnd,
-                onToggleFullscreen: onToggleFullscreen,
-                onInteractionStart: onInteractionStart,
-                onInteractionEnd: onInteractionEnd,
-              ),
-            );
-          },
-        ),
+        child: _ResponsiveShell(bar: this, decoration: effectiveDecoration),
       ),
     );
 
@@ -211,4 +176,80 @@ class _ControlBarBlurState extends State<_ControlBarBlur> {
       child: widget.content,
     );
   }
+}
+
+/// 控制栏外壳 — 按宽度断点选模式, 并按模式缓存 [ControlBarLayout] 子树.
+///
+/// Why: LayoutBuilder 在窗口 resize 的每个像素都重跑 builder; 旧实现每次
+/// 新建 ControlBarLayout, 整个控制栏 (≈15 个 GlassButton + Tooltip/Focus/
+/// Semantics 链) 随之全量重建 — Debug 下实测 ~13ms/帧, 是拖角缩放跟手慢的
+/// 主因之一. 缓存后同一模式内返回同一 widget 实例, Element 直接短路, 只剩
+/// 布局/绘制; 断点跨越或父级重建 (新的 [bar]) 时才重建.
+class _ResponsiveShell extends StatefulWidget {
+  const _ResponsiveShell({required this.bar, required this.decoration});
+
+  final ControlBar bar;
+  final Decoration decoration;
+
+  @override
+  State<_ResponsiveShell> createState() => _ResponsiveShellState();
+}
+
+class _ResponsiveShellState extends State<_ResponsiveShell> {
+  ControlBarLayoutMode? _mode;
+  Widget? _layout;
+
+  @override
+  void didUpdateWidget(_ResponsiveShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 父级重建 = 参数可能变化, 缓存作废.
+    if (!identical(oldWidget.bar, widget.bar)) _layout = null;
+  }
+
+  /// side effect: 在 layout 阶段写缓存字段 (不 setState, 合法).
+  Widget _layoutFor(ControlBarLayoutMode mode) {
+    final cached = _layout;
+    if (cached != null && _mode == mode) return cached;
+    final bar = widget.bar;
+    _mode = mode;
+    return _layout = ControlBarLayout(
+      vm: bar.vm,
+      actions: bar.actions,
+      mode: mode,
+      isIdle: bar.isIdle,
+      isIdleListenable: bar.isIdleListenable,
+      title: bar.title,
+      titleListenable: bar.titleListenable,
+      resizing: bar.resizing,
+      onSeekStart: bar.onSeekStart,
+      onSeekEnd: bar.onSeekEnd,
+      onToggleFullscreen: bar.onToggleFullscreen,
+      onInteractionStart: bar.onInteractionStart,
+      onInteractionEnd: bar.onInteractionEnd,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      // Match the child LayoutBuilder's post-padding width so the shell
+      // height and its content always select the same responsive mode.
+      final contentWidth = constraints.maxWidth - (Tokens.spSm * 2);
+      final mode = ControlBarLayoutMode.fromWidth(contentWidth);
+      final height = switch (mode) {
+        ControlBarLayoutMode.normal => Tokens.controlBarHeight,
+        ControlBarLayoutMode.minimal => Tokens.controlBarHeightMinimal,
+      };
+      return Container(
+        height: height,
+        decoration: widget.decoration,
+        padding: const EdgeInsets.only(
+          left: Tokens.spSm,
+          right: Tokens.spSm,
+          bottom: Tokens.controlBarContentBottomPadding,
+        ),
+        child: _layoutFor(mode),
+      );
+    },
+  );
 }
