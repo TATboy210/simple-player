@@ -4,7 +4,6 @@ import 'package:simple_player_flutter/kernel/diagnostics/dwm_capabilities.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/dwm_capabilities_probe.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_service_state.dart';
 
 import '../../helpers/fake_kernel_logger.dart';
 
@@ -89,47 +88,6 @@ void main() {
 
       // Assert
       expect(DwmCapabilities.I.snapshot.value, isNull);
-    });
-  });
-
-  group('WindowServiceState integration', () {
-    test('dwmCapabilities 转发门面同一 notifier 实例（identity-preserved）', () {
-      // Arrange
-      final state = WindowServiceState();
-
-      // Act + Assert — D-01：Phase 7/8 监听的就是门面那一个实例
-      expect(
-        identical(state.dwmCapabilities, DwmCapabilities.I.snapshot),
-        isTrue,
-      );
-      state.dispose();
-    });
-
-    test('dwmCapabilities notifier 暴露且初始为 null', () {
-      // Arrange
-      final state = WindowServiceState();
-
-      // Act + Assert
-      expect(state.dwmCapabilities.value, isNull);
-      state.dispose();
-    });
-
-    test('state.dispose 不释放借用通知器——释放后仍可写入（借用语义）', () {
-      // Arrange — 通知器生命周期由 DwmCapabilities 门面持有
-      final state = WindowServiceState();
-      state.dispose();
-
-      // Act + Assert — 借用通知器在容器释放后依旧存活可用
-      expect(() => state.dwmCapabilities.value = null, returnsNormally);
-    });
-
-    test('dispose 幂等且不抛出', () {
-      // Arrange
-      final state = WindowServiceState();
-      state.dispose();
-
-      // Act + Assert — 重复 dispose 安全（既有容器契约）
-      expect(state.dispose, returnsNormally);
     });
   });
 

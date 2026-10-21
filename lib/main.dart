@@ -33,12 +33,17 @@ const uatFaultWindowInit = bool.fromEnvironment('UAT_FAULT_WINDOW_INIT');
 Future<void> main() {
   return runZonedGuarded<Future<void>>(() async {
         if (kDebugMode) {
-          MarionetteBinding.ensureInitialized();
+          MarionetteBinding.ensureInitialized(
+            MarionetteConfiguration(logCollector: _marionetteLogCollector),
+          );
         } else {
           WidgetsFlutterBinding.ensureInitialized();
         }
 
         KernelLoggerImpl.init();
+        // marionette 取证 (临时): 探针会话摘要走 .debug 级, 生产 console 链是
+        // LoggerPackageSink (自持 minLevel=info) — 取证会话临时放行 debug 级。
+        LoggerPackageSink.minLevel = LogLevel.debug;
         // Dart 侧图像缓存治理 (v0.0.9 内存) — Flutter 默认 1000 条/100MB
         // 对播放器场景过大 (缩略图 LRU 之外的双层缓存), 压到 500 条/32MB.
         // 预期省 ~50-70MB RSS (大量列表滚动时) 且不产生可感知重解码.
@@ -117,8 +122,7 @@ Future<void> main() {
         }
 
         // 启动期一次性 DWM 能力探测（D-01，Phase 6 ENAB-01）：同步 FFI，
-        // 结果写入门面自有 notifier（WindowServiceState.dwmCapabilities
-        // 转发同一实例）。失败优雅降级——快照保持 null，Phase 7/8 属性门
+        // 结果写入门面自有 notifier。失败优雅降级——快照保持 null，Phase 7/8 属性门
         // 视 null 为「能力未知」跳过属性调用；本 try/catch 保证探测故障
         // 不阻断应用启动（261009-fio H1：容纳层为 on Object —— probe()
         // 内部已把绑定解析 ArgumentError 降级 null，此层兜其余 Error 家族
@@ -147,9 +151,22 @@ Future<void> main() {
         // 用户看到数百毫秒空白窗口。窗口隐藏态完成几何恢复 + runApp
         // 排程首帧 → 此处亮窗，窗口出现即带完整内容。
         unawaited(_revealWindowAfterFirstFrame(windowService));
-      }, BootstrapErrorFallback.report) ??
+      }, BootstrapErrorFallback.report,
+      // marionette 取证桥 (debug) — 把 zone 内全部 print 输出 (KernelLogger
+      // debug sink 的 debugPrint 在内) 转喂 marionette get_logs, 供自动化
+      // 会话读取 resize 探针的结构化摘要。kDebugMode const → release 零开销。
+      zoneSpecification: ZoneSpecification(
+        print: (self, parent, zone, line) {
+          parent.print(zone, line);
+          if (kDebugMode) _marionetteLogCollector.addLog(line);
+        },
+      ),
+    ) ??
       Future<void>.value();
 }
+
+/// marionette 日志收集器 — 仅 debug 构建接线 (见 main() 的 zone print 拦截)。
+final PrintLogCollector _marionetteLogCollector = PrintLogCollector();
 
 /// 首帧栅格化后亮窗 — 窗口出现即带完整首帧内容（v0.0.4 空白窗口修复）。
 ///

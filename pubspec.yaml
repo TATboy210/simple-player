@@ -27,13 +27,16 @@ dependencies:
   path: ^1.9.1
   crypto: ^3.0.7
   ffi: ^2.2.0
-  # 窗口方案(2026-10): nativeapi (libnativeapi, MIT, window_manager 作者) —
-  # 纯 Dart FFI, cnativeapi 构建钩子用本机 C++ 工具链从源码编译原生库
-  # (native assets, 需 Flutter >=3.38 / Dart ^3.13)。经 NativeWindowHost 端口
-  # 隔离 (lib/kernel/window_bridge/nativeapi_window_host.dart); Windows runner
+  # 窗口方案(2026-10): nativeapi_flutter (libnativeapi, MIT, window_manager
+  # 作者) — re-export 纯 Dart FFI 绑定 nativeapi + Flutter 类型转换/widgets;
+  # cnativeapi 构建钩子用本机 C++ 工具链从源码编译原生库 (native assets,
+  # 需 Flutter >=3.38 / Dart ^3.13)。经 NativeWindowHost 端口隔离
+  # (lib/kernel/window_bridge/nativeapi_window_host.dart); Windows runner
   # 须 UI isolate 跑在 platform 线程 (见 windows/runner/main.cpp)。
-  # 不用 nativeapi_flutter: 其 widgets/multi-window 桥本项目不需要。
-  nativeapi: ^0.5.2
+  # 注: dart:ui 同名类型 (Size/Color 等) 不在 re-export 内, 经 conversions
+  # 的 toNative() 扩展构造; widgets (DragToResizeArea 等) 本项目未用 —
+  # 原生 HTCAPTION/NCCALCSIZE 命中路径更快。
+  nativeapi_flutter: ^0.5.2
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）
