@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:fake_async/fake_async.dart';
@@ -627,14 +628,17 @@ void main() {
         expect(service.isResizing.value, isFalse);
         expect(service.windowSize.value, const Size(1600, 900));
 
-        // 几何持久化被触发 (windowWidth/Height 落盘到偏好存储).
+        // 几何持久化被触发 (单 blob 快照落盘到偏好存储).
         SharedPreferences? prefs;
         unawaited(SharedPreferences.getInstance().then((p) => prefs = p));
         async.flushMicrotasks();
         final resolvedPrefs = prefs;
         if (resolvedPrefs == null) fail('getInstance 必须已解析');
-        expect(resolvedPrefs.getDouble('windowWidth'), 1600.0);
-        expect(resolvedPrefs.getDouble('windowHeight'), 900.0);
+        final snapshot = resolvedPrefs.getString('windowSnapshot');
+        if (snapshot == null) fail('windowSnapshot 必须已落盘');
+        final decoded = jsonDecode(snapshot);
+        expect(decoded, containsPair('width', 1600.0));
+        expect(decoded, containsPair('height', 900.0));
 
         service.dispose();
       });
