@@ -303,11 +303,10 @@ class MpvKitEngine implements MediaEngine {
   void play() {
     if (_disposed || !_hasMedia) return;
     final s = _state.value;
-    if (s == MediaState.playing ||
-        s == MediaState.opening ||
-        s == MediaState.error) {
-      return;
-    }
+    if (s == MediaState.opening || s == MediaState.error) return;
+    // Dart 状态与 mpv 实际一致地在播才是 no-op — 状态漂移时 (Dart=playing
+    // 但 mpv 已暂停) 仍须下发, 否则用户按一次不响应.
+    if (s == MediaState.playing && _isMpvPlaying) return;
     _completing = false;
     _state.value = MediaState.playing;
     // 播完 (keep-open=no) 后 mpv 已 idle — 重新播放须重新起播当前条目.
@@ -320,7 +319,9 @@ class MpvKitEngine implements MediaEngine {
 
   @override
   void pause() {
-    if (_disposed || _state.value != MediaState.playing) return;
+    if (_disposed || !_hasMedia) return;
+    // 以 mpv 实际为准: Dart 状态漂移 (非 playing 但 mpv 在播) 时同样暂停.
+    if (_state.value != MediaState.playing && !_isMpvPlaying) return;
     _state.value = MediaState.paused;
     _guard('pause', _player.pause);
   }
@@ -355,15 +356,23 @@ class MpvKitEngine implements MediaEngine {
 
   @override
   void togglePlayPause() {
+    if (_disposed) return;
     switch (_state.value) {
-      case MediaState.playing:
-        pause();
-      case MediaState.idle || MediaState.paused || MediaState.completed:
-        play();
       case MediaState.opening || MediaState.error:
-        break; // not toggleable — no-op
+        return; // not toggleable — no-op
+      case MediaState.idle ||
+          MediaState.playing ||
+          MediaState.paused ||
+          MediaState.completed:
+        // 方向取 mpv 的实际 pause 属性 — 与控制栏图标同一真相源. 旧实现
+        // 按 Dart 镜像状态分支, 两者漂移时首按只"纠正"镜像, 须按第二下.
+        _isMpvPlaying ? pause() : play();
     }
   }
+
+  /// mpv 是否真在推进播放: 有已装载文件 (非 idle) 且 pause=false.
+  bool get _isMpvPlaying =>
+      _hasMedia && !_player.idle.value && !_player.paused.value;
 
   // ============================================================
   // QueueControl — 实现见 mpv_kit_engine_queue.dart

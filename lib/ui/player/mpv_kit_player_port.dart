@@ -112,15 +112,27 @@ final class MpvKitVideoControlsPort implements VideoControlsPort {
 /// 生产环境 [PlayerPort] — 包装 mpv_kit 真实 [Player].
 ///
 /// 流来自 [MpvState.stream] (不回放当前值), 快照来自 [MpvState.value];
-/// `playing` 取 `!paused`. 基础播放命令由 PlaybackController 门面负责, 本端口
+/// `playing` 取 `!paused && !idle`. 基础播放命令由 PlaybackController 门面负责, 本端口
 /// 只保留进度条 seek-hold 与倍速所需的直接操作.
 class MpvKitPlayerPort implements PlayerPort {
   MpvKitPlayerPort(this._player);
 
   final Player _player;
 
+  /// 在播 = 已装载文件 (非 idle) 且 pause=false — 与引擎 togglePlayPause
+  /// 的判定同源. 只看 `!paused` 会让无文件/播完 idle 时图标误显"暂停".
+  bool get _playingNow => !_player.paused.value && !_player.idle.value;
+
   @override
-  Stream<bool> get playing => _player.paused.stream.map((p) => !p);
+  Stream<bool> get playing => Stream<bool>.multi((controller) {
+    void emit(Object? _) => controller.add(_playingNow);
+    final subscriptions = [
+      _player.paused.stream.listen(emit),
+      _player.idle.stream.listen(emit),
+    ];
+    controller.onCancel = () =>
+        Future.wait([for (final s in subscriptions) s.cancel()]);
+  });
   @override
   Stream<bool> get buffering => _player.buffering.stream;
   @override
@@ -133,7 +145,7 @@ class MpvKitPlayerPort implements PlayerPort {
   Stream<double> get rate => _player.speed.stream;
 
   @override
-  bool get isPlayingNow => !_player.paused.value;
+  bool get isPlayingNow => _playingNow;
   @override
   bool get isBufferingNow => _player.buffering.value;
   @override
