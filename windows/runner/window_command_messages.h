@@ -28,7 +28,7 @@
 // na.Window.nativeHandle，64 位句柄，本应用只发 x64/arm64）。
 namespace window_command_messages {
 
-// WM_APP + 0x4B — 与 ime(0x49)/sizemove(0x4A) 相邻，Dart 侧同值。
+// WM_APP + 0x4B — 与 ime(0x49) 相邻，Dart 侧同值。
 constexpr UINT kAppWindowCommand = WM_APP + 0x4B;
 
 // Dart 侧 WindowCommand 枚举同序 — 勿单边修改。

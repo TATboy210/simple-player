@@ -7,7 +7,6 @@
 #include "close_bridge_messages.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
-#include "sizemove_bridge_messages.h"
 #include "window_command_messages.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -121,19 +120,6 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // Dart 投递的窗口状态命令 — 在 Dart 栈外执行, 引擎同步 resize 才能
       // 在 WM_SIZE 内产出新尺寸帧 (见 window_command_messages.h)。
       return window_command_messages::Handle(hwnd, wparam, lparam) ? 1 : 0;
-    case WM_ENTERSIZEMOVE:
-      // v0.0.9 P0-1 拖窗/Resize 取证 — 仅记录原生模态循环起点, 不消费
-      // 消息(落到 DefWindowProc), 窗口行为零变化 (见 sizemove_bridge_messages.h)。
-      sizemove_bridge_messages::OnEnter();
-      break;
-    case WM_EXITSIZEMOVE:
-      // 同上 — 记录模态循环终点。lag 由查询时刻现算, 此处只落 tick。
-      sizemove_bridge_messages::OnExit();
-      break;
-    case sizemove_bridge_messages::kAppQuerySizemove:
-      // Dart 侧 Win32SizemoveBridge 在 settle 关键时点查询 — 返回打包
-      // 状态 (active + exitLag + enterTick), 见 sizemove_bridge_messages.h。
-      return sizemove_bridge_messages::HandleQuerySizemove();
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
