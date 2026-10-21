@@ -40,11 +40,17 @@ import 'package:nativeapi/nativeapi.dart' as na;
 
 import '../bridge/win32/caption_region_bridge.dart';
 import '../bridge/win32/runner_window_handle.dart';
+import '../bridge/win32/window_command_bridge.dart';
 import '../diagnostics/kernel_logger.dart';
 import 'native_window_host.dart';
 
 /// Windows 11 起始内部版本号 — 低于此值的 Windows 10 走无 DWM frame 模式。
 const int _windows11Build = 22000;
+
+/// 投递命令后的落定轮询间隔与次数 (上限 ~1s) — 命令在下一轮消息循环执行,
+/// 上限只防命令丢失时卡住 WindowModeCoordinator 的串行队列。
+const Duration _settlePollInterval = Duration(milliseconds: 8);
+const int _settlePolls = 125;
 
 /// 生产宿主：绑定当前 Flutter runner 窗口。
 final class NativeApiWindowHost implements NativeWindowHost {
@@ -191,16 +197,64 @@ final class NativeApiWindowHost implements NativeWindowHost {
   Future<void> focus() async => _bound.focus();
 
   @override
-  Future<void> maximize() async => _bound.maximize();
+  Future<void> maximize() => _runStateCommand(
+    WindowCommand.maximize,
+    _bound.maximize,
+    () => _bound.isMaximized,
+  );
 
   @override
-  Future<void> unmaximize() async => _bound.unmaximize();
+  Future<void> unmaximize() => _runStateCommand(
+    WindowCommand.unmaximize,
+    _bound.unmaximize,
+    () => !_bound.isMaximized,
+  );
 
   @override
-  Future<void> minimize() async => _bound.minimize();
+  Future<void> minimize() => _runStateCommand(
+    WindowCommand.minimize,
+    _bound.minimize,
+    () => _bound.isMinimized,
+  );
 
   @override
-  Future<void> setFullScreen(bool value) async => _bound.isFullScreen = value;
+  Future<void> setFullScreen(bool value) => _runStateCommand(
+    value ? WindowCommand.enterFullScreen : WindowCommand.exitFullScreen,
+    () => _bound.isFullScreen = value,
+    () => _bound.isFullScreen == value,
+  );
+
+  /// 窗口状态命令: Windows 投递给 runner 在消息循环执行 (见
+  /// window_command_bridge.dart — FFI 内直调会让引擎的同步 resize 超时,
+  /// 露出拉伸残帧与系统边框), 再轮询到 [settled] 后返回, 让调用方 (如退出
+  /// 全屏后查询最大化) 读到落定状态。其他平台或投递失败时直调。
+  Future<void> _runStateCommand(
+    WindowCommand command,
+    void Function() direct,
+    bool Function() settled,
+  ) async {
+    final window = _bound;
+    if (!Platform.isWindows ||
+        _hwnd == 0 ||
+        settled() ||
+        !postRunnerWindowCommand(_hwnd, command, window.nativeHandle)) {
+      if (!settled()) direct();
+      return;
+    }
+    for (var i = 0; i < _settlePolls && !settled(); i++) {
+      await Future<void>.delayed(_settlePollInterval);
+    }
+    // 落空取证 — 命令丢失或 runner 执行失败时轮询静默耗尽 (占住模式协调
+    // 器串行队列上限 ~1s)。记一条 warn 让失败可见, 便于对照 runner 日志
+    // 排查; 行为不变, 仅补可观测性。
+    if (!settled()) {
+      KernelLogger.I.w(
+        '[NativeApiWindowHost] window command "${command.name}" did not '
+        'settle within ${_settlePolls * _settlePollInterval.inMilliseconds}'
+        'ms — continuing',
+      );
+    }
+  }
 
   @override
   Future<void> startDragging() async => _bound.startDragging();
