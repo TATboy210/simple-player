@@ -61,6 +61,58 @@ void main() {
     await tester.pumpAndSettle(); // 内容淡入完成
   }
 
+  group('宽窗口内容约束 (12 栏评估 §3.3 方案 A)', () {
+    /// 以给定面板矩形直接挂载 — 生产中该矩形由 PanelWorkspaceLayout 给出.
+    Future<void> pumpPanel(WidgetTester tester, Size size) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: SettingsPanel(visible: true, onClose: () {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    final constraint = find.byKey(
+      const ValueKey('settings-content-constraint'),
+    );
+
+    testWidgets('960 宽面板 — 内容收窄到 640 且水平居中', (tester) async {
+      const panel = Size(960, 930);
+      await pumpPanel(tester, panel);
+
+      expect(tester.getSize(constraint).width, Tokens.settingsContentMaxWidth);
+      expect(
+        tester.getRect(constraint).center.dx,
+        closeTo(panel.width / 2, 0.5),
+      );
+    });
+
+    testWidgets('400 宽面板 — 不受约束影响（默认窗口几何不变）', (tester) async {
+      const panel = Size(400, 330);
+      await pumpPanel(tester, panel);
+
+      final width = tester.getSize(constraint).width;
+      expect(width, lessThan(Tokens.settingsContentMaxWidth));
+      // 面板外壳 1px 描边×2 → 内容可用宽 = 面板宽 − 2；未触顶时铺满。
+      expect(width, closeTo(panel.width - 2, 0.5));
+    });
+  });
+
   testWidgets('shows the tag layer with nav entries at L0', (tester) async {
     await openDialog(tester);
 

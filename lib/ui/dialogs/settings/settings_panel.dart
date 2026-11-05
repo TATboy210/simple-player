@@ -527,7 +527,7 @@ class _SettingsPanelState extends State<SettingsPanel>
       _tagLayerCache = null;
       _contentLayerCache = null;
     }
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // header 重绘隔离 — backOpacity FadeTransition 与层动画并行期间
@@ -610,6 +610,19 @@ class _SettingsPanelState extends State<SettingsPanel>
           ),
         ),
       ],
+    );
+
+    // 宽窗口下面板矩形由工作区公式撑到 960px+；内容层约束到可读宽度并
+    // 居中，避免「标签—控件」被拉散、滑块变成超长跑道。面板矩形本身
+    // 不动，只有内容排版收窄 (MD3 max-measure)。
+    return Align(
+      child: ConstrainedBox(
+        key: const ValueKey('settings-content-constraint'),
+        constraints: const BoxConstraints(
+          maxWidth: Tokens.settingsContentMaxWidth,
+        ),
+        child: content,
+      ),
     );
   }
 

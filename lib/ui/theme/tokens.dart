@@ -232,6 +232,13 @@ class Tokens {
   /// 工作区中任务最低宽度，与现有右侧列表 280 槽位等宽。
   static const workspaceTaskMinWidth = 280.0;
 
+  /// 设置面板内容最大宽度。
+  ///
+  /// 工作区公式让中列随窗口线性变宽（1920 窗口下 960px），单列「标签 +
+  /// 控件」行铺满后两端会被拉散、滑块被拉成超长跑道。内容层约束到该值
+  /// 并居中，面板矩形本身不变（MD3 max-measure 建议）。
+  static const settingsContentMaxWidth = 640.0;
+
   /// 工作区角色位移动效独立于控制栏；resize 时宿主直接落位。
   static const workspaceMoveDuration = 150;
   static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
