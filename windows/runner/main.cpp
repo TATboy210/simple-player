@@ -15,10 +15,12 @@
 // （v0.0.4 空白窗口修复，详见 main.dart）。
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
-                      _In_ wchar_t *command_line, _In_ int show_command) {
+                      _In_ wchar_t *command_line, _In_ int show_command)
+{
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
-  if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
+  if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent())
+  {
     CreateAndAttachConsole();
   }
 
@@ -28,16 +30,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   flutter::DartProject project(L"data");
 
-  // UI isolate 跑在 platform 线程（2026-10 nativeapi 迁移，原为
-  // RunOnSeparateThread）。必要条件而非调优：nativeapi 是纯 Dart FFI，
-  // 在调用线程上直接调用 Win32 API 并安装 WINEVENT_OUTOFCONTEXT 钩子
-  // （窗口最大化/恢复/缩放/焦点事件经安装线程的消息队列投递）。独立 UI
-  // 线程没有消息循环 → 窗口事件永不送达；且跨线程 SetWindowPos 会在
-  // platform 线程等待新尺寸帧时与 UI 线程互锁。合并线程也是 Flutter
-  // 官方声明的未来默认（dart_project.h："later will be changed to running
-  // the UI isolate on platform thread"）。IME/SIZEMOVE 桥的
-  // SendMessageTimeoutW 在同线程下退化为直接调用 WndProc，语义不变。
-  project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnPlatformThread);
+  // UI isolate 保持 Flutter 默认的独立线程（2026-10 nativeapi 0.5.10）。
+  // nativeapi 0.5.3 起把 Windows 窗口观察（WinEvent 钩子与子类化）安装到
+  // 窗口所属线程，默认线程策略的 Flutter 应用仍能收到焦点/生命周期/几何
+  // 事件；窗口状态调用从 UI isolate 发出时会自行 marshal 到窗口线程，因此
+  // 不再需要把 UI isolate 合并进 platform 线程。IME 桥继续经
+  // SendMessageTimeoutW 投递消息，与 Dart 线程模型无关。
+  project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
 
   // 毛玻璃取证开关（v0.0.8.2 A/B，协议见 docs/audit/glass-perf-ab.md）：
   // SIMPLER_PLAYER_FORCE_SKIA=1 → 禁用 Impeller 走 Skia。
@@ -48,7 +47,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   wchar_t force_skia[2] = {0};
   if (::GetEnvironmentVariableW(L"SIMPLER_PLAYER_FORCE_SKIA", force_skia, 2) ==
           1 &&
-      force_skia[0] == L'1') {
+      force_skia[0] == L'1')
+  {
     project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
   }
 
@@ -60,13 +60,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"flutter_windows", origin, size)) {
+  if (!window.Create(L"flutter_windows", origin, size))
+  {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
 
   ::MSG msg;
-  while (::GetMessage(&msg, nullptr, 0, 0)) {
+  while (::GetMessage(&msg, nullptr, 0, 0))
+  {
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
   }

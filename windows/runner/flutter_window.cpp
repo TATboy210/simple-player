@@ -7,7 +7,6 @@
 #include "close_bridge_messages.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
-#include "window_command_messages.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -116,10 +115,6 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
           hwnd, wparam,
           flutter_controller_ ? flutter_controller_->view()->GetNativeWindow()
                               : nullptr);
-    case window_command_messages::kAppWindowCommand:
-      // Dart 投递的窗口状态命令 — 在 Dart 栈外执行, 引擎同步 resize 才能
-      // 在 WM_SIZE 内产出新尺寸帧 (见 window_command_messages.h)。
-      return window_command_messages::Handle(hwnd, wparam, lparam) ? 1 : 0;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);

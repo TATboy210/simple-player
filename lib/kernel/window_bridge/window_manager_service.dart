@@ -5,11 +5,10 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
-import 'package:nativeapi_flutter/nativeapi_flutter.dart' as na;
+import 'package:nativeapi/nativeapi.dart' as na;
 
 import '../bridge/win32/caption_region_bridge.dart';
 import '../bridge/win32/runner_window_handle.dart';
-import '../bridge/win32/window_command_bridge.dart';
 import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
 import 'window_bridge.dart';
@@ -28,7 +27,7 @@ const int _windows11Build = 22000;
 const Duration _settlePollInterval = Duration(milliseconds: 8);
 const int _settlePolls = 125;
 
-/// 精简窗口服务 — 单类直接封装 nativeapi_flutter (2026-10-21 重建)。
+/// 精简窗口服务 — 单类直接封装 nativeapi (2026-10-21 重建, 0.5.10 去补丁)。
 ///
 /// 上一代 (端口 + 三协调器) 的全部行为契约在本类内联保留：
 /// * resize 500ms 防抖 settle 后才更新 windowSize 并落盘; isResizing 仅在
@@ -36,12 +35,13 @@ const int _settlePolls = 125;
 ///   偏好导致下次启动恢复成巨窗)。
 /// * 模式语义: 全屏意图标志 (全屏期间原生 maximize 事件映射回 fullscreen、
 ///   不降级为 maximized)、退出全屏回查宿主实际最大化状态。
-/// * 关窗时序 (hide-first): hide → persist → closing listeners → destroy →
-///   exit(0), 每步 800ms 超时兜底, 卡住的命令记日志后继续推进。
-/// * Windows 状态命令 (全屏/最大化/还原/最小化) 经 WM_APP+0x4B 投递 runner
-///   在消息循环执行 — FFI 内直调会在 Dart 栈内触发 resize, 引擎同步等待
-///   超时后 DWM 合成拉伸残帧 (Debug 可见系统边框闪变); 8ms×125 轮询落定,
-///   落空记 warn。
+/// * 关窗时序 (hide-first): hide → persist → closing listeners → exit(0),
+///   每步 800ms 超时兜底, 卡住的操作记日志后继续推进。退出即由 OS 销毁
+///   窗口, 不再单独 destroy。
+/// * 窗口状态命令直接调用 nativeapi: UI isolate 已不在 platform 线程
+///   (nativeapi 0.5.3 起事件观察在窗口所属线程), 同步 FFI 不再挡住引擎
+///   产帧。maximize/minimize/unmaximize 由系统异步投递, 8ms×125 轮询到
+///   落定后返回; 落空记 warn。
 /// * init 隐藏态几何恢复; [reveal] 之前吞掉一切 resize 事件 (恢复引发的
 ///   WM_SIZE 不产生假会话/假落盘)。
 ///
@@ -63,7 +63,6 @@ class WindowService implements WindowBridge {
   /// Windows runner HWND（其他平台 0）— 关闭放行属性与拖动区写在其上。
   int _hwnd = 0;
   na.ListenerId? _listenerId;
-  bool _destroying = false;
   bool _isClosing = false;
   bool _revealed = false;
   bool _fullscreenIntent = false;
@@ -131,7 +130,10 @@ class WindowService implements WindowBridge {
       window.hasShadow = false;
     }
     window.titleBarStyle = na.TitleBarStyle.hidden;
-    window.minimumSize = minimumWindowSize.toNative();
+    window.minimumSize = na.Size(
+      width: minimumWindowSize.width,
+      height: minimumWindowSize.height,
+    );
     _listenerId ??= window.addListener(_onEvent);
     _log.i('[WindowService] event listener attached');
 
@@ -139,15 +141,18 @@ class WindowService implements WindowBridge {
     final persisted = await _persistence.load();
     if (_disposed) return;
     if (persisted.position case final position?) {
-      window.bounds = Rect.fromLTWH(
-        position.dx,
-        position.dy,
-        persisted.size.width,
-        persisted.size.height,
-      ).toNative();
+      window.bounds = na.Rectangle(
+        x: position.dx,
+        y: position.dy,
+        width: persisted.size.width,
+        height: persisted.size.height,
+      );
     } else {
       // 首次启动或位置损坏时仍应用已校验的尺寸, 并交给平台居中。
-      window.setSize(persisted.size.toNative(), false);
+      window.setSize(
+        na.Size(width: persisted.size.width, height: persisted.size.height),
+        false,
+      );
       window.center();
     }
     window.isAlwaysOnTop = persisted.alwaysOnTop;
@@ -155,11 +160,7 @@ class WindowService implements WindowBridge {
       // 隐藏态 maximize: nativeapi 不立即 SW_MAXIMIZE (会提前亮窗), 而是
       // 标记「显示即最大化」— runner 首帧 Show 直接以最大化形态出现,
       // 无普通→最大化闪变。
-      await _runStateCommand(
-        WindowCommand.maximize,
-        window.maximize,
-        () => window.isMaximized,
-      );
+      await _awaitSettled(window.maximize, () => window.isMaximized);
       if (_disposed) return;
     }
     windowSize.value = persisted.size;
@@ -185,15 +186,15 @@ class WindowService implements WindowBridge {
       );
       return;
     }
-    _window = na.WindowManager.instance.getCurrent() ??
+    _window =
+        na.WindowManager.instance.getCurrent() ??
         na.WindowManager.instance.getAll().firstOrNull;
   }
 
   static bool _isWindows10() {
     // operatingSystemVersion 形如 '"Windows 10 Pro" 10.0 (Build 19045)'。
-    final match = RegExp(
-      r'Build (\d+)',
-    ).firstMatch(Platform.operatingSystemVersion);
+    final match = RegExp(r'Build (\d+)')
+        .firstMatch(Platform.operatingSystemVersion);
     final build = int.tryParse(match?.group(1) ?? '');
     return build != null && build < _windows11Build;
   }
@@ -208,11 +209,7 @@ class WindowService implements WindowBridge {
     _bound.show();
     if (_disposed) return;
     if (mode.value.isMaximized) {
-      await _runStateCommand(
-        WindowCommand.maximize,
-        _bound.maximize,
-        () => _bound.isMaximized,
-      );
+      await _awaitSettled(_bound.maximize, () => _bound.isMaximized);
       if (_disposed) return;
     }
     _bound.focus();
@@ -272,8 +269,6 @@ class WindowService implements WindowBridge {
   }
 
   void _onNativeResized() {
-    // 取证 (临时): 验证 resize 事件是否到达 Dart — INFO 级绕过 debugPrint 滤网。
-    _log.i('[WindowService] resize-event arrived');
     if (_disposed || !_revealed) return;
     _resizeTimer?.cancel();
     final generation = ++_resizeGeneration;
@@ -286,8 +281,6 @@ class WindowService implements WindowBridge {
   }
 
   Future<void> _onResizeSettled(int generation) async {
-    // 取证 (临时): settle 是否触发 + isResizing 是否回落 — INFO 级绕过滤网。
-    _log.i('[WindowService] resize-settle fired gen=$generation');
     if (_disposed || generation != _resizeGeneration) return;
     // 全屏进入/退出触发的 resize 是过渡而非用户意图 — 清 isResizing
     // (filterQuality 恢复依赖它) 但不更新 windowSize、不落盘。
@@ -302,7 +295,6 @@ class WindowService implements WindowBridge {
     );
     if (size != windowSize.value) windowSize.value = size;
     isResizing.value = false;
-    _log.i('[WindowService] isResizing cleared, size=$size');
     _schedulePersist();
   }
 
@@ -320,8 +312,7 @@ class WindowService implements WindowBridge {
         // 再执行原生全屏。
         _fullscreenIntent = true;
         mode.value = WindowMode.fullscreen;
-        await _runStateCommand(
-          WindowCommand.enterFullScreen,
+        await _awaitSettled(
           () => _bound.isFullScreen = true,
           () => _bound.isFullScreen,
         );
@@ -335,11 +326,7 @@ class WindowService implements WindowBridge {
           return;
         }
         mode.value = WindowMode.maximized;
-        await _runStateCommand(
-          WindowCommand.maximize,
-          _bound.maximize,
-          () => _bound.isMaximized,
-        );
+        await _awaitSettled(_bound.maximize, () => _bound.isMaximized);
       case WindowMode.windowed:
         _fullscreenIntent = false;
         if (mode.value == WindowMode.windowed) return;
@@ -351,49 +338,37 @@ class WindowService implements WindowBridge {
           return;
         }
         mode.value = WindowMode.windowed;
-        await _runStateCommand(
-          WindowCommand.unmaximize,
-          _bound.unmaximize,
-          () => !_bound.isMaximized,
-        );
+        await _awaitSettled(_bound.unmaximize, () => !_bound.isMaximized);
     }
   }
 
   Future<void> _exitFullscreen() async {
     _fullscreenIntent = false;
-    await _runStateCommand(
-      WindowCommand.exitFullScreen,
+    await _awaitSettled(
       () => _bound.isFullScreen = false,
       () => !_bound.isFullScreen,
     );
   }
 
-  /// 窗口状态命令: Windows 投递给 runner 在消息循环执行 (FFI 内直调会在
-  /// Dart 栈内触发 resize, 引擎同步 resize 等待超时后 DWM 合成拉伸残帧),
-  /// 再轮询到 [settled] 后返回, 让调用方读到落定状态。其他平台或投递失败
-  /// 时直调; 轮询落空记 warn 取证。
-  Future<void> _runStateCommand(
-    WindowCommand command,
+  /// 执行一次窗口状态命令并等到它落定。
+  ///
+  /// nativeapi 在非 owner 线程调用 `maximize`/`minimize`/`unmaximize` 时只
+  /// 投递 `ShowWindow`, 返回时状态可能尚未翻转 — 这里轮询到 [settled] 为真
+  /// 再返回, 让调用方读到落定状态。全屏 / titleBarStyle 走 nativeapi 的
+  /// `OnWindowThread` 同步等待, 首轮即退出。轮询落空只记 warn, 不阻塞调用方。
+  Future<void> _awaitSettled(
     void Function() direct,
     bool Function() settled,
   ) async {
-    final window = _window;
-    if (window == null) return;
-    if (!Platform.isWindows ||
-        _hwnd == 0 ||
-        settled() ||
-        !postRunnerWindowCommand(_hwnd, command, window.nativeHandle)) {
-      if (!settled()) direct();
-      return;
-    }
+    if (_window == null || _disposed) return;
+    if (!settled()) direct();
     for (var i = 0; i < _settlePolls && !settled(); i++) {
       await Future<void>.delayed(_settlePollInterval);
     }
     if (!settled()) {
       _log.w(
-        '[WindowService] window command "${command.name}" did not settle '
-        'within ${_settlePolls * _settlePollInterval.inMilliseconds}ms '
-        '— continuing',
+        '[WindowService] window state did not settle within '
+        '${_settlePolls * _settlePollInterval.inMilliseconds}ms — continuing',
       );
     }
   }
@@ -413,11 +388,7 @@ class WindowService implements WindowBridge {
   @override
   Future<void> minimize() async {
     if (_disposed) return;
-    await _runStateCommand(
-      WindowCommand.minimize,
-      _bound.minimize,
-      () => _bound.isMinimized,
-    );
+    await _awaitSettled(_bound.minimize, () => _bound.isMinimized);
   }
 
   @override
@@ -461,8 +432,7 @@ class WindowService implements WindowBridge {
 
   /// 平台关闭请求 (✕ / Alt+F4 / WM_CLOSE — 默认关闭已被取消)。
   void _onCloseRequested(na.EventRequest request) {
-    if (_destroying) return;
-    // 取消默认 DestroyWindow — 服务完成持久化后经 destroy/exit 收尾。
+    // 取消默认 DestroyWindow — 服务完成持久化后 exit 收尾。
     if (!request.cancel()) {
       _log.d(
         '[WindowService] forced close (WM_CLOSE): not cancelable; '
@@ -475,11 +445,11 @@ class WindowService implements WindowBridge {
     unawaited(_closeOperation!);
   }
 
-  /// 关窗时序: 1) hide-first 窗口先视觉消失; 2) 几何落盘; 2.5) 应用级
-  /// 退出落盘 (播放列表断点等); 3) destroy fire 不等; 4) exit(0) 立即
-  /// 终止进程 — 窗口已不可见、状态已落盘, 硬杀跳过引擎/libmpv 收尾等待
-  /// (「窗口已消失但进程滞留」的根源), 播放器无跨进程状态, 硬杀无副作用。
-  /// 测试注入 [_exitOnClose] seam 拦截。
+  /// 关窗时序: 1) hide-first 窗口先视觉消失; 2) 几何落盘; 3) 应用级退出
+  /// 落盘 (播放列表断点等); 4) exit(0) 立即终止进程 — 窗口已不可见、状态
+  /// 已落盘, 硬杀跳过引擎/libmpv 收尾等待 (「窗口已消失但进程滞留」的根源),
+  /// 播放器无跨进程状态, 硬杀无副作用。窗口本身由 OS 随进程退出销毁, 不再
+  /// 单独 destroy。测试注入 [_exitOnClose] seam 拦截。
   Future<void> _closeSequence() async {
     _resizeTimer?.cancel();
     await _runCloseStep('hide', _bound.hide);
@@ -487,19 +457,6 @@ class WindowService implements WindowBridge {
     for (final listener in List.of(_closingListeners)) {
       await _runCloseStep('closing-listener', listener);
     }
-    _destroying = true;
-    // runner 把外部 WM_CLOSE 改投 SC_CLOSE 以便拦截; 自身销毁须先放行。
-    if (_hwnd != 0) allowRunnerWindowClose(_hwnd);
-    // destroy fire 不等 — 下一步 exit(0) 会瞬时终止进程 (OS 收尾销毁所有
-    // 窗口), 等待只会平添滞留。失败仅记录。
-    unawaited(
-      _runCloseStep('destroy', _bound.close).catchError((
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        _log.e('[WindowService.close] destroy failed: $error\n$stackTrace');
-      }),
-    );
     dispose();
     _exitOnClose(0);
   }
@@ -507,13 +464,14 @@ class WindowService implements WindowBridge {
   /// 执行关窗路径中的单个命令, 附带超时兜底 — 超时不会取消底层调用,
   /// 只是不再等待, 卡住的命令记日志后放任自生自灭。[step] 可为同步 void
   /// (nativeapi FFI) 或异步 Future (SharedPreferences/listeners)。
-  Future<void> _runCloseStep(String label, FutureOr<void> Function() step) async {
+  Future<void> _runCloseStep(
+    String label,
+    FutureOr<void> Function() step,
+  ) async {
     try {
       await Future<void>.value(step()).timeout(_closeCommandTimeout);
     } on TimeoutException {
-      _log.w(
-        '[WindowService.close] "$label" timed out — continuing anyway',
-      );
+      _log.w('[WindowService.close] "$label" timed out — continuing anyway');
     } on Object catch (error, stackTrace) {
       // 关窗路径刻意容纳一切 — 绝不让清理失败阻断退出。
       _log.e('[WindowService.close] "$label" failed: $error\n$stackTrace');

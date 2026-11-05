@@ -1,10 +1,11 @@
 /// runner 主窗口句柄定位 — 为 nativeapi 提供当前 Flutter 宿主 HWND.
 ///
-/// Why this FFI exists (nativeapi 0.5.2 gap): `WindowManager.getCurrent()`
-/// on Windows is `GetActiveWindow()`, which is null while the runner window is
-/// still hidden — and this app restores geometry *before* the first show (no
-/// white flash). We therefore look the runner window up ourselves and wrap it
-/// with `Window.createWithNativeWindow(hwnd)`.
+/// Why this FFI exists (nativeapi 0.5.10: still no gap-free API):
+/// `WindowManager.getCurrent()` on Windows is `GetActiveWindow()`, which is
+/// null while the runner window is still hidden — and this app restores
+/// geometry *before* the first show (no white flash). We therefore look the
+/// runner window up ourselves and wrap it with
+/// `Window.createWithNativeWindow(hwnd)`.
 ///
 /// Lookup is scoped to the current process (two player instances each own a
 /// `FLUTTER_RUNNER_WIN32_WINDOW`, so a bare `FindWindowW` could return the
@@ -56,25 +57,4 @@ int findRunnerWindowHandle() => using((arena) {
     _getWindowThreadProcessId(hwnd, processId);
     if (processId.value == self) return hwnd;
   }
-});
-
-/// runner 关闭放行属性名 — 与 windows/runner/close_bridge_messages.h 同名.
-const String _allowCloseProperty = 'SimplePlayerAllowClose';
-
-@Native<Int32 Function(IntPtr, Pointer<Uint16>, IntPtr)>(
-  symbol: 'SetPropW',
-  assetId: 'user32',
-)
-external int _setPropW(int hwnd, Pointer<Uint16> name, int data);
-
-/// 放行本应用自身发起的关闭 — 在 [hwnd] 上设置 runner 识别的属性,
-/// 之后到达的 WM_CLOSE 不再被改投 SC_CLOSE (见 close_bridge_messages.h).
-///
-/// side effect: 写窗口属性 (随窗口销毁自动释放, 无需 RemoveProp)。
-void allowRunnerWindowClose(int hwnd) => using((arena) {
-  _setPropW(
-    hwnd,
-    _allowCloseProperty.toNativeUtf16(allocator: arena).cast<Uint16>(),
-    1,
-  );
 });

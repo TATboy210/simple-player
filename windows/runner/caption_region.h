@@ -13,11 +13,12 @@
 // 不再经 Flutter 手势竞技场模拟（Chromium app-region: drag 同款做法）。
 //
 // 命中顺序：FlutterView 子窗口覆盖整个客户区并先被命中，其子类过程在拖动区
-// 内返回 HTTRANSPARENT（同线程才穿透——UI isolate 已跑在 platform 线程），
-// 命中落到顶层窗口：nativeapi 子类 → DefSubclassProc → 本 runner 的
-// MessageHandler 回答 HTCAPTION。nativeapi 只在命中为 HTCLIENT 时才补 HTTOP
-// 等缩放边，所以这里必须先让出缩放边带，否则顶边/（Win10 无 frame 模式）左右
-// 边缩放会被拖动吞掉。
+// 内返回 HTTRANSPARENT（只穿透到同一 Win32 线程创建的窗口——runner 顶层
+// 窗口与 FlutterView 子窗口都在 platform 线程创建，与 Dart isolate 跑在
+// 哪个线程无关），命中落到顶层窗口：nativeapi 子类 → DefSubclassProc →
+// 本 runner 的 MessageHandler 回答 HTCAPTION。nativeapi 只在命中为 HTCLIENT
+// 时才补 HTTOP 等缩放边，所以这里必须先让出缩放边带，否则顶边/（Win10 无
+// frame 模式）左右边缩放会被拖动吞掉。
 //
 // 全屏时 nativeapi 摘除 WS_CAPTION，此处一并失效（Dart 侧也会清空矩形）。
 namespace caption_region {
@@ -25,7 +26,8 @@ namespace caption_region {
 // Dart 侧同名常量 — 勿单边修改。
 constexpr wchar_t kCaptionRectProperty[] = L"SimplePlayerCaptionRect";
 
-// nativeapi 0.5.2 window_windows.cpp 的属性名（只读，用于对齐缩放边判定）。
+// nativeapi window_windows.cpp 的属性名（0.5.10 核对未变；只读，用于对齐
+// 缩放边判定）。
 constexpr wchar_t kNativeApiFramelessProperty[] = L"NativeAPIFramelessClient";
 
 // 子类 id — 与 nativeapi 的 TopEdgeChildProc（id 1）区分。
