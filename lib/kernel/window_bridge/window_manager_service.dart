@@ -5,7 +5,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
-import 'package:nativeapi/nativeapi.dart' as na;
+import 'package:window_manager/window_manager.dart';
 
 import '../bridge/win32/caption_region_bridge.dart';
 import '../bridge/win32/runner_window_handle.dart';
@@ -27,7 +27,7 @@ const int _windows11Build = 22000;
 const Duration _settlePollInterval = Duration(milliseconds: 8);
 const int _settlePolls = 125;
 
-/// 精简窗口服务 — 单类直接封装 nativeapi (2026-10-21 重建, 0.5.10 去补丁)。
+/// 精简窗口服务 — 单类直接封装 window_manager 0.6.0 (nativeapi 核心)。
 ///
 /// 上一代 (端口 + 三协调器) 的全部行为契约在本类内联保留：
 /// * resize 500ms 防抖 settle 后才更新 windowSize 并落盘; isResizing 仅在
@@ -38,8 +38,8 @@ const int _settlePolls = 125;
 /// * 关窗时序 (hide-first): hide → persist → closing listeners → exit(0),
 ///   每步 800ms 超时兜底, 卡住的操作记日志后继续推进。退出即由 OS 销毁
 ///   窗口, 不再单独 destroy。
-/// * 窗口状态命令直接调用 nativeapi: UI isolate 已不在 platform 线程
-///   (nativeapi 0.5.3 起事件观察在窗口所属线程), 同步 FFI 不再挡住引擎
+/// * 窗口状态命令直接调用 window_manager/nativeapi: UI isolate 已不在
+///   platform 线程 (nativeapi 0.5.3 起事件观察在窗口所属线程), 同步 FFI 不再挡住引擎
 ///   产帧。maximize/minimize/unmaximize 由系统异步投递, 8ms×125 轮询到
 ///   落定后返回; 落空记 warn。
 /// * init 隐藏态几何恢复; [reveal] 之前吞掉一切 resize 事件 (恢复引发的
@@ -58,11 +58,11 @@ class WindowService implements WindowBridge {
   final WindowPersistence _persistence;
   final void Function(int code) _exitOnClose;
 
-  na.Window? _window;
+  Window? _window;
 
   /// Windows runner HWND（其他平台 0）— 关闭放行属性与拖动区写在其上。
   int _hwnd = 0;
-  na.ListenerId? _listenerId;
+  ListenerId? _listenerId;
   bool _isClosing = false;
   bool _revealed = false;
   bool _fullscreenIntent = false;
@@ -96,7 +96,7 @@ class WindowService implements WindowBridge {
   @override
   bool get isFullscreen => mode.value.isFullscreen;
 
-  na.Window get _bound {
+  Window get _bound {
     final window = _window;
     if (window == null) {
       throw StateError('WindowService used before init()');
@@ -129,11 +129,8 @@ class WindowService implements WindowBridge {
       // 一次 frame 重算。
       window.hasShadow = false;
     }
-    window.titleBarStyle = na.TitleBarStyle.hidden;
-    window.minimumSize = na.Size(
-      width: minimumWindowSize.width,
-      height: minimumWindowSize.height,
-    );
+    window.titleBarStyle = TitleBarStyle.hidden;
+    window.minimumSize = minimumWindowSize.toNative();
     _listenerId ??= window.addListener(_onEvent);
     _log.i('[WindowService] event listener attached');
 
@@ -141,18 +138,15 @@ class WindowService implements WindowBridge {
     final persisted = await _persistence.load();
     if (_disposed) return;
     if (persisted.position case final position?) {
-      window.bounds = na.Rectangle(
-        x: position.dx,
-        y: position.dy,
-        width: persisted.size.width,
-        height: persisted.size.height,
-      );
+      window.bounds = Rect.fromLTWH(
+        position.dx,
+        position.dy,
+        persisted.size.width,
+        persisted.size.height,
+      ).toNative();
     } else {
       // 首次启动或位置损坏时仍应用已校验的尺寸, 并交给平台居中。
-      window.setSize(
-        na.Size(width: persisted.size.width, height: persisted.size.height),
-        false,
-      );
+      window.setSize(persisted.size.toNative(), false);
       window.center();
     }
     window.isAlwaysOnTop = persisted.alwaysOnTop;
@@ -170,7 +164,7 @@ class WindowService implements WindowBridge {
         : WindowMode.windowed;
   }
 
-  /// nativeapi 绑定当前 runner 窗口 — Windows 隐藏态下 GetActiveWindow 为
+  /// window_manager 绑定当前 runner 窗口 — Windows 隐藏态下 GetActiveWindow 为
   /// null, 自行定位 HWND (进程内枚举, 见 runner_window_handle.dart);
   /// macOS/Linux 走 WindowManager。
   void _bindWindow() {
@@ -181,14 +175,14 @@ class WindowService implements WindowBridge {
         throw StateError('window: Flutter host window not found');
       }
       _hwnd = hwnd;
-      _window = na.Window.createWithNativeWindow(
+      _window = Window.createWithNativeWindow(
         ffi.Pointer<ffi.Void>.fromAddress(hwnd),
       );
       return;
     }
     _window =
-        na.WindowManager.instance.getCurrent() ??
-        na.WindowManager.instance.getAll().firstOrNull;
+        WindowManager.instance.getCurrent() ??
+        WindowManager.instance.getAll().firstOrNull;
   }
 
   static bool _isWindows10() {
@@ -225,18 +219,18 @@ class WindowService implements WindowBridge {
   }
 
   // =========================================================================
-  // 事件分发 — nativeapi 事件 → 内联语义 (无中间端口层)
+  // 事件分发 — window_manager 事件 → 内联语义 (无中间端口层)
   // =========================================================================
 
-  void _onEvent(na.WindowEvent event) {
+  void _onEvent(WindowEvent event) {
     switch (event) {
-      case na.WindowMaximizedEvent():
+      case WindowMaximizedEvent():
         _onNativeMaximize();
-      case na.WindowRestoredEvent():
+      case WindowRestoredEvent():
         unawaited(_onNativeRestored());
-      case na.WindowResizedEvent():
+      case WindowResizedEvent():
         _onNativeResized();
-      case na.WindowCloseRequestedEvent(:final request):
+      case WindowCloseRequestedEvent(:final request):
         _onCloseRequested(request);
       default:
         // moved/focused/blurred 等 — 无应用语义 (焦点日志由需要方自取)。
@@ -431,7 +425,7 @@ class WindowService implements WindowBridge {
   }
 
   /// 平台关闭请求 (✕ / Alt+F4 / WM_CLOSE — 默认关闭已被取消)。
-  void _onCloseRequested(na.EventRequest request) {
+  void _onCloseRequested(EventRequest request) {
     // 取消默认 DestroyWindow — 服务完成持久化后 exit 收尾。
     if (!request.cancel()) {
       _log.d(

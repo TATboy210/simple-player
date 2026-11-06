@@ -20,13 +20,14 @@ enum WindowMode {
 
 /// 面向 UI 的窗口管理抽象，隐藏平台窗口库的具体实现。
 ///
-/// ## 窗口层架构边界（2026-10-21 精简重建：单类 [WindowService] 直接封装
-/// nativeapi（纯 Dart FFI 绑定），不再有端口/协调器中间层）
+/// ## 窗口层架构边界（2026-10-21 精简重建；2026-11 迁到 window_manager 0.6.0：
+/// 单类 [WindowService] 直接封装，不再有端口/协调器中间层）
 ///
-/// 生产实现经 nativeapi（纯 Dart FFI 绑定，
-/// C++ 核心由 cnativeapi 构建钩子从源码编译，无 Flutter 插件/MethodChannel）。
-/// nativeapi 0.5.10 起窗口观察在窗口所属线程运行，UI isolate 保持 Flutter
-/// 默认独立线程，状态调用直接经 FFI（不再需要 runner 消息命令桥）：
+/// 生产实现经 window_manager 0.6.0 — 它已重写为 nativeapi 之上的单一 C++
+/// core（平台插件代码全部移除），新 API 即 nativeapi 的 Window/WindowManager
+/// 重导出，几何经 toNative()/toSize() 转换。nativeapi 0.5.3 起窗口观察在
+/// 窗口所属线程运行，UI isolate 保持 Flutter 默认独立线程，状态调用直接经
+/// FFI（不再需要 runner 消息命令桥）：
 ///
 /// - **视觉与命中域**（仅 Windows）：`TitleBarStyle.hidden` 保留原生 sizing
 ///   frame（Aero Snap、系统缩放），顶边带交给客户区并命中 HTTOP；最大化贴合
