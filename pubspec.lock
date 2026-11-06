@@ -496,26 +496,26 @@ packages:
     dependency: transitive
     description:
       name: mpv_kit
-      sha256: "069db250995cb485bc33f250bc89aa5f33e2433042cab29a1dc0fbb5570fc670"
+      sha256: bef8d7a74dbcc33980e233b81ad86adf0289168edb46f749937230698f8aa0bd
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0-dev.8"
+    version: "0.1.0-dev.9"
   mpv_kit_libs:
     dependency: transitive
     description:
       name: mpv_kit_libs
-      sha256: "5693bc8647b2d2a55cb106f22320bdadf45163a3e5f45731973cde9e144f6096"
+      sha256: "1c75f0048603e1d72ee9153372314c27fda9f879e43c56455aaa97167f7ce4da"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0-dev.8"
+    version: "0.1.0-dev.9"
   mpv_kit_video:
     dependency: "direct main"
     description:
       name: mpv_kit_video
-      sha256: "2ee58c3c4609ca1cc79e1e6cfef5046587f29a635eaeebe1f117441e9a643adc"
+      sha256: c63a9cdc8495e6f68ae7e0d14fa26965c1b997999125cd9a4d5eaa45b564da6e
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0-dev.8"
+    version: "0.1.0-dev.9"
   msix:
     dependency: "direct dev"
     description:
@@ -533,10 +533,18 @@ packages:
     source: hosted
     version: "0.19.5"
   nativeapi:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: nativeapi
       sha256: "118045bb549cb6fabad472a3a22a537e7310bbf20097350f5027808b4a5853ce"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.10"
+  nativeapi_flutter:
+    dependency: transitive
+    description:
+      name: nativeapi_flutter
+      sha256: "357a405c69212f5157da1bd3be183a53c2b841d0de0eb51f4a3947913712aec4"
       url: "https://pub.dev"
     source: hosted
     version: "0.5.10"
@@ -905,6 +913,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.4.0"
+  window_manager:
+    dependency: "direct main"
+    description:
+      name: window_manager
+      sha256: bdd6b1a2c1ce50f3bba7ffbaa0d5dc5feb6b6a24fd20269da4de90244f77a471
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.0"
   windows_file_picker:
     dependency: transitive
     description:

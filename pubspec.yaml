@@ -15,7 +15,7 @@ dependencies:
   # mpv_kit (自研 libmpv 0.41 FFI 绑定) — 唯一后端; mpv_kit_video 重导出
   # mpv_kit 并经 mpv_kit_libs build hook 打包 libmpv (sha256 校验), runner 无需改动.
   # MpvKitEngine implements MediaEngine. media_kit 全家已移除 (2026-10).
-  mpv_kit_video: ^0.1.0-dev.8
+  mpv_kit_video: ^0.1.0-dev.9
   path_provider: ^2.1.6
   # 13.x 解封（2026-10 窗口层迁移）：此前 bitsdojo_window_windows 锁 win32
   # ^5.1.1，与 windows_file_picker 的 win32 ^6.3.0 不相交；现窗口层 nativeapi
@@ -27,13 +27,13 @@ dependencies:
   path: ^1.9.1
   crypto: ^3.0.7
   ffi: ^2.2.0
-  # 窗口方案(2026-10): nativeapi (libnativeapi, MIT, window_manager 作者) —
-  # 纯 Dart FFI 绑定; cnativeapi 构建钩子用本机 C++ 工具链从源码编译原生库
-  # (native assets, 需 Flutter >=3.38 / Dart ^3.13)。单类 WindowService 直接
-  # 封装 (lib/kernel/window_bridge/window_manager_service.dart); Windows
-  # runner 须 UI isolate 跑在 platform 线程 (见 windows/runner/main.cpp)。
-  # dart:ui 同名类型 (Size/Rect) 不冲突, 直接构造 na.Size/na.Rectangle。
-  nativeapi: ^0.5.10
+  # 窗口方案(2026-11): window_manager 0.6.0 — 已重写为 nativeapi 之上的
+  # 单一 C++ core (平台插件代码全部移除)。新 API 就是 nativeapi 的
+  # Window/WindowManager 重导出; 几何/颜色经 toNative()/toSize()/toRect()
+  # 转换, nativeapi 与 nativeapi_flutter 作为传递依赖引入。
+  # 单类 WindowService 直接封装 (lib/kernel/window_bridge/window_manager_service.dart);
+  # 自绘标题栏的原生 HTCAPTION 拖动区与 WM_CLOSE 补位仍由 runner 负责。
+  window_manager: ^0.6.0
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）
