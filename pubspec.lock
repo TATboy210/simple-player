@@ -496,26 +496,26 @@ packages:
     dependency: transitive
     description:
       name: mpv_kit
-      sha256: bef8d7a74dbcc33980e233b81ad86adf0289168edb46f749937230698f8aa0bd
+      sha256: "36861b1804ca6f2864cb0eb54695671e7f75472e9d0774529534e7ba828c6128"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0-dev.9"
+    version: "0.1.1"
   mpv_kit_libs:
     dependency: transitive
     description:
       name: mpv_kit_libs
-      sha256: "1c75f0048603e1d72ee9153372314c27fda9f879e43c56455aaa97167f7ce4da"
+      sha256: "59c0efa91632eed4bc8aeecdc27135475f37c4796b004fb1a1f4ca2f49034c58"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0-dev.9"
+    version: "0.1.1"
   mpv_kit_video:
     dependency: "direct main"
     description:
       name: mpv_kit_video
-      sha256: c63a9cdc8495e6f68ae7e0d14fa26965c1b997999125cd9a4d5eaa45b564da6e
+      sha256: "4acb800038a9f4827e4afa328c77d44aea996c6165bc3ca1d7e59717c12c69c0"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0-dev.9"
+    version: "0.1.1"
   msix:
     dependency: "direct dev"
     description:
