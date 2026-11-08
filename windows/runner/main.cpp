@@ -38,16 +38,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // SendMessageTimeoutW 投递消息，与 Dart 线程模型无关。
   project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
 
-  // 毛玻璃取证开关（v0.0.8.2 A/B，协议见 docs/audit/glass-perf-ab.md）：
-  // SIMPLER_PLAYER_FORCE_SKIA=1 → 禁用 Impeller 走 Skia。
+  // 渲染后端（2026-11-07 A/B 裁决，数据见 docs/audit/glass-perf-ab.md）：
+  // 默认锁 Skia——Flutter 3.47 Windows 的 Impeller（经 ANGLE 走 GLES）在窗口
+  // 拖拽缩放时 raster P95 约 19~27ms，Skia 约 15~17ms，jank60 近乎减半。
+  // SIMPLER_PLAYER_FORCE_IMPELLER=1 → 回到 SDK 默认（Impeller），供复测对比。
   // 用环境变量而非命令行 flag——命令行参数会经 set_dart_entrypoint_arguments
   // 混入 Dart 入口参数流；环境变量零污染，同一产物即可双后端对比。
-  // 不设或值非 "1" 时行为与 SDK 默认（ImpellerSwitch::Default）完全一致。
-  // A/B 裁决后按结论保留（锁 Skia）或删除本段（E1 阶段落锤）。
-  wchar_t force_skia[2] = {0};
-  if (::GetEnvironmentVariableW(L"SIMPLER_PLAYER_FORCE_SKIA", force_skia, 2) ==
-          1 &&
-      force_skia[0] == L'1')
+  wchar_t force_impeller[2] = {0};
+  const bool use_impeller =
+      ::GetEnvironmentVariableW(L"SIMPLER_PLAYER_FORCE_IMPELLER", force_impeller,
+                                2) == 1 &&
+      force_impeller[0] == L'1';
+  if (!use_impeller)
   {
     project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
   }
