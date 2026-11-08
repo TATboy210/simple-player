@@ -18,7 +18,7 @@ import 'package:simple_player_flutter/kernel/services/app_settings_service.dart'
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 import 'package:simple_player_flutter/kernel/services/playlist_coordinator.dart';
 import 'package:simple_player_flutter/kernel/services/video_processing_service.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_manager_service.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/player/drop_handler.dart';

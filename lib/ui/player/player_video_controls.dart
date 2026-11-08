@@ -230,18 +230,15 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
 
   /// 切换全屏 — 双击与全屏按钮共用入口。
   ///
-  /// media_kit 执行真实 route 切换，宿主只接收结果同步窗口语义。
-  /// (push/pop PageRouteBuilder)。用**本实例** [widget.video] — 窗口态
-  /// isFullscreen()=false→enter, 全屏态 =true→exit, 自动正确分支
-  /// (修复症状④退出渲染出错,见 memory [[project_fullscreen_minimal_fix]])。
+  /// 全屏由宿主经 WindowService.setMode 切换原生窗口全屏
+  /// (actions.onToggleFullscreen)，视频面侧钩子 [VideoControlsPort.toggleFullscreen]
+  /// 在生产实现里是 no-op，仅作为测试可观测的生命周期落点。
   void _toggleFullscreen() {
     if (!mounted || _isDeactivating || !widget.video.isMounted) return;
-    // Cancel exact menu before media_kit touches its own fullscreen route.
+    // 先摘掉自有菜单，再切换窗口模式。
     widget.menuSession?.cancel();
-    // media_kit 负责真实 route 切换，宿主只在根 Video 生命周期回调中同步状态。
     widget.actions.onToggleFullscreen?.call();
-    // The host callback may synchronously pop the fullscreen route, so re-check
-    // lifecycle before touching the route-local VideoState.
+    // 宿主回调可能同步使本控件失效，触碰视频面前重新校验生命周期。
     if (!mounted || _isDeactivating || !widget.video.isMounted) return;
     widget.video.toggleFullscreen();
   }

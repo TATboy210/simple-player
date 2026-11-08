@@ -1,8 +1,6 @@
-import 'dart:ui';
-
 import 'package:flutter/foundation.dart';
 
-import 'package:simple_player_flutter/kernel/window_bridge/window_manager_service.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_service.dart';
 
 /// 测试替身 — 实现 WindowBridge 接口，无 nativeapi 依赖。
 ///
@@ -30,9 +28,6 @@ class FakeWindowService implements WindowBridge {
   @override
   final ValueNotifier<WindowMode> mode = ValueNotifier(WindowMode.windowed);
   @override
-  /// 与生产实现一致的默认外部窗口尺寸。
-  final ValueNotifier<Size> windowSize = ValueNotifier(const Size(1280, 752));
-  @override
   final ValueNotifier<bool> isResizing = ValueNotifier(false);
   @override
   final ValueNotifier<int> resizeSessionId = ValueNotifier(0);
@@ -40,11 +35,6 @@ class FakeWindowService implements WindowBridge {
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
   // ─── WindowBridge implementation ───
-
-  @override
-  Future<void> init() async {
-    if (_disposed) return;
-  }
 
   @override
   Future<void> setMode(WindowMode target) async {
@@ -80,20 +70,12 @@ class FakeWindowService implements WindowBridge {
     startDraggingCallCount++;
   }
 
-  /// 最近一次上报的逻辑拖动区 (null = 已清除) 与调用次数。
-  Rect? dragRegion;
-  int dragRegionCallCount = 0;
-
-  /// 模拟平台是否原生接管拖动区 (默认 true, 同 Windows 生产路径;
-  /// 手势兜底在 Flutter 侧始终在位, 不受此值影响)。
-  bool supportsDragRegion = true;
+  int titleBarDoubleClickCallCount = 0;
 
   @override
-  bool setTitleBarDragRegion(Rect? logicalRect, double devicePixelRatio) {
-    if (_disposed) return false;
-    dragRegionCallCount++;
-    dragRegion = logicalRect;
-    return supportsDragRegion;
+  void titleBarDoubleClick() {
+    if (_disposed) return;
+    titleBarDoubleClickCallCount++;
   }
 
   @override
@@ -106,15 +88,11 @@ class FakeWindowService implements WindowBridge {
     };
   }
 
-  @override
-  bool get isFullscreen => mode.value == WindowMode.fullscreen;
-
-  @override
+  /// 释放通知器 — 接口不含 dispose（生命周期归组合根），测试自行收尾。
   void dispose() {
     if (_disposed) return;
     _disposed = true;
     mode.dispose();
-    windowSize.dispose();
     isResizing.dispose();
     resizeSessionId.dispose();
     isAlwaysOnTop.dispose();

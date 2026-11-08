@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mpv_kit_video/mpv_kit_video.dart';
 
-import '../../kernel/window_bridge/window_manager_service.dart';
+import '../../kernel/window_bridge/window_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/bridge/win32/ime_bridge.dart';
@@ -207,10 +207,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 纯 UI 弹层，不改播放状态，无需空置态隔离。
       // v0.0.6: services bundle 经 PlayerVideoControls 传入挂载的面板。
       onOpenSettings: () => _workspace.toggle(WorkspaceTaskIds.settings),
-      // setMode 仅同步 WindowService mode(守卫 + 鼠标隐藏联动). media_kit route
-      // 切换改由 PlayerVideoControls._toggleFullscreen 用各实例自己的 videoState 完成。
+      // 全屏即原生窗口全屏: setMode 驱动 WindowService mode (守卫 + 鼠标隐藏联动),
+      // 没有视频 route 可 push/pop.
       onToggleFullscreen: () {
-        // Remove only owned menus before the existing media_kit route exit/pop.
+        // 先摘掉自有菜单, 再切换窗口模式.
         _menus.cancel();
         final m = widget.windowService.mode.value;
         final entering = m != WindowMode.fullscreen;

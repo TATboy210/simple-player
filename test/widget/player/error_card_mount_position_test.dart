@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_manager_service.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/window_service.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card_host.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';

@@ -27,13 +27,11 @@ dependencies:
   path: ^1.9.1
   crypto: ^3.0.7
   ffi: ^2.2.0
-  # 窗口方案(2026-11): window_manager 0.6.0 — 已重写为 nativeapi 之上的
-  # 单一 C++ core (平台插件代码全部移除)。新 API 就是 nativeapi 的
-  # Window/WindowManager 重导出; 几何/颜色经 toNative()/toSize()/toRect()
-  # 转换, nativeapi 与 nativeapi_flutter 作为传递依赖引入。
-  # 单类 WindowService 直接封装 (lib/kernel/window_bridge/window_manager_service.dart);
-  # 自绘标题栏的原生 HTCAPTION 拖动区与 WM_CLOSE 补位仍由 runner 负责。
-  window_manager: ^0.6.0
+  # 窗口方案(2026-11): 直接使用 nativeapi — 纯 Dart FFI, cnativeapi 构建钩子
+  # 用本机 MSVC 从源码编译原生库 (native assets, 需 Flutter >=3.47)。窗口调用
+  # 集中在 lib/kernel/window_bridge/nativeapi_window.dart (NativeWindow 端口的
+  # 生产实现); UI isolate 保持 Flutter 默认独立线程, 原生侧自行 marshal。
+  nativeapi: ^0.5.10
   # SVG 渲染（关于页社交 logo：X/爱发电/Patreon/GitHub）
   flutter_svg: ^2.3.0
   # 视频缩略图（v0.0.5 Windows 槽位 — Media Foundation 解帧 + WIC 编码）

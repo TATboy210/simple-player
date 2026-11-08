@@ -16,10 +16,8 @@ import 'workspace_menu_session.dart';
 /// media_kit fullscreen route 内控制栏使用同一命令入口。音量、字幕等非基础播放操作
 /// 仍按原路径使用 [engine]，不改变现有交互语义。
 ///
-/// F 键全屏: 先 actions.onToggleFullscreen 同步 WindowMode(单一数据源,
-/// 修 F/ESC 退出后 mode 卡 fullscreen),再 media_kit route 切换(修症状④).
-/// enter 用 videoKey.enterFullscreen; exit 直接 pop root navigator 全屏 route
-/// (窗口态 key 的 exitFullscreen 受 isFullscreen 守卫失效, 见 onToggleFullscreen 注释).
+/// F 键全屏: actions.onToggleFullscreen 经 WindowService.setMode 切原生全屏,
+/// WindowMode 是唯一数据源 (F/ESC 退出后 mode 不会卡在 fullscreen).
 ///
 /// [isFullscreen] 由调用方 (AnimatedBuilder 内) 每次重建时传入,
 /// 保证 onExitFullscreen 闭包捕获的是最新全屏状态.
@@ -100,7 +98,7 @@ KeyboardHandler buildPlayerKeyboardActions({
       controller.trackPreferenceService?.recordSubtitleDelay(delay - 500);
     },
     onMediaPlayPause: actions.onPlayPause,
-    // 全屏由窗口模式驱动原生窗口全屏 (WindowModeCoordinator → Win32 FFI),
+    // 全屏由窗口模式驱动原生全屏 (WindowService.setMode),
     // F/ESC 只切 WindowMode — 无 route 可 push/pop.
     onToggleFullscreen: () => actions.onToggleFullscreen?.call(),
     onExitFullscreen: () {

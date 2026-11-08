@@ -3,7 +3,7 @@ import 'dart:ui';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../window_bridge/window_constants.dart';
+import '../window_bridge/window_geometry.dart';
 
 /// A validated window snapshot restored between application sessions.
 final class PersistedWindowState {

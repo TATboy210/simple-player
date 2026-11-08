@@ -331,9 +331,8 @@ class _KeyboardHandlerState extends State<KeyboardHandler> {
       widget.onExitFullscreen?.call();
       return true;
     }
-    // F 键切换全屏 — callback (player_keyboard_actions.onToggleFullscreen) 已修症状④:
-    // enter 用 videoKey.enterFullscreen; exit 直接 rootNavigator.maybePop
-    // (窗口态 key 的 toggleFullscreen/exitFullscreen 受 isFullscreen 守卫失效).
+    // F 键切换全屏 — callback 为 player_keyboard_actions.onToggleFullscreen,
+    // 经 WindowService.setMode 在 fullscreen / windowed 间切换.
     if (_keyMatches(key, 'toggleFullscreen', LogicalKeyboardKey.keyF)) {
       widget.onToggleFullscreen?.call();
       return true;

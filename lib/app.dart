@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'features/player/player_feature.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
-import 'kernel/window_bridge/window_manager_service.dart';
+import 'kernel/window_bridge/window_service.dart';
 import 'l10n/app_localizations.dart';
 import 'ui/dialogs/settings/error_feedback_settings.dart';
 import 'ui/player/error_card_host.dart';
