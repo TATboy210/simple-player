@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:path/path.dart' as p;
@@ -13,72 +10,16 @@ import 'noop_thumbnail_provider.dart';
 import 'thumbnail_concurrency_gate.dart';
 import 'thumbnail_disk_cache.dart';
 import 'thumbnail_flight_registry.dart';
+import 'thumbnail_identity.dart';
+import 'thumbnail_identity_resolver.dart';
+import 'thumbnail_identity.dart' as thumbnail_identity;
+import 'thumbnail_memory_cache.dart';
+import 'thumbnail_metrics.dart';
 import 'thumbnail_provider.dart';
 import 'windows_thumbnail_provider.dart';
 
-/// 缩略图规格 — 冻结的解帧参数（P-Thumb v1.3.2 §10.2）
-///
-/// Frozen extraction parameters. Every field enters the canonical cache-key
-/// string, so changing any value (or [schemaVersion]) rotates all keys at
-/// once — stale cached thumbnails can never be served after an upgrade.
-final class _ThumbnailSpec {
-  const _ThumbnailSpec._();
-
-  /// 缓存架构版本 — 整体换 key 的总闸，旧 v2 磁盘文件由后台清理回收
-  static const schemaVersion = 'v3';
-
-  /// 解帧最长边 — 列表卡片 128×72 显示足够
-  static const maxWidth = 320;
-  static const maxHeight = 320;
-
-  /// 截帧时间点 (ms) — 取 1s 处避开常见黑屏首帧
-  static const timeMs = 1000;
-  static const jpegQuality = 85;
-}
-
-/// 文件身份 — immutable snapshot（P-Thumb v1.3.2 §10.1）
-///
-/// Identity snapshot `(normalized path, size, mtime, spec)` hashed into a
-/// cache key. Resolved once per request; async stages must never re-stat
-/// or mutate it — they consume the same instance.
-final class _FileIdentity {
-  const _FileIdentity({required this.path, required this.cacheKey});
-
-  /// normalize 后的绝对路径 — 传给 provider 的唯一形态
-  final String path;
-
-  /// sha256(canonical) — 内存 LRU 与磁盘文件名共用的主键
-  final String cacheKey;
-}
-
-/// debug-only 观测计数器（P-Thumb v1.3.2 §32 — release 零开销）
-///
-/// Debug metrics: every increment is kDebugMode-gated at call sites, so
-/// release builds neither count nor allocate. Never log per-thumbnail
-/// request paths here (§32.3 — 噪音反而制造性能问题).
-@visibleForTesting
-final class ThumbnailMetrics {
-  int requests = 0;
-  int memoryHits = 0;
-  int diskHits = 0;
-  int providerCalls = 0;
-  int failures = 0;
-
-  /// in-flight join 合并的请求数（F1/F2 生效度）
-  int coalescedJoins = 0;
-
-  /// 磁盘写失败降级 MemoryImage 的次数（R6 disk 域观察）
-  int diskWriteFallbacks = 0;
-
-  /// provider 并发峰值（G1 — gate 生效度观测）
-  int peakConcurrent = 0;
-
-  /// identity 解析触发的 File.stat 次数 — ID7 用：memo 生效则第二次请求不再增长
-  int statCalls = 0;
-
-  /// identity memo 命中次数
-  int identityMemoHits = 0;
-}
+// 公开 API 不变: ThumbnailMetrics 经 ThumbnailService.metrics 对外, 类型随本库导出.
+export 'thumbnail_metrics.dart' show ThumbnailMetrics;
 
 /// 平台感知的缩略图服务门面 — P-Thumb v1.3.2
 ///
@@ -121,28 +62,20 @@ class ThumbnailService {
 
   ThumbnailDiskCache get _diskCache => _diskCacheOverride ?? _defaultDiskCache;
 
-  /// LRU — LinkedHashMap 维护插入顺序，访问时 remove+reinsert 移到末尾；
-  /// 键为 cacheKey（非 path — 同一 path 可随文件变化产生多个 identity）
-  final _cache = <String, ImageProvider>{};
+  /// 内存 LRU + 双向索引 (见 [ThumbnailMemoryCache]).
+  final ThumbnailMemoryCache _cache = ThumbnailMemoryCache(
+    maxSize: _maxCacheSize,
+  );
 
-  /// path → 该 path 历史产生过的全部 cacheKey（多版本共存：A.mp4/v1、/v2）
-  final Map<String, Set<String>> _cacheKeysByPath = {};
+  /// identity 解析 + memo (见 [ThumbnailIdentityResolver]).
+  final ThumbnailIdentityResolver _identities = ThumbnailIdentityResolver(
+    metrics: _metrics,
+  );
 
-  /// cacheKey → path 反查 — LRU 淘汰时同步维护反向索引
-  final Map<String, String> _pathByCacheKey = {};
-
-  /// identity memo — memory hot path 零 stat 的关键（R5/I10）。
-  /// 失效契约：evict(path) 删除对应条目；clearCache() 清空全部；
-  /// 文件被外部替换但未 evict → 显示旧图（与 v1.2 现状行为一致，
-  /// 由 Coordinator 的 evict 调用契约覆盖 — §40.1）。
-  final Map<String, _FileIdentity> _identityMemo = {};
-
-  /// negative memo — cacheKey → 失败屏蔽截止时刻（§21.2，TTL 10s）
-  final Map<String, DateTime> _failedUntil = {};
-
-  /// path → 失败 key 反向索引 — evict 时 O(keys-of-path) 清理（M6），
-  /// 杜绝 v1.3.1 A.9 startsWith prefix collision
-  final Map<String, Set<String>> _failureKeysByPath = {};
+  /// negative memo (见 [ThumbnailFailureMemo]) — TTL 10s, 不写磁盘.
+  final ThumbnailFailureMemo _failures = ThumbnailFailureMemo(
+    ttl: _negativeTtl,
+  );
 
   /// in-flight 注册表 + epoch 内核（B3）— join/失效/isCurrent 唯一入口
   final ThumbnailFlightRegistry _registry = ThumbnailFlightRegistry();
@@ -192,29 +125,21 @@ class ThumbnailService {
     if (kDebugMode) _metrics.requests++;
 
     // identity 解析（memo 命中 = 零磁盘 I/O — I10）
-    final identity = await _resolveIdentityImpl(filePath);
+    final identity = await _identities.resolve(filePath);
     if (identity == null) return null;
 
     final key = identity.cacheKey;
 
     // LRU 命中 — remove 返回非 null 即命中，reinsert 实现 LRU touch（O(1)）
-    final cached = _cache.remove(key);
+    final cached = _cache.get(key);
     if (cached != null) {
-      _cache[key] = cached;
       if (kDebugMode) _metrics.memoryHits++;
       return cached;
     }
 
-    // negative memo 命中 — TTL 内直接失败，挡住坏文件的重复解帧（§21）
-    final failedUntil = _failedUntil[key];
-    if (failedUntil != null) {
-      if (DateTime.now().isBefore(failedUntil)) {
-        return null;
-      }
-      // TTL 已过 — 回收后走正常流程
-      _failedUntil.remove(key);
-      _failureKeysByPath[identity.path]?.remove(key);
-    }
+    // negative memo 命中 — TTL 内直接失败，挡住坏文件的重复解帧（§21）;
+    // TTL 已过则回收后走正常流程
+    if (_failures.isBlocked(identity.path, key)) return null;
 
     // 磁盘命中（第二优先级 — 零 native decode，§28.3）
     final diskProvider = await _diskCache.read(key);
@@ -235,7 +160,7 @@ class ThumbnailService {
   ///   forceRefresh 仅由 [retry] 内部传入（M5，B5 接入），
   ///   retry 已先 evict → 旧 normal flight 必然 stale，覆盖注册表键安全。
   Future<ImageProvider?> _getFlightImpl(
-    _FileIdentity identity, {
+    ThumbnailIdentity identity, {
     required bool forceRefresh,
   }) {
     final key = identity.cacheKey;
@@ -262,90 +187,108 @@ class ThumbnailService {
   /// flight 执行体（A.6 — R6 三层异常域 + R7 紧贴 commit + M2）
   Future<void> _runFlight(
     ThumbnailFlight flight,
-    _FileIdentity identity, {
+    ThumbnailIdentity identity, {
     required bool forceRefresh,
   }) async {
     try {
-      // ── Provider 域：失败 = negative cache 语义（仅 current，M2/21.5）──
-      Uint8List? bytes;
-      try {
-        bytes = await _gate.run(() async {
-          // 峰值观测在 gate 内 — 排队中的请求未真正占用解帧资源
-          if (kDebugMode) {
-            _metrics.providerCalls++;
-            _activeProviderCount++;
-            if (_activeProviderCount > _metrics.peakConcurrent) {
-              _metrics.peakConcurrent = _activeProviderCount;
-            }
-          }
-          try {
-            return await _providerImpl.generateThumbnail(identity.path);
-          } finally {
-            if (kDebugMode) _activeProviderCount--;
-          }
-        });
-      } on Exception {
-        // 不捕获 Error — 编程 bug 必须暴露给 zone（I11）
-        if (kDebugMode) _metrics.failures++;
-        _recordFailureIfCurrent(flight, identity);
+      final bytes = await _generateBytes(flight, identity);
+      if (bytes == null) {
         flight.complete(null);
         return;
       }
-
-      if (bytes == null || bytes.isEmpty) {
-        if (kDebugMode) _metrics.failures++;
-        _recordFailureIfCurrent(flight, identity);
-        flight.complete(null);
-        return;
-      }
-
-      // 检查点 1（await 点 1 之后）— stale 可返回原请求，无 commit 权（§19.7）
-      if (!_registry.isCurrent(flight)) {
-        flight.complete(MemoryImage(bytes));
-        return;
-      }
-
-      // ── Disk/commit 域：失败 = 降级 MemoryImage，不进 negative cache ──
-      ImageProvider? committed;
-      try {
-        committed = await _commitToCache(
+      flight.complete(
+        await _commitOrFallback(
           flight,
           identity,
           bytes,
           forceRefresh: forceRefresh,
-        );
-      } on Exception {
-        // D7：写失败 ≠ 生成失败 — bytes 已拿到，降级展示（Error 不捕获）
-        flight.complete(MemoryImage(bytes));
-        return;
-      }
-
-      if (forceRefresh) {
-        // R2：retry 当前请求即时展示新 bytes — 旧 decoded FileImage 已在
-        // _commitToCache 内 evict，下次滚动从新磁盘文件重新 decode（§22.3）
-        flight.complete(MemoryImage(bytes));
-        return;
-      }
-      flight.complete(committed ?? MemoryImage(bytes));
+        ),
+      );
     } finally {
       _registry.remove(flight);
     }
   }
 
+  /// Provider 域 — 失败 = negative cache 语义（仅 current，M2/21.5）.
+  ///
+  /// 返回 null 表示生成失败 (异常 / 空 bytes), 已按 current 判定记入
+  /// negative memo; 不捕获 Error — 编程 bug 必须暴露给 zone（I11）.
+  Future<Uint8List?> _generateBytes(
+    ThumbnailFlight flight,
+    ThumbnailIdentity identity,
+  ) async {
+    Uint8List? bytes;
+    try {
+      bytes = await _gate.run(() => _callProvider(identity.path));
+    } on Exception {
+      bytes = null;
+    }
+    if (bytes != null && bytes.isNotEmpty) return bytes;
+    if (kDebugMode) _metrics.failures++;
+    _recordFailureIfCurrent(flight, identity);
+    return null;
+  }
+
+  /// gate 内的 provider 调用 — 峰值观测在 gate 内, 排队中的请求未真正
+  /// 占用解帧资源.
+  Future<Uint8List?> _callProvider(String path) async {
+    if (kDebugMode) {
+      _metrics.providerCalls++;
+      _activeProviderCount++;
+      if (_activeProviderCount > _metrics.peakConcurrent) {
+        _metrics.peakConcurrent = _activeProviderCount;
+      }
+    }
+    try {
+      return await _providerImpl.generateThumbnail(path);
+    } finally {
+      if (kDebugMode) _activeProviderCount--;
+    }
+  }
+
+  /// Disk/commit 域 — 失败 = 降级 MemoryImage，不进 negative cache.
+  ///
+  /// 返回交付给 flight 的 provider: stale flight 无 commit 权 (检查点 1,
+  /// §19.7) 仅返回原请求的 MemoryImage; 写盘异常降级 MemoryImage (D7: 写失败
+  /// ≠ 生成失败, Error 不捕获); force 请求即时展示新 bytes (R2) — 旧
+  /// decoded FileImage 已在 [_commitToCache] 内 evict, 下次滚动从新磁盘
+  /// 文件重新 decode (§22.3).
+  Future<ImageProvider> _commitOrFallback(
+    ThumbnailFlight flight,
+    ThumbnailIdentity identity,
+    Uint8List bytes, {
+    required bool forceRefresh,
+  }) async {
+    if (!_registry.isCurrent(flight)) return MemoryImage(bytes);
+    ImageProvider? committed;
+    try {
+      committed = await _commitToCache(
+        flight,
+        identity,
+        bytes,
+        forceRefresh: forceRefresh,
+      );
+    } on Exception {
+      return MemoryImage(bytes);
+    }
+    if (forceRefresh) return MemoryImage(bytes);
+    return committed ?? MemoryImage(bytes);
+  }
+
   /// negative memo 记录（§21.2）— M2/21.5：stale flight 的失败不记 memo，
   /// 否则文件替换恢复后的新请求会被旧代的失败挡住 10 秒
-  void _recordFailureIfCurrent(ThumbnailFlight flight, _FileIdentity identity) {
+  void _recordFailureIfCurrent(
+    ThumbnailFlight flight,
+    ThumbnailIdentity identity,
+  ) {
     if (!_registry.isCurrent(flight)) return;
-    _failedUntil[identity.cacheKey] = DateTime.now().add(_negativeTtl);
-    _failureKeysByPath
-        .putIfAbsent(identity.path, () => <String>{})
-        .add(identity.cacheKey);
+    _failures.record(identity.path, identity.cacheKey);
   }
 
   /// commit 阶段 — 内含检查点 2（R7/H1：紧贴 _cachePut，§19.8）
   Future<ImageProvider?> _commitToCache(
     ThumbnailFlight flight,
-    _FileIdentity identity,
+    ThumbnailIdentity identity,
     Uint8List bytes, {
     required bool forceRefresh,
   }) async {
@@ -379,122 +322,38 @@ class ThumbnailService {
     return provider;
   }
 
-  /// identity 解析 — normalize → memo → stat → canonical → SHA-256
-  ///
-  /// stat 失败或文件不存在返回 null（X3：stat 失败 → 不可信 identity，
-  /// 绝不降级到 path-only 缓存）。memo 命中时零磁盘访问。
-  Future<_FileIdentity?> _resolveIdentityImpl(String rawPath) async {
-    final path = p.normalize(rawPath);
-
-    if (!p.isAbsolute(path)) {
-      return null;
-    }
-
-    // R5：memo 命中 = 零 stat（memory hot path 的前提）
-    final memo = _identityMemo[path];
-    if (memo != null) {
-      if (kDebugMode) _metrics.identityMemoHits++;
-      return memo;
-    }
-
-    try {
-      if (kDebugMode) _metrics.statCalls++;
-      final stat = await File(path).stat();
-
-      if (stat.type == FileSystemEntityType.notFound) {
-        return null;
-      }
-
-      final identity = _buildIdentity(
-        path,
-        stat.size,
-        stat.modified.millisecondsSinceEpoch,
-      );
-
-      _identityMemo[path] = identity;
-      return identity;
-    } on FileSystemException {
-      return null;
-    }
-  }
-
-  /// 组装 identity — size + mtime 进入 canonical，防止源文件替换后命中旧图
-  static _FileIdentity _buildIdentity(String path, int size, int modifiedMs) {
-    final canonical = buildCanonicalString(
-      schemaVersion: _ThumbnailSpec.schemaVersion,
-      path: path,
-      size: size,
-      modifiedMs: modifiedMs,
-    );
-
-    return _FileIdentity(
-      path: path,
-      cacheKey: cacheKeyFromCanonical(canonical),
-    );
-  }
-
-  /// canonical 身份串 — NUL 分隔防字段拼接歧义（§12.4）。
-  ///
-  /// 分隔符歧义前提是 path 含 NUL — Windows/POSIX 文件名均由 OS 禁止，
-  /// 无需额外防御。实现用 [String.fromCharCode] 构造分隔符，
-  /// 避免转义字面量以真实 NUL 字节进入源文件。
+  /// canonical 身份串 — 委托 [buildCanonicalString] (保留公开入口).
   @visibleForTesting
   static String buildCanonicalString({
     required String schemaVersion,
     required String path,
     required int size,
     required int modifiedMs,
-    int maxWidth = _ThumbnailSpec.maxWidth,
-    int maxHeight = _ThumbnailSpec.maxHeight,
-    int timeMs = _ThumbnailSpec.timeMs,
+    int maxWidth = ThumbnailSpec.maxWidth,
+    int maxHeight = ThumbnailSpec.maxHeight,
+    int timeMs = ThumbnailSpec.timeMs,
     String format = 'jpeg',
-    int quality = _ThumbnailSpec.jpegQuality,
-  }) {
-    final sep = String.fromCharCode(0x00);
-    return '$schemaVersion$sep'
-        '$path$sep'
-        '$size$sep'
-        '$modifiedMs$sep'
-        '$maxWidth$sep'
-        '$maxHeight$sep'
-        '$timeMs$sep'
-        '$format$sep'
-        '$quality';
-  }
+    int quality = ThumbnailSpec.jpegQuality,
+  }) => thumbnail_identity.buildCanonicalString(
+    schemaVersion: schemaVersion,
+    path: path,
+    size: size,
+    modifiedMs: modifiedMs,
+    maxWidth: maxWidth,
+    maxHeight: maxHeight,
+    timeMs: timeMs,
+    format: format,
+    quality: quality,
+  );
 
-  /// canonical → cacheKey — SHA-256 hex（64 字符）。
-  ///
-  /// hash 只做缓存文件名身份，不是认证边界；输入仅几十到几百字节，
-  /// SHA-256 相比 MD5 的额外开销可忽略但抗恶意碰撞更强（§12.3）。
+  /// canonical → cacheKey (SHA-256 hex) — 委托 [cacheKeyFromCanonical].
   @visibleForTesting
-  static String cacheKeyFromCanonical(String canonical) {
-    return sha256.convert(utf8.encode(canonical)).toString();
-  }
+  static String cacheKeyFromCanonical(String canonical) =>
+      thumbnail_identity.cacheKeyFromCanonical(canonical);
 
-  /// LRU 写入 + 双向索引维护 + 容量溢出淘汰
-  void _cachePutImpl(String path, String key, ImageProvider provider) {
-    _cache[key] = provider;
-    _cacheKeysByPath.putIfAbsent(path, () => <String>{}).add(key);
-    _pathByCacheKey[key] = path;
-    _evictLruOverflowImpl();
-  }
-
-  /// 超出容量时淘汰最久未访问的条目（迭代器首位）— O(1) 摊销
-  void _evictLruOverflowImpl() {
-    while (_cache.length > _maxCacheSize) {
-      final oldest = _cache.keys.first;
-      _cache.remove(oldest);
-
-      final path = _pathByCacheKey.remove(oldest);
-      if (path != null) {
-        final keys = _cacheKeysByPath[path];
-        if (keys != null) {
-          keys.remove(oldest);
-          if (keys.isEmpty) _cacheKeysByPath.remove(path);
-        }
-      }
-    }
-  }
+  /// LRU 写入 + 双向索引维护 + 容量溢出淘汰 (委托 [ThumbnailMemoryCache.put]).
+  void _cachePutImpl(String path, String key, ImageProvider provider) =>
+      _cache.put(path, key, provider);
 
   /// 移除单个 path 的全部缓存条目（v1.3.2 A.9 — B1 子集）
   ///
@@ -506,26 +365,15 @@ class ThumbnailService {
     final path = p.normalize(rawPath);
 
     // R5：memo 同步失效 — 这是文件替换后 identity 能刷新的唯一通道
-    _identityMemo.remove(path);
+    _identities.evict(path);
 
     // B3：pathEpoch++ + 该 path 全部在飞 flight 出 join 表（A.9）
     _registry.evictPath(path);
 
-    final keys = _cacheKeysByPath.remove(path);
-    if (keys != null) {
-      for (final key in keys) {
-        _cache.remove(key);
-        _pathByCacheKey.remove(key);
-      }
-    }
+    _cache.evictPath(path);
 
     // B5：negative memo 反向索引清理（A.9 — O(keys-of-path)，无 prefix 碰撞）
-    final failedKeys = _failureKeysByPath.remove(path);
-    if (failedKeys != null) {
-      for (final key in failedKeys) {
-        _failedUntil.remove(key);
-      }
-    }
+    _failures.evictPath(path);
   }
 
   /// 清空全部缓存
@@ -538,11 +386,8 @@ class ThumbnailService {
     // B3：globalEpoch++ O(1) 失效全部 flight（A.10）
     _registry.clear();
     _cache.clear();
-    _cacheKeysByPath.clear();
-    _pathByCacheKey.clear();
-    _identityMemo.clear();
-    _failedUntil.clear();
-    _failureKeysByPath.clear();
+    _identities.clear();
+    _failures.clear();
   }
 
   /// 强制重新生成指定文件的缩略图（P-Thumb v1.3.2 §22 — 唯一 force 入口）
@@ -567,7 +412,7 @@ class ThumbnailService {
     }
 
     evict(path);
-    final identity = await _resolveIdentityImpl(path);
+    final identity = await _identities.resolve(path);
     if (identity == null) return null;
     return _getFlightImpl(identity, forceRefresh: true);
   }
@@ -587,24 +432,13 @@ class ThumbnailService {
     _instance._diskCacheOverride = diskCache;
     _instance._registry.clear();
     _instance._activeProviderCount = 0;
-    _instance._failedUntil.clear();
-    _instance._failureKeysByPath.clear();
+    _instance._failures.clear();
     // gate 同步重置 (v0.0.9 CI 稳定性) — 上一用例未归还的 slot 若跨
     // reset 存活, 后组可用并发永久减少 (G1 曾在 CI 全量跑时 calls 永卡
     // < 2)。gate.reset 唤醒排队者重新分配, 测试隔离完整。
     _instance._gate.reset();
     _instance._clearCacheImpl();
-    _metrics
-      ..requests = 0
-      ..memoryHits = 0
-      ..diskHits = 0
-      ..providerCalls = 0
-      ..failures = 0
-      ..coalescedJoins = 0
-      ..diskWriteFallbacks = 0
-      ..peakConcurrent = 0
-      ..statCalls = 0
-      ..identityMemoHits = 0;
+    _metrics.reset();
   }
 
   /// 手动触发 LRU 触摸（仅供测试使用）
@@ -631,7 +465,7 @@ class ThumbnailService {
   /// reuse the memoized identity.
   @visibleForTesting
   static Future<String?> resolveCacheKey(String rawPath) async {
-    final identity = await _instance._resolveIdentityImpl(rawPath);
+    final identity = await _instance._identities.resolve(rawPath);
     return identity?.cacheKey;
   }
 
@@ -643,8 +477,5 @@ class ThumbnailService {
   static String normalizePathForTest(String rawPath) => p.normalize(rawPath);
 
   /// 命中时移到末尾（最近访问）— O(1) remove + reinsert
-  void _touchImpl(String cacheKey) {
-    final value = _cache.remove(cacheKey);
-    if (value != null) _cache[cacheKey] = value;
-  }
+  void _touchImpl(String cacheKey) => _cache.touch(cacheKey);
 }
