@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -13,6 +14,7 @@ import '../shared/secondary_surface.dart';
 
 part 'progress_bar_painter.dart';
 part 'progress_bar_listenable.dart';
+part 'progress_bar_seek_hold.dart';
 part 'progress_time_preview.dart';
 
 class _HoverState {
@@ -65,23 +67,23 @@ class _ProgressBarState extends State<ProgressBar>
     with TickerProviderStateMixin {
   final _dragNotifier = ValueNotifier<double?>(null);
   final _hoverNotifier = ValueNotifier<_HoverState>(_HoverState.empty);
-  double _barWidth = 0;
+
+  /// 系统"减少动画"偏好 — 在 [didChangeDependencies] 同步, 不在 build 内写入.
   bool _reducedMotion = false;
   double? _dragStartX;
 
-  /// Tooltip 只关心位置、时长、悬停和拖拽，不关心窗口 resize。
-  late _MergedListenable _barListenable;
-
-  /// 条形绘制额外关心高度动画和 resize，用一个 builder 合并处理，
-  /// 避免“高度 AnimatedBuilder → 内层 bar AnimatedBuilder”的嵌套重建。
-  late _MergedListenable _barPaintListenable;
+  /// 位置/时长/拖拽/悬停/高度动画/resize 的合并监听源 — 单一
+  /// AnimatedBuilder 订阅, 取代原先"高度 → bar → tooltip"三层嵌套重建.
+  /// 源替换时整体重建 (见 [_replaceListenable]).
+  late _MergedListenable _listenable;
   Timer? _seekThrottle;
-  // 修 C (事件驱动 v2): dragEnd 后监听 position 到达目标才清 drag, 替代 v1 固定
-  // 300ms 定时器. 不依赖固定延迟, 网络流/慢 seek 下不回跳.
-  // 加超时兜底防 seek 失败永久卡住.
-  VoidCallback? _seekHoldListener;
-  int? _seekTargetMs;
-  Timer? _seekHoldTimer; // 超时兜底: position 未到达时强制清
+
+  /// 修 C (事件驱动 v2): dragEnd 后监听 position 到达目标才清 drag, 替代 v1
+  /// 固定 300ms 定时器; 含超时兜底防 seek 失败永久卡住.
+  late final _SeekHold _seekHold = _SeekHold(
+    isMounted: () => mounted,
+    onDone: _clearDrag,
+  );
 
   // Tooltip 淡入淡出动画
   late final AnimationController _tooltipFadeController;
@@ -90,6 +92,10 @@ class _ProgressBarState extends State<ProgressBar>
   // 悬停展开动画（3dp → 5dp）
   late final AnimationController _expandController;
   late final Animation<double> _barHeightAnimation;
+
+  /// 缓存上一帧的 CustomPaint — resize 期间直接复用，避免每帧重建 painter
+  /// （CB-06 wiring 修复后此缓存才生效）
+  Widget? _cachedCustomPaint;
 
   double get _hoverX => _hoverNotifier.value.x;
 
@@ -109,7 +115,6 @@ class _ProgressBarState extends State<ProgressBar>
   @override
   void initState() {
     super.initState();
-    _barListenable = _buildBarListenable();
     _expandController = AnimationController(
       duration: const Duration(milliseconds: Tokens.progressExpandDurationMs),
       vsync: this,
@@ -122,37 +127,41 @@ class _ProgressBarState extends State<ProgressBar>
           CurvedAnimation(parent: _expandController, curve: Curves.easeOut),
         );
     _tooltipFadeController = AnimationController(
-      duration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: Tokens.durationNormal),
       vsync: this,
     );
     _tooltipOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _tooltipFadeController, curve: Curves.easeOut),
     );
-    _barPaintListenable = _buildBarPaintListenable();
+    _listenable = _buildListenable();
   }
 
-  _MergedListenable _buildBarListenable() => _MergedListenable([
-    widget.position,
-    widget.duration,
-    _dragNotifier,
-    _hoverNotifier,
-  ]);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 副作用写入从 build 移到依赖变更回调 — disableAnimationsOf 已注册依赖,
+    // 偏好变化时本回调重跑, 与 build 内每帧读取等价.
+    _reducedMotion = MediaQuery.disableAnimationsOf(context);
+  }
 
-  /// 合并条形绘制的所有高频状态，避免高度动画和条形状态各自重建一层。
-  _MergedListenable _buildBarPaintListenable() {
-    final listenables = <Listenable>[_barListenable, _barHeightAnimation];
+  /// 合并条形绘制/tooltip/semantics 的全部高频状态到单一监听源.
+  _MergedListenable _buildListenable() {
     final resizing = widget.resizing;
-    if (resizing != null) listenables.add(resizing);
-    return _MergedListenable(listenables);
+    return _MergedListenable([
+      widget.position,
+      widget.duration,
+      _dragNotifier,
+      _hoverNotifier,
+      _barHeightAnimation,
+      ?resizing,
+    ]);
   }
 
-  /// Replaces merged listeners as one owned unit, avoiding old-source leaks
+  /// Replaces the merged listener as one owned unit, avoiding old-source leaks
   /// when a retained [ProgressBar] receives a replacement PlayerPort.
-  void _replaceBarListenables() {
-    _barPaintListenable.dispose();
-    _barListenable.dispose();
-    _barListenable = _buildBarListenable();
-    _barPaintListenable = _buildBarPaintListenable();
+  void _replaceListenable() {
+    _listenable.dispose();
+    _listenable = _buildListenable();
   }
 
   @override
@@ -161,11 +170,12 @@ class _ProgressBarState extends State<ProgressBar>
     if (oldWidget.position != widget.position ||
         oldWidget.duration != widget.duration ||
         oldWidget.resizing != widget.resizing) {
-      _replaceBarListenables();
-      if (oldWidget.position != widget.position && _seekHoldListener != null) {
-        final target = _seekTargetMs;
-        _cancelSeekHoldListeners(position: oldWidget.position);
-        if (target != null) _beginSeekHold(target);
+      _replaceListenable();
+      if (oldWidget.position != widget.position && _seekHold.isActive) {
+        // 源替换: hold 记住旧源, cancel 从旧源摘除; 同目标在新源上重开.
+        final target = _seekHold.targetMs;
+        _seekHold.cancel();
+        if (target != null) _seekHold.begin(widget.position, target);
       }
     }
   }
@@ -173,9 +183,8 @@ class _ProgressBarState extends State<ProgressBar>
   @override
   void dispose() {
     _seekThrottle?.cancel();
-    _cancelSeekHoldListeners();
-    _barPaintListenable.dispose();
-    _barListenable.dispose();
+    _seekHold.cancel();
+    _listenable.dispose();
     _dragNotifier.dispose();
     _hoverNotifier.dispose();
     _expandController.dispose();
@@ -195,6 +204,12 @@ class _ProgressBarState extends State<ProgressBar>
     }
   }
 
+  /// 清 drag 并刷新 tooltip — seek-hold 完成/取消路径共用.
+  void _clearDrag() {
+    _dragNotifier.value = null;
+    _updateTooltipVisibility();
+  }
+
   /// drag 结束/取消统一收尾 (v0.0.8.2 审查 H-1) — onSeekEnd **无条件配对**.
   ///
   /// [cancelled] = true 为手势被系统取消 (Flutter 只调 Cancel 不调 End)。
@@ -207,273 +222,194 @@ class _ProgressBarState extends State<ProgressBar>
     // 配对 onSeekStart — 重启隐藏计时(即使未真正拖动也保持 start/end 配对,
     // 避免 onSeekStart cancel 了 timer 却无 onSeekEnd 重启导致控件永显).
     widget.onSeekEnd?.call();
-    if (cancelled) {
-      // 取消路径: 不补发 seek / 不进 seek-hold, 仅复位拖拽态.
-      if (_dragNotifier.value != null) {
-        _dragNotifier.value = null;
-        _updateTooltipVisibility();
-      }
-      return;
-    }
     if (_dragNotifier.value == null) return;
-    if (widget.duration.value <= 0) {
-      _dragNotifier.value = null;
-      _updateTooltipVisibility();
+    // 取消路径 / duration 已翻转 ≤0: 不补发 seek / 不进 seek-hold, 仅复位拖拽态.
+    if (cancelled || widget.duration.value <= 0) {
+      _clearDrag();
       return;
     }
     widget.onSeek(_dragPositionMs);
     // 修 C (事件驱动 v2): 不立即清 drag — 监听 position 到达目标容差内
-    // 才清, 遮住旧 stream 回拨防回跳. 比 v1 固定 300ms 更贴近原生内部
-    // 协调, 网络流/慢 seek 下不回跳. 超时兜底防 seek 失败永久卡住.
-    _beginSeekHold(_dragPositionMs);
+    // 才清, 遮住旧 stream 回拨防回跳. 超时兜底防 seek 失败永久卡住.
+    _seekHold.begin(widget.position, _dragPositionMs);
     // 恢复悬停状态（鼠标仍在 bar 上）
     _hoverNotifier.value = _HoverState(true, _hoverX);
     _updateTooltipVisibility();
   }
 
-  /// 修 C (事件驱动 v2): dragEnd 后启动 seek hold — 监听 [widget.position]
-  /// 到达 [targetMs] 容差内才清 [_dragNotifier], 遮住旧 stream 回拨防回跳.
-  /// 加超时兜底: seek 失败/极慢时强制清, 避免进度条永久卡在 drag 位置.
-  void _beginSeekHold(int targetMs) {
-    _cancelSeekHoldListeners();
-    _seekTargetMs = targetMs;
-    // 局部函数声明 (非闭包变量赋值, 避免 prefer_function_declarations_over_variables);
-    // 复用函数名消除 addListener/call 的 `!`; 内 _seekTargetMs local 捕获消除 `!`
-    void listener() {
-      if (!mounted) return;
-      final target = _seekTargetMs;
-      if (target == null) return;
-      final pos = widget.position.value;
-      if ((pos - target).abs() <= Tokens.progressSeekArriveToleranceMs) {
-        _finishSeekHold();
-      }
-    }
-
-    _seekHoldListener = listener;
-    // 先建超时 timer, 再 addListener + 立即检查 — 若立即检查触发 _finishSeekHold,
-    // _cancelSeekHoldListeners 会 cancel 此 timer; 顺序反了 (timer 在 call 之后建)
-    // 会留下无人取消的 pending timer, 触发 flutter_test 的 !timersPending 断言.
-    _seekHoldTimer = Timer(
-      const Duration(milliseconds: Tokens.progressSeekHoldTimeoutMs),
-      _finishSeekHold,
-    );
-    // 误报 — listener 存入 _seekHoldListener 字段, _cancelSeekHoldListeners
-    // (含 dispose 路径) 统一移除.
-    // ignore: always-remove-listener
-    widget.position.addListener(listener);
-    // 立即检查一次: FakeEngine/同步 seek 可能已让 position 到达目标,
-    // addListener 只对未来变化触发, 不立即检查会卡到超时 (测试/同步路径).
-    listener.call();
-  }
-
-  /// 清理 seek hold 的监听 + 超时 timer, 不动 [_dragNotifier].
-  /// 用于 dragStart (新 drag 覆盖前) / dispose 取消未完成 hold.
-  void _cancelSeekHoldListeners({ValueListenable<int>? position}) {
-    _seekHoldTimer?.cancel();
-    _seekHoldTimer = null;
-    final listener = _seekHoldListener;
-    if (listener != null) {
-      // During source replacement, widget.position already points at the new
-      // port; use the old source explicitly to detach the existing callback.
-      (position ?? widget.position).removeListener(listener);
-      _seekHoldListener = null;
-    }
-    _seekTargetMs = null;
-  }
-
-  /// seek hold 正常完成: position 已到达目标 (或超时兜底) — 清监听 + 清 drag.
-  void _finishSeekHold() {
-    if (!mounted) return;
-    _cancelSeekHoldListeners();
-    _dragNotifier.value = null;
+  void _onEnter(PointerEnterEvent _) {
+    if (_disabled) return;
+    _hoverNotifier.value = _HoverState(true, _hoverX);
     _updateTooltipVisibility();
+  }
+
+  void _onExit(PointerExitEvent _) {
+    // 拖拽中不重置 hover，防止松手时 thumb 闪跳到 0.0
+    if (_dragNotifier.value != null) return;
+    _hoverNotifier.value = _HoverState.empty;
+    _updateTooltipVisibility();
+  }
+
+  void _onHover(PointerHoverEvent details, double barWidth) {
+    if (_disabled) return;
+    // 修 D: 直接更新 — hover 事件系统已节流,无需 postFrame 防抖
+    // (原 postFrame+_hoverScheduled 引入一帧延迟+漏更新,致 tooltip 不跟手)
+    _hoverNotifier.value = _HoverState(
+      true,
+      (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
+    );
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    if (widget.duration.value <= 0) return;
+    // 新 drag 开始 — 取消上次 dragEnd 未完成的 seek hold,
+    // 防旧 listener 在新 drag 期间触发完成回调清掉新 drag 状态.
+    _seekHold.cancel();
+    // 通知 auto-hide 冻结隐藏计时(seek 期间控件不消失)
+    widget.onSeekStart?.call();
+    _dragStartX = details.localPosition.dx;
+    _updateTooltipVisibility();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details, double barWidth) {
+    if (widget.duration.value <= 0) return;
+    final dx = details.localPosition.dx;
+    // 拖拽阈值：防止误触
+    if (_dragNotifier.value == null) {
+      final start = _dragStartX;
+      if (start != null && (dx - start).abs() < Tokens.progressDragThreshold) {
+        return;
+      }
+      _dragStartX = null;
+    }
+    _dragNotifier.value = (dx / barWidth).clamp(0.0, 1.0);
+    // 修 B: leading throttle — timer 未活跃才 seek+启动,活跃期跳过
+    // (原 cancel+重建 debounce 致拖动中永不 seek,松手才跳)
+    if (!(_seekThrottle?.isActive ?? false)) {
+      widget.onSeek(_dragPositionMs);
+      // 空回调刻意 — 拖拽结束由 seek hold 机制接管.
+      _seekThrottle = Timer(
+        const Duration(milliseconds: Tokens.progressSeekThrottleMs),
+        _noop,
+      );
+    }
+  }
+
+  /// 节流 timer 的空回调 — 仅用 isActive 表达"节流窗口未过".
+  static void _noop() {}
+
+  void _onTapDown(TapDownDetails details, double barWidth) {
+    if (widget.duration.value <= 0) return;
+    // 瞬时 seek — 配对 start+end(等同 show + scheduleHide:
+    // 闪现控件,3s 后隐藏)
+    widget.onSeekStart?.call();
+    final fraction = (details.localPosition.dx / barWidth).clamp(0.0, 1.0);
+    widget.onSeek((fraction * widget.duration.value).round());
+    widget.onSeekEnd?.call();
   }
 
   @override
   Widget build(BuildContext context) {
-    _reducedMotion = MediaQuery.disableAnimationsOf(context);
+    // 单一 AnimatedBuilder 订阅合并监听源 (取代三层嵌套). 修 A 同源遗漏
+    // (光标版): MouseRegion/Semantics/手势必须住进监听 duration 的 builder
+    // 内, duration 迟到后随装载即时切换 cursor, 回调体内判断 duration 避免
+    // _disabled 快照陈旧.
     return LayoutBuilder(
       builder: (context, constraints) {
         final barWidth = constraints.maxWidth;
-        _barWidth = barWidth;
         return AnimatedBuilder(
-          animation: _barListenable,
-          // 修 A 同源遗漏(光标版): cursor 若在顶层 build 求值则成快照 — duration
-          // 迟到后只重建本 builder, 顶层不动, 光标将永远停留 basic. 故 MouseRegion
-          // 必须住进监听 _barListenable(含 duration)的 builder 内, 随装载即时切换.
-          builder: (context, child) => MouseRegion(
-            cursor: _disabled
-                ? SystemMouseCursors.basic
-                : SystemMouseCursors.click,
-            onEnter: (_) {
-              if (_disabled) return;
-              _hoverNotifier.value = _HoverState(true, _hoverX);
-              _updateTooltipVisibility();
-            },
-            onExit: (_) {
-              // 拖拽中不重置 hover，防止松手时 thumb 闪跳到 0.0
-              if (_dragNotifier.value != null) return;
-              _hoverNotifier.value = _HoverState.empty;
-              _updateTooltipVisibility();
-            },
-            onHover: (details) {
-              if (_disabled) return;
-              // 修 D: 直接更新 — hover 事件系统已节流,无需 postFrame 防抖
-              // (原 postFrame+_hoverScheduled 引入一帧延迟+漏更新,致 tooltip 不跟手)
-              _hoverNotifier.value = _HoverState(
-                true,
-                (details.localPosition.dx / barWidth).clamp(0.0, 1.0),
-              );
-            },
-            // Semantics is outside the painter, so it must listen explicitly
-            // to expose stream-driven progress instead of retaining build-time 0%.
-            child: Semantics(
-              label: AppLocalizations.of(context).progressBar,
-              value: '${(_effectiveFraction * 100).round()}%',
-              slider: true,
-              child: child,
-            ),
-          ),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            // 修 A: 回调始终非 null,体内判断 duration — 避免 _disabled 顶层 build 快照陈旧
-            // (duration stream 到达后只触发子 AnimatedBuilder,不触发顶层 build,致回调永久 null)
-            onHorizontalDragStart: (details) {
-              if (widget.duration.value <= 0) return;
-              // 新 drag 开始 — 取消上次 dragEnd 未完成的 seek hold,
-              // 防旧 listener 在新 drag 期间触发 _finishSeekHold 清掉新 drag 状态.
-              _cancelSeekHoldListeners();
-              // 通知 auto-hide 冻结隐藏计时(seek 期间控件不消失)
-              widget.onSeekStart?.call();
-              _dragStartX = details.localPosition.dx;
-              _updateTooltipVisibility();
-            },
-            onHorizontalDragUpdate: (details) {
-              if (widget.duration.value <= 0) return;
-              final dx = details.localPosition.dx;
-              // 拖拽阈值：防止误触
-              if (_dragNotifier.value == null) {
-                final start = _dragStartX;
-                if (start != null &&
-                    (dx - start).abs() < Tokens.progressDragThreshold) {
-                  return;
-                }
-                _dragStartX = null;
-              }
-              _dragNotifier.value = (dx / barWidth).clamp(0.0, 1.0);
-              // 修 B: leading throttle — timer 未活跃才 seek+启动,活跃期跳过
-              // (原 cancel+重建 debounce 致拖动中永不 seek,松手才跳)
-              if (!(_seekThrottle?.isActive ?? false)) {
-                widget.onSeek(_dragPositionMs);
-                _seekThrottle = Timer(
-                  const Duration(milliseconds: Tokens.progressSeekThrottleMs),
-                  // 空块刻意 — 拖拽结束由 seek hold 机制接管.
-                  // ignore: no-empty-block
-                  () {},
-                );
-              }
-            },
-            onHorizontalDragEnd: (_) => _finishDrag(cancelled: false),
-            // 手势被系统取消 (指针捕获丢失/窗口失焦) 时 Flutter 只调 Cancel
-            // 不调 End — 不配对则 onSeekEnd 丢失, scrubbing 挂起信号卡死,
-            // 三玻璃面模糊永久冻结 (v0.0.8.2 审查 H-1)。End 与 Cancel 互斥,
-            // 不会双调。
-            onHorizontalDragCancel: () => _finishDrag(cancelled: true),
-            onTapDown: (details) {
-              if (widget.duration.value <= 0) return;
-              // 瞬时 seek — 配对 start+end(等同 show + scheduleHide:
-              // 闪现控件,3s 后隐藏)
-              widget.onSeekStart?.call();
-              final fraction = (details.localPosition.dx / barWidth).clamp(
-                0.0,
-                1.0,
-              );
-              final ms = (fraction * widget.duration.value).round();
-              widget.onSeek(ms);
-              widget.onSeekEnd?.call();
-            },
-            child: SizedBox(
-              height: Tokens.progressBarHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  // 合并高度动画与条形状态监听；避免高度 builder
-                  // 每帧重新创建一个内层 AnimatedBuilder。
-                  _buildBarLayers(),
-                  // 悬停/拖拽时间提示
-                  // tooltip 指向 _barListenable(已含 _dragNotifier+_hoverNotifier),
-                  // 拖动时跟随手指更新文字/位置(VLC TimeTooltip / mpv tooltipF 本地计算)
-                  AnimatedBuilder(
-                    animation: _barListenable,
-                    builder: (_, _) {
-                      final drag = _dragNotifier.value;
-                      final hover = _hoverNotifier.value;
-                      final isDragging = drag != null;
-                      final fraction = isDragging
-                          ? drag
-                          : hover.hovering
-                          ? hover.x
-                          : null;
-                      if (fraction == null || _disabled) {
-                        return const SizedBox.shrink();
-                      }
-                      return _buildTooltip(
-                        fraction: fraction,
-                        text: formatMs(
-                          (fraction * widget.duration.value).round(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
+          animation: _listenable,
+          builder: (context, _) => _buildInteractive(context, barWidth),
         );
       },
     );
   }
 
-  /// 缓存上一帧的 CustomPaint — resize 期间直接复用，避免每帧重建 painter（CB-06 wiring 修复后此缓存才生效）
-  Widget? _cachedCustomPaint;
-
-  Widget _buildBarLayers() {
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _barPaintListenable,
-        builder: (_, _) {
-          final resizing = widget.resizing;
-          // 缓存只用于加速 resize，不能在缓存尚未建立时用空组件替代进度条。
-          // 首次进入 resize 直接绘制当前状态，后续帧再复用已缓存的 CustomPaint。
-          final cached = _cachedCustomPaint;
-          if (resizing != null && resizing.value && cached != null) {
-            return cached;
-          }
-          final playedFrac = _effectiveFraction;
-          final child = CustomPaint(
-            size: Size.infinite,
-            painter: _BarPainter(
-              playedFraction: playedFrac,
-              dragging: _dragNotifier.value != null,
-              barHeight: _barHeightAnimation.value,
-              hoverFraction: _hoverNotifier.value.hovering ? _hoverX : null,
-              disabled: _disabled,
-            ),
-          );
-          _cachedCustomPaint = child;
-          return child;
-        },
+  /// 光标 + hover + Semantics + 手势外壳 — 内容见 [_buildBarStack].
+  Widget _buildInteractive(BuildContext context, double barWidth) {
+    return MouseRegion(
+      cursor: _disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: _onEnter,
+      onExit: _onExit,
+      onHover: (details) => _onHover(details, barWidth),
+      // Semantics is outside the painter, so it must listen explicitly
+      // to expose stream-driven progress instead of retaining build-time 0%.
+      child: Semantics(
+        label: AppLocalizations.of(context).progressBar,
+        value: '${(_effectiveFraction * 100).round()}%',
+        slider: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          // 修 A: 回调始终非 null,体内判断 duration.
+          onHorizontalDragStart: _onDragStart,
+          onHorizontalDragUpdate: (details) => _onDragUpdate(details, barWidth),
+          onHorizontalDragEnd: (_) => _finishDrag(cancelled: false),
+          // 手势被系统取消 (指针捕获丢失/窗口失焦) 时 Flutter 只调 Cancel
+          // 不调 End — 不配对则 onSeekEnd 丢失, scrubbing 挂起信号卡死,
+          // 三玻璃面模糊永久冻结 (v0.0.8.2 审查 H-1)。End 与 Cancel 互斥,
+          // 不会双调。
+          onHorizontalDragCancel: () => _finishDrag(cancelled: true),
+          onTapDown: (details) => _onTapDown(details, barWidth),
+          child: SizedBox(
+            height: Tokens.progressBarHeight,
+            child: _buildBarStack(barWidth),
+          ),
+        ),
       ),
     );
   }
 
-  /// Preview presentation is isolated from seek clocks and cached painting.
-  Widget _buildTooltip({required double fraction, required String text}) =>
-      _ProgressTimePreview(
-        fraction: fraction,
-        text: text,
-        barWidth: _barWidth,
-        opacity: _tooltipOpacity,
-      );
+  /// 条形 + 悬停/拖拽时间提示叠层.
+  Widget _buildBarStack(double barWidth) {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        _buildBarLayers(),
+        // tooltip 随拖动跟随手指更新文字/位置(VLC TimeTooltip / mpv tooltipF
+        // 本地计算); 与条形共用同一监听源, 无独立 builder.
+        _buildTooltip(barWidth),
+      ],
+    );
+  }
+
+  /// 悬停/拖拽时间提示 — 无目标分数或禁用态时为空占位.
+  Widget _buildTooltip(double barWidth) {
+    final drag = _dragNotifier.value;
+    final hover = _hoverNotifier.value;
+    final fraction = drag ?? (hover.hovering ? hover.x : null);
+    if (fraction == null || _disabled) {
+      return const SizedBox.shrink();
+    }
+    // Preview presentation is isolated from seek clocks and cached painting.
+    return _ProgressTimePreview(
+      fraction: fraction,
+      text: formatMs((fraction * widget.duration.value).round()),
+      barWidth: barWidth,
+      opacity: _tooltipOpacity,
+    );
+  }
+
+  /// 条形绘制层 — RepaintBoundary 隔离; resize 期间复用缓存 CustomPaint.
+  Widget _buildBarLayers() {
+    final resizing = widget.resizing;
+    // 缓存只用于加速 resize，不能在缓存尚未建立时用空组件替代进度条。
+    // 首次进入 resize 直接绘制当前状态，后续帧再复用已缓存的 CustomPaint。
+    final cached = _cachedCustomPaint;
+    if (resizing != null && resizing.value && cached != null) {
+      return RepaintBoundary(child: cached);
+    }
+    final child = CustomPaint(
+      size: Size.infinite,
+      painter: _BarPainter(
+        playedFraction: _effectiveFraction,
+        dragging: _dragNotifier.value != null,
+        barHeight: _barHeightAnimation.value,
+        hoverFraction: _hoverNotifier.value.hovering ? _hoverX : null,
+        disabled: _disabled,
+      ),
+    );
+    _cachedCustomPaint = child;
+    return RepaintBoundary(child: child);
+  }
 }
