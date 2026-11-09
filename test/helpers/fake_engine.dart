@@ -16,7 +16,7 @@ import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 /// No FFI imports, no platform plugins — runs purely in Dart.
 /// Provides controllable behavior and call tracking for tests.
 ///
-/// State/generation management is inlined (matching MediaKitEngine after
+/// State/generation management is inlined (matching MpvKitEngine after
 /// EngineStateMachine removal): self-owned notifiers + operation counter.
 class FakeEngine implements MediaEngine, SubtitleConfig {
   bool _disposed = false;
@@ -30,19 +30,11 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   final ValueNotifier<MediaState> state = ValueNotifier(MediaState.idle);
 
-  /// 是否正在 seek
-  @override
-  final ValueNotifier<bool> isSeeking = ValueNotifier(false);
-
-  /// 是否正在缓冲
-  @override
-  final ValueNotifier<bool> isBuffering = ValueNotifier(false);
-
-  // open/stop 请求计数器 — 与 MediaKitEngine._operationGeneration 同语义:
+  // open/stop 请求计数器 — 与 MpvKitEngine._operationGeneration 同语义:
   // 每次请求递增, 使旧异步 continuation 过期 (不得发布状态/错误/清空新媒体).
   int _operationGeneration = 0;
 
-  // 完成态抢占标志 — 镜像 MediaKitEngine._completing (K6 事件时序同构):
+  // 完成态抢占标志 — 镜像 MpvKitEngine._completing (K6 事件时序同构):
   // completed 先于 playing(false) 到达时拦截 paused 误转, 清除点
   // play()/jumpTo() 与真引擎一致.
   bool _completing = false;
@@ -60,15 +52,6 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   final ValueNotifier<bool> isMuted = ValueNotifier<bool>(false);
 
   @override
-  final ValueNotifier<String> subtitleText = ValueNotifier<String>('');
-
-  @override
-  final ValueNotifier<int> buffered = ValueNotifier<int>(0);
-
-  @override
-  final ValueNotifier<double> aspectRatio = ValueNotifier<double>(16 / 9);
-
-  @override
   final ValueNotifier<PlayerError?> lastError = ValueNotifier<PlayerError?>(
     null,
   );
@@ -76,7 +59,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   final ValueNotifier<double> playbackSpeed = ValueNotifier<double>(1.0);
 
-  // ─── 队列状态镜像 (QueueControl — 与 MediaKitEngine 同语义) ───
+  // ─── 队列状态镜像 (QueueControl — 与 MpvKitEngine 同语义) ───
 
   @override
   final ValueNotifier<List<String>> queuePaths = ValueNotifier<List<String>>(
@@ -173,7 +156,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   int previousInQueueCallCount = 0;
   PlayMode? lastSetPlayMode;
 
-  // ─── shuffle 覆盖层 (v0.0.6 — 与 MediaKitEngine 同构) ───
+  // ─── shuffle 覆盖层 (v0.0.6 — 与 MpvKitEngine 同构) ───
 
   /// 播放历史栈 (path 键) — 测试可内省.
   final ListQueue<String> shuffleHistory = ListQueue<String>();
@@ -194,7 +177,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   /// When set, the next stop() keeps the loaded media and reports an error.
   ///
-  /// This mirrors [MediaKitEngine.stop]'s recoverable failure behavior so
+  /// This mirrors [MpvKitEngine.stop]'s recoverable failure behavior so
   /// controller tests can verify that the visible title is not cleared early.
   String? failNextStopWith;
 
@@ -221,7 +204,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   double? lastSetVolumeValue;
   int _subtitleDelayMs = 0;
 
-  // ─── Interface getters (matching MediaKitEngine pattern) ───
+  // ─── Interface getters (matching MpvKitEngine pattern) ───
 
   TrackControl get trackControl => this;
 
@@ -262,7 +245,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     duration.value = _mediaInfo.duration;
     position.value = 0;
     lastError.value = null;
-    // open 成功后回到 idle — 匹配 MediaKitEngine.open() 行为
+    // open 成功后回到 idle — 匹配 MpvKitEngine.open() 行为
     state.value = MediaState.idle;
     return OpenSuccess(_mediaInfo);
   }
@@ -270,7 +253,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   @override
   void play() {
     if (_disposed) return;
-    // 空置态 (无媒体) play 无意义 — 与 MediaKitEngine.play 同款 guard:
+    // 空置态 (无媒体) play 无意义 — 与 MpvKitEngine.play 同款 guard:
     // state 保持 idle, 防止 UI 卸载空置页.
     if (!_hasMedia) return;
     _completing = false; // 镜像真引擎 play(): 重新播放, 清完成态.
@@ -309,13 +292,8 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     _mediaInfo = const MediaInfo();
     position.value = 0;
     duration.value = 0;
-    buffered.value = 0;
-    aspectRatio.value = 0;
-    subtitleText.value = '';
     lastError.value = null;
-    isSeeking.value = false;
-    isBuffering.value = false;
-    // 模拟 mpv stop 的 playlist-clear — 装载队列清空 (MediaKitEngine.stop
+    // 模拟 mpv stop 的 playlist-clear — 装载队列清空 (MpvKitEngine.stop
     // 经 stream.playlist 广播空列表回流到镜像).
     queuePaths.value = const <String>[];
     queueIndex.value = -1;
@@ -356,7 +334,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     isMuted.value = mute;
   }
 
-  /// 切换播放/暂停 — 分派逻辑与 MediaKitEngine.togglePlayPause 同构.
+  /// 切换播放/暂停 — 分派逻辑与 MpvKitEngine.togglePlayPause 同构.
   /// 计数保留: UI 路由契约测试依赖 togglePlayPauseCallCount.
   @override
   void togglePlayPause() {
@@ -396,14 +374,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     seekTo((position.value - ms).clamp(0, duration.value));
   }
 
-  // ─── AB loop / range ───
-
-  @override
-  void setRange({required int from, int to = -1}) {
-    // no-op in fake
-  }
-
-  // ─── Queue control (QueueControl — 镜像 MediaKitEngine 同语义) ───
+  // ─── Queue control (QueueControl — 镜像 MpvKitEngine 同语义) ───
 
   @override
   Future<OpenResult> openPlaylist(
@@ -474,7 +445,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   Future<void> removeFromQueueBatch(Set<int> indices) async {
     if (_disposed || indices.isEmpty) return;
     final count = queuePaths.value.length;
-    // 与 MediaKitEngine 同构: 越界过滤 + 降序处理, revision 单发.
+    // 与 MpvKitEngine 同构: 越界过滤 + 降序处理, revision 单发.
     final valid = indices.where((i) => i >= 0 && i < count).toList()
       ..sort((a, b) => b.compareTo(a));
     if (valid.isEmpty) return;
@@ -506,7 +477,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     // 测试内省: 记录最近一次排序目标顺序.
     lastSortQueueTarget = List<String>.unmodifiable(targetOrder);
-    // 与 MediaKitEngine 同构: 规划器恒等/非排列 no-op, 乐观镜像 + revision.
+    // 与 MpvKitEngine 同构: 规划器恒等/非排列 no-op, 乐观镜像 + revision.
     final moves = planPlaylistMoves(queuePaths.value, targetOrder);
     if (moves.isEmpty) return;
     final current = queuePaths.value;
@@ -518,7 +489,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     queueIndex.value = currentPath == null
         ? -1
         : targetOrder.indexOf(currentPath);
-    // 同构迟到 move 事件清流 (v0.0.12 V1, 与 MediaKitEngine.sortQueue
+    // 同构迟到 move 事件清流 (v0.0.12 V1, 与 MpvKitEngine.sortQueue
     // finally 一致): 拖延一轮事件循环再重申权威 index, 之后才单发
     // revision — "清流窗内投递的迟到事件只写镜像不发 revision"的桥接
     // 语义由此在 Coordinator 测试中可回放 (261009-rp1 T1).
@@ -563,7 +534,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
       unawaited(jumpTo(forward ? 0 : count - 1));
       return true;
     }
-    // v0.0.6: shuffle 模式 — 随机/历史覆盖层 (与 MediaKitEngine 同构).
+    // v0.0.6: shuffle 模式 — 随机/历史覆盖层 (与 MpvKitEngine 同构).
     if (playMode.value == PlayMode.shuffle) {
       return _stepShuffle(forward: forward, current: current);
     }
@@ -614,7 +585,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     return true;
   }
 
-  /// shuffle EOF 自动续播 — 与 MediaKitEngine._autoAdvanceShuffle 同构.
+  /// shuffle EOF 自动续播 — 与 MpvKitEngine._autoAdvanceShuffle 同构.
   void _autoAdvanceShuffle() {
     final queue = queuePaths.value;
     if (queue.isEmpty) return;
@@ -649,7 +620,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     lastSetPlayMode = mode;
     playMode.value = mode;
-    // 与 MediaKitEngine 同构: 进入 shuffle 清空历史栈.
+    // 与 MpvKitEngine 同构: 进入 shuffle 清空历史栈.
     if (mode == PlayMode.shuffle) {
       shuffleHistory.clear();
     }
@@ -657,7 +628,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   // ─── Track-table change signal (K4-b) ───
 
-  /// 轨道表变更广播流 — 镜像 MediaKitEngine 的轨道流对外通知语义
+  /// 轨道表变更广播流 — 镜像 MpvKitEngine 的轨道流对外通知语义
   /// (K4-b: 真实引擎中轨道帧晚于 open resolve 回流, 恢复类消费方须等
   /// 首帧而非即刻读 mediaInfo).
   ///
@@ -666,7 +637,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   final StreamController<void> _trackTableChanges =
       StreamController<void>.broadcast();
 
-  /// 轨道表变更通知流 — 镜像 MediaKitEngine 轨道流单发通知语义.
+  /// 轨道表变更通知流 — 镜像 MpvKitEngine 轨道流单发通知语义.
   @override
   Stream<void> get trackTableChanged => _trackTableChanges.stream;
 
@@ -687,7 +658,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   @override
   void switchAudioTrack(int trackIndex) {
-    // 镜像 MediaKitEngine.switchAudioTrack: 范围外静默拒绝.
+    // 镜像 MpvKitEngine.switchAudioTrack: 范围外静默拒绝.
     if (_disposed) return;
     if (trackIndex < 0 || trackIndex >= _mediaInfo.audioTracks.length) return;
     switchAudioTrackCallCount++;
@@ -710,7 +681,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
 
   @override
   void switchSubtitleTrack(int trackIndex) {
-    // 镜像 MediaKitEngine K4-a 修复: -1 是字幕关闭偏好 → 记关闭调用
+    // 镜像 MpvKitEngine K4-a 修复: -1 是字幕关闭偏好 → 记关闭调用
     // (SubtitleTrack.no() 语义); 其余 < 0 仍拒绝, 范围外静默拒绝.
     if (_disposed) return;
     if (trackIndex == -1) {
@@ -746,13 +717,6 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     if (_disposed) return;
     setSubtitleDelayCallCount++;
     _subtitleDelayMs = milliseconds;
-  }
-
-  // ─── Equalizer ───
-
-  @override
-  void setEqualizer(String afFilter) {
-    // no-op in fake
   }
 
   // ─── Video Processing (VideoEffectControl) ───
@@ -799,17 +763,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     lastDeinterlaceValue = enable;
   }
 
-  // ─── D3D11 Performance (RendererControl) ───
-
-  int setD3d11SyncEnabledCallCount = 0;
-  bool? lastD3d11SyncEnabled;
-
-  @override
-  void setD3d11SyncEnabled(bool enabled) {
-    if (_disposed) return;
-    setD3d11SyncEnabledCallCount++;
-    lastD3d11SyncEnabled = enabled;
-  }
+  // ─── Renderer (RendererControl) ───
 
   int setHardwareDecodingCallCount = 0;
   bool? lastHardwareDecodingEnabled;
@@ -834,16 +788,11 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     state.removeListener(_onStateChanged);
     isPlayingNotifier.dispose();
     state.dispose();
-    isSeeking.dispose();
-    isBuffering.dispose();
     textureId.dispose();
     position.dispose();
     duration.dispose();
     volume.dispose();
     isMuted.dispose();
-    subtitleText.dispose();
-    buffered.dispose();
-    aspectRatio.dispose();
     lastError.dispose();
     playbackSpeed.dispose();
     queuePaths.dispose();
@@ -874,7 +823,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
   }
 
   /// Simulate playback completed — shuffle 模式下同构触发 Dart 层
-  /// 随机自动续播 (镜像 MediaKitEngine._onCompleted 钩子).
+  /// 随机自动续播 (镜像 MpvKitEngine._onCompleted 钩子).
   void simulateCompleted() {
     _completing = true; // 镜像 _onCompleted: 进入完成态抢占.
     state.value = MediaState.completed;
@@ -883,7 +832,7 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
     }
   }
 
-  /// Simulate a `Player.stream.playing` 事件 — 镜像 MediaKitEngine._onPlaying
+  /// Simulate a `Player.stream.playing` 事件 — 镜像 MpvKitEngine._onPlaying
   /// (K6 事件时序测试用): playing(true) 转 playing, playing(false) 转 paused,
   /// 完成态抢占 guard 与真引擎同语义.
   void simulatePlaying(bool playing) {
@@ -901,10 +850,5 @@ class FakeEngine implements MediaEngine, SubtitleConfig {
         state.value = MediaState.paused;
       }
     }
-  }
-
-  /// Simulate buffering state — only sets transient flag, does not change main state.
-  void simulateBuffering(bool buffering) {
-    isBuffering.value = buffering;
   }
 }

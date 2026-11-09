@@ -7,9 +7,9 @@ import 'open_result.dart';
 ///
 /// Queue control facet — playlist loading, navigation and play mode.
 ///
-/// 队列权威是 mpv 原生 playlist (media_kit `Player.open(Playlist)` / `add` /
-/// `remove` / `jump`), 本接口是其项目层投影. 实现者 (MediaKitEngine) 订阅
-/// `Player.stream.playlist` 把 mpv 侧队列状态镜像到 [queuePaths] / [queueIndex]
+/// 队列权威是 mpv 原生 playlist (`loadfile append` / `playlist-remove` /
+/// `playlist-play-index` 等命令), 本接口是其项目层投影. 实现者
+/// (MpvKitEngine) 订阅 mpv `playlist` 属性流, 把 mpv 侧队列状态镜像到 [queuePaths] / [queueIndex]
 /// — 自动续播、坏文件跳过、shuffle 重排等 mpv 原生行为都经该镜像自动同步.
 ///
 /// Contract:
@@ -58,7 +58,7 @@ abstract class QueueControl {
 
   /// 跳到下一个条目.
   ///
-  /// 边界语义由实现者按 [playMode] 统一裁定 (不透传 media_kit 内部判断):
+  /// 边界语义由实现者按 [playMode] 统一裁定 (不透传 mpv 自身的循环判断):
   /// - `loopAll` / `shuffle`: 末尾回绕到 0 (随机模式乱序循环)
   /// - `loopSingle`: 用户主动切曲仍正常回绕 (单曲循环只约束自然播完)
   /// - 不循环的 none 语义: 末尾 no-op 返回 `false`

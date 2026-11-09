@@ -650,8 +650,6 @@ void main() {
         () async {
           engine.configureMedia(durationMs: 60000);
           await controller.openAndPlay('C:/test/video.mp4');
-          engine.buffered.value = 4000;
-          engine.subtitleText.value = 'stale subtitle';
 
           await controller.stopCurrentMedia();
 
@@ -659,8 +657,6 @@ void main() {
           expect(engine.state.value, MediaState.idle);
           expect(engine.position.value, 0);
           expect(engine.duration.value, 0);
-          expect(engine.buffered.value, 0);
-          expect(engine.subtitleText.value, isEmpty);
           expect(engine.mediaInfo, const MediaInfo());
           expect(controller.currentPath.value, isNull);
           expect(controller.currentFileName.value, isEmpty);

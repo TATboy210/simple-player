@@ -50,7 +50,6 @@ void main() {
     test('Dart 3 pattern matching: case RendererControl', () {
       final MediaEngine engine = FakeEngine();
       if (engine case final RendererControl rc) {
-        rc.setD3d11SyncEnabled(true);
         rc.setHardwareDecoding(false);
       }
       engine.dispose();
@@ -78,7 +77,7 @@ void main() {
       engine.dispose();
     });
 
-    test('all 12 ValueNotifiers are accessible', () {
+    test('all 8 engine-state ValueNotifiers are accessible', () {
       final engine = FakeEngine();
       expect(engine.textureId, isA<ValueNotifier<int?>>());
       expect(engine.state, isA<ValueNotifier<MediaState>>());
@@ -86,10 +85,6 @@ void main() {
       expect(engine.duration, isA<ValueNotifier<int>>());
       expect(engine.volume, isA<ValueNotifier<double>>());
       expect(engine.isMuted, isA<ValueNotifier<bool>>());
-      expect(engine.isBuffering, isA<ValueNotifier<bool>>());
-      expect(engine.subtitleText, isA<ValueNotifier<String>>());
-      expect(engine.buffered, isA<ValueNotifier<int>>());
-      expect(engine.aspectRatio, isA<ValueNotifier<double>>());
       expect(engine.lastError, isA<ValueNotifier<PlayerError?>>());
       expect(engine.playbackSpeed, isA<ValueNotifier<double>>());
       engine.dispose();
@@ -304,14 +299,6 @@ void main() {
   });
 
   group('RendererConfig behavior', () {
-    test('setD3d11SyncEnabled tracks call and value', () {
-      final engine = FakeEngine();
-      engine.setD3d11SyncEnabled(true);
-      expect(engine.setD3d11SyncEnabledCallCount, 1);
-      expect(engine.lastD3d11SyncEnabled, isTrue);
-      engine.dispose();
-    });
-
     test('setHardwareDecoding tracks call and value', () {
       final engine = FakeEngine();
       engine.setHardwareDecoding(false);
@@ -322,11 +309,11 @@ void main() {
 
     test('multiple calls increment counters', () {
       final engine = FakeEngine();
-      engine.setD3d11SyncEnabled(true);
-      engine.setD3d11SyncEnabled(false);
-      engine.setD3d11SyncEnabled(true);
-      expect(engine.setD3d11SyncEnabledCallCount, 3);
-      expect(engine.lastD3d11SyncEnabled, isTrue);
+      engine.setHardwareDecoding(true);
+      engine.setHardwareDecoding(false);
+      engine.setHardwareDecoding(true);
+      expect(engine.setHardwareDecodingCallCount, 3);
+      expect(engine.lastHardwareDecodingEnabled, isTrue);
       engine.dispose();
     });
   });
@@ -346,16 +333,6 @@ void main() {
       engine.play(); // opening → playing
       engine.simulateCompleted(); // playing → completed
       expect(engine.state.value, MediaState.completed);
-      engine.dispose();
-    });
-
-    test('simulateBuffering sets buffering flag', () {
-      final engine = FakeEngine();
-      engine.simulateBuffering(true);
-      expect(engine.isBuffering.value, isTrue);
-
-      engine.simulateBuffering(false);
-      expect(engine.isBuffering.value, isFalse);
       engine.dispose();
     });
 
@@ -391,7 +368,6 @@ void main() {
       engine.rotate(90);
       engine.setAspectRatio(16 / 9);
       engine.setDeinterlace(true);
-      engine.setD3d11SyncEnabled(true);
       engine.setHardwareDecoding(false);
       engine.setExternalSubtitle('test.srt');
       engine.setSubtitleDelay(500);

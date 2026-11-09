@@ -15,16 +15,16 @@ import 'volume_control.dart';
 /// interfaces (8 `implements` total) into a single type. Service layer
 /// (PlaybackController, PlaylistCoordinator, etc.)
 /// accesses both state and control through this interface without
-/// depending on concrete [MediaKitEngine].
+/// depending on concrete [MpvKitEngine].
 ///
 /// Architecture:
 ///   - UI layer → EngineStateView (read-only state)
 ///   - Service layer → MediaEngine (state + control)
-///   - MediaKitEngine implements MediaEngine (concrete implementation)
+///   - MpvKitEngine implements MediaEngine (concrete implementation)
 ///
 /// Design rationale: the legacy EngineState mixin mixed state and control
 /// methods. After ISP decomposition, the service layer needs both — this
-/// composite type bridges the gap without coupling to MediaKitEngine.
+/// composite type bridges the gap without coupling to MpvKitEngine.
 abstract class MediaEngine
     implements
         EngineStateView,

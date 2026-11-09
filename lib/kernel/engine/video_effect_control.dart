@@ -3,7 +3,7 @@ import 'package:simple_player_flutter/kernel/engine/video_effect_type.dart';
 /// 视频效果控制接口
 ///
 /// 包含亮度/对比度/色调/饱和度调节、旋转、宽高比、反交错。
-/// 只包含控制方法；aspectRatio 状态由 [EngineStateView] 提供。
+/// 只包含控制方法；视频分辨率/宽高比信息经 [EngineStateView.mediaInfo] 提供。
 ///
 /// Contract:
 /// - All methods delegate to the underlying engine — no ValueNotifier mutation.
@@ -28,8 +28,7 @@ abstract class VideoEffectControl {
   ///
   /// - `ratio`: aspect ratio value (e.g. 16/9, 4/3).
   /// - Side effect: applies ratio to the underlying player renderer.
-  /// - Note: does NOT write back to [EngineStateView.aspectRatio] —
-  ///   that ValueNotifier is only set by `open()` on success.
+  /// - Note: 只写 mpv `video-aspect-override`, 不影响 mediaInfo 里的源分辨率.
   /// - No-op when the engine is disposed.
   void setAspectRatio(double ratio);
 

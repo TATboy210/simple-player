@@ -172,11 +172,9 @@ void main() {
       },
     );
 
-    testWidgets('seeking CenterGroup accepts a second replay command', (
-      tester,
-    ) async {
-      // RED contract: isSeeking must not turn command taps into a mutual exclusion gate.
-      engine.isSeeking.value = true;
+    testWidgets('CenterGroup accepts a second replay command', (tester) async {
+      // Contract: command taps are never a mutual-exclusion gate (the engine
+      // no longer exposes an isSeeking flag that could turn them into one).
       await tester.pumpWidget(buildSubject(child: buildCenterGroup()));
       await tester.pump();
 

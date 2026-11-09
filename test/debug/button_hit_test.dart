@@ -154,11 +154,9 @@ void main() {
       expect(engine.lastSkipForwardMs, 30000);
     });
 
-    testWidgets('seeking state routes two consecutive forward taps', (
-      tester,
-    ) async {
-      // RED contract: a transient seek must not suppress the latest user intent.
-      engine.isSeeking.value = true;
+    testWidgets('two consecutive forward taps are both routed', (tester) async {
+      // Contract: the latest user intent is never suppressed by a transient
+      // seek (the engine no longer exposes an isSeeking gate at all).
       await tester.pumpWidget(buildControlBarOnly());
       await tester.pump();
 

@@ -7,7 +7,7 @@ part of 'mpv_kit_engine.dart';
 /// Queue operations of [MpvKitEngine]. Every edit updates the mirror
 /// optimistically and touches [MpvKitEngine.queueRevision] once; the mpv
 /// `playlist` / `playlist-playing-pos` observers overwrite it idempotently.
-extension _MpvKitQueue on MpvKitEngine {
+extension _MpvKitQueue on _MpvKitState {
   // ─── 回流镜像 ───
 
   /// 合并同一批 mpv 事件里的 playlist / playing-pos 变化, 微任务单发.
@@ -26,8 +26,7 @@ extension _MpvKitQueue on MpvKitEngine {
       final index = entries.isEmpty
           ? -1
           : _playingPos.clamp(-1, entries.length - 1);
-      if (_sameContent(_queuePaths.value, paths) &&
-          _queueIndex.value == index) {
+      if (listEquals(_queuePaths.value, paths) && _queueIndex.value == index) {
         return; // 乐观镜像已到位 — 不重复通知.
       }
       _queuePaths.value = paths;
@@ -63,7 +62,6 @@ extension _MpvKitQueue on MpvKitEngine {
     }
     final gen = ++_operationGeneration;
     _state.value = MediaState.opening;
-    _isBuffering.value = true;
     _queueEditInProgress = true;
     final clampedStart = startIndex.clamp(0, paths.length - 1);
     try {
@@ -87,7 +85,6 @@ extension _MpvKitQueue on MpvKitEngine {
     } on MpvException catch (error, stackTrace) {
       return _openFailed(gen, 'openPlaylist', '装载播放队列失败', error, stackTrace);
     } finally {
-      if (_isCurrentGeneration(gen)) _isBuffering.value = false;
       _queueEditInProgress = false;
       if (!_disposed) _touchQueueRevision();
     }
@@ -191,7 +188,7 @@ extension _MpvKitQueue on MpvKitEngine {
       // playlist 回流在抑制期内落地 — 只写镜像不发 revision; 窗末重申
       // 权威 index 后单发, Coordinator 不会收到"新序+旧索引"陈旧帧.
       await Future<void>.delayed(Duration.zero);
-      if (!_disposed && _sameContent(_queuePaths.value, targetOrder)) {
+      if (!_disposed && listEquals(_queuePaths.value, targetOrder)) {
         _queueIndex.value = targetIndex;
       }
       _queueEditInProgress = false;
@@ -347,11 +344,49 @@ extension _MpvKitQueue on MpvKitEngine {
   }
 }
 
-/// 逐元素内容等价 — 镜像是否已收敛为目标全序.
-bool _sameContent(List<String> a, List<String> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
+/// QueueControl 公开方法 — 薄转发到 [_MpvKitQueue] (disposed 守卫在此层).
+///
+/// Public QueueControl surface of [MpvKitEngine]; the bodies live in the
+/// private [_MpvKitQueue] extension above.
+mixin _MpvKitQueueApi on _MpvKitState {
+  @override
+  Future<OpenResult> openPlaylist(List<String> paths, {int startIndex = 0}) =>
+      _disposed
+      ? Future.value(const OpenSuperseded())
+      : _openPlaylist(paths, startIndex);
+
+  @override
+  Future<void> appendToQueue(List<String> paths) async {
+    if (_disposed || paths.isEmpty) return;
+    await _appendToQueue(paths);
   }
-  return true;
+
+  @override
+  Future<void> removeFromQueue(int index) async {
+    if (!_disposed) _removeFromQueue(index);
+  }
+
+  @override
+  Future<void> removeFromQueueBatch(Set<int> indices) async {
+    if (!_disposed && indices.isNotEmpty) _removeFromQueueBatch(indices);
+  }
+
+  @override
+  Future<void> sortQueue(List<String> targetOrder) async {
+    if (!_disposed) await _sortQueue(targetOrder);
+  }
+
+  @override
+  Future<bool> jumpTo(int index) async => !_disposed && _jumpTo(index);
+
+  @override
+  bool nextInQueue() => !_disposed && _stepQueue(forward: true);
+
+  @override
+  bool previousInQueue() => !_disposed && _stepQueue(forward: false);
+
+  @override
+  Future<void> setPlayMode(PlayMode mode) async {
+    if (!_disposed) _setPlayMode(mode);
+  }
 }

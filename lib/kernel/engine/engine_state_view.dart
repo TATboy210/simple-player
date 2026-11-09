@@ -12,12 +12,12 @@ import 'package:simple_player_flutter/kernel/engine/models/media_info.dart';
 /// [ValueListenableBuilder] 监听变化，不直接修改状态。
 ///
 /// 与 [PlaybackControl] 分离：此接口仅暴露状态，不包含控制方法。
-/// 实现者是具体的引擎类（MediaKitEngine），消费者通过此接口
+/// 实现者是具体的引擎类（MpvKitEngine），消费者通过此接口
 /// 以只读方式访问播放状态。
 ///
 /// requires: 无（所有 getter 幂等、无参数、永不 throw）
 /// ensures: 返回值反映最近一次内部状态更新；disposed 后返回安全默认值
-///   （state→idle, position/duration→0, isSeeking/isBuffering→false，见 D9）
+///   （state→idle, position/duration→0，见 D9）
 /// modifies: 无（本接口所有成员均为纯读取，无副作用）
 abstract class EngineStateView {
   /// 纹理 ID — 用于 Texture 渲染，null 表示尚未就绪
@@ -37,21 +37,6 @@ abstract class EngineStateView {
 
   /// 是否静音
   ValueNotifier<bool> get isMuted;
-
-  /// 是否正在缓冲 — transient 标志，独立于主状态枚举
-  ValueNotifier<bool> get isBuffering;
-
-  /// 是否正在 seek — transient 标志，独立于主状态枚举
-  ValueNotifier<bool> get isSeeking;
-
-  /// 当前字幕文本
-  ValueNotifier<String> get subtitleText;
-
-  /// 已缓冲位置（毫秒）
-  ValueNotifier<int> get buffered;
-
-  /// 视频宽高比
-  ValueNotifier<double> get aspectRatio;
 
   /// 最近一次错误 — null 表示无错误
   ValueNotifier<PlayerError?> get lastError;

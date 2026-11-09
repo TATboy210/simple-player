@@ -2,8 +2,8 @@ import 'package:simple_player_flutter/kernel/engine/models/subtitle_track_info.d
 
 /// 字幕配置接口
 ///
-/// 包含字幕轨道管理、外部字幕加载、字幕延迟调整、均衡器设置。
-/// 只包含控制方法；subtitleText 状态由 [EngineStateView] 提供。
+/// 包含字幕轨道管理、外部字幕加载、字幕与音频延迟调整。
+/// 只包含控制方法；轨道表经 [EngineStateView.mediaInfo] 提供。
 ///
 /// Contract:
 /// - Control methods delegate to the underlying engine — no ValueNotifier mutation.
@@ -54,13 +54,6 @@ abstract class SubtitleConfig {
   /// - Returns: current audio delay in ms; 0 when disposed.
   /// - Pure read: no side effects.
   int get audioDelay;
-
-  /// 设置音频均衡器预设
-  ///
-  /// - `preset`: EQ preset string; format constrained by the underlying af filter syntax.
-  /// - Side effect: applies the EQ preset to the underlying player.
-  /// - No-op when the engine is disposed.
-  void setEqualizer(String preset);
 
   /// 当前字幕延迟（毫秒）
   ///

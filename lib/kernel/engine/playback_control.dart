@@ -3,7 +3,7 @@ import 'open_result.dart';
 /// 播放控制接口 — 核心播放操作（含打开、播放、暂停、停止、跳转、音量、倍速等控制方法）
 ///
 /// 与 [EngineStateView] 分离：此接口仅暴露控制方法，不包含状态。
-/// 实现者是具体的引擎类（MediaKitEngine），消费者通过此接口控制播放行为。
+/// 实现者是具体的引擎类（MpvKitEngine），消费者通过此接口控制播放行为。
 ///
 /// Contract:
 /// - Implementations MUST update [state] via the declared transitions on each method.
@@ -15,10 +15,10 @@ abstract class PlaybackControl {
   ///
   /// requires: state ∈ {idle, opening, playing, paused, completed, error}
   /// ensures: 仅最新打开请求可操作共享播放器并发布结果；成功时 state == idle、
-  ///   duration/aspectRatio 更新且 lastError == null；调用者须随后 play() 才进入 playing。
+  ///   duration/mediaInfo 更新且 lastError == null；调用者须随后 play() 才进入 playing。
   /// states: 旧播放会话在新请求获得播放器独占权后收敛为 idle，再进入
   ///   opening；完成后转换为 idle 或 error。被取代的请求不发布任何状态。
-  /// modifies: [state], [position], [duration], [aspectRatio], [lastError], [isBuffering]
+  /// modifies: [state], [position], [duration], [lastError]
   /// returns: [OpenSuccess] 用于提交后续播放副作用；[OpenError] 携带结构化失败；
   ///   [OpenSuperseded] 表示请求被新请求或释放操作取代，调用方不得提交副作用。
   /// throws: 正常失败不会抛异常，且仍同步经 lastError + state→error 供 UI 持续观察。
@@ -45,7 +45,7 @@ abstract class PlaybackControl {
   ///
   /// requires: 无（任意可达态均可调用）。
   /// ensures: 当前媒体已停止、[hasMedia] 为 `false`、state == idle，且所有媒体派生
-  /// 状态（position、duration、buffered、aspectRatio、mediaInfo）均已重置。
+  /// 状态（position、duration、mediaInfo）均已重置。
   /// states: transitions to {idle}。
   /// modifies: [state]、媒体派生状态和 [hasMedia]。
   ///
@@ -73,7 +73,7 @@ abstract class PlaybackControl {
   /// requires: state ∉ {idle} 且 duration > 0（否则 no-op）
   /// ensures: 成功时 position 更新为 clamp(ms, 0, duration)；调用前后 state 不变
   ///   （playing 保持 playing，paused 保持 paused）
-  /// modifies: [position], [isSeeking]
+  /// modifies: [position]
   /// throws: 经 lastError=PlaybackError(seekFailed) 表达，position 回退为实际引擎位置
   Future<void> seekTo(int ms);
 
@@ -99,26 +99,17 @@ abstract class PlaybackControl {
   /// modifies: [playbackSpeed]
   void setPlaybackRate(double rate);
 
-  /// 设置 AB 循环范围
-  ///
-  /// [from] 起始位置（毫秒），[to] 结束位置（毫秒），-1 表示到末尾。
-  ///
-  /// requires: 无（from/to 越界或反序时内部自动纠正/clamp）
-  /// ensures: 底层播放器循环范围更新为纠正后的 [from, to]
-  /// modifies: 无 ValueNotifier（仅委托底层引擎设置，不反映到状态视图）
-  void setRange({required int from, int to = -1});
-
   /// 快进（默认 10 秒）
   ///
   /// requires: 与 [seekTo] 相同（内部委托 seekTo）
   /// ensures: position 增加 ms（clamp 到 [0, duration]）
-  /// modifies: [position], [isSeeking]（委托 seekTo）
+  /// modifies: [position]（委托 seekTo）
   void skipForward([int ms = 10000]);
 
   /// 快退（默认 10 秒）
   ///
   /// requires: 与 [seekTo] 相同（内部委托 seekTo）
   /// ensures: position 减少 ms（clamp 到 [0, duration]）
-  /// modifies: [position], [isSeeking]（委托 seekTo）
+  /// modifies: [position]（委托 seekTo）
   void skipBack([int ms = 10000]);
 }
