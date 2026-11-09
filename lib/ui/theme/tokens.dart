@@ -160,6 +160,12 @@ class Tokens {
   // durationFade=400,后者驱动 center_controls 中心播放/暂停图标,隔离影响)
   static const durationControlsFade = 150;
 
+  /// 视频面拖窗缩放防抖（毫秒）— MpvVideo 默认 80ms，拖动中短暂停顿就会
+  /// 触发一次 mpv 渲染目标重分配（4K 下可能掉帧）；提到 150ms 让停顿不再
+  /// 中途重分配，停手后约 150ms 内补出清晰帧。文件切换/首帧走立即路径，
+  /// 不受此值影响。
+  static const videoResizeDebounceMs = 150;
+
   // ── 自动隐藏 ──
   // 窗口/全屏统一 3s (原 windowed=5s 偏长)
   static const hideDelayWindowed = 3;

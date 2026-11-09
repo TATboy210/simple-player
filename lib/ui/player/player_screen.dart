@@ -478,7 +478,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           children: [
             ColoredBox(
               color: Tokens.bgVideo,
-              child: MpvVideo(controller: video),
+              child: MpvVideo(
+                controller: video,
+                resizeDebounce: const Duration(
+                  milliseconds: Tokens.videoResizeDebounceMs,
+                ),
+              ),
             ),
             controls,
           ],
