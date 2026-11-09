@@ -9,6 +9,7 @@ import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
 import 'native_window.dart';
 import 'nativeapi_window.dart';
+import 'normal_bounds_tracker.dart';
 import 'window_bridge.dart';
 import 'window_geometry.dart';
 
@@ -66,8 +67,13 @@ class WindowService implements WindowBridge {
   bool _fullscreenIntent = false;
   bool _disposed = false;
 
-  /// 最近一次普通窗口（非最大化/全屏/最小化）矩形 — 落盘的唯一几何来源。
-  Rect _normalBounds = Offset.zero & defaultWindowSize;
+  /// 最近一次普通窗口矩形的跟踪器 — 落盘的唯一几何来源。
+  /// late final：初始化器需捕获 this（读 _native/_revealed/mode），惰性求值，
+  /// 首次使用必在构造完成之后。
+  late final NormalBoundsTracker _bounds = NormalBoundsTracker(
+    window: () => _native,
+    canTrack: () => _revealed && !mode.value.isFullscreen,
+  );
 
   @override
   final ValueNotifier<WindowMode> mode = ValueNotifier(WindowMode.windowed);
@@ -148,7 +154,7 @@ class WindowService implements WindowBridge {
     );
     if (rect != null) {
       window.bounds = rect;
-      _normalBounds = rect;
+      _bounds.value = rect;
       return;
     }
     if (persisted.position != null) {
@@ -156,7 +162,7 @@ class WindowService implements WindowBridge {
     }
     window.setSize(persisted.size);
     window.center();
-    _normalBounds = window.bounds;
+    _bounds.value = window.bounds;
   }
 
   /// 工作区查询失败视为「未知」— [isReachableOnAnyDisplay] 对空列表信任原值。
@@ -213,10 +219,10 @@ class WindowService implements WindowBridge {
       case NativeRestored():
         _onNativeRestored();
       case NativeResized():
-        _trackNormalBounds();
+        _bounds.noteChanged();
         _onNativeResized();
       case NativeMoved():
-        _trackNormalBounds();
+        _bounds.noteChanged();
       case NativeCloseRequested(:final cancel):
         _onCloseRequested(cancel);
       case NativeMinimized():
@@ -231,20 +237,6 @@ class WindowService implements WindowBridge {
     mode.value = _bound.isMaximized
         ? WindowMode.maximized
         : WindowMode.windowed;
-  }
-
-  /// 记录最近一次普通窗口矩形。最大化/最小化/全屏时跳过，否则会把工作区或
-  /// 屏外坐标（-32000）当成还原尺寸；全程只读不 marshal 的属性。
-  /// 已知取舍：Aero Snap 半屏时 isMaximized 为 false，贴边矩形会被当作还原
-  /// 尺寸（读 WINDOWPLACEMENT 的 rcNormal 才能区分，原生 API 未暴露）。
-  void _trackNormalBounds() {
-    final window = _native;
-    if (window == null || !_revealed || mode.value.isFullscreen) return;
-    if (window.isMaximized || window.isMinimized) return;
-    final bounds = window.bounds;
-    // 原生读取失败时返回全零矩形 — 不能当作还原尺寸。
-    if (bounds.isEmpty) return;
-    _normalBounds = bounds;
   }
 
   void _onNativeResized() {
@@ -460,15 +452,16 @@ class WindowService implements WindowBridge {
     if (_disposed || mode.value.isFullscreen) return;
     // 普通窗口态下以现值为准（拖动结束可能没有 resize 事件），其余态沿用
     // 最近一次普通矩形，最大化因此不会覆盖还原尺寸。
-    if (mode.value.isWindowed) _trackNormalBounds();
+    if (mode.value.isWindowed) _bounds.sample();
+    final normal = _bounds.value;
     try {
       await _persistence.save(
         PersistedWindowState(
           size: Size(
-            math.max(_normalBounds.width, minimumWindowSize.width),
-            math.max(_normalBounds.height, minimumWindowSize.height),
+            math.max(normal.width, minimumWindowSize.width),
+            math.max(normal.height, minimumWindowSize.height),
           ),
-          position: _normalBounds.topLeft,
+          position: normal.topLeft,
           alwaysOnTop: isAlwaysOnTop.value,
           isMaximized: mode.value.isMaximized,
         ),
@@ -486,6 +479,7 @@ class WindowService implements WindowBridge {
     _disposed = true;
     _resizeTimer?.cancel();
     _resizeTimer = null;
+    _bounds.dispose();
     unawaited(_eventSub?.cancel());
     _eventSub = null;
     _native?.dispose();

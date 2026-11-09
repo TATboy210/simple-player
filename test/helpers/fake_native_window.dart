@@ -112,8 +112,15 @@ class FakeNativeWindow implements NativeWindow {
     alwaysOnTop = value;
   }
 
+  /// bounds getter 被读取的次数 — 断言热路径同步 FFI 读取被节流。
+  int boundsReads = 0;
+
   @override
-  Rect get bounds => boundsValue;
+  Rect get bounds {
+    boundsReads++;
+    return boundsValue;
+  }
+
   @override
   set bounds(Rect value) {
     calls.add('bounds=$value');
