@@ -93,6 +93,9 @@ class PlaylistPanel extends StatefulWidget {
   /// 松手恢复. null = 无挂起源 (恒不挂起).
   final ValueListenable<bool>? scrubbing;
 
+  /// 窗口 resize 信号 (可选) — true 时玻璃模糊挂起, 结束恢复. null = 不挂起.
+  final ValueListenable<bool>? resizing;
+
   const PlaylistPanel({
     super.key,
     required this.entries,
@@ -111,6 +114,7 @@ class PlaylistPanel extends StatefulWidget {
     required this.onSortSelected,
     this.resumeEnabled,
     this.scrubbing,
+    this.resizing,
   });
 
   @override
@@ -282,6 +286,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
         opacity: _fade,
         suspend: widget.scrubbing,
+        resizing: widget.resizing,
         child: Stack(
           fit: StackFit.expand,
           clipBehavior: Clip.hardEdge,

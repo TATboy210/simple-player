@@ -25,9 +25,9 @@ import '../theme/tokens.dart';
 ///
 /// 与 [GlassContainer] 的分工：本层只管"裸模糊层"（菜单/确认条/对话框/
 /// 面板壳的 BackdropFilter 散点收敛）；完整玻璃容器（装饰+容器+blur 一体）
-/// 仍用 GlassContainer，两者并存。⚠ resize 语义相反：GlassContainer 的
-/// resizing 分支在 resize 时停用 blur（冻结），本层**无 resize 钩子** —
-/// 控制栏视觉恒定契约要求 resize 全程 blur 恒开（438e76a9 实测量裁）。
+/// 仍用 GlassContainer，两者并存。resize：控制栏视觉恒定契约要求 blur 恒开
+/// （438e76a9 实测量裁），故 [resizing] 默认 null；面板壳显式传入以在拖拽
+/// 缩放期间挂起 blur（面板常驻视频之上，σ11.5 采样是 raster 主成本之一）。
 class GlassBlurLayer extends StatelessWidget {
   const GlassBlurLayer({
     super.key,
@@ -36,6 +36,7 @@ class GlassBlurLayer extends StatelessWidget {
     this.filter,
     this.opacity,
     this.suspend,
+    this.resizing,
     this.enabled = true,
   });
 
@@ -56,6 +57,11 @@ class GlassBlurLayer extends StatelessWidget {
   /// 挂起门控 — true 时强制停用（如 seek 拖动期间，v0.0.8.2 C1）。
   final ValueListenable<bool>? suspend;
 
+  /// 窗口 resize 挂起门控（可选）— true 时停用模糊，拖拽缩放期间不再对
+  /// 每帧变化的视频纹理做 σ≈11.5 的背景采样。仅面板壳接入；控制栏走自身
+  /// 淡出路径，不传此参数（视觉恒定契约不变）。
+  final ValueListenable<bool>? resizing;
+
   /// 静态总开关 — false 恒停用（低配降级通路，D-14 同义）。
   final bool enabled;
 
@@ -63,11 +69,12 @@ class GlassBlurLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final opacity = this.opacity;
     final suspend = this.suspend;
+    final resizing = this.resizing;
     // 无任何动态门控源 → 恒定结构，不引入 AnimatedBuilder。
-    if (opacity == null && suspend == null) {
+    if (opacity == null && suspend == null && resizing == null) {
       return _buildBlur(constantChild, enabled: enabled);
     }
-    final sources = <Listenable>[?opacity, ?suspend];
+    final sources = <Listenable>[?opacity, ?suspend, ?resizing];
     return AnimatedBuilder(
       animation: Listenable.merge(sources),
       // 常量子树 — 门控翻转零重建契约（与控制栏/设置面板先例一致）。
@@ -78,7 +85,8 @@ class GlassBlurLayer extends StatelessWidget {
         assert(child != null, 'child 必须传入 AnimatedBuilder 以保零重建契约');
         // 门控语义: enabled(静态) && 可见(opacity≥0.01) && 未挂起(!suspend).
         final visible = (opacity?.value ?? 1) >= 0.01;
-        final suspended = suspend?.value ?? false;
+        final suspended =
+            (suspend?.value ?? false) || (resizing?.value ?? false);
         return _buildBlur(child!, enabled: enabled && visible && !suspended);
       },
     );

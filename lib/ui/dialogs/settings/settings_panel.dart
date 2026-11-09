@@ -86,6 +86,9 @@ class SettingsPanel extends StatefulWidget {
   /// 松手恢复. null = 无挂起源 (恒不挂起).
   final ValueListenable<bool>? scrubbing;
 
+  /// 窗口 resize 信号 (可选) — true 时玻璃模糊挂起, 结束恢复. null = 不挂起.
+  final ValueListenable<bool>? resizing;
+
   const SettingsPanel({
     super.key,
     required this.visible,
@@ -94,6 +97,7 @@ class SettingsPanel extends StatefulWidget {
     this.session,
     this.onPromote,
     this.scrubbing,
+    this.resizing,
   });
 
   @override
@@ -477,6 +481,7 @@ class _SettingsPanelState extends State<SettingsPanel>
         borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
         opacity: _fade,
         suspend: widget.scrubbing,
+        resizing: widget.resizing,
         child: Material(
           // 透明 Material 祖先 — InkWell hover 色阶与 About 链接依赖它.
           color: Colors.transparent,

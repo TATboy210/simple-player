@@ -154,6 +154,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 驱动，不经过此层。
   late Widget _videoContent;
 
+  /// 构造标题栏（含 resize 期间的语义排除）。
+  ///
+  /// 窗口拖拽缩放时右侧按钮 rect 每帧移动，会让语义树逐帧重发
+  /// （控制台 AXTree error 44 洪流）；resize 期间条件排除语义。
+  /// ⚠ 只能条件排除：恒定排除会让引擎语义根缺失、debug 下 CHECK abort
+  /// （0532fa1b）；排除边界在 builder 外层、child 经参数传入以保持 identity
+  /// 稳定（4e0eb23a），仅 resize 上下沿各翻转一次。
+  Widget _createTitleBar() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.windowService.isResizing,
+      child: RepaintBoundary(
+        child: CustomTitleBar(windowService: widget.windowService),
+      ),
+      builder: (context, resizing, child) =>
+          ExcludeSemantics(excluding: resizing, child: child),
+    );
+  }
+
   /// 打开系统字幕选择器并返回用户选择的本地路径。
   ///
   /// 对话框期间临时恢复 IME — 窗口 IMC 已解除（flutter_window.cpp），
@@ -188,9 +206,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.initState();
     // 稳定化 actions — initState 构造一次,纯播放/项目回调闭包现读 widget 字段
     // 避免陈旧捕获. playModeIcon/Label 已下沉, 不需 l10n/context.
-    _titleBar = RepaintBoundary(
-      child: CustomTitleBar(windowService: widget.windowService),
-    );
+    _titleBar = _createTitleBar();
     _actions = PlayerActions(
       // actions 保持同一实例以保护 Video subtree identity，但在调用时读取当前
       // widget，避免 controller replacement 后继续把用户命令发送给旧数据源。
@@ -277,9 +293,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (oldWidget.windowService != widget.windowService) {
       // WindowBridge 是标题栏和 resize probe 的外部依赖；替换时一起迁移，
       // 避免稳定 widget identity 继续持有旧窗口服务的 notifier。
-      _titleBar = RepaintBoundary(
-        child: CustomTitleBar(windowService: widget.windowService),
-      );
+      _titleBar = _createTitleBar();
     }
 
     // probe 同时监听窗口 resize 与 controller 的 rect/id；任一来源替换时

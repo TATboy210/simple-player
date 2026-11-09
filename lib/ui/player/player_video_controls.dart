@@ -1043,6 +1043,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                 session: widget.settingsSession,
                 services: widget.settingsServices,
                 scrubbing: _seekScrubbing,
+                resizing: widget.resizing,
                 onClose: () => _workspaceFocus?.close(
                   WorkspaceTaskIds.settings,
                   WorkspaceCloseCause.header,
@@ -1074,6 +1075,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                     services: widget.settingsServices,
                     session: widget.settingsSession,
                     scrubbing: _seekScrubbing,
+                    resizing: widget.resizing,
                     onClose: () => settingsVisible.value = false,
                   ),
                 ),
@@ -1126,6 +1128,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
                   visible: visible,
                   // seek 拖动挂起玻璃模糊 (v0.0.8.2).
                   scrubbing: _seekScrubbing,
+                  resizing: widget.resizing,
                   onClose: () => widget.playlistVisible!.value = false,
                   onPlayEntry: (index) =>
                       unawaited(widget.playlistCoordinator!.playEntryAt(index)),

@@ -14,6 +14,7 @@ void main() {
     WidgetTester tester, {
     Animation<double>? opacity,
     ValueListenable<bool>? suspend,
+    ValueListenable<bool>? resizing,
     bool enabled = true,
     ImageFilter? filter,
   }) async {
@@ -23,6 +24,7 @@ void main() {
           body: GlassBlurLayer(
             opacity: opacity,
             suspend: suspend,
+            resizing: resizing,
             enabled: enabled,
             filter: filter,
             child: const Text('glass-content'),
@@ -79,6 +81,24 @@ void main() {
       same(elementBefore),
       reason: '门控翻转不得重建子树拓扑',
     );
+  });
+
+  testWidgets('resizing 挂起/恢复 — 拖拽缩放期间停用且子树 identity 保持', (tester) async {
+    final resizing = ValueNotifier<bool>(false);
+    addTearDown(resizing.dispose);
+    await pumpLayer(tester, resizing: resizing);
+    expect(backdrop(tester).enabled, isTrue);
+
+    final elementBefore = tester.element(find.text('glass-content'));
+
+    resizing.value = true;
+    await tester.pump();
+    expect(backdrop(tester).enabled, isFalse, reason: 'resize 期间挂起');
+
+    resizing.value = false;
+    await tester.pump();
+    expect(backdrop(tester).enabled, isTrue, reason: 'resize 结束恢复');
+    expect(tester.element(find.text('glass-content')), same(elementBefore));
   });
 
   testWidgets('enabled=false 静态开关 — 恒停用 (低配降级通路)', (tester) async {
