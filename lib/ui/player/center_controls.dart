@@ -46,7 +46,7 @@ class PlayPauseButton extends StatelessWidget {
 /// 中央控制组：上一个、后退、播放/暂停、前进、下一个与停止 (v0.0.5)。
 ///
 /// 切曲按钮紧贴播放键两侧（高频动作）；边界回绕合法性由引擎统一守卫
-/// （越界时 media_kit 步进经引擎裁定，越界不循环场景回 false，配 OSD 提示）。
+/// （越界时队列步进经引擎裁定，越界不循环场景回 false，配 OSD 提示）。
 /// [isIdle] 只控制视觉淡化。停止命令必须通过
 /// [onStop] 进入项目控制器，以统一完成媒体卸载、标题和空置态收尾。
 class CenterGroup extends StatelessWidget {

@@ -30,8 +30,8 @@ import '../dialogs/settings/settings_panel_session.dart';
 
 /// 播放器主屏幕 — 组合窗口壳、视频 surface、键盘与控制层。
 ///
-/// 控制栏位于 media_kit `Video.controls` builder 内，因此全屏 route 会复制同一
-/// 控制结构；视频 key、测试 surface 注入和 resize 期间 Element identity 均保持稳定。
+/// 控制层与 [MpvVideo] 纹理同处一个 Stack，全屏由窗口模式驱动（无独立 route）；
+/// 测试 surface 注入和 resize 期间 Element identity 均保持稳定。
 class PlayerScreen extends StatefulWidget {
   final MediaEngine engine;
 
@@ -46,8 +46,8 @@ class PlayerScreen extends StatefulWidget {
 
   /// 测试渲染面配套的 controls 端口；仅在 [videoSurfaceBuilder] 注入时使用。
   ///
-  /// 生产路径必须由 `Video.controls` 提供当前 route 的 [VideoState]，因此禁止单独
-  /// 注入本端口，避免绕过 media_kit 默认 fullscreen route。
+  /// 生产路径使用 [MpvKitVideoControlsPort]，本端口仅供测试注入，避免 widget
+  /// test 绑定 libmpv 原生运行时。
   final VideoControlsPort? testVideoControls;
 
   final PlaybackController controller;
@@ -103,8 +103,6 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  /// media_kit Video 的 state key — 供 setSubtitleViewPadding 调用
-  /// (控件可见性联动字幕上移). 不再用于全屏切换 (改走 WindowService.setMode).
   /// 视频面最近一次布局的逻辑高度 — 字幕避让 (sub-margin-y) 的换算基准.
   double _surfaceHeight = 0;
 
@@ -252,8 +250,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           : () => unawaited(widget.playlistCoordinator!.cyclePlayMode()),
       playMode: widget.playlistCoordinator?.playMode,
     );
-    // 阶段2:字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱
-    // (每实例调自己 VideoState),不再需本层 _onControlsVisibleChanged 联动.
+    // 字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱,
+    // 本层无需联动.
     // 拖窗纹理重建诊断 — 并联 ResizeFrameMetrics，分类只描述 Dart 侧
     // controller 信号。测试渲染面没有 controller 时仍创建 probe，以输出
     // probeUnavailable 摘要而非将观测源缺失误记成无信号变化。
@@ -361,9 +359,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               Expanded(
                 child: Stack(
                   children: [
-                    // v0.0.5: 播放列表面板已迁入 controls builder
-                    // (player_video_controls) — media_kit 全屏 route 复制
-                    // builder 时自动携带, 解决全屏下面板不可见.
+                    // 播放列表面板在控制层内 (player_video_controls),
+                    // 与视频同属此 Stack, 全屏下同样可见.
                     videoContent!,
                   ],
                 ),
@@ -414,10 +411,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// 创建视频内容子树 — 仅在 initState 与 [_videoContentDepsMatch] 判定
   /// 依赖替换时调用（构造快照，非每 build）。
   ///
-  /// DropHandler 包裹 media_kit [Video] (controls 住进 builder)。
-  /// 渐进路径核心:PlayerVideoControls + emptyState 都住进 Video.controls
-  /// builder, media_kit 全屏 route 复制 builder 时自动携带控制栏(解决
-  /// 全屏控制栏消失). engine/VideoController/videoKey/全屏机制不变.
+  /// DropHandler 包裹视频渲染面（控制层与 emptyState 由 [_createVideoSurface]
+  /// 一并装配）。
   ///
   /// ⚠ 兜底闭包在此固化 — `onFilesDropped ?? (_) {}` 若放进 build 会让
   /// 缓存比对（原始可空值 identity）与实际消费值脱节。
@@ -436,8 +431,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Video.controls builder 内含 PlayerVideoControls + emptyState,
-                // 全屏 route 复制 builder 时自动携带. 生产路径 media_kit 纯渲染；
+                // surface 内含 PlayerVideoControls + emptyState;
                 // 测试可注入无原生依赖 surface (videoSurfaceBuilder).
                 surface,
               ],
@@ -450,7 +444,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// 创建视频渲染面 — [MpvVideo] 纹理与控制层同处一个 Stack.
   ///
-  /// mpv_kit 无 media_kit 的全屏 route: 全屏由窗口模式驱动原生窗口全屏,
+  /// mpv_kit 无独立全屏 route: 全屏由窗口模式驱动原生窗口全屏,
   /// 控制层无需随 route 复制, 始终挂在此处. MpvVideo 按物理像素渲染并
   /// 自带 resize 防抖, 不再需要 resize 期间切 filterQuality.
   Widget _createVideoSurface() {
@@ -493,7 +487,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// 控制层装配的**唯一**入口 — 测试 seam 与生产 Video.controls 复用同一
+  /// 控制层装配的**唯一**入口 — 测试 seam 与生产路径复用同一
   /// 构造，防止双路径漂移 (v0.0.6 修复: 生产路径曾漏传 settingsServices,
   /// 导致"记住播放位置"的面板门控失效)。
   Widget _controlsFor(VideoControlsPort video) {

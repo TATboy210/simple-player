@@ -97,7 +97,7 @@ final class ErrorFeedbackSettingsData {
 /// 错误反馈设置单例 store —— 组合根与设置 UI 的唯一数据源。
 ///
 /// 同步构造零 I/O（先于 runApp 的任何时点都安全）；加载只发生在组合根的
-/// unawaited 激活路径内（RESEARCH Pitfall 7：绝不阻塞 MediaKit/window/
+/// unawaited 激活路径内（RESEARCH Pitfall 7：绝不阻塞 engine/window/
 /// runApp）。读写失败静默回退默认值（D-01）。
 final class ErrorFeedbackSettings {
   ErrorFeedbackSettings._({File Function()? settingsFile})

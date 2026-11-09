@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 /// auto-hide can freeze while any modal window is open (v0.0.5).
 ///
 /// 判定: [PopupRoute] 覆盖 showDialog(DialogRoute) / showMenu(PopupMenuRoute)
-/// 等全部模态弹层; media_kit 全屏 route 是普通 opaque PageRoute, **不计入**
+/// 等全部模态弹层; 全屏 route 若存在是普通 opaque PageRoute, **不计入**
 /// (全屏不是"额外窗口"). 注册于 MaterialApp.navigatorObservers (root
 /// navigator — showDialog/showMenu 默认都走 root).
 class ModalHoldObserver extends NavigatorObserver {

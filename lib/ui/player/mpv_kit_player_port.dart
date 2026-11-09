@@ -66,7 +66,7 @@ abstract interface class VideoControlsPort {
   void setSubtitleViewPadding(EdgeInsets padding);
 }
 
-/// 生产 [VideoControlsPort] — mpv_kit 视频面没有 media_kit 的全屏 route 与
+/// 生产 [VideoControlsPort] — mpv_kit 视频面没有全屏 route 与
 /// SubtitleView, 两项能力改由宿主提供:
 /// - 全屏: [WindowMode] 驱动原生全屏 (WindowService.setMode), 控制层经
 ///   `actions.onToggleFullscreen` 切模式, 本端口的 toggle/exit 无事可做;

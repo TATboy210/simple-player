@@ -8,10 +8,8 @@ import '../theme/tokens.dart';
 ///
 /// 控制栏自动隐藏逻辑，独立可测试。
 ///
-/// v0.0.5 对齐 media_kit 原生交互 (用户裁决: 原生优先): 隐藏与播放状态
-/// **无关** — 静置 (hover 离开/不响应区) 计时到点即隐藏, 暂停时同样隐藏
-/// (media_kit material_desktop.dart onHover/onEnter 的 controlsHoverDuration
-/// 语义)。在此基础上的项目层优化:
+/// 隐藏与播放状态**无关** — 静置 (hover 离开/不响应区) 计时到点即隐藏,
+/// 暂停时同样隐藏 (桌面播放器通行交互)。在此基础上的项目层优化:
 /// - [modalOpen]: 模态窗口 (设置/菜单) 开启期间冻结隐藏计时, 关窗重新计时
 /// - [_activeInteractionCount]: 进度条/滑块拖拽等交互会话保持显示
 /// - resizing 冻结; hover 节流; popup 关闭通知
@@ -24,7 +22,7 @@ class AutoHideController {
   }) {
     _animController = AnimationController(
       vsync: vsync,
-      // 对齐 media_kit 原生 150ms 控件淡入淡出(原 durationFade=400ms 偏慢)
+      // 150ms 控件淡入淡出(原 durationFade=400ms 偏慢)
       duration: const Duration(milliseconds: Tokens.durationControlsFade),
       value: 1,
     );
@@ -94,8 +92,8 @@ class AutoHideController {
     _animController.forward();
   }
 
-  /// 隐藏控制栏（带动画，resize/模态窗口/钉住中不隐藏 — 对齐 media_kit 原生:
-  /// 暂停状态同样可隐藏).
+  /// 隐藏控制栏（带动画，resize/模态窗口/钉住中不隐藏;
+  /// 暂停状态同样可隐藏）.
   void hide() {
     // 将 resize/modal/pinned gate 放在最终状态转换处：已进入事件队列的旧 Timer 回调
     // 即使无法再被 cancel，也不能在会话内启动淡出动画。
@@ -114,7 +112,7 @@ class AutoHideController {
 
   /// 取消旧 Timer 再设新的，避免多次鼠标移动导致 Timer 堆积。
   ///
-  /// 对齐 media_kit 原生: 隐藏与播放状态无关 — 未 resize、无模态窗口、
+  /// 隐藏与播放状态无关 — 未 resize、无模态窗口、
   /// 无活跃子控件交互时计时隐藏。
   void scheduleHide() {
     _hideTimer?.cancel();
@@ -133,8 +131,8 @@ class AutoHideController {
   /// (打开文件/播放列表/设置/全屏), 不参与自动隐藏; 置回 false 恢复
   /// 既有静置计时策略.
   ///
-  /// 特例声明: media_kit 原生交互无"空置态"概念 (空置页是项目自有的
-  /// empty state), 本钉住语义不违背播放中的"状态无关隐藏"对齐原则.
+  /// 特例声明: 空置页是项目自有的 empty state, 本钉住语义不违背播放中的
+  /// "状态无关隐藏"原则.
   set pinned(bool value) {
     if (_pinned == value) return;
     _pinned = value;
@@ -171,8 +169,8 @@ class AutoHideController {
     }
   }
 
-  /// 鼠标移动（节流 100ms，基于事件时间戳 — 热路径零分配）— 对齐 media_kit
-  /// 原生: 暂停时 hover 同样唤起.
+  /// 鼠标移动（节流 100ms，基于事件时间戳 — 热路径零分配）—
+  /// 暂停时 hover 同样唤起.
   void onMouseMove(Duration eventTimeStamp) {
     if (_resizing) return;
     final last = _lastHoverTimeStamp;
@@ -193,7 +191,7 @@ class AutoHideController {
     scheduleHide();
   }
 
-  /// 鼠标离开 — 静置计时隐藏 (对齐 media_kit 原生, 状态无关).
+  /// 鼠标离开 — 静置计时隐藏 (状态无关).
   void onMouseExit() {
     _hovering = false;
     scheduleHide();
@@ -201,7 +199,7 @@ class AutoHideController {
 
   /// isPlaying 变化处理 — 由 [_isPlaying] listener 自动触发。
   ///
-  /// 对齐 media_kit 原生: 状态切换瞬间唤起控件 (暂停/恢复同理), 之后
+  /// 状态切换瞬间唤起控件 (暂停/恢复同理), 之后
   /// 静置照常计时隐藏 — 无"非 playing 永显"特例。
   void _onPlayingChanged() {
     _activeInteractionCount = 0;
@@ -230,14 +228,14 @@ class AutoHideController {
 
   /// 用户开始拖动进度条 — 显示控件并冻结隐藏计时(seek 期间不隐藏).
   ///
-  /// 对齐 media_kit 原生 onSeekStart，并复用统一交互会话以保证其他子控件
+  /// 复用统一交互会话以保证其他子控件
   /// 同时交互时也不会提前恢复自动隐藏。
   void onSeekStart() => onInteractionStart();
 
   /// 用户结束拖动进度条 — 在最后一个活跃交互结束后重启隐藏计时。
   void onSeekEnd() => onInteractionEnd();
 
-  /// 初始状态：显示控制栏并启动自动隐藏计时 (状态无关, 对齐 media_kit 原生).
+  /// 初始状态：显示控制栏并启动自动隐藏计时 (状态无关).
   void init() {
     visible.value = true;
     _animController.value = 1;

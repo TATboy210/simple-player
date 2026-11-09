@@ -13,7 +13,7 @@
 /// - 本文件同时承担 View 和部分 ViewModel 职责（历史遗留，后续重构目标）
 ///
 /// 架构位置：App → **PlayerFeature** → PlayerScreen（启动链两层直挂，见 app.dart）
-/// 依赖链：PlayerFeature → PlayerServices → PlaybackController → MediaKitEngine
+/// 依赖链：PlayerFeature → PlayerServices → PlaybackController → MpvKitEngine
 library;
 
 import 'dart:async' show unawaited;

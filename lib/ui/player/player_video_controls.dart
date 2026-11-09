@@ -30,34 +30,28 @@ import '../shared/secondary_surface_visibility.dart';
 import 'workspace_focus_scope.dart';
 import '../dialogs/settings/settings_panel_session.dart';
 
-/// 路径B 控制栏 widget — 数据源直连 media_kit [PlayerPort].
+/// 控制层 widget — 数据源直连视频控制端口 [VideoControlsPort].
 ///
 /// 控制层由 Stack 组合空状态、控制栏、错误提示和鼠标唤起区域:
 /// - 播放/位置/时长/倍速(读): [PlayerControlsState] 订阅 `player.stream`
 /// - 播放/暂停、快退、快进(写): 经 [PlayerActions] 进入 PlaybackController 门面
-/// - 进度条 seek/倍速(写): 经 [PlayerPort] 直写 `player`，保留低延迟精细交互
+/// - 进度条 seek/倍速(写): 经端口直写 `player`，保留低延迟精细交互
 /// - 音量/静音(读写): 走 [MediaEngine] 单一数据源(感知曲线 + 原生静音,
 ///   v0.0.8.1 — 双源线性换算会使滑条漂移到 mpv 立方空间)
 /// - isFullscreen: 由 [WindowMode] 单一数据源驱动(图标/auto-hide/cursor/
-///   ESC)。不再读 route 本地 [VideoState.isFullscreen] — media_kit 在全屏
-///   期间把窗口态 VideoState 的 context 换成 route context(窗口态实例读
-///   true),退出后 refreshView 为空实现且参数相等抑制重建,notifier 永不
-///   同步回 false(按钮图标卡死根因)。
+///   ESC)，全屏由窗口模式驱动原生窗口，无独立 route。
 ///
-/// 阶段2 适配 route 约束(修实机 3 bug):
+/// 设计要点:
 /// - **AutoHide 改 isPlaying**:[PlayerControlsState.isPlaying] 驱动,静置照常隐藏
 ///   (v0.0.6 追加 pinned 语义: 空置态钉住常显, 见 [_syncAutoHidePinned])
-/// - **删 visibleSink 跨层**:字幕 padding 由本控件监听 [_autoHide.visible] 调
-///   `widget.video.setSubtitleViewPadding`(每实例调自己 VideoState,修"自动隐藏
-///   失效"根因 — 旧路径 PlayerScreen 用窗口态 _videoKey,全屏 route 调错对象)
+/// - **字幕 padding**:由本控件监听 [_autoHide.visible] 调
+///   `widget.video.setSubtitleViewPadding`，控制栏显隐时字幕上下避让
 /// - **键盘住进 controls**:[Focus] + autofocus + onKeyEvent 最小集(ESC/F/Space/
-///   方向键),全屏 route 复制 builder 时自动携带(修"退出 deactivated" — 旧路径
-///   KeyboardHandler 在 builder 外不进 route)
-/// - **MouseRegion cursor**:全屏 + 控件隐藏 → none(沉浸),替代旧 PlayerScreen
-///   _controlsVisible 跨层驱动
+///   方向键)
+/// - **MouseRegion cursor**:全屏 + 控件隐藏 → none(沉浸)
 class PlayerVideoControls extends StatefulWidget {
-  /// 当前 route 的视频控制端口；生产环境由 [MediaKitVideoControlsPort] 包装
-  /// media_kit [VideoState]，测试可注入不加载原生库的 fake。
+  /// 视频控制端口；生产环境为 [MpvKitVideoControlsPort]，
+  /// 测试可注入不加载原生库的 fake。
   final VideoControlsPort video;
 
   final MediaEngine engine;
@@ -80,9 +74,8 @@ class PlayerVideoControls extends StatefulWidget {
 
   /// 播放列表面板可见性 (v0.0.5) — 宿主持有的共享 notifier.
   ///
-  /// 面板住进 controls builder:media_kit 全屏 route 复制 builder 时自动
-  /// 携带本控件 → 面板全屏可见(与控制栏同机制);共享同一 notifier 使
-  /// 窗口态/全屏两实例状态同步。null 时面板整体不挂载(测试退路).
+  /// 面板住进控制层，与控制栏同机制随窗口/全屏显示;
+  /// null 时面板整体不挂载(测试退路).
   final ValueNotifier<bool>? playlistVisible;
 
   /// 播放列表协调器 — 面板数据源与动作入口。null 时面板不挂载.
@@ -209,9 +202,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 控件创建后读取一次的字幕基础 padding，避免 activate 重复叠加自身 inset。
   EdgeInsets? _subtitleBasePadding;
 
-  /// 最近一次应用到 VideoState 的字幕 padding — 值未变化时跳过
-  /// setSubtitleViewPadding (v0.0.6.1: 显隐翻转高频触发的空写守卫,
-  /// 避免 media_kit 内部 notifier 无谓通知).
+  /// 最近一次应用到视频端口的字幕 padding — 值未变化时跳过
+  /// setSubtitleViewPadding (v0.0.6.1: 显隐翻转高频触发的空写守卫).
   EdgeInsets? _lastAppliedSubtitlePadding;
 
   /// 控制栏可见时为字幕预留的底部安全区。
@@ -225,7 +217,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   /// 切换时 notifier identity 会被保留，因此无需随每次 stream 更新重建。
   late ControlBarViewModel _controlBarViewModel;
 
-  /// 对齐 media_kit 原生 onTapUp 400ms 双击窗口。
+  /// 单击/双击判定窗口 400ms。
   static const _clickDelayMs = 400;
 
   /// 切换全屏 — 双击与全屏按钮共用入口。
@@ -243,12 +235,8 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     widget.video.toggleFullscreen();
   }
 
-  /// 阶段2:字幕 padding 自驱 — 监听 [_autoHide.visible] 调本实例 VideoState.
-  ///
-  /// 修"自动隐藏失效"根因:旧路径 PlayerScreen._onControlsVisibleChanged 用窗口态
-  /// `_videoKey.currentState` 调 setSubtitleViewPadding,全屏 route 时全屏 VideoState
-  /// 是另一实例,padding 调错对象 → 字幕被控制栏遮挡/控件隐藏字幕不动。本控件每实例
-  /// 监听自己 _autoHide.visible,调 `widget.video`(本实例)→ 双实例各自正确。
+  /// 字幕 padding 自驱 — 监听 [_autoHide.visible] 调 `widget.video`，
+  /// 控制栏显示时字幕上移避让、隐藏时恢复。
   void _scheduleSubtitlePaddingSync() {
     if (_subtitleSyncScheduled || _isDeactivating || !mounted) return;
     // 空闲阶段没有正在进行的 widget build，可立即同步，保持 stream 事件的
@@ -266,13 +254,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   }
 
   void _syncSubtitlePadding() {
-    // 阶段3:退出全屏 route pop(Duration.zero) 后,全屏 VideoState deactivate/dispose。
-    // post-frame callback(line 413) 或 _autoHide.visible listener 可能在本控件
-    // 失效后触发本方法,调用已 deactivate 的 widget.video.setSubtitleViewPadding
-    // 会更新 media_kit _videoViewParametersNotifier → 触发全屏 Video rebuild →
-    // 查已 deactivate 的 InheritedWidget ancestor → "deactivated widget's
-    // ancestor" 断言(framework.dart:6417)。mounted 挡本控件 dispose 后;
-    // widget.video.isMounted 挡全屏 VideoState dispose 后。
+    // post-frame callback 或 _autoHide.visible listener 可能在本控件失效后
+    // 触发本方法;对已 deactivate 的端口写 padding 会触发"deactivated widget's
+    // ancestor"断言(framework.dart:6417)。mounted 挡本控件 dispose 后;
+    // widget.video.isMounted 挡视频端口已卸载后。
     // _isDeactivating 覆盖 State 仍 mounted 但 Element 已 inactive 的窗口，
     // 也能拦截不可取消的 post-frame callback。
     if (_isDeactivating || !mounted || !widget.video.isMounted) return;
@@ -283,8 +268,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     final padding = _autoHide.visible.value
         ? base + _subtitleControlBarInset
         : base;
-    // 空写守卫 — 与上次应用值相同则跳过 (media_kit 内部按值通知, 跳过
-    // 即省一次 SubtitleView 状态通知).
+    // 空写守卫 — 与上次应用值相同则跳过, 省一次无谓的字幕视图通知.
     if (padding == _lastAppliedSubtitlePadding) return;
     _lastAppliedSubtitlePadding = padding;
     videoState.setSubtitleViewPadding(padding);
@@ -363,13 +347,13 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   }
 
   /// Route-local ESC command: cancel menu, notify host, then guard video exit.
-  /// Window mode remains authoritative across media_kit context exchanges.
+  /// Window mode remains authoritative for the fullscreen state.
   bool _exitFullscreen() {
     if (!widget.windowMode.value.isFullscreen) return false;
     widget.menuSession?.cancel();
     if (_isDeactivating || !mounted || !widget.video.isMounted) return false;
     widget.actions.onToggleFullscreen?.call();
-    // Host callbacks may synchronously deactivate this route or its VideoState.
+    // Host callbacks may synchronously deactivate this control layer or its video port.
     if (mounted && !_isDeactivating && widget.video.isMounted) {
       widget.video.exitFullscreen();
     }
@@ -386,8 +370,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _isIdleNotifier = ValueNotifier<bool>(
       widget.engine.state.value == MediaState.idle,
     );
-    // 单一数据源:初始值与后续变化都来自 windowMode,不读 route 本地
-    // VideoState.isFullscreen(会被 media_kit context 交换污染)。
+    // 单一数据源:初始值与后续变化都来自 windowMode。
     _isFullscreenNotifier = ValueNotifier<bool>(
       widget.windowMode.value.isFullscreen,
     );
@@ -419,16 +402,14 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // CB-06: 防御性同步 — widget 创建时 resizing 可能已为 true
     if (widget.resizing?.value == true) _onResizeChanged();
 
-    // 阶段2:字幕 padding 自驱(每实例调自己 VideoState)。post-frame 确保
-    // widget.video 已挂载(setSubtitleViewPadding 需 VideoState 已构建)。
+    // 字幕 padding 自驱。post-frame 确保 widget.video 已挂载
+    // (setSubtitleViewPadding 需端口已构建)。
     _scheduleSubtitlePaddingSync();
   }
 
   /// 由 [WindowMode] 同步全屏派生状态(图标/auto-hide/过渡标记)。
   ///
-  /// 替代旧的 route 本地 VideoState.isFullscreen 现取:mode 由每条进出全屏
-  /// 路径的 setMode 提交,窗口态实例在全屏期间不会被 context 交换污染,
-  /// 退出后必然同步回 false(修按钮图标卡死)。
+  /// mode 由每条进出全屏路径的 setMode 提交,退出后必然同步回 false。
   void _syncModeFullscreen() {
     final fs = widget.windowMode.value.isFullscreen;
     if (_isFullscreenNotifier.value != fs) widget.menuSession?.cancel();
@@ -649,11 +630,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // didUpdateWidget/build 检查 flag 跳过 port 状态读取。本控件不 reparent,
     // 无需 activate 重置。
     //
-    // 全屏状态改由 windowMode 单一数据源驱动(C2):不再在此读
-    // route 本地 VideoState.isFullscreen — media_kit 全屏期间把窗口态
-    // VideoState 的 context 换成 route context(窗口态实例读 true),退出
-    // 后 refreshView 为空实现且 VideoViewParameters 相等抑制重建,旧路径
-    // 图标永不同步回(false 卡死根因,见类注释)。mode 由每条进出全屏路径
+    // 全屏状态由 windowMode 单一数据源驱动(C2):mode 由每条进出全屏路径
     // 的 setMode 提交,经 _syncModeFullscreen(亦由 windowMode 监听直驱)
     // 同步图标 + AutoHide + 过渡标记。
     if (!_isDeactivating) {
@@ -664,16 +641,16 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
         oldWidget.video != widget.video || oldWidget.engine != widget.engine;
     if (sourceChanged) {
       _controlsState.updateSources(widget.video.player, engine: widget.engine);
-      // 只有 VideoState 更换时基础 padding 才失效；仅替换 engine 时，
+      // 只有视频端口更换时基础 padding 才失效；仅替换 engine 时，
       // 复用同一视频端口可避免把已加过的 control bar inset 再次当作基础值。
       if (oldWidget.video != widget.video) {
         _subtitleBasePadding = null;
-        // 新 VideoState 必须至少收到一次写入 — 空写守卫一并失效.
+        // 新端口必须至少收到一次写入 — 空写守卫一并失效.
         _lastAppliedSubtitlePadding = null;
       }
       // active replacement 不一定伴随可见性、resize 或 engine 状态变化，
-      // 因此必须立即把当前控制栏可见性同步到新的 VideoState；inactive 阶段
-      // 则延迟到 activate，避免访问已经脱离祖先树的 media_kit 状态。
+      // 因此必须立即把当前控制栏可见性同步到新端口；inactive 阶段
+      // 则延迟到 activate，避免访问已经脱离祖先树的端口状态。
       if (!_isDeactivating) _scheduleSubtitlePaddingSync();
     }
     // engine 更换时迁移状态监听，并同步局部 idle 信号，避免沿用旧引擎状态。
@@ -764,12 +741,11 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
   void deactivate() {
     _isDeactivating =
         true; // 阶段3 bug1:标记 inactive,挡后续 didUpdateWidget/build 查 ancestor
-    // 阶段3:deactivate 即断开外部 listener — 退出全屏 route pop(Duration.zero)
-    // 后全屏 VideoState 即将 deactivate,但 _autoHide 的 _hideTimer/_animController
+    // deactivate 即断开外部 listener — _autoHide 的 _hideTimer/_animController
     // 在 deactivate→dispose 之间仍可能触发 visible 变化(playing 态 Timer / stream
     // isPlaying 推送 / resize 信号),经 _autoHide.visible listener 触发
     // _syncSubtitlePadding 调已 deactivate 的 widget.video.setSubtitleViewPadding
-    // → media_kit 查 deactivated ancestor 断言。dispose 太晚(Timer/动画仍跑),
+    // → 查 deactivated ancestor 断言。dispose 太晚(Timer/动画仍跑),
     // 须在此断开。dispose 内 removeListener 幂等保留(remove 已移除的 listener 是
     // no-op)。reparent 场景由 activate() 统一恢复，避免 inactive 期间重复注册。
     _detachLifecycleListeners();
@@ -785,7 +761,7 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     _isIdleNotifier.value = widget.engine.state.value == MediaState.idle;
     // engine 实例可能被替换 (测试) — 新引擎的空置态重新判定钉住 (v0.0.6).
     _syncAutoHidePinned();
-    // activate 视为新的写入契约起点 (reparent 后 VideoState 可能是全新实例,
+    // activate 视为新的写入契约起点 (reparent 后端口状态可能是全新实例,
     // 必须至少收到一次当前安全区) — 空写守卫复位, 允许一次值相同的重放.
     _lastAppliedSubtitlePadding = null;
     _scheduleSubtitlePaddingSync();

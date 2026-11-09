@@ -23,7 +23,7 @@ const List<OpenSourceComponent> kOpenSourceComponents = [
   // ── 引擎与解码 — 随附二进制，LGPL 动态链接（见 NOTICE）──
   (name: 'mpv · libmpv', license: 'LGPL-2.1-or-later'),
   (name: 'FFmpeg', license: 'LGPL-2.1-or-later'),
-  (name: 'media_kit', license: 'MIT'),
+  (name: 'mpv_kit', license: 'MIT'),
   // ── 框架与语言 ──
   (name: 'Flutter', license: 'BSD-3-Clause'),
   (name: 'Dart', license: 'BSD-3-Clause'),

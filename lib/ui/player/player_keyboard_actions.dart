@@ -13,7 +13,7 @@ import 'workspace_menu_session.dart';
 /// 构造播放器键盘处理器 — 绑定 20+ 快捷键到项目动作与引擎能力。
 ///
 /// 播放/暂停、快退与快进统一复用稳定的 [actions]，确保窗口态与
-/// media_kit fullscreen route 内控制栏使用同一命令入口。音量、字幕等非基础播放操作
+/// 全屏态控制栏使用同一命令入口。音量、字幕等非基础播放操作
 /// 仍按原路径使用 [engine]，不改变现有交互语义。
 ///
 /// F 键全屏: actions.onToggleFullscreen 经 WindowService.setMode 切原生全屏,

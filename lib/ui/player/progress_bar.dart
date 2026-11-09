@@ -77,8 +77,8 @@ class _ProgressBarState extends State<ProgressBar>
   late _MergedListenable _barPaintListenable;
   Timer? _seekThrottle;
   // 修 C (事件驱动 v2): dragEnd 后监听 position 到达目标才清 drag, 替代 v1 固定
-  // 300ms 定时器. 比 media_kit_control_bar 原生内部协调更贴近 — 不依赖固定
-  // 延迟, 网络流/慢 seek 下不回跳. 加超时兜底防 seek 失败永久卡住.
+  // 300ms 定时器. 不依赖固定延迟, 网络流/慢 seek 下不回跳.
+  // 加超时兜底防 seek 失败永久卡住.
   VoidCallback? _seekHoldListener;
   int? _seekTargetMs;
   Timer? _seekHoldTimer; // 超时兜底: position 未到达时强制清

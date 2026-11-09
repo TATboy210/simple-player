@@ -14,7 +14,7 @@
 ///    - 例如：拖动 brightness 时不会重复设置 contrast/saturation/hue
 ///
 /// 架构位置：VideoProcessingService → **VideoProcessingState** → EngineState
-/// 数据流：UI 滑块 → updateBrightness() → copyWith → ValueNotifier → _syncEngine → MediaKitEngine
+/// 数据流：UI 滑块 → updateBrightness() → copyWith → ValueNotifier → _syncEngine → MpvKitEngine
 library;
 
 import 'package:flutter/foundation.dart';

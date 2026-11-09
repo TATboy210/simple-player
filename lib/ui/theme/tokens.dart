@@ -6,7 +6,7 @@ class Tokens {
 
   static const bgDeep = Color(0xFF060810); // 最深背景 - 加深
   static const bgBase = Color(0xFF0C0F18); // 加深
-  /// 视频面底色 — 纯黑, 与 media_kit Video 默认底色一致 (letterbox 黑边).
+  /// 视频面底色 — 纯黑 (letterbox 黑边).
   static const bgVideo = Color(0xFF000000);
   static const bgHover = Color(0xFF283045); // hover 高亮
   static const bgGlass = Color(0x8C0C0F18); // 加深
@@ -156,12 +156,12 @@ class Tokens {
   static const durationFast = 80;
   static const durationNormal = 150;
   static const durationFade = 400;
-  // auto-hide 控件淡入淡出专用 — 对齐 media_kit 原生 150ms(独立于
+  // auto-hide 控件淡入淡出专用 — 150ms(独立于
   // durationFade=400,后者驱动 center_controls 中心播放/暂停图标,隔离影响)
   static const durationControlsFade = 150;
 
   // ── 自动隐藏 ──
-  // 窗口/全屏统一 3s — 对齐 media_kit 原生隐藏延迟(原 windowed=5s 偏长)
+  // 窗口/全屏统一 3s (原 windowed=5s 偏长)
   static const hideDelayWindowed = 3;
   static const hideDelayFullscreen = 3;
 
@@ -220,7 +220,7 @@ class Tokens {
   static const int progressSeekThrottleMs = 150;
 
   /// 修 C (事件驱动 v2): position 到达 seek 目标的容差 — 容差内视为 seek 完成, 清 drag.
-  /// 比 v1 固定 300ms 定时器更贴近 media_kit_control_bar 原生内部协调, 网络流/慢 seek 不回跳.
+  /// 比 v1 固定 300ms 定时器更稳, 网络流/慢 seek 不回跳.
   static const int progressSeekArriveToleranceMs = 500;
 
   /// 修 C (事件驱动 v2): seek 超时兜底 — position 一直未到达 (seek 失败/极慢) 时强制清 drag,
