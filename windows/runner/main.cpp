@@ -14,6 +14,19 @@
 // WindowService 以隐藏态完成几何恢复，组合根在首帧栅格化后 reveal 亮窗
 // （v0.0.4 空白窗口修复，详见 main.dart）。
 
+namespace
+{
+// 环境变量恰为 "1" 时返回 true（未设置、空值、其他值均为 false）。
+// 用于 A/B 开关：环境变量零污染 Dart 入口参数流，同一产物即可双路径对比。
+bool IsEnvFlagSet(const wchar_t *name)
+{
+  // 缓冲区只容 1 个字符 + NUL：返回值恰为 1 才说明值长度为 1（更长的值
+  // 会返回所需缓冲区大小 > 2，未设置返回 0）。
+  wchar_t value[2] = {0};
+  return ::GetEnvironmentVariableW(name, value, 2) == 1 && value[0] == L'1';
+}
+} // namespace
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
@@ -30,13 +43,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   flutter::DartProject project(L"data");
 
-  // UI isolate 保持 Flutter 默认的独立线程（2026-10 nativeapi 0.5.10）。
-  // nativeapi 0.5.3 起把 Windows 窗口观察（WinEvent 钩子与子类化）安装到
-  // 窗口所属线程，默认线程策略的 Flutter 应用仍能收到焦点/生命周期/几何
-  // 事件；窗口状态调用从 UI isolate 发出时会自行 marshal 到窗口线程，因此
-  // 不再需要把 UI isolate 合并进 platform 线程。IME 桥继续经
-  // SendMessageTimeoutW 投递消息，与 Dart 线程模型无关。
-  project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
+  // UI isolate 线程策略（2026-10 nativeapi 0.5.10；2026-11 加 A/B 开关）。
+  // 默认保持独立线程：nativeapi 0.5.3 起把 Windows 窗口观察（WinEvent 钩子
+  // 与子类化）安装到窗口所属线程，独立线程下仍能收到焦点/生命周期/几何
+  // 事件；窗口状态调用从 UI isolate 发出时会自行 marshal 到窗口线程。IME 桥
+  // 经 SendMessageTimeoutW 投递消息，与 Dart 线程模型无关。
+  // 副作用：引擎启动会打 "Running with unmerged platform and UI threads"
+  // 警告（Flutter 计划移除不合并选项，仅日志，无功能影响）。
+  // SIMPLER_PLAYER_MERGE_THREADS=1 → 把 UI isolate 合并进平台线程，供与默认
+  // 做 resize 帧时序/全屏/IME 的 A/B 对比；确认无退化后再翻转默认并删除开关。
+  // 注意：UIThreadPolicy::Default 目前等同独立线程，不是合并 —— 想消除警告
+  // 必须显式 RunOnPlatformThread，单纯删掉这行 set 不会生效。
+  project.set_ui_thread_policy(IsEnvFlagSet(L"SIMPLER_PLAYER_MERGE_THREADS")
+                                   ? flutter::UIThreadPolicy::RunOnPlatformThread
+                                   : flutter::UIThreadPolicy::RunOnSeparateThread);
 
   // 渲染后端（2026-11-07 A/B 裁决，数据见 docs/audit/glass-perf-ab.md）：
   // 默认锁 Skia——Flutter 3.47 Windows 的 Impeller（经 ANGLE 走 GLES）在窗口
@@ -44,12 +64,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // SIMPLER_PLAYER_FORCE_IMPELLER=1 → 回到 SDK 默认（Impeller），供复测对比。
   // 用环境变量而非命令行 flag——命令行参数会经 set_dart_entrypoint_arguments
   // 混入 Dart 入口参数流；环境变量零污染，同一产物即可双后端对比。
-  wchar_t force_impeller[2] = {0};
-  const bool use_impeller =
-      ::GetEnvironmentVariableW(L"SIMPLER_PLAYER_FORCE_IMPELLER", force_impeller,
-                                2) == 1 &&
-      force_impeller[0] == L'1';
-  if (!use_impeller)
+  if (!IsEnvFlagSet(L"SIMPLER_PLAYER_FORCE_IMPELLER"))
   {
     project.set_impeller_switch(flutter::ImpellerSwitch::Disabled);
   }
