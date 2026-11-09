@@ -10,6 +10,9 @@ import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/secondary_surface.dart';
 import '../shared/osd_overlay.dart';
+import 'error_card_header.dart';
+import 'error_card_message.dart';
+import 'error_card_sections.dart';
 import '../theme/tokens.dart';
 
 /// 错误卡片 — 折叠摘要 + 展开详情的纯呈现 widget（CARD-03/D-03/D-04）。
@@ -82,19 +85,6 @@ class _ErrorCardState extends State<ErrorCard> {
   /// 折叠/展开状态 —— 整卡点击切换（D-04），卡片内部状态即可，无新状态库。
   bool _expanded = false;
 
-  /// 等宽字体诊断文本样式 —— 源码行/调用栈段共享（terminal 语义）。
-  static const _monoStyle = TextStyle(
-    color: Tokens.textPrimary,
-    fontSize: Tokens.fontCaption,
-    fontFamily: Tokens.fontFamilyMono,
-  );
-
-  /// 次要信息文本样式 —— 日志路径/时间戳段共享。
-  static const _secondaryStyle = TextStyle(
-    color: Tokens.textSecondary,
-    fontSize: Tokens.fontCaption,
-  );
-
   /// 整卡点击切换折叠态（D-04）。
   void _toggle() => setState(() => _expanded = !_expanded);
 
@@ -117,38 +107,6 @@ class _ErrorCardState extends State<ErrorCard> {
     ErrorSeverity.fatal => Tokens.dangerFatal,
   };
 
-  /// l10nKey → AppLocalizations 查找，未知键 fallback 到原始 message（MIG-01
-  /// 迁移基线 —— 与旧横幅（legacy banner，03-04 已删除）的 13 key 枚举逐项
-  /// 一致，D-09 明确**不**迁移其动作按钮 switch）。
-  ///
-  /// ErrorReport 不携带 PlayerError 对象，只携带 intake 快照的
-  /// `playerErrorCode`（`file:fileNotFound` 形态）——先还原为与旧横幅同构的
-  /// `error.file.fileNotFound` 键，再走完全一致的 switch，保证旧横幅删除后
-  /// 零解析能力缺口。非 player 来源（无 code）直接用 raw
-  /// message（全局钩子错误的 message 本身可读）。
-  String _resolveMessage(AppLocalizations l10n, ErrorReport report) {
-    final code = report.playerErrorCode;
-    if (code == null) return report.message;
-    // 'file:fileNotFound' → 'error.file.fileNotFound'（unknown → error.unknown）。
-    final l10nKey = 'error.${code.replaceFirst(':', '.')}';
-    return switch (l10nKey) {
-      'error.file.pathEmpty' => l10n.errorFilePathEmpty,
-      'error.file.fileNotFound' => l10n.errorFileNotFound,
-      'error.file.pathTraversal' => l10n.errorFilepathTraversal,
-      'error.codec.unsupportedFormat' => l10n.errorCodecUnsupportedFormat,
-      'error.codec.decodeFailed' => l10n.errorCodecDecodeFailed,
-      'error.codec.codecUnsupported' => l10n.errorCodecCodecUnsupported,
-      'error.playback.playFailed' => l10n.errorPlaybackPlayFailed,
-      'error.playback.seekFailed' => l10n.errorPlaybackSeekFailed,
-      'error.playback.textureFailed' => l10n.errorPlaybackTextureFailed,
-      'error.playback.openTimeout' => l10n.errorPlaybackOpenTimeout,
-      'error.network.timeout' => l10n.errorNetworkTimeout,
-      'error.network.connectionLost' => l10n.errorNetworkConnectionLost,
-      'error.unknown' => l10n.errorUnknown,
-      _ => report.message, // fallback: 未知 l10nKey 用原始消息
-    };
-  }
-
   /// Phase 2 契约：diagnosticLogPath 是 `ValueListenable<String?>`，展开区取
   /// 当前值渲染；reporter 未初始化（纯卡片单测）或未配置 sink 时为 null，
   /// 由调用方降级为 errorCardLogUnavailable 文案。
@@ -156,6 +114,9 @@ class _ErrorCardState extends State<ErrorCard> {
     if (!ErrorReporterImpl.isInitialized) return null;
     return ErrorReporterImpl.I.diagnosticLogPath?.value;
   }
+
+  /// 借用的反馈服务 — 缺省为生产单例.
+  OsdService get _osd => widget.osdService ?? OsdService.I;
 
   /// CARD-04/D-06 一键复制诊断包 —— 格式一律走
   /// [formatDiagnosticPack]（LOG-05 单一来源，F11 用户裁决 2026-10-09 契约
@@ -180,44 +141,41 @@ class _ErrorCardState extends State<ErrorCard> {
     );
     try {
       await Clipboard.setData(ClipboardData(text: pack));
-      (widget.osdService ?? OsdService.I).show(
+      _osd.show(
         l10n.errorCardCopiedPathInLog,
         icon: Icons.check,
         priority: OsdPriority.success,
       );
     } on PlatformException catch (error) {
       _showCopyFailed(l10n);
-      // PlatformException 属可恢复运行期故障：结构化 warn 供日志回溯
-      // （kernel 红线内 UI 层允许 debugPrint，但结构化日志优先）。
-      // WR-02/CARD-04：KernelLogger.I 在未 init 时抛 StateError —— 失败
-      // 隔离路径不得自己先炸，先用 isInitialized 探针守卫。
-      if (KernelLoggerImpl.isInitialized) {
-        KernelLogger.I.w(
-          'clipboard copy failed',
-          context: {'code': error.code, 'message': error.message},
-        );
-      }
+      // PlatformException 属可恢复运行期故障：结构化 warn 供日志回溯。
+      _logCopyWarning('clipboard copy failed', {
+        'code': error.code,
+        'message': error.message,
+      });
     } on MissingPluginException catch (error) {
       // 防御分支：Clipboard 走 OptionalMethodChannel，其 invokeMethod 已在
       // 内部吞掉 MissingPluginException（测试环境未 mock 的 send 更是永不
       // 完成）—— 此 catch 正常不可触达，保留以对冲 channel 实现变化。
       _showCopyFailed(l10n);
-      assert(() {
-        // 同 WR-02：assert 内的日志调用同样不得在未 init 时抛错。
-        if (KernelLoggerImpl.isInitialized) {
-          KernelLogger.I.w(
-            'clipboard channel unavailable (MissingPluginException)',
-            context: {'error': error.toString()},
-          );
-        }
-        return true;
-      }());
+      _logCopyWarning(
+        'clipboard channel unavailable (MissingPluginException)',
+        {'error': error.toString()},
+      );
+    }
+  }
+
+  /// 复制失败的结构化 warn — WR-02/CARD-04：KernelLogger.I 在未 init 时抛
+  /// StateError，失败隔离路径不得自己先炸，先用 isInitialized 探针守卫.
+  void _logCopyWarning(String message, Map<String, Object?> context) {
+    if (KernelLoggerImpl.isInitialized) {
+      KernelLogger.I.w(message, context: context);
     }
   }
 
   /// 复制失败两态共用的 OSD 反馈（D-06「复制失败」pill）。
   void _showCopyFailed(AppLocalizations l10n) {
-    (widget.osdService ?? OsdService.I).show(
+    _osd.show(
       l10n.errorCardCopyFailed,
       icon: Icons.error_outline,
       priority: OsdPriority.failure,
@@ -229,7 +187,6 @@ class _ErrorCardState extends State<ErrorCard> {
     final l10n = AppLocalizations.of(context);
     final report = widget.report;
     final severityColor = _severityColor(report.severity);
-    final basename = _displayMediaPath(report.mediaPath);
 
     // One outer scroll owns both full summary and diagnostics; action row stays
     // before the message so long text cannot bury copy/log/close controls.
@@ -237,149 +194,29 @@ class _ErrorCardState extends State<ErrorCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 严重级色点 —— 语义色随 severity 分层（D-03）；v0.0.4 加同色
-            // 辉光（6px blur），让状态色从玻璃底上"点亮"而非平涂；
-            // message 一律纯文本渲染，无富文本解析。
-            Container(
-              width: Tokens.spSm,
-              height: Tokens.spSm,
-              decoration: BoxDecoration(
-                color: severityColor,
-                shape: BoxShape.circle,
-                // Flat semantic dot: secondary surfaces have no optical glow.
-              ),
-            ),
-            const SizedBox(width: Tokens.spSm),
-            // CR-01：挂载层收口到 errorCardExpandedMaxWidth 后，本 Row 的
-            // 可用宽度有界 —— message 必须 Flexible 才能在剩余空间内换行
-            // 省略，否则长消息（自身 320 上限）会把 Row 撑溢出。
-            const SizedBox(width: Tokens.spSm),
-            // D-01/D-11 计数徽标：可点击轮览入口（onBadgeTap 由宿主接线，
-            // 纯视图偏移不消费队列）。GestureDetector 承载，不用 GlassButton
-            // —— 避免 FocusableActionDetector 抢焦点（CARD-01）。
-            Semantics(
-              label: l10n.errorCardCycleTooltip,
-              button: widget.onBadgeTap != null,
-              child: GestureDetector(
-                key: const ValueKey('error-card-badge'),
-                onTap: widget.onBadgeTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Tokens.spSm,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Tokens.surfaceFloating,
-                    borderRadius: BorderRadius.circular(Tokens.radiusBtn),
-                  ),
-                  child: Text(
-                    l10n.errorCardBadgeLabel(widget.totalCount),
-                    style: const TextStyle(
-                      color: Tokens.textSecondary,
-                      fontSize: Tokens.fontCaption,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: Tokens.spSm),
-            // CARD-04 一键复制按钮：GestureDetector（不用 GlassButton ——
-            // 其 FocusableActionDetector 会请求焦点，破坏 CARD-01 零焦点
-            // 抢占）。嵌在整卡 GestureDetector 内层 —— 命中测试天然内层
-            // 优先（点复制不触发展开切换），无需 IgnorePointer。
-            Semantics(
-              label: l10n.errorCardCopyTooltip,
-              button: true,
-              child: GestureDetector(
-                key: const ValueKey('error-card-copy'),
-                onTap: () => unawaited(_copyDiagnosticPack()),
-                child: const Padding(
-                  padding: EdgeInsets.all(Tokens.spXs),
-                  child: Icon(
-                    Icons.copy,
-                    size: Tokens.iconSm,
-                    color: Tokens.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: Tokens.spSm),
-            // E97 打开日志按钮：GestureDetector（不用 GlassButton —— 其
-            // FocusableActionDetector 会请求焦点，破坏 CARD-01 零焦点抢占，
-            // 与 copy/close 同一理由）。嵌在整卡 GestureDetector 内层 ——
-            // 命中测试天然内层优先（点开日志不触发展开切换）。按钮只渲染
-            // 图标，不渲染任何路径文本（T-03-05：完整路径不进可见树）。
-            if (widget.onOpenLog != null)
-              Semantics(
-                label: l10n.errorCardOpenLogTooltip,
-                button: true,
-                child: GestureDetector(
-                  key: const ValueKey('error-card-open-log'),
-                  onTap: widget.onOpenLog,
-                  child: const Padding(
-                    padding: EdgeInsets.all(Tokens.spXs),
-                    child: Icon(
-                      Icons.folder_open,
-                      size: Tokens.iconSm,
-                      color: Tokens.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(width: Tokens.spSm),
-            // D-04 chevron 状态指示（纯指示器，点击切换由整卡 GestureDetector 承担）。
-            Icon(
-              _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-              size: Tokens.iconSm,
-              color: Tokens.textSecondary,
-            ),
-            // CARD-01 手动关闭：GestureDetector + Semantics 语义（不用
-            // GlassButton —— 其 FocusableActionDetector 会请求焦点，破坏
-            // KeyboardHandler 单焦点源假设）。onTap 为 null 时不渲染。
-            if (widget.onClose != null)
-              Semantics(
-                label: l10n.errorCardClose,
-                button: true,
-                child: GestureDetector(
-                  key: const ValueKey('error-card-close'),
-                  onTap: widget.onClose,
-                  child: const Padding(
-                    padding: EdgeInsets.all(Tokens.spXs),
-                    child: Icon(
-                      Icons.close,
-                      size: Tokens.iconSm,
-                      color: Tokens.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        ErrorCardHeader(
+          severityColor: severityColor,
+          totalCount: widget.totalCount,
+          expanded: _expanded,
+          onCopy: () => unawaited(_copyDiagnosticPack()),
+          onBadgeTap: widget.onBadgeTap,
+          onOpenLog: widget.onOpenLog,
+          onClose: widget.onClose,
         ),
+        // message 一律纯文本渲染，无富文本解析。
         Text(
-          _resolveMessage(l10n, report),
+          resolveErrorCardMessage(l10n, report),
           softWrap: true,
           style: const TextStyle(
             color: Tokens.textPrimary,
             fontSize: Tokens.fontBody,
           ),
         ),
-        // D-07：折叠区媒体路径只允许 basename 形态（intake 已脱敏 + 防御性截取）。
-        if (basename != null) ...[
-          const SizedBox(height: Tokens.spXs),
-          Text(basename, style: _secondaryStyle),
-        ],
-        // 展开态五段（D-04 Phase 2 诊断包段序），一律纯文本渲染；包在可滚动
-        // 区内 —— 展开高度超出窗口可用空间时滚动而非溢出（A2：栈硬上界
-        // 16384 字符，无需虚拟化）。
+        ..._mediaPathLine(report.mediaPath),
+        // 展开态五段（D-04 Phase 2 诊断包段序）；包在外层可滚动区内 ——
+        // 展开高度超出窗口可用空间时滚动而非溢出.
         if (_expanded)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: _buildExpandedSections(l10n, report),
-          ),
+          ErrorCardExpandedSections(report: report, logPath: _resolveLogPath()),
       ],
     );
 
@@ -397,69 +234,16 @@ class _ErrorCardState extends State<ErrorCard> {
     );
   }
 
-  /// 展开态五段，顺序遵循 D-04 Phase 2 诊断包段序：
-  /// 定位 → 源码行 → 调用栈 → 日志路径 → 重复信息。
-  ///
-  /// location 为 null（D-05 fallback）时定位段降级为 errorCardLocationUnavailable，
-  /// 其余段照常展示 —— 不抛错不缺段；源码行段依赖 location 数据，随之省略。
-  List<Widget> _buildExpandedSections(
-    AppLocalizations l10n,
-    ErrorReport report,
-  ) {
-    final location = report.location;
+  /// D-07：折叠区媒体路径只允许 basename 形态（intake 已脱敏 + 防御性截取）;
+  /// 无路径时返回空列表.
+  List<Widget> _mediaPathLine(String? mediaPath) {
+    final basename = _displayMediaPath(mediaPath);
+    if (basename == null) return const [];
     return [
-      // ① 定位：file:line + 成员名；无项目帧 → 降级文案。
-      _sectionTitle(l10n.errorCardSectionLocation),
-      if (location != null)
-        SelectableText(
-          '${location.primaryFrame.file}:${location.primaryFrame.line}'
-          '  ${location.primaryFrame.member}',
-          style: _monoStyle,
-        )
-      else
-        Text(l10n.errorCardLocationUnavailable, style: _secondaryStyle),
-      // ② 源码行：intake 已格式化为 'lineNumber: text'，逐行原样展示。
-      if (location != null && location.sourceLines.isNotEmpty) ...[
-        _sectionTitle(l10n.errorCardSectionSource),
-        SelectableText(location.sourceLines.join('\n'), style: _monoStyle),
-      ],
-      // ③ 调用栈：rawStackTrace 逐字符原样（terminal 语义，不二次处理）；
-      // 栈硬上界 16384 字符（A2），外层展开区滚动视图足够（IN-02：内层同轴
-      // SingleChildScrollView 恒不可滚且与外层手势冲突，已删除），SelectableText
-      // 附带自由文本选择。
-      _sectionTitle(l10n.errorCardSectionStack),
-      SelectableText(report.rawStackTrace, style: _monoStyle),
-      // ④ 日志路径：diagnosticLogPath 当前值；不可用 → 降级文案。
-      _sectionTitle(l10n.errorCardSectionLogPath),
-      Text(
-        _resolveLogPath() ?? l10n.errorCardLogUnavailable,
-        style: _secondaryStyle,
-      ),
-      // ⑤ 重复信息：出现次数 + 首次/末次时间。
-      _sectionTitle(l10n.errorCardSectionRepeats(report.occurrenceCount)),
-      Text(
-        '${_formatTime(report.firstOccurredAt)} → '
-        '${_formatTime(report.lastOccurredAt)}',
-        style: _secondaryStyle,
-      ),
+      const SizedBox(height: Tokens.spXs),
+      Text(basename, style: errorCardSecondaryStyle),
     ];
   }
-
-  /// 展开区段标题 —— caption 加粗次要色，与内容保持呼吸间距。
-  Widget _sectionTitle(String text) => Padding(
-    padding: const EdgeInsets.only(top: Tokens.spSm, bottom: Tokens.spXs),
-    child: Text(
-      text,
-      style: const TextStyle(
-        color: Tokens.textSecondary,
-        fontSize: Tokens.fontCaption,
-        fontWeight: Tokens.weightMedium,
-      ),
-    ),
-  );
-
-  /// ISO8601 UTC 纯文本时间 —— 与诊断包 formatter 的时区口径一致，确定性可测。
-  String _formatTime(DateTime time) => time.toUtc().toIso8601String();
 
   /// D-07 折叠区媒体路径展示值：只允许 basename。
   ///
