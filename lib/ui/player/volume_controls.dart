@@ -36,33 +36,53 @@ class VolumeButton extends StatefulWidget {
 }
 
 class _VolumeButtonState extends State<VolumeButton> {
+  /// isMuted + volume 合并监听源 — 单一订阅同时服务重建与自动取消静音,
+  /// 取代原先"外层 isMuted VLB → 内层 volume VLB + 独立 volume addListener"
+  /// 的重复订阅. 仅在源身份变化时重建.
+  late Listenable _sources;
+
+  /// 上次观测的音量 — 区分"音量变化"与"静音变化": 自动取消静音只应由
+  /// 音量变化触发 (用户点击静音时音量 > 0 不得被误当拖滑块).
+  double _lastVolume = 0;
+
   @override
   void initState() {
     super.initState();
-    widget.volume.addListener(_onVolumeChanged);
+    _lastVolume = widget.volume.value;
+    _sources = Listenable.merge([widget.isMuted, widget.volume]);
+    _sources.addListener(_onSourceChanged);
   }
 
   @override
   void didUpdateWidget(covariant VolumeButton oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.volume != widget.volume) {
-      oldWidget.volume.removeListener(_onVolumeChanged);
-      widget.volume.addListener(_onVolumeChanged);
+    if (oldWidget.volume != widget.volume ||
+        oldWidget.isMuted != widget.isMuted) {
+      _sources.removeListener(_onSourceChanged);
+      _lastVolume = widget.volume.value;
+      _sources = Listenable.merge([widget.isMuted, widget.volume]);
+      _sources.addListener(_onSourceChanged);
     }
   }
 
   @override
   void dispose() {
-    widget.volume.removeListener(_onVolumeChanged);
+    _sources.removeListener(_onSourceChanged);
     super.dispose();
   }
 
+  /// 任一源变化: 音量变化时先做自动取消静音兜底, 再重建按钮.
+  ///
   /// 静音状态下拖滑块到非零值 → 自动取消静音（UX 便捷操作）。
   /// 引擎侧 setVolume 零边界联动同语义，此处幂等兜底（兼容 FakeEngine）。
-  void _onVolumeChanged() {
-    if (widget.volume.value > 0 && widget.isMuted.value) {
+  void _onSourceChanged() {
+    final volume = widget.volume.value;
+    final volumeChanged = volume != _lastVolume;
+    _lastVolume = volume;
+    if (volumeChanged && volume > 0 && widget.isMuted.value) {
       widget.onToggleMute();
     }
+    if (mounted) setState(() {});
   }
 
   void _toggleMute() {
@@ -79,32 +99,22 @@ class _VolumeButtonState extends State<VolumeButton> {
     }
   }
 
+  /// 图标随音量/静音变化: 静音或 0 → off, <0.5 → down, 否则 up.
+  static IconData _iconFor({required bool muted, required double volume}) {
+    if (muted || volume == 0) return Icons.volume_off;
+    return volume < 0.5 ? Icons.volume_down : Icons.volume_up;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    // 两源嵌套监听：外层 isMuted、内层 volume（各自变化只重建内层按钮）。
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.isMuted,
-      builder: (_, muted, _) => ValueListenableBuilder<double>(
-        valueListenable: widget.volume,
-        builder: (_, volume, _) {
-          IconData icon;
-          if (muted || volume == 0) {
-            icon = Icons.volume_off;
-          } else if (volume < 0.5) {
-            icon = Icons.volume_down;
-          } else {
-            icon = Icons.volume_up;
-          }
-          return GlassButton.iconOnly(
-            icon: icon,
-            iconSize: Tokens.iconLg,
-            color: muted ? Tokens.accent : Tokens.textPrimary,
-            onPressed: _toggleMute,
-            tooltip: muted ? l10n.unmute : l10n.mute,
-          );
-        },
-      ),
+    final muted = widget.isMuted.value;
+    return GlassButton.iconOnly(
+      icon: _iconFor(muted: muted, volume: widget.volume.value),
+      iconSize: Tokens.iconLg,
+      color: muted ? Tokens.accent : Tokens.textPrimary,
+      onPressed: _toggleMute,
+      tooltip: muted ? l10n.unmute : l10n.mute,
     );
   }
 }
