@@ -96,29 +96,32 @@ class PlaylistEntryList extends StatelessWidget {
             onPointerSignal: onPointerSignal,
             child: Viewport(
               offset: position,
-              slivers: [
-                SliverPadding(
-                  // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
-                  // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
-                  padding: const EdgeInsets.fromLTRB(
-                    Tokens.spXs,
-                    Tokens.spSm,
-                    PlaylistTokens.listRightPadding,
-                    Tokens.controlBarRadius,
-                  ),
-                  sliver: SliverList(
-                    // 参数对齐 ListView.builder 默认 (addAutomaticKeepAlives/
-                    // addRepaintBoundaries/addSemanticIndexes 恒 true) —
-                    // 防缩略图 keep-alive/重绘边界行为漂移.
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _tileAt(i, validSelection),
-                      childCount: items.length,
-                    ),
-                  ),
-                ),
-              ],
+              slivers: [_sliver(validSelection)],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 带内边距的条目 sliver.
+  Widget _sliver(Set<int> validSelection) {
+    return SliverPadding(
+      // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
+      // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
+      padding: const EdgeInsets.fromLTRB(
+        Tokens.spXs,
+        Tokens.spSm,
+        PlaylistTokens.listRightPadding,
+        Tokens.controlBarRadius,
+      ),
+      sliver: SliverList(
+        // 参数对齐 ListView.builder 默认 (addAutomaticKeepAlives/
+        // addRepaintBoundaries/addSemanticIndexes 恒 true) —
+        // 防缩略图 keep-alive/重绘边界行为漂移.
+        delegate: SliverChildBuilderDelegate(
+          (context, i) => _tileAt(i, validSelection),
+          childCount: items.length,
         ),
       ),
     );

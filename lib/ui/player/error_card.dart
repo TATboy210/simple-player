@@ -184,13 +184,31 @@ class _ErrorCardState extends State<ErrorCard> {
 
   @override
   Widget build(BuildContext context) {
+    final severityColor = _severityColor(widget.report.severity);
+    // Clipping belongs to the opaque surface, including its hit-test boundary.
+    return GestureDetector(
+      onTap: _toggle,
+      child: SecondarySurface(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Tokens.spMd,
+          vertical: Tokens.spSm,
+        ),
+        borderColor: severityColor,
+        child: SingleChildScrollView(
+          child: _buildContent(context, severityColor),
+        ),
+      ),
+    );
+  }
+
+  /// 卡片正文 — 动作行 + message + 媒体 basename + 展开五段.
+  ///
+  /// One outer scroll owns both full summary and diagnostics; action row stays
+  /// before the message so long text cannot bury copy/log/close controls.
+  Widget _buildContent(BuildContext context, Color severityColor) {
     final l10n = AppLocalizations.of(context);
     final report = widget.report;
-    final severityColor = _severityColor(report.severity);
-
-    // One outer scroll owns both full summary and diagnostics; action row stays
-    // before the message so long text cannot bury copy/log/close controls.
-    final content = Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -218,19 +236,6 @@ class _ErrorCardState extends State<ErrorCard> {
         if (_expanded)
           ErrorCardExpandedSections(report: report, logPath: _resolveLogPath()),
       ],
-    );
-
-    // Clipping belongs to the opaque surface, including its hit-test boundary.
-    return GestureDetector(
-      onTap: _toggle,
-      child: SecondarySurface(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Tokens.spMd,
-          vertical: Tokens.spSm,
-        ),
-        borderColor: severityColor,
-        child: SingleChildScrollView(child: content),
-      ),
     );
   }
 
