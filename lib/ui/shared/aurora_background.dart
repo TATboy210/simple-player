@@ -258,9 +258,15 @@ class _AuroraBackgroundState extends State<AuroraBackground>
       child: RepaintBoundary(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // LayoutBuilder 只在窗口尺寸变化时触发（极低频）。
+            // LayoutBuilder 在拖窗缩放时每帧触发。噪点 Picture 的重录
+            // （50 次 drawPoints）交给 10fps 的 _onTick 按尺寸变化补录：
+            // 这里只在尚无有效缓存（首帧/零尺寸首帧）时同步录一次，
+            // 避免拖窗每帧重录；尺寸滞后至多约 100ms，噪点为极淡的随机点，
+            // 视觉无差异。
             _layoutSize = Size(constraints.maxWidth, constraints.maxHeight);
-            _regenerateNoiseCache(_layoutSize);
+            if (_cachedNoisePicture == null || _cachedNoiseSize == Size.zero) {
+              _regenerateNoiseCache(_layoutSize);
+            }
             return CustomPaint(painter: _painter);
           },
         ),

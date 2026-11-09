@@ -118,16 +118,37 @@ class _MarqueeTextState extends State<MarqueeText>
     _controller?.stop();
   }
 
+  /// 上次测量的输入与结果 — 拖窗缩放时 LayoutBuilder 每帧回调，但文本宽度
+  /// 只取决于文本/样式/缩放/方向，输入不变就复用，免去每帧新建 TextPainter。
+  String? _measuredText;
+  TextStyle? _measuredStyle;
+  TextScaler? _measuredScaler;
+  TextDirection? _measuredDirection;
+  double _measuredWidth = 0;
+
   /// 测量单行文本实际渲染宽度（含系统字体缩放）。
   double _measureTextWidth(BuildContext context) {
+    final direction = Directionality.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    if (_measuredText == widget.text &&
+        _measuredStyle == widget.style &&
+        _measuredScaler == scaler &&
+        _measuredDirection == direction) {
+      return _measuredWidth;
+    }
     final painter = TextPainter(
       text: TextSpan(text: widget.text, style: widget.style),
       maxLines: 1,
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: direction,
+      textScaler: scaler,
     )..layout();
     final width = painter.width;
     painter.dispose();
+    _measuredText = widget.text;
+    _measuredStyle = widget.style;
+    _measuredScaler = scaler;
+    _measuredDirection = direction;
+    _measuredWidth = width;
     return width;
   }
 }
