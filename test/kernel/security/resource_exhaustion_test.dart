@@ -25,7 +25,6 @@ import 'package:simple_player_flutter/kernel/services/path_validator.dart';
 
 import '../../helpers/fake_engine.dart';
 
-
 /// 批量 (万次级) 校验的墙钟预算 — 只为拦截灾难性退化 (正则回溯/二次方
 /// 膨胀会超出数量级), 不是性能基准. 共享 CI runner (macos-15-intel) 实测
 /// 1023ms 抖过旧 1000ms 线, 故留 3 倍余量.
