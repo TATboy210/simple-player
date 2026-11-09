@@ -32,55 +32,26 @@ void main() {
       if (await tempDir.exists()) await tempDir.delete(recursive: true);
     });
 
-    test('detectAndLoadSync finds matching subtitle', () async {
-      // Create media file and matching subtitle
-      final mediaFile = File('${tempDir.path}/movie.mp4');
-      final subFile = File('${tempDir.path}/movie.srt');
-      await mediaFile.create();
-      await subFile.create();
-
-      service.detectAndLoadSync(mediaFile.path);
-      expect(
-        engine.lastSubtitle,
-        subFile.path.replaceAll('/', Platform.pathSeparator),
-      );
-    });
-
-    test('detectAndLoadSync finds subtitle with language tag', () async {
+    test('detectAndLoad matches movie.<lang>.srt to the exact path', () async {
       final mediaFile = File('${tempDir.path}/movie.mp4');
       final subFile = File('${tempDir.path}/movie.chinese.srt');
       await mediaFile.create();
       await subFile.create();
 
-      service.detectAndLoadSync(mediaFile.path);
+      await service.detectAndLoad(mediaFile.path);
       expect(
         engine.lastSubtitle,
         subFile.path.replaceAll('/', Platform.pathSeparator),
       );
     });
 
-    test('detectAndLoadSync ignores non-subtitle extensions', () async {
-      final mediaFile = File('${tempDir.path}/movie.mp4');
-      final txtFile = File('${tempDir.path}/movie.txt');
-      await mediaFile.create();
-      await txtFile.create();
-
-      service.detectAndLoadSync(mediaFile.path);
-      expect(engine.lastSubtitle, isNull);
-    });
-
-    test('detectAndLoadSync ignores non-matching subtitle', () async {
+    test('detectAndLoad ignores a subtitle of another media file', () async {
       final mediaFile = File('${tempDir.path}/movie.mp4');
       final subFile = File('${tempDir.path}/other.srt');
       await mediaFile.create();
       await subFile.create();
 
-      service.detectAndLoadSync(mediaFile.path);
-      expect(engine.lastSubtitle, isNull);
-    });
-
-    test('detectAndLoadSync handles missing directory gracefully', () {
-      service.detectAndLoadSync('/nonexistent/path/movie.mp4');
+      await service.detectAndLoad(mediaFile.path);
       expect(engine.lastSubtitle, isNull);
     });
 
@@ -129,7 +100,7 @@ void main() {
       expect(engine.lastSubtitle, isNull);
     });
 
-    test('detectAndLoadSync stops at first match', () async {
+    test('detectAndLoad stops at the first match', () async {
       final mediaFile = File('${tempDir.path}/movie.mp4');
       final sub1 = File('${tempDir.path}/movie.srt');
       final sub2 = File('${tempDir.path}/movie.ass');
@@ -137,7 +108,7 @@ void main() {
       await sub1.create();
       await sub2.create();
 
-      service.detectAndLoadSync(mediaFile.path);
+      await service.detectAndLoad(mediaFile.path);
       // Should load exactly one subtitle (first match)
       expect(engine.lastSubtitle, isNotNull);
     });

@@ -3,9 +3,9 @@
 /// 本文件实现 [SubtitleService] 负责扫描媒体文件目录，
 /// 通过文件名相似性匹配外挂字幕文件（SRT/ASS/SSA/SUB/VTT/IDX/SUP）。
 ///
-/// 架构位置：PlaybackNavigator → **SubtitleService** → MediaEngine.setExternalSubtitle()
+/// 架构位置：PlaybackController → **SubtitleService** → MediaEngine.setExternalSubtitle()
 /// 匹配算法：提取媒体文件基名（不含扩展名），查找同目录下同名或 "基名.语言.扩展名" 格式的字幕文件
-/// 异步/同步变体：async 用于非热路径，sync 用于 playIndex 热路径
+/// 仅提供异步扫描：由 PlaybackController.openAndPlay 在装载成功后 unawaited 调用
 library;
 
 import 'dart:io';
@@ -55,34 +55,11 @@ class SubtitleService {
         final match = _matchSubtitle(entity.path, baseName);
         if (match != null) {
           _engine.setExternalSubtitle(match);
-          return; // 只加载第一个匹配的字幕（与 detectAndLoadSync 一致）
+          return; // 只加载第一个匹配的字幕
         }
       }
     } on Exception catch (e) {
       _log.d('SubtitleService.detectAndLoad error: $e');
-    }
-  }
-
-  /// 同步扫描媒体文件目录，加载第一个匹配的字幕文件。
-  ///
-  /// 用于 playIndex 热路径（避免 async 改变调用链签名）。
-  /// 使用 listSync() 同步遍历目录，文件数量通常很少（< 100），性能可接受。
-  void detectAndLoadSync(String mediaPath) {
-    try {
-      final dir = Directory(PathUtils.dirname(mediaPath));
-      if (!dir.existsSync()) return;
-
-      final baseName = _extractBaseName(mediaPath);
-      for (final entity in dir.listSync()) {
-        if (entity is! File) continue;
-        final match = _matchSubtitle(entity.path, baseName);
-        if (match != null) {
-          _engine.setExternalSubtitle(match);
-          break;
-        }
-      }
-    } on Exception catch (e) {
-      _log.d('SubtitleService.detectAndLoadSync error: $e');
     }
   }
 

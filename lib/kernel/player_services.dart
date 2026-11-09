@@ -18,7 +18,7 @@
 /// Architecture: PlayerFeature/PlayerViewModel → **PlayerServices** → concrete services.
 /// Dependency chain: PlayerServices → MpvKitEngine → mpv_kit/libmpv native.
 ///
-/// v1.8:移除 Playlist/playlistGeneration(单文件播放器,无队列)。
+/// 队列/断点/持久化由 [PlaylistCoordinator] 持有, 本容器只负责创建与释放.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -38,6 +38,8 @@ import 'persistence/settings_store.dart';
 import 'services/app_settings_service.dart';
 import 'services/playback_controller.dart';
 import 'services/playlist_coordinator.dart';
+import 'services/subtitle_service.dart';
+import 'services/track_preference_service.dart';
 import 'services/video_processing_service.dart';
 
 /// 播放器服务容器 — 创建并管理所有播放服务的生命周期.
@@ -70,7 +72,7 @@ class PlayerServices {
 
   /// 视频渲染引擎实例.
   ///
-  /// Media rendering engine (media_kit/libmpv wrapper).
+  /// Media rendering engine (mpv_kit/libmpv wrapper).
   MediaEngine? _engine;
 
   /// 内存治理状态锚点监听 (v0.0.9, debug/profile) — dispose 时摘除。
@@ -78,9 +80,9 @@ class PlayerServices {
 
   MediaEngine get engine => _engine!;
 
-  /// 播放控制编排器 — 单文件播放器门面.
+  /// 播放控制编排器 — 打开/停止门面 (同目录自动装载队列).
   ///
-  /// Playback orchestrator — single-file player facade.
+  /// Playback orchestrator — open/stop facade over the engine.
   PlaybackController? _controller;
 
   PlaybackController get controller => _controller!;
@@ -189,9 +191,14 @@ class PlayerServices {
         reporter: dependencies?.reporter ?? ErrorReporterImpl.I,
         currentMediaPath: () => _controller?.currentPath.value,
       );
+      // 外挂字幕自动检测 + 会话内轨道偏好恢复: 二者无外部 I/O 依赖
+      // (偏好仅存于会话内存, UI 经 controller.trackPreferenceService 记录),
+      // 只持有 engine 引用 — 无需 dispose, 随 controller 一并被丢弃.
       _controller = PlaybackController(
         engine: engine,
         onError: _playerErrorBridge?.reportControllerError,
+        subtitleService: SubtitleService(engine),
+        trackPreferenceService: TrackPreferenceService(engine),
       );
       _controllerCreated = true;
 
