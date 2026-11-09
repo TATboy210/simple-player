@@ -248,7 +248,7 @@ class _SocialLogoButton extends StatelessWidget {
   }
 }
 
-/// 分区小标题 — 与 media_info_dialog 的 `_Section` 同视觉语言（accent 强调色）。
+/// 分区小标题 — accent 强调色。
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);

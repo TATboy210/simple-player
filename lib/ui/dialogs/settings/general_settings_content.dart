@@ -317,7 +317,7 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
 }
 
 /// 通用设置行 — MouseRegion hover + AnimatedContainer 行语法
-/// （循 setting_action_row.dart:54-76 先例；trailing 位置放行内控件）。
+/// （trailing 位置放行内控件）。
 ///
 /// v0.0.8 纵轴键盘焦点：[isFocused] 恒亮 bgHover（与 hover 同色并存）+
 /// 行首恒 2px 槽位 accent 竖条（透明→点亮，防布局跳动 — 旧 _NavEntry 技法）。

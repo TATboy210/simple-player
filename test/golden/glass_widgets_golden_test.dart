@@ -1,7 +1,6 @@
 // ignore_for_file: no-empty-block, avoid-passing-async-when-sync-expected, avoid-dynamic, avoid-redundant-async, avoid-self-compare, avoid-unnecessary-type-assertions, avoid-unused-parameters
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/ui/shared/glass_chip.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 
 import 'golden_comparator.dart';
@@ -65,28 +64,6 @@ void main() {
       await expectLater(
         find.byType(GlassButton),
         matchesGoldenFile('goldens/glass_button_icon_only.png'),
-      );
-    });
-  });
-
-  group('GlassChip golden', () {
-    testWidgets('selected', (tester) async {
-      await tester.pumpWidget(
-        wrapForGolden(GlassChip(label: '1.0x', selected: true, onTap: () {})),
-      );
-      await expectLater(
-        find.byType(GlassChip),
-        matchesGoldenFile('goldens/glass_chip_selected.png'),
-      );
-    });
-
-    testWidgets('unselected', (tester) async {
-      await tester.pumpWidget(
-        wrapForGolden(GlassChip(label: '1.5x', selected: false, onTap: () {})),
-      );
-      await expectLater(
-        find.byType(GlassChip),
-        matchesGoldenFile('goldens/glass_chip_unselected.png'),
       );
     });
   });
