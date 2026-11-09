@@ -236,7 +236,7 @@ const _firstFrameRevealTimeout = Duration(milliseconds: 800);
 
 /// Resolves and activates durable diagnostic evidence after global capture is live.
 ///
-/// This asynchronous side effect intentionally does not delay MediaKit, window,
+/// This asynchronous side effect intentionally does not delay engine init, window,
 /// or runApp. Its failure is reported only through KernelLogger to avoid reporter
 /// reentrancy while the file effect is itself unavailable.
 Future<void> _activateDiagnosticLog(
@@ -244,7 +244,7 @@ Future<void> _activateDiagnosticLog(
 ) async {
   try {
     // 设置加载先于位置解析且同在 unawaited 激活路径内（RESEARCH Pitfall 7）：
-    // 绝不阻塞 MediaKit/window/runApp。store 构造同步零 I/O；save 失败静默
+    // 绝不阻塞引擎初始化/window/runApp。store 构造同步零 I/O；save 失败静默
     // 回退（D-01）。AS provider 供 WR-06 两层回退：exe 旁目录不可写
     //（MSIX/ACL 保护目录）时设置改存 Application Support，探测一次性在
     // load 内完成并记住层级。

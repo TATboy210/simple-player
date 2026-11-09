@@ -153,7 +153,7 @@
   "version": "버전",
   "techStack": "기술 스택",
   "licenses": "오픈 소스 라이선스",
-  "copyright": "Flutter + media_kit (libmpv) 기반",
+  "copyright": "Flutter + mpv_kit (libmpv) 기반",
   "resetShortcuts": "기본값 복원",
   "pressKeyToBind": "새 키를 누르세요...",
   "shortcutConflict": "이미 사용 중인 키입니다",

@@ -1,7 +1,7 @@
 /// QueueControl 契约测试 — fake 引擎上验证队列语义 (v0.0.5 Phase 2).
 ///
 /// QueueControl contract tests on FakeEngine: load/append/remove/jump/step
-/// boundaries and mode mapping. MediaKitEngine 的纯逻辑 (URI 反解) 单独覆盖.
+/// boundaries and mode mapping. MpvKitEngine 的纯逻辑 (路径映射) 单独覆盖.
 library;
 
 import 'package:flutter_test/flutter_test.dart';

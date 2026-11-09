@@ -1,7 +1,7 @@
 /// PlayerError 生产入口桥 — 汇合 controller callback 与 engine notifier。
 ///
 /// Owns exactly one project-level listener and forwards immutable snapshots to
-/// [ErrorReporter] without coupling diagnostics to MediaKitEngine.
+/// [ErrorReporter] without coupling diagnostics to MpvKitEngine.
 library;
 
 import '../engine/media_engine.dart';

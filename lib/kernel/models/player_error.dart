@@ -35,7 +35,7 @@ sealed class PlayerError {
 
   /// 可变 context setter — 支持引擎对下层错误的上下文丰富
   ///
-  /// Used when engine enriches errors from lower layers (e.g., media_kit Player)
+  /// Used when engine enriches errors from lower layers (e.g., the mpv_kit Player)
   /// with additional context like generation number.
   set context(ErrorContext? value);
 
@@ -80,7 +80,7 @@ class ErrorContext {
   /// Error timestamp — defaults to DateTime.now(), injectable for testing.
   final DateTime timestamp;
 
-  /// 模块名称 (e.g., 'MediaKitEngine') — 标识错误来源
+  /// 模块名称 (e.g., 'MpvKitEngine') — 标识错误来源
   ///
   /// Module name — identifies error source for diagnostics.
   final String? module;

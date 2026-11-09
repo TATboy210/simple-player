@@ -83,8 +83,8 @@ class PlaybackController {
 
   /// 当前播放文件绝对路径（null 表示无媒体加载）.
   ///
-  /// 替代原 `playlist.current` 的「当前媒体引用」职责；
-  /// 队列/历史/断点/播放模式职责已在 v1.8 移除。
+  /// 打开路径与队列切换 ([_syncCurrentMediaFromQueue]) 共同维护；
+  /// 队列/断点/播放模式本身由 `PlaylistCoordinator` 与引擎持有。
   final ValueNotifier<String?> currentPath = ValueNotifier<String?>(null);
 
   /// 最近一次路径校验错误（null 表示无错误）— UI 层显示用.

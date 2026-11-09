@@ -97,7 +97,7 @@ void main() {
     });
   });
 
-  group('FakeEngine shuffle 语义 (与 MediaKitEngine 同构)', () {
+  group('FakeEngine shuffle 语义 (与 MpvKitEngine 同构)', () {
     late FakeEngine engine;
 
     setUp(() => engine = FakeEngine());

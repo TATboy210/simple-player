@@ -486,7 +486,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get licenses => '오픈 소스 라이선스';
 
   @override
-  String get copyright => 'Flutter + media_kit (libmpv) 기반';
+  String get copyright => 'Flutter + mpv_kit (libmpv) 기반';
 
   @override
   String get resetShortcuts => '기본값 복원';

@@ -99,7 +99,7 @@ void main() {
         generation: 5,
         path: '/video/test.mp4',
         timestamp: DateTime(2026, 1, 15, 10, 30),
-        module: 'MediaKitEngine',
+        module: 'MpvKitEngine',
       );
       final map = ctx.toMap();
 
@@ -108,7 +108,7 @@ void main() {
       // 路径脱敏：toMap() 只保留文件名
       expect(map['path'], 'test.mp4');
       expect(map['timestamp'], '2026-01-15T10:30:00.000');
-      expect(map['module'], 'MediaKitEngine');
+      expect(map['module'], 'MpvKitEngine');
       expect(map.containsKey('callbackStackTrace'), isFalse);
     });
 
@@ -146,7 +146,7 @@ void main() {
       generation: 7,
       path: 'https://example.com/stream.mp4',
       timestamp: fixedTime,
-      module: 'MediaKitEngine',
+      module: 'MpvKitEngine',
       callbackStackTrace: fixedStack,
       networkInterfaceCount: 4,
       networkHasNonLoopback: true,
@@ -160,7 +160,7 @@ void main() {
       expect(copy.path, 'https://example.com/stream.mp4');
       // 透传铁证: 同一 DateTime 实例 — 重跑构造器默认会得到 DateTime.now()
       expect(copy.timestamp, same(full.timestamp));
-      expect(copy.module, 'MediaKitEngine');
+      expect(copy.module, 'MpvKitEngine');
       expect(copy.callbackStackTrace, same(fixedStack));
       expect(copy.networkInterfaceCount, 4);
       expect(copy.networkHasNonLoopback, true);
@@ -187,7 +187,7 @@ void main() {
         generation: 3,
         path: 'https://example.com/stream.mp4',
         timestamp: fixedTime,
-        module: 'MediaKitEngine',
+        module: 'MpvKitEngine',
         callbackStackTrace: fixedStack,
       );
 
@@ -202,7 +202,7 @@ void main() {
       expect(enriched.generation, 3);
       expect(enriched.path, 'https://example.com/stream.mp4');
       expect(enriched.timestamp, same(fixedTime));
-      expect(enriched.module, 'MediaKitEngine');
+      expect(enriched.module, 'MpvKitEngine');
       expect(enriched.callbackStackTrace, same(fixedStack));
     });
 
@@ -382,7 +382,7 @@ void main() {
     });
 
     test('errors with context carry it', () {
-      final ctx = ErrorContext(action: 'open', module: 'MediaKitEngine');
+      final ctx = ErrorContext(action: 'open', module: 'MpvKitEngine');
       final error = FileError(
         FileErrorCode.fileNotFound,
         'not found',
@@ -392,7 +392,7 @@ void main() {
 
       expect(error.context, isNotNull);
       expect(error.context?.action, 'open');
-      expect(error.context?.module, 'MediaKitEngine');
+      expect(error.context?.module, 'MpvKitEngine');
     });
   });
 

@@ -1,8 +1,8 @@
 /// mpv 属性映射 — 项目层值 → mpv 属性键值对的纯函数层 (v0.0.6).
 ///
 /// mpv property mapper — pure mapping from project-layer values to
-/// mpv property key/value pairs. 经 media_kit 公开 API
-/// `NativePlayer.setProperty` 应用 (不改 media_kit).
+/// mpv property key/value pairs. 由 MpvKitEngine 经 mpv_kit 的
+/// `mpv.setPropertyString` 应用.
 ///
 /// 范围约定 (VideoProcessingState 为权威): brightness/contrast/saturation/hue
 /// 项目层均为 -1..1 (0 = 无调整) → mpv -100..100 线性映射 ×100.

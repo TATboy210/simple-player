@@ -3,8 +3,7 @@
 /// Shuffle playback-order policy — pure logic for the random overlay.
 ///
 /// 设计裁决 (v0.0.6): 随机 = **播放顺序覆盖层**, mpv playlist 永不物理
-/// 乱序 (media_kit `setShuffle` 底层是 mpv `playlist-shuffle` 物理重排,
-/// 已弃用). 本文件只回答一个问题: "下一曲随机到哪" — 列表排列、
+/// 乱序 (mpv `playlist-shuffle` 会物理重排列表, 故不采用). 本文件只回答一个问题: "下一曲随机到哪" — 列表排列、
 /// 排序方式、持久化顺序均与本层无关.
 library;
 

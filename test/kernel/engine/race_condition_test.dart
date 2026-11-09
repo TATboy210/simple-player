@@ -11,7 +11,7 @@ import '../../helpers/fake_engine.dart';
 /// 竞态条件测试 — 验证引擎 operation-generation 守卫在快速/交错操作下的正确性.
 ///
 /// 原 [EngineStateMachine] 直接单测已随类移除 — generation 守卫内联进
-/// MediaKitEngine/FakeEngine (自管 `_operationGeneration` 计数器), 故改为
+/// MpvKitEngine/FakeEngine (自管 `_operationGeneration` 计数器), 故改为
 /// 面向 FakeEngine 外部可观察行为的测试:
 /// - stale 请求返回 `OpenSuperseded`
 /// - 旧异步 continuation 不得污染新会话的 state/媒体派生状态

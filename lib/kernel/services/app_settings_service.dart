@@ -5,7 +5,7 @@
 ///
 /// 职责切分 (每层只做一件事):
 /// - [AppSettingsStore] = 纯持久化 (无状态)
-/// - [MediaKitEngine] = 只执行, 不依赖存储; file-scoped mpv 属性自带
+/// - [MpvKitEngine] = 只执行, 不依赖存储; file-scoped mpv 属性自带
 ///   内存缓存 + 新文件装载后重放
 /// - 本类 = 编排: 启动回放 → 变更防抖写回 → 断点开关持有
 ///

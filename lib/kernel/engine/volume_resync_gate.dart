@@ -6,7 +6,7 @@
 /// 首次实际播放才完全就绪 — open 时设置的 volume/mute 属性可能不生效，
 /// 表现为"切曲/启动后音量沿用 mpv 默认值，首帧后突变为设定值"的跳变
 /// 观感。解法：open 成功点 [arm]，首个 playing 事件 [consumeOnPlaying]
-/// 消费 — 由调用方（MediaKitEngine）幂等重写一次 volume+mute 属性。
+/// 消费 — 由调用方（MpvKitEngine）幂等重写一次 volume+mute 属性。
 /// 平台门（仅 Windows）由调用方持有，本类保持平台无关纯逻辑。
 class VolumeResyncGate {
   bool _armed = false;

@@ -625,7 +625,7 @@
   "@licenses": {
     "description": "Button to show open source licenses"
   },
-  "copyright": "Built with Flutter + media_kit (libmpv)",
+  "copyright": "Built with Flutter + mpv_kit (libmpv)",
   "@copyright": {
     "description": "Copyright/technology description"
   },

@@ -112,7 +112,7 @@ class App extends StatelessWidget {
 /// 构建错误卡片挂载层（D-10 修订，2026-08-30 用户拍板；G-03-2 位置修订）。
 ///
 /// 卡片挂载于 MaterialApp.builder 的 root Stack、**Navigator 之上**：
-/// media_kit 全屏 route 与设置对话框均不再覆盖卡片，卡片在两者期间持续存活。
+/// 全屏 route 与设置对话框均不再覆盖卡片，卡片在两者期间持续存活。
 /// D-05 的「设置打开时卡片被覆盖」语义被 D-10 取代；D-05 其余意图
 /// （root Stack 顶层、打开期间存活）保留。
 ///

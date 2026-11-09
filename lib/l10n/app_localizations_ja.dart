@@ -486,7 +486,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get licenses => 'オープンソースライセンス';
 
   @override
-  String get copyright => 'Flutter + media_kit (libmpv) ベース';
+  String get copyright => 'Flutter + mpv_kit (libmpv) ベース';
 
   @override
   String get resetShortcuts => 'デフォルトに戻す';

@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 /// 音量控制接口
 ///
 /// 音量设置（0.0~1.0 感知刻度）和静音切换。
-/// 具体引擎类实现此接口（MediaKitEngine 经 MediaEngine 暴露 volumeControl getter）。
+/// 具体引擎类 (MpvKitEngine) 经 MediaEngine 实现此接口。
 ///
 /// 感知刻度约定 (v0.0.8.1)：[volume] notifier 与持久化均为用户空间 0.0~1.0，
 /// 滑条位置即感知响度 — 引擎内部经立方根曲线映射到 mpv `volume` 属性

@@ -1023,7 +1023,7 @@ abstract class AppLocalizations {
   /// Copyright/technology description
   ///
   /// In en, this message translates to:
-  /// **'Built with Flutter + media_kit (libmpv)'**
+  /// **'Built with Flutter + mpv_kit (libmpv)'**
   String get copyright;
 
   /// Button to reset all keyboard shortcuts to defaults
