@@ -198,11 +198,15 @@ class PlaybackController {
         if (requestGen != _openRequestGeneration) return false;
         // 字幕检测不影响主播放链路，失败仅记录诊断信息。
         unawaited(
-          subtitleService?.detectAndLoad(normalizedPath).catchError((
-            Object error,
-          ) {
-            _log.d('Subtitle detection failed: $error');
-          }),
+          subtitleService
+              ?.detectAndLoad(
+                normalizedPath,
+                // 扫描晚于后续切文件完成时放弃, 不把旧文件字幕挂到新文件上.
+                isStale: () => requestGen != _openRequestGeneration,
+              )
+              .catchError((Object error) {
+                _log.d('Subtitle detection failed: $error');
+              }),
         );
         // K4-b: 恢复不再即刻执行 — open resolve 即刻读 mediaInfo 是陈旧
         // 读 (轨道流未回流), 挂轨道表首帧后执行一次.

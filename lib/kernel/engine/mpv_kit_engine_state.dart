@@ -13,7 +13,11 @@ part of 'mpv_kit_engine.dart';
 /// 引擎自建 notifier 实例, getter 恒返回同一实例; 它们由 [Player] 的
 /// MpvState 流与 mpv 事件写入, 绝不包装.
 abstract class _MpvKitState implements MediaEngine {
-  _MpvKitState(this._player);
+  _MpvKitState(this._player, this._fileExists);
+
+  /// 失败条目存在性探测 — 生产走异步 `File.exists`; 测试可注入可控延迟的
+  /// 假探测以确定性复现"探测晚于熔断完成"的竞态.
+  final Future<bool> Function(String path) _fileExists;
 
   final Player _player;
   MpvVideoController? _video;
@@ -83,6 +87,11 @@ abstract class _MpvKitState implements MediaEngine {
   final Set<String> _warnedUnsupported = <String>{};
   final OpenFailureCircuitBreaker _openFailureBreaker =
       OpenFailureCircuitBreaker();
+
+  /// 播放错误发布代数 — 每次失败事件（含熔断）递增。异步存在性探测返回后，
+  /// 代数已变说明有更新的失败/熔断提示取代了它，旧结果必须丢弃，否则晚到的
+  /// 普通错误会覆盖熔断聚合提示，且多个探测完成顺序不定导致错误乱序发布。
+  int _errorGeneration = 0;
 
   final List<StreamSubscription<Object?>> _subscriptions = [];
 

@@ -5,6 +5,7 @@
 @Tags(['native'])
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -170,5 +171,44 @@ void main() {
       isFalse,
       reason: '文件存在, 不应判为 fileNotFound',
     );
+  });
+
+  test('连续失败熔断后聚合提示不被晚到的存在性探测覆盖', () async {
+    // 恰好 3 个不存在的文件: mpv 自动推进逐个失败, 第 3 次熔断且之后无更多失败事件
+    // (条目更多时后续失败会重发聚合提示, 把迟到探测的覆盖又盖回去, 掩盖竞态). 注入可控探测,
+    // 让前几次失败的存在性探测一直挂起, 直到熔断聚合提示发布之后才放行 —
+    // 本机磁盘太快, 真实 File.exists 总是先于熔断完成, 复现不了该竞态.
+    final pending = <Completer<bool>>[];
+    final racing = MpvKitEngine(
+      playerOptions: const {'vo': 'null', 'ao': 'null'},
+      fileExists: (_) {
+        final probe = Completer<bool>();
+        pending.add(probe);
+        return probe.future;
+      },
+    );
+    addTearDown(racing.dispose);
+    // 不存在的路径 → mpv loadingFailed, 只有这类失败才会触发存在性探测
+    // (存在但非媒体的文件是 unknownFormat, 不探测).
+    final missing = [
+      for (var i = 0; i < 3; i++)
+        '${tmp.path}${Platform.pathSeparator}missing$i.wav',
+    ];
+    await racing.openPlaylist(missing);
+    racing.play();
+
+    final tripped = await untilValue(
+      racing.lastError,
+      (e) => e != null && e.message.contains('连续'),
+    );
+    expect(tripped, isNotNull);
+    expect(pending, isNotEmpty, reason: '熔断前至少有一次探测挂起');
+
+    // 放行所有挂起的探测, 让出事件循环 — 它们过期, 不得覆盖聚合提示.
+    for (final probe in pending) {
+      probe.complete(true);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(racing.lastError.value?.message, contains('连续'));
   });
 }

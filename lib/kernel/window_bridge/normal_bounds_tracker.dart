@@ -16,8 +16,12 @@ const Duration _sampleCooldown = Duration(milliseconds: 120);
 /// * 冷却期内的后续事件只置脏，到期补一次，把逐帧 3 次同步 FFI 读取
 ///   （isMaximized/isMinimized/bounds）降到约每 120ms 一次。
 ///
-/// 已知取舍：Aero Snap 半屏时 isMaximized 为 false，贴边矩形会被当作还原
-/// 尺寸（读 WINDOWPLACEMENT 的 rcNormal 才能区分，原生 API 未暴露）。
+/// 已知取舍：
+/// * Aero Snap 半屏时 isMaximized 为 false，贴边矩形会被当作还原尺寸
+///   （读 WINDOWPLACEMENT 的 rcNormal 才能区分，原生 API 未暴露）；
+/// * 冷却期内（≤120ms）发生的最后几个 resize 只置脏——若拖拽刚结束就立刻
+///   最大化（如拖到屏幕顶部），到期采样会因 isMaximized 被跳过，还原矩形
+///   停留在冷却期内最后一次实际采样值，最多滞后约一个冷却期。
 class NormalBoundsTracker {
   /// [window] 取当前绑定的原生窗口（未绑定为 null）；[canTrack] 返回当前
   /// 是否允许采样（未亮窗/全屏期间为 false）。

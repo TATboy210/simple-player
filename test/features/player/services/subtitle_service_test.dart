@@ -55,6 +55,19 @@ void main() {
       expect(engine.lastSubtitle, isNull);
     });
 
+    test('detectAndLoad skips loading when the request is stale', () async {
+      // 快速连续切文件: 旧文件的目录扫描晚于新请求完成, 不得把旧字幕挂到新文件.
+      final mediaFile = File('${tempDir.path}/movie.mp4');
+      await mediaFile.create();
+      await File('${tempDir.path}/movie.srt').create();
+
+      await service.detectAndLoad(mediaFile.path, isStale: () => true);
+      expect(engine.lastSubtitle, isNull);
+
+      await service.detectAndLoad(mediaFile.path, isStale: () => false);
+      expect(engine.lastSubtitle, isNotNull);
+    });
+
     test('subtitleExtensions contains common formats', () {
       expect(SubtitleService.subtitleExtensions, contains('.srt'));
       expect(SubtitleService.subtitleExtensions, contains('.ass'));

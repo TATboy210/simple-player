@@ -44,7 +44,13 @@ class SubtitleService {
   /// 异步扫描媒体文件目录，匹配同名字幕文件并加载第一个匹配项。
   ///
   /// 使用 Stream.list() 异步遍历目录，适合非热路径调用。
-  Future<void> detectAndLoad(String mediaPath) async {
+  ///
+  /// [isStale] 在目录扫描完成、`sub-add` 之前复核：快速连续切文件时旧文件的
+  /// 扫描晚于新文件完成，返回 true 则放弃加载，避免把旧字幕挂到新文件上。
+  Future<void> detectAndLoad(
+    String mediaPath, {
+    bool Function()? isStale,
+  }) async {
     try {
       final dir = Directory(PathUtils.dirname(mediaPath));
       if (!await dir.exists()) return;
@@ -54,6 +60,7 @@ class SubtitleService {
         if (entity is! File) continue;
         final match = _matchSubtitle(entity.path, baseName);
         if (match != null) {
+          if (isStale?.call() ?? false) return;
           _engine.setExternalSubtitle(match);
           return; // 只加载第一个匹配的字幕
         }

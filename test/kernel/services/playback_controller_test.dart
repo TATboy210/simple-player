@@ -17,7 +17,10 @@ class _RecordingSubtitleService extends SubtitleService {
   final List<String> detectedPaths = <String>[];
 
   @override
-  Future<void> detectAndLoad(String mediaPath) async {
+  Future<void> detectAndLoad(
+    String mediaPath, {
+    bool Function()? isStale,
+  }) async {
     detectedPaths.add(mediaPath);
   }
 }

@@ -347,6 +347,10 @@ class _PlayerVideoControlsState extends State<PlayerVideoControls>
     // activate 视为新写入契约起点 (reparent 后端口可能全新)：空写守卫复位。
     _subtitle.resetGuard();
     _subtitle.schedule();
+    // inactive 期间 hub 已 detach，autoHide.visible/窗口模式/面板开关的变化
+    // 没有驱动派生信号 — 重新挂载时按现值补算一次，否则光标/语义保持旧值。
+    _derived.recompute();
+    _syncAutoHideHold();
   }
 
   @override

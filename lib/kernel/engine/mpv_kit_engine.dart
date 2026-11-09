@@ -57,8 +57,15 @@ class MpvKitEngine extends _MpvKitState
   ///
   /// [playerOptions] 覆盖 [defaultOptions] (测试传 `vo=null`/`ao=null`).
   /// 视频输出须另行 `await attachVideo()` — 渲染上下文创建是异步的.
-  MpvKitEngine({Map<String, String> playerOptions = const {}})
-    : super(Player(options: {...defaultOptions, ...playerOptions})) {
+  ///
+  /// [fileExists] 仅供测试注入失败条目存在性探测 (默认异步 `File.exists`).
+  MpvKitEngine({
+    Map<String, String> playerOptions = const {},
+    @visibleForTesting Future<bool> Function(String path)? fileExists,
+  }) : super(
+         Player(options: {...defaultOptions, ...playerOptions}),
+         fileExists ?? ((path) => File(path).exists()),
+       ) {
     _subscribe();
   }
 
@@ -127,7 +134,12 @@ class MpvKitEngine extends _MpvKitState
     _disposed = true;
     unawaited(_trackTableChanged.close());
     for (final s in _subscriptions) {
-      unawaited(s.cancel());
+      // 单个订阅取消失败不得变成未处理的异步异常, 也不得阻断其余订阅的取消.
+      unawaited(
+        s.cancel().catchError((Object error) {
+          _log('订阅取消失败 (忽略): $error');
+        }),
+      );
     }
     _subscriptions.clear();
     for (final n in <ChangeNotifier>[

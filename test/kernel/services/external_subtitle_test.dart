@@ -20,8 +20,11 @@ class _CompletingSubtitleService extends SubtitleService {
   Future<void> get completed => _completed.future;
 
   @override
-  Future<void> detectAndLoad(String mediaPath) async {
-    await super.detectAndLoad(mediaPath);
+  Future<void> detectAndLoad(
+    String mediaPath, {
+    bool Function()? isStale,
+  }) async {
+    await super.detectAndLoad(mediaPath, isStale: isStale);
     if (!_completed.isCompleted) _completed.complete();
   }
 }

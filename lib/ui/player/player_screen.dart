@@ -267,6 +267,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // 视频子树数据源替换 — 集中比对防漏判（漏判 = DropHandler 持陈旧
     // 回调，拖放丢失）。windowService 已在上面分支处理，此处补其余五源。
     if (!_videoContentDepsMatch(oldWidget)) {
+      // 控制端口捕获了 engine 与 windowService.mode — 任一替换都必须丢弃缓存的
+      // 端口，否则新控制层仍绑旧引擎/旧窗口模式。
+      _mpvControlsPort = null;
       _videoContent = _createVideoContent();
     }
   }

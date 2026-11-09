@@ -111,6 +111,8 @@ extension _MpvKitBridge on _MpvKitState {
             .map((entry) => entry.filename)
             .firstOrNull ??
         _currentQueuePath();
+    // 先递增代数: 熔断与普通错误都使更早挂起的存在性探测过期.
+    final generation = ++_errorGeneration;
     // 连续失败熔断 — 终止 mpv 自动推进的连锁失败 (实机: 90s 207 条).
     if (_openFailureBreaker.registerFailure()) {
       unawaited(stop());
@@ -126,7 +128,7 @@ extension _MpvKitBridge on _MpvKitState {
       );
       return;
     }
-    unawaited(_publishPlaybackError(e, failedPath));
+    unawaited(_publishPlaybackError(e, failedPath, generation));
   }
 
   /// 异步判定失败条目是否存在后发布 lastError.
@@ -134,21 +136,22 @@ extension _MpvKitBridge on _MpvKitState {
   /// `loadingFailed` 需区分"文件不存在"与其他装载失败; 存在性探测改走
   /// 异步 `File.exists`, 不在 UI isolate 上做同步磁盘 I/O (网络盘/休眠盘
   /// 上同步 stat 可阻塞数秒). 代价: 错误发布晚一个 I/O 往返, 期间若引擎
-  /// 已 dispose 则放弃发布.
+  /// 已 dispose、或有更新的失败/熔断提示取代它（[generation] 已过期）则放弃发布.
   Future<void> _publishPlaybackError(
     MpvPlaybackError e,
     String? failedPath,
+    int generation,
   ) async {
     var exists = true;
     if (failedPath != null && e.error == MpvError.loadingFailed) {
       try {
-        exists = await File(failedPath).exists();
+        exists = await _fileExists(failedPath);
       } on FileSystemException {
         // 探测本身失败 (权限/驱动器离线) — 按"存在"处理, 不误报 fileNotFound.
         exists = true;
       }
     }
-    if (_disposed) return;
+    if (_disposed || generation != _errorGeneration) return;
     _lastError.value = playerErrorFromMpv(
       e,
       path: failedPath,
