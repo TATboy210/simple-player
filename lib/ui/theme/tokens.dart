@@ -8,13 +8,11 @@ class Tokens {
   static const bgBase = Color(0xFF0C0F18); // 加深
   /// 视频面底色 — 纯黑, 与 media_kit Video 默认底色一致 (letterbox 黑边).
   static const bgVideo = Color(0xFF000000);
-  static const bgPanel = Color(0xFF111520); // 加深
-  static const bgElevated = Color(0xFF161A28); // 加深
-  static const bgHover = Color(0xFF283045); // hover 高亮 — 比 bgElevated 明显更亮
+  static const bgHover = Color(0xFF283045); // hover 高亮
   static const bgGlass = Color(0x8C0C0F18); // 加深
 
   /// 浮层表面 — OSD/菜单/确认卡等叠在玻璃层之上的次要表面底色.
-  /// 比 bgPanel 提亮约一档(Fluent 深色菜单亮度带, 保留 Midnight 蓝黑调性):
+  /// 比面板底色提亮约一档(Fluent 深色菜单亮度带, 保留 Midnight 蓝黑调性):
   /// Apple HIG 明言深色玻璃叠深色底对比度不足, 浮层必须比被叠层亮一级才可读.
   static const surfaceFloating = Color(0xFF242D3F);
 
@@ -23,9 +21,7 @@ class Tokens {
   static const surfaceHighlight = Color(0xFF3A4560);
 
   static const accent = Color.fromARGB(255, 44, 88, 244);
-  static const accentLight = Color.fromARGB(180, 44, 87, 244);
   static const accentBlue = Color(0xFF4A8EFF); // 蓝色辉光（进度条/边框）
-  static const accentEgg = Color.fromARGB(255, 102, 204, 255);
 
   /// 播放列表续播锚点高亮白 (v0.0.6.2) — 停止态"上次播放"条目的边框与
   /// 名称色, 与播放中的 accent 蓝区分两种状态语义.
@@ -44,12 +40,6 @@ class Tokens {
   /// Fatal severity color — deepened danger red (unrecoverable errors).
   static const dangerFatal = Color.fromARGB(255, 168, 16, 16);
 
-  // ── 边缘微光 ──
-  static const glowCore = Color(0xE6A0BEFF); // rgba(160,190,255,0.9)
-  static const glowMid = Color(0x40648CFF); // rgba(100,140,255,0.25)
-  static const glowEdge = Color(0x265078FF); // rgba(80,120,255,0.15)
-  static const glowEdgeStrong = Color(0x596496FF); // rgba(100,150,255,0.35)
-
   // ── 边缘微光 — gradient 变体 box-shadow ──
   static const glowHighlightWhite = Color(0x08FFFFFF);
   static const glowBorderBlue = Color(0x0F5078FF);
@@ -64,12 +54,6 @@ class Tokens {
   static const glowGradientEnd = Color(0x145078FF);
   static const glowTransparent = Color(0x005082FF); // 全透明，用于渐变端点
 
-  // ── 边缘微光 — omni 变体方向色 ──
-  static const glowOmniRight = Color(0x1A5082FF);
-  static const glowOmniDown = Color(0x0A3C64DC);
-  static const glowOmniLeft = Color(0x1A7850DC);
-  static const glowOmniUp = Color(0x0A5082FF);
-
   // ── 极光背景 ──
   /// 极光光团色 — 三层蓝色渐变（高→低 alpha）
   static const auroraBlue1 = Color(0x1A4A8EFF);
@@ -78,9 +62,6 @@ class Tokens {
 
   /// 噪点叠加色 — 低 alpha 白色，模拟胶片颗粒
   static const noiseOverlay = Color(0x0AFFFFFF);
-
-  /// 紫色透射光斑 — 中心光效默认色
-  static const glowPurple = Color(0x1AA855F7);
 
   // ── 控制栏装饰 ──
   static const controlBarBg = Color(0x990E111E);
@@ -109,11 +90,6 @@ class Tokens {
   static const controlBarIconIdle = Color(0x73FFFFFF);
 
   // ── 右键菜单 ──
-  static const menuBg = Color(0xE61A1A2E);
-  static const menuBorder = Color(0x22FFFFFF);
-  static const menuTextMuted = Color(0x99FFFFFF);
-  static const menuAccent = Color(0xFF2C58F4);
-  static const menuTextNormal = Color(0xCCFFFFFF);
 
   static const textPrimary = Color(0xEBFFFFFF); // rgba(255,255,255,0.92)
   static const textSecondary = Color(0x73FFFFFF); // rgba(255,255,255,0.45)
@@ -145,9 +121,6 @@ class Tokens {
   static const iconLg = 20.0;
   static const iconXl = 28.0;
 
-  /// 手指/鼠标点击的抖动容差，小于此距离视为点击而非拖拽
-  static const double tapJitterThreshold = 18.0;
-
   static const spXs = 4.0;
   static const spSm = 8.0;
 
@@ -160,7 +133,6 @@ class Tokens {
   static const radiusSm = 8.0; // 按钮、speed 标签
   static const radiusMd = 14.0; // 色板方块、透射卡片图标
   static const radiusLg = 22.0; // 卡片、控制栏、hover 区域
-  static const radiusXl = 32.0; // 外框容器
   static const radiusBtn = 4.0;
   static const radiusLarge = 12.0; // 保留兼容
   static const radiusPopup = 8.0;
@@ -187,9 +159,6 @@ class Tokens {
   // auto-hide 控件淡入淡出专用 — 对齐 media_kit 原生 150ms(独立于
   // durationFade=400,后者驱动 center_controls 中心播放/暂停图标,隔离影响)
   static const durationControlsFade = 150;
-  static const durationSlide = 300;
-  static const durationDebounce = 500;
-  static const durationWindowResize = 100;
 
   // ── 自动隐藏 ──
   // 窗口/全屏统一 3s — 对齐 media_kit 原生隐藏延迟(原 windowed=5s 偏长)
@@ -205,8 +174,6 @@ class Tokens {
   // ── 标题栏 ──
   static const titleBarHeight = 32.0;
   static const titleBarButtonWidth = 36.0;
-  static const titleBarBg = Color(0xE61A1A24);
-  static const titleBarBorder = Color(0x33FFFFFF);
   static const titleBarHover = Color(0x1AFFFFFF);
   static const titleBarPressed = Color(0x33FFFFFF);
   static const closeHoverBg = Color(0xFFC42B1C);
@@ -243,19 +210,11 @@ class Tokens {
   static const workspaceMoveDuration = 150;
   static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
 
-  // ── 缩略图 ──
-  /// 缩略图播放中叠加层 — 半透明黑色标识当前播放项
-  static const thumbnailOverlay = Color(0x66000000);
-
-  /// 缩略图迷你进度条背景轨道
-  static const progressBarBg = Color(0x33FFFFFF);
-
   // ── 进度条 ──
   static const progressBarRadius = 2.0;
   static const progressBarHeight = 31.0;
   static const progressBarThickness = 3.0;
   static const progressBarThicknessDrag = 5.0;
-  static const progressThumbRadius = 7.0;
   static const progressPlayed = Color(0xFFFFFFFF); // 白色（与设计稿一致）
   static const Color progressThumb = Color(0xFFFFFFFF);
   static const int progressSeekThrottleMs = 150;
@@ -268,8 +227,6 @@ class Tokens {
   /// 避免进度条永久卡在 drag 位置. 兜底大于典型 seek 完成时间.
   static const int progressSeekHoldTimeoutMs = 2000;
 
-  /// 渐变条高度
-  static const double gradientStripHeight = 3.0;
   static const int progressExpandDurationMs = 200;
   static const double progressDragThreshold = 5.0;
   static const double progressDisabledBgAlpha = 0.3;
@@ -299,14 +256,7 @@ class Tokens {
   /// OSD 迷你进度条背景轨道色
   static const Color osdTrackColor = Color(0x33FFFFFF);
 
-  // ── 对话框 ──
-  /// 占位/空态对话框的居中大图标尺寸（如设置壳）
-  static const double dialogEmptyIconSize = 40;
-
   // ── 滑块 ──
-  static const double sliderHeight = 42;
-  static const double sliderLabelWidth = 64;
-  static const double sliderValueWidth = 36;
 
   // ── 错误卡片（Phase 3）──
   /// 折叠视图 message 文本的最大宽度 —— 长诊断文本省略号截断，
@@ -323,28 +273,17 @@ class Tokens {
   static const double errorCardMaxHeightRatio = 0.6;
 
   // ── 按钮尺寸 ──
-  static const double iconButtonSizeLarge = 48;
   static const double iconButtonSizeSmall = 24;
   static const double iconButtonRadius = 24;
   static const double iconButtonPaddingH = 20;
   static const double iconButtonPaddingV = 12;
 
   // ── 播放列表 ──
-  static const double playlistPanelWidth = 420;
-  static const double playlistPanelWidthNarrow = 320;
-  static const double playlistPanelHeight = 240;
-  static const double playlistPanelHeightNarrow = 180;
-  static const double thumbnailTileHeight = 124;
 
   /// 滚轮滑行动画时长 (v0.0.11 T4) — 拦截 wheel 信号后单 tick 的
   /// easeOutCubic 滑行时长; 连发滚轮时 animateTo 自动取消前段并从
   /// 当前位置接力重算, 形成连续滑行, 替代瞬跳 (flutter#31658).
   static const int playlistWheelGlideMs = 180;
-
-  // ── 断点 ──
-  static const double compactBreakpoint = 500;
-  static const double breakpointUltraCompact = 360;
-  static const double breakpointWide = 1200;
 
   // ── 控制栏局部布局 ──
   /// 控制栏内容与底部边缘之间的留白。
@@ -363,12 +302,8 @@ class Tokens {
   static const int skipShortMs = 10000;
   static const int skipLongMs = 30000;
 
-  // ── 字体补充 ──
-  static const double fontSizeSmall = 9.0;
-
   // ── Tooltip 延迟 ──
   static const int tooltipDelayShort = 400;
-  static const int tooltipDelayLong = 600;
 
   // ── 音量/倍速控件 ──
   static const double volumeSliderWidth = 100;
@@ -388,8 +323,4 @@ class Tokens {
   /// 方向辉光显示窗口（毫秒）—— setArrowGlow 后到此时长自动回 null (NAV-06)，
   /// 复用 osdDefaultHoldMs=1200 的瞬态显示先例。
   static const int arrowGlowDuration = 1200;
-
-  /// 输入提示淡入淡出时长（毫秒）—— AnimatedSwitcher 交叉淡入键盘↔手柄标签，
-  /// 复用 [durationSlide] 的瞬态切换先例 (NAV-03)。
-  static const int hintFadeDuration = durationSlide;
 }
