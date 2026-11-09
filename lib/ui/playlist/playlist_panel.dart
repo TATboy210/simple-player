@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,16 +10,16 @@ import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/models/playlist_sort.dart';
 import '../../l10n/app_localizations.dart';
-import '../shared/glass_confirm_strip.dart';
 import '../shared/osd_service.dart';
 import '../shared/control_bar_decoration.dart';
 import '../shared/glass_blur_layer.dart';
-import '../shared/glass_container.dart' show GlassButton, GlassTier;
-import '../shared/play_mode_utils.dart';
 import '../theme/tokens.dart';
-import 'playlist_tile.dart';
 import 'pending_playlist_confirmation.dart';
-import '../shared/owned_anchored_menu.dart';
+import 'playlist_confirmation_overlay.dart';
+import 'playlist_entry_list.dart';
+import 'playlist_panel_headers.dart';
+import 'playlist_sort_menu.dart';
+import 'playlist_wheel_glide.dart';
 import '../shared/secondary_surface_visibility.dart';
 
 /// 播放列表面板 — 右侧竖条, 控制栏同款圆角玻璃 (v0.0.5).
@@ -129,12 +128,19 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   late final Animation<double> _fade;
 
-  /// 条目列表滚动控制器 — Scrollbar 显式挂载用 (桌面默认滚动条贴边
-  /// 拉满高度, 底部与面板圆角相交).
-  final ScrollController _scrollController = ScrollController();
-  final Object _sortOwner = Object();
-  final FocusNode _sortFocus = FocusNode(debugLabel: 'playlist-sort-trigger');
-  OwnedMenuHandle<PlaylistSortKey>? _sortMenu;
+  /// 滚轮平滑滚动 (v0.0.11 T4) — 持有列表滚动控制器 (Scrollbar 显式挂载用,
+  /// 桌面默认滚动条贴边拉满高度, 底部与面板圆角相交).
+  final PlaylistWheelGlide _wheel = PlaylistWheelGlide();
+
+  /// 排序菜单控制器 (焦点 + 锚定菜单 + early key latch).
+  late final PlaylistSortMenu _sortMenu = PlaylistSortMenu(
+    isVisible: () => widget.visible,
+    isMounted: () => mounted,
+  );
+
+  /// 列表层合并监听源 — 断点开关 (可选) + 当前索引 + 锚点路径, 一次读取
+  /// 取代原三层嵌套 ValueListenableBuilder. 仅在底层 notifier 身份变化时重建.
+  late Listenable _listSignals = _mergeListSignals();
 
   /// 批量选择模式 (v0.0.7) — 右键菜单"批量删除"进入, 操作条退出.
   bool _batchMode = false;
@@ -152,6 +158,13 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   final FocusNode _confirmFocus = FocusNode(
     debugLabel: 'playlist-confirm-confirm',
   );
+
+  /// 合并列表层监听源 — resume 为 null 时不参与 (测试退路恒允许).
+  Listenable _mergeListSignals() => Listenable.merge([
+    ?widget.resumeEnabled,
+    widget.currentIndex,
+    widget.lastPlayedPath,
+  ]);
 
   /// Tab/Shift+Tab 焦点陷阱 (U2) — 确认卡是破坏性动作表面, 焦点越卡后
   /// Enter 可能误触卡外播放器控件; 此处抢在 FocusManager 默认 Tab 遍历
@@ -203,7 +216,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       duration: const Duration(milliseconds: Tokens.durationControlsFade),
     )..value = widget.visible ? 1.0 : 0.0;
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-    FocusManager.instance.addEarlyKeyEventHandler(_sortKeyEvent);
+    FocusManager.instance.addEarlyKeyEventHandler(_sortMenu.onEarlyKey);
     FocusManager.instance.addEarlyKeyEventHandler(_confirmationKey);
   }
 
@@ -216,25 +229,30 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     if (oldWidget.visible != widget.visible) {
       widget.visible ? _controller.forward() : _controller.reverse();
     }
+    // 底层 notifier 身份变化 (宿主换源) 才重建合并源, 常态零分配.
+    if (!identical(oldWidget.resumeEnabled, widget.resumeEnabled) ||
+        !identical(oldWidget.currentIndex, widget.currentIndex) ||
+        !identical(oldWidget.lastPlayedPath, widget.lastPlayedPath)) {
+      _listSignals = _mergeListSignals();
+    }
   }
 
   @override
   void deactivate() {
     _finishConfirmation(false, rebuild: false);
-    _sortMenu?.cancel();
+    _sortMenu.cancel();
     super.deactivate();
   }
 
   @override
   void dispose() {
-    FocusManager.instance.removeEarlyKeyEventHandler(_sortKeyEvent);
+    FocusManager.instance.removeEarlyKeyEventHandler(_sortMenu.onEarlyKey);
     FocusManager.instance.removeEarlyKeyEventHandler(_confirmationKey);
     _finishConfirmation(false, rebuild: false);
     _cancelFocus.dispose();
     _confirmFocus.dispose();
-    _sortMenu?.cancel();
-    _sortFocus.dispose();
-    _scrollController.dispose();
+    _sortMenu.dispose();
+    _wheel.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -295,65 +313,33 @@ class _PlaylistPanelState extends State<PlaylistPanel>
               excluding: _confirmation != null,
               child: _buildContent(context),
             ),
-            if (_confirmation case final pending?) _buildConfirmation(pending),
+            if (_confirmation case final pending?)
+              PlaylistConfirmationOverlay(
+                pending: pending,
+                cancelFocus: _cancelFocus,
+                confirmFocus: _confirmFocus,
+                onFinish: _finishConfirmation,
+                onKeyEvent: _confirmationTabTrap,
+              ),
           ],
         ),
       ),
     );
   }
 
-  /// The hit-test shield is bounded by the existing panel, never the player.
-  Widget _buildConfirmation(PendingPlaylistConfirmation pending) =>
-      Positioned.fill(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _finishConfirmation(false),
-                child: const ColoredBox(color: Tokens.bgGlass),
-              ),
-            ),
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.all(Tokens.spSm),
-                child: Center(
-                  // U2 封闭焦点域: FocusTraversalGroup 声明遍历边界,
-                  // FocusScope.onKeyEvent 执行 Tab/Shift+Tab 回绕拦截
-                  // (handled 先于 FocusManager 默认遍历生效).
-                  child: FocusScope(
-                    onKeyEvent: (node, event) => _confirmationTabTrap(event),
-                    child: FocusTraversalGroup(
-                      child: GlassConfirmStrip(
-                        message: pending.message,
-                        cancelLabel: AppLocalizations.of(context).cancel,
-                        confirmTooltip: AppLocalizations.of(context)
-                            .batchDeleteConfirmAction,
-                        cancelFocus: _cancelFocus,
-                        confirmFocus: _confirmFocus,
-                        onCancel: () => _finishConfirmation(false),
-                        onConfirm: () => _finishConfirmation(true),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-
   /// 面板装饰 — 控制栏同款 playing 装饰, 静态缓存.
   static final _panelDecoration = ControlBarDecoration.playing(
     borderRadius: BorderRadius.circular(Tokens.controlBarRadius),
   );
 
+  /// 标题行 + 条目区. 标题行常态: 标题 + 排序 + 模式切换 + 关闭;
+  /// 批量模式: 操作条. 无分割线 — 浑然天成 (v0.0.5 用户钦定): 标题行与
+  /// 条目纵列以呼吸间距自然过渡.
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 标题行 — 常态: 标题 + 排序 + 模式切换 + 关闭; 批量模式: 操作条.
         Padding(
           padding: const EdgeInsets.fromLTRB(
             Tokens.spMd,
@@ -361,137 +347,69 @@ class _PlaylistPanelState extends State<PlaylistPanel>
             Tokens.spSm,
             Tokens.spSm,
           ),
-          child: _batchMode
-              ? _buildBatchHeader(l10n)
-              : _buildNormalHeader(l10n),
+          child: _batchMode ? _buildBatchHeader() : _buildNormalHeader(),
         ),
-        // 无分割线 — 浑然天成 (v0.0.5 用户钦定): 标题行与条目纵列以
-        // 呼吸间距自然过渡.
         Expanded(
           child: ValueListenableBuilder<List<PlaylistItem>>(
             valueListenable: widget.entries,
-            builder: (_, items, _) {
-              if (items.isEmpty) {
-                return Center(
-                  child: Text(
-                    l10n.playlistEmpty,
-                    style: const TextStyle(
-                      color: Tokens.textSecondary,
-                      fontSize: Tokens.fontCaption,
-                    ),
-                  ),
-                );
-              }
-              // v0.0.6: 断点开关监听层 — null 恒允许 (测试退路),
-              // ValueListenableBuilder 直挂恒真 notifier 的开销省略.
-              // v0.0.6.2: 锚点监听层 — 停止态高亮随 lastPlayedPath 刷新.
-              final resume = widget.resumeEnabled;
-              if (resume == null) {
-                return ValueListenableBuilder<int>(
-                  valueListenable: widget.currentIndex,
-                  builder: (_, index, _) => ValueListenableBuilder<String?>(
-                    valueListenable: widget.lastPlayedPath,
-                    builder: (_, lastPlayed, _) =>
-                        _buildList(items, index, lastPlayed, true),
-                  ),
-                );
-              }
-              return ValueListenableBuilder<bool>(
-                valueListenable: resume,
-                builder: (_, allowed, _) => ValueListenableBuilder<int>(
-                  valueListenable: widget.currentIndex,
-                  builder: (_, index, _) => ValueListenableBuilder<String?>(
-                    valueListenable: widget.lastPlayedPath,
-                    builder: (_, lastPlayed, _) =>
-                        _buildList(items, index, lastPlayed, allowed),
-                  ),
-                ),
-              );
-            },
+            builder: (_, items, _) =>
+                items.isEmpty ? _buildEmpty(l10n) : _buildListLayer(items),
           ),
         ),
       ],
     );
   }
 
-  /// 常态标题行 — 标题 + 排序 + 模式切换 + 关闭 (v0.0.6: 三按钮统一
-  /// GlassButton.iconOnly 方块风格, 向控制栏看齐).
-  Widget _buildNormalHeader(AppLocalizations l10n) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            l10n.playlist,
-            style: const TextStyle(
-              color: Tokens.textPrimary,
-              fontSize: Tokens.fontBody,
-              fontWeight: Tokens.weightSemiBold,
-            ),
-          ),
+  /// 空队列占位文案.
+  Widget _buildEmpty(AppLocalizations l10n) {
+    return Center(
+      child: Text(
+        l10n.playlistEmpty,
+        style: const TextStyle(
+          color: Tokens.textSecondary,
+          fontSize: Tokens.fontCaption,
         ),
-        // 排序 (v0.0.6) — 弹出排序方式菜单.
-        Builder(
-          builder: (buttonContext) => GlassButton.iconOnly(
-            icon: Icons.sort,
-            focusNode: _sortFocus,
-            tooltip: l10n.sortBy,
-            onPressed: () => unawaited(_showSortMenu(buttonContext)),
-          ),
-        ),
-        // 模式切换 — 图标随 playMode 变化, 点击循环切换.
-        ValueListenableBuilder<PlayMode>(
-          valueListenable: widget.playMode,
-          builder: (_, mode, _) => GlassButton.iconOnly(
-            icon: playModeIcon(mode),
-            tooltip: playModeLabel(mode, l10n),
-            onPressed: widget.onCyclePlayMode,
-          ),
-        ),
-        GlassButton.iconOnly(
-          icon: Icons.close,
-          tooltip: l10n.close,
-          onPressed: widget.onClose,
-        ),
-      ],
+      ),
     );
   }
 
-  /// 批量模式操作条 (v0.0.7) — 已选计数 + 全选 + 删除 + 取消,
-  /// 按钮沿用 GlassButton.iconOnly 方块风格与标题行同框替换.
-  Widget _buildBatchHeader(AppLocalizations l10n) {
-    final selectedCount = _batchSelected.length;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            l10n.batchSelectedCount(selectedCount),
-            style: const TextStyle(
-              color: Tokens.accent,
-              fontSize: Tokens.fontBody,
-              fontWeight: Tokens.weightSemiBold,
-            ),
-          ),
-        ),
-        // 全选/反选 — 图标随全选态切换.
-        GlassButton.iconOnly(
-          icon: selectedCount > 0 ? Icons.deselect : Icons.select_all,
-          tooltip: l10n.selectAll,
-          onPressed: () => setState(_toggleSelectAll),
-        ),
-        // 删除 — 确认对话框后执行 (0 选中时禁用).
-        GlassButton.iconOnly(
-          icon: Icons.delete_outline,
-          tooltip: l10n.batchDeleteConfirmAction,
-          onPressed: selectedCount == 0
-              ? null
-              : () => unawaited(_confirmBatchDelete()),
-        ),
-        GlassButton.iconOnly(
-          icon: Icons.close,
-          tooltip: l10n.cancel,
-          onPressed: _exitBatchMode,
-        ),
-      ],
+  /// 列表监听层 — 断点开关 (v0.0.6, null 恒允许) + 当前索引 + 锚点路径
+  /// (v0.0.6.2) 经 [_listSignals] 合并为单层, 一次读取三个值.
+  Widget _buildListLayer(List<PlaylistItem> items) {
+    return ListenableBuilder(
+      listenable: _listSignals,
+      builder: (_, _) => _buildList(
+        items,
+        widget.currentIndex.value,
+        widget.lastPlayedPath.value,
+        widget.resumeEnabled?.value ?? true,
+      ),
+    );
+  }
+
+  /// 常态标题行 (排序/模式/关闭).
+  Widget _buildNormalHeader() {
+    return PlaylistNormalHeader(
+      sortFocus: _sortMenu.focusNode,
+      onSortPressed: (buttonContext) => _sortMenu.open(
+        buttonContext,
+        sortKey: widget.sortKey,
+        ascending: widget.sortAscending,
+        onSelected: widget.onSortSelected,
+      ),
+      playMode: widget.playMode,
+      onCyclePlayMode: widget.onCyclePlayMode,
+      onClose: widget.onClose,
+    );
+  }
+
+  /// 批量模式操作条 (v0.0.7).
+  Widget _buildBatchHeader() {
+    return PlaylistBatchHeader(
+      selectedCount: _batchSelected.length,
+      onToggleSelectAll: () => setState(_toggleSelectAll),
+      onDelete: () => unawaited(_confirmBatchDelete()),
+      onCancel: _exitBatchMode,
     );
   }
 
@@ -520,17 +438,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   /// 全选/反选 — 已全选则清空, 否则选中全部当前条目.
   void _toggleSelectAll() {
-    setState(() {
-      // 全选判定用 builder 内传入的 items 长度 — 此处经 entries 快照.
-      final total = widget.entries.value.length;
-      if (_batchSelected.length >= total) {
-        _batchSelected.clear();
-      } else {
-        _batchSelected
-          ..clear()
-          ..addAll([for (var i = 0; i < total; i++) i]);
-      }
-    });
+    // 全选判定经 entries 快照 (setState 回调内同步执行).
+    final total = widget.entries.value.length;
+    if (_batchSelected.length >= total) {
+      _batchSelected.clear();
+    } else {
+      _batchSelected
+        ..clear()
+        ..addAll([for (var i = 0; i < total; i++) i]);
+    }
   }
 
   /// Freeze target identities and wording before yielding to the user's choice.
@@ -597,195 +513,22 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     String? lastPlayed,
     bool resumeAllowed,
   ) {
-    // 批量模式越界防护 — 队列被外部变化 (引擎回流/落盘恢复) 收缩时,
-    // 选中索引可能越界; builder 内过滤保证渲染与删除输入恒有效.
-    final validSelection = _batchSelected
-        .where((i) => i >= 0 && i < items.length)
-        .toSet();
-    return ScrollbarTheme(
-      // 两端内缩一个圆角半径 — thumb 拉到底不再与面板圆角
-      // 相交 (Scrollbar 绘制区域不受 ListView padding 影响,
-      // margin 必须经 ScrollbarThemeData 传入).
-      data: const ScrollbarThemeData(
-        mainAxisMargin: Tokens.controlBarRadius,
-        crossAxisMargin: 3,
-      ),
-      child: Scrollbar(
-        controller: _scrollController,
-        thumbVisibility: true,
-        // 滚轮平滑滚动 (v0.0.11 T4): ListView 塌缩为显式 Scrollable+Viewport,
-        // Listener 必须位于 viewportBuilder 内层 — SDK PointerSignalResolver
-        // "第一注册者胜出" (命中测试自最深叶起派发), 内层注册先于 Scrollable
-        // 自带的瞬跳 Listener, wheel 信号竞拍裁给我们. physics 路线不可行:
-        // 它只过 shouldAcceptUserOffset 门, 收不到 wheel 事件.
-        child: Scrollable(
-          controller: _scrollController,
-          semanticChildCount: items.length,
-          viewportBuilder: (context, position) => Listener(
-            onPointerSignal: _onWheelSignal,
-            child: Viewport(
-              offset: position,
-              slivers: [
-                SliverPadding(
-                  // 底部 padding 让开面板圆角半径 — 滚动条拉到底不与
-                  // 圆角相交 (用户反馈); 右侧留白让滚动条不贴边.
-                  padding: const EdgeInsets.fromLTRB(
-                    Tokens.spXs,
-                    Tokens.spSm,
-                    8,
-                    Tokens.controlBarRadius,
-                  ),
-                  sliver: SliverList(
-                    // 参数对齐 ListView.builder 默认 (addAutomaticKeepAlives/
-                    // addRepaintBoundaries/addSemanticIndexes 恒 true) —
-                    // 防缩略图 keep-alive/重绘边界行为漂移.
-                    delegate: SliverChildBuilderDelegate((context, i) {
-                      // 状态合成 (v0.0.6.2): 播放中 = accent 蓝; 停止态
-                      // (index == -1) 的"上次会话最后播放"条目 = 续播锚点白
-                      // (path 匹配). 播放态锚已被 revision 同步为当前 path,
-                      // 两状态天然不并存.
-                      return PlaylistTile(
-                        item: items[i],
-                        isCurrent: i == index,
-                        isResumeAnchor:
-                            index < 0 && items[i].path == lastPlayed,
-                        onPlay: () => widget.onPlayEntry(i),
-                        onResume: () => widget.onResumeEntry(i),
-                        // v0.0.7: 单条移除也过确认条 (与批量共用正式文案).
-                        onRemove: () => unawaited(_confirmSingleRemove(i)),
-                        selectionMode: _batchMode,
-                        isSelected: validSelection.contains(i),
-                        onToggleSelect: () => _toggleSelect(i),
-                        onStartBatchSelect:
-                            widget.onRemoveEntries == null || _batchMode
-                            ? null
-                            : () => _enterBatchMode(i),
-                        resumeAllowed: resumeAllowed,
-                      );
-                    }, childCount: items.length),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return PlaylistEntryList(
+      items: items,
+      currentIndex: index,
+      lastPlayed: lastPlayed,
+      resumeAllowed: resumeAllowed,
+      controller: _wheel.controller,
+      onPointerSignal: _wheel.onSignal,
+      batchMode: _batchMode,
+      batchSelected: _batchSelected,
+      onPlay: widget.onPlayEntry,
+      onResume: widget.onResumeEntry,
+      onRemove: (i) => unawaited(_confirmSingleRemove(i)),
+      onToggleSelect: _toggleSelect,
+      onStartBatchSelect: widget.onRemoveEntries == null
+          ? null
+          : _enterBatchMode,
     );
   }
-
-  // ============================================================
-  // 滚轮平滑滚动 (v0.0.11 T4)
-  // ============================================================
-
-  /// 滚轮信号入口 — 注册进 PointerSignalResolver 竞拍.
-  ///
-  /// resolver 规则: 同一 signal 事件只有第一个 register 的回调生效,
-  /// 命中测试自最深叶起派发 → 内层 Listener 先注册 → 裁给我们;
-  /// Scrollable 自带的瞬跳 handler (flutter#31658 forcePixels) 因此被压制.
-  void _onWheelSignal(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent) return;
-    final position = _scrollController.position;
-    // 首帧空 content dimension 守卫 — 此时 min/maxScrollExtent 尚不可用.
-    if (!position.hasContentDimensions) return;
-    GestureBinding.instance.pointerSignalResolver.register(
-      event,
-      _handleWheelScroll,
-    );
-  }
-
-  /// resolver 中标回调 — wheel delta 换 easeOutCubic 滑行动画.
-  void _handleWheelScroll(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent) return;
-    _glide(event.scrollDelta.dy);
-  }
-
-  /// 从当前 pixels 滑向 clamp 目标 — 连发时 animateTo 自动取消前段并
-  /// 从当前位置接力重算, 形成连续滑行; 已在边界 (target == pixels)
-  /// 时空转不建动画, 不打断在飞的滑行.
-  void _glide(double delta) {
-    final position = _scrollController.position;
-    final target = clampDouble(
-      position.pixels + delta,
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    if (target == position.pixels) return;
-    unawaited(
-      _scrollController.animateTo(
-        target,
-        duration: const Duration(milliseconds: Tokens.playlistWheelGlideMs),
-        curve: Curves.easeOutCubic,
-      ),
-    );
-  }
-
-  // ============================================================
-  // 排序 (v0.0.6)
-  // ============================================================
-
-  /// Observe only the actual trigger: latch before FAD activates or mutates routes.
-  KeyEventResult _sortKeyEvent(KeyEvent event) {
-    final trigger = _sortFocus.context;
-    if (trigger == null ||
-        !_sortFocus.hasPrimaryFocus ||
-        !widget.visible ||
-        ModalRoute.of(trigger)?.isCurrent != true ||
-        SecondarySurfaceVisibility.read(trigger)?.value == false ||
-        event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.space) {
-      WorkspaceMenuScope.maybeOf(trigger)?.session.latchEvent(event);
-    }
-    return KeyEventResult.ignored;
-  }
-
-  /// 排序方式菜单 — 锚定排序按钮下方, 当前键打勾并显示方向箭头.
-  /// 同键再次选择 = 翻转方向 (由协调器裁定); 菜单为瞬态弹出,
-  /// 打开时读取的 sortKey/sortAscending 即最新状态.
-  Future<void> _showSortMenu(BuildContext buttonContext) async {
-    final l10n = AppLocalizations.of(context);
-    final handle = OwnedAnchoredMenu.open<PlaylistSortKey>(
-      buttonContext,
-      owner: _sortOwner,
-      triggerFocus: _sortFocus,
-      entries: [
-        for (final key in PlaylistSortKey.values)
-          OwnedMenuEntry(
-            value: key,
-            label: _sortKeyLabel(key, l10n),
-            isChecked: key == widget.sortKey,
-            icon: key == widget.sortKey
-                ? (widget.sortAscending
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward)
-                : null,
-          ),
-      ],
-    );
-    _sortMenu = handle;
-    final action = await handle.result;
-    if (!identical(_sortMenu, handle)) return;
-    _sortMenu = null;
-    if (!mounted ||
-        action == null ||
-        !widget.visible ||
-        !buttonContext.mounted ||
-        SecondarySurfaceVisibility.read(buttonContext)?.value == false ||
-        ModalRoute.of(buttonContext)?.isCurrent != true) {
-      return;
-    }
-    // Checked keys are still actions: the coordinator alone flips direction.
-    widget.onSortSelected(action.value);
-  }
-
-  /// 排序键 → 菜单文案.
-  static String _sortKeyLabel(PlaylistSortKey key, AppLocalizations l10n) =>
-      switch (key) {
-        PlaylistSortKey.addedOrder => l10n.sortByAddedOrder,
-        PlaylistSortKey.name => l10n.sortByName,
-        PlaylistSortKey.lastPlayed => l10n.sortByLastPlayed,
-        PlaylistSortKey.duration => l10n.sortByDuration,
-      };
 }

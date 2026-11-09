@@ -4,15 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/services/thumbnail_service.dart';
-import '../../kernel/utils/path_utils.dart';
-import '../../kernel/utils/time_utils.dart';
-import '../../l10n/app_localizations.dart';
-import '../shared/owned_anchored_menu.dart';
-import '../shared/secondary_surface_visibility.dart';
 import '../theme/tokens.dart';
-
-/// Captured playlist-entry actions, independent of the currently playing path.
-enum _EntryAction { play, locate, remove, batchDelete }
+import 'playlist_entry_menu.dart';
+import 'playlist_thumb_box.dart';
+import 'playlist_thumbnail.dart';
+import 'playlist_tile_info.dart';
+import 'playlist_tokens.dart';
 
 /// 播放列表条目卡 — 缩略图 + 透明"塑料膜"按钮层 + 右侧名称/断点信息.
 ///
@@ -83,12 +80,9 @@ class PlaylistTile extends StatefulWidget {
   State<PlaylistTile> createState() => _PlaylistTileState();
 }
 
-/// 缩略图三态（P-Thumb v1.3.2 §26）— loading/ready/failed 驱动占位与重试入口
-enum _ThumbPhase { loading, ready, failed }
-
 class _PlaylistTileState extends State<PlaylistTile> {
   ImageProvider? _thumbnail;
-  _ThumbPhase _phase = _ThumbPhase.loading;
+  PlaylistThumbPhase _phase = PlaylistThumbPhase.loading;
 
   /// 生命周期代次 — didUpdateWidget/dispose 递增失效旧异步回写（§26）
   int _loadGeneration = 0;
@@ -99,16 +93,14 @@ class _PlaylistTileState extends State<PlaylistTile> {
 
   /// 鼠标悬停态 — 驱动整卡背景微亮 (v0.0.6.2).
   bool _hovered = false;
-  OwnedMenuHandle<_EntryAction>? _menu;
-  final Object _menuOwner = Object();
-  final FocusNode _menuTrigger = FocusNode(
-    debugLabel: 'playlist-entry-trigger',
-  );
+
+  /// 右键菜单控制器 (句柄 + 触发器焦点).
+  final PlaylistEntryMenu _menu = PlaylistEntryMenu();
 
   @override
   void initState() {
     super.initState();
-    _loadThumbnail();
+    unawaited(_load(ThumbnailService.getThumbnail));
   }
 
   /// path 变化触发重载 — P-Thumb v1.3.2 §26.0 强制保留的触发器
@@ -117,14 +109,14 @@ class _PlaylistTileState extends State<PlaylistTile> {
   void didUpdateWidget(covariant PlaylistTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.item.path != widget.item.path) {
-      _menu?.cancel();
-      _loadThumbnail();
+      _menu.cancel();
+      unawaited(_load(ThumbnailService.getThumbnail));
     }
   }
 
   @override
   void deactivate() {
-    _menu?.cancel();
+    _menu.cancel();
     super.deactivate();
   }
 
@@ -132,15 +124,15 @@ class _PlaylistTileState extends State<PlaylistTile> {
   void dispose() {
     // dispose 后 generation 失效 + mounted false — 双保险拒绝旧回写（§26.4）
     _loadGeneration++;
-    _menu?.cancel();
-    _menuTrigger.dispose();
+    _menu.dispose();
     super.dispose();
   }
 
   /// 异步取缩略图 — 三保险防 path reuse（§26.2）：mounted + generation +
-  /// capturedPath。ThumbnailService 内部带 identity/LRU/磁盘缓存与降级；
-  /// 失败转入 failed 态（右侧出现重试入口），绝不阻断列表滚动.
-  Future<void> _loadThumbnail() async {
+  /// capturedPath。[fetch] 为 ThumbnailService.getThumbnail (常规加载) 或
+  /// retry (绕过缓存强制重新解帧, §27.4)；失败转入 failed 态（右侧出现
+  /// 重试入口），绝不阻断列表滚动.
+  Future<void> _load(Future<ImageProvider?> Function(String path) fetch) async {
     final generation = ++_loadGeneration;
     final path = widget.item.path;
 
@@ -149,48 +141,20 @@ class _PlaylistTileState extends State<PlaylistTile> {
     setState(() {
       _thumbnail = null;
       _decodeFailed = false;
-      _phase = _ThumbPhase.loading;
+      _phase = PlaylistThumbPhase.loading;
     });
 
-    final provider = await ThumbnailService.getThumbnail(path);
+    final provider = await fetch(path);
 
     if (!mounted || generation != _loadGeneration || path != widget.item.path) {
-      {
-        return;
-      }
+      return;
     }
 
     setState(() {
       _thumbnail = provider;
-      _phase = provider == null ? _ThumbPhase.failed : _ThumbPhase.ready;
-    });
-  }
-
-  /// 用户点击重试 — ThumbnailService.retry 强制绕过内存/磁盘缓存重新
-  /// 解帧（§27.4）；成功返回 MemoryImage 即时展示新 bytes.
-  Future<void> _retryThumbnail() async {
-    final generation = ++_loadGeneration;
-    final path = widget.item.path;
-
-    if (!mounted) return;
-
-    setState(() {
-      _thumbnail = null;
-      _decodeFailed = false;
-      _phase = _ThumbPhase.loading;
-    });
-
-    final provider = await ThumbnailService.retry(path);
-
-    if (!mounted || generation != _loadGeneration || path != widget.item.path) {
-      {
-        return;
-      }
-    }
-
-    setState(() {
-      _thumbnail = provider;
-      _phase = provider == null ? _ThumbPhase.failed : _ThumbPhase.ready;
+      _phase = provider == null
+          ? PlaylistThumbPhase.failed
+          : PlaylistThumbPhase.ready;
     });
   }
 
@@ -203,208 +167,9 @@ class _PlaylistTileState extends State<PlaylistTile> {
     return (position / duration).clamp(0.0, 1.0);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    // 状态色三态 (v0.0.6.2): 播放中 accent 蓝 / 续播锚点白 / 普通无边框.
-    // 名称色复用同一高亮色 — 锚点白与 textPrimary 同亮度, 视觉一致.
-    // v0.0.7: 批量选中态 = danger 红 (用户钦定, 与播放蓝区分语义).
-    final highlightColor = widget.isCurrent
-        ? Tokens.accent
-        : (widget.isResumeAnchor ? Tokens.playlistAnchorWhite : null);
-    final borderColor = widget.isSelected
-        ? Tokens.danger
-        : (highlightColor ?? Colors.transparent);
-
-    // v0.0.7: 边框**恒定 1.5px 占位** — 宽度 0↔1.5 切换会让条目内容区
-    // 随高亮跳变 (用户钦定: 选中前后条目尺寸不变); 透明↔有色仅过渡颜色.
-    const borderWidth = 1.5;
-
-    // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
-    return InkWell(
-      focusNode: _menuTrigger,
-      // v0.0.7: 批量选择模式下整卡点击 = 切换选中 (播放/续播让位).
-      onTap: widget.selectionMode ? widget.onToggleSelect : widget.onPlay,
-      // InkWell 默认 defer (箭头) — 整卡可点播, 显式给食指与膜按钮一致.
-      mouseCursor: SystemMouseCursors.click,
-      onSecondaryTapUp: (details) =>
-          _showContextMenu(context, details.globalPosition),
-      borderRadius: BorderRadius.circular(Tokens.radiusSm),
-      // hover 微亮 (v0.0.6.2) — 整卡背景白 tint 渐入渐出, 替代原蓝色
-      // 辉光边框 (blue glow 与播放态 accent 蓝语义混淆; 微亮即定位反馈,
-      // 不与两种状态高亮争夺视觉层级).
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: Tokens.durationNormal),
-          padding: const EdgeInsets.all(Tokens.spXs),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Tokens.radiusSm),
-            color: _hovered ? Tokens.glowHighlightWhite : Colors.transparent,
-            border: Border.all(color: borderColor, width: borderWidth),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 缩略图 — 透明塑料膜按钮层覆盖其上 (整个缩略图区域,
-              // 膜层 ClipRRect 与缩略图同款圆角 — 用户钦定).
-              SizedBox(
-                width: _thumbWidth,
-                height: _thumbHeight,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _buildThumbnail()),
-                    // v0.0.7: 批量选中指示 — 右上角勾选圆标.
-                    if (widget.selectionMode)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: Icon(
-                          widget.isSelected
-                              ? Icons.check_circle
-                              : Icons.radio_button_unchecked,
-                          size: 18,
-                          color: widget.isSelected
-                              ? Tokens.accent
-                              : Tokens.textSecondary,
-                        ),
-                      ),
-                    if (!widget.selectionMode)
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: _FilmButton(
-                                  icon: Icons.play_arrow,
-                                  label: l10n.play,
-                                  onTap: widget.onPlay,
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: _FilmButton(
-                                  icon: Icons.replay,
-                                  label: l10n.resumePlayback,
-                                  enabled: _resumeProgress != null,
-                                  onTap: _resumeProgress == null
-                                      ? null
-                                      : widget.onResume,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: Tokens.spSm),
-              // 名称 + 上次播放进度 — 缩略图右侧.
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 名称 + 失败重试入口同行 — 重试 24px 热区（§27.2）
-                    // 位于缩略图外，绝不覆盖 FilmButton 播放/续播分区.
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.item.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: highlightColor ?? Tokens.textPrimary,
-                              fontSize: Tokens.fontCaption,
-                            ),
-                          ),
-                        ),
-                        if (_showRetry) _buildRetryButton(),
-                      ],
-                    ),
-                    if (_resumeProgress != null) ...[
-                      const SizedBox(height: Tokens.spXs),
-                      // 上次播放进度 — 细进度条 + 断点时间.
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(Tokens.radiusSm),
-                        child: LinearProgressIndicator(
-                          value: _resumeProgress,
-                          minHeight: 3,
-                          backgroundColor: Colors.black26,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Tokens.accent,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        l10n.breakpointAt(
-                          formatMs(widget.item.positionMs ?? 0),
-                        ),
-                        style: const TextStyle(
-                          color: Tokens.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 缩略图宽度 — 决定条目高度 (16:9 → 72px).
-  static const _thumbWidth = 128.0;
-  static const _thumbHeight = 72.0;
-
-  /// 解码宽度上限 — 与 ThumbnailSpec 冻结值 320 一致（§14A.2，
-  /// 防 高 DPI 把 decoded image 无限制放大）.
-  static const _maxDecodeWidth = 320;
-
   /// 失败重试入口可见性 — provider 失败（phase failed）或解码失败
   /// （decodeFailed）任一即显示（§27.1/§27.3）.
-  bool get _showRetry => _phase == _ThumbPhase.failed || _decodeFailed;
-
-  /// 失败重试入口 — 24px 热区 icon-only（refresh 语义自明），
-  /// 位于名称行右侧，不改变 Tile 总高度（§27.1）.
-  Widget _buildRetryButton() {
-    return SizedBox(
-      width: Tokens.iconButtonSizeSmall,
-      height: Tokens.iconButtonSizeSmall,
-      child: IconButton(
-        // async 回调包 sync wrapper — VoidCallback 期望同步签名（DCM
-        // avoid-passing-async-when-sync-expected）；unawaited 显式弃 Future
-        onPressed: () => unawaited(_retryThumbnail()),
-        icon: const Icon(
-          Icons.refresh_outlined,
-          size: 16,
-          color: Tokens.textSecondary,
-        ),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(
-          minWidth: Tokens.iconButtonSizeSmall,
-          minHeight: Tokens.iconButtonSizeSmall,
-        ),
-      ),
-    );
-  }
-
-  /// loading/failed 共用占位 — 电影 icon（§27.1：不为 loading 加独立
-  /// spinner 噪音；failed 的重试入口在名称行）.
-  Widget _thumbPlaceholder() {
-    return const Center(
-      child: Icon(Icons.movie_outlined, size: 22, color: Tokens.textSecondary),
-    );
-  }
+  bool get _showRetry => _phase == PlaylistThumbPhase.failed || _decodeFailed;
 
   /// 解码失败回写 — errorBuilder 在 build 期间触发，post-frame 再 setState.
   void _scheduleDecodeFailed() {
@@ -414,275 +179,115 @@ class _PlaylistTileState extends State<PlaylistTile> {
     });
   }
 
-  /// 16:9 缩略图三态渲染（§27.1）— 占位 → 异步图像; ready 按 Tile 物理
-  /// 宽度解码降内存（§14A.2：显示不变，decoded 工作集 ~230→~144 KiB/张）.
-  ///
-  /// 261009-o8z T5: 占位图标恒在 Stack 底层, ready 成图经
-  /// TweenAnimationBuilder ~150ms 淡入覆盖 — 消除占位→成图同帧硬切的
-  /// 弹现感 (UAT 实证体验问题); 淡入期间占位从成图底下透出是需求本身.
-  Widget _buildThumbnail() {
-    final thumbnail = _thumbnail;
-    final isReady = _phase == _ThumbPhase.ready;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(Tokens.radiusSm),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 占位底色 — 缩略图加载完成前保持视觉占位.
-          const ColoredBox(color: Tokens.bgGlass),
-          // 占位图标恒在底层（不再条件化）— ready 淡入期间从底下透出.
-          _thumbPlaceholder(),
-          if (isReady && thumbnail != null)
-            // 单次插值淡入 — 无常驻 AnimationController; 挂载即从 0 起步,
-            // retry/重载触发重挂载时自动二次淡入. DPR 变化换图不重挂载
-            // (gaplessPlayback), TweenAnimationBuilder 不重建 → 不重播.
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: Tokens.durationNormal),
-              builder: (_, value, child) =>
-                  Opacity(opacity: value, child: child),
-              child: Image(
-                image: ResizeImage(
-                  thumbnail,
-                  // 单轴 width 保持纵横比 — 128 logical × DPR，clamp 128..320
-                  width: (_thumbWidth * MediaQuery.devicePixelRatioOf(context))
-                      .round()
-                      .clamp(_thumbWidth.toInt(), _maxDecodeWidth)
-                      .toInt(),
-                ),
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (context, error, stack) {
-                  // bytes 损坏等解码失败 — 立即占位 + post-frame 揭示重试入口
-                  _scheduleDecodeFailed();
-                  return _thumbPlaceholder();
-                },
-              ),
-            ),
-        ],
-      ),
-    );
+  /// 状态高亮色 — 播放中 accent 蓝 / 续播锚点白 / 普通 null.
+  Color? get _highlightColor {
+    if (widget.isCurrent) return Tokens.accent;
+    return widget.isResumeAnchor ? Tokens.playlistAnchorWhite : null;
   }
 
-  /// 右键菜单 — captured pointer/path, exact typed route, no legacy double claim.
-  Future<void> _showContextMenu(BuildContext context, Offset position) async {
-    final path = widget.item.path;
-    final l10n = AppLocalizations.of(context);
-    final handle = OwnedAnchoredMenu.open<_EntryAction>(
-      context,
-      owner: _menuOwner,
-      position: position,
-      triggerFocus: _menuTrigger,
-      // State/FocusNode reuse does not mean the captured entry still owns focus
-      // return. Capture only its path, never the mutable playback/item object.
-      isOwnerValid: () => mounted && widget.item.path == path,
-      entries: [
-        OwnedMenuEntry(
-          value: _EntryAction.play,
-          label: l10n.play,
-          icon: Icons.play_arrow,
-        ),
-        OwnedMenuEntry(
-          value: _EntryAction.locate,
-          label: l10n.openFileLocation,
-          icon: Icons.folder_open,
-        ),
-        OwnedMenuEntry(
-          value: _EntryAction.remove,
-          label: l10n.remove,
-          icon: Icons.delete_outline,
-          isDestructive: true,
-        ),
-        if (widget.onStartBatchSelect != null)
-          OwnedMenuEntry(
-            value: _EntryAction.batchDelete,
-            label: l10n.batchDelete,
-            icon: Icons.checklist,
-          ),
-      ],
-    );
-    _menu = handle;
-    final selection = await handle.result;
-    if (!identical(_menu, handle)) return;
-    _menu = null;
-    if (!mounted ||
-        !context.mounted ||
-        selection == null ||
-        path != widget.item.path ||
-        SecondarySurfaceVisibility.read(context)?.value == false ||
-        ModalRoute.of(context)?.isCurrent != true) {
-      return;
-    }
-    // Act only on the captured entry; a playback switch never invalidates this menu.
-    switch (selection.value) {
-      case _EntryAction.play:
-        widget.onPlay();
-      case _EntryAction.locate:
-        PathUtils.openFileLocation(path);
-      case _EntryAction.remove:
-        widget.onRemove();
-      case _EntryAction.batchDelete:
-        widget.onStartBatchSelect?.call();
-    }
-  }
-}
-
-/// 透明"塑料膜"按钮分区 — 覆盖缩略图的一片区域, 交互三态:
-/// 静置完全透明 (缩略图焦点不受损), hover 微亮 (white 6%), 按下变暗
-/// (black 12%, pointer-down 即时 — Apple fluid interfaces §1).
-///
-/// 两段延迟揭示 (用户钦定): hover 1s 后图标渐显 (居中), 再 1s 后功能名
-/// 渐进展示 — [ClipRect] 内 `Align(widthFactor)` 由 [TweenAnimationBuilder]
-/// 驱动文字展开, 图标被自然推左; 移出立即反向渐退 (计时器作废, 两态同帧
-/// 回落, [AnimatedOpacity]/widthFactor 各自渐退).
-class _FilmButton extends StatefulWidget {
-  final IconData icon;
-  final String label;
-
-  /// null = 禁用 (如无断点的续播) — 不响应点击, hover 无反馈.
-  final VoidCallback? onTap;
-
-  /// 禁用态显式标记 — 与 onTap == null 同源传入, 驱动图标淡化.
-  final bool enabled;
-
-  const _FilmButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.enabled = true,
-  });
-
-  @override
-  State<_FilmButton> createState() => _FilmButtonState();
-}
-
-class _FilmButtonState extends State<_FilmButton> {
-  bool _hovering = false;
-  bool _pressed = false;
-
-  /// 两段延迟揭示状态 — hover 1s 后图标渐显, 再 1s 后文字展开.
-  bool _iconShown = false;
-  bool _textShown = false;
-  Timer? _iconTimer;
-  Timer? _textTimer;
-
-  /// 图标显现的 hover 延迟 (用户钦定 0.4s).
-  static const _iconDelay = Duration(milliseconds: 400);
-
-  /// 文字展开距图标显现的间隔 (用户钦定再 1s).
-  static const _textDelay = Duration(seconds: 1);
-
-  static const _fadeDuration = Duration(
-    milliseconds: Tokens.durationControlsFade,
-  );
-
-  bool get _enabled => widget.enabled && widget.onTap != null;
-
-  void _onEnter() {
-    setState(() => _hovering = true);
-    if (!_enabled) return;
-    _iconTimer = Timer(_iconDelay, () {
-      if (!mounted) return;
-      setState(() => _iconShown = true);
-      _textTimer = Timer(_textDelay, () {
-        if (mounted) setState(() => _textShown = true);
-      });
-    });
-  }
-
-  void _onExit() {
-    // 移出立即反向渐退 — 计时器作废, 两态同帧回落 (AnimatedOpacity 与
-    // widthFactor 各自渐退), 未触发的延迟揭示不再发生.
-    _iconTimer?.cancel();
-    _textTimer?.cancel();
-    _iconTimer = null;
-    _textTimer = null;
-    setState(() {
-      _hovering = false;
-      _pressed = false;
-      _iconShown = false;
-      _textShown = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _iconTimer?.cancel();
-    _textTimer?.cancel();
-    super.dispose();
-  }
+  /// 边框色三态 (v0.0.6.2) + v0.0.7 批量选中 = danger 红 (用户钦定,
+  /// 与播放蓝区分语义).
+  Color get _borderColor => widget.isSelected
+      ? Tokens.danger
+      : (_highlightColor ?? Colors.transparent);
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: _enabled ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) => _onEnter(),
-      onExit: (_) => _onExit(),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
-        onTapCancel: _enabled ? () => setState(() => _pressed = false) : null,
-        onTap: widget.onTap,
+    // v0.0.5: 去掉条目名称 Tooltip (用户反馈) — 膜层悬停文字已是提示.
+    return InkWell(
+      focusNode: _menu.trigger,
+      // v0.0.7: 批量选择模式下整卡点击 = 切换选中 (播放/续播让位).
+      onTap: widget.selectionMode ? widget.onToggleSelect : widget.onPlay,
+      // InkWell 默认 defer (箭头) — 整卡可点播, 显式给食指与膜按钮一致.
+      mouseCursor: SystemMouseCursors.click,
+      onSecondaryTapUp: (details) =>
+          unawaited(_showContextMenu(context, details.globalPosition)),
+      borderRadius: BorderRadius.circular(Tokens.radiusSm),
+      // hover 微亮 (v0.0.6.2) — 整卡背景白 tint 渐入渐出, 替代原蓝色
+      // 辉光边框 (blue glow 与播放态 accent 蓝语义混淆).
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100), // 即时反馈 (§1)
-          color: _pressed
-              ? Colors.black.withValues(alpha: 0.12)
-              : _hovering && _enabled
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: _buildContent(),
+          duration: const Duration(milliseconds: Tokens.durationNormal),
+          padding: const EdgeInsets.all(Tokens.spXs),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Tokens.radiusSm),
+            color: _hovered ? Tokens.glowHighlightWhite : Colors.transparent,
+            // 边框**恒定占位** — 宽度 0↔1.5 切换会让条目内容区随高亮跳变
+            // (用户钦定: 选中前后条目尺寸不变); 透明↔有色仅过渡颜色.
+            border: Border.all(
+              color: _borderColor,
+              width: PlaylistTokens.tileBorderWidth,
+            ),
+          ),
+          child: _buildRow(),
         ),
       ),
     );
   }
 
-  /// 图标 + 渐显文字 — 图标 hover 1s 后渐显 (居中), 文字再 1s 后
-  /// widthFactor 0→1 展开, 图标被推左.
-  Widget _buildContent() {
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 图标 — hover 1s 后渐显.
-          AnimatedOpacity(
-            opacity: _iconShown && _enabled ? 1.0 : 0.0,
-            duration: _fadeDuration,
-            child: Icon(
-              widget.icon,
-              size: 22,
-              color: _enabled ? Tokens.textPrimary : Tokens.textSecondary,
-            ),
+  /// 缩略图盒 + 右侧信息列.
+  Widget _buildRow() {
+    final progress = _resumeProgress;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PlaylistThumbBox(
+          thumbnail: PlaylistThumbnail(
+            thumbnail: _thumbnail,
+            phase: _phase,
+            onDecodeFailed: _scheduleDecodeFailed,
           ),
-          // 渐显文字区 — ClipRect + widthFactor 0→1 (展开推图标左移);
-          // 静置宽 0 不占位, 缩略图焦点不受损.
-          ClipRect(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: _textShown && _enabled ? 1.0 : 0.0),
-              duration: _fadeDuration,
-              curve: Curves.easeInOut,
-              builder: (_, width, child) => Align(
-                alignment: Alignment.centerLeft,
-                widthFactor: width,
-                heightFactor: 1.0,
-                child: child,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    color: Tokens.textPrimary,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ),
+          selectionMode: widget.selectionMode,
+          isSelected: widget.isSelected,
+          canResume: progress != null,
+          onPlay: widget.onPlay,
+          onResume: widget.onResume,
+        ),
+        const SizedBox(width: Tokens.spSm),
+        // 名称 + 上次播放进度 — 缩略图右侧.
+        Expanded(
+          child: PlaylistTileInfo(
+            name: widget.item.name,
+            nameColor: _highlightColor ?? Tokens.textPrimary,
+            showRetry: _showRetry,
+            // async 回调包 sync wrapper — VoidCallback 期望同步签名；
+            // unawaited 显式弃 Future.
+            onRetry: () => unawaited(_load(ThumbnailService.retry)),
+            resumeProgress: progress,
+            positionMs: widget.item.positionMs ?? 0,
           ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  /// 右键菜单 — 动作只作用于发起时捕获的条目路径.
+  Future<void> _showContextMenu(BuildContext context, Offset position) {
+    final path = widget.item.path;
+    return _menu.open(
+      context,
+      position,
+      path: path,
+      currentPath: () => widget.item.path,
+      isMounted: () => mounted,
+      canBatchDelete: widget.onStartBatchSelect != null,
+      onAction: (action) => _dispatch(action, path),
+    );
+  }
+
+  /// 执行菜单动作 — playback switch 不使菜单失效, 故 locate 用捕获路径.
+  void _dispatch(PlaylistEntryAction action, String path) {
+    switch (action) {
+      case PlaylistEntryAction.play:
+        widget.onPlay();
+      case PlaylistEntryAction.locate:
+        PlaylistEntryMenu.locate(path);
+      case PlaylistEntryAction.remove:
+        widget.onRemove();
+      case PlaylistEntryAction.batchDelete:
+        widget.onStartBatchSelect?.call();
+    }
   }
 }
