@@ -123,7 +123,7 @@ void main() {
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('音频'), findsOneWidget);
     // 两级覆盖导航：L0 时分区内容不可见（内容层 Offstage，默认 find 即排除）。
-    expect(find.text('media_kit'), findsNothing);
+    expect(find.text('mpv_kit'), findsNothing);
     expect(find.byType(GeneralSettingsContent), findsNothing);
   });
 
@@ -136,7 +136,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 开源技术区 — 顶部组件（真实在用的引擎封装与框架）必在首屏。
-    expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
+    expect(find.text('mpv_kit', skipOffstage: false), findsOneWidget);
     expect(find.text('Flutter', skipOffstage: false), findsOneWidget);
     // LGPL 组件（mpv/libmpv 与 FFmpeg）共用同一许可证标识；窄面板下
     // ListView 按视口裁剪构建，断言视口内至少出现一个。
@@ -208,7 +208,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(GeneralSettingsContent), findsOneWidget);
-      expect(find.text('media_kit', skipOffstage: false), findsNothing);
+      expect(find.text('mpv_kit', skipOffstage: false), findsNothing);
 
       // 选中高亮是持续态（区别于 hover 的瞬态）：bgHover 底；
       // 未选中的「关于」chip 无底色。
@@ -236,13 +236,13 @@ void main() {
     await tester.tap(find.byTooltip('返回'));
     await tester.pumpAndSettle();
     expect(find.byType(GeneralSettingsContent), findsNothing);
-    expect(find.text('media_kit', skipOffstage: false), findsNothing);
+    expect(find.text('mpv_kit', skipOffstage: false), findsNothing);
 
     await tester.tap(find.text('关于'));
     await tester.pumpAndSettle();
 
     // About 内容回归 —— 通用/关于互切均可达。
-    expect(find.text('media_kit', skipOffstage: false), findsOneWidget);
+    expect(find.text('mpv_kit', skipOffstage: false), findsOneWidget);
     expect(find.byType(GeneralSettingsContent), findsNothing);
   });
 
@@ -255,7 +255,7 @@ void main() {
     await tester.tap(find.text('视频'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(GeneralSettingsContent), findsNothing);
-    expect(find.text('media_kit'), findsNothing);
+    expect(find.text('mpv_kit'), findsNothing);
 
     // 灰显语义结构锁：38% 不透明度 + IgnorePointer 保持原状。
     // .first 取最内层（chip 自身的 Opacity/IgnorePointer）。
