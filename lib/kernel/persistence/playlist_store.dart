@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -159,27 +160,70 @@ class PlaylistStore {
 
   /// 保存快照; 失败仅记日志（断点丢失可接受, 不打断播放流程）.
   ///
-  /// **写入串行化**: 保存是 fire-and-forget, 切曲/节流/排序可能密集并发
-  /// 触发 — 并发 `writeAsString` 的 open/write/close 交错会让旧快照
-  /// 后完成、覆盖新快照. 链式队列保证按调用顺序落盘 (last-call-wins).
+  /// **写入串行化 + 合并 (coalescing)**: 保存是 fire-and-forget, 切曲/节流/
+  /// 排序可能密集并发触发 — 并发写的 open/write/close 交错会让旧快照
+  /// 后完成、覆盖新快照, 故同一时刻只有一个写在进行 (last-call-wins).
+  /// 写入进行期间到达的多个快照只保留**最新一份** (旧的被它取代, 不落盘,
+  /// 省掉整队列序列化 + 原子发布的中间代价); 返回的 Future 在"不早于
+  /// 本快照的那次写入"完成时兑现 — `await save(x)` 后 [load] 读到的恒为
+  /// x 或更新的快照.
   Future<void> save(PersistedPlaylistSnapshot snapshot) {
-    // 链式续接是写入串行化的核心模式 — async/await 改写会破坏 last-call-wins.
-    // ignore: prefer-async-await
-    final operation = _writeQueue.then((_) => _write(snapshot));
-    // 链续接吞异常防断裂 — _write 内部已捕获 Exception, 此处兜底.
-    // 空块刻意: 断链异常已由 _write 记日志, 此处仅维持队列不断裂.
-    // ignore: no-empty-block
-    _writeQueue = operation.catchError((Object _) {});
-    return operation;
+    _pending = snapshot;
+    final done = _pendingDone ??= Completer<void>();
+    if (!_draining) {
+      _draining = true;
+      unawaited(_drain());
+    }
+    return done.future;
   }
 
-  /// 串行写入队列 — 所有 save 依次执行.
-  Future<void> _writeQueue = Future<void>.value();
+  /// 待写的最新快照 (null = 无待写) 与其共享完成信号.
+  PersistedPlaylistSnapshot? _pending;
+  Completer<void>? _pendingDone;
+
+  /// 是否已有排水循环在跑 — 保证同一时刻至多一个写.
+  bool _draining = false;
+
+  /// 排水循环: 取走当前待写快照 → 写 → 兑现等待者, 直到无待写.
+  ///
+  /// [_write] 内部已捕获 Exception 记日志, 此处 finally 兜底保证等待者
+  /// 必被兑现; Error 子类不吞 (编程 bug 必须暴露给 zone).
+  Future<void> _drain() async {
+    try {
+      while (true) {
+        final snapshot = _pending;
+        final done = _pendingDone;
+        if (snapshot == null || done == null) return;
+        _pending = null;
+        _pendingDone = null;
+        try {
+          await _write(snapshot);
+        } finally {
+          done.complete();
+        }
+      }
+    } finally {
+      _draining = false;
+    }
+  }
 
   /// temp 唯一后缀计数器 — microseconds + counter（§30.5, 同
-  /// thumbnail_disk_cache 方案; 写入已由 _writeQueue 串行化,
-  /// counter 仅为防御性唯一性）.
+  /// thumbnail_disk_cache 方案; 写入已串行化, counter 仅为防御性唯一性）.
   int _writeCounter = 0;
+
+  /// 成功发布次数 — 驱动 [_shouldSweep] 的降频判定.
+  int _publishCount = 0;
+
+  /// 前 N 次发布每次都清扫 — 覆盖启动期 (上次崩溃残留 + 紧随的第二次写).
+  static const _sweepEveryPublishUntil = 2;
+
+  /// 此后每 N 次发布清扫一次 — `.part` 只可能由崩溃/并发实例产生,
+  /// 稳态下每次 `directory.list()` 是纯开销.
+  static const _sweepInterval = 12;
+
+  bool get _shouldSweep =>
+      _publishCount <= _sweepEveryPublishUntil ||
+      _publishCount % _sweepInterval == 0;
 
   Future<void> _write(PersistedPlaylistSnapshot snapshot) async {
     try {
@@ -195,8 +239,9 @@ class PlaylistStore {
         'items': [for (final item in snapshot.items) item.toJson()],
       };
       await _publishAtomic(directory, jsonEncode(json));
-      // rename 成功 = 发布完成 — 此刻清扫历史崩溃 .part 残留（见清扫注释）.
-      await _sweepStaleParts(directory);
+      // rename 成功 = 发布完成 — 按降频策略清扫历史崩溃 .part 残留.
+      _publishCount++;
+      if (_shouldSweep) await _sweepStaleParts(directory);
     } on Exception catch (error) {
       _log.w(
         'PlaylistStore: failed to save playlist.json',
@@ -275,7 +320,7 @@ class PlaylistStore {
   /// 清扫 `.part` 崩溃残留 — 历史中断写入不再无限累积（T-261009-fj2-03）.
   ///
   /// 调用时机安全性: 本 save 的 temp 已被 rename 消费, 且写入由
-  /// _writeQueue 串行化 — 此刻目录内不存在正在写的 temp, 整体清扫无竞争.
+  /// 排水循环串行化 — 此刻目录内不存在正在写的 temp, 整体清扫无竞争.
   /// 逐个 best-effort 吞异常（单文件被锁不影响其余）; 目录不可列（锁/权限）
   /// 时整体放弃, 残留留待下次 — 不影响本次 save 已成功的事实.
   Future<void> _sweepStaleParts(Directory directory) async {
@@ -325,23 +370,8 @@ class PlaylistStore {
     final rawLastPlayed = decoded['lastPlayedPath'];
     final lastPlayedPath = rawLastPlayed is String ? rawLastPlayed : null;
 
-    final rawItems = decoded['items'];
-    if (rawItems is! List) return null;
-    final items = <PlaylistItem>[];
-    for (final raw in rawItems) {
-      if (raw is! Map<String, dynamic>) continue; // 损坏条目跳过, 不弃整个队列
-      try {
-        items.add(PlaylistItem.fromJson(raw));
-      } on FormatException {
-        continue;
-      }
-    }
-    // v1 迁移: 条目缺 addedSeq 按数组下标合成 — 旧文件顺序即添加顺序.
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].addedSeq == null) {
-        items[i] = items[i].copyWith(addedSeq: i);
-      }
-    }
+    final items = _parseItems(decoded['items']);
+    if (items == null) return null;
     return PersistedPlaylistSnapshot(
       items: items,
       playMode: playMode,
@@ -349,5 +379,26 @@ class PlaylistStore {
       sortAscending: sortAscending,
       lastPlayedPath: lastPlayedPath,
     );
+  }
+
+  /// 解析条目数组 — 非 List 返回 null (整体损坏); 损坏条目跳过不弃整个队列;
+  /// v1 迁移: 条目缺 addedSeq 按数组下标合成 — 旧文件顺序即添加顺序.
+  List<PlaylistItem>? _parseItems(Object? rawItems) {
+    if (rawItems is! List) return null;
+    final items = <PlaylistItem>[];
+    for (final raw in rawItems) {
+      if (raw is! Map<String, dynamic>) continue;
+      try {
+        items.add(PlaylistItem.fromJson(raw));
+      } on FormatException {
+        continue;
+      }
+    }
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].addedSeq == null) {
+        items[i] = items[i].copyWith(addedSeq: i);
+      }
+    }
+    return items;
   }
 }

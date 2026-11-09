@@ -6,6 +6,7 @@
 /// 无 libmpv FFI, headless 安全.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -264,6 +265,68 @@ void main() {
         isEmpty,
         reason: '放弃时清除 temp',
       );
+    });
+  });
+
+  group('写入合并 + 清扫降频 (v0.0.13)', () {
+    test('写入进行期间到达的快照只保留最新一份 — 中间代不落盘', () async {
+      final tempDir = await Directory.systemTemp.createTemp('plstore_coalesce');
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = _storeFor(tempDir);
+      var publishes = 0;
+      store.renameOverride = (temp, target) async {
+        publishes++;
+        await temp.rename(target);
+      };
+
+      // 同步连发 A/B/C: A 立即开写, B 被 C 取代 — 只发布 A 与 C 两次.
+      final futures = [
+        store.save(_snapshot(paths: ['D:/a.mp4'])),
+        store.save(_snapshot(paths: ['D:/b.mp4'])),
+        store.save(_snapshot(paths: ['D:/c.mp4'])),
+      ];
+      await Future.wait(futures);
+
+      expect(publishes, 2, reason: '3 次 save → 2 次完整序列化+发布 (旧实现 3 次)');
+      final loaded = await store.load();
+      expect(loaded!.items.map((e) => e.path), [
+        'D:/c.mp4',
+      ], reason: '最终态为最后一次调用');
+    });
+
+    test('await save(x) 返回时 x (或更新快照) 已落盘', () async {
+      final tempDir = await Directory.systemTemp.createTemp('plstore_await');
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = _storeFor(tempDir);
+
+      unawaited(store.save(_snapshot(paths: ['D:/old.mp4'])));
+      await store.save(_snapshot(paths: ['D:/new.mp4']));
+
+      final loaded = await store.load();
+      expect(loaded!.items.map((e) => e.path), ['D:/new.mp4']);
+    });
+
+    test('清扫降频 — 稳态下 .part 残留延至第 12 次发布才清扫', () async {
+      final tempDir = await Directory.systemTemp.createTemp('plstore_sweep');
+      addTearDown(() => _deleteTempDir(tempDir));
+      final store = _storeFor(tempDir);
+
+      // 前 3 次发布 (含启动窗口内的前 2 次) 之后再伪造崩溃残留.
+      for (var i = 0; i < 3; i++) {
+        await store.save(_snapshot(paths: ['D:/$i.mp4']));
+      }
+      final part = File('${tempDir.path}/playlist.json.1728000000000-1.part');
+      await part.writeAsString('{"version": 3, "ite');
+
+      // 第 4~11 次发布: 不扫目录, 残留仍在 (降频生效).
+      for (var i = 3; i < 11; i++) {
+        await store.save(_snapshot(paths: ['D:/$i.mp4']));
+      }
+      expect(part.existsSync(), isTrue, reason: '稳态下不逐次 list 目录');
+
+      // 第 12 次发布: 周期清扫 — 残留被回收, 契约不破.
+      await store.save(_snapshot(paths: ['D:/12.mp4']));
+      expect(part.existsSync(), isFalse);
     });
   });
 }
