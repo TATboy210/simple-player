@@ -134,8 +134,9 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       // 守卫, 用户在恢复完成前已拖入文件时快照自动让位.
       widget.startupTimeline.mark(StartupTimeline.phaseRestoreDispatch);
       unawaited(_services.playlistCoordinator.restoreFromDisk());
-    } on Exception catch (e, stackTrace) {
-      // 只接 Exception — Error 子类是编程错误, 交全局钩子（错误卡片）而非吞入兜底页.
+    } on Object catch (e, stackTrace) {
+      // 刻意接 Object（含 Error）: 与 main.dart 组合根同口径 — init 任何失败都
+      // 必须落到可见的兜底页, 否则 Error 逸出后界面永远停在未就绪态且无提示.
       KernelLogger.I.e(
         '[PlayerFeature] init failed: $e',
         error: e,

@@ -123,13 +123,15 @@ class App extends StatelessWidget {
 /// 标题栏。[mode] 为 null 时按窗口化偏移定位（确定性分支，供 tear-off
 /// 调用方与非窗口宿主使用）。
 ///
-/// hit-test 边界（CARD-02 / T-03-04）：宿主以 Positioned(left, top) 内在尺寸
-/// 挂载——RenderStack 对未被子节点覆盖的位置 hitTestSelf 返回 false，点击
-/// 自然穿透到下层内容。严禁 Positioned.fill/全尺寸透明容器包裹宿主，严禁
-/// IgnorePointer 包卡片——过大的可命中矩形会吞掉全应用的点击。
+/// hit-test 边界（CARD-02 / T-03-04）：卡片层以 Positioned.fill +
+/// CustomSingleChildLayout 铺满 Stack，卡片上限（宽 420、高 0.6×窗口高）在
+/// 布局期由 delegate 计算，不再每帧读 MediaQuery 重建。点击穿透靠整条包装链
+/// 自身不参与命中：RenderCustomSingleChildLayoutBox 是 RenderShiftedBox，
+/// hitTestSelf 默认 false，只有卡片子树命中，空白区域落到下层内容。
+/// 严禁在这条链上加带背景的 Container/GestureDetector(opaque)/IgnorePointer
+/// 包卡片——任何会 hitTestSelf 的节点都会吞掉全应用的点击。
 /// （Positioned 经 ValueListenableBuilder 构建仍作用于 RenderStack：VLB 不
-/// 引入 render object，ParentData 直达 Stack——穿透语义不变，仅 top 值随
-/// mode 变化。）
+/// 引入 render object，ParentData 直达 Stack，仅 top 值随 mode 变化。）
 ///
 /// 局部 Overlay（CR-01 修复配套）：卡片挂载于 Navigator 之外（D-10，root
 /// Stack 层），子树内没有 Overlay 祖先 —— 展开详情的 SelectableText 在点击
