@@ -1,120 +1,38 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 
 /// 边缘微光容器 — 渐变描边 + 5 层 box-shadow 发光.
 ///
-/// 设计语言中的微光效果（原 pulse/omni 变体为死代码，已于 2026-09-08
-/// 移除 —— pulse 携带永不停止的 AnimationController.repeat() 每帧动画，
-/// 留在代码库中是误用陷阱）。
-// ignore: avoid-unnecessary-stateful-widgets
-class EdgeGlow extends StatefulWidget {
+/// 设计语言中的微光效果；生产仅控制栏使用。历史上的 pulse/omni 变体、
+/// resize 降级与强度参数均无调用方，已移除（pulse 携带永不停止的
+/// AnimationController.repeat() 每帧动画，留着是误用陷阱）。
+class EdgeGlow extends StatelessWidget {
   final Widget child;
   final BorderRadius? borderRadius;
-  final bool enabled;
-  final double? glowIntensity;
 
-  /// Resize 期间跳过模糊阴影，避免与视频纹理合成争用 raster 线程。
-  final ValueListenable<bool>? resizing;
+  const EdgeGlow({super.key, required this.child, this.borderRadius});
 
-  const EdgeGlow({
-    super.key,
-    required this.child,
-    this.borderRadius,
-    this.enabled = true,
-    this.glowIntensity,
-    this.resizing,
-  });
+  /// 5 层发光阴影 — 常量，避免每次 build 重新分配。
+  static const List<BoxShadow> _glowShadows = [
+    BoxShadow(color: Tokens.glowHighlightWhite, offset: Offset(0, 1)),
+    BoxShadow(color: Tokens.glowBorderBlue, spreadRadius: 1),
+    BoxShadow(color: Tokens.glowMidBlue, blurRadius: 20),
+    BoxShadow(color: Tokens.glowAmbientBlue, blurRadius: 50),
+    BoxShadow(color: Tokens.glowOuterRing, blurRadius: 1, spreadRadius: 1),
+  ];
 
-  @override
-  State<EdgeGlow> createState() => _EdgeGlowState();
-}
-
-class _EdgeGlowState extends State<EdgeGlow> {
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
-
-    final resizing = widget.resizing;
-    // ValueListenable 不会自动触发父组件重建；监听它可让 resize 降级阴影
-    // 在窗口状态变化的同一帧生效，而无需依赖无关的父级 build。
-    if (resizing != null) {
-      return AnimatedBuilder(
-        animation: resizing,
-        builder: (_, child) => _buildGradientGlow(),
-      );
-    }
-    return _buildGradientGlow();
-  }
-
-  /// 渐变描边 + 5 层 box-shadow
-  Widget _buildGradientGlow() {
-    final intensity = widget.glowIntensity ?? 1.0;
-    final isResizing = widget.resizing?.value ?? false;
-    // Resize 时保留边框和子树 identity，只移除高成本的模糊阴影。
-    final shadows = isResizing
-        ? _buildResizeShadows(intensity)
-        : _buildGlowShadows(intensity);
+    final radius = borderRadius ?? BorderRadius.circular(Tokens.radiusLg);
     return Container(
-      decoration: BoxDecoration(
-        borderRadius:
-            widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
-        boxShadow: shadows,
-      ),
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: _glowShadows),
       child: CustomPaint(
-        painter: _GradientBorderPainter(
-          borderRadius:
-              widget.borderRadius ?? BorderRadius.circular(Tokens.radiusLg),
-        ),
-        child: widget.child,
+        painter: _GradientBorderPainter(borderRadius: radius),
+        child: child,
       ),
     );
   }
-
-  List<BoxShadow> _buildGlowShadows(double intensity) => [
-    BoxShadow(
-      color: Tokens.glowHighlightWhite.withValues(
-        alpha: Tokens.glowHighlightWhite.a * intensity,
-      ),
-      offset: const Offset(0, 1),
-    ),
-    BoxShadow(
-      color: Tokens.glowBorderBlue.withValues(
-        alpha: Tokens.glowBorderBlue.a * intensity,
-      ),
-      spreadRadius: 1,
-    ),
-    BoxShadow(
-      color: Tokens.glowMidBlue.withValues(
-        alpha: Tokens.glowMidBlue.a * intensity,
-      ),
-      blurRadius: 20,
-    ),
-    BoxShadow(
-      color: Tokens.glowAmbientBlue.withValues(
-        alpha: Tokens.glowAmbientBlue.a * intensity,
-      ),
-      blurRadius: 50,
-    ),
-    BoxShadow(
-      color: Tokens.glowOuterRing.withValues(
-        alpha: Tokens.glowOuterRing.a * intensity,
-      ),
-      blurRadius: 1,
-      spreadRadius: 1,
-    ),
-  ];
-
-  /// Resize 时只保留无 blur 的边框，避免触发多层离屏模糊。
-  List<BoxShadow> _buildResizeShadows(double intensity) => [
-    BoxShadow(
-      color: Tokens.glowBorderBlue.withValues(
-        alpha: Tokens.glowBorderBlue.a * intensity,
-      ),
-      spreadRadius: 1,
-    ),
-  ];
 }
 
 /// 渐变描边画笔 — 模拟 mask-composite: exclude 效果

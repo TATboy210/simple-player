@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
@@ -8,17 +7,13 @@ void main() {
   group('GlassContainer', () {
     Widget buildSubject({
       GlassTier tier = GlassTier.normal,
-      ValueListenable<double>? opacity,
       bool blurEnabled = true,
-      ValueListenable<bool>? resizing,
     }) {
       return MaterialApp(
         home: Scaffold(
           body: GlassContainer(
             tier: tier,
-            opacity: opacity,
             blurEnabled: blurEnabled,
-            resizing: resizing,
             child: const Text('test'),
           ),
         ),
@@ -47,157 +42,7 @@ void main() {
       expect(find.byType(BackdropFilter), findsOneWidget);
     });
 
-    testWidgets('opacity near zero skips BackdropFilter', (tester) async {
-      final opacity = ValueNotifier<double>(0.0);
-      await tester.pumpWidget(buildSubject(opacity: opacity));
-      await tester.pump();
-      // opacity.value < 0.01 → AnimatedBuilder returns child without BackdropFilter
-      expect(find.text('test'), findsOneWidget);
-      opacity.dispose();
-    });
-
-    testWidgets('opacity at 1.0 renders BackdropFilter', (tester) async {
-      final opacity = ValueNotifier<double>(1.0);
-      await tester.pumpWidget(buildSubject(opacity: opacity));
-      await tester.pump();
-      // opacity.value >= 0.01 → ClipRRect + BackdropFilter
-      expect(find.byType(BackdropFilter), findsOneWidget);
-      opacity.dispose();
-    });
-
-    testWidgets('opacity animation transitions', (tester) async {
-      final opacity = ValueNotifier<double>(1.0);
-      await tester.pumpWidget(buildSubject(opacity: opacity));
-      await tester.pump();
-
-      // Start with blur
-      expect(find.byType(BackdropFilter), findsOneWidget);
-
-      // Fade to near-zero → skip blur
-      opacity.value = 0.005;
-      await tester.pump();
-
-      expect(find.text('test'), findsOneWidget);
-      opacity.dispose();
-    });
-
-    testWidgets(
-      'opacity changes skip the blur without replacing the content element',
-      (tester) async {
-        final opacity = ValueNotifier<double>(1.0);
-        addTearDown(opacity.dispose);
-        await tester.pumpWidget(buildSubject(opacity: opacity));
-        await tester.pump();
-
-        final content = find.text('test');
-        final initialContentElement = tester.element(content);
-        expect(find.byType(BackdropFilter), findsOneWidget);
-
-        // Fading a control out must not recreate its focusable/semantic content.
-        opacity.value = 0;
-        await tester.pump();
-
-        final filter = find.byType(BackdropFilter);
-        expect(filter, findsOneWidget);
-        expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
-        expect(tester.element(content), same(initialContentElement));
-
-        opacity.value = 1;
-        await tester.pump();
-
-        expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
-        expect(tester.element(content), same(initialContentElement));
-      },
-    );
-
-    testWidgets('resizing=true keeps BackdropFilter mounted but disabled', (
-      tester,
-    ) async {
-      final resizing = ValueNotifier<bool>(true);
-      addTearDown(resizing.dispose);
-      await tester.pumpWidget(buildSubject(resizing: resizing));
-      await tester.pump();
-
-      final filter = find.byType(BackdropFilter);
-      expect(filter, findsOneWidget);
-      expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
-      expect(find.text('test'), findsOneWidget);
-    });
-
-    testWidgets('resizing=false renders BackdropFilter', (tester) async {
-      final resizing = ValueNotifier<bool>(false);
-      await tester.pumpWidget(buildSubject(resizing: resizing));
-      await tester.pump();
-      // resizing=false → normal blur path with BackdropFilter
-      expect(find.byType(BackdropFilter), findsOneWidget);
-      resizing.dispose();
-    });
-
-    testWidgets(
-      'resizing transition toggles filter without replacing elements',
-      (tester) async {
-        final resizing = ValueNotifier<bool>(false);
-        addTearDown(resizing.dispose);
-        await tester.pumpWidget(buildSubject(resizing: resizing));
-        await tester.pump();
-
-        final filter = find.byType(BackdropFilter);
-        final content = find.text('test');
-        final filterElement = tester.element(filter);
-        final contentElement = tester.element(content);
-        expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
-
-        resizing.value = true;
-        await tester.pump();
-        expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
-        expect(tester.element(filter), same(filterElement));
-        expect(tester.element(content), same(contentElement));
-
-        resizing.value = false;
-        await tester.pump();
-        expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
-        expect(tester.element(filter), same(filterElement));
-        expect(tester.element(content), same(contentElement));
-      },
-    );
-
-    testWidgets('replacing resizing notifier detaches the old source', (
-      tester,
-    ) async {
-      final oldResizing = ValueNotifier(false);
-      final replacement = ValueNotifier(false);
-      addTearDown(oldResizing.dispose);
-      addTearDown(replacement.dispose);
-
-      await tester.pumpWidget(buildSubject(resizing: oldResizing));
-      await tester.pump();
-
-      final filter = find.byType(BackdropFilter);
-      final content = find.text('test');
-      final filterElement = tester.element(filter);
-      final contentElement = tester.element(content);
-      expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
-
-      await tester.pumpWidget(buildSubject(resizing: replacement));
-      await tester.pump();
-      expect(tester.binding.hasScheduledFrame, isFalse);
-
-      oldResizing.value = true;
-      expect(tester.binding.hasScheduledFrame, isFalse);
-      await tester.pump();
-      expect(tester.widget<BackdropFilter>(filter).enabled, isTrue);
-      expect(tester.element(filter), same(filterElement));
-      expect(tester.element(content), same(contentElement));
-
-      replacement.value = true;
-      expect(tester.binding.hasScheduledFrame, isTrue);
-      await tester.pump();
-      expect(tester.widget<BackdropFilter>(filter).enabled, isFalse);
-      expect(tester.element(filter), same(filterElement));
-      expect(tester.element(content), same(contentElement));
-    });
-
-    testWidgets('backgroundColor defaults to Tokens.bgGlass', (tester) async {
+    testWidgets('background is Tokens.bgGlass', (tester) async {
       await tester.pumpWidget(buildSubject());
       final container = tester.widget<Container>(
         find.descendant(
@@ -209,33 +54,6 @@ void main() {
       expect(decoration, isA<BoxDecoration>());
       if (decoration case final BoxDecoration boxDecoration) {
         expect(boxDecoration.color, Tokens.bgGlass);
-      }
-    });
-
-    testWidgets('backgroundColor overrides default when provided', (
-      tester,
-    ) async {
-      const customColor = Color(0x39080A10);
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: GlassContainer(
-              backgroundColor: customColor,
-              child: Text('test'),
-            ),
-          ),
-        ),
-      );
-      final container = tester.widget<Container>(
-        find.descendant(
-          of: find.byType(GlassContainer),
-          matching: find.byType(Container).first,
-        ),
-      );
-      final decoration = container.decoration;
-      expect(decoration, isA<BoxDecoration>());
-      if (decoration case final BoxDecoration boxDecoration) {
-        expect(boxDecoration.color, customColor);
       }
     });
   });

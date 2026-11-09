@@ -1,6 +1,5 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -41,9 +40,9 @@ enum GlassTier {
 
 /// 毛玻璃容器 — 可复用的 Glassmorphism 基础组件
 ///
-/// 性能优化：
-/// - [opacity] 非空且 value < 0.01 时跳过 BackdropFilter（D-13）
-/// - [blurEnabled] 为 false 时跳过 BackdropFilter，仅渲染 Container（D-14）
+/// 性能优化：[blurEnabled] 为 false 时跳过 BackdropFilter，仅渲染 Container（D-14）。
+/// 淡入淡出/resize 门控由 [GlassBlurLayer] 承担，本组件生产仅空置态与
+/// [GlassButton] 带 label 模式使用，不再重复提供这两类门控。
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double? width;
@@ -54,17 +53,8 @@ class GlassContainer extends StatelessWidget {
   final Border? border;
   final GlassTier tier;
 
-  /// 淡入淡出动画 — opacity=0 时跳过 BackdropFilter GPU readback（D-13）
-  final ValueListenable<double>? opacity;
-
   /// 低配硬件降级模式 — false 时跳过 BackdropFilter（D-14）
   final bool blurEnabled;
-
-  /// 窗口 resize 信号 — true 时跳过 BackdropFilter 避免 GPU readback 卡顿
-  final ValueListenable<bool>? resizing;
-
-  /// 背景色 — 默认 Tokens.bgGlass，可传入 idle token 实现状态感知
-  final Color? backgroundColor;
 
   const GlassContainer({
     super.key,
@@ -76,10 +66,7 @@ class GlassContainer extends StatelessWidget {
     this.borderRadius,
     this.border,
     this.tier = GlassTier.normal,
-    this.opacity,
     this.blurEnabled = true,
-    this.resizing,
-    this.backgroundColor,
   });
 
   @override
@@ -91,81 +78,27 @@ class GlassContainer extends StatelessWidget {
       height: height,
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Tokens.bgGlass,
+        color: Tokens.bgGlass,
         borderRadius: rRect,
         border: border ?? Border.all(color: Tokens.borderHighlight, width: 1),
       ),
       child: child,
     );
 
-    // margin 在最外层，确保不被 BackdropFilter 裁剪
-    Widget result;
-
-    // local 捕获 resizing/margin 字段消除 `!` (字段不提升); child `??` 兜底
-    final r = resizing;
-    final m = margin;
+    final blurContent = RepaintBoundary(child: content);
     // 降级模式：跳过 BackdropFilter，仅渲染半透明背景（D-14）。
     // Tokens.blurDisabled 为编译期 A/B 取证开关（v0.0.9 P0-3），复用本分支。
-    if (!blurEnabled || Tokens.blurDisabled) {
-      result = ClipRRect(
-        borderRadius: rRect,
-        child: RepaintBoundary(child: content),
-      );
-    } else if (r != null) {
-      // resize 期间仅停用滤镜采样，保留固定祖先链，避免后代内容因切换
-      // ClipRRect/BackdropFilter 分支而卸载，导致焦点和 semantics 状态重建。
-      final blurFilter = tier.blurFilter;
-      result = AnimatedBuilder(
-        animation: r,
-        builder: (_, child) => ClipRRect(
-          borderRadius: rRect,
-          child: BackdropFilter(
-            filter: blurFilter,
-            enabled: !r.value,
-            child: RepaintBoundary(child: child),
-          ),
-        ),
-        child: content,
-      );
-    } else {
-      result = _buildBlurContent(rRect, content);
-    }
+    final Widget result = (!blurEnabled || Tokens.blurDisabled)
+        ? ClipRRect(borderRadius: rRect, child: blurContent)
+        // 使用缓存的 ImageFilter 实例，避免每次 build 创建新对象（D-10/D-11）
+        : ClipRRect(
+            borderRadius: rRect,
+            child: BackdropFilter(filter: tier.blurFilter, child: blurContent),
+          );
 
     // margin 包裹在最外层，确保毛玻璃裁剪不影响间距
-    if (m != null) {
-      return Padding(padding: m, child: result);
-    }
-    return result;
-  }
-
-  Widget _buildBlurContent(BorderRadius rRect, Widget content) {
-    final blurContent = RepaintBoundary(child: content);
-    // 使用缓存的 ImageFilter 实例，避免每次 build 创建新对象（D-10/D-11）
-    final blurFilter = tier.blurFilter;
-
-    // opacity < 0.01 时跳过 BackdropFilter GPU readback（D-13）
-    final opacityNotifier = opacity;
-    if (opacityNotifier != null) {
-      return AnimatedBuilder(
-        animation: opacityNotifier,
-        builder: (_, child) => ClipRRect(
-          borderRadius: rRect,
-          child: BackdropFilter(
-            filter: blurFilter,
-            // Keep the filter mounted so opacity changes do not replace the
-            // content element or reset interaction state.
-            enabled: opacityNotifier.value >= 0.01,
-            child: child,
-          ),
-        ),
-        child: blurContent,
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: rRect,
-      child: BackdropFilter(filter: blurFilter, child: blurContent),
-    );
+    final m = margin;
+    return m == null ? result : Padding(padding: m, child: result);
   }
 }
 
