@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/glass_widgets.dart';
-import '../shared/value_listenable_builder2.dart';
 import '../shared/osd_overlay.dart';
 import '../shared/plain_slider.dart';
 
@@ -83,26 +82,29 @@ class _VolumeButtonState extends State<VolumeButton> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return ValueListenableBuilder2<bool, double>(
-      first: widget.isMuted,
-      second: widget.volume,
-      builder: (_, muted, volume, _) {
-        IconData icon;
-        if (muted || volume == 0) {
-          icon = Icons.volume_off;
-        } else if (volume < 0.5) {
-          icon = Icons.volume_down;
-        } else {
-          icon = Icons.volume_up;
-        }
-        return GlassButton.iconOnly(
-          icon: icon,
-          iconSize: Tokens.iconLg,
-          color: muted ? Tokens.accent : Tokens.textPrimary,
-          onPressed: _toggleMute,
-          tooltip: muted ? l10n.unmute : l10n.mute,
-        );
-      },
+    // 两源嵌套监听：外层 isMuted、内层 volume（各自变化只重建内层按钮）。
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.isMuted,
+      builder: (_, muted, _) => ValueListenableBuilder<double>(
+        valueListenable: widget.volume,
+        builder: (_, volume, _) {
+          IconData icon;
+          if (muted || volume == 0) {
+            icon = Icons.volume_off;
+          } else if (volume < 0.5) {
+            icon = Icons.volume_down;
+          } else {
+            icon = Icons.volume_up;
+          }
+          return GlassButton.iconOnly(
+            icon: icon,
+            iconSize: Tokens.iconLg,
+            color: muted ? Tokens.accent : Tokens.textPrimary,
+            onPressed: _toggleMute,
+            tooltip: muted ? l10n.unmute : l10n.mute,
+          );
+        },
+      ),
     );
   }
 }
