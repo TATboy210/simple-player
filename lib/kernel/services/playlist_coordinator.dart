@@ -258,7 +258,7 @@ class PlaylistCoordinator {
 
   /// 断点续播指定索引条目 (v0.0.5) — 播放 + seek 到该条目的断点位置.
   ///
-  /// **时序竞态修复** (media_kit 文档查证): `seek` 只等播放器初始化, 不等
+  /// **时序竞态修复** (mpv loadfile 异步语义): `seek` 只等播放器初始化, 不等
   /// 新文件加载完成 — 装载/跳转后立即 seek 会被发到尚未切换的 mpv 状态
   /// 而丢失. 因此无论装载还是已装载分支, 一律经 [_resumeSeeker] 挂起,
   /// 由 [_trackPosition] 在"新条目开始播放"信号 (position 回到低位锁存区

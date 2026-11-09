@@ -7,32 +7,12 @@ import 'package:flutter/services.dart';
 
 import '../player/workspace_menu_session.dart';
 import '../theme/tokens.dart';
+import 'owned_menu_types.dart';
 import 'secondary_surface.dart';
 import 'secondary_surface_visibility.dart';
 
-/// 不可变动作项 — checked is informational, never a disabled radio choice.
-class OwnedMenuEntry<T> {
-  const OwnedMenuEntry({
-    required this.value,
-    required this.label,
-    this.icon,
-    this.isEnabled = true,
-    this.isChecked = false,
-    this.isDestructive = false,
-  });
-  final T value;
-  final String label;
-  final IconData? icon;
-  final bool isEnabled;
-  final bool isChecked;
-  final bool isDestructive;
-}
-
-/// 菜单结果 — null future result denotes cancellation, not a selected null value.
-class OwnedMenuSelection<T> {
-  const OwnedMenuSelection(this.value);
-  final T value;
-}
+// 动作项/结果值类型已拆到 owned_menu_types.dart — 重导出让既有引用无需改动。
+export 'owned_menu_types.dart';
 
 /// 精确路由句柄 — borrowed session/visibility/focus are never disposed here.
 class OwnedMenuHandle<T> {
