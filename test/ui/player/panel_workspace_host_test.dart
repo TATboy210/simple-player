@@ -48,6 +48,54 @@ void main() {
       const Duration(milliseconds: 150),
     );
   });
+  testWidgets('task builder is not re-run on resize frames, only on role or '
+      'task-list change', (tester) async {
+    final controller = PanelWorkspaceController();
+    addTearDown(controller.dispose);
+    var builds = 0;
+    List<WorkspaceTask> makeTasks() => [
+      WorkspaceTask(
+        id: 'settings',
+        builder: (_, visible, role) {
+          builds++;
+          return Text('task-$builds');
+        },
+      ),
+    ];
+
+    Future<void> pumpAt(double width, List<WorkspaceTask> tasks) =>
+        tester.pumpWidget(
+          MaterialApp(
+            home: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: width,
+                height: 600,
+                child: PanelWorkspaceHost(controller: controller, tasks: tasks),
+              ),
+            ),
+          ),
+        );
+
+    final tasks = makeTasks();
+    await pumpAt(1000, tasks);
+    expect(builds, 1);
+
+    // 拖窗缩放：约束逐帧变化、任务清单实例不变 → 隐藏面板不重建。
+    await pumpAt(960, tasks);
+    await pumpAt(920, tasks);
+    expect(builds, 1, reason: '约束变化不得重复调用 builder');
+
+    // 角色翻转（隐藏 → 显示）必须重新构建。
+    controller.toggle('settings');
+    await tester.pump();
+    expect(builds, 2);
+
+    // 宿主父级换入新的任务清单（闭包可能捕获新数据）→ 缓存作废。
+    await pumpAt(920, makeTasks());
+    expect(builds, 3);
+  });
+
   testWidgets('role changes retain fake task state and exclude hidden focus', (
     tester,
   ) async {
