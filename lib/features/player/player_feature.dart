@@ -26,6 +26,7 @@ import '../../kernel/diagnostics/startup_timeline.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/player_services.dart';
 import '../../l10n/app_localizations.dart';
+import '../../ui/theme/tokens.dart';
 import '../../ui/dialogs/settings/settings_panel.dart';
 import '../../ui/player/player_screen.dart';
 import '../../ui/shared/empty_state.dart';
@@ -133,7 +134,8 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       // 守卫, 用户在恢复完成前已拖入文件时快照自动让位.
       widget.startupTimeline.mark(StartupTimeline.phaseRestoreDispatch);
       unawaited(_services.playlistCoordinator.restoreFromDisk());
-    } catch (e, stackTrace) {
+    } on Exception catch (e, stackTrace) {
+      // 只接 Exception — Error 子类是编程错误, 交全局钩子（错误卡片）而非吞入兜底页.
       KernelLogger.I.e(
         '[PlayerFeature] init failed: $e',
         error: e,
@@ -216,16 +218,26 @@ class _PlayerFeatureState extends State<PlayerFeature> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-          const SizedBox(height: 16),
+          const Icon(
+            Icons.error_outline,
+            color: Tokens.fallbackIconColor,
+            size: Tokens.fallbackIconSize,
+          ),
+          const SizedBox(height: Tokens.spLg),
           Text(
             AppLocalizations.of(context).playerInitFailed,
-            style: const TextStyle(color: Colors.white70, fontSize: 16),
+            style: const TextStyle(
+              color: Tokens.fallbackTextColor,
+              fontSize: Tokens.fontSubtitle,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: Tokens.spSm),
           Text(
             _errorMessage,
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
+            style: const TextStyle(
+              color: Tokens.fallbackDetailColor,
+              fontSize: Tokens.fontCaption,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

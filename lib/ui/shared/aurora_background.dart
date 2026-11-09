@@ -168,7 +168,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
   /// blur sigma = 256 × 0.6 × 0.3 = 46.08（breathScale=1.0 时的参考值）。
   /// 运行时通过 drawImage + scale 变换实现呼吸效果，零 saveLayer。
   Future<void> _generateBlobImages() async {
-    const size = 256;
+    const size = Tokens.auroraBlobImageSize;
     const refSigma = size * 0.6 * 0.3; // 46.08
 
     // 1. 创建白色径向渐变源图
@@ -181,7 +181,7 @@ class _AuroraBackgroundState extends State<AuroraBackground>
         ..shader = ui.Gradient.radial(
           const Offset(size / 2, size / 2),
           size / 2,
-          [const Color(0xFFFFFFFF), const Color(0x00FFFFFF)],
+          [Tokens.auroraBlobCore, Tokens.auroraBlobEdge],
           [0.0, 1.0],
         ),
     );

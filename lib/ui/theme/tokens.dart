@@ -212,6 +212,15 @@ class Tokens {
   /// 并居中，面板矩形本身不变（MD3 max-measure 建议）。
   static const settingsContentMaxWidth = 640.0;
 
+  /// 设置面板灰显 tag 不透明度 (video 分区暂不可达).
+  static const settingsTabDisabledOpacity = 0.38;
+
+  /// 设置面板 L0 层退场时向左位移 (px, 乘层动画进度).
+  static const settingsLayerSlideOffset = 16.0;
+
+  /// 设置面板 L0 层退场时缩小量 (scale = 1 - delta * 进度).
+  static const settingsLayerBackScaleDelta = 0.04;
+
   /// 工作区角色位移动效独立于控制栏；resize 时宿主直接落位。
   static const workspaceMoveDuration = 150;
   static const controlBarBorder = Color(0x146482FF); // rgba(100,130,255,0.08)
@@ -329,4 +338,46 @@ class Tokens {
   /// 方向辉光显示窗口（毫秒）—— setArrowGlow 后到此时长自动回 null (NAV-06)，
   /// 复用 osdDefaultHoldMs=1200 的瞬态显示先例。
   static const int arrowGlowDuration = 1200;
+
+  // ── 兜底/提示/空置态等零散视觉值（自硬编码收敛, 数值一致）──────────
+
+  /// 启动失败兜底页主文案色 (Colors.white70).
+  static const fallbackTextColor = Colors.white70;
+
+  /// 启动失败兜底页详情文案色 (Colors.white38).
+  static const fallbackDetailColor = Colors.white38;
+
+  /// 启动失败兜底页图标色 (Colors.redAccent).
+  static const fallbackIconColor = Colors.redAccent;
+
+  /// 启动失败兜底页图标尺寸.
+  static const fallbackIconSize = 48.0;
+
+  /// 副标题字号 (启动失败兜底页标题).
+  static const fontSubtitle = 16.0;
+
+  /// 拖放提示覆盖层: 图标尺寸 / 边框宽 / 边框 alpha.
+  static const dropHintIconSize = 48.0;
+  static const dropHintBorderWidth = 2.0;
+  static const dropHintBorderAlpha = 0.5;
+
+  /// 空置态: 拖入提示动画进入 / 退出时长 (ms).
+  static const emptyDragEnterMs = 300;
+  static const emptyDragExitMs = 200;
+
+  /// 空置态: 打开按钮 / 拖拽提示共用的固定高度区.
+  static const emptyActionAreaHeight = 56.0;
+
+  /// 空置态: 拖入时打开按钮缩小量 (scale = 1 - delta * 进度).
+  static const emptyOpenButtonShrink = 0.05;
+
+  /// About 支持者头像: 圆底直径 / 白色 tint / 玻璃描边宽.
+  static const aboutAvatarSize = 32.0;
+  static const aboutAvatarTint = Colors.white;
+  static const hairlineWidth = 1.0;
+
+  /// 极光光团源图: 边长 (px) / 径向渐变不透明端 / 透明端.
+  static const auroraBlobImageSize = 256;
+  static const auroraBlobCore = Color(0xFFFFFFFF);
+  static const auroraBlobEdge = Color(0x00FFFFFF);
 }

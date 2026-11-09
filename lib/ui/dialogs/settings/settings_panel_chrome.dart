@@ -106,7 +106,7 @@ class _SettingsTabChipState extends State<_SettingsTabChip> {
     final l10n = AppLocalizations.of(context);
     final selected = widget.selected;
     return Opacity(
-      opacity: widget.enabled ? 1 : 0.38,
+      opacity: widget.enabled ? 1 : Tokens.settingsTabDisabledOpacity,
       child: IgnorePointer(
         ignoring: !widget.enabled,
         child: MouseRegion(
@@ -140,7 +140,7 @@ class _SettingsTabChipState extends State<_SettingsTabChip> {
                     children: [
                       Icon(
                         _tabIcon(widget.tab),
-                        size: 18,
+                        size: Tokens.iconMd,
                         color: selected && widget.enabled
                             ? Tokens.accent
                             : Tokens.textPrimary,

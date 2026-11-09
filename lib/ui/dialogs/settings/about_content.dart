@@ -369,7 +369,7 @@ const _thanksAreaDecoration = BoxDecoration(
   color: Tokens.bgDeep,
   borderRadius: BorderRadius.all(Radius.circular(Tokens.radiusMd)),
   border: Border.fromBorderSide(
-    BorderSide(color: Tokens.glassBorderIdle, width: 1),
+    BorderSide(color: Tokens.glassBorderIdle, width: Tokens.hairlineWidth),
   ),
 );
 
@@ -381,13 +381,13 @@ class _SupporterAvatar extends StatelessWidget {
   const _SupporterAvatar();
 
   /// 头像内图标尺寸 — 32px 渐变圆内留呼吸边。
-  static const _iconSize = 18.0;
+  static const _iconSize = Tokens.iconMd;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 32,
-      height: 32,
+      width: Tokens.aboutAvatarSize,
+      height: Tokens.aboutAvatarSize,
       alignment: Alignment.center,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
@@ -401,7 +401,10 @@ class _SupporterAvatar extends StatelessWidget {
         'assets/logos/afdian.svg',
         width: _iconSize,
         height: _iconSize,
-        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        colorFilter: const ColorFilter.mode(
+          Tokens.aboutAvatarTint,
+          BlendMode.srcIn,
+        ),
       ),
     );
   }

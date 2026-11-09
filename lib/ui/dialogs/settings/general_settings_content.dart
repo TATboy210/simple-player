@@ -101,8 +101,7 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
   }
 
   /// 断点续播行激活 — 行点击与键盘 Enter 共用.
-  void _toggleResume() {
-    final settings = widget.settings!;
+  void _toggleResume(AppSettingsService settings) {
     settings.setResumeEnabled(!settings.resumeEnabled.value);
   }
 
@@ -114,7 +113,8 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
       case 1:
         _toggleErrorCard();
       case 2:
-        if (widget.settings != null) _toggleResume();
+        final settings = widget.settings;
+        if (settings != null) _toggleResume(settings);
     }
   }
 
@@ -157,10 +157,10 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildLanguageRow(l10n),
-            _buildErrorCardToggleRow(l10n),
+            _buildErrorFeedbackRows(l10n),
             // v0.0.6 断点续播总开关 — 服务注入后显示 (测试退路隐藏).
-            if (widget.settings != null) _buildResumeToggleRow(l10n),
+            if (widget.settings case final settings?)
+              _buildResumeToggleRow(l10n, settings),
           ],
         ),
       ),
@@ -169,14 +169,16 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
 
   /// 断点续播开关行 (v0.0.6) — 关闭时 coordinator 不记录断点,
   /// 面板隐藏断点进度; 打开恢复记录.
-  Widget _buildResumeToggleRow(AppLocalizations l10n) {
-    final settings = widget.settings!;
+  Widget _buildResumeToggleRow(
+    AppLocalizations l10n,
+    AppSettingsService settings,
+  ) {
     return ValueListenableBuilder<bool>(
       valueListenable: settings.resumeEnabled,
       builder: (context, enabled, _) {
         return _SettingsRow(
           label: l10n.resumeRememberPosition,
-          onTap: _toggleResume,
+          onTap: () => _toggleResume(settings),
           isFocused: _rowsFocused && _focusedRow == 2,
           trailing: Switch(
             value: enabled,
@@ -257,37 +259,53 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     ErrorFeedbackSettings.I.setLanguage(selected.value);
   }
 
-  /// 语言行 — project-owned popup replaces the SDK's snapshot Dropdown route.
-  Widget _buildLanguageRow(AppLocalizations l10n) {
+  /// 语言行 + 错误卡片开关行 — 同一 [ErrorFeedbackSettingsData] 只订阅一层
+  /// （此前两行各订阅一次，同一变更触发两次独立重建）.
+  Widget _buildErrorFeedbackRows(AppLocalizations l10n) {
     return ValueListenableBuilder<ErrorFeedbackSettingsData>(
       valueListenable: ErrorFeedbackSettings.I.state,
-      builder: (context, settings, _) => _SettingsRow(
-        label: l10n.languageLabel,
-        onTap: () => unawaited(_showLanguageMenu()),
-        isFocused: _rowsFocused && _focusedRow == 0,
-        trailing: KeyedSubtree(
-          key: _languageAnchor,
-          child: TextButton(
-            key: const ValueKey('language-menu-trigger'),
-            focusNode: _languageFocus,
-            onPressed: () => unawaited(_showLanguageMenu()),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _languageLabel(settings.language, l10n),
-                  style: const TextStyle(
-                    color: Tokens.textPrimary,
-                    fontSize: Tokens.fontCaption,
-                  ),
+      builder: (context, settings, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildLanguageRow(l10n, settings),
+          _buildErrorCardToggleRow(l10n, settings),
+        ],
+      ),
+    );
+  }
+
+  /// 语言行 — project-owned popup replaces the SDK's snapshot Dropdown route.
+  Widget _buildLanguageRow(
+    AppLocalizations l10n,
+    ErrorFeedbackSettingsData settings,
+  ) {
+    return _SettingsRow(
+      label: l10n.languageLabel,
+      onTap: () => unawaited(_showLanguageMenu()),
+      isFocused: _rowsFocused && _focusedRow == 0,
+      trailing: KeyedSubtree(
+        key: _languageAnchor,
+        child: TextButton(
+          key: const ValueKey('language-menu-trigger'),
+          focusNode: _languageFocus,
+          onPressed: () => unawaited(_showLanguageMenu()),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _languageLabel(settings.language, l10n),
+                style: const TextStyle(
+                  color: Tokens.textPrimary,
+                  fontSize: Tokens.fontCaption,
                 ),
-                const Icon(
-                  Icons.expand_more,
-                  size: Tokens.iconSm,
-                  color: Tokens.textSecondary,
-                ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.expand_more,
+                size: Tokens.iconSm,
+                color: Tokens.textSecondary,
+              ),
+            ],
           ),
         ),
       ),
@@ -296,22 +314,20 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
 
   /// 错误卡片开关行 —— 行本体点击与 Switch 均可切换（桌面友好；点击区手势
   /// 由最内层胜出，不会双重翻转）。
-  Widget _buildErrorCardToggleRow(AppLocalizations l10n) {
-    return ValueListenableBuilder<ErrorFeedbackSettingsData>(
-      valueListenable: ErrorFeedbackSettings.I.state,
-      builder: (context, settings, _) {
-        return _SettingsRow(
-          label: l10n.errorCardToggleLabel,
-          onTap: _toggleErrorCard,
-          isFocused: _rowsFocused && _focusedRow == 1,
-          trailing: Switch(
-            value: settings.errorCardEnabled,
-            // activeColor 已废弃（Flutter 3.31+）—— 用 activeThumbColor。
-            activeThumbColor: Tokens.accent,
-            onChanged: _setErrorCardEnabled,
-          ),
-        );
-      },
+  Widget _buildErrorCardToggleRow(
+    AppLocalizations l10n,
+    ErrorFeedbackSettingsData settings,
+  ) {
+    return _SettingsRow(
+      label: l10n.errorCardToggleLabel,
+      onTap: _toggleErrorCard,
+      isFocused: _rowsFocused && _focusedRow == 1,
+      trailing: Switch(
+        value: settings.errorCardEnabled,
+        // activeColor 已废弃（Flutter 3.31+）—— 用 activeThumbColor。
+        activeThumbColor: Tokens.accent,
+        onChanged: _setErrorCardEnabled,
+      ),
     );
   }
 }

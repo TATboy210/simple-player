@@ -87,12 +87,22 @@ class _PanelWorkspaceHostState extends State<PanelWorkspaceHost> {
       final layout = PanelWorkspaceLayout.calculate(constraints.biggest);
       return ListenableBuilder(
         listenable: _sources ?? widget.controller,
-        builder: (context, _) => Stack(
-          children: [
-            for (final task in widget.tasks)
-              _placeTask(context, task, widget.controller.value, layout),
-          ],
-        ),
+        builder: (context, _) {
+          // 减少动效偏好对所有 task 相同 — 循环外只查询一次.
+          final reduceMotion = MediaQuery.disableAnimationsOf(context);
+          return Stack(
+            children: [
+              for (final task in widget.tasks)
+                _placeTask(
+                  context,
+                  task,
+                  widget.controller.value,
+                  layout,
+                  reduceMotion: reduceMotion,
+                ),
+            ],
+          );
+        },
       );
     },
   );
@@ -102,8 +112,9 @@ class _PanelWorkspaceHostState extends State<PanelWorkspaceHost> {
     BuildContext context,
     WorkspaceTask task,
     PanelWorkspaceSnapshot snapshot,
-    PanelWorkspaceLayout layout,
-  ) {
+    PanelWorkspaceLayout layout, {
+    required bool reduceMotion,
+  }) {
     final role = snapshot.center == task.id
         ? WorkspaceTaskRole.center
         : snapshot.left == task.id
@@ -119,7 +130,6 @@ class _PanelWorkspaceHostState extends State<PanelWorkspaceHost> {
       content = task.builder(context, visible, role);
       _built[task.id] = _BuiltTask(role, visible, content);
     }
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     // TickerMode adds no RenderObject between Stack and Positioned; the keyed
     // parent chain stays fixed while hidden position and child tickers are muted.
     return TickerMode(

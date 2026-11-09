@@ -86,7 +86,8 @@ class _VideoSettingsContentState extends State<VideoSettingsContent> {
                 value: state.deinterlaceEnabled,
                 onChanged: (v) => widget.videoProcessing.updateDeinterlace(v),
               ),
-              if (widget.settings != null) _buildHardwareDecodingRow(l10n),
+              if (widget.settings case final settings?)
+                _buildHardwareDecodingRow(l10n, settings),
               const SizedBox(height: Tokens.spSm),
               Align(
                 alignment: Alignment.centerRight,
@@ -154,8 +155,10 @@ class _VideoSettingsContentState extends State<VideoSettingsContent> {
       };
 
   /// 硬解行 — AppSettingsService 通道 (mpv hwdec + 落盘).
-  Widget _buildHardwareDecodingRow(AppLocalizations l10n) {
-    final settings = widget.settings!;
+  Widget _buildHardwareDecodingRow(
+    AppLocalizations l10n,
+    AppSettingsService settings,
+  ) {
     return ValueListenableBuilder<bool>(
       valueListenable: settings.hardwareDecoding,
       builder: (context, enabled, _) => _buildSwitchRow(

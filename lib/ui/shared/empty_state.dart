@@ -53,8 +53,8 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
     super.initState();
     _dragAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
-      reverseDuration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: Tokens.emptyDragEnterMs),
+      reverseDuration: const Duration(milliseconds: Tokens.emptyDragExitMs),
       value: 0,
     );
     _dragCurve = CurvedAnimation(
@@ -139,14 +139,17 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
                       _buildBranding(context),
                       const SizedBox(height: Tokens.spXl),
                       SizedBox(
-                        height: 56,
+                        height: Tokens.emptyActionAreaHeight,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
                             FadeTransition(
                               opacity: ReverseAnimation(_dragCurve),
                               child: Transform.scale(
-                                scale: 1.0 - 0.05 * _dragCurve.value,
+                                scale:
+                                    1.0 -
+                                    Tokens.emptyOpenButtonShrink *
+                                        _dragCurve.value,
                                 child: openButton,
                               ),
                             ),
@@ -154,7 +157,10 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
                               child: FadeTransition(
                                 opacity: _dragCurve,
                                 child: Transform.translate(
-                                  offset: Offset(0, 8 * (1 - _dragCurve.value)),
+                                  offset: Offset(
+                                    0,
+                                    Tokens.spSm * (1 - _dragCurve.value),
+                                  ),
                                   child: dragHint,
                                 ),
                               ),
@@ -213,7 +219,11 @@ class _EmptyStateState extends State<EmptyState> with TickerProviderStateMixin {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.play_circle_outline, size: 20, color: Tokens.accent),
+          const Icon(
+            Icons.play_circle_outline,
+            size: Tokens.iconLg,
+            color: Tokens.accent,
+          ),
           const SizedBox(width: Tokens.spSm),
           Text(
             AppLocalizations.of(context).dragHint,

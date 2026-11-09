@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mpv_kit_video/mpv_kit_video.dart';
@@ -8,7 +7,6 @@ import 'package:mpv_kit_video/mpv_kit_video.dart';
 import '../../kernel/window_bridge/window_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
-import '../../kernel/bridge/win32/ime_bridge.dart';
 import '../../kernel/engine/engine_state.dart';
 import '../../kernel/engine/mpv_kit_engine.dart';
 import '../../kernel/services/playback_controller.dart';
@@ -21,9 +19,9 @@ import 'mpv_kit_player_port.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
 import 'player_actions.dart';
+import 'player_screen_actions.dart';
 import 'player_keyboard_actions.dart';
 import 'panel_workspace_controller.dart';
-import 'workspace_focus_scope.dart';
 import 'workspace_menu_session.dart';
 import '../shared/secondary_surface_visibility.dart';
 import '../dialogs/settings/settings_panel_session.dart';
@@ -170,25 +168,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  /// 打开系统字幕选择器并返回用户选择的本地路径。
-  ///
-  /// 对话框期间临时恢复 IME — 窗口 IMC 已解除（flutter_window.cpp），
-  /// 原生文件对话框在 NULL IMC 下触发 msctf 崩溃（与打开文件同因）。
-  Future<String?> _pickSubtitlePath() async {
-    final result = await Win32ImeBridge.withImeRestored(
-      // file_picker 13：pickFiles 变为多选，单选语义改用 pickFile。
-      () => FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: ['srt', 'ass', 'ssa', 'sub', 'vtt'],
-      ),
-    );
-    // 用户取消为 null——视为取消。
-    return result?.path;
-  }
-
   /// 选择并加载外部字幕；取消或不可加载的路径不会传给底层解析器。
   Future<void> _openSubtitle() async {
-    final selectPath = widget.pickSubtitlePath ?? _pickSubtitlePath;
+    final selectPath = widget.pickSubtitlePath ?? pickSubtitleFile;
     final path = await selectPath();
     if (path == null || !mounted) return;
 
@@ -205,50 +187,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // 稳定化 actions — initState 构造一次,纯播放/项目回调闭包现读 widget 字段
     // 避免陈旧捕获. playModeIcon/Label 已下沉, 不需 l10n/context.
     _titleBar = _createTitleBar();
-    _actions = PlayerActions(
-      // actions 保持同一实例以保护 Video subtree identity，但在调用时读取当前
-      // widget，避免 controller replacement 后继续把用户命令发送给旧数据源。
-      onPlayPause: () => widget.controller.togglePlayPause(),
-      onSeekBack: (milliseconds) => widget.controller.skipBack(milliseconds),
-      onSeekForward: (milliseconds) =>
-          widget.controller.skipForward(milliseconds),
-      // 主动停止 → 瞬间卸载媒体并切换空置态（用户决策：无过渡动画）。
-      // 不能直接调用 engine.stop：控制器会在确认卸载后清空活动标题。
-      onStop: () => unawaited(widget.controller.stopCurrentMedia()),
-      onOpenFile: () => widget.onOpenFile?.call(),
-      onOpenSubtitle: () => unawaited(_openSubtitle()),
-      // 设置面板 — toggle 语义（成熟播放器惯例）：开→关、关→开；
-      // 纯 UI 弹层，不改播放状态，无需空置态隔离。
-      // v0.0.6: services bundle 经 PlayerVideoControls 传入挂载的面板。
-      onOpenSettings: () => _workspace.toggle(WorkspaceTaskIds.settings),
-      // 全屏即原生窗口全屏: setMode 驱动 WindowService mode (守卫 + 鼠标隐藏联动),
-      // 没有视频 route 可 push/pop.
-      onToggleFullscreen: () {
-        // 先摘掉自有菜单, 再切换窗口模式.
-        _menus.cancel();
-        final m = widget.windowService.mode.value;
-        final entering = m != WindowMode.fullscreen;
-        widget.windowService.setMode(
-          entering ? WindowMode.fullscreen : WindowMode.windowed,
-        );
-      },
-      onFilesDropped: (paths) => widget.onFilesDropped?.call(paths),
-      onDragHoverChanged: (hovering) =>
-          widget.onDragHoverChanged?.call(hovering),
-      // ── v0.0.5 播放列表 — coordinator 为 null 时全部隐藏 (测试退路) ──
-      onTogglePlaylist: widget.playlistCoordinator == null
-          ? null
-          : () => _playlistVisible.value = !_playlistVisible.value,
-      onPreviousEntry: widget.playlistCoordinator == null
-          ? null
-          : () => widget.playlistCoordinator!.previous(),
-      onNextEntry: widget.playlistCoordinator == null
-          ? null
-          : () => widget.playlistCoordinator!.next(),
-      onCyclePlayMode: widget.playlistCoordinator == null
-          ? null
-          : () => unawaited(widget.playlistCoordinator!.cyclePlayMode()),
-      playMode: widget.playlistCoordinator?.playMode,
+    _actions = buildPlayerScreenActions(
+      current: () => widget,
+      workspace: _workspace,
+      menus: _menus,
+      playlistVisible: _playlistVisible,
+      openSubtitle: () => unawaited(_openSubtitle()),
     );
     // 字幕 padding 由 PlayerVideoControls 内 _autoHide.visible 自驱,
     // 本层无需联动.
@@ -362,58 +306,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
       // 原样透传，mode 翻转只重组 builder 内的窗口壳，视频链零重建。
       child: RepaintBoundary(child: _videoContent),
       builder: (context, videoContent) {
-        final m = widget.windowService.mode.value;
         // BUG-02: isFullscreen 仅在真正全屏时为 true,
         // 最大化不应触发全屏 auto-hide 和禁用拖拽.
-        final isFullscreen = m == WindowMode.fullscreen;
-
-        final scaffold = Scaffold(
-          backgroundColor: Tokens.bgBase,
-          body: Column(
-            children: [
-              // 标题栏 widget identity 在 initState 固定；窗口模式变化只更新
-              // 标题栏内部真正依赖 mode 的局部节点，不重建整棵标题栏子树。
-              SecondarySurfaceOwner(visible: !isFullscreen, child: _titleBar),
-              Expanded(
-                child: Stack(
-                  children: [
-                    // 播放列表面板在控制层内 (player_video_controls),
-                    // 与视频同属此 Stack, 全屏下同样可见.
-                    videoContent!,
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-
-        final keyboardHandler = buildPlayerKeyboardActions(
-          engine: widget.engine,
-          controller: widget.controller,
-          actions: _actions,
-          // Same borrowed session as route-local controls; keep video cache intact.
-          menuSession: _menus,
-          customBindings: widget.customBindings,
+        final isFullscreen =
+            widget.windowService.mode.value == WindowMode.fullscreen;
+        final keyboardHandler = _buildKeyboard(
+          context,
           isFullscreen: isFullscreen,
-          context: context,
-          // O 键与空置页按钮共享同一稳定窗口，不能绕过媒体释放延迟。
-          onOpenFile: () => widget.onOpenFile?.call(),
-          // [ ] 字幕延迟 — 设置服务在场时路由到持久化通道 (v0.0.6)。
-          onAdjustSubtitleDelay: widget.settingsServices?.settings == null
-              ? null
-              : (deltaMs) {
-                  final settings = widget.settingsServices!.settings!;
-                  settings.setSubtitleDelayMs(
-                    settings.subtitleDelayMs + deltaMs,
-                  );
-                  // TrackPreference 与持久化双写同步, 避免 open 后重放冲突.
-                  widget.controller.trackPreferenceService?.recordSubtitleDelay(
-                    settings.subtitleDelayMs,
-                  );
-                },
-          child: scaffold,
+          child: _buildScaffold(isFullscreen, videoContent),
         );
-
         // 边缘缩放：nativeapi 隐藏标题栏保留原生 sizing frame，系统在左/右/下
         // 边判定、nativeapi 在顶边带返回 HTTOP（FLUTTERVIEW 子窗口在该带让
         // 命中穿透），Flutter 层不自建缩放热区、无需声明容器。
@@ -423,6 +324,46 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: keyboardHandler,
         );
       },
+    );
+  }
+
+  /// 窗口壳 — 标题栏 + 视频区。[videoContent] 为 AnimatedBuilder 透传的缓存子树.
+  Widget _buildScaffold(bool isFullscreen, Widget? videoContent) {
+    return Scaffold(
+      backgroundColor: Tokens.bgBase,
+      body: Column(
+        children: [
+          // 标题栏 widget identity 在 initState 固定；窗口模式变化只更新
+          // 标题栏内部真正依赖 mode 的局部节点，不重建整棵标题栏子树。
+          SecondarySurfaceOwner(visible: !isFullscreen, child: _titleBar),
+          // 播放列表面板在控制层内 (player_video_controls),
+          // 与视频同属此 Stack, 全屏下同样可见.
+          Expanded(child: Stack(children: [?videoContent])),
+        ],
+      ),
+    );
+  }
+
+  /// 键盘层 — 包裹窗口壳 [child]，装配全部播放器快捷键.
+  Widget _buildKeyboard(
+    BuildContext context, {
+    required bool isFullscreen,
+    required Widget child,
+  }) {
+    return buildPlayerKeyboardActions(
+      engine: widget.engine,
+      controller: widget.controller,
+      actions: _actions,
+      // Same borrowed session as route-local controls; keep video cache intact.
+      menuSession: _menus,
+      customBindings: widget.customBindings,
+      isFullscreen: isFullscreen,
+      context: context,
+      // O 键与空置页按钮共享同一稳定窗口，不能绕过媒体释放延迟。
+      onOpenFile: () => widget.onOpenFile?.call(),
+      // [ ] 字幕延迟 — 设置服务在场时路由到持久化通道 (v0.0.6)。
+      onAdjustSubtitleDelay: subtitleDelayAdjuster(widget),
+      child: child,
     );
   }
 

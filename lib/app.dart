@@ -102,7 +102,7 @@ class App extends StatelessWidget {
         child: Text(
           '${AppLocalizations.of(context).windowInitializationFailed}: $error',
           textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white70),
+          style: const TextStyle(color: Tokens.fallbackTextColor),
         ),
       ),
     );
@@ -148,18 +148,12 @@ Widget buildErrorCardMount(
     children: [
       Positioned.fill(child: navigator ?? const SizedBox.shrink()),
       if (mode == null)
-        const Positioned(
-          left: Tokens.controlBarMarginH,
-          top: _errorCardWindowedTop,
-          child: RepaintBoundary(child: _ErrorCardOverlayMount()),
-        )
+        const _ErrorCardLayer(top: _errorCardWindowedTop)
       else
         ValueListenableBuilder<WindowMode>(
           valueListenable: mode,
-          builder: (context, current, _) => Positioned(
-            left: Tokens.controlBarMarginH,
+          builder: (context, current, _) => _ErrorCardLayer(
             top: current.isFullscreen ? Tokens.spMd : _errorCardWindowedTop,
-            child: const RepaintBoundary(child: _ErrorCardOverlayMount()),
           ),
         ),
     ],
@@ -174,23 +168,73 @@ Widget buildErrorCardMount(
 /// 精度足够（标题栏高度恒定，不随窗口尺寸/布局变化）。
 const double _errorCardWindowedTop = Tokens.titleBarHeight + Tokens.spMd;
 
-/// 错误卡片挂载壳 —— 局部 Overlay + 尺寸收口（CR-01）。
+/// 错误卡片定位层 —— 在 root Stack 内按 left/[top] 放置卡片并收口尺寸。
 ///
-/// 定位不归本壳负责：窗口化/全屏双位置语义（G-03-2）由外层
-/// [buildErrorCardMount] 的 Positioned top 值决定，本壳只负责从 Positioned
-/// 原点向下的 Overlay 提供与尺寸收口。
+/// 尺寸上界在**布局期**由 [_ErrorCardLayoutDelegate] 依窗口约束计算
+/// （宽 [Tokens.errorCardExpandedMaxWidth]、高 窗口高 ×
+/// [Tokens.errorCardMaxHeightRatio]），窗口 resize 只触发该层重新布局，
+/// 不再像旧写法（entry 内 `MediaQuery.sizeOf`）每帧重建 ConstrainedBox。
 ///
-/// 两层职责缺一不可：
-/// - **Overlay**（见 [buildErrorCardMount] 文档）：为卡片子树提供 Overlay
-///   祖先；entry `canSizeOverlay: true` 使 theatre 在无限约束下按子树内在
-///   尺寸定Size，空白区点击穿透语义（CARD-02）不变；
-/// - **ConstrainedBox**：RenderStack 对只有 left/top 锚点的 Positioned 子
-///   节点给**无界**约束——展开卡片曾被长调用栈撑到 1133px（800px 窗口），
-///   Flexible(SingleChildScrollView) 滚动失效。宽度上界
-///   [Tokens.errorCardExpandedMaxWidth]（折叠态天然更窄，message 另有
-///   [Tokens.errorCardMaxWidth] 截断）；高度上界为窗口高度 ×
-///   [Tokens.errorCardMaxHeightRatio]，超出部分进入展开详情区滚动路径。
-///   卡片仍以顶左内在尺寸放置，命中区域只覆盖卡片自身矩形。
+/// hit-test：层本身占满 Stack，但 CustomSingleChildLayout / Overlay /
+/// Theatre 均不 hitTestSelf，命中仅落在卡片真实矩形，其余区域穿透（CARD-02）。
+class _ErrorCardLayer extends StatelessWidget {
+  const _ErrorCardLayer({required this.top});
+
+  /// 卡片顶缘到窗口上缘的距离.
+  final double top;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: CustomSingleChildLayout(
+        delegate: _ErrorCardLayoutDelegate(
+          left: Tokens.controlBarMarginH,
+          top: top,
+        ),
+        child: const RepaintBoundary(child: _ErrorCardOverlayMount()),
+      ),
+    );
+  }
+}
+
+/// 卡片布局代理 —— 约束（CR-01 尺寸收口）+ 顶左定位（G-03-2）。
+///
+/// RenderStack 原先对只有 left/top 锚点的 Positioned 子节点给**无界**约束，
+/// 展开卡片曾被长调用栈撑到 1133px（800px 窗口），Flexible(
+/// SingleChildScrollView) 滚动失效；此处显式给有界约束，卡片仍以顶左内在
+/// 尺寸放置，超出高度上界的部分进入展开详情区滚动路径。
+class _ErrorCardLayoutDelegate extends SingleChildLayoutDelegate {
+  const _ErrorCardLayoutDelegate({required this.left, required this.top});
+
+  final double left;
+  final double top;
+
+  @override
+  Size getSize(BoxConstraints constraints) => constraints.biggest;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    return BoxConstraints(
+      maxWidth: constraints.maxWidth < Tokens.errorCardExpandedMaxWidth
+          ? constraints.maxWidth
+          : Tokens.errorCardExpandedMaxWidth,
+      maxHeight: constraints.maxHeight * Tokens.errorCardMaxHeightRatio,
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) => Offset(left, top);
+
+  @override
+  bool shouldRelayout(_ErrorCardLayoutDelegate oldDelegate) =>
+      oldDelegate.left != left || oldDelegate.top != top;
+}
+
+/// 错误卡片挂载壳 —— 局部 Overlay（CR-01）。
+///
+/// 卡片挂载于 Navigator 之外（root Stack 层），子树内没有 Overlay 祖先；
+/// 展开详情的 SelectableText 选择文本需要 Overlay，故自带一个最小 Overlay，
+/// 尺寸由 [_ErrorCardLayoutDelegate] 的有界约束决定。
 class _ErrorCardOverlayMount extends StatelessWidget {
   const _ErrorCardOverlayMount();
 
@@ -199,22 +243,10 @@ class _ErrorCardOverlayMount extends StatelessWidget {
     return Overlay(
       initialEntries: [
         OverlayEntry(
-          canSizeOverlay: true,
-          builder: (entryContext) {
-            // initialEntries are retained by OverlayState. Subscribe INSIDE the
-            // retained entry so resize updates its cap, not a discarded closure;
-            // Host/card State and the cached player subtree remain untouched.
-            final maxHeight =
-                MediaQuery.sizeOf(entryContext).height *
-                Tokens.errorCardMaxHeightRatio;
-            return ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: Tokens.errorCardExpandedMaxWidth,
-                maxHeight: maxHeight,
-              ),
-              child: const ErrorCardHost(),
-            );
-          },
+          // Overlay 以 tight 约束铺满 entry；Align 放松为 loose 并顶左对齐，
+          // 卡片才能按内在尺寸呈现（Align 自身不参与命中，空白区仍穿透）.
+          builder: (_) =>
+              const Align(alignment: Alignment.topLeft, child: ErrorCardHost()),
         ),
       ],
     );

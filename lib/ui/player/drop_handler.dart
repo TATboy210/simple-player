@@ -67,13 +67,15 @@ class _DropHandlerState extends State<DropHandler> {
           if (_hovering && widget.onHoverChanged == null)
             Positioned.fill(
               child: Container(
-                margin: const EdgeInsets.all(12),
+                margin: const EdgeInsets.all(Tokens.spMd),
                 decoration: BoxDecoration(
                   color: Tokens.bgGlass,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(Tokens.radiusLarge),
                   border: Border.all(
-                    color: Tokens.accent.withValues(alpha: 0.5),
-                    width: 2,
+                    color: Tokens.accent.withValues(
+                      alpha: Tokens.dropHintBorderAlpha,
+                    ),
+                    width: Tokens.dropHintBorderWidth,
                   ),
                 ),
                 child: Center(
@@ -82,10 +84,10 @@ class _DropHandlerState extends State<DropHandler> {
                     children: [
                       const Icon(
                         Icons.file_download_outlined,
-                        size: 48,
+                        size: Tokens.dropHintIconSize,
                         color: Tokens.accent,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: Tokens.spMd),
                       Text(
                         AppLocalizations.of(context).dragHint,
                         style: const TextStyle(
