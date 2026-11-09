@@ -13,7 +13,7 @@ import '../theme/tokens.dart';
 ///
 /// 仅支持单行（内部固定 maxLines: 1 + softWrap: false — 缺省折行会把
 /// 超宽字形在布局期裁掉，尾部内容永远滚不出来）。测量使用 [TextPainter]，
-/// 仅在 LayoutBuilder build（宽度/文本/样式变化）时执行一次，读完即 dispose。
+/// 仅在文本/样式/缩放/方向变化时重测（resize 每帧的 LayoutBuilder 命中缓存），读完即 dispose。
 class LoopMarqueeText extends StatefulWidget {
   /// 显示的文本（单行）。
   final String text;
@@ -109,7 +109,7 @@ class _LoopMarqueeTextState extends State<LoopMarqueeText>
               ),
               builder: (context, child) {
                 // 相位：滚动段线性推进，暂停段保持末值（1.0 → 回卷 0 无缝）.
-                final total = controller.duration!.inMilliseconds;
+                final total = controller.duration?.inMilliseconds ?? 0;
                 final scrollMs = total - _pauseAfterRound.inMilliseconds;
                 final t = controller.value;
                 final phase = t * total < scrollMs
@@ -156,37 +156,41 @@ class _LoopMarqueeTextState extends State<LoopMarqueeText>
     _controller?.stop();
   }
 
-  /// 测量缓存 — 测量结果只依赖 (text, style, textScaler)；hover/选中态
-  /// setState 重建时命中缓存跳过 TextPainter（4 chip × 每次 0.1-0.4ms）.
-  String? _cacheText;
-  TextStyle? _cacheStyle;
-  double? _cacheScale;
-  double? _cacheWidth;
+  /// 上次测量的输入与结果 — 拖窗缩放时 LayoutBuilder 每帧回调, 但测量结果
+  /// 只取决于 (text, style, textScaler, direction); 输入不变就复用, 免去每帧
+  /// 新建 TextPainter. style 用 `==` 比较 (TextStyle 值相等) — 父级每次
+  /// build 新建等值 style 实例时仍命中缓存 (旧 identical 会每帧失效).
+  String? _measuredText;
+  TextStyle? _measuredStyle;
+  TextScaler? _measuredScaler;
+  TextDirection? _measuredDirection;
+  double _measuredWidth = 0;
 
   /// 测量单行文本渲染宽度与行高（含系统字体缩放）。缓存命中零成本；
-  /// 未命中时现测、读完即 dispose。
+  /// 未命中时现测、读完即 dispose。行高写入 [_textHeight].
   double _measureTextWidth(BuildContext context) {
+    final direction = Directionality.of(context);
     final scaler = MediaQuery.textScalerOf(context);
-    final scale = scaler.scale(1.0);
-    if (_cacheText == widget.text &&
-        identical(_cacheStyle, widget.style) &&
-        _cacheScale == scale &&
-        _cacheWidth != null) {
-      return _cacheWidth!;
+    if (_measuredText == widget.text &&
+        _measuredStyle == widget.style &&
+        _measuredScaler == scaler &&
+        _measuredDirection == direction) {
+      return _measuredWidth;
     }
     final painter = TextPainter(
       text: TextSpan(text: widget.text, style: widget.style),
       maxLines: 1,
-      textDirection: Directionality.of(context),
+      textDirection: direction,
       textScaler: scaler,
     )..layout();
     final width = painter.maxIntrinsicWidth;
     _textHeight = painter.height;
     painter.dispose();
-    _cacheText = widget.text;
-    _cacheStyle = widget.style;
-    _cacheScale = scale;
-    _cacheWidth = width;
+    _measuredText = widget.text;
+    _measuredStyle = widget.style;
+    _measuredScaler = scaler;
+    _measuredDirection = direction;
+    _measuredWidth = width;
     return width;
   }
 }

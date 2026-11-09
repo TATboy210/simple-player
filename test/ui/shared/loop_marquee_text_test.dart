@@ -97,4 +97,33 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(findTranslateDx(tester), isNull);
   });
+
+  testWidgets('每帧新建的等值 style 下反复 resize 仍正确切换 (测量缓存按值命中)', (tester) async {
+    // 每次 buildSubject 都 new 一个值相等但非 identical 的 TextStyle,
+    // 模拟父级 build 每帧重建 style — 缓存须按 == 命中且结果仍随宽度联动.
+    for (final width in [200.0, 800.0, 200.0, 800.0, 150.0]) {
+      // 刻意非 const — 需要每次不同实例的等值 style.
+      // ignore: prefer_const_constructors
+      final style = TextStyle(fontSize: 14);
+      await tester.pumpWidget(
+        buildSubject(longText, style: style, width: width),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      if (width >= 800) {
+        expect(findTranslateDx(tester), isNull, reason: 'width=$width 应静止');
+      } else {
+        expect(findTranslateDx(tester), isNotNull, reason: 'width=$width 应滚动');
+      }
+    }
+  });
+
+  testWidgets('文本变化使测量缓存失效 — 短文本换长文本开始滚动', (tester) async {
+    await tester.pumpWidget(buildSubject(shortText));
+    await tester.pump();
+    expect(findTranslateDx(tester), isNull);
+
+    await tester.pumpWidget(buildSubject(longText));
+    await tester.pump();
+    expect(findTranslateDx(tester), isNotNull);
+  });
 }
