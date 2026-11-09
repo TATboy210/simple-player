@@ -222,6 +222,7 @@ final class ResizeFrameMetrics {
     required this._resizeSessionId,
     this._logger,
     this._enabled = !kReleaseMode,
+    this._extraContext,
   }) {
     if (_enabled) {
       _isResizing.addListener(_onResizingChanged);
@@ -233,7 +234,21 @@ final class ResizeFrameMetrics {
   final ValueListenable<int> _resizeSessionId;
   final KernelLogger? _logger;
   final bool _enabled;
+
+  /// 会话结束时附加到日志的归因上下文（播放状态/面板/尺寸等）。
+  ///
+  /// 在摘要 schema 之外追加，不改变 [ResizeFrameSummary.contextKeys]；
+  /// 返回值必须是可 JSON 序列化的简单值。
+  final Map<String, Object?> Function()? _extraContext;
   final List<ResizeFrameSample> _samples = [];
+
+  /// raster 重尾帧阈值（微秒）— 8ms 约为 60Hz 帧预算的一半，
+  /// 单帧 raster 超过它基本就是 jank 候选。
+  static const int heavyRasterUs = 8000;
+
+  /// "淡出阶段"帧数 — 会话开始后控制栏 150ms 淡出约 9~10 帧，
+  /// 用于区分重尾帧集中在淡出期（blur）还是均匀分布（视频帧导入）。
+  static const int fadePhaseFrames = 10;
 
   bool _sessionActive = false;
   bool _disposed = false;
@@ -283,12 +298,25 @@ final class ResizeFrameMetrics {
     SchedulerBinding.instance.removeTimingsCallback(_onTimings);
     _sessionActive = false;
     final summary = ResizeFrameMetricsReducer.reduce(_samples);
+    final heavy = <int>[
+      for (var i = 0; i < _samples.length; i++)
+        if (_samples[i].rasterUs > heavyRasterUs) i,
+    ];
+    final extra = _extraContext?.call() ?? const <String, Object?>{};
     // 先清除旧会话样本，再调用可重入的外部 logger；若日志 sink 同步开启下一次
     // resize，旧收尾不能在返回后清掉新会话已采集的帧。
     _samples.clear();
     (_logger ?? KernelLogger.I).debug(
       'resize_frame_metrics',
-      context: summary.toContext(sessionId: _sessionId),
+      context: {
+        ...summary.toContext(sessionId: _sessionId),
+        // 归因字段：重尾帧总数 / 其中落在淡出阶段的数量。
+        'heavyRasterCount': heavy.length,
+        'heavyRasterInFadePhase': heavy
+            .where((index) => index < fadePhaseFrames)
+            .length,
+        ...extra,
+      },
     );
   }
 

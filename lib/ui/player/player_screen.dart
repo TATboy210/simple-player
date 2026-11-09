@@ -279,7 +279,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _resizeMetrics = ResizeFrameMetrics(
       isResizing: widget.windowService.isResizing,
       resizeSessionId: widget.windowService.resizeSessionId,
+      extraContext: _resizeAttributionContext,
     );
+  }
+
+  /// resize 会话结束时附加到 `resize_frame_metrics` 日志的归因字段 —
+  /// 区分 raster 重尾帧来自播放中的视频帧导入、面板 blur 还是窗口尺寸。
+  /// 仅 Debug/Profile 的诊断器调用；每个会话一次，开销可忽略。
+  Map<String, Object?> _resizeAttributionContext() {
+    final view = WidgetsBinding.instance.platformDispatcher.views.firstOrNull;
+    final video = widget.engine.mediaInfo.video;
+    return {
+      'mediaState': widget.engine.state.value.name,
+      'videoWidth': video?.width,
+      'videoHeight': video?.height,
+      'playlistOpen': _playlistVisible.value,
+      'workspaceOpen': _workspace.value.hasTasks,
+      'windowPhysicalWidth': view?.physicalSize.width.round(),
+      'windowPhysicalHeight': view?.physicalSize.height.round(),
+    };
   }
 
   /// idle 既可能表示尚未加载，也可能表示 stop 正在卸载；两种情况都先隔离打开入口。

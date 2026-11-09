@@ -4,6 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/resize_frame_metrics.dart';
 
+/// 会话日志在摘要 schema 之外追加的归因字段（重尾帧统计）。
+const _attributionKeys = {'heavyRasterCount', 'heavyRasterInFadePhase'};
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -144,12 +147,47 @@ void main() {
 
       expect(logger.entries, hasLength(1));
       expect(logger.entries.single.message, 'resize_frame_metrics');
-      expect(
-        logger.entries.single.context?.keys.toSet(),
-        ResizeFrameSummary.contextKeys,
-      );
+      expect(logger.entries.single.context?.keys.toSet(), {
+        ...ResizeFrameSummary.contextKeys,
+        ..._attributionKeys,
+      });
       expect(logger.entries.single.context?['sessionId'], 41);
       expect(logger.entries.single.context?['sampleCount'], 0);
+
+      metrics.dispose();
+      resizing.dispose();
+      resizeSessionId.dispose();
+    });
+
+    test('输出 raster 重尾帧统计与注入的归因上下文', () {
+      final resizing = ValueNotifier<bool>(false);
+      final resizeSessionId = ValueNotifier<int>(60);
+      final logger = _RecordingLogger();
+      final metrics = ResizeFrameMetrics(
+        isResizing: resizing,
+        resizeSessionId: resizeSessionId,
+        logger: logger,
+        enabled: true,
+        extraContext: () => {'mediaState': 'playing', 'workspaceOpen': true},
+      );
+
+      resizing.value = true;
+      // 前 10 帧内 2 个重尾帧（淡出阶段），之后再 1 个重尾帧。
+      metrics.recordSamplesForTesting([
+        for (var i = 0; i < 20; i++)
+          ResizeFrameSample(
+            buildUs: 200,
+            rasterUs: (i == 1 || i == 9 || i == 15) ? 12000 : 1500,
+            totalSpanUs: 3000,
+          ),
+      ]);
+      resizing.value = false;
+
+      final context = logger.entries.single.context;
+      expect(context?['heavyRasterCount'], 3);
+      expect(context?['heavyRasterInFadePhase'], 2);
+      expect(context?['mediaState'], 'playing');
+      expect(context?['workspaceOpen'], true);
 
       metrics.dispose();
       resizing.dispose();
@@ -210,10 +248,10 @@ void main() {
 
       expect(logger.entries, hasLength(1));
       expect(logger.entries.single.message, 'resize_frame_metrics');
-      expect(
-        logger.entries.single.context?.keys.toSet(),
-        ResizeFrameSummary.contextKeys,
-      );
+      expect(logger.entries.single.context?.keys.toSet(), {
+        ...ResizeFrameSummary.contextKeys,
+        ..._attributionKeys,
+      });
       expect(logger.entries.single.context?['sessionId'], 7);
       expect(logger.entries.single.context?['sampleCount'], 0);
 
