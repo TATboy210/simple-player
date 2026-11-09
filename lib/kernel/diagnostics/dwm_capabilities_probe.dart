@@ -2,7 +2,9 @@
 ///
 /// Dart FFI leaf that probes DWM attribute availability at startup.
 /// Opens ntdll (RtlGetVersion), user32 (GetShellWindow), dwmapi
-/// (DwmGetWindowAttribute) and checks four Win11 22000+ attributes.
+/// (DwmGetWindowAttribute) and checks the readable Win11 22000+ attribute
+/// (corner preference); the three write-only color attributes are derived
+/// from the build number instead of probed.
 library;
 
 import 'dart:ffi';
@@ -98,11 +100,17 @@ external int _dwmGetWindowAttribute(
 /// S_OK HRESULT (0) — DwmGetWindowAttribute 成功
 const int _sOk = 0;
 
-/// DWM 属性 ID 常量（STACK.md build-floor matrix）
+/// DWMWA_WINDOW_CORNER_PREFERENCE — 唯一支持 Get 读取的探测属性。
 const int _dwmwaWindowCornerPreference = 33;
-const int _dwmwaBorderColor = 34;
-const int _dwmwaCaptionColor = 35;
-const int _dwmwaTextColor = 36;
+
+/// BORDER_COLOR(34)/CAPTION_COLOR(35)/TEXT_COLOR(36) 的最低 Windows 版本。
+///
+/// 这三个属性按文档是**只写**的（仅 DwmSetWindowAttribute），用
+/// DwmGetWindowAttribute 读取恒返回 E_INVALIDARG（0x80070057），与系统是否
+/// 支持无关 —— 旧版用 Get 探测会在 Win11 上每次启动固定误报 3 条
+/// "unavailable" 警告并把快照错记为 false。改按文档载明的最低版本
+/// （Windows 11 build 22000）推导。
+const int _dwmWriteOnlyColorMinBuild = 22000;
 
 /// 探测绑定调用点束 — @Native 绑定的可注入 seam（261009-fio H1）。
 ///
@@ -221,24 +229,8 @@ class DwmCapabilitiesProbe {
           dummy.cast<Void>(),
           sizeOf<Uint32>(),
         );
-        final hrBorder = dwmGetWindowAttribute(
-          shellHwnd,
-          _dwmwaBorderColor,
-          dummy.cast<Void>(),
-          sizeOf<Uint32>(),
-        );
-        final hrCaption = dwmGetWindowAttribute(
-          shellHwnd,
-          _dwmwaCaptionColor,
-          dummy.cast<Void>(),
-          sizeOf<Uint32>(),
-        );
-        final hrText = dwmGetWindowAttribute(
-          shellHwnd,
-          _dwmwaTextColor,
-          dummy.cast<Void>(),
-          sizeOf<Uint32>(),
-        );
+        // 三个颜色属性只写，不能 Get 探测 — 按最低版本推导（见常量说明）。
+        final colorsSupported = buildNumber >= _dwmWriteOnlyColorMinBuild;
 
         return DwmCapabilitySnapshot(
           buildNumber: buildNumber,
@@ -247,21 +239,9 @@ class DwmCapabilitiesProbe {
             _dwmwaWindowCornerPreference,
             buildNumber,
           ),
-          supportsBorderColor: processHResult(
-            hrBorder,
-            _dwmwaBorderColor,
-            buildNumber,
-          ),
-          supportsCaptionColor: processHResult(
-            hrCaption,
-            _dwmwaCaptionColor,
-            buildNumber,
-          ),
-          supportsTextColor: processHResult(
-            hrText,
-            _dwmwaTextColor,
-            buildNumber,
-          ),
+          supportsBorderColor: colorsSupported,
+          supportsCaptionColor: colorsSupported,
+          supportsTextColor: colorsSupported,
         );
       } finally {
         malloc.free(dummy);

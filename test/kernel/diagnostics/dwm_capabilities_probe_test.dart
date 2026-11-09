@@ -29,6 +29,7 @@ void main() {
       Object? shellWindowError,
       Object? Function(int attributeId)? attributeError,
       int Function(int attributeId)? attributeResults,
+      int buildNumber = 26200,
     }) {
       invocations = <String>[];
       return DwmProbeBindings(
@@ -36,7 +37,7 @@ void main() {
           invocations.add('readBuildNumber');
           final error = buildNumberError;
           if (error != null) throw error;
-          return 26200;
+          return buildNumber;
         },
         getShellWindow: () {
           invocations.add('getShellWindow');
@@ -102,7 +103,7 @@ void main() {
       expect(sink.records.where((r) => r.$1 == LogLevel.error), hasLength(1));
     });
 
-    test('happy path — 四属性 S_OK — 完整快照全 true 且属性矩阵锁定', () {
+    test('happy path — Win11 build — 完整快照全 true, 只 Get 探测可读的属性 33', () {
       final probe = probeWith(fakeBindings());
 
       final snapshot = probe.probe();
@@ -114,24 +115,24 @@ void main() {
       expect(snapshot.supportsBorderColor, isTrue);
       expect(snapshot.supportsCaptionColor, isTrue);
       expect(snapshot.supportsTextColor, isTrue);
-      // 四属性探测矩阵 (STACK.md build-floor) 与源码顺序双锁定.
+      // 34/35/36 是只写属性, Get 恒返回 E_INVALIDARG — 不得再被探测.
       expect(
         invocations
             .where((s) => s.startsWith('dwmGetWindowAttribute'))
             .toList(),
-        <String>[
-          'dwmGetWindowAttribute:33',
-          'dwmGetWindowAttribute:34',
-          'dwmGetWindowAttribute:35',
-          'dwmGetWindowAttribute:36',
-        ],
+        <String>['dwmGetWindowAttribute:33'],
+      );
+      expect(
+        sink.records.where((r) => r.$1 == LogLevel.warn),
+        isEmpty,
+        reason: 'Win11 上探测不得再产生"属性不可用"警告噪声',
       );
     });
 
-    test('单属性非 S_OK — 该属性 false 其余 true（processHResult 语义不变）', () {
+    test('圆角属性 33 非 S_OK — 仅该属性 false, 颜色属性按版本推导仍为 true', () {
       final probe = probeWith(
         fakeBindings(
-          attributeResults: (attributeId) => attributeId == 35 ? 0x80004005 : 0,
+          attributeResults: (attributeId) => attributeId == 33 ? 0x80004005 : 0,
         ),
       );
 
@@ -139,13 +140,26 @@ void main() {
 
       expect(snapshot, isNotNull);
       expect(
-        snapshot!.supportsCaptionColor,
+        snapshot!.supportsCornerPreference,
         isFalse,
-        reason: '属性 35 (CAPTION_COLOR) hr 非 S_OK → 探测答案 false',
+        reason: '属性 33 hr 非 S_OK → 探测答案 false (processHResult 语义不变)',
       );
-      expect(snapshot.supportsCornerPreference, isTrue);
       expect(snapshot.supportsBorderColor, isTrue);
+      expect(snapshot.supportsCaptionColor, isTrue);
       expect(snapshot.supportsTextColor, isTrue);
+      expect(sink.records.where((r) => r.$1 == LogLevel.warn), hasLength(1));
+    });
+
+    test('Win10 build (<22000) — 颜色属性按版本推导为 false', () {
+      final probe = probeWith(fakeBindings(buildNumber: 19045));
+
+      final snapshot = probe.probe();
+
+      expect(snapshot, isNotNull);
+      expect(snapshot!.isWin11OrLater, isFalse);
+      expect(snapshot.supportsBorderColor, isFalse);
+      expect(snapshot.supportsCaptionColor, isFalse);
+      expect(snapshot.supportsTextColor, isFalse);
     });
   });
 }

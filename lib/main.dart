@@ -170,11 +170,26 @@ final PrintLogCollector _marionetteLogCollector = PrintLogCollector();
 /// 等待或亮窗失败都 best-effort 直接 show（与 init 失败降级同一兜底），
 /// 绝不影响已 runApp 的应用本体。
 Future<void> _revealWindowAfterFirstFrame(WindowService windowService) async {
+  final waitStopwatch = Stopwatch()..start();
+  final firstFrame = WidgetsBinding.instance.waitUntilFirstFrameRasterized;
   try {
-    await WidgetsBinding.instance.waitUntilFirstFrameRasterized.timeout(
-      _firstFrameRevealTimeout,
-    );
+    await firstFrame.timeout(_firstFrameRevealTimeout);
   } on Object catch (error, stackTrace) {
+    // 超时仍在等的首帧: 到达时补记真实耗时, 供调 _firstFrameRevealTimeout 时
+    // 区分"稍慢一点"与"严重拖后"(只看超时 warn 无从判断).
+    unawaited(
+      firstFrame
+          .then((_) {
+            KernelLogger.I.i(
+              '[main] first frame rasterized ${waitStopwatch.elapsedMilliseconds}ms '
+              'after wait start (reveal timeout was '
+              '${_firstFrameRevealTimeout.inMilliseconds}ms)',
+            );
+          })
+          .catchError((Object _) {
+            // 首帧等待本身失败 — 已在下方 warn 记录, 此处不重复.
+          }),
+    );
     // 超时/等待异常不阻断亮窗 — 记 warn 后继续。
     KernelLogger.I.w(
       '[main] First-frame wait timed out or failed: $error',
