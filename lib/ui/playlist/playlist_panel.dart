@@ -2,9 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-import '../player/workspace_menu_session.dart';
 
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
@@ -15,6 +12,7 @@ import '../shared/control_bar_decoration.dart';
 import '../shared/glass_blur_layer.dart';
 import '../theme/tokens.dart';
 import 'pending_playlist_confirmation.dart';
+import 'playlist_confirmation_controller.dart';
 import 'playlist_confirmation_overlay.dart';
 import 'playlist_entry_list.dart';
 import 'playlist_panel_headers.dart';
@@ -147,17 +145,15 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   /// 批量选中的条目索引集合 — 逻辑队列索引, 条目数变化时自动过滤越界.
   final Set<int> _batchSelected = <int>{};
-  PendingPlaylistConfirmation? _confirmation;
-  final FocusNode _cancelFocus = FocusNode(
-    debugLabel: 'playlist-confirm-cancel',
-  );
 
-  /// 确认按钮焦点节点 — tab-trap 回绕落点 (U2): 卡内只有 cancel/confirm
-  /// 两个可聚焦节点, [_confirmationTabTrap] 据此把 Tab 落点锚定在两节点
-  /// 之间; debugLabel 供焦点断言与日志定位. dispose 成对释放 (见 dispose).
-  final FocusNode _confirmFocus = FocusNode(
-    debugLabel: 'playlist-confirm-confirm',
-  );
+  /// 确认流控制器 (待确认快照 + 焦点节点 + Tab 陷阱 + 早期 ESC).
+  late final PlaylistConfirmationController _confirm =
+      PlaylistConfirmationController(onChanged: _rebuild);
+
+  /// 确认流状态翻转 → 重建 (守卫 mounted, dispose 后的迟到回调安全).
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
 
   /// 合并列表层监听源 — resume 为 null 时不参与 (测试退路恒允许).
   Listenable _mergeListSignals() => Listenable.merge([
@@ -166,47 +162,9 @@ class _PlaylistPanelState extends State<PlaylistPanel>
     widget.lastPlayedPath,
   ]);
 
-  /// Tab/Shift+Tab 焦点陷阱 (U2) — 确认卡是破坏性动作表面, 焦点越卡后
-  /// Enter 可能误触卡外播放器控件; 此处抢在 FocusManager 默认 Tab 遍历
-  /// (焦点链上溯阶段) 之前返回 handled, 封死越卡路径.
-  ///
-  /// 两节点回绕下 shift 方向信息退化 — Tab 与 Shift+Tab 都移动到另一
-  /// 节点, 故不读 HardwareKeyboard 的 shift 状态.
-  KeyEventResult _confirmationTabTrap(KeyEvent event) {
-    // 仅确认卡在显时拦截; KeyRepeat 不移动焦点 (避免长按连跳).
-    if (_confirmation == null ||
-        event is! KeyDownEvent ||
-        event.logicalKey != LogicalKeyboardKey.tab) {
-      return KeyEventResult.ignored;
-    }
-    if (_cancelFocus.hasFocus) {
-      _confirmFocus.requestFocus();
-    } else {
-      _cancelFocus.requestFocus();
-    }
-    return KeyEventResult.handled;
-  }
-
-  /// Resolve once and remove only this panel's local confirmation.
-  void _finishConfirmation(bool confirmed, {bool rebuild = true}) {
-    final pending = _confirmation;
-    _confirmation = null;
-    pending?.complete(confirmed);
-    if (rebuild && mounted) setState(() {});
-  }
-
-  /// Early ESC prevents the player's hardware fallback from exiting fullscreen.
-  KeyEventResult _confirmationKey(KeyEvent event) {
-    if (_confirmation == null ||
-        !widget.visible ||
-        ModalRoute.of(context)?.isCurrent != true ||
-        event.logicalKey != LogicalKeyboardKey.escape) {
-      return KeyEventResult.ignored;
-    }
-    WorkspaceMenuScope.maybeOf(context)?.session.latchEvent(event);
-    if (event is KeyDownEvent) _finishConfirmation(false);
-    return KeyEventResult.handled;
-  }
+  /// 早期 ESC — 交给确认流控制器.
+  KeyEventResult _confirmationKey(KeyEvent event) =>
+      _confirm.onEarlyKey(event, visible: widget.visible, context: context);
 
   @override
   void initState() {
@@ -224,7 +182,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   void didUpdateWidget(covariant PlaylistPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.visible || !identical(oldWidget.entries, widget.entries)) {
-      _finishConfirmation(false, rebuild: false);
+      _confirm.finish(false, rebuild: false);
     }
     if (oldWidget.visible != widget.visible) {
       widget.visible ? _controller.forward() : _controller.reverse();
@@ -239,7 +197,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   @override
   void deactivate() {
-    _finishConfirmation(false, rebuild: false);
+    _confirm.finish(false, rebuild: false);
     _sortMenu.cancel();
     super.deactivate();
   }
@@ -248,9 +206,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
   void dispose() {
     FocusManager.instance.removeEarlyKeyEventHandler(_sortMenu.onEarlyKey);
     FocusManager.instance.removeEarlyKeyEventHandler(_confirmationKey);
-    _finishConfirmation(false, rebuild: false);
-    _cancelFocus.dispose();
-    _confirmFocus.dispose();
+    _confirm.dispose();
     _sortMenu.dispose();
     _wheel.dispose();
     _controller.dispose();
@@ -310,16 +266,16 @@ class _PlaylistPanelState extends State<PlaylistPanel>
           clipBehavior: Clip.hardEdge,
           children: [
             ExcludeFocus(
-              excluding: _confirmation != null,
+              excluding: _confirm.pending != null,
               child: _buildContent(context),
             ),
-            if (_confirmation case final pending?)
+            if (_confirm.pending case final pending?)
               PlaylistConfirmationOverlay(
                 pending: pending,
-                cancelFocus: _cancelFocus,
-                confirmFocus: _confirmFocus,
-                onFinish: _finishConfirmation,
-                onKeyEvent: _confirmationTabTrap,
+                cancelFocus: _confirm.cancelFocus,
+                confirmFocus: _confirm.confirmFocus,
+                onFinish: _confirm.finish,
+                onKeyEvent: _confirm.tabTrap,
               ),
           ],
         ),
@@ -461,8 +417,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
       indices: indices,
     );
     if (pending.isEmpty) return null;
-    _finishConfirmation(false, rebuild: false);
-    setState(() => _confirmation = pending);
+    _confirm.show(pending);
     final confirmed = await pending.result;
     if (!confirmed || !mounted || !widget.visible) return null;
     return pending;
