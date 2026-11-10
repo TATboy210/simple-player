@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/persistence/window_persistence.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/native_window.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_geometry.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_service.dart';
 
@@ -34,11 +33,18 @@ void main() {
     exitCodes = <int>[];
   });
 
+  /// 关门专线 seam 捕获位 — 测试用它模拟 runner 的 WM_CLOSE 通知。
+  void Function()? hostClose;
+
   WindowService createService({bool dropDwmFrame = false}) => WindowService(
     persistence: WindowPersistence(preferences: preferences),
     bindWindow: () => window,
     exitOnClose: exitCodes.add,
     dropDwmFrame: dropDwmFrame,
+    installCloseNotifier: (callback) {
+      hostClose = callback;
+      return true;
+    },
   );
 
   Map<String, dynamic> savedSnapshot() {
@@ -230,10 +236,13 @@ void main() {
       await service.reveal();
 
       expect(binds, 1);
-      // 事件订阅只挂一次：一次最大化事件只让 mode 更新一次。
+      // 阶段二（无事件流）语义：失败重试后的几何信号仍驱动模式，
+      // 且 ValueNotifier 只在边沿通知 — 重复信号不产生第二次变化。
+      window.completeMaximize();
       var changes = 0;
       service.mode.addListener(() => changes++);
-      window.completeMaximize();
+      service.noteGeometryChanged();
+      service.noteGeometryChanged();
       expect(changes, 1);
     });
 
@@ -274,14 +283,17 @@ void main() {
   });
 
   group('mode', () {
-    test('native maximize and restore events drive mode', () async {
+    test('geometry signals drive mode from queried host state', () async {
+      // 阶段二：模式不再由 maximize/restore 事件驱动，而是几何信号边沿现查。
       final service = await startedService();
       addTearDown(service.dispose);
 
       window.completeMaximize();
+      service.noteGeometryChanged();
       expect(service.mode.value, WindowMode.maximized);
 
       window.completeUnmaximize();
+      service.noteGeometryChanged();
       expect(service.mode.value, WindowMode.windowed);
     });
 
@@ -292,8 +304,8 @@ void main() {
         addTearDown(service.dispose);
         window.completeMaximize();
 
-        // 最大化窗口最小化后恢复只报 restored，宿主仍是最大化。
-        window.emit(const NativeRestored());
+        // 阶段二语义：恢复期尺寸变化 → 现查 isMaximized 校准（不再消费事件）。
+        service.noteGeometryChanged();
 
         expect(service.mode.value, WindowMode.maximized);
       },
@@ -416,26 +428,15 @@ void main() {
   });
 
   group('resize session', () {
-    test('events before reveal are ignored', () async {
-      final service = createService();
-      addTearDown(service.dispose);
-      await service.init();
-
-      window.emit(const NativeResized());
-
-      expect(service.isResizing.value, isFalse);
-      expect(service.resizeSessionId.value, 0);
-    });
-
     test('debounces into one session and bumps the id per session', () {
       fakeAsync((async) {
         final service = startInZone(async);
 
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
         async.elapse(const Duration(milliseconds: 100));
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
         async.elapse(const Duration(milliseconds: 100));
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
 
         expect(service.isResizing.value, isTrue);
         expect(service.resizeSessionId.value, 1);
@@ -445,7 +446,7 @@ void main() {
         async.elapse(const Duration(milliseconds: 2));
         expect(service.isResizing.value, isFalse);
 
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
         expect(service.resizeSessionId.value, 2);
         async.elapse(const Duration(seconds: 1));
         service.dispose();
@@ -457,7 +458,7 @@ void main() {
     // 会因续体困在假时钟里而永远不返回）。
     // 阶段一改：默认检测源 = 引擎指标（noteGeometryChanged），
     // 会话语义必须与旧事件源完全同构 — 下游（淡出/blur/落盘）无感知。
-    test('noteGeometryChanged drives the same session as events do', () {
+    test('noteGeometryChanged debounces into one session and bumps the id per session', () {
       fakeAsync((async) {
         final service = startInZone(async);
 
@@ -523,7 +524,7 @@ void main() {
         final service = startInZone(async);
         window.boundsValue = const Rect.fromLTWH(50, 60, 1100, 650);
 
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
         async.elapse(const Duration(milliseconds: 600));
         async.flushMicrotasks();
 
@@ -542,7 +543,7 @@ void main() {
         unawaited(service.setMode(WindowMode.fullscreen));
         async.flushMicrotasks();
 
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
         expect(service.isResizing.value, isTrue);
         async.elapse(const Duration(milliseconds: 600));
         async.flushMicrotasks();
@@ -553,7 +554,7 @@ void main() {
         // 链路根本没跑。
         unawaited(service.setMode(WindowMode.windowed));
         async.flushMicrotasks();
-        window.emit(const NativeResized());
+        service.noteGeometryChanged();
         async.elapse(const Duration(milliseconds: 600));
         async.flushMicrotasks();
         expect(preferences.getString(_snapshotKey), isNotNull);
@@ -567,13 +568,13 @@ void main() {
       final service = await startedService();
       addTearDown(service.dispose);
       window.boundsValue = const Rect.fromLTWH(70, 80, 1000, 600);
-      window.emit(const NativeResized());
+      service.noteGeometryChanged();
 
-      // 最大化: bounds 变成工作区，先 resize 事件、后 maximized 事件。
+      // 最大化: bounds 变工作区 + isMaximized 翻真 — 几何信号到达时
+      // 还原矩形已被上一次采样记住，采样守卫跳过工作区矩形。
       window.maximized = true;
       window.boundsValue = window.workAreasValue.first;
-      window.emit(const NativeResized());
-      window.emit(const NativeMaximized());
+      service.noteGeometryChanged();
       await service.close();
 
       final saved = savedSnapshot();
@@ -588,11 +589,11 @@ void main() {
       final service = await startedService();
       addTearDown(service.dispose);
       window.boundsValue = const Rect.fromLTWH(70, 80, 1000, 600);
-      window.emit(const NativeMoved());
+      service.noteGeometryChanged();
 
       window.minimized = true;
       window.boundsValue = const Rect.fromLTWH(-32000, -32000, 160, 28);
-      window.emit(const NativeMoved());
+      service.noteGeometryChanged();
       await service.close();
 
       expect(savedSnapshot()['x'], 70);
@@ -602,7 +603,7 @@ void main() {
       final service = await startedService();
       addTearDown(service.dispose);
       window.boundsValue = const Rect.fromLTWH(10, 10, 300, 200);
-      window.emit(const NativeResized());
+      service.noteGeometryChanged();
 
       await service.close();
 
@@ -675,7 +676,7 @@ void main() {
 
       // ✕ 连点 + 外部关闭请求，全部发生在序列完成之前。
       final first = service.close();
-      window.requestClose();
+      hostClose!();
       final second = service.close();
       await Future.wait([first, second]);
 
@@ -683,26 +684,36 @@ void main() {
       expect(exitCodes, [0]);
     });
 
-    test('cancels the default close synchronously inside the event', () async {
+    test('host WM_CLOSE notification runs the graceful sequence', () async {
       final service = await startedService();
       addTearDown(service.dispose);
 
-      final cancelled = window.requestClose();
-      await service.closeOperation;
-
-      expect(cancelled, isTrue);
-      expect(exitCodes, [0]);
-    });
-
-    test('a forced close that cannot be cancelled still shuts down', () async {
-      final service = await startedService();
-      addTearDown(service.dispose);
-
-      window.requestClose(cancelable: false);
+      expect(service.hostCloseBridgeInstalled, isTrue);
+      hostClose!();
       await service.closeOperation;
 
       expect(exitCodes, [0]);
     });
+
+    test(
+      'bridge install failure falls back but leaves Dart close working',
+      () async {
+        final service = WindowService(
+          persistence: WindowPersistence(preferences: preferences),
+          bindWindow: () => window,
+          exitOnClose: exitCodes.add,
+          dropDwmFrame: false,
+          installCloseNotifier: (_) => false,
+        );
+        addTearDown(service.dispose);
+        await service.init();
+        await service.reveal();
+
+        expect(service.hostCloseBridgeInstalled, isFalse);
+        await service.close();
+        expect(exitCodes, [0]);
+      },
+    );
 
     test('a failing listener does not block exit', () async {
       final service = await startedService();

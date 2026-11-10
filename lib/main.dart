@@ -140,8 +140,8 @@ Future<void> main() {
             ),
           );
 
-          // 拖拽会话检测源（阶段一改）：引擎视图尺寸变化 → WindowService 会话。
-          // 取代 nativeapi 逐步事件流（默认已不订阅，见 nativeapi_window 开关）。
+          // 拖拽会话检测源：引擎视图尺寸变化 → WindowService 会话（阶段一）。
+          // nativeapi 事件流已整体退订（阶段二，见 nativeapi_window 类注释）。
           WidgetsBinding.instance.addObserver(
             WindowMetricsObserver(
               onGeometryChanged: windowService.noteGeometryChanged,

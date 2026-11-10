@@ -3,64 +3,24 @@ import 'dart:ffi' as ffi;
 import 'dart:io' show Platform;
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:nativeapi/nativeapi.dart' as na;
 
 import '../bridge/win32/runner_window_handle.dart';
 import 'native_window.dart';
 
-/// nativeapi 事件 → [NativeWindowEvent]；无应用语义的事件返回 null。
-///
-/// 抽成纯函数以便不经 FFI 单测映射关系。
-@visibleForTesting
-NativeWindowEvent? mapWindowEvent(na.WindowEvent event) => switch (event) {
-  na.WindowMaximizedEvent() => const NativeMaximized(),
-  na.WindowRestoredEvent() => const NativeRestored(),
-  na.WindowMinimizedEvent() => const NativeMinimized(),
-  na.WindowResizedEvent() => const NativeResized(),
-  na.WindowMovedEvent() => const NativeMoved(),
-  na.WindowCloseRequestedEvent(:final request) => NativeCloseRequested(
-    request.cancel,
-  ),
-  // focus/blur/全屏等事件无应用语义（全屏由 setMode 同步驱动）。
-  _ => null,
-};
-
-// nativeapi 自带 Point/Size/Rectangle，与 dart:ui 同名 — 在此做最小转换，
-// 窗口几何全部以逻辑像素进出。
-extension on Rect {
-  na.Rectangle toNative() =>
-      na.Rectangle(x: left, y: top, width: width, height: height);
-}
-
-extension on na.Rectangle {
-  Rect toRect() => Rect.fromLTWH(x, y, width, height);
-}
-
-extension on Size {
-  na.Size toNative() => na.Size(width: width, height: height);
-}
-
-/// [NativeWindow] 的生产实现 — nativeapi 的 [na.Window]。
+/// [NativeWindow] 的生产实现 — nativeapi 的 [na.Window]，**命令通道**。
 ///
 /// 全项目唯一直接依赖 nativeapi 的文件；其余代码只见 [NativeWindow]。
+///
+/// 阶段二改造（取证 docs/audit/resize-drag-ab-2026-11.md）：**不注册**事件
+/// 监听 — nativeapi 在窗口线程按步构建 Moved/Resized 并跨语言投递，是边缘
+/// 拖拽"内容追边框"的主犯。本适配器的职责收缩为：包装 HWND、下发几何/状态
+/// 命令；[events] 返回恒定空的流以满足端口形状（[WindowService] 的 _settle
+/// 订阅它即得 onDone，落定语义退化为"命令后查询"，nativeapi 命令为同步
+/// marshal，实测等价）。几何变化检测走 WindowMetricsObserver（引擎指标），
+/// 关门走 CloseNotifierBridge（runner 专线），事件流整体退订。
 class NativeapiWindow implements NativeWindow {
-  NativeapiWindow._(this._window) {
-    // 拖拽流畅度改造·阶段一：默认 **不注册** nativeapi 窗口事件监听 —
-    // 每步 WM_WINDOWPOSCHANGED 的事件构建+跨语言投递挤占窗口线程，是边缘
-    // 拖拽"内容追边框"的主犯（取证见 docs/audit/resize-drag-ab-2026-11.md）。
-    // 会话检测改由 WindowMetricsObserver 喂引擎指标，模式靠现查。
-    // SIMPLER_PLAYER_WINDOW_EVENTS=1 恢复旧事件流（A/B 回退开关；阶段二
-    // 关闭消息桥落地后移除）。不订阅时原生侧仅剩快照 diff，无 Dart 投递。
-    if (legacyEventStreamEnabled) {
-      _listenerId = _window.addListener(_forward);
-    }
-  }
-
-  /// 旧事件流回退开关 — 读一次环境常量（阶段二随 close 桥一起删除）。
-  static final bool legacyEventStreamEnabled = Platform.environment.containsKey(
-    'SIMPLER_PLAYER_WINDOW_EVENTS',
-  );
+  NativeapiWindow._(this._window);
 
   /// 绑定当前 runner 窗口。
   ///
@@ -91,22 +51,11 @@ class NativeapiWindow implements NativeWindow {
   /// 必须长期持有同一个 [na.Window]：最小尺寸 handler 与其寿命绑定。
   final na.Window _window;
 
-  // 监听器仅在 legacyEventStreamEnabled 时注册；null = 未订阅（默认路径）。
-  na.ListenerId? _listenerId;
-
-  /// sync 广播 — 保证 [NativeCloseRequested.cancel] 在原生回调内被调用。
-  final StreamController<NativeWindowEvent> _events =
-      StreamController<NativeWindowEvent>.broadcast(sync: true);
-
-  void _forward(na.WindowEvent event) {
-    // removeListener 之后仍可能有在途的原生回调。
-    if (_events.isClosed) return;
-    final mapped = mapWindowEvent(event);
-    if (mapped != null) _events.add(mapped);
-  }
-
+  /// 退订事件流后的空实现（见类注释）。const 空流在 listen 时即 done，
+  /// 服务侧 _settle 的 onDone 收尾路径已覆盖。
   @override
-  Stream<NativeWindowEvent> get events => _events.stream;
+  Stream<NativeWindowEvent> get events =>
+      const Stream<NativeWindowEvent>.empty();
 
   @override
   void show() => _window.show();
@@ -167,11 +116,22 @@ class NativeapiWindow implements NativeWindow {
   @override
   void performTitleBarDoubleClick() => _window.performTitleBarDoubleClick();
 
+  /// 无监听器可摘、无流可关（事件流已退订）；保留方法满足端口契约。
   @override
-  void dispose() {
-    if (_events.isClosed) return;
-    final listenerId = _listenerId;
-    if (listenerId != null) _window.removeListener(listenerId);
-    unawaited(_events.close());
-  }
+  void dispose() {}
+}
+
+// nativeapi 自带 Point/Size/Rectangle，与 dart:ui 同名 — 在此做最小转换，
+// 窗口几何全部以逻辑像素进出（匿名扩展按接收者类型隐式解析）。
+extension on Rect {
+  na.Rectangle toNative() =>
+      na.Rectangle(x: left, y: top, width: width, height: height);
+}
+
+extension on na.Rectangle {
+  Rect toRect() => Rect.fromLTWH(x, y, width, height);
+}
+
+extension on Size {
+  na.Size toNative() => na.Size(width: width, height: height);
 }

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../diagnostics/kernel_logger.dart';
 import '../persistence/window_persistence.dart';
+import 'close_notifier_bridge.dart';
 import 'native_window.dart';
 import 'nativeapi_window.dart';
 import 'normal_bounds_tracker.dart';
@@ -30,28 +31,37 @@ const Duration _resizeDebounce = Duration(milliseconds: 500);
 /// 关窗路径单步超时 — 卡住的步骤记日志后继续推进。
 const Duration _closeStepTimeout = Duration(milliseconds: 800);
 
-/// 窗口服务 — 单类封装 [NativeWindow]（生产为 nativeapi）。
+/// 窗口服务 — 单类封装 [NativeWindow]（生产为 nativeapi，命令通道）。
+///
+/// 事件模型（阶段一/二改，取证 docs/audit/resize-drag-ab-2026-11.md）：
+/// 不再订阅 nativeapi 逐步事件流；几何变化检测源 = 引擎指标
+/// （[WindowMetricsObserver] → [noteGeometryChanged]），模式靠现查
+/// `isMaximized` 校准，关门走 runner 专线（[CloseNotifierBridge]）。
 ///
 /// 行为契约：
 /// * 生命周期：[init] 隐藏态恢复几何 → 首帧栅格化后 [reveal] 亮窗；reveal 前
-///   吞掉一切 resize 事件（恢复引发的 resize 不产生假会话/假落盘）。
+///   吞掉一切几何信号（恢复引发的尺寸变化不产生假会话/假落盘）。
 /// * resize：500ms 防抖，[isResizing] 仅在会话边沿通知；全屏过渡的 resize
 ///   清标志但不落盘（防把显示器尺寸写进偏好，下次启动恢复成巨窗）。
-/// * 模式：全屏意图标志让全屏期间的原生 maximize 事件映射回 fullscreen；
-///   退出全屏回查宿主实际最大化状态。
+/// * 模式：setMode 先落意图值；外部改动（Win+↑、贴边 Snap、任务栏）在下一个
+///   几何边沿由 `_syncModeFromNative` 现查校准；全屏意图期间校准让位。
 /// * 落盘：存「最近一次普通窗口矩形」+ 最大化标志，最大化不覆盖还原尺寸；
 ///   恢复位置不在任何显示器工作区内时回落居中。
-/// * 关窗（hide-first）：hide → persist → closing listeners → exit(0)，
-///   每步 800ms 超时兜底，多路触发共享同一次执行。
+/// * 关窗（hide-first）：专线/✕ 按钮 → [_beginClose]：hide → persist →
+///   closing listeners → exit(0)，每步 800ms 超时兜底，多路触发共享同一次执行。
 class WindowService implements WindowBridge {
-  /// 创建窗口服务。[bindWindow]/[exitOnClose]/[dropDwmFrame] 为测试 seam：
-  /// 生产分别绑定 [NativeapiWindow.bind]、dart:io exit、Win10 版本探测。
+  /// 创建窗口服务。[bindWindow]/[exitOnClose]/[dropDwmFrame]/
+  /// [installCloseNotifier] 为测试 seam：生产分别绑定 [NativeapiWindow.bind]、
+  /// dart:io exit、Win10 版本探测、[CloseNotifierBridge.install]。
   WindowService({
     WindowPersistence? persistence,
     NativeWindow Function()? bindWindow,
     void Function(int code)? exitOnClose,
     bool? dropDwmFrame,
+    bool Function(void Function() onHostClose)? installCloseNotifier,
   }) : _persistence = persistence ?? WindowPersistence(),
+       _installCloseNotifier =
+           installCloseNotifier ?? CloseNotifierBridge.install,
        _bindWindow = bindWindow ?? NativeapiWindow.bind,
        _exitOnClose = exitOnClose ?? exit,
        _dropDwmFrame = dropDwmFrame ?? _isWindows10();
@@ -60,10 +70,14 @@ class WindowService implements WindowBridge {
   final NativeWindow Function() _bindWindow;
   final void Function(int code) _exitOnClose;
   final bool _dropDwmFrame;
+  final bool Function(void Function() onHostClose) _installCloseNotifier;
 
   NativeWindow? _native;
-  StreamSubscription<NativeWindowEvent>? _eventSub;
   bool _revealed = false;
+
+  /// runner 关门专线是否已挂上（init 后有效）— 诊断/测试观察位。
+  @visibleForTesting
+  bool hostCloseBridgeInstalled = false;
   bool _fullscreenIntent = false;
   bool _disposed = false;
 
@@ -123,8 +137,12 @@ class WindowService implements WindowBridge {
     if (_dropDwmFrame) window.hasShadow = false;
     window.hideTitleBar();
     window.minimumSize = minimumWindowSize;
-    _eventSub ??= window.events.listen(_onEvent);
-    _log.i('[WindowService] event listener attached');
+    // 关门专线注册（阶段二）：WM_CLOSE → _beginClose（hide-first persist→exit）。
+    // 注册失败（旧 runner 产物/符号缺失）仅记日志 — runner 侧回退旧路径，
+    // ✕ 按钮的 Dart 侧 close() 不受影响。
+    hostCloseBridgeInstalled = _installCloseNotifier(
+      () => unawaited(_beginClose()),
+    );
 
     final persisted = await _persistence.load();
     if (_disposed) return;
@@ -205,39 +223,7 @@ class WindowService implements WindowBridge {
     _native?.show();
   }
 
-  // --- 事件分发 ---
-
-  void _onEvent(NativeWindowEvent event) {
-    if (_disposed) return;
-    switch (event) {
-      case NativeMaximized():
-        // 全屏意图期/全屏中的原生 maximize 是铺满的副产品 — 映射回 fullscreen，
-        // 不降级为 maximized（单一数据源语义，防全屏 UI 误退）。
-        mode.value = (_fullscreenIntent || mode.value.isFullscreen)
-            ? WindowMode.fullscreen
-            : WindowMode.maximized;
-      case NativeRestored():
-        _onNativeRestored();
-      case NativeResized():
-        _bounds.noteChanged();
-        _onNativeResized();
-      case NativeMoved():
-        _bounds.noteChanged();
-      case NativeCloseRequested(:final cancel):
-        _onCloseRequested(cancel);
-      case NativeMinimized():
-        break;
-    }
-  }
-
-  void _onNativeRestored() {
-    if (_fullscreenIntent || mode.value.isFullscreen) return;
-    // 最大化窗口最小化后恢复也只报 restored — 以宿主实际状态为准，
-    // 避免把仍最大化的窗口误记为 windowed。
-    mode.value = _bound.isMaximized
-        ? WindowMode.maximized
-        : WindowMode.windowed;
-  }
+  // --- resize 会话（检测源：引擎指标 noteGeometryChanged，见下） ---
 
   void _onNativeResized() {
     if (!_revealed) return;
@@ -255,6 +241,8 @@ class WindowService implements WindowBridge {
   /// 回退开关（SIMPLER_PLAYER_WINDOW_EVENTS=1）下两路并存亦幂等。
   void noteGeometryChanged() {
     if (_disposed || !_revealed) return;
+    // 还原矩形跟踪（tracker 内建节流，60Hz 指标率下开销可忽略）。
+    _bounds.noteChanged();
     // 尺寸变化顺带校准一次模式（外部最大化/还原不再依赖事件）。
     _syncModeFromNative();
     _onNativeResized();
@@ -397,20 +385,9 @@ class WindowService implements WindowBridge {
     await _beginClose();
   }
 
-  /// 关窗时序的唯一入口 — 重复触发（✕ 连点 / 外部 WM_CLOSE）共享同一次执行。
+  /// 关窗时序的唯一入口 — 重复触发（✕ 连点 / 外部 WM_CLOSE 专线回调）
+  /// 共享同一次执行。
   Future<void> _beginClose() => _closeOperation ??= _closeSequence();
-
-  /// 平台关闭请求（✕ / Alt+F4 / WM_CLOSE）。
-  void _onCloseRequested(bool Function() cancel) {
-    // 取消默认 DestroyWindow — 服务完成持久化后 exit 收尾。
-    if (!cancel()) {
-      _log.d(
-        '[WindowService] forced close (WM_CLOSE): not cancelable; '
-        'runner re-posts SC_CLOSE for the cancelable path',
-      );
-    }
-    unawaited(_beginClose());
-  }
 
   /// 关窗时序：1) hide-first 窗口先视觉消失；2) 几何落盘；3) 应用级退出落盘
   /// （播放列表断点等）；4) exit(0) 立即终止进程 — 窗口已不可见、状态已落盘，
@@ -505,8 +482,6 @@ class WindowService implements WindowBridge {
     _resizeTimer?.cancel();
     _resizeTimer = null;
     _bounds.dispose();
-    unawaited(_eventSub?.cancel());
-    _eventSub = null;
     _native?.dispose();
     mode.dispose();
     isResizing.dispose();
