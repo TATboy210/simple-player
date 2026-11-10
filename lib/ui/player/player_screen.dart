@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mpv_kit_video/mpv_kit_video.dart';
 
-import '../../kernel/window_bridge/window_service.dart';
+import '../../kernel/window_bridge/service/window_service.dart';
 import '../../kernel/diagnostics/resize_frame_metrics.dart';
 import '../../kernel/diagnostics/video_texture_resize_probe.dart';
 import '../../kernel/engine/engine_state.dart';

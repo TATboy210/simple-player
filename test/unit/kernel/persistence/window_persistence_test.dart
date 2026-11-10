@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/persistence/window_persistence.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_geometry.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/window_geometry.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));

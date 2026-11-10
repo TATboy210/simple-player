@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'port/window_resize_edge.dart';
+
 /// 窗口模式：普通窗口、最大化或全屏。
 enum WindowMode {
   /// 普通窗口。
@@ -33,7 +35,11 @@ abstract interface class WindowBridge {
   /// 当前是否置顶。
   ValueListenable<bool> get isAlwaysOnTop;
 
-  /// 切换窗口模式（普通 / 最大化 / 全屏），等到原生状态落定后返回。
+  /// 切换窗口模式（普通 / 最大化 / 全屏）。
+  ///
+  /// 语义 =「意图立即提交，原生状态在下一几何边沿校准」（契约 4）：
+  /// 命令为同步 FFI marshal，无事件流可等；外部改动（Win+↑/Snap）由
+  /// 几何信号触发现查校准收敛。
   Future<void> setMode(WindowMode target);
 
   /// 设置窗口置顶状态。
@@ -54,6 +60,10 @@ abstract interface class WindowBridge {
 
   /// 开始拖动窗口（进入系统拖动循环，Aero Snap 由系统处理）。
   Future<void> startDragging();
+
+  /// 从指定边缘进入系统 resize 循环 — 仅 frameless 无系统 resize 边缘的
+  /// 平台（Linux）由 UI 热区消费；Windows/macOS 有系统边缘，UI 不调用。
+  void startResizing(WindowResizeEdge edge);
 
   /// 执行系统标题栏双击动作（最大化/还原）。
   void titleBarDoubleClick();

@@ -1,21 +1,17 @@
-import 'dart:async';
 import 'dart:ui';
 
-import 'package:simple_player_flutter/kernel/window_bridge/native_window.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/port/native_window.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/port/window_resize_edge.dart';
 
 /// [NativeWindow] 测试替身 — 手写 fake，无 FFI 依赖。
 ///
-/// 默认命令（maximize/minimize/unmaximize）立即翻转状态并发出对应事件；
-/// [deferSettling] 为 true 时只记录调用，状态与事件由测试用 `complete*`
-/// 手动推进，用来覆盖「命令投递后异步落定」的真实时序。
+/// 纯命令通道（契约 1：端口无事件流）— 命令默认立即翻转同步状态；
+/// 「异步落定」时序由测试手动改状态（[completeMaximize] 等）+
+/// `noteGeometryChanged()` 模拟（生产 = 引擎指标边沿现查校准）。
 class FakeNativeWindow implements NativeWindow {
-  final StreamController<NativeWindowEvent> _events =
-      StreamController<NativeWindowEvent>.broadcast(sync: true);
-
   /// 调用流水（按发生顺序），形如 `show`、`maximize`、`bounds=...`。
   final List<String> calls = <String>[];
 
-  bool deferSettling = false;
   bool maximized = false;
   bool minimized = false;
   bool fullScreen = false;
@@ -32,39 +28,19 @@ class FakeNativeWindow implements NativeWindow {
   /// 工作区尺寸 — 模拟最大化时 bounds 贴合工作区。
   Rect get _workArea => workAreasValue.first;
 
-  void emit(NativeWindowEvent event) => _events.add(event);
-
-  /// 发出关闭请求并返回回调内是否**同步**调用了 cancel。
-  bool requestClose({bool cancelable = true}) {
-    var cancelled = false;
-    emit(
-      NativeCloseRequested(() {
-        cancelled = true;
-        return cancelable;
-      }),
-    );
-    return cancelled;
-  }
-
-  // 手动推进（配合 deferSettling）。
+  // 状态推进语法糖（无事件）— 模拟原生侧异步到达目标状态。
   void completeMaximize() {
     maximized = true;
     boundsValue = _workArea;
-    emit(const NativeMaximized());
   }
 
   void completeUnmaximize() {
     maximized = false;
-    emit(const NativeRestored());
   }
 
   void completeMinimize() {
     minimized = true;
-    emit(const NativeMinimized());
   }
-
-  @override
-  Stream<NativeWindowEvent> get events => _events.stream;
 
   @override
   void show() => calls.add('show');
@@ -76,19 +52,19 @@ class FakeNativeWindow implements NativeWindow {
   @override
   void maximize() {
     calls.add('maximize');
-    if (!deferSettling) completeMaximize();
+    completeMaximize();
   }
 
   @override
   void unmaximize() {
     calls.add('unmaximize');
-    if (!deferSettling) completeUnmaximize();
+    completeUnmaximize();
   }
 
   @override
   void minimize() {
     calls.add('minimize');
-    if (!deferSettling) completeMinimize();
+    completeMinimize();
   }
 
   @override
@@ -175,6 +151,10 @@ class FakeNativeWindow implements NativeWindow {
   void startDragging() => calls.add('startDragging');
 
   @override
+  void startResizing(WindowResizeEdge edge) =>
+      calls.add('startResizing=$edge');
+
+  @override
   void performTitleBarDoubleClick() => calls.add('titleBarDoubleClick');
 
   bool disposed = false;
@@ -182,6 +162,5 @@ class FakeNativeWindow implements NativeWindow {
   @override
   void dispose() {
     disposed = true;
-    unawaited(_events.close());
   }
 }

@@ -30,7 +30,7 @@ import 'diagnostics/player_error_report_bridge.dart';
 import 'diagnostics/memory_monitor.dart';
 import 'diagnostics/rss_provider.dart';
 
-import 'window_bridge/window_service.dart';
+import 'window_bridge/service/window_service.dart';
 import 'engine/media_engine.dart';
 import 'engine/mpv_kit_engine.dart';
 import 'persistence/playlist_store.dart';

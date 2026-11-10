@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:simple_player_flutter/kernel/window_bridge/window_service.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/port/window_resize_edge.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/window_service.dart';
 
 /// 测试替身 — 实现 WindowBridge 接口，无 nativeapi 依赖。
 ///
@@ -76,6 +77,16 @@ class FakeWindowService implements WindowBridge {
   void titleBarDoubleClick() {
     if (_disposed) return;
     titleBarDoubleClickCallCount++;
+  }
+
+  int startResizingCallCount = 0;
+  WindowResizeEdge? lastResizeEdge;
+
+  @override
+  void startResizing(WindowResizeEdge edge) {
+    if (_disposed) return;
+    startResizingCallCount++;
+    lastResizeEdge = edge;
   }
 
   @override

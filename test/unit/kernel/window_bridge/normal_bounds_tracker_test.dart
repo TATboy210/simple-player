@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/normal_bounds_tracker.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/normal_bounds_tracker.dart';
 
 import '../../../helpers/fake_native_window.dart';
 

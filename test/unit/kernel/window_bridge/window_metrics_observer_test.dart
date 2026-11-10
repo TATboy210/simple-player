@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_metrics_observer.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/window_metrics_observer.dart';
 
 /// WindowMetricsObserver 单测 — 只响应"尺寸真实变化"，同值抖动必须被过滤。
 /// 尺寸源注入，不依赖 test binding 的 surface/view 联动细节。

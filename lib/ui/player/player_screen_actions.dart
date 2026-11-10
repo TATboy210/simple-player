@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../kernel/bridge/win32/ime_bridge.dart';
-import '../../kernel/window_bridge/window_service.dart';
+import '../../kernel/window_bridge/service/window_service.dart';
 import 'panel_workspace_controller.dart';
 import 'player_actions.dart';
 import 'player_screen.dart';

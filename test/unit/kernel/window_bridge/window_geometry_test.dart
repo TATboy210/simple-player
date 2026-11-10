@@ -1,7 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_geometry.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/window_geometry.dart';
 
 void main() {
   const primary = Rect.fromLTWH(0, 0, 1920, 1040);

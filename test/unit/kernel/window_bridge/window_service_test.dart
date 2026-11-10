@@ -7,8 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/persistence/window_persistence.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_geometry.dart';
-import 'package:simple_player_flutter/kernel/window_bridge/window_service.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/platform/platform_profile.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/window_geometry.dart';
+import 'package:simple_player_flutter/kernel/window_bridge/service/window_service.dart';
 
 import '../../../helpers/fake_native_window.dart';
 
@@ -36,11 +37,15 @@ void main() {
   /// 关门专线 seam 捕获位 — 测试用它模拟 runner 的 WM_CLOSE 通知。
   void Function()? hostClose;
 
-  WindowService createService({bool dropDwmFrame = false}) => WindowService(
+  WindowService createService({
+    bool dropDwmFrame = false,
+    WindowPlatformProfile? profile,
+  }) => WindowService(
     persistence: WindowPersistence(preferences: preferences),
     bindWindow: () => window,
     exitOnClose: exitCodes.add,
     dropDwmFrame: dropDwmFrame,
+    profile: profile,
     installCloseNotifier: (callback) {
       hostClose = callback;
       return true;
@@ -57,8 +62,11 @@ void main() {
       WindowPersistence(preferences: preferences).save(state);
 
   /// 初始化并亮窗 — 多数用例的公共前置。
-  Future<WindowService> startedService({bool dropDwmFrame = false}) async {
-    final service = createService(dropDwmFrame: dropDwmFrame);
+  Future<WindowService> startedService({
+    bool dropDwmFrame = false,
+    WindowPlatformProfile? profile,
+  }) async {
+    final service = createService(dropDwmFrame: dropDwmFrame, profile: profile);
     await service.init();
     await service.reveal();
     return service;
@@ -67,12 +75,21 @@ void main() {
   /// 在 fakeAsync zone 内启动服务。事件订阅的回调运行在订阅时的 zone，
   /// 依赖假时钟的用例（防抖/超时）必须让 init 也发生在 fakeAsync 内，
   /// 否则服务里创建的 Timer 是真实计时器。
-  WindowService startInZone(FakeAsync async) {
+  WindowService startInZone(FakeAsync async, {WindowPlatformProfile? profile}) {
     late WindowService service;
-    unawaited(startedService().then((started) => service = started));
+    unawaited(
+      startedService(profile: profile).then((started) => service = started),
+    );
     async.flushMicrotasks();
     return service;
   }
+
+  /// Wayland 画像 — 定位语义不可用（x/y 恒 0），需要 UI resize 热区。
+  const waylandProfile = WindowPlatformProfile(
+    dropDwmFrame: false,
+    supportsWindowPositioning: false,
+    needsResizeHotZones: true,
+  );
 
   group('init', () {
     test('configures the frame before restoring geometry', () async {
@@ -360,64 +377,38 @@ void main() {
     );
 
     test(
-      'setMode(maximized) returns only after the native event arrives',
+      'setMode(maximized) commits intent and issues the native command',
       () async {
         final service = await startedService();
         addTearDown(service.dispose);
-        window.deferSettling = true;
 
-        var done = false;
-        unawaited(
-          service.setMode(WindowMode.maximized).then((_) => done = true),
-        );
-        await pumpEventQueue();
-        expect(done, isFalse);
+        await service.setMode(WindowMode.maximized);
 
-        window.completeMaximize();
-        await pumpEventQueue();
-        expect(done, isTrue);
+        // 契约 4：意图立即落定 + 命令即发（fake 即时翻转原生状态）。
         expect(service.mode.value, WindowMode.maximized);
+        expect(window.calls, contains('maximize'));
+        expect(window.maximized, isTrue);
       },
     );
 
-    test('setMode gives up waiting after the settle timeout', () {
+    test('setMode completes in a microtask — no settle wait', () {
       fakeAsync((async) {
         final service = startInZone(async);
-        window.deferSettling = true;
 
         var done = false;
         unawaited(
           service.setMode(WindowMode.maximized).then((_) => done = true),
         );
         async.flushMicrotasks();
-        // 事件从未到达 — 超时前仍在等待。
-        async.elapse(const Duration(milliseconds: 900));
-        expect(done, isFalse);
 
-        async.elapse(const Duration(milliseconds: 200));
-        async.flushMicrotasks();
+        // 无事件流可等 — 一轮 microtask 即完成，不存在 1s 超时路径。
         expect(done, isTrue);
+        expect(service.mode.value, WindowMode.maximized);
         service.dispose();
       });
     });
 
-    test('dispose while waiting for a state change returns promptly', () async {
-      final service = await startedService();
-      window.deferSettling = true;
-
-      var done = false;
-      unawaited(service.setMode(WindowMode.maximized).then((_) => done = true));
-      await pumpEventQueue();
-      expect(done, isFalse);
-
-      service.dispose();
-      await pumpEventQueue();
-
-      // 事件流关闭即放行，不必白等满 1s 超时。
-      expect(done, isTrue);
-    });
-
-    test('minimize waits for the minimized event', () async {
+    test('minimize commands the native window', () async {
       final service = await startedService();
       addTearDown(service.dispose);
 
@@ -812,5 +803,52 @@ void main() {
     service.dispose();
 
     expect(window.disposed, isTrue);
+  });
+
+  group('wayland profile (positioning unsupported)', () {
+    test('restore applies size only — no bounds write, no center', () async {
+      await seed(
+        const PersistedWindowState(
+          size: Size(1000, 600),
+          position: Offset(200, 150),
+          alwaysOnTop: false,
+          isMaximized: false,
+        ),
+      );
+      final service = createService(profile: waylandProfile);
+      addTearDown(service.dispose);
+
+      await service.init();
+
+      // Wayland 下 x/y 由 compositor 决定 — 只应用尺寸（契约见 CONTRACT.md）。
+      expect(window.calls, contains('setSize=Size(1000.0, 600.0)'));
+      expect(window.calls.any((call) => call.startsWith('bounds=')), isFalse);
+      expect(window.calls, isNot(contains('center')));
+    });
+
+    test('session persist stores null position', () {
+      fakeAsync((async) {
+        final service = startInZone(async, profile: waylandProfile);
+
+        service.noteGeometryChanged();
+        async.elapse(const Duration(milliseconds: 600));
+        async.flushMicrotasks();
+
+        final saved = savedSnapshot();
+        expect(saved['x'], isNull);
+        expect(saved['y'], isNull);
+        // 尺寸照常落盘 — 降级只影响定位，不影响几何记忆。
+        expect(saved['width'], isNotNull);
+        service.dispose();
+      });
+    });
+
+    test('profile is exposed for UI hot-zone decisions', () async {
+      final service = createService(profile: waylandProfile);
+      addTearDown(service.dispose);
+
+      expect(service.platformProfile.needsResizeHotZones, isTrue);
+      expect(service.platformProfile.supportsWindowPositioning, isFalse);
+    });
   });
 }

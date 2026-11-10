@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'native_window.dart';
+import '../port/native_window.dart';
 import 'window_geometry.dart';
 
 /// 采样冷却期 — 拖拽 resize/move 时原生事件逐帧到达，窗口属性读取是同步 FFI，

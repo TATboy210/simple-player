@@ -1,61 +1,63 @@
-import 'dart:async';
 import 'dart:ffi' as ffi;
-import 'dart:io' show Platform;
 import 'dart:ui';
 
 import 'package:nativeapi/nativeapi.dart' as na;
 
-import '../bridge/win32/runner_window_handle.dart';
+import '../platform/window_handle_locator.dart';
 import 'native_window.dart';
+import 'window_resize_edge.dart';
 
-/// [NativeWindow] 的生产实现 — nativeapi 的 [na.Window]，**命令通道**。
+/// [NativeWindow] 的生产实现 — nativeapi 的 [na.Window]，**纯命令通道**。
 ///
 /// 全项目唯一直接依赖 nativeapi 的文件；其余代码只见 [NativeWindow]。
 ///
-/// 阶段二改造（取证 docs/audit/resize-drag-ab-2026-11.md）：**不注册**事件
-/// 监听 — nativeapi 在窗口线程按步构建 Moved/Resized 并跨语言投递，是边缘
-/// 拖拽"内容追边框"的主犯。本适配器的职责收缩为：包装 HWND、下发几何/状态
-/// 命令；[events] 返回恒定空的流以满足端口形状（[WindowService] 的 _settle
-/// 订阅它即得 onDone，落定语义退化为"命令后查询"，nativeapi 命令为同步
-/// marshal，实测等价）。几何变化检测走 WindowMetricsObserver（引擎指标），
-/// 关门走 CloseNotifierBridge（runner 专线），事件流整体退订。
+/// 契约 1（CONTRACT.md）：**不注册**任何事件监听 — nativeapi 在窗口线程
+/// 按步构建 Moved/Resized 并跨语言投递，是边缘拖拽"内容追边框"的主犯
+/// （三平台共有设计，取证 docs/audit/resize-drag-ab-2026-11.md）。
+/// 几何变化检测走 WindowMetricsObserver（引擎指标），关门走
+/// CloseNotifierBridge（runner 专线），模式落定用现查校准。
 class NativeapiWindow implements NativeWindow {
   NativeapiWindow._(this._window);
 
   /// 绑定当前 runner 窗口。
   ///
-  /// Windows 上 `WindowManager.getCurrent()` 走 GetActiveWindow()，窗口隐藏
-  /// 或 UI isolate 不在窗口线程时为 null（本应用先隐藏态恢复几何再亮窗），
-  /// 因此自行按进程定位 HWND 再包装；其他平台走 WindowManager。
-  /// 找不到窗口抛 [StateError]。
-  factory NativeapiWindow.bind() {
-    final window = _locate();
+  /// 句柄定位 = [WindowHandleLocator] 策略链：runner 导出符号
+  /// （SimplerPlayerGetMainWindowHandle，隐藏态可用）优先，平台 fallback
+  /// 兜底（Windows=FindWindowExW 枚举；macOS/Linux=WindowManager
+  /// getCurrent/getAll — 注意 getCurrent 在隐藏态/非属主线程可能为 null，
+  /// 因此仅作符号缺失时的降级）。找不到窗口抛 [StateError]。
+  ///
+  /// [locateHandle] 为测试 seam（生产为 null → 默认策略链）。
+  factory NativeapiWindow.bind({int? Function()? locateHandle}) {
+    final locate =
+        locateHandle ??
+        WindowHandleLocator(
+          defaultHandleStrategies(managerFallback: _managerFallbackHandle),
+        ).locate;
+    final window = _wrap(locate());
     if (window == null) {
       throw StateError('window: Flutter host window not found');
     }
     return NativeapiWindow._(window);
   }
 
-  static na.Window? _locate() {
-    if (!Platform.isWindows) {
-      return na.WindowManager.instance.getCurrent() ??
-          na.WindowManager.instance.getAll().firstOrNull;
-    }
-    final hwnd = findRunnerWindowHandle();
-    if (hwnd == 0) return null;
+  static na.Window? _wrap(int? handle) {
+    if (handle == null || handle == 0) return null;
     return na.Window.createWithNativeWindow(
-      ffi.Pointer<ffi.Void>.fromAddress(hwnd),
+      ffi.Pointer<ffi.Void>.fromAddress(handle),
     );
+  }
+
+  /// nativeapi WindowManager 兜底 — 返回窗口句柄地址（供 locator 统一
+  /// 走 int? 协议）。nativeapi 类型不出本文件。
+  static int? _managerFallbackHandle() {
+    final manager = na.WindowManager.instance;
+    final window = manager.getCurrent() ?? manager.getAll().firstOrNull;
+    return window?.nativeNumber;
   }
 
   /// 必须长期持有同一个 [na.Window]：最小尺寸 handler 与其寿命绑定。
   final na.Window _window;
-
-  /// 退订事件流后的空实现（见类注释）。const 空流在 listen 时即 done，
-  /// 服务侧 _settle 的 onDone 收尾路径已覆盖。
-  @override
-  Stream<NativeWindowEvent> get events =>
-      const Stream<NativeWindowEvent>.empty();
 
   @override
   void show() => _window.show();
@@ -114,9 +116,13 @@ class NativeapiWindow implements NativeWindow {
   void startDragging() => _window.startDragging();
 
   @override
+  void startResizing(WindowResizeEdge edge) =>
+      _window.startResizing(edge.toNative());
+
+  @override
   void performTitleBarDoubleClick() => _window.performTitleBarDoubleClick();
 
-  /// 无监听器可摘、无流可关（事件流已退订）；保留方法满足端口契约。
+  /// 无监听器可摘、无流可关（契约 1：零订阅）；保留方法满足端口契约。
   @override
   void dispose() {}
 }
@@ -134,4 +140,17 @@ extension on na.Rectangle {
 
 extension on Size {
   na.Size toNative() => na.Size(width: width, height: height);
+}
+
+extension on WindowResizeEdge {
+  na.ResizeEdge toNative() => switch (this) {
+    WindowResizeEdge.top => na.ResizeEdge.top,
+    WindowResizeEdge.bottom => na.ResizeEdge.bottom,
+    WindowResizeEdge.left => na.ResizeEdge.left,
+    WindowResizeEdge.right => na.ResizeEdge.right,
+    WindowResizeEdge.topLeft => na.ResizeEdge.topLeft,
+    WindowResizeEdge.topRight => na.ResizeEdge.topRight,
+    WindowResizeEdge.bottomLeft => na.ResizeEdge.bottomLeft,
+    WindowResizeEdge.bottomRight => na.ResizeEdge.bottomRight,
+  };
 }
