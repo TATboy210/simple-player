@@ -3,23 +3,32 @@
 #include <imm.h>
 #include <optional>
 
-#include "close_bridge_messages.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
 
 namespace {
-// 关门专线（阶段二）：Dart 启动后经 SetCloseNotifier 注册一个无参回调
+// 关门专线：Dart 启动后经 SetCloseNotifier 注册一个无参回调
 // （FFI NativeCallable.listener，可自 platform 线程安全唤起 UI isolate）。
 // WM_CLOSE 有通知器时直接消费并唤起 Dart 的 hide-first persist→exit 时序；
-// 未注册（启动早期/降级/旧产物）回退 close_bridge_messages 的 SC_CLOSE 路径。
+// 未注册（启动极早期/降级）则放行默认销毁 — 旧的 close_bridge_messages
+// SC_CLOSE 转换路径已退役（事件流退订后它等价于放行销毁，见 CONTRACT.md）。
 // 指针在 Dart 侧永久保活：热重启后新注册覆盖旧值；空窗期极小且仅在 debug。
 using CloseNotifier = void (*)();
 CloseNotifier g_close_notifier = nullptr;
+
+// 主窗口句柄槽 — OnCreate 写入、OnDestroy 清空。Dart 侧经
+// SimplerPlayerGetMainWindowHandle 读取（隐藏态即可用，不依赖焦点/枚举）。
+HWND g_main_window = nullptr;
 }  // namespace
 
 // C 链接导出（x64 无修饰名），Dart 经 DynamicLibrary.process() 查找。
 extern "C" __declspec(dllexport) void SetCloseNotifier(CloseNotifier notifier) {
   g_close_notifier = notifier;
+}
+
+// C 链接导出 — 主窗口句柄（三平台同名符号，见 platform/window_handle_locator.dart）。
+extern "C" __declspec(dllexport) void* SimplerPlayerGetMainWindowHandle() {
+  return g_main_window;
 }
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -31,6 +40,7 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+  g_main_window = GetHandle();
 
   RECT frame = GetClientArea();
 
@@ -80,6 +90,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  g_main_window = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -103,14 +114,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 
   // 关门专线优先：Dart 通知器在线时 WM_CLOSE 被消费，Dart 完成
   // hide→persist→closing-listeners→exit(0) 后进程自退，窗口无需再销毁。
+  // 无通知器（启动极早期/降级）→ 落 DefWindowProc 默认销毁。
   if (message == WM_CLOSE) {
     if (CloseNotifier notifier = g_close_notifier) {
       notifier();
-      return 0;
-    }
-    // 回退：无通知器时保留旧的 WM_CLOSE → SC_CLOSE 转换（nativeapi 时代的
-    // 可取消关闭路径；事件流退订后此路径等于放行销毁 — 仅未就绪早期可见）。
-    if (close_bridge_messages::HandleClose(hwnd, message, wparam)) {
       return 0;
     }
   }
