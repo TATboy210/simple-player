@@ -236,9 +236,8 @@ class WindowService implements WindowBridge {
 
   /// 视图尺寸实际变化（引擎指标，来自 [WindowMetricsObserver]）— 拖拽会话的
   /// **默认检测源**（阶段一改：取代 nativeapi 逐步事件流，见 nativeapi_window
-  /// 的开关注释）。didChangeMetrics 由引擎按帧合并，频率远低于
-  /// WM_WINDOWPOSCHANGED 洪泛，且不占窗口线程。会话防抖逻辑与旧事件源共用，
-  /// 回退开关（SIMPLER_PLAYER_WINDOW_EVENTS=1）下两路并存亦幂等。
+  /// 的类注释）。didChangeMetrics 由引擎按帧合并，频率远低于
+  /// WM_WINDOWPOSCHANGED 洪泛，且不占窗口线程。会话防抖逻辑与旧事件源共用。
   void noteGeometryChanged() {
     if (_disposed || !_revealed) return;
     // 还原矩形跟踪（tracker 内建节流，60Hz 指标率下开销可忽略）。
