@@ -1,55 +1,45 @@
 import Cocoa
 import FlutterMacOS
 
-/// macOS 主窗口 — 处理全屏 MethodChannel + NSWindowDelegate 回调。
-///
-/// MethodChannel: com.simple_player/fullscreen
-///   - enterFullscreen: 进入全屏（阻塞等待动画完成）
-///   - exitFullscreen: 退出全屏（阻塞等待动画完成）
-///   - getWindowRect: 返回当前窗口 {x, y, width, height}
-///
-/// NSCondition 防止重入，2 秒超时防止永久挂起。
+// ─── runner C ABI 导出（与 Windows flutter_window.cpp 同模式，见 CONTRACT.md）───
+
+/// 关门专线回调 — Dart 经 FFI NativeCallable.listener 注册，主线程调用安全
+/// （投递回 UI isolate，不阻塞 AppKit）。
+typealias CloseNotifier = @convention(c) () -> Void
+private var gCloseNotifier: CloseNotifier?
+
+/// AppDelegate 读取专线（Cmd+Q 走 applicationShouldTerminate，不经窗口）。
+func currentCloseNotifier() -> CloseNotifier? { gCloseNotifier }
+
+/// 主窗口槽 — awakeFromNib 赋值（weak：窗口释放自动清空）。
+private weak var gMainWindow: MainFlutterWindow?
+
+@_cdecl("SetCloseNotifier")
+public func setCloseNotifier(_ notifier: @escaping @convention(c) () -> Void) {
+  gCloseNotifier = notifier
+}
+
+@_cdecl("SimplerPlayerGetMainWindowHandle")
+public func simplerPlayerGetMainWindowHandle() -> UnsafeMutableRawPointer? {
+  guard let window = gMainWindow else { return nil }
+  return Unmanaged.passUnretained(window).toOpaque()
+}
+
+/// macOS 主窗口 — 隐藏态建窗（xib visibleAtLaunch=NO，此处不 orderFront），
+/// 亮窗时机由 Dart reveal() 决定（契约 5）；关闭经专线交 Dart hide-first
+/// 序列（契约 7）。file_picker_attention 通道保留（file_picker_adapters 在用）。
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
-  private var fullscreenChannel: FlutterMethodChannel?
   private var filePickerAttentionChannel: FlutterMethodChannel?
-  private let fullscreenCondition = NSCondition()
-  private var isTogglingFullScreen = false
 
   override func awakeFromNib() {
     super.awakeFromNib()
     self.delegate = self
+    gMainWindow = self
 
     guard let controller = self.contentViewController as? FlutterViewController else {
       return
     }
     let messenger = controller.engine.binaryMessenger
-
-    fullscreenChannel = FlutterMethodChannel(
-      name: "com.simple_player/fullscreen",
-      binaryMessenger: messenger
-    )
-
-    fullscreenChannel?.setMethodCallHandler { [weak self] (call, result) in
-      guard let self = self else {
-        result(FlutterError(
-          code: "DISPOSED",
-          message: "Window was disposed",
-          details: nil
-        ))
-        return
-      }
-
-      switch call.method {
-      case "enterFullscreen":
-        self.handleEnterFullscreen(result: result)
-      case "exitFullscreen":
-        self.handleExitFullscreen(result: result)
-      case "getWindowRect":
-        self.handleGetWindowRect(result: result)
-      default:
-        result(FlutterMethodNotImplemented)
-      }
-    }
 
     filePickerAttentionChannel = FlutterMethodChannel(
       name: "com.simple_player/file_picker_attention",
@@ -80,84 +70,31 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       result(["found": found])
     }
 
-    self.center()
-    self.makeKeyAndOrderFront(nil)
+    // 刻意不 center()/makeKeyAndOrderFront — 隐藏态建窗，几何由 Dart init
+    // 恢复、首帧栅格化后 Dart reveal() 亮窗（与 Windows runner 时序对齐）。
   }
 
-  // MARK: - Fullscreen Methods
+  // MARK: - 关闭拦截（契约 7 的 macOS 通道）
 
-  private func handleEnterFullscreen(result: @escaping FlutterResult) {
-    // 已经全屏则跳过
-    guard !self.styleMask.contains(.fullScreen) else {
-      result(nil)
+  /// 全量拦截点 — performClose:（Cmd+W/程序化）、macOS 26 红绿灯按钮的
+  /// 私有 __close→close 直达路径、以及任何直接 close 调用都汇到这里。
+  /// 专线在线时交给 Dart hide-first 序列（其末尾 exit(0)，不会再回来调
+  /// 原生 close）；未注册（启动极早期/降级）放行原生销毁。
+  override func close() {
+    if let notifier = gCloseNotifier {
+      notifier()
       return
     }
+    super.close()
+  }
 
-    fullscreenCondition.lock()
-    isTogglingFullScreen = true
-    self.toggleFullScreen(nil)
-
-    // 等待动画完成（最多 2 秒）
-    let deadline = Date().addingTimeInterval(2.0)
-    while isTogglingFullScreen && Date() < deadline {
-      fullscreenCondition.wait(until: deadline)
+  /// performClose: 的 delegate 询问点 — 早于 close() 拦截，语义更显式；
+  /// 与 close() 覆盖有重叠，Dart 侧关窗序列单飞幂等，双保险无害。
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    if let notifier = gCloseNotifier {
+      notifier()
+      return false
     }
-    fullscreenCondition.unlock()
-    result(nil)
-  }
-
-  private func handleExitFullscreen(result: @escaping FlutterResult) {
-    // 非全屏则跳过
-    guard self.styleMask.contains(.fullScreen) else {
-      result(nil)
-      return
-    }
-
-    fullscreenCondition.lock()
-    isTogglingFullScreen = true
-    self.toggleFullScreen(nil)
-
-    let deadline = Date().addingTimeInterval(2.0)
-    while isTogglingFullScreen && Date() < deadline {
-      fullscreenCondition.wait(until: deadline)
-    }
-    fullscreenCondition.unlock()
-    result(nil)
-  }
-
-  private func handleGetWindowRect(result: @escaping FlutterResult) {
-    let frame = self.frame
-    result([
-      "x": frame.origin.x,
-      "y": frame.origin.y,
-      "width": frame.size.width,
-      "height": frame.size.height
-    ] as [String: Any])
-  }
-
-  // MARK: - NSWindowDelegate
-
-  func windowDidEnterFullScreen(_ notification: Notification) {
-    _signalCondition()
-  }
-
-  func windowDidExitFullScreen(_ notification: Notification) {
-    _signalCondition()
-  }
-
-  func windowDidFailToEnterFullScreen(_ window: NSWindow) {
-    _signalCondition()
-  }
-
-  func windowDidFailToExitFullScreen(_ window: NSWindow) {
-    _signalCondition()
-  }
-
-  /// 通知等待线程全屏动画已完成。
-  private func _signalCondition() {
-    fullscreenCondition.lock()
-    isTogglingFullScreen = false
-    fullscreenCondition.signal()
-    fullscreenCondition.unlock()
+    return true
   }
 }
