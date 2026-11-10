@@ -46,8 +46,21 @@ extension on Size {
 /// 全项目唯一直接依赖 nativeapi 的文件；其余代码只见 [NativeWindow]。
 class NativeapiWindow implements NativeWindow {
   NativeapiWindow._(this._window) {
-    _listenerId = _window.addListener(_forward);
+    // 拖拽流畅度改造·阶段一：默认 **不注册** nativeapi 窗口事件监听 —
+    // 每步 WM_WINDOWPOSCHANGED 的事件构建+跨语言投递挤占窗口线程，是边缘
+    // 拖拽"内容追边框"的主犯（取证见 docs/audit/resize-drag-ab-2026-11.md）。
+    // 会话检测改由 WindowMetricsObserver 喂引擎指标，模式靠现查。
+    // SIMPLER_PLAYER_WINDOW_EVENTS=1 恢复旧事件流（A/B 回退开关；阶段二
+    // 关闭消息桥落地后移除）。不订阅时原生侧仅剩快照 diff，无 Dart 投递。
+    if (legacyEventStreamEnabled) {
+      _listenerId = _window.addListener(_forward);
+    }
   }
+
+  /// 旧事件流回退开关 — 读一次环境常量（阶段二随 close 桥一起删除）。
+  static final bool legacyEventStreamEnabled = Platform.environment.containsKey(
+    'SIMPLER_PLAYER_WINDOW_EVENTS',
+  );
 
   /// 绑定当前 runner 窗口。
   ///
@@ -78,8 +91,8 @@ class NativeapiWindow implements NativeWindow {
   /// 必须长期持有同一个 [na.Window]：最小尺寸 handler 与其寿命绑定。
   final na.Window _window;
 
-  // late：监听回调是实例方法，构造体内才能注册，注册结果只赋值一次。
-  late final na.ListenerId _listenerId;
+  // 监听器仅在 legacyEventStreamEnabled 时注册；null = 未订阅（默认路径）。
+  na.ListenerId? _listenerId;
 
   /// sync 广播 — 保证 [NativeCloseRequested.cancel] 在原生回调内被调用。
   final StreamController<NativeWindowEvent> _events =
@@ -157,7 +170,8 @@ class NativeapiWindow implements NativeWindow {
   @override
   void dispose() {
     if (_events.isClosed) return;
-    _window.removeListener(_listenerId);
+    final listenerId = _listenerId;
+    if (listenerId != null) _window.removeListener(listenerId);
     unawaited(_events.close());
   }
 }

@@ -248,9 +248,34 @@ class WindowService implements WindowBridge {
     _resizeTimer = Timer(_resizeDebounce, () => _onResizeSettled(generation));
   }
 
+  /// 视图尺寸实际变化（引擎指标，来自 [WindowMetricsObserver]）— 拖拽会话的
+  /// **默认检测源**（阶段一改：取代 nativeapi 逐步事件流，见 nativeapi_window
+  /// 的开关注释）。didChangeMetrics 由引擎按帧合并，频率远低于
+  /// WM_WINDOWPOSCHANGED 洪泛，且不占窗口线程。会话防抖逻辑与旧事件源共用，
+  /// 回退开关（SIMPLER_PLAYER_WINDOW_EVENTS=1）下两路并存亦幂等。
+  void noteGeometryChanged() {
+    if (_disposed || !_revealed) return;
+    // 尺寸变化顺带校准一次模式（外部最大化/还原不再依赖事件）。
+    _syncModeFromNative();
+    _onNativeResized();
+  }
+
+  /// 现查宿主 `isMaximized` 校准 [mode]（一次轻量 FFI）。全屏意图/全屏中跳过
+  /// — 全屏的原生形态不是最大化，查到 windowed 也会把 fullscreen 冲掉。
+  void _syncModeFromNative() {
+    final window = _native;
+    if (window == null || !_revealed) return;
+    if (_fullscreenIntent || mode.value.isFullscreen) return;
+    mode.value = window.isMaximized
+        ? WindowMode.maximized
+        : WindowMode.windowed;
+  }
+
   void _onResizeSettled(int generation) {
     if (_disposed || generation != _resizeGeneration) return;
     isResizing.value = false;
+    // 会话结束再校准一次：覆盖"拖拽中途 isMaximized 翻转但无新指标"的边角。
+    _syncModeFromNative();
     // 全屏进入/退出触发的 resize 是过渡而非用户意图 — 不落盘。
     if (!mode.value.isFullscreen) _schedulePersist();
   }

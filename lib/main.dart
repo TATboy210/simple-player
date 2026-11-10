@@ -16,6 +16,7 @@ import 'kernel/diagnostics/global_error_hooks.dart';
 import 'kernel/diagnostics/kernel_logger.dart';
 import 'kernel/diagnostics/runtime_environment_report.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
+import 'kernel/window_bridge/window_metrics_observer.dart';
 import 'kernel/window_bridge/window_service.dart';
 import 'ui/dialogs/settings/diagnostic_log_target.dart';
 import 'ui/dialogs/settings/error_feedback_settings.dart';
@@ -136,6 +137,14 @@ Future<void> main() {
               startupTimeline: startupTimeline,
               windowService: windowService,
               windowInitError: windowInitError,
+            ),
+          );
+
+          // 拖拽会话检测源（阶段一改）：引擎视图尺寸变化 → WindowService 会话。
+          // 取代 nativeapi 逐步事件流（默认已不订阅，见 nativeapi_window 开关）。
+          WidgetsBinding.instance.addObserver(
+            WindowMetricsObserver(
+              onGeometryChanged: windowService.noteGeometryChanged,
             ),
           );
 

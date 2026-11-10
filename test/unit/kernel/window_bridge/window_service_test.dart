@@ -455,6 +455,69 @@ void main() {
     // SharedPreferences 的内存缓存在 setString 时同步更新、写盘 Future 另行
     // 完成 — 持久化断言须在 fakeAsync 内读缓存（zone 外 await 落盘 Future
     // 会因续体困在假时钟里而永远不返回）。
+    // 阶段一改：默认检测源 = 引擎指标（noteGeometryChanged），
+    // 会话语义必须与旧事件源完全同构 — 下游（淡出/blur/落盘）无感知。
+    test('noteGeometryChanged drives the same session as events do', () {
+      fakeAsync((async) {
+        final service = startInZone(async);
+
+        service.noteGeometryChanged();
+        async.elapse(const Duration(milliseconds: 100));
+        service.noteGeometryChanged();
+
+        expect(service.isResizing.value, isTrue);
+        expect(service.resizeSessionId.value, 1);
+
+        async.elapse(const Duration(milliseconds: 501));
+        expect(service.isResizing.value, isFalse);
+        service.dispose();
+      });
+    });
+
+    test('noteGeometryChanged before reveal is ignored', () async {
+      final service = createService();
+      addTearDown(service.dispose);
+      await service.init(); // 未 reveal
+
+      service.noteGeometryChanged();
+
+      expect(service.isResizing.value, isFalse);
+      expect(service.resizeSessionId.value, 0);
+    });
+
+    test('geometry change calibrates mode from isMaximized without events', () {
+      fakeAsync((async) {
+        final service = startInZone(async);
+
+        window.maximized = true;
+        service.noteGeometryChanged();
+        async.elapse(const Duration(milliseconds: 600));
+        expect(service.mode.value, WindowMode.maximized);
+
+        window.maximized = false;
+        service.noteGeometryChanged();
+        async.elapse(const Duration(milliseconds: 600));
+        expect(service.mode.value, WindowMode.windowed);
+        service.dispose();
+      });
+    });
+
+    test('mode calibration keeps fullscreen while fullscreen is held', () {
+      fakeAsync((async) {
+        final service = startInZone(async);
+        unawaited(service.setMode(WindowMode.fullscreen));
+        async.flushMicrotasks();
+
+        // 原生全屏的宿主常带 maximized 形态 — 校准不得把 fullscreen 冲掉。
+        window.maximized = true;
+        service.noteGeometryChanged();
+        async.elapse(const Duration(milliseconds: 600));
+
+        expect(service.mode.value, WindowMode.fullscreen);
+        service.dispose();
+      });
+    });
+
     test('a settled resize persists the new geometry', () {
       fakeAsync((async) {
         final service = startInZone(async);
