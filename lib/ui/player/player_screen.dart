@@ -15,6 +15,7 @@ import '../../kernel/services/subtitle_path_validator.dart';
 import '../theme/tokens.dart';
 import '../dialogs/settings/settings_panel.dart';
 import '../window/custom_title_bar.dart';
+import '../window/resize_hot_zones.dart';
 import 'mpv_kit_player_port.dart';
 import 'player_video_controls.dart';
 import 'drop_handler.dart';
@@ -318,13 +319,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
           isFullscreen: isFullscreen,
           child: _buildScaffold(isFullscreen, videoContent),
         );
-        // 边缘缩放：nativeapi 隐藏标题栏保留原生 sizing frame，系统在左/右/下
-        // 边判定、nativeapi 在顶边带返回 HTTOP（FLUTTERVIEW 子窗口在该带让
-        // 命中穿透），Flutter 层不自建缩放热区、无需声明容器。
+        // 边缘缩放：Windows/macOS 上 nativeapi 隐藏标题栏保留原生 resize
+        // 边缘（Windows sizing frame + 顶边 HTTOP；macOS hidden 保留 frame），
+        // Flutter 层不自建热区。Linux frameless（decorated=FALSE）无系统边缘，
+        // 经 needsResizeHotZones 门控挂不可见 ResizeHotZones（CONTRACT.md D7）；
+        // 全屏时窗口占满屏幕，热区会抢屏幕边缘控制层点击 — 不挂。
         // 全屏鼠标隐藏由 PlayerVideoControls 内 _autoHide.visible 驱动。
         return MouseRegion(
           cursor: isFullscreen ? SystemMouseCursors.basic : MouseCursor.defer,
-          child: keyboardHandler,
+          child: !isFullscreen && widget.windowService.needsResizeHotZones
+              ? Stack(
+                  children: <Widget>[
+                    keyboardHandler,
+                    Positioned.fill(
+                      child: ResizeHotZones(
+                        windowService: widget.windowService,
+                      ),
+                    ),
+                  ],
+                )
+              : keyboardHandler,
         );
       },
     );

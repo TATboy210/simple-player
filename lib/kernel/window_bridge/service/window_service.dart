@@ -79,8 +79,11 @@ class WindowService implements WindowBridge {
   @visibleForTesting
   bool hostCloseBridgeInstalled = false;
 
-  /// 平台画像 — UI 层经此决定是否挂边缘 resize 热区（Linux frameless）。
+  /// 平台画像 — 诊断/测试观察位（UI 经 [needsResizeHotZones] 消费门控）。
   WindowPlatformProfile get platformProfile => _profile;
+
+  @override
+  bool get needsResizeHotZones => _profile.needsResizeHotZones;
 
   /// 最近一次普通窗口矩形的跟踪器 — 落盘的唯一几何来源（契约 9）。
   /// late final：初始化器需捕获 this（读 _native/_revealed/mode），惰性求值，

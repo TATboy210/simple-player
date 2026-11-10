@@ -35,6 +35,10 @@ class FakeWindowService implements WindowBridge {
   @override
   final ValueNotifier<bool> isAlwaysOnTop = ValueNotifier(false);
 
+  /// 测试可翻 true 以驱动热区挂载分支（默认 false = Windows/macOS 形态）。
+  @override
+  bool needsResizeHotZones = false;
+
   // ─── WindowBridge implementation ───
 
   @override

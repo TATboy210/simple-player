@@ -35,6 +35,11 @@ abstract interface class WindowBridge {
   /// 当前是否置顶。
   ValueListenable<bool> get isAlwaysOnTop;
 
+  /// 是否需要 UI 挂边缘 resize 热区（契约见 CONTRACT.md 平台矩阵）：
+  /// Linux frameless 无系统 resize 边缘 → true；Windows（sizing frame
+  /// 保留）/macOS（hidden 保留 frame）→ false。
+  bool get needsResizeHotZones;
+
   /// 切换窗口模式（普通 / 最大化 / 全屏）。
   ///
   /// 语义 =「意图立即提交，原生状态在下一几何边沿校准」（契约 4）：

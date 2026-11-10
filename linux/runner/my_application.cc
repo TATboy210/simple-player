@@ -2,9 +2,6 @@
 
 #include <cstring>
 #include <flutter_linux/flutter_linux.h>
-#ifdef GDK_WINDOWING_X11
-#include <gdk/gdkx.h>
-#endif
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -15,12 +12,53 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
-// ─── MethodChannel: com.simple_player/window ───
+// ─── runner C ABI 导出（与 Windows/macOS 同模式，见 CONTRACT.md）───
 
-static FlMethodChannel* window_channel = nullptr;
-static FlMethodChannel* file_picker_attention_channel = nullptr;
+namespace {
 
-static void file_picker_attention_method_handler(
+// 关门专线 — Dart 经 SetCloseNotifier 注册（FFI NativeCallable.listener，
+// 自 GTK 主循环安全投递回 UI isolate）。delete-event 有通知器时阻断原生
+// 销毁并唤起 Dart hide-first persist→exit 序列；未注册（启动极早期/降级）
+// 放行默认关闭。
+using CloseNotifier = void (*)();
+CloseNotifier g_close_notifier = nullptr;
+
+// 主窗口句柄槽 — activate 时赋值。Dart 经
+// SimplerPlayerGetMainWindowHandle 读取（隐藏态即可用，不依赖焦点）。
+GtkWindow* g_main_window = nullptr;
+
+// X11 WM_DELETE_WINDOW 与 Wayland xdg_toplevel.close 都归结为 GTK
+// delete-event — 单点拦截即覆盖两后端（返回 TRUE 阻断销毁）。
+gboolean OnDeleteEvent(GtkWidget* widget, GdkEvent* event, gpointer user_data) {
+  if (g_close_notifier != nullptr) {
+    g_close_notifier();
+    return TRUE;
+  }
+  return FALSE;
+}
+
+}  // namespace
+
+extern "C" __attribute__((visibility("default"))) void SetCloseNotifier(
+    CloseNotifier notifier) {
+  g_close_notifier = notifier;
+}
+
+extern "C" __attribute__((visibility("default"))) void*
+SimplerPlayerGetMainWindowHandle() {
+  return g_main_window;
+}
+
+// ─── MethodChannel: com.simple_player/file_picker_attention ───
+// （旧 com.simple_player/window 的 getGtkWindowHandle 已退役 — Dart 侧改经
+// 上面的 C 符号导出取句柄；fullscreen 通道为 window_manager 时代遗产，
+// Dart 零消费者，一并删除。）
+
+namespace {
+
+FlMethodChannel* file_picker_attention_channel = nullptr;
+
+void file_picker_attention_method_handler(
     FlMethodChannel* channel, FlMethodCall* method_call, gpointer user_data) {
   g_autoptr(FlMethodResponse) response = nullptr;
   const gchar* method = fl_method_call_get_name(method_call);
@@ -43,37 +81,8 @@ static void file_picker_attention_method_handler(
   fl_method_call_respond(method_call, response, nullptr);
 }
 
-static void window_method_handler(FlMethodChannel* channel,
-                                   FlMethodCall* method_call,
-                                   gpointer user_data) {
-  g_autoptr(FlMethodResponse) response = nullptr;
-  const gchar* method = fl_method_call_get_name(method_call);
-
-  if (strcmp(method, "getGtkWindowHandle") == 0) {
-    GtkApplication* app = GTK_APPLICATION(user_data);
-    GtkWindow* window = gtk_application_get_active_window(app);
-    if (window != nullptr) {
-      g_autoptr(FlValue) result = fl_value_new_int(
-          static_cast<int64_t>(reinterpret_cast<intptr_t>(window)));
-      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-    } else {
-      response = FL_METHOD_RESPONSE(fl_method_error_response_new(
-          "NO_WINDOW", "No active GTK window found", nullptr));
-    }
-  } else {
-    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
-  }
-  fl_method_call_respond(method_call, response, nullptr);
-}
-
-static void register_window_channel(GtkApplication* app, FlView* view) {
+void register_file_picker_attention_channel(GtkApplication* app, FlView* view) {
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
-  window_channel = fl_method_channel_new(
-      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
-      "com.simple_player/window", FL_METHOD_CODEC(codec));
-  fl_method_channel_set_method_call_handler(
-      window_channel, window_method_handler, app, nullptr);
-
   file_picker_attention_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)),
       "com.simple_player/file_picker_attention", FL_METHOD_CODEC(codec));
@@ -82,9 +91,13 @@ static void register_window_channel(GtkApplication* app, FlView* view) {
       nullptr);
 }
 
+}  // namespace
+
 // ─── Flutter lifecycle ───
 
 // Called when first Flutter frame received.
+// 首帧后亮窗 failsafe — 与 Windows runner 的 SetNextFrameCallback(Show) 对齐；
+// Dart reveal() 是主路径（na show 幂等，两者先后无害）。
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
@@ -94,36 +107,16 @@ static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  g_main_window = window;
 
-  // Use a header bar when running in GNOME as this is the common style used
-  // by applications and is the setup most users will be using (e.g. Ubuntu
-  // desktop).
-  // If running on X and not using GNOME then just use a traditional title bar
-  // in case the window manager does more exotic layout, e.g. tiling.
-  // If running on Wayland assume the header bar will work (may need changing
-  // if future cases occur).
-  gboolean use_header_bar = TRUE;
-#ifdef GDK_WINDOWING_X11
-  GdkScreen* screen = gtk_window_get_screen(window);
-  if (GDK_IS_X11_SCREEN(screen)) {
-    const gchar* wm_name = gdk_x11_screen_get_window_manager_name(screen);
-    if (g_strcmp0(wm_name, "GNOME Shell") != 0) {
-      use_header_bar = FALSE;
-    }
-  }
-#endif
-  if (use_header_bar) {
-    GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
-    gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "simple_player_flutter");
-    gtk_header_bar_set_show_close_button(header_bar, TRUE);
-    gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
-  } else {
-    // 非 GNOME 的 X11 窗口管理器：传统系统标题栏（Flutter 模板行为）。
-    // 窗口层为 nativeapi（Dart FFI），Linux 保持系统装饰——非发布目标，
-    // 不启用隐藏标题栏（需 Dart 侧自建缩放热区）。
-    gtk_window_set_title(window, "simple_player_flutter");
-  }
+  // 无系统装饰/CSD 标题栏 — frameless 由 Dart 侧 titleBarStyle=hidden
+  // （nativeapi gtk_window_set_decorated(FALSE)）统一决定；边缘 resize 由
+  // Dart UI 热区经 startResizing 补（CONTRACT.md D7）。标题必须保留：
+  // Wayland 任务栏标识，且 nativeapi 的 decorated 切换以 title 非空为前提。
+  gtk_window_set_title(window, "simple_player_flutter");
+
+  // 关窗专线拦截点（✕ 的系统路径；自绘 ✕ 走 Dart close()）。
+  g_signal_connect(window, "delete-event", G_CALLBACK(OnDeleteEvent), nullptr);
 
   gtk_window_set_default_size(window, 1280, 720);
 
@@ -148,8 +141,7 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
-  // 注册窗口 MethodChannel（Dart 端获取 GtkWindow 指针）
-  register_window_channel(GTK_APPLICATION(application), view);
+  register_file_picker_attention_channel(GTK_APPLICATION(application), view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -177,7 +169,7 @@ static gboolean my_application_local_command_line(GApplication* application,
 
 // Implements GApplication::startup.
 static void my_application_startup(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
+  // MyApplication* self = MY_APPLICATION(application);
 
   // Perform any actions required at application startup.
 
@@ -186,9 +178,10 @@ static void my_application_startup(GApplication* application) {
 
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
+  // MyApplication* self = MY_APPLICATION(application);
 
   // Perform any actions required at application shutdown.
+  g_main_window = nullptr;
 
   G_APPLICATION_CLASS(my_application_parent_class)->shutdown(application);
 }
@@ -212,10 +205,10 @@ static void my_application_class_init(MyApplicationClass* klass) {
 static void my_application_init(MyApplication* self) {}
 
 MyApplication* my_application_new() {
-  // Set the program name to the application ID, which helps various systems
-  // like GTK and desktop environments map this running application to its
-  // corresponding .desktop file. This ensures better integration by allowing
-  // the application to be recognized beyond its binary name.
+  // Set the program name to the application ID (defined in the top-level
+  // CMakeLists.txt). This is used to set the application ID, and helps various
+  // systems such as the desktop environment and application launchers identify
+  // the application.
   g_set_prgname(APPLICATION_ID);
 
   return MY_APPLICATION(g_object_new(my_application_get_type(),
