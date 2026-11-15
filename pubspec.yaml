@@ -38,7 +38,6 @@ dependencies:
   flutter_video_thumbnail_plus: ^1.0.7
   # Debug-only VM service bridge for Marionette MCP UI automation.
   marionette_flutter: 0.7.0
-  xdg_directories: ^1.1.0
   intl: ^0.20.3
   logger: ^2.8.0
   material_ui: ^1.11.0
