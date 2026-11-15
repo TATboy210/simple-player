@@ -1,5 +1,8 @@
+import 'package:cupertino_ui/cupertino_ui.dart' as cui;
 import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter_localizations/flutter_localizations.dart' as fl;
 import 'package:material_ui/material_ui.dart';
+import 'package:material_ui/material_ui.dart' as mui;
 
 import 'features/player/player_feature.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
@@ -73,7 +76,26 @@ class App extends StatelessWidget {
         };
         return MaterialApp(
           locale: locale,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          // delegates 手工组装（生成文件的 localizationsDelegates 常量不含
+          // material_ui/cupertino_ui 侧）：SDK 三件覆盖 flutter/material 与
+          // widgets 组件链；mui/cui 两件覆盖 material_ui/cupertino_ui 组件链
+          // —— 二者的 MaterialLocalizations/CupertinoLocalizations 是不同
+          // Type，缺任一侧都会触发 "locale not supported by all delegates"
+          // 警告（框架按 delegate.type 去重检查）。flutter_localizations 的
+          // Global* 已弃用，待 gen-l10n 模板迁移后此列表可整体换 mui/cui 版。
+          localizationsDelegates: const <LocalizationsDelegate<Object>>[
+            AppLocalizations.delegate,
+            // SDK 三件：flutter_localizations 的 Global* 在 3.50 弃用，但其
+            // 支持的 MaterialLocalizations/CupertinoLocalizations 类型与
+            // mui/cui 的不是同一 Type，模板迁移前两边都要挂。
+            // ignore: deprecated_member_use
+            fl.GlobalMaterialLocalizations.delegate,
+            fl.GlobalWidgetsLocalizations.delegate,
+            // ignore: deprecated_member_use
+            fl.GlobalCupertinoLocalizations.delegate,
+            mui.GlobalMaterialLocalizations.delegate,
+            cui.GlobalCupertinoLocalizations.delegate,
+          ],
           supportedLocales: AppLocalizations.supportedLocales,
           onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
           debugShowCheckedModeBanner: false,
