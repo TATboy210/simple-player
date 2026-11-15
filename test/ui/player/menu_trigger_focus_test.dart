@@ -159,7 +159,7 @@ void main() {
     );
   }
 
-  testWidgets('all fifteen actual language choices update same mounted store', (
+  testWidgets('all nine actual language choices update same mounted store', (
     tester,
   ) async {
     final menus = WorkspaceMenuSession();
@@ -176,22 +176,16 @@ void main() {
         AppLanguage.chinese => '中文',
         AppLanguage.korean => '한국어',
         AppLanguage.japanese => '日本語',
-        AppLanguage.frenchCanada => 'Français (Canada)',
-        AppLanguage.englishAustralia => 'English (Australia)',
-        AppLanguage.englishNewZealand => 'English (New Zealand)',
-        AppLanguage.englishSingapore => 'English (Singapore)',
-        AppLanguage.spanishMexico => 'Español (México)',
-        AppLanguage.spanishChile => 'Español (Chile)',
-        AppLanguage.spanishPeru => 'Español (Perú)',
-        AppLanguage.malayMalaysia => 'Bahasa Melayu (Malaysia)',
-        AppLanguage.malayBrunei => 'Bahasa Melayu (Brunei)',
+        AppLanguage.spanish => 'Español',
+        AppLanguage.french => 'Français',
+        AppLanguage.malay => 'Bahasa Melayu',
         AppLanguage.vietnamese => 'Tiếng Việt',
       };
       final menuText = find.descendant(
         of: find.byType(SecondarySurface),
         matching: find.text(label),
       );
-      // 15 entries may overflow the menu's clamped height — scroll to the row
+      // 9 entries may overflow the menu's clamped height — scroll to the row
       // before tapping (no-op when already visible).
       await tester.ensureVisible(menuText.last);
       await tester.pumpAndSettle();

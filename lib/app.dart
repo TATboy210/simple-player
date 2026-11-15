@@ -63,15 +63,9 @@ class App extends StatelessWidget {
           AppLanguage.chinese => const Locale('zh'),
           AppLanguage.korean => const Locale('ko'),
           AppLanguage.japanese => const Locale('ja'),
-          AppLanguage.frenchCanada => const Locale('fr', 'CA'),
-          AppLanguage.englishAustralia => const Locale('en', 'AU'),
-          AppLanguage.englishNewZealand => const Locale('en', 'NZ'),
-          AppLanguage.englishSingapore => const Locale('en', 'SG'),
-          AppLanguage.spanishMexico => const Locale('es', 'MX'),
-          AppLanguage.spanishChile => const Locale('es', 'CL'),
-          AppLanguage.spanishPeru => const Locale('es', 'PE'),
-          AppLanguage.malayMalaysia => const Locale('ms', 'MY'),
-          AppLanguage.malayBrunei => const Locale('ms', 'BN'),
+          AppLanguage.spanish => const Locale('es'),
+          AppLanguage.french => const Locale('fr'),
+          AppLanguage.malay => const Locale('ms'),
           AppLanguage.vietnamese => const Locale('vi'),
         };
         return MaterialApp(

@@ -219,15 +219,9 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
         AppLanguage.chinese => '中文',
         AppLanguage.korean => '한국어',
         AppLanguage.japanese => '日本語',
-        AppLanguage.frenchCanada => 'Français (Canada)',
-        AppLanguage.englishAustralia => 'English (Australia)',
-        AppLanguage.englishNewZealand => 'English (New Zealand)',
-        AppLanguage.englishSingapore => 'English (Singapore)',
-        AppLanguage.spanishMexico => 'Español (México)',
-        AppLanguage.spanishChile => 'Español (Chile)',
-        AppLanguage.spanishPeru => 'Español (Perú)',
-        AppLanguage.malayMalaysia => 'Bahasa Melayu (Malaysia)',
-        AppLanguage.malayBrunei => 'Bahasa Melayu (Brunei)',
+        AppLanguage.spanish => 'Español',
+        AppLanguage.french => 'Français',
+        AppLanguage.malay => 'Bahasa Melayu',
         AppLanguage.vietnamese => 'Tiếng Việt',
       };
 

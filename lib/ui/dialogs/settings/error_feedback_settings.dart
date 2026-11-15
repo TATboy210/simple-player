@@ -36,32 +36,14 @@ enum AppLanguage {
   /// 强制日文 (v0.0.6)。
   japanese,
 
-  /// 加拿大法语 (fr-CA) —— 加拿大官方双语之一的加拿大法语变体。
-  frenchCanada,
+  /// 强制西班牙语（拉美西语基座）。
+  spanish,
 
-  /// 澳大利亚英语 (en-AU)。
-  englishAustralia,
+  /// 强制法语（法语基座）。
+  french,
 
-  /// 新西兰英语 (en-NZ)。
-  englishNewZealand,
-
-  /// 新加坡英语 (en-SG)。
-  englishSingapore,
-
-  /// 墨西哥西班牙语 (es-MX)。
-  spanishMexico,
-
-  /// 智利西班牙语 (es-CL)。
-  spanishChile,
-
-  /// 秘鲁西班牙语 (es-PE)。
-  spanishPeru,
-
-  /// 马来西亚马来语 (ms-MY)。
-  malayMalaysia,
-
-  /// 文莱马来语 (ms-BN)。
-  malayBrunei,
+  /// 强制马来语（马来语基座）。
+  malay,
 
   /// 越南语 (vi)。
   vietnamese;
@@ -73,33 +55,27 @@ enum AppLanguage {
     AppLanguage.chinese => 'chinese',
     AppLanguage.korean => 'korean',
     AppLanguage.japanese => 'japanese',
-    AppLanguage.frenchCanada => 'french-canada',
-    AppLanguage.englishAustralia => 'english-australia',
-    AppLanguage.englishNewZealand => 'english-newzealand',
-    AppLanguage.englishSingapore => 'english-singapore',
-    AppLanguage.spanishMexico => 'spanish-mexico',
-    AppLanguage.spanishChile => 'spanish-chile',
-    AppLanguage.spanishPeru => 'spanish-peru',
-    AppLanguage.malayMalaysia => 'malay-malaysia',
-    AppLanguage.malayBrunei => 'malay-brunei',
+    AppLanguage.spanish => 'spanish',
+    AppLanguage.french => 'french',
+    AppLanguage.malay => 'malay',
     AppLanguage.vietnamese => 'vietnamese',
   };
 
-  /// 从 settings.json 反序列化；未知值（旧版本/手改）回退 system。
+  /// 从 settings.json 反序列化。
+  ///
+  /// 兼容映射：区域变体时代的旧键（v0.0.12 的 fr-CA/en-AU/…）映射到对应
+  /// 语言基座——用户选过 en-AU 收敛后落到 english，而不是回退 system。
+  /// 真正未知值（旧版本/手改）回退 system。
   static AppLanguage fromRaw(Object? raw) => switch (raw) {
-    'english' => AppLanguage.english,
+    'english' || 'english-australia' || 'english-newzealand' ||
+    'english-singapore' => AppLanguage.english,
     'chinese' => AppLanguage.chinese,
     'korean' => AppLanguage.korean,
     'japanese' => AppLanguage.japanese,
-    'french-canada' => AppLanguage.frenchCanada,
-    'english-australia' => AppLanguage.englishAustralia,
-    'english-newzealand' => AppLanguage.englishNewZealand,
-    'english-singapore' => AppLanguage.englishSingapore,
-    'spanish-mexico' => AppLanguage.spanishMexico,
-    'spanish-chile' => AppLanguage.spanishChile,
-    'spanish-peru' => AppLanguage.spanishPeru,
-    'malay-malaysia' => AppLanguage.malayMalaysia,
-    'malay-brunei' => AppLanguage.malayBrunei,
+    'spanish' || 'spanish-mexico' || 'spanish-chile' || 'spanish-peru' =>
+      AppLanguage.spanish,
+    'french' || 'french-canada' => AppLanguage.french,
+    'malay' || 'malay-malaysia' || 'malay-brunei' => AppLanguage.malay,
     'vietnamese' => AppLanguage.vietnamese,
     _ => AppLanguage.system,
   };
