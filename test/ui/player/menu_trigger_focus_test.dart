@@ -1,7 +1,8 @@
+// ignore_for_file: no-empty-block
 import 'dart:io';
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
@@ -157,7 +158,7 @@ void main() {
     );
   }
 
-  testWidgets('all five actual language choices update same mounted store', (
+  testWidgets('all fifteen actual language choices update same mounted store', (
     tester,
   ) async {
     final menus = WorkspaceMenuSession();
@@ -174,11 +175,25 @@ void main() {
         AppLanguage.chinese => '中文',
         AppLanguage.korean => '한국어',
         AppLanguage.japanese => '日本語',
+        AppLanguage.frenchCanada => 'Français (Canada)',
+        AppLanguage.englishAustralia => 'English (Australia)',
+        AppLanguage.englishNewZealand => 'English (New Zealand)',
+        AppLanguage.englishSingapore => 'English (Singapore)',
+        AppLanguage.spanishMexico => 'Español (México)',
+        AppLanguage.spanishChile => 'Español (Chile)',
+        AppLanguage.spanishPeru => 'Español (Perú)',
+        AppLanguage.malayMalaysia => 'Bahasa Melayu (Malaysia)',
+        AppLanguage.malayBrunei => 'Bahasa Melayu (Brunei)',
+        AppLanguage.vietnamese => 'Tiếng Việt',
       };
       final menuText = find.descendant(
         of: find.byType(SecondarySurface),
         matching: find.text(label),
       );
+      // 15 entries may overflow the menu's clamped height — scroll to the row
+      // before tapping (no-op when already visible).
+      await tester.ensureVisible(menuText.last);
+      await tester.pumpAndSettle();
       await tester.tap(menuText);
       await tester.pumpAndSettle();
       expect(ErrorFeedbackSettings.I.state.value.language, choice);
@@ -222,6 +237,8 @@ void main() {
                 onCyclePlayMode: () {},
                 sortKey: coordinator.sortKey,
                 sortAscending: coordinator.sortAscending,
+                // 需等排序完成再翻转 visible, 同步包装会改变断言时序.
+                // ignore: avoid-passing-async-when-sync-expected
                 onSortSelected: (key) async {
                   await coordinator.sortEntries(key);
                   visible.value = !visible.value;

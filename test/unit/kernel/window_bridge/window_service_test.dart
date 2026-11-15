@@ -77,9 +77,9 @@ void main() {
   /// 否则服务里创建的 Timer 是真实计时器。
   WindowService startInZone(FakeAsync async, {WindowPlatformProfile? profile}) {
     late WindowService service;
-    unawaited(
-      startedService(profile: profile).then((started) => service = started),
-    );
+    unawaited(() async {
+      service = await startedService(profile: profile);
+    }());
     async.flushMicrotasks();
     return service;
   }
@@ -396,9 +396,10 @@ void main() {
         final service = startInZone(async);
 
         var done = false;
-        unawaited(
-          service.setMode(WindowMode.maximized).then((_) => done = true),
-        );
+        unawaited(() async {
+          await service.setMode(WindowMode.maximized);
+          done = true;
+        }());
         async.flushMicrotasks();
 
         // 无事件流可等 — 一轮 microtask 即完成，不存在 1s 超时路径。

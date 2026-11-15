@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -223,20 +223,19 @@ class WorkspaceMenuScope extends InheritedWidget {
 
     visibility?.addListener(visibilityChanged);
     visibilityChanged();
-    unawaited(
-      route.popped.then((_) {
-        visibility?.removeListener(visibilityChanged);
-        session.finish(token);
-        if (session.mayRestoreFocus(token) &&
-            visibility?.value != false &&
-            trigger.mounted &&
-            sourceRoute?.isCurrent == true &&
-            focus?.context != null &&
-            focus?.canRequestFocus == true) {
-          focus?.requestFocus();
-        }
-      }),
-    );
+    unawaited(() async {
+      await route.popped;
+      visibility?.removeListener(visibilityChanged);
+      session.finish(token);
+      if (session.mayRestoreFocus(token) &&
+          visibility?.value != false &&
+          trigger.mounted &&
+          sourceRoute?.isCurrent == true &&
+          focus?.context != null &&
+          focus?.canRequestFocus == true) {
+        focus?.requestFocus();
+      }
+    }());
   }
 
   @override

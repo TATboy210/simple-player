@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'owned_anchored_menu.dart';
 import '../player/workspace_menu_session.dart';
@@ -14,7 +14,7 @@ class GlassMenu {
     required Offset position,
     required List<GlassMenuItem> items,
     void Function(VoidCallback cancel)? onOpened,
-  }) {
+  }) async {
     final handle = OwnedAnchoredMenu.open<String>(
       context,
       owner: Object(),
@@ -43,7 +43,8 @@ class GlassMenu {
     if (claimed != null && !identical(claimed, before)) {
       legacy?.bindRoute(claimed, handle.route, ModalRoute.of(context));
     }
-    return handle.result.then((result) => result?.value);
+    final result = await handle.result;
+    return result?.value;
   }
 }
 

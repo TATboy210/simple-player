@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
 import 'osd_message.dart';
@@ -51,6 +51,8 @@ class _OsdOverlayState extends State<OsdOverlay>
     _isActive = TickerMode.valuesOf(context).enabled;
     if (_isActive) {
       _attach();
+      // 与监听器路径共用同一同步入口, 刻意调用.
+      // ignore: avoid-unnecessary-setstate
       _sync();
     } else {
       _detach();
@@ -68,6 +70,8 @@ class _OsdOverlayState extends State<OsdOverlay>
       }
       if (_isActive) {
         _attach();
+        // 与监听器路径共用同一同步入口, 刻意调用.
+        // ignore: avoid-unnecessary-setstate
         _sync();
       }
     }

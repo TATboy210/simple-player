@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
 import '../../l10n/app_localizations.dart';
@@ -82,6 +82,7 @@ class _VolumeButtonState extends State<VolumeButton> {
     if (volumeChanged && volume > 0 && widget.isMuted.value) {
       widget.onToggleMute();
     }
+    // ignore: no-empty-block
     if (mounted) setState(() {});
   }
 
@@ -305,6 +306,7 @@ class _VolumeSliderState extends State<VolumeSlider> {
         // 指针取消须先于滑条手势收尾丢弃待提交值 (滑条把取消当 onChangeEnd).
         onPointerCancel: (_) {
           _cancelDrag();
+          // ignore: no-empty-block
           if (mounted) setState(() {});
         },
         // 滚轮是离散事件（~3-5 次/秒），无需节流

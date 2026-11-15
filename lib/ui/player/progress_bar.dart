@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../shared/secondary_surface_visibility.dart';
@@ -296,6 +296,7 @@ class _ProgressBarState extends State<ProgressBar>
   }
 
   /// 节流 timer 的空回调 — 仅用 isActive 表达"节流窗口未过".
+  // ignore: no-empty-block
   static void _noop() {}
 
   void _onTapDown(TapDownDetails details, double barWidth) {

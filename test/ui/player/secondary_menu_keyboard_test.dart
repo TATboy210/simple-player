@@ -1,6 +1,7 @@
+// ignore_for_file: no-empty-block
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/player/keyboard_handler.dart';
@@ -338,7 +339,10 @@ void main() {
       await tester.pumpAndSettle();
       // 激活键 KeyRepeat 防连发:结果 Future 在重复期间绝不完成。
       var resultCompleted = false;
-      unawaited(menu.result.then((_) => resultCompleted = true));
+      unawaited(() async {
+        await menu.result;
+        resultCompleted = true;
+      }());
       // 行级 Focus 只带 focusNode/onFocusChange;但 MaterialApp/Navigator
       // 层作用域在更外侧也装有 onKeyEvent,故不能用 singleWhere。菜单体
       // Focus 是行 Focus 之上最近一个带 handler 的祖先——真实按键冒泡时

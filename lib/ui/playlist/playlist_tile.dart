@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/models/playlist_item.dart';
 import '../../kernel/services/thumbnail_service.dart';

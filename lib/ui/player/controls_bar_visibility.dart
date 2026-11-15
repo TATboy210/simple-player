@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../shared/secondary_surface_visibility.dart';
 import '../theme/tokens.dart';

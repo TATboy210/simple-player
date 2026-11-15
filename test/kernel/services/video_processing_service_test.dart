@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block
 /// VideoProcessingService 单测 — 不可变状态 / diff 同步 / loadFrom / reapplyAll.
 ///
 /// 使用 FakeEngine (无 libmpv FFI), 全部同步, 无真实延时.

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mpv_kit_video/mpv_kit_video.dart';
 
 import '../../kernel/window_bridge/service/window_service.dart';
@@ -393,6 +393,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// ⚠ 兜底闭包在此固化 — `onFilesDropped ?? (_) {}` 若放进 build 会让
   /// 缓存比对（原始可空值 identity）与实际消费值脱节。
   Widget _createVideoContent() {
+    // ignore: no-empty-block
     final onFilesDropped = widget.onFilesDropped ?? (_) {};
     final onHoverChanged = widget.onDragHoverChanged;
     final surface = _createVideoSurface();
@@ -400,8 +401,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       children: [
         Expanded(
           child: DropHandler(
-            // 空块刻意 — 空置态无拖放目标.
-            // ignore: no-empty-block
             onFilesDropped: onFilesDropped,
             onHoverChanged: onHoverChanged,
             child: Stack(

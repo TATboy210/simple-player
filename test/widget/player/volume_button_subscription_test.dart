@@ -1,7 +1,8 @@
+// ignore_for_file: no-empty-block
 /// VolumeButton 合并订阅后的语义回归 — 自动取消静音只由"音量变化"触发.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';

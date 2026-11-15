@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
@@ -97,6 +97,7 @@ class _PlainSliderState extends State<PlainSlider> {
     _dragging = true;
     widget.onChangeStart?.call(widget.value);
     _update(local, width);
+    // ignore: no-empty-block
     setState(() {});
   }
 
@@ -110,6 +111,7 @@ class _PlainSliderState extends State<PlainSlider> {
     if (!_dragging) return;
     _dragging = false;
     widget.onChangeEnd?.call(_lastValue);
+    // ignore: no-empty-block
     if (mounted) setState(() {});
   }
 

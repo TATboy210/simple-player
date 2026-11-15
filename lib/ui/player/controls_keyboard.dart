@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 // services: KeyDownEvent / LogicalKeyboardKey / KeyEventResult / FocusNode
 // (material.dart 不完整导出 services 的键盘事件类型)
 import 'package:flutter/services.dart';
@@ -48,7 +48,7 @@ class ControlsCommands {
   /// ESC(退出全屏)/F(切换全屏)/Space(播放暂停)/←→(seek)/↑↓(音量，经
   /// [adjustVolumeByKeyboard] 与窗口态共享唯一实现 — v0.0.12 U3)。其余键
   /// 返回 ignored 冒泡给窗口态 KeyboardHandler。
-  KeyEventResult handleKey(FocusNode node, KeyEvent event) {
+  KeyEventResult handleKey(FocusNode _, KeyEvent event) {
     // 自有菜单守卫：拒绝播放器回调，但让精确菜单路由导航/激活。
     // latch 跨同步关闭、替换与全屏宿主拆除保持有效。
     final menus = _host.menuSession;

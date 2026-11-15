@@ -42,6 +42,8 @@ class PersistQueue {
 
   /// 排队一次落盘 — 串行防交错。
   void schedule() {
+    // 串行链必须原子追加; async/await 改写会在 await 点引入交错窗口.
+    // ignore: prefer-async-await
     _queue = _queue.then((_) => persistNow());
     unawaited(_queue);
   }

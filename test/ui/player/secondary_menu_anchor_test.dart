@@ -1,6 +1,7 @@
+// ignore_for_file: no-empty-block
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/glass_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
@@ -184,12 +185,10 @@ void main() {
     );
     var completed = false;
     Object? selection;
-    unawaited(
-      handle.result.then((value) {
-        completed = true;
-        selection = value;
-      }),
-    );
+    unawaited(() async {
+      selection = await handle.result;
+      completed = true;
+    }());
     await tester.pumpAndSettle();
     expect(find.text('Rejected'), findsNothing);
     expect(handle.route.navigator, isNull);
@@ -223,7 +222,10 @@ void main() {
       entries: const [OwnedMenuEntry(value: 'a', label: 'Canceled')],
     );
     var completed = false;
-    unawaited(handle.result.then((_) => completed = true));
+    unawaited(() async {
+      await handle.result;
+      completed = true;
+    }());
     await tester.pumpAndSettle();
     expect(find.text('Canceled'), findsNothing);
     expect(handle.route.navigator, isNull);
@@ -265,7 +267,10 @@ void main() {
       entries: const [OwnedMenuEntry(value: 'old', label: 'Old')],
     );
     var completed = false;
-    unawaited(old.result.then((_) => completed = true));
+    unawaited(() async {
+      await old.result;
+      completed = true;
+    }());
     await tester.pumpAndSettle();
     expect(find.text('Old'), findsNothing);
     expect(find.text('New'), findsOneWidget);

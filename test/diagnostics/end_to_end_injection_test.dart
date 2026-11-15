@@ -33,7 +33,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_file_sink.dart';

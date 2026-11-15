@@ -208,8 +208,9 @@ class WindowService implements WindowBridge {
 
   /// 降级亮窗 — init/reveal 失败时组合根 best-effort 调用。
   /// 宿主未绑定时无窗口可操作；runner 首帧回调仍会亮窗。
-  Future<void> showDegraded() async {
+  Future<void> showDegraded() {
     _native?.show();
+    return Future<void>.value();
   }
 
   // --- resize 会话（检测源：引擎指标，契约 2/3/6） ---

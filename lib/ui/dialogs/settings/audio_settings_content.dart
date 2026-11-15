@@ -13,7 +13,7 @@
 /// 行首 accent 竖条（复用 General `_SettingsRow` 语法）。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../../../kernel/services/app_settings_service.dart';

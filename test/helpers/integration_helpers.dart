@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:simple_player_flutter/kernel/services/playback_controller.dart';
 
 import 'fake_engine.dart';

@@ -11,7 +11,7 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../shared/owned_anchored_menu.dart';
 import '../../shared/secondary_surface_visibility.dart';
@@ -210,7 +210,8 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
     return KeyEventResult.ignored;
   }
 
-  /// All five native language labels share the existing preference service.
+  /// All native language labels share the existing preference service.
+  /// Regional variants self-identify with their country (native name + region).
   String _languageLabel(AppLanguage language, AppLocalizations l10n) =>
       switch (language) {
         AppLanguage.system => l10n.languageSystem,
@@ -218,6 +219,16 @@ class _GeneralSettingsContentState extends State<GeneralSettingsContent> {
         AppLanguage.chinese => '中文',
         AppLanguage.korean => '한국어',
         AppLanguage.japanese => '日本語',
+        AppLanguage.frenchCanada => 'Français (Canada)',
+        AppLanguage.englishAustralia => 'English (Australia)',
+        AppLanguage.englishNewZealand => 'English (New Zealand)',
+        AppLanguage.englishSingapore => 'English (Singapore)',
+        AppLanguage.spanishMexico => 'Español (México)',
+        AppLanguage.spanishChile => 'Español (Chile)',
+        AppLanguage.spanishPeru => 'Español (Perú)',
+        AppLanguage.malayMalaysia => 'Bahasa Melayu (Malaysia)',
+        AppLanguage.malayBrunei => 'Bahasa Melayu (Brunei)',
+        AppLanguage.vietnamese => 'Tiếng Việt',
       };
 
   /// Row zero, pointer and actual button activation use this exact live anchor.

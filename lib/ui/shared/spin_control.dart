@@ -3,7 +3,7 @@
 // 左箭头 + 动画值显示 + 右箭头，支持键盘 D-pad 左右键调整。
 // 用于设置面板中的枚举选项切换（如语言、渲染器等）。
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';

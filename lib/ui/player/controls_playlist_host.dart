@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/services/playlist_coordinator.dart';
 import '../dialogs/settings/settings_panel.dart';

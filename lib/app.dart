@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'features/player/player_feature.dart';
 import 'kernel/diagnostics/startup_timeline.dart';
@@ -60,6 +60,16 @@ class App extends StatelessWidget {
           AppLanguage.chinese => const Locale('zh'),
           AppLanguage.korean => const Locale('ko'),
           AppLanguage.japanese => const Locale('ja'),
+          AppLanguage.frenchCanada => const Locale('fr', 'CA'),
+          AppLanguage.englishAustralia => const Locale('en', 'AU'),
+          AppLanguage.englishNewZealand => const Locale('en', 'NZ'),
+          AppLanguage.englishSingapore => const Locale('en', 'SG'),
+          AppLanguage.spanishMexico => const Locale('es', 'MX'),
+          AppLanguage.spanishChile => const Locale('es', 'CL'),
+          AppLanguage.spanishPeru => const Locale('es', 'PE'),
+          AppLanguage.malayMalaysia => const Locale('ms', 'MY'),
+          AppLanguage.malayBrunei => const Locale('ms', 'BN'),
+          AppLanguage.vietnamese => const Locale('vi'),
         };
         return MaterialApp(
           locale: locale,

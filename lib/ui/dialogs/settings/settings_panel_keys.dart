@@ -45,7 +45,7 @@ mixin _PanelKeyHandling on State<SettingsPanel> {
       key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown;
 
   /// 面板级按键 — 返回 handled 阻断冒泡，Esc 刻意 ignored.
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+  KeyEventResult _handleKeyEvent(FocusNode _, KeyEvent event) {
     // 防线：焦点滞留隐藏面板时绝不吞键（宿主负责归还焦点，此处兜底）.
     if (!widget.visible) return KeyEventResult.ignored;
     if (event is! KeyDownEvent) return KeyEventResult.ignored;

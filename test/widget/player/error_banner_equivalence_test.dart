@@ -14,7 +14,7 @@
 /// 单独用例记录该增量能力，不参与 D-09 等效判定。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/app.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';

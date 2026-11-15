@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/engine/engine_state.dart';
 import '../theme/tokens.dart';
@@ -120,9 +120,11 @@ class _NeverNotify implements Listenable {
   const _NeverNotify();
 
   @override
+  // ignore: no-empty-block
   void addListener(VoidCallback listener) {}
 
   @override
+  // ignore: no-empty-block
   void removeListener(VoidCallback listener) {}
 }
 

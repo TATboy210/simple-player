@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/models/play_mode.dart';
 import '../../kernel/models/playlist_item.dart';
@@ -152,6 +152,7 @@ class _PlaylistPanelState extends State<PlaylistPanel>
 
   /// 确认流状态翻转 → 重建 (守卫 mounted, dispose 后的迟到回调安全).
   void _rebuild() {
+    // ignore: no-empty-block
     if (mounted) setState(() {});
   }
 

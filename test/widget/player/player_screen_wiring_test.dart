@@ -6,7 +6,7 @@
 /// 面板门控在实机上失效(数据层不记录但面板仍显示旧断点)。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';

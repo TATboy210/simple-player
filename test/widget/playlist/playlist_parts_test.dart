@@ -1,7 +1,8 @@
+// ignore_for_file: no-empty-block
 /// 播放列表拆分后各子组件的独立 widget 测试 (无引擎/协调器依赖).
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';

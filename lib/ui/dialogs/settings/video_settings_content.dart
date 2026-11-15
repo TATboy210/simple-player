@@ -7,7 +7,7 @@
 /// file-scoped 自动跨文件重放 — UI 无感知。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../features/player/models/video_processing_state.dart';
 import '../../../kernel/models/aspect_ratio_mode.dart';

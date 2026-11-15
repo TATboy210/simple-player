@@ -8,7 +8,7 @@
 /// 视频面用纯色占位（真实纹理走 mpv_kit，headless 不可用）。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';

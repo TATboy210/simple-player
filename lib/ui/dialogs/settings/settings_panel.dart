@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 // services: LogicalKeyboardKey / KeyEventResult (material.dart 不完整导出).
 import 'package:flutter/services.dart';
 
@@ -262,6 +262,8 @@ class _SettingsPanelState extends State<SettingsPanel>
       _generalEligible.value = false;
       oldWidget.session?.removeListener(_syncSession);
       widget.session?.addListener(_syncSession);
+      // 监听器回调复用, 生命周期同步是刻意调用.
+      // ignore: avoid-unnecessary-setstate
       _syncSession();
     }
     if (oldWidget.visible != widget.visible) {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/engine/media_engine.dart';
 import '../../kernel/services/playback_controller.dart';

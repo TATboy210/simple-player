@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:simple_player_flutter/ui/player/mpv_kit_player_port.dart';
 
 import 'fake_player_controls.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 import 'package:simple_player_flutter/ui/player/auto_hide_controller.dart';

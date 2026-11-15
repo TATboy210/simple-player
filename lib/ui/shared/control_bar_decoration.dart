@@ -7,7 +7,7 @@
 // 不提取的部分（仍为控制栏专属 chrome 增强）：EdgeGlow 包装、_buildBlur 的
 // ClipRRect+BackdropFilter、顶部渐变光线 DecoratedBox——面板 chrome 不采纳。
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
 

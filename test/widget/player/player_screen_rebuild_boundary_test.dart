@@ -1,3 +1,4 @@
+// ignore_for_file: no-empty-block
 /// PlayerScreen 层 rebuild boundary 测试 (v0.0.9 P0-2)。
 ///
 /// 锁死重建矩阵：hover / isResizing / mode 翻转各事件对 PlayerScreen
@@ -9,7 +10,7 @@
 /// AnimatedBuilder.child 恒定 identity。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
@@ -110,7 +111,7 @@ void main() {
 
   testWidgets('hover 翻转 — PlayerScreen.build 零重建（P0-2 根因锁定）', (tester) async {
     var hoverEvents = 0;
-    void onHover(bool hovering) => hoverEvents++;
+    void onHover(bool _) => hoverEvents++;
     await pumpScreen(tester, onDragHoverChanged: onHover);
     final buildsBefore = screenBuilds;
 
@@ -164,7 +165,7 @@ void main() {
   });
 
   testWidgets('父级重泵（同依赖新实例）— 视频链缓存保留', (tester) async {
-    void onDrop(List<String> paths) {}
+    void onDrop(List<String> _) {}
     await pumpScreen(tester, onFilesDropped: onDrop);
     final dropHandlerBefore = tester.widget<DropHandler>(
       find.byType(DropHandler),
@@ -185,8 +186,8 @@ void main() {
 
   testWidgets('onFilesDropped 替换 — 缓存正确失效，DropHandler 收到新回调', (tester) async {
     var dropCount = 0;
-    void onDropV1(List<String> paths) {}
-    void onDropV2(List<String> paths) => dropCount++;
+    void onDropV1(List<String> _) {}
+    void onDropV2(List<String> _) => dropCount++;
 
     await pumpScreen(tester, onFilesDropped: onDropV1);
     await pumpScreen(tester, onFilesDropped: onDropV2);

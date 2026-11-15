@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+// ignore_for_file: no-empty-block
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_report.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/error_reporter.dart';

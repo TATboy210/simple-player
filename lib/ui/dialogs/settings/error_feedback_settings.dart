@@ -18,7 +18,8 @@ import 'package:flutter/foundation.dart';
 
 import 'package:simple_player_flutter/kernel/diagnostics/error_log_location.dart';
 
-/// 应用界面语言 —— 跟随系统（默认）或强制指定（v0.0.6 增韩/日）。
+/// 应用界面语言 —— 跟随系统（默认）或强制指定（v0.0.6 增韩/日；本次增
+/// 加/澳/墨/马/越/新/文/智/秘/新西兰十国 locale）。
 enum AppLanguage {
   /// 跟随系统 locale（MaterialApp locale = null 的官方语义）。
   system,
@@ -33,7 +34,37 @@ enum AppLanguage {
   korean,
 
   /// 强制日文 (v0.0.6)。
-  japanese;
+  japanese,
+
+  /// 加拿大法语 (fr-CA) —— 加拿大官方双语之一的加拿大法语变体。
+  frenchCanada,
+
+  /// 澳大利亚英语 (en-AU)。
+  englishAustralia,
+
+  /// 新西兰英语 (en-NZ)。
+  englishNewZealand,
+
+  /// 新加坡英语 (en-SG)。
+  englishSingapore,
+
+  /// 墨西哥西班牙语 (es-MX)。
+  spanishMexico,
+
+  /// 智利西班牙语 (es-CL)。
+  spanishChile,
+
+  /// 秘鲁西班牙语 (es-PE)。
+  spanishPeru,
+
+  /// 马来西亚马来语 (ms-MY)。
+  malayMalaysia,
+
+  /// 文莱马来语 (ms-BN)。
+  malayBrunei,
+
+  /// 越南语 (vi)。
+  vietnamese;
 
   /// settings.json 序列化形式 —— 稳定字符串键（append-only，勿改既有值）。
   String get raw => switch (this) {
@@ -42,6 +73,16 @@ enum AppLanguage {
     AppLanguage.chinese => 'chinese',
     AppLanguage.korean => 'korean',
     AppLanguage.japanese => 'japanese',
+    AppLanguage.frenchCanada => 'french-canada',
+    AppLanguage.englishAustralia => 'english-australia',
+    AppLanguage.englishNewZealand => 'english-newzealand',
+    AppLanguage.englishSingapore => 'english-singapore',
+    AppLanguage.spanishMexico => 'spanish-mexico',
+    AppLanguage.spanishChile => 'spanish-chile',
+    AppLanguage.spanishPeru => 'spanish-peru',
+    AppLanguage.malayMalaysia => 'malay-malaysia',
+    AppLanguage.malayBrunei => 'malay-brunei',
+    AppLanguage.vietnamese => 'vietnamese',
   };
 
   /// 从 settings.json 反序列化；未知值（旧版本/手改）回退 system。
@@ -50,6 +91,16 @@ enum AppLanguage {
     'chinese' => AppLanguage.chinese,
     'korean' => AppLanguage.korean,
     'japanese' => AppLanguage.japanese,
+    'french-canada' => AppLanguage.frenchCanada,
+    'english-australia' => AppLanguage.englishAustralia,
+    'english-newzealand' => AppLanguage.englishNewZealand,
+    'english-singapore' => AppLanguage.englishSingapore,
+    'spanish-mexico' => AppLanguage.spanishMexico,
+    'spanish-chile' => AppLanguage.spanishChile,
+    'spanish-peru' => AppLanguage.spanishPeru,
+    'malay-malaysia' => AppLanguage.malayMalaysia,
+    'malay-brunei' => AppLanguage.malayBrunei,
+    'vietnamese' => AppLanguage.vietnamese,
     _ => AppLanguage.system,
   };
 }

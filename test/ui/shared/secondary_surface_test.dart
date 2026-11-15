@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+// ignore_for_file: no-empty-block
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:simple_player_flutter/ui/window/custom_title_bar.dart';

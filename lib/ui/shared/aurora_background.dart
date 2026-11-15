@@ -3,7 +3,7 @@ import '../../kernel/engine/engine_state.dart';
 import 'dart:math';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../theme/tokens.dart';

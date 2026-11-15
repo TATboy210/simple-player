@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mpv_kit_video/mpv_kit_video.dart';
 
 import '../../kernel/engine/mpv_kit_engine.dart';
@@ -99,9 +99,11 @@ final class MpvKitVideoControlsPort implements VideoControlsPort {
   EdgeInsets get subtitlePadding => EdgeInsets.zero;
 
   @override
+  // ignore: no-empty-block
   void toggleFullscreen() {}
 
   @override
+  // ignore: no-empty-block
   void exitFullscreen() {}
 
   @override
@@ -159,12 +161,17 @@ class MpvKitPlayerPort implements PlayerPort {
 
   // 进度条 seek 走 mpv 默认精确绝对 seek (与引擎 seekTo 一致).
   @override
-  void seek(Duration position) => unawaited(
-    _player.mpv
-        .commandAsync(['seek', '${position.inMicroseconds / 1e6}', 'absolute'])
-        .result
-        .then((_) {}, onError: (Object e) => debugPrint('seek 失败: $e')),
-  );
+  void seek(Duration position) => unawaited(_seekNow(position));
+
+  Future<void> _seekNow(Duration position) async {
+    try {
+      await _player.mpv
+          .commandAsync(['seek', '${position.inMicroseconds / 1e6}', 'absolute'])
+          .result;
+    } on Object catch (e) {
+      debugPrint('seek 失败: $e');
+    }
+  }
 
   @override
   void setRate(double rate) => _player.setSpeed(rate);

@@ -59,7 +59,6 @@ class _SeekHold {
     );
     // 误报 — listener 存入 _listener 字段, cancel (含 dispose 路径)
     // 统一移除.
-    // ignore: always-remove-listener
     position.addListener(listener);
     // 立即检查一次: FakeEngine/同步 seek 可能已让 position 到达目标,
     // addListener 只对未来变化触发, 不立即检查会卡到超时 (测试/同步路径).

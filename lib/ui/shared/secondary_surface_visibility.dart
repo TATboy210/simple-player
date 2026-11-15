@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 可见 owner 的窄适配器 — compose live parent/layer eligibility outside caches.
 /// Owns only its output notifier; all source notifiers remain borrowed.

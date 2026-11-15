@@ -18,7 +18,7 @@ library;
 
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/window_bridge/service/window_service.dart';
 import '../../kernel/diagnostics/kernel_logger.dart';

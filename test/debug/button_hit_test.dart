@@ -4,7 +4,7 @@
 /// 运行: flutter test test/debug/button_hit_test.dart
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/engine/engine_state.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';

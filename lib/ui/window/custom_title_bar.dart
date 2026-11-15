@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../kernel/window_bridge/window_bridge.dart';
 import '../../l10n/app_localizations.dart';

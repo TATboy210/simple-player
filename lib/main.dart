@@ -3,7 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -187,7 +187,9 @@ Future<void> _revealWindowAfterFirstFrame(WindowService windowService) async {
     // 超时仍在等的首帧: 到达时补记真实耗时, 供调 _firstFrameRevealTimeout 时
     // 区分"稍慢一点"与"严重拖后"(只看超时 warn 无从判断).
     unawaited(
+      // 首帧补记是 fire-and-forget 续体, .then/.catchError 链比包装 async 闭包直白.
       firstFrame
+          // ignore: prefer-async-await
           .then((_) {
             KernelLogger.I.i(
               '[main] first frame rasterized ${waitStopwatch.elapsedMilliseconds}ms '
@@ -195,6 +197,7 @@ Future<void> _revealWindowAfterFirstFrame(WindowService windowService) async {
               '${_firstFrameRevealTimeout.inMilliseconds}ms)',
             );
           })
+          // ignore: no-empty-block
           .catchError((Object _) {
             // 首帧等待本身失败 — 已在下方 warn 记录, 此处不重复.
           }),

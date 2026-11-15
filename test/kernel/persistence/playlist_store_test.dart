@@ -217,8 +217,8 @@ void main() {
       expect(decoded['sortKey'], 'addedOrder');
       expect(decoded['sortAscending'], true);
       expect(decoded['lastPlayedPath'], 'D:/a.mp4');
-      expect(decoded['items'], isA<List<dynamic>>());
-      expect((decoded['items'] as List<dynamic>).length, 2);
+      expect(decoded['items'], isA<List<Object?>>());
+      expect((decoded['items'] as List<Object?>).length, 2);
     });
   });
 

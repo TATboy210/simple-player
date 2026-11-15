@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -117,23 +117,22 @@ class OwnedAnchoredMenu {
 
     signal?.addListener(visibilityChanged);
     visibilityChanged();
-    unawaited(
-      handle.result.then((_) {
-        signal?.removeListener(visibilityChanged);
-        menus.finish(handle.token);
-        // Replacement/top dialog/hidden owner must never lose its actual focus.
-        if (menus.mayRestoreFocus(handle.token) &&
-            trigger.mounted &&
-            signal?.value != false &&
-            source?.isCurrent == true &&
-            (isOwnerValid?.call() ?? true) &&
-            focus?.context != null &&
-            focus?.canRequestFocus == true) {
-          focus?.requestFocus();
-        }
-        if (ownsSession) menus.dispose();
-      }),
-    );
+    unawaited(() async {
+      await handle.result;
+      signal?.removeListener(visibilityChanged);
+      menus.finish(handle.token);
+      // Replacement/top dialog/hidden owner must never lose its actual focus.
+      if (menus.mayRestoreFocus(handle.token) &&
+          trigger.mounted &&
+          signal?.value != false &&
+          source?.isCurrent == true &&
+          (isOwnerValid?.call() ?? true) &&
+          focus?.context != null &&
+          focus?.canRequestFocus == true) {
+        focus?.requestFocus();
+      }
+      if (ownsSession) menus.dispose();
+    }());
   }
 
   /// Invalidate session synchronously; defer only Navigator mutation in build.

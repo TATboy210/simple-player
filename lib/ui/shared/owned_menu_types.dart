@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 不可变动作项 — checked is informational, never a disabled radio choice.
 class OwnedMenuEntry<T> {
