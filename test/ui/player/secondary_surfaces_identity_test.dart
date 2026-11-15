@@ -10,7 +10,7 @@ import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import 'package:simple_player_flutter/ui/player/progress_bar.dart';
 import 'package:simple_player_flutter/ui/shared/glass_confirm_strip.dart';
-import 'package:simple_player_flutter/ui/shared/glass_menu.dart';
+import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
@@ -253,10 +253,14 @@ void main() {
       await tester.pump();
       _secondary(tester, find.byType(SecondarySurface));
       final context = tester.element(bar);
-      final menu = GlassMenu.show(
+      final handle = OwnedAnchoredMenu.open<String>(
         context,
+        owner: Object(),
+        useWorkspaceScope: false,
         position: const Offset(100, 100),
-        items: const [GlassMenuItem(Icons.copy, 'Action', value: 'action')],
+        entries: const [
+          OwnedMenuEntry(value: 'action', label: 'Action', icon: Icons.copy),
+        ],
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -264,7 +268,7 @@ void main() {
       await tester.tap(find.text('Action'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      await menu;
+      await handle.result;
       showConfirmation.value = true;
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));

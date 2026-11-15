@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/ui/shared/glass_menu.dart';
+import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
@@ -418,18 +418,20 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const MaterialApp(home: Scaffold()));
     final context = tester.element(find.byType(Scaffold));
-    final result = GlassMenu.show(
+    final result = OwnedAnchoredMenu.open<String>(
       context,
+      owner: Object(),
+      useWorkspaceScope: false,
       position: const Offset(400, 400),
-      items: List.generate(
-        8,
-        (i) => GlassMenuItem(
-          Icons.language,
-          'Complete long language label $i',
-          value: '$i',
-        ),
-      ),
-    );
+      entries: [
+        for (var i = 0; i < 8; i++)
+          OwnedMenuEntry(
+            value: '$i',
+            label: 'Complete long language label $i',
+            icon: Icons.language,
+          ),
+      ],
+    ).result;
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     final rect = tester.getRect(find.byType(SecondarySurface));
@@ -448,6 +450,6 @@ void main() {
     );
     await tester.tap(find.text('Complete long language label 7'));
     await tester.pumpAndSettle();
-    expect(await result, '7');
+    expect((await result)?.value, '7');
   });
 }
