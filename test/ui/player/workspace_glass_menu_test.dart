@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:simple_player_flutter/ui/shared/glass_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
@@ -111,20 +110,32 @@ void main() {
         ),
       );
       final context = tester.element(find.text('trigger'));
-      final result = GlassMenu.show(
+      // 原 GlassMenu 门面（已删除）的 legacy 重绑序列，手动复现：
+      // open(useWorkspaceScope:false) → onOpened 同步 claim ownership →
+      // 把新 token 绑回本 route。
+      final handle = OwnedAnchoredMenu.open<String>(
         context,
+        owner: 'legacy',
+        useWorkspaceScope: false,
         position: Offset.zero,
-        items: const [GlassMenuItem(Icons.play_arrow, 'Legacy', value: 'play')],
-        onOpened: (cancel) => menus.open(
-          owner: 'legacy',
-          cancel: cancel,
-          isCurrent: () => ModalRoute.of(context)?.isCurrent == true,
-          onEscape: () {
-            menus.cancel();
-            exits++;
-          },
-        ),
+        entries: const [
+          OwnedMenuEntry(value: 'play', label: 'Legacy', icon: Icons.play_arrow),
+        ],
       );
+      menus.open(
+        owner: 'legacy',
+        cancel: handle.cancel,
+        isCurrent: () => ModalRoute.of(context)?.isCurrent == true,
+        onEscape: () {
+          menus.cancel();
+          exits++;
+        },
+      );
+      final claimed = menus.currentToken;
+      if (claimed != null) {
+        menus.bindRoute(claimed, handle.route, ModalRoute.of(context));
+      }
+      final result = handle.result.then((r) => r?.value);
       await tester.pumpAndSettle();
       expect(menus.isOwnedMenuTopmost, isTrue);
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -137,14 +148,20 @@ void main() {
   testWidgets('actual menu is opaque and arrows activate once', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: Scaffold()));
     final context = tester.element(find.byType(Scaffold));
-    final result = GlassMenu.show(
+    final result = OwnedAnchoredMenu.open<String>(
       context,
+      owner: Object(),
       position: const Offset(799, 599),
-      items: const [
-        GlassMenuItem(Icons.play_arrow, 'Play', value: 'play'),
-        GlassMenuItem(Icons.delete, 'Remove', value: 'remove'),
+      entries: const [
+        OwnedMenuEntry(value: 'play', label: 'Play', icon: Icons.play_arrow),
+        OwnedMenuEntry(
+          value: 'remove',
+          label: 'Remove',
+          icon: Icons.delete,
+          isDestructive: true,
+        ),
       ],
-    );
+    ).result.then((r) => r?.value);
     await tester.pumpAndSettle();
     expect(find.byType(SecondarySurface), findsOneWidget);
     expect(find.byType(BackdropFilter), findsNothing);
@@ -163,25 +180,33 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: Scaffold()));
     final context = tester.element(find.byType(Scaffold));
-    VoidCallback? closeOld;
-    final old = GlassMenu.show(
+    final old = OwnedAnchoredMenu.open<String>(
       context,
+      owner: Object(),
+      useWorkspaceScope: false,
       position: Offset.zero,
-      items: const [GlassMenuItem(Icons.play_arrow, 'Old', value: 'old')],
-      onOpened: (cancel) => closeOld = cancel,
+      entries: const [
+        OwnedMenuEntry(value: 'old', label: 'Old', icon: Icons.play_arrow),
+      ],
     );
+    VoidCallback? closeOld = old.cancel;
+    final oldResult = old.result.then((r) => r?.value);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(find.text('Old'), findsOneWidget);
     closeOld?.call();
     await tester.pumpAndSettle();
-    expect(await old, isNull);
-    final next = GlassMenu.show(
+    expect(await oldResult, isNull);
+    final next = OwnedAnchoredMenu.open<String>(
       context,
+      owner: Object(),
+      useWorkspaceScope: false,
       position: const Offset(100, 100),
-      items: const [GlassMenuItem(Icons.play_arrow, 'Next', value: 'next')],
-    );
+      entries: const [
+        OwnedMenuEntry(value: 'next', label: 'Next', icon: Icons.play_arrow),
+      ],
+    ).result.then((r) => r?.value);
     await tester.pumpAndSettle();
     closeOld?.call();
     await tester.pump();

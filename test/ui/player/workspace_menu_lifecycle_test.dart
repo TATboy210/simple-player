@@ -6,7 +6,7 @@ import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
-import 'package:simple_player_flutter/ui/shared/glass_menu.dart';
+import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import '../../helpers/l10n_delegates.dart' show l10nDelegates;
@@ -147,7 +147,7 @@ void main() {
         );
         await tester.pump();
         expect(
-          find.byType(GlassMenuItem),
+          find.byType(OwnedMenuEntry),
           findsNothing,
         ); // items are values, not widgets
         expect(menus.value, isTrue);
