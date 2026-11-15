@@ -5,6 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/service/close_sequence.dart';
 
+// 本文件大量使用无操作占位闭包充当序列步进器（hide/persist/dispose 的
+// “本用例不关心此步”变体），DCM 的 no-empty-block 会逐个误报 — 文件级豁免。
+// ignore_for_file: no-empty-block, avoid_redundant_async
+
 /// 关窗 hide-first 序列（契约 7）的行为锁定。
 ///
 /// 序列：hide → persist → closing listeners → dispose + exit(0)；
@@ -48,6 +52,7 @@ void main() {
       final releasePersist = Completer<void>();
       final seq = CloseSequence(
         hide: () => hideCount++,
+        // ignore: prefer_async_await
         persist: () => releasePersist.future.then((_) => persistCount++),
         closingListeners: () => const [],
         disposeService: () {},
@@ -101,6 +106,7 @@ void main() {
         exit: (_) => calls.add('exit'),
       );
       listeners = () => [
+        // ignore: avoid_redundant_async
         () async {
           calls.add('listener-1');
           // listener 执行期间注册 — 契约允许，但本次序列不遍历到它。
@@ -143,6 +149,7 @@ void main() {
           exit: (_) => exits++,
           stepTimeout: const Duration(milliseconds: 800),
         );
+        // ignore: prefer_async_await
         unawaited(seq2.begin().then((_) => exits++));
         async.elapse(const Duration(milliseconds: 1600));
         expect(exits, 2); // exit(0) + operation 完成计数

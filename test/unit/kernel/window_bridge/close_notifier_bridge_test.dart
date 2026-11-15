@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/platform/close_notifier_bridge.dart';
 
+// install() 的占位回调闭包（`() {}`）语义即“注册了但无操作”——
+// DCM 的 no-empty-block 会逐个误报，文件级豁免。
+// ignore_for_file: no-empty-block
+
 /// 关门专线注册桥（CONTRACT.md 契约 7 的宿主触发半边）的可测行为。
 ///
 /// 测试宿主（flutter_tester）不导出 `SetCloseNotifier` — 走「符号缺失 →

@@ -10,6 +10,9 @@ analyzer:
     missing_return: error
     dead_code: warning
   exclude:
+    # gen-l10n 生成物 — 手改会被覆盖；SDK Global* 的 deprecation 提示
+    # 无法经 header 注入抑制（Flutter 3.50 忽略 header-file）。
+    - lib/l10n/app_localizations*.dart
     - build/**
     - android/**
     - ios/**
