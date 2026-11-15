@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased · 多国本地化扩展 🌏
+
+> 一句话版本：**语言菜单从 5 项扩到 15 项 —— 新增加拿大（fr-CA）、澳大利亚（en-AU）、墨西哥（es-MX）、马来西亚（ms-MY）、越南（vi）、新加坡（en-SG）、文莱（ms-BN）、智利（es-CL）、秘鲁（es-PE）、新西兰（en-NZ）十国界面翻译（日本语已有）；全量 2204+ 测试绿。**
+
+### 🌏 本地化（11 国家/地区）
+- **ARB 新增**：`app_fr_CA` / `app_es_MX` / `app_es_CL` / `app_es_PE` / `app_ms_MY` / `app_ms_BN` / `app_vi` / `app_en_AU` / `app_en_SG` / `app_en_NZ` 各 230 键全量翻译；另增基础回退 `app_es` / `app_fr` / `app_ms`（gen-l10n 对带地区码 locale 的回退链要求，同时让无地区码的系统 locale 在「跟随系统」下命中翻译）
+- **en-AU/en-NZ/en-SG** 采用澳/新/新本地拼写（Colour）；es 三国共用拉美西语文案、ms 两国共用马来语文案（地区变体文件为后续差异保留挂点）
+- **AppLanguage 枚举扩展**：10 个新值 + `raw`/`fromRaw` 新键（append-only，既有 settings.json 未知键回退 system 语义不变）；`app.dart` locale 映射与通用分区 `_languageLabel` 原生语言标签（含国别后缀）同步扩展
+- **OSD 几何门禁适配**：vi `errorCardLogUnavailable` 用词缩短（"Tệp nhật ký không khả dụng" → "Nhật ký không khả dụng"）——原串在测试字体度量下超出 OSD 单行预算（854px 窗口右缘溢出 3.6px），新串含全 locale × 1.5/2.0 缩放的 producer summaries 几何测试在内全绿
+- 测试同步：`menu_trigger_focus_test` 语言菜单全选项遍历更新为 15 项（含弹层滚动后点选）
+
 ## 0.0.12 · 最小改动修复轮 · 三路缺陷猎捕 🎯
 
 > 一句话版本：**三路猎捕（历轮台账 + kernel 层 + UI 层）产出候选池，15 计划项全修 + 4 项待验证全部证实并修复（共 20 项）；每项 TDD 红-绿独立 commit，全量 2082+ 测试绿。**
