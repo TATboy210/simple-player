@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <imm.h>
+#include <iterator>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -31,6 +32,21 @@ extern "C" __declspec(dllexport) void* SimplerPlayerGetMainWindowHandle() {
   return g_main_window;
 }
 
+// 最小外框尺寸（逻辑像素）— Dart 侧 WindowService 在 init 时设置。
+// 走 runner 导出符号 + WM_GETMINMAXINFO 而不是 nativeapi 的 minimumSize
+// setter：后者经 WindowMessageDispatcher 注册 handler 时会对宿主窗口做
+// GWLP_WNDPROC 全量替换（libnativeapi/nativeapi#30 根因 4），拖拽期间
+// 每条 WM_NCHITTEST/WM_SETCURSOR/WM_SIZING（每秒数百条）都要付 dispatcher
+// 的互斥锁快照 + handler 遍历 + 排序。WM_GETMINMAXINFO 走 DefWindowProc
+// 既有查询点，拖拽热路径零额外开销。macOS/Linux 无此问题，继续走
+// nativeapi setter（见 NativeapiWindow.minimumSize 的平台分派）。
+SIZE g_min_window_size = {0, 0};  // 逻辑像素；0 表示未设置。
+
+extern "C" __declspec(dllexport) void SimplerPlayerSetMinWindowSize(
+    int32_t width, int32_t height) {
+  g_min_window_size = SIZE{width, height};
+}
+
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
@@ -41,6 +57,21 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   g_main_window = GetHandle();
+
+  // 渲染后端（libnativeapi/nativeapi#30 取证）：Windows 拖拽/resize 场景
+  // Impeller（经 ANGLE 走 GLES）实测显著劣于 Skia —— rasterP95 36.6ms vs
+  // 21.3ms（同机同帧集）。默认锁 Skia；SIMPLER_PLAYER_IMPELLER=1 恢复
+  // Impeller 以便后续 A/B 复测（上游优化落地后可再切回 Default）。
+  {
+    wchar_t buffer[8] = {};
+    DWORD read = GetEnvironmentVariableW(L"SIMPLER_PLAYER_IMPELLER", buffer,
+                                         static_cast<DWORD>(std::size(buffer)));
+    const bool use_impeller =
+        read > 0 && read < std::size(buffer) && wcscmp(buffer, L"1") == 0;
+    project_.set_impeller_switch(use_impeller
+                                     ? flutter::ImpellerSwitch::Enabled
+                                     : flutter::ImpellerSwitch::Disabled);
+  }
 
   RECT frame = GetClientArea();
 
@@ -125,6 +156,19 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
+      break;
+    case WM_GETMINMAXINFO:
+      // 最小外框约束 — Dart init 时经 SimplerPlayerSetMinWindowSize 设置
+      // （逻辑像素，此处按当前窗口 DPI 换算物理值）。未设置时放行默认。
+      if (g_min_window_size.cx > 0 && g_min_window_size.cy > 0) {
+        UINT dpi = GetDpiForWindow(hwnd);
+        auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+        info->ptMinTrackSize.x =
+            static_cast<LONG>(g_min_window_size.cx * dpi / USER_DEFAULT_SCREEN_DPI);
+        info->ptMinTrackSize.y =
+            static_cast<LONG>(g_min_window_size.cy * dpi / USER_DEFAULT_SCREEN_DPI);
+        return 0;
+      }
       break;
     case ime_bridge_messages::kAppSetImeEnabled:
       // Dart 侧 Win32ImeBridge 投递 — 本线程即创建窗口的 platform 线程,

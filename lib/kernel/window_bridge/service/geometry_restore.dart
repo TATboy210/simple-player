@@ -44,10 +44,13 @@ class GeometryRestore {
   }
 
   /// 工作区查询失败视为「未知」— [isReachableOnAnyDisplay] 对空列表信任原值。
+  ///
+  /// `on Object`：FFI 边界的失败多为 Error 系（ArgumentError/StateError），
+  /// 恢复路径刻意容纳一切失败，绝不因查询失败让窗口恢复崩溃。
   List<Rect> _workAreasOrEmpty(NativeWindow window) {
     try {
       return window.workAreas;
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
       KernelLogger.I.w(
         '[GeometryRestore] work area query failed: $error\n$stackTrace',
       );

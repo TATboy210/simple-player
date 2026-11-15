@@ -1,4 +1,5 @@
 import 'dart:ffi' as ffi;
+import 'dart:io' show Platform;
 import 'dart:ui';
 
 import 'package:nativeapi/nativeapi.dart' as na;
@@ -98,7 +99,48 @@ class NativeapiWindow implements NativeWindow {
   void center() => _window.center();
 
   @override
-  set minimumSize(Size value) => _window.minimumSize = value.toNative();
+  set minimumSize(Size value) {
+    // Windows：走 runner 导出符号 + WM_GETMINMAXINFO，不走 nativeapi 的
+    // minimumSize setter — 后者注册 WindowMessageDispatcher handler 时对
+    // 宿主窗口做 GWLP_WNDPROC 全量替换（libnativeapi/nativeapi#30 根因 4），
+    // 拖拽热路径每条消息都付 dispatcher 互斥锁税。WM_GETMINMAXINFO 是
+    // DefWindowProc 的既有查询点，零额外开销。符号缺失（旧 runner 产物）
+    // 或平台异常时降级回 nativeapi setter，保底约束不丢。
+    // macOS/Linux：dispatcher 不参与 resize 热路径（GTK/AppKit 机制不同），
+    // 直接走 nativeapi。
+    if (Platform.isWindows && _setRunnerMinSize(value)) return;
+    _window.minimumSize = value.toNative();
+  }
+
+  /// runner 导出符号 `SimplerPlayerSetMinWindowSize`（flutter_window.cpp，
+  /// 与 [WindowHandleLocator] 的 runner 符号同款模式）；查不到返回 false。
+  ///
+  /// 查找顺序与 [CloseNotifierBridge] 一致：process() 失败再试 executable()
+  /// （静态链入 exe 的符号在部分平台只对 executable 作用域可见）。
+  static bool _setRunnerMinSize(Size value) {
+    for (final lib in _lookupLibraries()) {
+      try {
+        final setMinSize =
+            lib.lookupFunction<
+              ffi.Void Function(ffi.Int32, ffi.Int32),
+              void Function(int, int)
+            >('SimplerPlayerSetMinWindowSize');
+        setMinSize(value.width.round(), value.height.round());
+        return true;
+      } on Object {
+        // 换下一个作用域；全部失败由调用方降级到 nativeapi setter。
+      }
+    }
+    return false;
+  }
+
+  static List<ffi.DynamicLibrary> _lookupLibraries() {
+    try {
+      return [ffi.DynamicLibrary.process(), ffi.DynamicLibrary.executable()];
+    } on Object {
+      return [ffi.DynamicLibrary.executable()];
+    }
+  }
 
   @override
   set hasShadow(bool value) => _window.hasShadow = value;
@@ -124,6 +166,7 @@ class NativeapiWindow implements NativeWindow {
 
   /// 无监听器可摘、无流可关（契约 1：零订阅）；保留方法满足端口契约。
   @override
+  // ignore: no-empty-block
   void dispose() {}
 }
 
