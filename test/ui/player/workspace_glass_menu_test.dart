@@ -189,13 +189,13 @@ void main() {
         OwnedMenuEntry(value: 'old', label: 'Old', icon: Icons.play_arrow),
       ],
     );
-    VoidCallback? closeOld = old.cancel;
+    final closeOld = old.cancel;
     final oldResult = old.result.then((r) => r?.value);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(find.text('Old'), findsOneWidget);
-    closeOld?.call();
+    closeOld.call();
     await tester.pumpAndSettle();
     expect(await oldResult, isNull);
     final next = OwnedAnchoredMenu.open<String>(
@@ -208,7 +208,7 @@ void main() {
       ],
     ).result.then((r) => r?.value);
     await tester.pumpAndSettle();
-    closeOld?.call();
+    closeOld.call();
     await tester.pump();
     expect(find.text('Next'), findsOneWidget);
     await tester.tapAt(const Offset(790, 590));

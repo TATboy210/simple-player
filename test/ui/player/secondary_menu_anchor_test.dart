@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
-import 'package:simple_player_flutter/ui/shared/owned_anchored_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
 import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
