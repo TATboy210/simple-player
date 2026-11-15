@@ -24,6 +24,7 @@ import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
 import '../../helpers/fake_window_service.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -71,7 +72,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: PlayerScreen(
           engine: engine,

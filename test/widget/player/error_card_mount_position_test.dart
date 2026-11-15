@@ -9,6 +9,7 @@ import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/error_card_host.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// G-03-2 挂载位置回归 —— 错误卡片窗口化时下移到视频区上缘（标题栏之下），
 /// 全屏时保持 D-10（窗口左上角）。
@@ -45,7 +46,7 @@ void main() {
   /// 挂载层 harness：builder 注入 mode notifier 的 buildErrorCardMount。
   Widget buildHarness(ValueListenable<WindowMode>? mode) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: const SizedBox.shrink(),
     builder: (context, navigator) =>
@@ -103,7 +104,7 @@ void main() {
         await tester.pumpWidget(
           const MaterialApp(
             locale: Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: SizedBox.shrink(),
             builder: buildErrorCardMount,

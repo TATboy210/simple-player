@@ -17,6 +17,7 @@ import 'package:simple_player_flutter/ui/dialogs/settings/video_settings_content
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   setUpAll(() {
@@ -34,7 +35,7 @@ void main() {
     ValueListenable<bool>? scrubbing,
   }) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Center(
@@ -72,7 +73,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: Center(
@@ -484,7 +485,7 @@ void main() {
 
     Widget buildInjectedSubject() => MaterialApp(
       locale: const Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: l10nDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(
@@ -569,7 +570,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: Center(
@@ -610,7 +611,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: Center(
@@ -663,7 +664,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SizedBox(
@@ -719,7 +720,7 @@ void main() {
 
     Widget buildSubject() => MaterialApp(
       locale: const Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: l10nDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(

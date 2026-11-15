@@ -30,6 +30,7 @@ import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   setUpAll(() {
@@ -50,7 +51,7 @@ void main() {
   //    复用 app.dart 的 buildErrorCardMount 与生产同一挂载语义）──
   Widget buildCardHarness() => const MaterialApp(
     locale: Locale('en'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(body: SizedBox.shrink()),
     builder: buildErrorCardMount,

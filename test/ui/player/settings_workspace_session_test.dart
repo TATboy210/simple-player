@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel_session.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   testWidgets(
@@ -16,7 +17,7 @@ void main() {
       addTearDown(second.dispose);
       Widget subject(SettingsPanelSession session) => MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Center(
           child: SizedBox(
@@ -65,7 +66,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Center(
             child: SizedBox(
@@ -95,7 +96,7 @@ void main() {
       addTearDown(session.dispose);
       Widget subject(Key key) => MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: Center(

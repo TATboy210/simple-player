@@ -6,6 +6,7 @@ import 'package:simple_player_flutter/ui/player/speed_button.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   group('SpeedButton', () {
@@ -22,7 +23,7 @@ void main() {
 
     Widget buildSubject() {
       return MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SpeedButton(

@@ -16,6 +16,7 @@ import 'package:simple_player_flutter/ui/player/progress_bar.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// Builds the production PlayerVideoControls shell with only project fakes.
 /// This probe never constructs media_kit Player or loads MDK.
@@ -25,7 +26,7 @@ Widget _controlsShell({
   required FakeEngine engine,
   required ValueListenable<WindowMode> windowMode,
 }) => MaterialApp(
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: l10nDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(
     body: SizedBox(
@@ -65,7 +66,7 @@ Widget _timelineTree({
     onSetRate: state.setRate,
   );
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: SizedBox(width: 800, height: 48, child: ControlBarTimeline(vm: vm)),

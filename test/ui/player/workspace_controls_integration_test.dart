@@ -24,6 +24,7 @@ import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   for (final injected in [false, true]) {
@@ -46,7 +47,7 @@ void main() {
         MaterialApp(
           navigatorKey: navigator,
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: PlayerVideoControls(
@@ -134,7 +135,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: KeyboardHandler(
@@ -248,7 +249,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: PlayerVideoControls(
               video: video,
@@ -315,7 +316,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('zh'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: PlayerVideoControls(
@@ -379,7 +380,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: PlayerVideoControls(
@@ -461,7 +462,7 @@ void main() {
           navigatorKey: navigator,
           navigatorObservers: [ModalHoldObserver()],
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: WorkspaceMenuScope(
             session: menus,
@@ -552,7 +553,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: PlayerVideoControls(
@@ -646,7 +647,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: PlayerVideoControls(

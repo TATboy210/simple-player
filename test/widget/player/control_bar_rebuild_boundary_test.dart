@@ -16,6 +16,7 @@ import 'package:simple_player_flutter/ui/player/progress_bar.dart';
 import 'package:simple_player_flutter/ui/player/right_button_group.dart';
 import 'package:simple_player_flutter/ui/player/time_range_display.dart';
 import 'package:simple_player_flutter/ui/player/volume_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// Counts the outer ControlBar build so notifier updates cannot be mistaken for
 /// a parent rebuild caused by the test harness itself.
@@ -195,7 +196,7 @@ class _ControlBarHarness {
     ValueListenable<bool>? isIdleListenable,
   }) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: l10nDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SizedBox(

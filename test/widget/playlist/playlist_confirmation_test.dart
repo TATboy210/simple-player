@@ -13,6 +13,7 @@ import 'package:simple_player_flutter/ui/player/workspace_menu_session.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
 import 'package:simple_player_flutter/ui/shared/glass_confirm_strip.dart';
 import 'package:simple_player_flutter/ui/shared/osd_service.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   setUpAll(() {
@@ -51,7 +52,7 @@ void main() {
       addTearDown(menus.dispose);
       Widget subject(bool visible) => MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: WorkspaceMenuScope(
@@ -267,7 +268,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: WorkspaceMenuScope(

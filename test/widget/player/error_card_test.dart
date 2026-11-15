@@ -20,6 +20,7 @@ import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// ErrorCard 折叠/展开详情测试（CARD-03/D-03/D-04，T-03-05 脱敏边界）。
 ///
@@ -65,7 +66,7 @@ void main() {
     VoidCallback? onOpenLog,
   }) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Align(
@@ -135,7 +136,7 @@ void main() {
   // 语义），home 可注入探针/焦点节点（CARD-01/CARD-02 行为归宿主层级）。
   Widget buildMountHarness({required Widget home}) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: home,
     builder: buildErrorCardMount,

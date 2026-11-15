@@ -19,9 +19,10 @@ import 'package:simple_player_flutter/ui/shared/osd_service.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 Widget _wrap(Widget child) => MaterialApp(
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: l10nDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(body: SizedBox(width: 800, height: 600, child: child)),
 );

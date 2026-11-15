@@ -15,6 +15,7 @@ import 'package:simple_player_flutter/ui/theme/tokens.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// 设置面板停靠化 + XMB 化 (v0.0.8) 行为契约 —
 /// 面板挂载于控制层 Stack 中列槽位（与播放列表同层，非 route）：
@@ -56,7 +57,7 @@ void main() {
         // 固定 zh — 英文摘要在 Ahem 字体下必超宽, 会启动跑马灯 repeat 使
         // pumpAndSettle 死循环 (SDK 无 timeout); 中文摘要不溢出全静止.
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SizedBox(

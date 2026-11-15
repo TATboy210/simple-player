@@ -105,16 +105,10 @@ abstract class AppLocalizations {
     Locale('en', 'NZ'),
     Locale('en', 'SG'),
     Locale('es'),
-    Locale('es', 'CL'),
-    Locale('es', 'MX'),
-    Locale('es', 'PE'),
     Locale('fr'),
-    Locale('fr', 'CA'),
     Locale('ja'),
     Locale('ko'),
     Locale('ms'),
-    Locale('ms', 'BN'),
-    Locale('ms', 'MY'),
     Locale('vi'),
     Locale('zh'),
   ];
@@ -1537,36 +1531,6 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
             return AppLocalizationsEnNz();
           case 'SG':
             return AppLocalizationsEnSg();
-        }
-        break;
-      }
-    case 'es':
-      {
-        switch (locale.countryCode) {
-          case 'CL':
-            return AppLocalizationsEsCl();
-          case 'MX':
-            return AppLocalizationsEsMx();
-          case 'PE':
-            return AppLocalizationsEsPe();
-        }
-        break;
-      }
-    case 'fr':
-      {
-        switch (locale.countryCode) {
-          case 'CA':
-            return AppLocalizationsFrCa();
-        }
-        break;
-      }
-    case 'ms':
-      {
-        switch (locale.countryCode) {
-          case 'BN':
-            return AppLocalizationsMsBn();
-          case 'MY':
-            return AppLocalizationsMsMy();
         }
         break;
       }

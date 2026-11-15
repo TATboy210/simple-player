@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/ui/shared/empty_state.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// 空置态播放命令守卫回归测试 (bug: 空置态点击播放按钮视频区域变黑).
 ///
@@ -40,7 +41,7 @@ void main() {
   Future<void> pumpControls(WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SizedBox(

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/player/drop_handler.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   group('DropHandler', () {
@@ -191,7 +192,7 @@ void main() {
       // overlay 内使用 AppLocalizations.of(context).dragHint，需要 l10n delegates
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: DropHandler(

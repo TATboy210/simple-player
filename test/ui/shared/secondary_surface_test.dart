@@ -21,6 +21,7 @@ import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dar
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// Check natural height and final-character boxes, not merely Text presence.
 void _expectCompleteTooltip(WidgetTester tester, String label, double scale) {
@@ -71,7 +72,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: Locale(locale),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             // Wrap Navigator AND its Overlay, not only the route body.
             builder: (context, child) => MediaQuery(
@@ -139,7 +140,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: PlayerVideoControls(

@@ -13,6 +13,7 @@ import 'package:simple_player_flutter/ui/shared/glass_confirm_strip.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// Real dialog/preview fixtures retain native routes and actual render geometry.
 Widget _app(
@@ -21,7 +22,7 @@ Widget _app(
   double scale = 2,
 }) => MaterialApp(
   locale: locale,
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: l10nDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
@@ -294,7 +295,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigator,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ValueListenableBuilder<ValueNotifier<bool>>(

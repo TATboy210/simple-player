@@ -16,6 +16,7 @@ import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_video_controls.dart';
 import '../../helpers/fake_window_service.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// G-03-3 全局回退分发回归 —— dead-keyboard 修复 + 守卫判定矩阵。
 ///
@@ -78,7 +79,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (_, child) => Focus(
             focusNode: external,

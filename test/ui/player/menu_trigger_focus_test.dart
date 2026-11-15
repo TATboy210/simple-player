@@ -20,6 +20,7 @@ import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   setUpAll(() {
@@ -394,7 +395,7 @@ Future<void> _drainSettings(WidgetTester tester) async {
 /// Real localized entry fixture, sharing the same production workspace session.
 Widget _app(WorkspaceMenuSession menus, Widget child) => MaterialApp(
   locale: const Locale('en'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: l10nDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: WorkspaceMenuScope(
     session: menus,

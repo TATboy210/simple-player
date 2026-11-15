@@ -7,6 +7,7 @@ import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   testWidgets('局部状态变化不会重建 PlayerVideoControls 外层', (tester) async {
@@ -27,7 +28,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: PlayerVideoControls(

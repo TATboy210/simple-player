@@ -9,6 +9,7 @@ import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
 import 'package:simple_player_flutter/ui/shared/glass_menu.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface_visibility.dart';
 import 'package:simple_player_flutter/ui/shared/secondary_surface.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   for (final action in ['Play', 'Remove', 'Batch delete']) {
@@ -23,7 +24,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: WorkspaceMenuScope(
             session: menus,
@@ -103,7 +104,7 @@ void main() {
         addTearDown(path.dispose);
         await tester.pumpWidget(
           MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: WorkspaceMenuScope(
               session: menus,
@@ -179,7 +180,7 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             locale: const Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: l10nDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: WorkspaceMenuScope(
               session: menus,

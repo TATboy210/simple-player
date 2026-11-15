@@ -7,6 +7,7 @@ import 'package:simple_player_flutter/ui/player/volume_controls.dart';
 import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   late FakeEngine engine;
@@ -21,7 +22,7 @@ void main() {
   });
 
   Widget buildSubject() => MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: VolumeSlider(volume: engine.volume, onSetVolume: engine.setVolume),

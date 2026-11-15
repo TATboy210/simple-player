@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_window_service.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   tearDown(() {
@@ -34,7 +35,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => buildPlayerKeyboardActions(

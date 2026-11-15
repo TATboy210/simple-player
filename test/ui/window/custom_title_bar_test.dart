@@ -6,10 +6,11 @@ import 'package:simple_player_flutter/ui/window/custom_title_bar.dart';
 import 'package:simple_player_flutter/kernel/window_bridge/window_bridge.dart';
 
 import '../../helpers/fake_window_service.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 Widget _wrapWithApp(Widget child, {double width = 800}) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: SizedBox(width: width, height: Tokens.titleBarHeight, child: child),
@@ -214,7 +215,7 @@ void main() {
     testWidgets('fullscreen collapses the title bar slot', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: Column(

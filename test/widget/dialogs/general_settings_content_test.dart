@@ -18,6 +18,7 @@ import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/diagnostic_log_target.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/error_feedback_settings.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   late Directory root;
@@ -29,7 +30,7 @@ void main() {
   Widget buildSubject() {
     return const MaterialApp(
       locale: Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: l10nDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SizedBox(

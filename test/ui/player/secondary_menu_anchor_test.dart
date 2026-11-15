@@ -14,6 +14,7 @@ import 'package:simple_player_flutter/ui/playlist/playlist_panel.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// Expose inherited listener state without violating protected Flutter APIs.
 class _VisibilityProbe extends ValueNotifier<bool> {
@@ -38,7 +39,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: WorkspaceMenuScope(
           session: menus,
@@ -105,7 +106,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: WorkspaceMenuScope(
             session: menus,

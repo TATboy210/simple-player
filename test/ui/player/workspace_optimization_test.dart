@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/ui/player/panel_workspace_host.dart';
 import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/ui/player/right_button_group.dart';
 import 'package:simple_player_flutter/ui/player/workspace_focus_scope.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   testWidgets('hidden position ticker stops and re-show reaches current rect', (
@@ -97,7 +98,7 @@ void main() {
     final r2 = WorkspaceFocusRegistry(controller: workspace, player: player);
     Widget subject(WorkspaceFocusRegistry registry) => MaterialApp(
       locale: const Locale('zh'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: l10nDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: WorkspaceFocusScope(
         registry: registry,

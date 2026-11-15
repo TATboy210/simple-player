@@ -12,10 +12,11 @@ import 'package:simple_player_flutter/ui/playlist/playlist_panel_headers.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_thumb_box.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile_info.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tokens.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 Widget _wrap(Widget child) => MaterialApp(
   locale: const Locale('en'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: l10nDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(
     body: Center(child: SizedBox(width: 300, child: child)),

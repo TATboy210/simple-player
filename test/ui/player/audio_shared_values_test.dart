@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/ui/dialogs/settings/audio_settings_content
 import 'package:simple_player_flutter/ui/shared/spin_control.dart';
 
 import '../../helpers/fake_engine.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   setUpAll(() {
@@ -34,7 +35,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Material(
             child: Row(

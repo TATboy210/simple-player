@@ -13,6 +13,7 @@ import 'package:simple_player_flutter/ui/player/player_video_controls.dart';
 import '../../helpers/fake_engine.dart';
 import '../../helpers/fake_player_controls.dart';
 import '../../helpers/fake_video_controls.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// Moves one keyed controls subtree between slots to exercise reparent lifecycle.
 class _ReparentHost extends StatefulWidget {
@@ -48,7 +49,7 @@ Widget _controlsApp({
   required ValueListenable<WindowMode> windowMode,
   GlobalKey<_ReparentHostState>? hostKey,
 }) => MaterialApp(
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: l10nDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(
     body: SizedBox(
@@ -207,7 +208,7 @@ void main() {
         Animation<double> opacity,
         ValueListenable<bool> resizing,
       ) => MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: ControlBar(

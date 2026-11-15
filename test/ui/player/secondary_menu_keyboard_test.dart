@@ -13,6 +13,7 @@ import 'package:simple_player_flutter/kernel/models/playlist_item.dart';
 import 'package:simple_player_flutter/kernel/models/playlist_sort.dart';
 import 'package:simple_player_flutter/kernel/models/play_mode.dart';
 import 'package:simple_player_flutter/ui/shared/glass_container.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   for (final activation in [
@@ -35,7 +36,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: WorkspaceMenuScope(
             session: menus,

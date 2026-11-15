@@ -8,6 +8,7 @@ import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_card_host.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// 错误卡片布局期尺寸上界 — 高度上界 = 窗口高 × [Tokens.errorCardMaxHeightRatio]，
 /// 由 CustomSingleChildLayout 代理在布局期计算，resize 后无需重建即跟随.
@@ -25,7 +26,7 @@ void main() {
 
   Widget harness() => const MaterialApp(
     locale: Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: SizedBox.shrink(),
     builder: buildErrorCardMount,

@@ -20,6 +20,7 @@ import 'package:simple_player_flutter/ui/shared/osd_overlay.dart';
 import 'package:simple_player_flutter/ui/theme/tokens.dart';
 
 import '../../helpers/fake_window_service.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   // Test owns this service; clock and Timer share the binding FakeAsync zone.
@@ -82,7 +83,7 @@ void main() {
   // home 可注入自定义控件（穿透/故障注入用例需要）。
   Widget buildMountHarness({required Widget home}) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: home,
     builder: buildErrorCardMount,
@@ -92,7 +93,7 @@ void main() {
   // 可达（生产挂载点 app.dart 保持 const ErrorCardHost() 零参形态）。
   Widget buildHostHarness(ErrorCardHost host) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Align(alignment: Alignment.topLeft, child: host),

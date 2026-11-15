@@ -10,6 +10,7 @@ import 'package:simple_player_flutter/ui/dialogs/settings/error_feedback_setting
 import 'package:simple_player_flutter/ui/dialogs/settings/general_settings_content.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/settings_panel.dart';
 import 'package:simple_player_flutter/ui/dialogs/settings/video_settings_content.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// 设置面板拆分后的层/分区装配 — 缺服务时的回落与单订阅契约.
 void main() {
@@ -20,7 +21,7 @@ void main() {
 
   Widget subject({SettingsServicesBundle? services}) => MaterialApp(
     locale: const Locale('zh'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Center(

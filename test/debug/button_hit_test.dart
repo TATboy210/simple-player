@@ -14,6 +14,7 @@ import 'package:simple_player_flutter/ui/player/player_actions.dart';
 import 'package:simple_player_flutter/kernel/diagnostics/kernel_logger.dart';
 
 import '../helpers/fake_engine.dart';
+import '../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   late FakeEngine engine;
@@ -57,7 +58,7 @@ void main() {
 
   Widget buildControlBarOnly({PlayerActions? actions, bool isIdle = false}) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: l10nDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SizedBox(

@@ -11,6 +11,7 @@ import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/playlist/playlist_tile.dart';
 
 import '../../helpers/fake_thumbnail_provider.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 /// PlaylistTile 缩略图生命周期（P-Thumb v1.3.2 §26/§27 — T1-T7）
 ///
@@ -42,7 +43,7 @@ void main() {
 
   Widget wrap(Widget child) => MaterialApp(
     // Tile build 依赖 AppLocalizations.of — delegates 必须就位
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: l10nDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(body: SizedBox(width: 280, child: child)),
   );

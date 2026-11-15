@@ -3,11 +3,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:simple_player_flutter/l10n/app_localizations.dart';
 import 'package:simple_player_flutter/ui/shared/empty_state.dart';
+import '../../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   Widget buildSubject({VoidCallback? onOpenFile, bool dragHovering = false}) =>
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: EmptyState(
@@ -38,7 +39,7 @@ void main() {
       addTearDown(hover.dispose);
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: EmptyState(onOpenFile: () {}, dragHoveringListenable: hover),
@@ -61,7 +62,7 @@ void main() {
       addTearDown(hover.dispose);
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: EmptyState(onOpenFile: () {}, dragHoveringListenable: hover),
@@ -83,7 +84,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: EmptyState(onOpenFile: () {}, dragHoveringListenable: hoverA),
@@ -93,7 +94,7 @@ void main() {
       // 替换 hover 源后，旧源翻转不应再驱动动画，新源翻转应生效。
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: l10nDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: EmptyState(

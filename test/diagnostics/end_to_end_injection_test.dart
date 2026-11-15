@@ -49,6 +49,7 @@ import 'package:simple_player_flutter/ui/player/error_card.dart';
 import 'package:simple_player_flutter/ui/player/error_capture_snapshot.dart';
 
 import '../helpers/fake_engine.dart';
+import '../helpers/l10n_delegates.dart' show l10nDelegates;
 
 void main() {
   setUpAll(() {
@@ -97,7 +98,7 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(
         locale: Locale('zh'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: l10nDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: SizedBox.shrink()),
         builder: buildErrorCardMount,

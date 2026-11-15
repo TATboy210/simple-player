@@ -140,7 +140,7 @@ void main() {
       service.dispose();
       service.dispose();
 
-      expect(() => state.addListener(() {}), throwsFlutterError);
+      expect(() => state.addListener(() {}), throwsStateError);
       expect(engine.setVideoEffectCallCount, 0);
     });
   });
