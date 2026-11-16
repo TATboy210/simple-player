@@ -3,6 +3,8 @@
 #include <imm.h>
 #include <iterator>
 #include <optional>
+#include <shobjidl.h>
+#include <string>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
@@ -45,6 +47,97 @@ SIZE g_min_window_size = {0, 0};  // 逻辑像素；0 表示未设置。
 extern "C" __declspec(dllexport) void SimplerPlayerSetMinWindowSize(
     int32_t width, int32_t height) {
   g_min_window_size = SIZE{width, height};
+}
+
+// ── 原生文件对话框（性能修复：windows_file_picker 2.0.2 的 compute-isolate
+// 架构在辅助线程冷启动 COM，点击到对话框出现实测 6~10s；本机主线程 STA
+// 直调同款对话框基线 149ms —— 见 tool 层的 OS 轮询取证记录）。
+//
+// Dart 侧经 FFI 同步调用：platform 线程进入 Show() 的模态循环直到用户
+// 选择/取消。期间 Dart UI isolate 冻结在 FFI 里 —— 与模态语义一致
+// （对话框期间本无交互），ModalHoldObserver 的冻结逻辑兼容。
+// IMC 状态：Dart 在调用前已经 Win32ImeBridge.enable 恢复（同线程
+// SendMessageTimeoutW 投递完成才返回），对话框子窗口创建时 IMC 在位，
+// v0.0.8 的 msctf NULL-IMC 崩溃路径不成立；调用方在 finally 里 disable。
+//
+// 返回码：1 = 选中（out_path 含完整路径）；0 = 用户取消；
+// 负值 = COM/参数错误（HRESULT 低 32 位）。
+extern "C" __declspec(dllexport) int32_t SimplerPlayerShowOpenDialog(
+    const wchar_t* filter_spec,     // 分号分隔扩展名，如 L"mkv;mp4;avi"
+    int32_t lock_parent_window,     // 1 = 模态前置于主窗口
+    wchar_t* out_path,              // Dart 预分配输出缓冲
+    int32_t out_path_capacity) {    // out_path 的 wchar 容量
+  if (!filter_spec || !out_path || out_path_capacity <= 0) {
+    return -1;
+  }
+  out_path[0] = L'\0';
+
+  // runner 主线程由 Flutter 引擎完成 COM 初始化（STA）；显式调用一次以
+  // 覆盖极端顺序，已初始化时 S_FALSE/RPC_E_CHANGED_MODE 均不视为错误。
+  HRESULT co_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  const bool need_co_uninit = SUCCEEDED(co_hr);
+
+  IFileOpenDialog* dialog = nullptr;
+  int32_t result = 0;
+  HRESULT hr =
+      CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
+                       IID_PPV_ARGS(&dialog));
+  if (FAILED(hr) || !dialog) {
+    result = static_cast<int32_t>(static_cast<int64_t>(hr));
+    if (need_co_uninit) CoUninitialize();
+    return result;
+  }
+
+  // filter: "mkv;mp4;avi" → COMDLG_FILTERSPEC{ 名称 = "媒体文件",
+  // 规格 = "*.mkv;*.mp4;*.avi" } + 全类型兜底（对齐 windows_file_picker
+  // 的 FileType.custom 语义：picker 层过滤 + 播放链路 PathValidator 双保险）。
+  std::wstring spec = L"*.";
+  spec += filter_spec;
+  size_t pos = 0;
+  while ((pos = spec.find(L";", pos)) != std::wstring::npos) {
+    spec.replace(pos, 1, L";*.");
+    pos += 3;
+  }
+  const COMDLG_FILTERSPEC filters[] = {
+      {L"媒体文件", spec.c_str()},
+      {L"所有文件 (*.*)", L"*.*"},
+  };
+  dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+  dialog->SetFileTypeIndex(1);
+
+  DWORD options = 0;
+  dialog->GetOptions(&options);
+  options |= FOS_PATHMUSTEXIST | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM;
+  dialog->SetOptions(options);
+
+  HWND parent =
+      lock_parent_window && g_main_window ? g_main_window : nullptr;
+  hr = dialog->Show(parent);
+  if (SUCCEEDED(hr)) {
+    IShellItem* item = nullptr;
+    if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+      PWSTR path = nullptr;
+      if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) && path) {
+        if (wcsnlen_s(path, static_cast<size_t>(out_path_capacity)) <
+            static_cast<size_t>(out_path_capacity)) {
+          wcscpy_s(out_path, static_cast<size_t>(out_path_capacity), path);
+          result = 1;
+        } else {
+          result = -2;  // 路径超出 Dart 侧缓冲容量
+        }
+        CoTaskMemFree(path);
+      }
+      item->Release();
+    }
+  } else if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+    result = 0;  // 用户取消
+  } else {
+    result = static_cast<int32_t>(static_cast<int64_t>(hr));
+  }
+
+  dialog->Release();
+  if (need_co_uninit) CoUninitialize();
+  return result;
 }
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
