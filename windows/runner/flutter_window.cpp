@@ -5,6 +5,7 @@
 #include <optional>
 #include <shobjidl.h>
 #include <string>
+#include <thread>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "ime_bridge_messages.h"
@@ -138,6 +139,98 @@ extern "C" __declspec(dllexport) int32_t SimplerPlayerShowOpenDialog(
   dialog->Release();
   if (need_co_uninit) CoUninitialize();
   return result;
+}
+
+// ── 异步版（A.2）：对话框跑在独立 STA 线程，platform 线程（= Dart UI
+// isolate）不被阻塞 —— 同步版的 Show() 模态循环会把 UI isolate 冻结在
+// FFI 里整个对话框存活期（实测：ESC 失效、点击积压"关了又弹"、hot
+// reload/日志全部超时）。结果经 callback(request_id, code, path) 回投：
+// path 由 new wchar_t[] 分配，Dart 读取后必须调 SimplerPlayerFreeString
+// 释放（与 delete[] 配对）。
+//
+// owner 跨线程：IFileDialog::Show 接受其他线程的 owner hwnd（禁用与
+// Z 序由对话框托管），实测行为正确。
+//
+// 返回码：0 = 已接受（结果稍后经 callback 回投）；-1 = 参数错误。
+typedef void (*DialogResultFn)(int32_t request_id, int32_t code,
+                               const wchar_t* path);
+
+extern "C" __declspec(dllexport) int32_t SimplerPlayerFreeString(
+    wchar_t* path) {
+  delete[] path;
+  return 0;
+}
+
+extern "C" __declspec(dllexport) int32_t SimplerPlayerShowOpenDialogAsync(
+    const wchar_t* filter_spec, int32_t lock_parent_window,
+    int32_t request_id, DialogResultFn callback) {
+  if (!filter_spec || !callback) {
+    return -1;
+  }
+  std::thread([filter = std::wstring(filter_spec), lock_parent_window,
+               request_id, callback]() {
+    // 独立线程的 STA apartment：对话框的标准宿主形态（COM 跨套间交互
+    // 由系统 marshal）。线程结束前 CoUninitialize 配对。
+    HRESULT co_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const bool need_co_uninit = SUCCEEDED(co_hr);
+
+    IFileOpenDialog* dialog = nullptr;
+    int32_t code = 0;
+    wchar_t* result_path = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr,
+                                  CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog));
+    if (FAILED(hr) || !dialog) {
+      code = static_cast<int32_t>(static_cast<int64_t>(hr));
+    } else {
+      std::wstring spec = L"*.";
+      spec += filter;
+      size_t pos = 0;
+      while ((pos = spec.find(L";", pos)) != std::wstring::npos) {
+        spec.replace(pos, 1, L";*.");
+        pos += 3;
+      }
+      const COMDLG_FILTERSPEC filters[] = {
+          {L"媒体文件", spec.c_str()},
+          {L"所有文件 (*.*)", L"*.*"},
+      };
+      dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
+      dialog->SetFileTypeIndex(1);
+      DWORD options = 0;
+      dialog->GetOptions(&options);
+      options |= FOS_PATHMUSTEXIST | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM;
+      dialog->SetOptions(options);
+
+      HWND parent =
+          lock_parent_window && g_main_window ? g_main_window : nullptr;
+      hr = dialog->Show(parent);
+      if (SUCCEEDED(hr)) {
+        IShellItem* item = nullptr;
+        if (SUCCEEDED(dialog->GetResult(&item)) && item) {
+          PWSTR path = nullptr;
+          if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) &&
+              path) {
+            code = 1;
+            result_path = new wchar_t[wcslen(path) + 1];
+            wcscpy_s(result_path, wcslen(path) + 1, path);
+            CoTaskMemFree(path);
+          }
+          item->Release();
+        }
+      } else if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+        code = 0;  // 用户取消 — result_path 保持 null
+      } else {
+        code = static_cast<int32_t>(static_cast<int64_t>(hr));
+      }
+      dialog->Release();
+    }
+
+    // 回投 Dart（NativeCallable.listener 任意线程可调）— path 所有权
+    // 移交 Dart（读完后经 SimplerPlayerFreeString 释放）。
+    callback(request_id, code, result_path);
+
+    if (need_co_uninit) CoUninitialize();
+  }).detach();
+  return 0;
 }
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)

@@ -1,3 +1,4 @@
+import 'dart:async' show Completer;
 import 'dart:ffi' as ffi;
 import 'dart:io' show Platform;
 
@@ -7,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 
 import '../../kernel/bridge/win32/ime_bridge.dart';
+import '../../kernel/diagnostics/kernel_logger.dart';
 import '../../kernel/services/path_validator.dart';
 import 'file_picker_coordinator.dart';
 
@@ -30,10 +32,11 @@ class FilePickerMediaGateway implements FilePickerGateway {
     // 6~10s）；runner 主线程 STA 已预热，同款对话框 149ms 基线。
     if (Platform.isWindows && RunnerFileDialog._useNative) {
       final result = await Win32ImeBridge.withImeRestored(
-        () => RunnerFileDialog.show(
+        () {
+              return RunnerFileDialog.show(
           extensionSpec: PathValidator.supportedExtensions.join(';'),
           lockParentWindow: true,
-        ),
+        ); },
       );
       if (result != RunnerFileDialog.fallback) {
         // 用户取消为 null（gateway 契约的取消，与 file_picker 路径一致）。
@@ -76,21 +79,29 @@ class MethodChannelFilePickerAttention implements FilePickerAttention {
   }
 }
 
-/// runner 主线程原生对话框通道（性能修复）。
+/// runner 原生对话框通道（性能修复，A.2 异步版）。
 ///
-/// `SimplerPlayerShowOpenDialog`（windows/runner/flutter_window.cpp）在
-/// platform 线程直调 IFileOpenDialog —— 主线程 STA 已由引擎预热，避开
-/// windows_file_picker 的 compute-isolate 冷 COM（点击→对话框 6~10s）。
+/// `SimplerPlayerShowOpenDialogAsync`（windows/runner/flutter_window.cpp）
+/// 在**独立 STA 线程**跑 IFileOpenDialog 并立即返回 —— UI isolate 不被
+/// 阻塞（A.1 同步版的 Show() 模态循环把 UI isolate 冻结在 FFI 里整个
+/// 对话框存活期：ESC 失效、点击积压"关了又弹"）。避开 windows_file_picker
+/// 的 compute-isolate 冷 COM（点击→对话框 6~10s）。
 ///
-/// 同步 FFI：对话框模态期间 Dart UI isolate 冻结在调用里 —— 与模态语义
-/// 一致（对话框期间本无交互）。IME：调用前经 [Win32ImeBridge.enable] 同步
-/// 恢复（同线程投递），对话框关闭后 finally 里 disable —— 与
-/// withImeRestored 的包裹语义等价，但 enable/对话框/disable 全在同一线程
-/// 串行，时序比跨线程更确定。
+/// 结果经 `NativeCallable.listener` 回投（任意线程可调）：runner 的
+/// `DialogResultFn(request_id, code, path)` —— path 由 C++ `new wchar_t[]`
+/// 分配，Dart 读取后调 `SimplerPlayerFreeString` 释放（与 `delete[]` 配对）。
 ///
-/// 返回码协议（runner 侧）：1=选中（`outPath` 含路径）、0=取消、
-/// -1=参数错误、-2=路径超出缓冲、其他负数=HRESULT。
-/// 符号缺失（旧 runner 产物）→ 返回 [sentinel] 触发调用方降级。
+/// IME：enable 在触发前同步执行，disable 在结果回调后 —— 异步时序下
+/// 对话框整个存活期 IMC 在位（v0.0.8 msctf 崩溃防御保持）。
+///
+/// 返回码协议（runner 侧）：1=选中（path 含完整路径）、0=取消、
+/// -1=参数错误、其他负数=HRESULT。
+/// 符号缺失（旧 runner 产物）→ 返回 [fallback] 触发调用方降级。
+/// runner 结果回调签名（NativeCallable.listener 持有）。
+typedef DialogResultNativeFn = ffi.Void Function(
+    ffi.Int32, ffi.Int32, ffi.Pointer<ffi.Uint16>);
+typedef DialogResultDartFn = void Function(int, int, ffi.Pointer<ffi.Uint16>);
+
 abstract final class RunnerFileDialog {
   /// pickMediaPaths 降级哨兵 — runner 符号缺失时返回，调用方走
   /// file_picker 旧路径。
@@ -99,9 +110,16 @@ abstract final class RunnerFileDialog {
   static bool get _useNative =>
       Platform.environment['SIMPLER_PLAYER_FILE_DIALOG'] != 'legacy';
 
+  static final ffi.DynamicLibrary _process = ffi.DynamicLibrary.process();
+
+  static int _nextRequestId = 1;
+  static final Map<int, Completer<String?>> _pendingCompleters = {};
+  static final Map<int, ffi.NativeCallable<DialogResultNativeFn>>
+  _callbackKeepalive = {};
+
   /// runner 返回码 → 语义结果（纯函数，单元测试覆盖）。
   ///
-  /// 1=选中（[path] 即完整路径）；0=取消（null）；-1/-2=参数与缓冲错误；
+  /// 1=选中（[path] 即完整路径）；0=取消（null）；-1=参数错误；
   /// 其他负数 = HRESULT（低 32 位取反还原后以十六进制入错误消息）。
   @visibleForTesting
   static String? mapResult(int code, String path) => switch (code) {
@@ -110,16 +128,26 @@ abstract final class RunnerFileDialog {
     -1 => throw StateError(
       'RunnerFileDialog: dialog argument error (code=-1)',
     ),
-    -2 => throw StateError(
-      'RunnerFileDialog: path exceeds Dart buffer capacity (code=-2)',
-    ),
     _ => throw StateError(
       'RunnerFileDialog: IFileOpenDialog failed '
       '(hr=0x${(-code).toRadixString(16)})',
     ),
   };
 
-  /// 打开 runner 原生对话框；返回 `null` = 用户取消。
+  /// 结果回调 — runner 线程经 NativeCallable.listener 唤起。
+  static void _onDialogResult(
+    int requestId,
+    int code,
+    ffi.Pointer<ffi.Uint16> pathPtr,
+  ) {
+    final path = pathPtr == ffi.nullptr
+        ? null
+        : pathPtr.cast<Utf16>().toDartString();
+    RunnerDialogFreeString.call(pathPtr);
+    _pendingCompleters.remove(requestId)?.complete(mapResult(code, path ?? ''));
+  }
+
+  /// 打开 runner 原生对话框（异步 — UI 不冻结）；返回 `null` = 用户取消。
   ///
   /// 返回 [fallback] 哨兵表示 runner 未导出符号（调用方降级）；
   /// 其他非空字符串 = 选中的媒体路径。HRESULT 错误抛 [StateError]。
@@ -128,31 +156,73 @@ abstract final class RunnerFileDialog {
     required bool lockParentWindow,
   }) async {
     if (!_useNative) return fallback;
+    final process = _process;
+    final showAsync = process.lookupFunction<
+        ffi.Int32 Function(
+            ffi.Pointer<ffi.Uint16>,
+            ffi.Int32,
+            ffi.Int32,
+            ffi.Pointer<ffi.NativeFunction<DialogResultNativeFn>>),
+        int Function(
+            ffi.Pointer<ffi.Uint16>,
+            int,
+            int,
+            ffi.Pointer<ffi.NativeFunction<DialogResultNativeFn>>)>(
+      'SimplerPlayerShowOpenDialogAsync',
+    );
+    final requestId = _nextRequestId++;
+    final completer = Completer<String?>();
+    _pendingCompleters[requestId] = completer;
+    final callback = ffi.NativeCallable<DialogResultNativeFn>.listener(
+      _onDialogResult,
+    );
+    _callbackKeepalive[requestId] = callback;
+
+    final specPtr = extensionSpec.toNativeUtf16();
     try {
-      final process = ffi.DynamicLibrary.process();
-      final show = process.lookupFunction<
-          ffi.Int32 Function(ffi.Pointer<ffi.Uint16>, ffi.Int32,
-              ffi.Pointer<ffi.Uint16>, ffi.Int32),
-          int Function(ffi.Pointer<ffi.Uint16>, int,
-              ffi.Pointer<ffi.Uint16>, int)>('SimplerPlayerShowOpenDialog');
-      final specPtr = extensionSpec.toNativeUtf16();
-      final outPath = calloc<ffi.Uint16>(32768);
-      try {
-        final code = show(
-          specPtr.cast<ffi.Uint16>(),
-          lockParentWindow ? 1 : 0,
-          outPath,
-          32768,
+      final accepted = showAsync(
+        specPtr.cast<ffi.Uint16>(),
+        lockParentWindow ? 1 : 0,
+        requestId,
+        callback.nativeFunction,
+      );
+      // runner 已在独立 STA 线程打开对话框；结果经 callback 回投。
+      // （accepted != 0 仅为参数校验失败，正常路径恒为 0。）
+      if (accepted != 0) {
+        throw StateError(
+          'RunnerFileDialog: async dialog rejected (code=$accepted)',
         );
-        return mapResult(code, outPath.cast<Utf16>().toDartString());
-      } finally {
-        calloc.free(specPtr);
-        calloc.free(outPath);
       }
     } on ArgumentError {
-      // 符号未导出（旧 runner 产物）— 调用方降级到 file_picker 路径。
+      // 符号未导出（旧 runner 产物）— 降级 file_picker 路径。
+      _pendingCompleters.remove(requestId);
+      _callbackKeepalive.remove(requestId);
+      callback.close();
+      calloc.free(specPtr);
       return fallback;
+    } finally {
+      calloc.free(specPtr);
     }
+
+    try {
+      final result = await completer.future;
+      return result;
+    } finally {
+      _pendingCompleters.remove(requestId);
+      _callbackKeepalive.remove(requestId);
+      callback.close();
+    }
+  }
+}
+
+/// C++ 分配的路径字符串释放（与 runner 的 `new wchar_t[]` 配对）。
+abstract final class RunnerDialogFreeString {
+  static final _free = RunnerFileDialog._process.lookupFunction<
+      ffi.Int32 Function(ffi.Pointer<ffi.Uint16>),
+      int Function(ffi.Pointer<ffi.Uint16>)>('SimplerPlayerFreeString');
+
+  static void call(ffi.Pointer<ffi.Uint16> pathPtr) {
+    if (pathPtr != ffi.nullptr) _free(pathPtr);
   }
 }
 
@@ -163,27 +233,49 @@ class RunnerFileDialogGateway implements FilePickerGateway {
 
   @override
   Future<List<String>?> pickMediaPaths() async {
-    final result = await Win32ImeBridge.withImeRestored(
-      () => RunnerFileDialog.show(
+    // 异步模式下不能再用 withImeRestored 包裹（action 立即返回，disable
+    // 会在对话框存活期提前执行 → IMC 解除 → msctf 崩溃回归）。改为手动
+    // enable/disable：enable 同步完成（同线程投递），disable 挂在结果
+    // 之后 —— 对话框整个存活期 IMC 在位，与同步版时序等价。
+    final bridge = Win32ImeBridge(logger: KernelLogger.I);
+    bool restored = false;
+    try {
+      restored = bridge.enable();
+    } on Object catch (error, stackTrace) {
+      // 环境性失败（user32 绑定解析失败）与 withImeRestored 同义降级：
+      // 未恢复就无从禁用，绝不让 Error 冲掉对话框调用。
+      KernelLogger.I.warn(
+        'RunnerFileDialogGateway: IME enable failed — proceeding '
+        'without IME restore, closing disable skipped',
+        context: <String, Object?>{
+          'error': '$error',
+          'stackTrace': '$stackTrace',
+        },
+      );
+    }
+    try {
+      final result = await RunnerFileDialog.show(
         extensionSpec: PathValidator.supportedExtensions.join(';'),
         lockParentWindow: true,
-      ),
-    );
-    if (result == RunnerFileDialog.fallback) {
-      // 旧 runner 产物无符号 — 降级 file_picker（与 FilePickerMediaGateway
-      // 的落穿分支一致，仍经 IME 包裹）。
-      final legacy = await Win32ImeBridge.withImeRestored(
-        () => FilePicker.pickFile(
-          type: FileType.custom,
-          allowedExtensions: PathValidator.supportedExtensions,
-          windowsOptions: const WindowsOptions(lockParentWindow: true),
-        ),
       );
-      if (legacy == null) return null;
-      final path = legacy.path;
-      return path == null ? const <String>[] : [path];
+      if (result == RunnerFileDialog.fallback) {
+        // 旧 runner 产物无符号 — 降级 file_picker（仍经 IME 包裹，同步
+        // 版对话框用 withImeRestored 时序）。
+        final legacy = await Win32ImeBridge.withImeRestored(
+          () => FilePicker.pickFile(
+            type: FileType.custom,
+            allowedExtensions: PathValidator.supportedExtensions,
+            windowsOptions: const WindowsOptions(lockParentWindow: true),
+          ),
+        );
+        if (legacy == null) return null;
+        final path = legacy.path;
+        return path == null ? const <String>[] : [path];
+      }
+      if (result == null) return null;
+      return [result];
+    } finally {
+      if (restored) bridge.disable();
     }
-    if (result == null) return null;
-    return [result];
   }
 }
